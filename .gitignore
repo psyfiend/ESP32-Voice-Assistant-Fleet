@@ -1,0 +1,16 @@
+# PlatformIO build files
+.pio/
+
+# VSCode workspace settings
+.vscode/
+.code-workspace
+
+# Other compiled objects and binaries
+*.o
+*.a
+*.so
+*.lib
+*.bin
+*.elf
+*.hex
+*.uf2
