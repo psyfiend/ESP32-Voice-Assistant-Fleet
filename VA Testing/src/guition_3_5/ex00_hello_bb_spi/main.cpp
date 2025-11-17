@@ -1,22 +1,7 @@
-/*
- * ex00_hello_bb_spi
- *
- * Target: Guition S3 3.5" (JC3248W535)
- *
- * Purpose: A minimal "Hello, Screen!" test to verify the bb_spi_lcd
- * driver, hardware connections, and display controller (AXS15231B).
- *
- * This test does NOT use LVGL.
- * It only initializes the display and fills the screen with solid
- * colors (Red, Green, Blue) in a loop.
- */
-
 #include <Arduino.h>
-#include <bb_spi_lcd.h> // Our "secret weapon" driver
+#include <bb_spi_lcd.h> // Include the high-performance library
 
-#define PANEL DISPLAY_CYD_535 // Guition 3.5" AXS15231B
-
-// Instantiate the driver object
+// Create our LCD object
 BB_SPI_LCD lcd;
 
 void setup()
