@@ -25,7 +25,7 @@ void loop()
 {
     Serial.println("Filling screen RED");
     lcd.fillScreen(0xf800); // 16-bit color (565) - RED
-  delay(2000);
+    delay(2000);
 
     Serial.println("Filling screen GREEN");
     lcd.fillScreen(0x07e0); // 16-bit color (565) - GREEN
