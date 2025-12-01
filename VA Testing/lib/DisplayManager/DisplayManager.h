@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 #include <Wire.h>
-#include "../pin_config.h" // Pin definitions and board config
+#include "pin_config.h"
 
 
 class DisplayManager {
@@ -34,10 +34,11 @@ private:
 
     // Specific to Waveshare S3: The IO Expander acts as the bus AND the GPIO provider
     // We keep a specific pointer to it if defined, so we can do digitalWrite calls
-    #if defined(HAS_IO_EXPANDER)
+    #ifdef BOARD_HAS_IO_EXPANDER
+      #ifdef WS_S3_SMART86
         Arduino_XCA9554SWSPI *_expander;
+      #endif
     #endif
-
     void initBus();
     void initPanel();
 };

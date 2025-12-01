@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "VA Testing",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"cstdint": "cpp"
+		}
+	}
+}
