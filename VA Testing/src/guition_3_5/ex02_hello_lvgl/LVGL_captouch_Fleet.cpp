@@ -1,9 +1,15 @@
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 #include <lvgl.h>
-#include "pin_config.h"
 #include "DisplayManager.h"
-#include "TouchManager.h" // We need to create this component folder!
+#include "TouchManager.h"
+#if defined(WS_P4_SMART86)
+    #include "panels/BSP_WS_P4_Smart86_LCD.h"
+#elif defined(WS_S3_SMART86)
+    #include "panels/BSP_WS_S3_Smart86_LCD.h"
+#elif defined(GUITION_3248W535)
+    #include "panels/BSP_Guition_3248W535_LCD.h"
+#endif
 
 // Global Managers
 DisplayManager displayMgr;
@@ -11,7 +17,7 @@ TouchManager touchMgr;
 
 // LVGL Globals
 static uint16_t *lv_draw_buf;
-#define LV_BUF_SIZE (DISPLAY_WIDTH * DISPLAY_HEIGHT / 10)
+#define LV_BUF_SIZE (cfg.WIDTH * cfg.HEIGHT / 10)
 
 // -------------------------------------------------------------------------
 // LVGL Flushing (Output)

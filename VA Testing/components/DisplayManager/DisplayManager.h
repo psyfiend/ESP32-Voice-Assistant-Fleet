@@ -1,10 +1,18 @@
 #pragma once
-
+#if defined(WS_P4_SMART86)
+    #include "panels/BSP_WS_P4_Smart86_LCD.h"
+#elif defined(WS_P4_7B)
+    #include "panels/BSP_WS_P4_7B_LCD.h"
+#elif defined(WS_S3_SMART86)
+    #include "panels/BSP_WS_S3_Smart86_LCD.h"
+#elif defined(GUITION_3248W535)
+    #include "panels/BSP_Guition_3248W535_LCD.h"
+#elif defined(GUITION_8048W550)
+    #include "panels/BSP_Guition_8048W550_LCD.h"
+#endif
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 #include <Wire.h>
-#include "pin_config.h"
-
 
 class DisplayManager {
 public:
@@ -34,7 +42,7 @@ private:
 
     // Specific to Waveshare S3: The IO Expander acts as the bus AND the GPIO provider
     // We keep a specific pointer to it if defined, so we can do digitalWrite calls
-    #ifdef BOARD_HAS_IO_EXPANDER
+    #ifdef HAS_IO_EXPANDER
       #ifdef WS_S3_SMART86
         Arduino_XCA9554SWSPI *_expander;
       #endif

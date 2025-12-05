@@ -1,20 +1,20 @@
 #include "TouchManager.h"
-#include "pin_config.h"
-
+#include "bb_captouch.h"
 
 TouchManager::TouchManager() {
 }
 
 bool TouchManager::begin() {
+    
 
     // -----------------------------------------------------------
     // STRATEGY A: Specific Panel ID (Fleet Architecture)
     // -----------------------------------------------------------
-    // If pin_config.h defines TOUCH_PANEL (e.g. TOUCH_CYD_535),
-    // we pass that ID to your modified bb_captouch library.
+    // If bb_cap_touch has a specific configuration for the device 
+    // and it is in the BSP as #define TOUCH_PANEL, use that.
     // The library uses its internal lookup table for pins.
     #ifdef TOUCH_PANEL
-        Serial.printf("[Touch] Initializing Panel ID: %d\n", TOUCH_PANEL);
+        Serial.printf("[TouchManager] Initializing Panel ID: %d\n", TOUCH_PANEL);
         
         // Assumes your fork has an overloaded init(int type)
         int touchtest = _touch.init(TOUCH_PANEL);
@@ -23,24 +23,25 @@ bool TouchManager::begin() {
     // STRATEGY B: Manual Pin Config (Legacy/Generic)
     // -----------------------------------------------------------
     #else
-        // We default to -1 if not defined (bb_captouch treats -1 as "unused")
-        int sda = -1;
-        int scl = -1;
-        int rst = -1;
-        int irq = -1;
+        // Manual touch init using explicit pin numbers from Fleet_BSP
+        int sda, scl, rst, irq;
 
-        #if defined(PIN_I2C_SDA) && defined(PIN_I2C_SCL)
-            sda = PIN_I2C_SDA;
-            scl = PIN_I2C_SCL;
-        #endif
+        if (cfg.I2C_SDA_PIN >= 0 && cfg.I2C_SCL_PIN >= 0) {
+            sda = cfg.TP_SDA;
+            scl = cfg.TP_SCL;
+        }
 
-        #if defined(PIN_TP_RST)
-            rst = PIN_TP_RST;
-        #endif
-
-        #if defined(PIN_TP_INT)
-            irq = PIN_TP_INT;
-        #endif
+        if (cfg.TP_RST >= 0) {
+            rst = cfg.TP_RST;
+        } else {
+            rst = -1; // Unused
+        }
+        
+        if (cfg.TP_INT >= 0) {
+            irq = cfg.TP_INT;
+        } else {
+            irq = -1; // Unused
+        }
 
         // Initialize bb_captouch with explicit pins
         Serial.printf("[Touch] Init SDA:%d SCL:%d IRQ:%d RST:%d\n", sda, scl, irq, rst);
@@ -51,13 +52,13 @@ bool TouchManager::begin() {
     // Validation
     // -----------------------------------------------------------
     if (touchtest == CT_SUCCESS) {
-        Serial.println("[Touch] Initialization Success");
+        Serial.println("[TouchManager] Initialization Success");
     } else {
-        Serial.printf("[Touch] Initialization Failed. Error Code: %d\n", touchtest);
+        Serial.printf("[TouchManager] Initialization Failed. Error Code: %d\n", touchtest);
         return false;
     }
 
-    // Serial.printf("[Touch] Controller Found. Type ID: %d\n", touchtest);
+    // Serial.printf("[TouchManager] Controller Found. Type ID: %d\n", touchtest);
     return true;
 }
 
@@ -91,17 +92,18 @@ void TouchManager::mapCoordinates(int *x, int *y) {
     // GUITION 3.5" (Native 320x480)
     // ==========================================================
     #ifdef GUITION_3248W535
-        
-        // Retrieve current rotation from pin_config
-        #if !defined(DISPLAY_ROTATION)
-            #define DISPLAY_ROTATION 0
-        #endif
+
+        int SW_ROTATION = cfg.ROTATION;
+
+        if (cfg.ROTATION > 3 || cfg.ROTATION < 0) {
+            SW_ROTATION = 0;    // Fallback to 0 if invalid
+        }
 
         // The AXS15231/CST816 usually reports 0..320 (X) and 0..480 (Y)
         // irrespective of what the screen is doing.
         // We assume NATIVE_WIDTH = 320, NATIVE_HEIGHT = 480
 
-        switch (DISPLAY_ROTATION) {
+        switch (SW_ROTATION) {
             case 0: // Portrait (Native)
                 // No change needed usually
                 *x = rawX;
@@ -145,6 +147,6 @@ void TouchManager::mapCoordinates(int *x, int *y) {
     // Sanity Clip (keep inside logical bounds)
     if (*x < 0) *x = 0;
     if (*y < 0) *y = 0;
-    if (*x >= DISPLAY_WIDTH) *x = DISPLAY_WIDTH - 1;
-    if (*y >= DISPLAY_HEIGHT) *y = DISPLAY_HEIGHT - 1;
+    if (*x >= cfg.WIDTH) *x = cfg.WIDTH - 1;
+    if (*y >= cfg.HEIGHT) *y = cfg.HEIGHT - 1;
 }

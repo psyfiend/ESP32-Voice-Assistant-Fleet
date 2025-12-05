@@ -9,6 +9,7 @@
 // - WS_S3_SMART86     (Waveshare S3 4" 480x480 RGB  ST7701 + TCA9554)
 // - GUITION_3248W535  (Guition 3.5"    320x480 QSPI ASX15231)
 // - GUITION_8048W550  (Guition 5"      800x480 RGB  ST7262 + GT911)
+// - WS_P4_SMART86     (Waveshare P4 4" 480x480 MIPI DSI xxx + GT911 + TCA9554)
 
 #define GFX_NOT_DEFINED -1
 
@@ -80,13 +81,13 @@
     #define PIN_RGB_B4 1
 
     #define RGB_HSYNC_POL       1
-    #define RGB_HSYNC_FPORCH    10
+    #define RGB_VSYNC_POL       1
     #define RGB_HSYNC_PWIDTH    8
     #define RGB_HSYNC_BPORCH    50
-    #define RGB_VSYNC_POL       1
-    #define RGB_VSYNC_FPORCH    10
+    #define RGB_HSYNC_FPORCH    10
     #define RGB_VSYNC_PWIDTH    8
     #define RGB_VSYNC_BPORCH    20
+    #define RGB_VSYNC_FPORCH    10
 
     #define RGB_PCLK_ACTIVE_NEG     0
     #define RGB_PCLK_HZ            12500000 // aka prefer_speed
@@ -134,7 +135,7 @@
     #define MAX_TOUCH       1
 
 
-#elif defined(JC8048W550C)
+#elif defined(GUITION_8048W550)
 // ==============================================================================
 //  GUITION S3 5" (800x480 RGB ST7262 + GT911)
 //  JC8048W550 ESP32-S3 N16R8 Module
@@ -228,33 +229,93 @@
     #define HAS_QSPI_PANEL  0
     #define HAS_MIPI_PANEL  1
 
-    // Display Orientation
+    // --- I2C BUS ---
+    #define PIN_I2C_SDA     7
+    #define PIN_I2C_SCL     8
+
+
+    // --- LCD DEFINITIONS ---
     #define DISPLAY_WIDTH   720
     #define DISPLAY_HEIGHT  720
-    #define DISPLAY_ROTATION 0
+    #define DISPLAY_ROTATION 2
 
     // Backlight (Active HIGH usually for P4 GPIO)
-    #define LCD_BL_ON_LEVEL 1
+    #define LCD_BL_ON_LEVEL 0   // Backlight active 1 for HIGH, 0 for LOW
     #define PIN_LCD_BL      26
-
-    // MIPI DSI Pins (P4 handles DSI PHY internally)
-    #define PIN_LCD_RST     27
-    
-    // Unused on MIPI
-    #define PIN_LCD_CS      -1
-    #define PIN_LCD_SCK     -1
-    #define PIN_LCD_MOSI    -1
+    #define PIN_LCD_RST     27  // MIPI DSI Pins (P4 handles DSI PHY internally)
 
     // Touch Panel (GT911)
     // Schematic: I2C0_SDA (7), I2C0_SCL (8), TP_INT (6), TP_RST (27)
     // Note: TP_RST is shared with LCD_RST on this board
     #define PIN_I2C_SDA     7
     #define PIN_I2C_SCL     8
-    #define PIN_TP_INT      6
-    #define PIN_TP_RST      27
-    
-    // Explicitly define the Touch ID for bb_captouch if needed
-    // #define TOUCH_PANEL   TOUCH_GT911 
+    // #define PIN_TP_INT      -1
+    #define PIN_TP_RST      23
+
+    // --- Audio Codec pins ---
+    #define PIN_I2S_SCLK    12
+    #define PIN_I2S_MCLK    13
+    #define PIN_I2S_LCLK    10
+    #define PIN_I2S_DOUT     9
+    #define PIN_I2S_DSIN    11
+    #define PIN_AMP_EN      53
+
+    // --- SD Card Interface ---
+    #define PIN_SD_CMD      44
+    #define PIN_SD_CLK      43
+    #define PIN_SD_D0       39
+    #define PIN_SD_D1       40
+    #define PIN_SD_D2       41
+
+    // --- DSI INTERFACE PINS ---
+
+    #define DSI_HSYNC_WIDTH      20
+    #define DSI_HSYNC_BACK_PORCH 80
+    #define DSI_HSYNC_FRONT_PORCH 80
+    #define DSI_VSYNC_WIDTH      4
+    #define DSI_VSYNC_BACK_PORCH 12
+    #define DSI_VSYNC_FRONT_PORCH 30
+    #define DSI_PREFER_SPEED    46000000
+    #define DSI_LANE_BIT_RATE   1000
+
+    #define DSI_WIDTH    720
+    #define DSI_HEIGHT   720
+    // *dsipanel
+    // #define DISPLAY_ROTATION // above
+    // init operations
+    // init operations len
+    #define DSI_COL_OFFSET1 0
+    #define DSI_ROW_OFFSET1 0
+    #define DSI_COL_OFFSET2 0
+    #define DSI_ROW_OFFSET2 0
+
+    /*
+    .name = "10.1-DSI-TOUCH-A",
+    .hsync_pulse_width = 20,
+    .hsync_back_porch = 80,
+    .hsync_front_porch = 80,
+    .vsync_pulse_width = 4,
+    .vsync_back_porch = 12,
+    .vsync_front_porch = 30,
+    .prefer_speed = 46000000,
+    .lane_bit_rate = 1000,
+    .width = 720,
+    .height = 720,
+    .rotation = 0,
+    .auto_flush = true,
+    .rst_pin = -1,
+    .init_cmds = vendor_specific_init_default,
+    .init_cmds_size = sizeof(vendor_specific_init_default) / sizeof(lcd_init_cmd_t),
+    .i2c_sda_pin = 7,
+    .i2c_scl_pin = 8,
+    .i2c_clock_speed = 100000,
+    .lcd_rst = 27,
+    */
+
+    // Unused on MIPI
+    #define PIN_LCD_CS      -1
+    #define PIN_LCD_SCK     -1
+    #define PIN_LCD_MOSI    -1
 
 #endif
 

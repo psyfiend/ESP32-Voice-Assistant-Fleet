@@ -9,6 +9,8 @@
     #include "panels/BSP_WS_S3_Smart86_LCD.h"
 #elif defined(GUITION_3248W535)
     #include "panels/BSP_Guition_3248W535_LCD.h"
+#elif defined(GUITION_8048W550)
+    #include "panels/BSP_Guition_8048W550_LCD.h"
 #endif
 
 // Global Managers
