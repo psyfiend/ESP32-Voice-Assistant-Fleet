@@ -82,7 +82,7 @@ const Fleet_BSP WS_P4_7B_LCD_Config = {
 
     // ---= Touch Panel =---
     .TP_NAME           = "GT911",
-//  .TP_CAPTOUCH_NAME  = "TOUCH_WS_P4_SMART86",
+    #define TOUCH_PANEL  TOUCH_WS_P4_7B
     .TP_I2C_ADDR       = 0x5D,
             // When power-on detects low level of the interrupt gpio, address is 0x5D.
             // Interrupt gpio is high level, address is 0x14.
