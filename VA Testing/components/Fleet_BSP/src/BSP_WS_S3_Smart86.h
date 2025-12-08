@@ -4,6 +4,12 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP.h"
 
+// -------------------------------------------------------------------------
+// Board: WaveShare S3 Smart86 Box (ESP32-S3 N16R8)
+// Driver: ST7701 (RGB)
+// Resolution: 480x480
+// -------------------------------------------------------------------------
+
 // Panel init commands (ST7701)
 static const uint8_t waveshare_s3_smart86_init[] = {
 //  {cmd, { data }, data_size, delay_ms}

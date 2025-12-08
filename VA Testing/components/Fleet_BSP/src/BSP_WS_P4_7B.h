@@ -1,8 +1,15 @@
 #pragma once
 #ifndef BSP_WS_P4_7B_H
 #define BSP_WS_P4_7B_H
+
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP_P4.h"
+
+// -------------------------------------------------------------------------
+// Board: WaveShare Touch-LCD-7B (ESP32-P4 + C6)
+// Driver: EK79007 (MIPI DSI)
+// Resolution: 1024x600
+// -------------------------------------------------------------------------
 
 // Panel init commands (EK79007)
 // CMD, DATA ptr, DATA len, DELAY ms

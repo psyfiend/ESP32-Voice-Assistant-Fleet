@@ -4,6 +4,11 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP.h"
 
+// -------------------------------------------------------------------------
+// Board: Guition JC8048W550 (ESP32-S3 N16R8)
+// Driver: ST7262 (RGB)
+// Resolution: 800x480
+// -------------------------------------------------------------------------
 
 // Guition 8048W550 with GT911 Touch Panel
 static const Fleet_BSP Guition_8048W550_LCD = {

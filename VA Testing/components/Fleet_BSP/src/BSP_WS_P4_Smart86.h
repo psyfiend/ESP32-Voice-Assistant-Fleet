@@ -4,6 +4,11 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP_P4.h"
 
+// -------------------------------------------------------------------------
+// Board: WaveShare P4 Smart86 Box (ESP32-P4 + C6)
+// Driver: ST7703 (MIPI DSI)
+// Resolution: 720x720
+// -------------------------------------------------------------------------
 
 // Panel init commands (ST7703)
 static const lcd_init_cmd_t waveshare_p4_smart86_init[] = {

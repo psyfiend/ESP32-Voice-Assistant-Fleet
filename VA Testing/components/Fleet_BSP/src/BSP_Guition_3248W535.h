@@ -4,6 +4,12 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP.h"
 
+// -------------------------------------------------------------------------
+// Board: Guition JC3248W535 (ESP32-S3N16R8)
+// Driver: JD9165BA ASX15231B (SPI)
+// Resolution: 324x480
+// -------------------------------------------------------------------------
+
 // Panel init commands (ST7701)
 static const uint8_t guition_3248W535_init[] = {
 //  {cmd, { data }, data_size, delay_ms}
