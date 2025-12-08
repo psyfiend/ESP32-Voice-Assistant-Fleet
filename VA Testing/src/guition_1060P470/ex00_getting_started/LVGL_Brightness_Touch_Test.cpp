@@ -1,7 +1,6 @@
 #ifndef BOARD_HAS_PSRAM
 #error "Error: This program requires PSRAM enabled, please enable PSRAM option in 'Tools' menu of Arduino IDE"
 #endif
-
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 #include <lvgl.h>
@@ -109,11 +108,8 @@ void readMultiTouch() {
 void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
     uint32_t w = (area->x2 - area->x1 + 1);
     uint32_t h = (area->y2 - area->y1 + 1);
-
     Arduino_GFX *gfx = displayMgr.getGfx();
-    
     gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t *)px_map, w, h);
-    
     gfx->flush();
     lv_display_flush_ready(disp);
 }

@@ -1,6 +1,9 @@
 #include <Arduino_GFX_Library.h>
+#include <esp32-hal-ledc.h>
 #include "DisplayManager.h"
 
+#define BL_PWM_RES 10
+#define BL_MAX_DUTY 1023
 
 DisplayManager::DisplayManager() {
     _bus = nullptr;
@@ -11,35 +14,42 @@ DisplayManager::DisplayManager() {
 }
 
 bool DisplayManager::begin() {
-    Serial.println("[DisplayManager] Begin");
+
+    Serial.println();
+    Serial.printf("Device init: %s\n", cfg.device_name);
+    Serial.printf("Display hardware: %s\n", cfg.LCD_MODEL);
+    Serial.printf("Touch panel: %s\n", cfg.TP_NAME);
+    Serial.println("------------------------------");
+
+    Serial.println("[DisplayMgr] Begin");
     Serial.flush(); // Force output before crash
 
-    // 1. Initialize Common Hardware (I2C)
+    // 1. Initialize  I2C
     Wire.begin(cfg.I2C_SDA_PIN, cfg.I2C_SCL_PIN);
     
-    // 2. Initialize the Data Bus
-    Serial.println("[DisplayManager] Init Bus..."); Serial.flush();
+    // 2. Initialize Display
+    Serial.println("[DisplayMgr] Init Bus..."); Serial.flush();
     initBus();
-
-    // 3. Initialize the Panel/Display Driver
     initPanel();
 
     if (!_gfx) {
-        Serial.println("[DisplayManager] GFX is NULL!"); Serial.flush();
+        Serial.println("[DisplayMgr] GFX is NULL!"); Serial.flush();
         return false;
     }
 
-    // 4. Start the Hardware
-    // Note: When using Arduino_Canvas, begin() recursively starts the output driver too.
-    Serial.println("[DisplayManager] GFX->begin()..."); Serial.flush();
+    // 3. Start GFX
+    Serial.println("[DisplayMgr] GFX->begin()..."); Serial.flush();
     if (!_gfx->begin()) {
-        Serial.println("[DisplayManager] GFX->begin() failed!"); Serial.flush();
+        Serial.println("[DisplayMgr] GFX->begin() failed!"); Serial.flush();
         return false;
     }
 
-    // 5. Turn on Backlight using the smart logic
+    // 4. Init Backlight
+    // We do this AFTER gfx->begin() to override any pinMode() calls
+    Serial.println("------------------------------");
+    Serial.println("[DisplayMgr] Init Backlight..."); Serial.flush();
     pinMode(cfg.LCD_BL, OUTPUT);
-    setBacklight(true);
+    initBacklightPWM(true);
 
     return true;
 }
@@ -108,27 +118,74 @@ void DisplayManager::initPanel() {
 
     #elif HAS_MIPI_PANEL
         // --- MIPI PANEL ---
-        Serial.println("[DisplayManager] Creating DSI Panel..."); Serial.flush();
+        Serial.println("[DisplayMgr] Creating DSI Panel..."); Serial.flush();
         Arduino_ESP32DSIPanel *dsipanel = new Arduino_ESP32DSIPanel(
             cfg.HSYNC_PWIDTH, cfg.HSYNC_BPORCH, cfg.HSYNC_FPORCH,
             cfg.VSYNC_PWIDTH, cfg.VSYNC_BPORCH, cfg.VSYNC_FPORCH
             , cfg.PREFER_SPEED, cfg.LANE_BIT_RATE
         );
-        if (!dsipanel) Serial.println("[DisplayManager] DSI Panel Alloc Failed!"); Serial.flush();
+        if (!dsipanel) Serial.println("[DisplayMgr] DSI Panel Alloc Failed!"); Serial.flush();
 
-        Serial.println("[DisplayManager] Creating DSI Display...");
+        Serial.println("[DisplayMgr] Creating DSI Display...");
         Arduino_DSI_Display *dsidisplay = new Arduino_DSI_Display(
             cfg.WIDTH, cfg.HEIGHT, dsipanel, cfg.ROTATION, cfg.AUTO_FLUSH,
             cfg.LCD_RST, cfg.INIT_CMDS_DSI, cfg.INIT_CMDS_SIZE
         );
-        if (!dsidisplay) Serial.println("[DisplayManager] DSI Display Alloc Failed!"); Serial.flush();
+        if (!dsidisplay) Serial.println("[DisplayMgr] DSI Display Alloc Failed!"); Serial.flush();
         _gfx = dsidisplay;
     #endif
 }
 
-void DisplayManager::setBacklight(bool on) {
+
+void DisplayManager::initBacklightPWM(bool on) {
+    // Check if pin is valid
+    if (cfg.LCD_BL < 0) return;
+
     int level = on ? cfg.LCD_BL_ON_LEVEL : !cfg.LCD_BL_ON_LEVEL;
     digitalWrite(cfg.LCD_BL, level);
+    Serial.printf("[BacklightMgr] Backlight pin on level: %s\n", (cfg.LCD_BL_ON_LEVEL ? "HIGH" : "LOW"));
+
+    Serial.printf("[BacklightMgr] Backlight Pin: %d, Freq: %dHz\n", cfg.LCD_BL, cfg.LCD_BL_FREQ);
+
+    // Attach Pin to LEDC Channel
+    // Arduino 3.0+: ledcAttach(pin, freq, res)
+    if (!ledcAttach(cfg.LCD_BL, cfg.LCD_BL_FREQ, BL_PWM_RES)) {
+        Serial.println("[BacklightMgr] PWM Attach Failed!");
+    } else {
+        Serial.println("[BacklightMgr] PWM Attach Succeeded");
+    }
+
+    // Set default brightness
+    setBrightness(_defaultBrightness);
+}
+
+void DisplayManager::setBrightness(uint8_t pct) {
+    if (pct > 100) pct = 100;
+    _currentBrightness = pct;
+
+    // Calculate Raw Duty (0 to 1023)
+    uint32_t raw_duty = map(pct, 0, 100, 0, BL_MAX_DUTY);
+    uint32_t final_duty = raw_duty;
+
+    // Handle Inversion based on BSP Config
+    // If ON_LEVEL is 0 (Active Low), we must invert the duty cycle
+    if (cfg.LCD_BL_ON_LEVEL == 0) {
+        final_duty = BL_MAX_DUTY - raw_duty;
+    }
+
+    // Write to Hardware
+    ledcWrite(cfg.LCD_BL, final_duty);
+    Serial.printf("[BacklightMgr] Set Brightness: %d%% (Raw: %d, Final: %d)\n", pct, raw_duty, final_duty);
+}
+
+void DisplayManager::setBacklight(bool on) {
+    // Reuse brightness logic for simple on/off
+    setBrightness(on ? _currentBrightness : 0);
+}
+
+int DisplayManager::getBrightness() {
+    Serial.printf("[BacklightMgr] Get Brightness: %d%%\n", _currentBrightness);
+    return _currentBrightness;
 }
 
 void DisplayManager::resetTouch() {
@@ -152,5 +209,6 @@ void DisplayManager::resetTouch() {
         delay(200);
     }
     #endif
+    Serial.println("[TouchMgr] Touch Reset Complete");
   #endif
 }

@@ -2,13 +2,13 @@
 #ifndef BSP_GUITION_8048W550_H
 #define BSP_GUITION_8048W550_H
 #include <Arduino_GFX_Library.h>
-#include "../Fleet_BSP.h"
+#include "Fleet_BSP.h"
 
 
-// Waveshare S3 Smart86 LCD Configuration
-static const Fleet_BSP Guition_8048W550_LCD_Config = {
+// Guition 8048W550 with GT911 Touch Panel
+static const Fleet_BSP Guition_8048W550_LCD = {
 
-    .device_name       = "Guition 8048W550",
+    .device_name       = "Guition S3 5\" JC8048W550",
 
     // --= Hardware Flags =--
     //#define HAS_IO_EXPANDER 1
@@ -76,6 +76,31 @@ static const Fleet_BSP Guition_8048W550_LCD_Config = {
     // .INIT_CMDS_SIZE     = sizeof(waveshare_s3_smart86_init),
 
 };
+inline const Fleet_BSP& cfg = Guition_8048W550_LCD;
 
-inline const Fleet_BSP& cfg = Guition_8048W550_LCD_Config;
+
+const Fleet_Hardware_Config Guition_8048W550_Hardware = {
+    
+    // IP530 battery monitor
+
+    // --= Audio Codec =--  NS4168
+    .I2S_BCLK   = 0,
+    .I2S_LRCK   = 18,
+    .I2S_DIN    = 17,
+
+
+    // --= SD Card Interface =--
+    .TF_CMD   = 11,  // MCU_MOSI && SPI_MOSI
+    .TF_CLK   = 12,
+    .TF_CS    = 10,  // TF_D3
+    .TF_MOSI  = 11,  // TF_CMD && SPI_MOSI
+    .TF_MISO  = 13,  // TF_D0 && SPI_MISO
+    .TF_D0    = 13,  // TF_MISO && SPI_MISO
+    .TF_D3    = 10,  // TF_CS
+    .SPI_MOSI = 11,  // TF_CMD && SPI_MOSI
+    .SPI_MISO = 13,  // TF_D0 && SPI_MISO
+
+};
+inline const Fleet_Hardware_Config& hw_cfg = Guition_8048W550_Hardware;
+
 #endif // BSP_GUITION_8048W550_H

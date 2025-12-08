@@ -4,13 +4,15 @@
 #if defined(WS_P4_SMART86)
     #include "panels/BSP_WS_P4_Smart86_LCD.h"
 #elif defined(WS_P4_7B)
-    #include "panels/BSP_WS_P4_7B_LCD.h"
+    #include "panels/BSP_WS_P4_7B.h"
 #elif defined(WS_S3_SMART86)
-    #include "panels/BSP_WS_S3_Smart86_LCD.h"
+    #include "panels/BSP_WS_S3_Smart86.h"
 #elif defined(GUITION_3248W535)
-    #include "panels/BSP_Guition_3248W535_LCD.h"
+    #include "panels/BSP_Guition_3248W535.h"
 #elif defined(GUITION_8048W550)
-    #include "panels/BSP_Guition_8048W550_LCD.h"
+    #include "panels/BSP_Guition_8048W550.h"
+#elif defined(GUITION_1060P470)
+    #include "panels/BSP_Guition_1060P470.h"
 #endif
 
 // --- Configuration matching Waveshare Hardware ---

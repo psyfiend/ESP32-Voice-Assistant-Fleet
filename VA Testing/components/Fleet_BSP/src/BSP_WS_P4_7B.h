@@ -1,8 +1,8 @@
 #pragma once
-#ifndef BSP_WS_P4_7B_LCD_H
-#define BSP_WS_P4_7B_LCD_H
+#ifndef BSP_WS_P4_7B_H
+#define BSP_WS_P4_7B_H
 #include <Arduino_GFX_Library.h>
-#include "../Fleet_BSP_P4.h"
+#include "Fleet_BSP_P4.h"
 
 // Panel init commands (EK79007)
 // CMD, DATA ptr, DATA len, DELAY ms
@@ -55,8 +55,8 @@ static const lcd_init_cmd_t waveshare_p4_7b_init[] = {
 };
 
 // Waveshare P4 7B LCD Configuration
-const Fleet_BSP WS_P4_7B_LCD_Config = {
-    .device_name       = "Waveshare P4 7B",
+const Fleet_BSP WS_P4_7B_LCD = {
+    .device_name       = "Waveshare P4 7\" Touch-LCD-7B",
 
     // --= Hardware Flags =--
     //#define HAS_IO_EXPANDER
@@ -69,6 +69,8 @@ const Fleet_BSP WS_P4_7B_LCD_Config = {
     .I2C_SDA_PIN       = 7,
     .I2C_SCL_PIN       = 8,
 
+    .BOOT_BUTTON_PIN  = 35,
+
     // ---=  LCD  =---
     .LCD_MODEL         = "EK79007",
     .WIDTH             = 1024,
@@ -79,6 +81,7 @@ const Fleet_BSP WS_P4_7B_LCD_Config = {
     // ---= Backlight =---
     .LCD_BL            = 32,
     .LCD_BL_ON_LEVEL   = 0, // 0 = active LOW, 1 = active HIGH
+    .LCD_BL_FREQ       = 5000, // 5 kHz PWM
 
     // ---= Touch Panel =---
     .TP_NAME           = "GT911",
@@ -114,34 +117,31 @@ const Fleet_BSP WS_P4_7B_LCD_Config = {
     .NUM_DSI_LANES  = 2,
 
     .PREFER_SPEED   = 52000000,
-    .LANE_BIT_RATE  = 1000,
+    .LANE_BIT_RATE  = 1000, // test 900!
 
     // ---= Init Commands =---
     .INIT_CMDS_DSI     = waveshare_p4_7b_init,
     .INIT_CMDS_SIZE    = sizeof(waveshare_p4_7b_init) / sizeof(lcd_init_cmd_t),
 
 };
+inline const Fleet_BSP& cfg = WS_P4_7B_LCD;
 
-const Fleet_Hardware_Config WS_P4_7B_Hardware_Config = {
-    .I2S_7210_ADDR     = 0x1A,  // 0x40?
+const Fleet_Hardware_Config WS_P4_7B_Hardware = {
 
-//  .I2S_7210_BCLK     = 12,
-    .I2S_7210_LRCK     = 10,
-    .I2S_7210_SCLK     = 12,
-//  .I2S_7210_DIN      = 12,
-    .I2S_7210_MCLK     = 13,
-    .I2S_7210_SDOUT1   = 11,
-//  .I2S_7210_SDOUT2   = -1,  // Not used
+    // --= Audio Codec =-- 
 
-    .I2S_8311_DSDIN    = 9,  // Not used
+    .I2S_ADDR     = 0x1A,  // 0x40?
 
-    // I2S random pins
-    .WS_IO             = 10,
-    .DO_IO             = 9,
-    .DI_IO             = 11,
+    .I2S_LRCK     = 10,  //WS
+    .I2S_SCLK     = 12,  //BCLK
+    .I2S_MCLK     = 13,
+    .I2S_ASDOUT   = 11,  //DIN
 
-    .POWER_AMP_IO      = 53, //25,  // WS_P4_7B
+    .I2S_DSDIN    = 9,   //DOUT
 
+    .AMP_EN      = 53, //25,  // WS_P4_7B
+
+    // --= SD Card Interface =--
     .TF_CMD            = 44,
     .TF_CLK            = 43,
     .TF_D0             = 39,
@@ -149,6 +149,7 @@ const Fleet_Hardware_Config WS_P4_7B_Hardware_Config = {
     .TF_D2             = 41,
     .TF_D3             = 42,    //CD/D3
 
+    /*
     // --= WS_P4_7B Experimental SDKconfig =--
     .SDIO_PIN_CMD      = 19,
     .SDIO_PIN_CLK      = 18,
@@ -156,9 +157,13 @@ const Fleet_Hardware_Config WS_P4_7B_Hardware_Config = {
     .SDIO_PIN_D1       = 15,
     .SDIO_PIN_D2       = 16,
     .SDIO_PIN_D3       = 17,
+
+    // I2S random pins
+    .WS_IO             = 10,
+    .DO_IO             = 9,
+    .DI_IO             = 11,
+    */
 };
+inline const Fleet_Hardware_Config& hw_cfg = WS_P4_7B_Hardware;
 
-
-
-inline const Fleet_BSP& cfg = WS_P4_7B_LCD_Config;
-#endif // BSP_WS_P4_7B_LCD_H
+#endif // BSP_WS_P4_7B_H

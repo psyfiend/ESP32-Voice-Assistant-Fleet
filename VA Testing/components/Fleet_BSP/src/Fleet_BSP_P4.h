@@ -31,6 +31,8 @@ struct Fleet_BSP
     uint32_t I2C_CLOCK_SPEED;
     uint8_t  EXPANDER_I2C_ADDR;
 
+    uint8_t  BOOT_BUTTON_PIN;
+
     // --- Expander Pins ---
     int8_t EXIO_LCD_RST;
     int8_t EXIO_LCD_CS;
@@ -50,6 +52,7 @@ struct Fleet_BSP
     // --- Backlight ---
     int8_t LCD_BL;
     int8_t LCD_BL_ON_LEVEL; // 1 = Active HIGH, 0 = Active LOW
+    uint32_t LCD_BL_FREQ;   // PWM Frequency in Hz
 
     // --- Touch Panel ---
     const char *TP_NAME;            // e.g., "GT911"
@@ -106,17 +109,17 @@ struct Fleet_BSP
 struct Fleet_Hardware_Config
 {
     // --- Audio Codec ---
-    uint8_t I2S_7210_ADDR;      // I2C Address
+    uint8_t I2S_ADDR;      // I2C Address
 
-    uint8_t I2S_7210_BCLK;
-    uint8_t I2S_7210_LRCK;      // 8311_LRCK
-    uint8_t I2S_7210_SCLK;      // 8311_SCLK/DMIC_SCL
-    uint8_t I2S_7210_DIN;
-    uint8_t I2S_7210_MCLK;      // 8311_MCLK
-    uint8_t I2S_7210_SDOUT1;    // TDMOUT   I2S_ASDOUT
-    uint8_t I2S_7210_SDOUT2;    // TMDMIN
+    uint8_t I2S_BCLK;
+    uint8_t I2S_LRCK;      // 8311_LRCK
+    uint8_t I2S_SCLK;      // 8311_SCLK/DMIC_SCL
+    uint8_t I2S_DIN;
+    uint8_t I2S_MCLK;      // 8311_MCLK
+    uint8_t I2S_ASDOUT;    // TDMOUT   I2S_ASDOUT
+    uint8_t I2S_SDOUT2;    // TMDMIN
 
-    uint8_t I2S_8311_DSDIN;    // DMIC_DATA
+    uint8_t I2S_DSDIN;    // DMIC_DATA
 
     uint8_t WS_IO;
     uint8_t DO_IO;

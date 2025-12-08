@@ -1,8 +1,8 @@
 #pragma once
-#ifndef BSP_GUITION_3248W535_LCD_H
-#define BSP_GUITION_3248W535_LCD_H
+#ifndef BSP_GUITION_3248W535_H
+#define BSP_GUITION_3248W535_H
 #include <Arduino_GFX_Library.h>
-#include "../Fleet_BSP.h"
+#include "Fleet_BSP.h"
 
 // Panel init commands (ST7701)
 static const uint8_t guition_3248W535_init[] = {
@@ -259,8 +259,8 @@ static const uint8_t guition_3248W535_init[] = {
 };
 
 // Guition 3.5" 320x480 LCD Configuration
-static const Fleet_BSP Guition_3248W535_LCD_Config = {
-    .device_name       = "Guition 3248W535",
+static const Fleet_BSP Guition_3248W535_LCD = {
+    .device_name       = "Guition 3.5\" JC3248W535",
 
     // --= Hardware Flags =--
     #define HAS_QSPI_PANEL
@@ -282,6 +282,7 @@ static const Fleet_BSP Guition_3248W535_LCD_Config = {
     // ---= Backlight =---
     .LCD_BL            = 1,
     .LCD_BL_ON_LEVEL   = 1, // Active HIGH
+    .LCD_BL_FREQ       = 5000, // 5 kHz PWM
 
     // ---= Touch Panel =---
     .TP_NAME           = "AXS15231B",
@@ -290,7 +291,7 @@ static const Fleet_BSP Guition_3248W535_LCD_Config = {
     .TP_I2C_CLOCK_SPEED = 400000,
     .TP_SDA            = 4,
     .TP_SCL            = 8,
-    .TP_INT            = 11,
+    .TP_INT            = 3, // 11,
     .TP_RST            = 12,
     .TP_MAX_TOUCH      = 5,
 
@@ -302,11 +303,38 @@ static const Fleet_BSP Guition_3248W535_LCD_Config = {
     .QSPI_D1           = 48,
     .QSPI_D2           = 40,
     .QSPI_D3           = 39,
+    .LCD_TE            = 38,
     
     // ---= Init Commands =---
     .INIT_CMDS_RGB     = guition_3248W535_init,
     .INIT_CMDS_SIZE    = sizeof(guition_3248W535_init),
 };
+inline const Fleet_BSP& cfg = Guition_3248W535_LCD;
 
-inline const Fleet_BSP& cfg = Guition_3248W535_LCD_Config;
-#endif // BSP_GUITION_3248W535_LCD_H
+
+const Fleet_Hardware_Config Guition_3248W535_Hardware = {
+    
+    // --- Audio Codec --- NS4168
+    .I2S_BCLK   = 42,
+    .I2S_LRCK   = 2,
+    .I2S_DIN    = 41,  // _DO_IO
+    .I2S_MCLK   = -1,
+
+    // --= SD Card Interface =--
+    .TF_CMD     = 11,  // MCU_MOSI && SPI_MOSI
+    .TF_CLK     = 12,
+    .TF_CS      = 10,  // TF_D3
+    .TF_MOSI    = 11,  // TF_CMD && SPI_MOSI
+    .TF_MISO    = 13,  // TF_D0 && SPI_MISO
+    .TF_D0      = 13,  // TF_MISO && SPI_MISO
+    .TF_D3      = 10,  // TF_CS
+    .SPI_MOSI   = 11,  // TF_CMD && SPI_MOSI
+    .SPI_MISO   = 13,  // TF_D0 && SPI_MISO
+
+    // --= IP5306 Battery Management =--
+    .BAT_ADC    = 5,
+
+};
+inline const Fleet_Hardware_Config& hw_cfg = Guition_3248W535_Hardware;
+
+#endif // BSP_GUITION_3248W535_H

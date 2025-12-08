@@ -1,8 +1,8 @@
 #pragma once
-#ifndef BSP_WS_S3_SMART86_LCD_H
-#define BSP_WS_S3_SMART86_LCD_H
+#ifndef BSP_WS_S3_SMART86_H
+#define BSP_WS_S3_SMART86_H
 #include <Arduino_GFX_Library.h>
-#include "../Fleet_BSP.h"
+#include "Fleet_BSP.h"
 
 // Panel init commands (ST7701)
 static const uint8_t waveshare_s3_smart86_init[] = {
@@ -120,9 +120,9 @@ static const uint8_t waveshare_s3_smart86_init[] = {
 };
 
 // Waveshare S3 Smart86 LCD Configuration
-static const Fleet_BSP WS_S3_SMART86_LCD_Config = {
+static const Fleet_BSP WS_S3_SMART86_LCD = {
 
-    .device_name       = "Waveshare S3 Smart86",
+    .device_name       = "Waveshare S3 4\" Smart86",
 
     // --= Hardware Flags =--
     #define HAS_IO_EXPANDER 1
@@ -135,6 +135,8 @@ static const Fleet_BSP WS_S3_SMART86_LCD_Config = {
     .I2C_SDA_PIN       = 47,
     .I2C_SCL_PIN       = 48,
     .EXPANDER_I2C_ADDR = 0x20,
+
+    .BOOT_BUTTON_PIN  = 0,
     
     // #define RST_PIN EXIO_LCD_RST
 
@@ -156,13 +158,14 @@ static const Fleet_BSP WS_S3_SMART86_LCD_Config = {
     // ---= Backlight =---
     .LCD_BL            = 4,
     .LCD_BL_ON_LEVEL   = 0, // Active LOW for P4 GPIO
+    .LCD_BL_FREQ       = 5000, // 5 kHz PWM
 
     // ---= Touch Panel =---
     .TP_NAME           = "GT911",
 //  .TP_CAPTOUCH_NAME  = "TOUCH_WS_S3_SMART86",
     #define TOUCH_PANEL   TOUCH_WS_S3_SMART86
     .TP_I2C_ADDR       = 0x5D,
-//  .TP_I2C_CLOCK_SPEED = 100000,
+    .TP_I2C_CLOCK_SPEED = 100000,
     .TP_SDA            = 47,
     .TP_SCL            = 48,
 //  .TP_INT            = EXIO 6,
@@ -200,6 +203,32 @@ static const Fleet_BSP WS_S3_SMART86_LCD_Config = {
     .INIT_CMDS_SIZE     = sizeof(waveshare_s3_smart86_init),
 
 };
+inline const Fleet_BSP& cfg = WS_S3_SMART86_LCD;
 
-inline const Fleet_BSP& cfg = WS_S3_SMART86_LCD_Config;
-#endif // BSP_WS_S3_SMART86_LCD_H
+
+const Fleet_Hardware_Config WS_S3_Smart86_Hardware = {
+ 
+    // --= Audio Codec =--
+    .I2S_LRCK   = 7,    //WS
+    .I2S_SCLK   = 16,   //BCLK
+    .I2S_MCLK   = 5,
+    .I2S_ASDOUT = 15,   //DIN
+
+    .I2S_DSDIN  =  6,   //DOUT
+
+    // --= Audio Amp =-- // NS4150B on WS Smart86 boxes
+//  .AMP_EN     = EXIO3,    // EXIO3 on Waveshare S3 Smart86
+
+    // --= SD Card Interface =--
+    .TF_CMD     = 44,
+    .TF_CLK     = 43,
+    .TF_CS      = 45,
+    .TF_MOSI    = 42,
+    .TF_MISO    = 41,
+    .TF_D0      = 40,
+    .TF_D1      = -1, // Not used
+    .TF_D2      = -1, // Not used
+};
+inline const Fleet_Hardware_Config& hw_cfg = WS_S3_Smart86_Hardware;
+
+#endif // BSP_WS_S3_SMART86_H

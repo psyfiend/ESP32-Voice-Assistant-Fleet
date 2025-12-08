@@ -1,8 +1,8 @@
 #pragma once
-#ifndef BSP_WS_P4_SMART86_LCD_H
-#define BSP_WS_P4_SMART86_LCD_H
+#ifndef BSP_WS_P4_SMART86_H
+#define BSP_WS_P4_SMART86_H
 #include <Arduino_GFX_Library.h>
-#include "../Fleet_BSP_P4.h"
+#include "Fleet_BSP_P4.h"
 
 
 // Panel init commands (ST7703)
@@ -35,8 +35,8 @@ static const lcd_init_cmd_t waveshare_p4_smart86_init[] = {
 };
 
 // Waveshare P4 Smart86 LCD Configuration
-const Fleet_BSP WS_P4_SMART86_LCD_Config = {
-    .device_name       = "Waveshare P4 Smart86",
+const Fleet_BSP WS_P4_SMART86_LCD = {
+    .device_name       = "Waveshare P4 4\" Smart86",
 
     // --= Hardware Flags =--
     //#define HAS_IO_EXPANDER
@@ -50,8 +50,10 @@ const Fleet_BSP WS_P4_SMART86_LCD_Config = {
     .I2C_SCL_PIN       = 8,
     .I2C_CLOCK_SPEED   = 100000,
 
+    .BOOT_BUTTON_PIN  = 35,
+
     // ---=  LCD  =---
-    .LCD_MODEL         = "ST7703",
+    .LCD_MODEL         = "ST7701",
     .WIDTH             = 720,
     .HEIGHT            = 720,
     .ROTATION          = 2,     // USB Port on left side
@@ -60,10 +62,11 @@ const Fleet_BSP WS_P4_SMART86_LCD_Config = {
     // ---= Backlight =---
     .LCD_BL            = 26,
     .LCD_BL_ON_LEVEL   = 0, // 0 = active LOW
+    .LCD_BL_FREQ       = 5000, // 5 kHz PWM
 
     // ---= Touch Panel =---
     .TP_NAME           = "GT911",
-    .TP_CAPTOUCH_NAME  = "TOUCH_WS_P4_SMART86",
+    #define TOUCH_PANEL   TOUCH_WS_P4_SMART86
     .TP_I2C_ADDR       = 0x5D,
     .TP_I2C_CLOCK_SPEED = 100000,
     .TP_SDA            = 7,
@@ -91,7 +94,28 @@ const Fleet_BSP WS_P4_SMART86_LCD_Config = {
     .INIT_CMDS_SIZE    = sizeof(waveshare_p4_smart86_init) / sizeof(lcd_init_cmd_t),
 
 };
+inline const Fleet_BSP& cfg = WS_P4_SMART86_LCD;
 
-inline const Fleet_BSP& cfg = WS_P4_SMART86_LCD_Config;
+const Fleet_Hardware_Config WS_P4_Smart86_Hardware = {
 
-#endif // BSP_WS_P4_SMART86_LCD_H
+    // --- Audio Codec ---
+    .I2S_LRCK   = 10,   //WS
+    .I2S_SCLK   = 12,   //BCLK
+    .I2S_MCLK   = 13,
+    .I2S_ASDOUT = 11,   //DIN
+    .I2S_DSDIN  = 9,    //DOUT
+
+    // --- Audio Amp --- // NS4150B on WS Smart86 boxes
+    .AMP_EN     = 53,
+
+    // --- SD Card Interface ---
+    .TF_CMD    = 44,
+    .TF_CLK    = 43,
+    .TF_D0     = 39,
+    .TF_D1     = 40,
+    .TF_D2     = 41,
+    .TF_D3     = 42,
+
+};
+
+#endif // BSP_WS_P4_SMART86_H

@@ -6,6 +6,7 @@ TouchManager::TouchManager() {
 
 bool TouchManager::begin() {
     
+    Serial.println("------------------------------");
 
     // -----------------------------------------------------------
     // STRATEGY A: Specific Panel ID (Fleet Architecture)
@@ -14,7 +15,7 @@ bool TouchManager::begin() {
     // and it is in the BSP as #define TOUCH_PANEL, use that.
     // The library uses its internal lookup table for pins.
     #ifdef TOUCH_PANEL
-        Serial.printf("[TouchManager] Initializing Panel ID: %d\n", TOUCH_PANEL);
+        Serial.printf("[TouchMgr] Initializing %s using bb_captouch ID: %d\n", cfg.TP_NAME, TOUCH_PANEL);
         
         // Assumes your fork has an overloaded init(int type)
         int touchtest = _touch.init(TOUCH_PANEL);
@@ -44,7 +45,8 @@ bool TouchManager::begin() {
         }
 
         // Initialize bb_captouch with explicit pins
-        Serial.printf("[Touch] Init SDA:%d SCL:%d IRQ:%d RST:%d\n", sda, scl, irq, rst);
+        Serial.println("[TouchMgr] No bb_captouch ID defined, using manual pin config...");
+        Serial.printf("[TouchMgr] Init SDA:%d SCL:%d IRQ:%d RST:%d\n", sda, scl, irq, rst);
         int touchtest = _touch.init(sda, scl, irq, rst);
     #endif
 
@@ -52,13 +54,12 @@ bool TouchManager::begin() {
     // Validation
     // -----------------------------------------------------------
     if (touchtest == CT_SUCCESS) {
-        Serial.println("[TouchManager] Initialization Success");
+        Serial.println("[TouchMgr] Initialization Success");
     } else {
-        Serial.printf("[TouchManager] Initialization Failed. Error Code: %d\n", touchtest);
+        Serial.printf("[TouchMgr] Initialization Failed. Error Code: %d\n", touchtest);
         return false;
     }
 
-    // Serial.printf("[TouchManager] Controller Found. Type ID: %d\n", touchtest);
     return true;
 }
 
@@ -92,6 +93,7 @@ void TouchManager::mapCoordinates(int *x, int *y) {
     // GUITION 3.5" (Native 320x480)
     // ==========================================================
     #ifdef GUITION_3248W535
+        Serial.println("[TouchMgr] Initializing GUITION 3248W535 rotation mapping...");
 
         int SW_ROTATION = cfg.ROTATION;
 
