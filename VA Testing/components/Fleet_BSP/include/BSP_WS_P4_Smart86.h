@@ -41,24 +41,22 @@ static const lcd_init_cmd_t waveshare_p4_smart86_init[] = {
 
 // Waveshare P4 Smart86 LCD Configuration
 const Fleet_BSP WS_P4_SMART86_LCD = {
-    .device_name       = "Waveshare P4 4\" Smart86",
+    .device_name       = "Waveshare P4 Smart86",
 
     // --= Hardware Flags =--
+    #define HAS_MIPI_PANEL 1
+    #define HAS_TOUCH 1
     //#define HAS_IO_EXPANDER
     //#define HAS_RGB_PANEL
     //#define HAS_QSPI_PANEL
-    #define HAS_MIPI_PANEL 1
-    #define HAS_TOUCH 1
     
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 7,
     .I2C_SCL_PIN       = 8,
     .I2C_CLOCK_SPEED   = 100000,
 
-    .BOOT_BUTTON_PIN  = 35,
-
     // ---=  LCD  =---
-    .LCD_MODEL         = "ST7701",
+    .LCD_MODEL         = "ST7703",
     .WIDTH             = 720,
     .HEIGHT            = 720,
     .ROTATION          = 2,     // USB Port on left side
@@ -103,17 +101,29 @@ inline const Fleet_BSP& cfg = WS_P4_SMART86_LCD;
 
 const Fleet_Hardware_Config WS_P4_Smart86_Hardware = {
 
-    // --- Audio Codec ---
-    .I2S_LRCK   = 10,   //WS
-    .I2S_SCLK   = 12,   //BCLK
+    // --= Audio Codec =--
+    // ES8311 / 7210 Codec + NS4150B PA
+    
+    .I2S_SDA_PIN   = 7,   // I2C SDA
+    .I2S_SCL_PIN   = 8,   // I2C SCL
+    .I2S_7210_ADDR  = 0x40,   // ES7210 ADC/Mics
+    .I2S_8311_ADDR  = 0x18,   // ES8311 DAC/Amp
+
     .I2S_MCLK   = 13,
-    .I2S_ASDOUT = 11,   //DIN
-    .I2S_DSDIN  = 9,    //DOUT
+    .I2S_BCLK   = 12,   //SCLK
+    .I2S_LRCK   = 10,   //WS
+    
+    .I2S_DIN  = 9,    //DOUT
+    .I2S_DOUT = 11,   //DIN
+    
 
-    // --- Audio Amp --- // NS4150B on WS Smart86 boxes
-    .AMP_EN     = 53,
+    // --= Audio Poweramp =-- // NS4150B on WS Smart86 boxes
+    .I2S_AMP_EN     = 53,
 
-    // --- SD Card Interface ---
+    // --= Button =--
+    .BOOT_BUTTON_PIN  = 35,
+
+    // --= SD Card Interface =--
     .TF_CMD    = 44,
     .TF_CLK    = 43,
     .TF_D0     = 39,

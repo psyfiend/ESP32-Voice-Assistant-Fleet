@@ -3,6 +3,10 @@
 		{
 			"name": "VA Testing",
 			"path": "."
+		},
+		{
+			"name": "Gem i2c scanner",
+			"path": "../../Gem i2c scanner"
 		}
 	],
 	"settings": {

@@ -66,17 +66,17 @@ const Fleet_BSP WS_P4_7B_LCD = {
     .device_name       = "Waveshare P4 7\" Touch-LCD-7B",
 
     // --= Hardware Flags =--
+    #define HAS_MIPI_PANEL 1
+    #define HAS_TOUCH 1
+    #define HAS_ES8311 1
+    #define HAS_ES7210 1
     //#define HAS_IO_EXPANDER
     //#define HAS_RGB_PANEL
     //#define HAS_QSPI_PANEL
-    #define HAS_MIPI_PANEL 1
-    #define HAS_TOUCH 1
     
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 7,
     .I2C_SCL_PIN       = 8,
-
-    .BOOT_BUTTON_PIN  = 35,
 
     // ---=  LCD  =---
     .LCD_MODEL         = "EK79007",
@@ -93,16 +93,16 @@ const Fleet_BSP WS_P4_7B_LCD = {
     // ---= Touch Panel =---
     .TP_NAME           = "GT911",
     #define TOUCH_PANEL  TOUCH_WS_P4_7B
+        // When power-on detects low level of the interrupt gpio, address is 0x5D.
+        // Interrupt gpio is high level, address is 0x14.
     .TP_I2C_ADDR       = 0x5D,
-            // When power-on detects low level of the interrupt gpio, address is 0x5D.
-            // Interrupt gpio is high level, address is 0x14.
     .TP_I2C_BACKUP_ADDR= 0x14,
     .TP_I2C_CLOCK_SPEED = 400000,
     .TP_SDA            = 7,
     .TP_SCL            = 8,
     .TP_INT            = -1,
     .TP_RST            = -1,
-    .TP_MAX_TOUCH      = 4,
+    .TP_MAX_TOUCH      = 7,
 
     // ---= LCD Control Pins =---
     .LCD_RST           = 33,
@@ -136,27 +136,68 @@ inline const Fleet_BSP& cfg = WS_P4_7B_LCD;
 const Fleet_Hardware_Config WS_P4_7B_Hardware = {
 
     // --= Audio Codec =-- 
+    // ES8311 / 7210 Codec + NS4150B PA
 
-    .I2S_ADDR     = 0x1A,  // 0x40?
+    .I2S_SDA_PIN    = 7,  // I2C SDA
+    .I2S_SCL_PIN    = 8,  // I2C SCL
+    .I2S_7210_ADDR  = 0x40,   // ES7210 ADC/Mics
+    .I2S_8311_ADDR  = 0x18,   // ES8311 DAC/Amp
 
-    .I2S_LRCK     = 10,  //WS
-    .I2S_SCLK     = 12,  //BCLK
-    .I2S_MCLK     = 13,
-    .I2S_ASDOUT   = 11,  //DIN
+    .I2S_MCLK   = 13,
+    .I2S_BCLK   = 12,  //SCLK
+    .I2S_LRCK   = 10,  //WS
 
-    .I2S_DSDIN    = 9,   //DOUT
+    .I2S_DIN    = 11,
+    .I2S_DOUT   = 9,
 
-    .AMP_EN      = 53, //25,  // WS_P4_7B
+    .AUDIO_INPUT_SAMPLE_RATE    = 16000,
+    .AUDIO_OUTPUT_SAMPLE_RATE   = 16000,
+    .I2S_MCLK_MULTIPLE          = 256,
+
+    // --= New Audio Settings =--
+    .I2S_DATA_BIT_WIDTH = 16, // I2S_DATA_BIT_WIDTH_16BIT
+    .I2S_SLOT_BIT_WIDTH = 16, // I2S_SLOT_BIT_WIDTH_16BIT
+    .I2S_SLOT_MODE      = 2,  // 1 = MONO, 2 = Stereo (I2S_SLOT_MODE_STEREO)
+    
+    // Codec Config (ES7210)
+    .CODEC_INPUT_MODE   = 0,  // AUDIO_HAL_ADC_INPUT_LINE1 (Mic 1/2)
+    .CODEC_CODEC_MODE   = 1,  // AUDIO_HAL_CODEC_MODE_ENCODE
+    .CODEC_IFACE_I2S_FMT      = 0,  // AUDIO_HAL_I2S_NORMAL
+    .CODEC_IFACE_SAMPLES      = 2,  // AUDIO_HAL_16K_SAMPLES
+    .CODEC_IFACE_BIT_LENGTH   = 1,  // AUDIO_HAL_BIT_LENGTH_16BITS
+    
+    // Codec Config (ES8311)
+    .DAC_BIT_LENGTH     = 16, // ES8311_RESOLUTION_16
+    
+    // Mic Settings (Standard)
+    .MIC_SELECTED       = 0x03, // Mic1 | Mic2
+    .MIC_GAIN_DB        = 13,   // GAIN_36DB
+
+    // Mic Settings (AEC / Loopback)
+    .AEC_MIC_SELECTED   = 0x0F, // Mic1 | Mic2 | Mic3 | Mic4
+    .AEC_MIC_GAIN_DB    = 4,    // GAIN_12DB (Conservative start for AEC)
+
+    // --= Audio Amp =--
+    .I2S_AMP_EN     = 53,   //25,  // WS_P4_7B
+
+    .BOOT_BUTTON_PIN  = 35,
 
     // --= SD Card Interface =--
-    .TF_CMD            = 44,
-    .TF_CLK            = 43,
-    .TF_D0             = 39,
-    .TF_D1             = 40,
-    .TF_D2             = 41,
-    .TF_D3             = 42,    //CD/D3
+    .TF_CMD     = 44,
+    .TF_CLK     = 43,
+    .TF_D0      = 39,
+    .TF_D1      = 40,
+    .TF_D2      = 41,
+    .TF_D3      = 42,    //CD/D3
 
-    /*
+    /* I2C Scan Results:
+    I2C device found at address 0x18  ! // ES8311 DAC/Amp
+    I2C device found at address 0x40  ! // ES7210 ADC/Mics
+    I2C device found at address 0x5D  ! // GT911 Touch Panel
+    */
+
+    /* Misc findings from Waveshare docs:
+
     // --= WS_P4_7B Experimental SDKconfig =--
     .SDIO_PIN_CMD      = 19,
     .SDIO_PIN_CLK      = 18,

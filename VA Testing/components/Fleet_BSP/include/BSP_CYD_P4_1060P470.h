@@ -93,7 +93,7 @@ static const lcd_init_cmd_t guition_1060P4709_init[] = {
 };
 
 const Fleet_BSP guition_1060P4709_LCD = {
-    .device_name       = "Guition P4 7\" JC1060P470C",
+    .device_name       = "Guition P4 JC1060P470C",
 
     // --= Hardware Flags =--
     #define HAS_MIPI_PANEL 1
@@ -159,7 +159,7 @@ inline const Fleet_BSP& cfg = guition_1060P4709_LCD;
 const Fleet_Hardware_Config Guition_P4_7_Hardware = {
     
     // --- Audio Codec ---
-    
+    // NS4150B power amplifier with ES8311 codec
     .I2S_ADDR  = 0x18,  // ES8311 Default I2C Address
     .I2S_LRCK  = 10,
     .I2S_SCLK  = 12,    // BCK_IO in examples

@@ -19,6 +19,12 @@ bool DisplayManager::begin() {
     Serial.printf("Device init: %s\n", cfg.device_name);
     Serial.printf("Display hardware: %s\n", cfg.LCD_MODEL);
     Serial.printf("Touch panel: %s\n", cfg.TP_NAME);
+    Serial.printf("PSRAM Total: %d bytes\n", ESP.getPsramSize());
+    if (ESP.getPsramSize() == 0) {
+        Serial.println("CRITICAL ERROR: PSRAM not found! Display will fail.");
+    }
+    Serial.printf("FLASH size : %d kb\r\n", ESP.getFlashChipSize() / 1024);
+    
     Serial.println("------------------------------");
 
     Serial.println("[DisplayMgr] Begin");
@@ -44,6 +50,15 @@ bool DisplayManager::begin() {
         return false;
     }
 
+    /*if (cfg.ROTATION != 0) {
+        Serial.println("[DisplayMgr] Initial Display Size: ");
+        Serial.printf("Display Size: %d x %d\n", _gfx->width(), _gfx->height());
+        _gfx->setRotation(cfg.ROTATION);
+        Serial.printf("[DisplayMgr] Setting Rotation: %d\n", cfg.ROTATION); Serial.flush();
+        Serial.println("[DisplayMgr] After Rotation Size: ");
+        Serial.printf("%d x %d\n", _gfx->height(), _gfx->width());
+    }*/  
+
     // 4. Init Backlight
     // We do this AFTER gfx->begin() to override any pinMode() calls
     Serial.println("------------------------------");
@@ -51,24 +66,36 @@ bool DisplayManager::begin() {
     pinMode(cfg.LCD_BL, OUTPUT);
     initBacklightPWM(true);
 
+    #ifdef HAS_TOUCH
+        resetTouch();
+    #endif
+
+    #ifdef HAS_IO_EXPANDER
+        powerAmpEnable(true);
+        powerAmpSwitch(true);
+    #endif
+
     return true;
 }
 
 void DisplayManager::initBus() {
-    #ifdef WS_S3_SMART86
-        _expander = new Arduino_XCA9554SWSPI(
-            cfg.EXIO_LCD_RST, cfg.EXIO_LCD_CS, cfg.EXIO_LCD_SCK, cfg.EXIO_LCD_MOSI,
-            &Wire, cfg.EXPANDER_I2C_ADDR
-        );
-        _bus = _expander;
-
-    #elif GUITION_3248W535
-        // Initialize QSPI Bus
-        // CS, SCK, D0, D1, D2, D3
-        _bus = new Arduino_ESP32QSPI(
-            cfg.LCD_CS, cfg.LCD_SCK, 
-            cfg.LCD_MOSI, cfg.QSPI_D1, cfg.QSPI_D2, cfg.QSPI_D3
-        );
+    #ifdef HAS_BUS
+        #ifdef HAS_IO_EXPANDER
+            Serial.println("[DisplayMgr] Init Expander Bus..."); Serial.flush();
+            _expander = new Arduino_XCA9554SWSPI(
+                cfg.EXIO_LCD_RST, cfg.EXIO_LCD_CS, cfg.EXIO_LCD_SCK, cfg.EXIO_LCD_MOSI,
+                &Wire, cfg.EXPANDER_I2C_ADDR
+            );
+            _bus = _expander;
+            if (!_bus) Serial.println("[DisplayMgr] RGB Panel Alloc Failed!"); Serial.flush();
+        #elif HAS_QSPI_PANEL
+            // Initialize QSPI Bus
+            // CS, SCK, D0, D1, D2, D3
+            _bus = new Arduino_ESP32QSPI(
+                cfg.LCD_CS, cfg.LCD_SCK, 
+                cfg.LCD_MOSI, cfg.QSPI_D1, cfg.QSPI_D2, cfg.QSPI_D3
+            );
+        #endif
     #endif
 }
 
@@ -76,16 +103,22 @@ void DisplayManager::initPanel() {
 
     #ifdef HAS_RGB_PANEL
         // --- RGB PANEL (Self-buffered) ---
+        Serial.println("[DisplayMgr] Creating RGB Panel..."); Serial.flush();
         Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
             cfg.LCD_DE, cfg.LCD_VSYNC, cfg.LCD_HSYNC, cfg.LCD_PCLK,
-            cfg.B0, cfg.B1, cfg.B2, cfg.B3, cfg.B4,
-            cfg.G0, cfg.G1, cfg.G2, cfg.G3, cfg.G4, cfg.G5,
             cfg.R0, cfg.R1, cfg.R2, cfg.R3, cfg.R4,
+            cfg.G0, cfg.G1, cfg.G2, cfg.G3, cfg.G4, cfg.G5,
+            cfg.B0, cfg.B1, cfg.B2, cfg.B3, cfg.B4,
             cfg.HSYNC_POL, cfg.HSYNC_FPORCH, cfg.HSYNC_PWIDTH, cfg.HSYNC_BPORCH,
             cfg.VSYNC_POL, cfg.VSYNC_FPORCH, cfg.VSYNC_PWIDTH, cfg.VSYNC_BPORCH
-            , cfg.PCLK_ACTIVE_NEG, cfg.PCLK_HZ
+            , cfg.PCLK_ACTIVE_NEG, cfg.PREFER_SPEED
+            #ifdef WS_S3_SMART86
+            , cfg.USE_BIG_ENDIAN
+            #endif
         );
+        if (!rgbpanel) Serial.println("[DisplayMgr] RGB Panel Alloc Failed!"); Serial.flush();
         // RGB Display IS the canvas, so we assign it directly to _gfx
+        Serial.println("[DisplayMgr] Creating RGB Display..."); Serial.flush();
         _gfx = new Arduino_RGB_Display(
             cfg.WIDTH, cfg.HEIGHT, rgbpanel, 
             cfg.ROTATION, true, _bus, cfg.LCD_RST
@@ -94,8 +127,9 @@ void DisplayManager::initPanel() {
             , cfg.INIT_CMDS_RGB, cfg.INIT_CMDS_SIZE
             #endif
         );
+        if (!_gfx) Serial.println("[DisplayMgr] RGB Display Alloc Failed!"); Serial.flush();
 
-    #elif GUITION_3248W535
+    #elif HAS_QSPI_PANEL
         // --- QSPI PANEL (Requires Canvas Wrapper) ---
         // 1. Create the Hardware Driver (The "Writer")
         // We use a local pointer 'driver' because we don't need to store this globally.
@@ -189,7 +223,6 @@ int DisplayManager::getBrightness() {
 }
 
 void DisplayManager::resetTouch() {
-  #ifdef HAS_TOUCH
     #ifdef HAS_IO_EXPANDER
         _expander->pinMode(cfg.EXIO_TP_RST, OUTPUT);
         _expander->pinMode(cfg.EXIO_TP_INT, OUTPUT);
@@ -209,6 +242,34 @@ void DisplayManager::resetTouch() {
         delay(200);
     }
     #endif
-    Serial.println("[TouchMgr] Touch Reset Complete");
-  #endif
+    Serial.println("[BusMgr] Touch Reset Complete");
+}
+
+void DisplayManager::powerAmpEnable(bool on) {
+    #ifdef HAS_IO_EXPANDER
+        #ifdef WS_S3_SMART86
+            if (_expander) {
+                _expander->pinMode(cfg.EXIO_AMP_EN, OUTPUT);
+                Serial.printf("[BusMgr] Power Amp Pin Enabled (via Expander): %d\n", hw_cfg.I2S_AMP_EN);
+            }
+        #endif
+    #else
+        pinMode(hw_cfg.I2S_AMP_EN, OUTPUT);
+        Serial.printf("[BusMgr] Power Amp Pin Enabled: %d\n", hw_cfg.I2S_AMP_EN);
+    #endif
+}
+
+void DisplayManager::powerAmpSwitch(bool on) {
+    #ifdef HAS_IO_EXPANDER
+        #ifdef WS_S3_SMART86
+            if (_expander) {
+                _expander->digitalWrite(cfg.EXIO_AMP_EN, on ? HIGH : LOW);
+                Serial.printf("[BusMgr] Power Amp Status (via Expander): %s\n", on ? "ON" : "OFF");
+                return;
+            }
+        #endif
+    #else
+        digitalWrite(hw_cfg.I2S_AMP_EN, on ? HIGH : LOW);
+        Serial.printf("[BusMgr] Power Amp Status: %s\n", on ? "ON" : "OFF");
+    #endif
 }

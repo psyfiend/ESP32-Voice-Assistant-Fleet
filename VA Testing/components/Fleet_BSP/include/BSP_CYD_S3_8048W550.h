@@ -16,11 +16,12 @@ static const Fleet_BSP Guition_8048W550_LCD = {
     .device_name       = "Guition S3 5\" JC8048W550",
 
     // --= Hardware Flags =--
-    //#define HAS_IO_EXPANDER 1
     #define HAS_RGB_PANEL 1
+    #define HAS_TOUCH 1
+    //#define HAS_IO_EXPANDER 1
     //#define HAS_QSPI_PANEL 1
     //#define HAS_MIPI_PANEL 1
-    #define HAS_TOUCH 1
+    
 
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 19,

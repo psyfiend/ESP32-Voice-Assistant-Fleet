@@ -266,11 +266,12 @@ static const uint8_t guition_3248W535_init[] = {
 
 // Guition 3.5" 320x480 LCD Configuration
 static const Fleet_BSP Guition_3248W535_LCD = {
-    .device_name       = "Guition 3.5\" JC3248W535",
+    .device_name       = "Guition S3 JC3248W535",
 
     // --= Hardware Flags =--
     #define HAS_QSPI_PANEL
     #define HAS_TOUCH
+    #define HAS_BUS
 
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 4,
@@ -320,7 +321,8 @@ inline const Fleet_BSP& cfg = Guition_3248W535_LCD;
 
 const Fleet_Hardware_Config Guition_3248W535_Hardware = {
     
-    // --- Audio Codec --- NS4168
+    // --= Audio Codec =--
+    // --= NS4168 power amp
     .I2S_BCLK   = 42,
     .I2S_LRCK   = 2,
     .I2S_DIN    = 41,  // _DO_IO

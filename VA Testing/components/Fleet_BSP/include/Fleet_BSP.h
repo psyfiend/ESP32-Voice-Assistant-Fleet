@@ -29,23 +29,22 @@ struct Fleet_BSP
     // --- I2C Bus ---
     int8_t   I2C_SDA_PIN, I2C_SCL_PIN;
     uint32_t I2C_CLOCK_SPEED;
-    uint8_t  EXPANDER_I2C_ADDR;
-    
-    uint8_t  BOOT_BUTTON_PIN;
 
     // --- Expander Pins ---
-    int8_t EXIO_LCD_RST;
-    int8_t EXIO_LCD_CS;
-    int8_t EXIO_LCD_SCK;
-    int8_t EXIO_LCD_MOSI;
-    int8_t EXIO_TP_RST;
-    int8_t EXIO_TP_INT;
-    int8_t EXIO_AMP_EN;
+    uint8_t  EXPANDER_I2C_ADDR;
+    int8_t   EXIO_LCD_CS;   // Header Pin 6
+    int8_t   EXIO_LCD_MOSI; // Header Pin 8
+    int8_t   EXIO_LCD_SCK;  // Header Pin 10
+    int8_t   EXIO_AMP_EN;   // Header Pin 12
+    int8_t   EXIO_HDR_14;   // Header Pin 14 - PWR / Key3
+    int8_t   EXIO_TP_RST;   // Header Pin 16
+    int8_t   EXIO_TP_INT;   // Header Pin 18
+    int8_t   EXIO_LCD_RST;  // Header Pin 17
 
     // --- LCD Definitions ---
     const char  *LCD_MODEL;   // ST7701, AXS15231B,, ST7262, ILI9xxx, etc.
-    uint16_t    WIDTH;
-    uint16_t    HEIGHT;
+    uint32_t    WIDTH;
+    uint32_t    HEIGHT;
     int8_t      ROTATION;
     bool        AUTO_FLUSH;
 
@@ -89,12 +88,12 @@ struct Fleet_BSP
     uint8_t COL_OFFSET2, ROW_OFFSET2;
 
     int8_t      PCLK_ACTIVE_NEG;
-    uint32_t    PCLK_HZ;
+    uint32_t    PCLK_HZ, PREFER_SPEED;
     bool        USE_BIG_ENDIAN;
     uint16_t    DE_IDLE_HIGH, PCLK_IDLE_HIGH;
     size_t      BOUNCE_BUFFER_SIZE_PX;
 
-    uint32_t    PREFER_SPEED, LANE_BIT_RATE;
+    uint32_t    LANE_BIT_RATE;
     
     #ifdef HAS_MIPI_PANEL
     const lcd_init_cmd_t *INIT_CMDS_DSI;
@@ -108,21 +107,57 @@ struct Fleet_BSP
 struct Fleet_Hardware_Config
 {
     // --- Audio Codec ---
+    uint8_t I2S_SDA_PIN, I2S_SCL_PIN;    // I2C SDA and SCL
+    uint8_t I2S_7210_ADDR;               // ES7210 ADC/Mics I2C Address
+    uint8_t I2S_8311_ADDR;               // ES8311 DAC/Amp I2C Address
+
+    uint8_t I2S_MCLK;
     uint8_t I2S_BCLK;
-    uint8_t I2S_LRCK;      // 8311_LRCK
-    uint8_t I2S_SCLK;      // 8311_SCLK/DMIC_SCL
-    uint8_t I2S_DIN;
-    uint8_t I2S_MCLK;      // 8311_MCLK
-    uint8_t I2S_ASDOUT;    // TDMOUT   I2S_ASDOUT
-    uint8_t I2S_SDOUT2;    // TMDMIN
+    uint8_t I2S_LRCK;
+    uint8_t I2S_SCLK;
 
-    uint8_t I2S_DSDIN;    // DMIC_DATA
+    uint8_t I2S_DIN, I2S_DOUT;
 
-    // --- Audio Amp ---        // NS4150B on WS Smart86 boxes // NS4168 on Guition P4.7
-    uint8_t AMP_EN; // CTRL (EXIO3 on Waveshare S3 Smart86)
+    uint32_t AUDIO_INPUT_SAMPLE_RATE;
+    uint32_t AUDIO_OUTPUT_SAMPLE_RATE;
+
+    uint32_t I2S_MCLK_MULTIPLE;
+
+    // --= New Audio Configuration Fields =--
+    // Using int types to avoid complex dependency chains in BSP headers
+    // These map to the standard ESP-IDF / Audio HAL enums
+    uint8_t I2S_DATA_BIT_WIDTH; // 16, 24, 32
+    uint8_t I2S_SLOT_BIT_WIDTH; // 16, 24, 32
+    uint8_t I2S_SLOT_MODE;      // 0 = Mono, 1 = Stereo
+    
+    // Codec Specifics (ES7210)
+    uint8_t CODEC_INPUT_MODE;   // Maps to audio_hal_adc_input_t (0=Line1, 2=All)
+    uint8_t CODEC_CODEC_MODE;   // Maps to audio_hal_codec_mode_t (0=Encode, 1=Decode, 2=Both)
+    uint8_t CODEC_IFACE_I2S_FMT;      // Maps to audio_hal_iface_format_t (0=Normal, 1=Left, etc)
+    uint8_t CODEC_IFACE_SAMPLES;      // Maps to audio_hal_iface_samples_t (0=8K, 1=11.025K, 2=16K, etc)
+    uint8_t CODEC_IFACE_BIT_LENGTH;   // Maps to audio_hal_iface_bits_t (1=16bit, 2=24bit)
+    
+    // Output Codec Specifics (ES8311)
+    uint8_t DAC_BIT_LENGTH;     // Maps to es8311_resolution_t (16, 24, 32)
+
+    // Mic Gain / Selection (Standard Mode)
+    uint8_t MIC_SELECTED;       // Bitmask for ES7210 (Mic1 | Mic2)
+    uint8_t MIC_GAIN_DB;        // Gain Enum (e.g. GAIN_36DB)
+
+    // Mic Gain / Selection (AEC Mode - HAS_EAC)
+    uint8_t AEC_MIC_SELECTED;   // Usually Mic1|2|3|4 (0x0F)
+    uint8_t AEC_MIC_GAIN_DB;    // Often lower gain for AEC
+
+    // --- Audio Amp --- // NS4150B on WS Smart86 boxes // NS4168 on Guition P4.7
+    // Set to -1 if managed externally (Expander) or if not present. 
+    // Set to GPIO number if directly connected.
+    int8_t I2S_AMP_EN;            // EXIO3 on Waveshare S3 Smart86
     uint8_t AMP_LRCK;
     uint8_t AMP_BCLK;
     uint8_t AMP_DIN;
+
+    // --= Button =--
+    uint8_t  BOOT_BUTTON_PIN;
 
     // --- SD Card Interface ---
     uint8_t TF_CMD;

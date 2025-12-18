@@ -2,27 +2,23 @@
 #include "bb_captouch.h"
 
 TouchManager::TouchManager() {
+    _lastTouchTime = 0;
+    _debounceMs = 50; // 50ms is usually the sweet spot for capacitive jitter
+    _isTouchActive = false;
+    _lastTouchCount = 0;
 }
 
 bool TouchManager::begin() {
     
     Serial.println("------------------------------");
 
-    // -----------------------------------------------------------
-    // STRATEGY A: Specific Panel ID (Fleet Architecture)
-    // -----------------------------------------------------------
     // If bb_cap_touch has a specific configuration for the device 
     // and it is in the BSP as #define TOUCH_PANEL, use that.
-    // The library uses its internal lookup table for pins.
     #ifdef TOUCH_PANEL
         Serial.printf("[TouchMgr] Initializing %s using bb_captouch ID: %d\n", cfg.TP_NAME, TOUCH_PANEL);
         
         // Assumes your fork has an overloaded init(int type)
         int touchtest = _touch.init(TOUCH_PANEL);
-
-    // -----------------------------------------------------------
-    // STRATEGY B: Manual Pin Config (Legacy/Generic)
-    // -----------------------------------------------------------
     #else
         // Manual touch init using explicit pin numbers from Fleet_BSP
         int sda, scl, rst, irq;
@@ -50,9 +46,6 @@ bool TouchManager::begin() {
         int touchtest = _touch.init(sda, scl, irq, rst);
     #endif
 
-    // -----------------------------------------------------------
-    // Validation
-    // -----------------------------------------------------------
     if (touchtest == CT_SUCCESS) {
         Serial.println("[TouchMgr] Initialization Success");
     } else {
@@ -63,37 +56,87 @@ bool TouchManager::begin() {
     return true;
 }
 
-bool TouchManager::read(int *x, int *y) {
+// <--- ADDED: New Multitouch Implementation
+// Fetches all available touch points up to maxPoints
+uint8_t TouchManager::read(TouchPoint* points, uint8_t maxPoints) {
     TOUCHINFO ti;
     
-    // bb_captouch stores state internally, we just ask for samples
-    if (_touch.getSamples(&ti)) {
-        if (ti.count > 0) {
-            // Get the RAW physical coordinates
-            int rawX = ti.x[0];
-            int rawY = ti.y[0];
-            
-            // Map them to the current display rotation
-            mapCoordinates(&rawX, &rawY);
-            
-            // Return the processed values
-            *x = rawX;
-            *y = rawY;
-            return true;
+    // 1. Fetch Raw Samples
+    // We check the hardware state first
+    bool hardwareAvailable = _touch.getSamples(&ti);
+
+    // 2. State Machine Logic
+    if (hardwareAvailable && ti.count > 0) {
+        // --- CASE A: Valid Signal Detected ---
+        _isTouchActive = true;
+        _lastTouchCount = ti.count;
+        _lastTouchTime = millis();
+        
+        // Safety: don't overflow internal cache
+        if(_lastTouchCount > 5) _lastTouchCount = 5;
+
+        // Process and Cache this valid frame
+        for (uint8_t i = 0; i < _lastTouchCount; i++) {
+            _lastValidPoints[i].x = ti.x[i];
+            _lastValidPoints[i].y = ti.y[i];
+            _lastValidPoints[i].strength = ti.area[i];
+            _lastValidPoints[i].id = i; 
+
+            // Apply rotation map IMMEDIATELY so cache contains valid screen coords
+            mapCoordinates(&_lastValidPoints[i]);
         }
+    } 
+    else {
+        // --- CASE B: Signal Loss (or Release) ---
+        // We only accept "Released" if the signal has been gone longer than _debounceMs
+        if (_isTouchActive && (millis() - _lastTouchTime < _debounceMs)) {
+            // It's a glitch! (Signal drop < 50ms)
+            // Restore state from CACHE (do not update time)
+            // This bridges the gap in the I2C stream
+        } else {
+            // It's a real release (or we've been released for a while)
+            _isTouchActive = false;
+            _lastTouchCount = 0;
+            return 0;
+        }
+    }
+
+    // 3. Output Population
+    // Whether fresh or cached, we copy the valid state to the user's buffer
+    uint8_t returnCount = (_lastTouchCount > maxPoints) ? maxPoints : _lastTouchCount;
+    
+    for (uint8_t i = 0; i < returnCount; i++) {
+        points[i] = _lastValidPoints[i];
+    }
+
+    return returnCount;
+}
+
+// <--- UPDATED: Legacy Wrapper
+// Maintains backward compatibility by calling the new reader
+bool TouchManager::read(int *x, int *y) {
+    TouchPoint p; // temporary container
+    
+    // We only ask for 1 point here
+    if (read(&p, 1) > 0) {
+        *x = p.x;
+        *y = p.y;
+        return true;
     }
     return false;
 }
 
-void TouchManager::mapCoordinates(int *x, int *y) {
-    int rawX = *x;
-    int rawY = *y;
+// <--- UPDATED: Accepts TouchPoint pointer to modify X/Y in place
+void TouchManager::mapCoordinates(TouchPoint *point) {
+    int rawX = point->x;
+    int rawY = point->y;
 
     // ==========================================================
     // GUITION 3.5" (Native 320x480)
     // ==========================================================
     #ifdef GUITION_3248W535
-        Serial.println("[TouchMgr] Initializing GUITION 3248W535 rotation mapping...");
+        // Serial.println("[TouchMgr] Initializing GUITION 3248W535 rotation mapping..."); 
+        // (Commented out Serial to prevent log spam in loop)
 
         int SW_ROTATION = cfg.ROTATION;
 
@@ -101,54 +144,40 @@ void TouchManager::mapCoordinates(int *x, int *y) {
             SW_ROTATION = 0;    // Fallback to 0 if invalid
         }
 
-        // The AXS15231/CST816 usually reports 0..320 (X) and 0..480 (Y)
-        // irrespective of what the screen is doing.
-        // We assume NATIVE_WIDTH = 320, NATIVE_HEIGHT = 480
-
         switch (SW_ROTATION) {
             case 0: // Portrait (Native)
-                // No change needed usually
-                *x = rawX;
-                *y = rawY;
+                point->x = rawX;
+                point->y = rawY;
                 break;
 
             case 1: // Landscape (90 deg CW)
-                // Top-Left of Portrait becomes Top-Right of Landscape
-                // New X = Raw Y
-                // New Y = NativeWidth - Raw X
-                *x = rawY;
-                *y = 320 - rawX;
+                point->x = rawY;
+                point->y = 320 - rawX;
                 break;
 
             case 2: // Inverted Portrait (180 deg)
-                // Top-Left becomes Bottom-Right
-                *x = 320 - rawX;
-                *y = 480 - rawY;
+                point->x = 320 - rawX;
+                point->y = 480 - rawY;
                 break;
 
             case 3: // Inverted Landscape (270 deg CW)
-                // Top-Left becomes Bottom-Left
-                // New X = NativeHeight - Raw Y
-                // New Y = Raw X
-                *x = 480 - rawY;
-                *y = rawX;
+                point->x = 480 - rawY;
+                point->y = rawX;
                 break;
         }
 
     // ==========================================================
-    // WAVESHARE S3 BOX (Native 480x480)
+    // WAVESHARE S3/P4 BOXES (Native Square/Landscape)
     // ==========================================================
-    #elif WS_S3_SMART86
-        // Square display is easier, but still needs rotation logic
-        // if we ever rotate the UI.
-        // For now, pass through as hardware is often 1:1 mapped
-        *x = rawX;
-        *y = rawY;
+    #elif defined(WS_S3_SMART86) || defined(WS_P4_SMART86) || defined(WS_P4_7B)
+        // Pass through for now as hardware is often 1:1 mapped on these panels
+        point->x = rawX;
+        point->y = rawY;
     #endif
 
     // Sanity Clip (keep inside logical bounds)
-    if (*x < 0) *x = 0;
-    if (*y < 0) *y = 0;
-    if (*x >= cfg.WIDTH) *x = cfg.WIDTH - 1;
-    if (*y >= cfg.HEIGHT) *y = cfg.HEIGHT - 1;
+    if (point->x < 0) point->x = 0;
+    if (point->y < 0) point->y = 0;
+    if (point->x >= cfg.WIDTH) point->x = cfg.WIDTH - 1;
+    if (point->y >= cfg.HEIGHT) point->y = cfg.HEIGHT - 1;
 }

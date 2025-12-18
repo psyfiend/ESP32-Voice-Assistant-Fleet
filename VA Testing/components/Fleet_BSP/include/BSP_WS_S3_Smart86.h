@@ -4,6 +4,8 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP.h"
 
+#define WS_S3_SMART86
+
 // -------------------------------------------------------------------------
 // Board: WaveShare S3 Smart86 Box (ESP32-S3 N16R8)
 // Driver: ST7701 (RGB)
@@ -113,7 +115,7 @@ static const uint8_t waveshare_s3_smart86_init[] = {
     WRITE_BYTES, 5, 0x77, 0x01, 0x00, 0x00, 0x00,
 
     WRITE_COMMAND_8, 0x21,   // 0x20 normal, 0x21 IPS
-    WRITE_C8_D8, 0x3A, 0x60, // 0x70 RGB888, 0x60 RGB666, 0x50 RGB565
+    WRITE_C8_D8, 0x3A, 0x66, // 0x70 RGB888, 0x60 RGB666-18bit, 0x50 RGB565-16bit - WS: 0x66
 
     WRITE_COMMAND_8, 0x11, // Sleep Out
     END_WRITE,
@@ -128,50 +130,51 @@ static const uint8_t waveshare_s3_smart86_init[] = {
 // Waveshare S3 Smart86 LCD Configuration
 static const Fleet_BSP WS_S3_SMART86_LCD = {
 
-    .device_name       = "Waveshare S3 4\" Smart86",
+    .device_name       = "Waveshare S3 Smart86",
 
     // --= Hardware Flags =--
     #define HAS_IO_EXPANDER 1
+    #define HAS_BUS 1
     #define HAS_RGB_PANEL 1
-    //#define HAS_QSPI_PANEL 1
-    //#define HAS_MIPI_PANEL 1
     #define HAS_TOUCH 1
+    #define HAS_BUTTON 1
+    #define HAS_ES8311
+    #define HAS_ES7210
 
     // --=  I2C Bus  =--
-    .I2C_SDA_PIN       = 47,
-    .I2C_SCL_PIN       = 48,
-    .EXPANDER_I2C_ADDR = 0x20,
-
-    .BOOT_BUTTON_PIN  = 0,
+    .I2C_SDA_PIN       = 47,    // Header Pin 14
+    .I2C_SCL_PIN       = 48,    // Header Pin 3
     
     // #define RST_PIN EXIO_LCD_RST
 
     // --= Expander Pins =--
-    .EXIO_LCD_RST      = 7,
-    .EXIO_LCD_CS       = 0,
-    .EXIO_LCD_SCK      = 2,
-    .EXIO_LCD_MOSI     = 1,
-    .EXIO_TP_RST       = 5,
-    .EXIO_TP_INT       = 6,
+    .EXPANDER_I2C_ADDR = 0x20,
+    .EXIO_LCD_CS       = 0,     // Header Pin 6
+    .EXIO_LCD_MOSI     = 1,     // Header Pin 8
+    .EXIO_LCD_SCK      = 2,     // Header Pin 10
+    .EXIO_AMP_EN       = 3,     // Header Pin 12
+    .EXIO_HDR_14       = 4,     // Header Pin 14 - PWR / Key3
+    .EXIO_TP_RST       = 5,     // Header Pin 16
+    .EXIO_TP_INT       = 6,     // Header Pin 18
+    .EXIO_LCD_RST      = 7,     // Header Pin 17
 
     // ---= LCD Definitions =---
     .LCD_MODEL         = "ST7701",
     .WIDTH             = 480,
     .HEIGHT            = 480,
-    .ROTATION          = 2,     // 0 = USB Port on right side
+    .ROTATION          = 0,     // 0 = USB Port on right side
     .AUTO_FLUSH        = true,
 
     // ---= Backlight =---
     .LCD_BL            = 4,
     .LCD_BL_ON_LEVEL   = 0, // Active LOW for P4 GPIO
-    .LCD_BL_FREQ       = 5000, // 5 kHz PWM
+    .LCD_BL_FREQ       = 25000, // WS: 5000 Hz PWM
 
     // ---= Touch Panel =---
     .TP_NAME           = "GT911",
-//  .TP_CAPTOUCH_NAME  = "TOUCH_WS_S3_SMART86",
     #define TOUCH_PANEL   TOUCH_WS_S3_SMART86
     .TP_I2C_ADDR       = 0x5D,
-    .TP_I2C_CLOCK_SPEED = 100000,
+    .TP_I2C_CLOCK_SPEED = 400000,
     .TP_SDA            = 47,
     .TP_SCL            = 48,
 //  .TP_INT            = EXIO 6,
@@ -187,6 +190,13 @@ static const Fleet_BSP WS_S3_SMART86_LCD = {
     .LCD_HSYNC         = 46,
     .LCD_PCLK          = 9,
 
+/*    
+    .R0 = 40, .R1 = 41, .R2 = 42, .R3 = 2,  .R4 = 1,
+    .G0 = 21, .G1 = 8,  .G2 = 18, .G3 = 45, .G4 = 38, .G5 = 39,
+    .B0 = 10, .B1 = 11, .B2 = 12, .B3 = 13, .B4 = 14,
+*/    
+
+    // Flipped R & B rows
     .R0 = 10, .R1 = 11, .R2 = 12, .R3 = 13, .R4 = 14,
     .G0 = 21, .G1 = 8,  .G2 = 18, .G3 = 45, .G4 = 38, .G5 = 39,
     .B0 = 40, .B1 = 41, .B2 = 42, .B3 = 2,  .B4 = 1,
@@ -194,19 +204,22 @@ static const Fleet_BSP WS_S3_SMART86_LCD = {
     // --= RGB Timing =---
     .HSYNC_POL      = 1,
     .VSYNC_POL      = 1,
-    .HSYNC_PWIDTH   = 8,
-    .HSYNC_BPORCH   = 50,
-    .HSYNC_FPORCH   = 10,
-    .VSYNC_PWIDTH   = 8,
+    .HSYNC_PWIDTH   = 10,   // 8,    // 10,
+    .HSYNC_BPORCH   = 10,   // 50,   // 10,
+    .HSYNC_FPORCH   = 20,   // 10,   // 20,
+    .VSYNC_PWIDTH   = 10,   // 8,    // 10,
     .VSYNC_BPORCH   = 20,
     .VSYNC_FPORCH   = 10,
 
-    .PCLK_ACTIVE_NEG    = 0,
-    .PCLK_HZ            = 12500000,
+    .PCLK_ACTIVE_NEG   = 0,
+    .PCLK_HZ           = 12500000,
+    .PREFER_SPEED      = 16000000, // 16000000,
+    .USE_BIG_ENDIAN    = false,
+    .BOUNCE_BUFFER_SIZE_PX = 9600, // 480x20 
 
     // ---= Init Commands =---
-    .INIT_CMDS_RGB      = waveshare_s3_smart86_init,
-    .INIT_CMDS_SIZE     = sizeof(waveshare_s3_smart86_init),
+    .INIT_CMDS_RGB     = waveshare_s3_smart86_init,
+    .INIT_CMDS_SIZE    = sizeof(waveshare_s3_smart86_init),
 
 };
 inline const Fleet_BSP& cfg = WS_S3_SMART86_LCD;
@@ -215,15 +228,54 @@ inline const Fleet_BSP& cfg = WS_S3_SMART86_LCD;
 const Fleet_Hardware_Config WS_S3_Smart86_Hardware = {
  
     // --= Audio Codec =--
-    .I2S_LRCK   = 7,    //WS
-    .I2S_SCLK   = 16,   //BCLK
+    // ES8311 / 7210 Codec + NS4150B PA
+
+    .I2S_SDA_PIN    = 47,   // I2C SDA
+    .I2S_SCL_PIN    = 48,   // I2C SCL
+    .I2S_7210_ADDR  = 0x40, // ES7210 ADC/Mics
+    .I2S_8311_ADDR  = 0x18, // ES8311 DAC/Amp
+
     .I2S_MCLK   = 5,
-    .I2S_ASDOUT = 15,   //DIN
+    .I2S_BCLK   = 16,   //SCLK
+    .I2S_LRCK   = 7,    //WS
 
-    .I2S_DSDIN  =  6,   //DOUT
+    .I2S_DIN    = 15,   //7210
+    .I2S_DOUT   = 6,    //8311
 
-    // --= Audio Amp =-- // NS4150B on WS Smart86 boxes
-//  .AMP_EN     = EXIO3,    // EXIO3 on Waveshare S3 Smart86
+    .AUDIO_INPUT_SAMPLE_RATE    = 16000,
+    .AUDIO_OUTPUT_SAMPLE_RATE   = 16000,
+    .I2S_MCLK_MULTIPLE          = 256,
+
+    // --= New Audio Settings =--
+    .I2S_DATA_BIT_WIDTH = 16, // I2S_DATA_BIT_WIDTH_16BIT
+    .I2S_SLOT_BIT_WIDTH = 16, // I2S_SLOT_BIT_WIDTH_16BIT
+    .I2S_SLOT_MODE      = 2,  // 1 = MONO, 2 = Stereo (I2S_SLOT_MODE_STEREO)
+    
+    // Codec Config (ES7210)
+    .CODEC_INPUT_MODE   = 0,  // AUDIO_HAL_ADC_INPUT_LINE1 (Mic 1/2)
+    .CODEC_CODEC_MODE   = 1,  // AUDIO_HAL_CODEC_MODE_ENCODE
+    .CODEC_IFACE_I2S_FMT      = 0,  // AUDIO_HAL_I2S_NORMAL
+    .CODEC_IFACE_SAMPLES      = 2,  // AUDIO_HAL_16K_SAMPLES
+    .CODEC_IFACE_BIT_LENGTH   = 1,  // AUDIO_HAL_BIT_LENGTH_16BITS
+    
+    // Codec Config (ES8311)
+    .DAC_BIT_LENGTH     = 16, // ES8311_RESOLUTION_16
+    
+    // Mic Settings (Standard)
+    .MIC_SELECTED       = 0x03, // Mic1 | Mic2
+    .MIC_GAIN_DB        = 13,   // GAIN_36DB
+
+    // Mic Settings (AEC / Loopback)
+    .AEC_MIC_SELECTED   = 0x0F, // Mic1 | Mic2 | Mic3 | Mic4
+    .AEC_MIC_GAIN_DB    = 4,    // GAIN_12DB (Conservative start for AEC)
+
+    // --= Audio Amp =--
+    // Set to -1 because this board uses the IO Expander (EXIO3)
+    // which is managed by DisplayManager, not AudioManager.
+    .I2S_AMP_EN         = 3,    // = EXIO3 - Must use expander to control
+
+    // --= Button =--
+    .BOOT_BUTTON_PIN   = 0,     // Header Pin 14 - PWR / Key3
 
     // --= SD Card Interface =--
     .TF_CMD     = 44,
@@ -232,8 +284,8 @@ const Fleet_Hardware_Config WS_S3_Smart86_Hardware = {
     .TF_MOSI    = 42,
     .TF_MISO    = 41,
     .TF_D0      = 40,
-    .TF_D1      = -1, // Not used
-    .TF_D2      = -1, // Not used
+//  .TF_D1      = -1, // Not used
+//  .TF_D2      = -1, // Not used
 };
 inline const Fleet_Hardware_Config& hw_cfg = WS_S3_Smart86_Hardware;
 

@@ -31,7 +31,7 @@ struct Fleet_BSP
     uint32_t I2C_CLOCK_SPEED;
     uint8_t  EXPANDER_I2C_ADDR;
 
-    uint8_t  BOOT_BUTTON_PIN;
+
 
     // --- Expander Pins ---
     int8_t EXIO_LCD_RST;
@@ -44,8 +44,8 @@ struct Fleet_BSP
 
     // --- LCD Definitions ---
     const char  *LCD_MODEL;   // ST7701, AXS15231B,, ST7262, ILI9xxx, etc.
-    uint16_t    WIDTH;
-    uint16_t    HEIGHT;
+    uint32_t    WIDTH;
+    uint32_t    HEIGHT;
     int8_t      ROTATION;
     bool        AUTO_FLUSH;
 
@@ -109,25 +109,58 @@ struct Fleet_BSP
 struct Fleet_Hardware_Config
 {
     // --- Audio Codec ---
-    uint8_t I2S_ADDR;      // I2C Address
+    // NS4150B on WS Smart86 boxes // NS4168 on Guition P4.7
+    uint8_t I2S_SDA_PIN;    // I2C SDA
+    uint8_t I2S_SCL_PIN;    // I2C SCL
+    uint8_t I2S_7210_ADDR;  // I2C Address
+    uint8_t I2S_8311_ADDR;  // I2C Address
 
+    uint8_t I2S_MCLK;   // 8311_MCLK
     uint8_t I2S_BCLK;
-    uint8_t I2S_LRCK;      // 8311_LRCK
-    uint8_t I2S_SCLK;      // 8311_SCLK/DMIC_SCL
+    uint8_t I2S_LRCK;   // 8311_LRCK
+    uint8_t I2S_SCLK;   // 8311_SCLK/DMIC_SCL
     uint8_t I2S_DIN;
-    uint8_t I2S_MCLK;      // 8311_MCLK
-    uint8_t I2S_ASDOUT;    // TDMOUT   I2S_ASDOUT
-    uint8_t I2S_SDOUT2;    // TMDMIN
+    uint8_t I2S_DOUT;   // DMIC_DATA
+    
+    uint8_t I2S_ASDOUT;  // TDMOUT   I2S_ASDOUT
+    uint8_t I2S_SDOUT2;  // TMDMIN
 
-    uint8_t I2S_DSDIN;    // DMIC_DATA
+    uint32_t AUDIO_INPUT_SAMPLE_RATE;
+    uint32_t AUDIO_OUTPUT_SAMPLE_RATE;
 
-    uint8_t WS_IO;
-    uint8_t DO_IO;
-    uint8_t DI_IO;
+    uint32_t I2S_MCLK_MULTIPLE;
 
-    // --- Audio Amp ---        // NS4150B on WS Smart86 boxes
-    uint8_t AMP_EN; // CTRL (EXIO3 on Waveshare S3 Smart86)
+    // --= New Audio Configuration Fields =--
+    // Using int types to avoid complex dependency chains in BSP headers
+    // These map to the standard ESP-IDF / Audio HAL enums
+    uint8_t I2S_DATA_BIT_WIDTH; // 16, 24, 32
+    uint8_t I2S_SLOT_BIT_WIDTH; // 16, 24, 32
+    uint8_t I2S_SLOT_MODE;      // 0 = Mono, 1 = Stereo
+    
+    // Codec Specifics (ES7210)
+    uint8_t CODEC_INPUT_MODE;   // Maps to audio_hal_adc_input_t (0=Line1, 2=All)
+    uint8_t CODEC_CODEC_MODE;   // Maps to audio_hal_codec_mode_t (0=Encode, 1=Decode, 2=Both)
+    uint8_t CODEC_IFACE_I2S_FMT;      // Maps to audio_hal_iface_format_t (0=Normal, 1=Left, etc)
+    uint8_t CODEC_IFACE_SAMPLES;      // Maps to audio_hal_iface_samples_t (0=8K, 1=11.025K, 2=16K, etc)
+    uint8_t CODEC_IFACE_BIT_LENGTH;   // Maps to audio_hal_iface_bits_t (1=16bit, 2=24bit)
+    
+    // Output Codec Specifics (ES8311)
+    uint8_t DAC_BIT_LENGTH;     // Maps to es8311_resolution_t (16, 24, 32)
+
+    // Mic Gain / Selection (Standard Mode)
+    uint8_t MIC_SELECTED;       // Bitmask for ES7210 (Mic1 | Mic2)
+    uint8_t MIC_GAIN_DB;        // Gain Enum (e.g. GAIN_36DB)
+
+    // Mic Gain / Selection (AEC Mode - HAS_EAC)
+    uint8_t AEC_MIC_SELECTED;   // Usually Mic1|2|3|4 (0x0F)
+    uint8_t AEC_MIC_GAIN_DB;    // Often lower gain for AEC
+
+    // --- Audio Amp --- // NS4150B on WS Smart86 boxes // NS4168 on Guition P4.7
+    int8_t I2S_AMP_EN;
     uint8_t POWER_AMP_IO;  // WS_P4_7B
+
+    // --= Button =--
+    uint8_t  BOOT_BUTTON_PIN;
 
     // --- SD Card Interface ---
     uint8_t TF_CMD;
