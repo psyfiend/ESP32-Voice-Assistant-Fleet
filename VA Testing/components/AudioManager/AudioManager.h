@@ -24,6 +24,7 @@ public:
     void setOutputEnable(bool on);
     // Soft Mute Control
     void setMute(bool on);
+    bool getMute();
 
     // Play a simple test tone
     void tone(uint32_t freq, uint32_t durationMs);

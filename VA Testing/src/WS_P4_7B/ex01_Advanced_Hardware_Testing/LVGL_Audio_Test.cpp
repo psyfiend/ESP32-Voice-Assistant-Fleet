@@ -259,13 +259,13 @@ static void btn_tone_cb(lv_event_t * e) {
     show_toast("Playing Tone...", 500);
 }
 
-// <--- UPDATED: Sets flag instead of running logic directly
+// Sets flag instead of running logic directly
 static void btn_pcm_cb(lv_event_t * e) {
     lv_label_set_text(lbl_pcm_text, "WAIT...");
     trigger_audio_test = true; 
 }
 
-// <--- NEW: Test Sequence Processor (Runs in main loop)
+// Test Sequence Processor (Runs in main loop)
 void process_audio_test_sequence() {
     // 1. Alloc
     if (rec_buffer == NULL) {
@@ -544,7 +544,7 @@ void setup() {
     for(int i=0; i<5; i++) {
         coord_labels[i] = lv_label_create(panel_touch_data);
         lv_label_set_text_fmt(coord_labels[i], "ID%d: --", i);
-        lv_obj_align(coord_labels[i], LV_ALIGN_TOP_LEFT, 40, 25 + (i * 25));
+        lv_obj_align(coord_labels[i], LV_ALIGN_TOP_LEFT, 20, 25 + (i * 25));
         lv_obj_set_style_text_color(coord_labels[i], lv_color_hex(0x808080), 0); 
     }
 
@@ -674,7 +674,7 @@ void setup() {
     lv_obj_center(lbl_pcm_text);
     lv_obj_add_event_cb(btn_pcm, btn_pcm_cb, LV_EVENT_CLICKED, NULL);
 
-    // ROW 3: 1,0 - VU Meter
+    // ROW 3 - VU Meter
     lv_obj_t * vu_wrapper = lv_obj_create(pnl_audio_content);
     lv_obj_set_size(vu_wrapper, lv_pct(100), 12); // Wrapper container
     lv_obj_set_style_bg_opa(vu_wrapper, LV_OPA_0, 0); // Transparent
@@ -683,7 +683,7 @@ void setup() {
     lv_obj_set_style_pad_all(vu_wrapper, 0, 0);
     lv_obj_set_style_pad_gap(vu_wrapper, 6, 0); // Gap between L and R meters
 
-    // ROW 3: 1,1 - Left Channel Container (Dark Grey Background)
+    // ROW 3,1 - Left Channel Container (Dark Grey Background)
     lv_obj_t * meter_l_bg = lv_obj_create(vu_wrapper);
     lv_obj_set_flex_grow(meter_l_bg, 1); // Take 50% of width
     lv_obj_set_height(meter_l_bg, lv_pct(100));

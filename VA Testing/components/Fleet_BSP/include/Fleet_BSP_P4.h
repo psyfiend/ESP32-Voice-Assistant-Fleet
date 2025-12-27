@@ -101,6 +101,9 @@ struct Fleet_BSP
     uint8_t     NUM_DSI_LANES;
     uint32_t    PREFER_SPEED, LANE_BIT_RATE;
     
+    // --= LVGL Settings =--
+    size_t      DRAW_BUF_HEIGHT;
+    
     const lcd_init_cmd_t *INIT_CMDS_DSI;
     size_t      INIT_CMDS_SIZE;
 

@@ -7,7 +7,7 @@ AudioManager::AudioManager() {
     _tx_handle = NULL;
     _rx_handle = NULL;
     _currentVolume = 0;
-    _defaultVolume = 50;
+    _defaultVolume = 63;
     _isMuted = false;
     _es8311_dev = NULL;
 }
@@ -94,6 +94,8 @@ bool AudioManager::begin() {
     #endif
     
     Serial.println("[AudioMgr] I2S Initialized (Duplex).");
+
+    setVolume(_defaultVolume);
 
     return true;
 }
@@ -221,6 +223,10 @@ void AudioManager::setMute(bool on) {
     if (_es8311_dev) {
         es8311_voice_mute(_es8311_dev, on) ? true : false;    // True = Mute, False = Unmute
     }
+}
+
+bool AudioManager::getMute() {
+    return _isMuted;
 }
 
 void AudioManager::setOutputEnable(bool on) {

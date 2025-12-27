@@ -126,15 +126,18 @@ bool TouchManager::read(int *x, int *y) {
     return false;
 }
 
-// <--- UPDATED: Accepts TouchPoint pointer to modify X/Y in place
 void TouchManager::mapCoordinates(TouchPoint *point) {
     int rawX = point->x;
     int rawY = point->y;
 
     // ==========================================================
+    // ROTATION LOGIC
     // GUITION 3.5" (Native 320x480)
     // ==========================================================
-    #ifdef GUITION_3248W535
+    // #ifdef GUITION_3248W535
+
+    if (cfg.ROTATION >= 0) 
+        {
         // Serial.println("[TouchMgr] Initializing GUITION 3248W535 rotation mapping..."); 
         // (Commented out Serial to prevent log spam in loop)
 
@@ -152,28 +155,29 @@ void TouchManager::mapCoordinates(TouchPoint *point) {
 
             case 1: // Landscape (90 deg CW)
                 point->x = rawY;
-                point->y = 320 - rawX;
+                point->y = cfg.WIDTH - rawX;
                 break;
 
             case 2: // Inverted Portrait (180 deg)
-                point->x = 320 - rawX;
-                point->y = 480 - rawY;
+                point->x = cfg.WIDTH - rawX;
+                point->y = cfg.HEIGHT - rawY;
                 break;
 
             case 3: // Inverted Landscape (270 deg CW)
-                point->x = 480 - rawY;
+                point->x = cfg.HEIGHT - rawY;
                 point->y = rawX;
                 break;
-        }
-
+            }
+        }   
     // ==========================================================
     // WAVESHARE S3/P4 BOXES (Native Square/Landscape)
     // ==========================================================
-    #elif defined(WS_S3_SMART86) || defined(WS_P4_SMART86) || defined(WS_P4_7B)
+    // #elif defined(WS_S3_SMART86) || defined(WS_P4_SMART86) || defined(WS_P4_7B)
         // Pass through for now as hardware is often 1:1 mapped on these panels
-        point->x = rawX;
-        point->y = rawY;
-    #endif
+    //     point->x = rawX;
+    //     point->y = rawY;
+    // #endif
+
 
     // Sanity Clip (keep inside logical bounds)
     if (point->x < 0) point->x = 0;

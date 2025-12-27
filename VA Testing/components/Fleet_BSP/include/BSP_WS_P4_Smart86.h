@@ -46,6 +46,9 @@ const Fleet_BSP WS_P4_SMART86_LCD = {
     // --= Hardware Flags =--
     #define HAS_MIPI_PANEL 1
     #define HAS_TOUCH 1
+    #define HIGH_DPI_DISPLAY 1
+    #define HAS_ES8311 1
+    #define HAS_ES7210 1
     //#define HAS_IO_EXPANDER
     //#define HAS_RGB_PANEL
     //#define HAS_QSPI_PANEL
@@ -84,13 +87,16 @@ const Fleet_BSP WS_P4_SMART86_LCD = {
     // ---= MIPI Timing =---
     .HSYNC_PWIDTH   = 20,
     .HSYNC_BPORCH   = 80,
-    .HSYNC_FPORCH   = 40,
+    .HSYNC_FPORCH   = 80,   // 40,
     .VSYNC_PWIDTH   = 4,
     .VSYNC_BPORCH   = 12,
     .VSYNC_FPORCH   = 30,
 
     .PREFER_SPEED      = 46000000,
     .LANE_BIT_RATE     = 1000,
+
+    // --= LVGL Settings =--
+    .DRAW_BUF_HEIGHT    = 50,
 
     // ---= Init Commands =---
     .INIT_CMDS_DSI     = waveshare_p4_smart86_init,
@@ -113,15 +119,41 @@ const Fleet_Hardware_Config WS_P4_Smart86_Hardware = {
     .I2S_BCLK   = 12,   //SCLK
     .I2S_LRCK   = 10,   //WS
     
-    .I2S_DIN  = 9,    //DOUT
-    .I2S_DOUT = 11,   //DIN
+    .I2S_DIN    = 11,
+    .I2S_DOUT   = 9,
+
+    .AUDIO_INPUT_SAMPLE_RATE    = 16000,
+    .AUDIO_OUTPUT_SAMPLE_RATE   = 16000,
+    .I2S_MCLK_MULTIPLE          = 256,
+
+    // --= New Audio Settings =--
+    .I2S_DATA_BIT_WIDTH = 16, // I2S_DATA_BIT_WIDTH_16BIT
+    .I2S_SLOT_BIT_WIDTH = 16, // I2S_SLOT_BIT_WIDTH_16BIT
+    .I2S_SLOT_MODE      = 2,  // 1 = MONO, 2 = Stereo (I2S_SLOT_MODE_STEREO)
     
+    // Codec Config (ES7210)
+    .CODEC_INPUT_MODE   = 0,  // AUDIO_HAL_ADC_INPUT_LINE1 (Mic 1/2)
+    .CODEC_CODEC_MODE   = 1,  // AUDIO_HAL_CODEC_MODE_ENCODE
+    .CODEC_IFACE_I2S_FMT      = 0,  // AUDIO_HAL_I2S_NORMAL
+    .CODEC_IFACE_SAMPLES      = 2,  // AUDIO_HAL_16K_SAMPLES
+    .CODEC_IFACE_BIT_LENGTH   = 1,  // AUDIO_HAL_BIT_LENGTH_16BITS
+    
+    // Codec Config (ES8311)
+    .DAC_BIT_LENGTH     = 16, // ES8311_RESOLUTION_16
+    
+    // Mic Settings (Standard)
+    .MIC_SELECTED       = 0x03, // Mic1 | Mic2
+    .MIC_GAIN_DB        = 13,   // GAIN_36DB
+
+    // Mic Settings (AEC / Loopback)
+    .AEC_MIC_SELECTED   = 0x0F, // Mic1 | Mic2 | Mic3 | Mic4
+    .AEC_MIC_GAIN_DB    = 4,    // GAIN_12DB (Conservative start for AEC)
 
     // --= Audio Poweramp =-- // NS4150B on WS Smart86 boxes
-    .I2S_AMP_EN     = 53,
+    .I2S_AMP_EN         = 53,
 
     // --= Button =--
-    .BOOT_BUTTON_PIN  = 35,
+    .BOOT_BUTTON_PIN    = 35,
 
     // --= SD Card Interface =--
     .TF_CMD    = 44,
@@ -132,5 +164,6 @@ const Fleet_Hardware_Config WS_P4_Smart86_Hardware = {
     .TF_D3     = 42,
 
 };
+inline const Fleet_Hardware_Config& hw_cfg = WS_P4_Smart86_Hardware;
 
 #endif // BSP_WS_P4_SMART86_H

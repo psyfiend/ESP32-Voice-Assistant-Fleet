@@ -269,9 +269,9 @@ static const Fleet_BSP Guition_3248W535_LCD = {
     .device_name       = "Guition S3 JC3248W535",
 
     // --= Hardware Flags =--
-    #define HAS_QSPI_PANEL
-    #define HAS_TOUCH
-    #define HAS_BUS
+    #define HAS_QSPI_PANEL 1
+    #define HAS_TOUCH 1
+    #define HAS_BUS 1
 
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 4,
