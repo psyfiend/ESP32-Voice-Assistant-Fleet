@@ -49,7 +49,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     _ui_root = lv_obj_create    (parent);
     lv_obj_set_width            (_ui_root, lv_pct(100)); // Full width
     lv_obj_set_height           (_ui_root, 0); 
-    lv_obj_set_pos              (_ui_root, 0, UiToolkit::sc(50)); // Offset Y by Header Height
+    lv_obj_set_pos              (_ui_root, 0, UiToolkit::sc(30)); // Offset Y by Header Height
     
     // Wrapper Style (Invisible, Clipping)
     lv_obj_set_style_bg_opa         (_ui_root, LV_OPA_TRANSP, 0);
@@ -60,9 +60,9 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_style_clip_corner    (_ui_root, true, 0); 
 
     // 2. Create the CONTENT CONTAINER (_ui_content)
-    _ui_content = lv_obj_create    (_ui_root);
+    _ui_content = lv_obj_create     (_ui_root);
     // Fill the wrapper completely. The wrapper controls the visible height.
-    lv_obj_set_size                (_ui_content, lv_pct(100), lv_pct(100));
+    lv_obj_set_size                 (_ui_content, lv_pct(100), lv_pct(100));
     
     // Content Style
     lv_obj_set_style_bg_color       (_ui_content, lv_color_hex(0x181818), 0);
@@ -72,9 +72,9 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // LVGL radius applies to all corners.
     // Trick: Move content UP by the radius amount to clip the top rounded corners off.
     int32_t radius = UiToolkit::sc(15);
-    lv_obj_set_style_radius     (_ui_content, radius, 0);
-    lv_obj_set_y                (_ui_content, -radius); // Shift up to hide top curves
-    lv_obj_set_height           (_ui_content, lv_pct(100)); // Just fill, we will add padding at bottom if needed
+    lv_obj_set_style_radius     (_ui_content, UiToolkit::sc(15), 0);
+    lv_obj_set_y                (_ui_content, -(UiToolkit::sc(15))); // Shift up to hide top curves
+    
     // Resetting size to account for the shift isn't strictly necessary if we use flex grow inside, 
     // but effectively the bottom area will be "Radius" pixels shorter than visual. 
     // Actually simpler: Just set height to 100% + radius.
@@ -82,12 +82,16 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // Let's stick to standard alignment for now, just radius.
     // If you really want square top, we can accept rounded top or use the hack. 
     // Let's use the hack:
-    lv_obj_set_style_margin_top (_ui_content, -radius, 0);
-    lv_obj_set_style_pad_top    (_ui_content, radius + UiToolkit::sc(10), 0); // Compensate padding
+    
+    // lv_obj_set_style_margin_top (_ui_content, -(UiToolkit::sc(15)), 0);
+    // lv_obj_set_style_pad_top    (_ui_content, UiToolkit::sc(15) + UiToolkit::sc(10), 0); // Radius + padding
     
     lv_obj_set_style_border_color   (_ui_content, lv_color_hex(0x404040), 0);
     lv_obj_set_style_border_width   (_ui_content, UiToolkit::sc(2), 0);
-    lv_obj_set_style_pad_all        (_ui_content, UiToolkit::sc(10), 0); 
+    // lv_obj_set_style_pad_all        (_ui_content, UiToolkit::sc(10), 0);
+    lv_obj_set_style_pad_left       (_ui_content, UiToolkit::sc(10), 0);
+    lv_obj_set_style_pad_right      (_ui_content, UiToolkit::sc(10), 0);
+    lv_obj_set_style_pad_bottom     (_ui_content, UiToolkit::sc(10), 0);
     lv_obj_clear_flag               (_ui_content, LV_OBJ_FLAG_SCROLLABLE); // Static background
 
     lv_obj_set_flex_flow            (_ui_content, LV_FLEX_FLOW_COLUMN);
@@ -95,11 +99,11 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_style_pad_row        (_ui_content, UiToolkit::sc(8), 0);
 
     // -- ROW 1: Stats --
-    lbl_stats = lv_label_create (_ui_content);
-    lv_obj_set_width            (lbl_stats, lv_pct(100));
-    lv_label_set_text           (lbl_stats, "System Ready.");
-    lv_obj_set_style_text_color (lbl_stats, lv_color_hex(0x00FF00), 0);
-    lv_obj_set_style_text_font  (lbl_stats, UiToolkit::Font_Label ? UiToolkit::Font_Label : &lv_font_montserrat_14, 0);
+    lbl_stats = lv_label_create     (_ui_content);
+    lv_obj_set_width                (lbl_stats, lv_pct(100));
+    lv_label_set_text               (lbl_stats, "System Ready.");
+    lv_obj_set_style_text_color     (lbl_stats, lv_color_hex(0x00FF00), 0);
+    lv_obj_set_style_text_font      (lbl_stats, UiToolkit::Font_Label, 0);
 
     // -- ROW 2: Actions --
     _ui_actions = lv_obj_create     (_ui_content);
@@ -120,9 +124,9 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_style_bg_color       (btn, lv_color_hex(0x00A8FF), 0); // Cyan
     
     lv_obj_t* lbl = lv_label_create(btn);
-    lv_label_set_text(lbl, "Dump Config");
-    lv_obj_center(lbl);
-    if(UiToolkit::Font_Button) lv_obj_set_style_text_font(lbl, UiToolkit::Font_Button, 0);
+    lv_label_set_text               (lbl, "Dump Config");
+    lv_obj_center                   (lbl);
+    lv_obj_set_style_text_font      (lbl, UiToolkit::Font_Button, 0);
 
     // -- ROW 3: Log Container --
     lv_obj_t* log_box = lv_obj_create(_ui_content);

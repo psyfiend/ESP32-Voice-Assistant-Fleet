@@ -91,14 +91,16 @@ struct Fleet_BSP
     uint32_t    PCLK_HZ, PREFER_SPEED;
     bool        USE_BIG_ENDIAN;
     uint16_t    DE_IDLE_HIGH, PCLK_IDLE_HIGH;
+
     size_t      BOUNCE_BUFFER_SIZE_PX;
+
+    // --= LVGL Settings =--
+    bool        DOUBLE_BUFFERING;
+    size_t      DRAW_BUF_HEIGHT;
+    size_t      BUFFER_SIZE_PX;
 
     uint32_t    LANE_BIT_RATE;
     
-    #ifdef HAS_MIPI_PANEL
-    const lcd_init_cmd_t *INIT_CMDS_DSI;
-    #endif
-
     const uint8_t        *INIT_CMDS_RGB;
     size_t      INIT_CMDS_SIZE;
 

@@ -140,6 +140,7 @@ static const Fleet_BSP WS_S3_SMART86_LCD = {
     #define HAS_BUTTON 1
     #define HAS_ES8311
     #define HAS_ES7210
+    // #define DOUBLE_BUFFER
 
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 47,    // Header Pin 14
@@ -217,6 +218,11 @@ static const Fleet_BSP WS_S3_SMART86_LCD = {
     .USE_BIG_ENDIAN    = false,
     .BOUNCE_BUFFER_SIZE_PX = 9600, // 480x20 
 
+    // --= LVGL Settings =--
+    .DOUBLE_BUFFERING   = true,
+    .DRAW_BUF_HEIGHT    = 20,
+    .BUFFER_SIZE_PX     = 480 * 20, // Width x 20 rows
+
     // ---= Init Commands =---
     .INIT_CMDS_RGB     = waveshare_s3_smart86_init,
     .INIT_CMDS_SIZE    = sizeof(waveshare_s3_smart86_init),
@@ -239,8 +245,8 @@ const Fleet_Hardware_Config WS_S3_Smart86_Hardware = {
     .I2S_BCLK   = 16,   //SCLK
     .I2S_LRCK   = 7,    //WS
 
-    .I2S_DIN    = 15,   //7210
-    .I2S_DOUT   = 6,    //8311
+    .I2S_DIN    = 15,   // From ADC ES7210
+    .I2S_DOUT   = 6,    // To Codec ES8311
 
     .AUDIO_INPUT_SAMPLE_RATE    = 16000,
     .AUDIO_OUTPUT_SAMPLE_RATE   = 16000,

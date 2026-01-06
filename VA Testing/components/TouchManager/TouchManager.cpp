@@ -135,7 +135,7 @@ void TouchManager::mapCoordinates(TouchPoint *point) {
     // GUITION 3.5" (Native 320x480)
     // ==========================================================
     // #ifdef GUITION_3248W535
-
+    #ifndef WS_P4_7B
     if (cfg.ROTATION >= 0) 
         {
         // Serial.println("[TouchMgr] Initializing GUITION 3248W535 rotation mapping..."); 
@@ -172,11 +172,12 @@ void TouchManager::mapCoordinates(TouchPoint *point) {
     // ==========================================================
     // WAVESHARE S3/P4 BOXES (Native Square/Landscape)
     // ==========================================================
-    // #elif defined(WS_S3_SMART86) || defined(WS_P4_SMART86) || defined(WS_P4_7B)
-        // Pass through for now as hardware is often 1:1 mapped on these panels
-    //     point->x = rawX;
-    //     point->y = rawY;
-    // #endif
+    //elif defined(WS_S3_SMART86) || defined(WS_P4_SMART86) || defined(WS_P4_7B)
+    // Pass through for now as hardware is often 1:1 mapped on these panels
+    #else
+         point->x = rawX;
+         point->y = rawY;
+    #endif
 
 
     // Sanity Clip (keep inside logical bounds)

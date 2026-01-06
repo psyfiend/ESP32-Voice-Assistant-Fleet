@@ -4,9 +4,10 @@
 #define REC_LIMIT_SECONDS 5.0f
 
 Panel_Audio::Panel_Audio(AudioManager& mgr) : _audio(mgr) {
-    _trigger_rec = false;
-    _enabled = true; // Default state of Switch
-    rec_buffer = NULL;
+    _enabled        = true; // Default state of Switch
+    _trigger_rec    = false;
+    _is_loopback    = false;
+    rec_buffer      = NULL;
 }
 
 void Panel_Audio::sw_enable_cb(lv_event_t * e) {
@@ -19,12 +20,16 @@ void Panel_Audio::sw_enable_cb(lv_event_t * e) {
         p->_audio.setMute(false);
         UiToolkit::show_toast("Audio Enabled");
         lv_obj_remove_state (p->btn_tone, LV_STATE_DISABLED);
-        lv_obj_remove_state (p->btn_pcm, LV_STATE_DISABLED);
+        lv_obj_remove_state (p->btn_recloop, LV_STATE_DISABLED);
+        lv_obj_remove_state (p->slider_vol, LV_STATE_DISABLED);
+        lv_obj_remove_state (p->btn_loopback, LV_STATE_DISABLED);
     } else {
         p->_audio.setMute(true);
         UiToolkit::show_toast("Audio Muted");
         lv_obj_add_state (p->btn_tone, LV_STATE_DISABLED);
-        lv_obj_add_state (p->btn_pcm, LV_STATE_DISABLED);
+        lv_obj_add_state (p->btn_recloop, LV_STATE_DISABLED);
+        lv_obj_add_state (p->slider_vol, LV_STATE_DISABLED);
+        lv_obj_add_state (p->btn_loopback, LV_STATE_DISABLED);
     }
 }
 
@@ -45,10 +50,20 @@ void Panel_Audio::btn_tone_cb(lv_event_t * e) {
     UiToolkit::show_toast("Playing Test Tone", 650);
 }
 
-void Panel_Audio::btn_pcm_cb(lv_event_t * e) {
+void Panel_Audio::btn_recloop_cb(lv_event_t * e) {
     Panel_Audio* p = (Panel_Audio*)lv_event_get_user_data(e);
-    lv_label_set_text(p->lbl_pcm_text, "WAIT...");
+    lv_label_set_text(p->lbl_recloop_text, "WAIT...");
     p->_trigger_rec = true; 
+}
+
+void Panel_Audio::btn_loopback_cb(lv_event_t * e) {
+    Panel_Audio* p = (Panel_Audio*)lv_event_get_user_data(e);
+    lv_obj_t* target = (lv_obj_t*)lv_event_get_target(e);
+    bool state = lv_obj_has_state(target, LV_STATE_CHECKED);
+    p->_is_loopback = state;
+    if(state) UiToolkit::show_toast("Mic Passthrough: ON", 1000);
+    else UiToolkit::show_toast("Mic Passthrough: OFF", 1000);
+    p->_audio.setLoopback(state);
 }
 
 void Panel_Audio::init(lv_obj_t* parent) {
@@ -89,11 +104,11 @@ void Panel_Audio::init(lv_obj_t* parent) {
 
     // ROW 1,2 COL 2 - Volume Slider Column
     // Column container with 2 rows: Label + Slider
+    #ifdef HAS_ES8311
     UiToolkit::create_slider_col(row_ctrls, "VOLUME", &col_vol, &slider_vol);
-    // lv_obj_set_style_pad_bottom (col_vol, UiToolkit::sc(10), 0);
-
     lv_slider_set_value         (slider_vol, _audio.getVolume(), LV_ANIM_OFF);
     lv_obj_add_event_cb         (slider_vol, slider_vol_cb, LV_EVENT_VALUE_CHANGED, this);
+    #endif
 
     // ROW 2 - Buttons Row
     UiToolkit::create_panel_row (pnl_content, &row_btns);
@@ -109,16 +124,29 @@ void Panel_Audio::init(lv_obj_t* parent) {
     lv_obj_set_style_text_font  (lbl_tone_text, UiToolkit::Font_Button, 0); // Semantic Font
     lv_obj_center               (lbl_tone_text);
 
+    #ifdef HAS_ES7210
     // ROW 2,2 - Record Loop Button
-    btn_pcm = lv_button_create(row_btns);
-    lv_obj_set_height           (btn_pcm, UiToolkit::sc(35));
-    lv_obj_set_style_max_width  (btn_pcm, UiToolkit::sc(100), 0);
-    lv_obj_set_flex_grow        (btn_pcm, 1);
-    lv_obj_add_event_cb         (btn_pcm, btn_pcm_cb, LV_EVENT_CLICKED, this);
-    lbl_pcm_text              = lv_label_create(btn_pcm); 
-    lv_label_set_text           (lbl_pcm_text, "REC LOOP"); 
-    lv_obj_set_style_text_font  (lbl_pcm_text, UiToolkit::Font_Button, 0); // Semantic Font
-    lv_obj_center               (lbl_pcm_text);
+    btn_recloop = lv_button_create(row_btns);
+    lv_obj_set_height           (btn_recloop, UiToolkit::sc(35));
+    lv_obj_set_style_max_width  (btn_recloop, UiToolkit::sc(100), 0);
+    lv_obj_set_flex_grow        (btn_recloop, 1);
+    lv_obj_add_event_cb         (btn_recloop, btn_recloop_cb, LV_EVENT_CLICKED, this);
+    lbl_recloop_text          = lv_label_create(btn_recloop); 
+    lv_label_set_text           (lbl_recloop_text, "REC LOOP"); 
+    lv_obj_set_style_text_font  (lbl_recloop_text, UiToolkit::Font_Button, 0); // Semantic Font
+    lv_obj_center               (lbl_recloop_text);
+
+    // ROW 2,3 - Loopback Button
+    btn_loopback = lv_button_create(row_btns);
+    lv_obj_set_height           (btn_loopback, UiToolkit::sc(35));
+    lv_obj_set_style_max_width  (btn_loopback, UiToolkit::sc(100), 0);
+    lv_obj_set_flex_grow        (btn_loopback, 1);
+    lv_obj_add_flag             (btn_loopback, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_add_event_cb         (btn_loopback, btn_loopback_cb, LV_EVENT_CLICKED, this);
+    lbl_loopback_text         = lv_label_create(btn_loopback); 
+    lv_label_set_text           (lbl_loopback_text, "LOOPBACK"); 
+    lv_obj_set_style_text_font  (lbl_loopback_text, UiToolkit::Font_Button, 0); // Semantic Font
+    lv_obj_center               (lbl_loopback_text);
 
     // ROW 3 - VU Meter
     UiToolkit::create_panel_row(pnl_content, &row_vu_meter);
@@ -149,6 +177,7 @@ void Panel_Audio::init(lv_obj_t* parent) {
     lv_obj_set_size               (bar_vu_r, lv_pct(0), lv_pct(100));
     lv_obj_set_style_bg_color     (bar_vu_r, lv_palette_main(LV_PALETTE_GREEN), 0);
     lv_obj_set_style_border_width (bar_vu_r,0,0);
+    #endif
 }
 
 void Panel_Audio::tick() {
@@ -157,7 +186,7 @@ void Panel_Audio::tick() {
         process_recording_sequence();
     }
 
-    if (_enabled) {
+    if (_enabled && !_is_loopback) {
         int mic_vol = _audio.getMicLevel();
         // Smoothing
         static int smooth_vol = 0;
@@ -166,6 +195,10 @@ void Panel_Audio::tick() {
 
         if (bar_vu_l) lv_obj_set_width(bar_vu_l, lv_pct(smooth_vol));
         if (bar_vu_r) lv_obj_set_width(bar_vu_r, lv_pct(smooth_vol));
+    }
+
+    if (_is_loopback) {
+        _audio.update();
     }
 }
 
@@ -176,12 +209,12 @@ void Panel_Audio::process_recording_sequence() {
         rec_buffer = (int16_t*)heap_caps_malloc(rec_buffer_size, MALLOC_CAP_SPIRAM);
         if (!rec_buffer) {
             UiToolkit::show_toast("Alloc Failed!", 3000);
-            lv_label_set_text(lbl_pcm_text, "ERR RAM");
+            lv_label_set_text(lbl_recloop_text, "ERR RAM");
             return;
         }
     }
 
-    lv_label_set_text(lbl_pcm_text, "REC...");
+    lv_label_set_text(lbl_recloop_text, "REC...");
     UiToolkit::show_toast("Recording...", (REC_LIMIT_SECONDS * 1000));
     lv_timer_handler();
     delay(50);
@@ -210,7 +243,7 @@ void Panel_Audio::process_recording_sequence() {
         if (samples_read % 4000 == 0) lv_timer_handler(); // Keep UI alive
     }
 
-    lv_label_set_text(lbl_pcm_text, "PLAY...");
+    lv_label_set_text(lbl_recloop_text, "PLAY...");
     UiToolkit::show_toast("Playback...", (REC_LIMIT_SECONDS * 1000));
     lv_timer_handler();
 
@@ -224,6 +257,6 @@ void Panel_Audio::process_recording_sequence() {
         if (samples_written % 4000 == 0) lv_timer_handler();
     }
 
-    lv_label_set_text(lbl_pcm_text, "REC LOOP");
+    lv_label_set_text(lbl_recloop_text, "REC LOOP");
     UiToolkit::show_toast("Done", 1000);
 }

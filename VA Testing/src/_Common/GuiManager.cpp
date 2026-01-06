@@ -6,10 +6,22 @@ static void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px
     GuiManager* gui = (GuiManager*)lv_display_get_user_data(disp);
     Arduino_GFX *gfx = gui->displayMgr.getGfx();
     
+    // 1. Draw the chunk (Partial or Full)
+    // Even in "Direct Mode" style usage with full buffers, we use this to copy
+    // the pixels from our LVGL buffer into the Arduino_GFX internal driver.
     uint32_t w = (area->x2 - area->x1 + 1);
     uint32_t h = (area->y2 - area->y1 + 1);
     gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t *)px_map, w, h);
-    gfx->flush();
+    
+    // 2. The "Waveshare Logic" (Batching Optimization)
+    // We check if this is the LAST chunk of the frame.
+    // If it is, we tell the hardware to refresh. This prevents sending 
+    // partial frames to MIPI/RGB displays which can cause tearing or high bus overhead.
+    if (lv_display_flush_is_last(disp)) {
+        gfx->flush();
+    }
+    
+    // 3. Notify LVGL we are done
     lv_display_flush_ready(disp);
 }
 
@@ -53,60 +65,88 @@ void GuiManager::begin() {
     // 3. Buffer Alloc (Ping-Pong Strategy)
     Arduino_GFX *gfx = displayMgr.getGfx();
     
-    // Allocate 1/10th of the screen per buffer
-    #ifdef WS_P4_SMART86
-        size_t pixel_count = (gfx->width() * cfg.DRAW_BUF_HEIGHT);
-        Serial.println("[GUI] P4 Smart86 Detected: Using Configured Draw Buffer Height.");
-    #else
-        size_t pixel_count = (gfx->width() * gfx->height() / 10);
+    // --= Intelligent Architecture Allocation =--
+    
+    size_t pixel_count = 0;
+    uint32_t malloc_flags = MALLOC_CAP_DMA; // Always need DMA capability
+
+    // Case A: High Bandwidth Interfaces (MIPI / RGB)
+    #if defined(HAS_MIPI_PANEL) || defined(HAS_RGB_PANEL)
+        Serial.println("[GUI] Config: High Bandwidth (MIPI/RGB)");
+        
+        // Use Full Frame Buffers in PSRAM.
+        // Even though we use PARTIAL mode below, having the buffer be full size
+        // allows LVGL to render huge chunks at once, and our 'is_last' check
+        // ensures we sync with the display refresh rate.
+        pixel_count = gfx->width() * gfx->height(); 
+        malloc_flags |= MALLOC_CAP_SPIRAM;
+        
+        Serial.println("[GUI] Strategy: Full Frame Buffers (PSRAM) + Frame Sync");
+
+    // Case B: Bus Constrained Interfaces (SPI / QSPI)
+    #else 
+        Serial.println("[GUI] Config: Bus Constrained (SPI/QSPI)");
+        
+        // 1/10th screen size in Internal SRAM.
+        pixel_count = (gfx->width() * gfx->height()) / 10;
+        
+        #ifdef CONFIG_IDF_TARGET_ESP32P4
+            malloc_flags |= MALLOC_CAP_INTERNAL; 
+        #else
+            malloc_flags |= MALLOC_CAP_INTERNAL;
+        #endif
+        
+        Serial.println("[GUI] Strategy: 1/10th Partial Buffers (Internal SRAM)");
+    #endif
+
+    // Override: If a specific config defined a draw buffer height, respect it
+    #ifdef DRAW_BUF_HEIGHT
+        pixel_count = gfx->width() * DRAW_BUF_HEIGHT;
+        Serial.println("[GUI] Override: Using Custom Draw Buffer Height");
     #endif
 
     size_t byte_count = pixel_count * sizeof(uint16_t);
 
-    // --= NEW: Smart Architecture Allocation =--
-    uint32_t malloc_flags = MALLOC_CAP_DMA; // Base requirement: DMA capable
-
-    #ifdef CONFIG_IDF_TARGET_ESP32P4
-        // P4 Strategy: Ferrari Mode.
-        // The P4 has ~2.5MB of Unified Internal SRAM. 
-        // 100KB buffers fit easily and are MUCH faster than PSRAM.
-        malloc_flags |= MALLOC_CAP_INTERNAL;
-        Serial.println("[GUI] Allocating Buffers in INTERNAL SRAM (Fast)");
-    #else
-        // S3 Strategy: Cargo Truck Mode.
-        // The S3 has limited/fragmented SRAM. Large buffers must go to PSRAM.
-        malloc_flags |= MALLOC_CAP_SPIRAM;
-        Serial.println("[GUI] Allocating Buffers in PSRAM");
-    #endif
+    Serial.printf("[GUI] Allocating: %d bytes per buffer... ", byte_count);
 
     _draw_buf = (uint16_t*)heap_caps_malloc(byte_count, malloc_flags);
-    // Fallback: If optimized allocation fails, try generic malloc
-    if (!_draw_buf) _draw_buf = (uint16_t*)malloc(byte_count);
+    // Fallback 1: If Internal failed, try PSRAM
+    if (!_draw_buf && (malloc_flags & MALLOC_CAP_INTERNAL)) {
+        Serial.print(" (Internal Full! Retrying PSRAM)... ");
+        malloc_flags &= ~MALLOC_CAP_INTERNAL;
+        malloc_flags |= MALLOC_CAP_SPIRAM;
+        _draw_buf = (uint16_t*)heap_caps_malloc(byte_count, malloc_flags);
+    }
+    // Fallback 2: Generic Malloc
+    if (!_draw_buf) {
+        Serial.print(" (Struct alloc failed! Retrying generic)... ");
+        _draw_buf = (uint16_t*)malloc(byte_count);
+    }
 
+    // Allocate Second Buffer (Double Buffering)
     _draw_buf2 = (uint16_t*)heap_caps_malloc(byte_count, malloc_flags);
     if (!_draw_buf2) _draw_buf2 = (uint16_t*)malloc(byte_count);
 
     if (!_draw_buf) {
-        Serial.println("[GUI] Critical: Failed to allocate draw buffer!");
+        Serial.println("\n[GUI] Critical: Failed to allocate ANY draw buffer!");
         while(1) delay(100);
     }
+    Serial.println("Success.");
 
     // 4. Driver Registration
     _disp = lv_display_create(gfx->width(), gfx->height());
     lv_display_set_flush_cb(_disp, my_disp_flush);
     
-    // Register BOTH buffers here
+    // Note: We use PARTIAL mode. This is safer for Arduino_GFX.
+    // If we used DIRECT mode, we would need to handle 'strided' memory writes manually
+    // because Arduino_GFX expects contiguous bitmaps.
     lv_display_set_buffers(_disp, _draw_buf, _draw_buf2, byte_count, LV_DISPLAY_RENDER_MODE_PARTIAL);
     
     lv_display_set_user_data(_disp, this); 
 
     // --= DPI Awareness =--
     #ifdef HIGH_DPI_DISPLAY
-        // P4 Smart86: ~180 PPI calculated, Waveshare uses 150.
         lv_display_set_dpi(_disp, 150); 
-    #else
-        // S3 Smart86: ~120 PPI.
-        lv_display_set_dpi(_disp, 120);
     #endif
 
     _indev = lv_indev_create();
@@ -117,7 +157,7 @@ void GuiManager::begin() {
     // 5. Styles & Toolkit
     UiToolkit::init();
     
-    Serial.println("[GUI] Engine Started (Double Buffer + DMA).");
+    Serial.println("[GUI] Engine Started.");
 }
 
 void GuiManager::update() {

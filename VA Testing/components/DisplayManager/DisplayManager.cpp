@@ -121,10 +121,10 @@ void DisplayManager::initPanel() {
         Serial.println("[DisplayMgr] Creating RGB Display..."); Serial.flush();
         _gfx = new Arduino_RGB_Display(
             cfg.WIDTH, cfg.HEIGHT, rgbpanel, 
-            cfg.ROTATION, true, _bus, cfg.LCD_RST
+            cfg.ROTATION, true
         // Only WS_S3_SMART86 needs the init operations
             #ifdef WS_S3_SMART86
-            , cfg.INIT_CMDS_RGB, cfg.INIT_CMDS_SIZE
+            , _bus, cfg.LCD_RST, cfg.INIT_CMDS_RGB, cfg.INIT_CMDS_SIZE
             #endif
         );
         if (!_gfx) Serial.println("[DisplayMgr] RGB Display Alloc Failed!"); Serial.flush();
@@ -179,6 +179,11 @@ void DisplayManager::initBacklightPWM(bool on) {
     digitalWrite(cfg.LCD_BL, level);
     Serial.printf("[BacklightMgr] Backlight pin on level: %s\n", (cfg.LCD_BL_ON_LEVEL ? "HIGH" : "LOW"));
 
+    if (cfg.LCD_BL_FREQ <= 0) {
+        Serial.println("[BacklightMgr] Backlight PWM Frequency not set or invalid, skipping PWM setup.");
+        return;
+    }
+
     Serial.printf("[BacklightMgr] Backlight Pin: %d, Freq: %dHz\n", cfg.LCD_BL, cfg.LCD_BL_FREQ);
 
     // Attach Pin to LEDC Channel
@@ -198,7 +203,11 @@ void DisplayManager::setBrightness(uint8_t pct) {
     _currentBrightness = pct;
 
     // Calculate Raw Duty (0 to 1023)
-    uint32_t raw_duty = map(pct, 0, 100, 0, BL_MAX_DUTY);
+    #if defined(WS_S3_SMART86) || defined(WS_P4_SMART86)
+        // These panels have a limited brightness range
+        pct = map(pct, 0, 100, 43, 100);
+    #endif
+    uint32_t raw_duty = map(pct, 0, 100, 0, BL_MAX_DUTY);   // Minimum 2% to avoid off state
     uint32_t final_duty = raw_duty;
 
     // Handle Inversion based on BSP Config

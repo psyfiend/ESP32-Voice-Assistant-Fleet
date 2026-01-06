@@ -20,15 +20,18 @@ private:
     // Controls
     lv_obj_t* slider_vol;
     lv_obj_t* btn_tone;
-    lv_obj_t* btn_pcm;
+    lv_obj_t* btn_recloop;
+    lv_obj_t* btn_loopback;
     lv_obj_t* lbl_tone_text;
-    lv_obj_t* lbl_pcm_text;
+    lv_obj_t* lbl_recloop_text;
+    lv_obj_t* lbl_loopback_text;
     lv_obj_t* bar_vu_l;
     lv_obj_t* bar_vu_r;
     
     // Logic Flags
     bool _trigger_rec;
-    bool _enabled;
+    bool _enabled;  // Audio Panel Expanded & Enabled
+    bool _is_loopback;
 
     // Recording Data
     int16_t *rec_buffer;
@@ -37,8 +40,9 @@ private:
     void process_recording_sequence();
 
     // Static Callbacks
-    static void sw_enable_cb(lv_event_t * e);
-    static void slider_vol_cb(lv_event_t * e);
-    static void btn_tone_cb(lv_event_t * e);
-    static void btn_pcm_cb(lv_event_t * e);
+    static void sw_enable_cb    (lv_event_t * e);
+    static void slider_vol_cb   (lv_event_t * e);
+    static void btn_tone_cb     (lv_event_t * e);
+    static void btn_recloop_cb  (lv_event_t * e);
+    static void btn_loopback_cb (lv_event_t * e);
 };

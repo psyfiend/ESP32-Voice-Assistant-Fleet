@@ -46,7 +46,7 @@ void UiToolkit::init() {
     lv_obj_set_size             (toast_panel, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_align                (toast_panel, LV_ALIGN_TOP_MID, 0, sc(60)); 
     lv_obj_set_style_bg_color   (toast_panel, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_radius     (toast_panel, sc(20), 0);
+    lv_obj_set_style_radius     (toast_panel, sc(30), 0);
     lv_obj_set_style_pad_all    (toast_panel, sc(15), 0);
     lv_obj_add_flag             (toast_panel, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag           (toast_panel, LV_OBJ_FLAG_CLICKABLE);
@@ -236,6 +236,8 @@ lv_obj_t* UiToolkit::create_slider_col(lv_obj_t* parent, const char* title, lv_o
     lv_obj_set_flex_grow        (slider, 1);
     lv_obj_set_style_max_height (slider, sc(15), 0);
     lv_obj_set_align            (slider, LV_ALIGN_CENTER);
+    lv_obj_set_style_pad_left   (slider, sc(5), 0);
+    lv_obj_set_style_pad_right  (slider, sc(5), 0);
     // lv_obj_set_style_pad_bottom (slider, sc(0), 0);
     lv_slider_set_value         (slider, 50, LV_ANIM_OFF);
     lv_obj_remove_flag          (slider, LV_OBJ_FLAG_SCROLLABLE);

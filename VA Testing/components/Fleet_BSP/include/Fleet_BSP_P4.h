@@ -102,7 +102,9 @@ struct Fleet_BSP
     uint32_t    PREFER_SPEED, LANE_BIT_RATE;
     
     // --= LVGL Settings =--
+    bool        DOUBLE_BUFFERING;
     size_t      DRAW_BUF_HEIGHT;
+    size_t      BUFFER_SIZE_PX;
     
     const lcd_init_cmd_t *INIT_CMDS_DSI;
     size_t      INIT_CMDS_SIZE;

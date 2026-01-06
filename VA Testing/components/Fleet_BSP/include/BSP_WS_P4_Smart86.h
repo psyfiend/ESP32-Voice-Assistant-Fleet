@@ -1,8 +1,11 @@
 #pragma once
 #ifndef BSP_WS_P4_SMART86_H
 #define BSP_WS_P4_SMART86_H
+
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP_P4.h"
+
+#define WS_P4_SMART86
 
 // -------------------------------------------------------------------------
 // Board: WaveShare P4 Smart86 Box (ESP32-P4 + C6)
@@ -96,7 +99,9 @@ const Fleet_BSP WS_P4_SMART86_LCD = {
     .LANE_BIT_RATE     = 1000,
 
     // --= LVGL Settings =--
+    .DOUBLE_BUFFERING   = true,
     .DRAW_BUF_HEIGHT    = 50,
+    .BUFFER_SIZE_PX     = 36000, // 720 * 50, // WIDTH * DRAW_BUF_HEIGHT
 
     // ---= Init Commands =---
     .INIT_CMDS_DSI     = waveshare_p4_smart86_init,

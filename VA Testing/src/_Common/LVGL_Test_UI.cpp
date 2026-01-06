@@ -197,10 +197,8 @@ void setup() {
     lv_obj_t * deck = lv_obj_create(screen);
     lv_obj_set_size               (deck, lv_pct(100), deck_h); 
     lv_obj_set_y                  (deck, header_h); // Bottom of header
-
     lv_obj_set_flex_flow          (deck, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align         (deck, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END); 
-    
     lv_obj_set_style_bg_opa       (deck, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (deck, 0, 0);
     lv_obj_set_style_pad_all      (deck, UiToolkit::sc(10), 0);
@@ -213,14 +211,8 @@ void setup() {
     lv_obj_t * upper_deck = lv_obj_create(screen);
     lv_obj_set_size               (upper_deck, lv_pct(100), lv_pct(100)); 
     lv_obj_set_y                  (upper_deck, 0); // Hidden behind header
-    
-    // lv_obj_set_flex_flow          (upper_deck, LV_FLEX_FLOW_ROW);
-    // lv_obj_set_flex_align         (upper_deck, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END); 
-
     lv_obj_set_style_bg_opa       (upper_deck, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (upper_deck, 0, 0);
-    // lv_obj_set_style_pad_all      (upper_deck, UiToolkit::sc(10), 0);
-    // lv_obj_set_style_pad_gap      (upper_deck, UiToolkit::sc(10), 0);
     lv_obj_clear_flag             (upper_deck, LV_OBJ_FLAG_CLICKABLE); 
     lv_obj_clear_flag             (upper_deck, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -243,10 +235,10 @@ void setup() {
     // 2. System Panel (Middle - Slides out)
     // 3. Header (Top - Covers System Panel top edge)
 
-    // Touchpoint Overlay is moved in Panel_Display init()
-    lv_obj_move_to_index(deck, 1);
-    lv_obj_move_to_index(upper_deck, 2);
-    lv_obj_move_to_index(header.getContainer(), 3);
+    // Touchpoint Overlay - 0 (set in Panel_Display init())
+    lv_obj_move_to_index(deck, 1);                  // 1. Deck
+    lv_obj_move_to_index(upper_deck, 2);            // 2. System Panel
+    lv_obj_move_to_index(header.getContainer(), 3); // 3. Header
 
     // 4. Run System Doctor
     debug_dump_config();

@@ -34,7 +34,7 @@ void Panel_Header::init(lv_obj_t* parent, const char* title) {
     lv_obj_set_style_text_font  (lbl_title, UiToolkit::Font_PanelHeader, 0); // Semantic Font
     lv_obj_set_style_text_color (lbl_title, lv_color_hex(0x00A8FF), 0);
     
-    // -- NEW: Status Button Wrapper (Hotspot) --
+    // Status Button Wrapper (Touch Hotspot) --
     btn_status = lv_obj_create(container);
     lv_obj_set_size             (btn_status, UiToolkit::sc(80), lv_pct(100)); // Wide touch target
     lv_obj_set_style_bg_opa     (btn_status, LV_OPA_TRANSP, 0); // Invisible

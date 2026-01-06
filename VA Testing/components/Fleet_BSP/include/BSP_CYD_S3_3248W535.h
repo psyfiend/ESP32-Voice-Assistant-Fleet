@@ -1,16 +1,19 @@
 #pragma once
 #ifndef BSP_GUITION_3248W535_H
 #define BSP_GUITION_3248W535_H
+
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP.h"
 
+#define GUITION_S3_3248W535
+
 // -------------------------------------------------------------------------
 // Board: Guition JC3248W535 (ESP32-S3N16R8)
-// Driver: JD9165BA ASX15231B (SPI)
+// Driver: ASX15231B (SPI)
 // Resolution: 324x480
 // -------------------------------------------------------------------------
 
-// Panel init commands (ST7701)
+// Panel init commands (ASX15231B)
 static const uint8_t guition_3248W535_init[] = {
 //  {cmd, { data }, data_size, delay_ms}
     BEGIN_WRITE,
@@ -311,6 +314,13 @@ static const Fleet_BSP Guition_3248W535_LCD = {
     .QSPI_D2           = 40,
     .QSPI_D3           = 39,
     .LCD_TE            = 38,
+
+    // --= LVGL Settings =--
+    .DOUBLE_BUFFERING   = false,
+    .DRAW_BUF_HEIGHT    = 20,
+    .BUFFER_SIZE_PX     = 320 * 20, // Width x 20 rows
+    #define LVGL_BUFFER_MALLOC_FLAGS (MALLOC_CAP_DMA|MALLOC_CAP_8BIT)
+    #define LVGL_BUFFER_PIXELS ((320 * 480) / 8)
     
     // ---= Init Commands =---
     .INIT_CMDS_RGB     = guition_3248W535_init,
@@ -322,11 +332,25 @@ inline const Fleet_BSP& cfg = Guition_3248W535_LCD;
 const Fleet_Hardware_Config Guition_3248W535_Hardware = {
     
     // --= Audio Codec =--
-    // --= NS4168 power amp
+    // --= NS4168 power amp =--
+
+    .I2S_SDA_PIN    = 4,   // I2C SDA
+    .I2S_SCL_PIN    = 8,   // I2C SCL
+
+    .I2S_8311_ADDR  = 0x00,
+
     .I2S_BCLK   = 42,
     .I2S_LRCK   = 2,
-    .I2S_DIN    = 41,  // _DO_IO
-    .I2S_MCLK   = -1,
+    .I2S_DOUT   = 41,  // _DO_IO
+
+    .AUDIO_INPUT_SAMPLE_RATE    = 16000,
+    .AUDIO_OUTPUT_SAMPLE_RATE   = 16000,
+    .I2S_MCLK_MULTIPLE          = 256,
+
+    // --= New Audio Settings =--
+    .I2S_DATA_BIT_WIDTH = 16, // I2S_DATA_BIT_WIDTH_16BIT
+    .I2S_SLOT_BIT_WIDTH = 16, // I2S_SLOT_BIT_WIDTH_16BIT
+    .I2S_SLOT_MODE      = 2,  // 1 = MONO, 2 = Stereo (I2S_SLOT_MODE_STEREO)
 
     // --= SD Card Interface =--
     .TF_CMD     = 11,  // MCU_MOSI && SPI_MOSI

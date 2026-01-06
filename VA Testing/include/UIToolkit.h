@@ -18,26 +18,26 @@ typedef void (*UiActionCallback)(void);
 class UiToolkit {
 public:
     // Scale a pixel value based on the target device
-    static int32_t sc(int32_t val);
+    static int32_t  sc(int32_t val);
     
     // Global Init (Styles, Toast layer)
-    static void init();
+    static void     init();
 
     // Show a floating toast message
-    static void show_toast(const char* text, uint32_t duration_ms = 2000);
+    static void     show_toast(const char* text, uint32_t duration_ms = 2000);
 
     // Widget Generators
-    static lv_obj_t* create_collapsible_panel(lv_obj_t* parent, const char* title, lv_obj_t** content_container);
-    static lv_obj_t* create_panel_row(lv_obj_t* pnl_content, lv_obj_t** row_container);
-    static lv_obj_t* create_slider_col(lv_obj_t* parent, const char* title, lv_obj_t** out_col, lv_obj_t** out_slider);
-    static lv_obj_t* create_header_label(lv_obj_t* parent, const char* text);
+    static lv_obj_t*    create_collapsible_panel(lv_obj_t* parent, const char* title, lv_obj_t** content_container);
+    static lv_obj_t*    create_panel_row(lv_obj_t* pnl_content, lv_obj_t** row_container);
+    static lv_obj_t*    create_slider_col(lv_obj_t* parent, const char* title, lv_obj_t** out_col, lv_obj_t** out_slider);
+    static lv_obj_t*    create_header_label(lv_obj_t* parent, const char* text);
 
         // --= NEW: Helper to force close bottom panels =--
-    static void closeActiveAccordion(); 
-    static lv_obj_t* getActiveAccordionPanel();
+    static void         closeActiveAccordion(); 
+    static lv_obj_t*    getActiveAccordionPanel();
 
     // -- NEW: Register a callback to close the System Panel --
-    static void registerSystemCloseCb(UiActionCallback cb);
+    static void         registerSystemCloseCb(UiActionCallback cb);
 
     // --= SEMANTIC FONTS =--
     // Defined by function rather than size

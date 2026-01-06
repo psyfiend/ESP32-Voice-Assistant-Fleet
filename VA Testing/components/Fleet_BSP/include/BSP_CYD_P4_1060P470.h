@@ -5,6 +5,8 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP_P4.h"
 
+#define GUITION_P4_1060P470
+
 // -------------------------------------------------------------------------
 // Board: Guition JC1060P470C (ESP32-P4 + C6 + ETH)
 // Driver: JD9165BA (MIPI DSI)
@@ -98,6 +100,7 @@ const Fleet_BSP guition_1060P4709_LCD = {
     // --= Hardware Flags =--
     #define HAS_MIPI_PANEL 1
     #define HAS_TOUCH 1
+    #define HAS_ES8311 1
     
     // --=  I2C Bus (Touch) =--
     .I2C_SDA_PIN       = 7,
@@ -149,6 +152,11 @@ const Fleet_BSP guition_1060P4709_LCD = {
     .PREFER_SPEED   = 48000000, // Guition docs || GFX: 48000000
     .LANE_BIT_RATE  = 750, // Guition 750
 
+    // --= LVGL Settings =--
+    .DOUBLE_BUFFERING   = true,
+    .DRAW_BUF_HEIGHT    = 50,
+    .BUFFER_SIZE_PX     = 1024 * 50,    // WIDTH * DRAW_BUF_HEIGHT
+
     // ---= Init Commands =---
     .INIT_CMDS_DSI     = guition_1060P4709_init,
     .INIT_CMDS_SIZE    = sizeof(guition_1060P4709_init) / sizeof(lcd_init_cmd_t),
@@ -160,22 +168,46 @@ const Fleet_Hardware_Config Guition_P4_7_Hardware = {
     
     // --- Audio Codec ---
     // NS4150B power amplifier with ES8311 codec
-    .I2S_ADDR  = 0x18,  // ES8311 Default I2C Address
-    .I2S_LRCK  = 10,
-    .I2S_SCLK  = 12,    // BCK_IO in examples
-    .I2S_MCLK  = 13,
-    .I2S_ASDOUT = 48,
 
-    .I2S_DSDIN = 9,     // I2S_DO_IO in examples
-    .AMP_EN   = 11,     // ES8311_PA in examples
+    .I2S_SDA_PIN    = 7,      // I2C SDA
+    .I2S_SCL_PIN    = 8,      // I2C SCL
+
+    .I2S_8311_ADDR  = 0x18,   // ES8311 DAC/Amp
+
+    .I2S_MCLK       = 13,   // I2S_MCK_IO
+    .I2S_BCLK       = 12,   // I2S_BCK_IO
+    .I2S_LRCK       = 10,   // I2S_WS_IO
+
+    .I2S_DIN        = 48,   // I2S_DI_IO in example sketch
+    .I2S_DOUT       = 9,    // I2S_DO_IO in example sketch
+
+    .AUDIO_INPUT_SAMPLE_RATE    = 16000,
+    .AUDIO_OUTPUT_SAMPLE_RATE   = 16000,
+    .I2S_MCLK_MULTIPLE          = 256,
+
+    // --= New Audio Settings =--
+    .I2S_DATA_BIT_WIDTH     = 16, // I2S_DATA_BIT_WIDTH_16BIT
+    .I2S_SLOT_BIT_WIDTH     = 16, // I2S_SLOT_BIT_WIDTH_16BIT
+    .I2S_SLOT_MODE          = 2,  // 1 = MONO, 2 = Stereo (I2S_SLOT_MODE_STEREO)
+
+    // Codec Config (ES8311)
+    .DAC_BIT_LENGTH         = 16, // ES8311_RESOLUTION_16
+
+    // --= Audio Amp =--
+    .I2S_AMP_EN  = 11,   // PA_CTRL in schematic // ES8311_PA in example sketch
+
+    // MIC1 MSM381A3729H9CP
+    // MIC1_P         - ES8311 18
+    // MIC1_N         - ES8311 17
+    // ADC_MICBIAS_12 - ES8311 15
 
     // --- SD Card Interface ---
     .TF_CMD   = 44,
     .TF_CLK   = 43,
-    .TF_D0    = 39,
-    .TF_D1    = 40,
-    .TF_D2    = 41,
-    .TF_D3    = 42,    //CD/D3
+    .TF_D0    = 39,     //SD_D0
+    .TF_D1    = 40,     //SD_D1
+    .TF_D2    = 41,     //SD_D2
+    .TF_D3    = 42,     //SD_D3
 
 };
 inline const Fleet_Hardware_Config& hw_cfg = Guition_P4_7_Hardware;
