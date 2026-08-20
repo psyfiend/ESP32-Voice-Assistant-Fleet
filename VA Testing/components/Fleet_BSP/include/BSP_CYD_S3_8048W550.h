@@ -94,7 +94,7 @@ inline const Fleet_BSP& cfg = Guition_8048W550_LCD;
 
 const Fleet_Hardware_Config Guition_8048W550_Hardware = {
     
-    // IP530 battery monitor
+    // IP5306 battery monitor
 
     // --= Audio Codec =--
     // --= NS4168 power amp =--

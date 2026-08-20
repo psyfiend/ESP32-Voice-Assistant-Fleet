@@ -110,6 +110,7 @@ void GuiManager::begin() {
     Serial.printf("[GUI] Allocating: %d bytes per buffer... ", byte_count);
 
     _draw_buf = (uint16_t*)heap_caps_malloc(byte_count, malloc_flags);
+    
     // Fallback 1: If Internal failed, try PSRAM
     if (!_draw_buf && (malloc_flags & MALLOC_CAP_INTERNAL)) {
         Serial.print(" (Internal Full! Retrying PSRAM)... ");
