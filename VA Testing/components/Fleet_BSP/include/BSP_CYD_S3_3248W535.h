@@ -1,11 +1,11 @@
 #pragma once
-#ifndef BSP_GUITION_3248W535_H
-#define BSP_GUITION_3248W535_H
+#ifndef BSP_GUITION_S3_3248W535_H
+#define BSP_GUITION_S3_3248W535_H
 
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP.h"
 
-#define GUITION_S3_3248W535
+// #define GUITION_S3_3248W535  // Build flag in platformio.ini handles the BSP choice
 
 // -------------------------------------------------------------------------
 // Board: Guition JC3248W535 (ESP32-S3N16R8)
@@ -13,8 +13,16 @@
 // Resolution: 324x480
 // -------------------------------------------------------------------------
 
+// --= Hardware Flags =--
+#define HAS_QSPI_PANEL 1
+#define HAS_TOUCH 1
+#define HAS_BUS 1
+//#define TOUCH_PANEL TOUCH_CYD_535
+
 // Panel init commands (ASX15231B)
-static const uint8_t guition_3248W535_init[] = {
+// NOTE: Must stay here, immediately before `cfg` below — see BSP_WS_P4_7B.h
+// for why (sizeof() on this array needs its complete type at use-site).
+static const uint8_t guition_s3_3248W535_init[] = {
 //  {cmd, { data }, data_size, delay_ms}
     BEGIN_WRITE,
     WRITE_C8_BYTES, 0xBB, 8,
@@ -268,13 +276,8 @@ static const uint8_t guition_3248W535_init[] = {
 };
 
 // Guition 3.5" 320x480 LCD Configuration
-static const Fleet_BSP Guition_3248W535_LCD = {
+static const Fleet_BSP Guition_S3_3248W535_LCD = {
     .device_name       = "Guition S3 JC3248W535",
-
-    // --= Hardware Flags =--
-    #define HAS_QSPI_PANEL 1
-    #define HAS_TOUCH 1
-    #define HAS_BUS 1
 
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 4,
@@ -296,7 +299,6 @@ static const Fleet_BSP Guition_3248W535_LCD = {
 
     // ---= Touch Panel =---
     .TP_NAME           = "AXS15231B",
-    #define TOUCH_PANEL TOUCH_CYD_535
     .TP_I2C_ADDR       = 0x38,
     .TP_I2C_CLOCK_SPEED = 400000,
     .TP_SDA            = 4,
@@ -317,19 +319,17 @@ static const Fleet_BSP Guition_3248W535_LCD = {
 
     // --= LVGL Settings =--
     .DOUBLE_BUFFERING   = false,
-    .DRAW_BUF_HEIGHT    = 20,
+    .DRAW_BUF_HEIGHT    = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
     .BUFFER_SIZE_PX     = 320 * 20, // Width x 20 rows
-    #define LVGL_BUFFER_MALLOC_FLAGS (MALLOC_CAP_DMA|MALLOC_CAP_8BIT)
-    #define LVGL_BUFFER_PIXELS ((320 * 480) / 8)
-    
+
     // ---= Init Commands =---
-    .INIT_CMDS_RGB     = guition_3248W535_init,
-    .INIT_CMDS_SIZE    = sizeof(guition_3248W535_init),
+    .INIT_CMDS_RGB     = guition_s3_3248W535_init,
+    .INIT_CMDS_SIZE    = sizeof(guition_s3_3248W535_init),
 };
-inline const Fleet_BSP& cfg = Guition_3248W535_LCD;
+inline const Fleet_BSP& cfg = Guition_S3_3248W535_LCD;
 
 
-const Fleet_Hardware_Config Guition_3248W535_Hardware = {
+const Fleet_Hardware_Config Guition_S3_3248W535_Hardware = {
     
     // --= Audio Codec =--
     // --= NS4168 power amp =--
@@ -352,6 +352,8 @@ const Fleet_Hardware_Config Guition_3248W535_Hardware = {
     .I2S_SLOT_BIT_WIDTH = 16, // I2S_SLOT_BIT_WIDTH_16BIT
     .I2S_SLOT_MODE      = 2,  // 1 = MONO, 2 = Stereo (I2S_SLOT_MODE_STEREO)
 
+    .I2S_AMP_EN = -1, // No direct amp control
+
     // --= SD Card Interface =--
     .TF_CMD     = 11,  // MCU_MOSI && SPI_MOSI
     .TF_CLK     = 12,
@@ -367,6 +369,6 @@ const Fleet_Hardware_Config Guition_3248W535_Hardware = {
     .BAT_ADC    = 5,
 
 };
-inline const Fleet_Hardware_Config& hw_cfg = Guition_3248W535_Hardware;
+inline const Fleet_Hardware_Config& hw_cfg = Guition_S3_3248W535_Hardware;
 
-#endif // BSP_GUITION_3248W535_H
+#endif // BSP_GUITION_S3_3248W535_H

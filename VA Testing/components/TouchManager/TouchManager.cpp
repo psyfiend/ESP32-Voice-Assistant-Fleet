@@ -43,7 +43,7 @@ bool TouchManager::begin() {
         // Initialize bb_captouch with explicit pins
         Serial.println("[TouchMgr] No bb_captouch ID defined, using manual pin config...");
         Serial.printf("[TouchMgr] Init SDA:%d SCL:%d IRQ:%d RST:%d\n", sda, scl, irq, rst);
-        int touchtest = _touch.init(sda, scl, irq, rst);
+        int touchtest = _touch.init(sda, scl, rst, irq);
     #endif
 
     if (touchtest == CT_SUCCESS) {
@@ -80,10 +80,25 @@ uint8_t TouchManager::read(TouchPoint* points, uint8_t maxPoints) {
             _lastValidPoints[i].x = ti.x[i];
             _lastValidPoints[i].y = ti.y[i];
             _lastValidPoints[i].strength = ti.area[i];
-            _lastValidPoints[i].id = i; 
+            _lastValidPoints[i].id = i;
+
+            // DEBUG_TOUCH: raw, pre-rotation coordinates straight from the touch
+            // chip - lets a hardware dead zone (bad at the same raw coords
+            // regardless of firmware rotation) be told apart from a mapping bug
+            // (bad only after mapCoordinates() transforms them). Enable with
+            // -D DEBUG_TOUCH in build_flags.
+            #ifdef DEBUG_TOUCH
+            Serial.printf("[TouchMgr] RAW touch    #%d: x=%d y=%d\n", i, ti.x[i], ti.y[i]);
+            #endif
 
             // Apply rotation map IMMEDIATELY so cache contains valid screen coords
             mapCoordinates(&_lastValidPoints[i]);
+
+            // DEBUG_TOUCH: mapped (post-rotation/clip) coordinates, so raw vs.
+            // mapped can be compared directly per touch event.
+            #ifdef DEBUG_TOUCH
+            Serial.printf("[TouchMgr] MAPPED touch #%d: x=%d y=%d\n", i, _lastValidPoints[i].x, _lastValidPoints[i].y);
+            #endif
         }
     } 
     else {
@@ -134,7 +149,7 @@ void TouchManager::mapCoordinates(TouchPoint *point) {
     // ROTATION LOGIC
     // GUITION 3.5" (Native 320x480)
     // ==========================================================
-    // #ifdef GUITION_3248W535
+    // #ifdef GUITION_S3_3248W535
     #ifndef WS_P4_7B
     if (cfg.ROTATION >= 0) 
         {
@@ -180,9 +195,27 @@ void TouchManager::mapCoordinates(TouchPoint *point) {
     #endif
 
 
-    // Sanity Clip (keep inside logical bounds)
-    if (point->x < 0) point->x = 0;
-    if (point->y < 0) point->y = 0;
-    if (point->x >= cfg.WIDTH) point->x = cfg.WIDTH - 1;
-    if (point->y >= cfg.HEIGHT) point->y = cfg.HEIGHT - 1;
+    // Sanity Clip (keep inside logical bounds). Bounds must follow the same
+    // width/height swap the display itself uses at 90/270 degree rotations
+    // (matches gfx->width()/height()) - cfg.WIDTH/HEIGHT alone are the raw,
+    // UNROTATED native panel dimensions and don't swap with rotation, so
+    // using them directly here was silently clamping any touch past the
+    // native boundary to a fixed, wrong edge coordinate instead of its real
+    // position - e.g. every touch past x=319 on a 320x480 panel in landscape
+    // (where the real screen is 480 wide) collapsed to exactly x=319.
+    bool swapped = (cfg.ROTATION == 1 || cfg.ROTATION == 3);
+    int32_t maxX = (swapped ? cfg.HEIGHT : cfg.WIDTH) - 1;
+    int32_t maxY = (swapped ? cfg.WIDTH : cfg.HEIGHT) - 1;
+
+    // Clamp using signed intermediates: point->x/y are uint16_t, so a
+    // negative result (e.g. from sensor noise) would otherwise wrap to a
+    // huge unsigned value instead of being caught by a "< 0" check.
+    int32_t x = point->x;
+    int32_t y = point->y;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x > maxX) x = maxX;
+    if (y > maxY) y = maxY;
+    point->x = (uint16_t)x;
+    point->y = (uint16_t)y;
 }

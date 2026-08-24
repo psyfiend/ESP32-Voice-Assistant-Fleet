@@ -161,6 +161,12 @@ struct Fleet_Hardware_Config
     // --= Button =--
     uint8_t  BOOT_BUTTON_PIN;
 
+    // --= SPI Pins =--
+    uint8_t SPI_MOSI;
+    uint8_t SPI_MISO;
+    uint8_t SPI_CS;
+    uint8_t SPI_CLK;
+
     // --- SD Card Interface ---
     uint8_t TF_CMD;
     uint8_t TF_CLK;
@@ -171,8 +177,6 @@ struct Fleet_Hardware_Config
     uint8_t TF_D1;
     uint8_t TF_D2;
     uint8_t TF_D3;
-    uint8_t SPI_MOSI;
-    uint8_t SPI_MISO;
 
     // --= IP5306 (3248W535) Battery Management =--
     uint8_t BAT_ADC;

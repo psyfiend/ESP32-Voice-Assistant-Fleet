@@ -1,11 +1,11 @@
 #pragma once
-#ifndef BSP_GUITION_1060P470_H
-#define BSP_GUITION_1060P470_H
+#ifndef BSP_CYD_P4_1060P470_H
+#define BSP_CYD_P4_1060P470_H
 
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP_P4.h"
 
-#define GUITION_P4_1060P470
+// #define GUITION_P4_1060P470  // Build flag in platformio.ini handles the BSP choice
 
 // -------------------------------------------------------------------------
 // Board: Guition JC1060P470C (ESP32-P4 + C6 + ETH)
@@ -13,8 +13,16 @@
 // Resolution: 1024x600
 // -------------------------------------------------------------------------
 
+// --= Hardware Flags =--
+#define HAS_MIPI_PANEL 1
+#define HAS_TOUCH 1
+#define HAS_ES8311 1
+//#define TOUCH_PANEL TOUCH_1060P470
+
 // --- Init Sequence (Extracted from MTK_JD9165BA...dtsi.txt) ---
-static const lcd_init_cmd_t guition_1060P4709_init[] = {
+// NOTE: Must stay here, immediately before `cfg` below — see BSP_WS_P4_7B.h
+// for why (sizeof() on this array needs its complete type at use-site).
+static const lcd_init_cmd_t CYD_P4_1060P470_init[] = {
     //  {cmd, { data }, data_size, delay_ms}
     // 1. Switch to Page 0
     {0x30, (uint8_t[]){0x00}, 1, 0},
@@ -94,14 +102,9 @@ static const lcd_init_cmd_t guition_1060P4709_init[] = {
     {0x00, (uint8_t[]){0x00}, 0, 0},    // End
 };
 
-const Fleet_BSP guition_1060P4709_LCD = {
+const Fleet_BSP CYD_P4_1060P470_LCD = {
     .device_name       = "Guition P4 JC1060P470C",
 
-    // --= Hardware Flags =--
-    #define HAS_MIPI_PANEL 1
-    #define HAS_TOUCH 1
-    #define HAS_ES8311 1
-    
     // --=  I2C Bus (Touch) =--
     .I2C_SDA_PIN       = 7,
     .I2C_SCL_PIN       = 8,
@@ -120,7 +123,6 @@ const Fleet_BSP guition_1060P4709_LCD = {
 
     // ---= Touch Panel =---
     .TP_NAME            = "GT911",
-    #define TOUCH_PANEL TOUCH_1060P470
     .TP_I2C_ADDR        = 0x5D, // Likely 0x5D or 0x14
     .TP_I2C_BACKUP_ADDR = 0x14,
     .TP_I2C_CLOCK_SPEED = 400000,
@@ -154,17 +156,17 @@ const Fleet_BSP guition_1060P4709_LCD = {
 
     // --= LVGL Settings =--
     .DOUBLE_BUFFERING   = true,
-    .DRAW_BUF_HEIGHT    = 50,
+    .DRAW_BUF_HEIGHT    = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
     .BUFFER_SIZE_PX     = 1024 * 50,    // WIDTH * DRAW_BUF_HEIGHT
 
     // ---= Init Commands =---
-    .INIT_CMDS_DSI     = guition_1060P4709_init,
-    .INIT_CMDS_SIZE    = sizeof(guition_1060P4709_init) / sizeof(lcd_init_cmd_t),
+    .INIT_CMDS_DSI     = CYD_P4_1060P470_init,
+    .INIT_CMDS_SIZE    = sizeof(CYD_P4_1060P470_init) / sizeof(lcd_init_cmd_t),
 };
-inline const Fleet_BSP& cfg = guition_1060P4709_LCD;
+inline const Fleet_BSP& cfg = CYD_P4_1060P470_LCD;
 
 
-const Fleet_Hardware_Config Guition_P4_7_Hardware = {
+const Fleet_Hardware_Config CYD_P4_1060P470_Hardware = {
     
     // --- Audio Codec ---
     // NS4150B power amplifier with ES8311 codec
@@ -210,6 +212,6 @@ const Fleet_Hardware_Config Guition_P4_7_Hardware = {
     .TF_D3    = 42,     //SD_D3
 
 };
-inline const Fleet_Hardware_Config& hw_cfg = Guition_P4_7_Hardware;
+inline const Fleet_Hardware_Config& hw_cfg = CYD_P4_1060P470_Hardware;
 
-#endif // BSP_GUITION_1060P4709_H
+#endif // BSP_CYD_P4_1060P470_H

@@ -6,8 +6,16 @@
 Panel_Audio::Panel_Audio(AudioManager& mgr) : _audio(mgr) {
     _enabled        = true; // Default state of Switch
     _trigger_rec    = false;
-    _is_loopback    = false;
     rec_buffer      = NULL;
+
+    // These are only created in init() under HAS_ES7210/HAS_ES8311 guards - on boards
+    // with neither (no codec chip, e.g. an NS4168-only amp board), they're never
+    // assigned. Without an explicit nullptr here they'd be garbage, which defeats the
+    // `if (bar_vu_l)` runtime check in tick() and would crash if dereferenced anywhere.
+    btn_recloop = nullptr;
+    slider_vol  = nullptr;
+    bar_vu_l    = nullptr;
+    bar_vu_r    = nullptr;
 }
 
 void Panel_Audio::sw_enable_cb(lv_event_t * e) {
@@ -20,16 +28,22 @@ void Panel_Audio::sw_enable_cb(lv_event_t * e) {
         p->_audio.setMute(false);
         UiToolkit::show_toast("Audio Enabled");
         lv_obj_remove_state (p->btn_tone, LV_STATE_DISABLED);
-        lv_obj_remove_state (p->btn_recloop, LV_STATE_DISABLED);
-        lv_obj_remove_state (p->slider_vol, LV_STATE_DISABLED);
-        lv_obj_remove_state (p->btn_loopback, LV_STATE_DISABLED);
+        #if defined(HAS_ES7210) || defined(HAS_ES8311)
+            lv_obj_remove_state (p->btn_recloop, LV_STATE_DISABLED);
+        #endif
+        #ifdef HAS_ES8311
+            lv_obj_remove_state (p->slider_vol, LV_STATE_DISABLED);
+        #endif
     } else {
         p->_audio.setMute(true);
         UiToolkit::show_toast("Audio Muted");
         lv_obj_add_state (p->btn_tone, LV_STATE_DISABLED);
-        lv_obj_add_state (p->btn_recloop, LV_STATE_DISABLED);
-        lv_obj_add_state (p->slider_vol, LV_STATE_DISABLED);
-        lv_obj_add_state (p->btn_loopback, LV_STATE_DISABLED);
+        #if defined(HAS_ES7210) || defined(HAS_ES8311)
+            lv_obj_add_state (p->btn_recloop, LV_STATE_DISABLED);
+        #endif
+        #ifdef HAS_ES8311
+            lv_obj_add_state (p->slider_vol, LV_STATE_DISABLED);
+        #endif
     }
 }
 
@@ -54,16 +68,6 @@ void Panel_Audio::btn_recloop_cb(lv_event_t * e) {
     Panel_Audio* p = (Panel_Audio*)lv_event_get_user_data(e);
     lv_label_set_text(p->lbl_recloop_text, "WAIT...");
     p->_trigger_rec = true; 
-}
-
-void Panel_Audio::btn_loopback_cb(lv_event_t * e) {
-    Panel_Audio* p = (Panel_Audio*)lv_event_get_user_data(e);
-    lv_obj_t* target = (lv_obj_t*)lv_event_get_target(e);
-    bool state = lv_obj_has_state(target, LV_STATE_CHECKED);
-    p->_is_loopback = state;
-    if(state) UiToolkit::show_toast("Mic Passthrough: ON", 1000);
-    else UiToolkit::show_toast("Mic Passthrough: OFF", 1000);
-    p->_audio.setLoopback(state);
 }
 
 void Panel_Audio::init(lv_obj_t* parent) {
@@ -124,29 +128,19 @@ void Panel_Audio::init(lv_obj_t* parent) {
     lv_obj_set_style_text_font  (lbl_tone_text, UiToolkit::Font_Button, 0); // Semantic Font
     lv_obj_center               (lbl_tone_text);
 
-    #ifdef HAS_ES7210
+    #if defined(HAS_ES7210) || defined(HAS_ES8311)
+    // Mic input can come from a dedicated ES7210, or (when ES7210 isn't present)
+    // from the ES8311's own ADC - either way, recording/VU-meter UI applies.
     // ROW 2,2 - Record Loop Button
     btn_recloop = lv_button_create(row_btns);
     lv_obj_set_height           (btn_recloop, UiToolkit::sc(35));
     lv_obj_set_style_max_width  (btn_recloop, UiToolkit::sc(100), 0);
     lv_obj_set_flex_grow        (btn_recloop, 1);
     lv_obj_add_event_cb         (btn_recloop, btn_recloop_cb, LV_EVENT_CLICKED, this);
-    lbl_recloop_text          = lv_label_create(btn_recloop); 
-    lv_label_set_text           (lbl_recloop_text, "REC LOOP"); 
+    lbl_recloop_text          = lv_label_create(btn_recloop);
+    lv_label_set_text           (lbl_recloop_text, "REC LOOP");
     lv_obj_set_style_text_font  (lbl_recloop_text, UiToolkit::Font_Button, 0); // Semantic Font
     lv_obj_center               (lbl_recloop_text);
-
-    // ROW 2,3 - Loopback Button
-    btn_loopback = lv_button_create(row_btns);
-    lv_obj_set_height           (btn_loopback, UiToolkit::sc(35));
-    lv_obj_set_style_max_width  (btn_loopback, UiToolkit::sc(100), 0);
-    lv_obj_set_flex_grow        (btn_loopback, 1);
-    lv_obj_add_flag             (btn_loopback, LV_OBJ_FLAG_CHECKABLE);
-    lv_obj_add_event_cb         (btn_loopback, btn_loopback_cb, LV_EVENT_CLICKED, this);
-    lbl_loopback_text         = lv_label_create(btn_loopback); 
-    lv_label_set_text           (lbl_loopback_text, "LOOPBACK"); 
-    lv_obj_set_style_text_font  (lbl_loopback_text, UiToolkit::Font_Button, 0); // Semantic Font
-    lv_obj_center               (lbl_loopback_text);
 
     // ROW 3 - VU Meter
     UiToolkit::create_panel_row(pnl_content, &row_vu_meter);
@@ -186,7 +180,7 @@ void Panel_Audio::tick() {
         process_recording_sequence();
     }
 
-    if (_enabled && !_is_loopback) {
+    if (_enabled) {
         int mic_vol = _audio.getMicLevel();
         // Smoothing
         static int smooth_vol = 0;
@@ -195,10 +189,6 @@ void Panel_Audio::tick() {
 
         if (bar_vu_l) lv_obj_set_width(bar_vu_l, lv_pct(smooth_vol));
         if (bar_vu_r) lv_obj_set_width(bar_vu_r, lv_pct(smooth_vol));
-    }
-
-    if (_is_loopback) {
-        _audio.update();
     }
 }
 

@@ -51,34 +51,24 @@ bool isGpioOutput(int pin) {
 void debug_dump_config() {
     pnlSystem.log("=== SYSTEM DIAGNOSTICS ===");
     
-    // 1. Compile-Time Definitions
-    pnlSystem.log("[COMPILE-TIME CONFIGURATION]");
-    #ifdef HAS_RGB_PANEL
-        pnlSystem.log("  Display Type: RGB PANEL");
-    #elif defined(HAS_QSPI_PANEL)
-        pnlSystem.log("  Display Type: QSPI PANEL");
-    #elif defined(HAS_MIPI_PANEL)
-        pnlSystem.log("  Display Type: MIPI PANEL");
-    #endif
-
-    #ifdef HIGH_DPI_DISPLAY
-        pnlSystem.log("  Display Mode: HIGH DPI (1.5x Scaling)");
-    #else
-        pnlSystem.log("  Display Mode: STANDARD (1.0x Scaling)");
-    #endif
-
+    // Hardware Status (Runtime)
+    pnlSystem.log("[HARDWARE STATUS]");
+    pnlSystem.log("  Uptime: %lu ms", millis());
+    pnlSystem.log("  Free Heap: %d kb", ESP.getFreeHeap()/1024);
+    pnlSystem.log("  PSRAM Size: %d mb", ESP.getPsramSize()/1024/1024);
     #ifdef HAS_IO_EXPANDER
-        pnlSystem.log("  Pin Expander: REQUIRED (TCA9554/Similar)");
+        pnlSystem.log("  Pin Expander: Active (TCA9554/Similar)");
     #else
-        pnlSystem.log("  Pin Expander: NOT REQUIRED (Native GPIOs)");
+        pnlSystem.log("  Pin Expander: None (Native GPIOs)");
     #endif
-
     #ifdef HAS_BUTTON
         pnlSystem.log("  Button: ENABLED");
     #else
         pnlSystem.log("  Button: NOT PRESENT");
     #endif
-
+    
+    // Audio State
+    pnlSystem.log("[AUDIO]");
     #ifdef HAS_ES8311
         pnlSystem.log("  Codec ES8311: ENABLED");
     #else
@@ -90,27 +80,12 @@ void debug_dump_config() {
     #else
         pnlSystem.log("  ADC ES7210: NOT PRESENT");
     #endif
-
-    if (hw_cfg.I2S_AMP_EN < 0) {
-        pnlSystem.log("  AMP PIN: UNDEFINED");
-    } else {
-        pnlSystem.log("  AMP PIN: GPIO %d", hw_cfg.I2S_AMP_EN);
-    }
-
-    // 2. Hardware Status (Runtime)
-    pnlSystem.log("[HARDWARE STATUS]");
-    pnlSystem.log("  Uptime: %lu ms", millis());
-    pnlSystem.log("  Free Heap: %d kb", ESP.getFreeHeap()/1024);
-    pnlSystem.log("  PSRAM Size: %d mb", ESP.getPsramSize()/1024/1024);
-    
-    // Audio State
-    pnlSystem.log("[AUDIO]");
     pnlSystem.log("  Volume: %d%%", audioMgr.getVolume());
     bool isMuted = audioMgr.getMute();
     pnlSystem.log("  Muted: %s", isMuted ? "YES" : "NO");
     
     // AMP Pin Diagnostics
-    if (hw_cfg.I2S_AMP_EN >= 0) {        
+    if (hw_cfg.I2S_AMP_EN != -1) {        
         #ifdef HAS_IO_EXPANDER
             // If checking an Expander pin, we can't check ESP32 registers.
             // We rely on the fact that we wrote to it.
@@ -129,6 +104,21 @@ void debug_dump_config() {
 
     // Display State
     pnlSystem.log("[DISPLAY]");
+    #ifdef HAS_RGB_PANEL
+        pnlSystem.log("  Display Type: RGB - %s", cfg.LCD_MODEL);
+        pnlSystem.log("  Touch Type: %s", cfg.TP_NAME);
+    #elif defined(HAS_QSPI_PANEL)
+        pnlSystem.log("  Display Type: QSPI - %s", cfg.LCD_MODEL);
+        pnlSystem.log("  Touch Type: %s", cfg.TP_NAME); 
+    #elif defined(HAS_MIPI_PANEL)
+        pnlSystem.log("  Display Type: MIPI/DSI - %s", cfg.LCD_MODEL);
+        pnlSystem.log("  Touch Type: %s", cfg.TP_NAME);
+    #endif
+    #ifdef HIGH_DPI_DISPLAY
+        pnlSystem.log("  Display Mode: HIGH DPI (1.5x Scaling)");
+    #else
+        pnlSystem.log("  Display Mode: STANDARD (1.0x Scaling)");
+    #endif
     pnlSystem.log("  Resolution: %dx%d", cfg.WIDTH, cfg.HEIGHT);
     pnlSystem.log("  Rotation: %d", cfg.ROTATION);
     pnlSystem.log("  Brightness: %d%%", gui.displayMgr.getBrightness());
@@ -153,6 +143,7 @@ void debug_dump_config() {
             else if (address == 0x40 || address == 0x41) name = "(ES7210)";
             else if (address == 0x5D || address == 0x14) name = "(GT911 Touch)";
             else if (address == 0x38 || address == 0x20) name = "(EXPANDER)";
+            else if (address == 0x3B || address == 0x3C) name = "(AXS15231 Touch)";
             
             pnlSystem.log("  Found I2C Device: 0x%02X %s", address, name);
             nDevices++;

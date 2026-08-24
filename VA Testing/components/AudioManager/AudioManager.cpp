@@ -3,6 +3,34 @@
 // I2C Port used by the ESP-IDF drivers
 #define I2C_PORT_NUM 0
 
+// --= Sanity check: BSP raw values vs. es7210 driver enums =--
+// hw_cfg.MIC_SELECTED / MIC_GAIN_DB / AEC_MIC_SELECTED / AEC_MIC_GAIN_DB are stored as
+// plain uint8_t in Fleet_Hardware_Config (the BSP headers deliberately avoid including
+// es7210.h to keep their dependency chain simple), but the raw numbers are meant to equal
+// these es7210 enum values exactly. This can't be a static_assert: hw_cfg/WS_P4_7B_Hardware
+// (etc.) are declared `const`, not `constexpr`, so they aren't usable in a constant
+// expression as-is - making them constexpr would mean requalifying every BSP struct
+// instance across all 6 device headers, a bigger change than this warrants right now.
+// So this runs once at startup instead: if es7210_gain_value_t or es7210_input_mics_t is
+// ever reordered or extended, this logs a loud, specific error instead of silently
+// misconfiguring mic gain/selection.
+#ifdef HAS_ES7210
+static void checkAudioBspSanity() {
+    if (hw_cfg.MIC_SELECTED != (uint8_t)(ES7210_INPUT_MIC1 | ES7210_INPUT_MIC2)) {
+        Serial.println("[AudioMgr] CONFIG WARNING: hw_cfg.MIC_SELECTED no longer matches Mic1|Mic2 - check es7210_input_mics_t");
+    }
+    if (hw_cfg.MIC_GAIN_DB != (uint8_t)GAIN_36DB) {
+        Serial.println("[AudioMgr] CONFIG WARNING: hw_cfg.MIC_GAIN_DB no longer matches GAIN_36DB - check es7210_gain_value_t");
+    }
+    if (hw_cfg.AEC_MIC_SELECTED != (uint8_t)(ES7210_INPUT_MIC1 | ES7210_INPUT_MIC2 | ES7210_INPUT_MIC3 | ES7210_INPUT_MIC4)) {
+        Serial.println("[AudioMgr] CONFIG WARNING: hw_cfg.AEC_MIC_SELECTED no longer matches Mic1|2|3|4 - check es7210_input_mics_t");
+    }
+    if (hw_cfg.AEC_MIC_GAIN_DB != (uint8_t)GAIN_12DB) {
+        Serial.println("[AudioMgr] CONFIG WARNING: hw_cfg.AEC_MIC_GAIN_DB no longer matches GAIN_12DB - check es7210_gain_value_t");
+    }
+}
+#endif
+
 AudioManager::AudioManager() {
     _tx_handle = NULL;
     _rx_handle = NULL;
@@ -10,16 +38,16 @@ AudioManager::AudioManager() {
     _defaultVolume = 63;
     _isMuted = false;
     _es8311_dev = NULL;
-
-    _isLoopbackActive = false;
-    _loopbackChunkSize = 512; 
-    _loopbackBuffer = (int16_t*)malloc(_loopbackChunkSize * sizeof(int16_t));
 }
 
 bool AudioManager::begin() {
 
     Serial.println("------------------------------");
     Serial.println("[AudioMgr] Initializing...");
+
+    #ifdef HAS_ES7210
+        checkAudioBspSanity();
+    #endif
 
     // 1. --= Initialize Power Amp Pin =--
     #ifndef HAS_IO_EXPANDER
@@ -130,7 +158,8 @@ bool AudioManager::begin() {
     #else
         Serial.println("[AudioMgr] Mode: Standard Voice (Stereo)");
         std_cfg.gpio_cfg.din = (gpio_num_t)hw_cfg.I2S_DIN;  // In case es8311 is the only codec used
-        std.cfg.slot_cfg.left_align = false; // Standard mode uses right align
+        // left_align stays true (see std_cfg init above) - that matches ESP-IDF's own
+        // I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG default for standard 2-slot stereo mode.
         err  = i2s_channel_init_std_mode    (_tx_handle, &std_cfg);
         err |= i2s_channel_init_std_mode    (_rx_handle, &std_cfg);
     #endif
@@ -181,9 +210,12 @@ bool AudioManager::initCodecOutput() {
             .bits    = AUDIO_HAL_BIT_LENGTH_16BITS
         }
     };
-    #ifdef HAS_ES7210
-        // If both codecs are present, set to BOTH mode
-    // cfg.codec_mode = AUDIO_HAL_CODEC_MODE_BOTH;
+    #ifndef HAS_ES7210
+        // No separate ADC codec on this board - the ES8311's own mic input is the
+        // only input path available, so it has to run DAC (speaker) and ADC (mic)
+        // simultaneously instead of DAC-only. On boards with ES7210 present, ES7210
+        // handles all mic input and ES8311 stays output-only, so this is skipped.
+        cfg.codec_mode = AUDIO_HAL_CODEC_MODE_BOTH;
     #endif
 
     #ifdef ENABLE_AEC
@@ -228,22 +260,19 @@ bool AudioManager::initCodecInput() {
         }
     };
 
-    #ifdef HAS_ES8311
-        // If both codecs are present, set to BOTH mode
-    // cfg.codec_mode = AUDIO_HAL_CODEC_MODE_BOTH;
-    #endif
+    // Note: when HAS_ES8311 is also present, ES8311 stays output-only (DECODE) - see
+    // initCodecOutput(). ES7210 is always the mic path whenever it's present.
 
     #ifdef ENABLE_AEC
         cfg.adc_input     = AUDIO_HAL_ADC_INPUT_ALL;
         cfg.i2s_iface.fmt = AUDIO_HAL_I2S_DSP;
         // Note: The driver automatically handles TDM reg 0x12 if input count > 2
-        // It also applies gains based on ES7210_MIC_SELECT definition
     #endif
 
     esp_err_t   err  = es7210_adc_init        (&cfg);
                 err |= es7210_adc_config_i2s  (cfg.codec_mode, &cfg.i2s_iface);
-    // Note: es7210_adc_init calls es7210_mic_select(ES7210_MIC_SELECT) internally.
-    // Selected mics are powered on with default GAIN_24DB.
+    // Note: es7210_adc_init calls es7210_mic_select()/es7210_adc_set_gain() internally,
+    // using hw_cfg.MIC_SELECTED/MIC_GAIN_DB (or the AEC_ variants if ENABLE_AEC is on).
     // Note: es7210_adc_config_i2s sets codec mode internally
 
     if (err != ESP_OK) {
@@ -257,8 +286,12 @@ bool AudioManager::initCodecInput() {
     Serial.println("[AudioMgr] Input Codec (ES7210) Ready.");
     return true;
 #else
-    Serial.println("[AudioMgr] No Input Codec Defined.");    
-    return true; 
+    #ifdef HAS_ES8311
+        Serial.println("[AudioMgr] No ES7210; mic input handled by ES8311 (see initCodecOutput).");
+    #else
+        Serial.println("[AudioMgr] No Input Codec Defined.");
+    #endif
+    return true;
 #endif
 }
 
@@ -347,7 +380,7 @@ int AudioManager::getMicLevel() {
     return level;
 }
 
-// --= Primitives for Loopback Testing =--
+// --= Raw I2S Read/Write Primitives =--
 
 size_t AudioManager::readRaw(int16_t *data, size_t samples) {
     if (!_rx_handle) return 0;
@@ -404,56 +437,6 @@ bool AudioManager::playSeconds(int16_t* buffer, float seconds) {
                                       portMAX_DELAY);
                                       
     return (err == ESP_OK);
-}
-
-// --= Loopback Implementation =--
-
-void AudioManager::setLoopback(bool active) {
-    _isLoopbackActive = active;
-    Serial.printf("[AudioMgr] Loopback %s\n", active ? "ENABLED" : "DISABLED");
-}
-
-bool AudioManager::getLoopback() {
-    return _isLoopbackActive;
-}
-
-void AudioManager::update() {
-    if (!_isLoopbackActive || !_rx_handle || !_tx_handle) return;
-
-    size_t bytes_read = 0;
-    size_t bytes_written = 0;
-    esp_err_t err;
-
-    // --= The "Smart Drain" Loop =--
-    // We aggressively read the input buffer until it's empty.
-    // We write to the output buffer non-blockingly. If output is full, we drop packets.
-    // This prioritizes "System Liveness" over "Audio Completeness".
-    
-    for (int i = 0; i < 16; i++) { 
-        
-        // 1. Try to read a chunk
-        err = i2s_channel_read(_rx_handle, 
-                               _loopbackBuffer, 
-                               _loopbackChunkSize * sizeof(int16_t), 
-                               &bytes_read, 
-                               0); // 0 = Non-blocking (return immediately)
-        
-        // 2. Stop if no data or error
-        if (err != ESP_OK || bytes_read == 0) break;
-
-        // 3. Write attempt (Non-blocking: Timeout 0)
-        // If the output buffer is full (because we are reading faster than playing),
-        // we skip the write. This prevents the "Silence of Death" stall.
-        i2s_channel_write(_tx_handle, 
-                          _loopbackBuffer, 
-                          bytes_read, 
-                          &bytes_written, 
-                          0); // 0 = Do NOT wait if full
-                          
-        // 4. Optimization: If we read LESS than a full chunk, 
-        // the buffer is empty, so we can exit the loop early.
-        if (bytes_read < _loopbackChunkSize * sizeof(int16_t)) break;
-    }
 }
 
 // Note: Manual writeReg/readReg helpers removed as they are no longer needed

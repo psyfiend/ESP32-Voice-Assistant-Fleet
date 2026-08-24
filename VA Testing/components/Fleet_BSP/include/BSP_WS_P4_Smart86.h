@@ -5,7 +5,7 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP_P4.h"
 
-#define WS_P4_SMART86
+// #define WS_P4_SMART86 // Build flag in platformio.ini handles the BSP choice
 
 // -------------------------------------------------------------------------
 // Board: WaveShare P4 Smart86 Box (ESP32-P4 + C6)
@@ -13,7 +13,20 @@
 // Resolution: 720x720
 // -------------------------------------------------------------------------
 
+// --= Hardware Flags =--
+#define HAS_MIPI_PANEL 1
+#define HAS_TOUCH 1
+#define HIGH_DPI_DISPLAY 1
+#define HAS_ES8311 1
+#define HAS_ES7210 1
+//#define HAS_IO_EXPANDER
+//#define HAS_RGB_PANEL
+//#define HAS_QSPI_PANEL
+//#define TOUCH_PANEL   TOUCH_WS_P4_SMART86
+
 // Panel init commands (ST7703)
+// NOTE: Must stay here, immediately before `cfg` below — see BSP_WS_P4_7B.h
+// for why (sizeof() on this array needs its complete type at use-site).
 static const lcd_init_cmd_t waveshare_p4_smart86_init[] = {
     {0xB9, (uint8_t[]){0xF1, 0x12, 0x83}, 3, 0},
 
@@ -46,16 +59,6 @@ static const lcd_init_cmd_t waveshare_p4_smart86_init[] = {
 const Fleet_BSP WS_P4_SMART86_LCD = {
     .device_name       = "Waveshare P4 Smart86",
 
-    // --= Hardware Flags =--
-    #define HAS_MIPI_PANEL 1
-    #define HAS_TOUCH 1
-    #define HIGH_DPI_DISPLAY 1
-    #define HAS_ES8311 1
-    #define HAS_ES7210 1
-    //#define HAS_IO_EXPANDER
-    //#define HAS_RGB_PANEL
-    //#define HAS_QSPI_PANEL
-    
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 7,
     .I2C_SCL_PIN       = 8,
@@ -75,7 +78,6 @@ const Fleet_BSP WS_P4_SMART86_LCD = {
 
     // ---= Touch Panel =---
     .TP_NAME           = "GT911",
-    #define TOUCH_PANEL   TOUCH_WS_P4_SMART86
     .TP_I2C_ADDR       = 0x5D,
     .TP_I2C_CLOCK_SPEED = 100000,
     .TP_SDA            = 7,
@@ -100,7 +102,7 @@ const Fleet_BSP WS_P4_SMART86_LCD = {
 
     // --= LVGL Settings =--
     .DOUBLE_BUFFERING   = true,
-    .DRAW_BUF_HEIGHT    = 50,
+    .DRAW_BUF_HEIGHT    = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
     .BUFFER_SIZE_PX     = 36000, // 720 * 50, // WIDTH * DRAW_BUF_HEIGHT
 
     // ---= Init Commands =---

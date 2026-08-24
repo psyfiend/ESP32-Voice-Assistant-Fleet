@@ -11,8 +11,9 @@
 #include "DisplayManager.h"
 
 // --- CONFIGURATION FLAGS ---
-// Uncomment this to enable 4-Channel TDM Input (Mic1/2 + Ref1/2)
-#define ENABLE_AEC
+// Uncomment this to enable 4-Channel TDM Input (Mic1/2 + Ref1/2). Off by default:
+// AEC development is on hold, and this path is unfinished/untested against real hardware.
+// #define ENABLE_AEC
 
 #define AUDIO_CODEC_DMA_DESC_NUM 6
 #define AUDIO_CODEC_DMA_FRAME_NUM 240
@@ -37,18 +38,13 @@ public:
     void    tone            (uint32_t freq, uint32_t durationMs);
     int     getMicLevel();
 
-    // --= Loopback / Passthrough Primitives =--
+    // --= Raw I2S Read/Write Primitives =--
     size_t  readRaw     (int16_t *data, size_t samples);
     size_t  writeRaw    (int16_t *data, size_t samples);
     
     // --= Blocking Helpers =--
     bool    recordSeconds   (int16_t* buffer, float seconds);
     bool    playSeconds     (int16_t* buffer, float seconds);
-
-    // --= Loopback Control =--
-    void    setLoopback    (bool active);
-    bool    getLoopback    ();
-    void    update         (); // Call this in main loop()
 
 private:
     // Internal Config Constants (Voice Assistant Standard)
@@ -63,11 +59,6 @@ private:
     uint8_t _defaultVolume = 70;
     uint8_t _currentVolume;
     bool _isMuted;
-
-    // --= Loopback State =--
-    bool    _isLoopbackActive = false;
-    int16_t *_loopbackBuffer = nullptr;
-    size_t  _loopbackChunkSize = 512; // 10ms Stereo @ 16kHz
 
     // --= Driver Handles =--
     es8311_handle_t     _es8311_dev;  // ES8311 Codec Handle

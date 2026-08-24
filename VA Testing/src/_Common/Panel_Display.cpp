@@ -72,7 +72,11 @@ void Panel_Display::init(lv_obj_t* parent) {
     UiToolkit::create_slider_col(row_bri, "BRIGHTNESS", &col_bri, &slider_bri);
 
     lv_slider_set_value         (slider_bri, _gui.displayMgr.getBrightness(), LV_ANIM_OFF);
-    lv_slider_set_range         (slider_bri, 2, 100);
+        #if defined (WS_S3_SMART86) || defined (WS_P4_SMART86)
+            lv_slider_set_range (slider_bri, 43, 100); // These panels have a limited brightness range
+        #else
+            lv_slider_set_range (slider_bri, 3, 100);  // Floor avoids the backlight cutting out; measured on WS_P4_7B, untested elsewhere
+        #endif
     lv_obj_add_event_cb         (slider_bri, slider_bri_cb, LV_EVENT_VALUE_CHANGED, this);
 
     // ROW 2 - Touch Visualization Switch

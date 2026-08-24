@@ -4,7 +4,7 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP.h"
 
-#define WS_S3_SMART86
+// #define WS_S3_SMART86 // Build flag in platformio.ini handles the BSP choice
 
 // -------------------------------------------------------------------------
 // Board: WaveShare S3 Smart86 Box (ESP32-S3 N16R8)
@@ -12,7 +12,20 @@
 // Resolution: 480x480
 // -------------------------------------------------------------------------
 
+// --= Hardware Flags =--
+#define HAS_IO_EXPANDER 1
+#define HAS_BUS 1
+#define HAS_RGB_PANEL 1
+#define HAS_TOUCH 1
+#define HAS_BUTTON 1
+#define HAS_ES8311
+#define HAS_ES7210
+
+//#define TOUCH_PANEL   TOUCH_WS_S3_SMART86
+
 // Panel init commands (ST7701)
+// NOTE: Must stay here, immediately before `cfg` below — see BSP_WS_P4_7B.h
+// for why (sizeof() on this array needs its complete type at use-site).
 static const uint8_t waveshare_s3_smart86_init[] = {
 //  {cmd, { data }, data_size, delay_ms}
     BEGIN_WRITE,
@@ -132,21 +145,9 @@ static const Fleet_BSP WS_S3_SMART86_LCD = {
 
     .device_name       = "Waveshare S3 Smart86",
 
-    // --= Hardware Flags =--
-    #define HAS_IO_EXPANDER 1
-    #define HAS_BUS 1
-    #define HAS_RGB_PANEL 1
-    #define HAS_TOUCH 1
-    #define HAS_BUTTON 1
-    #define HAS_ES8311
-    #define HAS_ES7210
-    // #define DOUBLE_BUFFER
-
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 47,    // Header Pin 14
     .I2C_SCL_PIN       = 48,    // Header Pin 3
-    
-    // #define RST_PIN EXIO_LCD_RST
 
     // --= Expander Pins =--
     .EXPANDER_I2C_ADDR = 0x20,
@@ -173,7 +174,6 @@ static const Fleet_BSP WS_S3_SMART86_LCD = {
 
     // ---= Touch Panel =---
     .TP_NAME           = "GT911",
-    #define TOUCH_PANEL   TOUCH_WS_S3_SMART86
     .TP_I2C_ADDR       = 0x5D,
     .TP_I2C_CLOCK_SPEED = 400000,
     .TP_SDA            = 47,
@@ -220,7 +220,7 @@ static const Fleet_BSP WS_S3_SMART86_LCD = {
 
     // --= LVGL Settings =--
     .DOUBLE_BUFFERING   = true,
-    .DRAW_BUF_HEIGHT    = 20,
+    .DRAW_BUF_HEIGHT    = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
     .BUFFER_SIZE_PX     = 480 * 20, // Width x 20 rows
 
     // ---= Init Commands =---
@@ -282,6 +282,13 @@ const Fleet_Hardware_Config WS_S3_Smart86_Hardware = {
 
     // --= Button =--
     .BOOT_BUTTON_PIN   = 0,     // Header Pin 14 - PWR / Key3
+
+    // --= SPI Pins =--
+    .SPI_MOSI   = 42,
+    .SPI_MISO   = 41,
+    .SPI_CS     = 45,
+    .SPI_CLK    = 43,
+    
 
     // --= SD Card Interface =--
     .TF_CMD     = 44,

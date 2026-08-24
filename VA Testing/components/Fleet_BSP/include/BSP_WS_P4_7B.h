@@ -5,7 +5,7 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP_P4.h"
 
-#define WS_P4_7B
+// #define WS_P4_7B    // Build flag in platformio.ini handles the BSP choice
 
 // -------------------------------------------------------------------------
 // Board: WaveShare Touch-LCD-7B (ESP32-P4 + C6)
@@ -13,7 +13,22 @@
 // Resolution: 1024x600
 // -------------------------------------------------------------------------
 
+// --= Hardware Flags =--
+#define HAS_MIPI_PANEL 1
+#define HAS_TOUCH 1
+#define HAS_ES8311 1
+#define HAS_ES7210 1
+//#define HAS_IO_EXPANDER
+//#define HAS_RGB_PANEL
+//#define HAS_QSPI_PANEL
+//#define TOUCH_PANEL  TOUCH_WS_P4_7B
+
 // Panel init commands (EK79007)
+// NOTE: Must stay here, immediately before `cfg` below — .INIT_CMDS_SIZE uses
+// sizeof() on this array, which requires the array's complete (sized) type.
+// A forward declaration would leave the type incomplete at that point and
+// fail to compile, so this can't move below cfg/hw_cfg without hardcoding
+// the element count as a separate maintained constant instead.
 // CMD, DATA ptr, DATA len, DELAY ms
 static const lcd_init_cmd_t waveshare_p4_7b_init[] = {
     // 1. Soft Reset
@@ -67,16 +82,6 @@ static const lcd_init_cmd_t waveshare_p4_7b_init[] = {
 const Fleet_BSP WS_P4_7B_LCD = {
     .device_name       = "Waveshare P4 7\" Touch-LCD-7B",
 
-    // --= Hardware Flags =--
-    #define HAS_MIPI_PANEL 1
-    #define HAS_TOUCH 1
-    #define HAS_ES8311 1
-    #define HAS_ES7210 1
-    #define ES7210_MIC_SELECT ((es7210_input_mics_t)(ES7210_INPUT_MIC1 | ES7210_INPUT_MIC2 | ES7210_INPUT_MIC3 ))
-    //#define HAS_IO_EXPANDER
-    //#define HAS_RGB_PANEL
-    //#define HAS_QSPI_PANEL
-    
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 7,
     .I2C_SCL_PIN       = 8,
@@ -95,7 +100,6 @@ const Fleet_BSP WS_P4_7B_LCD = {
 
     // ---= Touch Panel =---
     .TP_NAME           = "GT911",
-    #define TOUCH_PANEL  TOUCH_WS_P4_7B
         // When power-on detects low level of the interrupt gpio, address is 0x5D.
         // Interrupt gpio is high level, address is 0x14.
     .TP_I2C_ADDR       = 0x5D,
@@ -133,7 +137,6 @@ const Fleet_BSP WS_P4_7B_LCD = {
     .DOUBLE_BUFFERING   = true,
     .DRAW_BUF_HEIGHT    = 50,
     .BUFFER_SIZE_PX     = 51200, // 1024 * 50, // WIDTH * DRAW_BUF_HEIGHT
-    #define DRAW_BUF_HEIGHT 50
 
     // ---= Init Commands =---
     .INIT_CMDS_DSI     = waveshare_p4_7b_init,

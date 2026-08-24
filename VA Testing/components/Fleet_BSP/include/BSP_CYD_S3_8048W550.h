@@ -1,11 +1,12 @@
 #pragma once
-#ifndef BSP_GUITION_8048W550_H
-#define BSP_GUITION_8048W550_H
+#ifndef BSP_CYD_S3_8048W550_H
+#define BSP_CYD_S3_8048W550_H
 
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP.h"
 
-#define GUITION_S3_8048W550
+#define DEBUG_DISPLAY 1
+// #define GUITION_S3_8048W550  // Build flag in platformio.ini handles the BSP choice
 
 // -------------------------------------------------------------------------
 // Board: Guition JC8048W550 (ESP32-S3 N16R8)
@@ -13,18 +14,13 @@
 // Resolution: 800x480
 // -------------------------------------------------------------------------
 
+// --= Hardware Flags =--
+// !! Moved to environment build_flags in platformio.ini
+
 // Guition 8048W550 with GT911 Touch Panel
 static const Fleet_BSP Guition_8048W550_LCD = {
 
     .device_name       = "Guition S3 5\" JC8048W550",
-
-    // --= Hardware Flags =--
-    #define HAS_RGB_PANEL 1
-    #define HAS_TOUCH 1
-    //#define HAS_IO_EXPANDER 1
-    //#define HAS_QSPI_PANEL 1
-    //#define HAS_MIPI_PANEL 1
-    
 
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 19,
@@ -35,7 +31,7 @@ static const Fleet_BSP Guition_8048W550_LCD = {
     .LCD_MODEL         = "ST7262",
     .WIDTH             = 800,
     .HEIGHT            = 480,
-    .ROTATION          = 0,
+    .ROTATION          = 0, // 0 = Landscape (USB on bottom), 1 = Portrait (USB left side), 2 = Landscape Inverted, 3 = Portrait Inverted
     .AUTO_FLUSH        = true,
 
     // ---= Backlight =---
@@ -45,12 +41,11 @@ static const Fleet_BSP Guition_8048W550_LCD = {
 
     // ---= Touch Panel =---
     .TP_NAME            = "GT911",
-    #define TOUCH_PANEL   TOUCH_CYD_550
     .TP_I2C_ADDR        = 0x5D,
     .TP_I2C_CLOCK_SPEED = 400000,
     .TP_SDA             = 19,
     .TP_SCL             = 20,
-    .TP_INT             = 18,
+    .TP_INT             = -1, // 18
     .TP_RST             = 38,
     .TP_MAX_TOUCH       = 5,
 
@@ -83,10 +78,8 @@ static const Fleet_BSP Guition_8048W550_LCD = {
 
     // --= LVGL Settings =--
     .DOUBLE_BUFFERING   = false,
-    .DRAW_BUF_HEIGHT    = 20,
+    .DRAW_BUF_HEIGHT    = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
     .BUFFER_SIZE_PX     = 800 * 20, // Width x 20 rows
-    #define LVGL_BUFFER_MALLOC_FLAGS (MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)
-    #define LVGL_BUFFER_PIXELS (800*480) // Full Screen
 
 };
 inline const Fleet_BSP& cfg = Guition_8048W550_LCD;
@@ -98,7 +91,7 @@ const Fleet_Hardware_Config Guition_8048W550_Hardware = {
 
     // --= Audio Codec =--
     // --= NS4168 power amp =--
-    .I2S_BCLK   = 19,   // 0,
+    .I2S_BCLK   = 0,   // 19
     .I2S_LRCK   = 18,
     .I2S_DOUT   = 17,
 
@@ -113,7 +106,15 @@ const Fleet_Hardware_Config Guition_8048W550_Hardware = {
 
     .I2S_AMP_EN = -1, // No direct amp control
 
+    // --= Button =--
+    
     .BOOT_BUTTON_PIN = 0,
+
+    // --= SPI Pins =--
+    .SPI_MOSI   = 11,   // Demo refers to TF_CMD or TF_MOSI
+    .SPI_MISO   = 13,   // Demo refers to TF_D0 or TF_MISO
+    .SPI_CS     = 10,   // Demo refers to TF_D3 or TF_CS
+    .SPI_CLK    = 12,   // Demo refers to TF_CLK
 
     // --= SD Card Interface =--
     .TF_CMD     = 11,  // MCU_MOSI && SPI_MOSI
@@ -123,10 +124,11 @@ const Fleet_Hardware_Config Guition_8048W550_Hardware = {
     .TF_MISO    = 13,  // TF_D0 && SPI_MISO
     .TF_D0      = 13,  // TF_MISO && SPI_MISO
     .TF_D3      = 10,  // TF_CS
-    .SPI_MOSI   = 11,  // TF_CMD && SPI_MOSI
-    .SPI_MISO   = 13,  // TF_D0 && SPI_MISO
+
+    // --= IP5306 Battery Management =--
+    .BAT_ADC    = 17,
 
 };
 inline const Fleet_Hardware_Config& hw_cfg = Guition_8048W550_Hardware;
 
-#endif // BSP_GUITION_8048W550_H
+#endif // BSP_CYD_S3_8048W550_H

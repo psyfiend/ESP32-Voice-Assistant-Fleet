@@ -44,11 +44,6 @@
 #define ENABLE_TDM_MAX_NUM    (3)
 #define ES7210_MCLK_SOURCE    (FROM_CLOCK_DOUBLE_PIN)  /* In master mode. 0 : MCLK from pad; 1 : MCLK from clock doubler */
 
-// Default Mic Selection (can be overridden by calling es7210_mic_select later)
-// #ifndef ES7210_MIC_SELECT
-#define ES7210_MIC_SELECT (es7210_input_mics_t)(ES7210_INPUT_MIC1 | ES7210_INPUT_MIC2 | ES7210_INPUT_MIC2)
-// #endif  /* ES7210_MIC_SELECT */
-
 static const char *TAG = "ES7210_HAL";
 
 // Static handle to maintain state
@@ -322,8 +317,18 @@ esp_err_t es7210_adc_init(audio_hal_codec_config_t *codec_cfg)
     ret |= es7210_write_reg(ES7210_OSR_REG07, 0x20);
     ret |= es7210_write_reg(ES7210_MAINCLK_REG02, 0xc1);  
     ret |= es7210_config_sample(i2s_cfg->samples);
-    ret |= es7210_mic_select(ES7210_MIC_SELECT);
-    ret |= es7210_adc_set_gain(ES7210_MIC_SELECT, GAIN_24DB);
+
+    // Mic selection/gain come from the active board's BSP (Fleet_Hardware_Config), not a
+    // hardcoded default, so each device can use its own tested mic configuration.
+    #ifdef ENABLE_AEC
+        es7210_input_mics_t mic_sel  = (es7210_input_mics_t)hw_cfg.AEC_MIC_SELECTED;
+        es7210_gain_value_t mic_gain = (es7210_gain_value_t)hw_cfg.AEC_MIC_GAIN_DB;
+    #else
+        es7210_input_mics_t mic_sel  = (es7210_input_mics_t)hw_cfg.MIC_SELECTED;
+        es7210_gain_value_t mic_gain = (es7210_gain_value_t)hw_cfg.MIC_GAIN_DB;
+    #endif
+    ret |= es7210_mic_select(mic_sel);
+    ret |= es7210_adc_set_gain(mic_sel, mic_gain);
     return ESP_OK;
 }
 

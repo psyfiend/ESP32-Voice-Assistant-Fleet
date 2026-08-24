@@ -1,9 +1,14 @@
 #include <Arduino_GFX_Library.h>
-#include <esp32-hal-ledc.h>
+#include "driver/ledc.h"
 #include "DisplayManager.h"
 
 #define BL_PWM_RES 10
 #define BL_MAX_DUTY 1023
+
+// Dedicated LEDC timer/channel for the backlight - this is the only PWM user
+// in the project, so these are free to pick without colliding with anything else.
+#define BL_LEDC_TIMER   LEDC_TIMER_1
+#define BL_LEDC_CHANNEL LEDC_CHANNEL_1
 
 DisplayManager::DisplayManager() {
     _bus = nullptr;
@@ -30,6 +35,12 @@ bool DisplayManager::begin() {
     Serial.println("[DisplayMgr] Begin");
     Serial.flush(); // Force output before crash
 
+    // DEBUG_DISPLAY: raw BSP dimensions/rotation, for comparing against the
+    // post-rotation gfx dimensions below. Enable with -D DEBUG_DISPLAY.
+    #ifdef DEBUG_DISPLAY
+    Serial.printf("[DisplayMgr] Display Dimensions: w=%d x h=%d, ROTATION=%d\n", cfg.WIDTH, cfg.HEIGHT, cfg.ROTATION); Serial.flush();
+    #endif
+
     // 1. Initialize  I2C
     Wire.begin(cfg.I2C_SDA_PIN, cfg.I2C_SCL_PIN);
     
@@ -50,14 +61,11 @@ bool DisplayManager::begin() {
         return false;
     }
 
-    /*if (cfg.ROTATION != 0) {
-        Serial.println("[DisplayMgr] Initial Display Size: ");
-        Serial.printf("Display Size: %d x %d\n", _gfx->width(), _gfx->height());
-        _gfx->setRotation(cfg.ROTATION);
-        Serial.printf("[DisplayMgr] Setting Rotation: %d\n", cfg.ROTATION); Serial.flush();
-        Serial.println("[DisplayMgr] After Rotation Size: ");
-        Serial.printf("%d x %d\n", _gfx->height(), _gfx->width());
-    }*/  
+    #ifdef DEBUG_DISPLAY
+    if (cfg.ROTATION >= 0) {
+        Serial.printf("[DisplayMgr] Rotated Dimensions: w=%d x h=%d\n", _gfx->width(), _gfx->height()); Serial.flush();
+    }
+    #endif
 
     // 4. Init Backlight
     // We do this AFTER gfx->begin() to override any pinMode() calls
@@ -180,18 +188,44 @@ void DisplayManager::initBacklightPWM(bool on) {
     Serial.printf("[BacklightMgr] Backlight pin on level: %s\n", (cfg.LCD_BL_ON_LEVEL ? "HIGH" : "LOW"));
 
     if (cfg.LCD_BL_FREQ <= 0) {
-        Serial.println("[BacklightMgr] Backlight PWM Frequency not set or invalid, skipping PWM setup.");
+        Serial.println("[BacklightMgr] No PWM on this board (on/off backlight only) - fixed at full brightness.");
+        // No dimming available, so report "full" rather than leaving _currentBrightness
+        // at its zero-initialized default - that previously made getBrightness() claim
+        // 0% while the backlight pin was actually being driven fully on above.
+        _currentBrightness = 100;
         return;
     }
 
     Serial.printf("[BacklightMgr] Backlight Pin: %d, Freq: %dHz\n", cfg.LCD_BL, cfg.LCD_BL_FREQ);
 
-    // Attach Pin to LEDC Channel
-    // Arduino 3.0+: ledcAttach(pin, freq, res)
-    if (!ledcAttach(cfg.LCD_BL, cfg.LCD_BL_FREQ, BL_PWM_RES)) {
-        Serial.println("[BacklightMgr] PWM Attach Failed!");
+    const ledc_timer_config_t backlight_timer = {
+        .speed_mode      = LEDC_LOW_SPEED_MODE,
+        .duty_resolution = (ledc_timer_bit_t)BL_PWM_RES,
+        .timer_num       = BL_LEDC_TIMER,
+        .freq_hz         = (uint32_t)cfg.LCD_BL_FREQ,
+        .clk_cfg         = LEDC_AUTO_CLK,
+    };
+
+    const ledc_channel_config_t backlight_channel = {
+        .gpio_num   = cfg.LCD_BL,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .channel    = BL_LEDC_CHANNEL,
+        .intr_type  = LEDC_INTR_DISABLE,
+        .timer_sel  = BL_LEDC_TIMER,
+        .duty       = 0,
+        .hpoint     = 0,
+        // Active-LOW boards get inverted here in hardware, replacing the manual
+        // "BL_MAX_DUTY - raw_duty" math setBrightness() used to do in software.
+        .flags      = {.output_invert = (cfg.LCD_BL_ON_LEVEL == 0) ? 1u : 0u},
+    };
+
+    esp_err_t err  = ledc_timer_config(&backlight_timer);
+               err |= ledc_channel_config(&backlight_channel);
+
+    if (err != ESP_OK) {
+        Serial.printf("[BacklightMgr] PWM Config Failed: %d\n", err);
     } else {
-        Serial.println("[BacklightMgr] PWM Attach Succeeded");
+        Serial.println("[BacklightMgr] PWM Config Succeeded");
     }
 
     // Set default brightness
@@ -202,23 +236,15 @@ void DisplayManager::setBrightness(uint8_t pct) {
     if (pct > 100) pct = 100;
     _currentBrightness = pct;
 
-    // Calculate Raw Duty (0 to 1023)
-    #if defined(WS_S3_SMART86) || defined(WS_P4_SMART86)
-        // These panels have a limited brightness range
-        pct = map(pct, 0, 100, 43, 100);
-    #endif
-    uint32_t raw_duty = map(pct, 0, 100, 0, BL_MAX_DUTY);   // Minimum 2% to avoid off state
-    uint32_t final_duty = raw_duty;
+    // Any per-board minimum-brightness floor is enforced by the UI slider range
+    // (see Panel_Display.cpp) rather than here, so this stays a plain, direct
+    // mapping - active-LOW inversion is handled by the LEDC channel's
+    // output_invert flag (set once in initBacklightPWM), not here.
+    uint32_t duty = map(pct, 0, 100, 0, BL_MAX_DUTY);
 
-    // Handle Inversion based on BSP Config
-    // If ON_LEVEL is 0 (Active Low), we must invert the duty cycle
-    if (cfg.LCD_BL_ON_LEVEL == 0) {
-        final_duty = BL_MAX_DUTY - raw_duty;
-    }
-
-    // Write to Hardware
-    ledcWrite(cfg.LCD_BL, final_duty);
-    Serial.printf("[BacklightMgr] Set Brightness: %d%% (Raw: %d, Final: %d)\n", pct, raw_duty, final_duty);
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, BL_LEDC_CHANNEL, duty);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, BL_LEDC_CHANNEL);
+    Serial.printf("[BacklightMgr] Set Brightness: %d%% (Duty: %d)\n", pct, duty);
 }
 
 void DisplayManager::setBacklight(bool on) {
