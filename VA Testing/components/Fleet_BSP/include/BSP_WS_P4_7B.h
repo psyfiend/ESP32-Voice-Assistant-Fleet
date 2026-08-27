@@ -5,23 +5,11 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP_P4.h"
 
-// #define WS_P4_7B    // Build flag in platformio.ini handles the BSP choice
-
 // -------------------------------------------------------------------------
 // Board: WaveShare Touch-LCD-7B (ESP32-P4 + C6)
 // Driver: EK79007 (MIPI DSI)
 // Resolution: 1024x600
 // -------------------------------------------------------------------------
-
-// --= Hardware Flags =--
-#define HAS_MIPI_PANEL 1
-#define HAS_TOUCH 1
-#define HAS_ES8311 1
-#define HAS_ES7210 1
-//#define HAS_IO_EXPANDER
-//#define HAS_RGB_PANEL
-//#define HAS_QSPI_PANEL
-//#define TOUCH_PANEL  TOUCH_WS_P4_7B
 
 // Panel init commands (EK79007)
 // NOTE: Must stay here, immediately before `cfg` below — .INIT_CMDS_SIZE uses

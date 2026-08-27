@@ -5,19 +5,11 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP_P4.h"
 
-// #define GUITION_P4_1060P470  // Build flag in platformio.ini handles the BSP choice
-
 // -------------------------------------------------------------------------
 // Board: Guition JC1060P470C (ESP32-P4 + C6 + ETH)
 // Driver: JD9165BA (MIPI DSI)
 // Resolution: 1024x600
 // -------------------------------------------------------------------------
-
-// --= Hardware Flags =--
-#define HAS_MIPI_PANEL 1
-#define HAS_TOUCH 1
-#define HAS_ES8311 1
-//#define TOUCH_PANEL TOUCH_1060P470
 
 // --- Init Sequence (Extracted from MTK_JD9165BA...dtsi.txt) ---
 // NOTE: Must stay here, immediately before `cfg` below — see BSP_WS_P4_7B.h

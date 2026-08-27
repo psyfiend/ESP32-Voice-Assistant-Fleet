@@ -5,22 +5,44 @@
 static void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
     GuiManager* gui = (GuiManager*)lv_display_get_user_data(disp);
     Arduino_GFX *gfx = gui->displayMgr.getGfx();
-    
+
+    #ifdef DEBUG_DISPLAY
+    // Unconditional, every call - separate from the is_last-gated counter
+    // below, so we can tell "flush never called at all" apart from
+    // "called repeatedly but is_last never true" instead of just seeing
+    // silence either way.
+    static uint32_t callCount = 0;
+    callCount++;
+    if (callCount <= 10 || callCount % 200 == 0) {
+        Serial.printf("[GUI] my_disp_flush called #%lu: area (%d,%d)-(%d,%d) is_last=%d\n",
+            (unsigned long)callCount, area->x1, area->y1, area->x2, area->y2,
+            lv_display_flush_is_last(disp));
+    }
+    #endif
+
     // 1. Draw the chunk (Partial or Full)
     // Even in "Direct Mode" style usage with full buffers, we use this to copy
     // the pixels from our LVGL buffer into the Arduino_GFX internal driver.
     uint32_t w = (area->x2 - area->x1 + 1);
     uint32_t h = (area->y2 - area->y1 + 1);
     gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t *)px_map, w, h);
-    
+
     // 2. The "Waveshare Logic" (Batching Optimization)
     // We check if this is the LAST chunk of the frame.
-    // If it is, we tell the hardware to refresh. This prevents sending 
+    // If it is, we tell the hardware to refresh. This prevents sending
     // partial frames to MIPI/RGB displays which can cause tearing or high bus overhead.
     if (lv_display_flush_is_last(disp)) {
         gfx->flush();
+        #ifdef DEBUG_DISPLAY
+        static uint32_t frameCount = 0;
+        frameCount++;
+        if (frameCount <= 5 || frameCount % 100 == 0) {
+            Serial.printf("[GUI] flush: frame #%lu complete (last area %d,%d %dx%d)\n",
+                (unsigned long)frameCount, area->x1, area->y1, w, h);
+        }
+        #endif
     }
-    
+
     // 3. Notify LVGL we are done
     lv_display_flush_ready(disp);
 }
@@ -41,6 +63,13 @@ static void my_touch_read(lv_indev_t *indev, lv_indev_data_t *data) {
 
 static uint32_t my_tick_get_cb(void) { return millis(); }
 
+#if LV_USE_LOG
+static void my_lv_log_print(lv_log_level_t level, const char *buf) {
+    Serial.print("[LVGL] ");
+    Serial.println(buf);
+}
+#endif
+
 // --- IMPLEMENTATION ---
 
 GuiManager::GuiManager() {
@@ -56,10 +85,17 @@ void GuiManager::begin() {
         Serial.println("[GUI] Display Init Failed!");
         while(1) delay(100);
     }
+    #ifndef DEBUG_SKIP_TOUCH
     touchMgr.begin();
+    #else
+    Serial.println("[GUI] DEBUG_SKIP_TOUCH: skipping touchMgr.begin() entirely.");
+    #endif
 
     // 2. LVGL Init
     lv_init();
+    #if LV_USE_LOG
+    lv_log_register_print_cb(my_lv_log_print);
+    #endif
     lv_tick_set_cb(my_tick_get_cb);
 
     // 3. Buffer Alloc (Ping-Pong Strategy)

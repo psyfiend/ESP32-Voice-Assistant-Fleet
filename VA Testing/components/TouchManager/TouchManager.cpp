@@ -9,10 +9,14 @@ TouchManager::TouchManager() {
 }
 
 bool TouchManager::begin() {
-    
+
     Serial.println("------------------------------");
 
-    // If bb_cap_touch has a specific configuration for the device 
+    // bb_captouch's init() calls FleetI2C::begin() itself (see bb_captouch.cpp) -
+    // that's idempotent, so it's safe even though DisplayManager::begin()
+    // already brought the bus up.
+
+    // If bb_cap_touch has a specific configuration for the device
     // and it is in the BSP as #define TOUCH_PANEL, use that.
     #ifdef TOUCH_PANEL
         Serial.printf("[TouchMgr] Initializing %s using bb_captouch ID: %d\n", cfg.TP_NAME, TOUCH_PANEL);
@@ -41,9 +45,13 @@ bool TouchManager::begin() {
         }
 
         // Initialize bb_captouch with explicit pins
+        // TP_I2C_CLOCK_SPEED was declared in every BSP but never actually
+        // reached bb_captouch - init() silently defaulted to its own
+        // built-in 400kHz regardless of what a board's BSP said. WS_P4_Smart86's
+        // BSP has said 100000 this whole time without it ever taking effect.
         Serial.println("[TouchMgr] No bb_captouch ID defined, using manual pin config...");
-        Serial.printf("[TouchMgr] Init SDA:%d SCL:%d IRQ:%d RST:%d\n", sda, scl, irq, rst);
-        int touchtest = _touch.init(sda, scl, rst, irq);
+        Serial.printf("[TouchMgr] Init SDA:%d SCL:%d IRQ:%d RST:%d Speed:%lu\n", sda, scl, irq, rst, (unsigned long)cfg.TP_I2C_CLOCK_SPEED);
+        int touchtest = _touch.init(sda, scl, rst, irq, cfg.TP_I2C_CLOCK_SPEED);
     #endif
 
     if (touchtest == CT_SUCCESS) {
@@ -56,16 +64,14 @@ bool TouchManager::begin() {
     return true;
 }
 
-// <--- ADDED: New Multitouch Implementation
 // Fetches all available touch points up to maxPoints
 uint8_t TouchManager::read(TouchPoint* points, uint8_t maxPoints) {
     TOUCHINFO ti;
     
-    // 1. Fetch Raw Samples
-    // We check the hardware state first
+    // Fetch Raw Samples
     bool hardwareAvailable = _touch.getSamples(&ti);
 
-    // 2. State Machine Logic
+    // State Machine Logic
     if (hardwareAvailable && ti.count > 0) {
         // --- CASE A: Valid Signal Detected ---
         _isTouchActive = true;
@@ -102,7 +108,6 @@ uint8_t TouchManager::read(TouchPoint* points, uint8_t maxPoints) {
         }
     } 
     else {
-        // --- CASE B: Signal Loss (or Release) ---
         // We only accept "Released" if the signal has been gone longer than _debounceMs
         if (_isTouchActive && (millis() - _lastTouchTime < _debounceMs)) {
             // It's a glitch! (Signal drop < 50ms)
@@ -116,7 +121,7 @@ uint8_t TouchManager::read(TouchPoint* points, uint8_t maxPoints) {
         }
     }
 
-    // 3. Output Population
+    // Output Population
     // Whether fresh or cached, we copy the valid state to the user's buffer
     uint8_t returnCount = (_lastTouchCount > maxPoints) ? maxPoints : _lastTouchCount;
     
@@ -127,7 +132,6 @@ uint8_t TouchManager::read(TouchPoint* points, uint8_t maxPoints) {
     return returnCount;
 }
 
-// <--- UPDATED: Legacy Wrapper
 // Maintains backward compatibility by calling the new reader
 bool TouchManager::read(int *x, int *y) {
     TouchPoint p; // temporary container

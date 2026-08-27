@@ -5,24 +5,11 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP_P4.h"
 
-// #define WS_P4_SMART86 // Build flag in platformio.ini handles the BSP choice
-
 // -------------------------------------------------------------------------
 // Board: WaveShare P4 Smart86 Box (ESP32-P4 + C6)
 // Driver: ST7703 (MIPI DSI)
 // Resolution: 720x720
 // -------------------------------------------------------------------------
-
-// --= Hardware Flags =--
-#define HAS_MIPI_PANEL 1
-#define HAS_TOUCH 1
-#define HIGH_DPI_DISPLAY 1
-#define HAS_ES8311 1
-#define HAS_ES7210 1
-//#define HAS_IO_EXPANDER
-//#define HAS_RGB_PANEL
-//#define HAS_QSPI_PANEL
-//#define TOUCH_PANEL   TOUCH_WS_P4_SMART86
 
 // Panel init commands (ST7703)
 // NOTE: Must stay here, immediately before `cfg` below — see BSP_WS_P4_7B.h
@@ -57,7 +44,7 @@ static const lcd_init_cmd_t waveshare_p4_smart86_init[] = {
 
 // Waveshare P4 Smart86 LCD Configuration
 const Fleet_BSP WS_P4_SMART86_LCD = {
-    .device_name       = "Waveshare P4 Smart86",
+    .device_name       = "Waveshare ESP32-P4-Touch-LCD-4B",
 
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 7,

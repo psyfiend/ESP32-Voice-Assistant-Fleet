@@ -1,11 +1,9 @@
 #pragma once
-#ifndef BSP_GUITION_S3_3248W535_H
-#define BSP_GUITION_S3_3248W535_H
+#ifndef BSP_CYD_S3_3248W535_H
+#define BSP_CYD_S3_3248W535_H
 
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP.h"
-
-// #define GUITION_S3_3248W535  // Build flag in platformio.ini handles the BSP choice
 
 // -------------------------------------------------------------------------
 // Board: Guition JC3248W535 (ESP32-S3N16R8)
@@ -13,16 +11,10 @@
 // Resolution: 324x480
 // -------------------------------------------------------------------------
 
-// --= Hardware Flags =--
-#define HAS_QSPI_PANEL 1
-#define HAS_TOUCH 1
-#define HAS_BUS 1
-//#define TOUCH_PANEL TOUCH_CYD_535
-
 // Panel init commands (ASX15231B)
 // NOTE: Must stay here, immediately before `cfg` below — see BSP_WS_P4_7B.h
 // for why (sizeof() on this array needs its complete type at use-site).
-static const uint8_t guition_s3_3248W535_init[] = {
+static const uint8_t CYD_S3_3248W535_init[] = {
 //  {cmd, { data }, data_size, delay_ms}
     BEGIN_WRITE,
     WRITE_C8_BYTES, 0xBB, 8,
@@ -276,8 +268,8 @@ static const uint8_t guition_s3_3248W535_init[] = {
 };
 
 // Guition 3.5" 320x480 LCD Configuration
-static const Fleet_BSP Guition_S3_3248W535_LCD = {
-    .device_name       = "Guition S3 JC3248W535",
+static const Fleet_BSP CYD_S3_3248W535_LCD = {
+    .device_name       = "CYD S3 JC3248W535",
 
     // --=  I2C Bus  =--
     .I2C_SDA_PIN       = 4,
@@ -323,13 +315,13 @@ static const Fleet_BSP Guition_S3_3248W535_LCD = {
     .BUFFER_SIZE_PX     = 320 * 20, // Width x 20 rows
 
     // ---= Init Commands =---
-    .INIT_CMDS_RGB     = guition_s3_3248W535_init,
-    .INIT_CMDS_SIZE    = sizeof(guition_s3_3248W535_init),
+    .INIT_CMDS_RGB     = CYD_S3_3248W535_init,
+    .INIT_CMDS_SIZE    = sizeof(CYD_S3_3248W535_init),
 };
-inline const Fleet_BSP& cfg = Guition_S3_3248W535_LCD;
+inline const Fleet_BSP& cfg = CYD_S3_3248W535_LCD;
 
 
-const Fleet_Hardware_Config Guition_S3_3248W535_Hardware = {
+const Fleet_Hardware_Config CYD_S3_3248W535_Hardware = {
     
     // --= Audio Codec =--
     // --= NS4168 power amp =--
@@ -354,6 +346,10 @@ const Fleet_Hardware_Config Guition_S3_3248W535_Hardware = {
 
     .I2S_AMP_EN = -1, // No direct amp control
 
+    // --= SPI Pins =--
+    .SPI_MOSI   = 11,  // TF_CMD && SPI_MOSI
+    .SPI_MISO   = 13,  // TF_D0 && SPI_MISO
+
     // --= SD Card Interface =--
     .TF_CMD     = 11,  // MCU_MOSI && SPI_MOSI
     .TF_CLK     = 12,
@@ -362,13 +358,11 @@ const Fleet_Hardware_Config Guition_S3_3248W535_Hardware = {
     .TF_MISO    = 13,  // TF_D0 && SPI_MISO
     .TF_D0      = 13,  // TF_MISO && SPI_MISO
     .TF_D3      = 10,  // TF_CS
-    .SPI_MOSI   = 11,  // TF_CMD && SPI_MOSI
-    .SPI_MISO   = 13,  // TF_D0 && SPI_MISO
 
     // --= IP5306 Battery Management =--
     .BAT_ADC    = 5,
 
 };
-inline const Fleet_Hardware_Config& hw_cfg = Guition_S3_3248W535_Hardware;
+inline const Fleet_Hardware_Config& hw_cfg = CYD_S3_3248W535_Hardware;
 
-#endif // BSP_GUITION_S3_3248W535_H
+#endif // BSP_CYD_S3_3248W535_H

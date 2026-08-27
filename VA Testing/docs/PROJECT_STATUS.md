@@ -13,6 +13,7 @@ they get resolved; don't let this file grow stale.
 | Guition P4 7" (JC1060P470C) | `guition_1060p470c_base` | ✅ | ✅ | ✅ | ✅ (first-ever test of the ES8311-as-sole-mic-input path) |
 | Guition 3.5" (JC3248W535) | `guition_3_5_base` | ✅ (both rotation 0 and 1 confirmed) | ✅ **fully confirmed, both rotations** — see below for the fix | ✅ | ✅ |
 | Guition 5" (JC8048W550) | `guition_8048w550_base` | ✅ (brightness slider broken, see below) | ✅ (fixed, see below) | ✅ (notably quieter than other boards, unexplained) | ✅ |
+| WaveShare ESP32-S3-Touch-LCD-5B | `waveshare_s3_touch_lcd_5b_base` | ✅ (visible tearing, see below) | ✅ (confirmed 5 simultaneous points) | N/A (no audio hardware on this board) | N/A |
 
 SD card and WiFi are **untested on every board** — not touched this session at all. Note on
 naming: the codebase still uses `WS_S3_SMART86`/"S3 Smart86" internally (BSP filenames,
@@ -70,6 +71,19 @@ WaveShare published official Arduino examples/libraries for this board on GitHub
 
 Just need WiFi and SD card functionality tested — no other outstanding to-do beyond that
 noted above.
+
+### WaveShare ESP32-S3-Touch-LCD-5B
+
+Display and touch are confirmed working (see `docs/BRINGUP_WS_S3_TOUCH_LCD_5B.md` for the
+full bring-up investigation). Still untested:
+- **RS485** — user has a WaveShare Modbus-RTU-Relay-B board to test against; see the
+  sprinkler-controller project note in `FUTURE_IMPROVEMENTS.md`.
+- **Digital IO (relay/DIO pins)**
+- **SD card**
+- **WiFi/connectivity** — same fleet-wide MQTT/Home Assistant prerequisite as every other
+  board, see above.
+- Fleet-wide **per-device LVGL settings** item (double-buffering, etc.) applies here too —
+  see `FUTURE_IMPROVEMENTS.md`.
 
 ## Open bugs / unresolved investigations
 
@@ -157,6 +171,17 @@ entirely (matching `HAS_ES7210`/`HAS_ES8311`-style capability gating already use
 in `Panel_Audio.cpp`) or get real PWM dimming wired up if the hardware actually supports it
 after all (worth double-checking `LCD_BL_FREQ = 0` is actually correct before assuming the
 UI is the only thing to fix).
+
+### WaveShare ESP32-S3-Touch-LCD-5B — visible tearing
+
+Root-caused during bring-up: `Arduino_ESP32RGBPanel` requests two hardware framebuffers but
+only ever draws into/reads back one, so there's no real double-buffering happening — every
+draw writes into the same buffer that's simultaneously being scanned out. Not unique to this
+board (affects every board using that class), but most visible here since this board's
+1024x600 panel pushes ~60% more pixels per frame than `8048W550` through the same
+single-buffer bottleneck. Real fix needs genuine buffer-swap support added to the class; see
+the `Arduino_ESP32RGBPanel` bullet under "LVGL / display" in `FUTURE_IMPROVEMENTS.md` and
+`docs/BRINGUP_WS_S3_TOUCH_LCD_5B.md` for the full investigation.
 
 ### CYD_S3_8048W550 — possible GPIO17 conflict between battery ADC and I2S DOUT
 

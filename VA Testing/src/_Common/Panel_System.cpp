@@ -1,7 +1,7 @@
 #include "Panel_System.h"
 
 // -- EXTERN DECLARATION --
-extern void debug_dump_config();
+extern void debug_dump_config(bool manualTrigger);
 
 Panel_System::Panel_System() {
     _ui_root    = NULL;
@@ -37,7 +37,7 @@ void Panel_System::btn_action_cb(lv_event_t* e) {
     
     if (p) {
         p->log("> Action: Dump Config...");
-        debug_dump_config(); 
+        debug_dump_config(true); // manually triggered - mirror to Serial too
     }
 }
 
@@ -185,11 +185,18 @@ void Panel_System::close() {
 }
 
 void Panel_System::log(const char* fmt, ...) {
-    char buf[256]; 
+    char buf[256];
     va_list args;
     va_start(args, fmt);
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
+
+    // Mirrors to Serial only when explicitly turned on (see setSerialEcho) -
+    // debug_dump_config() controls this: off for a routine automatic boot
+    // run (most of its content already duplicates the boot dashboard's own
+    // direct Serial prints), on for a manually-triggered run (the "Dump
+    // Config" button), or on for boot too if -D DUMP_CONFIG is set.
+    if (_echoToSerial) Serial.println(buf);
 
     // Push to Queue
     if (_log_queue.size() < 100) { // Limit queue depth

@@ -69,7 +69,15 @@
 
 #if LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN
     /** Size of memory available for `lv_malloc()` in bytes (>= 2kB) */
-    #define LV_MEM_SIZE (64 * 1024U)          /**< [bytes] */
+    // Bumped from 64KB: this pool covers ALL of LVGL's internal allocations
+    // (widget objects, styles, animations, internal draw-time buffers) across
+    // every board in the fleet. 64KB was fine for boards up to 800x480; the
+    // WS_S3_TOUCH_LCD_5B's 1024x600 screen, with the most widgets on screen
+    // at once of any board here, silently hung on its first render with the
+    // old size and LV_USE_LOG disabled (see LV_USE_LOG below) - suspected
+    // silent allocation failure. ~238KB of internal RAM was free at the old
+    // size, so this leaves ample headroom for every board, not just this one.
+    #define LV_MEM_SIZE (128 * 1024U)          /**< [bytes] */
 
     /** Size of the memory expand for `lv_malloc()` in bytes */
     #define LV_MEM_POOL_EXPAND_SIZE 0
@@ -410,7 +418,13 @@
  *-----------*/
 
 /** Enable log module */
-#define LV_USE_LOG 0
+// Was 0 (fully silent). WARN-level logging costs nothing when nothing's
+// wrong, and its absence is exactly what made the WS_S3_TOUCH_LCD_5B's
+// silent first-render hang so hard to diagnose - see LV_MEM_SIZE above.
+// Routed to Serial via lv_log_register_print_cb() in GuiManager.cpp
+// (LV_LOG_PRINTF stays 0 - plain printf() isn't guaranteed to reach the
+// Arduino Serial console on every board/core config here).
+#define LV_USE_LOG 1
 #if LV_USE_LOG
     /** Set value to one of the following levels of logging detail:
      *  - LV_LOG_LEVEL_TRACE    Log detailed information.

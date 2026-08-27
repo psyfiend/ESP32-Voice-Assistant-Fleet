@@ -6,7 +6,6 @@
 #include "Fleet_BSP.h"
 
 #define DEBUG_DISPLAY 1
-// #define GUITION_S3_8048W550  // Build flag in platformio.ini handles the BSP choice
 
 // -------------------------------------------------------------------------
 // Board: Guition JC8048W550 (ESP32-S3 N16R8)
@@ -14,10 +13,6 @@
 // Resolution: 800x480
 // -------------------------------------------------------------------------
 
-// --= Hardware Flags =--
-// !! Moved to environment build_flags in platformio.ini
-
-// Guition 8048W550 with GT911 Touch Panel
 static const Fleet_BSP Guition_8048W550_LCD = {
 
     .device_name       = "Guition S3 5\" JC8048W550",
@@ -75,6 +70,12 @@ static const Fleet_BSP Guition_8048W550_LCD = {
     .PCLK_ACTIVE_NEG    = 1,
     .PREFER_SPEED       = 16000000, // 12000000, // PCLK_HZ
     .USE_BIG_ENDIAN     = false,
+    // Explicitly set to match what Arduino_ESP32RGBPanel.cpp used to hardcode
+    // unconditionally (480 * 20) before it started respecting this field -
+    // 800 * 12 is the same 9600px bounce buffer, still a whole number of
+    // scanlines at this board's width. Preserves this board's exact existing
+    // (working) behavior.
+    .BOUNCE_BUFFER_SIZE_PX = 800 * 12,
 
     // --= LVGL Settings =--
     .DOUBLE_BUFFERING   = false,

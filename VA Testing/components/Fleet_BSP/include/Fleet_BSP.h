@@ -31,6 +31,11 @@ struct Fleet_BSP
     uint32_t I2C_CLOCK_SPEED;
 
     // --- Expander Pins ---
+    // EXPANDER_I2C_ADDR / EXIO_LCD_CS / _MOSI / _SCK / _AMP_EN / _HDR_14 are
+    // XCA9554-shaped (WS_S3_SMART86, where the expander doubles as the panel's
+    // soft-SPI databus). EXIO_LCD_BL / _SD_CS / _USB_SEL are CH422G-shaped
+    // (WS_S3_TOUCH_LCD_5B, where the expander is a side-channel GPIO bank, not
+    // the databus) - CH422G also ignores EXPANDER_I2C_ADDR entirely, see CH422G.h.
     uint8_t  EXPANDER_I2C_ADDR;
     int8_t   EXIO_LCD_CS;   // Header Pin 6
     int8_t   EXIO_LCD_MOSI; // Header Pin 8
@@ -40,6 +45,9 @@ struct Fleet_BSP
     int8_t   EXIO_TP_RST;   // Header Pin 16
     int8_t   EXIO_TP_INT;   // Header Pin 18
     int8_t   EXIO_LCD_RST;  // Header Pin 17
+    int8_t   EXIO_LCD_BL;   // CH422G IO pin - backlight enable
+    int8_t   EXIO_SD_CS;    // CH422G IO pin - SD card chip-select
+    int8_t   EXIO_USB_SEL;  // CH422G IO pin - USB/CAN header mux select
 
     // --- LCD Definitions ---
     const char  *LCD_MODEL;   // ST7701, AXS15231B,, ST7262, ILI9xxx, etc.

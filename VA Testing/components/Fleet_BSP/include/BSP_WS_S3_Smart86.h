@@ -4,24 +4,11 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP.h"
 
-// #define WS_S3_SMART86 // Build flag in platformio.ini handles the BSP choice
-
 // -------------------------------------------------------------------------
 // Board: WaveShare S3 Smart86 Box (ESP32-S3 N16R8)
 // Driver: ST7701 (RGB)
 // Resolution: 480x480
 // -------------------------------------------------------------------------
-
-// --= Hardware Flags =--
-#define HAS_IO_EXPANDER 1
-#define HAS_BUS 1
-#define HAS_RGB_PANEL 1
-#define HAS_TOUCH 1
-#define HAS_BUTTON 1
-#define HAS_ES8311
-#define HAS_ES7210
-
-//#define TOUCH_PANEL   TOUCH_WS_S3_SMART86
 
 // Panel init commands (ST7701)
 // NOTE: Must stay here, immediately before `cfg` below — see BSP_WS_P4_7B.h

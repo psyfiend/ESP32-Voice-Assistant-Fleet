@@ -3,6 +3,9 @@
 #include <Arduino_GFX_Library.h>
 #include <Wire.h>
 #include "bsp_loader.h"  // Fleet_BSP inclusion
+#ifdef HAS_CH422G
+#include "CH422G.h"
+#endif
 
 class DisplayManager {
 public:
@@ -42,5 +45,10 @@ private:
       #ifdef WS_S3_SMART86
         Arduino_XCA9554SWSPI *_expander;
       #endif
+    #endif
+
+    #ifdef HAS_CH422G
+        CH422G *_ch422g;
+        void initExpander();
     #endif
 };

@@ -36,6 +36,17 @@ stale for a while, but prune entries once actually done.
   boards is pure CPU-based per-pixel transform, same technique as the QSPI `Canvas` wrapper.
   Not causing a known problem today (no reported tearing/stutter on DSI boards), so this is
   purely a "if it ever becomes a problem" item, not a proactive priority.
+- **`Arduino_ESP32RGBPanel` requests two hardware framebuffers (`num_fbs = 2`) but only ever
+  uses one** (`getFrameBuffer()` always fetches index 1, index 0 is allocated and never
+  touched) — confirmed via source while bringing up `WS_S3_TOUCH_LCD_5B`. No board using this
+  class gets real hardware double-buffering/tear-avoidance today; every draw writes into the
+  same buffer that's simultaneously being scanned out. Wastes ~1.2MB of PSRAM per board on
+  the unused buffer, and is now causing *visible* tearing on `WS_S3_TOUCH_LCD_5B` (1024x600 —
+  ~60% more pixels per frame than `8048W550` through the same single-buffer bottleneck, so the
+  same underlying limitation is more noticeable there). Real fix is giving the class genuine
+  buffer-swap capability, matching what Waveshare's own ESP-IDF reference does via
+  `switchFrameBufferTo()` — real `Arduino_GFX`-internals work, not a config tweak. See
+  `docs/BRINGUP_WS_S3_TOUCH_LCD_5B.md` for the full investigation that found this.
 
 ## Audio
 
@@ -131,16 +142,29 @@ data (via MQTT or otherwise) — this is a prerequisite for WiFi testing to mean
 ## New hardware to add to the fleet/HAL
 
 Not yet integrated into this codebase at all — no BSP header, nothing. Listed here so
-intent isn't lost before the work starts.
+intent isn't lost before the work starts. (`WS_S3_TOUCH_LCD_5B` used to be listed here —
+it's integrated and working now, see `PROJECT_STATUS.md` and
+`docs/BRINGUP_WS_S3_TOUCH_LCD_5B.md`.)
 
-### WaveShare ESP32-S3-Touch-LCD-5B (1024x600, rev 1.1)
+### WaveShare ESP32-P4-WIFI6-Touch-LCD-5 (arrived, not yet started)
 
-- No audio hardware, but has an SD card slot.
-- I/O: CAN, RS485, and wet/dry contact relay I/O. CAN doesn't need testing; **RS485 does**
-  — intended to control the Modbus relay board (see below).
-- Has an RTC battery holder and battery terminals — needs functional verification once
-  brought up.
-- Planned use: garage door opener control (a relay wired to the opener's button).
+The P4 sibling of `WS_S3_TOUCH_LCD_5B` — same general concept (utilitarian/functional HMI,
+not a voice-assistant board), bigger MCU. Waveshare has been actively publishing Arduino
+support for their P4 boards recently (previously ESP-IDF-only for several of them) — worth
+checking their GitHub for this board specifically, and worth a broader pass (see next item)
+before assuming this board's bring-up needs to be as much of an from-scratch investigation as
+`WS_S3_TOUCH_LCD_5B`'s was.
+
+### General: sync with Waveshare's latest example repos across the fleet
+
+Waveshare has been shipping real Arduino example code/libraries for boards that were
+previously ESP-IDF-only, and updating existing ones. Worth a periodic pass across every board
+already in this fleet (not just new ones) checking their current GitHub repos for anything
+that's changed since this project's own bring-up — pin corrections, timing values, library
+updates, newly-added Arduino support. The `WS_S3_TOUCH_LCD_5B` bring-up (see
+`docs/BRINGUP_WS_S3_TOUCH_LCD_5B.md`) leaned on exactly this kind of vendor reference material
+(their real ESP-IDF driver source, byte-for-byte) to make real progress after guessing alone
+had stalled — worth doing proactively, not just when something's already broken.
 
 ### WaveShare ESP32-S3 RGB Matrix board + 128x64 HUB75 panel
 

@@ -4,11 +4,14 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <FleetI2C.h>
 #include "GuiManager.h"
+#ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
+#include "Panel_Audio.h"
+#endif
 #include "Panel_Header.h"
 #include "Panel_Display.h"
-#include "Panel_Audio.h"
 #include "Panel_System.h"
 
 // --= FORCE DEPENDENCIES =--
@@ -25,11 +28,15 @@
 
 // --= OBJECTS =--
 GuiManager gui;
+#ifdef HAS_AUDIO_HW
 AudioManager audioMgr;
+#endif
 Panel_Header header;
 Panel_System pnlSystem;
 Panel_Display pnlDisplay(gui);
+#ifdef HAS_AUDIO_HW
 Panel_Audio pnlAudio(audioMgr);
+#endif
 
 // Global callback to toggle system panel
 static void header_icon_click_cb(lv_event_t * e) {
@@ -48,11 +55,24 @@ bool isGpioOutput(int pin) {
     }
 
 // --= SYSTEM DOCTOR =--
-void debug_dump_config() {
+// manualTrigger: true when called from the System panel's "Dump Config"
+// button, false for the automatic boot-time run. Controls whether this
+// dump's output also mirrors to Serial (see Panel_System::setSerialEcho) -
+// on for a manual run or if -D DUMP_CONFIG is set, off otherwise, since an
+// automatic boot dump would mostly just duplicate the dashboard's own direct
+// Serial prints already produced during setup().
+void debug_dump_config(bool manualTrigger) {
+    #ifdef DUMP_CONFIG
+        pnlSystem.setSerialEcho(true);
+    #else
+        pnlSystem.setSerialEcho(manualTrigger);
+    #endif
+
     pnlSystem.log("=== SYSTEM DIAGNOSTICS ===");
     
     // Hardware Status (Runtime)
     pnlSystem.log("[HARDWARE STATUS]");
+    pnlSystem.log("  I2C Backend: %s", FleetI2C::backendName());
     pnlSystem.log("  Uptime: %lu ms", millis());
     pnlSystem.log("  Free Heap: %d kb", ESP.getFreeHeap()/1024);
     pnlSystem.log("  PSRAM Size: %d mb", ESP.getPsramSize()/1024/1024);
@@ -68,6 +88,7 @@ void debug_dump_config() {
     #endif
     
     // Audio State
+    #ifdef HAS_AUDIO_HW
     pnlSystem.log("[AUDIO]");
     #ifdef HAS_ES8311
         pnlSystem.log("  Codec ES8311: ENABLED");
@@ -83,7 +104,11 @@ void debug_dump_config() {
     pnlSystem.log("  Volume: %d%%", audioMgr.getVolume());
     bool isMuted = audioMgr.getMute();
     pnlSystem.log("  Muted: %s", isMuted ? "YES" : "NO");
-    
+    #else
+    pnlSystem.log("[AUDIO]");
+    pnlSystem.log("  No audio hardware on this board");
+    #endif
+
     // AMP Pin Diagnostics
     if (hw_cfg.I2S_AMP_EN != -1) {        
         #ifdef HAS_IO_EXPANDER
@@ -135,8 +160,8 @@ void debug_dump_config() {
     int nDevices = 0;
     // Standard I2C Scan
     for(address = 1; address < 127; address++ ) {
-        Wire.beginTransmission(address);
-        error = Wire.endTransmission();
+        FleetI2C::beginTransmission(address);
+        error = FleetI2C::endTransmission();
         if (error == 0) {
             const char* name = "";
             if (address == 0x18) name = "(ES8311)";
@@ -155,7 +180,16 @@ void debug_dump_config() {
         pnlSystem.log("  I2C Scan Complete");
     }
 
-    Serial.println("==========================================\n");
+    if (manualTrigger) {
+        Serial.println("==========================================\n");
+    }
+    #ifdef DUMP_CONFIG
+    else {
+        Serial.println("==========================================\n");
+    }
+    #endif
+
+    pnlSystem.setSerialEcho(false); // Restore default (off) for any later log() calls.
 }
 
 void setup() {
@@ -165,7 +199,9 @@ void setup() {
 
     // Init Engine
     gui.begin();
+    #ifdef HAS_AUDIO_HW
     audioMgr.begin();
+    #endif
 
     // --= ROOT SCREEN =--
     lv_obj_t * screen = lv_screen_active();
@@ -216,7 +252,9 @@ void setup() {
         // pnlDisplay.setTouchWindowVisibility(!isOpen); 
     });
 
+    #ifdef HAS_AUDIO_HW
     pnlAudio.init(deck);
+    #endif
     pnlDisplay.init(deck);
     pnlSystem.init(upper_deck, &header);
 
@@ -232,13 +270,37 @@ void setup() {
     lv_obj_move_to_index(header.getContainer(), 3); // 3. Header
 
     // 4. Run System Doctor
-    debug_dump_config();
+    debug_dump_config(false); // automatic boot run, not manually triggered
+
+    #ifdef DEBUG_DISPLAY
+    Serial.println("[Loop] Entering loop() for the first time.");
+    #endif
 }
 
 void loop() {
+    #ifdef DEBUG_DISPLAY
+    // Heartbeat: if this stops incrementing (or the whole boot log repeats
+    // from the top), the board is hanging/reboot-looping somewhere in or
+    // just after this point, not silently succeeding.
+    static uint32_t loopCount = 0;
+    loopCount++;
+    if (loopCount <= 5 || loopCount % 500 == 0) {
+        Serial.printf("[Loop] Heartbeat #%lu (uptime %lu ms)\n", (unsigned long)loopCount, millis());
+    }
+    #endif
+
+    #ifdef DEBUG_DISPLAY
+    if (loopCount <= 5) Serial.println("[Loop] Calling gui.update()...");
+    #endif
     gui.update();
+    #ifdef DEBUG_DISPLAY
+    if (loopCount <= 5) Serial.println("[Loop] gui.update() returned.");
+    #endif
+
     header.tick();
     pnlDisplay.tick();
+    #ifdef HAS_AUDIO_HW
     pnlAudio.tick();
+    #endif
     delay(2);
 }

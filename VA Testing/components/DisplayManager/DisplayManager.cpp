@@ -1,6 +1,7 @@
 #include <Arduino_GFX_Library.h>
 #include "driver/ledc.h"
 #include "DisplayManager.h"
+#include <FleetI2C.h>
 
 #define BL_PWM_RES 10
 #define BL_MAX_DUTY 1023
@@ -10,11 +11,34 @@
 #define BL_LEDC_TIMER   LEDC_TIMER_1
 #define BL_LEDC_CHANNEL LEDC_CHANNEL_1
 
+#ifdef HAS_CH422G
+// Raw CH422G register write, bypassing our own CH422G class entirely and
+// routed through FleetI2C rather than Wire directly (so it transparently
+// uses whichever I2C backend this board is configured for - see FleetI2C.h).
+// Added while chasing a persistent, unresolved GT911 I2C failure on
+// WS_S3_TOUCH_LCD_5B that survived every other fix attempted (RGB timing
+// porches, removing the LCD_RST low pulse, tearing down Wire before
+// bb_captouch's re-init, lowering the touch I2C clock speed) - this makes
+// the backlight-on and touch/LCD reset sequences a byte-for-byte match of
+// Waveshare's own proven-working ESP-IDF reference
+// (08_lvgl_Porting/main/waveshare_rgb_lcd_port.c), to rule out (or in) a bug
+// in our own CH422G class's bit-manipulation logic. See DisplayManager::begin()
+// and resetTouch()'s HAS_CH422G branch for the actual sequences.
+static void ch422gRawWrite(uint8_t reg7, uint8_t data) {
+    FleetI2C::beginTransmission(reg7);
+    FleetI2C::write(data);
+    FleetI2C::endTransmission();
+}
+#endif
+
 DisplayManager::DisplayManager() {
     _bus = nullptr;
     _gfx = nullptr;
     #ifdef HAS_IO_EXPANDER
         _expander = nullptr;
+    #endif
+    #ifdef HAS_CH422G
+        _ch422g = nullptr;
     #endif
 }
 
@@ -42,8 +66,13 @@ bool DisplayManager::begin() {
     #endif
 
     // 1. Initialize  I2C
-    Wire.begin(cfg.I2C_SDA_PIN, cfg.I2C_SCL_PIN);
-    
+    // Routed through FleetI2C instead of calling Wire.begin() directly, so
+    // this board can transparently use whichever I2C backend it's
+    // configured for (see FleetI2C.h). begin() is idempotent, so this is
+    // safe even though TouchManager::begin() also calls it later.
+    FleetI2C::begin(cfg.I2C_SDA_PIN, cfg.I2C_SCL_PIN);
+    Serial.printf("[DisplayMgr] I2C backend: %s\n", FleetI2C::backendName());
+
     // 2. Initialize Display
     Serial.println("[DisplayMgr] Init Bus..."); Serial.flush();
     initBus();
@@ -62,6 +91,24 @@ bool DisplayManager::begin() {
     }
 
     #ifdef DEBUG_DISPLAY
+    // Raw color-fill test, bypassing LVGL entirely - if this doesn't show up
+    // on the panel either, the problem is in the RGB pin table/timing (or the
+    // panel isn't actually receiving valid sync), not the GUI layer above it.
+    Serial.println("[DisplayMgr] DEBUG: Raw fill RED..."); Serial.flush();
+    _gfx->fillScreen(RED);
+    _gfx->flush();
+    delay(1500);
+    Serial.println("[DisplayMgr] DEBUG: Raw fill GREEN..."); Serial.flush();
+    _gfx->fillScreen(GREEN);
+    _gfx->flush();
+    delay(1500);
+    Serial.println("[DisplayMgr] DEBUG: Raw fill BLUE..."); Serial.flush();
+    _gfx->fillScreen(BLUE);
+    _gfx->flush();
+    delay(1500);
+    #endif
+
+    #ifdef DEBUG_DISPLAY
     if (cfg.ROTATION >= 0) {
         Serial.printf("[DisplayMgr] Rotated Dimensions: w=%d x h=%d\n", _gfx->width(), _gfx->height()); Serial.flush();
     }
@@ -71,8 +118,17 @@ bool DisplayManager::begin() {
     // We do this AFTER gfx->begin() to override any pinMode() calls
     Serial.println("------------------------------");
     Serial.println("[DisplayMgr] Init Backlight..."); Serial.flush();
-    pinMode(cfg.LCD_BL, OUTPUT);
-    initBacklightPWM(true);
+    #ifdef HAS_CH422G
+        // Verbatim port of Waveshare's own wavesahre_rgb_lcd_bl_on() (see
+        // ch422gRawWrite() for why this bypasses our own CH422G class).
+        ch422gRawWrite(0x24, 0x01); // WR_SET: IO bank -> output mode
+        ch422gRawWrite(0x38, 0x1E); // WR_IO: TP_RST=1, LCD_BL=1, LCD_RST=1, SD_CS=1
+        _currentBrightness = 100;
+        Serial.println("[BacklightMgr] Backlight on (via CH422G expander, on/off only).");
+    #else
+        pinMode(cfg.LCD_BL, OUTPUT);
+        initBacklightPWM(true);
+    #endif
 
     #ifdef HAS_TOUCH
         resetTouch();
@@ -86,7 +142,22 @@ bool DisplayManager::begin() {
     return true;
 }
 
+#ifdef HAS_CH422G
+void DisplayManager::initExpander() {
+    Serial.println("[DisplayMgr] Init CH422G Expander..."); Serial.flush();
+    _ch422g = new CH422G();
+    _ch422g->begin();
+    _ch422g->setIOBankDirection(CH422G::IO_BANK_OUTPUT);
+    // LCD_RST/TP_RST/LCD_BL are now handled by the verbatim ch422gRawWrite()
+    // sequences in begin()/resetTouch() below, not through this class - see
+    // the comment on ch422gRawWrite() for why.
+}
+#endif
+
 void DisplayManager::initBus() {
+    #ifdef HAS_CH422G
+        initExpander();
+    #endif
     #ifdef HAS_BUS
         #ifdef HAS_IO_EXPANDER
             Serial.println("[DisplayMgr] Init Expander Bus..."); Serial.flush();
@@ -118,11 +189,9 @@ void DisplayManager::initPanel() {
             cfg.G0, cfg.G1, cfg.G2, cfg.G3, cfg.G4, cfg.G5,
             cfg.B0, cfg.B1, cfg.B2, cfg.B3, cfg.B4,
             cfg.HSYNC_POL, cfg.HSYNC_FPORCH, cfg.HSYNC_PWIDTH, cfg.HSYNC_BPORCH,
-            cfg.VSYNC_POL, cfg.VSYNC_FPORCH, cfg.VSYNC_PWIDTH, cfg.VSYNC_BPORCH
-            , cfg.PCLK_ACTIVE_NEG, cfg.PREFER_SPEED
-            #ifdef WS_S3_SMART86
-            , cfg.USE_BIG_ENDIAN
-            #endif
+            cfg.VSYNC_POL, cfg.VSYNC_FPORCH, cfg.VSYNC_PWIDTH, cfg.VSYNC_BPORCH,
+            cfg.PCLK_ACTIVE_NEG, cfg.PREFER_SPEED, cfg.USE_BIG_ENDIAN,
+            cfg.DE_IDLE_HIGH, cfg.PCLK_IDLE_HIGH, cfg.BOUNCE_BUFFER_SIZE_PX
         );
         if (!rgbpanel) Serial.println("[DisplayMgr] RGB Panel Alloc Failed!"); Serial.flush();
         // RGB Display IS the canvas, so we assign it directly to _gfx
@@ -258,7 +327,24 @@ int DisplayManager::getBrightness() {
 }
 
 void DisplayManager::resetTouch() {
-    #ifdef HAS_IO_EXPANDER
+    #ifdef HAS_CH422G
+        // Verbatim port of Waveshare's own waveshare_esp32_s3_touch_reset()
+        // (see ch422gRawWrite() above for why this bypasses our CH422G class).
+        // TP_INT is a native GPIO here (not on the expander); GT911 samples
+        // it during reset to select its I2C address. Note this intentionally
+        // does NOT release TP_INT back to INPUT afterward - their reference
+        // doesn't either (their touch driver config sets int_gpio_num = -1,
+        // i.e. polling-only, same as ours), so matching verbatim leaves it
+        // as an output.
+        ch422gRawWrite(0x24, 0x01); // WR_SET: IO bank -> output mode
+        ch422gRawWrite(0x38, 0x2C); // WR_IO: LCD_BL=1, LCD_RST=1, TP_RST=0, USB_SEL=1
+        delay(100);
+        pinMode(cfg.TP_INT, OUTPUT);
+        digitalWrite(cfg.TP_INT, LOW);
+        delay(100);
+        ch422gRawWrite(0x38, 0x2E); // WR_IO: TP_RST=1 (rest unchanged)
+        delay(200);
+    #elif defined(HAS_IO_EXPANDER)
         _expander->pinMode(cfg.EXIO_TP_RST, OUTPUT);
         _expander->pinMode(cfg.EXIO_TP_INT, OUTPUT);
         _expander->digitalWrite(cfg.EXIO_TP_INT, LOW);

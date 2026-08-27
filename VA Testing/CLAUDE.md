@@ -5,9 +5,13 @@ ESP32-S3 and ESP32-P4 boards (WaveShare and Guition displays), each with a touch
 audio codec(s), and LVGL-based UI. One codebase, many boards, selected at build time via
 PlatformIO environments.
 
-See `docs/PROJECT_STATUS.md` for current bugs and unconfirmed/untested items, and
-`docs/FUTURE_IMPROVEMENTS.md` for deliberately deferred work. Both are more volatile than
-this file and worth checking first for "is X already known/planned."
+See `docs/PROJECT_STATUS.md` for current bugs and unconfirmed/untested items,
+`docs/FUTURE_IMPROVEMENTS.md` for deliberately deferred work, `docs/GUI_FRAMEWORK.md` for
+the UI layer's own longer-term vision/architecture (separate from the HAL concerns this file
+covers), and `docs/BRINGUP_WS_S3_TOUCH_LCD_5B.md` for that board's own detailed bring-up
+history (RGB bounce-buffer bug, the still-open GT911 touch issue, everything tried and
+ruled out). All four are more volatile than this file and worth checking first for "is X
+already known/planned."
 
 ## Board selection
 
