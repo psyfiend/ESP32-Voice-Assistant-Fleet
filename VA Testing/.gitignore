@@ -18,3 +18,7 @@
 *.elf
 *.hex
 *.uf2
+
+# Retired per-board example sketches - kept locally for reference only,
+# not synced to GitHub (superseded by the current BSP-driven fleet code).
+legacy_testing/

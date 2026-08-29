@@ -1,3 +1,0 @@
-[submodule "VA Testing/boards"]
-	path = VA Testing/boards
-	url = https://github.com/rzeldent/platformio-espressif32-sunton.git
