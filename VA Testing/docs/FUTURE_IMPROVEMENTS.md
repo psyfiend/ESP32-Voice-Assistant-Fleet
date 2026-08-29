@@ -6,19 +6,28 @@ stale for a while, but prune entries once actually done.
 
 ## BSP / architecture
 
-- **Merge `Fleet_BSP.h` and `Fleet_BSP_P4.h`** into one shared struct definition instead of
-  two independently-drifting ones. Explicitly deferred as too large a change to take on
-  alongside everything else.
-- **Move `HAS_X` capability `#define`s from BSP headers into PlatformIO `build_flags`**,
-  mirroring how the board-name macro already works on 5 of 6 boards. Removes the
-  include-order fragility of `#ifdef HAS_X` checks (currently only defined once
-  `bsp_loader.h` has been included) and cleanly separates "which board is this" (build
-  concern) from "what are this board's values" (BSP struct concern).
+- ~~**Merge `Fleet_BSP.h` and `Fleet_BSP_P4.h`** into one shared struct definition instead of
+  two independently-drifting ones.~~ **Done, then taken further.** `Fleet_BSP.h` now declares
+  seven independent flat struct types (`BoardHardware`, `ExpanderConfig`, `DisplayConfig`,
+  `TouchConfig`, `LvglConfig`, `AudioConfig`, `StorageConfig`) instead of one struct nested
+  inside another — see CLAUDE.md's BSP pattern section. Each board declares per-group
+  instances and aliases them to fixed lowercase names (`bsp_hw`, `bsp_display`, `bsp_touch`,
+  `bsp_lvgl`, `bsp_audio`, `bsp_storage`, `bsp_expander`); all 8 board headers were renamed to
+  match their official vendor model designations in the same pass. Every consumer
+  (`DisplayManager`, `TouchManager`, `AudioManager`, `GuiManager`, plus the legacy per-board
+  example sketches) was migrated to the new `bsp_<alias>.FIELD` paths and rebuilt clean.
+- ~~**Move the board-identity macro out of `build_flags`**~~ **Done** as part of the above -
+  each `BSP_<NAME>.h` now defines its own short device macro (e.g. `WS_P4_7B`) at the top of
+  the file instead of a separate, redundant `-D <BOARDNAME>` build flag (since `-D
+  BSP_HEADER=...` already implies exactly which board it is). `HAS_X` capability flags
+  (`HAS_ES7210`, `HAS_MIPI_PANEL`, etc.) already lived in `build_flags` before this and still
+  do - untouched by this change, and still a candidate for the "which board is this" vs.
+  "what are this board's values" separation described below if that's ever revisited.
 - **Per-board minimum-brightness floor as a real BSP field.** Currently hardcoded directly
   in `Panel_Display.cpp` (43 for the two Smart86 boards, 3 for everyone else, based on one
   hardware measurement on the 7B) rather than being a per-device, per-hardware-measured
   value.
-- **Static-assert the `hw_cfg.MIC_SELECTED`/etc. sanity checks** instead of the current
+- **Static-assert the `bsp_audio.MIC_SELECTED`/etc. sanity checks** instead of the current
   runtime check. Would require re-qualifying every BSP struct instance across all 6 device
   headers from `const` to `constexpr` — a real, if mechanical, change, deferred as
   out-of-scope for a quick sanity check.

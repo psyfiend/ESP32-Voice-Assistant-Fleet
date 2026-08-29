@@ -21,9 +21,9 @@ public:
 
     // --= Primary Multitouch Reader =--
     // Populates the provided array 'points'. 
-    // Defaults to the hardware limit (cfg.TP_MAX_TOUCH) if not specified.
+    // Defaults to the hardware limit (bsp_touch.MAX_TOUCH) if not specified.
     // Returns the number of active touches found.
-    uint8_t read(TouchPoint* points, uint8_t maxPoints = cfg.TP_MAX_TOUCH);
+    uint8_t read(TouchPoint* points, uint8_t maxPoints = bsp_touch.MAX_TOUCH);
 
     // <--- UPDATED: Legacy Single-Touch Wrapper
     // Reads the primary touch point only.

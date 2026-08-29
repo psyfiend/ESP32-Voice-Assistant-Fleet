@@ -19,7 +19,7 @@ bool TouchManager::begin() {
     // If bb_cap_touch has a specific configuration for the device
     // and it is in the BSP as #define TOUCH_PANEL, use that.
     #ifdef TOUCH_PANEL
-        Serial.printf("[TouchMgr] Initializing %s using bb_captouch ID: %d\n", cfg.TP_NAME, TOUCH_PANEL);
+        Serial.printf("[TouchMgr] Initializing %s using bb_captouch ID: %d\n", bsp_touch.NAME, TOUCH_PANEL);
         
         // Assumes your fork has an overloaded init(int type)
         int touchtest = _touch.init(TOUCH_PANEL);
@@ -27,19 +27,19 @@ bool TouchManager::begin() {
         // Manual touch init using explicit pin numbers from Fleet_BSP
         int sda, scl, rst, irq;
 
-        if (cfg.I2C_SDA_PIN >= 0 && cfg.I2C_SCL_PIN >= 0) {
-            sda = cfg.TP_SDA;
-            scl = cfg.TP_SCL;
+        if (bsp_hw.SDA_PIN >= 0 && bsp_hw.SCL_PIN >= 0) {
+            sda = bsp_touch.SDA;
+            scl = bsp_touch.SCL;
         }
 
-        if (cfg.TP_RST >= 0) {
-            rst = cfg.TP_RST;
+        if (bsp_touch.RST >= 0) {
+            rst = bsp_touch.RST;
         } else {
             rst = -1; // Unused
         }
         
-        if (cfg.TP_INT >= 0) {
-            irq = cfg.TP_INT;
+        if (bsp_touch.INT >= 0) {
+            irq = bsp_touch.INT;
         } else {
             irq = -1; // Unused
         }
@@ -50,8 +50,8 @@ bool TouchManager::begin() {
         // built-in 400kHz regardless of what a board's BSP said. WS_P4_Smart86's
         // BSP has said 100000 this whole time without it ever taking effect.
         Serial.println("[TouchMgr] No bb_captouch ID defined, using manual pin config...");
-        Serial.printf("[TouchMgr] Init SDA:%d SCL:%d IRQ:%d RST:%d Speed:%lu\n", sda, scl, irq, rst, (unsigned long)cfg.TP_I2C_CLOCK_SPEED);
-        int touchtest = _touch.init(sda, scl, rst, irq, cfg.TP_I2C_CLOCK_SPEED);
+        Serial.printf("[TouchMgr] Init SDA:%d SCL:%d IRQ:%d RST:%d Speed:%lu\n", sda, scl, irq, rst, (unsigned long)bsp_hw.I2C_CLOCK_SPEED);
+        int touchtest = _touch.init(sda, scl, rst, irq, bsp_hw.I2C_CLOCK_SPEED);
     #endif
 
     if (touchtest == CT_SUCCESS) {
@@ -153,16 +153,16 @@ void TouchManager::mapCoordinates(TouchPoint *point) {
     // ROTATION LOGIC
     // GUITION 3.5" (Native 320x480)
     // ==========================================================
-    // #ifdef GUITION_S3_3248W535
+    // #ifdef CYD_S3_3248
     #ifndef WS_P4_7B
-    if (cfg.ROTATION >= 0) 
+    if (bsp_display.ROTATION >= 0) 
         {
         // Serial.println("[TouchMgr] Initializing GUITION 3248W535 rotation mapping..."); 
         // (Commented out Serial to prevent log spam in loop)
 
-        int SW_ROTATION = cfg.ROTATION;
+        int SW_ROTATION = bsp_display.ROTATION;
 
-        if (cfg.ROTATION > 3 || cfg.ROTATION < 0) {
+        if (bsp_display.ROTATION > 3 || bsp_display.ROTATION < 0) {
             SW_ROTATION = 0;    // Fallback to 0 if invalid
         }
 
@@ -174,16 +174,16 @@ void TouchManager::mapCoordinates(TouchPoint *point) {
 
             case 1: // Landscape (90 deg CW)
                 point->x = rawY;
-                point->y = cfg.WIDTH - rawX;
+                point->y = bsp_display.WIDTH - rawX;
                 break;
 
             case 2: // Inverted Portrait (180 deg)
-                point->x = cfg.WIDTH - rawX;
-                point->y = cfg.HEIGHT - rawY;
+                point->x = bsp_display.WIDTH - rawX;
+                point->y = bsp_display.HEIGHT - rawY;
                 break;
 
             case 3: // Inverted Landscape (270 deg CW)
-                point->x = cfg.HEIGHT - rawY;
+                point->x = bsp_display.HEIGHT - rawY;
                 point->y = rawX;
                 break;
             }
@@ -191,7 +191,7 @@ void TouchManager::mapCoordinates(TouchPoint *point) {
     // ==========================================================
     // WAVESHARE S3/P4 BOXES (Native Square/Landscape)
     // ==========================================================
-    //elif defined(WS_S3_SMART86) || defined(WS_P4_SMART86) || defined(WS_P4_7B)
+    //elif defined(WS_S3_4B) || defined(WS_P4_4B) || defined(WS_P4_7B)
     // Pass through for now as hardware is often 1:1 mapped on these panels
     #else
          point->x = rawX;
@@ -201,15 +201,15 @@ void TouchManager::mapCoordinates(TouchPoint *point) {
 
     // Sanity Clip (keep inside logical bounds). Bounds must follow the same
     // width/height swap the display itself uses at 90/270 degree rotations
-    // (matches gfx->width()/height()) - cfg.WIDTH/HEIGHT alone are the raw,
+    // (matches gfx->width()/height()) - bsp_display.WIDTH/HEIGHT alone are the raw,
     // UNROTATED native panel dimensions and don't swap with rotation, so
     // using them directly here was silently clamping any touch past the
     // native boundary to a fixed, wrong edge coordinate instead of its real
     // position - e.g. every touch past x=319 on a 320x480 panel in landscape
     // (where the real screen is 480 wide) collapsed to exactly x=319.
-    bool swapped = (cfg.ROTATION == 1 || cfg.ROTATION == 3);
-    int32_t maxX = (swapped ? cfg.HEIGHT : cfg.WIDTH) - 1;
-    int32_t maxY = (swapped ? cfg.WIDTH : cfg.HEIGHT) - 1;
+    bool swapped = (bsp_display.ROTATION == 1 || bsp_display.ROTATION == 3);
+    int32_t maxX = (swapped ? bsp_display.HEIGHT : bsp_display.WIDTH) - 1;
+    int32_t maxY = (swapped ? bsp_display.WIDTH : bsp_display.HEIGHT) - 1;
 
     // Clamp using signed intermediates: point->x/y are uint16_t, so a
     // negative result (e.g. from sensor noise) would otherwise wrap to a

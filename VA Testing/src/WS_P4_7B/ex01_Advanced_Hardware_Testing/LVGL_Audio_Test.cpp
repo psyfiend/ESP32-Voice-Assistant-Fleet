@@ -9,12 +9,8 @@
 #include <Wire.h>
 
 // --- FORCE DEPENDENCIES ---
-#include <bb_captouch.h> 
-#ifdef CONFIG_IDF_TARGET_ESP32P4
-    #include "Fleet_BSP_P4.h"
-#else
-    #include "Fleet_BSP.h"   
-#endif
+#include <bb_captouch.h>
+#include "Fleet_BSP.h"
 #ifdef BSP_HEADER
     #include BSP_HEADER 
 #endif
@@ -42,7 +38,7 @@ bool trigger_audio_test = false; // Flag to decouple UI from Processing
 
 // --- LVGL Globals ---
 static uint16_t *lv_draw_buf;
-#define LV_BUF_SIZE (cfg.WIDTH * cfg.HEIGHT / 10)
+#define LV_BUF_SIZE (bsp_display.WIDTH * bsp_display.HEIGHT / 10)
 
 // --- UI Constants ---
 #define PNL_COLLAPSED_H 85
@@ -101,8 +97,8 @@ void my_touch_read(lv_indev_t *indev, lv_indev_data_t *data) {
         int16_t x = activePoints[0].x;
         int16_t y = activePoints[0].y;
         if(TOUCH_SWAP_XY) { int16_t temp = x; x = y; y = temp; }
-        if(TOUCH_INV_X)   x = cfg.WIDTH - 1 - x;
-        if(TOUCH_INV_Y)   y = cfg.HEIGHT - 1 - y;
+        if(TOUCH_INV_X)   x = bsp_display.WIDTH - 1 - x;
+        if(TOUCH_INV_Y)   y = bsp_display.HEIGHT - 1 - y;
         data->point.x = x;
         data->point.y = y;
     } else {
@@ -500,7 +496,7 @@ void setup() {
     lv_obj_clear_flag(top_bar, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t * title = lv_label_create(top_bar);
-    lv_label_set_text(title, cfg.device_name); 
+    lv_label_set_text(title, bsp_hw.device_name); 
     lv_obj_align(title, LV_ALIGN_LEFT_MID, 5, 0);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(title, lv_color_hex(0x00A8FF), 0); 
@@ -739,7 +735,7 @@ void setup() {
     lv_obj_set_flex_grow(slider_bri, 1);
     lv_obj_set_align(slider_bri, LV_ALIGN_BOTTOM_MID);
     lv_obj_remove_flag(slider_bri, LV_OBJ_FLAG_SCROLLABLE);
-    #ifdef WS_S3_SMART86
+    #ifdef WS_S3_4B
         lv_slider_set_range(slider_bri, 43, 100); // Glitch where brightness turns off at 43%
     #else
         lv_slider_set_range(slider_bri, 0, 100);
@@ -846,8 +842,8 @@ void loop() {
                 int16_t x = p.x;
                 int16_t y = p.y;
                 if(TOUCH_SWAP_XY) { int16_t temp = x; x = y; y = temp; }
-                if(TOUCH_INV_X)   x = cfg.WIDTH - 1 - x;
-                if(TOUCH_INV_Y)   y = cfg.HEIGHT - 1 - y;
+                if(TOUCH_INV_X)   x = bsp_display.WIDTH - 1 - x;
+                if(TOUCH_INV_Y)   y = bsp_display.HEIGHT - 1 - y;
 
                 lv_obj_set_pos(cursors[i], x - 30, y - 30); 
                 lv_label_set_text_fmt(coord_labels[i], "ID%d: %d,%d", p.id, x, y);

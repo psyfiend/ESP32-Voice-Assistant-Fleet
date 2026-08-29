@@ -321,11 +321,11 @@ esp_err_t es7210_adc_init(audio_hal_codec_config_t *codec_cfg)
     // Mic selection/gain come from the active board's BSP (Fleet_Hardware_Config), not a
     // hardcoded default, so each device can use its own tested mic configuration.
     #ifdef ENABLE_AEC
-        es7210_input_mics_t mic_sel  = (es7210_input_mics_t)hw_cfg.AEC_MIC_SELECTED;
-        es7210_gain_value_t mic_gain = (es7210_gain_value_t)hw_cfg.AEC_MIC_GAIN_DB;
+        es7210_input_mics_t mic_sel  = (es7210_input_mics_t)bsp_audio.AEC_MIC_SELECTED;
+        es7210_gain_value_t mic_gain = (es7210_gain_value_t)bsp_audio.AEC_MIC_GAIN_DB;
     #else
-        es7210_input_mics_t mic_sel  = (es7210_input_mics_t)hw_cfg.MIC_SELECTED;
-        es7210_gain_value_t mic_gain = (es7210_gain_value_t)hw_cfg.MIC_GAIN_DB;
+        es7210_input_mics_t mic_sel  = (es7210_input_mics_t)bsp_audio.MIC_SELECTED;
+        es7210_gain_value_t mic_gain = (es7210_gain_value_t)bsp_audio.MIC_GAIN_DB;
     #endif
     ret |= es7210_mic_select(mic_sel);
     ret |= es7210_adc_set_gain(mic_sel, mic_gain);

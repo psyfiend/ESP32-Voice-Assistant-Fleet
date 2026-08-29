@@ -1,22 +1,22 @@
 #pragma once
 
 #include <Arduino.h>
-#if defined(WS_P4_SMART86)
+#if defined(WS_P4_4B)
     #include "panels/BSP_WS_P4_Smart86_LCD.h"
 #elif defined(WS_P4_7B)
     #include "panels/BSP_WS_P4_7B.h"
-#elif defined(WS_S3_SMART86)
+#elif defined(WS_S3_4B)
     #include "panels/BSP_WS_S3_Smart86.h"
 #elif defined(GUITION_3248W535)
     #include "panels/BSP_Guition_3248W535.h"
 #elif defined(GUITION_8048W550)
     #include "panels/BSP_Guition_8048W550.h"
-#elif defined(GUITION_1060P470)
+#elif defined(CYD_P4_1060)
     #include "panels/BSP_Guition_1060P470.h"
 #endif
 
 // --- Configuration matching Waveshare Hardware ---
-//      cfg.LCD_BL      32      // GPIO 32 for P4 7-inch
+//      bsp_display.BL_PIN      32      // GPIO 32 for P4 7-inch
 #define BL_PWM_FREQ     5000    // 5kHz frequency
 #define BL_PWM_RES      10      // 10-bit resolution (0-1023 steps)
 #define BL_MAX_DUTY     1023    // Max value for 10-bit
@@ -30,10 +30,10 @@ static int _currentBrightness = 100;
 void initBacklight() {
     // Arduino 3.x+ API: ledcAttach(pin, freq, resolution)
     // This sets up the timer and channel automatically
-    if (!ledcAttach(cfg.LCD_BL, BL_PWM_FREQ, BL_PWM_RES)) {
+    if (!ledcAttach(bsp_display.BL_PIN, BL_PWM_FREQ, BL_PWM_RES)) {
         Serial.println("ERROR: Failed to attach Backlight PWM!");
     } else {
-        Serial.printf("Backlight initialized on Pin %d at %dHz\n", cfg.LCD_BL, BL_PWM_FREQ);
+        Serial.printf("Backlight initialized on Pin %d at %dHz\n", bsp_display.BL_PIN, BL_PWM_FREQ);
     }
 
     // Initialize to full brightness
@@ -67,7 +67,7 @@ void setBrightness(uint8_t percent) {
     uint32_t inverted_duty = BL_MAX_DUTY - raw_duty;
 
     // Apply
-    ledcWrite(cfg.LCD_BL, inverted_duty);
+    ledcWrite(bsp_display.BL_PIN, inverted_duty);
 
     // Debug output (optional, remove for production)
     // Serial.printf("Set Brightness: %d%% (Duty: %d)\n", percent, inverted_duty);

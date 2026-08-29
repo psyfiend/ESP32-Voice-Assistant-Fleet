@@ -14,7 +14,7 @@ TouchManager touchMgr;
 
 // --- LVGL Globals ---
 static uint16_t *lv_draw_buf;
-#define LV_BUF_SIZE (cfg.WIDTH * cfg.HEIGHT / 10)
+#define LV_BUF_SIZE (bsp_display.WIDTH * bsp_display.HEIGHT / 10)
 
 // --- Dashboard Globals ---
 lv_obj_t *cursors[5];       // The colored circles
@@ -131,7 +131,7 @@ void setup() {
     lv_obj_clear_flag(top_bar, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t * title = lv_label_create(top_bar);
-    lv_label_set_text(title, cfg.device_name); 
+    lv_label_set_text(title, bsp_hw.device_name); 
     lv_obj_align(title, LV_ALIGN_LEFT_MID, 5, 0);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
     lv_obj_set_style_text_color(title, lv_color_hex(0x00A8FF), 0); 
@@ -144,17 +144,17 @@ void setup() {
     lv_obj_align(specs_panel, LV_ALIGN_TOP_LEFT, 10, 80);
 
     lv_obj_t * lcd_info = lv_label_create(specs_panel);
-    lv_label_set_text_fmt(lcd_info, "LCD: %s", cfg.LCD_MODEL);
+    lv_label_set_text_fmt(lcd_info, "LCD: %s", bsp_display.PANEL_MODEL);
     lv_obj_set_style_text_color(lcd_info, lv_color_hex(0xAAAAAA), 0);
     
     lv_obj_t * tp_info = lv_label_create(specs_panel);
-    lv_label_set_text_fmt(tp_info, "Touch: %s", cfg.TP_NAME);
+    lv_label_set_text_fmt(tp_info, "Touch: %s", bsp_touch.NAME);
     lv_obj_align_to(tp_info, lcd_info, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 5);
     lv_obj_set_style_text_color(tp_info, lv_color_hex(0xAAAAAA), 0);
 
     // --- Right Panel (Data) ---
     lv_obj_t * panel_data = lv_obj_create(lv_screen_active());
-    int p_width = (cfg.WIDTH < 500) ? 45 : 25;
+    int p_width = (bsp_display.WIDTH < 500) ? 45 : 25;
     lv_obj_set_size(panel_data, lv_pct(p_width), lv_pct(60));
     lv_obj_align(panel_data, LV_ALIGN_RIGHT_MID, -10, -20);
     lv_obj_set_style_bg_color(panel_data, lv_color_hex(0x000000), 0);

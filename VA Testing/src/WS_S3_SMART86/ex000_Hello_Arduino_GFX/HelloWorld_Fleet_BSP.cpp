@@ -6,11 +6,11 @@
 #include <Arduino_GFX_Library.h>
 #include "DisplayManager.h"
 
-#if defined(WS_P4_SMART86)
+#if defined(WS_P4_4B)
     #include "panels/BSP_WS_P4_Smart86_LCD.h"
 #elif defined(WS_P4_7B)
     #include "panels/BSP_WS_P4_7B_LCD.h"
-#elif defined(WS_S3_SMART86)
+#elif defined(WS_S3_4B)
     #include "panels/BSP_WS_S3_Smart86_LCD.h"
 #elif defined(GUITION_3248W535)
     #include "panels/BSP_Guition_3248W535_LCD.h"
@@ -55,8 +55,8 @@ void setup() {
     Serial.printf("Display Size: %d x %d\n", gfx->width(), gfx->height());
 
     // 2. Rotation Test (Landscape)
-    gfx->setRotation(cfg.ROTATION);
-    Serial.printf("After setRotation(%d):", cfg.ROTATION);
+    gfx->setRotation(bsp_display.ROTATION);
+    Serial.printf("After setRotation(%d):", bsp_display.ROTATION);
     Serial.printf("Display Size: %d x %d\n", gfx->width(), gfx->height());
 
 

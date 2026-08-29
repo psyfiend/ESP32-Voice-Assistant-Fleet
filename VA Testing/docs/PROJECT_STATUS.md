@@ -7,19 +7,20 @@ they get resolved; don't let this file grow stale.
 
 | Board | Env | Display | Touch | Audio out | Audio in (mic) |
 |---|---|---|---|---|---|
-| **ESP32-P4-WIFI6-Touch-LCD-7B** (WaveShare, aka WS_P4_7B) | `waveshare_p4_7b_base` | ✅ | ✅ (portrait; rotation untested) | untested (no speaker access — enclosure doesn't expose it) | untested |
-| WaveShare P4 Smart86 | `waveshare_p4_smart86_base` | ✅ | ✅ | ✅ | ✅ |
-| **ESP32-S3-Touch-LCD-4B** (WaveShare, aka "S3 Smart86") | `waveshare_s3_smart86_base` | ✅ | ✅ | ✅ | ✅ |
-| Guition P4 7" (JC1060P470C) | `guition_1060p470c_base` | ✅ | ✅ | ✅ | ✅ (first-ever test of the ES8311-as-sole-mic-input path) |
-| Guition 3.5" (JC3248W535) | `guition_3_5_base` | ✅ (both rotation 0 and 1 confirmed) | ✅ **fully confirmed, both rotations** — see below for the fix | ✅ | ✅ |
-| Guition 5" (JC8048W550) | `guition_8048w550_base` | ✅ (brightness slider broken, see below) | ✅ (fixed, see below) | ✅ (notably quieter than other boards, unexplained) | ✅ |
-| WaveShare ESP32-S3-Touch-LCD-5B | `waveshare_s3_touch_lcd_5b_base` | ✅ (visible tearing, see below) | ✅ (confirmed 5 simultaneous points) | N/A (no audio hardware on this board) | N/A |
+| **ESP32-P4-WIFI6-Touch-LCD-7B** (WaveShare, macro `WS_P4_7B`) | `waveshare_p4_7b_base` | ✅ | ✅ (portrait; rotation untested) | untested (no speaker access — enclosure doesn't expose it) | untested |
+| **ESP32-P4-WIFI6-Touch-LCD-4B** (WaveShare, macro `WS_P4_4B`) | `waveshare_p4_smart86_base` | ✅ | ✅ | ✅ | ✅ |
+| **ESP32-P4-WIFI6-Touch-LCD-5** (WaveShare, macro `WS_P4_5`) | `waveshare_p4_touch_lcd_5_base` | untested (bring-up not yet started on hardware) | untested | untested | untested |
+| **ESP32-S3-Touch-LCD-4B** (WaveShare, macro `WS_S3_4B`) | `waveshare_s3_smart86_base` | ✅ | ✅ | ✅ | ✅ |
+| Guition P4 7" (JC1060P470C, macro `CYD_P4_1060`) | `guition_1060p470c_base` | ✅ | ✅ | ✅ | ✅ (first-ever test of the ES8311-as-sole-mic-input path) |
+| Guition 3.5" (JC3248W535, macro `CYD_S3_3248`) | `guition_3_5_base` | ✅ (both rotation 0 and 1 confirmed) | ✅ **fully confirmed, both rotations** — see below for the fix | ✅ | ✅ |
+| Guition 5" (JC8048W550, macro `CYD_S3_8048`) | `guition_8048w550_base` | ✅ (brightness slider broken, see below) | ✅ (fixed, see below) | ✅ (notably quieter than other boards, unexplained) | ✅ |
+| WaveShare ESP32-S3-Touch-LCD-5B (macro `WS_S3_5B`) | `waveshare_s3_touch_lcd_5b_base` | ✅ (visible tearing, see below) | ✅ (confirmed 5 simultaneous points) | N/A (no audio hardware on this board) | N/A |
 
-SD card and WiFi are **untested on every board** — not touched this session at all. Note on
-naming: the codebase still uses `WS_S3_SMART86`/"S3 Smart86" internally (BSP filenames,
-build flags, this doc's earlier sections) — going forward, prefer the official model names
-**ESP32-S3-Touch-LCD-4B** and **ESP32-P4-WIFI6-Touch-LCD-7B** in conversation/docs, even
-though the code itself hasn't been renamed to match.
+SD card and WiFi are **untested on every board** — not touched this session at all. Naming
+note: BSP filenames, device-identity macros, and struct instance names were all renamed to
+match official vendor model designations (see CLAUDE.md's Board selection / BSP pattern
+sections) — the old internal nicknames (`WS_S3_SMART86`, `WS_P4_SMART86`, "Smart86") no
+longer appear anywhere in code, only in this file's own history above.
 
 ## Connectivity testing (WiFi/SD) — not yet meaningfully started
 

@@ -11,9 +11,12 @@
 // Resolution: 324x480
 // -------------------------------------------------------------------------
 
+#define CYD_S3_3248
+
 // Panel init commands (ASX15231B)
-// NOTE: Must stay here, immediately before `cfg` below — see BSP_WS_P4_7B.h
-// for why (sizeof() on this array needs its complete type at use-site).
+// NOTE: Must stay here, immediately before the structs below - see
+// BSP_WS_P4_TOUCH_LCD_7B.h for why (sizeof() on this array needs its
+// complete type at use-site).
 static const uint8_t CYD_S3_3248W535_init[] = {
 //  {cmd, { data }, data_size, delay_ms}
     BEGIN_WRITE,
@@ -267,102 +270,101 @@ static const uint8_t CYD_S3_3248W535_init[] = {
     END_WRITE
 };
 
-// Guition 3.5" 320x480 LCD Configuration
-static const Fleet_BSP CYD_S3_3248W535_LCD = {
-    .device_name       = "CYD S3 JC3248W535",
+const BoardHardware CYD_S3_3248W535_HARDWARE = {
+    .device_name = "CYD S3 JC3248W535",
+    .MANUFACTURER = "Guition",
+    .MODEL        = "JC3248W535",
+    .SI_REV       = "n/a", // ESP32-S3, not P4
 
-    // --=  I2C Bus  =--
-    .I2C_SDA_PIN       = 4,
-    .I2C_SCL_PIN       = 8,
-    .I2C_CLOCK_SPEED   = 400000,
-    
-    // ---=  LCD  =---
+    .SDA_PIN = 4,
+    .SCL_PIN = 8,
+    .I2C_CLOCK_SPEED = 400000,
+
+    .BAT_ADC    = 5,   // IP5306 Battery Management
+    .I2S_AMP_EN = -1,  // No direct amp control
+};
+inline const BoardHardware& bsp_hw = CYD_S3_3248W535_HARDWARE;
+
+// Guition 3.5" 320x480 LCD Configuration
+const DisplayConfig CYD_S3_3248W535_DISPLAY = {
     // Hardware locked to portrait mode, DisplayManager and TouchManager
     // handle visual orientation and touch mapping.
-    .LCD_MODEL         = "AXS15231B",
-    .WIDTH             = 320,
-    .HEIGHT            = 480,
-    .ROTATION          = 1,    // 0 = Portrait, 1 = Landscape, 2 = Inverted Portrait, 3 = Inverted Landscape
+    .PANEL_MODEL = "AXS15231B",
+    .WIDTH       = 320,
+    .HEIGHT      = 480,
+    .ROTATION    = 3,    // 0 = Portrait, 1 = Landscape, 2 = Inverted Portrait, 3 = Inverted Landscape
 
-    // ---= Backlight =---
-    .LCD_BL            = 1,
-    .LCD_BL_ON_LEVEL   = 1, // Active HIGH
-    .LCD_BL_FREQ       = 5000, // 5 kHz PWM
-
-    // ---= Touch Panel =---
-    .TP_NAME           = "AXS15231B",
-    .TP_I2C_ADDR       = 0x38,
-    .TP_I2C_CLOCK_SPEED = 400000,
-    .TP_SDA            = 4,
-    .TP_SCL            = 8,
-    .TP_INT            = 3, // 11,
-    .TP_RST            = 12,
-    .TP_MAX_TOUCH      = 5,
+    .BL_PIN      = 1,
+    .BL_ON_LEVEL = 1, // Active HIGH
+    .BL_FREQ     = 5000, // 5 kHz PWM
 
     // ---= QSPI Interface =---
-    .LCD_RST           = -1,
-    .LCD_CS            = 45,
-    .LCD_SCK           = 47,
-    .LCD_MOSI          = 21, // QSPI_D0
-    .QSPI_D1           = 48,
-    .QSPI_D2           = 40,
-    .QSPI_D3           = 39,
-    .LCD_TE            = 38,
-
-    // --= LVGL Settings =--
-    .DOUBLE_BUFFERING   = false,
-    .DRAW_BUF_HEIGHT    = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
-    .BUFFER_SIZE_PX     = 320 * 20, // Width x 20 rows
+    .RST     = -1,
+    .CS      = 45,
+    .SCK     = 47,
+    .MOSI    = 21, // QSPI_D0
+    .QSPI_D1 = 48,
+    .QSPI_D2 = 40,
+    .QSPI_D3 = 39,
+    .TE      = 38,
 
     // ---= Init Commands =---
-    .INIT_CMDS_RGB     = CYD_S3_3248W535_init,
-    .INIT_CMDS_SIZE    = sizeof(CYD_S3_3248W535_init),
+    .INIT_CMDS_RGB  = CYD_S3_3248W535_init,
+    .INIT_CMDS_SIZE = sizeof(CYD_S3_3248W535_init),
 };
-inline const Fleet_BSP& cfg = CYD_S3_3248W535_LCD;
+inline const DisplayConfig& bsp_display = CYD_S3_3248W535_DISPLAY;
 
+const TouchConfig CYD_S3_3248W535_TOUCH = {
+    .NAME            = "AXS15231B",
+    .I2C_ADDR        = 0x38,
+    .SDA             = 4,
+    .SCL             = 8,
+    .INT             = 3, // 11,
+    .RST             = 12,
+    .MAX_TOUCH       = 5,
+};
+inline const TouchConfig& bsp_touch = CYD_S3_3248W535_TOUCH;
 
-const Fleet_Hardware_Config CYD_S3_3248W535_Hardware = {
-    
-    // --= Audio Codec =--
-    // --= NS4168 power amp =--
+const AudioConfig CYD_S3_3248W535_AUDIO = {
+    // NS4168 power amp
+    .I2S_SDA_PIN = 4,   // I2C SDA
+    .I2S_SCL_PIN = 8,   // I2C SCL
 
-    .I2S_SDA_PIN    = 4,   // I2C SDA
-    .I2S_SCL_PIN    = 8,   // I2C SCL
+    .I2S_8311_ADDR = 0x00,
 
-    .I2S_8311_ADDR  = 0x00,
+    .I2S_BCLK = 42,
+    .I2S_LRCK = 2,
+    .I2S_DOUT = 41,  // _DO_IO
 
-    .I2S_BCLK   = 42,
-    .I2S_LRCK   = 2,
-    .I2S_DOUT   = 41,  // _DO_IO
+    .AUDIO_INPUT_SAMPLE_RATE  = 16000,
+    .AUDIO_OUTPUT_SAMPLE_RATE = 16000,
+    .I2S_MCLK_MULTIPLE        = 256,
 
-    .AUDIO_INPUT_SAMPLE_RATE    = 16000,
-    .AUDIO_OUTPUT_SAMPLE_RATE   = 16000,
-    .I2S_MCLK_MULTIPLE          = 256,
-
-    // --= New Audio Settings =--
     .I2S_DATA_BIT_WIDTH = 16, // I2S_DATA_BIT_WIDTH_16BIT
     .I2S_SLOT_BIT_WIDTH = 16, // I2S_SLOT_BIT_WIDTH_16BIT
-    .I2S_SLOT_MODE      = 2,  // 1 = MONO, 2 = Stereo (I2S_SLOT_MODE_STEREO)
-
-    .I2S_AMP_EN = -1, // No direct amp control
-
-    // --= SPI Pins =--
-    .SPI_MOSI   = 11,  // TF_CMD && SPI_MOSI
-    .SPI_MISO   = 13,  // TF_D0 && SPI_MISO
-
-    // --= SD Card Interface =--
-    .TF_CMD     = 11,  // MCU_MOSI && SPI_MOSI
-    .TF_CLK     = 12,
-    .TF_CS      = 10,  // TF_D3
-    .TF_MOSI    = 11,  // TF_CMD && SPI_MOSI
-    .TF_MISO    = 13,  // TF_D0 && SPI_MISO
-    .TF_D0      = 13,  // TF_MISO && SPI_MISO
-    .TF_D3      = 10,  // TF_CS
-
-    // --= IP5306 Battery Management =--
-    .BAT_ADC    = 5,
-
+    .I2S_SLOT_MODE      = 2,  // I2S_SLOT_MODE_STEREO
 };
-inline const Fleet_Hardware_Config& hw_cfg = CYD_S3_3248W535_Hardware;
+inline const AudioConfig& bsp_audio = CYD_S3_3248W535_AUDIO;
+
+const StorageConfig CYD_S3_3248W535_STORAGE = {
+    .TF_CMD  = 11,  // MCU_MOSI && SPI_MOSI
+    .TF_CLK  = 12,
+    .TF_CS   = 10,  // TF_D3
+    .TF_MOSI = 11,  // TF_CMD && SPI_MOSI
+    .TF_MISO = 13,  // TF_D0 && SPI_MISO
+    .TF_D0   = 13,  // TF_MISO && SPI_MISO
+    .TF_D3   = 10,  // TF_CS
+
+    .SPI_MOSI = 11,  // TF_CMD && SPI_MOSI
+    .SPI_MISO = 13,  // TF_D0 && SPI_MISO
+};
+inline const StorageConfig& bsp_storage = CYD_S3_3248W535_STORAGE;
+
+const LvglConfig CYD_S3_3248W535_LVGL = {
+    .DOUBLE_BUFFERING = false,
+    .DRAW_BUF_HEIGHT  = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
+    .BUFFER_SIZE_PX   = 320 * 20, // Width x 20 rows
+};
+inline const LvglConfig& bsp_lvgl = CYD_S3_3248W535_LVGL;
 
 #endif // BSP_CYD_S3_3248W535_H

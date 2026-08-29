@@ -4,29 +4,29 @@
 #define I2C_PORT_NUM 0
 
 // --= Sanity check: BSP raw values vs. es7210 driver enums =--
-// hw_cfg.MIC_SELECTED / MIC_GAIN_DB / AEC_MIC_SELECTED / AEC_MIC_GAIN_DB are stored as
-// plain uint8_t in Fleet_Hardware_Config (the BSP headers deliberately avoid including
+// bsp_audio.MIC_SELECTED / MIC_GAIN_DB / AEC_MIC_SELECTED / AEC_MIC_GAIN_DB are stored as
+// plain uint8_t in AudioConfig (the BSP headers deliberately avoid including
 // es7210.h to keep their dependency chain simple), but the raw numbers are meant to equal
-// these es7210 enum values exactly. This can't be a static_assert: hw_cfg/WS_P4_7B_Hardware
+// these es7210 enum values exactly. This can't be a static_assert: bsp_audio/WS_P4_TOUCH_LCD_7B_AUDIO
 // (etc.) are declared `const`, not `constexpr`, so they aren't usable in a constant
 // expression as-is - making them constexpr would mean requalifying every BSP struct
-// instance across all 6 device headers, a bigger change than this warrants right now.
+// instance across all 8 device headers, a bigger change than this warrants right now.
 // So this runs once at startup instead: if es7210_gain_value_t or es7210_input_mics_t is
 // ever reordered or extended, this logs a loud, specific error instead of silently
 // misconfiguring mic gain/selection.
 #ifdef HAS_ES7210
 static void checkAudioBspSanity() {
-    if (hw_cfg.MIC_SELECTED != (uint8_t)(ES7210_INPUT_MIC1 | ES7210_INPUT_MIC2)) {
-        Serial.println("[AudioMgr] CONFIG WARNING: hw_cfg.MIC_SELECTED no longer matches Mic1|Mic2 - check es7210_input_mics_t");
+    if (bsp_audio.MIC_SELECTED != (uint8_t)(ES7210_INPUT_MIC1 | ES7210_INPUT_MIC2)) {
+        Serial.println("[AudioMgr] CONFIG WARNING: bsp_audio.MIC_SELECTED no longer matches Mic1|Mic2 - check es7210_input_mics_t");
     }
-    if (hw_cfg.MIC_GAIN_DB != (uint8_t)GAIN_36DB) {
-        Serial.println("[AudioMgr] CONFIG WARNING: hw_cfg.MIC_GAIN_DB no longer matches GAIN_36DB - check es7210_gain_value_t");
+    if (bsp_audio.MIC_GAIN_DB != (uint8_t)GAIN_36DB) {
+        Serial.println("[AudioMgr] CONFIG WARNING: bsp_audio.MIC_GAIN_DB no longer matches GAIN_36DB - check es7210_gain_value_t");
     }
-    if (hw_cfg.AEC_MIC_SELECTED != (uint8_t)(ES7210_INPUT_MIC1 | ES7210_INPUT_MIC2 | ES7210_INPUT_MIC3 | ES7210_INPUT_MIC4)) {
-        Serial.println("[AudioMgr] CONFIG WARNING: hw_cfg.AEC_MIC_SELECTED no longer matches Mic1|2|3|4 - check es7210_input_mics_t");
+    if (bsp_audio.AEC_MIC_SELECTED != (uint8_t)(ES7210_INPUT_MIC1 | ES7210_INPUT_MIC2 | ES7210_INPUT_MIC3 | ES7210_INPUT_MIC4)) {
+        Serial.println("[AudioMgr] CONFIG WARNING: bsp_audio.AEC_MIC_SELECTED no longer matches Mic1|2|3|4 - check es7210_input_mics_t");
     }
-    if (hw_cfg.AEC_MIC_GAIN_DB != (uint8_t)GAIN_12DB) {
-        Serial.println("[AudioMgr] CONFIG WARNING: hw_cfg.AEC_MIC_GAIN_DB no longer matches GAIN_12DB - check es7210_gain_value_t");
+    if (bsp_audio.AEC_MIC_GAIN_DB != (uint8_t)GAIN_12DB) {
+        Serial.println("[AudioMgr] CONFIG WARNING: bsp_audio.AEC_MIC_GAIN_DB no longer matches GAIN_12DB - check es7210_gain_value_t");
     }
 }
 #endif
@@ -51,14 +51,14 @@ bool AudioManager::begin() {
 
     // 1. --= Initialize Power Amp Pin =--
     #ifndef HAS_IO_EXPANDER
-    if (hw_cfg.I2S_AMP_EN != -1) {
-        pinMode     (hw_cfg.I2S_AMP_EN, OUTPUT);
-        digitalWrite(hw_cfg.I2S_AMP_EN, LOW); // Start Muted to prevent pops
+    if (bsp_hw.I2S_AMP_EN != -1) {
+        pinMode     (bsp_hw.I2S_AMP_EN, OUTPUT);
+        digitalWrite(bsp_hw.I2S_AMP_EN, LOW); // Start Muted to prevent pops
     }
     #endif
 
     // 2. --= Initialize I2C (Arduino layer) =--
-    Wire.begin      (hw_cfg.I2S_SDA_PIN, hw_cfg.I2S_SCL_PIN);
+    Wire.begin      (bsp_audio.I2S_SDA_PIN, bsp_audio.I2S_SCL_PIN);
 
     // 3. --= Initialize Codecs =--
     bool output_ok = initCodecOutput();
@@ -108,11 +108,11 @@ bool AudioManager::begin() {
             .total_slot     = I2S_TDM_AUTO_SLOT_NUM
         },
         .gpio_cfg = {
-            .mclk = (gpio_num_t)hw_cfg.I2S_MCLK,
-            .bclk = (gpio_num_t)hw_cfg.I2S_BCLK,
-            .ws   = (gpio_num_t)hw_cfg.I2S_LRCK,
+            .mclk = (gpio_num_t)bsp_audio.I2S_MCLK,
+            .bclk = (gpio_num_t)bsp_audio.I2S_BCLK,
+            .ws   = (gpio_num_t)bsp_audio.I2S_LRCK,
             .dout = I2S_GPIO_UNUSED,
-            .din  = (gpio_num_t)hw_cfg.I2S_DIN,
+            .din  = (gpio_num_t)bsp_audio.I2S_DIN,
             .invert_flags = {0}
         },
     };
@@ -138,10 +138,10 @@ bool AudioManager::begin() {
             .bit_order_lsb  = false,
         },
         .gpio_cfg = {
-            .mclk = (gpio_num_t)hw_cfg.I2S_MCLK,
-            .bclk = (gpio_num_t)hw_cfg.I2S_BCLK,
-            .ws   = (gpio_num_t)hw_cfg.I2S_LRCK,
-            .dout = (gpio_num_t)hw_cfg.I2S_DOUT,
+            .mclk = (gpio_num_t)bsp_audio.I2S_MCLK,
+            .bclk = (gpio_num_t)bsp_audio.I2S_BCLK,
+            .ws   = (gpio_num_t)bsp_audio.I2S_LRCK,
+            .dout = (gpio_num_t)bsp_audio.I2S_DOUT,
             .din  = I2S_GPIO_UNUSED,
             .invert_flags = {0},
         },
@@ -157,7 +157,7 @@ bool AudioManager::begin() {
         err |= i2s_channel_init_std_mode    (_tx_handle, &std_cfg); // TX in standard mode to match codec config
     #else
         Serial.println("[AudioMgr] Mode: Standard Voice (Stereo)");
-        std_cfg.gpio_cfg.din = (gpio_num_t)hw_cfg.I2S_DIN;  // In case es8311 is the only codec used
+        std_cfg.gpio_cfg.din = (gpio_num_t)bsp_audio.I2S_DIN;  // In case es8311 is the only codec used
         // left_align stays true (see std_cfg init above) - that matches ESP-IDF's own
         // I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG default for standard 2-slot stereo mode.
         err  = i2s_channel_init_std_mode    (_tx_handle, &std_cfg);
@@ -174,7 +174,7 @@ bool AudioManager::begin() {
     
     // Enable Power Amp (Direct GPIO Only)
     #ifndef HAS_IO_EXPANDER
-        if (hw_cfg.I2S_AMP_EN != -1) {
+        if (bsp_hw.I2S_AMP_EN != -1) {
             setOutputEnable(true); 
         }
     #endif
@@ -195,7 +195,7 @@ bool AudioManager::begin() {
 bool AudioManager::initCodecOutput() {
 #ifdef HAS_ES8311
 
-    _es8311_dev = es8311_create(I2C_PORT_NUM, hw_cfg.I2S_8311_ADDR); 
+    _es8311_dev = es8311_create(I2C_PORT_NUM, bsp_audio.I2S_8311_ADDR); 
     if (!_es8311_dev) return false;
 
     // Use unified audio_hal configuration struct
@@ -272,7 +272,7 @@ bool AudioManager::initCodecInput() {
     esp_err_t   err  = es7210_adc_init        (&cfg);
                 err |= es7210_adc_config_i2s  (cfg.codec_mode, &cfg.i2s_iface);
     // Note: es7210_adc_init calls es7210_mic_select()/es7210_adc_set_gain() internally,
-    // using hw_cfg.MIC_SELECTED/MIC_GAIN_DB (or the AEC_ variants if ENABLE_AEC is on).
+    // using bsp_audio.MIC_SELECTED/MIC_GAIN_DB (or the AEC_ variants if ENABLE_AEC is on).
     // Note: es7210_adc_config_i2s sets codec mode internally
 
     if (err != ESP_OK) {
@@ -319,7 +319,7 @@ bool AudioManager::getMute() {
 
 void AudioManager::setOutputEnable(bool on) {
 #ifndef HAS_IO_EXPANDER
-    digitalWrite(hw_cfg.I2S_AMP_EN, on ? HIGH : LOW);
+    digitalWrite(bsp_hw.I2S_AMP_EN, on ? HIGH : LOW);
 #else
     if (_es8311_dev) es8311_set_voice_mute(!on);
 #endif

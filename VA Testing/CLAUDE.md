@@ -16,32 +16,74 @@ already known/planned."
 ## Board selection
 
 Each PlatformIO environment in `platformio.ini` picks a board via `build_flags`:
-`-D BSP_HEADER='"BSP_<Name>.h"'` (tells `bsp_loader.h` which header to include) plus a
-`-D <BOARDNAME>` flag (e.g. `-D WS_P4_SMART86`) used throughout the codebase for
-`#ifdef <BOARDNAME>`-style device-specific branches.
+`-D BSP_HEADER='"BSP_<NAME>.h"'` tells `bsp_loader.h` which header to include — that's the
+*only* board-select build flag now. Each `BSP_<NAME>.h` itself declares a single short
+device-identity `#define` at its own top (e.g. `#define WS_P4_7B`, `#define CYD_S3_3248`),
+used fleet-wide for `#ifdef <BOARDNAME>`-style device-specific branches. This used to be a
+second, redundant `-D <BOARDNAME>` build flag (BSP_HEADER already implies exactly which
+board it is) — collapsed down to the one flag plus the in-header `#define`. `HAS_X`
+capability flags (`HAS_ES7210`, `HAS_MIPI_PANEL`, etc.) are unrelated to this and stay as
+`build_flags`, unchanged. Board macro names are deliberately short (`WS_P4_7B`, `WS_P4_5`,
+`WS_P4_4B`, `WS_S3_5B`, `WS_S3_4B`, `CYD_P4_1060`, `CYD_S3_3248`, `CYD_S3_8048`) for
+readability at `#ifdef` call sites — shorter than the BSP filename's full model name and
+deliberately distinct from any struct instance name in the same file (see below for why that
+distinction matters).
 
 ## The BSP pattern
 
-`components/Fleet_BSP/include/`:
-- `Fleet_BSP.h` (S3 family) and `Fleet_BSP_P4.h` (P4 family) each declare the same *shape*
-  of two structs — `Fleet_BSP` (display/touch config) and `Fleet_Hardware_Config`
-  (audio/SD/misc peripheral pins) — but are two **separate, non-unified** definitions with
-  some field drift between them. Deliberately left unmerged for now (see FUTURE_IMPROVEMENTS.md).
-- Each board gets its own `BSP_<Name>.h`, which:
-  1. Defines `HAS_X` capability flags (`HAS_ES7210`, `HAS_ES8311`, `HAS_RGB_PANEL`,
-     `HAS_QSPI_PANEL`, `HAS_MIPI_PANEL`, `HAS_IO_EXPANDER`, `HAS_TOUCH`, etc.) at the top of
-     the file, right after the board's own `#define`.
-  2. Declares the panel init command array next. **This can't move below `cfg`/`hw_cfg`** —
-     `.INIT_CMDS_SIZE = sizeof(array)/sizeof(element)` needs the array's complete (sized)
-     type at the point it's used inside the `cfg` struct literal; a forward declaration
-     would leave it incomplete and fail to compile.
-  3. Declares `const Fleet_BSP <Name>_LCD = { ... }` and aliases it via
-     `inline const Fleet_BSP& cfg = <Name>_LCD;` — all app code reads the board's config
-     through the generic `cfg`/`hw_cfg` names, never the concrete instance name.
-  4. Same pattern for `const Fleet_Hardware_Config <Name>_Hardware` → `inline const
-     Fleet_Hardware_Config& hw_cfg`.
+`components/Fleet_BSP/include/Fleet_BSP.h` declares **seven independent, flat struct types**
+— not one struct nested inside another, and not two separately-drifting families (there used
+to be a `Fleet_BSP.h` for S3 and `Fleet_BSP_P4.h` for P4; later merged into one file, then
+further split into these seven flat types instead of one big nested struct):
+`BoardHardware`, `ExpanderConfig`, `DisplayConfig`, `TouchConfig`, `LvglConfig`,
+`AudioConfig`, `StorageConfig`. `lcd_init_cmd_t` (needed by `DisplayConfig`'s DSI
+init-command field) only really exists on P4 targets — it's normally defined by
+`Arduino_ESP32DSIPanel.h`, gated `#if CONFIG_IDF_TARGET_ESP32P4` — so `Fleet_BSP.h` declares
+an identical fallback typedef for non-P4 builds rather than making the field itself
+conditional.
 
-`hw_cfg.MIC_SELECTED`/`MIC_GAIN_DB`/`AEC_MIC_SELECTED`/`AEC_MIC_GAIN_DB` are raw `uint8_t`,
+- **`BoardHardware`** holds device-identity strings (`device_name` — GUI header label,
+  unchanged; `MANUFACTURER`; `MODEL` — board model, *not* the LCD driver chip, see
+  `DisplayConfig.PANEL_MODEL` for that; `SI_REV` — P4 silicon revision, `"rev1_3"` /
+  `"rev3_x"` / `"n/a"` on S3 boards, documentary only for now, nothing branches on it yet),
+  the shared I2C bus (`SDA_PIN`, `SCL_PIN`, `I2C_CLOCK_SPEED`), and a few standalone scalars
+  not worth their own struct (`BOOT_BUTTON_PIN`, `BAT_ADC`, `I2S_AMP_EN` — the last one lives
+  here rather than on `AudioConfig` because it's a plain GPIO enable line, not an I2S signal
+  or codec setting). `I2C_CLOCK_SPEED` used to be two separate fields — a bus-level one on
+  the old I2C struct (confirmed dead: nothing ever read it) and a touch-controller-specific
+  one (the value that actually reached hardware, fed into `bb_captouch`'s init call) —
+  collapsed into this one field using the touch-side value, since that was the only one ever
+  live.
+- **`DisplayConfig`** merges the old separate panel + backlight structs — backlight fields
+  are prefixed `BL_` (`BL_PIN`, `BL_ON_LEVEL`, `BL_FREQ`) to stay unambiguous now that they
+  sit alongside the panel's own generic-sounding fields. The LCD driver chip name field is
+  `PANEL_MODEL`, not `MODEL` — deliberately distinct from `BoardHardware.MODEL` (the board,
+  not the chip) since both are visible in the same file.
+- Every board declares up to seven per-board `const` instances (skipping any struct it
+  doesn't need — e.g. only 2 of 8 boards populate `ExpanderConfig`) and aliases each to a
+  fixed lowercase name app code actually uses: `bsp_hw`, `bsp_expander`, `bsp_display`,
+  `bsp_touch`, `bsp_lvgl`, `bsp_audio`, `bsp_storage`. App code never references the concrete
+  per-board instance name (e.g. `WS_P4_TOUCH_LCD_7B_DISPLAY`), only the `bsp_*` alias —
+  `bsp_display.WIDTH`, `bsp_touch.I2C_ADDR`, `bsp_audio.MIC_GAIN_DB`. **The concrete instance
+  name must not collide with the board's own short `#define`** (e.g.
+  `WS_P4_TOUCH_LCD_7B_HARDWARE`, not bare `WS_P4_7B`) — once that macro is defined, the
+  preprocessor rewrites any bare occurrence of its name, including a struct's own
+  declaration, to `1`.
+- **C++'s designated initializers require members to be listed in declaration order** — when
+  writing a new board header, list each struct's fields in the same order they appear in
+  `Fleet_BSP.h` (skipping unset ones is fine; reordering the ones you do set is not, and
+  fails to compile with `designator order for field 'X' does not match declaration order`).
+- Each board's `BSP_<NAME>.h`:
+  1. Defines the short device-identity macro (see Board selection above), then `HAS_X`
+     capability flags stay in `platformio.ini`, not here.
+  2. Declares the panel init command array next (if any). **This can't move below the struct
+     literals** — `.INIT_CMDS_SIZE = sizeof(array)/sizeof(element)` needs the array's
+     complete (sized) type at the point it's used; a forward declaration would leave it
+     incomplete and fail to compile.
+  3. Declares each `const <Type> <BOARD>_<GROUP> = { ... }` and its `inline const <Type>&
+     bsp_<alias> = ...;` line, one pair per group the board actually needs.
+
+`bsp_audio.MIC_SELECTED`/`MIC_GAIN_DB`/`AEC_MIC_SELECTED`/`AEC_MIC_GAIN_DB` are raw `uint8_t`,
 not the real `es7210_input_mics_t`/`es7210_gain_value_t` enum types — BSP headers
 deliberately avoid including `es7210.h` to keep their dependency chain simple. A runtime
 check (`checkAudioBspSanity()` in `AudioManager.cpp`, gated by `HAS_ES7210`) logs a warning
@@ -72,7 +114,7 @@ reads closer to official ESP-IDF audio examples.
 
 - **QSPI boards**: wrapped in `Arduino_Canvas`, a software-rotation layer. The raw panel
   driver (e.g. `Arduino_AXS15231B`) is always constructed with `rotation=0`; `Canvas` alone
-  gets the real `cfg.ROTATION`. This is intentional, not an oversight — QSPI panel driver
+  gets the real `bsp_display.ROTATION`. This is intentional, not an oversight — QSPI panel driver
   chips generally have no hardware rotation, so `Canvas` transforms coordinates in software
   at every draw call and pushes an already-rotated framebuffer to the raw driver, which
   never needs to know rotation is happening. Setting rotation on both layers would
@@ -83,7 +125,7 @@ reads closer to official ESP-IDF audio examples.
   DSI boards), but worth revisiting with true LVGL+PPA rotation if that ever changes.
 - `TouchManager::mapCoordinates()` has a per-board special case (`#ifndef WS_P4_7B`): most
   boards get a Guition-style rotation transform switch; `WS_P4_7B` instead always does raw
-  coordinate passthrough regardless of its own `cfg.ROTATION` value. The reasoning behind
+  coordinate passthrough regardless of its own `bsp_display.ROTATION` value. The reasoning behind
   this split is undocumented and was never actually re-tested against the alternative —
   treat it as unverified, not settled.
 
@@ -96,7 +138,7 @@ BSP_HEADER`, a macro-indirected include (`BSP_HEADER` expands to a quoted filena
 `-D BSP_HEADER=...` in `build_flags`) — real compilers handle this fine, but if this cache's
 dependency scanner doesn't correctly resolve it, files that only depend on the BSP header
 through that indirection can keep serving a stale cached object indefinitely, even after a
-full clean, silently ignoring BSP field edits (confirmed happening with a `cfg.ROTATION`
+full clean, silently ignoring BSP field edits (confirmed happening with a `bsp_display.ROTATION`
 change during this session's recovery pass). Files edited directly still rebuild correctly,
 since their own content hash changes regardless of the BSP-dependency issue — it's *only*
 files that depend on a BSP value change through the header alone that can go stale. If a
@@ -114,8 +156,9 @@ add a new `DEBUG_<AREA>` flag for future debugging needs rather than ad-hoc unco
 
 ## Working conventions established this session
 
-- BSP header layout: `#define`s → panel init array (forced position, see above) → `cfg` →
-  `hw_cfg`.
+- BSP header layout: device-identity `#define` → panel init array (forced position, see
+  above) → the seven `const <Type> <BOARD>_<GROUP>` / `inline const <Type>& bsp_<alias>`
+  pairs, skipping any group the board doesn't need.
 - Prefer runtime checks over `static_assert` for validating BSP struct field values — the
   struct instances are declared `const`, not `constexpr`, so they aren't usable in constant
   expressions as-is (confirmed via compiler error, not assumption).

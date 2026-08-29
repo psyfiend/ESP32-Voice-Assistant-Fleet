@@ -14,7 +14,7 @@ TouchManager touchMgr;
 
 // --- LVGL Globals ---
 static uint16_t *lv_draw_buf;
-#define LV_BUF_SIZE (cfg.WIDTH * cfg.HEIGHT / 10)
+#define LV_BUF_SIZE (bsp_display.WIDTH * bsp_display.HEIGHT / 10)
 
 // --- Dashboard Globals ---
 lv_obj_t *cursors[5];       // The colored circles
@@ -35,11 +35,11 @@ TouchPoint touchPoints[5];
 // -------------------------------------------------------------------------
 #define GT911_ADDR 0x5D 
 // Or 0x14 depending on your board - check TouchManager config
-// Since we are inside main.cpp and have access to cfg, we can use:
-// cfg.TP_I2C_ADDR
+// Since we are inside main.cpp and have access to bsp_touch, we can use:
+// bsp_touch.I2C_ADDR
 
 void readMultiTouch() {
-    uint8_t addr = cfg.TP_I2C_ADDR;
+    uint8_t addr = bsp_touch.I2C_ADDR;
     
     // 1. Read Status
     Wire.beginTransmission(addr);
@@ -73,9 +73,9 @@ void readMultiTouch() {
                 Wire.read(); // Reserved
                 
                 // Rotation Logic (Standard Inverted Landscape for P4-7B)
-                if (cfg.ROTATION == 2) {
-                    touchPoints[i].x = cfg.WIDTH - x;
-                    touchPoints[i].y = cfg.HEIGHT - y;
+                if (bsp_display.ROTATION == 2) {
+                    touchPoints[i].x = bsp_display.WIDTH - x;
+                    touchPoints[i].y = bsp_display.HEIGHT - y;
                 } else {
                     touchPoints[i].x = x;
                     touchPoints[i].y = y;

@@ -45,9 +45,9 @@ DisplayManager::DisplayManager() {
 bool DisplayManager::begin() {
 
     Serial.println();
-    Serial.printf("Device init: %s\n", cfg.device_name);
-    Serial.printf("Display hardware: %s\n", cfg.LCD_MODEL);
-    Serial.printf("Touch panel: %s\n", cfg.TP_NAME);
+    Serial.printf("Device init: %s\n", bsp_hw.device_name);
+    Serial.printf("Display hardware: %s\n", bsp_display.PANEL_MODEL);
+    Serial.printf("Touch panel: %s\n", bsp_touch.NAME);
     Serial.printf("PSRAM Total: %d bytes\n", ESP.getPsramSize());
     if (ESP.getPsramSize() == 0) {
         Serial.println("CRITICAL ERROR: PSRAM not found! Display will fail.");
@@ -62,7 +62,7 @@ bool DisplayManager::begin() {
     // DEBUG_DISPLAY: raw BSP dimensions/rotation, for comparing against the
     // post-rotation gfx dimensions below. Enable with -D DEBUG_DISPLAY.
     #ifdef DEBUG_DISPLAY
-    Serial.printf("[DisplayMgr] Display Dimensions: w=%d x h=%d, ROTATION=%d\n", cfg.WIDTH, cfg.HEIGHT, cfg.ROTATION); Serial.flush();
+    Serial.printf("[DisplayMgr] Display Dimensions: w=%d x h=%d, ROTATION=%d\n", bsp_display.WIDTH, bsp_display.HEIGHT, bsp_display.ROTATION); Serial.flush();
     #endif
 
     // 1. Initialize  I2C
@@ -70,7 +70,7 @@ bool DisplayManager::begin() {
     // this board can transparently use whichever I2C backend it's
     // configured for (see FleetI2C.h). begin() is idempotent, so this is
     // safe even though TouchManager::begin() also calls it later.
-    FleetI2C::begin(cfg.I2C_SDA_PIN, cfg.I2C_SCL_PIN);
+    FleetI2C::begin(bsp_hw.SDA_PIN, bsp_hw.SCL_PIN);
     Serial.printf("[DisplayMgr] I2C backend: %s\n", FleetI2C::backendName());
 
     // 2. Initialize Display
@@ -109,7 +109,7 @@ bool DisplayManager::begin() {
     #endif
 
     #ifdef DEBUG_DISPLAY
-    if (cfg.ROTATION >= 0) {
+    if (bsp_display.ROTATION >= 0) {
         Serial.printf("[DisplayMgr] Rotated Dimensions: w=%d x h=%d\n", _gfx->width(), _gfx->height()); Serial.flush();
     }
     #endif
@@ -126,7 +126,7 @@ bool DisplayManager::begin() {
         _currentBrightness = 100;
         Serial.println("[BacklightMgr] Backlight on (via CH422G expander, on/off only).");
     #else
-        pinMode(cfg.LCD_BL, OUTPUT);
+        pinMode(bsp_display.BL_PIN, OUTPUT);
         initBacklightPWM(true);
     #endif
 
@@ -162,8 +162,8 @@ void DisplayManager::initBus() {
         #ifdef HAS_IO_EXPANDER
             Serial.println("[DisplayMgr] Init Expander Bus..."); Serial.flush();
             _expander = new Arduino_XCA9554SWSPI(
-                cfg.EXIO_LCD_RST, cfg.EXIO_LCD_CS, cfg.EXIO_LCD_SCK, cfg.EXIO_LCD_MOSI,
-                &Wire, cfg.EXPANDER_I2C_ADDR
+                bsp_expander.LCD_RST, bsp_expander.LCD_CS, bsp_expander.LCD_SCK, bsp_expander.LCD_MOSI,
+                &Wire, bsp_expander.I2C_ADDR
             );
             _bus = _expander;
             if (!_bus) Serial.println("[DisplayMgr] RGB Panel Alloc Failed!"); Serial.flush();
@@ -171,8 +171,8 @@ void DisplayManager::initBus() {
             // Initialize QSPI Bus
             // CS, SCK, D0, D1, D2, D3
             _bus = new Arduino_ESP32QSPI(
-                cfg.LCD_CS, cfg.LCD_SCK, 
-                cfg.LCD_MOSI, cfg.QSPI_D1, cfg.QSPI_D2, cfg.QSPI_D3
+                bsp_display.CS, bsp_display.SCK, 
+                bsp_display.MOSI, bsp_display.QSPI_D1, bsp_display.QSPI_D2, bsp_display.QSPI_D3
             );
         #endif
     #endif
@@ -184,24 +184,24 @@ void DisplayManager::initPanel() {
         // --- RGB PANEL (Self-buffered) ---
         Serial.println("[DisplayMgr] Creating RGB Panel..."); Serial.flush();
         Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
-            cfg.LCD_DE, cfg.LCD_VSYNC, cfg.LCD_HSYNC, cfg.LCD_PCLK,
-            cfg.R0, cfg.R1, cfg.R2, cfg.R3, cfg.R4,
-            cfg.G0, cfg.G1, cfg.G2, cfg.G3, cfg.G4, cfg.G5,
-            cfg.B0, cfg.B1, cfg.B2, cfg.B3, cfg.B4,
-            cfg.HSYNC_POL, cfg.HSYNC_FPORCH, cfg.HSYNC_PWIDTH, cfg.HSYNC_BPORCH,
-            cfg.VSYNC_POL, cfg.VSYNC_FPORCH, cfg.VSYNC_PWIDTH, cfg.VSYNC_BPORCH,
-            cfg.PCLK_ACTIVE_NEG, cfg.PREFER_SPEED, cfg.USE_BIG_ENDIAN,
-            cfg.DE_IDLE_HIGH, cfg.PCLK_IDLE_HIGH, cfg.BOUNCE_BUFFER_SIZE_PX
+            bsp_display.DE, bsp_display.VSYNC, bsp_display.HSYNC, bsp_display.PCLK,
+            bsp_display.R0, bsp_display.R1, bsp_display.R2, bsp_display.R3, bsp_display.R4,
+            bsp_display.G0, bsp_display.G1, bsp_display.G2, bsp_display.G3, bsp_display.G4, bsp_display.G5,
+            bsp_display.B0, bsp_display.B1, bsp_display.B2, bsp_display.B3, bsp_display.B4,
+            bsp_display.HSYNC_POL, bsp_display.HSYNC_FPORCH, bsp_display.HSYNC_PWIDTH, bsp_display.HSYNC_BPORCH,
+            bsp_display.VSYNC_POL, bsp_display.VSYNC_FPORCH, bsp_display.VSYNC_PWIDTH, bsp_display.VSYNC_BPORCH,
+            bsp_display.PCLK_ACTIVE_NEG, bsp_display.PREFER_SPEED, bsp_display.USE_BIG_ENDIAN,
+            bsp_display.DE_IDLE_HIGH, bsp_display.PCLK_IDLE_HIGH, bsp_display.BOUNCE_BUFFER_SIZE_PX
         );
         if (!rgbpanel) Serial.println("[DisplayMgr] RGB Panel Alloc Failed!"); Serial.flush();
         // RGB Display IS the canvas, so we assign it directly to _gfx
         Serial.println("[DisplayMgr] Creating RGB Display..."); Serial.flush();
         _gfx = new Arduino_RGB_Display(
-            cfg.WIDTH, cfg.HEIGHT, rgbpanel, 
-            cfg.ROTATION, true
-        // Only WS_S3_SMART86 needs the init operations
-            #ifdef WS_S3_SMART86
-            , _bus, cfg.LCD_RST, cfg.INIT_CMDS_RGB, cfg.INIT_CMDS_SIZE
+            bsp_display.WIDTH, bsp_display.HEIGHT, rgbpanel, 
+            bsp_display.ROTATION, true
+        // Only WS_S3_4B needs the init operations
+            #ifdef WS_S3_4B
+            , _bus, bsp_display.RST, bsp_display.INIT_CMDS_RGB, bsp_display.INIT_CMDS_SIZE
             #endif
         );
         if (!_gfx) Serial.println("[DisplayMgr] RGB Display Alloc Failed!"); Serial.flush();
@@ -216,31 +216,31 @@ void DisplayManager::initPanel() {
         // Arduino_ESP32QSPI* qspi_bus = (Arduino_ESP32QSPI*)_bus;
         Arduino_AXS15231B *g = new Arduino_AXS15231B(
             _bus, GFX_NOT_DEFINED /* RST */, 0 /* Rotation */, false /* IPS */,
-            cfg.WIDTH, cfg.HEIGHT
+            bsp_display.WIDTH, bsp_display.HEIGHT
         );
 
         // 2. Create the Canvas (The "Frame Buffer" in PSRAM)
         // This solves the rotation and static issues.
         // We assign THIS to _gfx so all drawing calls go to memory first.
         _gfx = new Arduino_Canvas(
-            cfg.WIDTH, cfg.HEIGHT, 
-            g /* Output GFX */, 0, 0 /* Output X, Y */, cfg.ROTATION /* Rotation */
+            bsp_display.WIDTH, bsp_display.HEIGHT, 
+            g /* Output GFX */, 0, 0 /* Output X, Y */, bsp_display.ROTATION /* Rotation */
         );
 
     #elif HAS_MIPI_PANEL
         // --- MIPI PANEL ---
         Serial.println("[DisplayMgr] Creating DSI Panel..."); Serial.flush();
         Arduino_ESP32DSIPanel *dsipanel = new Arduino_ESP32DSIPanel(
-            cfg.HSYNC_PWIDTH, cfg.HSYNC_BPORCH, cfg.HSYNC_FPORCH,
-            cfg.VSYNC_PWIDTH, cfg.VSYNC_BPORCH, cfg.VSYNC_FPORCH
-            , cfg.PREFER_SPEED, cfg.LANE_BIT_RATE
+            bsp_display.HSYNC_PWIDTH, bsp_display.HSYNC_BPORCH, bsp_display.HSYNC_FPORCH,
+            bsp_display.VSYNC_PWIDTH, bsp_display.VSYNC_BPORCH, bsp_display.VSYNC_FPORCH
+            , bsp_display.PREFER_SPEED, bsp_display.LANE_BIT_RATE
         );
         if (!dsipanel) Serial.println("[DisplayMgr] DSI Panel Alloc Failed!"); Serial.flush();
 
         Serial.println("[DisplayMgr] Creating DSI Display...");
         Arduino_DSI_Display *dsidisplay = new Arduino_DSI_Display(
-            cfg.WIDTH, cfg.HEIGHT, dsipanel, cfg.ROTATION, cfg.AUTO_FLUSH,
-            cfg.LCD_RST, cfg.INIT_CMDS_DSI, cfg.INIT_CMDS_SIZE
+            bsp_display.WIDTH, bsp_display.HEIGHT, dsipanel, bsp_display.ROTATION, bsp_display.AUTO_FLUSH,
+            bsp_display.RST, bsp_display.INIT_CMDS_DSI, bsp_display.INIT_CMDS_SIZE
         );
         if (!dsidisplay) Serial.println("[DisplayMgr] DSI Display Alloc Failed!"); Serial.flush();
         _gfx = dsidisplay;
@@ -250,13 +250,13 @@ void DisplayManager::initPanel() {
 
 void DisplayManager::initBacklightPWM(bool on) {
     // Check if pin is valid
-    if (cfg.LCD_BL < 0) return;
+    if (bsp_display.BL_PIN < 0) return;
 
-    int level = on ? cfg.LCD_BL_ON_LEVEL : !cfg.LCD_BL_ON_LEVEL;
-    digitalWrite(cfg.LCD_BL, level);
-    Serial.printf("[BacklightMgr] Backlight pin on level: %s\n", (cfg.LCD_BL_ON_LEVEL ? "HIGH" : "LOW"));
+    int level = on ? bsp_display.BL_ON_LEVEL : !bsp_display.BL_ON_LEVEL;
+    digitalWrite(bsp_display.BL_PIN, level);
+    Serial.printf("[BacklightMgr] Backlight pin on level: %s\n", (bsp_display.BL_ON_LEVEL ? "HIGH" : "LOW"));
 
-    if (cfg.LCD_BL_FREQ <= 0) {
+    if (bsp_display.BL_FREQ <= 0) {
         Serial.println("[BacklightMgr] No PWM on this board (on/off backlight only) - fixed at full brightness.");
         // No dimming available, so report "full" rather than leaving _currentBrightness
         // at its zero-initialized default - that previously made getBrightness() claim
@@ -265,18 +265,18 @@ void DisplayManager::initBacklightPWM(bool on) {
         return;
     }
 
-    Serial.printf("[BacklightMgr] Backlight Pin: %d, Freq: %dHz\n", cfg.LCD_BL, cfg.LCD_BL_FREQ);
+    Serial.printf("[BacklightMgr] Backlight Pin: %d, Freq: %dHz\n", bsp_display.BL_PIN, bsp_display.BL_FREQ);
 
     const ledc_timer_config_t backlight_timer = {
         .speed_mode      = LEDC_LOW_SPEED_MODE,
         .duty_resolution = (ledc_timer_bit_t)BL_PWM_RES,
         .timer_num       = BL_LEDC_TIMER,
-        .freq_hz         = (uint32_t)cfg.LCD_BL_FREQ,
+        .freq_hz         = (uint32_t)bsp_display.BL_FREQ,
         .clk_cfg         = LEDC_AUTO_CLK,
     };
 
     const ledc_channel_config_t backlight_channel = {
-        .gpio_num   = cfg.LCD_BL,
+        .gpio_num   = bsp_display.BL_PIN,
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .channel    = BL_LEDC_CHANNEL,
         .intr_type  = LEDC_INTR_DISABLE,
@@ -285,7 +285,7 @@ void DisplayManager::initBacklightPWM(bool on) {
         .hpoint     = 0,
         // Active-LOW boards get inverted here in hardware, replacing the manual
         // "BL_MAX_DUTY - raw_duty" math setBrightness() used to do in software.
-        .flags      = {.output_invert = (cfg.LCD_BL_ON_LEVEL == 0) ? 1u : 0u},
+        .flags      = {.output_invert = (bsp_display.BL_ON_LEVEL == 0) ? 1u : 0u},
     };
 
     esp_err_t err  = ledc_timer_config(&backlight_timer);
@@ -339,27 +339,27 @@ void DisplayManager::resetTouch() {
         ch422gRawWrite(0x24, 0x01); // WR_SET: IO bank -> output mode
         ch422gRawWrite(0x38, 0x2C); // WR_IO: LCD_BL=1, LCD_RST=1, TP_RST=0, USB_SEL=1
         delay(100);
-        pinMode(cfg.TP_INT, OUTPUT);
-        digitalWrite(cfg.TP_INT, LOW);
+        pinMode(bsp_touch.INT, OUTPUT);
+        digitalWrite(bsp_touch.INT, LOW);
         delay(100);
         ch422gRawWrite(0x38, 0x2E); // WR_IO: TP_RST=1 (rest unchanged)
         delay(200);
     #elif defined(HAS_IO_EXPANDER)
-        _expander->pinMode(cfg.EXIO_TP_RST, OUTPUT);
-        _expander->pinMode(cfg.EXIO_TP_INT, OUTPUT);
-        _expander->digitalWrite(cfg.EXIO_TP_INT, LOW);
+        _expander->pinMode(bsp_expander.TP_RST, OUTPUT);
+        _expander->pinMode(bsp_expander.TP_INT, OUTPUT);
+        _expander->digitalWrite(bsp_expander.TP_INT, LOW);
         delay(20);
-        _expander->digitalWrite(cfg.EXIO_TP_RST, LOW);
+        _expander->digitalWrite(bsp_expander.TP_RST, LOW);
         delay(20);
-        _expander->digitalWrite(cfg.EXIO_TP_RST, HIGH);
+        _expander->digitalWrite(bsp_expander.TP_RST, HIGH);
         delay(200);
     #else
-    if (cfg.TP_RST >= 0 && cfg.TP_INT >= 0) {
-        pinMode(cfg.TP_INT, INPUT_PULLUP);
-        pinMode(cfg.TP_RST, OUTPUT);
-        digitalWrite(cfg.TP_RST, LOW);
+    if (bsp_touch.RST >= 0 && bsp_touch.INT >= 0) {
+        pinMode(bsp_touch.INT, INPUT_PULLUP);
+        pinMode(bsp_touch.RST, OUTPUT);
+        digitalWrite(bsp_touch.RST, LOW);
         delay(20);
-        digitalWrite(cfg.TP_RST, HIGH);
+        digitalWrite(bsp_touch.RST, HIGH);
         delay(200);
     }
     #endif
@@ -368,29 +368,29 @@ void DisplayManager::resetTouch() {
 
 void DisplayManager::powerAmpEnable(bool on) {
     #ifdef HAS_IO_EXPANDER
-        #ifdef WS_S3_SMART86
+        #ifdef WS_S3_4B
             if (_expander) {
-                _expander->pinMode(cfg.EXIO_AMP_EN, OUTPUT);
-                Serial.printf("[BusMgr] Power Amp Pin Enabled (via Expander): %d\n", hw_cfg.I2S_AMP_EN);
+                _expander->pinMode(bsp_expander.AMP_EN, OUTPUT);
+                Serial.printf("[BusMgr] Power Amp Pin Enabled (via Expander): %d\n", bsp_hw.I2S_AMP_EN);
             }
         #endif
     #else
-        pinMode(hw_cfg.I2S_AMP_EN, OUTPUT);
-        Serial.printf("[BusMgr] Power Amp Pin Enabled: %d\n", hw_cfg.I2S_AMP_EN);
+        pinMode(bsp_hw.I2S_AMP_EN, OUTPUT);
+        Serial.printf("[BusMgr] Power Amp Pin Enabled: %d\n", bsp_hw.I2S_AMP_EN);
     #endif
 }
 
 void DisplayManager::powerAmpSwitch(bool on) {
     #ifdef HAS_IO_EXPANDER
-        #ifdef WS_S3_SMART86
+        #ifdef WS_S3_4B
             if (_expander) {
-                _expander->digitalWrite(cfg.EXIO_AMP_EN, on ? HIGH : LOW);
+                _expander->digitalWrite(bsp_expander.AMP_EN, on ? HIGH : LOW);
                 Serial.printf("[BusMgr] Power Amp Status (via Expander): %s\n", on ? "ON" : "OFF");
                 return;
             }
         #endif
     #else
-        digitalWrite(hw_cfg.I2S_AMP_EN, on ? HIGH : LOW);
+        digitalWrite(bsp_hw.I2S_AMP_EN, on ? HIGH : LOW);
         Serial.printf("[BusMgr] Power Amp Status: %s\n", on ? "ON" : "OFF");
     #endif
 }

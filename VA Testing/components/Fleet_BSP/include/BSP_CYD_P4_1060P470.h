@@ -3,7 +3,7 @@
 #define BSP_CYD_P4_1060P470_H
 
 #include <Arduino_GFX_Library.h>
-#include "Fleet_BSP_P4.h"
+#include "Fleet_BSP.h"
 
 // -------------------------------------------------------------------------
 // Board: Guition JC1060P470C (ESP32-P4 + C6 + ETH)
@@ -11,9 +11,12 @@
 // Resolution: 1024x600
 // -------------------------------------------------------------------------
 
+#define CYD_P4_1060
+
 // --- Init Sequence (Extracted from MTK_JD9165BA...dtsi.txt) ---
-// NOTE: Must stay here, immediately before `cfg` below — see BSP_WS_P4_7B.h
-// for why (sizeof() on this array needs its complete type at use-site).
+// NOTE: Must stay here, immediately before the structs below - see
+// BSP_WS_P4_TOUCH_LCD_7B.h for why (sizeof() on this array needs its
+// complete type at use-site).
 static const lcd_init_cmd_t CYD_P4_1060P470_init[] = {
     //  {cmd, { data }, data_size, delay_ms}
     // 1. Switch to Page 0
@@ -22,7 +25,7 @@ static const lcd_init_cmd_t CYD_P4_1060P470_init[] = {
     {0xF7, (uint8_t[]){0x49, 0x61, 0x02, 0x00}, 4, 0},
     // 3. Switch to Page 1
     {0x30, (uint8_t[]){0x01}, 1, 0},
-    
+
     // --- Power & Analog Config ---
     {0x04, (uint8_t[]){0x0C}, 1, 0},
     {0x05, (uint8_t[]){0x00}, 1, 0}, //05=06(xhs)
@@ -32,7 +35,7 @@ static const lcd_init_cmd_t CYD_P4_1060P470_init[] = {
     {0x20, (uint8_t[]){0x04}, 1, 0}, //add //r_lansel_sel_reg=1, software charge lane must open
     {0x1F, (uint8_t[]){0x05}, 1, 0}, //add hs_settle time
     {0x23, (uint8_t[]){0x00}, 1, 0}, //add //close gas
-    {0x25, (uint8_t[]){0x19}, 1, 0}, 
+    {0x25, (uint8_t[]){0x19}, 1, 0},
     {0x28, (uint8_t[]){0x18}, 1, 0},
     {0x29, (uint8_t[]){0x04}, 1, 0}, //revcom
     {0x2A, (uint8_t[]){0x01}, 1, 0}, //revcom
@@ -94,116 +97,117 @@ static const lcd_init_cmd_t CYD_P4_1060P470_init[] = {
     {0x00, (uint8_t[]){0x00}, 0, 0},    // End
 };
 
-const Fleet_BSP CYD_P4_1060P470_LCD = {
-    .device_name       = "Guition P4 JC1060P470C",
+const BoardHardware CYD_P4_1060P470_HARDWARE = {
+    .device_name = "Guition P4 JC1060P470C",
+    .MANUFACTURER = "Guition",
+    .MODEL        = "JC1060P470C",
+    .SI_REV       = "unconfirmed",
 
-    // --=  I2C Bus (Touch) =--
-    .I2C_SDA_PIN       = 7,
-    .I2C_SCL_PIN       = 8,
+    .SDA_PIN = 7,
+    .SCL_PIN = 8,
+    .I2C_CLOCK_SPEED = 400000,
 
-    // ---=  LCD  =---
-    .LCD_MODEL         = "JD9165",
-    .WIDTH             = 1024,
-    .HEIGHT            = 600,
-    .ROTATION          = 0,
-    .AUTO_FLUSH        = true,
+    .I2S_AMP_EN = 11,   // PA_CTRL in schematic // ES8311_PA in example sketch
+};
+inline const BoardHardware& bsp_hw = CYD_P4_1060P470_HARDWARE;
 
-    // ---= Backlight =---
-    .LCD_BL            = 23, 
-    .LCD_BL_ON_LEVEL   = 1,     // Active HIGH
-    .LCD_BL_FREQ       = 20000, // 20 kHz PWM
+const DisplayConfig CYD_P4_1060P470_DISPLAY = {
+    .PANEL_MODEL = "JD9165",
+    .WIDTH       = 1024,
+    .HEIGHT      = 600,
+    .ROTATION    = 0,
+    .AUTO_FLUSH  = true,
 
-    // ---= Touch Panel =---
-    .TP_NAME            = "GT911",
-    .TP_I2C_ADDR        = 0x5D, // Likely 0x5D or 0x14
-    .TP_I2C_BACKUP_ADDR = 0x14,
-    .TP_I2C_CLOCK_SPEED = 400000,
-    .TP_SDA             = 7,
-    .TP_SCL             = 8,
-    .TP_INT             = 21, 
-    .TP_RST             = 22,
-    .TP_MAX_TOUCH       = 5,
+    .BL_PIN      = 23,
+    .BL_ON_LEVEL = 1,     // Active HIGH
+    .BL_FREQ     = 20000, // 20 kHz PWM
 
-    // ---= LCD Control Pins =---
-    .LCD_RST            = 27,  // 0 in schema, 27 in GFX Library, 5 in examples
+    .RST = 27,  // 0 in schema, 27 in GFX Library, 5 in examples
 
     // ---= MIPI Timing (Extracted from .dtsi) =---
-    .HSYNC_PWIDTH   = 24,   // 40,
-    .HSYNC_BPORCH   = 136,  // 160,
-    .HSYNC_FPORCH   = 160,  // 160,
-    .VSYNC_PWIDTH   = 2,    // 10,
-    .VSYNC_BPORCH   = 21,   // 23,
-    .VSYNC_FPORCH   = 12,   // 12,
+    .HSYNC_PWIDTH = 24,   // 40,
+    .HSYNC_BPORCH = 136,  // 160,
+    .HSYNC_FPORCH = 160,  // 160,
+    .VSYNC_PWIDTH = 2,    // 10,
+    .VSYNC_BPORCH = 21,   // 23,
+    .VSYNC_FPORCH = 12,   // 12,
 
     // Pixel Clock: 51.2 MHz (from .dtsi JDEVB_DOTCLK)
-    .PCLK_HZ        = 48000000,     // 48000000 in GFX Library example
+    .PCLK_HZ      = 48000000,     // 48000000 in GFX Library example
+    .PREFER_SPEED = 48000000, // Guition docs || GFX: 48000000
 
     // ---= DSI Specific =---
-    .TEST_MIPI_DSI_PHY_PWR_LDO_CHAN      = 3,
-    .TEST_MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV= 2500, // Standard
+    .TEST_MIPI_DSI_PHY_PWR_LDO_CHAN       = 3,
+    .TEST_MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV = 2500, // Standard
 
-    .NUM_DSI_LANES  = 2,
-    .PREFER_SPEED   = 48000000, // Guition docs || GFX: 48000000
-    .LANE_BIT_RATE  = 750, // Guition 750
-
-    // --= LVGL Settings =--
-    .DOUBLE_BUFFERING   = true,
-    .DRAW_BUF_HEIGHT    = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
-    .BUFFER_SIZE_PX     = 1024 * 50,    // WIDTH * DRAW_BUF_HEIGHT
+    .NUM_DSI_LANES = 2,
+    .LANE_BIT_RATE = 750, // Guition 750
 
     // ---= Init Commands =---
-    .INIT_CMDS_DSI     = CYD_P4_1060P470_init,
-    .INIT_CMDS_SIZE    = sizeof(CYD_P4_1060P470_init) / sizeof(lcd_init_cmd_t),
+    .INIT_CMDS_DSI  = CYD_P4_1060P470_init,
+    .INIT_CMDS_SIZE = sizeof(CYD_P4_1060P470_init) / sizeof(lcd_init_cmd_t),
 };
-inline const Fleet_BSP& cfg = CYD_P4_1060P470_LCD;
+inline const DisplayConfig& bsp_display = CYD_P4_1060P470_DISPLAY;
 
+const TouchConfig CYD_P4_1060P470_TOUCH = {
+    .NAME            = "GT911",
+    .I2C_ADDR        = 0x5D, // Likely 0x5D or 0x14
+    .I2C_BACKUP_ADDR = 0x14,
+    .SDA             = 7,
+    .SCL             = 8,
+    .INT             = 21,
+    .RST             = 22,
+    .MAX_TOUCH       = 5,
+};
+inline const TouchConfig& bsp_touch = CYD_P4_1060P470_TOUCH;
 
-const Fleet_Hardware_Config CYD_P4_1060P470_Hardware = {
-    
-    // --- Audio Codec ---
+const AudioConfig CYD_P4_1060P470_AUDIO = {
     // NS4150B power amplifier with ES8311 codec
+    .I2S_SDA_PIN = 7,      // I2C SDA
+    .I2S_SCL_PIN = 8,      // I2C SCL
 
-    .I2S_SDA_PIN    = 7,      // I2C SDA
-    .I2S_SCL_PIN    = 8,      // I2C SCL
+    .I2S_8311_ADDR = 0x18,   // ES8311 DAC/Amp
 
-    .I2S_8311_ADDR  = 0x18,   // ES8311 DAC/Amp
+    .I2S_MCLK = 13,   // I2S_MCK_IO
+    .I2S_BCLK = 12,   // I2S_BCK_IO
+    .I2S_LRCK = 10,   // I2S_WS_IO
 
-    .I2S_MCLK       = 13,   // I2S_MCK_IO
-    .I2S_BCLK       = 12,   // I2S_BCK_IO
-    .I2S_LRCK       = 10,   // I2S_WS_IO
+    .I2S_DIN  = 48,   // I2S_DI_IO in example sketch
+    .I2S_DOUT = 9,    // I2S_DO_IO in example sketch
 
-    .I2S_DIN        = 48,   // I2S_DI_IO in example sketch
-    .I2S_DOUT       = 9,    // I2S_DO_IO in example sketch
+    .AUDIO_INPUT_SAMPLE_RATE  = 16000,
+    .AUDIO_OUTPUT_SAMPLE_RATE = 16000,
+    .I2S_MCLK_MULTIPLE        = 256,
 
-    .AUDIO_INPUT_SAMPLE_RATE    = 16000,
-    .AUDIO_OUTPUT_SAMPLE_RATE   = 16000,
-    .I2S_MCLK_MULTIPLE          = 256,
-
-    // --= New Audio Settings =--
-    .I2S_DATA_BIT_WIDTH     = 16, // I2S_DATA_BIT_WIDTH_16BIT
-    .I2S_SLOT_BIT_WIDTH     = 16, // I2S_SLOT_BIT_WIDTH_16BIT
-    .I2S_SLOT_MODE          = 2,  // 1 = MONO, 2 = Stereo (I2S_SLOT_MODE_STEREO)
+    .I2S_DATA_BIT_WIDTH = 16, // I2S_DATA_BIT_WIDTH_16BIT
+    .I2S_SLOT_BIT_WIDTH = 16, // I2S_SLOT_BIT_WIDTH_16BIT
+    .I2S_SLOT_MODE      = 2,  // I2S_SLOT_MODE_STEREO
 
     // Codec Config (ES8311)
-    .DAC_BIT_LENGTH         = 16, // ES8311_RESOLUTION_16
-
-    // --= Audio Amp =--
-    .I2S_AMP_EN  = 11,   // PA_CTRL in schematic // ES8311_PA in example sketch
+    .DAC_BIT_LENGTH = 16, // ES8311_RESOLUTION_16
 
     // MIC1 MSM381A3729H9CP
     // MIC1_P         - ES8311 18
     // MIC1_N         - ES8311 17
     // ADC_MICBIAS_12 - ES8311 15
-
-    // --- SD Card Interface ---
-    .TF_CMD   = 44,
-    .TF_CLK   = 43,
-    .TF_D0    = 39,     //SD_D0
-    .TF_D1    = 40,     //SD_D1
-    .TF_D2    = 41,     //SD_D2
-    .TF_D3    = 42,     //SD_D3
-
 };
-inline const Fleet_Hardware_Config& hw_cfg = CYD_P4_1060P470_Hardware;
+inline const AudioConfig& bsp_audio = CYD_P4_1060P470_AUDIO;
+
+const StorageConfig CYD_P4_1060P470_STORAGE = {
+    .TF_CMD = 44,
+    .TF_CLK = 43,
+    .TF_D0  = 39,     //SD_D0
+    .TF_D1  = 40,     //SD_D1
+    .TF_D2  = 41,     //SD_D2
+    .TF_D3  = 42,     //SD_D3
+};
+inline const StorageConfig& bsp_storage = CYD_P4_1060P470_STORAGE;
+
+const LvglConfig CYD_P4_1060P470_LVGL = {
+    .DOUBLE_BUFFERING = true,
+    .DRAW_BUF_HEIGHT  = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
+    .BUFFER_SIZE_PX   = 1024 * 50,    // WIDTH * DRAW_BUF_HEIGHT
+};
+inline const LvglConfig& bsp_lvgl = CYD_P4_1060P470_LVGL;
 
 #endif // BSP_CYD_P4_1060P470_H

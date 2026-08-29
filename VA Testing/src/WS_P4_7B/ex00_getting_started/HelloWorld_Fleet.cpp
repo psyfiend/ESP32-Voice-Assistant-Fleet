@@ -42,8 +42,8 @@ void setup() {
     Serial.printf("Display Size: %d x %d\n", gfx->width(), gfx->height());
 
     // 2. Rotation Test (Landscape)
-    gfx->setRotation(cfg.ROTATION);
-    Serial.printf("After setRotation(%d):", cfg.ROTATION);
+    gfx->setRotation(bsp_display.ROTATION);
+    Serial.printf("After setRotation(%d):", bsp_display.ROTATION);
     Serial.printf("Display Size: %d x %d\n", gfx->width(), gfx->height());
 
 

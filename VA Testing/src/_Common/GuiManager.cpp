@@ -136,8 +136,8 @@ void GuiManager::begin() {
     #endif
 
     // Override: If the BSP specified a draw buffer height, respect it (0 = no override)
-    if (cfg.DRAW_BUF_HEIGHT > 0) {
-        pixel_count = gfx->width() * cfg.DRAW_BUF_HEIGHT;
+    if (bsp_lvgl.DRAW_BUF_HEIGHT > 0) {
+        pixel_count = gfx->width() * bsp_lvgl.DRAW_BUF_HEIGHT;
         Serial.println("[GUI] Override: Using Custom Draw Buffer Height");
     }
 

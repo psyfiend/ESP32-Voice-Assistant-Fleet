@@ -42,7 +42,7 @@ private:
     void initBacklightPWM(bool on);
 
     #ifdef HAS_IO_EXPANDER
-      #ifdef WS_S3_SMART86
+      #ifdef WS_S3_4B
         Arduino_XCA9554SWSPI *_expander;
       #endif
     #endif

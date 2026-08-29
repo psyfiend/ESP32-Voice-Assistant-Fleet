@@ -1,4 +1,4 @@
-Wire.begin(hw_cfg.I2S_SDA_PIN, hw_cfg.I2S_SCL_PIN);
+Wire.begin(bsp_audio.I2S_SDA_PIN, bsp_audio.I2S_SCL_PIN);
 int initCodecOutput();
     _es8311_dev = es8311_create(I2C_PORT_NUM, ES8311_ADDRESS_0);
     es8311_clock_config_t clk_cfg = {
@@ -112,11 +112,11 @@ i2s_std_config_t std_cfg = {
     .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(16000), 
     .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
     .gpio_cfg = {
-        .mclk = (gpio_num_t)hw_cfg.I2S_MCLK,
-        .bclk = (gpio_num_t)hw_cfg.I2S_BCLK,
-        .ws   = (gpio_num_t)hw_cfg.I2S_LRCK,
-        .dout = (gpio_num_t)hw_cfg.I2S_DOUT,
-        .din  = (gpio_num_t)hw_cfg.I2S_DIN,
+        .mclk = (gpio_num_t)bsp_audio.I2S_MCLK,
+        .bclk = (gpio_num_t)bsp_audio.I2S_BCLK,
+        .ws   = (gpio_num_t)bsp_audio.I2S_LRCK,
+        .dout = (gpio_num_t)bsp_audio.I2S_DOUT,
+        .din  = (gpio_num_t)bsp_audio.I2S_DIN,
         .invert_flags = {
             .mclk_inv = false, 
             .bclk_inv = false,

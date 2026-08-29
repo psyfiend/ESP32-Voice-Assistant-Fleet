@@ -15,12 +15,8 @@
 #include "Panel_System.h"
 
 // --= FORCE DEPENDENCIES =--
-#include <bb_captouch.h> 
-#ifdef CONFIG_IDF_TARGET_ESP32P4
-    #include "Fleet_BSP_P4.h"
-#else
-    #include "Fleet_BSP.h"   
-#endif
+#include <bb_captouch.h>
+#include "Fleet_BSP.h"
 #ifdef BSP_HEADER
     #include BSP_HEADER 
 #endif
@@ -110,19 +106,19 @@ void debug_dump_config(bool manualTrigger) {
     #endif
 
     // AMP Pin Diagnostics
-    if (hw_cfg.I2S_AMP_EN != -1) {        
+    if (bsp_hw.I2S_AMP_EN != -1) {        
         #ifdef HAS_IO_EXPANDER
             // If checking an Expander pin, we can't check ESP32 registers.
             // We rely on the fact that we wrote to it.
             pnlSystem.log("AMP Driver: VIA IO EXPANDER (Assumed OUTPUT)");
         #else
             // Native GPIO Check
-            pnlSystem.log("  Amp Pin: GPIO %d", hw_cfg.I2S_AMP_EN);
-            bool isOut = isGpioOutput(hw_cfg.I2S_AMP_EN);
+            pnlSystem.log("  Amp Pin: GPIO %d", bsp_hw.I2S_AMP_EN);
+            bool isOut = isGpioOutput(bsp_hw.I2S_AMP_EN);
             pnlSystem.log("  AMP Driver: %s", isOut ? "OUTPUT (OK)" : "INPUT/HI-Z (ERROR!)");
         #endif
         
-        pnlSystem.log("  AMP Pin Level: %s", digitalRead(hw_cfg.I2S_AMP_EN) ? "HIGH (ON)" : "LOW (OFF)");
+        pnlSystem.log("  AMP Pin Level: %s", digitalRead(bsp_hw.I2S_AMP_EN) ? "HIGH (ON)" : "LOW (OFF)");
     } else {
         pnlSystem.log("  Amp Pin: UNDEFINED");
     }
@@ -130,22 +126,22 @@ void debug_dump_config(bool manualTrigger) {
     // Display State
     pnlSystem.log("[DISPLAY]");
     #ifdef HAS_RGB_PANEL
-        pnlSystem.log("  Display Type: RGB - %s", cfg.LCD_MODEL);
-        pnlSystem.log("  Touch Type: %s", cfg.TP_NAME);
+        pnlSystem.log("  Display Type: RGB - %s", bsp_display.PANEL_MODEL);
+        pnlSystem.log("  Touch Type: %s", bsp_touch.NAME);
     #elif defined(HAS_QSPI_PANEL)
-        pnlSystem.log("  Display Type: QSPI - %s", cfg.LCD_MODEL);
-        pnlSystem.log("  Touch Type: %s", cfg.TP_NAME); 
+        pnlSystem.log("  Display Type: QSPI - %s", bsp_display.PANEL_MODEL);
+        pnlSystem.log("  Touch Type: %s", bsp_touch.NAME); 
     #elif defined(HAS_MIPI_PANEL)
-        pnlSystem.log("  Display Type: MIPI/DSI - %s", cfg.LCD_MODEL);
-        pnlSystem.log("  Touch Type: %s", cfg.TP_NAME);
+        pnlSystem.log("  Display Type: MIPI/DSI - %s", bsp_display.PANEL_MODEL);
+        pnlSystem.log("  Touch Type: %s", bsp_touch.NAME);
     #endif
     #ifdef HIGH_DPI_DISPLAY
         pnlSystem.log("  Display Mode: HIGH DPI (1.5x Scaling)");
     #else
         pnlSystem.log("  Display Mode: STANDARD (1.0x Scaling)");
     #endif
-    pnlSystem.log("  Resolution: %dx%d", cfg.WIDTH, cfg.HEIGHT);
-    pnlSystem.log("  Rotation: %d", cfg.ROTATION);
+    pnlSystem.log("  Resolution: %dx%d", bsp_display.WIDTH, bsp_display.HEIGHT);
+    pnlSystem.log("  Rotation: %d", bsp_display.ROTATION);
     pnlSystem.log("  Brightness: %d%%", gui.displayMgr.getBrightness());
     // Note: Can't easily get rotation back from GFX in a generic way without casting, skipping for now.
 
@@ -210,7 +206,7 @@ void setup() {
 
     // --= LAYER 3: HEADER BAR =--
     // Header Click -> Toggle System Panel
-    header.init(screen, cfg.device_name);
+    header.init(screen, bsp_hw.device_name);
     lv_obj_add_event_cb(header.getStatusIcon(), header_icon_click_cb, LV_EVENT_CLICKED, NULL);
 
     // 2. BOTTOM DECK (The "Right" Way)

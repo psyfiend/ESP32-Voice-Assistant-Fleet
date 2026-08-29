@@ -11,7 +11,7 @@ TouchManager touchMgr;
 
 // LVGL Globals
 static uint16_t *lv_draw_buf;
-#define LV_BUF_SIZE (cfg.WIDTH * cfg.HEIGHT / 10)
+#define LV_BUF_SIZE (bsp_display.WIDTH * bsp_display.HEIGHT / 10)
 
 // -------------------------------------------------------------------------
 // LVGL Flushing (Output)
