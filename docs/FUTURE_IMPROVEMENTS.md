@@ -5,6 +5,37 @@ to one device or a small group of devices (that's `PROJECT_STATUS.md`'s job). De
 deferred work, not bugs, not blocking anything currently. Lower volatility than
 `PROJECT_STATUS.md`; safe to leave stale for a while, but prune entries once actually done.
 
+## Startup / GUI reorganization
+
+Raised during connectivity design work, deliberately out of scope for that branch — a
+naming/responsibility mismatch noticed in passing, not a bug. Currently: `LVGL_Test_UI.cpp`'s
+`setup()` does hardware bring-up (`gui.begin()`, `audioMgr.begin()`) *and* builds the LVGL
+dashboard (root screen, header, deck panels) in the same function; `GuiManager.cpp` is
+entirely LVGL engine plumbing (buffer-alloc matrix, driver registration, tick/log callbacks)
+despite its name, and `DisplayManager::begin()` prints generic device-info lines (`device_name`,
+PSRAM, flash size, `bsp_touch.NAME`) that aren't display-specific at all.
+
+Proposed three-way split:
+- **`main`** — hardware bring-up only (`displayMgr.begin()`, `touchMgr.begin()`,
+  `audioMgr.begin()`, `connMgr.begin()`), plus `debug_dump_config()` and the GPIO-register
+  checker. No LVGL code. Also absorbs the generic device-info Serial prints currently
+  misplaced in `DisplayManager::begin()`.
+- **`LVGL_Startup`** (new file) — the LVGL engine plumbing currently in `GuiManager.cpp`:
+  buffer-alloc matrix, `lv_init()`/tick/log setup, display+indev driver registration, and the
+  `flush_cb`/`touch_read` callbacks (these bridge LVGL to `DisplayManager`/`TouchManager` and
+  are needed by any screen content, so they belong with engine plumbing, not screen content).
+  Invoked conditionally from **`main`** (build-flag or parallel no-GUI env gated), *not* from
+  `DisplayManager` itself — `DisplayManager` is a reusable HAL component and should stay
+  LVGL-agnostic, same as it is today; having it call into UI-layer code would invert that
+  dependency. A no-LVGL build variant can reuse the `build_src_filter` exclusion mechanism
+  `WS_S3_TOUCH_LCD_5B` already uses to drop `Panel_Audio.cpp`, extended to
+  `GuiManager.cpp`/`LVGL_Startup.cpp`/all `Panel_*.cpp`.
+- **`GuiManager`** — becomes actual screen content: root screen, header, deck panels. Name
+  finally matches what's in the file.
+
+Worth doing before connectivity/MQTT GUI panels and future peripheral panels add more
+`Panel_*.cpp` files through the current setup(), but not blocking anything today.
+
 ## LVGL / Display
 
 - **Per-board minimum-brightness floor as a real BSP field.** Currently hardcoded directly
