@@ -63,6 +63,51 @@ deferred work, not bugs, not blocking anything currently. Lower volatility than
 This is the actual definition of "WiFi tested" for this project — device discovery and
 entity surfacing the way an ESPHome device would, not just "joins an AP."
 
+**Status: in progress on the `wifi-testing` branch, WiFi first, MQTT deferred until every
+board joins an AP.** Architecture agreed so far:
+
+- **Not part of `Fleet_BSP.h`.** BSP structs are hardware-wiring facts; WiFi/MQTT settings
+  are deployment config, a different axis entirely. New component,
+  `components/Fleet_Connectivity/`, holds a `ConnectivityDefaults.h` with flat structs in the
+  BSP's style (`WiFiDefaults`, `MqttDefaults` kept separate — WiFi has to succeed before MQTT
+  is meaningful, and they'll get separate GUI panels).
+- **One fleet-wide default, not per-device files.** All devices are expected to join the same
+  home AP, so WiFi needs little to no per-device variation. Where a device genuinely needs to
+  differ, override individual fields with `#ifdef WS_P4_7B` / etc. blocks in the same header —
+  reusing the unique per-board identity macro every `BSP_<NAME>.h` already defines, no new
+  build_flag or file-selection mechanism needed. Promote a field to a real per-board file only
+  if it turns out to need heavy variation later; don't build that machinery speculatively.
+- **Compile-time struct is only the fresh-flash fallback.** Source of truth at runtime is NVS
+  (`Preferences` library) via a `ConnectivityManager`: read NVS first, fall back to the
+  compile-time default if unconfigured. Every GUI-driven change (scan-and-connect, portal
+  settings) writes straight to NVS. Unencrypted for now — see encryption note below.
+- **MQTT device-identity fields** (device name, device ID, broker address, base topic) follow
+  the same default-plus-NVS-override layering as WiFi. **Per-peripheral MQTT entities do
+  not** — a peripheral (audio, and eventually IMU/RTC/battery/relay per this file's own
+  "generic capability pattern" item above) should be able to advertise its own HA discovery
+  entity regardless of which board it's wired to. Planned shape once the MQTT phase starts:
+  each `HAS_X`-gated peripheral registers a small `MqttEntityDescriptor` (component type,
+  object_id, name, device_class, state topic suffix) into a central registry; one
+  `MqttManager` walks it at connect time and publishes discovery payloads with the device ID
+  injected centrally (`<device_id>_<object_id>` as `unique_id`), so descriptors stay portable
+  across boards and never need to know their own device ID. This is the same underlying
+  problem as `docs/GUI_FRAMEWORK.md`'s manifest/data-source-abstraction vision (layer 3) —
+  worth building with an eye toward that reuse, not as a throwaway.
+- **NVS encryption: deferred, not designed out.** The standard scheme ties NVS encryption to
+  full flash encryption (irreversible eFuse burn in release mode, not something to flip while
+  still actively reflashing boards for bring-up); chips with an HMAC peripheral (S3 confirmed,
+  P4 unconfirmed) support a narrower key-derivation scheme without encrypting all of flash.
+  Either way it's a one-time per-physical-device provisioning step (eFuse + a `nvs_keys`
+  partition-table entry), not a code change — `Preferences` call sites are identical with or
+  without it, so starting unencrypted doesn't force a later rewrite. Needs its own
+  investigation into whether PlatformIO's Arduino-framework build exposes the necessary
+  sdkconfig options before committing to a scheme.
+- **Custom lean AP/captive-portal, not `tzapu/WiFiManager`.** That library owns the whole
+  scan/connect/portal flow with its own web UI, which would fight the LVGL touchscreen being
+  the primary settings surface instead of complementing it. Native `WiFi.h` (STA scan/connect,
+  `softAP()`) + `DNSServer` for the captive-portal DNS redirect; a web page only as a minimal
+  phone/laptop fallback for credential entry, not the main UX.
+
 ## bb_captouch_fork
 
 - **Detach from the original author's repo.** `components/bb_captouch_fork` is currently a
