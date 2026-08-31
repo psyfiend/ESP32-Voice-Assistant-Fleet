@@ -6,6 +6,7 @@
 #include <Wire.h>
 #include <FleetI2C.h>
 #include "GuiManager.h"
+#include "ConnectivityManager.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #include "Panel_Audio.h"
@@ -24,6 +25,7 @@
 
 // --= OBJECTS =--
 GuiManager gui;
+ConnectivityManager connMgr;
 #ifdef HAS_AUDIO_HW
 AudioManager audioMgr;
 #endif
@@ -198,6 +200,7 @@ void setup() {
     #ifdef HAS_AUDIO_HW
     audioMgr.begin();
     #endif
+    connMgr.begin();
 
     // --= ROOT SCREEN =--
     lv_obj_t * screen = lv_screen_active();
