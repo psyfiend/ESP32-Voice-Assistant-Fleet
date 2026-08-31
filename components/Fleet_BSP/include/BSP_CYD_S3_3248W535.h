@@ -271,7 +271,7 @@ static const uint8_t CYD_S3_3248W535_init[] = {
 };
 
 const BoardHardware CYD_S3_3248W535_HARDWARE = {
-    .device_name = "CYD S3 JC3248W535",
+    .device_name  = "CYD S3 JC3248W535",
     .MANUFACTURER = "Guition",
     .MODEL        = "JC3248W535",
     .SI_REV       = "n/a", // ESP32-S3, not P4

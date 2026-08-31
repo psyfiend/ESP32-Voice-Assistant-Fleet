@@ -98,7 +98,7 @@ static const lcd_init_cmd_t CYD_P4_1060P470_init[] = {
 };
 
 const BoardHardware CYD_P4_1060P470_HARDWARE = {
-    .device_name = "Guition P4 JC1060P470C",
+    .device_name  = "CYD P4 JC1060P470C",
     .MANUFACTURER = "Guition",
     .MODEL        = "JC1060P470C",
     .SI_REV       = "unconfirmed",

@@ -69,7 +69,7 @@ static const lcd_init_cmd_t ws_p4_touch_lcd_7b_init[] = {
 };
 
 const BoardHardware WS_P4_TOUCH_LCD_7B_HARDWARE = {
-    .device_name = "Waveshare ESP32-P4-Touch-LCD-7B",
+    .device_name  = "Waveshare P4-Touch-LCD-7B",
     .MANUFACTURER = "Waveshare",
     .MODEL        = "ESP32-P4-WIFI6-Touch-LCD-7B",
     .SI_REV       = "unconfirmed",
@@ -141,12 +141,12 @@ const AudioConfig WS_P4_TOUCH_LCD_7B_AUDIO = {
     .I2S_7210_ADDR  = 0x40, // ES7210 ADC/Mics
     .I2S_8311_ADDR  = 0x18, // ES8311 DAC/Amp
 
-    .I2S_MCLK   = 13,
-    .I2S_BCLK   = 12,  //SCLK
-    .I2S_LRCK   = 10,  //WS
+    .I2S_MCLK = 13,
+    .I2S_BCLK = 12,  //SCLK
+    .I2S_LRCK = 10,  //WS
 
-    .I2S_DIN    = 11,
-    .I2S_DOUT   = 9,
+    .I2S_DIN  = 11,
+    .I2S_DOUT = 9,
 
     .AUDIO_INPUT_SAMPLE_RATE  = 16000,
     .AUDIO_OUTPUT_SAMPLE_RATE = 16000,

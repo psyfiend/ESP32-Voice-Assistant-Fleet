@@ -21,7 +21,7 @@
 #define WS_S3_5B
 
 const BoardHardware WS_S3_TOUCH_LCD_5B_HARDWARE = {
-    .device_name = "Waveshare S3 Touch LCD 5B",
+    .device_name  = "Waveshare S3-Touch-LCD-5B",
     .MANUFACTURER = "Waveshare",
     .MODEL        = "ESP32-S3-Touch-LCD-5B",
     .SI_REV       = "n/a", // ESP32-S3, not P4
@@ -121,22 +121,22 @@ const DisplayConfig WS_S3_TOUCH_LCD_5B_DISPLAY = {
 inline const DisplayConfig& bsp_display = WS_S3_TOUCH_LCD_5B_DISPLAY;
 
 const TouchConfig WS_S3_TOUCH_LCD_5B_TOUCH = {
-    .NAME = "GT911",
-    .I2C_ADDR = 0x5D,
-    .SDA             = 8,
-    .SCL             = 9,
-    .INT             = 4,   // Native GPIO
-    .RST             = -1,  // Via CH422G bsp_expander.TP_RST, not a native pin
-    .MAX_TOUCH       = 5,
+    .NAME       = "GT911",
+    .I2C_ADDR   = 0x5D,
+    .SDA        = 8,
+    .SCL        = 9,
+    .INT        = 4,   // Native GPIO
+    .RST        = -1,  // Via CH422G bsp_expander.TP_RST, not a native pin
+    .MAX_TOUCH  = 5,
 };
 inline const TouchConfig& bsp_touch = WS_S3_TOUCH_LCD_5B_TOUCH;
 
 const StorageConfig WS_S3_TOUCH_LCD_5B_STORAGE = {
     // CS lives on the CH422G expander (bsp_expander.SD_CS), not a native
     // GPIO - no SD component exists yet to consume it.
-    .TF_CLK  = 12,
-    .TF_MOSI = 11,
-    .TF_MISO = 13,
+    .TF_CLK   = 12,
+    .TF_MOSI  = 11,
+    .TF_MISO  = 13,
 
     .SPI_MOSI = 11,
     .SPI_MISO = 13,

@@ -48,7 +48,7 @@ static const lcd_init_cmd_t ws_p4_touch_lcd_5_init[] = {
 };
 
 const BoardHardware WS_P4_TOUCH_LCD_5_HARDWARE = {
-    .device_name = "Waveshare ESP32-P4-Touch-LCD-5",
+    .device_name  = "Waveshare P4-Touch-LCD-5",
     .MANUFACTURER = "Waveshare",
     .MODEL        = "ESP32-P4-WIFI6-Touch-LCD-5",
     .SI_REV       = "unconfirmed",

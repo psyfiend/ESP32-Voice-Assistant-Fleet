@@ -16,7 +16,7 @@
 #define CYD_S3_8048
 
 const BoardHardware CYD_S3_8048W550_HARDWARE = {
-    .device_name = "Guition S3 JC8048W550",
+    .device_name  = "CYD S3 JC8048W550",
     .MANUFACTURER = "Guition",
     .MODEL        = "JC8048W550",
     .SI_REV       = "n/a", // ESP32-S3, not P4
@@ -77,13 +77,13 @@ const DisplayConfig CYD_S3_8048W550_DISPLAY = {
 inline const DisplayConfig& bsp_display = CYD_S3_8048W550_DISPLAY;
 
 const TouchConfig CYD_S3_8048W550_TOUCH = {
-    .NAME            = "GT911",
-    .I2C_ADDR        = 0x5D,
-    .SDA             = 19,
-    .SCL             = 20,
-    .INT             = -1, // 18
-    .RST             = 38,
-    .MAX_TOUCH       = 5,
+    .NAME      = "GT911",
+    .I2C_ADDR  = 0x5D,
+    .SDA       = 19,
+    .SCL       = 20,
+    .INT       = -1, // 18
+    .RST       = 38,
+    .MAX_TOUCH = 5,
 };
 inline const TouchConfig& bsp_touch = CYD_S3_8048W550_TOUCH;
 

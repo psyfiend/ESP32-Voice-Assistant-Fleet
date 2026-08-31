@@ -131,7 +131,7 @@ static const uint8_t ws_s3_touch_lcd_4b_init[] = {
 };
 
 const BoardHardware WS_S3_TOUCH_LCD_4B_HARDWARE = {
-    .device_name = "Waveshare ESP32-S3-Touch-LCD-4B",
+    .device_name  = "Waveshare S3-Touch-LCD-4B",
     .MANUFACTURER = "Waveshare",
     .MODEL        = "ESP32-S3-Touch-LCD-4B",
     .SI_REV       = "n/a", // ESP32-S3, not P4 - the rev1_3/rev3_x silicon-revision distinction doesn't apply here
@@ -171,10 +171,10 @@ const DisplayConfig WS_S3_TOUCH_LCD_4B_DISPLAY = {
     .BL_ON_LEVEL = 0, // Active LOW for P4 GPIO
     .BL_FREQ     = 25000, // WS: 5000 Hz PWM
 
-    .RST = -1,    // EXIO 7
+    .RST   = -1,    // EXIO 7
 
     // ---= RGB Interface =---
-    .DE   = 17,
+    .DE    = 17,
     .VSYNC = 3,
     .HSYNC = 46,
     .PCLK  = 9,
@@ -213,13 +213,13 @@ const DisplayConfig WS_S3_TOUCH_LCD_4B_DISPLAY = {
 inline const DisplayConfig& bsp_display = WS_S3_TOUCH_LCD_4B_DISPLAY;
 
 const TouchConfig WS_S3_TOUCH_LCD_4B_TOUCH = {
-    .NAME            = "GT911",
-    .I2C_ADDR        = 0x5D,
-    .SDA             = 47,
-    .SCL             = 48,
-    // .INT          = EXIO 6,
-    // .RST          = EXIO 5,
-    .MAX_TOUCH       = 5,
+    .NAME      = "GT911",
+    .I2C_ADDR  = 0x5D,
+    .SDA       = 47,
+    .SCL       = 48,
+    // .INT    = EXIO 6,
+    // .RST    = EXIO 5,
+    .MAX_TOUCH = 5,
 };
 inline const TouchConfig& bsp_touch = WS_S3_TOUCH_LCD_4B_TOUCH;
 
