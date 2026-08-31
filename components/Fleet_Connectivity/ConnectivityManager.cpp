@@ -38,18 +38,20 @@ void ConnectivityManager::clearStationCredentials() {
 
 bool ConnectivityManager::connectSTA(const char *ssid, const char *password, uint32_t timeoutMs, uint8_t retries) {
     if (!ssid || ssid[0] == '\0') {
-        #ifdef DEBUG_WIFI
-        Serial.println("[ConnectivityManager] No STA SSID configured (NVS empty, no compile-time default) - skipping connect attempt.");
-        #endif
+        Serial.println("[WiFi] No STA SSID configured - not attempting to connect.");
         _state = WiFiConnState::FAILED;
         return false;
     }
 
+    // Baseline: mode changes and connect start/success/failure always print.
+    // Per-attempt detail (retry count, raw status codes, timeouts) is
+    // troubleshooting-only - gate that behind DEBUG_WIFI, not this.
+    Serial.printf("[WiFi] Mode: STA - connecting to \"%s\"...\n", ssid);
     WiFi.mode(WIFI_STA);
 
     for (uint8_t attempt = 1; attempt <= retries; attempt++) {
         #ifdef DEBUG_WIFI
-        Serial.printf("[ConnectivityManager] STA connect attempt %u/%u to \"%s\"...\n", attempt, retries, ssid);
+        Serial.printf("[WiFi:debug] STA connect attempt %u/%u to \"%s\"...\n", attempt, retries, ssid);
         #endif
         _state = WiFiConnState::CONNECTING;
         WiFi.begin(ssid, password);
@@ -61,19 +63,18 @@ bool ConnectivityManager::connectSTA(const char *ssid, const char *password, uin
 
         if (WiFi.status() == WL_CONNECTED) {
             _state = WiFiConnState::CONNECTED;
-            #ifdef DEBUG_WIFI
-            Serial.printf("[ConnectivityManager] Connected. IP: %s\n", WiFi.localIP().toString().c_str());
-            #endif
+            Serial.printf("[WiFi] Connected. IP: %s\n", WiFi.localIP().toString().c_str());
             return true;
         }
 
         #ifdef DEBUG_WIFI
-        Serial.printf("[ConnectivityManager] Attempt %u timed out (status=%d).\n", attempt, WiFi.status());
+        Serial.printf("[WiFi:debug] Attempt %u timed out (status=%d).\n", attempt, WiFi.status());
         #endif
         WiFi.disconnect();
     }
 
     _state = WiFiConnState::FAILED;
+    Serial.printf("[WiFi] Failed to connect to \"%s\" after %u attempt(s).\n", ssid, retries);
     return false;
 }
 
@@ -89,11 +90,11 @@ bool ConnectivityManager::begin() {
         ssid     = nvsSsid.c_str();
         password = nvsPassword.c_str();
         #ifdef DEBUG_WIFI
-        Serial.println("[ConnectivityManager] Using NVS-stored STA credentials.");
+        Serial.println("[WiFi:debug] Using NVS-stored STA credentials.");
         #endif
     } else {
         #ifdef DEBUG_WIFI
-        Serial.println("[ConnectivityManager] NVS unconfigured - falling back to compile-time default.");
+        Serial.println("[WiFi:debug] NVS unconfigured - falling back to compile-time default.");
         #endif
     }
 
@@ -101,7 +102,7 @@ bool ConnectivityManager::begin() {
 
     #ifdef DEBUG_WIFI
     if (!connected) {
-        Serial.println("[ConnectivityManager] STA connect failed after all retries. AP/captive-portal fallback not implemented yet (Phase 2).");
+        Serial.println("[WiFi:debug] AP/captive-portal fallback not implemented yet (Phase 2) - device has no connectivity.");
     }
     #endif
 
