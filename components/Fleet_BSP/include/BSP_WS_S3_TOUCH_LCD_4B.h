@@ -191,12 +191,22 @@ const DisplayConfig WS_S3_TOUCH_LCD_4B_DISPLAY = {
     .B0 = 40, .B1 = 41, .B2 = 42, .B3 = 2,  .B4 = 1,
 
     // --= RGB Timing =---
+    // Set to match Waveshare's own Arduino demo (06_LVGL_Arduino_v9.ino) exactly.
+    // Confirmed on hardware to fix a ~25px vertical frame shift plus tearing/
+    // flicker that appeared on this board after the arduino-esp32 3.3.4 -> 3.3.11
+    // platform upgrade (pioarduino 55.03.311) - stable across repeated
+    // power-cycle/reflash testing post-fix. Root cause (BSP-value bug vs.
+    // framework-side RGB driver behavior change) is still unconfirmed either
+    // way; these values simply match Waveshare's proven-good reference. Note:
+    // these exact commented-out values were tried once before, pre-upgrade, and
+    // swapped out for a reason not recorded at the time - if a similar-looking
+    // problem resurfaces later, that history is worth revisiting.
     .HSYNC_POL    = 1,
     .VSYNC_POL    = 1,
-    .HSYNC_PWIDTH = 10,   // 8,    // 10,
-    .HSYNC_BPORCH = 10,   // 50,   // 10,
-    .HSYNC_FPORCH = 20,   // 10,   // 20,
-    .VSYNC_PWIDTH = 10,   // 8,    // 10,
+    .HSYNC_PWIDTH = 8,    // 10,
+    .HSYNC_BPORCH = 50,   // 10,
+    .HSYNC_FPORCH = 10,   // 20,
+    .VSYNC_PWIDTH = 8,    // 10,
     .VSYNC_BPORCH = 20,
     .VSYNC_FPORCH = 10,
 
