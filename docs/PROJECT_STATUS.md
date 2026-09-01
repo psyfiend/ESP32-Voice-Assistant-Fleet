@@ -63,6 +63,22 @@ Does **not** have battery headers (the only P4 board without one, as far as know
 component not currently owned. Believed to expose: 5V bus, USB data (`USB_IN1_P`/`USB_IN1_N`),
 and SDA/SCL.
 
+- **Battery power: still unconfirmed.** `VCC_5V` header pin measured 5V with the board
+  powered over USB - doesn't itself prove it'd accept 5V *input* there (could be USB power
+  passed straight through, one-directional). Needs an actual battery/external-5V-source test,
+  not just a meter reading under USB power.
+- **This board ships in two hardware variants** - this project's unit is the plain
+  ESP32-P4-WIFI6-Touch-LCD-4B (has a CSI camera port, unpopulated on this unit). A second
+  variant, ESP32-P4-86-Panel-ETH-2RO, adds an add-on board plugging into the second 7x2
+  header bank (physical relays, RS485, Ethernet) that this unit's board does *not* come
+  with. This unit still exposes that same second header bank in hardware, unpopulated.
+- **GPIO47/GPIO48 on that second header bank are labeled TXD/RXD and map to UART1** - the
+  same UART Waveshare's ESP-IDF RS485 example uses. But per that example's own docs: *"the
+  standalone 4B board does not expose the RS485 A/B pair, and its main PCB must not be
+  assumed interchangeable"* with the ETH-2RO variant's add-on board. So UART1 is there, but
+  it's raw TTL-UART on this unit, not RS485 - would need an external RS485 transceiver
+  breakout to actually use it for Modbus, unlike WS_S3_5B's onboard-relay-board setup.
+
 ### WS_S3_4B — ESP32-S3-Touch-LCD-4B
 
 On-board hardware not yet touched by firmware at all — develop libraries for each, reference
