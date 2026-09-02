@@ -17,21 +17,23 @@ section.
 
 ## Per-board test status
 
-| Board | Env | Display | Touch | Audio out | Audio in (mic) |
-|---|---|---|---|---|---|
-| **ESP32-P4-WIFI6-Touch-LCD-7B** (WaveShare, macro `WS_P4_7B`) | `WS_P4_TOUCH_LCD_7B` | ✅ | ✅ (portrait; rotation untested) | untested (no speaker access — enclosure doesn't expose it) | untested |
-| **ESP32-P4-WIFI6-Touch-LCD-4B** (WaveShare, macro `WS_P4_4B`) | `WS_P4_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ |
-| **ESP32-P4-WIFI6-Touch-LCD-5** (WaveShare, macro `WS_P4_5`) | `WS_P4_TOUCH_LCD_5` | untested (not flashed yet) | untested | untested | untested |
-| **ESP32-S3-Touch-LCD-4B** (WaveShare, macro `WS_S3_4B`) | `WS_S3_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ |
-| Guition P4 7" (JC1060P470C, macro `CYD_P4_1060`) | `CYD_P4_1060P470` | ✅ | ✅ | ✅ | ✅ (first-ever test of the ES8311-as-sole-mic-input path) |
-| Guition 3.5" (JC3248W535, macro `CYD_S3_3248`) | `CYD_S3_3248W535` | ✅ (both rotations confirmed) | ✅ (both rotations confirmed) | ✅ | ✅ |
-| Guition 5" (JC8048W550, macro `CYD_S3_8048`) | `CYD_S3_8048W550` | ✅ (brightness slider broken, see below) | ✅ | ✅ (notably quieter than other boards, unexplained) | ✅ |
-| WaveShare ESP32-S3-Touch-LCD-5B (macro `WS_S3_5B`) | `WS_S3_TOUCH_LCD_5B` | ✅ (visible tearing, see `FUTURE_IMPROVEMENTS.md`) | ✅ (5 simultaneous points confirmed) | N/A (no audio hardware) | N/A |
+| Board | Env | Display | Touch | Audio out | Audio in (mic) | WiFi (STA) |
+|---|---|---|---|---|---|---|
+| **ESP32-P4-WIFI6-Touch-LCD-7B** (WaveShare, macro `WS_P4_7B`) | `WS_P4_TOUCH_LCD_7B` | ✅ | ✅ (portrait; rotation untested) | untested (no speaker access — enclosure doesn't expose it) | untested | untested (physically enclosed, no USB access currently) |
+| **ESP32-P4-WIFI6-Touch-LCD-4B** (WaveShare, macro `WS_P4_4B`) | `WS_P4_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ connects, real DHCP IP (see below) |
+| **ESP32-P4-WIFI6-Touch-LCD-5** (WaveShare, macro `WS_P4_5`) | `WS_P4_TOUCH_LCD_5` | untested (not flashed yet) | untested | untested | untested | untested |
+| **ESP32-S3-Touch-LCD-4B** (WaveShare, macro `WS_S3_4B`) | `WS_S3_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ connects (native radio, no hosted-WiFi complexity) |
+| Guition P4 7" (JC1060P470C, macro `CYD_P4_1060`) | `CYD_P4_1060P470` | ✅ | ✅ | ✅ | ✅ (first-ever test of the ES8311-as-sole-mic-input path) | untested (builds clean, not flash-tested for WiFi) |
+| Guition 3.5" (JC3248W535, macro `CYD_S3_3248`) | `CYD_S3_3248W535` | ✅ (both rotations confirmed) | ✅ (both rotations confirmed) | ✅ | ✅ | ⚠️ connects eventually, but reboots several times first (see below) |
+| Guition 5" (JC8048W550, macro `CYD_S3_8048`) | `CYD_S3_8048W550` | ✅ (brightness slider broken, see below) | ✅ | ✅ (notably quieter than other boards, unexplained) | ✅ | untested |
+| WaveShare ESP32-S3-Touch-LCD-5B (macro `WS_S3_5B`) | `WS_S3_TOUCH_LCD_5B` | ✅ (visible tearing, see `FUTURE_IMPROVEMENTS.md`) | ✅ (5 simultaneous points confirmed) | N/A (no audio hardware) | N/A | untested |
 
 ## Fleet-wide investigations
 
-- **WiFi / MQTT** — not started. See `FUTURE_IMPROVEMENTS.md`'s Connectivity section for what
-  "tested" actually requires.
+- **WiFi (station mode)** — in progress on the `wifi-testing` branch; 3 of 8 boards flash-tested
+  so far (2 confirmed connecting, 1 connecting with an open issue). AP/captive-portal fallback
+  and MQTT not started. See `FUTURE_IMPROVEMENTS.md`'s Connectivity section for the full
+  phased plan and the fleet-wide platform/framework upgrade this required.
 - **SD card** — untested on every board. Low priority.
 - **Battery ADC "gauge"** — no board has a working battery percentage readout yet. Low
   priority. See `FUTURE_IMPROVEMENTS.md` for the voltage-divider math already confirmed for
@@ -49,6 +51,10 @@ section.
   raw-passthrough special case is still needed, or whether the generic rotation transform
   works fine here too (unverified assumption, not a known problem).
 - Test RS485 (Modbus board available).
+- **WiFi untested** — currently enclosed in an in-progress case design, no easy USB access.
+  Same P4/ESP32-C6 hosted-WiFi architecture as `WS_P4_4B` (see that board's notes below), so
+  expected to behave the same, but not yet confirmed on this specific physical unit — each
+  unit's C6 co-processor firmware could in principle differ.
 - Nothing else board-specific outstanding — remaining items are fleet-wide, see above.
 
 ### WS_P4_5 — ESP32-P4-WIFI6-Touch-LCD-5
@@ -78,6 +84,16 @@ and SDA/SCL.
   assumed interchangeable"* with the ETH-2RO variant's add-on board. So UART1 is there, but
   it's raw TTL-UART on this unit, not RS485 - would need an external RS485 transceiver
   breakout to actually use it for Modbus, unlike WS_S3_5B's onboard-relay-board setup.
+- **WiFi (STA) confirmed working** — this board's WiFi runs through an onboard ESP32-C6
+  co-processor over SDIO (`esp_hosted`), since the P4 itself has no WiFi radio at all.
+  Connects cleanly and gets a real DHCP IP. Serial shows a benign
+  `rpc_core: Response not received for [0x15e] (Req_GetCoprocessorFwVersion)` /
+  `hostedHasUpdate(): Could not get slave firmware version` warning on every boot — traced to
+  the exact source in `esp32-hal-hosted.c` (`hostedInit()` calls `hostedHasUpdate()` purely
+  for diagnostic version logging, discards its return value, and returns success regardless).
+  Confirmed structurally incapable of blocking anything; safe to ignore. Required bumping the
+  fleet's platform to pioarduino 55.03.311 / arduino-esp32 3.3.11 to get this far at all — see
+  `FUTURE_IMPROVEMENTS.md`'s Connectivity section.
 
 ### WS_S3_4B — ESP32-S3-Touch-LCD-4B
 
@@ -87,6 +103,17 @@ Waveshare's own repo:
 - **PCF85063** RTC clock chip
 - **QMI8658** 6-axis IMU
 - Controllable **PWRKEY** button
+
+- **WiFi (STA) confirmed working** — native S3 radio, no co-processor/hosted-transport layer
+  involved, so the simplest connect path in the fleet.
+- **RGB display timing regression, found and fixed during WiFi testing.** After the fleet's
+  platform bump to arduino-esp32 3.3.11, this board showed a ~25px vertical frame shift plus
+  tearing/flicker. Root cause unconfirmed (bad pre-existing BSP timing values vs. a
+  framework-side RGB driver behavior change - both plausible, see `FUTURE_IMPROVEMENTS.md`),
+  but fixed by matching `BSP_WS_S3_TOUCH_LCD_4B.h`'s HSYNC/VSYNC pulse-width and porch values
+  to Waveshare's own Arduino demo exactly. Confirmed stable across repeated power-cycle/reflash
+  testing. Note: these exact values were apparently tried once before (pre-upgrade) and
+  reverted for an unrecorded reason - worth revisiting if a similar-looking problem resurfaces.
 
 ### WS_S3_5B — ESP32-S3-Touch-LCD-5B
 
@@ -126,6 +153,16 @@ connectivity path.
   (the only tested QSPI panel in the fleet, inherently lower-bandwidth than RGB/DSI boards),
   or the CPU cost of `Arduino_Canvas`'s per-pixel software rotation transform, paid on every
   draw call (see `CLAUDE.md`'s Display/touch pipeline section for why that exists).
+- **WiFi (STA) connects, but the board fully resets several times first.** Each reset re-enters
+  `setup()` from scratch (confirmed via serial - the full boot banner and every manager's
+  init log reprint each time), not just a WiFi-internal retry, and it always shows "attempt
+  1/3" since the attempt counter is wiped along with everything else by a real reset. Not yet
+  root-caused; leading hypothesis is a power-supply brownout when the radio's PA keys up for
+  the first time (a well-known ESP32 pattern, especially over a marginal USB
+  port/cable/hub) - unconfirmed, needs a serial capture from cold power-on including the ROM
+  bootloader's own output (a `Brownout detector was triggered!` line would confirm it) and/or
+  a cleaner power source test. Unrelated to the WS_S3_4B RGB timing regression above - this is
+  a different board and a different symptom.
 
 ## Done
 
@@ -148,3 +185,14 @@ Kept brief — enough to know what changed and why, not a full narrative. See gi
 - **Fleet-wide board/BSP rename** — all BSP filenames, device macros, and struct names now
   match official vendor model designations; old internal nicknames (`WS_S3_SMART86`,
   `WS_P4_SMART86`, "Smart86") no longer appear anywhere in code.
+- **WS_S3_4B RGB timing regression** (see per-device notes above) — fixed by matching
+  Waveshare's own Arduino demo's HSYNC/VSYNC timing values exactly.
+- **Brightness slider toast showing the wrong range** — `WS_S3_4B`/`WS_P4_4B`'s artificial
+  slider floor (45–100, to avoid the backlight cutting out at low values) was leaking into
+  the toast popup (e.g. showing "45%" as the dimmest setting). `Panel_Display` now remaps the
+  displayed percentage to a user-facing 0–100 via `lv_map()`; the slider and actual backlight
+  hardware behavior are unchanged.
+- **CYD_P4_1060P470 missing partition table override** — every other P4 environment set
+  `board_build.partitions = default_16MB.csv`; this one silently fell back to a much smaller
+  default and started overflowing once the arduino-esp32 3.3.11 upgrade grew the framework
+  slightly. Fixed in `platformio.ini`.

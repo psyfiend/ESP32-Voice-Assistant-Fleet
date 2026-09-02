@@ -95,7 +95,52 @@ This is the actual definition of "WiFi tested" for this project — device disco
 entity surfacing the way an ESPHome device would, not just "joins an AP."
 
 **Status: in progress on the `wifi-testing` branch, WiFi first, MQTT deferred until every
-board joins an AP.** Architecture agreed so far:
+board joins an AP.**
+
+**Progress so far:**
+- `Fleet_Connectivity`/`ConnectivityManager` Phase 1 (STA connect with NVS-fallback-to-compile-
+  default, per the layering below) is implemented and confirmed connecting on real hardware:
+  `WS_P4_TOUCH_LCD_4B` (P4/ESP32-C6 hosted-WiFi, real DHCP IP) and `WS_S3_TOUCH_LCD_4B` (native
+  radio). `CYD_S3_3248W535` also connects but has an open, unrelated issue (see
+  `docs/PROJECT_STATUS.md`'s per-device notes) - full per-board WiFi status lives there, not
+  here.
+- Getting the P4/C6 boards to connect at all **required a fleet-wide platform/framework
+  upgrade**: pioarduino `platform-espressif32` 55.03.34 → 55.03.311 (arduino-esp32 3.3.4 →
+  3.3.11), plus a PlatformIO Core bump (6.1.18 → 6.1.19, pioarduino 55.03.311's minimum). The
+  P4 has no WiFi radio at all - it depends entirely on an onboard ESP32-C6 co-processor over
+  SDIO (`esp_hosted`), and the older host-driver version couldn't complete its RPC handshake
+  with the C6's factory firmware. Waveshare's own compatibility docs named 3.3.11 as their
+  tested Arduino-core version for this hardware.
+  - All 8 environments rebuilt clean against the new platform. Two real regressions surfaced
+    and got fixed along the way: `GFX_Library_for_Arduino`'s `Arduino_ESP32SPI`/
+    `Arduino_ESP32SPIDMA` databus classes called `spiFrequencyToClockDiv()` with 3.3.4's old
+    single-argument signature, broken against 3.3.11's new `(spi_t*, uint32_t)` signature -
+    both confirmed unused anywhere in this fleet and excluded via the library's `library.json`
+    `srcFilter` (files kept on disk, just not compiled) rather than fixed or deleted;
+    `CYD_P4_1060P470` was missing a `board_build.partitions` override every other P4 env has,
+    silently running on a too-small default partition table that only started overflowing
+    once 3.3.11's larger framework didn't fit.
+  - **Operational gotcha worth knowing**: pioarduino 55.03.311's tooling actively rejects
+    being invoked from a Git Bash/MSYS shell (fails with `MSys/Mingw is not supported`, plus
+    knock-on failures like the toolchain compiler not being found on `PATH`). Run `pio`
+    commands from PowerShell or cmd.exe, not Git Bash, for this platform version. VS Code's
+    PlatformIO IDE extension is unaffected either way - it doesn't invoke Core through MSYS.
+  - The `hostedHasUpdate()` RPC warning that still prints on every P4/C6 boot
+    (`Req_GetCoprocessorFwVersion` timing out) is confirmed cosmetic - traced to source, it's a
+    diagnostic-only version check whose result is discarded, structurally incapable of
+    blocking the actual connection. Safe to ignore; see `docs/PROJECT_STATUS.md`'s `WS_P4_4B`
+    notes for the full trace.
+  - Not yet pinned: `platformio.ini` still says `platform = espressif32` with no version/commit
+    pin, so this upgrade currently only "sticks" because it's installed globally on this one
+    dev machine. A fresh machine or a routine `pio pkg update` wouldn't reproduce it. Worth
+    pinning the exact fork commit once the platform choice feels settled.
+
+**Still open:** AP/captive-portal fallback (Phase 2) not started; GUI integration (Phase 3)
+not started; 5 of 8 boards not yet flash-tested for WiFi at all (`WS_P4_TOUCH_LCD_7B`
+physically inaccessible mid-enclosure-build, `WS_P4_TOUCH_LCD_5`/`CYD_P4_1060P470`/
+`CYD_S3_8048W550`/`WS_S3_TOUCH_LCD_5B` simply not attempted yet).
+
+Architecture agreed so far:
 
 - **Not part of `Fleet_BSP.h`.** BSP structs are hardware-wiring facts; WiFi/MQTT settings
   are deployment config, a different axis entirely. New component,
