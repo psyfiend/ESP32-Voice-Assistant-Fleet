@@ -12,12 +12,17 @@ Idempotent: skips milestones and issues whose titles already exist, so re-runnin
 after adding roadmap entries only creates the new ones.
 #>
 
-$ErrorActionPreference = "Stop"
+# Deliberately NOT "Stop": in Windows PowerShell 5.1, a native executable writing to
+# stderr under a redirect raises NativeCommandError, which would abort this script on
+# the entirely normal "label already exists" case. Exit codes are checked explicitly
+# instead, and native stderr is left unredirected.
+$ErrorActionPreference = "Continue"
+
 $gh = "C:\Program Files\GitHub CLI\gh.exe"
 if (-not (Test-Path $gh)) { $gh = "gh" }
 
-& $gh auth status *> $null
-if ($LASTEXITCODE -ne 0) { Write-Error "Not logged in. Run: gh auth login"; exit 1 }
+$null = & $gh auth status
+if ($LASTEXITCODE -ne 0) { Write-Output "Not logged in. Run: gh auth login"; exit 1 }
 
 $repo = (& $gh repo view --json nameWithOwner -q .nameWithOwner)
 Write-Output "Repo: $repo"
@@ -35,7 +40,8 @@ $labels = @(
     @{ n = "blocked"; c = "000000"; d = "Waiting on an external answer or another issue" }
 )
 foreach ($l in $labels) {
-    & $gh label create $l.n --color $l.c --description $l.d 2>$null | Out-Null
+    # Non-zero exit here just means the label already exists - not an error worth stopping for.
+    $null = & $gh label create $l.n --color $l.c --description $l.d
 }
 Write-Output "Labels ensured."
 
@@ -101,9 +107,11 @@ foreach ($i in $issues) {
     $phase = $i[0]; $title = $i[1]; $body = $i[2]
     if ($openTitles -contains $title) { Write-Output "  = $title"; continue }
     $ms = $milestones | Where-Object { $_ -like "Phase $phase*" }
-    $args = @("issue","create","--title",$title,"--body",$body,"--label","phase-$phase","--milestone",$ms)
-    if ($title -match "SPIKE") { $args += @("--label","spike") }
-    & $gh @args | Out-Null
+    # NB: not $args - that is an automatic PowerShell variable and must not be assigned to.
+    $ghArgs = @("issue","create","--title",$title,"--body",$body,"--label","phase-$phase","--milestone",$ms)
+    if ($title -match "SPIKE") { $ghArgs += @("--label","spike") }
+    $null = & $gh @ghArgs
+    if ($LASTEXITCODE -ne 0) { Write-Output "  ! FAILED: $title"; continue }
     Write-Output "  + $title"
 }
 
