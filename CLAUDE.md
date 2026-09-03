@@ -184,3 +184,23 @@ stash/branch survived). Its pre-vendoring history remains published at `psyfiend
 (HEAD was `586cf77`). Edit these files directly and normally; the old "prefer the smallest
 possible fix, don't edit the vendored file" caution no longer applies, though the
 `build_flags`-scoped `-D FUTURE` trick for the AXS15231 path is still in use and still correct.
+
+## `platformio.ini` hardcodes this machine's project path — don't move the folder
+
+Every local library is declared as `NAME =symlink://c:/Users/Marge/Documents/PlatformIO/Projects/ESP32 Voice Assistant Fleet/components/NAME` — 26 of them. `symlink://` (as opposed to `file://`, which **copies**) is a deliberate choice: it links the library in place so all 8 environments share one copy instead of each getting its own, which matters most for LVGL.
+
+**Consequence: renaming or moving the project folder breaks all 8 environments at once**, and so does restoring a backup to a different path. The fix is a search-and-replace of that prefix across `platformio.ini` — 30 seconds once you know, mystifying if you don't.
+
+The absolute path is load-bearing and **four alternatives were tested and all failed** (2026-09-03, each with a cold `.pio` in a scratch clone):
+
+| Attempt | Result |
+|---|---|
+| `symlink://components/NAME` (relative) | fails — `bsp_loader.h` not found |
+| `lib_extra_dirs = components` + bare names | fails — same |
+| ...plus explicit `-I components/Fleet_BSP/include` | gets further, then fails on `Arduino_GFX_Library.h` |
+| `symlink://${platformio.src_dir}/../components/NAME` | fails — links are created (no copies) but include dirs still unregistered |
+| **literal absolute path** | **works** |
+
+Root cause of the first two: `Fleet_BSP` is header-only with its headers under `include/` and no `library.json`, so PlatformIO's LDF never registers its include directory unless the package was installed via a literal absolute symlink path. Don't "clean up" these paths without re-running that matrix.
+
+Path-independence is deliberately deferred as a *distribution* concern, not a development one: at public-release time the answer is to ship a `platformio.ini` whose `lib_deps` pull stock libraries (LVGL, SensorLib, XPowersLib) from the PlatformIO registry, leaving only original and modified components in-repo. Tracked as a GitHub issue.

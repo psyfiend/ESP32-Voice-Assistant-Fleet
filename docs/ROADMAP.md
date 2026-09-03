@@ -481,8 +481,28 @@ Per-library decisions made 2026-09-03 (see §1.1 for why this matters at all):
 | 0.4 | Add GFX `upstream` remote | **done** | `upstream` -> `moononournation/Arduino_GFX`; fetch verified, pulled tags through **v1.6.7** (fork was on `1.6.0-Waveshare`+4, i.e. 7 releases behind with no way to see it). Documented in `CLAUDE.md` |
 | 0.5 | Pin the platform | in progress | `platformio.ini` pins pioarduino `55.03.311` by release-zip URL (tag + asset both verified to exist) |
 | 0.6 | Version plumbing | in progress | `scripts/fw_version.py` injects `FW_VERSION`/`FW_COMMIT` from `git describe`; wired via `extra_scripts` in `[env]` |
-| 0.7 | **Clone test** | pending | Fresh clone into a scratch dir + `git submodule update --init --recursive` builds clean. *This is the milestone that proves 0.1-0.6 actually worked; everything before it is unverified.* |
+| 0.7 | **Clone test** | **done (with caveat)** | Fresh clone + `git submodule update --init --recursive` verified: LVGL checks out at `v9.5.0`, GFX at `1.6.0-Waveshare-4-g861a218`, `bb_captouch_fork` and `boards/*.json` present. **Building from a clone at a different path still requires fixing the hardcoded `symlink://` prefix** — deliberate, see below |
 | 0.8 | Merge to `main` + tag | pending | `--no-ff`; `main` pushed; `v0.1.0` tagged; all 8 envs build |
+
+**What the clone test actually found — three independent clone-breakers**, none visible from inside
+the working repo, and each of which would have surfaced only during a recovery or on a new machine:
+
+1. **No `.gitmodules`** despite five recorded gitlinks — clone produced empty component dirs. *Fixed.*
+2. **`boards/esp32-s3-n16r8-Guition_JC3248W535EN.json` existed only inside PlatformIO's install
+   directory**, never in the repo. Surfaced when pinning the platform re-extracted the package and
+   deleted it. Would also have broken this machine on any future `pio pkg update`. *Fixed by
+   vendoring it into `boards/`.*
+3. **26 hardcoded absolute `symlink://` paths** in `platformio.ini`. A clone on this machine would
+   have compiled the *original* repo's components while appearing to build its own — passing for the
+   wrong reason. *Deliberately not fixed; see `CLAUDE.md`.*
+
+Two incidental findings worth keeping:
+
+- Windows `MAX_PATH`: cloning into a deep directory fails on
+  `components/SensorLib/examples/...` paths. Use `git config --global core.longpaths true`.
+- `default_envs = WS_P4_TOUCH_LCD_7B` means a bare `pio run` builds **one** environment, not eight.
+  The "`main` must build everywhere" rule needs the explicit 8-env invocation (milestone 5.3's
+  fleet build script should absorb this).
 | 0.9 | Issue tracker setup | **blocked** | Issues + Project board created from this roadmap. `gh` 2.99.0 is installed but **not authenticated** — needs `gh auth login` |
 
 **Carried forward from Phase 0 (not blocking, don't lose these):**
