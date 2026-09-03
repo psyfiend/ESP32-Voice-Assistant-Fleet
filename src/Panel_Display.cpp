@@ -27,8 +27,13 @@ void Panel_Display::slider_bri_cb(lv_event_t * e) {
     
     pThis->_gui.displayMgr.setBrightness(val);
 
+    // Toast shows a user-facing 0-100% regardless of the slider's real
+    // per-board floor - val itself (not this remap) is what actually drives
+    // the backlight, so hardware behavior is unaffected.
+    int32_t displayPct = lv_map(val, pThis->_briFloor, 100, 0, 100);
+
     char buf[32];
-    snprintf(buf, sizeof(buf), "Brightness: %d%%", (int)val);
+    snprintf(buf, sizeof(buf), "Brightness: %d%%", (int)displayPct);
     UiToolkit::show_toast(buf, 1000);
 }
 
@@ -73,10 +78,11 @@ void Panel_Display::init(lv_obj_t* parent) {
 
     lv_slider_set_value         (slider_bri, _gui.displayMgr.getBrightness(), LV_ANIM_OFF);
         #if defined (WS_S3_4B) || defined (WS_P4_4B)
-            lv_slider_set_range (slider_bri, 43, 100); // These panels have a limited brightness range
+            _briFloor = 45; // These panels have a limited brightness range
         #else
-            lv_slider_set_range (slider_bri, 3, 100);  // Floor avoids the backlight cutting out; measured on WS_P4_7B, untested elsewhere
+            _briFloor = 3;  // Floor avoids the backlight cutting out; measured on WS_P4_7B, untested elsewhere
         #endif
+        lv_slider_set_range (slider_bri, _briFloor, 100);
     lv_obj_add_event_cb         (slider_bri, slider_bri_cb, LV_EVENT_VALUE_CHANGED, this);
 
     // ROW 2 - Touch Visualization Switch

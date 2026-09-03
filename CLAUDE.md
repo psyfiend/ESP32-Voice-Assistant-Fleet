@@ -162,11 +162,45 @@ add a new `DEBUG_<AREA>` flag for future debugging needs rather than ad-hoc unco
 - Prefer runtime checks over `static_assert` for validating BSP struct field values — the
   struct instances are declared `const`, not `constexpr`, so they aren't usable in constant
   expressions as-is (confirmed via compiler error, not assumption).
-- `components/bb_captouch_fork` is a nested, separate git repo (own remote,
-  `psyfiend/bb_captouch`) — **not** a proper git submodule of this parent repo, and the
-  parent has zero history for it. Treat modifications there cautiously: an earlier,
-  extensive set of local modifications was reverted to stock, and the revert is
-  unrecoverable via git (fresh re-clone, no stash/branch survived). When something in that
-  library needs to change, prefer the smallest possible fix (e.g. enabling a dead
-  `#ifdef FUTURE` code path via a `build_flags`-scoped `-D FUTURE`, rather than editing the
-  vendored file) over broad changes.
+## Vendored code and submodules
+
+As of Phase 0 (2026-09-03) there are exactly **two submodules**, both mapped in `.gitmodules`
+(which previously did not exist at all — five gitlinks were recorded with no URL mapping, so a
+fresh clone produced empty directories and `git submodule status` failed outright):
+
+- **`components/lvgl`** — stock upstream, no local modifications. Pinned to a release tag.
+- **`components/GFX_Library_for_Arduino`** — fork `psyfiend/Arduino_GFX`, based on the
+  `1.6.0-Waveshare` tag plus local commits (RGB bounce-buffer fix, two `srcFilter` exclusions
+  for files broken against arduino-esp32 3.3.11). An `upstream` remote pointing at
+  `moononournation/Arduino_GFX` is configured so newer releases can be pulled — **preserve this
+  fork's exact structure**; it's the library most likely to need upstream updates for future
+  boards, and pulling them is the whole reason it stays a submodule.
+
+**`components/bb_captouch_fork` is no longer a submodule** — it was vendored into this repo in
+Phase 0. Its 11 files are tracked here directly, so modifications are versioned in this repo's
+own history and can't be lost the way the earlier revert was (an extensive set of local
+modifications was once reverted to stock and proved unrecoverable — fresh re-clone, no
+stash/branch survived). Its pre-vendoring history remains published at `psyfiend/bb_captouch`
+(HEAD was `586cf77`). Edit these files directly and normally; the old "prefer the smallest
+possible fix, don't edit the vendored file" caution no longer applies, though the
+`build_flags`-scoped `-D FUTURE` trick for the AXS15231 path is still in use and still correct.
+
+## `platformio.ini` hardcodes this machine's project path — don't move the folder
+
+Every local library is declared as `NAME =symlink://c:/Users/Marge/Documents/PlatformIO/Projects/ESP32 Voice Assistant Fleet/components/NAME` — 26 of them. `symlink://` (as opposed to `file://`, which **copies**) is a deliberate choice: it links the library in place so all 8 environments share one copy instead of each getting its own, which matters most for LVGL.
+
+**Consequence: renaming or moving the project folder breaks all 8 environments at once**, and so does restoring a backup to a different path. The fix is a search-and-replace of that prefix across `platformio.ini` — 30 seconds once you know, mystifying if you don't.
+
+The absolute path is load-bearing and **four alternatives were tested and all failed** (2026-09-03, each with a cold `.pio` in a scratch clone):
+
+| Attempt | Result |
+|---|---|
+| `symlink://components/NAME` (relative) | fails — `bsp_loader.h` not found |
+| `lib_extra_dirs = components` + bare names | fails — same |
+| ...plus explicit `-I components/Fleet_BSP/include` | gets further, then fails on `Arduino_GFX_Library.h` |
+| `symlink://${platformio.src_dir}/../components/NAME` | fails — links are created (no copies) but include dirs still unregistered |
+| **literal absolute path** | **works** |
+
+Root cause of the first two: `Fleet_BSP` is header-only with its headers under `include/` and no `library.json`, so PlatformIO's LDF never registers its include directory unless the package was installed via a literal absolute symlink path. Don't "clean up" these paths without re-running that matrix.
+
+Path-independence is deliberately deferred as a *distribution* concern, not a development one: at public-release time the answer is to ship a `platformio.ini` whose `lib_deps` pull stock libraries (LVGL, SensorLib, XPowersLib) from the PlatformIO registry, leaving only original and modified components in-repo. Tracked as a GitHub issue.

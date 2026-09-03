@@ -5,6 +5,37 @@ to one device or a small group of devices (that's `PROJECT_STATUS.md`'s job). De
 deferred work, not bugs, not blocking anything currently. Lower volatility than
 `PROJECT_STATUS.md`; safe to leave stale for a while, but prune entries once actually done.
 
+## Startup / GUI reorganization
+
+Raised during connectivity design work, deliberately out of scope for that branch — a
+naming/responsibility mismatch noticed in passing, not a bug. Currently: `LVGL_Test_UI.cpp`'s
+`setup()` does hardware bring-up (`gui.begin()`, `audioMgr.begin()`) *and* builds the LVGL
+dashboard (root screen, header, deck panels) in the same function; `GuiManager.cpp` is
+entirely LVGL engine plumbing (buffer-alloc matrix, driver registration, tick/log callbacks)
+despite its name, and `DisplayManager::begin()` prints generic device-info lines (`device_name`,
+PSRAM, flash size, `bsp_touch.NAME`) that aren't display-specific at all.
+
+Proposed three-way split:
+- **`main`** — hardware bring-up only (`displayMgr.begin()`, `touchMgr.begin()`,
+  `audioMgr.begin()`, `connMgr.begin()`), plus `debug_dump_config()` and the GPIO-register
+  checker. No LVGL code. Also absorbs the generic device-info Serial prints currently
+  misplaced in `DisplayManager::begin()`.
+- **`LVGL_Startup`** (new file) — the LVGL engine plumbing currently in `GuiManager.cpp`:
+  buffer-alloc matrix, `lv_init()`/tick/log setup, display+indev driver registration, and the
+  `flush_cb`/`touch_read` callbacks (these bridge LVGL to `DisplayManager`/`TouchManager` and
+  are needed by any screen content, so they belong with engine plumbing, not screen content).
+  Invoked conditionally from **`main`** (build-flag or parallel no-GUI env gated), *not* from
+  `DisplayManager` itself — `DisplayManager` is a reusable HAL component and should stay
+  LVGL-agnostic, same as it is today; having it call into UI-layer code would invert that
+  dependency. A no-LVGL build variant can reuse the `build_src_filter` exclusion mechanism
+  `WS_S3_TOUCH_LCD_5B` already uses to drop `Panel_Audio.cpp`, extended to
+  `GuiManager.cpp`/`LVGL_Startup.cpp`/all `Panel_*.cpp`.
+- **`GuiManager`** — becomes actual screen content: root screen, header, deck panels. Name
+  finally matches what's in the file.
+
+Worth doing before connectivity/MQTT GUI panels and future peripheral panels add more
+`Panel_*.cpp` files through the current setup(), but not blocking anything today.
+
 ## LVGL / Display
 
 - **Per-board minimum-brightness floor as a real BSP field.** Currently hardcoded directly
@@ -64,7 +95,52 @@ This is the actual definition of "WiFi tested" for this project — device disco
 entity surfacing the way an ESPHome device would, not just "joins an AP."
 
 **Status: in progress on the `wifi-testing` branch, WiFi first, MQTT deferred until every
-board joins an AP.** Architecture agreed so far:
+board joins an AP.**
+
+**Progress so far:**
+- `Fleet_Connectivity`/`ConnectivityManager` Phase 1 (STA connect with NVS-fallback-to-compile-
+  default, per the layering below) is implemented and confirmed connecting on real hardware:
+  `WS_P4_TOUCH_LCD_4B` (P4/ESP32-C6 hosted-WiFi, real DHCP IP) and `WS_S3_TOUCH_LCD_4B` (native
+  radio). `CYD_S3_3248W535` also connects but has an open, unrelated issue (see
+  `docs/PROJECT_STATUS.md`'s per-device notes) - full per-board WiFi status lives there, not
+  here.
+- Getting the P4/C6 boards to connect at all **required a fleet-wide platform/framework
+  upgrade**: pioarduino `platform-espressif32` 55.03.34 → 55.03.311 (arduino-esp32 3.3.4 →
+  3.3.11), plus a PlatformIO Core bump (6.1.18 → 6.1.19, pioarduino 55.03.311's minimum). The
+  P4 has no WiFi radio at all - it depends entirely on an onboard ESP32-C6 co-processor over
+  SDIO (`esp_hosted`), and the older host-driver version couldn't complete its RPC handshake
+  with the C6's factory firmware. Waveshare's own compatibility docs named 3.3.11 as their
+  tested Arduino-core version for this hardware.
+  - All 8 environments rebuilt clean against the new platform. Two real regressions surfaced
+    and got fixed along the way: `GFX_Library_for_Arduino`'s `Arduino_ESP32SPI`/
+    `Arduino_ESP32SPIDMA` databus classes called `spiFrequencyToClockDiv()` with 3.3.4's old
+    single-argument signature, broken against 3.3.11's new `(spi_t*, uint32_t)` signature -
+    both confirmed unused anywhere in this fleet and excluded via the library's `library.json`
+    `srcFilter` (files kept on disk, just not compiled) rather than fixed or deleted;
+    `CYD_P4_1060P470` was missing a `board_build.partitions` override every other P4 env has,
+    silently running on a too-small default partition table that only started overflowing
+    once 3.3.11's larger framework didn't fit.
+  - **Operational gotcha worth knowing**: pioarduino 55.03.311's tooling actively rejects
+    being invoked from a Git Bash/MSYS shell (fails with `MSys/Mingw is not supported`, plus
+    knock-on failures like the toolchain compiler not being found on `PATH`). Run `pio`
+    commands from PowerShell or cmd.exe, not Git Bash, for this platform version. VS Code's
+    PlatformIO IDE extension is unaffected either way - it doesn't invoke Core through MSYS.
+  - The `hostedHasUpdate()` RPC warning that still prints on every P4/C6 boot
+    (`Req_GetCoprocessorFwVersion` timing out) is confirmed cosmetic - traced to source, it's a
+    diagnostic-only version check whose result is discarded, structurally incapable of
+    blocking the actual connection. Safe to ignore; see `docs/PROJECT_STATUS.md`'s `WS_P4_4B`
+    notes for the full trace.
+  - Not yet pinned: `platformio.ini` still says `platform = espressif32` with no version/commit
+    pin, so this upgrade currently only "sticks" because it's installed globally on this one
+    dev machine. A fresh machine or a routine `pio pkg update` wouldn't reproduce it. Worth
+    pinning the exact fork commit once the platform choice feels settled.
+
+**Still open:** AP/captive-portal fallback (Phase 2) not started; GUI integration (Phase 3)
+not started; 5 of 8 boards not yet flash-tested for WiFi at all (`WS_P4_TOUCH_LCD_7B`
+physically inaccessible mid-enclosure-build, `WS_P4_TOUCH_LCD_5`/`CYD_P4_1060P470`/
+`CYD_S3_8048W550`/`WS_S3_TOUCH_LCD_5B` simply not attempted yet).
+
+Architecture agreed so far:
 
 - **Not part of `Fleet_BSP.h`.** BSP structs are hardware-wiring facts; WiFi/MQTT settings
   are deployment config, a different axis entirely. New component,

@@ -14,6 +14,8 @@ public:
 
 private:
     GuiManager& _gui;
+    int32_t _briFloor; // Slider's real minimum (per-board artificial brightness floor) - the
+                        // toast display remaps [_briFloor, 100] back to a user-facing [0, 100].
     lv_obj_t* slider_bri;
     lv_obj_t* pnl_content;
     lv_obj_t* row_bri;

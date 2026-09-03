@@ -22,3 +22,8 @@
 # Retired per-board example sketches - kept locally for reference only,
 # not synced to GitHub (superseded by the current BSP-driven fleet code).
 legacy_testing/
+
+# Local-only dev WiFi credentials for STA connect testing - never commit
+# real AP credentials. See ConnectivityDefaults.h for the __has_include
+# pattern that picks this up when present.
+components/Fleet_Connectivity/ConnectivityLocalSecrets.h
