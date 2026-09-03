@@ -1,0 +1,6 @@
+[submodule "components/lvgl"]
+	path = components/lvgl
+	url = https://github.com/lvgl/lvgl.git
+[submodule "components/GFX_Library_for_Arduino"]
+	path = components/GFX_Library_for_Arduino
+	url = https://github.com/psyfiend/Arduino_GFX.git
