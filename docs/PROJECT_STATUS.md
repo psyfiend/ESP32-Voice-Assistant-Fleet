@@ -19,7 +19,7 @@ section.
 
 | Board | Env | Display | Touch | Audio out | Audio in (mic) | WiFi (STA) |
 |---|---|---|---|---|---|---|
-| **ESP32-P4-WIFI6-Touch-LCD-7B** (WaveShare, macro `WS_P4_7B`) | `WS_P4_TOUCH_LCD_7B` | ✅ | ✅ (portrait; rotation untested) | untested (no speaker access — enclosure doesn't expose it) | untested | untested (physically enclosed, no USB access currently) |
+| **ESP32-P4-WIFI6-Touch-LCD-7B** (WaveShare, macro `WS_P4_7B`) | `WS_P4_TOUCH_LCD_7B` | ✅ | ✅ (portrait; rotation untested) | untested (no speaker access — enclosure doesn't expose it) | untested | ✅ connects (2026-09-03) |
 | **ESP32-P4-WIFI6-Touch-LCD-4B** (WaveShare, macro `WS_P4_4B`) | `WS_P4_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ connects, real DHCP IP (see below) |
 | **ESP32-P4-WIFI6-Touch-LCD-5** (WaveShare, macro `WS_P4_5`) | `WS_P4_TOUCH_LCD_5` | untested (not flashed yet) | untested | untested | untested | untested |
 | **ESP32-S3-Touch-LCD-4B** (WaveShare, macro `WS_S3_4B`) | `WS_S3_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ connects (native radio, no hosted-WiFi complexity) |
@@ -30,8 +30,8 @@ section.
 
 ## Fleet-wide investigations
 
-- **WiFi (station mode)** — in progress on the `wifi-testing` branch; 3 of 8 boards flash-tested
-  so far (2 confirmed connecting, 1 connecting with an open issue). AP/captive-portal fallback
+- **WiFi (station mode)** — in progress; 4 of 8 boards flash-tested so far (3 confirmed
+  connecting — `WS_P4_4B`, `WS_S3_4B`, `WS_P4_7B` — and 1 connecting with an open issue). AP/captive-portal fallback
   and MQTT not started. See `FUTURE_IMPROVEMENTS.md`'s Connectivity section for the full
   phased plan and the fleet-wide platform/framework upgrade this required.
 - **SD card** — untested on every board. Low priority.
@@ -51,10 +51,13 @@ section.
   raw-passthrough special case is still needed, or whether the generic rotation transform
   works fine here too (unverified assumption, not a known problem).
 - Test RS485 (Modbus board available).
-- **WiFi untested** — currently enclosed in an in-progress case design, no easy USB access.
-  Same P4/ESP32-C6 hosted-WiFi architecture as `WS_P4_4B` (see that board's notes below), so
-  expected to behave the same, but not yet confirmed on this specific physical unit — each
-  unit's C6 co-processor firmware could in principle differ.
+- **WiFi (STA) confirmed working (2026-09-03).** Connects without serious issue. Shows the same
+  benign `hostedHasUpdate()` / `Req_GetCoprocessorFwVersion` RPC warning as `WS_P4_4B` — expected,
+  since both share the P4 + ESP32-C6 hosted-WiFi architecture, and confirmed cosmetic (see that
+  board's notes below for the full trace). This also settles the open question of whether each
+  unit's C6 co-processor firmware might differ: two separate physical units now behave identically.
+- **Now the primary development target** — see `docs/ROADMAP.md` Q11. Every milestone builds for
+  this board and `CYD_S3_3248W535` (the fleet's weakest board) as a matched pair.
 - Nothing else board-specific outstanding — remaining items are fleet-wide, see above.
 
 ### WS_P4_5 — ESP32-P4-WIFI6-Touch-LCD-5

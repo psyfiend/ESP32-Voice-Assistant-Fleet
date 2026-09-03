@@ -154,14 +154,28 @@ work, tried Y" is the useful record. Rare.
 
 Firmware needs a version because OTA and HA discovery both report one.
 
-- Semantic-ish: `v<MAJOR>.<MINOR>.<PATCH>`. MAJOR = breaking build-sheet schema change.
-  MINOR = new feature/card type. PATCH = fix.
-- Tag on `main` only, at each phase completion. Start at `v0.1.0` — pre-1.0 honestly signals
-  "schema may still change."
-- The version string gets baked in via `build_flags` (`-D FW_VERSION='"0.1.0"'`) generated from
-  the git tag by a small `extra_scripts` Python hook, so it can never drift from the tag.
-- Every OTA image and every HA discovery payload carries it. When a board misbehaves you can ask
-  it what it's running.
+**Scheme: `A.B.C.D` — adopted 2026-09-03**, per the four-level split you described. Your
+description was accurate, and the four-part form is common in firmware precisely because a build
+counter is useful there in a way it isn't for libraries.
+
+| Level | Name | Bumped when | Set by |
+|---|---|---|---|
+| **A** | Major | Breaking changes — UI overhaul, architecture rewrite, build-sheet schema break | you, by tagging |
+| **B** | Minor | New features, new card types, new tools — backwards compatible within the same A | you, by tagging |
+| **C** | Patch | Stability fixes, performance, anything short of a new feature | you, by tagging |
+| **D** | Build | Hotfixes, typos, padding tweaks — every commit | **automatic** |
+
+**D auto-increments**, which is the part you said you liked. It's derived from
+`git describe --tags --long`: tag `v0.1.0`, make 14 commits, and it reports `v0.1.0-14-gabc1234`,
+which becomes version `0.1.0.14`. Monotonic, never typed by hand, and it can't drift — because
+nobody maintains it. You only ever tag `A.B.C`; `D` takes care of itself.
+
+- Tag on `main` only. Start at `v0.1.0` — pre-1.0 honestly signals "schema may still change."
+- A small `extra_scripts` Python hook runs `git describe` at build time and injects
+  `-D FW_VERSION='"0.1.0.14"'`, so the firmware always knows exactly which commit it is.
+- A dirty working tree appends `+dirty`, so you can never mistake a hand-modified local build for
+  a real release when debugging a board on the wall.
+- Every OTA image and every HA discovery payload carries it.
 
 ### 3.4 Progress tracking — GitHub Issues + one Project board
 
@@ -459,17 +473,29 @@ Per-library decisions made 2026-09-03 (see §1.1 for why this matters at all):
 | **GFX_Library_for_Arduino** | Stay a submodule; **add an `upstream` remote** | Fork has 3 real local commits on top of `1.6.0-Waveshare` (the bounce-buffer fix + 2 srcFilter exclusions). Only `origin` (your fork) is configured — no upstream remote exists, so pulling new releases is currently impossible. This is the library most likely to need upstream updates for future boards. |
 | **bb_captouch_fork** | **Un-submodule it** — vendor the files directly into this repo | Modifications have gone past cosmetic; syncing with the original author is no longer expected. Becomes a normal folder whose files are tracked in *this* repo's history, so future changes are versioned here and nothing can be lost the way the earlier revert was. |
 
-| # | Milestone | Acceptance criteria |
-|---|---|---|
-| 0.1 | Vendor `bb_captouch_fork` | Nested `.git` removed; all files tracked in this repo; build unaffected |
-| 0.2 | Fix remaining submodules | `.gitmodules` maps LVGL + GFX; the 2 stale `lib/` gitlinks and their directories removed; `VA Testing/` removed |
-| 0.3 | Update LVGL to `v9.5.0` | Submodule at the `v9.5.0` tag; all 8 envs build; at least 2 boards flash-tested for visual regressions |
-| 0.4 | Add GFX `upstream` remote | `upstream` points at the original author's repo; `git fetch upstream` works; documented in CLAUDE.md so it survives |
-| 0.5 | **Clone test** | Fresh clone into a scratch dir + `git submodule update --init --recursive` builds `WS_P4_TOUCH_LCD_4B` clean. *This is the milestone that proves 0.1-0.4 actually worked.* |
-| 0.6 | Pin the platform | `platformio.ini` pins the exact pioarduino commit/version; the clone test still passes |
-| 0.7 | Version plumbing | `FW_VERSION` derived from the git tag; printed at boot; `v0.1.0` tagged |
-| 0.8 | Merge `wifi-testing` -> `main` | `--no-ff`; `main` pushed; all 8 envs build |
-| 0.9 | Issue tracker setup | Issues + Project board created from this roadmap. Needs `gh` CLI installed (not currently present on this machine) or manual setup |
+| # | Milestone | Status | Acceptance criteria |
+|---|---|---|---|
+| 0.1 | Vendor `bb_captouch_fork` | **done** | Nested `.git` removed; 11 files tracked here. Prior history verified pushed to `psyfiend/bb_captouch` (`586cf77`) before removal |
+| 0.2 | Fix remaining submodules | **done** | `.gitmodules` maps LVGL + GFX; `git submodule status` works (previously failed outright); stale `lib/` gitlinks + dirs and `VA Testing/` removed; exactly 2 gitlinks remain |
+| 0.3 | Update LVGL to `v9.5.0` | **done (build)** | Submodule at `v9.5.0`. Full rebuild after clearing `build_cache`: both dev targets SUCCESS. Cost on CYD_S3_3248: RAM +0, flash +9,932 (+0.7%). *Flash-test for visual regressions still pending.* |
+| 0.4 | Add GFX `upstream` remote | **done** | `upstream` -> `moononournation/Arduino_GFX`; fetch verified, pulled tags through **v1.6.7** (fork was on `1.6.0-Waveshare`+4, i.e. 7 releases behind with no way to see it). Documented in `CLAUDE.md` |
+| 0.5 | Pin the platform | in progress | `platformio.ini` pins pioarduino `55.03.311` by release-zip URL (tag + asset both verified to exist) |
+| 0.6 | Version plumbing | in progress | `scripts/fw_version.py` injects `FW_VERSION`/`FW_COMMIT` from `git describe`; wired via `extra_scripts` in `[env]` |
+| 0.7 | **Clone test** | pending | Fresh clone into a scratch dir + `git submodule update --init --recursive` builds clean. *This is the milestone that proves 0.1-0.6 actually worked; everything before it is unverified.* |
+| 0.8 | Merge to `main` + tag | pending | `--no-ff`; `main` pushed; `v0.1.0` tagged; all 8 envs build |
+| 0.9 | Issue tracker setup | **blocked** | Issues + Project board created from this roadmap. `gh` 2.99.0 is installed but **not authenticated** — needs `gh auth login` |
+
+**Carried forward from Phase 0 (not blocking, don't lose these):**
+
+- `include/lvgl/lv_conf.h` is still labelled *"Configuration file for v9.4.0"*. No hard version
+  gate exists and the build is correct, but options **added in 9.5 are silently taking defaults**
+  rather than being reviewed. Worth a diff against 9.5's `lv_conf_template.h` — likely relevant
+  to the §5.2 memory work, since draw-buffer and cache options live there.
+- `src/Panel_Header.cpp:18` warns `bitwise operation between different enumeration types
+  'lv_part_t' and 'lv_state_t' is deprecated`. Pre-existing, harmless, but it's the standard
+  `LV_PART_MAIN | LV_STATE_DEFAULT` idiom and will recur in every new card and panel. Worth
+  settling on a cast helper in the design system (§2.2) before writing 8 card types that each
+  reproduce it.
 
 ### Phase 1 — Connectivity (your stated priority)
 
@@ -572,21 +598,91 @@ Implementation notes:
 Is a build sheet something (a) you hand-write in a text editor and I compile in, (b) you edit in
 the web UI on the device, or (c) both?
 
-Assumptions: 1. **Both, with compile-time as source of truth** — you author in a file, the device
-can override locally, and the web UI writes the override. Matches the WiFi/NVS pattern already
-established. 2. Compile-time only at first (much simpler, defers the parser), web editing in
-Phase 4. 3. Runtime-only; the device is generic and everything is configured after flashing.
+**DECIDED 2026-09-03: both, and a compile-time sheet has the final say.**
 
-I'd recommend **#1's shape on #2's schedule** — design for both, ship compile-time first.
+That inverts the layering used for WiFi (where NVS overrides the compile-time default), so it
+needs stating explicitly rather than being assumed to match.
 
-### Q3 — JSON or YAML for the runtime build sheet?
+**One consequence to confirm (open):** taken literally, "compile-time has the final say" means a
+device that ships with a compiled sheet can *never* have its layout changed from the web UI or
+the on-device settings — every runtime edit would be discarded at the next boot. That would make
+the layout half of Phase 4 (milestone 4.2, live grid/spacing/page-reorder editing) pointless on
+exactly the devices you care most about.
 
-Assumptions: 1. **JSON** (ArduinoJson is mature, streaming, low-RAM; embedded YAML is not).
-2. YAML, because it's what you've been reading in ESPHome configs and it's nicer to hand-write.
-3. A custom compact format.
+Proposed resolution — a per-sheet `authority` field, which gives you both behaviours without
+another decision:
 
-I'd recommend **JSON**, with the option of a YAML-to-JSON converter on your PC if hand-authoring
-YAML matters to you.
+| `authority` | Behaviour |
+|---|---|
+| `LOCKED` | Compile-time wins absolutely. Runtime edits are rejected with a message. Use for a device you want frozen. |
+| `DEFAULT` *(default)* | Compile-time is the authoritative *starting point* and the factory-reset target. Runtime edits persist on top of it until reset. |
+
+`DEFAULT` is what most devices want; `LOCKED` is what your sentence describes literally.
+**Confirm which you meant, or whether the two-mode split is right.** Not blocking until Phase 3.
+
+### Q3 — Build sheet format — **DECIDED 2026-09-03**
+
+Your nested-struct proposal (Dashboard > Pages > Grid > Cards > Entities, ESP-IDF/BSP style) is
+adopted **as the in-memory model**. The key move is separating two things that felt like one
+question:
+
+- **The model** — nested plain-C++ structs, exactly your hierarchy. This is the contract
+  everything else is written against. Arduino-free, per the Q8 rule.
+- **The loaders** — two of them, both producing that same model:
+  - *Compile-time*: struct literals in a header, BSP style. Zero parse cost, type-safe.
+  - *Runtime*: JSON on LittleFS, parsed with ArduinoJson streaming.
+
+Format is not the same question as model. Once the model is the contract, the two loaders are
+interchangeable and neither the grid engine nor the cards know which one ran.
+
+**On "as universally readable as possible" if this takes off** — that's the argument that settles
+format. A C++ header is readable to C++ programmers. JSON is readable by every language, every
+tool, and any web UI you build. So: **struct model internally, JSON as the interchange format.**
+If you later want a friendlier authoring syntax (YAML, or something custom), it becomes a
+converter that runs on your PC and emits JSON — never a parser that has to run on the device.
+
+Two things worth knowing before you commit to hand-authoring the compile-time form:
+
+- C++ designated initializers must be listed in declaration order (already documented in
+  `CLAUDE.md` for the BSP). Nested designated initializers with 12-card arrays get visually
+  heavy fast. Workable, but it will not feel as pleasant as an ESPHome YAML block.
+- Compile-time struct arrays are fixed-size and can't be resized at runtime, so the runtime
+  loader needs its own allocation path. That's expected and fine — it's why there are two
+  loaders rather than one.
+
+### Q3b — Sub-cell / fractional grid placement — **DECIDED 2026-09-03**
+
+You raised the case of a 3x3 page with a special card occupying "a quarter of the grid." Worth
+solving up front, as you said, because it's very expensive to retrofit.
+
+A quarter isn't expressible in a 3x3 grid (3 isn't divisible by 2). Three ways out:
+
+1. **Sub-grid units (subdivision) — chosen.** Author the page as `3x3` *cells*, but allocate
+   `6x6` *units* underneath (each cell = 2x2 units). Cards span in units. A quarter-page card is
+   3x3 units — exactly expressible. A normal card is 2x2 units. Half-cell cards are 2x1 or 1x2.
+   `subdivision` is a per-page property defaulting to 2, so a page that needs thirds can set 3.
+2. Nested grids (a cell containing its own grid). Simpler, but a card then cannot span *across*
+   a parent cell boundary — which is precisely the quarter-page case. Rejected.
+3. Free positioning for special cards. Escape hatch that abandons the grid model. Rejected.
+
+This is what CSS grid does, and LVGL's grid supports arbitrary track counts natively, so it costs
+nothing structurally.
+
+**On your two sub-questions** — dynamically shrinking neighbours vs. making half-spaces
+un-assignable: I'd recommend neither.
+
+- *Dynamic neighbour shrinking* is a constraint solver. Layouts become unpredictable, hard to
+  author and very hard to debug ("why did that card move?"). Strongly recommend against.
+- *Un-assignable half-spaces* is simple but wastes real estate on exactly the pages you cared
+  enough to customise.
+- **Chosen third option: placement at unit granularity, plus a validator.** Any card may be
+  placed at any unit coordinate with any unit span. The loader detects overlaps and
+  out-of-bounds and reports them — at *compile time* for compiled sheets, at *parse time* for
+  JSON. No solver, fully predictable, and the half-spaces stay usable by anything declaring a
+  matching span.
+
+The responsive degradation from Q4 (`preferred_span` / `min_span` / `priority`) operates in units
+too, so the two systems compose rather than fight.
 
 ### Q4 — Per-device vs fleet-shared — **DECIDED 2026-09-03**
 
@@ -662,10 +758,11 @@ Assumptions: 1. **8 independent HA devices** — standard and simplest. 2. One H
 sub-devices (HA supports this now; more complex). 3. 8 devices plus a virtual "fleet" device
 carrying aggregate status. I'd recommend **#1**.
 
-### Q7 — Rename "screen" -> "page"? (§4.4)
+### Q7 — Terminology — **DECIDED 2026-09-03: "page"**
 
-Assumptions: 1. **Yes**, avoid the `lv_screen` collision. 2. Keep "screen," accept the ambiguity.
-3. Call it "view." I'd recommend **#1**.
+A **Dashboard** contains **Pages**; a Page has a **Grid**; a Grid holds **Cards**; a Card binds
+**Entities**. "Screen" now refers only to the physical display, and `lv_screen` keeps its LVGL
+meaning. Usage: *"Page 1 is on the screen; swiping right-to-left shows Page 2."*
 
 ### Q8 — Voice assistant — **DECIDED 2026-09-03: parked, not abandoned**
 
@@ -689,13 +786,33 @@ That constraint is nearly free to honour now and very expensive to retrofit, so 
 an architecture rule regardless of which path is taken later. Tracked as a review item on every
 Phase 2/3 milestone.
 
-### Q9 — Ethernet on CYD_P4_1060?
+### Q9 — Ethernet + library boundaries — **DECIDED 2026-09-03**
 
-It has a physical port. Should `ConnectivityManager` be generalised to "network transport"
-(WiFi | Ethernet) now, or stay WiFi-only?
+**No rename needed.** `Fleet_Connectivity` is already transport-agnostic as a name — it says
+"connectivity," not "WiFi." Ethernet belongs inside it, not in a separate library; a second
+library just for a wired link would duplicate the entire state machine, the mode selection and
+the NVS settings layer for no gain.
 
-Assumptions: 1. **Design the interface to allow it, implement WiFi only** — cheap now, expensive
-to retrofit. 2. WiFi only, ignore Ethernet. 3. Implement both now. I'd recommend **#1**.
+Ethernet is designed into the interface **now**, implemented later. Concretely: the state machine
+from milestone 1.1 tracks a `link` that is `WIFI_STA | WIFI_AP | WIFI_APSTA | ETHERNET | NONE`,
+and callers only ever ask `isOnline()` / `getIP()` / `getLinkType()`. Only the WiFi backend gets
+written for now. Two boards make this non-hypothetical: `CYD_P4_1060` has a physical port today,
+and other `WS_P4_4B` variants ship with one.
+
+**Three libraries, agreeing with your instinct to split MQTT out:**
+
+| Library | Owns | Depends on |
+|---|---|---|
+| `Fleet_Connectivity` | Link layer: WiFi STA/AP/APSTA, Ethernet (later), the 4 modes from Q1, credentials in NVS, the connection state machine | Arduino/WiFi |
+| `Fleet_MQTT` | Broker session: connect, pub/sub, LWT, backoff/reconnect, HA discovery publishing | `Fleet_Connectivity` (needs *a* link, doesn't care which) |
+| `Fleet_Entities` | The Entity Registry (§4.1) and its dirty-flag bridge | **nothing** — plain C++, Arduino-free |
+
+The boundaries earn their keep: `Fleet_MQTT` never learns whether the link is WiFi or Ethernet,
+and `Fleet_Entities` never learns MQTT exists. Providers are the only code that bridges them,
+which is exactly what makes a card render a local sensor and a remote HA entity identically.
+
+`Fleet_Entities` having zero dependencies is also what makes the Q8 ESP-IDF escape hatch real —
+it, the grid engine and the build-sheet model can be compiled and unit-tested on a PC.
 
 ### Q10 — External code: how do you want to hand it to me?
 
@@ -720,12 +837,26 @@ path.
 And yes to "point me at a repo and have me reproduce certain aspects of it" — with the caveat in
 §6.15 about licenses if we copy rather than reimplement.
 
-### Q11 — Which board is the primary development target?
+### Q11 — Dev targets — **DECIDED 2026-09-03**
 
-I'd assume **`WS_P4_TOUCH_LCD_4B`** (WiFi confirmed, audio confirmed, touch confirmed, physically
-accessible, already carries `-D DEBUG_WIFI`) as the daily driver, with **`CYD_S3_3248W535`** as
-the "if it works here it works anywhere" stress case (smallest screen, slowest bus, known
-sluggishness, known touch margins). Confirm or correct.
+- **Primary: `WS_P4_TOUCH_LCD_7B`** (`WS_P4_7B`). Biggest screen, best case.
+- **Stress case: `CYD_S3_3248W535`** (`CYD_S3_3248`). Smallest screen, slowest bus (only QSPI
+  panel in the fleet), known sluggish animations, known touch dead margins. If a page renders
+  acceptably here, it renders anywhere.
+
+Every milestone builds for both. That pairing deliberately brackets the fleet: the responsive
+card system from Q4 is exercised at both extremes on every single change, rather than being
+discovered broken on the small board months later.
+
+**New hardware fact (2026-09-03): `WS_P4_7B` WiFi STA now confirmed working on real hardware.**
+`docs/PROJECT_STATUS.md` still lists it as untested/enclosed — needs updating. Same benign
+`hostedHasUpdate()` / `Req_GetCoprocessorFwVersion` warning as `WS_P4_4B`, as expected for the
+shared P4+C6 architecture.
+
+Follow-up raised: flashing/rebuilding the ESP32-C6 co-processor firmware appears to be a known,
+not-difficult procedure in several projects. Worth investigating in Phase 1 — it may clear the
+cosmetic RPC warning outright, and it's useful knowledge regardless for a fleet whose four P4
+boards all depend on that co-processor. Not blocking; the warning is confirmed harmless.
 
 ---
 

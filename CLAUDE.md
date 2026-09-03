@@ -162,11 +162,25 @@ add a new `DEBUG_<AREA>` flag for future debugging needs rather than ad-hoc unco
 - Prefer runtime checks over `static_assert` for validating BSP struct field values — the
   struct instances are declared `const`, not `constexpr`, so they aren't usable in constant
   expressions as-is (confirmed via compiler error, not assumption).
-- `components/bb_captouch_fork` is a nested, separate git repo (own remote,
-  `psyfiend/bb_captouch`) — **not** a proper git submodule of this parent repo, and the
-  parent has zero history for it. Treat modifications there cautiously: an earlier,
-  extensive set of local modifications was reverted to stock, and the revert is
-  unrecoverable via git (fresh re-clone, no stash/branch survived). When something in that
-  library needs to change, prefer the smallest possible fix (e.g. enabling a dead
-  `#ifdef FUTURE` code path via a `build_flags`-scoped `-D FUTURE`, rather than editing the
-  vendored file) over broad changes.
+## Vendored code and submodules
+
+As of Phase 0 (2026-09-03) there are exactly **two submodules**, both mapped in `.gitmodules`
+(which previously did not exist at all — five gitlinks were recorded with no URL mapping, so a
+fresh clone produced empty directories and `git submodule status` failed outright):
+
+- **`components/lvgl`** — stock upstream, no local modifications. Pinned to a release tag.
+- **`components/GFX_Library_for_Arduino`** — fork `psyfiend/Arduino_GFX`, based on the
+  `1.6.0-Waveshare` tag plus local commits (RGB bounce-buffer fix, two `srcFilter` exclusions
+  for files broken against arduino-esp32 3.3.11). An `upstream` remote pointing at
+  `moononournation/Arduino_GFX` is configured so newer releases can be pulled — **preserve this
+  fork's exact structure**; it's the library most likely to need upstream updates for future
+  boards, and pulling them is the whole reason it stays a submodule.
+
+**`components/bb_captouch_fork` is no longer a submodule** — it was vendored into this repo in
+Phase 0. Its 11 files are tracked here directly, so modifications are versioned in this repo's
+own history and can't be lost the way the earlier revert was (an extensive set of local
+modifications was once reverted to stock and proved unrecoverable — fresh re-clone, no
+stash/branch survived). Its pre-vendoring history remains published at `psyfiend/bb_captouch`
+(HEAD was `586cf77`). Edit these files directly and normally; the old "prefer the smallest
+possible fix, don't edit the vendored file" caution no longer applies, though the
+`build_flags`-scoped `-D FUTURE` trick for the AXS15231 path is still in use and still correct.
