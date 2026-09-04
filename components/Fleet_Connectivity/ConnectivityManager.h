@@ -135,9 +135,17 @@ private:
     std::atomic<int32_t> _gotIp{0};
     // Set by the event handler on a transient disconnect, consumed by loop().
     // The re-issue itself must not happen inside the event callback - calling
-    // WiFi.begin() re-entrantly from the event task is asking for trouble.
+    // into the WiFi stack re-entrantly from the event task is asking for trouble.
     std::atomic<int32_t> _reissuePending{0};
     std::atomic<int32_t> _reissueCount{0};
+    // How the current attempt cycle is failing. FAIL_AUTH is terminal: the same
+    // credentials will not start working on the next try, so retrying is just
+    // noise. Drives both the give-up decision and the AP re-try backoff.
+    std::atomic<int32_t> _lastFailure{(int32_t)JoinResult::NONE};
+    std::atomic<int32_t> _authFailCount{0};
+    // Set by the event handler when a failure is terminal, so loop() stops
+    // waiting out the remaining 15 s deadline for an answer it already has.
+    std::atomic<int32_t> _giveUpNow{0};
 
     // Guarded by _mutex.
     SemaphoreHandle_t _mutex = nullptr;
@@ -154,6 +162,10 @@ private:
     uint32_t _attemptStartedMs = 0;
     uint32_t _joinStartedMs    = 0;
     uint32_t _apLastClientMs   = 0;
+    // Grows each time a full attempt cycle fails while parked in AP, so a
+    // device with genuinely wrong credentials stops thrashing the radio (and
+    // the power rail) every minute forever. Reset on success.
+    uint32_t _apRetryDelayMs   = 0;
     uint8_t  _attempt          = 0;
     bool     _configured       = false;
     bool     _apFallbackForced = false;   // BOOT-button recovery override

@@ -119,7 +119,22 @@ static const WiFiDefaults CONNECTIVITY_DEFAULT_WIFI = {
     .AP_SUBNET              = "255.255.255.0",
     .AP_IDLE_TIMEOUT_MIN    = 10,
 
+// CYD_S3_3248W535 has a documented history of resetting when the radio first
+// transmits (see docs/PROJECT_STATUS.md), and it reappeared during AP-fallback
+// testing on 2026-09-04 - resets on the first STA attempt and when the AP comes
+// up. Capping TX power reduces the current spike when the PA keys up, which is
+// the mitigation the ESP32-P4-NINA-Display project applies for exactly this
+// symptom ("keeps the radio's current bursts from sagging the board rail").
+//
+// 13 dBm is a starting point, not a measured optimum: still ample for a panel
+// sitting in the same house as its AP, roughly a third of the current draw of
+// full power. If resets persist, try 11; if they are gone and range is poor,
+// try 15. Set back to 0 to confirm the cap is what is actually helping.
+#if defined(CYD_S3_3248)
+    .TX_POWER_DBM           = 13,
+#else
     .TX_POWER_DBM           = 0,    // chip default until a board proves it needs a cap
+#endif
 };
 
 static const TimeDefaults CONNECTIVITY_DEFAULT_TIME = {

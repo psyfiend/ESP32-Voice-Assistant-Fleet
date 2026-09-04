@@ -21,7 +21,14 @@ static const char *K_MIGRATED      = "migrated";
 // How often to re-attempt STA while parked in AP fallback. Without this a
 // device whose router rebooted would sit in AP mode until someone power-cycled
 // it - the failure mode that makes AP fallback feel broken rather than helpful.
-static const uint32_t RETRY_WHILE_AP_MS = 60000;
+// AP-mode STA retry backoff. A device sitting in AP mode should still notice
+// when the real network comes back - but it must not retry forever on a fixed
+// one-minute tick, which is what an earlier version did: with wrong
+// credentials it re-attempted indefinitely, and on a marginal supply every
+// radio burst is another brownout opportunity. Doubles from base to cap;
+// resets on a successful connect or a credential change.
+static const uint32_t AP_RETRY_BASE_MS  = 120000;    // 2 min
+static const uint32_t AP_RETRY_MAX_MS   = 1800000;   // 30 min
 static const uint32_t JOIN_TIMEOUT_MS   = 20000;
 static const uint32_t BOOT_HOLD_MS      = 1500;
 
@@ -333,6 +340,7 @@ void ConnectivityManager::startStaAttempt() {
     _gotIp.store(0);
     _reissueCount.store(0);
     _reissuePending.store(0);
+    _giveUpNow.store(0);
     _attemptStartedMs = millis();
     _attempt++;
     setState(ConnState::STA_CONNECTING,
@@ -368,6 +376,9 @@ bool ConnectivityManager::raiseAp(const char *why) {
     }
     _apActive.store(1);
     _apLastClientMs = millis();
+    // Bringing the AP up is a second point where the PA keys up hard, so
+    // re-apply the cap here as well as on link-up.
+    applyRadioTuning();
     Serial.printf("[Conn] AP up: SSID \"%s\"  pass \"%s\"  IP %s  (%s)\n",
                   getApSsid(), getApPassword(), WiFi.softAPIP().toString().c_str(), why);
     return true;
@@ -453,12 +464,13 @@ void ConnectivityManager::loop() {
     // Done here rather than in the event handler so WiFi.begin() is never
     // called re-entrantly from the event task.
     if (_reissuePending.exchange(0)) {
-        char ssid[33], pass[65];
-        LOCK();
-        strlcpy(ssid, _ssid, sizeof(ssid));
-        strlcpy(pass, _password, sizeof(pass));
-        UNLOCK();
-        WiFi.begin(ssid, pass);
+        // esp_wifi_connect(), NOT WiFi.begin(). WiFi.begin() rewrites the
+        // station config, and doing that while a connect is already in flight
+        // fails with `sta is connecting, cannot set config` /
+        // ESP_ERR_WIFI_STATE - observed on hardware. The config has not
+        // changed; only the association needs retrying.
+        esp_err_t err = esp_wifi_connect();
+        if (err != ESP_OK) DBG_WIFI("re-issue esp_wifi_connect: %s\n", esp_err_to_name(err));
         return;
     }
 
@@ -513,36 +525,61 @@ void ConnectivityManager::loop() {
     }
 
     // --- STA connect deadline / retry escalation ------------------------
+    bool giveUp = _giveUpNow.exchange(0) != 0;
     if (st == ConnState::STA_CONNECTING &&
-        now - _attemptStartedMs > _defaults.STA_CONNECT_TIMEOUT_MS) {
+        (giveUp || now - _attemptStartedMs > _defaults.STA_CONNECT_TIMEOUT_MS)) {
 
-        DBG_WIFI("attempt %u timed out after %lums (status=%d)\n",
-                 _attempt, (unsigned long)(now - _attemptStartedMs), (int)WiFi.status());
+        DBG_WIFI("attempt %u ended after %lums (status=%d)%s\n",
+                 _attempt, (unsigned long)(now - _attemptStartedMs), (int)WiFi.status(),
+                 giveUp ? " - terminal failure, not waiting out the deadline" : " - timed out");
+
+        _reissuePending.store(0);   // do not let a queued re-issue resurrect this attempt
         WiFi.disconnect(false);
-        if (_attempt < _defaults.STA_RETRY_COUNT) {
+
+        // A terminal failure (wrong password, or an SSID that is simply not
+        // there) skips the remaining attempts. Repeating them cannot change
+        // the answer, and on a marginal power rail every extra radio burst is
+        // another chance to brown out.
+        bool exhausted = giveUp || (_attempt >= _defaults.STA_RETRY_COUNT);
+
+        if (!exhausted) {
             startStaAttempt();
         } else {
-            ConnMode mode = (ConnMode)_mode.load();
+            JoinResult why = (JoinResult)_lastFailure.load();
+            ConnMode mode  = (ConnMode)_mode.load();
             bool wantAp = (mode == ConnMode::STA_WITH_AP_FALLBACK) ||
                           (mode == ConnMode::STA_PLUS_AP) ||
                           _apFallbackForced;
-            if (wantAp && raiseAp("STA retries exhausted")) {
+
+            // Back off before trying the same credentials again. Doubling from
+            // the base to a cap means a device with genuinely wrong credentials
+            // settles into a quiet AP rather than thrashing the radio - and the
+            // power rail - every single minute forever.
+            if (_apRetryDelayMs == 0) _apRetryDelayMs = AP_RETRY_BASE_MS;
+            else _apRetryDelayMs = (_apRetryDelayMs * 2 > AP_RETRY_MAX_MS)
+                                   ? AP_RETRY_MAX_MS : _apRetryDelayMs * 2;
+
+            if (wantAp && raiseAp(why == JoinResult::FAIL_AUTH
+                                  ? "wrong credentials - waiting for setup"
+                                  : "STA retries exhausted")) {
                 setState(ConnState::AP_ACTIVE, LinkType::AP);
-                _attemptStartedMs = now;      // reuse as the AP-retry clock
             } else {
                 enterDegraded(mode == ConnMode::STA_ONLY
                               ? "STA_ONLY: retries exhausted, no AP by policy"
                               : "retries exhausted and AP unavailable");
-                _attemptStartedMs = now;
             }
+            Serial.printf("[Conn] Next STA retry in %lu s (reason: %s)\n",
+                          (unsigned long)(_apRetryDelayMs / 1000), joinResultName(why));
+            _attemptStartedMs = now;      // reuse as the AP-retry clock
         }
     }
 
     // --- keep trying STA while parked in AP / DEGRADED -------------------
     if ((st == ConnState::AP_ACTIVE || st == ConnState::DEGRADED) &&
         _configured && !_joinActive.load() &&
-        now - _attemptStartedMs > RETRY_WHILE_AP_MS) {
+        now - _attemptStartedMs > _apRetryDelayMs) {
         _attempt = 0;
+        _authFailCount.store(0);   // give the credentials a genuine fresh look
         startStaAttempt();
     }
 
@@ -594,6 +631,11 @@ void ConnectivityManager::handleEvent(int32_t eventId, void *infoPtr) {
         }
         _gotIp.store(1);
         _attempt = 0;
+        // A working link clears the failure history, so a later outage starts
+        // from the short backoff again rather than inheriting a 30-minute wait.
+        _apRetryDelayMs = 0;
+        _authFailCount.store(0);
+        _lastFailure.store((int32_t)JoinResult::NONE);
         captureLinkInfo();
         applyRadioTuning();                            // re-apply on every link-up
         setState(isApActive() ? ConnState::APSTA : ConnState::STA_CONNECTED,
@@ -637,16 +679,61 @@ void ConnectivityManager::handleEvent(int32_t eventId, void *infoPtr) {
         ConnState cur = (ConnState)_state.load();
 
         if (cur == ConnState::STA_CONNECTING) {
-            // Transient reason mid-attempt. Routers commonly answer the first
-            // association with AUTH_EXPIRE (reason 2) and accept the immediate
-            // retry - observed on real hardware, where waiting out the 15 s
-            // deadline instead of re-issuing cost ~13 s of avoidable boot time.
-            // Bounded so a flapping AP cannot spin here.
+            // ASSOC_LEAVE is OUR OWN disconnect - the give-up path calls
+            // WiFi.disconnect() and the resulting event used to set the
+            // re-issue flag, immediately restarting a connect we had just
+            // abandoned. Never treat a self-inflicted disconnect as a reason
+            // to retry.
+            if (reason == WIFI_REASON_ASSOC_LEAVE) break;
+
+            JoinResult r = classifyDisconnect(reason);
+
+            if (r == JoinResult::FAIL_AUTH) {
+                // Terminal. The same credentials will not start working on the
+                // next attempt, so re-issuing just hammers the AP - which is
+                // exactly what this code did before consulting the classifier:
+                // 18 attempts against a known-wrong password over 45 seconds.
+                //
+                // Two are allowed, because 4WAY_HANDSHAKE_TIMEOUT can also fire
+                // once on a marginal link with a perfectly good password.
+                // Repeated, it means the password is wrong.
+                _authFailCount.fetch_add(1);
+                _lastFailure.store((int32_t)JoinResult::FAIL_AUTH);
+                if (_authFailCount.load() >= 2) {
+                    Serial.printf("[Conn] Authentication rejected (reason %u) - "
+                                  "credentials are wrong, not retrying.\n", reason);
+                    _reissuePending.store(0);
+                    _giveUpNow.store(1);        // loop() escalates immediately
+                } else {
+                    _reissuePending.store(1);
+                    DBG_WIFI("auth failure %d/2 - one more try before giving up\n",
+                             (int)_authFailCount.load());
+                }
+                break;
+            }
+
+            if (r == JoinResult::FAIL_NO_AP) {
+                Serial.printf("[Conn] Network \"not found\" (reason %u).\n", reason);
+                _lastFailure.store((int32_t)JoinResult::FAIL_NO_AP);
+                // Worth a couple of retries: a busy channel can mask a beacon.
+                if (_reissueCount.load() < 2) {
+                    _reissueCount.fetch_add(1);
+                    _reissuePending.store(1);
+                } else {
+                    _giveUpNow.store(1);
+                }
+                break;
+            }
+
+            // Genuinely transient. Routers commonly answer a first association
+            // with AUTH_EXPIRE (reason 2) and accept the immediate retry -
+            // observed on real hardware, where waiting out the 15 s deadline
+            // instead cost ~13 s of avoidable boot time.
             if (_reissueCount.load() < 6) {
                 _reissueCount.fetch_add(1);
                 _reissuePending.store(1);
-                DBG_WIFI("transient disconnect mid-attempt - re-issuing connect (%d/6)\n",
-                         (int)_reissueCount.load());
+                DBG_WIFI("transient disconnect (reason %u) - re-issuing (%d/6)\n",
+                         reason, (int)_reissueCount.load());
             }
             break;
         }
