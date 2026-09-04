@@ -1,37 +1,153 @@
 #pragma once
+#ifndef CONNECTIVITY_MANAGER_H
+#define CONNECTIVITY_MANAGER_H
+
 #include <Arduino.h>
 #include <IPAddress.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#include <atomic>
+#include "ConnectivityTypes.h"
 #include "ConnectivityDefaults.h"
+#include "DeviceIdentity.h"
 
-enum class WiFiConnState : uint8_t {
-    NOT_STARTED,
-    CONNECTING,
-    CONNECTED,
-    FAILED, // retries exhausted, no fallback yet - AP/captive-portal fallback is Phase 2
-};
+// ---------------------------------------------------------------------------
+// ConnectivityManager - the fleet's link layer.
+//
+// Owns WiFi station mode, the fallback/provisioning AP, the four connectivity
+// modes from docs/ROADMAP.md Q1, and the interactive scan/join flow the
+// settings UI drives. Ethernet is represented in the type vocabulary
+// (LinkType) but not implemented yet - callers ask isOnline()/getLinkType()
+// rather than "is wifi up", so adding it later does not churn call sites.
+//
+// THREADING - read this before calling anything from UI code.
+//
+//   * Every method here is non-blocking. begin() kicks the state machine off
+//     and returns immediately; loop() advances deadlines, retries and the AP
+//     idle timer. Nothing spins on WiFi.status().
+//   * WiFi events arrive on the Arduino event task, NOT the LVGL task. The
+//     event handler is the single authority for state transitions; it never
+//     touches LVGL and never calls back into UI code.
+//   * The UI therefore POLLS the getters (cheap, all atomic or mutex-guarded)
+//     rather than being called back. This is deliberate: a callback into the
+//     UI layer from the event task would need LVGL locking at every call site
+//     and would invert the dependency. Same conclusion both reference projects
+//     reached independently - see docs/ROADMAP.md section 4.2.
+//
+// A NOTE ON ATOMIC WIDTH: scalars shared across tasks are int32_t-backed, not
+// uint8_t. Sub-word atomics on RISC-V (i.e. the P4 boards) can read-modify-write
+// neighbouring bytes in the same word. Borrowed from the ESP32-P4-NINA-Display
+// project, which documents the same hazard.
+// ---------------------------------------------------------------------------
 
-// Phase 1: station-mode connect only (NVS-stored credentials, falling back
-// to the compile-time default when NVS has never been configured), no
-// AP/captive-portal fallback yet. See docs/FUTURE_IMPROVEMENTS.md's
-// Connectivity section for the full phased plan.
 class ConnectivityManager {
 public:
     ConnectivityManager();
 
+    // Applies hostname + TX power, raises the AP if the mode calls for it, and
+    // starts the first join attempt. Returns false only if connectivity is
+    // disabled or unconfigured - not merely because the link is not up yet.
     bool begin();
 
-    WiFiConnState getState() const { return _state; }
-    bool          isConnected() const;
-    IPAddress     getLocalIP() const;
+    // Drive from loop(). Handles connect deadlines, retry escalation, AP
+    // fallback, the AP idle timer, and scan-result collection.
+    void loop();
 
-    // --= NVS credential access - used by the GUI once it exists (Phase 3) =--
+    // --- Link state -------------------------------------------------------
+    ConnState   getState() const      { return (ConnState)_state.load(); }
+    LinkType    getLinkType() const   { return (LinkType)_link.load(); }
+    ConnMode    getMode() const       { return (ConnMode)_mode.load(); }
+    bool        isOnline() const;
+    IPAddress   getIP() const;
+    int8_t      getRssi() const       { return (int8_t)_rssi.load(); }
+    SignalBand  getSignalBand() const { return signalBandFromRssi(getRssi()); }
+    uint8_t     getLastDisconnectReason() const { return (uint8_t)_lastReason.load(); }
+
+    // Copies into caller storage - the underlying buffers are written from the
+    // event task, so returning a pointer would hand out a data race.
+    void getSsid(char *out, size_t len) const;
+    void getHostname(char *out, size_t len) const;
+
+    // --- Access point -----------------------------------------------------
+    bool        isApActive() const { return _apActive.load() != 0; }
+    const char *getApSsid() const;
+    const char *getApPassword() const;   // shown in Settings; MAC-derived
+    IPAddress   getApIP() const;
+    uint8_t     getApClientCount() const { return (uint8_t)_apClients.load(); }
+
+    // --- Configuration (NVS-backed, survives reflash) ---------------------
+    bool setMode(ConnMode m);
     bool setStationCredentials(const char *ssid, const char *password);
     void clearStationCredentials();
+    // Rejects anything that cannot be made into a valid DNS label rather than
+    // letting it fail confusingly at the DHCP server. Takes effect next connect.
+    bool setHostname(const char *hostname);
+
+    // --- Interactive scan / join (settings UI) ----------------------------
+    bool       startScan();
+    JoinPhase  getJoinPhase() const  { return (JoinPhase)_joinPhase.load(); }
+    int        getScanResults(WiFiScanEntry *out, int max) const;
+    bool       startConnect(const char *ssid, const char *password);
+    void       cancelJoin();
+    JoinResult getJoinResult() const { return (JoinResult)_joinResult.load(); }
+    // Terminal join states persist until the UI says it has shown them, so a
+    // fast failure cannot flash past before the user sees why.
+    void       ackJoinResult();
+
+    // --- Diagnostics ------------------------------------------------------
+    void dumpStatus(Print &out) const;
+
+    // Internal: the Arduino WiFi event hook. Public only so the free-function
+    // trampoline can reach it; do not call from application code.
+    void handleEvent(int32_t eventId, void *info);
 
 private:
-    bool connectSTA(const char *ssid, const char *password, uint32_t timeoutMs, uint8_t retries);
-    void loadCredentialsFromNvs(String &ssidOut, String &passwordOut, bool &configuredOut);
+    static const int SCAN_MAX_RESULTS = 20;
 
-    const WiFiDefaults &_wifiDefaults;
-    WiFiConnState        _state;
+    void  applyRadioTuning();
+    void  startStaAttempt();
+    bool  raiseAp(const char *why);
+    void  stopAp(const char *why);
+    void  enterDegraded(const char *why);
+    void  loadConfigFromNvs();
+    void  setState(ConnState s, LinkType l);
+    void  captureLinkInfo();
+    static JoinResult classifyDisconnect(uint8_t reason);
+    bool  bootButtonHeld() const;
+
+    const WiFiDefaults &_defaults;
+
+    // Cross-task scalars. int32_t-backed - see the class comment.
+    std::atomic<int32_t> _state{(int32_t)ConnState::BOOT};
+    std::atomic<int32_t> _link{(int32_t)LinkType::NONE};
+    std::atomic<int32_t> _mode{(int32_t)ConnMode::STA_WITH_AP_FALLBACK};
+    std::atomic<int32_t> _rssi{0};
+    std::atomic<int32_t> _lastReason{0};
+    std::atomic<int32_t> _apActive{0};
+    std::atomic<int32_t> _apClients{0};
+    std::atomic<int32_t> _joinPhase{(int32_t)JoinPhase::IDLE};
+    std::atomic<int32_t> _joinResult{(int32_t)JoinResult::NONE};
+    std::atomic<int32_t> _joinActive{0};   // gates auto-retry while a user join runs
+    std::atomic<int32_t> _gotIp{0};
+
+    // Guarded by _mutex.
+    SemaphoreHandle_t _mutex = nullptr;
+    char          _ssid[33]     = {0};
+    char          _password[65] = {0};
+    char          _hostname[64] = {0};
+    char          _joinSsid[33] = {0};
+    char          _joinPass[65] = {0};
+    char          _prevSsid[33] = {0};   // rollback target if a user join fails
+    char          _prevPass[65] = {0};
+    WiFiScanEntry _scan[SCAN_MAX_RESULTS];
+    int           _scanCount = 0;
+
+    uint32_t _attemptStartedMs = 0;
+    uint32_t _joinStartedMs    = 0;
+    uint32_t _apLastClientMs   = 0;
+    uint8_t  _attempt          = 0;
+    bool     _configured       = false;
+    bool     _apFallbackForced = false;   // BOOT-button recovery override
 };
+
+#endif // CONNECTIVITY_MANAGER_H

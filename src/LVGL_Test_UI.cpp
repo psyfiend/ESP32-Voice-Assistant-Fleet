@@ -83,6 +83,33 @@ void debug_dump_config(bool manualTrigger) {
     pnlSystem.log("  Commit: %s", FW_COMMIT);
     pnlSystem.log("  Device: %s", bsp_hw.device_name);
 
+    // Connectivity. Mirrors ConnectivityManager::dumpStatus() but routed
+    // through pnlSystem.log() so it lands in the on-device System panel as
+    // well as on serial.
+    {
+        char cbuf[64];
+        pnlSystem.log("[CONNECTIVITY]");
+        pnlSystem.log("  Mode: %s", connModeName(connMgr.getMode()));
+        pnlSystem.log("  State: %s (%s)", connStateName(connMgr.getState()),
+                                          linkTypeName(connMgr.getLinkType()));
+        connMgr.getHostname(cbuf, sizeof(cbuf));
+        pnlSystem.log("  Hostname: %s", cbuf);
+        pnlSystem.log("  Device ID: %s", DeviceIdentity::deviceId());
+        if (connMgr.isOnline()) {
+            connMgr.getSsid(cbuf, sizeof(cbuf));
+            pnlSystem.log("  SSID: %s", cbuf);
+            pnlSystem.log("  IP: %s", connMgr.getIP().toString().c_str());
+            pnlSystem.log("  RSSI: %d dBm", (int)connMgr.getRssi());
+        } else {
+            pnlSystem.log("  Offline (last reason: %u)", connMgr.getLastDisconnectReason());
+        }
+        if (connMgr.isApActive()) {
+            pnlSystem.log("  AP: %s / %s", connMgr.getApSsid(), connMgr.getApPassword());
+            pnlSystem.log("  AP IP: %s (%u client(s))",
+                          connMgr.getApIP().toString().c_str(), connMgr.getApClientCount());
+        }
+    }
+
     // Hardware Status (Runtime)
     pnlSystem.log("[HARDWARE STATUS]");
     pnlSystem.log("  I2C Backend: %s", FleetI2C::backendName());
@@ -310,6 +337,11 @@ void loop() {
     #ifdef DEBUG_DISPLAY
     if (loopCount <= 5) Serial.println("[Loop] gui.update() returned.");
     #endif
+
+    // Non-blocking: advances connect deadlines, retry escalation, AP fallback,
+    // the AP idle timer and async scan collection. Must be called every loop -
+    // ConnectivityManager deliberately never spins on WiFi.status() itself.
+    connMgr.loop();
 
     header.tick();
     pnlDisplay.tick();
