@@ -27,3 +27,8 @@ legacy_testing/
 # real AP credentials. See ConnectivityDefaults.h for the __has_include
 # pattern that picks this up when present.
 components/Fleet_Connectivity/ConnectivityLocalSecrets.h
+# Reference clones of other projects, for reading only - never part of this
+# repo. Cloned here so they can be read locally at zero network cost; see
+# docs/ROADMAP.md Q10. Nested git repos, so tracking them would recreate the
+# no-.gitmodules gitlink problem Phase 0 fixed.
+reference/
