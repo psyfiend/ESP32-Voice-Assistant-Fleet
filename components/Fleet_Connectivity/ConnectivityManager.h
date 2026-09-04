@@ -82,6 +82,13 @@ public:
     // Rejects anything that cannot be made into a valid DNS label rather than
     // letting it fail confusingly at the DHCP server. Takes effect next connect.
     bool setHostname(const char *hostname);
+    // The escape hatch from every terminal state - "Retry now" in the settings
+    // UI, and the only way back from wrong-and-unproven credentials short of a
+    // reboot. Resets every counter, backoff and stop flag.
+    void retryNow();
+    // Have the stored credentials ever successfully connected? Decides what
+    // happens AFTER a failed boot attempt, never whether that attempt runs.
+    bool areCredentialsProven() const { return _proven; }
     // Append the MAC suffix to hostname and AP SSID. Never touches the MQTT/HA
     // device id - see DeviceIdentity.h.
     bool setAppendMacSuffix(bool on);
@@ -118,6 +125,8 @@ private:
     void  captureLinkInfo();
     static JoinResult classifyDisconnect(uint8_t reason);
     bool  bootButtonHeld() const;
+    void  markProven(bool proven);
+    void  escalateAfterFailure(uint32_t now);   // decide AP / DEGRADED and the next retry gap
 
     const WiFiDefaults &_defaults;
 
@@ -143,6 +152,14 @@ private:
     // noise. Drives both the give-up decision and the AP re-try backoff.
     std::atomic<int32_t> _lastFailure{(int32_t)JoinResult::NONE};
     std::atomic<int32_t> _authFailCount{0};
+    // Which of the two boot-time auth rounds we are in. A router in a
+    // momentarily odd state can look exactly like a wrong password, so the
+    // credentials get a second chance ~45 s later before being written off.
+    std::atomic<int32_t> _authRound{0};
+    // Set once both rounds have failed on auth. What happens next depends on
+    // _proven: an unproven device stops entirely, a proven one rechecks
+    // periodically in case the AP's password changed back.
+    std::atomic<int32_t> _authStopped{0};
     // Set by the event handler when a failure is terminal, so loop() stops
     // waiting out the remaining 15 s deadline for an answer it already has.
     std::atomic<int32_t> _giveUpNow{0};
@@ -166,6 +183,12 @@ private:
     // device with genuinely wrong credentials stops thrashing the radio (and
     // the power rail) every minute forever. Reset on success.
     uint32_t _apRetryDelayMs   = 0;
+    // Accumulated deferral while a client is attached to our AP. Someone is
+    // probably configuring us and yanking the radio mid-form is hostile - but
+    // this is capped, because a phone that auto-rejoins a saved network would
+    // otherwise pin the device in AP mode forever.
+    uint32_t _clientDeferMs    = 0;
+    bool     _proven           = false;   // NVS-backed; see areCredentialsProven()
     uint8_t  _attempt          = 0;
     bool     _configured       = false;
     bool     _apFallbackForced = false;   // BOOT-button recovery override

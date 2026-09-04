@@ -17,6 +17,7 @@ static const char *K_MODE          = "mode";
 static const char *K_HOST          = "host";
 static const char *K_MACSFX        = "macsfx";
 static const char *K_MIGRATED      = "migrated";
+static const char *K_PROVEN        = "proven";
 
 // How often to re-attempt STA while parked in AP fallback. Without this a
 // device whose router rebooted would sit in AP mode until someone power-cycled
@@ -31,6 +32,27 @@ static const uint32_t AP_RETRY_BASE_MS  = 120000;    // 2 min
 static const uint32_t AP_RETRY_MAX_MS   = 1800000;   // 30 min
 static const uint32_t JOIN_TIMEOUT_MS   = 20000;
 static const uint32_t BOOT_HOLD_MS      = 1500;
+
+// --- Auth-failure policy (docs: "Connectivity behavior spec", signed off) ---
+// A wrong password cannot fix itself, so it is never retried on a timer. But a
+// router in a momentarily odd state looks identical to a wrong password from
+// here, so the credentials get exactly one second chance before being written
+// off. Two failures, a pause, two more, then stop.
+static const int32_t  AUTH_FAILS_PER_ROUND = 2;
+static const int32_t  AUTH_ROUNDS          = 2;
+static const uint32_t SECOND_CHANCE_MS     = 45000;      // 45 s between rounds
+
+// Credentials that have connected before and are NOW rejected almost certainly
+// mean the AP's password changed. Still terminal, but worth a periodic probe -
+// passwords sometimes change back, and one association attempt costs nothing.
+// Unproven credentials get no probe at all: they are a typo.
+static const uint32_t PROVEN_RECHECK_MS    = 2700000;    // 45 min
+
+// While a client is attached to our AP, push the STA retry out rather than
+// cancelling it. Capped, so a phone that silently auto-rejoins a saved network
+// cannot pin the device in AP mode indefinitely.
+static const uint32_t CLIENT_DEFER_STEP_MS = 300000;     // +5 min per evaluation
+static const uint32_t CLIENT_DEFER_MAX_MS  = 1800000;    // never defer past 30 min total
 
 // Troubleshooting-only detail. Baseline lines (state transitions, connect
 // success/failure, AP up/down) always print - they are what you need from a
@@ -190,6 +212,7 @@ void ConnectivityManager::loadConfigFromNvs() {
             UNLOCK();
         }
         _mode.store((int32_t)p.getUChar(K_MODE, (uint8_t)_defaults.MODE));
+        _proven = p.getBool(K_PROVEN, false);
         p.end();
     }
 
@@ -259,6 +282,19 @@ bool ConnectivityManager::setStationCredentials(const char *ssid, const char *pa
     strlcpy(_password, password ? password : "", sizeof(_password));
     UNLOCK();
     _configured = true;
+
+    // New credentials are unproven by definition, and they deserve a clean
+    // slate: no inherited backoff, no inherited terminal stop. Skipped while an
+    // interactive join is in flight, since that path calls this on success and
+    // would otherwise immediately unprove what it just proved.
+    if (!_joinActive.load()) {
+        if (_proven) markProven(false);
+        _authFailCount.store(0);
+        _authRound.store(0);
+        _authStopped.store(0);
+        _apRetryDelayMs = 0;
+        _clientDeferMs  = 0;
+    }
     return true;
 }
 
@@ -269,6 +305,34 @@ void ConnectivityManager::clearStationCredentials() {
     _ssid[0] = _password[0] = '\0';
     UNLOCK();
     _configured = false;
+}
+
+// Written once, on the first successful connect, and cleared when credentials
+// change - not per attempt, so NVS wear is a non-issue.
+void ConnectivityManager::markProven(bool proven) {
+    _proven = proven;
+    Preferences p;
+    if (p.begin(NVS_NS, false)) { p.putBool(K_PROVEN, proven); p.end(); }
+    if (proven) Serial.println("[Conn] Credentials confirmed working.");
+}
+
+// The escape hatch from every terminal state. Without this, wrong-and-unproven
+// credentials would need a reboot or a reflash to get out of - which is exactly
+// the trap AP fallback exists to avoid.
+void ConnectivityManager::retryNow() {
+    if ((ConnState)_state.load() == ConnState::RADIO_OFF) return;
+    Serial.println("[Conn] Manual retry requested.");
+    _attempt = 0;
+    _authFailCount.store(0);
+    _authRound.store(0);
+    _authStopped.store(0);
+    _reissueCount.store(0);
+    _reissuePending.store(0);
+    _giveUpNow.store(0);
+    _lastFailure.store((int32_t)JoinResult::NONE);
+    _apRetryDelayMs = 0;
+    _clientDeferMs  = 0;
+    startStaAttempt();
 }
 
 bool ConnectivityManager::setAppendMacSuffix(bool on) {
@@ -310,8 +374,16 @@ void ConnectivityManager::applyRadioTuning() {
     if (_defaults.TX_POWER_DBM == 0) return;   // leave the chip default alone
     // esp_wifi_set_max_tx_power takes quarter-dBm units.
     esp_err_t err = esp_wifi_set_max_tx_power((int8_t)(_defaults.TX_POWER_DBM * 4));
-    Serial.printf("[Conn] TX power capped to %u dBm (%s)\n",
-                  _defaults.TX_POWER_DBM, err == ESP_OK ? "ok" : esp_err_to_name(err));
+    // Announced once. It is re-applied on every link-up and every AP raise
+    // (both are points where the PA keys up hard), but repeating the line
+    // mid-sequence reads like something is being reconfigured when nothing is.
+    static bool announced = false;
+    if (!announced && err == ESP_OK) {
+        announced = true;
+        Serial.printf("[Conn] TX power capped to %u dBm.\n", _defaults.TX_POWER_DBM);
+    } else if (err != ESP_OK) {
+        DBG_WIFI("TX power cap failed: %s\n", esp_err_to_name(err));
+    }
 }
 
 bool ConnectivityManager::bootButtonHeld() const {
@@ -396,6 +468,62 @@ void ConnectivityManager::stopAp(const char *why) {
     Serial.printf("[Conn] AP stopped (%s).\n", why);
 }
 
+// Decide where an exhausted attempt cycle lands, and when (or whether) to try
+// again. The three outcomes come straight from the signed-off behavior spec.
+void ConnectivityManager::escalateAfterFailure(uint32_t now) {
+    JoinResult why  = (JoinResult)_lastFailure.load();
+    ConnMode   mode = (ConnMode)_mode.load();
+    bool wantAp = (mode == ConnMode::STA_WITH_AP_FALLBACK) ||
+                  (mode == ConnMode::STA_PLUS_AP) ||
+                  _apFallbackForced;
+
+    bool authStop  = _authStopped.load() != 0;
+    bool midRounds = (why == JoinResult::FAIL_AUTH) && !authStop;
+
+    if (midRounds) {
+        // Between the two auth rounds. Short, fixed pause - not the
+        // environmental backoff, which would be far too long for a second look.
+        _apRetryDelayMs = SECOND_CHANCE_MS;
+    } else if (authStop) {
+        // Terminal. Proven credentials get a periodic probe in case the AP's
+        // password changed back; unproven ones get nothing at all, and the
+        // retry block refuses to run for them.
+        _apRetryDelayMs = _proven ? PROVEN_RECHECK_MS : 0;
+    } else {
+        // Environmental: the network was absent, which routinely resolves
+        // itself. Retry indefinitely, backing off so a long outage does not
+        // mean thrashing the radio - and the power rail - every two minutes.
+        if (_apRetryDelayMs == 0 || _apRetryDelayMs == SECOND_CHANCE_MS) {
+            _apRetryDelayMs = AP_RETRY_BASE_MS;
+        } else {
+            _apRetryDelayMs = (_apRetryDelayMs * 2 > AP_RETRY_MAX_MS)
+                              ? AP_RETRY_MAX_MS : _apRetryDelayMs * 2;
+        }
+    }
+    _clientDeferMs = 0;
+
+    const char *reason = midRounds ? "auth rejected - one more round queued"
+                       : authStop  ? "wrong credentials - waiting for setup"
+                                   : "network unreachable";
+
+    if (wantAp && raiseAp(reason)) {
+        setState(ConnState::AP_ACTIVE, LinkType::AP);
+    } else {
+        enterDegraded(mode == ConnMode::STA_ONLY
+                      ? "STA_ONLY: no AP by policy"
+                      : "AP unavailable");
+    }
+
+    if (authStop && !_proven) {
+        Serial.println("[Conn] These credentials have never worked. Not retrying "
+                       "automatically - reboot, change them, or use Retry now.");
+    } else {
+        Serial.printf("[Conn] Next STA retry in %lu s (%s)\n",
+                      (unsigned long)(_apRetryDelayMs / 1000), joinResultName(why));
+    }
+    _attemptStartedMs = now;      // doubles as the AP-retry clock
+}
+
 void ConnectivityManager::enterDegraded(const char *why) {
     setState(ConnState::DEGRADED, LinkType::NONE);
     Serial.printf("[Conn] DEGRADED: %s\n", why);
@@ -464,13 +592,20 @@ void ConnectivityManager::loop() {
     // Done here rather than in the event handler so WiFi.begin() is never
     // called re-entrantly from the event task.
     if (_reissuePending.exchange(0)) {
-        // esp_wifi_connect(), NOT WiFi.begin(). WiFi.begin() rewrites the
-        // station config, and doing that while a connect is already in flight
-        // fails with `sta is connecting, cannot set config` /
-        // ESP_ERR_WIFI_STATE - observed on hardware. The config has not
-        // changed; only the association needs retrying.
+        // Tear the in-flight association down before starting another.
+        //
+        // WiFi.begin() here failed with ESP_ERR_WIFI_STATE ("cannot set
+        // config"); switching to esp_wifi_connect() then failed with
+        // ESP_ERR_WIFI_CONN ("sta is connecting, return error") - a cleaner
+        // error for the same underlying problem, and still a no-op, so the
+        // log claimed a retry that never happened. Both observed on hardware.
+        //
+        // The resulting ASSOC_LEAVE is our own disconnect and is ignored by
+        // the event handler, so this cannot feed itself.
+        esp_wifi_disconnect();
         esp_err_t err = esp_wifi_connect();
-        if (err != ESP_OK) DBG_WIFI("re-issue esp_wifi_connect: %s\n", esp_err_to_name(err));
+        if (err != ESP_OK) DBG_WIFI("re-issue failed: %s\n", esp_err_to_name(err));
+        else               DBG_WIFI("re-issued association\n");
         return;
     }
 
@@ -545,42 +680,42 @@ void ConnectivityManager::loop() {
         if (!exhausted) {
             startStaAttempt();
         } else {
-            JoinResult why = (JoinResult)_lastFailure.load();
-            ConnMode mode  = (ConnMode)_mode.load();
-            bool wantAp = (mode == ConnMode::STA_WITH_AP_FALLBACK) ||
-                          (mode == ConnMode::STA_PLUS_AP) ||
-                          _apFallbackForced;
-
-            // Back off before trying the same credentials again. Doubling from
-            // the base to a cap means a device with genuinely wrong credentials
-            // settles into a quiet AP rather than thrashing the radio - and the
-            // power rail - every single minute forever.
-            if (_apRetryDelayMs == 0) _apRetryDelayMs = AP_RETRY_BASE_MS;
-            else _apRetryDelayMs = (_apRetryDelayMs * 2 > AP_RETRY_MAX_MS)
-                                   ? AP_RETRY_MAX_MS : _apRetryDelayMs * 2;
-
-            if (wantAp && raiseAp(why == JoinResult::FAIL_AUTH
-                                  ? "wrong credentials - waiting for setup"
-                                  : "STA retries exhausted")) {
-                setState(ConnState::AP_ACTIVE, LinkType::AP);
-            } else {
-                enterDegraded(mode == ConnMode::STA_ONLY
-                              ? "STA_ONLY: retries exhausted, no AP by policy"
-                              : "retries exhausted and AP unavailable");
-            }
-            Serial.printf("[Conn] Next STA retry in %lu s (reason: %s)\n",
-                          (unsigned long)(_apRetryDelayMs / 1000), joinResultName(why));
-            _attemptStartedMs = now;      // reuse as the AP-retry clock
+            escalateAfterFailure(now);
         }
     }
 
     // --- keep trying STA while parked in AP / DEGRADED -------------------
     if ((st == ConnState::AP_ACTIVE || st == ConnState::DEGRADED) &&
-        _configured && !_joinActive.load() &&
-        now - _attemptStartedMs > _apRetryDelayMs) {
-        _attempt = 0;
-        _authFailCount.store(0);   // give the credentials a genuine fresh look
-        startStaAttempt();
+        _configured && !_joinActive.load()) {
+
+        // A terminal auth stop on credentials that have NEVER worked means
+        // exactly one thing: they are wrong. No timer will change that, so
+        // there is no timer. Only a reboot, a credentials change or the
+        // "Retry now" control gets out of here.
+        bool blocked = _authStopped.load() && !_proven;
+
+        // Someone attached to our AP is probably mid-configuration; dropping
+        // the radio to go chase the home network would be hostile. Defer -
+        // but cap it, or a phone silently rejoining a saved network pins us
+        // in AP mode forever.
+        if (!blocked && _apClients.load() > 0 && _clientDeferMs < CLIENT_DEFER_MAX_MS) {
+            uint32_t add = CLIENT_DEFER_MAX_MS - _clientDeferMs;
+            if (add > CLIENT_DEFER_STEP_MS) add = CLIENT_DEFER_STEP_MS;
+            if (now - _attemptStartedMs > _apRetryDelayMs + _clientDeferMs) {
+                _clientDeferMs += add;
+                DBG_WIFI("AP client attached - deferring STA retry by %lus (total %lus)\n",
+                         (unsigned long)(add / 1000), (unsigned long)(_clientDeferMs / 1000));
+            }
+        }
+
+        if (!blocked && now - _attemptStartedMs > _apRetryDelayMs + _clientDeferMs) {
+            _attempt = 0;
+            _authFailCount.store(0);
+            _authRound.store(0);
+            _authStopped.store(0);     // a scheduled recheck is a genuine fresh look
+            _clientDeferMs = 0;
+            startStaAttempt();
+        }
     }
 
     // --- AP idle shutdown (mode STA_PLUS_AP only) ------------------------
@@ -634,8 +769,15 @@ void ConnectivityManager::handleEvent(int32_t eventId, void *infoPtr) {
         // A working link clears the failure history, so a later outage starts
         // from the short backoff again rather than inheriting a 30-minute wait.
         _apRetryDelayMs = 0;
+        _clientDeferMs  = 0;
         _authFailCount.store(0);
+        _authRound.store(0);
+        _authStopped.store(0);
         _lastFailure.store((int32_t)JoinResult::NONE);
+        // These credentials demonstrably work. From here on an auth rejection
+        // means the AP's password changed rather than a typo, which earns a
+        // periodic recheck instead of a permanent stop.
+        if (!_proven) markProven(true);
         captureLinkInfo();
         applyRadioTuning();                            // re-apply on every link-up
         setState(isApActive() ? ConnState::APSTA : ConnState::STA_CONNECTED,
@@ -689,26 +831,31 @@ void ConnectivityManager::handleEvent(int32_t eventId, void *infoPtr) {
             JoinResult r = classifyDisconnect(reason);
 
             if (r == JoinResult::FAIL_AUTH) {
-                // Terminal. The same credentials will not start working on the
-                // next attempt, so re-issuing just hammers the AP - which is
-                // exactly what this code did before consulting the classifier:
-                // 18 attempts against a known-wrong password over 45 seconds.
-                //
-                // Two are allowed, because 4WAY_HANDSHAKE_TIMEOUT can also fire
-                // once on a marginal link with a perfectly good password.
-                // Repeated, it means the password is wrong.
                 _authFailCount.fetch_add(1);
                 _lastFailure.store((int32_t)JoinResult::FAIL_AUTH);
-                if (_authFailCount.load() >= 2) {
-                    Serial.printf("[Conn] Authentication rejected (reason %u) - "
-                                  "credentials are wrong, not retrying.\n", reason);
-                    _reissuePending.store(0);
-                    _giveUpNow.store(1);        // loop() escalates immediately
-                } else {
+
+                if (_authFailCount.load() < AUTH_FAILS_PER_ROUND) {
                     _reissuePending.store(1);
-                    DBG_WIFI("auth failure %d/2 - one more try before giving up\n",
-                             (int)_authFailCount.load());
+                    DBG_WIFI("auth failure %d/%d this round\n",
+                             (int)_authFailCount.load(), (int)AUTH_FAILS_PER_ROUND);
+                    break;
                 }
+
+                // Round over. A second round gets a pause first, because a
+                // router that is briefly unhappy presents exactly like a wrong
+                // password and deserves one more look before being written off.
+                _reissuePending.store(0);
+                if (_authRound.load() + 1 < AUTH_ROUNDS) {
+                    _authRound.fetch_add(1);
+                    Serial.printf("[Conn] Auth rejected (reason %u) - retrying once "
+                                  "in %lu s before giving up.\n",
+                                  reason, (unsigned long)(SECOND_CHANCE_MS / 1000));
+                } else {
+                    Serial.printf("[Conn] Authentication rejected (reason %u) - "
+                                  "credentials are wrong.\n", reason);
+                    _authStopped.store(1);
+                }
+                _giveUpNow.store(1);        // loop() escalates immediately
                 break;
             }
 
