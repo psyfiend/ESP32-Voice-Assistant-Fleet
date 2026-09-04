@@ -133,6 +133,11 @@ private:
     std::atomic<int32_t> _joinResult{(int32_t)JoinResult::NONE};
     std::atomic<int32_t> _joinActive{0};   // gates auto-retry while a user join runs
     std::atomic<int32_t> _gotIp{0};
+    // Set by the event handler on a transient disconnect, consumed by loop().
+    // The re-issue itself must not happen inside the event callback - calling
+    // WiFi.begin() re-entrantly from the event task is asking for trouble.
+    std::atomic<int32_t> _reissuePending{0};
+    std::atomic<int32_t> _reissueCount{0};
 
     // Guarded by _mutex.
     SemaphoreHandle_t _mutex = nullptr;

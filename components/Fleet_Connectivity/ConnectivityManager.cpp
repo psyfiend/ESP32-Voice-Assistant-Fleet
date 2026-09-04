@@ -16,6 +16,7 @@ static const char *K_PASS          = "password";
 static const char *K_MODE          = "mode";
 static const char *K_HOST          = "host";
 static const char *K_MACSFX        = "macsfx";
+static const char *K_MIGRATED      = "migrated";
 
 // How often to re-attempt STA while parked in AP fallback. Without this a
 // device whose router rebooted would sit in AP mode until someone power-cycled
@@ -166,6 +167,12 @@ void ConnectivityManager::loadConfigFromNvs() {
     Preferences p;
     bool haveNew = false;
 
+    // Opening a namespace read-only before it exists makes the Preferences
+    // library log `nvs_open failed: NOT_FOUND` at error level on every boot -
+    // alarming-looking noise for an entirely normal fresh flash. One
+    // read-write open creates the namespace so later reads are quiet.
+    { Preferences seed; if (seed.begin(NVS_NS, /*readOnly=*/false)) seed.end(); }
+
     if (p.begin(NVS_NS, /*readOnly=*/true)) {
         haveNew = p.getBool(K_CONFIGURED, false);
         if (haveNew) {
@@ -179,7 +186,16 @@ void ConnectivityManager::loadConfigFromNvs() {
         p.end();
     }
 
-    if (!haveNew) {
+    // Probe the legacy namespace at most once ever. Without the guard, a board
+    // that legitimately has no stored credentials logs a NOT_FOUND every boot
+    // forever; with it, at worst one line on the very first boot.
+    bool migrated = false;
+    if (p.begin(NVS_NS, /*readOnly=*/true)) {
+        migrated = p.getBool(K_MIGRATED, false);
+        p.end();
+    }
+
+    if (!haveNew && !migrated) {
         // Migrate the prototype's namespace so credentials provisioned before
         // this rewrite are not silently lost on update.
         Preferences old;
@@ -195,6 +211,9 @@ void ConnectivityManager::loadConfigFromNvs() {
             old.end();
             if (haveNew) setStationCredentials(_ssid, _password);
         }
+        // Stamp the flag whatever the outcome, so the legacy namespace is
+        // probed at most once in this device's life.
+        { Preferences q; if (q.begin(NVS_NS, false)) { q.putBool(K_MIGRATED, true); q.end(); } }
     }
 
     if (!haveNew) {
@@ -312,6 +331,8 @@ void ConnectivityManager::startStaAttempt() {
     WiFi.setHostname(host);
 
     _gotIp.store(0);
+    _reissueCount.store(0);
+    _reissuePending.store(0);
     _attemptStartedMs = millis();
     _attempt++;
     setState(ConnState::STA_CONNECTING,
@@ -427,6 +448,19 @@ void ConnectivityManager::loop() {
     if (st == ConnState::RADIO_OFF || st == ConnState::BOOT) return;
 
     uint32_t now = millis();
+
+    // --- re-issue a connect after a transient disconnect ----------------
+    // Done here rather than in the event handler so WiFi.begin() is never
+    // called re-entrantly from the event task.
+    if (_reissuePending.exchange(0)) {
+        char ssid[33], pass[65];
+        LOCK();
+        strlcpy(ssid, _ssid, sizeof(ssid));
+        strlcpy(pass, _password, sizeof(pass));
+        UNLOCK();
+        WiFi.begin(ssid, pass);
+        return;
+    }
 
     // --- interactive join deadline -------------------------------------
     if (_joinActive.load() && (JoinPhase)_joinPhase.load() == JoinPhase::CONNECTING) {
@@ -600,8 +634,24 @@ void ConnectivityManager::handleEvent(int32_t eventId, void *infoPtr) {
             break;
         }
 
-        if ((ConnState)_state.load() == ConnState::STA_CONNECTED ||
-            (ConnState)_state.load() == ConnState::APSTA) {
+        ConnState cur = (ConnState)_state.load();
+
+        if (cur == ConnState::STA_CONNECTING) {
+            // Transient reason mid-attempt. Routers commonly answer the first
+            // association with AUTH_EXPIRE (reason 2) and accept the immediate
+            // retry - observed on real hardware, where waiting out the 15 s
+            // deadline instead of re-issuing cost ~13 s of avoidable boot time.
+            // Bounded so a flapping AP cannot spin here.
+            if (_reissueCount.load() < 6) {
+                _reissueCount.fetch_add(1);
+                _reissuePending.store(1);
+                DBG_WIFI("transient disconnect mid-attempt - re-issuing connect (%d/6)\n",
+                         (int)_reissueCount.load());
+            }
+            break;
+        }
+
+        if (cur == ConnState::STA_CONNECTED || cur == ConnState::APSTA) {
             Serial.printf("[Conn] Link lost (reason %u) - reconnecting.\n", reason);
             _attempt = 0;
             startStaAttempt();

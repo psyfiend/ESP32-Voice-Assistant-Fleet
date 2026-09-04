@@ -1,10 +1,15 @@
 #include "Widget_ConnStatus.h"
 #include "UIToolkit.h"
 
-// Palette - matches the approved glyph spec exactly so firmware and design
-// cannot drift. Semantic, not themeable: these colours ARE the information.
-static const uint32_t COL_STRONG  = 0x34d399;  // excellent
-static const uint32_t COL_GOOD    = 0x4ade80;  // good
+// Palette - semantic, not themeable: these colours ARE the information.
+//
+// The greens are brighter than the original spec's #34d399/#4ade80. Those read
+// as washed out on the WS_P4_7B panel in person - these displays have poor
+// gamma and mid-saturation colours lose a lot of punch, which a mockup on a
+// desktop monitor cannot show you. Matched to the pure green the old dummy
+// icon used, which was legible. Tune per-board if another panel disagrees.
+static const uint32_t COL_STRONG  = 0x00ff00;  // excellent
+static const uint32_t COL_GOOD    = 0x2ee65a;  // good
 static const uint32_t COL_WEAK    = 0xfbbf24;  // marginal / AP mode
 static const uint32_t COL_BAD     = 0xf87171;  // no link / degraded
 static const uint32_t COL_OFF     = 0x64748b;  // deliberately disabled
@@ -66,11 +71,18 @@ void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr) {
         _arc[i] = a;
     }
 
+    // Optical centring nudge. lv_arc centres its stroke on the arc radius, so
+    // the visual centre of the fan sits slightly above and right of the
+    // geometric origin; the dot needs to come back down and left to look
+    // centred. Confirmed by eye on both the 7B and the 3248.
+    const int32_t nx = -UiToolkit::sc(1);
+    const int32_t ny =  UiToolkit::sc(2);
+
     const int32_t dotD = UiToolkit::sc(5) < 4 ? 4 : UiToolkit::sc(5);
     _dot = lv_obj_create(_fan);
     lv_obj_remove_style_all(_dot);
     lv_obj_set_size(_dot, dotD, dotD);
-    lv_obj_set_pos(_dot, cx - dotD / 2, cy - dotD / 2);
+    lv_obj_set_pos(_dot, cx - dotD / 2 + nx, cy - dotD / 2 + ny);
     lv_obj_set_style_radius(_dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_opa(_dot, LV_OPA_COVER, 0);
 
@@ -79,7 +91,7 @@ void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr) {
     _stalk = lv_obj_create(_fan);
     lv_obj_remove_style_all(_stalk);
     lv_obj_set_size(_stalk, aw, UiToolkit::sc(7));
-    lv_obj_set_pos(_stalk, cx - aw / 2, cy - UiToolkit::sc(7));
+    lv_obj_set_pos(_stalk, cx - aw / 2 + nx, cy - UiToolkit::sc(7) + ny);
     lv_obj_set_style_bg_opa(_stalk, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(_stalk, aw, 0);
     lv_obj_add_flag(_stalk, LV_OBJ_FLAG_HIDDEN);
