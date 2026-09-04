@@ -41,6 +41,7 @@ char g_deviceId[64]   = {0};
 char g_apSsid[36]     = {0};
 char g_apPassword[16] = {0};
 bool g_built          = false;
+bool g_appendMac      = true;   // default: unique names out of the box
 
 void buildOnce() {
     if (g_built) return;
@@ -56,19 +57,29 @@ void buildOnce() {
     }
     snprintf(g_macSuffix, sizeof(g_macSuffix), "%02x%02x%02x", mac[3], mac[4], mac[5]);
 
-    snprintf(g_hostname, sizeof(g_hostname), "fleet-%s-%s", FLEET_BOARD_SLUG, g_macSuffix);
-
-    // Same identity, underscore rendering. Built by substitution rather than a
-    // second literal so the two can never drift apart.
-    snprintf(g_deviceId, sizeof(g_deviceId), "%s", g_hostname);
+    // deviceId ALWAYS carries the MAC - see the asymmetry note in the header.
+    // Built first, from the always-suffixed form, so the user-facing toggle
+    // below can never reach it.
+    snprintf(g_deviceId, sizeof(g_deviceId), "fleet-%s-%s", FLEET_BOARD_SLUG, g_macSuffix);
     for (char *p = g_deviceId; *p; ++p) {
-        if (*p == '-') *p = '_';
+        if (*p == '-') *p = '_';   // same identity, underscore rendering
+    }
+
+    // User-facing names honour the toggle.
+    if (g_appendMac) {
+        snprintf(g_hostname, sizeof(g_hostname), "fleet-%s-%s", FLEET_BOARD_SLUG, g_macSuffix);
+    } else {
+        snprintf(g_hostname, sizeof(g_hostname), "fleet-%s", FLEET_BOARD_SLUG);
     }
 
     char upper[8];
     snprintf(upper, sizeof(upper), "%s", g_macSuffix);
     for (char *p = upper; *p; ++p) *p = (char)toupper((unsigned char)*p);
-    snprintf(g_apSsid, sizeof(g_apSsid), "FleetSetup-%s", upper);
+    if (g_appendMac) {
+        snprintf(g_apSsid, sizeof(g_apSsid), "FleetSetup-%s", upper);
+    } else {
+        snprintf(g_apSsid, sizeof(g_apSsid), "FleetSetup");
+    }
 
     // Per-device provisioning password derived from the MAC. Not a secret in
     // the cryptographic sense - anyone who can see the AP can see its SSID -
@@ -80,6 +91,15 @@ void buildOnce() {
 } // namespace
 
 namespace DeviceIdentity {
+
+void configure(bool appendMacSuffix) {
+    if (g_built && g_appendMac == appendMacSuffix) return;
+    g_appendMac = appendMacSuffix;
+    g_built     = false;      // force a rebuild with the new policy
+    buildOnce();
+}
+
+bool appendMacSuffix() { return g_appendMac; }
 
 const char *boardSlug()  { return FLEET_BOARD_SLUG; }
 const char *macSuffix()  { buildOnce(); return g_macSuffix; }

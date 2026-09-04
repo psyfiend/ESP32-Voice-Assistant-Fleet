@@ -15,6 +15,7 @@ static const char *K_SSID          = "ssid";
 static const char *K_PASS          = "password";
 static const char *K_MODE          = "mode";
 static const char *K_HOST          = "host";
+static const char *K_MACSFX        = "macsfx";
 
 // How often to re-attempt STA while parked in AP fallback. Without this a
 // device whose router rebooted would sit in AP mode until someone power-cycled
@@ -22,6 +23,18 @@ static const char *K_HOST          = "host";
 static const uint32_t RETRY_WHILE_AP_MS = 60000;
 static const uint32_t JOIN_TIMEOUT_MS   = 20000;
 static const uint32_t BOOT_HOLD_MS      = 1500;
+
+// Troubleshooting-only detail. Baseline lines (state transitions, connect
+// success/failure, AP up/down) always print - they are what you need from a
+// board on a wall. Raw reason codes, per-entry scan dumps and join internals
+// are noise until something is actually wrong, so they are gated. Enable with
+// -D DEBUG_WIFI in one environment's build_flags; see CLAUDE.md's Debug flag
+// convention.
+#ifdef DEBUG_WIFI
+    #define DBG_WIFI(...) Serial.printf("[Conn:debug] " __VA_ARGS__)
+#else
+    #define DBG_WIFI(...) do {} while (0)
+#endif
 
 // ---------------------------------------------------------------------------
 // Name tables (declared in ConnectivityTypes.h)
@@ -232,6 +245,19 @@ void ConnectivityManager::clearStationCredentials() {
     _configured = false;
 }
 
+bool ConnectivityManager::setAppendMacSuffix(bool on) {
+    Preferences p;
+    if (!p.begin(NVS_NS, false)) return false;
+    p.putBool(K_MACSFX, on);
+    p.putBool(K_CONFIGURED, true);
+    p.end();
+    DeviceIdentity::configure(on);
+    Serial.printf("[Conn] MAC suffix %s - hostname now \"%s\", AP SSID \"%s\" (applies on next connect).\n",
+                  on ? "enabled" : "disabled",
+                  DeviceIdentity::hostname(), DeviceIdentity::apSsid());
+    return true;
+}
+
 bool ConnectivityManager::setHostname(const char *hostname) {
     char clean[64];
     if (!DeviceIdentity::sanitizeHostname(hostname, clean, sizeof(clean))) {
@@ -292,6 +318,12 @@ void ConnectivityManager::startStaAttempt() {
              isApActive() ? LinkType::APSTA : LinkType::STA);
     Serial.printf("[Conn] STA attempt %u/%u -> \"%s\" as \"%s\"\n",
                   _attempt, _defaults.STA_RETRY_COUNT, ssid, host);
+    DBG_WIFI("  mode=%s timeout=%lums txcap=%udBm macSuffix=%s deviceId=%s\n",
+             connModeName((ConnMode)_mode.load()),
+             (unsigned long)_defaults.STA_CONNECT_TIMEOUT_MS,
+             _defaults.TX_POWER_DBM,
+             DeviceIdentity::appendMacSuffix() ? "on" : "off",
+             DeviceIdentity::deviceId());
     WiFi.begin(ssid, pass);
 }
 
@@ -436,6 +468,13 @@ void ConnectivityManager::loop() {
             WiFi.scanDelete();
             _joinPhase.store((int32_t)JoinPhase::SCAN_DONE);
             Serial.printf("[Conn] Scan done: %d unique network(s).\n", _scanCount);
+            #ifdef DEBUG_WIFI
+            DBG_WIFI("  %d raw hits collapsed to %d unique\n", n, _scanCount);
+            for (int i = 0; i < _scanCount; i++) {
+                DBG_WIFI("  scan[%d] %-32s %4d dBm  %s\n", i, _scan[i].ssid,
+                         (int)_scan[i].rssi, _scan[i].secured ? "secured" : "open");
+            }
+            #endif
         }
     }
 
@@ -443,6 +482,8 @@ void ConnectivityManager::loop() {
     if (st == ConnState::STA_CONNECTING &&
         now - _attemptStartedMs > _defaults.STA_CONNECT_TIMEOUT_MS) {
 
+        DBG_WIFI("attempt %u timed out after %lums (status=%d)\n",
+                 _attempt, (unsigned long)(now - _attemptStartedMs), (int)WiFi.status());
         WiFi.disconnect(false);
         if (_attempt < _defaults.STA_RETRY_COUNT) {
             startStaAttempt();
@@ -525,6 +566,9 @@ void ConnectivityManager::handleEvent(int32_t eventId, void *infoPtr) {
                  isApActive() ? LinkType::APSTA : LinkType::STA);
         Serial.printf("[Conn] Online: %s  IP %s  RSSI %d dBm\n",
                       WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), (int)WiFi.RSSI());
+        DBG_WIFI("  gw=%s mask=%s dns=%s ch=%d hostname=%s\n",
+                 WiFi.gatewayIP().toString().c_str(), WiFi.subnetMask().toString().c_str(),
+                 WiFi.dnsIP().toString().c_str(), (int)WiFi.channel(), WiFi.getHostname());
 
         // Mode 1 raised the AP only as a fallback; the link is back, so drop it.
         if (isApActive() && (ConnMode)_mode.load() == ConnMode::STA_WITH_AP_FALLBACK) {
@@ -538,6 +582,8 @@ void ConnectivityManager::handleEvent(int32_t eventId, void *infoPtr) {
         uint8_t reason = info ? info->wifi_sta_disconnected.reason : 0;
         _lastReason.store((int32_t)reason);
         _gotIp.store(0);
+        DBG_WIFI("STA_DISCONNECTED raw reason=%u -> %s (joinActive=%d)\n",
+                 reason, joinResultName(classifyDisconnect(reason)), (int)_joinActive.load());
 
         if (_joinActive.load()) {
             JoinResult r = classifyDisconnect(reason);

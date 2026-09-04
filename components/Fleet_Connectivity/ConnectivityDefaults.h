@@ -49,6 +49,15 @@ struct WiFiDefaults {
     // fixed name. Applied BEFORE WiFi.begin() - see ConnectivityManager.
     const char *HOSTNAME;
 
+    // Append the last 6 MAC hex digits to the hostname and AP SSID?
+    //   true  -> "fleet-ws-p4-7b-98d510" / "FleetSetup-98D510"
+    //   false -> "fleet-ws-p4-7b"        / "FleetSetup"
+    // Also settable at runtime from the UI. Turning it OFF makes names
+    // collide between two boards of the same model - fine when you own one of
+    // each, a real nuisance with a pair. It never affects the MQTT/HA device
+    // id, which always keeps the MAC (see DeviceIdentity.h for why).
+    bool        APPEND_MAC_SUFFIX;
+
     // --- AP / captive portal fallback ---
     const char *AP_SSID;                // empty = DeviceIdentity::apSsid()
     const char *AP_PASSWORD;            // empty = DeviceIdentity::apPassword()
@@ -102,6 +111,7 @@ static const WiFiDefaults CONNECTIVITY_DEFAULT_WIFI = {
     .STA_RETRY_COUNT        = 3,
 
     .HOSTNAME               = "",   // derive per-device
+    .APPEND_MAC_SUFFIX      = true, // unique names out of the box
 
     .AP_SSID                = "",   // derive per-device
     .AP_PASSWORD            = "",   // derive per-device

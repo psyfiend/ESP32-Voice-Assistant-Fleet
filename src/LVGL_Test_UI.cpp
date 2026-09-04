@@ -251,7 +251,7 @@ void setup() {
 
     // --= LAYER 3: HEADER BAR =--
     // Header Click -> Toggle System Panel
-    header.init(screen, bsp_hw.device_name);
+    header.init(screen, bsp_hw.device_name, &connMgr);
     lv_obj_add_event_cb(header.getStatusIcon(), header_icon_click_cb, LV_EVENT_CLICKED, NULL);
 
     // 2. BOTTOM DECK (The "Right" Way)

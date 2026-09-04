@@ -699,6 +699,34 @@ Two things worth knowing before you commit to hand-authoring the compile-time fo
   loader needs its own allocation path. That's expected and fine — it's why there are two
   loaders rather than one.
 
+### Q3c — Every default is build-sheet overridable — **DECIDED 2026-09-04**
+
+Requirement: anyone should be able to write a build sheet that redefines *any* default
+setting — not enums or core function names, but every tunable value. `WiFiDefaults` and
+`TimeDefaults` are exactly the shape this applies to.
+
+The design that makes this tractable rather than a maintenance treadmill: **each `*Defaults`
+struct is a schema, and a build sheet is a set of overrides against it.** Adding a field to a
+Defaults struct makes it overridable automatically — no per-setting plumbing, no second list
+to keep in sync, no way for the two to drift.
+
+The mechanism to adopt is the one the NINA project already proved: `settings_table.h` is an
+**X-macro table**, one row per setting carrying its key, default and valid range, which drives
+`settings_defaults_apply()`, `settings_clamp_apply()` and JSON serialization from a single
+declaration. Its own comment warns against "improving" a range without updating both the
+firmware behaviour and the comment — learned the hard way, and worth heeding.
+
+**The line that stays drawn:** `Fleet_BSP` is *not* overridable. Pin assignments, panel
+timings and bus configuration are hardware facts, not preferences; exposing them to a config
+file just lets someone brick a board by editing text. The existing Defaults-vs-BSP split
+already draws this correctly and should not be blurred to satisfy "override everything".
+
+Concretely in scope for build-sheet override: hostname, `APPEND_MAC_SUFFIX`, AP SSID/password,
+AP IP/subnet, idle timeout, connect timeout, retry count, TX power cap, timezone, NTP servers,
+12/24-hour clock — and every field added to a Defaults struct hereafter.
+
+Scoped into milestone 3.1 (schema).
+
 ### Q3b — Sub-cell / fractional grid placement — **DECIDED 2026-09-03**
 
 You raised the case of a 3x3 page with a special card occupying "a quarter of the grid." Worth

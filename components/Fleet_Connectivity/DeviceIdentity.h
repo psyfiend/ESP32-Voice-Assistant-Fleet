@@ -22,6 +22,19 @@
 
 namespace DeviceIdentity {
 
+// Append the MAC suffix to the USER-FACING names (hostname, AP SSID)?
+// Default true. Call before first use - ConnectivityManager applies the stored
+// setting during begin().
+//
+// IMPORTANT ASYMMETRY: this deliberately does NOT affect deviceId(). Hostname
+// and AP SSID are cosmetic - a collision there is a nuisance you notice
+// immediately in the DHCP table. deviceId() is the MQTT/HA unique_id root, and
+// two boards of the same model sharing one would silently merge their entities
+// in Home Assistant, which is both much worse and much harder to spot. So the
+// toggle buys you a tidy "fleet-ws-p4-7b" hostname without ever risking that.
+void configure(bool appendMacSuffix);
+bool appendMacSuffix();
+
 // Board slug from the BSP's device-identity macro, e.g. "ws-p4-7b".
 // Resolved at compile time from whichever BSP_<NAME>.h is active.
 const char *boardSlug();

@@ -82,6 +82,10 @@ public:
     // Rejects anything that cannot be made into a valid DNS label rather than
     // letting it fail confusingly at the DHCP server. Takes effect next connect.
     bool setHostname(const char *hostname);
+    // Append the MAC suffix to hostname and AP SSID. Never touches the MQTT/HA
+    // device id - see DeviceIdentity.h.
+    bool setAppendMacSuffix(bool on);
+    bool getAppendMacSuffix() const { return DeviceIdentity::appendMacSuffix(); }
 
     // --- Interactive scan / join (settings UI) ----------------------------
     bool       startScan();
