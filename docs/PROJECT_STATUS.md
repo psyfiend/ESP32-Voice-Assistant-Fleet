@@ -24,7 +24,7 @@ section.
 | **ESP32-P4-WIFI6-Touch-LCD-5** (WaveShare, macro `WS_P4_5`) | `WS_P4_TOUCH_LCD_5` | untested (not flashed yet) | untested | untested | untested | untested |
 | **ESP32-S3-Touch-LCD-4B** (WaveShare, macro `WS_S3_4B`) | `WS_S3_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ connects (native radio, no hosted-WiFi complexity) |
 | Guition P4 7" (JC1060P470C, macro `CYD_P4_1060`) | `CYD_P4_1060P470` | ✅ | ✅ | ✅ | ✅ (first-ever test of the ES8311-as-sole-mic-input path) | untested (builds clean, not flash-tested for WiFi) |
-| Guition 3.5" (JC3248W535, macro `CYD_S3_3248`) | `CYD_S3_3248W535` | ✅ (both rotations confirmed) | ✅ (both rotations confirmed) | ✅ | ✅ | ⚠️ connects eventually, but reboots several times first (see below) |
+| Guition 3.5" (JC3248W535, macro `CYD_S3_3248`) | `CYD_S3_3248W535` | ✅ (both rotations confirmed) | ✅ (both rotations confirmed) | ✅ | ✅ | ✅ connects, boot resets no longer reproduce (see below) |
 | Guition 5" (JC8048W550, macro `CYD_S3_8048`) | `CYD_S3_8048W550` | ✅ (brightness slider broken, see below) | ✅ | ✅ (notably quieter than other boards, unexplained) | ✅ | untested |
 | WaveShare ESP32-S3-Touch-LCD-5B (macro `WS_S3_5B`) | `WS_S3_TOUCH_LCD_5B` | ✅ (visible tearing, see `FUTURE_IMPROVEMENTS.md`) | ✅ (5 simultaneous points confirmed) | N/A (no audio hardware) | N/A | untested |
 
@@ -156,16 +156,25 @@ connectivity path.
   (the only tested QSPI panel in the fleet, inherently lower-bandwidth than RGB/DSI boards),
   or the CPU cost of `Arduino_Canvas`'s per-pixel software rotation transform, paid on every
   draw call (see `CLAUDE.md`'s Display/touch pipeline section for why that exists).
-- **WiFi (STA) connects, but the board fully resets several times first.** Each reset re-enters
-  `setup()` from scratch (confirmed via serial - the full boot banner and every manager's
-  init log reprint each time), not just a WiFi-internal retry, and it always shows "attempt
-  1/3" since the attempt counter is wiped along with everything else by a real reset. Not yet
-  root-caused; leading hypothesis is a power-supply brownout when the radio's PA keys up for
-  the first time (a well-known ESP32 pattern, especially over a marginal USB
-  port/cable/hub) - unconfirmed, needs a serial capture from cold power-on including the ROM
-  bootloader's own output (a `Brownout detector was triggered!` line would confirm it) and/or
-  a cleaner power source test. Unrelated to the WS_S3_4B RGB timing regression above - this is
-  a different board and a different symptom.
+- **WiFi (STA) boot resets: no longer reproducing as of 2026-09-04 — but not root-caused.**
+  Previously this board reset several times before connecting, each reset re-entering `setup()`
+  from scratch. After the `v0.1.0` Phase 0 work it boots fast and connects cleanly, confirmed on
+  hardware.
+
+  **Treat this as "symptom gone", not "fixed".** Nothing about the power supply, cable or USB port
+  changed, which argues *against* the leading brownout hypothesis rather than confirming it. The
+  changes that landed in between were: LVGL v9.4.0+134 (untagged) → v9.5.0, the platform pinned to
+  the already-installed 55.03.311 (no actual version change), and the board JSON moving from
+  PlatformIO's install directory to `boards/`.
+
+  That last one is worth a look if this ever returns: the vendored JSON came from
+  `~/.platformio/boards/boards 3.3.0/`, and it was never verified byte-identical to the copy that
+  had been sitting in the platform directory. A difference in `f_flash`, `flash_mode` or
+  `psram_type` between them could plausibly change boot-time power behaviour. Unverified, and the
+  environment overrides several of those values in `platformio.ini` anyway.
+
+  If it comes back: capture serial from cold power-on including the ROM bootloader, and look for
+  `Brownout detector was triggered!`.
 
 ## Done
 

@@ -292,7 +292,7 @@ const DisplayConfig CYD_S3_3248W535_DISPLAY = {
     .PANEL_MODEL = "AXS15231B",
     .WIDTH       = 320,
     .HEIGHT      = 480,
-    .ROTATION    = 3,    // 0 = Portrait, 1 = Landscape, 2 = Inverted Portrait, 3 = Inverted Landscape
+    .ROTATION    = 0,    // 0 = Portrait (USB on bottom), 1 = Landscape (USB on right), 2 = Inverted Portrait (USB on left), 3 = Inverted Landscape
 
     .BL_PIN      = 1,
     .BL_ON_LEVEL = 1, // Active HIGH
