@@ -42,9 +42,21 @@ DisplayManager::DisplayManager() {
     #endif
 }
 
+// Normally injected by scripts/fw_version.py via extra_scripts (derived from
+// `git describe`). Defined defensively here so a build still succeeds if that
+// hook is ever skipped - a missing version string must never break the build,
+// it just becomes unknown. See docs/ROADMAP.md section 3.3.
+#ifndef FW_VERSION
+    #define FW_VERSION "unknown"
+#endif
+#ifndef FW_COMMIT
+    #define FW_COMMIT "unknown"
+#endif
+
 bool DisplayManager::begin() {
 
     Serial.println();
+    Serial.printf("Firmware: v%s (%s)\n", FW_VERSION, FW_COMMIT);
     Serial.printf("Device init: %s\n", bsp_hw.device_name);
     Serial.printf("Display hardware: %s\n", bsp_display.PANEL_MODEL);
     Serial.printf("Touch panel: %s\n", bsp_touch.NAME);

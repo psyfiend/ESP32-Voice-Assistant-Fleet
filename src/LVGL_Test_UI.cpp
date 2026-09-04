@@ -67,7 +67,22 @@ void debug_dump_config(bool manualTrigger) {
     #endif
 
     pnlSystem.log("=== SYSTEM DIAGNOSTICS ===");
-    
+
+    // Firmware identity - first, so a photo of the screen or a pasted serial
+    // dump always says which build it came from. FW_VERSION/FW_COMMIT are
+    // injected from `git describe` by scripts/fw_version.py; the fallbacks
+    // below keep the build working if that hook is ever skipped.
+    #ifndef FW_VERSION
+        #define FW_VERSION "unknown"
+    #endif
+    #ifndef FW_COMMIT
+        #define FW_COMMIT "unknown"
+    #endif
+    pnlSystem.log("[FIRMWARE]");
+    pnlSystem.log("  Version: v%s", FW_VERSION);
+    pnlSystem.log("  Commit: %s", FW_COMMIT);
+    pnlSystem.log("  Device: %s", bsp_hw.device_name);
+
     // Hardware Status (Runtime)
     pnlSystem.log("[HARDWARE STATUS]");
     pnlSystem.log("  I2C Backend: %s", FleetI2C::backendName());

@@ -618,27 +618,56 @@ Implementation notes:
 Is a build sheet something (a) you hand-write in a text editor and I compile in, (b) you edit in
 the web UI on the device, or (c) both?
 
-**DECIDED 2026-09-03: both, and a compile-time sheet has the final say.**
+**DECIDED 2026-09-04: both. Three-layer precedence, plus a separate hierarchical lock.**
 
-That inverts the layering used for WiFi (where NVS overrides the compile-time default), so it
-needs stating explicitly rather than being assumed to match.
+Clarified: "the compile-time sheet has the final say" means it **overrules built-in defaults** and
+is the single source of truth for what a device starts as. It does **not** mean runtime
+customization is forbidden. Precedence, lowest to highest:
 
-**One consequence to confirm (open):** taken literally, "compile-time has the final say" means a
-device that ships with a compiled sheet can *never* have its layout changed from the web UI or
-the on-device settings — every runtime edit would be discarded at the next boot. That would make
-the layout half of Phase 4 (milestone 4.2, live grid/spacing/page-reorder editing) pointless on
-exactly the devices you care most about.
-
-Proposed resolution — a per-sheet `authority` field, which gives you both behaviours without
-another decision:
-
-| `authority` | Behaviour |
+| Layer | Role |
 |---|---|
-| `LOCKED` | Compile-time wins absolutely. Runtime edits are rejected with a message. Use for a device you want frozen. |
-| `DEFAULT` *(default)* | Compile-time is the authoritative *starting point* and the factory-reset target. Runtime edits persist on top of it until reset. |
+| 1. Built-in defaults | Baseline used when no sheet says otherwise (the public/first-flash path from Q4) |
+| 2. **Build sheet** (compile-time) | Overrules defaults. The single source of truth for the device's starting state, and the factory-reset target |
+| 3. Runtime / user edits | Overrule the build sheet — **unless blocked by an authority lock** |
 
-`DEFAULT` is what most devices want; `LOCKED` is what your sentence describes literally.
-**Confirm which you meant, or whether the two-mode split is right.** Not blocking until Phase 3.
+This matches the WiFi/NVS layering rather than inverting it, which is the more consistent outcome.
+
+### Authority locks — hierarchical, inherited, overridable
+
+Not over-thinking it. This is the same inheritance pattern as CSS, filesystem ACLs, and LVGL's
+own style system, and it's cheap: one field per node plus a resolver.
+
+`authority` is set at any level of the nesting (Dashboard > Page > Grid > Card > Entity). It
+propagates down until something overrides it.
+
+**It must be a tri-state, not a boolean:**
+
+| Value | Meaning |
+|---|---|
+| `INHERIT` *(default)* | Take the effective value from the nearest ancestor that sets one |
+| `LOCKED` | Frozen here and, by inheritance, below |
+| `UNLOCKED` | Explicitly editable, **even under a `LOCKED` ancestor** |
+
+A boolean can't express the last row, and that row is the whole point of your "unless manually
+overridden by discrete downstream components" — e.g. a locked dashboard with one deliberately
+user-editable card. Resolution walks up until it finds a non-`INHERIT`; the root defaults to
+`UNLOCKED`.
+
+**Critical distinction — lock configuration, never interaction.** Your examples mix two things:
+"pages are locked so new cards cannot be added or deleted" is *structure*, but a naive single
+LOCKED flag would also stop the cards from working. A locked light card must still toggle the
+light. So the lock governs **what the build sheet describes** (layout, placement, which cards
+exist, their config), never whether a control responds to touch. Otherwise a locked kiosk
+dashboard degrades into a photograph.
+
+If a use case later needs "visible but not operable," that's a separate per-card `read_only`
+flag, not a mode of `authority`.
+
+**UI consequence:** when something is locked by inheritance, the settings screen has to say *why*
+and name the ancestor that locked it. A control that silently refuses to change is a bug report
+waiting to happen.
+
+Scoped into milestone 3.1 (schema) and 4.2 (live layout settings).
 
 ### Q3 — Build sheet format — **DECIDED 2026-09-03**
 
