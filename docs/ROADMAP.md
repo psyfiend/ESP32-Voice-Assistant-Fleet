@@ -521,8 +521,8 @@ Two incidental findings worth keeping:
 
 | # | Milestone | Acceptance criteria |
 |---|---|---|
-| 1.1 | Connectivity state machine | Formal `enum class` state machine (BOOT -> STA_CONNECTING -> STA_CONNECTED -> AP_FALLBACK -> APSTA -> DEGRADED) replacing today's 4-state enum; observable via callback |
-| 1.2 | **APSTA feasibility spike** | *Spike branch.* Answer: does `softAP()` + STA work over `esp_hosted` on P4? Result written into PROJECT_STATUS.md. **Gates 1.3.** |
+| 1.1 | Connectivity state machine | **DONE, hardware-verified.** Event-driven, non-blocking, four modes, rich failure classification. Behaviour governed by the signed-off "Connectivity Behavior Spec" |
+| 1.2 | **APSTA feasibility spike** | **DONE — the answer is YES.** `STA_PLUS_AP` confirmed working on both a P4 (`WS_P4_7B`, WiFi via ESP32-C6 over `esp_hosted`) and an S3 (`CYD_S3_3248`) on 2026-09-04. `softAP()` concurrent with STA is fully supported over the hosted transport, so **connectivity mode 2 can be offered fleet-wide** and the settings UI does not need per-board gating. This was the gate on 1.3 and it is now open |
 | 1.3 | AP + captive portal | Device stands up an AP; DNS redirect works; credential-entry page works; STA-only mode selectable with automatic AP fallback on failure |
 | 1.4 | Connectivity settings UI | On-device: scan, pick network, enter password, view IP/RSSI/mode. Header bar shows a live WiFi status icon |
 | 1.5 | Flash-test remaining 5 boards | Every board in PROJECT_STATUS's WiFi column is either confirmed or has a documented reason |

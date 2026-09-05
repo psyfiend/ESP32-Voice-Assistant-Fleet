@@ -4,6 +4,64 @@ Bugs, fixes, additions, and enhancements that apply to a **specific device or a 
 of devices** — not fleet-wide HAL/environment concerns (that's `FUTURE_IMPROVEMENTS.md`'s
 job). Volatile; update or prune entries as they get resolved, don't let this file grow stale.
 
+---
+
+## ⚡ WORK IN FLIGHT — read this first (2026-09-05)
+
+**Branch: `feat/connectivity-state-machine` @ `aa4baab`. Not merged to `main`, deliberately —
+`main` is meant to be always-flashable and this has unverified behaviour on it.**
+
+Phase 1 connectivity. The full mode × failure-type behaviour is **signed off** and lives in the
+"Connectivity Behavior Spec" artifact; `docs/ROADMAP.md` Q1/Q9 carry the decisions. The
+implementation follows that spec.
+
+### Verified on hardware
+- STA connect, both `CYD_S3_3248` and `WS_P4_7B`.
+- `STA_PLUS_AP` (mode 2) works on **both** chip families — this answers GitHub issue #5, the
+  APSTA-over-`esp_hosted` spike, in the affirmative. P4 boards *can* run AP and STA together.
+- AP fallback raises, phone connects, `192.168.4.1` reachable.
+- Auth-failure classification: reason 15 correctly reported as "wrong password", reason 2
+  (`AUTH_EXPIRE`) correctly treated as transient rather than a credentials problem.
+- Header WiFi glyph: blue blink while connecting → green arcs when connected → amber + "AP"
+  badge in AP mode. Per-board motion default confirmed (pulse on DSI, blink on the QSPI 3248).
+- TX power cap of 13 dBm on `CYD_S3_3248` — brownouts stopped. **Confounded**: a USB cable
+  swap happened at the same time, so the cap is not independently proven. `WS_P4_7B` runs with
+  no cap and is stable, which is the control.
+
+### Built but NOT yet verified
+- **Hostname reaching DHCP.** Fixed in `be6e60e`; never confirmed against a real DHCP server.
+  This one must be checked in the router's lease table, **not** in serial output — see the
+  Known-issues entry below for why the device's own report was untrustworthy.
+- **`APPEND_MAC_SUFFIX = false`.** Fixed in `be6e60e`, unverified.
+- The signed-off retry policy: two auth rounds with a 45 s gap, permanent stop when unproven,
+  45-minute recheck when proven, environmental backoff 2→4→8→16→30 min, AP-client deferral.
+  All compiles, none observed.
+
+### Known bug, not yet fixed
+**`_proven` is not tied to the credentials that proved themselves.** It is a bare bool in NVS,
+so changing `LOCAL_STA_PASSWORD` and reflashing leaves a device thinking a password it has
+never tried is proven. Fix is to store a fingerprint of SSID+password alongside the flag and
+only honour `proven` on a match. Deliberately left in place so the proven path could be
+observed at all — changing credentials is otherwise the only easy way to trigger an auth
+failure, and the fix makes that mark them unproven.
+
+### Next tests, in order
+1. Hostname in the DHCP lease table with `APPEND_MAC_SUFFIX = false` → expect `fleet-cyd-s3-3248`
+   / `fleet-ws-p4-5`, no MAC suffix, and `macSuffix=off` in the `[Conn:debug]` line.
+2. Wrong password on a **proven** board → expect two auth rounds then `Next STA retry in 2700 s`.
+   Attach a phone to the AP during the wait to see the deferral line.
+3. `pio run -t erase` then wrong password → **unproven** path → `These credentials have never
+   worked` and a permanent stop, no retry ladder.
+4. Junk SSID → environmental → reason 201, ladder that continues indefinitely and never stops.
+
+### Working on a second machine
+`platformio.ini`'s 26 `symlink://` paths are absolute and machine-specific (see `CLAUDE.md`).
+A clone on another machine must rewrite that prefix — **and must not commit the change**, or
+it breaks the original machine. `components/Fleet_Connectivity/ConnectivityLocalSecrets.h` is
+gitignored and has to be recreated by hand.
+
+---
+
 ## The BSP, briefly
 
 Each board's `components/Fleet_BSP/include/BSP_<NAME>.h` declares a short device-identity
@@ -29,6 +87,19 @@ section.
 | WaveShare ESP32-S3-Touch-LCD-5B (macro `WS_S3_5B`) | `WS_S3_TOUCH_LCD_5B` | ✅ (visible tearing, see `FUTURE_IMPROVEMENTS.md`) | ✅ (5 simultaneous points confirmed) | N/A (no audio hardware) | N/A | untested |
 
 ## Fleet-wide investigations
+
+- **Two diagnostics have now lied to us. Verify connectivity claims from OUTSIDE the device.**
+  This is the most transferable lesson of the Phase 1 work so far:
+  - `WiFi.getHostname()` reads back the same global buffer `WiFi.setHostname()` writes, so the
+    firmware happily reported a hostname the interface had never been given. Only a look at the
+    router's DHCP lease table exposed it. (`setHostname` writes a *default* applied at netif
+    creation; the interface-level call is `WiFi.STA.setHostname()`.)
+  - `esp_wifi_connect()` returns `ESP_ERR_WIFI_CONN` when a connect is already in flight, so a
+    "re-issuing connect" log line described a retry that never happened.
+
+  Consequence for the MQTT and HA-discovery work: "the device says it published" and "the
+  broker received it" are different claims. Issues #9 and #11 require `mosquitto_sub` and the
+  HA UI for exactly this reason.
 
 - **WiFi (station mode)** — in progress; 4 of 8 boards flash-tested so far (3 confirmed
   connecting — `WS_P4_4B`, `WS_S3_4B`, `WS_P4_7B` — and 1 connecting with an open issue). AP/captive-portal fallback
@@ -62,8 +133,19 @@ section.
 
 ### WS_P4_5 — ESP32-P4-WIFI6-Touch-LCD-5
 
-No testing done yet at all — BSP built and compiles, not flashed. See
-`FUTURE_IMPROVEMENTS.md`'s New Hardware section.
+**Never flashed. Currently the active test target (2026-09-05) alongside `CYD_S3_3248`.**
+
+BSP is written and all 8 environments compile, but no code has ever run on this board — so
+display bring-up, touch, rotation and WiFi are all genuinely unknown, not merely unconfirmed.
+Treat a first-flash failure as ordinary rather than as a regression in the connectivity work:
+its sibling `WS_P4_7B` is DSI + P4/C6 hosted WiFi and works, which makes this board *likely*
+to work, but the panel timings and touch controller have never been exercised.
+
+Useful property for connectivity testing: with factory-fresh NVS it is **unproven**, so it
+exercises the permanent-stop path without needing `pio run -t erase`, while the 3248 carries a
+`proven` flag and exercises the 45-minute recheck path. One board for each branch of the spec.
+
+See `FUTURE_IMPROVEMENTS.md`'s New Hardware section.
 
 ### WS_P4_4B — ESP32-P4-WIFI6-Touch-LCD-4B
 
