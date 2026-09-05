@@ -103,7 +103,7 @@ struct TimeDefaults {
 // NOTE: C++ designated initializers must follow declaration order (same rule
 // as the BSP structs - see CLAUDE.md).
 static const WiFiDefaults CONNECTIVITY_DEFAULT_WIFI = {
-    .MODE                   = ConnMode::STA_WITH_AP_FALLBACK,
+    .MODE                   = ConnMode::STA_PLUS_AP,
 
     .STA_SSID               = LOCAL_STA_SSID,
     .STA_PASSWORD           = LOCAL_STA_PASSWORD,
@@ -111,7 +111,7 @@ static const WiFiDefaults CONNECTIVITY_DEFAULT_WIFI = {
     .STA_RETRY_COUNT        = 3,
 
     .HOSTNAME               = "",   // derive per-device
-    .APPEND_MAC_SUFFIX      = true, // unique names out of the box
+    .APPEND_MAC_SUFFIX      = false, // unique names out of the box
 
     .AP_SSID                = "",   // derive per-device
     .AP_PASSWORD            = "",   // derive per-device

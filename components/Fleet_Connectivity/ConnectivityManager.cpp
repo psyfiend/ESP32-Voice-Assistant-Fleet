@@ -254,6 +254,21 @@ void ConnectivityManager::loadConfigFromNvs() {
         UNLOCK();
         _mode.store((int32_t)_defaults.MODE);
     }
+    // Apply the stored MAC-suffix policy BEFORE anything reads a derived name.
+    // DeviceIdentity caches its strings on first use, so a late call here would
+    // leave hostname/AP SSID built against the wrong policy - which is exactly
+    // what happened when this call went missing: APPEND_MAC_SUFFIX = false had
+    // no effect at all, because nothing ever told DeviceIdentity about it.
+    {
+        Preferences q;
+        bool appendMac = _defaults.APPEND_MAC_SUFFIX;
+        if (q.begin(NVS_NS, /*readOnly=*/true)) {
+            appendMac = q.getBool(K_MACSFX, _defaults.APPEND_MAC_SUFFIX);
+            q.end();
+        }
+        DeviceIdentity::configure(appendMac);
+    }
+
     _configured = (_ssid[0] != '\0');
 }
 
@@ -405,9 +420,13 @@ void ConnectivityManager::startStaAttempt() {
     strlcpy(host, _hostname[0] ? _hostname : DeviceIdentity::hostname(), sizeof(host));
     UNLOCK();
 
-    // Hostname MUST be applied before WiFi.begin(). Setting it afterwards
-    // silently has no effect until the next reconnect - a classic time-waster.
+    // Two calls, deliberately. The first keeps NetworkManager's global default
+    // in sync (it is what any freshly-created netif inherits); the second sets
+    // the hostname on the STA interface itself via esp_netif_set_hostname,
+    // which is the value actually sent in DHCP option 12. Only the second one
+    // affects what your router displays - see the long note in begin().
     WiFi.setHostname(host);
+    WiFi.STA.setHostname(host);
 
     _gotIp.store(0);
     _reissueCount.store(0);
@@ -557,6 +576,28 @@ bool ConnectivityManager::begin() {
     WiFi.onEvent(wifiEventTrampoline);
     WiFi.persistent(false);           // NVS is ours, not the WiFi driver's
     WiFi.setAutoReconnect(false);     // this class owns retry policy
+
+    // The hostname MUST be set before WiFi.mode(), and this is subtle enough
+    // to be worth spelling out.
+    //
+    // WiFi.setHostname() does NOT set the interface's hostname. It writes a
+    // global `default_hostname[32]` in NetworkManager and returns true
+    // unconditionally. That default is copied onto the STA netif only when the
+    // netif is CREATED - which is what WiFi.mode() does. Call it afterwards and
+    // the string changes but the interface never does, so DHCP keeps
+    // advertising the stock esp32s3-XXXXXX name.
+    //
+    // Worse, WiFi.getHostname() reads back that same global buffer, so it
+    // cheerfully reports the name you set while the router shows the old one -
+    // which is exactly how this hid until someone checked a DHCP lease table.
+    //
+    // Note the 32-byte ceiling on that buffer: a long board slug plus a MAC
+    // suffix could silently truncate.
+    {
+        char host[64];
+        getHostname(host, sizeof(host));
+        WiFi.setHostname(host);
+    }
 
     WiFi.mode(mode == ConnMode::STA_PLUS_AP ? WIFI_AP_STA : WIFI_STA);
     applyRadioTuning();
@@ -905,7 +946,7 @@ void ConnectivityManager::handleEvent(int32_t eventId, void *infoPtr) {
     case ARDUINO_EVENT_WIFI_AP_STACONNECTED:
         _apClients.fetch_add(1);
         _apLastClientMs = millis();
-        Serial.printf("[Conn] AP client connected (%d total).\n", (int)_apClients.load());
+        Serial.printf("[Conn] AP client connected (%d total)\n", (int)_apClients.load());
         break;
 
     case ARDUINO_EVENT_WIFI_AP_STADISCONNECTED:
