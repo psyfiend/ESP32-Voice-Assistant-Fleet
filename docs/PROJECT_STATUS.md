@@ -27,12 +27,26 @@ implementation follows that spec.
 - TX power cap of 13 dBm on `CYD_S3_3248` — brownouts stopped. **Confounded**: a USB cable
   swap happened at the same time, so the cap is not independently proven. `WS_P4_7B` runs with
   no cap and is stable, which is the control.
+- **`APPEND_MAC_SUFFIX = false` — VERIFIED 2026-09-06 on `WS_P4_5`.** `macSuffix=off` in the
+  `[Conn:debug]` line and the derived hostname is `fleet-ws-p4-5` with no hex suffix, while
+  `deviceId` still carries it (`fleet_ws_p4_5_e0d24b`) — so the two names are being derived
+  independently as intended. This is a local-derivation check and is legitimately confirmed;
+  it is **not** the same claim as the DHCP item below.
+
+- **`WS_P4_5` full bring-up (2026-09-06).** Display, GT911 touch, ES8311 out, ES7210 in
+  (codec init), WiFi STA on a real DHCP lease, and the AP with a client attached — all on the
+  first boot after the reset-polarity fix. Third P4 board confirming `STA_PLUS_AP`, and the
+  first live sighting of the unproven → proven NVS transition
+  (`[Conn] Credentials confirmed working.`). `HIGH_DPI_DISPLAY` also confirmed good on this
+  panel. See `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
 
 ### Built but NOT yet verified
-- **Hostname reaching DHCP.** Fixed in `be6e60e`; never confirmed against a real DHCP server.
-  This one must be checked in the router's lease table, **not** in serial output — see the
-  Known-issues entry below for why the device's own report was untrustworthy.
-- **`APPEND_MAC_SUFFIX = false`.** Fixed in `be6e60e`, unverified.
+- **Hostname reaching DHCP.** Fixed in `be6e60e`; still never confirmed against a real DHCP
+  server. Must be checked in the router's lease table, **not** in serial output — the device's
+  `hostname=` line reads back the same buffer it wrote, which is exactly how this fooled us
+  before. Note `WS_P4_5` printing `hostname=fleet-ws-p4-5` on 2026-09-06 does **not** close
+  this; there was no router access at that location.
+
 - The signed-off retry policy: two auth rounds with a 45 s gap, permanent stop when unproven,
   45-minute recheck when proven, environmental backoff 2→4→8→16→30 min, AP-client deferral.
   All compiles, none observed.

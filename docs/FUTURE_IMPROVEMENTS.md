@@ -58,6 +58,24 @@ Worth doing before connectivity/MQTT GUI panels and future peripheral panels add
   internals work, not a config tweak. See `docs/BRINGUP_WS_S3_TOUCH_LCD_5B.md` for the
   investigation that found this.
 
+### Per-device DPI and font scaling
+
+`HIGH_DPI_DISPLAY` is currently a single on/off build flag that does two things: sets LVGL's
+DPI to 150 (`GuiManager.cpp`) and swaps in a larger font set (`UIToolkit.cpp` — caption 10->16,
+label 12->20, button/header ->22, hero ->34). The high-DPI font block is commented "P4 Smart86
+(High Res)", i.e. it was sized for one specific panel.
+
+That is too coarse for the fleet. The boards differ in both pixel count *and* physical size, and
+those are independent: a 720x1280 4-inch panel and a 1024x600 7-inch panel want different
+scaling even though a single flag treats them as one case. Confirmed good on `WS_P4_5`
+(720x1280, 2026-09-06) and on the 4B, but that is two data points on a boolean.
+
+Better shape: derive scaling from BSP values rather than a flag — physical diagonal (or DPI)
+alongside the existing `WIDTH`/`HEIGHT`, and pick fonts and LVGL DPI from that. Would also let
+the diagnostics dump report a real computed scale instead of `STANDARD (1.0x Scaling)` versus
+an implicit "high". Low priority while the fleet is small; worth doing before the card library
+expands (GitHub issue #31).
+
 ## Audio
 
 - **AEC stays deprioritized indefinitely**, not just paused. If from-scratch
@@ -227,11 +245,34 @@ revision — two physical units of the same board model can ship with different 
 revisions depending on manufacture date, and it's confirmed only via a chip-ID probe, never
 from the PCB silkscreen alone.
 
-This project's patched `GFX_Library_for_Arduino` currently hardcodes `PLL_F20M` (`rev1_3`
-behavior) — it does not read or branch on anything at runtime. Every P4 board's BSP has a
-`bsp_hw.SI_REV` field (`"rev1_3"` / `"rev3_x"` / `"unconfirmed"`) for documentation purposes,
-but it's inert — nothing consumes it yet. Wiring it up to actually select the PHY clock
-source at build time would mean touching the vendored GFX library, not just the BSP.
+**Updated 2026-09-06 (`feat/p4-5-display-bringup`).** Three things are now known that were not
+when the above was written:
+
+- **`pioarduino` already handles the build-setting half automatically.** It ships two prebuilt
+  lib variants — `esp32p4_es` (pre-rev3: `SELECTS_REV_LESS_V3=y`, `REV_MIN_1`) and `esp32p4`
+  (`REV_MIN_301`) — and selects between them from the board definition. `board =
+  esp32-p4-evboard` picks **`esp32p4_es`**, so the fleet is already built for pre-rev3 silicon
+  and the `Chip Variant` concern is handled. Beware: `framework-arduinoespressif32-libs/` holds
+  *both* variants' `sdkconfig` files, and reading the wrong one is very easy — it cost most of
+  a session.
+- **The PHY clock source is now selectable per board.** `DisplayConfig.PHY_CLK_SRC` plus a
+  constructor parameter on `Arduino_ESP32DSIPanel` does exactly the wiring-up this section
+  anticipated. `0` = keep the library's `PLL_F20M`, so no existing board changed.
+- **It did not matter in practice.** `PLL_F20M` and IDF-auto were tested head-to-head on a
+  confirmed rev1.3 chip and behaved identically. The display bug that prompted the
+  investigation turned out to be panel reset polarity, not the clock source. So treat the
+  rev1_3/rev3_x PHY-clock distinction as real but so far unobserved — do not assume it explains
+  a DSI failure.
+
+One measured data point exists: the `WS_P4_5` unit is **rev v1.3** (eFuse
+`WAFER_VERSION_MAJOR=1`, `MINOR=3`). The other three P4 boards have never been probed — one
+`esptool flash-id` each would settle what the fleet actually contains.
+
+`bsp_hw.SI_REV` remains inert and should stay `"unconfirmed"`: silicon revision is a per-chip
+property, so a per-board-model header cannot represent it correctly. If it is ever made
+load-bearing, read the revision at runtime and compare, the way `checkAudioBspSanity()` does.
+
+Full detail: `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
 
 ## New hardware
 

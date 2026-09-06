@@ -135,6 +135,29 @@ calling test 1 done.
   rotation other than 0, actual mic capture, SD card, `HIGH_DPI_DISPLAY` scaling.
 - Chip is ESP32-P4 rev v1.3, which turned out to be irrelevant - see corrections.
 
+## Follow-up flashes, same session (2026-09-06)
+
+Two more builds after the fix, both good:
+
+- **`HIGH_DPI_DISPLAY` enabled** — looks correct on this panel, no clipping. The flag sets LVGL
+  DPI to 150 and swaps in a larger font set whose block is commented "P4 Smart86 (High Res)",
+  i.e. tuned for a different board. It happens to suit 720x1280 too. A proper per-device
+  scaling scheme is written up in `FUTURE_IMPROVEMENTS.md` under LVGL / Display.
+- **`CORE_DEBUG_LEVEL` lowered 4 -> 1** (errors only) to stop the serial flood. The `STEP`
+  instrumentation is `ESP_LOGI` so it compiles out entirely at level 1 — verified: the strings
+  are not even linked into the image, which shrank by ~18 KB. All the app's own
+  `Serial.printf` output (`[Conn]`, `[DisplayMgr]`, `[AudioMgr]`, the diagnostics dump) is
+  unaffected, and the ESP32-C6 `rpc_core` error still shows because it is `[E]`.
+  **Raise it back to 4 before debugging anything display-related on this board.**
+
+**`APPEND_MAC_SUFFIX = false` is confirmed**: `macSuffix=off`, hostname `fleet-ws-p4-5` with no
+hex suffix, while `deviceId` still carries one (`fleet_ws_p4_5_e0d24b`) — the two names derive
+independently, as intended. This is a local-derivation check and stands on its own.
+
+**It does not close the DHCP question.** The device's `hostname=` line reads back the buffer it
+wrote; that is precisely the trap recorded in `PROJECT_STATUS.md`. There was no router access
+at this location, so the lease-table check is still outstanding.
+
 ## Where it used to hang (history, kept for the diagnostic method)
 
 Line numbers shift as instrumentation changes, so this is expressed by call. From a
