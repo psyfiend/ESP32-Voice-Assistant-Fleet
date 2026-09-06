@@ -15,13 +15,15 @@ here — the root cause below was found by diffing against it.
 
 ---
 
-## PRIME SUSPECT (2026-09-06): the panel's reset is ACTIVE HIGH and we drive it active LOW
+## RESOLVED (2026-09-06): the panel's reset is ACTIVE HIGH; we were driving it active LOW
 
-**IMPLEMENTED AND BUILT on this branch; not yet flashed.** Flash and read the log — the new
-`panel reset done (active HIGH)` line confirms the new path ran.
+**Confirmed on hardware. The display, touch, audio and WiFi all came up on the first boot
+after the fix.**
 
-Waveshare's own copy of `Arduino_DSI_Display.cpp` carries a patch our fork does not, with an
-explicit comment:
+`Arduino_DSI_Display::begin()` hardcoded a generic active-LOW reset sequence that *ends with
+the pin HIGH*. This panel's HX8394 declares reset **active HIGH**, so "HIGH" means asserted —
+the panel was held in reset for the entire init. Waveshare had patched their own bundled copy
+of this exact file, with a comment stating the consequence outright:
 
 > The Waveshare ESP32-P4-WIFI6-Touch-LCD-5 HX8394 panel declares an ACTIVE-HIGH reset (BSP
 > `flags.reset_active_high = 1`): assert = HIGH, release = LOW. **The generic Arduino sequence
@@ -30,25 +32,19 @@ explicit comment:
 
 | | sequence | ends at |
 |---|---|---|
-| **Vendor (correct for this panel)** | `LOW` -> 10 ms -> `HIGH` -> 10 ms -> `LOW` -> 120 ms | **LOW = released** |
-| **Our fork (generic active-low)** | `HIGH` -> 5 ms -> `LOW` -> 10 ms -> `HIGH` -> 120 ms | **HIGH = asserted** |
+| **Correct for this panel** | `LOW` -> 10 ms -> `HIGH` -> 10 ms -> `LOW` -> 120 ms | **LOW = released** |
+| **What the fork did** | `HIGH` -> 5 ms -> `LOW` -> 10 ms -> `HIGH` -> 120 ms | **HIGH = asserted** |
 
-Our sequence leaves RST asserted, so the HX8394 is held in reset for the whole init.
+It explained every symptom at once: the host-side calls all succeeded because the panel was
+never involved; init commands 0-18 returned instantly because they were only landing in the DSI
+command FIFO; command 19 blocked because ~238 bytes in, the FIFO was full and nothing was
+draining; the backlight never lit because `gfx->begin()` never returned; the shipped factory
+firmware worked because IDF's `esp_lcd_hx8394` driver honours `flags.reset_active_high`; and
+the other three P4 boards were fine because their panels are active-LOW.
 
-This explains every observation simultaneously:
+### The fix
 
-| observation | explanation under this hypothesis |
-|---|---|
-| DSI bus, DBI IO and DPI panel all create successfully | all host-side; the panel is not involved |
-| commands 0-18 return instantly | they are only landing in the DSI command FIFO |
-| command 19 blocks forever | ~238 bytes in, FIFO full, nothing draining because the panel is in reset |
-| backlight never lights | `DisplayManager` lights it after `gfx->begin()`, which never returns |
-| the shipped factory demo drives the panel fine | IDF's `esp_lcd_hx8394` driver honours `flags.reset_active_high` |
-| `WS_P4_7B`, `WS_P4_4B`, `CYD_P4_1060` all work | their panels are active-LOW; the generic sequence is correct for them |
-
-### The fix, as implemented
-
-`DisplayConfig` gains `uint8_t RST_ACTIVE_HIGH`, declared next to the reset pin. `0` (the
+`DisplayConfig` gained `uint8_t RST_ACTIVE_HIGH`, declared beside the reset pin. `0` (the
 zero-filled default) means active-low, so the three working P4 boards take a bit-for-bit
 identical path; only `BSP_WS_P4_TOUCH_LCD_5.h` sets `.RST_ACTIVE_HIGH = 1`. It is plumbed
 through `Arduino_DSI_Display`'s constructor, which now branches:
@@ -59,28 +55,87 @@ else                  { HIGH; 5ms; LOW; 10ms; HIGH; 120ms; }   // generic, uncha
 ```
 
 An `ESP_LOGI("panel reset done (active %s)")` reports which branch ran, so a stale build is
-visible immediately.
+visible immediately. The vendor's sequence was deliberately **not** copied in unconditionally,
+which would have inverted reset on the three working boards.
 
-The vendor's sequence was deliberately **not** copied in unconditionally — that would invert
-reset on the three boards that currently work.
+### Confirming log
 
-All four P4 environments build clean with this change.
+```
+[1559] panel reset done (active HIGH)
+[1665]   cmd[0] = 0x11
+...
+[1941]   cmd[19] = 0xBD      <- previously blocked here forever
+[2182]   cmd[24] = 0x29
+[2270] send init commands success
+```
+
+### How it was found
+
+By diffing Waveshare's bundled copy of the Arduino GFX library against our fork. Earlier
+rounds had diffed only `Arduino_ESP32DSIPanel.cpp`; the reset patch lives in
+`Arduino_DSI_Display.cpp`, which had never been compared. **When a vendor ships a
+known-working copy of a library you have forked, diff the whole tree before theorising.**
 
 ---
 
+## First successful boot: what came up (2026-09-06)
+
+Everything on the board worked on the first boot after the reset fix. Nothing else needed
+changing.
+
+| Subsystem | Result |
+|---|---|
+| **Display** | MIPI/DSI HX8394, 720x1280, rotation 0. All 25 init commands sent |
+| **Backlight** | GPIO26 PWM 5 kHz, brightness sweep 3% - 100% clean |
+| **Touch** | GT911 at `0x5D`, manual pin config (INT/RST both `-1`), init success |
+| **Audio out** | ES8311 at `0x18`, I2S slave, 440 Hz tone played |
+| **Audio in** | ES7210 at `0x40`, TDM disabled, I2S format OK. Codec init only - mic capture not yet exercised |
+| **Amp** | GPIO53 driven HIGH |
+| **WiFi STA** | Connected, `10.0.0.2`, RSSI -65 dBm, gw `10.0.0.1` |
+| **WiFi AP** | `FleetSetup` / `fleete0d24b` at `192.168.4.1`, one client attached |
+| **Mode** | `STA_PLUS_AP` - third P4 board confirming APSTA works on this chip family |
+| **NVS proven flag** | `[Conn] Credentials confirmed working.` observed - the unproven -> proven transition, seen live for the first time |
+| **PSRAM** | 32 MB, 3.74 MB allocated after setup (two 720x1280x2 framebuffers plus LVGL) |
+
+**Partial result on connectivity test 1.** `macSuffix=off` appears in the `[Conn:debug]` line
+and the derived hostname is `fleet-ws-p4-5` with no MAC suffix, so `APPEND_MAC_SUFFIX = false`
+is confirmed at the derivation level. **The DHCP half is still unverified** - there was no
+router access at the test location, and per this repo's own hard-won lesson the device's
+`hostname=` report reads back the same buffer it wrote. Check the router's lease table before
+calling test 1 done.
+
+### Two things worth following up
+
+1. **ESP32-C6 co-processor firmware is unreadable and reports `0.0.0`.**
+
+   ```
+   E (5397) rpc_core: Response not received for [0x15e](Req_GetCoprocessorFwVersion)
+   Could not get slave firmware version: ESP_FAIL
+   Host firmware version: 2.12.11   Slave firmware version: 0.0.0
+   Version on Host is NEWER than version on co-processor
+   Update URL: https://espressif.github.io/arduino-esp32/hosted/esp32c6-v2.12.11.bin
+   ```
+
+   WiFi works anyway, but this costs roughly **1 second of boot time** in failed RPC retries
+   (t=5397 and t=6438). Likely affects every P4 board in the fleet, since they all use the same
+   ESP-Hosted SDIO transport to a C6. Worth checking on `WS_P4_7B` and `WS_P4_4B` and, if
+   consistent, flashing the slave firmware once per board.
+
+2. **I2C speed reported twice, differently.** `i2cInit()` logs `freq=100000` while
+   `[TouchMgr]` logs `Speed:400000`. Both work. Probably just two different reporters, but
+   `CLAUDE.md` records that `I2C_CLOCK_SPEED` was collapsed from two fields into the
+   touch-side value, so it is worth confirming which one actually reaches the bus.
+
 ## Current state
 
-- **Display: NOT working.** Firmware boots and runs; hangs inside `_gfx->begin()` while
-  transmitting DSI init command index 19.
-- **Touch, audio, WiFi, SD: untested**, blocked behind the display.
-- **The board is healthy.** Not bricked, not a bad flash, not a bad BSP, and the shipped
-  factory firmware drives the panel — so the hardware and the panel are known good.
-- **Chip is ESP32-P4 rev v1.3**, and (see corrections) that turned out to be a non-issue.
-- Committed on this branch: a per-board `PHY_CLK_SRC` and `NUM_FB` mechanism plus `STEP`
-  instrumentation. Both experiments came back negative; the mechanism is kept because it is
-  the right shape for the reset-polarity fix and costs the other boards nothing.
+- **Display: WORKING.** Root cause was reset polarity (above); fixed and confirmed on hardware.
+- **Touch, audio out, audio in (codec init), WiFi STA, WiFi AP, STA_PLUS_AP: all working** on
+  the first boot after the fix. See the boot table above.
+- **Not yet exercised:** rotation (BSP is `ROTATION = 0`), touch coordinate mapping at any
+  rotation other than 0, actual mic capture, SD card, `HIGH_DPI_DISPLAY` scaling.
+- Chip is ESP32-P4 rev v1.3, which turned out to be irrelevant - see corrections.
 
-## Where it hangs, precisely
+## Where it used to hang (history, kept for the diagnostic method)
 
 Line numbers shift as instrumentation changes, so this is expressed by call. From a
 `CORE_DEBUG_LEVEL=4` boot:
@@ -239,29 +294,38 @@ rather than being mistaken for a failed experiment.
 
 ## Next steps, in order
 
-1. **Test the reset polarity fix.** Add `RST_ACTIVE_HIGH` to `DisplayConfig` (default `0` =
-   active low), plumb it through `Arduino_DSI_Display`, set it on the P4_5, and use the vendor
-   sequence when set: `LOW` -> 10 ms -> `HIGH` -> 10 ms -> `LOW` -> 120 ms. Expect the init loop
-   to run past index 19 and `gfx->begin()` to return.
-2. **If that works**, reset `.PHY_CLK_SRC` and `.NUM_FB` to `0` and re-test, to confirm neither
-   was load-bearing before leaving them in. Then move the `STEP` instrumentation behind
-   `#ifdef DEBUG_DISPLAY` per the repo's debug-flag convention rather than deleting it.
-3. **If it does not work**, stop theorising and run the two controls:
-   - Flash `firmware/...FactoryOnly...bin` from the vendor tree — restores the shipped demo and
-     re-proves the hardware.
-   - Build Waveshare's `01_HelloWorld` against **their** bundled libraries. Their Arduino path
-     uses the same prebuilt `arduino-esp32` libs we do, so the framework is byte-identical and
-     any difference is purely library/config code — directly bisectable.
-4. **Adopt Waveshare's `DSI_STEP_CHECK`** in place of `ESP_ERROR_CHECK` regardless of outcome: it
+The display bug is closed. What remains is ordinary bring-up plus tidy-up of the scaffolding
+built while chasing it.
+
+1. **`HIGH_DPI_DISPLAY`.** Added to the `WS_P4_TOUCH_LCD_5` env after the first successful
+   boot (that boot reported `Display Mode: STANDARD (1.0x Scaling)`). A 720x1280 panel at this
+   size wants it. Verify the diagnostics dump switches away from `STANDARD (1.0x Scaling)` and
+   that the UI scales without clipping.
+2. **Rotation and touch mapping.** BSP is `ROTATION = 0` (portrait, vendor-confirmed). Nothing
+   else has been tried. Note `TouchManager::mapCoordinates()` has a per-board special case
+   (`#ifndef WS_P4_7B`) whose reasoning `CLAUDE.md` records as undocumented and never
+   re-tested - this board is a clean opportunity to check which branch is actually correct.
+3. **Finish connectivity test 1.** `macSuffix=off` and the un-suffixed derived hostname are
+   confirmed; the DHCP lease-table half needs a router. Do it at home.
+4. **Connectivity test 2 is now unblocked.** This board logged
+   `[Conn] Credentials confirmed working.`, so it is *proven* in NVS. Set a wrong
+   `LOCAL_STA_PASSWORD`, rebuild, and flash **without** `-t erase` (erasing would clear the
+   proven flag and drop you into test 3 instead).
+5. **Mic capture.** ES7210 initialises, but nothing has actually recorded.
+6. **Retire the scaffolding.** Set `.PHY_CLK_SRC` and `.NUM_FB` back to `0` and re-test to
+   confirm neither was load-bearing - both were tested against the bug and neither changed it,
+   so they should come out. Then move the `STEP` and per-command instrumentation behind
+   `#ifdef DEBUG_DISPLAY`, per this repo's debug-flag convention, rather than deleting it.
+   Keep `RST_ACTIVE_HIGH` - it is a real board property.
+7. **Adopt Waveshare's `DSI_STEP_CHECK`** in place of `ESP_ERROR_CHECK` in the DSI path. It
    prints the failing step and error code instead of aborting.
-5. **Diff the rest of the vendor GFX tree.** The reset finding surfaced only because
-   `Arduino_DSI_Display.cpp` was diffed. These also differ and have not been examined:
-   `Arduino_GFX.h`, `Arduino_ESP32RGBPanel.cpp`, `Arduino_ESP32SPIDMA.cpp`,
-   `Arduino_DSI_Display.h`, `Arduino_RGB_Display.h`. Some may matter for other boards.
-6. **Backlight ordering.** Waveshare lights the backlight *before* `gfx->begin()`;
-   `DisplayManager` does it after, deliberately, to override `pinMode()` calls. Not a bug, but it
-   means a dark panel carries no diagnostic information. Consider an early low-brightness enable
-   so panel state is visible during init.
+8. **Diff the rest of the vendor GFX tree.** The reset fix was found only because
+   `Arduino_DSI_Display.cpp` was finally diffed. These also differ and have never been
+   examined: `Arduino_GFX.h`, `Arduino_ESP32RGBPanel.cpp`, `Arduino_ESP32SPIDMA.cpp`,
+   `Arduino_DSI_Display.h`, `Arduino_RGB_Display.h`. Some may carry fixes relevant to the RGB
+   boards.
+9. **ESP32-C6 co-processor firmware** reports `0.0.0` and costs ~1 s of boot time in failed
+   RPC. Check whether `WS_P4_7B` and `WS_P4_4B` do the same; if so it is a fleet-wide P4 item.
 
 ## Corrections — theories that were confidently wrong
 

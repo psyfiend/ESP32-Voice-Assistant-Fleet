@@ -154,11 +154,17 @@ reads closer to official ESP-IDF audio examples.
   session. `BoardHardware.SI_REV` stays `"unconfirmed"` on every P4 board and should: silicon
   revision is a per-chip property, not a per-board-model one, so a BSP header cannot represent
   it correctly. See `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
-- **Panel reset polarity is per-board and is not currently modelled in the BSP.**
-  `Arduino_DSI_Display::begin()` hardcodes an active-LOW reset sequence. The Waveshare P4-5's
-  HX8394 declares reset **active HIGH**, so that sequence leaves it held in reset. Suspected
-  cause of the open `WS_P4_5` display hang; the fix is a `DisplayConfig` field defaulting to
-  active-low so existing boards are unaffected. See `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
+- **Panel reset polarity is per-board: `DisplayConfig.RST_ACTIVE_HIGH`.** `0` (the zero-fill
+  default) is the generic active-LOW sequence every board used before this field existed; `1`
+  selects assert-HIGH / release-LOW, mirroring `esp_lcd panel_hx8394_reset`. The Waveshare
+  P4-5's HX8394 needs `1` — with the active-low sequence the pin ends asserted and the panel
+  is held in reset, which manifests as DSI init commands filling the host FIFO and blocking
+  part-way through `gfx->begin()`. That cost most of a session to find. Confirmed fixed on
+  hardware 2026-09-06; see `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
+- **When a vendor ships a known-working copy of a library you have forked, diff the whole tree
+  before theorising.** The reset-polarity fix sat in Waveshare's own copy of
+  `Arduino_DSI_Display.cpp`, with a comment naming the exact failure mode. Several rounds of
+  hypotheses were spent because only `Arduino_ESP32DSIPanel.cpp` had been compared.
 
 ## PlatformIO build cache can silently ignore BSP header edits
 

@@ -62,18 +62,19 @@ gitignored and has to be recreated by hand.
 
 ---
 
-### WS_P4_5 display bring-up — on its own branch, see its own doc
+### WS_P4_5 display bring-up — RESOLVED 2026-09-06
 
-Work happens on **`feat/p4-5-display-bringup`** (cut from this branch), not here. The board
-boots and runs firmware but hangs inside `_gfx->begin()` transmitting DSI init command 19.
-Hardware is known good — the shipped factory firmware drives the panel.
+Branch **`feat/p4-5-display-bringup`**. The board is fully up: display, touch, audio, WiFi STA
+and AP all working.
 
-Prime suspect as of 2026-09-06: **the HX8394's reset is active HIGH and the GFX library drives
-it active LOW**, holding the panel in reset for the whole init. Waveshare patched their own
-copy of the library for exactly this; our fork did not inherit it. Untested.
+Root cause was **panel reset polarity** — the HX8394 resets active HIGH while the GFX library
+hardcoded an active-LOW sequence that ends with the pin asserted, holding the panel in reset
+through the whole init. Fixed with a per-board `DisplayConfig.RST_ACTIVE_HIGH` defaulting to
+active-low, so no other board changed. Found by diffing Waveshare's bundled copy of the
+library against our fork.
 
-Everything — evidence, ruled-out causes, corrections to earlier wrong theories, and next steps
-— is in `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`. Read that before touching the P4 display path.
+Full history, the ruled-out list, corrections to several wrong theories, and remaining
+bring-up items: `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
 
 ## The BSP, briefly
 
@@ -92,7 +93,7 @@ section.
 |---|---|---|---|---|---|---|
 | **ESP32-P4-WIFI6-Touch-LCD-7B** (WaveShare, macro `WS_P4_7B`) | `WS_P4_TOUCH_LCD_7B` | ✅ | ✅ (portrait; rotation untested) | untested (no speaker access — enclosure doesn't expose it) | untested | ✅ connects (2026-09-03) |
 | **ESP32-P4-WIFI6-Touch-LCD-4B** (WaveShare, macro `WS_P4_4B`) | `WS_P4_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ connects, real DHCP IP (see below) |
-| **ESP32-P4-WIFI6-Touch-LCD-5** (WaveShare, macro `WS_P4_5`) | `WS_P4_TOUCH_LCD_5` | flashed; boots, hangs in DSI init (see WORK IN FLIGHT) | untested | untested | untested | untested |
+| **ESP32-P4-WIFI6-Touch-LCD-5** (WaveShare, macro `WS_P4_5`) | `WS_P4_TOUCH_LCD_5` | ✅ (rotation untested) | ✅ | ✅ | ✅ codec init (capture untested) | ✅ connects, AP + STA_PLUS_AP confirmed |
 | **ESP32-S3-Touch-LCD-4B** (WaveShare, macro `WS_S3_4B`) | `WS_S3_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ connects (native radio, no hosted-WiFi complexity) |
 | Guition P4 7" (JC1060P470C, macro `CYD_P4_1060`) | `CYD_P4_1060P470` | ✅ | ✅ | ✅ | ✅ (first-ever test of the ES8311-as-sole-mic-input path) | untested (builds clean, not flash-tested for WiFi) |
 | Guition 3.5" (JC3248W535, macro `CYD_S3_3248`) | `CYD_S3_3248W535` | ✅ (both rotations confirmed) | ✅ (both rotations confirmed) | ✅ | ✅ | ✅ connects, boot resets no longer reproduce (see below) |
@@ -118,6 +119,11 @@ section.
   connecting — `WS_P4_4B`, `WS_S3_4B`, `WS_P4_7B` — and 1 connecting with an open issue). AP/captive-portal fallback
   and MQTT not started. See `FUTURE_IMPROVEMENTS.md`'s Connectivity section for the full
   phased plan and the fleet-wide platform/framework upgrade this required.
+- **ESP32-C6 co-processor firmware (P4 boards)** — on `WS_P4_5` the host cannot read the slave
+  firmware version (`Req_GetCoprocessorFwVersion` times out, reports `0.0.0` vs host
+  `2.12.11`). WiFi works regardless, but it costs roughly a second of boot time in failed RPC
+  retries. Not yet checked on `WS_P4_7B` / `WS_P4_4B`; if they behave the same it is a
+  fleet-wide P4 item, and Espressif publish a matching slave binary.
 - **SD card** — untested on every board. Low priority.
 - **Battery ADC "gauge"** — no board has a working battery percentage readout yet. Low
   priority. See `FUTURE_IMPROVEMENTS.md` for the voltage-divider math already confirmed for
