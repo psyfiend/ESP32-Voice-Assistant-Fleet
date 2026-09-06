@@ -206,6 +206,37 @@ laptop it also carries `-D ARDUINO_USB_CDC_ON_BOOT=0` and `-D CORE_DEBUG_LEVEL=4
 `WS_P4_TOUCH_LCD_5` env; **both are required to debug this board and must be re-applied on any
 other machine.**
 
+## Resuming this work on another machine
+
+Three things do not travel automatically. Miss any one and the board will not behave the same.
+
+**1. The GFX changes live in a submodule and need their own fetch.** The parent repo only
+records a commit SHA; the commit itself lives in `psyfiend/Arduino_GFX` on branch
+`feat/p4-5-dsi-overrides` (`5eb36b3`). After checking out this branch:
+
+```bash
+git checkout feat/p4-5-display-bringup
+git submodule update --init --recursive
+git -C components/GFX_Library_for_Arduino log --oneline -1   # expect 5eb36b3
+```
+
+If that SHA is missing, the submodule commit was never pushed — recover it from the machine
+that made it rather than re-deriving the changes.
+
+**2. `platformio.ini` is never committed** (machine-specific `symlink://` paths). Two flags in
+the `WS_P4_TOUCH_LCD_5` env are **required to debug this board at all** and must be re-added by
+hand on any other machine:
+
+```ini
+-D ARDUINO_USB_CDC_ON_BOOT=0   ; without this there is NO serial output from this board
+-D CORE_DEBUG_LEVEL=4          ; without this every ESP_LOGI in the DSI path is compiled out
+```
+
+**3. The build cache can serve stale objects after a BSP-only edit** (see `CLAUDE.md`). If a
+BSP field change appears to have no effect, `rm -rf .pio/build_cache`. The `STEP` and
+`panel reset done` log lines exist partly so a stale build is obvious from the serial output
+rather than being mistaken for a failed experiment.
+
 ## Next steps, in order
 
 1. **Test the reset polarity fix.** Add `RST_ACTIVE_HIGH` to `DisplayConfig` (default `0` =
