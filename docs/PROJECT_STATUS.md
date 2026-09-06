@@ -62,6 +62,19 @@ gitignored and has to be recreated by hand.
 
 ---
 
+### WS_P4_5 display bring-up — on its own branch, see its own doc
+
+Work happens on **`feat/p4-5-display-bringup`** (cut from this branch), not here. The board
+boots and runs firmware but hangs inside `_gfx->begin()` transmitting DSI init command 19.
+Hardware is known good — the shipped factory firmware drives the panel.
+
+Prime suspect as of 2026-09-06: **the HX8394's reset is active HIGH and the GFX library drives
+it active LOW**, holding the panel in reset for the whole init. Waveshare patched their own
+copy of the library for exactly this; our fork did not inherit it. Untested.
+
+Everything — evidence, ruled-out causes, corrections to earlier wrong theories, and next steps
+— is in `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`. Read that before touching the P4 display path.
+
 ## The BSP, briefly
 
 Each board's `components/Fleet_BSP/include/BSP_<NAME>.h` declares a short device-identity
@@ -79,7 +92,7 @@ section.
 |---|---|---|---|---|---|---|
 | **ESP32-P4-WIFI6-Touch-LCD-7B** (WaveShare, macro `WS_P4_7B`) | `WS_P4_TOUCH_LCD_7B` | ✅ | ✅ (portrait; rotation untested) | untested (no speaker access — enclosure doesn't expose it) | untested | ✅ connects (2026-09-03) |
 | **ESP32-P4-WIFI6-Touch-LCD-4B** (WaveShare, macro `WS_P4_4B`) | `WS_P4_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ connects, real DHCP IP (see below) |
-| **ESP32-P4-WIFI6-Touch-LCD-5** (WaveShare, macro `WS_P4_5`) | `WS_P4_TOUCH_LCD_5` | untested (not flashed yet) | untested | untested | untested | untested |
+| **ESP32-P4-WIFI6-Touch-LCD-5** (WaveShare, macro `WS_P4_5`) | `WS_P4_TOUCH_LCD_5` | flashed; boots, hangs in DSI init (see WORK IN FLIGHT) | untested | untested | untested | untested |
 | **ESP32-S3-Touch-LCD-4B** (WaveShare, macro `WS_S3_4B`) | `WS_S3_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ connects (native radio, no hosted-WiFi complexity) |
 | Guition P4 7" (JC1060P470C, macro `CYD_P4_1060`) | `CYD_P4_1060P470` | ✅ | ✅ | ✅ | ✅ (first-ever test of the ES8311-as-sole-mic-input path) | untested (builds clean, not flash-tested for WiFi) |
 | Guition 3.5" (JC3248W535, macro `CYD_S3_3248`) | `CYD_S3_3248W535` | ✅ (both rotations confirmed) | ✅ (both rotations confirmed) | ✅ | ✅ | ✅ connects, boot resets no longer reproduce (see below) |

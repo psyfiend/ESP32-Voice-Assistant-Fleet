@@ -89,6 +89,17 @@ struct ExpanderConfig {
 // needs - e.g. an RGB board sets DE/VSYNC/HSYNC/PCLK + the R/G/B pin rows
 // and leaves the DSI-specific fields at 0; a QSPI board sets
 // CS/SCK/MOSI/QSPI_D1-3 and leaves the RGB pins alone.
+// --- DSI PHY PLL reference clock source selectors (DisplayConfig.PHY_CLK_SRC) ---
+// 0 is the zero-filled default for any board that does not set the field, and
+// deliberately means "change nothing", so adding this field cannot alter the
+// behaviour of a board that was working before it existed.
+#define BSP_PHY_CLK_SRC_DEFAULT   0  // keep the DSI library's existing choice (PLL_F20M)
+#define BSP_PHY_CLK_SRC_IDF_AUTO  1  // pass IDF's 0 sentinel; IDF picks per silicon revision
+#define BSP_PHY_CLK_SRC_PLL_F20M  2  // explicit; ESP32-P4 rev < 3.0 only
+#define BSP_PHY_CLK_SRC_PLL_F25M  3  // explicit; ESP32-P4 rev < 3.0 only
+#define BSP_PHY_CLK_SRC_RC_FAST   4  // explicit; rev < 3.0 only, imprecise - diagnostics only
+#define BSP_PHY_CLK_SRC_XTAL      5  // explicit; ESP32-P4 rev >= 3.0 only
+
 struct DisplayConfig {
     const char *PANEL_MODEL;   // LCD driver chip, e.g. ST7701, AXS15231B, ST7262, HX8394, EK79007 - NOT the board model (see BoardHardware.MODEL for that)
     uint32_t    WIDTH;
@@ -105,6 +116,12 @@ struct DisplayConfig {
     int8_t RST, CS, SCK, MOSI; // MOSI doubles as QSPI_D0
     int8_t QSPI_D1, QSPI_D2, QSPI_D3;
     int8_t TE;
+    // Panel reset polarity. 0 (the zero-filled default) = active LOW, which is the
+    // generic Arduino sequence and correct for every board that predates this field.
+    // 1 = active HIGH: assert = HIGH, release = LOW. The Waveshare P4-5's HX8394 needs
+    // this (its ESP-IDF BSP sets flags.reset_active_high = 1); driving it active-low
+    // leaves the panel held in reset forever. Only honoured by the DSI display path.
+    uint8_t RST_ACTIVE_HIGH;
 
     // --- RGB / DSI parallel interface pins ---
     int8_t DE, VSYNC, HSYNC, PCLK;
@@ -129,6 +146,16 @@ struct DisplayConfig {
     uint16_t TEST_MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV;
     uint8_t  NUM_DSI_LANES;
     uint32_t LANE_BIT_RATE;
+    // DSI PHY PLL reference clock source, as a BSP_PHY_CLK_SRC_* value above.
+    // Deliberately a small Fleet-defined code rather than a raw
+    // mipi_dsi_phy_pllref_clock_source_t: those are positional ordinals in
+    // soc_module_clk_t, so hardcoding their integers here would silently
+    // repoint every board if Espressif ever reordered that enum. The DSI
+    // panel driver maps these to the real constants by name.
+    uint8_t  PHY_CLK_SRC;
+    // Number of DPI framebuffers. 0 = leave the DSI library's default (1) alone, so
+    // boards predating this field are unchanged. Waveshare's own Arduino library uses 2.
+    uint8_t  NUM_FB;
 
     // --- Panel init command tables ---
     // Arduino_GFX's RGB and DSI display classes take two genuinely

@@ -245,14 +245,15 @@ void DisplayManager::initPanel() {
         Arduino_ESP32DSIPanel *dsipanel = new Arduino_ESP32DSIPanel(
             bsp_display.HSYNC_PWIDTH, bsp_display.HSYNC_BPORCH, bsp_display.HSYNC_FPORCH,
             bsp_display.VSYNC_PWIDTH, bsp_display.VSYNC_BPORCH, bsp_display.VSYNC_FPORCH
-            , bsp_display.PREFER_SPEED, bsp_display.LANE_BIT_RATE
+            , bsp_display.PREFER_SPEED, bsp_display.LANE_BIT_RATE, bsp_display.PHY_CLK_SRC, bsp_display.NUM_FB
         );
         if (!dsipanel) Serial.println("[DisplayMgr] DSI Panel Alloc Failed!"); Serial.flush();
 
         Serial.println("[DisplayMgr] Creating DSI Display...");
         Arduino_DSI_Display *dsidisplay = new Arduino_DSI_Display(
             bsp_display.WIDTH, bsp_display.HEIGHT, dsipanel, bsp_display.ROTATION, bsp_display.AUTO_FLUSH,
-            bsp_display.RST, bsp_display.INIT_CMDS_DSI, bsp_display.INIT_CMDS_SIZE
+            bsp_display.RST, bsp_display.INIT_CMDS_DSI, bsp_display.INIT_CMDS_SIZE,
+            0, 0, 0, 0, bsp_display.RST_ACTIVE_HIGH
         );
         if (!dsidisplay) Serial.println("[DisplayMgr] DSI Display Alloc Failed!"); Serial.flush();
         _gfx = dsidisplay;

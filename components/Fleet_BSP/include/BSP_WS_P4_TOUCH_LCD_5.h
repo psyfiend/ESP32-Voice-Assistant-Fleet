@@ -81,6 +81,8 @@ const DisplayConfig WS_P4_TOUCH_LCD_5_DISPLAY = {
     .BL_FREQ     = 5000,   // 5 kHz PWM
 
     .RST = 27,
+    // HX8394 on this board resets ACTIVE HIGH - see docs/BRINGUP_WS_P4_TOUCH_LCD_5.md.
+    .RST_ACTIVE_HIGH = 1,
 
     // ---= MIPI Timing =---
     // LCD-5 single screen profile. DSI timing matches the audited
@@ -94,6 +96,14 @@ const DisplayConfig WS_P4_TOUCH_LCD_5_DISPLAY = {
 
     .PREFER_SPEED  = 58000000,
     .LANE_BIT_RATE = 700,
+    // rev1.3 silicon (eFuse-confirmed on the unit under test). Ask IDF to pick
+    // the PHY PLL reference for the running revision instead of inheriting the
+    // library's hardcoded PLL_F20M. Only this board opts in; every other board
+    // leaves PHY_CLK_SRC at 0 and is bit-for-bit unchanged.
+    .PHY_CLK_SRC = BSP_PHY_CLK_SRC_IDF_AUTO,
+    // Waveshare's confirmed-working Arduino library uses 2 here; the fork defaults to 1.
+    // Last known config delta from a vendor setup that is known to drive this panel.
+    .NUM_FB = 2,
 
     // ---= Init Commands =---
     .INIT_CMDS_DSI  = ws_p4_touch_lcd_5_init,
