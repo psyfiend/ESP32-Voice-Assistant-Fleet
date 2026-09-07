@@ -84,16 +84,32 @@ The proven/unproven behaviour matrix was consuming the schedule for diminishing 
 bar is now **"the common paths are verified; the edge cases are coded, reviewed and honestly
 recorded as unobserved"** — not full coverage. Revisit if a board misbehaves in the field.
 
+**All kept tests are now done.** Test 1 (hostname in the DHCP lease table) and test 4 (the
+environmental ladder) both passed; tests 2 and 3 are tabled. Worth noting that the one test
+kept on the grounds that it was cheap and had never been run is the one that found a real bug
+(#42) — a point in favour of keeping "never observed at all" as the selection criterion when
+scope has to be cut again.
+
 1. ~~Hostname in the DHCP lease table~~ — **DONE 2026-09-06**, confirmed in the router's lease
    table. Closes #38.
 2. ~~Wrong password on a **proven** board~~ — **TABLED.** Coded, never observed. Note this test
    is also compromised by the #39 bug below until that is fixed.
 3. ~~`pio run -t erase` then wrong password → unproven permanent stop~~ — **TABLED.** Coded,
    never observed. Costs a full chip erase to set up.
-4. **Junk SSID → environmental ladder** (reason 201, continues indefinitely, never stops).
-   **Still worth doing** — it is the one path never observed at all, it needs no NVS surgery
-   and no credential juggling, and "retries forever" vs "stops permanently" is the difference
-   between a wall panel that recovers from a router reboot and one that does not.
+4. ~~**Junk SSID → environmental ladder**~~ — **PASSED 2026-09-06 on `WS_P4_5`.** The full
+   ladder was observed end to end in one unbroken capture: **120 → 240 → 480 → 960 → 1800 →
+   1800 (cap held)**. Reason 201 classified as environmental every time, AP fallback raised,
+   and no permanent-stop line ever printed. This was the last behaviour path in the spec that
+   had never been observed on any board.
+
+   **It also found a real bug — see GitHub issue #42.** The AP idle-shutdown (10 min, no
+   clients) fires in `AP_ACTIVE`, not just in `APSTA` as intended. In `AP_ACTIVE` the AP is
+   the *rescue path*, not a redundant extra, so the device hides the only network a human
+   could use to fix it — and at the 1800 s cap `FleetSetup` is absent roughly two-thirds of
+   the time. Worse, the state stays `AP_ACTIVE` after the AP stops, so `getState()` and the
+   header glyph both advertise an access point that is not broadcasting. That is the **third**
+   lying diagnostic this project has found (see fleet-wide investigations below), and the
+   first one caught from inside rather than from the router.
 
 **Tabled, not forgotten:** on-device connectivity settings UI (#7) and the captive portal (#6)
 are both deferred out of Phase 1 by decision, not by blockage. #6 was in any case gated on a
