@@ -533,6 +533,29 @@ Two incidental findings worth keeping:
 Note the ordering: **1.7 before 1.8, deliberately.** Hand-writing discovery JSON first and
 retrofitting the registry later means writing it twice.
 
+**Phase 1 scope cut — 2026-09-06.** The proven/unproven behaviour matrix was consuming the
+schedule for diminishing returns, so the bar for this phase was lowered deliberately to
+*"the common paths are verified; the edge cases are coded, reviewed, and honestly recorded as
+unobserved."* Concretely:
+
+| Milestone | Revised status |
+|---|---|
+| 1.0 Device hostnames (#38) | **DONE** — verified in the router's DHCP lease table 2026-09-06 |
+| 1.1 State machine (#4) | **DONE**, hardware-verified on five boards. One acceptance criterion met differently: state is a polled atomic, not a callback — see the issue for why that is the right call given §4.2's threading trap |
+| 1.2 APSTA spike (#5) | **DONE** — closed, answer is yes, now confirmed on three P4 boards |
+| 1.3 AP + captive portal (#6) | **AP half done. Portal TABLED** out of Phase 1 — and was gated on a web server that does not arrive until #25 (Phase 4) regardless |
+| 1.4 Settings UI (#7) | **Glyph done. Screen TABLED** out of Phase 1. Backend API complete and unchanged; better built after the Phase 2 design system (#13) than before it |
+| 1.5 Flash-test (#8) | **5 of 8.** Three boards outstanding, all physically accessible |
+| 1.6–1.8 MQTT / Registry / HA discovery | **The remaining real work in this phase** |
+
+Two items deliberately carried rather than closed: **#39** (the `_proven` flag is not tied to
+the credentials that proved themselves — cannot be hit by a user, will be hit by a developer)
+and connectivity **test 4** (junk SSID → environmental ladder, the one behaviour path never
+observed at all, and cheap to run).
+
+Tabled means *descoped by decision*, not blocked and not abandoned. Every tabled item keeps its
+issue open with the reasoning recorded on it.
+
 ### Phase 2 — UI foundation
 
 | # | Milestone | Acceptance criteria |

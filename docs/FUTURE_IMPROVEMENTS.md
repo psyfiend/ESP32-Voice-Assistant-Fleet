@@ -60,8 +60,8 @@ Worth doing before connectivity/MQTT GUI panels and future peripheral panels add
 
 ### ⚠️ BEFORE tuning LVGL buffering: diff the fork against EVERY vendor GFX tree
 
-**Do this first. It is the highest-value hour available on this topic and it has never been
-done.**
+**Tracked as GitHub issue #40. Do this first — it is the highest-value hour available on this
+topic and it has never been done.**
 
 `reference/Waveshare Official Repos/` holds six vendor repos, each shipping its own
 **confirmed-working** copy of `Arduino_GFX` for the board it came with:
