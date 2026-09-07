@@ -8,6 +8,7 @@
 #include "GuiManager.h"
 #include "ConnectivityManager.h"
 #include "MqttManager.h"
+#include "EntityRegistry.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #include "Panel_Audio.h"
@@ -28,6 +29,9 @@
 GuiManager gui;
 ConnectivityManager connMgr;
 MqttManager mqttMgr;
+// The registry every card will bind to and HA discovery will be generated
+// from. Populated by providers; see ROADMAP 4.1. Empty until they exist.
+EntityRegistry entities;
 #ifdef HAS_AUDIO_HW
 AudioManager audioMgr;
 #endif
