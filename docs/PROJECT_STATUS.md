@@ -33,6 +33,16 @@ implementation follows that spec.
 - TX power cap of 13 dBm on `CYD_S3_3248` — brownouts stopped. **Confounded**: a USB cable
   swap happened at the same time, so the cap is not independently proven. `WS_P4_7B` runs with
   no cap and is stable, which is the control.
+
+  **Independent corroboration found 2026-09-06.** The `ESP32-P4-NINA-Display` project
+  (`reference/Examples and related projects/`) ships a user-facing WiFi TX-power cap for exactly
+  this symptom, describing it as curing *"brief teal or green screen flashes on boards whose
+  supply sags during WiFi bursts"*, and warns that too low a value makes the device unreachable.
+  Different project, different boards, same mitigation for the same mechanism. It does **not**
+  de-confound our own test — the cable swap still happened — but it moves "supply sag during
+  WiFi bursts" from our hypothesis to a failure mode others independently mitigate the same way.
+  Note they expose it as a *runtime setting* rather than a build-time constant, which is
+  probably the right shape for us too.
 - **`APPEND_MAC_SUFFIX = false` — VERIFIED 2026-09-06 on `WS_P4_5`.** `macSuffix=off` in the
   `[Conn:debug]` line and the derived hostname is `fleet-ws-p4-5` with no hex suffix, while
   `deviceId` still carries it (`fleet_ws_p4_5_e0d24b`) — so the two names are being derived
