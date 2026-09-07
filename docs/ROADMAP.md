@@ -829,7 +829,7 @@ Consequence for milestone 2.4: the `Card` base class must carry `preferred_span`
 `priority` from the very first version. Retrofitting responsive sizing after 8 card types exist
 means rewriting all 8.
 
-### Q5 — Confirm the HA naming scheme
+### Q5 — HA naming scheme — **DECIDED 2026-09-07**
 
 Concrete proposal:
 
@@ -850,9 +850,41 @@ This solves your "two boards with the same temperature sensor" problem: `unique_
 device-scoped, so identical peripherals never collide, while the friendly name stays human
 ("Kitchen Panel Temperature").
 
-**Does this match your existing discovery code's conventions, or should we match that instead?**
+**Answered by the owner's own prior project** (`reference/.../Shed Power Monitor`, his code and
+therefore freely reusable). The scheme above stands **except for the discovery topic**, which is
+replaced:
 
-### Q6 — One HA device per board, or a fleet parent device?
+| | Original proposal | Adopted |
+|---|---|---|
+| discovery | `homeassistant/<component>/<device_id>/<object_id>/config`, one payload per entity | **`homeassistant/device/<device_id>/config`, ONE payload for the whole device** |
+
+Everything else is unchanged and turns out to be directly compatible: `device_id`, `object_id`,
+`unique_id`, and the `state` / `command` / `availability` topics all survive as written. The
+state and command topics also compose neatly with MQTT's `~` base-topic abbreviation
+(`~` = `fleet/<device_id>/<object_id>`, then `stat_t` = `~/state`, `cmd_t` = `~/set`).
+
+**Why device-based discovery.** It is the modern HA format (2024.11+) and it maps directly onto
+the Entity Registry: with per-entity discovery you publish N payloads each repeating the full
+device block; with device-based, **the registry *is* the `cmps` map** and discovery becomes one
+serializer over it. It also makes entity *removal* work properly - under per-entity discovery a
+removed entity needs an empty payload published to its config topic to evict the retained one,
+or it haunts HA forever.
+
+Requires HA >= 2024.11. Confirmed available: the target install is **2026.8.1**.
+
+Full reasoning and the list of practices adopted alongside it: GitHub issue #11.
+
+### Q6 — One HA device per board, or a fleet parent device? — **DECIDED 2026-09-07**
+
+**One HA device per board. No fleet parent.**
+
+Each board publishes its own device-based discovery payload and appears in Home Assistant as its
+own device with its own entities. Both reference projects do exactly this, and the device-based
+discovery format assumes that shape.
+
+A parent device would mean boards declaring `via_device` against a hub that does not exist -
+publishing a fiction to make an organisational chart. If a real coordinator ever appears, HA
+supports `via_device` and this can be revisited without changing entity identity.
 
 Assumptions: 1. **8 independent HA devices** — standard and simplest. 2. One HA device with 8
 sub-devices (HA supports this now; more complex). 3. 8 devices plus a virtual "fleet" device

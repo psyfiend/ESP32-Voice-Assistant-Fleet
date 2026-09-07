@@ -7,6 +7,7 @@
 #include <FleetI2C.h>
 #include "GuiManager.h"
 #include "ConnectivityManager.h"
+#include "MqttManager.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #include "Panel_Audio.h"
@@ -26,6 +27,7 @@
 // --= OBJECTS =--
 GuiManager gui;
 ConnectivityManager connMgr;
+MqttManager mqttMgr;
 #ifdef HAS_AUDIO_HW
 AudioManager audioMgr;
 #endif
@@ -107,6 +109,17 @@ void debug_dump_config(bool manualTrigger) {
             pnlSystem.log("  AP: %s / %s", connMgr.getApSsid(), connMgr.getApPassword());
             pnlSystem.log("  AP IP: %s (%u client(s))",
                           connMgr.getApIP().toString().c_str(), connMgr.getApClientCount());
+        }
+
+        pnlSystem.log("[MQTT]");
+        pnlSystem.log("  State: %s", mqttStateName(mqttMgr.getState()));
+        if (mqttMgr.getState() != MqttState::SESSION_OFF) {
+            pnlSystem.log("  Base topic: %s", mqttMgr.getBaseTopic());
+            if (!mqttMgr.isConnected()) {
+                pnlSystem.log("  Last failure: %s", mqttFailureName(mqttMgr.getLastFailure()));
+                uint32_t s = mqttMgr.secondsUntilRetry();
+                if (s) pnlSystem.log("  Retry in: %lu s", (unsigned long)s);
+            }
         }
     }
 
@@ -243,6 +256,9 @@ void setup() {
     audioMgr.begin();
     #endif
     connMgr.begin();
+    // Broker session. Reads connMgr's link state and does nothing until it is
+    // online; stays cleanly DISABLED when no MqttLocalSecrets.h is present.
+    mqttMgr.begin(&connMgr);
 
     // --= ROOT SCREEN =--
     lv_obj_t * screen = lv_screen_active();
@@ -342,6 +358,10 @@ void loop() {
     // the AP idle timer and async scan collection. Must be called every loop -
     // ConnectivityManager deliberately never spins on WiFi.status() itself.
     connMgr.loop();
+
+    // Broker connect/backoff ladder plus PubSubClient's keepalive pump.
+    // Non-blocking, and a no-op while the link is down or MQTT is disabled.
+    mqttMgr.loop();
 
     header.tick();
     pnlDisplay.tick();

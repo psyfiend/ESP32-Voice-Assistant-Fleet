@@ -182,6 +182,23 @@ files that depend on a BSP value change through the header alone that can go sta
 BSP struct field change doesn't seem to take effect no matter what: `rm -rf
 .pio/build_cache` before assuming the bug is in your code.
 
+## Arduino's global macro namespace will eat your enum
+
+`esp32-hal-gpio.h` defines bare, unprefixed, ALL-CAPS macros for pin and interrupt modes:
+`DISABLED`, `RISING`, `FALLING`, `CHANGE`, `HIGH`, `LOW`, `INPUT`, `OUTPUT`, `ANALOG`,
+`PULLUP`, `OPEN_DRAIN` and more. They are macros, so they apply **everywhere**, including
+inside a scoped `enum class` where a same-named enumerator ought to be perfectly safe.
+
+`MqttState::DISABLED` was rewritten by the preprocessor into `MqttState::0x00`, producing a
+cascade of errors that point at `esp32-hal-gpio.h` and at the *uses* of the enum rather than at
+the declaration - so the actual cause is nowhere in the message. Renamed to `SESSION_OFF`.
+
+This is the same hazard already documented above for board identity macros (a `#define
+WS_P4_7B` rewriting a struct named `WS_P4_7B`), arriving from the framework rather than from
+our own headers. **When naming an enumerator, avoid single-word ALL-CAPS names that could
+plausibly be an Arduino pin/interrupt mode.** A compound name (`SESSION_OFF`, `RADIO_OFF`) costs
+nothing and is immune.
+
 ## Debug flag convention
 
 Diagnostic `Serial.print`s worth keeping (not deleting) are gated behind a `#ifdef
