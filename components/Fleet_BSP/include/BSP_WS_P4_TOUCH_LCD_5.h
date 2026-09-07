@@ -69,7 +69,16 @@ const DisplayConfig WS_P4_TOUCH_LCD_5_DISPLAY = {
     .PANEL_MODEL = "HX8394",
     .WIDTH       = 720,
     .HEIGHT      = 1280,
-    .ROTATION    = 0,     // Confirmed via vendor displays_config.h (SCREEN_DEFAULT.rotation = 0, swap_xy/mirror all 0)
+    // 0 = portrait (USB on bottom), 1 = landscape (USB on right), 2 = inverted
+    // portrait, 3 = inverted landscape. Set to 1 by preference, NOT by vendor
+    // guidance: Waveshare's displays_config.h specifies rotation 0 with swap_xy
+    // and both mirrors clear, so 1 is our own choice and the panel's native
+    // orientation is portrait. UNVERIFIED on hardware as of 2026-09-06 - and
+    // note this board takes the GENERIC branch of TouchManager::mapCoordinates()
+    // (the special case is #ifndef WS_P4_7B), which has never been exercised on
+    // a DSI panel at a non-zero rotation. If touch comes back swapped or
+    // mirrored, that is the thing to look at first.
+    .ROTATION    = 1,
     .AUTO_FLUSH  = true,
 
     // LCD backlight is driven by GPIO26 on this board, exactly like the
