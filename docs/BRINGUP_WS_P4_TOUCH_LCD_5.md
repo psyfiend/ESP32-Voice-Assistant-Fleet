@@ -134,9 +134,10 @@ calling test 1 done.
 - **Touch, audio out, audio in (codec init), WiFi STA, WiFi AP, STA_PLUS_AP: all working** on
   the first boot after the fix. See the boot table above.
 - **Rotation 1 (landscape): WORKING, confirmed on hardware 2026-09-07.** Display orientation
-  correct. Note this is also the first time the *generic* branch of
+  correct, **and touch tracks flawlessly**. This is the first time the *generic* branch of
   `TouchManager::mapCoordinates()` (the special case is `#ifndef WS_P4_7B`) has run on a DSI
-  panel at a non-zero rotation.
+  panel at a non-zero rotation, so it is real evidence that the `WS_P4_7B` special case is
+  unnecessary — see `PROJECT_STATUS.md`.
 - **Not yet exercised:** actual mic capture, SD card.
 - Chip is ESP32-P4 rev v1.3, which turned out to be irrelevant - see corrections.
 

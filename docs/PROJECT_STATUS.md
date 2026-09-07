@@ -208,6 +208,14 @@ section.
 - Test rotation on real hardware to determine whether `TouchManager`'s `#ifndef WS_P4_7B`
   raw-passthrough special case is still needed, or whether the generic rotation transform
   works fine here too (unverified assumption, not a known problem).
+
+  **Evidence gathered 2026-09-07: the generic branch works on a DSI panel at rotation 1.**
+  `WS_P4_5` (MIPI/DSI, 720x1280, rotation 1) takes the generic transform and touch tracks
+  flawlessly. That is the first time the generic path has run on DSI at a non-zero rotation,
+  and it removes the main reason to assume DSI needs the special case. It is **not** proof for
+  `WS_P4_7B` itself — that board may have had a different underlying problem — but it shifts
+  the burden: the special case should now be treated as suspect rather than as a safe default.
+  Cheapest test is to delete the `#ifndef` and flash the 7B.
 - Test RS485 (Modbus board available).
 - **WiFi (STA) confirmed working (2026-09-03).** Connects without serious issue. Shows the same
   benign `hostedHasUpdate()` / `Req_GetCoprocessorFwVersion` RPC warning as `WS_P4_4B` — expected,
