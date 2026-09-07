@@ -133,8 +133,11 @@ calling test 1 done.
 - **Display: WORKING.** Root cause was reset polarity (above); fixed and confirmed on hardware.
 - **Touch, audio out, audio in (codec init), WiFi STA, WiFi AP, STA_PLUS_AP: all working** on
   the first boot after the fix. See the boot table above.
-- **Not yet exercised:** rotation (BSP is `ROTATION = 0`), touch coordinate mapping at any
-  rotation other than 0, actual mic capture, SD card, `HIGH_DPI_DISPLAY` scaling.
+- **Rotation 1 (landscape): WORKING, confirmed on hardware 2026-09-07.** Display orientation
+  correct. Note this is also the first time the *generic* branch of
+  `TouchManager::mapCoordinates()` (the special case is `#ifndef WS_P4_7B`) has run on a DSI
+  panel at a non-zero rotation.
+- **Not yet exercised:** actual mic capture, SD card.
 - Chip is ESP32-P4 rev v1.3, which turned out to be irrelevant - see corrections.
 
 ## Follow-up flashes, same session (2026-09-06)
@@ -343,7 +346,10 @@ built while chasing it.
 5. **Mic capture.** ES7210 initialises, but nothing has actually recorded.
 6. ~~**Retire the scaffolding.**~~ **DONE 2026-09-06**, but not as originally written — the
    plan above was partly wrong and the reasoning is worth keeping:
-   - `.PHY_CLK_SRC` → back to `BSP_PHY_CLK_SRC_DEFAULT`. Every P4 board now runs the library's
+   - `.PHY_CLK_SRC` → back to `BSP_PHY_CLK_SRC_DEFAULT`. **Confirmed on hardware 2026-09-07:**
+     the display comes up normally on `PLL_F20M`, so the reset-polarity fix is proven to have
+     been the entire story - it never depended on the clock experiment.
+     Every P4 board now runs the library's
      `PLL_F20M` on one uniform path. The *mechanism* stays in `Arduino_ESP32DSIPanel` as the
      escape hatch for rev3+ silicon, which needs `XTAL` and cannot use the hardcoded
      rev<3-only `PLL_F20M`.
