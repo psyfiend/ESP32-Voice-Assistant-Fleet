@@ -6,10 +6,16 @@ job). Volatile; update or prune entries as they get resolved, don't let this fil
 
 ---
 
-## ⚡ WORK IN FLIGHT — read this first (2026-09-05)
+## ⚡ WORK IN FLIGHT — read this first (2026-09-06)
 
-**Branch: `feat/connectivity-state-machine` @ `aa4baab`. Not merged to `main`, deliberately —
+**Branch: `feat/connectivity-state-machine`. Not merged to `main`, deliberately —
 `main` is meant to be always-flashable and this has unverified behaviour on it.**
+
+`feat/p4-5-display-bringup` was merged in here `--no-ff` on 2026-09-06 (ROADMAP §3.2: bring-up
+branches keep their commits). That merge moves the **GFX submodule** forward, so a checkout of
+this branch without `git submodule update --init --recursive` will fail to compile on all four
+P4 boards — `DisplayManager.cpp` passes constructor arguments that do not exist in the older
+submodule commit.
 
 Phase 1 connectivity. The full mode × failure-type behaviour is **signed off** and lives in the
 "Connectivity Behavior Spec" artifact; `docs/ROADMAP.md` Q1/Q9 carry the decisions. The
@@ -40,12 +46,15 @@ implementation follows that spec.
   (`[Conn] Credentials confirmed working.`). `HIGH_DPI_DISPLAY` also confirmed good on this
   panel. See `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
 
+- **Hostname reaching DHCP — VERIFIED 2026-09-06.** Confirmed from **outside** the device, in
+  the router's own DHCP lease table, which is the only check that counts here. Fixed in
+  `be6e60e`. This closes GitHub issue #38 and connectivity test 1, and retires the caveat that
+  stood on this item through the whole P4-5 bring-up. Serial output remains worthless as
+  evidence for this specific claim — `WiFi.getHostname()` reads back the same buffer
+  `setHostname()` wrote — so re-verify in the lease table, never in the log, if it is ever
+  questioned again.
+
 ### Built but NOT yet verified
-- **Hostname reaching DHCP.** Fixed in `be6e60e`; still never confirmed against a real DHCP
-  server. Must be checked in the router's lease table, **not** in serial output — the device's
-  `hostname=` line reads back the same buffer it wrote, which is exactly how this fooled us
-  before. Note `WS_P4_5` printing `hostname=fleet-ws-p4-5` on 2026-09-06 does **not** close
-  this; there was no router access at that location.
 
 - The signed-off retry policy: two auth rounds with a 45 s gap, permanent stop when unproven,
   45-minute recheck when proven, environmental backoff 2→4→8→16→30 min, AP-client deferral.
@@ -59,14 +68,26 @@ only honour `proven` on a match. Deliberately left in place so the proven path c
 observed at all — changing credentials is otherwise the only easy way to trigger an auth
 failure, and the fix makes that mark them unproven.
 
-### Next tests, in order
-1. Hostname in the DHCP lease table with `APPEND_MAC_SUFFIX = false` → expect `fleet-cyd-s3-3248`
-   / `fleet-ws-p4-5`, no MAC suffix, and `macSuffix=off` in the `[Conn:debug]` line.
-2. Wrong password on a **proven** board → expect two auth rounds then `Next STA retry in 2700 s`.
-   Attach a phone to the AP during the wait to see the deferral line.
-3. `pio run -t erase` then wrong password → **unproven** path → `These credentials have never
-   worked` and a permanent stop, no retry ladder.
-4. Junk SSID → environmental → reason 201, ladder that continues indefinitely and never stops.
+### Next tests — scope deliberately cut 2026-09-06
+
+The proven/unproven behaviour matrix was consuming the schedule for diminishing returns. The
+bar is now **"the common paths are verified; the edge cases are coded, reviewed and honestly
+recorded as unobserved"** — not full coverage. Revisit if a board misbehaves in the field.
+
+1. ~~Hostname in the DHCP lease table~~ — **DONE 2026-09-06**, confirmed in the router's lease
+   table. Closes #38.
+2. ~~Wrong password on a **proven** board~~ — **TABLED.** Coded, never observed. Note this test
+   is also compromised by the #39 bug below until that is fixed.
+3. ~~`pio run -t erase` then wrong password → unproven permanent stop~~ — **TABLED.** Coded,
+   never observed. Costs a full chip erase to set up.
+4. **Junk SSID → environmental ladder** (reason 201, continues indefinitely, never stops).
+   **Still worth doing** — it is the one path never observed at all, it needs no NVS surgery
+   and no credential juggling, and "retries forever" vs "stops permanently" is the difference
+   between a wall panel that recovers from a router reboot and one that does not.
+
+**Tabled, not forgotten:** on-device connectivity settings UI (#7) and the captive portal (#6)
+are both deferred out of Phase 1 by decision, not by blockage. #6 was in any case gated on a
+web server that does not arrive until #25 (Phase 4).
 
 ### Working on a second machine
 `platformio.ini`'s 26 `symlink://` paths are absolute and machine-specific (see `CLAUDE.md`).
@@ -166,17 +187,29 @@ section.
 
 ### WS_P4_5 — ESP32-P4-WIFI6-Touch-LCD-5
 
-**Never flashed. Currently the active test target (2026-09-05) alongside `CYD_S3_3248`.**
+**Fully up as of 2026-09-06 and at parity with the rest of the fleet.** Display, GT911 touch,
+ES8311 out, ES7210 in (codec init), WiFi STA on a real DHCP lease, AP with a client attached,
+and `STA_PLUS_AP` — all confirmed on hardware. `HIGH_DPI_DISPLAY` confirmed good on this panel.
 
-BSP is written and all 8 environments compile, but no code has ever run on this board — so
-display bring-up, touch, rotation and WiFi are all genuinely unknown, not merely unconfirmed.
-Treat a first-flash failure as ordinary rather than as a regression in the connectivity work:
-its sibling `WS_P4_7B` is DSI + P4/C6 hosted WiFi and works, which makes this board *likely*
-to work, but the panel timings and touch controller have never been exercised.
+Bring-up cost most of a session to one root cause: **the HX8394 panel resets ACTIVE HIGH**
+while `Arduino_DSI_Display` hardcoded a generic active-LOW sequence that *ends with the pin
+asserted*, holding the panel in reset through the entire init. Fixed by
+`DisplayConfig.RST_ACTIVE_HIGH`, zero-defaulted so no other board changed. Full history,
+ruled-out list and corrections: `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
 
-Useful property for connectivity testing: with factory-fresh NVS it is **unproven**, so it
-exercises the permanent-stop path without needing `pio run -t erase`, while the 3248 carries a
-`proven` flag and exercises the 45-minute recheck path. One board for each branch of the spec.
+**Note this board is now `proven` in NVS** — it logged `[Conn] Credentials confirmed working.`
+It therefore no longer exercises the unproven permanent-stop path, which was its original
+value as a test target. Reaching that path again needs `pio run -t erase` (which wipes the
+whole chip, not just NVS).
+
+Two practical traps specific to this board, both expensive to rediscover:
+- **`ARDUINO_USB_CDC_ON_BOOT=0` is mandatory or there is no serial output at all.** Its second
+  USB-C never enumerates in any state; UART0 via the onboard CH343 is the only channel.
+- It enumerates as `USB-Enhanced-SERIAL CH343` (VID_1A86/PID_55D3). Pass `--upload-port`
+  explicitly rather than trusting auto-detect.
+
+Still unexercised: rotation (BSP is `ROTATION = 0`), touch mapping at any non-zero rotation,
+actual mic capture, SD card.
 
 See `FUTURE_IMPROVEMENTS.md`'s New Hardware section.
 

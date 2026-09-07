@@ -96,13 +96,22 @@ const DisplayConfig WS_P4_TOUCH_LCD_5_DISPLAY = {
 
     .PREFER_SPEED  = 58000000,
     .LANE_BIT_RATE = 700,
-    // rev1.3 silicon (eFuse-confirmed on the unit under test). Ask IDF to pick
-    // the PHY PLL reference for the running revision instead of inheriting the
-    // library's hardcoded PLL_F20M. Only this board opts in; every other board
-    // leaves PHY_CLK_SRC at 0 and is bit-for-bit unchanged.
-    .PHY_CLK_SRC = BSP_PHY_CLK_SRC_IDF_AUTO,
-    // Waveshare's confirmed-working Arduino library uses 2 here; the fork defaults to 1.
-    // Last known config delta from a vendor setup that is known to drive this panel.
+    // Retired experiment, deliberately left explicit rather than deleted.
+    // IDF_AUTO was tried here while chasing the init hang; the hang turned out to
+    // be reset polarity (.RST_ACTIVE_HIGH below) and the clock source made no
+    // difference either way. Back to DEFAULT so every P4 board in the fleet runs
+    // the library's PLL_F20M on one uniform path and no board carries an
+    // experimental clock setting. The BSP_PHY_CLK_SRC_* mechanism stays in
+    // Arduino_ESP32DSIPanel as the escape hatch for rev3+ silicon, which needs
+    // XTAL and cannot use the library's hardcoded rev<3-only PLL_F20M.
+    .PHY_CLK_SRC = BSP_PHY_CLK_SRC_DEFAULT,
+    // KEPT, and not an experiment. Waveshare's own confirmed-working copy of this
+    // library uses 2 for this panel; the fork defaults to 1. This board has only
+    // ever booted successfully with 2, so 0/1 would be a change to a known-good
+    // config rather than a revert. Note the 1-vs-2 test during bring-up proved
+    // nothing about buffering - it was run against the reset-polarity hang, which
+    // masked everything downstream. Revisit fleet-wide during LVGL buffering
+    // tuning; see FUTURE_IMPROVEMENTS.md "LVGL / Display".
     .NUM_FB = 2,
 
     // ---= Init Commands =---

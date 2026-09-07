@@ -4,7 +4,9 @@ Working notes from bringing up the Waveshare ESP32-P4-WIFI6-Touch-LCD-5. High vo
 update or prune as things resolve. See `PROJECT_STATUS.md` for the rest of the fleet,
 `CLAUDE.md` for the BSP architecture, `FUTURE_IMPROVEMENTS.md` for deferred items.
 
-Branch: `feat/p4-5-display-bringup`, cut from `feat/connectivity-state-machine`.
+Branch: `feat/p4-5-display-bringup`, cut from `feat/connectivity-state-machine` and
+**merged back into it `--no-ff` on 2026-09-06**. The board is at fleet parity; what is
+left below is history and the small list of things still unexercised.
 
 Vendor reference tree (local only, not part of this repo):
 `C:/Users/eric/Documents/ESP32-P4-WIFI6-Touch-LCD-5` — Waveshare's own repo: their ESP-IDF
@@ -154,9 +156,11 @@ Two more builds after the fix, both good:
 hex suffix, while `deviceId` still carries one (`fleet_ws_p4_5_e0d24b`) — the two names derive
 independently, as intended. This is a local-derivation check and stands on its own.
 
-**It does not close the DHCP question.** The device's `hostname=` line reads back the buffer it
-wrote; that is precisely the trap recorded in `PROJECT_STATUS.md`. There was no router access
-at this location, so the lease-table check is still outstanding.
+**The DHCP question is now closed — 2026-09-06.** It was *not* closed by the serial line above:
+the device's `hostname=` output reads back the buffer it wrote, which is precisely the trap
+recorded in `PROJECT_STATUS.md`. It was closed by looking at the router's own DHCP lease table
+once the board was back at a location with router access. Both halves of connectivity test 1
+now hold, and GitHub issue #38 is closed.
 
 ## Where it used to hang (history, kept for the diagnostic method)
 
@@ -254,30 +258,32 @@ represent it correctly. If it is ever made load-bearing, read it at runtime and 
 Still worth doing when convenient: `esptool flash-id` on the other three P4 boards, purely to
 know what silicon the fleet actually contains.
 
-## What is committed on this branch
+## What this branch landed (final state, post-cleanup)
 
-Two per-board override mechanisms plus instrumentation. Both experiments came back negative, but
-the mechanism is retained because it is exactly the shape the reset-polarity fix needs.
+Three per-board `DisplayConfig` fields plus gated instrumentation. All three default to `0` =
+"behave exactly as before this existed", so `WS_P4_7B`, `WS_P4_4B` and `CYD_P4_1060` are
+bit-for-bit unchanged. Verified by a cold-cache rebuild of all three after the merge.
 
 | file | change |
 |---|---|
-| `components/Fleet_BSP/include/Fleet_BSP.h` | `BSP_PHY_CLK_SRC_*` selectors; `uint8_t PHY_CLK_SRC` and `uint8_t NUM_FB` at the end of the MIPI-DSI block (both `0` = change nothing) |
-| `components/Fleet_BSP/include/BSP_WS_P4_TOUCH_LCD_5.h` | `.PHY_CLK_SRC = BSP_PHY_CLK_SRC_IDF_AUTO`, `.NUM_FB = 2` |
-| `components/DisplayManager/DisplayManager.cpp` | passes both to the panel constructor |
-| `components/GFX_Library_for_Arduino` (**submodule**) | `Arduino_ESP32DSIPanel.{h,cpp}`: constructor parameters, selector-to-enum mapping, `STEP` instrumentation around each call, per-command trace in the init loop |
+| `components/Fleet_BSP/include/Fleet_BSP.h` | `uint8_t RST_ACTIVE_HIGH` beside the reset pin; `BSP_PHY_CLK_SRC_*` selectors; `uint8_t PHY_CLK_SRC` and `uint8_t NUM_FB` in the MIPI-DSI block |
+| `components/Fleet_BSP/include/BSP_WS_P4_TOUCH_LCD_5.h` | `.RST_ACTIVE_HIGH = 1` (**the actual fix**), `.NUM_FB = 2` (kept, vendor-matched), `.PHY_CLK_SRC = BSP_PHY_CLK_SRC_DEFAULT` (experiment retired) |
+| `components/DisplayManager/DisplayManager.cpp` | passes all three to the panel/display constructors |
+| `components/GFX_Library_for_Arduino` (**submodule**, `f9586a9`) | `Arduino_DSI_Display.{h,cpp}`: reset-polarity branch. `Arduino_ESP32DSIPanel.{h,cpp}`: constructor params, selector-to-enum mapping, `num_fbs` plumbing. All `STEP` / per-command / reset-branch logging gated behind `#ifdef DEBUG_DISPLAY` |
+
+**Only one of the three fields fixed the bug.** `RST_ACTIVE_HIGH` did. `PHY_CLK_SRC` and
+`NUM_FB` were built as hypotheses, both came back negative *against the hang*, and they were
+kept for different reasons — see next-steps item 6 above. Do not read their survival as
+evidence either mattered.
 
 `PHY_CLK_SRC` holds a small Fleet-defined code, **not** a raw
 `mipi_dsi_phy_pllref_clock_source_t`: those are positional ordinals inside `soc_module_clk_t`, so
 storing their integers would silently repoint every board if Espressif reordered that enum. The
 driver maps the codes to real constants by name.
 
-To undo the experiments but keep the mechanism, set `.PHY_CLK_SRC` and `.NUM_FB` back to `0` in
-the board header. To revert everything:
-
-```bash
-git checkout feat/connectivity-state-machine -- components/Fleet_BSP components/DisplayManager
-git -C components/GFX_Library_for_Arduino checkout -- src/databus
-```
+**The submodule pointer moved.** Any checkout of this work needs
+`git submodule update --init --recursive`, or all four P4 environments fail to compile —
+`DisplayManager.cpp` passes constructor arguments that older GFX commits do not have.
 
 `platformio.ini` is **never** committed — it carries machine-specific `symlink://` paths. On this
 laptop it also carries `-D ARDUINO_USB_CDC_ON_BOOT=0` and `-D CORE_DEBUG_LEVEL=4` for the
@@ -320,33 +326,45 @@ rather than being mistaken for a failed experiment.
 The display bug is closed. What remains is ordinary bring-up plus tidy-up of the scaffolding
 built while chasing it.
 
-1. **`HIGH_DPI_DISPLAY`.** Added to the `WS_P4_TOUCH_LCD_5` env after the first successful
-   boot (that boot reported `Display Mode: STANDARD (1.0x Scaling)`). A 720x1280 panel at this
-   size wants it. Verify the diagnostics dump switches away from `STANDARD (1.0x Scaling)` and
-   that the UI scales without clipping.
+1. ~~**`HIGH_DPI_DISPLAY`.**~~ **DONE** — enabled and confirmed good on this panel, no
+   clipping. A per-device scaling scheme to replace the boolean is written up in
+   `FUTURE_IMPROVEMENTS.md` under LVGL / Display.
 2. **Rotation and touch mapping.** BSP is `ROTATION = 0` (portrait, vendor-confirmed). Nothing
    else has been tried. Note `TouchManager::mapCoordinates()` has a per-board special case
    (`#ifndef WS_P4_7B`) whose reasoning `CLAUDE.md` records as undocumented and never
    re-tested - this board is a clean opportunity to check which branch is actually correct.
-3. **Finish connectivity test 1.** `macSuffix=off` and the un-suffixed derived hostname are
-   confirmed; the DHCP lease-table half needs a router. Do it at home.
-4. **Connectivity test 2 is now unblocked.** This board logged
-   `[Conn] Credentials confirmed working.`, so it is *proven* in NVS. Set a wrong
-   `LOCAL_STA_PASSWORD`, rebuild, and flash **without** `-t erase` (erasing would clear the
-   proven flag and drop you into test 3 instead).
+3. ~~**Finish connectivity test 1.**~~ **DONE 2026-09-06** — lease table checked at home,
+   both halves confirmed. Issue #38 closed.
+4. ~~**Connectivity test 2.**~~ **TABLED 2026-09-06** by decision — the proven/unproven
+   matrix was eating the schedule for diminishing returns. Still technically unblocked (this
+   board is *proven* in NVS), and still compromised by issue #39 until that is fixed. If it is
+   ever revived: set a wrong `LOCAL_STA_PASSWORD`, rebuild, flash **without** `-t erase`
+   (erasing clears the proven flag and drops you into test 3 instead).
 5. **Mic capture.** ES7210 initialises, but nothing has actually recorded.
-6. **Retire the scaffolding.** Set `.PHY_CLK_SRC` and `.NUM_FB` back to `0` and re-test to
-   confirm neither was load-bearing - both were tested against the bug and neither changed it,
-   so they should come out. Then move the `STEP` and per-command instrumentation behind
-   `#ifdef DEBUG_DISPLAY`, per this repo's debug-flag convention, rather than deleting it.
-   Keep `RST_ACTIVE_HIGH` - it is a real board property.
+6. ~~**Retire the scaffolding.**~~ **DONE 2026-09-06**, but not as originally written — the
+   plan above was partly wrong and the reasoning is worth keeping:
+   - `.PHY_CLK_SRC` → back to `BSP_PHY_CLK_SRC_DEFAULT`. Every P4 board now runs the library's
+     `PLL_F20M` on one uniform path. The *mechanism* stays in `Arduino_ESP32DSIPanel` as the
+     escape hatch for rev3+ silicon, which needs `XTAL` and cannot use the hardcoded
+     rev<3-only `PLL_F20M`.
+   - `.NUM_FB` → **kept at `2`.** Setting it to `0` would have been a *change* to a
+     confirmed-good config, not a revert: this board has only ever booted with 2, and
+     Waveshare's own working copy uses 2. Critically, the 1-vs-2 test recorded above proved
+     nothing about buffering — it was run against the reset hang, which masked everything
+     downstream. Treat `num_fbs` as untested on this fleet and settle it during LVGL buffering
+     tuning.
+   - `STEP` + per-command instrumentation → gated behind `#ifdef DEBUG_DISPLAY` (submodule
+     `f9586a9`), not deleted, per the debug-flag convention. The reset-branch log is gated too.
+   - `RST_ACTIVE_HIGH` → kept. It is a real board property.
 7. **Adopt Waveshare's `DSI_STEP_CHECK`** in place of `ESP_ERROR_CHECK` in the DSI path. It
    prints the failing step and error code instead of aborting.
-8. **Diff the rest of the vendor GFX tree.** The reset fix was found only because
-   `Arduino_DSI_Display.cpp` was finally diffed. These also differ and have never been
-   examined: `Arduino_GFX.h`, `Arduino_ESP32RGBPanel.cpp`, `Arduino_ESP32SPIDMA.cpp`,
-   `Arduino_DSI_Display.h`, `Arduino_RGB_Display.h`. Some may carry fixes relevant to the RGB
-   boards.
+8. **Diff the rest of the vendor GFX trees — promoted and widened.** Now written up as a
+   blocking pre-step for the LVGL buffering work in `FUTURE_IMPROVEMENTS.md`
+   ("BEFORE tuning LVGL buffering"). Scope grew from this board's tree to **all six** vendor
+   repos in `reference/Waveshare Official Repos/`, only one of which has ever been diffed and
+   then only two files deep. Known-differing and never examined: `Arduino_GFX.h`,
+   `Arduino_ESP32RGBPanel.cpp`, `Arduino_ESP32SPIDMA.cpp`, `Arduino_DSI_Display.h`,
+   `Arduino_RGB_Display.h`.
 9. **ESP32-C6 co-processor firmware** reports `0.0.0` and costs ~1 s of boot time in failed
    RPC. Check whether `WS_P4_7B` and `WS_P4_4B` do the same; if so it is a fleet-wide P4 item.
 

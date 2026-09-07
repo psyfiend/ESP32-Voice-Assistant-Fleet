@@ -58,6 +58,52 @@ Worth doing before connectivity/MQTT GUI panels and future peripheral panels add
   internals work, not a config tweak. See `docs/BRINGUP_WS_S3_TOUCH_LCD_5B.md` for the
   investigation that found this.
 
+### ⚠️ BEFORE tuning LVGL buffering: diff the fork against EVERY vendor GFX tree
+
+**Do this first. It is the highest-value hour available on this topic and it has never been
+done.**
+
+`reference/Waveshare Official Repos/` holds six vendor repos, each shipping its own
+**confirmed-working** copy of `Arduino_GFX` for the board it came with:
+
+| repo | fleet board |
+|---|---|
+| `Waveshare-P4-WIFI6-Touch-LCD-4B` | `WS_P4_4B` |
+| `Waveshare-P4-WIFI6-Touch-LCD-5` | `WS_P4_5` |
+| `Waveshare-P4-WIFI6-Touch-LCD-7B` | `WS_P4_7B` |
+| `Waveshare-S3-Touch-LCD-4B` | `WS_S3_4B` |
+| `WaveShare-S3-Touch-LCD-5B` | `WS_S3_5B` (the tearing board) |
+| `Waveshare-S3-Touch-AMOLED-2.06` | not in the fleet — still a free source of fixes |
+
+**Exactly one of these has ever been diffed** (the P4-5), and within it only two files.
+That single partial diff is what produced the reset-polarity fix that unblocked the P4-5
+after most of a session of wrong theories — the patch was sitting in Waveshare's own
+`Arduino_DSI_Display.cpp` with a comment naming the exact failure mode. Assume the other
+five carry fixes nobody here has seen.
+
+Files known to differ and never examined (from the P4-5 tree alone): `Arduino_GFX.h`,
+`Arduino_ESP32RGBPanel.cpp`, `Arduino_ESP32SPIDMA.cpp`, `Arduino_DSI_Display.h`,
+`Arduino_RGB_Display.h`. The RGB ones bear directly on the `num_fbs` item above.
+
+**Why this belongs to the buffering work specifically.** Framebuffer count is the one setting
+where the fork and the vendors are known to disagree, and the disagreement is not consistent:
+
+- **RGB path** — our fork requests `.num_fbs = 2` but `getFrameBuffer()` always returns index
+  1, so it never actually double-buffers (the item above). Two buffers of PSRAM paid for, one
+  used.
+- **DSI path** — the fork hardcoded `num_fbs = 1` until `DisplayConfig.NUM_FB` was added.
+  Waveshare's P4-5 copy uses `2`. Only `WS_P4_5` currently sets it, so `WS_P4_7B`,
+  `WS_P4_4B` and `CYD_P4_1060` are still single-buffered at the panel level.
+
+So the fleet currently has one class allocating a buffer it never uses and another not
+allocating one it might want. Settle both against the vendor trees before writing any
+per-board buffering logic — otherwise that logic gets built on top of two unexamined
+defaults.
+
+Caution learned the hard way: the 1-vs-2 `num_fbs` test run during P4-5 bring-up came back
+"no difference," but it was run against the reset-polarity hang, which masked everything
+downstream. **It is not evidence about buffering.** Treat `num_fbs` as untested on this fleet.
+
 ### Per-device DPI and font scaling
 
 `HIGH_DPI_DISPLAY` is currently a single on/off build flag that does two things: sets LVGL's
