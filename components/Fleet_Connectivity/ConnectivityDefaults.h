@@ -50,8 +50,8 @@ struct WiFiDefaults {
     const char *HOSTNAME;
 
     // Append the last 6 MAC hex digits to the hostname and AP SSID?
-    //   true  -> "fleet-ws-p4-7b-98d510" / "FleetSetup-98D510"
-    //   false -> "fleet-ws-p4-7b"        / "FleetSetup"
+    //   true  -> "fleet-ws-p4-7b-98d510" / "Fleet-ws-p4-7b-98D510"
+    //   false -> "fleet-ws-p4-7b"        / "Fleet-ws-p4-7b"
     // Also settable at runtime from the UI. Turning it OFF makes names
     // collide between two boards of the same model - fine when you own one of
     // each, a real nuisance with a pair. It never affects the MQTT/HA device

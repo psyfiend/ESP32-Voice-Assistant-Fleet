@@ -51,7 +51,8 @@ const char *hostname();
 // "fleet_ws_p4_7b_98d510" - MQTT topic and HA unique_id component.
 const char *deviceId();
 
-// Default AP SSID for provisioning, e.g. "FleetSetup-98D510". Uppercase suffix
+// Default AP SSID for provisioning, e.g. "Fleet-ws-p4-7b-98D510". Always carries
+// the board slug so several boards in setup mode stay distinguishable. Uppercase suffix
 // so it is readable on a phone's network list.
 const char *apSsid();
 

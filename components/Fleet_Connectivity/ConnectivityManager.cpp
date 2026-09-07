@@ -765,8 +765,20 @@ void ConnectivityManager::loop() {
         uint32_t idleMs = (uint32_t)_defaults.AP_IDLE_TIMEOUT_MIN * 60000UL;
         if (now - _apLastClientMs > idleMs) {
             stopAp("idle timeout, no clients");
-            if ((ConnState)_state.load() == ConnState::APSTA) {
+            // The state must stop claiming an AP the instant one stops
+            // broadcasting. The header glyph renders AP_ACTIVE/APSTA as amber
+            // arcs plus an "AP" badge, which tells the user to go join the
+            // setup network - and pointing someone at a network that is not
+            // there is worse than showing them the fault.
+            ConnState st = (ConnState)_state.load();
+            if (st == ConnState::APSTA) {
+                // STA is up; the AP was the redundant half. Nothing is wrong.
                 setState(ConnState::STA_CONNECTED, LinkType::STA);
+            } else if (st == ConnState::AP_ACTIVE) {
+                // STA is down and now there is no AP either. Retries continue:
+                // DEGRADED is handled alongside AP_ACTIVE by the retry block
+                // above, and the next failure re-raises the AP.
+                enterDegraded("AP idled down, STA still retrying");
             }
         }
     }

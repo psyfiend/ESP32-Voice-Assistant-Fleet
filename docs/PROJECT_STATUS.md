@@ -102,14 +102,21 @@ scope has to be cut again.
    and no permanent-stop line ever printed. This was the last behaviour path in the spec that
    had never been observed on any board.
 
-   **It also found a real bug — see GitHub issue #42.** The AP idle-shutdown (10 min, no
-   clients) fires in `AP_ACTIVE`, not just in `APSTA` as intended. In `AP_ACTIVE` the AP is
-   the *rescue path*, not a redundant extra, so the device hides the only network a human
-   could use to fix it — and at the 1800 s cap `FleetSetup` is absent roughly two-thirds of
-   the time. Worse, the state stays `AP_ACTIVE` after the AP stops, so `getState()` and the
-   header glyph both advertise an access point that is not broadcasting. That is the **third**
-   lying diagnostic this project has found (see fleet-wide investigations below), and the
-   first one caught from inside rather than from the router.
+   **It also found a real bug — GitHub issue #42, now fixed.** After the AP idles down (10 min,
+   no clients), the state stayed `AP_ACTIVE`, so `getState()` and the header glyph kept
+   advertising an access point that was not broadcasting — confirmed visually on the device,
+   with the arcs and `AP` lettering still shown. The state fix-up after `stopAp()` only handled
+   `APSTA`; `AP_ACTIVE` now lands in `DEGRADED`, which continues the retry ladder (the retry
+   block already tests `AP_ACTIVE || DEGRADED`) while no longer claiming an AP exists.
+
+   That is the **third** lying diagnostic this project has found (see fleet-wide investigations
+   below), and the first caught from inside rather than from the router.
+
+   **A first reading of this as two bugs was wrong.** The AP idling down in `AP_ACTIVE` is
+   correct as designed, not a defect: the rescue scenario is *wrong credentials at boot*, and a
+   reboot re-raises the AP and restarts the window — so the beacon is up exactly when a human
+   is at the device. Keeping it up indefinitely on an unattended panel costs power for nobody's
+   benefit, and `AP_IDLE_TIMEOUT_MIN` (`0 = never`) already exposes the choice.
 
 **Tabled, not forgotten:** on-device connectivity settings UI (#7) and the captive portal (#6)
 are both deferred out of Phase 1 by decision, not by blockage. #6 was in any case gated on a

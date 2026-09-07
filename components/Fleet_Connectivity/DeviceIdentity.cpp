@@ -75,10 +75,14 @@ void buildOnce() {
     char upper[8];
     snprintf(upper, sizeof(upper), "%s", g_macSuffix);
     for (char *p = upper; *p; ++p) *p = (char)toupper((unsigned char)*p);
+    // The AP SSID always carries the board slug, so a fleet in setup mode shows
+    // "Fleet-ws-p4-5" / "Fleet-cyd-s3-3248" rather than several identical
+    // "FleetSetup" networks nobody can tell apart. Longest slug is 11 chars, so
+    // the suffixed form tops out at 24 bytes - inside the 32-byte SSID limit.
     if (g_appendMac) {
-        snprintf(g_apSsid, sizeof(g_apSsid), "FleetSetup-%s", upper);
+        snprintf(g_apSsid, sizeof(g_apSsid), "Fleet-%s-%s", FLEET_BOARD_SLUG, upper);
     } else {
-        snprintf(g_apSsid, sizeof(g_apSsid), "FleetSetup");
+        snprintf(g_apSsid, sizeof(g_apSsid), "Fleet-%s", FLEET_BOARD_SLUG);
     }
 
     // Per-device provisioning password derived from the MAC. Not a secret in
