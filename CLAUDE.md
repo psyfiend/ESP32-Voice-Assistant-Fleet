@@ -10,8 +10,9 @@ See `docs/PROJECT_STATUS.md` for current bugs and unconfirmed/untested items,
 the UI layer's own longer-term vision/architecture (separate from the HAL concerns this file
 covers), and `docs/BRINGUP_WS_S3_TOUCH_LCD_5B.md` for that board's own detailed bring-up
 history (RGB bounce-buffer bug, the still-open GT911 touch issue, everything tried and
-ruled out). All four are more volatile than this file and worth checking first for "is X
-already known/planned."
+ruled out). `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md` covers the P4-5 bring-up and the ESP32-P4
+silicon-revision investigation. All of these are more volatile than this file and worth
+checking first for "is X already known/planned."
 
 ## Board selection
 
@@ -69,6 +70,14 @@ conditional.
   `WS_P4_TOUCH_LCD_7B_HARDWARE`, not bare `WS_P4_7B`) — once that macro is defined, the
   preprocessor rewrites any bare occurrence of its name, including a struct's own
   declaration, to `1`.
+- **`components/Fleet_BSP/src/` must exist, even though Fleet_BSP is header-only.** It holds
+  nothing but a README. Because Fleet_BSP ships a `library.properties`, PlatformIO's LDF
+  builds it with `ArduinoLibBuilder`, whose `include_dir` returns `None` unless `include/`
+  *and* `src/` both exist (`platformio/builder/tools/piolib.py`). Without `src/`, only the
+  library root lands on the include path and every `#include "bsp_loader.h"` fails - in the
+  compiler *and* in VSCode IntelliSense. Git cannot track empty directories, which is why
+  the README is what keeps it alive. Do not delete either.
+
 - **C++'s designated initializers require members to be listed in declaration order** — when
   writing a new board header, list each struct's fields in the same order they appear in
   `Fleet_BSP.h` (skipping unset ones is fine; reordering the ones you do set is not, and
@@ -128,6 +137,34 @@ reads closer to official ESP-IDF audio examples.
   coordinate passthrough regardless of its own `bsp_display.ROTATION` value. The reasoning behind
   this split is undocumented and was never actually re-tested against the alternative —
   treat it as unverified, not settled.
+
+- **`DisplayConfig.PHY_CLK_SRC` selects the DSI PHY PLL reference clock per board.** It
+  holds a small Fleet-defined `BSP_PHY_CLK_SRC_*` code, deliberately *not* a raw
+  `mipi_dsi_phy_pllref_clock_source_t` — those are positional ordinals in
+  `soc_module_clk_t`, so storing their integers would silently repoint every board if
+  Espressif reordered that enum. `Arduino_ESP32DSIPanel` maps the codes to the real
+  constants by name. `0` is both the zero-fill default and "change nothing", so a board that
+  omits the field keeps the library's historical `PLL_F20M` choice untouched — which is what
+  `WS_P4_7B`, `WS_P4_4B` and `CYD_P4_1060` rely on.
+- **`pioarduino` ships two prebuilt P4 lib variants and picks one from the board definition.**
+  `esp32p4_es` (pre-rev3 silicon: `SELECTS_REV_LESS_V3=y`, `REV_MIN_1`) and `esp32p4`
+  (`REV_MIN_301`). `board = esp32-p4-evboard` selects **`esp32p4_es`**, so the fleet is already
+  built for pre-rev3 P4 silicon. When checking framework config, confirm which variant is on
+  the include path before reading an `sdkconfig` — reading the wrong one wasted most of a
+  session. `BoardHardware.SI_REV` stays `"unconfirmed"` on every P4 board and should: silicon
+  revision is a per-chip property, not a per-board-model one, so a BSP header cannot represent
+  it correctly. See `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
+- **Panel reset polarity is per-board: `DisplayConfig.RST_ACTIVE_HIGH`.** `0` (the zero-fill
+  default) is the generic active-LOW sequence every board used before this field existed; `1`
+  selects assert-HIGH / release-LOW, mirroring `esp_lcd panel_hx8394_reset`. The Waveshare
+  P4-5's HX8394 needs `1` — with the active-low sequence the pin ends asserted and the panel
+  is held in reset, which manifests as DSI init commands filling the host FIFO and blocking
+  part-way through `gfx->begin()`. That cost most of a session to find. Confirmed fixed on
+  hardware 2026-09-06; see `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
+- **When a vendor ships a known-working copy of a library you have forked, diff the whole tree
+  before theorising.** The reset-polarity fix sat in Waveshare's own copy of
+  `Arduino_DSI_Display.cpp`, with a comment naming the exact failure mode. Several rounds of
+  hypotheses were spent because only `Arduino_ESP32DSIPanel.cpp` had been compared.
 
 ## PlatformIO build cache can silently ignore BSP header edits
 

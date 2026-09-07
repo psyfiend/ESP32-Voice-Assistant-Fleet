@@ -27,12 +27,26 @@ implementation follows that spec.
 - TX power cap of 13 dBm on `CYD_S3_3248` — brownouts stopped. **Confounded**: a USB cable
   swap happened at the same time, so the cap is not independently proven. `WS_P4_7B` runs with
   no cap and is stable, which is the control.
+- **`APPEND_MAC_SUFFIX = false` — VERIFIED 2026-09-06 on `WS_P4_5`.** `macSuffix=off` in the
+  `[Conn:debug]` line and the derived hostname is `fleet-ws-p4-5` with no hex suffix, while
+  `deviceId` still carries it (`fleet_ws_p4_5_e0d24b`) — so the two names are being derived
+  independently as intended. This is a local-derivation check and is legitimately confirmed;
+  it is **not** the same claim as the DHCP item below.
+
+- **`WS_P4_5` full bring-up (2026-09-06).** Display, GT911 touch, ES8311 out, ES7210 in
+  (codec init), WiFi STA on a real DHCP lease, and the AP with a client attached — all on the
+  first boot after the reset-polarity fix. Third P4 board confirming `STA_PLUS_AP`, and the
+  first live sighting of the unproven → proven NVS transition
+  (`[Conn] Credentials confirmed working.`). `HIGH_DPI_DISPLAY` also confirmed good on this
+  panel. See `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
 
 ### Built but NOT yet verified
-- **Hostname reaching DHCP.** Fixed in `be6e60e`; never confirmed against a real DHCP server.
-  This one must be checked in the router's lease table, **not** in serial output — see the
-  Known-issues entry below for why the device's own report was untrustworthy.
-- **`APPEND_MAC_SUFFIX = false`.** Fixed in `be6e60e`, unverified.
+- **Hostname reaching DHCP.** Fixed in `be6e60e`; still never confirmed against a real DHCP
+  server. Must be checked in the router's lease table, **not** in serial output — the device's
+  `hostname=` line reads back the same buffer it wrote, which is exactly how this fooled us
+  before. Note `WS_P4_5` printing `hostname=fleet-ws-p4-5` on 2026-09-06 does **not** close
+  this; there was no router access at that location.
+
 - The signed-off retry policy: two auth rounds with a 45 s gap, permanent stop when unproven,
   45-minute recheck when proven, environmental backoff 2→4→8→16→30 min, AP-client deferral.
   All compiles, none observed.
@@ -62,6 +76,20 @@ gitignored and has to be recreated by hand.
 
 ---
 
+### WS_P4_5 display bring-up — RESOLVED 2026-09-06
+
+Branch **`feat/p4-5-display-bringup`**. The board is fully up: display, touch, audio, WiFi STA
+and AP all working.
+
+Root cause was **panel reset polarity** — the HX8394 resets active HIGH while the GFX library
+hardcoded an active-LOW sequence that ends with the pin asserted, holding the panel in reset
+through the whole init. Fixed with a per-board `DisplayConfig.RST_ACTIVE_HIGH` defaulting to
+active-low, so no other board changed. Found by diffing Waveshare's bundled copy of the
+library against our fork.
+
+Full history, the ruled-out list, corrections to several wrong theories, and remaining
+bring-up items: `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
+
 ## The BSP, briefly
 
 Each board's `components/Fleet_BSP/include/BSP_<NAME>.h` declares a short device-identity
@@ -79,7 +107,7 @@ section.
 |---|---|---|---|---|---|---|
 | **ESP32-P4-WIFI6-Touch-LCD-7B** (WaveShare, macro `WS_P4_7B`) | `WS_P4_TOUCH_LCD_7B` | ✅ | ✅ (portrait; rotation untested) | untested (no speaker access — enclosure doesn't expose it) | untested | ✅ connects (2026-09-03) |
 | **ESP32-P4-WIFI6-Touch-LCD-4B** (WaveShare, macro `WS_P4_4B`) | `WS_P4_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ connects, real DHCP IP (see below) |
-| **ESP32-P4-WIFI6-Touch-LCD-5** (WaveShare, macro `WS_P4_5`) | `WS_P4_TOUCH_LCD_5` | untested (not flashed yet) | untested | untested | untested | untested |
+| **ESP32-P4-WIFI6-Touch-LCD-5** (WaveShare, macro `WS_P4_5`) | `WS_P4_TOUCH_LCD_5` | ✅ (rotation untested) | ✅ | ✅ | ✅ codec init (capture untested) | ✅ connects, AP + STA_PLUS_AP confirmed |
 | **ESP32-S3-Touch-LCD-4B** (WaveShare, macro `WS_S3_4B`) | `WS_S3_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ connects (native radio, no hosted-WiFi complexity) |
 | Guition P4 7" (JC1060P470C, macro `CYD_P4_1060`) | `CYD_P4_1060P470` | ✅ | ✅ | ✅ | ✅ (first-ever test of the ES8311-as-sole-mic-input path) | untested (builds clean, not flash-tested for WiFi) |
 | Guition 3.5" (JC3248W535, macro `CYD_S3_3248`) | `CYD_S3_3248W535` | ✅ (both rotations confirmed) | ✅ (both rotations confirmed) | ✅ | ✅ | ✅ connects, boot resets no longer reproduce (see below) |
@@ -105,6 +133,11 @@ section.
   connecting — `WS_P4_4B`, `WS_S3_4B`, `WS_P4_7B` — and 1 connecting with an open issue). AP/captive-portal fallback
   and MQTT not started. See `FUTURE_IMPROVEMENTS.md`'s Connectivity section for the full
   phased plan and the fleet-wide platform/framework upgrade this required.
+- **ESP32-C6 co-processor firmware (P4 boards)** — on `WS_P4_5` the host cannot read the slave
+  firmware version (`Req_GetCoprocessorFwVersion` times out, reports `0.0.0` vs host
+  `2.12.11`). WiFi works regardless, but it costs roughly a second of boot time in failed RPC
+  retries. Not yet checked on `WS_P4_7B` / `WS_P4_4B`; if they behave the same it is a
+  fleet-wide P4 item, and Espressif publish a matching slave binary.
 - **SD card** — untested on every board. Low priority.
 - **Battery ADC "gauge"** — no board has a working battery percentage readout yet. Low
   priority. See `FUTURE_IMPROVEMENTS.md` for the voltage-divider math already confirmed for
