@@ -53,62 +53,92 @@ void MqttProvider::onMessage(const char *topic, const uint8_t *payload,
 void MqttProvider::handle(const char *topic, const uint8_t *payload, unsigned int length) {
     if (!_reg || !topic) return;
 
-    // Copy to a NUL-terminated buffer. Deliberately NOT payload[length] = 0 -
-    // that writes one byte past the buffer the MQTT library owns, which is a
-    // real out-of-bounds write even though it usually appears to work.
-    char buf[257];
-    const unsigned int n = (length < sizeof(buf) - 1) ? length : sizeof(buf) - 1;
-    memcpy(buf, payload, n);
-    buf[n] = '\0';
+    // First pass: does anything want this topic, and does anything need the
+    // payload parsed as JSON?
+    bool matchedAny = false;
+    bool needsJson  = false;
+    for (uint8_t i = 0; i < _reg->count(); i++) {
+        const Entity *e = _reg->at(i);
+        if (!e) continue;
+        if (e->desc.source != EntitySource::MQTT) continue;
+        if (strcmp(e->desc.externalRef, topic) != 0) continue;
+        matchedAny = true;
+        if (e->desc.valueKey[0]) needsJson = true;
+    }
+
+    if (!matchedAny) {
+        // Subscribed but nothing wants it. Almost always a topic typo in an
+        // entity declaration, so it is worth saying rather than dropping.
+        _unmatched++;
+        Serial.printf("[MqttProv] No entity for topic \"%s\"\n", topic);
+        return;
+    }
+
+    // Parse ONCE for the whole message, straight from the library's buffer.
+    //
+    // Deliberately no intermediate copy. An earlier version copied into a
+    // fixed 257-byte buffer first, which silently TRUNCATED any larger payload
+    // and then handed the fragment to the parser - every Zigbee2MQTT message
+    // is bigger than that, so every one failed as "not JSON". The lesson
+    // generalises: a fixed buffer sized by guess in the middle of a data path
+    // fails as corruption, not as an error.
+    //
+    // ArduinoJson reads (pointer, length) directly and never needs the payload
+    // NUL-terminated, which also avoids the payload[length] = 0 idiom - that
+    // writes one byte past a buffer the MQTT library owns.
+    JsonDocument doc;
+    if (needsJson) {
+        DeserializationError err = deserializeJson(doc, (const char *)payload, length);
+        if (err) {
+            // Reported once per message rather than once per entity.
+            Serial.printf("[MqttProv] \"%s\": %u-byte payload did not parse (%s)\n",
+                          topic, length, err.c_str());
+            return;
+        }
+    }
 
     const uint32_t now = millis();
-    bool matchedAny = false;
 
-    // Several entities may share one topic, each reading its own key, so every
-    // entity is checked rather than stopping at the first match.
     for (uint8_t i = 0; i < _reg->count(); i++) {
         const Entity *e = _reg->at(i);
         if (!e) continue;
         if (e->desc.source != EntitySource::MQTT) continue;
         if (strcmp(e->desc.externalRef, topic) != 0) continue;
 
-        matchedAny = true;
-
-        // Snapshot what we need before releasing our read of the entity.
+        // Snapshot what is needed before writing back into the registry.
         const ValueType vt = e->desc.valueType;
         char id[ENTITY_ID_MAX];
         char key[ENTITY_SHORT_MAX];
         snprintf(id,  sizeof(id),  "%s", e->desc.id);
         snprintf(key, sizeof(key), "%s", e->desc.valueKey);
 
-        const char *raw = buf;
-        JsonDocument doc;             // only populated when a key is named
-
         if (key[0]) {
-            if (deserializeJson(doc, buf, n) != DeserializationError::Ok) {
-                Serial.printf("[MqttProv] %s: payload on \"%s\" is not JSON\n", id, topic);
-                continue;
-            }
             JsonVariant v = doc[key];
             if (v.isNull()) {
                 Serial.printf("[MqttProv] %s: key \"%s\" not in payload\n", id, key);
                 continue;
             }
-            // Numbers are converted below from the variant directly; text
-            // routes through a string view of it.
             switch (vt) {
-                case ValueType::FLOAT: _reg->setValue(id, EntityValue::makeFloat(v.as<float>()), now); continue;
-                case ValueType::INT:   _reg->setValue(id, EntityValue::makeInt(v.as<int32_t>()), now); continue;
-                case ValueType::BOOL:  _reg->setValue(id, EntityValue::makeBool(v.as<bool>()), now);  continue;
+                case ValueType::FLOAT: _reg->setValue(id, EntityValue::makeFloat(v.as<float>()), now); break;
+                case ValueType::INT:   _reg->setValue(id, EntityValue::makeInt(v.as<int32_t>()), now); break;
+                case ValueType::BOOL:  _reg->setValue(id, EntityValue::makeBool(v.as<bool>()), now);   break;
                 default: {
                     const char *s = v.as<const char *>();
                     _reg->setValue(id, EntityValue::makeText(s ? s : ""), now);
-                    continue;
+                    break;
                 }
             }
+            continue;
         }
 
-        // No key: the whole payload is the value.
+        // No key: the whole payload is the value. These are short by nature
+        // ("ON", "21.4"), so a small stack buffer is safe here - and unlike the
+        // JSON path, a truncation would be visible rather than silent.
+        char raw[64];
+        const unsigned int n = (length < sizeof(raw) - 1) ? length : sizeof(raw) - 1;
+        memcpy(raw, payload, n);
+        raw[n] = '\0';
+
         switch (vt) {
             case ValueType::FLOAT: _reg->setValue(id, EntityValue::makeFloat(atof(raw)), now); break;
             case ValueType::INT:   _reg->setValue(id, EntityValue::makeInt((int32_t)atol(raw)), now); break;
@@ -126,12 +156,5 @@ void MqttProvider::handle(const char *topic, const uint8_t *payload, unsigned in
         }
     }
 
-    if (matchedAny) {
-        _handled++;
-    } else {
-        // Subscribed but nothing wants it. Almost always a topic typo in an
-        // entity declaration, so it is worth saying rather than dropping.
-        _unmatched++;
-        Serial.printf("[MqttProv] No entity for topic \"%s\"\n", topic);
-    }
+    _handled++;
 }
