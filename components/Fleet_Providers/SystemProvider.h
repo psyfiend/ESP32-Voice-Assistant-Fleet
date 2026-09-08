@@ -38,12 +38,9 @@ public:
 
     void setIntervalMs(uint32_t ms) { _intervalMs = ms; }
 
-    // Entity ids, exposed so cards and tests can bind without stringly-typed
-    // duplication. Per ROADMAP Q5's object_id convention, <peripheral>_<measurement>.
-    static constexpr const char *ID_RSSI   = "sys_rssi";
-    static constexpr const char *ID_IP     = "sys_ip";
-    static constexpr const char *ID_UPTIME = "sys_uptime";
-    static constexpr const char *ID_HEAP   = "sys_heap";
+    // Entity ids live in SystemEntities.h as SYS_ENT_* - see that file for the
+    // full declarative table. Not duplicated here: two lists of the same ids
+    // is exactly how one gets renamed and the other does not.
 
 private:
     EntityRegistry      *_reg  = nullptr;
