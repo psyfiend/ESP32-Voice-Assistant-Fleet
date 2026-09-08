@@ -5,14 +5,20 @@ ESP32-S3 and ESP32-P4 boards (WaveShare and Guition displays), each with a touch
 audio codec(s), and LVGL-based UI. One codebase, many boards, selected at build time via
 PlatformIO environments.
 
-See `docs/PROJECT_STATUS.md` for current bugs and unconfirmed/untested items,
-`docs/FUTURE_IMPROVEMENTS.md` for deliberately deferred work, `docs/GUI_FRAMEWORK.md` for
-the UI layer's own longer-term vision/architecture (separate from the HAL concerns this file
-covers), and `docs/BRINGUP_WS_S3_TOUCH_LCD_5B.md` for that board's own detailed bring-up
-history (RGB bounce-buffer bug, the still-open GT911 touch issue, everything tried and
-ruled out). `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md` covers the P4-5 bring-up and the ESP32-P4
-silicon-revision investigation. All of these are more volatile than this file and worth
-checking first for "is X already known/planned."
+**This file is the stable one: how the HAL and BSP work today.** Everything volatile lives
+elsewhere, and it is worth checking those first for "is X already known or planned."
+
+| Doc | Answers |
+|---|---|
+| `docs/ROADMAP.md` | What we are building, in what order, and what is done. **Start here.** |
+| `docs/HARDWARE_STATUS.md` | Which board does what, what is untested, build-environment issues |
+| `docs/LESSONS.md` | Mistakes that cost real time, written down so they cost it once |
+| `docs/FUTURE_IMPROVEMENTS.md` | Deliberately deferred fleet-wide work |
+| `docs/REFERENCE_PROJECTS.md` | What is in `reference/`, what to mine from it, and its licensing |
+| `docs/BRINGUP_*.md` | Per-board bring-up history for the two boards that fought back |
+| GitHub issues | What is in flight right now, and what is blocked |
+
+`docs/GUI_FRAMEWORK.md` is superseded by the roadmap and retained only as a pointer.
 
 ## Board selection
 

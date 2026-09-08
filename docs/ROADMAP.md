@@ -1,16 +1,57 @@
 # Fleet Dashboard — Blueprint & Roadmap
 
-**Status: FIRST DRAFT. Not agreed yet.** Section 8 (Open Questions) has to be answered before
-any of Phases 2+ get built. Phase 0 and most of Phase 1 are safe to start regardless.
+**Status: AGREED and in progress.** Phases 0 and 1 are complete. Section 8's open questions
+are answered except where marked, and the answers are recorded there rather than in chat.
 
 This is the *plan* doc. It answers "what are we building, in what order, and how do we know
 we're making progress." It does not replace:
 
-- `CLAUDE.md` — how the HAL/BSP works today (stable facts)
-- `docs/PROJECT_STATUS.md` — per-board bugs/test status (volatile)
-- `docs/FUTURE_IMPROVEMENTS.md` — fleet-wide deferred work (medium volatility)
-- `docs/GUI_FRAMEWORK.md` — the earlier UI vision sketch. **This doc supersedes it** once
-  agreed; GUI_FRAMEWORK.md then gets reduced to a pointer here.
+| Doc | Answers |
+|---|---|
+| `CLAUDE.md` | How the HAL/BSP works today (stable facts) |
+| `docs/HARDWARE_STATUS.md` | Which board does what; what is untested; build-environment issues |
+| `docs/FUTURE_IMPROVEMENTS.md` | Fleet-wide deferred work |
+| `docs/LESSONS.md` | Mistakes worth not repeating |
+| `docs/REFERENCE_PROJECTS.md` | What is in `reference/` and what to mine from it |
+| `docs/GUI_FRAMEWORK.md` | Superseded by this doc; retained as a pointer |
+| GitHub issues | What is being worked on right now, and what is blocked |
+
+---
+
+## 0. Where we are — 2026-09-08
+
+**Phase 0 (repo hygiene) and Phase 1 (connectivity) are done.** The dashboard has a working
+data pipeline in both directions and nothing to draw it with yet.
+
+**What exists and runs on hardware:**
+
+- WiFi station, AP and APSTA, with classified failures and retry ladders, on five boards.
+- Device hostnames in DHCP, verified from the router's lease table.
+- An MQTT broker session with its own backoff, LWT and reconnect handling.
+- An Entity Registry: one list of everything the panel knows, with staleness and optimistic
+  writes, and zero dependencies so it compiles and tests on a PC.
+- Two providers. `SystemProvider` publishes this board's own telemetry; `MqttProvider` reads
+  entities other devices own.
+- Home Assistant discovery — the device appears in HA with correct BSP-derived identity and
+  four diagnostic entities, and four Zigbee2MQTT values arrive back the other way.
+
+**The literal next step: Phase 2.1, the startup reorganisation.** Split `main` /
+`LVGL_Startup` / `GuiManager` *before* adding UI rather than after — it is the cheapest it
+will ever be, and every card built beforehand would have to move. Written up in
+`FUTURE_IMPROVEMENTS.md`.
+
+**What we are deliberately leaving behind for now.** None of these are blocked; each was
+descoped so the framework could progress. Every one keeps an open issue with its reasoning:
+
+| Left behind | Issue | Why it can wait |
+|---|---|---|
+| Captive portal | #6 | Needs a web server that does not arrive until Phase 4 |
+| On-device connectivity settings screen | #7 | The System panel already shows network state during development; better built after the Phase 2 design system |
+| `_proven` credential fingerprint | #39 | Cannot be hit by a user, only by a developer changing credentials |
+| Proven/unproven behaviour matrix (tests 2 and 3) | — | Coded and reviewed, never observed; the matrix was consuming the schedule |
+| HA access without MQTT | #43 | **Important, not urgent.** Most HA users have no broker, so this blocks other people before it blocks us |
+| Flash-testing the last three boards | #8 | All physically accessible; nothing board-specific is expected |
+| Outbound entity commands | #10 | The registry supports them; nothing yet has a control to send one |
 
 ---
 
@@ -79,7 +120,7 @@ a nice-to-have. These are the levers that actually matter, in rough order of imp
 
 **1. One session = one milestone.** The biggest cost driver is a long session where every later
 message re-reads a growing history. When a milestone is done and committed, start a fresh
-session. The docs (this one, `PROJECT_STATUS.md`, `CLAUDE.md`) are the handoff mechanism — they
+session. The docs (this one, `HARDWARE_STATUS.md`, `CLAUDE.md`) are the handoff mechanism — they
 let a new session get up to speed in ~5k tokens instead of ~60k of re-exploration.
 
 **2. Write the design down before writing the code.** A one-page `docs/design/<subsystem>.md`
@@ -517,44 +558,36 @@ Two incidental findings worth keeping:
   settling on a cast helper in the design system (§2.2) before writing 8 card types that each
   reproduce it.
 
-### Phase 1 — Connectivity (your stated priority)
+### Phase 1 — Connectivity — **COMPLETE 2026-09-08**
 
-| # | Milestone | Acceptance criteria |
+| # | Milestone | Status |
 |---|---|---|
-| 1.1 | Connectivity state machine | **DONE, hardware-verified.** Event-driven, non-blocking, four modes, rich failure classification. Behaviour governed by the signed-off "Connectivity Behavior Spec" |
-| 1.2 | **APSTA feasibility spike** | **DONE — the answer is YES.** `STA_PLUS_AP` confirmed working on both a P4 (`WS_P4_7B`, WiFi via ESP32-C6 over `esp_hosted`) and an S3 (`CYD_S3_3248`) on 2026-09-04. `softAP()` concurrent with STA is fully supported over the hosted transport, so **connectivity mode 2 can be offered fleet-wide** and the settings UI does not need per-board gating. This was the gate on 1.3 and it is now open |
-| 1.3 | AP + captive portal | Device stands up an AP; DNS redirect works; credential-entry page works; STA-only mode selectable with automatic AP fallback on failure |
-| 1.4 | Connectivity settings UI | On-device: scan, pick network, enter password, view IP/RSSI/mode. Header bar shows a live WiFi status icon |
-| 1.5 | Flash-test remaining 5 boards | Every board in PROJECT_STATUS's WiFi column is either confirmed or has a documented reason |
-| 1.6 | MQTT transport | Connect using credentials from the settings layer; publish; subscribe; LWT; exponential-backoff reconnect; status visible in the UI |
-| 1.7 | **Entity Registry** | Core registry + dirty-flag/mutex bridge (§4.2). `SystemProvider` populates rssi/ip/uptime/heap. `MqttProvider` maps topics to entities both ways |
-| 1.8 | HA discovery | Discovery payloads **generated from the registry**; device + entities appear correctly in HA; naming scheme per Q5 |
+| 1.0 | Device hostnames (#38) | **DONE.** Verified in the router's DHCP lease table, not in serial output — see `LESSONS.md` |
+| 1.1 | Connectivity state machine (#4) | **DONE**, hardware-verified on five boards. Four modes, classified failures, retry ladders. One criterion met differently: state is a polled atomic rather than a callback, which avoids firing UI work from the WiFi event task (§4.2) |
+| 1.2 | APSTA feasibility spike (#5) | **DONE — yes.** `STA_PLUS_AP` confirmed on three P4 boards and an S3, so mode 2 is offered fleet-wide with no per-board gating |
+| 1.3 | AP + captive portal (#6) | **AP half DONE.** Portal descoped — needs the Phase 4 web server |
+| 1.4 | Connectivity settings UI (#7) | **Header glyph DONE.** Screen descoped to after the Phase 2 design system |
+| 1.5 | Flash-test remaining boards (#8) | **5 of 8.** Three outstanding, all accessible |
+| 1.6 | MQTT transport (#9) | **DONE**, connected to a real broker. Classified failures, own backoff ladder, LWT plus explicit `offline` on clean shutdown, subscriptions replayed on reconnect |
+| 1.7 | Entity Registry (#10) | **DONE.** Registry, staleness, optimistic writes, and two providers. Zero-dependency build proven by compiling it standalone. Outbound commands remain unimplemented — nothing has a control to send one yet |
+| 1.8 | HA discovery (#11) | **DONE**, verified in Home Assistant. Device-based discovery, one retained payload generated by walking the registry |
 
-Note the ordering: **1.7 before 1.8, deliberately.** Hand-writing discovery JSON first and
-retrofitting the registry later means writing it twice.
+Ordering note, now vindicated: **1.7 before 1.8.** Because discovery is a *projection* of the
+registry, it turned out to be a single serializer rather than a per-entity publish loop, and
+the `cmps` map of device-based discovery mapped straight onto the registry's contents.
 
-**Phase 1 scope cut — 2026-09-06.** The proven/unproven behaviour matrix was consuming the
-schedule for diminishing returns, so the bar for this phase was lowered deliberately to
+**Verified end to end on `WS_P4_5`:** four entities published outward to HA with correct
+BSP-derived device identity, four Zigbee2MQTT entities read back inward, all through one
+registry that neither side knows the shape of.
+
+**The scope cut that made this finishable (2026-09-06).** The proven/unproven behaviour matrix
+was consuming the schedule for diminishing returns, so the bar was deliberately lowered to
 *"the common paths are verified; the edge cases are coded, reviewed, and honestly recorded as
-unobserved."* Concretely:
+unobserved."* That decision stands, and it is worth keeping as a template for later phases.
 
-| Milestone | Revised status |
-|---|---|
-| 1.0 Device hostnames (#38) | **DONE** — verified in the router's DHCP lease table 2026-09-06 |
-| 1.1 State machine (#4) | **DONE**, hardware-verified on five boards. One acceptance criterion met differently: state is a polled atomic, not a callback — see the issue for why that is the right call given §4.2's threading trap |
-| 1.2 APSTA spike (#5) | **DONE** — closed, answer is yes, now confirmed on three P4 boards |
-| 1.3 AP + captive portal (#6) | **AP half done. Portal TABLED** out of Phase 1 — and was gated on a web server that does not arrive until #25 (Phase 4) regardless |
-| 1.4 Settings UI (#7) | **Glyph done. Screen TABLED** out of Phase 1. Backend API complete and unchanged; better built after the Phase 2 design system (#13) than before it |
-| 1.5 Flash-test (#8) | **5 of 8.** Three boards outstanding, all physically accessible |
-| 1.6–1.8 MQTT / Registry / HA discovery | **The remaining real work in this phase** |
-
-Two items deliberately carried rather than closed: **#39** (the `_proven` flag is not tied to
-the credentials that proved themselves — cannot be hit by a user, will be hit by a developer)
-and connectivity **test 4** (junk SSID → environmental ladder, the one behaviour path never
-observed at all, and cheap to run).
-
-Tabled means *descoped by decision*, not blocked and not abandoned. Every tabled item keeps its
-issue open with the reasoning recorded on it.
+One result is worth carrying forward: the single test retained purely because it was cheap and
+had **never been run** immediately exposed a real bug (#42). When scope has to be cut again,
+"never observed at all" beats "most likely to fail" as the selection criterion.
 
 ### Phase 2 — UI foundation
 
@@ -981,7 +1014,7 @@ card system from Q4 is exercised at both extremes on every single change, rather
 discovered broken on the small board months later.
 
 **New hardware fact (2026-09-03): `WS_P4_7B` WiFi STA now confirmed working on real hardware.**
-`docs/PROJECT_STATUS.md` still lists it as untested/enclosed — needs updating. Same benign
+`docs/HARDWARE_STATUS.md` still lists it as untested/enclosed — needs updating. Same benign
 `hostedHasUpdate()` / `Req_GetCoprocessorFwVersion` warning as `WS_P4_4B`, as expected for the
 shared P4+C6 architecture.
 

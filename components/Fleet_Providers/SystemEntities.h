@@ -44,7 +44,7 @@
 inline const EntityDescriptor SYSTEM_ENTITIES[] = {
     {
         .id          = SYS_ENT_RSSI,
-        .name        = "WiFi Signal",
+        .name        = "RSSI",
         .kind        = EntityKind::SENSOR,
         .source      = EntitySource::SYSTEM,
         .valueType   = ValueType::INT,

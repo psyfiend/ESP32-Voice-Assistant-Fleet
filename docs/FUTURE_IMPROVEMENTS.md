@@ -1,11 +1,16 @@
 # Future Improvements
 
 Ideas, enhancements, and fixes that affect the **entire build environment / HAL** — not tied
-to one device or a small group of devices (that's `PROJECT_STATUS.md`'s job). Deliberately
+to one device or a small group of devices (that's `HARDWARE_STATUS.md`'s job). Deliberately
 deferred work, not bugs, not blocking anything currently. Lower volatility than
-`PROJECT_STATUS.md`; safe to leave stale for a while, but prune entries once actually done.
+`HARDWARE_STATUS.md`; safe to leave stale for a while, but prune entries once actually done.
 
 ## Startup / GUI reorganization
+
+> **⏭ THIS IS NEXT.** Scheduled as ROADMAP **Phase 2.1**, the first milestone after Phase 1.
+> Do it *before* any cards exist rather than after: every card built beforehand would have to
+> move, and the split is at its cheapest right now while `setup()` is the only caller.
+
 
 Raised during connectivity design work, deliberately out of scope for that branch — a
 naming/responsibility mismatch noticed in passing, not a bug. Currently: `LVGL_Test_UI.cpp`'s
@@ -146,63 +151,27 @@ expands (GitHub issue #31).
 
 ## Connectivity (WiFi / MQTT / Home Assistant)
 
-"WiFi tested" requires **both** of the following, not just joining a network:
-- **Station mode**: on-device method to scan for and connect to an AP, with no hardcoded
-  credentials.
-- **AP / captive-portal fallback mode**: if the device can't connect to a known AP after
-  boot, it stands up its own AP with a captive portal to collect WiFi credentials.
-- Once connected: a modular, portable **MQTT component/library**, usable across every board,
-  to register the device and whatever peripherals it has with Home Assistant, including MQTT
-  discovery (auto-registering entities without manual HA config).
+**Phase 1 is COMPLETE — see `ROADMAP.md` for what was built and what was descoped.** The
+narrative that used to live here (progress logs, the `wifi-testing` branch, the platform
+upgrade) has been removed: it described work that is now done, and git history is a better
+record of how it went than a stale status section.
 
-This is the actual definition of "WiFi tested" for this project — device discovery and
-entity surfacing the way an ESPHome device would, not just "joins an AP."
+What this project originally meant by "WiFi tested" — station mode, AP fallback, and a
+portable MQTT component that registers the device and its peripherals with Home Assistant
+via discovery, the way an ESPHome device does — is now largely satisfied. Discovery works,
+and entities flow in both directions.
 
-**Status: in progress on the `wifi-testing` branch, WiFi first, MQTT deferred until every
-board joins an AP.**
+**Still deferred, each with an open GitHub issue:** the captive portal (#6), the on-device
+settings screen (#7), HA access without an MQTT broker (#43), and outbound entity commands
+(part of #10).
 
-**Progress so far:**
-- `Fleet_Connectivity`/`ConnectivityManager` Phase 1 (STA connect with NVS-fallback-to-compile-
-  default, per the layering below) is implemented and confirmed connecting on real hardware:
-  `WS_P4_TOUCH_LCD_4B` (P4/ESP32-C6 hosted-WiFi, real DHCP IP) and `WS_S3_TOUCH_LCD_4B` (native
-  radio). `CYD_S3_3248W535` also connects but has an open, unrelated issue (see
-  `docs/PROJECT_STATUS.md`'s per-device notes) - full per-board WiFi status lives there, not
-  here.
-- Getting the P4/C6 boards to connect at all **required a fleet-wide platform/framework
-  upgrade**: pioarduino `platform-espressif32` 55.03.34 → 55.03.311 (arduino-esp32 3.3.4 →
-  3.3.11), plus a PlatformIO Core bump (6.1.18 → 6.1.19, pioarduino 55.03.311's minimum). The
-  P4 has no WiFi radio at all - it depends entirely on an onboard ESP32-C6 co-processor over
-  SDIO (`esp_hosted`), and the older host-driver version couldn't complete its RPC handshake
-  with the C6's factory firmware. Waveshare's own compatibility docs named 3.3.11 as their
-  tested Arduino-core version for this hardware.
-  - All 8 environments rebuilt clean against the new platform. Two real regressions surfaced
-    and got fixed along the way: `GFX_Library_for_Arduino`'s `Arduino_ESP32SPI`/
-    `Arduino_ESP32SPIDMA` databus classes called `spiFrequencyToClockDiv()` with 3.3.4's old
-    single-argument signature, broken against 3.3.11's new `(spi_t*, uint32_t)` signature -
-    both confirmed unused anywhere in this fleet and excluded via the library's `library.json`
-    `srcFilter` (files kept on disk, just not compiled) rather than fixed or deleted;
-    `CYD_P4_1060P470` was missing a `board_build.partitions` override every other P4 env has,
-    silently running on a too-small default partition table that only started overflowing
-    once 3.3.11's larger framework didn't fit.
-  - **Operational gotcha worth knowing**: pioarduino 55.03.311's tooling actively rejects
-    being invoked from a Git Bash/MSYS shell (fails with `MSys/Mingw is not supported`, plus
-    knock-on failures like the toolchain compiler not being found on `PATH`). Run `pio`
-    commands from PowerShell or cmd.exe, not Git Bash, for this platform version. VS Code's
-    PlatformIO IDE extension is unaffected either way - it doesn't invoke Core through MSYS.
-  - The `hostedHasUpdate()` RPC warning that still prints on every P4/C6 boot
-    (`Req_GetCoprocessorFwVersion` timing out) is confirmed cosmetic - traced to source, it's a
-    diagnostic-only version check whose result is discarded, structurally incapable of
-    blocking the actual connection. Safe to ignore; see `docs/PROJECT_STATUS.md`'s `WS_P4_4B`
-    notes for the full trace.
-  - Not yet pinned: `platformio.ini` still says `platform = espressif32` with no version/commit
-    pin, so this upgrade currently only "sticks" because it's installed globally on this one
-    dev machine. A fresh machine or a routine `pio pkg update` wouldn't reproduce it. Worth
-    pinning the exact fork commit once the platform choice feels settled.
+The build-environment consequence worth keeping: reaching the P4/C6 boards at all required a
+fleet-wide bump to pioarduino `55.03.311` / arduino-esp32 `3.3.11` and PlatformIO Core
+`6.1.19`. The P4 has no radio of its own and depends entirely on an onboard ESP32-C6 over
+SDIO (`esp_hosted`); older host drivers could not complete the RPC handshake. Do not float
+that platform pin without rebuilding all eight environments.
 
-**Still open:** AP/captive-portal fallback (Phase 2) not started; GUI integration (Phase 3)
-not started; 5 of 8 boards not yet flash-tested for WiFi at all (`WS_P4_TOUCH_LCD_7B`
-physically inaccessible mid-enclosure-build, `WS_P4_TOUCH_LCD_5`/`CYD_P4_1060P470`/
-`CYD_S3_8048W550`/`WS_S3_TOUCH_LCD_5B` simply not attempted yet).
+The settings-layering design below still stands and still describes the intended shape.
 
 Architecture agreed so far:
 
@@ -262,7 +231,7 @@ Architecture agreed so far:
 
 ## Battery / power management
 
-Keep as-is for now — see `PROJECT_STATUS.md` for the one low-priority fleet-wide item
+Keep as-is for now — see `HARDWARE_STATUS.md` for the one low-priority fleet-wide item
 (battery ADC "gauge" investigation).
 
 ## General
@@ -278,7 +247,7 @@ Keep as-is for now — see `PROJECT_STATUS.md` for the one low-priority fleet-wi
 3D-printed enclosures exist for most devices with room for a battery. Goal: a single USB-C
 port on the enclosure that powers the device, charges the battery, and provides a data
 connection to a PC simultaneously. Some boards have native battery headers (see
-`PROJECT_STATUS.md` per-device notes for which). Fallback for boards without one: TP4056
+`HARDWARE_STATUS.md` per-device notes for which). Fallback for boards without one: TP4056
 modules on hand (USB-C input, plus separate +/- pads for input, battery, and device output).
 
 ## P4 silicon revision — what it is and why it matters
@@ -340,7 +309,7 @@ clean across all 8 environments; has not been flashed or tested on physical hard
 
 No microcontroller on this board — a dumb RS485-controlled relay bank, intended to be driven
 by `WS_S3_TOUCH_LCD_5B`. Its intended use (a sprinkler controller) is a **special project
-outside the scope of this environment** — see `PROJECT_STATUS.md`'s `WS_S3_5B` entry for the
+outside the scope of this environment** — see `HARDWARE_STATUS.md`'s `WS_S3_5B` entry for the
 immediate to-do (basic Modbus communication + relay switching only).
 
 ## Done
@@ -352,7 +321,7 @@ the rest.
   (`Fleet_BSP.h`/`Fleet_BSP_P4.h`), then one nested struct, now seven independent flat
   structs (`BoardHardware`, `ExpanderConfig`, `DisplayConfig`, `TouchConfig`, `LvglConfig`,
   `AudioConfig`, `StorageConfig`) aliased to `bsp_hw`/`bsp_display`/etc. See `CLAUDE.md`'s BSP
-  pattern section and `PROJECT_STATUS.md` for the summary.
+  pattern section and `HARDWARE_STATUS.md` for the summary.
 - **Board-identity macro moved out of `build_flags`.** Each `BSP_<NAME>.h` now defines its
   own short device macro at the top of the file instead of a redundant separate build flag.
   `HAS_X` capability flags are unaffected, still in `build_flags`.

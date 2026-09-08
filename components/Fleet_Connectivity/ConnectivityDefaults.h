@@ -70,7 +70,7 @@ struct WiFiDefaults {
     // Capping keeps the radio's current bursts from sagging the board rail,
     // which on these panels shows up as display glitches or a brownout reset
     // when the PA first keys up. CYD_S3_3248W535 has a documented history of
-    // exactly that symptom - see docs/PROJECT_STATUS.md. Technique borrowed
+    // exactly that symptom - see docs/HARDWARE_STATUS.md. Technique borrowed
     // from the ESP32-P4-NINA-Display project's wifi_apply_tx_power().
     uint8_t     TX_POWER_DBM;
 };
@@ -120,7 +120,7 @@ static const WiFiDefaults CONNECTIVITY_DEFAULT_WIFI = {
     .AP_IDLE_TIMEOUT_MIN    = 10,
 
 // CYD_S3_3248W535 has a documented history of resetting when the radio first
-// transmits (see docs/PROJECT_STATUS.md), and it reappeared during AP-fallback
+// transmits (see docs/HARDWARE_STATUS.md), and it reappeared during AP-fallback
 // testing on 2026-09-04 - resets on the first STA attempt and when the AP comes
 // up. Capping TX power reduces the current spike when the PA keys up, which is
 // the mitigation the ESP32-P4-NINA-Display project applies for exactly this
