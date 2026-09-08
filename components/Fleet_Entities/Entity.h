@@ -120,6 +120,12 @@ struct Entity {
     bool        pending        = false;
     EntityValue prevValue;             // value before the optimistic write
     uint32_t    pendingSinceMs = 0;
+
+    // Needs a UI update. Lives here rather than in a parallel array in the
+    // registry so that entity storage is ONE allocation - which is what lets
+    // the whole table be placed in PSRAM with a single call. See
+    // EntityRegistry::begin().
+    bool        dirty          = false;
 };
 
 #endif // ENTITY_H

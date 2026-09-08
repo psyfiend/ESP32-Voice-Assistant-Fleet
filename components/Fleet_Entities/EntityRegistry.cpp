@@ -1,4 +1,5 @@
 #include "EntityRegistry.h"
+#include <new>   // placement new over caller-provided storage
 
 // ---------------------------------------------------------------------------
 // Names. Kept in the .cpp so the header stays free of string tables.
@@ -55,11 +56,37 @@ const char *entityKindHaPlatform(EntityKind k) {
 // ---------------------------------------------------------------------------
 
 int EntityRegistry::indexOf(const char *id) const {
-    if (!id || !id[0]) return -1;
+    if (!id || !id[0] || !_items) return -1;
     for (uint8_t i = 0; i < _count; i++) {
         if (strcmp(_items[i].desc.id, id) == 0) return (int)i;
     }
     return -1;
+}
+
+bool EntityRegistry::begin(Entity *storage, uint8_t capacity) {
+    if (!storage || capacity == 0) return false;
+
+    std::lock_guard<std::mutex> lk(_mx);
+
+    // The caller may hand us raw malloc'd memory, and Entity is not trivially
+    // constructible - EntityValue has a user-provided constructor and several
+    // members have default initialisers. Without this, every field would start
+    // as whatever was in that memory.
+    // The cast to void* is not decoration. Placement new is declared as
+    //   void *operator new(size_t, void *)
+    // and passing an Entity* relies on an implicit conversion that GCC accepts
+    // but VSCode's IntelliSense parser rejects, reporting "no instance of
+    // overloaded operator new matches the argument list". Being explicit
+    // compiles identically and keeps the Problems pane honest - a permanent
+    // false error there is worse than none, because it teaches you to ignore it.
+    for (uint8_t i = 0; i < capacity; i++) {
+        ::new (static_cast<void *>(&storage[i])) Entity();
+    }
+
+    _items    = storage;
+    _capacity = capacity;
+    _count    = 0;
+    return true;
 }
 
 Entity *EntityRegistry::add(const EntityDescriptor &d) {
@@ -67,15 +94,15 @@ Entity *EntityRegistry::add(const EntityDescriptor &d) {
 
     std::lock_guard<std::mutex> lk(_mx);
 
+    if (!_items) return nullptr;              // begin() was never called
     if (indexOf(d.id) >= 0) return nullptr;   // duplicate id: caller's bug
-    if (_count >= ENTITY_MAX)  return nullptr;
+    if (_count >= _capacity) return nullptr;
 
     Entity &e = _items[_count];
     e = Entity{};
     e.desc = d;
     e.value.type = d.valueType;
 
-    _dirty[_count] = false;
     _count++;
     return &e;
 }
@@ -118,7 +145,7 @@ bool EntityRegistry::setValue(const char *id, const EntityValue &v, uint32_t now
     // Unchanged values are not dirtied. This is most of ROADMAP 4.2's
     // rate-limiting: a sensor republishing the same reading every second
     // causes no redraws at all.
-    if (changed) _dirty[i] = true;
+    if (changed) e.dirty = true;
     return changed;
 }
 
@@ -144,20 +171,20 @@ bool EntityRegistry::commandValue(const char *id, const EntityValue &v, uint32_t
     e.pendingSinceMs = nowMs;
     e.lastUpdateMs   = nowMs;
     e.everSet        = true;
-    _dirty[i]        = true;
+    e.dirty          = true;
     return true;
 }
 
 void EntityRegistry::drainDirty(DirtyFn fn, void *ctx) {
     if (!fn) return;
 
-    for (uint8_t i = 0; i < ENTITY_MAX; i++) {
+    for (uint8_t i = 0; i < _count; i++) {
         Entity snapshot;
         {
             std::lock_guard<std::mutex> lk(_mx);
-            if (i >= _count || !_dirty[i]) continue;
-            snapshot  = _items[i];
-            _dirty[i] = false;
+            if (!_items || i >= _count || !_items[i].dirty) continue;
+            snapshot = _items[i];
+            _items[i].dirty = false;
         }
         // Callback runs OUTSIDE the lock. A slow widget update must never
         // block a provider that is mid-publish on another task.
@@ -176,9 +203,9 @@ bool EntityRegistry::isStale(const Entity &e, uint32_t nowMs) const {
 }
 
 void EntityRegistry::tick(uint32_t nowMs) {
-    for (uint8_t i = 0; i < ENTITY_MAX; i++) {
+    for (uint8_t i = 0; i < _count; i++) {
         std::lock_guard<std::mutex> lk(_mx);
-        if (i >= _count) break;
+        if (!_items || i >= _count) break;
         Entity &e = _items[i];
 
         // An optimistic write whose echo never arrived. Revert, and dirty the
@@ -188,7 +215,7 @@ void EntityRegistry::tick(uint32_t nowMs) {
         if (e.pending && (nowMs - e.pendingSinceMs) > _reconcileMs) {
             e.value   = e.prevValue;
             e.pending = false;
-            _dirty[i] = true;
+            e.dirty   = true;
         }
     }
 }

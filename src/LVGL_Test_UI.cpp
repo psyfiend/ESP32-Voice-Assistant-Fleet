@@ -13,6 +13,8 @@
 #include "HaPublisher.h"
 #include "MqttProvider.h"
 #include "ExternalEntities.h"
+#include "esp_heap_caps.h"
+#include "esp_memory_utils.h"   // esp_ptr_external_ram()
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #include "Panel_Audio.h"
@@ -300,6 +302,35 @@ void setup() {
     // Broker session. Reads connMgr's link state and does nothing until it is
     // online; stays cleanly DISABLED when no MqttLocalSecrets.h is present.
     mqttMgr.begin(&connMgr);
+    // Entity storage lives in PSRAM, not internal SRAM.
+    //
+    // It used to be a fixed array inside EntityRegistry, which put ~21 KB in
+    // internal DRAM on every board. CYD_S3_3248 could not afford it: as the
+    // fleet's only QSPI panel it is the only board whose LVGL buffers must also
+    // be in internal SRAM, and the two together starved the WiFi driver badly
+    // enough that softAP() crashed inside ieee80211_hostap_attach.
+    //
+    // PSRAM also removes the ceiling: a build can size the registry for what it
+    // actually needs rather than for the worst case across the fleet.
+    {
+        const size_t bytes = (size_t)ENTITY_MAX * sizeof(Entity);
+        Entity *store = (Entity *)heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM);
+        if (!store) {
+            // Every board in the fleet has PSRAM, so this should not happen -
+            // but falling back to internal RAM is better than a registry that
+            // silently accepts nothing.
+            Serial.println("[Entities] PSRAM alloc FAILED; falling back to internal RAM.");
+            store = (Entity *)heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL);
+        }
+        if (!entities.begin(store, ENTITY_MAX)) {
+            Serial.println("[Entities] Registry unavailable - no entities will register.");
+        } else {
+            Serial.printf("[Entities] Capacity %u (%u bytes in %s)\n",
+                          (unsigned)ENTITY_MAX, (unsigned)bytes,
+                          esp_ptr_external_ram(store) ? "PSRAM" : "internal RAM");
+        }
+    }
+
     sysProvider.begin(&entities, &connMgr);
     haPub.begin(&entities, &mqttMgr);
     mqttProv.begin(&entities, &mqttMgr);

@@ -1,4 +1,5 @@
 #include "ConnectivityManager.h"
+#include "esp_heap_caps.h"   // pre-AP internal-heap probe, see raiseAp()
 #include <WiFi.h>
 #include <Preferences.h>
 #include <esp_wifi.h>
@@ -456,6 +457,18 @@ bool ConnectivityManager::raiseAp(const char *why) {
     WiFi.mode((_mode.load() == (int32_t)ConnMode::STA_PLUS_AP ||
                (ConnState)_state.load() == ConnState::STA_CONNECTED)
               ? WIFI_AP_STA : WIFI_AP_STA);
+    // Internal RAM at the moment of truth. softAP() allocates from INTERNAL
+    // DRAM, and when that allocation fails the WiFi driver does not report it -
+    // it dereferences the null and panics inside ieee80211_hostap_attach. That
+    // is a crash with no error message, so the number is worth having.
+    //
+    // CYD_S3_3248 is the board to watch: it is the fleet's only QSPI panel, so
+    // it is the only one whose LVGL buffers must live in internal SRAM rather
+    // than PSRAM, and it has the least headroom by a wide margin.
+    DBG_WIFI("pre-AP internal heap: %u free, largest block %u\n",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+
     WiFi.softAPConfig(ip, ip, sub);
     bool ok = WiFi.softAP(getApSsid(), getApPassword());
     if (!ok) {

@@ -103,7 +103,12 @@ struct TimeDefaults {
 // NOTE: C++ designated initializers must follow declaration order (same rule
 // as the BSP structs - see CLAUDE.md).
 static const WiFiDefaults CONNECTIVITY_DEFAULT_WIFI = {
-    .MODE                   = ConnMode::STA_PLUS_AP,
+    // STA with AP fallback: join the network, and raise our own AP only when
+    // that fails. This is the intended default and always was; it had been left
+    // on STA_PLUS_AP after the APSTA feasibility spike (issue #5) and never set
+    // back, which meant every board stood up an access point on every boot for
+    // no reason.
+    .MODE                   = ConnMode::STA_WITH_AP_FALLBACK,
 
     .STA_SSID               = LOCAL_STA_SSID,
     .STA_PASSWORD           = LOCAL_STA_PASSWORD,

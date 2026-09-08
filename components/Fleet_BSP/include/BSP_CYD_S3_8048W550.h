@@ -5,8 +5,6 @@
 #include <Arduino_GFX_Library.h>
 #include "Fleet_BSP.h"
 
-#define DEBUG_DISPLAY 1
-
 // -------------------------------------------------------------------------
 // Board: Guition JC8048W550 (ESP32-S3 N16R8)
 // Driver: ST7262 (RGB)
@@ -35,7 +33,7 @@ const DisplayConfig CYD_S3_8048W550_DISPLAY = {
     .PANEL_MODEL = "ST7262",
     .WIDTH       = 800,
     .HEIGHT      = 480,
-    .ROTATION    = 0, // 0 = Landscape (USB on bottom), 1 = Portrait (USB left side), 2 = Landscape Inverted, 3 = Portrait Inverted
+    .ROTATION    = 0, // 0 = Landscape (USB on left), 1 = Portrait (USB on bottom), 2 = Landscape Inverted (USB right), 3 = Portrait Inverted (USB top)
     .AUTO_FLUSH  = true,
 
     .BL_PIN      = 2,

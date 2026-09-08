@@ -29,14 +29,35 @@
 // ROADMAP Q9. Nothing in this library includes Arduino.h.
 // ---------------------------------------------------------------------------
 
-// Fixed capacity, no heap. At ~400 bytes per entity this is ~19 KB of static
-// storage - affordable on every board in the fleet, and predictable, which
-// matters more. Raise it deliberately rather than by reflex; the memory-budget
-// spike (issue #14) should measure the real number on the smallest board.
+// Default capacity. NOT a hard limit any more - it is what the application
+// asks for when it allocates storage, and it may pass something else.
+//
+// This used to be a fixed inline array, which put ~21 KB in internal SRAM on
+// every board. That was fine everywhere except CYD_S3_3248: it is the fleet's
+// only QSPI board, so it is the only one whose LVGL buffers must live in
+// INTERNAL SRAM rather than PSRAM (see GuiManager's bus-type branch), and the
+// combination left too little internal RAM for the WiFi driver to bring up an
+// AP. It crashed inside ieee80211_hostap_attach. See docs/LESSONS.md.
 static constexpr uint8_t ENTITY_MAX = 48;
 
 class EntityRegistry {
 public:
+    // Hand the registry its storage. The caller owns the memory and it must
+    // outlive the registry.
+    //
+    // Storage is injected rather than allocated here ON PURPOSE: this library
+    // has zero dependencies (ROADMAP Q9) so it can compile and unit-test on a
+    // PC, and calling heap_caps_malloc() would end that. The application knows
+    // it is on an ESP32 and can place the block in PSRAM; a host test can pass
+    // a plain array.
+    //
+    // Runs a placement-new over each slot, so raw malloc'd memory is fine -
+    // Entity is not trivially constructible and its members would otherwise be
+    // uninitialised.
+    //
+    // Returns false if storage is null or capacity is 0. Calling any other
+    // method before this simply does nothing.
+    bool begin(Entity *storage, uint8_t capacity);
     // --- Registration (startup only, single-threaded) ---------------------
     //
     // Called by each provider for the entities it owns. Deliberately a
@@ -104,9 +125,11 @@ public:
     bool isStale(const Entity &e, uint32_t nowMs) const;
 
 private:
-    Entity  _items[ENTITY_MAX];
-    bool    _dirty[ENTITY_MAX] = {};
-    uint8_t _count = 0;
+    // Caller-owned storage; see begin(). The registry object itself stays tiny,
+    // which is the point - only the table is large, and only the table moves.
+    Entity *_items    = nullptr;
+    uint8_t _capacity = 0;
+    uint8_t _count    = 0;
 
     mutable std::mutex _mx;
     uint32_t _reconcileMs = 5000;   // generous: a round trip through a broker
