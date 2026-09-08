@@ -12,6 +12,7 @@
 #include "SystemProvider.h"
 #include "HaPublisher.h"
 #include "MqttProvider.h"
+#include "ExternalEntities.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #include "Panel_Audio.h"
@@ -302,6 +303,13 @@ void setup() {
     sysProvider.begin(&entities, &connMgr);
     haPub.begin(&entities, &mqttMgr);
     mqttProv.begin(&entities, &mqttMgr);
+
+    // Entities other devices own, which we only read. Temporary stand-in
+    // for the build sheet (#20) - registered here so MqttProvider can
+    // derive its subscriptions from the registry like any other entity.
+    for (uint8_t i = 0; i < EXTERNAL_ENTITY_COUNT; i++) {
+        entities.add(EXTERNAL_ENTITIES[i]);
+    }
 
     // --= ROOT SCREEN =--
     lv_obj_t * screen = lv_screen_active();
