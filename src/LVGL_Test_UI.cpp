@@ -9,6 +9,7 @@
 #include "ConnectivityManager.h"
 #include "MqttManager.h"
 #include "EntityRegistry.h"
+#include "SystemProvider.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #include "Panel_Audio.h"
@@ -32,6 +33,9 @@ MqttManager mqttMgr;
 // The registry every card will bind to and HA discovery will be generated
 // from. Populated by providers; see ROADMAP 4.1. Empty until they exist.
 EntityRegistry entities;
+// First provider: this board's own telemetry into the registry.
+// Writes values only - never renders, never publishes. See ROADMAP 4.1.
+SystemProvider sysProvider;
 #ifdef HAS_AUDIO_HW
 AudioManager audioMgr;
 #endif
@@ -123,6 +127,30 @@ void debug_dump_config(bool manualTrigger) {
                 pnlSystem.log("  Last failure: %s", mqttFailureName(mqttMgr.getLastFailure()));
                 uint32_t s = mqttMgr.secondsUntilRetry();
                 if (s) pnlSystem.log("  Retry in: %lu s", (unsigned long)s);
+            }
+        }
+
+        // Whatever the providers have registered so far. Empty until they run,
+        // which is itself the useful signal if a provider fails to start.
+        pnlSystem.log("[ENTITIES] %u registered", (unsigned)entities.count());
+        {
+            const uint32_t now = millis();
+            for (uint8_t i = 0; i < entities.count(); i++) {
+                const Entity *e = entities.at(i);
+                if (!e) continue;
+
+                char val[56];
+                switch (e->value.type) {
+                    case ValueType::BOOL:     snprintf(val, sizeof(val), "%s", e->value.b ? "on" : "off"); break;
+                    case ValueType::INT:      snprintf(val, sizeof(val), "%ld", (long)e->value.i); break;
+                    case ValueType::FLOAT:    snprintf(val, sizeof(val), "%.2f", e->value.f); break;
+                    case ValueType::TEXT_VAL: snprintf(val, sizeof(val), "%s", e->value.text); break;
+                    default:                  snprintf(val, sizeof(val), "-"); break;
+                }
+
+                pnlSystem.log("  %s = %s%s%s%s", e->desc.id, val,
+                              e->desc.unit[0] ? " " : "", e->desc.unit,
+                              entities.isStale(*e, now) ? "  (stale)" : "");
             }
         }
     }
@@ -263,6 +291,7 @@ void setup() {
     // Broker session. Reads connMgr's link state and does nothing until it is
     // online; stays cleanly DISABLED when no MqttLocalSecrets.h is present.
     mqttMgr.begin(&connMgr);
+    sysProvider.begin(&entities, &connMgr);
 
     // --= ROOT SCREEN =--
     lv_obj_t * screen = lv_screen_active();
@@ -366,6 +395,10 @@ void loop() {
     // Broker connect/backoff ladder plus PubSubClient's keepalive pump.
     // Non-blocking, and a no-op while the link is down or MQTT is disabled.
     mqttMgr.loop();
+    sysProvider.loop(millis());
+    // Expires stale values and reverts optimistic writes whose echo never
+    // arrived. Cheap; safe from any task.
+    entities.tick(millis());
 
     header.tick();
     pnlDisplay.tick();

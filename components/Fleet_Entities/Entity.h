@@ -48,6 +48,14 @@ struct EntityDescriptor {
     // Can the UI command it? Drives whether a card offers a control at all.
     bool writable = false;
 
+    // Maps to HA's `entity_category: diagnostic`. Diagnostic entities are
+    // hidden from a device's main controls and tucked into its diagnostics
+    // section - correct for RSSI, uptime and free heap, which are about the
+    // panel's health rather than about the room it is in. Without this every
+    // board contributes four pieces of debug telemetry to the user's primary
+    // HA view, which is how a device page becomes unreadable.
+    bool diagnostic = false;
+
     // Should this be published in our HA discovery payload?
     //
     // This is the real difference between the two groups of entity, and it is

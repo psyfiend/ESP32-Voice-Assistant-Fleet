@@ -51,6 +51,19 @@ public:
     const Entity *find(const char *id) const;
 
     uint8_t       count() const { return _count; }
+
+    // Raw access by index, for diagnostics and for iterating at startup.
+    //
+    // DELIBERATELY UNLOCKED, and therefore NOT safe to call while another task
+    // is writing. It returns a pointer into the table, so a concurrent
+    // setValue() could tear the value out from under the reader.
+    //
+    // Safe today because every provider so far runs on the loop() task. The
+    // moment a provider runs on its own task, callers that need a consistent
+    // read must go through drainDirty() (which snapshots under the lock) or
+    // find() a copy. Kept unlocked rather than made safe-by-default because a
+    // locking accessor invites exactly the pattern 4.2 forbids: holding the
+    // registry lock while doing LVGL work.
     const Entity *at(uint8_t i) const { return (i < _count) ? &_items[i] : nullptr; }
 
     // --- Provider side (any task) -----------------------------------------
