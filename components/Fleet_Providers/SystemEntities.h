@@ -62,7 +62,12 @@ inline const EntityDescriptor SYSTEM_ENTITIES[] = {
     {
         .id          = SYS_ENT_IP,
         .name        = "IP Address",
-        .kind        = EntityKind::TEXT,
+        // SENSOR, not TEXT. A string value does not make this a TEXT entity:
+        // HA's `text` platform is WRITABLE and requires a command_topic, so a
+        // read-only one is rejected outright - the entity simply never appears,
+        // with no error anywhere. A sensor's state can be a string, which is
+        // what a read-only string actually is.
+        .kind        = EntityKind::SENSOR,
         .source      = EntitySource::SYSTEM,
         .valueType   = ValueType::TEXT_VAL,
         // No device_class deliberately: HA has none that fits an IP address,

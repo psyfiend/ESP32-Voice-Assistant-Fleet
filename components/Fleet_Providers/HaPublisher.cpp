@@ -39,6 +39,28 @@ void HaPublisher::stateTopicFor(const Entity &e, char *out, size_t outLen) const
     snprintf(out, outLen, "%s/%s/state", _mqtt->getBaseTopic(), e.desc.id);
 }
 
+// Platforms Home Assistant treats as COMMANDABLE. Each requires a
+// command_topic in its discovery config, and HA rejects the entity outright
+// without one - it simply never appears, with no error logged anywhere.
+//
+// This cost us the IP Address entity on the first hardware test: it was
+// declared EntityKind::TEXT because its value is a string, but HA's `text`
+// platform is an input field, not a readout. A read-only string is a SENSOR
+// whose valueType is TEXT_VAL.
+static bool kindNeedsCommandTopic(EntityKind k) {
+    switch (k) {
+        case EntityKind::SWITCH:
+        case EntityKind::LIGHT:
+        case EntityKind::BUTTON:
+        case EntityKind::NUMBER:
+        case EntityKind::TEXT:
+        case EntityKind::CLIMATE:
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool HaPublisher::appendComponent(String &json, const Entity &e, bool first) const {
     char uniq[96];
     snprintf(uniq, sizeof(uniq), "%s_%s", DeviceIdentity::deviceId(), e.desc.id);
@@ -103,6 +125,18 @@ void HaPublisher::publishDiscovery() {
     for (uint8_t i = 0; i < _reg->count(); i++) {
         const Entity *e = _reg->at(i);
         if (!e || !e->desc.advertise) continue;   // not ours to announce
+
+        // Catch the silent-rejection case before HA does. We do not publish
+        // command topics yet, so any commandable platform would be dropped by
+        // HA without explanation. Say so rather than letting an entity quietly
+        // go missing from the device page.
+        if (kindNeedsCommandTopic(e->desc.kind)) {
+            Serial.printf("[HaPub] WARNING: \"%s\" is a %s, which HA requires a "
+                          "command topic for. It will NOT appear. A read-only "
+                          "value should be a sensor.\n",
+                          e->desc.id, entityKindHaPlatform(e->desc.kind));
+        }
+
         appendComponent(j, *e, first);
         first = false;
         advertised++;

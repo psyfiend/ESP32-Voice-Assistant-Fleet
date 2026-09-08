@@ -29,7 +29,12 @@ enum class EntityKind : uint8_t {
     LIGHT,          // writable on/off plus optional brightness / colour
     BUTTON,         // stateless, momentary; press is the whole payload
     NUMBER,         // writable numeric within a range
-    TEXT,           // string value
+    // A WRITABLE free-text entity. HA's `text` platform requires a
+    // command_topic and silently rejects a config without one - the entity
+    // just never appears. A read-only string is a SENSOR whose valueType is
+    // TEXT_VAL, not this. Same applies to SWITCH, NUMBER, LIGHT and BUTTON:
+    // all are command platforms.
+    TEXT,
     CLIMATE,        // setpoint + mode + current reading
     WEATHER,        // condition + forecast
 };
