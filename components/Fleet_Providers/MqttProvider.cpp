@@ -1,6 +1,23 @@
 #include "MqttProvider.h"
 #include <ArduinoJson.h>
 
+// Per the repo's debug-flag convention (CLAUDE.md): informational chatter is
+// gated, errors are not. Enable with -D DEBUG_MQTT in an environment's
+// build_flags - the same flag MqttManager uses, since "is my MQTT working"
+// is one question and splitting it across two flags would just mean always
+// setting both.
+//
+// What stays UNGATED below is only the three misconfiguration messages: an
+// unparseable payload, a missing key, and a topic no entity wants. Those are
+// silent during healthy operation and each one means something is actually
+// wrong, so hiding them behind a flag would recreate exactly the silent
+// failure that cost us the IP entity.
+#ifdef DEBUG_MQTT
+    #define DBG_MQTTP(...) Serial.printf("[MqttProv] " __VA_ARGS__)
+#else
+    #define DBG_MQTTP(...) do {} while (0)
+#endif
+
 MqttProvider *MqttProvider::s_self = nullptr;
 
 void MqttProvider::begin(EntityRegistry *reg, MqttManager *mqtt) {
@@ -48,6 +65,28 @@ void MqttProvider::onMessage(const char *topic, const uint8_t *payload,
                              unsigned int length, bool retained) {
     (void)retained;   // retained is expected on a state topic; nothing to guard
     if (s_self) s_self->handle(topic, payload, length);
+}
+
+void MqttProvider::applyValue(const char *id, const EntityValue &v, uint32_t now,
+                              bool wasEverSet, const char *unit) {
+    _reg->setValue(id, v, now);
+
+#ifdef DEBUG_MQTT
+    if (wasEverSet) return;   // already announced this one
+
+    char shown[64];
+    switch (v.type) {
+        case ValueType::BOOL:     snprintf(shown, sizeof(shown), "%s", v.b ? "on" : "off"); break;
+        case ValueType::INT:      snprintf(shown, sizeof(shown), "%ld", (long)v.i); break;
+        case ValueType::FLOAT:    snprintf(shown, sizeof(shown), "%.2f", v.f); break;
+        case ValueType::TEXT_VAL: snprintf(shown, sizeof(shown), "%s", v.text); break;
+        default:                  return;
+    }
+    DBG_MQTTP("first value: %s = %s%s%s\n",
+              id, shown, (unit && unit[0]) ? " " : "", (unit && unit[0]) ? unit : "");
+#else
+    (void)wasEverSet; (void)unit;
+#endif
 }
 
 void MqttProvider::handle(const char *topic, const uint8_t *payload, unsigned int length) {
@@ -107,10 +146,13 @@ void MqttProvider::handle(const char *topic, const uint8_t *payload, unsigned in
 
         // Snapshot what is needed before writing back into the registry.
         const ValueType vt = e->desc.valueType;
+        const bool wasEverSet = e->everSet;
         char id[ENTITY_ID_MAX];
         char key[ENTITY_SHORT_MAX];
-        snprintf(id,  sizeof(id),  "%s", e->desc.id);
-        snprintf(key, sizeof(key), "%s", e->desc.valueKey);
+        char unit[ENTITY_SHORT_MAX];
+        snprintf(id,   sizeof(id),   "%s", e->desc.id);
+        snprintf(key,  sizeof(key),  "%s", e->desc.valueKey);
+        snprintf(unit, sizeof(unit), "%s", e->desc.unit);
 
         if (key[0]) {
             JsonVariant v = doc[key];
@@ -119,12 +161,12 @@ void MqttProvider::handle(const char *topic, const uint8_t *payload, unsigned in
                 continue;
             }
             switch (vt) {
-                case ValueType::FLOAT: _reg->setValue(id, EntityValue::makeFloat(v.as<float>()), now); break;
-                case ValueType::INT:   _reg->setValue(id, EntityValue::makeInt(v.as<int32_t>()), now); break;
-                case ValueType::BOOL:  _reg->setValue(id, EntityValue::makeBool(v.as<bool>()), now);   break;
+                case ValueType::FLOAT: applyValue(id, EntityValue::makeFloat(v.as<float>()), now, wasEverSet, unit); break;
+                case ValueType::INT:   applyValue(id, EntityValue::makeInt(v.as<int32_t>()), now, wasEverSet, unit); break;
+                case ValueType::BOOL:  applyValue(id, EntityValue::makeBool(v.as<bool>()), now, wasEverSet, unit);   break;
                 default: {
                     const char *s = v.as<const char *>();
-                    _reg->setValue(id, EntityValue::makeText(s ? s : ""), now);
+                    applyValue(id, EntityValue::makeText(s ? s : ""), now, wasEverSet, unit);
                     break;
                 }
             }
@@ -140,18 +182,18 @@ void MqttProvider::handle(const char *topic, const uint8_t *payload, unsigned in
         raw[n] = '\0';
 
         switch (vt) {
-            case ValueType::FLOAT: _reg->setValue(id, EntityValue::makeFloat(atof(raw)), now); break;
-            case ValueType::INT:   _reg->setValue(id, EntityValue::makeInt((int32_t)atol(raw)), now); break;
+            case ValueType::FLOAT: applyValue(id, EntityValue::makeFloat(atof(raw)), now, wasEverSet, unit); break;
+            case ValueType::INT:   applyValue(id, EntityValue::makeInt((int32_t)atol(raw)), now, wasEverSet, unit); break;
             case ValueType::BOOL: {
                 // Accept the spellings devices actually use, rather than
                 // insisting on one and silently reading everything else as off.
                 const bool on = (strcasecmp(raw, "ON") == 0) || (strcasecmp(raw, "true") == 0) ||
                                 (strcmp(raw, "1") == 0) || (strcasecmp(raw, "open") == 0);
-                _reg->setValue(id, EntityValue::makeBool(on), now);
+                applyValue(id, EntityValue::makeBool(on), now, wasEverSet, unit);
                 break;
             }
             default:
-                _reg->setValue(id, EntityValue::makeText(raw), now);
+                applyValue(id, EntityValue::makeText(raw), now, wasEverSet, unit);
                 break;
         }
     }

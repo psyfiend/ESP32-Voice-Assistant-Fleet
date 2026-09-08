@@ -45,6 +45,13 @@ private:
                           unsigned int length, bool retained);
     void handle(const char *topic, const uint8_t *payload, unsigned int length);
 
+    // Writes a value and announces the FIRST one each entity ever receives.
+    // A working parse is otherwise completely silent, which makes "is my
+    // sensor arriving?" unanswerable without opening the System panel.
+    // Self-limiting: one line per entity for the life of the boot.
+    void applyValue(const char *id, const EntityValue &v, uint32_t now,
+                    bool wasEverSet, const char *unit);
+
     EntityRegistry *_reg  = nullptr;
     MqttManager    *_mqtt = nullptr;
 
