@@ -11,6 +11,7 @@
 #include "EntityRegistry.h"
 #include "SystemProvider.h"
 #include "HaPublisher.h"
+#include "MqttProvider.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #include "Panel_Audio.h"
@@ -40,6 +41,9 @@ SystemProvider sysProvider;
 // Announces the entities we own to Home Assistant and publishes their
 // values. Ignores anything with advertise = false.
 HaPublisher haPub;
+// Reads values other devices publish. Subscribes to whatever external
+// entities are registered - none yet, so it is idle.
+MqttProvider mqttProv;
 #ifdef HAS_AUDIO_HW
 AudioManager audioMgr;
 #endif
@@ -297,6 +301,7 @@ void setup() {
     mqttMgr.begin(&connMgr);
     sysProvider.begin(&entities, &connMgr);
     haPub.begin(&entities, &mqttMgr);
+    mqttProv.begin(&entities, &mqttMgr);
 
     // --= ROOT SCREEN =--
     lv_obj_t * screen = lv_screen_active();
@@ -405,6 +410,7 @@ void loop() {
     // arrived. Cheap; safe from any task.
     entities.tick(millis());
     haPub.loop(millis());
+    mqttProv.loop(millis());
 
     header.tick();
     pnlDisplay.tick();

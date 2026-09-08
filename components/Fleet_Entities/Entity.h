@@ -84,6 +84,19 @@ struct EntityDescriptor {
     // topics are derived centrally from the device identity - ROADMAP 4.1 is
     // explicit that a descriptor never spells its own topics out.
     char externalRef[ENTITY_TOPIC_MAX] = {0};
+
+    // Which field to read out of the payload that arrives on externalRef.
+    //
+    // Empty  -> the whole payload IS the value ("ON", "21.4").
+    // Set    -> the payload is JSON and this names the key, e.g. "temperature"
+    //           from {"temperature":21.4,"humidity":48,"battery":100}.
+    //
+    // This is what lets several entities share one topic - a Zigbee2MQTT
+    // sensor publishes temperature, humidity and battery in a single message,
+    // and three entities read three keys from it. HA solves the same problem
+    // with `val_tpl`; a plain key is enough for us and needs no template
+    // engine on the device.
+    char valueKey[ENTITY_SHORT_MAX] = {0};
 };
 
 struct Entity {
