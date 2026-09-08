@@ -10,6 +10,7 @@
 #include "MqttManager.h"
 #include "EntityRegistry.h"
 #include "SystemProvider.h"
+#include "HaPublisher.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #include "Panel_Audio.h"
@@ -36,6 +37,9 @@ EntityRegistry entities;
 // First provider: this board's own telemetry into the registry.
 // Writes values only - never renders, never publishes. See ROADMAP 4.1.
 SystemProvider sysProvider;
+// Announces the entities we own to Home Assistant and publishes their
+// values. Ignores anything with advertise = false.
+HaPublisher haPub;
 #ifdef HAS_AUDIO_HW
 AudioManager audioMgr;
 #endif
@@ -292,6 +296,7 @@ void setup() {
     // online; stays cleanly DISABLED when no MqttLocalSecrets.h is present.
     mqttMgr.begin(&connMgr);
     sysProvider.begin(&entities, &connMgr);
+    haPub.begin(&entities, &mqttMgr);
 
     // --= ROOT SCREEN =--
     lv_obj_t * screen = lv_screen_active();
@@ -399,6 +404,7 @@ void loop() {
     // Expires stale values and reverts optimistic writes whose echo never
     // arrived. Cheap; safe from any task.
     entities.tick(millis());
+    haPub.loop(millis());
 
     header.tick();
     pnlDisplay.tick();
