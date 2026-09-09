@@ -16,8 +16,8 @@ Phase 0 (repo hygiene) and Phase 1 (connectivity) are done and merged to `main` 
 to Home Assistant, and real Zigbee2MQTT sensors read back — through an Entity Registry that
 neither side knows the shape of. There is **nothing to draw it with yet**.
 
-**Phase 2.1 (startup reorganisation, #12) is done and hardware-verified**, on branch
-`feat/startup-reorg-12`, not yet merged. Startup is now five files —
+**Phase 2.1 (startup reorganisation, #12) is done, hardware-verified, and merged to `main`**
+as `b5fc6d7` (squashed, per ROADMAP 3.2). Not tagged - A/B/C versions are the owner's to set. Startup is now five files —
 `main` / `SystemCore` / `SystemReport` / `LVGL_Startup` / `GUIManager` — with the design, the
 decisions and their reasons in `docs/design/startup.md`. Read that before touching startup;
 it is the doc that explains why LVGL initialises last and why `LVGL_Startup::lock()` is a no-op
@@ -83,7 +83,7 @@ forgotten.
 |---|---|---|
 | ~~AP path fixed but unproven~~ | **#45** | **RESOLVED 2026-09-09 on `CYD_S3_3248`** - see below |
 | AP idle-down leaves `AP_ACTIVE` stale | #42 | **Still open. The #45 test did NOT cover it** - see below |
-| Reason-36 is treated as real signal | *unfiled* | Found during the #45 run - see below |
+| Reason-36 is treated as real signal | **#48** | Found during the #45 run - see below |
 | HA access without MQTT | #43 | Most HA users have no broker; blocks *others* before us |
 | Captive portal | #6 | Needs a web server that arrives in Phase 4 |
 | On-device settings screen | #7 | System panel covers development needs |
@@ -124,7 +124,7 @@ path - so the idle-shutdown code never executed.
 **To actually test #42:** mode 3 (`STA_PLUS_AP`), junk SSID, then leave it alone for ten minutes
 with nothing joined to the AP.
 
-### Unfiled finding: reason 36 is self-inflicted and is treated as real signal
+### #48 - reason 36 is self-inflicted and is treated as real signal
 
 `WIFI_REASON_STA_LEAVING` (36) is emitted by the local stack when *we* tear down our own
 association attempt. `classifyDisconnect()` has no case for it, so it falls to
@@ -197,10 +197,11 @@ off-the-shelf will keep presenting itself; that is not a reason to revisit it.
 
 ## Immediate next steps
 
-1. **Merge `feat/startup-reorg-12`.** Done and verified; only the last commit (the
-   device-identity banner move) has not been re-flashed, and its output is byte-identical by
-   construction.
-2. Then Phase 2 proper: design system (#13), memory spike (#14), card base class (#15).
+1. **Phase 2.2 - design system (#13).** The next milestone. See the collaboration plan agreed
+   at the end of the 2026-09-09 session: a live token sandbox the owner reacts to, rather than a
+   spec he has to imagine. He is explicit that he knows what he likes when he sees it and finds
+   originating visual design a slog - so lead with rendered options, not vocabulary.
+2. Then the rest of Phase 2: design system (#13), memory spike (#14), card base class (#15).
    **#14 has grown two extra deliverables** — see `FUTURE_IMPROVEMENTS.md`: a written
    internal-SRAM/PSRAM allocation-order table, and the free-heap number on `CYD_S3_3248`
    (22 KB at boot, measured once) turned into something actually measured.
