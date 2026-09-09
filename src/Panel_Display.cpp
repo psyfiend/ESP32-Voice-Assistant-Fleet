@@ -1,6 +1,7 @@
 #include "Panel_Display.h"
 
-Panel_Display::Panel_Display(GUIManager& gui) : _gui(gui) {
+Panel_Display::Panel_Display(DisplayManager& display, TouchManager& touch)
+    : _display(display), _touch(touch) {
     showTouches = false;
 }
 
@@ -25,7 +26,7 @@ void Panel_Display::slider_bri_cb(lv_event_t * e) {
     lv_obj_t * slider = (lv_obj_t*)lv_event_get_target(e);
     int32_t val = lv_slider_get_value(slider);
     
-    pThis->_gui.displayMgr.setBrightness(val);
+    pThis->_display.setBrightness(val);
 
     // Toast shows a user-facing 0-100% regardless of the slider's real
     // per-board floor - val itself (not this remap) is what actually drives
@@ -76,7 +77,7 @@ void Panel_Display::init(lv_obj_t* parent) {
     // Column container with 2 rows: Label + Slider
     UIToolkit::create_slider_col(row_bri, "BRIGHTNESS", &col_bri, &slider_bri);
 
-    lv_slider_set_value         (slider_bri, _gui.displayMgr.getBrightness(), LV_ANIM_OFF);
+    lv_slider_set_value         (slider_bri, _display.getBrightness(), LV_ANIM_OFF);
         #if defined (WS_S3_4B) || defined (WS_P4_4B)
             _briFloor = 45; // These panels have a limited brightness range
         #else
@@ -151,7 +152,7 @@ void Panel_Display::tick() {
     if (!showTouches) return;
 
     TouchPoint points[5];
-    uint8_t count = _gui.touchMgr.read(points, 5);
+    uint8_t count = _touch.read(points, 5);
 
     // Turns "ACTIVE:" bright when touches are present
     if (count > 0)  lv_obj_set_style_text_color(count_label, lv_color_hex(0xFFFFFF), 0); 

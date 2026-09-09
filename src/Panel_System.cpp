@@ -1,7 +1,8 @@
 #include "Panel_System.h"
 
-// -- EXTERN DECLARATION --
-extern void debug_dump_config(bool manualTrigger);
+// The single System panel, so the SystemReport sink (a plain function pointer)
+// can reach it. One panel exists by construction.
+static Panel_System *s_self = nullptr;
 
 Panel_System::Panel_System() {
     _ui_root    = NULL;
@@ -37,12 +38,21 @@ void Panel_System::btn_action_cb(lv_event_t* e) {
     
     if (p) {
         p->log("> Action: Dump Config...");
-        debug_dump_config(true); // manually triggered - mirror to Serial too
+        if (p->_onDumpRequested) p->_onDumpRequested();
     }
+}
+
+void Panel_System::reportSink(const char *line) {
+    if (s_self) s_self->log("%s", line);
 }
 
 void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     _headerRef = headerRef;
+
+    // Receive the System Doctor's output. Registering rather than being
+    // written into is what lets SystemReport stay LVGL-free.
+    s_self = this;
+    SystemReport::addSink(reportSink);
 
     // 1. Create the WRAPPER (_ui_root)
     // Acts as the "Viewmask". Positioned explicitly below the header.
@@ -191,12 +201,8 @@ void Panel_System::log(const char* fmt, ...) {
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
-    // Mirrors to Serial only when explicitly turned on (see setSerialEcho) -
-    // debug_dump_config() controls this: off for a routine automatic boot
-    // run (most of its content already duplicates the boot dashboard's own
-    // direct Serial prints), on for a manually-triggered run (the "Dump
-    // Config" button), or on for boot too if -D DUMP_CONFIG is set.
-    if (_echoToSerial) Serial.println(buf);
+    // No Serial mirroring here. SystemReport owns that decision now, and
+    // doing it in both places would double every report line.
 
     // Push to Queue
     if (_log_queue.size() < 100) { // Limit queue depth
