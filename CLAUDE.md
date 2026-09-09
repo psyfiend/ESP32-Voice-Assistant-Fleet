@@ -10,7 +10,8 @@ elsewhere, and it is worth checking those first for "is X already known or plann
 
 | Doc | Answers |
 |---|---|
-| `docs/ROADMAP.md` | What we are building, in what order, and what is done. **Start here.** |
+| `docs/HANDOFF.md` | Where we left off, what to know that the other docs do not say. **Start here.** |
+| `docs/ROADMAP.md` | What we are building, in what order, and what is done |
 | `docs/HARDWARE_STATUS.md` | Which board does what, what is untested, build-environment issues |
 | `docs/LESSONS.md` | Mistakes that cost real time, written down so they cost it once |
 | `docs/FUTURE_IMPROVEMENTS.md` | Deliberately deferred fleet-wide work |
