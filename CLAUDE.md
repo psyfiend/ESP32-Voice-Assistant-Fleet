@@ -10,7 +10,8 @@ elsewhere, and it is worth checking those first for "is X already known or plann
 
 | Doc | Answers |
 |---|---|
-| `docs/ROADMAP.md` | What we are building, in what order, and what is done. **Start here.** |
+| `docs/HANDOFF.md` | Where we left off, what to know that the other docs do not say. **Start here.** |
+| `docs/ROADMAP.md` | What we are building, in what order, and what is done |
 | `docs/HARDWARE_STATUS.md` | Which board does what, what is untested, build-environment issues |
 | `docs/LESSONS.md` | Mistakes that cost real time, written down so they cost it once |
 | `docs/FUTURE_IMPROVEMENTS.md` | Deliberately deferred fleet-wide work |
@@ -204,6 +205,57 @@ WS_P4_7B` rewriting a struct named `WS_P4_7B`), arriving from the framework rath
 our own headers. **When naming an enumerator, avoid single-word ALL-CAPS names that could
 plausibly be an Arduino pin/interrupt mode.** A compound name (`SESSION_OFF`, `RADIO_OFF`) costs
 nothing and is immune.
+
+## Application layout (`src/` + `include/`)
+
+Since Phase 2.1 (2026-09-09) startup is a five-way split, each file with one job. Design and
+reasoning: `docs/design/startup.md`.
+
+| File | Owns |
+|---|---|
+| `main.cpp` | `setup()` and `loop()`, and nothing else |
+| `SystemCore` | Every non-UI subsystem — display, touch, audio, connectivity, MQTT, registry, providers — started in one documented order |
+| `SystemReport` | The System Doctor, emitting to registered sinks |
+| `LVGL_Startup` | The LVGL engine: buffers, `lv_init()`, tick/log callbacks, flush + touch bridges, driver registration |
+| `GUIManager` | Screen content: root screen, decks, header, panels |
+
+Three rules hold this together, and each is load-bearing rather than stylistic:
+
+- **`SystemCore` and `SystemReport` include no LVGL header.** Not enforced by a build flag — it
+  is simply what is in the files. It is also the entire reason a GUI-less build variant is a
+  `build_src_filter` line rather than a redesign.
+- **Hardware is owned by `SystemCore` and borrowed by everything above it.**
+  `LVGL_Startup::begin(display, touch)` takes the already-initialised managers, mirroring
+  Espressif's `lvgl_port_init(lcd, tp)` and Waveshare's `bsp_display_start()`. `GUIManager` used
+  to own them; it must not again.
+- **UI code registers with lower layers; lower layers never reach up into UI.** `Panel_System`
+  registers itself as a `SystemReport` sink. `GUIManager` registers the `[UI STATE]` section and
+  the "Dump Config" handler. The `extern void debug_dump_config(bool)` that used to sit in
+  `Panel_System.cpp` is the shape to avoid.
+
+`LVGL_Startup::lock()`/`unlock()` exist and are no-ops. LVGL runs on `loop()` with
+`LV_USE_OS == LV_OS_NONE`, and thread safety comes from the rule that providers never touch LVGL
+plus `EntityRegistry`'s own mutex — a stronger guarantee than a display mutex, because the
+architecture enforces it rather than everyone remembering. The no-ops exist so that switching to
+`LV_OS_FREERTOS` and a dedicated LVGL task later is a change to one file instead of an audit of
+the whole tree. **Use them from any caller that is not the LVGL thread**, even though they
+currently do nothing.
+
+Planned but not yet done: `src/UI/` and `src/Cards/` subfolders, introduced at milestone 2.4 when
+the card library starts adding files. See `docs/design/startup.md` §3.5 — it notes the two things
+that break (`WS_S3_TOUCH_LCD_5B`'s `build_src_filter` exclusion, and `include/` subfolders not
+being on the include path automatically).
+
+## Naming: UI and GUI keep their capitals
+
+Project-wide, from 2026-09-09: the initialisms **UI** and **GUI** are always capitalised, in
+filenames and in code. `UIToolkit`, `GUIManager` — never `UiToolkit` or `GuiManager`.
+
+This is not only taste. `include/UIToolkit.h` was already correct on disk but was included as both
+`"UiToolkit.h"` and `"UIToolkit.h"` from different files. Windows does not care; a clone on any
+case-sensitive filesystem — a Linux CI runner, or another contributor — fails outright on
+whichever spelling loses. Same hazard class as the macro collisions below: invisible here,
+immediate elsewhere.
 
 ## Debug flag convention
 

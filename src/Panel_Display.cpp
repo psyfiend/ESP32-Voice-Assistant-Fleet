@@ -1,6 +1,7 @@
 #include "Panel_Display.h"
 
-Panel_Display::Panel_Display(GuiManager& gui) : _gui(gui) {
+Panel_Display::Panel_Display(DisplayManager& display, TouchManager& touch)
+    : _display(display), _touch(touch) {
     showTouches = false;
 }
 
@@ -25,7 +26,7 @@ void Panel_Display::slider_bri_cb(lv_event_t * e) {
     lv_obj_t * slider = (lv_obj_t*)lv_event_get_target(e);
     int32_t val = lv_slider_get_value(slider);
     
-    pThis->_gui.displayMgr.setBrightness(val);
+    pThis->_display.setBrightness(val);
 
     // Toast shows a user-facing 0-100% regardless of the slider's real
     // per-board floor - val itself (not this remap) is what actually drives
@@ -34,7 +35,7 @@ void Panel_Display::slider_bri_cb(lv_event_t * e) {
 
     char buf[32];
     snprintf(buf, sizeof(buf), "Brightness: %d%%", (int)displayPct);
-    UiToolkit::show_toast(buf, 1000);
+    UIToolkit::show_toast(buf, 1000);
 }
 
 void Panel_Display::sw_touch_viz_cb(lv_event_t * e) {
@@ -67,16 +68,16 @@ void Panel_Display::setTouchWindowVisibility(bool visible) {
 
 void Panel_Display::init(lv_obj_t* parent) {
     
-    UiToolkit::create_collapsible_panel(parent, "DISPLAY", &pnl_content);
+    UIToolkit::create_collapsible_panel(parent, "DISPLAY", &pnl_content);
 
     // ROW 1 - Brightness
-    UiToolkit::create_panel_row(pnl_content, &row_bri);
+    UIToolkit::create_panel_row(pnl_content, &row_bri);
 
     // ROW 1 COL 1 - Brightness
     // Column container with 2 rows: Label + Slider
-    UiToolkit::create_slider_col(row_bri, "BRIGHTNESS", &col_bri, &slider_bri);
+    UIToolkit::create_slider_col(row_bri, "BRIGHTNESS", &col_bri, &slider_bri);
 
-    lv_slider_set_value         (slider_bri, _gui.displayMgr.getBrightness(), LV_ANIM_OFF);
+    lv_slider_set_value         (slider_bri, _display.getBrightness(), LV_ANIM_OFF);
         #if defined (WS_S3_4B) || defined (WS_P4_4B)
             _briFloor = 45; // These panels have a limited brightness range
         #else
@@ -86,26 +87,26 @@ void Panel_Display::init(lv_obj_t* parent) {
     lv_obj_add_event_cb         (slider_bri, slider_bri_cb, LV_EVENT_VALUE_CHANGED, this);
 
     // ROW 2 - Touch Visualization Switch
-    UiToolkit::create_panel_row (pnl_content, &row_viz);
+    UIToolkit::create_panel_row (pnl_content, &row_viz);
     lv_obj_set_flex_align       (row_viz, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);  
 
     // ROW 2,1 - Label
     lv_obj_t * lbl_viz = lv_label_create(row_viz);
     lv_label_set_text           (lbl_viz, "Show Touches");
     lv_obj_set_style_text_color (lbl_viz, lv_color_white(), 0);
-    lv_obj_set_style_text_font  (lbl_viz, UiToolkit::Font_Label, 0); // Semantic Font
+    lv_obj_set_style_text_font  (lbl_viz, UIToolkit::Font_Label, 0); // Semantic Font
 
     // ROW 2,2 - Switch
     lv_obj_t * sw_viz = lv_switch_create(row_viz);
-    lv_obj_set_size     (sw_viz, UiToolkit::sc(60), UiToolkit::sc(25));  // To match enable switch
+    lv_obj_set_size     (sw_viz, UIToolkit::sc(60), UIToolkit::sc(25));  // To match enable switch
     lv_obj_set_align    (sw_viz, LV_ALIGN_CENTER);
     lv_obj_add_event_cb (sw_viz, sw_touch_viz_cb, LV_EVENT_VALUE_CHANGED, this);
 
 
     // Touch Overlay Logic
     panel_touch_data = lv_obj_create(lv_screen_active());
-    lv_obj_set_size             (panel_touch_data, UiToolkit::sc(180), UiToolkit::sc(210)); 
-    lv_obj_align                (panel_touch_data, LV_ALIGN_RIGHT_MID, UiToolkit::sc(-10), UiToolkit::sc(-50));
+    lv_obj_set_size             (panel_touch_data, UIToolkit::sc(180), UIToolkit::sc(210)); 
+    lv_obj_align                (panel_touch_data, LV_ALIGN_RIGHT_MID, UIToolkit::sc(-10), UIToolkit::sc(-50));
     lv_obj_set_style_bg_color   (panel_touch_data, lv_color_hex(0x000000), 0);
     lv_obj_set_style_bg_opa     (panel_touch_data, LV_OPA_80, 0); 
     lv_obj_set_style_border_width(panel_touch_data, 2, 0);
@@ -121,24 +122,24 @@ void Panel_Display::init(lv_obj_t* parent) {
     lv_obj_t * lbl_h = lv_label_create(panel_touch_data);
     lv_label_set_text           (lbl_h, "TOUCH POINTS");
     lv_obj_align                (lbl_h, LV_ALIGN_TOP_MID, 0, 0);
-    lv_obj_set_style_text_font  (lbl_h, UiToolkit::Font_PanelHeader, 0); // Semantic Font
+    lv_obj_set_style_text_font  (lbl_h, UIToolkit::Font_PanelHeader, 0); // Semantic Font
     lv_obj_set_style_text_color (lbl_h, lv_color_hex(0x00A8FF), 0);
 
     count_label = lv_label_create(panel_touch_data);
     lv_label_set_text           (count_label, "ACTIVE: 0");
-    lv_obj_align                (count_label, LV_ALIGN_BOTTOM_MID, 0, UiToolkit::sc(7));
-    lv_obj_set_style_text_font  (count_label, UiToolkit::Font_Hero, 0); // Semantic Font
+    lv_obj_align                (count_label, LV_ALIGN_BOTTOM_MID, 0, UIToolkit::sc(7));
+    lv_obj_set_style_text_font  (count_label, UIToolkit::Font_Hero, 0); // Semantic Font
     lv_obj_set_style_text_color (count_label, lv_color_hex(0x404040), 0); 
 
     for(int i=0; i<5; i++) {
         coord_labels[i] = lv_label_create(panel_touch_data);
         lv_label_set_text_fmt       (coord_labels[i], "ID%d: --", i);
-        lv_obj_align                (coord_labels[i], LV_ALIGN_TOP_LEFT, UiToolkit::sc(25), UiToolkit::sc(25 + (i * 25)));
+        lv_obj_align                (coord_labels[i], LV_ALIGN_TOP_LEFT, UIToolkit::sc(25), UIToolkit::sc(25 + (i * 25)));
         lv_obj_set_style_text_color (coord_labels[i], lv_color_hex(0x808080), 0); 
-        lv_obj_set_style_text_font  (coord_labels[i], UiToolkit::Font_Caption, 0); // Semantic Font
+        lv_obj_set_style_text_font  (coord_labels[i], UIToolkit::Font_Caption, 0); // Semantic Font
 
         cursors[i] = lv_obj_create(lv_screen_active());
-        lv_obj_set_size            (cursors[i], UiToolkit::sc(60), UiToolkit::sc(60));
+        lv_obj_set_size            (cursors[i], UIToolkit::sc(60), UIToolkit::sc(60));
         lv_obj_set_style_radius    (cursors[i], LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_opa    (cursors[i], LV_OPA_0, 0); 
         lv_obj_set_style_border_width(cursors[i], 3, 0);
@@ -151,7 +152,7 @@ void Panel_Display::tick() {
     if (!showTouches) return;
 
     TouchPoint points[5];
-    uint8_t count = _gui.touchMgr.read(points, 5);
+    uint8_t count = _touch.read(points, 5);
 
     // Turns "ACTIVE:" bright when touches are present
     if (count > 0)  lv_obj_set_style_text_color(count_label, lv_color_hex(0xFFFFFF), 0); 
@@ -162,7 +163,7 @@ void Panel_Display::tick() {
     for(int i=0; i<5; i++) {
         if(i < count) {
             lv_obj_clear_flag       (cursors[i], LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_pos          (cursors[i], points[i].x - UiToolkit::sc(30), points[i].y - UiToolkit::sc(30));
+            lv_obj_set_pos          (cursors[i], points[i].x - UIToolkit::sc(30), points[i].y - UIToolkit::sc(30));
             lv_label_set_text_fmt   (coord_labels[i], "ID%d: %d,%d", points[i].id, points[i].x, points[i].y);
             
             // Color Logic

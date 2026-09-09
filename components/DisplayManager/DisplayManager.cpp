@@ -42,32 +42,12 @@ DisplayManager::DisplayManager() {
     #endif
 }
 
-// Normally injected by scripts/fw_version.py via extra_scripts (derived from
-// `git describe`). Defined defensively here so a build still succeeds if that
-// hook is ever skipped - a missing version string must never break the build,
-// it just becomes unknown. See docs/ROADMAP.md section 3.3.
-#ifndef FW_VERSION
-    #define FW_VERSION "unknown"
-#endif
-#ifndef FW_COMMIT
-    #define FW_COMMIT "unknown"
-#endif
-
+// The device-identity banner that used to open this function - firmware
+// version, device name, PSRAM and flash size - was never display-specific.
+// It now lives in SystemCore::printIdentity(), which is where "what board is
+// this" belongs. DisplayManager is a reusable HAL component and prints only
+// about the display. See docs/design/startup.md.
 bool DisplayManager::begin() {
-
-    Serial.println();
-    Serial.printf("Firmware: v%s (%s)\n", FW_VERSION, FW_COMMIT);
-    Serial.printf("Device init: %s\n", bsp_hw.device_name);
-    Serial.printf("Display hardware: %s\n", bsp_display.PANEL_MODEL);
-    Serial.printf("Touch panel: %s\n", bsp_touch.NAME);
-    Serial.printf("PSRAM Total: %d bytes\n", ESP.getPsramSize());
-    if (ESP.getPsramSize() == 0) {
-        Serial.println("CRITICAL ERROR: PSRAM not found! Display will fail.");
-    }
-    Serial.printf("FLASH size : %d kb\r\n", ESP.getFlashChipSize() / 1024);
-    
-    Serial.println("------------------------------");
-
     Serial.println("[DisplayMgr] Begin");
     Serial.flush(); // Force output before crash
 

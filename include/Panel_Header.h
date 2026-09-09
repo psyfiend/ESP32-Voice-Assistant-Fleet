@@ -1,7 +1,7 @@
 #pragma once
 #include <lvgl.h>
 #include <Arduino.h>
-#include "UiToolkit.h"
+#include "UIToolkit.h"
 #include "Widget_ConnStatus.h"
 
 class ConnectivityManager;

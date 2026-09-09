@@ -421,7 +421,7 @@
 // Was 0 (fully silent). WARN-level logging costs nothing when nothing's
 // wrong, and its absence is exactly what made the WS_S3_TOUCH_LCD_5B's
 // silent first-render hang so hard to diagnose - see LV_MEM_SIZE above.
-// Routed to Serial via lv_log_register_print_cb() in GuiManager.cpp
+// Routed to Serial via lv_log_register_print_cb() in GUIManager.cpp
 // (LV_LOG_PRINTF stays 0 - plain printf() isn't guaranteed to reach the
 // Arduino Serial console on every board/core config here).
 #define LV_USE_LOG 1

@@ -53,7 +53,8 @@ find .pio/build/<env> -name "MyFile.cpp.o"
 injects `FW_VERSION`/`FW_COMMIT` as `CPPDEFINES`, so they land on every file's compile
 command. Every commit changes the describe count and hash; every edit flips `+dirty`. Each
 one is a full rebuild. Injecting into a generated header included by one file would make
-this a few seconds instead of minutes — tracked in `FUTURE_IMPROVEMENTS.md`.
+this a few seconds instead of minutes — **GitHub issue #46**. This is also why the VSCode
+upload arrow appears to hang: it silently rebuilds before flashing.
 
 **`platformio.ini`'s 26 `symlink://` paths are absolute and machine-specific — but only the
 paths are.** Committing it from the original machine is correct and normal. What must never

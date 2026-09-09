@@ -27,32 +27,34 @@ with `-D BSP_HEADER='"BSP_<NAME>.h"'` alone.
 
 Updated 2026-09-08.
 
-| Board | Env | Display | Touch | Audio out | Audio in | WiFi STA | MQTT |
+| Board | Env | Display | Touch | Audio out | Audio in | WiFi STA | MQTT + HA |
 |---|---|---|---|---|---|---|---|
-| **WS_P4_7B** ESP32-P4-WIFI6-Touch-LCD-7B | `WS_P4_TOUCH_LCD_7B` | ✅ | ✅ (portrait; rotation untested) | untested — enclosure hides the speaker | untested | ✅ | untested |
-| **WS_P4_4B** ESP32-P4-WIFI6-Touch-LCD-4B | `WS_P4_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ | untested |
-| **WS_P4_5** ESP32-P4-WIFI6-Touch-LCD-5 | `WS_P4_TOUCH_LCD_5` | ✅ landscape (rot 1) | ✅ confirmed at rot 1 | ✅ | ✅ codec init only | ✅ | ✅ **full pipeline** |
-| **WS_S3_4B** ESP32-S3-Touch-LCD-4B | `WS_S3_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ native radio | untested |
-| **CYD_P4_1060** Guition JC1060P470C 7" | `CYD_P4_1060P470` | ✅ | ✅ | ✅ | ✅ | **untested** | untested |
-| **CYD_S3_3248** Guition JC3248W535 3.5" | `CYD_S3_3248W535` | ✅ both rotations | ✅ both rotations | ✅ | ✅ | ✅ | untested |
-| **CYD_S3_8048** Guition JC8048W550 5" | `CYD_S3_8048W550` | ✅ brightness slider dead | ✅ | ✅ notably quiet | ✅ | **untested** | untested |
-| **WS_S3_5B** ESP32-S3-Touch-LCD-5B | `WS_S3_TOUCH_LCD_5B` | ✅ visible tearing | ✅ 5 points | N/A no audio hw | N/A | **untested** | untested |
+| **WS_P4_7B** ESP32-P4-WIFI6-Touch-LCD-7B | `WS_P4_TOUCH_LCD_7B` | ✅ | ✅ (portrait; rotation untested) | untested — enclosure hides the speaker | untested | ✅ | ✅ |
+| **WS_P4_4B** ESP32-P4-WIFI6-Touch-LCD-4B | `WS_P4_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **WS_P4_5** ESP32-P4-WIFI6-Touch-LCD-5 | `WS_P4_TOUCH_LCD_5` | ✅ landscape (rot 1) | ✅ confirmed at rot 1 | ✅ | ✅ codec init only | ✅ | ✅ **on current build** |
+| **WS_S3_4B** ESP32-S3-Touch-LCD-4B | `WS_S3_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ native radio | ✅ |
+| **CYD_P4_1060** Guition JC1060P470C 7" | `CYD_P4_1060P470` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **CYD_S3_3248** Guition JC3248W535 3.5" | `CYD_S3_3248W535` | ✅ both rotations | ✅ both rotations | ✅ | ✅ | ✅ | ✅ **on current build** |
+| **CYD_S3_8048** Guition JC8048W550 5" | `CYD_S3_8048W550` | ✅ brightness slider dead | ✅ | ✅ notably quiet | ✅ | ✅ | ✅ |
+| **WS_S3_5B** ESP32-S3-Touch-LCD-5B | `WS_S3_TOUCH_LCD_5B` | ✅ visible tearing | ✅ 5 points | N/A no audio hw | N/A | ✅ | ✅ |
 
-**WiFi: 5 of 8 flash-tested** — three outstanding (`CYD_P4_1060`, `CYD_S3_8048`,
-`WS_S3_5B`), all physically accessible, tracked as GitHub issue #8.
+**WiFi and the MQTT/HA pipeline: 8 of 8.** The fleet-wide flash pass on 2026-09-08 put the
+full stack on every board — each one joined the network, connected to the broker, published
+discovery and appeared in Home Assistant. Reaching HA exercises the whole chain, so a board
+that shows up there has demonstrated WiFi, MQTT, discovery and the registry together.
 
-**MQTT + entity pipeline: 2 of 8, chosen deliberately.** `WS_P4_5` (MIPI/DSI, P4) and
-`CYD_S3_3248` (QSPI, S3) both run the whole path — broker session, HA discovery, four system
-entities published, four Zigbee2MQTT entities read back. Those two cover **both chip families
-and both LVGL buffer strategies**, which is the axis that actually differs between boards.
-The rest are expected to work; expected is not tested.
+**One nuance worth recording rather than glossing.** Six boards were verified at `dcbe9ff`.
+`WS_P4_5` and `CYD_S3_3248` were re-verified at `fa35c21`, after entity storage moved to
+PSRAM and the default mode changed. Those two changes are **strictly relieving** — the first
+removes ~22 KB from internal RAM, the second does *less* work at boot by not raising an AP —
+so neither can plausibly break a board that already worked with more pressure. The six are
+treated as verified; if something ever contradicts that, this is the paragraph to re-read.
 
-**Fleet-wide boot pass 2026-09-08:** every board flashed and reached Home Assistant except
-`CYD_S3_3248`, which boot-looped and is now fixed (see below).
-
-**⚠ The AP path has not run on any board since that fix.** Both verified boards connect to
-STA and therefore never call `softAP()`. Tracked as GitHub issue #45 — it matters because the
-AP is the rescue path.
+**⚠ The AP path is the real gap, not the boards.** Every board now uses
+`STA_WITH_AP_FALLBACK`, so a board with working credentials never calls `softAP()`. It has
+not run anywhere since the crash that motivated the PSRAM change. Tracked as GitHub issue
+#45, and it matters because the AP is the rescue path — it runs precisely when something has
+already gone wrong.
 
 ### The internal-RAM constraint, and which board has it
 

@@ -1,7 +1,8 @@
 #include "Panel_System.h"
 
-// -- EXTERN DECLARATION --
-extern void debug_dump_config(bool manualTrigger);
+// The single System panel, so the SystemReport sink (a plain function pointer)
+// can reach it. One panel exists by construction.
+static Panel_System *s_self = nullptr;
 
 Panel_System::Panel_System() {
     _ui_root    = NULL;
@@ -37,19 +38,28 @@ void Panel_System::btn_action_cb(lv_event_t* e) {
     
     if (p) {
         p->log("> Action: Dump Config...");
-        debug_dump_config(true); // manually triggered - mirror to Serial too
+        if (p->_onDumpRequested) p->_onDumpRequested();
     }
+}
+
+void Panel_System::reportSink(const char *line) {
+    if (s_self) s_self->log("%s", line);
 }
 
 void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     _headerRef = headerRef;
+
+    // Receive the System Doctor's output. Registering rather than being
+    // written into is what lets SystemReport stay LVGL-free.
+    s_self = this;
+    SystemReport::addSink(reportSink);
 
     // 1. Create the WRAPPER (_ui_root)
     // Acts as the "Viewmask". Positioned explicitly below the header.
     _ui_root = lv_obj_create    (parent);
     lv_obj_set_width            (_ui_root, lv_pct(100)); // Full width
     lv_obj_set_height           (_ui_root, 0); 
-    lv_obj_set_pos              (_ui_root, 0, UiToolkit::sc(30)); // Offset Y by Header Height
+    lv_obj_set_pos              (_ui_root, 0, UIToolkit::sc(30)); // Offset Y by Header Height
     
     // Wrapper Style (Invisible, Clipping)
     lv_obj_set_style_bg_opa         (_ui_root, LV_OPA_TRANSP, 0);
@@ -71,9 +81,9 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // We want square top corners (to connect to header) and rounded bottom corners.
     // LVGL radius applies to all corners.
     // Trick: Move content UP by the radius amount to clip the top rounded corners off.
-    int32_t radius = UiToolkit::sc(15);
-    lv_obj_set_style_radius     (_ui_content, UiToolkit::sc(15), 0);
-    lv_obj_set_y                (_ui_content, -(UiToolkit::sc(15))); // Shift up to hide top curves
+    int32_t radius = UIToolkit::sc(15);
+    lv_obj_set_style_radius     (_ui_content, UIToolkit::sc(15), 0);
+    lv_obj_set_y                (_ui_content, -(UIToolkit::sc(15))); // Shift up to hide top curves
     
     // Resetting size to account for the shift isn't strictly necessary if we use flex grow inside, 
     // but effectively the bottom area will be "Radius" pixels shorter than visual. 
@@ -83,27 +93,27 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // If you really want square top, we can accept rounded top or use the hack. 
     // Let's use the hack:
     
-    // lv_obj_set_style_margin_top (_ui_content, -(UiToolkit::sc(15)), 0);
-    // lv_obj_set_style_pad_top    (_ui_content, UiToolkit::sc(15) + UiToolkit::sc(10), 0); // Radius + padding
+    // lv_obj_set_style_margin_top (_ui_content, -(UIToolkit::sc(15)), 0);
+    // lv_obj_set_style_pad_top    (_ui_content, UIToolkit::sc(15) + UIToolkit::sc(10), 0); // Radius + padding
     
     lv_obj_set_style_border_color   (_ui_content, lv_color_hex(0x404040), 0);
-    lv_obj_set_style_border_width   (_ui_content, UiToolkit::sc(2), 0);
-    // lv_obj_set_style_pad_all        (_ui_content, UiToolkit::sc(10), 0);
-    lv_obj_set_style_pad_left       (_ui_content, UiToolkit::sc(10), 0);
-    lv_obj_set_style_pad_right      (_ui_content, UiToolkit::sc(10), 0);
-    lv_obj_set_style_pad_bottom     (_ui_content, UiToolkit::sc(10), 0);
+    lv_obj_set_style_border_width   (_ui_content, UIToolkit::sc(2), 0);
+    // lv_obj_set_style_pad_all        (_ui_content, UIToolkit::sc(10), 0);
+    lv_obj_set_style_pad_left       (_ui_content, UIToolkit::sc(10), 0);
+    lv_obj_set_style_pad_right      (_ui_content, UIToolkit::sc(10), 0);
+    lv_obj_set_style_pad_bottom     (_ui_content, UIToolkit::sc(10), 0);
     lv_obj_clear_flag               (_ui_content, LV_OBJ_FLAG_SCROLLABLE); // Static background
 
     lv_obj_set_flex_flow            (_ui_content, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align           (_ui_content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_pad_row        (_ui_content, UiToolkit::sc(8), 0);
+    lv_obj_set_style_pad_row        (_ui_content, UIToolkit::sc(8), 0);
 
     // -- ROW 1: Stats --
     lbl_stats = lv_label_create     (_ui_content);
     lv_obj_set_width                (lbl_stats, lv_pct(100));
     lv_label_set_text               (lbl_stats, "System Ready.");
     lv_obj_set_style_text_color     (lbl_stats, lv_color_hex(0x00FF00), 0);
-    lv_obj_set_style_text_font      (lbl_stats, UiToolkit::Font_Label, 0);
+    lv_obj_set_style_text_font      (lbl_stats, UIToolkit::Font_Label, 0);
 
     // -- ROW 2: Actions --
     _ui_actions = lv_obj_create     (_ui_content);
@@ -115,18 +125,18 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_style_bg_opa         (_ui_actions, LV_OPA_TRANSP, 0);
     lv_obj_set_style_pad_all        (_ui_actions, 0, 0);
     lv_obj_set_style_border_width   (_ui_actions, 0, 0);
-    lv_obj_set_style_pad_gap        (_ui_actions, UiToolkit::sc(10), 0);
+    lv_obj_set_style_pad_gap        (_ui_actions, UIToolkit::sc(10), 0);
 
     // Button: Dump Config
     lv_obj_t* btn = lv_button_create(_ui_actions);
-    lv_obj_set_height               (btn, UiToolkit::sc(32));
+    lv_obj_set_height               (btn, UIToolkit::sc(32));
     lv_obj_add_event_cb             (btn, btn_action_cb, LV_EVENT_CLICKED, this);
     lv_obj_set_style_bg_color       (btn, lv_color_hex(0x00A8FF), 0); // Cyan
     
     lv_obj_t* lbl = lv_label_create(btn);
     lv_label_set_text               (lbl, "Dump Config");
     lv_obj_center                   (lbl);
-    lv_obj_set_style_text_font      (lbl, UiToolkit::Font_Button, 0);
+    lv_obj_set_style_text_font      (lbl, UIToolkit::Font_Button, 0);
 
     // -- ROW 3: Log Container --
     lv_obj_t* log_box = lv_obj_create(_ui_content);
@@ -136,8 +146,8 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_flex_grow            (log_box, 1); 
     
     lv_obj_set_style_bg_color       (log_box, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_pad_all        (log_box, UiToolkit::sc(8), 0);
-    lv_obj_set_style_radius         (log_box, UiToolkit::sc(4), 0);
+    lv_obj_set_style_pad_all        (log_box, UIToolkit::sc(8), 0);
+    lv_obj_set_style_radius         (log_box, UIToolkit::sc(4), 0);
     lv_obj_set_scrollbar_mode       (log_box, LV_SCROLLBAR_MODE_AUTO); // Enable scrolling here
     
     txt_log = lv_label_create       (log_box);
@@ -146,8 +156,8 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_label_set_text               (txt_log, "> Init...");
     lv_obj_set_style_text_color     (txt_log, lv_color_hex(0xDDDDDD), 0); 
     
-    if(UiToolkit::Font_Caption) {
-        lv_obj_set_style_text_font  (txt_log, UiToolkit::Font_Caption, 0);
+    if(UIToolkit::Font_Caption) {
+        lv_obj_set_style_text_font  (txt_log, UIToolkit::Font_Caption, 0);
     } else {
         lv_obj_set_style_text_font  (txt_log, &lv_font_montserrat_14, 0);
     }
@@ -158,13 +168,13 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
 void Panel_System::toggle() {
     _expanded = !_expanded;
     if (_onToggle) _onToggle(_expanded);
-    if (_expanded) UiToolkit::closeActiveAccordion();
+    if (_expanded) UIToolkit::closeActiveAccordion();
     
     int32_t start_h = lv_obj_get_height(_ui_root);
     
     // Calculate Safe Height: Screen - Header(50) - BottomGap(100)
     int32_t screen_h = lv_display_get_vertical_resolution(lv_display_get_default());
-    int32_t max_h = screen_h - UiToolkit::sc(50) - UiToolkit::sc(100); 
+    int32_t max_h = screen_h - UIToolkit::sc(50) - UIToolkit::sc(100); 
     
     int32_t end_h = _expanded ? max_h : 0;
 
@@ -191,12 +201,8 @@ void Panel_System::log(const char* fmt, ...) {
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
-    // Mirrors to Serial only when explicitly turned on (see setSerialEcho) -
-    // debug_dump_config() controls this: off for a routine automatic boot
-    // run (most of its content already duplicates the boot dashboard's own
-    // direct Serial prints), on for a manually-triggered run (the "Dump
-    // Config" button), or on for boot too if -D DUMP_CONFIG is set.
-    if (_echoToSerial) Serial.println(buf);
+    // No Serial mirroring here. SystemReport owns that decision now, and
+    // doing it in both places would double every report line.
 
     // Push to Queue
     if (_log_queue.size() < 100) { // Limit queue depth

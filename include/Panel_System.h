@@ -5,7 +5,8 @@
 #include <vector>
 #include <functional> // Required for std::function
 #include "Panel_Header.h"
-#include "UiToolkit.h"
+#include "UIToolkit.h"
+#include "SystemReport.h"
 
 class Panel_System {
 public:
@@ -18,12 +19,11 @@ public:
     // Public logging - SAFE to call from anywhere (buffers data)
     void log(const char* fmt, ...);
 
-    // Controls whether log() also mirrors to Serial. Off by default - most
-    // of what debug_dump_config() logs already duplicates the boot-time
-    // dashboard's own direct Serial prints. debug_dump_config() turns this
-    // on for the duration of a manually-triggered ("Dump Config" button) run,
-    // or for an automatic boot run if -D DUMP_CONFIG is set.
-    void setSerialEcho(bool on) { _echoToSerial = on; }
+    // What to run when the "Dump Config" button is pressed. Registered by
+    // GUIManager. This replaces an `extern void debug_dump_config(bool)` that
+    // reached from this UI file straight into main.
+    using DumpCallback = std::function<void()>;
+    void setOnDumpRequested(DumpCallback cb) { _onDumpRequested = cb; }
 
     // Update system stats - SAFE to call from anywhere
     void updateSystemStats(float voltage, float current, int wifi_rssi);
@@ -63,7 +63,11 @@ private:
     // -- Safe Data Buffering --
     std::vector<std::string> _log_queue;
     bool _log_dirty;
-    bool _echoToSerial = false;
+    DumpCallback _onDumpRequested = nullptr;
+
+    // Sink registered with SystemReport in init(), so report lines land in this
+    // panel. Serial mirroring is SystemReport's job now, not log()'s.
+    static void reportSink(const char *line);
     
     float _batt_volts = 0;
     float _batt_amps = 0;

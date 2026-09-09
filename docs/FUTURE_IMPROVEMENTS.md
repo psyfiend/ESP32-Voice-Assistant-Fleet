@@ -5,41 +5,16 @@ to one device or a small group of devices (that's `HARDWARE_STATUS.md`'s job). D
 deferred work, not bugs, not blocking anything currently. Lower volatility than
 `HARDWARE_STATUS.md`; safe to leave stale for a while, but prune entries once actually done.
 
-## Startup / GUI reorganization
+## Startup / GUI reorganization — **DONE 2026-09-09**
 
-> **⏭ THIS IS NEXT.** Scheduled as ROADMAP **Phase 2.1**, the first milestone after Phase 1.
-> Do it *before* any cards exist rather than after: every card built beforehand would have to
-> move, and the split is at its cheapest right now while `setup()` is the only caller.
+Landed as ROADMAP Phase 2.1 / issue #12. Ended up a five-way split rather than the three-way
+one sketched here: `main` / `SystemCore` / `SystemReport` / `LVGL_Startup` / `GUIManager`.
+`SystemCore` and `SystemReport` were not anticipated when this entry was written — the ten
+subsystem globals needed an owner, and the System Doctor turned out to be the thing standing
+between us and an LVGL-free `main`.
 
-
-Raised during connectivity design work, deliberately out of scope for that branch — a
-naming/responsibility mismatch noticed in passing, not a bug. Currently: `LVGL_Test_UI.cpp`'s
-`setup()` does hardware bring-up (`gui.begin()`, `audioMgr.begin()`) *and* builds the LVGL
-dashboard (root screen, header, deck panels) in the same function; `GuiManager.cpp` is
-entirely LVGL engine plumbing (buffer-alloc matrix, driver registration, tick/log callbacks)
-despite its name, and `DisplayManager::begin()` prints generic device-info lines (`device_name`,
-PSRAM, flash size, `bsp_touch.NAME`) that aren't display-specific at all.
-
-Proposed three-way split:
-- **`main`** — hardware bring-up only (`displayMgr.begin()`, `touchMgr.begin()`,
-  `audioMgr.begin()`, `connMgr.begin()`), plus `debug_dump_config()` and the GPIO-register
-  checker. No LVGL code. Also absorbs the generic device-info Serial prints currently
-  misplaced in `DisplayManager::begin()`.
-- **`LVGL_Startup`** (new file) — the LVGL engine plumbing currently in `GuiManager.cpp`:
-  buffer-alloc matrix, `lv_init()`/tick/log setup, display+indev driver registration, and the
-  `flush_cb`/`touch_read` callbacks (these bridge LVGL to `DisplayManager`/`TouchManager` and
-  are needed by any screen content, so they belong with engine plumbing, not screen content).
-  Invoked conditionally from **`main`** (build-flag or parallel no-GUI env gated), *not* from
-  `DisplayManager` itself — `DisplayManager` is a reusable HAL component and should stay
-  LVGL-agnostic, same as it is today; having it call into UI-layer code would invert that
-  dependency. A no-LVGL build variant can reuse the `build_src_filter` exclusion mechanism
-  `WS_S3_TOUCH_LCD_5B` already uses to drop `Panel_Audio.cpp`, extended to
-  `GuiManager.cpp`/`LVGL_Startup.cpp`/all `Panel_*.cpp`.
-- **`GuiManager`** — becomes actual screen content: root screen, header, deck panels. Name
-  finally matches what's in the file.
-
-Worth doing before connectivity/MQTT GUI panels and future peripheral panels add more
-`Panel_*.cpp` files through the current setup(), but not blocking anything today.
+Design, reasoning and acceptance criteria: `docs/design/startup.md`. **Code complete, not yet
+flashed** — identical on-device behaviour is still unverified.
 
 ## LVGL / Display
 
@@ -53,8 +28,54 @@ Worth doing before connectivity/MQTT GUI panels and future peripheral panels add
   logic around it.
 - **True LVGL+PPA hardware-accelerated rotation** for MIPI/DSI boards (ESP32-P4 has a PPA —
   Pixel Processing Accelerator — capable of this in hardware). Current rotation on those
-  boards is pure CPU-based per-pixel transform. Not causing a known problem today — a
-  "if it ever becomes a problem" item, not proactive.
+  boards is pure CPU-based per-pixel transform.
+
+  **Upgraded from hypothetical to observed, 2026-09-09.** The owner reports visible stutter on
+  P4 boards running in a non-native orientation — not on the same boards in native orientation.
+  That is the CPU rotation transform, and it is exactly the symptom this entry predicted. It is
+  still not scheduled, but it is no longer an "if it ever becomes a problem" item; it is a
+  problem, currently tolerated.
+
+  Sequencing: this belongs **after** milestone 2.3 (memory budget spike), not before. 2.3
+  decides the render path — buffer sizes, `LV_MEM` location, whether tileview pages are lazily
+  built — and PPA has hard buffer requirements (64-byte alignment, `MALLOC_CAP_DMA |
+  MALLOC_CAP_SPIRAM`, explicit cache writeback/invalidate around every operation). Building
+  against a render path that 2.3 then changes means doing it twice. `REFERENCE_PROJECTS.md`
+  covers what is minable from Allsky's `ppa_accelerator.h` — approach only, the repo is
+  unlicensed.
+
+- **A written PSRAM allocation-order budget, as a deliverable of milestone 2.3.** Raised
+  2026-09-09 after reading Allsky's `docs/developer/architecture.md`, which publishes an exact
+  PSRAM map and states that its buffers must be allocated *before* display init so the
+  framebuffer still finds contiguous space.
+
+  **Their problem is not ours, and the numbers say so.** Allsky juggles ~15.7 MB in four
+  multi-megabyte image buffers where fragmentation genuinely bites. Our PSRAM residents are the
+  entity registry (~21 KB) and the LVGL draw buffers; on a MIPI/RGB board the draw buffers are
+  full-frame and the largest thing we allocate, and there is nothing else competing.
+
+  **But the *practice* transfers, and we have already been bitten by its sibling.** The
+  `CYD_S3_3248` softAP crash was an allocation-order and allocation-location problem in internal
+  SRAM — the scarce pool for us — found the expensive way. 2.3 already has to measure per-card
+  heap on the smallest board; it should also produce the table: what lives where, in what order,
+  and what the headroom is on the worst board. Cheap as a deliverable of a measuring milestone,
+  expensive as an archaeology exercise in Phase 6.
+
+  **Starting numbers, measured on `CYD_S3_3248` during the #45 test (2026-09-09):**
+
+  | Measurement | Value |
+  |---|---|
+  | Static internal RAM (link time) | 188,048 bytes of 327,680 - **57.4%** |
+  | Free internal heap just before `softAP()` | 21,968 bytes |
+  | Largest free internal block at that moment | 13,300 bytes |
+  | LVGL draw buffers (internal SRAM, x2) | 30,720 bytes each |
+  | Entity registry (PSRAM) | 22,080 bytes |
+
+  The largest-free-block figure is the one to watch: `softAP()` succeeded from 13,300 bytes, and
+  the WiFi driver allocates more per associated station. That is the real headroom, and it is
+  thinner than the free-heap total suggests. The 57.4% is only visible at all since the
+  `maximum_ram_size` fix - the board previously reported 35.9% against a denominator 1.6x too
+  large.
 - **`Arduino_ESP32RGBPanel` `num_fbs` investigation.** Requests two hardware framebuffers but
   only ever draws into/reads back one (`getFrameBuffer()` always fetches index 1) — no real
   double-buffering on any board using this class, causing visible tearing on

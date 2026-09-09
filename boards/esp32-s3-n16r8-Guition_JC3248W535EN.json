@@ -15,7 +15,7 @@
     "f_flash": "80000000L",
     "flash_mode": "qio",
     "flash_size": "16MB",
-    "psram_type": "qspi",
+    "psram_type": "opi",
     "psram_size": "8MB",
     "hwids": [
       [
@@ -47,7 +47,7 @@
   "name": "Guition ESP32-S3-N16R8 3.5in 320x480",
   "upload": {
     "flash_size": "16MB",
-    "maximum_ram_size": 524288,
+    "maximum_ram_size": 327680,
     "maximum_size": 16777216,
     "require_upload_port": true,
     "speed": 921600

@@ -1,7 +1,6 @@
 #pragma once
 #include <lvgl.h>
 #include <Arduino.h>
-#include "GuiManager.h"
 
 #define ROW_HEIGHT 50
 
@@ -15,7 +14,7 @@
 // Define a simple callback type for closing external panels
 typedef void (*UiActionCallback)(void);
 
-class UiToolkit {
+class UIToolkit {
 public:
     // Scale a pixel value based on the target device
     static int32_t  sc(int32_t val);

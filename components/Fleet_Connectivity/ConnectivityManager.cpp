@@ -454,9 +454,16 @@ bool ConnectivityManager::raiseAp(const char *why) {
     ip.fromString(_defaults.AP_IP);
     sub.fromString(_defaults.AP_SUBNET);
 
-    WiFi.mode((_mode.load() == (int32_t)ConnMode::STA_PLUS_AP ||
-               (ConnState)_state.load() == ConnState::STA_CONNECTED)
-              ? WIFI_AP_STA : WIFI_AP_STA);
+    // Always AP+STA, never AP-only. escalateAfterFailure() keeps a STA retry
+    // ladder running the entire time the AP is up (AP_RETRY_BASE_MS doubling to
+    // AP_RETRY_MAX_MS) and the retry re-issues WiFi.begin() without touching the
+    // mode - so dropping the STA interface here would strand a board that raised
+    // its AP over a router reboot in AP mode until someone power-cycled it,
+    // which is the exact failure AP_RETRY_BASE_MS exists to prevent.
+    //
+    // This was previously a ternary whose two branches were both WIFI_AP_STA -
+    // a leftover from an earlier design in which the fallback AP was AP-only.
+    WiFi.mode(WIFI_AP_STA);
     // Internal RAM at the moment of truth. softAP() allocates from INTERNAL
     // DRAM, and when that allocation fails the WiFi driver does not report it -
     // it dereferences the null and panics inside ieee80211_hostap_attach. That

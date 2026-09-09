@@ -31,10 +31,10 @@ void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr) {
         _motion = Motion::BLINK;
     #endif
 
-    const int32_t S   = UiToolkit::sc(28);          // fan bounding box
+    const int32_t S   = UIToolkit::sc(28);          // fan bounding box
     const int32_t cx  = S / 2;
     const int32_t cy  = (S * 4) / 5;                 // fan origin sits low
-    const int32_t aw  = UiToolkit::sc(2) < 2 ? 2 : UiToolkit::sc(2);
+    const int32_t aw  = UIToolkit::sc(2) < 2 ? 2 : UIToolkit::sc(2);
 
     _root = lv_obj_create(parent);
     lv_obj_remove_style_all(_root);
@@ -75,10 +75,10 @@ void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr) {
     // the visual centre of the fan sits slightly above and right of the
     // geometric origin; the dot needs to come back down and left to look
     // centred. Confirmed by eye on both the 7B and the 3248.
-    const int32_t nx = -UiToolkit::sc(1);
-    const int32_t ny =  UiToolkit::sc(2);
+    const int32_t nx = -UIToolkit::sc(1);
+    const int32_t ny =  UIToolkit::sc(2);
 
-    const int32_t dotD = UiToolkit::sc(5) < 4 ? 4 : UiToolkit::sc(5);
+    const int32_t dotD = UIToolkit::sc(5) < 4 ? 4 : UIToolkit::sc(5);
     _dot = lv_obj_create(_fan);
     lv_obj_remove_style_all(_dot);
     lv_obj_set_size(_dot, dotD, dotD);
@@ -90,8 +90,8 @@ void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr) {
     // link" is a distinct silhouette rather than just a recoloured full fan.
     _stalk = lv_obj_create(_fan);
     lv_obj_remove_style_all(_stalk);
-    lv_obj_set_size(_stalk, aw, UiToolkit::sc(7));
-    lv_obj_set_pos(_stalk, cx - aw / 2 + nx, cy - UiToolkit::sc(7) + ny);
+    lv_obj_set_size(_stalk, aw, UIToolkit::sc(7));
+    lv_obj_set_pos(_stalk, cx - aw / 2 + nx, cy - UIToolkit::sc(7) + ny);
     lv_obj_set_style_bg_opa(_stalk, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(_stalk, aw, 0);
     lv_obj_add_flag(_stalk, LV_OBJ_FLAG_HIDDEN);
@@ -109,7 +109,7 @@ void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr) {
     // an independent colour, and mixing sizes inside one label renders badly.
     _badge = lv_label_create(_root);
     lv_label_set_text(_badge, "");
-    lv_obj_set_style_text_font(_badge, UiToolkit::Font_Caption, 0);
+    lv_obj_set_style_text_font(_badge, UIToolkit::Font_Caption, 0);
 
     _lastKey = -1;
     tick();   // paint the real state immediately, not a default frame

@@ -1,4 +1,4 @@
-#include "UiToolkit.h"
+#include "UIToolkit.h"
 
 static lv_obj_t *toast_panel = NULL;
 static lv_obj_t *toast_label = NULL;
@@ -7,13 +7,13 @@ static lv_obj_t * _active_accordion_panel = NULL;
 static UiActionCallback _system_close_cb = NULL; 
 
 // Initialize Static Fonts
-const lv_font_t* UiToolkit::Font_Caption = NULL;
-const lv_font_t* UiToolkit::Font_Label = NULL;
-const lv_font_t* UiToolkit::Font_Button = NULL;
-const lv_font_t* UiToolkit::Font_PanelHeader = NULL;
-const lv_font_t* UiToolkit::Font_Hero = NULL;
+const lv_font_t* UIToolkit::Font_Caption = NULL;
+const lv_font_t* UIToolkit::Font_Label = NULL;
+const lv_font_t* UIToolkit::Font_Button = NULL;
+const lv_font_t* UIToolkit::Font_PanelHeader = NULL;
+const lv_font_t* UIToolkit::Font_Hero = NULL;
 
-int32_t UiToolkit::sc(int32_t val) {
+int32_t UIToolkit::sc(int32_t val) {
     return (int32_t)(val * UI_SCALE);
 }
 
@@ -23,7 +23,7 @@ static void toast_timer_cb(lv_timer_t * t) {
     toast_timer_handle = NULL;
 }
 
-void UiToolkit::init() {
+void UIToolkit::init() {
 
     // --= FONT MAPPING =--
     #ifdef HIGH_DPI_DISPLAY
@@ -57,7 +57,7 @@ void UiToolkit::init() {
     lv_obj_set_style_text_font  (toast_label, Font_Hero, 0); // Use semantic font
 }
 
-void UiToolkit::show_toast(const char* text, uint32_t duration_ms) {
+void UIToolkit::show_toast(const char* text, uint32_t duration_ms) {
     if (!toast_panel || !toast_label) return;
 
     lv_label_set_text           (toast_label, text);
@@ -72,11 +72,11 @@ void UiToolkit::show_toast(const char* text, uint32_t duration_ms) {
 }
 
 // Expanded Accordion Panel Accessor
-lv_obj_t* UiToolkit::getActiveAccordionPanel() {
+lv_obj_t* UIToolkit::getActiveAccordionPanel() {
     return _active_accordion_panel;
 }
 
-void UiToolkit::registerSystemCloseCb(UiActionCallback cb) {
+void UIToolkit::registerSystemCloseCb(UiActionCallback cb) {
     _system_close_cb = cb;
 }
 
@@ -87,7 +87,7 @@ static void anim_height_cb(void * var, int32_t v) {
 
 static void execute_panel_toggle(lv_obj_t* panel, bool expand) {
     int32_t h_start = lv_obj_get_height(panel);
-    int32_t h_end   = expand ? UiToolkit::sc(280) : UiToolkit::sc(85);
+    int32_t h_end   = expand ? UIToolkit::sc(280) : UIToolkit::sc(85);
 
     lv_obj_t * header   = lv_obj_get_child(panel, 0);
     lv_obj_t * icon     = lv_obj_get_child(header, 1);
@@ -106,7 +106,7 @@ static void execute_panel_toggle(lv_obj_t* panel, bool expand) {
 }
 
 // --= NEW: Implementation =--
-void UiToolkit::closeActiveAccordion() {
+void UIToolkit::closeActiveAccordion() {
     if (_active_accordion_panel) {
         execute_panel_toggle(_active_accordion_panel, false);
         _active_accordion_panel = NULL;
@@ -117,7 +117,7 @@ static void panel_header_click_cb(lv_event_t * e) {
     lv_obj_t * panel = (lv_obj_t*)lv_event_get_user_data(e);
 
     // Determine if we are expanding or collapsing
-    bool currently_collapsed = (lv_obj_get_height(panel) == UiToolkit::sc(85));
+    bool currently_collapsed = (lv_obj_get_height(panel) == UIToolkit::sc(85));
 
     if (currently_collapsed) {
         // --= Expanding =--
@@ -138,7 +138,7 @@ static void panel_header_click_cb(lv_event_t * e) {
     }
 }
 
-lv_obj_t* UiToolkit::create_collapsible_panel(lv_obj_t* parent, const char* title, lv_obj_t** content_container) {
+lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* title, lv_obj_t** content_container) {
     lv_obj_t * pnl = lv_obj_create(parent);
     lv_obj_set_width            (pnl, 0);       // Set base width to 0 so flex takes over completely
     lv_obj_set_height           (pnl, sc(85));  // Collapsed Height
@@ -186,7 +186,7 @@ lv_obj_t* UiToolkit::create_collapsible_panel(lv_obj_t* parent, const char* titl
     return pnl;
 }
 
-lv_obj_t* UiToolkit::create_panel_row(lv_obj_t* pnl_content, lv_obj_t** row_container) {
+lv_obj_t* UIToolkit::create_panel_row(lv_obj_t* pnl_content, lv_obj_t** row_container) {
     lv_obj_t * row = lv_obj_create(pnl_content);
     lv_obj_set_size             (row, lv_pct(100), sc(ROW_HEIGHT));
     lv_obj_set_flex_flow        (row, LV_FLEX_FLOW_ROW);
@@ -204,7 +204,7 @@ lv_obj_t* UiToolkit::create_panel_row(lv_obj_t* pnl_content, lv_obj_t** row_cont
     return row;
 }
 
-lv_obj_t* UiToolkit::create_slider_col(lv_obj_t* parent, const char* title, lv_obj_t** out_col, lv_obj_t** out_slider) {
+lv_obj_t* UIToolkit::create_slider_col(lv_obj_t* parent, const char* title, lv_obj_t** out_col, lv_obj_t** out_slider) {
     lv_obj_t * col = lv_obj_create(parent);
     
     // lv_obj_set_size(col, lv_pct(100), lv_pct(100));
