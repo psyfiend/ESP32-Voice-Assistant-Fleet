@@ -146,9 +146,11 @@ and I already have. They're the expensive path. I won't use them without you ask
 paste it once. Ten separate "here's another log" round-trips each re-send the conversation.
 
 **6. Compile locally, not through me.** Run `pio run -e <env>` yourself and paste only the
-errors. Me running builds burns tokens on output you can read for free. (Reminder from
-FUTURE_IMPROVEMENTS: run `pio` from **PowerShell, not Git Bash** — pioarduino 55.03.311 rejects
-MSYS shells.)
+errors. **Superseded 2026-09-09:** Claude builds as a matter of course now — a build is the
+cheapest possible check that a refactor did not break anything, and paying for it in tokens beats
+finding out on the bench. The rule that survives is the one about *hardware* feedback: batch it
+(§2.5). (Reminder from FUTURE_IMPROVEMENTS: run `pio` from **PowerShell, not Git Bash** —
+pioarduino 55.03.311 rejects MSYS shells.)
 
 **7. Track progress in GitHub Issues, not in chat.** See §3.4.
 
@@ -602,10 +604,10 @@ had **never been run** immediately exposed a real bug (#42). When scope has to b
 
 | # | Milestone | Acceptance criteria |
 |---|---|---|
-| 2.1 | Startup reorg | The 3-way split already proposed in FUTURE_IMPROVEMENTS (`main` / `LVGL_Startup` / `GuiManager`). Do it *before* adding UI, not after |
+| 2.1 | Startup reorg | **CODE DONE 2026-09-09, hardware-unverified.** Landed as a 5-way split — `main` / `SystemCore` / `SystemReport` / `LVGL_Startup` / `GUIManager`. Design and acceptance criteria in `docs/design/startup.md`. Both dev targets build; **neither has been flashed**, and criterion 2 (identical on-device behaviour) is what closes this |
 | 2.2 | Design system | Colour tokens, spacing scale, type scale, MDI icon font, card elevation/border/radius. One reference page rendering every token |
 | 2.3 | Memory budget spike | Measure real LVGL heap per card on the *smallest* board. Decide tileview lazy-loading vs. PSRAM `LV_MEM`. **Gates 2.5** |
-| 2.4 | `Card` base class | Grid placement with spans, entity binding, staleness handling, tap + long-press, compact/full variants |
+| 2.4 | `Card` base class | Grid placement with spans, entity binding, staleness handling, tap + long-press, compact/full variants. Also the agreed moment to introduce `src/UI/` and `src/Cards/` — see `docs/design/startup.md` §3.5 |
 | 2.5 | Page + grid engine | A Page renders a grid from a config struct; cards place with spans; correct on 3 different resolutions |
 | 2.6 | Tileview navigation | Swipe L/R between pages, U/D to menus; gesture conflicts resolved (§5.2); page indicator dots |
 | 2.7 | First 4 card types | `sensor`, `binary_sensor`, `switch`, `button` — bound to real HA entities over MQTT |
@@ -1011,9 +1013,11 @@ path.
 And yes to "point me at a repo and have me reproduce certain aspects of it" — with the caveat in
 §6.15 about licenses if we copy rather than reimplement.
 
-### Q11 — Dev targets — **DECIDED 2026-09-03**
+### Q11 — Dev targets — **DECIDED 2026-09-03, REVISED 2026-09-09**
 
-- **Primary: `WS_P4_TOUCH_LCD_7B`** (`WS_P4_7B`). Biggest screen, best case.
+- **Primary: `WS_P4_TOUCH_LCD_5`** (`WS_P4_5`). MIPI/DSI, P4 silicon. Revised from
+  `WS_P4_TOUCH_LCD_7B` — the 5 is the board actually on the bench, and it is the one Phase 1 was
+  verified on. The 7B remains fleet-supported, just not the day-to-day target.
 - **Stress case: `CYD_S3_3248W535`** (`CYD_S3_3248`). Smallest screen, slowest bus (only QSPI
   panel in the fleet), known sluggish animations, known touch dead margins. If a page renders
   acceptably here, it renders anywhere.
