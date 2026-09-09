@@ -1,0 +1,141 @@
+#pragma once
+#ifndef ENTITY_REGISTRY_H
+#define ENTITY_REGISTRY_H
+
+#include "Entity.h"
+#include <mutex>
+
+// ---------------------------------------------------------------------------
+// The Entity Registry. ROADMAP section 4.1 (what it is) and 4.2 (the rule that
+// keeps it from corrupting LVGL).
+//
+// THE THREADING CONTRACT, restated because getting it wrong does not crash
+// immediately - it corrupts LVGL and crashes randomly, hours later:
+//
+//   Providers (MQTT, system telemetry, I2C sensors) run on their own tasks.
+//   They call setValue(). That takes a short mutex, writes the value, marks
+//   the entity dirty, and returns. A provider NEVER touches LVGL.
+//
+//   The LVGL task calls drainDirty() from an lv_timer, roughly every 100 ms.
+//   That is the ONLY place bound widgets are updated, and it runs on the one
+//   task LVGL is safe on.
+//
+// Suppressing unchanged values (see EntityValue::equals) also rate-limits for
+// free: a topic firing 50x/sec produces at most 10 redraws/sec, and none at
+// all if the value is not actually moving.
+//
+// std::mutex rather than a FreeRTOS handle, deliberately: it works on the
+// device AND on a PC, which is what keeps this library unit-testable per
+// ROADMAP Q9. Nothing in this library includes Arduino.h.
+// ---------------------------------------------------------------------------
+
+// Default capacity. NOT a hard limit any more - it is what the application
+// asks for when it allocates storage, and it may pass something else.
+//
+// This used to be a fixed inline array, which put ~21 KB in internal SRAM on
+// every board. That was fine everywhere except CYD_S3_3248: it is the fleet's
+// only QSPI board, so it is the only one whose LVGL buffers must live in
+// INTERNAL SRAM rather than PSRAM (see GuiManager's bus-type branch), and the
+// combination left too little internal RAM for the WiFi driver to bring up an
+// AP. It crashed inside ieee80211_hostap_attach. See docs/LESSONS.md.
+static constexpr uint8_t ENTITY_MAX = 48;
+
+class EntityRegistry {
+public:
+    // Hand the registry its storage. The caller owns the memory and it must
+    // outlive the registry.
+    //
+    // Storage is injected rather than allocated here ON PURPOSE: this library
+    // has zero dependencies (ROADMAP Q9) so it can compile and unit-test on a
+    // PC, and calling heap_caps_malloc() would end that. The application knows
+    // it is on an ESP32 and can place the block in PSRAM; a host test can pass
+    // a plain array.
+    //
+    // Runs a placement-new over each slot, so raw malloc'd memory is fine -
+    // Entity is not trivially constructible and its members would otherwise be
+    // uninitialised.
+    //
+    // Returns false if storage is null or capacity is 0. Calling any other
+    // method before this simply does nothing.
+    bool begin(Entity *storage, uint8_t capacity);
+    // --- Registration (startup only, single-threaded) ---------------------
+    //
+    // Called by each provider for the entities it owns. Deliberately a
+    // registration call rather than a central table: a new sensor library
+    // declares its own entities and becomes placeable on a dashboard and
+    // visible in HA without editing any shared list.
+    //
+    // Returns nullptr if the id is empty, already taken, or the table is full.
+    Entity *add(const EntityDescriptor &d);
+
+    Entity       *find(const char *id);
+    const Entity *find(const char *id) const;
+
+    uint8_t       count() const { return _count; }
+
+    // Raw access by index, for diagnostics and for iterating at startup.
+    //
+    // DELIBERATELY UNLOCKED, and therefore NOT safe to call while another task
+    // is writing. It returns a pointer into the table, so a concurrent
+    // setValue() could tear the value out from under the reader.
+    //
+    // Safe today because every provider so far runs on the loop() task. The
+    // moment a provider runs on its own task, callers that need a consistent
+    // read must go through drainDirty() (which snapshots under the lock) or
+    // find() a copy. Kept unlocked rather than made safe-by-default because a
+    // locking accessor invites exactly the pattern 4.2 forbids: holding the
+    // registry lock while doing LVGL work.
+    const Entity *at(uint8_t i) const { return (i < _count) ? &_items[i] : nullptr; }
+
+    // --- Provider side (any task) -----------------------------------------
+
+    // Write a value from its source of truth. Takes the lock briefly.
+    // Returns true if the value actually changed (and the entity was dirtied).
+    //
+    // An echo of a pending optimistic write clears the pending state, which is
+    // how a tap gets confirmed.
+    bool setValue(const char *id, const EntityValue &v, uint32_t nowMs);
+
+    // --- UI side ----------------------------------------------------------
+
+    // Optimistically apply a commanded value so a control responds instantly,
+    // and start the reconcile window. The CALLER is responsible for actually
+    // sending the command (publishing to MQTT); this only updates local state.
+    //
+    // Returns false if the entity is unknown or not writable.
+    bool commandValue(const char *id, const EntityValue &v, uint32_t nowMs);
+
+    // Drain the dirty set. Call from the LVGL task only.
+    //
+    // The callback is invoked OUTSIDE the lock, with a snapshot, so a slow
+    // widget update cannot block a provider mid-publish. `ctx` is passed
+    // straight through so this stays free of std::function and heap.
+    using DirtyFn = void (*)(const Entity &snapshot, void *ctx);
+    void drainDirty(DirtyFn fn, void *ctx);
+
+    // Housekeeping: expires stale values and reverts optimistic writes whose
+    // echo never arrived. Safe from any task. Call every loop.
+    void tick(uint32_t nowMs);
+
+    // How long an optimistic write waits for its echo before reverting.
+    void setReconcileTimeoutMs(uint32_t ms) { _reconcileMs = ms; }
+
+    // True when the value is older than its staleAfterMs, or was never set.
+    // Cards use this to grey out rather than display a confident stale number.
+    bool isStale(const Entity &e, uint32_t nowMs) const;
+
+private:
+    // Caller-owned storage; see begin(). The registry object itself stays tiny,
+    // which is the point - only the table is large, and only the table moves.
+    Entity *_items    = nullptr;
+    uint8_t _capacity = 0;
+    uint8_t _count    = 0;
+
+    mutable std::mutex _mx;
+    uint32_t _reconcileMs = 5000;   // generous: a round trip through a broker
+                                    // and back via HA can take a moment
+
+    int  indexOf(const char *id) const;   // caller holds the lock (or startup)
+};
+
+#endif // ENTITY_REGISTRY_H

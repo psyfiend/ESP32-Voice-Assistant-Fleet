@@ -1,16 +1,66 @@
 # Fleet Dashboard — Blueprint & Roadmap
 
-**Status: FIRST DRAFT. Not agreed yet.** Section 8 (Open Questions) has to be answered before
-any of Phases 2+ get built. Phase 0 and most of Phase 1 are safe to start regardless.
+**Status: AGREED and in progress.** Phases 0 and 1 are complete. Section 8's open questions
+are answered except where marked, and the answers are recorded there rather than in chat.
 
 This is the *plan* doc. It answers "what are we building, in what order, and how do we know
 we're making progress." It does not replace:
 
-- `CLAUDE.md` — how the HAL/BSP works today (stable facts)
-- `docs/PROJECT_STATUS.md` — per-board bugs/test status (volatile)
-- `docs/FUTURE_IMPROVEMENTS.md` — fleet-wide deferred work (medium volatility)
-- `docs/GUI_FRAMEWORK.md` — the earlier UI vision sketch. **This doc supersedes it** once
-  agreed; GUI_FRAMEWORK.md then gets reduced to a pointer here.
+| Doc | Answers |
+|---|---|
+| `CLAUDE.md` | How the HAL/BSP works today (stable facts) |
+| `docs/HARDWARE_STATUS.md` | Which board does what; what is untested; build-environment issues |
+| `docs/FUTURE_IMPROVEMENTS.md` | Fleet-wide deferred work |
+| `docs/LESSONS.md` | Mistakes worth not repeating |
+| `docs/REFERENCE_PROJECTS.md` | What is in `reference/` and what to mine from it |
+| `docs/GUI_FRAMEWORK.md` | Superseded by this doc; retained as a pointer |
+| GitHub issues | What is being worked on right now, and what is blocked |
+
+---
+
+## 0. Where we are — 2026-09-08
+
+**Phase 0 (repo hygiene) and Phase 1 (connectivity) are done.** The dashboard has a working
+data pipeline in both directions and nothing to draw it with yet.
+
+**What exists and runs on hardware:**
+
+- WiFi station, AP and APSTA, with classified failures and retry ladders, on five boards.
+- Device hostnames in DHCP, verified from the router's lease table.
+- An MQTT broker session with its own backoff, LWT and reconnect handling.
+- An Entity Registry: one list of everything the panel knows, with staleness and optimistic
+  writes, and zero dependencies so it compiles and tests on a PC.
+- Two providers. `SystemProvider` publishes this board's own telemetry; `MqttProvider` reads
+  entities other devices own.
+- Home Assistant discovery — the device appears in HA with correct BSP-derived identity and
+  four diagnostic entities, and four Zigbee2MQTT values arrive back the other way.
+
+**Verified on two boards chosen to cover the real axis of difference:** `WS_P4_5` (MIPI/DSI,
+P4) and `CYD_S3_3248` (QSPI, S3) — both chip families and both LVGL buffer strategies. A
+fleet-wide boot pass on 2026-09-08 covered the other six.
+
+**One thing is fixed but unproven: the AP path.** `softAP()` has not run on any board since
+the crash that motivated the PSRAM change, because the default mode moved to
+`STA_WITH_AP_FALLBACK` and a board with working credentials never raises an AP. Tracked as
+issue #45, and it matters because the AP is the rescue path.
+
+**The literal next step: Phase 2.1, the startup reorganisation.** Split `main` /
+`LVGL_Startup` / `GuiManager` *before* adding UI rather than after — it is the cheapest it
+will ever be, and every card built beforehand would have to move. Written up in
+`FUTURE_IMPROVEMENTS.md`.
+
+**What we are deliberately leaving behind for now.** None of these are blocked; each was
+descoped so the framework could progress. Every one keeps an open issue with its reasoning:
+
+| Left behind | Issue | Why it can wait |
+|---|---|---|
+| Captive portal | #6 | Needs a web server that does not arrive until Phase 4 |
+| On-device connectivity settings screen | #7 | The System panel already shows network state during development; better built after the Phase 2 design system |
+| `_proven` credential fingerprint | #39 | Cannot be hit by a user, only by a developer changing credentials |
+| Proven/unproven behaviour matrix (tests 2 and 3) | — | Coded and reviewed, never observed; the matrix was consuming the schedule |
+| HA access without MQTT | #43 | **Important, not urgent.** Most HA users have no broker, so this blocks other people before it blocks us |
+| Flash-testing the last three boards | #8 | All physically accessible; nothing board-specific is expected |
+| Outbound entity commands | #10 | The registry supports them; nothing yet has a control to send one |
 
 ---
 
@@ -79,7 +129,7 @@ a nice-to-have. These are the levers that actually matter, in rough order of imp
 
 **1. One session = one milestone.** The biggest cost driver is a long session where every later
 message re-reads a growing history. When a milestone is done and committed, start a fresh
-session. The docs (this one, `PROJECT_STATUS.md`, `CLAUDE.md`) are the handoff mechanism — they
+session. The docs (this one, `HARDWARE_STATUS.md`, `CLAUDE.md`) are the handoff mechanism — they
 let a new session get up to speed in ~5k tokens instead of ~60k of re-exploration.
 
 **2. Write the design down before writing the code.** A one-page `docs/design/<subsystem>.md`
@@ -517,21 +567,36 @@ Two incidental findings worth keeping:
   settling on a cast helper in the design system (§2.2) before writing 8 card types that each
   reproduce it.
 
-### Phase 1 — Connectivity (your stated priority)
+### Phase 1 — Connectivity — **COMPLETE 2026-09-08**
 
-| # | Milestone | Acceptance criteria |
+| # | Milestone | Status |
 |---|---|---|
-| 1.1 | Connectivity state machine | Formal `enum class` state machine (BOOT -> STA_CONNECTING -> STA_CONNECTED -> AP_FALLBACK -> APSTA -> DEGRADED) replacing today's 4-state enum; observable via callback |
-| 1.2 | **APSTA feasibility spike** | *Spike branch.* Answer: does `softAP()` + STA work over `esp_hosted` on P4? Result written into PROJECT_STATUS.md. **Gates 1.3.** |
-| 1.3 | AP + captive portal | Device stands up an AP; DNS redirect works; credential-entry page works; STA-only mode selectable with automatic AP fallback on failure |
-| 1.4 | Connectivity settings UI | On-device: scan, pick network, enter password, view IP/RSSI/mode. Header bar shows a live WiFi status icon |
-| 1.5 | Flash-test remaining 5 boards | Every board in PROJECT_STATUS's WiFi column is either confirmed or has a documented reason |
-| 1.6 | MQTT transport | Connect using credentials from the settings layer; publish; subscribe; LWT; exponential-backoff reconnect; status visible in the UI |
-| 1.7 | **Entity Registry** | Core registry + dirty-flag/mutex bridge (§4.2). `SystemProvider` populates rssi/ip/uptime/heap. `MqttProvider` maps topics to entities both ways |
-| 1.8 | HA discovery | Discovery payloads **generated from the registry**; device + entities appear correctly in HA; naming scheme per Q5 |
+| 1.0 | Device hostnames (#38) | **DONE.** Verified in the router's DHCP lease table, not in serial output — see `LESSONS.md` |
+| 1.1 | Connectivity state machine (#4) | **DONE**, hardware-verified on five boards. Four modes, classified failures, retry ladders. One criterion met differently: state is a polled atomic rather than a callback, which avoids firing UI work from the WiFi event task (§4.2) |
+| 1.2 | APSTA feasibility spike (#5) | **DONE — yes.** `STA_PLUS_AP` confirmed on three P4 boards and an S3, so mode 2 is offered fleet-wide with no per-board gating |
+| 1.3 | AP + captive portal (#6) | **AP half DONE.** Portal descoped — needs the Phase 4 web server |
+| 1.4 | Connectivity settings UI (#7) | **Header glyph DONE.** Screen descoped to after the Phase 2 design system |
+| 1.5 | Flash-test remaining boards (#8) | **5 of 8.** Three outstanding, all accessible |
+| 1.6 | MQTT transport (#9) | **DONE**, connected to a real broker. Classified failures, own backoff ladder, LWT plus explicit `offline` on clean shutdown, subscriptions replayed on reconnect |
+| 1.7 | Entity Registry (#10) | **DONE.** Registry, staleness, optimistic writes, and two providers. Zero-dependency build proven by compiling it standalone. Outbound commands remain unimplemented — nothing has a control to send one yet |
+| 1.8 | HA discovery (#11) | **DONE**, verified in Home Assistant. Device-based discovery, one retained payload generated by walking the registry |
 
-Note the ordering: **1.7 before 1.8, deliberately.** Hand-writing discovery JSON first and
-retrofitting the registry later means writing it twice.
+Ordering note, now vindicated: **1.7 before 1.8.** Because discovery is a *projection* of the
+registry, it turned out to be a single serializer rather than a per-entity publish loop, and
+the `cmps` map of device-based discovery mapped straight onto the registry's contents.
+
+**Verified end to end on `WS_P4_5`:** four entities published outward to HA with correct
+BSP-derived device identity, four Zigbee2MQTT entities read back inward, all through one
+registry that neither side knows the shape of.
+
+**The scope cut that made this finishable (2026-09-06).** The proven/unproven behaviour matrix
+was consuming the schedule for diminishing returns, so the bar was deliberately lowered to
+*"the common paths are verified; the edge cases are coded, reviewed, and honestly recorded as
+unobserved."* That decision stands, and it is worth keeping as a template for later phases.
+
+One result is worth carrying forward: the single test retained purely because it was cheap and
+had **never been run** immediately exposed a real bug (#42). When scope has to be cut again,
+"never observed at all" beats "most likely to fail" as the selection criterion.
 
 ### Phase 2 — UI foundation
 
@@ -699,6 +764,34 @@ Two things worth knowing before you commit to hand-authoring the compile-time fo
   loader needs its own allocation path. That's expected and fine — it's why there are two
   loaders rather than one.
 
+### Q3c — Every default is build-sheet overridable — **DECIDED 2026-09-04**
+
+Requirement: anyone should be able to write a build sheet that redefines *any* default
+setting — not enums or core function names, but every tunable value. `WiFiDefaults` and
+`TimeDefaults` are exactly the shape this applies to.
+
+The design that makes this tractable rather than a maintenance treadmill: **each `*Defaults`
+struct is a schema, and a build sheet is a set of overrides against it.** Adding a field to a
+Defaults struct makes it overridable automatically — no per-setting plumbing, no second list
+to keep in sync, no way for the two to drift.
+
+The mechanism to adopt is the one the NINA project already proved: `settings_table.h` is an
+**X-macro table**, one row per setting carrying its key, default and valid range, which drives
+`settings_defaults_apply()`, `settings_clamp_apply()` and JSON serialization from a single
+declaration. Its own comment warns against "improving" a range without updating both the
+firmware behaviour and the comment — learned the hard way, and worth heeding.
+
+**The line that stays drawn:** `Fleet_BSP` is *not* overridable. Pin assignments, panel
+timings and bus configuration are hardware facts, not preferences; exposing them to a config
+file just lets someone brick a board by editing text. The existing Defaults-vs-BSP split
+already draws this correctly and should not be blurred to satisfy "override everything".
+
+Concretely in scope for build-sheet override: hostname, `APPEND_MAC_SUFFIX`, AP SSID/password,
+AP IP/subnet, idle timeout, connect timeout, retry count, TX power cap, timezone, NTP servers,
+12/24-hour clock — and every field added to a Defaults struct hereafter.
+
+Scoped into milestone 3.1 (schema).
+
 ### Q3b — Sub-cell / fractional grid placement — **DECIDED 2026-09-03**
 
 You raised the case of a 3x3 page with a special card occupying "a quarter of the grid." Worth
@@ -778,7 +871,7 @@ Consequence for milestone 2.4: the `Card` base class must carry `preferred_span`
 `priority` from the very first version. Retrofitting responsive sizing after 8 card types exist
 means rewriting all 8.
 
-### Q5 — Confirm the HA naming scheme
+### Q5 — HA naming scheme — **DECIDED 2026-09-07**
 
 Concrete proposal:
 
@@ -799,9 +892,41 @@ This solves your "two boards with the same temperature sensor" problem: `unique_
 device-scoped, so identical peripherals never collide, while the friendly name stays human
 ("Kitchen Panel Temperature").
 
-**Does this match your existing discovery code's conventions, or should we match that instead?**
+**Answered by the owner's own prior project** (`reference/.../Shed Power Monitor`, his code and
+therefore freely reusable). The scheme above stands **except for the discovery topic**, which is
+replaced:
 
-### Q6 — One HA device per board, or a fleet parent device?
+| | Original proposal | Adopted |
+|---|---|---|
+| discovery | `homeassistant/<component>/<device_id>/<object_id>/config`, one payload per entity | **`homeassistant/device/<device_id>/config`, ONE payload for the whole device** |
+
+Everything else is unchanged and turns out to be directly compatible: `device_id`, `object_id`,
+`unique_id`, and the `state` / `command` / `availability` topics all survive as written. The
+state and command topics also compose neatly with MQTT's `~` base-topic abbreviation
+(`~` = `fleet/<device_id>/<object_id>`, then `stat_t` = `~/state`, `cmd_t` = `~/set`).
+
+**Why device-based discovery.** It is the modern HA format (2024.11+) and it maps directly onto
+the Entity Registry: with per-entity discovery you publish N payloads each repeating the full
+device block; with device-based, **the registry *is* the `cmps` map** and discovery becomes one
+serializer over it. It also makes entity *removal* work properly - under per-entity discovery a
+removed entity needs an empty payload published to its config topic to evict the retained one,
+or it haunts HA forever.
+
+Requires HA >= 2024.11. Confirmed available: the target install is **2026.8.1**.
+
+Full reasoning and the list of practices adopted alongside it: GitHub issue #11.
+
+### Q6 — One HA device per board, or a fleet parent device? — **DECIDED 2026-09-07**
+
+**One HA device per board. No fleet parent.**
+
+Each board publishes its own device-based discovery payload and appears in Home Assistant as its
+own device with its own entities. Both reference projects do exactly this, and the device-based
+discovery format assumes that shape.
+
+A parent device would mean boards declaring `via_device` against a hub that does not exist -
+publishing a fiction to make an organisational chart. If a real coordinator ever appears, HA
+supports `via_device` and this can be revisited without changing entity identity.
 
 Assumptions: 1. **8 independent HA devices** — standard and simplest. 2. One HA device with 8
 sub-devices (HA supports this now; more complex). 3. 8 devices plus a virtual "fleet" device
@@ -898,7 +1023,7 @@ card system from Q4 is exercised at both extremes on every single change, rather
 discovered broken on the small board months later.
 
 **New hardware fact (2026-09-03): `WS_P4_7B` WiFi STA now confirmed working on real hardware.**
-`docs/PROJECT_STATUS.md` still lists it as untested/enclosed — needs updating. Same benign
+`docs/HARDWARE_STATUS.md` still lists it as untested/enclosed — needs updating. Same benign
 `hostedHasUpdate()` / `Req_GetCoprocessorFwVersion` warning as `WS_P4_4B`, as expected for the
 shared P4+C6 architecture.
 

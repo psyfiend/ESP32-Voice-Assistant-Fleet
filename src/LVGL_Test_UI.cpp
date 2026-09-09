@@ -7,6 +7,14 @@
 #include <FleetI2C.h>
 #include "GuiManager.h"
 #include "ConnectivityManager.h"
+#include "MqttManager.h"
+#include "EntityRegistry.h"
+#include "SystemProvider.h"
+#include "HaPublisher.h"
+#include "MqttProvider.h"
+#include "ExternalEntities.h"
+#include "esp_heap_caps.h"
+#include "esp_memory_utils.h"   // esp_ptr_external_ram()
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #include "Panel_Audio.h"
@@ -26,6 +34,19 @@
 // --= OBJECTS =--
 GuiManager gui;
 ConnectivityManager connMgr;
+MqttManager mqttMgr;
+// The registry every card will bind to and HA discovery will be generated
+// from. Populated by providers; see ROADMAP 4.1. Empty until they exist.
+EntityRegistry entities;
+// First provider: this board's own telemetry into the registry.
+// Writes values only - never renders, never publishes. See ROADMAP 4.1.
+SystemProvider sysProvider;
+// Announces the entities we own to Home Assistant and publishes their
+// values. Ignores anything with advertise = false.
+HaPublisher haPub;
+// Reads values other devices publish. Subscribes to whatever external
+// entities are registered - none yet, so it is idle.
+MqttProvider mqttProv;
 #ifdef HAS_AUDIO_HW
 AudioManager audioMgr;
 #endif
@@ -82,6 +103,68 @@ void debug_dump_config(bool manualTrigger) {
     pnlSystem.log("  Version: v%s", FW_VERSION);
     pnlSystem.log("  Commit: %s", FW_COMMIT);
     pnlSystem.log("  Device: %s", bsp_hw.device_name);
+
+    // Connectivity. Mirrors ConnectivityManager::dumpStatus() but routed
+    // through pnlSystem.log() so it lands in the on-device System panel as
+    // well as on serial.
+    {
+        char cbuf[64];
+        pnlSystem.log("[CONNECTIVITY]");
+        pnlSystem.log("  Mode: %s", connModeName(connMgr.getMode()));
+        pnlSystem.log("  State: %s (%s)", connStateName(connMgr.getState()),
+                                          linkTypeName(connMgr.getLinkType()));
+        connMgr.getHostname(cbuf, sizeof(cbuf));
+        pnlSystem.log("  Hostname: %s", cbuf);
+        pnlSystem.log("  Device ID: %s", DeviceIdentity::deviceId());
+        if (connMgr.isOnline()) {
+            connMgr.getSsid(cbuf, sizeof(cbuf));
+            pnlSystem.log("  SSID: %s", cbuf);
+            pnlSystem.log("  IP: %s", connMgr.getIP().toString().c_str());
+            pnlSystem.log("  RSSI: %d dBm", (int)connMgr.getRssi());
+        } else {
+            pnlSystem.log("  Offline (last reason: %u)", connMgr.getLastDisconnectReason());
+        }
+        if (connMgr.isApActive()) {
+            pnlSystem.log("  AP: %s / %s", connMgr.getApSsid(), connMgr.getApPassword());
+            pnlSystem.log("  AP IP: %s (%u client(s))",
+                          connMgr.getApIP().toString().c_str(), connMgr.getApClientCount());
+        }
+
+        pnlSystem.log("[MQTT]");
+        pnlSystem.log("  State: %s", mqttStateName(mqttMgr.getState()));
+        if (mqttMgr.getState() != MqttState::SESSION_OFF) {
+            pnlSystem.log("  Base topic: %s", mqttMgr.getBaseTopic());
+            if (!mqttMgr.isConnected()) {
+                pnlSystem.log("  Last failure: %s", mqttFailureName(mqttMgr.getLastFailure()));
+                uint32_t s = mqttMgr.secondsUntilRetry();
+                if (s) pnlSystem.log("  Retry in: %lu s", (unsigned long)s);
+            }
+        }
+
+        // Whatever the providers have registered so far. Empty until they run,
+        // which is itself the useful signal if a provider fails to start.
+        pnlSystem.log("[ENTITIES] %u registered", (unsigned)entities.count());
+        {
+            const uint32_t now = millis();
+            for (uint8_t i = 0; i < entities.count(); i++) {
+                const Entity *e = entities.at(i);
+                if (!e) continue;
+
+                char val[56];
+                switch (e->value.type) {
+                    case ValueType::BOOL:     snprintf(val, sizeof(val), "%s", e->value.b ? "on" : "off"); break;
+                    case ValueType::INT:      snprintf(val, sizeof(val), "%ld", (long)e->value.i); break;
+                    case ValueType::FLOAT:    snprintf(val, sizeof(val), "%.2f", e->value.f); break;
+                    case ValueType::TEXT_VAL: snprintf(val, sizeof(val), "%s", e->value.text); break;
+                    default:                  snprintf(val, sizeof(val), "-"); break;
+                }
+
+                pnlSystem.log("  %s = %s%s%s%s", e->desc.id, val,
+                              e->desc.unit[0] ? " " : "", e->desc.unit,
+                              entities.isStale(*e, now) ? "  (stale)" : "");
+            }
+        }
+    }
 
     // Hardware Status (Runtime)
     pnlSystem.log("[HARDWARE STATUS]");
@@ -216,6 +299,48 @@ void setup() {
     audioMgr.begin();
     #endif
     connMgr.begin();
+    // Broker session. Reads connMgr's link state and does nothing until it is
+    // online; stays cleanly DISABLED when no MqttLocalSecrets.h is present.
+    mqttMgr.begin(&connMgr);
+    // Entity storage lives in PSRAM, not internal SRAM.
+    //
+    // It used to be a fixed array inside EntityRegistry, which put ~21 KB in
+    // internal DRAM on every board. CYD_S3_3248 could not afford it: as the
+    // fleet's only QSPI panel it is the only board whose LVGL buffers must also
+    // be in internal SRAM, and the two together starved the WiFi driver badly
+    // enough that softAP() crashed inside ieee80211_hostap_attach.
+    //
+    // PSRAM also removes the ceiling: a build can size the registry for what it
+    // actually needs rather than for the worst case across the fleet.
+    {
+        const size_t bytes = (size_t)ENTITY_MAX * sizeof(Entity);
+        Entity *store = (Entity *)heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM);
+        if (!store) {
+            // Every board in the fleet has PSRAM, so this should not happen -
+            // but falling back to internal RAM is better than a registry that
+            // silently accepts nothing.
+            Serial.println("[Entities] PSRAM alloc FAILED; falling back to internal RAM.");
+            store = (Entity *)heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL);
+        }
+        if (!entities.begin(store, ENTITY_MAX)) {
+            Serial.println("[Entities] Registry unavailable - no entities will register.");
+        } else {
+            Serial.printf("[Entities] Capacity %u (%u bytes in %s)\n",
+                          (unsigned)ENTITY_MAX, (unsigned)bytes,
+                          esp_ptr_external_ram(store) ? "PSRAM" : "internal RAM");
+        }
+    }
+
+    sysProvider.begin(&entities, &connMgr);
+    haPub.begin(&entities, &mqttMgr);
+    mqttProv.begin(&entities, &mqttMgr);
+
+    // Entities other devices own, which we only read. Temporary stand-in
+    // for the build sheet (#20) - registered here so MqttProvider can
+    // derive its subscriptions from the registry like any other entity.
+    for (uint8_t i = 0; i < EXTERNAL_ENTITY_COUNT; i++) {
+        entities.add(EXTERNAL_ENTITIES[i]);
+    }
 
     // --= ROOT SCREEN =--
     lv_obj_t * screen = lv_screen_active();
@@ -224,7 +349,7 @@ void setup() {
 
     // --= LAYER 3: HEADER BAR =--
     // Header Click -> Toggle System Panel
-    header.init(screen, bsp_hw.device_name);
+    header.init(screen, bsp_hw.device_name, &connMgr);
     lv_obj_add_event_cb(header.getStatusIcon(), header_icon_click_cb, LV_EVENT_CLICKED, NULL);
 
     // 2. BOTTOM DECK (The "Right" Way)
@@ -310,6 +435,21 @@ void loop() {
     #ifdef DEBUG_DISPLAY
     if (loopCount <= 5) Serial.println("[Loop] gui.update() returned.");
     #endif
+
+    // Non-blocking: advances connect deadlines, retry escalation, AP fallback,
+    // the AP idle timer and async scan collection. Must be called every loop -
+    // ConnectivityManager deliberately never spins on WiFi.status() itself.
+    connMgr.loop();
+
+    // Broker connect/backoff ladder plus PubSubClient's keepalive pump.
+    // Non-blocking, and a no-op while the link is down or MQTT is disabled.
+    mqttMgr.loop();
+    sysProvider.loop(millis());
+    // Expires stale values and reverts optimistic writes whose echo never
+    // arrived. Cheap; safe from any task.
+    entities.tick(millis());
+    haPub.loop(millis());
+    mqttProv.loop(millis());
 
     header.tick();
     pnlDisplay.tick();

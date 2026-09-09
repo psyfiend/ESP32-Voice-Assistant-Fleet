@@ -1,13 +1,13 @@
 #include "Panel_Header.h"
 #include "UIToolkit.h"  // Semantic fonts
+#include "ConnectivityManager.h"
 
 Panel_Header::Panel_Header() {
-    lbl_title = NULL;
+    lbl_title  = NULL;
     btn_status = NULL;
-    lbl_status_icon = NULL;
 }
 
-void Panel_Header::init(lv_obj_t* parent, const char* title) {
+void Panel_Header::init(lv_obj_t* parent, const char* title, ConnectivityManager* conn) {
     // Top Bar Container
     container = lv_obj_create(parent);
     lv_obj_set_size             (container, lv_pct(100), UiToolkit::sc(50));
@@ -45,14 +45,16 @@ void Panel_Header::init(lv_obj_t* parent, const char* title) {
     lv_obj_add_flag             (btn_status, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag           (btn_status, LV_OBJ_FLAG_SCROLLABLE);
 
-    // The Icon Text inside
-    lbl_status_icon = lv_label_create(btn_status);
-    lv_label_set_text           (lbl_status_icon, LV_SYMBOL_WIFI);
-    lv_obj_set_style_text_font  (lbl_status_icon, UiToolkit::Font_Button, 0);
-    lv_obj_set_style_text_color (lbl_status_icon, lv_color_hex(0x00FF00), 0);
-    lv_obj_center               (lbl_status_icon); // Center icon in the generous touch area
+    // Live connectivity glyph, inside the existing touch hotspot. Replaces the
+    // old always-green LV_SYMBOL_WIFI label, which reported nothing.
+    if (conn) {
+        connStatus.init(btn_status, conn);
+        lv_obj_center(connStatus.getRoot());
+    }
 }
 
 void Panel_Header::tick() {
-
+    // Self-throttling and change-guarded internally, so calling this every
+    // loop costs a millis() compare in the common case.
+    connStatus.tick();
 }

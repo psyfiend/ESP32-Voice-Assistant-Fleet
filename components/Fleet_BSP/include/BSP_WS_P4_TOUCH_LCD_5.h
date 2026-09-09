@@ -69,7 +69,16 @@ const DisplayConfig WS_P4_TOUCH_LCD_5_DISPLAY = {
     .PANEL_MODEL = "HX8394",
     .WIDTH       = 720,
     .HEIGHT      = 1280,
-    .ROTATION    = 0,     // Confirmed via vendor displays_config.h (SCREEN_DEFAULT.rotation = 0, swap_xy/mirror all 0)
+    // 0 = portrait (USB on bottom), 1 = landscape (USB on right), 2 = inverted
+    // portrait, 3 = inverted landscape. Set to 1 by preference, NOT by vendor
+    // guidance: Waveshare's displays_config.h specifies rotation 0 with swap_xy
+    // and both mirrors clear, so 1 is our own choice and the panel's native
+    // orientation is portrait. UNVERIFIED on hardware as of 2026-09-06 - and
+    // note this board takes the GENERIC branch of TouchManager::mapCoordinates()
+    // (the special case is #ifndef WS_P4_7B), which has never been exercised on
+    // a DSI panel at a non-zero rotation. If touch comes back swapped or
+    // mirrored, that is the thing to look at first.
+    .ROTATION    = 1,
     .AUTO_FLUSH  = true,
 
     // LCD backlight is driven by GPIO26 on this board, exactly like the
@@ -81,6 +90,8 @@ const DisplayConfig WS_P4_TOUCH_LCD_5_DISPLAY = {
     .BL_FREQ     = 5000,   // 5 kHz PWM
 
     .RST = 27,
+    // HX8394 on this board resets ACTIVE HIGH - see docs/BRINGUP_WS_P4_TOUCH_LCD_5.md.
+    .RST_ACTIVE_HIGH = 1,
 
     // ---= MIPI Timing =---
     // LCD-5 single screen profile. DSI timing matches the audited
@@ -94,6 +105,23 @@ const DisplayConfig WS_P4_TOUCH_LCD_5_DISPLAY = {
 
     .PREFER_SPEED  = 58000000,
     .LANE_BIT_RATE = 700,
+    // Retired experiment, deliberately left explicit rather than deleted.
+    // IDF_AUTO was tried here while chasing the init hang; the hang turned out to
+    // be reset polarity (.RST_ACTIVE_HIGH below) and the clock source made no
+    // difference either way. Back to DEFAULT so every P4 board in the fleet runs
+    // the library's PLL_F20M on one uniform path and no board carries an
+    // experimental clock setting. The BSP_PHY_CLK_SRC_* mechanism stays in
+    // Arduino_ESP32DSIPanel as the escape hatch for rev3+ silicon, which needs
+    // XTAL and cannot use the library's hardcoded rev<3-only PLL_F20M.
+    .PHY_CLK_SRC = BSP_PHY_CLK_SRC_DEFAULT,
+    // KEPT, and not an experiment. Waveshare's own confirmed-working copy of this
+    // library uses 2 for this panel; the fork defaults to 1. This board has only
+    // ever booted successfully with 2, so 0/1 would be a change to a known-good
+    // config rather than a revert. Note the 1-vs-2 test during bring-up proved
+    // nothing about buffering - it was run against the reset-polarity hang, which
+    // masked everything downstream. Revisit fleet-wide during LVGL buffering
+    // tuning; see FUTURE_IMPROVEMENTS.md "LVGL / Display".
+    .NUM_FB = 2,
 
     // ---= Init Commands =---
     .INIT_CMDS_DSI  = ws_p4_touch_lcd_5_init,
