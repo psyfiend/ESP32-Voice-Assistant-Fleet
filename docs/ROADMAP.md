@@ -35,6 +35,15 @@ data pipeline in both directions and nothing to draw it with yet.
 - Home Assistant discovery — the device appears in HA with correct BSP-derived identity and
   four diagnostic entities, and four Zigbee2MQTT values arrive back the other way.
 
+**Verified on two boards chosen to cover the real axis of difference:** `WS_P4_5` (MIPI/DSI,
+P4) and `CYD_S3_3248` (QSPI, S3) — both chip families and both LVGL buffer strategies. A
+fleet-wide boot pass on 2026-09-08 covered the other six.
+
+**One thing is fixed but unproven: the AP path.** `softAP()` has not run on any board since
+the crash that motivated the PSRAM change, because the default mode moved to
+`STA_WITH_AP_FALLBACK` and a board with working credentials never raises an AP. Tracked as
+issue #45, and it matters because the AP is the rescue path.
+
 **The literal next step: Phase 2.1, the startup reorganisation.** Split `main` /
 `LVGL_Startup` / `GuiManager` *before* adding UI rather than after — it is the cheapest it
 will ever be, and every card built beforehand would have to move. Written up in

@@ -41,9 +41,30 @@ Updated 2026-09-08.
 **WiFi: 5 of 8 flash-tested** — three outstanding (`CYD_P4_1060`, `CYD_S3_8048`,
 `WS_S3_5B`), all physically accessible, tracked as GitHub issue #8.
 
-**MQTT + entity pipeline: 1 of 8.** `WS_P4_5` runs the whole path — broker session, HA
-discovery, four system entities published, four Zigbee2MQTT entities read back. Nothing
-about it is board-specific, so the others are expected to work; expected is not tested.
+**MQTT + entity pipeline: 2 of 8, chosen deliberately.** `WS_P4_5` (MIPI/DSI, P4) and
+`CYD_S3_3248` (QSPI, S3) both run the whole path — broker session, HA discovery, four system
+entities published, four Zigbee2MQTT entities read back. Those two cover **both chip families
+and both LVGL buffer strategies**, which is the axis that actually differs between boards.
+The rest are expected to work; expected is not tested.
+
+**Fleet-wide boot pass 2026-09-08:** every board flashed and reached Home Assistant except
+`CYD_S3_3248`, which boot-looped and is now fixed (see below).
+
+**⚠ The AP path has not run on any board since that fix.** Both verified boards connect to
+STA and therefore never call `softAP()`. Tracked as GitHub issue #45 — it matters because the
+AP is the rescue path.
+
+### The internal-RAM constraint, and which board has it
+
+`GuiManager` places LVGL buffers by bus type: MIPI/RGB boards get full framebuffers in
+**PSRAM**; SPI/QSPI boards get partial buffers in **internal SRAM**, because a QSPI panel
+cannot stream from PSRAM fast enough.
+
+`CYD_S3_3248` is the fleet's **only QSPI panel**, so it is the only board spending ~61 KB of
+internal SRAM on display. That makes it the fleet's real memory constraint and the board any
+new static allocation should be checked against first. A 21 KB entity table in internal
+`.bss` was enough to make `softAP()` panic inside the WiFi driver; moving that table to PSRAM
+took static internal RAM from 209,895 back to 187,960 bytes.
 
 ---
 

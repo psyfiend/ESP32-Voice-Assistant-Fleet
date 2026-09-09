@@ -149,6 +149,56 @@ regardless.
 
 ---
 
+## Memory: internal SRAM is the scarce resource, and not evenly
+
+**Not all boards have the same internal RAM headroom, and the difference is the display
+bus.** `GuiManager` places LVGL buffers by bus type: MIPI/RGB boards get full framebuffers in
+**PSRAM**; SPI/QSPI boards get partial buffers in **internal SRAM**, because a QSPI panel
+cannot stream from PSRAM fast enough.
+
+`CYD_S3_3248` is the fleet's only QSPI panel, so it is the only board spending ~61 KB of
+internal SRAM on display buffers. Adding a 21 KB `EntityRegistry` to internal `.bss`
+alongside that starved the WiFi driver, and `softAP()` panicked inside
+`ieee80211_hostap_attach` — a **null deref with no error message**, because the driver does
+not check that allocation.
+
+Two lessons:
+
+- **When something works on seven boards and fails on one, look for what that board does
+  differently at the resource level**, not at the feature level. It was not "S3 versus P4";
+  it was "the one board whose display cannot use PSRAM."
+- **Large fixed arrays do not belong in internal RAM.** Put the storage in PSRAM and inject
+  it, which also removes the ceiling — a build can size a table for what it needs rather than
+  for the fleet's worst case.
+
+A useful trick for finding the offenders:
+
+```bash
+xtensa-esp32s3-elf-nm -C --size-sort -r -S .pio/build/<env>/firmware.elf | awk '$3=="b"||$3=="B"'
+```
+
+**A WiFi driver crash with `A2 = 0x00000000` and a small `EXCVADDR` is an out-of-memory
+symptom**, not a logic bug. `ieee80211_hostap_attach` reading address `0x2c` means it
+allocated, got NULL, and dereferenced it.
+
+**And decode the backtrace before theorising.** Raw PCs look opaque but are two seconds of
+work, and they said "this is entirely inside the WiFi stack" — which immediately ruled out
+every one of our own new libraries:
+
+```bash
+xtensa-esp32s3-elf-addr2line -pfiaC -e .pio/build/<env>/firmware.elf 0x... 0x...
+```
+
+## A default left over from a spike is a bug that hides
+
+`ConnMode::STA_PLUS_AP` was set as the fleet default during the APSTA feasibility spike
+(#5) and never set back, so every board stood up an access point on every boot for months.
+Nothing failed, so nothing drew attention to it — it only surfaced because the AP path
+crashed on one board.
+
+**When a setting is changed to enable a test, the change is not done until it is reverted or
+deliberately kept.** Worth a grep through `*Defaults.h` after any spike.
+
 ## Method
 
 **When a vendor ships a known-working copy of a library you have forked, diff the whole
