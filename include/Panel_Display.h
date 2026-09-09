@@ -1,11 +1,11 @@
 #pragma once
 #include <lvgl.h>
-#include "GuiManager.h"
-#include "UiToolkit.h"
+#include "GUIManager.h"
+#include "UIToolkit.h"
 
 class Panel_Display {
 public:
-    Panel_Display(GuiManager& gui);
+    Panel_Display(GUIManager& gui);
     void init(lv_obj_t* parent);
     void tick();
 
@@ -13,7 +13,7 @@ public:
     void setTouchWindowVisibility(bool visible);
 
 private:
-    GuiManager& _gui;
+    GUIManager& _gui;
     int32_t _briFloor; // Slider's real minimum (per-board artificial brightness floor) - the
                         // toast display remaps [_briFloor, 100] back to a user-facing [0, 100].
     lv_obj_t* slider_bri;

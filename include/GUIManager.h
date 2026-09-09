@@ -4,9 +4,9 @@
 #include "DisplayManager.h"
 #include "TouchManager.h"
 
-class GuiManager {
+class GUIManager {
 public:
-    GuiManager();
+    GUIManager();
     
     // Core Managers
     DisplayManager displayMgr;

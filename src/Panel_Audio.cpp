@@ -26,7 +26,7 @@ void Panel_Audio::sw_enable_cb(lv_event_t * e) {
     
     if(state) {
         p->_audio.setMute(false);
-        UiToolkit::show_toast("Audio Enabled");
+        UIToolkit::show_toast("Audio Enabled");
         lv_obj_remove_state (p->btn_tone, LV_STATE_DISABLED);
         #if defined(HAS_ES7210) || defined(HAS_ES8311)
             lv_obj_remove_state (p->btn_recloop, LV_STATE_DISABLED);
@@ -36,7 +36,7 @@ void Panel_Audio::sw_enable_cb(lv_event_t * e) {
         #endif
     } else {
         p->_audio.setMute(true);
-        UiToolkit::show_toast("Audio Muted");
+        UIToolkit::show_toast("Audio Muted");
         lv_obj_add_state (p->btn_tone, LV_STATE_DISABLED);
         #if defined(HAS_ES7210) || defined(HAS_ES8311)
             lv_obj_add_state (p->btn_recloop, LV_STATE_DISABLED);
@@ -55,13 +55,13 @@ void Panel_Audio::slider_vol_cb(lv_event_t * e) {
     
     char buf[32];
     snprintf(buf, sizeof(buf), "Vol: %d%%", (int)val);
-    UiToolkit::show_toast(buf, 800);
+    UIToolkit::show_toast(buf, 800);
 }
 
 void Panel_Audio::btn_tone_cb(lv_event_t * e) {
     Panel_Audio* p = (Panel_Audio*)lv_event_get_user_data(e);
     p->_audio.tone(440, 200);
-    UiToolkit::show_toast("Playing Test Tone", 650);
+    UIToolkit::show_toast("Playing Test Tone", 650);
 }
 
 void Panel_Audio::btn_recloop_cb(lv_event_t * e) {
@@ -72,22 +72,22 @@ void Panel_Audio::btn_recloop_cb(lv_event_t * e) {
 
 void Panel_Audio::init(lv_obj_t* parent) {
     
-    UiToolkit::create_collapsible_panel(parent, "AUDIO", &pnl_content);
+    UIToolkit::create_collapsible_panel(parent, "AUDIO", &pnl_content);
 
     // ROW 1: Controls (Switch on Left, Slider on Right)
-    UiToolkit::create_panel_row(pnl_content, &row_ctrls);
+    UIToolkit::create_panel_row(pnl_content, &row_ctrls);
 
     // ROW 1,1 COL 1 - Switch/Enable Column
     // Container for Switch + Label
     lv_obj_t * col_sw = lv_obj_create(row_ctrls);
-    lv_obj_set_size             (col_sw, UiToolkit::sc(70), LV_SIZE_CONTENT);
+    lv_obj_set_size             (col_sw, UIToolkit::sc(70), LV_SIZE_CONTENT);
     lv_obj_set_flex_flow        (col_sw, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align       (col_sw, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_bg_opa     (col_sw, LV_OPA_0, 0);
     lv_obj_set_style_border_width(col_sw, 0, 0);
-    lv_obj_set_style_pad_left   (col_sw, UiToolkit::sc(5), 0);
-    lv_obj_set_style_pad_right  (col_sw, UiToolkit::sc(5), 0);
-    lv_obj_set_style_pad_row    (col_sw, UiToolkit::sc(6), 0);
+    lv_obj_set_style_pad_left   (col_sw, UIToolkit::sc(5), 0);
+    lv_obj_set_style_pad_right  (col_sw, UIToolkit::sc(5), 0);
+    lv_obj_set_style_pad_row    (col_sw, UIToolkit::sc(6), 0);
     lv_obj_remove_flag          (col_sw, LV_OBJ_FLAG_SCROLLABLE);
 
     // ROW 1,1 COL 1,1 - Label
@@ -95,13 +95,13 @@ void Panel_Audio::init(lv_obj_t* parent) {
     lv_obj_set_size             (lbl_en, lv_pct(100), LV_SIZE_CONTENT);
     lv_label_set_text           (lbl_en, "ENABLE");
     lv_obj_set_align            (lbl_en, LV_ALIGN_CENTER);
-    lv_obj_set_style_text_font  (lbl_en, UiToolkit::Font_Label, 0); // Semantic Font
+    lv_obj_set_style_text_font  (lbl_en, UIToolkit::Font_Label, 0); // Semantic Font
     lv_obj_set_style_text_color (lbl_en, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_text_align (lbl_en, LV_TEXT_ALIGN_CENTER, 0);
 
     // ROW 1,1 COL 1,2 - Switch
     lv_obj_t * sw = lv_switch_create(col_sw);
-    lv_obj_set_size     (sw, UiToolkit::sc(60), UiToolkit::sc(25));
+    lv_obj_set_size     (sw, UIToolkit::sc(60), UIToolkit::sc(25));
     lv_obj_set_align    (sw, LV_ALIGN_CENTER);
     lv_obj_add_state    (sw, LV_STATE_CHECKED);
     lv_obj_add_event_cb (sw, sw_enable_cb, LV_EVENT_VALUE_CHANGED, this);
@@ -109,23 +109,23 @@ void Panel_Audio::init(lv_obj_t* parent) {
     // ROW 1,2 COL 2 - Volume Slider Column
     // Column container with 2 rows: Label + Slider
     #ifdef HAS_ES8311
-    UiToolkit::create_slider_col(row_ctrls, "VOLUME", &col_vol, &slider_vol);
+    UIToolkit::create_slider_col(row_ctrls, "VOLUME", &col_vol, &slider_vol);
     lv_slider_set_value         (slider_vol, _audio.getVolume(), LV_ANIM_OFF);
     lv_obj_add_event_cb         (slider_vol, slider_vol_cb, LV_EVENT_VALUE_CHANGED, this);
     #endif
 
     // ROW 2 - Buttons Row
-    UiToolkit::create_panel_row (pnl_content, &row_btns);
+    UIToolkit::create_panel_row (pnl_content, &row_btns);
 
     // ROW 2,1 - Test Tone Button
     btn_tone = lv_button_create (row_btns);
-    lv_obj_set_height           (btn_tone, UiToolkit::sc(35));
-    lv_obj_set_style_max_width  (btn_tone, UiToolkit::sc(100), 0);
+    lv_obj_set_height           (btn_tone, UIToolkit::sc(35));
+    lv_obj_set_style_max_width  (btn_tone, UIToolkit::sc(100), 0);
     lv_obj_set_flex_grow        (btn_tone, 1);
     lv_obj_add_event_cb         (btn_tone, btn_tone_cb, LV_EVENT_CLICKED, this);
     lbl_tone_text             = lv_label_create(btn_tone); 
     lv_label_set_text           (lbl_tone_text, "TONE"); 
-    lv_obj_set_style_text_font  (lbl_tone_text, UiToolkit::Font_Button, 0); // Semantic Font
+    lv_obj_set_style_text_font  (lbl_tone_text, UIToolkit::Font_Button, 0); // Semantic Font
     lv_obj_center               (lbl_tone_text);
 
     #if defined(HAS_ES7210) || defined(HAS_ES8311)
@@ -133,18 +133,18 @@ void Panel_Audio::init(lv_obj_t* parent) {
     // from the ES8311's own ADC - either way, recording/VU-meter UI applies.
     // ROW 2,2 - Record Loop Button
     btn_recloop = lv_button_create(row_btns);
-    lv_obj_set_height           (btn_recloop, UiToolkit::sc(35));
-    lv_obj_set_style_max_width  (btn_recloop, UiToolkit::sc(100), 0);
+    lv_obj_set_height           (btn_recloop, UIToolkit::sc(35));
+    lv_obj_set_style_max_width  (btn_recloop, UIToolkit::sc(100), 0);
     lv_obj_set_flex_grow        (btn_recloop, 1);
     lv_obj_add_event_cb         (btn_recloop, btn_recloop_cb, LV_EVENT_CLICKED, this);
     lbl_recloop_text          = lv_label_create(btn_recloop);
     lv_label_set_text           (lbl_recloop_text, "REC LOOP");
-    lv_obj_set_style_text_font  (lbl_recloop_text, UiToolkit::Font_Button, 0); // Semantic Font
+    lv_obj_set_style_text_font  (lbl_recloop_text, UIToolkit::Font_Button, 0); // Semantic Font
     lv_obj_center               (lbl_recloop_text);
 
     // ROW 3 - VU Meter
-    UiToolkit::create_panel_row(pnl_content, &row_vu_meter);
-    lv_obj_set_height(row_vu_meter, UiToolkit::sc(ROW_HEIGHT / 2));
+    UIToolkit::create_panel_row(pnl_content, &row_vu_meter);
+    lv_obj_set_height(row_vu_meter, UIToolkit::sc(ROW_HEIGHT / 2));
 
     // ROW 3,1 - Left Channel Container (Dark Grey Background)
     lv_obj_t* meter_l_bg = lv_obj_create(row_vu_meter); 
@@ -198,14 +198,14 @@ void Panel_Audio::process_recording_sequence() {
         rec_buffer_size = 16000 * 2 * 2 * (int)REC_LIMIT_SECONDS; 
         rec_buffer = (int16_t*)heap_caps_malloc(rec_buffer_size, MALLOC_CAP_SPIRAM);
         if (!rec_buffer) {
-            UiToolkit::show_toast("Alloc Failed!", 3000);
+            UIToolkit::show_toast("Alloc Failed!", 3000);
             lv_label_set_text(lbl_recloop_text, "ERR RAM");
             return;
         }
     }
 
     lv_label_set_text(lbl_recloop_text, "REC...");
-    UiToolkit::show_toast("Recording...", (REC_LIMIT_SECONDS * 1000));
+    UIToolkit::show_toast("Recording...", (REC_LIMIT_SECONDS * 1000));
     lv_timer_handler();
     delay(50);
 
@@ -234,7 +234,7 @@ void Panel_Audio::process_recording_sequence() {
     }
 
     lv_label_set_text(lbl_recloop_text, "PLAY...");
-    UiToolkit::show_toast("Playback...", (REC_LIMIT_SECONDS * 1000));
+    UIToolkit::show_toast("Playback...", (REC_LIMIT_SECONDS * 1000));
     lv_timer_handler();
 
     // 3. Play
@@ -248,5 +248,5 @@ void Panel_Audio::process_recording_sequence() {
     }
 
     lv_label_set_text(lbl_recloop_text, "REC LOOP");
-    UiToolkit::show_toast("Done", 1000);
+    UIToolkit::show_toast("Done", 1000);
 }

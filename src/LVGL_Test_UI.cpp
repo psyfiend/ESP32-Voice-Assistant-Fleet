@@ -5,7 +5,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <FleetI2C.h>
-#include "GuiManager.h"
+#include "GUIManager.h"
 #include "ConnectivityManager.h"
 #include "MqttManager.h"
 #include "EntityRegistry.h"
@@ -32,7 +32,7 @@
 // --------------------------
 
 // --= OBJECTS =--
-GuiManager gui;
+GUIManager gui;
 ConnectivityManager connMgr;
 MqttManager mqttMgr;
 // The registry every card will bind to and HA discovery will be generated
@@ -247,7 +247,7 @@ void debug_dump_config(bool manualTrigger) {
 
     // 3. UI State
     pnlSystem.log("[UI STATE]");
-    lv_obj_t* activePnl = UiToolkit::getActiveAccordionPanel();
+    lv_obj_t* activePnl = UIToolkit::getActiveAccordionPanel();
     pnlSystem.log("  Active Panel: %s", activePnl ? "EXPANDED" : "NONE (Collapsed)");
     
     // 4. I2C Bus Scan
@@ -355,7 +355,7 @@ void setup() {
     // 2. BOTTOM DECK (The "Right" Way)
     // Instead of pushing it off-screen, we calculate the remaining space.
     // Height = Screen Height - Header Height (50px)
-    int32_t header_h = UiToolkit::sc(50);
+    int32_t header_h = UIToolkit::sc(50);
     int32_t deck_h = lv_obj_get_height(screen);
 
     // --= LAYER 1: BOTTOM DECK =--
@@ -367,8 +367,8 @@ void setup() {
     lv_obj_set_flex_align         (deck, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END); 
     lv_obj_set_style_bg_opa       (deck, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (deck, 0, 0);
-    lv_obj_set_style_pad_all      (deck, UiToolkit::sc(10), 0);
-    lv_obj_set_style_pad_gap      (deck, UiToolkit::sc(10), 0);
+    lv_obj_set_style_pad_all      (deck, UIToolkit::sc(10), 0);
+    lv_obj_set_style_pad_gap      (deck, UIToolkit::sc(10), 0);
     lv_obj_clear_flag             (deck, LV_OBJ_FLAG_CLICKABLE); 
     lv_obj_clear_flag             (deck, LV_OBJ_FLAG_SCROLLABLE); 
 
@@ -383,7 +383,7 @@ void setup() {
     lv_obj_clear_flag             (upper_deck, LV_OBJ_FLAG_SCROLLABLE);
 
     // Bottom Panel Open -> Close System
-    UiToolkit::registerSystemCloseCb(close_system_panel_cb);
+    UIToolkit::registerSystemCloseCb(close_system_panel_cb);
     
     // System Open -> Hide Touch Window
     pnlSystem.setOnToggleCallback([](bool isOpen) {

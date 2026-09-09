@@ -1,9 +1,9 @@
-#include "GuiManager.h"
-#include "UiToolkit.h" // Needed for HIGH_DPI_DISPLAY check
+#include "GUIManager.h"
+#include "UIToolkit.h" // Needed for HIGH_DPI_DISPLAY check
 
 // --- LVGL CALLBACKS ---
 static void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
-    GuiManager* gui = (GuiManager*)lv_display_get_user_data(disp);
+    GUIManager* gui = (GUIManager*)lv_display_get_user_data(disp);
     Arduino_GFX *gfx = gui->displayMgr.getGfx();
 
     #ifdef DEBUG_DISPLAY
@@ -48,7 +48,7 @@ static void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px
 }
 
 static void my_touch_read(lv_indev_t *indev, lv_indev_data_t *data) {
-    GuiManager* gui = (GuiManager*)lv_indev_get_user_data(indev);
+    GUIManager* gui = (GUIManager*)lv_indev_get_user_data(indev);
     TouchPoint points[5];
     uint8_t count = gui->touchMgr.read(points, 5); 
 
@@ -72,14 +72,14 @@ static void my_lv_log_print(lv_log_level_t level, const char *buf) {
 
 // --- IMPLEMENTATION ---
 
-GuiManager::GuiManager() {
+GUIManager::GUIManager() {
     _disp = NULL;
     _indev = NULL;
     _draw_buf = NULL;
     _draw_buf2 = NULL;
 }
 
-void GuiManager::begin() {
+void GUIManager::begin() {
     // 1. Hardware Init
     if (!displayMgr.begin()) {
         Serial.println("[GUI] Display Init Failed!");
@@ -192,11 +192,11 @@ void GuiManager::begin() {
     lv_indev_set_user_data(_indev, this);
 
     // 5. Styles & Toolkit
-    UiToolkit::init();
+    UIToolkit::init();
     
     Serial.println("[GUI] Engine Started.");
 }
 
-void GuiManager::update() {
+void GUIManager::update() {
     lv_timer_handler();
 }
