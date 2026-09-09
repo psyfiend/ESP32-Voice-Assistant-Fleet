@@ -60,6 +60,22 @@ flashed** — identical on-device behaviour is still unverified.
   heap on the smallest board; it should also produce the table: what lives where, in what order,
   and what the headroom is on the worst board. Cheap as a deliverable of a measuring milestone,
   expensive as an archaeology exercise in Phase 6.
+
+  **Starting numbers, measured on `CYD_S3_3248` during the #45 test (2026-09-09):**
+
+  | Measurement | Value |
+  |---|---|
+  | Static internal RAM (link time) | 188,048 bytes of 327,680 - **57.4%** |
+  | Free internal heap just before `softAP()` | 21,968 bytes |
+  | Largest free internal block at that moment | 13,300 bytes |
+  | LVGL draw buffers (internal SRAM, x2) | 30,720 bytes each |
+  | Entity registry (PSRAM) | 22,080 bytes |
+
+  The largest-free-block figure is the one to watch: `softAP()` succeeded from 13,300 bytes, and
+  the WiFi driver allocates more per associated station. That is the real headroom, and it is
+  thinner than the free-heap total suggests. The 57.4% is only visible at all since the
+  `maximum_ram_size` fix - the board previously reported 35.9% against a denominator 1.6x too
+  large.
 - **`Arduino_ESP32RGBPanel` `num_fbs` investigation.** Requests two hardware framebuffers but
   only ever draws into/reads back one (`getFrameBuffer()` always fetches index 1) — no real
   double-buffering on any board using this class, causing visible tearing on

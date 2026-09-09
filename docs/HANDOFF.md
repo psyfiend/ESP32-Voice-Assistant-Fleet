@@ -81,8 +81,9 @@ forgotten.
 
 | Item | Issue | Why it can wait |
 |---|---|---|
-| **AP path fixed but unproven** | **#45** | `softAP()` has not run since the crash fix. Highest-value loose end |
-| `AP_ACTIVE → DEGRADED` compile-verified only | #42 | Same test as #45 covers it |
+| ~~AP path fixed but unproven~~ | **#45** | **RESOLVED 2026-09-09 on `CYD_S3_3248`** - see below |
+| AP idle-down leaves `AP_ACTIVE` stale | #42 | **Still open. The #45 test did NOT cover it** - see below |
+| Reason-36 is treated as real signal | *unfiled* | Found during the #45 run - see below |
 | HA access without MQTT | #43 | Most HA users have no broker; blocks *others* before us |
 | Captive portal | #6 | Needs a web server that arrives in Phase 4 |
 | On-device settings screen | #7 | System panel covers development needs |
@@ -91,9 +92,57 @@ forgotten.
 | Mic capture, SD card, rotation on most boards | — | Peripheral coverage, not framework work |
 | Discovery payload will outgrow the buffer | #47 | ~10 entities of headroom today |
 
-**If you do one thing from this list, do #45.** The AP is the rescue path — it runs when
-something has already gone wrong — and we currently cannot say whether it works. One junk-SSID
-flash settles #45 and #42 together.
+### #45 - resolved 2026-09-09, on the board that crashed
+
+Junk SSID on `CYD_S3_3248`, mode `STA_WITH_AP_FALLBACK`. STA failed with reason 201
+(`WIFI_REASON_NO_AP_FOUND`), the AP raised cleanly, and **a phone associated and got a DHCP
+lease on 192.168.4.1** - verified from the phone, not from serial, per the rule at the top of
+this file.
+
+Numbers worth keeping, because they are the first real measurement of this board's
+internal-SRAM headroom under load:
+
+```
+pre-AP internal heap: 21968 free, largest block 13300
+```
+
+`softAP()` succeeded from that. The PSRAM move was the fix, and it is now an observation rather
+than an inference. It also incidentally proved the `raiseAp()` mode change in `b4b4336`: the log
+shows `AP_ACTIVE -> STA_CONNECTING (wifi-apsta)`, i.e. the board keeps retrying STA while its AP
+stays up, ladder doubling 120s / 240s / 480s. An AP-only branch would have made that impossible.
+
+### #42 is NOT covered by that test - an earlier claim in this file was wrong
+
+This file previously said one junk-SSID flash settled #45 and #42 together. It does not.
+
+#42 is about the AP **idling down** and leaving `AP_ACTIVE` stale so the header glyph advertises
+a network that is gone. That path is gated on `ConnMode::STA_PLUS_AP` *and*
+`AP_IDLE_TIMEOUT_MIN` (default 10 minutes, zero clients). The #45 run used
+`STA_WITH_AP_FALLBACK`, where the AP deliberately never idles down because it is the rescue
+path - so the idle-shutdown code never executed.
+
+**To actually test #42:** mode 3 (`STA_PLUS_AP`), junk SSID, then leave it alone for ten minutes
+with nothing joined to the AP.
+
+### Unfiled finding: reason 36 is self-inflicted and is treated as real signal
+
+`WIFI_REASON_STA_LEAVING` (36) is emitted by the local stack when *we* tear down our own
+association attempt. `classifyDisconnect()` has no case for it, so it falls to
+`default: return JoinResult::NONE` - "transient, keep trying" - and we re-issue, which produces
+another 36. Six times per attempt, roughly five seconds of radio, before the real 201 verdict
+lands anyway. Two symptoms:
+
+1. **Wasted re-associations.** Harmless in principle, but `ConnectivityManager.cpp` itself
+   carries the comment *"on a marginal supply every radio burst is another brownout
+   opportunity"*, and `CYD_S3_3248` is the board that comment is about.
+2. **The diagnostic lies.** `_lastReason` is stored on *every* disconnect event
+   (`ConnectivityManager.cpp:874`), so the last one recorded is our own 36, and the report says
+   `Offline (last reason: 36)` when the actual cause was 201. The correctly classified cause is
+   sitting in `_lastFailure` and is not what that line prints.
+
+Pre-existing; `classifyDisconnect()` has never been touched by the Phase 2 work. Fix is small:
+do not let `STA_LEAVING` consume a transient re-issue slot, do not let it overwrite
+`_lastReason`, and print the classified failure rather than the raw number.
 
 ---
 
