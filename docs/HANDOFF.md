@@ -77,7 +77,7 @@ forgotten.
 | On-device settings screen | #7 | System panel covers development needs |
 | `_proven` credential fingerprint | #39 | Only a developer can hit it |
 | Outbound entity commands | #44 | Nothing has a control to send one yet |
-| Three boards unflashed for WiFi | #8 | All accessible, nothing board-specific expected |
+| Mic capture, SD card, rotation on most boards | — | Peripheral coverage, not framework work |
 | Discovery payload will outgrow the buffer | #47 | ~10 entities of headroom today |
 
 **If you do one thing from this list, do #45.** The AP is the rescue path — it runs when
