@@ -43,6 +43,7 @@ public:
 #endif
 
 private:
+    void printIdentity();
     void beginEntityStorage();
 
     DisplayManager      _display;

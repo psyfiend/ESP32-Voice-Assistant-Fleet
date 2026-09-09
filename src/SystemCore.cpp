@@ -5,7 +5,40 @@
 #include "esp_memory_utils.h"   // esp_ptr_external_ram()
 #include "bsp_loader.h"
 
+// Normally injected by scripts/fw_version.py via extra_scripts (derived from
+// `git describe`). Defined defensively here so a build still succeeds if that
+// hook is ever skipped - a missing version string must never break the build,
+// it just becomes unknown. See docs/ROADMAP.md section 3.3.
+#ifndef FW_VERSION
+    #define FW_VERSION "unknown"
+#endif
+#ifndef FW_COMMIT
+    #define FW_COMMIT "unknown"
+#endif
+
+// Who and what this board is. Every line here is BSP identity or chip
+// inventory - none of it is about the display, which is why it no longer opens
+// DisplayManager::begin(). Printed first so a pasted boot log always says which
+// build, on which board, before anything can go wrong.
+void SystemCore::printIdentity() {
+    Serial.println();
+    Serial.printf("Firmware: v%s (%s)\n", FW_VERSION, FW_COMMIT);
+    Serial.printf("Device init: %s\n", bsp_hw.device_name);
+    Serial.printf("Display hardware: %s\n", bsp_display.PANEL_MODEL);
+    Serial.printf("Touch panel: %s\n", bsp_touch.NAME);
+    Serial.printf("PSRAM Total: %d bytes\n", ESP.getPsramSize());
+    if (ESP.getPsramSize() == 0) {
+        Serial.println("CRITICAL ERROR: PSRAM not found! Display will fail.");
+    }
+    Serial.printf("FLASH size : %d kb\r\n", ESP.getFlashChipSize() / 1024);
+
+    Serial.println("------------------------------");
+}
+
 bool SystemCore::begin() {
+    // --= 0. Identity =--
+    printIdentity();
+
     // --= 1. I2C =--
     // This used to happen as a side effect inside DisplayManager::begin() -
     // the display simply happened to be the first thing that needed the bus.
