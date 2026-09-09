@@ -38,6 +38,19 @@ bool addSection(const char *name, Section fill);
 // echoing. Sections call this.
 void line(const char *fmt, ...);
 
+// Format a byte count as "<exact> bytes (<human> KB|MB)".
+//
+// One convention, used everywhere memory is reported. Exact bytes come first
+// because that is the number you diff between two runs to spot a regression;
+// the human-readable form is a convenience in parentheses, never a
+// replacement. Values under 1 KB print as bytes alone.
+//
+// Note "KB", not "kb" - lower-case b is bits. The old output mixed "bytes",
+// "kb" and "mb" for the same quantity in three places.
+//
+// Returns `out` so it can be used inline in a printf argument list.
+const char *fmtBytes(uint64_t bytes, char *out, size_t outLen);
+
 // Walk everything and emit it.
 //
 // echoSerial mirrors the old manualTrigger flag: off for the automatic boot

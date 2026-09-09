@@ -3,6 +3,7 @@
 #include "ExternalEntities.h"
 #include "esp_heap_caps.h"
 #include "esp_memory_utils.h"   // esp_ptr_external_ram()
+#include "SystemReport.h"   // fmtBytes - one memory-reporting convention
 #include "bsp_loader.h"
 
 // Normally injected by scripts/fw_version.py via extra_scripts (derived from
@@ -26,11 +27,12 @@ void SystemCore::printIdentity() {
     Serial.printf("Device init: %s\n", bsp_hw.device_name);
     Serial.printf("Display hardware: %s\n", bsp_display.PANEL_MODEL);
     Serial.printf("Touch panel: %s\n", bsp_touch.NAME);
-    Serial.printf("PSRAM Total: %d bytes\n", ESP.getPsramSize());
+    char b[48];
+    Serial.printf("PSRAM: %s\n", SystemReport::fmtBytes(ESP.getPsramSize(), b, sizeof(b)));
     if (ESP.getPsramSize() == 0) {
         Serial.println("CRITICAL ERROR: PSRAM not found! Display will fail.");
     }
-    Serial.printf("FLASH size : %d kb\r\n", ESP.getFlashChipSize() / 1024);
+    Serial.printf("Flash: %s\n", SystemReport::fmtBytes(ESP.getFlashChipSize(), b, sizeof(b)));
 
     Serial.println("------------------------------");
 }
@@ -126,8 +128,10 @@ void SystemCore::beginEntityStorage() {
     if (!_entities.begin(store, ENTITY_MAX)) {
         Serial.println("[Entities] Registry unavailable - no entities will register.");
     } else {
-        Serial.printf("[Entities] Capacity %u (%u bytes in %s)\n",
-                      (unsigned)ENTITY_MAX, (unsigned)bytes,
+        char b[48];
+        Serial.printf("[Entities] Capacity %u entities, %s, in %s\n",
+                      (unsigned)ENTITY_MAX,
+                      SystemReport::fmtBytes(bytes, b, sizeof(b)),
                       esp_ptr_external_ram(store) ? "PSRAM" : "internal RAM");
     }
 }

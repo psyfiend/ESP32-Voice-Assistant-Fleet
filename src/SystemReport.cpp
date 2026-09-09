@@ -100,11 +100,17 @@ void reportEntities(SystemCore &core) {
 }
 
 void reportHardware(SystemCore &core) {
+    char b[48];
+
     SystemReport::line("[HARDWARE STATUS]");
     SystemReport::line("  I2C Backend: %s", FleetI2C::backendName());
     SystemReport::line("  Uptime: %lu ms", millis());
-    SystemReport::line("  Free Heap: %d kb", ESP.getFreeHeap()/1024);
-    SystemReport::line("  PSRAM Size: %d mb", ESP.getPsramSize()/1024/1024);
+    // Same labels and same units as the boot banner in SystemCore, on purpose:
+    // these are the same quantities and used to be reported three different
+    // ways.
+    SystemReport::line("  Free Heap: %s", SystemReport::fmtBytes(ESP.getFreeHeap(), b, sizeof(b)));
+    SystemReport::line("  PSRAM: %s",     SystemReport::fmtBytes(ESP.getPsramSize(), b, sizeof(b)));
+    SystemReport::line("  Flash: %s",     SystemReport::fmtBytes(ESP.getFlashChipSize(), b, sizeof(b)));
     #ifdef HAS_IO_EXPANDER
         SystemReport::line("  Pin Expander: Active (TCA9554/Similar)");
     #else
@@ -200,6 +206,19 @@ void reportI2cScan() {
 } // namespace
 
 namespace SystemReport {
+
+const char *fmtBytes(uint64_t bytes, char *out, size_t outLen) {
+    if (bytes < 1024ULL) {
+        snprintf(out, outLen, "%llu bytes", (unsigned long long)bytes);
+    } else if (bytes < 1024ULL * 1024ULL) {
+        snprintf(out, outLen, "%llu bytes (%.1f KB)",
+                 (unsigned long long)bytes, bytes / 1024.0);
+    } else {
+        snprintf(out, outLen, "%llu bytes (%.2f MB)",
+                 (unsigned long long)bytes, bytes / (1024.0 * 1024.0));
+    }
+    return out;
+}
 
 bool addSink(Sink s) {
     if (!s || s_sinkCount >= MAX_SINKS) return false;

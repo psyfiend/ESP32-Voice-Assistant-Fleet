@@ -3,6 +3,7 @@
 #include <Arduino_GFX_Library.h>
 #include "DisplayManager.h"
 #include "TouchManager.h"
+#include "SystemReport.h"   // fmtBytes - one memory-reporting convention
 #include "bsp_loader.h"
 
 namespace {
@@ -136,7 +137,9 @@ bool begin(DisplayManager &display, TouchManager &touch) {
     }
 
     size_t byte_count = pixel_count * sizeof(uint16_t);
-    Serial.printf("[LVGL] Allocating: %d bytes per buffer... ", byte_count);
+    char bbuf[48];
+    Serial.printf("[LVGL] Allocating %s per buffer... ",
+                  SystemReport::fmtBytes(byte_count, bbuf, sizeof(bbuf)));
 
     s_draw_buf = (uint16_t *)heap_caps_malloc(byte_count, malloc_flags);
 
