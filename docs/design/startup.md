@@ -185,8 +185,14 @@ improvement (it says where a header lives) but is a whole-tree edit, and therefo
 
 ## 4. Start order, with reasons
 
-`SystemCore::begin()`. The order is **exactly today's order** — this milestone does not
-re-sequence anything. What is new is that each step now states its constraint.
+`SystemCore::begin()`. Each step states its constraint.
+
+> **Correction, 2026-09-09.** This section originally claimed the order was *exactly* the old
+> order and that nothing was re-sequenced. That was wrong, and the boot log is what showed it.
+> **LVGL initialisation moved from position 3 to position 8.** Previously `gui.begin()` did
+> display → touch → *LVGL* as one unit, before audio, connectivity, MQTT and the registry ever
+> ran. Now everything non-UI completes first and LVGL initialises last. See §4.1 for why that is
+> being kept rather than reverted.
 
 | # | Step | Why here |
 |---|---|---|
@@ -207,6 +213,34 @@ Then, back in `main.cpp` and only if a GUI is built:
 | 10 | `LVGL_Startup::begin(core.display(), core.touch())` | Needs both initialized. Allocates draw buffers — after the registry's PSRAM claim, so the existing internal-SRAM headroom on `CYD_S3_3248` is unchanged. |
 | 11 | `gui.begin(core)` | `UIToolkit::init()` then screen content. Needs LVGL alive. |
 | 12 | `SystemReport::run(core, false)` | Last, so it reports the finished state of everything above. |
+
+### 4.1 The one real re-sequencing: LVGL now initialises last
+
+Old order: display → touch → **LVGL** → audio → connectivity → MQTT → registry → providers.
+New order: display → touch → audio → connectivity → MQTT → registry → providers → **LVGL**.
+
+This was a side effect of the split — the LVGL step could not stay bundled inside `gui.begin()`
+once `gui` stopped owning the hardware — rather than a decision anyone made. Worth being explicit
+about, because **it changes who gets first claim on internal SRAM**, and this project has already
+lost a session to exactly that class of bug (`CYD_S3_3248`, `softAP()` panicking inside
+`ieee80211_hostap_attach`).
+
+Concretely, on `CYD_S3_3248` — the only board whose LVGL draw buffers must live in internal SRAM —
+LVGL used to allocate its 30,720 bytes before the WiFi driver had taken anything. Now the WiFi
+driver goes first.
+
+**Keeping the new order, deliberately, for one reason: LVGL degrades and WiFi does not.**
+`LVGL_Startup::begin()` has a three-step fallback — internal SRAM, then PSRAM, then plain
+`malloc()` — so a squeezed LVGL gets slower, not broken. The WiFi driver has no fallback; when its
+internal DRAM allocation fails it dereferences the null and panics with no error message. Giving
+the allocator with no fallback first claim is the safer arrangement, and it is the one we now
+have. It was luck rather than judgement, and it is recorded here so the next person does not
+"fix" it back.
+
+**Hardware-confirmed 2026-09-09, both dev targets.** `CYD_S3_3248W535` reports
+`[LVGL] Allocating: 30720 bytes per buffer... Success.` with 22 KB of internal heap still free
+afterwards. That is the number to watch: milestone 2.3's memory spike should measure it properly
+rather than leaving it as one observation on one boot.
 
 `loop()` keeps today's call order — LVGL first, then the data layer:
 
@@ -307,9 +341,12 @@ conditional compilation that rots — the same reason `LESSONS.md` distinguishes
 1. **MET.** `WS_P4_TOUCH_LCD_5` and `CYD_S3_3248W535` both build clean, after clearing
    `build_cache`. Cost on the small board: RAM +88 bytes, flash +632 — the sink and section
    tables plus a few statics.
-2. **NOT YET VERIFIED — the one that matters.** Both boards must flash and behave *identically*
-   to `v0.2.0`: same boot serial, same dashboard, same panels, same HA entities. This milestone's
-   success looks like nothing happening. Compiling is not this.
+2. **MET — hardware-verified 2026-09-09 on both dev targets.** Both boards flashed and behaved
+   identically to `v0.2.0`: same UI behaviour, same boot serial, same dashboard, same panels,
+   same eight registry entities, same HA discovery. The full report renders on both, with
+   `[UI STATE]` still between `[DISPLAY]` and `[I2C BUS SCAN]`. `WS_P4_5` also exercised the
+   MIPI/full-frame-PSRAM buffer path and `CYD_S3_3248` the QSPI/internal-SRAM one, so both
+   branches of the allocation matrix in `LVGL_Startup` are covered.
 3. **MET.** `src/main.cpp` is 73 lines and calls no `lv_*` function directly.
 4. **MET.** `SystemCore` and `SystemReport` include no LVGL header.
 5. **MET.** No `extern` function declarations remain in any `Panel_*.cpp`.
@@ -339,4 +376,13 @@ One design detail settled during implementation, not before: `FleetI2C::begin()`
 safe because `FleetI2C::begin()` is explicitly idempotent (`FleetI2C.cpp:136`), which was checked
 rather than assumed — so `DisplayManager` remains usable standalone and nothing initialises twice.
 
-**Remaining: flash both boards and confirm acceptance criterion 2 before merging.**
+4. `9079061` — move the device-identity banner out of `DisplayManager`.
+
+**The fourth commit was scope this milestone had and missed.** FUTURE_IMPROVEMENTS asked for
+`main` to absorb the generic device-info prints misplaced in `DisplayManager::begin()`; the split
+landed without doing it, and the verification boot log is what made it obvious — the display
+driver was still announcing firmware version, device name, touch panel, PSRAM and flash size.
+Now `SystemCore::printIdentity()`, called as step 0. Output is byte-identical by construction,
+but that half is not yet re-flashed.
+
+**Status: milestone complete apart from re-flashing after commit 4.** Nothing else is outstanding.

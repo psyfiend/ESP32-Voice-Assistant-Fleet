@@ -1,4 +1,4 @@
-# Handoff — 2026-09-08
+# Handoff — 2026-09-09
 
 For whoever picks this up next, human or Claude. Written at the end of the session that closed
 Phase 1, while the context was still warm.
@@ -14,8 +14,19 @@ me.
 Phase 0 (repo hygiene) and Phase 1 (connectivity) are done and merged to `main` at tag
 `v0.2.0`. The fleet has a working data pipeline in both directions — board telemetry publishes
 to Home Assistant, and real Zigbee2MQTT sensors read back — through an Entity Registry that
-neither side knows the shape of. There is **nothing to draw it with yet**. That is Phase 2, and
-the next milestone is the startup reorganisation on branch `feat/startup-reorg-12`.
+neither side knows the shape of. There is **nothing to draw it with yet**.
+
+**Phase 2.1 (startup reorganisation, #12) is done and hardware-verified**, on branch
+`feat/startup-reorg-12`, not yet merged. Startup is now five files —
+`main` / `SystemCore` / `SystemReport` / `LVGL_Startup` / `GUIManager` — with the design, the
+decisions and their reasons in `docs/design/startup.md`. Read that before touching startup;
+it is the doc that explains why LVGL initialises last and why `LVGL_Startup::lock()` is a no-op
+that you should nevertheless call. Next up is 2.2 (design system) or 2.3 (memory spike).
+
+**One thing to know if you are new to this branch:** `SystemCore` and `SystemReport` contain no
+LVGL include, and that is load-bearing rather than tidy. It is what would make a GUI-less build
+a `build_src_filter` line instead of a redesign. Do not casually add one — same class of rule as
+`Fleet_Entities`' zero dependencies.
 
 ---
 
@@ -137,12 +148,18 @@ off-the-shelf will keep presenting itself; that is not a reason to revisit it.
 
 ## Immediate next steps
 
-1. **Issue #12 — startup reorganisation.** Branch is cut: `feat/startup-reorg-12`. Split
-   `main` / `LVGL_Startup` / `GuiManager`. Do it before any cards exist; `setup()` now starts
-   six things whose ordering matters and that ordering is expressed nowhere but line order.
+1. **Merge `feat/startup-reorg-12`.** Done and verified; only the last commit (the
+   device-identity banner move) has not been re-flashed, and its output is byte-identical by
+   construction.
 2. Then Phase 2 proper: design system (#13), memory spike (#14), card base class (#15).
-3. Fold #45 into whenever a board is next on the bench with time to spare.
+   **#14 has grown two extra deliverables** — see `FUTURE_IMPROVEMENTS.md`: a written
+   internal-SRAM/PSRAM allocation-order table, and the free-heap number on `CYD_S3_3248`
+   (22 KB at boot, measured once) turned into something actually measured.
+3. Fold #45 into whenever a board is next on the bench with time to spare. It now settles three
+   things, not two: `raiseAp()`'s mode line was fixed on this branch and is equally unexercised,
+   because a board with working credentials never calls `softAP()`.
 
-One small nit noticed and not fixed: `ConnectivityManager::raiseAp()` has
-`WiFi.mode(cond ? WIFI_AP_STA : WIFI_AP_STA)` — both branches identical. Harmless, and a
-two-line cleanup for whoever is next in that file.
+`ConnectivityManager::raiseAp()`'s identical-branch ternary is **fixed** (`b4b4336`). The
+interesting part was which branch was right: the STA retry ladder runs the whole time the AP is
+up and re-issues `WiFi.begin()` without touching the mode, so `WIFI_AP_STA` is correct
+unconditionally and an AP-only branch would have stranded a board over a router reboot.

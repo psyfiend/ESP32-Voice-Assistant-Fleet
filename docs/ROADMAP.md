@@ -604,7 +604,7 @@ had **never been run** immediately exposed a real bug (#42). When scope has to b
 
 | # | Milestone | Acceptance criteria |
 |---|---|---|
-| 2.1 | Startup reorg | **CODE DONE 2026-09-09, hardware-unverified.** Landed as a 5-way split — `main` / `SystemCore` / `SystemReport` / `LVGL_Startup` / `GUIManager`. Design and acceptance criteria in `docs/design/startup.md`. Both dev targets build; **neither has been flashed**, and criterion 2 (identical on-device behaviour) is what closes this |
+| 2.1 | Startup reorg | **DONE 2026-09-09, hardware-verified on both dev targets.** Landed as a 5-way split — `main` / `SystemCore` / `SystemReport` / `LVGL_Startup` / `GUIManager`. Identical UI behaviour, boot serial, entities and HA discovery on `WS_P4_5` and `CYD_S3_3248`. Design, decisions and the one real re-sequencing (LVGL now initialises last) in `docs/design/startup.md` |
 | 2.2 | Design system | Colour tokens, spacing scale, type scale, MDI icon font, card elevation/border/radius. One reference page rendering every token |
 | 2.3 | Memory budget spike | Measure real LVGL heap per card on the *smallest* board. Decide tileview lazy-loading vs. PSRAM `LV_MEM`. **Gates 2.5** |
 | 2.4 | `Card` base class | Grid placement with spans, entity binding, staleness handling, tap + long-press, compact/full variants. Also the agreed moment to introduce `src/UI/` and `src/Cards/` — see `docs/design/startup.md` §3.5 |
