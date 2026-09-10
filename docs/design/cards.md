@@ -1,6 +1,6 @@
 # Card design — decisions and open questions
 
-**Status: decisions captured 2026-09-10, not yet implemented.** Owner's design direction from the
+**Status: decisions captured and open questions answered 2026-09-10, not yet implemented.** Owner's design direction from the
 Phase 2.2 bench sessions, written down so 2.4 (`Card` base class) and 3.1 (build-sheet schema)
 build against it instead of relitigating it.
 
@@ -33,6 +33,16 @@ every card type must declare which of its states map onto it.
 the card becomes unreadable at 3248 sizes, and every candidate for a third secondary turned out
 to belong somewhere else.
 
+**What makes something a legitimate secondary — the rule, not the list.** A secondary is another
+entity *of the same physical device* as the primary. That is why battery works: a Zigbee
+temperature sensor publishes temperature, humidity, pressure and battery, and a Philips motion
+sensor publishes occupancy, temperature, lux and battery. They arrive together because they *are*
+one device.
+
+In practice this collapses to a very short list: **battery, and last-seen** — where last-seen
+always refers to the primary entity, never to a sibling. Anything else that wants to be on the
+card is really asking to be a group card (see §4, "Group / room card").
+
 | Slot | Content | Notes |
 |---|---|---|
 | Primary | The value, or the state | Prominent. Size set by the type scale, not per card |
@@ -57,11 +67,27 @@ through the front door. **Provenance is diagnostic** — it belongs in `SystemRe
 
 ---
 
-## 2. Area is a tag, and it lives outside the border
+## 2. Area, and the card header bar
 
-Colour-coded, **attached to the card rather than inside it**. Putting it inside alongside label +
-value + icon + secondary + status is what tips a card from dense into busy — the owner called this
-before it was built, and the bench's inside-the-border version confirmed it.
+**A card may have its own header bar**, and where it does, the layout is fixed: **area on the
+left, STALE on the right.** This is the same slot the escalating staleness band uses (§3), and the
+same idea as the page header's configurable slot list (2.8) — see §8.
+
+**Two treatments to prototype, not one.** Both go on the 2.2 reference page so they can be
+compared on glass:
+
+| | Internal header bar | External tag |
+|---|---|---|
+| Where | A band inside the card's top edge | A small tag bolted to the top edge, outside the border |
+| Area | Left | Left |
+| STALE | Right | Right |
+| Fill | Solid accent | Solid accent |
+| Text | The card's **background** colour — so dark text on Paper Coral, light text on Slate | Same |
+
+Colour-coded either way. The original objection stands and shaped this: area *inside* the card
+body, alongside label + value + icon + secondary + status, is what tips a card from dense into
+busy. A header bar is not the card body — it is a separate register, which is why it can carry
+what the body cannot.
 
 Area comes free: Home Assistant already carries it on devices, so `MqttProvider` can populate it
 from discovery rather than anyone tagging entities by hand.
@@ -81,13 +107,31 @@ data must be conspicuous, because a dashboard that quietly lies is worse than on
 Agreed treatment, escalating with age:
 
 1. **Fresh** — nothing.
-2. **Stale** — a bright, noticeable tag at the top of the card.
-3. **Long stale** (past a second threshold) — the tag **grows into a header band** across the top
-   of the card. The card is still readable; it just cannot be mistaken for live.
+2. **Stale** — a bright tag in the header bar (or the external tag), on the right.
+3. **Long stale** — unmistakable. Two candidates, both to be prototyped: the STALE tag **grows**
+   to occupy more of the header, or a **single diagonal accent line** is drawn corner to corner
+   across the card in a warning colour. The card stays readable; it just cannot be mistaken for
+   live.
 
-Both thresholds are per-entity (`Entity.stale_after` already exists) and the second one needs a
-name and a default. **Open: what is the second threshold, and is it a multiple of the first or its
-own field?**
+**The second threshold is its own field, not a multiple.** Defaults live per *data type* in a
+library header — a switch or light should go stale in seconds, while temperature or occupancy can
+reasonably be minutes or hours — and any default is overridable from the build sheet, exactly the
+overlay model #20 describes.
+
+### A failed command is not staleness, and it must not wait for a timeout
+
+Tap a light card, and if the light does not turn on, the card jumps **straight to the loud state**.
+No gradual escalation: the user just did something and it did not happen, so the feedback is
+immediate.
+
+**This needs no new plumbing.** `EntityRegistry` already implements optimistic writes with a
+revert when the echo never arrives (`EntityRegistry.h:95` and `:116`). That revert *is* the
+"command didn't take" event — it exists, it is already timed, and nothing currently renders it.
+The card layer only has to give it a face.
+
+Worth naming this as its own state rather than folding it into stale: **stale means "I have not
+heard from this", the reverted write means "I told it to do something and it refused".** They
+deserve different words on screen.
 
 **Separate from staleness: a per-card "pause / ignore this entity" setting.** A deliberately
 paused card *may* dim, or be removed from the page entirely — because that state is the user's own
@@ -104,8 +148,24 @@ The icon already says what kind of quantity it is. This removes a whole line fro
 card in the fleet.
 
 Wanted: **history**, as an inline sparkline or bar strip, with a tap opening a detailed view.
-Open question — a history buffer is per-entity RAM the registry does not currently have, and on
-`CYD_S3_3248` that is the scarce pool. Sizing this is work for #14.
+
+**Decided: fetch it, do not store it.** Rather than a per-entity ring buffer in RAM — which on
+`CYD_S3_3248` competes with the LVGL draw buffers in internal SRAM — pull the series from Home
+Assistant on demand, via its history REST endpoint, and keep it only for as long as the chart is
+on screen. That turns a permanent per-entity memory cost into a transient one paid only by the
+card the user is actually looking at.
+
+This makes the HTTP path in ROADMAP layer 1 (`HaProvider`) real work rather than an alternative,
+and it overlaps #43 (HA access without MQTT) — the same client serves both.
+
+Two honest caveats, neither blocking:
+- **Response size.** A day of temperature at native resolution is on the order of a thousand
+  points. HA's `minimal_response` and significant-change filtering exist for exactly this, and we
+  should ask for a downsampled series rather than parse a large body on a board with ~22 KB of
+  free internal heap.
+- **It only works for entities HA knows about.** A purely local I2C sensor has no HA history to
+  fetch, so those either get no chart or get a small local buffer as a special case. Worth
+  deciding once rather than per card.
 
 ### Binary sensor / occupancy
 **Motion does not deserve a card.** It is one bit that matters per *area*, so the default
@@ -120,9 +180,10 @@ colour, exactly like a non-dimmable light.
   active colour.
 - Where the light reports colour or colour temperature, the card mirrors it. Where it reports
   brightness, brightness is shown prominently.
-- **Groupable by room.** One tap = "turn on all the kitchen lights". Long-press (or double-tap)
-  opens a sheet listing the individual lights and their states.
-- Open: does a group card show "3 of 6 on", a single aggregate state, or both?
+- **Groupable by room.** One tap toggles every light in the group. Long-press or double-tap opens
+  a sheet in which each light appears as its own standalone card.
+- **Mixed state gets its own indicator** — an icon or badge saying the group is not uniform. The
+  card does not have to pick a side and lie about it.
 
 ### Action / scene
 New type, not previously in the roadmap's list. Cards that fire an automation, scene or template —
@@ -131,10 +192,32 @@ which makes this the **first real consumer of #44**, currently deferred as "noth
 to send one yet." That is no longer true.
 
 ### Weather station
-A custom, standalone card showing several published temperatures and/or forecast data. Almost
-certainly a multi-cell span rather than a grid unit, which makes it the first test of whether
-"cards" and "full-width panels" are the same object. Phase 6 in the roadmap; the requirement is
-now specific enough to design against earlier.
+A card with a **minimum size** — 2×2 or larger — rather than a page of its own. It shows several
+published temperatures and/or forecast data in that footprint.
+
+**Plus an optional full-page version**, reachable either by swiping to it like any other page or
+by opening it from the small card (long-press, double-tap, or the context sheet). So the same
+content has two presentations, and only the large one is a page. That answers the "is it a card or
+a page" question with *both*, and it means the grid engine needs minimum-span support but not a
+second layout system.
+
+### Group / room card — a distinct type
+
+The one genuinely new card type, and the one that most affects 2.4's design.
+
+A group card holds **several primaries**, not a primary plus secondaries. "Living Room" might
+carry occupancy, temperature and two lights. It occupies more than one grid cell, and inside its
+border the member entities appear as icons or symbols that are **individually interactive**, each
+behaving like a small card of its own type.
+
+Its header — internal bar or bolted-on external tag, the same two treatments as §2 — carries the
+title and can also hold values that would crowd the body. Occupancy and temperature belong there;
+the lights stay in the body where they can be tapped.
+
+**"Secondary" means something different inside a group card**, and that is fine as long as it is
+deliberate: on a normal card a secondary is a sibling entity of the same device (§1); inside a
+group card, a header value is one of the group's own primaries, promoted for space. Two different
+mechanisms, two different names needed.
 
 ---
 
@@ -173,13 +256,22 @@ comparison because it covers one of our exact boards.
 | Board | Resolution (landscape) | Target | Evidence |
 |---|---|---|---|
 | `CYD_S3_3248` | 480×320 | **2×3** portrait, 3×2 landscape | Owner's call. The veto board |
+| `WS_S3_4B` | 480×480 | **3×3** | `espcontrol` ships 3×3 on two different 480×480 boards |
+| `WS_P4_4B` | 720×720 @ **1.5× DPI** | **3×3** | Same *effective* UI space as `WS_S3_4B` — see below |
 | `CYD_S3_8048` | 800×480 | **4×2** | Owner's call |
 | `WS_P4_5` | 1280×720 | **5×3**, possibly 5×4 | `espcontrol` runs 5×4 on jc8012p4a1 at 1280×800 |
 | `WS_S3_5B` | 1024×600 | 5×3 on pixels, **but see note** | Tearing and slow refresh may cap it below what the pixels allow |
 | `CYD_P4_1060` | 1024×600 | **5×3** | `espcontrol` ships exactly this for jc1060p470 — the same panel |
 | `WS_P4_7B` | 1024×600 | **5×3 minimum**, 6×4 plausible | Owner's estimate |
 
-Two things this table settles:
+**The two 4-inch boards are the same layout problem in different pixels**, and that is a useful
+result rather than a coincidence. `WS_P4_4B` is 720×720 with `HIGH_DPI_DISPLAY` (1.5×), so its
+effective UI space is 480×480 — exactly `WS_S3_4B`'s native size. Same grid, same token values,
+same card count; one just draws them 1.5× larger. If the DPI-scaling approach is right, these two
+boards should be visually indistinguishable apart from sharpness. That makes them a free
+correctness check on the whole scheme, and worth flashing as a pair.
+
+Three things this table settles:
 
 - **Column count is derived, not configured.** The bench proved the model: pick a target card
   width, and the page fits as many whole cards as the screen allows, with a fixed gap and a fixed
@@ -207,22 +299,40 @@ The owner's three signed-off token sets from the bench are the starting points f
 
 ---
 
-## 8. Open questions, collected
+## 8. One slot system, used in three places
 
-Each of these blocks something specific; none blocks 2.2.
+Noticed while answering the group-card question, and worth building once rather than three times.
 
-| # | Question | Blocks |
-|---|---|---|
-| 1 | Second staleness threshold — own field, or a multiple of `stale_after`? | 2.4 |
-| 2 | How many icon state-variants can the flash budget afford? | The MDI subset — answer **before** generating it |
-| 3 | Per-entity history buffer: how many samples, in which RAM? | Sensor card history, #14 |
-| 4 | Group light card: "3 of 6 on", aggregate state, or both? | 2.7 |
-| 5 | Is the weather-station card a card, or a different object that owns a page? | Phase 6, but the answer shapes 2.5 |
-| 6 | Does a card bind one entity or primary + N secondaries? | **2.4 — the biggest one.** §1's status row is the argument for primary + 2 |
+The page header (2.8) is specified as a **configurable slot list** — clock, WiFi and MQTT glyphs,
+optional sensor slots. A group card's header wants exactly the same thing: named slots, filled
+from a config, rendered left-to-right. And a normal card's header bar (§2) is the degenerate case
+of the same idea with two fixed slots, area and STALE.
+
+So: **one slot mechanism, three consumers.** Page header, group-card header, card header. If 2.8
+builds it as a general thing rather than as the page header specifically, the group card gets its
+header free, and the build sheet gets one grammar to describe all three.
 
 ---
 
-## 9. Reference material — read, do not copy
+## 9. Open questions — answered 2026-09-10
+
+| # | Question | Answer |
+|---|---|---|
+| 1 | Second staleness threshold — own field, or a multiple? | **Own field.** Defaults per data type in a library header; overridable from the build sheet |
+| 2 | How many icon state-variants can flash afford? | **Unanswered, and mine to measure.** Blocks the MDI subset — see below |
+| 3 | Per-entity history: how many samples, in which RAM? | **Dissolved.** Fetch from HA on demand, store nothing (§4.1) |
+| 4 | Group light card: aggregate, count, or both? | Tap toggles all; **mixed state gets its own indicator**; long-press opens per-light cards |
+| 5 | Weather station: card or page? | **Both.** A card with a 2×2 minimum, plus an optional full-page view opened from it |
+| 6 | One entity per card, or primary + N? | **Primary + up to 2 siblings of the same device** (§1). A card that wants more is a group card |
+
+**Question 2 is the only one still open, and it is the one that gates real work.** The MDI subset
+must not be generated until the state-variant budget is known, because regenerating it later means
+regenerating every board's font blob. It is answered by measurement, not discussion — folded into
+#14.
+
+---
+
+## 10. Reference material — read, do not copy
 
 Two projects added 2026-09-10. **Check `docs/REFERENCE_PROJECTS.md` before reusing anything from
 either**; one of them is not permissively licensed.
