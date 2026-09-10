@@ -77,7 +77,7 @@ flashed** — identical on-device behaviour is still unverified.
   `maximum_ram_size` fix - the board previously reported 35.9% against a denominator 1.6x too
   large.
 - **`Arduino_ESP32RGBPanel` `num_fbs` investigation.** Requests two hardware framebuffers but
-  only ever draws into/reads back one (`getFrameBuffer()` always fetches index 1) — no real
+  only ever draws into/reads back one — no real
   double-buffering on any board using this class, causing visible tearing on
   `WS_S3_TOUCH_LCD_5B` (worst case, 1024x600). Real fix needs genuine buffer-swap support
   added to the class, matching Waveshare's own `switchFrameBufferTo()` — real `Arduino_GFX`
@@ -114,7 +114,34 @@ Files known to differ and never examined (from the P4-5 tree alone): `Arduino_GF
 **Why this belongs to the buffering work specifically.** Framebuffer count is the one setting
 where the fork and the vendors are known to disagree, and the disagreement is not consistent:
 
-- **RGB path** — our fork requests `.num_fbs = 2` but `getFrameBuffer()` always returns index
+> **Correction, 2026-09-10 — "index 1" was a misreading, and the truth is worse.**
+>
+> `esp_lcd_rgb_panel_get_frame_buffer()` and `esp_lcd_dpi_panel_get_frame_buffer()` are
+> **variadic**, and their second parameter is `fb_num` — *"Number of frame buffer(s) to get. This
+> value must be the same as the number of the followed parameters."* Verified in
+> `esp_lcd_mipi_dsi.h:131` and `esp_lcd_panel_rgb.h:249`.
+>
+> So `get_frame_buffer(panel, 1, &frame_buffer)` does not fetch *index 1*. It says **"give me one
+> framebuffer"** and returns **fb0**. Both wrappers are asking for exactly one, and getting the
+> first.
+>
+> Which makes the real defect a shape problem, not an off-by-one:
+>
+> | Path | Allocated | Reachable through the wrapper |
+> |---|---|---|
+> | RGB (`Arduino_ESP32RGBPanel.cpp:74`) | `.num_fbs = 2` | **fb0 only** |
+> | DSI (`Arduino_ESP32DSIPanel.cpp:89`) | `NUM_FB` BSP field, default 1 | **fb0 only** |
+>
+> On every RGB board we are **allocating a second full framebuffer and never touching it** — pure
+> wasted PSRAM. And raising `DisplayConfig.NUM_FB` on a DSI board would do the same thing, because
+> the getter cannot express a second buffer either way.
+>
+> **`Arduino_GFX::getFrameBuffer()` returns a single `uint16_t *`.** No amount of fixing behind
+> that signature produces double buffering; the API shape is the ceiling. That is the concrete,
+> verified argument for going to `esp_lcd` directly rather than patching the wrapper — see
+> `docs/research/display-stack-migration.md`.
+
+- **RGB path** — our fork requests `.num_fbs = 2` but `getFrameBuffer()` returns index
   1, so it never actually double-buffers (the item above). Two buffers of PSRAM paid for, one
   used.
 - **DSI path** — the fork hardcoded `num_fbs = 1` until `DisplayConfig.NUM_FB` was added.
