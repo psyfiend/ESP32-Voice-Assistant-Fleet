@@ -14,8 +14,23 @@ other projects' code and what it teaches.
 | Project | Licence | What we may do |
 |---|---|---|
 | `ha-dashboard` (Tommzn) | **MIT** | Reuse with attribution |
+| `esphome-modular-lvgl-buttons` (Andrew Gillis) | **MIT** | Reuse with attribution |
 | `ESP32-P4-NINA-Display` (chvvkumar) | **none** | Read only |
 | `ESP32-P4-Allsky-Display` (chvvkumar) | **none** | Read only |
+| `espcontrol` | **PolyForm Noncommercial 1.0.0** | Read only — see below |
+
+**`espcontrol` needs its own warning.** PolyForm Noncommercial is not a permissive licence and is
+not "MIT with a nag". It permits use of *the software* for noncommercial purposes only, and grants
+nothing resembling the right to copy its source into another project. Two consequences:
+
+- **Do not copy code from it, in any amount, adapted or otherwise.** Same rule as the two
+  unlicensed chvvkumar repos, for a different legal reason.
+- **It constrains us further than "none" does in one respect**: an explicit noncommercial term is
+  a deliberate restriction by the author rather than an oversight, so there is no point asking for
+  a licence clarification the way there is with chvvkumar's repos.
+
+Architecture, layout decisions and *facts about hardware* are not copyrightable, and those are why
+it is here — its per-device grid dimensions are cited in `docs/design/cards.md` §7.
 
 "No licence" is not "public domain" — under default copyright it means **all rights reserved**.
 Public on GitHub grants no reuse rights. Neither chvvkumar repo has a LICENSE file, a README
@@ -159,6 +174,48 @@ client. The breadth is the point: one author, one panel family, all of Phases 4 
 built.
 
 ---
+
+## `esphome-modular-lvgl-buttons` (Andrew Gillis) — MIT, ESPHome + LVGL
+
+Added 2026-09-10. **The only reference project whose structure maps onto ours almost exactly, and
+one we may legally borrow from.**
+
+Its `ui/<type>/` layout gives every entity type three files:
+
+```
+ui/<type>/local.yaml    tile for a component on the same device
+ui/<type>/remote.yaml   tile for a Home Assistant entity
+ui/<type>/detail.yaml   full-screen detail page (complex types only)
+```
+
+That is our card library plus our context sheets, arrived at independently — and the
+local/remote split is our `advertise` flag by another name (entities we own vs. entities someone
+else owns). Worth reading `ARCHITECTURE.md` before finalising the `Card` base class in #15,
+specifically for how it decides which types get a detail page and which do not.
+
+Also relevant: the README claims support up to a 4×7 grid on the `WS_P4_7B`. **No confirmed
+screenshots have been found**, so treat that as a claim about what the layout system permits, not
+evidence that it is legible.
+
+## `espcontrol` — PolyForm Noncommercial, ESPHome, and the density evidence
+
+Added 2026-09-10. Deliberately plain, and effective *because* it is plain: at a glance you can see
+what is happening. Its value to us is the per-device grid definitions in
+`devices/*/device/lvgl.yaml`, which are real shipped numbers rather than estimates:
+
+| Their device | Resolution | Grid |
+|---|---|---|
+| `guition-esp32-p4-jc1060p470` | 1024×600 | **5×3** |
+| `guition-esp32-p4-jc8012p4a1` | 1280×800 | **5×4** |
+| `esp32-p4-86` | 480×480 | 3×3 |
+| `guition-esp32-s3-4848s040` | 480×480 | 3×3 |
+| `guition-esp32-p4-jc4880p443` | 480×480 | 2×3 |
+
+`jc1060p470` is **our `CYD_P4_1060`** — the same panel, so 5×3 on that board is confirmed rather
+than guessed. And 5×4 at 1280×800 makes the owner's 5×3-or-5×4 estimate for `WS_P4_5` (1280×720)
+well supported.
+
+See the licence warning above before reading its source with intent.
 
 ## `ha-dashboard` (Tommzn) — MIT, smaller, ESP-IDF
 
