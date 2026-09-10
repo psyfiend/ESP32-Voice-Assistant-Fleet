@@ -214,7 +214,7 @@ counter is useful there in a way it isn't for libraries.
 |---|---|---|---|
 | **A** | Major | Breaking changes — UI overhaul, architecture rewrite, build-sheet schema break | you, by tagging |
 | **B** | Minor | New features, new card types, new tools — backwards compatible within the same A | you, by tagging |
-| **C** | Patch | Stability fixes, performance, anything short of a new feature | you, by tagging |
+| **C** | Phase | **The roadmap sub-phase just completed.** Finishing 2.1 tags `v0.2.1`; finishing 2.2 tags `v0.2.2` | you, by tagging |
 | **D** | Build | Hotfixes, typos, padding tweaks — every commit | **automatic** |
 
 **D auto-increments**, which is the part you said you liked. It's derived from
@@ -223,6 +223,12 @@ which becomes version `0.1.0.14`. Monotonic, never typed by hand, and it can't d
 nobody maintains it. You only ever tag `A.B.C`; `D` takes care of itself.
 
 - Tag on `main` only. Start at `v0.1.0` — pre-1.0 honestly signals "schema may still change."
+- **C tracks the roadmap, revised 2026-09-10.** It was originally "patch / stability fixes", but
+  this project's version has one real job: telling you where you are. Mapping `B.C` onto the phase
+  number does that for free and never needs a judgement call — `v0.2.1` *is* Phase 2.1. The cost is
+  that a mid-phase stability fix has nowhere of its own to go; it lands in `D` with everything
+  else, which is fine because `D` is what the firmware actually reports.
+- Retroactive: `v0.2.1` tags the Phase 2.1 merge (`b5fc6d7`). Phase 1 keeps `v0.2.0`.
 - A small `extra_scripts` Python hook runs `git describe` at build time and injects
   `-D FW_VERSION='"0.1.0.14"'`, so the firmware always knows exactly which commit it is.
 - A dirty working tree appends `+dirty`, so you can never mistake a hand-modified local build for
