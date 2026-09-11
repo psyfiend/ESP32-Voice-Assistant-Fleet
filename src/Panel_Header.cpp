@@ -1,4 +1,5 @@
 #include "Panel_Header.h"
+#include "UITokens.h"
 #include "UIToolkit.h"  // Semantic fonts
 #include "ConnectivityManager.h"
 
@@ -11,13 +12,13 @@ void Panel_Header::init(lv_obj_t* parent, const char* title, ConnectivityManager
     // Top Bar Container
     container = lv_obj_create(parent);
     lv_obj_set_size             (container, lv_pct(100), UIToolkit::sc(50));
-    lv_obj_set_style_bg_color   (container, lv_color_hex(0x202020), 0);
+    lv_obj_set_style_bg_color   (container, UI::c(UI::pal().SURFACE_ALT), 0);
 
     // Bottom Border Only (Blue Line)
     lv_obj_set_style_border_width(container, 0, 0);
-    lv_obj_set_style_border_width(container, UIToolkit::sc(2), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(container, UIToolkit::sc(2), UI::part(LV_PART_MAIN));
     lv_obj_set_style_border_side (container, LV_BORDER_SIDE_BOTTOM, 0);
-    lv_obj_set_style_border_color(container, lv_color_hex(0x00A8FF), 0); // Cyan Blue
+    lv_obj_set_style_border_color(container, UI::c(UI::pal().ACCENT), 0); // Cyan Blue
 
     lv_obj_set_style_radius     (container, 0, 0);
     lv_obj_set_style_pad_all    (container, 0, 0); // Remove padding so button hits edge
@@ -32,7 +33,7 @@ void Panel_Header::init(lv_obj_t* parent, const char* title, ConnectivityManager
     lbl_title = lv_label_create(container);
     lv_label_set_text           (lbl_title, title);
     lv_obj_set_style_text_font  (lbl_title, UIToolkit::Font_PanelHeader, 0); // Semantic Font
-    lv_obj_set_style_text_color (lbl_title, lv_color_hex(0x00A8FF), 0);
+    lv_obj_set_style_text_color (lbl_title, UI::c(UI::pal().ACCENT), 0);
     
     // Status Button Wrapper (Touch Hotspot) --
     btn_status = lv_obj_create(container);

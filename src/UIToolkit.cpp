@@ -1,4 +1,5 @@
 #include "UIToolkit.h"
+#include "UITokens.h"
 
 static lv_obj_t *toast_panel = NULL;
 static lv_obj_t *toast_label = NULL;
@@ -51,7 +52,7 @@ void UIToolkit::init() {
     toast_panel = lv_obj_create(lv_layer_top()); // Use layer_top to float over everything
     lv_obj_set_size             (toast_panel, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_align                (toast_panel, LV_ALIGN_TOP_MID, 0, sc(60)); 
-    lv_obj_set_style_bg_color   (toast_panel, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_bg_color   (toast_panel, UI::c(UI::pal().SURFACE_ALT), 0);
     lv_obj_set_style_radius     (toast_panel, sc(30), 0);
     lv_obj_set_style_pad_all    (toast_panel, sc(15), 0);
     lv_obj_add_flag             (toast_panel, LV_OBJ_FLAG_HIDDEN);
@@ -149,10 +150,10 @@ lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* titl
     lv_obj_set_width            (pnl, 0);       // Set base width to 0 so flex takes over completely
     lv_obj_set_height           (pnl, sc(85));  // Collapsed Height
     lv_obj_set_flex_grow        (pnl, 1);       // Tell flex engine to share available space equally (1:1)
-    lv_obj_set_style_bg_color   (pnl, lv_color_hex(0x181818), 0);
+    lv_obj_set_style_bg_color   (pnl, UI::c(UI::pal().SURFACE), 0);
     lv_obj_set_style_radius     (pnl, sc(12), 0);
     lv_obj_set_style_border_width(pnl, 1, 0);
-    lv_obj_set_style_border_color(pnl, lv_color_hex(0x606060), 0);
+    lv_obj_set_style_border_color(pnl, UI::border(), 0);
     lv_obj_set_style_pad_all    (pnl, 0, 0); 
     lv_obj_set_style_pad_row    (pnl, sc(10), 0);   
     lv_obj_set_style_clip_corner(pnl, true, 0); 
@@ -171,12 +172,12 @@ lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* titl
     lv_label_set_text           (lbl, title);
     lv_obj_align                (lbl, LV_ALIGN_LEFT_MID, 0, 0);
     lv_obj_set_style_text_font  (lbl, Font_PanelHeader, 0); // Use Semantic Font
-    lv_obj_set_style_text_color (lbl, lv_color_hex(0x00A8FF), 0);
+    lv_obj_set_style_text_color (lbl, UI::c(UI::pal().ACCENT), 0);
 
     lv_obj_t * icon = lv_label_create(header);
     lv_label_set_text           (icon, LV_SYMBOL_UP); 
     lv_obj_align                (icon, LV_ALIGN_RIGHT_MID, 0, 0);
-    lv_obj_set_style_text_color (icon, lv_color_hex(0x808080), 0);
+    lv_obj_set_style_text_color (icon, UI::c(UI::pal().TEXT_DIM), 0);
 
     // Content Container
     *content_container = lv_obj_create(pnl);
@@ -234,7 +235,7 @@ lv_obj_t* UIToolkit::create_slider_col(lv_obj_t* parent, const char* title, lv_o
     lv_label_set_text           (lbl, title);
     lv_obj_set_style_text_align (lbl, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font  (lbl, Font_Label, 0); // Use Semantic Font
-    lv_obj_set_style_text_color (lbl, lv_color_hex(0x808080), 0);
+    lv_obj_set_style_text_color (lbl, UI::c(UI::pal().TEXT_DIM), 0);
 
     // Row 2 - Slider
     lv_obj_t * slider = lv_slider_create(col);

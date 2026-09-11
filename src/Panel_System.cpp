@@ -1,4 +1,5 @@
 #include "Panel_System.h"
+#include "UITokens.h"
 
 // The single System panel, so the SystemReport sink (a plain function pointer)
 // can reach it. One panel exists by construction.
@@ -75,7 +76,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_size                 (_ui_content, lv_pct(100), lv_pct(100));
     
     // Content Style
-    lv_obj_set_style_bg_color       (_ui_content, lv_color_hex(0x181818), 0);
+    lv_obj_set_style_bg_color       (_ui_content, UI::c(UI::pal().SURFACE), 0);
     
     // -- CORNER HACK --
     // We want square top corners (to connect to header) and rounded bottom corners.
@@ -96,7 +97,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // lv_obj_set_style_margin_top (_ui_content, -(UIToolkit::sc(15)), 0);
     // lv_obj_set_style_pad_top    (_ui_content, UIToolkit::sc(15) + UIToolkit::sc(10), 0); // Radius + padding
     
-    lv_obj_set_style_border_color   (_ui_content, lv_color_hex(0x404040), 0);
+    lv_obj_set_style_border_color   (_ui_content, UI::border(), 0);
     lv_obj_set_style_border_width   (_ui_content, UIToolkit::sc(2), 0);
     // lv_obj_set_style_pad_all        (_ui_content, UIToolkit::sc(10), 0);
     lv_obj_set_style_pad_left       (_ui_content, UIToolkit::sc(10), 0);
@@ -112,7 +113,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lbl_stats = lv_label_create     (_ui_content);
     lv_obj_set_width                (lbl_stats, lv_pct(100));
     lv_label_set_text               (lbl_stats, "System Ready.");
-    lv_obj_set_style_text_color     (lbl_stats, lv_color_hex(0x00FF00), 0);
+    lv_obj_set_style_text_color     (lbl_stats, UI::c(UI::pal().ST_OK), 0);
     lv_obj_set_style_text_font      (lbl_stats, UIToolkit::Font_Label, 0);
 
     // -- ROW 2: Actions --
@@ -131,7 +132,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_t* btn = lv_button_create(_ui_actions);
     lv_obj_set_height               (btn, UIToolkit::sc(32));
     lv_obj_add_event_cb             (btn, btn_action_cb, LV_EVENT_CLICKED, this);
-    lv_obj_set_style_bg_color       (btn, lv_color_hex(0x00A8FF), 0); // Cyan
+    lv_obj_set_style_bg_color       (btn, UI::c(UI::pal().ACCENT), 0); // Cyan
     
     lv_obj_t* lbl = lv_label_create(btn);
     lv_label_set_text               (lbl, "Dump Config");
@@ -145,7 +146,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // FLEX GROW: Take all remaining space!
     lv_obj_set_flex_grow            (log_box, 1); 
     
-    lv_obj_set_style_bg_color       (log_box, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_color       (log_box, UI::c(UI::pal().GROUND), 0);
     lv_obj_set_style_pad_all        (log_box, UIToolkit::sc(8), 0);
     lv_obj_set_style_radius         (log_box, UIToolkit::sc(4), 0);
     lv_obj_set_scrollbar_mode       (log_box, LV_SCROLLBAR_MODE_AUTO); // Enable scrolling here
@@ -154,7 +155,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_width                (txt_log, lv_pct(100));
     lv_label_set_long_mode          (txt_log, LV_LABEL_LONG_WRAP);
     lv_label_set_text               (txt_log, "> Init...");
-    lv_obj_set_style_text_color     (txt_log, lv_color_hex(0xDDDDDD), 0); 
+    lv_obj_set_style_text_color     (txt_log, UI::c(UI::pal().TEXT), 0); 
     
     if(UIToolkit::Font_Caption) {
         lv_obj_set_style_text_font  (txt_log, UIToolkit::Font_Caption, 0);
