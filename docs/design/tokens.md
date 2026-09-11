@@ -121,7 +121,38 @@ Four groups, deliberately not nested:
 - **`UIGrid`** — target card width, aspect, gap, inset. **Columns are always derived from target
   width, never declared.** Defaults computed from resolution and DPI, overridable per board later
   if a board disagrees.
-- **`UIType`** — the font shortlist and icon size. Fleet-wide. Absorbs `UIToolkit::Font_*`.
+- **`UIType`** — the font shortlist and icon size. Fleet-wide.
+
+### Font cost — measured 2026-09-10, and it corrects an earlier claim here
+
+An earlier note in this file said `lv_conf.h` enabling every Montserrat size from 8 to 48 meant
+21 faces were "compiled into every board". **That was wrong.** Enabling a size in `lv_conf.h` puts
+it in the archive; the linker only pulls in the object files something actually *references*, and
+discards the rest. Trimming `lv_conf.h` would therefore save nothing.
+
+What costs flash is **referencing another distinct size**, and the price is high. Measured on
+`WS_P4_5` by pointing `UIType::HERO` at a face nothing else used and then away again:
+
+| Change | Flash |
+|---|---|
+| Before the reference page | 1,478,486 |
+| + page, with `HERO` = `montserrat_48` | 1,662,840 |
+| + page, with `HERO` = `montserrat_40` | **1,566,104** |
+
+**One font face = 96,736 bytes.** The reference page's own code is only a few KB; essentially the
+entire 184 KB jump was two new font faces being linked.
+
+Three consequences:
+
+1. **The type shortlist is a flash budget, not a style choice.** Every distinct size in `UIType`
+   costs roughly 85–97 KB. Four sizes is ~350 KB; the fleet currently references nine across
+   `UIToolkit` and `UITokens`.
+2. **`HERO` shares `VALUE`'s face** until a fullscreen card genuinely needs a larger one. Paying
+   96 KB for something nothing draws was not a trade worth making.
+3. **This is the number #14 needed for the icon question.** An MDI subset is a font too. A
+   card-sized icon set will be far smaller than a 48 px full-ASCII face — fewer glyphs, smaller
+   glyphs — but it is the same order of magnitude, and it has to be budgeted against the type
+   scale rather than considered separately.
 
 Access goes through one namespace rather than globals, so runtime scheme switching has a single
 choke point:

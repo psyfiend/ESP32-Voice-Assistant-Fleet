@@ -1,4 +1,5 @@
 #include "Panel_System.h"
+#include "ReferencePage.h"
 #include "UITokens.h"
 
 // The single System panel, so the SystemReport sink (a plain function pointer)
@@ -138,6 +139,25 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_label_set_text               (lbl, "Dump Config");
     lv_obj_center                   (lbl);
     lv_obj_set_style_text_font      (lbl, UIToolkit::Font_Button, 0);
+
+    // Button: Design Tokens — opens the 2.2 reference page as its own screen.
+    // Lives here rather than behind a build flag so the schemes can be flipped
+    // and compared without reflashing, and so the page survives into the Phase
+    // 4 settings surface instead of being throwaway scaffolding.
+    lv_obj_t* btnRef = lv_button_create(_ui_actions);
+    lv_obj_set_height               (btnRef, UIToolkit::sc(32));
+    lv_obj_add_event_cb             (btnRef, [](lv_event_t *e) {
+                                        (void)e; ReferencePage::show();
+                                     }, LV_EVENT_CLICKED, NULL);
+    lv_obj_set_style_bg_color       (btnRef, UI::c(UI::pal().SURFACE_ALT), 0);
+    lv_obj_set_style_border_width   (btnRef, 1, 0);
+    lv_obj_set_style_border_color   (btnRef, UI::border(), 0);
+
+    lv_obj_t* lblRef = lv_label_create(btnRef);
+    lv_label_set_text               (lblRef, "Design Tokens");
+    lv_obj_center                   (lblRef);
+    lv_obj_set_style_text_font      (lblRef, UIToolkit::Font_Button, 0);
+    lv_obj_set_style_text_color     (lblRef, UI::c(UI::pal().TEXT), 0);
 
     // -- ROW 3: Log Container --
     lv_obj_t* log_box = lv_obj_create(_ui_content);

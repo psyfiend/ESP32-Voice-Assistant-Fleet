@@ -173,7 +173,11 @@ const UIType &type() {
         .VALUE = &lv_font_montserrat_40,
         .NAME  = &lv_font_montserrat_16,
         .TAG   = &lv_font_montserrat_12,
-        .HERO  = &lv_font_montserrat_48,
+        // HERO shares VALUE's face for now. Referencing montserrat_48 pulled a
+        // whole extra font into the link for something nothing draws yet -
+        // measured at the cost recorded in docs/design/tokens.md. Point it at a
+        // larger face when a fullscreen card actually needs one.
+        .HERO  = &lv_font_montserrat_40,
         .ICON  = 26
     };
     return t;
