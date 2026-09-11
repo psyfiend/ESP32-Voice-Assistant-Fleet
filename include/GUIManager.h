@@ -12,11 +12,11 @@
 //
 #include <lvgl.h>
 #include "SystemCore.h"
-#include "Panel_Header.h"
-#include "Panel_Display.h"
-#include "Panel_System.h"
+#include "UI/Panel_Header.h"
+#include "UI/Panel_Display.h"
+#include "UI/Panel_System.h"
 #ifdef HAS_AUDIO_HW
-#include "Panel_Audio.h"
+#include "UI/Panel_Audio.h"
 #endif
 
 class GUIManager {

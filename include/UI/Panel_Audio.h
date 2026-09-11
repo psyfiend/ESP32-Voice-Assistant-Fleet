@@ -1,7 +1,7 @@
 #pragma once
 #include <lvgl.h>
 #include "AudioManager.h"
-#include "UIToolkit.h"
+#include "UI/UIToolkit.h"
 
 class Panel_Audio {
 public:

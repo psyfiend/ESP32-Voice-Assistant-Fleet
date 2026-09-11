@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 #include <functional> // Required for std::function
-#include "Panel_Header.h"
-#include "UIToolkit.h"
+#include "UI/Panel_Header.h"
+#include "UI/UIToolkit.h"
 #include "SystemReport.h"
 
 class Panel_System {

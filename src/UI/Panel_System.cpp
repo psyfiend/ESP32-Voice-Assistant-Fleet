@@ -1,6 +1,6 @@
-#include "Panel_System.h"
-#include "ReferencePage.h"
-#include "UITokens.h"
+#include "UI/Panel_System.h"
+#include "UI/ReferencePage.h"
+#include "UI/UITokens.h"
 
 // The single System panel, so the SystemReport sink (a plain function pointer)
 // can reach it. One panel exists by construction.

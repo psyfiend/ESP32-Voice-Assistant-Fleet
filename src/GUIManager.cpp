@@ -1,6 +1,6 @@
 #include "GUIManager.h"
-#include "UIToolkit.h"
-#include "UITokens.h"
+#include "UI/UIToolkit.h"
+#include "UI/UITokens.h"
 #include "SystemReport.h"
 #include "bsp_loader.h"
 

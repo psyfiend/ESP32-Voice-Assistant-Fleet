@@ -1,6 +1,6 @@
-#include "Panel_Header.h"
-#include "UITokens.h"
-#include "UIToolkit.h"  // Semantic fonts
+#include "UI/Panel_Header.h"
+#include "UI/UITokens.h"
+#include "UI/UIToolkit.h"  // Semantic fonts
 #include "ConnectivityManager.h"
 
 Panel_Header::Panel_Header() {

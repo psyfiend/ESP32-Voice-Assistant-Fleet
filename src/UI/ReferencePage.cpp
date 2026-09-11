@@ -1,6 +1,6 @@
-#include "ReferencePage.h"
-#include "UITokens.h"
-#include "UIToolkit.h"
+#include "UI/ReferencePage.h"
+#include "UI/UITokens.h"
+#include "UI/UIToolkit.h"
 #include <Arduino.h>
 
 namespace {
