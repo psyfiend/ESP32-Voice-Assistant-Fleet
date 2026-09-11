@@ -1,23 +1,30 @@
 #pragma once
 #include <lvgl.h>
 #include <Arduino.h>
+#include "bsp_loader.h"
 
 #define ROW_HEIGHT 50
 
-// --- DPI SCALING CONFIG ---
-#ifdef HIGH_DPI_DISPLAY
-    #define UI_SCALE 1.5f 
-#else
-    #define UI_SCALE 1.0f
-#endif
+// --- DPI SCALING ---
+// UI_SCALE used to be a macro set by `-D HIGH_DPI_DISPLAY`: 1.5 on three
+// boards, 1.0 on five. That split tracked real pixel density surprisingly well
+// (the fleet falls into 165-187 PPI and 237-294 PPI clusters with a 50 PPI gap)
+// but it rounded two boards to the wrong side - CYD_S3_8048 and, more
+// importantly, the WS_P4_5 dev target. The scale is now DERIVED from
+// bsp_display.DIAGONAL_IN via bspUiScale(). See docs/design/tokens.md.
 
 // Define a simple callback type for closing external panels
 typedef void (*UiActionCallback)(void);
 
 class UIToolkit {
 public:
-    // Scale a pixel value based on the target device
+    // Scale a logical pixel value to this board's pixel density.
     static int32_t  sc(int32_t val);
+
+    // The derived values behind sc(), exposed for diagnostics and for LVGL's
+    // own DPI setting. ppi() returns 0 if the board declares no DIAGONAL_IN.
+    static float    scale() { return bspUiScale(); }
+    static uint16_t ppi()   { return bspPixelDensity(); }
     
     // Global Init (Styles, Toast layer)
     static void     init();

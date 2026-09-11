@@ -169,11 +169,17 @@ void reportDisplay(SystemCore &core) {
         SystemReport::line("  Display Type: MIPI/DSI - %s", bsp_display.PANEL_MODEL);
     #endif
     SystemReport::line("  Touch Type: %s", bsp_touch.NAME);
-    #ifdef HIGH_DPI_DISPLAY
-        SystemReport::line("  Display Mode: HIGH DPI (1.5x Scaling)");
-    #else
-        SystemReport::line("  Display Mode: STANDARD (1.0x Scaling)");
-    #endif
+    {
+        const uint16_t ppi = bspPixelDensity();
+        if (ppi) {
+            SystemReport::line("  Density: %u PPI (%.1f\" diagonal)", (unsigned)ppi,
+                               bsp_display.DIAGONAL_IN / 10.0);
+            SystemReport::line("  UI Scale: %.2fx (derived)", (double)bspUiScale());
+        } else {
+            SystemReport::line("  Density: unknown - no DIAGONAL_IN in this board's BSP");
+            SystemReport::line("  UI Scale: 1.00x (fallback)");
+        }
+    }
     SystemReport::line("  Resolution: %dx%d", bsp_display.WIDTH, bsp_display.HEIGHT);
     SystemReport::line("  Rotation: %d", bsp_display.ROTATION);
     SystemReport::line("  Brightness: %d%%", core.display().getBrightness());

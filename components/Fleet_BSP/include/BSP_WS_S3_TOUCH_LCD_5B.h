@@ -117,6 +117,10 @@ const DisplayConfig WS_S3_TOUCH_LCD_5B_DISPLAY = {
     .PREFER_SPEED          = 21000000,
     .USE_BIG_ENDIAN        = false,
     .BOUNCE_BUFFER_SIZE_PX = 1024 * 10, // Vendor-recommended; divides 1024x600 evenly (N=60)
+
+    // Panel diagonal in tenths of an inch (5.0" Waveshare S3-Touch-LCD-5B).
+    // 1024x600 over 5.0" = ~237 PPI, so bspUiScale() = 1.39.
+    .DIAGONAL_IN = 50,
 };
 inline const DisplayConfig& bsp_display = WS_S3_TOUCH_LCD_5B_DISPLAY;
 

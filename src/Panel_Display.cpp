@@ -1,4 +1,5 @@
 #include "Panel_Display.h"
+#include "UITokens.h"
 
 Panel_Display::Panel_Display(DisplayManager& display, TouchManager& touch)
     : _display(display), _touch(touch) {
@@ -107,10 +108,10 @@ void Panel_Display::init(lv_obj_t* parent) {
     panel_touch_data = lv_obj_create(lv_screen_active());
     lv_obj_set_size             (panel_touch_data, UIToolkit::sc(180), UIToolkit::sc(210)); 
     lv_obj_align                (panel_touch_data, LV_ALIGN_RIGHT_MID, UIToolkit::sc(-10), UIToolkit::sc(-50));
-    lv_obj_set_style_bg_color   (panel_touch_data, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_color   (panel_touch_data, UI::c(UI::pal().GROUND), 0);
     lv_obj_set_style_bg_opa     (panel_touch_data, LV_OPA_80, 0); 
     lv_obj_set_style_border_width(panel_touch_data, 2, 0);
-    lv_obj_set_style_border_color(panel_touch_data, lv_color_hex(0xFFFFFF), 0); 
+    lv_obj_set_style_border_color(panel_touch_data, UI::c(UI::pal().TEXT), 0); 
     lv_obj_add_flag             (panel_touch_data, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag           (panel_touch_data, LV_OBJ_FLAG_SCROLLABLE);
     
@@ -123,19 +124,19 @@ void Panel_Display::init(lv_obj_t* parent) {
     lv_label_set_text           (lbl_h, "TOUCH POINTS");
     lv_obj_align                (lbl_h, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_set_style_text_font  (lbl_h, UIToolkit::Font_PanelHeader, 0); // Semantic Font
-    lv_obj_set_style_text_color (lbl_h, lv_color_hex(0x00A8FF), 0);
+    lv_obj_set_style_text_color (lbl_h, UI::c(UI::pal().ACCENT), 0);
 
     count_label = lv_label_create(panel_touch_data);
     lv_label_set_text           (count_label, "ACTIVE: 0");
     lv_obj_align                (count_label, LV_ALIGN_BOTTOM_MID, 0, UIToolkit::sc(7));
     lv_obj_set_style_text_font  (count_label, UIToolkit::Font_Hero, 0); // Semantic Font
-    lv_obj_set_style_text_color (count_label, lv_color_hex(0x404040), 0); 
+    lv_obj_set_style_text_color (count_label, UI::c(UI::pal().ST_IDLE), 0); 
 
     for(int i=0; i<5; i++) {
         coord_labels[i] = lv_label_create(panel_touch_data);
         lv_label_set_text_fmt       (coord_labels[i], "ID%d: --", i);
         lv_obj_align                (coord_labels[i], LV_ALIGN_TOP_LEFT, UIToolkit::sc(25), UIToolkit::sc(25 + (i * 25)));
-        lv_obj_set_style_text_color (coord_labels[i], lv_color_hex(0x808080), 0); 
+        lv_obj_set_style_text_color (coord_labels[i], UI::c(UI::pal().TEXT_DIM), 0); 
         lv_obj_set_style_text_font  (coord_labels[i], UIToolkit::Font_Caption, 0); // Semantic Font
 
         cursors[i] = lv_obj_create(lv_screen_active());
@@ -155,8 +156,8 @@ void Panel_Display::tick() {
     uint8_t count = _touch.read(points, 5);
 
     // Turns "ACTIVE:" bright when touches are present
-    if (count > 0)  lv_obj_set_style_text_color(count_label, lv_color_hex(0xFFFFFF), 0); 
-    else            lv_obj_set_style_text_color(count_label, lv_color_hex(0x404040), 0); 
+    if (count > 0)  lv_obj_set_style_text_color(count_label, UI::c(UI::pal().TEXT), 0); 
+    else            lv_obj_set_style_text_color(count_label, UI::c(UI::pal().ST_IDLE), 0); 
     
     lv_label_set_text_fmt(count_label, "ACTIVE: %d", count);
 
@@ -173,7 +174,7 @@ void Panel_Display::tick() {
         } else {
             lv_obj_add_flag            (cursors[i], LV_OBJ_FLAG_HIDDEN);
             lv_label_set_text_fmt      (coord_labels[i], "ID%d: --", i);
-            lv_obj_set_style_text_color(coord_labels[i], lv_color_hex(0x404040), 0);
+            lv_obj_set_style_text_color(coord_labels[i], UI::c(UI::pal().ST_IDLE), 0);
         }
     }
 }

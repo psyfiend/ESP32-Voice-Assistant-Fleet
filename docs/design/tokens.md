@@ -1,6 +1,7 @@
 # Design tokens — Phase 2.2 (issue #13)
 
-**Status: proposed 2026-09-10, not yet implemented.** Design agreed before the code, per ROADMAP §2.2.
+**Status: implemented and hardware-verified 2026-09-10.** Design was agreed before the code, per
+ROADMAP §2.2. Everything below held up on glass except the grid target width, corrected in §6.
 
 Companion to `docs/design/cards.md` (what a card contains) and `docs/design/startup.md` (where the
 UI layer sits). This file covers **how things look** and nothing else — see §1 for why that
@@ -121,7 +122,38 @@ Four groups, deliberately not nested:
 - **`UIGrid`** — target card width, aspect, gap, inset. **Columns are always derived from target
   width, never declared.** Defaults computed from resolution and DPI, overridable per board later
   if a board disagrees.
-- **`UIType`** — the font shortlist and icon size. Fleet-wide. Absorbs `UIToolkit::Font_*`.
+- **`UIType`** — the font shortlist and icon size. Fleet-wide.
+
+### Font cost — measured 2026-09-10, and it corrects an earlier claim here
+
+An earlier note in this file said `lv_conf.h` enabling every Montserrat size from 8 to 48 meant
+21 faces were "compiled into every board". **That was wrong.** Enabling a size in `lv_conf.h` puts
+it in the archive; the linker only pulls in the object files something actually *references*, and
+discards the rest. Trimming `lv_conf.h` would therefore save nothing.
+
+What costs flash is **referencing another distinct size**, and the price is high. Measured on
+`WS_P4_5` by pointing `UIType::HERO` at a face nothing else used and then away again:
+
+| Change | Flash |
+|---|---|
+| Before the reference page | 1,478,486 |
+| + page, with `HERO` = `montserrat_48` | 1,662,840 |
+| + page, with `HERO` = `montserrat_40` | **1,566,104** |
+
+**One font face = 96,736 bytes.** The reference page's own code is only a few KB; essentially the
+entire 184 KB jump was two new font faces being linked.
+
+Three consequences:
+
+1. **The type shortlist is a flash budget, not a style choice.** Every distinct size in `UIType`
+   costs roughly 85–97 KB. Four sizes is ~350 KB; the fleet currently references nine across
+   `UIToolkit` and `UITokens`.
+2. **`HERO` shares `VALUE`'s face** until a fullscreen card genuinely needs a larger one. Paying
+   96 KB for something nothing draws was not a trade worth making.
+3. **This is the number #14 needed for the icon question.** An MDI subset is a font too. A
+   card-sized icon set will be far smaller than a 48 px full-ASCII face — fewer glyphs, smaller
+   glyphs — but it is the same order of magnitude, and it has to be budgeted against the type
+   scale rather than considered separately.
 
 Access goes through one namespace rather than globals, so runtime scheme switching has a single
 choke point:
@@ -194,3 +226,41 @@ appearance slightly as it starts reading tokens. That is the owner's stated pref
 prefer all visual customization and specification not live in the actual UI code"* — and it is the
 right call, but it means the Phase 2.1 regression baseline ("does it look identical") no longer
 applies from here on.
+
+---
+
+## 6. What hardware changed — measured 2026-09-10
+
+Flashed to `WS_P4_5` (294 PPI, 1.73×) and `CYD_S3_3248` (165 PPI, 0.97×, portrait).
+
+**The grid derivation works.** One token set, two boards, no per-board layout code:
+
+```
+[UI] Scheme "Fleet" | 5x3 grid of 230x210 px | scale 1.73x (294 PPI)   WS_P4_5
+[UI] Scheme "Fleet" | 2x3 grid of 141x144 px | scale 0.97x (165 PPI)   CYD_S3_3248
+```
+
+**`TARGET_CARD_W` is 130, not the 135 the bench used.** The browser bench modelled `WS_P4_5` at a
+hardcoded 1.5× because that is what `HIGH_DPI_DISPLAY` gave it; the board is really 1.73×. Every
+value tuned in the bench therefore rendered ~15% larger on real glass, and at 135 that cost a
+whole column and a whole row. Corrected in both the firmware and the bench.
+
+**The measured card cost.** `CYD_S3_3248`, 8 sample cards, repeated across all three schemes:
+
+```
+713-723 bytes per card | pool 35% used, 29% frag (stable)
+```
+
+The 10-byte spread is allocator noise — block headers, alignment, and which free hole each of the
+24 objects lands in. The schemes build identical widget trees and differ only in style property
+values, so scheme choice costs nothing.
+
+**Font range is ASCII plus a small symbol set.** `·` (U+00B7) and `—` (U+2014) rendered as tofu
+boxes. The degree sign is in range and works. Rule for anything drawn on these panels: **stay
+ASCII, except `°`**, unless the font range is deliberately extended — which costs flash at the
+rate in §3.
+
+**Scrolling needed taming.** `UI::tameScroll()` — vertical-only, no elastic rubber-banding, no
+scrollbar. The springback at the end of a scroll looks poor at the refresh rates the S3 boards
+manage, and a slightly-too-wide row must never be able to start a sideways drag. Call it on every
+scrollable container.

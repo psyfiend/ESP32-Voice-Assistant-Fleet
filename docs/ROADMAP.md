@@ -611,8 +611,30 @@ had **never been run** immediately exposed a real bug (#42). When scope has to b
 | # | Milestone | Acceptance criteria |
 |---|---|---|
 | 2.1 | Startup reorg | **DONE 2026-09-09, hardware-verified on both dev targets.** Landed as a 5-way split — `main` / `SystemCore` / `SystemReport` / `LVGL_Startup` / `GUIManager`. Identical UI behaviour, boot serial, entities and HA discovery on `WS_P4_5` and `CYD_S3_3248`. Design, decisions and the one real re-sequencing (LVGL now initialises last) in `docs/design/startup.md` |
-| 2.2 | Design system | Colour tokens, spacing scale, type scale, MDI icon font, card elevation/border/radius. One reference page rendering every token |
-| 2.3 | Memory budget spike | Measure real LVGL heap per card on the *smallest* board. Decide tileview lazy-loading vs. PSRAM `LV_MEM`. **Gates 2.5** |
+| 2.2 | Design system | **DONE 2026-09-10, hardware-verified.** `UITokens` - palette incl. semantic state colours, per-scheme metrics, derived grid, type scale. Reference page reachable from the System panel, three schemes switchable live. Panels ported off hardcoded colours. **MDI icon font deferred to 2.4** - see below. `docs/design/tokens.md` |
+| 2.3 | Memory budget spike | **DONE 2026-09-10, measured on `CYD_S3_3248`.** ~715 B per card in `lv_mem`; pool steady at 35% with dashboard + reference page. **Decision: neither lazy-loading nor a PSRAM `LV_MEM` is needed** - see below. No longer gates 2.5 |
+
+**What 2.3 actually found, and why the decision went the way it did.**
+
+The question was framed as "how many cards fit". It turned out to be the wrong question, twice.
+
+- **Cards are cheap.** ~715 bytes each in LVGL's pool. A 5x3 grid is ~11 KB of a 124 KB pool; a
+  dense 20-card page is ~14 KB. You would need well over a hundred cards before `lv_mem` bound
+  anything. Tileview lazy-loading solves a problem we do not have.
+- **The measurement everyone would reach for is the wrong one.** `ESP.getFreeHeap()` barely moves
+  when a card is created. `LV_USE_STDLIB_MALLOC` is `LV_STDLIB_BUILTIN` with `LV_MEM_ADR 0`, so
+  widgets come out of a **128 KB static array in internal DRAM** - which is ~70% of
+  `CYD_S3_3248`'s entire 188 KB static footprint. `lv_mem_monitor()` is the instrument.
+- **The real cost is fonts, not widgets.** One referenced font face is **~96 KB of flash** -
+  measured, not estimated. Enabling sizes in `lv_conf.h` is free; *referencing* them is what
+  costs. That reframes the icon question completely (see below) and is worth more than the
+  per-card number.
+- **Fragmentation is stable.** It climbs to ~29% after repeated page rebuilds and parks there.
+  Worth re-checking on a panel that has been up for weeks, but it is not growing.
+
+**Moving `LV_MEM` to PSRAM stays available and is not needed yet.** At 35% used there is ample
+headroom, and widget access is frequent enough that PSRAM's slower access is a real cost. Revisit
+only if a future page genuinely fills the pool.
 | 2.4 | `Card` base class | Grid placement with spans, entity binding, staleness handling, tap + long-press, compact/full variants. Also the agreed moment to introduce `src/UI/` and `src/Cards/` — see `docs/design/startup.md` §3.5 |
 | 2.5 | Page + grid engine | A Page renders a grid from a config struct; cards place with spans; correct on 3 different resolutions |
 | 2.6 | Tileview navigation | Swipe L/R between pages, U/D to menus; gesture conflicts resolved (§5.2); page indicator dots |

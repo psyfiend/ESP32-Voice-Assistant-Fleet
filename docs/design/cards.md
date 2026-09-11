@@ -319,16 +319,30 @@ header free, and the build sheet gets one grammar to describe all three.
 | # | Question | Answer |
 |---|---|---|
 | 1 | Second staleness threshold — own field, or a multiple? | **Own field.** Defaults per data type in a library header; overridable from the build sheet |
-| 2 | How many icon state-variants can flash afford? | **Unanswered, and mine to measure.** Blocks the MDI subset — see below |
+| 2 | How many icon state-variants can flash afford? | **ANSWERED 2026-09-10 by measurement.** ~96 KB per referenced font face — see below |
 | 3 | Per-entity history: how many samples, in which RAM? | **Dissolved.** Fetch from HA on demand, store nothing (§4.1) |
 | 4 | Group light card: aggregate, count, or both? | Tap toggles all; **mixed state gets its own indicator**; long-press opens per-light cards |
 | 5 | Weather station: card or page? | **Both.** A card with a 2×2 minimum, plus an optional full-page view opened from it |
 | 6 | One entity per card, or primary + N? | **Primary + up to 2 siblings of the same device** (§1). A card that wants more is a group card |
 
-**Question 2 is the only one still open, and it is the one that gates real work.** The MDI subset
-must not be generated until the state-variant budget is known, because regenerating it later means
-regenerating every board's font blob. It is answered by measurement, not discussion — folded into
-#14.
+**Question 2, answered.** Measured on `WS_P4_5` during milestone 2.2: **one referenced font face
+costs ~96 KB of flash.** Enabling a size in `lv_conf.h` is free — the linker drops unreferenced
+font objects — but *referencing* one is expensive.
+
+What that means for icons:
+
+- **The MDI subset must be a genuine subset**, at **one size**, not a family. A second icon size
+  is another ~96 KB.
+- **State variants are affordable; extra sizes are not.** Glyph count scales the bitmap data
+  roughly linearly, and an icon set of 40-60 glyphs at card size is far smaller than a 95-glyph
+  full-ASCII face at 40 px. Ten bulb/door/motion variants cost far less than one extra size.
+- **Budget it against the type scale, not separately.** They come out of the same flash. The fleet
+  currently references nine Montserrat faces; every one is ~96 KB, and trimming that list is the
+  cheapest way to pay for icons.
+
+So the guidance for 2.4: **one icon size, generous glyph count.** Generate the subset only once
+the card types have settled which glyphs they need, because regenerating means regenerating every
+board's font blob.
 
 ---
 

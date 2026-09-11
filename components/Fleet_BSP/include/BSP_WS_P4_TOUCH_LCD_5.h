@@ -126,6 +126,10 @@ const DisplayConfig WS_P4_TOUCH_LCD_5_DISPLAY = {
     // ---= Init Commands =---
     .INIT_CMDS_DSI  = ws_p4_touch_lcd_5_init,
     .INIT_CMDS_SIZE = sizeof(ws_p4_touch_lcd_5_init) / sizeof(lcd_init_cmd_t),
+
+    // Panel diagonal in tenths of an inch (5.0" Waveshare P4-Touch-LCD-5).
+    // 720x1280 over 5.0" = ~294 PPI, so bspUiScale() = 1.73.
+    .DIAGONAL_IN = 50,
 };
 inline const DisplayConfig& bsp_display = WS_P4_TOUCH_LCD_5_DISPLAY;
 

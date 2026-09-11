@@ -34,7 +34,7 @@ Updated 2026-09-08.
 | **WS_P4_5** ESP32-P4-WIFI6-Touch-LCD-5 | `WS_P4_TOUCH_LCD_5` | ✅ landscape (rot 1) | ✅ confirmed at rot 1 | ✅ | ✅ codec init only | ✅ | ✅ **on current build** |
 | **WS_S3_4B** ESP32-S3-Touch-LCD-4B | `WS_S3_TOUCH_LCD_4B` | ✅ | ✅ | ✅ | ✅ | ✅ native radio | ✅ |
 | **CYD_P4_1060** Guition JC1060P470C 7" | `CYD_P4_1060P470` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **CYD_S3_3248** Guition JC3248W535 3.5" | `CYD_S3_3248W535` | ✅ both rotations | ✅ both rotations | ✅ | ✅ | ✅ | ✅ **on current build** |
+| **CYD_S3_3248** Guition JC3248W535 3.5" | `CYD_S3_3248W535` | ✅ **portrait (rot 0) as of 2026-09-10** | ✅ both rotations | ✅ | ✅ | ✅ | ✅ **on current build** |
 | **CYD_S3_8048** Guition JC8048W550 5" | `CYD_S3_8048W550` | ✅ brightness slider dead | ✅ | ✅ notably quiet | ✅ | ✅ | ✅ |
 | **WS_S3_5B** ESP32-S3-Touch-LCD-5B | `WS_S3_TOUCH_LCD_5B` | ✅ visible tearing | ✅ 5 points | N/A no audio hw | N/A | ✅ | ✅ |
 
@@ -291,3 +291,31 @@ Kept for the board-specific facts, not as a changelog - git history is the chang
 - **WS_S3_5B tearing**: root-caused to `Arduino_ESP32RGBPanel` never actually
   double-buffering despite allocating two framebuffers. Real fix tracked in
   `FUTURE_IMPROVEMENTS.md` and GitHub issue #40.
+
+## Pixel density and UI scale — measured 2026-09-10
+
+`-D HIGH_DPI_DISPLAY` is retired. Scale is derived from `DisplayConfig.DIAGONAL_IN` plus the
+resolution: `PPI / 170`. See `docs/design/tokens.md` §2 for how the reference figure was chosen.
+
+| Board | Resolution | Diagonal | PPI | Scale | Was |
+|---|---|---|---|---|---|
+| `CYD_S3_3248` | 320×480 | 3.5" | 165 | 0.97 | 1.0 |
+| `CYD_P4_1060` | 1024×600 | 7" | 170 | 1.00 | 1.0 |
+| `WS_P4_7B` | 1024×600 | 7" | 170 | 1.00 | 1.0 |
+| `WS_S3_4B` | 480×480 | 4" | 170 | 1.00 | 1.0 |
+| `CYD_S3_8048` | 800×480 | 5" | 187 | **1.10** | 1.0 — was under-scaled |
+| `WS_S3_5B` | 1024×600 | 5" | 237 | 1.39 | 1.5 |
+| `WS_P4_4B` | 720×720 | 4" | 255 | 1.50 | 1.5 |
+| `WS_P4_5` | 720×1280 | 5" | 294 | **1.73** | 1.5 — was under-scaled |
+
+Two boards were visibly wrong under the old blanket split and one of them is a dev target, so
+every padding and font judgement made on `WS_P4_5` before this date was made ~15% too small.
+
+**`WS_P4_4B` and `WS_S3_4B` are the same layout problem in different pixels** — 720×720 at 1.5×
+is the same effective UI space as 480×480 at 1.0×. If the scaling approach is right they should be
+visually indistinguishable apart from sharpness, which makes them a free correctness check. **Not
+yet flashed as a pair.**
+
+Only `WS_P4_5` and `CYD_S3_3248` have been flashed since the change. The other six build clean but
+their appearance at the new scales is unverified — `CYD_S3_8048` is the one to look at first, since
+it moved.

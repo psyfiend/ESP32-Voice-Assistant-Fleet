@@ -1,5 +1,6 @@
 #include "GUIManager.h"
 #include "UIToolkit.h"
+#include "UITokens.h"
 #include "SystemReport.h"
 #include "bsp_loader.h"
 
@@ -45,7 +46,14 @@ void GUIManager::begin() {
 
     // --= ROOT SCREEN =--
     lv_obj_t *screen = lv_screen_active();
-    lv_obj_set_style_bg_color(screen, lv_color_hex(0x101010), LV_PART_MAIN); // Dark background
+
+    // Design tokens. Started here rather than in LVGL_Startup for the same
+    // reason UIToolkit is: this is the design system, not the engine. The
+    // viewport comes from the live screen so it is already rotated - deriving
+    // the grid from bsp_display.WIDTH/HEIGHT would be wrong on every board
+    // running at rotation 1 or 3.
+    UI::begin(lv_obj_get_width(screen), lv_obj_get_height(screen));
+    lv_obj_set_style_bg_color(screen, UI::c(UI::pal().GROUND), LV_PART_MAIN); // Dark background
     lv_obj_clear_flag        (screen, LV_OBJ_FLAG_SCROLLABLE);               // Disable global scrolling
 
     // --= LAYER 3: HEADER BAR =--

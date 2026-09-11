@@ -292,7 +292,7 @@ const DisplayConfig CYD_S3_3248W535_DISPLAY = {
     .PANEL_MODEL = "AXS15231B",
     .WIDTH       = 320,
     .HEIGHT      = 480,
-    .ROTATION    = 3,    // 0 = Portrait (USB on bottom), 1 = Landscape (USB on right), 2 = Inverted Portrait (USB on left), 3 = Inverted Landscape
+    .ROTATION    = 0,    // 0 = Portrait (USB on bottom), 1 = Landscape (USB on right), 2 = Inverted Portrait (USB on left), 3 = Inverted Landscape
 
     .BL_PIN      = 1,
     .BL_ON_LEVEL = 1, // Active HIGH
@@ -311,6 +311,10 @@ const DisplayConfig CYD_S3_3248W535_DISPLAY = {
     // ---= Init Commands =---
     .INIT_CMDS_RGB  = CYD_S3_3248W535_init,
     .INIT_CMDS_SIZE = sizeof(CYD_S3_3248W535_init),
+
+    // Panel diagonal in tenths of an inch (3.5" Guition JC3248W535).
+    // 320x480 over 3.5" = ~165 PPI, so bspUiScale() = 0.97.
+    .DIAGONAL_IN = 35,
 };
 inline const DisplayConfig& bsp_display = CYD_S3_3248W535_DISPLAY;
 

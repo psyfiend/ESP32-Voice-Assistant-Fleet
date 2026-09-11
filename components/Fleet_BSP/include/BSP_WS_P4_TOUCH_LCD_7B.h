@@ -117,6 +117,10 @@ const DisplayConfig WS_P4_TOUCH_LCD_7B_DISPLAY = {
     // ---= Init Commands =---
     .INIT_CMDS_DSI  = ws_p4_touch_lcd_7b_init,
     .INIT_CMDS_SIZE = sizeof(ws_p4_touch_lcd_7b_init) / sizeof(lcd_init_cmd_t),
+
+    // Panel diagonal in tenths of an inch (7.0" Waveshare P4-Touch-LCD-7B).
+    // 1024x600 over 7.0" = ~170 PPI, so bspUiScale() = 1.00.
+    .DIAGONAL_IN = 70,
 };
 inline const DisplayConfig& bsp_display = WS_P4_TOUCH_LCD_7B_DISPLAY;
 

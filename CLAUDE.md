@@ -246,6 +246,57 @@ the card library starts adding files. See `docs/design/startup.md` §3.5 — it 
 that break (`WS_S3_TOUCH_LCD_5B`'s `build_src_filter` exclusion, and `include/` subfolders not
 being on the include path automatically).
 
+## Design tokens — no colour or size literals in UI code
+
+Since Phase 2.2 (2026-09-10). `include/UITokens.h` is the single source for how anything looks.
+Design and the measurements behind it: `docs/design/tokens.md`; what a card *contains* is
+`docs/design/cards.md`.
+
+Four flat struct groups in the `Fleet_BSP` idiom — `UIPalette` (surfaces, accent, the **semantic
+state palette**, sensor tints), `UIMetrics` (radius, padding, border, shadow), `UIGrid`, `UIType` —
+reached through one namespace: `UI::pal()`, `UI::met()`, `UI::grid()`, `UI::type()`.
+
+Rules that are load-bearing rather than stylistic:
+
+- **No `lv_color_hex()` outside `UITokens.cpp`.** Use `UI::c(UI::pal().X)`. Borders go through
+  `UI::border()`, which derives from the *surface* when a scheme leaves `BORDER` at 0.
+- **Never cache a colour.** The active palette is a mutable *copy* of a scheme so `UI::setScheme()`
+  and `UI::setAccent()` can work live; a card that caches a colour will not repaint on a scheme
+  change.
+- **All token values are logical pixels.** Run them through `UI::sc()` at the point of use. Never
+  store a scaled value — the scale is per board.
+- **Columns and rows are derived, never declared.** Pick `TARGET_CARD_W`; the page fits as many
+  whole cards as the screen allows and stretches row height to fill. One token set gives 5x3 on
+  `WS_P4_5` and 2x3 on `CYD_S3_3248` portrait.
+- **Use `UI::part(LV_PART_MAIN)`** instead of `LV_PART_MAIN | LV_STATE_DEFAULT`, which is
+  deprecated and warns.
+- **Use `UI::tameScroll()`** on every scrollable container: vertical-only, no elastic springback,
+  no scrollbar. Rubber-banding looks bad at the refresh rates the S3 boards manage.
+
+### UI scale is derived from pixel density, not declared
+
+`-D HIGH_DPI_DISPLAY` and the `UI_SCALE` macro are **retired**. `DisplayConfig.DIAGONAL_IN`
+(tenths of an inch) plus the resolution give real PPI, and `bspUiScale()` in `bsp_loader.h` returns
+`PPI / 170`. The fleet spans 165-294 PPI; the old blanket 1.0/1.5 split left `CYD_S3_8048` and
+`WS_P4_5` visibly mis-scaled. `lv_display_set_dpi()` gets the real PPI too.
+
+`UI::minTouch()` returns 9 mm in real pixels — 60 px at 170 PPI, 104 px at 294 — so touch targets
+are derived rather than guessed per board.
+
+### Two costs worth knowing before adding anything visual
+
+- **One referenced font face is ~96 KB of flash.** Measured. Enabling a size in `lv_conf.h` is
+  free (the linker drops unreferenced font objects); *referencing* one is what costs. `UIType` is a
+  budget, not a style choice — and the MDI icon subset competes for the same flash.
+- **A card costs ~715 bytes of `lv_mem`**, LVGL's own 128 KB pool — which is a static array in
+  internal DRAM, not the system heap. `ESP.getFreeHeap()` barely moves when a widget is created;
+  `lv_mem_monitor()` is the instrument.
+
+### Anything drawn on a panel stays ASCII, except the degree sign
+
+LVGL's stock Montserrat covers ASCII plus a small symbol set. `·` (U+00B7) and `—` (U+2014) render
+as empty boxes on the panels. `°` is in range. Extending the range costs flash at the rate above.
+
 ## Naming: UI and GUI keep their capitals
 
 Project-wide, from 2026-09-09: the initialisms **UI** and **GUI** are always capitalised, in
