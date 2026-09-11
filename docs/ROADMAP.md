@@ -614,6 +614,13 @@ had **never been run** immediately exposed a real bug (#42). When scope has to b
 | 2.2 | Design system | **DONE 2026-09-10, hardware-verified.** `UITokens` - palette incl. semantic state colours, per-scheme metrics, derived grid, type scale. Reference page reachable from the System panel, three schemes switchable live. Panels ported off hardcoded colours. **MDI icon font deferred to 2.4** - see below. `docs/design/tokens.md` |
 | 2.3 | Memory budget spike | **DONE 2026-09-10, measured on `CYD_S3_3248`.** ~715 B per card in `lv_mem`; pool steady at 35% with dashboard + reference page. **Decision: neither lazy-loading nor a PSRAM `LV_MEM` is needed** - see below. No longer gates 2.5 |
 
+| 2.4 | `Card` base class | Grid placement with spans, entity binding, staleness handling, tap + long-press, compact/full variants. Also the agreed moment to introduce `src/UI/` and `src/Cards/` — see `docs/design/startup.md` §3.5 |
+| 2.5 | Page + grid engine | A Page renders a grid from a config struct; cards place with spans; correct on 3 different resolutions |
+| 2.6 | Tileview navigation | Swipe L/R between pages, U/D to menus; gesture conflicts resolved (§5.2); page indicator dots |
+| 2.7 | First 4 card types | `sensor`, `binary_sensor`, `switch`, `button` — bound to real HA entities over MQTT |
+| 2.8 | Header bar v2 | Configurable slot list: clock, WiFi/MQTT status, optional sensor slots |
+| 2.9 | **Display stack: Arduino_GFX -> `esp_lcd`** | Scheduled here deliberately, not left as "someday" - see `docs/FUTURE_IMPROVEMENTS.md` and `docs/research/display-stack-migration.md`. Unlocks real framebuffers, working rotation, and `esp_lvgl_adapter`. Done *after* the card system so there is a demanding workload to judge it against |
+
 **What 2.3 actually found, and why the decision went the way it did.**
 
 The question was framed as "how many cards fit". It turned out to be the wrong question, twice.
@@ -635,11 +642,6 @@ The question was framed as "how many cards fit". It turned out to be the wrong q
 **Moving `LV_MEM` to PSRAM stays available and is not needed yet.** At 35% used there is ample
 headroom, and widget access is frequent enough that PSRAM's slower access is a real cost. Revisit
 only if a future page genuinely fills the pool.
-| 2.4 | `Card` base class | Grid placement with spans, entity binding, staleness handling, tap + long-press, compact/full variants. Also the agreed moment to introduce `src/UI/` and `src/Cards/` — see `docs/design/startup.md` §3.5 |
-| 2.5 | Page + grid engine | A Page renders a grid from a config struct; cards place with spans; correct on 3 different resolutions |
-| 2.6 | Tileview navigation | Swipe L/R between pages, U/D to menus; gesture conflicts resolved (§5.2); page indicator dots |
-| 2.7 | First 4 card types | `sensor`, `binary_sensor`, `switch`, `button` — bound to real HA entities over MQTT |
-| 2.8 | Header bar v2 | Configurable slot list: clock, WiFi/MQTT status, optional sensor slots |
 
 ### Phase 3 — Build sheet
 
