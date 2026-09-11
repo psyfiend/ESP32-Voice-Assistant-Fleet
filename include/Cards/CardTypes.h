@@ -49,8 +49,28 @@ enum class CardState : uint8_t {
     ST_STALE,        // past desc.staleAfterMs - a tag, never a dim
     ST_LONG_STALE,   // past the second threshold - unmistakable
     ST_REFUSED,      // we commanded it and it did not happen. NOT staleness
+    ST_PARTIAL,      // SOME of what we commanded did not happen - see below
     ST_PAUSED,       // the user's own choice, so quiet is correct. May dim
 };
+
+// ST_PARTIAL exists because of the owner's rule for cards that command several
+// entities at once, and it is a genuinely different thing from ST_REFUSED:
+//
+//   "unless every single switch has failed then the card should continue to
+//    reflect the state of its children (on or off) but show a simple warning
+//    tag in the header. If every single child has failed, then the parent card
+//    should say failed."
+//
+// So a partial failure must NOT take over the card's body - the body is still
+// telling the truth about what the lights are doing, and replacing it with a
+// failure treatment would throw away correct information to report a partial
+// one. Only the tag changes. That is what stateColor() returning 0 for this
+// state encodes, and why the tag colour is asked for separately.
+inline bool cardStateOwnsBody(CardState s) {
+    return s == CardState::ST_REFUSED ||
+           s == CardState::ST_STALE   ||
+           s == CardState::ST_LONG_STALE;
+}
 
 // Dimming is rejected for staleness and permitted for pause, and cards.md
 // section 3 is explicit that the two must look different on purpose. This

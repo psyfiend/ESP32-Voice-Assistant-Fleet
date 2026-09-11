@@ -31,9 +31,21 @@
 // "groupable by room", and it is deliberately NOT the group card.
 // ---------------------------------------------------------------------------
 
+// How an active state is shown. cards.md section 4 specifies FILL - "the card
+// reflects state across its whole surface, not in a corner" - but the owner
+// recalled an earlier option worth comparing on glass rather than on paper,
+// where only the icon and name light up and the card keeps its surface. Both
+// are built so the choice is made by looking.
+enum class ActorStateStyle : uint8_t {
+    FILL_SURFACE = 0,   // cards.md section 4 as written
+    LIGHT_ICON,         // icon and name take the state colour; surface does not
+};
+
 class ActorCard : public Card {
 public:
     const char *typeName() const override { return "actor"; }
+
+    void setStateStyle(ActorStateStyle s) { _style = s; if (root()) render(); }
 
 protected:
     void buildBody(lv_obj_t *body) override;
@@ -45,6 +57,8 @@ private:
     // a bool so the caller can tell all / none / some apart in one read, which
     // is what rule 3 needs.
     uint8_t activeCount() const;
+
+    ActorStateStyle _style = ActorStateStyle::FILL_SURFACE;
 
     lv_obj_t *_disc  = nullptr;
     lv_obj_t *_icon  = nullptr;

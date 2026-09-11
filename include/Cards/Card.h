@@ -166,9 +166,17 @@ protected:
     // the reconcile window; if the echo never arrives, tick() reverts it and
     // dirties the entity. cards.md section 3 says that revert IS the "command
     // didn't take" event and needs no new plumbing - this is the code that
-    // gives it a face. How the refusal is DETECTED is documented at
-    // _cmdActive below, because it is not obvious.
-    bool command(const Entity *e, const EntityValue &v);
+    // gives it a face. How the refusal is DETECTED is documented at the
+    // command masks below, because it is not obvious.
+    // `slot` is the index into the primary list, so a card commanding several
+    // entities can tell afterwards WHICH of them refused. That distinction is
+    // the whole of the owner's partial-failure rule.
+    bool command(uint8_t slot, const EntityValue &v);
+
+    // Call once at the top of onTap(), before any command(). Resets the
+    // per-tap bookkeeping so "did everything I just asked for fail?" is a
+    // question about this tap alone.
+    void beginCommandBatch();
 
     // The card surface, for a subclass that tints its whole body - which
     // cards.md section 4 requires of a light ("reflects state across its whole
@@ -184,6 +192,8 @@ private:
     void applyState();                 // repaint chrome for _state
     CardState deriveState(uint32_t nowMs) const;
     bool resolveCommand();             // true if the outcome just became known
+    uint32_t tagColor() const;         // the badge's colour, which is NOT
+                                       // stateColor() - see ST_PARTIAL
     static void eventCb(lv_event_t *e);
 
     // --- Widget tree ------------------------------------------------------
@@ -200,8 +210,15 @@ private:
     lv_obj_t *_body     = nullptr;
     lv_obj_t *_header   = nullptr;   // null when HDR_NONE
     lv_obj_t *_lblArea  = nullptr;
-    lv_obj_t *_lblStale = nullptr;
+    lv_obj_t *_badge    = nullptr;   // STALE / FAILED / PARTIAL
     lv_obj_t *_diagonal = nullptr;   // ST_LONG_STALE: corner to corner
+
+    // The state tag has TWO HOMES, and that is the owner's correction: it used
+    // to live only in the header, so choosing HDR_NONE silently disabled the
+    // FAILED indicator. A failure signal must never depend on a cosmetic
+    // choice. With a header the tag sits in its right-hand slot, exactly as
+    // cards.md section 2 lays out; without one it floats at the card's
+    // top-right. Same object, reparented at build time.
 
     // lv_line stores its points BY POINTER and does not copy them, so they
     // must outlive the widget - which rules out a local, and rules out one
@@ -233,7 +250,7 @@ private:
     // flag to Entity - Fleet_Entities is dependency-free and stable, and this
     // is a UI concern - the card remembers what it asked for and compares.
     //
-    // Once pending clears on _cmdEnt:
+    // Once pending clears on a commanded entity:
     //   value == _cmdValue  -> the command took. Confirmed.
     //   anything else       -> it did not. ST_REFUSED.
     //
@@ -250,10 +267,18 @@ private:
     // registry's side (it is most of ROADMAP 4.2's rate limiting), so the card
     // is what has to adapt: resolveCommand() watches the pending flag from
     // pollState() and needs no notification at all.
-    const Entity *_cmdEnt    = nullptr;
-    EntityValue   _cmdValue;
-    bool          _cmdActive = false;   // a command is out, outcome unknown
-    bool          _refused   = false;   // the last one did not take
+    // ONE commanded value, not one per entity: a card that commands several
+    // entities is asking them all for the SAME state - that is what makes the
+    // aggregate light one card. Six EntityValues would be 336 bytes against a
+    // measured 2.5 KB card for a generality nothing needs. A future card that
+    // wants per-entity values overrides command() rather than paying here.
+    //
+    // The masks are indexed by primary slot, which is why CARD_PRIMARY_MAX is
+    // 6 and not 9 - one uint8_t of bits each.
+    EntityValue _cmdValue;
+    uint8_t     _cmdMask  = 0;   // bit i: command outstanding on primary i
+    uint8_t     _failMask = 0;   // bit i: primary i refused the last command
+    uint8_t     _sentMask = 0;   // bit i: primary i was part of the last tap
 
     static EntityRegistry *s_reg;
 };

@@ -26,6 +26,11 @@ CardHeaderStyle s_hdr = CardHeaderStyle::HDR_EXTERNAL;
 
 int s_scheme = 0;
 
+// Which actor treatment the page is wearing. Same idea as s_hdr: a knob rather
+// than a decision, because the question is "which of these do you prefer" and
+// that is answered by looking at both.
+ActorStateStyle s_actorStyle = ActorStateStyle::FILL_SURFACE;
+
 // Measured across the page build, in LVGL's own pool. ESP.getFreeHeap() is the
 // wrong instrument here and 2.3 established why: LV_USE_STDLIB_MALLOC is
 // LV_STDLIB_BUILTIN with LV_MEM_ADR 0, so every widget comes out of a 128 KB
@@ -63,6 +68,13 @@ void schemeCb(lv_event_t *e) {
     // their own. The cards themselves would survive a bare restyleAll(), and
     // that is the property worth having - it is what "never cache a colour"
     // buys. Rebuilding also re-runs the grid, which a metrics change needs.
+    CardDemo::show(*s_reg, *s_binder);
+}
+
+void actorCb(lv_event_t *e) {
+    (void)e;
+    s_actorStyle = (s_actorStyle == ActorStateStyle::FILL_SURFACE)
+                 ? ActorStateStyle::LIGHT_ICON : ActorStateStyle::FILL_SURFACE;
     CardDemo::show(*s_reg, *s_binder);
 }
 
@@ -150,6 +162,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     topButton(bar, UI::pal().name, schemeCb);
     topButton(bar, s_hdr == CardHeaderStyle::HDR_EXTERNAL ? "Tag"
                  : s_hdr == CardHeaderStyle::HDR_INTERNAL ? "Bar" : "No hdr", headerCb);
+    topButton(bar, s_actorStyle == ActorStateStyle::FILL_SURFACE ? "Fill" : "Icon", actorCb);
 
     // --- The grid ---------------------------------------------------------
     lv_obj_t *host = lv_obj_create(col);
@@ -201,6 +214,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
         c->bindPrimary(a);
         if (idB) c->bindPrimary(ent(idB));
         c->setLabel(label).setHeaderStyle(s_hdr);
+        c->setStateStyle(s_actorStyle);
         s_page->add(c);
     };
 
@@ -229,18 +243,23 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     // IT, and no stale card anywhere on this page dims.
     measure(SYS_ENT_UPTIME, "Paused",    nullptr, nullptr, nullptr, true);
 
-    lv_screen_load(s_screen);
-    if (oldPage) delete oldPage;      // unregisters its cards from the binder
-    if (old)     lv_obj_delete(old);
-
+    // MEASURED HERE, before the old page is freed, and that ordering is the
+    // whole point. Taken afterwards it reports (new page - old page), which on
+    // a rebuild is roughly zero and underflows an unsigned subtraction into
+    // the 4294966956-style nonsense the first flash produced. What a page
+    // costs is what it ADDS while it is the only new thing in the pool.
     lv_mem_monitor(&mon);
     const uint32_t used  = mon.total_size - mon.free_size;
     const uint8_t  cards = s_page->count();
-    Serial.printf("[Cards] %u cards, lv_mem %u -> %u (+%u, %u B/card), frag %u%%\n",
+    const int32_t  delta = (int32_t)used - (int32_t)s_lvBefore;
+    Serial.printf("[Cards] %u cards, lv_mem %u -> %u (%+ld, %ld B/card), frag %u%%\n",
                   (unsigned)cards, (unsigned)s_lvBefore, (unsigned)used,
-                  (unsigned)(used - s_lvBefore),
-                  cards ? (unsigned)((used - s_lvBefore) / cards) : 0u,
+                  (long)delta, cards ? (long)(delta / cards) : 0L,
                   (unsigned)mon.frag_pct);
+
+    lv_screen_load(s_screen);
+    if (oldPage) delete oldPage;      // unregisters its cards from the binder
+    if (old)     lv_obj_delete(old);
 }
 
 } // namespace CardDemo

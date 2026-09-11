@@ -61,6 +61,10 @@ public:
 private:
     void placeCard(Card *c);
 
+    // Grow the row descriptor so `need` rows exist. Rows past the viewport are
+    // real rows that scroll into view, not overflow.
+    void ensureRows(uint8_t need);
+
     lv_obj_t   *_root   = nullptr;
     CardBinder *_binder = nullptr;
     Card       *_cards[CARD_PAGE_MAX] = {nullptr};
@@ -69,8 +73,22 @@ private:
     // LVGL's grid descriptors are held BY POINTER for the lifetime of the
     // container, not copied, so they are members rather than locals. +1 for
     // LV_GRID_TEMPLATE_LAST, which is how LVGL finds the end of each array.
+    //
+    // THE ROW ARRAY IS SIZED FOR EVERY CARD, not for the visible rows, and
+    // that is not defensive padding - it is the fix for a hard freeze. The row
+    // descriptor used to hold exactly UIGrid::rows entries, because the page
+    // scrolls and rows are conceptually unbounded. But placement kept flowing
+    // into row 3, 4, 5... and LVGL then indexed a three-entry array with a 4,
+    // read past the end, and hit LV_ASSERT - which lv_conf.h defines as
+    // `while(1);`. On WS_P4_5 the nine demo cards happened to fill exactly
+    // 5x2 with nothing left over, so it never showed; on CYD_S3_3248 at two
+    // columns the same nine cards need five rows and it locked the board
+    // solid. A page can never place more rows than it has cards.
     lv_coord_t _colDsc[16 + 1];
-    lv_coord_t _rowDsc[16 + 1];
+    lv_coord_t _rowDsc[CARD_PAGE_MAX + 1];
+
+    uint8_t    _rowsDefined = 0;   // entries currently valid in _rowDsc
+    uint16_t   _cellH       = 0;   // the token height every row gets
 
     // The cursor placement walks. Rows are unbounded - a page taller than the
     // viewport scrolls, which is why every container here goes through

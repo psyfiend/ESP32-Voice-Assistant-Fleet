@@ -46,17 +46,20 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder) {
     // Rows are the token's real pixel height. Unlike columns, rows must NOT be
     // fractions: the page scrolls vertically, so the row count is open-ended
     // and a fraction of an unbounded height is meaningless.
-    uint8_t rows = g.rows;
-    if (rows < 1) rows = 1;
-    if (rows > 16) rows = 16;
-    for (uint8_t i = 0; i < rows; i++) _rowDsc[i] = g.cellH;
-    _rowDsc[rows] = LV_GRID_TEMPLATE_LAST;
+    //
+    // UIGrid::rows is how many rows FIT, which is a different question from
+    // how many rows EXIST. Cards beyond the first screenful are placed into
+    // real rows that scroll into view, and every one of them has to be in this
+    // descriptor before LVGL reads it - see the header for what happens when
+    // it is not.
+    _cellH       = g.cellH;
+    _rowsDefined = 0;
+    ensureRows(g.rows < 1 ? 1 : g.rows);
 
-    lv_obj_set_grid_dsc_array(_root, _colDsc, _rowDsc);
-    lv_obj_set_layout        (_root, LV_LAYOUT_GRID);
+    lv_obj_set_layout(_root, LV_LAYOUT_GRID);
 
-    Serial.printf("[Cards] Page %ux%u, cell %ux%u px\n",
-                  (unsigned)cols, (unsigned)rows,
+    Serial.printf("[Cards] Page %ux%u visible, cell %ux%u px\n",
+                  (unsigned)cols, (unsigned)_rowsDefined,
                   (unsigned)g.cellW, (unsigned)g.cellH);
 }
 
@@ -75,6 +78,20 @@ Card *CardPage::add(Card *c) {
     placeCard(c);
     if (_binder) _binder->add(c);
     return c;
+}
+
+void CardPage::ensureRows(uint8_t need) {
+    if (need > CARD_PAGE_MAX) need = CARD_PAGE_MAX;
+    if (need <= _rowsDefined) return;
+
+    for (uint8_t i = _rowsDefined; i < need; i++) _rowDsc[i] = _cellH;
+    _rowDsc[need] = LV_GRID_TEMPLATE_LAST;
+    _rowsDefined  = need;
+
+    // Re-applied because the array's LENGTH changed. LVGL keeps the pointer,
+    // not a copy, so the contents are already live - but it caches the row
+    // count at set time and has to be told again.
+    lv_obj_set_grid_dsc_array(_root, _colDsc, _rowDsc);
 }
 
 void CardPage::placeCard(Card *c) {
@@ -106,7 +123,11 @@ void CardPage::placeCard(Card *c) {
         }
     }
 
-    const uint8_t spanY = p.prefSpanY ? p.prefSpanY : 1;
+    uint8_t spanY = p.prefSpanY ? p.prefSpanY : 1;
+
+    // Every row this card touches must exist before LVGL is told about it.
+    if (_curRow + spanY > CARD_PAGE_MAX) spanY = 1;
+    ensureRows((uint8_t)(_curRow + spanY));
 
     lv_obj_set_grid_cell(c->root(),
                          LV_GRID_ALIGN_STRETCH, _curCol, spanX,
@@ -119,6 +140,8 @@ void CardPage::placeCard(Card *c) {
 void CardPage::relayout() {
     _curCol = 0;
     _curRow = 0;
+    // Not reset: _rowsDefined only ever grows, and shrinking it would mean
+    // re-applying a shorter array while cards still reference the rows in it.
     for (uint8_t i = 0; i < _n; i++) if (_cards[i]) placeCard(_cards[i]);
 }
 

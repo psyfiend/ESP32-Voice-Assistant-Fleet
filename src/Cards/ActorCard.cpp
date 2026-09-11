@@ -77,16 +77,28 @@ void ActorCard::render() {
     // being on is content, not decoration, so it does not change colour when
     // the dashboard does.
     const uint32_t chrome = stateColor();   // stale/refused override, or 0
-    if (isOn && !chrome) {
-        lv_obj_set_style_bg_color(surface(), UI::c(p.ST_ACTIVE), 0);
-        lv_obj_set_style_bg_opa  (_disc, LV_OPA_20, 0);
-        lv_obj_set_style_bg_color(_disc, UI::c(p.SURFACE), 0);
+    const bool fill = (_style == ActorStateStyle::FILL_SURFACE);
+
+    if (isOn && !chrome && fill) {
+        // The whole surface. cards.md section 4 as written.
+        lv_obj_set_style_bg_color  (surface(), UI::c(p.ST_ACTIVE), 0);
+        lv_obj_set_style_bg_opa    (_disc, LV_OPA_20, 0);
+        lv_obj_set_style_bg_color  (_disc, UI::c(p.SURFACE), 0);
         lv_obj_set_style_text_color(_icon, UI::c(p.SURFACE), 0);
         lv_obj_set_style_text_color(_name, UI::c(p.SURFACE), 0);
+    } else if (isOn && !chrome) {
+        // Only the icon lights, in the state colour, with the disc tinted
+        // behind it. The card keeps its own surface, which reads as quieter
+        // across a page where several things are on at once.
+        lv_obj_set_style_bg_color  (surface(), UI::c(p.SURFACE), 0);
+        lv_obj_set_style_bg_opa    (_disc, LV_OPA_30, 0);
+        lv_obj_set_style_bg_color  (_disc, UI::c(p.ST_ACTIVE), 0);
+        lv_obj_set_style_text_color(_icon, UI::c(p.ST_ACTIVE), 0);
+        lv_obj_set_style_text_color(_name, UI::c(p.ST_ACTIVE), 0);
     } else {
-        lv_obj_set_style_bg_color(surface(), UI::c(p.SURFACE), 0);
-        lv_obj_set_style_bg_opa  (_disc, LV_OPA_COVER, 0);
-        lv_obj_set_style_bg_color(_disc, UI::c(p.SURFACE_ALT), 0);
+        lv_obj_set_style_bg_color  (surface(), UI::c(p.SURFACE), 0);
+        lv_obj_set_style_bg_opa    (_disc, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color  (_disc, UI::c(p.SURFACE_ALT), 0);
         lv_obj_set_style_text_color(_icon, UI::c(chrome ? chrome : p.ST_IDLE), 0);
         lv_obj_set_style_text_color(_name, UI::c(p.TEXT), 0);
     }
@@ -109,7 +121,7 @@ void ActorCard::render() {
         snprintf(buf, sizeof(buf), "%u/%u", (unsigned)active, (unsigned)total);
         lv_label_set_text          (_mixed, buf);
         lv_obj_set_style_text_font (_mixed, t.TAG, 0);
-        lv_obj_set_style_text_color(_mixed, UI::c(p.SURFACE), 0);
+        lv_obj_set_style_text_color(_mixed, UI::c(fill && isOn ? p.SURFACE : p.TEXT_DIM), 0);
         lv_obj_clear_flag          (_mixed, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag            (_mixed, LV_OBJ_FLAG_HIDDEN);
@@ -122,13 +134,15 @@ void ActorCard::onTap() {
     // OF THE MAJORITY rather than of each light individually: a room with two
     // lights on and one off should go fully off on the first tap, not swap
     // which one is lit.
-    const uint8_t total  = primaryCount();
+    const uint8_t total = primaryCount();
     if (!total) return;
-    const bool    wantOn = activeCount() * 2 <= total;
 
+    // Resets the per-tap masks. Without this the failure question would be
+    // asked of every tap ever made rather than of this one.
+    beginCommandBatch();
+
+    const bool wantOn = activeCount() * 2 <= total;
     for (uint8_t i = 0; i < total; i++) {
-        const Entity *e = primary(i);
-        if (!e || !e->desc.writable) continue;
-        command(e, EntityValue::makeBool(wantOn));
+        command(i, EntityValue::makeBool(wantOn));
     }
 }
