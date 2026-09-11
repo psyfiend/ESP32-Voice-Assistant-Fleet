@@ -80,9 +80,25 @@ const UIMetrics UI_MET_LIGHT = {
 // ---------------------------------------------------------------------------
 namespace {
 
-UIPalette s_pal = UI_PAL_SLATE;
+// Fleet, not Slate: the port onto tokens should be invisible on glass, so the
+// default has to be today's colours. Switching the default to Slate or Paper is
+// a one-line change once the new look has been seen on a board.
+UIPalette s_pal = UI_PAL_FLEET;
 UIMetrics s_met = UI_MET_DARK;
-UIGrid    s_grid = { .TARGET_CARD_W = 135, .ASPECT_PCT = 85, .GAP = 12, .INSET = 14,
+
+// TARGET_CARD_W is 130, not the 135 the design bench used, and the difference
+// is the bench's fault rather than a change of mind.
+//
+// The bench modelled WS_P4_5 at a hardcoded 1.5x because that is what
+// -D HIGH_DPI_DISPLAY gave it. The board is really 1.73x (294 PPI), so every
+// logical value tuned in the bench renders ~15% larger here than it appeared
+// there. At 135 that pushed WS_P4_5 from the intended 5x3 down to 4x2.
+//
+// 130 reproduces the layouts actually chosen:
+//   WS_P4_5 landscape      5x3 of 230x210 px
+//   CYD_S3_3248 portrait   2x3 of 141x144 px
+//   CYD_S3_3248 landscape  3x2 of 144x141 px
+UIGrid    s_grid = { .TARGET_CARD_W = 130, .ASPECT_PCT = 85, .GAP = 12, .INSET = 14,
                      .cols = 1, .rows = 1, .cellW = 0, .cellH = 0 };
 
 int32_t s_vpW = 0, s_vpH = 0;
