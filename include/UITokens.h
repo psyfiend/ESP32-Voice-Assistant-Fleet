@@ -114,6 +114,7 @@ struct UIType {
 extern const UIPalette UI_PAL_SLATE;  // dark, the owner's primary
 extern const UIPalette UI_PAL_PAPER;  // light
 extern const UIPalette UI_PAL_FLEET;  // today's shipped UI, for comparison
+extern const UIPalette UI_PAL_MIDNIGHT; // Slate's ground, Fleet's cyan - the owner's pick
 
 extern const UIMetrics UI_MET_DARK;   // 1px lighten @40% border, no shadow needed
 extern const UIMetrics UI_MET_LIGHT;  // no border, leans on the shadow

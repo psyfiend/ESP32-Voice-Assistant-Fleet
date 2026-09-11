@@ -91,9 +91,10 @@ lv_obj_t *sampleCard(lv_obj_t *parent, const char *name, const char *value, uint
 void schemeCb(lv_event_t *e) {
     const int which = (int)(intptr_t)lv_event_get_user_data(e);
     switch (which) {
-        case 0: UI::setScheme(UI_PAL_FLEET, UI_MET_DARK);  break;
-        case 1: UI::setScheme(UI_PAL_SLATE, UI_MET_DARK);  break;
-        default: UI::setScheme(UI_PAL_PAPER, UI_MET_LIGHT); break;
+        case 0: UI::setScheme(UI_PAL_FLEET,    UI_MET_DARK);  break;
+        case 1: UI::setScheme(UI_PAL_SLATE,    UI_MET_DARK);  break;
+        case 2: UI::setScheme(UI_PAL_MIDNIGHT, UI_MET_DARK);  break;
+        default: UI::setScheme(UI_PAL_PAPER,   UI_MET_LIGHT); break;
     }
     ReferencePage::show();   // rebuild against the new tokens
 }
@@ -156,7 +157,8 @@ void show() {
     button(bar, "Back",  backCb,   nullptr);
     button(bar, "Fleet", schemeCb, (void *)(intptr_t)0);
     button(bar, "Slate", schemeCb, (void *)(intptr_t)1);
-    button(bar, "Paper", schemeCb, (void *)(intptr_t)2);
+    button(bar, "Night", schemeCb, (void *)(intptr_t)2);
+    button(bar, "Paper", schemeCb, (void *)(intptr_t)3);
 
     // --- The numbers --------------------------------------------------------
     lv_mem_monitor_t mon;
@@ -233,7 +235,7 @@ void show() {
     const uint32_t tints[] = { UI::pal().TINT_TEMP, UI::pal().TINT_HUMID, UI::pal().TINT_LIGHT,
                                UI::pal().TINT_AIR,  UI::pal().TINT_POWER, UI::pal().TINT_TEMP,
                                UI::pal().TINT_HUMID, UI::pal().TINT_LIGHT };
-    for (int i = 0; i < SAMPLE_CARDS; i++) sampleCard(r, names[i], "21.4", tints[i]);
+    for (int i = 0; i < SAMPLE_CARDS; i++) sampleCard(r, names[i], "21.4°", tints[i]);
 
     lv_mem_monitor(&mon);
     const uint32_t after = mon.total_size - mon.free_size;

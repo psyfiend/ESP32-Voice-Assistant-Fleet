@@ -1,6 +1,7 @@
 # Design tokens — Phase 2.2 (issue #13)
 
-**Status: proposed 2026-09-10, not yet implemented.** Design agreed before the code, per ROADMAP §2.2.
+**Status: implemented and hardware-verified 2026-09-10.** Design was agreed before the code, per
+ROADMAP §2.2. Everything below held up on glass except the grid target width, corrected in §6.
 
 Companion to `docs/design/cards.md` (what a card contains) and `docs/design/startup.md` (where the
 UI layer sits). This file covers **how things look** and nothing else — see §1 for why that
@@ -225,3 +226,41 @@ appearance slightly as it starts reading tokens. That is the owner's stated pref
 prefer all visual customization and specification not live in the actual UI code"* — and it is the
 right call, but it means the Phase 2.1 regression baseline ("does it look identical") no longer
 applies from here on.
+
+---
+
+## 6. What hardware changed — measured 2026-09-10
+
+Flashed to `WS_P4_5` (294 PPI, 1.73×) and `CYD_S3_3248` (165 PPI, 0.97×, portrait).
+
+**The grid derivation works.** One token set, two boards, no per-board layout code:
+
+```
+[UI] Scheme "Fleet" | 5x3 grid of 230x210 px | scale 1.73x (294 PPI)   WS_P4_5
+[UI] Scheme "Fleet" | 2x3 grid of 141x144 px | scale 0.97x (165 PPI)   CYD_S3_3248
+```
+
+**`TARGET_CARD_W` is 130, not the 135 the bench used.** The browser bench modelled `WS_P4_5` at a
+hardcoded 1.5× because that is what `HIGH_DPI_DISPLAY` gave it; the board is really 1.73×. Every
+value tuned in the bench therefore rendered ~15% larger on real glass, and at 135 that cost a
+whole column and a whole row. Corrected in both the firmware and the bench.
+
+**The measured card cost.** `CYD_S3_3248`, 8 sample cards, repeated across all three schemes:
+
+```
+713-723 bytes per card | pool 35% used, 29% frag (stable)
+```
+
+The 10-byte spread is allocator noise — block headers, alignment, and which free hole each of the
+24 objects lands in. The schemes build identical widget trees and differ only in style property
+values, so scheme choice costs nothing.
+
+**Font range is ASCII plus a small symbol set.** `·` (U+00B7) and `—` (U+2014) rendered as tofu
+boxes. The degree sign is in range and works. Rule for anything drawn on these panels: **stay
+ASCII, except `°`**, unless the font range is deliberately extended — which costs flash at the
+rate in §3.
+
+**Scrolling needed taming.** `UI::tameScroll()` — vertical-only, no elastic rubber-banding, no
+scrollbar. The springback at the end of a scroll looks poor at the refresh rates the S3 boards
+manage, and a slightly-too-wide row must never be able to start a sideways drag. Call it on every
+scrollable container.

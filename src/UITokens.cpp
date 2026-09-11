@@ -63,6 +63,22 @@ const UIPalette UI_PAL_FLEET = {
     FLEET_STATE_AND_TINTS
 };
 
+// The owner's verdict after seeing all three on glass: Slate's ground, Fleet's
+// blue. This is what the runtime-copy design was for - the same result is
+// reachable with setScheme(UI_PAL_SLATE, ...) + setAccent(0x00A8FF), but a
+// named scheme is easier to pick from a button.
+const UIPalette UI_PAL_MIDNIGHT = {
+    .name        = "Midnight",
+    .GROUND      = 0x1A1F27,   // Slate
+    .SURFACE     = 0x212429,
+    .SURFACE_ALT = 0x2B2F36,
+    .TEXT        = 0xF0F2F4,
+    .TEXT_DIM    = 0x98A0AA,
+    .ACCENT      = 0x00A8FF,   // Fleet cyan
+    .BORDER      = 0,
+    FLEET_STATE_AND_TINTS
+};
+
 #undef FLEET_STATE_AND_TINTS
 
 // Dark schemes take a hairline border because a dark card on a dark ground
