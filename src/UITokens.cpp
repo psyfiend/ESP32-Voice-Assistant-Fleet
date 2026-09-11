@@ -217,6 +217,13 @@ lv_color_t border() {
                               s_met.BORDER_OPA_PCT));
 }
 
+void tameScroll(lv_obj_t *o) {
+    lv_obj_set_scroll_dir  (o, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(o, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_clear_flag      (o, LV_OBJ_FLAG_SCROLL_ELASTIC);
+    lv_obj_clear_flag      (o, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
+}
+
 int32_t minTouch() {
     const uint16_t ppi = bspPixelDensity();
     if (!ppi) return sc(44);          // no density declared — a sane default

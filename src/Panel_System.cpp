@@ -127,11 +127,15 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_style_bg_opa         (_ui_actions, LV_OPA_TRANSP, 0);
     lv_obj_set_style_pad_all        (_ui_actions, 0, 0);
     lv_obj_set_style_border_width   (_ui_actions, 0, 0);
-    lv_obj_set_style_pad_gap        (_ui_actions, UIToolkit::sc(10), 0);
+    lv_obj_set_style_pad_gap        (_ui_actions, UIToolkit::sc(8), 0);
+    lv_obj_clear_flag               (_ui_actions, LV_OBJ_FLAG_SCROLLABLE);
+    UI::tameScroll                  (_ui_actions);
 
     // Button: Dump Config
     lv_obj_t* btn = lv_button_create(_ui_actions);
     lv_obj_set_height               (btn, UIToolkit::sc(32));
+    lv_obj_set_width                (btn, LV_SIZE_CONTENT);
+    lv_obj_set_flex_grow            (btn, 1);   // two buttons split the row evenly
     lv_obj_add_event_cb             (btn, btn_action_cb, LV_EVENT_CLICKED, this);
     lv_obj_set_style_bg_color       (btn, UI::c(UI::pal().ACCENT), 0); // Cyan
     
@@ -146,6 +150,8 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // 4 settings surface instead of being throwaway scaffolding.
     lv_obj_t* btnRef = lv_button_create(_ui_actions);
     lv_obj_set_height               (btnRef, UIToolkit::sc(32));
+    lv_obj_set_width                (btnRef, LV_SIZE_CONTENT);
+    lv_obj_set_flex_grow            (btnRef, 1);
     lv_obj_add_event_cb             (btnRef, [](lv_event_t *e) {
                                         (void)e; ReferencePage::show();
                                      }, LV_EVENT_CLICKED, NULL);
@@ -154,7 +160,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_style_border_color   (btnRef, UI::border(), 0);
 
     lv_obj_t* lblRef = lv_label_create(btnRef);
-    lv_label_set_text               (lblRef, "Design Tokens");
+    lv_label_set_text               (lblRef, "Tokens");
     lv_obj_center                   (lblRef);
     lv_obj_set_style_text_font      (lblRef, UIToolkit::Font_Button, 0);
     lv_obj_set_style_text_color     (lblRef, UI::c(UI::pal().TEXT), 0);

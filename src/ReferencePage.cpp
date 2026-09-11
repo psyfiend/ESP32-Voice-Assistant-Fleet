@@ -30,6 +30,7 @@ lv_obj_t *section(lv_obj_t *parent, const char *title) {
     lv_obj_set_style_pad_all      (row, 0, 0);
     lv_obj_set_style_pad_gap      (row, UI::sc(6), 0);
     lv_obj_clear_flag             (row, LV_OBJ_FLAG_SCROLLABLE);
+    UI::tameScroll                (row);
     return row;
 }
 
@@ -102,6 +103,8 @@ void backCb(lv_event_t *e) { (void)e; ReferencePage::close(); }
 lv_obj_t *button(lv_obj_t *parent, const char *text, lv_event_cb_t cb, void *ud) {
     lv_obj_t *b = lv_button_create(parent);
     lv_obj_set_height             (b, UI::minTouch());   // 9 mm, derived
+    lv_obj_set_width              (b, LV_SIZE_CONTENT);
+    lv_obj_set_flex_grow          (b, 1);                // share the row, never overflow
     lv_obj_set_style_bg_color     (b, UI::c(UI::pal().ACCENT), 0);
     lv_obj_set_style_radius       (b, UI::sc(UI::met().RADIUS / 2), 0);
     lv_obj_add_event_cb           (b, cb, LV_EVENT_CLICKED, ud);
@@ -136,6 +139,7 @@ void show() {
     lv_obj_set_style_border_width (col, 0, 0);
     lv_obj_set_style_pad_all      (col, UI::sc(UI::grid().INSET), 0);
     lv_obj_set_style_pad_gap      (col, UI::sc(4), 0);
+    UI::tameScroll                (col);
 
     // --- Top bar: identity, schemes, back -----------------------------------
     lv_obj_t *bar = lv_obj_create(col);
@@ -147,6 +151,7 @@ void show() {
     lv_obj_set_style_pad_all      (bar, 0, 0);
     lv_obj_set_style_pad_gap      (bar, UI::sc(6), 0);
     lv_obj_clear_flag             (bar, LV_OBJ_FLAG_SCROLLABLE);
+    UI::tameScroll                (bar);
 
     button(bar, "Back",  backCb,   nullptr);
     button(bar, "Fleet", schemeCb, (void *)(intptr_t)0);
@@ -160,17 +165,21 @@ void show() {
     lv_obj_t *stats = lv_label_create(col);
     lv_obj_set_style_text_font (stats, UI::type().TAG, 0);
     lv_obj_set_style_text_color(stats, UI::c(UI::pal().TEXT_DIM), 0);
+    lv_obj_set_width           (stats, lv_pct(100));
+    lv_label_set_long_mode     (stats, LV_LABEL_LONG_WRAP);
     lv_label_set_text_fmt(stats,
-        "%s  ·  %u PPI  ·  scale %d.%02dx  ·  grid %ux%u of %ux%u  ·  touch %upx\n"
-        "lv_mem %u/%u KB used (%u%%)  ·  per card ~%u B  ·  internal heap %u KB",
+        "%s | %u PPI | scale %d.%02dx | touch %upx\n"
+        "grid %ux%u of %ux%u px\n"
+        "lv_mem %u/%u KB (%u%%) frag %u%%\n"
+        "per card ~%u B | int heap %u KB",
         UI::pal().name,
         (unsigned)bspPixelDensity(),
-        (int)bspUiScale(), (int)((bspUiScale() - (int)bspUiScale()) * 100),
+        (int)bspUiScale(), (int)((bspUiScale() - (int)bspUiScale()) * 100 + 0.5f),
+        (unsigned)UI::minTouch(),
         (unsigned)UI::grid().cols, (unsigned)UI::grid().rows,
         (unsigned)UI::grid().cellW, (unsigned)UI::grid().cellH,
-        (unsigned)UI::minTouch(),
         (unsigned)((mon.total_size - mon.free_size) / 1024), (unsigned)(mon.total_size / 1024),
-        (unsigned)mon.used_pct,
+        (unsigned)mon.used_pct, (unsigned)mon.frag_pct,
         (unsigned)s_perCard,
         (unsigned)(ESP.getFreeHeap() / 1024));
 
@@ -184,7 +193,7 @@ void show() {
     chip(r, "accent",  UI::pal().ACCENT);
 
     // --- State: the palette that carries meaning ----------------------------
-    r = section(col, "STATE  ·  meaning, not decoration");
+    r = section(col, "STATE - meaning, not decoration");
     chip(r, "active", UI::pal().ST_ACTIVE);
     chip(r, "idle",   UI::pal().ST_IDLE);
     chip(r, "ok",     UI::pal().ST_OK);
@@ -204,8 +213,8 @@ void show() {
     lv_obj_set_flex_flow(r, LV_FLEX_FLOW_COLUMN);
     struct { const lv_font_t *f; const char *s; } faces[] = {
         { UI::type().VALUE, "23.4  value" },
-        { UI::type().NAME,  "Deck  ·  name" },
-        { UI::type().TAG,   "OUTDOOR  ·  tag / status row" },
+        { UI::type().NAME,  "Deck - name" },
+        { UI::type().TAG,   "OUTDOOR - tag / status row" },
     };
     for (auto &f : faces) {
         lv_obj_t *l = lv_label_create(r);
@@ -215,7 +224,7 @@ void show() {
     }
 
     // --- Cards, and the measurement -----------------------------------------
-    r = section(col, "CARDS  ·  live grid metrics");
+    r = section(col, "CARDS - live grid metrics");
 
     lv_mem_monitor(&mon);
     s_lvUsedBefore = mon.total_size - mon.free_size;
@@ -229,14 +238,19 @@ void show() {
     lv_mem_monitor(&mon);
     const uint32_t after = mon.total_size - mon.free_size;
     if (after > s_lvUsedBefore) s_perCard = (after - s_lvUsedBefore) / SAMPLE_CARDS;
-
-    Serial.printf("[Ref] %s | %u cards cost %u B of lv_mem (%u B each) | pool %u%% used\n",
-                  UI::pal().name, (unsigned)SAMPLE_CARDS,
-                  (unsigned)(after - s_lvUsedBefore), (unsigned)s_perCard,
-                  (unsigned)mon.used_pct);
-
     lv_screen_load(s_screen);
     if (old) lv_obj_delete(old);   // after the load, never before
+
+    // Report only once the previous page is gone. Reading used_pct before the
+    // delete counted BOTH pages, which is why the pool appeared to jump from
+    // 36% to 54% on the first rebuild and then sit there - that was peak usage
+    // during a rebuild, not steady state, and not a leak.
+    lv_mem_monitor(&mon);
+    Serial.printf("[Ref] %s | %u cards cost %u B of lv_mem (%u B each) | "
+                  "pool %u%% used, %u%% frag\n",
+                  UI::pal().name, (unsigned)SAMPLE_CARDS,
+                  (unsigned)(after - s_lvUsedBefore), (unsigned)s_perCard,
+                  (unsigned)mon.used_pct, (unsigned)mon.frag_pct);
 }
 
 } // namespace ReferencePage

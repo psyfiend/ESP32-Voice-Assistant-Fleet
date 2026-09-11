@@ -94,11 +94,12 @@ struct UIGrid {
 // ---------------------------------------------------------------------------
 // 4. Type — fleet-wide
 // ---------------------------------------------------------------------------
-// LVGL compiles fixed bitmap faces, so this is a shortlist, not a scale.
-// NOTE: lv_conf.h currently enables every Montserrat size from 8 to 48 — 21
-// faces, most of them unused. Trimming that to the set named here is real flash
-// back, and it competes directly with the MDI icon subset for the same budget.
-// Measured under #14 before the subset is generated.
+// LVGL compiles fixed bitmap faces, so this is a shortlist, not a scale - and
+// the shortlist is a FLASH BUDGET. Measured on WS_P4_5: one referenced face
+// costs ~96 KB. Enabling a size in lv_conf.h is free, because the linker drops
+// unreferenced font objects; REFERENCING one is what costs. Every entry added
+// here is another ~96 KB, and the MDI icon subset competes for the same budget.
+// See docs/design/tokens.md section 3.
 struct UIType {
     const lv_font_t *VALUE;   // the number on a measure card
     const lv_font_t *NAME;    // card name
@@ -154,6 +155,17 @@ lv_color_t border();                     // BORDER, or derived from SURFACE
 inline lv_style_selector_t part(lv_part_t p, lv_state_t s = LV_STATE_DEFAULT) {
     return (lv_style_selector_t)p | (lv_style_selector_t)s;
 }
+
+// Scroll behaviour, applied to any container that may overflow.
+//
+// Three things, all of which matter more on these panels than on a phone:
+//   - vertical only, so a slightly-too-wide row can never start a sideways drag
+//   - no elastic rubber-banding at the ends, which looks terrible at the refresh
+//     rates the S3 boards manage
+//   - no scrollbar, since it is one more thing to redraw
+//
+// Call it on every scrollable container rather than remembering three flags.
+void tameScroll(lv_obj_t *o);
 
 // Minimum comfortable touch target: ~9 mm, the width of a fingertip. Derived
 // from real density, so it is 60 px at 170 PPI and 104 px at 294 PPI rather
