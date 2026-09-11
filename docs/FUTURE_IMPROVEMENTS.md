@@ -18,6 +18,77 @@ flashed** — identical on-device behaviour is still unverified.
 
 ## LVGL / Display
 
+> **The three display items below have one answer: move off Arduino_GFX onto `esp_lcd`.**
+> Scheduled as **ROADMAP milestone 2.9**, after the card system and before Phase 3 — deliberately
+> given a slot rather than left as an ephemeral "later". Full analysis in
+> `docs/research/display-stack-migration.md`. The short version is here so this file stands alone.
+
+### 2.9 — Arduino_GFX to `esp_lcd`
+
+**This is not a framework migration.** arduino-esp32 3.x *is* ESP-IDF 5.x underneath, and the
+libraries are already linked into every binary we ship. Verified on this machine:
+
+- `esp_lcd`, `esp_lcd_mipi_dsi.h` and `esp_lcd_panel_rgb.h` are on the include path for both P4
+  package variants, and `-lesp_lcd` is in **every** environment's default link flags.
+- `-lesp_driver_ppa` is already linked on the P4 variants. `SOC_PPA_SUPPORTED` is `1` there and
+  undefined on S3, which is the real gate — the header ships for every target, so its presence
+  proves nothing.
+- Arduino_GFX's own RGB and DSI classes turn out to be thin wrappers over these same `esp_lcd`
+  calls.
+
+So "port to `esp_lcd`" means *removing a wrapper*, not adopting a new stack. No `platformio.ini`
+change is needed to start calling it.
+
+**Why it is worth doing, in the order the reasons actually matter:**
+
+1. **Framebuffers. `Arduino_GFX::getFrameBuffer()` returns a single `uint16_t *`** — the API shape
+   is the ceiling, and no fix behind that signature can express double buffering. The RGB path
+   already allocates `.num_fbs = 2` and hands out only `fb0`: a whole framebuffer of PSRAM
+   allocated and never touched, on every RGB board. The DSI path has a `NUM_FB` BSP field that
+   would waste memory the same way. See the correction note below.
+2. **Rotation.** Both the QSPI (`Arduino_Canvas`) and MIPI/DSI paths do CPU per-pixel transforms.
+   The stutter the owner sees on P4 boards in non-native orientation is exactly this. **Note the
+   cheapest fix is not code:** `CYD_S3_3248` was moved to portrait (rotation 0) on 2026-09-10
+   precisely because native orientation runs no transform at all — worth checking per board before
+   assuming rotation is a requirement.
+3. **`esp_lvgl_adapter`.** Espressif's current LVGL porting layer, which the newest Waveshare BSPs
+   (P4-4B and P4-7B, `3.0.1`) depend on; older repos use `esp_lvgl_port`. Reaching it means real
+   framebuffer management and tear-avoidance modes rather than our hand-rolled flush path.
+4. **Alignment with ESP-IDF design philosophy**, which matters beyond this milestone: it is the
+   same direction the voice-assistant work would eventually pull (`esp_codec_dev`, `esp-sr`), so
+   the two long-term goals stop fighting each other.
+5. **PPA** is a P4-only bonus, not the point. LVGL 9.5 already ships a PPA draw unit at
+   `components/lvgl/src/draw/espressif/ppa/`, disabled (`LV_USE_PPA 0`) — **and enabling it will
+   not fix the stutter**, because `lv_draw_ppa.c:123` explicitly declines rotated draws
+   (`dsc->rotation == 0`). Rotation needs hand-written code against the raw PPA API.
+
+**Why 2.9 and not sooner.** Cards are insulated from the display stack by LVGL — a card talks to
+LVGL, LVGL talks to `LVGL_Startup`, `LVGL_Startup` talks to `DisplayManager`. Building twenty cards
+makes this swap exactly as hard as building zero, so the "do it before X or it gets expensive"
+logic that made 2.1 urgent does not apply. What *does* apply: **you cannot judge a render-stack
+change without a demanding workload running on it.** Swapping before the card system exists means
+measuring six static test panels, which proves nothing about tearing, tileview swipes or rotation
+under load. Phase 3 is pure data-layer work and does not care about the display stack, so nothing
+downstream is blocked by waiting.
+
+**Known obstacles, from the research:**
+
+- `ESP32_Display_Panel` (Espressif's own, Apache-2.0, so legally reusable) covers 7 of 8 boards'
+  controllers but has **no HX8394 driver** — the `WS_P4_5` panel that already cost a full bring-up
+  session. It does have AXS15231B. Writing a vendor init for a panel whose sequence we already
+  possess is bounded work, not a blocker.
+- Touch mapping, the BSP init-command fields, and `Arduino_Canvas` rotation all assume the current
+  stack and will need revisiting.
+- Eight working boards is the real risk. The research recommends one board converted first, behind
+  the existing `DisplayManager` interface, with the other seven untouched.
+
+**Deliberately skipped:** a scoped "PPA rotation inside `LVGL_Startup::disp_flush()`" experiment.
+It would work, but it is throwaway work if the wrapper is coming out anyway. The cost of that
+decision is living with the P4 stutter until 2.9 — accepted, on the grounds that the *S3* boards
+are where the real sluggishness is and PPA cannot help them at all.
+
+### Smaller display items
+
 - **Per-board minimum-brightness floor as a real BSP field.** Currently hardcoded directly
   in `Panel_Display.cpp` (43 for the two 4B boards, 3 for everyone else, based on one
   hardware measurement on the 7B) rather than being a per-device, per-hardware-measured value.
@@ -26,25 +97,14 @@ flashed** — identical on-device behaviour is still unverified.
   unused/dead in `GuiManager.cpp` — every board gets the same buffering strategy regardless
   of what these fields say. Measure which boards actually benefit and build real per-device
   logic around it.
-- **True LVGL+PPA hardware-accelerated rotation** for MIPI/DSI boards (ESP32-P4 has a PPA —
-  Pixel Processing Accelerator — capable of this in hardware). Current rotation on those
-  boards is pure CPU-based per-pixel transform.
+- **PPA rotation** — folded into 2.9 above. Kept as a pointer because the buffer discipline is
+  the part that will bite: 64-byte alignment, `MALLOC_CAP_DMA | MALLOC_CAP_SPIRAM`, and explicit
+  cache writeback/invalidate around every operation. `REFERENCE_PROJECTS.md` covers what is
+  minable from Allsky's `ppa_accelerator.h` — approach only, that repo is unlicensed.
 
-  **Upgraded from hypothetical to observed, 2026-09-09.** The owner reports visible stutter on
-  P4 boards running in a non-native orientation — not on the same boards in native orientation.
-  That is the CPU rotation transform, and it is exactly the symptom this entry predicted. It is
-  still not scheduled, but it is no longer an "if it ever becomes a problem" item; it is a
-  problem, currently tolerated.
-
-  Sequencing: this belongs **after** milestone 2.3 (memory budget spike), not before. 2.3
-  decides the render path — buffer sizes, `LV_MEM` location, whether tileview pages are lazily
-  built — and PPA has hard buffer requirements (64-byte alignment, `MALLOC_CAP_DMA |
-  MALLOC_CAP_SPIRAM`, explicit cache writeback/invalidate around every operation). Building
-  against a render path that 2.3 then changes means doing it twice. `REFERENCE_PROJECTS.md`
-  covers what is minable from Allsky's `ppa_accelerator.h` — approach only, the repo is
-  unlicensed.
-
-- **A written PSRAM allocation-order budget, as a deliverable of milestone 2.3.** Raised
+- **A written PSRAM allocation-order budget.** *(2.3 measured the LVGL side and found cards cost
+  ~715 B in a 124 KB pool, so this is no longer urgent — but the internal-SRAM table below is
+  still the useful artefact and nobody has written it.)* Raised
   2026-09-09 after reading Allsky's `docs/developer/architecture.md`, which publishes an exact
   PSRAM map and states that its buffers must be allocated *before* display init so the
   framebuffer still finds contiguous space.
@@ -157,23 +217,25 @@ Caution learned the hard way: the 1-vs-2 `num_fbs` test run during P4-5 bring-up
 "no difference," but it was run against the reset-polarity hang, which masked everything
 downstream. **It is not evidence about buffering.** Treat `num_fbs` as untested on this fleet.
 
-### Per-device DPI and font scaling
+### Per-device DPI and font scaling - **DONE 2026-09-10 (milestone 2.2)**
 
-`HIGH_DPI_DISPLAY` is currently a single on/off build flag that does two things: sets LVGL's
-DPI to 150 (`GuiManager.cpp`) and swaps in a larger font set (`UIToolkit.cpp` — caption 10->16,
-label 12->20, button/header ->22, hero ->34). The high-DPI font block is commented "P4 Smart86
-(High Res)", i.e. it was sized for one specific panel.
+Retired. `HIGH_DPI_DISPLAY` and the `UI_SCALE` macro are gone; scale is derived from
+`DisplayConfig.DIAGONAL_IN` plus the resolution via `bspUiScale()` in `bsp_loader.h`, and
+`lv_display_set_dpi()` gets the board's real PPI.
 
-That is too coarse for the fleet. The boards differ in both pixel count *and* physical size, and
-those are independent: a 720x1280 4-inch panel and a 1024x600 7-inch panel want different
-scaling even though a single flag treats them as one case. Confirmed good on `WS_P4_5`
-(720x1280, 2026-09-06) and on the 4B, but that is two data points on a boolean.
+This entry predicted the problem exactly - *"a 720x1280 4-inch panel and a 1024x600 7-inch panel
+want different scaling even though a single flag treats them as one case"* - and the measurement
+bore it out. The old boolean was better than it looked (the fleet clusters at 165-187 and 237-294
+PPI with a clean gap) but the high cluster spans 24%, so `WS_P4_5` at 294 PPI and `WS_S3_5B` at
+237 PPI both got 1.5x. Two boards were visibly mis-scaled and one was a dev target.
 
-Better shape: derive scaling from BSP values rather than a flag — physical diagonal (or DPI)
-alongside the existing `WIDTH`/`HEIGHT`, and pick fonts and LVGL DPI from that. Would also let
-the diagnostics dump report a real computed scale instead of `STANDARD (1.0x Scaling)` versus
-an implicit "high". Low priority while the fleet is small; worth doing before the card library
-expands (GitHub issue #31).
+Density table and per-board scales: `docs/HARDWARE_STATUS.md`. Reasoning: `docs/design/tokens.md`
+section 2. The diagnostics dump now reports the real computed scale, as this entry asked for.
+
+**One piece deliberately not built: a viewing-distance term.** Pure density scaling makes
+everything the same *physical* size, which is right for touch targets (a fingertip is 9 mm on
+every board) and arguably wrong for text on a 7-inch panel across a room. Add a small per-board
+nudge only if something still looks wrong on glass.
 
 ## Audio
 
