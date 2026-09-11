@@ -219,6 +219,10 @@ const DisplayConfig WS_S3_TOUCH_LCD_4B_DISPLAY = {
     // ---= Init Commands =---
     .INIT_CMDS_RGB  = ws_s3_touch_lcd_4b_init,
     .INIT_CMDS_SIZE = sizeof(ws_s3_touch_lcd_4b_init),
+
+    // Panel diagonal in tenths of an inch (4.0" Waveshare S3-Touch-LCD-4B).
+    // 480x480 over 4.0" = ~170 PPI, so bspUiScale() = 1.00.
+    .DIAGONAL_IN = 40,
 };
 inline const DisplayConfig& bsp_display = WS_S3_TOUCH_LCD_4B_DISPLAY;
 

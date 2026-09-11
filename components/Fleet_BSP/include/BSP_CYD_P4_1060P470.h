@@ -146,6 +146,10 @@ const DisplayConfig CYD_P4_1060P470_DISPLAY = {
     // ---= Init Commands =---
     .INIT_CMDS_DSI  = CYD_P4_1060P470_init,
     .INIT_CMDS_SIZE = sizeof(CYD_P4_1060P470_init) / sizeof(lcd_init_cmd_t),
+
+    // Panel diagonal in tenths of an inch (7.0" Guition JC1060P470C).
+    // 1024x600 over 7.0" = ~170 PPI, so bspUiScale() = 1.00.
+    .DIAGONAL_IN = 70,
 };
 inline const DisplayConfig& bsp_display = CYD_P4_1060P470_DISPLAY;
 

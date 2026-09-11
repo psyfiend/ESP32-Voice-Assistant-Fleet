@@ -71,6 +71,10 @@ const DisplayConfig CYD_S3_8048W550_DISPLAY = {
     // scanlines at this board's width. Preserves this board's exact existing
     // (working) behavior.
     .BOUNCE_BUFFER_SIZE_PX = 800 * 12,
+
+    // Panel diagonal in tenths of an inch (5.0" Guition JC8048W550).
+    // 800x480 over 5.0" = ~187 PPI, so bspUiScale() = 1.10.
+    .DIAGONAL_IN = 50,
 };
 inline const DisplayConfig& bsp_display = CYD_S3_8048W550_DISPLAY;
 

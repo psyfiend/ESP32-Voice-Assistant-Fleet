@@ -166,6 +166,22 @@ struct DisplayConfig {
     const uint8_t         *INIT_CMDS_RGB;
     const lcd_init_cmd_t  *INIT_CMDS_DSI;
     size_t                 INIT_CMDS_SIZE;
+
+    // --- Physical panel size, for deriving pixel density ---
+    // Diagonal in TENTHS of an inch: 35 = 3.5", 70 = 7.0". Tenths rather than
+    // a float because these structs are `const`, not `constexpr`, and a float
+    // member buys nothing here.
+    //
+    // This is what lets UI scale be DERIVED rather than declared. See
+    // docs/design/tokens.md section 2: the fleet spans 165-294 PPI, and the
+    // old blanket `-D HIGH_DPI_DISPLAY` (1.5x on three boards, 1.0x on five)
+    // left CYD_S3_8048 and WS_P4_5 visibly mis-scaled.
+    //
+    // Appended as a TRAILING member on purpose - designated initialisers must
+    // list members in declaration order, so adding at the end keeps every
+    // existing board header valid. 0 means "unknown", and bspUiScale() falls
+    // back to 1.0 rather than guessing.
+    uint8_t                DIAGONAL_IN;
 };
 
 // --= Touch Panel =--

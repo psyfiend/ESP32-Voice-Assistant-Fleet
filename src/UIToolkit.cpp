@@ -14,7 +14,7 @@ const lv_font_t* UIToolkit::Font_PanelHeader = NULL;
 const lv_font_t* UIToolkit::Font_Hero = NULL;
 
 int32_t UIToolkit::sc(int32_t val) {
-    return (int32_t)(val * UI_SCALE);
+    return (int32_t)(val * bspUiScale());
 }
 
 // --- Toast Logic ---
@@ -26,20 +26,26 @@ static void toast_timer_cb(lv_timer_t * t) {
 void UIToolkit::init() {
 
     // --= FONT MAPPING =--
-    #ifdef HIGH_DPI_DISPLAY
-        // P4 Smart86 (High Res)
+    // Threshold chosen so the three boards that carried -D HIGH_DPI_DISPLAY
+    // keep exactly the fonts they had: WS_S3_5B 1.39, WS_P4_4B 1.50,
+    // WS_P4_5 1.73 are above it; CYD_S3_8048 at 1.10 stays below, as it was.
+    // Only sc() changes on those two boards in this commit, never the faces.
+    // These sizes move into the token header in the next commit.
+    if (bspUiScale() >= 1.3f) {
+        // High density
         Font_Caption     = &lv_font_montserrat_16;
         Font_Label       = &lv_font_montserrat_20; 
         Font_Button      = &lv_font_montserrat_22;
         Font_PanelHeader = &lv_font_montserrat_22;
         Font_Hero        = &lv_font_montserrat_34;
-    #else
+    } else {
+        // Reference density
         Font_Caption     = &lv_font_montserrat_10;
         Font_Label       = &lv_font_montserrat_12; 
         Font_Button      = &lv_font_montserrat_14;
         Font_PanelHeader = &lv_font_montserrat_14;
         Font_Hero        = &lv_font_montserrat_24;
-    #endif
+    }
 
     // Toast Setup - Top Z Index
     toast_panel = lv_obj_create(lv_layer_top()); // Use layer_top to float over everything

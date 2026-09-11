@@ -177,9 +177,20 @@ bool begin(DisplayManager &display, TouchManager &touch) {
                            LV_DISPLAY_RENDER_MODE_PARTIAL);
 
     // --= DPI Awareness =--
-    #ifdef HIGH_DPI_DISPLAY
-        lv_display_set_dpi(s_disp, 150);
-    #endif
+    // LVGL uses this for lv_dpx() and its own default sizing, so it wants the
+    // panel's REAL density, not a blanket figure. This used to be a flat 150
+    // on the three -D HIGH_DPI_DISPLAY boards and LVGL's own default (130)
+    // everywhere else - wrong by up to 96 PPI on WS_P4_5.
+    {
+        const uint16_t ppi = bspPixelDensity();
+        if (ppi) {
+            lv_display_set_dpi(s_disp, ppi);
+            Serial.printf("[LVGL] Panel density: %u PPI (UI scale %.2fx)\n",
+                          (unsigned)ppi, (double)bspUiScale());
+        } else {
+            Serial.println("[LVGL] Panel density unknown (no DIAGONAL_IN) - UI scale 1.00x");
+        }
+    }
 
     s_indev = lv_indev_create();
     lv_indev_set_type(s_indev, LV_INDEV_TYPE_POINTER);
