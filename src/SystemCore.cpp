@@ -102,6 +102,14 @@ bool SystemCore::begin() {
         _entities.add(EXTERNAL_ENTITIES[i]);
     }
 
+    // --= 10. Virtual test entities =--
+    // TEMPORARY scaffolding for milestone 2.4, removed with #44. Registers two
+    // writable switches so the command path has something to command - as of
+    // this milestone nothing else in the fleet is writable at all, and
+    // commandValue() has never run on hardware. Registered last because
+    // nothing else depends on it.
+    _virtProv.begin(&_entities);
+
     return true;
 }
 
@@ -153,4 +161,5 @@ void SystemCore::loop() {
     _entities.tick(now);
     _haPub.loop(now);
     _mqttProv.loop(now);
+    _virtProv.loop(now);
 }

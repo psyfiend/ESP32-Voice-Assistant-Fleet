@@ -19,6 +19,7 @@
 #include "SystemProvider.h"
 #include "HaPublisher.h"
 #include "MqttProvider.h"
+#include "VirtualProvider.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #endif
@@ -69,4 +70,10 @@ private:
     // Reads values other devices publish, deriving its subscriptions from
     // whatever external entities are registered.
     MqttProvider        _mqttProv;
+
+    // TEMPORARY, with #44. The fleet has no writable entity of any kind, so
+    // the registry's optimistic-write path has never once executed on
+    // hardware. This provides two switches to tap - one that answers and one
+    // that does not. See VirtualEntities.h.
+    VirtualProvider     _virtProv;
 };
