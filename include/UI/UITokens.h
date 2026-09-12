@@ -20,6 +20,7 @@
 #include <lvgl.h>
 #include <stdint.h>
 #include "bsp_loader.h"
+#include "UI/UITypeScale.h"   // generated: this board's four faces
 
 // ---------------------------------------------------------------------------
 // 1. Colour
@@ -101,11 +102,15 @@ struct UIGrid {
 // here is another ~96 KB, and the MDI icon subset competes for the same budget.
 // See docs/design/tokens.md section 3.
 struct UIType {
-    const lv_font_t *VALUE;   // the number on a measure card
+    const lv_font_t *VALUE;   // the number on a measure card. DIGITS ONLY on
+                              // dense boards - it is a generated subset, and
+                              // it has no letters and no LV_SYMBOL range
+    const lv_font_t *UNIT;    // the unit beside a value, deliberately smaller
     const lv_font_t *NAME;    // card name
-    const lv_font_t *TAG;     // header bar, status row, units
+    const lv_font_t *TAG;     // header bar, status row
+    const lv_font_t *ICON;    // the glyph in an actor card's disc. A full
+                              // face, because VALUE cannot draw a symbol
     const lv_font_t *HERO;    // oversized, for a fullscreen card
-    uint8_t ICON;             // logical px
 };
 
 // ---------------------------------------------------------------------------

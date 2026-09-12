@@ -33,6 +33,7 @@ private:
     lv_obj_t *_icon   = nullptr;
     lv_obj_t *_name   = nullptr;
     lv_obj_t *_value  = nullptr;
+    lv_obj_t *_unit   = nullptr;   // its own label, and smaller - see the .cpp
     lv_obj_t *_status = nullptr;   // battery / last-seen. Absent, not empty
 };
 

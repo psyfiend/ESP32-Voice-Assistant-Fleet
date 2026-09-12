@@ -57,11 +57,13 @@ void ActorCard::render() {
     const bool    isMixed = active > 0 && active < total;
 
     // --- Disc geometry, derived from the type scale -----------------------
-    // The icon is ICON logical px; the disc is that plus breathing room. Both
-    // go through UI::sc() here and are never stored, because the scale is per
-    // board - a stored value would be right on one panel and wrong on seven.
-    const int32_t iconPx = UI::sc(t.ICON);
-    const int32_t discPx = iconPx * 2;
+    // ICON is now a FACE rather than a logical pixel count, because the type
+    // scale is generated per board and already carries real density - so the
+    // disc measures the font instead of scaling a number. It also has to be a
+    // full face: VALUE is a digits-only subset on the dense boards and cannot
+    // draw an LV_SYMBOL glyph at all.
+    const int32_t iconPx = lv_font_get_line_height(t.ICON);
+    const int32_t discPx = (iconPx * 9) / 5;
     lv_obj_set_size        (_disc, discPx, discPx);
     lv_obj_set_style_radius(_disc, LV_RADIUS_CIRCLE, 0);
     lv_obj_align           (_disc, LV_ALIGN_CENTER, 0, -UI::sc(8));
@@ -105,7 +107,7 @@ void ActorCard::render() {
 
     // --- Icon and name ----------------------------------------------------
     lv_label_set_text          (_icon, cardIconFor(e->desc));
-    lv_obj_set_style_text_font (_icon, t.VALUE, 0);
+    lv_obj_set_style_text_font (_icon, t.ICON, 0);
 
     lv_label_set_text          (_name, label());
     lv_obj_set_style_text_font (_name, t.NAME, 0);

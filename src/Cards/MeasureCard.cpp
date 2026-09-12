@@ -18,8 +18,13 @@ void MeasureCard::buildBody(lv_obj_t *body) {
     lv_obj_align(_name, LV_ALIGN_TOP_LEFT, 0, 0);   // x set in render(), from
                                                     // the icon's real width
 
+    // Value and unit are TWO labels, not one string. The design bench draws
+    // the unit markedly smaller and baseline-aligned beside the number, which
+    // a single label cannot do - and splitting them is also what lets the
+    // VALUE face be a digits-only subset, which is the only reason a 68 px
+    // face is affordable on WS_P4_5. See scripts/gen_type_scale.py.
     _value = lv_label_create(body);
-    lv_obj_align(_value, LV_ALIGN_CENTER, 0, 0);
+    _unit  = lv_label_create(body);
 
     _status = lv_label_create(body);
     lv_obj_align(_status, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
@@ -58,9 +63,9 @@ void MeasureCard::render() {
     const int32_t avail = lv_obj_get_content_width(par) - iconW - gap;
     if (avail > 0) lv_obj_set_width(_name, avail);
 
-    // --- The value, dominant ----------------------------------------------
+    // --- The value, dominant, with its unit smaller beside it -------------
     char buf[40];
-    cardFormatValue(*e, buf, sizeof(buf));
+    cardFormatValue(*e, buf, sizeof(buf), false);   // no unit in this string
     lv_label_set_text          (_value, buf);
     lv_obj_set_style_text_font (_value, t.VALUE, 0);
 
@@ -68,6 +73,33 @@ void MeasureCard::render() {
     // the value. cards.md section 3 rejects dimming precisely so the reading
     // stays legible while the card makes clear it cannot be trusted.
     lv_obj_set_style_text_color(_value, UI::c(p.TEXT), 0);
+
+    lv_label_set_text          (_unit, e->desc.unit);
+    lv_obj_set_style_text_font (_unit, t.UNIT, 0);
+    lv_obj_set_style_text_color(_unit, UI::c(p.TEXT_DIM), 0);
+
+    // Centre the PAIR, then sit the unit on the number's baseline. Centring
+    // the number alone and hanging the unit off it would shift the number
+    // left or right as the unit's width changed, which is the sort of twitch
+    // that makes a wall of cards look unsettled.
+    lv_obj_update_layout(_value);
+    lv_obj_update_layout(_unit);
+    const int32_t vW = lv_obj_get_width(_value);
+    const int32_t uW = e->desc.unit[0] ? lv_obj_get_width(_unit) : 0;
+    const int32_t kern = e->desc.unit[0] ? UI::sc(2) : 0;
+    const int32_t pairW = vW + kern + uW;
+
+    lv_obj_align(_value, LV_ALIGN_CENTER, -(pairW - vW) / 2, 0);
+    if (e->desc.unit[0]) {
+        lv_obj_clear_flag(_unit, LV_OBJ_FLAG_HIDDEN);
+        // Baseline, approximated by the difference in line height - LVGL does
+        // not expose a baseline offset on a label.
+        const int32_t drop = (lv_font_get_line_height(t.VALUE) -
+                              lv_font_get_line_height(t.UNIT)) / 2;
+        lv_obj_align_to(_unit, _value, LV_ALIGN_OUT_RIGHT_BOTTOM, kern, -drop);
+    } else {
+        lv_obj_add_flag(_unit, LV_OBJ_FLAG_HIDDEN);
+    }
 
     // --- Status row: battery and/or last-seen, or nothing at all ----------
     //

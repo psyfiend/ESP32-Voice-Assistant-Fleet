@@ -181,20 +181,29 @@ const UIMetrics &met()  { return s_met; }
 const UIGrid    &grid() { return s_grid; }
 
 const UIType &type() {
-    // Built on first use rather than at static-init time: lv_font_montserrat_*
-    // are LVGL globals, and depending on a global's initialisation order from
+    // Built on first use rather than at static-init time: the font objects are
+    // LVGL globals, and depending on a global's initialisation order from
     // another translation unit is the static-init-order fiasco waiting to
     // happen. One branch, once.
+    //
+    // The sizes come from include/UI/UITypeScale.h, which scripts/
+    // gen_type_scale.py derives from THIS BOARD's pixel density. They used to
+    // be four hardcoded faces shared by all eight boards, and that was the one
+    // place the "derive from density" rule of tokens.md had not reached - so
+    // WS_P4_5 at 294 PPI drew its smallest text at 1.04 mm while CYD_S3_3248
+    // at 165 PPI drew the same token at 1.85 mm. The better panel was the
+    // harder one to read. Flashed and caught by eye, not by arithmetic.
     static UIType t = {
-        .VALUE = &lv_font_montserrat_40,
-        .NAME  = &lv_font_montserrat_16,
-        .TAG   = &lv_font_montserrat_12,
-        // HERO shares VALUE's face for now. Referencing montserrat_48 pulled a
-        // whole extra font into the link for something nothing draws yet -
-        // measured at the cost recorded in docs/design/tokens.md. Point it at a
-        // larger face when a fullscreen card actually needs one.
-        .HERO  = &lv_font_montserrat_40,
-        .ICON  = 26
+        .VALUE = FLEET_FONT_VALUE,
+        .UNIT  = FLEET_FONT_UNIT,
+        .NAME  = FLEET_FONT_NAME,
+        .TAG   = FLEET_FONT_TAG,
+        .ICON  = FLEET_FONT_ICON,
+        // HERO shares VALUE's face. Referencing another size pulls a whole
+        // extra font into the link for something nothing draws yet - at the
+        // cost recorded in docs/design/tokens.md. Point it somewhere larger
+        // when a fullscreen card actually needs one.
+        .HERO  = FLEET_FONT_VALUE,
     };
     return t;
 }
