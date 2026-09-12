@@ -379,15 +379,31 @@ CardState Card::deriveState(uint32_t nowMs) const {
     // caused is the one they need to see.
     if (_paused) return CardState::ST_PAUSED;
 
-    if (_failMask) {
-        // THE OWNER'S RULE for a card commanding several entities: a parent
-        // says FAILED only when every child it commanded failed. Short of
-        // that it keeps reporting what its children are actually doing and
-        // raises a warning tag instead - because the body is still correct,
-        // and replacing correct information with a failure banner loses more
-        // than it tells.
-        return (_failMask == _sentMask) ? CardState::ST_REFUSED
-                                        : CardState::ST_PARTIAL;
+    // THE FAILURE STATE IS READ OFF THE ENTITIES, NOT OFF THIS CARD.
+    //
+    // The card used to track which of its own commands had failed, in a
+    // bitmask. That made a parent card and a child card bound to the same
+    // switch disagree, because each only knew about commands IT had issued -
+    // so "Both" reported something different depending on whether you had
+    // tapped it or tapped one of its children. The owner's rule is that a
+    // parent reflects where its children ARE, not the path they took to get
+    // there, and reading Entity::cmdFailed makes that true by construction:
+    // every card bound to an entity reads the identical fact.
+    uint8_t failed = 0, resolved = 0;
+    for (uint8_t i = 0; i < _nPrimary; i++) {
+        const Entity *e = _primary[i];
+        if (!e || !e->desc.writable) continue;
+        if (e->pending) continue;          // still in flight; no verdict yet
+        resolved++;
+        if (e->cmdFailed) failed++;
+    }
+    if (failed) {
+        // Every child that has an answer failed -> the card itself failed.
+        // Some but not all -> the body is still telling the truth about the
+        // children, so only the tag changes. cards.md and the owner agree on
+        // this one from opposite directions.
+        return (failed == resolved) ? CardState::ST_REFUSED
+                                    : CardState::ST_PARTIAL;
     }
 
     CardState worst = CardState::ST_LIVE;
@@ -408,41 +424,16 @@ CardState Card::deriveState(uint32_t nowMs) const {
 
 // True when an outstanding command's outcome just became known, so the caller
 // knows it has to repaint the body as well as the chrome.
-bool Card::resolveCommand() {
-    if (!_cmdMask) return false;
-
-    bool anyResolved = false;
-    for (uint8_t i = 0; i < _nPrimary; i++) {
-        const uint8_t bit = (uint8_t)(1u << i);
-        if (!(_cmdMask & bit)) continue;
-
-        const Entity *e = _primary[i];
-        if (!e) { _cmdMask &= (uint8_t)~bit; anyResolved = true; continue; }
-
-        // Still in flight. EntityRegistry::tick() owns the deadline and will
-        // clear this one way or the other - either an echo arrives (setValue
-        // clears it) or the reconcile window expires (tick reverts and clears
-        // it). The card needs no timer of its own, which is the whole reason
-        // cards.md could say this needs no new plumbing.
-        if (e->pending) continue;
-
-        _cmdMask &= (uint8_t)~bit;
-        if (e->value.equals(_cmdValue)) _failMask &= (uint8_t)~bit;
-        else                            _failMask |= bit;
-        anyResolved = true;
-    }
-    return anyResolved;
-}
-
 void Card::pollState(uint32_t nowMs) {
     if (!_root) return;
 
-    const bool resolved = resolveCommand();
     const CardState next = deriveState(nowMs);
 
-    // The common case is neither: touch no LVGL at all. That is what makes a
-    // 10 Hz poll over every card on a page cost nothing worth measuring.
-    if (next == _state && !resolved) return;
+    // The common case is no transition: touch no LVGL at all. That is what
+    // makes a 10 Hz poll over every card on a page cost nothing worth
+    // measuring - and it is now the ONLY thing this method does, because the
+    // registry resolves commands itself.
+    if (next == _state) return;
 
     _state = next;
     applyState();
@@ -480,36 +471,11 @@ bool Card::command(uint8_t slot, const EntityValue &v) {
     if (!e || !e->desc.writable) return false;
     if (!s_reg) return false;
 
-    const uint8_t bit = (uint8_t)(1u << slot);
-
-    // A new command clears this entity's previous failure. The loud state is
-    // about the action the user just took; leaving it up while they are
-    // mid-retry would report the old failure as if it were the new one.
-    //
-    // _sentMask is REBUILT per tap rather than accumulated, which is what the
-    // owner's bug report exposed: the old code tracked a single _cmdEnt and
-    // overwrote it on every entity in the loop, so a card commanding two
-    // switches only ever watched the second one. That is why "Both" failed
-    // unpredictably depending on which card had been tapped before it.
-    if (!(_cmdMask & bit)) _failMask &= (uint8_t)~bit;
-
-    if (!s_reg->commandValue(e->desc.id, v, millis())) return false;
-
-    _cmdValue  = v;
-    _cmdMask  |= bit;
-    _sentMask |= bit;
-    return true;
-}
-
-// Called by a subclass before it issues the commands for one tap, so that
-// _sentMask describes THIS tap and not the union of every tap so far.
-void Card::beginCommandBatch() {
-    _sentMask = 0;
-    _failMask = 0;
-    if (_state == CardState::ST_REFUSED || _state == CardState::ST_PARTIAL) {
-        _state = CardState::ST_LIVE;
-        applyState();
-    }
+    // No bookkeeping left here at all. commandValue() clears the entity's own
+    // cmdFailed and arms the reconcile window; EntityRegistry decides the
+    // outcome; deriveState() reads it back. Three bitmasks and a resolver went
+    // away when the fact moved to where it belonged.
+    return s_reg->commandValue(e->desc.id, v, millis());
 }
 
 void Card::eventCb(lv_event_t *e) {

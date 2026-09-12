@@ -173,11 +173,6 @@ protected:
     // the whole of the owner's partial-failure rule.
     bool command(uint8_t slot, const EntityValue &v);
 
-    // Call once at the top of onTap(), before any command(). Resets the
-    // per-tap bookkeeping so "did everything I just asked for fail?" is a
-    // question about this tap alone.
-    void beginCommandBatch();
-
     // The card surface, for a subclass that tints its whole body - which
     // cards.md section 4 requires of a light ("reflects state across its whole
     // surface, not in a corner").
@@ -191,7 +186,6 @@ private:
     void buildHeader();
     void applyState();                 // repaint chrome for _state
     CardState deriveState(uint32_t nowMs) const;
-    bool resolveCommand();             // true if the outcome just became known
     uint32_t tagColor() const;         // the badge's colour, which is NOT
                                        // stateColor() - see ST_PARTIAL
     static void eventCb(lv_event_t *e);
@@ -242,43 +236,11 @@ private:
     char _label[ENTITY_NAME_MAX] = {0};
     char _area[ENTITY_SHORT_MAX] = {0};
 
-    // --- Refusal detection ------------------------------------------------
-    //
-    // The registry's revert is honest but ANONYMOUS: after it fires, pending
-    // is false and value is back to prevValue, which is indistinguishable from
-    // an ordinary value change arriving from the source. Rather than add a
-    // flag to Entity - Fleet_Entities is dependency-free and stable, and this
-    // is a UI concern - the card remembers what it asked for and compares.
-    //
-    // Once pending clears on a commanded entity:
-    //   value == _cmdValue  -> the command took. Confirmed.
-    //   anything else       -> it did not. ST_REFUSED.
-    //
-    // That comparison is right in BOTH failure modes, which is what makes it
-    // worth preferring over a registry flag: a silent timeout reverts to the
-    // old value, and a light that actively reports back that it stayed off
-    // also arrives as the old value. Both mean the same thing to the user.
-    //
-    // IT IS RESOLVED BY POLLING, NOT BY THE SNAPSHOT, and that is not a
-    // shortcut - a snapshot never arrives in the success case. A confirming
-    // echo carries the value the optimistic write ALREADY applied, so
-    // setValue() finds nothing changed, declines to dirty the entity, and no
-    // card is told anything. That suppression is correct and deliberate on the
-    // registry's side (it is most of ROADMAP 4.2's rate limiting), so the card
-    // is what has to adapt: resolveCommand() watches the pending flag from
-    // pollState() and needs no notification at all.
-    // ONE commanded value, not one per entity: a card that commands several
-    // entities is asking them all for the SAME state - that is what makes the
-    // aggregate light one card. Six EntityValues would be 336 bytes against a
-    // measured 2.5 KB card for a generality nothing needs. A future card that
-    // wants per-entity values overrides command() rather than paying here.
-    //
-    // The masks are indexed by primary slot, which is why CARD_PRIMARY_MAX is
-    // 6 and not 9 - one uint8_t of bits each.
-    EntityValue _cmdValue;
-    uint8_t     _cmdMask  = 0;   // bit i: command outstanding on primary i
-    uint8_t     _failMask = 0;   // bit i: primary i refused the last command
-    uint8_t     _sentMask = 0;   // bit i: primary i was part of the last tap
+    // Refusal detection lives on the ENTITY now, not here - see
+    // Entity::cmdFailed and deriveState(). A card asks the entities it is
+    // bound to whether their last command took; it no longer remembers what it
+    // asked for, which is what makes a parent and a child agree about a switch
+    // they both render.
 
     static EntityRegistry *s_reg;
 };

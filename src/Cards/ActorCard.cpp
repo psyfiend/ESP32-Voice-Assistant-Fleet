@@ -139,10 +139,6 @@ void ActorCard::onTap() {
     const uint8_t total = primaryCount();
     if (!total) return;
 
-    // Resets the per-tap masks. Without this the failure question would be
-    // asked of every tap ever made rather than of this one.
-    beginCommandBatch();
-
     const bool wantOn = activeCount() * 2 <= total;
     for (uint8_t i = 0; i < total; i++) {
         command(i, EntityValue::makeBool(wantOn));
