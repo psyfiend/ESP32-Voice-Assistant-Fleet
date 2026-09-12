@@ -30,11 +30,21 @@ protected:
     void render() override;
 
 private:
-    lv_obj_t *_icon   = nullptr;
-    lv_obj_t *_name   = nullptr;
-    lv_obj_t *_value  = nullptr;
-    lv_obj_t *_unit   = nullptr;   // its own label, and smaller - see the .cpp
-    lv_obj_t *_status = nullptr;   // battery / last-seen. Absent, not empty
+    // Two flex rows rather than free-floating labels. Both replaced hand
+    // positioning that needed a layout pass which had not run yet - the name
+    // wrapped mid-word and the unit landed beside it instead of beside the
+    // number. See the .cpp for the specific trap in each case.
+    lv_obj_t *_titleRow = nullptr;   // icon + name, one line
+    lv_obj_t *_icon     = nullptr;
+    lv_obj_t *_name     = nullptr;
+
+    lv_obj_t *_valueRow = nullptr;   // value + unit, bottom-aligned
+    lv_obj_t *_value    = nullptr;
+    lv_obj_t *_unit     = nullptr;
+
+    // The two bottom corners, independently present or absent.
+    lv_obj_t *_battery  = nullptr;   // bottom-left, with its own glyph
+    lv_obj_t *_seen     = nullptr;   // bottom-right
 };
 
 #endif // MEASURE_CARD_H

@@ -87,30 +87,32 @@ static int32_t headerHeight() {
 void Card::build(lv_obj_t *parent) {
     const UIMetrics &m = UI::met();
 
-    // The wrapper: a FLEX COLUMN, transparent, filling the grid cell.
+    // THE CARD IS ONE BOX, AND IT IS THE SAME BOX IN ALL THREE HEADER MODES.
     //
-    // It was padding plus absolute alignment, and that was wrong in a way the
-    // owner caught immediately - lv_obj_align() positions against the parent's
-    // CONTENT area, so padding the root to make room for an external tag moved
-    // the tag down onto the card it was supposed to sit above, covering the
-    // name in the top-left corner. A flex column has no such trap: the tag is
-    // the first child, the surface is the second and takes what is left.
+    // This is the owner's rule, and it replaces two earlier attempts that both
+    // got it wrong: "whether there is a bar, a tag, or nothing, the top of the
+    // card should be considered the top of the bar/tag/whatever", and icons
+    // "should remain at the exact same height relative to the bottom of the
+    // card". On glass the previous version shifted content in three different
+    // directions depending on the mode, which made the two treatments
+    // impossible to compare - the thing the modes exist for.
+    //
+    // So: the surface always fills the whole cell, and a strip of exactly
+    // headerHeight() is ALWAYS reserved at its top, drawn into or left empty.
+    // Nothing about the body's geometry depends on the header at all any more,
+    // which is why the pad_top below is unconditional.
+    //
+    // It does mean HDR_NONE leaves an empty strip. That is deliberate: the
+    // alternative is a card whose contents move when you change a decoration.
     _root = lv_obj_create(parent);
     lv_obj_set_style_bg_opa       (_root, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (_root, 0, 0);
     lv_obj_set_style_pad_all      (_root, 0, 0);
-    lv_obj_set_style_pad_gap      (_root, 0, 0);
-    lv_obj_set_flex_flow          (_root, LV_FLEX_FLOW_COLUMN);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_CLICKABLE);
 
-    // An external tag is built BEFORE the surface, because in a flex column
-    // "above" means "first".
-    if (_hdrStyle == CardHeaderStyle::HDR_EXTERNAL) buildHeader();
-
     _surface = lv_obj_create(_root);
-    lv_obj_set_width              (_surface, lv_pct(100));
-    lv_obj_set_flex_grow          (_surface, 1);
+    lv_obj_set_size               (_surface, lv_pct(100), lv_pct(100));
     lv_obj_set_style_pad_all      (_surface, 0, 0);   // the body owns padding
     lv_obj_clear_flag             (_surface, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -127,30 +129,33 @@ void Card::build(lv_obj_t *parent) {
     lv_obj_add_event_cb   (_surface, eventCb, LV_EVENT_SHORT_CLICKED, this);
     lv_obj_add_event_cb   (_surface, eventCb, LV_EVENT_LONG_PRESSED,  this);
 
-    if (_hdrStyle == CardHeaderStyle::HDR_INTERNAL) buildHeader();
+    // Both header treatments now live INSIDE the surface, in that reserved
+    // strip. cards.md section 2 describes the tag as sitting outside the
+    // border; that is the one line of it this deviates from, because outside
+    // the border is precisely what made the card box change size per mode.
+    // The tag still reads as a distinct register - a pill inset from the
+    // corner rather than a band running edge to edge.
+    if (_hdrStyle != CardHeaderStyle::HDR_NONE) buildHeader();
 
     // The state badge. Created ALWAYS, even with no header, which is the
     // owner's correction: FAILED must not be something a cosmetic choice can
     // switch off. With a header it lives in the header's right slot; without
-    // one it floats over the card's top-right corner.
+    // one it sits in the reserved strip's right end.
     _badge = lv_label_create(_header ? _header : _surface);
     if (_header) lv_obj_align(_badge, LV_ALIGN_RIGHT_MID, 0, 0);
-    else         lv_obj_align(_badge, LV_ALIGN_TOP_RIGHT, UI::sc(-4), UI::sc(4));
+    else         lv_obj_align(_badge, LV_ALIGN_TOP_RIGHT, -UI::sc(4), UI::sc(2));
     lv_obj_add_flag(_badge, LV_OBJ_FLAG_HIDDEN);
 
-    // The body. Padded, transparent, and below the header bar when there is
-    // one - which is what lets a subclass centre a value without having to
-    // know whether a header exists.
     _body = lv_obj_create(_surface);
     lv_obj_set_size               (_body, lv_pct(100), lv_pct(100));
     lv_obj_set_style_bg_opa       (_body, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (_body, 0, 0);
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
+    // Unconditional. See the box rule above - this is the line that makes a
+    // card's contents sit still when the header treatment changes.
+    lv_obj_set_style_pad_top      (_body, headerHeight() + UI::sc(m.PAD), 0);
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_CLICKABLE);
-    if (_hdrStyle == CardHeaderStyle::HDR_INTERNAL) {
-        lv_obj_set_style_pad_top(_body, headerHeight() + UI::sc(m.PAD), 0);
-    }
 
     buildBody(_body);
     restyle();
@@ -158,9 +163,10 @@ void Card::build(lv_obj_t *parent) {
 
 void Card::buildHeader() {
     const UIMetrics &m = UI::met();
-    const bool external = (_hdrStyle == CardHeaderStyle::HDR_EXTERNAL);
+    (void)m;
+    const bool tag = (_hdrStyle == CardHeaderStyle::HDR_EXTERNAL);
 
-    _header = lv_obj_create(external ? _root : _surface);
+    _header = lv_obj_create(_surface);
     lv_obj_set_height             (_header, headerHeight());
     lv_obj_set_style_pad_all      (_header, 0, 0);
     lv_obj_set_style_pad_left     (_header, UI::sc(6), 0);
@@ -169,14 +175,14 @@ void Card::buildHeader() {
     lv_obj_clear_flag             (_header, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_header, LV_OBJ_FLAG_CLICKABLE);
 
-    if (external) {
-        // A tag, so it is only as wide as its content and sits at the left.
-        // It is a flex child of _root, so no alignment is involved at all.
+    if (tag) {
+        // A pill: only as wide as its content, inset from the corner so the
+        // card's radius still reads as the card's outline.
         lv_obj_set_width  (_header, LV_SIZE_CONTENT);
+        lv_obj_align      (_header, LV_ALIGN_TOP_LEFT, UI::sc(6), 0);
     } else {
         lv_obj_set_width  (_header, lv_pct(100));
         lv_obj_align      (_header, LV_ALIGN_TOP_MID, 0, 0);
-        lv_obj_add_flag   (_header, LV_OBJ_FLAG_IGNORE_LAYOUT);
     }
 
     // Area left, STALE right. Fixed, per cards.md section 2 - and the
@@ -209,15 +215,18 @@ void Card::restyle() {
     lv_obj_set_style_shadow_opa   (_surface, m.SHADOW ? LV_OPA_40 : LV_OPA_TRANSP, 0);
 
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
-    if (_header && _hdrStyle == CardHeaderStyle::HDR_INTERNAL) {
-        lv_obj_set_style_pad_top  (_body, headerHeight() + UI::sc(m.PAD), 0);
-    }
+    // Unconditional, matching build(). The strip is reserved in every mode so
+    // that changing the header treatment moves no content - see the box rule
+    // in build().
+    lv_obj_set_style_pad_top      (_body, headerHeight() + UI::sc(m.PAD), 0);
 
     if (_header) {
         lv_obj_set_height             (_header, headerHeight());
         lv_obj_set_style_bg_opa       (_header, LV_OPA_COVER, 0);
+        // A tag is a pill and rounds on its own; a bar runs edge to edge and
+        // takes the card's corners from clip_corner instead.
         lv_obj_set_style_radius       (_header, _hdrStyle == CardHeaderStyle::HDR_EXTERNAL
-                                                ? UI::sc(m.RADIUS / 2) : 0, 0);
+                                                ? LV_RADIUS_CIRCLE : 0, 0);
         // Text in the card's BACKGROUND colour, per cards.md section 2 - dark
         // text on a light accent, light text on a dark one, without anyone
         // having to pick per scheme.
