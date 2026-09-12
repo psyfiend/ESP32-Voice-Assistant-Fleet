@@ -13,19 +13,28 @@ CardPage::~CardPage() {
     if (_root) lv_obj_delete(_root);
 }
 
-void CardPage::begin(lv_obj_t *parent, CardBinder *binder) {
+void CardPage::begin(lv_obj_t *parent, CardBinder *binder, int32_t tagOverhang) {
     _binder = binder;
 
-    const UIGrid    &g = UI::grid();
-    const UIMetrics &m = UI::met();
-    (void)m;
+    const UIGrid &g = UI::grid();
+
+    // Clearance for a tag that hangs above its card. Both the top inset and
+    // the row gap have to carry it - the first row's tags stick up past the
+    // page's own top edge, and every other row's stick into the gap above.
+    const int32_t inset  = UI::sc(g.INSET);
+    const int32_t gap    = UI::sc(g.GAP);
+    const int32_t clear  = tagOverhang > 0 ? tagOverhang + UI::sc(4) : 0;
+    const int32_t padTop = (clear > inset) ? clear : inset;
+    const int32_t padRow = (clear > gap)   ? clear : gap;
 
     _root = lv_obj_create(parent);
     lv_obj_set_size               (_root, lv_pct(100), lv_pct(100));
     lv_obj_set_style_bg_color     (_root, UI::c(UI::pal().GROUND), 0);
     lv_obj_set_style_border_width (_root, 0, 0);
-    lv_obj_set_style_pad_all      (_root, UI::sc(g.INSET), 0);
-    lv_obj_set_style_pad_gap      (_root, UI::sc(g.GAP), 0);
+    lv_obj_set_style_pad_all      (_root, inset, 0);
+    lv_obj_set_style_pad_top      (_root, padTop, 0);
+    lv_obj_set_style_pad_column   (_root, gap, 0);
+    lv_obj_set_style_pad_row      (_root, padRow, 0);
     UI::tameScroll(_root);
 
     // Columns are FR units, not the pixel widths UI::grid() computed.
@@ -47,20 +56,38 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder) {
     // fractions: the page scrolls vertically, so the row count is open-ended
     // and a fraction of an unbounded height is meaningless.
     //
+    // Recomputed here rather than taken from UIGrid::cellH because the tag
+    // clearance above widened the gaps this page uses, and cellH was derived
+    // against the standard ones. Without this the rows would still be the
+    // original height, the grid would overflow by exactly the clearance, and
+    // the last row would hang off the bottom.
+    uint8_t rows = g.rows;
+    if (rows < 1) rows = 1;
+    if (rows > 16) rows = 16;
+
+    _cellH = g.cellH;
+    if (clear) {
+        const int32_t availH = lv_obj_get_height(parent) - padTop - inset;
+        if (availH > 0) {
+            const int32_t h = (availH - padRow * (rows - 1)) / rows;
+            if (h > 0) _cellH = (uint16_t)h;
+        }
+    }
+
     // UIGrid::rows is how many rows FIT, which is a different question from
     // how many rows EXIST. Cards beyond the first screenful are placed into
     // real rows that scroll into view, and every one of them has to be in this
     // descriptor before LVGL reads it - see the header for what happens when
     // it is not.
-    _cellH       = g.cellH;
     _rowsDefined = 0;
-    ensureRows(g.rows < 1 ? 1 : g.rows);
+    ensureRows(rows);
 
     lv_obj_set_layout(_root, LV_LAYOUT_GRID);
 
-    Serial.printf("[Cards] Page %ux%u visible, cell %ux%u px\n",
+    Serial.printf("[Cards] Page %ux%u visible, cell %ux%u px, row gap %d%s\n",
                   (unsigned)cols, (unsigned)_rowsDefined,
-                  (unsigned)g.cellW, (unsigned)g.cellH);
+                  (unsigned)g.cellW, (unsigned)_cellH, (int)padRow,
+                  clear ? " (tag clearance)" : "");
 }
 
 Card *CardPage::add(Card *c) {

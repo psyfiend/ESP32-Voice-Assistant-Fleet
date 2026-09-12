@@ -41,7 +41,15 @@ public:
     // parent is any container; the page fills it. binder may be null, in which
     // case the cards render once and never update - useful for a static
     // reference layout, wrong for a dashboard.
-    void begin(lv_obj_t *parent, CardBinder *binder);
+    //
+    // tagOverhang is how far an external tag sticks up above its card, in real
+    // pixels, or 0 when no card on this page wears one. It is a PAGE concern
+    // rather than a card one because the clearance a tag needs comes out of
+    // the space BETWEEN cards: the owner's own framing - "enabling the tag sets
+    // a requirement for a minimum card gap so a tag doesn't touch or overlap
+    // with a card above it". The page widens its row gap and top inset to
+    // exactly that, and shortens the rows so the grid still fits.
+    void begin(lv_obj_t *parent, CardBinder *binder, int32_t tagOverhang = 0);
 
     // Hand the page a card. The page takes ownership, builds it, places it and
     // registers it with the binder. Returns the same pointer for chaining, or

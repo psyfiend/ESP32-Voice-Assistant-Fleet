@@ -181,7 +181,9 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     UI::setViewport(lv_obj_get_content_width(host), lv_obj_get_content_height(host));
 
     s_page = new CardPage();
-    s_page->begin(host, &binder);
+    // In tag mode the page has to carve the clearance the tags hang into.
+    s_page->begin(host, &binder,
+                  s_hdr == CardHeaderStyle::HDR_EXTERNAL ? Card::headerHeight() : 0);
 
     CardPlacement wide;  wide.prefSpanX = 2;  wide.minSpanX = 1;  wide.priority = 200;
 

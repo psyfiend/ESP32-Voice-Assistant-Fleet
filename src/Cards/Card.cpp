@@ -74,7 +74,7 @@ const char *Card::label() const {
 // Deriving rather than declaring is the same move tokens.md already made for UI
 // scale, and for the same reason - a declared number is right on one board and
 // wrong on seven.
-static int32_t headerHeight() {
+int32_t Card::headerHeight() {
     const int32_t tok  = UI::sc(UI::met().HEADER_H);
     const int32_t text = lv_font_get_line_height(UI::type().TAG) + UI::sc(4);
     return (text > tok) ? text : tok;
@@ -87,29 +87,28 @@ static int32_t headerHeight() {
 void Card::build(lv_obj_t *parent) {
     const UIMetrics &m = UI::met();
 
-    // THE CARD IS ONE BOX, AND IT IS THE SAME BOX IN ALL THREE HEADER MODES.
+    // THE CARD IS THE SAME SIZE AND SHAPE IN ALL THREE HEADER MODES.
     //
-    // This is the owner's rule, and it replaces two earlier attempts that both
-    // got it wrong: "whether there is a bar, a tag, or nothing, the top of the
-    // card should be considered the top of the bar/tag/whatever", and icons
-    // "should remain at the exact same height relative to the bottom of the
-    // card". On glass the previous version shifted content in three different
-    // directions depending on the mode, which made the two treatments
-    // impossible to compare - the thing the modes exist for.
+    // The owner's rule, stated twice because two attempts broke it in two
+    // different ways: "the cards must not differ in shape or size because of
+    // the tag", and icons "should remain at the exact same height relative to
+    // the bottom of the card". The first attempt made a tagged card SHORTER by
+    // putting the tag above it in a flex column; the second kept the size but
+    // moved the tag inside, which cost the card the space the tag was supposed
+    // to save it.
     //
-    // So: the surface always fills the whole cell, and a strip of exactly
-    // headerHeight() is ALWAYS reserved at its top, drawn into or left empty.
-    // Nothing about the body's geometry depends on the header at all any more,
-    // which is why the pad_top below is unconditional.
-    //
-    // It does mean HDR_NONE leaves an empty strip. That is deliberate: the
-    // alternative is a card whose contents move when you change a decoration.
+    // The surface therefore always fills the whole cell, in every mode, and a
+    // tag hangs outside it into clearance the PAGE carves out of the row gap.
     _root = lv_obj_create(parent);
     lv_obj_set_style_bg_opa       (_root, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (_root, 0, 0);
     lv_obj_set_style_pad_all      (_root, 0, 0);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_CLICKABLE);
+    // The external tag hangs ABOVE the card, outside the cell's own bounds, so
+    // the cell must not clip its children. The page reserves the room it needs
+    // in the row gap - see CardPage::begin().
+    lv_obj_add_flag               (_root, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
 
     _surface = lv_obj_create(_root);
     lv_obj_set_size               (_surface, lv_pct(100), lv_pct(100));
@@ -129,12 +128,18 @@ void Card::build(lv_obj_t *parent) {
     lv_obj_add_event_cb   (_surface, eventCb, LV_EVENT_SHORT_CLICKED, this);
     lv_obj_add_event_cb   (_surface, eventCb, LV_EVENT_LONG_PRESSED,  this);
 
-    // Both header treatments now live INSIDE the surface, in that reserved
-    // strip. cards.md section 2 describes the tag as sitting outside the
-    // border; that is the one line of it this deviates from, because outside
-    // the border is precisely what made the card box change size per mode.
-    // The tag still reads as a distinct register - a pill inset from the
-    // corner rather than a band running edge to edge.
+    // The tag goes OUTSIDE the card, which is what cards.md section 2 said all
+    // along and what the owner restated when the previous attempt tucked it
+    // inside: "attached to the card at the top left sticking out above the
+    // card". Its purpose is to let groups of cards be read at a glance without
+    // spending any of the card's own contents on it - which only works if it
+    // is genuinely not part of the card.
+    //
+    // The earlier attempt put it outside and made the card SHORTER to fit,
+    // which is the thing that must not happen: "in order for this to look good
+    // the cards must not differ in shape or size because of the tag". So the
+    // surface still fills the whole cell in every mode, and the tag overhangs
+    // into the row gap above, which the page widens to make room.
     if (_hdrStyle != CardHeaderStyle::HDR_NONE) buildHeader();
 
     // The state badge. Created ALWAYS, even with no header, which is the
@@ -151,9 +156,22 @@ void Card::build(lv_obj_t *parent) {
     lv_obj_set_style_bg_opa       (_body, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (_body, 0, 0);
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
-    // Unconditional. See the box rule above - this is the line that makes a
-    // card's contents sit still when the header treatment changes.
-    lv_obj_set_style_pad_top      (_body, headerHeight() + UI::sc(m.PAD), 0);
+    // Reserved ONLY for an internal bar, and that is the point of the tag.
+    //
+    // This was briefly unconditional, back when the tag lived inside the card
+    // and every mode therefore had to reserve the same strip. With the tag
+    // outside, reserving one in tag mode would take the card's own space for a
+    // thing that is no longer in it - defeating the reason the owner wanted it
+    // outside: "a tag doesn't interfere with the inner contents and layout".
+    //
+    // So tag mode and no-header mode give the body the whole card and are
+    // pixel-identical to each other, while bar mode indents by exactly the
+    // bar's height. Content no longer moves because a card changed SIZE, which
+    // was the actual bug; it differs between bar and tag by precisely what an
+    // internal bar costs, which is the thing the two modes exist to compare.
+    if (_hdrStyle == CardHeaderStyle::HDR_INTERNAL) {
+        lv_obj_set_style_pad_top  (_body, Card::headerHeight() + UI::sc(m.PAD), 0);
+    }
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_CLICKABLE);
 
@@ -162,12 +180,14 @@ void Card::build(lv_obj_t *parent) {
 }
 
 void Card::buildHeader() {
-    const UIMetrics &m = UI::met();
-    (void)m;
     const bool tag = (_hdrStyle == CardHeaderStyle::HDR_EXTERNAL);
 
-    _header = lv_obj_create(_surface);
-    lv_obj_set_height             (_header, headerHeight());
+    // A tag parents to the CELL and a bar parents to the CARD. That one line
+    // is the whole difference between the two treatments: the bar is part of
+    // the card's surface and costs it space, the tag hangs above it and costs
+    // it nothing.
+    _header = lv_obj_create(tag ? _root : _surface);
+    lv_obj_set_height             (_header, Card::headerHeight());
     lv_obj_set_style_pad_all      (_header, 0, 0);
     lv_obj_set_style_pad_left     (_header, UI::sc(6), 0);
     lv_obj_set_style_pad_right    (_header, UI::sc(6), 0);
@@ -176,10 +196,15 @@ void Card::buildHeader() {
     lv_obj_clear_flag             (_header, LV_OBJ_FLAG_CLICKABLE);
 
     if (tag) {
-        // A pill: only as wide as its content, inset from the corner so the
-        // card's radius still reads as the card's outline.
+        // Only as wide as its content, and lifted clear of the card by its own
+        // height less a couple of pixels - the overlap is what makes it read
+        // as attached to the card rather than floating above it.
         lv_obj_set_width  (_header, LV_SIZE_CONTENT);
-        lv_obj_align      (_header, LV_ALIGN_TOP_LEFT, UI::sc(6), 0);
+        lv_obj_align      (_header, LV_ALIGN_TOP_LEFT, UI::sc(8),
+                           -Card::headerHeight() + UI::sc(2));
+        // Behind the card, so the card's own edge draws over the bottom of the
+        // tag and the two read as one shape.
+        lv_obj_move_background(_header);
     } else {
         lv_obj_set_width  (_header, lv_pct(100));
         lv_obj_align      (_header, LV_ALIGN_TOP_MID, 0, 0);
@@ -215,18 +240,20 @@ void Card::restyle() {
     lv_obj_set_style_shadow_opa   (_surface, m.SHADOW ? LV_OPA_40 : LV_OPA_TRANSP, 0);
 
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
-    // Unconditional, matching build(). The strip is reserved in every mode so
-    // that changing the header treatment moves no content - see the box rule
-    // in build().
-    lv_obj_set_style_pad_top      (_body, headerHeight() + UI::sc(m.PAD), 0);
+    if (_hdrStyle == CardHeaderStyle::HDR_INTERNAL) {
+        lv_obj_set_style_pad_top  (_body, Card::headerHeight() + UI::sc(m.PAD), 0);
+    }
 
     if (_header) {
-        lv_obj_set_height             (_header, headerHeight());
+        lv_obj_set_height             (_header, Card::headerHeight());
         lv_obj_set_style_bg_opa       (_header, LV_OPA_COVER, 0);
-        // A tag is a pill and rounds on its own; a bar runs edge to edge and
-        // takes the card's corners from clip_corner instead.
+        // A tag is a tab: a modest radius, and it overlaps the card by that
+        // same amount so its rounded bottom corners hide behind the card's own
+        // edge and the two read as one shape. A full pill would float.
+        // A bar runs edge to edge and takes the card's corners from
+        // clip_corner instead.
         lv_obj_set_style_radius       (_header, _hdrStyle == CardHeaderStyle::HDR_EXTERNAL
-                                                ? LV_RADIUS_CIRCLE : 0, 0);
+                                                ? UI::sc(m.RADIUS / 2) : 0, 0);
         // Text in the card's BACKGROUND colour, per cards.md section 2 - dark
         // text on a light accent, light text on a dark one, without anyone
         // having to pick per scheme.

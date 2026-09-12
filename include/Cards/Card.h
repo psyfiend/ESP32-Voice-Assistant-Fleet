@@ -130,6 +130,17 @@ public:
     // member and CardBinder passes its own.
     static void useRegistry(EntityRegistry *r) { s_reg = r; }
 
+    // The height of the header strip, derived rather than declared:
+    // UIMetrics::HEADER_H is a floor, and the real value is whichever is
+    // larger, that token or the TAG font's line height plus breathing room. A
+    // fixed 14 logical px was a band smaller than its own text once the type
+    // scale grew.
+    //
+    // Public because a PAGE needs it: an external tag hangs ABOVE its card, in
+    // the grid's row gap, so the page has to reserve that much clearance or
+    // the tag lands on the card above. See CardPage::begin().
+    static int32_t headerHeight();
+
 protected:
     // --- Subclass contract ------------------------------------------------
 
