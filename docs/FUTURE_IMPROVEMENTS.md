@@ -237,6 +237,36 @@ everything the same *physical* size, which is right for touch targets (a fingert
 every board) and arguably wrong for text on a 7-inch panel across a room. Add a small per-board
 nudge only if something still looks wrong on glass.
 
+### `UI::sc()` duplicates LVGL's own `lv_dpx()` - collapse it eventually
+
+Found 2026-09-11 while answering "are we over-engineering this?", and the honest answer for this
+one piece was yes.
+
+    UI::sc(n)   =  n * PPI / 170          UITokens.cpp
+    lv_dpx(n)   =  n * PPI / 160          lv_display.h:716, as LV_DPX_CALC
+
+The same function with a different reference constant. Ours is not layered on top of LVGL's
+mechanism - it *is* LVGL's mechanism, spelled again, against a 170 baseline instead of 160.
+
+**Deliberately not fixed now.** The whole difference is 1.0625x, which is not visible, so the fix
+buys no behaviour - only one less concept - and it costs a pass over every token in
+`UITokens.cpp` plus a flash to confirm nothing shifted. The owner's call: note it, keep moving,
+and do it when something else is already touching those values.
+
+The same class of thing as the duplicated touch rotation logic in `TouchManager::mapCoordinates()`,
+which `bb_captouch` turns out to implement itself - neither is a bug, both are a second
+implementation of something we already had, and both are worth removing on a day when that is the
+job rather than a detour.
+
+**What this does NOT cover, and the reason it is worth being precise here:** DPI in LVGL only ever
+scales *shapes*. Verified in this tree - every DPI-sensitive path goes through `LV_DPX_CALC`, and
+the complete list of callers is `lv_obj.c` (default size of an unsized object), `lv_obj_scroll.c`
+(minimum scrollbar), `lv_slider.c` (click area), `lv_arc.c` (touch tolerance) and
+`lv_theme_default.c` (radius, border, padding, shadow). **No DPI path touches fonts**, in any
+version - the default theme takes `font_normal` as a parameter and never consults DPI to pick it.
+So `lv_display_set_dpi()` is not an alternative to the generated type scale, and setting it would
+not have moved the too-small text of 2.4's first flash by a single pixel.
+
 ## Audio
 
 - **AEC stays deprioritized indefinitely**, not just paused. If from-scratch
