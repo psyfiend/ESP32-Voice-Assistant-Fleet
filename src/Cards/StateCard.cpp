@@ -108,7 +108,7 @@ void StateCard::render() {
     }
 
     // --- Icon and name ----------------------------------------------------
-    lv_label_set_text          (_icon, cardIconFor(e->desc));
+    lv_label_set_text          (_icon, cardIconForState(e->desc, isOn));
     lv_obj_set_style_text_font (_icon, t.ICON, 0);
 
     lv_label_set_text          (_name, label());

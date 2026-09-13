@@ -71,16 +71,6 @@ void ValueCard::buildBody(lv_obj_t *body) {
     lv_obj_align(_seen, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
 }
 
-// The battery glyph for a percentage. LVGL ships five levels and using them is
-// free - they are already in every Montserrat face we reference.
-static const char *batteryGlyph(int pct) {
-    if (pct >= 90) return LV_SYMBOL_BATTERY_FULL;
-    if (pct >= 65) return LV_SYMBOL_BATTERY_3;
-    if (pct >= 40) return LV_SYMBOL_BATTERY_2;
-    if (pct >= 15) return LV_SYMBOL_BATTERY_1;
-    return LV_SYMBOL_BATTERY_EMPTY;
-}
-
 void ValueCard::render() {
     const Entity *e = primary();
     if (!e) return;
@@ -90,7 +80,7 @@ void ValueCard::render() {
 
     // --- Icon, tinted by what this measures -------------------------------
     lv_label_set_text          (_icon, cardIconFor(e->desc));
-    lv_obj_set_style_text_font (_icon, t.NAME, 0);
+    lv_obj_set_style_text_font (_icon, t.ICON_SM, 0);
     lv_obj_set_style_text_color(_icon, UI::c(cardTintFor(e->desc)), 0);
     lv_obj_set_style_pad_right (_icon, UI::sc(5), 0);
 
@@ -134,7 +124,7 @@ void ValueCard::render() {
         const int pct = (batt->value.type == ValueType::FLOAT)
                       ? (int)batt->value.f : (int)batt->value.i;
         char b[24];
-        snprintf(b, sizeof(b), "%s %d%%", batteryGlyph(pct), pct);
+        snprintf(b, sizeof(b), "%s %d%%", cardBatteryGlyph(pct), pct);
         lv_label_set_text          (_battery, b);
         lv_obj_set_style_text_font (_battery, t.TAG, 0);
         lv_obj_set_style_text_color(_battery, UI::c(p.TEXT_DIM), 0);

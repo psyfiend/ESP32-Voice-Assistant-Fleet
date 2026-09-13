@@ -1,5 +1,6 @@
 #include "Cards/CardIcons.h"
 #include "UI/UITokens.h"
+#include "UI/UIIcons.h"
 #include <lvgl.h>
 #include <stdio.h>
 #include <string.h>
@@ -14,40 +15,96 @@ static bool dc(const EntityDescriptor &d, const char *what) {
 }
 
 const char *cardIconFor(const EntityDescriptor &d) {
-    // Ordered most specific first: battery and signal_strength are device
-    // classes that appear on entities of several kinds, so they have to be
-    // tested before anything falls through to a kind-based default.
-    if (dc(d, "battery"))         return LV_SYMBOL_BATTERY_FULL;
-    if (dc(d, "signal_strength")) return LV_SYMBOL_WIFI;
-    if (dc(d, "temperature"))     return LV_SYMBOL_TINT;
-    if (dc(d, "humidity"))        return LV_SYMBOL_TINT;
-    if (dc(d, "illuminance"))     return LV_SYMBOL_EYE_OPEN;
-    if (dc(d, "power") ||
-        dc(d, "energy"))          return LV_SYMBOL_CHARGE;
-    if (dc(d, "occupancy") ||
-        dc(d, "motion"))          return LV_SYMBOL_EYE_OPEN;
-    if (dc(d, "door") ||
-        dc(d, "opening"))         return LV_SYMBOL_DRIVE;
+    // 1. THE ENTITY'S OWN ICON WINS.
+    //
+    // cards.md section 5: "Prefer provider-supplied. We already publish an
+    // `icon` in our own MQTT discovery payloads, so the inbound direction
+    // should be symmetrical: if HA or an MQTT discovery message names an icon,
+    // use it." Every descriptor in the tree already carries one and until the
+    // MDI subset existed nothing could draw it, so all of them were ignored.
+    //
+    // A name the subset does not contain returns null rather than something
+    // approximate, so an unknown icon falls through to the rules below instead
+    // of confidently drawing the wrong thing.
+    if (const char *g = mdiGlyph(d.icon)) return g;
 
+    // 2. device_class. Ordered most specific first: battery and
+    //    signal_strength appear on entities of several kinds, so they have to
+    //    be tested before anything falls through to a kind-based default.
+    if (dc(d, "battery"))         return MDI_BATTERY;
+    if (dc(d, "signal_strength")) return MDI_WIFI;
+    if (dc(d, "temperature"))     return MDI_THERMOMETER;
+    if (dc(d, "humidity"))        return MDI_WATER_PERCENT;
+    if (dc(d, "illuminance"))     return MDI_BRIGHTNESS_5;
+    if (dc(d, "power") ||
+        dc(d, "energy"))          return MDI_LIGHTNING_BOLT;
+    if (dc(d, "pressure"))        return MDI_GAUGE;
+    if (dc(d, "occupancy") ||
+        dc(d, "motion"))          return MDI_MOTION_SENSOR;
+    if (dc(d, "door"))            return MDI_DOOR_OPEN;
+    if (dc(d, "window") ||
+        dc(d, "opening"))         return MDI_WINDOW_OPEN;
+    if (dc(d, "lock"))            return MDI_LOCK;
+    if (dc(d, "moisture"))        return MDI_WATER_ALERT;
+    if (dc(d, "smoke"))           return MDI_SMOKE_DETECTOR;
+    if (dc(d, "carbon_dioxide"))  return MDI_MOLECULE_CO2;
+    if (dc(d, "pm25") ||
+        dc(d, "volatile_organic_compounds")) return MDI_AIR_FILTER;
+
+    // 3. The domain, as a last resort.
     switch (d.kind) {
-        case EntityKind::LIGHT:
-        case EntityKind::SWITCH:        return LV_SYMBOL_POWER;
-        case EntityKind::BUTTON:        return LV_SYMBOL_PLAY;
-        case EntityKind::BINARY_SENSOR: return LV_SYMBOL_EYE_OPEN;
-        case EntityKind::NUMBER:        return LV_SYMBOL_SETTINGS;
-        case EntityKind::TEXT:          return LV_SYMBOL_FILE;
-        case EntityKind::CLIMATE:       return LV_SYMBOL_HOME;
-        case EntityKind::WEATHER:       return LV_SYMBOL_IMAGE;
+        case EntityKind::LIGHT:         return MDI_LIGHTBULB;
+        case EntityKind::SWITCH:        return MDI_TOGGLE_SWITCH;
+        case EntityKind::BUTTON:        return MDI_GESTURE_TAP_BUTTON;
+        case EntityKind::BINARY_SENSOR: return MDI_CHECK_CIRCLE;
+        case EntityKind::NUMBER:        return MDI_SPEEDOMETER;
+        case EntityKind::TEXT:          return MDI_SCRIPT_TEXT;
+        case EntityKind::CLIMATE:       return MDI_THERMOSTAT;
+        case EntityKind::WEATHER:       return MDI_WEATHER_PARTLY_CLOUDY;
         case EntityKind::SENSOR:        break;
     }
-    return LV_SYMBOL_LIST;
+    return MDI_GAUGE;
+}
+
+const char *cardIconForState(const EntityDescriptor &d, bool on) {
+    // A glyph that changes with the reading, which cards.md section 5 asks for
+    // as the fallback behaviour: "a local set whose glyph varies with the
+    // reading - bulb off / half / on, thermometer by band, occupancy present /
+    // absent". Only the pairs that genuinely read differently are listed; a
+    // switch toggling between two near-identical glyphs is noise, and the card
+    // already carries state in its colour.
+    if (dc(d, "occupancy") || dc(d, "motion"))
+        return on ? MDI_MOTION_SENSOR : MDI_MOTION_SENSOR_OFF;
+    if (dc(d, "door"))   return on ? MDI_DOOR_OPEN   : MDI_DOOR_CLOSED;
+    if (dc(d, "window") || dc(d, "opening"))
+        return on ? MDI_WINDOW_OPEN : MDI_WINDOW_CLOSED;
+    if (dc(d, "lock"))   return on ? MDI_LOCK_OPEN_VARIANT : MDI_LOCK;
+
+    if (!d.icon[0]) {
+        switch (d.kind) {
+            case EntityKind::LIGHT:  return on ? MDI_LIGHTBULB : MDI_LIGHTBULB_OUTLINE;
+            case EntityKind::SWITCH: return on ? MDI_TOGGLE_SWITCH : MDI_TOGGLE_SWITCH_OFF;
+            default: break;
+        }
+    }
+    return cardIconFor(d);
+}
+
+const char *cardBatteryGlyph(int pct) {
+    if (pct >= 90) return MDI_BATTERY;
+    if (pct >= 70) return MDI_BATTERY_90;
+    if (pct >= 50) return MDI_BATTERY_70;
+    if (pct >= 30) return MDI_BATTERY_50;
+    if (pct >= 10) return MDI_BATTERY_30;
+    return MDI_BATTERY_ALERT;
 }
 
 uint32_t cardTintFor(const EntityDescriptor &d) {
     const UIPalette &p = UI::pal();
 
     if (dc(d, "temperature"))     return p.TINT_TEMP;
-    if (dc(d, "humidity"))        return p.TINT_HUMID;
+    if (dc(d, "humidity") ||
+        dc(d, "moisture"))        return p.TINT_HUMID;
     if (dc(d, "illuminance"))     return p.TINT_LIGHT;
     if (dc(d, "power") ||
         dc(d, "energy"))          return p.TINT_POWER;

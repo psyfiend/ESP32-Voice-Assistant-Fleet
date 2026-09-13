@@ -20,7 +20,8 @@
 #include <lvgl.h>
 #include <stdint.h>
 #include "bsp_loader.h"
-#include "UI/UITypeScale.h"   // generated: this board's four faces
+#include "UI/UITypeScale.h"   // generated: this board's text faces
+#include "UI/UIIcons.h"       // generated: this board's MDI subset
 
 // ---------------------------------------------------------------------------
 // 1. Colour
@@ -108,8 +109,12 @@ struct UIType {
     const lv_font_t *UNIT;    // the unit beside a value, deliberately smaller
     const lv_font_t *NAME;    // card name
     const lv_font_t *TAG;     // header bar, status row
-    const lv_font_t *ICON;    // the glyph in an actor card's disc. A full
-                              // face, because VALUE cannot draw a symbol
+    // The two icon faces. Material Design Icons, generated as an 84-glyph
+    // subset per board - NOT Montserrat, and not interchangeable with it:
+    // MDI codepoints sit in the private use area, so these faces can draw
+    // nothing but icons and every other face can draw none of them.
+    const lv_font_t *ICON;    // the disc glyph on a state card
+    const lv_font_t *ICON_SM; // the tinted glyph on a value card's title row
     const lv_font_t *HERO;    // oversized, for a fullscreen card
 };
 

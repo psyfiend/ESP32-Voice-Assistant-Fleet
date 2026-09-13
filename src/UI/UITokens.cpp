@@ -194,16 +194,17 @@ const UIType &type() {
     // at 165 PPI drew the same token at 1.85 mm. The better panel was the
     // harder one to read. Flashed and caught by eye, not by arithmetic.
     static UIType t = {
-        .VALUE = FLEET_FONT_VALUE,
-        .UNIT  = FLEET_FONT_UNIT,
-        .NAME  = FLEET_FONT_NAME,
-        .TAG   = FLEET_FONT_TAG,
-        .ICON  = FLEET_FONT_ICON,
+        .VALUE   = FLEET_FONT_VALUE,
+        .UNIT    = FLEET_FONT_UNIT,
+        .NAME    = FLEET_FONT_NAME,
+        .TAG     = FLEET_FONT_TAG,
+        .ICON    = FLEET_ICONS_LG,
+        .ICON_SM = FLEET_ICONS_SM,
         // HERO shares VALUE's face. Referencing another size pulls a whole
         // extra font into the link for something nothing draws yet - at the
         // cost recorded in docs/design/tokens.md. Point it somewhere larger
         // when a fullscreen card actually needs one.
-        .HERO  = FLEET_FONT_VALUE,
+        .HERO    = FLEET_FONT_VALUE,
     };
     return t;
 }
