@@ -291,6 +291,49 @@ not have moved the too-small text of 2.4's first flash by a single pixel.
 
 ## Connectivity (WiFi / MQTT / Home Assistant)
 
+### MQTT is the wrong transport for Home Assistant ENTITIES - websocket is the real path
+
+Owner's conclusion, 2026-09-13, and it reframes issue #43 from "an alternative
+way to reach HA" into "the way HA entities are actually going to work".
+
+The problem is not that any single piece of metadata is missing. It is that
+**MQTT carries a value per topic and nothing else.** A light at
+`/home/office/light/state` tells you the light's state. Its area, its battery,
+its last-seen, the device it belongs to - each of those needs its own
+hand-crafted topic on the HA side, or an automation maintaining it per entity.
+At a handful of entities that is tedious; at hundreds it is unmanageable, and
+it is work the user has to do before our panel shows anything useful.
+
+A JSON payload helps a little and does not fix it: someone still has to decide
+and configure what goes in that JSON, per entity, on the HA side.
+
+**This corrects an assumption in `docs/design/cards.md` section 2**, which says
+"Area comes free: Home Assistant already carries it on devices, so
+`MqttProvider` can populate it from discovery rather than anyone tagging
+entities by hand." Verified against the code: nothing in the tree publishes or
+reads an area, and MQTT discovery's `suggested_area` runs OUTBOUND - it is how
+a device suggests its own area to HA, not a way to learn someone else's. That
+sentence should be struck when cards.md is next edited.
+
+**Not yet designed, and deliberately not guessed at here.** What the websocket
+API does and does not expose is worth confirming against the real thing rather
+than assumed - the owner's instruction on exactly this point was "don't make
+any assumptions about what does or doesn't come from HA". What is settled is
+the direction: full HA entity integration goes over the websocket, and MQTT
+stays for what it is genuinely good at - our own telemetry outbound, and plain
+broker topics that have nothing to do with HA.
+
+Consequences to think through when it is scheduled:
+
+- Area, and any custom grouping, become available rather than build-sheet-only.
+  `Card::setShowArea()` and the header modes were built assuming area might
+  arrive from somewhere later; that is the somewhere.
+- It overlaps the sensor-history fetch cards.md section 4 needs, which was
+  already going to want an HTTP or websocket client.
+- `MqttProvider` does not go away. It stops being the way HA entities arrive.
+
+
+
 **Phase 1 is COMPLETE — see `ROADMAP.md` for what was built and what was descoped.** The
 narrative that used to live here (progress logs, the `wifi-testing` branch, the platform
 upgrade) has been removed: it described work that is now done, and git history is a better

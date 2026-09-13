@@ -23,8 +23,13 @@ void StateCard::buildBody(lv_obj_t *body) {
     lv_label_set_long_mode(_name, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(_name, LV_TEXT_ALIGN_CENTER, 0);
 
+    // TOP-LEFT, not top-right. In HDR_NONE the card's STALE marker is a
+    // floating badge over the top-right corner, and two things fighting for
+    // that corner is the sort of collision you only see once it happens on a
+    // board. The body's top-left is empty on this layout - the disc is centred
+    // and the name is at the bottom - so nothing is displaced.
     _mixed = lv_label_create(body);
-    lv_obj_align(_mixed, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_align(_mixed, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_obj_add_flag(_mixed, LV_OBJ_FLAG_HIDDEN);
 }
 

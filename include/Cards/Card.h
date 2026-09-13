@@ -219,6 +219,7 @@ protected:
 private:
     void buildHeader();
     void applyState();                 // repaint chrome for _state
+    void applyDiagonal();              // the loud treatment, every mode
     CardState deriveState(uint32_t nowMs) const;
     uint32_t tagColor() const;         // the badge's colour, which is NOT
                                        // stateColor() - see ST_PARTIAL

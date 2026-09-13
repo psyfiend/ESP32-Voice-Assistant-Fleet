@@ -128,13 +128,17 @@ void Card::build(lv_obj_t *parent) {
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_CLICKABLE);
 
-    // The strip is reserved for the two modes that draw INSIDE the card, and
-    // not for the one that does not. That is the whole trade between them: a
-    // tag costs the card no space, a bar and in-card text each cost a strip.
+    // ONLY HDR_BAR reserves a strip, and that is the whole trade between the
+    // three modes:
     //
-    // It is reserved whether or not there is anything in it right now, so that
-    // a card's contents do not jump when it goes stale or loses its area.
-    if (_hdrStyle != CardHeaderStyle::HDR_TAG) {
+    //   HDR_BAR   the band is part of the card, so it costs the body a strip
+    //   HDR_TAG   the tags are outside the card, so the body keeps everything
+    //   HDR_NONE  shows no area at all, so there is nothing to reserve for -
+    //             its STALE marker floats over the top-right corner instead
+    //
+    // The bar's strip is reserved whether or not there is anything in it right
+    // now, so a card's contents do not jump when it goes stale.
+    if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
         lv_obj_set_style_pad_top(_body, Card::headerHeight() + UI::sc(m.PAD), 0);
     }
 
@@ -159,8 +163,22 @@ static lv_obj_t *makeStrip(lv_obj_t *parent) {
 void Card::buildHeader() {
     const bool tag = (_hdrStyle == CardHeaderStyle::HDR_TAG);
 
-    // A tag parents to the CELL; a bar and plain text parent to the CARD. That
-    // single line is the entire structural difference between the modes.
+    // HDR_NONE builds no area holder at all. The owner was explicit: "no header
+    // mode: Area is not displayed." It is not a hidden label or an empty strip
+    // - there is nowhere in that mode for an area to go, which is what makes it
+    // the mode you pick when you do not want one.
+    if (_hdrStyle == CardHeaderStyle::HDR_NONE) {
+        // A floating badge over the card's top-right corner, inset from the
+        // rounded edge rather than jammed against it. Transient, so it takes no
+        // permanent space - which is why this mode gives the body the whole card.
+        _badge = lv_label_create(_surface);
+        lv_obj_align   (_badge, LV_ALIGN_TOP_RIGHT, -UI::sc(6), UI::sc(6));
+        lv_obj_add_flag(_badge, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    // A tag parents to the CELL; a bar parents to the CARD. That single line is
+    // the entire structural difference between the two.
     _header = makeStrip(tag ? _root : _surface);
 
     if (tag) {
@@ -225,9 +243,11 @@ void Card::restyle() {
         lv_obj_set_style_pad_top  (_body, Card::headerHeight() + UI::sc(m.PAD), 0);
     }
 
-    lv_obj_set_height          (_header, Card::headerHeight());
-    lv_obj_set_style_text_font (_lblArea, UI::type().TAG, 0);
-    lv_obj_set_style_text_font (_badge,   UI::type().TAG, 0);
+    if (_header) {
+        lv_obj_set_height          (_header, Card::headerHeight());
+        lv_obj_set_style_text_font (_lblArea, UI::type().TAG, 0);
+    }
+    lv_obj_set_style_text_font (_badge, UI::type().TAG, 0);
     if (_stale) lv_obj_set_height(_stale, Card::headerHeight());
 
     applyState();
@@ -285,6 +305,25 @@ void Card::applyState() {
         case CardState::ST_LIVE:       mark = "";        break;
     }
 
+    // HDR_NONE has no area holder, so it is only ever the floating badge.
+    if (!_header) {
+        if (mark[0]) {
+            lv_label_set_text          (_badge, mark);
+            lv_obj_set_style_bg_color  (_badge, UI::c(tc ? tc : p.ACCENT), 0);
+            lv_obj_set_style_bg_opa    (_badge, LV_OPA_COVER, 0);
+            lv_obj_set_style_radius    (_badge, UI::sc(m.RADIUS / 2), 0);
+            lv_obj_set_style_pad_hor   (_badge, UI::sc(6), 0);
+            lv_obj_set_style_pad_ver   (_badge, UI::sc(3), 0);
+            lv_obj_set_style_text_color(_badge, UI::c(p.SURFACE), 0);
+            lv_obj_clear_flag          (_badge, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_move_foreground     (_badge);
+        } else {
+            lv_obj_add_flag(_badge, LV_OBJ_FLAG_HIDDEN);
+        }
+        applyDiagonal();
+        return;
+    }
+
     const bool wantArea = _showArea && _area[0];
     lv_label_set_text(_lblArea, wantArea ? _area : "");
     lv_label_set_text(_badge,   mark);
@@ -300,9 +339,9 @@ void Card::applyState() {
         lv_obj_set_style_text_color(_lblArea, UI::c(p.SURFACE), 0);
         if (wantArea) lv_obj_clear_flag(_header, LV_OBJ_FLAG_HIDDEN);
         else          lv_obj_add_flag  (_header, LV_OBJ_FLAG_HIDDEN);
-    } else if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
-        // The whole band takes the state colour, so it reads as the warning
-        // rather than just the word inside it.
+    } else {
+        // HDR_BAR. The whole band takes the state colour, so it reads as the
+        // warning rather than just the word inside it.
         lv_obj_set_style_bg_color  (_header, UI::c(tc ? tc : p.ACCENT), 0);
         lv_obj_set_style_bg_opa    (_header, LV_OPA_COVER, 0);
         lv_obj_set_style_radius    (_header, 0, 0);
@@ -312,12 +351,6 @@ void Card::applyState() {
         lv_obj_set_style_text_color(_badge,   UI::c(p.SURFACE), 0);
         // The band stays even when empty: it is part of the card's shape in
         // this mode, and appearing only sometimes would be worse than blank.
-        lv_obj_clear_flag(_header, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        // HDR_NONE: no fill at all, just text in the strip the body left free.
-        lv_obj_set_style_bg_opa    (_header, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_text_color(_lblArea, UI::c(p.TEXT_DIM), 0);
-        lv_obj_set_style_text_color(_badge,   UI::c(tc ? tc : p.TEXT_DIM), 0);
         lv_obj_clear_flag(_header, LV_OBJ_FLAG_HIDDEN);
     }
 
@@ -331,11 +364,16 @@ void Card::applyState() {
         else         lv_obj_add_flag  (_stale, LV_OBJ_FLAG_HIDDEN);
     }
 
-    // --- the loud treatment -------------------------------------------------
-    //
-    // cards.md section 3 offers two candidates - a growing tag or a
-    // corner-to-corner diagonal - and asks for both to be prototyped. This is
-    // the one a header bar cannot express.
+    applyDiagonal();
+}
+
+// The loud treatment, shared by every mode.
+//
+// cards.md section 3 offers two candidates - a growing tag or a
+// corner-to-corner diagonal - and asks for both to be prototyped. This is the
+// one a header bar cannot express, which is also why it has to live outside
+// the per-mode branching above.
+void Card::applyDiagonal() {
     const bool wantDiag = (_state == CardState::ST_LONG_STALE ||
                            _state == CardState::ST_REFUSED);
     if (!wantDiag) {
