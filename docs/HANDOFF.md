@@ -38,10 +38,21 @@ Everything it needs has been decided. `docs/design/cards.md` is the spec; the sh
 - A card binds **one primary entity plus at most two secondaries**, where a secondary is another
   entity *of the same physical device* (battery, last-seen). Anything wanting more is a **group
   card** — a separate type holding several primaries, spanning multiple cells.
-- **Two layout families.** *Measure* cards (temperature, lux, power): small tinted icon top-left,
-  name beside it, value centred and dominant — and the name is the **location**, not the
-  measurement. *Actor* cards (lights, switches, doors, motion): big icon in a disc, centred, name
-  below. **No "On"/"Off"/"Open"/"Closed" text anywhere** — state is the icon and its colour.
+- **Card types are named for their Home Assistant DOMAIN** — `sensor`, `binary_sensor`, `switch`,
+  `light`, `button` — exactly as `cards.md` §4 and ROADMAP 2.7 list them. A user picks a domain and
+  supplies topics; the framework decides the arrangement. **They never pick a layout.**
+- **Two layouts sit underneath, and they are an implementation detail.** `ValueCard` (hero is a
+  number: small tinted icon top-left, name beside it, value centred and dominant — and the name is
+  the **location**, not the measurement) and `StateCard` (hero is a state: big icon in a disc,
+  centred, name below). Both are abstract; only domain types in `CardCatalog.h` are instantiable.
+  **No "On"/"Off"/"Open"/"Closed" text anywhere** — state is the icon and its colour.
+
+  *An earlier version of this file called these two "Measure" and "Actor" cards, as though they
+  were the types rather than the layouts. That paraphrase got promoted to class names in 2.4 and
+  the domain layer underneath was skipped entirely, which would have forced a build sheet to record
+  a layout decision that is not a user's to make. Fixed the same milestone. Worth remembering that
+  a summary written for the next session can outrank the spec if it is the thing that gets read
+  first — which is exactly what this document is.*
 - **Provenance never renders on a card.** Not `Zigbee2MQTT`, not the source. It is an Entity
   Registry violation as well as visual noise; it belongs in `SystemReport`.
 - **Staleness never dims.** Tag, escalating to a fat corner-to-corner diagonal. A *paused* card may

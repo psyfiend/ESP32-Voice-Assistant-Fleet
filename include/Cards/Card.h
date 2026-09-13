@@ -15,8 +15,8 @@
 //   Card (here)   everything every card does the same way. Binding, spans,
 //                 staleness, the refused-command state, the header bar,
 //                 tap and long-press, and the root object styled from tokens.
-//   subclasses    the body, and what a change looks like. MeasureCard and
-//                 ActorCard are genuinely different widget trees; that is the
+//   subclasses    the body, and what a change looks like. ValueCard and
+//                 StateCard are genuinely different widget trees; that is the
 //                 two layout families of cards.md section 4.
 //
 // This shape came out of the owner's answer when asked to pick a class shape:

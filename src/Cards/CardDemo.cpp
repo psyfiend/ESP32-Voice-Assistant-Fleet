@@ -1,7 +1,6 @@
 #include "Cards/CardDemo.h"
 #include "Cards/CardPage.h"
-#include "Cards/MeasureCard.h"
-#include "Cards/ActorCard.h"
+#include "Cards/CardCatalog.h"
 #include "UI/UITokens.h"
 #include "SystemReport.h"
 #include "SystemEntities.h"
@@ -29,7 +28,7 @@ int s_scheme = 0;
 // Which actor treatment the page is wearing. Same idea as s_hdr: a knob rather
 // than a decision, because the question is "which of these do you prefer" and
 // that is answered by looking at both.
-ActorStateStyle s_actorStyle = ActorStateStyle::FILL_SURFACE;
+StateCardFill s_actorStyle = StateCardFill::FILL_SURFACE;
 
 // Measured across the page build, in LVGL's own pool. ESP.getFreeHeap() is the
 // wrong instrument here and 2.3 established why: LV_USE_STDLIB_MALLOC is
@@ -73,8 +72,8 @@ void schemeCb(lv_event_t *e) {
 
 void actorCb(lv_event_t *e) {
     (void)e;
-    s_actorStyle = (s_actorStyle == ActorStateStyle::FILL_SURFACE)
-                 ? ActorStateStyle::LIGHT_ICON : ActorStateStyle::FILL_SURFACE;
+    s_actorStyle = (s_actorStyle == StateCardFill::FILL_SURFACE)
+                 ? StateCardFill::LIGHT_ICON : StateCardFill::FILL_SURFACE;
     CardDemo::show(*s_reg, *s_binder);
 }
 
@@ -162,7 +161,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     topButton(bar, UI::pal().name, schemeCb);
     topButton(bar, s_hdr == CardHeaderStyle::HDR_EXTERNAL ? "Tag"
                  : s_hdr == CardHeaderStyle::HDR_INTERNAL ? "Bar" : "No hdr", headerCb);
-    topButton(bar, s_actorStyle == ActorStateStyle::FILL_SURFACE ? "Fill" : "Icon", actorCb);
+    topButton(bar, s_actorStyle == StateCardFill::FILL_SURFACE ? "Fill" : "Icon", actorCb);
 
     // --- The grid ---------------------------------------------------------
     lv_obj_t *host = lv_obj_create(col);
@@ -185,79 +184,70 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     s_page->begin(host, &binder,
                   s_hdr == CardHeaderStyle::HDR_EXTERNAL ? Card::headerHeight() : 0);
 
-    CardPlacement wide;  wide.prefSpanX = 2;  wide.minSpanX = 1;  wide.priority = 200;
 
     // --- Two small builders -----------------------------------------------
     //
-    // Card's setters chain and return Card&, while CardPage::add() takes
-    // ownership of a Card* - so the two do not compose into one expression.
-    // A local that configures then hands over is clearer than making the
-    // setters return a pointer just to enable a one-liner.
+    // Every card here is created by DOMAIN, through cardForEntity(), and never
+    // by naming a layout. That is the whole point of the catalog: this demo is
+    // the closest thing to a build sheet that exists yet, so if it had to pick
+    // between a value layout and a state layout, the real build sheet would
+    // have to as well - and that is not a user's decision to make.
     //
-    // Note every label below: "Deck", never "Temperature". cards.md section 4
-    // - the icon says what the quantity is, so the name says WHERE.
-    auto measure = [&](const char *id, const char *label, const char *area,
-                       const Entity *sec, const CardPlacement *pl, bool paused) {
+    // Note every label: "Deck", never "Temperature". cards.md section 4 - the
+    // tinted icon says what the quantity is, so the name says WHERE.
+    StateCard::setFill(s_actorStyle);
+
+    auto place = [&](const char *id, const char *label, const char *area,
+                     const Entity *sec, const CardPlacement *pl, bool paused) {
         const Entity *e = ent(id);
         if (!e) return;
-        MeasureCard *c = new MeasureCard();
-        c->bindPrimary(e).setLabel(label).setHeaderStyle(s_hdr);
-        if (area) c->setArea(area);
-        if (sec)  c->bindSecondary(sec);
-        if (pl)   c->setPlacement(*pl);
+        Card *c = cardForEntity(e);   // EntityKind picks the class
+        if (!c) return;               // a kind with no card type yet
+        c->setLabel(label).setHeaderStyle(s_hdr);
+        if (area)   c->setArea(area);
+        if (sec)    c->bindSecondary(sec);
+        if (pl)     c->setPlacement(*pl);
         if (paused) c->setPaused(true);
         s_page->add(c);
     };
 
-    auto actor = [&](const char *idA, const char *idB, const char *label) {
+    // The aggregate: ONE card, two entities, one tap for both. Same class as a
+    // single switch - only the binding differs, which is what cards.md section
+    // 4's "groupable by room" asks for and why it is not a group card.
+    auto placeGroup = [&](const char *idA, const char *idB, const char *label) {
         const Entity *a = ent(idA);
         if (!a) return;
-        ActorCard *c = new ActorCard();
-        c->bindPrimary(a);
-        if (idB) c->bindPrimary(ent(idB));
+        Card *c = cardForEntity(a);
+        if (!c) return;
+        c->bindPrimary(ent(idB));
         c->setLabel(label).setHeaderStyle(s_hdr);
-        c->setStateStyle(s_actorStyle);
         s_page->add(c);
     };
 
-    measure("deck_temp", "Deck",  "Outdoor", ent("deck_battery"), nullptr, false);
-    measure("deck_lux",  "Deck",  "Outdoor", nullptr,             nullptr, false);
+    CardPlacement wide;  wide.prefSpanX = 2;  wide.minSpanX = 1;  wide.priority = 200;
 
-    // Motion is an ACTOR, not a measure, even though it is a sensor. cards.md
-    // section 4: a binary sensor placed as its own card behaves as a state
-    // card - prominent icon, whole card shifts colour - exactly like a
-    // non-dimmable light. What it measures is not a number.
-    actor("deck_motion", nullptr, "Deck");
+    // sensor -> value layout, chosen by the catalog and not by this file
+    place("deck_temp", "Deck", "Outdoor", ent("deck_battery"), nullptr, false);
+    place("deck_lux",  "Deck", "Outdoor", nullptr,             nullptr, false);
 
-    // The two halves of the optimistic write. Tap both.
-    actor(VIRT_ENT_SWITCH, nullptr, "Obeys");
-    actor(VIRT_ENT_STUCK,  nullptr, "Ignores");
+    // binary_sensor -> state layout, and NOTHING happens when it is tapped.
+    // Before the catalog existed this was an ActorCard whose tap tried to
+    // command a read-only entity and was saved only by a writable check.
+    place("deck_motion", "Deck", nullptr, nullptr, nullptr, false);
 
-    // The aggregate: one card, two entities, one tap. Tapping this after
-    // tapping only one of the two above is what shows the mixed indicator.
-    actor(VIRT_ENT_SWITCH, VIRT_ENT_STUCK, "Both");
+    // switch -> state layout, and a tap actually commands. Both halves of the
+    // optimistic write: one entity answers, one is deliberately ignored.
+    place(VIRT_ENT_SWITCH, "Obeys",   nullptr, nullptr, nullptr, false);
+    place(VIRT_ENT_STUCK,  "Ignores", nullptr, nullptr, nullptr, false);
+    placeGroup(VIRT_ENT_SWITCH, VIRT_ENT_STUCK, "Both");
 
-    measure(SYS_ENT_RSSI,   "Signal",    nullptr, nullptr, nullptr, false);
-    measure(SYS_ENT_HEAP,   "Free Heap", nullptr, nullptr, &wide,   false);
+    place(SYS_ENT_RSSI,   "Signal",    nullptr, nullptr, nullptr, false);
+    place(SYS_ENT_HEAP,   "Free Heap", nullptr, nullptr, &wide,   false);
 
     // Paused, permanently, so the distinction cards.md section 3 insists on is
     // visible rather than described: this card is dim BECAUSE THE USER CHOSE
     // IT, and no stale card anywhere on this page dims.
-    measure(SYS_ENT_UPTIME, "Paused",    nullptr, nullptr, nullptr, true);
-
-    // MEASURED HERE, before the old page is freed, and that ordering is the
-    // whole point. Taken afterwards it reports (new page - old page), which on
-    // a rebuild is roughly zero and underflows an unsigned subtraction into
-    // the 4294966956-style nonsense the first flash produced. What a page
-    // costs is what it ADDS while it is the only new thing in the pool.
-    lv_mem_monitor(&mon);
-    const uint32_t used  = mon.total_size - mon.free_size;
-    const uint8_t  cards = s_page->count();
-    const int32_t  delta = (int32_t)used - (int32_t)s_lvBefore;
-    Serial.printf("[Cards] %u cards, lv_mem %u -> %u (%+ld, %ld B/card), frag %u%%\n",
-                  (unsigned)cards, (unsigned)s_lvBefore, (unsigned)used,
-                  (long)delta, cards ? (long)(delta / cards) : 0L,
-                  (unsigned)mon.frag_pct);
+    place(SYS_ENT_UPTIME, "Paused", nullptr, nullptr, nullptr, true);
 
     lv_screen_load(s_screen);
     if (oldPage) delete oldPage;      // unregisters its cards from the binder

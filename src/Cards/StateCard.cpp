@@ -1,10 +1,12 @@
-#include "Cards/ActorCard.h"
+#include "Cards/StateCard.h"
 #include "Cards/CardIcons.h"
 #include "UI/UITokens.h"
 #include <Arduino.h>
 #include <stdio.h>
 
-void ActorCard::buildBody(lv_obj_t *body) {
+StateCardFill StateCard::s_fill = StateCardFill::FILL_SURFACE;
+
+void StateCard::buildBody(lv_obj_t *body) {
     // The disc. A plain object with a full radius rather than an arc or an
     // image: it is a circle behind a glyph, and the cheapest thing that draws
     // a circle in LVGL is a square with radius set past half its side.
@@ -26,7 +28,7 @@ void ActorCard::buildBody(lv_obj_t *body) {
     lv_obj_add_flag(_mixed, LV_OBJ_FLAG_HIDDEN);
 }
 
-uint8_t ActorCard::activeCount() const {
+uint8_t StateCard::activeCount() const {
     uint8_t n = 0;
     for (uint8_t i = 0; i < primaryCount(); i++) {
         const Entity *e = primary(i);
@@ -44,7 +46,7 @@ uint8_t ActorCard::activeCount() const {
     return n;
 }
 
-void ActorCard::render() {
+void StateCard::render() {
     const Entity *e = primary();
     if (!e) return;
 
@@ -79,7 +81,7 @@ void ActorCard::render() {
     // being on is content, not decoration, so it does not change colour when
     // the dashboard does.
     const uint32_t chrome = stateColor();   // stale/refused override, or 0
-    const bool fill = (_style == ActorStateStyle::FILL_SURFACE);
+    const bool fill = (s_fill == StateCardFill::FILL_SURFACE);
 
     if (isOn && !chrome && fill) {
         // The whole surface. cards.md section 4 as written.
@@ -130,17 +132,8 @@ void ActorCard::render() {
     }
 }
 
-void ActorCard::onTap() {
-    // One tap commands every bound primary, which is what makes the aggregate
-    // light work with no separate group type. The target state is the INVERSE
-    // OF THE MAJORITY rather than of each light individually: a room with two
-    // lights on and one off should go fully off on the first tap, not swap
-    // which one is lit.
-    const uint8_t total = primaryCount();
-    if (!total) return;
-
-    const bool wantOn = activeCount() * 2 <= total;
-    for (uint8_t i = 0; i < total; i++) {
-        command(i, EntityValue::makeBool(wantOn));
+void StateCard::commandAll(bool on) {
+    for (uint8_t i = 0; i < primaryCount(); i++) {
+        command(i, EntityValue::makeBool(on));
     }
 }

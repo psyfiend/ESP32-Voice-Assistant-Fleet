@@ -1,11 +1,11 @@
 #pragma once
-#ifndef MEASURE_CARD_H
-#define MEASURE_CARD_H
+#ifndef VALUE_CARD_H
+#define VALUE_CARD_H
 
 #include "Cards/Card.h"
 
 // ---------------------------------------------------------------------------
-// MeasureCard - the first of cards.md section 4's two layout families.
+// ValueCard - the first of cards.md section 4's two layout families.
 //
 // Temperature, lux, power, RSSI, free heap. Anything whose point is a NUMBER.
 //
@@ -19,12 +19,29 @@
 // kind of quantity this is, so spending a line on saying it again costs a line
 // on every sensor card in the fleet. Card::setLabel() is how a page supplies
 // it; falling back to the entity's name is a convenience, not the intent.
+//
+// THIS IS A LAYOUT, NOT A CARD TYPE, and the distinction is the whole point of
+// the rename that produced this file.
+//
+// docs/design/cards.md - the spec - lists card types by HOME ASSISTANT DOMAIN:
+// sensor, binary_sensor, light, action/scene, weather, group. ROADMAP milestone
+// 2.7 names the first four the same way. The "two layout families" framing
+// exists in exactly one place, HANDOFF.md, as a paraphrase written to brief the
+// next session - and that paraphrase got promoted to the class names, which
+// skipped the domain layer underneath it entirely.
+//
+// The result was a user having to know that a temperature reading wants a
+// "measure" card. They should pick `sensor`, give it a topic, and never learn
+// where the number goes. What the thing IS and how it is ARRANGED are two
+// axes, and only the first one belongs to whoever is configuring a dashboard.
+//
+// So this class deliberately does NOT implement typeName(): it stays abstract,
+// and the compiler refuses to let anyone instantiate a layout. Concrete types
+// live in CardCatalog.h and are named for their domain.
+//
 // ---------------------------------------------------------------------------
 
-class MeasureCard : public Card {
-public:
-    const char *typeName() const override { return "measure"; }
-
+class ValueCard : public Card {
 protected:
     void buildBody(lv_obj_t *body) override;
     void render() override;
@@ -47,4 +64,4 @@ private:
     lv_obj_t *_seen     = nullptr;   // bottom-right
 };
 
-#endif // MEASURE_CARD_H
+#endif // VALUE_CARD_H

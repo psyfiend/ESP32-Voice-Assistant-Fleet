@@ -1,11 +1,11 @@
-#include "Cards/MeasureCard.h"
+#include "Cards/ValueCard.h"
 #include "Cards/CardIcons.h"
 #include "UI/UITokens.h"
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
 
-void MeasureCard::buildBody(lv_obj_t *body) {
+void ValueCard::buildBody(lv_obj_t *body) {
     // --- Title row: icon then name, on ONE line ---------------------------
     //
     // A flex row rather than two aligned labels. The previous version measured
@@ -81,7 +81,7 @@ static const char *batteryGlyph(int pct) {
     return LV_SYMBOL_BATTERY_EMPTY;
 }
 
-void MeasureCard::render() {
+void ValueCard::render() {
     const Entity *e = primary();
     if (!e) return;
 
