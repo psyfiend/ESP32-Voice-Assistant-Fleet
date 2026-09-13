@@ -5,6 +5,7 @@
 #include <string.h>
 
 EntityRegistry *Card::s_reg = nullptr;
+bool            Card::s_showArea = true;
 
 const char *cardStateName(CardState s) {
     switch (s) {
@@ -87,134 +88,114 @@ int32_t Card::headerHeight() {
 void Card::build(lv_obj_t *parent) {
     const UIMetrics &m = UI::met();
 
-    // THE CARD IS THE SAME SIZE AND SHAPE IN ALL THREE HEADER MODES.
+    // THE CARD IS THE SAME SIZE AND SHAPE IN ALL THREE MODES.
     //
-    // The owner's rule, stated twice because two attempts broke it in two
-    // different ways: "the cards must not differ in shape or size because of
-    // the tag", and icons "should remain at the exact same height relative to
-    // the bottom of the card". The first attempt made a tagged card SHORTER by
-    // putting the tag above it in a flex column; the second kept the size but
-    // moved the tag inside, which cost the card the space the tag was supposed
-    // to save it.
-    //
-    // The surface therefore always fills the whole cell, in every mode, and a
-    // tag hangs outside it into clearance the PAGE carves out of the row gap.
+    // The owner's rule, stated more than once because it is the thing two
+    // earlier attempts broke: "the cards must not differ in shape or size
+    // because of the tag". The surface fills the whole cell, always. A tag
+    // hangs outside it, into clearance the PAGE carves from the row gap.
     _root = lv_obj_create(parent);
     lv_obj_set_style_bg_opa       (_root, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (_root, 0, 0);
     lv_obj_set_style_pad_all      (_root, 0, 0);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_CLICKABLE);
-    // The external tag hangs ABOVE the card, outside the cell's own bounds, so
-    // the cell must not clip its children. The page reserves the room it needs
-    // in the row gap - see CardPage::begin().
+    // Without this LVGL clips the tag away and it simply is not there.
     lv_obj_add_flag               (_root, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
 
     _surface = lv_obj_create(_root);
     lv_obj_set_size               (_surface, lv_pct(100), lv_pct(100));
     lv_obj_set_style_pad_all      (_surface, 0, 0);   // the body owns padding
     lv_obj_clear_flag             (_surface, LV_OBJ_FLAG_SCROLLABLE);
-
-    // Clip children to the rounded corners. Without this an internal header
-    // bar - a full-width child with square corners - pokes out past the card's
-    // radius and draws little rectangular ears over both top corners.
+    // An edge-to-edge band with square corners would otherwise draw little
+    // rectangular ears over the card's rounded top corners.
     lv_obj_set_style_clip_corner  (_surface, true, 0);
 
-    // Touch. LVGL fires LV_EVENT_SHORT_CLICKED for a tap and
-    // LV_EVENT_LONG_PRESSED once the press passes its threshold, which is the
-    // pair cards.md asks for. CLICKED is deliberately not used: it also fires
-    // at the end of a long press, so a long press would run both handlers.
+    // LVGL fires LV_EVENT_SHORT_CLICKED for a tap and LV_EVENT_LONG_PRESSED
+    // once the press passes its threshold. CLICKED is deliberately not used:
+    // it also fires at the end of a long press, so a long press would run both.
     lv_obj_add_flag       (_surface, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb   (_surface, eventCb, LV_EVENT_SHORT_CLICKED, this);
     lv_obj_add_event_cb   (_surface, eventCb, LV_EVENT_LONG_PRESSED,  this);
 
-    // The tag goes OUTSIDE the card, which is what cards.md section 2 said all
-    // along and what the owner restated when the previous attempt tucked it
-    // inside: "attached to the card at the top left sticking out above the
-    // card". Its purpose is to let groups of cards be read at a glance without
-    // spending any of the card's own contents on it - which only works if it
-    // is genuinely not part of the card.
-    //
-    // The earlier attempt put it outside and made the card SHORTER to fit,
-    // which is the thing that must not happen: "in order for this to look good
-    // the cards must not differ in shape or size because of the tag". So the
-    // surface still fills the whole cell in every mode, and the tag overhangs
-    // into the row gap above, which the page widens to make room.
-    if (_hdrStyle != CardHeaderStyle::HDR_NONE) buildHeader();
-
-    // The state badge. Created ALWAYS, even with no header, which is the
-    // owner's correction: FAILED must not be something a cosmetic choice can
-    // switch off. With a header it lives in the header's right slot; without
-    // one it sits in the reserved strip's right end.
-    _badge = lv_label_create(_header ? _header : _surface);
-    if (_header) lv_obj_align(_badge, LV_ALIGN_RIGHT_MID, 0, 0);
-    else         lv_obj_align(_badge, LV_ALIGN_TOP_RIGHT, -UI::sc(4), UI::sc(2));
-    lv_obj_add_flag(_badge, LV_OBJ_FLAG_HIDDEN);
+    buildHeader();
 
     _body = lv_obj_create(_surface);
     lv_obj_set_size               (_body, lv_pct(100), lv_pct(100));
     lv_obj_set_style_bg_opa       (_body, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (_body, 0, 0);
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
-    // Reserved ONLY for an internal bar, and that is the point of the tag.
-    //
-    // This was briefly unconditional, back when the tag lived inside the card
-    // and every mode therefore had to reserve the same strip. With the tag
-    // outside, reserving one in tag mode would take the card's own space for a
-    // thing that is no longer in it - defeating the reason the owner wanted it
-    // outside: "a tag doesn't interfere with the inner contents and layout".
-    //
-    // So tag mode and no-header mode give the body the whole card and are
-    // pixel-identical to each other, while bar mode indents by exactly the
-    // bar's height. Content no longer moves because a card changed SIZE, which
-    // was the actual bug; it differs between bar and tag by precisely what an
-    // internal bar costs, which is the thing the two modes exist to compare.
-    if (_hdrStyle == CardHeaderStyle::HDR_INTERNAL) {
-        lv_obj_set_style_pad_top  (_body, Card::headerHeight() + UI::sc(m.PAD), 0);
-    }
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_CLICKABLE);
+
+    // The strip is reserved for the two modes that draw INSIDE the card, and
+    // not for the one that does not. That is the whole trade between them: a
+    // tag costs the card no space, a bar and in-card text each cost a strip.
+    //
+    // It is reserved whether or not there is anything in it right now, so that
+    // a card's contents do not jump when it goes stale or loses its area.
+    if (_hdrStyle != CardHeaderStyle::HDR_TAG) {
+        lv_obj_set_style_pad_top(_body, Card::headerHeight() + UI::sc(m.PAD), 0);
+    }
 
     buildBody(_body);
     restyle();
 }
 
-void Card::buildHeader() {
-    const bool tag = (_hdrStyle == CardHeaderStyle::HDR_EXTERNAL);
+// One helper for the three near-identical containers, so the differences
+// between the modes stay visible instead of being buried in repetition.
+static lv_obj_t *makeStrip(lv_obj_t *parent) {
+    lv_obj_t *o = lv_obj_create(parent);
+    lv_obj_set_height             (o, Card::headerHeight());
+    lv_obj_set_style_pad_all      (o, 0, 0);
+    lv_obj_set_style_pad_left     (o, UI::sc(7), 0);
+    lv_obj_set_style_pad_right    (o, UI::sc(7), 0);
+    lv_obj_set_style_border_width (o, 0, 0);
+    lv_obj_clear_flag             (o, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag             (o, LV_OBJ_FLAG_CLICKABLE);
+    return o;
+}
 
-    // A tag parents to the CELL and a bar parents to the CARD. That one line
-    // is the whole difference between the two treatments: the bar is part of
-    // the card's surface and costs it space, the tag hangs above it and costs
-    // it nothing.
-    _header = lv_obj_create(tag ? _root : _surface);
-    lv_obj_set_height             (_header, Card::headerHeight());
-    lv_obj_set_style_pad_all      (_header, 0, 0);
-    lv_obj_set_style_pad_left     (_header, UI::sc(6), 0);
-    lv_obj_set_style_pad_right    (_header, UI::sc(6), 0);
-    lv_obj_set_style_border_width (_header, 0, 0);
-    lv_obj_clear_flag             (_header, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_clear_flag             (_header, LV_OBJ_FLAG_CLICKABLE);
+void Card::buildHeader() {
+    const bool tag = (_hdrStyle == CardHeaderStyle::HDR_TAG);
+
+    // A tag parents to the CELL; a bar and plain text parent to the CARD. That
+    // single line is the entire structural difference between the modes.
+    _header = makeStrip(tag ? _root : _surface);
 
     if (tag) {
-        // Only as wide as its content, and lifted clear of the card by its own
-        // height less a couple of pixels - the overlap is what makes it read
+        // Sized to its own text and lifted clear of the card by its own
+        // height, less a couple of pixels. That overlap is what makes it read
         // as attached to the card rather than floating above it.
-        lv_obj_set_width  (_header, LV_SIZE_CONTENT);
-        lv_obj_align      (_header, LV_ALIGN_TOP_LEFT, UI::sc(8),
-                           -Card::headerHeight() + UI::sc(2));
-        // Behind the card, so the card's own edge draws over the bottom of the
-        // tag and the two read as one shape.
+        lv_obj_set_width      (_header, LV_SIZE_CONTENT);
+        lv_obj_align          (_header, LV_ALIGN_TOP_LEFT, UI::sc(8),
+                               -Card::headerHeight() + UI::sc(2));
+        // Behind the card, so the card's own edge draws over the pill's bottom
+        // and the two read as one shape.
         lv_obj_move_background(_header);
+
+        // The STALE marker gets its own pill at the other end. In the two
+        // in-card modes it is just the right-hand end of the same strip; here
+        // there is no shared strip to sit in, because the card does not own
+        // this space at all.
+        _stale = makeStrip(_root);
+        lv_obj_set_width      (_stale, LV_SIZE_CONTENT);
+        lv_obj_align          (_stale, LV_ALIGN_TOP_RIGHT, -UI::sc(8),
+                               -Card::headerHeight() + UI::sc(2));
+        lv_obj_move_background(_stale);
     } else {
         lv_obj_set_width  (_header, lv_pct(100));
         lv_obj_align      (_header, LV_ALIGN_TOP_MID, 0, 0);
     }
 
-    // Area left, STALE right. Fixed, per cards.md section 2 - and the
-    // degenerate case of 2.8's configurable slot list, which is why this
-    // deliberately reads as named slots rather than as two labels.
+    // Area left, STALE right - fixed in every mode, per cards.md section 2,
+    // and the degenerate two-slot case of 2.8's configurable slot list.
     _lblArea = lv_label_create(_header);
+    lv_label_set_long_mode(_lblArea, LV_LABEL_LONG_DOT);
     lv_obj_align (_lblArea, LV_ALIGN_LEFT_MID, 0, 0);
+
+    _badge = lv_label_create(_stale ? _stale : _header);
+    lv_obj_align (_badge, _stale ? LV_ALIGN_CENTER : LV_ALIGN_RIGHT_MID, 0, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,26 +221,14 @@ void Card::restyle() {
     lv_obj_set_style_shadow_opa   (_surface, m.SHADOW ? LV_OPA_40 : LV_OPA_TRANSP, 0);
 
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
-    if (_hdrStyle == CardHeaderStyle::HDR_INTERNAL) {
+    if (_hdrStyle != CardHeaderStyle::HDR_TAG) {
         lv_obj_set_style_pad_top  (_body, Card::headerHeight() + UI::sc(m.PAD), 0);
     }
 
-    if (_header) {
-        lv_obj_set_height             (_header, Card::headerHeight());
-        lv_obj_set_style_bg_opa       (_header, LV_OPA_COVER, 0);
-        // A tag is a tab: a modest radius, and it overlaps the card by that
-        // same amount so its rounded bottom corners hide behind the card's own
-        // edge and the two read as one shape. A full pill would float.
-        // A bar runs edge to edge and takes the card's corners from
-        // clip_corner instead.
-        lv_obj_set_style_radius       (_header, _hdrStyle == CardHeaderStyle::HDR_EXTERNAL
-                                                ? UI::sc(m.RADIUS / 2) : 0, 0);
-        // Text in the card's BACKGROUND colour, per cards.md section 2 - dark
-        // text on a light accent, light text on a dark one, without anyone
-        // having to pick per scheme.
-        lv_obj_set_style_text_font (_lblArea, UI::type().TAG, 0);
-        lv_obj_set_style_text_color(_lblArea, UI::c(p.SURFACE), 0);
-    }
+    lv_obj_set_height          (_header, Card::headerHeight());
+    lv_obj_set_style_text_font (_lblArea, UI::type().TAG, 0);
+    lv_obj_set_style_text_font (_badge,   UI::type().TAG, 0);
+    if (_stale) lv_obj_set_height(_stale, Card::headerHeight());
 
     applyState();
     render();
@@ -279,9 +248,8 @@ uint32_t Card::stateColor() const {
     }
 }
 
-// The badge's colour, which is deliberately NOT stateColor(): a partial
-// failure has a tag but no body takeover, so the two questions have to be
-// asked separately.
+// The badge's colour, deliberately NOT stateColor(): a partial failure has a
+// tag but no body takeover, so the two questions are asked separately.
 uint32_t Card::tagColor() const {
     const UIPalette &p = UI::pal();
     switch (_state) {
@@ -297,73 +265,77 @@ uint32_t Card::tagColor() const {
 
 void Card::applyState() {
     if (!_root) return;
-    const UIPalette &p = UI::pal();
+    const UIPalette &p  = UI::pal();
+    const UIMetrics &m  = UI::met();
+    const bool tag      = (_hdrStyle == CardHeaderStyle::HDR_TAG);
+    const uint32_t tc   = tagColor();
 
     // Staleness NEVER dims - cards.md section 3 rejects it outright, because a
     // dimmed card is easy to miss and stale data has to be conspicuous. Pause
     // is the one state that may go quiet, because it is the user's own choice.
     lv_obj_set_style_opa(_root, cardStateMayDim(_state) ? LV_OPA_40 : LV_OPA_COVER, 0);
 
-    const char *tag = "";
+    const char *mark = "";
     switch (_state) {
-        case CardState::ST_STALE:      tag = "STALE";   break;
-        case CardState::ST_LONG_STALE: tag = "STALE";   break;
-        case CardState::ST_REFUSED:    tag = "FAILED";  break;
-        case CardState::ST_PARTIAL:    tag = "PARTIAL"; break;
-        case CardState::ST_PAUSED:     tag = "PAUSED";  break;
-        case CardState::ST_LIVE:       tag = "";        break;
+        case CardState::ST_STALE:      mark = "STALE";   break;
+        case CardState::ST_LONG_STALE: mark = "STALE";   break;
+        case CardState::ST_REFUSED:    mark = "FAILED";  break;
+        case CardState::ST_PARTIAL:    mark = "PARTIAL"; break;
+        case CardState::ST_PAUSED:     mark = "PAUSED";  break;
+        case CardState::ST_LIVE:       mark = "";        break;
     }
 
-    const uint32_t tc = tagColor();
+    const bool wantArea = _showArea && _area[0];
+    lv_label_set_text(_lblArea, wantArea ? _area : "");
+    lv_label_set_text(_badge,   mark);
 
-    if (_header) {
-        lv_label_set_text(_lblArea, _area);
-        // The header takes the state's colour when there is one, so the whole
-        // band reads as the warning rather than just the word in it.
-        lv_obj_set_style_bg_color(_header, UI::c(tc ? tc : p.ACCENT), 0);
-
-        // A header carrying nothing at all is chrome for its own sake, so it
-        // hides rather than sitting there empty. The card keeps its geometry
-        // either way, which is what stops a card resizing as it goes stale.
-        const bool empty = !_area[0] && !tag[0];
-        if (empty) lv_obj_add_flag   (_header, LV_OBJ_FLAG_HIDDEN);
-        else       lv_obj_clear_flag (_header, LV_OBJ_FLAG_HIDDEN);
+    // --- the area holder ---------------------------------------------------
+    if (tag) {
+        // A pill only exists when it has something in it. Hiding it is safe
+        // precisely because the clearance is the PAGE's, not the card's: a
+        // card with no tag is exactly as tall as one with a tag.
+        lv_obj_set_style_bg_color  (_header, UI::c(p.ACCENT), 0);
+        lv_obj_set_style_bg_opa    (_header, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius    (_header, UI::sc(m.RADIUS / 2), 0);
+        lv_obj_set_style_text_color(_lblArea, UI::c(p.SURFACE), 0);
+        if (wantArea) lv_obj_clear_flag(_header, LV_OBJ_FLAG_HIDDEN);
+        else          lv_obj_add_flag  (_header, LV_OBJ_FLAG_HIDDEN);
+    } else if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
+        // The whole band takes the state colour, so it reads as the warning
+        // rather than just the word inside it.
+        lv_obj_set_style_bg_color  (_header, UI::c(tc ? tc : p.ACCENT), 0);
+        lv_obj_set_style_bg_opa    (_header, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius    (_header, 0, 0);
+        // Text in the card's BACKGROUND colour - dark on a light accent, light
+        // on a dark one, without anyone picking per scheme. cards.md section 2.
+        lv_obj_set_style_text_color(_lblArea, UI::c(p.SURFACE), 0);
+        lv_obj_set_style_text_color(_badge,   UI::c(p.SURFACE), 0);
+        // The band stays even when empty: it is part of the card's shape in
+        // this mode, and appearing only sometimes would be worse than blank.
+        lv_obj_clear_flag(_header, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        // HDR_NONE: no fill at all, just text in the strip the body left free.
+        lv_obj_set_style_bg_opa    (_header, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_text_color(_lblArea, UI::c(p.TEXT_DIM), 0);
+        lv_obj_set_style_text_color(_badge,   UI::c(tc ? tc : p.TEXT_DIM), 0);
+        lv_obj_clear_flag(_header, LV_OBJ_FLAG_HIDDEN);
     }
 
-    if (_badge) {
-        lv_obj_set_style_text_font (_badge, UI::type().TAG, 0);
-        if (!tag[0]) {
-            lv_obj_add_flag(_badge, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_label_set_text(_badge, tag);
-            lv_obj_clear_flag(_badge, LV_OBJ_FLAG_HIDDEN);
-            if (_header) {
-                // In the header's right slot: the band is already coloured, so
-                // the text is the card's background, per cards.md section 2.
-                lv_obj_set_style_bg_opa    (_badge, LV_OPA_TRANSP, 0);
-                lv_obj_set_style_text_color(_badge, UI::c(p.SURFACE), 0);
-            } else {
-                // Free-floating, so it has to carry its own colour. This is the
-                // path that makes FAILED visible with HDR_NONE - the owner's
-                // point that a failure signal must not depend on a cosmetic
-                // choice.
-                lv_obj_set_style_bg_color  (_badge, UI::c(tc ? tc : p.ACCENT), 0);
-                lv_obj_set_style_bg_opa    (_badge, LV_OPA_COVER, 0);
-                lv_obj_set_style_radius    (_badge, UI::sc(3), 0);
-                lv_obj_set_style_pad_hor   (_badge, UI::sc(4), 0);
-                lv_obj_set_style_pad_ver   (_badge, UI::sc(2), 0);
-                lv_obj_set_style_text_color(_badge, UI::c(p.SURFACE), 0);
-            }
-            lv_obj_move_foreground(_badge);
-        }
+    // --- the stale holder, which only exists in tag mode --------------------
+    if (_stale) {
+        lv_obj_set_style_bg_color  (_stale, UI::c(tc ? tc : p.ACCENT), 0);
+        lv_obj_set_style_bg_opa    (_stale, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius    (_stale, UI::sc(m.RADIUS / 2), 0);
+        lv_obj_set_style_text_color(_badge, UI::c(p.SURFACE), 0);
+        if (mark[0]) lv_obj_clear_flag(_stale, LV_OBJ_FLAG_HIDDEN);
+        else         lv_obj_add_flag  (_stale, LV_OBJ_FLAG_HIDDEN);
     }
 
-    // The loud treatment. cards.md section 3 offers two candidates for it - a
-    // growing tag or a corner-to-corner diagonal - and asks for both to be
-    // prototyped. This is the one the header bar cannot express.
+    // --- the loud treatment -------------------------------------------------
     //
-    // A line rather than an image: one lv_line is a handful of bytes against
-    // an over-drawn bitmap, and it scales with the cell without a redraw hook.
+    // cards.md section 3 offers two candidates - a growing tag or a
+    // corner-to-corner diagonal - and asks for both to be prototyped. This is
+    // the one a header bar cannot express.
     const bool wantDiag = (_state == CardState::ST_LONG_STALE ||
                            _state == CardState::ST_REFUSED);
     if (!wantDiag) {
@@ -378,8 +350,8 @@ void Card::applyState() {
 
     // The surface's size comes from a percentage of a grid cell, so it is not
     // known until layout has run - and applyState() is reached from build()
-    // before that has happened. Without this the first diagonal drawn on a
-    // page would be a zero-length point.
+    // before that has happened. Without this the first diagonal on a page
+    // would be a zero-length point.
     lv_obj_update_layout(_surface);
 
     _diagPts[1].x = lv_obj_get_width(_surface);

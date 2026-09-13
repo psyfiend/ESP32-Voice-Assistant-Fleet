@@ -83,6 +83,22 @@ public:
 
     Card &setHeaderStyle(CardHeaderStyle s) { _hdrStyle = s; return *this; }
 
+    // Whether this card displays its area (or, later, a custom grouping) at
+    // all. Separate from the header style on purpose - they are two
+    // independent build-sheet settings, and the owner asked for exactly this
+    // split: pick a presentation, and separately decide whether there is
+    // anything to present.
+    //
+    // With area off, HDR_TAG has nothing to put in its left pill. The card
+    // still reserves the same clearance, because a page of cards where some
+    // have tags and some do not must not have some cards sitting higher than
+    // others.
+    Card &setShowArea(bool v) { _showArea = v; return *this; }
+
+    // The page-wide default, so a build sheet can set this once rather than on
+    // every card. Same pattern as StateCard::setFill().
+    static void setShowAreaDefault(bool v) { s_showArea = v; }
+
     // Overrides cardLongStaleMs(). This is the build sheet's hook.
     Card &setLongStaleMs(uint32_t ms) { _longStaleMs = ms; return *this; }
 
@@ -140,6 +156,13 @@ public:
     // the grid's row gap, so the page has to reserve that much clearance or
     // the tag lands on the card above. See CardPage::begin().
     static int32_t headerHeight();
+
+    // How far an HDR_TAG pill rises above its card, in real pixels. The PAGE
+    // needs this: the clearance comes out of the grid's row gap, not out of
+    // the card. Returns the same value as headerHeight() today and is a
+    // separate function because they answer different questions and only one
+    // of them is the page's business.
+    static int32_t tagOverhang() { return headerHeight(); }
 
 protected:
     // --- Subclass contract ------------------------------------------------
@@ -205,7 +228,7 @@ private:
     //
     // _root is a TRANSPARENT wrapper filling the grid cell, and _surface is
     // the styled card inside it. That extra object exists for exactly one
-    // reason: HDR_EXTERNAL bolts a tag to the top edge OUTSIDE the border, and
+    // reason: HDR_TAG bolts a tag to the top edge OUTSIDE the border, and
     // LVGL clips children to their parent, so the tag cannot be a child of the
     // thing it sits above. Making the wrapper unconditional keeps all three
     // header treatments one code path instead of two, which matters while both
@@ -213,7 +236,19 @@ private:
     lv_obj_t *_root     = nullptr;
     lv_obj_t *_surface  = nullptr;
     lv_obj_t *_body     = nullptr;
-    lv_obj_t *_header   = nullptr;   // null when HDR_NONE
+    // The top section. Every card has one in every mode; what differs is where
+    // it is parented and how it is painted.
+    //
+    //   HDR_BAR / HDR_NONE   _header spans the card's top strip and holds BOTH
+    //                        labels - area left, badge right. _stale is unused.
+    //   HDR_TAG              _header is the area pill and _stale is a second
+    //                        pill on the right, both OUTSIDE the card.
+    //
+    // Two objects rather than one in tag mode because the two pills are sized
+    // to their own content and sit at opposite ends of a strip the card does
+    // not own - there is nothing for them to share.
+    lv_obj_t *_header   = nullptr;   // area holder
+    lv_obj_t *_stale    = nullptr;   // HDR_TAG only: the badge's own pill
     lv_obj_t *_lblArea  = nullptr;
     lv_obj_t *_badge    = nullptr;   // STALE / FAILED / PARTIAL
     lv_obj_t *_diagonal = nullptr;   // ST_LONG_STALE: corner to corner
@@ -243,6 +278,7 @@ private:
     CardState       _state       = CardState::ST_LIVE;
     uint32_t        _longStaleMs = 0;     // 0 = ask cardLongStaleMs()
     bool            _paused      = false;
+    bool            _showArea    = s_showArea;
 
     char _label[ENTITY_NAME_MAX] = {0};
     char _area[ENTITY_SHORT_MAX] = {0};
@@ -254,6 +290,7 @@ private:
     // they both render.
 
     static EntityRegistry *s_reg;
+    static bool            s_showArea;
 };
 
 #endif // CARD_H

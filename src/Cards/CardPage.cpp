@@ -18,14 +18,28 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, int32_t tagOverhang) 
 
     const UIGrid &g = UI::grid();
 
-    // Clearance for a tag that hangs above its card. Both the top inset and
-    // the row gap have to carry it - the first row's tags stick up past the
-    // page's own top edge, and every other row's stick into the gap above.
+    // Clearance for tags that hang above their cards.
+    //
+    // The rule is the owner's and it is a SUM, not a maximum: "the space
+    // between a tag and the card above it is the same as would be between two
+    // cards without the tag." So a row's pitch has to carry the ordinary gap
+    // AND the tag's full height on top of it -
+    //
+    //     card bottom  ->  [ normal gap ]  ->  tag top
+    //     tag top      ->  [ tag height ]  ->  card top
+    //
+    // An earlier version took max(gap, tagHeight), which let a tag sit closer
+    // to the card above it than two plain cards ever sit to each other. The
+    // top inset takes the same treatment, because the first row's tags rise
+    // past the page's own top edge.
+    //
+    // A card with no tag is unaffected: it simply has that much clear space
+    // above it, which is exactly why cards stay the same height whether they
+    // carry a tag or not.
     const int32_t inset  = UI::sc(g.INSET);
     const int32_t gap    = UI::sc(g.GAP);
-    const int32_t clear  = tagOverhang > 0 ? tagOverhang + UI::sc(4) : 0;
-    const int32_t padTop = (clear > inset) ? clear : inset;
-    const int32_t padRow = (clear > gap)   ? clear : gap;
+    const int32_t padTop = inset + tagOverhang;
+    const int32_t padRow = gap   + tagOverhang;
 
     _root = lv_obj_create(parent);
     lv_obj_set_size               (_root, lv_pct(100), lv_pct(100));
@@ -66,7 +80,7 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, int32_t tagOverhang) 
     if (rows > 16) rows = 16;
 
     _cellH = g.cellH;
-    if (clear) {
+    if (tagOverhang) {
         const int32_t availH = lv_obj_get_height(parent) - padTop - inset;
         if (availH > 0) {
             const int32_t h = (availH - padRow * (rows - 1)) / rows;
@@ -87,7 +101,7 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, int32_t tagOverhang) 
     Serial.printf("[Cards] Page %ux%u visible, cell %ux%u px, row gap %d%s\n",
                   (unsigned)cols, (unsigned)_rowsDefined,
                   (unsigned)g.cellW, (unsigned)_cellH, (int)padRow,
-                  clear ? " (tag clearance)" : "");
+                  tagOverhang ? " (gap + tag)" : "");
 }
 
 Card *CardPage::add(Card *c) {

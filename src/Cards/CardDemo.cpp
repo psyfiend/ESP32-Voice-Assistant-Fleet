@@ -21,7 +21,7 @@ CardBinder     *s_binder = nullptr;
 // for the whole page rather than per card, because the question cards.md is
 // asking is "which of these two do you prefer", and that is easiest to answer
 // when the whole page switches at once.
-CardHeaderStyle s_hdr = CardHeaderStyle::HDR_EXTERNAL;
+CardHeaderStyle s_hdr = CardHeaderStyle::HDR_TAG;
 
 int s_scheme = 0;
 
@@ -29,6 +29,12 @@ int s_scheme = 0;
 // than a decision, because the question is "which of these do you prefer" and
 // that is answered by looking at both.
 StateCardFill s_actorStyle = StateCardFill::FILL_SURFACE;
+
+// Whether cards display their area at all. INDEPENDENT of the header style -
+// two build-sheet settings, not one, which is what the owner asked for. With
+// this off, HDR_TAG has nothing to put in its left pill and the tags simply do
+// not appear; the row spacing does not change, so nothing on the page moves.
+bool s_showArea = true;
 
 // Measured across the page build, in LVGL's own pool. ESP.getFreeHeap() is the
 // wrong instrument here and 2.3 established why: LV_USE_STDLIB_MALLOC is
@@ -77,14 +83,20 @@ void actorCb(lv_event_t *e) {
     CardDemo::show(*s_reg, *s_binder);
 }
 
+void areaCb(lv_event_t *e) {
+    (void)e;
+    s_showArea = !s_showArea;
+    CardDemo::show(*s_reg, *s_binder);
+}
+
 void headerCb(lv_event_t *e) {
     (void)e;
     // A header bar is created in Card::build(), not styled in restyle(), so
     // changing the treatment means rebuilding. That is correct: this is a
     // structural choice a card makes once, not a live style.
-    s_hdr = (s_hdr == CardHeaderStyle::HDR_EXTERNAL) ? CardHeaderStyle::HDR_INTERNAL
-          : (s_hdr == CardHeaderStyle::HDR_INTERNAL) ? CardHeaderStyle::HDR_NONE
-                                                     : CardHeaderStyle::HDR_EXTERNAL;
+    s_hdr = (s_hdr == CardHeaderStyle::HDR_TAG) ? CardHeaderStyle::HDR_BAR
+          : (s_hdr == CardHeaderStyle::HDR_BAR) ? CardHeaderStyle::HDR_NONE
+                                                     : CardHeaderStyle::HDR_TAG;
     CardDemo::show(*s_reg, *s_binder);
 }
 
@@ -159,8 +171,9 @@ void show(EntityRegistry &reg, CardBinder &binder) {
 
     topButton(bar, LV_SYMBOL_LEFT " Back", backCb);
     topButton(bar, UI::pal().name, schemeCb);
-    topButton(bar, s_hdr == CardHeaderStyle::HDR_EXTERNAL ? "Tag"
-                 : s_hdr == CardHeaderStyle::HDR_INTERNAL ? "Bar" : "No hdr", headerCb);
+    topButton(bar, s_hdr == CardHeaderStyle::HDR_TAG ? "Tag"
+                 : s_hdr == CardHeaderStyle::HDR_BAR ? "Bar" : "No hdr", headerCb);
+    topButton(bar, s_showArea ? "Area on" : "Area off", areaCb);
     topButton(bar, s_actorStyle == StateCardFill::FILL_SURFACE ? "Fill" : "Icon", actorCb);
 
     // --- The grid ---------------------------------------------------------
@@ -181,8 +194,12 @@ void show(EntityRegistry &reg, CardBinder &binder) {
 
     s_page = new CardPage();
     // In tag mode the page has to carve the clearance the tags hang into.
+    // The clearance is reserved for the MODE, not for whether any given card
+    // happens to have an area - otherwise a page with one un-tagged card would
+    // lay out differently from a page with none, which is the inconsistency
+    // the whole arrangement exists to avoid.
     s_page->begin(host, &binder,
-                  s_hdr == CardHeaderStyle::HDR_EXTERNAL ? Card::headerHeight() : 0);
+                  s_hdr == CardHeaderStyle::HDR_TAG ? Card::tagOverhang() : 0);
 
 
     // --- Two small builders -----------------------------------------------
@@ -196,6 +213,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     // Note every label: "Deck", never "Temperature". cards.md section 4 - the
     // tinted icon says what the quantity is, so the name says WHERE.
     StateCard::setFill(s_actorStyle);
+    Card::setShowAreaDefault(s_showArea);
 
     auto place = [&](const char *id, const char *label, const char *area,
                      const Entity *sec, const CardPlacement *pl, bool paused) {
@@ -241,8 +259,8 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     place(VIRT_ENT_STUCK,  "Ignores", nullptr, nullptr, nullptr, false);
     placeGroup(VIRT_ENT_SWITCH, VIRT_ENT_STUCK, "Both");
 
-    place(SYS_ENT_RSSI,   "Signal",    nullptr, nullptr, nullptr, false);
-    place(SYS_ENT_HEAP,   "Free Heap", nullptr, nullptr, &wide,   false);
+    place(SYS_ENT_RSSI,   "Signal",    "Panel", nullptr, nullptr, false);
+    place(SYS_ENT_HEAP,   "Free Heap", "Panel", nullptr, &wide,   false);
 
     // Paused, permanently, so the distinction cards.md section 3 insists on is
     // visible rather than described: this card is dim BECAUSE THE USER CHOSE

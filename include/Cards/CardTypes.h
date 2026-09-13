@@ -78,17 +78,36 @@ inline bool cardStateOwnsBody(CardState s) {
 inline bool cardStateMayDim(CardState s) { return s == CardState::ST_PAUSED; }
 
 // ---------------------------------------------------------------------------
-// The card header bar. cards.md section 2 asks for BOTH treatments to be built
-// and compared on glass rather than one being chosen on paper, so this is a
-// prototype switch, not a permanent setting - once the owner picks, the loser
-// comes out.
+// How a card presents its top section.
 //
-// Either way the layout is fixed: area on the left, STALE on the right.
+// THESE ARE THREE PERMANENT CHOICES, not a comparison to be narrowed later.
+// The owner's call: all three stay, and a build sheet picks one with a single
+// setting. They were briefly treated as a prototype switch with a winner to be
+// declared - that was wrong, and it would have deleted two of them.
+//
+// Every card has a TOP SECTION regardless. It carries two things and always in
+// the same places: the area (or a custom grouping, later) on the left, and the
+// STALE marker on the right. What changes between these three is only how that
+// section is PRESENTED:
+//
+//   HDR_BAR    a filled band inside the card, edge to edge
+//   HDR_TAG    a pill hanging OUTSIDE, above the card's top-left corner, with
+//              a second pill on the right when the card needs a STALE marker
+//   HDR_NONE   plain text in the top strip inside the card, no fill
+//
+// HDR_TAG is the only one that costs the card nothing: the body gets the whole
+// surface, because the tag is not on it. The other two reserve a strip. That
+// difference is real and is the reason to pick one.
+//
+// The room a tag needs comes out of the grid's ROW GAP, not out of the card -
+// see CardPage::begin(). Cards are the same size and shape in all three modes,
+// which the owner was explicit about: "in order for this to look good the
+// cards must not differ in shape or size because of the tag."
 // ---------------------------------------------------------------------------
 enum class CardHeaderStyle : uint8_t {
-    HDR_NONE = 0,    // no header. The status row and body carry everything
-    HDR_INTERNAL,    // a band inside the card's top edge, edge to edge
-    HDR_EXTERNAL,    // a small tag bolted to the top edge, outside the border
+    HDR_NONE = 0,   // plain text in the card's top strip
+    HDR_BAR,        // a filled band inside the card, edge to edge
+    HDR_TAG,        // pills hanging outside, above the card
 };
 
 // ---------------------------------------------------------------------------
