@@ -110,6 +110,18 @@ void reportHardware(SystemCore &core) {
     // these are the same quantities and used to be reported three different
     // ways.
     SystemReport::line("  Free Heap: %s", SystemReport::fmtBytes(ESP.getFreeHeap(), b, sizeof(b)));
+
+    // THE LVGL THREAD'S REMAINING STACK, and the one number that would have
+    // caught every crash in milestone 2.4 immediately.
+    //
+    // All of them were "Stack canary watchpoint triggered (loopTask)" - LVGL's
+    // draw walk recursing once per level of widget nesting, inside the 8 KB
+    // arduino-esp32 gives loopTask by default. main.cpp raises it; this is how
+    // we know by how much rather than hoping. A high-water mark trending toward
+    // zero as cards get more deeply nested is the warning.
+    SystemReport::line("  LVGL task stack free: %s (low-water mark)",
+                       SystemReport::fmtBytes(uxTaskGetStackHighWaterMark(NULL),
+                                              b, sizeof(b)));
     SystemReport::line("  PSRAM: %s",     SystemReport::fmtBytes(ESP.getPsramSize(), b, sizeof(b)));
     SystemReport::line("  Flash: %s",     SystemReport::fmtBytes(ESP.getFlashChipSize(), b, sizeof(b)));
     #ifdef HAS_IO_EXPANDER
