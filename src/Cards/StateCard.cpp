@@ -116,6 +116,18 @@ void StateCard::render() {
     lv_label_set_text          (_icon, cardIconForState(e->desc, isOn));
     lv_obj_set_style_text_font (_icon, t.ICON, 0);
 
+    // COMPACT drops the NAME, not the icon. cards.md section 4: "state is the
+    // icon and its colour" - so the glyph is the part that cannot go, and a
+    // very small actor card is a disc and nothing else. The disc also recentres
+    // once there is no name below it to balance against.
+    const bool compact = (variant() == CardVariant::VAR_COMPACT);
+    if (compact) {
+        lv_obj_add_flag(_name, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_align   (_disc, LV_ALIGN_CENTER, 0, 0);
+    } else {
+        lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
+    }
+
     lv_label_set_text          (_name, label());
     lv_obj_set_style_text_font (_name, t.NAME, 0);
 

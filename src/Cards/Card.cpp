@@ -19,6 +19,15 @@ const char *cardStateName(CardState s) {
     return "?";
 }
 
+const char *cardVariantName(CardVariant v) {
+    switch (v) {
+        case CardVariant::VAR_AUTO:    return "auto";
+        case CardVariant::VAR_FULL:    return "full";
+        case CardVariant::VAR_COMPACT: return "compact";
+    }
+    return "?";
+}
+
 // A card owns its widget tree. Deleting the root takes the whole subtree with
 // it, which is also what returns the ~715 bytes to lv_mem rather than to the
 // system heap - see docs/design/tokens.md on why those are different pools.
@@ -79,6 +88,50 @@ int32_t Card::headerHeight() {
     const int32_t tok  = UI::sc(UI::met().HEADER_H);
     const int32_t text = lv_font_get_line_height(UI::type().TAG) + UI::sc(4);
     return (text > tok) ? text : tok;
+}
+
+// Which variant this card's cell can actually carry.
+//
+// Measured, not declared. The question is whether a FULL layout's rows fit at
+// the sizes the type scale already settled on - and if they do not, the answer
+// is to draw less, never to draw the same thing smaller. Shrinking text below
+// the scale would undo the work gen_type_scale.py exists to do.
+//
+// The budget is the tallest thing each layout stacks: a title row, the hero,
+// and an optional row, plus the padding between them. A card that cannot seat
+// all three goes compact and drops the optional one.
+void Card::resolveVariant() {
+    if (_variant != CardVariant::VAR_AUTO) { _resolved = _variant; return; }
+
+    const UIType    &t = UI::type();
+    const UIMetrics &m = UI::met();
+
+    lv_obj_update_layout(_root);
+    int32_t h = lv_obj_get_height(_surface);
+    if (h <= 0) h = UI::grid().cellH;          // before layout; close enough
+
+    // What a full layout needs vertically. The header strip only counts when
+    // it is inside the card - a tag costs the body nothing.
+    int32_t need = lv_font_get_line_height(t.NAME)    // title row
+                 + lv_font_get_line_height(t.VALUE)   // the hero
+                 + lv_font_get_line_height(t.TAG)     // the optional row
+                 + UI::sc(m.PAD) * 3;
+    if (_hdrStyle == CardHeaderStyle::HDR_BAR) need += Card::headerHeight();
+
+    _resolved = (h >= need) ? CardVariant::VAR_FULL : CardVariant::VAR_COMPACT;
+}
+
+// Long press pauses, on every card type.
+//
+// cards.md section 3: a paused card is "the user's own choice rather than a
+// failure, so quiet is correct" - it is the one state allowed to dim, and the
+// one the user causes deliberately. Binding it to a long press makes PAUSED
+// reachable on a real card rather than only through a test button, and it is
+// the only whole-card action that makes sense on a read-only sensor as well as
+// on a switch.
+void Card::onLongPress() {
+    setPaused(!_paused);
+    pollState(millis());
 }
 
 // ---------------------------------------------------------------------------
@@ -143,6 +196,7 @@ void Card::build(lv_obj_t *parent) {
     }
 
     buildBody(_body);
+    resolveVariant();
     restyle();
 }
 
@@ -250,6 +304,7 @@ void Card::restyle() {
     lv_obj_set_style_text_font (_badge, UI::type().TAG, 0);
     if (_stale) lv_obj_set_height(_stale, Card::headerHeight());
 
+    resolveVariant();
     applyState();
     render();
 }

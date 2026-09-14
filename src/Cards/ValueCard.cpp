@@ -109,6 +109,17 @@ void ValueCard::render() {
         lv_obj_add_flag            (_unit, LV_OBJ_FLAG_HIDDEN);
     }
 
+    // --- The two status corners, which COMPACT does not have room for -----
+    //
+    // Dropped wholesale rather than shrunk. cards.md section 1 already treats
+    // this row as absent when there is nothing to put in it; a cell too small
+    // to seat it is the same situation arriving from the other direction.
+    if (variant() == CardVariant::VAR_COMPACT) {
+        lv_obj_add_flag(_battery, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(_seen,    LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
     // --- Bottom-left: battery ---------------------------------------------
     //
     // cards.md section 1: if the entity has neither secondary, the row is

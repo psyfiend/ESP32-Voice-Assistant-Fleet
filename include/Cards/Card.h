@@ -69,6 +69,12 @@ public:
 
     Card &setPlacement(const CardPlacement &p) { _place = p; return *this; }
 
+    // Pin the variant instead of letting the card measure its own cell.
+    Card &setVariant(CardVariant v) { _variant = v; return *this; }
+
+    // The resolved variant - never VAR_AUTO. Valid after build().
+    CardVariant variant() const { return _resolved; }
+
     // The card's own label. Left unset, a card uses its primary's name - but
     // cards.md section 4 is emphatic that on a measure card the label is the
     // LOCATION, not the measurement ("Deck", not "Temperature"), because the
@@ -196,7 +202,17 @@ protected:
     // What a card does when touched. Default is nothing, which is correct for
     // a read-only sensor.
     virtual void onTap() {}
-    virtual void onLongPress() {}
+
+    // Long press. The BASE class implements this rather than leaving it empty,
+    // because pausing is a property of every card regardless of type - cards.md
+    // section 3's "per-card pause / ignore this entity", the one state allowed
+    // to go quiet because it is the user's own choice rather than a failure.
+    //
+    // cards.md section 4 eventually wants a long press on a group to open a
+    // sheet of per-light cards. That needs an overlay this milestone does not
+    // have; when it arrives, a group card overrides this and everything else
+    // keeps pausing.
+    virtual void onLongPress();
 
     // --- Helpers for subclasses -------------------------------------------
 
@@ -237,6 +253,7 @@ private:
     void buildHeader();
     void applyState();                 // repaint chrome for _state
     void applyDiagonal();              // the loud treatment, every mode
+    void resolveVariant();             // measure the cell, pick FULL or COMPACT
     CardState deriveState(uint32_t nowMs) const;
     uint32_t tagColor() const;         // the badge's colour, which is NOT
                                        // stateColor() - see ST_PARTIAL
@@ -292,6 +309,8 @@ private:
     uint8_t _nSecondary = 0;
 
     CardPlacement   _place;
+    CardVariant     _variant  = CardVariant::VAR_AUTO;
+    CardVariant     _resolved = CardVariant::VAR_FULL;
     CardHeaderStyle _hdrStyle    = CardHeaderStyle::HDR_NONE;
     CardState       _state       = CardState::ST_LIVE;
     uint32_t        _longStaleMs = 0;     // 0 = ask cardLongStaleMs()

@@ -195,11 +195,12 @@ void CardPage::report() const {
         // priority is printed although nothing reads it yet. That is the point
         // - it makes the field visible on a real board before 2.5 has to make
         // decisions with it.
-        SystemReport::line("    %-8s span %ux%u min %ux%u pri %3u  %s",
+        SystemReport::line("    %-14s span %ux%u min %ux%u pri %3u  %-7s %s",
                            c->typeName(),
                            (unsigned)p.prefSpanX, (unsigned)p.prefSpanY,
                            (unsigned)p.minSpanX,  (unsigned)p.minSpanY,
                            (unsigned)p.priority,
+                           cardVariantName(c->variant()),
                            cardStateName(c->state()));
     }
 }

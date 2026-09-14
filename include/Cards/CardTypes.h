@@ -134,6 +134,34 @@ struct CardPlacement {
                              // renumbering everything else
 };
 
+// ---------------------------------------------------------------------------
+// How much of itself a card draws.
+//
+// DERIVED from the cell it was given, not declared - the same rule the grid and
+// the type scale already follow. A card asked to live in a small cell shows
+// less rather than overflowing or shrinking its text below the readable size
+// the type scale worked out.
+//
+// What each layout drops is the thing cards.md already calls optional:
+//
+//   ValueCard   the status corners. Section 1: "if the entity has neither
+//               battery nor last-seen, the row is simply absent - not an empty
+//               reserved strip." Compact treats a cell too small to hold it the
+//               same way it treats an entity with nothing to put in it.
+//   StateCard   the name. Section 4 is explicit that on an actor card "state is
+//               the icon and its colour" - so the icon is the part that cannot
+//               go, and a very small one is a disc and nothing else.
+//
+// VAR_AUTO is the default and resolves at build time by measuring. A build
+// sheet can pin either variant when it disagrees.
+// ---------------------------------------------------------------------------
+enum class CardVariant : uint8_t {
+    VAR_AUTO = 0,
+    VAR_FULL,
+    VAR_COMPACT,
+};
+
 const char *cardStateName(CardState s);
+const char *cardVariantName(CardVariant v);
 
 #endif // CARD_TYPES_H
