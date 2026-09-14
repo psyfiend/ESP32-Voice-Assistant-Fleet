@@ -124,10 +124,16 @@ void Card::resolveVariant() {
 
     // What a full layout needs: a title row, the hero, and an optional row,
     // plus the padding between them.
-    int32_t need = lv_font_get_line_height(t.NAME)
+    // Counts every band a FULL layout reserves, which now includes the icon
+    // line at the top. Leaving it out made CYD_S3_3248 cards claim they could
+    // seat a full layout in 121 px when they could not, and the name was
+    // clipped underneath the status row as a result.
+    int32_t need = topBandHeight()
                  + lv_font_get_line_height(t.VALUE)
-                 + lv_font_get_line_height(t.TAG)
-                 + UI::sc(m.PAD) * 3;
+                 + midGap()
+                 + lv_font_get_line_height(t.NAME)
+                 + statusBandHeight()
+                 + UI::sc(m.PAD) * 2;
     if (_hdrStyle == CardHeaderStyle::HDR_BAR) need += Card::headerHeight();
 
     _resolved = (h >= need) ? CardVariant::VAR_FULL : CardVariant::VAR_COMPACT;
@@ -365,6 +371,36 @@ uint32_t Card::tagColor() const {
     return 0;
 }
 
+int32_t Card::topBandHeight() {
+    return lv_font_get_line_height(UI::type().ICON_SM);
+}
+
+int32_t Card::statusBandHeight() {
+    // Whichever of the two things that can sit here is taller. The battery
+    // glyph comes from the icon face and the percentage from the text face,
+    // and sizing to only one of them made a card with a battery sit its status
+    // line lower than a card with just an age on it - which is exactly what
+    // the owner spotted comparing the temperature and lux cards.
+    const int32_t a = lv_font_get_line_height(UI::type().ICON_SM);
+    const int32_t b = lv_font_get_line_height(UI::type().TAG);
+    return (a > b) ? a : b;
+}
+
+int32_t Card::midGap() {
+    return UI::sc(6);
+}
+
+// The area's colour, or the accent when it has none.
+//
+// The owner's idea, and it is what the header is FOR: "have the areas be
+// differentiated by color so cards could be ID'd visually at a glance. Header
+// bars and tag colors would be the same for cards within a group." Two cards in
+// the same area therefore carry the same band, and the name on it becomes
+// confirmation rather than the only cue.
+uint32_t Card::headerColor() const {
+    return _areaColor ? _areaColor : UI::pal().ACCENT;
+}
+
 uint32_t Card::tone(uint32_t hex) const {
     return _dimmed ? UI::mix(hex, UI::pal().GROUND, 55) : hex;
 }
@@ -430,7 +466,7 @@ void Card::applyState() {
         // A pill only exists when it has something in it. Hiding it is safe
         // precisely because the clearance is the PAGE's, not the card's: a
         // card with no tag is exactly as tall as one with a tag.
-        lv_obj_set_style_bg_color  (_header, UI::c(p.ACCENT), 0);
+        lv_obj_set_style_bg_color  (_header, UI::c(headerColor()), 0);
         lv_obj_set_style_bg_opa    (_header, LV_OPA_COVER, 0);
         lv_obj_set_style_radius    (_header, UI::sc(m.RADIUS / 2), 0);
         lv_obj_set_style_text_color(_lblArea, UI::c(p.SURFACE), 0);
@@ -441,7 +477,7 @@ void Card::applyState() {
         // colour - the owner's call after seeing a whole header go yellow:
         // "instead of the entire bar changing color only the badge section
         // should turn yellow around STALE".
-        lv_obj_set_style_bg_color  (_header, UI::c(p.ACCENT), 0);
+        lv_obj_set_style_bg_color  (_header, UI::c(headerColor()), 0);
         lv_obj_set_style_bg_opa    (_header, LV_OPA_COVER, 0);
         lv_obj_set_style_radius    (_header, 0, 0);
         // Text in the card's BACKGROUND colour - dark on a light accent, light
@@ -466,7 +502,7 @@ void Card::applyState() {
 
     // --- the stale holder, which only exists in tag mode --------------------
     if (_stale) {
-        lv_obj_set_style_bg_color  (_stale, UI::c(tc ? tc : p.ACCENT), 0);
+        lv_obj_set_style_bg_color  (_stale, UI::c(tc ? tc : headerColor()), 0);
         lv_obj_set_style_bg_opa    (_stale, LV_OPA_COVER, 0);
         lv_obj_set_style_radius    (_stale, UI::sc(m.RADIUS / 2), 0);
         lv_obj_set_style_text_color(_badge, UI::c(p.SURFACE), 0);

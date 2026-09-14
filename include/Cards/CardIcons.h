@@ -48,6 +48,13 @@ const char *cardIconForState(const EntityDescriptor &d, bool on);
 // The battery glyph for a percentage, in six steps.
 const char *cardBatteryGlyph(int pct);
 
+// A stable colour for an area name. The same name always gives the same
+// colour, on every board and across reboots, because it is derived from the
+// string rather than handed out in arrival order - two panels showing the same
+// house must agree about what "Kitchen" looks like. Returns 0 for an empty
+// name, meaning "no area, use the accent".
+uint32_t cardAreaColor(const char *area);
+
 // Compact age, written into `out`: "now", "45s", "12m", "3h", "2d".
 //
 // ASCII only, no exceptions and no cleverness. CLAUDE.md: LVGL's stock

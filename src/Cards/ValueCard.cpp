@@ -39,7 +39,7 @@ void ValueCard::buildBody(lv_obj_t *body) {
 
     _topRow = plain(body);
     lv_obj_set_width (_topRow, lv_pct(100));
-    lv_obj_set_height(_topRow, LV_SIZE_CONTENT);
+    lv_obj_set_height(_topRow, Card::topBandHeight());
     _icon = lv_label_create(_topRow);
 
     // The middle takes whatever is left and centres the value and the name in
@@ -61,6 +61,7 @@ void ValueCard::buildBody(lv_obj_t *body) {
     lv_obj_set_flex_align(_valueRow, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END,
                           LV_FLEX_ALIGN_END);
     lv_obj_set_style_pad_gap(_valueRow, UI::sc(3), 0);
+    lv_obj_set_style_pad_bottom(_valueRow, Card::midGap(), 0);
 
     _value = lv_label_create(_valueRow);
     _unit  = lv_label_create(_valueRow);
@@ -70,9 +71,12 @@ void ValueCard::buildBody(lv_obj_t *body) {
     lv_obj_set_style_text_align(_name, LV_TEXT_ALIGN_CENTER, 0);
 
     // Battery on the left, last-seen on the right, on one line at the bottom.
+    // RESERVED, always, in a full layout - see Card::statusBandHeight(). A
+    // card whose sensor reports no battery must not sit its name lower than
+    // the one beside it that does.
     _statusRow = plain(body);
     lv_obj_set_width     (_statusRow, lv_pct(100));
-    lv_obj_set_height    (_statusRow, LV_SIZE_CONTENT);
+    lv_obj_set_height    (_statusRow, Card::statusBandHeight());
     lv_obj_set_flex_flow (_statusRow, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(_statusRow, LV_FLEX_ALIGN_SPACE_BETWEEN,
                           LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -161,9 +165,13 @@ void ValueCard::render() {
         lv_label_set_text          (_battery, b);
         lv_obj_set_style_text_font (_battery, t.TAG, 0);
         lv_obj_set_style_text_color(_battery, UI::c(tone(p.TEXT_DIM)), 0);
-        lv_obj_clear_flag          (_battGroup, LV_OBJ_FLAG_HIDDEN);
     } else {
-        lv_obj_add_flag            (_battGroup, LV_OBJ_FLAG_HIDDEN);
+        // Emptied rather than hidden. Hiding it removed it from the row, and
+        // SPACE_BETWEEN with a single child puts that child on the LEFT - which
+        // is why "Seen: now" jumped to the wrong corner on a card with no
+        // battery to report.
+        lv_label_set_text(_battIcon, "");
+        lv_label_set_text(_battery,  "");
     }
 
     if (e->everSet) {
@@ -182,8 +190,7 @@ void ValueCard::render() {
 
         lv_obj_update_layout(_statusRow);
         const int32_t avail = lv_obj_get_content_width(_statusRow)
-                            - (lv_obj_has_flag(_battGroup, LV_OBJ_FLAG_HIDDEN)
-                               ? 0 : lv_obj_get_width(_battGroup) + UI::sc(6));
+                            - lv_obj_get_width(_battGroup) - UI::sc(6);
         if (lv_obj_get_width(_seen) > avail) lv_label_set_text(_seen, age);
 
         lv_obj_clear_flag(_seen, LV_OBJ_FLAG_HIDDEN);

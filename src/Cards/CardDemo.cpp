@@ -1,6 +1,7 @@
 #include "Cards/CardDemo.h"
 #include "Cards/CardPage.h"
 #include "Cards/CardCatalog.h"
+#include "Cards/CardIcons.h"
 #include "UI/UITokens.h"
 #include "SystemReport.h"
 #include "SystemEntities.h"
@@ -36,6 +37,11 @@ StateCardFill s_actorStyle = StateCardFill::FILL_SURFACE;
 // this off, HDR_TAG has nothing to put in its left pill and the tags simply do
 // not appear; the row spacing does not change, so nothing on the page moves.
 bool s_showArea = true;
+
+// Colour-code the header band or tag by AREA, so a group of cards reads as a
+// group before you read a word of it. Independent of s_showArea: the owner
+// wants the colour available whether or not the name is displayed.
+bool s_areaColor = true;
 
 // Testing: walk every card on the page through each state in turn.
 //
@@ -103,6 +109,12 @@ void actorCb(lv_event_t *e) {
     (void)e;
     s_actorStyle = (s_actorStyle == StateCardFill::FILL_SURFACE)
                  ? StateCardFill::LIGHT_ICON : StateCardFill::FILL_SURFACE;
+    CardDemo::show(*s_reg, *s_binder);
+}
+
+void colorCb(lv_event_t *e) {
+    (void)e;
+    s_areaColor = !s_areaColor;
     CardDemo::show(*s_reg, *s_binder);
 }
 
@@ -237,6 +249,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     topButton(bar, s_hdr == CardHeaderStyle::HDR_TAG ? "Tag"
                  : s_hdr == CardHeaderStyle::HDR_BAR ? "Bar" : "No hdr", headerCb);
     topButton(bar, s_showArea ? "Area on" : "Area off", areaCb);
+    topButton(bar, s_areaColor ? "Colour" : "Mono", colorCb);
     topButton(bar, s_actorStyle == StateCardFill::FILL_SURFACE ? "Fill" : "Icon", actorCb);
     s_btnState = topButton(bar, FORCED_LABEL[s_forced], stateCb);
     // The System panel's Dump Config is unreachable while this screen is up,
@@ -292,7 +305,12 @@ void show(EntityRegistry &reg, CardBinder &binder) {
         Card *c = cardForEntity(e);   // EntityKind picks the class
         if (!c) return;               // a kind with no card type yet
         c->setLabel(label).setHeaderStyle(s_hdr);
-        if (area)   c->setArea(area);
+        if (area) {
+            c->setArea(area);
+            // Derived from the NAME, so two cards in one area always agree and
+            // the colour survives a reboot. See cardAreaColor().
+            if (s_areaColor) c->setAreaColor(cardAreaColor(area));
+        }
         if (sec)    c->bindSecondary(sec);
         if (pl)     c->setPlacement(*pl);
         if (paused) c->setPaused(true);
@@ -302,13 +320,18 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     // The aggregate: ONE card, two entities, one tap for both. Same class as a
     // single switch - only the binding differs, which is what cards.md section
     // 4's "groupable by room" asks for and why it is not a group card.
-    auto placeGroup = [&](const char *idA, const char *idB, const char *label) {
+    auto placeGroup = [&](const char *idA, const char *idB, const char *label,
+                          const char *area) {
         const Entity *a = ent(idA);
         if (!a) return;
         Card *c = cardForEntity(a);
         if (!c) return;
         c->bindPrimary(ent(idB));
         c->setLabel(label).setHeaderStyle(s_hdr);
+        if (area) {
+            c->setArea(area);
+            if (s_areaColor) c->setAreaColor(cardAreaColor(area));
+        }
         s_page->add(c);
     };
 
@@ -321,13 +344,13 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     // binary_sensor -> state layout, and NOTHING happens when it is tapped.
     // Before the catalog existed this was an ActorCard whose tap tried to
     // command a read-only entity and was saved only by a writable check.
-    place("deck_motion", "Deck", nullptr, nullptr, nullptr, false);
+    place("deck_motion", "Deck", "Outdoor", nullptr, nullptr, false);
 
     // switch -> state layout, and a tap actually commands. Both halves of the
     // optimistic write: one entity answers, one is deliberately ignored.
-    place(VIRT_ENT_SWITCH, "Obeys",   nullptr, nullptr, nullptr, false);
-    place(VIRT_ENT_STUCK,  "Ignores", nullptr, nullptr, nullptr, false);
-    placeGroup(VIRT_ENT_SWITCH, VIRT_ENT_STUCK, "Both");
+    place(VIRT_ENT_SWITCH, "Obeys",   "Office", nullptr, nullptr, false);
+    place(VIRT_ENT_STUCK,  "Ignores", "Office", nullptr, nullptr, false);
+    placeGroup(VIRT_ENT_SWITCH, VIRT_ENT_STUCK, "Both", "Office");
 
     place(SYS_ENT_RSSI,   "RSSI",      "Panel", nullptr, nullptr, false);
     place(SYS_ENT_HEAP,   "Free Heap", "Panel", nullptr, &wide,   false);
@@ -335,7 +358,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     // Paused, permanently, so the distinction cards.md section 3 insists on is
     // visible rather than described: this card is dim BECAUSE THE USER CHOSE
     // IT, and no stale card anywhere on this page dims.
-    place(SYS_ENT_UPTIME, "Paused", nullptr, nullptr, nullptr, true);
+    place(SYS_ENT_UPTIME, "Paused", "Panel", nullptr, nullptr, true);
 
     // A rebuild creates fresh cards, which derive their own state - so a
     // pinned state has to be re-applied or the button would silently lie.

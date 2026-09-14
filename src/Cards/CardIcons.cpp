@@ -99,6 +99,34 @@ const char *cardBatteryGlyph(int pct) {
     return MDI_BATTERY_ALERT;
 }
 
+uint32_t cardAreaColor(const char *area) {
+    if (!area || !area[0]) return 0;
+
+    // Hues chosen to stay distinguishable from each other AND from the
+    // semantic state palette - an area must never be mistaken for a warning.
+    // Nothing here is amber or red for that reason.
+    static const uint32_t AREA_HUES[] = {
+        0x4A9EDA,   // blue
+        0x53B88A,   // green
+        0x9B7BD4,   // violet
+        0x2FA8A8,   // teal
+        0xC06FA8,   // magenta
+        0x6E86D6,   // indigo
+        0x7FA644,   // olive
+        0xCF7A5B,   // clay
+    };
+    static const uint32_t N = sizeof(AREA_HUES) / sizeof(AREA_HUES[0]);
+
+    // FNV-1a. Small, well-spread, and deterministic - which is the only
+    // property that actually matters here.
+    uint32_t h = 2166136261u;
+    for (const char *c = area; *c; c++) {
+        h ^= (uint8_t)*c;
+        h *= 16777619u;
+    }
+    return AREA_HUES[h % N];
+}
+
 uint32_t cardTintFor(const EntityDescriptor &d) {
     const UIPalette &p = UI::pal();
 

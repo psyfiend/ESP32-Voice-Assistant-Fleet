@@ -101,6 +101,12 @@ public:
     // others.
     Card &setShowArea(bool v) { _showArea = v; return *this; }
 
+    // Colour the header band or tag by AREA rather than by accent, so a group
+    // of cards reads as a group before you read a word of it. 0 means "use the
+    // accent". Independent of setShowArea(): the owner wants colour coding
+    // available whether or not the area's NAME is displayed.
+    Card &setAreaColor(uint32_t hex) { _areaColor = hex; return *this; }
+
     // The page-wide default, so a build sheet can set this once rather than on
     // every card. Same pattern as StateCard::setFill().
     static void setShowAreaDefault(bool v) { s_showArea = v; }
@@ -258,12 +264,27 @@ protected:
     // strength, so the card did not read as paused at all.
     uint32_t tone(uint32_t hex) const;
 
+    // THE VERTICAL RHYTHM, shared by every layout so that a value card and a
+    // state card sitting side by side line up.
+    //
+    // Both reserve the same three bands - an icon line at the top, a growing
+    // middle, and a status line at the bottom - and both reserve them WHETHER
+    // OR NOT they have anything to put there. The owner's rule: "the row where
+    // secondary data would be should be accounted for as if it's reserved
+    // space, even if there is no secondary data for the card." A card whose
+    // sensor reports no battery must not sit its name lower than the one next
+    // to it that does.
+    static int32_t topBandHeight();      // the small icon line
+    static int32_t statusBandHeight();   // battery / last-seen
+    static int32_t midGap();             // between the hero and the name
+
 private:
     void buildHeader();
     void applyState();                 // repaint chrome for _state
     void applyDiagonal();              // the loud treatment, every mode
     void resolveVariant();             // measure the cell, pick FULL or COMPACT
     CardState deriveState(uint32_t nowMs) const;
+    uint32_t headerColor() const;      // the area's colour, or the accent
     uint32_t tagColor() const;         // the badge's colour, which is NOT
                                        // stateColor() - see ST_PARTIAL
     static void eventCb(lv_event_t *e);
@@ -331,6 +352,7 @@ private:
 
     char _label[ENTITY_NAME_MAX] = {0};
     char _area[ENTITY_SHORT_MAX] = {0};
+    uint32_t _areaColor = 0;   // 0 = use the accent
 
     // Refusal detection lives on the ENTITY now, not here - see
     // Entity::cmdFailed and deriveState(). A card asks the entities it is

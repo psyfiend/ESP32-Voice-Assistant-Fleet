@@ -25,7 +25,18 @@ void StateCard::buildBody(lv_obj_t *body) {
     lv_obj_set_flex_flow (body, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(body, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(body, UI::sc(2), 0);
+    lv_obj_set_style_pad_gap(body, 0, 0);
+
+    // THE SAME THREE BANDS ValueCard uses, reserved even though this layout
+    // has nothing to put in either of them yet. It is what makes a state card
+    // and a value card side by side put their names at the same height.
+    //
+    // The top band is also where a small corner icon goes when that lands -
+    // the owner wants one on every card, including those that already show a
+    // large one in the middle. The space is already here for it.
+    _topRow = plainCol(body);
+    lv_obj_set_width (_topRow, lv_pct(100));
+    lv_obj_set_height(_topRow, Card::topBandHeight());
 
     _mid = plainCol(body);
     lv_obj_set_width     (_mid, lv_pct(100));
@@ -33,6 +44,7 @@ void StateCard::buildBody(lv_obj_t *body) {
     lv_obj_set_flex_flow (_mid, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(_mid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_bottom(_mid, Card::midGap(), 0);
 
     // A plain object with a full radius rather than an arc or an image: it is
     // a circle behind a glyph, and the cheapest thing that draws a circle in
@@ -50,6 +62,10 @@ void StateCard::buildBody(lv_obj_t *body) {
     lv_label_set_long_mode     (_name, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(_name, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width           (_name, lv_pct(100));
+
+    _statusRow = plainCol(body);
+    lv_obj_set_width (_statusRow, lv_pct(100));
+    lv_obj_set_height(_statusRow, Card::statusBandHeight());
 
     // The not-uniform badge. Top-LEFT, out of the flow, because HDR_NONE parks
     // its floating STALE badge in the top-right corner and two things fighting
@@ -100,6 +116,7 @@ void StateCard::render() {
     const int32_t discPx = (iconPx * 9) / 5;
     lv_obj_set_size        (_disc, discPx, discPx);
     lv_obj_set_style_radius(_disc, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_pad_bottom(_disc, 0, 0);
 
     // --- State: the whole surface, not a corner ---------------------------
     //
@@ -148,8 +165,12 @@ void StateCard::render() {
     // once there is no name below it to balance against.
     const bool compact = (variant() == CardVariant::VAR_COMPACT);
     if (compact) {
-        lv_obj_add_flag(_name, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag  (_name,      LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag  (_statusRow, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag  (_topRow,    LV_OBJ_FLAG_HIDDEN);
     } else {
+        lv_obj_clear_flag(_statusRow, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(_topRow,    LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
     }
 
