@@ -357,3 +357,100 @@ either**; one of them is not permissively licensed.
 - **`espcontrol`** — **PolyForm Noncommercial 1.0.0.** Architecture and layout decisions may be
   studied; **code may not be copied**, and the licence bars commercial use of the software itself.
   Its per-device grid definitions are the evidence in §7.
+
+---
+
+## 11. Implementation notes — milestone 2.4, 2026-09-13
+
+**This section records where the build and the body of this document disagree, and why.** The
+document above is the spec and was written before anything existed; these are the places real glass
+sent it back. Nothing here is a silent override — each item was raised and decided.
+
+### The two "layout families" were never card types
+
+§4 lists card types by Home Assistant domain, and ROADMAP 2.7 names the first four the same way.
+A summary in `HANDOFF.md` called the two layouts "Measure" and "Actor" cards, and that paraphrase
+got promoted to the class names — skipping the domain layer entirely and leaving a build sheet
+having to record which *layout* a temperature reading wants.
+
+Corrected. `ValueCard` and `StateCard` are **abstract** layouts; concrete types are named for their
+domain in `CardCatalog.h` and reached through `cardForKind()`. A user picks `sensor`; the framework
+picks the arrangement. The split immediately exposed a latent bug: tap handling had been on the
+shared layout, so a read-only `binary_sensor` had an `onTap()` that tried to command it.
+
+### §2's area tag — three permanent modes, and area is a separate setting
+
+§2 offers two header treatments "to prototype, not one", implying a winner would be chosen. The
+owner's decision is that **all three ship** — bar, tag, and none — selected by one build-sheet
+setting, with a **second, independent** setting for whether the area displays at all.
+
+The three differ in what they cost the card:
+
+| Mode | Card height | Body cost | Area | STALE |
+|---|---|---|---|---|
+| bar | X | a strip | in the band | in the band |
+| tag | X − tag | nothing | pill above, outside | second pill above |
+| none | X | nothing | **not shown at all** | floating badge, top-right |
+
+`none` showing no area is the owner's explicit call: it is the mode you pick when you do not want
+one, not a mode that renders one without decoration.
+
+### The tag's clearance comes out of the row gap, and it is a sum
+
+The tag hangs **outside** the card, as §2 says. Making that work without cards differing in size
+took three attempts. What it requires: the cell must not clip (`LV_OBJ_FLAG_OVERFLOW_VISIBLE`), the
+tag parents to the *cell* rather than the card, and the page widens its row gap to
+**`gap + tagHeight`** — a sum, not a maximum, so the space above a tag equals the space between two
+plain cards. Every card in tag mode takes the shorter height whether it carries a tag or not.
+
+### §2's "area comes free from MQTT discovery" is wrong
+
+> *"Area comes free: Home Assistant already carries it on devices, so `MqttProvider` can populate
+> it from discovery rather than anyone tagging entities by hand."*
+
+Verified against the code: nothing in the tree publishes or reads an area, and MQTT discovery's
+`suggested_area` runs **outbound** — it is how a device suggests its own area to HA, not a way to
+learn someone else's.
+
+The owner's broader point, which supersedes this: **MQTT carries a value per topic and nothing
+else.** Area, battery, last-seen and device grouping each need a hand-crafted topic or an
+automation maintaining it, per entity — unmanageable at hundreds of entities. Full HA entity
+integration goes over the **websocket** (#43). Until then, area is build-sheet supplied. See
+`FUTURE_IMPROVEMENTS.md`.
+
+### §9's "one icon size" was costed against the wrong thing
+
+§9 concludes "one icon size, not a family", on a measured ~96 KB per referenced face. That figure
+came from a **95-glyph full-ASCII** face. The shipped subset is 84 glyphs at two sizes per board —
+one for a state card's disc, one for a value card's title row — and it cost **less than the single
+Montserrat_48 the placeholder icons had been borrowing**: the 3248's flash went *down* 4,680 bytes.
+
+§5's "prefer provider-supplied" is now honoured for the first time. Every `EntityDescriptor`
+already carried `mdi:thermometer` and the like, and nothing could draw them, so all of them were
+being ignored in favour of a `device_class` guess.
+
+### A command's verdict belongs to the entity
+
+§3 says the reverted optimistic write "*is* the event" and needs no new plumbing. True, but it is
+**anonymous**: after the revert, `pending` is false and the value is back, indistinguishable from
+an ordinary update. Worse, a *successful* echo carries the value the optimistic write already
+applied, so nothing is dirtied and no card is told anything at all.
+
+`Entity::cmdFailed` resolves both. Every card bound to an entity reads the identical fact, which is
+what makes a parent's state derive from where its children *are* rather than the path they took —
+all resolved children failed → `FAILED`, some → `PARTIAL` (a new state, §3 had only the total case).
+
+### Compact and full are derived, not declared
+
+Issue #15 asks for both. A card measures whether its cell can seat a title row, the hero and an
+optional row at the type scale's sizes, and draws **less** when it cannot — never the same thing
+smaller, which would undo the work the generated type scale exists to do. `ValueCard` drops the
+status corners (§1 already treats that row as absent when empty); `StateCard` drops the **name**
+and keeps the icon, because §4 says state *is* the icon and its colour.
+
+### Long press pauses, for now
+
+§4 wants a long press on a group to open a sheet of per-light cards. That needs an overlay this
+milestone does not have. Long press currently toggles §3's per-card **pause**, on the base class,
+for every type — the only whole-card action meaningful on a read-only sensor as well as a switch.
+A group card will override it; everything else keeps pausing.
