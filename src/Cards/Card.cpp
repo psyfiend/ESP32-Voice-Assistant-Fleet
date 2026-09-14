@@ -136,7 +136,27 @@ void Card::resolveVariant() {
                  + UI::sc(m.PAD) * 2;
     if (_hdrStyle == CardHeaderStyle::HDR_BAR) need += Card::headerHeight();
 
+    // A MARGIN, because "it exactly fits" is not a safe answer.
+    //
+    // A font's line box is taller than the ink in it, labels round up, and the
+    // body's own padding is approximate here. Landing within a pixel or two of
+    // the cell meant CYD_S3_3248 claimed a full layout at 121 px and then
+    // overflowed - the name clipped in half and drawn over the status row, and
+    // in the two modes that also spend height on a header the status row was
+    // pushed off the card entirely. Being slightly too eager to go compact
+    // costs a status line; being slightly too reluctant breaks the card.
+    need += UI::sc(8);
+
     _resolved = (h >= need) ? CardVariant::VAR_FULL : CardVariant::VAR_COMPACT;
+
+    // Printed once per card, because this decision was guessed at twice and
+    // both times the guess was wrong. The numbers are cheap and they end the
+    // argument - and they say WHY a card went compact rather than leaving it
+    // to be inferred from what is missing on screen.
+    #ifdef DEBUG_CARDS
+    Serial.printf("[Cards] %s: cell %ld need %ld -> %s\n",
+                  typeName(), (long)h, (long)need, cardVariantName(_resolved));
+    #endif
 }
 
 // Long press pauses, on every card type.
@@ -372,7 +392,11 @@ uint32_t Card::tagColor() const {
 }
 
 int32_t Card::topBandHeight() {
-    return lv_font_get_line_height(UI::type().ICON_SM);
+    // Plus a couple of pixels. An icon GLYPH can be taller than its font's
+    // nominal line height - the MDI subset is drawn to its own metrics, not
+    // Montserrat's - and a band sized to the line height alone clipped the top
+    // of the thermometer on CYD_S3_3248.
+    return lv_font_get_line_height(UI::type().ICON_SM) + UI::sc(2);
 }
 
 int32_t Card::statusBandHeight() {
@@ -383,7 +407,7 @@ int32_t Card::statusBandHeight() {
     // the owner spotted comparing the temperature and lux cards.
     const int32_t a = lv_font_get_line_height(UI::type().ICON_SM);
     const int32_t b = lv_font_get_line_height(UI::type().TAG);
-    return (a > b) ? a : b;
+    return ((a > b) ? a : b) + UI::sc(2);
 }
 
 int32_t Card::midGap() {
