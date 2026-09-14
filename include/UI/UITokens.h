@@ -161,6 +161,15 @@ int32_t    sc(int32_t logical);          // logical px -> this board's pixels
 lv_color_t c(uint32_t hex);              // the one place that calls lv_color_hex
 lv_color_t border();                     // BORDER, or derived from SURFACE
 
+// Blend two 0xRRGGBB values, pct% of b into a.
+//
+// Exists so a card can look QUIET without using opacity. Setting an opa below
+// LV_OPA_COVER on a container makes LVGL render that whole subtree to an
+// intermediate layer buffer - which on a constrained board fails outright
+// ("lv_draw_layer_alloc_buf: Allocating layer buffer failed"). Mixing toward
+// the ground colour costs nothing.
+uint32_t mix(uint32_t a, uint32_t b, uint8_t pct);
+
 // Silences the `lv_part_t | lv_state_t` deprecation warning that would
 // otherwise be reproduced in every card type. Issue #13 asked for this.
 inline lv_style_selector_t part(lv_part_t p, lv_state_t s = LV_STATE_DEFAULT) {

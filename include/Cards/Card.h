@@ -185,7 +185,7 @@ public:
     // the card. Returns the same value as headerHeight() today and is a
     // separate function because they answer different questions and only one
     // of them is the page's business.
-    static int32_t tagOverhang() { return headerHeight(); }
+    static int32_t tagOverhang() { return headerHeight(); }   // deprecated; see CardPage
 
 protected:
     // --- Subclass contract ------------------------------------------------
@@ -282,6 +282,7 @@ private:
     // Two objects rather than one in tag mode because the two pills are sized
     // to their own content and sit at opposite ends of a strip the card does
     // not own - there is nothing for them to share.
+    lv_obj_t *_tagRow   = nullptr;   // HDR_TAG only: the strip above the card
     lv_obj_t *_header   = nullptr;   // area holder
     lv_obj_t *_stale    = nullptr;   // HDR_TAG only: the badge's own pill
     lv_obj_t *_lblArea  = nullptr;
@@ -317,6 +318,7 @@ private:
     bool            _paused      = false;
     bool            _showArea    = s_showArea;
     bool            _forced      = false;   // debugForceState()
+    bool            _dimmed      = false;   // paused, mixed not opa'd
 
     char _label[ENTITY_NAME_MAX] = {0};
     char _area[ENTITY_SHORT_MAX] = {0};

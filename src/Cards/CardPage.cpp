@@ -18,38 +18,37 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, int32_t tagOverhang) 
 
     const UIGrid &g = UI::grid();
 
-    // Clearance for tags that hang above their cards.
+    // No tag clearance any more, and no widened gaps.
     //
-    // The rule is the owner's and it is a SUM, not a maximum: "the space
-    // between a tag and the card above it is the same as would be between two
-    // cards without the tag." So a row's pitch has to carry the ordinary gap
-    // AND the tag's full height on top of it -
-    //
-    //     card bottom  ->  [ normal gap ]  ->  tag top
-    //     tag top      ->  [ tag height ]  ->  card top
-    //
-    // An earlier version took max(gap, tagHeight), which let a tag sit closer
-    // to the card above it than two plain cards ever sit to each other. The
-    // top inset takes the same treatment, because the first row's tags rise
-    // past the page's own top edge.
-    //
-    // A card with no tag is unaffected: it simply has that much clear space
-    // above it, which is exactly why cards stay the same height whether they
-    // carry a tag or not.
-    const int32_t inset  = UI::sc(g.INSET);
-    const int32_t gap    = UI::sc(g.GAP);
-    const int32_t padTop = inset + tagOverhang;
-    const int32_t padRow = gap   + tagOverhang;
+    // A tag now lives INSIDE its cell, above the card - see Card::build(). The
+    // page went to some trouble to widen its row gap and shrink its cells so a
+    // tag could hang into the space between rows, and none of it ever worked:
+    // the grid container clips its children and the tags were simply cut away.
+    // The owner's rule - the space between a tag and the card above it equals
+    // the space between two plain cards - now falls out of an ordinary gap.
+    const int32_t inset = UI::sc(g.INSET);
+    const int32_t gap   = UI::sc(g.GAP);
+    (void)tagOverhang;
 
     _root = lv_obj_create(parent);
     lv_obj_set_size               (_root, lv_pct(100), lv_pct(100));
     lv_obj_set_style_bg_color     (_root, UI::c(UI::pal().GROUND), 0);
     lv_obj_set_style_border_width (_root, 0, 0);
     lv_obj_set_style_pad_all      (_root, inset, 0);
-    lv_obj_set_style_pad_top      (_root, padTop, 0);
     lv_obj_set_style_pad_column   (_root, gap, 0);
-    lv_obj_set_style_pad_row      (_root, padRow, 0);
-    UI::tameScroll(_root);
+    lv_obj_set_style_pad_row      (_root, gap, 0);
+
+    // A DASHBOARD PAGE DOES NOT SCROLL. The owner, unprompted: "There should
+    // never be any scrolling of cards on any dashboard pages, the cards should
+    // effectively be locked in place. Only when swiping or navigating to a new
+    // page entirely should new entities be on the screen."
+    //
+    // So cards that do not fit are not placed at all - see add(). Scrolling was
+    // also what made the 3248 reboot: dragging a grid whose rows ran off the
+    // bottom. Which cards get dropped when a page is over-subscribed is
+    // CardPlacement::priority's job, and that is milestone 2.5.
+    lv_obj_clear_flag       (_root, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(_root, LV_SCROLLBAR_MODE_OFF);
 
     // Columns are FR units, not the pixel widths UI::grid() computed.
     //
@@ -79,14 +78,8 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, int32_t tagOverhang) 
     if (rows < 1) rows = 1;
     if (rows > 16) rows = 16;
 
-    _cellH = g.cellH;
-    if (tagOverhang) {
-        const int32_t availH = lv_obj_get_height(parent) - padTop - inset;
-        if (availH > 0) {
-            const int32_t h = (availH - padRow * (rows - 1)) / rows;
-            if (h > 0) _cellH = (uint16_t)h;
-        }
-    }
+    _cellH    = g.cellH;
+    _maxRows  = rows;
 
     // UIGrid::rows is how many rows FIT, which is a different question from
     // how many rows EXIST. Cards beyond the first screenful are placed into
@@ -98,10 +91,9 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, int32_t tagOverhang) 
 
     lv_obj_set_layout(_root, LV_LAYOUT_GRID);
 
-    Serial.printf("[Cards] Page %ux%u visible, cell %ux%u px, row gap %d%s\n",
+    Serial.printf("[Cards] Page %ux%u, cell %ux%u px, gap %d - no scroll\n",
                   (unsigned)cols, (unsigned)_rowsDefined,
-                  (unsigned)g.cellW, (unsigned)_cellH, (int)padRow,
-                  tagOverhang ? " (gap + tag)" : "");
+                  (unsigned)g.cellW, (unsigned)_cellH, (int)gap);
 }
 
 Card *CardPage::add(Card *c) {
@@ -114,11 +106,40 @@ Card *CardPage::add(Card *c) {
         return nullptr;
     }
 
+    // Would this card land past the last visible row? Then it does not go on
+    // the page at all. A page shows what fits and nothing else.
+    if (!fits(c)) {
+        Serial.printf("[Cards] dropped %s - page is full at %u rows\n",
+                      c->typeName(), (unsigned)_maxRows);
+        delete c;
+        return nullptr;
+    }
+
     _cards[_n++] = c;
     c->build(_root);
     placeCard(c);
     if (_binder) _binder->add(c);
     return c;
+}
+
+// Would this card fit, without actually placing it? Runs the same cursor
+// arithmetic placeCard() does, on copies, so the two cannot disagree.
+bool CardPage::fits(const Card *c) const {
+    const CardPlacement &p = c->placement();
+
+    uint8_t cols = 0;
+    while (_colDsc[cols] != LV_GRID_TEMPLATE_LAST && cols < 16) cols++;
+    if (!cols) cols = 1;
+
+    uint8_t col = _curCol, row = _curRow;
+    uint8_t spanX = p.prefSpanX ? p.prefSpanX : 1;
+    if (spanX > cols) spanX = cols;
+    if (col + spanX > cols) {
+        const uint8_t left = cols - col;
+        if (!(left >= p.minSpanX && p.minSpanX >= 1)) { col = 0; row++; }
+    }
+    const uint8_t spanY = p.prefSpanY ? p.prefSpanY : 1;
+    return (row + spanY) <= _maxRows;
 }
 
 void CardPage::ensureRows(uint8_t need) {

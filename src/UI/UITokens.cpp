@@ -120,7 +120,8 @@ UIGrid    s_grid = { .TARGET_CARD_W = 130, .ASPECT_PCT = 85, .GAP = 12, .INSET =
 int32_t s_vpW = 0, s_vpH = 0;
 void (*s_onChange)() = nullptr;
 
-// Blend two 0xRRGGBB values. Used only for deriving a border from a surface.
+// Blend two 0xRRGGBB values. Used for deriving a border from a surface, and
+// exposed as UI::mix() for dimming without opacity.
 uint32_t blend(uint32_t a, uint32_t b, uint8_t pct) {
     uint32_t out = 0;
     for (int sh = 16; sh >= 0; sh -= 8) {
@@ -232,6 +233,8 @@ void onSchemeChanged(void (*cb)()) { s_onChange = cb; }
 int32_t sc(int32_t logical) { return (int32_t)(logical * bspUiScale()); }
 
 lv_color_t c(uint32_t hex) { return lv_color_hex(hex); }
+
+uint32_t mix(uint32_t a, uint32_t b, uint8_t pct) { return blend(a, b, pct); }
 
 lv_color_t border() {
     if (s_pal.BORDER) return lv_color_hex(s_pal.BORDER);

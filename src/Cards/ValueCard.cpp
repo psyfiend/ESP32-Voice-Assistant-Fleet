@@ -64,8 +64,16 @@ void ValueCard::buildBody(lv_obj_t *body) {
     // --- Status: the two bottom corners -----------------------------------
     // Battery bottom-LEFT with its own glyph, last-seen bottom-RIGHT. The
     // owner's layout, replacing one concatenated string in the right corner.
+    // TWO labels, not one string. The battery glyph is a Material Design
+    // codepoint in the private use area and the percentage is plain text, and
+    // NO SINGLE FACE HAS BOTH - the icon subset has no digits and the text face
+    // has no icons. Concatenating them drew the glyph with the TAG font, which
+    // has nothing at that codepoint, so it came out as a hollow rectangle.
+    // That is the "bare rectangle" in the 3248 report.
+    _battIcon = lv_label_create(body);
+    lv_obj_align(_battIcon, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+
     _battery = lv_label_create(body);
-    lv_obj_align(_battery, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 
     _seen = lv_label_create(body);
     lv_obj_align(_seen, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
@@ -115,8 +123,9 @@ void ValueCard::render() {
     // this row as absent when there is nothing to put in it; a cell too small
     // to seat it is the same situation arriving from the other direction.
     if (variant() == CardVariant::VAR_COMPACT) {
-        lv_obj_add_flag(_battery, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(_seen,    LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(_battIcon, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(_battery,  LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(_seen,     LV_OBJ_FLAG_HIDDEN);
         return;
     }
 
@@ -134,14 +143,22 @@ void ValueCard::render() {
     if (batt) {
         const int pct = (batt->value.type == ValueType::FLOAT)
                       ? (int)batt->value.f : (int)batt->value.i;
-        char b[24];
-        snprintf(b, sizeof(b), "%s %d%%", cardBatteryGlyph(pct), pct);
+        lv_label_set_text          (_battIcon, cardBatteryGlyph(pct));
+        lv_obj_set_style_text_font (_battIcon, t.ICON_SM, 0);
+        lv_obj_set_style_text_color(_battIcon, UI::c(p.TEXT_DIM), 0);
+        lv_obj_clear_flag          (_battIcon, LV_OBJ_FLAG_HIDDEN);
+
+        char b[12];
+        snprintf(b, sizeof(b), "%d%%", pct);
         lv_label_set_text          (_battery, b);
         lv_obj_set_style_text_font (_battery, t.TAG, 0);
         lv_obj_set_style_text_color(_battery, UI::c(p.TEXT_DIM), 0);
         lv_obj_clear_flag          (_battery, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_align_to            (_battery, _battIcon, LV_ALIGN_OUT_RIGHT_MID,
+                                    UI::sc(3), 0);
     } else {
-        lv_obj_add_flag            (_battery, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag            (_battIcon, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag            (_battery,  LV_OBJ_FLAG_HIDDEN);
     }
 
     // --- Bottom-right: last seen ------------------------------------------
@@ -164,7 +181,8 @@ void ValueCard::render() {
         lv_obj_update_layout(par);
         const int32_t avail = lv_obj_get_content_width(par)
                             - (lv_obj_has_flag(_battery, LV_OBJ_FLAG_HIDDEN)
-                               ? 0 : lv_obj_get_width(_battery) + UI::sc(6));
+                               ? 0 : lv_obj_get_width(_battery)
+                                     + lv_obj_get_width(_battIcon) + UI::sc(9));
         if (lv_obj_get_width(_seen) > avail) lv_label_set_text(_seen, age);
 
         lv_obj_clear_flag          (_seen, LV_OBJ_FLAG_HIDDEN);

@@ -168,9 +168,22 @@ void show(EntityRegistry &reg, CardBinder &binder) {
         s_sectionAdded = true;
     }
 
-    lv_obj_t *old     = s_screen;
-    CardPage *oldPage = s_page;
     if (!s_previous) s_previous = lv_screen_active();   // only on first entry
+
+    // THE OLD PAGE COMES DOWN FIRST.
+    //
+    // It used to be built-then-swapped, which meant eighteen cards alive at
+    // once: double the widgets, double the lv_mem, and double the intermediate
+    // layer buffers LVGL wants for them. That is what exhausted the P4's draw
+    // buffers mid-rebuild - "Allocating layer buffer failed", forever - and
+    // what blew the 3248's loopTask stack, which surfaced as a stack canary
+    // panic with a backtrace full of recursive LVGL frames.
+    //
+    // The cost is a frame of the dashboard with no cards on it. The
+    // alternative is a board that reboots when you press a button.
+    if (s_page)   { delete s_page;           s_page   = nullptr; }
+    if (s_screen) { lv_obj_delete(s_screen); s_screen = nullptr; }
+    if (s_previous) lv_screen_load(s_previous);
 
     lv_mem_monitor_t mon;
     lv_mem_monitor(&mon);
@@ -193,7 +206,10 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     lv_obj_t *bar = lv_obj_create(col);
     lv_obj_set_width              (bar, lv_pct(100));
     lv_obj_set_height             (bar, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow          (bar, LV_FLEX_FLOW_ROW);
+    // WRAPS. Six buttons ran off the right edge of the 3248's 320 px screen,
+    // so its state and fill controls were simply unreachable and the report
+    // that came back could not cover them.
+    lv_obj_set_flex_flow          (bar, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_style_bg_opa       (bar, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (bar, 0, 0);
     lv_obj_set_style_pad_all      (bar, UI::sc(6), 0);
@@ -207,6 +223,12 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     topButton(bar, s_showArea ? "Area on" : "Area off", areaCb);
     topButton(bar, s_actorStyle == StateCardFill::FILL_SURFACE ? "Fill" : "Icon", actorCb);
     s_btnState = topButton(bar, FORCED_LABEL[s_forced], stateCb);
+    // The System panel's Dump Config is unreachable while this screen is up,
+    // and the CARDS section of that report is where spans and variants live.
+    topButton(bar, "Dump", [](lv_event_t *e) {
+        (void)e;
+        if (s_page) s_page->report();
+    });
 
     // --- The grid ---------------------------------------------------------
     lv_obj_t *host = lv_obj_create(col);
@@ -226,12 +248,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
 
     s_page = new CardPage();
     // In tag mode the page has to carve the clearance the tags hang into.
-    // The clearance is reserved for the MODE, not for whether any given card
-    // happens to have an area - otherwise a page with one un-tagged card would
-    // lay out differently from a page with none, which is the inconsistency
-    // the whole arrangement exists to avoid.
-    s_page->begin(host, &binder,
-                  s_hdr == CardHeaderStyle::HDR_TAG ? Card::tagOverhang() : 0);
+    s_page->begin(host, &binder);
 
 
     // --- Two small builders -----------------------------------------------
@@ -303,9 +320,16 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     // pinned state has to be re-applied or the button would silently lie.
     if (s_forced) binder.debugForceAll(FORCED[s_forced], true);
 
+    lv_mem_monitor(&mon);
+    const uint32_t used  = mon.total_size - mon.free_size;
+    const uint8_t  cards = s_page->count();
+    const int32_t  delta = (int32_t)used - (int32_t)s_lvBefore;
+    Serial.printf("[Cards] %u cards, lv_mem %u -> %u (%+ld, %ld B/card), frag %u%%\n",
+                  (unsigned)cards, (unsigned)s_lvBefore, (unsigned)used,
+                  (long)delta, cards ? (long)(delta / cards) : 0L,
+                  (unsigned)mon.frag_pct);
+
     lv_screen_load(s_screen);
-    if (oldPage) delete oldPage;      // unregisters its cards from the binder
-    if (old)     lv_obj_delete(old);
 }
 
 } // namespace CardDemo

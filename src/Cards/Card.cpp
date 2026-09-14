@@ -105,16 +105,28 @@ void Card::resolveVariant() {
 
     const UIType    &t = UI::type();
     const UIMetrics &m = UI::met();
+    const UIGrid    &g = UI::grid();
 
-    lv_obj_update_layout(_root);
-    int32_t h = lv_obj_get_height(_surface);
-    if (h <= 0) h = UI::grid().cellH;          // before layout; close enough
+    // DERIVED FROM THE TOKENS, not measured off the widget.
+    //
+    // It used to call lv_obj_update_layout() and read the surface's height -
+    // and got LVGL's default object size, because resolveVariant() runs from
+    // build() and a card has no grid cell until placeCard() a moment later.
+    // On WS_P4_5 that default is ~92 px against a real cell of 264, so every
+    // card on the fleet's largest panel went compact and lost its name and
+    // status row. The owner's report of "no text under the icons" was that.
+    //
+    // The cell height is knowable without asking LVGL anything: the grid
+    // derived it, and the card knows its own row span.
+    int32_t h = (int32_t)g.cellH * (_place.prefSpanY ? _place.prefSpanY : 1);
+    if (_place.prefSpanY > 1) h += UI::sc(g.GAP) * (_place.prefSpanY - 1);
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
 
-    // What a full layout needs vertically. The header strip only counts when
-    // it is inside the card - a tag costs the body nothing.
-    int32_t need = lv_font_get_line_height(t.NAME)    // title row
-                 + lv_font_get_line_height(t.VALUE)   // the hero
-                 + lv_font_get_line_height(t.TAG)     // the optional row
+    // What a full layout needs: a title row, the hero, and an optional row,
+    // plus the padding between them.
+    int32_t need = lv_font_get_line_height(t.NAME)
+                 + lv_font_get_line_height(t.VALUE)
+                 + lv_font_get_line_height(t.TAG)
                  + UI::sc(m.PAD) * 3;
     if (_hdrStyle == CardHeaderStyle::HDR_BAR) need += Card::headerHeight();
 
@@ -141,28 +153,64 @@ void Card::onLongPress() {
 void Card::build(lv_obj_t *parent) {
     const UIMetrics &m = UI::met();
 
-    // THE CARD IS THE SAME SIZE AND SHAPE IN ALL THREE MODES.
+    // THE TAG LIVES INSIDE THE CELL, above the card. It used to hang outside
+    // it, and it never once appeared on hardware.
     //
-    // The owner's rule, stated more than once because it is the thing two
-    // earlier attempts broke: "the cards must not differ in shape or size
-    // because of the tag". The surface fills the whole cell, always. A tag
-    // hangs outside it, into clearance the PAGE carves from the row gap.
+    // LV_OBJ_FLAG_OVERFLOW_VISIBLE stops a card's own root clipping its
+    // children - but the GRID CONTAINER above it clips too, and that one is
+    // scrollable, so anything drawn above a cell was cut away. All that showed
+    // was the two-pixel overlap, and only once a paused card went translucent
+    // enough to see through. Escaping two levels of clipping to sit in a gap
+    // the page had to be widened to create was a lot of machinery for a thing
+    // that cannot be made to work reliably.
+    //
+    // A flex column inside the cell gets the same result with none of it:
+    //
+    //     [ tag row   ]  headerHeight(), only in HDR_TAG
+    //     [ surface   ]  everything else, flex_grow 1
+    //
+    // The card is shorter by exactly the tag's height, every card in the mode
+    // takes that same height, and the space between a tag and the card above
+    // it is the page's ordinary row gap - which is precisely the owner's rule,
+    // now satisfied by construction rather than by arithmetic. CardPage no
+    // longer widens anything.
     _root = lv_obj_create(parent);
     lv_obj_set_style_bg_opa       (_root, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (_root, 0, 0);
     lv_obj_set_style_pad_all      (_root, 0, 0);
+    lv_obj_set_style_pad_gap      (_root, 0, 0);
+    lv_obj_set_flex_flow          (_root, LV_FLEX_FLOW_COLUMN);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_CLICKABLE);
-    // Without this LVGL clips the tag away and it simply is not there.
-    lv_obj_add_flag               (_root, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG) {
+        _tagRow = lv_obj_create(_root);
+        lv_obj_set_width              (_tagRow, lv_pct(100));
+        lv_obj_set_height             (_tagRow, Card::headerHeight());
+        lv_obj_set_style_bg_opa       (_tagRow, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width (_tagRow, 0, 0);
+        lv_obj_set_style_pad_all      (_tagRow, 0, 0);
+        lv_obj_clear_flag             (_tagRow, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_clear_flag             (_tagRow, LV_OBJ_FLAG_CLICKABLE);
+    }
 
     _surface = lv_obj_create(_root);
-    lv_obj_set_size               (_surface, lv_pct(100), lv_pct(100));
+    lv_obj_set_width              (_surface, lv_pct(100));
+    lv_obj_set_flex_grow          (_surface, 1);
     lv_obj_set_style_pad_all      (_surface, 0, 0);   // the body owns padding
     lv_obj_clear_flag             (_surface, LV_OBJ_FLAG_SCROLLABLE);
-    // An edge-to-edge band with square corners would otherwise draw little
-    // rectangular ears over the card's rounded top corners.
-    lv_obj_set_style_clip_corner  (_surface, true, 0);
+
+    // CLIP_CORNER ONLY WHERE SOMETHING ACTUALLY NEEDS CLIPPING.
+    //
+    // It forces LVGL to render the whole card to an intermediate LAYER so it
+    // can mask the rounded corners - and a layer is a buffer allocation, per
+    // card, per frame. With a page rebuilt while the old one is still alive
+    // that is thirty-six allocations, and the P4 filled its draw buffers and
+    // spewed "lv_draw_layer_alloc_buf: Allocating layer buffer failed" until
+    // it was reset. Only an edge-to-edge header band needs it.
+    if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
+        lv_obj_set_style_clip_corner(_surface, true, 0);
+    }
 
     // LVGL fires LV_EVENT_SHORT_CLICKED for a tap and LV_EVENT_LONG_PRESSED
     // once the press passes its threshold. CLICKED is deliberately not used:
@@ -180,17 +228,6 @@ void Card::build(lv_obj_t *parent) {
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_CLICKABLE);
-
-    // ONLY HDR_BAR reserves a strip, and that is the whole trade between the
-    // three modes:
-    //
-    //   HDR_BAR   the band is part of the card, so it costs the body a strip
-    //   HDR_TAG   the tags are outside the card, so the body keeps everything
-    //   HDR_NONE  shows no area at all, so there is nothing to reserve for -
-    //             its STALE marker floats over the top-right corner instead
-    //
-    // The bar's strip is reserved whether or not there is anything in it right
-    // now, so a card's contents do not jump when it goes stale.
     if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
         lv_obj_set_style_pad_top(_body, Card::headerHeight() + UI::sc(m.PAD), 0);
     }
@@ -218,50 +255,32 @@ void Card::buildHeader() {
     const bool tag = (_hdrStyle == CardHeaderStyle::HDR_TAG);
 
     // HDR_NONE builds no area holder at all. The owner was explicit: "no header
-    // mode: Area is not displayed." It is not a hidden label or an empty strip
-    // - there is nowhere in that mode for an area to go, which is what makes it
-    // the mode you pick when you do not want one.
+    // mode: Area is not displayed." There is nowhere in that mode for an area
+    // to go, which is what makes it the mode you pick when you do not want one.
     if (_hdrStyle == CardHeaderStyle::HDR_NONE) {
-        // A floating badge over the card's top-right corner, inset from the
-        // rounded edge rather than jammed against it. Transient, so it takes no
-        // permanent space - which is why this mode gives the body the whole card.
         _badge = lv_label_create(_surface);
         lv_obj_align   (_badge, LV_ALIGN_TOP_RIGHT, -UI::sc(6), UI::sc(6));
         lv_obj_add_flag(_badge, LV_OBJ_FLAG_HIDDEN);
         return;
     }
 
-    // A tag parents to the CELL; a bar parents to the CARD. That single line is
-    // the entire structural difference between the two.
-    _header = makeStrip(tag ? _root : _surface);
+    // A tag's pills sit in the row above the card; a bar sits inside it.
+    _header = makeStrip(tag ? _tagRow : _surface);
 
     if (tag) {
-        // Sized to its own text and lifted clear of the card by its own
-        // height, less a couple of pixels. That overlap is what makes it read
-        // as attached to the card rather than floating above it.
-        lv_obj_set_width      (_header, LV_SIZE_CONTENT);
-        lv_obj_align          (_header, LV_ALIGN_TOP_LEFT, UI::sc(8),
-                               -Card::headerHeight() + UI::sc(2));
-        // Behind the card, so the card's own edge draws over the pill's bottom
-        // and the two read as one shape.
-        lv_obj_move_background(_header);
+        lv_obj_set_width (_header, LV_SIZE_CONTENT);
+        lv_obj_align     (_header, LV_ALIGN_BOTTOM_LEFT, UI::sc(6), 0);
 
-        // The STALE marker gets its own pill at the other end. In the two
-        // in-card modes it is just the right-hand end of the same strip; here
-        // there is no shared strip to sit in, because the card does not own
-        // this space at all.
-        _stale = makeStrip(_root);
-        lv_obj_set_width      (_stale, LV_SIZE_CONTENT);
-        lv_obj_align          (_stale, LV_ALIGN_TOP_RIGHT, -UI::sc(8),
-                               -Card::headerHeight() + UI::sc(2));
-        lv_obj_move_background(_stale);
+        // The STALE marker gets its own pill at the other end of the same row.
+        _stale = makeStrip(_tagRow);
+        lv_obj_set_width (_stale, LV_SIZE_CONTENT);
+        lv_obj_align     (_stale, LV_ALIGN_BOTTOM_RIGHT, -UI::sc(6), 0);
     } else {
-        lv_obj_set_width  (_header, lv_pct(100));
-        lv_obj_align      (_header, LV_ALIGN_TOP_MID, 0, 0);
+        lv_obj_set_width (_header, lv_pct(100));
+        lv_obj_align     (_header, LV_ALIGN_TOP_MID, 0, 0);
     }
 
-    // Area left, STALE right - fixed in every mode, per cards.md section 2,
-    // and the degenerate two-slot case of 2.8's configurable slot list.
+    // Area left, STALE right - fixed in every mode, per cards.md section 2.
     _lblArea = lv_label_create(_header);
     lv_label_set_long_mode(_lblArea, LV_LABEL_LONG_DOT);
     lv_obj_align (_lblArea, LV_ALIGN_LEFT_MID, 0, 0);
@@ -284,7 +303,8 @@ void Card::restyle() {
     const UIPalette &p = UI::pal();
     const UIMetrics &m = UI::met();
 
-    lv_obj_set_style_bg_color     (_surface, UI::c(p.SURFACE), 0);
+    const uint32_t surf = _dimmed ? UI::mix(p.SURFACE, p.GROUND, 55) : p.SURFACE;
+    lv_obj_set_style_bg_color     (_surface, UI::c(surf), 0);
     lv_obj_set_style_bg_opa       (_surface, LV_OPA_COVER, 0);
     lv_obj_set_style_radius       (_surface, UI::sc(m.RADIUS), 0);
     lv_obj_set_style_border_width (_surface, m.BORDER_W, 0);
@@ -348,7 +368,12 @@ void Card::applyState() {
     // Staleness NEVER dims - cards.md section 3 rejects it outright, because a
     // dimmed card is easy to miss and stale data has to be conspicuous. Pause
     // is the one state that may go quiet, because it is the user's own choice.
-    lv_obj_set_style_opa(_root, cardStateMayDim(_state) ? LV_OPA_40 : LV_OPA_COVER, 0);
+    //
+    // Dimmed by MIXING toward the ground rather than by setting an opa. An opa
+    // below LV_OPA_COVER on a container makes LVGL render that whole subtree to
+    // an intermediate layer buffer, and on a page of cards those allocations
+    // are what exhausted the P4's draw buffers.
+    _dimmed = cardStateMayDim(_state);
 
     const char *mark = "";
     switch (_state) {
@@ -395,15 +420,27 @@ void Card::applyState() {
         if (wantArea) lv_obj_clear_flag(_header, LV_OBJ_FLAG_HIDDEN);
         else          lv_obj_add_flag  (_header, LV_OBJ_FLAG_HIDDEN);
     } else {
-        // HDR_BAR. The whole band takes the state colour, so it reads as the
-        // warning rather than just the word inside it.
-        lv_obj_set_style_bg_color  (_header, UI::c(tc ? tc : p.ACCENT), 0);
+        // HDR_BAR. The band keeps the ACCENT and only the BADGE takes the state
+        // colour - the owner's call after seeing a whole header go yellow:
+        // "instead of the entire bar changing color only the badge section
+        // should turn yellow around STALE".
+        lv_obj_set_style_bg_color  (_header, UI::c(p.ACCENT), 0);
         lv_obj_set_style_bg_opa    (_header, LV_OPA_COVER, 0);
         lv_obj_set_style_radius    (_header, 0, 0);
         // Text in the card's BACKGROUND colour - dark on a light accent, light
         // on a dark one, without anyone picking per scheme. cards.md section 2.
         lv_obj_set_style_text_color(_lblArea, UI::c(p.SURFACE), 0);
-        lv_obj_set_style_text_color(_badge,   UI::c(p.SURFACE), 0);
+        // The badge carries the state, as its own chip inside the band.
+        if (tc) {
+            lv_obj_set_style_bg_color  (_badge, UI::c(tc), 0);
+            lv_obj_set_style_bg_opa    (_badge, LV_OPA_COVER, 0);
+            lv_obj_set_style_radius    (_badge, UI::sc(m.RADIUS / 2), 0);
+            lv_obj_set_style_pad_hor   (_badge, UI::sc(5), 0);
+            lv_obj_set_style_text_color(_badge, UI::c(p.SURFACE), 0);
+        } else {
+            lv_obj_set_style_bg_opa    (_badge, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_text_color(_badge, UI::c(p.SURFACE), 0);
+        }
         // The band stays even when empty: it is part of the card's shape in
         // this mode, and appearing only sometimes would be worse than blank.
         lv_obj_clear_flag(_header, LV_OBJ_FLAG_HIDDEN);
@@ -441,14 +478,21 @@ void Card::applyDiagonal() {
         lv_obj_clear_flag(_diagonal, LV_OBJ_FLAG_CLICKABLE);
     }
 
-    // The surface's size comes from a percentage of a grid cell, so it is not
-    // known until layout has run - and applyState() is reached from build()
-    // before that has happened. Without this the first diagonal on a page
-    // would be a zero-length point.
-    lv_obj_update_layout(_surface);
+    // Sized from the TOKENS rather than by measuring, for the same reason
+    // resolveVariant() is: a card has no cell when this first runs, and
+    // lv_obj_update_layout() here walked the whole screen once per card per
+    // repaint. The line is redrawn on the next restyle anyway.
+    const UIGrid &g = UI::grid();
+    int32_t w = (int32_t)g.cellW * (_place.prefSpanX ? _place.prefSpanX : 1);
+    int32_t h = (int32_t)g.cellH * (_place.prefSpanY ? _place.prefSpanY : 1);
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+    const int32_t mw = lv_obj_get_width(_surface);
+    const int32_t mh = lv_obj_get_height(_surface);
+    if (mw > 8) w = mw;
+    if (mh > 8) h = mh;
 
-    _diagPts[1].x = lv_obj_get_width(_surface);
-    _diagPts[1].y = lv_obj_get_height(_surface);
+    _diagPts[1].x = w;
+    _diagPts[1].y = h;
     lv_line_set_points            (_diagonal, _diagPts, 2);
     lv_obj_align                  (_diagonal, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_obj_set_style_line_width   (_diagonal, UI::sc(6), 0);
@@ -481,21 +525,25 @@ CardState Card::deriveState(uint32_t nowMs) const {
     // parent reflects where its children ARE, not the path they took to get
     // there, and reading Entity::cmdFailed makes that true by construction:
     // every card bound to an entity reads the identical fact.
-    uint8_t failed = 0, resolved = 0;
+    uint8_t failed = 0, commandable = 0;
     for (uint8_t i = 0; i < _nPrimary; i++) {
         const Entity *e = _primary[i];
         if (!e || !e->desc.writable) continue;
-        if (e->pending) continue;          // still in flight; no verdict yet
-        resolved++;
-        if (e->cmdFailed) failed++;
+        commandable++;                     // counted whether or not it resolved
+        if (!e->pending && e->cmdFailed) failed++;
     }
     if (failed) {
         // Every child that has an answer failed -> the card itself failed.
         // Some but not all -> the body is still telling the truth about the
         // children, so only the tag changes. cards.md and the owner agree on
         // this one from opposite directions.
-        return (failed == resolved) ? CardState::ST_REFUSED
-                                    : CardState::ST_PARTIAL;
+        // Against EVERY commandable child, not just the resolved ones. While
+        // one child is still in flight the only child with a verdict may be a
+        // failed one, and comparing against the resolved subset made a
+        // two-switch card flash FAILED for a second on its way to PARTIAL -
+        // exactly what the owner saw tapping Obeys while Ignores was failed.
+        return (failed == commandable) ? CardState::ST_REFUSED
+                                       : CardState::ST_PARTIAL;
     }
 
     CardState worst = CardState::ST_LIVE;

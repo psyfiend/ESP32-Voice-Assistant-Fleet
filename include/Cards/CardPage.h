@@ -73,6 +73,11 @@ private:
     // real rows that scroll into view, not overflow.
     void ensureRows(uint8_t need);
 
+    // Dry-run of placeCard()'s cursor arithmetic: would this card land on a
+    // row the page actually has? A page does not scroll, so one that would not
+    // is never built.
+    bool fits(const Card *c) const;
+
     lv_obj_t   *_root   = nullptr;
     CardBinder *_binder = nullptr;
     Card       *_cards[CARD_PAGE_MAX] = {nullptr};
@@ -97,6 +102,7 @@ private:
 
     uint8_t    _rowsDefined = 0;   // entries currently valid in _rowDsc
     uint16_t   _cellH       = 0;   // the token height every row gets
+    uint8_t    _maxRows     = 1;   // rows that FIT. Nothing is placed past them
 
     // The cursor placement walks. Rows are unbounded - a page taller than the
     // viewport scrolls, which is why every container here goes through

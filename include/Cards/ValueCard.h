@@ -60,7 +60,8 @@ private:
     lv_obj_t *_unit     = nullptr;
 
     // The two bottom corners, independently present or absent.
-    lv_obj_t *_battery  = nullptr;   // bottom-left, with its own glyph
+    lv_obj_t *_battIcon = nullptr;   // bottom-left glyph, in the ICON face
+    lv_obj_t *_battery  = nullptr;   // its percentage, in the TEXT face
     lv_obj_t *_seen     = nullptr;   // bottom-right
 };
 
