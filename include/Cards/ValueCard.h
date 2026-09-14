@@ -51,9 +51,8 @@ private:
     // positioning that needed a layout pass which had not run yet - the name
     // wrapped mid-word and the unit landed beside it instead of beside the
     // number. See the .cpp for the specific trap in each case.
-    lv_obj_t *_titleRow = nullptr;   // icon + name, one line
-    lv_obj_t *_icon     = nullptr;
-    lv_obj_t *_name     = nullptr;
+    lv_obj_t *_icon     = nullptr;   // alone, top-left
+    lv_obj_t *_name     = nullptr;   // centred UNDER the value - see the .cpp
 
     lv_obj_t *_valueRow = nullptr;   // value + unit, bottom-aligned
     lv_obj_t *_value    = nullptr;

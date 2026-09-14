@@ -87,8 +87,12 @@ const UIPalette UI_PAL_MIDNIGHT = {
 const UIMetrics UI_MET_DARK  = {
     .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 8, .HEADER_H = 14
 };
+// The light scheme leaned entirely on its shadow and drew no border at all,
+// which on glass left the owner asking whether one was even there. A hairline
+// derived from the surface toward BLACK - UI::border() picks the direction from
+// the surface's own lightness - gives the card an edge without a hard outline.
 const UIMetrics UI_MET_LIGHT = {
-    .RADIUS = 12, .PAD = 5, .BORDER_W = 0, .BORDER_OPA_PCT = 0,  .SHADOW = 8, .HEADER_H = 14
+    .RADIUS = 12, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 14, .SHADOW = 8, .HEADER_H = 14
 };
 
 // ---------------------------------------------------------------------------

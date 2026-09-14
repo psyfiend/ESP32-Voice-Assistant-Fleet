@@ -268,13 +268,16 @@ void Card::buildHeader() {
     _header = makeStrip(tag ? _tagRow : _surface);
 
     if (tag) {
+        // FLUSH with the card's left edge. They were inset and crowded each
+        // other in the middle; the owner wants them "at the side edges of the
+        // cards... and push inwards depending on width".
         lv_obj_set_width (_header, LV_SIZE_CONTENT);
-        lv_obj_align     (_header, LV_ALIGN_BOTTOM_LEFT, UI::sc(6), 0);
+        lv_obj_align     (_header, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 
         // The STALE marker gets its own pill at the other end of the same row.
         _stale = makeStrip(_tagRow);
         lv_obj_set_width (_stale, LV_SIZE_CONTENT);
-        lv_obj_align     (_stale, LV_ALIGN_BOTTOM_RIGHT, -UI::sc(6), 0);
+        lv_obj_align     (_stale, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
     } else {
         lv_obj_set_width (_header, lv_pct(100));
         lv_obj_align     (_header, LV_ALIGN_TOP_MID, 0, 0);
@@ -352,8 +355,12 @@ uint32_t Card::tagColor() const {
         case CardState::ST_LONG_STALE: return p.ST_WARN;
         case CardState::ST_PARTIAL:    return p.ST_WARN;
         case CardState::ST_REFUSED:    return p.ST_BAD;
-        case CardState::ST_LIVE:
-        case CardState::ST_PAUSED:     return 0;
+        // Paused gets a colour of its own - muted, because the state means
+        // "the user asked for quiet", but a colour nonetheless. Returning 0
+        // meant its badge got no chip in bar mode and was painted the same
+        // hue as the band it sat in, so it did not read as a badge at all.
+        case CardState::ST_PAUSED:     return p.ST_IDLE;
+        case CardState::ST_LIVE:       return 0;
     }
     return 0;
 }
@@ -373,7 +380,13 @@ void Card::applyState() {
     // below LV_OPA_COVER on a container makes LVGL render that whole subtree to
     // an intermediate layer buffer, and on a page of cards those allocations
     // are what exhausted the P4's draw buffers.
+    // APPLIED HERE, not in restyle(). Setting the flag and leaving the colour
+    // to restyle() meant a paused card never actually dimmed: applyState()
+    // runs on every transition, restyle() only on a scheme change. That is the
+    // regression the owner spotted - "cards no longer dim when paused".
     _dimmed = cardStateMayDim(_state);
+    lv_obj_set_style_bg_color(_surface,
+        UI::c(_dimmed ? UI::mix(p.SURFACE, p.GROUND, 55) : p.SURFACE), 0);
 
     const char *mark = "";
     switch (_state) {
@@ -430,7 +443,8 @@ void Card::applyState() {
         // Text in the card's BACKGROUND colour - dark on a light accent, light
         // on a dark one, without anyone picking per scheme. cards.md section 2.
         lv_obj_set_style_text_color(_lblArea, UI::c(p.SURFACE), 0);
-        // The badge carries the state, as its own chip inside the band.
+        // The badge carries the state, as its own chip inside the band - and
+        // now for every state that has a colour, paused included.
         if (tc) {
             lv_obj_set_style_bg_color  (_badge, UI::c(tc), 0);
             lv_obj_set_style_bg_opa    (_badge, LV_OPA_COVER, 0);
@@ -491,8 +505,18 @@ void Card::applyDiagonal() {
     if (mw > 8) w = mw;
     if (mh > 8) h = mh;
 
-    _diagPts[1].x = w;
-    _diagPts[1].y = h;
+    // INSET BY HALF THE LINE WIDTH, at both ends.
+    //
+    // A rounded cap extends half the stroke past its endpoint, so a line drawn
+    // corner to corner pokes out of both corners - which only bar mode hid,
+    // because that is the one mode with clip_corner turned on. Everywhere else
+    // it hung outside the card. Clipping would have been the expensive fix;
+    // drawing it the right length is free.
+    const int32_t half = UI::sc(3);
+    _diagPts[0].x = half;
+    _diagPts[0].y = half;
+    _diagPts[1].x = w - half;
+    _diagPts[1].y = h - half;
     lv_line_set_points            (_diagonal, _diagPts, 2);
     lv_obj_align                  (_diagonal, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_obj_set_style_line_width   (_diagonal, UI::sc(6), 0);

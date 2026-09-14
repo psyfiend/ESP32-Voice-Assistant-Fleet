@@ -151,7 +151,17 @@ bool EntityRegistry::setValue(const char *id, const EntityValue &v, uint32_t now
     // that actively reported it stayed put both report the old value, and both
     // mean the same thing to whoever is looking at the screen.
     if (wasPending) {
-        e.cmdFailed = v.equals(e.prevValue);
+        // Compared against what we OPTIMISTICALLY APPLIED, which is e.value at
+        // this moment, not against prevValue.
+        //
+        // prevValue is the state from before the FIRST command in a burst - it
+        // is deliberately not overwritten by a second command inside the same
+        // window, so the revert cannot restore a state the hardware never had.
+        // That makes it the wrong baseline for "did this take": tap a switch
+        // twice quickly and the value legitimately returns to prevValue, and
+        // comparing against it declared a perfectly successful command failed.
+        // That is the residual "Obeys can still show FAILED" case.
+        e.cmdFailed = !v.equals(e.value);
     } else if (changed) {
         // An unsolicited change means we now know the current state, so an
         // older failure is history rather than news.

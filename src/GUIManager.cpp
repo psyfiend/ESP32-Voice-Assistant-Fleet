@@ -131,6 +131,10 @@ void GUIManager::begin() {
         CardDemo::show(_core.entities(), _binder);
     });
 
+    // The card page's own Dump button runs the same report the System panel's
+    // does, Serial echo and all.
+    CardDemo::setDumpHandler([this]() { SystemReport::run(_core, true); });
+
     // Contribute the one LVGL-dependent section of the report.
     SystemReport::addSection("UI STATE", reportUiSection);
 

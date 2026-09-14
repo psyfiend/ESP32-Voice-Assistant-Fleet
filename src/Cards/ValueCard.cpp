@@ -6,33 +6,21 @@
 #include <string.h>
 
 void ValueCard::buildBody(lv_obj_t *body) {
-    // --- Title row: icon then name, on ONE line ---------------------------
+    // THE NAME SITS UNDER THE VALUE, not beside the icon.
     //
-    // A flex row rather than two aligned labels. The previous version measured
-    // the icon and positioned the name from it by hand, which needed a layout
-    // pass that had not happened yet - so the name landed at the wrong x, and
-    // with no height set LV_LABEL_LONG_DOT wrapped instead of ellipsising.
-    // "Deck" came out as "Dec / k" on a card 230 px wide. Flex does the
-    // measuring, and it does it after layout rather than during render.
-    _titleRow = lv_obj_create(body);
-    lv_obj_set_width              (_titleRow, lv_pct(100));
-    lv_obj_set_height             (_titleRow, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow          (_titleRow, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align         (_titleRow, LV_FLEX_ALIGN_START,
-                                   LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_bg_opa       (_titleRow, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width (_titleRow, 0, 0);
-    lv_obj_set_style_pad_all      (_titleRow, 0, 0);
-    lv_obj_clear_flag             (_titleRow, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_clear_flag             (_titleRow, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_align                  (_titleRow, LV_ALIGN_TOP_LEFT, 0, 0);
+    // The owner's call after seeing both layouts on glass: a state card puts
+    // its name under its icon, and "it's simply much more consistent that way".
+    // It also frees the top-right corner, which is where HDR_NONE parks its
+    // floating STALE badge - the two used to collide.
+    //
+    // So the icon is alone at the top-left, and the name is centred at the
+    // bottom above whatever the status corners are using.
+    _icon = lv_label_create(body);
+    lv_obj_align(_icon, LV_ALIGN_TOP_LEFT, 0, 0);
 
-    _icon = lv_label_create(_titleRow);
-
-    _name = lv_label_create(_titleRow);
-    lv_label_set_long_mode(_name, LV_LABEL_LONG_DOT);
-    lv_obj_set_flex_grow  (_name, 1);   // takes the rest of the row, so DOT
-                                        // has a real width to ellipsise against
+    _name = lv_label_create(body);
+    lv_label_set_long_mode     (_name, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_align(_name, LV_TEXT_ALIGN_CENTER, 0);
 
     // --- Value and unit, as one centred group -----------------------------
     //
@@ -56,7 +44,7 @@ void ValueCard::buildBody(lv_obj_t *body) {
     lv_obj_set_style_pad_gap      (_valueRow, UI::sc(3), 0);
     lv_obj_clear_flag             (_valueRow, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_valueRow, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_center                 (_valueRow);
+    lv_obj_center                 (_valueRow);   // nudged in render()
 
     _value = lv_label_create(_valueRow);
     _unit  = lv_label_create(_valueRow);
@@ -90,7 +78,6 @@ void ValueCard::render() {
     lv_label_set_text          (_icon, cardIconFor(e->desc));
     lv_obj_set_style_text_font (_icon, t.ICON_SM, 0);
     lv_obj_set_style_text_color(_icon, UI::c(cardTintFor(e->desc)), 0);
-    lv_obj_set_style_pad_right (_icon, UI::sc(5), 0);
 
     // --- Name, which is the LOCATION --------------------------------------
     lv_label_set_text          (_name, label());
@@ -116,6 +103,21 @@ void ValueCard::render() {
     } else {
         lv_obj_add_flag            (_unit, LV_OBJ_FLAG_HIDDEN);
     }
+
+    // --- Place the name, and lift the value to make room for it -----------
+    //
+    // Both measured AFTER their text is set, which is the whole reason this
+    // lives in render() rather than buildBody().
+    lv_obj_t *par = lv_obj_get_parent(_name);
+    lv_obj_update_layout(par);
+    lv_obj_set_width(_name, lv_obj_get_content_width(par));
+
+    const bool compact  = (variant() == CardVariant::VAR_COMPACT);
+    const int32_t nameH = lv_font_get_line_height(t.NAME);
+    const int32_t statH = compact ? 0 : lv_font_get_line_height(t.TAG) + UI::sc(2);
+
+    lv_obj_align(_name,     LV_ALIGN_BOTTOM_MID, 0, -statH);
+    lv_obj_align(_valueRow, LV_ALIGN_CENTER,     0, -(nameH + statH) / 2);
 
     // --- The two status corners, which COMPACT does not have room for -----
     //

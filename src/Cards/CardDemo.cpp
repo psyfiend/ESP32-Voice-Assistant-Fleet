@@ -7,6 +7,7 @@
 #include "ExternalEntities.h"
 #include "VirtualEntities.h"
 #include <Arduino.h>
+#include <functional>
 
 namespace {
 
@@ -59,6 +60,10 @@ const char *FORCED_LABEL[] = { "Live", "Stale", "Long", "Failed", "Partial", "Pa
 // static array in internal DRAM and the system heap barely moves.
 uint32_t s_lvBefore = 0;
 lv_obj_t *s_btnState = nullptr;
+
+// Set by GUIManager. The card page cannot reach SystemCore, and the full
+// report needs it.
+std::function<void()> s_onDump = nullptr;
 
 lv_obj_t *topButton(lv_obj_t *parent, const char *text, lv_event_cb_t cb) {
     lv_obj_t *b = lv_button_create(parent);
@@ -137,6 +142,8 @@ const Entity *ent(const char *id) { return s_reg ? s_reg->find(id) : nullptr; }
 
 namespace CardDemo {
 
+void setDumpHandler(std::function<void()> cb) { s_onDump = cb; }
+
 void close() {
     if (s_previous) lv_screen_load(s_previous);
     if (s_page)   { delete s_page;          s_page = nullptr; }
@@ -181,9 +188,13 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     //
     // The cost is a frame of the dashboard with no cards on it. The
     // alternative is a board that reboots when you press a button.
+    // Load the previous screen BEFORE deleting this one. Deleting the active
+    // screen and then replacing it works, but LVGL rightly complains about it
+    // every time ("lv_obj_delete: the active screen was deleted"), and a log
+    // full of warnings that are fine is how a real one gets missed.
+    if (s_previous) lv_screen_load(s_previous);
     if (s_page)   { delete s_page;           s_page   = nullptr; }
     if (s_screen) { lv_obj_delete(s_screen); s_screen = nullptr; }
-    if (s_previous) lv_screen_load(s_previous);
 
     lv_mem_monitor_t mon;
     lv_mem_monitor(&mon);
@@ -206,15 +217,20 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     lv_obj_t *bar = lv_obj_create(col);
     lv_obj_set_width              (bar, lv_pct(100));
     lv_obj_set_height             (bar, LV_SIZE_CONTENT);
-    // WRAPS. Six buttons ran off the right edge of the 3248's 320 px screen,
-    // so its state and fill controls were simply unreachable and the report
-    // that came back could not cover them.
-    lv_obj_set_flex_flow          (bar, LV_FLEX_FLOW_ROW_WRAP);
+    // ONE ROW THAT SCROLLS SIDEWAYS, rather than wrapping onto two.
+    //
+    // Wrapping made every button reachable on the 3248's 320 px screen, but it
+    // cost a second row of chrome - and on a 2x3 grid that is a third of the
+    // page, which is why only four cards survived there. Scrolling keeps the
+    // buttons full size and gives the row back to the grid. This is demo
+    // chrome; a real page has none of it.
+    lv_obj_set_flex_flow          (bar, LV_FLEX_FLOW_ROW);
+    lv_obj_set_scroll_dir         (bar, LV_DIR_HOR);
+    lv_obj_set_scrollbar_mode     (bar, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_style_bg_opa       (bar, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (bar, 0, 0);
     lv_obj_set_style_pad_all      (bar, UI::sc(6), 0);
     lv_obj_set_style_pad_gap      (bar, UI::sc(6), 0);
-    lv_obj_clear_flag             (bar, LV_OBJ_FLAG_SCROLLABLE);
 
     topButton(bar, LV_SYMBOL_LEFT " Back", backCb);
     topButton(bar, UI::pal().name, schemeCb);
@@ -227,7 +243,12 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     // and the CARDS section of that report is where spans and variants live.
     topButton(bar, "Dump", [](lv_event_t *e) {
         (void)e;
-        if (s_page) s_page->report();
+        // Through the registered handler, which runs the whole report with
+        // Serial echo ON. Calling s_page->report() straight only reached the
+        // System panel's sink - SystemReport::line() mirrors to Serial only
+        // during a run() that asked for it, so the button looked dead.
+        if (s_onDump) s_onDump();
+        else if (s_page) s_page->report();
     });
 
     // --- The grid ---------------------------------------------------------

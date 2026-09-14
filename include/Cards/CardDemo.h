@@ -4,6 +4,7 @@
 
 #include "EntityRegistry.h"
 #include "Cards/CardBinder.h"
+#include <functional>
 
 // ---------------------------------------------------------------------------
 // CardDemo - milestone 2.4's acceptance criterion, on the actual glass.
@@ -33,6 +34,11 @@
 namespace CardDemo {
 
 void show(EntityRegistry &reg, CardBinder &binder);
+
+// What the "Dump" button runs. Registered by GUIManager, for the same reason
+// Panel_System's is: the full System Doctor report needs SystemCore, and this
+// page has no business knowing SystemCore exists.
+void setDumpHandler(std::function<void()> cb);
 void close();
 
 } // namespace CardDemo
