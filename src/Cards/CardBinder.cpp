@@ -36,6 +36,11 @@ void CardBinder::restyleAll() {
     for (uint8_t i = 0; i < _n; i++) if (_cards[i]) _cards[i]->restyle();
 }
 
+void CardBinder::debugForceAll(CardState s, bool force) {
+    for (uint8_t i = 0; i < _n; i++) if (_cards[i]) _cards[i]->debugForceState(s, force);
+    Serial.printf("[Cards] forced state: %s\n", force ? cardStateName(s) : "released");
+}
+
 void CardBinder::timerCb(lv_timer_t *t) {
     CardBinder *self = (CardBinder *)lv_timer_get_user_data(t);
     if (self) self->tick();

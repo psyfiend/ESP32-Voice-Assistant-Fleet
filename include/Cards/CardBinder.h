@@ -54,6 +54,10 @@ public:
     // owns the dashboard, so switching scheme repaints live cards.
     void restyleAll();
 
+    // Testing only: pin every registered card to one state, or release them
+    // all. See Card::debugForceState() for why this exists.
+    void debugForceAll(CardState s, bool force = true);
+
     uint8_t count() const { return _n; }
 
 private:

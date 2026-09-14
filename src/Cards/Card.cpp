@@ -461,8 +461,17 @@ CardState Card::deriveState(uint32_t nowMs) const {
 
 // True when an outstanding command's outcome just became known, so the caller
 // knows it has to repaint the body as well as the chrome.
+void Card::debugForceState(CardState s, bool force) {
+    _forced = force;
+    if (!_root) return;
+    _state = force ? s : deriveState(millis());
+    applyState();
+    render();
+}
+
 void Card::pollState(uint32_t nowMs) {
     if (!_root) return;
+    if (_forced) return;   // pinned by debugForceState()
 
     const CardState next = deriveState(nowMs);
 

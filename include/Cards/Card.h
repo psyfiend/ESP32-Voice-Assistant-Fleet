@@ -137,6 +137,23 @@ public:
 
     virtual const char *typeName() const = 0;
 
+    // --- Testing only -----------------------------------------------------
+    //
+    // Pin this card to a state and stop deriving one. It exists because the
+    // states are otherwise almost impossible to SEE: nothing on a running
+    // panel goes stale inside a test session - the Zigbee entities are on a
+    // 30 minute window and the system ones are refreshed every 5 seconds - and
+    // the long-stale threshold is an hour. Judging five visual treatments
+    // would mean five waits or five builds.
+    //
+    // It overrides the derivation rather than faking the inputs, deliberately:
+    // it is the RENDERING being judged here. Whether a card goes stale at the
+    // right moment is a different question, tested by pulling the sensor's
+    // battery, and no amount of forcing helps with that.
+    //
+    // Pass ST_LIVE with force=false to hand control back.
+    void debugForceState(CardState s, bool force = true);
+
     // Where a commanded value goes. Set once by CardBinder::begin().
     //
     // Static rather than a per-card pointer: there is exactly one registry per
@@ -280,6 +297,7 @@ private:
     uint32_t        _longStaleMs = 0;     // 0 = ask cardLongStaleMs()
     bool            _paused      = false;
     bool            _showArea    = s_showArea;
+    bool            _forced      = false;   // debugForceState()
 
     char _label[ENTITY_NAME_MAX] = {0};
     char _area[ENTITY_SHORT_MAX] = {0};

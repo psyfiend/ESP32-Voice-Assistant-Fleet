@@ -36,11 +36,29 @@ StateCardFill s_actorStyle = StateCardFill::FILL_SURFACE;
 // not appear; the row spacing does not change, so nothing on the page moves.
 bool s_showArea = true;
 
+// Testing: walk every card on the page through each state in turn.
+//
+// 0 is "derive normally"; 1..5 pin all cards to one state so the five visual
+// treatments can be judged side by side, on every card type, in every header
+// mode, in seconds. Without this the only way to see a long-stale card is to
+// wait an hour for one.
+int s_forced = 0;
+const CardState FORCED[] = {
+    CardState::ST_LIVE,        // index 0 is unused - 0 means "release"
+    CardState::ST_STALE,
+    CardState::ST_LONG_STALE,
+    CardState::ST_REFUSED,
+    CardState::ST_PARTIAL,
+    CardState::ST_PAUSED,
+};
+const char *FORCED_LABEL[] = { "Live", "Stale", "Long", "Failed", "Partial", "Paused" };
+
 // Measured across the page build, in LVGL's own pool. ESP.getFreeHeap() is the
 // wrong instrument here and 2.3 established why: LV_USE_STDLIB_MALLOC is
 // LV_STDLIB_BUILTIN with LV_MEM_ADR 0, so every widget comes out of a 128 KB
 // static array in internal DRAM and the system heap barely moves.
 uint32_t s_lvBefore = 0;
+lv_obj_t *s_btnState = nullptr;
 
 lv_obj_t *topButton(lv_obj_t *parent, const char *text, lv_event_cb_t cb) {
     lv_obj_t *b = lv_button_create(parent);
@@ -87,6 +105,19 @@ void areaCb(lv_event_t *e) {
     (void)e;
     s_showArea = !s_showArea;
     CardDemo::show(*s_reg, *s_binder);
+}
+
+void stateCb(lv_event_t *e) {
+    (void)e;
+    s_forced = (s_forced + 1) % 6;
+    // Applied straight to the live cards rather than rebuilding the page: this
+    // is the one control where a rebuild would hide what is being tested,
+    // because a rebuilt card derives its own state again immediately.
+    if (s_binder) s_binder->debugForceAll(FORCED[s_forced], s_forced != 0);
+    if (s_btnState) {
+        lv_obj_t *l = lv_obj_get_child(s_btnState, 0);
+        if (l) lv_label_set_text(l, FORCED_LABEL[s_forced]);
+    }
 }
 
 void headerCb(lv_event_t *e) {
@@ -175,6 +206,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
                  : s_hdr == CardHeaderStyle::HDR_BAR ? "Bar" : "No hdr", headerCb);
     topButton(bar, s_showArea ? "Area on" : "Area off", areaCb);
     topButton(bar, s_actorStyle == StateCardFill::FILL_SURFACE ? "Fill" : "Icon", actorCb);
+    s_btnState = topButton(bar, FORCED_LABEL[s_forced], stateCb);
 
     // --- The grid ---------------------------------------------------------
     lv_obj_t *host = lv_obj_create(col);
@@ -266,6 +298,10 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     // visible rather than described: this card is dim BECAUSE THE USER CHOSE
     // IT, and no stale card anywhere on this page dims.
     place(SYS_ENT_UPTIME, "Paused", nullptr, nullptr, nullptr, true);
+
+    // A rebuild creates fresh cards, which derive their own state - so a
+    // pinned state has to be re-applied or the button would silently lie.
+    if (s_forced) binder.debugForceAll(FORCED[s_forced], true);
 
     lv_screen_load(s_screen);
     if (oldPage) delete oldPage;      // unregisters its cards from the binder
