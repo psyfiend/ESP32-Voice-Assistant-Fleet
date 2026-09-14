@@ -43,7 +43,19 @@ public:
 
     bool discoveryPublished() const { return _discoveryDone; }
 
+    // The firmware version to advertise to Home Assistant.
+    //
+    // INJECTED rather than read from a macro. It used to use FW_VERSION
+    // directly, which only worked because the version was a global -D on every
+    // translation unit in the build - and that global was rebuilding the entire
+    // tree on every commit (issue #46). A component has no business knowing how
+    // the application derives its version; SystemCore owns device identity and
+    // hands it over.
+    void setSwVersion(const char *v) { if (v && *v) _swVersion = v; }
+
 private:
+    const char *_swVersion = "0.0.0";
+
     void publishDiscovery();
     void publishState(const Entity &e, uint8_t idx, uint32_t nowMs);
     bool appendComponent(String &json, const Entity &e, bool first) const;

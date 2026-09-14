@@ -6,6 +6,7 @@
 // FW_VERSION/FW_COMMIT are injected from `git describe` by
 // scripts/fw_version.py; the fallbacks keep the build working if that hook is
 // ever skipped.
+#include "fleet_fw_version.h"
 #ifndef FW_VERSION
     #define FW_VERSION "unknown"
 #endif

@@ -10,6 +10,7 @@
 // `git describe`). Defined defensively here so a build still succeeds if that
 // hook is ever skipped - a missing version string must never break the build,
 // it just becomes unknown. See docs/ROADMAP.md section 3.3.
+#include "fleet_fw_version.h"
 #ifndef FW_VERSION
     #define FW_VERSION "unknown"
 #endif
@@ -90,6 +91,7 @@ bool SystemCore::begin() {
     // --= 8. Providers =--
     // All three need the registry; two of them also need the broker.
     _sysProvider.begin(&_entities, &_conn);
+    _haPub.setSwVersion(FW_VERSION);   // see HaPublisher::setSwVersion
     _haPub.begin(&_entities, &_mqtt);
     _mqttProv.begin(&_entities, &_mqtt);
 
