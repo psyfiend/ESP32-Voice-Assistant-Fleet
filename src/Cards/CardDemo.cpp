@@ -329,7 +329,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     place(VIRT_ENT_STUCK,  "Ignores", nullptr, nullptr, nullptr, false);
     placeGroup(VIRT_ENT_SWITCH, VIRT_ENT_STUCK, "Both");
 
-    place(SYS_ENT_RSSI,   "Signal",    "Panel", nullptr, nullptr, false);
+    place(SYS_ENT_RSSI,   "RSSI",      "Panel", nullptr, nullptr, false);
     place(SYS_ENT_HEAP,   "Free Heap", "Panel", nullptr, &wide,   false);
 
     // Paused, permanently, so the distinction cards.md section 3 insists on is

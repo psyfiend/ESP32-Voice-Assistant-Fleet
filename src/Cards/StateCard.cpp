@@ -6,11 +6,38 @@
 
 StateCardFill StateCard::s_fill = StateCardFill::FILL_SURFACE;
 
+static lv_obj_t *plainCol(lv_obj_t *parent) {
+    lv_obj_t *o = lv_obj_create(parent);
+    lv_obj_set_style_bg_opa       (o, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width (o, 0, 0);
+    lv_obj_set_style_pad_all      (o, 0, 0);
+    lv_obj_clear_flag             (o, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag             (o, LV_OBJ_FLAG_CLICKABLE);
+    return o;
+}
+
 void StateCard::buildBody(lv_obj_t *body) {
-    // The disc. A plain object with a full radius rather than an arc or an
-    // image: it is a circle behind a glyph, and the cheapest thing that draws
-    // a circle in LVGL is a square with radius set past half its side.
-    _disc = lv_obj_create(body);
+    // Same vertical stack as ValueCard, and for the same reason: the disc used
+    // to be centred with a hand-tuned offset and the name aligned to the
+    // bottom, which left a gap the owner described as the icon being too high
+    // and the name too far from it. A column with the disc in a growing middle
+    // puts them together and centres the pair.
+    lv_obj_set_flex_flow (body, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(body, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(body, UI::sc(2), 0);
+
+    _mid = plainCol(body);
+    lv_obj_set_width     (_mid, lv_pct(100));
+    lv_obj_set_flex_grow (_mid, 1);
+    lv_obj_set_flex_flow (_mid, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(_mid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+
+    // A plain object with a full radius rather than an arc or an image: it is
+    // a circle behind a glyph, and the cheapest thing that draws a circle in
+    // LVGL is a square whose radius is set past half its side.
+    _disc = lv_obj_create(_mid);
     lv_obj_clear_flag             (_disc, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_disc, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_border_width (_disc, 0, 0);
@@ -20,16 +47,16 @@ void StateCard::buildBody(lv_obj_t *body) {
     lv_obj_center(_icon);
 
     _name = lv_label_create(body);
-    lv_label_set_long_mode(_name, LV_LABEL_LONG_DOT);
+    lv_label_set_long_mode     (_name, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(_name, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width           (_name, lv_pct(100));
 
-    // TOP-LEFT, not top-right. In HDR_NONE the card's STALE marker is a
-    // floating badge over the top-right corner, and two things fighting for
-    // that corner is the sort of collision you only see once it happens on a
-    // board. The body's top-left is empty on this layout - the disc is centred
-    // and the name is at the bottom - so nothing is displaced.
+    // The not-uniform badge. Top-LEFT, out of the flow, because HDR_NONE parks
+    // its floating STALE badge in the top-right corner and two things fighting
+    // over one corner is a collision you only find on a board.
     _mixed = lv_label_create(body);
-    lv_obj_align(_mixed, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_add_flag(_mixed, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_align   (_mixed, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_obj_add_flag(_mixed, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -73,7 +100,6 @@ void StateCard::render() {
     const int32_t discPx = (iconPx * 9) / 5;
     lv_obj_set_size        (_disc, discPx, discPx);
     lv_obj_set_style_radius(_disc, LV_RADIUS_CIRCLE, 0);
-    lv_obj_align           (_disc, LV_ALIGN_CENTER, 0, -UI::sc(8));
 
     // --- State: the whole surface, not a corner ---------------------------
     //
@@ -90,26 +116,26 @@ void StateCard::render() {
 
     if (isOn && !chrome && fill) {
         // The whole surface. cards.md section 4 as written.
-        lv_obj_set_style_bg_color  (surface(), UI::c(p.ST_ACTIVE), 0);
+        lv_obj_set_style_bg_color  (surface(), UI::c(tone(p.ST_ACTIVE)), 0);
         lv_obj_set_style_bg_opa    (_disc, LV_OPA_20, 0);
-        lv_obj_set_style_bg_color  (_disc, UI::c(p.SURFACE), 0);
-        lv_obj_set_style_text_color(_icon, UI::c(p.SURFACE), 0);
-        lv_obj_set_style_text_color(_name, UI::c(p.SURFACE), 0);
+        lv_obj_set_style_bg_color  (_disc, UI::c(tone(p.SURFACE)), 0);
+        lv_obj_set_style_text_color(_icon, UI::c(tone(p.SURFACE)), 0);
+        lv_obj_set_style_text_color(_name, UI::c(tone(p.SURFACE)), 0);
     } else if (isOn && !chrome) {
         // Only the icon lights, in the state colour, with the disc tinted
         // behind it. The card keeps its own surface, which reads as quieter
         // across a page where several things are on at once.
-        lv_obj_set_style_bg_color  (surface(), UI::c(p.SURFACE), 0);
+        lv_obj_set_style_bg_color  (surface(), UI::c(tone(p.SURFACE)), 0);
         lv_obj_set_style_bg_opa    (_disc, LV_OPA_30, 0);
-        lv_obj_set_style_bg_color  (_disc, UI::c(p.ST_ACTIVE), 0);
-        lv_obj_set_style_text_color(_icon, UI::c(p.ST_ACTIVE), 0);
-        lv_obj_set_style_text_color(_name, UI::c(p.ST_ACTIVE), 0);
+        lv_obj_set_style_bg_color  (_disc, UI::c(tone(p.ST_ACTIVE)), 0);
+        lv_obj_set_style_text_color(_icon, UI::c(tone(p.ST_ACTIVE)), 0);
+        lv_obj_set_style_text_color(_name, UI::c(tone(p.ST_ACTIVE)), 0);
     } else {
-        lv_obj_set_style_bg_color  (surface(), UI::c(p.SURFACE), 0);
+        lv_obj_set_style_bg_color  (surface(), UI::c(tone(p.SURFACE)), 0);
         lv_obj_set_style_bg_opa    (_disc, LV_OPA_COVER, 0);
-        lv_obj_set_style_bg_color  (_disc, UI::c(p.SURFACE_ALT), 0);
-        lv_obj_set_style_text_color(_icon, UI::c(chrome ? chrome : p.ST_IDLE), 0);
-        lv_obj_set_style_text_color(_name, UI::c(p.TEXT), 0);
+        lv_obj_set_style_bg_color  (_disc, UI::c(tone(p.SURFACE_ALT)), 0);
+        lv_obj_set_style_text_color(_icon, UI::c(tone(chrome ? chrome : p.ST_IDLE)), 0);
+        lv_obj_set_style_text_color(_name, UI::c(tone(p.TEXT)), 0);
     }
 
     // --- Icon and name ----------------------------------------------------
@@ -123,7 +149,6 @@ void StateCard::render() {
     const bool compact = (variant() == CardVariant::VAR_COMPACT);
     if (compact) {
         lv_obj_add_flag(_name, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_align   (_disc, LV_ALIGN_CENTER, 0, 0);
     } else {
         lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
     }
@@ -131,18 +156,13 @@ void StateCard::render() {
     lv_label_set_text          (_name, label());
     lv_obj_set_style_text_font (_name, t.NAME, 0);
 
-    lv_obj_t *par = lv_obj_get_parent(_name);
-    lv_obj_update_layout(par);
-    lv_obj_set_width(_name, lv_obj_get_content_width(par));
-    lv_obj_align    (_name, LV_ALIGN_BOTTOM_MID, 0, 0);
-
     // --- Mixed: its own indicator, not a guess ----------------------------
     if (isMixed) {
         char buf[12];
         snprintf(buf, sizeof(buf), "%u/%u", (unsigned)active, (unsigned)total);
         lv_label_set_text          (_mixed, buf);
         lv_obj_set_style_text_font (_mixed, t.TAG, 0);
-        lv_obj_set_style_text_color(_mixed, UI::c(fill && isOn ? p.SURFACE : p.TEXT_DIM), 0);
+        lv_obj_set_style_text_color(_mixed, UI::c(tone(fill && isOn ? p.SURFACE : p.TEXT_DIM)), 0);
         lv_obj_clear_flag          (_mixed, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag            (_mixed, LV_OBJ_FLAG_HIDDEN);

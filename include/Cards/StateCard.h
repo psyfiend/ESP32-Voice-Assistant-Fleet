@@ -93,6 +93,7 @@ private:
 
     static StateCardFill s_fill;
 
+    lv_obj_t *_mid   = nullptr;   // grows; centres the disc
     lv_obj_t *_disc  = nullptr;
     lv_obj_t *_icon  = nullptr;
     lv_obj_t *_name  = nullptr;

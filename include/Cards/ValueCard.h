@@ -47,21 +47,23 @@ protected:
     void render() override;
 
 private:
-    // Two flex rows rather than free-floating labels. Both replaced hand
-    // positioning that needed a layout pass which had not run yet - the name
-    // wrapped mid-word and the unit landed beside it instead of beside the
-    // number. See the .cpp for the specific trap in each case.
-    lv_obj_t *_icon     = nullptr;   // alone, top-left
-    lv_obj_t *_name     = nullptr;   // centred UNDER the value - see the .cpp
+    // A vertical stack. Nothing here is positioned against anything else -
+    // every hand-alignment in the previous version resolved against a position
+    // layout had not computed yet. See the .cpp.
+    lv_obj_t *_topRow    = nullptr;   // the icon, on its own line
+    lv_obj_t *_icon      = nullptr;
 
-    lv_obj_t *_valueRow = nullptr;   // value + unit, bottom-aligned
-    lv_obj_t *_value    = nullptr;
-    lv_obj_t *_unit     = nullptr;
+    lv_obj_t *_mid       = nullptr;   // grows; centres value+name as a group
+    lv_obj_t *_valueRow  = nullptr;   // value + unit, bottom-aligned
+    lv_obj_t *_value     = nullptr;
+    lv_obj_t *_unit      = nullptr;
+    lv_obj_t *_name      = nullptr;   // the LOCATION, under the value
 
-    // The two bottom corners, independently present or absent.
-    lv_obj_t *_battIcon = nullptr;   // bottom-left glyph, in the ICON face
-    lv_obj_t *_battery  = nullptr;   // its percentage, in the TEXT face
-    lv_obj_t *_seen     = nullptr;   // bottom-right
+    lv_obj_t *_statusRow = nullptr;   // battery left, seen right. Absent in COMPACT
+    lv_obj_t *_battGroup = nullptr;
+    lv_obj_t *_battIcon  = nullptr;   // in the ICON face
+    lv_obj_t *_battery   = nullptr;   // its percentage, in the TEXT face
+    lv_obj_t *_seen      = nullptr;
 };
 
 #endif // VALUE_CARD_H

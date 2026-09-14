@@ -249,6 +249,15 @@ protected:
     // own and the subclass should use its normal palette.
     uint32_t stateColor() const;
 
+    // Run every colour a subclass draws through this.
+    //
+    // A paused card goes quiet, and it does so by MIXING toward the ground -
+    // not by setting an opa, which would make LVGL render the card to an
+    // intermediate layer and is what exhausted the P4's draw buffers. Mixing
+    // only the surface dimmed the background and left the text at full
+    // strength, so the card did not read as paused at all.
+    uint32_t tone(uint32_t hex) const;
+
 private:
     void buildHeader();
     void applyState();                 // repaint chrome for _state

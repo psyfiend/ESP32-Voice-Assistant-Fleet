@@ -365,6 +365,10 @@ uint32_t Card::tagColor() const {
     return 0;
 }
 
+uint32_t Card::tone(uint32_t hex) const {
+    return _dimmed ? UI::mix(hex, UI::pal().GROUND, 55) : hex;
+}
+
 void Card::applyState() {
     if (!_root) return;
     const UIPalette &p  = UI::pal();
@@ -505,14 +509,18 @@ void Card::applyDiagonal() {
     if (mw > 8) w = mw;
     if (mh > 8) h = mh;
 
-    // INSET BY HALF THE LINE WIDTH, at both ends.
+    // INSET BY THE CORNER, not just by the stroke.
     //
-    // A rounded cap extends half the stroke past its endpoint, so a line drawn
-    // corner to corner pokes out of both corners - which only bar mode hid,
-    // because that is the one mode with clip_corner turned on. Everywhere else
-    // it hung outside the card. Clipping would have been the expensive fix;
-    // drawing it the right length is free.
-    const int32_t half = UI::sc(3);
+    // Half the line width covers the rounded cap overhanging its endpoint. It
+    // does NOT cover the card's own RADIUS: a diagonal to the true corner of a
+    // rounded rectangle leaves the shape well before it gets there, which is
+    // why the line still appeared to escape at both ends. The distance from
+    // the corner to the arc along a 45 degree line is r*(1 - 1/sqrt(2)),
+    // about 0.293r.
+    //
+    // Bar mode looked right throughout only because clip_corner was masking
+    // the overhang for it.
+    const int32_t half = UI::sc(3) + (UI::sc(UI::met().RADIUS) * 293) / 1000;
     _diagPts[0].x = half;
     _diagPts[0].y = half;
     _diagPts[1].x = w - half;
