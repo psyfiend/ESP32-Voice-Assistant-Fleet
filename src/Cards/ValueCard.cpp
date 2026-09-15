@@ -49,12 +49,16 @@ void ValueCard::buildBody(lv_obj_t *body) {
     // paying for a collision that cannot happen.
     _icon = lv_label_create(body);
     lv_obj_add_flag(_icon, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    // Nudged up by the label's top leading. A glyph does not fill its line box
-    // - there is empty space above the ink - so a label aligned flush to the
-    // corner LOOKS further from the top than from the left. The owner wants
-    // "equal distance between left wall and top of card", and that is a visual
-    // equality, not a box one.
-    lv_obj_align   (_icon, LV_ALIGN_TOP_LEFT, 0, -UI::sc(3));
+    // FLUSH to the body's top-left, and left alone.
+    //
+    // A previous version nudged this up by the label's top leading, reasoning
+    // that a glyph does not fill its line box so a flush label reads as further
+    // from the top than from the side. That is true, but the nudge was applied
+    // in every mode - and it traded a correct arrangement in bar and tag for a
+    // marginally better one in no-header. The body's padding already puts it
+    // the same distance from both edges; whatever leading the font carries is
+    // the font's, and compensating for it here is guesswork dressed as layout.
+    lv_obj_align   (_icon, LV_ALIGN_TOP_LEFT, 0, 0);
 
     // The middle takes whatever is left and centres the HERO in it - the value
     // only, with the name as a sibling BELOW it.

@@ -419,13 +419,24 @@ int32_t Card::midHeight() const {
     const UIMetrics &m = UI::met();
 
     int32_t h = (int32_t)g.cellH * (_place.prefSpanY ? _place.prefSpanY : 1);
-    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
-    if (_hdrStyle == CardHeaderStyle::HDR_BAR) h -= Card::headerHeight();
+
+    // ALWAYS charges for a header, whatever this card's mode is.
+    //
+    // A hero sized from the real band grew in HDR_NONE, where there is no
+    // header to pay for - so the same card's disc was one size in bar and tag
+    // and a bigger one with no header, which is what the owner saw as "in
+    // no-hdr mode the icon grows in size and clips". Sizing to the most
+    // constrained mode makes a card's hero identical in all three, which is
+    // what a reader expects of the same card wearing different chrome.
+    h -= Card::headerHeight();
 
     h -= UI::sc(m.PAD) * 2;                       // the body's own padding
     h -= lv_font_get_line_height(UI::type().NAME);
     h -= midGap();
     if (_resolved != CardVariant::VAR_COMPACT) h -= statusBandHeight();
+
+    // And never let a hero touch the edges of its band.
+    h -= UI::sc(4);
     return h > 0 ? h : 0;
 }
 

@@ -15,8 +15,8 @@ is compressing, and treat any vocabulary that does not appear in the source as s
 
 **Phases 0, 1 and 2.1–2.3 are done and merged to `main`, tagged `v0.2.2`.**
 
-**Milestone 2.4 is code complete on `feat/2.4-card-base` and awaiting hardware sign-off.** All eight
-environments build. The branch is pushed.
+**Milestone 2.4 is DONE and hardware-verified** on `WS_P4_5`, `CYD_S3_3248` and `WS_P4_7B`, on
+branch `feat/2.4-card-base`. All eight environments build. Ready to merge and tag `v0.2.4`.
 
 The device boots, joins WiFi, talks to a broker, appears in Home Assistant, publishes its telemetry
 and reads other devices' entities — all through one Entity Registry that neither side knows the
@@ -25,7 +25,10 @@ shape of. And it now renders those entities as cards.
 ### Read in this order
 
 1. `CLAUDE.md` — the HAL/BSP, the startup split, the token rules, the traps.
-2. `docs/TEST_2.4.md` — **what has to pass before 2.4 is signed off.** Immediate.
+2. **`docs/design/card-layout.md` — read this BEFORE moving anything on a card.** The layout
+   model, and the three traps that produced every visual defect in 2.4. It exists because the
+   same class of bug came back four times in four places and was each time fixed by adjusting
+   a number and reflashing. That is not how the next change should go.
 3. `docs/design/cards.md` — the card spec. Read the "Implementation notes" section at the end
    first: it records where the build deviates from the body of the document, and why.
 4. `docs/design/tokens.md` — the design system and the measurements behind it.
@@ -268,6 +271,20 @@ changed the design twice.
 Build for `WS_P4_TOUCH_LCD_5` and `CYD_S3_3248W535` on every change. They bracket the fleet: the
 densest panel and the tightest memory. **Do not run two `pio` invocations at once** — they contend
 for `.pio/build` and fail with a directory-lock error that looks nothing like a compile error.
+
+### Deliberately postponed — do not rediscover these
+
+| What | Where it goes | Note |
+|---|---|---|
+| Corner icon on EVERY card, by domain | card library | The corner icon is the card's DOMAIN (a light always wears the same mark); the HERO is the specific thing (bulb vs ceiling vs strip). Moves a group card's mixed indicator to the top-right. Costs nothing — the corner is already out of the flow |
+| One slot mechanism, three consumers | **2.8 (#19)** | `cards.md` §8. Page header, group-card header, card header are one idea. 2.4 hardcoded the card's two slots; 2.8 should generalise rather than build a third thing |
+| `priority`-based degradation | **2.5 (#16)** | Carried, reported in the Doctor, read by nothing. A page drops cards that do not fit in declaration order today |
+| Group / container cards | own milestone | The owner described four distinct flavours. `Card` binds 1..6 primaries and nothing assumes a card is a leaf, so the seam is there |
+| Outbound commands | **#44** | Not a 2.4 requisite (owner's call). Two virtual switches exercise the path |
+| HA over websocket | **#43**, promoted | MQTT carries a value per topic and nothing else. Every metadata field needs a hand-crafted topic per entity — unmanageable at scale |
+| `UI::sc()` duplicates `lv_dpx()` | logged in FUTURE_IMPROVEMENTS | Same arithmetic, different reference constant. 1.0625x, invisible, not worth a re-tune yet |
+| `ST_WARN` amber on the Paper scheme | owner's call | Reads poorly on white. Changing it contradicts "state colour is content, not decoration" |
+| Sibling secondaries from one device | **#20** | All three deck cards come from one sensor and could share a battery. Which siblings a card inherits is build-sheet territory |
 
 ### Two decisions still open, both awaiting glass
 
