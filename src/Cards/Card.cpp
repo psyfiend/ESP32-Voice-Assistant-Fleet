@@ -128,8 +128,10 @@ void Card::resolveVariant() {
     // line at the top. Leaving it out made CYD_S3_3248 cards claim they could
     // seat a full layout in 121 px when they could not, and the name was
     // clipped underneath the status row as a result.
-    int32_t need = topBandHeight()
-                 + lv_font_get_line_height(t.VALUE)
+    // No top band: the corner icon is out of the flow on both layouts, so it
+    // costs the stack nothing. Charging for it here is what pushed the 3248
+    // into compact and took away a status line that used to fit.
+    int32_t need = lv_font_get_line_height(t.VALUE)
                  + midGap()
                  + lv_font_get_line_height(t.NAME)
                  + statusBandHeight()

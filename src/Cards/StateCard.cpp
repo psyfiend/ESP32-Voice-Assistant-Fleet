@@ -27,17 +27,10 @@ void StateCard::buildBody(lv_obj_t *body) {
                           LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(body, 0, 0);
 
-    // THE SAME THREE BANDS ValueCard uses, reserved even though this layout
-    // has nothing to put in either of them yet. It is what makes a state card
-    // and a value card side by side put their names at the same height.
-    //
-    // The top band is also where a small corner icon goes when that lands -
-    // the owner wants one on every card, including those that already show a
-    // large one in the middle. The space is already here for it.
-    _topRow = plainCol(body);
-    lv_obj_set_width (_topRow, lv_pct(100));
-    lv_obj_set_height(_topRow, Card::topBandHeight());
-
+    // TWO bands, matching ValueCard: a growing middle and a reserved status
+    // line. Neither layout reserves a row for its corner icon any more - that
+    // one is out of the flow on both, which is what gave CYD_S3_3248 back the
+    // height its status line needs.
     _mid = plainCol(body);
     lv_obj_set_width     (_mid, lv_pct(100));
     lv_obj_set_flex_grow (_mid, 1);
@@ -167,10 +160,8 @@ void StateCard::render() {
     if (compact) {
         lv_obj_add_flag  (_name,      LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag  (_statusRow, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag  (_topRow,    LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_clear_flag(_statusRow, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(_topRow,    LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
     }
 

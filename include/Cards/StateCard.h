@@ -93,7 +93,6 @@ private:
 
     static StateCardFill s_fill;
 
-    lv_obj_t *_topRow    = nullptr;   // reserved, matches ValueCard's icon line
     lv_obj_t *_mid       = nullptr;   // grows; centres the disc
     lv_obj_t *_statusRow = nullptr;   // reserved, matches ValueCard's status line
     lv_obj_t *_disc  = nullptr;

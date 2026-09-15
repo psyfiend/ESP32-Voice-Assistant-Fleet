@@ -37,10 +37,19 @@ void ValueCard::buildBody(lv_obj_t *body) {
                           LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(body, 0, 0);
 
-    _topRow = plain(body);
-    lv_obj_set_width (_topRow, lv_pct(100));
-    lv_obj_set_height(_topRow, Card::topBandHeight());
-    _icon = lv_label_create(_topRow);
+    // THE ICON IS OUT OF FLOW, in the corner, costing the stack nothing.
+    //
+    // It used to have a reserved band of its own, and that band is what broke
+    // CYD_S3_3248: moving the name under the value turned three rows into
+    // four, and 22 px is the whole difference on a 121 px card. The owner
+    // noticed the status line had fit perfectly well before.
+    //
+    // It does not need a row. It sits top-left and the value is centred, so
+    // they never contend for the same space - reserving a row for it was
+    // paying for a collision that cannot happen.
+    _icon = lv_label_create(body);
+    lv_obj_add_flag(_icon, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_align   (_icon, LV_ALIGN_TOP_LEFT, 0, 0);
 
     // The middle takes whatever is left and centres the value and the name in
     // it as one group - which is what stops the value drifting when the status

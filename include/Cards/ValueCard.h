@@ -50,8 +50,7 @@ private:
     // A vertical stack. Nothing here is positioned against anything else -
     // every hand-alignment in the previous version resolved against a position
     // layout had not computed yet. See the .cpp.
-    lv_obj_t *_topRow    = nullptr;   // the icon, on its own line
-    lv_obj_t *_icon      = nullptr;
+    lv_obj_t *_icon      = nullptr;   // top-left corner, OUT of the flow
 
     lv_obj_t *_mid       = nullptr;   // grows; centres value+name as a group
     lv_obj_t *_valueRow  = nullptr;   // value + unit, bottom-aligned
