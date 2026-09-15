@@ -1,4 +1,4 @@
-# Handoff — 2026-09-13
+# Handoff — 2026-09-15
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; this is where we actually are, what will
 bite you, and what to do next.
@@ -15,8 +15,9 @@ is compressing, and treat any vocabulary that does not appear in the source as s
 
 **Phases 0, 1 and 2.1–2.3 are done and merged to `main`, tagged `v0.2.2`.**
 
-**Milestone 2.4 is DONE and hardware-verified** on `WS_P4_5`, `CYD_S3_3248` and `WS_P4_7B`, on
-branch `feat/2.4-card-base`. All eight environments build. Ready to merge and tag `v0.2.4`.
+**Milestone 2.4 is DONE, hardware-verified, merged and tagged `v0.2.4`** — thirty commits, signed
+off on `WS_P4_5`, `CYD_S3_3248` and `WS_P4_7B` against `docs/TEST_2.4.md`. All eight environments
+build. Phase 2 is half shipped: 2.1 through 2.4 done, 2.5 through 2.9 open.
 
 The device boots, joins WiFi, talks to a broker, appears in Home Assistant, publishes its telemetry
 and reads other devices' entities — all through one Entity Registry that neither side knows the
@@ -89,14 +90,107 @@ everything else keeps pausing.
 
 ---
 
-## What is immediately next
+## Where this is going
 
-**Flash both dev targets and work `docs/TEST_2.4.md`.** The 3248 first — it is the veto board and
-the one that froze. Section A of that document is the gate; nothing else matters if A1 fails.
+The panel renders cards. What it does not yet do is get its entities from anywhere a normal
+person would call convenient, and everything on screen is still hardcoded in C++. Those two
+gaps are the project, and each cuts across several milestones — which is why they are worth
+thinking about before picking up a milestone number.
 
-After sign-off: merge `--no-ff`, tag `v0.2.4`, close #15. `ROADMAP.md` §7 has the table of which
-other issues 2.4 does and does not let us close — **#18 (2.7) is half done and must stay open**,
-because the card types exist but are not yet bound to real HA entities.
+### Home Assistant over the websocket is the big one (#43)
+
+**MQTT is the wrong transport for HA entities.** That is the owner's conclusion, reached
+2026-09-13, and it is not about a missing field. It is that **MQTT carries a value per topic
+and nothing else.** A light at `home/office/light/state` tells you the light is on. Its area,
+its battery, its last-seen, the device it belongs to, whether it is dimmable — each needs its
+own hand-crafted topic, or an automation maintaining one, per entity. At eight entities that
+is tedious. At a house's worth it is unmanageable, and all of it is work the owner has to do
+by hand before the panel shows anything. A JSON payload helps at the margins and does not fix
+it: somebody still has to decide and configure what goes in it.
+
+HA's own websocket API already knows all of it, because it is the same data the HA frontend
+draws. So #43 stops being "an alternative way to reach HA" and becomes **how HA entities are
+going to work**. MQTT keeps what it is genuinely good at: our own telemetry outbound, plus
+plain broker topics that have nothing to do with HA.
+
+**Nothing about that API is assumed here, deliberately.** The owner's instruction on exactly
+this point was not to guess at what does or does not come from HA — confirm it against the
+real thing before designing to it. What is settled is the direction, not the schema.
+
+Three things already built lean on it, which is the argument for doing it sooner:
+
+- **Area** is build-sheet-supplied today. `Card::setShowArea()`, the three header modes and
+  `cardAreaColor()` were all written assuming area would arrive from somewhere eventually.
+  This is that somewhere. (`cards.md` §2's claim that area comes free from MQTT discovery is
+  wrong — `suggested_area` is outbound only. Corrected in §11.)
+- **Sensor history**, for the sparkline `cards.md` §4 wants, is fetched rather than stored.
+  Same client, same session.
+- **Outbound commands** (#44) have exactly two virtual switches to talk to right now.
+
+Two things worth deciding early: whether this is a **new provider beside `MqttProvider`**
+rather than a change to it — the Entity Registry's whole shape says yes, since a card must
+never learn where its value came from — and whether a long-lived authenticated websocket
+plus a REST fallback is something the connectivity layer can hold without a rethink. That
+second question is the one that could turn #43 from a milestone into two.
+
+### The build sheet is what turns this from a demo into a product (#20)
+
+Everything on a screen today is constructed in `CardDemo.cpp`. 2.4 settled what a sheet has to
+be able to express, and it is more than it looked like at the start:
+
+| A sheet entry carries | |
+|---|---|
+| a **domain** | `sensor`, `binary_sensor`, `switch`, `light`, `button` — never a layout |
+| a header mode | `bar` / `tag` / `none` |
+| area on, colour on | two independent settings, not one |
+| spans and priority | `prefSpan`, `minSpan`, `priority` |
+| a variant override | for when `VAR_AUTO` guesses wrong |
+| staleness overrides | per data type, over `cardLongStaleMs()` |
+
+2.5 needs a page-config struct anyway, so the two want doing in one thought rather than two.
+The open question is the format — a header the build compiles, JSON on the filesystem, or
+something served. Only the last two make it configurable without a rebuild, which is what the
+owner has said he wants at the end of it.
+
+### The rest of Phase 2, in the order it makes sense
+
+| | |
+|---|---|
+| **2.5** (#16) | Pages and navigation. `priority`-based degradation is carried by every card and read by nothing; a page drops overflow in declaration order today |
+| **2.6** | Theming at runtime — `UI::setScheme()` works, nothing exposes it |
+| **2.7** (#18) | The remaining domains, and binding the existing ones to real HA entities. Half done: the types exist, their data does not |
+| **2.8** (#19) | The slot system. Page header, group-card header and card header are one idea with three consumers; 2.4 hardcoded the card's two slots |
+| **2.9** | Group / container cards. The owner described four distinct flavours. `Card` already binds 1..6 primaries and nothing assumes a card is a leaf, so the seam exists |
+
+Grid tokens want a pass somewhere in 2.5: on `WS_P4_7B` the derivation produces 7 columns
+where `cards.md` §7 targets 5×3, leaving every card ~13 px short of a full layout and forcing
+the compact variant. Nothing is wrong with the arithmetic — `TARGET_CARD_W` is simply tuned
+for the smaller panels.
+
+### Small, self-contained things
+
+Good when a whole milestone is too much in one sitting, and each genuinely independent:
+
+- **#48** — reason 36 treated as real signal. Well-specified, and it costs six wasted
+  re-associations per connect attempt today.
+- **#42** — `AP_ACTIVE` goes stale after idle-down. Needs its own test: mode 3, junk SSID,
+  ten minutes untouched.
+- **#3** — `lv_conf.h` is still labelled for LVGL 9.4. Options added in 9.5 are taking
+  defaults nobody has read, and the draw-buffer ones bear on everything above.
+- **#47** — HA discovery will outgrow the MQTT buffer. Not urgent at eight entities; the card
+  work is what makes more of them.
+- **Flash `WS_P4_4B` and `WS_S3_4B` as a pair.** 720×720 at 1.5× is the same effective UI
+  space as 480×480 at 1.0×, so the two together are a free correctness check on the whole
+  scaling scheme. Six boards have not been flashed at all since the type scale changed.
+
+### The one number to keep an eye on
+
+**The LVGL task stack.** The System Doctor reports its high-water mark beside free heap. Every
+crash in 2.4 was that stack, and it was misread as a memory problem three times before anyone
+measured it; `SET_LOOP_TASK_STACK_SIZE(16 * 1024)` in `main.cpp` is the fix, and the margin
+today is 7556 bytes free of 16384 on `CYD_S3_3248`. If that trends toward zero as cards gain
+nesting, the answer is a **flatter widget tree**, not a bigger stack —
+`docs/design/card-layout.md` §1.3 explains why the draw walk costs what it does.
 
 ---
 
@@ -194,12 +288,17 @@ Measured on hardware:
 | Fleet density | 165–294 PPI; scale derived as `PPI / 170` | 2.2 |
 | Fleet flash | 24.4–25.9% across all eight environments | 2.4 |
 
-Still assumed, and the reason `docs/TEST_2.4.md` exists:
+Verified against `docs/TEST_2.4.md` at sign-off:
 
-- **Everything visual in 2.4.** The branch has been flashed twice, both times before the header
-  rework, the icon subset, the domain types and the compact variants landed.
-- **The 3248 freeze fix.** Diagnosed precisely and never confirmed on the board.
+- **Everything visual in 2.4**, on three boards. `WS_P4_5` clean, `CYD_S3_3248` clean after the
+  stack fix, `WS_P4_7B` correct but compact — a grid-token matter, not a defect.
+- **The 3248 freeze.** It was the loop task's stack, not `lv_mem`. Confirmed on the board.
+
+Still assumed:
+
 - **Six boards have not been flashed at all** since the type scale changed. They compile.
+- **`TouchManager::mapCoordinates()`'s `WS_P4_7B` special case.** Undocumented, never re-tested
+  against the alternative. `CLAUDE.md` flags it and it is still true.
 
 ---
 
@@ -261,12 +360,13 @@ appends `+dirty`, which is working correctly and is useful.
 
 ## Suggested first move
 
-**Work `docs/TEST_2.4.md`.** Flash `CYD_S3_3248W535` first — it is the veto board and the one that
-froze. Section A is the gate; if A1 fails, send serial and stop, because nothing below it matters.
+**Ask which of the two above he wants first**, because they are a genuine fork and he has not
+picked. #43 makes the panel worth owning; #20 makes it configurable without a rebuild. #20 is
+smaller and unblocks 2.5 — but doing it first risks designing a format around the fields MQTT
+happens to carry, which is the mistake #43 exists to undo.
 
-Do not write more card code before that. Every acceptance criterion in #15 has an implementation;
-what is unknown is whether it looks right, and two flashes' worth of visual feedback has already
-changed the design twice.
+Whichever it is, **read `docs/design/card-layout.md` before moving anything on a card**, and do
+not tune a number and reflash to find out. That loop is what §1 of that document exists to end.
 
 Build for `WS_P4_TOUCH_LCD_5` and `CYD_S3_3248W535` on every change. They bracket the fleet: the
 densest panel and the tightest memory. **Do not run two `pio` invocations at once** — they contend
