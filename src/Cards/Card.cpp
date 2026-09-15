@@ -155,10 +155,8 @@ void Card::resolveVariant() {
     // both times the guess was wrong. The numbers are cheap and they end the
     // argument - and they say WHY a card went compact rather than leaving it
     // to be inferred from what is missing on screen.
-    #ifdef DEBUG_CARDS
-    Serial.printf("[Cards] %s: cell %ld need %ld -> %s\n",
-                  typeName(), (long)h, (long)need, cardVariantName(_resolved));
-    #endif
+    DBG_CARDS("%s: cell %ld need %ld -> %s\n",
+              typeName(), (long)h, (long)need, cardVariantName(_resolved));
 }
 
 // Long press pauses, on every card type.

@@ -51,15 +51,25 @@ void ValueCard::buildBody(lv_obj_t *body) {
     lv_obj_add_flag(_icon, LV_OBJ_FLAG_IGNORE_LAYOUT);
     lv_obj_align   (_icon, LV_ALIGN_TOP_LEFT, 0, 0);
 
-    // The middle takes whatever is left and centres the value and the name in
-    // it as one group - which is what stops the value drifting when the status
-    // row appears or disappears.
+    // The middle takes whatever is left and centres the HERO in it - the value
+    // only, with the name as a sibling BELOW it.
+    //
+    // The name used to live inside here, centred as a group with the value,
+    // while StateCard kept its name outside its own middle. Two different
+    // structures, so the two card types put their names at different heights -
+    // which is exactly what the owner saw: "for cards with value the hero text
+    // is tucked up hard against the value and NOT aligned with the other
+    // cards". Both are the same shape now.
     _mid = plain(body);
     lv_obj_set_width     (_mid, lv_pct(100));
     lv_obj_set_flex_grow (_mid, 1);
     lv_obj_set_flex_flow (_mid, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(_mid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
+    // Keeps the hero clear of the corner icon, which is out of the flow above
+    // it. Half a band rather than a whole one: they sit side by side, and the
+    // owner's only constraint is that they must not touch.
+    lv_obj_set_style_pad_top(_mid, Card::topBandHeight() / 2, 0);
 
     // Value and unit share a bottom edge, which is as close to a shared
     // baseline as LVGL gets without font metrics - and the reason the unit can
@@ -70,12 +80,12 @@ void ValueCard::buildBody(lv_obj_t *body) {
     lv_obj_set_flex_align(_valueRow, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END,
                           LV_FLEX_ALIGN_END);
     lv_obj_set_style_pad_gap(_valueRow, UI::sc(3), 0);
-    lv_obj_set_style_pad_bottom(_valueRow, Card::midGap(), 0);
+    lv_obj_set_style_pad_bottom(_mid, Card::midGap(), 0);
 
     _value = lv_label_create(_valueRow);
     _unit  = lv_label_create(_valueRow);
 
-    _name = lv_label_create(_mid);
+    _name = lv_label_create(body);
     lv_label_set_long_mode     (_name, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(_name, LV_TEXT_ALIGN_CENTER, 0);
 

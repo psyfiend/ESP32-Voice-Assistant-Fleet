@@ -124,6 +124,14 @@ uint32_t cardAreaColor(const char *area) {
         h ^= (uint8_t)*c;
         h *= 16777619u;
     }
+
+    // Fold the whole hash down rather than taking its low bits. A modulo of
+    // the raw value leans on the last byte mixed in, which is why "Kitchen"
+    // and "Lounge" landed on the same hue - they are the same length and end
+    // similarly. Mixing the high half back in first spreads short names.
+    h ^= h >> 16;
+    h *= 2246822519u;
+    h ^= h >> 13;
     return AREA_HUES[h % N];
 }
 

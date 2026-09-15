@@ -3,6 +3,7 @@
 #define CARD_TYPES_H
 
 #include <stdint.h>
+#include <Arduino.h>
 
 // ---------------------------------------------------------------------------
 // Card vocabulary. Shaped like EntityTypes.h on purpose: the small enums and
@@ -160,6 +161,16 @@ enum class CardVariant : uint8_t {
     VAR_FULL,
     VAR_COMPACT,
 };
+
+// Debug output, gated and tagged the way every other area in this project does
+// it - see DBG_WIFI in ConnectivityManager and DBG_MQTT in MqttManager. Enabled
+// per build from the shared [S3-options] / [P4-options] sections of
+// platformio.ini rather than per board.
+#ifdef DEBUG_CARDS
+    #define DBG_CARDS(...) Serial.printf("[Cards:debug] " __VA_ARGS__)
+#else
+    #define DBG_CARDS(...)
+#endif
 
 const char *cardStateName(CardState s);
 const char *cardVariantName(CardVariant v);

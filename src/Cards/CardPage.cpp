@@ -109,8 +109,8 @@ Card *CardPage::add(Card *c) {
     // Would this card land past the last visible row? Then it does not go on
     // the page at all. A page shows what fits and nothing else.
     if (!fits(c)) {
-        Serial.printf("[Cards] dropped %s - page is full at %u rows\n",
-                      c->typeName(), (unsigned)_maxRows);
+        DBG_CARDS("dropped %s - page is full at %u rows\n",
+                  c->typeName(), (unsigned)_maxRows);
         delete c;
         return nullptr;
     }
