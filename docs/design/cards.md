@@ -448,6 +448,28 @@ smaller, which would undo the work the generated type scale exists to do. `Value
 status corners (§1 already treats that row as absent when empty); `StateCard` drops the **name**
 and keeps the icon, because §4 says state *is* the icon and its colour.
 
+### The corner icon is per DOMAIN; the hero icon is per THING
+
+Owner's direction, 2026-09-14, recorded before it is built.
+
+**Every card carries a small icon in its top-left corner**, including the ones
+that already show a large one in the middle. The two answer different questions
+and should be allowed to differ:
+
+- the **corner** icon is the card's TYPE — eventually mapped straight from the
+  domain, so a light card always wears the same corner mark wherever it appears
+- the **hero** icon is the specific THING — a light might be a bulb, a ceiling
+  fixture, a strip, a lamp; the corner stays a bulb regardless
+
+A consequence worth noting now: on a group card, the mixed indicator moves from
+the top-left to the top-RIGHT, because the corner belongs to the icon.
+
+The corner icon costs nothing to place. It is deliberately **out of the vertical
+flow** on both layouts - it sits in a corner the centred hero never uses, and
+reserving a row for it is what broke `CYD_S3_3248`'s status line at 121 px. The
+owner's constraint is only that the two must not touch: "It is perfectly fine if
+part of the value or icon is adjacent to it horizontally."
+
 ### Long press pauses, for now
 
 §4 wants a long press on a group to open a sheet of per-light cards. That needs an overlay this

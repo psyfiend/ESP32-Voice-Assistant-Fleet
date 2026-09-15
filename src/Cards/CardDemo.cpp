@@ -352,6 +352,14 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     place(VIRT_ENT_STUCK,  "Ignores", "Office", nullptr, nullptr, false);
     placeGroup(VIRT_ENT_SWITCH, VIRT_ENT_STUCK, "Both", "Office");
 
+    // Four more tappable cards, so a board with seven columns has enough to
+    // show what more than two rows looks like. They are lights rather than
+    // switches to exercise the other domain type in CardCatalog.
+    place(VIRT_ENT_L1, "Lamp 1", "Kitchen", nullptr, nullptr, false);
+    place(VIRT_ENT_L2, "Lamp 2", "Kitchen", nullptr, nullptr, false);
+    place(VIRT_ENT_L3, "Lamp 3", "Lounge",  nullptr, nullptr, false);
+    place(VIRT_ENT_L4, "Lamp 4", "Lounge",  nullptr, nullptr, false);
+
     place(SYS_ENT_RSSI,   "RSSI",      "Panel", nullptr, nullptr, false);
     place(SYS_ENT_HEAP,   "Free Heap", "Panel", nullptr, &wide,   false);
 

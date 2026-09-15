@@ -39,6 +39,15 @@
 #define VIRT_ENT_SWITCH "test_switch"   // echoes. The command takes
 #define VIRT_ENT_STUCK  "test_stuck"    // never echoes. The command is refused
 
+// Four more well-behaved switches, added purely so the larger boards have
+// enough cards to fill more than a row or two. WS_P4_7B derives SEVEN columns
+// at 1024 px, and nine demo cards cannot show what four rows of grid look
+// like. All four echo, like VIRT_ENT_SWITCH.
+#define VIRT_ENT_L1     "test_lamp_1"
+#define VIRT_ENT_L2     "test_lamp_2"
+#define VIRT_ENT_L3     "test_lamp_3"
+#define VIRT_ENT_L4     "test_lamp_4"
+
 // How long the obedient one takes to answer. Long enough to actually see the
 // optimistic value land before it is confirmed, short enough that it does not
 // read as a fault. Well inside EntityRegistry's 5 s reconcile window.
@@ -68,6 +77,54 @@ inline const EntityDescriptor VIRTUAL_ENTITIES[] = {
         .source      = EntitySource::VIRTUAL,
         .valueType   = ValueType::BOOL,
         .icon        = "mdi:toggle-off",   // ENTITY_SHORT_MAX is 20 incl. the null
+        .writable    = true,
+        .diagnostic  = false,
+        .advertise   = false,
+        .staleAfterMs = 0,
+    },
+    {
+        .id          = VIRT_ENT_L1,
+        .name        = "Lamp 1",
+        .kind        = EntityKind::LIGHT,
+        .source      = EntitySource::VIRTUAL,
+        .valueType   = ValueType::BOOL,
+        .icon        = "mdi:lightbulb",
+        .writable    = true,
+        .diagnostic  = false,
+        .advertise   = false,
+        .staleAfterMs = 0,
+    },
+    {
+        .id          = VIRT_ENT_L2,
+        .name        = "Lamp 2",
+        .kind        = EntityKind::LIGHT,
+        .source      = EntitySource::VIRTUAL,
+        .valueType   = ValueType::BOOL,
+        .icon        = "mdi:lightbulb",
+        .writable    = true,
+        .diagnostic  = false,
+        .advertise   = false,
+        .staleAfterMs = 0,
+    },
+    {
+        .id          = VIRT_ENT_L3,
+        .name        = "Lamp 3",
+        .kind        = EntityKind::LIGHT,
+        .source      = EntitySource::VIRTUAL,
+        .valueType   = ValueType::BOOL,
+        .icon        = "mdi:lightbulb",
+        .writable    = true,
+        .diagnostic  = false,
+        .advertise   = false,
+        .staleAfterMs = 0,
+    },
+    {
+        .id          = VIRT_ENT_L4,
+        .name        = "Lamp 4",
+        .kind        = EntityKind::LIGHT,
+        .source      = EntitySource::VIRTUAL,
+        .valueType   = ValueType::BOOL,
+        .icon        = "mdi:lightbulb",
         .writable    = true,
         .diagnostic  = false,
         .advertise   = false,
