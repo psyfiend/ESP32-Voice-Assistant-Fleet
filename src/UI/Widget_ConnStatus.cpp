@@ -1,5 +1,5 @@
-#include "Widget_ConnStatus.h"
-#include "UIToolkit.h"
+#include "UI/Widget_ConnStatus.h"
+#include "UI/UIToolkit.h"
 
 // Palette - semantic, not themeable: these colours ARE the information.
 //

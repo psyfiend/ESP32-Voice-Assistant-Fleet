@@ -237,6 +237,36 @@ everything the same *physical* size, which is right for touch targets (a fingert
 every board) and arguably wrong for text on a 7-inch panel across a room. Add a small per-board
 nudge only if something still looks wrong on glass.
 
+### `UI::sc()` duplicates LVGL's own `lv_dpx()` - collapse it eventually
+
+Found 2026-09-11 while answering "are we over-engineering this?", and the honest answer for this
+one piece was yes.
+
+    UI::sc(n)   =  n * PPI / 170          UITokens.cpp
+    lv_dpx(n)   =  n * PPI / 160          lv_display.h:716, as LV_DPX_CALC
+
+The same function with a different reference constant. Ours is not layered on top of LVGL's
+mechanism - it *is* LVGL's mechanism, spelled again, against a 170 baseline instead of 160.
+
+**Deliberately not fixed now.** The whole difference is 1.0625x, which is not visible, so the fix
+buys no behaviour - only one less concept - and it costs a pass over every token in
+`UITokens.cpp` plus a flash to confirm nothing shifted. The owner's call: note it, keep moving,
+and do it when something else is already touching those values.
+
+The same class of thing as the duplicated touch rotation logic in `TouchManager::mapCoordinates()`,
+which `bb_captouch` turns out to implement itself - neither is a bug, both are a second
+implementation of something we already had, and both are worth removing on a day when that is the
+job rather than a detour.
+
+**What this does NOT cover, and the reason it is worth being precise here:** DPI in LVGL only ever
+scales *shapes*. Verified in this tree - every DPI-sensitive path goes through `LV_DPX_CALC`, and
+the complete list of callers is `lv_obj.c` (default size of an unsized object), `lv_obj_scroll.c`
+(minimum scrollbar), `lv_slider.c` (click area), `lv_arc.c` (touch tolerance) and
+`lv_theme_default.c` (radius, border, padding, shadow). **No DPI path touches fonts**, in any
+version - the default theme takes `font_normal` as a parameter and never consults DPI to pick it.
+So `lv_display_set_dpi()` is not an alternative to the generated type scale, and setting it would
+not have moved the too-small text of 2.4's first flash by a single pixel.
+
 ## Audio
 
 - **AEC stays deprioritized indefinitely**, not just paused. If from-scratch
@@ -260,6 +290,49 @@ nudge only if something still looks wrong on glass.
   would actually plug into `AudioManager`'s existing shape before committing to a design.
 
 ## Connectivity (WiFi / MQTT / Home Assistant)
+
+### MQTT is the wrong transport for Home Assistant ENTITIES - websocket is the real path
+
+Owner's conclusion, 2026-09-13, and it reframes issue #43 from "an alternative
+way to reach HA" into "the way HA entities are actually going to work".
+
+The problem is not that any single piece of metadata is missing. It is that
+**MQTT carries a value per topic and nothing else.** A light at
+`/home/office/light/state` tells you the light's state. Its area, its battery,
+its last-seen, the device it belongs to - each of those needs its own
+hand-crafted topic on the HA side, or an automation maintaining it per entity.
+At a handful of entities that is tedious; at hundreds it is unmanageable, and
+it is work the user has to do before our panel shows anything useful.
+
+A JSON payload helps a little and does not fix it: someone still has to decide
+and configure what goes in that JSON, per entity, on the HA side.
+
+**This corrects an assumption in `docs/design/cards.md` section 2**, which says
+"Area comes free: Home Assistant already carries it on devices, so
+`MqttProvider` can populate it from discovery rather than anyone tagging
+entities by hand." Verified against the code: nothing in the tree publishes or
+reads an area, and MQTT discovery's `suggested_area` runs OUTBOUND - it is how
+a device suggests its own area to HA, not a way to learn someone else's. That
+sentence should be struck when cards.md is next edited.
+
+**Not yet designed, and deliberately not guessed at here.** What the websocket
+API does and does not expose is worth confirming against the real thing rather
+than assumed - the owner's instruction on exactly this point was "don't make
+any assumptions about what does or doesn't come from HA". What is settled is
+the direction: full HA entity integration goes over the websocket, and MQTT
+stays for what it is genuinely good at - our own telemetry outbound, and plain
+broker topics that have nothing to do with HA.
+
+Consequences to think through when it is scheduled:
+
+- Area, and any custom grouping, become available rather than build-sheet-only.
+  `Card::setShowArea()` and the header modes were built assuming area might
+  arrive from somewhere later; that is the somewhere.
+- It overlaps the sensor-history fetch cards.md section 4 needs, which was
+  already going to want an HTTP or websocket client.
+- `MqttProvider` does not go away. It stops being the way HA entities arrive.
+
+
 
 **Phase 1 is COMPLETE — see `ROADMAP.md` for what was built and what was descoped.** The
 narrative that used to live here (progress logs, the `wifi-testing` branch, the platform

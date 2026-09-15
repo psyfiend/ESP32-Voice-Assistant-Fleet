@@ -19,6 +19,26 @@
 #endif
 // --------------------------
 
+// THE LVGL THREAD NEEDS MORE THAN 8 KB OF STACK.
+//
+// loopTask is where LVGL runs - lv_timer_handler(), the layout pass and the
+// whole draw walk - and arduino-esp32 gives it ARDUINO_LOOP_STACK_SIZE, which
+// defaults to 8192 (cores/esp32/main.cpp:17). LVGL's refresh recurses once per
+// level of widget nesting, and a card is nested deep: screen, column, host,
+// page, cell, surface, body, band, row, label.
+//
+// That is the real cause of EVERY crash in milestone 2.4. All of them reported
+// as "Stack canary watchpoint triggered (loopTask)" with a backtrace full of
+// one alternating pair of addresses repeating a dozen times - LVGL walking
+// itself down the tree. CYD_S3_3248 hit it first each time simply because it
+// is the board where everything is tightest, and the fixes that helped before
+// helped by making the tree shallower or the page smaller, never by addressing
+// the depth itself.
+//
+// 16 KB is ordinary for an LVGL application. The System Doctor reports the
+// high-water mark so this is a measured number rather than a hopeful one.
+SET_LOOP_TASK_STACK_SIZE(16 * 1024);
+
 static SystemCore core;
 static GUIManager gui(core);
 

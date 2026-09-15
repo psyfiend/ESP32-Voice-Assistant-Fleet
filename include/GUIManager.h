@@ -12,11 +12,12 @@
 //
 #include <lvgl.h>
 #include "SystemCore.h"
-#include "Panel_Header.h"
-#include "Panel_Display.h"
-#include "Panel_System.h"
+#include "Cards/CardBinder.h"
+#include "UI/Panel_Header.h"
+#include "UI/Panel_Display.h"
+#include "UI/Panel_System.h"
 #ifdef HAS_AUDIO_HW
-#include "Panel_Audio.h"
+#include "UI/Panel_Audio.h"
 #endif
 
 class GUIManager {
@@ -33,6 +34,7 @@ public:
 
     Panel_Header &header()      { return _header; }
     Panel_System &systemPanel() { return _pnlSystem; }
+    CardBinder   &cards()       { return _binder; }
 
 private:
     static void headerIconClickCb(lv_event_t *e);
@@ -40,6 +42,13 @@ private:
     static void reportUiSection();   // [UI STATE] in the System Doctor
 
     SystemCore   &_core;
+
+    // The one registry-to-UI pump for the whole device. Owned here rather than
+    // by a page because pages come and go and it must not: milestone 2.6's
+    // tileview will have several pages sharing this single lv_timer, and an
+    // off-screen page still needs its values. See CardBinder.h.
+    CardBinder    _binder;
+
     Panel_Header  _header;
     Panel_System  _pnlSystem;
     Panel_Display _pnlDisplay;

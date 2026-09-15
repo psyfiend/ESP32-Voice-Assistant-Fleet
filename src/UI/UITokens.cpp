@@ -1,4 +1,4 @@
-#include "UITokens.h"
+#include "UI/UITokens.h"
 #include <Arduino.h>
 
 // ---------------------------------------------------------------------------
@@ -87,8 +87,12 @@ const UIPalette UI_PAL_MIDNIGHT = {
 const UIMetrics UI_MET_DARK  = {
     .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 8, .HEADER_H = 14
 };
+// The light scheme leaned entirely on its shadow and drew no border at all,
+// which on glass left the owner asking whether one was even there. A hairline
+// derived from the surface toward BLACK - UI::border() picks the direction from
+// the surface's own lightness - gives the card an edge without a hard outline.
 const UIMetrics UI_MET_LIGHT = {
-    .RADIUS = 12, .PAD = 5, .BORDER_W = 0, .BORDER_OPA_PCT = 0,  .SHADOW = 8, .HEADER_H = 14
+    .RADIUS = 12, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 14, .SHADOW = 8, .HEADER_H = 14
 };
 
 // ---------------------------------------------------------------------------
@@ -120,7 +124,8 @@ UIGrid    s_grid = { .TARGET_CARD_W = 130, .ASPECT_PCT = 85, .GAP = 12, .INSET =
 int32_t s_vpW = 0, s_vpH = 0;
 void (*s_onChange)() = nullptr;
 
-// Blend two 0xRRGGBB values. Used only for deriving a border from a surface.
+// Blend two 0xRRGGBB values. Used for deriving a border from a surface, and
+// exposed as UI::mix() for dimming without opacity.
 uint32_t blend(uint32_t a, uint32_t b, uint8_t pct) {
     uint32_t out = 0;
     for (int sh = 16; sh >= 0; sh -= 8) {
@@ -181,20 +186,30 @@ const UIMetrics &met()  { return s_met; }
 const UIGrid    &grid() { return s_grid; }
 
 const UIType &type() {
-    // Built on first use rather than at static-init time: lv_font_montserrat_*
-    // are LVGL globals, and depending on a global's initialisation order from
+    // Built on first use rather than at static-init time: the font objects are
+    // LVGL globals, and depending on a global's initialisation order from
     // another translation unit is the static-init-order fiasco waiting to
     // happen. One branch, once.
+    //
+    // The sizes come from include/UI/UITypeScale.h, which scripts/
+    // gen_type_scale.py derives from THIS BOARD's pixel density. They used to
+    // be four hardcoded faces shared by all eight boards, and that was the one
+    // place the "derive from density" rule of tokens.md had not reached - so
+    // WS_P4_5 at 294 PPI drew its smallest text at 1.04 mm while CYD_S3_3248
+    // at 165 PPI drew the same token at 1.85 mm. The better panel was the
+    // harder one to read. Flashed and caught by eye, not by arithmetic.
     static UIType t = {
-        .VALUE = &lv_font_montserrat_40,
-        .NAME  = &lv_font_montserrat_16,
-        .TAG   = &lv_font_montserrat_12,
-        // HERO shares VALUE's face for now. Referencing montserrat_48 pulled a
-        // whole extra font into the link for something nothing draws yet -
-        // measured at the cost recorded in docs/design/tokens.md. Point it at a
-        // larger face when a fullscreen card actually needs one.
-        .HERO  = &lv_font_montserrat_40,
-        .ICON  = 26
+        .VALUE   = FLEET_FONT_VALUE,
+        .UNIT    = FLEET_FONT_UNIT,
+        .NAME    = FLEET_FONT_NAME,
+        .TAG     = FLEET_FONT_TAG,
+        .ICON    = FLEET_ICONS_LG,
+        .ICON_SM = FLEET_ICONS_SM,
+        // HERO shares VALUE's face. Referencing another size pulls a whole
+        // extra font into the link for something nothing draws yet - at the
+        // cost recorded in docs/design/tokens.md. Point it somewhere larger
+        // when a fullscreen card actually needs one.
+        .HERO    = FLEET_FONT_VALUE,
     };
     return t;
 }
@@ -222,6 +237,8 @@ void onSchemeChanged(void (*cb)()) { s_onChange = cb; }
 int32_t sc(int32_t logical) { return (int32_t)(logical * bspUiScale()); }
 
 lv_color_t c(uint32_t hex) { return lv_color_hex(hex); }
+
+uint32_t mix(uint32_t a, uint32_t b, uint8_t pct) { return blend(a, b, pct); }
 
 lv_color_t border() {
     if (s_pal.BORDER) return lv_color_hex(s_pal.BORDER);

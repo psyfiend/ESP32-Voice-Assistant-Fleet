@@ -1,7 +1,8 @@
 #include "GUIManager.h"
-#include "UIToolkit.h"
-#include "UITokens.h"
+#include "UI/UIToolkit.h"
+#include "UI/UITokens.h"
 #include "SystemReport.h"
+#include "Cards/CardDemo.h"
 #include "bsp_loader.h"
 
 // LVGL's event and callback APIs take plain function pointers with no user
@@ -111,6 +112,28 @@ void GUIManager::begin() {
     _pnlSystem.setOnDumpRequested([this]() {
         SystemReport::run(_core, true); // manually triggered - mirror to Serial too
     });
+
+    // The card binder. Started AFTER UI::begin() because a card reads tokens
+    // the moment it is built, and before any page exists because a page
+    // registers its cards with it. Nothing has a card yet - this only starts
+    // the pump.
+    _binder.begin(&_core.entities());
+
+    // Cards read UI::pal() on every render and cache nothing, which is what
+    // makes a live scheme change possible at all. This is the other half of
+    // that bargain: somebody has to tell them the scheme moved.
+    UI::onSchemeChanged([]() { if (s_self) s_self->_binder.restyleAll(); });
+
+    // The System panel's "Cards" button. Registered rather than reached for,
+    // for the same reason Dump Config is: Panel_System has no business knowing
+    // the entity registry exists.
+    _pnlSystem.setOnCardsRequested([this]() {
+        CardDemo::show(_core.entities(), _binder);
+    });
+
+    // The card page's own Dump button runs the same report the System panel's
+    // does, Serial echo and all.
+    CardDemo::setDumpHandler([this]() { SystemReport::run(_core, true); });
 
     // Contribute the one LVGL-dependent section of the report.
     SystemReport::addSection("UI STATE", reportUiSection);

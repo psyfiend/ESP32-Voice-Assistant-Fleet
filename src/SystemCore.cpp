@@ -10,6 +10,7 @@
 // `git describe`). Defined defensively here so a build still succeeds if that
 // hook is ever skipped - a missing version string must never break the build,
 // it just becomes unknown. See docs/ROADMAP.md section 3.3.
+#include "fleet_fw_version.h"
 #ifndef FW_VERSION
     #define FW_VERSION "unknown"
 #endif
@@ -90,6 +91,7 @@ bool SystemCore::begin() {
     // --= 8. Providers =--
     // All three need the registry; two of them also need the broker.
     _sysProvider.begin(&_entities, &_conn);
+    _haPub.setSwVersion(FW_VERSION);   // see HaPublisher::setSwVersion
     _haPub.begin(&_entities, &_mqtt);
     _mqttProv.begin(&_entities, &_mqtt);
 
@@ -101,6 +103,14 @@ bool SystemCore::begin() {
     for (uint8_t i = 0; i < EXTERNAL_ENTITY_COUNT; i++) {
         _entities.add(EXTERNAL_ENTITIES[i]);
     }
+
+    // --= 10. Virtual test entities =--
+    // TEMPORARY scaffolding for milestone 2.4, removed with #44. Registers two
+    // writable switches so the command path has something to command - as of
+    // this milestone nothing else in the fleet is writable at all, and
+    // commandValue() has never run on hardware. Registered last because
+    // nothing else depends on it.
+    _virtProv.begin(&_entities);
 
     return true;
 }
@@ -153,4 +163,5 @@ void SystemCore::loop() {
     _entities.tick(now);
     _haPub.loop(now);
     _mqttProv.loop(now);
+    _virtProv.loop(now);
 }

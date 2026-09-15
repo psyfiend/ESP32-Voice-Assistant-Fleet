@@ -1,6 +1,6 @@
-#include "Panel_Audio.h"
-#include "UITokens.h"
-#include "UIToolkit.h"
+#include "UI/Panel_Audio.h"
+#include "UI/UITokens.h"
+#include "UI/UIToolkit.h"
 
 #define REC_LIMIT_SECONDS 5.0f
 

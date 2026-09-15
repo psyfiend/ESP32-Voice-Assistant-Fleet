@@ -121,6 +121,27 @@ struct Entity {
     EntityValue prevValue;             // value before the optimistic write
     uint32_t    pendingSinceMs = 0;
 
+    // Did the LAST command on this entity fail to take?
+    //
+    // This lives on the entity rather than on whichever card issued the
+    // command, and that placement is the whole point. A card bound to several
+    // switches was previously tracking its own commands in a bitmask, so a
+    // parent card and a child card bound to the same switch could disagree
+    // about whether it had failed - the answer depended on which card you had
+    // tapped, not on what the switch was actually doing. The owner's rule is
+    // that a parent reflects "the current state of the children, NOT the
+    // method or path in which child cards arrived at their state", and that is
+    // only expressible if the fact belongs to the thing itself.
+    //
+    // Set when the reconcile window expires, or when an echo arrives carrying
+    // the value from BEFORE the command. Cleared by the next command, and by
+    // any genuine change from the source - at which point we know the current
+    // state and the old failure is history.
+    //
+    // It is one bool and no new dependency, so the zero-dependency guarantee
+    // of ROADMAP Q9 is untouched.
+    bool        cmdFailed      = false;
+
     // Needs a UI update. Lives here rather than in a parallel array in the
     // registry so that entity storage is ONE allocation - which is what lets
     // the whole table be placed in PSRAM with a single call. See

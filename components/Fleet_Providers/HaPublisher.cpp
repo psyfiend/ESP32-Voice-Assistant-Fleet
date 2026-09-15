@@ -109,14 +109,14 @@ void HaPublisher::publishDiscovery() {
         appendKV(j, "name", bsp_hw.device_name);
         appendKV(j, "mf",   bsp_hw.MANUFACTURER);
         appendKV(j, "mdl",  bsp_hw.MODEL);
-        appendKV(j, "sw",   FW_VERSION);
+        appendKV(j, "sw",   _swVersion);
         closeObj(j);
     }
 
     // Origin: what software produced this. Fleet-wide, identical on every board.
     j += ",\"o\":{";
     appendKV(j, "name", "ESP32 Voice Assistant Fleet");
-    appendKV(j, "sw",   FW_VERSION);
+    appendKV(j, "sw",   _swVersion);
     closeObj(j);
 
     j += ",\"cmps\":{";

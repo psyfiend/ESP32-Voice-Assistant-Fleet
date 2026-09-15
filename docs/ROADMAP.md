@@ -608,17 +608,36 @@ had **never been run** immediately exposed a real bug (#42). When scope has to b
 
 ### Phase 2 — UI foundation
 
+**What 2.4 lets us close, and what it does not.** Checked against the tracker rather than against
+memory, because 2.4 delivered several things that were scheduled for later milestones and it would
+be easy to either double-build them or wrongly tick them off.
+
+| Issue | After 2.4 | Why |
+|---|---|---|
+| **#15** 2.4 Card base class | **CLOSE**, once hardware signs off | Every acceptance criterion has an implementation. `docs/TEST_2.4.md` is the sign-off gate |
+| **#18** 2.7 First four card types | **KEEP OPEN — partially done** | All four types exist in `CardCatalog.h` (plus `light`), with compact and full variants. What 2.7 still owes is its other half: *bound to real HA entities*, and the local-only demo cards that make a fresh flash useful with no network |
+| **#16** 2.5 Page + grid engine | **KEEP OPEN** | `CardPage` derives columns and honours spans, but nothing reads `CardPlacement::priority`. Real responsive degradation means ordering by it and dropping the losers, and that is 2.5's job. A config struct is also still 2.5 |
+| **#44** Outbound commands | **KEEP OPEN, and not a 2.4 requisite** | Owner's call. The command path is exercised end to end by two virtual switches; what is missing is publishing a real command to a real broker |
+| **#43** Read HA without MQTT | **KEEP OPEN, and PROMOTED** | No longer "an alternative way to reach HA". See `FUTURE_IMPROVEMENTS.md` — MQTT carries a value per topic and nothing else, so every piece of metadata needs a hand-crafted topic per entity. Websocket is the path for HA entities |
+| **#19** 2.8 Header bar v2 | **KEEP OPEN** | The card header is the degenerate two-slot case of the slot list 2.8 generalises. 2.4 did not build the general mechanism |
+| **#20** 3.1 Build sheet schema | **KEEP OPEN**, but better specified now | 2.4 settled what it has to express: a domain, a header mode, whether area shows, spans, and a variant override |
+| **#3** `lv_conf.h` vs 9.5 | **KEEP OPEN** | Untouched by 2.4 |
+
+Not touched by 2.4 at all, listed so nobody re-checks: #48, #47, #46, #42, #41, #40, #39, #37, #36
+and everything in Phases 4 through 6.
+
+
+
 | # | Milestone | Acceptance criteria |
 |---|---|---|
 | 2.1 | Startup reorg | **DONE 2026-09-09, hardware-verified on both dev targets.** Landed as a 5-way split — `main` / `SystemCore` / `SystemReport` / `LVGL_Startup` / `GUIManager`. Identical UI behaviour, boot serial, entities and HA discovery on `WS_P4_5` and `CYD_S3_3248`. Design, decisions and the one real re-sequencing (LVGL now initialises last) in `docs/design/startup.md` |
 | 2.2 | Design system | **DONE 2026-09-10, hardware-verified.** `UITokens` - palette incl. semantic state colours, per-scheme metrics, derived grid, type scale. Reference page reachable from the System panel, three schemes switchable live. Panels ported off hardcoded colours. **MDI icon font deferred to 2.4** - see below. `docs/design/tokens.md` |
 | 2.3 | Memory budget spike | **DONE 2026-09-10, measured on `CYD_S3_3248`.** ~715 B per card in `lv_mem`; pool steady at 35% with dashboard + reference page. **Decision: neither lazy-loading nor a PSRAM `LV_MEM` is needed** - see below. No longer gates 2.5 |
-
-| 2.4 | `Card` base class | Grid placement with spans, entity binding, staleness handling, tap + long-press, compact/full variants. Also the agreed moment to introduce `src/UI/` and `src/Cards/` — see `docs/design/startup.md` §3.5 |
-| 2.5 | Page + grid engine | A Page renders a grid from a config struct; cards place with spans; correct on 3 different resolutions |
+| 2.4 | `Card` base class | **DONE 2026-09-15, hardware-verified on `WS_P4_5`, `CYD_S3_3248` and `WS_P4_7B`.** `Card` base + `ValueCard`/`StateCard` layouts + five domain types behind `CardCatalog`; `CardBinder` (the first caller of `drainDirty()` in the project's history); `CardPage` with spans. Type scale and MDI icon subset both generated per board. `src/UI/` and `src/Cards/` introduced. Layout model and every trap behind it written up in `docs/design/card-layout.md` — **read that before moving anything on a card** |
+| 2.5 | Page + grid engine | A Page renders a grid from a config struct; cards place with spans; correct on 3 different resolutions. **Inherits from 2.4:** `CardPage` already derives columns and honours spans, but nothing reads `CardPlacement::priority` — real responsive degradation means ordering by it and dropping the losers, which is this milestone's job |
 | 2.6 | Tileview navigation | Swipe L/R between pages, U/D to menus; gesture conflicts resolved (§5.2); page indicator dots |
-| 2.7 | First 4 card types | `sensor`, `binary_sensor`, `switch`, `button` — bound to real HA entities over MQTT |
-| 2.8 | Header bar v2 | Configurable slot list: clock, WiFi/MQTT status, optional sensor slots |
+| 2.7 | First 4 card types | `sensor`, `binary_sensor`, `switch`, `button` — bound to real HA entities over MQTT. **Largely landed early at 2.4**: all four exist in `CardCatalog.h`, plus `light`. What 2.7 still owes is binding them to real HA entities rather than the virtual test switches, and whatever each type needs that a generic layout does not give it |
+| 2.8 | Header bar v2 | Configurable slot list: clock, WiFi/MQTT status, optional sensor slots. **Build the slot mechanism ONCE and use it three times** — `cards.md` §8: the page header, a group card's header, and a normal card's header are the same idea at different sizes, and a card's is the degenerate two-slot case (area left, STALE right) that 2.4 hardcoded. If 2.8 builds a general named-slot list rather than the page header specifically, the group card gets its header free and the build sheet gets one grammar for all three |
 | 2.9 | **Display stack: Arduino_GFX -> `esp_lcd`** | Scheduled here deliberately, not left as "someday" - see `docs/FUTURE_IMPROVEMENTS.md` and `docs/research/display-stack-migration.md`. Unlocks real framebuffers, working rotation, and `esp_lvgl_adapter`. Done *after* the card system so there is a demanding workload to judge it against |
 
 **What 2.3 actually found, and why the decision went the way it did.**

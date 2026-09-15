@@ -218,3 +218,56 @@ actually on the include path before reasoning about its contents.
 to be cut, "never observed at all" is a better selection criterion than "most likely to
 fail" — connectivity test 4 was retained on those grounds and immediately exposed the
 `AP_ACTIVE` state bug.
+
+## LVGL, from milestone 2.4
+
+**An out-of-range grid row is a hard freeze, not a wrong layout.** `lv_conf.h` defines
+`LV_ASSERT_HANDLER` as `while(1);`, so indexing a grid's row descriptor past its end locks the
+board with no serial output and no reboot — indistinguishable from a hang in your own code.
+`CardPage` defined exactly as many rows as *fit* the viewport while placement flowed into as many
+as the cards *needed*. `WS_P4_5` survived it by luck: nine cards at five columns fill exactly
+5×2 with nothing left over. `CYD_S3_3248` at two columns needs five rows and froze solid.
+
+Two things follow. **Flash the veto board first, not second** — the tightest board is where an
+off-by-one becomes a crash rather than a cosmetic bug. And when a board freezes with no output at
+all, `LV_ASSERT` is a better first hypothesis than an infinite loop of your own.
+
+**`lv_obj_align_to()` resolves against the reference object's position at the moment it is
+called.** Not at layout time. Positioning a widget from a sibling that was re-aligned earlier in
+the same function places it against the sibling's *stale* coordinates — which is how a
+measurement card's unit ended up rendering beside the card's name instead of beside its number.
+The same mistake, in three places in one file, also wrapped "Deck" onto two lines.
+
+**The fix is to stop hand-positioning and let a layout do it.** A flex row measures after layout
+rather than during render, which is the only time the measurements are real. Reach for
+`lv_obj_align_to()` only against something whose position is already settled.
+
+**`LV_LABEL_LONG_DOT` needs a real width to ellipsise against**, and silently wraps without one.
+`flex_grow` on the label gives it that width; setting only the parent's does not.
+
+**A child that must escape its parent's bounds needs `LV_OBJ_FLAG_OVERFLOW_VISIBLE`.** LVGL clips
+children by default and does so silently — the widget simply is not there. The card's area tag
+hangs above its cell and vanished entirely until the cell carried that flag.
+
+## A paraphrase can outrank the spec
+
+`docs/design/cards.md` lists card types by Home Assistant domain, and ROADMAP 2.7 names the first
+four the same way. The phrase "two layout families — Measure cards and Actor cards" existed in
+exactly one place: `HANDOFF.md`, as a **summary written to brief the next session**.
+
+The next session read the summary first, promoted it to the class names, and skipped the domain
+layer the spec actually called for. Nothing contradicted anything — the paraphrase was accurate
+about layout and silent about types, and silence is what got implemented.
+
+**When a handoff note compresses a spec, it becomes the spec for whoever reads it first.** The
+owner caught this by instinct ("I am not a fan of the actor/measure nomenclature") well before
+anyone went back to the source document. Two defences, both cheap: say *which* document a summary
+is compressing, and treat a summary's vocabulary as suspect whenever it does not appear in the
+thing it summarises.
+
+## Writing C string literals through a script
+
+`\n` inside a Python heredoc becomes a real newline in the emitted C, producing `missing
+terminating " character` — a warning `HANDOFF.md` already carried, and which still cost a build
+cycle in this milestone. Prefer a line-based edit for anything containing an escape sequence, and
+re-read the emitted line rather than trusting the patch.

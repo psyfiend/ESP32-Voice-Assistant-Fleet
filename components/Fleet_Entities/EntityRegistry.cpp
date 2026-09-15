@@ -134,9 +134,39 @@ bool EntityRegistry::setValue(const char *id, const EntityValue &v, uint32_t now
     // the echo we were waiting for. It clears even when the value disagrees
     // with what we optimistically applied - the source is right and we were
     // wrong, which is exactly the case the reconcile exists to catch.
+    const bool wasPending = e.pending;
     e.pending = false;
 
     const bool changed = !e.value.equals(v) || !e.everSet;
+
+    // Resolve the command this echo answers. A cooperative device echoes the
+    // value we optimistically applied, so `changed` is false and the entity is
+    // not even dirtied - which is why the outcome has to be recorded here
+    // rather than left for a listener to infer from a notification that never
+    // arrives.
+    //
+    // The test is against prevValue, the state from BEFORE the command: an
+    // echo carrying that value means the command did not take. That is correct
+    // in both failure modes - a device that silently ignored us and a device
+    // that actively reported it stayed put both report the old value, and both
+    // mean the same thing to whoever is looking at the screen.
+    if (wasPending) {
+        // Compared against what we OPTIMISTICALLY APPLIED, which is e.value at
+        // this moment, not against prevValue.
+        //
+        // prevValue is the state from before the FIRST command in a burst - it
+        // is deliberately not overwritten by a second command inside the same
+        // window, so the revert cannot restore a state the hardware never had.
+        // That makes it the wrong baseline for "did this take": tap a switch
+        // twice quickly and the value legitimately returns to prevValue, and
+        // comparing against it declared a perfectly successful command failed.
+        // That is the residual "Obeys can still show FAILED" case.
+        e.cmdFailed = !v.equals(e.value);
+    } else if (changed) {
+        // An unsolicited change means we now know the current state, so an
+        // older failure is history rather than news.
+        e.cmdFailed = false;
+    }
 
     e.value        = v;
     e.lastUpdateMs = nowMs;
@@ -165,6 +195,10 @@ bool EntityRegistry::commandValue(const char *id, const EntityValue &v, uint32_t
     // window overwriting prevValue with the optimistic value from the first -
     // that would make the revert restore a state the hardware never had.
     if (!e.pending) e.prevValue = e.value;
+
+    // A fresh command supersedes the previous verdict. Leaving it set would
+    // report the old failure while the new attempt is still in flight.
+    e.cmdFailed      = false;
 
     e.value          = v;
     e.pending        = true;
@@ -213,9 +247,10 @@ void EntityRegistry::tick(uint32_t nowMs) {
         // when the command was never acted upon is precisely the class of lie
         // this project has already been bitten by three times.
         if (e.pending && (nowMs - e.pendingSinceMs) > _reconcileMs) {
-            e.value   = e.prevValue;
-            e.pending = false;
-            e.dirty   = true;
+            e.value     = e.prevValue;
+            e.pending   = false;
+            e.cmdFailed = true;   // the echo never came: it did not take
+            e.dirty     = true;
         }
     }
 }

@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 #include <functional> // Required for std::function
-#include "Panel_Header.h"
-#include "UIToolkit.h"
+#include "UI/Panel_Header.h"
+#include "UI/UIToolkit.h"
 #include "SystemReport.h"
 
 class Panel_System {
@@ -24,6 +24,18 @@ public:
     // reached from this UI file straight into main.
     using DumpCallback = std::function<void()>;
     void setOnDumpRequested(DumpCallback cb) { _onDumpRequested = cb; }
+
+    // What to run when the "Cards" button is pressed. Registered by GUIManager
+    // for the same reason the dump callback is: the card demo needs the entity
+    // registry and the card binder, and this panel has no business knowing
+    // either exists. Lower layers never reach up into UI, and UI files do not
+    // reach sideways into each other's dependencies.
+    using CardsCallback = std::function<void()>;
+    void setOnCardsRequested(CardsCallback cb) { _onCardsRequested = cb; }
+
+    // Fires the above. Public because a capture-less lv_event_cb lambda is a
+    // free function, not a member, so it cannot reach a private field.
+    void requestCards() { if (_onCardsRequested) _onCardsRequested(); }
 
     // Update system stats - SAFE to call from anywhere
     void updateSystemStats(float voltage, float current, int wifi_rssi);
@@ -63,7 +75,8 @@ private:
     // -- Safe Data Buffering --
     std::vector<std::string> _log_queue;
     bool _log_dirty;
-    DumpCallback _onDumpRequested = nullptr;
+    DumpCallback  _onDumpRequested  = nullptr;
+    CardsCallback _onCardsRequested = nullptr;
 
     // Sink registered with SystemReport in init(), so report lines land in this
     // panel. Serial mirroring is SystemReport's job now, not log()'s.

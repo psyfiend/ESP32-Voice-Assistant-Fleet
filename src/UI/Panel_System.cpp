@@ -1,6 +1,6 @@
-#include "Panel_System.h"
-#include "ReferencePage.h"
-#include "UITokens.h"
+#include "UI/Panel_System.h"
+#include "UI/ReferencePage.h"
+#include "UI/UITokens.h"
 
 // The single System panel, so the SystemReport sink (a plain function pointer)
 // can reach it. One panel exists by construction.
@@ -164,6 +164,31 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_center                   (lblRef);
     lv_obj_set_style_text_font      (lblRef, UIToolkit::Font_Button, 0);
     lv_obj_set_style_text_color     (lblRef, UI::c(UI::pal().TEXT), 0);
+
+    // Button: Cards - opens the 2.4 card demo as its own screen.
+    //
+    // Same shape as Tokens above and for the same reason: the dashboard
+    // underneath stays untouched, so a card layout can be judged without
+    // disturbing anything that already works. Unlike Tokens it goes through a
+    // registered callback, because the page it opens needs the entity registry
+    // and the card binder and this panel must not know about either.
+    lv_obj_t* btnCards = lv_button_create(_ui_actions);
+    lv_obj_set_height               (btnCards, UIToolkit::sc(32));
+    lv_obj_set_width                (btnCards, LV_SIZE_CONTENT);
+    lv_obj_set_flex_grow            (btnCards, 1);
+    lv_obj_add_event_cb             (btnCards, [](lv_event_t *e) {
+                                        Panel_System *self = (Panel_System *)lv_event_get_user_data(e);
+                                        if (self) self->requestCards();
+                                     }, LV_EVENT_CLICKED, this);
+    lv_obj_set_style_bg_color       (btnCards, UI::c(UI::pal().SURFACE_ALT), 0);
+    lv_obj_set_style_border_width   (btnCards, 1, 0);
+    lv_obj_set_style_border_color   (btnCards, UI::border(), 0);
+
+    lv_obj_t* lblCards = lv_label_create(btnCards);
+    lv_label_set_text               (lblCards, "Cards");
+    lv_obj_center                   (lblCards);
+    lv_obj_set_style_text_font      (lblCards, UIToolkit::Font_Button, 0);
+    lv_obj_set_style_text_color     (lblCards, UI::c(UI::pal().TEXT), 0);
 
     // -- ROW 3: Log Container --
     lv_obj_t* log_box = lv_obj_create(_ui_content);
