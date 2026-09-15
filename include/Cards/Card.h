@@ -278,6 +278,13 @@ protected:
     static int32_t statusBandHeight();   // battery / last-seen
     static int32_t midGap();             // between the hero and the name
 
+    // How tall the hero's band actually is on THIS card, from the tokens and
+    // the card's own header mode. A hero that sizes itself from its font alone
+    // will overflow a small cell - which is what clipped the disc top and
+    // bottom on CYD_S3_3248, where the band is 55 px and a font-derived disc
+    // wanted 68.
+    int32_t midHeight() const;
+
 private:
     void buildHeader();
     void applyState();                 // repaint chrome for _state

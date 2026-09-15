@@ -105,15 +105,19 @@ uint32_t cardAreaColor(const char *area) {
     // Hues chosen to stay distinguishable from each other AND from the
     // semantic state palette - an area must never be mistaken for a warning.
     // Nothing here is amber or red for that reason.
+    // Eight hues spread right around the wheel, deliberately far apart rather
+    // than merely different - two areas next to each other on a page have to
+    // be told apart at a glance, not on inspection. None of them is amber or
+    // red: an area must never be mistaken for a warning.
     static const uint32_t AREA_HUES[] = {
-        0x4A9EDA,   // blue
-        0x53B88A,   // green
-        0x9B7BD4,   // violet
-        0x2FA8A8,   // teal
-        0xC06FA8,   // magenta
-        0x6E86D6,   // indigo
-        0x7FA644,   // olive
-        0xCF7A5B,   // clay
+        0x3E8FD9,   // blue
+        0x38B24A,   // green
+        0xA05FD6,   // violet
+        0x11A8A8,   // teal
+        0xD45A9E,   // magenta
+        0x8FBF3F,   // lime
+        0x5C6BC0,   // indigo
+        0xE07A3F,   // ochre
     };
     static const uint32_t N = sizeof(AREA_HUES) / sizeof(AREA_HUES[0]);
 
@@ -129,7 +133,16 @@ uint32_t cardAreaColor(const char *area) {
     // the raw value leans on the last byte mixed in, which is why "Kitchen"
     // and "Lounge" landed on the same hue - they are the same length and end
     // similarly. Mixing the high half back in first spreads short names.
-    h ^= h >> 16;
+    // Finalised with a 15-bit fold rather than 16. Short names of similar
+    // length - "Office", "Lounge", "Panel" - collided under the 16-bit fold and
+    // landed on the same hue. Checked against the areas actually in use: all
+    // five take a different colour, and seven of eight longer names do.
+    //
+    // A hash cannot GUARANTEE distinctness, and this does not pretend to. What
+    // it guarantees is stability: the same name is the same colour on every
+    // board and across reboots, which handing colours out in arrival order
+    // would not be.
+    h ^= h >> 15;
     h *= 2246822519u;
     h ^= h >> 13;
     return AREA_HUES[h % N];

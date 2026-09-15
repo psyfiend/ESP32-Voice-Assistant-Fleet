@@ -414,6 +414,21 @@ int32_t Card::midGap() {
     return UI::sc(6);
 }
 
+int32_t Card::midHeight() const {
+    const UIGrid    &g = UI::grid();
+    const UIMetrics &m = UI::met();
+
+    int32_t h = (int32_t)g.cellH * (_place.prefSpanY ? _place.prefSpanY : 1);
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+    if (_hdrStyle == CardHeaderStyle::HDR_BAR) h -= Card::headerHeight();
+
+    h -= UI::sc(m.PAD) * 2;                       // the body's own padding
+    h -= lv_font_get_line_height(UI::type().NAME);
+    h -= midGap();
+    if (_resolved != CardVariant::VAR_COMPACT) h -= statusBandHeight();
+    return h > 0 ? h : 0;
+}
+
 // The area's colour, or the accent when it has none.
 //
 // The owner's idea, and it is what the header is FOR: "have the areas be

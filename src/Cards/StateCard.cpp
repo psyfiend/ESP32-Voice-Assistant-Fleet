@@ -38,8 +38,6 @@ void StateCard::buildBody(lv_obj_t *body) {
     lv_obj_set_flex_align(_mid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_bottom(_mid, Card::midGap(), 0);
-    // Same top inset as ValueCard, so the two heroes sit at the same height.
-    lv_obj_set_style_pad_top   (_mid, Card::topBandHeight() / 2, 0);
 
     // A plain object with a full radius rather than an arc or an image: it is
     // a circle behind a glyph, and the cheapest thing that draws a circle in
@@ -108,11 +106,14 @@ void StateCard::render() {
     // full face: VALUE is a digits-only subset on the dense boards and cannot
     // draw an LV_SYMBOL glyph at all.
     const int32_t iconPx = lv_font_get_line_height(t.ICON);
-    // TWICE the line height, not 1.8x. An icon's ink can exceed its font's
-    // nominal line height - the MDI subset is drawn to its own metrics - and an
-    // lv_obj clips its children, so a disc sized too closely to the glyph cut
-    // the top off it. That is the clipping the owner spotted on CYD_S3_3248.
-    const int32_t discPx = iconPx * 2;
+    // CLAMPED TO THE BAND IT SITS IN. Twice the line height is the look on a
+    // large card; on CYD_S3_3248 the band is 55 px and twice the line height
+    // wants 68, so the disc was clipped top and bottom - by its own parent,
+    // not by the glyph. Sizing it from the font alone was the mistake, and
+    // making the multiplier larger made it worse.
+    const int32_t room   = midHeight();
+    int32_t discPx = iconPx * 2;
+    if (room > 0 && discPx > room) discPx = room;
     lv_obj_set_size        (_disc, discPx, discPx);
     lv_obj_set_style_radius(_disc, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_pad_bottom(_disc, 0, 0);
