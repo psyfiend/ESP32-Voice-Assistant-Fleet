@@ -39,15 +39,18 @@ Phase 2.
    a number and reflashing. That is not how the next change should go.
 3. **`docs/design/dashboard.md` — the page spec, new at 2.5.** How a page is described, placed
    and degraded, the two grid knobs and what they each decide, and the unit policy.
-4. `docs/design/cards.md` — the card spec. Read the "Implementation notes" section at the end
+4. **`docs/design/ha-websocket.md`** — what Home Assistant's websocket API actually gives us,
+   measured against the real instance. Read before designing #43; it contains one finding that
+   changes the architecture (`subscribe_trigger`, not `subscribe_events`).
+5. `docs/design/cards.md` — the card spec. Read the "Implementation notes" section at the end
    first: it records where the build deviates from the body of the document, and why.
-5. `docs/design/tokens.md` — the design system and the measurements behind it.
-6. `docs/design/startup.md` — only if you are touching boot order or LVGL setup.
-7. **`docs/REFERENCE_PROJECTS.md`** - read section "The page/view/grid back-end" before any
+6. `docs/design/tokens.md` — the design system and the measurements behind it.
+7. `docs/design/startup.md` — only if you are touching boot order or LVGL setup.
+8. **`docs/REFERENCE_PROJECTS.md`** - read section "The page/view/grid back-end" before any
    navigation or build-sheet work. It was missing from this list and should not have been: the
    NINA project's frozen-id / append-only page registry is a decision we would otherwise make
    badly and only find out about after something had been persisted.
-8. `docs/ROADMAP.md` §7 — the milestone list, and what 2.4 lets us close in the tracker.
+9. `docs/ROADMAP.md` §7 — the milestone list, and what 2.4 lets us close in the tracker.
 
 `docs/research/` holds three background reports. Not on the critical path — read them when the owner
 raises the topic.
@@ -95,27 +98,31 @@ so a card's ratio is an output. Nothing constrains a card to a ratio.
 
 ---
 
-## What to do first: turn the knobs on the 7B
+## Where 2.5 stands
 
-**This is the one thing waiting on hardware, and it is why 2.5 is not signed off.**
+**Flashed on `WS_P4_7B` 2026-09-16 and it works** - the device boots into the dashboard, cards
+render, the panels animate over them, priority degradation drops the right cards. Five defects came
+out of that session and all five are fixed on the branch but **not yet re-flashed**:
 
-`WS_P4_TOUCH_LCD_7B` is the board the owner intends to actually use. Its grid currently forces
-every card to the compact variant, and the threshold is calculable: at 170 PPI a full card needs
-**129 px** of row height in `HDR_BAR` / `HDR_TAG` and **109 px** in `HDR_NONE`. That number also
-explains 2.4's unexplained "~13 px short" - the bench gave 116 px, and 129 - 116 = 13.
+| Found | Cause | Fixed by |
+|---|---|---|
+| Every card compact; hiding the deck made it worse | row count came from geometry, so the page sized cards for rows nothing was in | rows now come from the cards - `CardPage::rowsWanted()` |
+| Permanent gap between the bottom row and the deck | reserved `sc(85)+sc(20)` for a strip that is really 45 px | measured with `lv_obj_get_coords()` |
+| Tapping "Cards" reset the board | bench built 13 more cards beside the dashboard's 13 - 2.4's documented layer-buffer death | dashboard torn down before the bench opens |
+| "Show Touches" did nothing | overlay was a child of the screen, under the dashboard | moved to `lv_layer_top()` |
+| "Seen: now" on the panel's own cards | last-seen shown for entities we own | hidden when `advertise == true` |
 
-With the deck shown, the 7B's row height is quantised to **202 px at 2 rows, 131 at 3, 95 at 4**,
-so three rows is the practical maximum and 131 clears the threshold by **two pixels**. Hiding the
-deck moves three rows to 166. Columns are free: 4/5/6/7 columns gives 12/15/18/21 cells, and 6x3
-is 18 - almost exactly the owner's list.
+`ASPECT_PCT` changed meaning as part of the first fix: it is a **ceiling on card height**, not a
+row-count hint. `TARGET_CARD_W` default moved to 135, which is the 6x3 layout the owner chose on
+the 7B. Full reasoning in `docs/design/dashboard.md` section 6.
 
-Open the System drawer and use `Col -/+`, `Row -/+` and `Deck`. `DEBUG_CARDS` is enabled on that
-environment, so every card prints `cell N need N -> variant` and each knob prints the resulting
-grid. **Bake the winning numbers into `UITokens.cpp` and take `-D DEBUG_CARDS` back out.**
+**To close 2.5:** re-flash the 7B and confirm the five above, then flash `WS_P4_5` and
+`CYD_S3_3248` - the 3248 is the priority-degradation check, since it cannot fit 13 cards and
+should drop the three `PRI_DEBUG` Panel cards first.
 
-Also unverified on glass: the `Deck` toggle's reserve arithmetic (a collapsed panel is `sc(85)`
-plus `sc(10)` of deck padding - believed, not measured), whether an expanded panel covers the
-cards cleanly, and whether the dashboard still receives touches under the transparent deck.
+**Still open on the 7B, owner's own observation:** icons look undersized on large cards. Both icon
+faces are chosen by pixel density alone and never by cell size. Recorded in `FUTURE_IMPROVEMENTS`
+with the catch - the faces already exist per board, but every *referenced* face costs flash.
 
 ---
 
