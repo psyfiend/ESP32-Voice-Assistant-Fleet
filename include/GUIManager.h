@@ -46,6 +46,15 @@ public:
     void nudgeCardWidth(int8_t steps);
     void nudgeAspect(int8_t steps);
     void toggleDeck();
+
+    // Cycle the header treatment on the live dashboard: tag -> bar -> none.
+    //
+    // All three modes ship permanently - cards.md is explicit that picking one
+    // is "what a card looks like when nobody chose", not an elimination - so
+    // this is how a default gets chosen by looking at it. It is deliberately
+    // RUNTIME state rather than a rebuild-time constant, because the device
+    // settings page (4.1) will own exactly this control later.
+    void cycleHeader();
     bool deckShown() const { return _showDeck; }
 
     Panel_Header &header()      { return _header; }
@@ -77,6 +86,10 @@ private:
     // It costs a row of cards on every board, which is a real trade rather
     // than a preference - see buildDashboard().
     bool          _showDeck = true;
+
+    // Overrides PageSpec::headerDefault. The spec is const; this is the live
+    // choice laid over it in buildDashboard().
+    CardHeaderStyle _hdr = CardHeaderStyle::HDR_TAG;
     lv_obj_t     *_deck     = nullptr;
 
     Panel_Header  _header;

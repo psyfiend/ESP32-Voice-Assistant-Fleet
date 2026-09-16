@@ -11,6 +11,7 @@ Panel_System::Panel_System() {
     _ui_content = NULL;
     _ui_actions = NULL;
     _ui_grid    = NULL;
+    _lbl_hdr    = NULL;
     txt_log     = NULL;
     lbl_stats   = NULL;
     _headerRef  = NULL;
@@ -51,6 +52,10 @@ void Panel_System::reportSink(const char *line) {
 
 // One knob button. Capture-less lambdas only - an lv_event_cb_t is a plain
 // function pointer, so the panel arrives as user_data rather than in a capture.
+void Panel_System::setHeaderLabel(const char *text) {
+    if (_lbl_hdr && text) lv_label_set_text(_lbl_hdr, text);
+}
+
 static lv_obj_t *knobButton(lv_obj_t *parent, Panel_System *self,
                             const char *text, lv_event_cb_t cb) {
     lv_obj_t *b = lv_button_create(parent);
@@ -250,6 +255,17 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
         Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
         if (p) p->requestGrid(Panel_System::GridAction::DECK_TOGGLE);
     });
+
+    // Header mode, on the LIVE dashboard rather than on the bench. All three
+    // modes ship - cards.md treats this as "what a card looks like when nobody
+    // chose", not an elimination - so this is the owner picking a default by
+    // looking at it, and it is the same control the device settings page will
+    // eventually own.
+    lv_obj_t *btnHdr = knobButton(_ui_grid, this, "Tag", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestGrid(Panel_System::GridAction::HDR_CYCLE);
+    });
+    _lbl_hdr = lv_obj_get_child(btnHdr, 0);
 
     // -- ROW 3: Log Container --
     lv_obj_t* log_box = lv_obj_create(_ui_content);

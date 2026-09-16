@@ -52,10 +52,15 @@ public:
         CARD_W_DOWN, CARD_W_UP,    // TARGET_CARD_W - decides COLUMNS
         ASPECT_DOWN, ASPECT_UP,    // ASPECT_PCT    - decides ROWS
         DECK_TOGGLE,               // the deck costs a row on every board
+        HDR_CYCLE,                 // bar / tag / none, on the live dashboard
     };
     using GridCallback = std::function<void(GridAction)>;
     void setOnGridAction(GridCallback cb) { _onGridAction = cb; }
     void requestGrid(GridAction a) { if (_onGridAction) _onGridAction(a); }
+
+    // The header-mode button says which mode is live. Set by GUIManager, which
+    // owns the choice - this panel only knows a button was pressed.
+    void setHeaderLabel(const char *text);
 
     // Update system stats - SAFE to call from anywhere
     void updateSystemStats(float voltage, float current, int wifi_rssi);
@@ -77,6 +82,7 @@ private:
     lv_obj_t* _ui_content; // The Inner Container (Has Padding & Style, Auto Height)
     lv_obj_t* _ui_actions; // Button Row
     lv_obj_t* _ui_grid;    // Second button row - the 2.5 grid knobs
+    lv_obj_t* _lbl_hdr;    // label inside the header-mode button
     
     lv_obj_t* txt_log;     // The log text label
     lv_obj_t* lbl_stats;   // The stats header label

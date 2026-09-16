@@ -152,6 +152,7 @@ void GUIManager::begin() {
             case Panel_System::GridAction::ASPECT_DOWN: nudgeAspect(-1);    break;
             case Panel_System::GridAction::ASPECT_UP:   nudgeAspect(+1);    break;
             case Panel_System::GridAction::DECK_TOGGLE: toggleDeck();       break;
+            case Panel_System::GridAction::HDR_CYCLE:   cycleHeader();     break;
         }
     });
 
@@ -266,7 +267,18 @@ void GUIManager::buildDashboard() {
 
     _page = new CardPage();
     _page->begin(_dashHost, &_binder);
-    _page->applySpec(FLEET_PAGE, _core.entities());
+
+    // The fleet spec is const and carries a header default; the live choice is
+    // laid over a copy of it. PageSpec is a plain aggregate, so this is a copy
+    // and an assignment rather than any kind of mechanism - which is the point
+    // of the spec being data.
+    PageSpec page = FLEET_PAGE;
+    page.headerDefault = _hdr;
+    _page->applySpec(page, _core.entities());
+
+    _pnlSystem.setHeaderLabel(_hdr == CardHeaderStyle::HDR_TAG  ? "Tag"
+                            : _hdr == CardHeaderStyle::HDR_BAR  ? "Bar"
+                                                                : "No hdr");
 
     lv_obj_move_to_index(_dashHost, 1);
 
@@ -317,6 +329,20 @@ void GUIManager::nudgeAspect(int8_t steps) {
                   (unsigned)UI::grid().ASPECT_PCT,
                   (unsigned)UI::grid().cols, (unsigned)UI::grid().rows,
                   (unsigned)UI::grid().cellW, (unsigned)UI::grid().cellH);
+}
+
+void GUIManager::cycleHeader() {
+    // A rebuild, not a restyle. A header bar is CREATED in Card::build() rather
+    // than styled in restyle(), and that is correct - it is a structural choice
+    // a card makes once, not a live style. CardDemo's own header button has
+    // always worked this way for the same reason.
+    _hdr = (_hdr == CardHeaderStyle::HDR_TAG) ? CardHeaderStyle::HDR_BAR
+         : (_hdr == CardHeaderStyle::HDR_BAR) ? CardHeaderStyle::HDR_NONE
+                                              : CardHeaderStyle::HDR_TAG;
+    rebuildDashboard();
+    Serial.printf("[Cards] header mode -> %s\n",
+                  _hdr == CardHeaderStyle::HDR_TAG ? "tag"
+                : _hdr == CardHeaderStyle::HDR_BAR ? "bar" : "none");
 }
 
 void GUIManager::toggleDeck() {
