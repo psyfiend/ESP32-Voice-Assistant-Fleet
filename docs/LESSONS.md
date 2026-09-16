@@ -271,3 +271,27 @@ thing it summarises.
 terminating " character` — a warning `HANDOFF.md` already carried, and which still cost a build
 cycle in this milestone. Prefer a line-based edit for anything containing an escape sequence, and
 re-read the emitted line rather than trusting the patch.
+
+
+**It happened three more times at 2.5, in one session, after the lesson above had been read.**
+Quoting the heredoc delimiter (`<<'PYEOF'`) is *not* enough: one level of backslash is still
+consumed before Python sees the string, so a doubled escape arrives as a single one and Python
+turns it into the character it denotes. The damage is not always a compile error:
+
+| Written | Landed in the file | Symptom |
+|---|---|---|
+| `"\xC2\xB0"` | the two UTF-8 bytes it denotes, as real characters | file reads as "binary", compiles, renders wrong |
+| `'\0'` | a literal NUL byte inside the source | file reads as "binary", string silently terminates |
+| `"... px\n"` | a real newline inside a string literal | missing terminating quote - the only loud one |
+
+Only the last one announces itself; the first two produce a file that builds and behaves wrongly.
+
+**So the rule is not "prefer a line-based edit" - it is: never put a backslash escape in text a
+script writes.** Build the backslash explicitly with `chr(92)`, or use an editor tool rather than
+a script for that file. `grep` calling a source file "binary" is the tell, and anything a script
+just wrote is worth a byte scan:
+
+    python -c "d=open(F,'rb').read(); print([hex(b) for b in d if b<9 or b>126])"
+
+A second, unrelated trap from the same session: an anchor string for a patch must not assume the
+section it anchors to is followed by a blank line. This one was at the end of the file.

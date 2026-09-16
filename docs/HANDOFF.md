@@ -13,15 +13,22 @@ is compressing, and treat any vocabulary that does not appear in the source as s
 
 ## Where the project is
 
-**Phases 0, 1 and 2.1–2.3 are done and merged to `main`, tagged `v0.2.2`.**
+**Phases 0, 1 and 2.1 through 2.4 are done and merged to `main`, tagged `v0.2.4`.**
 
-**Milestone 2.4 is DONE, hardware-verified, merged and tagged `v0.2.4`** — thirty commits, signed
-off on `WS_P4_5`, `CYD_S3_3248` and `WS_P4_7B` against `docs/TEST_2.4.md`. All eight environments
-build. Phase 2 is half shipped: 2.1 through 2.4 done, 2.5 through 2.9 open.
+**Milestone 2.5 is CODE-COMPLETE on `feat/2.5-page-grid-engine` and NOT YET FLASHED.** All eight
+environments build. Nothing in it has been seen on glass, and two of its decisions are the kind
+that have been wrong before - the compact/full threshold and the grid arithmetic both look right
+and both have looked right before while being wrong on the board.
 
-The device boots, joins WiFi, talks to a broker, appears in Home Assistant, publishes its telemetry
-and reads other devices' entities — all through one Entity Registry that neither side knows the
-shape of. And it now renders those entities as cards.
+**The device now boots into a dashboard.** Until 2.5 it booted into the Phase 1 UI - a header and
+two accordion panels - with the cards behind a button in the System drawer. That was correct while
+the card layer was being built and wrong the moment it worked.
+
+What it draws is still only what the device can see: four Zigbee2MQTT values off one deck sensor,
+four pieces of this board's own telemetry, and two virtual switches. **That is the project's
+binding constraint, and it is not a card problem.** See "Where this is going" below - the running
+order changed after 2.4, and Home Assistant over the websocket now comes before the rest of
+Phase 2.
 
 ### Read in this order
 
@@ -30,14 +37,81 @@ shape of. And it now renders those entities as cards.
    model, and the three traps that produced every visual defect in 2.4. It exists because the
    same class of bug came back four times in four places and was each time fixed by adjusting
    a number and reflashing. That is not how the next change should go.
-3. `docs/design/cards.md` — the card spec. Read the "Implementation notes" section at the end
+3. **`docs/design/dashboard.md` — the page spec, new at 2.5.** How a page is described, placed
+   and degraded, the two grid knobs and what they each decide, and the unit policy.
+4. `docs/design/cards.md` — the card spec. Read the "Implementation notes" section at the end
    first: it records where the build deviates from the body of the document, and why.
-4. `docs/design/tokens.md` — the design system and the measurements behind it.
-5. `docs/design/startup.md` — only if you are touching boot order or LVGL setup.
-6. `docs/ROADMAP.md` §7 — the milestone list, and what 2.4 lets us close in the tracker.
+5. `docs/design/tokens.md` — the design system and the measurements behind it.
+6. `docs/design/startup.md` — only if you are touching boot order or LVGL setup.
+7. `docs/ROADMAP.md` §7 — the milestone list, and what 2.4 lets us close in the tracker.
 
 `docs/research/` holds three background reports. Not on the critical path — read them when the owner
 raises the topic.
+
+---
+
+## What 2.5 built
+
+Full design in `docs/design/dashboard.md`. The parts that will not be obvious from the code:
+
+**A page is DATA.** `include/Cards/PageSpec.h` declares `CardSpec` and `PageSpec`;
+`include/Dashboards/Dashboard_Fleet.h` is the first one, and it is one page for the whole fleet.
+`CardDemo` keeps its imperative path for the bench, but both now finish through
+`CardPage::commit()` - one placement implementation, not two.
+
+**Spans are in UNITS now, not cells.** ROADMAP Q3b's sub-grid, implemented: a page authored as
+N x M cells allocates N*sub x M*sub units, `subdivision` defaults to 2, and an ordinary card is
+therefore `2x2`. This is the one place 2.5 changed the meaning of a 2.4 struct - `CardPlacement`
+has the same fields with a different unit, and its defaults moved from 1 to 2 to match. **If you
+write a span, it is units.**
+
+**The subdivision costs nothing dimensionally.** `sub` FR tracks plus the gaps between them
+measure exactly what one cell did - the arithmetic cancels - so no card changes size when a page
+subdivides. Rows lose up to `sub-1` px to integer division, which is why `commit()` tells each
+card the height it ACTUALLY got rather than the one the token asked for.
+
+**Priority is read at last.** An over-subscribed page drops the **lowest-priority** card and
+re-plans - not the card that failed to place. Those differ whenever a low-priority card was
+declared early, and dropping the failure would make the result depend on declaration order, which
+is the thing priority exists to stop.
+
+**A card no longer works out its own cell height.** `resolveVariant()` and `midHeight()` derived
+it from `UI::grid()` and their own row span; that is wrong once a span is in units and was already
+fragile, because `UI::grid()` is global state another page can move mid-build.
+
+**Temperature is converted at FORMAT time, never on the way in.** The registry keeps what the
+source said - that value is what an echo is compared against, what an optimistic write reverts to,
+and what our own discovery would publish. The unit label comes from `cardDisplayUnit()` rather
+than `desc.unit`, because printing the source's unit beside a converted number is a caption that
+lies. Fleet default is Fahrenheit.
+
+**The grid has two knobs and they are easy to confuse.** `TARGET_CARD_W` decides COLUMNS;
+`ASPECT_PCT` decides ROWS. Neither sizes a card - both counts are stretched to fill the viewport,
+so a card's ratio is an output. Nothing constrains a card to a ratio.
+
+---
+
+## What to do first: turn the knobs on the 7B
+
+**This is the one thing waiting on hardware, and it is why 2.5 is not signed off.**
+
+`WS_P4_TOUCH_LCD_7B` is the board the owner intends to actually use. Its grid currently forces
+every card to the compact variant, and the threshold is calculable: at 170 PPI a full card needs
+**129 px** of row height in `HDR_BAR` / `HDR_TAG` and **109 px** in `HDR_NONE`. That number also
+explains 2.4's unexplained "~13 px short" - the bench gave 116 px, and 129 - 116 = 13.
+
+With the deck shown, the 7B's row height is quantised to **202 px at 2 rows, 131 at 3, 95 at 4**,
+so three rows is the practical maximum and 131 clears the threshold by **two pixels**. Hiding the
+deck moves three rows to 166. Columns are free: 4/5/6/7 columns gives 12/15/18/21 cells, and 6x3
+is 18 - almost exactly the owner's list.
+
+Open the System drawer and use `Col -/+`, `Row -/+` and `Deck`. `DEBUG_CARDS` is enabled on that
+environment, so every card prints `cell N need N -> variant` and each knob prints the resulting
+grid. **Bake the winning numbers into `UITokens.cpp` and take `-D DEBUG_CARDS` back out.**
+
+Also unverified on glass: the `Deck` toggle's reserve arithmetic (a collapsed panel is `sc(85)`
+plus `sc(10)` of deck padding - believed, not measured), whether an expanded panel covers the
+cards cleanly, and whether the dashboard still receives touches under the transparent deck.
 
 ---
 
@@ -101,37 +175,71 @@ thinking about before picking up a milestone number.
 
 **MQTT is the wrong transport for HA entities.** That is the owner's conclusion, reached
 2026-09-13, and it is not about a missing field. It is that **MQTT carries a value per topic
-and nothing else.** A light at `home/office/light/state` tells you the light is on. Its area,
-its battery, its last-seen, the device it belongs to, whether it is dimmable — each needs its
-own hand-crafted topic, or an automation maintaining one, per entity. At eight entities that
-is tedious. At a house's worth it is unmanageable, and all of it is work the owner has to do
-by hand before the panel shows anything. A JSON payload helps at the margins and does not fix
-it: somebody still has to decide and configure what goes in it.
+and nothing else.** A light's area, battery, last-seen, the device it belongs to, whether it is
+dimmable - each needs its own hand-crafted topic, or an automation maintaining one, per entity.
+At a house's worth it is unmanageable, and all of it is work the owner does by hand before the
+panel shows anything.
 
-HA's own websocket API already knows all of it, because it is the same data the HA frontend
-draws. So #43 stops being "an alternative way to reach HA" and becomes **how HA entities are
-going to work**. MQTT keeps what it is genuinely good at: our own telemetry outbound, plus
-plain broker topics that have nothing to do with HA.
+MQTT keeps what it is genuinely good at: our own telemetry outbound, plus plain broker topics
+that have nothing to do with HA.
 
-**Nothing about that API is assumed here, deliberately.** The owner's instruction on exactly
-this point was not to guess at what does or does not come from HA — confirm it against the
-real thing before designing to it. What is settled is the direction, not the schema.
+**Measured against the owner's real Home Assistant on 2026-09-15**, from a PC rather than from a
+board - which is the cheap way to answer "what does HA actually give us" and cost about an hour:
 
-Three things already built lean on it, which is the argument for doing it sooner:
+| | |
+|---|---|
+| Reachable at | `http://192.168.0.70:8123`, also `homeassistant:8123`. Plain HTTP on the LAN, 6 ms |
+| Token | a long-lived access token, `LOCAL_HA_ACCESS_TOKEN` in the gitignored `ConnectivityLocalSecrets.h` |
+| **`/api/states`** | **742 KB across 1,662 entities** |
+| One entity | 472 bytes of JSON on average, 1,328 at the largest |
+| Units | 34 of 35 temperature sensors report Fahrenheit; `sensor.office_temperature` reports Celsius |
+
+**The 742 KB is the decisive number.** No ESP32 holds that, so selective subscription is not an
+optimisation, it is the only way this works - and `ENTITY_MAX` (raised to 128 at 2.5) is a ceiling
+we choose rather than one we will hit. Per-entity payloads are comfortable to stream.
+
+**And the entity_id does not tell you the room.** `switch.office_plug_3d_printer` is named
+"Living Room Plug". That is the argument for the area registry made by the owner's own config, and
+it is why his living room lights could not be found by name at all. Do not build anything that
+parses an entity_id for meaning - he has said he intends to rename things to carry area, domain
+and function, which will change the ids but not this conclusion.
+
+**Still not designed, deliberately.** The owner's instruction stands: do not guess what the
+websocket API does and does not expose, confirm it. What was confirmed above is REST; the
+websocket half of the spike - the auth handshake, `subscribe_events` shape and rate, and the
+area / device / entity registries - has not been run yet.
+
+**One framework fact that bears on the cost.** `esp_http_client`, `esp-tls` and `esp_http_server`
+are all in the prebuilt framework libs; **`esp_websocket_client` is not** - checked in the
+`esp32p4`, `esp32p4_es` (the variant this fleet builds) and `esp32s3` include trees. So the
+fetch-once half is free today and only the live half needs a library decision: an Arduino
+websocket library, or roughly 300 lines of RFC 6455 we own outright. Given this project's history
+with forked dependencies, the second is worth pricing seriously.
+
+Three things already built lean on this, which is the argument for doing it sooner:
 
 - **Area** is build-sheet-supplied today. `Card::setShowArea()`, the three header modes and
-  `cardAreaColor()` were all written assuming area would arrive from somewhere eventually.
-  This is that somewhere. (`cards.md` §2's claim that area comes free from MQTT discovery is
-  wrong — `suggested_area` is outbound only. Corrected in §11.)
-- **Sensor history**, for the sparkline `cards.md` §4 wants, is fetched rather than stored.
-  Same client, same session.
+  `cardAreaColor()` were all written assuming area would arrive from somewhere. This is that
+  somewhere. (`cards.md` section 2's claim that area comes free from MQTT discovery is wrong -
+  `suggested_area` is outbound only.)
+- **Sensor history**, for the sparkline `cards.md` section 4 wants, is fetched rather than stored.
 - **Outbound commands** (#44) have exactly two virtual switches to talk to right now.
 
-Two things worth deciding early: whether this is a **new provider beside `MqttProvider`**
-rather than a change to it — the Entity Registry's whole shape says yes, since a card must
-never learn where its value came from — and whether a long-lived authenticated websocket
-plus a REST fallback is something the connectivity layer can hold without a rethink. That
-second question is the one that could turn #43 from a milestone into two.
+Two things worth deciding early: whether this is a **new provider beside `MqttProvider`** rather
+than a change to it - the registry's whole shape says yes - and whether a long-lived
+authenticated websocket plus a REST fallback is something the connectivity layer can hold without
+a rethink. That second question is what could turn #43 into two milestones.
+
+**What the owner wants on the first real dashboard** (his list, 2026-09-15), which is what the
+websocket spike should go and look at specifically rather than dumping everything:
+
+> Office lights / temp / occupancy, Kitchen lights / temp / occupancy, Living Room lights, all
+> indoor temperature sensors except the AMS one, and front door, deck and garage temperatures.
+
+Roughly 18 cards. Entities confirmed present include `light.office_left` / `_right` / `_lamp` /
+`_overhead`, `binary_sensor.office_occupancy`, `binary_sensor.kitchen_occupancy`,
+`light.kitchen_switch_1` ("Sink lights"), `sensor.temp_1_garage_temperature` and
+`sensor.outdoor_deck_motion_temperature`. The living room lights need the area registry.
 
 ### The build sheet is what turns this from a demo into a product (#20)
 
@@ -287,6 +395,10 @@ Measured on hardware:
 | **Icon subset** | 84 glyphs at two sizes cost **less than the one Montserrat_48 they replaced** — the 3248 went *down* 4,680 bytes | 2.4 |
 | Fleet density | 165–294 PPI; scale derived as `PPI / 170` | 2.2 |
 | Fleet flash | 24.4–25.9% across all eight environments | 2.4 |
+| **HA `/api/states`** | **742 KB, 1,662 entities**, 472 B average per entity | 2.5, against the real HA |
+| HA reachability | plain HTTP on the LAN, 6 ms to `/api/` | 2.5 |
+| Full-card threshold, 7B | **129 px** row height (bar/tag), 109 px (none) | 2.5, derived from the type scale |
+| Fleet build | all 8 environments build on `feat/2.5-page-grid-engine` | 2.5 |
 
 Verified against `docs/TEST_2.4.md` at sign-off:
 
@@ -296,6 +408,8 @@ Verified against `docs/TEST_2.4.md` at sign-off:
 
 Still assumed:
 
+- **NOTHING IN 2.5 HAS BEEN FLASHED.** The page engine, the boot screen, the unit conversion, the
+  knobs and the deck reserve are all code-complete and unseen.
 - **Six boards have not been flashed at all** since the type scale changed. They compile.
 - **`TouchManager::mapCoordinates()`'s `WS_P4_7B` special case.** Undocumented, never re-tested
   against the alternative. `CLAUDE.md` flags it and it is still true.
@@ -360,17 +474,17 @@ appends `+dirty`, which is working correctly and is useful.
 
 ## Suggested first move
 
-**Ask which of the two above he wants first**, because they are a genuine fork and he has not
-picked. #43 makes the panel worth owning; #20 makes it configurable without a rebuild. #20 is
-smaller and unblocks 2.5 — but doing it first risks designing a format around the fields MQTT
-happens to carry, which is the mistake #43 exists to undo.
+**Flash `WS_P4_TOUCH_LCD_7B` and turn the grid knobs** - see above. That is 2.5's sign-off and it
+needs nothing else.
 
-Whichever it is, **read `docs/design/card-layout.md` before moving anything on a card**, and do
-not tune a number and reflash to find out. That loop is what §1 of that document exists to end.
+**Then the websocket half of the #43 spike**, which is unblocked: the address, the token and the
+REST findings are all recorded above. Run it from a PC first the way the REST half was run - it
+answers "what does HA actually give us" with no firmware at all, and it is what the design should
+be built against rather than guessed at.
 
-Build for `WS_P4_TOUCH_LCD_5` and `CYD_S3_3248W535` on every change. They bracket the fleet: the
-densest panel and the tightest memory. **Do not run two `pio` invocations at once** — they contend
-for `.pio/build` and fail with a directory-lock error that looks nothing like a compile error.
+Build for `WS_P4_TOUCH_LCD_5` and `CYD_S3_3248W535` on every change; they bracket the fleet. All
+eight build as of this branch. **Do not run two `pio` invocations at once** - they contend for
+`.pio/build` and fail with a directory-lock error that looks nothing like a compile error.
 
 ### Deliberately postponed — do not rediscover these
 
