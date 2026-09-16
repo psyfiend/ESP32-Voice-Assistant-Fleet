@@ -144,57 +144,93 @@ can move out from under a card that is mid-build. The page knows the answer exac
 grid derives from **that container**, never from `bsp_display.WIDTH/HEIGHT` — which would be wrong
 on every rotated board and wrong here regardless, since the cards do not get the whole screen.
 
-Z-order is `touch overlay / dashboard / deck / system panel / header`. The dashboard sits *below*
+Z-order on the screen is `dashboard / deck / system panel / header`. The dashboard sits *below*
 the deck deliberately: an expanded accordion panel covers cards rather than pushing them, which is
-what the owner asked to see.
+what the owner asked to see, and it works.
 
-**The deck costs a row.** A collapsed panel is `sc(85)` and the deck pads itself by `sc(10)`, so on
-`WS_P4_7B` it is ~105 px of 600 — enough to take the page from four rows to three. That is a real
-trade, not a preference, which is why the deck is one of the knobs below.
+The touch-visualiser overlay is **not** in that stack — it lives on `lv_layer_top()`, which draws
+above all screen content. It used to be a child of the screen and therefore sat under the
+dashboard, where "Show Touches" did nothing at all. An overlay belongs on the overlay layer, and
+there it does not need re-stacking every time the dashboard is rebuilt.
+
+**The deck costs vertical space, and how much is measured rather than assumed** — see §6.
 
 ---
 
-## 6. The two grid knobs
+## 6. How many rows a page gets
 
-They are two, not one, and confusing them cost a round of explanation:
+**The row count comes from the CARDS, not from the geometry.** This is the correction that came
+out of the first hardware session and it is the most important rule in this document.
 
-| Token | Decides | Notes |
+`recomputeGrid()` answers one question well - how many COLUMNS fit, from `TARGET_CARD_W`. It used
+to answer a second question badly: how many ROWS, from an aspect hint. That is pure geometry, and
+geometry does not know that the page only has thirteen cards on it. On `WS_P4_7B` it asked for four
+rows, the page divided the height by four, and every card came out too short for a full layout -
+sized for a row that had nothing in it. Hiding the deck made it worse, because the extra height
+bought a fifth row rather than taller cards.
+
+So:
+
+1. `CardPage::rowsWanted()` counts the cells the specs ask for and divides by the columns.
+2. `commit()` starts at that number, plans, and **adds a row only when placement actually fails**.
+3. Cards are dropped by priority only after every available row has been tried.
+4. `useRows()` then divides the whole height among exactly that many rows.
+
+**Fewer rows means taller cards.** That is what makes hiding the deck grow the grid instead of
+shrinking it, which is the behaviour anyone would expect and the opposite of what shipped first.
+
+`UIGrid::rows` still exists and is still geometric. It is an estimate for callers that have no
+cards to count; `CardPage` overrides both it and `cellH`.
+
+### The two knobs, and what each one now does
+
+| Token | Decides | |
 |---|---|---|
-| `TARGET_CARD_W` | **columns** | as many whole target-width cards as fit the width |
-| `ASPECT_PCT` | **rows** | a hint: `cellW × pct` suggests a height, and the row count follows |
+| `TARGET_CARD_W` | **columns** | as many whole target-width cards as fit the width. The real knob |
+| `ASPECT_PCT` | **a ceiling** | the tallest a card may be as a percentage of its width |
 
-**Neither sizes a card.** Both counts are then stretched to fill the viewport exactly, so the ratio
-a card ends up with is an *output*. Nothing constrains a card to a ratio, and a grid of 6×3 at
-156×131 is as reachable as 7×3 — on `WS_P4_7B` the six-column case misses its third row by four
-hundredths of a row, and the fix is in `ASPECT_PCT`, not in the width.
+`ASPECT_PCT` changed job at the same time. It no longer picks a row count; all it does now is stop
+a page with three cards on it from making each one as tall as the screen. Above the cap the grid
+stops stretching and leaves the slack at the bottom. Default 130.
 
-Both are exposed on the System panel (`Col -/+`, `Row -/+`, `Deck`) because that drawer opens over
-the **real** dashboard. The bench derives its grid from a different host — a screen minus a button
-bar — so a number tuned there would be right for the bench and wrong for the page that boots.
+Both are on the System panel (`Col -/+`, `Row -/+`, `Deck`) because that drawer opens over the
+**real** dashboard. Each knob **rebuilds** rather than re-laying-out, because a card decides
+compact-vs-full from its cell height when it is built.
 
-Each knob **rebuilds** rather than re-lays-out, because a card decides compact-vs-full from its
-cell height when it is built; re-placing the same cards would show nothing.
+### The number a row has to clear
 
-### The number to aim at
+`Card::fullCellNeedPx()` and `Card::compactCellNeedPx()` are shared statics, not arithmetic buried
+in `resolveVariant()`, precisely so the page can ask the card layer the same question before
+deciding how many rows to carve. A page that guesses a number the card computes differently is how
+you end up planning a row no card can live in.
 
-`Card::resolveVariant()` computes what a full card needs from the type scale, so the threshold is
-calculable rather than a matter of taste. On `WS_P4_7B` at 170 PPI — VALUE montserrat_40 (line
-height 44), NAME 18 (21), status band 20, padding 10, margin 8:
+On `WS_P4_7B` at 170 PPI - VALUE montserrat_40 (line height 44), NAME 18 (21), status band 20,
+padding 10, margin 8:
 
 | Header mode | Row height needed for a full card |
 |---|---|
 | `HDR_NONE` | 109 px |
 | `HDR_BAR` / `HDR_TAG` | 129 px |
 
-That also explains the open item 2.4 left: on the bench the row height was 116 px, and 129 − 116 =
-**13** — the "~13 px short" recorded as unexplained in `HANDOFF.md`.
+That also explains the open item 2.4 left: on the bench the row height was 116 px, and 129 - 116 =
+**13** - the "~13 px short" recorded as unexplained in `HANDOFF.md`.
 
-With the deck shown, the 7B's row height is quantised to 202 px at 2 rows, 131 at 3 and 95 at 4, so
-3 rows is the practical maximum and it clears the threshold by **two pixels**. Hiding the deck
-moves 3 rows to 166 px. `DEBUG_CARDS` is enabled on that environment so every card prints
-`cell N need N -> variant` and the knob-turning is instrumented rather than judged by eye.
+### What the deck costs, and why it is measured
 
----
+The deck reserve was `sc(85) + sc(20)` on the reasoning that `UIToolkit` builds a collapsed panel
+at `sc(85)`. It was wrong by about 60 px, and it showed as a permanent gap between the bottom row
+of cards and the panels.
+
+The panel really is 85 px tall. The deck, however, is **as tall as the whole screen** and starts
+below the header, so its bottom edge hangs ~50 px below the display; a bottom-aligned panel
+therefore has its lower ~40 px off-screen and all you see is its `sc(45)` header. The visible
+strip is 45 px, not 105.
+
+`buildDashboard()` no longer encodes that coincidence. It asks the objects where they are with
+`lv_obj_get_coords()` - absolute screen coordinates, because the x/y accessors are relative to the
+parent and the deck's children have a different parent from the screen - and reserves the
+difference plus one gap. It survives someone changing a panel's height, which a magic number
+would not.
 
 ## 7. Units on a card
 

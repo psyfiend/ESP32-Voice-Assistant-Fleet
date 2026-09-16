@@ -405,6 +405,25 @@ Architecture agreed so far:
 Passed over verbatim-in-substance so they are not lost. None are scheduled; each notes where it
 would land.
 
+### More, 2026-09-16 (after the first dashboard flash)
+
+**Icons look undersized on large cards.** Observed at 189x202 px: the corner icon looks puny and
+the hero looks lost in the middle of a big empty disc. Both faces are picked by PIXEL DENSITY
+alone, so they are the same physical size whatever the card - which is right across boards and
+wrong across card sizes on one board. The fix is to choose the icon face from the CELL as well as
+the density, and the faces already exist (18/20/26/28/30/32/34/42/46/52 are generated per board).
+The cost is flash: each face a translation unit REFERENCES is linked, so a third referenced size
+is real money. Wants measuring before it is done. Lands with 2.7 or the card-library work.
+
+**Long-press opens a detail view, with the context panels sliding up.** The owner's framing: the
+background dims or blurs so the cards stay visible behind the popup, and the deck's panel HEADERS
+animate up from the bottom, expanding only when tapped. This is the same feature as the per-card
+detail page recorded above and as `cards.md` section 4's long-press sheet - three descriptions of
+one thing, and it should be built once. 2.4 deliberately left the overlay unbuilt.
+
+**Button-press feedback.** Cards shrink slightly while held and pop back on release. Cheap with
+LVGL transforms, and it is the one animation that makes a touch panel feel like it is working.
+
 ### The panel should advertise its OWN entities to Home Assistant, and that capability must survive #43
 
 **This is a constraint on #43, not a wish.** The owner intends to add sensors, hardware and
