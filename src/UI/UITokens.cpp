@@ -232,6 +232,17 @@ void setTargetCardWidth(uint16_t logicalPx) {
     if (s_onChange) s_onChange();
 }
 
+void setAspectPct(uint8_t pct) {
+    // Clamped to a range that can still produce a usable grid. Below ~40 the
+    // rows get shorter than the type scale can seat and every card goes
+    // compact; above ~200 a page is one row of very tall cards.
+    if (pct < 40)  pct = 40;
+    if (pct > 200) pct = 200;
+    s_grid.ASPECT_PCT = pct;
+    recomputeGrid();
+    if (s_onChange) s_onChange();
+}
+
 void onSchemeChanged(void (*cb)()) { s_onChange = cb; }
 
 int32_t sc(int32_t logical) { return (int32_t)(logical * bspUiScale()); }

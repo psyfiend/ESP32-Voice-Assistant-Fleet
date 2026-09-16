@@ -105,7 +105,6 @@ void Card::resolveVariant() {
 
     const UIType    &t = UI::type();
     const UIMetrics &m = UI::met();
-    const UIGrid    &g = UI::grid();
 
     // DERIVED FROM THE TOKENS, not measured off the widget.
     //
@@ -118,8 +117,7 @@ void Card::resolveVariant() {
     //
     // The cell height is knowable without asking LVGL anything: the grid
     // derived it, and the card knows its own row span.
-    int32_t h = (int32_t)g.cellH * (_place.prefSpanY ? _place.prefSpanY : 1);
-    if (_place.prefSpanY > 1) h += UI::sc(g.GAP) * (_place.prefSpanY - 1);
+    int32_t h = cellPx();
     if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
 
     // What a full layout needs: a title row, the hero, and an optional row,
@@ -414,11 +412,22 @@ int32_t Card::midGap() {
     return UI::sc(6);
 }
 
+// How tall this card's cell really is.
+//
+// The page measures it and hands it over, because spans are in grid UNITS at
+// 2.5 and a unit's height is the page's business. The fallback is ONE WHOLE
+// CELL rather than cellH * prefSpanY: multiplying by a unit span would double
+// an ordinary card, and a card built outside a page is by definition one that
+// nobody sized.
+int32_t Card::cellPx() const {
+    if (_cellPx > 0) return _cellPx;
+    return (int32_t)UI::grid().cellH;
+}
+
 int32_t Card::midHeight() const {
-    const UIGrid    &g = UI::grid();
     const UIMetrics &m = UI::met();
 
-    int32_t h = (int32_t)g.cellH * (_place.prefSpanY ? _place.prefSpanY : 1);
+    int32_t h = cellPx();
 
     // ALWAYS charges for a header, whatever this card's mode is.
     //

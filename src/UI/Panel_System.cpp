@@ -10,6 +10,7 @@ Panel_System::Panel_System() {
     _ui_root    = NULL;
     _ui_content = NULL;
     _ui_actions = NULL;
+    _ui_grid    = NULL;
     txt_log     = NULL;
     lbl_stats   = NULL;
     _headerRef  = NULL;
@@ -46,6 +47,27 @@ void Panel_System::btn_action_cb(lv_event_t* e) {
 
 void Panel_System::reportSink(const char *line) {
     if (s_self) s_self->log("%s", line);
+}
+
+// One knob button. Capture-less lambdas only - an lv_event_cb_t is a plain
+// function pointer, so the panel arrives as user_data rather than in a capture.
+static lv_obj_t *knobButton(lv_obj_t *parent, Panel_System *self,
+                            const char *text, lv_event_cb_t cb) {
+    lv_obj_t *b = lv_button_create(parent);
+    lv_obj_set_height             (b, UIToolkit::sc(32));
+    lv_obj_set_width              (b, LV_SIZE_CONTENT);
+    lv_obj_set_flex_grow          (b, 1);
+    lv_obj_add_event_cb           (b, cb, LV_EVENT_CLICKED, self);
+    lv_obj_set_style_bg_color     (b, UI::c(UI::pal().SURFACE_ALT), 0);
+    lv_obj_set_style_border_width (b, 1, 0);
+    lv_obj_set_style_border_color (b, UI::border(), 0);
+
+    lv_obj_t *l = lv_label_create(b);
+    lv_label_set_text             (l, text);
+    lv_obj_center                 (l);
+    lv_obj_set_style_text_font    (l, UIToolkit::Font_Button, 0);
+    lv_obj_set_style_text_color   (l, UI::c(UI::pal().TEXT), 0);
+    return b;
 }
 
 void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
@@ -189,6 +211,45 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_center                   (lblCards);
     lv_obj_set_style_text_font      (lblCards, UIToolkit::Font_Button, 0);
     lv_obj_set_style_text_color     (lblCards, UI::c(UI::pal().TEXT), 0);
+
+    // -- ROW 2b: the grid knobs -------------------------------------------
+    //
+    // A second row rather than five more buttons in the first: CYD_S3_3248 is
+    // 320 px wide and eight flex-grown buttons on one row would each be about
+    // a finger-width too narrow to hit.
+    _ui_grid = lv_obj_create        (_ui_content);
+    lv_obj_set_width                (_ui_grid, lv_pct(100));
+    lv_obj_set_height               (_ui_grid, LV_SIZE_CONTENT);
+    lv_obj_set_layout               (_ui_grid, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow            (_ui_grid, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align           (_ui_grid, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_bg_opa         (_ui_grid, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_pad_all        (_ui_grid, 0, 0);
+    lv_obj_set_style_border_width   (_ui_grid, 0, 0);
+    lv_obj_set_style_pad_gap        (_ui_grid, UIToolkit::sc(8), 0);
+    lv_obj_clear_flag               (_ui_grid, LV_OBJ_FLAG_SCROLLABLE);
+    UI::tameScroll                  (_ui_grid);
+
+    knobButton(_ui_grid, this, "Col -", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestGrid(Panel_System::GridAction::CARD_W_UP);   // wider card, fewer columns
+    });
+    knobButton(_ui_grid, this, "Col +", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestGrid(Panel_System::GridAction::CARD_W_DOWN);
+    });
+    knobButton(_ui_grid, this, "Row -", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestGrid(Panel_System::GridAction::ASPECT_UP);   // taller hint, fewer rows
+    });
+    knobButton(_ui_grid, this, "Row +", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestGrid(Panel_System::GridAction::ASPECT_DOWN);
+    });
+    knobButton(_ui_grid, this, "Deck", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestGrid(Panel_System::GridAction::DECK_TOGGLE);
+    });
 
     // -- ROW 3: Log Container --
     lv_obj_t* log_box = lv_obj_create(_ui_content);

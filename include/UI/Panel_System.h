@@ -37,6 +37,26 @@ public:
     // free function, not a member, so it cannot reach a private field.
     void requestCards() { if (_onCardsRequested) _onCardsRequested(); }
 
+    // The 2.5 GRID KNOBS.
+    //
+    // They live here rather than on the card bench deliberately: this drawer
+    // opens OVER the real dashboard, so what is being tuned is the page the
+    // device actually boots into. The bench derives its grid from a different
+    // host - a screen minus a button bar - and a number tuned there would be
+    // right for the bench and wrong for the dashboard.
+    //
+    // One callback carrying a code rather than five callbacks, because this
+    // panel is a remote control: it knows a button was pressed and nothing at
+    // all about what a column is.
+    enum class GridAction : uint8_t {
+        CARD_W_DOWN, CARD_W_UP,    // TARGET_CARD_W - decides COLUMNS
+        ASPECT_DOWN, ASPECT_UP,    // ASPECT_PCT    - decides ROWS
+        DECK_TOGGLE,               // the deck costs a row on every board
+    };
+    using GridCallback = std::function<void(GridAction)>;
+    void setOnGridAction(GridCallback cb) { _onGridAction = cb; }
+    void requestGrid(GridAction a) { if (_onGridAction) _onGridAction(a); }
+
     // Update system stats - SAFE to call from anywhere
     void updateSystemStats(float voltage, float current, int wifi_rssi);
 
@@ -56,6 +76,7 @@ private:
     lv_obj_t* _ui_root;    // The Outer Wrapper (Animates Height, No Padding)
     lv_obj_t* _ui_content; // The Inner Container (Has Padding & Style, Auto Height)
     lv_obj_t* _ui_actions; // Button Row
+    lv_obj_t* _ui_grid;    // Second button row - the 2.5 grid knobs
     
     lv_obj_t* txt_log;     // The log text label
     lv_obj_t* lbl_stats;   // The stats header label
@@ -77,6 +98,7 @@ private:
     bool _log_dirty;
     DumpCallback  _onDumpRequested  = nullptr;
     CardsCallback _onCardsRequested = nullptr;
+    GridCallback  _onGridAction     = nullptr;
 
     // Sink registered with SystemReport in init(), so report lines land in this
     // panel. Serial mirroring is SystemReport's job now, not log()'s.

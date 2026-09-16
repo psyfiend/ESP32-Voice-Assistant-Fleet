@@ -153,6 +153,18 @@ void setScheme(const UIPalette &p, const UIMetrics &m);
 void setAccent(uint32_t hex);
 void setTargetCardWidth(uint16_t logicalPx);
 
+// The OTHER grid knob, and the one that was missing.
+//
+// TARGET_CARD_W decides how many COLUMNS fit; ASPECT_PCT decides how many
+// ROWS, by suggesting a height for the column width that came out. Neither
+// sizes a card - both counts are then stretched to fill the viewport exactly,
+// so the ratio a card ends up with is an output.
+//
+// It matters because the two are easy to confuse: on WS_P4_7B at 6 columns the
+// row count misses three by four hundredths, and the fix is here rather than
+// in the width. See docs/design/tokens.md.
+void setAspectPct(uint8_t pct);
+
 // Registered by GUIManager so a scheme change can restyle what is on screen.
 void onSchemeChanged(void (*cb)());
 

@@ -72,6 +72,22 @@ public:
     // Pin the variant instead of letting the card measure its own cell.
     Card &setVariant(CardVariant v) { _variant = v; return *this; }
 
+    // The card's REAL height in pixels, handed over by the page before build().
+    //
+    // A card used to work this out itself from UI::grid() and its own row
+    // span, which stopped being possible at 2.5: a span is in grid UNITS now,
+    // and only the page knows how tall a unit is. It was already the weaker
+    // arrangement - UI::grid() is global state that any other page can move
+    // out from under a card that is mid-build.
+    //
+    // Zero means nobody said, and the card falls back to one whole cell.
+    Card &setCellHeightPx(int32_t px) { _cellPx = px; return *this; }
+
+    // Which unit this card renders a temperature in. TEMP_INHERIT defers to
+    // the fleet setting - see cardTempUnit() in CardIcons.h.
+    Card &setTempUnit(TempUnit u) { _tempUnit = u; return *this; }
+    TempUnit tempUnit() const { return _tempUnit; }
+
     // The resolved variant - never VAR_AUTO. Valid after build().
     CardVariant variant() const { return _resolved; }
 
@@ -283,6 +299,7 @@ protected:
     // will overflow a small cell - which is what clipped the disc top and
     // bottom on CYD_S3_3248, where the band is 55 px and a font-derived disc
     // wanted 68.
+    int32_t cellPx() const;              // the page-supplied cell height
     int32_t midHeight() const;
 
 private:
@@ -352,6 +369,8 @@ private:
     CardHeaderStyle _hdrStyle    = CardHeaderStyle::HDR_NONE;
     CardState       _state       = CardState::ST_LIVE;
     uint32_t        _longStaleMs = 0;     // 0 = ask cardLongStaleMs()
+    int32_t         _cellPx      = 0;     // set by CardPage::commit()
+    TempUnit        _tempUnit    = TempUnit::TEMP_INHERIT;
     bool            _paused      = false;
     bool            _showArea    = s_showArea;
     bool            _forced      = false;   // debugForceState()

@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include "Entity.h"
+#include "Cards/CardTypes.h"   // TempUnit
 
 // ---------------------------------------------------------------------------
 // Icons and tints, by what an entity MEASURES rather than by card type.
@@ -68,6 +69,32 @@ void cardFormatAge(uint32_t ageMs, char *out, size_t cap);
 // Booleans deliberately produce no words - cards.md section 4 forbids
 // "On"/"Off"/"Open"/"Closed" text anywhere, because state is the icon and its
 // colour. A bool renders as an empty string here and the card draws the icon.
-void cardFormatValue(const Entity &e, char *out, size_t cap, bool withUnit = true);
+// ---------------------------------------------------------------------------
+// Units.
+//
+// The owner, 2026-09-15: "I will always prefer temp in F not C but both should
+// be supported and customizable by users if the source is not in the unit they
+// want." So the fleet has a preference, a page may override it and a card may
+// override that, and anything already in the wanted unit is left alone.
+//
+// CONVERSION IS A DISPLAY CONCERN AND HAPPENS HERE, at format time. The
+// registry keeps whatever the source actually said, because that value is what
+// an echo is compared against, what an optimistic write reverts to, and what
+// our own HA discovery would publish - converting on the way in would corrupt
+// all three and the damage would be invisible.
+//
+// Confirmed against the owner's real Home Assistant: 34 of 35 temperature
+// sensors report Fahrenheit and one reports Celsius. A fleet with a preference
+// and no conversion renders that one card wrong, silently, and it looks
+// exactly like a working card.
+void     cardSetTempUnit(TempUnit u);     // the fleet default
+TempUnit cardTempUnit();
+
+// The unit string to DISPLAY for this entity, which is not always desc.unit.
+// Returns "" when the entity has no unit at all.
+const char *cardDisplayUnit(const Entity &e, TempUnit want = TempUnit::TEMP_INHERIT);
+
+void cardFormatValue(const Entity &e, char *out, size_t cap, bool withUnit = true,
+                     TempUnit want = TempUnit::TEMP_INHERIT);
 
 #endif // CARD_ICONS_H

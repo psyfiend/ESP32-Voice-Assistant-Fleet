@@ -39,6 +39,13 @@ void show(EntityRegistry &reg, CardBinder &binder);
 // Panel_System's is: the full System Doctor report needs SystemCore, and this
 // page has no business knowing SystemCore exists.
 void setDumpHandler(std::function<void()> cb);
+
+// Run when the bench closes. The bench borrows UI::grid() - it derives the
+// grid from ITS host, which is the screen minus a button bar, and that is
+// global state the dashboard also reads. Handing back control rather than
+// guessing at the previous viewport is the only way the dashboard comes back
+// the shape it was; GUIManager registers a rebuild here.
+void setCloseHandler(std::function<void()> cb);
 void close();
 
 } // namespace CardDemo

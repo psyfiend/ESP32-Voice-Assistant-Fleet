@@ -111,28 +111,67 @@ enum class CardHeaderStyle : uint8_t {
     HDR_TAG,        // pills hanging outside, above the card
 };
 
+// Which unit a temperature is DISPLAYED in, whatever the source reports.
+//
+// The owner's rule, 2026-09-15: "I will always prefer temp in F not C but both
+// should be supported and customizable by users if the source is not in the
+// unit they want." Confirmed against his real Home Assistant, where 34 of 35
+// temperature sensors report Fahrenheit and one reports Celsius - so a fleet
+// with one preference and no conversion would render that one card wrong,
+// silently, and look exactly like a working card.
+//
+// Conversion is a DISPLAY concern and happens at format time. The registry
+// keeps what the source actually said, because that value is what an echo is
+// compared against, what an optimistic write reverts to, and what our own HA
+// discovery would publish. Converting on the way in would corrupt all three.
+enum class TempUnit : uint8_t {
+    TEMP_INHERIT = 0,   // use the page's setting (on a card) or the fleet's
+    TEMP_SOURCE,        // show whatever the entity reports, unconverted
+    TEMP_C,
+    TEMP_F,
+};
+
 // ---------------------------------------------------------------------------
-// Where a card wants to sit, in grid CELLS.
+// Where a card wants to sit, in grid UNITS.
+//
+// CHANGED AT 2.5, and the change is the unit rather than the fields: these
+// used to be CELLS. ROADMAP Q3b decided sub-grid placement on 2026-09-03 and
+// the reason it is being honoured now rather than later is that document's own
+// warning - it is very expensive to retrofit, because every span already
+// written has to be re-read in the new unit.
+//
+//   A page is authored as N x M CELLS and allocates N*sub x M*sub UNITS.
+//   With the default subdivision of 2, ONE CELL IS 2x2 UNITS, so an ordinary
+//   card is prefSpan 2x2 and the defaults below say so. A quarter-page card on
+//   a 3x3 page is 3x3 units; a half-cell card is 2x1 or 1x2.
 //
 // Issue #15: "MUST carry preferred_span / min_span / priority from the very
 // first version. Retrofitting responsive sizing after 8 card types exist means
-// rewriting all 8." So these exist now even though milestone 2.4's placement
-// only honours the spans - priority is carried and reported, and 2.5's page
-// engine is what will actually order and degrade by it.
+// rewriting all 8." All three are now actually READ - priority by
+// CardPage::plan(), which drops the lowest-priority cards until the rest fit.
 //
 // Deliberately NOT on EntityDescriptor. Entity.h says why: keeping size out of
 // the entity is what lets the same temperature reading be a 1x1 tile on one
 // page and a 4x2 chart on another.
 // ---------------------------------------------------------------------------
 struct CardPlacement {
-    uint8_t prefSpanX = 1;
-    uint8_t prefSpanY = 1;
-    uint8_t minSpanX  = 1;   // shrink to this before wrapping to a new row
-    uint8_t minSpanY  = 1;
-    uint8_t priority  = 128; // higher keeps its preferred size when space runs
-                             // short. 128 is the neutral middle of the range,
-                             // so a card can be pushed either way without
+    uint8_t prefSpanX = 2;   // UNITS. 2 = one cell at the default subdivision
+    uint8_t prefSpanY = 2;
+    uint8_t minSpanX  = 2;   // shrink to this before dropping to a lower row
+    uint8_t minSpanY  = 2;
+    uint8_t priority  = 128; // higher survives when the page runs out of room.
+                             // 128 is the neutral middle of the range, so a
+                             // card can be pushed either way without
                              // renumbering everything else
+
+    // Explicit placement, in units, or PAGE_FLOW (-1) to be flowed.
+    //
+    // ROADMAP Q3b chose "placement at unit granularity, plus a validator" over
+    // a constraint solver, precisely so a layout is predictable: any card may
+    // be pinned anywhere, and the page REPORTS overlaps and out-of-bounds
+    // rather than quietly resolving them. See CardPage::plan().
+    int8_t  col = -1;
+    int8_t  row = -1;
 };
 
 // ---------------------------------------------------------------------------

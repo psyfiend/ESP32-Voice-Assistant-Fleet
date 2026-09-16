@@ -69,7 +69,8 @@ lv_obj_t *s_btnState = nullptr;
 
 // Set by GUIManager. The card page cannot reach SystemCore, and the full
 // report needs it.
-std::function<void()> s_onDump = nullptr;
+std::function<void()> s_onDump  = nullptr;
+std::function<void()> s_onClose = nullptr;
 
 lv_obj_t *topButton(lv_obj_t *parent, const char *text, lv_event_cb_t cb) {
     lv_obj_t *b = lv_button_create(parent);
@@ -154,7 +155,8 @@ const Entity *ent(const char *id) { return s_reg ? s_reg->find(id) : nullptr; }
 
 namespace CardDemo {
 
-void setDumpHandler(std::function<void()> cb) { s_onDump = cb; }
+void setDumpHandler (std::function<void()> cb) { s_onDump  = cb; }
+void setCloseHandler(std::function<void()> cb) { s_onClose = cb; }
 
 void close() {
     if (s_previous) lv_screen_load(s_previous);
@@ -165,9 +167,12 @@ void close() {
     // screen minus a top bar - correct there, and quietly wrong for everyone
     // else the moment we leave. UI::grid() is global state and this page
     // borrows it.
-    if (s_previous) {
-        UI::setViewport(lv_obj_get_width(s_previous), lv_obj_get_height(s_previous));
-    }
+    //
+    // Restoring it by measuring the previous SCREEN was wrong as soon as the
+    // dashboard stopped owning the whole screen: it sits under a header and
+    // above the deck, so the screen's size is not its viewport. The owner of
+    // the dashboard is the only thing that knows, so it is asked.
+    if (s_onClose) s_onClose();
 }
 
 void show(EntityRegistry &reg, CardBinder &binder) {
@@ -335,7 +340,9 @@ void show(EntityRegistry &reg, CardBinder &binder) {
         s_page->add(c);
     };
 
-    CardPlacement wide;  wide.prefSpanX = 2;  wide.minSpanX = 1;  wide.priority = 200;
+    // Spans are UNITS at 2.5: U_2 is two whole cells, U_CELL is one.
+    CardPlacement wide;  wide.prefSpanX = U_2;  wide.minSpanX = U_CELL;
+    wide.priority = 200;
 
     // sensor -> value layout, chosen by the catalog and not by this file
     place("deck_temp", "Deck", "Outdoor", ent("deck_battery"), nullptr, false);
@@ -367,6 +374,11 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     // visible rather than described: this card is dim BECAUSE THE USER CHOSE
     // IT, and no stale card anywhere on this page dims.
     place(SYS_ENT_UPTIME, "Paused", "Panel", nullptr, nullptr, true);
+
+    // NOTHING IS BUILT UNTIL HERE. CardPage::add() only queues at 2.5,
+    // because which cards survive is a decision about all of them at once now
+    // that priority can drop some - it cannot be made one card at a time.
+    s_page->commit();
 
     // A rebuild creates fresh cards, which derive their own state - so a
     // pinned state has to be re-applied or the button would silently lie.

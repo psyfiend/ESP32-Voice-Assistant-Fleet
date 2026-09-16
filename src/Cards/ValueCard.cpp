@@ -141,7 +141,7 @@ void ValueCard::render() {
 
     // --- The value, dominant, with its unit smaller beside it -------------
     char buf[40];
-    cardFormatValue(*e, buf, sizeof(buf), false);   // no unit in this string
+    cardFormatValue(*e, buf, sizeof(buf), false, tempUnit());  // unit drawn separately
     lv_label_set_text          (_value, buf);
     lv_obj_set_style_text_font (_value, t.VALUE, 0);
 
@@ -150,8 +150,12 @@ void ValueCard::render() {
     // stays legible while the card makes clear it cannot be trusted.
     lv_obj_set_style_text_color(_value, UI::c(tone(p.TEXT)), 0);
 
-    if (e->desc.unit[0]) {
-        lv_label_set_text          (_unit, e->desc.unit);
+    // NOT desc.unit. A card may render a temperature in a unit the source does
+    // not use, in which case the number beside this label has already been
+    // converted and printing the source's unit would caption it with a lie.
+    const char *dispUnit = cardDisplayUnit(*e, tempUnit());
+    if (dispUnit[0]) {
+        lv_label_set_text          (_unit, dispUnit);
         lv_obj_set_style_text_font (_unit, t.UNIT, 0);
         lv_obj_set_style_text_color(_unit, UI::c(tone(p.TEXT_DIM)), 0);
         lv_obj_clear_flag          (_unit, LV_OBJ_FLAG_HIDDEN);

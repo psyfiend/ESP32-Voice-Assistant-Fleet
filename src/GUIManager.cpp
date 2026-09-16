@@ -3,6 +3,7 @@
 #include "UI/UITokens.h"
 #include "SystemReport.h"
 #include "Cards/CardDemo.h"
+#include "Dashboards/Dashboard_Fleet.h"
 #include "bsp_loader.h"
 
 // LVGL's event and callback APIs take plain function pointers with no user
@@ -69,6 +70,7 @@ void GUIManager::begin() {
     // --= LAYER 1: BOTTOM DECK =--
     // Contains the Audio/Display panels.
     lv_obj_t *deck = lv_obj_create(screen);
+    _deck = deck;
     lv_obj_set_size               (deck, lv_pct(100), deck_h);
     lv_obj_set_y                  (deck, header_h); // Bottom of header
     lv_obj_set_flex_flow          (deck, LV_FLEX_FLOW_ROW);
@@ -131,21 +133,154 @@ void GUIManager::begin() {
         CardDemo::show(_core.entities(), _binder);
     });
 
+    // The grid knobs. The panel knows a button was pressed; what a column is
+    // remains entirely this class's business.
+    _pnlSystem.setOnGridAction([this](Panel_System::GridAction a) {
+        switch (a) {
+            case Panel_System::GridAction::CARD_W_DOWN: nudgeCardWidth(-1); break;
+            case Panel_System::GridAction::CARD_W_UP:   nudgeCardWidth(+1); break;
+            case Panel_System::GridAction::ASPECT_DOWN: nudgeAspect(-1);    break;
+            case Panel_System::GridAction::ASPECT_UP:   nudgeAspect(+1);    break;
+            case Panel_System::GridAction::DECK_TOGGLE: toggleDeck();       break;
+        }
+    });
+
     // The card page's own Dump button runs the same report the System panel's
     // does, Serial echo and all.
     CardDemo::setDumpHandler([this]() { SystemReport::run(_core, true); });
+
+    // The bench derives the grid from its own host - a screen minus a button
+    // bar - and UI::grid() is global. Rebuilding on the way back is the only
+    // thing that reliably restores the dashboard's own geometry.
+    CardDemo::setCloseHandler([this]() { rebuildDashboard(); });
 
     // Contribute the one LVGL-dependent section of the report.
     SystemReport::addSection("UI STATE", reportUiSection);
 
     // --= Z-INDEX SANDWICH =--
     // 0. Touch overlay (bottom - hidden by default, set in Panel_Display::init)
-    // 1. Deck (bottom panels)
-    // 2. System panel (middle - slides out)
-    // 3. Header (top - covers the system panel's top edge)
+    // 1. Dashboard (the cards)
+    // 2. Deck (bottom panels, which may expand OVER the cards)
+    // 3. System panel (middle - slides out)
+    // 4. Header (top - covers the system panel's top edge)
     lv_obj_move_to_index(deck, 1);
     lv_obj_move_to_index(upper_deck, 2);
     lv_obj_move_to_index(_header.getContainer(), 3);
+
+    // THE DASHBOARD IS THE BOOT SCREEN NOW.
+    //
+    // Until 2.5 the device booted into the Phase 1 UI - a header and two
+    // accordion panels - and the cards were a demo behind a button in the
+    // System drawer. That was the right shape while the card layer was being
+    // built and the wrong one the moment it worked.
+    //
+    // Built LAST so it can read the real geometry of everything above it, and
+    // moved to index 1 so the deck's panels expand over the cards rather than
+    // pushing them - which is what the owner asked to see.
+    buildDashboard();
+}
+
+// ---------------------------------------------------------------------------
+// The dashboard
+// ---------------------------------------------------------------------------
+
+void GUIManager::buildDashboard() {
+    lv_obj_t *screen = lv_screen_active();
+
+    const int32_t headerH = UIToolkit::sc(50);
+
+    // What the accordion deck keeps for itself while every panel is COLLAPSED.
+    // UIToolkit builds a collapsed panel at sc(85) and the deck pads itself by
+    // sc(10) - see UIToolkit.cpp. An EXPANDED panel is sc(280) and is allowed
+    // to cover cards; only the resting state costs the grid anything.
+    //
+    // This is not free and it is not a preference: on WS_P4_7B it is ~105 px
+    // of 600, which is what takes the page from four rows to three.
+    const int32_t deckReserve = _showDeck ? UIToolkit::sc(85) + UIToolkit::sc(20) : 0;
+
+    int32_t h = lv_obj_get_height(screen) - headerH - deckReserve;
+    if (h < UIToolkit::sc(80)) h = lv_obj_get_height(screen) - headerH;
+
+    _dashHost = lv_obj_create(screen);
+    lv_obj_set_size               (_dashHost, lv_pct(100), h);
+    lv_obj_set_y                  (_dashHost, headerH);
+    lv_obj_set_style_bg_opa       (_dashHost, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width (_dashHost, 0, 0);
+    lv_obj_set_style_pad_all      (_dashHost, 0, 0);
+    lv_obj_clear_flag             (_dashHost, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag             (_dashHost, LV_OBJ_FLAG_CLICKABLE);
+
+    // The grid is derived from THIS CONTAINER, not from the screen and not
+    // from bsp_display.WIDTH/HEIGHT. Deriving it from the panel would be wrong
+    // on every rotated board and wrong here as well, because the cards do not
+    // get the whole screen - the same mistake begin() already documents for
+    // UI::begin().
+    lv_obj_update_layout(screen);
+    UI::setViewport(lv_obj_get_content_width(_dashHost),
+                    lv_obj_get_content_height(_dashHost));
+
+    _page = new CardPage();
+    _page->begin(_dashHost, &_binder);
+    _page->applySpec(FLEET_PAGE, _core.entities());
+
+    lv_obj_move_to_index(_dashHost, 1);
+
+    if (_deck) {
+        if (_showDeck) lv_obj_clear_flag(_deck, LV_OBJ_FLAG_HIDDEN);
+        else           lv_obj_add_flag  (_deck, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void GUIManager::destroyDashboard() {
+    // The page first: it deletes its cards, and a card deregisters from the
+    // binder in its destructor's path. Deleting the host out from under them
+    // would take the widgets without the bookkeeping.
+    if (_page)     { delete _page;              _page = nullptr; }
+    if (_dashHost) { lv_obj_delete(_dashHost);  _dashHost = nullptr; }
+}
+
+void GUIManager::rebuildDashboard() {
+    destroyDashboard();
+    buildDashboard();
+}
+
+// ---------------------------------------------------------------------------
+// The grid knobs
+//
+// A rebuild rather than CardPage::relayout(), and the difference is the whole
+// reason these exist: a card decides compact-vs-full from its cell height when
+// it is BUILT, so moving the grid without rebuilding would re-place the same
+// cards at the same level of detail and show nothing.
+// ---------------------------------------------------------------------------
+
+void GUIManager::nudgeCardWidth(int8_t steps) {
+    int32_t w = (int32_t)UI::grid().TARGET_CARD_W + steps * 5;
+    if (w < 80)  w = 80;
+    if (w > 300) w = 300;
+    UI::setTargetCardWidth((uint16_t)w);
+    rebuildDashboard();
+    Serial.printf("[Cards] TARGET_CARD_W %ld -> %ux%u cells of %ux%u px\n",
+                  (long)w, (unsigned)UI::grid().cols, (unsigned)UI::grid().rows,
+                  (unsigned)UI::grid().cellW, (unsigned)UI::grid().cellH);
+}
+
+void GUIManager::nudgeAspect(int8_t steps) {
+    int32_t a = (int32_t)UI::grid().ASPECT_PCT + steps * 5;
+    UI::setAspectPct((uint8_t)(a < 40 ? 40 : (a > 200 ? 200 : a)));
+    rebuildDashboard();
+    Serial.printf("[Cards] ASPECT_PCT %u -> %ux%u cells of %ux%u px\n",
+                  (unsigned)UI::grid().ASPECT_PCT,
+                  (unsigned)UI::grid().cols, (unsigned)UI::grid().rows,
+                  (unsigned)UI::grid().cellW, (unsigned)UI::grid().cellH);
+}
+
+void GUIManager::toggleDeck() {
+    _showDeck = !_showDeck;
+    rebuildDashboard();
+    Serial.printf("[Cards] deck %s -> %ux%u cells of %ux%u px\n",
+                  _showDeck ? "shown" : "hidden",
+                  (unsigned)UI::grid().cols, (unsigned)UI::grid().rows,
+                  (unsigned)UI::grid().cellW, (unsigned)UI::grid().cellH);
 }
 
 void GUIManager::tick() {
