@@ -43,7 +43,11 @@ Phase 2.
    first: it records where the build deviates from the body of the document, and why.
 5. `docs/design/tokens.md` — the design system and the measurements behind it.
 6. `docs/design/startup.md` — only if you are touching boot order or LVGL setup.
-7. `docs/ROADMAP.md` §7 — the milestone list, and what 2.4 lets us close in the tracker.
+7. **`docs/REFERENCE_PROJECTS.md`** - read section "The page/view/grid back-end" before any
+   navigation or build-sheet work. It was missing from this list and should not have been: the
+   NINA project's frozen-id / append-only page registry is a decision we would otherwise make
+   badly and only find out about after something had been persisted.
+8. `docs/ROADMAP.md` §7 — the milestone list, and what 2.4 lets us close in the tracker.
 
 `docs/research/` holds three background reports. Not on the critical path — read them when the owner
 raises the topic.

@@ -152,6 +152,10 @@ inline const CardSpec FLEET_CARDS[] = {
 };
 
 inline const PageSpec FLEET_PAGE = {
+    // Page 1 is home, and 1 stays home forever. See PageSpec's comment: ids
+    // are append-only and slugs are the external key.
+    .id    = 1,
+    .slug  = "home",
     .title = "Home",
     .cards = FLEET_CARDS,
     .count = (uint8_t)(sizeof(FLEET_CARDS) / sizeof(FLEET_CARDS[0])),

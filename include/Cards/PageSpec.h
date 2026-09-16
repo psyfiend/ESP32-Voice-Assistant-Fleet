@@ -93,6 +93,26 @@ struct CardSpec {
 // A page of cards.
 // ---------------------------------------------------------------------------
 struct PageSpec {
+    // STABLE IDENTITY, and it is append-only.
+    //
+    // Straight out of docs/REFERENCE_PROJECTS.md's reading of the NINA
+    // project's page_registry.h, which is the one part of that project our own
+    // notes call "the most valuable part for our actual purpose". Their rule,
+    // learned the hard way: a page needs a stable numeric id AND a stable
+    // string slug, a retired id is reserved forever and never reused, and
+    // reordering the table must never renumber anything.
+    //
+    // It matters here for the same reason it mattered there: the moment a
+    // build sheet or a saved setting persists "which page", a refactor that
+    // renumbers pages silently re-points a user's dashboard at a different
+    // one. Adding these now costs two fields; adding them after anything has
+    // been persisted costs a migration.
+    //
+    // id   - internal, never reused, never reordered
+    // slug - the external key. What a build sheet, a URL or an NVS value holds
+    uint8_t     id   = 0;
+    const char *slug = nullptr;
+
     const char *title = nullptr;
 
     const CardSpec *cards = nullptr;
