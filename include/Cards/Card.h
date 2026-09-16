@@ -202,6 +202,16 @@ public:
     // the tag lands on the card above. See CardPage::begin().
     static int32_t headerHeight();
 
+    // What a cell must be TALL ENOUGH FOR, in real pixels, at this board's
+    // type scale. Exposed because the page needs the same numbers the card
+    // does - it must not plan more rows than could ever carry a card, and it
+    // was previously duplicating a guess at these.
+    //
+    //   fullCellNeedPx()    a title row, the hero, an optional row and padding
+    //   compactCellNeedPx() the hero alone, which is the least a card can be
+    static int32_t fullCellNeedPx(CardHeaderStyle style);
+    static int32_t compactCellNeedPx();
+
     // How far an HDR_TAG pill rises above its card, in real pixels. The PAGE
     // needs this: the clearance comes out of the grid's row gap, not out of
     // the card. Returns the same value as headerHeight() today and is a

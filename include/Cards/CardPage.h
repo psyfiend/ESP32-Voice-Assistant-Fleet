@@ -114,6 +114,14 @@ private:
     // The real pixel height of a card spanning `spanY` units, gaps included.
     int32_t heightOf(uint8_t spanY) const;
 
+    // How many CELL rows the cards actually need, from their spans and the
+    // column count. A lower bound: placement can still need one more when
+    // wide cards do not tile neatly.
+    uint8_t rowsWanted() const;
+
+    // Commit to a row count and work out what a unit row is worth in pixels.
+    void useRows(uint8_t cellRows);
+
     lv_obj_t   *_root   = nullptr;
     CardBinder *_binder = nullptr;
     Card       *_cards[CARD_PAGE_MAX] = {nullptr};
@@ -134,9 +142,16 @@ private:
 
     uint8_t  _sub   = PAGE_SUBDIVISION_DEFAULT;
     uint8_t  _uCols = 1;      // unit columns
-    uint8_t  _uRows = 1;      // unit rows that FIT. Nothing is placed past them
+    uint8_t  _uRows = 1;      // unit rows in use. Nothing is placed past them
     int32_t  _unitH = 0;      // one unit row, in real pixels
     int32_t  _gap   = 0;
+
+    // The height the page has to spend, and the most cell rows that could be
+    // carved out of it before a card stops being readable. The page spends as
+    // FEW rows as its cards need and gives the rest of the height to them - it
+    // does not fill the space with empty rows. See useRows().
+    int32_t  _availH   = 0;
+    uint8_t  _maxRows  = 1;
 
     // Occupancy of the unit grid, one bit per unit, row-major. 192 bytes.
     // Flow placement alone cannot overlap, but flow MIXED with pinned cards

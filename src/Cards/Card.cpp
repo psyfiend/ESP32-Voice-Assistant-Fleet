@@ -100,52 +100,54 @@ int32_t Card::headerHeight() {
 // The budget is the tallest thing each layout stacks: a title row, the hero,
 // and an optional row, plus the padding between them. A card that cannot seat
 // all three goes compact and drops the optional one.
-void Card::resolveVariant() {
-    if (_variant != CardVariant::VAR_AUTO) { _resolved = _variant; return; }
-
+// What a FULL layout needs, in real pixels. Lifted out of resolveVariant() so
+// that CardPage can ask the same question before it decides how many rows to
+// carve the page into - it used to guess, and a guess that disagrees with this
+// function is how a page plans a row no card can live in.
+int32_t Card::fullCellNeedPx(CardHeaderStyle style) {
     const UIType    &t = UI::type();
     const UIMetrics &m = UI::met();
 
-    // DERIVED FROM THE TOKENS, not measured off the widget.
-    //
-    // It used to call lv_obj_update_layout() and read the surface's height -
-    // and got LVGL's default object size, because resolveVariant() runs from
-    // build() and a card has no grid cell until placeCard() a moment later.
-    // On WS_P4_5 that default is ~92 px against a real cell of 264, so every
-    // card on the fleet's largest panel went compact and lost its name and
-    // status row. The owner's report of "no text under the icons" was that.
-    //
-    // The cell height is knowable without asking LVGL anything: the grid
-    // derived it, and the card knows its own row span.
-    int32_t h = cellPx();
-    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
-
-    // What a full layout needs: a title row, the hero, and an optional row,
-    // plus the padding between them.
-    // Counts every band a FULL layout reserves, which now includes the icon
-    // line at the top. Leaving it out made CYD_S3_3248 cards claim they could
-    // seat a full layout in 121 px when they could not, and the name was
-    // clipped underneath the status row as a result.
-    // No top band: the corner icon is out of the flow on both layouts, so it
-    // costs the stack nothing. Charging for it here is what pushed the 3248
-    // into compact and took away a status line that used to fit.
+    // Counts every band a FULL layout reserves. No top band: the corner icon is
+    // out of the flow on both layouts, so it costs the stack nothing.
     int32_t need = lv_font_get_line_height(t.VALUE)
                  + midGap()
                  + lv_font_get_line_height(t.NAME)
                  + statusBandHeight()
                  + UI::sc(m.PAD) * 2;
-    if (_hdrStyle == CardHeaderStyle::HDR_BAR) need += Card::headerHeight();
 
-    // A MARGIN, because "it exactly fits" is not a safe answer.
-    //
-    // A font's line box is taller than the ink in it, labels round up, and the
-    // body's own padding is approximate here. Landing within a pixel or two of
-    // the cell meant CYD_S3_3248 claimed a full layout at 121 px and then
-    // overflowed - the name clipped in half and drawn over the status row, and
-    // in the two modes that also spend height on a header the status row was
-    // pushed off the card entirely. Being slightly too eager to go compact
-    // costs a status line; being slightly too reluctant breaks the card.
-    need += UI::sc(8);
+    // HDR_BAR reserves a strip inside the card. HDR_TAG takes its room from
+    // OUTSIDE, so the caller subtracts it from the cell instead - see
+    // resolveVariant(). HDR_NONE costs nothing.
+    if (style == CardHeaderStyle::HDR_BAR) need += Card::headerHeight();
+
+    // A MARGIN, because "it exactly fits" is not a safe answer. A font's line
+    // box is taller than the ink in it, labels round up, and the body's own
+    // padding is approximate here. Landing within a pixel or two of the cell
+    // meant CYD_S3_3248 claimed a full layout at 121 px and then overflowed -
+    // the name clipped in half and drawn over the status row.
+    return need + UI::sc(8);
+}
+
+// The least a cell can be and still hold a card at all: the hero, its padding
+// and the same safety margin. A page will not plan a row shorter than this.
+int32_t Card::compactCellNeedPx() {
+    const UIMetrics &m = UI::met();
+    return lv_font_get_line_height(UI::type().VALUE)
+         + UI::sc(m.PAD) * 2
+         + UI::sc(8);
+}
+
+void Card::resolveVariant() {
+    if (_variant != CardVariant::VAR_AUTO) { _resolved = _variant; return; }
+
+    int32_t h = cellPx();
+
+    // HDR_TAG hangs OUTSIDE the card, so the cell it leaves the body is
+    // shorter by exactly the tag.
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+
+    const int32_t need = fullCellNeedPx(_hdrStyle);
 
     _resolved = (h >= need) ? CardVariant::VAR_FULL : CardVariant::VAR_COMPACT;
 

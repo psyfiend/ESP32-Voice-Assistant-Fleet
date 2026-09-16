@@ -118,7 +118,7 @@ UIMetrics s_met = UI_MET_DARK;
 //   WS_P4_5 landscape      5x3 of 230x210 px
 //   CYD_S3_3248 portrait   2x3 of 141x144 px
 //   CYD_S3_3248 landscape  3x2 of 144x141 px
-UIGrid    s_grid = { .TARGET_CARD_W = 130, .ASPECT_PCT = 85, .GAP = 12, .INSET = 14,
+UIGrid    s_grid = { .TARGET_CARD_W = 135, .ASPECT_PCT = 130, .GAP = 12, .INSET = 14,
                      .cols = 1, .rows = 1, .cellW = 0, .cellH = 0 };
 
 int32_t s_vpW = 0, s_vpH = 0;
@@ -151,8 +151,13 @@ void recomputeGrid() {
     if (cols < 1) cols = 1;
     const int32_t cellW = (availW - gap * (cols - 1)) / cols;
 
-    // Rows: aim for the requested aspect, then stretch the row height so the
-    // grid fills the viewport exactly rather than leaving a dead strip.
+    // Rows here are only an ESTIMATE for callers with no cards to count.
+    //
+    // CardPage overrides both the row count and the cell height, because the
+    // right number of rows is a question about CONTENT and this function only
+    // knows geometry. See CardPage::rowsWanted(). ASPECT_PCT is now a CAP on
+    // how tall a card may get relative to its width rather than a target
+    // shape, so this estimate is deliberately generous.
     const int32_t wantH = (cellW * s_grid.ASPECT_PCT) / 100;
     int32_t rows = (availH + gap) / (wantH + gap);
     if (rows < 1) rows = 1;

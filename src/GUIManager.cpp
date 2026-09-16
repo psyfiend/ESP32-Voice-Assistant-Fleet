@@ -130,6 +130,16 @@ void GUIManager::begin() {
     // for the same reason Dump Config is: Panel_System has no business knowing
     // the entity registry exists.
     _pnlSystem.setOnCardsRequested([this]() {
+        // THE DASHBOARD COMES DOWN FIRST.
+        //
+        // The bench builds its own page of thirteen more cards. With the
+        // dashboard still alive that is twenty-six cards and two full widget
+        // trees, which is precisely the condition 2.4 documented as fatal:
+        // "Allocating layer buffer failed", then a reboot. The owner hit it
+        // immediately - tapping Cards reset the board.
+        //
+        // The close handler below rebuilds it on the way back.
+        destroyDashboard();
         CardDemo::show(_core.entities(), _binder);
     });
 
@@ -189,14 +199,49 @@ void GUIManager::buildDashboard() {
 
     const int32_t headerH = UIToolkit::sc(50);
 
-    // What the accordion deck keeps for itself while every panel is COLLAPSED.
-    // UIToolkit builds a collapsed panel at sc(85) and the deck pads itself by
-    // sc(10) - see UIToolkit.cpp. An EXPANDED panel is sc(280) and is allowed
-    // to cover cards; only the resting state costs the grid anything.
+    // WHAT THE DECK ACTUALLY COSTS, MEASURED RATHER THAN ASSUMED.
     //
-    // This is not free and it is not a preference: on WS_P4_7B it is ~105 px
-    // of 600, which is what takes the page from four rows to three.
-    const int32_t deckReserve = _showDeck ? UIToolkit::sc(85) + UIToolkit::sc(20) : 0;
+    // The first version of this reserved sc(85) + sc(20), on the reasoning that
+    // UIToolkit builds a collapsed panel at sc(85). That was wrong by about
+    // 60 px and the owner spotted it on the glass: "with the deck present there
+    // is always a massive gap between the bottom row and the deck".
+    //
+    // The panel really is 85 px tall. It is just that the deck is as tall as
+    // the whole screen and starts BELOW the header, so its bottom edge hangs
+    // 50 px off the bottom of the panel - and a bottom-aligned panel therefore
+    // has its lower ~40 px off-screen. What you can actually see is the panel's
+    // sc(45) header and nothing else, which is exactly what he described.
+    //
+    // Rather than encode that coincidence as a number, ask the objects where
+    // they are. This survives someone changing a panel's height, and it is the
+    // same "verify from outside" rule the connectivity work runs on.
+    int32_t deckReserve = 0;
+    if (_showDeck && _deck) {
+        lv_obj_update_layout(screen);
+
+        // lv_obj_get_coords() gives ABSOLUTE screen coordinates. The x/y
+        // accessors are relative to the parent, and the deck's children have a
+        // different parent from the screen - mixing the two would measure
+        // nothing meaningful.
+        lv_area_t sc_area;
+        lv_obj_get_coords(screen, &sc_area);
+        const int32_t screenBottom = sc_area.y2;
+
+        int32_t topMost = screenBottom;
+        const uint32_t kids = lv_obj_get_child_count(_deck);
+        for (uint32_t i = 0; i < kids; i++) {
+            lv_obj_t *k = lv_obj_get_child(_deck, i);
+            if (!k || lv_obj_has_flag(k, LV_OBJ_FLAG_HIDDEN)) continue;
+            lv_area_t k_area;
+            lv_obj_get_coords(k, &k_area);
+            if (k_area.y1 < topMost) topMost = k_area.y1;
+        }
+        deckReserve = screenBottom - topMost;
+        if (deckReserve < 0) deckReserve = 0;
+        // Plus one gap, so the bottom row of cards does not sit flush against
+        // the panel headers.
+        if (deckReserve > 0) deckReserve += UI::sc(UI::grid().GAP);
+    }
 
     int32_t h = lv_obj_get_height(screen) - headerH - deckReserve;
     if (h < UIToolkit::sc(80)) h = lv_obj_get_height(screen) - headerH;

@@ -61,22 +61,43 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, uint8_t subdivision) 
     for (uint8_t i = 0; i < _uCols; i++) _colDsc[i] = LV_GRID_FR(1);
     _colDsc[_uCols] = LV_GRID_TEMPLATE_LAST;
 
-    // Rows are real pixels, because a row's height is a token and not a
-    // fraction of anything. One unit row is a cell split `sub` ways with the
-    // gaps taken out first, so `sub` unit rows plus the gap between them come
-    // back to the cell height - give or take the (sub-1) px integer division
-    // loses, which commit() accounts for by telling each card the height it
-    // ACTUALLY got rather than the one the token asked for.
-    _unitH = ((int32_t)g.cellH - _gap * (_sub - 1)) / _sub;
-    if (_unitH < 1) _unitH = 1;
+    // ROWS ARE NOT DECIDED HERE ANY MORE, and that is the 2.5 fix the owner
+    // found on the glass.
+    //
+    // They used to come straight from UI::grid().rows, which is pure geometry:
+    // "how many rows of roughly this shape fit in this height". With 13 cards
+    // on a 7-column board that asked for FOUR rows, and since the page then
+    // divides the height by the row count, every card was sized for a row that
+    // had nothing in it - which on the 7B pushed all of them under the
+    // compact threshold. Hiding the deck made it WORSE, because the extra
+    // height bought a fifth row rather than taller cards.
+    //
+    // His rule, and it is the right one: "there is no reason to create an
+    // additional row if all the cards can be made to fit". So the page records
+    // the height it has to spend and decides the row count in commit(), once
+    // it knows what it is being asked to place.
+    lv_obj_update_layout(_root);   // _root was created a moment ago; without
+                                   // this its content height is still zero
+    _availH = (int32_t)lv_obj_get_content_height(_root);
+    if (_availH <= 0) {
+        // Called before the parent has been laid out. Fall back to the token's
+        // own arithmetic rather than to zero.
+        _availH = (int32_t)g.cellH * (g.rows ? g.rows : 1)
+                + _gap * ((g.rows ? g.rows : 1) - 1);
+    }
 
-    uint16_t ur = (uint16_t)g.rows * _sub;
-    if (ur < 1) ur = 1;
-    if (ur > PAGE_MAX_UNIT_ROWS) ur = PAGE_MAX_UNIT_ROWS;
-    _uRows = (uint8_t)ur;
+    // The most rows this height could carry before a card stops being able to
+    // draw a full layout. Below this a card goes compact, which is a decision
+    // the CARD makes about its own contents - the page just refuses to plan
+    // more rows than could ever be useful.
+    _maxRows = 1;
+    for (uint8_t r = 1; r <= PAGE_MAX_UNIT_ROWS / _sub; r++) {
+        const int32_t cellH = (_availH - _gap * (r - 1)) / r;
+        if (cellH < Card::compactCellNeedPx()) break;
+        _maxRows = r;
+    }
 
-    for (uint8_t i = 0; i < _uRows; i++) _rowDsc[i] = (lv_coord_t)_unitH;
-    _rowDsc[_uRows] = LV_GRID_TEMPLATE_LAST;
+    useRows(1);   // provisional; commit() replaces it
 
     lv_obj_set_grid_dsc_array(_root, _colDsc, _rowDsc);
     lv_obj_set_layout        (_root, LV_LAYOUT_GRID);
@@ -86,11 +107,66 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, uint8_t subdivision) 
     _committed = false;
     clearOcc();
 
-    Serial.printf("[Cards] Page %ux%u cells / %ux%u units, cell %ux%u px, unit row %ld px, gap %ld\n",
-                  (unsigned)g.cols, (unsigned)g.rows,
-                  (unsigned)_uCols, (unsigned)_uRows,
-                  (unsigned)g.cellW, (unsigned)g.cellH,
-                  (long)_unitH, (long)_gap);
+    Serial.printf("[Cards] Page %u cols (%u units), %ld px of height, max %u rows, gap %ld\n",
+                  (unsigned)g.cols, (unsigned)_uCols,
+                  (long)_availH, (unsigned)_maxRows, (long)_gap);
+}
+
+// How many CELL rows the cards need, from the area they ask for.
+//
+// A lower bound rather than an answer: it assumes cards tile without waste,
+// which a 2-wide card on an odd column count does not. commit() starts here
+// and adds rows until placement succeeds.
+uint8_t CardPage::rowsWanted() const {
+    if (!_n) return 1;
+    const uint8_t cellCols = _uCols / _sub ? _uCols / _sub : 1;
+
+    uint16_t cells = 0;
+    for (uint8_t i = 0; i < _n; i++) {
+        if (!_cards[i]) continue;
+        const CardPlacement &p = _cards[i]->placement();
+        uint8_t sx = p.prefSpanX ? p.prefSpanX : _sub;
+        uint8_t sy = p.prefSpanY ? p.prefSpanY : _sub;
+        // Round each card up to whole cells; a half-cell card still occupies a
+        // row, and this is a floor, not a packing.
+        const uint8_t cx = (uint8_t)((sx + _sub - 1) / _sub);
+        const uint8_t cy = (uint8_t)((sy + _sub - 1) / _sub);
+        cells = (uint16_t)(cells + cx * cy);
+    }
+    uint16_t rows = (uint16_t)((cells + cellCols - 1) / cellCols);
+    if (rows < 1) rows = 1;
+    return (uint8_t)(rows > 255 ? 255 : rows);
+}
+
+// Spend the height on exactly this many cell rows.
+//
+// The rows share the whole height, so FEWER rows means TALLER cards - which is
+// what makes hiding the deck grow the cards instead of shrinking them.
+//
+// One guard: a page with two cards on it would otherwise get one row as tall
+// as the screen. UIGrid::ASPECT_PCT caps how tall a card may be relative to
+// its width; past that the grid stops stretching and the slack is left at the
+// bottom rather than poured into a card nobody wants that tall.
+void CardPage::useRows(uint8_t cellRows) {
+    if (cellRows < 1) cellRows = 1;
+    if (cellRows > PAGE_MAX_UNIT_ROWS / _sub) cellRows = PAGE_MAX_UNIT_ROWS / _sub;
+
+    int32_t cellH = (_availH - _gap * (cellRows - 1)) / cellRows;
+
+    const int32_t capH = ((int32_t)UI::grid().cellW * UI::grid().ASPECT_PCT) / 100;
+    if (capH > 0 && cellH > capH) cellH = capH;
+    if (cellH < 1) cellH = 1;
+
+    _unitH = (cellH - _gap * (_sub - 1)) / _sub;
+    if (_unitH < 1) _unitH = 1;
+
+    uint16_t ur = (uint16_t)cellRows * _sub;
+    if (ur > PAGE_MAX_UNIT_ROWS) ur = PAGE_MAX_UNIT_ROWS;
+    _uRows = (uint8_t)ur;
+
+    for (uint8_t i = 0; i < _uRows; i++) _rowDsc[i] = (lv_coord_t)_unitH;
+    _rowDsc[_uRows] = LV_GRID_TEMPLATE_LAST;
+    lv_obj_set_grid_dsc_array(_root, _colDsc, _rowDsc);
 }
 
 int32_t CardPage::heightOf(uint8_t spanY) const {
@@ -258,7 +334,26 @@ Card *CardPage::add(Card *c) {
 
 void CardPage::commit() {
     if (_committed) return;
-    plan();
+
+    // Spend as few rows as the cards need, and only add more when placement
+    // genuinely cannot fit them. Dropping cards is the LAST resort, after the
+    // page has already grown to every row it could carry.
+    uint8_t rows = rowsWanted();
+    if (rows > _maxRows) rows = _maxRows;
+
+    for (;;) {
+        useRows(rows);
+        plan();
+        if (_placed == _n) break;       // everything fits at this row count
+        if (rows >= _maxRows) break;    // no more rows to give - plan() drops
+        rows++;
+    }
+
+    Serial.printf("[Cards] %u cards want %u rows; using %u of max %u -> cell %ldx%ld px\n",
+                  (unsigned)_n, (unsigned)rowsWanted(), (unsigned)(_uRows / _sub),
+                  (unsigned)_maxRows,
+                  (long)UI::grid().cellW, (long)heightOf(_sub));
+
 
     for (uint8_t i = 0; i < _n; i++) {
         Card *c = _cards[i];

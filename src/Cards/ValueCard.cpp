@@ -206,7 +206,25 @@ void ValueCard::render() {
         lv_label_set_text(_battery,  "");
     }
 
-    if (e->everSet) {
+    // LAST-SEEN IS FOR VALUES THAT ARRIVE FROM SOMEWHERE ELSE.
+    //
+    // The owner, seeing "Seen: now" on the panel's own RSSI and uptime cards:
+    // "Do local entities (like Panel) need secondary information such as
+    // battery or last seen?" They do not. An entity this board OWNS is read
+    // straight off the hardware every couple of seconds, so its age is always
+    // "now" and the line is pure clutter.
+    //
+    // advertise == true is exactly the "we own it" flag - Entity.h calls it
+    // "the real difference between the two groups of entity". The staleness
+    // machinery still runs: if our own telemetry ever DID stop updating, the
+    // card would still raise a STALE tag, which is the part worth keeping.
+    //
+    // It also answers the question underneath his: "Seen" is the last time
+    // THIS ENTITY'S VALUE changed, not the last time the device was heard
+    // from. For a Zigbee sensor publishing four values on one topic those are
+    // the same moment; for anything else they are not, and the device-level
+    // question is one only #43's device registry can answer.
+    if (e->everSet && !e->desc.advertise) {
         char age[12];
         cardFormatAge(millis() - e->lastUpdateMs, age, sizeof(age));
 

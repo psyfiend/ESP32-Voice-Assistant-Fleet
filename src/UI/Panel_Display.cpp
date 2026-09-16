@@ -105,7 +105,15 @@ void Panel_Display::init(lv_obj_t* parent) {
 
 
     // Touch Overlay Logic
-    panel_touch_data = lv_obj_create(lv_screen_active());
+    // ON THE TOP LAYER, not on the screen.
+    //
+    // As a child of the screen it sat below the dashboard in the z-order from
+    // 2.5 onward and was never visible - the owner reported "Show Touches"
+    // doing nothing. lv_layer_top() is drawn above all screen content, which
+    // is what a touch visualiser wants anyway: it is an overlay, not part of
+    // the page, and it should not have to be re-stacked every time the
+    // dashboard is rebuilt.
+    panel_touch_data = lv_obj_create(lv_layer_top());
     lv_obj_set_size             (panel_touch_data, UIToolkit::sc(180), UIToolkit::sc(210)); 
     lv_obj_align                (panel_touch_data, LV_ALIGN_RIGHT_MID, UIToolkit::sc(-10), UIToolkit::sc(-50));
     lv_obj_set_style_bg_color   (panel_touch_data, UI::c(UI::pal().GROUND), 0);

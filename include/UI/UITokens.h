@@ -81,8 +81,16 @@ struct UIMetrics {
 // This is what makes one token set produce 5 columns on WS_P4_5 and 2 on
 // CYD_S3_3248 portrait with no per-board layout code.
 struct UIGrid {
-    uint16_t TARGET_CARD_W; // logical px — the knob you actually turn
-    uint8_t  ASPECT_PCT;    // 100 = square. Only a hint; rows stretch to fit
+    uint16_t TARGET_CARD_W; // logical px - decides how many COLUMNS fit
+    // The TALLEST a card may be, as a percentage of its own width.
+    //
+    // CHANGED AT 2.5. It used to be a target shape that decided the ROW COUNT,
+    // and that was the bug behind "hiding the deck made the cards smaller":
+    // more height bought another empty row instead of taller cards. The row
+    // count now comes from how many cards there are (CardPage::rowsWanted()),
+    // and this only stops a page with three cards on it from making each one
+    // as tall as the screen. Above the cap the grid leaves slack at the bottom.
+    uint8_t  ASPECT_PCT;
     uint8_t  GAP;
     uint8_t  INSET;         // cluster inset from the screen edge
 
