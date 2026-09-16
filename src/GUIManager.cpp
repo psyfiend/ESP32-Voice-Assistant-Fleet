@@ -239,9 +239,11 @@ void GUIManager::buildDashboard() {
         }
         deckReserve = screenBottom - topMost;
         if (deckReserve < 0) deckReserve = 0;
-        // Plus one gap, so the bottom row of cards does not sit flush against
-        // the panel headers.
-        if (deckReserve > 0) deckReserve += UI::sc(UI::grid().GAP);
+        // NO EXTRA GAP. The page's own INSET already holds the bottom row off
+        // the edge of its host, and with the deck hidden that inset is exactly
+        // the margin the owner liked ("6x3 sits neatly against the bottom
+        // margin"). Adding a gap on top of it made the deck case visibly
+        // looser than the hidden case for no reason - his "modest gap".
     }
 
     int32_t h = lv_obj_get_height(screen) - headerH - deckReserve;
@@ -280,7 +282,17 @@ void GUIManager::buildDashboard() {
                             : _hdr == CardHeaderStyle::HDR_BAR  ? "Bar"
                                                                 : "No hdr");
 
-    lv_obj_move_to_index(_dashHost, 1);
+    // THE DASHBOARD GOES TO THE BACK, by role rather than by index.
+    //
+    // This was `move_to_index(_dashHost, 1)`, which assumed the touch overlay
+    // was still the screen's child 0. Moving that overlay to lv_layer_top()
+    // shifted every remaining index down by one, so index 1 quietly became
+    // ABOVE the deck instead of below it - and the panels that used to animate
+    // over the cards started expanding behind them.
+    //
+    // move_background() says what is actually meant and cannot rot when the
+    // screen's child list changes again.
+    lv_obj_move_background(_dashHost);
 
     if (_deck) {
         if (_showDeck) lv_obj_clear_flag(_deck, LV_OBJ_FLAG_HIDDEN);
