@@ -104,6 +104,7 @@ public:
     Card &setArea(const char *area);
 
     Card &setHeaderStyle(CardHeaderStyle s) { _hdrStyle = s; return *this; }
+    CardHeaderStyle headerStyle() const { return _hdrStyle; }
 
     // Whether this card displays its area (or, later, a custom grouping) at
     // all. Separate from the header style on purpose - they are two

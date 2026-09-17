@@ -129,11 +129,18 @@ int32_t Card::fullCellNeedPx(CardHeaderStyle style) {
     return need + UI::sc(8);
 }
 
-// The least a cell can be and still hold a card at all: the hero, its padding
-// and the same safety margin. A page will not plan a row shorter than this.
+// The least a cell can be and still hold a card at all: the hero, the NAME and
+// the padding, plus the same safety margin. A page will not plan a row shorter
+// than this.
+//
+// The name is counted since 2026-09-17, when compact stopped dropping it -
+// compact now drops the secondary row and nothing else, so the floor has to
+// include a name or the page could plan a row that a compact card overflows.
 int32_t Card::compactCellNeedPx() {
     const UIMetrics &m = UI::met();
     return lv_font_get_line_height(UI::type().VALUE)
+         + midGap()
+         + lv_font_get_line_height(UI::type().NAME)
          + UI::sc(m.PAD) * 2
          + UI::sc(8);
 }

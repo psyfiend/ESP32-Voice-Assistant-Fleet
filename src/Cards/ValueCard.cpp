@@ -143,8 +143,16 @@ void ValueCard::render() {
     // GLYPH rather than the glyph's line box. Measured from the font, not
     // guessed - see cardGlyphTopBearing(). Re-applied on every render because
     // the face changes with the scheme's type scale.
-    lv_obj_align(_icon, LV_ALIGN_TOP_LEFT, 0,
-                 -cardGlyphTopBearing(t.ICON_SM, cornerGlyph));
+    // HDR_NONE ONLY, which is the owner's call and the right one.
+    //
+    // In bar and tag mode the icon already sits the correct distance below the
+    // top of the space the card's contents live in - the bottom of the band in
+    // bar, the top border in tag - and he is happy with both. Only in No-hdr,
+    // where nothing sits above it, does the label's own leading become visible
+    // as the glyph appearing to float away from the corner.
+    const int32_t lift = (headerStyle() == CardHeaderStyle::HDR_NONE)
+                       ? cardGlyphTopBearing(t.ICON_SM, cornerGlyph) : 0;
+    lv_obj_align(_icon, LV_ALIGN_TOP_LEFT, 0, -lift);
     lv_obj_set_style_text_color(_icon, UI::c(tone(cardTintFor(e->desc))), 0);
 
     // --- The value, dominant, with its unit smaller beside it -------------
