@@ -86,13 +86,29 @@
     // silent allocation failure. ~238KB of internal RAM was free at the old
     // size, so this leaves ample headroom for every board, not just this one.
     //
-    // 256 KB WAS TRIED FOR THE P4 BOARDS ON 2026-09-17 AND DOES NOT LINK.
-    // Their RAM report reads 3% of 512 KB, which is misleading - that is the
-    // whole internal SRAM, not what is available to a static array in DRAM.
-    // The linker was 32,983 bytes short. If this ever needs raising on P4,
-    // 192 KB is the next value to try, and it needs a link test, not a
-    // calculation.
-    #define LV_MEM_SIZE (128 * 1024U)          /**< [bytes] */
+    // PER TARGET, because the boards are not alike and this pool pays for more
+    // than widgets.
+    //
+    // It also funds LVGL's LAYER buffers - the intermediate surfaces it needs
+    // whenever something has to be composited, which on this project means
+    // clip_corner, transforms, and object opacity below COVER. A layer is
+    // sized by the object's WIDTH, so a 482 px card in HDR_BAR wants ~38 KB
+    // and a 615 px deck panel wanted ~49 KB. Those are the allocations that
+    // have failed, intermittently, and taken the board down with them.
+    //
+    // 256 KB DOES NOT LINK on P4 - tried 2026-09-17, linker short by 32,983
+    // bytes. The RAM report reading "3% of 512,000" is the whole internal
+    // SRAM, not what a static array can have. 192 KB links with room to
+    // spare, and gives the P4 boards - which have the widest objects in the
+    // fleet - the headroom the failures were asking for.
+    //
+    // The S3 boards stay at 128 KB. CYD_S3_3248 already sits at ~59% internal
+    // because, as the only QSPI board, its display buffers must live there too.
+    #ifdef CONFIG_IDF_TARGET_ESP32P4
+        #define LV_MEM_SIZE (192 * 1024U)      /**< [bytes] */
+    #else
+        #define LV_MEM_SIZE (128 * 1024U)      /**< [bytes] */
+    #endif
 
     /** Size of the memory expand for `lv_malloc()` in bytes */
     #define LV_MEM_POOL_EXPAND_SIZE 0

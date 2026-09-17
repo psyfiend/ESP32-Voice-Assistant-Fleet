@@ -59,3 +59,9 @@ void Panel_Header::tick() {
     // loop costs a millis() compare in the common case.
     connStatus.tick();
 }
+void Panel_Header::restyle() {
+    if (!container) return;
+    lv_obj_set_style_bg_color    (container, UI::c(UI::pal().SURFACE_ALT), 0);
+    lv_obj_set_style_border_color(container, UI::c(UI::pal().ACCENT), 0);
+    if (lbl_title) lv_obj_set_style_text_color(lbl_title, UI::c(UI::pal().ACCENT), 0);
+}

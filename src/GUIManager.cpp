@@ -66,7 +66,11 @@ void GUIManager::begin() {
 
     // Bottom deck height = screen height - header height.
     int32_t header_h = UIToolkit::systemHeaderPx();
-    int32_t deck_h   = lv_obj_get_height(screen);
+    // The deck ENDS AT THE BOTTOM OF THE SCREEN. It used to be as tall as the
+    // whole display while starting below the header, so it overhung by exactly
+    // the header height and a bottom-aligned panel had that much of itself
+    // off-screen. Nothing should depend on where an invisible edge is.
+    int32_t deck_h   = lv_obj_get_height(screen) - header_h;
 
     // --= LAYER 1: BOTTOM DECK =--
     // Contains the Audio/Display panels.
@@ -411,6 +415,7 @@ void GUIManager::cycleScheme() {
         default: UI::setScheme(UI_PAL_PAPER,    UI_MET_LIGHT); break;
     }
     applyGround();
+    _header.restyle();
     _pnlSystem.setSchemeLabel(UI::pal().name);
 
     // A rebuild rather than a restyle. Cards would survive restyleAll() - that
