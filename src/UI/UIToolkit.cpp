@@ -159,7 +159,20 @@ lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* titl
     lv_obj_set_style_border_color(pnl, UI::border(), 0);
     lv_obj_set_style_pad_all    (pnl, 0, 0); 
     lv_obj_set_style_pad_row    (pnl, sc(10), 0);   
-    lv_obj_set_style_clip_corner(pnl, true, 0); 
+    // CLIP_CORNER IS OFF, and this is the whole reason WS_P4_5 froze on boot.
+    //
+    // clip_corner forces LVGL to render the object to an intermediate LAYER so
+    // it can mask the rounded corners, and a layer is a real buffer allocation
+    // out of the LV_MEM pool. On a 1280 px panel each deck panel is 615 px
+    // wide, so LVGL asked for 615 x 20 x 4 bytes = 49 KB, failed, and repeated
+    // - "lv_draw_layer_alloc_buf: Allocating layer buffer failed", forever.
+    // The 7B never hit it because its panels are 490 px and the request fits.
+    //
+    // Nothing here needs the clip: the header and the content container are
+    // both transparent, so no child paints into the corners this was masking.
+    // Card::build() already avoids clip_corner for exactly this reason and
+    // says so - the same trap, found twice.
+    // lv_obj_set_style_clip_corner(pnl, true, 0);
     lv_obj_clear_flag           (pnl, LV_OBJ_FLAG_SCROLLABLE);
 
     // Header

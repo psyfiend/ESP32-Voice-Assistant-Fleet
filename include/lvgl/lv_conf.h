@@ -77,6 +77,21 @@
     // old size and LV_USE_LOG disabled (see LV_USE_LOG below) - suspected
     // silent allocation failure. ~238KB of internal RAM was free at the old
     // size, so this leaves ample headroom for every board, not just this one.
+    // Bumped from 64KB: this pool covers ALL of LVGL's internal allocations
+    // (widget objects, styles, animations, internal draw-time buffers) across
+    // every board in the fleet. 64KB was fine for boards up to 800x480; the
+    // WS_S3_TOUCH_LCD_5B's 1024x600 screen, with the most widgets on screen
+    // at once of any board here, silently hung on its first render with the
+    // old size and LV_USE_LOG disabled (see LV_USE_LOG below) - suspected
+    // silent allocation failure. ~238KB of internal RAM was free at the old
+    // size, so this leaves ample headroom for every board, not just this one.
+    //
+    // 256 KB WAS TRIED FOR THE P4 BOARDS ON 2026-09-17 AND DOES NOT LINK.
+    // Their RAM report reads 3% of 512 KB, which is misleading - that is the
+    // whole internal SRAM, not what is available to a static array in DRAM.
+    // The linker was 32,983 bytes short. If this ever needs raising on P4,
+    // 192 KB is the next value to try, and it needs a link test, not a
+    // calculation.
     #define LV_MEM_SIZE (128 * 1024U)          /**< [bytes] */
 
     /** Size of the memory expand for `lv_malloc()` in bytes */

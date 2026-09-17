@@ -173,6 +173,27 @@ reads closer to official ESP-IDF audio examples.
   `Arduino_DSI_Display.cpp`, with a comment naming the exact failure mode. Several rounds of
   hypotheses were spent because only `Arduino_ESP32DSIPanel.cpp` had been compared.
 
+## There is exactly ONE `lv_conf.h`, and it is `include/lvgl/lv_conf.h`
+
+Two copies existed for most of this project's life - `include/lvgl/lv_conf.h` and
+`components/lv_conf.h` - left over from the original fight to get LVGL's config found at all.
+Nobody knew which one the build read, which meant nobody could trust an edit to either.
+
+**Settled 2026-09-17, by experiment rather than by reading the include chain.** An `#error` was
+placed at the top of `components/lv_conf.h` and `WS_P4_TOUCH_LCD_5` was rebuilt with a cleared
+`build_cache`. It compiled. That file was never being read, and it has been deleted; it is in git
+history if it is ever wanted.
+
+The live file is on the include path via `-I include/lvgl` in the shared `[S3-options]` /
+`[P4-options]` sections. The corroborating evidence, which was available all along: the stale copy
+had `LV_USE_LOG 0` and `LV_MEM_SIZE 64KB`, and the fleet demonstrably prints `[LVGL] [Warn]` lines
+and behaves like a 128KB pool.
+
+**`LV_MEM_SIZE` is 128 KB fleet-wide and 256 KB does not link on P4.** Tried 2026-09-17: the RAM
+report says 3% of 512,000 bytes, which is the whole internal SRAM and not what a static array can
+have. The linker came up 32,983 bytes short. 192 KB is the next value worth trying and it needs a
+link test, not a calculation.
+
 ## PlatformIO build cache can silently ignore BSP header edits
 
 `platformio.ini` sets `build_cache_dir = .pio/build_cache` — a content-addressed compiler
