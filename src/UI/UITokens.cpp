@@ -119,14 +119,20 @@ UIMetrics s_met = UI_MET_DARK;
 // Chosen on the glass, per board, by the owner turning the knob:
 //
 //   WS_P4_7B   1024 x 600 @ 170 PPI   135 -> 6 columns
-//   WS_P4_5    1280 x 800 @ 294 PPI   148 -> 5 columns
+//   WS_P4_5    1280 x 800 @ 294 PPI   130 -> 5 columns
+//
+// NOTE THE DIRECTION, because it is easy to get backwards and I did: a LARGER
+// target means FEWER columns, since it is the width each card is trying to be.
+// 148 was picked for the P4_5 on the reasoning that it wanted bigger cards
+// than the 7B; what it actually did was drop it from 5 columns to 4. That
+// board needs <= 132 for five, and 130 is the value already proven on glass.
 //
 // Every other board keeps the fleet default until someone has looked at it.
 // This is the ConnectivityDefaults.h pattern - one shared default, overridden
 // per board through the identity macro every BSP header already defines, and
 // no new machinery.
 #if   defined(WS_P4_5)
-    #define FLEET_TARGET_CARD_W 148
+    #define FLEET_TARGET_CARD_W 130
 #elif defined(WS_P4_7B)
     #define FLEET_TARGET_CARD_W 135
 #else

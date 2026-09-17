@@ -127,8 +127,18 @@ void StateCard::render() {
     // A disc smaller than its own glyph is never the right answer. If the band
     // cannot hold that, the card is too small for this layout and the variant
     // logic is what should be giving way, not the geometry.
-    const int32_t minDisc = iconPx + UI::sc(4);
-    if (discPx < minDisc) discPx = minDisc;
+    // THE DISC NEVER EXCEEDS ITS BAND. The first attempt at the problem above
+    // FLOORED it at the glyph size, which made it bigger than the band
+    // containing it - and a child overflowing its parent is what forces LVGL
+    // to render that parent to an intermediate LAYER so it can be clipped. On
+    // WS_P4_5 a two-cell-wide card then asked for a 615x20 layer buffer,
+    // failed, and the board froze on FIRST BOOT with nothing yet on screen.
+    // That was worse than the bug it fixed.
+    //
+    // So when the band is too tight to hold a circle bigger than the glyph,
+    // the circle is not drawn at all and the icon stands on its own. Draw
+    // LESS, never the same thing smaller - the rule the variants already obey.
+    const bool discFits = (discPx >= iconPx + UI::sc(4));
     lv_obj_set_size        (_disc, discPx, discPx);
     lv_obj_set_style_radius(_disc, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_pad_bottom(_disc, 0, 0);
@@ -210,6 +220,10 @@ void StateCard::render() {
     } else {
         lv_obj_add_flag            (_mixed, LV_OBJ_FLAG_HIDDEN);
     }
+
+    // Last word, after the state block has set the real opacity: a disc too
+    // small to enclose its own glyph is not drawn.
+    if (!discFits) lv_obj_set_style_bg_opa(_disc, LV_OPA_TRANSP, 0);
 }
 
 void StateCard::commandAll(bool on) {
