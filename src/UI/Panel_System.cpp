@@ -13,6 +13,7 @@ Panel_System::Panel_System() {
     _ui_grid    = NULL;
     _lbl_hdr    = NULL;
     _lbl_scheme = NULL;
+    _lbl_bar    = NULL;
     txt_log     = NULL;
     lbl_stats   = NULL;
     _headerRef  = NULL;
@@ -59,6 +60,10 @@ void Panel_System::setHeaderLabel(const char *text) {
 
 void Panel_System::setSchemeLabel(const char *text) {
     if (_lbl_scheme && text) lv_label_set_text(_lbl_scheme, text);
+}
+
+void Panel_System::setBarLabel(const char *text) {
+    if (_lbl_bar && text) lv_label_set_text(_lbl_bar, text);
 }
 
 static lv_obj_t *knobButton(lv_obj_t *parent, Panel_System *self,
@@ -281,6 +286,13 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
         if (p) p->requestScheme();
     });
     _lbl_scheme = lv_obj_get_child(btnScheme, 0);
+
+    // System header bar height: 50 -> 45 -> 40 -> 35 -> 30 -> none -> 50.
+    lv_obj_t *btnBar = knobButton(_ui_grid, this, "Bar", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestGrid(Panel_System::GridAction::BAR_CYCLE);
+    });
+    _lbl_bar = lv_obj_get_child(btnBar, 0);
 
     // -- ROW 3: Log Container --
     lv_obj_t* log_box = lv_obj_create(_ui_content);

@@ -135,8 +135,16 @@ void ValueCard::render() {
     const bool   compact = (variant() == CardVariant::VAR_COMPACT);
 
     // --- Icon, tinted by what this measures -------------------------------
-    lv_label_set_text          (_icon, cardIconFor(e->desc));
+    const char *cornerGlyph = cardIconFor(e->desc);
+    lv_label_set_text          (_icon, cornerGlyph);
     lv_obj_set_style_text_font (_icon, t.ICON_SM, 0);
+
+    // PULL THE LABEL UP BY ITS OWN LEADING, so what lands in the corner is the
+    // GLYPH rather than the glyph's line box. Measured from the font, not
+    // guessed - see cardGlyphTopBearing(). Re-applied on every render because
+    // the face changes with the scheme's type scale.
+    lv_obj_align(_icon, LV_ALIGN_TOP_LEFT, 0,
+                 -cardGlyphTopBearing(t.ICON_SM, cornerGlyph));
     lv_obj_set_style_text_color(_icon, UI::c(tone(cardTintFor(e->desc))), 0);
 
     // --- The value, dominant, with its unit smaller beside it -------------

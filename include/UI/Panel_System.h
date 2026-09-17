@@ -49,6 +49,7 @@ public:
     void setOnSchemeRequested(SchemeCallback cb) { _onSchemeRequested = cb; }
     void requestScheme() { if (_onSchemeRequested) _onSchemeRequested(); }
     void setSchemeLabel(const char *text);
+    void setBarLabel(const char *text);
 
     // Fires the above. Public because a capture-less lv_event_cb lambda is a
     // free function, not a member, so it cannot reach a private field.
@@ -70,6 +71,7 @@ public:
         ASPECT_DOWN, ASPECT_UP,    // ASPECT_PCT    - decides ROWS
         DECK_TOGGLE,               // the deck costs a row on every board
         HDR_CYCLE,                 // bar / tag / none, on the live dashboard
+        BAR_CYCLE,                 // the SYSTEM header bar height
     };
     using GridCallback = std::function<void(GridAction)>;
     void setOnGridAction(GridCallback cb) { _onGridAction = cb; }
@@ -101,6 +103,7 @@ private:
     lv_obj_t* _ui_grid;    // Second button row - the 2.5 grid knobs
     lv_obj_t* _lbl_hdr;    // label inside the header-mode button
     lv_obj_t* _lbl_scheme; // label inside the scheme button
+    lv_obj_t* _lbl_bar;    // label inside the header-size button
     
     lv_obj_t* txt_log;     // The log text label
     lv_obj_t* lbl_stats;   // The stats header label

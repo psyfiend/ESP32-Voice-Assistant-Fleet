@@ -64,6 +64,15 @@ public:
 
     // Open the design-token reference page, standing the dashboard down first.
     void openTokens();
+
+    // Cycle the SYSTEM header bar height: 50 -> 45 -> 40 -> 35 -> 30 -> none.
+    //
+    // "none" hides the bar entirely, which would otherwise strand the user:
+    // the header's status icon is the only way to open this drawer. So a
+    // transparent strip is left on the top layer to take the tap - the
+    // simplest form of the owner's swipe-down-to-reveal idea, and a footgun
+    // guard rather than a feature.
+    void cycleHeaderBar();
     bool deckShown() const { return _showDeck; }
 
     Panel_Header &header()      { return _header; }
@@ -101,6 +110,7 @@ private:
     // choice laid over it in buildDashboard().
     CardHeaderStyle _hdr = CardHeaderStyle::HDR_TAG;
     uint8_t         _scheme = 0;
+    lv_obj_t       *_hiddenBarTap = nullptr;
     lv_obj_t     *_deck     = nullptr;
 
     Panel_Header  _header;

@@ -211,6 +211,36 @@ const char *DEG_F = "\xC2\xB0" "F";
 
 } // namespace
 
+// Decode one UTF-8 sequence. Hand-rolled rather than borrowed from LVGL's
+// internals: the MDI glyphs live in the private use area above U+F0000, which
+// is a FOUR byte sequence, and this needs to be right for exactly that case.
+static uint32_t utf8First(const char *s) {
+    const unsigned char *p = (const unsigned char *)s;
+    if (!p || !p[0]) return 0;
+    if (p[0] < 0x80) return p[0];
+    if ((p[0] & 0xE0) == 0xC0 && p[1])
+        return (uint32_t)(p[0] & 0x1F) << 6 | (p[1] & 0x3F);
+    if ((p[0] & 0xF0) == 0xE0 && p[1] && p[2])
+        return (uint32_t)(p[0] & 0x0F) << 12 | (uint32_t)(p[1] & 0x3F) << 6 | (p[2] & 0x3F);
+    if ((p[0] & 0xF8) == 0xF0 && p[1] && p[2] && p[3])
+        return (uint32_t)(p[0] & 0x07) << 18 | (uint32_t)(p[1] & 0x3F) << 12
+             | (uint32_t)(p[2] & 0x3F) << 6  | (p[3] & 0x3F);
+    return 0;
+}
+
+int32_t cardGlyphTopBearing(const lv_font_t *font, const char *utf8) {
+    if (!font || !utf8) return 0;
+    const uint32_t cp = utf8First(utf8);
+    if (!cp) return 0;
+
+    lv_font_glyph_dsc_t g;
+    if (!lv_font_get_glyph_dsc(font, &g, cp, 0)) return 0;
+
+    const int32_t baseline = (int32_t)font->line_height - (int32_t)font->base_line;
+    const int32_t inkTop   = baseline - ((int32_t)g.ofs_y + (int32_t)g.box_h);
+    return inkTop > 0 ? inkTop : 0;
+}
+
 void     cardSetTempUnit(TempUnit u) { s_tempUnit = u; }
 TempUnit cardTempUnit()              { return s_tempUnit; }
 

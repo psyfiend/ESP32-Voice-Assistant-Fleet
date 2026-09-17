@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "Entity.h"
 #include "Cards/CardTypes.h"   // TempUnit
+#include <lvgl.h>              // lv_font_t, for cardGlyphTopBearing()
 
 // ---------------------------------------------------------------------------
 // Icons and tints, by what an entity MEASURES rather than by card type.
@@ -87,6 +88,23 @@ void cardFormatAge(uint32_t ageMs, char *out, size_t cap);
 // sensors report Fahrenheit and one reports Celsius. A fleet with a preference
 // and no conversion renders that one card wrong, silently, and it looks
 // exactly like a working card.
+// How much EMPTY SPACE sits between the top of a label's line box and the top
+// of the glyph's actual ink, for this font and this glyph, in pixels.
+//
+// Why this exists. A label's box is a LINE box: it is as tall as the font's
+// line height, and a glyph does not fill it - there is leading above the ink
+// and a descender gap below. So aligning an icon label TOP_LEFT puts its BOX
+// in the corner, and the thing you can see sits noticeably lower.
+//
+// The owner has tried to correct this by eye twice and both attempts made
+// something else worse, because a hand-picked nudge is right for one font size
+// and one header mode and wrong for the rest. This measures it instead:
+// baseline is at (line_height - base_line) from the top of the box, and the
+// glyph's ink reaches (ofs_y + box_h) above the baseline.
+//
+// Returns 0 if the glyph is not in the font, which is the safe answer.
+int32_t cardGlyphTopBearing(const lv_font_t *font, const char *utf8);
+
 void     cardSetTempUnit(TempUnit u);     // the fleet default
 TempUnit cardTempUnit();
 

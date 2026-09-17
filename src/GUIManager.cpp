@@ -65,7 +65,7 @@ void GUIManager::begin() {
     lv_obj_add_event_cb(_header.getStatusIcon(), headerIconClickCb, LV_EVENT_CLICKED, NULL);
 
     // Bottom deck height = screen height - header height.
-    int32_t header_h = UIToolkit::sc(50);
+    int32_t header_h = UIToolkit::systemHeaderPx();
     int32_t deck_h   = lv_obj_get_height(screen);
 
     // --= LAYER 1: BOTTOM DECK =--
@@ -157,6 +157,7 @@ void GUIManager::begin() {
             case Panel_System::GridAction::ASPECT_UP:   nudgeAspect(+1);    break;
             case Panel_System::GridAction::DECK_TOGGLE: toggleDeck();       break;
             case Panel_System::GridAction::HDR_CYCLE:   cycleHeader();     break;
+            case Panel_System::GridAction::BAR_CYCLE:   cycleHeaderBar();  break;
         }
     });
 
@@ -203,7 +204,7 @@ void GUIManager::begin() {
 void GUIManager::buildDashboard() {
     lv_obj_t *screen = lv_screen_active();
 
-    const int32_t headerH = UIToolkit::sc(50);
+    const int32_t headerH = UIToolkit::systemHeaderPx();
 
     // WHAT THE DECK ACTUALLY COSTS, MEASURED RATHER THAN ASSUMED.
     //
@@ -355,6 +356,50 @@ void GUIManager::nudgeAspect(int8_t steps) {
 void GUIManager::applyGround() {
     lv_obj_t *screen = lv_screen_active();
     if (screen) lv_obj_set_style_bg_color(screen, UI::c(UI::pal().GROUND), LV_PART_MAIN);
+}
+
+void GUIManager::cycleHeaderBar() {
+    static const uint8_t STEPS[] = { 50, 45, 40, 35, 30, 0 };
+    uint8_t i = 0;
+    for (; i < sizeof(STEPS); i++) if (STEPS[i] == UIToolkit::systemHeaderH) break;
+    UIToolkit::systemHeaderH = STEPS[(i + 1) % sizeof(STEPS)];
+
+    // The header object itself is Phase-1 UI built once in begin(), so it is
+    // resized in place rather than rebuilt.
+    lv_obj_t *hdr = _header.getContainer();
+    if (hdr) {
+        lv_obj_set_height(hdr, UIToolkit::systemHeaderPx());
+        if (UIToolkit::systemHeaderH) lv_obj_clear_flag(hdr, LV_OBJ_FLAG_HIDDEN);
+        else                          lv_obj_add_flag  (hdr, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // With no bar there is no status icon, and the status icon is the only way
+    // back into this drawer. Leave an invisible strip on the top layer that
+    // toggles it - otherwise choosing "none" and closing the drawer means a
+    // reboot.
+    if (!UIToolkit::systemHeaderH && !_hiddenBarTap) {
+        _hiddenBarTap = lv_obj_create(lv_layer_top());
+        lv_obj_set_size               (_hiddenBarTap, lv_pct(100), UI::minTouch() / 2);
+        lv_obj_align                  (_hiddenBarTap, LV_ALIGN_TOP_MID, 0, 0);
+        lv_obj_set_style_bg_opa       (_hiddenBarTap, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width (_hiddenBarTap, 0, 0);
+        lv_obj_add_flag               (_hiddenBarTap, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb           (_hiddenBarTap, [](lv_event_t *e) {
+            (void)e; if (s_self) s_self->_pnlSystem.toggle();
+        }, LV_EVENT_CLICKED, nullptr);
+    } else if (UIToolkit::systemHeaderH && _hiddenBarTap) {
+        lv_obj_delete(_hiddenBarTap);
+        _hiddenBarTap = nullptr;
+    }
+
+    char lbl[12];
+    if (UIToolkit::systemHeaderH) snprintf(lbl, sizeof(lbl), "Bar %u", (unsigned)UIToolkit::systemHeaderH);
+    else                          snprintf(lbl, sizeof(lbl), "Bar off");
+    _pnlSystem.setBarLabel(lbl);
+
+    rebuildDashboard();
+    Serial.printf("[UI] system header %u logical px -> %ld real\n",
+                  (unsigned)UIToolkit::systemHeaderH, (long)UIToolkit::systemHeaderPx());
 }
 
 void GUIManager::cycleScheme() {

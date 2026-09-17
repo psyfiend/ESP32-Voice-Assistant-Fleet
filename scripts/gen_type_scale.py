@@ -70,6 +70,26 @@ TARGETS_MM = {
     "ICON":  4.50,
 }
 
+# A PER-BOARD SCALE ON TOP OF THOSE TARGETS.
+#
+# The mm targets keep text the same PHYSICAL size fleet-wide, which is the
+# right default and was worth building. It is not an absolute rule, and the
+# owner said so after living with it (2026-09-17): "These devices are primarily
+# desktop dashboards not wall mounted... I'm not overly concerned about using
+# an appropriately smaller size on smaller screens."
+#
+# The reason it bites on WS_P4_5 is arithmetic, not taste. It is the fleet's
+# densest panel at 294 PPI, so 5.89 mm is a 68 px face - and its CARDS are not
+# proportionally bigger, because the board is only 5 inches. A 68 px line in a
+# 182 px cell is 41% of the card before anything else is drawn, which is what
+# forced every card on it to the compact variant.
+#
+# So: a multiplier, per board, default 1.0. This is a preference and belongs
+# here rather than in Fleet_BSP, which holds hardware facts.
+SCALE = {
+    "WS_P4_5": 0.88,
+}
+
 # Glyphs each role actually draws. A face is only as expensive as its range.
 RANGES = {
     # Full printable ASCII plus the degree sign, which CLAUDE.md notes is the
@@ -171,7 +191,8 @@ def main():
 
     generated = {}
     for b in boards:
-        b["px"] = {role: px_for(b["ppi"], mm) for role, mm in TARGETS_MM.items()}
+        k = SCALE.get(b["macro"], 1.0)
+        b["px"] = {role: px_for(b["ppi"], mm * k) for role, mm in TARGETS_MM.items()}
         print("%-14s %5d %6s  %3d / %3d / %3d / %3d" % (
             b["macro"], b["ppi"], "%.1f\"" % b["diag"],
             b["px"]["TAG"], b["px"]["UNIT"], b["px"]["NAME"], b["px"]["VALUE"]))

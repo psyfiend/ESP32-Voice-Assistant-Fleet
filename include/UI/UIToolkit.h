@@ -21,6 +21,16 @@ public:
     // Scale a logical pixel value to this board's pixel density.
     static int32_t  sc(int32_t val);
 
+    // THE SYSTEM HEADER BAR's height, in logical px, and settable.
+    //
+    // It was UIToolkit::sc(50) in three places. The owner, looking at a 1280x800
+    // panel full of short cards: "the height of the header becomes more
+    // pronounced... it really doesn't need to be just for some icons, clock,
+    // and a title." It is a preference, so it is a value rather than a
+    // constant, and the System panel cycles it. 0 means no header at all.
+    static uint8_t      systemHeaderH;
+    static int32_t      systemHeaderPx() { return systemHeaderH ? sc(systemHeaderH) : 0; }
+
     // The derived values behind sc(), exposed for diagnostics and for LVGL's
     // own DPI setting. ppi() returns 0 if the board declares no DIAGONAL_IN.
     static float    scale() { return bspUiScale(); }

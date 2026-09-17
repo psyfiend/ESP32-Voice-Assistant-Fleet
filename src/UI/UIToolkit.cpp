@@ -9,6 +9,9 @@ static UiActionCallback _system_close_cb = NULL;
 
 // Initialize Static Fonts
 const lv_font_t* UIToolkit::Font_Caption = NULL;
+
+// 40, not the 50 it shipped with - the owner's call on the glass.
+uint8_t UIToolkit::systemHeaderH = 40;
 const lv_font_t* UIToolkit::Font_Label = NULL;
 const lv_font_t* UIToolkit::Font_Button = NULL;
 const lv_font_t* UIToolkit::Font_PanelHeader = NULL;
