@@ -3,6 +3,7 @@
 #include "UI/UITokens.h"
 #include "SystemReport.h"
 #include "Cards/CardDemo.h"
+#include "UI/ReferencePage.h"
 #include "Dashboards/Dashboard_Fleet.h"
 #include "bsp_loader.h"
 
@@ -55,7 +56,7 @@ void GUIManager::begin() {
     // the grid from bsp_display.WIDTH/HEIGHT would be wrong on every board
     // running at rotation 1 or 3.
     UI::begin(lv_obj_get_width(screen), lv_obj_get_height(screen));
-    lv_obj_set_style_bg_color(screen, UI::c(UI::pal().GROUND), LV_PART_MAIN); // Dark background
+    applyGround();
     lv_obj_clear_flag        (screen, LV_OBJ_FLAG_SCROLLABLE);               // Disable global scrolling
 
     // --= LAYER 3: HEADER BAR =--
@@ -143,6 +144,9 @@ void GUIManager::begin() {
         CardDemo::show(_core.entities(), _binder);
     });
 
+    _pnlSystem.setOnTokensRequested([this]() { openTokens();  });
+    _pnlSystem.setOnSchemeRequested([this]() { cycleScheme(); });
+
     // The grid knobs. The panel knows a button was pressed; what a column is
     // remains entirely this class's business.
     _pnlSystem.setOnGridAction([this](Panel_System::GridAction a) {
@@ -164,6 +168,7 @@ void GUIManager::begin() {
     // bar - and UI::grid() is global. Rebuilding on the way back is the only
     // thing that reliably restores the dashboard's own geometry.
     CardDemo::setCloseHandler([this]() { rebuildDashboard(); });
+    ReferencePage::setCloseHandler([]() { if (s_self) s_self->rebuildDashboard(); });
 
     // Contribute the one LVGL-dependent section of the report.
     SystemReport::addSection("UI STATE", reportUiSection);
@@ -341,6 +346,44 @@ void GUIManager::nudgeAspect(int8_t steps) {
                   (unsigned)UI::grid().ASPECT_PCT,
                   (unsigned)UI::grid().cols, (unsigned)UI::grid().rows,
                   (unsigned)UI::grid().cellW, (unsigned)UI::grid().cellH);
+}
+
+// The screen's own background. Called at start-up and again on every scheme
+// change, which is the part that was missing: GROUND was applied once in
+// begin() and never again, so switching scheme left the strip behind the deck
+// painted in the old scheme's colour. Reported on both P4 boards.
+void GUIManager::applyGround() {
+    lv_obj_t *screen = lv_screen_active();
+    if (screen) lv_obj_set_style_bg_color(screen, UI::c(UI::pal().GROUND), LV_PART_MAIN);
+}
+
+void GUIManager::cycleScheme() {
+    _scheme = (uint8_t)((_scheme + 1) % 4);
+    switch (_scheme) {
+        case 0:  UI::setScheme(UI_PAL_FLEET,    UI_MET_DARK);  break;
+        case 1:  UI::setScheme(UI_PAL_SLATE,    UI_MET_DARK);  break;
+        case 2:  UI::setScheme(UI_PAL_MIDNIGHT, UI_MET_DARK);  break;
+        default: UI::setScheme(UI_PAL_PAPER,    UI_MET_LIGHT); break;
+    }
+    applyGround();
+    _pnlSystem.setSchemeLabel(UI::pal().name);
+
+    // A rebuild rather than a restyle. Cards would survive restyleAll() - that
+    // is what "never cache a colour" buys - but a METRICS change moves radii
+    // and padding, which a card reads when it is built.
+    rebuildDashboard();
+}
+
+void GUIManager::openTokens() {
+    // THE DASHBOARD STANDS DOWN FIRST, exactly as it does for the card bench.
+    //
+    // ReferencePage builds a whole second screen. With the dashboard's cards
+    // still alive that is two full widget trees, and LVGL then fails to
+    // allocate the layer buffers it needs to composite - "No memory: 482x17",
+    // repeated, and on WS_P4_5 an unrecoverable board. The owner hit it by
+    // going into Tokens, changing scheme, and coming back.
+    destroyDashboard();
+    ReferencePage::show();
 }
 
 void GUIManager::cycleHeader() {

@@ -33,6 +33,23 @@ public:
     using CardsCallback = std::function<void()>;
     void setOnCardsRequested(CardsCallback cb) { _onCardsRequested = cb; }
 
+    // Same again for the design-token reference page. It used to call
+    // ReferencePage::show() straight from the button, which meant a second
+    // full screen was built while the dashboard was still alive - the exact
+    // condition that exhausts LVGL's layer buffers and hangs the board. The
+    // dashboard's owner has to be given the chance to stand down first.
+    using TokensCallback = std::function<void()>;
+    void setOnTokensRequested(TokensCallback cb) { _onTokensRequested = cb; }
+    void requestTokens() { if (_onTokensRequested) _onTokensRequested(); }
+
+    // Cycle the colour scheme without going near the reference page. The owner
+    // asked for this directly, and it also removes the only reason to open
+    // that page during normal use.
+    using SchemeCallback = std::function<void()>;
+    void setOnSchemeRequested(SchemeCallback cb) { _onSchemeRequested = cb; }
+    void requestScheme() { if (_onSchemeRequested) _onSchemeRequested(); }
+    void setSchemeLabel(const char *text);
+
     // Fires the above. Public because a capture-less lv_event_cb lambda is a
     // free function, not a member, so it cannot reach a private field.
     void requestCards() { if (_onCardsRequested) _onCardsRequested(); }
@@ -83,6 +100,7 @@ private:
     lv_obj_t* _ui_actions; // Button Row
     lv_obj_t* _ui_grid;    // Second button row - the 2.5 grid knobs
     lv_obj_t* _lbl_hdr;    // label inside the header-mode button
+    lv_obj_t* _lbl_scheme; // label inside the scheme button
     
     lv_obj_t* txt_log;     // The log text label
     lv_obj_t* lbl_stats;   // The stats header label
@@ -105,6 +123,8 @@ private:
     DumpCallback  _onDumpRequested  = nullptr;
     CardsCallback _onCardsRequested = nullptr;
     GridCallback  _onGridAction     = nullptr;
+    TokensCallback _onTokensRequested = nullptr;
+    SchemeCallback _onSchemeRequested = nullptr;
 
     // Sink registered with SystemReport in init(), so report lines land in this
     // panel. Serial mirroring is SystemReport's job now, not log()'s.

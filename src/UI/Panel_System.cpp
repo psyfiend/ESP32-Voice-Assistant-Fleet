@@ -12,6 +12,7 @@ Panel_System::Panel_System() {
     _ui_actions = NULL;
     _ui_grid    = NULL;
     _lbl_hdr    = NULL;
+    _lbl_scheme = NULL;
     txt_log     = NULL;
     lbl_stats   = NULL;
     _headerRef  = NULL;
@@ -54,6 +55,10 @@ void Panel_System::reportSink(const char *line) {
 // function pointer, so the panel arrives as user_data rather than in a capture.
 void Panel_System::setHeaderLabel(const char *text) {
     if (_lbl_hdr && text) lv_label_set_text(_lbl_hdr, text);
+}
+
+void Panel_System::setSchemeLabel(const char *text) {
+    if (_lbl_scheme && text) lv_label_set_text(_lbl_scheme, text);
 }
 
 static lv_obj_t *knobButton(lv_obj_t *parent, Panel_System *self,
@@ -180,8 +185,9 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_width                (btnRef, LV_SIZE_CONTENT);
     lv_obj_set_flex_grow            (btnRef, 1);
     lv_obj_add_event_cb             (btnRef, [](lv_event_t *e) {
-                                        (void)e; ReferencePage::show();
-                                     }, LV_EVENT_CLICKED, NULL);
+                                        Panel_System *self = (Panel_System *)lv_event_get_user_data(e);
+                                        if (self) self->requestTokens();
+                                     }, LV_EVENT_CLICKED, this);
     lv_obj_set_style_bg_color       (btnRef, UI::c(UI::pal().SURFACE_ALT), 0);
     lv_obj_set_style_border_width   (btnRef, 1, 0);
     lv_obj_set_style_border_color   (btnRef, UI::border(), 0);
@@ -266,6 +272,15 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
         if (p) p->requestGrid(Panel_System::GridAction::HDR_CYCLE);
     });
     _lbl_hdr = lv_obj_get_child(btnHdr, 0);
+
+    // Scheme, on the dashboard rather than on the reference page. The owner
+    // asked for it, and it is also the fix for WHY he was on that page: the
+    // only reason to open Tokens during normal use was to change the scheme.
+    lv_obj_t *btnScheme = knobButton(_ui_grid, this, "Fleet", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestScheme();
+    });
+    _lbl_scheme = lv_obj_get_child(btnScheme, 0);
 
     // -- ROW 3: Log Container --
     lv_obj_t* log_box = lv_obj_create(_ui_content);

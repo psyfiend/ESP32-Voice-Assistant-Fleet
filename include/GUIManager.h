@@ -55,6 +55,15 @@ public:
     // RUNTIME state rather than a rebuild-time constant, because the device
     // settings page (4.1) will own exactly this control later.
     void cycleHeader();
+
+    // Cycle the colour scheme, from the System panel rather than the reference
+    // page. Also re-applies the SCREEN's own background, which nothing did
+    // before: the ground colour behind the deck was set once at start-up and
+    // then never followed the scheme.
+    void cycleScheme();
+
+    // Open the design-token reference page, standing the dashboard down first.
+    void openTokens();
     bool deckShown() const { return _showDeck; }
 
     Panel_Header &header()      { return _header; }
@@ -62,6 +71,7 @@ public:
     CardBinder   &cards()       { return _binder; }
 
 private:
+    void applyGround();              // the screen background, per scheme
     void buildDashboard();           // creates _dashHost and _page
     void destroyDashboard();
 
@@ -90,6 +100,7 @@ private:
     // Overrides PageSpec::headerDefault. The spec is const; this is the live
     // choice laid over it in buildDashboard().
     CardHeaderStyle _hdr = CardHeaderStyle::HDR_TAG;
+    uint8_t         _scheme = 0;
     lv_obj_t     *_deck     = nullptr;
 
     Panel_Header  _header;

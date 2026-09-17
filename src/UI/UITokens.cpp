@@ -106,19 +106,37 @@ namespace {
 UIPalette s_pal = UI_PAL_FLEET;
 UIMetrics s_met = UI_MET_DARK;
 
-// TARGET_CARD_W is 130, not the 135 the design bench used, and the difference
-// is the bench's fault rather than a change of mind.
+// TARGET_CARD_W IS PER BOARD, and it has to be.
 //
-// The bench modelled WS_P4_5 at a hardcoded 1.5x because that is what
-// -D HIGH_DPI_DISPLAY gave it. The board is really 1.73x (294 PPI), so every
-// logical value tuned in the bench renders ~15% larger here than it appeared
-// there. At 135 that pushed WS_P4_5 from the intended 5x3 down to 4x2.
+// It decides how many COLUMNS fit, and the answer is not transferable: the
+// same logical width that gives WS_P4_7B the 6 columns the owner chose gives
+// WS_P4_5 only 4, because the 7B is 1024 logical px wide and the P4_5 is
+// 1280/1.73 = 740. One fleet-wide number cannot serve both, and the attempt
+// cost a session - moving the default 130 -> 135 for the 7B's benefit quietly
+// knocked the P4_5 from 5 columns to 4, and at 4 columns nothing on it was
+// readable.
 //
-// 130 reproduces the layouts actually chosen:
-//   WS_P4_5 landscape      5x3 of 230x210 px
-//   CYD_S3_3248 portrait   2x3 of 141x144 px
-//   CYD_S3_3248 landscape  3x2 of 144x141 px
-UIGrid    s_grid = { .TARGET_CARD_W = 135, .ASPECT_PCT = 130, .GAP = 12, .INSET = 14,
+// Chosen on the glass, per board, by the owner turning the knob:
+//
+//   WS_P4_7B   1024 x 600 @ 170 PPI   135 -> 6 columns
+//   WS_P4_5    1280 x 800 @ 294 PPI   148 -> 5 columns
+//
+// Every other board keeps the fleet default until someone has looked at it.
+// This is the ConnectivityDefaults.h pattern - one shared default, overridden
+// per board through the identity macro every BSP header already defines, and
+// no new machinery.
+#if   defined(WS_P4_5)
+    #define FLEET_TARGET_CARD_W 148
+#elif defined(WS_P4_7B)
+    #define FLEET_TARGET_CARD_W 135
+#else
+    #define FLEET_TARGET_CARD_W 135
+#endif
+
+// ASPECT_PCT is a CEILING on card height as a percentage of card width, not a
+// target shape - see UITokens.h. It no longer picks the row count.
+UIGrid    s_grid = { .TARGET_CARD_W = FLEET_TARGET_CARD_W, .ASPECT_PCT = 130,
+                     .GAP = 12, .INSET = 14,
                      .cols = 1, .rows = 1, .cellW = 0, .cellH = 0 };
 
 int32_t s_vpW = 0, s_vpH = 0;
@@ -175,9 +193,14 @@ namespace UI {
 
 void begin(int32_t viewportW, int32_t viewportH) {
     setViewport(viewportW, viewportH);
-    Serial.printf("[UI] Scheme \"%s\" | %ux%u grid of %ux%u px | scale %.2fx (%u PPI)\n",
-                  s_pal.name, (unsigned)s_grid.cols, (unsigned)s_grid.rows,
-                  (unsigned)s_grid.cellW, (unsigned)s_grid.cellH,
+    // Columns and the scale only. The ROW count printed here used to be
+    // taken seriously and is not the page's answer - CardPage decides rows
+    // from how many cards it has, against the host it is actually given,
+    // which is the screen minus the header and the deck rather than the
+    // whole panel. Printing a row count here read as a decision and caused
+    // real confusion ("why does it say 4x1?").
+    Serial.printf("[UI] Scheme \"%s\" | %u cols of %u px | scale %.2fx (%u PPI)\n",
+                  s_pal.name, (unsigned)s_grid.cols, (unsigned)s_grid.cellW,
                   (double)bspUiScale(), (unsigned)bspPixelDensity());
 }
 
