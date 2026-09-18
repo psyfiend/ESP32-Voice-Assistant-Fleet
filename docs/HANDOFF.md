@@ -14,16 +14,9 @@ does not appear in the source as suspect.
 
 Phases 0, 1 and 2.1–2.4 are merged and tagged `v0.2.4`.
 
-**Milestone 2.5 is code-complete on `feat/2.5-page-grid-engine` and awaiting sign-off.** All eight
-environments build. The device boots into a dashboard rendered from a data table, on three very
-different panels.
-
-**To close 2.5, two things:**
-
-1. **Confirm issue #16's last two paths on hardware** — see "Signing off 2.5" below. Everything
-   else in #16 is done and observed.
-2. **An overnight soak.** Every fault this week was time-dependent, so a milestone that has not
-   survived a night has not been tested.
+**Milestone 2.5 is code-complete on `feat/2.5-page-grid-engine`, issue #16 is CLOSED, and the only
+thing between it and `v0.2.5` is an overnight soak.** All eight environments build; five boards are
+running it. The device boots into a dashboard rendered from a data table.
 
 ### Read in this order
 
