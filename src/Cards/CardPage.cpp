@@ -389,6 +389,24 @@ void CardPage::commit() {
                              LV_GRID_ALIGN_STRETCH, _slot[i].row, _slot[i].spanY);
         if (_binder) _binder->add(c);
     }
+    // CARDS THAT DID NOT MAKE THE PAGE ARE FREED, not kept around.
+    //
+    // The owner asked directly: "is the device holding the cards not on the
+    // page in memory?" It was. An unplaced card was never built, so it held no
+    // LVGL widgets - but the object itself, its bound entity pointers and its
+    // label buffers stayed alive for the life of the page. Small, and on the
+    // board where this matters there is nothing to spare.
+    //
+    // Deleted here rather than in the destructor because they can never come
+    // back: placement has already been decided, and a card that was not placed
+    // will not be placed by anything short of a rebuild - which constructs
+    // fresh ones from the spec anyway.
+    for (uint8_t i = 0; i < _n; i++) {
+        if (!_cards[i] || _slot[i].placed) continue;
+        delete _cards[i];
+        _cards[i] = nullptr;
+    }
+
     _committed = true;
 
     if (_placed != _n) {

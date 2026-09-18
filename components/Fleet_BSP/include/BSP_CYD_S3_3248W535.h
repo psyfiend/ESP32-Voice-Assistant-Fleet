@@ -366,7 +366,12 @@ inline const StorageConfig& bsp_storage = CYD_S3_3248W535_STORAGE;
 
 const LvglConfig CYD_S3_3248W535_LVGL = {
     .DOUBLE_BUFFERING = false,
-    .DRAW_BUF_HEIGHT  = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
+    // 20 rows, not the 1/10th of the screen (48 rows) the default computes.
+    // This board has the least internal SRAM to spare in the fleet and its
+    // draw buffer must live there, so the buffer is sized deliberately rather
+    // than as a fraction. BUFFER_SIZE_PX below already said 20 rows; nothing
+    // read it. See LVGL_Startup.cpp.
+    .DRAW_BUF_HEIGHT  = 20,
     .BUFFER_SIZE_PX   = 320 * 20, // Width x 20 rows
 };
 inline const LvglConfig& bsp_lvgl = CYD_S3_3248W535_LVGL;
