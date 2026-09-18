@@ -286,10 +286,23 @@ void CardPage::plan() {
             _slot[i].pinFail = pf;      // a bad pin stays reportable across replans
         }
 
+        // PINNED CARDS ARE PLACED FIRST, in two passes.
+        //
+        // The serial from WS_P4_5 showed "pin 2,2 rejected (out of bounds or
+        // occupied) - flowing": the coordinate was perfectly valid and had
+        // already been taken by a card that flowed into it first. A pin is a
+        // STRONGER statement than flow - the author named that spot - so flow
+        // must not be allowed to consume it. One pass for the pinned, then one
+        // for everything else.
         bool ok = true;
-        for (uint8_t i = 0; i < _n; i++) {
-            if (!alive[i]) continue;
-            if (!placeOne(i)) { ok = false; break; }
+        for (uint8_t pass = 0; pass < 2 && ok; pass++) {
+            for (uint8_t i = 0; i < _n; i++) {
+                if (!alive[i] || !_cards[i]) continue;
+                const CardPlacement &pl = _cards[i]->placement();
+                const bool pinned = (pl.col >= 0 && pl.row >= 0);
+                if (pinned != (pass == 0)) continue;
+                if (!placeOne(i)) { ok = false; break; }
+            }
         }
         if (ok) break;
 

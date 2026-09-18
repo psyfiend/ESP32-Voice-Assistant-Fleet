@@ -241,9 +241,23 @@ void Card::build(lv_obj_t *parent) {
     // that is thirty-six allocations, and the P4 filled its draw buffers and
     // spewed "lv_draw_layer_alloc_buf: Allocating layer buffer failed" until
     // it was reset. Only an edge-to-edge header band needs it.
-    if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
-        lv_obj_set_style_clip_corner(_surface, true, 0);
-    }
+    // NO CLIP_CORNER, EVEN FOR THE BAND. This froze WS_P4_5 on boot.
+    //
+    // clip_corner makes LVGL render the object to an intermediate LAYER so it
+    // can mask the rounded corners, and that layer is sized by the object's
+    // WIDTH. A two-cell card is 482 px, so it asked for 32,776 bytes out of
+    // the 128 KB lv_mem pool - which already holds thirteen cards - failed,
+    // and retried forever: "lv_draw_layer_alloc_buf: Allocating layer buffer
+    // failed. Try later", with 80 KB of system heap still free. Draw buffers
+    // come from lv_mem, not the heap, which is why the heap looked healthy.
+    //
+    // This was already a known liability, logged against 2.8. It became a
+    // FREEZE rather than a risk the moment HDR_BAR became the default header
+    // mode, because every card now wants the layer.
+    //
+    // The band gets the card's own radius instead. Its lower corners round too
+    // where they used to be square - a real visual difference, and the honest
+    // trade for a board that does not hang. Revisit with the slot rework.
 
     // LVGL fires LV_EVENT_SHORT_CLICKED for a tap and LV_EVENT_LONG_PRESSED
     // once the press passes its threshold. CLICKED is deliberately not used:
@@ -314,6 +328,11 @@ void Card::buildHeader() {
     } else {
         lv_obj_set_width (_header, lv_pct(100));
         lv_obj_align     (_header, LV_ALIGN_TOP_MID, 0, 0);
+
+        // The band carries the card's own radius now that the card no longer
+        // clips it. Its lower corners round where they used to be square -
+        // the visible cost of not allocating a layer per card. See build().
+        lv_obj_set_style_radius(_header, UI::sc(UI::met().RADIUS), 0);
     }
 
     // Area left, STALE right - fixed in every mode, per cards.md section 2.
