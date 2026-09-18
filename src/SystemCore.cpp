@@ -35,6 +35,19 @@ void SystemCore::printIdentity() {
     }
     Serial.printf("Flash: %s\n", SystemReport::fmtBytes(ESP.getFlashChipSize(), b, sizeof(b)));
 
+    // THE NUMBER THAT DECIDES WHETHER THE NETWORK WORKS.
+    //
+    // Internal heap is what the WiFi driver and LWIP take socket buffers from,
+    // and it is the first thing a large static array eats. WS_P4_5 spent an
+    // evening unable to hold a TCP connection - MQTT timing out at 60 s, every
+    // reconnect failing raw=-2, unpingable - with 10,928 bytes free, and
+    // nothing in the boot log said so. Printed here so that next time it is
+    // the first thing anyone sees.
+    const uint32_t internalFree = ESP.getFreeHeap();
+    Serial.printf("Internal heap free: %s%s\n",
+                  SystemReport::fmtBytes(internalFree, b, sizeof(b)),
+                  internalFree < 40000 ? "   *** LOW - expect network failures ***" : "");
+
     Serial.println("------------------------------");
 }
 

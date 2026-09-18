@@ -86,29 +86,27 @@
     // silent allocation failure. ~238KB of internal RAM was free at the old
     // size, so this leaves ample headroom for every board, not just this one.
     //
-    // PER TARGET, because the boards are not alike and this pool pays for more
-    // than widgets.
+    // 128 KB FLEET-WIDE. 192 KB ON P4 WAS TRIED AND IT BROKE THE NETWORK.
     //
-    // It also funds LVGL's LAYER buffers - the intermediate surfaces it needs
-    // whenever something has to be composited, which on this project means
-    // clip_corner, transforms, and object opacity below COVER. A layer is
-    // sized by the object's WIDTH, so a 482 px card in HDR_BAR wants ~38 KB
-    // and a 615 px deck panel wanted ~49 KB. Those are the allocations that
-    // have failed, intermittently, and taken the board down with them.
+    // This is a static array in INTERNAL DRAM, and internal DRAM is also where
+    // the WiFi driver and LWIP take their socket buffers from. Giving LVGL
+    // another 64 KB on WS_P4_5 left 10,928 bytes of internal heap free, and at
+    // that point the board could not hold a TCP connection: MQTT timed out at
+    // 60 s, every reconnect failed with raw=-2, WiFi never came back and the
+    // device stopped answering pings. It looked exactly like a broker fault
+    // and was nothing of the kind.
     //
-    // 256 KB DOES NOT LINK on P4 - tried 2026-09-17, linker short by 32,983
-    // bytes. The RAM report reading "3% of 512,000" is the whole internal
-    // SRAM, not what a static array can have. 192 KB links with room to
-    // spare, and gives the P4 boards - which have the widest objects in the
-    // fleet - the headroom the failures were asking for.
+    //     [Mqtt] Disconnected ... state=-4 after 60041 ms, heap 10928, wifi up
     //
-    // The S3 boards stay at 128 KB. CYD_S3_3248 already sits at ~59% internal
-    // because, as the only QSPI board, its display buffers must live there too.
-    #ifdef CONFIG_IDF_TARGET_ESP32P4
-        #define LV_MEM_SIZE (192 * 1024U)      /**< [bytes] */
-    #else
-        #define LV_MEM_SIZE (128 * 1024U)      /**< [bytes] */
-    #endif
+    // The free-heap card had been reading ~76 KB before the change and ~11 KB
+    // after - almost exactly the 64 KB handed to this pool.
+    //
+    // The reason 192 KB was reached for is also gone: the layer-buffer
+    // failures it was meant to absorb were clip_corner forcing LVGL to
+    // composite a 615 px panel, and that is fixed at the source. Do not raise
+    // this again without watching ESP.getFreeHeap() on a board that is trying
+    // to hold a socket - "it links" is not the test.
+    #define LV_MEM_SIZE (128 * 1024U)          /**< [bytes] */
 
     /** Size of the memory expand for `lv_malloc()` in bytes */
     #define LV_MEM_POOL_EXPAND_SIZE 0
