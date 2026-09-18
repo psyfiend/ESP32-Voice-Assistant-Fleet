@@ -105,10 +105,24 @@ inline const CardSpec FLEET_CARDS[] = {
         .place     = { .prefSpanX = U_2, .minSpanX = U_CELL,
                        .priority  = PRI_NORMAL },
     },
+    // --- ISSUE #16 ACCEPTANCE: SUB-GRID UNITS, on the glass ---------------
+    //
+    // THREE units each, which is ONE AND A HALF CELLS. Two of them side by
+    // side occupy exactly three cells. That is the whole point of Q3b's
+    // sub-grid and it has never been rendered - every card in the fleet has
+    // been a flat 2x2 units (one whole cell), so the subdivision was
+    // implemented, reasoned about, and never once exercised.
+    //
+    // Note what the span is NOT: it is not "three cells" and it does not
+    // rescale when the column count changes. A unit is half a cell whatever
+    // the grid, so on a wider page these get narrower along with everything
+    // else and still measure 1.5 cells. minSpanX lets them fall back to a
+    // whole cell where 3 units will not fit - CYD_S3_3248 has only 4 units
+    // across, so the second one wraps rather than squeezing.
     { .primaries = { VIRT_ENT_L1 }, .label = "Lamp 1", .area = "Kitchen",
-      .place = { .priority = PRI_NICE } },
+      .place = { .prefSpanX = 3, .minSpanX = U_CELL, .priority = PRI_NICE } },
     { .primaries = { VIRT_ENT_L2 }, .label = "Lamp 2", .area = "Kitchen",
-      .place = { .priority = PRI_NICE } },
+      .place = { .prefSpanX = 3, .minSpanX = U_CELL, .priority = PRI_NICE } },
     { .primaries = { VIRT_ENT_L3 }, .label = "Lamp 3", .area = "Lounge",
       .place = { .priority = PRI_NICE } },
     { .primaries = { VIRT_ENT_L4 }, .label = "Lamp 4", .area = "Lounge",
@@ -120,10 +134,25 @@ inline const CardSpec FLEET_CARDS[] = {
     // deliberately ignored, which is the only way the optimistic-write revert
     // and the FAILED treatment can be seen on a real board - nothing else in
     // the fleet is writable yet.
+    // --- ISSUE #16 ACCEPTANCE: EXPLICIT PLACEMENT AND THE VALIDATOR -------
+    //
+    // "Obeys" is PINNED to unit column 2, row 2 - the top-left corner of the
+    // second cell of the second row - and should land there regardless of
+    // what the flow was doing. Every board has at least that many units, so
+    // this is a valid pin everywhere.
+    //
+    // "Ignores" is pinned OUT OF BOUNDS on purpose, at unit column 40 on a
+    // grid that has at most 16. It must be REPORTED and then flowed, never
+    // dropped: the card is still the one the author asked for and only its
+    // coordinate was wrong. Watch for "[pin rejected]" beside it in Dump
+    // Config, and the DBG_CARDS line naming the rejected coordinate.
+    //
+    // Both are deliberately left in the shipped page until #16 is signed off.
+    // They are the only demonstration that either code path has ever run.
     { .primaries = { VIRT_ENT_SWITCH }, .label = "Obeys",   .area = "Office",
-      .place = { .priority = PRI_NICE } },
+      .place = { .priority = PRI_NICE, .col = 2, .row = 2 } },
     { .primaries = { VIRT_ENT_STUCK },  .label = "Ignores", .area = "Office",
-      .place = { .priority = PRI_NICE } },
+      .place = { .priority = PRI_NICE, .col = 40, .row = 0 } },
 
     // --- This panel -------------------------------------------------------
     //
