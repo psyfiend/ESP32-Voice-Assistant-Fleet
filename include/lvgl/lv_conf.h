@@ -77,6 +77,35 @@
     // old size and LV_USE_LOG disabled (see LV_USE_LOG below) - suspected
     // silent allocation failure. ~238KB of internal RAM was free at the old
     // size, so this leaves ample headroom for every board, not just this one.
+    // Bumped from 64KB: this pool covers ALL of LVGL's internal allocations
+    // (widget objects, styles, animations, internal draw-time buffers) across
+    // every board in the fleet. 64KB was fine for boards up to 800x480; the
+    // WS_S3_TOUCH_LCD_5B's 1024x600 screen, with the most widgets on screen
+    // at once of any board here, silently hung on its first render with the
+    // old size and LV_USE_LOG disabled (see LV_USE_LOG below) - suspected
+    // silent allocation failure. ~238KB of internal RAM was free at the old
+    // size, so this leaves ample headroom for every board, not just this one.
+    //
+    // 128 KB FLEET-WIDE. 192 KB ON P4 WAS TRIED AND IT BROKE THE NETWORK.
+    //
+    // This is a static array in INTERNAL DRAM, and internal DRAM is also where
+    // the WiFi driver and LWIP take their socket buffers from. Giving LVGL
+    // another 64 KB on WS_P4_5 left 10,928 bytes of internal heap free, and at
+    // that point the board could not hold a TCP connection: MQTT timed out at
+    // 60 s, every reconnect failed with raw=-2, WiFi never came back and the
+    // device stopped answering pings. It looked exactly like a broker fault
+    // and was nothing of the kind.
+    //
+    //     [Mqtt] Disconnected ... state=-4 after 60041 ms, heap 10928, wifi up
+    //
+    // The free-heap card had been reading ~76 KB before the change and ~11 KB
+    // after - almost exactly the 64 KB handed to this pool.
+    //
+    // The reason 192 KB was reached for is also gone: the layer-buffer
+    // failures it was meant to absorb were clip_corner forcing LVGL to
+    // composite a 615 px panel, and that is fixed at the source. Do not raise
+    // this again without watching ESP.getFreeHeap() on a board that is trying
+    // to hold a socket - "it links" is not the test.
     #define LV_MEM_SIZE (128 * 1024U)          /**< [bytes] */
 
     /** Size of the memory expand for `lv_malloc()` in bytes */

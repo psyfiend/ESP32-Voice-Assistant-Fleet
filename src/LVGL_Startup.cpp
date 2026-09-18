@@ -156,9 +156,39 @@ bool begin(DisplayManager &display, TouchManager &touch) {
         s_draw_buf = (uint16_t *)malloc(byte_count);
     }
 
-    // Allocate Second Buffer (Double Buffering)
-    s_draw_buf2 = (uint16_t *)heap_caps_malloc(byte_count, malloc_flags);
-    if (!s_draw_buf2) s_draw_buf2 = (uint16_t *)malloc(byte_count);
+    // Allocate Second Buffer - ONLY IF THE BOARD ASKED FOR ONE.
+    //
+    // This used to allocate unconditionally, which quietly ignored
+    // bsp_lvgl.DOUBLE_BUFFERING. CYD_S3_3248 sets it FALSE and got two buffers
+    // anyway: 2 x 30,720 bytes of INTERNAL SRAM, on the one board in the fleet
+    // that cannot spare it - the only QSPI panel, so the only one whose draw
+    // buffers must be internal rather than PSRAM.
+    //
+    // The cost was the whole evening. It booted with 10 KB of internal heap
+    // free, the WiFi driver and LWIP had nothing to allocate sockets from, and
+    // MQTT died at the keepalive every single time with "state=-3 ... heap
+    // 5588". It looked like a leak and was not: the heap never trended down,
+    // it simply sat at 2-8 KB, which is below what a TCP connection needs.
+    // AND THE OWNER'S CAVEAT, WHICH GOES FURTHER THAN THIS FIX (2026-09-18):
+    // "despite our configuration of double buffering in LVGL_Startup,
+    // GFX_Library is essentially neutered and only uses 1 of the buffers, thus
+    // eating available memory."
+    //
+    // If that holds, the second buffer is dead weight on ALL SEVEN of the
+    // other boards too, not just the one that could not afford it - the P4s
+    // are simply rich enough in PSRAM not to notice. Honouring the BSP flag is
+    // as far as this change goes, because "GFX ignores buffer two" is a claim
+    // about the library that should be confirmed against its source before
+    // seven boards are changed on the strength of it. That confirmation is
+    // milestone 2.9's job (Arduino_GFX -> esp_lcd), and it is now one of the
+    // concrete things 2.9 buys rather than a general tidy-up.
+    if (bsp_lvgl.DOUBLE_BUFFERING) {
+        s_draw_buf2 = (uint16_t *)heap_caps_malloc(byte_count, malloc_flags);
+        if (!s_draw_buf2) s_draw_buf2 = (uint16_t *)malloc(byte_count);
+    } else {
+        s_draw_buf2 = nullptr;
+        Serial.print(" (single-buffered, per BSP) ");
+    }
 
     if (!s_draw_buf) {
         Serial.println("\n[LVGL] Critical: Failed to allocate ANY draw buffer!");

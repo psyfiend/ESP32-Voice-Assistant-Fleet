@@ -35,7 +35,7 @@
 // no bookkeeping whatsoever.
 // ---------------------------------------------------------------------------
 
-static constexpr uint8_t  CARD_BINDER_MAX    = 48;
+static constexpr uint8_t  CARD_BINDER_MAX    = 64;
 static constexpr uint32_t CARD_BINDER_TICK_MS = 100;
 
 class CardBinder {

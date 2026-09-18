@@ -1,6 +1,8 @@
 #include "UI/UIToolkit.h"
 #include "UI/UITokens.h"
 
+
+
 static lv_obj_t *toast_panel = NULL;
 static lv_obj_t *toast_label = NULL;
 static lv_timer_t *toast_timer_handle = NULL;
@@ -9,6 +11,9 @@ static UiActionCallback _system_close_cb = NULL;
 
 // Initialize Static Fonts
 const lv_font_t* UIToolkit::Font_Caption = NULL;
+
+// 35, chosen on the glass. The button still cycles it.
+uint8_t UIToolkit::systemHeaderH = 35;
 const lv_font_t* UIToolkit::Font_Label = NULL;
 const lv_font_t* UIToolkit::Font_Button = NULL;
 const lv_font_t* UIToolkit::Font_PanelHeader = NULL;
@@ -94,7 +99,7 @@ static void anim_height_cb(void * var, int32_t v) {
 
 static void execute_panel_toggle(lv_obj_t* panel, bool expand) {
     int32_t h_start = lv_obj_get_height(panel);
-    int32_t h_end   = expand ? UIToolkit::sc(280) : UIToolkit::sc(85);
+    int32_t h_end   = expand ? UIToolkit::sc(280) : UIToolkit::sc(UIToolkit::PANEL_COLLAPSED_H);
 
     lv_obj_t * header   = lv_obj_get_child(panel, 0);
     lv_obj_t * icon     = lv_obj_get_child(header, 1);
@@ -124,7 +129,7 @@ static void panel_header_click_cb(lv_event_t * e) {
     lv_obj_t * panel = (lv_obj_t*)lv_event_get_user_data(e);
 
     // Determine if we are expanding or collapsing
-    bool currently_collapsed = (lv_obj_get_height(panel) == UIToolkit::sc(85));
+    bool currently_collapsed = (lv_obj_get_height(panel) == UIToolkit::sc(UIToolkit::PANEL_COLLAPSED_H));
 
     if (currently_collapsed) {
         // --= Expanding =--
@@ -145,10 +150,11 @@ static void panel_header_click_cb(lv_event_t * e) {
     }
 }
 
+
 lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* title, lv_obj_t** content_container) {
     lv_obj_t * pnl = lv_obj_create(parent);
     lv_obj_set_width            (pnl, 0);       // Set base width to 0 so flex takes over completely
-    lv_obj_set_height           (pnl, sc(85));  // Collapsed Height
+    lv_obj_set_height           (pnl, sc(PANEL_COLLAPSED_H));  // taller than the visible strip - see the header
     lv_obj_set_flex_grow        (pnl, 1);       // Tell flex engine to share available space equally (1:1)
     lv_obj_set_style_bg_color   (pnl, UI::c(UI::pal().SURFACE), 0);
     lv_obj_set_style_radius     (pnl, sc(12), 0);
@@ -156,12 +162,25 @@ lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* titl
     lv_obj_set_style_border_color(pnl, UI::border(), 0);
     lv_obj_set_style_pad_all    (pnl, 0, 0); 
     lv_obj_set_style_pad_row    (pnl, sc(10), 0);   
-    lv_obj_set_style_clip_corner(pnl, true, 0); 
+    // CLIP_CORNER IS OFF, and this is the whole reason WS_P4_5 froze on boot.
+    //
+    // clip_corner forces LVGL to render the object to an intermediate LAYER so
+    // it can mask the rounded corners, and a layer is a real buffer allocation
+    // out of the LV_MEM pool. On a 1280 px panel each deck panel is 615 px
+    // wide, so LVGL asked for 615 x 20 x 4 bytes = 49 KB, failed, and repeated
+    // - "lv_draw_layer_alloc_buf: Allocating layer buffer failed", forever.
+    // The 7B never hit it because its panels are 490 px and the request fits.
+    //
+    // Nothing here needs the clip: the header and the content container are
+    // both transparent, so no child paints into the corners this was masking.
+    // Card::build() already avoids clip_corner for exactly this reason and
+    // says so - the same trap, found twice.
+    // lv_obj_set_style_clip_corner(pnl, true, 0);
     lv_obj_clear_flag           (pnl, LV_OBJ_FLAG_SCROLLABLE);
 
     // Header
     lv_obj_t * header = lv_obj_create(pnl);
-    lv_obj_set_size             (header, lv_pct(100), sc(45));
+    lv_obj_set_size             (header, lv_pct(100), sc(PANEL_HEADER_H));
     lv_obj_set_style_bg_opa     (header, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(header, 0, 0);
     lv_obj_set_style_pad_all    (header, sc(15), 0); 

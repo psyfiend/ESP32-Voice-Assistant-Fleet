@@ -400,6 +400,93 @@ Architecture agreed so far:
   `softAP()`) + `DNSServer` for the captive-portal DNS redirect; a web page only as a minimal
   phone/laptop fallback for credential entry, not the main UX.
 
+## Owner's ideas, recorded 2026-09-15
+
+Passed over verbatim-in-substance so they are not lost. None are scheduled; each notes where it
+would land.
+
+### More, 2026-09-16 (after the first dashboard flash)
+
+**Icons look undersized on large cards.** Observed at 189x202 px: the corner icon looks puny and
+the hero looks lost in the middle of a big empty disc. Both faces are picked by PIXEL DENSITY
+alone, so they are the same physical size whatever the card - which is right across boards and
+wrong across card sizes on one board. The fix is to choose the icon face from the CELL as well as
+the density, and the faces already exist (18/20/26/28/30/32/34/42/46/52 are generated per board).
+The cost is flash: each face a translation unit REFERENCES is linked, so a third referenced size
+is real money. Wants measuring before it is done. Lands with 2.7 or the card-library work.
+
+**Long-press opens a detail view, with the context panels sliding up.** The owner's framing: the
+background dims or blurs so the cards stay visible behind the popup, and the deck's panel HEADERS
+animate up from the bottom, expanding only when tapped. This is the same feature as the per-card
+detail page recorded above and as `cards.md` section 4's long-press sheet - three descriptions of
+one thing, and it should be built once. 2.4 deliberately left the overlay unbuilt.
+
+**Button-press feedback.** Cards shrink slightly while held and pop back on release. Cheap with
+LVGL transforms, and it is the one animation that makes a touch panel feel like it is working.
+
+### The panel should advertise its OWN entities to Home Assistant, and that capability must survive #43
+
+**This is a constraint on #43, not a wish.** The owner intends to add sensors, hardware and
+controls to several boards, so publishing entities INTO Home Assistant has to keep working. MQTT
+discovery is the only way to do that - HA's REST API can set arbitrary states, but entities made
+that way are not backed by a device and do not survive a restart.
+
+So the split stays exactly as #43 describes it: **websocket inbound for HA's entities, MQTT
+outbound for ours.** Whoever builds #43 must not treat MQTT as legacy.
+
+Beyond local sensors, he wants the panel itself to expose device entities for automation:
+
+- screen brightness, sleep-mode settings
+- battery information
+- **custom toast popups an HA automation can invoke** - an inbound command entity, which is a
+  different shape from everything we publish today (we publish state; this receives it)
+- other device and fleet-specific controls
+
+And, further out: **something like Android's Live Updates / iOS's Live Activities** - a
+persistent, updating notification surface driven from HA. Worth thinking about as a card type
+with a lifecycle rather than as a toast.
+
+Tempering note from the owner himself: with a full web UI doing detailed configuration, not
+everything needs to be manageable from HA.
+
+### First-boot AP and a web UI that configures everything (relates to #6, #27, #36)
+
+A **first-boot flag defaulting to STA+AP**, so a user connects to the device and does initial
+setup in a browser: connectivity, MQTT, HA access, cards, pages, preferences. Not everything needs
+to be in the on-device GUI, but virtually everything should be reachable from the web UI.
+
+**The point is distribution.** It makes shipping a flashable binary viable, which is what lowers
+the barrier to anyone else adopting this. That reframes #6 (captive portal) and #27 (web config)
+from conveniences into the adoption path.
+
+Stretch idea, explicitly not a priority: a **web interface that builds a build sheet and compiles
+a custom binary** the user flashes and runs immediately.
+
+### Every card gets a full-screen detail page (2.7 / 3.2 / 4.4)
+
+Formalising the interest `REFERENCE_PROJECTS.md` records in `esphome-modular-lvgl-buttons`'
+`detail.yaml` - a full-screen detail view for complex types. The model is Home Assistant's own
+more-info dialog: tap a card, get the extra information and controls for that entity.
+
+This is the thing `cards.md` section 4's long-press-opens-a-sheet was reaching for, and 2.4
+deliberately left the overlay unbuilt. It lands across 2.7 (what each domain shows), 3.2 (how a
+sheet declares it) and 4.4 (the context-sheet mechanism).
+
+### Tag mode should look like a manila folder tab
+
+`HDR_TAG` currently draws a rounded rectangle above the card's top-left corner. The owner wants
+the tag's BOTTOM corners to curve OUTWARD instead of inward, so it reads as a tab pushed up from
+inside the card rather than a separate pill sitting on top. Likely needs the tag inset slightly
+from the left edge to look natural. Explicitly low priority, and a case for experimenting on glass.
+
+### Two cards he wants to build once the engine allows it
+
+- **An irrigation integration.** He built a full irrigation system in HA over summer 2026:
+  scheduling and queuing, valve and zone entities decoupled from hardware so valves can be swapped
+  without breaking configuration, climate-driven run-time adjustment, and a guardian watching for
+  stuck valves. A card - probably a group card with its own detail page - is the target.
+- **A thermostat card.** `EntityKind::CLIMATE` already exists with no card behind it.
+
 ## bb_captouch_fork
 
 - **Detach from the original author's repo.** `components/bb_captouch_fork` is currently a

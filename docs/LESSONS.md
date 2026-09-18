@@ -271,3 +271,102 @@ thing it summarises.
 terminating " character` — a warning `HANDOFF.md` already carried, and which still cost a build
 cycle in this milestone. Prefer a line-based edit for anything containing an escape sequence, and
 re-read the emitted line rather than trusting the patch.
+
+
+**It happened three more times at 2.5, in one session, after the lesson above had been read.**
+Quoting the heredoc delimiter (`<<'PYEOF'`) is *not* enough: one level of backslash is still
+consumed before Python sees the string, so a doubled escape arrives as a single one and Python
+turns it into the character it denotes. The damage is not always a compile error:
+
+| Written | Landed in the file | Symptom |
+|---|---|---|
+| `"\xC2\xB0"` | the two UTF-8 bytes it denotes, as real characters | file reads as "binary", compiles, renders wrong |
+| `'\0'` | a literal NUL byte inside the source | file reads as "binary", string silently terminates |
+| `"... px\n"` | a real newline inside a string literal | missing terminating quote - the only loud one |
+
+Only the last one announces itself; the first two produce a file that builds and behaves wrongly.
+
+**So the rule is not "prefer a line-based edit" - it is: never put a backslash escape in text a
+script writes.** Build the backslash explicitly with `chr(92)`, or use an editor tool rather than
+a script for that file. `grep` calling a source file "binary" is the tell, and anything a script
+just wrote is worth a byte scan:
+
+    python -c "d=open(F,'rb').read(); print([hex(b) for b in d if b<9 or b>126])"
+
+A second, unrelated trap from the same session: an anchor string for a patch must not assume the
+section it anchors to is followed by a blank line. This one was at the end of the file.
+
+
+## Internal heap is the scarcest thing on this fleet, and nothing announces it
+
+Three separate faults in one week all presented as "MQTT keeps dropping" and none of them were
+MQTT. Internal DRAM is what the WiFi driver and LWIP take socket buffers from, and it is also
+where static arrays and LVGL draw buffers land. When it runs low the network fails first, loudly,
+and in a way that points everywhere except the cause.
+
+**The three, so the shapes are recognisable:**
+
+| What happened | Looked like | Actually was |
+|---|---|---|
+| `LV_MEM_SIZE` raised 128 -> 192 KB on P4 | broker refusing us | 11 KB internal heap left; no socket could be allocated |
+| `DOUBLE_BUFFERING` ignored on CYD_S3_3248 | a heap leak | two 30 KB draw buffers where the BSP asked for one; board booted with 10 KB free |
+| Socket never released on a detected drop | broker timing us out | a leaked TCP socket per reconnect; the broker was reaping ghosts |
+
+**The rules that came out of it:**
+
+- **"It links" is not a memory test.** 192 KB linked with room to spare and still broke the board.
+  Linking proves the array fits in the layout; it says nothing about what is left at runtime.
+  Watch `ESP.getFreeHeap()` on a board that is trying to hold a socket.
+- **A falling number is a leak; a low flat number is a budget.** They need opposite fixes and the
+  disconnect log could not tell them apart until it printed heap and elapsed time. It does now.
+- **Below ~40 KB internal, expect network failure.** `SystemCore` prints internal free heap at boot
+  and marks it.
+- **`ESP.getFreeHeap()` is internal heap only.** PSRAM being 8 MB free is irrelevant to a socket.
+
+## LVGL allocates a LAYER whenever something has to be composited
+
+`clip_corner`, transforms, and object opacity below `LV_OPA_COVER` all force LVGL to render an
+object to an intermediate buffer. **That buffer is sized by the object's WIDTH**, so it scales
+with the screen and with card spans:
+
+- a 615 px deck panel wanted **49 KB** for a single 20 px band
+- a 482 px two-cell card in `HDR_BAR` wanted **38 KB**
+
+Both failed intermittently and hung boards. `Card::build()` already avoided `clip_corner` for this
+reason and said so in a comment; `UIToolkit::create_collapsible_panel()` did it anyway, months
+apart, and cost an evening. **Before adding any of those three properties to a wide object, work
+out what the layer will cost.**
+
+A corollary found the same week: **a child larger than its parent also forces a layer**, because
+the parent has to be composited to clip it. A "floor" on a child size that can exceed its
+container is therefore not a safe fix.
+
+## A knob that moves an input nobody can predict is not a control
+
+The Col/Row buttons originally nudged `TARGET_CARD_W` and `ASPECT_PCT` and hoped the derivation
+landed somewhere useful. On `CYD_S3_3248` it could not: rows come from how many cards there are,
+so no aspect value could ever subtract a row. The button moved a number, printed a number, and
+changed nothing on screen.
+
+They now demand a count outright. The lesson generalises: **when a user wants to say "three
+columns", let them say three columns.** Deriving is the right default; it is not a user interface.
+
+Related, same session: a knob's log must report what the SYSTEM did, not what the knob set. Those
+buttons printed `UI::grid()`'s estimate - "2x2 cells of 141x205" - beside per-card lines saying
+the cell was 97 px tall. Two numbers describing the same thing that disagree is worse than one.
+
+## Never put a backslash escape in text a script writes
+
+Recorded above and worth restating because it happened **six times** across two sessions, in both
+directions - in the text being written *and* in the search string used to find an anchor. Quoting
+the heredoc delimiter is not enough. Build the backslash with `chr(92)`, or use an editor tool.
+The `grep`-says-binary tell only catches two of the three failure modes.
+
+## Ask the far end
+
+The MQTT fault was solved in one step by reading Mosquitto's own log, which said in plain words
+what four rounds of device-side inference had not: `disconnected: exceeded timeout`. The broker,
+the router's lease table, the HA device page and a ping all know things the firmware cannot.
+
+This is the oldest rule in the project - "verify from outside the device" - and it keeps earning
+its place. When a device-side theory needs a fifth iteration, stop and ask something else.

@@ -18,7 +18,6 @@
 
 LV_FONT_DECLARE(fleet_font_num_56);
 LV_FONT_DECLARE(fleet_font_num_60);
-LV_FONT_DECLARE(fleet_font_num_68);
 
 #if defined(CYD_P4_1060)
     // CYD_P4_1060 - 170 PPI, 7.0"
@@ -50,11 +49,11 @@ LV_FONT_DECLARE(fleet_font_num_68);
     #define FLEET_FONT_ICON   (&lv_font_montserrat_46)
 #elif defined(WS_P4_5)
     // WS_P4_5 - 294 PPI, 5.0"
-    #define FLEET_FONT_VALUE  (&fleet_font_num_68)
-    #define FLEET_FONT_NAME   (&lv_font_montserrat_32)
-    #define FLEET_FONT_UNIT   (&lv_font_montserrat_30)
-    #define FLEET_FONT_TAG    (&lv_font_montserrat_22)
-    #define FLEET_FONT_ICON   (&lv_font_montserrat_48)
+    #define FLEET_FONT_VALUE  (&fleet_font_num_60)
+    #define FLEET_FONT_NAME   (&lv_font_montserrat_28)
+    #define FLEET_FONT_UNIT   (&lv_font_montserrat_26)
+    #define FLEET_FONT_TAG    (&lv_font_montserrat_20)
+    #define FLEET_FONT_ICON   (&lv_font_montserrat_46)
 #elif defined(WS_P4_7B)
     // WS_P4_7B - 170 PPI, 7.0"
     #define FLEET_FONT_VALUE  (&lv_font_montserrat_40)

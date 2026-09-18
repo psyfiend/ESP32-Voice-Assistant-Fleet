@@ -1,4 +1,5 @@
 #include "MqttManager.h"
+#include <WiFi.h>   // WiFi.status(), for the disconnect diagnostic
 #include "DeviceIdentity.h"
 
 #include <string.h>
@@ -125,7 +126,11 @@ void MqttManager::loop() {
     // and note this is deliberately the ONLY thing MqttManager asks about the
     // link. It never learns whether it is WiFi, AP or Ethernet.
     if (!_link || !_link->isOnline()) {
-        if (_client.connected()) _client.disconnect();
+        // Unconditional, for the same reason as the drop path below: the guard
+        // that used to be here skips exactly the case that needs it, because a
+        // link that has gone away is precisely when connected() is already
+        // false and the socket is still held.
+        _client.disconnect();
         if (_state != MqttState::AUTH_STOPPED) setState(MqttState::NO_LINK);
         return;
     }
@@ -137,7 +142,49 @@ void MqttManager::loop() {
 
     // Was connected, is not any more.
     if (_state == MqttState::CONNECTED) {
-        Serial.println("[Mqtt] Disconnected from broker.");
+        // WHY, not just THAT. PubSubClient records a reason code and we were
+        // throwing it away, which left "Disconnected from broker." as the only
+        // evidence for a fault that has now cost two evenings.
+        //
+        //   -4 timeout   -3 connection LOST (the broker closed it)
+        //   -2 connect failed   -1 clean disconnect by us
+        //
+        // The elapsed time matters as much as the code: a socket that dies one
+        // second after a successful CONNECT is being closed by the far end, and
+        // a socket that dies at the keepalive interval is one we failed to
+        // service because loop() was blocked. Those need opposite fixes.
+        const uint32_t heldMs = millis() - _connectedAtMs;
+        Serial.printf("[Mqtt] Disconnected from broker. state=%d after %lu ms, "
+                      "heap %lu, wifi %s\n",
+                      _client.state(), (unsigned long)heldMs,
+                      (unsigned long)ESP.getFreeHeap(),
+                      WiFi.status() == WL_CONNECTED ? "up" : "DOWN");
+        // RELEASE THE SOCKET. This is the bug, and the broker's own log is what
+        // named it: "Client fleet_cyd_s3_3248_98d510 [192.168.0.165:61323]
+        // disconnected: exceeded timeout."
+        //
+        // We noticed the session was gone, backed off, and reconnected - but
+        // never told the TCP client to let go. PubSubClient::connected() going
+        // false does not close anything; it only reports. So every cycle left
+        // a socket open and opened a NEW one, which is why the broker saw the
+        // source port climb - 61323, 61328, 61329 - and why each abandoned
+        // session sat there until ITS keepalive lapsed 45 seconds later. The
+        // broker was not rejecting us. It was timing out the ghosts we left
+        // behind, one every few minutes, while the device churned every five
+        // seconds.
+        //
+        // Two consequences, both observed: LWIP runs out of sockets and new
+        // connects start failing outright (raw=-2, raw=-4), and Home Assistant
+        // flaps because the availability topic keeps getting the Will from
+        // sessions that died minutes ago.
+        //
+        // disconnect() is called unconditionally rather than behind a
+        // connected() guard - the guard is exactly what would skip it here,
+        // since the whole reason we are in this branch is that connected() is
+        // already false. PubSubClient::disconnect() stops the underlying
+        // client either way.
+        _client.disconnect();
+
         escalate(now, MqttFailure::ENVIRONMENTAL);
         return;
     }
@@ -185,6 +232,13 @@ void MqttManager::attemptConnect(uint32_t now) {
     const int  raw = _client.state();
     const MqttFailure why = mqttClassify(raw);
     DBG_MQTT("connect failed raw=%d -> %s\n", raw, mqttFailureName(why));
+
+    // A FAILED connect can still leave a half-open socket: the TCP handshake
+    // may well have completed before the MQTT CONNECT was refused or timed
+    // out. Releasing it is what stops a run of failures from exhausting
+    // LWIP's socket table and turning a transient fault into a permanent one.
+    _client.disconnect();
+
     escalate(now, why);
 }
 
@@ -199,6 +253,13 @@ void MqttManager::onConnected() {
 
     resubscribeAll();
 
+    _connectedAtMs = millis();
+    // Printed every reconnect. On CYD_S3_3248 free heap fell 7884 -> 4188 ->
+    // 3900 -> 2348 across four cycles, which is what turned a recoverable
+    // drop into a board that could not open a socket at all. If that trend
+    // continues with this line in place, the leak is in this path.
+    Serial.printf("[Heap] mqtt connect           %10lu free\n",
+                  (unsigned long)ESP.getFreeHeap());
     Serial.printf("[Mqtt] Online: %s:%u as \"%s\"\n",
                   _cfg.BROKER_HOST, (unsigned)_cfg.BROKER_PORT,
                   DeviceIdentity::deviceId());
@@ -286,6 +347,42 @@ bool MqttManager::publish(const char *topic, const char *payload, bool retain) {
 
 bool MqttManager::addSub(const char *topic, bool isCommand) {
     if (!topic || !topic[0]) return false;
+
+    // ALREADY IN THE TABLE? Then this is not a new subscription.
+    //
+    // This table holds TOPICS, and several entities routinely share one - a
+    // Zigbee2MQTT device publishes temperature, illuminance, occupancy and
+    // battery in a single message, so four entities name the same topic and
+    // MqttProvider asks for it four times. Each of those was appended as its
+    // own row.
+    //
+    // That alone was survivable. What made it fatal is that MqttProvider asks
+    // again after every reconnect while MqttManager ALSO replays the table -
+    // so four rows became eight, then twelve, then sixteen, and the table was
+    // full. The device then sent sixteen SUBSCRIBE packets per connect for one
+    // topic, publishes started failing on a 4-byte payload, the broker dropped
+    // it, and it reconnected into the same loop. Both boards spent an evening
+    // flickering in and out of Home Assistant.
+    //
+    // Subscribing to the same topic twice was never meaningful - the broker
+    // sends one copy either way, and MqttProvider already fans one message out
+    // to every entity that named it.
+    for (uint8_t i = 0; i < _subCount; i++) {
+        if (strcmp(_subs[i].topic, topic) != 0) continue;
+        // A topic first seen as state and later wanted as a command has to be
+        // promoted, or the command path would never see it.
+        if (isCommand && !_subs[i].isCommand) {
+            _subs[i].isCommand = true;
+            if (_cmdTopicCount < MAX_CMD_TOPICS) {
+                snprintf(_cmdTopics[_cmdTopicCount], sizeof(_cmdTopics[0]), "%s", topic);
+                _cmdTopicCount++;
+            }
+        }
+        // Already known; nothing to add. Not re-sent either - the broker has
+        // it, and re-sending is what produced sixteen SUBSCRIBEs a connect.
+        return true;
+    }
+
     if (_subCount >= MAX_SUBS) {
         Serial.printf("[Mqtt] subscription table full, dropping \"%s\"\n", topic);
         return false;

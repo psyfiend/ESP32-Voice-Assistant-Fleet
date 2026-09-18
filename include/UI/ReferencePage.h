@@ -19,6 +19,11 @@ namespace ReferencePage {
 // Build and load the page. Safe to call repeatedly; rebuilds each time.
 void show();
 
+// Run when the page closes. Registered by GUIManager so the dashboard - which
+// stands down before this page opens, to keep two full widget trees from
+// existing at once - is rebuilt on the way back.
+void setCloseHandler(void (*cb)());
+
 // Restore whatever screen was active before show(). Wired to the Back button.
 void close();
 

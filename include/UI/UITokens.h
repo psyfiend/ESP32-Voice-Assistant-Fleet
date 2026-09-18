@@ -80,9 +80,33 @@ struct UIMetrics {
 //
 // This is what makes one token set produce 5 columns on WS_P4_5 and 2 on
 // CYD_S3_3248 portrait with no per-board layout code.
+// The hard limits on what a grid may be asked for. Not taste - a card narrower
+// than a finger is not a card, and the unit grid underneath has a fixed-size
+// descriptor. The owner: "we can set a limit within reason".
+static constexpr uint8_t UI_MAX_COLS = 8;
+static constexpr uint8_t UI_MAX_ROWS = 6;
+
 struct UIGrid {
-    uint16_t TARGET_CARD_W; // logical px — the knob you actually turn
-    uint8_t  ASPECT_PCT;    // 100 = square. Only a hint; rows stretch to fit
+    uint16_t TARGET_CARD_W; // logical px - decides how many COLUMNS fit
+
+    // An EXPLICIT column count, or 0 to derive one from TARGET_CARD_W.
+    //
+    // The derivation is the right default - it is what makes one page spec
+    // render sensibly on eight panels. But "I want three columns on this
+    // board" is a legitimate thing to say, and saying it by tuning a target
+    // width until the arithmetic lands on three is not a user interface. When
+    // this is set the count is obeyed and the cells take whatever width falls
+    // out of it.
+    uint8_t  COLS_OVERRIDE;
+    // The TALLEST a card may be, as a percentage of its own width.
+    //
+    // CHANGED AT 2.5. It used to be a target shape that decided the ROW COUNT,
+    // and that was the bug behind "hiding the deck made the cards smaller":
+    // more height bought another empty row instead of taller cards. The row
+    // count now comes from how many cards there are (CardPage::rowsWanted()),
+    // and this only stops a page with three cards on it from making each one
+    // as tall as the screen. Above the cap the grid leaves slack at the bottom.
+    uint8_t  ASPECT_PCT;
     uint8_t  GAP;
     uint8_t  INSET;         // cluster inset from the screen edge
 
@@ -152,6 +176,21 @@ const UIType    &type();
 void setScheme(const UIPalette &p, const UIMetrics &m);
 void setAccent(uint32_t hex);
 void setTargetCardWidth(uint16_t logicalPx);
+
+// The OTHER grid knob, and the one that was missing.
+//
+// TARGET_CARD_W decides how many COLUMNS fit; ASPECT_PCT decides how many
+// ROWS, by suggesting a height for the column width that came out. Neither
+// sizes a card - both counts are then stretched to fill the viewport exactly,
+// so the ratio a card ends up with is an output.
+//
+// It matters because the two are easy to confuse: on WS_P4_7B at 6 columns the
+// row count misses three by four hundredths, and the fix is here rather than
+// in the width. See docs/design/tokens.md.
+void setAspectPct(uint8_t pct);
+
+// Demand an exact column count, or 0 to go back to deriving it.
+void setColumnsOverride(uint8_t cols);
 
 // Registered by GUIManager so a scheme change can restyle what is on screen.
 void onSchemeChanged(void (*cb)());

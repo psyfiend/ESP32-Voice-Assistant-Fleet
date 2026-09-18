@@ -176,7 +176,106 @@ void cardFormatAge(uint32_t ageMs, char *out, size_t cap) {
     else                 snprintf(out, cap, "%ud", (unsigned)(s / 86400));
 }
 
-void cardFormatValue(const Entity &e, char *out, size_t cap, bool withUnit) {
+namespace {
+
+// The fleet default. Fahrenheit because that is the owner's standing
+// preference; a build sheet overrides it per page or per card, and TEMP_SOURCE
+// turns conversion off entirely.
+TempUnit s_tempUnit = TempUnit::TEMP_F;
+
+bool isTemperature(const EntityDescriptor &d) {
+    return strcmp(d.deviceClass, "temperature") == 0;
+}
+
+// Which unit an entity's own string means. The degree sign is two UTF-8 bytes,
+// so this reads the LAST character rather than trying to match the whole
+// string - "C", "degC" and the degree-prefixed form all answer the same.
+char sourceTempLetter(const EntityDescriptor &d) {
+    const size_t n = strlen(d.unit);
+    if (!n) return 0;
+    const char last = d.unit[n - 1];
+    return (last == 'C' || last == 'F') ? last : 0;
+}
+
+TempUnit resolveWant(TempUnit want) {
+    if (want == TempUnit::TEMP_INHERIT) want = s_tempUnit;
+    if (want == TempUnit::TEMP_INHERIT) want = TempUnit::TEMP_SOURCE;
+    return want;
+}
+
+// UTF-8 for the degree sign, written as bytes so this file's own encoding
+// cannot silently mangle it - the same guard ExternalEntities.h uses. The
+// degree sign is inside stock Montserrat; an em dash and a middle dot are not.
+const char *DEG_C = "\xC2\xB0" "C";
+const char *DEG_F = "\xC2\xB0" "F";
+
+} // namespace
+
+// Decode one UTF-8 sequence. Hand-rolled rather than borrowed from LVGL's
+// internals: the MDI glyphs live in the private use area above U+F0000, which
+// is a FOUR byte sequence, and this needs to be right for exactly that case.
+static uint32_t utf8First(const char *s) {
+    const unsigned char *p = (const unsigned char *)s;
+    if (!p || !p[0]) return 0;
+    if (p[0] < 0x80) return p[0];
+    if ((p[0] & 0xE0) == 0xC0 && p[1])
+        return (uint32_t)(p[0] & 0x1F) << 6 | (p[1] & 0x3F);
+    if ((p[0] & 0xF0) == 0xE0 && p[1] && p[2])
+        return (uint32_t)(p[0] & 0x0F) << 12 | (uint32_t)(p[1] & 0x3F) << 6 | (p[2] & 0x3F);
+    if ((p[0] & 0xF8) == 0xF0 && p[1] && p[2] && p[3])
+        return (uint32_t)(p[0] & 0x07) << 18 | (uint32_t)(p[1] & 0x3F) << 12
+             | (uint32_t)(p[2] & 0x3F) << 6  | (p[3] & 0x3F);
+    return 0;
+}
+
+int32_t cardGlyphTopBearing(const lv_font_t *font, const char *utf8) {
+    if (!font || !utf8) return 0;
+    const uint32_t cp = utf8First(utf8);
+    if (!cp) return 0;
+
+    lv_font_glyph_dsc_t g;
+    if (!lv_font_get_glyph_dsc(font, &g, cp, 0)) return 0;
+
+    const int32_t baseline = (int32_t)font->line_height - (int32_t)font->base_line;
+    const int32_t inkTop   = baseline - ((int32_t)g.ofs_y + (int32_t)g.box_h);
+    return inkTop > 0 ? inkTop : 0;
+}
+
+void     cardSetTempUnit(TempUnit u) { s_tempUnit = u; }
+TempUnit cardTempUnit()              { return s_tempUnit; }
+
+const char *cardDisplayUnit(const Entity &e, TempUnit want) {
+    if (!e.desc.unit[0]) return "";
+    if (!isTemperature(e.desc)) return e.desc.unit;
+
+    const char src = sourceTempLetter(e.desc);
+    if (!src) return e.desc.unit;          // a temperature in neither C nor F
+
+    switch (resolveWant(want)) {
+        case TempUnit::TEMP_C: return DEG_C;
+        case TempUnit::TEMP_F: return DEG_F;
+        default:               return e.desc.unit;
+    }
+}
+
+// The value as a number in the wanted unit, or the value unchanged when there
+// is nothing to convert.
+static float displayValue(const Entity &e, TempUnit want, bool &converted) {
+    converted = false;
+    float v = (e.value.type == ValueType::FLOAT) ? e.value.f
+            : (e.value.type == ValueType::INT)   ? (float)e.value.i : 0.0f;
+    if (!isTemperature(e.desc)) return v;
+
+    const char src = sourceTempLetter(e.desc);
+    if (!src) return v;
+
+    const TempUnit w = resolveWant(want);
+    if (w == TempUnit::TEMP_F && src == 'C') { converted = true; return v * 9.0f / 5.0f + 32.0f; }
+    if (w == TempUnit::TEMP_C && src == 'F') { converted = true; return (v - 32.0f) * 5.0f / 9.0f; }
+    return v;
+}
+
+void cardFormatValue(const Entity &e, char *out, size_t cap, bool withUnit, TempUnit want) {
     out[0] = '\0';
 
     // Never set, and not a lie about it. An em dash would be the typographic
@@ -184,17 +283,25 @@ void cardFormatValue(const Entity &e, char *out, size_t cap, bool withUnit) {
     // ASCII hyphens on purpose - see CardIcons.h.
     if (!e.everSet) { snprintf(out, cap, "--"); return; }
 
-    const char *unit = (withUnit && e.desc.unit[0]) ? e.desc.unit : "";
+    const char *unit = withUnit ? cardDisplayUnit(e, want) : "";
+
+    bool converted = false;
+    const float dv = displayValue(e, want, converted);
 
     switch (e.value.type) {
         case ValueType::FLOAT:
             // One decimal. A panel read from across a room gains nothing from
             // the second, and a Zigbee sensor's own quantisation means the
             // extra digit is frequently noise rather than precision.
-            snprintf(out, cap, "%.1f%s", (double)e.value.f, unit);
+            snprintf(out, cap, "%.1f%s", (double)dv, unit);
             break;
         case ValueType::INT:
-            snprintf(out, cap, "%ld%s", (long)e.value.i, unit);
+            // A converted integer stops being one. 22 C is 71.6 F, and
+            // printing 71 would be a rounding the source never made - so a
+            // conversion promotes the reading to one decimal and an
+            // unconverted integer stays exactly what arrived.
+            if (converted) snprintf(out, cap, "%.1f%s", (double)dv, unit);
+            else           snprintf(out, cap, "%ld%s", (long)e.value.i, unit);
             break;
         case ValueType::TEXT_VAL:
             snprintf(out, cap, "%s", e.value.text);

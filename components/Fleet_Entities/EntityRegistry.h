@@ -38,7 +38,16 @@
 // INTERNAL SRAM rather than PSRAM (see GuiManager's bus-type branch), and the
 // combination left too little internal RAM for the WiFi driver to bring up an
 // AP. It crashed inside ieee80211_hostap_attach. See docs/LESSONS.md.
-static constexpr uint8_t ENTITY_MAX = 48;
+//
+// RAISED FROM 48 AT 2.5, and the number is chosen rather than inherited. The
+// owner's own Home Assistant carries 1,662 entities and answers /api/states
+// with 742 KB, so the panel is never going to mirror a house - it subscribes
+// to a named subset, and this is the ceiling on that subset. His first
+// dashboard is around 18 cards, which with battery and last-seen siblings and
+// this board's own eight diagnostics lands near 40; 128 is headroom without
+// being a blank cheque. It costs ~450 bytes each IN PSRAM and nothing in
+// internal SRAM. The index type caps it at 255 regardless.
+static constexpr uint8_t ENTITY_MAX = 128;
 
 class EntityRegistry {
 public:

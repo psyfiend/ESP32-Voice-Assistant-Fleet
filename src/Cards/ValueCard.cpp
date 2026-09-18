@@ -135,13 +135,29 @@ void ValueCard::render() {
     const bool   compact = (variant() == CardVariant::VAR_COMPACT);
 
     // --- Icon, tinted by what this measures -------------------------------
-    lv_label_set_text          (_icon, cardIconFor(e->desc));
+    const char *cornerGlyph = cardIconFor(e->desc);
+    lv_label_set_text          (_icon, cornerGlyph);
     lv_obj_set_style_text_font (_icon, t.ICON_SM, 0);
+
+    // PULL THE LABEL UP BY ITS OWN LEADING, so what lands in the corner is the
+    // GLYPH rather than the glyph's line box. Measured from the font, not
+    // guessed - see cardGlyphTopBearing(). Re-applied on every render because
+    // the face changes with the scheme's type scale.
+    // HDR_NONE ONLY, which is the owner's call and the right one.
+    //
+    // In bar and tag mode the icon already sits the correct distance below the
+    // top of the space the card's contents live in - the bottom of the band in
+    // bar, the top border in tag - and he is happy with both. Only in No-hdr,
+    // where nothing sits above it, does the label's own leading become visible
+    // as the glyph appearing to float away from the corner.
+    const int32_t lift = (headerStyle() == CardHeaderStyle::HDR_NONE)
+                       ? cardGlyphTopBearing(t.ICON_SM, cornerGlyph) : 0;
+    lv_obj_align(_icon, LV_ALIGN_TOP_LEFT, 0, -lift);
     lv_obj_set_style_text_color(_icon, UI::c(tone(cardTintFor(e->desc))), 0);
 
     // --- The value, dominant, with its unit smaller beside it -------------
     char buf[40];
-    cardFormatValue(*e, buf, sizeof(buf), false);   // no unit in this string
+    cardFormatValue(*e, buf, sizeof(buf), false, tempUnit());  // unit drawn separately
     lv_label_set_text          (_value, buf);
     lv_obj_set_style_text_font (_value, t.VALUE, 0);
 
@@ -150,8 +166,12 @@ void ValueCard::render() {
     // stays legible while the card makes clear it cannot be trusted.
     lv_obj_set_style_text_color(_value, UI::c(tone(p.TEXT)), 0);
 
-    if (e->desc.unit[0]) {
-        lv_label_set_text          (_unit, e->desc.unit);
+    // NOT desc.unit. A card may render a temperature in a unit the source does
+    // not use, in which case the number beside this label has already been
+    // converted and printing the source's unit would caption it with a lie.
+    const char *dispUnit = cardDisplayUnit(*e, tempUnit());
+    if (dispUnit[0]) {
+        lv_label_set_text          (_unit, dispUnit);
         lv_obj_set_style_text_font (_unit, t.UNIT, 0);
         lv_obj_set_style_text_color(_unit, UI::c(tone(p.TEXT_DIM)), 0);
         lv_obj_clear_flag          (_unit, LV_OBJ_FLAG_HIDDEN);
@@ -202,7 +222,25 @@ void ValueCard::render() {
         lv_label_set_text(_battery,  "");
     }
 
-    if (e->everSet) {
+    // LAST-SEEN IS FOR VALUES THAT ARRIVE FROM SOMEWHERE ELSE.
+    //
+    // The owner, seeing "Seen: now" on the panel's own RSSI and uptime cards:
+    // "Do local entities (like Panel) need secondary information such as
+    // battery or last seen?" They do not. An entity this board OWNS is read
+    // straight off the hardware every couple of seconds, so its age is always
+    // "now" and the line is pure clutter.
+    //
+    // advertise == true is exactly the "we own it" flag - Entity.h calls it
+    // "the real difference between the two groups of entity". The staleness
+    // machinery still runs: if our own telemetry ever DID stop updating, the
+    // card would still raise a STALE tag, which is the part worth keeping.
+    //
+    // It also answers the question underneath his: "Seen" is the last time
+    // THIS ENTITY'S VALUE changed, not the last time the device was heard
+    // from. For a Zigbee sensor publishing four values on one topic those are
+    // the same moment; for anything else they are not, and the device-level
+    // question is one only #43's device registry can answer.
+    if (e->everSet && !e->desc.advertise) {
         char age[12];
         cardFormatAge(millis() - e->lastUpdateMs, age, sizeof(age));
 

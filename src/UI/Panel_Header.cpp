@@ -11,7 +11,7 @@ Panel_Header::Panel_Header() {
 void Panel_Header::init(lv_obj_t* parent, const char* title, ConnectivityManager* conn) {
     // Top Bar Container
     container = lv_obj_create(parent);
-    lv_obj_set_size             (container, lv_pct(100), UIToolkit::sc(50));
+    lv_obj_set_size             (container, lv_pct(100), UIToolkit::systemHeaderPx());
     lv_obj_set_style_bg_color   (container, UI::c(UI::pal().SURFACE_ALT), 0);
 
     // Bottom Border Only (Blue Line)
@@ -58,4 +58,10 @@ void Panel_Header::tick() {
     // Self-throttling and change-guarded internally, so calling this every
     // loop costs a millis() compare in the common case.
     connStatus.tick();
+}
+void Panel_Header::restyle() {
+    if (!container) return;
+    lv_obj_set_style_bg_color    (container, UI::c(UI::pal().SURFACE_ALT), 0);
+    lv_obj_set_style_border_color(container, UI::c(UI::pal().ACCENT), 0);
+    if (lbl_title) lv_obj_set_style_text_color(lbl_title, UI::c(UI::pal().ACCENT), 0);
 }

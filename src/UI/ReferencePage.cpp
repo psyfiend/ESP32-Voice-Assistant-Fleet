@@ -7,6 +7,7 @@ namespace {
 
 lv_obj_t *s_screen   = nullptr;
 lv_obj_t *s_previous = nullptr;
+void (*s_onClose)() = nullptr;
 
 // Measured while the sample grid is built. Card cost comes from LVGL's pool,
 // which is the budget that actually constrains us - see the header.
@@ -121,9 +122,12 @@ lv_obj_t *button(lv_obj_t *parent, const char *text, lv_event_cb_t cb, void *ud)
 
 namespace ReferencePage {
 
+void setCloseHandler(void (*cb)()) { s_onClose = cb; }
+
 void close() {
     if (s_previous) lv_screen_load(s_previous);
     if (s_screen) { lv_obj_delete(s_screen); s_screen = nullptr; }
+    if (s_onClose) s_onClose();
 }
 
 void show() {

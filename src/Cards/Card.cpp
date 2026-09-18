@@ -100,54 +100,61 @@ int32_t Card::headerHeight() {
 // The budget is the tallest thing each layout stacks: a title row, the hero,
 // and an optional row, plus the padding between them. A card that cannot seat
 // all three goes compact and drops the optional one.
-void Card::resolveVariant() {
-    if (_variant != CardVariant::VAR_AUTO) { _resolved = _variant; return; }
-
+// What a FULL layout needs, in real pixels. Lifted out of resolveVariant() so
+// that CardPage can ask the same question before it decides how many rows to
+// carve the page into - it used to guess, and a guess that disagrees with this
+// function is how a page plans a row no card can live in.
+int32_t Card::fullCellNeedPx(CardHeaderStyle style) {
     const UIType    &t = UI::type();
     const UIMetrics &m = UI::met();
-    const UIGrid    &g = UI::grid();
 
-    // DERIVED FROM THE TOKENS, not measured off the widget.
-    //
-    // It used to call lv_obj_update_layout() and read the surface's height -
-    // and got LVGL's default object size, because resolveVariant() runs from
-    // build() and a card has no grid cell until placeCard() a moment later.
-    // On WS_P4_5 that default is ~92 px against a real cell of 264, so every
-    // card on the fleet's largest panel went compact and lost its name and
-    // status row. The owner's report of "no text under the icons" was that.
-    //
-    // The cell height is knowable without asking LVGL anything: the grid
-    // derived it, and the card knows its own row span.
-    int32_t h = (int32_t)g.cellH * (_place.prefSpanY ? _place.prefSpanY : 1);
-    if (_place.prefSpanY > 1) h += UI::sc(g.GAP) * (_place.prefSpanY - 1);
-    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
-
-    // What a full layout needs: a title row, the hero, and an optional row,
-    // plus the padding between them.
-    // Counts every band a FULL layout reserves, which now includes the icon
-    // line at the top. Leaving it out made CYD_S3_3248 cards claim they could
-    // seat a full layout in 121 px when they could not, and the name was
-    // clipped underneath the status row as a result.
-    // No top band: the corner icon is out of the flow on both layouts, so it
-    // costs the stack nothing. Charging for it here is what pushed the 3248
-    // into compact and took away a status line that used to fit.
+    // Counts every band a FULL layout reserves. No top band: the corner icon is
+    // out of the flow on both layouts, so it costs the stack nothing.
     int32_t need = lv_font_get_line_height(t.VALUE)
                  + midGap()
                  + lv_font_get_line_height(t.NAME)
                  + statusBandHeight()
                  + UI::sc(m.PAD) * 2;
-    if (_hdrStyle == CardHeaderStyle::HDR_BAR) need += Card::headerHeight();
 
-    // A MARGIN, because "it exactly fits" is not a safe answer.
-    //
-    // A font's line box is taller than the ink in it, labels round up, and the
-    // body's own padding is approximate here. Landing within a pixel or two of
-    // the cell meant CYD_S3_3248 claimed a full layout at 121 px and then
-    // overflowed - the name clipped in half and drawn over the status row, and
-    // in the two modes that also spend height on a header the status row was
-    // pushed off the card entirely. Being slightly too eager to go compact
-    // costs a status line; being slightly too reluctant breaks the card.
-    need += UI::sc(8);
+    // HDR_BAR reserves a strip inside the card. HDR_TAG takes its room from
+    // OUTSIDE, so the caller subtracts it from the cell instead - see
+    // resolveVariant(). HDR_NONE costs nothing.
+    if (style == CardHeaderStyle::HDR_BAR) need += Card::headerHeight();
+
+    // A MARGIN, because "it exactly fits" is not a safe answer. A font's line
+    // box is taller than the ink in it, labels round up, and the body's own
+    // padding is approximate here. Landing within a pixel or two of the cell
+    // meant CYD_S3_3248 claimed a full layout at 121 px and then overflowed -
+    // the name clipped in half and drawn over the status row.
+    return need + UI::sc(8);
+}
+
+// The least a cell can be and still hold a card at all: the hero, the NAME and
+// the padding, plus the same safety margin. A page will not plan a row shorter
+// than this.
+//
+// The name is counted since 2026-09-17, when compact stopped dropping it -
+// compact now drops the secondary row and nothing else, so the floor has to
+// include a name or the page could plan a row that a compact card overflows.
+int32_t Card::compactCellNeedPx() {
+    const UIMetrics &m = UI::met();
+    return lv_font_get_line_height(UI::type().VALUE)
+         + midGap()
+         + lv_font_get_line_height(UI::type().NAME)
+         + UI::sc(m.PAD) * 2
+         + UI::sc(8);
+}
+
+void Card::resolveVariant() {
+    if (_variant != CardVariant::VAR_AUTO) { _resolved = _variant; return; }
+
+    int32_t h = cellPx();
+
+    // HDR_TAG hangs OUTSIDE the card, so the cell it leaves the body is
+    // shorter by exactly the tag.
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+
+    const int32_t need = fullCellNeedPx(_hdrStyle);
 
     _resolved = (h >= need) ? CardVariant::VAR_FULL : CardVariant::VAR_COMPACT;
 
@@ -234,9 +241,23 @@ void Card::build(lv_obj_t *parent) {
     // that is thirty-six allocations, and the P4 filled its draw buffers and
     // spewed "lv_draw_layer_alloc_buf: Allocating layer buffer failed" until
     // it was reset. Only an edge-to-edge header band needs it.
-    if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
-        lv_obj_set_style_clip_corner(_surface, true, 0);
-    }
+    // NO CLIP_CORNER, EVEN FOR THE BAND. This froze WS_P4_5 on boot.
+    //
+    // clip_corner makes LVGL render the object to an intermediate LAYER so it
+    // can mask the rounded corners, and that layer is sized by the object's
+    // WIDTH. A two-cell card is 482 px, so it asked for 32,776 bytes out of
+    // the 128 KB lv_mem pool - which already holds thirteen cards - failed,
+    // and retried forever: "lv_draw_layer_alloc_buf: Allocating layer buffer
+    // failed. Try later", with 80 KB of system heap still free. Draw buffers
+    // come from lv_mem, not the heap, which is why the heap looked healthy.
+    //
+    // This was already a known liability, logged against 2.8. It became a
+    // FREEZE rather than a risk the moment HDR_BAR became the default header
+    // mode, because every card now wants the layer.
+    //
+    // The band gets the card's own radius instead. Its lower corners round too
+    // where they used to be square - a real visual difference, and the honest
+    // trade for a board that does not hang. Revisit with the slot rework.
 
     // LVGL fires LV_EVENT_SHORT_CLICKED for a tap and LV_EVENT_LONG_PRESSED
     // once the press passes its threshold. CLICKED is deliberately not used:
@@ -307,6 +328,11 @@ void Card::buildHeader() {
     } else {
         lv_obj_set_width (_header, lv_pct(100));
         lv_obj_align     (_header, LV_ALIGN_TOP_MID, 0, 0);
+
+        // The band carries the card's own radius now that the card no longer
+        // clips it. Its lower corners round where they used to be square -
+        // the visible cost of not allocating a layer per card. See build().
+        lv_obj_set_style_radius(_header, UI::sc(UI::met().RADIUS), 0);
     }
 
     // Area left, STALE right - fixed in every mode, per cards.md section 2.
@@ -414,11 +440,22 @@ int32_t Card::midGap() {
     return UI::sc(6);
 }
 
+// How tall this card's cell really is.
+//
+// The page measures it and hands it over, because spans are in grid UNITS at
+// 2.5 and a unit's height is the page's business. The fallback is ONE WHOLE
+// CELL rather than cellH * prefSpanY: multiplying by a unit span would double
+// an ordinary card, and a card built outside a page is by definition one that
+// nobody sized.
+int32_t Card::cellPx() const {
+    if (_cellPx > 0) return _cellPx;
+    return (int32_t)UI::grid().cellH;
+}
+
 int32_t Card::midHeight() const {
-    const UIGrid    &g = UI::grid();
     const UIMetrics &m = UI::met();
 
-    int32_t h = (int32_t)g.cellH * (_place.prefSpanY ? _place.prefSpanY : 1);
+    int32_t h = cellPx();
 
     // ALWAYS charges for a header, whatever this card's mode is.
     //
