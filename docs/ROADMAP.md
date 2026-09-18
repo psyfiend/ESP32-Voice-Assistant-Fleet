@@ -634,7 +634,7 @@ and everything in Phases 4 through 6.
 | 2.2 | Design system | **DONE 2026-09-10, hardware-verified.** `UITokens` - palette incl. semantic state colours, per-scheme metrics, derived grid, type scale. Reference page reachable from the System panel, three schemes switchable live. Panels ported off hardcoded colours. **MDI icon font deferred to 2.4** - see below. `docs/design/tokens.md` |
 | 2.3 | Memory budget spike | **DONE 2026-09-10, measured on `CYD_S3_3248`.** ~715 B per card in `lv_mem`; pool steady at 35% with dashboard + reference page. **Decision: neither lazy-loading nor a PSRAM `LV_MEM` is needed** - see below. No longer gates 2.5 |
 | 2.4 | `Card` base class | **DONE 2026-09-15, hardware-verified on `WS_P4_5`, `CYD_S3_3248` and `WS_P4_7B`.** `Card` base + `ValueCard`/`StateCard` layouts + five domain types behind `CardCatalog`; `CardBinder` (the first caller of `drainDirty()` in the project's history); `CardPage` with spans. Type scale and MDI icon subset both generated per board. `src/UI/` and `src/Cards/` introduced. Layout model and every trap behind it written up in `docs/design/card-layout.md` — **read that before moving anything on a card** |
-| 2.5 | Page + grid engine | **DONE 2026-09-15 (builds on all 8; hardware sign-off pending).** A page renders from a `PageSpec` config struct; sub-grid units per Q3b with a per-page `subdivision`; explicit unit placement with a validator that reports rather than resolves; priority degradation that drops the lowest-priority card and re-plans. The dashboard is now the BOOT SCREEN, fed by `include/Dashboards/Dashboard_Fleet.h`. Grid knobs (column, row, deck) on the System panel. Design: `docs/design/dashboard.md` |
+| 2.5 | Page + grid engine | **CODE-COMPLETE 2026-09-18 on `feat/2.5-page-grid-engine`, AWAITING SIGN-OFF.** A page renders from a `PageSpec`; sub-grid units per Q3b; explicit unit placement with a validator that reports rather than resolves; priority degradation that drops the lowest-priority card and re-plans. The dashboard is the BOOT SCREEN. Row count comes from the CARDS, not from geometry. Col/Row knobs demand exact counts. Confirmed on `WS_P4_5`, `WS_P4_7B` and `CYD_S3_3248` - three resolutions, one page definition, priority degradation observed. **What remains: sub-grid spans and explicit placement confirmed on glass (both now instrumented in `Dashboard_Fleet.h`), plus an overnight soak.** See `HANDOFF.md` "Signing off 2.5". Design: `docs/design/dashboard.md` |
 | 2.6 | Tileview navigation | Swipe L/R between pages, U/D to menus; gesture conflicts resolved (§5.2); page indicator dots |
 | 2.7 | First 4 card types | `sensor`, `binary_sensor`, `switch`, `button` — bound to real HA entities over MQTT. **Largely landed early at 2.4**: all four exist in `CardCatalog.h`, plus `light`. What 2.7 still owes is binding them to real HA entities rather than the virtual test switches, and whatever each type needs that a generic layout does not give it |
 | 2.8 | Header bar v2 | Configurable slot list: clock, WiFi/MQTT status, optional sensor slots. **Build the slot mechanism ONCE and use it three times** — `cards.md` §8: the page header, a group card's header, and a normal card's header are the same idea at different sizes, and a card's is the degenerate two-slot case (area left, STALE right) that 2.4 hardcoded. If 2.8 builds a general named-slot list rather than the page header specifically, the group card gets its header free and the build sheet gets one grammar for all three |
@@ -687,6 +687,24 @@ So the running order is:
 Two things pulled forward and one pushed back: screen dimming and brightness out of 4.1 (a wall
 panel at full brightness all night is a daily-use problem, not a settings feature); OTA (5.2)
 becomes urgent the moment a board is physically mounted; and 2.9 leaves the phase as above.
+
+### What 2.5 delivered beyond its own scope
+
+Worth listing because a later milestone should not rebuild any of it:
+
+- **The dashboard is the boot screen.** `GUIManager` owns a host between header and deck; the old
+  Phase-1 deck and System drawer survive alongside it.
+- **Live knobs on the System panel** — columns, rows, deck on/off, card-header mode, colour scheme,
+  system-header height. All of them become stored settings at 4.1; none is a closed decision.
+- **Per-board tuning where derivation could not serve two boards**: `TARGET_CARD_W` and a
+  type-scale multiplier, both overridden through the board identity macro.
+- **Temperature units** — Fahrenheit fleet-wide, converted at format time, overridable per page and
+  per card. The registry still stores what the source said.
+- **The System Doctor report moved to its own page** (`LogPage`), which also unblocks the System
+  panel rework specified in `HANDOFF.md`.
+- **Three network faults found and fixed** — duplicate subscriptions, a leaked socket per
+  reconnect, and internal-heap starvation from two different causes. None of them were MQTT. See
+  `LESSONS.md`.
 
 ### Phase 3 — Build sheet
 
