@@ -134,6 +134,7 @@ private:
     // that is the correct trade (see MqttManager.cpp for the full reasoning).
     static constexpr uint32_t RETAINED_CMD_WINDOW_MS = 2000;
     uint32_t _subscribedAtMs = 0;
+    uint32_t _connectedAtMs  = 0;   // for "how long did the socket last"
 
     static constexpr uint8_t MAX_CMD_TOPICS = 12;
     char    _cmdTopics[MAX_CMD_TOPICS][96] = {};

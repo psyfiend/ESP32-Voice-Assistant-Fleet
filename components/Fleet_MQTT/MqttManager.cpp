@@ -1,4 +1,5 @@
 #include "MqttManager.h"
+#include <WiFi.h>   // WiFi.status(), for the disconnect diagnostic
 #include "DeviceIdentity.h"
 
 #include <string.h>
@@ -137,7 +138,23 @@ void MqttManager::loop() {
 
     // Was connected, is not any more.
     if (_state == MqttState::CONNECTED) {
-        Serial.println("[Mqtt] Disconnected from broker.");
+        // WHY, not just THAT. PubSubClient records a reason code and we were
+        // throwing it away, which left "Disconnected from broker." as the only
+        // evidence for a fault that has now cost two evenings.
+        //
+        //   -4 timeout   -3 connection LOST (the broker closed it)
+        //   -2 connect failed   -1 clean disconnect by us
+        //
+        // The elapsed time matters as much as the code: a socket that dies one
+        // second after a successful CONNECT is being closed by the far end, and
+        // a socket that dies at the keepalive interval is one we failed to
+        // service because loop() was blocked. Those need opposite fixes.
+        const uint32_t heldMs = millis() - _connectedAtMs;
+        Serial.printf("[Mqtt] Disconnected from broker. state=%d after %lu ms, "
+                      "heap %lu, wifi %s\n",
+                      _client.state(), (unsigned long)heldMs,
+                      (unsigned long)ESP.getFreeHeap(),
+                      WiFi.status() == WL_CONNECTED ? "up" : "DOWN");
         escalate(now, MqttFailure::ENVIRONMENTAL);
         return;
     }
@@ -199,6 +216,7 @@ void MqttManager::onConnected() {
 
     resubscribeAll();
 
+    _connectedAtMs = millis();
     Serial.printf("[Mqtt] Online: %s:%u as \"%s\"\n",
                   _cfg.BROKER_HOST, (unsigned)_cfg.BROKER_PORT,
                   DeviceIdentity::deviceId());
