@@ -349,19 +349,24 @@ void GUIManager::nudgeCardWidth(int8_t steps) {
     if (w > 300) w = 300;
     UI::setTargetCardWidth((uint16_t)w);
     rebuildDashboard();
-    Serial.printf("[Cards] TARGET_CARD_W %ld -> %ux%u cells of %ux%u px\n",
-                  (long)w, (unsigned)UI::grid().cols, (unsigned)UI::grid().rows,
-                  (unsigned)UI::grid().cellW, (unsigned)UI::grid().cellH);
+    // The PAGE logs what it actually did, in commit(). Printing UI::grid()'s
+    // cols/rows/cellH here as well was worse than useless: those are the
+    // token's own geometric estimate against the whole screen, nothing reads
+    // them any more, and they disagreed with the real layout - "2x2 cells of
+    // 141x205" beside per-card lines saying the cell was 97 px tall.
+
 }
 
 void GUIManager::nudgeAspect(int8_t steps) {
     int32_t a = (int32_t)UI::grid().ASPECT_PCT + steps * 5;
     UI::setAspectPct((uint8_t)(a < 40 ? 40 : (a > 200 ? 200 : a)));
     rebuildDashboard();
-    Serial.printf("[Cards] ASPECT_PCT %u -> %ux%u cells of %ux%u px\n",
-                  (unsigned)UI::grid().ASPECT_PCT,
-                  (unsigned)UI::grid().cols, (unsigned)UI::grid().rows,
-                  (unsigned)UI::grid().cellW, (unsigned)UI::grid().cellH);
+    // The PAGE logs what it actually did, in commit(). Printing UI::grid()'s
+    // cols/rows/cellH here as well was worse than useless: those are the
+    // token's own geometric estimate against the whole screen, nothing reads
+    // them any more, and they disagreed with the real layout - "2x2 cells of
+    // 141x205" beside per-card lines saying the cell was 97 px tall.
+
 }
 
 // The screen's own background. Called at start-up and again on every scheme
@@ -464,10 +469,7 @@ void GUIManager::cycleHeader() {
 void GUIManager::toggleDeck() {
     _showDeck = !_showDeck;
     rebuildDashboard();
-    Serial.printf("[Cards] deck %s -> %ux%u cells of %ux%u px\n",
-                  _showDeck ? "shown" : "hidden",
-                  (unsigned)UI::grid().cols, (unsigned)UI::grid().rows,
-                  (unsigned)UI::grid().cellW, (unsigned)UI::grid().cellH);
+    Serial.printf("[Cards] deck %s\n", _showDeck ? "shown" : "hidden");
 }
 
 void GUIManager::tick() {

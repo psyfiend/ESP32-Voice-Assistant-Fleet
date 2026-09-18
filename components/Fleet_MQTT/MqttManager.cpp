@@ -286,6 +286,42 @@ bool MqttManager::publish(const char *topic, const char *payload, bool retain) {
 
 bool MqttManager::addSub(const char *topic, bool isCommand) {
     if (!topic || !topic[0]) return false;
+
+    // ALREADY IN THE TABLE? Then this is not a new subscription.
+    //
+    // This table holds TOPICS, and several entities routinely share one - a
+    // Zigbee2MQTT device publishes temperature, illuminance, occupancy and
+    // battery in a single message, so four entities name the same topic and
+    // MqttProvider asks for it four times. Each of those was appended as its
+    // own row.
+    //
+    // That alone was survivable. What made it fatal is that MqttProvider asks
+    // again after every reconnect while MqttManager ALSO replays the table -
+    // so four rows became eight, then twelve, then sixteen, and the table was
+    // full. The device then sent sixteen SUBSCRIBE packets per connect for one
+    // topic, publishes started failing on a 4-byte payload, the broker dropped
+    // it, and it reconnected into the same loop. Both boards spent an evening
+    // flickering in and out of Home Assistant.
+    //
+    // Subscribing to the same topic twice was never meaningful - the broker
+    // sends one copy either way, and MqttProvider already fans one message out
+    // to every entity that named it.
+    for (uint8_t i = 0; i < _subCount; i++) {
+        if (strcmp(_subs[i].topic, topic) != 0) continue;
+        // A topic first seen as state and later wanted as a command has to be
+        // promoted, or the command path would never see it.
+        if (isCommand && !_subs[i].isCommand) {
+            _subs[i].isCommand = true;
+            if (_cmdTopicCount < MAX_CMD_TOPICS) {
+                snprintf(_cmdTopics[_cmdTopicCount], sizeof(_cmdTopics[0]), "%s", topic);
+                _cmdTopicCount++;
+            }
+        }
+        // Already known; nothing to add. Not re-sent either - the broker has
+        // it, and re-sending is what produced sixteen SUBSCRIBEs a connect.
+        return true;
+    }
+
     if (_subCount >= MAX_SUBS) {
         Serial.printf("[Mqtt] subscription table full, dropping \"%s\"\n", topic);
         return false;
