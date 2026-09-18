@@ -141,8 +141,8 @@ UIMetrics s_met = UI_MET_DARK;
 
 // ASPECT_PCT is a CEILING on card height as a percentage of card width, not a
 // target shape - see UITokens.h. It no longer picks the row count.
-UIGrid    s_grid = { .TARGET_CARD_W = FLEET_TARGET_CARD_W, .ASPECT_PCT = 130,
-                     .GAP = 12, .INSET = 14,
+UIGrid    s_grid = { .TARGET_CARD_W = FLEET_TARGET_CARD_W, .COLS_OVERRIDE = 0,
+                     .ASPECT_PCT = 130, .GAP = 12, .INSET = 14,
                      .cols = 1, .rows = 1, .cellW = 0, .cellH = 0 };
 
 int32_t s_vpW = 0, s_vpH = 0;
@@ -170,9 +170,12 @@ void recomputeGrid() {
     const int32_t availH = s_vpH - inset * 2;
     if (availW <= 0 || availH <= 0) return;
 
-    // Columns: as many whole target-width cards as fit.
-    int32_t cols = (availW + gap) / (target + gap);
+    // An explicit count wins; otherwise as many whole target-width cards as fit.
+    int32_t cols = s_grid.COLS_OVERRIDE
+                 ? (int32_t)s_grid.COLS_OVERRIDE
+                 : (availW + gap) / (target + gap);
     if (cols < 1) cols = 1;
+    if (cols > UI_MAX_COLS) cols = UI_MAX_COLS;
     const int32_t cellW = (availW - gap * (cols - 1)) / cols;
 
     // Rows here are only an ESTIMATE for callers with no cards to count.
@@ -262,6 +265,13 @@ void setAccent(uint32_t hex) {
 
 void setTargetCardWidth(uint16_t logicalPx) {
     s_grid.TARGET_CARD_W = logicalPx;
+    recomputeGrid();
+    if (s_onChange) s_onChange();
+}
+
+void setColumnsOverride(uint8_t cols) {
+    if (cols > UI_MAX_COLS) cols = UI_MAX_COLS;
+    s_grid.COLS_OVERRIDE = cols;
     recomputeGrid();
     if (s_onChange) s_onChange();
 }

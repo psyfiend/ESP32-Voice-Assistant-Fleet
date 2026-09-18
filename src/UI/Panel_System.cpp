@@ -14,6 +14,8 @@ Panel_System::Panel_System() {
     _lbl_hdr    = NULL;
     _lbl_scheme = NULL;
     _lbl_bar    = NULL;
+    _lbl_cols   = NULL;
+    _lbl_rows   = NULL;
     txt_log     = NULL;
     lbl_stats   = NULL;
     _headerRef  = NULL;
@@ -64,6 +66,14 @@ void Panel_System::setSchemeLabel(const char *text) {
 
 void Panel_System::setBarLabel(const char *text) {
     if (_lbl_bar && text) lv_label_set_text(_lbl_bar, text);
+}
+
+void Panel_System::setColsLabel(const char *text) {
+    if (_lbl_cols && text) lv_label_set_text(_lbl_cols, text);
+}
+
+void Panel_System::setRowsLabel(const char *text) {
+    if (_lbl_rows && text) lv_label_set_text(_lbl_rows, text);
 }
 
 static lv_obj_t *knobButton(lv_obj_t *parent, Panel_System *self,
@@ -246,22 +256,29 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_clear_flag               (_ui_grid, LV_OBJ_FLAG_SCROLLABLE);
     UI::tameScroll                  (_ui_grid);
 
+    // COUNTS, not nudges. These used to move a target width and an aspect
+    // ceiling and hope the arithmetic landed somewhere useful; now they demand
+    // a column and row count outright and the layout obeys. Each wraps through
+    // "A" for auto. The labels are updated by GUIManager, which owns the state.
     knobButton(_ui_grid, this, "Col -", [](lv_event_t *e) {
-        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
-        if (p) p->requestGrid(Panel_System::GridAction::CARD_W_UP);   // wider card, fewer columns
-    });
-    knobButton(_ui_grid, this, "Col +", [](lv_event_t *e) {
         Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
         if (p) p->requestGrid(Panel_System::GridAction::CARD_W_DOWN);
     });
-    knobButton(_ui_grid, this, "Row -", [](lv_event_t *e) {
+    lv_obj_t *btnCols = knobButton(_ui_grid, this, "Col A", [](lv_event_t *e) {
         Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
-        if (p) p->requestGrid(Panel_System::GridAction::ASPECT_UP);   // taller hint, fewer rows
+        if (p) p->requestGrid(Panel_System::GridAction::CARD_W_UP);
     });
-    knobButton(_ui_grid, this, "Row +", [](lv_event_t *e) {
+    _lbl_cols = lv_obj_get_child(btnCols, 0);
+
+    knobButton(_ui_grid, this, "Row -", [](lv_event_t *e) {
         Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
         if (p) p->requestGrid(Panel_System::GridAction::ASPECT_DOWN);
     });
+    lv_obj_t *btnRows = knobButton(_ui_grid, this, "Row A", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestGrid(Panel_System::GridAction::ASPECT_UP);
+    });
+    _lbl_rows = lv_obj_get_child(btnRows, 0);
     knobButton(_ui_grid, this, "Deck", [](lv_event_t *e) {
         Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
         if (p) p->requestGrid(Panel_System::GridAction::DECK_TOGGLE);

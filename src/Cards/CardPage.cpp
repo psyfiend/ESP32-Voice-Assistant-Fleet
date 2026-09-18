@@ -153,8 +153,14 @@ void CardPage::useRows(uint8_t cellRows) {
 
     int32_t cellH = (_availH - _gap * (cellRows - 1)) / cellRows;
 
-    const int32_t capH = ((int32_t)UI::grid().cellW * UI::grid().ASPECT_PCT) / 100;
-    if (capH > 0 && cellH > capH) cellH = capH;
+    // The ASPECT ceiling is a guard against a two-card page making each card
+    // as tall as the screen. It does NOT apply when a row count was demanded -
+    // there the tall card is what was asked for, and quietly refusing to give
+    // it would make the button feel broken in exactly the way the old one did.
+    if (!_rowsOverride) {
+        const int32_t capH = ((int32_t)UI::grid().cellW * UI::grid().ASPECT_PCT) / 100;
+        if (capH > 0 && cellH > capH) cellH = capH;
+    }
     if (cellH < 1) cellH = 1;
 
     _unitH = (cellH - _gap * (_sub - 1)) / _sub;
@@ -338,15 +344,25 @@ void CardPage::commit() {
     // Spend as few rows as the cards need, and only add more when placement
     // genuinely cannot fit them. Dropping cards is the LAST resort, after the
     // page has already grown to every row it could carry.
-    uint8_t rows = rowsWanted();
-    if (rows > _maxRows) rows = _maxRows;
-
-    for (;;) {
+    if (_rowsOverride) {
+        // OBEYED, not negotiated. The caller asked for this many rows; cards
+        // that do not fit are dropped by priority, which is the whole point of
+        // asking. The only clamp is the descriptor's own size.
+        uint8_t rows = _rowsOverride;
+        if (rows > PAGE_MAX_UNIT_ROWS / _sub) rows = PAGE_MAX_UNIT_ROWS / _sub;
         useRows(rows);
         plan();
-        if (_placed == _n) break;       // everything fits at this row count
-        if (rows >= _maxRows) break;    // no more rows to give - plan() drops
-        rows++;
+    } else {
+        uint8_t rows = rowsWanted();
+        if (rows > _maxRows) rows = _maxRows;
+
+        for (;;) {
+            useRows(rows);
+            plan();
+            if (_placed == _n) break;       // everything fits at this row count
+            if (rows >= _maxRows) break;    // no more rows to give - plan() drops
+            rows++;
+        }
     }
 
     Serial.printf("[Cards] %u cards want %u rows; using %u of max %u -> cell %ldx%ld px\n",

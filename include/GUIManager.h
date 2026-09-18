@@ -43,8 +43,11 @@ public:
     // The grid knobs. Milestone 2.5 folded these in at the owner's request:
     // the 7B derives a grid that forces every card compact, and the question
     // of which cell size is right is one only the glass can answer.
-    void nudgeCardWidth(int8_t steps);
-    void nudgeAspect(int8_t steps);
+    // Demand a column / row count. Each wraps through AUTO, so there is always
+    // a way back to the derived layout. Auto starts from whatever the grid is
+    // currently showing, so the first press moves by one rather than jumping.
+    void nudgeColumns(int8_t steps);
+    void nudgeRows(int8_t steps);
     void toggleDeck();
 
     // Cycle the header treatment on the live dashboard: tag -> bar -> none.
@@ -114,6 +117,8 @@ private:
     // that have been closed.
     CardHeaderStyle _hdr    = CardHeaderStyle::HDR_BAR;
     uint8_t         _scheme = 1;            // Slate
+    uint8_t         _colsOverride = 0;      // 0 = derive from TARGET_CARD_W
+    uint8_t         _rowsOverride = 0;      // 0 = let the cards decide
     lv_obj_t       *_hiddenBarTap = nullptr;
     lv_obj_t     *_deck     = nullptr;
 

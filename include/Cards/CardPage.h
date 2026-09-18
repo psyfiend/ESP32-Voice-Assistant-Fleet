@@ -76,6 +76,19 @@ public:
     Card *add(Card *c);
 
     // Plan, build and place everything added since begin(). Idempotent.
+    // Demand an exact row count, or 0 to let the cards decide.
+    //
+    // Auto is the right default and stays the default: the page spends as few
+    // rows as its cards need. But "show me two rows" is a legitimate request -
+    // it means FEWER, LARGER cards, and priority already knows how to choose
+    // which ones survive. Expressing that by tuning an aspect ceiling until
+    // the arithmetic happened to land on two was not a user interface, and on
+    // CYD_S3_3248 it could not land on two at all: the cards wanted eight rows
+    // and only four fit, so no ceiling could reduce the count.
+    //
+    // Call before commit().
+    void setRowsOverride(uint8_t rows) { _rowsOverride = rows; }
+
     void commit();
 
     // Re-plan and re-place without rebuilding widgets. Correct for a span or
@@ -87,6 +100,7 @@ public:
     lv_obj_t *root() const { return _root; }
     uint8_t   count() const { return _n; }
     uint8_t   placed() const { return _placed; }
+    uint8_t   cellRows() const { return _sub ? (uint8_t)(_uRows / _sub) : _uRows; }
     uint8_t   dropped() const { return (uint8_t)(_n - _placed); }
 
     // One line per card for the System Doctor: type, span, priority, where it
@@ -152,6 +166,7 @@ private:
     // does not fill the space with empty rows. See useRows().
     int32_t  _availH   = 0;
     uint8_t  _maxRows  = 1;
+    uint8_t  _rowsOverride = 0;   // 0 = let the cards decide
 
     // Occupancy of the unit grid, one bit per unit, row-major. 192 bytes.
     // Flow placement alone cannot overlap, but flow MIXED with pinned cards

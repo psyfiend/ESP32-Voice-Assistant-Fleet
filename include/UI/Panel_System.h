@@ -50,6 +50,8 @@ public:
     void requestScheme() { if (_onSchemeRequested) _onSchemeRequested(); }
     void setSchemeLabel(const char *text);
     void setBarLabel(const char *text);
+    void setColsLabel(const char *text);
+    void setRowsLabel(const char *text);
 
     // Fires the above. Public because a capture-less lv_event_cb lambda is a
     // free function, not a member, so it cannot reach a private field.
@@ -104,6 +106,8 @@ private:
     lv_obj_t* _lbl_hdr;    // label inside the header-mode button
     lv_obj_t* _lbl_scheme; // label inside the scheme button
     lv_obj_t* _lbl_bar;    // label inside the header-size button
+    lv_obj_t* _lbl_cols;
+    lv_obj_t* _lbl_rows;
     
     lv_obj_t* txt_log;     // The log text label
     lv_obj_t* lbl_stats;   // The stats header label

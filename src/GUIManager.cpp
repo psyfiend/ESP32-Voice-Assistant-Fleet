@@ -166,10 +166,10 @@ void GUIManager::begin() {
     // remains entirely this class's business.
     _pnlSystem.setOnGridAction([this](Panel_System::GridAction a) {
         switch (a) {
-            case Panel_System::GridAction::CARD_W_DOWN: nudgeCardWidth(-1); break;
-            case Panel_System::GridAction::CARD_W_UP:   nudgeCardWidth(+1); break;
-            case Panel_System::GridAction::ASPECT_DOWN: nudgeAspect(-1);    break;
-            case Panel_System::GridAction::ASPECT_UP:   nudgeAspect(+1);    break;
+            case Panel_System::GridAction::CARD_W_DOWN: nudgeColumns(-1);  break;
+            case Panel_System::GridAction::CARD_W_UP:   nudgeColumns(+1);  break;
+            case Panel_System::GridAction::ASPECT_DOWN: nudgeRows(-1);     break;
+            case Panel_System::GridAction::ASPECT_UP:   nudgeRows(+1);     break;
             case Panel_System::GridAction::DECK_TOGGLE: toggleDeck();       break;
             case Panel_System::GridAction::HDR_CYCLE:   cycleHeader();     break;
             case Panel_System::GridAction::BAR_CYCLE:   cycleHeaderBar();  break;
@@ -290,6 +290,7 @@ void GUIManager::buildDashboard() {
 
     _page = new CardPage();
     _page->begin(_dashHost, &_binder);
+    _page->setRowsOverride(_rowsOverride);
 
     // The fleet spec is const and carries a header default; the live choice is
     // laid over a copy of it. PageSpec is a plain aggregate, so this is a copy
@@ -343,30 +344,14 @@ void GUIManager::rebuildDashboard() {
 // cards at the same level of detail and show nothing.
 // ---------------------------------------------------------------------------
 
-void GUIManager::nudgeCardWidth(int8_t steps) {
-    int32_t w = (int32_t)UI::grid().TARGET_CARD_W + steps * 5;
-    if (w < 80)  w = 80;
-    if (w > 300) w = 300;
-    UI::setTargetCardWidth((uint16_t)w);
-    rebuildDashboard();
-    // The PAGE logs what it actually did, in commit(). Printing UI::grid()'s
-    // cols/rows/cellH here as well was worse than useless: those are the
-    // token's own geometric estimate against the whole screen, nothing reads
-    // them any more, and they disagreed with the real layout - "2x2 cells of
-    // 141x205" beside per-card lines saying the cell was 97 px tall.
-
-}
-
-void GUIManager::nudgeAspect(int8_t steps) {
-    int32_t a = (int32_t)UI::grid().ASPECT_PCT + steps * 5;
-    UI::setAspectPct((uint8_t)(a < 40 ? 40 : (a > 200 ? 200 : a)));
-    rebuildDashboard();
-    // The PAGE logs what it actually did, in commit(). Printing UI::grid()'s
-    // cols/rows/cellH here as well was worse than useless: those are the
-    // token's own geometric estimate against the whole screen, nothing reads
-    // them any more, and they disagreed with the real layout - "2x2 cells of
-    // 141x205" beside per-card lines saying the cell was 97 px tall.
-
+// Wraps through 0 = AUTO, so the button can always get back to the derived
+// layout. From auto the first press moves one step from what is on screen,
+// which is what makes it feel like a nudge rather than a jump.
+static uint8_t cycleCount(uint8_t current, uint8_t showing, int8_t steps, uint8_t maxN) {
+    int n = (current ? current : showing) + steps;
+    if (n > (int)maxN) return 0;      // past the top -> auto
+    if (n < 1)         return 0;      // past the bottom -> auto
+    return (uint8_t)n;
 }
 
 // The screen's own background. Called at start-up and again on every scheme
@@ -376,6 +361,36 @@ void GUIManager::nudgeAspect(int8_t steps) {
 void GUIManager::applyGround() {
     lv_obj_t *screen = lv_screen_active();
     if (screen) lv_obj_set_style_bg_color(screen, UI::c(UI::pal().GROUND), LV_PART_MAIN);
+}
+
+void GUIManager::cycleScheme() {
+    _scheme = (uint8_t)((_scheme + 1) % 4);
+    switch (_scheme) {
+        case 0:  UI::setScheme(UI_PAL_FLEET,    UI_MET_DARK);  break;
+        case 1:  UI::setScheme(UI_PAL_SLATE,    UI_MET_DARK);  break;
+        case 2:  UI::setScheme(UI_PAL_MIDNIGHT, UI_MET_DARK);  break;
+        default: UI::setScheme(UI_PAL_PAPER,    UI_MET_LIGHT); break;
+    }
+    applyGround();
+    _header.restyle();
+    _pnlSystem.setSchemeLabel(UI::pal().name);
+
+    // A rebuild rather than a restyle. Cards would survive restyleAll() - that
+    // is what "never cache a colour" buys - but a METRICS change moves radii
+    // and padding, which a card reads when it is built.
+    rebuildDashboard();
+}
+
+void GUIManager::openTokens() {
+    // THE DASHBOARD STANDS DOWN FIRST, exactly as it does for the card bench.
+    //
+    // ReferencePage builds a whole second screen. With the dashboard's cards
+    // still alive that is two full widget trees, and LVGL then fails to
+    // allocate the layer buffers it needs to composite - "No memory: 482x17",
+    // repeated, and on WS_P4_5 an unrecoverable board. The owner hit it by
+    // going into Tokens, changing scheme, and coming back.
+    destroyDashboard();
+    ReferencePage::show();
 }
 
 void GUIManager::cycleHeaderBar() {
@@ -422,36 +437,6 @@ void GUIManager::cycleHeaderBar() {
                   (unsigned)UIToolkit::systemHeaderH, (long)UIToolkit::systemHeaderPx());
 }
 
-void GUIManager::cycleScheme() {
-    _scheme = (uint8_t)((_scheme + 1) % 4);
-    switch (_scheme) {
-        case 0:  UI::setScheme(UI_PAL_FLEET,    UI_MET_DARK);  break;
-        case 1:  UI::setScheme(UI_PAL_SLATE,    UI_MET_DARK);  break;
-        case 2:  UI::setScheme(UI_PAL_MIDNIGHT, UI_MET_DARK);  break;
-        default: UI::setScheme(UI_PAL_PAPER,    UI_MET_LIGHT); break;
-    }
-    applyGround();
-    _header.restyle();
-    _pnlSystem.setSchemeLabel(UI::pal().name);
-
-    // A rebuild rather than a restyle. Cards would survive restyleAll() - that
-    // is what "never cache a colour" buys - but a METRICS change moves radii
-    // and padding, which a card reads when it is built.
-    rebuildDashboard();
-}
-
-void GUIManager::openTokens() {
-    // THE DASHBOARD STANDS DOWN FIRST, exactly as it does for the card bench.
-    //
-    // ReferencePage builds a whole second screen. With the dashboard's cards
-    // still alive that is two full widget trees, and LVGL then fails to
-    // allocate the layer buffers it needs to composite - "No memory: 482x17",
-    // repeated, and on WS_P4_5 an unrecoverable board. The owner hit it by
-    // going into Tokens, changing scheme, and coming back.
-    destroyDashboard();
-    ReferencePage::show();
-}
-
 void GUIManager::cycleHeader() {
     // A rebuild, not a restyle. A header bar is CREATED in Card::build() rather
     // than styled in restyle(), and that is correct - it is a structural choice
@@ -464,6 +449,29 @@ void GUIManager::cycleHeader() {
     Serial.printf("[Cards] header mode -> %s\n",
                   _hdr == CardHeaderStyle::HDR_TAG ? "tag"
                 : _hdr == CardHeaderStyle::HDR_BAR ? "bar" : "none");
+}
+
+void GUIManager::nudgeColumns(int8_t steps) {
+    _colsOverride = cycleCount(_colsOverride, (uint8_t)UI::grid().cols, steps, UI_MAX_COLS);
+    UI::setColumnsOverride(_colsOverride);
+    rebuildDashboard();
+
+    char lbl[12];
+    if (_colsOverride) snprintf(lbl, sizeof(lbl), "Col %u", (unsigned)_colsOverride);
+    else               snprintf(lbl, sizeof(lbl), "Col A");
+    _pnlSystem.setColsLabel(lbl);
+}
+
+void GUIManager::nudgeRows(int8_t steps) {
+    // The page is rebuilt from scratch on every change, so the override is
+    // held HERE and handed to each new page - a CardPage cannot remember it.
+    _rowsOverride = cycleCount(_rowsOverride, _page ? _page->cellRows() : 1, steps, UI_MAX_ROWS);
+    rebuildDashboard();
+
+    char lbl[12];
+    if (_rowsOverride) snprintf(lbl, sizeof(lbl), "Row %u", (unsigned)_rowsOverride);
+    else               snprintf(lbl, sizeof(lbl), "Row A");
+    _pnlSystem.setRowsLabel(lbl);
 }
 
 void GUIManager::toggleDeck() {
