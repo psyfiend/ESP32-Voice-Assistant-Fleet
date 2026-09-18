@@ -1,4 +1,4 @@
-# Handoff — 2026-09-18
+# Handoff — 2026-09-19
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This is where we are, what will bite you,
 and what to do next. Kept lean on purpose: anything that is "why we did X and not Y" now lives in
@@ -14,9 +14,13 @@ does not appear in the source as suspect.
 
 Phases 0, 1 and 2.1–2.4 are merged and tagged `v0.2.4`.
 
-**Milestone 2.5 is code-complete on `feat/2.5-page-grid-engine`, issue #16 is CLOSED, and the only
-thing between it and `v0.2.5` is an overnight soak.** All eight environments build; five boards are
-running it. The device boots into a dashboard rendered from a data table.
+**Milestone 2.5 is DONE — merged to `main` and tagged `v0.2.5` on 2026-09-19.** Issue #16 is
+closed. One page definition renders on five panels. The device boots into a dashboard built from a
+data table.
+
+**The single most urgent thing in the project is now connectivity — see the next section.** It is
+not a 2.5 problem and it did not arrive with 2.5; it is the oldest open fault here and it has
+graduated from "one board is annoying" to "four of five boards drop off overnight."
 
 ### Read in this order
 
@@ -74,38 +78,91 @@ fixed the pin test had never actually proved anything.
 
 ---
 
-## The state of the network, which is three separate faults
+## DO THIS FIRST: the fleet cannot stay online overnight (#49)
 
-Do not treat "MQTT keeps dropping" as one bug. It was three, and two are fixed.
+**Soak result, 2026-09-18 into 09-19.** Four of five boards were left running the same build.
 
-| | Status |
+| Board | Result |
 |---|---|
-| **Duplicate MQTT subscriptions** filling the table (16 rows of one topic) | **Fixed** — `addSub()` dedupes |
-| **A leaked TCP socket per reconnect** — the broker was reaping ghosts, hence `exceeded timeout` in its log | **Fixed** — `_client.disconnect()` on all three exits |
-| **Internal heap starvation**, twice: `LV_MEM_SIZE` 192 KB on P4, and `DOUBLE_BUFFERING` ignored on CYD_S3_3248 | **Fixed** — see `LESSONS.md` |
-| **#49: a board reports `STA_CONNECTED` with a frozen RSSI and is unpingable** | **OPEN, and not any of the above** |
+| `CYD_S3_3248`, `WS_S3_4B` | still receiving MQTT in the morning |
+| `WS_P4_7B` (on the older `v0.2.4.23`) | still receiving MQTT |
+| `WS_P4_4B` | **went unavailable after ~5-6 hours** |
+| `WS_P4_5` | **went unavailable after ~3-4 hours** |
 
-**#49 is the one that remains.** Confirmed on `WS_P4_5` with **75.9 KB of free heap**, so it is not
-a memory problem. Both boards that show it are P4, where WiFi runs over an ESP32-C6 co-processor on
-SDIO, and the P4_5's boot log carries:
+Every board still responds to touch, animates, and runs its UI. Nothing is frozen. **This is purely
+a network fault**, and it has now been seen on `WS_P4_5`, `WS_P4_4B` and `WS_P4_7B` — so it is not
+one board and not a 2.5 regression. `WS_S3_4B` is the only board never to have shown it.
+
+### What the serial says, and it is conclusive
+
+```
+[Mqtt] Disconnected from broker. state=-4 after 6080715 ms, heap 73548, wifi up
+[Mqtt:debug] connect failed raw=-2 -> broker unreachable      (x dozens, forever)
+```
+
+- **101 minutes of healthy session**, then a keepalive timeout.
+- **73 KB of free heap.** Not memory. All the memory faults fixed during 2.5 are genuinely fixed.
+- **`wifi up`** — but that is only `WiFi.status() == WL_CONNECTED`, which is exactly the value that
+  lies.
+- **`raw=-2` is `MQTT_CONNECT_FAILED`** — the TCP connect never completes. The broker is not
+  refusing anything; there is no path to it.
+- **Not one `[Conn]` line appears in the rest of the log.** The connectivity layer never notices,
+  never re-associates, never falls back to AP. It has nothing to react to, because the only thing
+  it polls still claims success.
+
+The owner's summary, and it is correct: *"the device never realizes that wifi has become
+disconnected. The MQTT reconnects are the obvious result of retrying when there is no network."*
+
+### Fix direction
+
+The shape of the fix is not in doubt; only the root cause is.
+
+1. **Stop treating `WiFi.status()` as proof of liveness.** It is the only thing
+   `ConnectivityManager` polls, and it is the thing that is wrong.
+2. **Let repeated MQTT failure count as evidence about the LINK**, not just the broker. We already
+   have a perfectly good liveness signal and we throw it away as somebody else's problem. This is
+   the cheapest change and it would have recovered every board overnight.
+3. **Add an active check** — ping or ARP the gateway on a slow timer while idle, and force a
+   re-association after N failures.
+4. **Let RSSI go stale like any other value.** The header glyph currently shows full bars from a
+   reading taken hours ago, which is the same class of lying diagnostic.
+
+### The lead worth chasing first
+
+Every P4 boot carries this, before anything else happens:
 
 ```
 E rpc_core: Response not received for [0x15e](Req_GetCoprocessorFwVersion)
 hostedHasUpdate(): Could not get slave firmware version: ESP_FAIL
 ```
 
-**That is the best lead there has been** — if the RPC link to the C6 is already unreliable at boot,
-"WiFi says connected but isn't" follows naturally, and it explains why `CYD_S3_3248` (native S3
-radio) has never shown it. Worth pulling #41 in as a possible cause. Fix direction in #49: stop
-treating `WiFi.status()` as proof of liveness, let repeated MQTT failure count as evidence about
-the *link*, and let RSSI go stale like any other value.
+On P4 boards WiFi is not native — it runs over an ESP32-C6 co-processor on SDIO (`esp_hosted`). If
+the RPC channel to that co-processor is already unreliable at boot, "the host believes it is
+associated while the radio is not" follows naturally, and it explains why the two S3 boards with
+native radios have fared best. **Pull #41 in as a possible cause** — "do NVS writes disrupt the
+esp-hosted SDIO transport on P4?" is exactly the right shape.
 
-**The diagnostic you will need is already there.** Disconnects print
-`state=-3 after 45983 ms, heap 5644, wifi up`; `-3` means the far end closed it, `-4` a timeout.
-`SystemCore::heapMark()` traces internal heap through startup, every dashboard rebuild and every
-MQTT reconnect.
+Caveat worth keeping: `WS_P4_7B` has also dropped, and the S3 boards have not been soaked as long.
+Do not over-fit to "P4 only" on a sample of one night.
 
----
+### The instruments are already in place
+
+- Disconnects print `state=`, how long the socket held, free heap and WiFi state.
+- `SystemCore::heapMark()` traces internal heap through startup, every dashboard rebuild and every
+  MQTT reconnect.
+- The broker's own log is the fastest route to the truth and settled the last fault in one step —
+  HA → Settings → Add-ons → Mosquitto → Log.
+
+### The three faults that ARE fixed
+
+Do not re-investigate these; they are separate and done. Full reasoning in `LESSONS.md`.
+
+| | |
+|---|---|
+| Duplicate MQTT subscriptions filling the table | `addSub()` dedupes by topic |
+| A leaked TCP socket per reconnect — the broker was reaping ghosts | `_client.disconnect()` on all three exits |
+| Internal heap starvation, twice — `LV_MEM_SIZE` 192 KB on P4, and `DOUBLE_BUFFERING` ignored on CYD_S3_3248 | both reverted/honoured |
+
 
 ## What is next, after 2.5
 
@@ -113,6 +170,9 @@ The running order was agreed on 2026-09-15 and it overrides the milestone number
 in `ROADMAP.md`; the short version is that **entity supply, not card features, is what limits this
 project.**
 
+0. **#49 — connectivity.** Not optional and not negotiable against the rest: a panel that leaves
+   Home Assistant every few hours is not a dashboard, and #43 puts MORE weight on the same link.
+   See the section above.
 1. **#43 — Home Assistant over the websocket.** Design-and-build, not research: the API has been
    measured against the owner's live instance. `docs/design/ha-websocket.md` has the numbers and
    one finding that changes the architecture (`subscribe_trigger`, never `subscribe_events`).
