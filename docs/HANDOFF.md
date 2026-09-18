@@ -41,28 +41,43 @@ different panels.
 
 ## Signing off 2.5
 
-**What is already confirmed on glass:** the dashboard as boot screen, the page built from
-`PageSpec`, priority degradation (CYD_S3_3248 drops its three `PRI_DEBUG` cards first, correctly),
-the row-count-from-cards rule, the Col/Row/Deck/Header/Scheme/Bar knobs, and the same page
-definition rendering on 1280×800, 1024×600 and 320×480 portrait.
+**Issue #16 is CLOSED** — confirmed on hardware 2026-09-18. Sub-grid units, explicit placement and
+the validator were all observed: "Obeys" lands at unit 2,2, "Ignores" is rejected at 40,0 and
+flowed to 1,1, and on the 4B boards with a column added Lamp 1 and Lamp 2 each span 3 units.
 
-**What has not been seen yet — both now instrumented in `Dashboard_Fleet.h`:**
+One `FLEET_PAGE` now renders on **five** panels — 1280x800, 1024x600, 720x720, 480x480 and 320x480
+portrait — with priority degradation trimming the small ones. The acceptance criterion asked for
+three.
 
-| Path | How to confirm |
-|---|---|
-| **Sub-grid units** | Lamp 1 and Lamp 2 are `prefSpanX = 3` — three units, i.e. **1.5 cells each**. Side by side they occupy exactly 3 cells. On a 2-column board (4 units) the second wraps via `minSpanX` |
-| **Explicit placement** | "Obeys" is pinned to unit `col 2, row 2` and must land there |
-| **The validator** | "Ignores" is pinned out of bounds at `col 40`. It must be **reported and then flowed**, never dropped. Look for `[pin rejected]` in the Log page and the `DBG_CARDS` line |
+**What remains before tagging `v0.2.5`: an overnight soak, and nothing else.**
 
-Boards flashed with this: `CYD_S3_3248` (COM10), `WS_P4_5` (COM15), `WS_S3_4B` (COM8).
-`WS_P4_4B` is built and unflashed. `WS_P4_7B` is on `v0.2.4.23`, in an enclosure that blocks a USB
-port — leave it alone (and note that is the argument for OTA, Phase 5).
+Every fault this week was time-dependent, so a milestone that has not survived a night has not been
+tested. Watch for: boards staying in Home Assistant, `[Mqtt] Disconnected` lines (which now carry
+`state=`, elapsed and heap), and `[Heap]` trending flat rather than down.
 
-**A span is in UNITS and does not rescale with the column count.** Three units is 1.5 cells on
-every board. Two such cards occupy three cells' worth of grid; add a column and they still occupy
-three of the now-four cells, each one narrower. That distinction caused confusion once already.
+Flashed and running this build: `CYD_S3_3248` (COM10), `WS_P4_5` (COM15), `WS_S3_4B` (COM8),
+`WS_P4_4B` (COM7). `WS_P4_7B` has a build waiting but is in an enclosure that blocks a USB port —
+which is the argument for OTA, Phase 5.
 
-Once confirmed: close #16, merge with `--no-ff`, tag `v0.2.5` on `main`.
+### Two things found at the very end, both fixed, one with a visible cost
+
+**`clip_corner` in `HDR_BAR` froze `WS_P4_5` on boot.** A 482 px two-cell card asked for a
+32,776-byte layer buffer out of the `lv_mem` pool and failed, with 80 KB of system heap still free.
+It only hit that board because **a layer is sized by the object's WIDTH**, and the P4_5 has the
+fleet's widest cells: 1280 px across only 5 columns gives 230 px cells, so its two-cell cards are
+the largest in the fleet. The other boards asked for smaller layers that fitted. It became fatal
+rather than occasional the moment `HDR_BAR` became the default header mode, because then every card
+wants one.
+
+**The cost, and it is visible:** the band no longer gets masked by the card's rounded corners, so
+its corners sit slightly outside them. Cosmetic, deliberate, and the honest price of not allocating
+a layer per card. **Resolve it properly with the slot rework at 2.8** — the band wants to be part
+of the card's own background rather than a child that has to be clipped.
+
+**A pin lost to the flow.** `pin 2,2 rejected (occupied)` where 2,2 was perfectly valid: an earlier
+card had flowed into it first. Placement is two passes now, pinned then flowed. Until this was
+fixed the pin test had never actually proved anything.
+
 
 ---
 
