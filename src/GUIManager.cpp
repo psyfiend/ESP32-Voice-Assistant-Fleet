@@ -4,6 +4,7 @@
 #include "SystemReport.h"
 #include "Cards/CardDemo.h"
 #include "UI/ReferencePage.h"
+#include "UI/LogPage.h"
 #include "Dashboards/Dashboard_Fleet.h"
 #include "bsp_loader.h"
 
@@ -161,6 +162,16 @@ void GUIManager::begin() {
     });
 
     _pnlSystem.setOnTokensRequested([this]() { openTokens();  });
+    _pnlSystem.setOnLogRequested   ([this]() { openLog();     });
+
+    // The log page's own Dump button re-runs the report and redraws it in
+    // place. The panel keeps buffering while the page is open, so this is just
+    // "run it again and show me".
+    LogPage::setDumpHandler([this]() {
+        SystemReport::run(_core, true);
+        LogPage::refresh(_pnlSystem.logText());
+    });
+    LogPage::setCloseHandler([this]() { rebuildDashboard(); });
     _pnlSystem.setOnSchemeRequested([this]() { cycleScheme(); });
 
     // The grid knobs. The panel knows a button was pressed; what a column is
@@ -440,6 +451,13 @@ void GUIManager::cycleHeaderBar() {
     rebuildDashboard();
     Serial.printf("[UI] system header %u logical px -> %ld real\n",
                   (unsigned)UIToolkit::systemHeaderH, (long)UIToolkit::systemHeaderPx());
+}
+
+void GUIManager::openLog() {
+    // Dashboard down first, same as the bench and the token page - two full
+    // widget trees is what exhausts LVGL's layer buffers.
+    destroyDashboard();
+    LogPage::show(_pnlSystem.logText());
 }
 
 void GUIManager::cycleHeader() {

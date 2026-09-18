@@ -16,7 +16,6 @@ Panel_System::Panel_System() {
     _lbl_bar    = NULL;
     _lbl_cols   = NULL;
     _lbl_rows   = NULL;
-    txt_log     = NULL;
     lbl_stats   = NULL;
     _headerRef  = NULL;
     _expanded   = false;
@@ -213,6 +212,24 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_style_text_font      (lblRef, UIToolkit::Font_Button, 0);
     lv_obj_set_style_text_color     (lblRef, UI::c(UI::pal().TEXT), 0);
 
+    // Button: Log - the System Doctor's output, on its own page now.
+    lv_obj_t* btnLog = lv_button_create(_ui_actions);
+    lv_obj_set_height               (btnLog, UIToolkit::sc(32));
+    lv_obj_set_width                (btnLog, LV_SIZE_CONTENT);
+    lv_obj_set_flex_grow            (btnLog, 1);
+    lv_obj_add_event_cb             (btnLog, [](lv_event_t *e) {
+                                        Panel_System *self = (Panel_System *)lv_event_get_user_data(e);
+                                        if (self) self->requestLog();
+                                     }, LV_EVENT_CLICKED, this);
+    lv_obj_set_style_bg_color       (btnLog, UI::c(UI::pal().SURFACE_ALT), 0);
+    lv_obj_set_style_border_width   (btnLog, 1, 0);
+    lv_obj_set_style_border_color   (btnLog, UI::border(), 0);
+    lv_obj_t* lblLog = lv_label_create(btnLog);
+    lv_label_set_text               (lblLog, "Log");
+    lv_obj_center                   (lblLog);
+    lv_obj_set_style_text_font      (lblLog, UIToolkit::Font_Button, 0);
+    lv_obj_set_style_text_color     (lblLog, UI::c(UI::pal().TEXT), 0);
+
     // Button: Cards - opens the 2.4 card demo as its own screen.
     //
     // Same shape as Tokens above and for the same reason: the dashboard
@@ -312,28 +329,13 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     _lbl_bar = lv_obj_get_child(btnBar, 0);
 
     // -- ROW 3: Log Container --
-    lv_obj_t* log_box = lv_obj_create(_ui_content);
-    lv_obj_set_width                (log_box, lv_pct(100));
-    
-    // FLEX GROW: Take all remaining space!
-    lv_obj_set_flex_grow            (log_box, 1); 
-    
-    lv_obj_set_style_bg_color       (log_box, UI::c(UI::pal().GROUND), 0);
-    lv_obj_set_style_pad_all        (log_box, UIToolkit::sc(8), 0);
-    lv_obj_set_style_radius         (log_box, UIToolkit::sc(4), 0);
-    lv_obj_set_scrollbar_mode       (log_box, LV_SCROLLBAR_MODE_AUTO); // Enable scrolling here
-    
-    txt_log = lv_label_create       (log_box);
-    lv_obj_set_width                (txt_log, lv_pct(100));
-    lv_label_set_long_mode          (txt_log, LV_LABEL_LONG_WRAP);
-    lv_label_set_text               (txt_log, "> Init...");
-    lv_obj_set_style_text_color     (txt_log, UI::c(UI::pal().TEXT), 0); 
-    
-    if(UIToolkit::Font_Caption) {
-        lv_obj_set_style_text_font  (txt_log, UIToolkit::Font_Caption, 0);
-    } else {
-        lv_obj_set_style_text_font  (txt_log, &lv_font_montserrat_14, 0);
-    }
+    // THE LOG BOX IS GONE FROM THIS PANEL - see UI/LogPage.h.
+    //
+    // A scrollable child inside an accordion is re-laid-out and re-clipped on
+    // every frame of the height animation, which is why this panel has always
+    // been choppy while the deck Audio/Display panels - same animation, no
+    // nested scroller - are smooth. The report now lives on its own screen,
+    // reached by the "Log" button, and this panel is a plain box again.
 
     _ui_timer = lv_timer_create     (_ui_timer_cb, 50, this); // 50ms for faster log flushing
 }
@@ -399,28 +401,21 @@ void Panel_System::_ui_timer_cb(lv_timer_t* timer) {
 void Panel_System::_tick() {
     // Process LOG Queue
     if (_log_dirty) {
-        // Process up to 5 messages per tick to keep UI responsive
+        // Drained into a STRING, not into a label. No LVGL work happens here
+        // at all now, which is the point: this used to insert text into a
+        // widget five lines per tick whether or not anyone was looking at it.
         int processed = 0;
-        while(!_log_queue.empty() && processed < 5) {
-            std::string& msg = _log_queue.front();
-            
-            lv_label_ins_text   (txt_log, LV_LABEL_POS_LAST, "\n");
-            lv_label_ins_text   (txt_log, LV_LABEL_POS_LAST, msg.c_str());
-            
-            _log_queue.erase    (_log_queue.begin());
+        while (!_log_queue.empty() && processed < 5) {
+            _log_text += _log_queue.front();
+            _log_text += "\n";
+            _log_queue.erase(_log_queue.begin());
             processed++;
         }
 
-        // Clean up label if it gets too huge
-        const char* current_txt = lv_label_get_text(txt_log);
-        if (strlen(current_txt) > 4000) {
-             lv_label_set_text(txt_log, "Log Cleared (Buffer Full)...\n");
-        }
+        // Same 4 KB ceiling as before and for the same reason: this is a
+        // diagnostic tail, not a history.
+        if (_log_text.size() > 4000) _log_text = "(log trimmed)\n";
 
-        // Auto Scroll
-        lv_obj_t* parent = lv_obj_get_parent(txt_log);
-        lv_obj_scroll_to_y(parent, LV_COORD_MAX, LV_ANIM_ON);
-        
         if (_log_queue.empty()) _log_dirty = false;
     }
 

@@ -50,6 +50,24 @@ public:
     void requestScheme() { if (_onSchemeRequested) _onSchemeRequested(); }
     void setSchemeLabel(const char *text);
     void setBarLabel(const char *text);
+
+    // The accumulated report, as plain text. The panel BUFFERS the log; it no
+    // longer displays it - LogPage does. Keeping the buffer here means the
+    // boot-time dump is already waiting when the page is first opened.
+    const char *logText() const { return _log_text.c_str(); }
+
+    // What the "Log" button runs. Registered by GUIManager, which stands the
+    // dashboard down before the page opens.
+    using LogCallback = std::function<void()>;
+    void setOnLogRequested(LogCallback cb) { _onLogRequested = cb; }
+    void requestLog() { if (_onLogRequested) _onLogRequested(); }
+
+    // The accumulated report, as plain text. The panel BUFFERS the log; it no
+    // longer displays it - LogPage does. Keeping the buffer here means the
+    // boot-time dump is already waiting when the page is first opened.
+
+    // What the "Log" button runs. Registered by GUIManager, which stands the
+    // dashboard down before the page opens.
     void setColsLabel(const char *text);
     void setRowsLabel(const char *text);
 
@@ -109,7 +127,6 @@ private:
     lv_obj_t* _lbl_cols;
     lv_obj_t* _lbl_rows;
     
-    lv_obj_t* txt_log;     // The log text label
     lv_obj_t* lbl_stats;   // The stats header label
 
     Panel_Header* _headerRef;
@@ -126,11 +143,13 @@ private:
     
     // -- Safe Data Buffering --
     std::vector<std::string> _log_queue;
+    std::string              _log_text;   // what LogPage renders
     bool _log_dirty;
     DumpCallback  _onDumpRequested  = nullptr;
     CardsCallback _onCardsRequested = nullptr;
     GridCallback  _onGridAction     = nullptr;
     TokensCallback _onTokensRequested = nullptr;
+    LogCallback    _onLogRequested    = nullptr;
     SchemeCallback _onSchemeRequested = nullptr;
 
     // Sink registered with SystemReport in init(), so report lines land in this

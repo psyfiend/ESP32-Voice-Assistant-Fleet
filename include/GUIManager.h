@@ -67,6 +67,7 @@ public:
 
     // Open the design-token reference page, standing the dashboard down first.
     void openTokens();
+    void openLog();      // the System Doctor report, on its own screen
 
     // Cycle the SYSTEM header bar height: 50 -> 45 -> 40 -> 35 -> 30 -> none.
     //
