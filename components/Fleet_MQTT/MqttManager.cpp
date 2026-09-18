@@ -254,6 +254,12 @@ void MqttManager::onConnected() {
     resubscribeAll();
 
     _connectedAtMs = millis();
+    // Printed every reconnect. On CYD_S3_3248 free heap fell 7884 -> 4188 ->
+    // 3900 -> 2348 across four cycles, which is what turned a recoverable
+    // drop into a board that could not open a socket at all. If that trend
+    // continues with this line in place, the leak is in this path.
+    Serial.printf("[Heap] mqtt connect           %10lu free\n",
+                  (unsigned long)ESP.getFreeHeap());
     Serial.printf("[Mqtt] Online: %s:%u as \"%s\"\n",
                   _cfg.BROKER_HOST, (unsigned)_cfg.BROKER_PORT,
                   DeviceIdentity::deviceId());

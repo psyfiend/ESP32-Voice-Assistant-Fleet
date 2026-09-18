@@ -45,6 +45,7 @@ void GUIManager::begin() {
     // Styles, semantic fonts and the toast layer. Design system, not engine -
     // which is why it lives here and not in LVGL_Startup. This is the seam
     // milestone 2.2 lands on.
+    SystemCore::heapMark("before UI");
     UIToolkit::init();
 
     // The starting scheme. UITokens defaults to Fleet; the owner's pick is
@@ -210,6 +211,7 @@ void GUIManager::begin() {
     // moved to index 1 so the deck's panels expand over the cards rather than
     // pushing them - which is what the owner asked to see.
     buildDashboard();
+    SystemCore::heapMark("after dashboard");
 }
 
 // ---------------------------------------------------------------------------
@@ -333,6 +335,9 @@ void GUIManager::destroyDashboard() {
 void GUIManager::rebuildDashboard() {
     destroyDashboard();
     buildDashboard();
+    // A rebuild is the one thing that happens over and over on a running
+    // board. If internal heap trends down across these, the leak is here.
+    SystemCore::heapMark("after rebuild");
 }
 
 // ---------------------------------------------------------------------------

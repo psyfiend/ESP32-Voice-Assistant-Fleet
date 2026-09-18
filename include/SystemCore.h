@@ -26,6 +26,15 @@
 
 class SystemCore {
 public:
+    // Internal-heap checkpoint. Prints what is free and what the last step
+    // cost, so "where did the RAM go" is answered by the boot log instead of
+    // by bisecting. Internal heap is what the WiFi driver and LWIP allocate
+    // from, and on CYD_S3_3248 - the only QSPI board, so the only one whose
+    // LVGL buffers must ALSO be internal - it is the scarcest thing on the
+    // device. A board that boots with a few KB free cannot hold a socket, and
+    // nothing in the log used to say so.
+    static void heapMark(const char *stage);
+
     // Hardware, then the data layer. Returns false only when the display fails
     // to initialise - the one startup failure the previous code treated as
     // fatal. The caller decides what fatal means; SystemCore does not halt.
@@ -45,6 +54,7 @@ public:
 
 private:
     void printIdentity();
+
     void beginEntityStorage();
 
     DisplayManager      _display;

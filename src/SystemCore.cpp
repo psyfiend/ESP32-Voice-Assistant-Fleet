@@ -51,6 +51,22 @@ void SystemCore::printIdentity() {
     Serial.println("------------------------------");
 }
 
+void SystemCore::heapMark(const char *stage) {
+    static uint32_t last = 0;
+    const uint32_t now = ESP.getFreeHeap();
+    char a[32], d[32];
+    SystemReport::fmtBytes(now, a, sizeof(a));
+    if (last) {
+        const int32_t delta = (int32_t)now - (int32_t)last;
+        SystemReport::fmtBytes((uint32_t)(delta < 0 ? -delta : delta), d, sizeof(d));
+        Serial.printf("[Heap] %-22s %10s free  (%s%s)\n",
+                      stage, a, delta < 0 ? "-" : "+", d);
+    } else {
+        Serial.printf("[Heap] %-22s %10s free\n", stage, a);
+    }
+    last = now;
+}
+
 bool SystemCore::begin() {
     // --= 0. Identity =--
     printIdentity();
@@ -63,11 +79,13 @@ bool SystemCore::begin() {
     // DisplayManager's own call is now a no-op and that component stays usable
     // on its own.
     FleetI2C::begin(bsp_hw.SDA_PIN, bsp_hw.SCL_PIN);
+    heapMark("after I2C");
 
     // --= 2. Display =--
     // Must precede LVGL, which sizes its draw buffers from gfx->width() and
     // gfx->height().
     if (!_display.begin()) {
+    heapMark("after display");
         Serial.println("[Core] Display init FAILED.");
         return false;
     }
@@ -77,6 +95,7 @@ bool SystemCore::begin() {
     // have been driven already - hence after the display, not before it.
     #ifndef DEBUG_SKIP_TOUCH
     _touch.begin();
+    heapMark("after touch");
     #else
     Serial.println("[Core] DEBUG_SKIP_TOUCH: skipping touch.begin() entirely.");
     #endif
@@ -91,15 +110,18 @@ bool SystemCore::begin() {
     // Independent of the display. Sets the hostname before WiFi.mode(), an
     // ordering trap documented inside ConnectivityManager itself.
     _conn.begin();
+    heapMark("after wifi");
 
     // --= 6. Broker session =--
     // Needs the link object. Does nothing until it reports online, and stays
     // cleanly disabled when no MqttLocalSecrets.h is present.
     _mqtt.begin(&_conn);
+    heapMark("after mqtt");
 
     // --= 7. Registry storage =--
     // Must precede every provider.
     beginEntityStorage();
+    heapMark("after registry");
 
     // --= 8. Providers =--
     // All three need the registry; two of them also need the broker.
@@ -124,6 +146,8 @@ bool SystemCore::begin() {
     // commandValue() has never run on hardware. Registered last because
     // nothing else depends on it.
     _virtProv.begin(&_entities);
+
+    heapMark("core ready");
 
     return true;
 }
