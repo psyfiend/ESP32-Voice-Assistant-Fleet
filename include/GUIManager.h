@@ -104,12 +104,16 @@ private:
     // Whether the Audio/Display accordion deck is on the dashboard at all.
     // It costs a row of cards on every board, which is a real trade rather
     // than a preference - see buildDashboard().
-    bool          _showDeck = true;
+    bool          _showDeck = false;    // the cards get the height instead
 
     // Overrides PageSpec::headerDefault. The spec is const; this is the live
     // choice laid over it in buildDashboard().
-    CardHeaderStyle _hdr = CardHeaderStyle::HDR_TAG;
-    uint8_t         _scheme = 0;
+    // DEFAULTS CHOSEN ON THE GLASS, 2026-09-17. Every one of these is still a
+    // knob on the System panel, and every one of them becomes a stored setting
+    // at 4.1 - these are the values a fresh flash starts from, not decisions
+    // that have been closed.
+    CardHeaderStyle _hdr    = CardHeaderStyle::HDR_BAR;
+    uint8_t         _scheme = 1;            // Slate
     lv_obj_t       *_hiddenBarTap = nullptr;
     lv_obj_t     *_deck     = nullptr;
 

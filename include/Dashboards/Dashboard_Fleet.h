@@ -165,7 +165,7 @@ inline const PageSpec FLEET_PAGE = {
     // card looks like when nobody chose", not an elimination). HDR_TAG is what
     // the 2.4 bench defaulted to and the only mode that costs the card body
     // nothing, so it is the one to be talked out of rather than into.
-    .headerDefault = CardHeaderStyle::HDR_TAG,
+    .headerDefault = CardHeaderStyle::HDR_BAR,   // chosen on glass 2026-09-17
     .showArea      = true,
     .areaColor     = true,
 

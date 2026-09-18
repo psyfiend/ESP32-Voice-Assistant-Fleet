@@ -47,6 +47,11 @@ void GUIManager::begin() {
     // milestone 2.2 lands on.
     UIToolkit::init();
 
+    // The starting scheme. UITokens defaults to Fleet; the owner's pick is
+    // Slate, and applying it here rather than editing the token file keeps
+    // "which scheme ships" a GUIManager decision alongside the other defaults.
+    UI::setScheme(UI_PAL_SLATE, UI_MET_DARK);
+
     // --= ROOT SCREEN =--
     lv_obj_t *screen = lv_screen_active();
 
@@ -66,11 +71,17 @@ void GUIManager::begin() {
 
     // Bottom deck height = screen height - header height.
     int32_t header_h = UIToolkit::systemHeaderPx();
-    // The deck ENDS AT THE BOTTOM OF THE SCREEN. It used to be as tall as the
-    // whole display while starting below the header, so it overhung by exactly
-    // the header height and a bottom-aligned panel had that much of itself
-    // off-screen. Nothing should depend on where an invisible edge is.
-    int32_t deck_h   = lv_obj_get_height(screen) - header_h;
+    // The deck ends a FIXED distance below the screen, so that exactly one
+    // panel header shows however tall the system header is.
+    //
+    // It used to be as tall as the whole display while starting below the
+    // header, which meant its overhang WAS the header height - so the visible
+    // strip changed whenever the header did. That is what put a gap under the
+    // word AUDIO when the header went to 35. Making the deck stop at the
+    // screen edge fixed the gap and broke the effect instead: the panels
+    // became floating buttons with four rounded corners. Both wrong; this is
+    // the relationship they were each half of.
+    int32_t deck_h   = lv_obj_get_height(screen) - header_h + UIToolkit::deckOverhangPx();
 
     // --= LAYER 1: BOTTOM DECK =--
     // Contains the Audio/Display panels.
