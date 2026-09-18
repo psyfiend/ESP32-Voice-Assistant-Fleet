@@ -126,7 +126,11 @@ void MqttManager::loop() {
     // and note this is deliberately the ONLY thing MqttManager asks about the
     // link. It never learns whether it is WiFi, AP or Ethernet.
     if (!_link || !_link->isOnline()) {
-        if (_client.connected()) _client.disconnect();
+        // Unconditional, for the same reason as the drop path below: the guard
+        // that used to be here skips exactly the case that needs it, because a
+        // link that has gone away is precisely when connected() is already
+        // false and the socket is still held.
+        _client.disconnect();
         if (_state != MqttState::AUTH_STOPPED) setState(MqttState::NO_LINK);
         return;
     }
@@ -155,6 +159,32 @@ void MqttManager::loop() {
                       _client.state(), (unsigned long)heldMs,
                       (unsigned long)ESP.getFreeHeap(),
                       WiFi.status() == WL_CONNECTED ? "up" : "DOWN");
+        // RELEASE THE SOCKET. This is the bug, and the broker's own log is what
+        // named it: "Client fleet_cyd_s3_3248_98d510 [192.168.0.165:61323]
+        // disconnected: exceeded timeout."
+        //
+        // We noticed the session was gone, backed off, and reconnected - but
+        // never told the TCP client to let go. PubSubClient::connected() going
+        // false does not close anything; it only reports. So every cycle left
+        // a socket open and opened a NEW one, which is why the broker saw the
+        // source port climb - 61323, 61328, 61329 - and why each abandoned
+        // session sat there until ITS keepalive lapsed 45 seconds later. The
+        // broker was not rejecting us. It was timing out the ghosts we left
+        // behind, one every few minutes, while the device churned every five
+        // seconds.
+        //
+        // Two consequences, both observed: LWIP runs out of sockets and new
+        // connects start failing outright (raw=-2, raw=-4), and Home Assistant
+        // flaps because the availability topic keeps getting the Will from
+        // sessions that died minutes ago.
+        //
+        // disconnect() is called unconditionally rather than behind a
+        // connected() guard - the guard is exactly what would skip it here,
+        // since the whole reason we are in this branch is that connected() is
+        // already false. PubSubClient::disconnect() stops the underlying
+        // client either way.
+        _client.disconnect();
+
         escalate(now, MqttFailure::ENVIRONMENTAL);
         return;
     }
@@ -202,6 +232,13 @@ void MqttManager::attemptConnect(uint32_t now) {
     const int  raw = _client.state();
     const MqttFailure why = mqttClassify(raw);
     DBG_MQTT("connect failed raw=%d -> %s\n", raw, mqttFailureName(why));
+
+    // A FAILED connect can still leave a half-open socket: the TCP handshake
+    // may well have completed before the MQTT CONNECT was refused or timed
+    // out. Releasing it is what stops a run of failures from exhausting
+    // LWIP's socket table and turning a transient fault into a permanent one.
+    _client.disconnect();
+
     escalate(now, why);
 }
 
