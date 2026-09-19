@@ -393,3 +393,50 @@ the router's lease table, the HA device page and a ping all know things the firm
 
 This is the oldest rule in the project - "verify from outside the device" - and it keeps earning
 its place. When a device-side theory needs a fifth iteration, stop and ask something else.
+
+## A script that prints "ok" has not necessarily done anything
+
+2026-09-19, and this is the **reverse direction** of the backslash rule above — the one the
+`CLAUDE.md` section calls out and which still caught a session that had just written it.
+
+`lv_indev_wait_release()` was supposed to be added to the gesture handler. The script that added it
+matched on an anchor string containing `\n`. The heredoc ate one backslash, Python turned the rest
+into a real newline, the anchor no longer matched anything in the file, `str.replace()` replaced
+nothing, and the script printed its success message and exited 0.
+
+**Nothing failed. Nothing warned. The call was simply never there**, and three separate user-facing
+bugs were attributed to other causes for a day: a swipe's start acting as a tap, a drawer opening
+and instantly closing, and a swipe-up bringing back the deck *and* expanding a panel *and*
+squashing the grid.
+
+Two defences, and the second is the one that would have caught it:
+
+- Never put a backslash escape in text a script writes **or in the string it searches for**.
+- **Confirm the file changed.** `grep -c` for the thing you just added. A replace that matched
+  nothing and a replace that worked look identical from the outside, and only one of them leaves a
+  trace in the file.
+
+## Events do not reach the screen through a clickable child
+
+LVGL delivers an event to the object that was hit and stops there unless `LV_OBJ_FLAG_EVENT_BUBBLE`
+is set. A card is clickable, so a press that lands on one never reaches the screen.
+
+This was shipped with a comment claiming the bubbling existed - "on the SCREEN with EVENT_BUBBLE set
+on the things above it" - while nothing anywhere set it. The comment described the design; the code
+implemented half of it, and the uninitialised press origin `{0,0}` then read as "left half, top
+edge" for every gesture on the display.
+
+**A comment that describes a mechanism in another file is a claim, and claims get checked.** Name
+the file that holds the other half, so the pair can be found.
+
+## Release the touch BEFORE an action that rebuilds the screen
+
+LVGL delivers a gesture and then still delivers the press and click of the same finger.
+`lv_indev_wait_release()` exists for exactly this, and WHERE it is called matters as much as
+whether it is.
+
+Called after the action, a rebuild has already happened - so LVGL puts new objects under a finger
+it still considers pressed, and the press lands on whatever appeared there. That is how a swipe-up
+to reveal the deck also expanded the first panel that materialised under the fingertip.
+
+Release first. Then rebuild.
