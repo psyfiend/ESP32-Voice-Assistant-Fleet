@@ -35,9 +35,34 @@ GUIManager::GUIManager(SystemCore &core)
     s_self = this;
 }
 
+// THE ONE WAY TO OPEN OR CLOSE THE DRAWER. Both the header tap and the swipe
+// come through here, and that is the point.
+//
+// The drawer hangs off whatever bar is currently above it, and there are three
+// possibilities: a permanent header, a peeked one, or nothing. Getting that
+// offset right was originally done in the swipe handler alone - so tapping the
+// status icon while the header was peeked opened the drawer at y=0, behind the
+// bar, with its SYSTEM - DIAGNOSTICS title cut off. Two entry points, one of
+// which knew a rule the other did not.
+//
+// The duplication was the bug, so the fix is to have one entry point rather
+// than to teach the second one the same rule.
+void GUIManager::syncPanelOffset() {
+    int32_t top = 0;
+    if (!_headerHidden)      top = UIToolkit::sc(UI_HEADER_H);        // permanent bar
+    else if (_headerPeeking) top = UIToolkit::sc(UI_HEADER_PEEK_H);   // temporary one
+    // else: no bar at all, so the drawer starts at the top of the screen.
+    _pnlSystem.setTopOffset(top);
+}
+
+void GUIManager::toggleSystemPanel() {
+    syncPanelOffset();
+    _pnlSystem.toggle();
+}
+
 void GUIManager::headerIconClickCb(lv_event_t *e) {
     (void)e;
-    if (s_self) s_self->_pnlSystem.toggle();
+    if (s_self) s_self->toggleSystemPanel();
 }
 
 // ---------------------------------------------------------------------------
@@ -115,10 +140,10 @@ void GUIManager::unpeekHeader() {
     if (_peekTimer) { lv_timer_delete(_peekTimer); _peekTimer = nullptr; }
 
     // The drawer hung off the peeked bar while it was there; with it gone the
-    // bar's space goes back to the screen. Without this the NEXT open would
-    // start a header's height down with nothing above it - the same floating
-    // gap #50 existed to remove.
-    if (_headerHidden) _pnlSystem.setTopOffset(0);
+    // bar's space goes back to the screen. Through syncPanelOffset() rather
+    // than a second copy of the rule - see toggleSystemPanel() for what the
+    // duplication cost the first time.
+    syncPanelOffset();
 
     lv_obj_t *hdr = _header.getContainer();
     if (!hdr) return;
@@ -238,17 +263,8 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
             if (!UIToolkit::systemHeaderH && !s_self->_headerPeeking) {
                 s_self->peekHeader();
             } else {
-                // A peeked header is REAL ESTATE the drawer has to respect.
-                //
-                // With the bar hidden the drawer opens at y=0, which is right
-                // until a peek puts a header there - and then the drawer slid
-                // up behind it and its SYSTEM - DIAGNOSTICS title was cut off.
-                // While peeking, hang it off the peeked bar exactly as it
-                // hangs off a permanent one.
-                if (s_self->_headerPeeking) {
-                    s_self->_pnlSystem.setTopOffset(UIToolkit::sc(UI_HEADER_PEEK_H));
-                }
-                s_self->_pnlSystem.toggle();
+                // Through the one entry point, which owns the top offset.
+                s_self->toggleSystemPanel();
             }
         } else {
             // LEFT half: straight to the log. The owner's pick, and it is a
@@ -809,10 +825,11 @@ void GUIManager::toggleHeaderBar() {
         else               lv_obj_clear_flag(hdr, LV_OBJ_FLAG_HIDDEN);
     }
 
-    // The drawer hangs off the header, so it has to move with it - otherwise
-    // hiding the bar leaves the panel floating a header's height down the
-    // screen with nothing above it.
-    _pnlSystem.setTopOffset(_headerHidden ? 0 : UIToolkit::sc(UI_HEADER_H));
+    // The drawer hangs off the header, so it moves with it - otherwise hiding
+    // the bar leaves the panel floating a header's height down an empty
+    // screen. Needed here as well as on open, because the drawer may be open
+    // RIGHT NOW while this runs.
+    syncPanelOffset();
 
     _pnlSystem.setBarLabel(_headerHidden ? "Show Bar" : "Hide Bar");
     rebuildDashboard();

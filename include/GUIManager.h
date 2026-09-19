@@ -115,6 +115,12 @@ private:
     // so the status glyphs can be read; a second opens the drawer. Drawn over
     // the page on the top layer rather than rebuilt into it, so a glance never
     // re-plans the grid.
+    // Where the drawer hangs from, in ONE place. Three sites used to compute
+    // it and one of them did not know about a peeked header, which is how
+    // tapping the status icon opened the drawer behind the bar.
+    void syncPanelOffset();
+    void toggleSystemPanel();
+
     void peekHeader();
     void unpeekHeader();
 
