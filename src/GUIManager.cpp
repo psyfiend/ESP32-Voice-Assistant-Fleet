@@ -62,6 +62,67 @@ void GUIManager::headerIconClickCb(lv_event_t *e) {
 // still takes its click. The dashboard page does not scroll by design, so the
 // gesture reaches here.
 // ---------------------------------------------------------------------------
+// Bring a hidden header back for a few seconds.
+//
+// Deliberately NOT a rebuild. cycleHeaderBar() rebuilds the dashboard because
+// it changes how much room the cards get; a peek must not, or the grid would
+// re-plan and the cards would jump every time somebody glanced at the clock.
+// The bar is drawn on the TOP layer over the page instead, which is also what
+// makes it retract without disturbing anything.
+void GUIManager::peekHeader() {
+    lv_obj_t *hdr = _header.getContainer();
+    if (!hdr) return;
+
+    _headerPeeking = true;
+    lv_obj_set_height(hdr, UIToolkit::sc(UI_HEADER_PEEK_H));
+    lv_obj_clear_flag(hdr, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(hdr);
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, hdr);
+    lv_anim_set_values(&a, -UIToolkit::sc(UI_HEADER_PEEK_H), 0);
+    lv_anim_set_duration(&a, 220);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_set_exec_cb(&a, [](void *o, int32_t v) { lv_obj_set_y((lv_obj_t *)o, v); });
+    lv_anim_start(&a);
+
+    // Single-shot: LVGL deletes a timer whose repeat count runs out, so there
+    // is nothing to clean up if it fires, and unpeekHeader() kills it if the
+    // user acts first.
+    if (_peekTimer) lv_timer_delete(_peekTimer);
+    _peekTimer = lv_timer_create([](lv_timer_t *t) {
+        (void)t;
+        if (s_self) s_self->unpeekHeader();
+    }, UI_HEADER_PEEK_MS, nullptr);
+    lv_timer_set_repeat_count(_peekTimer, 1);
+
+    DBG_GESTURE("header peek for %d ms\n", (int)UI_HEADER_PEEK_MS);
+}
+
+void GUIManager::unpeekHeader() {
+    if (!_headerPeeking) return;
+    _headerPeeking = false;
+
+    if (_peekTimer) { lv_timer_delete(_peekTimer); _peekTimer = nullptr; }
+
+    lv_obj_t *hdr = _header.getContainer();
+    if (!hdr) return;
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, hdr);
+    lv_anim_set_values(&a, 0, -UIToolkit::sc(UI_HEADER_PEEK_H));
+    lv_anim_set_duration(&a, 220);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
+    lv_anim_set_exec_cb(&a, [](void *o, int32_t v) { lv_obj_set_y((lv_obj_t *)o, v); });
+    // Hide only once it has finished travelling, or it vanishes mid-slide.
+    lv_anim_set_completed_cb(&a, [](lv_anim_t *an) {
+        lv_obj_add_flag((lv_obj_t *)an->var, LV_OBJ_FLAG_HIDDEN);
+    });
+    lv_anim_start(&a);
+}
+
 void GUIManager::screenGestureCb(lv_event_t *e) {
     (void)e;
     if (!s_self) return;
@@ -79,12 +140,27 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
     switch (dir) {
     case LV_DIR_BOTTOM:                      // swipe DOWN
         if (rightHalf) {
-            // The same drawer the status icon opens, from the side of the
-            // screen that icon lives on - so the gesture and the tap agree
-            // about where the panel comes from.
-            s_self->_pnlSystem.toggle();
+            // RIGHT half: the system drawer - the side the status icon lives
+            // on, so the gesture and the tap agree about where it comes from.
+            //
+            // With the bar HIDDEN there is an extra step first. The owner's
+            // rule: one swipe brings the header back for three seconds so the
+            // status glyphs can be read without committing to anything; a
+            // second swipe while it is showing opens the drawer. That makes
+            // "what is my signal" a cheaper question than "let me change
+            // something", which is the right way round for a wall panel.
+            if (!UIToolkit::systemHeaderH && !s_self->_headerPeeking) {
+                s_self->peekHeader();
+            } else {
+                s_self->_pnlSystem.toggle();
+            }
         } else {
-            DBG_GESTURE("swipe down, left half - nothing bound yet\n");
+            // LEFT half: straight to the log. The owner's pick, and it is a
+            // good one - the log was two taps deep behind a drawer whose only
+            // other use is changing settings, so reading it always meant
+            // opening something you did not want to touch.
+            DBG_GESTURE("swipe down, left half -> log\n");
+            s_self->openLog();
         }
         break;
 
@@ -159,6 +235,29 @@ void GUIManager::begin() {
     // Swipe navigation, milestone 2.6 first cut. On the screen, not an
     // overlay - see screenGestureCb() for why that distinction matters.
     lv_obj_add_event_cb(screen, screenGestureCb, LV_EVENT_GESTURE, NULL);
+
+    // TAP ANYWHERE ELSE TO DISMISS, which is the rule the deck already uses.
+    //
+    // The owner: "The deck panels were wired such that tapping to open any one
+    // of them would close any other open panels. This rule should be applied
+    // here." So an open drawer, or a peeking header, closes on a tap that is
+    // not on the drawer itself.
+    //
+    // On the SCREEN and on LV_EVENT_CLICKED, which means a tap that landed on
+    // a card never reaches here - LVGL delivers the click to the card and
+    // stops. That is the behaviour we want and it is why this does not need a
+    // hit-test against the panel's rectangle: a tap inside the drawer hits one
+    // of the drawer's own children instead.
+    // Explicit rather than relying on lv_obj's default flags: everything above
+    // depends on the screen being the thing that finally catches a stray tap,
+    // and a default is a poor place to rest that.
+    lv_obj_add_flag(screen, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(screen, [](lv_event_t *ev) {
+        (void)ev;
+        if (!s_self) return;
+        if (s_self->_headerPeeking)          s_self->unpeekHeader();
+        else if (s_self->_pnlSystem.isExpanded()) s_self->_pnlSystem.close();
+    }, LV_EVENT_CLICKED, NULL);
 
     // HOW FAR A SWIPE HAS TO TRAVEL, in real millimetres rather than pixels.
     //

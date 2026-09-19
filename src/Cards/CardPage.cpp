@@ -43,6 +43,19 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, uint8_t subdivision) 
     // So cards that do not fit are not placed at all, and WHICH ones is now
     // CardPlacement::priority's decision rather than declaration order's.
     lv_obj_clear_flag        (_root, LV_OBJ_FLAG_SCROLLABLE);
+    // NOT CLICKABLE either, so a tap on the gap between two cards falls
+    // through to the screen instead of stopping here.
+    //
+    // The cards are the interactive things; this is the grid they sit in, and
+    // it was absorbing every tap that missed one. That is invisible until
+    // something wants those taps - 2.6's "tap anywhere else to dismiss" is the
+    // first thing that does, and without this it would work on the header
+    // strip and the margins and nowhere else, which is the kind of half-broken
+    // that gets blamed on the gesture code.
+    //
+    // Gestures are unaffected: LV_OBJ_FLAG_GESTURE_BUBBLE is on by default, so
+    // a swipe still reaches the screen either way.
+    lv_obj_clear_flag        (_root, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_scrollbar_mode(_root, LV_SCROLLBAR_MODE_OFF);
 
     // --- The unit grid ----------------------------------------------------

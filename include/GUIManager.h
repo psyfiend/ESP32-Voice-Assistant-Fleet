@@ -110,6 +110,19 @@ private:
     // still wins its own drag - see the definition.
     static void screenGestureCb(lv_event_t *e);
 
+    // The hidden-header peek (2.6). One swipe shows the bar for a few seconds
+    // so the status glyphs can be read; a second opens the drawer. Drawn over
+    // the page on the top layer rather than rebuilt into it, so a glance never
+    // re-plans the grid.
+    void peekHeader();
+    void unpeekHeader();
+
+    // How tall a peeking header is, and how long it stays. The height is its
+    // own constant rather than systemHeaderH because that is 0 in this mode -
+    // "hidden" is exactly the state we are temporarily undoing.
+    static constexpr uint8_t  UI_HEADER_PEEK_H  = 35;      // logical px
+    static constexpr uint32_t UI_HEADER_PEEK_MS = 3000;    // the owner's 3 seconds
+
     SystemCore   &_core;
 
     // The one registry-to-UI pump for the whole device. Owned here rather than
@@ -175,6 +188,8 @@ private:
     uint8_t         _rowsOverride = 0;      // 0 = let the cards decide
 #endif
     lv_obj_t       *_hiddenBarTap = nullptr;
+    bool            _headerPeeking = false;
+    lv_timer_t     *_peekTimer     = nullptr;
     lv_obj_t     *_deck     = nullptr;
 
     Panel_Header  _header;
