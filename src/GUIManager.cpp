@@ -15,6 +15,16 @@
 // with user_data, which LVGL does support for lv_event_cb.
 static GUIManager *s_self = nullptr;
 
+// Per the repo's debug-flag convention (CLAUDE.md): a diagnostic worth keeping
+// rather than deleting, off unless an environment asks for it. Gesture work is
+// exactly the kind that needs "did the swipe even arrive" answered before
+// anything else, and the answer is invisible without this.
+#ifdef DEBUG_GESTURE
+    #define DBG_GESTURE(...) Serial.printf("[Gesture:debug] " __VA_ARGS__)
+#else
+    #define DBG_GESTURE(...) do {} while (0)
+#endif
+
 GUIManager::GUIManager(SystemCore &core)
     : _core(core)
     , _pnlDisplay(core.display(), core.touch())
@@ -28,6 +38,72 @@ GUIManager::GUIManager(SystemCore &core)
 void GUIManager::headerIconClickCb(lv_event_t *e) {
     (void)e;
     if (s_self) s_self->_pnlSystem.toggle();
+}
+
+// ---------------------------------------------------------------------------
+// Swipe navigation - a FIRST CUT for milestone 2.6, and deliberately small.
+//
+// The owner's brief, 2026-09-19: swipe down from the top to open the system
+// panel, swipe up from the bottom to show the deck, and "maybe a swipe
+// downward on the right half of the screen can open the system panel, and
+// swipe downward on the left side can pull down something else?"
+//
+// What is built here is the part that is decided. The left half is WIRED AND
+// EMPTY on purpose - it logs and does nothing, because what belongs there is
+// an open question and guessing at it overnight would produce a gesture the
+// owner has to undo rather than react to. Same for the auto-hiding header: it
+// needs a reveal, a timeout and a second-swipe rule, none of which are settled.
+//
+// WHY THE SCREEN AND NOT AN OVERLAY. An invisible full-screen catcher on
+// lv_layer_top() would see every swipe - and eat every tap underneath it,
+// which is how the touch visualiser broke before it was moved (see
+// dashboard.md section 5). LVGL sends LV_EVENT_GESTURE to the screen only when
+// no child consumed the drag, so a scrollable child still scrolls and a card
+// still takes its click. The dashboard page does not scroll by design, so the
+// gesture reaches here.
+// ---------------------------------------------------------------------------
+void GUIManager::screenGestureCb(lv_event_t *e) {
+    (void)e;
+    if (!s_self) return;
+
+    lv_indev_t *indev = lv_indev_active();
+    if (!indev) return;
+
+    const lv_dir_t dir = lv_indev_get_gesture_dir(indev);
+
+    lv_point_t p;
+    lv_indev_get_point(indev, &p);
+    const int32_t halfW = lv_obj_get_width(lv_screen_active()) / 2;
+    const bool rightHalf = (p.x >= halfW);
+
+    switch (dir) {
+    case LV_DIR_BOTTOM:                      // swipe DOWN
+        if (rightHalf) {
+            // The same drawer the status icon opens, from the side of the
+            // screen that icon lives on - so the gesture and the tap agree
+            // about where the panel comes from.
+            s_self->_pnlSystem.toggle();
+        } else {
+            DBG_GESTURE("swipe down, left half - nothing bound yet\n");
+        }
+        break;
+
+    case LV_DIR_TOP:                         // swipe UP
+        // A swipe up closes the drawer before it touches the deck. With the
+        // panel open it is the obvious "put that away" gesture, and toggling
+        // the deck underneath an open panel would change something the user
+        // cannot see.
+        if (s_self->_pnlSystem.isExpanded()) s_self->_pnlSystem.close();
+        else                                 s_self->toggleDeck();
+        break;
+
+    default:
+        // Horizontal swipes belong to page navigation, which is the rest of
+        // 2.6 and does not exist yet. Left unclaimed rather than bound to
+        // something plausible.
+        DBG_GESTURE("gesture dir %d ignored\n", (int)dir);
+        break;
+    }
 }
 
 void GUIManager::closeSystemPanelCb() {
@@ -79,6 +155,31 @@ void GUIManager::begin() {
     // Header click -> toggle system panel
     _header.init(screen, bsp_hw.device_name, &_core.conn(), &_core.mqtt());
     lv_obj_add_event_cb(_header.getStatusIcon(), headerIconClickCb, LV_EVENT_CLICKED, NULL);
+
+    // Swipe navigation, milestone 2.6 first cut. On the screen, not an
+    // overlay - see screenGestureCb() for why that distinction matters.
+    lv_obj_add_event_cb(screen, screenGestureCb, LV_EVENT_GESTURE, NULL);
+
+    // HOW FAR A SWIPE HAS TO TRAVEL, in real millimetres rather than pixels.
+    //
+    // LVGL's default is 50 PHYSICAL pixels, which means a swipe is a different
+    // physical gesture on every board: 7.7 mm of finger travel on CYD_S3_3248
+    // at 165 PPI, but only 4.3 mm on WS_P4_5 at 294 PPI. That is backwards -
+    // the denser the panel, the twitchier the gesture - and it is the same
+    // mistake the type scale already fixed for fonts.
+    //
+    // sc() is exactly the right tool: 50 LOGICAL px is a constant ~7.5 mm on
+    // every panel in the fleet, which is a deliberate swipe and not a slipped
+    // finger. Set here rather than in LVGL_Startup because it is a gesture
+    // POLICY decision and belongs beside the handler that reads it.
+    // The setter is lv_indev_set_gesture_min_distance(), and it takes a
+    // uint8_t - so the value is CLAMPED. sc(50) is 87 on WS_P4_5, still inside
+    // the range, but a denser panel than anything in the fleet would wrap
+    // silently and make every stray finger a swipe.
+    if (lv_indev_t *indev = lv_indev_get_next(NULL)) {
+        const int32_t want = UIToolkit::sc(50);
+        lv_indev_set_gesture_min_distance(indev, (uint8_t)(want > 255 ? 255 : want));
+    }
 
     // Bottom deck height = screen height - header height.
     int32_t header_h = UIToolkit::systemHeaderPx();

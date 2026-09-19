@@ -106,6 +106,9 @@ private:
     static void headerIconClickCb(lv_event_t *e);
     static void closeSystemPanelCb();
     static void reportUiSection();   // [UI STATE] in the System Doctor
+    // Milestone 2.6, first cut. Registered on the SCREEN so a scrollable child
+    // still wins its own drag - see the definition.
+    static void screenGestureCb(lv_event_t *e);
 
     SystemCore   &_core;
 

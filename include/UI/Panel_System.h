@@ -124,6 +124,9 @@ public:
     
     // Returns the main wrapper (for parenting checks if needed)
     lv_obj_t* getContainer() { return _ui_root; }
+    // For the 2.6 swipe handler: a swipe up should put an open drawer away
+    // rather than toggle the deck behind it.
+    bool isExpanded() const { return _expanded; }
 
 private:
     // Measured, not guessed - see the definition. Const because opening the
