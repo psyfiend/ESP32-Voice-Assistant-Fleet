@@ -493,7 +493,8 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
         c->setHeaderStyle(cs.header == CARD_HDR_INHERIT
                           ? spec.headerDefault
                           : (CardHeaderStyle)cs.header);
-        c->setVariant(cs.variant);
+        c->setVariant(cs.variant == CardVariant::VAR_AUTO ? spec.variantDefault
+                                                          : cs.variant);
         c->setPlacement(cs.place);
         c->setTempUnit(cs.tempUnit == TempUnit::TEMP_INHERIT ? spec.tempUnit
                                                              : cs.tempUnit);

@@ -70,6 +70,9 @@ public:
     // dashboard down before the page opens.
     void setColsLabel(const char *text);
     void setRowsLabel(const char *text);
+    void setVariantLabel(const char *text);
+    void setFillLabel(const char *text);
+    void setAreaLabel(const char *text);
 
     // Fires the above. Public because a capture-less lv_event_cb lambda is a
     // free function, not a member, so it cannot reach a private field.
@@ -92,6 +95,13 @@ public:
         DECK_TOGGLE,               // the deck costs a row on every board
         HDR_CYCLE,                 // bar / tag / none, on the live dashboard
         BAR_CYCLE,                 // the SYSTEM header bar height
+        // Added with the #50 rework. All three drive statics that already
+        // existed on the card layer - Card::setShowAreaDefault(),
+        // StateCard::setFill() and the per-card variant - so these are new
+        // CONTROLS over settled behaviour rather than new behaviour.
+        VARIANT_CYCLE,             // auto / full / compact, overriding the measurement
+        FILL_CYCLE,                // how an active StateCard reads: fill or icon
+        AREA_TOGGLE,               // show the area on every card, or not
     };
     using GridCallback = std::function<void(GridAction)>;
     void setOnGridAction(GridCallback cb) { _onGridAction = cb; }
@@ -116,11 +126,33 @@ public:
     lv_obj_t* getContainer() { return _ui_root; }
 
 private:
+    // Measured, not guessed - see the definition. Const because opening the
+    // drawer must not be able to change what is in it.
+    int32_t contentHeight() const;
+
+    // Width thresholds, in LOGICAL pixels. Named rather than inline because
+    // they are a judgement about readable panel width and the only way to know
+    // they are right is to look at one. The fleet's logical widths cluster at
+    // 330 / 480 / 727-740 / 1024, so both sit in a wide gap.
+    static constexpr int32_t PANEL_WIDE_LOGICAL = 700;   // and up -> half width
+    static constexpr int32_t PANEL_MID_LOGICAL  = 400;   // and up -> three quarters
+
+public:
+
+private:
     // -- UI Objects --
     lv_obj_t* _ui_root;    // The Outer Wrapper (Animates Height, No Padding)
     lv_obj_t* _ui_content; // The Inner Container (Has Padding & Style, Auto Height)
-    lv_obj_t* _ui_actions; // Button Row
-    lv_obj_t* _ui_grid;    // Second button row - the 2.5 grid knobs
+    // Four button rows (issue #50). Splitting them is not decoration: eight
+    // flex-grown buttons on one row are each a finger-width too narrow on
+    // CYD_S3_3248, and the panel is now narrower on every board but that one.
+    lv_obj_t* _ui_actions; // row 1 - Log / Tokens / Cards
+    lv_obj_t* _ui_grid;    // row 2 - Col -/+, Row -/+
+    lv_obj_t* _ui_row3;    // row 3 - Deck / Compact / Theme
+    lv_obj_t* _ui_row4;    // row 4 - header mode / Fill / Area
+    lv_obj_t* _lbl_variant;
+    lv_obj_t* _lbl_fill;
+    lv_obj_t* _lbl_area;
     lv_obj_t* _lbl_hdr;    // label inside the header-mode button
     lv_obj_t* _lbl_scheme; // label inside the scheme button
     lv_obj_t* _lbl_bar;    // label inside the header-size button

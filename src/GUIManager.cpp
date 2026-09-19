@@ -194,6 +194,9 @@ void GUIManager::begin() {
             case Panel_System::GridAction::DECK_TOGGLE: toggleDeck();       break;
             case Panel_System::GridAction::HDR_CYCLE:   cycleHeader();     break;
             case Panel_System::GridAction::BAR_CYCLE:   cycleHeaderBar();  break;
+            case Panel_System::GridAction::VARIANT_CYCLE: cycleVariant();  break;
+            case Panel_System::GridAction::FILL_CYCLE:    cycleFill();     break;
+            case Panel_System::GridAction::AREA_TOGGLE:   toggleArea();    break;
         }
     });
 
@@ -319,7 +322,9 @@ void GUIManager::buildDashboard() {
     // and an assignment rather than any kind of mechanism - which is the point
     // of the spec being data.
     PageSpec page = FLEET_PAGE;
-    page.headerDefault = _hdr;
+    page.headerDefault  = _hdr;
+    page.variantDefault = _variant;
+    page.showArea       = _showArea;
     _page->applySpec(page, _core.entities());
 
     _pnlSystem.setHeaderLabel(_hdr == CardHeaderStyle::HDR_TAG  ? "Tag"
@@ -467,6 +472,51 @@ void GUIManager::openLog() {
     // widget trees is what exhausts LVGL's layer buffers.
     destroyDashboard();
     LogPage::show(_pnlSystem.logText());
+}
+
+// --- The three controls #50 added --------------------------------------
+//
+// All three drive statics that the card layer has had since 2.4 and that
+// nothing on the device could reach. They are new CONTROLS, not new behaviour,
+// which is why each is a handful of lines rather than a feature.
+
+void GUIManager::cycleVariant() {
+    // A rebuild, not a restyle, for the same reason cycleHeader() is: a card
+    // decides compact-vs-full in build() by measuring its cell, so overriding
+    // the decision means making it again.
+    _variant = (_variant == CardVariant::VAR_AUTO)   ? CardVariant::VAR_FULL
+             : (_variant == CardVariant::VAR_FULL)   ? CardVariant::VAR_COMPACT
+                                                     : CardVariant::VAR_AUTO;
+    rebuildDashboard();
+    const char *n = (_variant == CardVariant::VAR_AUTO) ? "Auto"
+                  : (_variant == CardVariant::VAR_FULL) ? "Full" : "Cmpct";
+    _pnlSystem.setVariantLabel(n);
+    Serial.printf("[Cards] variant override -> %s\n", n);
+}
+
+void GUIManager::cycleFill() {
+    _fill = (_fill == StateCardFill::FILL_SURFACE) ? StateCardFill::LIGHT_ICON
+                                                   : StateCardFill::FILL_SURFACE;
+    StateCard::setFill(_fill);
+    // Fill IS a live style - StateCard reads it in render() - so the binder's
+    // restyle is enough and a rebuild would be a waste of a page.
+    _binder.restyleAll();
+    const char *n = (_fill == StateCardFill::FILL_SURFACE) ? "Fill" : "Icon";
+    _pnlSystem.setFillLabel(n);
+    Serial.printf("[Cards] active state -> %s\n", n);
+}
+
+void GUIManager::toggleArea() {
+    _showArea = !_showArea;
+    // Through the PAGE SPEC rather than the card-layer static.
+    //
+    // PageSpec::showArea already existed and buildDashboard() now sets it from
+    // this flag, so the page stays the single description of itself. Calling
+    // Card::setShowAreaDefault() as well would give the same answer twice from
+    // two places, and they would disagree the first time a second page exists.
+    rebuildDashboard();
+    _pnlSystem.setAreaLabel(_showArea ? "Area" : "No Area");
+    Serial.printf("[Cards] show area -> %s\n", _showArea ? "on" : "off");
 }
 
 void GUIManager::cycleHeader() {

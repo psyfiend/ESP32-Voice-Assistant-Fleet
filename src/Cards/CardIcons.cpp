@@ -183,8 +183,71 @@ namespace {
 // turns conversion off entirely.
 TempUnit s_tempUnit = TempUnit::TEMP_F;
 
+DurationFormat s_durFormat = DurationFormat::DUR_AUTO;
+
 bool isTemperature(const EntityDescriptor &d) {
     return strcmp(d.deviceClass, "temperature") == 0;
+}
+
+// Keyed on device_class, exactly like isTemperature() above, and NOT on the
+// unit string. "s" is a perfectly good unit for something that is not a
+// duration, and device_class is the field whose whole job is to say what a
+// number means. sys_uptime already declares it.
+bool isDuration(const EntityDescriptor &d) {
+    return strcmp(d.deviceClass, "duration") == 0;
+}
+
+DurationFormat resolveDur(DurationFormat want) {
+    if (want == DurationFormat::DUR_INHERIT) want = s_durFormat;
+    if (want == DurationFormat::DUR_INHERIT) want = DurationFormat::DUR_AUTO;
+    return want;
+}
+
+// Seconds -> the chosen text. Returns false when the caller should fall
+// through to ordinary number formatting.
+//
+// Takes SECONDS, not milliseconds. The issue's title said milliseconds and the
+// entity has always been seconds - SystemProvider writes nowMs / 1000 and a
+// System Doctor dump reads "sys_uptime = 598 s". Dividing again here would
+// show an uptime a thousand times short, which looks plausible and is the
+// reason this comment exists.
+bool formatDuration(int32_t secs, DurationFormat want, char *out, size_t cap) {
+    if (secs < 0) return false;                      // not a duration we can draw
+
+    const uint32_t s = (uint32_t)secs;
+    const uint32_t days = s / 86400u;
+    const uint32_t hrs  = (s % 86400u) / 3600u;
+    const uint32_t mins = (s % 3600u) / 60u;
+    const uint32_t secr = s % 60u;
+
+    switch (resolveDur(want)) {
+        case DurationFormat::DUR_SECONDS:
+            return false;                            // caller prints the raw number
+
+        case DurationFormat::DUR_CLOCK:
+            // Hours accumulate rather than wrapping at 24 - a panel up for
+            // three weeks says 504:00:00, which is wide and true.
+            snprintf(out, cap, "%lu:%02lu:%02lu",
+                     (unsigned long)(days * 24u + hrs),
+                     (unsigned long)mins, (unsigned long)secr);
+            return true;
+
+        case DurationFormat::DUR_AUTO:
+        default:
+            // Seconds are dropped past the first day on purpose. Nobody reads
+            // the seconds digit of a three-week uptime, and dropping it is
+            // what keeps the widest case from being the one that overflows the
+            // card it has to sit in.
+            if (days)      snprintf(out, cap, "%lud %02lu:%02lu",
+                                    (unsigned long)days, (unsigned long)hrs,
+                                    (unsigned long)mins);
+            else if (hrs)  snprintf(out, cap, "%lu:%02lu:%02lu",
+                                    (unsigned long)hrs, (unsigned long)mins,
+                                    (unsigned long)secr);
+            else           snprintf(out, cap, "%02lu:%02lu",
+                                    (unsigned long)mins, (unsigned long)secr);
+            return true;
+    }
 }
 
 // Which unit an entity's own string means. The degree sign is two UTF-8 bytes,
@@ -244,8 +307,18 @@ int32_t cardGlyphTopBearing(const lv_font_t *font, const char *utf8) {
 void     cardSetTempUnit(TempUnit u) { s_tempUnit = u; }
 TempUnit cardTempUnit()              { return s_tempUnit; }
 
+void           cardSetDurationFormat(DurationFormat f) { s_durFormat = f; }
+DurationFormat cardDurationFormat()                    { return s_durFormat; }
+
 const char *cardDisplayUnit(const Entity &e, TempUnit want) {
     if (!e.desc.unit[0]) return "";
+
+    // A formatted duration carries its own units inside the text - "4:15:33"
+    // followed by "s" would be a caption that lies, which is the same rule
+    // that sends temperature through this function rather than desc.unit.
+    if (isDuration(e.desc) && resolveDur(DurationFormat::DUR_INHERIT)
+                              != DurationFormat::DUR_SECONDS) return "";
+
     if (!isTemperature(e.desc)) return e.desc.unit;
 
     const char src = sourceTempLetter(e.desc);
@@ -282,6 +355,14 @@ void cardFormatValue(const Entity &e, char *out, size_t cap, bool withUnit, Temp
     // answer and renders as a tofu box in stock Montserrat, so this is two
     // ASCII hyphens on purpose - see CardIcons.h.
     if (!e.everSet) { snprintf(out, cap, "--"); return; }
+
+    // A duration is text, not a number with a unit, so it resolves before the
+    // numeric paths below and returns straight out. DUR_SECONDS declines,
+    // which falls through and prints the raw count exactly as before.
+    if (isDuration(e.desc) && e.value.type == ValueType::INT &&
+        formatDuration(e.value.i, DurationFormat::DUR_INHERIT, out, cap)) {
+        return;
+    }
 
     const char *unit = withUnit ? cardDisplayUnit(e, want) : "";
 

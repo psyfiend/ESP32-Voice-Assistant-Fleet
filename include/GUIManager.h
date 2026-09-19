@@ -22,6 +22,7 @@
 #include "SystemCore.h"
 #include "Cards/CardBinder.h"
 #include "Cards/CardPage.h"
+#include "Cards/StateCard.h"   // StateCardFill, for the #50 Fill control
 #include "UI/Panel_Header.h"
 #include "UI/Panel_Display.h"
 #include "UI/Panel_System.h"
@@ -85,6 +86,12 @@ public:
     // simplest form of the owner's swipe-down-to-reveal idea, and a footgun
     // guard rather than a feature.
     void cycleHeaderBar();
+
+    // The three controls #50 added. Each drives a card-layer static that has
+    // existed since 2.4 with nothing on the device able to reach it.
+    void cycleVariant();   // auto / full / compact - argue with the measurement
+    void cycleFill();      // how an active StateCard reads
+    void toggleArea();     // area on every card, or not
     bool deckShown() const { return _showDeck; }
 
     Panel_Header &header()      { return _header; }
@@ -125,6 +132,9 @@ private:
     // at 4.1 - these are the values a fresh flash starts from, not decisions
     // that have been closed.
     CardHeaderStyle _hdr    = CardHeaderStyle::HDR_BAR;
+    CardVariant     _variant = CardVariant::VAR_AUTO;   // derive, until told otherwise
+    StateCardFill   _fill    = StateCardFill::FILL_SURFACE;
+    bool            _showArea = true;
     uint8_t         _scheme = 1;            // Slate
 
     // PER-BOARD DEFAULT GRID, chosen on the glass by the owner.
