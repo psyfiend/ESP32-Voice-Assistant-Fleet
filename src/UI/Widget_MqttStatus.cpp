@@ -18,12 +18,14 @@ static const uint32_t COL_OFF   = 0x64748b;  // deliberately disabled
 
 static const uint32_t POLL_MS = 400;   // matched to the WiFi glyph
 
-// Nothing on any subscribed topic for this long, while connected, is STALE.
-// Generous on purpose: a quiet house genuinely produces long gaps, and a
-// false stale warning would train the owner to ignore the indicator. The
-// failure it is aimed at - a sensor that died while the broker stayed up -
-// lasts hours, so minutes of tolerance cost nothing.
-static const uint32_t STALE_AFTER_MS = 10UL * 60UL * 1000UL;
+// There is deliberately NO staleness constant here any more.
+//
+// There was one - a blanket ten minutes for the whole fleet - and it was wrong
+// within two hours of reaching hardware. Staleness is a property of the
+// SOURCE, not of the indicator: a mains-powered mmWave sensor and a quiet
+// battery door contact have nothing useful in common to threshold against.
+// EntityDescriptor::staleAfterMs already says it per entity and the cards
+// already honour it, so resolveLook() asks the registry instead.
 
 void Widget_MqttStatus::init(lv_obj_t *parent, MqttManager *mqtt, EntityRegistry *reg) {
     _mqtt = mqtt;
@@ -180,9 +182,8 @@ Widget_MqttStatus::Look Widget_MqttStatus::resolveLook() const {
     // late.
     if (!_reg) return Look::OK;
 
-    uint32_t now    = millis();
-    uint32_t newest = 0;
-    bool     anyExternal = false;
+    const uint32_t now = millis();
+    uint8_t live = 0, stale = 0;
 
     for (uint8_t i = 0; i < _reg->count(); i++) {
         const Entity *e = _reg->at(i);
@@ -191,19 +192,38 @@ Widget_MqttStatus::Look Widget_MqttStatus::resolveLook() const {
         // Our own telemetry is written locally every few seconds and would
         // report a healthy feed on a board receiving nothing at all.
         if (e->desc.source != EntitySource::MQTT && e->desc.source != EntitySource::HA) continue;
-        anyExternal = true;
-        if (e->everSet && e->lastUpdateMs > newest) newest = e->lastUpdateMs;
+        // Never heard from at all is not the same as gone quiet. There is no
+        // baseline to measure against, and Zigbee2MQTT does not retain state
+        // topics - so a quiet sensor legitimately says nothing for a long time
+        // after boot and must not be read as a fault.
+        if (!e->everSet) continue;
+
+        // ASK THE REGISTRY, do not invent a number.
+        //
+        // This used to compare the newest arrival against one blanket
+        // STALE_AFTER_MS for the whole fleet, and the owner caught it on glass
+        // within a couple of hours: two boards showed amber overnight simply
+        // because his outdoor Zigbee sensors are quiet, then went violet when
+        // one finally published. That is the indicator crying wolf, which
+        // trains you to ignore it - the precise failure the constant's own
+        // comment warned about.
+        //
+        // Every entity already carries a staleAfterMs chosen for how chatty
+        // that source actually is, and the cards grey out on exactly this
+        // call. The header must answer the same question the same way, or the
+        // glyph and the cards can disagree about the same feed.
+        if (_reg->isStale(*e, now)) stale++; else live++;
     }
 
-    // Nothing inbound is subscribed, so there is no feed to be stale. A board
-    // that only publishes is working exactly as configured.
-    if (!anyExternal) return Look::OK;
-    // Subscribed but nothing has ever arrived. Not stale - we have no baseline
-    // to call it stale against, and Zigbee2MQTT does not retain state topics,
-    // so a quiet sensor legitimately sends nothing for a long time after boot.
-    if (newest == 0) return Look::OK;
+    // Nothing inbound is subscribed, or nothing has ever arrived: there is no
+    // feed to be stale. A board that only publishes is working as configured.
+    if (live == 0 && stale == 0) return Look::OK;
 
-    return (now - newest > STALE_AFTER_MS) ? Look::STALE : Look::OK;
+    // STALE means the FEED is dead, not that one sensor is. A single stale
+    // entity is the card's job to show, and it shows it far better - in place,
+    // on the thing that is stale. The header glyph earns its space only by
+    // reporting something no card can: everything has gone quiet at once.
+    return (live == 0) ? Look::STALE : Look::OK;
 }
 
 void Widget_MqttStatus::applyVisual(Look look) {
