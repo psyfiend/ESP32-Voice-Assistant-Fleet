@@ -111,7 +111,7 @@ sends none at all. That keeps a 2.5 KB task stack out of internal RAM on `CYD_S3
 
 ## What is next
 
-0. **#59 — flash the C6 on `WS_P4_4B`.** Approved. Highest value experiment available.
+0. **SOAK the C6 result.** #59 is DONE on `WS_P4_4B`; whether it fixes the dropouts needs a night, with `WS_P4_5` and `WS_P4_7B` as untouched controls.
 1. **Finish verifying 2.6's swipes on glass**, then merge this branch.
 2. **#43 — Home Assistant over the websocket.** See the transport note below.
 3. **#44 — outbound commands.**
