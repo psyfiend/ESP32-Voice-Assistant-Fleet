@@ -159,6 +159,29 @@ internal. Static cost on that board: +120 bytes.
 `liblwip.a` and `lwip` is in `flags/ld_libs` for both `esp32p4_es` and `esp32s3` - the same check
 that found `esp_websocket_client` ABSENT during the #43 spike.
 
+### Hardware status, 2026-09-18
+
+| Board | Port | State |
+|---|---|---|
+| `CYD_S3_3248` | COM10 | flashed with the fix, booted, probe armed |
+| `WS_S3_4B` | COM8 | flashed with the fix, reachable from the LAN |
+| `WS_P4_5` | COM15 | **NOT flashed** - port held by Arduino IDE's serial monitor |
+
+**The probe is viable on this network**, which was the largest open unknown - the whole approach
+collapses if the gateway drops ICMP:
+
+    [Conn] Gateway 192.168.0.1 answers ICMP - liveness probe armed.
+
+`WS_S3_4B` is verified from off-device, not from serial: it is `ARDUINO_USB_CDC_ON_BOOT=1`, so its
+port is native USB CDC and discards output when no host is attached - the boot log is gone before a
+monitor can attach. Ping it instead.
+
+**`WS_P4_5` is the board that matters most** - fastest to fail, 3-4 hours - and is still on the
+pre-fix firmware. Free COM15 and reflash it before any soak means anything.
+
+Static cost on `CYD_S3_3248`, measured against `main`: **+168 bytes internal RAM, +8,456 flash**
+for the liveness layer and both status glyphs together.
+
 ### How to test it, and why the soak is second
 
 The owner can block a single board at the router, which turns a 3-6 hour wait into a two-minute
