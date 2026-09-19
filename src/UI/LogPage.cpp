@@ -42,10 +42,28 @@ void close() {
     if (s_onClose) s_onClose();
 }
 
+// Diagnostics for the Dump Config freeze, 2026-09-18. Enable with
+// -D DEBUG_LOGPAGE in an environment's build_flags.
+//
+// The report itself was ruled out by proving it completes - the closing
+// separator reaches the serial line - so the hang is in one of the two calls
+// below and this says which. Each print is flushed, because on a CDC board an
+// unflushed line is lost when the CPU stops and the last thing you see is not
+// the last thing that ran.
+#ifdef DEBUG_LOGPAGE
+    #define DBG_LOGPAGE(...) do { Serial.printf("[LogPage:debug] " __VA_ARGS__); \
+                                  if (Serial) Serial.flush(); } while (0)
+#else
+    #define DBG_LOGPAGE(...) do {} while (0)
+#endif
+
 void refresh(const char *text) {
     if (s_label && text) {
+        DBG_LOGPAGE("refresh: %u chars -> set_text\n", (unsigned)strlen(text));
         lv_label_set_text(s_label, text);
+        DBG_LOGPAGE("refresh: set_text returned -> scroll\n");
         lv_obj_scroll_to_y(lv_obj_get_parent(s_label), LV_COORD_MAX, LV_ANIM_OFF);
+        DBG_LOGPAGE("refresh: done\n");
     }
 }
 

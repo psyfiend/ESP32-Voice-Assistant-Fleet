@@ -11,6 +11,14 @@
 // reads from it; it never brings anything up.
 //
 #include <lvgl.h>
+// Pulls in the active board's identity macro (WS_P4_5, CYD_S3_3248, ...),
+// which the per-board default grid below branches on. Included HERE rather
+// than relied upon from the .cpp on purpose: GUIManager.cpp includes
+// "GUIManager.h" first and "bsp_loader.h" eight lines later, so a board macro
+// tested in this header would be undefined at the point it is tested, quietly
+// take the fallback branch, and compile without a word. Same reason
+// ConnectivityDefaults.h includes it directly.
+#include "bsp_loader.h"
 #include "SystemCore.h"
 #include "Cards/CardBinder.h"
 #include "Cards/CardPage.h"
@@ -118,8 +126,41 @@ private:
     // that have been closed.
     CardHeaderStyle _hdr    = CardHeaderStyle::HDR_BAR;
     uint8_t         _scheme = 1;            // Slate
+
+    // PER-BOARD DEFAULT GRID, chosen on the glass by the owner.
+    //
+    // A board should boot into ITS layout rather than into whatever the
+    // derivation happens to produce - ROADMAP section 7 records the picks and
+    // notes they belong in the flashed image. These are that, and the Col/Row
+    // buttons remain the override.
+    //
+    // They are EXACT COUNTS, not hints, and that is deliberate. TARGET_CARD_W
+    // decides columns by derivation, which is the right default but is not a
+    // user interface: `docs/LESSONS.md` records the session where the Col/Row
+    // knobs nudged TARGET_CARD_W and ASPECT_PCT and hoped, and on
+    // CYD_S3_3248 no aspect value could ever subtract a row. "When a user
+    // wants to say three columns, let them say three columns" - so a default
+    // says it the same way a knob does, through COLS_OVERRIDE and
+    // CardPage::setRowsOverride().
+    //
+    // Same #ifdef-on-the-board-identity-macro pattern as
+    // ConnectivityDefaults.h and UITokens.cpp's TARGET_CARD_W. No new
+    // machinery, and 0 still means "derive it".
+    //
+    // Set 2026-09-18 for the boards the owner named. The remaining picks in
+    // ROADMAP section 7 (CYD_S3_3248 2x4, WS_P4_7B and CYD_P4_1060 6x3) are
+    // NOT applied here yet - he asked for these two and guessing the rest
+    // would put numbers on boards nobody has looked at since.
+#if   defined(WS_P4_5)
+    uint8_t         _colsOverride = 5;
+    uint8_t         _rowsOverride = 3;
+#elif defined(WS_P4_4B) || defined(WS_S3_4B)
+    uint8_t         _colsOverride = 3;
+    uint8_t         _rowsOverride = 4;
+#else
     uint8_t         _colsOverride = 0;      // 0 = derive from TARGET_CARD_W
     uint8_t         _rowsOverride = 0;      // 0 = let the cards decide
+#endif
     lv_obj_t       *_hiddenBarTap = nullptr;
     lv_obj_t     *_deck     = nullptr;
 

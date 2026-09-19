@@ -82,6 +82,22 @@ uint32_t tick_get_cb(void) { return millis(); }
 void lv_log_print(lv_log_level_t level, const char *buf) {
     Serial.print("[LVGL] ");
     Serial.println(buf);
+
+    // FLUSH, because the most important message LVGL ever prints is the last
+    // one before it stops.
+    //
+    // LV_ASSERT_HANDLER is `while(1);` (see docs/LESSONS.md), and both
+    // LV_USE_ASSERT_NULL and LV_USE_ASSERT_MALLOC are on - so an allocation
+    // failure logs and then hangs the board forever. Six of eight boards are
+    // ARDUINO_USB_CDC_ON_BOOT=1, where Serial is a buffered USB endpoint:
+    // without this, that final message is still sitting in the buffer when the
+    // CPU stops, and the board looks like it froze in silence for no reason.
+    //
+    // That silence is exactly what made the 2026-09-18 CYD_S3_3248 Dump Config
+    // freeze look causeless. Guarded on `if (Serial)` for the same reason as
+    // the one in SystemReport::line(): on a CDC board, flushing with no host
+    // attached waits for a host that will never drain it.
+    if (Serial) Serial.flush();
 }
 #endif
 

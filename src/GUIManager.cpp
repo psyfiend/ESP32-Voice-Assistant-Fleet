@@ -63,6 +63,15 @@ void GUIManager::begin() {
     // the grid from bsp_display.WIDTH/HEIGHT would be wrong on every board
     // running at rotation 1 or 3.
     UI::begin(lv_obj_get_width(screen), lv_obj_get_height(screen));
+
+    // Apply the board's default column count, if it has one.
+    //
+    // Rows need no equivalent line - buildDashboard() already passes
+    // _rowsOverride to the page every time it builds - but columns live in the
+    // token layer and were only ever set from the Col button, so a default
+    // that nobody applied would be a number that did nothing.
+    if (_colsOverride) UI::setColumnsOverride(_colsOverride);
+
     applyGround();
     lv_obj_clear_flag        (screen, LV_OBJ_FLAG_SCROLLABLE);               // Disable global scrolling
 

@@ -105,24 +105,20 @@ inline const CardSpec FLEET_CARDS[] = {
         .place     = { .prefSpanX = U_2, .minSpanX = U_CELL,
                        .priority  = PRI_NORMAL },
     },
-    // --- ISSUE #16 ACCEPTANCE: SUB-GRID UNITS, on the glass ---------------
+    // Four plain lamps, one cell each.
     //
-    // THREE units each, which is ONE AND A HALF CELLS. Two of them side by
-    // side occupy exactly three cells. That is the whole point of Q3b's
-    // sub-grid and it has never been rendered - every card in the fleet has
-    // been a flat 2x2 units (one whole cell), so the subdivision was
-    // implemented, reasoned about, and never once exercised.
+    // Lamp 1 and Lamp 2 carried 3-unit spans (one and a half cells) through
+    // 2.5 as the only rendering of Q3b's sub-grid that had ever existed.
+    // Removed 2026-09-18 at the owner's request: the point was proved on three
+    // boards and a shipped page should not keep wearing its test fixture.
     //
-    // Note what the span is NOT: it is not "three cells" and it does not
-    // rescale when the column count changes. A unit is half a cell whatever
-    // the grid, so on a wider page these get narrower along with everything
-    // else and still measure 1.5 cells. minSpanX lets them fall back to a
-    // whole cell where 3 units will not fit - CYD_S3_3248 has only 4 units
-    // across, so the second one wraps rather than squeezing.
+    // The mechanism is untouched. A unit is still half a cell, `prefSpanX` and
+    // `minSpanX` are still ordinary fields, and "All Lamps" above still spans
+    // U_2 - so the sub-grid remains exercised by the group card on every boot.
     { .primaries = { VIRT_ENT_L1 }, .label = "Lamp 1", .area = "Kitchen",
-      .place = { .prefSpanX = 3, .minSpanX = U_CELL, .priority = PRI_NICE } },
+      .place = { .priority = PRI_NICE } },
     { .primaries = { VIRT_ENT_L2 }, .label = "Lamp 2", .area = "Kitchen",
-      .place = { .prefSpanX = 3, .minSpanX = U_CELL, .priority = PRI_NICE } },
+      .place = { .priority = PRI_NICE } },
     { .primaries = { VIRT_ENT_L3 }, .label = "Lamp 3", .area = "Lounge",
       .place = { .priority = PRI_NICE } },
     { .primaries = { VIRT_ENT_L4 }, .label = "Lamp 4", .area = "Lounge",
@@ -134,25 +130,26 @@ inline const CardSpec FLEET_CARDS[] = {
     // deliberately ignored, which is the only way the optimistic-write revert
     // and the FAILED treatment can be seen on a real board - nothing else in
     // the fleet is writable yet.
-    // --- ISSUE #16 ACCEPTANCE: EXPLICIT PLACEMENT AND THE VALIDATOR -------
+    // The #16 acceptance instrumentation is GONE, 2026-09-18, at the owner's
+    // request now that the milestone is signed off.
     //
-    // "Obeys" is PINNED to unit column 2, row 2 - the top-left corner of the
-    // second cell of the second row - and should land there regardless of
-    // what the flow was doing. Every board has at least that many units, so
-    // this is a valid pin everywhere.
+    // These two used to be pinned - one to a valid unit coordinate and one
+    // deliberately out of bounds - to prove that explicit placement worked and
+    // that an invalid pin was reported and then flowed rather than dropped.
+    // Both were observed on hardware; the labels were literally "Obeys" and
+    // "Ignores". Lamp 1 and Lamp 2 carried 3-unit spans for the same reason:
+    // to make the sub-grid visible at all.
     //
-    // "Ignores" is pinned OUT OF BOUNDS on purpose, at unit column 40 on a
-    // grid that has at most 16. It must be REPORTED and then flowed, never
-    // dropped: the card is still the one the author asked for and only its
-    // coordinate was wrong. Watch for "[pin rejected]" beside it in Dump
-    // Config, and the DBG_CARDS line naming the rejected coordinate.
-    //
-    // Both are deliberately left in the shipped page until #16 is signed off.
-    // They are the only demonstration that either code path has ever run.
-    { .primaries = { VIRT_ENT_SWITCH }, .label = "Obeys",   .area = "Office",
-      .place = { .priority = PRI_NICE, .col = 2, .row = 2 } },
-    { .primaries = { VIRT_ENT_STUCK },  .label = "Ignores", .area = "Office",
-      .place = { .priority = PRI_NICE, .col = 40, .row = 0 } },
+    // The demonstration is done, and a shipped page should look like a
+    // dashboard rather than like a test fixture. The code paths they exercised
+    // are unchanged and still reachable - `col`/`row` and `prefSpanX` remain
+    // ordinary fields any page may set - so nothing was removed but the
+    // evidence. The two switches stay because they are the only writable
+    // entities on the device, and they leave with #44.
+    { .primaries = { VIRT_ENT_SWITCH }, .label = "Switch", .area = "Office",
+      .place = { .priority = PRI_NICE } },
+    { .primaries = { VIRT_ENT_STUCK },  .label = "Stuck",  .area = "Office",
+      .place = { .priority = PRI_NICE } },
 
     // --- This panel -------------------------------------------------------
     //
