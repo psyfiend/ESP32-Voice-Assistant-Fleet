@@ -133,9 +133,14 @@ void GUIManager::unpeekHeader() {
 
 // Capture where a press began, for the edge gating above.
 //
-// On the SCREEN with EVENT_BUBBLE set on the things above it, so the origin is
-// recorded even when the press lands on a card - which is exactly the case
-// that matters, because a swipe that starts on a card is still a swipe.
+// On the SCREEN, which only works because Card::build() sets EVENT_BUBBLE on
+// its surface. That pairing is load-bearing and was broken once: this comment
+// claimed the bubbling existed before anything set it, so the origin never
+// updated from {0,0} - which reads as "left half, top edge" for every gesture
+// and made a downward swipe anywhere open the log page.
+//
+// If cards ever stop bubbling, this silently returns to that behaviour rather
+// than failing, so the two belong in the same thought.
 void GUIManager::screenPressCb(lv_event_t *e) {
     (void)e;
     if (!s_self) return;
