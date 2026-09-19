@@ -180,6 +180,26 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
     const bool fromTop    = (p.y <= band);
     const bool fromBottom = (p.y >= scrH - band);
 
+    // SWALLOW THE REST OF THIS TOUCH BEFORE ACTING ON IT.
+    //
+    // LVGL delivers a gesture AND still delivers the press/click of the same
+    // finger. Three separate faults were that one behaviour:
+    //
+    //   * "the location where I START swiping acts as a tap on whichever
+    //     button is underneath" - the button got a click it should not see.
+    //   * "the panel appears then retracts" - the gesture opened the drawer
+    //     and the click closed it again via tap-to-dismiss.
+    //   * swiping up with the deck hidden brought the deck back AND expanded
+    //     the DISPLAY panel AND squashed the grid - because toggleDeck()
+    //     rebuilds, and the still-live press then landed on a panel header
+    //     that had just appeared under the finger.
+    //
+    // BEFORE the switch, not after, and that ordering is the whole fix for the
+    // third one: an action that rebuilds the screen puts new objects under a
+    // finger LVGL still considers pressed, so the input has to be released
+    // first or the rebuild hands it a fresh target.
+    lv_indev_wait_release(indev);
+
     switch (dir) {
     case LV_DIR_BOTTOM:                      // swipe DOWN
         if (!fromTop) { DBG_GESTURE("down from y=%d, not the top band\n", (int)p.y); break; }
