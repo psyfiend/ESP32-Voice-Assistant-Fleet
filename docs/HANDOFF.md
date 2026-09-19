@@ -68,8 +68,17 @@ It also explains the detail that puzzled everyone: a failed board could not rais
 rescue access point either. If the host-to-C6 conversation is broken, every radio command fails —
 not just joining someone else's network.
 
-**#59 has the procedure, the pass/fail signal and the rollback.** The owner approved running it on
-`WS_P4_4B`. Leave `WS_P4_5` and `WS_P4_7B` as controls.
+**DONE on `WS_P4_4B`, 2026-09-19. The C6 was on older firmware; it is now on 2.12.9 and the boot
+warning is GONE** - on a board that printed it every boot for weeks. Procedure, evidence and
+rollback in #59.
+
+**Whether it fixes the dropouts is unproven.** They take 5-6 hours on that board, so only a soak
+answers it. `WS_P4_5` and `WS_P4_7B` are deliberately untouched as controls: if the 4B survives the
+night and they do not, that is as close to conclusive as this project gets. **That soak is the
+single most important thing to check next.**
+
+Note the update is a full-flash write and wiped NVS, so the 4B is running on the compile-time
+credentials and its `_proven` flag has reset.
 
 ### What the #49 branch actually built
 
