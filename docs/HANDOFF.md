@@ -1,4 +1,4 @@
-# Handoff — 2026-09-19
+# Handoff — 2026-09-18
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This is where we are, what will bite you,
 and what to do next. Kept lean on purpose: anything that is "why we did X and not Y" now lives in
@@ -14,7 +14,7 @@ does not appear in the source as suspect.
 
 Phases 0, 1 and 2.1–2.4 are merged and tagged `v0.2.4`.
 
-**Milestone 2.5 is DONE — merged to `main` and tagged `v0.2.5` on 2026-09-19.** Issue #16 is
+**Milestone 2.5 is DONE — merged to `main` and tagged `v0.2.5` on 2026-09-18.** Issue #16 is
 closed. One page definition renders on five panels. The device boots into a dashboard built from a
 data table.
 
@@ -78,7 +78,13 @@ fixed the pin test had never actually proved anything.
 
 ---
 
-## DO THIS FIRST: the fleet cannot stay online overnight (#49)
+## IN PROGRESS: the fleet cannot stay online overnight (#49)
+
+**Status 2026-09-18: a fix is written and flashed, and NOTHING about it is verified yet.** It is
+on `fix/49-link-liveness`, it builds on all three flashed boards, and it has not yet seen the
+fault. Read "What the fix does" below before touching it, and "How to test it" before believing
+it.
+
 
 **Soak result, 2026-09-18 into 09-19.** Four of five boards were left running the same build.
 
@@ -113,37 +119,94 @@ one board and not a 2.5 regression. `WS_S3_4B` is the only board never to have s
 The owner's summary, and it is correct: *"the device never realizes that wifi has become
 disconnected. The MQTT reconnects are the obvious result of retrying when there is no network."*
 
-### Fix direction
+### What the fix does (commit d11fb40, `fix/49-link-liveness`)
 
-The shape of the fix is not in doubt; only the root cause is.
+Recovery first, root cause second. A recovery layer works whatever the cause, and it instruments
+the board so the next soak ANSWERS the cause instead of us guessing at it a fifth time.
 
-1. **Stop treating `WiFi.status()` as proof of liveness.** It is the only thing
-   `ConnectivityManager` polls, and it is the thing that is wrong.
-2. **Let repeated MQTT failure count as evidence about the LINK**, not just the broker. We already
-   have a perfectly good liveness signal and we throw it away as somebody else's problem. This is
-   the cheapest change and it would have recovered every board overnight.
-3. **Add an active check** — ping or ARP the gateway on a slow timer while idle, and force a
-   re-association after N failures.
-4. **Let RSSI go stale like any other value.** The header glyph currently shows full bars from a
-   reading taken hours ago, which is the same class of lying diagnostic.
+Three layers, and the unifying rule is that **none of them asks the driver how it is doing.**
+`WiFi.status()` appears nowhere in any of them. Every signal is either a round trip that left the
+board, or a report from a layer above about something it could not reach.
 
-### The lead worth chasing first
+1. **RSSI is re-read on a timer and carries an age.** Past `RSSI_STALE_MS` the band is `NONE` and
+   the glyph stops claiming a strength. A read that returns 0 is logged, not stored - and on P4
+   that call is an RPC to the C6, so a FAILING read would itself be a liveness signal. Whether it
+   fails during the fault is unmeasured; the logging is there to find out.
+2. **`LinkHealth`** - a second axis beside `ConnState`, because one enum cannot express "the driver
+   says connected and it is wrong". Evidence: an ICMP gateway probe, plus MQTT's verdict relayed
+   down by `SystemCore`. `Fleet_MQTT` still knows nothing about what carries it (ROADMAP Q9); it
+   only exposes `consecutiveEnvFailures()` and `msSinceLastConnected()`, and `SystemCore` - which
+   owns both objects - is what joins them up.
+3. **A three-rung recovery ladder**: re-associate, cycle the radio, hand back to the state machine
+   so AP fallback and the normal retry path engage. That last rung is what was missing entirely.
 
-Every P4 boot carries this, before anything else happens:
+**Two guards matter more than the feature itself, and must not be removed casually:**
 
-```
-E rpc_core: Response not received for [0x15e](Req_GetCoprocessorFwVersion)
-hostedHasUpdate(): Could not get slave firmware version: ESP_FAIL
-```
+- **A probe that has NEVER been answered is not evidence.** Plenty of routers drop ICMP by policy.
+  Without this guard the fix would be far worse than the fault - every board would convict its own
+  healthy link within minutes and cycle its radio forever. One reply latches the instrument as
+  trustworthy; until then failures are counted, logged, and draw no conclusion.
+- **Each completed ladder widens the cool-off.** A board whose problem is upstream settles into
+  checking occasionally rather than thrashing.
 
-On P4 boards WiFi is not native — it runs over an ESP32-C6 co-processor on SDIO (`esp_hosted`). If
-the RPC channel to that co-processor is already unreliable at boot, "the host believes it is
-associated while the radio is not" follows naturally, and it explains why the two S3 boards with
-native radios have fared best. **Pull #41 in as a possible cause** — "do NVS writes disrupt the
-esp-hosted SDIO transport on P4?" is exactly the right shape.
+**The probe is demand-driven, and that is a MEMORY decision.** A held MQTT session is continuous
+evidence - PubSubClient's keepalive is a real round trip, which is exactly how the original fault
+announced itself - so a healthy board sends no probes at all. That keeps a 2.5 KB task stack out of
+internal RAM on `CYD_S3_3248`, the only QSPI board and so the only one whose LVGL buffers are also
+internal. Static cost on that board: +120 bytes.
 
-Caveat worth keeping: `WS_P4_7B` has also dropped, and the S3 boards have not been soaked as long.
-Do not over-fit to "P4 only" on a sample of one night.
+`esp_ping` needed no new dependency. Verified before designing to it: `esp_ping_new_session` is in
+`liblwip.a` and `lwip` is in `flags/ld_libs` for both `esp32p4_es` and `esp32s3` - the same check
+that found `esp_websocket_client` ABSENT during the #43 spike.
+
+### How to test it, and why the soak is second
+
+The owner can block a single board at the router, which turns a 3-6 hour wait into a two-minute
+iteration. **Bench first, soak second** - the soak should CONFIRM the fix, not discover whether it
+works.
+
+What to watch for, in order:
+
+1. `[Conn] Link health healthy -> suspect (...)` within ~2 probe intervals of the block.
+2. `[Conn] Link health suspect -> DEAD (gateway unreachable)` about 90 s later.
+3. `[Conn] RECOVERY 1/3`, then `2/3`, then `3/3` at 30 s intervals.
+4. The WiFi glyph dropping to a bare red stalk with a `!` badge WHILE the board still thinks it is
+   associated. That specific frame is the whole point of the change.
+5. On unblocking: `[Conn] Online:` and health back to healthy.
+
+**The failure mode to watch for is the opposite one:** a healthy board convicting itself. If any
+board reports `LINK_DEAD` while it is demonstrably reachable, the guards above are the first thing
+to read. `Dump Config` prints the probe's own status, including whether it has ever been answered.
+
+### The "#41 is the lead" theory does NOT hold up - checked 2026-09-18
+
+An earlier version of this section named the P4 boot-time RPC warning, and #41 behind it, as the
+lead worth chasing first. **It does not survive contact with the code**, and the next reader should
+not spend a night on it.
+
+Every NVS write in this firmware is a CONFIGURATION event - the complete list is
+`ConnectivityManager.cpp:247` (one-shot migration), `:280`, `:291-293` (`setStationCredentials`),
+`:331` (`markProven`, once ever), `:357-358` and `:376-377`. Nothing writes NVS on a timer, per
+message or per reconnect, and every affected board is already `proven`.
+
+**So no NVS writes occur at all during the 3-6 hour window in which the fault appears.** A
+mechanism that only fires on NVS writes cannot explain it.
+
+#41 stays open and stays right - as a constraint on **Phase 4**, when the settings UI starts
+writing NVS at runtime on four P4 boards. It is simply not the cause here.
+
+The boot RPC timeout is likewise a boot-time event. Keep it as weak evidence that the host-to-C6
+channel is not perfectly healthy; do not build a theory on it.
+
+Caveat still worth keeping: `WS_P4_7B` has also dropped, and the S3 boards have not been soaked as
+long. Do not over-fit to "P4 only" on a sample of one night.
+
+### A sharper statement of the RSSI symptom
+
+"Stale RSSI" undersells it. `captureLinkInfo()` (`ConnectivityManager.cpp:810`) was called from
+exactly one place - the `GOT_IP` handler - so `_rssi` was written **once per association and never
+again**. The header was not showing a cached reading going stale; it was showing a value nobody
+ever asked for a second time.
 
 ### The instruments are already in place
 
@@ -172,15 +235,19 @@ project.**
 
 0. **#49 — connectivity.** Not optional and not negotiable against the rest: a panel that leaves
    Home Assistant every few hours is not a dashboard, and #43 puts MORE weight on the same link.
-   See the section above.
-1. **#43 — Home Assistant over the websocket.** Design-and-build, not research: the API has been
+   See the section above. **A fix is written and flashed, unverified.**
+1. **#50 — the System panel rework.** Moved ahead of #43 by the owner on 2026-09-18: *"relatively
+   minor task but will make a big improvement in the visual experience."* It was specified at the
+   end of 2.5 and lived only in this file's postponed table until it got an issue; the spec is now
+   in #50 and the table below points there instead of carrying it.
+2. **#43 — Home Assistant over the websocket.** Design-and-build, not research: the API has been
    measured against the owner's live instance. `docs/design/ha-websocket.md` has the numbers and
    one finding that changes the architecture (`subscribe_trigger`, never `subscribe_events`).
-2. **#44 — outbound commands** through the same client. This is where the panel stops being a
+3. **#44 — outbound commands** through the same client. This is where the panel stops being a
    display and becomes an interface. `call_service` is deliberately untested — running it turns on
    a light in the owner's house.
-3. **2.6 tileview / 2.8 slots**, once there are enough entities to need pages.
-4. **3.1 + 3.3 — the build sheet**, with a schema informed by what HA actually gives.
+4. **2.6 tileview / 2.8 slots**, once there are enough entities to need pages.
+5. **3.1 + 3.3 — the build sheet**, with a schema informed by what HA actually gives.
 
 ---
 
@@ -190,7 +257,7 @@ Everything here was raised, discussed and consciously deferred.
 
 | What | Where it goes |
 |---|---|
-| **System panel rework** — see the section below. Fully specified, not started | next session |
+| **System panel rework** — fully specified, not started. Spec now lives in **#50**, not here | NEXT, after #49 |
 | **The system header bar needs its OWN colour**, not the scheme's. Paper makes it unreadable | 2.8 |
 | **Corner icon = the DOMAIN; the hero = the specific fixture** | 2.7 |
 | **State-dependent hero glyphs** (`motion-sensor-off`, `garage-open`). HA already ships these in `attributes.icon` — see `ha-websocket.md` §5 | 2.7 |
@@ -208,23 +275,20 @@ Everything here was raised, discussed and consciously deferred.
 
 ### The system panel rework, specified
 
-Asked for at the end of the 2.5 session and **deliberately declined** — it is a new page, a layout
+Asked for at the end of the 2.5 session and **deliberately declined** - it is a new page, a layout
 rewrite, width and anchoring work and a dynamic height, and starting it on an exhausted context
 would have left it half-done. The owner agreed. One piece was done: **the log moved to its own
 page** (`LogPage`), which is the likely cause of the panel's choppy animation.
 
-Remaining, as he specified it:
+**The full spec now lives in GitHub issue #50** and is not duplicated here. That is deliberate:
+this file having been the only home for a fully-specified piece of work is exactly how it nearly
+got rediscovered instead of built, and a paraphrase in a handoff becomes the spec for whoever
+reads it first (see `LESSONS.md`, "A paraphrase can outrank the spec").
 
-- **Button layout.** Row 1: `Log` `Tokens` `Cards`. Row 2: `Col -/+` `Row -/+`. Row 3: `Deck`
-  `Compact` (manual variant override) `Theme`. Row 4: card-header mode, `Fill` (fill/icon for
-  active states), `Area` (show/hide).
-- **Width:** ~1/2 screen on `WS_P4_5` and `WS_P4_7B`, ~3/4 on the 4B boards, unchanged on
-  `CYD_S3_3248`.
-- **Anchor right**, so it reads as coming from the status icon you tapped — with the same margin
-  the deck panels have, not hard against the edge.
-- **Dynamic height:** expand only as far as the content needs.
-- **Fix the slide origin.** It was meant to slide out from under the header bar; since the header
-  became resizable it appears from nothing and sits disconnected.
+One correction worth carrying, because the opposite was assumed once in this session: the panel is
+`lv_pct(100)` today (`Panel_System.cpp:108`), so the rework makes it **narrower**. A layer buffer
+is sized by object WIDTH, so the resize RELIEVES the `clip_corner` liability rather than worsening
+it. Do not add `clip_corner` here, but do not fear the resize.
 
 ---
 

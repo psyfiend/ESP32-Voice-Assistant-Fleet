@@ -77,6 +77,23 @@ fails with `designator order for field 'X' does not match declaration order`. Ap
 BSP headers and to every other struct we initialise this way — it caught us again on
 `EntityDescriptor` months after the BSP rule was written down.
 
+**The `DISABLED` trap caught us AGAIN at #49, with the lesson already written down.**
+`Widget_MqttStatus`'s state enum had a `DISABLED` member. The rule was in `CLAUDE.md`, it was in
+this file naming that exact identifier, and it was hit anyway - because "remember to avoid
+ALL-CAPS enumerator names" is a thing you have to think of at the moment you type one, and the
+error message still points at `esp32-hal-gpio.h` and at the call sites rather than at the
+declaration.
+
+**So make it a check rather than a memory.** Before adding enumerators, run them past the
+framework headers:
+
+    cd ~/.platformio/packages/framework-arduinoespressif32/cores/esp32
+    for m in MY_NAMES HERE; do grep -rhwE "^ *# *define +$m" . | head -1; done
+
+Ten seconds, and it is the difference between a rename and twenty minutes reading errors that
+point nowhere near the cause. The compound-name habit (`SESSION_OFF`, `LINK_DEAD`) is still the
+right default; the grep is what catches the one you did not think to compound.
+
 **A board's identity macro must not match a struct instance name.** Once `#define WS_P4_7B`
 exists, the preprocessor rewrites every bare occurrence — including a struct's own
 declaration — to `1`.
