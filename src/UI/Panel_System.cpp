@@ -445,6 +445,21 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // reached by the "Log" button, and this panel is a plain box again.
 
     _ui_timer = lv_timer_create     (_ui_timer_cb, 50, this); // 50ms for faster log flushing
+
+    // One line, once, at start-up - and it is not decoration.
+    //
+    // Three of #50's four changes are geometry that is only visible once a
+    // finger has opened the drawer, which makes them exactly the kind of thing
+    // that ships wrong and is noticed a week later. Printing what was computed
+    // means a board can be checked from the serial log at boot: a width that
+    // is not half or three-quarters of the screen, an x that does not put the
+    // right edge one margin in, or a height of 0 or "most of the screen" are
+    // all obvious here and all invisible until tapped.
+    Serial.printf("[SysPanel] %ld px wide at x=%ld (screen %ld, %ld logical), "
+                  "top %ld, content %ld px\n",
+                  (long)panelW, (long)(screenW - panelW - margin), (long)screenW,
+                  (long)logicalW, (long)UIToolkit::systemHeaderPx(),
+                  (long)contentHeight());
 }
 
 // How tall the drawer needs to be to show everything in it, and no taller.
