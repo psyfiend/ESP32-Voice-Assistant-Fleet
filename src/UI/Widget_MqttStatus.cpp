@@ -18,18 +18,33 @@ static const uint32_t COL_OFF   = 0x64748b;  // deliberately disabled
 
 static const uint32_t POLL_MS = 400;   // matched to the WiFi glyph
 
-// There is deliberately NO staleness constant here any more.
+// Connected, but NOTHING has arrived on ANY subscribed topic for this long.
 //
-// There was one - a blanket ten minutes for the whole fleet - and it was wrong
-// within two hours of reaching hardware. Staleness is a property of the
-// SOURCE, not of the indicator: a mains-powered mmWave sensor and a quiet
-// battery door contact have nothing useful in common to threshold against.
-// EntityDescriptor::staleAfterMs already says it per entity and the cards
-// already honour it, so resolveLook() asks the registry instead.
+// This is a statement about the PIPE and nothing else. The owner's rule,
+// 2026-09-18: this icon "should never reflect the status of individual
+// entities and the conditions for it turning orange should be entirely
+// independent from what makes a card go STALE."
+//
+// Two earlier attempts got this wrong in the same direction and are worth
+// recording so a third does not:
+//
+//   1. A blanket ten minutes measured against the newest ENTITY update. Wrong
+//      within two hours of reaching hardware - two boards sat amber all
+//      evening because his outdoor Zigbee sensors are simply quiet.
+//   2. Asking EntityRegistry::isStale() per entity instead. Better, and still
+//      wrong by the rule above: that is literally the call that makes a card
+//      grey out, so the header would have been a second opinion on the same
+//      question rather than a different question.
+//
+// Half an hour, because it is not trying to catch a quiet sensor - the cards
+// already do that, in place, far better. It is trying to catch a session that
+// is nominally CONNECTED and receiving nothing at all, which is a fault no
+// card can show because every card would be stale at once and none of them
+// would say why.
+static const uint32_t FEED_SILENT_MS = 30UL * 60UL * 1000UL;
 
-void Widget_MqttStatus::init(lv_obj_t *parent, MqttManager *mqtt, EntityRegistry *reg) {
+void Widget_MqttStatus::init(lv_obj_t *parent, MqttManager *mqtt) {
     _mqtt = mqtt;
-    _reg  = reg;
 
     // Same reasoning as the WiFi glyph: the QSPI board pays a per-pixel
     // software rotation cost on every draw, so it gets the cheap motion.
@@ -176,54 +191,18 @@ Widget_MqttStatus::Look Widget_MqttStatus::resolveLook() const {
             break;
     }
 
-    // Connected. The remaining question is whether anything is actually
-    // arriving - the state that catches a sensor that died while the broker
-    // stayed perfectly healthy, which is the failure you otherwise notice days
-    // late.
-    if (!_reg) return Look::OK;
+    // The session is up. The remaining question is whether the PIPE is
+    // carrying anything - and that is a question about the pipe, not about any
+    // entity on the other end of it.
+    const uint32_t since = _mqtt->msSinceLastInbound();
 
-    const uint32_t now = millis();
-    uint8_t live = 0, stale = 0;
+    // Nothing has ever arrived. Not a fault: a board may subscribe to nothing
+    // at all, and Zigbee2MQTT does not retain state topics, so a quiet sensor
+    // legitimately says nothing for a long while after boot. There is no
+    // baseline here to call anything stale against.
+    if (since == UINT32_MAX) return Look::OK;
 
-    for (uint8_t i = 0; i < _reg->count(); i++) {
-        const Entity *e = _reg->at(i);
-        if (!e) continue;
-        // Only entities that arrive FROM the broker can say anything about it.
-        // Our own telemetry is written locally every few seconds and would
-        // report a healthy feed on a board receiving nothing at all.
-        if (e->desc.source != EntitySource::MQTT && e->desc.source != EntitySource::HA) continue;
-        // Never heard from at all is not the same as gone quiet. There is no
-        // baseline to measure against, and Zigbee2MQTT does not retain state
-        // topics - so a quiet sensor legitimately says nothing for a long time
-        // after boot and must not be read as a fault.
-        if (!e->everSet) continue;
-
-        // ASK THE REGISTRY, do not invent a number.
-        //
-        // This used to compare the newest arrival against one blanket
-        // STALE_AFTER_MS for the whole fleet, and the owner caught it on glass
-        // within a couple of hours: two boards showed amber overnight simply
-        // because his outdoor Zigbee sensors are quiet, then went violet when
-        // one finally published. That is the indicator crying wolf, which
-        // trains you to ignore it - the precise failure the constant's own
-        // comment warned about.
-        //
-        // Every entity already carries a staleAfterMs chosen for how chatty
-        // that source actually is, and the cards grey out on exactly this
-        // call. The header must answer the same question the same way, or the
-        // glyph and the cards can disagree about the same feed.
-        if (_reg->isStale(*e, now)) stale++; else live++;
-    }
-
-    // Nothing inbound is subscribed, or nothing has ever arrived: there is no
-    // feed to be stale. A board that only publishes is working as configured.
-    if (live == 0 && stale == 0) return Look::OK;
-
-    // STALE means the FEED is dead, not that one sensor is. A single stale
-    // entity is the card's job to show, and it shows it far better - in place,
-    // on the thing that is stale. The header glyph earns its space only by
-    // reporting something no card can: everything has gone quiet at once.
-    return (live == 0) ? Look::STALE : Look::OK;
+    return (since > FEED_SILENT_MS) ? Look::STALE : Look::OK;
 }
 
 void Widget_MqttStatus::applyVisual(Look look) {

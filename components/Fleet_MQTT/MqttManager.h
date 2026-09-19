@@ -108,6 +108,25 @@ public:
         return millis() - _lastConnectedAtMs;
     }
 
+    // How long since ANY message arrived on ANY subscribed topic.
+    // UINT32_MAX if none ever has.
+    //
+    // Deliberately transport-level and entity-blind. This class does not know
+    // what an entity is and must not learn: "is the feed alive" and "is this
+    // sensor's value old" are different questions with different answers, and
+    // the header indicator is only entitled to ask the first one.
+    //
+    // The owner's rule, 2026-09-18, after the MQTT glyph sat amber overnight
+    // because his outdoor sensors are quiet: the icon "should never reflect
+    // the status of individual entities and the conditions for it turning
+    // orange should be entirely independent from what makes a card go STALE."
+    // A card going stale is a statement about one sensor; this is a statement
+    // about the pipe.
+    uint32_t msSinceLastInbound() const {
+        if (_lastInboundMs == 0) return UINT32_MAX;
+        return millis() - _lastInboundMs;
+    }
+
     // "<TOPIC_PREFIX>/<deviceId>", e.g. "fleet/fleet_ws_p4_5_e0d24b".
     // Per ROADMAP Q5. Valid after begin().
     const char *getBaseTopic() const { return _baseTopic; }
@@ -150,6 +169,7 @@ private:
     // last have a broker at all" outlives any one session.
     uint8_t  _envFailCount      = 0;
     uint32_t _lastConnectedAtMs = 0;
+    uint32_t _lastInboundMs     = 0;   // see msSinceLastInbound()
 
     char _baseTopic[96]  = {0};
     char _availTopic[112] = {0};

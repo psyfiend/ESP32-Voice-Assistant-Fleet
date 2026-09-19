@@ -1,7 +1,6 @@
 #pragma once
 #include <lvgl.h>
 #include "MqttManager.h"
-#include "EntityRegistry.h"
 
 // ---------------------------------------------------------------------------
 // MQTT status glyph - "glyph A" from the Fleet Status Glyphs artifact: a
@@ -29,7 +28,7 @@
 // time, and the exact confusion that cost days on issue #49, where "broker
 // unreachable" was really a statement about the link.
 //
-// THREADING: tick() polls MqttManager and EntityRegistry from the LVGL task.
+// THREADING: tick() polls MqttManager from the LVGL task.
 // Nothing here is called from another task.
 // ---------------------------------------------------------------------------
 
@@ -37,11 +36,10 @@ class Widget_MqttStatus {
 public:
     enum class Motion : uint8_t { OFF, BLINK, PULSE };
 
-    // reg may be null. It is used only for the STALE state - "connected, but
-    // nothing has arrived on any subscribed topic lately" - which is the state
-    // that catches a sensor that died while the broker stayed healthy. Without
-    // a registry the widget simply never reports stale.
-    void init(lv_obj_t *parent, MqttManager *mqtt, EntityRegistry *reg = nullptr);
+    // No registry, deliberately. Everything this widget reports comes from the
+    // broker session itself - see FEED_SILENT_MS in the .cpp for why asking
+    // the entity layer was the wrong answer twice.
+    void init(lv_obj_t *parent, MqttManager *mqtt);
     void tick();
     void setMotion(Motion m);
     lv_obj_t *getRoot() { return _root; }
@@ -58,8 +56,7 @@ private:
     void startMotion();
     void stopMotion();
 
-    MqttManager    *_mqtt = nullptr;
-    EntityRegistry *_reg  = nullptr;
+    MqttManager *_mqtt = nullptr;
 
     lv_obj_t *_root   = nullptr;
     lv_obj_t *_box    = nullptr;   // the rounded square outline

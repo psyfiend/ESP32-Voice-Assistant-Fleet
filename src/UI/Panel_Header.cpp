@@ -10,7 +10,7 @@ Panel_Header::Panel_Header() {
 }
 
 void Panel_Header::init(lv_obj_t* parent, const char* title, ConnectivityManager* conn,
-                        MqttManager* mqtt, EntityRegistry* reg) {
+                        MqttManager* mqtt) {
     // Top Bar Container
     container = lv_obj_create(parent);
     lv_obj_set_size             (container, lv_pct(100), UIToolkit::systemHeaderPx());
@@ -72,7 +72,7 @@ void Panel_Header::init(lv_obj_t* parent, const char* title, ConnectivityManager
 
     // Both glyphs are omitted rather than faked when their subsystem is absent
     // - a GUI-less or broker-less build should show nothing, not a grey lie.
-    if (mqtt) mqttStatus.init(slots, mqtt, reg);
+    if (mqtt) mqttStatus.init(slots, mqtt);
 
     // Live connectivity glyph, inside the existing touch hotspot. Replaces the
     // old always-green LV_SYMBOL_WIFI label, which reported nothing.

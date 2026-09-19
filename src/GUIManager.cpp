@@ -77,7 +77,7 @@ void GUIManager::begin() {
 
     // --= LAYER 3: HEADER BAR =--
     // Header click -> toggle system panel
-    _header.init(screen, bsp_hw.device_name, &_core.conn(), &_core.mqtt(), &_core.entities());
+    _header.init(screen, bsp_hw.device_name, &_core.conn(), &_core.mqtt());
     lv_obj_add_event_cb(_header.getStatusIcon(), headerIconClickCb, LV_EVENT_CLICKED, NULL);
 
     // Bottom deck height = screen height - header height.

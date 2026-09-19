@@ -7,7 +7,6 @@
 
 class ConnectivityManager;
 class MqttManager;
-class EntityRegistry;
 
 class Panel_Header {
 public:
@@ -19,11 +18,10 @@ public:
 // the same omission the screen background had.
 void restyle();
 
-    // mqtt and reg may be null on the same terms as conn: an indicator with
-    // nothing behind it is omitted rather than shown reporting a made-up
-    // state. reg is only used for the MQTT glyph's STALE case.
+    // mqtt may be null on the same terms as conn: an indicator with nothing
+    // behind it is omitted rather than shown reporting a made-up state.
     void init(lv_obj_t* parent, const char* title, ConnectivityManager* conn = nullptr,
-              MqttManager* mqtt = nullptr, EntityRegistry* reg = nullptr);
+              MqttManager* mqtt = nullptr);
     void tick(); // Update stats
 
     // --= NEW: Accessors for System Panel Interaction =--

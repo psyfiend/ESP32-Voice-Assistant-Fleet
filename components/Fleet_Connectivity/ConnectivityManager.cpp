@@ -922,19 +922,69 @@ void ConnectivityManager::probeOnEnd(esp_ping_handle_t, void *args) {
     self->_probeResult.compare_exchange_strong(expected, 2);
 }
 
+// Which host this probe should aim at.
+//
+// A LADDER, not a single target, and the owner's reasoning for it is exactly
+// right: "The router/gateway will always respond to a ping so long as the
+// router is turned on. I can't say the same if I were to boot the devices up
+// on a different network though, and not all routers will respond to a ping."
+//
+// There is a second reason he did not raise and it may matter more: **routers
+// rate-limit ICMP**. A gateway that normally answers can drop a burst of them
+// and look dead for exactly as long as it takes us to convict the link and
+// cycle a working radio. Rotating the target means the failures that convict
+// must come from three different hosts, which no rate-limiter produces.
+//
+// The rung is chosen by the consecutive-failure count, so a healthy board
+// always asks the gateway (cheapest, most local, nothing leaves the LAN) and
+// only a board that is already failing reaches further out. Conviction takes
+// PROBE_FAILS_DEAD failures, which is enough to have tried every rung.
+//
+// Returns false when this rung has no usable address, which is normal - a
+// network with no DNS server configured simply skips that rung.
+bool ConnectivityManager::probeTarget(uint8_t rung, IPAddress &out) const {
+    switch (rung % 3) {
+    case 0:
+        out = WiFi.gatewayIP();
+        break;
+    case 1:
+        // The DNS server. Usually the gateway again on a home LAN, in which
+        // case this rung is a free retry rather than a new host - still useful
+        // against rate-limiting, and genuinely a different host wherever DNS
+        // is a separate box (as it is here: gw .1, dns .60).
+        out = WiFi.dnsIP();
+        break;
+    default:
+        // Off-LAN, and the only rung that leaves the building.
+        //
+        // Reached only after the two local rungs have both failed, so a
+        // standalone or air-gapped fleet never sends it: those boards fail all
+        // three, _probeEverWorked stays false, and the never-answered guard
+        // suppresses every verdict. That is the correct outcome for a board
+        // with genuinely nothing to talk to.
+        out = IPAddress(PROBE_FALLBACK_A, PROBE_FALLBACK_B,
+                        PROBE_FALLBACK_C, PROBE_FALLBACK_D);
+        break;
+    }
+    return out != IPAddress((uint32_t)0);
+}
+
 void ConnectivityManager::probeStart() {
     if (_ping) return;                        // one in flight is enough
 
-    IPAddress gw = WiFi.gatewayIP();
-    if (gw == IPAddress((uint32_t)0)) {
-        DBG_WIFI("probe skipped - no gateway address\n");
+    IPAddress tgt;
+    if (!probeTarget(_probeFails, tgt)) {
+        DBG_WIFI("probe rung %u has no address - skipping\n", (unsigned)(_probeFails % 3));
+        // Count it, so a rung that never has an address cannot stall the
+        // ladder on itself forever.
+        if (_probeFails < 255) _probeFails++;
         return;
     }
 
     ip_addr_t target;
     // IPv4 only. The fleet has never been on a v6 network and a v6 literal
     // here would silently probe nothing.
-    IP_ADDR4(&target, gw[0], gw[1], gw[2], gw[3]);
+    IP_ADDR4(&target, tgt[0], tgt[1], tgt[2], tgt[3]);
 
     esp_ping_config_t cfg = ESP_PING_DEFAULT_CONFIG();
     cfg.target_addr  = target;
@@ -962,7 +1012,8 @@ void ConnectivityManager::probeStart() {
         DBG_WIFI("probe could not be started\n");
         return;
     }
-    DBG_WIFI("probe -> %s\n", gw.toString().c_str());
+    _probeLast = tgt;
+    DBG_WIFI("probe rung %u -> %s\n", (unsigned)(_probeFails % 3), tgt.toString().c_str());
 }
 
 bool ConnectivityManager::probeCollect(bool &okOut) {
@@ -1013,14 +1064,14 @@ void ConnectivityManager::liveness(uint32_t now) {
             // network" is the single fact that decides whether any of this
             // can work, and it should not have to be inferred from silence.
             if (!_probeEverWorked) {
-                Serial.printf("[Conn] Gateway %s answers ICMP - liveness probe armed.\n",
-                              WiFi.gatewayIP().toString().c_str());
+                Serial.printf("[Conn] %s answers ICMP - liveness probe armed.\n",
+                              _probeLast.toString().c_str());
             }
             _probeEverWorked = true;
             _probeFails      = 0;
             _lastEvidenceMs  = now;
             if ((LinkHealth)_health.load() != LinkHealth::LINK_HEALTHY) {
-                setHealth(LinkHealth::LINK_HEALTHY, "gateway replied");
+                setHealth(LinkHealth::LINK_HEALTHY, "probe answered");
             }
             _remoteFails.store(0);
         } else {
@@ -1054,9 +1105,9 @@ void ConnectivityManager::liveness(uint32_t now) {
                           (unsigned long)((now - _lastEvidenceMs) / 1000));
 
             if (_probeFails >= _defaults.PROBE_FAILS_DEAD) {
-                setHealth(LinkHealth::LINK_DEAD, "gateway unreachable");
+                setHealth(LinkHealth::LINK_DEAD, "no probe target answers");
             } else if (_probeFails >= _defaults.PROBE_FAILS_SUSPECT) {
-                setHealth(LinkHealth::LINK_SUSPECT, "gateway not answering");
+                setHealth(LinkHealth::LINK_SUSPECT, "probe not answering");
             }
         }
     }

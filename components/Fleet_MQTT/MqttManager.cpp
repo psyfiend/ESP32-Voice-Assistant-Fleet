@@ -453,6 +453,13 @@ void MqttManager::staticCallback(char *topic, uint8_t *payload, unsigned int len
     MqttManager *self = s_self;
     if (!self) return;
 
+    // Stamped before the retained-command guard below, and deliberately so.
+    // The question this answers is "is the pipe carrying anything", and a
+    // retained payload we then discard still proves the broker is talking to
+    // us. Moving this past the guard would make a board that only subscribes
+    // to command topics look like a dead feed.
+    self->_lastInboundMs = millis();
+
     // --- The retained-command guard, and why it is shaped like this ---------
     //
     // Retained payloads on a COMMAND topic must be dropped: a broker

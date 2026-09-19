@@ -190,6 +190,10 @@ private:
     // returns immediately; probeCollect() picks up the answer on a later
     // loop() pass. Nothing in ConnectivityManager may block: the whole class
     // is built on that promise and the UI runs on the same task.
+    // Which host to aim rung N at. See the long note at the definition: the
+    // ladder exists because not every router answers ICMP, and because the
+    // ones that do will rate-limit it.
+    bool  probeTarget(uint8_t rung, IPAddress &out) const;
     void  probeStart();
     bool  probeCollect(bool &okOut);      // true when a verdict is ready
     static void probeOnSuccess(esp_ping_handle_t h, void *args);
@@ -261,6 +265,16 @@ private:
     // one of those a probe-driven verdict would convict every healthy board on
     // the fleet. Latched for the boot; see the long note at the failure site.
     bool     _probeEverWorked  = false;
+    // The host the last probe was aimed at, so the "armed" line can name which
+    // rung of the ladder actually answered rather than assuming the gateway.
+    IPAddress _probeLast;
+
+    // Rung 3 of the probe ladder - the only target that leaves the LAN, and
+    // only reached after the gateway and the DNS server have both failed.
+    // Split into octets rather than written as a literal so it is greppable
+    // and so changing it needs no include here. 8.8.8.8.
+    static constexpr uint8_t PROBE_FALLBACK_A = 8, PROBE_FALLBACK_B = 8,
+                             PROBE_FALLBACK_C = 8, PROBE_FALLBACK_D = 8;
     // Completed recovery ladders since the last confirmed-good link. Caps the
     // thrash when recovery cannot fix the problem, which is the usual case
     // when the fault is upstream of this device entirely.
