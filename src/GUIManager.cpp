@@ -114,6 +114,12 @@ void GUIManager::unpeekHeader() {
 
     if (_peekTimer) { lv_timer_delete(_peekTimer); _peekTimer = nullptr; }
 
+    // The drawer hung off the peeked bar while it was there; with it gone the
+    // bar's space goes back to the screen. Without this the NEXT open would
+    // start a header's height down with nothing above it - the same floating
+    // gap #50 existed to remove.
+    if (_headerHidden) _pnlSystem.setTopOffset(0);
+
     lv_obj_t *hdr = _header.getContainer();
     if (!hdr) return;
 
@@ -133,14 +139,30 @@ void GUIManager::unpeekHeader() {
 
 // Capture where a press began, for the edge gating above.
 //
-// On the SCREEN, which only works because Card::build() sets EVENT_BUBBLE on
-// its surface. That pairing is load-bearing and was broken once: this comment
-// claimed the bubbling existed before anything set it, so the origin never
-// updated from {0,0} - which reads as "left half, top edge" for every gesture
-// and made a downward swipe anywhere open the log page.
+// ON THE INPUT DEVICE, not on the screen, and the difference is the whole bug.
 //
-// If cards ever stop bubbling, this silently returns to that behaviour rather
-// than failing, so the two belong in the same thought.
+// This was registered on the screen, which only sees a press that reaches it.
+// Cards were made to bubble so their presses would - but the deck panels, the
+// system drawer, the header and every button do NOT bubble, so a press landing
+// on any of those left the PREVIOUS swipe's origin in place.
+//
+// That is exactly the "stickiness" the owner reported, and his description is
+// worth keeping because it names the mechanism better than any summary:
+//
+//   "If I swipe from the very bottom to open the DECK, it opens. Then I can
+//    swipe UP from anywhere on the screen to toggle the deck repeatedly. But
+//    if I ever swipe DOWN, at this point swiping UP no longer toggles it."
+//
+// Once the deck is showing, the bottom of the screen IS the deck panel, so the
+// next press never updated the origin and fromBottom stayed true forever. A
+// downward swipe landed on a card, which DOES bubble, so the origin finally
+// moved and the up-swipe stopped working. Same cause behind the log page
+// sticking after a visit, and behind the header toggle changing which gesture
+// fired.
+//
+// lv_indev_add_event_cb() fires for every press regardless of what was hit, so
+// there is no target to have the wrong flags. Cards keep EVENT_BUBBLE - it is
+// wanted for tap-to-dismiss - but nothing here depends on it any more.
 void GUIManager::screenPressCb(lv_event_t *e) {
     (void)e;
     if (!s_self) return;
@@ -216,6 +238,16 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
             if (!UIToolkit::systemHeaderH && !s_self->_headerPeeking) {
                 s_self->peekHeader();
             } else {
+                // A peeked header is REAL ESTATE the drawer has to respect.
+                //
+                // With the bar hidden the drawer opens at y=0, which is right
+                // until a peek puts a header there - and then the drawer slid
+                // up behind it and its SYSTEM - DIAGNOSTICS title was cut off.
+                // While peeking, hang it off the peeked bar exactly as it
+                // hangs off a permanent one.
+                if (s_self->_headerPeeking) {
+                    s_self->_pnlSystem.setTopOffset(UIToolkit::sc(UI_HEADER_PEEK_H));
+                }
                 s_self->_pnlSystem.toggle();
             }
         } else {
@@ -232,7 +264,12 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
         // An open drawer is dismissed by an up-swipe from anywhere; only the
         // DECK gesture is edge-gated, because that one is pulling something up
         // from the bottom of the screen and should read as such.
-        if (!s_self->_pnlSystem.isExpanded() && !fromBottom) {
+        // Edge-gated ONLY for the deck, which is the one being pulled up from
+        // the bottom and should read as such. Dismissing an open drawer or a
+        // peeked header is a "put that away" gesture and is allowed from
+        // anywhere - a peek in particular lives at the TOP of the screen, so
+        // requiring a swipe from the bottom to dismiss it would be perverse.
+        if (!s_self->_pnlSystem.isExpanded() && !s_self->_headerPeeking && !fromBottom) {
             DBG_GESTURE("up from y=%d, not the bottom band\n", (int)p.y);
             break;
         }
@@ -240,8 +277,16 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
         // panel open it is the obvious "put that away" gesture, and toggling
         // the deck underneath an open panel would change something the user
         // cannot see.
-        if (s_self->_pnlSystem.isExpanded()) s_self->_pnlSystem.close();
-        else                                 s_self->toggleDeck();
+        if (s_self->_pnlSystem.isExpanded()) {
+            s_self->_pnlSystem.close();
+        } else if (s_self->_headerPeeking) {
+            // Put a peeked header away immediately rather than waiting out the
+            // three seconds. The owner asked for it and it is the right
+            // symmetry: the gesture that brought it down should take it back.
+            s_self->unpeekHeader();
+        } else {
+            s_self->toggleDeck();
+        }
         break;
 
     default:
@@ -306,7 +351,6 @@ void GUIManager::begin() {
     // Swipe navigation, milestone 2.6 first cut. On the screen, not an
     // overlay - see screenGestureCb() for why that distinction matters.
     lv_obj_add_event_cb(screen, screenGestureCb, LV_EVENT_GESTURE, NULL);
-    lv_obj_add_event_cb(screen, screenPressCb,  LV_EVENT_PRESSED,  NULL);
 
     // TAP ANYWHERE ELSE TO DISMISS, which is the rule the deck already uses.
     //
@@ -350,6 +394,9 @@ void GUIManager::begin() {
     if (lv_indev_t *indev = lv_indev_get_next(NULL)) {
         const int32_t want = UIToolkit::sc(50);
         lv_indev_set_gesture_min_distance(indev, (uint8_t)(want > 255 ? 255 : want));
+
+        // Every press, whatever it lands on. See screenPressCb().
+        lv_indev_add_event_cb(indev, screenPressCb, LV_EVENT_PRESSED, NULL);
     }
 
     // Bottom deck height = screen height - header height.
