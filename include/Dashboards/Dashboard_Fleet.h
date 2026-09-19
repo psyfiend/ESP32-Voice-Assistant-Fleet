@@ -102,8 +102,11 @@ inline const CardSpec FLEET_CARDS[] = {
         .primaries = { VIRT_ENT_L1, VIRT_ENT_L2, VIRT_ENT_L3, VIRT_ENT_L4 },
         .label     = "All Lamps",
         .area      = "Kitchen",
-        .place     = { .prefSpanX = U_2, .minSpanX = U_CELL,
-                       .priority  = PRI_NORMAL },
+        // One whole cell, 2026-09-19. It spanned U_2 (two cells) as the group
+        // card's showcase; the owner would rather have the cell back. Dropping
+        // it takes the page from 15 cells to 14, which is the difference
+        // between a card surviving and not on the 3-column boards.
+        .place     = { .priority = PRI_NORMAL },
     },
     // Four plain lamps, one cell each.
     //
@@ -121,8 +124,13 @@ inline const CardSpec FLEET_CARDS[] = {
       .place = { .priority = PRI_NICE } },
     { .primaries = { VIRT_ENT_L3 }, .label = "Lamp 3", .area = "Lounge",
       .place = { .priority = PRI_NICE } },
-    { .primaries = { VIRT_ENT_L4 }, .label = "Lamp 4", .area = "Lounge",
-      .place = { .priority = PRI_NICE } },
+    // Lamp 4's CARD is gone (owner, 2026-09-19) - 13 cards to 12, and with
+    // All Lamps narrowed, 15 cells to 13.
+    //
+    // VIRT_ENT_L4 itself deliberately stays. "All Lamps" above still
+    // aggregates all four, so the group card keeps showing a child that has no
+    // card of its own - which is the normal case for a real group and is worth
+    // having on screen rather than hiding.
 
     // --- The two test switches -------------------------------------------
     //
@@ -162,18 +170,43 @@ inline const CardSpec FLEET_CARDS[] = {
         .area      = "Panel",
         .place     = { .priority = PRI_DEBUG },
     },
+    // Free Heap and Uptime are THREE UNITS each - one and a half cells.
+    //
+    // Two reasons, and the second is the one that will outlive the first.
+    //
+    // Packing: they used to be U_2 (two cells) and U_CELL (one), three cells
+    // between them. Three units each is still three cells, so the page total
+    // does not move - the width is redistributed rather than spent.
+    //
+    // Width: Uptime is about to format HH:MM:SS (#51), and six digits plus two
+    // colons do not fit the VALUE face in a single cell on any board in the
+    // fleet - least of all the 4B pair, which are the most cramped and are
+    // exactly where Uptime becomes visible for the first time.
+    //
+    // minSpanX lets both fall back to a whole cell where three units will not
+    // fit. That matters on CYD_S3_3248, whose rows are only four units wide:
+    // a 3-unit card there would strand a unit beside it every time.
     {
         .primaries = { SYS_ENT_HEAP },
         .label     = "Free Heap",
         .area      = "Panel",
-        .place     = { .prefSpanX = U_2, .minSpanX = U_CELL,
+        .place     = { .prefSpanX = 3, .minSpanX = U_CELL,
                        .priority  = PRI_DEBUG },
     },
     {
         .primaries = { SYS_ENT_UPTIME },
         .label     = "Uptime",
         .area      = "Panel",
-        .place     = { .priority = PRI_DEBUG },
+        // ABOVE Free Heap, so Free Heap is the panel card that goes first.
+        //
+        // All three panel cards sat at PRI_DEBUG, and ties break toward the
+        // LATER declaration - so Uptime, declared last, was always the first
+        // card dropped on the whole page. It has never once been visible on
+        // either 4B board. This is the smallest change that fixes that, and it
+        // is the mechanism working as designed rather than a workaround:
+        // priority is exactly how you say "this one matters more".
+        .place     = { .prefSpanX = 3, .minSpanX = U_CELL,
+                       .priority  = PRI_DEBUG + 10 },
     },
 };
 

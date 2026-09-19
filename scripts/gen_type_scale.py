@@ -88,6 +88,30 @@ TARGETS_MM = {
 # here rather than in Fleet_BSP, which holds hardware facts.
 SCALE = {
     "WS_P4_5": 0.88,
+
+    # The 4B pair, 2026-09-19. Same value for both, and that is the point.
+    #
+    # HARDWARE_STATUS.md: "WS_P4_4B and WS_S3_4B are the same layout problem in
+    # different pixels - 720x720 at 1.5x is the same effective UI space as
+    # 480x480 at 1.0x. If the scaling approach is right they should be visually
+    # indistinguishable apart from sharpness." They are now flashed as a pair
+    # and running the same 3x4 grid, so anything that cramps one cramps the
+    # other, and a different multiplier on each would break that property for
+    # no reason.
+    #
+    # Why they need one at all: both are FOUR INCH panels being asked for 12
+    # cells. That is the densest cards-per-inch in the fleet - the 7B gets 18
+    # cells across seven inches - so the mm-based targets, which are right
+    # about physical size, produce type that is correct and still too big for
+    # the box it has to sit in. Observed by the owner on both boards: the icon
+    # disc is barely larger than its glyph on WS_P4_4B and not visible at all
+    # on WS_S3_4B, because Card::midHeight() clamps the disc to whatever band
+    # is left once the faces have taken theirs.
+    #
+    # 0.85 is a STARTING POINT, not a measured optimum - the same status 0.88
+    # had on WS_P4_5 before it was looked at. The glass decides.
+    "WS_P4_4B": 0.85,
+    "WS_S3_4B": 0.85,
 }
 
 # Glyphs each role actually draws. A face is only as expensive as its range.
