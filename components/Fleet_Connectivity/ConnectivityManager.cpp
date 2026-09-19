@@ -1009,9 +1009,16 @@ void ConnectivityManager::liveness(uint32_t now) {
             // one answered reply proves it for good. Clearing it on every
             // re-association would re-arm the never-worked guard exactly when
             // the probe is most needed.
+            // Logged once, because "is the liveness probe usable on this
+            // network" is the single fact that decides whether any of this
+            // can work, and it should not have to be inferred from silence.
+            if (!_probeEverWorked) {
+                Serial.printf("[Conn] Gateway %s answers ICMP - liveness probe armed.\n",
+                              WiFi.gatewayIP().toString().c_str());
+            }
             _probeEverWorked = true;
             _probeFails      = 0;
-            _lastEvidenceMs = now;
+            _lastEvidenceMs  = now;
             if ((LinkHealth)_health.load() != LinkHealth::LINK_HEALTHY) {
                 setHealth(LinkHealth::LINK_HEALTHY, "gateway replied");
             }
@@ -1097,10 +1104,26 @@ void ConnectivityManager::liveness(uint32_t now) {
         gap = 30UL * 60UL * 1000UL;
     }
 
+    // CALIBRATION, and it is not optional - without it the guard above becomes
+    // a permanent gag on exactly the boards that need the probe most.
+    //
+    // The demand-driven rule says "do not probe while other evidence is
+    // arriving", and a board with a healthy broker produces that evidence
+    // continuously. So it would never probe, _probeEverWorked would never
+    // latch, and the first probe of its life would be the one fired the moment
+    // MQTT went down - which the never-worked guard would then correctly
+    // refuse to believe. The link would be dead, the probe would say so, and
+    // nothing would act.
+    //
+    // So until the instrument has proved itself once, probe on the ordinary
+    // interval regardless of other evidence. That is at most PROBE_FAILS_DEAD
+    // probes on a network that drops ICMP, one probe on a network that does
+    // not, and then demand-driven behaviour for the rest of the boot.
+    const bool calibrating   = !_probeEverWorked && _probeFails < _defaults.PROBE_FAILS_DEAD;
     const bool evidenceStale = (now - _lastEvidenceMs) >= gap;
     const bool dueAnyway     = (_lastProbeMs == 0) || ((now - _lastProbeMs) >= gap);
 
-    if (!_ping && evidenceStale && dueAnyway) {
+    if (!_ping && dueAnyway && (evidenceStale || calibrating)) {
         _lastProbeMs = now;
         probeStart();
     }
