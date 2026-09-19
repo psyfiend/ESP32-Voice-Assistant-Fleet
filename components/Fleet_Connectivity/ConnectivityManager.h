@@ -7,6 +7,11 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <atomic>
+// ICMP gateway probe. Already in liblwip.a and on the include path for every
+// environment (verified against esp32p4_es and esp32s3 - the symbol
+// esp_ping_new_session is in the archive and lwip is in flags/ld_libs), so
+// this costs no new dependency.
+#include <ping/ping_sock.h>
 #include "ConnectivityTypes.h"
 #include "ConnectivityDefaults.h"
 #include "DeviceIdentity.h"
@@ -60,8 +65,52 @@ public:
     bool        isOnline() const;
     IPAddress   getIP() const;
     int8_t      getRssi() const       { return (int8_t)_rssi.load(); }
-    SignalBand  getSignalBand() const { return signalBandFromRssi(getRssi()); }
     uint8_t     getLastDisconnectReason() const { return (uint8_t)_lastReason.load(); }
+
+    // How long ago the RSSI value was actually measured. Before issue #49 this
+    // question could not be asked: RSSI was read once in the GOT_IP handler
+    // and never again, so getRssi() returned a number from the moment of
+    // association for as long as the board stayed up. UINT32_MAX = never read.
+    uint32_t    rssiAgeMs() const;
+    bool        isRssiFresh() const;
+
+    // NONE when the sample is too old to stand behind, so the header glyph
+    // says "I do not know" instead of repeating a six-hour-old reading. That
+    // substitution is the whole point - a confident wrong indicator is worse
+    // than an honest blank one, which is this project's oldest lesson.
+    SignalBand  getSignalBand() const {
+        return isRssiFresh() ? signalBandFromRssi(getRssi()) : SignalBand::NONE;
+    }
+
+    // --- Link liveness (issue #49) ----------------------------------------
+
+    LinkHealth getLinkHealth() const { return (LinkHealth)_health.load(); }
+
+    // Which attempt of the current cycle is in flight, counting from 1 the way
+    // the "[Conn] STA attempt 2/3" log line does - deliberately the same
+    // numbering, so the glyph and the serial cannot disagree about which try
+    // this is. 0 only before the first attempt.
+    //
+    // It exists so the UI can tell a first join apart from a board that has
+    // been failing to get back on for ten minutes. Both are STA_CONNECTING;
+    // they should not look the same to somebody walking past the panel.
+    uint8_t    getAttempt() const { return (uint8_t)_attemptPub.load(); }
+    bool       isRetrying() const {
+        return (ConnState)_state.load() == ConnState::STA_CONNECTING && getAttempt() > 1;
+    }
+
+    // Evidence from a layer ABOVE that something beyond this device could not
+    // be reached. Called by SystemCore, never by Fleet_MQTT itself - MQTT
+    // deliberately knows nothing about the link it rides on (ROADMAP Q9), so
+    // the owner of both objects is what joins them up.
+    //
+    // This is corroborating evidence only. It can raise LINK_SUSPECT and it
+    // can trigger an immediate probe, but it never on its own declares the
+    // link dead: a broker that is switched off is not a broken network.
+    void noteRemoteUnreachable();
+    // Anything at all arrived from off-device. The strongest evidence there
+    // is, and it clears everything.
+    void noteRemoteReachable();
 
     // Copies into caller storage - the underlying buffers are written from the
     // event task, so returning a pointer would hand out a data race.
@@ -128,6 +177,25 @@ private:
     void  markProven(bool proven);
     void  escalateAfterFailure(uint32_t now);   // decide AP / DEGRADED and the next retry gap
 
+    // --- Link liveness (issue #49) ---
+    void  pollRssi(uint32_t now);         // re-read RSSI on a timer, with an age stamp
+    void  liveness(uint32_t now);         // probe scheduling + verdict
+    void  runRecovery(uint32_t now);      // the ladder, once LINK_DEAD
+    void  setHealth(LinkHealth h, const char *why);
+    void  resetLiveness();                // called on every fresh association
+
+    // esp_ping is ASYNCHRONOUS - it runs its own task and answers through
+    // callbacks - so the probe cannot be a bool-returning function call
+    // however much one would read better here. probeStart() kicks one off and
+    // returns immediately; probeCollect() picks up the answer on a later
+    // loop() pass. Nothing in ConnectivityManager may block: the whole class
+    // is built on that promise and the UI runs on the same task.
+    void  probeStart();
+    bool  probeCollect(bool &okOut);      // true when a verdict is ready
+    static void probeOnSuccess(esp_ping_handle_t h, void *args);
+    static void probeOnTimeout(esp_ping_handle_t h, void *args);
+    static void probeOnEnd(esp_ping_handle_t h, void *args);
+
     const WiFiDefaults &_defaults;
 
     // Cross-task scalars. int32_t-backed - see the class comment.
@@ -163,6 +231,41 @@ private:
     // Set by the event handler when a failure is terminal, so loop() stops
     // waiting out the remaining 15 s deadline for an answer it already has.
     std::atomic<int32_t> _giveUpNow{0};
+
+    // --- Link liveness (issue #49). Atomic because the UI polls them. ---
+    std::atomic<int32_t> _health{(int32_t)LinkHealth::LINK_UNKNOWN};
+    // millis() at which _rssi was last actually measured. 0 = never. Paired
+    // with _rssi rather than folded into it because "how old" and "how strong"
+    // are different questions and the fault was caused by only being able to
+    // ask the second one.
+    std::atomic<int32_t> _rssiAtMs{0};
+    // A publishable copy of _attempt, which is otherwise a plain uint8_t only
+    // touched from loop(). The UI reads this one.
+    std::atomic<int32_t> _attemptPub{0};
+    // Set by noteRemoteUnreachable() from SystemCore's task; consumed by
+    // liveness() on the main loop, so the counter itself never races.
+    std::atomic<int32_t> _remoteFails{0};
+
+    // Probe result, written from the esp_ping task and read from loop().
+    // 0 = no verdict yet, 1 = reply received, 2 = timed out.
+    std::atomic<int32_t> _probeResult{0};
+
+    uint32_t _lastRssiPollMs   = 0;
+    uint32_t _lastProbeMs      = 0;
+    uint32_t _lastEvidenceMs   = 0;
+    uint8_t  _probeFails       = 0;
+    uint8_t  _recoveryRung     = 0;
+    uint32_t _lastRecoveryMs   = 0;
+    // Has a gateway probe EVER been answered on this network? Until it has,
+    // probe failures prove nothing - many routers drop ICMP by policy, and on
+    // one of those a probe-driven verdict would convict every healthy board on
+    // the fleet. Latched for the boot; see the long note at the failure site.
+    bool     _probeEverWorked  = false;
+    // Completed recovery ladders since the last confirmed-good link. Caps the
+    // thrash when recovery cannot fix the problem, which is the usual case
+    // when the fault is upstream of this device entirely.
+    uint8_t  _laddersRun       = 0;
+    esp_ping_handle_t _ping    = nullptr;   // non-null only while one is in flight
 
     // Guarded by _mutex.
     SemaphoreHandle_t _mutex = nullptr;

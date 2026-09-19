@@ -57,6 +57,11 @@ private:
 
     void beginEntityStorage();
 
+    // Issue #49. Turns MqttManager's read-only verdict into a call on
+    // ConnectivityManager, which neither class may make for itself. See the
+    // long note at the call site in loop().
+    void mqttEvidence();
+
     DisplayManager      _display;
     TouchManager        _touch;
 #ifdef HAS_AUDIO_HW

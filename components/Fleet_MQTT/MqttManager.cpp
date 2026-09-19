@@ -245,6 +245,7 @@ void MqttManager::attemptConnect(uint32_t now) {
 void MqttManager::onConnected() {
     _backoffMs     = 0;
     _authFailCount = 0;
+    _envFailCount  = 0;
     _lastFailure   = MqttFailure::NONE;
     setState(MqttState::CONNECTED);
 
@@ -253,7 +254,8 @@ void MqttManager::onConnected() {
 
     resubscribeAll();
 
-    _connectedAtMs = millis();
+    _connectedAtMs     = millis();
+    _lastConnectedAtMs = _connectedAtMs;
     // Printed every reconnect. On CYD_S3_3248 free heap fell 7884 -> 4188 ->
     // 3900 -> 2348 across four cycles, which is what turned a recoverable
     // drop into a board that could not open a socket at all. If that trend
@@ -281,6 +283,16 @@ void MqttManager::escalate(uint32_t now, MqttFailure why) {
         }
     } else {
         _authFailCount = 0;
+    }
+
+    // A broker we cannot REACH is evidence about the path, not about the
+    // broker - which is the whole of issue #49. Counted here and read by
+    // SystemCore; credentials and protocol rejections are excluded because
+    // both prove the packet arrived, which means the path is fine.
+    if (why == MqttFailure::ENVIRONMENTAL) {
+        if (_envFailCount < 255) _envFailCount++;
+    } else {
+        _envFailCount = 0;
     }
 
     // Environmental ladder: double to a ceiling, then hold there forever. A

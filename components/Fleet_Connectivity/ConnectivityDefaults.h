@@ -66,6 +66,47 @@ struct WiFiDefaults {
     uint16_t    AP_IDLE_TIMEOUT_MIN;    // ConnMode::STA_PLUS_AP only; 0 = never idle down
 
     // --- Radio ---
+    // --- Link liveness (issue #49) -------------------------------------
+    //
+    // The fault these exist for: a board sits in STA_CONNECTED holding an IP,
+    // WiFi.status() keeps saying WL_CONNECTED, WiFi.RSSI() keeps handing back
+    // the value it read at association, and nothing on the LAN can reach the
+    // board. Observed on WS_P4_5 (~3-4 h), WS_P4_4B (~5-6 h) and WS_P4_7B.
+    // Every one of those boards ran its UI perfectly throughout, so nothing
+    // the device asked ITSELF could have detected it.
+
+    // How often to re-read RSSI while associated. Before this existed, RSSI
+    // was captured once in the GOT_IP handler and never again - the header
+    // glyph's "full bars for six hours" was not a stale cache, it was a value
+    // nobody ever asked for a second time. Cheap: one call, no allocation.
+    uint32_t    RSSI_POLL_MS;
+    // Past this age a reading is not reported as signal strength at all. It
+    // only goes stale if the poll itself stops succeeding, which is a signal
+    // in its own right.
+    uint32_t    RSSI_STALE_MS;
+
+    // Gateway ICMP probe. Runs only while associated and only when nothing
+    // else has produced evidence recently, so a healthy board with a working
+    // broker almost never sends one. esp_ping is already in liblwip.a and on
+    // the include path for every environment - verified, no new dependency.
+    bool        PROBE_ENABLED;
+    uint32_t    PROBE_INTERVAL_MS;      // gap between probes while idle
+    uint32_t    PROBE_TIMEOUT_MS;       // per-probe deadline
+    uint8_t     PROBE_FAILS_SUSPECT;    // consecutive failures -> LINK_SUSPECT
+    uint8_t     PROBE_FAILS_DEAD;       // consecutive failures -> LINK_DEAD
+
+    // How many consecutive "cannot reach the broker" reports from above count
+    // as evidence about the LINK rather than about the broker. A broker that
+    // is genuinely down must not trigger a re-association, so this is
+    // deliberately higher than the probe's threshold and is only ever
+    // corroborating evidence - the probe is what actually convicts.
+    uint8_t     REMOTE_FAILS_SUSPECT;
+
+    // Recovery ladder, once LINK_DEAD is reached. Each rung is tried once,
+    // then the next. Gap between rungs so a router that is simply rebooting
+    // gets a chance to come back on its own before we cycle the radio.
+    uint32_t    RECOVERY_STEP_MS;
+
     // TX power cap in dBm; 0 leaves the chip default (maximum) in place.
     // Capping keeps the radio's current bursts from sagging the board rail,
     // which on these panels shows up as display glitches or a brownout reset
@@ -123,6 +164,28 @@ static const WiFiDefaults CONNECTIVITY_DEFAULT_WIFI = {
     .AP_IP                  = "192.168.4.1",
     .AP_SUBNET              = "255.255.255.0",
     .AP_IDLE_TIMEOUT_MIN    = 10,
+
+    // --- Link liveness (issue #49) ---
+    // Sized against the observed fault, not against a guess: the boards died
+    // 3-6 hours in and stayed dead until rebooted, so detection measured in
+    // minutes is ample and false positives are the thing worth avoiding.
+    // While LINK_SUSPECT the probe interval is divided (see the manager), so
+    // conviction takes ~90 s from the first missed probe rather than 4 min.
+    .RSSI_POLL_MS           = 10000,
+    .RSSI_STALE_MS          = 45000,
+
+    .PROBE_ENABLED          = true,
+    .PROBE_INTERVAL_MS      = 60000,
+    .PROBE_TIMEOUT_MS       = 2000,
+    .PROBE_FAILS_SUSPECT    = 2,
+    .PROBE_FAILS_DEAD       = 4,
+
+    // Higher than the probe's threshold on purpose. A broker that is genuinely
+    // down would otherwise get the radio cycled underneath it, which fixes
+    // nothing and drops a working link. This corroborates; the probe convicts.
+    .REMOTE_FAILS_SUSPECT   = 3,
+
+    .RECOVERY_STEP_MS       = 30000,
 
 // CYD_S3_3248W535 has a documented history of resetting when the radio first
 // transmits (see docs/HARDWARE_STATUS.md), and it reappeared during AP-fallback

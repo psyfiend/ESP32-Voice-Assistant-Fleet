@@ -183,6 +183,39 @@ void SystemCore::beginEntityStorage() {
     }
 }
 
+void SystemCore::mqttEvidence() {
+    static uint8_t  lastEnvFails  = 0;
+    static uint32_t lastRefreshMs = 0;
+
+    const uint32_t now       = millis();
+    const bool     connected = _mqtt.isConnected();
+    const uint8_t  envFails  = _mqtt.consecutiveEnvFailures();
+
+    // A HELD broker session is continuous evidence, not a one-off event, and
+    // that distinction is what keeps the gateway probe asleep.
+    //
+    // It is real evidence rather than a convenient assumption: PubSubClient
+    // sends PINGREQ every keepalive interval and tears the session down if no
+    // PINGRESP comes back - which is precisely how the original fault
+    // announced itself ("state=-4 after 6080715 ms"). So a session that is
+    // still up has completed a round trip to another host recently, which is
+    // exactly the question the probe would have asked, already answered by
+    // traffic the board was sending anyway.
+    if (connected && (lastRefreshMs == 0 || (now - lastRefreshMs) >= 15000)) {
+        lastRefreshMs = now;
+        _conn.noteRemoteReachable();
+    }
+    if (!connected) lastRefreshMs = 0;
+
+    // Edge-triggered, not level-triggered. escalate() increments the count once
+    // per attempt and the backoff ladder stretches to minutes, but loop() runs
+    // thousands of times in between - reporting every pass would inflate one
+    // failure into thousands and convict the link instantly. Only a CHANGE is
+    // news.
+    if (envFails > lastEnvFails) _conn.noteRemoteUnreachable();
+    lastEnvFails = envFails;
+}
+
 void SystemCore::loop() {
     // Non-blocking: advances connect deadlines, retry escalation, AP fallback,
     // the AP idle timer and async scan collection. Must be called every loop -
@@ -192,6 +225,20 @@ void SystemCore::loop() {
     // Broker connect/backoff ladder plus PubSubClient's keepalive pump.
     // Non-blocking, and a no-op while the link is down or MQTT is disabled.
     _mqtt.loop();
+
+    // --- Issue #49: MQTT's verdict becomes evidence about the LINK ---------
+    //
+    // The joint lives here because SystemCore is the only thing that owns both
+    // objects. Fleet_MQTT must not know what carries it and Fleet_Connectivity
+    // must not know a broker exists (ROADMAP Q9), so neither can make this
+    // call; the owner of both can, and that is exactly the "hardware is owned
+    // by SystemCore and borrowed by everything above it" rule from
+    // docs/design/startup.md pointed at a new problem.
+    //
+    // During the original fault the device printed "broker unreachable" every
+    // few seconds for six hours while ConnectivityManager printed nothing at
+    // all. This is the wire that was missing.
+    mqttEvidence();
 
     const uint32_t now = millis();
     _sysProvider.loop(now);

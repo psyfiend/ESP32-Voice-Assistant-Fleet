@@ -6,9 +6,11 @@
 Panel_Header::Panel_Header() {
     lbl_title  = NULL;
     btn_status = NULL;
+    slots      = NULL;
 }
 
-void Panel_Header::init(lv_obj_t* parent, const char* title, ConnectivityManager* conn) {
+void Panel_Header::init(lv_obj_t* parent, const char* title, ConnectivityManager* conn,
+                        MqttManager* mqtt, EntityRegistry* reg) {
     // Top Bar Container
     container = lv_obj_create(parent);
     lv_obj_set_size             (container, lv_pct(100), UIToolkit::systemHeaderPx());
@@ -37,7 +39,11 @@ void Panel_Header::init(lv_obj_t* parent, const char* title, ConnectivityManager
     
     // Status Button Wrapper (Touch Hotspot) --
     btn_status = lv_obj_create(container);
-    lv_obj_set_size             (btn_status, UIToolkit::sc(80), lv_pct(100)); // Wide touch target
+    // Was sc(80) for one glyph; two need the room. Still one hotspot, because
+    // the tap means "show me connectivity" whichever half you hit - splitting
+    // it into two targets would make the smaller boards' glyphs harder to hit
+    // than UI::minTouch() allows for no gain.
+    lv_obj_set_size             (btn_status, UIToolkit::sc(116), lv_pct(100)); // Wide touch target
     lv_obj_set_style_bg_opa     (btn_status, LV_OPA_TRANSP, 0); // Invisible
     lv_obj_set_style_border_width(btn_status, 0, 0);
     lv_obj_set_style_pad_all    (btn_status, 0, 0);
@@ -46,18 +52,39 @@ void Panel_Header::init(lv_obj_t* parent, const char* title, ConnectivityManager
     lv_obj_add_flag             (btn_status, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag           (btn_status, LV_OBJ_FLAG_SCROLLABLE);
 
+    // The status cluster. A flex row inside the hotspot rather than each glyph
+    // centred on top of the other - which is what a second lv_obj_center()
+    // call would have produced.
+    //
+    // Order is MQTT then WiFi, left to right, matching the Fleet Status Glyphs
+    // artifact's own header mock. It also reads correctly as a dependency
+    // chain: the link is nearest the edge and everything else rides on it.
+    slots = lv_obj_create(btn_status);
+    lv_obj_remove_style_all(slots);
+    lv_obj_set_size(slots, LV_SIZE_CONTENT, lv_pct(100));
+    lv_obj_center(slots);
+    lv_obj_set_flex_flow(slots, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(slots, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(slots, UIToolkit::sc(8), 0);
+    // The hotspot above owns the touch; these must not eat it.
+    lv_obj_remove_flag(slots, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(slots, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Both glyphs are omitted rather than faked when their subsystem is absent
+    // - a GUI-less or broker-less build should show nothing, not a grey lie.
+    if (mqtt) mqttStatus.init(slots, mqtt, reg);
+
     // Live connectivity glyph, inside the existing touch hotspot. Replaces the
     // old always-green LV_SYMBOL_WIFI label, which reported nothing.
-    if (conn) {
-        connStatus.init(btn_status, conn);
-        lv_obj_center(connStatus.getRoot());
-    }
+    if (conn) connStatus.init(slots, conn);
 }
 
 void Panel_Header::tick() {
     // Self-throttling and change-guarded internally, so calling this every
-    // loop costs a millis() compare in the common case.
+    // loop costs a millis() compare in the common case. Both glyphs no-op
+    // when their subsystem was never handed to init().
     connStatus.tick();
+    mqttStatus.tick();
 }
 void Panel_Header::restyle() {
     if (!container) return;

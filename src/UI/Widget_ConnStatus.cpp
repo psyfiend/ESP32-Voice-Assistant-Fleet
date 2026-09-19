@@ -171,12 +171,44 @@ void Widget_ConnStatus::setMotion(Motion m) {
     if (wasRunning) startMotion();
 }
 
-void Widget_ConnStatus::applyVisual(ConnState st, SignalBand band, bool apUp) {
+void Widget_ConnStatus::setArcsUnknown(lv_color_t col) {
+    // Connected, strength unknown. Every arc ghosted, dot solid: the dot says
+    // "there is a link", the ghosted arcs say "how strong is not known".
+    for (int i = 0; i < 3; i++) {
+        lv_obj_set_style_arc_color(_arc[i], col, LV_PART_MAIN);
+        lv_obj_set_style_arc_opa(_arc[i], LV_OPA_30, LV_PART_MAIN);
+    }
+    lv_obj_set_style_bg_color(_dot, col, 0);
+    lv_obj_add_flag(_stalk, LV_OBJ_FLAG_HIDDEN);
+}
+
+void Widget_ConnStatus::applyVisual(ConnState st, SignalBand band, bool apUp,
+                                    LinkHealth health, bool retrying) {
     // Always reset the transient bits first, so no previous state can leak
     // through into the next one.
     stopMotion();
     lv_obj_add_flag(_strike, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_text(_badge, "");
+
+    // Issue #49 - THE OVERRIDE, and it comes before the switch on purpose.
+    //
+    // A board whose link has been confirmed dead is still sitting in
+    // STA_CONNECTED as far as the driver is concerned, so the switch below
+    // would paint it green with full arcs. That is the precise lie this whole
+    // change exists to stop: full bars for six hours while nothing on the LAN
+    // could reach the panel.
+    //
+    // The evidence outranks the driver's own story, so it is applied first and
+    // the switch never sees the case.
+    if (health == LinkHealth::LINK_DEAD &&
+        (st == ConnState::STA_CONNECTED || st == ConnState::APSTA)) {
+        // Bare stalk, red - identical to a frank disconnect, because that is
+        // what it is. The device just has not been told yet.
+        setArcs(0, lv_color_hex(COL_BAD), false);
+        lv_label_set_text(_badge, "!");
+        lv_obj_set_style_text_color(_badge, lv_color_hex(COL_BAD), 0);
+        return;
+    }
 
     switch (st) {
     case ConnState::RADIO_OFF:
@@ -189,12 +221,36 @@ void Widget_ConnStatus::applyVisual(ConnState st, SignalBand band, bool apUp) {
         break;
 
     case ConnState::STA_CONNECTING:
-        setArcs(2, lv_color_hex(COL_BUSY), false);
+        // Two readings of the same state, because they mean different things
+        // to somebody looking at the panel. A first join is blue and unworried;
+        // a board on its second or third try has been failing, and the amber
+        // says so without needing a number. Both pulse - motion still means
+        // "working", per the status-glyph spec.
+        if (retrying) {
+            setArcs(2, lv_color_hex(COL_WEAK), false);
+            lv_label_set_text(_badge, "RETRY");
+            lv_obj_set_style_text_color(_badge, lv_color_hex(COL_WEAK), 0);
+        } else {
+            setArcs(2, lv_color_hex(COL_BUSY), false);
+        }
         startMotion();
         break;
 
     case ConnState::STA_CONNECTED:
     case ConnState::APSTA: {
+        // Strength unknown - the RSSI sample has aged out. Only reachable when
+        // the periodic re-read has been failing, which is itself informative,
+        // so it gets its own silhouette rather than being folded into "weak".
+        if (band == SignalBand::NONE) {
+            bool suspect = (health == LinkHealth::LINK_SUSPECT);
+            setArcsUnknown(lv_color_hex(suspect ? COL_WEAK : COL_GOOD));
+            if (st == ConnState::APSTA) {
+                lv_label_set_text(_badge, "AP");
+                lv_obj_set_style_text_color(_badge, lv_color_hex(COL_WEAK), 0);
+            }
+            break;
+        }
+
         int      lit = 1;
         uint32_t c   = COL_WEAK;
         switch (band) {
@@ -203,7 +259,13 @@ void Widget_ConnStatus::applyVisual(ConnState st, SignalBand band, bool apUp) {
             case SignalBand::FAIR:      lit = 1; c = COL_WEAK;   break;
             default:                    lit = 1; c = COL_BAD;    break;
         }
-        setArcs(lit, lv_color_hex(c), band == SignalBand::EXCELLENT);
+        // A link under suspicion keeps its arc COUNT - the radio really is
+        // hearing the AP that well - but loses its colour and its glow. The
+        // count is a measurement and still true; the green is a reassurance
+        // and no longer earned.
+        if (health == LinkHealth::LINK_SUSPECT) c = COL_WEAK;
+        setArcs(lit, lv_color_hex(c),
+                band == SignalBand::EXCELLENT && health != LinkHealth::LINK_SUSPECT);
         if (st == ConnState::APSTA) {
             // Green arcs, amber badge: each half of the link reports itself.
             lv_label_set_text(_badge, "AP");
@@ -235,16 +297,24 @@ void Widget_ConnStatus::tick() {
     if (now - _lastPollMs < POLL_MS) return;
     _lastPollMs = now;
 
-    ConnState  st   = _mgr->getState();
-    SignalBand band = _mgr->getSignalBand();
-    bool       apUp = _mgr->isApActive();
+    ConnState  st       = _mgr->getState();
+    SignalBand band     = _mgr->getSignalBand();
+    bool       apUp     = _mgr->isApActive();
+    LinkHealth health   = _mgr->getLinkHealth();
+    bool       retrying = _mgr->isRetrying();
 
     // Change guard. Without it every poll would reissue style calls and
     // invalidate the icon region 2.5x/second forever - the redraw-scoping trap
     // from the roadmap's gotcha list.
-    int32_t key = ((int32_t)st << 8) | ((int32_t)band << 4) | (apUp ? 1 : 0);
+    //
+    // Health and retrying are IN the key because they are in the visual. A
+    // state the glyph can draw but the guard cannot see is a glyph that
+    // silently stops updating, and this indicator exists to stop exactly that
+    // class of quiet wrongness.
+    int32_t key = ((int32_t)st << 12) | ((int32_t)band << 8) |
+                  ((int32_t)health << 4) | (apUp ? 2 : 0) | (retrying ? 1 : 0);
     if (key == _lastKey) return;
     _lastKey = key;
 
-    applyVisual(st, band, apUp);
+    applyVisual(st, band, apUp, health, retrying);
 }

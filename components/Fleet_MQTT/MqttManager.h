@@ -83,6 +83,31 @@ public:
     MqttFailure getLastFailure() const { return _lastFailure; }
     bool        isConnected() const  { return _state == MqttState::CONNECTED; }
 
+    // --- Evidence about the world, for whoever owns both halves -----------
+    //
+    // Issue #49: a board sat for hours printing "connect failed raw=-2 ->
+    // broker unreachable" while ConnectivityManager insisted the link was up.
+    // That log line was the only true statement the device made about itself,
+    // and nothing consumed it. These two accessors are how it gets consumed.
+    //
+    // They are READ-ONLY and this class still calls nothing outward. Fleet_MQTT
+    // must not know what carries it (ROADMAP Q9) - so it reports, and
+    // SystemCore, which owns both objects, is what joins them up. Putting the
+    // call here instead would be the shorter patch and the wrong dependency.
+
+    // Consecutive ENVIRONMENTAL failures - "the broker is not reachable", as
+    // opposed to "the broker said no", which is a credentials problem and says
+    // nothing about the network. Reset by any successful connect.
+    uint8_t  consecutiveEnvFailures() const { return _envFailCount; }
+
+    // How long since a broker session was last established. UINT32_MAX if one
+    // never has been, so a board that has never reached its broker cannot be
+    // mistaken for one that just lost it.
+    uint32_t msSinceLastConnected() const {
+        if (_lastConnectedAtMs == 0) return UINT32_MAX;
+        return millis() - _lastConnectedAtMs;
+    }
+
     // "<TOPIC_PREFIX>/<deviceId>", e.g. "fleet/fleet_ws_p4_5_e0d24b".
     // Per ROADMAP Q5. Valid after begin().
     const char *getBaseTopic() const { return _baseTopic; }
@@ -118,6 +143,13 @@ private:
     uint32_t _lastAttemptMs  = 0;
     uint8_t  _authFailCount  = 0;
     bool     _begun          = false;
+
+    // See consecutiveEnvFailures() / msSinceLastConnected() above. Distinct
+    // from _connectedAtMs, which is reset per session to time how long a
+    // socket held; this one is never cleared, because "when did this board
+    // last have a broker at all" outlives any one session.
+    uint8_t  _envFailCount      = 0;
+    uint32_t _lastConnectedAtMs = 0;
 
     char _baseTopic[96]  = {0};
     char _availTopic[112] = {0};
