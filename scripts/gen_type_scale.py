@@ -152,9 +152,22 @@ RANGES = {
     # Full printable ASCII plus the degree sign, which CLAUDE.md notes is the
     # one non-ASCII character stock Montserrat covers and the fleet relies on.
     "text": "0x20-0x7E,0xB0",
-    # A value label draws digits and nothing else. The unit moved to its own
-    # label precisely so this subset could be this small - see MeasureCard.
-    "num":  "0x20,0x2B,0x2D,0x2E,0x30-0x39,0xB0",
+    # A value label draws digits and nearly nothing else. The unit moved to its
+    # own label precisely so this subset could be this small - see MeasureCard.
+    #
+    # COLON (0x3A) and 'd' (0x64) are here for #51's durations, and their
+    # absence was a real bug rather than a theoretical one. A VALUE face is
+    # either a built-in Montserrat (full ASCII) or one of these generated
+    # subsets, so "01:25" rendered correctly on CYD_S3_3248, WS_S3_4B,
+    # WS_P4_7B, CYD_P4_1060 and CYD_S3_8048 - and as tofu boxes on exactly the
+    # three boards using a generated face: WS_P4_4B (50), WS_P4_5 (60) and
+    # WS_S3_5B (56). The owner saw it as "boxes between the units" and
+    # reasonably suspected the connectivity fault; it was a missing glyph.
+    #
+    # Two extra glyphs is a rounding error against a ~96 KB face, and the
+    # alternative - keeping the subset pure and never printing a duration in
+    # the VALUE role - gives up the feature to protect the budget.
+    "num":  "0x20,0x2B,0x2D,0x2E,0x30-0x39,0x3A,0x64,0xB0",
 }
 
 BUILTIN_MIN, BUILTIN_MAX = 8, 48

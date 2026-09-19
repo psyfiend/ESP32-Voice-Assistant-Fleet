@@ -95,7 +95,20 @@ inline constexpr MqttSettings MQTT_DEFAULT_SETTINGS = {
 
     .BUFFER_SIZE      = 4096,
     .KEEPALIVE_S      = 30,
-    .SOCKET_TIMEOUT_S = 10,
+    // FOUR SECONDS, DOWN FROM TEN, AND THE UNIT HERE IS "UI FREEZE".
+    //
+    // PubSubClient::connect() is synchronous and runs on the loop task - the
+    // same task as LVGL. So this value is not "how patient are we with the
+    // broker", it is "how long can the screen stop responding to a finger".
+    // At 10 s the owner reported the panel locking up whenever connectivity
+    // was unhappy, which is exactly one of these in flight.
+    //
+    // 4 s is still far longer than a LAN broker needs (measured connects are
+    // milliseconds) and short enough that a dropped frame reads as a stutter
+    // rather than a hang. The real fix is that isOnline() now returns false on
+    // a dead link, so the attempt is not made at all - this is the backstop
+    // for the case where the link is merely slow.
+    .SOCKET_TIMEOUT_S = 4,
 
     .BACKOFF_INITIAL_MS = 5000,     // 5 s
     .BACKOFF_MAX_MS     = 300000,   // 5 min ceiling

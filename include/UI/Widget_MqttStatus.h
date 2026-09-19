@@ -48,7 +48,7 @@ private:
     // Mirrors the artifact's state table rather than MqttState 1:1, because
     // several transport states share one appearance: CONNECTING and BACKOFF
     // are both "working on it" to a person walking past.
-    enum class Look : uint8_t { OK, CONNECTING, STALE, UNREACHABLE, SESSION_OFF };
+    enum class Look : uint8_t { OK, CONNECTING, STALE, UNREACHABLE, NO_LINK, SESSION_OFF };
 
     Look resolveLook() const;
     void applyVisual(Look look);

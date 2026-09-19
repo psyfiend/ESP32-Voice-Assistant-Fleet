@@ -85,7 +85,7 @@ public:
     // transparent strip is left on the top layer to take the tap - the
     // simplest form of the owner's swipe-down-to-reveal idea, and a footgun
     // guard rather than a feature.
-    void cycleHeaderBar();
+    void toggleHeaderBar();
 
     // The three controls #50 added. Each drives a card-layer static that has
     // existed since 2.4 with nothing on the device able to reach it.
@@ -109,6 +109,7 @@ private:
     // Milestone 2.6, first cut. Registered on the SCREEN so a scrollable child
     // still wins its own drag - see the definition.
     static void screenGestureCb(lv_event_t *e);
+    static void screenPressCb(lv_event_t *e);
 
     // The hidden-header peek (2.6). One swipe shows the bar for a few seconds
     // so the status glyphs can be read; a second opens the drawer. Drawn over
@@ -188,7 +189,19 @@ private:
     uint8_t         _rowsOverride = 0;      // 0 = let the cards decide
 #endif
     lv_obj_t       *_hiddenBarTap = nullptr;
+    lv_obj_t       *_dismissScrim = nullptr;
+    // Where the current press began. lv_indev_get_point() gives the CURRENT
+    // point, which for a completed swipe is the far end of it - useless for
+    // asking which edge it started from.
+    lv_point_t      _pressStart = {0, 0};
+    // How close to an edge a swipe must begin, in LOGICAL px, so it is the
+    // same physical band on every panel.
+    static constexpr int32_t UI_EDGE_BAND = 40;
     bool            _headerPeeking = false;
+    bool            _headerHidden  = false;
+    // THE permanent system header height. Owner's decision 2026-09-19: the
+    // size cycle is gone, only hide/show remains.
+    static constexpr uint8_t UI_HEADER_H = 35;
     lv_timer_t     *_peekTimer     = nullptr;
     lv_obj_t     *_deck     = nullptr;
 

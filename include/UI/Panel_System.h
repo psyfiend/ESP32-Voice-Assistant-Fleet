@@ -70,6 +70,7 @@ public:
     // dashboard down before the page opens.
     void setColsLabel(const char *text);
     void setRowsLabel(const char *text);
+    void setTopOffset(int32_t y);
     void setVariantLabel(const char *text);
     void setFillLabel(const char *text);
     void setAreaLabel(const char *text);

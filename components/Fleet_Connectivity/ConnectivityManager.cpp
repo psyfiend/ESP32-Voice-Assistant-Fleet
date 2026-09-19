@@ -176,6 +176,20 @@ const char *ConnectivityManager::getApPassword() const {
 IPAddress ConnectivityManager::getApIP() const { return WiFi.softAPIP(); }
 
 bool ConnectivityManager::isOnline() const {
+    // A CONFIRMED-DEAD LINK IS NOT ONLINE, whatever the driver says.
+    //
+    // This one line is what makes the #49 verdict mean something to the rest
+    // of the system rather than only to the header glyph. Everything above
+    // asks isOnline() and nothing above asks getLinkHealth(), so a board that
+    // had convicted its own link still told MqttManager it was fine - and
+    // MqttManager then spent up to SOCKET_TIMEOUT_S blocking the loop task on
+    // a TCP connect that could not succeed.
+    //
+    // That is the owner's "the device frequently locks up where screen taps do
+    // nothing". LVGL runs on that same task. The UI was not slow; it was not
+    // running.
+    if ((LinkHealth)_health.load() == LinkHealth::LINK_DEAD) return false;
+
     ConnState s = (ConnState)_state.load();
     return (s == ConnState::STA_CONNECTED || s == ConnState::APSTA) && _gotIp.load() != 0;
 }

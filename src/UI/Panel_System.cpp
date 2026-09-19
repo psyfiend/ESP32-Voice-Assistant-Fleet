@@ -80,6 +80,14 @@ void Panel_System::setRowsLabel(const char *text) {
     if (_lbl_rows && text) lv_label_set_text(_lbl_rows, text);
 }
 
+// Where the drawer hangs from. GUIManager calls this when the header is
+// hidden or shown, because the drawer has to travel with the thing it is
+// supposed to be attached to - otherwise hiding the bar leaves it floating a
+// header's height down an empty screen.
+void Panel_System::setTopOffset(int32_t y) {
+    if (_ui_root) lv_obj_set_y(_ui_root, y);
+}
+
 void Panel_System::setVariantLabel(const char *text) {
     if (_lbl_variant && text) lv_label_set_text(_lbl_variant, text);
 }
@@ -245,12 +253,38 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_flex_align           (_ui_content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_row        (_ui_content, UIToolkit::sc(8), 0);
 
-    // -- ROW 1: Stats --
-    lbl_stats = lv_label_create     (_ui_content);
-    lv_obj_set_width                (lbl_stats, lv_pct(100));
-    lv_label_set_text               (lbl_stats, "System Ready.");
-    lv_obj_set_style_text_color     (lbl_stats, UI::c(UI::pal().ST_OK), 0);
+    // -- TITLE: centred, with a rule running out to each edge ---------------
+    //
+    // Replaces "System Ready." - which was a status line from the Phase 1 UI
+    // that had long since stopped reporting anything, and read as a leftover
+    // rather than a heading. The owner: "an archaic throwback that has no
+    // place on the panel today."
+    //
+    // A flex row of [rule][label][rule] rather than a label with a background:
+    // the rules grow to fill whatever the label does not, so it stays centred
+    // on every board without anyone computing a width.
+    lv_obj_t *titleRow = makeRow(_ui_content);
+    lv_obj_set_flex_align(titleRow, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                                    LV_FLEX_ALIGN_CENTER);
+
+    auto rule = [&](void) {
+        lv_obj_t *r = lv_obj_create(titleRow);
+        lv_obj_remove_style_all      (r);
+        lv_obj_set_height            (r, UIToolkit::sc(1) < 1 ? 1 : UIToolkit::sc(1));
+        lv_obj_set_flex_grow         (r, 1);
+        lv_obj_set_style_bg_opa      (r, LV_OPA_50, 0);
+        lv_obj_set_style_bg_color    (r, UI::c(UI::pal().ACCENT), 0);
+        return r;
+    };
+
+    rule();
+    lbl_stats = lv_label_create     (titleRow);
+    lv_label_set_text               (lbl_stats, "SYSTEM  -  DIAGNOSTICS");
+    lv_obj_set_style_text_color     (lbl_stats, UI::c(UI::pal().ACCENT), 0);
     lv_obj_set_style_text_font      (lbl_stats, UIToolkit::Font_Label, 0);
+    lv_obj_set_style_pad_left       (lbl_stats, UIToolkit::sc(10), 0);
+    lv_obj_set_style_pad_right      (lbl_stats, UIToolkit::sc(10), 0);
+    rule();
 
     // -- ROW 2: Actions --
     _ui_actions = lv_obj_create     (_ui_content);
@@ -429,7 +463,11 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     _lbl_scheme = lv_obj_get_child(btnScheme, 0);
 
     // System header bar height: 50 -> 45 -> 40 -> 35 -> 30 -> none -> 50.
-    lv_obj_t *btnBar = knobButton(_ui_row3, this, "Bar", [](lv_event_t *e) {
+    // Hide / show the header. NOT a size cycle - the owner fixed the height at
+    // 35 on 2026-09-19 ("35 is now the permanent header bar size") and the
+    // cycle had a trap in it: one of its six positions was "gone", and from
+    // there nothing could bring the bar back.
+    lv_obj_t *btnBar = knobButton(_ui_row3, this, "Hide Bar", [](lv_event_t *e) {
         Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
         if (p) p->requestGrid(Panel_System::GridAction::BAR_CYCLE);
     });
@@ -443,6 +481,12 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // been choppy while the deck Audio/Display panels - same animation, no
     // nested scroller - are smooth. The report now lives on its own screen,
     // reached by the "Log" button, and this panel is a plain box again.
+
+    // The Col/Row knobs go to the BOTTOM. Owner's layout, 2026-09-19: "the
+    // first 3 rows each have 3 buttons and the bottom row is the only row with
+    // 4". Reordered by index rather than by moving their construction, the
+    // same call the Log button uses above.
+    lv_obj_move_to_index(_ui_grid, lv_obj_get_child_count(_ui_content) - 1);
 
     _ui_timer = lv_timer_create     (_ui_timer_cb, 50, this); // 50ms for faster log flushing
 

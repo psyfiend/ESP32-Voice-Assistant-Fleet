@@ -181,11 +181,20 @@ Widget_MqttStatus::Look Widget_MqttStatus::resolveLook() const {
             return Look::CONNECTING;
 
         case MqttState::NO_LINK:
-            // The WiFi glyph next door is already saying this, loudly and with
-            // more detail. Repeating it here as a red MQTT fault would have the
-            // panel report one problem twice and send whoever reads it looking
-            // for a broker fault that does not exist.
-            return Look::CONNECTING;
+            // NOT "connecting", which is what this used to say and what the
+            // owner saw: "the MQTT icon frequently switches from softly
+            // blinking (meaning trying to connect?) and stuck in a dimmed
+            // state". It was blinking because it was being drawn as busy, and
+            // it is not busy - MqttManager::loop() returns immediately while
+            // the link is down and makes no attempts at all.
+            //
+            // Motion means TRANSIENT and "working on it"; animating here
+            // claimed effort that is not happening. Not red either: the WiFi
+            // glyph beside it already reports the real fault with more detail,
+            // and two red icons for one problem sends the reader hunting for a
+            // broker failure that does not exist. Dimmed and still is the
+            // honest reading - "nothing to say until the link comes back".
+            return Look::NO_LINK;
 
         case MqttState::CONNECTED:
             break;
@@ -225,6 +234,12 @@ void Widget_MqttStatus::applyVisual(Look look) {
 
     case Look::UNREACHABLE:
         tint(lv_color_hex(COL_BAD));
+        break;
+
+    case Look::NO_LINK:
+        // Dimmed, static, and NO strike - the strike means a human turned this
+        // off, and nobody did.
+        tint(lv_color_hex(COL_OFF));
         break;
 
     case Look::SESSION_OFF:
