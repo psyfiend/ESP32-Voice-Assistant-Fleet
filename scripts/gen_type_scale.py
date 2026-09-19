@@ -70,7 +70,7 @@ TARGETS_MM = {
     "ICON":  4.50,
 }
 
-# A PER-BOARD SCALE ON TOP OF THOSE TARGETS.
+# A PER-BOARD, OPTIONALLY PER-ROLE SCALE ON TOP OF THOSE TARGETS.
 #
 # The mm targets keep text the same PHYSICAL size fleet-wide, which is the
 # right default and was worth building. It is not an absolute rule, and the
@@ -86,8 +86,33 @@ TARGETS_MM = {
 #
 # So: a multiplier, per board, default 1.0. This is a preference and belongs
 # here rather than in Fleet_BSP, which holds hardware facts.
+# A value may be a plain float (every role) or a dict keyed by role, where "*"
+# is the fallback for roles it does not name. Per-role exists because a single
+# multiplier provably cannot express what these boards need - see the note on
+# TAG below.
 SCALE = {
-    "WS_P4_5": 0.88,
+    # TAG IS NOT SCALED ON ANY BOARD, and the reason generalises.
+    #
+    # What makes a card cramped is the VERTICAL STACK - hero, name, status -
+    # and VALUE dominates it. TAG is a small label in the area header; shrinking
+    # it reclaims almost no height and costs legibility immediately. The owner,
+    # on both 4B boards at 0.85: "the header text is simply too small on both of
+    # the boards, it is not viable as it stands right now."
+    #
+    # A global multiplier could not have fixed it, which is worth recording
+    # because it is not obvious. Sizes quantise to even pixels, and on
+    # WS_S3_4B TAG is ~12.7 px at 1.0 - so 0.85, 0.88, 0.90 and 0.92 ALL land
+    # on 12. The first scale that returns TAG to 14 is 1.00, which also drags
+    # VALUE from 34 back to 40 and undoes the entire change. Measured, not
+    # reasoned:
+    #
+    #   WS_S3_4B   x0.85  12/14/16/34     WS_P4_4B  x0.85  16/22/24/50
+    #              x0.92  12/16/16/36               x0.92  18/24/26/54
+    #              x1.00  14/18/18/40               x1.00  20/26/28/60
+    #
+    # Hence per-role. "*" shrinks what actually costs height; TAG keeps the mm
+    # target, which was right about it all along.
+    "WS_P4_5": {"*": 0.88, "TAG": 1.00},
 
     # The 4B pair, 2026-09-19. Same value for both, and that is the point.
     #
@@ -110,9 +135,17 @@ SCALE = {
     #
     # 0.85 is a STARTING POINT, not a measured optimum - the same status 0.88
     # had on WS_P4_5 before it was looked at. The glass decides.
-    "WS_P4_4B": 0.85,
-    "WS_S3_4B": 0.85,
+    "WS_P4_4B": {"*": 0.85, "TAG": 1.00},
+    "WS_S3_4B": {"*": 0.85, "TAG": 1.00},
 }
+
+
+def scale_for(macro, role):
+    """Per-board, per-role multiplier. Default 1.0 - i.e. trust the mm target."""
+    s = SCALE.get(macro, 1.0)
+    if isinstance(s, dict):
+        return s.get(role, s.get("*", 1.0))
+    return s
 
 # Glyphs each role actually draws. A face is only as expensive as its range.
 RANGES = {
@@ -215,8 +248,8 @@ def main():
 
     generated = {}
     for b in boards:
-        k = SCALE.get(b["macro"], 1.0)
-        b["px"] = {role: px_for(b["ppi"], mm * k) for role, mm in TARGETS_MM.items()}
+        b["px"] = {role: px_for(b["ppi"], mm * scale_for(b["macro"], role))
+                   for role, mm in TARGETS_MM.items()}
         print("%-14s %5d %6s  %3d / %3d / %3d / %3d" % (
             b["macro"], b["ppi"], "%.1f\"" % b["diag"],
             b["px"]["TAG"], b["px"]["UNIT"], b["px"]["NAME"], b["px"]["VALUE"]))
