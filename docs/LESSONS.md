@@ -374,6 +374,12 @@ the cell was 97 px tall. Two numbers describing the same thing that disagree is 
 
 ## Never put a backslash escape in text a script writes
 
+> **The authoritative version of this now lives in `CLAUDE.md`, in the "STOP - how to edit files in
+> this repo" section at the top.** It was moved there on 2026-09-18 because this file is read
+> *before debugging* and the mistake happens *while editing* - so the warning sat in a document
+> nobody had opened yet. The account below is kept for the failure history; the procedure to follow
+> is the one in `CLAUDE.md`.
+
 Recorded above and worth restating because it happened **six times** across two sessions, in both
 directions - in the text being written *and* in the search string used to find an anchor. Quoting
 the heredoc delimiter is not enough. Build the backslash with `chr(92)`, or use an editor tool.

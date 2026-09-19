@@ -21,6 +21,72 @@ elsewhere, and it is worth checking those first for "is X already known or plann
 
 `docs/GUI_FRAMEWORK.md` is superseded by the roadmap and retained only as a pointer.
 
+## STOP — how to edit files in this repo (read before your first edit)
+
+**Every Claude session that has worked on this project has corrupted a file by writing it with a
+shell heredoc.** Seven occurrences across three sessions, each rediscovered from scratch and each
+costing a build cycle or worse. It is the single most repeated mistake in this repo's history. It
+is not a hard problem; it is a problem nobody writes down in the one place the next session looks.
+
+This is that place.
+
+### The rule
+
+> **Use the `Edit` and `Write` tools to change files. Do not pipe file content through a shell.**
+
+That is the whole rule. `Edit` and `Write` pass their content to the filesystem directly and no
+shell, no heredoc and no language runtime ever sees it, so there is no layer left to eat anything.
+
+### Why the shell path keeps failing, specifically
+
+A heredoc consumes one level of backslash **before** the interpreter inside it sees the text.
+Quoting the delimiter (`<<'PYEOF'`) does *not* prevent this — that is the part everyone gets wrong,
+because it looks like it should. So a doubled escape arrives at Python as a single one, and Python
+turns it into the character it denotes:
+
+| You wrote | Python received | What landed in the file | How it showed up |
+|---|---|---|---|
+| `\\n` | `\n` | a real newline | `missing terminating " character` |
+| `\\b` | `\b` | byte 0x08, invisible | grep prints the line correctly; the file is corrupt |
+| `\\0` | a NUL byte | byte 0x00 | file "is binary"; C string silently truncates |
+| `\\xC2\\xB0` | the two UTF-8 bytes | a literal degree sign | compiles, renders wrong |
+
+**Only the first one announces itself.** The other three produce a file that builds and behaves
+wrongly, which is why this keeps costing real time instead of being caught immediately. The 0x08
+case landed in `docs/LESSONS.md` on 2026-09-18 while writing the lesson warning about it.
+
+### What to use, by job
+
+| Job | Use |
+|---|---|
+| Change part of a file | **`Edit`** |
+| Create or fully replace a file | **`Write`** |
+| Read, search, build, flash, git | Bash / PowerShell — fine, they are not writing file content |
+| A genuinely mechanical bulk edit across many files | a script, under the constraints below |
+
+### If a script is genuinely the right tool
+
+Sometimes it is — renaming a symbol across thirty files, say. Then:
+
+1. **Emit no backslash escapes at all.** Rewrite the content so it does not need one. Most
+   "required" escapes are avoidable: `grep -w` instead of a word-boundary escape, a real newline in
+   the source instead of an escape sequence, `printf '%s'` instead of an escape.
+2. If a literal backslash is unavoidable, **build it with `chr(92)`** and concatenate. Never type it.
+3. **Verify the bytes afterwards. Every time.** This is not optional and it is two seconds:
+
+       python -c "d=open(PATH,'rb').read(); print([hex(b) for b in d if b<9 or (b>13 and b<32)])"
+
+   Anything but an empty list means the file is corrupt. Fix it with `Edit`, not with another script.
+4. `grep` calling a source file "binary" is the other tell — but it only catches two of the three
+   silent cases, so it does not replace the byte scan.
+
+### The same trap in the other direction
+
+An anchor string used to *find* a patch site goes through the identical mangling. A search string
+containing an escape will silently fail to match, and a script that then "successfully" writes
+nothing is indistinguishable from one that worked. If a scripted edit reports success, confirm the
+file actually changed.
+
 ## Board selection
 
 Each PlatformIO environment in `platformio.ini` picks a board via `build_flags`:
