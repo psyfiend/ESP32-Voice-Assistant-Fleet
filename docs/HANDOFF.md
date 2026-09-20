@@ -1,5 +1,9 @@
 # Handoff — 2026-09-19
 
+**If you are the owner returning after time away, read `docs/REVIEW_2026-09-20.md` FIRST.** It is
+the same work written for someone who was not here, with a test plan and pass/fail criteria. This
+file assumes you were.
+
 **Start here.** `CLAUDE.md` is the stable how-it-works. This is where we are, what will bite you,
 and what to do next. Kept lean on purpose: anything that is "why we did X and not Y" now lives in
 `docs/LESSONS.md`, and anything that is a design lives in `docs/design/`.
@@ -40,6 +44,9 @@ deliberately untouched because they are the #49 soak.
 6. `docs/design/cards.md` — the card spec. Its "Implementation notes" first.
 7. `docs/design/tokens.md`, `docs/design/startup.md` — the design system, and boot order.
 8. `docs/ROADMAP.md` §7 — the milestone list.
+9. `docs/REVIEW_2026-09-20.md` — the 2026-09-19/20 work in review form: what changed, what it
+   took, what is unproven, and a test plan. Supersedes nothing; it is a narrative of the same
+   commits.
 
 ---
 
