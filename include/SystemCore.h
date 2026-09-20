@@ -23,6 +23,7 @@
 #include "HaClient.h"
 #include "HaProvider.h"
 #include "HaRest.h"
+#include "CommandRouter.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #endif
@@ -118,4 +119,8 @@ private:
     // entity table rather than a hardcoded list. Also owns the decision that a
     // new session has begun, and tells _haRest to re-fetch when it does.
     HaProvider          _haProv;
+
+    // The outbound leg (#44). The ONLY code that knows a command can travel
+    // two ways - the registry stays transport-agnostic, per ROADMAP 4.1.
+    CommandRouter       _cmdRouter;
 };

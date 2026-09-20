@@ -381,12 +381,23 @@ bool EntityRegistry::setValue(const char *id, const EntityValue &v, uint32_t now
 // ---------------------------------------------------------------------------
 
 bool EntityRegistry::commandValue(const char *id, const EntityValue &v, uint32_t nowMs) {
+    // Snapshot taken under the lock; the SINK is called after it is released.
+    Entity snapshot;
+    {
     std::lock_guard<std::mutex> lk(_mx);
 
     const int i = indexOf(id);
     if (i < 0) return false;
     Entity &e = _items[i];
     if (!e.desc.writable) return false;
+
+    // A PAUSED ENTITY REFUSES COMMANDS. Issue #60.
+    //
+    // Not "accepts and ignores" - refuses, so the caller knows. The owner:
+    // "I would expect a PAUSED button to not respond". Accepting silently
+    // would leave the card showing an optimistic value for something that was
+    // never sent, which is the lying-diagnostic shape all over again.
+    if (e.paused) return false;
 
     // Remember what to fall back to. Guard against a second tap inside the
     // window overwriting prevValue with the optimistic value from the first -
@@ -403,6 +414,15 @@ bool EntityRegistry::commandValue(const char *id, const EntityValue &v, uint32_t
     e.lastUpdateMs   = nowMs;
     e.everSet        = true;
     e.dirty          = true;
+
+    snapshot         = e;
+    }   // lock released here
+
+    // OUTSIDE THE LOCK, and that placement is the point. The sink publishes or
+    // calls a service, which can block on a socket for milliseconds; holding
+    // the registry mutex across that would stall every provider and the LVGL
+    // thread queued behind them. Issue #44.
+    if (_cmdFn) _cmdFn(snapshot, v, _cmdCtx);
     return true;
 }
 

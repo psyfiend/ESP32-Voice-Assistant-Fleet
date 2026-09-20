@@ -165,20 +165,23 @@ sends none at all. That keeps a 2.5 KB task stack out of internal RAM on `CYD_S3
 ## What is next
 
 0. **OWNER SIGN-OFF ON #43**, then merge. Everything below assumes that happens.
-1. **#44 — outbound commands.** The HA half has NO unknowns left: `call_service` was exercised on
-   `light.office_overhead` with permission and the echo came back in **~91 ms**. What remains is
-   the device side - a card tap reaching the transport, and the domain taken from the entity id
-   prefix rather than from `kind`.
-2. **#60 — give PAUSE a behaviour.** Fully specified, every decision made, not started. Small,
-   and it folds naturally into 2.7.
-3. **2.7 card types.** The 18 real entities are now on glass, so this is judgeable for the first
+1. **2.7 card types.** The 18 real entities are now on glass, so this is judgeable for the first
    time: a `door` type, `LightCard` learning brightness, the corner-icon/hero split.
 4. **2.8 slots** — and the card-corner artifact below goes with it.
 
 **#49 IS NOT FIXED.** The C6 update did not stop the dropouts - see the headline below.
 
 Done 2026-09-19: #50, #51, 2.6's vertical swipes (#17 stays open for the horizontal half).
-Done 2026-09-20 on `feat/43-ha-websocket`: #43 inbound, #56, #57.
+Done 2026-09-20 on `feat/43-ha-websocket`: #43 inbound, #56, #57, **#60**, **#44 outbound**.
+
+**#44's outbound leg is written but HAS NEVER RUN.** Nothing can tap the screen remotely, so the
+path from a card tap to `call_service` has only ever been compiled. The transport under it is
+proven (~91 ms echo, measured). T9 in `REVIEW_2026-09-20.md` is that test.
+
+**#44 is not finished, deliberately.** Nothing subscribes to our own `/set` topics -
+`MqttManager::subscribeCommand()` exists with no caller - because no entity in the fleet is both
+writable AND advertised. The virtual test switches are `advertise = false` on purpose. The hook is
+where it goes the day a real one exists.
 
 ## #43 — WHAT SHIPPED, AND HOW TO CHECK IT
 

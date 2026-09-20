@@ -135,6 +135,20 @@ public:
     // Returns false if the entity is unknown or not writable.
     bool commandValue(const char *id, const EntityValue &v, uint32_t nowMs);
 
+    // WHERE A COMMAND LEAVES THE DEVICE. Issue #44.
+    //
+    // commandValue() has existed since #10 and applies a value optimistically,
+    // but nothing ever TRANSMITTED it - the outbound leg was the missing half.
+    // The registry still knows nothing about transports: it hands the command
+    // to whatever registered here and that thing decides whether it is a
+    // websocket call_service or an MQTT publish.
+    //
+    // CALLED WITH THE REGISTRY LOCK RELEASED. The sink sends over a socket,
+    // which can block for milliseconds; holding the mutex across that would
+    // stall every provider and the LVGL thread behind it.
+    typedef void (*CommandSink)(const Entity &e, const EntityValue &v, void *ctx);
+    void setCommandSink(CommandSink fn, void *ctx) { _cmdFn = fn; _cmdCtx = ctx; }
+
     // Drain the dirty set. Call from the LVGL task only.
     //
     // The callback is invoked OUTSIDE the lock, with a snapshot, so a slow
@@ -172,6 +186,9 @@ private:
     Entity *_items    = nullptr;
     uint8_t _capacity = 0;
     uint8_t _count    = 0;
+
+    CommandSink _cmdFn  = nullptr;
+    void       *_cmdCtx = nullptr;
 
     mutable std::mutex _mx;
     uint32_t _reconcileMs = 5000;   // generous: a round trip through a broker

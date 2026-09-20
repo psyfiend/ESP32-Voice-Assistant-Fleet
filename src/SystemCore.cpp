@@ -183,7 +183,18 @@ bool SystemCore::begin() {
     _haRest.begin(&_entities);
     _haProv.begin(&_entities, &_ha, &_haRest);
 
-    // --= 12. Restore the user's pauses =--
+    // --= 12. Outbound commands =--
+    //
+    // Registers itself as the registry's command sink, so a card tap becomes a
+    // call_service or an MQTT publish. Before this, commandValue() applied a
+    // value optimistically and nothing ever transmitted it - #44 was the half
+    // of the command path that had never been written.
+    //
+    // After the transports exist and before the pause restore, which only
+    // touches flags.
+    _cmdRouter.begin(&_entities, &_mqtt, &_ha);
+
+    // --= 13. Restore the user's pauses =--
     //
     // LAST, and it has to be: restorePaused() marks entities by id, and an id
     // that is not in the table yet cannot be marked. Every provider above has

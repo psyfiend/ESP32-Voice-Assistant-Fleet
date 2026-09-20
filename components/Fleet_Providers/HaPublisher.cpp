@@ -39,6 +39,23 @@ void HaPublisher::stateTopicFor(const Entity &e, char *out, size_t outLen) const
     snprintf(out, outLen, "%s/%s/state", _mqtt->getBaseTopic(), e.desc.id);
 }
 
+// ROADMAP Q5: command = <base>/<object_id>/set. Issue #44.
+//
+// The /state and /set pair is not a house style - it is HA's own discovery
+// convention (state_topic vs command_topic), it is what Zigbee2MQTT does, and
+// it is what the owner's Shed Power Monitor already does with
+// `.../motion_timer/state` and `.../motion_timer/set`. Three independent
+// sources agreeing was worth checking before inventing a fourth.
+//
+// Derived here rather than stored on the descriptor, deliberately: for an
+// entity WE own, the topic follows from the device identity, and ROADMAP 4.1
+// is explicit that a descriptor never spells its own topics out. Only entities
+// someone ELSE owns carry a commandRef, because only they have an address we
+// cannot compute.
+void HaPublisher::commandTopicFor(const Entity &e, char *out, size_t outLen) const {
+    snprintf(out, outLen, "%s/%s/set", _mqtt->getBaseTopic(), e.desc.id);
+}
+
 // Platforms Home Assistant treats as COMMANDABLE. Each requires a
 // command_topic in its discovery config, and HA rejects the entity outright
 // without one - it simply never appears, with no error logged anywhere.
@@ -78,6 +95,15 @@ bool HaPublisher::appendComponent(String &json, const Entity &e, bool first) con
     appendKV(json, "uniq_id",       uniq);
     appendKV(json, "object_id",     uniq);
     appendKV(json, "stat_t",        stateTopic);
+
+    // Issue #44. Only for platforms HA requires it on, and only when the entity
+    // can actually take an order - advertising a command topic for something
+    // read-only would draw a control that silently does nothing.
+    if (kindNeedsCommandTopic(e.desc.kind) && e.desc.writable) {
+        char cmdTopic[ENTITY_TOPIC_MAX];
+        commandTopicFor(e, cmdTopic, sizeof(cmdTopic));
+        appendKV(json, "cmd_t", cmdTopic);
+    }
     appendKV(json, "avty_t",        _mqtt->getAvailabilityTopic());
     appendKV(json, "pl_avail",      "online");
     appendKV(json, "pl_not_avail",  "offline");

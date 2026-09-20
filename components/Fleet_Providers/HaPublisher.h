@@ -78,6 +78,9 @@ private:
 
     // Publishes "unavailable" to one entity's state topic. Issue #60.
     void publishPaused(const Entity &e);
+
+    // <base>/<object_id>/set, for entities we own. Issue #44.
+    void commandTopicFor(const Entity &e, char *out, size_t outLen) const;
     uint32_t    _lastPubMs[ENTITY_MAX] = {};
 
     // Republish an unchanged value this often anyway. Cheap insurance: a

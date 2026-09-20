@@ -117,6 +117,25 @@ struct EntityDescriptor {
     // with `val_tpl`; a plain key is enough for us and needs no template
     // engine on the device.
     char valueKey[ENTITY_SHORT_MAX] = {0};
+
+    // WHERE A COMMAND GOES, when that is not where the value comes from.
+    // Issue #44.
+    //
+    // Needed because the two are genuinely different addresses for an entity
+    // someone else owns. Zigbee2MQTT publishes state on `zigbee2mqtt/thing`
+    // and takes orders on `zigbee2mqtt/thing/set`; the owner's own Shed Power
+    // Monitor uses the same split, `.../motion_timer/state` and
+    // `.../motion_timer/set`, which is also exactly HA's discovery convention
+    // of state_topic vs command_topic. Three independent sources, one shape.
+    //
+    // Left EMPTY for:
+    //   - entities WE own (advertise = true). Their command topic is derived
+    //     centrally from the device identity, the same way their state topic
+    //     is - ROADMAP 4.1 is explicit that a descriptor never spells its own
+    //     topics out.
+    //   - HA-sourced entities. A websocket call_service is addressed by
+    //     entity_id, which externalRef already holds; there is no topic.
+    char commandRef[ENTITY_TOPIC_MAX] = {0};
 };
 
 struct Entity {
