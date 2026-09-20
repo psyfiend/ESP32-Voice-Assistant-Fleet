@@ -141,6 +141,18 @@ public:
     // Cards use this to grey out rather than display a confident stale number.
     bool isStale(const Entity &e, uint32_t nowMs) const;
 
+public:
+    // How long the value has held its current reading, in ms. Issue #57.
+    //
+    // Answers "the garage has been open for 40 minutes", which is NOT what age
+    // since lastUpdateMs answers. Returns 0 for an entity that has never had a
+    // value, which callers must treat as "unknown" rather than "just now".
+    static uint32_t heldForMs(const Entity &e, uint32_t nowMs) {
+        return e.everSet ? (nowMs - e.lastChangeMs) : 0;
+    }
+
+private:
+
 private:
     // Caller-owned storage; see begin(). The registry object itself stays tiny,
     // which is the point - only the table is large, and only the table moves.

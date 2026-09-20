@@ -123,7 +123,27 @@ struct Entity {
     EntityDescriptor desc;
 
     EntityValue value;
+    // WHEN WE LAST HEARD ANYTHING, changed or not. Issue #57.
+    //
+    // This is a statement about the TRANSPORT, not about the thing: it moves
+    // on every message, including one carrying a value identical to the last.
+    // Staleness is derived from it, because staleness is a question about
+    // whether we are still in touch.
     uint32_t    lastUpdateMs = 0;
+
+    // WHEN THE VALUE LAST ACTUALLY CHANGED. Issue #57.
+    //
+    // A different question, and the one a card usually wants: "the garage has
+    // been open for 40 minutes", "the light went on at 6:03". Deriving that
+    // from lastUpdateMs is wrong in both directions - an MQTT sensor
+    // republishing an unchanged reading every 30 s would claim it just
+    // changed, and an HA entity on a change-driven feed would be indefinitely
+    // "unchanged" only because nothing has been said.
+    //
+    // Set together with the first value, so "changed" and "first seen" are the
+    // same instant rather than zero.
+    uint32_t    lastChangeMs = 0;
+
     bool        everSet      = false;   // distinguishes "0" from "no reading yet"
 
     // --- Optimistic write bookkeeping ------------------------------------

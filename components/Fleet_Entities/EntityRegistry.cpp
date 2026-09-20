@@ -198,7 +198,16 @@ bool EntityRegistry::setValue(const char *id, const EntityValue &v, uint32_t now
     }
 
     e.value        = v;
+
+    // ALWAYS: we heard from it. Issue #57 - this is the transport's clock.
     e.lastUpdateMs = nowMs;
+
+    // ONLY ON A REAL CHANGE: this is the thing's own clock. `changed` is true
+    // for the first value too, so an entity's first reading counts as its
+    // first change rather than leaving this at zero and making "how long has
+    // it been like this" answer "since boot".
+    if (changed) e.lastChangeMs = nowMs;
+
     e.everSet      = true;
 
     // Unchanged values are not dirtied. This is most of ROADMAP 4.2's
