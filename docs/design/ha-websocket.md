@@ -202,6 +202,52 @@ the websocket cannot replace. Websocket inbound for HA's entities, MQTT outbound
 
 ---
 
+## 7a. SUPERSEDED — do not stream the device registry. Ask HA to resolve areas.
+
+**§4 and §7 say to fetch the 120 KB device registry and keep `id` + `area_id`. Do not.** Measured
+2026-09-20, and there is a far better way that was not considered when §4 was written.
+
+| Route | Bytes | Time |
+|---|---|---|
+| `config/device_registry/list` | **115,742** | 6 ms |
+| **one `render_template` for all 18 entities** | **818** | 17 ms |
+
+A **141x** reduction, and the decisive part is not the ratio: `HaClient`'s reassembly buffer is
+**8 KB**, so the device registry does not fit and never could without an incremental parser that
+does not exist. The template reply does fit, comfortably.
+
+HA's `area_name()` template function **follows the device hop itself**, which is the whole reason
+§4 wanted the device registry:
+
+```jinja
+{% set ns = namespace(o=[]) %}
+{% for e in [ ...entity ids... ] %}
+{% set ns.o = ns.o + [e ~ '=' ~ (area_name(e) or '')] %}
+{% endfor %}
+{{ ns.o | join('|') }}
+```
+
+860 bytes out, 818 back, one round trip, `entity=Area|entity=Area|…` — a format a device can split
+with `strtok` and no JSON parse at all. All 18 resolved correctly, including `light.office`, whose
+own `area_id` is null and which §4 specifically warns about.
+
+**Caveat worth knowing:** `render_template` is a *subscription*, not a one-shot. It re-renders when
+its dependencies change, so it must be cancelled with `unsubscribe_events` once the answer is in,
+or it becomes a permanent feed. That is one extra message, not a reason to avoid it.
+
+### Why this is not implemented yet
+
+Areas are currently hardcoded in `Dashboard_HA.h` and they are correct, so resolving them at
+runtime changes nothing visible today. It earns its keep when pages are grouped by area - the
+owner's "a button for Bedroom that takes you to the Bedroom page" - and it should be built then,
+against this measurement rather than against §4's plan.
+
+Note the names HA returns are its own: `Living Room`, `Eric Bedroom`, `Front Room`. The owner
+shortened these deliberately, and `HA_AREA_NAMES` in `ExternalEntities_HA.h` is the override table
+keyed on `area_id`.
+
+---
+
 ## 7b. Measured 2026-09-20 — request ids, and what a reconnect costs
 
 Run from a PC against the live instance, read-only, no `call_service`.
@@ -250,7 +296,18 @@ entity list small.
 - **The trigger event shape on a real change of one of OUR entities.** The 60-second window caught
   zero — those entities were simply quiet. The shape was confirmed against a busy solar sensor
   instead (`event.variables.trigger.to_state`), and it should be re-confirmed on a light.
-- **`call_service` has not been exercised at all.** Doing so turns on a light in the owner's
-  house, so it waits for him to be present and to say go.
+- ~~**`call_service` has not been exercised at all.**~~ **DONE 2026-09-20**, with the owner's
+  explicit permission and on the one entity he named (`light.office_overhead`, "harmless and
+  won't disturb anybody"). Turned on, then off, and confirmed left exactly as found.
+
+  | | |
+  |---|---|
+  | `light.turn_on` / `light.turn_off` | both `success: true` |
+  | **echo back via `subscribe_trigger`** | **~91 ms** |
+  | echo event size | 1,462 / 1,492 B |
+
+  **That 91 ms is the number #44's optimistic-write reconcile window should be built around** -
+  the registry currently reverts on a timeout measured in seconds, which is two orders of
+  magnitude of slack. The HA half of #44 now has no unknowns left in it.
 - **Sensor history** (`history/stream` or the REST history endpoint) for the sparkline `cards.md`
   §4 wants. Not looked at.
