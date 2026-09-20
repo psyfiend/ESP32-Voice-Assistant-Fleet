@@ -1,4 +1,17 @@
 #include "EntityRegistry.h"
+
+// ESP-IDF's NVS directly, NOT Arduino's Preferences.
+//
+// Preferences is a thin Arduino wrapper over exactly this, and the owner's
+// standing constraint (2026-09-19) is to avoid Arduino-specific libraries so an
+// ESP-IDF port stays straightforward. ConnectivityManager predates that rule and
+// still uses Preferences; new code should not add to the pile. The two
+// interoperate at the namespace level anyway, so this is not a split brain.
+#include "esp_log.h"
+#include "nvs.h"
+#include "nvs_flash.h"
+#include <string.h>
+#include <stdio.h>
 #include <new>   // placement new over caller-provided storage
 
 // ---------------------------------------------------------------------------
@@ -122,6 +135,152 @@ const Entity *EntityRegistry::find(const char *id) const {
 // ---------------------------------------------------------------------------
 // Provider side
 // ---------------------------------------------------------------------------
+
+
+// ---------------------------------------------------------------------------
+// Pause - issue #60
+// ---------------------------------------------------------------------------
+//
+// Stored as ONE comma-delimited string of entity ids rather than a key each.
+//
+// That is a deliberate trade. A key per entity means a write per entity and a
+// scan to read them back; one string means one write, whatever changed. NVS
+// writes matter here beyond the usual wear argument: #41 records NINA's claim
+// that a write runs with the CPU cache disabled and "can starve the esp-hosted
+// SDIO transport and trigger a host restart" on exactly our P4 hardware.
+//
+// Pausing is a deliberate long-press, so it is rare by construction and nothing
+// like the slider-drag case that motivated that warning. One write per press is
+// the correct cost, and it is bounded.
+
+// ESP-IDF logging rather than Serial: this translation unit deliberately pulls
+// in no Arduino header, which is the point of using nvs.h here in the first
+// place. The output lands on the same console either way.
+static const char *ENT_TAG = "Entities";
+
+static const char *PAUSE_NS  = "fleet_ent";
+static const char *PAUSE_KEY = "paused";
+static constexpr size_t PAUSE_BLOB_MAX = 512;
+
+// Is `id` present in the comma-delimited list? Compares whole fields, so
+// "deck_temp" does not match inside "deck_temp_2".
+static bool listHas(const char *list, const char *id) {
+    const size_t n = strlen(id);
+    for (const char *p = list; *p; ) {
+        const char *e = strchr(p, ',');
+        const size_t len = e ? (size_t)(e - p) : strlen(p);
+        if (len == n && strncmp(p, id, n) == 0) return true;
+        if (!e) break;
+        p = e + 1;
+    }
+    return false;
+}
+
+static bool loadPauseList(char *out, size_t cap) {
+    out[0] = '\0';
+    nvs_handle_t h;
+    if (nvs_open(PAUSE_NS, NVS_READONLY, &h) != ESP_OK) return false;
+    size_t len = cap;
+    esp_err_t err = nvs_get_str(h, PAUSE_KEY, out, &len);
+    nvs_close(h);
+    if (err != ESP_OK) { out[0] = '\0'; return false; }
+    return true;
+}
+
+static bool savePauseList(const char *list) {
+    nvs_handle_t h;
+    if (nvs_open(PAUSE_NS, NVS_READWRITE, &h) != ESP_OK) return false;
+    esp_err_t err = nvs_set_str(h, PAUSE_KEY, list);
+    if (err == ESP_OK) err = nvs_commit(h);
+    nvs_close(h);
+    return err == ESP_OK;
+}
+
+bool EntityRegistry::isPaused(const char *id) const {
+    std::lock_guard<std::mutex> lk(_mx);
+    const int i = indexOf(id);
+    return (i >= 0) && _items[i].paused;
+}
+
+uint8_t EntityRegistry::pausedCount() const {
+    std::lock_guard<std::mutex> lk(_mx);
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < _count; i++) if (_items[i].paused) n++;
+    return n;
+}
+
+bool EntityRegistry::setPaused(const char *id, bool paused, uint32_t nowMs) {
+    {
+        std::lock_guard<std::mutex> lk(_mx);
+        const int i = indexOf(id);
+        if (i < 0) return false;
+        Entity &e = _items[i];
+        if (e.paused == paused) return true;
+
+        e.paused = paused;
+
+        // A pause freezes the entity where it stands. Any optimistic write in
+        // flight is abandoned rather than left to time out and be reported as
+        // a failure the user did not cause - the owner's rule is that a paused
+        // entity changes no state at all.
+        if (paused) {
+            e.pending   = false;
+            e.cmdFailed = false;
+        }
+
+        e.lastUpdateMs = nowMs;
+        e.dirty        = true;
+    }
+
+    // Rebuild and persist OUTSIDE the lock: the NVS write can take hundreds of
+    // milliseconds and nothing else may be blocked behind it. See the note at
+    // the top of this section.
+    char list[PAUSE_BLOB_MAX];
+    size_t used = 0;
+    list[0] = '\0';
+    {
+        std::lock_guard<std::mutex> lk(_mx);
+        for (uint8_t i = 0; i < _count; i++) {
+            if (!_items[i].paused) continue;
+            const char *eid = _items[i].desc.id;
+            const size_t need = strlen(eid) + (used ? 1 : 0);
+            if (used + need + 1 >= sizeof(list)) {
+                // Refuse to write a truncated list rather than silently
+                // forgetting a pause on the next boot.
+                ESP_LOGW(ENT_TAG, "paused list full; not persisting. "
+                                  "Raise PAUSE_BLOB_MAX.");
+                return true;   // the in-RAM pause still stands
+            }
+            if (used) list[used++] = ',';
+            strcpy(list + used, eid);
+            used += strlen(eid);
+        }
+    }
+
+    if (!savePauseList(list)) {
+        ESP_LOGW(ENT_TAG, "NVS write failed; pause is live but will not "
+                          "survive a reboot.");
+    }
+    return true;
+}
+
+void EntityRegistry::restorePaused() {
+    char list[PAUSE_BLOB_MAX];
+    if (!loadPauseList(list, sizeof(list)) || !list[0]) return;
+
+    uint8_t n = 0;
+    {
+        std::lock_guard<std::mutex> lk(_mx);
+        for (uint8_t i = 0; i < _count; i++) {
+            if (listHas(list, _items[i].desc.id)) {
+                _items[i].paused = true;
+                _items[i].dirty  = true;
+                n++;
+            }
+        }
+    }
+    if (n) ESP_LOGI(ENT_TAG, "restored %u paused entities from NVS", (unsigned)n);
+}
 
 bool EntityRegistry::setAvailable(const char *id, bool available, uint32_t nowMs) {
     std::lock_guard<std::mutex> lk(_mx);

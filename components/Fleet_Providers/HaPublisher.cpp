@@ -165,6 +165,31 @@ void HaPublisher::publishDiscovery() {
     }
 }
 
+// Tell HA this entity is deliberately not reporting. Issue #60.
+//
+// Published to the ENTITY'S OWN STATE TOPIC, not to an availability topic,
+// because there is no per-entity availability topic: discovery points every
+// entity at the DEVICE-level LWT (pl_avail / pl_not_avail above). Using that
+// would mark the whole panel offline, which is the opposite of what the owner
+// asked for - "set it as Unavailable for the sensor only, obviously not for the
+// board itself or any other entities".
+//
+// Retained, so HA still sees it after a broker reconnect - a pause that
+// survives our reboot but not the broker's would be a odd half-promise.
+//
+// NOT YET CONFIRMED ON HARDWARE: HA special-cases the literal payload
+// "unavailable" on a state topic for sensor and binary_sensor. That is the
+// documented behaviour and it is why this is a one-line change rather than a
+// discovery-schema change (#47 warns that payload is already close to the MQTT
+// buffer limit), but nobody has watched it happen on this fleet. If HA instead
+// shows the string "unavailable" as a value, the fix is a per-entity
+// availability_topic and it belongs with #47.
+void HaPublisher::publishPaused(const Entity &e) {
+    char topic[ENTITY_TOPIC_MAX];
+    stateTopicFor(e, topic, sizeof(topic));
+    _mqtt->publish(topic, "unavailable", /*retain=*/true);
+}
+
 void HaPublisher::publishState(const Entity &e, uint8_t idx, uint32_t nowMs) {
     char topic[ENTITY_TOPIC_MAX];
     stateTopicFor(e, topic, sizeof(topic));
@@ -211,6 +236,36 @@ void HaPublisher::loop(uint32_t nowMs) {
     for (uint8_t i = 0; i < _reg->count(); i++) {
         const Entity *e = _reg->at(i);
         if (!e || !e->desc.advertise) continue;
+
+        // PAUSED ENTITIES STOP TRANSMITTING. Issue #60.
+        //
+        // The owner's case: "if the device was sending temp data to HA but I
+        // knew the temp sensor was broken, I would not want it sending bogus
+        // data to HA." So we go quiet - but we say so FIRST, once, rather than
+        // just stopping. Silence would leave HA showing the last good reading
+        // indefinitely, which is precisely the bogus data he is trying to stop.
+        //
+        // Scoped to this entity. The board's own availability topic and every
+        // other entity are untouched: a paused deck probe must not make the
+        // whole panel look offline.
+        if (e->paused) {
+            if (!_pauseAnnounced[i]) {
+                publishPaused(*e);
+                _pauseAnnounced[i] = true;
+                Serial.printf("[HaPub] %s paused - published unavailable\n",
+                              e->desc.id);
+            }
+            continue;
+        }
+        if (_pauseAnnounced[i]) {
+            // Resumed. Clear the flag and fall through; the value publish
+            // below is itself the "it is back" signal.
+            _pauseAnnounced[i] = false;
+            // No explicit "available" is needed: the value publish that falls
+            // through below is itself the proof it is back, exactly as it is on
+            // the inbound side (EntityRegistry::setValue).
+            Serial.printf("[HaPub] %s resumed\n", e->desc.id);
+        }
         if (!e->everSet) continue;              // no reading yet; nothing honest to send
 
         const bool changed   = !_everPub[i] || !_lastPub[i].equals(e->value);

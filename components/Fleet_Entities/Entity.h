@@ -203,6 +203,35 @@ struct Entity {
     // Starts TRUE so that an entity nobody has said anything about is not born
     // broken; `everSet` is what distinguishes "no reading yet".
     bool        available      = true;
+
+    // --- The user's own choice. Issue #60. --------------------------------
+    //
+    // PAUSED LIVES ON THE ENTITY, NOT ON THE CARD, and that placement is the
+    // whole point. A card is a VIEW; "this temperature probe is broken, stop
+    // sending bogus data to HA" is a statement about the PROBE, and stays true
+    // whether or not a tile happens to be showing it.
+    //
+    // This project already made the identical call once, for cmdFailed just
+    // below: a fact tracked per-card let a parent card and a child card bound
+    // to the same switch disagree. Pause has the same shape - leave it on the
+    // card and pausing from the wrong tile leaves a local sensor publishing.
+    //
+    // What it means, by who owns the entity:
+    //   advertise == true  (ours)    -> stop sampling, stop publishing, and
+    //                                   tell HA "unavailable" once.
+    //   advertise == false (theirs)  -> stop APPLYING inbound values.
+    //
+    // Either way the value stops changing, so the frozen display is free -
+    // deliberately NOT implemented as "stop rendering", which would leave the
+    // registry holding one number while the screen showed another.
+    //
+    // Owner's rule, and it is stronger than "looks frozen": a paused entity
+    // stops ALL conditional evaluation. No staleness transition, no cmdFailed
+    // transition. Held still, not merely quiet.
+    //
+    // Persisted in NVS: "if I want a card paused I do not want a reboot to
+    // unpause it."
+    bool        paused         = false;
 };
 
 #endif // ENTITY_H

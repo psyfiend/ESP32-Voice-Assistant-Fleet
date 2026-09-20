@@ -183,6 +183,17 @@ bool SystemCore::begin() {
     _haRest.begin(&_entities);
     _haProv.begin(&_entities, &_ha, &_haRest);
 
+    // --= 12. Restore the user's pauses =--
+    //
+    // LAST, and it has to be: restorePaused() marks entities by id, and an id
+    // that is not in the table yet cannot be marked. Every provider above has
+    // now registered, so the table is complete.
+    //
+    // Issue #60 - "if I want a card paused I do not want a reboot to unpause
+    // it." A pause that survived the user but not the power cut would be worse
+    // than no pause at all.
+    _entities.restorePaused();
+
     heapMark("core ready");
 
     return true;

@@ -80,6 +80,26 @@ void reportEntities(SystemCore &core) {
     // which is itself the useful signal if a provider fails to start.
     SystemReport::line("[ENTITIES] %u registered", (unsigned)entities.count());
 
+    // PAUSED ENTITIES ARE LISTED HERE BECAUSE NOTHING ELSE WOULD SHOW THEM.
+    //
+    // Issue #60 made pause persist across reboots, which turns it from a glance
+    // tool into a setting - and a setting with no inventory is a trap. Someone
+    // pauses a probe in October, forgets, and spends February wondering why one
+    // sensor never updates. The dump is the one place that answers it without
+    // hunting for the tile and long-pressing to see if it toggles.
+    const uint8_t nPaused = entities.pausedCount();
+    if (nPaused) {
+        SystemReport::line("[ENTITIES] %u PAUSED by the user:", (unsigned)nPaused);
+        for (uint8_t i = 0; i < entities.count(); i++) {
+            const Entity *e = entities.at(i);
+            if (e && e->paused) {
+                SystemReport::line("             %s (%s)", e->desc.id,
+                                   e->desc.advertise ? "ours - not publishing"
+                                                     : "theirs - not applying");
+            }
+        }
+    }
+
     const uint32_t now = millis();
     for (uint8_t i = 0; i < entities.count(); i++) {
         const Entity *e = entities.at(i);

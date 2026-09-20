@@ -113,6 +113,19 @@ public:
     // that repeats "unavailable" does not repaint the screen.
     bool setAvailable(const char *id, bool available, uint32_t nowMs);
 
+    // The user's pause. Issue #60. Persisted to NVS so a reboot does not undo
+    // it. Returns false if the id is unknown.
+    bool setPaused(const char *id, bool paused, uint32_t nowMs);
+    bool isPaused(const char *id) const;
+
+    // Restore paused ids from NVS. Call AFTER every provider has registered,
+    // because an id that is not in the table yet cannot be marked.
+    void restorePaused();
+
+    // How many entities are currently paused - for the system dump, which is
+    // the only place a pause that outlives a reboot is discoverable from.
+    uint8_t pausedCount() const;
+
     // --- UI side ----------------------------------------------------------
 
     // Optimistically apply a commanded value so a control responds instantly,

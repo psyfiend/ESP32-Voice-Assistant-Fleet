@@ -63,9 +63,34 @@ Card &Card::setLabel(const char *l) { copyBounded(_label, sizeof(_label), l); re
 Card &Card::setArea (const char *a) { copyBounded(_area,  sizeof(_area),  a); return *this; }
 
 Card &Card::setPaused(bool p) {
-    _paused = p;
+    // THE FLAG LIVES ON THE ENTITY, NOT HERE. Issue #60.
+    //
+    // A card is a view; pausing is a statement about the thing. Writing it to
+    // the registry means every card bound to the same entity agrees by
+    // construction, a local sensor actually stops publishing, and the choice
+    // survives a reboot - none of which a per-card bool could do.
+    //
+    // Applied to every primary. A card showing two things pauses both, because
+    // a half-paused card is not a state anyone can read at a glance.
+    if (s_reg) {
+        const uint32_t now = millis();
+        for (uint8_t i = 0; i < _nPrimary; i++) {
+            const Entity *e = _primary[i];
+            if (e) s_reg->setPaused(e->desc.id, p, now);
+        }
+    }
     if (_root) { applyState(); render(); }
     return *this;
+}
+
+// Is this card paused? Asked of the ENTITIES, so a card built after the pause -
+// or a second card on the same entity - reports it correctly without being told.
+bool Card::isPaused() const {
+    for (uint8_t i = 0; i < _nPrimary; i++) {
+        const Entity *e = _primary[i];
+        if (e && e->paused) return true;
+    }
+    return false;
 }
 
 const char *Card::label() const {
@@ -176,7 +201,7 @@ void Card::resolveVariant() {
 // the only whole-card action that makes sense on a read-only sensor as well as
 // on a switch.
 void Card::onLongPress() {
-    setPaused(!_paused);
+    setPaused(!isPaused());
     pollState(millis());
 }
 
@@ -688,7 +713,8 @@ CardState Card::deriveState(uint32_t nowMs) const {
     // cards.md section 3: stale is "I have not heard from this", refused is
     // "I told it to do something and it refused" - and the one the user just
     // caused is the one they need to see.
-    if (_paused) return CardState::ST_PAUSED;
+    // Read off the ENTITY. Issue #60 - see setPaused().
+    if (isPaused()) return CardState::ST_PAUSED;
 
     // UNAVAILABLE OUTRANKS EVERYTHING EXCEPT THE USER'S OWN CHOICE. Issue #56.
     //
