@@ -6,6 +6,9 @@
 #include "UI/ReferencePage.h"
 #include "UI/LogPage.h"
 #include "Dashboards/Dashboard_Fleet.h"
+#ifdef USE_HA_DASHBOARD
+#include "Dashboards/Dashboard_HA.h"
+#endif
 #include "bsp_loader.h"
 
 // LVGL's event and callback APIs take plain function pointers with no user
@@ -695,7 +698,18 @@ void GUIManager::buildDashboard() {
     // laid over a copy of it. PageSpec is a plain aggregate, so this is a copy
     // and an assignment rather than any kind of mechanism - which is the point
     // of the spec being data.
+    // WHICH PAGE THIS BOARD BOOTS INTO.
+    //
+    // An either/or rather than a choice, and only until 2.6. A board can show
+    // exactly one page today, and 18 HA cards plus 12 fleet cards fit nowhere,
+    // so -D USE_HA_DASHBOARD swaps the whole page. When horizontal swipes land
+    // this becomes two pages and the flag goes away - HA_PAGE already carries
+    // id 2 for that day.
+#ifdef USE_HA_DASHBOARD
+    PageSpec page = HA_PAGE;
+#else
     PageSpec page = FLEET_PAGE;
+#endif
     page.headerDefault  = _hdr;
     page.variantDefault = _variant;
     page.showArea       = _showArea;
