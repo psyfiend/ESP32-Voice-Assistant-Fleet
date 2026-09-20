@@ -12,9 +12,17 @@ does not appear in the source as suspect.
 
 ## Where the project is
 
-Phases 0, 1 and 2.1–2.5 are merged and tagged `v0.2.5`. Work since then is on
-**`fix/49-link-liveness`**, 19 commits, pushed, **not yet merged**. It carries #49, #50, #51, the
-first cut of 2.6's swipe navigation, and a lot of small corrections found on glass.
+Phases 0, 1 and 2.1–2.5 are merged and tagged `v0.2.5`. **`fix/49-link-liveness` merged to `main`
+on 2026-09-19** (`7d723be`, 23 commits, `--no-ff` per ROADMAP §3.2's exception — the intermediate
+commits are the diagnostic record, and for #49 that record *is* the finding). It carried #49's
+detection half, #50, #51, the first cut of 2.6's swipe navigation, and a lot of small corrections
+found on glass.
+
+**No new tag.** `C` tracks the roadmap phase and 2.6 is not finished; the build counter `D` moves
+on its own. Boards report `v0.2.5.x`.
+
+Next branch is **#43, Home Assistant over the websocket** — the transport decision is settled, see
+below.
 
 Four boards are attached and flashed: `CYD_S3_3248` (COM10), `WS_P4_5` (COM15),
 `WS_S3_4B` (COM8), `WS_P4_4B` (COM7).
@@ -77,6 +85,14 @@ answers it. `WS_P4_5` and `WS_P4_7B` are deliberately untouched as controls: if 
 night and they do not, that is as close to conclusive as this project gets. **That soak is the
 single most important thing to check next.**
 
+**Soak status, 2026-09-19:** running. Owner's call is to give the 4B roughly **20 more hours**; if
+it is still up, the flash is judged safe and `WS_P4_5` and `WS_P4_7B` get the same treatment.
+
+**Do not read the S3 boards as evidence either way.** `CYD_S3_3248` and `WS_S3_4B` have built-in
+radios, have never once dropped, and are not part of this experiment. A long uptime on the 3248
+says the firmware is not leaking or wedging; it says nothing about #49, because the 3248 does not
+have the hardware that fails. Only the three P4 boards can answer this.
+
 Note the update is a full-flash write and wiped NVS, so the 4B is running on the compile-time
 credentials and its `_proven` flag has reset.
 
@@ -111,13 +127,42 @@ sends none at all. That keeps a 2.5 KB task stack out of internal RAM on `CYD_S3
 
 ## What is next
 
-0. **SOAK the C6 result.** #59 is DONE on `WS_P4_4B`; whether it fixes the dropouts needs a night, with `WS_P4_5` and `WS_P4_7B` as untouched controls.
-1. **Finish verifying 2.6's swipes on glass**, then merge this branch.
-2. **#43 — Home Assistant over the websocket.** See the transport note below.
-3. **#44 — outbound commands.**
+0. **SOAK the C6 result.** #59 is DONE on `WS_P4_4B` and the soak is running — ~20 more hours, then flash `WS_P4_5` and `WS_P4_7B` if it holds. This is a *watch*, not a build; it does not block anything below.
+1. **#43 — Home Assistant over the websocket. THIS IS THE ACTIVE BRANCH.** Both transports, not one: see below and `docs/design/ha-websocket.md` §7.
+2. **#44 — outbound commands.** `call_service`. The first thing in this project that changes the house rather than reading it.
+3. **#60 — give PAUSE a behaviour.** Fully specified, decisions all made, not started. Small, and it folds naturally into 2.7.
 4. **2.8 slots** — and the card-corner artifact below goes with it.
 
-### #43's transport decision, now informed
+Done and merged on 2026-09-19: #50, #51, and 2.6's vertical swipes (#17 stays open for the
+horizontal half). #49 stays open for the recovery half.
+
+### #43's transport — DECIDED 2026-09-19: both, and they are not redundant
+
+**REST does not get replaced by the websocket. They do different jobs, and `ha-websocket.md` §7
+already assumes both.**
+
+| Job | Transport | Why |
+|---|---|---|
+| auth, handshake | **WS** | three messages, milliseconds |
+| area / device / entity registries | **WS** | `get_states` is 787 KB and unusable; the per-entity forms are 842 B |
+| **initial value, per entity** | **REST** | `GET /api/states/<id>`, 399–843 B, 4–25 ms. Explicitly *not* `get_states` |
+| **live changes** | **WS** | `subscribe_trigger`, filtered server-side |
+| outbound commands (#44) | **WS** | `call_service` |
+| sensor history for sparklines | **REST** | `cards.md` §4's "fetch it, do not store it". Unmeasured — see §8 |
+| publishing OUR entities into HA | **MQTT** | discovery; the websocket cannot replace it |
+
+**The 30 s latency goes away, and that is the websocket's doing specifically.** REST is *pull* — the
+reference projects poll on a 30 s task, so a door could take half a minute to appear. WS is *push*,
+so a change lands as fast as the LAN carries it. The 30 s was never a property of REST as such; it
+is what polling costs. REST keeps its place above because one-shot fetches are exactly what it is
+good at.
+
+**Use `subscribe_trigger`, never `subscribe_events`.** Measured on the owner's instance: all
+`state_changed` is 731 events and 913 KB per minute, ~15 KB/s of JSON parsed continuously to find
+the handful that matter. The same window filtered to our 18 entities was **zero bytes**. That is
+~100x and it is the single most important finding in `ha-websocket.md`.
+
+### The library
 
 Checked rather than assumed: **both ESP-IDF reference projects use REST for HA.** NINA does
 `GET /api/states/{entity_id}` per tile; `ha-dashboard` polls on a 30 s task. Neither uses a
@@ -127,7 +172,7 @@ websocket for HA — though NINA pulls `esp_websocket_client` for other feeds.
 of core IDF — which is exactly why it is absent from the Arduino prebuilt libs. Nobody writes their
 own.
 
-**Recommendation: vendor `esp_websocket_client`** rather than write one. It is plain ESP-IDF C over
+**DECIDED: vendor `esp_websocket_client`** rather than write one. It is plain ESP-IDF C over
 `esp-tls`/lwIP, both already linked here; the only obstacle is that PlatformIO's Arduino build
 cannot run the IDF component manager, so it would be vendored like `bb_captouch_fork`. That is the
 same code an ESP-IDF migration would use later, and it keeps the owner's "avoid Arduino-specific
