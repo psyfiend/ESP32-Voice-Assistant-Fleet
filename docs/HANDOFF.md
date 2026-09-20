@@ -21,11 +21,13 @@ found on glass.
 **No new tag.** `C` tracks the roadmap phase and 2.6 is not finished; the build counter `D` moves
 on its own. Boards report `v0.2.5.x`.
 
-Next branch is **#43, Home Assistant over the websocket** — the transport decision is settled, see
-below.
+**`feat/43-ha-websocket` is the live branch, 10 commits, pushed, NOT merged.** #43's inbound half
+is code-complete and verified on hardware; #56 and #57 rode along because the HA path made both
+concrete. The owner has not signed it off, and that is the gate — not the build.
 
-Four boards are attached and flashed: `CYD_S3_3248` (COM10), `WS_P4_5` (COM15),
-`WS_S3_4B` (COM8), `WS_P4_4B` (COM7).
+Four boards attached: `CYD_S3_3248` (COM10), `WS_P4_5` (COM15), `WS_S3_4B` (COM8),
+`WS_P4_4B` (COM7). **Only the 3248 and the S3_4B carry the #43 firmware** - the two P4 boards are
+deliberately untouched because they are the #49 soak.
 
 ### Read in this order
 
@@ -41,7 +43,7 @@ Four boards are attached and flashed: `CYD_S3_3248` (COM10), `WS_P4_5` (COM15),
 
 ---
 
-## THE HEADLINE: #49 is half solved, and #59 is probably the other half
+## THE HEADLINE: #49 is half solved, and #59 was NOT the other half
 
 **Detection works. Recovery does not.**
 
@@ -85,8 +87,36 @@ answers it. `WS_P4_5` and `WS_P4_7B` are deliberately untouched as controls: if 
 night and they do not, that is as close to conclusive as this project gets. **That soak is the
 single most important thing to check next.**
 
-**Soak status, 2026-09-19:** running. Owner's call is to give the 4B roughly **20 more hours**; if
-it is still up, the flash is judged safe and `WS_P4_5` and `WS_P4_7B` get the same treatment.
+### SOAK RESULT, 2026-09-20: the C6 update did NOT fix it
+
+Read out of Home Assistant rather than off a serial cable - HA knows when it last heard from each
+board, which is the same question and needs no port:
+
+| Board | C6 | HA last heard |
+|---|---|---|
+| `WS_P4_4B` | **updated to 2.12.9** | **9 h 27 m ago** |
+| `WS_P4_5` | untouched | 1 h 09 m ago - **contaminated, see below** |
+| `WS_P4_7B` | untouched | 42 h ago - unplugged from the PC, not evidence |
+| `CYD_S3_3248` | n/a, own radio | seconds |
+| `WS_S3_4B` | n/a, own radio | seconds |
+
+**The 4B dropped anyway.** It lasted about 9.5 hours against the 5-6 it used to manage, which is
+*weak* evidence of improvement and nothing more - one sample, and nobody recorded when its clock
+started. The C6 firmware mismatch was real and worth fixing on its own merits; it was not the cause.
+
+**`WS_P4_5` is a void data point and it is my fault.** It went quiet around the time a flash
+attempt was killed on COM15. The evidence says `pio` crashed before `esptool` ever wrote (no
+`Writing at` lines in its log), but an orphaned `esptool` was found later, so it cannot be ruled
+out. Do not cite that 1 h 09 m for anything.
+
+**What this leaves.** The P4/S3 split still holds perfectly - no S3 board has EVER dropped, both
+P4s do - so the fault is still in the esp_hosted path, just not in the version pairing. #41 (do
+NVS writes disrupt the SDIO transport?) is the next unexamined suspect and is still open.
+
+**A cheap instrument nobody was using:** `scripts/scan_ha_icons.py`'s sibling technique. HA's
+`last_updated` on any entity a board publishes answers "is that board alive" for every board at
+once, from a PC, with no serial cable and no touching the fleet. That is how this result was
+obtained and it is how the next soak should be read.
 
 **Do not read the S3 boards as evidence either way.** `CYD_S3_3248` and `WS_S3_4B` have built-in
 radios, have never once dropped, and are not part of this experiment. A long uptime on the 3248
@@ -127,14 +157,84 @@ sends none at all. That keeps a 2.5 KB task stack out of internal RAM on `CYD_S3
 
 ## What is next
 
-0. **SOAK the C6 result.** #59 is DONE on `WS_P4_4B` and the soak is running — ~20 more hours, then flash `WS_P4_5` and `WS_P4_7B` if it holds. This is a *watch*, not a build; it does not block anything below.
-1. **#43 — Home Assistant over the websocket. THIS IS THE ACTIVE BRANCH.** Both transports, not one: see below and `docs/design/ha-websocket.md` §7.
-2. **#44 — outbound commands.** `call_service`. The first thing in this project that changes the house rather than reading it.
-3. **#60 — give PAUSE a behaviour.** Fully specified, decisions all made, not started. Small, and it folds naturally into 2.7.
+0. **OWNER SIGN-OFF ON #43**, then merge. Everything below assumes that happens.
+1. **#44 — outbound commands.** The HA half has NO unknowns left: `call_service` was exercised on
+   `light.office_overhead` with permission and the echo came back in **~91 ms**. What remains is
+   the device side - a card tap reaching the transport, and the domain taken from the entity id
+   prefix rather than from `kind`.
+2. **#60 — give PAUSE a behaviour.** Fully specified, every decision made, not started. Small,
+   and it folds naturally into 2.7.
+3. **2.7 card types.** The 18 real entities are now on glass, so this is judgeable for the first
+   time: a `door` type, `LightCard` learning brightness, the corner-icon/hero split.
 4. **2.8 slots** — and the card-corner artifact below goes with it.
 
-Done and merged on 2026-09-19: #50, #51, and 2.6's vertical swipes (#17 stays open for the
-horizontal half). #49 stays open for the recovery half.
+**#49 IS NOT FIXED.** The C6 update did not stop the dropouts - see the headline below.
+
+Done 2026-09-19: #50, #51, 2.6's vertical swipes (#17 stays open for the horizontal half).
+Done 2026-09-20 on `feat/43-ha-websocket`: #43 inbound, #56, #57.
+
+## #43 — WHAT SHIPPED, AND HOW TO CHECK IT
+
+Inbound is code-complete and running on `CYD_S3_3248`. Awaiting owner sign-off, then merge.
+
+**The chain, as the boot log prints it:**
+
+    [HA] auth_ok - session ready
+    [HaProv] subscribe_trigger id 1 for 18 entities (675 B)
+    [HaProv] HA ACCEPTED the subscription (id 1)
+    [HaRest] initial values: 18 fetched, 0 failed
+    [Cards] 8 of 18 cards placed; 10 dropped for space
+
+If all five lines appear, the whole feature works. If `HA ACCEPTED` is missing, nothing else below
+is trustworthy.
+
+**How to read a board without a serial cable.** Only `WS_P4_5` has `ARDUINO_USB_CDC_ON_BOOT=0`;
+the rest route `Serial` to native USB, which on `WS_S3_4B` is not cabled at all. Use HA instead -
+see the soak table above. `pio device monitor -p COM10` works for the 3248.
+
+**Pieces, and where each lives:**
+
+| | |
+|---|---|
+| `components/esp_websocket_client/` | vendored Espressif v1.6.1, unmodified. See its README |
+| `components/Fleet_HA/HaClient` | socket + auth + reassembly + retry ladder |
+| `components/Fleet_HA/HaRest` | initial values, one entity per `loop()` pass |
+| `components/Fleet_HA/HaValue.h` | `haCoerceState()` - ONE copy, shared by both paths |
+| `components/Fleet_Providers/HaProvider` | the subscription and the live feed |
+| `components/Fleet_Providers/ExternalEntities_HA.h` | the 18 entities |
+| `include/Dashboards/Dashboard_HA.h` | the page, behind `-D USE_HA_DASHBOARD` |
+| `scripts/scan_ha_icons.py` | which icons HA actually serves |
+
+### The things that will bite whoever touches this next
+
+- **HaProvider's receive path runs on the WEBSOCKET TASK, not `loop()`.** First asynchronous
+  provider in the project. It must never touch LVGL; it writes through `EntityRegistry`'s mutex.
+  Sends happen on the loop task only - `HaClient::sendText()` refuses otherwise.
+- **Request ids must strictly increase within a connection.** HA answers `id_reuse` per request,
+  not by dropping the socket, so a pooled or recycled id scheme fails looking like an HA bug.
+- **A reconnect is a COLD START.** HA discards subscriptions with the connection. Nothing to clean
+  up; everything to rebuild. `HaProvider` watches `HaClient::sessions()` - a counter, not a
+  boolean, because a drop and recovery between two `loop()` calls is invisible to a boolean.
+- **`staleAfterMs` is 0 on all 18 HA entities and that is deliberate.** `subscribe_trigger` fires
+  on CHANGE, so silence carries no information and a stale window would grey out every quiet
+  sensor overnight. Death is reported by HA saying `unavailable` - that is #56.
+- **HA serves Fahrenheit.** It converts to the user's display unit before sending. The same deck
+  probe reads 53.276 F here and ~11.8 C over Zigbee2MQTT. The page converts only when the source
+  says `C`, so both land on F - but never infer a unit from a `device_class`.
+- **The 8 KB reassembly buffer is a design constraint, not a tuning knob.** It is why the device
+  registry (115 KB) is not fetched and why areas are resolved server-side instead.
+
+### Deliberately NOT built
+
+- **Area resolution at runtime.** Measured and documented (`ha-websocket.md` §7a): one
+  `render_template` resolves all 18 in **818 bytes** against the device registry's 115,742. Not
+  implemented because `Dashboard_HA.h`'s hardcoded areas are already correct, so it changes
+  nothing visible. Build it when pages are grouped by area.
+- **Reading `attributes.icon` live.** The glyphs are now in the font, but nothing consumes the
+  field yet. 2.7.
+- **Outbound.** That is #44.
+
+---
 
 ### #43's transport — DECIDED 2026-09-19: both, and they are not redundant
 

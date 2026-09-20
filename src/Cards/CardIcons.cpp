@@ -41,6 +41,13 @@ const char *cardIconFor(const EntityDescriptor &d) {
     if (dc(d, "pressure"))        return MDI_GAUGE;
     if (dc(d, "occupancy") ||
         dc(d, "motion"))          return MDI_MOTION_SENSOR;
+    // garage_door is its OWN class and does not match "door" - dc() is an
+    // exact compare. Without this the owner's two garage sensors fall all the
+    // way through to the BINARY_SENSOR default and draw a check circle. They
+    // are only correct today because HA sends an explicit mdi:garage, and the
+    // whole point of dashboard-target-7b.md is that he should be able to
+    // REMOVE that override to get the open/closed pair back.
+    if (dc(d, "garage_door"))     return MDI_GARAGE;
     if (dc(d, "door"))            return MDI_DOOR_OPEN;
     if (dc(d, "window") ||
         dc(d, "opening"))         return MDI_WINDOW_OPEN;
@@ -75,6 +82,11 @@ const char *cardIconForState(const EntityDescriptor &d, bool on) {
     // already carries state in its colour.
     if (dc(d, "occupancy") || dc(d, "motion"))
         return on ? MDI_MOTION_SENSOR : MDI_MOTION_SENSOR_OFF;
+    // The pair the owner actually asked for. It only engages once the static
+    // mdi:garage override is removed in HA - while that override stands, HA
+    // sends the same glyph for both states and step 1 of cardIconFor() honours
+    // it, which is the behaviour he is currently seeing and disliking.
+    if (dc(d, "garage_door")) return on ? MDI_GARAGE_OPEN : MDI_GARAGE;
     if (dc(d, "door"))   return on ? MDI_DOOR_OPEN   : MDI_DOOR_CLOSED;
     if (dc(d, "window") || dc(d, "opening"))
         return on ? MDI_WINDOW_OPEN : MDI_WINDOW_CLOSED;
