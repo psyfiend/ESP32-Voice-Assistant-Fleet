@@ -294,6 +294,23 @@ bool HaClient::accumulate(const char *data, int len, int payloadOffset, int payl
     return (payloadLen > 0) && (_rxLen >= (uint32_t)payloadLen);
 }
 
+bool HaClient::sendText(const char *json, int len) {
+    if (!_ws || len <= 0) return false;
+    if ((HaLink)_state.load() != HaLink::LINK_READY) return false;
+
+    // portMAX_DELAY matches the auth send. The websocket client's own TX lock
+    // is held only for the duration of a frame write, so this blocks for
+    // microseconds in practice - but it IS a block on the loop task, which is
+    // why frames are kept small and why nothing here ever sends in a loop.
+    int sent = esp_websocket_client_send_text(_ws, json, len, portMAX_DELAY);
+    if (sent < 0) {
+        _transportErrs.fetch_add(1);
+        _stop.store((uint8_t)HaStop::STOP_TRANSPORT);
+        return false;
+    }
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 // Message classification
 // ---------------------------------------------------------------------------

@@ -23,7 +23,27 @@
 
 static constexpr uint8_t ENTITY_ID_MAX     = 40;  // "living_room_temp"
 static constexpr uint8_t ENTITY_NAME_MAX   = 40;  // "Living Room Temperature"
-static constexpr uint8_t ENTITY_SHORT_MAX  = 20;  // unit, device_class, icon
+static constexpr uint8_t ENTITY_SHORT_MAX  = 20;  // unit, device_class, state_class
+
+// ICONS NEED MORE ROOM THAN THE OTHER SHORT FIELDS, AND 20 WAS NOT ENOUGH.
+//
+// Material Design Icon names are long and the ones this fleet actually wants
+// are among the longest: `mdi:ceiling-light-outline` is 25 characters and
+// `mdi:motion-sensor-off` is 21. Both overflowed, and the second matters more
+// than the first, because HA ships the live state-dependent icon in
+// `attributes.icon` - so the limit was not only clipping what we declare, it
+// would have clipped what the server sends us.
+//
+// Found at compile time on the owner's 18-entity table (2026-09-20), which is
+// the good outcome; a char array one byte too small for a string that arrives
+// at runtime truncates silently and renders as the wrong glyph or as tofu.
+//
+// 32 costs 12 bytes per entity over the old size, and entity storage lives in
+// PSRAM (see SystemCore::beginEntityStorage), so 128 entities pay 1.5 KB of
+// the cheap memory. Splitting it out rather than raising ENTITY_SHORT_MAX
+// keeps unit / device_class / state_class - which are genuinely short - from
+// paying for it.
+static constexpr uint8_t ENTITY_ICON_MAX   = 32;  // "mdi:ceiling-light-outline"
 static constexpr uint8_t ENTITY_TOPIC_MAX  = 128; // external topic / HA entity id
 
 struct EntityDescriptor {
@@ -43,7 +63,7 @@ struct EntityDescriptor {
     char unit[ENTITY_SHORT_MAX]        = {0};  // "C", "%", "lx", "W"
     char deviceClass[ENTITY_SHORT_MAX] = {0};  // "temperature", "occupancy"
     char stateClass[ENTITY_SHORT_MAX]  = {0};  // "measurement", "total_increasing"
-    char icon[ENTITY_SHORT_MAX]        = {0};  // "mdi:thermometer"
+    char icon[ENTITY_ICON_MAX]         = {0};  // "mdi:thermometer"
 
     // Can the UI command it? Drives whether a card offers a control at all.
     bool writable = false;

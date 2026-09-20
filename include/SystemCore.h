@@ -21,6 +21,7 @@
 #include "MqttProvider.h"
 #include "VirtualProvider.h"
 #include "HaClient.h"
+#include "HaProvider.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #endif
@@ -103,4 +104,9 @@ private:
     // instead. That rule has always been in CLAUDE.md for providers; this is
     // the first one that could actually break it. See HaClient.h.
     HaClient            _ha;
+
+    // Reads HA's entities off that session into the registry. The websocket
+    // twin of MqttProvider, and like it, derives its subscription from the
+    // entity table rather than a hardcoded list.
+    HaProvider          _haProv;
 };

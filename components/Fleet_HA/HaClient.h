@@ -75,6 +75,15 @@ public:
 
     void setMessageHandler(MessageFn fn, void *ctx) { _msgFn = fn; _msgCtx = ctx; }
 
+    // Send one text frame. Returns false unless the session is LINK_READY.
+    //
+    // LOOP TASK ONLY. Calling this from the message handler re-enters
+    // esp_websocket_client from inside its own callback, which is the deadlock
+    // this class is shaped to avoid - see the note at the top. A provider that
+    // wants to send in response to a message sets a flag and sends on the next
+    // loop(), exactly as the auth handshake does.
+    bool sendText(const char *json, int len);
+
     // --- State, safe to call from either task ----------------------------
     HaLink state()   const { return (HaLink)_state.load(); }
     HaStop lastStop() const { return (HaStop)_stop.load(); }

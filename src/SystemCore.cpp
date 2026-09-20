@@ -1,6 +1,7 @@
 #include "SystemCore.h"
 #include <FleetI2C.h>
 #include "ExternalEntities.h"
+#include "ExternalEntities_HA.h"
 #include "esp_heap_caps.h"
 #include "esp_memory_utils.h"   // esp_ptr_external_ram()
 #include "SystemReport.h"   // fmtBytes - one memory-reporting convention
@@ -139,6 +140,18 @@ bool SystemCore::begin() {
         _entities.add(EXTERNAL_ENTITIES[i]);
     }
 
+    // The owner's 18 Home Assistant entities (#43). Same standing as the MQTT
+    // block above - someone else owns them, we only read - and registered in
+    // the same place for the same reason: HaProvider derives its subscription
+    // from the registry, so an entity that is not registered by now is an
+    // entity that will not be subscribed to.
+    //
+    // Note two of these are the SAME PHYSICAL SENSOR as the deck entries
+    // above, deliberately, to compare the two transports. See the header.
+    for (uint8_t i = 0; i < HA_ENTITY_COUNT; i++) {
+        _entities.add(HA_ENTITIES[i]);
+    }
+
     // --= 10. Virtual test entities =--
     // TEMPORARY scaffolding for milestone 2.4, removed with #44. Registers two
     // writable switches so the command path has something to command - as of
@@ -162,6 +175,12 @@ bool SystemCore::begin() {
     // attempt happens on the first loop() where Fleet_Connectivity reports
     // online. A board with no network boots exactly as fast as before.
     _ha.begin(&_conn, &_entities);
+
+    // Registers itself as the session's message handler and, once a session is
+    // up, issues ONE subscribe_trigger built from the registry. After
+    // _ha.begin() so the handler is attached to a live object, though
+    // setMessageHandler only stores a pointer and the order is not load-bearing.
+    _haProv.begin(&_entities, &_ha);
 
     heapMark("core ready");
 
@@ -272,4 +291,5 @@ void SystemCore::loop() {
     // HaClient.h; this is the project's first provider where loop() is not the
     // whole story.
     _ha.loop(now);
+    _haProv.loop(now);
 }
