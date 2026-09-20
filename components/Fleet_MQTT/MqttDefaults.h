@@ -95,7 +95,28 @@ inline constexpr MqttSettings MQTT_DEFAULT_SETTINGS = {
 
     .BUFFER_SIZE      = 4096,
     .KEEPALIVE_S      = 30,
-    .SOCKET_TIMEOUT_S = 10,
+    // FOUR SECONDS, DOWN FROM TEN, AND THE UNIT HERE IS "UI FREEZE".
+    //
+    // PubSubClient::connect() is synchronous and runs on the loop task - the
+    // same task as LVGL - so this value is not "how patient are we with the
+    // broker", it is "how long can the screen stop responding to a finger".
+    //
+    // BE PRECISE ABOUT WHAT IT BOUNDS, because the obvious reading is wrong
+    // and was believed here for a while. Checked in PubSubClient.cpp:
+    // socketTimeout is used only in the post-connect wait loops (lines 259 and
+    // 293 - waiting for CONNACK, and readByte). It is NOT passed to
+    // _client->connect() at line 190. The TCP connect has its own bound:
+    // NetworkClient's WIFI_CLIENT_DEF_CONN_TIMEOUT_MS, 3000 ms.
+    //
+    // So one bad attempt blocks the UI for roughly (up to 3 s of TCP connect)
+    // + (up to this, waiting for a CONNACK that never comes). At 10 s that was
+    // up to thirteen seconds of dead screen per attempt; at 4 it is seven, and
+    // 4 s is still far longer than a LAN broker needs.
+    //
+    // The REAL fix is that isOnline() now returns false on LINK_DEAD, so the
+    // attempt is not made at all. This is the backstop for a link that is
+    // merely slow rather than gone.
+    .SOCKET_TIMEOUT_S = 4,
 
     .BACKOFF_INITIAL_MS = 5000,     // 5 s
     .BACKOFF_MAX_MS     = 300000,   // 5 min ceiling

@@ -84,6 +84,28 @@ enum class JoinPhase : uint8_t {
     FINISHED,      // terminal - read getJoinResult(), then ackJoinResult()
 };
 
+// How much we believe the link actually carries traffic, as opposed to how
+// much the driver CLAIMS it does. These are orthogonal to ConnState on
+// purpose: the whole fault behind issue #49 is a board sitting in
+// STA_CONNECTED, with an IP, answering nothing - so a single enum that has to
+// express both "what the driver says" and "what is true" cannot represent the
+// bug at all. ConnState stays the driver's story; this is the evidence.
+//
+// Evidence arrives from two places and neither is WiFi.status():
+//   * an ICMP probe of the gateway (ConnectivityManager's own, on a slow timer)
+//   * repeated remote failure reported downward by SystemCore, which is how
+//     MQTT's "broker unreachable" becomes a statement about the LINK without
+//     Fleet_MQTT having to reach into Fleet_Connectivity (ROADMAP Q9).
+//
+// Compound names per the hazard note at the top of this file - LINK_DEAD
+// rather than DEAD, so no future framework macro can eat one.
+enum class LinkHealth : uint8_t {
+    LINK_UNKNOWN = 0, // no evidence yet: just associated, or probing disabled
+    LINK_HEALTHY,     // something reached the outside world recently
+    LINK_SUSPECT,     // evidence of trouble; not yet enough to act on
+    LINK_DEAD,        // confirmed no path out. The recovery ladder is running
+};
+
 // One scan hit, already de-duplicated and sorted strongest-first.
 struct WiFiScanEntry {
     char    ssid[33];
@@ -109,5 +131,6 @@ const char *connModeName(ConnMode m);
 const char *connStateName(ConnState s);
 const char *linkTypeName(LinkType l);
 const char *joinResultName(JoinResult r);
+const char *linkHealthName(LinkHealth h);
 
 #endif // CONNECTIVITY_TYPES_H

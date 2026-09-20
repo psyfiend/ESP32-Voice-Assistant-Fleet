@@ -476,3 +476,77 @@ part of the value or icon is adjacent to it horizontally."
 milestone does not have. Long press currently toggles §3's per-card **pause**, on the base class,
 for every type — the only whole-card action meaningful on a read-only sensor as well as a switch.
 A group card will override it; everything else keeps pausing.
+
+---
+
+## 12. Corrections from hardware — 2026-09-19
+
+### The HDR_BAR band DOES overhang the card's corners. Confirmed.
+
+`Card.cpp`'s own comment said the band "gets the card's own radius instead. Its lower corners round
+where they used to be square." `HANDOFF.md` said its "corners sit slightly outside them." **Those
+are different artifacts and the handoff was right** — the owner photographed it and circled the
+overhang at both top corners.
+
+The code comment has been the misleading one since 2.5. Whoever takes the 2.8 slot rework should
+trust the photo, not the comment: the band is `lv_pct(100)` of the surface with the card's radius,
+and it escapes the rounded corners rather than being masked by them. `clip_corner` is what used to
+hide it, and `clip_corner` is what froze `WS_P4_5` — see `LESSONS.md`.
+
+### A generated VALUE face carries only the glyphs the script lists
+
+`gen_type_scale.py`'s `num` range had no colon. A VALUE face is either a built-in Montserrat (full
+ASCII) or one of these subsets, so `01:25` rendered correctly on five boards and as tofu boxes on
+exactly the three using a generated face — `WS_P4_4B`, `WS_P4_5`, `WS_S3_5B`.
+
+**The owner reasonably suspected the connectivity fault.** It was a missing glyph. `0x3A` and
+`0x64` (for `3d 04:15`) are in the range now.
+
+The general rule: **anything a card can print in the VALUE role must be in the `num` range.** That
+includes whatever #51's duration formats and any future unit or separator produce.
+
+### TAG is not scaled, and the reason generalises
+
+What makes a card cramped is the **vertical stack**, and VALUE dominates it. TAG is a small label
+in the area header; shrinking it reclaims almost no height and costs legibility immediately.
+
+The owner asked whether a global 0.92 would fix it on the 4B pair. It cannot, and the reason is not
+obvious: sizes quantise to even pixels, and on `WS_S3_4B` the TAG target is ~12.7 px at 1.0, so
+0.85, 0.88, 0.90 and 0.92 **all land on 12**. The first scale that returns it to 14 is 1.00, which
+drags VALUE from 34 back to 40 and undoes the change entirely.
+
+Hence `SCALE` takes a per-role dict as well as a float. Scale what costs height; leave the label
+faces alone.
+
+### Duration display: three formats, resolved like TempUnit
+
+`DurationFormat` sits beside `TempUnit` in `CardTypes.h` and resolves the same way — fleet default,
+then page, then card — because it is the same problem: a value whose stored form and displayed
+form differ. `DUR_AUTO` switches by magnitude (`09:58` / `1:06:40` / `3d 04:15`) and is the
+default; `DUR_CLOCK` is fixed `H:MM:SS`; `DUR_SECONDS` is the raw count.
+
+Keyed on `device_class: duration`, **not** on the unit string — `"s"` is a fine unit for something
+that is not a duration. The unit label is suppressed for a formatted duration for the same reason
+temperature goes through `cardDisplayUnit()`: `4:15:33 s` is a caption that lies.
+
+### What the card's secondary line should measure — see #57
+
+`Seen:` currently reads `lastUpdateMs`, which `EntityRegistry::setValue()` sets **unconditionally**,
+including for unchanged values. On a Zigbee2MQTT device that publishes temperature, occupancy,
+illuminance and battery in one payload, that means **`deck_temp`'s timestamp is bumped every time
+somebody walks past the deck**.
+
+It is a device-liveness timestamp wearing a value's name. Useful — it is what staleness should use
+— but not what the card should display. #57 adds `lastChangeMs` for the card and keeps
+`lastUpdateMs` for staleness, at which point `Last:` becomes the correct label and `Seen:` the
+wrong one. The label and the semantics move together or not at all.
+
+### Cards must bubble their events
+
+`Card::build()` sets `LV_OBJ_FLAG_EVENT_BUBBLE` on `_surface`. This is not cosmetic: 2.6's swipe
+handling records the press origin on the SCREEN, and a clickable object consumes its own events, so
+without bubbling a swipe that starts on a card reports an origin of `{0,0}` — which reads as "left
+half, top edge" for every gesture on the display.
+
+If cards ever stop bubbling, gesture navigation silently returns to that behaviour rather than
+failing. The two belong in the same thought.

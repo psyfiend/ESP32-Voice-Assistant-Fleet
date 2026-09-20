@@ -70,7 +70,7 @@ TARGETS_MM = {
     "ICON":  4.50,
 }
 
-# A PER-BOARD SCALE ON TOP OF THOSE TARGETS.
+# A PER-BOARD, OPTIONALLY PER-ROLE SCALE ON TOP OF THOSE TARGETS.
 #
 # The mm targets keep text the same PHYSICAL size fleet-wide, which is the
 # right default and was worth building. It is not an absolute rule, and the
@@ -86,18 +86,88 @@ TARGETS_MM = {
 #
 # So: a multiplier, per board, default 1.0. This is a preference and belongs
 # here rather than in Fleet_BSP, which holds hardware facts.
+# A value may be a plain float (every role) or a dict keyed by role, where "*"
+# is the fallback for roles it does not name. Per-role exists because a single
+# multiplier provably cannot express what these boards need - see the note on
+# TAG below.
 SCALE = {
-    "WS_P4_5": 0.88,
+    # TAG IS NOT SCALED ON ANY BOARD, and the reason generalises.
+    #
+    # What makes a card cramped is the VERTICAL STACK - hero, name, status -
+    # and VALUE dominates it. TAG is a small label in the area header; shrinking
+    # it reclaims almost no height and costs legibility immediately. The owner,
+    # on both 4B boards at 0.85: "the header text is simply too small on both of
+    # the boards, it is not viable as it stands right now."
+    #
+    # A global multiplier could not have fixed it, which is worth recording
+    # because it is not obvious. Sizes quantise to even pixels, and on
+    # WS_S3_4B TAG is ~12.7 px at 1.0 - so 0.85, 0.88, 0.90 and 0.92 ALL land
+    # on 12. The first scale that returns TAG to 14 is 1.00, which also drags
+    # VALUE from 34 back to 40 and undoes the entire change. Measured, not
+    # reasoned:
+    #
+    #   WS_S3_4B   x0.85  12/14/16/34     WS_P4_4B  x0.85  16/22/24/50
+    #              x0.92  12/16/16/36               x0.92  18/24/26/54
+    #              x1.00  14/18/18/40               x1.00  20/26/28/60
+    #
+    # Hence per-role. "*" shrinks what actually costs height; TAG keeps the mm
+    # target, which was right about it all along.
+    "WS_P4_5": {"*": 0.88, "TAG": 1.00},
+
+    # The 4B pair, 2026-09-19. Same value for both, and that is the point.
+    #
+    # HARDWARE_STATUS.md: "WS_P4_4B and WS_S3_4B are the same layout problem in
+    # different pixels - 720x720 at 1.5x is the same effective UI space as
+    # 480x480 at 1.0x. If the scaling approach is right they should be visually
+    # indistinguishable apart from sharpness." They are now flashed as a pair
+    # and running the same 3x4 grid, so anything that cramps one cramps the
+    # other, and a different multiplier on each would break that property for
+    # no reason.
+    #
+    # Why they need one at all: both are FOUR INCH panels being asked for 12
+    # cells. That is the densest cards-per-inch in the fleet - the 7B gets 18
+    # cells across seven inches - so the mm-based targets, which are right
+    # about physical size, produce type that is correct and still too big for
+    # the box it has to sit in. Observed by the owner on both boards: the icon
+    # disc is barely larger than its glyph on WS_P4_4B and not visible at all
+    # on WS_S3_4B, because Card::midHeight() clamps the disc to whatever band
+    # is left once the faces have taken theirs.
+    #
+    # 0.85 is a STARTING POINT, not a measured optimum - the same status 0.88
+    # had on WS_P4_5 before it was looked at. The glass decides.
+    "WS_P4_4B": {"*": 0.85, "TAG": 1.00},
+    "WS_S3_4B": {"*": 0.85, "TAG": 1.00},
 }
+
+
+def scale_for(macro, role):
+    """Per-board, per-role multiplier. Default 1.0 - i.e. trust the mm target."""
+    s = SCALE.get(macro, 1.0)
+    if isinstance(s, dict):
+        return s.get(role, s.get("*", 1.0))
+    return s
 
 # Glyphs each role actually draws. A face is only as expensive as its range.
 RANGES = {
     # Full printable ASCII plus the degree sign, which CLAUDE.md notes is the
     # one non-ASCII character stock Montserrat covers and the fleet relies on.
     "text": "0x20-0x7E,0xB0",
-    # A value label draws digits and nothing else. The unit moved to its own
-    # label precisely so this subset could be this small - see MeasureCard.
-    "num":  "0x20,0x2B,0x2D,0x2E,0x30-0x39,0xB0",
+    # A value label draws digits and nearly nothing else. The unit moved to its
+    # own label precisely so this subset could be this small - see MeasureCard.
+    #
+    # COLON (0x3A) and 'd' (0x64) are here for #51's durations, and their
+    # absence was a real bug rather than a theoretical one. A VALUE face is
+    # either a built-in Montserrat (full ASCII) or one of these generated
+    # subsets, so "01:25" rendered correctly on CYD_S3_3248, WS_S3_4B,
+    # WS_P4_7B, CYD_P4_1060 and CYD_S3_8048 - and as tofu boxes on exactly the
+    # three boards using a generated face: WS_P4_4B (50), WS_P4_5 (60) and
+    # WS_S3_5B (56). The owner saw it as "boxes between the units" and
+    # reasonably suspected the connectivity fault; it was a missing glyph.
+    #
+    # Two extra glyphs is a rounding error against a ~96 KB face, and the
+    # alternative - keeping the subset pure and never printing a duration in
+    # the VALUE role - gives up the feature to protect the budget.
+    "num":  "0x20,0x2B,0x2D,0x2E,0x30-0x39,0x3A,0x64,0xB0",
 }
 
 BUILTIN_MIN, BUILTIN_MAX = 8, 48
@@ -191,8 +261,8 @@ def main():
 
     generated = {}
     for b in boards:
-        k = SCALE.get(b["macro"], 1.0)
-        b["px"] = {role: px_for(b["ppi"], mm * k) for role, mm in TARGETS_MM.items()}
+        b["px"] = {role: px_for(b["ppi"], mm * scale_for(b["macro"], role))
+                   for role, mm in TARGETS_MM.items()}
         print("%-14s %5d %6s  %3d / %3d / %3d / %3d" % (
             b["macro"], b["ppi"], "%.1f\"" % b["diag"],
             b["px"]["TAG"], b["px"]["UNIT"], b["px"]["NAME"], b["px"]["VALUE"]))

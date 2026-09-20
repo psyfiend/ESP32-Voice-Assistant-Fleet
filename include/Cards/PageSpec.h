@@ -121,6 +121,16 @@ struct PageSpec {
     // The default every card inherits unless it overrides.
     CardHeaderStyle headerDefault = CardHeaderStyle::HDR_TAG;
 
+    // Compact-vs-full for the whole page, added with #50's manual override.
+    //
+    // VAR_AUTO doubles as the inherit sentinel, which is exactly right here
+    // rather than a shortcut: a card whose own variant is VAR_AUTO is saying
+    // "derive it", and so is a page whose default is VAR_AUTO. The two mean
+    // the same thing, so there is nothing for a separate INHERIT value to
+    // express - unlike CARD_HDR_INHERIT, where "tag" and "inherit" are
+    // genuinely different answers.
+    CardVariant     variantDefault = CardVariant::VAR_AUTO;
+
     // Two independent settings, not one. The owner was explicit: the colour
     // should be available whether or not the area's NAME is displayed.
     bool showArea  = true;

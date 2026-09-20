@@ -263,6 +263,19 @@ void Card::build(lv_obj_t *parent) {
     // once the press passes its threshold. CLICKED is deliberately not used:
     // it also fires at the end of a long press, so a long press would run both.
     lv_obj_add_flag       (_surface, LV_OBJ_FLAG_CLICKABLE);
+    // EVENTS BUBBLE UP TO THE SCREEN, which the 2.6 swipe handling needs.
+    //
+    // A clickable object consumes its events, so a press that lands on a card
+    // never reaches the screen - and the screen is where the swipe origin is
+    // recorded. Without this the origin stayed at its initial {0,0}, which
+    // reads as "left half, top edge" for EVERY gesture: the owner got the log
+    // page from a downward swipe anywhere on the display, and could never
+    // reach the system drawer by swiping at all.
+    //
+    // Bubbling ADDS the ancestors as listeners, it does not take the event
+    // away from this card - taps and long-presses still work exactly as
+    // before.
+    lv_obj_add_flag       (_surface, LV_OBJ_FLAG_EVENT_BUBBLE);
     lv_obj_add_event_cb   (_surface, eventCb, LV_EVENT_SHORT_CLICKED, this);
     lv_obj_add_event_cb   (_surface, eventCb, LV_EVENT_LONG_PRESSED,  this);
 

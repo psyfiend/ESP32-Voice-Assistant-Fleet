@@ -108,6 +108,11 @@ int32_t cardGlyphTopBearing(const lv_font_t *font, const char *utf8);
 void     cardSetTempUnit(TempUnit u);     // the fleet default
 TempUnit cardTempUnit();
 
+// How durations render, resolved the same way as TempUnit (issue #51). Applies
+// to any entity whose device_class is "duration"; today that is sys_uptime.
+void           cardSetDurationFormat(DurationFormat f);   // the fleet default
+DurationFormat cardDurationFormat();
+
 // The unit string to DISPLAY for this entity, which is not always desc.unit.
 // Returns "" when the entity has no unit at all.
 const char *cardDisplayUnit(const Entity &e, TempUnit want = TempUnit::TEMP_INHERIT);

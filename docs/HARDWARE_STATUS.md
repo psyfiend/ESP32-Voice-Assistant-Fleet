@@ -70,6 +70,50 @@ took static internal RAM from 209,895 back to 187,960 bytes.
 
 ---
 
+## The ESP32-C6 coprocessor firmware — the P4 boards' hidden variable
+
+**Updated on `WS_P4_4B`, 2026-09-19, and it was out of date.** See GitHub issue #59.
+
+The four P4 boards have no radio of their own; WiFi runs on an onboard ESP32-C6 over SDIO
+(`esp_hosted`). **Host and slave firmware must be interoperable**, and Waveshare publish the matrix
+in `docs/P4_C6_HOSTED_WIFI.md` in two of the vendor trees under `reference/Waveshare Official
+Repos/`: esp_hosted 1.4.x pairs with ESP-IDF before 6.0, 2.12-3.0 with 6.0 and later. Our host runs
+**2.12.11**.
+
+For weeks every P4 boot printed a warning that the host could not read the slave's version, and it
+was recorded here as cosmetic. It was not - it was the mismatch announcing itself. An older slave
+does not implement that RPC at all.
+
+**After updating the C6 to 2.12.9 the warning is gone on `WS_P4_4B`.**
+
+| Board | C6 firmware | Boot RPC warning |
+|---|---|---|
+| `WS_P4_4B` | **2.12.9** (updated 2026-09-19) | **gone** |
+| `WS_P4_5` | unknown, factory | present |
+| `WS_P4_7B` | unknown, factory | present |
+| `CYD_P4_1060` | unknown, factory | not checked |
+
+### How it is updated
+
+`reference/Examples and related projects/ESP32-P4-NINA-Display/firmware/merged-flash.bin` is a P4
+APPLICATION, not a C6 image. Flash it to the P4 at `0x0`; it updates the C6 over the internal link,
+shows progress on screen, restarts to resync, then you reflash normal firmware. No second cable, no
+separate programmer. Full procedure and rollback in #59.
+
+**It is a full-flash write, so it wipes NVS** - stored credentials included. The board falls back to
+the compile-time defaults in `ConnectivityLocalSecrets.h` and the `_proven` flag resets.
+
+### Facts this exposed, none of which were previously written down
+
+- The slave firmware lives in a partition on the P4's OWN flash: `slave_fw`, 2 MB, project name
+  `network_adapter`.
+- The host resets the C6 over **GPIO 54**.
+- SDIO on the 4B: `CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17]`.
+- The 4B's flash chip reports 32 MB; the image header says 16 MB and the header wins.
+
+**Whether this fixes the overnight dropouts (#49) is unproven** - that needs a soak, with
+`WS_P4_5` and `WS_P4_7B` left alone as controls.
+
 ## Fleet-wide, still open
 
 - **ESP32-C6 co-processor firmware (P4 boards).** On `WS_P4_5` the host cannot read the

@@ -132,6 +132,37 @@ enum class TempUnit : uint8_t {
 };
 
 // ---------------------------------------------------------------------------
+// How a DURATION is rendered (issue #51).
+//
+// Deliberately the same shape as TempUnit above, resolved the same way -
+// fleet default, then page, then card - because it is the same problem:
+// a value whose stored form and displayed form differ. Uptime is stored as a
+// plain count of SECONDS (SystemProvider writes nowMs / 1000) and nobody wants
+// to read 598 and work out that it means ten minutes.
+//
+// One grammar for "display differs from storage" rather than two. The registry
+// still keeps exactly what the source said, for the same three reasons the
+// temperature note gives above.
+//
+// Compound names per the naming hazard in CLAUDE.md - DUR_ rather than bare
+// AUTO/FIXED/RAW, any of which is a plausible future Arduino macro.
+enum class DurationFormat : uint8_t {
+    DUR_INHERIT = 0,  // use the page's setting (on a card) or the fleet's
+    // Switches by magnitude: "09:12" under an hour, "04:15:33" under a day,
+    // "3d 04:15" beyond. The owner's pick, 2026-09-19, and the default - it is
+    // what a person says out loud, and it keeps the card narrow while a board
+    // is young without lying about a board that has been up for weeks.
+    DUR_AUTO,
+    // Always H:MM:SS, hours growing past two digits rather than wrapping.
+    // Honest, and wide - three weeks reads "504:00:00".
+    DUR_CLOCK,
+    // The raw count with its source unit, exactly as it arrives. What every
+    // duration did before this existed, kept so the change is reversible from
+    // a settings screen rather than from a rebuild.
+    DUR_SECONDS,
+};
+
+// ---------------------------------------------------------------------------
 // Where a card wants to sit, in grid UNITS.
 //
 // CHANGED AT 2.5, and the change is the unit rather than the fields: these

@@ -258,7 +258,28 @@ void line(const char *fmt, ...) {
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
-    if (s_echoSerial) Serial.println(buf);
+    if (s_echoSerial) {
+        Serial.println(buf);
+        // Flush every echoed line, so that where the output STOPS is where the
+        // code stopped.
+        //
+        // Without this the two are different questions and the answer misleads.
+        // Six of eight boards are ARDUINO_USB_CDC_ON_BOOT=1, where Serial is a
+        // buffered USB endpoint: if the report hangs part-way, everything still
+        // sitting in that buffer is never sent. Chasing the 2026-09-18 Dump
+        // Config freeze on CYD_S3_3248, the output ended at "[CONNECTIVITY]"
+        // and the hang was NOT there - it was wherever the buffer happened to
+        // fill, which is a completely different place and cost an inference.
+        //
+        // Only manual dumps echo, so this costs nothing on the boot run.
+        //
+        // GUARDED, and the guard is not decoration. On a USB CDC board
+        // Serial.flush() waits for the host to drain the endpoint, and with no
+        // host attached there is nothing to drain it - the exact shape of hang
+        // this line was added to diagnose. `if (Serial)` is false when no host
+        // has opened the port, so an unattended board never waits on one.
+        if (Serial) Serial.flush();
+    }
     for (uint8_t i = 0; i < s_sinkCount; i++) s_sinks[i](buf);
 }
 

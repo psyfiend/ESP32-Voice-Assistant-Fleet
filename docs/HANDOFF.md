@@ -12,293 +12,231 @@ does not appear in the source as suspect.
 
 ## Where the project is
 
-Phases 0, 1 and 2.1–2.4 are merged and tagged `v0.2.4`.
+Phases 0, 1 and 2.1–2.5 are merged and tagged `v0.2.5`. Work since then is on
+**`fix/49-link-liveness`**, 19 commits, pushed, **not yet merged**. It carries #49, #50, #51, the
+first cut of 2.6's swipe navigation, and a lot of small corrections found on glass.
 
-**Milestone 2.5 is DONE — merged to `main` and tagged `v0.2.5` on 2026-09-19.** Issue #16 is
-closed. One page definition renders on five panels. The device boots into a dashboard built from a
-data table.
-
-**The single most urgent thing in the project is now connectivity — see the next section.** It is
-not a 2.5 problem and it did not arrive with 2.5; it is the oldest open fault here and it has
-graduated from "one board is annoying" to "four of five boards drop off overnight."
+Four boards are attached and flashed: `CYD_S3_3248` (COM10), `WS_P4_5` (COM15),
+`WS_S3_4B` (COM8), `WS_P4_4B` (COM7).
 
 ### Read in this order
 
-1. `CLAUDE.md` — the HAL/BSP, the startup split, the token rules, the traps.
-2. **`docs/LESSONS.md`** — read before debugging anything. Most of this week is in there.
+1. `CLAUDE.md` — the HAL/BSP, the startup split, the token rules, **and the file-editing rule at
+   the top, which is not optional.**
+2. **`docs/LESSONS.md`** — read before debugging anything.
 3. `docs/design/dashboard.md` — the page spec, the grid, the two knobs, the unit policy.
 4. `docs/design/card-layout.md` — **before moving anything inside a card.**
 5. `docs/design/ha-websocket.md` — what HA's API actually gives us, measured. Read before #43.
 6. `docs/design/cards.md` — the card spec. Its "Implementation notes" first.
 7. `docs/design/tokens.md`, `docs/design/startup.md` — the design system, and boot order.
-8. `docs/REFERENCE_PROJECTS.md` — "The page/view/grid back-end" before any navigation work.
-9. `docs/ROADMAP.md` §7 — the milestone list.
+8. `docs/ROADMAP.md` §7 — the milestone list.
 
 ---
 
-## Signing off 2.5
+## THE HEADLINE: #49 is half solved, and #59 is probably the other half
 
-**Issue #16 is CLOSED** — confirmed on hardware 2026-09-18. Sub-grid units, explicit placement and
-the validator were all observed: "Obeys" lands at unit 2,2, "Ignores" is rejected at 40,0 and
-flowed to 1,1, and on the 4B boards with a column added Lamp 1 and Lamp 2 each span 3 units.
+**Detection works. Recovery does not.**
 
-One `FLEET_PAGE` now renders on **five** panels — 1280x800, 1024x600, 720x720, 480x480 and 320x480
-portrait — with priority degradation trimming the small ones. The acceptance criterion asked for
-three.
+The fix on this branch means a board now KNOWS when its link is dead — the WiFi glyph drops to a
+bare red stalk, the dump says `DEGRADED`, and `isOnline()` returns false. Before this week a dead
+board sat showing full green bars for six hours. That part is done and confirmed on hardware.
 
-**What remains before tagging `v0.2.5`: an overnight soak, and nothing else.**
+**What it cannot do is get back on.** Both P4 boards were still off the network the next morning.
+`DEGRADED (none)`, `Offline (last reason: 2)` (`AUTH_EXPIRE`).
 
-Every fault this week was time-dependent, so a milestone that has not survived a night has not been
-tested. Watch for: boards staying in Home Assistant, `[Mqtt] Disconnected` lines (which now carry
-`state=`, elapsed and heap), and `[Heap]` trending flat rather than down.
+### The finding that reframes it — see #59
 
-Flashed and running this build: `CYD_S3_3248` (COM10), `WS_P4_5` (COM15), `WS_S3_4B` (COM8),
-`WS_P4_4B` (COM7). `WS_P4_7B` has a build waiting but is in an enclosure that blocks a USB port —
-which is the argument for OTA, Phase 5.
+**Neither S3 board has ever dropped.** The S3s have a built-in radio; the P4s reach WiFi through a
+separate ESP32-C6 over an internal link.
 
-### Two things found at the very end, both fixed, one with a visible cost
+Waveshare's own `docs/P4_C6_HOSTED_WIFI.md` (in two of the vendor trees under
+`reference/Waveshare Official Repos/`) publishes a host/slave compatibility matrix:
+esp_hosted **1.4.x** pairs with ESP-IDF before 6.0; **2.12–3.0** pairs with 6.0 and later. **Our
+host runs 2.12.11.** The C6 runs whatever Waveshare factory-flashed, version unknown — because the
+query for it fails.
 
-**`clip_corner` in `HDR_BAR` froze `WS_P4_5` on boot.** A 482 px two-cell card asked for a
-32,776-byte layer buffer out of the `lv_mem` pool and failed, with 80 KB of system heap still free.
-It only hit that board because **a layer is sized by the object's WIDTH**, and the P4_5 has the
-fleet's widest cells: 1280 px across only 5 columns gives 230 px cells, so its two-cell cards are
-the largest in the fleet. The other boards asked for smaller layers that fitted. It became fatal
-rather than occasional the moment `HDR_BAR` became the default header mode, because then every card
-wants one.
+That query failing is the boot warning we dismissed as cosmetic for weeks:
 
-**The cost, and it is visible:** the band no longer gets masked by the card's rounded corners, so
-its corners sit slightly outside them. Cosmetic, deliberate, and the honest price of not allocating
-a layer per card. **Resolve it properly with the slot rework at 2.8** — the band wants to be part
-of the card's own background rather than a child that has to be clipped.
+    E rpc_core: Response not received for [0x15e](Req_GetCoprocessorFwVersion)
 
-**A pin lost to the flow.** `pin 2,2 rejected (occupied)` where 2,2 was perfectly valid: an earlier
-card had flowed into it first. Placement is two passes now, pinned then flowed. Until this was
-fixed the pin test had never actually proved anything.
+An old slave does not implement that RPC at all. **It is the mismatch announcing itself.**
 
+Waveshare's own doc says to validate *"association, IP traffic, reconnect, and restart behavior"*
+when host dependencies change. **Reconnect** is our exact symptom.
+
+It also explains the detail that puzzled everyone: a failed board could not raise its **own**
+rescue access point either. If the host-to-C6 conversation is broken, every radio command fails —
+not just joining someone else's network.
+
+**DONE on `WS_P4_4B`, 2026-09-19. The C6 was on older firmware; it is now on 2.12.9 and the boot
+warning is GONE** - on a board that printed it every boot for weeks. Procedure, evidence and
+rollback in #59.
+
+**Whether it fixes the dropouts is unproven.** They take 5-6 hours on that board, so only a soak
+answers it. `WS_P4_5` and `WS_P4_7B` are deliberately untouched as controls: if the 4B survives the
+night and they do not, that is as close to conclusive as this project gets. **That soak is the
+single most important thing to check next.**
+
+Note the update is a full-flash write and wiped NVS, so the 4B is running on the compile-time
+credentials and its `_proven` flag has reset.
+
+### What the #49 branch actually built
+
+None of this becomes wrong if #59 turns out to be the cause — a wall panel still has to survive a
+router reboot.
+
+- **RSSI is re-polled with an age stamp.** It used to be read once in the `GOT_IP` handler and
+  never again, so the header showed a value from the moment of association for as long as the
+  board stayed up. Not a stale cache — a number nobody ever asked for a second time.
+- **`LinkHealth`** — a second axis beside `ConnState`, because one enum cannot express "the driver
+  says connected and it is wrong". Fed by an ICMP probe ladder (gateway → DNS → off-LAN, rotating
+  on failure so a rate-limiting router cannot convict a healthy link) and by MQTT's verdict
+  relayed down through `SystemCore`.
+- **A three-rung recovery ladder** — re-associate, cycle the radio, hand back to the state machine.
+- **`isOnline()` returns false on `LINK_DEAD`.** This is the line that makes the verdict mean
+  something to the rest of the system: every caller asks `isOnline()` and none asks
+  `getLinkHealth()`.
+
+**Two guards that must not be removed casually:**
+
+- A probe that has **never** been answered is not evidence. Many routers drop ICMP; without this
+  every board would convict its own healthy link within minutes and cycle its radio forever.
+- Each completed recovery ladder widens the cool-off, so a board whose problem is upstream settles
+  into checking occasionally rather than thrashing.
+
+**The probe is demand-driven** — a held MQTT session is continuous evidence, so a healthy board
+sends none at all. That keeps a 2.5 KB task stack out of internal RAM on `CYD_S3_3248`.
 
 ---
 
-## DO THIS FIRST: the fleet cannot stay online overnight (#49)
+## What is next
 
-**Soak result, 2026-09-18 into 09-19.** Four of five boards were left running the same build.
+0. **SOAK the C6 result.** #59 is DONE on `WS_P4_4B`; whether it fixes the dropouts needs a night, with `WS_P4_5` and `WS_P4_7B` as untouched controls.
+1. **Finish verifying 2.6's swipes on glass**, then merge this branch.
+2. **#43 — Home Assistant over the websocket.** See the transport note below.
+3. **#44 — outbound commands.**
+4. **2.8 slots** — and the card-corner artifact below goes with it.
 
-| Board | Result |
-|---|---|
-| `CYD_S3_3248`, `WS_S3_4B` | still receiving MQTT in the morning |
-| `WS_P4_7B` (on the older `v0.2.4.23`) | still receiving MQTT |
-| `WS_P4_4B` | **went unavailable after ~5-6 hours** |
-| `WS_P4_5` | **went unavailable after ~3-4 hours** |
+### #43's transport decision, now informed
 
-Every board still responds to touch, animates, and runs its UI. Nothing is frozen. **This is purely
-a network fault**, and it has now been seen on `WS_P4_5`, `WS_P4_4B` and `WS_P4_7B` — so it is not
-one board and not a 2.5 regression. `WS_S3_4B` is the only board never to have shown it.
+Checked rather than assumed: **both ESP-IDF reference projects use REST for HA.** NINA does
+`GET /api/states/{entity_id}` per tile; `ha-dashboard` polls on a 30 s task. Neither uses a
+websocket for HA — though NINA pulls `esp_websocket_client` for other feeds.
 
-### What the serial says, and it is conclusive
+`esp_websocket_client` is an **official Espressif component from the Component Registry**, not part
+of core IDF — which is exactly why it is absent from the Arduino prebuilt libs. Nobody writes their
+own.
 
-```
-[Mqtt] Disconnected from broker. state=-4 after 6080715 ms, heap 73548, wifi up
-[Mqtt:debug] connect failed raw=-2 -> broker unreachable      (x dozens, forever)
-```
+**Recommendation: vendor `esp_websocket_client`** rather than write one. It is plain ESP-IDF C over
+`esp-tls`/lwIP, both already linked here; the only obstacle is that PlatformIO's Arduino build
+cannot run the IDF component manager, so it would be vendored like `bb_captouch_fork`. That is the
+same code an ESP-IDF migration would use later, and it keeps the owner's "avoid Arduino-specific
+libraries" constraint intact.
 
-- **101 minutes of healthy session**, then a keepalive timeout.
-- **73 KB of free heap.** Not memory. All the memory faults fixed during 2.5 are genuinely fixed.
-- **`wifi up`** — but that is only `WiFi.status() == WL_CONNECTED`, which is exactly the value that
-  lies.
-- **`raw=-2` is `MQTT_CONNECT_FAILED`** — the TCP connect never completes. The broker is not
-  refusing anything; there is no path to it.
-- **Not one `[Conn]` line appears in the rest of the log.** The connectivity layer never notices,
-  never re-associates, never falls back to AP. It has nothing to react to, because the only thing
-  it polls still claims success.
-
-The owner's summary, and it is correct: *"the device never realizes that wifi has become
-disconnected. The MQTT reconnects are the obvious result of retrying when there is no network."*
-
-### Fix direction
-
-The shape of the fix is not in doubt; only the root cause is.
-
-1. **Stop treating `WiFi.status()` as proof of liveness.** It is the only thing
-   `ConnectivityManager` polls, and it is the thing that is wrong.
-2. **Let repeated MQTT failure count as evidence about the LINK**, not just the broker. We already
-   have a perfectly good liveness signal and we throw it away as somebody else's problem. This is
-   the cheapest change and it would have recovered every board overnight.
-3. **Add an active check** — ping or ARP the gateway on a slow timer while idle, and force a
-   re-association after N failures.
-4. **Let RSSI go stale like any other value.** The header glyph currently shows full bars from a
-   reading taken hours ago, which is the same class of lying diagnostic.
-
-### The lead worth chasing first
-
-Every P4 boot carries this, before anything else happens:
-
-```
-E rpc_core: Response not received for [0x15e](Req_GetCoprocessorFwVersion)
-hostedHasUpdate(): Could not get slave firmware version: ESP_FAIL
-```
-
-On P4 boards WiFi is not native — it runs over an ESP32-C6 co-processor on SDIO (`esp_hosted`). If
-the RPC channel to that co-processor is already unreliable at boot, "the host believes it is
-associated while the radio is not" follows naturally, and it explains why the two S3 boards with
-native radios have fared best. **Pull #41 in as a possible cause** — "do NVS writes disrupt the
-esp-hosted SDIO transport on P4?" is exactly the right shape.
-
-Caveat worth keeping: `WS_P4_7B` has also dropped, and the S3 boards have not been soaked as long.
-Do not over-fit to "P4 only" on a sample of one night.
-
-### The instruments are already in place
-
-- Disconnects print `state=`, how long the socket held, free heap and WiFi state.
-- `SystemCore::heapMark()` traces internal heap through startup, every dashboard rebuild and every
-  MQTT reconnect.
-- The broker's own log is the fastest route to the truth and settled the last fault in one step —
-  HA → Settings → Add-ons → Mosquitto → Log.
-
-### The three faults that ARE fixed
-
-Do not re-investigate these; they are separate and done. Full reasoning in `LESSONS.md`.
-
-| | |
-|---|---|
-| Duplicate MQTT subscriptions filling the table | `addSub()` dedupes by topic |
-| A leaked TCP socket per reconnect — the broker was reaping ghosts | `_client.disconnect()` on all three exits |
-| Internal heap starvation, twice — `LV_MEM_SIZE` 192 KB on P4, and `DOUBLE_BUFFERING` ignored on CYD_S3_3248 | both reverted/honoured |
-
-
-## What is next, after 2.5
-
-The running order was agreed on 2026-09-15 and it overrides the milestone numbering. Reasoning is
-in `ROADMAP.md`; the short version is that **entity supply, not card features, is what limits this
-project.**
-
-0. **#49 — connectivity.** Not optional and not negotiable against the rest: a panel that leaves
-   Home Assistant every few hours is not a dashboard, and #43 puts MORE weight on the same link.
-   See the section above.
-1. **#43 — Home Assistant over the websocket.** Design-and-build, not research: the API has been
-   measured against the owner's live instance. `docs/design/ha-websocket.md` has the numbers and
-   one finding that changes the architecture (`subscribe_trigger`, never `subscribe_events`).
-2. **#44 — outbound commands** through the same client. This is where the panel stops being a
-   display and becomes an interface. `call_service` is deliberately untested — running it turns on
-   a light in the owner's house.
-3. **2.6 tileview / 2.8 slots**, once there are enough entities to need pages.
-4. **3.1 + 3.3 — the build sheet**, with a schema informed by what HA actually gives.
+REST is *pull*: a 30 s poll means up to 30 s before motion or a door shows on screen. Outbound
+commands are fine either way. It is inbound latency that suffers.
 
 ---
 
 ## Deliberately postponed — do not rediscover these
 
-Everything here was raised, discussed and consciously deferred.
-
 | What | Where it goes |
 |---|---|
-| **System panel rework** — see the section below. Fully specified, not started | next session |
+| **The card header band overhangs the rounded corners** — CONFIRMED on glass with a photo, 2026-09-19. `HANDOFF` was right and the code comment in `Card.cpp` was wrong | 2.8, with the slot rework |
+| **RSSI card shows STALE when WiFi is down**, which is the wrong word. `ST_PAUSED` is defined as "the user's own choice", so it must not be overloaded — this wants its own state | with #56 |
+| **Hide the battery glyph when a card is stale** | with #56 |
 | **The system header bar needs its OWN colour**, not the scheme's. Paper makes it unreadable | 2.8 |
 | **Corner icon = the DOMAIN; the hero = the specific fixture** | 2.7 |
-| **State-dependent hero glyphs** (`motion-sensor-off`, `garage-open`). HA already ships these in `attributes.icon` — see `ha-websocket.md` §5 | 2.7 |
+| **State-dependent hero glyphs**. HA ships these in `attributes.icon` | 2.7 |
 | **A `door` card type**; a `LightCard` that handles dimming/RGB/colour-temp | 2.7 |
-| **Icons look undersized on large cards** — both faces are picked by density alone, never by cell size. Fixable; costs flash | 2.7 |
-| **Per-card full-screen detail page**, long-press, background dimmed, deck headers sliding up | 2.7 / 3.2 / 4.4 |
-| **Manila-folder tag shape** — tag's bottom corners curving outward | low priority |
-| **Card press feedback** — shrink on hold | low priority |
-| **`clip_corner` in `HDR_BAR`** is a standing layer-buffer liability on wide cards | 2.8, with the slot rework |
-| **Arduino_GFX only uses one draw buffer**, so buffer two may be dead weight on all seven other boards. Confirm against its source first | **2.9**, and now a concrete thing 2.9 buys |
-| **Auto-hiding system header**, swipe down to reveal. Overlay it; do not re-lay-out the grid | 2.6 |
-| **Priority's vocabulary** — four bands was my choice, never ratified. Worth revisiting before the build-sheet schema freezes | 3.1 |
-| **OTA** — the 7B is in an enclosure that blocks a USB port. This is the argument | Phase 5 |
-| Irrigation card; thermostat card; first-boot AP + web config; HA-facing device entities (brightness, sleep, toast, battery) | `FUTURE_IMPROVEMENTS.md` |
-
-### The system panel rework, specified
-
-Asked for at the end of the 2.5 session and **deliberately declined** — it is a new page, a layout
-rewrite, width and anchoring work and a dynamic height, and starting it on an exhausted context
-would have left it half-done. The owner agreed. One piece was done: **the log moved to its own
-page** (`LogPage`), which is the likely cause of the panel's choppy animation.
-
-Remaining, as he specified it:
-
-- **Button layout.** Row 1: `Log` `Tokens` `Cards`. Row 2: `Col -/+` `Row -/+`. Row 3: `Deck`
-  `Compact` (manual variant override) `Theme`. Row 4: card-header mode, `Fill` (fill/icon for
-  active states), `Area` (show/hide).
-- **Width:** ~1/2 screen on `WS_P4_5` and `WS_P4_7B`, ~3/4 on the 4B boards, unchanged on
-  `CYD_S3_3248`.
-- **Anchor right**, so it reads as coming from the status icon you tapped — with the same margin
-  the deck panels have, not hard against the edge.
-- **Dynamic height:** expand only as far as the content needs.
-- **Fix the slide origin.** It was meant to slide out from under the header bar; since the header
-  became resizable it appears from nothing and sits disconnected.
+| **Icons look undersized on large cards** — faces are picked by density alone, never by cell size | 2.7 |
+| **Per-card full-screen detail page**, long-press, background dimmed | 2.7 / 3.2 / 4.4 |
+| **Horizontal swipes** — left unclaimed on purpose, they belong to page navigation | 2.6 |
+| **Swipe down on the LEFT half below the top band** — currently opens the log from the top band only; nothing else is bound | 2.6 |
+| **Arduino_GFX only uses one draw buffer** | 2.9 / #40 |
+| **Priority's vocabulary** — four bands was never ratified | 3.1 |
+| **OTA** | Phase 5 |
 
 ---
 
 ## Things that will bite you
 
+**Read the file-editing rule at the top of `CLAUDE.md` before your first edit.** It cost this
+session three separate incidents in one day, including one where a script reported success and
+changed nothing because its anchor string had been mangled the same way.
+
 **Build from PowerShell, not Git Bash.** pioarduino rejects MSYS shells.
 
-**`pio run` with no `-e` builds ONE environment.** The fleet is eight explicit `-e` flags.
+**`pio run` with no `-e` builds ONE environment.** Same for `pio device monitor` — it inherits
+`default_envs` and will try to load a different board's ELF.
 
-**Clear `.pio/build_cache` after editing any BSP header or `lv_conf.h`.** `pio run -t clean` does
-not clear it, and the macro-indirected `#include BSP_HEADER` defeats its dependency scanner.
+**Clear `.pio/build_cache` after editing any BSP header or `lv_conf.h`.**
 
-**There is exactly one `lv_conf.h`** and it is `include/lvgl/lv_conf.h`. Settled by experiment; see
-`CLAUDE.md`.
+**A serial monitor resets the board when it opens**, which destroys the evidence of a fault you
+were trying to capture. Use `--rts 0 --dtr 0` to attach without resetting:
 
-**Do not run two `pio` invocations at once** — they contend for `.pio/build`.
+    pio device monitor -e WS_P4_TOUCH_LCD_5 -p COM15 -b 115200 --rts 0 --dtr 0
 
-**Never put a backslash escape in text a script writes.** Six occurrences in two sessions. See
-`LESSONS.md`.
+**Six of eight boards are `ARDUINO_USB_CDC_ON_BOOT=1`**, where serial is a buffered USB endpoint:
+the boot log is gone before a monitor can attach, and on a hang everything still in the buffer is
+lost. `SystemReport::line()` and the LVGL log callback both flush for this reason.
 
-**Anything drawn on a panel stays ASCII, except `°`.**
+**Do not run two `pio` invocations at once.**
 
-**Verify from outside the device.** The MQTT fault was solved in one step by reading the broker's
-own log after four rounds of device-side guessing.
+**Anything drawn on a panel stays ASCII, except `°`** — and a generated `num` face carries only the
+glyphs `gen_type_scale.py` lists. A colon was missing from it until 2026-09-19, which showed as
+tofu boxes on exactly the three boards using a generated face.
+
+**Verify from outside the device.**
 
 ---
 
 ## What is measured vs. what is assumed
 
-Say "verified at `<path>:<line>`" or say "I believe".
-
 | Measured | |
 |---|---|
-| Card cost | ~2.8 KB in `lv_mem`; a 13-card dashboard is ~5 KB of *internal heap* |
-| `lv_mem` pool | 128 KB static array in internal DRAM, fleet-wide. 192 KB on P4 links and breaks the network |
-| Internal heap after boot | `CYD_S3_3248` ~10 KB before the draw-buffer fix; the WiFi driver alone takes ~61 KB |
+| Card cost | ~2.8 KB in `lv_mem` |
+| `lv_mem` pool | 128 KB static array in internal DRAM. 192 KB on P4 links and breaks the network |
 | One font face | ~96 KB of flash |
-| HA `/api/states` | 742 KB across 1,662 entities. The area registry is 3.6 KB |
-| HA event rate | 12.2/s and 913 KB/min on `subscribe_events`; **zero** for the same entities via `subscribe_trigger` |
-| Full-card threshold, 7B | 129 px row height (bar/tag), 109 px (none) |
+| #49 branch cost on `CYD_S3_3248` | +168 bytes internal RAM, +8,456 flash |
+| System panel, `WS_P4_5` | 640 px wide at x=623 (screen 1280, 740 logical), content 334 px |
+| System panel, `WS_P4_4B` | 540 px wide at x=165 (screen 720, 480 logical), content 298 px |
+| HA `/api/states` | 742 KB across 1,662 entities |
+| HA event rate | 12.2/s on `subscribe_events`; **zero** for the same entities via `subscribe_trigger` |
+| Screenshot PSRAM peak | 0.88 MB on `CYD_S3_3248`, 5.27 MB on `WS_P4_5` |
+| MQTT connect block | up to ~3 s TCP + up to `SOCKET_TIMEOUT_S` for CONNACK, **on the LVGL task** |
 
-**Still assumed:** `WS_P4_4B` unflashed this milestone; `CYD_S3_8048`, `CYD_P4_1060`, `WS_S3_5B`
-never flashed since the type scale changed; `TouchManager::mapCoordinates()`'s `WS_P4_7B` special
-case remains undocumented and untested against the alternative.
+**Still assumed:** that the C6 firmware is the cause of #49; that NINA's updater matches our board
+wiring; that the recovery ladder works at all — **it has never once been seen to run to completion
+and succeed.** No swipe gesture has been verified by a finger since the last two fixes.
 
 ---
 
 ## How to work with this owner
 
 He is a hobbyist and an ESP32 enthusiast, not a professional developer, and explicit about that —
-but he reads code, spots real bugs, and has caught several this week that were not obvious. **Treat
-his instincts as data.** The broker log, the "is it holding cards in memory" question and the
-column-count regression were all his.
+but he reads code, spots real bugs, and has caught several that were not obvious. **Treat his
+instincts as data.** The broker log, the missing colon being a font problem rather than a
+connectivity one, and the "swipe from anywhere" regression were all his.
 
 **What works:**
 
-- **Show, don't spec.** Build something he can react to. He knows what he likes when he sees it.
-- **Plain language, not metaphor.** His words: "sometimes I get a little lost in the slang." For
-  each change say what it does, why, what it affects downstream, and what he would see if it were
-  wrong. Name the takeaway explicitly.
+- **Show, don't spec.** Build something he can react to.
+- **Plain language, not metaphor.** His words: "sometimes I get a little lost in the slang."
 - **Give a recommendation, not a menu.**
-- **Own mistakes plainly and move on.** Several changes this week were regressions of mine. Saying
-  so directly, once, and fixing them is the expected behaviour.
+- **Own mistakes plainly and move on.**
 - **He flashes fast** and will often hand you a COM port mid-turn.
-- **Push back on scope when it is real.** He asked for a large batch at the end of an exhausted
-  context; declining most of it with a reason was welcomed, not resented.
+- **Push back on scope when it is real.**
+- **Structure long answers.** He said directly that the what-I-did / caveats / uncertain / next
+  breakdown is his preferred format.
 
 **What to avoid:**
 
 - Don't say "we should wait until phase X" as a reflex.
 - Don't trust a browser mock. The bench narrows the options; the glass decides.
 - Don't commit straight to `main`. Feature branch, then merge.
-- **Don't guess a fourth time.** When a theory needs another iteration, instrument it or ask the
-  far end.
+- **Don't guess a fourth time.** Instrument it or ask the far end.
+- **Don't claim a script worked because it printed something.** Check the file changed.
 
 **Versioning:** `A.B.C.D`, where **C is the roadmap phase**. Tag on `main` at merge, never during
-development. A dirty tree appends `+dirty`, which is working correctly.
+development. A dirty tree appends `+dirty`.

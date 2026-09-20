@@ -232,6 +232,43 @@ parent and the deck's children have a different parent from the screen - and res
 difference plus one gap. It survives someone changing a panel's height, which a magic number
 would not.
 
+## 6b. What the page looks like now — 2026-09-19
+
+The shipped `FLEET_PAGE` is **12 cards / 13 cells**, down from 13 / 15. Three owner changes:
+
+- **All Lamps is one cell**, not two. It spanned `U_2` as the group card's showcase; the cell was
+  worth more than the demonstration.
+- **Lamp 4's card is gone.** `VIRT_ENT_L4` deliberately stays, so "All Lamps" still aggregates a
+  child with no card of its own — which is the normal case for a real group.
+- **Uptime outranks Free Heap** (`PRI_DEBUG + 10`), and both are **3 units** (one and a half
+  cells). All three panel cards sat at `PRI_DEBUG`, and ties break toward the LATER declaration, so
+  Uptime — declared last — was always the first card dropped on the whole page and had never once
+  been visible on either 4B board.
+
+The 3-unit width is not only packing. Uptime formats `HH:MM:SS` (#51) and six digits plus two
+colons do not fit the VALUE face in one cell on any board in the fleet. `minSpanX = U_CELL` lets
+both fall back on `CYD_S3_3248`, whose rows are only four units wide.
+
+**Consequence worth knowing:** on a 3x4 board this leaves 13 cells of content in 12, so one card
+drops and half a cell goes empty. That gap is exactly what #53 and #54 exist for, and it is the
+honest outcome rather than a bug.
+
+### Per-board default grids are now in the flashed image
+
+`GUIManager` carries an `#ifdef` on the board identity macro: `WS_P4_5` boots **5x3**, both 4B
+boards **3x4**. These are the owner's picks from ROADMAP §7, which says they belong in the image
+rather than behind a knob nobody turns. They are EXACT COUNTS via `COLS_OVERRIDE` and
+`setRowsOverride()`, not nudges to `TARGET_CARD_W` — `LESSONS.md` records why deriving is the right
+default but not a user interface.
+
+Only the boards the owner named are set. The rest of ROADMAP §7's table is deliberately NOT
+applied: putting numbers on boards nobody has looked at recently is how a default becomes a bug.
+
+**A trap caught before flashing rather than after:** `GUIManager.cpp` includes `GUIManager.h`
+first and `bsp_loader.h` eight lines later, so a board macro tested in that header is undefined at
+the point it is tested. The `#if` would have taken the fallback branch, applied no default at all,
+and compiled without a warning. `GUIManager.h` now includes `bsp_loader.h` itself.
+
 ## 7. Units on a card
 
 The owner always wants Fahrenheit, and both must be supported and overridable — his Home Assistant
@@ -249,3 +286,43 @@ Two consequences worth knowing: the unit *label* comes from `cardDisplayUnit()` 
 `desc.unit`, because printing the source's unit beside a converted number is a caption that lies;
 and a converted integer is promoted to one decimal, because 22 °C is 71.6 °F and printing `71`
 would be a rounding the source never made.
+
+---
+
+## 8. The system drawer — rebuilt 2026-09-19 (#50)
+
+Not strictly a page, but it opens over one and its geometry is derived the same way.
+
+**Width comes from the SCREEN, in LOGICAL pixels, with no board macro anywhere.** At or above 700
+logical px it takes half the width; at or above 400, three quarters; below that the whole screen.
+The owner's constraint was as firm as the rule: *"I just want to avoid doing basically anything on
+a per-board one-off condition."*
+
+Logical rather than physical is load-bearing. `WS_P4_5` is 1280 px across and 740 logical at 1.73x,
+so a physical test would file it with the 7B when it has less usable width than a five-inch board.
+The fleet clusters at **330 / 480 / 727-740 / 1024**, so both thresholds sit in a wide gap rather
+than next to a board.
+
+**Height is measured, not guessed.** `_ui_content` is `LV_SIZE_CONTENT` and the wrapper animates to
+what it measures. It used to open to `screen_h - sc(50) - sc(100)`, two constants standing in for a
+header the panel should not know about and a gap nobody could name — and the dependency was
+backwards, which is why the drawer could never be the size of its contents.
+
+**Two visible bugs were one omission.** `upper_deck` never cleared its theme padding, and
+`lv_obj_set_pos()` is relative to the parent's CONTENT area — so the drawer was shifted down (a gap
+under the header, "floating in the air") and right (its border off the screen edge). Both were
+reported as separate faults.
+
+**The header is hide/show only, fixed at 35 logical px.** The old size cycle had six positions and
+one of them was "gone", from which nothing could bring the bar back. The drawer's top offset moves
+with it, so a hidden header means the panel starts at y=0.
+
+Measured on hardware, and the panel prints this line at boot precisely because three of these
+changes are invisible until a finger opens it:
+
+    WS_P4_5   640 px at x=623 (screen 1280, 740 logical), top 60, content 334
+    WS_P4_4B  540 px at x=165 (screen  720, 480 logical), top 52, content 298
+
+`clip_corner` was removed from the wrapper. It did nothing — radius 0 — but it is one of the three
+styles that force a render layer sized by object WIDTH, on what was then the widest object on
+screen. That is the shape that froze `WS_P4_5` at the end of 2.5.

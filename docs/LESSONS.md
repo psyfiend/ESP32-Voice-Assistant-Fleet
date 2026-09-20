@@ -77,6 +77,23 @@ fails with `designator order for field 'X' does not match declaration order`. Ap
 BSP headers and to every other struct we initialise this way — it caught us again on
 `EntityDescriptor` months after the BSP rule was written down.
 
+**The `DISABLED` trap caught us AGAIN at #49, with the lesson already written down.**
+`Widget_MqttStatus`'s state enum had a `DISABLED` member. The rule was in `CLAUDE.md`, it was in
+this file naming that exact identifier, and it was hit anyway - because "remember to avoid
+ALL-CAPS enumerator names" is a thing you have to think of at the moment you type one, and the
+error message still points at `esp32-hal-gpio.h` and at the call sites rather than at the
+declaration.
+
+**So make it a check rather than a memory.** Before adding enumerators, run them past the
+framework headers:
+
+    cd ~/.platformio/packages/framework-arduinoespressif32/cores/esp32
+    for m in MY_NAMES HERE; do grep -rhwE "^ *# *define +$m" . | head -1; done
+
+Ten seconds, and it is the difference between a rename and twenty minutes reading errors that
+point nowhere near the cause. The compound-name habit (`SESSION_OFF`, `LINK_DEAD`) is still the
+right default; the grep is what catches the one you did not think to compound.
+
 **A board's identity macro must not match a struct instance name.** Once `#define WS_P4_7B`
 exists, the preprocessor rewrites every bare occurrence — including a struct's own
 declaration — to `1`.
@@ -357,6 +374,12 @@ the cell was 97 px tall. Two numbers describing the same thing that disagree is 
 
 ## Never put a backslash escape in text a script writes
 
+> **The authoritative version of this now lives in `CLAUDE.md`, in the "STOP - how to edit files in
+> this repo" section at the top.** It was moved there on 2026-09-18 because this file is read
+> *before debugging* and the mistake happens *while editing* - so the warning sat in a document
+> nobody had opened yet. The account below is kept for the failure history; the procedure to follow
+> is the one in `CLAUDE.md`.
+
 Recorded above and worth restating because it happened **six times** across two sessions, in both
 directions - in the text being written *and* in the search string used to find an anchor. Quoting
 the heredoc delimiter is not enough. Build the backslash with `chr(92)`, or use an editor tool.
@@ -370,3 +393,50 @@ the router's lease table, the HA device page and a ping all know things the firm
 
 This is the oldest rule in the project - "verify from outside the device" - and it keeps earning
 its place. When a device-side theory needs a fifth iteration, stop and ask something else.
+
+## A script that prints "ok" has not necessarily done anything
+
+2026-09-19, and this is the **reverse direction** of the backslash rule above — the one the
+`CLAUDE.md` section calls out and which still caught a session that had just written it.
+
+`lv_indev_wait_release()` was supposed to be added to the gesture handler. The script that added it
+matched on an anchor string containing `\n`. The heredoc ate one backslash, Python turned the rest
+into a real newline, the anchor no longer matched anything in the file, `str.replace()` replaced
+nothing, and the script printed its success message and exited 0.
+
+**Nothing failed. Nothing warned. The call was simply never there**, and three separate user-facing
+bugs were attributed to other causes for a day: a swipe's start acting as a tap, a drawer opening
+and instantly closing, and a swipe-up bringing back the deck *and* expanding a panel *and*
+squashing the grid.
+
+Two defences, and the second is the one that would have caught it:
+
+- Never put a backslash escape in text a script writes **or in the string it searches for**.
+- **Confirm the file changed.** `grep -c` for the thing you just added. A replace that matched
+  nothing and a replace that worked look identical from the outside, and only one of them leaves a
+  trace in the file.
+
+## Events do not reach the screen through a clickable child
+
+LVGL delivers an event to the object that was hit and stops there unless `LV_OBJ_FLAG_EVENT_BUBBLE`
+is set. A card is clickable, so a press that lands on one never reaches the screen.
+
+This was shipped with a comment claiming the bubbling existed - "on the SCREEN with EVENT_BUBBLE set
+on the things above it" - while nothing anywhere set it. The comment described the design; the code
+implemented half of it, and the uninitialised press origin `{0,0}` then read as "left half, top
+edge" for every gesture on the display.
+
+**A comment that describes a mechanism in another file is a claim, and claims get checked.** Name
+the file that holds the other half, so the pair can be found.
+
+## Release the touch BEFORE an action that rebuilds the screen
+
+LVGL delivers a gesture and then still delivers the press and click of the same finger.
+`lv_indev_wait_release()` exists for exactly this, and WHERE it is called matters as much as
+whether it is.
+
+Called after the action, a rebuild has already happened - so LVGL puts new objects under a finger
+it still considers pressed, and the press lands on whatever appeared there. That is how a swipe-up
+to reveal the deck also expanded the first panel that materialised under the fingertip.
+
+Release first. Then rebuild.

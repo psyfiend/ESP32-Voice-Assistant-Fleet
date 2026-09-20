@@ -112,6 +112,15 @@ const char *joinResultName(JoinResult r) {
     }
     return "?";
 }
+const char *linkHealthName(LinkHealth h) {
+    switch (h) {
+        case LinkHealth::LINK_UNKNOWN: return "unknown";
+        case LinkHealth::LINK_HEALTHY: return "healthy";
+        case LinkHealth::LINK_SUSPECT: return "suspect";
+        case LinkHealth::LINK_DEAD:    return "DEAD";
+    }
+    return "?";
+}
 
 // ---------------------------------------------------------------------------
 // Event plumbing. One instance, one handler - the handler is the single
@@ -167,6 +176,20 @@ const char *ConnectivityManager::getApPassword() const {
 IPAddress ConnectivityManager::getApIP() const { return WiFi.softAPIP(); }
 
 bool ConnectivityManager::isOnline() const {
+    // A CONFIRMED-DEAD LINK IS NOT ONLINE, whatever the driver says.
+    //
+    // This one line is what makes the #49 verdict mean something to the rest
+    // of the system rather than only to the header glyph. Everything above
+    // asks isOnline() and nothing above asks getLinkHealth(), so a board that
+    // had convicted its own link still told MqttManager it was fine - and
+    // MqttManager then spent up to SOCKET_TIMEOUT_S blocking the loop task on
+    // a TCP connect that could not succeed.
+    //
+    // That is the owner's "the device frequently locks up where screen taps do
+    // nothing". LVGL runs on that same task. The UI was not slow; it was not
+    // running.
+    if ((LinkHealth)_health.load() == LinkHealth::LINK_DEAD) return false;
+
     ConnState s = (ConnState)_state.load();
     return (s == ConnState::STA_CONNECTED || s == ConnState::APSTA) && _gotIp.load() != 0;
 }
@@ -435,6 +458,7 @@ void ConnectivityManager::startStaAttempt() {
     _giveUpNow.store(0);
     _attemptStartedMs = millis();
     _attempt++;
+    _attemptPub.store(_attempt);   // the UI reads this; _attempt is loop()-only
     setState(ConnState::STA_CONNECTING,
              isApActive() ? LinkType::APSTA : LinkType::STA);
     Serial.printf("[Conn] STA attempt %u/%u -> \"%s\" as \"%s\"\n",
@@ -649,6 +673,12 @@ void ConnectivityManager::loop() {
 
     uint32_t now = millis();
 
+    // Issue #49. Both are no-ops unless associated, and both run BEFORE the
+    // retry machinery below so a link that has just been convicted is acted on
+    // in the same pass rather than a loop later.
+    pollRssi(now);
+    liveness(now);
+
     // --- re-issue a connect after a transient disconnect ----------------
     // Done here rather than in the event handler so WiFi.begin() is never
     // called re-entrantly from the event task.
@@ -805,6 +835,439 @@ void ConnectivityManager::loop() {
 }
 
 // ---------------------------------------------------------------------------
+// Link liveness - issue #49.
+//
+// THE FAULT THIS EXISTS FOR, because it dictates every choice below. Boards
+// sat in STA_CONNECTED holding an IP, with WiFi.status() returning
+// WL_CONNECTED and WiFi.RSSI() returning the value it read at association,
+// while nothing on the LAN could reach them. WS_P4_5 at ~3-4 h, WS_P4_4B at
+// ~5-6 h, WS_P4_7B intermittently. The UI ran perfectly throughout.
+//
+// So: NOTHING HERE MAY ASK THE DRIVER HOW IT IS DOING. Every signal in this
+// section is either a round trip that left the board, or a report from a
+// layer above about something it failed to reach. WiFi.status() appears
+// exactly nowhere in it, and that is the point rather than an oversight.
+// ---------------------------------------------------------------------------
+
+uint32_t ConnectivityManager::rssiAgeMs() const {
+    uint32_t at = (uint32_t)_rssiAtMs.load();
+    if (at == 0) return UINT32_MAX;          // never measured
+    return millis() - at;
+}
+
+bool ConnectivityManager::isRssiFresh() const {
+    return rssiAgeMs() <= _defaults.RSSI_STALE_MS;
+}
+
+void ConnectivityManager::pollRssi(uint32_t now) {
+    if (_lastRssiPollMs != 0 && (now - _lastRssiPollMs) < _defaults.RSSI_POLL_MS) return;
+    _lastRssiPollMs = now;
+
+    int32_t r = (int32_t)WiFi.RSSI();
+
+    // 0 is what the driver hands back when it has nothing, and it is also a
+    // legal-looking RSSI, so it must not be stored as a measurement. Leaving
+    // the timestamp alone lets the value age out into SignalBand::NONE, which
+    // is the honest answer: we asked and did not get one.
+    //
+    // Worth watching on the P4 boards specifically. RSSI there is an RPC to
+    // the ESP32-C6 over SDIO, so a failing read is itself evidence about the
+    // hosted transport - the cheapest liveness signal available, if it fires.
+    // Whether it actually does during the fault is UNMEASURED; this logs it
+    // so the next soak answers the question instead of us guessing again.
+    if (r == 0) {
+        DBG_WIFI("RSSI read returned 0 - not storing (age now %lums)\n",
+                 (unsigned long)rssiAgeMs());
+        return;
+    }
+
+    _rssi.store(r);
+    _rssiAtMs.store((int32_t)now);
+}
+
+void ConnectivityManager::setHealth(LinkHealth h, const char *why) {
+    LinkHealth prev = (LinkHealth)_health.load();
+    if (prev == h) return;
+    _health.store((int32_t)h);
+    // Printed unconditionally, not behind DEBUG_WIFI. The single loudest fact
+    // about the original fault was that the log contained no [Conn] lines at
+    // all for hours - the connectivity layer never noticed anything, so there
+    // was nothing to read. A health transition is exactly the line whose
+    // absence was the evidence.
+    Serial.printf("[Conn] Link health %s -> %s (%s)\n",
+                  linkHealthName(prev), linkHealthName(h), why ? why : "");
+}
+
+// Called from the GOT_IP handler and nowhere else. A genuinely new
+// association is the ONLY thing entitled to clear the ladder counter - see the
+// note in runRecovery()'s last rung for why the failure path must not.
+void ConnectivityManager::resetLiveness() {
+    _probeFails      = 0;
+    _remoteFails.store(0);
+    _recoveryRung    = 0;
+    _laddersRun      = 0;
+    _lastRecoveryMs  = 0;
+    _lastProbeMs     = 0;
+    _lastEvidenceMs  = millis();
+    _probeResult.store(0);
+    setHealth(LinkHealth::LINK_UNKNOWN, "fresh association");
+}
+
+// --- the probe ------------------------------------------------------------
+//
+// esp_ping runs its own task and answers through callbacks, so this is split
+// across two loop() passes rather than written as the bool-returning call it
+// would like to be. ConnectivityManager promises never to block and the UI
+// shares its task, so an answer that takes 2 s to arrive has to be collected,
+// not waited for.
+
+void ConnectivityManager::probeOnSuccess(esp_ping_handle_t, void *args) {
+    static_cast<ConnectivityManager *>(args)->_probeResult.store(1);
+}
+void ConnectivityManager::probeOnTimeout(esp_ping_handle_t, void *args) {
+    static_cast<ConnectivityManager *>(args)->_probeResult.store(2);
+}
+void ConnectivityManager::probeOnEnd(esp_ping_handle_t, void *args) {
+    // A session that produced neither callback still has to resolve, or the
+    // collector would wait on it forever and the probe would silently stop
+    // being a check at all.
+    ConnectivityManager *self = static_cast<ConnectivityManager *>(args);
+    int32_t expected = 0;
+    self->_probeResult.compare_exchange_strong(expected, 2);
+}
+
+// Which host this probe should aim at.
+//
+// A LADDER, not a single target, and the owner's reasoning for it is exactly
+// right: "The router/gateway will always respond to a ping so long as the
+// router is turned on. I can't say the same if I were to boot the devices up
+// on a different network though, and not all routers will respond to a ping."
+//
+// There is a second reason he did not raise and it may matter more: **routers
+// rate-limit ICMP**. A gateway that normally answers can drop a burst of them
+// and look dead for exactly as long as it takes us to convict the link and
+// cycle a working radio. Rotating the target means the failures that convict
+// must come from three different hosts, which no rate-limiter produces.
+//
+// The rung is chosen by the consecutive-failure count, so a healthy board
+// always asks the gateway (cheapest, most local, nothing leaves the LAN) and
+// only a board that is already failing reaches further out. Conviction takes
+// PROBE_FAILS_DEAD failures, which is enough to have tried every rung.
+//
+// Returns false when this rung has no usable address, which is normal - a
+// network with no DNS server configured simply skips that rung.
+bool ConnectivityManager::probeTarget(uint8_t rung, IPAddress &out) const {
+    switch (rung % 3) {
+    case 0:
+        out = WiFi.gatewayIP();
+        break;
+    case 1:
+        // The DNS server. Usually the gateway again on a home LAN, in which
+        // case this rung is a free retry rather than a new host - still useful
+        // against rate-limiting, and genuinely a different host wherever DNS
+        // is a separate box (as it is here: gw .1, dns .60).
+        out = WiFi.dnsIP();
+        break;
+    default:
+        // Off-LAN, and the only rung that leaves the building.
+        //
+        // Reached only after the two local rungs have both failed, so a
+        // standalone or air-gapped fleet never sends it: those boards fail all
+        // three, _probeEverWorked stays false, and the never-answered guard
+        // suppresses every verdict. That is the correct outcome for a board
+        // with genuinely nothing to talk to.
+        out = IPAddress(PROBE_FALLBACK_A, PROBE_FALLBACK_B,
+                        PROBE_FALLBACK_C, PROBE_FALLBACK_D);
+        break;
+    }
+    return out != IPAddress((uint32_t)0);
+}
+
+void ConnectivityManager::probeStart() {
+    if (_ping) return;                        // one in flight is enough
+
+    IPAddress tgt;
+    if (!probeTarget(_probeFails, tgt)) {
+        DBG_WIFI("probe rung %u has no address - skipping\n", (unsigned)(_probeFails % 3));
+        // Count it, so a rung that never has an address cannot stall the
+        // ladder on itself forever.
+        if (_probeFails < 255) _probeFails++;
+        return;
+    }
+
+    ip_addr_t target;
+    // IPv4 only. The fleet has never been on a v6 network and a v6 literal
+    // here would silently probe nothing.
+    IP_ADDR4(&target, tgt[0], tgt[1], tgt[2], tgt[3]);
+
+    esp_ping_config_t cfg = ESP_PING_DEFAULT_CONFIG();
+    cfg.target_addr  = target;
+    cfg.count        = 1;                     // one round trip is the question
+    cfg.timeout_ms   = _defaults.PROBE_TIMEOUT_MS;
+    cfg.task_stack_size = 2560;               // default is 2048; margin for the callbacks
+    cfg.task_prio    = 2;                     // below the WiFi task, above idle
+
+    esp_ping_callbacks_t cbs = {
+        .cb_args        = this,
+        .on_ping_success = probeOnSuccess,
+        .on_ping_timeout = probeOnTimeout,
+        .on_ping_end     = probeOnEnd,
+    };
+
+    _probeResult.store(0);
+    if (esp_ping_new_session(&cfg, &cbs, &_ping) != ESP_OK) {
+        _ping = nullptr;
+        DBG_WIFI("probe session could not be created\n");
+        return;
+    }
+    if (esp_ping_start(_ping) != ESP_OK) {
+        esp_ping_delete_session(_ping);
+        _ping = nullptr;
+        DBG_WIFI("probe could not be started\n");
+        return;
+    }
+    _probeLast = tgt;
+    DBG_WIFI("probe rung %u -> %s\n", (unsigned)(_probeFails % 3), tgt.toString().c_str());
+}
+
+bool ConnectivityManager::probeCollect(bool &okOut) {
+    if (!_ping) return false;
+    int32_t r = _probeResult.load();
+    if (r == 0) return false;                 // still in flight
+
+    okOut = (r == 1);
+    esp_ping_stop(_ping);
+    esp_ping_delete_session(_ping);           // frees the task; not optional
+    _ping = nullptr;
+    _probeResult.store(0);
+    return true;
+}
+
+void ConnectivityManager::noteRemoteUnreachable() {
+    // Only meaningful while we believe we are online. Off-link this says
+    // nothing we do not already know.
+    if (!isOnline()) return;
+    _remoteFails.fetch_add(1);
+}
+
+void ConnectivityManager::noteRemoteReachable() {
+    // The strongest evidence available: a packet came back from off-device.
+    // It outranks a failed probe, so it clears the counters outright.
+    _remoteFails.store(0);
+    _probeFails = 0;
+    _lastEvidenceMs = millis();
+    if ((LinkHealth)_health.load() != LinkHealth::LINK_HEALTHY) {
+        setHealth(LinkHealth::LINK_HEALTHY, "traffic from off-device");
+    }
+}
+
+void ConnectivityManager::liveness(uint32_t now) {
+    if (!isOnline()) return;
+    if (!_defaults.PROBE_ENABLED) return;
+
+    // 1. Collect an outstanding probe before scheduling another.
+    bool ok = false;
+    if (probeCollect(ok)) {
+        if (ok) {
+            // Latched for the life of the boot, never cleared by resetLiveness():
+            // "does ICMP work on this network" is a property of the network, and
+            // one answered reply proves it for good. Clearing it on every
+            // re-association would re-arm the never-worked guard exactly when
+            // the probe is most needed.
+            // Logged once, because "is the liveness probe usable on this
+            // network" is the single fact that decides whether any of this
+            // can work, and it should not have to be inferred from silence.
+            if (!_probeEverWorked) {
+                Serial.printf("[Conn] %s answers ICMP - liveness probe armed.\n",
+                              _probeLast.toString().c_str());
+            }
+            _probeEverWorked = true;
+            _probeFails      = 0;
+            _lastEvidenceMs  = now;
+            if ((LinkHealth)_health.load() != LinkHealth::LINK_HEALTHY) {
+                setHealth(LinkHealth::LINK_HEALTHY, "probe answered");
+            }
+            _remoteFails.store(0);
+        } else {
+            if (_probeFails < 255) _probeFails++;
+
+            // NEVER CONVICT ON AN INSTRUMENT THAT HAS NEVER WORKED.
+            //
+            // Plenty of routers and APs drop ICMP by policy. On such a network
+            // every probe fails from the first second of the first boot, and
+            // without this guard the fix for #49 would be far worse than the
+            // fault: every board would declare its own healthy link dead
+            // within minutes and start cycling its radio, forever.
+            //
+            // So a probe only becomes evidence once it has been seen to
+            // succeed at least once on this network. Until then a failure
+            // means "this test does not work here", not "the link is down" -
+            // which is the same discipline as this project's oldest rule,
+            // pointed at our own instrument instead of at the device.
+            if (!_probeEverWorked) {
+                if (_probeFails == _defaults.PROBE_FAILS_SUSPECT) {
+                    Serial.println("[Conn] Gateway does not answer ICMP - liveness probing "
+                                   "disabled. Link health will rely on traffic alone.");
+                }
+                // Keep counting (the number is in the dump and tells the story)
+                // but draw no conclusion from it.
+                return;
+            }
+
+            Serial.printf("[Conn] Gateway probe failed (%u consecutive, %lus since last reply)\n",
+                          (unsigned)_probeFails,
+                          (unsigned long)((now - _lastEvidenceMs) / 1000));
+
+            if (_probeFails >= _defaults.PROBE_FAILS_DEAD) {
+                setHealth(LinkHealth::LINK_DEAD, "no probe target answers");
+            } else if (_probeFails >= _defaults.PROBE_FAILS_SUSPECT) {
+                setHealth(LinkHealth::LINK_SUSPECT, "probe not answering");
+            }
+        }
+    }
+
+    // 2. Corroborating evidence from above. This can raise suspicion and bring
+    //    the next probe forward, but it never convicts on its own - a broker
+    //    that is switched off is not a broken network, and cycling the radio
+    //    under it would drop a perfectly good link.
+    if ((int32_t)_remoteFails.load() >= (int32_t)_defaults.REMOTE_FAILS_SUSPECT) {
+        if ((LinkHealth)_health.load() == LinkHealth::LINK_HEALTHY ||
+            (LinkHealth)_health.load() == LinkHealth::LINK_UNKNOWN) {
+            setHealth(LinkHealth::LINK_SUSPECT, "a remote host stopped answering");
+        }
+    }
+
+    // 3. Schedule - and the important word is DEMAND. A probe is only sent
+    //    when nothing else has produced evidence recently.
+    //
+    //    This matters more than it looks. esp_ping spawns a task, and a task
+    //    stack comes out of INTERNAL RAM - the scarcest thing on this fleet
+    //    (docs/LESSONS.md: "Internal heap is the scarcest thing on this fleet,
+    //    and nothing announces it"). On CYD_S3_3248, the only QSPI board and
+    //    so the only one whose LVGL buffers are also internal, spending 2.5 KB
+    //    of it every sixty seconds forever would be a real cost paid by the
+    //    one board that has never exhibited the fault.
+    //
+    //    A board with a healthy broker session refreshes its evidence from
+    //    ordinary MQTT keepalive traffic and therefore sends NO probes at all.
+    //    The probe exists for the cases that traffic cannot cover: MQTT off,
+    //    MQTT down, or a link that just went quiet.
+    uint32_t gap = _defaults.PROBE_INTERVAL_MS;
+    LinkHealth h = (LinkHealth)_health.load();
+    // Once suspicious, probe four times as often: conviction takes ~90 s from
+    // the first missed probe rather than four minutes.
+    if (h == LinkHealth::LINK_SUSPECT || h == LinkHealth::LINK_DEAD) gap /= 4;
+
+    // A network that has never answered a probe gets checked rarely rather
+    // than every minute forever. Without this the "probing disabled" line
+    // logged above would be false - we would keep spending a task stack on an
+    // instrument we had already decided not to believe, which is both a waste
+    // on the board that can least afford it and a message that does not match
+    // the behaviour. It stays on a slow retry rather than stopping outright
+    // because the board may be moved to a different network without rebooting.
+    if (!_probeEverWorked && _probeFails >= _defaults.PROBE_FAILS_DEAD) {
+        gap = 30UL * 60UL * 1000UL;
+    }
+
+    // CALIBRATION, and it is not optional - without it the guard above becomes
+    // a permanent gag on exactly the boards that need the probe most.
+    //
+    // The demand-driven rule says "do not probe while other evidence is
+    // arriving", and a board with a healthy broker produces that evidence
+    // continuously. So it would never probe, _probeEverWorked would never
+    // latch, and the first probe of its life would be the one fired the moment
+    // MQTT went down - which the never-worked guard would then correctly
+    // refuse to believe. The link would be dead, the probe would say so, and
+    // nothing would act.
+    //
+    // So until the instrument has proved itself once, probe on the ordinary
+    // interval regardless of other evidence. That is at most PROBE_FAILS_DEAD
+    // probes on a network that drops ICMP, one probe on a network that does
+    // not, and then demand-driven behaviour for the rest of the boot.
+    const bool calibrating   = !_probeEverWorked && _probeFails < _defaults.PROBE_FAILS_DEAD;
+    const bool evidenceStale = (now - _lastEvidenceMs) >= gap;
+    const bool dueAnyway     = (_lastProbeMs == 0) || ((now - _lastProbeMs) >= gap);
+
+    if (!_ping && dueAnyway && (evidenceStale || calibrating)) {
+        _lastProbeMs = now;
+        probeStart();
+    }
+
+    // 4. Act.
+    if (h == LinkHealth::LINK_DEAD) runRecovery(now);
+}
+
+// --- recovery -------------------------------------------------------------
+//
+// Escalating, one rung per RECOVERY_STEP_MS, because the cheapest action that
+// works should be the one that runs. A router rebooting fixes itself; there is
+// no reason to cycle the radio at it.
+void ConnectivityManager::runRecovery(uint32_t now) {
+    // Cool-off. Each completed ladder widens the gap before the next one, so a
+    // board whose problem is upstream - the router is off, the uplink is down,
+    // the AP has gone - stops cycling its radio every few minutes and settles
+    // into checking occasionally.
+    //
+    // It converges on "keep the UI alive, keep looking, stop thrashing", which
+    // is the right behaviour for a wall panel: the fault is not ours to fix
+    // and the owner will notice the house's network before they notice us.
+    uint32_t step = _defaults.RECOVERY_STEP_MS;
+    for (uint8_t i = 0; i < _laddersRun && step < 15UL * 60UL * 1000UL; i++) step *= 2;
+
+    if (_lastRecoveryMs != 0 && (now - _lastRecoveryMs) < step) return;
+    _lastRecoveryMs = now;
+
+    switch (_recoveryRung) {
+    case 0:
+        // Re-associate. Cheapest thing that could possibly work, and on the
+        // evidence the most likely: the association is what died.
+        Serial.println("[Conn] RECOVERY 1/3: re-associating (link confirmed dead).");
+        esp_wifi_disconnect();
+        esp_wifi_connect();
+        _recoveryRung = 1;
+        break;
+
+    case 1:
+        // Full radio cycle. On the P4 boards this also re-runs the esp_hosted
+        // bring-up to the ESP32-C6, which is the layer most suspected of being
+        // what actually fails - see issue #49's boot-time RPC timeout.
+        Serial.println("[Conn] RECOVERY 2/3: cycling the radio.");
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        WiFi.mode(WIFI_STA);
+        applyRadioTuning();
+        _gotIp.store(0);
+        _attempt = 0;
+        _attemptPub.store(0);
+        startStaAttempt();
+        _recoveryRung = 2;
+        break;
+
+    default:
+        // Give the state machine the fault properly, so AP fallback and the
+        // normal retry ladder take over. From here the board behaves exactly
+        // as it would after any other failed association - which is the
+        // behaviour that was missing entirely, because nothing ever told it
+        // the link had gone.
+        if (_laddersRun < 255) _laddersRun++;
+        Serial.printf("[Conn] RECOVERY 3/3: handing back to the state machine "
+                      "(ladder %u since the last good link).\n", (unsigned)_laddersRun);
+        _gotIp.store(0);
+        enterDegraded("link dead and recovery exhausted");
+        _recoveryRung = 0;
+        // Deliberately NOT resetLiveness() - that would zero _laddersRun and
+        // throw away the cool-off this branch just earned. Only a genuinely
+        // restored link (GOT_IP) is allowed to declare the slate clean.
+        _probeFails   = 0;
+        _remoteFails.store(0);
+        _probeResult.store(0);
+        setHealth(LinkHealth::LINK_UNKNOWN, "recovery exhausted, retrying from scratch");
+        escalateAfterFailure(now);
+        break;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Events - runs on the Arduino event task. Never touches LVGL.
 // ---------------------------------------------------------------------------
 void ConnectivityManager::captureLinkInfo() {
@@ -812,6 +1275,7 @@ void ConnectivityManager::captureLinkInfo() {
     strlcpy(_ssid, WiFi.SSID().c_str(), sizeof(_ssid));
     UNLOCK();
     _rssi.store((int32_t)WiFi.RSSI());
+    _rssiAtMs.store((int32_t)millis());
 }
 
 void ConnectivityManager::handleEvent(int32_t eventId, void *infoPtr) {
@@ -852,6 +1316,13 @@ void ConnectivityManager::handleEvent(int32_t eventId, void *infoPtr) {
         // periodic recheck instead of a permanent stop.
         if (!_proven) markProven(true);
         captureLinkInfo();
+        // A new association is a clean slate for liveness: the probe counters,
+        // the recovery rung and any lingering LINK_DEAD verdict all belong to
+        // the link that just went away, not to this one. Without this a board
+        // that recovered would carry its own conviction into the new session
+        // and immediately start the ladder again.
+        resetLiveness();
+        _attemptPub.store(0);
         applyRadioTuning();                            // re-apply on every link-up
         setState(isApActive() ? ConnState::APSTA : ConnState::STA_CONNECTED,
                  isApActive() ? LinkType::APSTA : LinkType::STA);
@@ -1082,7 +1553,25 @@ void ConnectivityManager::dumpStatus(Print &out) const {
     if (isOnline()) {
         out.printf("  SSID: %s\n", ssid);
         out.printf("  IP: %s\n", WiFi.localIP().toString().c_str());
-        out.printf("  RSSI: %d dBm\n", (int)getRssi());
+        out.printf("  Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
+        // The age is printed beside the value on purpose. "RSSI: -42 dBm" was
+        // a true statement for six hours while the board was off the network
+        // (issue #49); "-42 dBm (measured 21341 s ago)" could never have been
+        // read that way by anyone.
+        uint32_t age = rssiAgeMs();
+        if (age == UINT32_MAX) {
+            out.println("  RSSI: never measured");
+        } else {
+            out.printf("  RSSI: %d dBm (measured %lus ago%s)\n", (int)getRssi(),
+                       (unsigned long)(age / 1000), isRssiFresh() ? "" : ", STALE");
+        }
+        out.printf("  Link health: %s\n", linkHealthName(getLinkHealth()));
+        out.printf("  Gateway probe: %s, %u consecutive failure(s), evidence %lus old\n",
+                   _probeEverWorked ? "working" : "NEVER ANSWERED (verdicts suppressed)",
+                   (unsigned)_probeFails,
+                   (unsigned long)((millis() - _lastEvidenceMs) / 1000));
+        if (_laddersRun) out.printf("  Recovery ladders run: %u\n", (unsigned)_laddersRun);
+        out.printf("  Remote-unreachable reports: %ld\n", (long)_remoteFails.load());
     } else {
         out.printf("  Last disconnect reason: %u\n", getLastDisconnectReason());
     }

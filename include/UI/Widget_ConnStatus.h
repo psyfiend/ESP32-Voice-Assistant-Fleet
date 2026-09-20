@@ -42,8 +42,14 @@ public:
     lv_obj_t *getRoot() { return _root; }
 
 private:
-    void applyVisual(ConnState st, SignalBand band, bool apUp);
+    void applyVisual(ConnState st, SignalBand band, bool apUp,
+                     LinkHealth health, bool retrying);
     void setArcs(int litCount, lv_color_t col, bool glow);
+    // "Connected, strength unknown" - all three arcs ghosted in the link
+    // colour with a solid dot. Distinct from every other state on purpose:
+    // one arc would read as "weak", three as "excellent", and both would be
+    // claims we cannot support once the RSSI sample has gone stale.
+    void setArcsUnknown(lv_color_t col);
     void startMotion();
     void stopMotion();
 
@@ -61,5 +67,9 @@ private:
     Motion   _motion           = Motion::PULSE;
     bool     _motionRunning    = false;
     uint32_t _lastPollMs       = 0;
-    int32_t  _lastKey          = -1;        // change guard: state+band+ap packed
+    // Change guard: state + band + ap + health + retrying, packed. Health and
+    // retrying joined the key when they joined the visual - a state the glyph
+    // can draw but the guard cannot see is a glyph that never updates, which
+    // is a silent failure and exactly the sort this indicator exists to stop.
+    int32_t  _lastKey          = -1;
 };

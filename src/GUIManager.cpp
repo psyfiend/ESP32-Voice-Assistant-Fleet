@@ -15,6 +15,16 @@
 // with user_data, which LVGL does support for lv_event_cb.
 static GUIManager *s_self = nullptr;
 
+// Per the repo's debug-flag convention (CLAUDE.md): a diagnostic worth keeping
+// rather than deleting, off unless an environment asks for it. Gesture work is
+// exactly the kind that needs "did the swipe even arrive" answered before
+// anything else, and the answer is invisible without this.
+#ifdef DEBUG_GESTURE
+    #define DBG_GESTURE(...) Serial.printf("[Gesture:debug] " __VA_ARGS__)
+#else
+    #define DBG_GESTURE(...) do {} while (0)
+#endif
+
 GUIManager::GUIManager(SystemCore &core)
     : _core(core)
     , _pnlDisplay(core.display(), core.touch())
@@ -25,9 +35,283 @@ GUIManager::GUIManager(SystemCore &core)
     s_self = this;
 }
 
+// THE ONE WAY TO OPEN OR CLOSE THE DRAWER. Both the header tap and the swipe
+// come through here, and that is the point.
+//
+// The drawer hangs off whatever bar is currently above it, and there are three
+// possibilities: a permanent header, a peeked one, or nothing. Getting that
+// offset right was originally done in the swipe handler alone - so tapping the
+// status icon while the header was peeked opened the drawer at y=0, behind the
+// bar, with its SYSTEM - DIAGNOSTICS title cut off. Two entry points, one of
+// which knew a rule the other did not.
+//
+// The duplication was the bug, so the fix is to have one entry point rather
+// than to teach the second one the same rule.
+void GUIManager::syncPanelOffset() {
+    int32_t top = 0;
+    if (!_headerHidden)      top = UIToolkit::sc(UI_HEADER_H);        // permanent bar
+    else if (_headerPeeking) top = UIToolkit::sc(UI_HEADER_PEEK_H);   // temporary one
+    // else: no bar at all, so the drawer starts at the top of the screen.
+    _pnlSystem.setTopOffset(top);
+}
+
+void GUIManager::toggleSystemPanel() {
+    syncPanelOffset();
+    _pnlSystem.toggle();
+}
+
 void GUIManager::headerIconClickCb(lv_event_t *e) {
     (void)e;
-    if (s_self) s_self->_pnlSystem.toggle();
+    if (s_self) s_self->toggleSystemPanel();
+}
+
+// ---------------------------------------------------------------------------
+// Swipe navigation - a FIRST CUT for milestone 2.6, and deliberately small.
+//
+// The owner's brief, 2026-09-19: swipe down from the top to open the system
+// panel, swipe up from the bottom to show the deck, and "maybe a swipe
+// downward on the right half of the screen can open the system panel, and
+// swipe downward on the left side can pull down something else?"
+//
+// What is built here is the part that is decided. The left half is WIRED AND
+// EMPTY on purpose - it logs and does nothing, because what belongs there is
+// an open question and guessing at it overnight would produce a gesture the
+// owner has to undo rather than react to. Same for the auto-hiding header: it
+// needs a reveal, a timeout and a second-swipe rule, none of which are settled.
+//
+// WHY THE SCREEN AND NOT AN OVERLAY. An invisible full-screen catcher on
+// lv_layer_top() would see every swipe - and eat every tap underneath it,
+// which is how the touch visualiser broke before it was moved (see
+// dashboard.md section 5). LVGL sends LV_EVENT_GESTURE to the screen only when
+// no child consumed the drag, so a scrollable child still scrolls and a card
+// still takes its click. The dashboard page does not scroll by design, so the
+// gesture reaches here.
+// ---------------------------------------------------------------------------
+// Bring a hidden header back for a few seconds.
+//
+// Deliberately NOT a rebuild. cycleHeaderBar() rebuilds the dashboard because
+// it changes how much room the cards get; a peek must not, or the grid would
+// re-plan and the cards would jump every time somebody glanced at the clock.
+// The bar is drawn on the TOP layer over the page instead, which is also what
+// makes it retract without disturbing anything.
+void GUIManager::peekHeader() {
+    lv_obj_t *hdr = _header.getContainer();
+    if (!hdr) return;
+
+    _headerPeeking = true;
+    lv_obj_set_height(hdr, UIToolkit::sc(UI_HEADER_PEEK_H));
+    lv_obj_clear_flag(hdr, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(hdr);
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, hdr);
+    lv_anim_set_values(&a, -UIToolkit::sc(UI_HEADER_PEEK_H), 0);
+    lv_anim_set_duration(&a, 220);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_set_exec_cb(&a, [](void *o, int32_t v) { lv_obj_set_y((lv_obj_t *)o, v); });
+    lv_anim_start(&a);
+
+    // Single-shot: LVGL deletes a timer whose repeat count runs out, so there
+    // is nothing to clean up if it fires, and unpeekHeader() kills it if the
+    // user acts first.
+    if (_peekTimer) lv_timer_delete(_peekTimer);
+    _peekTimer = lv_timer_create([](lv_timer_t *t) {
+        (void)t;
+        if (!s_self) return;
+        // THE HEADER STAYS WHILE THE DRAWER IS OPEN.
+        //
+        // Retracting it underneath an open panel leaves the panel hanging a
+        // header's height down the screen with nothing above it - the owner
+        // saw exactly that and called the gap "even worse". The peek timeout
+        // is about an unattended glance, and a drawer standing open is not
+        // one, so the timer simply re-arms instead of firing.
+        if (s_self->_pnlSystem.isExpanded()) return;
+        s_self->unpeekHeader();
+    }, UI_HEADER_PEEK_MS, nullptr);
+
+    DBG_GESTURE("header peek for %d ms\n", (int)UI_HEADER_PEEK_MS);
+}
+
+void GUIManager::unpeekHeader() {
+    if (!_headerPeeking) return;
+    _headerPeeking = false;
+
+    if (_peekTimer) { lv_timer_delete(_peekTimer); _peekTimer = nullptr; }
+
+    // The drawer hung off the peeked bar while it was there; with it gone the
+    // bar's space goes back to the screen. Through syncPanelOffset() rather
+    // than a second copy of the rule - see toggleSystemPanel() for what the
+    // duplication cost the first time.
+    syncPanelOffset();
+
+    lv_obj_t *hdr = _header.getContainer();
+    if (!hdr) return;
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, hdr);
+    lv_anim_set_values(&a, 0, -UIToolkit::sc(UI_HEADER_PEEK_H));
+    lv_anim_set_duration(&a, 220);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
+    lv_anim_set_exec_cb(&a, [](void *o, int32_t v) { lv_obj_set_y((lv_obj_t *)o, v); });
+    // Hide only once it has finished travelling, or it vanishes mid-slide.
+    lv_anim_set_completed_cb(&a, [](lv_anim_t *an) {
+        lv_obj_add_flag((lv_obj_t *)an->var, LV_OBJ_FLAG_HIDDEN);
+    });
+    lv_anim_start(&a);
+}
+
+// Capture where a press began, for the edge gating above.
+//
+// ON THE INPUT DEVICE, not on the screen, and the difference is the whole bug.
+//
+// This was registered on the screen, which only sees a press that reaches it.
+// Cards were made to bubble so their presses would - but the deck panels, the
+// system drawer, the header and every button do NOT bubble, so a press landing
+// on any of those left the PREVIOUS swipe's origin in place.
+//
+// That is exactly the "stickiness" the owner reported, and his description is
+// worth keeping because it names the mechanism better than any summary:
+//
+//   "If I swipe from the very bottom to open the DECK, it opens. Then I can
+//    swipe UP from anywhere on the screen to toggle the deck repeatedly. But
+//    if I ever swipe DOWN, at this point swiping UP no longer toggles it."
+//
+// Once the deck is showing, the bottom of the screen IS the deck panel, so the
+// next press never updated the origin and fromBottom stayed true forever. A
+// downward swipe landed on a card, which DOES bubble, so the origin finally
+// moved and the up-swipe stopped working. Same cause behind the log page
+// sticking after a visit, and behind the header toggle changing which gesture
+// fired.
+//
+// lv_indev_add_event_cb() fires for every press regardless of what was hit, so
+// there is no target to have the wrong flags. Cards keep EVENT_BUBBLE - it is
+// wanted for tap-to-dismiss - but nothing here depends on it any more.
+void GUIManager::screenPressCb(lv_event_t *e) {
+    (void)e;
+    if (!s_self) return;
+    lv_indev_t *indev = lv_indev_active();
+    if (indev) lv_indev_get_point(indev, &s_self->_pressStart);
+}
+
+void GUIManager::screenGestureCb(lv_event_t *e) {
+    (void)e;
+    if (!s_self) return;
+
+    lv_indev_t *indev = lv_indev_active();
+    if (!indev) return;
+
+    const lv_dir_t dir = lv_indev_get_gesture_dir(indev);
+
+    // WHERE THE FINGER STARTED, not where it is now.
+    //
+    // Two of the owner's complaints are this one fact. lv_indev_get_point()
+    // returns the CURRENT position, so a downward swipe reports a y near the
+    // BOTTOM of its travel - which meant "did this start at the top edge" could
+    // not be asked at all, and a swipe beginning in the middle of the page
+    // opened the drawer. The press origin is captured in screenPressCb().
+    const lv_point_t p = s_self->_pressStart;
+    const int32_t scrW = lv_obj_get_width(lv_screen_active());
+    const int32_t scrH = lv_obj_get_height(lv_screen_active());
+    const bool rightHalf = (p.x >= scrW / 2);
+
+    // EDGE GATING. A vertical swipe only counts when it begins within a band
+    // of the edge it is pulling from, which is how every phone does it and is
+    // what the owner asked for: "I wanted these swipes to only engage when
+    // swiping from the top edge of the screen downward."
+    //
+    // The band is in logical pixels so it is the same physical distance on
+    // every panel, for the same reason the swipe DISTANCE is.
+    const int32_t band = UIToolkit::sc(UI_EDGE_BAND);
+    const bool fromTop    = (p.y <= band);
+    const bool fromBottom = (p.y >= scrH - band);
+
+    // SWALLOW THE REST OF THIS TOUCH BEFORE ACTING ON IT.
+    //
+    // LVGL delivers a gesture AND still delivers the press/click of the same
+    // finger. Three separate faults were that one behaviour:
+    //
+    //   * "the location where I START swiping acts as a tap on whichever
+    //     button is underneath" - the button got a click it should not see.
+    //   * "the panel appears then retracts" - the gesture opened the drawer
+    //     and the click closed it again via tap-to-dismiss.
+    //   * swiping up with the deck hidden brought the deck back AND expanded
+    //     the DISPLAY panel AND squashed the grid - because toggleDeck()
+    //     rebuilds, and the still-live press then landed on a panel header
+    //     that had just appeared under the finger.
+    //
+    // BEFORE the switch, not after, and that ordering is the whole fix for the
+    // third one: an action that rebuilds the screen puts new objects under a
+    // finger LVGL still considers pressed, so the input has to be released
+    // first or the rebuild hands it a fresh target.
+    lv_indev_wait_release(indev);
+
+    switch (dir) {
+    case LV_DIR_BOTTOM:                      // swipe DOWN
+        if (!fromTop) { DBG_GESTURE("down from y=%d, not the top band\n", (int)p.y); break; }
+        if (rightHalf) {
+            // RIGHT half: the system drawer - the side the status icon lives
+            // on, so the gesture and the tap agree about where it comes from.
+            //
+            // With the bar HIDDEN there is an extra step first. The owner's
+            // rule: one swipe brings the header back for three seconds so the
+            // status glyphs can be read without committing to anything; a
+            // second swipe while it is showing opens the drawer. That makes
+            // "what is my signal" a cheaper question than "let me change
+            // something", which is the right way round for a wall panel.
+            if (!UIToolkit::systemHeaderH && !s_self->_headerPeeking) {
+                s_self->peekHeader();
+            } else {
+                // Through the one entry point, which owns the top offset.
+                s_self->toggleSystemPanel();
+            }
+        } else {
+            // LEFT half: straight to the log. The owner's pick, and it is a
+            // good one - the log was two taps deep behind a drawer whose only
+            // other use is changing settings, so reading it always meant
+            // opening something you did not want to touch.
+            DBG_GESTURE("swipe down, left half -> log\n");
+            s_self->openLog();
+        }
+        break;
+
+    case LV_DIR_TOP:                         // swipe UP
+        // An open drawer is dismissed by an up-swipe from anywhere; only the
+        // DECK gesture is edge-gated, because that one is pulling something up
+        // from the bottom of the screen and should read as such.
+        // Edge-gated ONLY for the deck, which is the one being pulled up from
+        // the bottom and should read as such. Dismissing an open drawer or a
+        // peeked header is a "put that away" gesture and is allowed from
+        // anywhere - a peek in particular lives at the TOP of the screen, so
+        // requiring a swipe from the bottom to dismiss it would be perverse.
+        if (!s_self->_pnlSystem.isExpanded() && !s_self->_headerPeeking && !fromBottom) {
+            DBG_GESTURE("up from y=%d, not the bottom band\n", (int)p.y);
+            break;
+        }
+        // A swipe up closes the drawer before it touches the deck. With the
+        // panel open it is the obvious "put that away" gesture, and toggling
+        // the deck underneath an open panel would change something the user
+        // cannot see.
+        if (s_self->_pnlSystem.isExpanded()) {
+            s_self->_pnlSystem.close();
+        } else if (s_self->_headerPeeking) {
+            // Put a peeked header away immediately rather than waiting out the
+            // three seconds. The owner asked for it and it is the right
+            // symmetry: the gesture that brought it down should take it back.
+            s_self->unpeekHeader();
+        } else {
+            s_self->toggleDeck();
+        }
+        break;
+
+    default:
+        // Horizontal swipes belong to page navigation, which is the rest of
+        // 2.6 and does not exist yet. Left unclaimed rather than bound to
+        // something plausible.
+        DBG_GESTURE("gesture dir %d ignored\n", (int)dir);
+        break;
+    }
 }
 
 void GUIManager::closeSystemPanelCb() {
@@ -63,13 +347,73 @@ void GUIManager::begin() {
     // the grid from bsp_display.WIDTH/HEIGHT would be wrong on every board
     // running at rotation 1 or 3.
     UI::begin(lv_obj_get_width(screen), lv_obj_get_height(screen));
+
+    // Apply the board's default column count, if it has one.
+    //
+    // Rows need no equivalent line - buildDashboard() already passes
+    // _rowsOverride to the page every time it builds - but columns live in the
+    // token layer and were only ever set from the Col button, so a default
+    // that nobody applied would be a number that did nothing.
+    if (_colsOverride) UI::setColumnsOverride(_colsOverride);
+
     applyGround();
     lv_obj_clear_flag        (screen, LV_OBJ_FLAG_SCROLLABLE);               // Disable global scrolling
 
     // --= LAYER 3: HEADER BAR =--
     // Header click -> toggle system panel
-    _header.init(screen, bsp_hw.device_name, &_core.conn());
+    _header.init(screen, bsp_hw.device_name, &_core.conn(), &_core.mqtt());
     lv_obj_add_event_cb(_header.getStatusIcon(), headerIconClickCb, LV_EVENT_CLICKED, NULL);
+
+    // Swipe navigation, milestone 2.6 first cut. On the screen, not an
+    // overlay - see screenGestureCb() for why that distinction matters.
+    lv_obj_add_event_cb(screen, screenGestureCb, LV_EVENT_GESTURE, NULL);
+
+    // TAP ANYWHERE ELSE TO DISMISS, which is the rule the deck already uses.
+    //
+    // The owner: "The deck panels were wired such that tapping to open any one
+    // of them would close any other open panels. This rule should be applied
+    // here." So an open drawer, or a peeking header, closes on a tap that is
+    // not on the drawer itself.
+    //
+    // On the SCREEN and on LV_EVENT_CLICKED, which means a tap that landed on
+    // a card never reaches here - LVGL delivers the click to the card and
+    // stops. That is the behaviour we want and it is why this does not need a
+    // hit-test against the panel's rectangle: a tap inside the drawer hits one
+    // of the drawer's own children instead.
+    // Explicit rather than relying on lv_obj's default flags: everything above
+    // depends on the screen being the thing that finally catches a stray tap,
+    // and a default is a poor place to rest that.
+    lv_obj_add_flag(screen, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(screen, [](lv_event_t *ev) {
+        (void)ev;
+        if (!s_self) return;
+        if (s_self->_headerPeeking)          s_self->unpeekHeader();
+        else if (s_self->_pnlSystem.isExpanded()) s_self->_pnlSystem.close();
+    }, LV_EVENT_CLICKED, NULL);
+
+    // HOW FAR A SWIPE HAS TO TRAVEL, in real millimetres rather than pixels.
+    //
+    // LVGL's default is 50 PHYSICAL pixels, which means a swipe is a different
+    // physical gesture on every board: 7.7 mm of finger travel on CYD_S3_3248
+    // at 165 PPI, but only 4.3 mm on WS_P4_5 at 294 PPI. That is backwards -
+    // the denser the panel, the twitchier the gesture - and it is the same
+    // mistake the type scale already fixed for fonts.
+    //
+    // sc() is exactly the right tool: 50 LOGICAL px is a constant ~7.5 mm on
+    // every panel in the fleet, which is a deliberate swipe and not a slipped
+    // finger. Set here rather than in LVGL_Startup because it is a gesture
+    // POLICY decision and belongs beside the handler that reads it.
+    // The setter is lv_indev_set_gesture_min_distance(), and it takes a
+    // uint8_t - so the value is CLAMPED. sc(50) is 87 on WS_P4_5, still inside
+    // the range, but a denser panel than anything in the fleet would wrap
+    // silently and make every stray finger a swipe.
+    if (lv_indev_t *indev = lv_indev_get_next(NULL)) {
+        const int32_t want = UIToolkit::sc(50);
+        lv_indev_set_gesture_min_distance(indev, (uint8_t)(want > 255 ? 255 : want));
+
+        // Every press, whatever it lands on. See screenPressCb().
+        lv_indev_add_event_cb(indev, screenPressCb, LV_EVENT_PRESSED, NULL);
+    }
 
     // Bottom deck height = screen height - header height.
     int32_t header_h = UIToolkit::systemHeaderPx();
@@ -107,15 +451,54 @@ void GUIManager::begin() {
     lv_obj_set_y                  (upper_deck, 0); // Hidden behind header
     lv_obj_set_style_bg_opa       (upper_deck, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width (upper_deck, 0, 0);
+    // PADDING ZERO, and this one line was two visible bugs.
+    //
+    // lv_obj carries theme padding by default, and lv_obj_set_pos() positions
+    // against the parent's CONTENT area - inside that padding. So the system
+    // drawer, which sets its own x and y precisely, was being shifted by an
+    // invisible margin it could not see: down, leaving a gap between it and
+    // the header bar (the "floating in the air" look), and right, pushing its
+    // right border off the edge of the screen.
+    //
+    // Both were reported as separate faults and both are this. A transparent
+    // full-screen positioning layer must not have padding.
+    lv_obj_set_style_pad_all      (upper_deck, 0, 0);
     lv_obj_clear_flag             (upper_deck, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag             (upper_deck, LV_OBJ_FLAG_SCROLLABLE);
+
+    // THE DISMISS SCRIM: an invisible sheet covering everything below the
+    // drawer, shown only while the drawer is open.
+    //
+    // The owner: "with the panel open tapping on cards does not close the
+    // panel." A card is clickable and consumes the tap, so no amount of
+    // screen-level handling can ever see it - the event stops at the card.
+    //
+    // A scrim is the standard answer and it is better than bubbling the card's
+    // click, because it also makes the first tap MEAN dismiss: putting a
+    // drawer away should not also toggle the light you happened to tap.
+    //
+    // Created here, immediately after upper_deck, because it is a child of it.
+    _dismissScrim = lv_obj_create(upper_deck);
+    lv_obj_remove_style_all       (_dismissScrim);
+    lv_obj_set_size               (_dismissScrim, lv_pct(100), lv_pct(100));
+    lv_obj_set_pos                (_dismissScrim, 0, 0);
+    lv_obj_set_style_bg_opa       (_dismissScrim, LV_OPA_TRANSP, 0);
+    lv_obj_add_flag               (_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag               (_dismissScrim, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(_dismissScrim, [](lv_event_t *ev) {
+        (void)ev;
+        if (s_self) s_self->_pnlSystem.close();
+    }, LV_EVENT_CLICKED, NULL);
 
     // Bottom panel open -> close system panel
     UIToolkit::registerSystemCloseCb(closeSystemPanelCb);
 
     // System open -> hide touch window
     _pnlSystem.setOnToggleCallback([](bool isOpen) {
-        (void)isOpen;
+        if (s_self && s_self->_dismissScrim) {
+            if (isOpen) lv_obj_clear_flag(s_self->_dismissScrim, LV_OBJ_FLAG_HIDDEN);
+            else        lv_obj_add_flag  (s_self->_dismissScrim, LV_OBJ_FLAG_HIDDEN);
+        }
         // If System Panel is OPEN (true), Hide Touch Window (false)
         // pnlDisplay.setTouchWindowVisibility(!isOpen);
     });
@@ -184,7 +567,10 @@ void GUIManager::begin() {
             case Panel_System::GridAction::ASPECT_UP:   nudgeRows(+1);     break;
             case Panel_System::GridAction::DECK_TOGGLE: toggleDeck();       break;
             case Panel_System::GridAction::HDR_CYCLE:   cycleHeader();     break;
-            case Panel_System::GridAction::BAR_CYCLE:   cycleHeaderBar();  break;
+            case Panel_System::GridAction::BAR_CYCLE:   toggleHeaderBar(); break;
+            case Panel_System::GridAction::VARIANT_CYCLE: cycleVariant();  break;
+            case Panel_System::GridAction::FILL_CYCLE:    cycleFill();     break;
+            case Panel_System::GridAction::AREA_TOGGLE:   toggleArea();    break;
         }
     });
 
@@ -310,7 +696,9 @@ void GUIManager::buildDashboard() {
     // and an assignment rather than any kind of mechanism - which is the point
     // of the spec being data.
     PageSpec page = FLEET_PAGE;
-    page.headerDefault = _hdr;
+    page.headerDefault  = _hdr;
+    page.variantDefault = _variant;
+    page.showArea       = _showArea;
     _page->applySpec(page, _core.entities());
 
     _pnlSystem.setHeaderLabel(_hdr == CardHeaderStyle::HDR_TAG  ? "Tag"
@@ -409,48 +797,43 @@ void GUIManager::openTokens() {
     ReferencePage::show();
 }
 
-void GUIManager::cycleHeaderBar() {
-    static const uint8_t STEPS[] = { 50, 45, 40, 35, 30, 0 };
-    uint8_t i = 0;
-    for (; i < sizeof(STEPS); i++) if (STEPS[i] == UIToolkit::systemHeaderH) break;
-    UIToolkit::systemHeaderH = STEPS[(i + 1) % sizeof(STEPS)];
+// Hide or show the system header. NOT a size cycle any more.
+//
+// The owner, 2026-09-19: "35 is now the permanent header bar size. No more
+// adjusting the header size. However we do still need to be able to hide/show
+// the header as without header and deck we have the most screen real estate
+// available."
+//
+// The size cycle (50/45/40/35/30/none) had also produced a trap: hiding the
+// bar moved it off-screen and nothing could bring it back, because every path
+// that restored it went through the same cycle that had six positions and one
+// of them was "gone". Two states cannot get lost in the same way.
+void GUIManager::toggleHeaderBar() {
+    _headerHidden = !_headerHidden;
+    UIToolkit::systemHeaderH = _headerHidden ? 0 : UI_HEADER_H;
 
-    // The header object itself is Phase-1 UI built once in begin(), so it is
-    // resized in place rather than rebuilt.
+    // Any peek in flight belongs to the state we are leaving.
+    if (_headerPeeking) { _headerPeeking = false;
+                          if (_peekTimer) { lv_timer_delete(_peekTimer); _peekTimer = nullptr; } }
+
     lv_obj_t *hdr = _header.getContainer();
     if (hdr) {
-        lv_obj_set_height(hdr, UIToolkit::systemHeaderPx());
-        if (UIToolkit::systemHeaderH) lv_obj_clear_flag(hdr, LV_OBJ_FLAG_HIDDEN);
-        else                          lv_obj_add_flag  (hdr, LV_OBJ_FLAG_HIDDEN);
+        lv_anim_delete(hdr, nullptr);        // kill a half-finished peek slide
+        lv_obj_set_height(hdr, UIToolkit::sc(UI_HEADER_H));
+        lv_obj_set_y     (hdr, 0);
+        if (_headerHidden) lv_obj_add_flag  (hdr, LV_OBJ_FLAG_HIDDEN);
+        else               lv_obj_clear_flag(hdr, LV_OBJ_FLAG_HIDDEN);
     }
 
-    // With no bar there is no status icon, and the status icon is the only way
-    // back into this drawer. Leave an invisible strip on the top layer that
-    // toggles it - otherwise choosing "none" and closing the drawer means a
-    // reboot.
-    if (!UIToolkit::systemHeaderH && !_hiddenBarTap) {
-        _hiddenBarTap = lv_obj_create(lv_layer_top());
-        lv_obj_set_size               (_hiddenBarTap, lv_pct(100), UI::minTouch() / 2);
-        lv_obj_align                  (_hiddenBarTap, LV_ALIGN_TOP_MID, 0, 0);
-        lv_obj_set_style_bg_opa       (_hiddenBarTap, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width (_hiddenBarTap, 0, 0);
-        lv_obj_add_flag               (_hiddenBarTap, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb           (_hiddenBarTap, [](lv_event_t *e) {
-            (void)e; if (s_self) s_self->_pnlSystem.toggle();
-        }, LV_EVENT_CLICKED, nullptr);
-    } else if (UIToolkit::systemHeaderH && _hiddenBarTap) {
-        lv_obj_delete(_hiddenBarTap);
-        _hiddenBarTap = nullptr;
-    }
+    // The drawer hangs off the header, so it moves with it - otherwise hiding
+    // the bar leaves the panel floating a header's height down an empty
+    // screen. Needed here as well as on open, because the drawer may be open
+    // RIGHT NOW while this runs.
+    syncPanelOffset();
 
-    char lbl[12];
-    if (UIToolkit::systemHeaderH) snprintf(lbl, sizeof(lbl), "Bar %u", (unsigned)UIToolkit::systemHeaderH);
-    else                          snprintf(lbl, sizeof(lbl), "Bar off");
-    _pnlSystem.setBarLabel(lbl);
-
+    _pnlSystem.setBarLabel(_headerHidden ? "Show Bar" : "Hide Bar");
     rebuildDashboard();
-    Serial.printf("[UI] system header %u logical px -> %ld real\n",
-                  (unsigned)UIToolkit::systemHeaderH, (long)UIToolkit::systemHeaderPx());
+    Serial.printf("[UI] system header %s\n", _headerHidden ? "hidden" : "shown");
 }
 
 void GUIManager::openLog() {
@@ -458,6 +841,51 @@ void GUIManager::openLog() {
     // widget trees is what exhausts LVGL's layer buffers.
     destroyDashboard();
     LogPage::show(_pnlSystem.logText());
+}
+
+// --- The three controls #50 added --------------------------------------
+//
+// All three drive statics that the card layer has had since 2.4 and that
+// nothing on the device could reach. They are new CONTROLS, not new behaviour,
+// which is why each is a handful of lines rather than a feature.
+
+void GUIManager::cycleVariant() {
+    // A rebuild, not a restyle, for the same reason cycleHeader() is: a card
+    // decides compact-vs-full in build() by measuring its cell, so overriding
+    // the decision means making it again.
+    _variant = (_variant == CardVariant::VAR_AUTO)   ? CardVariant::VAR_FULL
+             : (_variant == CardVariant::VAR_FULL)   ? CardVariant::VAR_COMPACT
+                                                     : CardVariant::VAR_AUTO;
+    rebuildDashboard();
+    const char *n = (_variant == CardVariant::VAR_AUTO) ? "Auto"
+                  : (_variant == CardVariant::VAR_FULL) ? "Full" : "Cmpct";
+    _pnlSystem.setVariantLabel(n);
+    Serial.printf("[Cards] variant override -> %s\n", n);
+}
+
+void GUIManager::cycleFill() {
+    _fill = (_fill == StateCardFill::FILL_SURFACE) ? StateCardFill::LIGHT_ICON
+                                                   : StateCardFill::FILL_SURFACE;
+    StateCard::setFill(_fill);
+    // Fill IS a live style - StateCard reads it in render() - so the binder's
+    // restyle is enough and a rebuild would be a waste of a page.
+    _binder.restyleAll();
+    const char *n = (_fill == StateCardFill::FILL_SURFACE) ? "Fill" : "Icon";
+    _pnlSystem.setFillLabel(n);
+    Serial.printf("[Cards] active state -> %s\n", n);
+}
+
+void GUIManager::toggleArea() {
+    _showArea = !_showArea;
+    // Through the PAGE SPEC rather than the card-layer static.
+    //
+    // PageSpec::showArea already existed and buildDashboard() now sets it from
+    // this flag, so the page stays the single description of itself. Calling
+    // Card::setShowAreaDefault() as well would give the same answer twice from
+    // two places, and they would disagree the first time a second page exists.
+    rebuildDashboard();
+    _pnlSystem.setAreaLabel(_showArea ? "Area" : "No Area");
+    Serial.printf("[Cards] show area -> %s\n", _showArea ? "on" : "off");
 }
 
 void GUIManager::cycleHeader() {
