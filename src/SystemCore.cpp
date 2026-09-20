@@ -147,6 +147,22 @@ bool SystemCore::begin() {
     // nothing else depends on it.
     _virtProv.begin(&_entities);
 
+    // --= 11. Home Assistant websocket session =--
+    //
+    // LAST ON PURPOSE, and for a reason that will matter more than it does
+    // today. Right now HaClient only owns the socket, so it could start
+    // anywhere after the link and the registry exist. But #43's next piece
+    // subscribes to exactly the entities the registry holds - one
+    // subscribe_trigger naming all of them - so the session must not open
+    // before the registry is fully populated, or the subscription is built
+    // from a half-filled list and silently misses whatever registered late.
+    //
+    // Starting it here costs nothing: begin() does not connect. It allocates
+    // the reassembly buffer and moves to LINK_IDLE, and the first connection
+    // attempt happens on the first loop() where Fleet_Connectivity reports
+    // online. A board with no network boots exactly as fast as before.
+    _ha.begin(&_conn, &_entities);
+
     heapMark("core ready");
 
     return true;
@@ -248,4 +264,12 @@ void SystemCore::loop() {
     _haPub.loop(now);
     _mqttProv.loop(now);
     _virtProv.loop(now);
+
+    // The HA session's LOOP-TASK half: it drives connect and backoff, sends
+    // what the websocket task deferred, and enforces the handshake timeout.
+    // Receiving does not happen here - that runs on the websocket task and
+    // reaches us through EntityRegistry's mutex. See the long note in
+    // HaClient.h; this is the project's first provider where loop() is not the
+    // whole story.
+    _ha.loop(now);
 }

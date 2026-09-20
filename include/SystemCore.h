@@ -20,6 +20,7 @@
 #include "HaPublisher.h"
 #include "MqttProvider.h"
 #include "VirtualProvider.h"
+#include "HaClient.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #endif
@@ -48,6 +49,7 @@ public:
     ConnectivityManager &conn()     { return _conn; }
     MqttManager         &mqtt()     { return _mqtt; }
     EntityRegistry      &entities() { return _entities; }
+    HaClient            &ha()       { return _ha; }
 #ifdef HAS_AUDIO_HW
     AudioManager        &audio()    { return _audio; }
 #endif
@@ -91,4 +93,14 @@ private:
     // hardware. This provides two switches to tap - one that answers and one
     // that does not. See VirtualEntities.h.
     VirtualProvider     _virtProv;
+
+    // The Home Assistant websocket session (#43). Owns the socket and the auth
+    // handshake only - it knows nothing about areas, entities or cards.
+    //
+    // THE FIRST COMPONENT IN THIS PROJECT THAT RUNS ON ITS OWN TASK. Its
+    // receive path is called by esp_websocket_client's task, not by loop(), so
+    // it must never touch LVGL and writes through EntityRegistry's mutex
+    // instead. That rule has always been in CLAUDE.md for providers; this is
+    // the first one that could actually break it. See HaClient.h.
+    HaClient            _ha;
 };
