@@ -167,6 +167,22 @@ struct Entity {
     // the whole table be placed in PSRAM with a single call. See
     // EntityRegistry::begin().
     bool        dirty          = false;
+
+    // --- Availability, as stated by the source. Issue #56. -----------------
+    //
+    // NOT derived from age. `lastUpdateMs` answers "when did we last hear
+    // anything", which under a change-driven feed is not evidence of health:
+    // HA's subscribe_trigger fires on CHANGE, so a thermostat holding steady
+    // and a thermostat that has been unplugged are indistinguishable by age.
+    //
+    // HA states this directly - it sends the literal state "unavailable" - and
+    // that word is strictly better information than any timeout we could
+    // invent. Before this the word was simply dropped on the floor and the
+    // card went on displaying its last good reading indefinitely.
+    //
+    // Starts TRUE so that an entity nobody has said anything about is not born
+    // broken; `everSet` is what distinguishes "no reading yet".
+    bool        available      = true;
 };
 
 #endif // ENTITY_H

@@ -123,6 +123,25 @@ const Entity *EntityRegistry::find(const char *id) const {
 // Provider side
 // ---------------------------------------------------------------------------
 
+bool EntityRegistry::setAvailable(const char *id, bool available, uint32_t nowMs) {
+    std::lock_guard<std::mutex> lk(_mx);
+
+    const int i = indexOf(id);
+    if (i < 0) return false;
+    Entity &e = _items[i];
+
+    if (e.available == available) return true;   // no change, no repaint
+
+    e.available = available;
+
+    // The timestamp moves either way, because hearing "unavailable" IS hearing
+    // from the source. Not moving it would let an entity be both unavailable
+    // and stale, which says the same thing twice and badly.
+    e.lastUpdateMs = nowMs;
+    e.dirty        = true;
+    return true;
+}
+
 bool EntityRegistry::setValue(const char *id, const EntityValue &v, uint32_t nowMs) {
     std::lock_guard<std::mutex> lk(_mx);
 
@@ -136,6 +155,16 @@ bool EntityRegistry::setValue(const char *id, const EntityValue &v, uint32_t now
     // wrong, which is exactly the case the reconcile exists to catch.
     const bool wasPending = e.pending;
     e.pending = false;
+
+    // A VALUE IS ITSELF PROOF OF AVAILABILITY, so recovery needs no separate
+    // announcement. HA sends a real state the moment an entity comes back and
+    // never sends an explicit "available" - if this were not here, anything
+    // that went unavailable once would stay marked so for ever while happily
+    // reporting fresh readings.
+    if (!e.available) {
+        e.available = true;
+        e.dirty     = true;
+    }
 
     const bool changed = !e.value.equals(v) || !e.everSet;
 

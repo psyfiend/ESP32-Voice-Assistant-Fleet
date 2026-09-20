@@ -15,6 +15,7 @@ const char *cardStateName(CardState s) {
         case CardState::ST_REFUSED:    return "refused";
         case CardState::ST_PARTIAL:    return "partial";
         case CardState::ST_PAUSED:     return "paused";
+        case CardState::ST_UNAVAILABLE: return "unavailable";
     }
     return "?";
 }
@@ -407,6 +408,7 @@ uint32_t Card::stateColor() const {
         case CardState::ST_STALE:
         case CardState::ST_LONG_STALE: return p.ST_WARN;
         case CardState::ST_REFUSED:    return p.ST_BAD;
+        case CardState::ST_UNAVAILABLE: return p.ST_BAD;
         default:                       return 0;
     }
 }
@@ -420,6 +422,7 @@ uint32_t Card::tagColor() const {
         case CardState::ST_LONG_STALE: return p.ST_WARN;
         case CardState::ST_PARTIAL:    return p.ST_WARN;
         case CardState::ST_REFUSED:    return p.ST_BAD;
+        case CardState::ST_UNAVAILABLE: return p.ST_BAD;
         // Paused gets a colour of its own - muted, because the state means
         // "the user asked for quiet", but a colour nonetheless. Returning 0
         // meant its badge got no chip in bar mode and was painted the same
@@ -535,6 +538,9 @@ void Card::applyState() {
         case CardState::ST_REFUSED:    mark = "FAILED";  break;
         case CardState::ST_PARTIAL:    mark = "PARTIAL"; break;
         case CardState::ST_PAUSED:     mark = "PAUSED";  break;
+        // The SOURCE said so, which is a different claim from STALE and gets a
+        // different word. Issue #56.
+        case CardState::ST_UNAVAILABLE: mark = "N/A";    break;
         case CardState::ST_LIVE:       mark = "";        break;
     }
 
@@ -621,7 +627,8 @@ void Card::applyState() {
 // the per-mode branching above.
 void Card::applyDiagonal() {
     const bool wantDiag = (_state == CardState::ST_LONG_STALE ||
-                           _state == CardState::ST_REFUSED);
+                           _state == CardState::ST_REFUSED   ||
+                           _state == CardState::ST_UNAVAILABLE);
     if (!wantDiag) {
         if (_diagonal) { lv_obj_delete(_diagonal); _diagonal = nullptr; }
         return;
@@ -682,6 +689,21 @@ CardState Card::deriveState(uint32_t nowMs) const {
     // "I told it to do something and it refused" - and the one the user just
     // caused is the one they need to see.
     if (_paused) return CardState::ST_PAUSED;
+
+    // UNAVAILABLE OUTRANKS EVERYTHING EXCEPT THE USER'S OWN CHOICE. Issue #56.
+    //
+    // Above staleness because it is a better class of evidence: stale is our
+    // inference from silence, unavailable is the source's own statement. Above
+    // the command states because a command against something that is not there
+    // did not "fail" in any way worth reporting - saying FAILED would send the
+    // user looking for a fault in the wrong place.
+    //
+    // ANY primary being unavailable is enough. A card showing two things, one
+    // of which is gone, is not a card that can be trusted at a glance.
+    for (uint8_t i = 0; i < _nPrimary; i++) {
+        const Entity *e = _primary[i];
+        if (e && !e->available) return CardState::ST_UNAVAILABLE;
+    }
 
     // THE FAILURE STATE IS READ OFF THE ENTITIES, NOT OFF THIS CARD.
     //

@@ -58,6 +58,7 @@ public:
     uint16_t eventsHandled()   const { return _handled; }
     uint16_t eventsUnmatched() const { return _unmatched; }
     uint16_t parseFailures()   const { return _parseFails; }
+    uint16_t unavailableSeen() const { return _unavailable; }
 
     // False until HA has answered our subscribe_trigger with success. A
     // subscription that was never accepted is indistinguishable from a quiet
@@ -91,7 +92,8 @@ private:
 
     uint16_t _handled    = 0;
     uint16_t _unmatched  = 0;
-    uint16_t _parseFails = 0;
+    uint16_t _parseFails  = 0;
+    uint16_t _unavailable = 0;
 };
 
 #endif // HA_PROVIDER_H

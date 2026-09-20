@@ -52,6 +52,23 @@ enum class CardState : uint8_t {
     ST_REFUSED,      // we commanded it and it did not happen. NOT staleness
     ST_PARTIAL,      // SOME of what we commanded did not happen - see below
     ST_PAUSED,       // the user's own choice, so quiet is correct. May dim
+
+    // THE SOURCE SAID SO. Issue #56.
+    //
+    // Distinct from ST_STALE, and the distinction is the entire point: stale
+    // means "we have not heard from this in a while and are guessing", while
+    // this means "the thing that owns it TOLD us it is not there". One is an
+    // inference from silence, the other is a fact from the horse's mouth, and
+    // a panel that renders them identically throws away the better signal.
+    //
+    // It matters most on the HA path, where silence carries no information at
+    // all: subscribe_trigger fires on change, so a quiet sensor and a dead one
+    // look the same by age. HA sends the word "unavailable" as a state, and
+    // that word is the only reliable evidence available. Without this the
+    // value was simply not written and the card kept displaying its last good
+    // reading for ever - the fourth lying diagnostic in a project that has
+    // already paid for three.
+    ST_UNAVAILABLE,
 };
 
 // ST_PARTIAL exists because of the owner's rule for cards that command several
@@ -70,7 +87,19 @@ enum class CardState : uint8_t {
 inline bool cardStateOwnsBody(CardState s) {
     return s == CardState::ST_REFUSED ||
            s == CardState::ST_STALE   ||
-           s == CardState::ST_LONG_STALE;
+           s == CardState::ST_LONG_STALE ||
+           // UNAVAILABLE MUST TAKE THE BODY, not merely wear a tag. Issue #56.
+           //
+           // This was nearly missed: adding the state and its colours is not
+           // enough, because stateColor() returns early for anything this
+           // predicate rejects. The card would have kept displaying its last
+           // good reading under a small "N/A" badge - which is precisely the
+           // lie the whole issue exists to remove, just with a label on it.
+           //
+           // The body is the thing the user reads at a glance from across the
+           // room. If the source says the sensor is gone, the number has to go
+           // with it.
+           s == CardState::ST_UNAVAILABLE;
 }
 
 // Dimming is rejected for staleness and permitted for pause, and cards.md

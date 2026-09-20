@@ -105,6 +105,14 @@ public:
     // how a tap gets confirmed.
     bool setValue(const char *id, const EntityValue &v, uint32_t nowMs);
 
+    // Record what the SOURCE says about an entity being reachable. Issue #56.
+    //
+    // Separate from setValue() on purpose: an unavailable entity has no value
+    // to write, and inventing one - zero, or the previous reading - is exactly
+    // the lie this exists to stop. Marks dirty only on a CHANGE, so a source
+    // that repeats "unavailable" does not repaint the screen.
+    bool setAvailable(const char *id, bool available, uint32_t nowMs);
+
     // --- UI side ----------------------------------------------------------
 
     // Optimistically apply a commanded value so a control responds instantly,
