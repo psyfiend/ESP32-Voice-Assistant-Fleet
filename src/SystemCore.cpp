@@ -180,7 +180,8 @@ bool SystemCore::begin() {
     // up, issues ONE subscribe_trigger built from the registry. After
     // _ha.begin() so the handler is attached to a live object, though
     // setMessageHandler only stores a pointer and the order is not load-bearing.
-    _haProv.begin(&_entities, &_ha);
+    _haRest.begin(&_entities);
+    _haProv.begin(&_entities, &_ha, &_haRest);
 
     heapMark("core ready");
 
@@ -292,4 +293,5 @@ void SystemCore::loop() {
     // whole story.
     _ha.loop(now);
     _haProv.loop(now);
+    _haRest.loop(now);
 }

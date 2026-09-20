@@ -440,3 +440,65 @@ it still considers pressed, and the press lands on whatever appeared there. That
 to reveal the deck also expanded the first panel that materialised under the fingertip.
 
 Release first. Then rebuild.
+
+---
+
+## `pio` dies with UnicodeEncodeError the moment its output is not a console
+
+Four upload attempts in a row appeared to hang: no output, no error, timeout. They were not hanging.
+They were crashing, and the crash was invisible because it happened while writing the crash to a
+pipe.
+
+PlatformIO prints box-drawing characters in the upload summary. When stdout is a terminal, Windows
+renders them. When stdout is a **pipe or a file**, Python falls back to the `cp1252` console
+codepage and the write raises:
+
+    UnicodeEncodeError: 'charmap' codec can't encode characters in position 23-52
+
+So `pio run -t upload | tail`, `| grep`, and `> file` all fail, while the identical command run
+bare succeeds. The build itself already warns about this - *"Firmware metrics can not be shown. Set
+the terminal codepage to utf-8"* - which reads like a cosmetic note and is not.
+
+**Always set `PYTHONIOENCODING=utf-8` before `pio` when the output is being captured.**
+
+```bash
+export PYTHONIOENCODING=utf-8 && pio run -e <env> -t upload --upload-port COMn
+```
+
+### The second-order damage is worse than the first
+
+A killed `pio` leaves **orphaned `esptool` and `python` children**. Those keep holding the serial
+port and `.pio/build/<env>/firmware.bin`, so the next attempt fails with
+`The process cannot access the file because it is being used by another process` - an error that
+points at the filesystem and says nothing about the real cause. Check for strays before concluding
+anything about the board:
+
+```bash
+powershell "Get-Process | Where-Object { $_.ProcessName -match 'python|esptool|pio' }"
+```
+
+---
+
+## `Serial` does not come out of the port you flashed through
+
+`WS_S3_TOUCH_LCD_4B` was flashed successfully over COM8 and then printed nothing but the ROM
+bootloader header. The app was fine; the output was somewhere else.
+
+The board sets `-D ARDUINO_USB_CDC_ON_BOOT=1`, which maps Arduino's `Serial` to the ESP32-S3's
+**native USB CDC**, not to UART0. COM8 is the CH343 bridge - correct for flashing, and permanently
+silent for application output. The CDC port is a *separate* device that only enumerates once the
+app is running (`VID_303A&PID_1001`).
+
+If the native USB socket is not physically cabled, there is no way to read that board's log at all,
+however well it is running. Six of the eight environments set this flag; `CYD_P4_1060P470` is the
+one that explicitly sets it to `0` with a comment saying native USB is not supported there.
+
+**Before debugging silence, check which transport the board's `Serial` is on:**
+
+```bash
+grep -A3 "^\[env:<NAME>\]" platformio.ini | grep USB_CDC_ON_BOOT
+powershell "Get-CimInstance Win32_PnPEntity | Where-Object { $_.Name -match 'COM\d+' } | Select-Object Name, DeviceID"
+```
+
+A `VID_303A` device is an Espressif CDC port and is where the log is. A `VID_1A86` device is a CH343
+bridge and is not.

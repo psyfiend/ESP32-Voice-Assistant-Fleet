@@ -22,6 +22,7 @@
 #include "VirtualProvider.h"
 #include "HaClient.h"
 #include "HaProvider.h"
+#include "HaRest.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #endif
@@ -105,8 +106,16 @@ private:
     // the first one that could actually break it. See HaClient.h.
     HaClient            _ha;
 
+    // One-shot initial values over REST, because HA's websocket has NO
+    // per-entity state call - get_states is 787 KB on the owner's instance.
+    // Without this the dashboard comes up blank and fills in over hours as
+    // things happen to change, since subscribe_trigger only fires on change.
+    // See HaRest.h.
+    HaRest              _haRest;
+
     // Reads HA's entities off that session into the registry. The websocket
     // twin of MqttProvider, and like it, derives its subscription from the
-    // entity table rather than a hardcoded list.
+    // entity table rather than a hardcoded list. Also owns the decision that a
+    // new session has begun, and tells _haRest to re-fetch when it does.
     HaProvider          _haProv;
 };

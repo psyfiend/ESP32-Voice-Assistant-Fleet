@@ -1,6 +1,7 @@
 #include "HaProvider.h"
 
 #include <ArduinoJson.h>
+#include "HaValue.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -10,9 +11,10 @@
   #define DBG_HAP(...) do {} while (0)
 #endif
 
-void HaProvider::begin(EntityRegistry *reg, HaClient *ha) {
-    _reg = reg;
-    _ha  = ha;
+void HaProvider::begin(EntityRegistry *reg, HaClient *ha, HaRest *rest) {
+    _reg  = reg;
+    _ha   = ha;
+    _rest = rest;
     if (_ha) _ha->setMessageHandler(&HaProvider::onMessage, this);
 }
 
@@ -72,6 +74,10 @@ bool HaProvider::sendSubscribe() {
 
     if (!_ha->sendText(frame, n)) return false;
 
+    // Remembered so the reply can be matched. Cleared when it arrives.
+    _pendingSubId = id;
+    _subAccepted  = false;
+
     Serial.printf("[HaProv] subscribe_trigger id %lu for %u entities (%d B)\n",
                   (unsigned long)id, (unsigned)named, n);
     return true;
@@ -92,7 +98,19 @@ void HaProvider::loop(uint32_t nowMs) {
 
     if (_subscribedForSession == session) return;
 
-    if (sendSubscribe()) _subscribedForSession = session;
+    if (!sendSubscribe()) return;
+    _subscribedForSession = session;
+
+    // Subscribing and re-fetching are ONE event, so they happen in one place.
+    //
+    // The order matters and it is subscribe-then-fetch, not the reverse. The
+    // subscription is live from the moment HA accepts it, so anything that
+    // changes DURING the fetch pass still arrives; the fetch then fills in
+    // everything that was already sitting still. Fetching first would leave a
+    // window where a change could land between the read and the subscribe and
+    // be lost silently - the value would sit wrong on screen until the next
+    // time that entity happened to move, which for a light could be days.
+    if (_rest) _rest->restart();
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +140,12 @@ void HaProvider::handle(const char *json, size_t len) {
         ts["state"]                   = true;
         ts["attributes"]["icon"]      = true;
         filter["type"]                = true;
+        // Needed to read the subscription's own reply. Without these three the
+        // filtered parse drops them and every result looks like success=false.
+        filter["id"]                  = true;
+        filter["success"]             = true;
+        filter["error"]["code"]       = true;
+        filter["error"]["message"]    = true;
     }
 
     JsonDocument doc;
@@ -133,9 +157,37 @@ void HaProvider::handle(const char *json, size_t len) {
         return;
     }
 
-    // Replies to our own subscribe_trigger arrive as type "result" and carry
-    // nothing we filtered for. Only "event" matters here.
     const char *type = doc["type"] | "";
+
+    // THE REPLY TO OUR OWN SUBSCRIPTION, AND IT IS WORTH READING.
+    //
+    // This was originally discarded with every other "result", which meant a
+    // REFUSED subscription looked exactly like an accepted one that nothing
+    // had happened on yet - and since these entities can be quiet for hours,
+    // "no events" is the normal case. The failure would have surfaced as "the
+    // dashboard never updates", days later, with nothing in the log.
+    //
+    // HA answers {"id":N,"type":"result","success":true|false,...}. We match
+    // on the id we sent and say so either way.
+    if (strcmp(type, "result") == 0) {
+        uint32_t rid = doc["id"] | 0UL;
+        if (rid != 0 && rid == _pendingSubId) {
+            _pendingSubId = 0;
+            bool ok = doc["success"] | false;
+            _subAccepted = ok;
+            if (ok) {
+                Serial.printf("[HaProv] HA ACCEPTED the subscription (id %lu)\n",
+                              (unsigned long)rid);
+            } else {
+                const char *code = doc["error"]["code"]    | "?";
+                const char *msg  = doc["error"]["message"] | "";
+                Serial.printf("[HaProv] HA REFUSED the subscription (id %lu): %s - %s\n",
+                              (unsigned long)rid, code, msg);
+            }
+        }
+        return;
+    }
+
     if (strcmp(type, "event") != 0) return;
 
     JsonVariantConst to = doc["event"]["variables"]["trigger"]["to_state"];
@@ -161,7 +213,7 @@ void HaProvider::handle(const char *json, size_t len) {
     }
 
     EntityValue v;
-    if (!coerce(*match, state, v)) {
+    if (!haCoerceState(match->desc, state, v)) {
         // unavailable / unknown / unparseable. Deliberately NOT written: an
         // unavailable sensor is not a reading of zero, and writing one would
         // make a dead thermostat display 0 degrees with full confidence.
@@ -171,52 +223,4 @@ void HaProvider::handle(const char *json, size_t len) {
 
     _reg->setValue(match->desc.id, v, millis());
     _handled++;
-}
-
-bool HaProvider::coerce(const Entity &e, const char *state, EntityValue &out) const {
-    if (strcmp(state, "unavailable") == 0) return false;
-    if (strcmp(state, "unknown")     == 0) return false;
-
-    switch (e.desc.valueType) {
-        case ValueType::BOOL: {
-            // HA's on/off covers switches, lights and binary sensors. A
-            // binary_sensor with device_class garage_door still reports
-            // on/off, not open/closed - the device class only changes how HA's
-            // own frontend words it. open/closed are accepted anyway so that a
-            // future entity that does report them is not silently dropped.
-            const bool on  = (strcmp(state, "on")   == 0) ||
-                             (strcmp(state, "open") == 0) ||
-                             (strcmp(state, "true") == 0);
-            const bool off = (strcmp(state, "off")    == 0) ||
-                             (strcmp(state, "closed") == 0) ||
-                             (strcmp(state, "false")  == 0);
-            if (!on && !off) return false;
-            out.type = ValueType::BOOL;
-            out.b    = on;
-            return true;
-        }
-        case ValueType::FLOAT: {
-            char *end = nullptr;
-            float f = strtof(state, &end);
-            if (end == state) return false;
-            out.type = ValueType::FLOAT;
-            out.f    = f;
-            return true;
-        }
-        case ValueType::INT: {
-            char *end = nullptr;
-            long l = strtol(state, &end, 10);
-            if (end == state) return false;
-            out.type = ValueType::INT;
-            out.i    = (int32_t)l;
-            return true;
-        }
-        case ValueType::TEXT_VAL: {
-            out.type = ValueType::TEXT_VAL;
-            snprintf(out.text, sizeof(out.text), "%s", state);
-            return true;
-        }
-        default:
-            return false;
-    }
 }
