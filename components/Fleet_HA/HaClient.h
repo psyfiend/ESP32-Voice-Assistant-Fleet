@@ -81,7 +81,25 @@ public:
     bool   isReady() const { return (HaLink)_state.load() == HaLink::LINK_READY; }
 
     // The next request id. HA replies carry the id back, which is how a reply
-    // is matched to its request. Monotonic for the life of the session.
+    // is matched to its request.
+    //
+    // IT MUST STRICTLY INCREASE WITHIN A CONNECTION, AND THAT IS A SERVER RULE,
+    // NOT A CONVENTION. Measured against HA 2026.9.2 on 2026-09-20: sending id
+    // 5 then id 3 returns
+    //
+    //     {"success":false,"error":{"code":"id_reuse",
+    //      "message":"Identifier values have to increase."}}
+    //
+    // and id 6 afterwards succeeds. So a scheme that allocates ids from a pool,
+    // or recycles them when a request completes, silently breaks - and breaks as
+    // a per-request error rather than a dropped connection, which is the kind of
+    // failure that gets blamed on the network.
+    //
+    // A counter that never resets is therefore correct by construction. Resetting
+    // it on reconnect would ALSO be legal (the id space is per-connection -
+    // measured: a fresh socket accepted id 2 again after the previous one had
+    // used it), but there is no reason to, and not resetting is one less rule to
+    // remember.
     uint32_t nextId() { return ++_reqId; }
 
     // --- Diagnostics, for SystemReport -----------------------------------

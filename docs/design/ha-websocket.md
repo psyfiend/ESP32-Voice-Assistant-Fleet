@@ -202,10 +202,51 @@ the websocket cannot replace. Websocket inbound for HA's entities, MQTT outbound
 
 ---
 
-## 8. Still unmeasured
+## 7b. Measured 2026-09-20 — request ids, and what a reconnect costs
 
-- **Reconnection behaviour.** What HA does when the socket drops mid-subscription, and whether
-  trigger subscriptions survive. Needs a deliberate disconnect test.
+Run from a PC against the live instance, read-only, no `call_service`.
+
+**The instance has moved to HA 2026.9.2** (this document's other numbers were taken against
+2026.8.1). The area registry is now 14 areas in **3,405 bytes**, down slightly from 3,663. Nothing
+else re-measured, so treat the §2 table as approximate rather than current.
+
+### Request ids must strictly increase within a connection
+
+Not a convention — a server rule, and it fails per-request rather than by dropping the socket:
+
+```
+id 5  -> success
+id 3  -> {"success":false,"error":{"code":"id_reuse",
+          "message":"Identifier values have to increase."}}
+id 6  -> success
+```
+
+So any scheme that allocates ids from a pool, or frees one when its request completes, breaks in a
+way that looks like an application bug on HA's side. A counter that only ever increments is correct
+by construction, and that is what `HaClient::nextId()` does.
+
+### Subscriptions are connection-scoped, and the id space resets with them
+
+A socket was closed **without** unsubscribing, then a fresh one opened. The new connection accepted
+`subscribe_trigger` with **the same id 2** the dead connection had used, with no conflict and no
+error.
+
+Two consequences for #43:
+
+1. **Nothing has to be cleaned up after a drop.** HA discards the subscription with the connection.
+   There is no leak to chase and no unsubscribe to send on the way down.
+2. **Everything has to be rebuilt after a reconnect.** Area registry, entity registry reads and the
+   `subscribe_trigger` all have to be re-issued on every new session. A reconnect is a cold start,
+   not a resume — so the reconnect path is the *same* code as the boot path, and should be written
+   that way rather than as a special case.
+
+The handshake itself is 2–3 ms and `subscribe_trigger` another 2 ms, so a full rebuild is cheap.
+The cost that matters is the per-entity registry reads, which is an argument for keeping the
+entity list small.
+
+---
+
+## 8. Still unmeasured
 - **The trigger event shape on a real change of one of OUR entities.** The 60-second window caught
   zero — those entities were simply quiet. The shape was confirmed against a busy solar sensor
   instead (`event.variables.trigger.to_state`), and it should be re-confirmed on a light.
