@@ -202,6 +202,27 @@ bool EntityRegistry::isPaused(const char *id) const {
     return (i >= 0) && _items[i].paused;
 }
 
+bool EntityRegistry::takeNeedsRefresh(char *idOut, size_t cap, EntitySource *srcOut,
+                                      char *refOut, size_t refCap) {
+    std::lock_guard<std::mutex> lk(_mx);
+    for (uint8_t i = 0; i < _count; i++) {
+        Entity &e = _items[i];
+        if (!e.needsRefresh) continue;
+
+        // Cleared HERE, under the lock, whatever the caller does next. A
+        // provider that cannot re-fetch must not leave the flag set and be
+        // asked again on every loop; and if a fetch fails, the next genuine
+        // change from the source still corrects the value.
+        e.needsRefresh = false;
+
+        if (idOut  && cap)    snprintf(idOut,  cap,    "%s", e.desc.id);
+        if (refOut && refCap) snprintf(refOut, refCap, "%s", e.desc.externalRef);
+        if (srcOut)           *srcOut = e.desc.source;
+        return true;
+    }
+    return false;
+}
+
 uint8_t EntityRegistry::pausedCount() const {
     std::lock_guard<std::mutex> lk(_mx);
     uint8_t n = 0;
@@ -226,6 +247,27 @@ bool EntityRegistry::setPaused(const char *id, bool paused, uint32_t nowMs) {
         if (paused) {
             e.pending   = false;
             e.cmdFailed = false;
+        } else {
+            // UNPAUSING LEAVES US HOLDING A VALUE FROM THE PAST.
+            //
+            // While paused we DROPPED every inbound update rather than applying
+            // it, which is the whole point - but it means the held value is
+            // whatever was true at the moment of the pause, and the world has
+            // moved on since. Under a change-driven feed nothing will correct
+            // it either: subscribe_trigger fires on CHANGE, so an occupancy
+            // sensor that went busy while we were paused and has stayed busy
+            // will not say so again.
+            //
+            // The owner found this within minutes: unpaused an occupancy card
+            // he knew was occupied - confirmed on another board and in HA - and
+            // it still read unoccupied.
+            //
+            // So resuming asks for the current value rather than waiting to be
+            // told. The registry does not know HOW - it just says this entity
+            // needs refreshing, and whichever provider owns it decides what
+            // that means. HaRest re-fetches it; a transport that cannot
+            // re-fetch simply clears the flag.
+            e.needsRefresh = true;
         }
 
         e.lastUpdateMs = nowMs;

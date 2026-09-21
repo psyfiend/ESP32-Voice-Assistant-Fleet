@@ -45,8 +45,34 @@ void HaRest::restart() {
 }
 
 void HaRest::loop(uint32_t nowMs) {
-    if (_done || !_reg) return;
+    if (!_reg) return;
     if (nowMs < _nextAtMs) return;
+
+    // RESUMED ENTITIES FIRST, even when the initial pass is long finished.
+    //
+    // A pause drops inbound updates, so on release the held value is from the
+    // moment of the pause and a change-driven feed will never correct it - the
+    // change already happened while nobody was listening. Issue #60's
+    // follow-up: the owner unpaused an occupancy card he knew was occupied and
+    // it still read unoccupied.
+    //
+    // One per pass, like the initial fetch and for the same reason: this
+    // blocks the loop task.
+    {
+        char id[ENTITY_ID_MAX], ref[ENTITY_TOPIC_MAX];
+        EntitySource src = EntitySource::LOCAL;
+        if (_reg->takeNeedsRefresh(id, sizeof(id), &src, ref, sizeof(ref))) {
+            if (src == EntitySource::HA && ref[0]) {
+                Serial.printf("[HaRest] %s resumed; re-fetching\n", id);
+                if (fetchOne(ref, id)) _fetched++;
+                else                   _failed++;
+                _nextAtMs = nowMs + REST_GAP_MS;
+            }
+            return;
+        }
+    }
+
+    if (_done) return;
 
     // Walk forward to the next HA-sourced entity. Non-HA entities are skipped
     // without costing a loop pass, since skipping is free and only the HTTP

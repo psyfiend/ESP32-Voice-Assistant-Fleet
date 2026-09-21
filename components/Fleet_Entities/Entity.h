@@ -251,6 +251,16 @@ struct Entity {
     // Persisted in NVS: "if I want a card paused I do not want a reboot to
     // unpause it."
     bool        paused         = false;
+
+    // Set when a pause is LIFTED. The held value is from the moment of the
+    // pause and nothing will correct it on its own - a change-driven feed only
+    // speaks when something changes, and an entity that changed while we were
+    // not listening has already said its piece.
+    //
+    // Deliberately transport-agnostic: this says "this needs refreshing", not
+    // how. Whichever provider owns the entity decides what that means and
+    // clears the flag. A transport with no way to re-ask simply clears it.
+    bool        needsRefresh   = false;
 };
 
 #endif // ENTITY_H

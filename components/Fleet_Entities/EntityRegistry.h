@@ -126,6 +126,19 @@ public:
     // the only place a pause that outlives a reboot is discoverable from.
     uint8_t pausedCount() const;
 
+    // Hand back the next entity whose pause was lifted, and CLEAR the flag in
+    // the same locked step. Returns false when there are none.
+    //
+    // One call rather than "scan with at(), then clear" because at() is const
+    // by design - the registry hands out read-only views and owns every
+    // mutation itself. Doing the find and the clear together also means two
+    // providers cannot both claim the same entity.
+    //
+    // The caller gets the id and the source, which is all it needs to decide
+    // whether the refresh is its job.
+    bool takeNeedsRefresh(char *idOut, size_t cap, EntitySource *srcOut,
+                          char *refOut, size_t refCap);
+
     // --- UI side ----------------------------------------------------------
 
     // Optimistically apply a commanded value so a control responds instantly,
