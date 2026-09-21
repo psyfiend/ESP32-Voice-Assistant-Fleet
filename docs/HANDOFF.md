@@ -1,4 +1,4 @@
-# Handoff — 2026-09-19
+# Handoff — 2026-09-21
 
 **If you are the owner returning after time away, read `docs/REVIEW_2026-09-20.md` FIRST.** It is
 the same work written for someone who was not here, with a test plan and pass/fail criteria. This
@@ -30,8 +30,12 @@ is code-complete and verified on hardware; #56 and #57 rode along because the HA
 concrete. The owner has not signed it off, and that is the gate — not the build.
 
 Four boards attached: `CYD_S3_3248` (COM10), `WS_P4_5` (COM15), `WS_S3_4B` (COM8),
-`WS_P4_4B` (COM7). **Only the 3248 and the S3_4B carry the #43 firmware** - the two P4 boards are
-deliberately untouched because they are the #49 soak.
+`WS_P4_4B` (COM7). **All four now carry the #43 firmware and the real HA dashboard**
+(`-D USE_HA_DASHBOARD`, set on all five screen environments as of 2026-09-21). `WS_P4_7B` has the
+flag but is not plugged into the PC.
+
+**The two S3 boards work. The two P4 boards do not** - they render a card or two and lose WiFi
+within seconds. That is #243, not a regression: see the headline below.
 
 ### Read in this order
 
@@ -187,8 +191,26 @@ sends none at all. That keeps a 2.5 KB task stack out of internal RAM on `CYD_S3
 
 ## What is next
 
-0. **OWNER SIGN-OFF ON #43**, then merge. Everything below assumes that happens.
-1. **2.7 card types.** The 18 real entities are now on glass, so this is judgeable for the first
+0. **DO THE REVIEW, THEN SIGN OFF #43, THEN MERGE.** `docs/REVIEW_2026-09-20.md` has the test
+   plan, T1-T9. The owner's words, 2026-09-21: *"we're opening more than we're closing sometimes"* -
+   so the review closes issues before anything new starts. Do this FIRST.
+
+1. **#61 - the esp_hosted workaround.** This is now the top build task and it is why four of eight
+   boards are unusable. `CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y` +
+   `CONFIG_CACHE_L2_CACHE_LINE_64B=y`, which means rebuilding the P4 framework libs.
+
+   **URGENT since 2026-09-21, and the urgency is new.** The HA dashboard made the boards *worse*,
+   exactly as #243 predicts: before #43 the P4s carried steady MQTT traffic and lasted 5-9 hours;
+   now they do 18 REST fetches plus a websocket at boot - "bursty inbound TCP", the literal trigger
+   in the issue title - and die in **seconds**. `WS_P4_5` showed two correct cards and dropped.
+   `WS_P4_4B` never rendered a full page. We did not break them; we started feeding them the
+   workload that reproduces the defect immediately instead of overnight.
+
+   **Do NOT expect pioarduino 55.03.312 to fix it.** Checked 2026-09-21: Arduino 3.3.12's only
+   hosted change is PR 12879, pinning `esp_hosted` to 2.12.3 "for lower hosted RAM usage". That is
+   OLDER than what we run, predates the retry added in 2.12.12, and sets nothing about SPIRAM. It
+   may change which failure mode appears; it will not remove it.
+2. **2.7 card types.** The 18 real entities are now on glass, so this is judgeable for the first
    time: a `door` type, `LightCard` learning brightness, the corner-icon/hero split.
 4. **2.8 slots** — and the card-corner artifact below goes with it.
 
@@ -414,7 +436,34 @@ connectivity one, and the "swipe from anywhere" regression were all his.
 - Don't trust a browser mock. The bench narrows the options; the glass decides.
 - Don't commit straight to `main`. Feature branch, then merge.
 - **Don't guess a fourth time.** Instrument it or ask the far end.
-- **Don't claim a script worked because it printed something.** Check the file changed.
+- **Don't claim a script worked because it printed something.** Check the file changed. On
+  2026-09-20 this rule was broken three separate times in one day by the same mechanism: a Python
+  replace whose anchor did not match, followed by a `print("ok")`. It cost a pause guard that
+  silently did nothing, the whole of #56's wire-side detection, and a build flag that never reached
+  `WS_S3_TOUCH_LCD_4B`. **Assert the anchor, then grep the file.** The owner found two of the three
+  within minutes of looking at hardware.
+
+### Added 2026-09-21, from the session that solved #49
+
+- **He is often right about the shape of a thing before he can name it.** "Priority should be the
+  entities I actually reach for" arrived as a musing and was a better model than the
+  domain-weighting in `Dashboard_HA.h`. "Can a card group several doors?" was group cards. When he
+  says "I'm wondering whether...", that is usually a design instinct, not a question - engage with
+  it rather than answering narrowly.
+- **A half-remembered detail from him is worth re-checking at the source.** He recalled NINA
+  deferring NVS writes for wear reasons rather than connectivity. He was half right, and going back
+  to find out surfaced a second rationale in a different file that reframed #41 entirely.
+- **He will solve your problem if you tell him what you are stuck on.** Four weeks of #49 theories
+  ended because he went looking for other people with the same symptom and found
+  esp-hosted-mcu#243. Say plainly what is unexplained.
+- **Tell him what has NOT been tested.** He acts on it immediately and without complaint. The tap
+  path, the pause `unavailable` publish and the icon rendering were all flagged as unverified and
+  all were on glass within the hour.
+- **Report negative results as clearly as wins.** "The C6 update did not fix it" and "that data
+  point is void because I killed a flash on that port" were both received as useful. Hedging them
+  would have been worse than useless.
+- **Do not let a background build run while you edit the tree.** Two flashes failed on 2026-09-20
+  because a background `pio` compiled a half-finished edit. Edit first, then flash.
 
 **Versioning:** `A.B.C.D`, where **C is the roadmap phase**. Tag on `main` at merge, never during
 development. A dirty tree appends `+dirty`.
