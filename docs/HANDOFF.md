@@ -50,7 +50,30 @@ deliberately untouched because they are the #49 soak.
 
 ---
 
-## THE HEADLINE: #49 is half solved, and #59 was NOT the other half
+## THE HEADLINE: #49 IS SOLVED, AND IT WAS NEVER OUR BUG
+
+**[espressif/esp-hosted-mcu#243](https://github.com/espressif/esp-hosted-mcu/issues/243).** Found
+2026-09-21. Our board, our symptom, our log lines, our sdkconfig. Full write-up in `LESSONS.md`.
+
+One failed `MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA` RX-buffer allocation permanently disables host
+RX, because the retry added in 2.12.12 exits at an interrupt gate that was already cleared. Writes
+keep working, so the driver still reports associated - which is exactly why a dead board showed
+full bars.
+
+**The fix is not reachable from our build.** `CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y` plus
+`CONFIG_CACHE_L2_CACHE_LINE_64B=y` are compiled into arduino-esp32's PREBUILT libraries; our
+`esp32p4/sdkconfig` has neither. Reaching them means rebuilding the P4 framework libs with the IDF
+component manager. Upstream's confirmed result: 4 stalls in 13 minutes became 2 h 52 m with zero.
+
+**#41 is dead as a theory** - NVS writes are not the cause. **#59's C6 update was real and worth
+doing** and was also not the cause.
+
+**What we keep regardless:** detection (a board now knows it is offline) and the RSSI poll backoff,
+which stops the 10 s UI freezes once a board has stalled. Neither fixes the stall.
+
+### The superseded theory, kept for the record
+
+#### #49 is half solved, and #59 was NOT the other half
 
 **Detection works. Recovery does not.**
 

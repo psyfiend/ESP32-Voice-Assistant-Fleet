@@ -502,3 +502,71 @@ powershell "Get-CimInstance Win32_PnPEntity | Where-Object { $_.Name -match 'COM
 
 A `VID_303A` device is an Espressif CDC port and is where the log is. A `VID_1A86` device is a CH343
 bridge and is not.
+
+---
+
+## #49 was never our bug — search upstream before building a theory
+
+**Four weeks of #49, and the answer was an open issue on Espressif's tracker the whole time.**
+[espressif/esp-hosted-mcu#243](https://github.com/espressif/esp-hosted-mcu/issues/243). Found on
+2026-09-21 because the owner went looking for other people with the same symptom, which is the step
+nobody had taken.
+
+### It is our board, our symptom and our configuration
+
+The reporter's log line is the one we captured off `WS_P4_4B`, character for character:
+
+    W H_SDIO_DRV: RX buffer alloc failed (len=18432); dropping read
+    E rpc_core: Response not received for [0x126](Req_WifiStaGetApInfo)
+
+And their description is #49 in one sentence: *"the host stops receiving from the co-processor
+permanently. There is no transport error, no bus fault and no restart. Host-to-slave writes still
+succeed, so every RPC times out."*
+
+**That is why a dead board reported itself connected.** Writes work, so the driver sees an
+association. Nothing can come back.
+
+### The mechanism
+
+Under bursty inbound TCP the host asks for an RX buffer with
+`MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA`. The P4's DMA-capable internal region is small, so the
+allocation fails. A retry exists (added in 2.12.12) and **never runs**: `NEW_PACKET` was cleared
+before the allocation was attempted, so the retry pass exits at the interrupt gate. One failed
+allocation disables RX for the life of the boot.
+
+### Our framework ships the failing configuration exactly
+
+Checked in `framework-arduinoespressif32-libs/esp32p4/sdkconfig`:
+
+| Setting | Ours | Working |
+|---|---|---|
+| `CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM` | **not set** | `=y` |
+| `CONFIG_CACHE_L2_CACHE_LINE_128B` | **=y** | 64B (`#219`) |
+| `CONFIG_ESP_HOSTED_SDIO_OPTIMIZATION_RX_STREAMING_MODE` | `=y` | `=y` — the affected path |
+
+Confirmed workaround, same device and workload: 4 stalls in 13 minutes became **2 h 52 m with zero
+failures**, internal-heap low rising from 17–58 KB to 145 KB.
+
+**We cannot set it with a `-D`.** These are sdkconfig options compiled into arduino-esp32's
+*prebuilt* libraries. Reaching them means rebuilding the P4 framework libs with the IDF component
+manager, which is what the reporter did.
+
+### What this cost, and the lesson
+
+Every theory we built was plausible, internally consistent and wrong:
+
+- the C6 firmware version mismatch (**real, worth fixing, not the cause** — the boot warning went
+  away and the dropouts did not)
+- NVS writes starving the SDIO transport (#41 — a sourced, specific claim from a mature project on
+  our hardware, and still not this)
+- our own reconnect ladder
+
+The P4/S3 split was correctly diagnosed from the first day: no S3 has ever dropped, every P4 does.
+Everything after that was building explanations for a defect in somebody else's code.
+
+**When a symptom is sharply hardware-specific and reproduces across an entire class of board,
+search the vendor's issue tracker before the third hypothesis.** A grep of the exact error string
+would have found this in minutes, at any point. The cost of not looking was weeks.
+
+Corollary: keep the exact error text. `Req_WifiStaGetApInfo` was in our logs for weeks and was
+dismissed as noise; it is the literal search term that finds the answer.
