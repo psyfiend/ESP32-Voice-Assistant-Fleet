@@ -255,6 +255,13 @@ private:
     std::atomic<int32_t> _probeResult{0};
 
     uint32_t _lastRssiPollMs   = 0;
+
+    // Consecutive RSSI reads that returned nothing. Backs the poll interval
+    // off, because on a P4 whose C6 link is dead WiFi.RSSI() is an SDIO RPC
+    // that blocks the LOOP TASK on a ~10 s timeout every single time - the
+    // "freezing every few seconds" the owner saw on WS_P4_4B. See pollRssi().
+    uint8_t  _rssiFails        = 0;
+    static constexpr uint32_t RSSI_POLL_MAX_MS = 300000;   // 5 minutes
     uint32_t _lastProbeMs      = 0;
     uint32_t _lastEvidenceMs   = 0;
     uint8_t  _probeFails       = 0;

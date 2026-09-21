@@ -71,6 +71,16 @@ private:
     // republished every cycle. Indexed the same way the registry is.
     EntityValue _lastPub[ENTITY_MAX];
     bool        _everPub[ENTITY_MAX] = {};
+
+    // Has this entity's pause already been announced to HA? Issue #60 - the
+    // "unavailable" goes out once on pause, not on every loop.
+    bool        _pauseAnnounced[ENTITY_MAX] = {};
+
+    // Publishes "unavailable" to one entity's state topic. Issue #60.
+    void publishPaused(const Entity &e);
+
+    // <base>/<object_id>/set, for entities we own. Issue #44.
+    void commandTopicFor(const Entity &e, char *out, size_t outLen) const;
     uint32_t    _lastPubMs[ENTITY_MAX] = {};
 
     // Republish an unchanged value this often anyway. Cheap insurance: a

@@ -105,6 +105,27 @@ public:
     // how a tap gets confirmed.
     bool setValue(const char *id, const EntityValue &v, uint32_t nowMs);
 
+    // Record what the SOURCE says about an entity being reachable. Issue #56.
+    //
+    // Separate from setValue() on purpose: an unavailable entity has no value
+    // to write, and inventing one - zero, or the previous reading - is exactly
+    // the lie this exists to stop. Marks dirty only on a CHANGE, so a source
+    // that repeats "unavailable" does not repaint the screen.
+    bool setAvailable(const char *id, bool available, uint32_t nowMs);
+
+    // The user's pause. Issue #60. Persisted to NVS so a reboot does not undo
+    // it. Returns false if the id is unknown.
+    bool setPaused(const char *id, bool paused, uint32_t nowMs);
+    bool isPaused(const char *id) const;
+
+    // Restore paused ids from NVS. Call AFTER every provider has registered,
+    // because an id that is not in the table yet cannot be marked.
+    void restorePaused();
+
+    // How many entities are currently paused - for the system dump, which is
+    // the only place a pause that outlives a reboot is discoverable from.
+    uint8_t pausedCount() const;
+
     // --- UI side ----------------------------------------------------------
 
     // Optimistically apply a commanded value so a control responds instantly,
@@ -113,6 +134,20 @@ public:
     //
     // Returns false if the entity is unknown or not writable.
     bool commandValue(const char *id, const EntityValue &v, uint32_t nowMs);
+
+    // WHERE A COMMAND LEAVES THE DEVICE. Issue #44.
+    //
+    // commandValue() has existed since #10 and applies a value optimistically,
+    // but nothing ever TRANSMITTED it - the outbound leg was the missing half.
+    // The registry still knows nothing about transports: it hands the command
+    // to whatever registered here and that thing decides whether it is a
+    // websocket call_service or an MQTT publish.
+    //
+    // CALLED WITH THE REGISTRY LOCK RELEASED. The sink sends over a socket,
+    // which can block for milliseconds; holding the mutex across that would
+    // stall every provider and the LVGL thread behind it.
+    typedef void (*CommandSink)(const Entity &e, const EntityValue &v, void *ctx);
+    void setCommandSink(CommandSink fn, void *ctx) { _cmdFn = fn; _cmdCtx = ctx; }
 
     // Drain the dirty set. Call from the LVGL task only.
     //
@@ -133,12 +168,27 @@ public:
     // Cards use this to grey out rather than display a confident stale number.
     bool isStale(const Entity &e, uint32_t nowMs) const;
 
+public:
+    // How long the value has held its current reading, in ms. Issue #57.
+    //
+    // Answers "the garage has been open for 40 minutes", which is NOT what age
+    // since lastUpdateMs answers. Returns 0 for an entity that has never had a
+    // value, which callers must treat as "unknown" rather than "just now".
+    static uint32_t heldForMs(const Entity &e, uint32_t nowMs) {
+        return e.everSet ? (nowMs - e.lastChangeMs) : 0;
+    }
+
+private:
+
 private:
     // Caller-owned storage; see begin(). The registry object itself stays tiny,
     // which is the point - only the table is large, and only the table moves.
     Entity *_items    = nullptr;
     uint8_t _capacity = 0;
     uint8_t _count    = 0;
+
+    CommandSink _cmdFn  = nullptr;
+    void       *_cmdCtx = nullptr;
 
     mutable std::mutex _mx;
     uint32_t _reconcileMs = 5000;   // generous: a round trip through a broker

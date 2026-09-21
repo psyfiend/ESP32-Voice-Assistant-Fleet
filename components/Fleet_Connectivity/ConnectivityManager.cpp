@@ -860,7 +860,37 @@ bool ConnectivityManager::isRssiFresh() const {
 }
 
 void ConnectivityManager::pollRssi(uint32_t now) {
-    if (_lastRssiPollMs != 0 && (now - _lastRssiPollMs) < _defaults.RSSI_POLL_MS) return;
+    // THIS CALL CAN BLOCK FOR TEN SECONDS, AND ON A SICK P4 IT ALWAYS DOES.
+    //
+    // MEASURED on WS_P4_4B, 2026-09-20, after 30 hours with a dead C6 link:
+    //
+    //   E rpc_core: Response not received for [0x126](Req_WifiStaGetApInfo)
+    //   [Conn:debug] RSSI read returned 0 - not storing
+    //
+    // ...every 10 s, forever. WiFi.RSSI() on a P4 is an RPC to the ESP32-C6
+    // over SDIO. When that link is dead the request is never answered and the
+    // call sits on its timeout - on the LOOP TASK, where LVGL lives. The owner
+    // reported the panel "freezing every few seconds, for a few seconds". That
+    // was this, and it was introduced by #49's own detection code, on exactly
+    // the boards #49 exists for.
+    //
+    // The comment that used to sit further down said whether a failing read
+    // fires during the fault was UNMEASURED. It fires. It is also ruinously
+    // expensive, which that note did not anticipate.
+    //
+    // BACKOFF RATHER THAN REMOVAL, because the failing read is still the
+    // cheapest evidence we have that the hosted transport is gone - deleting
+    // it would throw away a real signal to fix a cost problem. Each consecutive
+    // failure doubles the interval to a five-minute ceiling, so a dead board
+    // pays the stall about once every five minutes instead of six times a
+    // minute, and a healthy board is completely unaffected.
+    uint32_t interval = _defaults.RSSI_POLL_MS;
+    for (uint8_t i = 0; i < _rssiFails && interval < RSSI_POLL_MAX_MS; i++) {
+        interval *= 2;
+    }
+    if (interval > RSSI_POLL_MAX_MS) interval = RSSI_POLL_MAX_MS;
+
+    if (_lastRssiPollMs != 0 && (now - _lastRssiPollMs) < interval) return;
     _lastRssiPollMs = now;
 
     int32_t r = (int32_t)WiFi.RSSI();
@@ -876,10 +906,19 @@ void ConnectivityManager::pollRssi(uint32_t now) {
     // Whether it actually does during the fault is UNMEASURED; this logs it
     // so the next soak answers the question instead of us guessing again.
     if (r == 0) {
-        DBG_WIFI("RSSI read returned 0 - not storing (age now %lums)\n",
-                 (unsigned long)rssiAgeMs());
+        // Cap the streak so the shift above cannot run away, and so the
+        // interval is a predictable five minutes rather than an accident of
+        // how long the board has been broken.
+        if (_rssiFails < 16) _rssiFails++;
+        DBG_WIFI("RSSI read returned 0 - not storing (age now %lums, "
+                 "next poll in %lums)\n",
+                 (unsigned long)rssiAgeMs(), (unsigned long)interval);
         return;
     }
+
+    // A real reading means the RPC answered, so the transport is alive and the
+    // backoff has nothing left to protect against.
+    _rssiFails = 0;
 
     _rssi.store(r);
     _rssiAtMs.store((int32_t)now);

@@ -1,0 +1,16 @@
+{
+  "name": "esp_websocket_client",
+  "version": "1.6.1",
+  "description": "Espressif's WebSocket client, vendored from esp-protocols. Unmodified upstream source. See README.md for provenance and why it is vendored rather than pulled by the IDF component manager.",
+  "keywords": "websocket, home-assistant, esp-idf",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/espressif/esp-protocols/tree/master/components/esp_websocket_client",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "headers": "esp_websocket_client.h",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "include",
+    "srcFilter": ["+<*.c>"]
+  }
+}

@@ -440,3 +440,133 @@ it still considers pressed, and the press lands on whatever appeared there. That
 to reveal the deck also expanded the first panel that materialised under the fingertip.
 
 Release first. Then rebuild.
+
+---
+
+## `pio` dies with UnicodeEncodeError the moment its output is not a console
+
+Four upload attempts in a row appeared to hang: no output, no error, timeout. They were not hanging.
+They were crashing, and the crash was invisible because it happened while writing the crash to a
+pipe.
+
+PlatformIO prints box-drawing characters in the upload summary. When stdout is a terminal, Windows
+renders them. When stdout is a **pipe or a file**, Python falls back to the `cp1252` console
+codepage and the write raises:
+
+    UnicodeEncodeError: 'charmap' codec can't encode characters in position 23-52
+
+So `pio run -t upload | tail`, `| grep`, and `> file` all fail, while the identical command run
+bare succeeds. The build itself already warns about this - *"Firmware metrics can not be shown. Set
+the terminal codepage to utf-8"* - which reads like a cosmetic note and is not.
+
+**Always set `PYTHONIOENCODING=utf-8` before `pio` when the output is being captured.**
+
+```bash
+export PYTHONIOENCODING=utf-8 && pio run -e <env> -t upload --upload-port COMn
+```
+
+### The second-order damage is worse than the first
+
+A killed `pio` leaves **orphaned `esptool` and `python` children**. Those keep holding the serial
+port and `.pio/build/<env>/firmware.bin`, so the next attempt fails with
+`The process cannot access the file because it is being used by another process` - an error that
+points at the filesystem and says nothing about the real cause. Check for strays before concluding
+anything about the board:
+
+```bash
+powershell "Get-Process | Where-Object { $_.ProcessName -match 'python|esptool|pio' }"
+```
+
+---
+
+## `Serial` does not come out of the port you flashed through
+
+`WS_S3_TOUCH_LCD_4B` was flashed successfully over COM8 and then printed nothing but the ROM
+bootloader header. The app was fine; the output was somewhere else.
+
+The board sets `-D ARDUINO_USB_CDC_ON_BOOT=1`, which maps Arduino's `Serial` to the ESP32-S3's
+**native USB CDC**, not to UART0. COM8 is the CH343 bridge - correct for flashing, and permanently
+silent for application output. The CDC port is a *separate* device that only enumerates once the
+app is running (`VID_303A&PID_1001`).
+
+If the native USB socket is not physically cabled, there is no way to read that board's log at all,
+however well it is running. Six of the eight environments set this flag; `CYD_P4_1060P470` is the
+one that explicitly sets it to `0` with a comment saying native USB is not supported there.
+
+**Before debugging silence, check which transport the board's `Serial` is on:**
+
+```bash
+grep -A3 "^\[env:<NAME>\]" platformio.ini | grep USB_CDC_ON_BOOT
+powershell "Get-CimInstance Win32_PnPEntity | Where-Object { $_.Name -match 'COM\d+' } | Select-Object Name, DeviceID"
+```
+
+A `VID_303A` device is an Espressif CDC port and is where the log is. A `VID_1A86` device is a CH343
+bridge and is not.
+
+---
+
+## #49 was never our bug — search upstream before building a theory
+
+**Four weeks of #49, and the answer was an open issue on Espressif's tracker the whole time.**
+[espressif/esp-hosted-mcu#243](https://github.com/espressif/esp-hosted-mcu/issues/243). Found on
+2026-09-21 because the owner went looking for other people with the same symptom, which is the step
+nobody had taken.
+
+### It is our board, our symptom and our configuration
+
+The reporter's log line is the one we captured off `WS_P4_4B`, character for character:
+
+    W H_SDIO_DRV: RX buffer alloc failed (len=18432); dropping read
+    E rpc_core: Response not received for [0x126](Req_WifiStaGetApInfo)
+
+And their description is #49 in one sentence: *"the host stops receiving from the co-processor
+permanently. There is no transport error, no bus fault and no restart. Host-to-slave writes still
+succeed, so every RPC times out."*
+
+**That is why a dead board reported itself connected.** Writes work, so the driver sees an
+association. Nothing can come back.
+
+### The mechanism
+
+Under bursty inbound TCP the host asks for an RX buffer with
+`MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA`. The P4's DMA-capable internal region is small, so the
+allocation fails. A retry exists (added in 2.12.12) and **never runs**: `NEW_PACKET` was cleared
+before the allocation was attempted, so the retry pass exits at the interrupt gate. One failed
+allocation disables RX for the life of the boot.
+
+### Our framework ships the failing configuration exactly
+
+Checked in `framework-arduinoespressif32-libs/esp32p4/sdkconfig`:
+
+| Setting | Ours | Working |
+|---|---|---|
+| `CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM` | **not set** | `=y` |
+| `CONFIG_CACHE_L2_CACHE_LINE_128B` | **=y** | 64B (`#219`) |
+| `CONFIG_ESP_HOSTED_SDIO_OPTIMIZATION_RX_STREAMING_MODE` | `=y` | `=y` — the affected path |
+
+Confirmed workaround, same device and workload: 4 stalls in 13 minutes became **2 h 52 m with zero
+failures**, internal-heap low rising from 17–58 KB to 145 KB.
+
+**We cannot set it with a `-D`.** These are sdkconfig options compiled into arduino-esp32's
+*prebuilt* libraries. Reaching them means rebuilding the P4 framework libs with the IDF component
+manager, which is what the reporter did.
+
+### What this cost, and the lesson
+
+Every theory we built was plausible, internally consistent and wrong:
+
+- the C6 firmware version mismatch (**real, worth fixing, not the cause** — the boot warning went
+  away and the dropouts did not)
+- NVS writes starving the SDIO transport (#41 — a sourced, specific claim from a mature project on
+  our hardware, and still not this)
+- our own reconnect ladder
+
+The P4/S3 split was correctly diagnosed from the first day: no S3 has ever dropped, every P4 does.
+Everything after that was building explanations for a defect in somebody else's code.
+
+**When a symptom is sharply hardware-specific and reproduces across an entire class of board,
+search the vendor's issue tracker before the third hypothesis.** A grep of the exact error string
+would have found this in minutes, at any point. The cost of not looking was weeks.
+
+Corollary: keep the exact error text. `Req_WifiStaGetApInfo` was in our logs for weeks and was
+dismissed as noise; it is the literal search term that finds the answer.

@@ -604,11 +604,39 @@ void Panel_System::_tick() {
             processed++;
         }
 
-        // Same 4 KB ceiling as before and for the same reason: this is a
-        // diagnostic tail, not a history.
-        if (_log_text.size() > 4000) _log_text = "(log trimmed)\n";
+        // A TAIL, TRIMMED FROM THE FRONT - not a bucket that empties itself.
+        //
+        // This used to be `if (size > 4000) _log_text = "(log trimmed)"`, which
+        // threw the whole log away the moment it filled. The owner met that as:
+        // two dumps fit, the third is cut off mid-report, and a fourth is
+        // needed to read anything. The report has grown a great deal since 4 KB
+        // was chosen and one dump is now a sizeable fraction of it.
+        //
+        // Dropping whole lines off the FRONT keeps the newest output intact -
+        // the half anyone actually wants - and never truncates the dump you
+        // just asked for.
+        if (_log_text.size() > LOG_TAIL_MAX) {
+            size_t cut = _log_text.size() - LOG_TAIL_MAX;
+            // Round forward to a line boundary so the tail never opens
+            // mid-sentence.
+            size_t nl = _log_text.find('\n', cut);
+            _log_text.erase(0, (nl == std::string::npos) ? cut : nl + 1);
+        }
 
         if (_log_queue.empty()) _log_dirty = false;
+
+        // REDRAW WHILE THE PAGE IS OPEN.
+        //
+        // Two things at once. It fixes the owner's bug - tapping Dump from the
+        // log page did nothing visible, because LogPage::refresh() ran
+        // immediately after SystemReport::run() while every one of those lines
+        // was still sitting in _log_queue, unappended. The page was faithfully
+        // redrawing the text from BEFORE the dump.
+        //
+        // And it restores what he liked about the panel's first incarnation:
+        // the log scrolling upward in real time as output arrives, five lines a
+        // tick, instead of appearing all at once when you leave and come back.
+        if (_log_on_change) _log_on_change(_log_text.c_str());
     }
 
     if (_stats_dirty && lbl_stats) {

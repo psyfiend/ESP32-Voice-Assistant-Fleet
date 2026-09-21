@@ -10,6 +10,7 @@ lv_obj_t *s_previous = nullptr;
 lv_obj_t *s_label    = nullptr;
 
 std::function<void()> s_onDump  = nullptr;
+std::function<void()> s_onClear = nullptr;
 std::function<void()> s_onClose = nullptr;
 
 lv_obj_t *topButton(lv_obj_t *parent, const char *text, lv_event_cb_t cb) {
@@ -33,6 +34,7 @@ lv_obj_t *topButton(lv_obj_t *parent, const char *text, lv_event_cb_t cb) {
 namespace LogPage {
 
 void setDumpHandler (std::function<void()> cb) { s_onDump  = cb; }
+void setClearHandler(std::function<void()> cb) { s_onClear = cb; }
 void setCloseHandler(std::function<void()> cb) { s_onClose = cb; }
 
 void close() {
@@ -102,7 +104,17 @@ void show(const char *text) {
     topButton(bar, LV_SYMBOL_LEFT " Back", [](lv_event_t *e) { (void)e; LogPage::close(); });
     topButton(bar, "Dump", [](lv_event_t *e) {
         (void)e;
-        if (s_onDump) s_onDump();     // re-runs the report; refresh() redraws it
+        // The redraw is NOT done here. The report's lines go into a queue that
+        // Panel_System drains five per tick, so calling refresh() on this line
+        // would redraw the text from before the dump - which is exactly what it
+        // used to do, and why the owner had to leave the page and come back.
+        // The drain notifies us instead, and the log scrolls as it fills.
+        if (s_onDump) s_onDump();
+    });
+
+    topButton(bar, "Clear", [](lv_event_t *e) {
+        (void)e;
+        if (s_onClear) s_onClear();
     });
 
     // The report itself. This is the scroller that used to live inside the

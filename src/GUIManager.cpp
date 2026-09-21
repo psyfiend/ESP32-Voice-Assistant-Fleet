@@ -6,6 +6,9 @@
 #include "UI/ReferencePage.h"
 #include "UI/LogPage.h"
 #include "Dashboards/Dashboard_Fleet.h"
+#ifdef USE_HA_DASHBOARD
+#include "Dashboards/Dashboard_HA.h"
+#endif
 #include "bsp_loader.h"
 
 // LVGL's event and callback APIs take plain function pointers with no user
@@ -321,9 +324,52 @@ void GUIManager::closeSystemPanelCb() {
 // The one part of the System Doctor that genuinely needs LVGL. Registered with
 // SystemReport rather than living inside it, which is what keeps SystemReport
 // free of any LVGL include.
+// What the UI is actually set to.
+//
+// This used to print one line - "Active Panel: EXPANDED / NONE" - which could
+// never say anything useful, because opening any panel closes the others by
+// rule, so the answer was structurally always the same. The owner: "which
+// never showed anything".
+//
+// The twiddly knobs are the useful thing. Every one of them is a live
+// experiment the owner is running on glass, and until now the only way to know
+// where they stood was to remember what you last pressed. A dump pasted into a
+// conversation now carries the state it was taken in.
 void GUIManager::reportUiSection() {
-    lv_obj_t *activePnl = UIToolkit::getActiveAccordionPanel();
-    SystemReport::line("  Active Panel: %s", activePnl ? "EXPANDED" : "NONE (Collapsed)");
+    if (!s_self) return;
+    GUIManager &g = *s_self;
+
+    SystemReport::line("  Screen:      %ldx%ld  %ld DPI",
+                       (long)lv_obj_get_width(lv_screen_active()),
+                       (long)lv_obj_get_height(lv_screen_active()),
+                       (long)lv_display_get_dpi(lv_display_get_default()));
+
+    // Cards placed vs declared is the single most useful UI fact on a small
+    // board: it is how you know the page degraded rather than that something
+    // failed to bind. The 3248 shows 8 of 18 and that is correct behaviour.
+    if (g._page) {
+        SystemReport::line("  Cards:       %u of %u placed, %u dropped for space",
+                           (unsigned)g._page->placed(), (unsigned)g._page->count(),
+                           (unsigned)g._page->dropped());
+    }
+
+    if (g._page) {
+        SystemReport::line("  Grid:        %u cell rows   target card width %u px",
+                           (unsigned)g._page->cellRows(),
+                           (unsigned)UI::grid().TARGET_CARD_W);
+    }
+
+    SystemReport::line("  Card header: %s   variant: %s   area: %s",
+                       g._hdr == CardHeaderStyle::HDR_TAG  ? "tag"
+                     : g._hdr == CardHeaderStyle::HDR_BAR  ? "bar" : "none",
+                       cardVariantName(g._variant),
+                       g._showArea ? "shown" : "hidden");
+
+    SystemReport::line("  Chrome:      header bar %s   deck %s   drawer %s",
+                       g._headerHidden ? (g._headerPeeking ? "peeking" : "hidden")
+                                       : "shown",
+                       g._showDeck ? "shown" : "hidden",
+                       g._pnlSystem.isExpanded() ? "open" : "closed");
 }
 
 void GUIManager::begin() {
@@ -550,10 +596,19 @@ void GUIManager::begin() {
     // The log page's own Dump button re-runs the report and redraws it in
     // place. The panel keeps buffering while the page is open, so this is just
     // "run it again and show me".
-    LogPage::setDumpHandler([this]() {
-        SystemReport::run(_core, true);
-        LogPage::refresh(_pnlSystem.logText());
-    });
+    // Dump just runs the report. The REDRAW comes from the drain, not from
+    // here - see the note on the button in LogPage.cpp. Calling refresh() on
+    // this line redrew the text from before the dump, because every line was
+    // still queued.
+    LogPage::setDumpHandler([this]() { SystemReport::run(_core, true); });
+
+    LogPage::setClearHandler([this]() { _pnlSystem.clearLog(); });
+
+    // The single wire that makes the log live: Panel_System drains five lines
+    // a tick and tells us, so an open page scrolls as output arrives. It is
+    // also what restores the effect the owner liked in the panel's first
+    // incarnation, before the log moved to its own screen.
+    _pnlSystem.setLogOnChange([](const char *text) { LogPage::refresh(text); });
     LogPage::setCloseHandler([this]() { rebuildDashboard(); });
     _pnlSystem.setOnSchemeRequested([this]() { cycleScheme(); });
 
@@ -695,7 +750,18 @@ void GUIManager::buildDashboard() {
     // laid over a copy of it. PageSpec is a plain aggregate, so this is a copy
     // and an assignment rather than any kind of mechanism - which is the point
     // of the spec being data.
+    // WHICH PAGE THIS BOARD BOOTS INTO.
+    //
+    // An either/or rather than a choice, and only until 2.6. A board can show
+    // exactly one page today, and 18 HA cards plus 12 fleet cards fit nowhere,
+    // so -D USE_HA_DASHBOARD swaps the whole page. When horizontal swipes land
+    // this becomes two pages and the flag goes away - HA_PAGE already carries
+    // id 2 for that day.
+#ifdef USE_HA_DASHBOARD
+    PageSpec page = HA_PAGE;
+#else
     PageSpec page = FLEET_PAGE;
+#endif
     page.headerDefault  = _hdr;
     page.variantDefault = _variant;
     page.showArea       = _showArea;

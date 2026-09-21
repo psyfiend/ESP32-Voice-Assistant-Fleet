@@ -23,7 +23,27 @@
 
 static constexpr uint8_t ENTITY_ID_MAX     = 40;  // "living_room_temp"
 static constexpr uint8_t ENTITY_NAME_MAX   = 40;  // "Living Room Temperature"
-static constexpr uint8_t ENTITY_SHORT_MAX  = 20;  // unit, device_class, icon
+static constexpr uint8_t ENTITY_SHORT_MAX  = 20;  // unit, device_class, state_class
+
+// ICONS NEED MORE ROOM THAN THE OTHER SHORT FIELDS, AND 20 WAS NOT ENOUGH.
+//
+// Material Design Icon names are long and the ones this fleet actually wants
+// are among the longest: `mdi:ceiling-light-outline` is 25 characters and
+// `mdi:motion-sensor-off` is 21. Both overflowed, and the second matters more
+// than the first, because HA ships the live state-dependent icon in
+// `attributes.icon` - so the limit was not only clipping what we declare, it
+// would have clipped what the server sends us.
+//
+// Found at compile time on the owner's 18-entity table (2026-09-20), which is
+// the good outcome; a char array one byte too small for a string that arrives
+// at runtime truncates silently and renders as the wrong glyph or as tofu.
+//
+// 32 costs 12 bytes per entity over the old size, and entity storage lives in
+// PSRAM (see SystemCore::beginEntityStorage), so 128 entities pay 1.5 KB of
+// the cheap memory. Splitting it out rather than raising ENTITY_SHORT_MAX
+// keeps unit / device_class / state_class - which are genuinely short - from
+// paying for it.
+static constexpr uint8_t ENTITY_ICON_MAX   = 32;  // "mdi:ceiling-light-outline"
 static constexpr uint8_t ENTITY_TOPIC_MAX  = 128; // external topic / HA entity id
 
 struct EntityDescriptor {
@@ -43,7 +63,7 @@ struct EntityDescriptor {
     char unit[ENTITY_SHORT_MAX]        = {0};  // "C", "%", "lx", "W"
     char deviceClass[ENTITY_SHORT_MAX] = {0};  // "temperature", "occupancy"
     char stateClass[ENTITY_SHORT_MAX]  = {0};  // "measurement", "total_increasing"
-    char icon[ENTITY_SHORT_MAX]        = {0};  // "mdi:thermometer"
+    char icon[ENTITY_ICON_MAX]         = {0};  // "mdi:thermometer"
 
     // Can the UI command it? Drives whether a card offers a control at all.
     bool writable = false;
@@ -97,13 +117,52 @@ struct EntityDescriptor {
     // with `val_tpl`; a plain key is enough for us and needs no template
     // engine on the device.
     char valueKey[ENTITY_SHORT_MAX] = {0};
+
+    // WHERE A COMMAND GOES, when that is not where the value comes from.
+    // Issue #44.
+    //
+    // Needed because the two are genuinely different addresses for an entity
+    // someone else owns. Zigbee2MQTT publishes state on `zigbee2mqtt/thing`
+    // and takes orders on `zigbee2mqtt/thing/set`; the owner's own Shed Power
+    // Monitor uses the same split, `.../motion_timer/state` and
+    // `.../motion_timer/set`, which is also exactly HA's discovery convention
+    // of state_topic vs command_topic. Three independent sources, one shape.
+    //
+    // Left EMPTY for:
+    //   - entities WE own (advertise = true). Their command topic is derived
+    //     centrally from the device identity, the same way their state topic
+    //     is - ROADMAP 4.1 is explicit that a descriptor never spells its own
+    //     topics out.
+    //   - HA-sourced entities. A websocket call_service is addressed by
+    //     entity_id, which externalRef already holds; there is no topic.
+    char commandRef[ENTITY_TOPIC_MAX] = {0};
 };
 
 struct Entity {
     EntityDescriptor desc;
 
     EntityValue value;
+    // WHEN WE LAST HEARD ANYTHING, changed or not. Issue #57.
+    //
+    // This is a statement about the TRANSPORT, not about the thing: it moves
+    // on every message, including one carrying a value identical to the last.
+    // Staleness is derived from it, because staleness is a question about
+    // whether we are still in touch.
     uint32_t    lastUpdateMs = 0;
+
+    // WHEN THE VALUE LAST ACTUALLY CHANGED. Issue #57.
+    //
+    // A different question, and the one a card usually wants: "the garage has
+    // been open for 40 minutes", "the light went on at 6:03". Deriving that
+    // from lastUpdateMs is wrong in both directions - an MQTT sensor
+    // republishing an unchanged reading every 30 s would claim it just
+    // changed, and an HA entity on a change-driven feed would be indefinitely
+    // "unchanged" only because nothing has been said.
+    //
+    // Set together with the first value, so "changed" and "first seen" are the
+    // same instant rather than zero.
+    uint32_t    lastChangeMs = 0;
+
     bool        everSet      = false;   // distinguishes "0" from "no reading yet"
 
     // --- Optimistic write bookkeeping ------------------------------------
@@ -147,6 +206,51 @@ struct Entity {
     // the whole table be placed in PSRAM with a single call. See
     // EntityRegistry::begin().
     bool        dirty          = false;
+
+    // --- Availability, as stated by the source. Issue #56. -----------------
+    //
+    // NOT derived from age. `lastUpdateMs` answers "when did we last hear
+    // anything", which under a change-driven feed is not evidence of health:
+    // HA's subscribe_trigger fires on CHANGE, so a thermostat holding steady
+    // and a thermostat that has been unplugged are indistinguishable by age.
+    //
+    // HA states this directly - it sends the literal state "unavailable" - and
+    // that word is strictly better information than any timeout we could
+    // invent. Before this the word was simply dropped on the floor and the
+    // card went on displaying its last good reading indefinitely.
+    //
+    // Starts TRUE so that an entity nobody has said anything about is not born
+    // broken; `everSet` is what distinguishes "no reading yet".
+    bool        available      = true;
+
+    // --- The user's own choice. Issue #60. --------------------------------
+    //
+    // PAUSED LIVES ON THE ENTITY, NOT ON THE CARD, and that placement is the
+    // whole point. A card is a VIEW; "this temperature probe is broken, stop
+    // sending bogus data to HA" is a statement about the PROBE, and stays true
+    // whether or not a tile happens to be showing it.
+    //
+    // This project already made the identical call once, for cmdFailed just
+    // below: a fact tracked per-card let a parent card and a child card bound
+    // to the same switch disagree. Pause has the same shape - leave it on the
+    // card and pausing from the wrong tile leaves a local sensor publishing.
+    //
+    // What it means, by who owns the entity:
+    //   advertise == true  (ours)    -> stop sampling, stop publishing, and
+    //                                   tell HA "unavailable" once.
+    //   advertise == false (theirs)  -> stop APPLYING inbound values.
+    //
+    // Either way the value stops changing, so the frozen display is free -
+    // deliberately NOT implemented as "stop rendering", which would leave the
+    // registry holding one number while the screen showed another.
+    //
+    // Owner's rule, and it is stronger than "looks frozen": a paused entity
+    // stops ALL conditional evaluation. No staleness transition, no cmdFailed
+    // transition. Held still, not merely quiet.
+    //
+    // Persisted in NVS: "if I want a card paused I do not want a reboot to
+    // unpause it."
+    bool        paused         = false;
 };
 
 #endif // ENTITY_H

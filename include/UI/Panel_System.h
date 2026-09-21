@@ -56,6 +56,19 @@ public:
     // boot-time dump is already waiting when the page is first opened.
     const char *logText() const { return _log_text.c_str(); }
 
+    // Called whenever the drained log text changes, so an open LogPage can
+    // redraw as output arrives rather than only when it is reopened.
+    void setLogOnChange(std::function<void(const char *)> cb) { _log_on_change = cb; }
+
+    // Empty the log and tell any listener. The "Clear log" button, so a fresh
+    // dump is not stacked underneath the previous three.
+    void clearLog() {
+        _log_text.clear();
+        _log_queue.clear();
+        _log_dirty = false;
+        if (_log_on_change) _log_on_change(_log_text.c_str());
+    }
+
     // What the "Log" button runs. Registered by GUIManager, which stands the
     // dashboard down before the page opens.
     using LogCallback = std::function<void()>;
@@ -180,6 +193,14 @@ private:
     // -- Safe Data Buffering --
     std::vector<std::string> _log_queue;
     std::string              _log_text;   // what LogPage renders
+
+    // How much log to keep, trimmed from the FRONT. Raised from the original
+    // 4,000 because the System Doctor's report has grown a lot since that
+    // number was picked - at 4 KB a third dump was being cut off mid-report.
+    // This is a diagnostic tail, not a history, so it is still bounded.
+    static constexpr size_t  LOG_TAIL_MAX = 12000;
+
+    std::function<void(const char *)> _log_on_change;
     bool _log_dirty;
     DumpCallback  _onDumpRequested  = nullptr;
     CardsCallback _onCardsRequested = nullptr;

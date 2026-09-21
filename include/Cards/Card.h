@@ -135,6 +135,9 @@ public:
     // the ONE state allowed to go quiet. See cards.md section 3.
     Card &setPaused(bool p);
 
+    // Asked of the entities rather than of this card. Issue #60.
+    bool isPaused() const;
+
     // --- Lifecycle --------------------------------------------------------
 
     // Build the widget tree under parent and draw the current values.
@@ -382,7 +385,10 @@ private:
     uint32_t        _longStaleMs = 0;     // 0 = ask cardLongStaleMs()
     int32_t         _cellPx      = 0;     // set by CardPage::commit()
     TempUnit        _tempUnit    = TempUnit::TEMP_INHERIT;
-    bool            _paused      = false;
+    // NO _paused HERE. Issue #60 moved it onto Entity, because pausing is a
+    // property of the thing and not of the view - the same reasoning that put
+    // cmdFailed on the entity. Two cards on one switch used to be able to
+    // disagree; now they cannot.
     bool            _showArea    = s_showArea;
     bool            _forced      = false;   // debugForceState()
     bool            _dimmed      = false;   // paused, mixed not opa'd

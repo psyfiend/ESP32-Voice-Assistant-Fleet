@@ -202,14 +202,112 @@ the websocket cannot replace. Websocket inbound for HA's entities, MQTT outbound
 
 ---
 
-## 8. Still unmeasured
+## 7a. SUPERSEDED — do not stream the device registry. Ask HA to resolve areas.
 
-- **Reconnection behaviour.** What HA does when the socket drops mid-subscription, and whether
-  trigger subscriptions survive. Needs a deliberate disconnect test.
+**§4 and §7 say to fetch the 120 KB device registry and keep `id` + `area_id`. Do not.** Measured
+2026-09-20, and there is a far better way that was not considered when §4 was written.
+
+| Route | Bytes | Time |
+|---|---|---|
+| `config/device_registry/list` | **115,742** | 6 ms |
+| **one `render_template` for all 18 entities** | **818** | 17 ms |
+
+A **141x** reduction, and the decisive part is not the ratio: `HaClient`'s reassembly buffer is
+**8 KB**, so the device registry does not fit and never could without an incremental parser that
+does not exist. The template reply does fit, comfortably.
+
+HA's `area_name()` template function **follows the device hop itself**, which is the whole reason
+§4 wanted the device registry:
+
+```jinja
+{% set ns = namespace(o=[]) %}
+{% for e in [ ...entity ids... ] %}
+{% set ns.o = ns.o + [e ~ '=' ~ (area_name(e) or '')] %}
+{% endfor %}
+{{ ns.o | join('|') }}
+```
+
+860 bytes out, 818 back, one round trip, `entity=Area|entity=Area|…` — a format a device can split
+with `strtok` and no JSON parse at all. All 18 resolved correctly, including `light.office`, whose
+own `area_id` is null and which §4 specifically warns about.
+
+**Caveat worth knowing:** `render_template` is a *subscription*, not a one-shot. It re-renders when
+its dependencies change, so it must be cancelled with `unsubscribe_events` once the answer is in,
+or it becomes a permanent feed. That is one extra message, not a reason to avoid it.
+
+### Why this is not implemented yet
+
+Areas are currently hardcoded in `Dashboard_HA.h` and they are correct, so resolving them at
+runtime changes nothing visible today. It earns its keep when pages are grouped by area - the
+owner's "a button for Bedroom that takes you to the Bedroom page" - and it should be built then,
+against this measurement rather than against §4's plan.
+
+Note the names HA returns are its own: `Living Room`, `Eric Bedroom`, `Front Room`. The owner
+shortened these deliberately, and `HA_AREA_NAMES` in `ExternalEntities_HA.h` is the override table
+keyed on `area_id`.
+
+---
+
+## 7b. Measured 2026-09-20 — request ids, and what a reconnect costs
+
+Run from a PC against the live instance, read-only, no `call_service`.
+
+**The instance has moved to HA 2026.9.2** (this document's other numbers were taken against
+2026.8.1). The area registry is now 14 areas in **3,405 bytes**, down slightly from 3,663. Nothing
+else re-measured, so treat the §2 table as approximate rather than current.
+
+### Request ids must strictly increase within a connection
+
+Not a convention — a server rule, and it fails per-request rather than by dropping the socket:
+
+```
+id 5  -> success
+id 3  -> {"success":false,"error":{"code":"id_reuse",
+          "message":"Identifier values have to increase."}}
+id 6  -> success
+```
+
+So any scheme that allocates ids from a pool, or frees one when its request completes, breaks in a
+way that looks like an application bug on HA's side. A counter that only ever increments is correct
+by construction, and that is what `HaClient::nextId()` does.
+
+### Subscriptions are connection-scoped, and the id space resets with them
+
+A socket was closed **without** unsubscribing, then a fresh one opened. The new connection accepted
+`subscribe_trigger` with **the same id 2** the dead connection had used, with no conflict and no
+error.
+
+Two consequences for #43:
+
+1. **Nothing has to be cleaned up after a drop.** HA discards the subscription with the connection.
+   There is no leak to chase and no unsubscribe to send on the way down.
+2. **Everything has to be rebuilt after a reconnect.** Area registry, entity registry reads and the
+   `subscribe_trigger` all have to be re-issued on every new session. A reconnect is a cold start,
+   not a resume — so the reconnect path is the *same* code as the boot path, and should be written
+   that way rather than as a special case.
+
+The handshake itself is 2–3 ms and `subscribe_trigger` another 2 ms, so a full rebuild is cheap.
+The cost that matters is the per-entity registry reads, which is an argument for keeping the
+entity list small.
+
+---
+
+## 8. Still unmeasured
 - **The trigger event shape on a real change of one of OUR entities.** The 60-second window caught
   zero — those entities were simply quiet. The shape was confirmed against a busy solar sensor
   instead (`event.variables.trigger.to_state`), and it should be re-confirmed on a light.
-- **`call_service` has not been exercised at all.** Doing so turns on a light in the owner's
-  house, so it waits for him to be present and to say go.
+- ~~**`call_service` has not been exercised at all.**~~ **DONE 2026-09-20**, with the owner's
+  explicit permission and on the one entity he named (`light.office_overhead`, "harmless and
+  won't disturb anybody"). Turned on, then off, and confirmed left exactly as found.
+
+  | | |
+  |---|---|
+  | `light.turn_on` / `light.turn_off` | both `success: true` |
+  | **echo back via `subscribe_trigger`** | **~91 ms** |
+  | echo event size | 1,462 / 1,492 B |
+
+  **That 91 ms is the number #44's optimistic-write reconcile window should be built around** -
+  the registry currently reverts on a timeout measured in seconds, which is two orders of
+  magnitude of slack. The HA half of #44 now has no unknowns left in it.
 - **Sensor history** (`history/stream` or the REST history endpoint) for the sparkline `cards.md`
   §4 wants. Not looked at.
