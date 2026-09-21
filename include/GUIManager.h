@@ -187,9 +187,17 @@ private:
 #if   defined(WS_P4_5)
     uint8_t         _colsOverride = 5;
     uint8_t         _rowsOverride = 3;
+// 4x3, changed from 3x4 on 2026-09-21 after seeing the real 18-card dashboard
+// on both 4B panels. The owner: "4x3 looks and fits better than 3x4 on the 4B
+// screens, the circle around icons actually fits then."
+//
+// It is the same cell COUNT either way. What changes is the aspect: three rows
+// of four gives each cell more width and less height, and the icon disc - which
+// is sized from the cell - stops being squashed into an ellipse. A card is
+// wider than it is tall in every mock we have, and 3x4 was fighting that.
 #elif defined(WS_P4_4B) || defined(WS_S3_4B)
-    uint8_t         _colsOverride = 3;
-    uint8_t         _rowsOverride = 4;
+    uint8_t         _colsOverride = 4;
+    uint8_t         _rowsOverride = 3;
 #else
     uint8_t         _colsOverride = 0;      // 0 = derive from TARGET_CARD_W
     uint8_t         _rowsOverride = 0;      // 0 = let the cards decide
