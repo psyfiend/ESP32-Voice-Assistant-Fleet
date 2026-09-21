@@ -131,9 +131,20 @@ bool HaRest::fetchOne(const char *entityRef, const char *ourId) {
                     ok = true;
                     DBG_REST("%s = %s\n", ourId, state);
                 } else {
-                    // A real reply that is not a value - "unavailable" is the
-                    // common one. Not an error, and not written.
-                    DBG_REST("%s -> %s (not a value)\n", ourId, state);
+                    // Issue #56. "unavailable" is a STATEMENT, not a gap, and
+                    // it gets recorded. A board that boots while a sensor is
+                    // down must not show a blank card that reads as "waiting" -
+                    // it is not coming.
+                    //
+                    // Anything else ("unknown", unparseable) means the entity
+                    // is there with nothing useful to say, so no claim is made
+                    // either way and the last good value stands.
+                    if (strcmp(state, "unavailable") == 0) {
+                        _reg->setAvailable(ourId, false, millis());
+                        DBG_REST("%s = unavailable\n", ourId);
+                    } else {
+                        DBG_REST("%s -> %s (not a value)\n", ourId, state);
+                    }
                     ok = true;
                 }
             } else {

@@ -212,15 +212,46 @@ void HaProvider::handle(const char *json, size_t len) {
         return;
     }
 
+    // PAUSED: stop applying inbound values. Issue #60.
+    //
+    // Nothing to stop transmitting for an entity someone else owns, so pause
+    // means the held value is whatever was there at the moment of the pause.
+    // The display freezes as a CONSEQUENCE of the data stopping, not because
+    // anything stopped rendering - which is what keeps the registry and the
+    // screen telling the same story.
+    //
+    // This guard was written once and silently lost: the scripted edit that
+    // was meant to insert it never matched, and the script reported success
+    // anyway. The owner found it in thirty seconds by pausing a light and
+    // toggling it in HA. See CLAUDE.md on confirming a scripted edit changed
+    // the file.
+    if (match->paused) {
+        DBG_HAP("%s paused; inbound value dropped\n", match->desc.id);
+        return;
+    }
+
+    // "unavailable" is not a missing value, it is a STATEMENT. Issue #56.
+    //
+    // Recording it is the whole point of #56: under a change-driven feed this
+    // word is the only evidence of death that exists, because silence means
+    // "unchanged" and carries no information at all.
+    if (strcmp(state, "unavailable") == 0) {
+        _reg->setAvailable(match->desc.id, false, millis());
+        _unavailable++;
+        _handled++;
+        return;
+    }
+
     EntityValue v;
     if (!haCoerceState(match->desc, state, v)) {
-        // unavailable / unknown / unparseable. Deliberately NOT written: an
-        // unavailable sensor is not a reading of zero, and writing one would
-        // make a dead thermostat display 0 degrees with full confidence.
+        // "unknown" and anything unparseable. Distinct from unavailable: the
+        // entity is there, it just has nothing meaningful to say yet, so the
+        // last good value stays and no claim is made either way.
         DBG_HAP("%s -> %s (not a value; left alone)\n", match->desc.id, state);
         return;
     }
 
+    // setValue() marks it available again - a value IS proof of life.
     _reg->setValue(match->desc.id, v, millis());
     _handled++;
 }
