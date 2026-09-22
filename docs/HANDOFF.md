@@ -1,4 +1,4 @@
-# Handoff — 2026-09-21
+# Handoff — 2026-09-22
 
 **If you are the owner returning after time away, read `docs/REVIEW_2026-09-20.md` FIRST.** It is
 the same work written for someone who was not here, with a test plan and pass/fail criteria. This
@@ -25,17 +25,22 @@ found on glass.
 **No new tag.** `C` tracks the roadmap phase and 2.6 is not finished; the build counter `D` moves
 on its own. Boards report `v0.2.5.x`.
 
-**`feat/43-ha-websocket` is the live branch, 10 commits, pushed, NOT merged.** #43's inbound half
-is code-complete and verified on hardware; #56 and #57 rode along because the HA path made both
-concrete. The owner has not signed it off, and that is the gate — not the build.
+**`feat/43-ha-websocket` MERGED to `main` 2026-09-21** (`206de29`, 17 commits, 58 files,
++9,051/-350, `--no-ff`). Signed off on hardware by the owner: T1, T5, T6, T8, T10, T11, T12 and the
+swipe regression all pass. It carried #43, #44's outbound half, #56, #57, #60, the RSSI poll
+backoff and the log-page rework.
+
+**Closed by it:** #43, #60. **#44 stays open** for the MQTT outbound leg - nothing subscribes to
+our own `/set` topics yet because no entity is both writable AND advertised.
 
 Four boards attached: `CYD_S3_3248` (COM10), `WS_P4_5` (COM15), `WS_S3_4B` (COM8),
 `WS_P4_4B` (COM7). **All four now carry the #43 firmware and the real HA dashboard**
 (`-D USE_HA_DASHBOARD`, set on all five screen environments as of 2026-09-21). `WS_P4_7B` has the
 flag but is not plugged into the PC.
 
-**The two S3 boards work. The two P4 boards do not** - they render a card or two and lose WiFi
-within seconds. That is #243, not a regression: see the headline below.
+**As of 2026-09-22 all four boards work.** The two P4s were rendering a card or two and losing
+WiFi within seconds to #243; the rebuilt libraries fixed that and both now boot clean. A soak is
+running - see the #61 section below.
 
 ### Read in this order
 
@@ -64,13 +69,14 @@ RX, because the retry added in 2.12.12 exits at an interrupt gate that was alrea
 keep working, so the driver still reports associated - which is exactly why a dead board showed
 full bars.
 
-**The fix is not reachable from our build.** `CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y` plus
-`CONFIG_CACHE_L2_CACHE_LINE_64B=y` are compiled into arduino-esp32's PREBUILT libraries; our
-`esp32p4/sdkconfig` has neither. Reaching them means rebuilding the P4 framework libs with the IDF
-component manager. Upstream's confirmed result: 4 stalls in 13 minutes became 2 h 52 m with zero.
+**FIXED 2026-09-22 by rebuilding the P4 libraries** with `MEMPOOL_PREFER_SPIRAM` and a 64-byte
+L2 cache line. Those are compiled into arduino-esp32's PREBUILT libraries and unreachable with a
+`-D`, so it took a lib-builder run under WSL. Procedure: `docs/REBUILD_P4_LIBS.md`. Result and
+soak: the #61 section under "What is next".
 
-**#41 is dead as a theory** - NVS writes are not the cause. **#59's C6 update was real and worth
-doing** and was also not the cause.
+**#41 is dead as a theory** - NVS writes are not the cause; closed 2026-09-21. **#59's C6 update
+was real and worth doing** and was also not the cause. The soak now running tests exactly that:
+`WS_P4_4B` has the updated C6, `WS_P4_5` does not, and everything else about them is identical.
 
 **What we keep regardless:** detection (a board now knows it is offline) and the RSSI poll backoff,
 which stops the 10 s UI freezes once a board has stalled. Neither fixes the stall.
@@ -277,33 +283,53 @@ the CHIP VARIANT rather than the target.
 
 ---
 
-0. **DO THE REVIEW, THEN SIGN OFF #43, THEN MERGE.** `docs/REVIEW_2026-09-20.md` has the test
-   plan, T1-T9. The owner's words, 2026-09-21: *"we're opening more than we're closing sometimes"* -
-   so the review closes issues before anything new starts. Do this FIRST.
+0. **READ THE SOAK.** Both P4 boards went on rebuilt libraries at ~02:00 on 2026-09-22 and both
+   booted clean. That is the open question and it needs no hardware to answer - HA's `last_updated`
+   on any entity a board publishes says whether it is alive, for the whole fleet, from a PC.
+   Details and the interpretation table are in the #61 section above.
 
-1. **#61 - the esp_hosted workaround.** This is now the top build task and it is why four of eight
-   boards are unusable. `CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y` +
-   `CONFIG_CACHE_L2_CACHE_LINE_64B=y`, which means rebuilding the P4 framework libs.
+1. **2.7 card types.** The 18 real entities are on glass on four boards, so this is judgeable for
+   the first time rather than theoretical. What it owes, with the evidence now in hand:
 
-   **URGENT since 2026-09-21, and the urgency is new.** The HA dashboard made the boards *worse*,
-   exactly as #243 predicts: before #43 the P4s carried steady MQTT traffic and lasted 5-9 hours;
-   now they do 18 REST fetches plus a websocket at boot - "bursty inbound TCP", the literal trigger
-   in the issue title - and die in **seconds**. `WS_P4_5` showed two correct cards and dropped.
-   `WS_P4_4B` never rendered a full page. We did not break them; we started feeding them the
-   workload that reproduces the defect immediately instead of overnight.
+   - a **`door`** type - both garage sensors report `device_class: garage_door` and render as
+     generic binary sensors
+   - **`LightCard` learning brightness and colour** - `light.office` is a group with
+     `['color_temp','xy']`, `light.dining_room_light` is `['brightness']`
+   - the **corner-icon (domain) vs hero (fixture)** split
+   - consuming HA's live **`attributes.icon`** - the glyphs are in the font now and nothing reads
+     the field
+   - **#62**, scaling the hero font to the card rather than only to the board
+   - **#63** and **#64**, the twobugs found on 2026-09-22
 
-   **Do NOT expect pioarduino 55.03.312 to fix it.** Checked 2026-09-21: Arduino 3.3.12's only
-   hosted change is PR 12879, pinning `esp_hosted` to 2.12.3 "for lower hosted RAM usage". That is
-   OLDER than what we run, predates the retry added in 2.12.12, and sets nothing about SPIRAM. It
-   may change which failure mode appears; it will not remove it.
-2. **2.7 card types.** The 18 real entities are now on glass, so this is judgeable for the first
-   time: a `door` type, `LightCard` learning brightness, the corner-icon/hero split.
-4. **2.8 slots** — and the card-corner artifact below goes with it.
+   `Entity::lastChangeMs` (#57) exists for "open for 40 minutes" and has no caller yet.
 
-**#49 IS NOT FIXED.** The C6 update did not stop the dropouts - see the headline below.
+2. **2.6's remaining half: horizontal swipes, page indicator dots, gesture conflicts.** Nothing
+   technical blocks multi-page - `PageSpec` already carries `id`/`slug`, `HA_PAGE` is already id 2,
+   and 2.3's measurement (~715 B per card) makes ROADMAP §5.2's memory warning far softer than it
+   reads. The owner wants it: he asked for more entities on the bigger screens on 2026-09-21, and
+   the `USE_HA_DASHBOARD` either/or flag is the stand-in until it lands.
+
+   His own framing, worth keeping: **per-entity priority** is what he actually wants, not the
+   domain weighting in `Dashboard_HA.h` - priority is about what you reach for, not what kind of
+   thing it is. And **group cards** ("all garage doors in one 2x1") remove most of the pressure
+   that made priority load-bearing.
+
+3. **#44's MQTT half.** Closing condition is written on the issue: one writable advertised entity,
+   exercised end to end.
+
+4. **2.8 slots** — and the card-corner overhang goes with it, plus #64's "the system header bar
+   needs its own colour, not the scheme's".
+
+**Ideas recorded, not scheduled:** #52 auto-sort, #53 auto-fill, #54 auto-adjust card size,
+#55 fleet peer discovery. The owner's larger vision, stated 2026-09-20: a **web UI that configures
+everything pre-build** and compiles a dashboard exactly as specified, plus a live on-device
+settings page - "a pretty front end to the build sheet". Phase 3's `PageSpec`/`EntityDescriptor`
+data-not-code shape is deliberately aimed at that.
 
 Done 2026-09-19: #50, #51, 2.6's vertical swipes (#17 stays open for the horizontal half).
-Done 2026-09-20 on `feat/43-ha-websocket`: #43 inbound, #56, #57, **#60**, **#44 outbound**.
+Done 2026-09-21: **#43**, **#60** closed; #56, #57 closed; `feat/43-ha-websocket` merged.
+Done 2026-09-22: **#61** - P4 libraries rebuilt, verified and installed; **#41** closed as not the
+cause; **#49** root-caused to esp-hosted-mcu#243.
 
 **#44's outbound leg is written but HAS NEVER RUN.** Nothing can tap the screen remotely, so the
 path from a card tap to `call_service` has only ever been compiled. The transport under it is
