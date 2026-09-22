@@ -97,8 +97,40 @@ version drift as a difference, and you decide whether to accept it.
 
 ## Step 3 — set the two options
 
+### `-t` TAKES THE CHIP VARIANT, NOT THE TARGET. Use `esp32p4_es`.
+
+`configs/builds.json` has two entries under one target:
+
+```json
+{"chip_variant": "esp32p4_es", "target": "esp32p4", ...}
+{                              "target": "esp32p4", ...}
+```
+
+and `build.sh` selects on the **variant**, defaulting it to the target name when absent:
+
 ```bash
-./build.sh -t esp32p4 -b menuconfig qio 80m_200m
+export CHIP_VARIANT=$(... '.chip_variant // "'$target'"' ...)
+for item in "${TARGET[@]}"; do
+    if [ "$item" = "$CHIP_VARIANT" ]; then
+```
+
+So **`-t esp32p4` matches only the entry WITHOUT a `chip_variant`** — the rev3+ build — and skips
+`esp32p4_es` silently. It would complete successfully and produce libraries for silicon we do not
+have.
+
+Verified at the source: `diff configs/defconfig.esp32p4 configs/defconfig.esp32p4_es` shows exactly
+the pre-rev3 set our boards need, matching the shipped `esp32p4_es/sdkconfig`:
+
+```
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_1=y
+CONFIG_ESP32P4_REV_MAX_FULL=199
+```
+
+Building one variant instead of two is also faster.
+
+```bash
+./build.sh -t esp32p4_es -b menuconfig qio 80m_200m
 ```
 
 In menuconfig:
@@ -115,7 +147,7 @@ build.
 ## Step 4 — build
 
 ```bash
-./build.sh -t esp32p4 qio 80m_200m
+./build.sh -t esp32p4_es qio 80m_200m
 ```
 
 One chip rather than all ten, so think **30–90 minutes**, not the "many hours" the README quotes
