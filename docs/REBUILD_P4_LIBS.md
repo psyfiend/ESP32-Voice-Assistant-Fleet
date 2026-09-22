@@ -74,14 +74,26 @@ match, or we are changing far more than two settings.
 cd ~
 git clone https://github.com/espressif/esp32-arduino-lib-builder.git
 cd esp32-arduino-lib-builder
-git checkout release/v3.3      # the branch matching arduino-esp32 3.3.x
 ```
 
-Confirm before continuing — if these do not say 3.3.11 and 5.5.5, stop and find the right tag:
+**LIB-BUILDER'S BRANCHES ARE NAMED AFTER ESP-IDF, NOT ARDUINO.** This is a trap and it very nearly
+went into this document as an instruction. `release/v3.3` sounds like it matches arduino-esp32
+3.3.x — it is in fact from **December 2021** and pins `IDF_BRANCH="release/v3.3"`, i.e. ESP-IDF 3.3,
+the arduino-esp32 1.x era. Building it would produce libraries from a different decade.
+
+We need **ESP-IDF 5.5.5**, so:
 
 ```bash
-grep -rE "AR_VERSION|IDF_BRANCH|IDF_TAG" build.sh tools/config.sh 2>/dev/null | head
+git checkout master      # targets IDF_BRANCH="release/v5.5"
+grep -n 'IDF_BRANCH=' tools/config.sh | head -2
 ```
+
+Must print `IDF_BRANCH="release/v5.5"`. There is also a `idf-release_v5.5` tag if a pinned point is
+preferred to a moving branch.
+
+`master` tracks IDF 5.5's branch rather than the exact 5.5.5 point release, so it may resolve to a
+slightly later patch. **That is what the sdkconfig diff in Step 5 is for** — it will show any
+version drift as a difference, and you decide whether to accept it.
 
 ## Step 3 — set the two options
 
