@@ -1,4 +1,4 @@
-# Handoff — 2026-09-22
+# Handoff — 2026-09-23
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This is where we are, what will bite you,
 and what to do next. Kept lean on purpose: anything that is "why we did X and not Y" now lives in
@@ -34,9 +34,9 @@ Four boards attached: `CYD_S3_3248` (COM10), `WS_P4_5` (COM15), `WS_S3_4B` (COM8
 (`-D USE_HA_DASHBOARD`, set on all five screen environments as of 2026-09-21). `WS_P4_7B` has the
 flag but is not plugged into the PC.
 
-**As of 2026-09-22 all four boards work.** The two P4s were rendering a card or two and losing
-WiFi within seconds to #243; the rebuilt libraries fixed that and both now boot clean. A soak is
-running - see the #61 section below.
+**All four boards work, and the overnight soak confirmed it.** The two P4s were rendering a card
+or two and losing WiFi within seconds to #243; the rebuilt libraries fixed that, and both ran
+through the night of 2026-09-22 without a drop.
 
 ### Read in this order
 
@@ -71,8 +71,8 @@ L2 cache line. Those are compiled into arduino-esp32's PREBUILT libraries and un
 soak: the #61 section under "What is next".
 
 **#41 is dead as a theory** - NVS writes are not the cause; closed 2026-09-21. **#59's C6 update
-was real and worth doing** and was also not the cause. The soak now running tests exactly that:
-`WS_P4_4B` has the updated C6, `WS_P4_5` does not, and everything else about them is identical.
+was real and worth doing** and was also not the cause. The soak settled it: `WS_P4_5`
+survived on the STOCK C6, so the C6 update is not needed for #243.
 
 **What we keep regardless:** detection (a board now knows it is offline) and the RSSI poll backoff,
 which stops the 10 s UI freezes once a board has stalled. Neither fixes the stall.
@@ -199,8 +199,13 @@ The owner, the morning after: *"all boards are online and functional"*.
 
 **It was a one-variable experiment and it answered cleanly.** `WS_P4_5` was running the STOCK C6
 firmware and survived. So **the SPIRAM mempool alone fixed #243** - the C6 update from #59 was not
-needed for it. The C6 update is now being rolled out to the other P4 boards anyway, as hygiene:
-it removes the `Req_GetCoprocessorFwVersion` boot timeout and keeps host and slave on one line.
+needed for it. **Do NOT roll the C6 update out with NINA's updater.** Tried on `WS_P4_5` on 2026-09-23: it hung
+in display init - blank screen, backlight on, task watchdog firing on `esp_timer` - because NINA's
+image is built for NINA's board, which matches our 4B and not the 5 or the 7B. It hung BEFORE
+touching the C6 (the stock `Req_GetCoprocessorFwVersion` timeout was still there afterwards), and
+reflashing our firmware recovered it fully. With #243 fixed, all that remains on stock-C6 boards is
+that one cosmetic boot line; a board-correct C6 image would be needed to remove it, and it is not
+worth building.
 
 ### The rebuild itself (#61)
 
