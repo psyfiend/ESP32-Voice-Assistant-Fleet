@@ -41,6 +41,14 @@ INTENDED = {
 # there would be no pool to prefer anything for.
 MUST_MATCH_BASELINE = (
     "CONFIG_ESP_HOSTED_USE_MEMPOOL",
+    # L2 CACHE SIZE. Setting CACHE_L2_CACHE_LINE_64B in a defconfig makes
+    # Kconfig satisfy its `depends on CACHE_L2_CACHE_128KB || _256KB` by
+    # falling back to the SIZE choice's own default, which is 128KB - silently
+    # halving the L2 cache from the 256KB the shipped libraries use. 64B lines
+    # are perfectly legal at 256KB; nothing forces the reduction. Caught on the
+    # first good build, 2026-09-22. Pin the size explicitly in the defconfig.
+    "CONFIG_CACHE_L2_CACHE_256KB",
+    "CONFIG_CACHE_L2_CACHE_SIZE",
 )
 
 # Settings the two above are expected to drag with them. Changing a cache line

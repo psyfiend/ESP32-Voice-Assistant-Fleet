@@ -138,7 +138,7 @@ CONFIG_ESP32P4_REV_MAX_FULL=199
 Building one variant instead of two is also faster.
 
 ```bash
-./build.sh -t esp32p4_es -b menuconfig qio 80m_200m
+./build.sh -s -t esp32p4_es -b idf-libs qio 80m_200m hosted_fix
 ```
 
 In menuconfig, press `/` and search by symbol name rather than hunting the tree — the menu paths
@@ -176,10 +176,58 @@ Leave it alone.
 libraries with, taken from `configs/builds.json`. Omitting it produces a differently-configured
 build.
 
+### Step 3b — put the settings in a DEFCONFIG. menuconfig does not survive.
+
+**menuconfig saves honestly and the build throws it away.** The all-targets path opens with
+
+```bash
+rm -rf build sdkconfig out
+```
+
+so the very first thing a plain `./build.sh` does is delete the `sdkconfig` menuconfig just wrote.
+Every phase then regenerates it from `-DSDKCONFIG_DEFAULTS=<chain>`. Interactive edits cannot
+survive that; only a defconfig in the chain can.
+
+Create `configs/defconfig.hosted_fix`:
+
+```
+CONFIG_ESP_HOSTED_USE_MEMPOOL=y
+CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y
+CONFIG_CACHE_L2_CACHE_LINE_64B=y
+CONFIG_CACHE_L2_CACHE_256KB=y
+```
+
+**Only the deltas.** Do NOT copy the generated `sdkconfig` here — that would turn all 2,987
+settings into explicit overrides, defeat every defconfig earlier in the chain, and make the
+verification meaningless.
+
+#### That fourth line is not optional, and it is the subtlest trap in this document
+
+`CONFIG_CACHE_L2_CACHE_256KB=y` exists because of what the checker caught on the first good build.
+
+`esp-idf/components/esp_system/port/soc/esp32p4/Kconfig.cache`:
+
+```
+choice CACHE_L2_CACHE_SIZE
+    default CACHE_L2_CACHE_128KB          # IDF's default
+
+config CACHE_L2_CACHE_LINE_64B
+    depends on CACHE_L2_CACHE_128KB || CACHE_L2_CACHE_256KB
+```
+
+The shipped libraries use **256 KB**. Asserting `LINE_64B` in a defconfig makes Kconfig satisfy
+that `depends on` by falling back to the size choice's own default of **128 KB** — **silently
+halving the L2 cache**. Nothing forces it: 64-byte lines are perfectly legal at 256 KB.
+
+Left unnoticed, that would have surfaced weeks later as "everything feels slower since the
+rebuild", on a display-heavy device, with no obvious cause. Pin the size and it does not happen.
+
+`scripts/verify_p4_sdkconfig.py` now refuses any build where it has moved.
+
 ## Step 4 — build
 
 ```bash
-./build.sh -t esp32p4_es qio 80m_200m
+./build.sh -s -t esp32p4_es -b idf-libs qio 80m_200m hosted_fix
 ```
 
 One chip rather than all ten, so think **30–90 minutes**, not the "many hours" the README quotes
