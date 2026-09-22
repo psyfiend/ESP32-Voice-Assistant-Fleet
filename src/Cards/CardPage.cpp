@@ -511,6 +511,8 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
         c->setPlacement(cs.place);
         c->setTempUnit(cs.tempUnit == TempUnit::TEMP_INHERIT ? spec.tempUnit
                                                              : cs.tempUnit);
+        c->setLabelMode(cs.labelMode == CardLabel::LBL_INHERIT ? spec.labelMode
+                                                               : cs.labelMode);
         if (cs.longStaleMs) c->setLongStaleMs(cs.longStaleMs);
         if (cs.paused)      c->setPaused(true);
 

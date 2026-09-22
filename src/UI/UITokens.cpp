@@ -295,6 +295,19 @@ lv_color_t c(uint32_t hex) { return lv_color_hex(hex); }
 
 uint32_t mix(uint32_t a, uint32_t b, uint8_t pct) { return blend(a, b, pct); }
 
+// Rec. 601 luma, 0-255. Good enough to choose between two inks; not a
+// colour-science claim.
+static int32_t luma(uint32_t c) {
+    return (int32_t)((((c >> 16) & 0xFF) * 299 + ((c >> 8) & 0xFF) * 587 +
+                      (c & 0xFF) * 114) / 1000);
+}
+
+uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b) {
+    const int32_t l = luma(bg);
+    const int32_t da = luma(a) - l, db = luma(b) - l;
+    return (da * da >= db * db) ? a : b;
+}
+
 lv_color_t border() {
     if (s_pal.BORDER) return lv_color_hex(s_pal.BORDER);
     // Derived: pull the surface toward white on dark schemes, toward black on

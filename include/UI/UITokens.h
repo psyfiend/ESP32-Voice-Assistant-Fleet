@@ -209,6 +209,14 @@ lv_color_t border();                     // BORDER, or derived from SURFACE
 // the ground colour costs nothing.
 uint32_t mix(uint32_t a, uint32_t b, uint8_t pct);
 
+// Whichever of `a` and `b` stands further from `bg` in perceived brightness.
+//
+// For colour the palette does not own - a light's own rgb_color, drawn in its
+// card's disc - where no scheme token can be picked in advance. Passing two
+// scheme tokens (GROUND and TEXT) keeps the answer inside the palette, so the
+// "no colour literals in UI code" rule holds.
+uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b);
+
 // Silences the `lv_part_t | lv_state_t` deprecation warning that would
 // otherwise be reproduced in every card type. Issue #13 asked for this.
 inline lv_style_selector_t part(lv_part_t p, lv_state_t s = LV_STATE_DEFAULT) {

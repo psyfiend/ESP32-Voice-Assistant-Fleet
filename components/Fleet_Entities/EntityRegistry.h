@@ -113,6 +113,17 @@ public:
     // that repeats "unavailable" does not repaint the screen.
     bool setAvailable(const char *id, bool available, uint32_t nowMs);
 
+    // Record the source's attributes - live icon, brightness, colour. 2.7.
+    //
+    // Separate from setValue() because the two change independently: a light
+    // fading down sends "on", "on", "on" with a falling brightness, and none of
+    // those is a change of VALUE. Dirties only when an attribute actually
+    // changed, so a sensor whose attributes never move costs no repaints.
+    //
+    // Does not move lastUpdateMs or touch the command bookkeeping - the value
+    // that arrives with the attributes does that, through setValue().
+    bool setAttrs(const char *id, const EntityAttrs &a);
+
     // The user's pause. Issue #60. Persisted to NVS so a reboot does not undo
     // it. Returns false if the id is unknown.
     bool setPaused(const char *id, bool paused, uint32_t nowMs);

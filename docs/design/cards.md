@@ -550,3 +550,102 @@ half, top edge" for every gesture on the display.
 
 If cards ever stop bubbling, gesture navigation silently returns to that behaviour rather than
 failing. The two belong in the same thought.
+
+---
+
+## 13. Milestone 2.7 decisions — 2026-09-22
+
+Agreed with the owner before any of 2.7 was built. Where this section and an earlier one disagree,
+this one wins; the earlier text is kept as the record of how the design got here.
+
+### Where a card's icons come from
+
+**Measured first**, against the owner's instance (read-only websocket query, 2026-09-22):
+
+| Entity | `attributes.icon` | Why |
+|---|---|---|
+| garage doors | *absent* | the owner removed his static override that morning |
+| kitchen / office occupancy | changes with state | they are **template** entities whose template sets it |
+| the lights, the TV-room switch | fixed | the owner's own registry override |
+| temperatures, illuminance | *absent* | nobody set one |
+
+So **HA core does not compute a state-dependent icon into the state object.** The frontend picks
+its defaults client-side; `attributes.icon` only exists when a user or an integration set one.
+`ha-websocket.md` §5 generalised from the two template sensors and was wrong about this. Our own
+state pairs therefore stay the main source for binary sensors, not a fallback nobody reaches.
+
+**Two icons per card, answering different questions** (§11 recorded the split; this settles it):
+
+| | Question it answers | Source, first match wins |
+|---|---|---|
+| **Corner** | what KIND of card this is | build-sheet override -> **our table**, keyed on `device_class`, then domain. HA has no per-entity "type" icon, so this is always ours |
+| **Hero** | this particular THING, in its current state | build-sheet on/off pair -> build-sheet icon -> HA's live `attributes.icon` -> our `device_class` state pair -> the corner icon |
+
+Until the build sheet exists, `EntityDescriptor` stands in for it: `icon` is the user's override,
+`iconOn`/`iconOff` are the owner's custom state pair. The descriptors that copied HA's icons have
+been emptied, so HA's live icon wins as agreed.
+
+**A static icon set in HA freezes the hero.** It outranks our open/closed pair, exactly as it does
+in HA's own frontend. Accepted deliberately, for consistency; the build-sheet pair is the escape
+hatch.
+
+**Any override glyph must be in the generated font.** `scripts/gen_icon_font.py`'s `GLYPHS` list is
+maintained by hand; `scripts/scan_ha_icons.py` reports what HA uses that we do not ship. A name the
+font lacks falls through to the next source rather than drawing tofu. At 3.2 the generator should
+read the build sheet's overrides so nobody maintains the list.
+
+### Binary sensors: one card type, driven by a `device_class` table
+
+Not a class per sub-type. A row per class carries the corner glyph, the on/off hero pair and the
+on/off words; adding `valve` or `moisture` is a row, not a class. HA's own "Show as" setting is a
+`device_class` override (the garage doors are `opening` underneath, shown as `garage_door`), so it
+feeds this table for free. `door` survives only as a word a build sheet may use to mean "show as
+door".
+
+- **Label: name | state word | none**, per card, resolving fleet -> page -> card like `TempUnit`.
+  Default **name**, because the name is what tells two doors in one area apart. The state word is
+  the table's ("Open"/"Closed", "Detected"/"Clear"), never a raw "on"/"off". This relaxes the
+  NO STATE WORDS rule in `StateCard.h` into a user choice that defaults to off.
+- **Colour: the ordinary active colour** for an open door and a detected presence alike. The icon
+  carries the difference.
+
+### Lights
+
+- **The disc takes the light's own colour** when it reports one. HA sends `rgb_color` for every
+  colour mode, colour-temperature included (`light.office` reads `[255,167,88]` at 2710 K), so one
+  field covers both. The whole surface is NOT tinted: legibility on a saturated colour is the risk.
+- **Brightness fills the card from the bottom up**, after HA's own tile. Off is empty, 100% is the
+  fully-filled card we have today, a light with no brightness fills fully when on. The disc still
+  says on/off; the fill says how much.
+- **Tap toggles. No slider on the card.** Cards are smaller and more numerous than was assumed, and
+  a slider is the gesture conflict #17 warns about.
+- **A long-press popup** mirroring HA's light dialog (brightness, colour, colour temperature) is
+  the control surface. It is **not 2.7**: groundwork is milestone 2.10, after 2.6's horizontal
+  swipes, with the full per-type content at 4.4. Long press stays PAUSE until then, and pause moves
+  into the popup when it arrives.
+
+### Corner icon geometry
+
+- It must be **glued to the corner**: the same distance from the card's left edge as from whatever
+  bounds its top — the band in bar mode, the top border in tag and none. The owner's report that it
+  sits too low in No-header mode traces, in the code, to `Card::restyle()`: it reserved a header's
+  height of top padding in every mode except tag, undoing `build()`, which reserved it only in bar.
+  Fixed on this reading; confirmation is on glass.
+- It **scales with the card**, not only with the board. See the type-scale note below.
+- It now appears on **every** card. Until 2.7 only `ValueCard` drew one. The aggregate "2/3" badge
+  that occupied `StateCard`'s top-left moves to the status row.
+
+### Type sizes by card size
+
+The "~96 KB per face" figure that has shaped every font decision was ONE large full-alphabet
+Montserrat. Measured from the P4 builds' object files (an upper bound on flash):
+
+| Face | Size per face |
+|---|---|
+| generated VALUE digits subset, 50-68 px | 6-10 KB |
+| full MDI icon subset, 18-52 px | 10-73 KB |
+| Montserrat 14-24, full ASCII | 14-29 KB |
+
+So only the roles that make a card cramped step with the cell: the **hero value**, the **hero
+icon** and the **corner icon**. Name, unit, tag and status text stay one size per board. Chosen by
+the cell's size in millimetres, so a card looks the same across boards. Absorbs #62.

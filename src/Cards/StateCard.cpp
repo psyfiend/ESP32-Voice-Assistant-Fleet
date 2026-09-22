@@ -60,13 +60,28 @@ void StateCard::buildBody(lv_obj_t *body) {
     lv_obj_set_width (_statusRow, lv_pct(100));
     lv_obj_set_height(_statusRow, Card::statusBandHeight());
 
-    // The not-uniform badge. Top-LEFT, out of the flow, because HDR_NONE parks
-    // its floating STALE badge in the top-right corner and two things fighting
-    // over one corner is a collision you only find on a board.
-    _mixed = lv_label_create(body);
-    lv_obj_add_flag(_mixed, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    lv_obj_align   (_mixed, LV_ALIGN_TOP_LEFT, 0, 0);
+    // The not-uniform badge, IN THE STATUS ROW. It used to sit out of the flow
+    // at the top-left, which was free space until 2.7 gave every card a corner
+    // icon there. The top-right is the floating STALE badge's in HDR_NONE, and
+    // a mixed count is status - so it moved down to where status lives.
+    _mixed = lv_label_create(_statusRow);
+    lv_obj_align   (_mixed, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_flag(_mixed, LV_OBJ_FLAG_HIDDEN);
+
+    // The DOMAIN icon, top-left, out of the flow - the same object and the
+    // same placement ValueCard uses. cards.md section 11: the corner says what
+    // kind of card this is, the disc says which thing and in what state.
+    _corner = makeCornerIcon(body);
+}
+
+bool StateCard::onFill(int32_t fromBottom, int pct) const {
+    if (pct >= 100) return true;
+    if (pct <= 0)   return false;
+    // The surface's height, from the page-supplied cell. A tag hangs outside
+    // the card, so it is not part of the surface.
+    int32_t h = cellPx();
+    if (headerStyle() == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+    return fromBottom * 100 < h * pct;
 }
 
 uint8_t StateCard::activeCount() const {
@@ -155,67 +170,163 @@ void StateCard::render() {
     // the dashboard does.
     const uint32_t chrome = stateColor();   // stale/refused override, or 0
     const bool fill = (s_fill == StateCardFill::FILL_SURFACE);
+    const bool compact = (variant() == CardVariant::VAR_COMPACT);
 
-    if (isOn && !chrome && fill) {
-        // The whole surface. cards.md section 4 as written.
-        lv_obj_set_style_bg_color  (surface(), UI::c(tone(p.ST_ACTIVE)), 0);
+    // --- What the line under the hero says --------------------------------
+    // Decided before any colour, because whether a name exists changes where
+    // the disc sits, and the fill below needs to know that.
+    const CardLabel lbl = cardResolveLabel(labelMode());
+    const bool showName = (lbl != CardLabel::LBL_NONE);
+
+    // --- Brightness, from the source's attributes. cards.md section 13 ----
+    //
+    // Only a single-entity card: an aggregate of several lights has no one
+    // brightness to show, and averaging them would draw a level no light is
+    // actually at. -1 means the entity does not report one - an on/off light,
+    // a door - and such a card fills completely when on, exactly as before.
+    const EntityAttrs &a = e->attrs;
+    const bool single = (total == 1);
+    int pct = 100;
+    if (single && isOn && a.brightness >= 0) {
+        pct = (a.brightness * 100 + 127) / 255;
+        if (pct < 1) pct = 1;   // on is never drawn as empty
+    }
+
+    // Where each element's centre sits, measured up from the surface's bottom
+    // edge, so each can pick the text colour for what is actually behind it.
+    // From the tokens rather than from layout: see applyDiagonal() on why a
+    // card does not call lv_obj_update_layout() per repaint.
+    const UIMetrics &m = UI::met();
+    const int32_t pad    = UI::sc(m.PAD);
+    const int32_t status = compact ? 0 : Card::statusBandHeight();
+    const int32_t nameH  = showName ? lv_font_get_line_height(t.NAME) : 0;
+    int32_t surfH = cellPx();
+    if (headerStyle() == CardHeaderStyle::HDR_TAG) surfH -= Card::headerHeight();
+    const int32_t bodyTop = pad + (headerStyle() == CardHeaderStyle::HDR_BAR
+                                   ? Card::headerHeight() : 0);
+    const int32_t midBottom = pad + status + nameH + Card::midGap();
+    const int32_t yName   = pad + status + nameH / 2;
+    const int32_t yDisc   = (midBottom + (surfH - bodyTop)) / 2;
+    const int32_t yCorner = surfH - bodyTop - lv_font_get_line_height(cornerFont()) / 2;
+    const int32_t yMixed  = pad + status / 2;
+
+    // Text on the fill takes the surface colour; text off it takes its normal
+    // one. On a fully-filled card that reduces to what this code always did.
+    const bool filled = isOn && !chrome && fill;
+    auto ink = [&](int32_t fromBottom, uint32_t normal) -> uint32_t {
+        return (filled && onFill(fromBottom, pct)) ? p.SURFACE : normal;
+    };
+
+    // --- The surface ------------------------------------------------------
+    if (filled && pct < 100) {
+        // A HARD-EDGED GRADIENT ON THE SURFACE ITSELF, not a child object.
+        //
+        // A child "fill" rectangle would have to be clipped to the card's
+        // rounded corners, which means clip_corner, which means an
+        // intermediate LAYER per card - the allocation that froze WS_P4_5
+        // (LESSONS.md, "LVGL allocates a LAYER"). The surface already draws
+        // inside its own radius, so painting the fill as its background does
+        // the rounding for free.
+        //
+        // Both stops at the same position gives a hard edge: LVGL's software
+        // gradient returns the first colour at or above the lower stop and
+        // the last at or below the upper, and with the two equal no row falls
+        // between them (lv_draw_sw_grad.c, checked for 9.5 - no division by
+        // the zero-width span either). Top is the empty part, bottom the fill.
+        const uint8_t stop = (uint8_t)(255 - (pct * 255) / 100);
+        lv_obj_set_style_bg_color    (surface(), UI::c(tone(p.SURFACE)), 0);
+        lv_obj_set_style_bg_grad_color(surface(), UI::c(tone(p.ST_ACTIVE)), 0);
+        lv_obj_set_style_bg_grad_dir (surface(), LV_GRAD_DIR_VER, 0);
+        lv_obj_set_style_bg_main_stop(surface(), stop, 0);
+        lv_obj_set_style_bg_grad_stop(surface(), stop, 0);
+    } else {
+        lv_obj_set_style_bg_grad_dir (surface(), LV_GRAD_DIR_NONE, 0);
+        lv_obj_set_style_bg_color    (surface(),
+            UI::c(tone(filled ? p.ST_ACTIVE : p.SURFACE)), 0);
+    }
+
+    if (filled) {
+        // The whole surface, or as much of it as the brightness says.
+        const uint32_t discInk = ink(yDisc, p.ST_ACTIVE);
         lv_obj_set_style_bg_opa    (_disc, LV_OPA_20, 0);
-        lv_obj_set_style_bg_color  (_disc, UI::c(tone(p.SURFACE)), 0);
-        lv_obj_set_style_text_color(_icon, UI::c(tone(p.SURFACE)), 0);
-        lv_obj_set_style_text_color(_name, UI::c(tone(p.SURFACE)), 0);
+        lv_obj_set_style_bg_color  (_disc, UI::c(tone(onFill(yDisc, pct) ? p.SURFACE
+                                                                         : p.ST_ACTIVE)), 0);
+        lv_obj_set_style_text_color(_icon, UI::c(tone(discInk)), 0);
+        lv_obj_set_style_text_color(_name, UI::c(tone(ink(yName, p.TEXT))), 0);
     } else if (isOn && !chrome) {
         // Only the icon lights, in the state colour, with the disc tinted
         // behind it. The card keeps its own surface, which reads as quieter
         // across a page where several things are on at once.
-        lv_obj_set_style_bg_color  (surface(), UI::c(tone(p.SURFACE)), 0);
         lv_obj_set_style_bg_opa    (_disc, LV_OPA_30, 0);
         lv_obj_set_style_bg_color  (_disc, UI::c(tone(p.ST_ACTIVE)), 0);
         lv_obj_set_style_text_color(_icon, UI::c(tone(p.ST_ACTIVE)), 0);
         lv_obj_set_style_text_color(_name, UI::c(tone(p.ST_ACTIVE)), 0);
     } else {
-        lv_obj_set_style_bg_color  (surface(), UI::c(tone(p.SURFACE)), 0);
         lv_obj_set_style_bg_opa    (_disc, LV_OPA_COVER, 0);
         lv_obj_set_style_bg_color  (_disc, UI::c(tone(p.SURFACE_ALT)), 0);
         lv_obj_set_style_text_color(_icon, UI::c(tone(chrome ? chrome : p.ST_IDLE)), 0);
         lv_obj_set_style_text_color(_name, UI::c(tone(p.TEXT)), 0);
     }
 
-    // --- Icon and name ----------------------------------------------------
-    lv_label_set_text          (_icon, cardIconForState(e->desc, isOn));
-    lv_obj_set_style_text_font (_icon, t.ICON, 0);
-
-    // COMPACT drops the NAME, not the icon. cards.md section 4: "state is the
-    // icon and its colour" - so the glyph is the part that cannot go, and a
-    // very small actor card is a disc and nothing else. The disc also recentres
-    // once there is no name below it to balance against.
-    const bool compact = (variant() == CardVariant::VAR_COMPACT);
-    if (compact) {
-        // COMPACT DROPS THE SECONDARY ROW AND KEEPS THE NAME.
-        //
-        // It used to drop both, on cards.md section 4's reading that state IS
-        // the icon and its colour - true, but it left a state card compact
-        // with no name while a value card compact still had one, so the two
-        // types disagreed about what "less" means. The owner's call, 2026-09-17:
-        // compact drops the secondary row, full stop, and showing either the
-        // name or the row becomes its own setting rather than a side effect of
-        // how much space is left.
-        lv_obj_clear_flag(_name,      LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag  (_statusRow, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_clear_flag(_statusRow, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
+    // --- The light's own colour, in the disc. cards.md section 13 ---------
+    //
+    // The DISC, not the surface: a saturated colour across the whole card is
+    // where legibility goes. HA sends rgb_color for every colour mode,
+    // colour-temperature included, so this one field covers both. The glyph
+    // takes whichever of the scheme's ground and text colours stands further
+    // from it, so a warm white and a deep blue both stay readable without a
+    // colour literal in UI code.
+    //
+    // When the card is too tight to draw a disc at all (discFits, above), the
+    // GLYPH takes the colour instead - the owner's "or the icon itself?".
+    if (single && isOn && !chrome && a.hasRgb) {
+        if (discFits) {
+            const uint32_t ink2 = UI::contrastOf(a.rgb, p.GROUND, p.TEXT);
+            lv_obj_set_style_bg_opa    (_disc, LV_OPA_COVER, 0);
+            lv_obj_set_style_bg_color  (_disc, UI::c(tone(a.rgb)), 0);
+            lv_obj_set_style_text_color(_icon, UI::c(tone(ink2)), 0);
+        } else {
+            lv_obj_set_style_text_color(_icon, UI::c(tone(a.rgb)), 0);
+        }
     }
 
-    lv_label_set_text          (_name, label());
-    lv_obj_set_style_text_font (_name, t.NAME, 0);
+    // --- Icons ------------------------------------------------------------
+    lv_label_set_text          (_icon, cardHeroIcon(*e, isOn));
+    lv_obj_set_style_text_font (_icon, t.ICON, 0);
+
+    // The corner takes the fill's surface colour where the fill reaches it,
+    // and otherwise the same tint a value card's corner wears, so a row of
+    // mixed cards reads as one family.
+    renderCornerIcon(_corner, cardCornerIcon(*e, true),
+                     ink(yCorner, chrome ? chrome : cardTintFor(e->desc)));
+
+    // COMPACT DROPS THE SECONDARY ROW AND KEEPS THE NAME.
+    //
+    // It used to drop both, on cards.md section 4's reading that state IS the
+    // icon and its colour - true, but it left a state card compact with no
+    // name while a value card compact still had one, so the two types
+    // disagreed about what "less" means. The owner's call, 2026-09-17: compact
+    // drops the secondary row, full stop, and showing the name became its own
+    // setting - which, since 2.7, it is: CardLabel.
+    if (compact) lv_obj_add_flag  (_statusRow, LV_OBJ_FLAG_HIDDEN);
+    else         lv_obj_clear_flag(_statusRow, LV_OBJ_FLAG_HIDDEN);
+
+    if (showName) {
+        lv_label_set_text(_name, lbl == CardLabel::LBL_STATE
+                                 ? cardStateWord(e->desc, isOn) : label());
+        lv_obj_set_style_text_font(_name, t.NAME, 0);
+        lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(_name, LV_OBJ_FLAG_HIDDEN);
+    }
 
     // --- Mixed: its own indicator, not a guess ----------------------------
-    if (isMixed) {
+    if (isMixed && !compact) {
         char buf[12];
         snprintf(buf, sizeof(buf), "%u/%u", (unsigned)active, (unsigned)total);
         lv_label_set_text          (_mixed, buf);
         lv_obj_set_style_text_font (_mixed, t.TAG, 0);
-        lv_obj_set_style_text_color(_mixed, UI::c(tone(fill && isOn ? p.SURFACE : p.TEXT_DIM)), 0);
+        lv_obj_set_style_text_color(_mixed, UI::c(tone(ink(yMixed, p.TEXT_DIM))), 0);
         lv_obj_clear_flag          (_mixed, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag            (_mixed, LV_OBJ_FLAG_HIDDEN);

@@ -15,10 +15,12 @@
 //
 // Three rules from cards.md that are easy to lose and expensive to re-derive:
 //
-//   1. NO STATE WORDS. No "On", no "Off", no "Open", no "Closed", anywhere.
-//      The icon and its colour are the state. This is not a style preference;
-//      it is what makes a wall of these readable at a glance from across a
-//      room, which is the whole job.
+//   1. NO STATE WORDS BY DEFAULT. The icon and its colour are the state; that
+//      is what makes a wall of these readable at a glance from across a room.
+//      Since 2.7 a user may ASK for the word in place of the name (CardLabel,
+//      cards.md section 13) - it is a choice that defaults to off, not a rule
+//      that was dropped. The word is the device_class table's "Open" or
+//      "Detected", never a raw "on" off the wire.
 //   2. The colour is across the WHOLE SURFACE, not in a corner. The rejected
 //      accent rail survives only where it IS the state indicator.
 //   3. Mixed state gets its OWN indicator. A group of lights that disagrees
@@ -93,10 +95,17 @@ private:
 
     static StateCardFill s_fill;
 
+    // Is a point `fromBottom` px above the surface's bottom edge covered by a
+    // brightness fill of `pct` percent? Decides text colour element by
+    // element, because on a half-filled card the name sits on the fill and
+    // the corner icon does not. See render().
+    bool onFill(int32_t fromBottom, int pct) const;
+
     lv_obj_t *_mid       = nullptr;   // grows; centres the disc
     lv_obj_t *_statusRow = nullptr;   // reserved, matches ValueCard's status line
+    lv_obj_t *_corner = nullptr;  // the DOMAIN icon; see Card::renderCornerIcon()
     lv_obj_t *_disc  = nullptr;
-    lv_obj_t *_icon  = nullptr;
+    lv_obj_t *_icon  = nullptr;   // the HERO: this thing, in its current state
     lv_obj_t *_name  = nullptr;
     lv_obj_t *_mixed = nullptr;   // the not-uniform badge. Hidden when uniform
 };

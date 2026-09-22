@@ -15,37 +15,45 @@
 // scripts/gen_icon_font.py into include/UI/UIIcons.h - 84 glyphs at two sizes
 // per board, derived from real pixel density like everything else.
 //
-// Resolution order, and the first step is the one cards.md section 5 actually
-// asked for:
+// TWO ICONS PER CARD, answering different questions - cards.md section 13,
+// which also records the measurement behind the order:
 //
-//   1. the entity's OWN icon      "mdi:thermometer" straight off the descriptor
-//   2. its device_class           temperature, occupancy, battery...
-//   3. its domain                 a light, a switch, a button
+//   CORNER   what KIND of card this is. Override, then OUR table (device_class,
+//            then domain). HA has no per-entity "type" icon, so this is ours.
+//   HERO     this THING in its current state. The user's on/off pair, the
+//            user's icon, HA's live attributes.icon, our device_class pair,
+//            the domain's pair, then whatever the corner says.
 //
-// Step 1 was impossible until the subset existed, so every descriptor's icon
-// field was being ignored. An unknown name falls through rather than drawing
-// an approximation, because a confidently wrong icon is worse than a generic
-// one - the same reasoning behind everything else in this project that
-// refuses to guess.
+// An unknown name falls through rather than drawing an approximation, because
+// a confidently wrong icon is worse than a generic one - the same reasoning
+// behind everything else in this project that refuses to guess.
 //
 // The TINTS are unrelated and were never placeholders. UIPalette's sensor
 // tints are design tokens with a job - cards.md section 0: a wall of sensor
 // cards should be scannable by colour before you read a single number.
 // ---------------------------------------------------------------------------
 
-// The glyph for this entity. Never null.
-const char *cardIconFor(const EntityDescriptor &d);
+// The corner glyph. Never null. `cardHasHero` is false for a value card, whose
+// corner is its only icon - see the .cpp for why that changes the answer.
+const char *cardCornerIcon(const Entity &e, bool cardHasHero);
+
+// The hero glyph for the entity in state `on`. Never null.
+const char *cardHeroIcon(const Entity &e, bool on);
+
+// The word for a state, from the binary-sensor table: "Open", "Detected",
+// "Locked". "On"/"Off" for anything the table does not name. ASCII only.
+const char *cardStateWord(const EntityDescriptor &d, bool on);
+
+// The line under a state card's hero - fleet default, and resolution of a
+// card's own setting against it. See CardLabel in CardTypes.h.
+void      cardSetLabelMode(CardLabel m);
+CardLabel cardLabelMode();
+CardLabel cardResolveLabel(CardLabel want);
 
 // The icon's tint, as a 0xRRGGBB from the ACTIVE palette. Call it at render
 // time and never cache the result - the active palette is a mutable copy that
 // UI::setScheme() edits live.
 uint32_t cardTintFor(const EntityDescriptor &d);
-
-// The glyph for an entity in a given state, where the two read differently
-// enough to be worth it - motion present or absent, a door open or shut. Falls
-// back to cardIconFor() when a state pair would be two near-identical glyphs,
-// because the card already carries state in its colour.
-const char *cardIconForState(const EntityDescriptor &d, bool on);
 
 // The battery glyph for a percentage, in six steps.
 const char *cardBatteryGlyph(int pct);

@@ -88,6 +88,11 @@ public:
     Card &setTempUnit(TempUnit u) { _tempUnit = u; return *this; }
     TempUnit tempUnit() const { return _tempUnit; }
 
+    // What a state card's line under the hero says. LBL_INHERIT defers to
+    // the fleet setting - see cardLabelMode() in CardIcons.h.
+    Card &setLabelMode(CardLabel m) { _labelMode = m; return *this; }
+    CardLabel labelMode() const { return _labelMode; }
+
     // The resolved variant - never VAR_AUTO. Valid after build().
     CardVariant variant() const { return _resolved; }
 
@@ -316,6 +321,23 @@ protected:
     int32_t cellPx() const;              // the page-supplied cell height
     int32_t midHeight() const;
 
+    // THE CORNER ICON, one implementation for every layout. Milestone 2.7.
+    //
+    // It used to exist only on ValueCard, positioned by code of its own; a
+    // state card had none. cards.md section 11 wants one on every card, and
+    // two copies of "where exactly is the corner" is how the two layouts
+    // would drift apart - the same lesson HaValue.h records for parsing.
+    //
+    // makeCornerIcon() at build time, renderCornerIcon() on every render.
+    // Out of the flow, so it costs the vertical stack nothing.
+    lv_obj_t *makeCornerIcon(lv_obj_t *body);
+    void renderCornerIcon(lv_obj_t *icon, const char *glyph, uint32_t hex) const;
+
+    // Which face the corner icon draws in. One place, so that scaling it with
+    // the card rather than only with the board is a change here and nowhere
+    // else.
+    const lv_font_t *cornerFont() const;
+
 private:
     void buildHeader();
     void applyState();                 // repaint chrome for _state
@@ -385,6 +407,7 @@ private:
     uint32_t        _longStaleMs = 0;     // 0 = ask cardLongStaleMs()
     int32_t         _cellPx      = 0;     // set by CardPage::commit()
     TempUnit        _tempUnit    = TempUnit::TEMP_INHERIT;
+    CardLabel       _labelMode   = CardLabel::LBL_INHERIT;
     // NO _paused HERE. Issue #60 moved it onto Entity, because pausing is a
     // property of the thing and not of the view - the same reasoning that put
     // cmdFailed on the entity. Two cards on one switch used to be able to

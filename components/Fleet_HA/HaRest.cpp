@@ -143,6 +143,9 @@ bool HaRest::fetchOne(const char *entityRef, const char *ourId) {
             static JsonDocument filter;
             if (filter.isNull() || filter.size() == 0) {
                 filter["state"] = true;
+                // FIRST, because to<JsonObject>() CLEARS an existing object in
+                // ArduinoJson 7 - after the unit line it would silently drop it.
+                haAttrFilter(filter["attributes"].to<JsonObject>());
                 filter["attributes"]["unit_of_measurement"] = true;
             }
 
@@ -151,6 +154,12 @@ bool HaRest::fetchOne(const char *entityRef, const char *ourId) {
                                  DeserializationOption::Filter(filter))) {
                 const char *state = doc["state"] | "";
                 const Entity *e = _reg->find(ourId);
+
+                // Same attributes the live feed reads, by the same helper.
+                EntityAttrs attrs;
+                haReadAttrs(doc["attributes"], attrs);
+                _reg->setAttrs(ourId, attrs);
+
                 EntityValue v;
                 if (e && haCoerceState(e->desc, state, v)) {
                     _reg->setValue(ourId, v, millis());

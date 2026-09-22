@@ -83,6 +83,9 @@ struct CardSpec {
     CardPlacement place   = {};
     TempUnit      tempUnit = TempUnit::TEMP_INHERIT;
 
+    // What the line under a state card's hero says. See CardLabel.
+    CardLabel     labelMode = CardLabel::LBL_INHERIT;
+
     // 0 = use cardLongStaleMs() for this entity's kind.
     uint32_t longStaleMs = 0;
 
@@ -138,6 +141,7 @@ struct PageSpec {
 
     uint8_t  subdivision = PAGE_SUBDIVISION_DEFAULT;
     TempUnit tempUnit    = TempUnit::TEMP_INHERIT;
+    CardLabel labelMode  = CardLabel::LBL_INHERIT;
 };
 
 // Author-facing span constants, for the default subdivision of 2.

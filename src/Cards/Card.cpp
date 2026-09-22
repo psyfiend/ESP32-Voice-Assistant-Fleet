@@ -1,5 +1,6 @@
 #include "Cards/Card.h"
 #include "Cards/CardDefaults.h"
+#include "Cards/CardIcons.h"
 #include "UI/UITokens.h"
 #include <Arduino.h>
 #include <string.h>
@@ -407,7 +408,13 @@ void Card::restyle() {
     lv_obj_set_style_shadow_opa   (_surface, m.SHADOW ? LV_OPA_40 : LV_OPA_TRANSP, 0);
 
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
-    if (_hdrStyle != CardHeaderStyle::HDR_TAG) {
+    // BAR ONLY. This said "not TAG", which also reserved a header's height in
+    // HDR_NONE - a mode whose whole point is that it reserves nothing, and
+    // which build() above and fullCellNeedPx() both already treated that way.
+    // restyle() runs at the end of build(), so it silently won: every No-hdr
+    // card carried an invisible empty band, and the corner icon sat a band's
+    // height below the corner. The owner's report, 2026-09-22.
+    if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
         lv_obj_set_style_pad_top  (_body, Card::headerHeight() + UI::sc(m.PAD), 0);
     }
 
@@ -516,6 +523,43 @@ int32_t Card::midHeight() const {
     // And never let a hero touch the edges of its band.
     h -= UI::sc(4);
     return h > 0 ? h : 0;
+}
+
+lv_obj_t *Card::makeCornerIcon(lv_obj_t *body) {
+    lv_obj_t *o = lv_label_create(body);
+    lv_obj_add_flag(o, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_clear_flag(o, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_align(o, LV_ALIGN_TOP_LEFT, 0, 0);
+    return o;
+}
+
+const lv_font_t *Card::cornerFont() const {
+    return UI::type().ICON_SM;
+}
+
+void Card::renderCornerIcon(lv_obj_t *icon, const char *glyph, uint32_t hex) const {
+    if (!icon) return;
+    const lv_font_t *f = cornerFont();
+    lv_label_set_text          (icon, glyph);
+    lv_obj_set_style_text_font (icon, f, 0);
+
+    // GLUED TO THE CORNER: the same distance from the card's left edge as from
+    // whatever bounds its top. The body's padding supplies that distance in
+    // every mode; the label is flush to the body's top-left.
+    //
+    // In No-header mode one more thing is needed. A label's box is a LINE box
+    // with leading above the ink, so a flush box puts the visible glyph lower
+    // than it is far from the side. Measured from the font - see
+    // cardGlyphTopBearing() - and applied in HDR_NONE only, which is the
+    // owner's call: in bar and tag the icon already sits where he wants it.
+    //
+    // The other half of the owner's "too low in No-header" report was not
+    // here at all: restyle() was reserving a header's worth of top padding in
+    // HDR_NONE too. See restyle().
+    const int32_t lift = (_hdrStyle == CardHeaderStyle::HDR_NONE)
+                       ? cardGlyphTopBearing(f, glyph) : 0;
+    lv_obj_align               (icon, LV_ALIGN_TOP_LEFT, 0, -lift);
+    lv_obj_set_style_text_color(icon, UI::c(tone(hex)), 0);
 }
 
 // The area's colour, or the accent when it has none.

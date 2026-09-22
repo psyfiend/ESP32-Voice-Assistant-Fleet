@@ -47,18 +47,10 @@ void ValueCard::buildBody(lv_obj_t *body) {
     // It does not need a row. It sits top-left and the value is centred, so
     // they never contend for the same space - reserving a row for it was
     // paying for a collision that cannot happen.
-    _icon = lv_label_create(body);
-    lv_obj_add_flag(_icon, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    // FLUSH to the body's top-left, and left alone.
     //
-    // A previous version nudged this up by the label's top leading, reasoning
-    // that a glyph does not fill its line box so a flush label reads as further
-    // from the top than from the side. That is true, but the nudge was applied
-    // in every mode - and it traded a correct arrangement in bar and tag for a
-    // marginally better one in no-header. The body's padding already puts it
-    // the same distance from both edges; whatever leading the font carries is
-    // the font's, and compensating for it here is guesswork dressed as layout.
-    lv_obj_align   (_icon, LV_ALIGN_TOP_LEFT, 0, 0);
+    // Placement is the base class's, shared with StateCard - Card::
+    // renderCornerIcon() explains the corner rule.
+    _icon = makeCornerIcon(body);
 
     // The middle takes whatever is left and centres the HERO in it - the value
     // only, with the name as a sibling BELOW it.
@@ -135,25 +127,8 @@ void ValueCard::render() {
     const bool   compact = (variant() == CardVariant::VAR_COMPACT);
 
     // --- Icon, tinted by what this measures -------------------------------
-    const char *cornerGlyph = cardIconFor(e->desc);
-    lv_label_set_text          (_icon, cornerGlyph);
-    lv_obj_set_style_text_font (_icon, t.ICON_SM, 0);
-
-    // PULL THE LABEL UP BY ITS OWN LEADING, so what lands in the corner is the
-    // GLYPH rather than the glyph's line box. Measured from the font, not
-    // guessed - see cardGlyphTopBearing(). Re-applied on every render because
-    // the face changes with the scheme's type scale.
-    // HDR_NONE ONLY, which is the owner's call and the right one.
-    //
-    // In bar and tag mode the icon already sits the correct distance below the
-    // top of the space the card's contents live in - the bottom of the band in
-    // bar, the top border in tag - and he is happy with both. Only in No-hdr,
-    // where nothing sits above it, does the label's own leading become visible
-    // as the glyph appearing to float away from the corner.
-    const int32_t lift = (headerStyle() == CardHeaderStyle::HDR_NONE)
-                       ? cardGlyphTopBearing(t.ICON_SM, cornerGlyph) : 0;
-    lv_obj_align(_icon, LV_ALIGN_TOP_LEFT, 0, -lift);
-    lv_obj_set_style_text_color(_icon, UI::c(tone(cardTintFor(e->desc))), 0);
+    // false: the corner is this card's ONLY icon - see cardCornerIcon().
+    renderCornerIcon(_icon, cardCornerIcon(*e, false), cardTintFor(e->desc));
 
     // --- The value, dominant, with its unit smaller beside it -------------
     char buf[40];

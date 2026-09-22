@@ -14,21 +14,69 @@ static bool dc(const EntityDescriptor &d, const char *what) {
     return strcmp(d.deviceClass, what) == 0;
 }
 
-const char *cardIconFor(const EntityDescriptor &d) {
-    // 1. THE ENTITY'S OWN ICON WINS.
-    //
-    // cards.md section 5: "Prefer provider-supplied. We already publish an
-    // `icon` in our own MQTT discovery payloads, so the inbound direction
-    // should be symmetrical: if HA or an MQTT discovery message names an icon,
-    // use it." Every descriptor in the tree already carries one and until the
-    // MDI subset existed nothing could draw it, so all of them were ignored.
-    //
-    // A name the subset does not contain returns null rather than something
-    // approximate, so an unknown icon falls through to the rules below instead
-    // of confidently drawing the wrong thing.
-    if (const char *g = mdiGlyph(d.icon)) return g;
+// ---------------------------------------------------------------------------
+// THE BINARY SENSOR TABLE. Milestone 2.7, cards.md section 13.
+//
+// One row per device_class, and one card type for all of them. A row carries
+// everything that differs between a garage door and a motion sensor: the
+// corner glyph, the hero's on/off pair, and the words a user may ask for in
+// place of the name. Adding a class is adding a row.
+//
+// HA's own "Show as" setting is a device_class override, so it lands here with
+// no extra work - the owner's garage doors are `opening` underneath and
+// `garage_door` as shown.
+//
+// Every glyph here must be in the generated subset (scripts/gen_icon_font.py);
+// the words are HA's own English wording for each class, so the panel and HA's
+// frontend say the same thing about the same door. ASCII only - CLAUDE.md.
+// ---------------------------------------------------------------------------
+struct BinaryClass {
+    const char *deviceClass;
+    const char *corner;
+    const char *on;
+    const char *off;
+    const char *wordOn;
+    const char *wordOff;
+};
 
-    // 2. device_class. Ordered most specific first: battery and
+static const BinaryClass BINARY_CLASSES[] = {
+    // garage_door is its OWN class and does not match "door" - every lookup
+    // is an exact compare - so it needs its own row.
+    { "garage_door",  MDI_GARAGE,         MDI_GARAGE_OPEN,       MDI_GARAGE,        "Open",      "Closed"   },
+    { "door",         MDI_DOOR_CLOSED,    MDI_DOOR_OPEN,         MDI_DOOR_CLOSED,   "Open",      "Closed"   },
+    { "window",       MDI_WINDOW_CLOSED,  MDI_WINDOW_OPEN,       MDI_WINDOW_CLOSED, "Open",      "Closed"   },
+    { "opening",      MDI_WINDOW_CLOSED,  MDI_WINDOW_OPEN,       MDI_WINDOW_CLOSED, "Open",      "Closed"   },
+    { "occupancy",    MDI_MOTION_SENSOR,  MDI_MOTION_SENSOR,     MDI_MOTION_SENSOR_OFF, "Detected", "Clear" },
+    { "motion",       MDI_MOTION_SENSOR,  MDI_MOTION_SENSOR,     MDI_MOTION_SENSOR_OFF, "Detected", "Clear" },
+    { "presence",     MDI_ACCOUNT,        MDI_ACCOUNT,           MDI_ACCOUNT_OFF,   "Home",      "Away"     },
+    // HA's lock binary_sensor is inverted from what the word suggests: ON
+    // means UNLOCKED. Worded to match.
+    { "lock",         MDI_LOCK,           MDI_LOCK_OPEN_VARIANT, MDI_LOCK,          "Unlocked",  "Locked"   },
+    { "moisture",     MDI_WATER_ALERT,    MDI_WATER_ALERT,       MDI_WATER_PERCENT, "Wet",       "Dry"      },
+    { "smoke",        MDI_SMOKE_DETECTOR, MDI_SMOKE_DETECTOR,    MDI_SMOKE_DETECTOR,"Detected",  "Clear"    },
+    { "safety",       MDI_SHIELD_CHECK,   MDI_SHIELD_ALERT,      MDI_SHIELD_CHECK,  "Unsafe",    "Safe"     },
+    { "problem",      MDI_ALERT_CIRCLE,   MDI_ALERT_CIRCLE,      MDI_CHECK_CIRCLE,  "Problem",   "OK"       },
+    { "battery",      MDI_BATTERY,        MDI_BATTERY_ALERT,     MDI_BATTERY,       "Low",       "Normal"   },
+    { "connectivity", MDI_WIFI,           MDI_WIFI,              MDI_WIFI_OFF,      "Connected", "Disconnected" },
+    { "plug",         MDI_POWER_PLUG,     MDI_POWER_PLUG,        MDI_POWER_PLUG_OFF,"Plugged in","Unplugged" },
+    { "power",        MDI_POWER,          MDI_POWER,             MDI_POWER,         "On",        "Off"      },
+};
+
+static const BinaryClass *binaryClass(const EntityDescriptor &d) {
+    if (!d.deviceClass[0]) return nullptr;
+    for (const BinaryClass &c : BINARY_CLASSES)
+        if (strcmp(d.deviceClass, c.deviceClass) == 0) return &c;
+    return nullptr;
+}
+
+// The icon a device_class or a domain implies, with no entity-specific
+// override considered. Shared by the corner and by the hero's last resort.
+static const char *classIcon(const EntityDescriptor &d) {
+    if (d.kind == EntityKind::BINARY_SENSOR) {
+        if (const BinaryClass *c = binaryClass(d)) return c->corner;
+    }
+
+    // device_class. Ordered most specific first: battery and
     //    signal_strength appear on entities of several kinds, so they have to
     //    be tested before anything falls through to a kind-based default.
     if (dc(d, "battery"))         return MDI_BATTERY;
@@ -39,21 +87,7 @@ const char *cardIconFor(const EntityDescriptor &d) {
     if (dc(d, "power") ||
         dc(d, "energy"))          return MDI_LIGHTNING_BOLT;
     if (dc(d, "pressure"))        return MDI_GAUGE;
-    if (dc(d, "occupancy") ||
-        dc(d, "motion"))          return MDI_MOTION_SENSOR;
-    // garage_door is its OWN class and does not match "door" - dc() is an
-    // exact compare. Without this the owner's two garage sensors fall all the
-    // way through to the BINARY_SENSOR default and draw a check circle. They
-    // are only correct today because HA sends an explicit mdi:garage, and the
-    // whole point of dashboard-target-7b.md is that he should be able to
-    // REMOVE that override to get the open/closed pair back.
-    if (dc(d, "garage_door"))     return MDI_GARAGE;
-    if (dc(d, "door"))            return MDI_DOOR_OPEN;
-    if (dc(d, "window") ||
-        dc(d, "opening"))         return MDI_WINDOW_OPEN;
-    if (dc(d, "lock"))            return MDI_LOCK;
-    if (dc(d, "moisture"))        return MDI_WATER_ALERT;
-    if (dc(d, "smoke"))           return MDI_SMOKE_DETECTOR;
+    // The binary classes - doors, occupancy, locks - are the table's job, above.
     if (dc(d, "carbon_dioxide"))  return MDI_MOLECULE_CO2;
     if (dc(d, "pm25") ||
         dc(d, "volatile_organic_compounds")) return MDI_AIR_FILTER;
@@ -73,33 +107,83 @@ const char *cardIconFor(const EntityDescriptor &d) {
     return MDI_GAUGE;
 }
 
-const char *cardIconForState(const EntityDescriptor &d, bool on) {
-    // A glyph that changes with the reading, which cards.md section 5 asks for
-    // as the fallback behaviour: "a local set whose glyph varies with the
-    // reading - bulb off / half / on, thermometer by band, occupancy present /
-    // absent". Only the pairs that genuinely read differently are listed; a
-    // switch toggling between two near-identical glyphs is noise, and the card
-    // already carries state in its colour.
-    if (dc(d, "occupancy") || dc(d, "motion"))
-        return on ? MDI_MOTION_SENSOR : MDI_MOTION_SENSOR_OFF;
-    // The pair the owner actually asked for. It only engages once the static
-    // mdi:garage override is removed in HA - while that override stands, HA
-    // sends the same glyph for both states and step 1 of cardIconFor() honours
-    // it, which is the behaviour he is currently seeing and disliking.
-    if (dc(d, "garage_door")) return on ? MDI_GARAGE_OPEN : MDI_GARAGE;
-    if (dc(d, "door"))   return on ? MDI_DOOR_OPEN   : MDI_DOOR_CLOSED;
-    if (dc(d, "window") || dc(d, "opening"))
-        return on ? MDI_WINDOW_OPEN : MDI_WINDOW_CLOSED;
-    if (dc(d, "lock"))   return on ? MDI_LOCK_OPEN_VARIANT : MDI_LOCK;
+const char *cardCornerIcon(const Entity &e, bool cardHasHero) {
+    const EntityDescriptor &d = e.desc;
 
-    if (!d.icon[0]) {
-        switch (d.kind) {
-            case EntityKind::LIGHT:  return on ? MDI_LIGHTBULB : MDI_LIGHTBULB_OUTLINE;
-            case EntityKind::SWITCH: return on ? MDI_TOGGLE_SWITCH : MDI_TOGGLE_SWITCH_OFF;
-            default: break;
-        }
+    // 1. The user's override.
+    if (const char *g = mdiGlyph(d.cornerIcon)) return g;
+
+    // 2. OUR TABLE - device_class, then domain - which is what makes a light
+    //    card wear a bulb in its corner wherever it appears. HA has no
+    //    per-entity "type" icon to follow, so outside an override this is
+    //    always ours (cards.md section 13).
+    //
+    //    EXCEPT when the corner is the card's ONLY icon. A value card has no
+    //    hero glyph, so for a sensor our table has nothing specific to say
+    //    about (no device_class) the entity's own icon is the better answer
+    //    than a generic gauge - which is how the panel's own RSSI, heap and IP
+    //    cards have always drawn wifi, memory and network glyphs.
+    if (!cardHasHero && !d.deviceClass[0]) {
+        if (const char *g = mdiGlyph(d.icon))       return g;
+        if (const char *g = mdiGlyph(e.attrs.icon)) return g;
     }
-    return cardIconFor(d);
+    return classIcon(d);
+}
+
+const char *cardHeroIcon(const Entity &e, bool on) {
+    const EntityDescriptor &d = e.desc;
+
+    // Resolution order is cards.md section 13, and each step's reason is
+    // there. A name the generated subset does not carry returns null from
+    // mdiGlyph() and falls through, so an unknown icon draws the next-best
+    // thing rather than tofu.
+
+    // 1. The user's own state pair, both halves or neither.
+    if (d.iconOn[0] && d.iconOff[0]) {
+        if (const char *g = mdiGlyph(on ? d.iconOn : d.iconOff)) return g;
+    }
+
+    // 2. The user's single override.
+    if (const char *g = mdiGlyph(d.icon)) return g;
+
+    // 3. What the source says RIGHT NOW. Only present when a user or an
+    //    integration set one - measured, see cards.md section 13 - but when it
+    //    is, it may already be state-dependent (the owner's template occupancy
+    //    sensors flip it) and it is his choice made in HA.
+    if (const char *g = mdiGlyph(e.attrs.icon)) return g;
+
+    // 4. Our own state pair, by device_class.
+    if (d.kind == EntityKind::BINARY_SENSOR) {
+        if (const BinaryClass *c = binaryClass(d)) return on ? c->on : c->off;
+    }
+
+    // 5. The domain's pair. Only where the two halves genuinely read
+    //    differently; the card already carries state in its colour.
+    switch (d.kind) {
+        case EntityKind::LIGHT:  return on ? MDI_LIGHTBULB : MDI_LIGHTBULB_OUTLINE;
+        case EntityKind::SWITCH: return on ? MDI_TOGGLE_SWITCH : MDI_TOGGLE_SWITCH_OFF;
+        default: break;
+    }
+
+    // 6. Whatever the corner would say.
+    return classIcon(d);
+}
+
+const char *cardStateWord(const EntityDescriptor &d, bool on) {
+    if (d.kind == EntityKind::BINARY_SENSOR) {
+        if (const BinaryClass *c = binaryClass(d)) return on ? c->wordOn : c->wordOff;
+    }
+    return on ? "On" : "Off";
+}
+
+static CardLabel s_labelMode = CardLabel::LBL_NAME;
+void      cardSetLabelMode(CardLabel m) { s_labelMode = m; }
+CardLabel cardLabelMode()               { return s_labelMode; }
+
+CardLabel cardResolveLabel(CardLabel want) {
+    if (want == CardLabel::LBL_INHERIT) want = s_labelMode;
+    if (want == CardLabel::LBL_INHERIT) want = CardLabel::LBL_NAME;
+    return want;
 }
 
 const char *cardBatteryGlyph(int pct) {
