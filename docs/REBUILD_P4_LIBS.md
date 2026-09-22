@@ -169,7 +169,21 @@ We kept a copy of the current configuration:
 reference/framework-baseline/sdkconfig.esp32p4_es.55.03.311
 ```
 
-1,968 `CONFIG_` lines, exactly as shipped. Diff the new one against it:
+**2,987 settings**, exactly as shipped. (Counting only `^CONFIG_` lines gives 1,968 and is wrong —
+every `# X is not set` line is a real setting too, and one of the two we are changing is currently
+expressed that way.)
+
+Rather than reading a raw diff, run the checker:
+
+```bash
+python scripts/verify_p4_sdkconfig.py <path-to-new>/sdkconfig
+```
+
+It sorts every difference into *intended*, *expected fallout from the cache-line change*, and
+*unexplained*; it refuses outright if the build is the wrong chip variant; and it fails if
+menuconfig did not actually take. **Exit code 0 means safe to install.**
+
+The raw diff, if you want to look yourself:
 
 ```bash
 diff reference/framework-baseline/sdkconfig.esp32p4_es.55.03.311 \
