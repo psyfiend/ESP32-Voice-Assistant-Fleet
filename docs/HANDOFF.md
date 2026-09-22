@@ -191,6 +191,43 @@ sends none at all. That keeps a 2.5 KB task stack out of internal RAM on `CYD_S3
 
 ## What is next
 
+### IN FLIGHT RIGHT NOW - the P4 library rebuild (#61)
+
+A lib-builder run is underway in WSL as of 2026-09-21. If you are picking this up cold, this is
+where it got to.
+
+| | |
+|---|---|
+| WSL | Ubuntu-24.04 LTS, WSL2, working |
+| lib-builder | `~/esp32-arduino-lib-builder`, branch **master** (IDF `release/v5.5`) |
+| IDF resolved | **5.5.5** - exact match to our framework, so no version drift |
+| menuconfig | done: PREFER_SPIRAM on, L2 line 64B, USE_MEMPOOL restored to on |
+| build | **running** - `./build.sh -t esp32p4_es qio 80m_200m` |
+
+**Next step when it finishes:**
+
+```bash
+find ~/esp32-arduino-lib-builder -name sdkconfig -newermt '-3 hours'
+python scripts/verify_p4_sdkconfig.py <that path>
+```
+
+**Do not install on a green tick alone.** The judgement is not "is the diff empty" - it is "is
+every difference explainable, and would any of them change behaviour we care about". Build-id and
+version strings are fine. Anything touching memory layout, task stacks or the WiFi/lwIP path needs
+a hard look first.
+
+**Expect more than two differences.** `USE_MEMPOOL` and the L2 cache line BOTH differed from
+Espressif's shipped build before anything was typed, which means lib-builder master has drifted
+from 55.03.311. If the unexplained list is long, the fallback is to pin lib-builder to the
+`idf-release_v5.5` tag rather than master and rebuild - closer to the shipped point, fewer
+incidental changes.
+
+Everything else is in `docs/REBUILD_P4_LIBS.md`, including the two traps that nearly went into it
+as instructions: lib-builder's branches are named after ESP-IDF rather than Arduino, and `-t` takes
+the CHIP VARIANT rather than the target.
+
+---
+
 0. **DO THE REVIEW, THEN SIGN OFF #43, THEN MERGE.** `docs/REVIEW_2026-09-20.md` has the test
    plan, T1-T9. The owner's words, 2026-09-21: *"we're opening more than we're closing sometimes"* -
    so the review closes issues before anything new starts. Do this FIRST.
