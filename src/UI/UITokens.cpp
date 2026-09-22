@@ -237,10 +237,12 @@ const UIType &type() {
     // harder one to read. Flashed and caught by eye, not by arithmetic.
     static UIType t = {
         .VALUE   = FLEET_FONT_VALUE,
+        .VALUE_SM = FLEET_FONT_VALUE_SM,
         .UNIT    = FLEET_FONT_UNIT,
         .NAME    = FLEET_FONT_NAME,
         .TAG     = FLEET_FONT_TAG,
         .ICON    = FLEET_ICONS_LG,
+        .ICON_MD = FLEET_ICONS_MD,
         .ICON_SM = FLEET_ICONS_SM,
         // HERO shares VALUE's face. Referencing another size pulls a whole
         // extra font into the link for something nothing draws yet - at the

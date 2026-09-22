@@ -63,6 +63,13 @@ TARGETS_MM = {
     "UNIT":  2.47,   # the unit beside a value, deliberately smaller than it
     "NAME":  2.66,   # the card's name - which is the LOCATION, per cards.md
     "VALUE": 5.89,   # the number, dominant
+    # The number on a CRAMPED card. #62, milestone 2.7: one type scale per board
+    # was right for the board and wrong for the card - on a dense page the
+    # value overflowed cells it would have fitted a size smaller. A card now
+    # picks VALUE or VALUE_SM by what its own cell can seat (Card::
+    # resolveVariant). About three quarters of VALUE; a generated digits-only
+    # face costs 6-10 KB, measured, so this is cheap on every board.
+    "VALUE_SM": 4.40,
     # The glyph in an actor card's disc. It is its own role and not just
     # "VALUE size" because the VALUE face is a DIGITS-ONLY subset - it has no
     # LV_SYMBOL range at all, so drawing an icon with it renders nothing. This
@@ -256,16 +263,17 @@ def main():
         print("No BSP headers parsed.")
         return 1
 
-    print("\n%-14s %5s %6s  %s" % ("BOARD", "PPI", "", "TAG / UNIT / NAME / VALUE (px)"))
-    print("-" * 74)
+    print("\n%-14s %5s %6s  %s" % ("BOARD", "PPI", "", "TAG / UNIT / NAME / VALUE / VALUE_SM (px)"))
+    print("-" * 80)
 
     generated = {}
     for b in boards:
         b["px"] = {role: px_for(b["ppi"], mm * scale_for(b["macro"], role))
                    for role, mm in TARGETS_MM.items()}
-        print("%-14s %5d %6s  %3d / %3d / %3d / %3d" % (
+        print("%-14s %5d %6s  %3d / %3d / %3d / %3d / %3d" % (
             b["macro"], b["ppi"], "%.1f\"" % b["diag"],
-            b["px"]["TAG"], b["px"]["UNIT"], b["px"]["NAME"], b["px"]["VALUE"]))
+            b["px"]["TAG"], b["px"]["UNIT"], b["px"]["NAME"], b["px"]["VALUE"],
+            b["px"]["VALUE_SM"]))
 
     # Only what has no built-in needs generating. In practice that is the
     # VALUE face on the dense boards and nothing else.
@@ -273,12 +281,17 @@ def main():
     any_gen = False
     for b in boards:
         for role, px in b["px"].items():
-            if builtin_available(px):
+            # VALUE_SM IS ALWAYS GENERATED, even where a built-in exists. A
+            # built-in is full ASCII - 30-60 KB at these sizes - while the
+            # digits-only subset is 6-10 KB, and VALUE_SM draws nothing else.
+            # Preferring the built-in would have made #62's second face cost
+            # several times what cards.md section 13 says it costs.
+            if builtin_available(px) and role != "VALUE_SM":
                 continue
             any_gen = True
             if role == "ICON":
                 continue   # always a built-in; see below
-            kind = "num" if role == "VALUE" else "text"
+            kind = "num" if role in ("VALUE", "VALUE_SM") else "text"
             key = (px, kind)
             if key not in generated:
                 generated[key] = generate(px, kind)
@@ -316,7 +329,7 @@ def main():
         L.append("%s defined(%s)" % ("#if" if first else "#elif", b["macro"]))
         first = False
         L.append("    // %s - %d PPI, %.1f\"" % (b["macro"], b["ppi"], b["diag"]))
-        for role in ("VALUE", "NAME", "UNIT", "TAG", "ICON"):
+        for role in ("VALUE", "VALUE_SM", "NAME", "UNIT", "TAG", "ICON"):
             px = b["px"][role]
             if role == "ICON":
                 # Always a built-in, clamped to the largest one. Icons are
@@ -325,11 +338,13 @@ def main():
                 # properly. What matters here is only that it is a FULL face:
                 # VALUE is a digits-only subset and cannot draw a symbol.
                 sym = "lv_font_montserrat_%d" % min(px, BUILTIN_MAX)
+            elif role == "VALUE_SM" and generated.get((px, "num")):
+                sym = generated[(px, "num")]    # always the subset; see above
             else:
-                kind = "num" if role == "VALUE" else "text"
+                kind = "num" if role in ("VALUE", "VALUE_SM") else "text"
                 sym = ("lv_font_montserrat_%d" % px) if builtin_available(px) \
                       else (generated.get((px, kind)) or "lv_font_montserrat_%d" % min(px, BUILTIN_MAX))
-            L.append("    #define FLEET_FONT_%-6s (&%s)" % (role, sym))
+            L.append("    #define FLEET_FONT_%-8s (&%s)" % (role, sym))
     L.append("#else")
     L.append("    #error \"No type scale for this board - rerun scripts/gen_type_scale.py\"")
     L.append("#endif")

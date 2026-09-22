@@ -120,13 +120,24 @@ void StateCard::render() {
     // disc measures the font instead of scaling a number. It also has to be a
     // full face: VALUE is a digits-only subset on the dense boards and cannot
     // draw an LV_SYMBOL glyph at all.
-    const int32_t iconPx = lv_font_get_line_height(t.ICON);
+    //
+    // THE FACE STEPS DOWN WITH THE CELL, since 2.7 (#62). LG, then MD, then
+    // SM: the largest whose glyph still fits the band with a margin. Before
+    // this a cramped card kept the LG glyph and simply lost its disc, which is
+    // what the owner saw on the 4B pair as "the disc is barely larger than its
+    // glyph" and, on WS_S3_4B, as no disc at all.
+    const int32_t room   = midHeight();
+    const lv_font_t *heroFace = t.ICON;
+    if (room > 0 && room < lv_font_get_line_height(t.ICON) + UI::sc(4))
+        heroFace = t.ICON_MD;
+    if (room > 0 && room < lv_font_get_line_height(t.ICON_MD) + UI::sc(4))
+        heroFace = t.ICON_SM;
+    const int32_t iconPx = lv_font_get_line_height(heroFace);
     // CLAMPED TO THE BAND IT SITS IN. Twice the line height is the look on a
     // large card; on CYD_S3_3248 the band is 55 px and twice the line height
     // wants 68, so the disc was clipped top and bottom - by its own parent,
     // not by the glyph. Sizing it from the font alone was the mistake, and
     // making the multiplier larger made it worse.
-    const int32_t room   = midHeight();
     int32_t discPx = iconPx * 2;
     if (room > 0 && discPx > room) discPx = room;
 
@@ -292,7 +303,7 @@ void StateCard::render() {
 
     // --- Icons ------------------------------------------------------------
     lv_label_set_text          (_icon, cardHeroIcon(*e, isOn));
-    lv_obj_set_style_text_font (_icon, t.ICON, 0);
+    lv_obj_set_style_text_font (_icon, heroFace, 0);
 
     // The corner takes the fill's surface colour where the fill reaches it,
     // and otherwise the same tint a value card's corner wears, so a row of

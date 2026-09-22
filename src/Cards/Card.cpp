@@ -131,13 +131,13 @@ int32_t Card::headerHeight() {
 // that CardPage can ask the same question before it decides how many rows to
 // carve the page into - it used to guess, and a guess that disagrees with this
 // function is how a page plans a row no card can live in.
-int32_t Card::fullCellNeedPx(CardHeaderStyle style) {
+int32_t Card::fullCellNeedPx(CardHeaderStyle style, const lv_font_t *hero) {
     const UIType    &t = UI::type();
     const UIMetrics &m = UI::met();
 
     // Counts every band a FULL layout reserves. No top band: the corner icon is
     // out of the flow on both layouts, so it costs the stack nothing.
-    int32_t need = lv_font_get_line_height(t.VALUE)
+    int32_t need = lv_font_get_line_height(hero ? hero : t.VALUE)
                  + midGap()
                  + lv_font_get_line_height(t.NAME)
                  + statusBandHeight()
@@ -173,24 +173,61 @@ int32_t Card::compactCellNeedPx() {
 }
 
 void Card::resolveVariant() {
-    if (_variant != CardVariant::VAR_AUTO) { _resolved = _variant; return; }
-
     int32_t h = cellPx();
 
     // HDR_TAG hangs OUTSIDE the card, so the cell it leaves the body is
     // shorter by exactly the tag.
     if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
 
-    const int32_t need = fullCellNeedPx(_hdrStyle);
+    const UIType &t = UI::type();
+    const int32_t need   = fullCellNeedPx(_hdrStyle, t.VALUE);
+    const int32_t needSm = fullCellNeedPx(_hdrStyle, t.VALUE_SM);
 
-    _resolved = (h >= need) ? CardVariant::VAR_FULL : CardVariant::VAR_COMPACT;
+    // THE HERO STEPS DOWN A SIZE BEFORE THE CARD DROPS A ROW. #62.
+    //
+    // The order used to be "full at VALUE, else compact at VALUE" - draw less,
+    // never the same thing smaller. That rule was written when a page held a
+    // handful of cards; with eighteen on a 4-inch panel the owner found values
+    // and names that "would actually fit if they were smaller". So a cell too
+    // short for a full layout at VALUE now tries VALUE_SM first, and only goes
+    // compact if even that will not seat. Name, unit and tag faces never
+    // change - only the one role that dominates the vertical stack does.
+    //
+    //   full    at VALUE      the cell seats everything at full size
+    //   full    at VALUE_SM   it does with a smaller number
+    //   compact at VALUE_SM   it does not; drop the status row too
+    if (h >= need) {
+        _resolved = CardVariant::VAR_FULL;    _valueSmall = false;
+    } else if (h >= needSm) {
+        _resolved = CardVariant::VAR_FULL;    _valueSmall = true;
+    } else {
+        _resolved = CardVariant::VAR_COMPACT; _valueSmall = true;
+    }
+
+    // A pinned variant still gets the hero size its cell can carry.
+    if (_variant != CardVariant::VAR_AUTO) {
+        _resolved = _variant;
+        if (_variant == CardVariant::VAR_FULL) _valueSmall = (h < need);
+    }
 
     // Printed once per card, because this decision was guessed at twice and
     // both times the guess was wrong. The numbers are cheap and they end the
     // argument - and they say WHY a card went compact rather than leaving it
     // to be inferred from what is missing on screen.
-    DBG_CARDS("%s: cell %ld need %ld -> %s\n",
-              typeName(), (long)h, (long)need, cardVariantName(_resolved));
+    DBG_CARDS("%s: cell %ld need %ld / %ld (sm) -> %s%s\n",
+              typeName(), (long)h, (long)need, (long)needSm,
+              cardVariantName(_resolved), _valueSmall ? ", small value" : "");
+}
+
+const lv_font_t *Card::valueFont() const {
+    return _valueSmall ? UI::type().VALUE_SM : UI::type().VALUE;
+}
+
+int32_t Card::shortSidePx() const {
+    int32_t h = cellPx();
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+    const int32_t w = _cellWPx > 0 ? _cellWPx : (int32_t)UI::grid().cellW;
+    return (w < h) ? w : h;
 }
 
 // Long press pauses, on every card type.
@@ -533,8 +570,30 @@ lv_obj_t *Card::makeCornerIcon(lv_obj_t *body) {
     return o;
 }
 
+// THE CORNER ICON SCALES WITH THE CARD, not only with the board. 2.7.
+//
+// The owner: it "looks tiny on the 7B". Every face in the type scale is sized
+// in millimetres, which keeps text the same physical size fleet-wide - right
+// for text, wrong for a mark whose job is to be in proportion to the tile it
+// labels. A 25 mm card and a 15 mm card wore the same 2.66 mm glyph.
+//
+// So: the corner aims at ~15% of the card's SHORT side, and takes whichever of
+// the two faces is nearer - SM (2.66 mm) or MD (3.50 mm). The crossover is a
+// short side of about 20.5 mm. Measured against today's default grids that
+// puts WS_P4_7B and CYD_P4_1060 (~25 mm cells) on MD and every other board on
+// SM, which is what the owner described. A starting ratio, not a measured
+// optimum - the glass decides.
+static constexpr float CORNER_RATIO = 0.15f;
+static constexpr float CORNER_SM_MM = 2.66f;   // gen_icon_font.py SIZES_MM
+static constexpr float CORNER_MD_MM = 3.50f;
+
 const lv_font_t *Card::cornerFont() const {
-    return UI::type().ICON_SM;
+    const float ppi = (float)bspPixelDensity();
+    if (ppi <= 0.f) return UI::type().ICON_SM;
+    const float shortMm = (float)shortSidePx() * 25.4f / ppi;
+    const float want    = shortMm * CORNER_RATIO;
+    return (want >= (CORNER_SM_MM + CORNER_MD_MM) * 0.5f) ? UI::type().ICON_MD
+                                                          : UI::type().ICON_SM;
 }
 
 void Card::renderCornerIcon(lv_obj_t *icon, const char *glyph, uint32_t hex) const {

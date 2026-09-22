@@ -134,7 +134,23 @@ void ValueCard::render() {
     char buf[40];
     cardFormatValue(*e, buf, sizeof(buf), false, tempUnit());  // unit drawn separately
     lv_label_set_text          (_value, buf);
-    lv_obj_set_style_text_font (_value, t.VALUE, 0);
+
+    // The HEIGHT decided the face in resolveVariant(); the WIDTH gets a say
+    // here, because only now is the text known. A long reading ("1024" lux,
+    // "3d 04:15") can overflow a narrow card at VALUE while fitting at
+    // VALUE_SM - the owner's "the values would actually fit if they were
+    // smaller", #62. Measured with the font, not estimated per character.
+    const lv_font_t *vf = valueFont();
+    const int32_t cw = cellWidthPx() > 0
+                     ? cellWidthPx() - UI::sc(UI::met().PAD) * 2 : 0;
+    if (cw > 0 && vf != t.VALUE_SM) {
+        const char *du = cardDisplayUnit(*e, tempUnit());
+        lv_point_t vs, us = {0, 0};
+        lv_text_get_size(&vs, buf, vf, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+        if (du[0]) lv_text_get_size(&us, du, t.UNIT, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+        if (vs.x + us.x + UI::sc(3) > cw) vf = t.VALUE_SM;
+    }
+    lv_obj_set_style_text_font (_value, vf, 0);
 
     // A stale number is still the number - it is the chrome that shouts, not
     // the value. cards.md section 3 rejects dimming precisely so the reading

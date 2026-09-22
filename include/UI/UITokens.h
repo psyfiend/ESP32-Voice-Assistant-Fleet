@@ -121,15 +121,21 @@ struct UIGrid {
 // 4. Type — fleet-wide
 // ---------------------------------------------------------------------------
 // LVGL compiles fixed bitmap faces, so this is a shortlist, not a scale - and
-// the shortlist is a FLASH BUDGET. Measured on WS_P4_5: one referenced face
-// costs ~96 KB. Enabling a size in lv_conf.h is free, because the linker drops
-// unreferenced font objects; REFERENCING one is what costs. Every entry added
-// here is another ~96 KB, and the MDI icon subset competes for the same budget.
-// See docs/design/tokens.md section 3.
+// the shortlist is a FLASH BUDGET. Enabling a size in lv_conf.h is free,
+// because the linker drops unreferenced font objects; REFERENCING one is what
+// costs.
+//
+// HOW MUCH, corrected at 2.7. "~96 KB per face" was measured on ONE large,
+// full-ASCII Montserrat and was then applied to every face for months. From the
+// P4 builds' object files: a generated digits-only VALUE face is 6-10 KB, an
+// MDI icon face 10-73 KB by size, Montserrat 14-24 is 14-29 KB. Still a budget;
+// a much smaller one. See docs/design/cards.md section 13.
 struct UIType {
     const lv_font_t *VALUE;   // the number on a measure card. DIGITS ONLY on
                               // dense boards - it is a generated subset, and
                               // it has no letters and no LV_SYMBOL range
+    const lv_font_t *VALUE_SM;// the number on a CRAMPED card, ~3/4 of VALUE.
+                              // Always the digits-only subset. #62, 2.7
     const lv_font_t *UNIT;    // the unit beside a value, deliberately smaller
     const lv_font_t *NAME;    // card name
     const lv_font_t *TAG;     // header bar, status row
@@ -138,7 +144,9 @@ struct UIType {
     // MDI codepoints sit in the private use area, so these faces can draw
     // nothing but icons and every other face can draw none of them.
     const lv_font_t *ICON;    // the disc glyph on a state card
-    const lv_font_t *ICON_SM; // the tinted glyph on a value card's title row
+    const lv_font_t *ICON_MD; // between the two: the corner on a LARGE card,
+                              // the hero on a CRAMPED one. 2.7
+    const lv_font_t *ICON_SM; // the corner icon on an ordinary card
     const lv_font_t *HERO;    // oversized, for a fullscreen card
 };
 
