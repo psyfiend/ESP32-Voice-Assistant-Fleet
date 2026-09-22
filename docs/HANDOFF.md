@@ -1,9 +1,5 @@
 # Handoff — 2026-09-22
 
-**If you are the owner returning after time away, read `docs/REVIEW_2026-09-20.md` FIRST.** It is
-the same work written for someone who was not here, with a test plan and pass/fail criteria. This
-file assumes you were.
-
 **Start here.** `CLAUDE.md` is the stable how-it-works. This is where we are, what will bite you,
 and what to do next. Kept lean on purpose: anything that is "why we did X and not Y" now lives in
 `docs/LESSONS.md`, and anything that is a design lives in `docs/design/`.
@@ -53,9 +49,9 @@ running - see the #61 section below.
 6. `docs/design/cards.md` — the card spec. Its "Implementation notes" first.
 7. `docs/design/tokens.md`, `docs/design/startup.md` — the design system, and boot order.
 8. `docs/ROADMAP.md` §7 — the milestone list.
-9. `docs/REVIEW_2026-09-20.md` — the 2026-09-19/20 work in review form: what changed, what it
-   took, what is unproven, and a test plan. Supersedes nothing; it is a narrative of the same
-   commits.
+9. `docs/REVIEW_2026-09-20.md` — **historical.** The 2026-09-19/20 work written up for the owner
+   to review cold. Reviewed and signed off 2026-09-21; every test passed. Kept as a narrative, not
+   as a to-do list.
 
 ---
 
@@ -197,7 +193,16 @@ sends none at all. That keeps a 2.5 KB task stack out of internal RAM on `CYD_S3
 
 ## What is next
 
-### THE P4 REBUILD IS DONE AND INSTALLED. A SOAK IS RUNNING (#61)
+### SOAK RESULT, 2026-09-23: BOTH P4 BOARDS SURVIVED. #243 IS FIXED.
+
+The owner, the morning after: *"all boards are online and functional"*.
+
+**It was a one-variable experiment and it answered cleanly.** `WS_P4_5` was running the STOCK C6
+firmware and survived. So **the SPIRAM mempool alone fixed #243** - the C6 update from #59 was not
+needed for it. The C6 update is now being rolled out to the other P4 boards anyway, as hygiene:
+it removes the `Req_GetCoprocessorFwVersion` boot timeout and keeps host and slave on one line.
+
+### The rebuild itself (#61)
 
 2026-09-22. Both P4 boards are up on rebuilt libraries and neither shows the #243 signature.
 
@@ -283,7 +288,7 @@ the CHIP VARIANT rather than the target.
 
 ---
 
-0. **READ THE SOAK.** Both P4 boards went on rebuilt libraries at ~02:00 on 2026-09-22 and both
+0. ~~**READ THE SOAK.**~~ **Done 2026-09-23 - both survived, see above.** Both P4 boards went on rebuilt libraries at ~02:00 on 2026-09-22 and both
    booted clean. That is the open question and it needs no hardware to answer - HA's `last_updated`
    on any entity a board publishes says whether it is alive, for the whole fleet, from a PC.
    Details and the interpretation table are in the #61 section above.
@@ -302,6 +307,12 @@ the CHIP VARIANT rather than the target.
    - **#63** and **#64**, the twobugs found on 2026-09-22
 
    `Entity::lastChangeMs` (#57) exists for "open for 40 minutes" and has no caller yet.
+
+   **Two residuals from the review, both small:** `ST_UNAVAILABLE` has never rendered on hardware
+   (nothing in the house went unavailable while anyone was watching - worth forcing once by
+   unplugging a sensor), and the deck temperature and illuminance appear TWICE on the HA page,
+   once per transport. That duplicate was deliberate, to compare MQTT and the websocket side by
+   side; it has served its purpose and should be removed from `Dashboard_HA.h`.
 
 2. **2.6's remaining half: horizontal swipes, page indicator dots, gesture conflicts.** Nothing
    technical blocks multi-page - `PageSpec` already carries `id`/`slug`, `HA_PAGE` is already id 2,
