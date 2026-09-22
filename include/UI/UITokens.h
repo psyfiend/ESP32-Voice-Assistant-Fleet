@@ -153,6 +153,18 @@ extern const UIPalette UI_PAL_MIDNIGHT; // Slate's ground, Fleet's cyan - the ow
 extern const UIMetrics UI_MET_DARK;   // 1px lighten @40% border, no shadow needed
 extern const UIMetrics UI_MET_LIGHT;  // no border, leans on the shadow
 
+// Colour roles for UI::paint() - shared styles that repaint themselves on a
+// scheme change. #64; the full story is at UI::paint() below.
+enum class UIPaint : uint8_t {
+    PAINT_SURFACE = 0,   // bg SURFACE, border UI::border()     - panels
+    PAINT_SURFACE_ALT,   // bg SURFACE_ALT, border UI::border() - buttons
+    PAINT_TEXT,          // text TEXT
+    PAINT_TEXT_DIM,      // text TEXT_DIM
+    PAINT_ACCENT_TEXT,   // text ACCENT                         - panel titles
+    PAINT_ACCENT_BG,     // bg ACCENT
+    PAINT_COUNT
+};
+
 namespace UI {
 
 // Call once, after LVGL is up and the display's rotated size is known.
@@ -216,6 +228,26 @@ uint32_t mix(uint32_t a, uint32_t b, uint8_t pct);
 // scheme tokens (GROUND and TEXT) keeps the answer inside the palette, so the
 // "no colour literals in UI code" rule holds.
 uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b);
+
+// --- Shared paints: chrome that repaints itself on a scheme change. #64 -----
+//
+// Cards re-read UI::pal() in their own restyle(), and CardBinder calls it on
+// every card when the scheme changes. The CHROME around them - deck panels,
+// the system drawer, their buttons - set a local colour once at build time and
+// had no restyle at all, so they kept the old scheme until something rebuilt
+// them. The owner saw it switching Fleet to Slate.
+//
+// Rather than give every panel a restyle() that has to remember each widget
+// it coloured, these are SHARED lv_style_t objects, one per role. A widget
+// adds the style instead of setting a colour; a scheme change updates the
+// style in place and tells LVGL, and every widget using it repaints. One
+// place decides what a scheme change repaints - the same consolidation that
+// fixed the drawer offset in 2.6.
+//
+// A LOCAL style property beats a shared style in LVGL, so a widget painted
+// this way must not also call lv_obj_set_style_*_color for the same property.
+// The roles are UIPaint, declared above the namespace with the other types.
+lv_style_t *paint(UIPaint p);
 
 // Silences the `lv_part_t | lv_state_t` deprecation warning that would
 // otherwise be reproduced in every card type. Issue #13 asked for this.

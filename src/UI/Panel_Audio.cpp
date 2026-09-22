@@ -97,7 +97,7 @@ void Panel_Audio::init(lv_obj_t* parent) {
     lv_label_set_text           (lbl_en, "ENABLE");
     lv_obj_set_align            (lbl_en, LV_ALIGN_CENTER);
     lv_obj_set_style_text_font  (lbl_en, UIToolkit::Font_Label, 0); // Semantic Font
-    lv_obj_set_style_text_color (lbl_en, UI::c(UI::pal().TEXT), 0);
+    lv_obj_add_style            (lbl_en, UI::paint(UIPaint::PAINT_TEXT), 0);
     lv_obj_set_style_text_align (lbl_en, LV_TEXT_ALIGN_CENTER, 0);
 
     // ROW 1,1 COL 1,2 - Switch
@@ -151,7 +151,7 @@ void Panel_Audio::init(lv_obj_t* parent) {
     lv_obj_t* meter_l_bg = lv_obj_create(row_vu_meter); 
     lv_obj_set_height               (meter_l_bg, lv_pct(100));
     lv_obj_set_flex_grow            (meter_l_bg, 1);
-    lv_obj_set_style_bg_color       (meter_l_bg, UI::c(UI::pal().SURFACE_ALT), 0);
+    lv_obj_add_style                (meter_l_bg, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
     lv_obj_set_style_border_width   (meter_l_bg, 0, 0);
     lv_obj_set_style_pad_all        (meter_l_bg, 0, 0);
 
@@ -164,7 +164,7 @@ void Panel_Audio::init(lv_obj_t* parent) {
     lv_obj_t* meter_r_bg = lv_obj_create(row_vu_meter); 
     lv_obj_set_height               (meter_r_bg, lv_pct(100));
     lv_obj_set_flex_grow            (meter_r_bg, 1);
-    lv_obj_set_style_bg_color       (meter_r_bg, UI::c(UI::pal().SURFACE_ALT), 0);
+    lv_obj_add_style                (meter_r_bg, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
     lv_obj_set_style_border_width   (meter_r_bg, 0,0);
     lv_obj_set_style_pad_all        (meter_r_bg, 0, 0);
     

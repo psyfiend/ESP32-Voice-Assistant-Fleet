@@ -251,15 +251,54 @@ const UIType &type() {
     return t;
 }
 
+// --- Shared paints. #64 - see the header. -----------------------------------
+static lv_style_t s_paint[(int)UIPaint::PAINT_COUNT];
+static bool       s_paintReady = false;
+
+static void refreshPaints() {
+    if (!s_paintReady) return;   // nothing has asked for one yet
+    auto st = [](UIPaint p) { return &s_paint[(int)p]; };
+    const lv_color_t bd = border();
+
+    lv_style_set_bg_color    (st(UIPaint::PAINT_SURFACE),     c(s_pal.SURFACE));
+    lv_style_set_border_color(st(UIPaint::PAINT_SURFACE),     bd);
+    lv_style_set_bg_color    (st(UIPaint::PAINT_SURFACE_ALT), c(s_pal.SURFACE_ALT));
+    lv_style_set_border_color(st(UIPaint::PAINT_SURFACE_ALT), bd);
+    lv_style_set_text_color  (st(UIPaint::PAINT_TEXT),        c(s_pal.TEXT));
+    lv_style_set_text_color  (st(UIPaint::PAINT_TEXT_DIM),    c(s_pal.TEXT_DIM));
+    lv_style_set_text_color  (st(UIPaint::PAINT_ACCENT_TEXT), c(s_pal.ACCENT));
+    lv_style_set_bg_color    (st(UIPaint::PAINT_ACCENT_BG),   c(s_pal.ACCENT));
+
+    // NULL means "every style changed": each object re-reads what it uses and
+    // invalidates itself. A scheme change is a rare, deliberate act, so the
+    // whole-tree walk is the right price for never missing a widget.
+    lv_obj_report_style_change(NULL);
+}
+
+lv_style_t *paint(UIPaint p) {
+    if (!s_paintReady) {
+        for (lv_style_t &s : s_paint) lv_style_init(&s);
+        s_paintReady = true;
+        // The report inside is harmless at first use: nothing is using these
+        // styles yet, so there is nothing for it to repaint.
+        refreshPaints();
+    }
+    const int i = (int)p;
+    return (i >= 0 && i < (int)UIPaint::PAINT_COUNT) ? &s_paint[i]
+                                                     : &s_paint[0];
+}
+
 void setScheme(const UIPalette &p, const UIMetrics &m) {
     s_pal = p;   // copies, so setAccent() can override without touching a const
     s_met = m;
     recomputeGrid();
+    refreshPaints();
     if (s_onChange) s_onChange();
 }
 
 void setAccent(uint32_t hex) {
     s_pal.ACCENT = hex;
+    refreshPaints();
     if (s_onChange) s_onChange();
 }
 
