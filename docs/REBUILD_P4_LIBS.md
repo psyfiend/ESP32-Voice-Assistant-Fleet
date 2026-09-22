@@ -141,12 +141,36 @@ Building one variant instead of two is also faster.
 ./build.sh -t esp32p4_es -b menuconfig qio 80m_200m
 ```
 
-In menuconfig:
+In menuconfig, press `/` and search by symbol name rather than hunting the tree — the menu paths
+move between IDF versions.
 
-- `Component config → ESP Hosted → ` enable **Prefer SPIRAM for mempool**
-  (`CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM`)
-- `Component config → Hardware Settings → Cache config → L2 cache line size → **64 bytes**`
-  (`CONFIG_CACHE_L2_CACHE_LINE_64B`)
+| Symbol | Set to | Why |
+|---|---|---|
+| `CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM` | **y** | the fix |
+| `CONFIG_CACHE_L2_CACHE_LINE_64B` | **y** (64 bytes) | required alongside it, #219 |
+| `CONFIG_ESP_HOSTED_USE_MEMPOOL` | **y** | **restores the baseline, see below** |
+
+### lib-builder's defaults are NOT what Espressif shipped. Check all three.
+
+Found on the first real run, 2026-09-21. Two settings already differed from
+`55.03.311` before anything was typed:
+
+- **`CONFIG_ESP_HOSTED_USE_MEMPOOL` was OFF.** The shipped libraries have it `=y`. Leaving it off
+  would disable the hosted mempool entirely — a far larger behavioural change than the one we came
+  for, and it would probably make `PREFER_SPIRAM` meaningless, since there would be no pool to
+  prefer anything for. Turn it **on**, not as a new change but to match what we already run.
+- **`CONFIG_CACHE_L2_CACHE_LINE_64B` was already `y`.** The shipped libraries are at **128B**. So
+  one of our two intended changes arrives from lib-builder's own defaults rather than from a
+  keystroke.
+
+Do not read "the option is already right" as "nothing to do". Read it as *lib-builder master has
+moved since 55.03.311 was cut*, and expect the diff in Step 5 to show more than two lines. **Every
+extra one needs a decision** — that is what the checker is for.
+
+There is also a near-miss worth naming: `Component config → ESP PSRAM → "Try to allocate memories
+of WiFi and LWIP in SPIRAM firstly"` is `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP`. It sounds like the
+one we want and is not — it governs WiFi and lwIP buffers, not esp_hosted's transport mempool.
+Leave it alone.
 
 `qio 80m_200m` is not decoration — it is the flash/PSRAM configuration Espressif builds the P4
 libraries with, taken from `configs/builds.json`. Omitting it produces a differently-configured

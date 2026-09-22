@@ -5,7 +5,11 @@ verify_p4_sdkconfig.py - is the rebuilt P4 config the one we meant to build?
 Step 5 of docs/REBUILD_P4_LIBS.md, and the step that makes the whole exercise
 safe rather than hopeful. We are replacing 136 prebuilt libraries in order to
 change TWO settings. This answers "did we change two things, or two hundred?"
-without anyone reading 1,968 config lines by eye.
+without anyone reading 2,987 settings by eye.
+
+It also guards the two things lib-builder gets WRONG BY DEFAULT for us: the
+chip variant, and settings whose stock value differs from what Espressif
+actually shipped in 55.03.311.
 
     python scripts/verify_p4_sdkconfig.py <path-to-new-sdkconfig>
 
@@ -28,6 +32,16 @@ INTENDED = {
     "CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM": "y",
     "CONFIG_CACHE_L2_CACHE_LINE_64B": "y",
 }
+
+# Settings that must MATCH THE BASELINE, because lib-builder's current defaults
+# do not. Found on the first real run: ESP_HOSTED_USE_MEMPOOL is =y in the
+# shipped 55.03.311 libraries and arrives OFF from lib-builder master. Leaving
+# it off disables the hosted mempool altogether - a far bigger change than the
+# one we came for, and it would likely make PREFER_SPIRAM meaningless, since
+# there would be no pool to prefer anything for.
+MUST_MATCH_BASELINE = (
+    "CONFIG_ESP_HOSTED_USE_MEMPOOL",
+)
 
 # Settings the two above are expected to drag with them. Changing a cache line
 # size is not a local edit - IDF recomputes sizes and alignments from it - so
@@ -97,6 +111,24 @@ def main():
         print("   See docs/REBUILD_P4_LIBS.md step 3.")
         return 2
     print("chip variant : esp32p4_es confirmed (pre-rev3, matches our silicon)")
+
+    # --- Settings that must not have drifted from the baseline.
+    drifted = []
+    for k in MUST_MATCH_BASELINE:
+        b, n = base.get(k, "<absent>"), new.get(k, "<absent>")
+        if b != n:
+            drifted.append((k, b, n))
+    if drifted:
+        print()
+        print("!! A SETTING THAT SHOULD MATCH THE BASELINE HAS DRIFTED !!")
+        for k, b, n in drifted:
+            print("   %s : baseline %s, new build %s" % (k, b, n))
+        print()
+        print("   lib-builder's defaults are not what Espressif shipped. Set it")
+        print("   back in menuconfig and rebuild; see docs/REBUILD_P4_LIBS.md")
+        print("   step 3. Do NOT install this build.")
+        return 4
+    print("baseline-match settings : ok")
     print()
 
     # --- Classify every difference.
