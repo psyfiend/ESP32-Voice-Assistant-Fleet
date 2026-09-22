@@ -191,6 +191,55 @@ sends none at all. That keeps a 2.5 KB task stack out of internal RAM on `CYD_S3
 
 ## What is next
 
+### THE P4 REBUILD IS DONE AND INSTALLED. A SOAK IS RUNNING (#61)
+
+2026-09-22. Both P4 boards are up on rebuilt libraries and neither shows the #243 signature.
+
+**Installed:** `~/.platformio/packages/framework-arduinoespressif32-libs/esp32p4_es`, rebuilt from
+lib-builder master (IDF 5.5.5, exact match). **Stock kept as `esp32p4_es.stock.55.03.311` - the
+rollback is a rename, and this is the one change in the project git cannot undo.**
+
+The four settings, verified in the installed `sdkconfig`:
+
+```
+CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y   the fix
+CONFIG_CACHE_L2_CACHE_LINE_64B=y            required alongside it (#219)
+CONFIG_ESP_HOSTED_USE_MEMPOOL=y             restored to baseline
+CONFIG_CACHE_L2_CACHE_256KB=y               stops the cache silently halving
+```
+
+**First boot, both boards:**
+
+| | `WS_P4_5` | `WS_P4_4B` |
+|---|---|---|
+| Internal heap free | **245.4 KB** | **245.4 KB** |
+| `RX buffer alloc failed` | none | none |
+| `rpc_core` timeout | none | none |
+| HA subscription | accepted | accepted |
+| Initial values | 18 / 18 | 18 / 18 |
+| C6 firmware | **stock** | **updated, 2.12.9** |
+
+**245 KB free is the proof the setting took at runtime.** Upstream reported internal-heap low
+rising from 17-58 KB to ~145 KB when the mempool moved to PSRAM; we are well past that. A config
+file saying `=y` proves nothing on its own.
+
+### The soak: one variable, two boards
+
+Same firmware, same libraries, **only the C6 version differs**.
+
+- **Both survive** -> the SPIRAM mempool is the fix and #59's C6 update was not needed
+- **Only the 4B survives** -> both were needed
+- **Neither survives** -> #243 is not the whole problem
+
+Before this, both died within SECONDS under exactly this workload - 18 REST fetches plus a
+websocket at boot is the bursty inbound TCP in #243's title. Read the result the cheap way:
+HA's `last_updated` on any entity a board publishes, from a PC, without touching anything.
+
+**A clean boot is necessary, not sufficient.** #243 stalls on repeated allocation pressure. Hours,
+not minutes, settle it.
+
+### The superseded plan
+
 ### IN FLIGHT RIGHT NOW - the P4 library rebuild (#61)
 
 A lib-builder run is underway in WSL as of 2026-09-21. If you are picking this up cold, this is
