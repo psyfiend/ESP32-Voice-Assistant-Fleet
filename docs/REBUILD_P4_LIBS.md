@@ -48,8 +48,12 @@ anything into place.**
 Needs admin and a reboot. From an elevated PowerShell:
 
 ```powershell
-wsl --install -d Ubuntu
+wsl --install -d Ubuntu-24.04
 ```
+
+Name the LTS explicitly. The bare `Ubuntu` alias tracks whatever Canonical currently defaults to
+and drifts over time; ESP-IDF is tested against the LTS releases. Confirm afterwards with
+`wsl -l -v` — it must say **version 2**, not 1.
 
 Reboot, let Ubuntu finish first-run setup, then:
 
@@ -57,8 +61,12 @@ Reboot, let Ubuntu finish first-run setup, then:
 sudo apt update
 sudo apt install -y git wget curl libssl-dev libncurses-dev flex bison \
                     gperf python3 python3-pip python3-venv cmake ninja-build \
-                    ccache libffi-dev dfu-util libusb-1.0-0
+                    ccache libffi-dev dfu-util libusb-1.0-0 jq
 ```
+
+**`jq` is not optional and is not in Espressif's own prerequisites list.** `build.sh` parses
+`configs/builds.json` with it to select the target, so a machine without it fails at the very first
+step with nothing useful in the output. Found on a fresh Ubuntu 24.04 install.
 
 **Work inside the WSL filesystem, not `/mnt/c/`.** WSL2's cross-filesystem I/O is dramatically
 slower and this build is I/O-bound. Clone to `~/`, and copy results across at the end.
