@@ -570,3 +570,51 @@ would have found this in minutes, at any point. The cost of not looking was week
 
 Corollary: keep the exact error text. `Req_WifiStaGetApInfo` was in our logs for weeks and was
 dismissed as noise; it is the literal search term that finds the answer.
+
+---
+
+## Rebuilding a vendor's prebuilt libraries: four traps, and the one that nearly shipped
+
+2026-09-22. We rebuilt arduino-esp32's ESP32-P4 libraries to change **two** sdkconfig settings.
+Full procedure in `docs/REBUILD_P4_LIBS.md`; this is what it cost to learn.
+
+**Three of the four came from trusting a NAME instead of reading the tool.**
+
+1. **lib-builder's branches are named after ESP-IDF, not Arduino.** `release/v3.3` looks like it
+   matches arduino-esp32 3.3.x. It is from December 2021 and pins ESP-IDF 3.3.
+2. **`build.sh -t` takes the CHIP VARIANT, not the target.** `-t esp32p4` silently skips the
+   `esp32p4_es` entry and builds for silicon we do not have. It would link, boot, and misbehave in
+   ways indistinguishable from new bugs.
+3. **menuconfig cannot work here, however honestly it says it saved.** The all-targets path opens
+   with `rm -rf build sdkconfig out`, so a plain `./build.sh` deletes the file menuconfig just
+   wrote. Only a defconfig inside `SDKCONFIG_DEFAULTS` survives. This cost a full build to discover.
+
+### The fourth one is the reason to keep a baseline
+
+Asserting `CONFIG_CACHE_L2_CACHE_LINE_64B=y` in a defconfig **silently halved the L2 cache**, 256 KB
+to 128 KB. Kconfig satisfied the option's `depends on CACHE_L2_CACHE_128KB || _256KB` by falling
+back to the size choice's own default. Nothing required it — 64-byte lines are perfectly legal at
+256 KB.
+
+Nothing in the build output mentioned it. It would have shipped, and surfaced weeks later on a
+display-heavy device as *"everything feels slower since the rebuild"*, with no suspect and no way
+back.
+
+**It was caught because we copied the shipped `sdkconfig` BEFORE touching anything** and wrote a
+checker that classifies every difference — intended, expected fallout, unexplained. That is the
+whole technique, and it generalises:
+
+> Before replacing anything a vendor built, capture exactly what it was. Afterwards, diff, and
+> require every single difference to be explainable. "The build succeeded" is not evidence.
+
+### Also worth keeping
+
+- **Espressif's own prerequisites list omits `jq`**, which `build.sh` needs to parse
+  `configs/builds.json`. A fresh Ubuntu fails at the first step with nothing useful on screen.
+- **A defconfig must contain only the DELTAS.** Copying the generated `sdkconfig` into one turns
+  2,987 settings into explicit overrides, defeats every defconfig earlier in the chain, and makes
+  the verification meaningless.
+- **`-s` skips environment setup, which is also what puts `idf.py` on `PATH`.** Source
+  `esp-idf/export.sh` first.
+- **Keep the stock folder.** The rollback for this is a rename. It is the only change in this
+  project that git cannot undo.
