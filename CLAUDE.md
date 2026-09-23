@@ -80,6 +80,15 @@ Sometimes it is — renaming a symbol across thirty files, say. Then:
 4. `grep` calling a source file "binary" is the other tell — but it only catches two of the three
    silent cases, so it does not replace the byte scan.
 
+### `Edit` has one trap of its own: deleting a line in a CRLF file
+
+Most files here are CRLF. Removing a whole line by matching `"\n    the line"` (leading newline,
+nothing after) and replacing it with `""` **joined the previous line to the next one** twice on
+2026-09-23 — once commenting out a member declaration behind a `//`, which broke the build, once
+silently gluing two statements onto one line, which did not. Delete a line by matching it *with its
+neighbours* and writing the neighbours back, then check `git diff` for a `+` line that holds two
+statements.
+
 ### The same trap in the other direction
 
 An anchor string used to *find* a patch site goes through the identical mangling. A search string

@@ -85,10 +85,16 @@ void UIToolkit::show_toast(const char* text, uint32_t duration_ms) {
     // Measuring the toast AFTER its text is set and centring it by hand does
     // not depend on when anything else was sized. Unverified on the two boards
     // that showed it - 2026-09-23.
+    //
+    // TOP_LEFT, EXPLICITLY. The first version of this used lv_obj_set_pos(),
+    // but the panel still carried the TOP_MID alignment from init() - and in
+    // LVGL x/y are offsets FROM the alignment point, so "(dw - tw) / 2" was
+    // measured from the centre and put the toast hard against the right edge
+    // on every board. The owner saw exactly that at 2.6.
     lv_obj_update_layout        (toast_panel);
     const int32_t dw = lv_display_get_horizontal_resolution(NULL);
     const int32_t tw = lv_obj_get_width(toast_panel);
-    lv_obj_set_pos              (toast_panel, (dw - tw) / 2, sc(60));
+    lv_obj_align                (toast_panel, LV_ALIGN_TOP_LEFT, (dw - tw) / 2, sc(60));
     lv_obj_move_foreground      (toast_panel);
     
     // Reset Timer

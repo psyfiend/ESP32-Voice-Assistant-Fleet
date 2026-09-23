@@ -294,7 +294,21 @@ void Card::build(lv_obj_t *parent) {
     // ever shown one, whatever the metrics asked for. Overflow-visible costs no
     // layer: it REMOVES a clip rather than adding one. The page's gaps and
     // inset are where the shadows land.
+    //
+    // AND THE FLAG ALONE IS NOT ENOUGH - round three shipped with only the
+    // flag, and the owner saw shadow only in the rounded corners, "like mud
+    // hanging off the corners", cut off sharply at the card's edge. LVGL 9.5's
+    // lv_obj_redraw() (lv_refr.c) clips an overflow-visible object's children
+    // to its coords PLUS ITS OWN ext_draw_size - and a transparent wrapper has
+    // none. So the wrapper declares one, big enough for its surface's shadow.
     lv_obj_add_flag               (_root, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    lv_obj_add_event_cb(_root, [](lv_event_t *e) {
+        const UIMetrics &m = UI::met();
+        if (!m.SHADOW) return;
+        // Blur reaches half its width past the edge; the drop adds its offset.
+        const int32_t need = UI::sc(m.SHADOW) / 2 + UI::sc(m.SHADOW_Y) + 2;
+        lv_event_set_ext_draw_size(e, need);
+    }, LV_EVENT_REFR_EXT_DRAW_SIZE, nullptr);
 
     if (_hdrStyle == CardHeaderStyle::HDR_TAG) {
         _tagRow = lv_obj_create(_root);
@@ -460,6 +474,9 @@ void Card::restyle() {
     lv_obj_set_style_shadow_width   (_surface, UI::sc(m.SHADOW), 0);
     lv_obj_set_style_shadow_offset_y(_surface, UI::sc(m.SHADOW_Y), 0);
     lv_obj_set_style_shadow_opa     (_surface, m.SHADOW ? (lv_opa_t)m.SHADOW_OPA : LV_OPA_TRANSP, 0);
+    // The wrapper's clip margin follows the metrics - see build(). LVGL only
+    // asks for it again when told to.
+    lv_obj_refresh_ext_draw_size(_root);
 
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
     // BAR ONLY. This said "not TAG", which also reserved a header's height in
@@ -658,13 +675,25 @@ lv_obj_t *Card::makeCornerIcon(lv_obj_t *body) {
 //    the columns. It's only when you add a 4th row that the hero moves up
 //    towards the icon which requires the smaller icon size."
 //
-// So: MD at 3 rows or fewer, SM at 4 or more. Columns do not enter into it.
-// A card the page never told (0 rows) keeps SM, the old behaviour.
-static constexpr uint8_t CORNER_MD_MAX_ROWS = 3;
+// Round five: rows alone gave the P4_5 the large corner too, and there it ran
+// into text ("I don't think the P4_5 needs the larger icons like the 7B did").
+// A row count is not a size - three rows on a 5-inch panel are much shorter
+// cards than three rows on a 7-inch one. What the owner was describing on the
+// 7B is PHYSICAL card height, and what varies with columns (the width) is
+// what he said should not matter.
+//
+// So: MD when the card is at least CORNER_MD_MIN_MM tall, in millimetres on
+// glass, whatever the columns. At the default grids that puts the 7B's
+// three-row cards (~20-23 mm, deck and header or not) on MD and its four-row
+// cards (~15 mm) on SM, and keeps WS_P4_5 (~16 mm) on SM. The 4-inch pair
+// land near 19 mm and get MD - unjudged on glass.
+static constexpr float CORNER_MD_MIN_MM = 17.5f;
 
 const lv_font_t *Card::cornerFont() const {
-    return (_pageRows > 0 && _pageRows <= CORNER_MD_MAX_ROWS) ? UI::type().ICON_MD
-                                                               : UI::type().ICON_SM;
+    const float ppi = (float)bspPixelDensity();
+    if (ppi <= 0.f) return UI::type().ICON_SM;
+    const float hMm = (float)surfaceHeightPx() * 25.4f / ppi;
+    return (hMm >= CORNER_MD_MIN_MM) ? UI::type().ICON_MD : UI::type().ICON_SM;
 }
 
 void Card::renderCornerIcon(lv_obj_t *icon, const char *glyph, uint32_t hex) const {
@@ -838,14 +867,18 @@ void Card::applyDiagonal() {
         lv_obj_clear_flag(_diagonal, LV_OBJ_FLAG_CLICKABLE);
     }
 
-    // Sized from the TOKENS rather than by measuring, for the same reason
-    // resolveVariant() is: a card has no cell when this first runs, and
-    // lv_obj_update_layout() here walked the whole screen once per card per
-    // repaint. The line is redrawn on the next restyle anyway.
-    const UIGrid &g = UI::grid();
-    int32_t w = (int32_t)g.cellW * (_place.prefSpanX ? _place.prefSpanX : 1);
-    int32_t h = (int32_t)g.cellH * (_place.prefSpanY ? _place.prefSpanY : 1);
-    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+    // Sized from what the PAGE handed over, not by measuring: a card has no
+    // laid-out size when this first runs, and lv_obj_update_layout() here
+    // walked the whole screen once per card per repaint.
+    //
+    // The fallback used to be UI::grid().cellW x prefSpanX - which has been
+    // WRONG since 2.5 made spans UNITS: a one-cell card is prefSpan 2, so the
+    // line was drawn for a card twice the size. It only looked right because
+    // a later restyle, with the card laid out, read the real size instead. The
+    // owner caught it at 2.6: reboot with a card already N/A, swipe to it, and
+    // the diagonal was in the wrong place until a knob forced a restyle.
+    int32_t w = cellWidthPx() > 0 ? cellWidthPx() : (int32_t)UI::grid().cellW;
+    int32_t h = surfaceHeightPx();
     const int32_t mw = lv_obj_get_width(_surface);
     const int32_t mh = lv_obj_get_height(_surface);
     if (mw > 8) w = mw;

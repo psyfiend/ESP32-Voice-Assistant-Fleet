@@ -127,20 +127,24 @@ void Panel_Header::setPage(const char *title, uint8_t index, uint8_t count) {
     }
 
     lv_label_set_text(pageTitle, title ? title : "");
-    pageIndex = index;
-    pageCount = count;
 
     // Rebuild the dots - there are at most a dozen, and it happens once per
     // page change. The ">12 pages" case is a label instead of dots.
     lv_obj_clean(pageDots);
     if (count > 1 && count <= PAGE_DOTS_MAX) {
-        const int32_t d = UIToolkit::sc(7);
+        // CURRENT AND OTHER DIFFER BY SHAPE AND SIZE, NOT ONLY BY COLOUR. The
+        // owner is a little colour-blind and found two same-sized dots in two
+        // colours hard to tell apart. The current page is a larger filled dot;
+        // the others are smaller hollow rings. Readable in greyscale.
         for (uint8_t i = 0; i < count; i++) {
+            const bool cur = (i == index);
+            const int32_t d = UIToolkit::sc(cur ? 11 : 8);
             lv_obj_t *dot = lv_obj_create(pageDots);
             lv_obj_remove_style_all(dot);
             lv_obj_set_size        (dot, d, d);
             lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-            lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+            lv_obj_set_style_bg_opa(dot, cur ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(dot, cur ? 0 : UIToolkit::sc(2), 0);
         }
     } else if (count > PAGE_DOTS_MAX) {
         lv_obj_t *l = lv_label_create(pageDots);
@@ -148,6 +152,28 @@ void Panel_Header::setPage(const char *title, uint8_t index, uint8_t count) {
         lv_obj_set_style_text_font(l, UIToolkit::Font_Label, 0);
     }
     paintPage();
+
+    // ROOM FOR THE DEVICE NAME, measured. On CYD_S3_3248 (320 px) the centred
+    // page title landed on top of the device name. Where the name cannot have
+    // a useful width left of the centred group, it gives way entirely and the
+    // page group takes its place at the left - which is where the owner first
+    // asked for the page title to go. Elsewhere it is shortened with "..."
+    // only if it has to be.
+    lv_obj_update_layout(container);
+    const int32_t barW   = lv_obj_get_content_width(container);
+    const int32_t boxW   = lv_obj_get_width(pageBox);
+    const int32_t roomL  = barW / 2 - boxW / 2 - UIToolkit::sc(10);
+    if (roomL >= UIToolkit::sc(60)) {
+        lv_obj_clear_flag     (lbl_title, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_long_mode(lbl_title, LV_LABEL_LONG_DOT);
+        lv_obj_set_width      (lbl_title, LV_SIZE_CONTENT);
+        lv_obj_update_layout  (container);
+        if (lv_obj_get_width(lbl_title) > roomL) lv_obj_set_width(lbl_title, roomL);
+        lv_obj_align(pageBox, LV_ALIGN_CENTER, 0, 0);
+    } else {
+        lv_obj_add_flag(lbl_title, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_align   (pageBox, LV_ALIGN_LEFT_MID, 0, 0);
+    }
 }
 
 void Panel_Header::paintPage() {
@@ -157,10 +183,12 @@ void Panel_Header::paintPage() {
     const uint32_t n = lv_obj_get_child_count(pageDots);
     for (uint32_t i = 0; i < n; i++) {
         lv_obj_t *c = lv_obj_get_child(pageDots, i);
-        // The current page in the accent; the others dim. For the "3 / 15"
-        // label the single child takes the dim colour.
-        const bool cur = (pageCount <= PAGE_DOTS_MAX) && (i == pageIndex);
-        lv_obj_set_style_bg_color  (c, UI::c(cur ? p.ACCENT : p.TEXT_DIM), 0);
-        lv_obj_set_style_text_color(c, UI::c(p.TEXT_DIM), 0);
+        // Which dot is current is decided by its SHAPE, in setPage(); this
+        // only colours them. The filled dot takes the accent, the hollow rings
+        // take TEXT rather than TEXT_DIM so a ring is still plainly visible.
+        // The "3 / 15" label reads its colour from text_color.
+        lv_obj_set_style_bg_color    (c, UI::c(p.ACCENT), 0);
+        lv_obj_set_style_border_color(c, UI::c(p.TEXT), 0);
+        lv_obj_set_style_text_color  (c, UI::c(p.TEXT_DIM), 0);
     }
 }

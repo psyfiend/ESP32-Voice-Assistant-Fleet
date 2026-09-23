@@ -45,6 +45,23 @@ the page-change toast should now be top-centre. **Unverified** - neither is on t
 **R9/T10 — Refused.** Tap **Refuse**.
 - PASS: it lights immediately (optimistic), then about 3 s later springs back with FAILED.
 
+## Round two of 2.6 — flashed 2026-09-23
+
+First-round results: P1-P5, P7, R9 PASS; P5 overlap on the 3248; P6 FAIL (toast against the right
+edge); T15 partial (diagonal misplaced after reboot); C1 FAIL on the P4_5; C2 PASS; C3 partial.
+
+**Q1 — Toast.** Centred at the top on both benches. (Cause: x was an offset from the centre.)
+**Q2 — 3248 header.** No overlap: on a bar too narrow for both, the device name gives way and the
+page title and dots sit at the left.
+**Q3 — Dots.** Current page a larger filled dot; the others smaller hollow rings. Tell them apart
+without relying on colour.
+**Q4 — T15 again.** Leave Reading N/A, reboot, swipe to Fleet: the diagonal runs corner to corner.
+(Cause: a fallback computed the card twice its real size.)
+**Q5 — Corner size.** Now by the card's physical HEIGHT (17.5 mm and up = larger). P4_5: back to
+the small ones. 7B, when next flashed: large at 3 rows with or without header and deck, small at 4.
+**Q6 — Linen shadow, properly this time.** A shadow along the bottom edge and down the sides of every
+card, not just in the corners. (Cause: the wrapper's clip margin was zero, see Card.cpp.)
+
 ## 2.7 round four
 
 **C1 — Corner size by rows.** 3 rows or fewer: the larger corner icons, whatever the columns

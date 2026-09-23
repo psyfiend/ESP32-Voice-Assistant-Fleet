@@ -49,8 +49,6 @@ private:
     lv_obj_t* pageBox   = nullptr;
     lv_obj_t* pageTitle = nullptr;
     lv_obj_t* pageDots  = nullptr;
-    uint8_t   pageIndex = 0;
-    uint8_t   pageCount = 0;
     void paintPage();              // colours only; called by setPage and restyle
     Widget_ConnStatus connStatus;  // replaces the old static LV_SYMBOL_WIFI label
     Widget_MqttStatus mqttStatus;  // sibling glyph; the two fail independently

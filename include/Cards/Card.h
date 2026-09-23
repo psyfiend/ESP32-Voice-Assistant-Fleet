@@ -87,10 +87,6 @@ public:
     // icon's size follows the card's SHORT side, not only its height.
     Card &setCellWidthPx(int32_t px) { _cellWPx = px; return *this; }
 
-    // How many CELL rows the page it sits on has. The corner icon's size
-    // follows it - see Card::cornerFont(). 0 = nobody said.
-    Card &setPageRows(uint8_t rows) { _pageRows = rows; return *this; }
-
     // Which unit this card renders a temperature in. TEMP_INHERIT defers to
     // the fleet setting - see cardTempUnit() in CardIcons.h.
     Card &setTempUnit(TempUnit u) { _tempUnit = u; return *this; }
@@ -447,7 +443,6 @@ private:
     uint32_t        _longStaleMs = 0;     // 0 = ask cardLongStaleMs()
     int32_t         _cellPx      = 0;     // set by CardPage::commit()
     int32_t         _cellWPx     = 0;     // likewise; 0 = nobody said
-    uint8_t         _pageRows    = 0;     // likewise
     bool            _valueSmall  = false; // resolveVariant(): hero at VALUE_SM
     TempUnit        _tempUnit    = TempUnit::TEMP_INHERIT;
     CardLabel       _labelMode   = CardLabel::LBL_INHERIT;
