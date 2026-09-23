@@ -1088,8 +1088,18 @@
 /** 1: Enable API to take snapshot for object */
 #define LV_USE_SNAPSHOT 0
 
-/** 1: Enable system monitor component */
-#define LV_USE_SYSMON   0
+/** 1: Enable system monitor component
+ *
+ * ON since 2026-09-23 for the FPS/CPU overlay the owner asked for, toggled by
+ * a swipe up from the bottom-right (GUIManager::togglePerf). LVGL creates it
+ * SHOWING when the display is made; GUIManager hides and pauses it at boot.
+ *
+ * What "CPU" means here, read from lv_os_none.c rather than assumed: with
+ * LV_OS_NONE, LV_SYSMON_GET_IDLE is lv_timer_get_idle() - the share of time
+ * LVGL's own timer handler spent idle. So it is LVGL's load, NOT the chip's:
+ * the websocket task, WiFi and everything else on the other core or between
+ * lv_timer_handler() calls are invisible to it. */
+#define LV_USE_SYSMON   1
 #if LV_USE_SYSMON
     /** Get the idle percentage. E.g. uint32_t my_get_idle(void); */
     #define LV_SYSMON_GET_IDLE lv_os_get_idle_percent
@@ -1103,8 +1113,10 @@
 
     /** 1: Show CPU usage and FPS count.
      *  - Requires `LV_USE_SYSMON = 1` */
-    #define LV_USE_PERF_MONITOR 0
+    #define LV_USE_PERF_MONITOR 1
     #if LV_USE_PERF_MONITOR
+        /* Bottom-right, where the swipe that toggles it starts. On the system
+         * layer, so it draws over the deck and the cards alike. */
         #define LV_USE_PERF_MONITOR_POS LV_ALIGN_BOTTOM_RIGHT
 
         /** 0: Displays performance data on the screen; 1: Prints performance data using log. */

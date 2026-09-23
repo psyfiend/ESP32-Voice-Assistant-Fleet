@@ -300,15 +300,10 @@ void Card::build(lv_obj_t *parent) {
     // hanging off the corners", cut off sharply at the card's edge. LVGL 9.5's
     // lv_obj_redraw() (lv_refr.c) clips an overflow-visible object's children
     // to its coords PLUS ITS OWN ext_draw_size - and a transparent wrapper has
-    // none. So the wrapper declares one, big enough for its surface's shadow.
-    lv_obj_add_flag               (_root, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
-    lv_obj_add_event_cb(_root, [](lv_event_t *e) {
-        const UIMetrics &m = UI::met();
-        if (!m.SHADOW) return;
-        // Blur reaches half its width past the edge; the drop adds its offset.
-        const int32_t need = UI::sc(m.SHADOW) / 2 + UI::sc(m.SHADOW_Y) + 2;
-        lv_event_set_ext_draw_size(e, need);
-    }, LV_EVENT_REFR_EXT_DRAW_SIZE, nullptr);
+    // none. So the wrapper declares one, big enough for its surface's shadow -
+    // UI::unclipShadows(), shared with every other container that lets a
+    // child's shadow out (the drawer's button rows, the tag row below).
+    UI::unclipShadows(_root);
 
     if (_hdrStyle == CardHeaderStyle::HDR_TAG) {
         _tagRow = lv_obj_create(_root);
@@ -319,6 +314,9 @@ void Card::build(lv_obj_t *parent) {
         lv_obj_set_style_pad_all      (_tagRow, 0, 0);
         lv_obj_clear_flag             (_tagRow, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_clear_flag             (_tagRow, LV_OBJ_FLAG_CLICKABLE);
+        // The area and STALE pills cast the scheme's shadow (Linen), and the
+        // row they sit in is exactly their height - so it must not clip them.
+        UI::unclipShadows(_tagRow);
     }
 
     _surface = lv_obj_create(_root);
@@ -432,6 +430,12 @@ void Card::buildHeader() {
         _stale = makeStrip(_tagRow);
         lv_obj_set_width (_stale, LV_SIZE_CONTENT);
         lv_obj_align     (_stale, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+
+        // Both pills float above the page like the card does, so they cast
+        // the same shadow - nothing on a scheme without one. The owner's
+        // Linen request, 2026-09-23.
+        lv_obj_add_style (_header, UI::paint(UIPaint::PAINT_LIFT), 0);
+        lv_obj_add_style (_stale,  UI::paint(UIPaint::PAINT_LIFT), 0);
     } else {
         lv_obj_set_width (_header, lv_pct(100));
         lv_obj_align     (_header, LV_ALIGN_TOP_MID, 0, 0);
@@ -474,9 +478,6 @@ void Card::restyle() {
     lv_obj_set_style_shadow_width   (_surface, UI::sc(m.SHADOW), 0);
     lv_obj_set_style_shadow_offset_y(_surface, UI::sc(m.SHADOW_Y), 0);
     lv_obj_set_style_shadow_opa     (_surface, m.SHADOW ? (lv_opa_t)m.SHADOW_OPA : LV_OPA_TRANSP, 0);
-    // The wrapper's clip margin follows the metrics - see build(). LVGL only
-    // asks for it again when told to.
-    lv_obj_refresh_ext_draw_size(_root);
 
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
     // BAR ONLY. This said "not TAG", which also reserved a header's height in

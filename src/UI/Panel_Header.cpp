@@ -23,6 +23,9 @@ void Panel_Header::init(lv_obj_t* parent, const char* title, ConnectivityManager
     lv_obj_set_style_border_color(container, UI::c(UI::pal().ACCENT), 0); // Cyan Blue
 
     lv_obj_set_style_radius     (container, 0, 0);
+    // The scheme's drop shadow, onto the page below - nothing on a scheme
+    // without one. The owner's Linen request, 2026-09-23.
+    lv_obj_add_style            (container, UI::paint(UIPaint::PAINT_LIFT), 0);
     lv_obj_set_style_pad_all    (container, 0, 0); // Remove padding so button hits edge
     lv_obj_set_style_pad_left   (container, UIToolkit::sc(15), 0); // Restore left pad for title
     lv_obj_set_style_pad_right  (container, UIToolkit::sc(5), 0); // Small pad for button

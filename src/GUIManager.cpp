@@ -313,6 +313,11 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
             // three seconds. The owner asked for it and it is the right
             // symmetry: the gesture that brought it down should take it back.
             s_self->unpeekHeader();
+        } else if (rightHalf) {
+            // RIGHT half: the FPS/CPU overlay, which sits in that corner. The
+            // owner's split, 2026-09-23 - the mirror of the top edge, where the
+            // two halves already open different things.
+            s_self->togglePerf();
         } else {
             s_self->toggleDeck();
         }
@@ -404,6 +409,12 @@ void GUIManager::begin() {
     // milestone 2.2 lands on.
     SystemCore::heapMark("before UI");
     UIToolkit::init();
+
+    // LVGL shows its FPS/CPU overlay by itself when the display is created
+    // (lv_display.c, LV_USE_PERF_MONITOR). It is an instrument, not chrome:
+    // off until asked for. See togglePerf().
+    lv_sysmon_performance_pause(nullptr);
+    lv_sysmon_hide_performance(nullptr);
 
     // The starting scheme. UITokens defaults to Fleet; the owner's pick is
     // Midnight (Slate, which this used to be, was deleted 2026-09-23 as a
@@ -1148,6 +1159,16 @@ void GUIManager::goToPage(int16_t index) {
     UIToolkit::show_toast(t, 1500);
     Serial.printf("[Pages] -> %s (%u of %u)\n", _pages[_curPage].spec->slug,
                   (unsigned)_curPage + 1, (unsigned)_nPages);
+}
+
+void GUIManager::togglePerf() {
+    _showPerf = !_showPerf;
+    // Paused as well as hidden when off: a hidden label still has a timer
+    // refreshing it, and an instrument should not cost anything while nobody
+    // is looking at it.
+    if (_showPerf) { lv_sysmon_show_performance(nullptr); lv_sysmon_performance_resume(nullptr); }
+    else           { lv_sysmon_performance_pause(nullptr); lv_sysmon_hide_performance(nullptr); }
+    Serial.printf("[UI] perf overlay %s\n", _showPerf ? "shown" : "hidden");
 }
 
 void GUIManager::toggleDeck() {

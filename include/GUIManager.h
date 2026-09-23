@@ -60,6 +60,11 @@ public:
     void nudgeRows(int8_t steps);
     void toggleDeck();
 
+    // LVGL's FPS / CPU overlay, bottom-right. Swipe up from the bottom-right
+    // to toggle; the bottom-left keeps the deck. Hidden at boot. The CPU
+    // figure is LVGL's own load, not the chip's - see lv_conf.h.
+    void togglePerf();
+
     // Cycle the header treatment on the live dashboard: tag -> bar -> none.
     //
     // All three modes ship permanently - cards.md is explicit that picking one
@@ -162,6 +167,7 @@ private:
     // It costs a row of cards on every board, which is a real trade rather
     // than a preference - see buildDashboard().
     bool          _showDeck = false;    // the cards get the height instead
+    bool          _showPerf = false;    // the FPS/CPU overlay
 
     // Overrides PageSpec::headerDefault. The spec is const; this is the live
     // choice laid over it in buildDashboard().

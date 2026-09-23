@@ -310,6 +310,20 @@ static void refreshPaints() {
     lv_style_set_text_color  (st(UIPaint::PAINT_ACCENT_TEXT), c(s_pal.ACCENT));
     lv_style_set_bg_color    (st(UIPaint::PAINT_ACCENT_BG),   c(s_pal.ACCENT));
 
+    // The lifts. Same metrics the cards use, so everything that floats casts
+    // the same shadow; the small one is half the blur and a third of the drop.
+    // Zero width on a scheme without shadows, which is the "nothing" case.
+    lv_style_t *lift = st(UIPaint::PAINT_LIFT);
+    lv_style_set_shadow_width   (lift, sc(s_met.SHADOW));
+    lv_style_set_shadow_offset_y(lift, sc(s_met.SHADOW_Y));
+    lv_style_set_shadow_opa     (lift, s_met.SHADOW ? (lv_opa_t)s_met.SHADOW_OPA : LV_OPA_TRANSP);
+    lv_style_set_shadow_color   (lift, lv_color_black());
+    lv_style_t *liftSm = st(UIPaint::PAINT_LIFT_SM);
+    lv_style_set_shadow_width   (liftSm, sc(s_met.SHADOW) / 2);
+    lv_style_set_shadow_offset_y(liftSm, (sc(s_met.SHADOW_Y) + 2) / 3);
+    lv_style_set_shadow_opa     (liftSm, s_met.SHADOW ? (lv_opa_t)s_met.SHADOW_OPA : LV_OPA_TRANSP);
+    lv_style_set_shadow_color   (liftSm, lv_color_black());
+
     // NULL means "every style changed": each object re-reads what it uses and
     // invalidates itself. A scheme change is a rare, deliberate act, so the
     // whole-tree walk is the right price for never missing a widget.
@@ -327,6 +341,28 @@ lv_style_t *paint(UIPaint p) {
     const int i = (int)p;
     return (i >= 0 && i < (int)UIPaint::PAINT_COUNT) ? &s_paint[i]
                                                      : &s_paint[0];
+}
+
+// The largest reach any scheme's shadow has past its object's edge. Linen is
+// the only scheme with one; computing it from the metrics keeps this honest if
+// that changes.
+static int32_t shadowReachPx() {
+    const UIMetrics *all[] = { &UI_MET_DARK, &UI_MET_LIGHT };
+    int32_t r = 0;
+    for (const UIMetrics *m : all) {
+        const int32_t v = sc(m->SHADOW) / 2 + sc(m->SHADOW_Y) + 2;
+        if (m->SHADOW && v > r) r = v;
+    }
+    return r;
+}
+
+void unclipShadows(lv_obj_t *container) {
+    if (!container) return;
+    lv_obj_add_flag(container, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    lv_obj_add_event_cb(container, [](lv_event_t *e) {
+        lv_event_set_ext_draw_size(e, shadowReachPx());
+    }, LV_EVENT_REFR_EXT_DRAW_SIZE, nullptr);
+    lv_obj_refresh_ext_draw_size(container);
 }
 
 void setScheme(const UIPalette &p, const UIMetrics &m) {

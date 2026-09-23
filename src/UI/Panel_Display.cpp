@@ -36,7 +36,7 @@ void Panel_Display::slider_bri_cb(lv_event_t * e) {
 
     char buf[32];
     snprintf(buf, sizeof(buf), "Brightness: %d%%", (int)displayPct);
-    UIToolkit::show_toast(buf, 1000);
+    UIToolkit::show_toast(buf, 1000, "Brightness: 100%");   // fixed width
 }
 
 void Panel_Display::sw_touch_viz_cb(lv_event_t * e) {

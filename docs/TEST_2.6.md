@@ -62,6 +62,28 @@ the small ones. 7B, when next flashed: large at 3 rows with or without header an
 **Q6 — Linen shadow, properly this time.** A shadow along the bottom edge and down the sides of every
 card, not just in the corners. (Cause: the wrapper's clip margin was zero, see Card.cpp.)
 
+## Round three of 2.6 — flashed 2026-09-23
+
+Round-two results: Q1-Q6 all PASS.
+
+**L1 — Linen lift.** On Linen, the same drop shadow the cards have now falls under: the toast, the
+header bar (onto the page), the system drawer (it grows with the drawer as it opens), the AUDIO and
+DISPLAY panels, and the Bar/Tag area pills. The drawer's buttons get a smaller one.
+- FAIL: a shadow that stops sharply at an edge (something still clipping it), or a thin shadow line
+  under the header when the drawer is CLOSED.
+- On Fleet and Midnight: no change at all.
+
+**L2 — Toast.** A thick accent-coloured border. Drag the volume and brightness sliders slowly and
+fast: the toast stays exactly the same width and "Volume:" / "Brightness:" do not move - only the
+digits change. It says "Volume", not "Vol".
+
+**L3 — Perf overlay.** Swipe up from the bottom edge, RIGHT half: FPS and CPU appear bottom-right.
+Again: gone. Bottom edge, LEFT half: still the deck.
+- The CPU figure is LVGL's own load (time its timer handler is busy), NOT the whole chip - WiFi,
+  the websocket task and everything outside lv_timer_handler() are invisible to it.
+- Worth reading on the P4_5: FPS while an accordion panel opens, Linen vs Midnight. That answers
+  "is Linen slower, or does it only look it".
+
 ## 2.7 round four
 
 **C1 — Corner size by rows.** 3 rows or fewer: the larger corner icons, whatever the columns

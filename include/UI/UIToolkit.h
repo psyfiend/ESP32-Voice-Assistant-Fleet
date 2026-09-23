@@ -63,7 +63,11 @@ public:
     static void     init();
 
     // Show a floating toast message
-    static void     show_toast(const char* text, uint32_t duration_ms = 2000);
+    // `widthOf`, when given, fixes the toast's width to that string's and
+    // left-aligns the text, so a readout that repeats while a slider moves
+    // stays still. Pass the WIDEST value it can show, e.g. "Volume: 100%".
+    static void     show_toast(const char* text, uint32_t duration_ms = 2000,
+                               const char* widthOf = nullptr);
 
     // Widget Generators
     static lv_obj_t*    create_collapsible_panel(lv_obj_t* parent, const char* title, lv_obj_t** content_container);
