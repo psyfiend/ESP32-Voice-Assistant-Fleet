@@ -7,9 +7,7 @@
 #include "UI/ReferencePage.h"
 #include "UI/LogPage.h"
 #include "Dashboards/Dashboard_Fleet.h"
-#ifdef USE_HA_DASHBOARD
-#include "Dashboards/Dashboard_HA.h"
-#endif
+#include "Dashboards/Dashboard_HA.h"   // both pages on every board since 2.6
 #include "bsp_loader.h"
 
 // LVGL's event and callback APIs take plain function pointers with no user
@@ -320,10 +318,26 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
         }
         break;
 
+    case LV_DIR_LEFT:                        // swipe LEFT  -> next page
+    case LV_DIR_RIGHT:                       // swipe RIGHT -> previous page
+        // FROM ANYWHERE on the page - no edge band. That is the convention on
+        // every phone, and nothing on a card claims a horizontal drag: cards
+        // are not scrollable and the one slider-like control, the deck's
+        // sliders, no longer bubble gestures at all (UIToolkit).
+        //
+        // Not while the drawer is open or a header is peeking: both are
+        // "something is on top of the page", and turning the page under them
+        // would change what the user cannot see.
+        if (s_self->_pnlSystem.isExpanded() || s_self->_headerPeeking) {
+            DBG_GESTURE("horizontal swipe ignored: drawer or peek in the way\n");
+            break;
+        }
+        release();
+        if (dir == LV_DIR_LEFT) s_self->nextPage();
+        else                    s_self->prevPage();
+        break;
+
     default:
-        // Horizontal swipes belong to page navigation, which is the rest of
-        // 2.6 and does not exist yet. Left unclaimed rather than bound to
-        // something plausible.
         DBG_GESTURE("gesture dir %d ignored\n", (int)dir);
         break;
     }
@@ -679,6 +693,11 @@ void GUIManager::begin() {
     // Built LAST so it can read the real geometry of everything above it, and
     // moved to index 1 so the deck's panels expand over the cards rather than
     // pushing them - which is what the owner asked to see.
+    //
+    // The pages first (2.6): which page, and that page's own settings, decide
+    // what buildDashboard() builds. Boot always lands on the first page.
+    initPages();
+    loadPageState();
     buildDashboard();
     SystemCore::heapMark("after dashboard");
 }
@@ -767,18 +786,10 @@ void GUIManager::buildDashboard() {
     // laid over a copy of it. PageSpec is a plain aggregate, so this is a copy
     // and an assignment rather than any kind of mechanism - which is the point
     // of the spec being data.
-    // WHICH PAGE THIS BOARD BOOTS INTO.
-    //
-    // An either/or rather than a choice, and only until 2.6. A board can show
-    // exactly one page today, and 18 HA cards plus 12 fleet cards fit nowhere,
-    // so -D USE_HA_DASHBOARD swaps the whole page. When horizontal swipes land
-    // this becomes two pages and the flag goes away - HA_PAGE already carries
-    // id 2 for that day.
-#ifdef USE_HA_DASHBOARD
-    PageSpec page = HA_PAGE;
-#else
-    PageSpec page = FLEET_PAGE;
-#endif
+    // THE CURRENT PAGE, and its own settings laid over its spec. Until 2.6
+    // this was an either/or picked by -D USE_HA_DASHBOARD, because a board
+    // could only show one page; the flag is gone and every board has both.
+    PageSpec page = *_pages[_curPage].spec;
     page.headerDefault  = _hdr;
     page.variantDefault = _variant;
     page.showArea       = _showArea;
@@ -787,6 +798,10 @@ void GUIManager::buildDashboard() {
     _pnlSystem.setHeaderLabel(_hdr == CardHeaderStyle::HDR_TAG  ? "Tag"
                             : _hdr == CardHeaderStyle::HDR_BAR  ? "Bar"
                                                                 : "No hdr");
+
+    // The page indicator: this page's title, centred in the bar, and a dot
+    // per page. Set on every build so a knob that rebuilds cannot lose it.
+    _header.setPage(page.title, _curPage, _nPages);
 
     // THE DASHBOARD GOES TO THE BACK, by role rather than by index.
     //
@@ -1016,6 +1031,123 @@ void GUIManager::nudgeRows(int8_t steps) {
     if (_rowsOverride) snprintf(lbl, sizeof(lbl), "Row %u", (unsigned)_rowsOverride);
     else               snprintf(lbl, sizeof(lbl), "Row A");
     _pnlSystem.setRowsLabel(lbl);
+}
+
+// ---------------------------------------------------------------------------
+// Pages - milestone 2.6. docs/design/pages.md.
+// ---------------------------------------------------------------------------
+
+// THE SWIPE ORDER. House first, then Fleet - the owner's call, 2026-09-22.
+// Order is a list and has nothing to do with the page ids, which are frozen
+// identities (Fleet is id 1 and stays id 1 while being page 2).
+//
+// NO OVERFLOW between them, also the owner's call: each page shows what fits
+// and drops the rest by priority, as it did alone. A card never moves pages.
+void GUIManager::initPages() {
+    const PageSpec *order[] = { &HA_PAGE, &FLEET_PAGE };
+    _nPages = 0;
+    for (const PageSpec *s : order) {
+        if (_nPages >= GUI_MAX_PAGES) break;
+        // Every page starts from the SAME defaults the dashboard always had -
+        // the board's grid, compact, bar headers - so the first swipe changes
+        // what is on the page and nothing about how it looks. The working set
+        // at this moment holds exactly those defaults.
+        _pages[_nPages++] = PageLive{
+            .spec = s, .hdr = _hdr, .variant = _variant, .fill = _fill,
+            .label = cardLabelMode(), .showArea = _showArea,
+            .cols = _colsOverride, .rows = _rowsOverride,
+            .scheme = UI::schemeIndex(),
+        };
+    }
+    _curPage = 0;
+}
+
+void GUIManager::savePageState() {
+    if (_curPage >= _nPages) return;
+    PageLive &p = _pages[_curPage];
+    p.hdr      = _hdr;
+    p.variant  = _variant;
+    p.fill     = _fill;
+    p.label    = cardLabelMode();
+    p.showArea = _showArea;
+    p.cols     = _colsOverride;
+    p.rows     = _rowsOverride;
+    p.scheme   = UI::schemeIndex();
+}
+
+void GUIManager::loadPageState() {
+    if (_curPage >= _nPages) return;
+    const PageLive &p = _pages[_curPage];
+    _hdr          = p.hdr;
+    _variant      = p.variant;
+    _fill         = p.fill;
+    _showArea     = p.showArea;
+    _colsOverride = p.cols;
+    _rowsOverride = p.rows;
+
+    // The three that live outside this class, applied where they live.
+    StateCard::setFill(_fill);
+    cardSetLabelMode(p.label);
+    UI::setColumnsOverride(_colsOverride);
+
+    // Colour is per page too. setSchemeIndex() is a no-op when the scheme is
+    // already right, so two pages in the same scheme cost nothing here.
+    if (UI::schemeIndex() != p.scheme) {
+        UI::setSchemeIndex(p.scheme);
+        applyGround();
+        _header.restyle();
+    }
+    refreshKnobLabels();
+}
+
+// Every drawer label from the working set, so the drawer describes the page
+// you are on rather than the last one a knob was pressed on.
+void GUIManager::refreshKnobLabels() {
+    char lbl[12];
+    if (_colsOverride) snprintf(lbl, sizeof(lbl), "Col %u", (unsigned)_colsOverride);
+    else               snprintf(lbl, sizeof(lbl), "Col A");
+    _pnlSystem.setColsLabel(lbl);
+    if (_rowsOverride) snprintf(lbl, sizeof(lbl), "Row %u", (unsigned)_rowsOverride);
+    else               snprintf(lbl, sizeof(lbl), "Row A");
+    _pnlSystem.setRowsLabel(lbl);
+
+    _pnlSystem.setVariantLabel(_variant == CardVariant::VAR_AUTO ? "Auto"
+                             : _variant == CardVariant::VAR_FULL ? "Full" : "Cmpct");
+    _pnlSystem.setFillLabel(_fill == StateCardFill::FILL_SURFACE ? "Fill" : "Icon");
+    _pnlSystem.setAreaLabel(_showArea ? "Area" : "No Area");
+    const CardLabel l = cardLabelMode();
+    _pnlSystem.setLabelModeLabel(l == CardLabel::LBL_NAME  ? "Name"
+                               : l == CardLabel::LBL_STATE ? "State" : "No lbl");
+    _pnlSystem.setSchemeLabel(UI::pal().name);
+    // The header-mode label is set by buildDashboard(), which every page change
+    // goes through.
+}
+
+void GUIManager::goToPage(int16_t index) {
+    if (_nPages < 2) return;
+
+    // WRAP-AROUND, both ways. The owner asked for it to be tested now, whether
+    // or not it stays the default: with many pages, no-wrap means swiping all
+    // the way back to reach page 1.
+    const int16_t n = (int16_t)_nPages;
+    const uint8_t next = (uint8_t)(((index % n) + n) % n);
+    if (next == _curPage) return;
+
+    savePageState();
+    _curPage = next;
+    loadPageState();
+    rebuildDashboard();
+
+    // The toast carries the position whether or not the header bar - and so
+    // the dots - is visible. The owner's idea, 2026-09-22. ASCII only: a
+    // middle dot or an en dash renders as tofu on the panels (CLAUDE.md).
+    char t[40];
+    snprintf(t, sizeof(t), "%s  -  %u of %u",
+             _pages[_curPage].spec->title ? _pages[_curPage].spec->title : "Page",
+             (unsigned)_curPage + 1, (unsigned)_nPages);
+    UIToolkit::show_toast(t, 1500);
+    Serial.printf("[Pages] -> %s (%u of %u)\n", _pages[_curPage].spec->slug,
+                  (unsigned)_curPage + 1, (unsigned)_nPages);
 }
 
 void GUIManager::toggleDeck() {

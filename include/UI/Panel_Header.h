@@ -24,6 +24,14 @@ void restyle();
               MqttManager* mqtt = nullptr);
     void tick(); // Update stats
 
+    // THE PAGE INDICATOR, milestone 2.6. The page's title, centred in the
+    // bar, with one dot per swipe page beside it and the current one filled.
+    // The device name keeps its place on the left. `count` 0 or 1 hides the
+    // dots; past PAGE_DOTS_MAX pages they become "3 / 15" text, because a
+    // row that long stops being countable at a glance.
+    void setPage(const char *title, uint8_t index, uint8_t count);
+    static constexpr uint8_t PAGE_DOTS_MAX = 12;
+
     // --= NEW: Accessors for System Panel Interaction =--
     lv_obj_t* getContainer() { return container; }
     // Returns the clickable container wrapper, not just the label
@@ -37,6 +45,13 @@ private:
     lv_obj_t* lbl_title;
     lv_obj_t* btn_status; // Wrapper for the icon
     lv_obj_t* slots;              // right-hand status cluster, laid out as a row
+    // The centred page group: title and dots. Built on the first setPage().
+    lv_obj_t* pageBox   = nullptr;
+    lv_obj_t* pageTitle = nullptr;
+    lv_obj_t* pageDots  = nullptr;
+    uint8_t   pageIndex = 0;
+    uint8_t   pageCount = 0;
+    void paintPage();              // colours only; called by setPage and restyle
     Widget_ConnStatus connStatus;  // replaces the old static LV_SYMBOL_WIFI label
     Widget_MqttStatus mqttStatus;  // sibling glyph; the two fail independently
 };

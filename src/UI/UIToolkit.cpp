@@ -75,6 +75,21 @@ void UIToolkit::show_toast(const char* text, uint32_t duration_ms) {
 
     lv_label_set_text           (toast_label, text);
     lv_obj_clear_flag           (toast_panel, LV_OBJ_FLAG_HIDDEN);
+
+    // PLACED ON EVERY SHOW, from the display's own resolution.
+    //
+    // It used to be aligned once, in init(), and the owner found it in three
+    // different places on five boards: right-hand side on the 7B, half-way
+    // down on WS_S3_4B, correct elsewhere. The alignment was computed before
+    // the display's final (rotated) geometry was settled and never again.
+    // Measuring the toast AFTER its text is set and centring it by hand does
+    // not depend on when anything else was sized. Unverified on the two boards
+    // that showed it - 2026-09-23.
+    lv_obj_update_layout        (toast_panel);
+    const int32_t dw = lv_display_get_horizontal_resolution(NULL);
+    const int32_t tw = lv_obj_get_width(toast_panel);
+    lv_obj_set_pos              (toast_panel, (dw - tw) / 2, sc(60));
+    lv_obj_move_foreground      (toast_panel);
     
     // Reset Timer
     if (toast_timer_handle) {

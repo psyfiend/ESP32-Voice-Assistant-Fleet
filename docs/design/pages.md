@@ -1,7 +1,12 @@
 # Pages — model, navigation, and what 2.6 builds
 
-**Status: PROPOSAL, 2026-09-22.** Written from the owner's brain-dump of that day, before any code.
-Items marked **DECIDED** are his; items marked **PROPOSED** await his answer. Companion to
+**Status: 2.6 BUILT, 2026-09-23, on `feat/17-page-swipes`; awaiting glass (`docs/TEST_2.6.md`).**
+Written from the owner's brain-dump of 2026-09-22. His answers of 2026-09-23 settled the proposals:
+**wrap-around on** (test it now, decide the default later); **every knob is per page except Deck
+and Hide Bar** - including the colour scheme; **page 2 is strictly the Fleet dashboard**, no
+overflow; card links wait for 2.10. The page TITLE is centred in the header bar ("House", "Fleet"),
+with the dots beside it; the device name keeps its place on the left.
+Items marked **DECIDED** are his; items marked **PROPOSED** were the questions put to him. Companion to
 `cards.md` (what is on a page) and `dashboard.md` (the grid a page lays out on).
 
 ---

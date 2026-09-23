@@ -82,6 +82,7 @@ struct UIMetrics {
     // a DROP shadow, which is what makes a card read as lifted off the page -
     // the owner's "it looks too flat" on Linen, 2026-09-23.
     uint8_t SHADOW_Y;
+    uint8_t SHADOW_OPA;     // 0-255
 };
 
 // ---------------------------------------------------------------------------
@@ -210,6 +211,11 @@ void setScheme(const UIPalette &p, const UIMetrics &m);
 // The next scheme in the knob's order - Fleet, Midnight, Linen - with its
 // metrics. Every scheme button calls this; the order lives in UITokens.cpp.
 void cycleScheme();
+// The active scheme as a position in that order, and back. Pages remember
+// their own scheme since 2.6 (the owner: colour is per page), and an index is
+// what a page can hold without knowing what a scheme is.
+uint8_t schemeIndex();
+void    setSchemeIndex(uint8_t i);
 void setAccent(uint32_t hex);
 void setTargetCardWidth(uint16_t logicalPx);
 

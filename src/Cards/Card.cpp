@@ -459,7 +459,7 @@ void Card::restyle() {
     lv_obj_set_style_border_color (_surface, UI::border(), 0);
     lv_obj_set_style_shadow_width   (_surface, UI::sc(m.SHADOW), 0);
     lv_obj_set_style_shadow_offset_y(_surface, UI::sc(m.SHADOW_Y), 0);
-    lv_obj_set_style_shadow_opa     (_surface, m.SHADOW ? LV_OPA_30 : LV_OPA_TRANSP, 0);
+    lv_obj_set_style_shadow_opa     (_surface, m.SHADOW ? (lv_opa_t)m.SHADOW_OPA : LV_OPA_TRANSP, 0);
 
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
     // BAR ONLY. This said "not TAG", which also reserved a header's height in
@@ -646,30 +646,25 @@ lv_obj_t *Card::makeCornerIcon(lv_obj_t *body) {
     return o;
 }
 
-// THE CORNER ICON SCALES WITH THE CARD, not only with the board. 2.7.
+// THE CORNER ICON SCALES WITH THE PAGE, by ROW COUNT. 2.7 round four.
 //
-// The owner: it "looks tiny on the 7B". Every face in the type scale is sized
-// in millimetres, which keeps text the same physical size fleet-wide - right
-// for text, wrong for a mark whose job is to be in proportion to the tile it
-// labels. A 25 mm card and a 15 mm card wore the same 2.66 mm glyph.
+// The first rule aimed at ~15% of the card's short side. On glass it failed
+// the owner's test in the wrong direction: on the 7B at 6x3 the icons were
+// small with both the header and the deck showing, jumped up when either was
+// hidden, and shrank again at a 7th column. His rule, 2026-09-23, and it is
+// simpler and describes what he actually sees:
 //
-// So: the corner aims at ~15% of the card's SHORT side, and takes whichever of
-// the two faces is nearer - SM (2.66 mm) or MD (3.50 mm). The crossover is a
-// short side of about 20.5 mm. Measured against today's default grids that
-// puts WS_P4_7B and CYD_P4_1060 (~25 mm cells) on MD and every other board on
-// SM, which is what the owner described. A starting ratio, not a measured
-// optimum - the glass decides.
-static constexpr float CORNER_RATIO = 0.15f;
-static constexpr float CORNER_SM_MM = 2.66f;   // gen_icon_font.py SIZES_MM
-static constexpr float CORNER_MD_MM = 3.50f;
+//   "the larger icons should remain if there are 3 or fewer rows no matter
+//    the columns. It's only when you add a 4th row that the hero moves up
+//    towards the icon which requires the smaller icon size."
+//
+// So: MD at 3 rows or fewer, SM at 4 or more. Columns do not enter into it.
+// A card the page never told (0 rows) keeps SM, the old behaviour.
+static constexpr uint8_t CORNER_MD_MAX_ROWS = 3;
 
 const lv_font_t *Card::cornerFont() const {
-    const float ppi = (float)bspPixelDensity();
-    if (ppi <= 0.f) return UI::type().ICON_SM;
-    const float shortMm = (float)shortSidePx() * 25.4f / ppi;
-    const float want    = shortMm * CORNER_RATIO;
-    return (want >= (CORNER_SM_MM + CORNER_MD_MM) * 0.5f) ? UI::type().ICON_MD
-                                                          : UI::type().ICON_SM;
+    return (_pageRows > 0 && _pageRows <= CORNER_MD_MAX_ROWS) ? UI::type().ICON_MD
+                                                               : UI::type().ICON_SM;
 }
 
 void Card::renderCornerIcon(lv_obj_t *icon, const char *glyph, uint32_t hex) const {

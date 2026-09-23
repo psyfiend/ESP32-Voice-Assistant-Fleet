@@ -91,4 +91,76 @@ void Panel_Header::restyle() {
     lv_obj_set_style_bg_color    (container, UI::c(UI::pal().SURFACE_ALT), 0);
     lv_obj_set_style_border_color(container, UI::c(UI::pal().ACCENT), 0);
     if (lbl_title) lv_obj_set_style_text_color(lbl_title, UI::c(UI::pal().ACCENT), 0);
+    paintPage();
+}
+
+void Panel_Header::setPage(const char *title, uint8_t index, uint8_t count) {
+    if (!container) return;
+
+    if (!pageBox) {
+        // OUT OF THE BAR'S FLEX ROW and centred on the bar itself, so it sits
+        // in the true middle of the screen whatever the device name on the
+        // left and the status glyphs on the right happen to measure.
+        pageBox = lv_obj_create(container);
+        lv_obj_remove_style_all(pageBox);
+        lv_obj_add_flag       (pageBox, LV_OBJ_FLAG_IGNORE_LAYOUT);
+        lv_obj_set_size       (pageBox, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_flex_flow  (pageBox, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align (pageBox, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                               LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(pageBox, UIToolkit::sc(8), 0);
+        lv_obj_remove_flag    (pageBox, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag    (pageBox, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_align          (pageBox, LV_ALIGN_CENTER, 0, 0);
+
+        pageTitle = lv_label_create(pageBox);
+        lv_obj_set_style_text_font(pageTitle, UIToolkit::Font_PanelHeader, 0);
+
+        pageDots = lv_obj_create(pageBox);
+        lv_obj_remove_style_all(pageDots);
+        lv_obj_set_size       (pageDots, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_flex_flow  (pageDots, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align (pageDots, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                               LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(pageDots, UIToolkit::sc(5), 0);
+        lv_obj_remove_flag    (pageDots, LV_OBJ_FLAG_CLICKABLE);
+    }
+
+    lv_label_set_text(pageTitle, title ? title : "");
+    pageIndex = index;
+    pageCount = count;
+
+    // Rebuild the dots - there are at most a dozen, and it happens once per
+    // page change. The ">12 pages" case is a label instead of dots.
+    lv_obj_clean(pageDots);
+    if (count > 1 && count <= PAGE_DOTS_MAX) {
+        const int32_t d = UIToolkit::sc(7);
+        for (uint8_t i = 0; i < count; i++) {
+            lv_obj_t *dot = lv_obj_create(pageDots);
+            lv_obj_remove_style_all(dot);
+            lv_obj_set_size        (dot, d, d);
+            lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+            lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+        }
+    } else if (count > PAGE_DOTS_MAX) {
+        lv_obj_t *l = lv_label_create(pageDots);
+        lv_label_set_text_fmt(l, "%u / %u", (unsigned)index + 1, (unsigned)count);
+        lv_obj_set_style_text_font(l, UIToolkit::Font_Label, 0);
+    }
+    paintPage();
+}
+
+void Panel_Header::paintPage() {
+    if (!pageBox) return;
+    const UIPalette &p = UI::pal();
+    lv_obj_set_style_text_color(pageTitle, UI::c(p.TEXT), 0);
+    const uint32_t n = lv_obj_get_child_count(pageDots);
+    for (uint32_t i = 0; i < n; i++) {
+        lv_obj_t *c = lv_obj_get_child(pageDots, i);
+        // The current page in the accent; the others dim. For the "3 / 15"
+        // label the single child takes the dim colour.
+        const bool cur = (pageCount <= PAGE_DOTS_MAX) && (i == pageIndex);
+        lv_obj_set_style_bg_color  (c, UI::c(cur ? p.ACCENT : p.TEXT_DIM), 0);
+        lv_obj_set_style_text_color(c, UI::c(p.TEXT_DIM), 0);
+    }
 }

@@ -65,6 +65,22 @@ static constexpr uint8_t PRI_NICE     = 100;
 static constexpr uint8_t PRI_DEBUG    = 40;    // first to be dropped
 
 inline const CardSpec FLEET_CARDS[] = {
+    // --- Test fixtures, 2026-09-23 -----------------------------------------
+    //
+    // The owner's three HA helpers - see ExternalEntities_HA.h. Above
+    // everything else so they survive on the smallest board while the two
+    // tests they exist for are being run. Remove with the helpers.
+    //
+    //   Avail    tap to make "Reading" go unavailable and come back (T15)
+    //   Reading  should show N/A with the diagonal while unavailable
+    //   Refuse   tap it: nothing will ever change, so FAILED after 3 s (R9)
+    { .primaries = { "test_available" }, .label = "Avail",   .area = "Test",
+      .place = { .priority = PRI_CRITICAL + 20 } },
+    { .primaries = { "test_reading" },   .label = "Reading", .area = "Test",
+      .place = { .priority = PRI_CRITICAL + 20 } },
+    { .primaries = { "test_refuse" },    .label = "Refuse",  .area = "Test",
+      .place = { .priority = PRI_CRITICAL + 20 } },
+
     // --- Outdoors ---------------------------------------------------------
     //
     // The deck sensor publishes temperature, illuminance, occupancy and its
@@ -215,7 +231,10 @@ inline const PageSpec FLEET_PAGE = {
     // are append-only and slugs are the external key.
     .id    = 1,
     .slug  = "home",
-    .title = "Home",
+    // Title "Fleet" since 2.6, when it became page 2 behind House. The TITLE is
+    // display text and free to change; the id and slug are the frozen keys and
+    // stay exactly as they were.
+    .title = "Fleet",
     .cards = FLEET_CARDS,
     .count = (uint8_t)(sizeof(FLEET_CARDS) / sizeof(FLEET_CARDS[0])),
 

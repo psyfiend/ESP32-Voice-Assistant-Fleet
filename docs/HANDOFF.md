@@ -12,7 +12,24 @@ does not appear in the source as suspect.
 
 ## Where the project is
 
-### NOW, 2026-09-22: milestone 2.7 in progress on `feat/18-card-types`
+### NOW, 2026-09-23: 2.6 built on `feat/17-page-swipes`, 2.7 through round three on `feat/18-card-types`
+
+**Two branches, merge in this order: `feat/18-card-types`, then `feat/17-page-swipes`** (cut from
+18's tip, so it carries 2.7 round four too). Neither is merged; the owner has signed off 2.7's
+rounds one to three on glass (TEST_2.7.md), 2.6 awaits `docs/TEST_2.6.md`.
+
+2.6: two pages on every board, House then Fleet, swiped horizontally from anywhere, wrapping;
+every drawer knob per page except Deck and Hide Bar (scheme included); page title and dots centred
+in the header; a "Fleet - 2 of 2" toast. `-D USE_HA_DASHBOARD` is gone. One entry point,
+`GUIManager::goToPage()`, per NINA's navigation arbiter. Design: `docs/design/pages.md`.
+Confirmed working on `WS_P4_5` from the log, heap flat across page changes (~133 KB internal).
+
+Also on 17: three HA test entities on the Fleet page (Avail / Reading / Refuse) for T15 and the
+refused-command path; corner icon size by ROW COUNT (MD at 3 rows or fewer); LVGL theme button
+grow and shadow removed (they were being clipped - the drawer's "fuzzy" corners); Linen's shadow
+tighter and darker. **Toast placement fix is unverified** on the two boards that showed the bug.
+
+### Earlier, 2026-09-22: milestone 2.7 in progress on `feat/18-card-types`
 
 Five commits. **All 8 environments build** (clean tree, after `build_cache` was cleared twice for
 struct-layout changes). Flashed to `CYD_S3_3248` and `WS_P4_5`, both boot and report to HA, and

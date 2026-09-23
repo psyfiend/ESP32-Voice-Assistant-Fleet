@@ -346,6 +346,55 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .staleAfterMs = 0,
         .externalRef = "sensor.temp_1_garage_temperature",
     },
+
+    // --- Test fixtures, 2026-09-23 --------------------------------------------
+    //
+    // Three throwaway HA entities the owner created so two card states can be
+    // tested on demand rather than waited for. They live on the FLEET page,
+    // not on House. Delete these and the three HA helpers when done.
+    //
+    //   fleet_test_available  input_boolean. Tapping its card turns the sensor
+    //                         below available / unavailable - ST_UNAVAILABLE,
+    //                         never before seen on hardware (T15)
+    //   fleet_test_reading    a template sensor whose availability follows the
+    //                         toggle above
+    //   fleet_test_refuse     a template switch that accepts taps and never
+    //                         changes state - the command-refused path (R9/T10)
+    {
+        .id          = "test_available",
+        .name        = "Test Available",
+        .kind        = EntityKind::SWITCH,
+        .source      = EntitySource::HA,
+        .valueType   = ValueType::BOOL,
+        .writable    = true,
+        .advertise   = false,
+        .staleAfterMs = 0,
+        // input_boolean.* - the domain comes from the prefix, so the command
+        // router calls input_boolean.turn_on/off. See note 2 above.
+        .externalRef = "input_boolean.fleet_test_available",
+    },
+    {
+        .id          = "test_reading",
+        .name        = "Test Reading",
+        .kind        = EntityKind::SENSOR,
+        .source      = EntitySource::HA,
+        .valueType   = ValueType::FLOAT,
+        .writable    = false,
+        .advertise   = false,
+        .staleAfterMs = 0,
+        .externalRef = "sensor.fleet_test_reading",
+    },
+    {
+        .id          = "test_refuse",
+        .name        = "Test Refuse",
+        .kind        = EntityKind::SWITCH,
+        .source      = EntitySource::HA,
+        .valueType   = ValueType::BOOL,
+        .writable    = true,
+        .advertise   = false,
+        .staleAfterMs = 0,
+        .externalRef = "switch.fleet_test_refuse",
+    },
 };
 
 inline constexpr uint8_t HA_ENTITY_COUNT =

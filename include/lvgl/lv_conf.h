@@ -868,8 +868,13 @@
     /** 0: Light mode; 1: Dark mode */
     #define LV_THEME_DEFAULT_DARK 0
 
-    /** 1: Enable grow on press */
-    #define LV_THEME_DEFAULT_GROW 1
+    /** 1: Enable grow on press
+     *
+     * OFF since 2026-09-23. A pressed button grew 3 px each way, and every
+     * button on this panel sits in a row that clips it - the owner saw the
+     * drawer's buttons with "the top and bottom edges cut off as if clipped"
+     * on every press. The theme's pressed darkening still gives feedback. */
+    #define LV_THEME_DEFAULT_GROW 0
 
     /** Default transition time in ms. */
     #define LV_THEME_DEFAULT_TRANSITION_TIME 80

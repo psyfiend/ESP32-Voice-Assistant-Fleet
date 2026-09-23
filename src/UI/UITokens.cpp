@@ -103,15 +103,20 @@ const UIPalette UI_PAL_MIDNIGHT = {
 // scheme, where a shadow is what separates a card from the page, gets one.
 const UIMetrics UI_MET_DARK  = {
     .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 0, .HEADER_H = 14,
-    .SHADOW_Y = 0
+    .SHADOW_Y = 0, .SHADOW_OPA = 0
 };
 // Linen's. A 2 px border, darker than the old hairline (the owner: "make it a
 // bit darker and increase by 1 or 2px", knobs included - the drawer's buttons
 // take BORDER_W through UI::paint()), and a mild DROP shadow - "in HA for most
 // of my custom dashboards I shamelessly use a mild drop shadow".
+//
+// Round four, from the owner's close-up of the shadow he means: TIGHTER and
+// DARKER, not wider. A short blur, a small drop, a firm edge - the first try
+// (12 px blur at 30%) read as fuzz rather than depth. Border darker again
+// ("a bit darker than it is or expand it 1 more pixel" - darker was chosen).
 const UIMetrics UI_MET_LIGHT = {
-    .RADIUS = 12, .PAD = 5, .BORDER_W = 2, .BORDER_OPA_PCT = 26, .SHADOW = 12, .HEADER_H = 14,
-    .SHADOW_Y = 4
+    .RADIUS = 12, .PAD = 5, .BORDER_W = 2, .BORDER_OPA_PCT = 34, .SHADOW = 6, .HEADER_H = 14,
+    .SHADOW_Y = 3, .SHADOW_OPA = 140
 };
 
 // ---------------------------------------------------------------------------
@@ -291,6 +296,15 @@ static void refreshPaints() {
     lv_style_set_bg_color    (st(UIPaint::PAINT_SURFACE_ALT), c(s_pal.SURFACE_ALT));
     lv_style_set_border_color(st(UIPaint::PAINT_SURFACE_ALT), bd);
     lv_style_set_border_width(st(UIPaint::PAINT_SURFACE_ALT), s_met.BORDER_W);
+    // AND NO SHADOW. PAINT_SURFACE_ALT dresses the drawer's buttons, and
+    // LVGL's default theme gives every button a grey shadow 4 px below it.
+    // Each button sits in a row that clips, so the shadow showed as bottom
+    // corners that "bulge a tiny bit but then something is cutting off 1 or 2
+    // pixel rows", and on the dark schemes as a light "glint" at those
+    // corners - both the owner's, 2026-09-23. A shared style added after the
+    // theme's outranks it, so this one line removes it everywhere the paint
+    // is used.
+    lv_style_set_shadow_width(st(UIPaint::PAINT_SURFACE_ALT), 0);
     lv_style_set_text_color  (st(UIPaint::PAINT_TEXT),        c(s_pal.TEXT));
     lv_style_set_text_color  (st(UIPaint::PAINT_TEXT_DIM),    c(s_pal.TEXT_DIM));
     lv_style_set_text_color  (st(UIPaint::PAINT_ACCENT_TEXT), c(s_pal.ACCENT));
@@ -333,12 +347,22 @@ static const SchemeEntry SCHEMES[] = {
     { &UI_PAL_LINEN,    &UI_MET_LIGHT },
 };
 
+static constexpr uint8_t SCHEME_N = sizeof(SCHEMES) / sizeof(SCHEMES[0]);
+
+uint8_t schemeIndex() {
+    for (uint8_t i = 0; i < SCHEME_N; i++)
+        if (strcmp(SCHEMES[i].pal->name, s_pal.name) == 0) return i;
+    return 0;
+}
+
+void setSchemeIndex(uint8_t i) {
+    if (i >= SCHEME_N) i = 0;
+    if (i == schemeIndex()) return;   // no change, no repaint
+    setScheme(*SCHEMES[i].pal, *SCHEMES[i].met);
+}
+
 void cycleScheme() {
-    const size_t n = sizeof(SCHEMES) / sizeof(SCHEMES[0]);
-    size_t cur = 0;
-    for (size_t i = 0; i < n; i++)
-        if (strcmp(SCHEMES[i].pal->name, s_pal.name) == 0) { cur = i; break; }
-    const SchemeEntry &next = SCHEMES[(cur + 1) % n];
+    const SchemeEntry &next = SCHEMES[(schemeIndex() + 1) % SCHEME_N];
     setScheme(*next.pal, *next.met);
 }
 

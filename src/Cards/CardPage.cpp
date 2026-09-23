@@ -422,6 +422,7 @@ void CardPage::commit() {
         // page knows the answer exactly; handing it over removes the guess.
         c->setCellHeightPx(heightOf(_slot[i].spanY));
         c->setCellWidthPx (widthOf (_slot[i].spanX));
+        c->setPageRows    ((uint8_t)(_uRows / (_sub ? _sub : 1)));
         c->build(_root);
         lv_obj_set_grid_cell(c->root(),
                              LV_GRID_ALIGN_STRETCH, _slot[i].col, _slot[i].spanX,
