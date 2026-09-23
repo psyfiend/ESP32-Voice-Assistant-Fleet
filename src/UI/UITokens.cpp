@@ -22,7 +22,14 @@
     .TINT_HUMID = 0x4A9EDA,                 \
     .TINT_LIGHT = 0xE0A53C,                 \
     .TINT_AIR   = 0x9B7BD4,                 \
-    .TINT_POWER = 0x93C04A
+    .TINT_POWER = 0x93C04A,                 \
+    .TINT_OPENING  = 0x5B8DEF,              \
+    .TINT_PRESENCE = 0x2EC4B6
+
+// Lighting's corner tint: yellow-white on the dark schemes, where it reads as
+// a bulb; a deeper amber on the light ones, where yellow-white would vanish.
+#define TINT_LIGHTING_DARK  0xFFE3A3
+#define TINT_LIGHTING_LIGHT 0xC98A12
 
 const UIPalette UI_PAL_SLATE = {
     .name        = "Slate",
@@ -33,7 +40,8 @@ const UIPalette UI_PAL_SLATE = {
     .TEXT_DIM    = 0x98A0AA,
     .ACCENT      = 0x9B7BD4,   // violet — the owner's pick for the 3248
     .BORDER      = 0,          // derived: lighten SURFACE
-    FLEET_STATE_AND_TINTS
+    FLEET_STATE_AND_TINTS,
+    .TINT_LIGHTING = TINT_LIGHTING_DARK,
 };
 
 const UIPalette UI_PAL_PAPER = {
@@ -45,7 +53,46 @@ const UIPalette UI_PAL_PAPER = {
     .TEXT_DIM    = 0x666D77,
     .ACCENT      = 0xE0A53C,   // amber — the owner's pick for the large panels
     .BORDER      = 0,
-    FLEET_STATE_AND_TINTS
+    FLEET_STATE_AND_TINTS,
+    .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
+};
+
+// TWO CANDIDATE LIGHT SCHEMES, 2026-09-22, to be judged on glass.
+//
+// The owner, on Paper: the card and panel colour has too little contrast
+// against the ground, and the amber accent is weak as TEXT (device name, panel
+// titles, "SYSTEM - DIAGNOSTICS"). And: "I will know it when I see it". So
+// rather than tune Paper by argument, two different directions to look at:
+//
+//   Linen   warm - a sand ground, cream cards, dark brown text, copper accent
+//   Frost   cool - a blue-grey ground, near-white cards, ink text, blue accent
+//
+// Both put clear daylight between ground and card, and both pick an accent
+// dark enough to read as text on a light surface. Whichever loses is deleted.
+const UIPalette UI_PAL_LINEN = {
+    .name        = "Linen",
+    .GROUND      = 0xDDD5C8,
+    .SURFACE     = 0xF8F4EC,
+    .SURFACE_ALT = 0xEDE6DA,
+    .TEXT        = 0x2B2520,
+    .TEXT_DIM    = 0x6E6459,
+    .ACCENT      = 0xA8561C,   // copper
+    .BORDER      = 0,
+    FLEET_STATE_AND_TINTS,
+    .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
+};
+
+const UIPalette UI_PAL_FROST = {
+    .name        = "Frost",
+    .GROUND      = 0xCDD5E0,
+    .SURFACE     = 0xF5F7FA,
+    .SURFACE_ALT = 0xE3E8EF,
+    .TEXT        = 0x15202E,
+    .TEXT_DIM    = 0x55637A,
+    .ACCENT      = 0x2463C9,   // ink blue
+    .BORDER      = 0,
+    FLEET_STATE_AND_TINTS,
+    .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
 };
 
 // Today's shipped UI, read out of UIToolkit.cpp and Panel_Header.cpp rather
@@ -60,7 +107,8 @@ const UIPalette UI_PAL_FLEET = {
     .TEXT_DIM    = 0x808080,
     .ACCENT      = 0x00A8FF,
     .BORDER      = 0x404040,   // explicit — this one is not derived
-    FLEET_STATE_AND_TINTS
+    FLEET_STATE_AND_TINTS,
+    .TINT_LIGHTING = TINT_LIGHTING_DARK,
 };
 
 // The owner's verdict after seeing all three on glass: Slate's ground, Fleet's
@@ -76,10 +124,13 @@ const UIPalette UI_PAL_MIDNIGHT = {
     .TEXT_DIM    = 0x98A0AA,
     .ACCENT      = 0x00A8FF,   // Fleet cyan
     .BORDER      = 0,
-    FLEET_STATE_AND_TINTS
+    FLEET_STATE_AND_TINTS,
+    .TINT_LIGHTING = TINT_LIGHTING_DARK,
 };
 
 #undef FLEET_STATE_AND_TINTS
+#undef TINT_LIGHTING_DARK
+#undef TINT_LIGHTING_LIGHT
 
 // Dark schemes take a hairline border because a dark card on a dark ground
 // needs an edge; light schemes lean on the shadow instead. That difference was

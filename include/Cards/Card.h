@@ -355,6 +355,25 @@ protected:
     // The page-supplied cell width, or 0 if the page never said.
     int32_t cellWidthPx() const { return _cellWPx; }
 
+    // THE HERO'S SIZE, shared by both layouts. Moved up from StateCard at 2.7
+    // round two so a value card can place its name exactly where a state
+    // card's goes - the owner has twice caught the two types disagreeing about
+    // where a name sits. heroIconFace() steps LG -> MD -> SM to fit the band;
+    // heroDiscPx() is the disc drawn behind it, never taller than the band.
+    const lv_font_t *heroIconFace() const;
+    int32_t heroDiscPx() const;
+
+    // COMPACT: how far to shift the name so it sits centred between the
+    // hero's bottom edge and the card's bottom edge - the owner's rule, from
+    // a photo where it sat "a little low". Returned as a translate, applied
+    // without disturbing the flex layout. 0 outside compact.
+    int32_t compactNameShiftPx() const;
+
+    // The surface's height and the body's top inset in real pixels - the
+    // geometry the two helpers above and StateCard's fill all work from.
+    int32_t surfaceHeightPx() const;
+    int32_t bodyTopPx() const;
+
 private:
     void buildHeader();
     void applyState();                 // repaint chrome for _state

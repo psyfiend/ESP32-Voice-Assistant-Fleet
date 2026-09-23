@@ -646,6 +646,28 @@ Montserrat. Measured from the P4 builds' object files (an upper bound on flash):
 | full MDI icon subset, 18-52 px | 10-73 KB |
 | Montserrat 14-24, full ASCII | 14-29 KB |
 
+### Round two, after the first glass pass — 2026-09-22
+
+The owner's verdicts on the first round, and what changed:
+
+- **Compact is the fleet default.** The "Seen" line turned out less useful than expected — HA's
+  own tiles do not surface it — and without it the icons, disc and text breathe. Auto and Full stay
+  on the knob. Future group cards will not carry per-card headers or tags either.
+- **In compact, the name sits centred between the disc's bottom edge and the card's bottom edge**,
+  measured against the state card's disc on BOTH layouts so a mixed row keeps its names level.
+- **Corner icons are all tinted, by kind of thing**: lighting yellow-white ("like one would picture
+  a light bulb"; deeper amber on light schemes, where yellow-white vanishes), openings blue, presence
+  teal. Quantities keep their existing tints.
+- **Desk's group bulb is its HERO, not its corner.** It is a light and wears the lights' corner;
+  what makes it different should be the most prominent thing on it.
+- **"No icon" joined the label knob**: the name stays, the disc and hero go, the fill and corner
+  carry the state. **"No lbl" applies to value cards too.**
+- **Ink on an active fill is chosen by contrast**, not the scheme's card colour — white icons on
+  yellow in Paper, and Desk's black one beside them, were the same bug from two directions.
+- **The reconcile window is 3 s**, down from 5. The Desk fade measured ~1.5 s by eye.
+- **Light schemes:** the owner cannot picture the right one but "will know it when I see it", so two
+  candidates, Linen (warm) and Frost (cool), are on the scheme knob beside Paper.
+
 So only the roles that make a card cramped step with the cell: the **hero value**, the **hero
 icon** and the **corner icon**. Name, unit, tag and status text stay one size per board. Chosen by
 the cell's size in millimetres, so a card looks the same across boards. Absorbs #62.

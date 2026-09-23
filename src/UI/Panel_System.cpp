@@ -421,7 +421,8 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // layout - docs/design/card-layout.md records the threshold being guessed
     // wrong twice before it was measured. This is how you check the
     // measurement by eye instead of reflashing.
-    lv_obj_t *btnVar = knobButton(_ui_row3, this, "Auto", [](lv_event_t *e) {
+    // Labelled for GUIManager's default, which is compact since 2.7.
+    lv_obj_t *btnVar = knobButton(_ui_row3, this, "Cmpct", [](lv_event_t *e) {
         Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
         if (p) p->requestGrid(Panel_System::GridAction::VARIANT_CYCLE);
     });

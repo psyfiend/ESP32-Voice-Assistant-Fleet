@@ -178,10 +178,13 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .kind        = EntityKind::LIGHT,
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
-        // The owner's spec (dashboard-target-7b.md row 7) wants a GROUP bulb in
-        // this card's corner, not the plain one every light gets from the
-        // table. A corner override - the first real use of one.
-        .cornerIcon  = "mdi:lightbulb-group",
+        // The GROUP bulb is the HERO, not the corner - the owner's call on glass,
+        // 2026-09-22: "it (mostly) acts and functions just like any other light
+        // card", so the corner is the ordinary bulb every light wears, and what
+        // makes it different "should be prominent, the first and most easy thing
+        // to see". A custom on/off pair - the first real use of one.
+        .iconOn      = "mdi:lightbulb-group",
+        .iconOff     = "mdi:lightbulb-group-outline",
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,

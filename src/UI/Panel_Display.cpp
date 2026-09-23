@@ -94,7 +94,8 @@ void Panel_Display::init(lv_obj_t* parent) {
     // ROW 2,1 - Label
     lv_obj_t * lbl_viz = lv_label_create(row_viz);
     lv_label_set_text           (lbl_viz, "Show Touches");
-    lv_obj_set_style_text_color (lbl_viz, lv_color_white(), 0);
+    // A shared paint, not hard white: white vanished on Paper's light panel.
+    lv_obj_add_style            (lbl_viz, UI::paint(UIPaint::PAINT_TEXT), 0);
     lv_obj_set_style_text_font  (lbl_viz, UIToolkit::Font_Label, 0); // Semantic Font
 
     // ROW 2,2 - Switch

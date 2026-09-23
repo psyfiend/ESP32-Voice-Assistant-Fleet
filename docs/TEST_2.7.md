@@ -92,6 +92,25 @@ Paper.
 **T14 — Scheme with a lit light.** With Desk on at a partial brightness, cycle schemes.
 - PASS: the fill and its edge repaint in each scheme's active colour.
 
+## Round two — flashed 2026-09-22
+
+First-round results: T1-T3, T5-T9, T11-T13 PASS. T4 needs the 7B; T10, T15 not run.
+
+**R1 — Compact by default.** Boot. The variant knob reads **Cmpct** and no card shows a "Seen" line.
+**R2 — Compact name position.** PASS: every name sits midway between its disc's bottom edge and the
+card's bottom edge, and names in one row are level whether the card is a light or a temperature.
+**R3 — Corner tints.** Lights yellow-white, garage doors blue, occupancy teal; temps and lux as before.
+**R4 — Desk.** Corner: the plain bulb. Hero: the group bulb, filled when on, outline when off.
+**R5 — Label knob, four steps.** Name -> State -> No lbl -> No icon. No lbl hides names on the
+temperature cards too. No icon: names centred, no discs, corner icons and fills still there.
+**R6 — Seen, deterministic.** Knob to **Full**, then Name/State/Auto in any order. PASS: a given card
+shows "Seen: 22m" or "22m" the same way every time; only a narrow card with a battery drops the prefix.
+**R7 — Active ink.** In Paper, Linen and Frost, icons and names on a lit card are dark, Desk included.
+**R8 — Light schemes.** The scheme knob now runs Fleet, Slate, Midnight, **Linen, Frost**, Paper.
+Judge the two new ones: card vs background, and the device name / panel titles / SYSTEM - DIAGNOSTICS.
+Also: "Show Touches" in the Display panel is readable on all three light schemes.
+**R9 — 3 s window.** Tap Desk off: still no FAILED.
+
 ## G. Residuals
 
 **T15 — `ST_UNAVAILABLE`.** Unplug one sensor that HA marks unavailable quickly.

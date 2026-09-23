@@ -171,10 +171,37 @@ void ValueCard::render() {
     }
 
     // --- Name, which is the LOCATION, under the value ---------------------
+    //
+    // The label setting applies here too - the owner found temperatures
+    // keeping their names under "No lbl" and looking odd as the only cards
+    // that did. For a value card the number already IS the state, so State
+    // shows the name, and No icon changes nothing: there is no hero glyph to
+    // drop, and the corner stays on every card.
+    const bool showName = (cardResolveLabel(labelMode()) != CardLabel::LBL_NONE);
+    if (showName) lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
+    else          lv_obj_add_flag  (_name, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_text          (_name, label());
     lv_obj_set_style_text_font (_name, t.NAME, 0);
     lv_obj_set_style_text_color(_name, UI::c(tone(p.TEXT_DIM)), 0);
     lv_obj_set_width           (_name, lv_pct(100));
+
+    // Compact: the same shift a state card's name takes, so a row of mixed
+    // cards keeps its names on one line - Card::compactNameShiftPx() measures
+    // against the state card's disc for exactly that reason. Clamped here so
+    // it can never ride up into this card's own number, which may be taller
+    // than the disc it is measured against.
+    int32_t shift = showName ? compactNameShiftPx() : 0;
+    if (shift < 0) {
+        const int32_t pad   = UI::sc(UI::met().PAD);
+        const int32_t contH = surfaceHeightPx() - bodyTopPx() - pad;
+        const int32_t nameH = lv_font_get_line_height(t.NAME);
+        const int32_t band  = Card::topBandHeight() / 2;      // _mid's pad_top
+        const int32_t midH  = contH - nameH - band - Card::midGap();
+        const int32_t valBottom = band + midH / 2 + lv_font_get_line_height(vf) / 2;
+        const int32_t minShift  = valBottom + UI::sc(2) - (contH - nameH);
+        if (shift < minShift) shift = minShift < 0 ? minShift : 0;
+    }
+    lv_obj_set_style_translate_y(_name, shift, 0);
 
     // --- The status row, which COMPACT does not have room for -------------
     //
@@ -245,10 +272,28 @@ void ValueCard::render() {
         lv_obj_set_style_text_font (_seen, t.TAG, 0);
         lv_obj_set_style_text_color(_seen, UI::c(tone(p.TEXT_DIM)), 0);
 
-        lv_obj_update_layout(_statusRow);
-        const int32_t avail = lv_obj_get_content_width(_statusRow)
-                            - lv_obj_get_width(_battGroup) - UI::sc(6);
-        if (lv_obj_get_width(_seen) > avail) lv_label_set_text(_seen, age);
+        // MEASURED FROM THE TEXT, not from layout. This used to call
+        // lv_obj_update_layout() and read widths back - and right after a page
+        // rebuild the layout is not settled, so the same card measured
+        // differently depending on HOW it was last drawn. The owner saw "Seen:"
+        // appear for every card after the Label knob (a repaint, layout
+        // settled) and vanish at random after Auto -> Full (a rebuild, not
+        // settled). The text's own size and the page-supplied width answer the
+        // same question the same way every time.
+        const int32_t cw = cellWidthPx() > 0
+                         ? cellWidthPx() - UI::sc(UI::met().PAD) * 2 : 0;
+        if (cw > 0) {
+            lv_point_t fs, bs = {0, 0}, bi = {0, 0};
+            lv_text_get_size(&fs, full, t.TAG, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+            if (batt) {
+                lv_text_get_size(&bi, lv_label_get_text(_battIcon), t.ICON_SM, 0, 0,
+                                 LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+                lv_text_get_size(&bs, lv_label_get_text(_battery), t.TAG, 0, 0,
+                                 LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+            }
+            const int32_t battW = batt ? bi.x + UI::sc(3) + bs.x : 0;
+            if (fs.x > cw - battW - UI::sc(6)) lv_label_set_text(_seen, age);
+        }
 
         lv_obj_clear_flag(_seen, LV_OBJ_FLAG_HIDDEN);
     } else {

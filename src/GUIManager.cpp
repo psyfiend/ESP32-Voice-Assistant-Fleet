@@ -836,11 +836,14 @@ void GUIManager::applyGround() {
 }
 
 void GUIManager::cycleScheme() {
-    _scheme = (uint8_t)((_scheme + 1) % 4);
+    // Six while the two light candidates are being judged; see UITokens.cpp.
+    _scheme = (uint8_t)((_scheme + 1) % 6);
     switch (_scheme) {
         case 0:  UI::setScheme(UI_PAL_FLEET,    UI_MET_DARK);  break;
         case 1:  UI::setScheme(UI_PAL_SLATE,    UI_MET_DARK);  break;
         case 2:  UI::setScheme(UI_PAL_MIDNIGHT, UI_MET_DARK);  break;
+        case 3:  UI::setScheme(UI_PAL_LINEN,    UI_MET_LIGHT); break;
+        case 4:  UI::setScheme(UI_PAL_FROST,    UI_MET_LIGHT); break;
         default: UI::setScheme(UI_PAL_PAPER,    UI_MET_LIGHT); break;
     }
     applyGround();
@@ -947,13 +950,16 @@ void GUIManager::cycleLabel() {
     // The FLEET default, which every page and card inherits unless it says
     // otherwise - the same place TempUnit's fleet default lives. Live, like
     // Fill: StateCard resolves it in render(), so a restyle is enough.
-    const CardLabel next = (cardLabelMode() == CardLabel::LBL_NAME)  ? CardLabel::LBL_STATE
-                         : (cardLabelMode() == CardLabel::LBL_STATE) ? CardLabel::LBL_NONE
-                                                                     : CardLabel::LBL_NAME;
+    const CardLabel cur  = cardLabelMode();
+    const CardLabel next = (cur == CardLabel::LBL_NAME)  ? CardLabel::LBL_STATE
+                         : (cur == CardLabel::LBL_STATE) ? CardLabel::LBL_NONE
+                         : (cur == CardLabel::LBL_NONE)  ? CardLabel::LBL_NO_ICON
+                                                         : CardLabel::LBL_NAME;
     cardSetLabelMode(next);
     _binder.restyleAll();
     const char *n = (next == CardLabel::LBL_NAME)  ? "Name"
-                  : (next == CardLabel::LBL_STATE) ? "State" : "No lbl";
+                  : (next == CardLabel::LBL_STATE) ? "State"
+                  : (next == CardLabel::LBL_NONE)  ? "No lbl" : "No icon";
     _pnlSystem.setLabelModeLabel(n);
     Serial.printf("[Cards] state-card label -> %s\n", n);
 }

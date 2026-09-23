@@ -209,6 +209,12 @@ enum class CardLabel : uint8_t {
     LBL_NAME,         // the card's label - the default
     LBL_STATE,        // "Open" / "Closed", from the device_class table
     LBL_NONE,         // nothing; the hero stands alone
+    // The name, and NO HERO ICON - the card's fill (and its corner) carry the
+    // state. The owner, 2026-09-22, after looking at espcontrol's plainer
+    // tiles: not his first choice, but a user should be able to have it.
+    // Rides the label knob because it is the same question from the other
+    // side: what does the middle of the card say.
+    LBL_NO_ICON,
 };
 
 // ---------------------------------------------------------------------------

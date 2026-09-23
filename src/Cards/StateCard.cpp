@@ -126,20 +126,14 @@ void StateCard::render() {
     // this a cramped card kept the LG glyph and simply lost its disc, which is
     // what the owner saw on the 4B pair as "the disc is barely larger than its
     // glyph" and, on WS_S3_4B, as no disc at all.
-    const int32_t room   = midHeight();
-    const lv_font_t *heroFace = t.ICON;
-    if (room > 0 && room < lv_font_get_line_height(t.ICON) + UI::sc(4))
-        heroFace = t.ICON_MD;
-    if (room > 0 && room < lv_font_get_line_height(t.ICON_MD) + UI::sc(4))
-        heroFace = t.ICON_SM;
+    //
+    // Both now live on Card - heroIconFace() and heroDiscPx() - so a value
+    // card can place its name against the same reference. The clamp to the
+    // band is there too: on CYD_S3_3248 the band is 55 px and twice the line
+    // height wanted 68, so the disc was clipped by its own parent.
+    const lv_font_t *heroFace = heroIconFace();
     const int32_t iconPx = lv_font_get_line_height(heroFace);
-    // CLAMPED TO THE BAND IT SITS IN. Twice the line height is the look on a
-    // large card; on CYD_S3_3248 the band is 55 px and twice the line height
-    // wants 68, so the disc was clipped top and bottom - by its own parent,
-    // not by the glyph. Sizing it from the font alone was the mistake, and
-    // making the multiplier larger made it worse.
-    int32_t discPx = iconPx * 2;
-    if (room > 0 && discPx > room) discPx = room;
+    const int32_t discPx = heroDiscPx();
 
     // AND NEVER SMALLER THAN THE GLYPH IT CONTAINS.
     //
@@ -188,6 +182,12 @@ void StateCard::render() {
     // the disc sits, and the fill below needs to know that.
     const CardLabel lbl = cardResolveLabel(labelMode());
     const bool showName = (lbl != CardLabel::LBL_NONE);
+    const bool noIcon   = (lbl == CardLabel::LBL_NO_ICON);
+
+    // Compact: the name moves up to sit centred between the disc and the
+    // card's bottom edge. A translate, so the flex layout - and the disc's
+    // position - is untouched. See Card::compactNameShiftPx().
+    const int32_t nameShift = (showName && !noIcon) ? compactNameShiftPx() : 0;
 
     // --- Brightness, from the source's attributes. cards.md section 13 ----
     //
@@ -216,16 +216,23 @@ void StateCard::render() {
     const int32_t bodyTop = pad + (headerStyle() == CardHeaderStyle::HDR_BAR
                                    ? Card::headerHeight() : 0);
     const int32_t midBottom = pad + status + nameH + Card::midGap();
-    const int32_t yName   = pad + status + nameH / 2;
+    // With no icon the name is alone in the body and flex centres it.
+    const int32_t yName   = noIcon ? pad + (surfH - bodyTop - pad) / 2
+                                   : pad + status + nameH / 2 - nameShift;
     const int32_t yDisc   = (midBottom + (surfH - bodyTop)) / 2;
     const int32_t yCorner = surfH - bodyTop - lv_font_get_line_height(cornerFont()) / 2;
     const int32_t yMixed  = pad + status / 2;
 
-    // Text on the fill takes the surface colour; text off it takes its normal
-    // one. On a fully-filled card that reduces to what this code always did.
+    // Ink ON THE FILL is whichever of the scheme's ground and text colours
+    // stands further from the active colour. It used to be SURFACE, which is
+    // dark on the dark schemes and fine - and WHITE on a light scheme, on
+    // yellow. The owner saw white icons on Paper, and the Desk icon (whose ink
+    // already came from contrast, over its coloured disc) black beside them.
+    // One rule for both makes them agree. Off the fill, the element's normal.
     const bool filled = isOn && !chrome && fill;
+    const uint32_t fillInk = UI::contrastOf(p.ST_ACTIVE, p.GROUND, p.TEXT);
     auto ink = [&](int32_t fromBottom, uint32_t normal) -> uint32_t {
-        return (filled && onFill(fromBottom, pct)) ? p.SURFACE : normal;
+        return (filled && onFill(fromBottom, pct)) ? fillInk : normal;
     };
 
     // --- The surface ------------------------------------------------------
@@ -322,10 +329,16 @@ void StateCard::render() {
     if (compact) lv_obj_add_flag  (_statusRow, LV_OBJ_FLAG_HIDDEN);
     else         lv_obj_clear_flag(_statusRow, LV_OBJ_FLAG_HIDDEN);
 
+    // No icon: the middle band - disc and glyph - goes, and flex centres the
+    // name in the card. The corner stays: it says what kind of card this is.
+    if (noIcon) lv_obj_add_flag  (_mid, LV_OBJ_FLAG_HIDDEN);
+    else        lv_obj_clear_flag(_mid, LV_OBJ_FLAG_HIDDEN);
+
     if (showName) {
         lv_label_set_text(_name, lbl == CardLabel::LBL_STATE
                                  ? cardStateWord(e->desc, isOn) : label());
         lv_obj_set_style_text_font(_name, t.NAME, 0);
+        lv_obj_set_style_translate_y(_name, nameShift, 0);
         lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(_name, LV_OBJ_FLAG_HIDDEN);

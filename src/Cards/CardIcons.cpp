@@ -257,6 +257,13 @@ uint32_t cardTintFor(const EntityDescriptor &d) {
         dc(d, "carbon_dioxide") ||
         dc(d, "volatile_organic_compounds")) return p.TINT_AIR;
 
+    // By kind of THING, for the corner icons of state cards - 2.7 round two.
+    if (dc(d, "garage_door") || dc(d, "door") || dc(d, "window") ||
+        dc(d, "opening") || dc(d, "lock"))             return p.TINT_OPENING;
+    if (dc(d, "occupancy") || dc(d, "motion") ||
+        dc(d, "presence"))                              return p.TINT_PRESENCE;
+    if (d.kind == EntityKind::LIGHT)                    return p.TINT_LIGHTING;
+
     // Everything without a tint of its own falls back to the accent rather
     // than to a grey. A sensor wall is meant to be scannable; an untinted card
     // should read as "no category", not as "broken".

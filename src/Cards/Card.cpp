@@ -204,10 +204,19 @@ void Card::resolveVariant() {
         _resolved = CardVariant::VAR_COMPACT; _valueSmall = true;
     }
 
-    // A pinned variant still gets the hero size its cell can carry.
+    // A pinned variant still gets the hero size ITS layout can carry. Compact
+    // has no status row, so it keeps the full-size value in cells where full
+    // would have had to shrink it - which is most of the point of compact, and
+    // since 2.7 round two it is the fleet default.
     if (_variant != CardVariant::VAR_AUTO) {
         _resolved = _variant;
-        if (_variant == CardVariant::VAR_FULL) _valueSmall = (h < need);
+        if (_variant == CardVariant::VAR_FULL) {
+            _valueSmall = (h < need);
+        } else {
+            int32_t needC = compactCellNeedPx();
+            if (_hdrStyle == CardHeaderStyle::HDR_BAR) needC += Card::headerHeight();
+            _valueSmall = (h < needC);
+        }
     }
 
     // Printed once per card, because this decision was guessed at twice and
@@ -560,6 +569,65 @@ int32_t Card::midHeight() const {
     // And never let a hero touch the edges of its band.
     h -= UI::sc(4);
     return h > 0 ? h : 0;
+}
+
+int32_t Card::surfaceHeightPx() const {
+    int32_t h = cellPx();
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+    return h;
+}
+
+int32_t Card::bodyTopPx() const {
+    const int32_t pad = UI::sc(UI::met().PAD);
+    return pad + (_hdrStyle == CardHeaderStyle::HDR_BAR ? Card::headerHeight() : 0);
+}
+
+// LG, then MD, then SM: the largest glyph that fits the hero band with a
+// margin. See StateCard::render() for the history - a cramped card used to
+// keep LG and lose its disc.
+const lv_font_t *Card::heroIconFace() const {
+    const UIType &t = UI::type();
+    const int32_t room = midHeight();
+    if (room <= 0) return t.ICON;
+    if (room >= lv_font_get_line_height(t.ICON)    + UI::sc(4)) return t.ICON;
+    if (room >= lv_font_get_line_height(t.ICON_MD) + UI::sc(4)) return t.ICON_MD;
+    return t.ICON_SM;
+}
+
+// Twice the glyph's line height is the look on a large card, clamped to the
+// band - a disc sized from the font alone was clipped by its own parent on
+// CYD_S3_3248, and a disc larger than its band forces a layer (LESSONS.md).
+int32_t Card::heroDiscPx() const {
+    const int32_t room = midHeight();
+    int32_t d = lv_font_get_line_height(heroIconFace()) * 2;
+    if (room > 0 && d > room) d = room;
+    return d;
+}
+
+int32_t Card::compactNameShiftPx() const {
+    if (_resolved != CardVariant::VAR_COMPACT) return 0;
+
+    // Everything in BODY CONTENT coordinates: 0 is the top of the padded body.
+    // Compact has no status row, so the stack is [middle band][name], and the
+    // hero is centred in the middle band - which ends a midGap above the name.
+    const int32_t pad   = UI::sc(UI::met().PAD);
+    const int32_t contH = surfaceHeightPx() - bodyTopPx() - pad;
+    const int32_t nameH = lv_font_get_line_height(UI::type().NAME);
+    const int32_t midH  = contH - nameH - midGap();
+    if (contH <= 0 || midH <= 0) return 0;
+
+    // The reference hero is the STATE card's disc, for both layouts, so that
+    // a row mixing lights and temperatures keeps its names on one line.
+    const int32_t heroBottom = midH / 2 + heroDiscPx() / 2;
+    const int32_t cardBottom = contH + pad;            // the surface's edge
+    const int32_t wantTop    = (heroBottom + cardBottom) / 2 - nameH / 2;
+    const int32_t flowTop    = contH - nameH;          // where flex put it
+
+    int32_t dy = wantTop - flowTop;
+    // Never over the hero, never off the card.
+    if (wantTop < heroBottom + UI::sc(2)) dy = heroBottom + UI::sc(2) - flowTop;
+    if (flowTop + dy + nameH > cardBottom - UI::sc(2)) dy = cardBottom - UI::sc(2) - nameH - flowTop;
+    return dy;
 }
 
 lv_obj_t *Card::makeCornerIcon(lv_obj_t *body) {

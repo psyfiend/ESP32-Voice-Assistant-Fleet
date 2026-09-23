@@ -55,6 +55,15 @@ struct UIPalette {
     uint32_t TINT_LIGHT;
     uint32_t TINT_AIR;
     uint32_t TINT_POWER;
+
+    // --- Corner icon tints, by kind of thing. 2.7 round two. ---
+    // The owner: "if the temp and lux are going to be colored then they all
+    // should be". Bulbs yellow-white "like one would picture a light bulb";
+    // doors blue. TINT_LIGHTING is per scheme rather than shared, because a
+    // yellow-white glyph vanishes on a light scheme's white card.
+    uint32_t TINT_OPENING;  // doors, windows, garage doors, locks
+    uint32_t TINT_PRESENCE; // occupancy, motion, presence
+    uint32_t TINT_LIGHTING; // lights, and switches used as lights
 };
 
 // ---------------------------------------------------------------------------
@@ -157,6 +166,8 @@ extern const UIPalette UI_PAL_SLATE;  // dark, the owner's primary
 extern const UIPalette UI_PAL_PAPER;  // light
 extern const UIPalette UI_PAL_FLEET;  // today's shipped UI, for comparison
 extern const UIPalette UI_PAL_MIDNIGHT; // Slate's ground, Fleet's cyan - the owner's pick
+extern const UIPalette UI_PAL_LINEN;  // light candidate, warm - 2026-09-22
+extern const UIPalette UI_PAL_FROST;  // light candidate, cool - 2026-09-22
 
 extern const UIMetrics UI_MET_DARK;   // 1px lighten @40% border, no shadow needed
 extern const UIMetrics UI_MET_LIGHT;  // no border, leans on the shadow
