@@ -85,6 +85,8 @@ through the night of 2026-09-22 without a drop.
 5. `docs/design/ha-websocket.md` — what HA's API actually gives us, measured. Read before #43.
 6. `docs/design/cards.md` — the card spec. Its "Implementation notes" first.
 7. `docs/design/tokens.md`, `docs/design/startup.md` — the design system, and boot order.
+7b. `docs/design/pages.md` — the page model and 2.6's scope. **A proposal as of 2026-09-22**; read
+   which items are DECIDED and which PROPOSED before building on any of it.
 8. `docs/ROADMAP.md` §7 — the milestone list.
 9. `docs/REVIEW_2026-09-20.md` — **historical.** The 2026-09-19/20 work written up for the owner
    to review cold. Reviewed and signed off 2026-09-21; every test passed. Kept as a narrative, not
