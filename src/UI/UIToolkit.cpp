@@ -139,6 +139,16 @@ void UIToolkit::registerSystemCloseCb(UiActionCallback cb) {
     _system_close_cb = cb;
 }
 
+// Told whenever a deck panel opens or the last one closes - GUIManager uses it
+// to show and hide the dismiss scrim, the same rule the system drawer follows.
+static void (*_accordion_change_cb)(bool open) = NULL;
+void UIToolkit::registerAccordionChangeCb(void (*cb)(bool open)) {
+    _accordion_change_cb = cb;
+}
+static void notifyAccordion() {
+    if (_accordion_change_cb) _accordion_change_cb(_active_accordion_panel != NULL);
+}
+
 // --- Panel Animation ---
 static void anim_height_cb(void * var, int32_t v) {
     lv_obj_set_height((lv_obj_t*)var, v);
@@ -169,6 +179,7 @@ void UIToolkit::closeActiveAccordion() {
     if (_active_accordion_panel) {
         execute_panel_toggle(_active_accordion_panel, false);
         _active_accordion_panel = NULL;
+        notifyAccordion();
     }
 }
 
@@ -195,6 +206,7 @@ static void panel_header_click_cb(lv_event_t * e) {
             _active_accordion_panel = NULL;
         }
     }
+    notifyAccordion();
 }
 
 

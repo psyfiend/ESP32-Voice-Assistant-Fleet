@@ -84,6 +84,29 @@ Again: gone. Bottom edge, LEFT half: still the deck.
 - Worth reading on the P4_5: FPS while an accordion panel opens, Linen vs Midnight. That answers
   "is Linen slower, or does it only look it".
 
+## Round four of 2.6 — flashed 2026-09-23
+
+Round-three results: L1-L3 PASS. Owner's perf readings, P4_5, before this round:
+
+| | Midnight | Linen |
+|---|---|---|
+| idle | ~29-30 FPS | same |
+| deck panel opening | dips to ~24 | dips to ~17 |
+| one panel opens as the other closes | - | ~9 |
+| system drawer | teens, CPU 40-50% | ~7, CPU 50-90% |
+| page swipe | faster | single digits, ~1.5 s pause |
+
+**D1 — Tap away from a deck panel.** Open AUDIO. Tap a card: the panel closes and the card does NOT
+toggle. Tap the empty page: closes. Tap inside the panel, drag its slider: works, stays open.
+**D2 — Swipe with a panel open.** Open a deck panel, swipe sideways: the panel closes, the page does
+NOT change. Same with the drawer open. Swipe again: now the page turns.
+**D3 — The scrunch.** Should be impossible to reach now (D2), but if a page is ever built with a
+panel open, the grid keeps its normal height.
+**D4 — Linen speed.** Same readings as the table above, on Linen. The shadow corner cache is on; a
+page swipe and the drawer should be noticeably better. Expect Tag mode to gain least - each card's
+tag pill and card have different corner radii and evict each other from the one-entry cache - so
+compare Bar mode against Tag mode too.
+
 ## 2.7 round four
 
 **C1 — Corner size by rows.** 3 rows or fewer: the larger corner icons, whatever the columns

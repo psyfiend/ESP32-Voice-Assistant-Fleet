@@ -262,6 +262,10 @@ private:
 
     lv_obj_t       *_hiddenBarTap = nullptr;
     lv_obj_t       *_dismissScrim = nullptr;
+    lv_obj_t       *_deckScrim    = nullptr;   // the deck's tap-away sheet
+    // The deck's height with every panel COLLAPSED, measured on the last
+    // build that had none open. See buildDashboard().
+    int32_t         _deckReserveCollapsed = 0;
     // Where the current press began. lv_indev_get_point() gives the CURRENT
     // point, which for a completed swipe is the far end of it - useless for
     // asking which edge it started from.

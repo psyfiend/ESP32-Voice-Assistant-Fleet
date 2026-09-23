@@ -246,7 +246,17 @@
         /** Allow buffering some shadow calculation.
          *  LV_DRAW_SW_SHADOW_CACHE_SIZE is the maximum shadow size to buffer, where shadow size is
          *  `shadow_width + radius`.  Caching has LV_DRAW_SW_SHADOW_CACHE_SIZE^2 RAM cost. */
-        #define LV_DRAW_SW_SHADOW_CACHE_SIZE 0
+        #define LV_DRAW_SW_SHADOW_CACHE_SIZE 32
+        /* ON since 2026-09-23, 32 (a 1 KB static buffer). Linen's shadows made
+         * the owner's panels visibly chunkier - page switches in single-digit
+         * FPS - and the expensive part of a software shadow is blurring its
+         * CORNER, which lv_draw_sw_box_shadow.c recomputes on every draw unless
+         * cached. The cache is keyed on (width + radius) and radius, NOT on the
+         * object's size, so every card sharing a radius and shadow width hits
+         * the same entry. 32 covers the largest on the fleet: WS_P4_5, 10 px
+         * blur + 20 px radius. It holds ONE entry, so objects with different
+         * radii drawn one after another - a tag pill then its card - evict
+         * each other; that is a limit of the stock cache, not a setting. */
 
         /** Set number of maximally-cached circle data.
          *  The circumference of 1/4 circle are saved for anti-aliasing.

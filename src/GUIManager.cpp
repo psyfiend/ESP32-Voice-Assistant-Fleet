@@ -330,11 +330,17 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
         // are not scrollable and the one slider-like control, the deck's
         // sliders, no longer bubble gestures at all (UIToolkit).
         //
-        // Not while the drawer is open or a header is peeking: both are
-        // "something is on top of the page", and turning the page under them
-        // would change what the user cannot see.
-        if (s_self->_pnlSystem.isExpanded() || s_self->_headerPeeking) {
-            DBG_GESTURE("horizontal swipe ignored: drawer or peek in the way\n");
+        // NOT while anything is open over the page - the drawer, a deck panel
+        // or a peeking header. A sideways swipe then PUTS IT AWAY instead of
+        // turning the page: the owner's rule that panels are closed before a
+        // page swipe can happen, and one rule for the drawer and the deck.
+        if (s_self->_pnlSystem.isExpanded() || s_self->_headerPeeking ||
+            UIToolkit::getActiveAccordionPanel()) {
+            release();
+            if (s_self->_pnlSystem.isExpanded()) s_self->_pnlSystem.close();
+            if (s_self->_headerPeeking)          s_self->unpeekHeader();
+            UIToolkit::closeActiveAccordion();
+            DBG_GESTURE("horizontal swipe closed what was open; page unchanged\n");
             break;
         }
         release();
@@ -577,6 +583,44 @@ void GUIManager::begin() {
     // Bottom panel open -> close system panel
     UIToolkit::registerSystemCloseCb(closeSystemPanelCb);
 
+    // THE DECK'S OWN DISMISS SCRIM - the drawer's rule, applied to the deck.
+    //
+    // The owner, 2026-09-23: "any taps outside of an exposed panel cause it to
+    // close, period. I can't think of any good reason why the system panel
+    // should differ from the deck panels." Same mechanism as _dismissScrim
+    // above, for the same reason: a card consumes its own tap, so only a sheet
+    // over the cards can catch it - and the first tap then MEANS "put the
+    // panel away" rather than also toggling the light underneath.
+    //
+    // On the SCREEN, and slotted in directly ABOVE the cards each time it is
+    // shown: over the cards, under the deck, so the open panel itself (and
+    // its sliders) still take their touches.
+    _deckScrim = lv_obj_create(screen);
+    lv_obj_remove_style_all       (_deckScrim);
+    lv_obj_set_size               (_deckScrim, lv_pct(100), lv_pct(100));
+    lv_obj_set_pos                (_deckScrim, 0, 0);
+    lv_obj_set_style_bg_opa       (_deckScrim, LV_OPA_TRANSP, 0);
+    lv_obj_add_flag               (_deckScrim, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag               (_deckScrim, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(_deckScrim, [](lv_event_t *ev) {
+        (void)ev;
+        UIToolkit::closeActiveAccordion();
+    }, LV_EVENT_CLICKED, NULL);
+    UIToolkit::registerAccordionChangeCb([](bool open) {
+        if (!s_self || !s_self->_deckScrim) return;
+        if (open) {
+            lv_obj_clear_flag(s_self->_deckScrim, LV_OBJ_FLAG_HIDDEN);
+            // Scrim to the back, then the cards behind it: cards, scrim, and
+            // everything else (deck, drawer layer, header) above. Deterministic
+            // from any starting order - lv_obj_move_to_index(deck's index)
+            // lands ABOVE the deck when the scrim starts below it.
+            lv_obj_move_background(s_self->_deckScrim);
+            if (s_self->_dashHost) lv_obj_move_background(s_self->_dashHost);
+        } else {
+            lv_obj_add_flag(s_self->_deckScrim, LV_OBJ_FLAG_HIDDEN);
+        }
+    });
+
     // System open -> hide touch window
     _pnlSystem.setOnToggleCallback([](bool isOpen) {
         if (s_self && s_self->_dismissScrim) {
@@ -761,6 +805,19 @@ void GUIManager::buildDashboard() {
         }
         deckReserve = screenBottom - topMost;
         if (deckReserve < 0) deckReserve = 0;
+
+        // AN OPEN PANEL IS NOT THE DECK'S HEIGHT. This measures where the
+        // deck's children actually are - and an expanded panel reaches far up
+        // the screen, so a page built while one was open was squeezed into
+        // the space above it. The owner: swipe to the next page with a deck
+        // panel open and "it scrunches the entire grid vertically". So the
+        // measurement is only trusted, and remembered, with every panel
+        // collapsed; with one open, the remembered collapsed value is used.
+        if (UIToolkit::getActiveAccordionPanel() && _deckReserveCollapsed > 0) {
+            deckReserve = _deckReserveCollapsed;
+        } else if (!UIToolkit::getActiveAccordionPanel()) {
+            _deckReserveCollapsed = deckReserve;
+        }
         // NO EXTRA GAP. The page's own INSET already holds the bottom row off
         // the edge of its host, and with the deck hidden that inset is exactly
         // the margin the owner liked ("6x3 sits neatly against the bottom
@@ -1172,6 +1229,9 @@ void GUIManager::togglePerf() {
 }
 
 void GUIManager::toggleDeck() {
+    // Put an open panel away first, so the deck never goes into hiding with a
+    // panel half-expanded and the scrim left up behind it.
+    UIToolkit::closeActiveAccordion();
     _showDeck = !_showDeck;
     rebuildDashboard();
     Serial.printf("[Cards] deck %s\n", _showDeck ? "shown" : "hidden");

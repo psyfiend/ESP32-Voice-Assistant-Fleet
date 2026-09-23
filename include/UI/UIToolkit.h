@@ -81,6 +81,8 @@ public:
 
     // -- NEW: Register a callback to close the System Panel --
     static void         registerSystemCloseCb(UiActionCallback cb);
+    // Called with true when a deck panel opens, false when none is open.
+    static void         registerAccordionChangeCb(void (*cb)(bool open));
 
     // --= SEMANTIC FONTS =--
     // Defined by function rather than size
