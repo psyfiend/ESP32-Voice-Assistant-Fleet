@@ -100,6 +100,10 @@ void Panel_System::setAreaLabel(const char *text) {
     if (_lbl_area && text) lv_label_set_text(_lbl_area, text);
 }
 
+void Panel_System::setLabelModeLabel(const char *text) {
+    if (_lbl_label && text) lv_label_set_text(_lbl_label, text);
+}
+
 // One transparent flex row of buttons. Four of these existed as four
 // copy-pasted blocks the moment #50 added rows 3 and 4, which is three too
 // many places to change a gap.
@@ -450,6 +454,15 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
         if (p) p->requestGrid(Panel_System::GridAction::AREA_TOGGLE);
     });
     _lbl_area = lv_obj_get_child(btnArea, 0);
+
+    // What a state card says under its hero: name, the state word, or nothing.
+    // 2.7, cards.md section 13. A control so the three can be compared on
+    // glass rather than by rebuilding.
+    lv_obj_t *btnLabel = knobButton(_ui_row4, this, "Name", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestGrid(Panel_System::GridAction::LABEL_CYCLE);
+    });
+    _lbl_label = lv_obj_get_child(btnLabel, 0);
 
     // Scheme, on the dashboard rather than on the reference page. The owner
     // asked for it, and it is also the fix for WHY he was on that page: the

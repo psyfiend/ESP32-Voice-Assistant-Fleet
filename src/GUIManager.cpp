@@ -3,6 +3,7 @@
 #include "UI/UITokens.h"
 #include "SystemReport.h"
 #include "Cards/CardDemo.h"
+#include "Cards/CardIcons.h"   // cardSetLabelMode(), for the Label knob
 #include "UI/ReferencePage.h"
 #include "UI/LogPage.h"
 #include "Dashboards/Dashboard_Fleet.h"
@@ -626,6 +627,7 @@ void GUIManager::begin() {
             case Panel_System::GridAction::VARIANT_CYCLE: cycleVariant();  break;
             case Panel_System::GridAction::FILL_CYCLE:    cycleFill();     break;
             case Panel_System::GridAction::AREA_TOGGLE:   toggleArea();    break;
+            case Panel_System::GridAction::LABEL_CYCLE:   cycleLabel();    break;
         }
     });
 
@@ -939,6 +941,21 @@ void GUIManager::cycleFill() {
     const char *n = (_fill == StateCardFill::FILL_SURFACE) ? "Fill" : "Icon";
     _pnlSystem.setFillLabel(n);
     Serial.printf("[Cards] active state -> %s\n", n);
+}
+
+void GUIManager::cycleLabel() {
+    // The FLEET default, which every page and card inherits unless it says
+    // otherwise - the same place TempUnit's fleet default lives. Live, like
+    // Fill: StateCard resolves it in render(), so a restyle is enough.
+    const CardLabel next = (cardLabelMode() == CardLabel::LBL_NAME)  ? CardLabel::LBL_STATE
+                         : (cardLabelMode() == CardLabel::LBL_STATE) ? CardLabel::LBL_NONE
+                                                                     : CardLabel::LBL_NAME;
+    cardSetLabelMode(next);
+    _binder.restyleAll();
+    const char *n = (next == CardLabel::LBL_NAME)  ? "Name"
+                  : (next == CardLabel::LBL_STATE) ? "State" : "No lbl";
+    _pnlSystem.setLabelModeLabel(n);
+    Serial.printf("[Cards] state-card label -> %s\n", n);
 }
 
 void GUIManager::toggleArea() {

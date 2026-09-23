@@ -350,6 +350,11 @@ Rules that are load-bearing rather than stylistic:
 - **Never cache a colour.** The active palette is a mutable *copy* of a scheme so `UI::setScheme()`
   and `UI::setAccent()` can work live; a card that caches a colour will not repaint on a scheme
   change.
+- **Chrome uses `UI::paint(UIPaint::…)`, not a local colour.** A local
+  `lv_obj_set_style_*_color` is set once and never revisited — that is #64, where the deck panels
+  and system drawer kept the old scheme. A shared paint is updated in place by `setScheme()`, and
+  everything using it repaints. A local colour property beats a shared style in LVGL, so never set
+  both on one widget.
 - **All token values are logical pixels.** Run them through `UI::sc()` at the point of use. Never
   store a scaled value — the scale is per board.
 - **Columns and rows are derived, never declared.** Pick `TARGET_CARD_W`; the page fits as many
@@ -372,9 +377,16 @@ are derived rather than guessed per board.
 
 ### Two costs worth knowing before adding anything visual
 
-- **One referenced font face is ~96 KB of flash.** Measured. Enabling a size in `lv_conf.h` is
-  free (the linker drops unreferenced font objects); *referencing* one is what costs. `UIType` is a
-  budget, not a style choice — and the MDI icon subset competes for the same flash.
+- **A referenced font face costs 6–73 KB of flash, by kind and size — not "~96 KB".** That figure
+  was ONE large full-ASCII Montserrat, and it was applied to every face for months. Measured
+  2026-09-22 from object files: generated digits-only VALUE faces 6–10 KB, MDI icon faces 10–73 KB,
+  Montserrat 14–24 at 14–29 KB. Enabling a size in `lv_conf.h` is free (the linker drops
+  unreferenced font objects); *referencing* one is what costs. `UIType` is still a budget — a much
+  smaller one. `gen_type_scale.py` prefers a built-in Montserrat when one exists, which for a
+  digits-only role is the expensive choice; `VALUE_SM` is forced to the generated subset for that
+  reason.
+- **Card-size faces (2.7, #62).** `VALUE_SM` and `ICON_MD` let a card step its hero and corner with
+  its own cell. Name, unit and tag faces never change per card. See `cards.md` §13.
 - **A card costs ~715 bytes of `lv_mem`**, LVGL's own 128 KB pool — which is a static array in
   internal DRAM, not the system heap. `ESP.getFreeHeap()` barely moves when a widget is created;
   `lv_mem_monitor()` is the instrument.

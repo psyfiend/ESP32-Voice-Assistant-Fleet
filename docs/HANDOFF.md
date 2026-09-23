@@ -12,6 +12,43 @@ does not appear in the source as suspect.
 
 ## Where the project is
 
+### NOW, 2026-09-22: milestone 2.7 in progress on `feat/18-card-types`
+
+Five commits. **All 8 environments build** (clean tree, after `build_cache` was cleared twice for
+struct-layout changes). Flashed to `CYD_S3_3248` and `WS_P4_5`, both boot and report to HA, and
+`WS_P4_5`'s log shows HA accepted + 18/18 initial values. **None of it seen on glass yet.**
+
+The 3248's serial (native USB, COM10) printed nothing to a capture script, even with a reset and DTR
+asserted - and its HA uptime showed the "reset" never happened. It is alive and quiet; use HA's
+`last_updated`, not the cable, to check it. The test sheet is `docs/TEST_2.7.md`. Every design
+decision was agreed with the owner first and is written down in `docs/design/cards.md` §13 — read
+that before touching any card.
+
+- **HA attributes**: live icon, brightness and `rgb_color` land in `Entity::attrs` through ONE
+  filter/reader pair in `HaValue.h`, used by both HaRest and HaProvider.
+- **Icons**: every card has a corner icon (our table) and state cards a hero icon (user's on/off
+  pair -> user's icon -> HA's live icon -> our pair). The HA descriptors no longer copy HA's icons.
+- **Binary sensors**: one card type and a `device_class` table in `CardIcons.cpp` — NOT a `door`
+  class. A new Label knob (Name / State / No lbl) in the drawer.
+- **Lights**: brightness fills the card bottom-up (a hard-edged gradient on the surface, deliberately
+  not a child object — no `clip_corner` layer); the disc takes the light's colour.
+- **#62**: new `VALUE_SM` and `ICON_MD` faces; hero and corner step with the card.
+- **#63**: a non-matching echo is no longer a verdict; only a matching echo or the 5 s window ends a
+  command.
+- **#64**: chrome uses shared `UI::paint()` styles that repaint on a scheme change.
+- **No-header corner**: `Card::restyle()` was reserving a header strip in HDR_NONE. Fixed.
+
+**Measured on the way, and worth knowing:** HA core does NOT compute state-dependent icons into
+`attributes.icon` — only users and integrations set it (`ha-websocket.md` §5 was wrong and is
+corrected). And a font face costs 6-73 KB, not "~96 KB" (CLAUDE.md corrected).
+
+**Two HANDOFF claims below were wrong, found today:**
+- *"#44's outbound leg is written but HAS NEVER RUN"* — the owner's #63 report is a tap on Desk that
+  faded the lights off, so the tap -> `call_service` path works on glass.
+- *"the deck temperature and illuminance appear TWICE on the HA page"* — `Dashboard_HA.h` places only
+  the HA copies; the MQTT `deck_*` cards are on the Fleet page, which `USE_HA_DASHBOARD` replaces.
+  Nothing was removed. Both entities are still REGISTERED, which is harmless.
+
 Phases 0, 1 and 2.1–2.5 are merged and tagged `v0.2.5`. **`fix/49-link-liveness` merged to `main`
 on 2026-09-19** (`7d723be`, 23 commits, `--no-ff` per ROADMAP §3.2's exception — the intermediate
 commits are the diagnostic record, and for #49 that record *is* the finding). It carried #49's
@@ -298,8 +335,10 @@ the CHIP VARIANT rather than the target.
    on any entity a board publishes says whether it is alive, for the whole fleet, from a PC.
    Details and the interpretation table are in the #61 section above.
 
-1. **2.7 card types.** The 18 real entities are on glass on four boards, so this is judgeable for
-   the first time rather than theoretical. What it owes, with the evidence now in hand:
+1. **2.7 card types — IN PROGRESS, see "NOW" at the top.** Next: the owner runs
+   `docs/TEST_2.7.md` on the two benches, then flash the 7B to judge the corner-icon size rule.
+   After 2.7: **2.6 horizontal swipes, then 2.10 popup groundwork, 2.8 slots, 2.11 group cards,
+   3.1** — ROADMAP §7's revised running order. The original scope, kept for reference:
 
    - a **`door`** type - both garage sensors report `device_class: garage_door` and render as
      generic binary sensors
@@ -347,9 +386,9 @@ Done 2026-09-21: **#43**, **#60** closed; #56, #57 closed; `feat/43-ha-websocket
 Done 2026-09-22: **#61** - P4 libraries rebuilt, verified and installed; **#41** closed as not the
 cause; **#49** root-caused to esp-hosted-mcu#243.
 
-**#44's outbound leg is written but HAS NEVER RUN.** Nothing can tap the screen remotely, so the
-path from a card tap to `call_service` has only ever been compiled. The transport under it is
-proven (~91 ms echo, measured). T9 in `REVIEW_2026-09-20.md` is that test.
+~~**#44's outbound leg is written but HAS NEVER RUN.**~~ **Wrong as of 2026-09-22**: the owner's
+#63 report is a tap on Desk that faded the lights off, which is this path working on glass. Kept
+struck through so the correction is visible.
 
 **#44 is not finished, deliberately.** Nothing subscribes to our own `/set` topics -
 `MqttManager::subscribeCommand()` exists with no caller - because no entity in the fleet is both

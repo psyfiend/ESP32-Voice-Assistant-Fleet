@@ -91,6 +91,7 @@ public:
     // existed since 2.4 with nothing on the device able to reach it.
     void cycleVariant();   // auto / full / compact - argue with the measurement
     void cycleFill();      // how an active StateCard reads
+    void cycleLabel();     // name / state word / none under a state card's hero
     void toggleArea();     // area on every card, or not
     bool deckShown() const { return _showDeck; }
 

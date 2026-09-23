@@ -87,6 +87,7 @@ public:
     void setVariantLabel(const char *text);
     void setFillLabel(const char *text);
     void setAreaLabel(const char *text);
+    void setLabelModeLabel(const char *text);
 
     // Fires the above. Public because a capture-less lv_event_cb lambda is a
     // free function, not a member, so it cannot reach a private field.
@@ -116,6 +117,9 @@ public:
         VARIANT_CYCLE,             // auto / full / compact, overriding the measurement
         FILL_CYCLE,                // how an active StateCard reads: fill or icon
         AREA_TOGGLE,               // show the area on every card, or not
+        // 2.7: what the line under a state card's hero says - name, the state
+        // word ("Open"), or nothing. cards.md section 13.
+        LABEL_CYCLE,
     };
     using GridCallback = std::function<void(GridAction)>;
     void setOnGridAction(GridCallback cb) { _onGridAction = cb; }
@@ -166,10 +170,11 @@ private:
     lv_obj_t* _ui_actions; // row 1 - Log / Tokens / Cards
     lv_obj_t* _ui_grid;    // row 2 - Col -/+, Row -/+
     lv_obj_t* _ui_row3;    // row 3 - Deck / Compact / Theme
-    lv_obj_t* _ui_row4;    // row 4 - header mode / Fill / Area
+    lv_obj_t* _ui_row4;    // row 4 - header mode / Fill / Area / Label
     lv_obj_t* _lbl_variant;
     lv_obj_t* _lbl_fill;
     lv_obj_t* _lbl_area;
+    lv_obj_t* _lbl_label = nullptr;   // name / state / none
     lv_obj_t* _lbl_hdr;    // label inside the header-mode button
     lv_obj_t* _lbl_scheme; // label inside the scheme button
     lv_obj_t* _lbl_bar;    // label inside the header-size button
