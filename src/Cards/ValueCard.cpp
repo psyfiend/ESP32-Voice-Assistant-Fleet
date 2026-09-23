@@ -175,8 +175,7 @@ void ValueCard::render() {
     // The label setting applies here too - the owner found temperatures
     // keeping their names under "No lbl" and looking odd as the only cards
     // that did. For a value card the number already IS the state, so State
-    // shows the name, and No icon changes nothing: there is no hero glyph to
-    // drop, and the corner stays on every card.
+    // shows the name.
     const bool showName = (cardResolveLabel(labelMode()) != CardLabel::LBL_NONE);
     if (showName) lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
     else          lv_obj_add_flag  (_name, LV_OBJ_FLAG_HIDDEN);

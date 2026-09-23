@@ -76,8 +76,12 @@ struct UIMetrics {
     uint8_t PAD;            // card inner padding
     uint8_t BORDER_W;       // 0 on light schemes, 1 on dark
     uint8_t BORDER_OPA_PCT; // strength of the derived border colour
-    uint8_t SHADOW;
+    uint8_t SHADOW;         // blur width. 0 = none
     uint8_t HEADER_H;       // card header bar — covers the border, edge to edge
+    // How far the shadow drops below the card. 0 is a halo; a few pixels is
+    // a DROP shadow, which is what makes a card read as lifted off the page -
+    // the owner's "it looks too flat" on Linen, 2026-09-23.
+    uint8_t SHADOW_Y;
 };
 
 // ---------------------------------------------------------------------------
@@ -162,12 +166,10 @@ struct UIType {
 // ---------------------------------------------------------------------------
 // Built-in schemes
 // ---------------------------------------------------------------------------
-extern const UIPalette UI_PAL_SLATE;  // dark, the owner's primary
-extern const UIPalette UI_PAL_PAPER;  // light
-extern const UIPalette UI_PAL_FLEET;  // today's shipped UI, for comparison
-extern const UIPalette UI_PAL_MIDNIGHT; // Slate's ground, Fleet's cyan - the owner's pick
-extern const UIPalette UI_PAL_LINEN;  // light candidate, warm - 2026-09-22
-extern const UIPalette UI_PAL_FROST;  // light candidate, cool - 2026-09-22
+// Three, pruned on glass 2026-09-23. See UITokens.cpp.
+extern const UIPalette UI_PAL_FLEET;    // the original shipped UI
+extern const UIPalette UI_PAL_MIDNIGHT; // dark, the default
+extern const UIPalette UI_PAL_LINEN;    // light
 
 extern const UIMetrics UI_MET_DARK;   // 1px lighten @40% border, no shadow needed
 extern const UIMetrics UI_MET_LIGHT;  // no border, leans on the shadow
@@ -205,6 +207,9 @@ const UIType    &type();
 // Cards must therefore read UI::pal() when they build or restyle and must never
 // cache a colour — cheap to honour now, invasive to retrofit later.
 void setScheme(const UIPalette &p, const UIMetrics &m);
+// The next scheme in the knob's order - Fleet, Midnight, Linen - with its
+// metrics. Every scheme button calls this; the order lives in UITokens.cpp.
+void cycleScheme();
 void setAccent(uint32_t hex);
 void setTargetCardWidth(uint16_t logicalPx);
 

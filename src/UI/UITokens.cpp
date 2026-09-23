@@ -31,44 +31,17 @@
 #define TINT_LIGHTING_DARK  0xFFE3A3
 #define TINT_LIGHTING_LIGHT 0xC98A12
 
-const UIPalette UI_PAL_SLATE = {
-    .name        = "Slate",
-    .GROUND      = 0x1A1F27,
-    .SURFACE     = 0x212429,
-    .SURFACE_ALT = 0x2B2F36,
-    .TEXT        = 0xF0F2F4,
-    .TEXT_DIM    = 0x98A0AA,
-    .ACCENT      = 0x9B7BD4,   // violet — the owner's pick for the 3248
-    .BORDER      = 0,          // derived: lighten SURFACE
-    FLEET_STATE_AND_TINTS,
-    .TINT_LIGHTING = TINT_LIGHTING_DARK,
-};
+// THREE SCHEMES, pruned on glass 2026-09-23: Fleet, Midnight, Linen.
+//
+// Slate went because it differed from Midnight only in its accent ("slate is
+// purplish, midnight is blue"). Paper went because Linen replaced it. Frost
+// went because it lost to Linen - "I might have thought Frost would look good
+// but when I saw it it's definitely not for me". All three are in git history.
 
-const UIPalette UI_PAL_PAPER = {
-    .name        = "Paper",
-    .GROUND      = 0xE8E9EC,
-    .SURFACE     = 0xFFFFFF,
-    .SURFACE_ALT = 0xF1F2F5,
-    .TEXT        = 0x16181C,
-    .TEXT_DIM    = 0x666D77,
-    .ACCENT      = 0xE0A53C,   // amber — the owner's pick for the large panels
-    .BORDER      = 0,
-    FLEET_STATE_AND_TINTS,
-    .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
-};
-
-// TWO CANDIDATE LIGHT SCHEMES, 2026-09-22, to be judged on glass.
-//
-// The owner, on Paper: the card and panel colour has too little contrast
-// against the ground, and the amber accent is weak as TEXT (device name, panel
-// titles, "SYSTEM - DIAGNOSTICS"). And: "I will know it when I see it". So
-// rather than tune Paper by argument, two different directions to look at:
-//
-//   Linen   warm - a sand ground, cream cards, dark brown text, copper accent
-//   Frost   cool - a blue-grey ground, near-white cards, ink text, blue accent
-//
-// Both put clear daylight between ground and card, and both pick an accent
-// dark enough to read as text on a light surface. Whichever loses is deleted.
+// LINEN - the light scheme. A candidate from 2026-09-22 that won against Paper
+// and Frost: a sand ground, cream cards, dark brown text, and a copper accent
+// dark enough to read as text on a light surface - which Paper's amber was
+// not (the owner's complaint about the device name and the panel titles).
 const UIPalette UI_PAL_LINEN = {
     .name        = "Linen",
     .GROUND      = 0xDDD5C8,
@@ -77,19 +50,6 @@ const UIPalette UI_PAL_LINEN = {
     .TEXT        = 0x2B2520,
     .TEXT_DIM    = 0x6E6459,
     .ACCENT      = 0xA8561C,   // copper
-    .BORDER      = 0,
-    FLEET_STATE_AND_TINTS,
-    .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
-};
-
-const UIPalette UI_PAL_FROST = {
-    .name        = "Frost",
-    .GROUND      = 0xCDD5E0,
-    .SURFACE     = 0xF5F7FA,
-    .SURFACE_ALT = 0xE3E8EF,
-    .TEXT        = 0x15202E,
-    .TEXT_DIM    = 0x55637A,
-    .ACCENT      = 0x2463C9,   // ink blue
     .BORDER      = 0,
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
@@ -111,13 +71,11 @@ const UIPalette UI_PAL_FLEET = {
     .TINT_LIGHTING = TINT_LIGHTING_DARK,
 };
 
-// The owner's verdict after seeing all three on glass: Slate's ground, Fleet's
-// blue. This is what the runtime-copy design was for - the same result is
-// reachable with setScheme(UI_PAL_SLATE, ...) + setAccent(0x00A8FF), but a
-// named scheme is easier to pick from a button.
+// The owner's verdict after seeing the dark schemes on glass: the former
+// Slate's ground, Fleet's blue. The DEFAULT since 2026-09-23.
 const UIPalette UI_PAL_MIDNIGHT = {
     .name        = "Midnight",
-    .GROUND      = 0x1A1F27,   // Slate
+    .GROUND      = 0x1A1F27,
     .SURFACE     = 0x212429,
     .SURFACE_ALT = 0x2B2F36,
     .TEXT        = 0xF0F2F4,
@@ -135,15 +93,25 @@ const UIPalette UI_PAL_MIDNIGHT = {
 // Dark schemes take a hairline border because a dark card on a dark ground
 // needs an edge; light schemes lean on the shadow instead. That difference was
 // the only thing separating the owner's light and dark configs.
+//
+// NO CARD SHADOW HAS EVER BEEN VISIBLE, until 2026-09-23. Both metric sets
+// asked for SHADOW = 8, and Card clipped it away: the styled surface sits in a
+// transparent wrapper exactly its own size, and a parent clips its children.
+// The owner put his finger on it from the other end - Linen "looks too flat" -
+// and the fix is one flag on that wrapper (Card::build()). The dark schemes are
+// set to SHADOW 0 so they look exactly as they always have; only the light
+// scheme, where a shadow is what separates a card from the page, gets one.
 const UIMetrics UI_MET_DARK  = {
-    .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 8, .HEADER_H = 14
+    .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 0, .HEADER_H = 14,
+    .SHADOW_Y = 0
 };
-// The light scheme leaned entirely on its shadow and drew no border at all,
-// which on glass left the owner asking whether one was even there. A hairline
-// derived from the surface toward BLACK - UI::border() picks the direction from
-// the surface's own lightness - gives the card an edge without a hard outline.
+// Linen's. A 2 px border, darker than the old hairline (the owner: "make it a
+// bit darker and increase by 1 or 2px", knobs included - the drawer's buttons
+// take BORDER_W through UI::paint()), and a mild DROP shadow - "in HA for most
+// of my custom dashboards I shamelessly use a mild drop shadow".
 const UIMetrics UI_MET_LIGHT = {
-    .RADIUS = 12, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 14, .SHADOW = 8, .HEADER_H = 14
+    .RADIUS = 12, .PAD = 5, .BORDER_W = 2, .BORDER_OPA_PCT = 26, .SHADOW = 12, .HEADER_H = 14,
+    .SHADOW_Y = 4
 };
 
 // ---------------------------------------------------------------------------
@@ -313,10 +281,16 @@ static void refreshPaints() {
     auto st = [](UIPaint p) { return &s_paint[(int)p]; };
     const lv_color_t bd = border();
 
+    // Border WIDTH as well as colour, from the scheme's metrics: Linen's 2 px
+    // edge is meant for the drawer's buttons and the deck panels too (the
+    // owner, 2026-09-23), and a width set locally on each widget would not
+    // follow a scheme change.
     lv_style_set_bg_color    (st(UIPaint::PAINT_SURFACE),     c(s_pal.SURFACE));
     lv_style_set_border_color(st(UIPaint::PAINT_SURFACE),     bd);
+    lv_style_set_border_width(st(UIPaint::PAINT_SURFACE),     s_met.BORDER_W);
     lv_style_set_bg_color    (st(UIPaint::PAINT_SURFACE_ALT), c(s_pal.SURFACE_ALT));
     lv_style_set_border_color(st(UIPaint::PAINT_SURFACE_ALT), bd);
+    lv_style_set_border_width(st(UIPaint::PAINT_SURFACE_ALT), s_met.BORDER_W);
     lv_style_set_text_color  (st(UIPaint::PAINT_TEXT),        c(s_pal.TEXT));
     lv_style_set_text_color  (st(UIPaint::PAINT_TEXT_DIM),    c(s_pal.TEXT_DIM));
     lv_style_set_text_color  (st(UIPaint::PAINT_ACCENT_TEXT), c(s_pal.ACCENT));
@@ -347,6 +321,25 @@ void setScheme(const UIPalette &p, const UIMetrics &m) {
     recomputeGrid();
     refreshPaints();
     if (s_onChange) s_onChange();
+}
+
+// THE SCHEME KNOB'S ORDER, in one place. Three screens each carried their own
+// copy of this switch - the drawer, the card bench and the reference page -
+// which is how deleting a scheme came to mean editing three files.
+struct SchemeEntry { const UIPalette *pal; const UIMetrics *met; };
+static const SchemeEntry SCHEMES[] = {
+    { &UI_PAL_FLEET,    &UI_MET_DARK  },
+    { &UI_PAL_MIDNIGHT, &UI_MET_DARK  },
+    { &UI_PAL_LINEN,    &UI_MET_LIGHT },
+};
+
+void cycleScheme() {
+    const size_t n = sizeof(SCHEMES) / sizeof(SCHEMES[0]);
+    size_t cur = 0;
+    for (size_t i = 0; i < n; i++)
+        if (strcmp(SCHEMES[i].pal->name, s_pal.name) == 0) { cur = i; break; }
+    const SchemeEntry &next = SCHEMES[(cur + 1) % n];
+    setScheme(*next.pal, *next.met);
 }
 
 void setAccent(uint32_t hex) {

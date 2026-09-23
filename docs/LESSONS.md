@@ -249,6 +249,13 @@ the thing it was taken on**, and when reading one, check whether the claim is ab
 about everything like it. The entity registry (`config/entity_registry/get`: `platform`,
 `original_icon`) and an object-file size are both seconds away.
 
+**A style that is set is not a style that is seen.** Found 2026-09-23: every card had asked for an
+8 px shadow since 2.4, and none had ever drawn one. The styled surface fills a transparent wrapper
+exactly, so its whole shadow lay outside its parent - and LVGL clips children to their parent,
+silently. Nobody noticed because nothing looked broken; the owner only said Linen "looks too flat".
+Same family as the missing `EVENT_BUBBLE` below and the `OVERFLOW_VISIBLE` note after it. **When a
+visual token seems to do nothing, check what clips it before tuning its value.**
+
 ## LVGL, from milestone 2.4
 
 **An out-of-range grid row is a hard freeze, not a wrong layout.** `lv_conf.h` defines

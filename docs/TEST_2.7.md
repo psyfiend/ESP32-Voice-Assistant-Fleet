@@ -97,19 +97,48 @@ Paper.
 First-round results: T1-T3, T5-T9, T11-T13 PASS. T4 needs the 7B; T10, T15 not run.
 
 **R1 — Compact by default.** Boot. The variant knob reads **Cmpct** and no card shows a "Seen" line.
-**R2 — Compact name position.** PASS: every name sits midway between its disc's bottom edge and the
-card's bottom edge, and names in one row are level whether the card is a light or a temperature.
+
+**R2 — Compact name position.**
+- PASS: every name sits midway between its disc's bottom edge and the card's bottom edge, and names in
+  one row are level whether the card is a light or a temperature.
+
 **R3 — Corner tints.** Lights yellow-white, garage doors blue, occupancy teal; temps and lux as before.
+
 **R4 — Desk.** Corner: the plain bulb. Hero: the group bulb, filled when on, outline when off.
+
 **R5 — Label knob, four steps.** Name -> State -> No lbl -> No icon. No lbl hides names on the
 temperature cards too. No icon: names centred, no discs, corner icons and fills still there.
-**R6 — Seen, deterministic.** Knob to **Full**, then Name/State/Auto in any order. PASS: a given card
-shows "Seen: 22m" or "22m" the same way every time; only a narrow card with a battery drops the prefix.
+
+**R6 — Seen, deterministic.** Knob to **Full**, then Name/State/Auto in any order.
+- PASS: a given card shows "Seen: 22m" or "22m" the same way every time; only a narrow card with a 
+  battery drops the prefix.
+
 **R7 — Active ink.** In Paper, Linen and Frost, icons and names on a lit card are dark, Desk included.
+
 **R8 — Light schemes.** The scheme knob now runs Fleet, Slate, Midnight, **Linen, Frost**, Paper.
 Judge the two new ones: card vs background, and the device name / panel titles / SYSTEM - DIAGNOSTICS.
 Also: "Show Touches" in the Display panel is readable on all three light schemes.
+
 **R9 — 3 s window.** Tap Desk off: still no FAILED.
+
+## Round three — flashed 2026-09-23 to CYD_S3_3248 and WS_P4_7B
+
+Round-two results: R1-R4, R6-R9 PASS. R5's "No icon" rejected and removed.
+
+**S1 — Slider.** Grab the brightness or volume handle and whip it back and forth fast.
+- PASS: the handle stays under your finger the whole time. FAIL: it freezes and jumps on release.
+
+**S2 — Schemes.** The knob cycles **Fleet -> Midnight -> Linen** and the board boots in Midnight, with
+the knob saying so (it used to read "Fleet" whatever was on screen).
+
+**S3 — Linen depth.** On Linen: every card has a soft shadow falling slightly below it; card borders
+are 2 px and visibly darker; the drawer's buttons and the deck panels have the same border.
+- Also judge speed: shadows are drawn in software. If the 3248 now feels slower redrawing, say so.
+
+**S4 — Dark schemes unchanged.** Fleet and Midnight look exactly as they did - no new shadows.
+
+**S5 — T4, corner size on the 7B.** The corner icons on the 7B should be one size larger than on the
+3248 (the MD face). Judge whether that is the right size, not just different.
 
 ## G. Residuals
 

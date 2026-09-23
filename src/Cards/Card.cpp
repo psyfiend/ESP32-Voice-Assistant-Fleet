@@ -288,6 +288,13 @@ void Card::build(lv_obj_t *parent) {
     lv_obj_set_flex_flow          (_root, LV_FLEX_FLOW_COLUMN);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_CLICKABLE);
+    // THE SHADOW LIVES OUTSIDE THIS WRAPPER, so the wrapper must not clip it.
+    // The surface fills _root exactly, which put every pixel of its shadow
+    // outside its parent - and a parent clips its children - so no card has
+    // ever shown one, whatever the metrics asked for. Overflow-visible costs no
+    // layer: it REMOVES a clip rather than adding one. The page's gaps and
+    // inset are where the shadows land.
+    lv_obj_add_flag               (_root, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
 
     if (_hdrStyle == CardHeaderStyle::HDR_TAG) {
         _tagRow = lv_obj_create(_root);
@@ -450,8 +457,9 @@ void Card::restyle() {
     lv_obj_set_style_radius       (_surface, UI::sc(m.RADIUS), 0);
     lv_obj_set_style_border_width (_surface, m.BORDER_W, 0);
     lv_obj_set_style_border_color (_surface, UI::border(), 0);
-    lv_obj_set_style_shadow_width (_surface, UI::sc(m.SHADOW), 0);
-    lv_obj_set_style_shadow_opa   (_surface, m.SHADOW ? LV_OPA_40 : LV_OPA_TRANSP, 0);
+    lv_obj_set_style_shadow_width   (_surface, UI::sc(m.SHADOW), 0);
+    lv_obj_set_style_shadow_offset_y(_surface, UI::sc(m.SHADOW_Y), 0);
+    lv_obj_set_style_shadow_opa     (_surface, m.SHADOW ? LV_OPA_30 : LV_OPA_TRANSP, 0);
 
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
     // BAR ONLY. This said "not TAG", which also reserved a header's height in

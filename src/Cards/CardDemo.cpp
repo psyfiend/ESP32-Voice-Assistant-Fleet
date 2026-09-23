@@ -25,7 +25,6 @@ CardBinder     *s_binder = nullptr;
 // when the whole page switches at once.
 CardHeaderStyle s_hdr = CardHeaderStyle::HDR_TAG;
 
-int s_scheme = 0;
 
 // Which actor treatment the page is wearing. Same idea as s_hdr: a knob rather
 // than a decision, because the question is "which of these do you prefer" and
@@ -91,13 +90,7 @@ void backCb  (lv_event_t *e) { (void)e; CardDemo::close(); }
 
 void schemeCb(lv_event_t *e) {
     (void)e;
-    s_scheme = (s_scheme + 1) % 4;
-    switch (s_scheme) {
-        case 0: UI::setScheme(UI_PAL_FLEET,    UI_MET_DARK);  break;
-        case 1: UI::setScheme(UI_PAL_SLATE,    UI_MET_DARK);  break;
-        case 2: UI::setScheme(UI_PAL_MIDNIGHT, UI_MET_DARK);  break;
-        default:UI::setScheme(UI_PAL_PAPER,    UI_MET_LIGHT); break;
-    }
+    UI::cycleScheme();   // the order lives in UITokens.cpp
     // The page is rebuilt rather than restyled ONLY because the top bar and
     // the page background are built here by hand and have no restyle hook of
     // their own. The cards themselves would survive a bare restyleAll(), and

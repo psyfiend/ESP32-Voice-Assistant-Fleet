@@ -160,8 +160,7 @@ lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* titl
     // A SHARED paint, not a local colour - #64. A local colour is set once and
     // never revisited, which is why these panels kept the old scheme.
     lv_obj_add_style            (pnl, UI::paint(UIPaint::PAINT_SURFACE), 0);
-    lv_obj_set_style_radius     (pnl, sc(12), 0);
-    lv_obj_set_style_border_width(pnl, 1, 0);
+    lv_obj_set_style_radius     (pnl, sc(12), 0);   // border width: the paint's
     lv_obj_set_style_pad_all    (pnl, 0, 0); 
     lv_obj_set_style_pad_row    (pnl, sc(10), 0);   
     // CLIP_CORNER IS OFF, and this is the whole reason WS_P4_5 froze on boot.
@@ -269,6 +268,13 @@ lv_obj_t* UIToolkit::create_slider_col(lv_obj_t* parent, const char* title, lv_o
     // lv_obj_set_style_pad_bottom (slider, sc(0), 0);
     lv_slider_set_value         (slider, 50, LV_ANIM_OFF);
     lv_obj_remove_flag          (slider, LV_OBJ_FLAG_SCROLLABLE);
+    // A DRAG ON A SLIDER IS NOT A SWIPE. LVGL classifies a quick flick along
+    // the track as a gesture and, by default, bubbles it up to the screen -
+    // where the swipe handler used to release the touch and freeze the slider
+    // mid-drag (the owner's report, 2026-09-23). With the bubble cleared the
+    // gesture stays on the slider, which ignores it. It matters more at 2.6:
+    // a horizontal drag here must never turn the page.
+    lv_obj_remove_flag          (slider, LV_OBJ_FLAG_GESTURE_BUBBLE);
 
     // --= Assign Pointers =--
     if (out_col != NULL)    *out_col = col;

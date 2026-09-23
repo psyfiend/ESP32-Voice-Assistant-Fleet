@@ -245,15 +245,25 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
     //     rebuilds, and the still-live press then landed on a panel header
     //     that had just appeared under the finger.
     //
-    // BEFORE the switch, not after, and that ordering is the whole fix for the
+    // BEFORE the action, not after, and that ordering is the whole fix for the
     // third one: an action that rebuilds the screen puts new objects under a
     // finger LVGL still considers pressed, so the input has to be released
     // first or the rebuild hands it a fresh target.
-    lv_indev_wait_release(indev);
+    //
+    // BUT ONLY FOR A GESTURE WE ACT ON. This used to run unconditionally, at
+    // the top, for every gesture that reached the screen - including a quick
+    // flick along a volume or brightness slider, which LVGL also classifies as
+    // a gesture. The release froze the slider mid-drag: "the slider will get
+    // stuck and stop moving, but only visually", the owner, 2026-09-23. Now
+    // each branch releases just before it acts, and an ignored gesture leaves
+    // the touch alone. The sliders also stop bubbling gestures at all - see
+    // UIToolkit::create_slider_col().
+    auto release = [&]() { lv_indev_wait_release(indev); };
 
     switch (dir) {
     case LV_DIR_BOTTOM:                      // swipe DOWN
         if (!fromTop) { DBG_GESTURE("down from y=%d, not the top band\n", (int)p.y); break; }
+        release();
         if (rightHalf) {
             // RIGHT half: the system drawer - the side the status icon lives
             // on, so the gesture and the tap agree about where it comes from.
@@ -293,6 +303,7 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
             DBG_GESTURE("up from y=%d, not the bottom band\n", (int)p.y);
             break;
         }
+        release();
         // A swipe up closes the drawer before it touches the deck. With the
         // panel open it is the obvious "put that away" gesture, and toggling
         // the deck underneath an open panel would change something the user
@@ -381,9 +392,10 @@ void GUIManager::begin() {
     UIToolkit::init();
 
     // The starting scheme. UITokens defaults to Fleet; the owner's pick is
-    // Slate, and applying it here rather than editing the token file keeps
-    // "which scheme ships" a GUIManager decision alongside the other defaults.
-    UI::setScheme(UI_PAL_SLATE, UI_MET_DARK);
+    // Midnight (Slate, which this used to be, was deleted 2026-09-23 as a
+    // Midnight with a violet accent). Applied here rather than in the token
+    // file so "which scheme ships" is a GUIManager decision beside the others.
+    UI::setScheme(UI_PAL_MIDNIGHT, UI_MET_DARK);
 
     // --= ROOT SCREEN =--
     lv_obj_t *screen = lv_screen_active();
@@ -555,6 +567,9 @@ void GUIManager::begin() {
 #endif
     _pnlDisplay.init(deck);
     _pnlSystem.init(upper_deck, &_header);
+    // The scheme button was built reading "Fleet" whatever the board booted
+    // into - visible in the owner's photos with Slate on screen. Say the truth.
+    _pnlSystem.setSchemeLabel(UI::pal().name);
 
     // The System panel's "Dump Config" button re-runs the report with Serial
     // echo on. Registered rather than reached for: Panel_System used to call
@@ -836,16 +851,7 @@ void GUIManager::applyGround() {
 }
 
 void GUIManager::cycleScheme() {
-    // Six while the two light candidates are being judged; see UITokens.cpp.
-    _scheme = (uint8_t)((_scheme + 1) % 6);
-    switch (_scheme) {
-        case 0:  UI::setScheme(UI_PAL_FLEET,    UI_MET_DARK);  break;
-        case 1:  UI::setScheme(UI_PAL_SLATE,    UI_MET_DARK);  break;
-        case 2:  UI::setScheme(UI_PAL_MIDNIGHT, UI_MET_DARK);  break;
-        case 3:  UI::setScheme(UI_PAL_LINEN,    UI_MET_LIGHT); break;
-        case 4:  UI::setScheme(UI_PAL_FROST,    UI_MET_LIGHT); break;
-        default: UI::setScheme(UI_PAL_PAPER,    UI_MET_LIGHT); break;
-    }
+    UI::cycleScheme();   // Fleet -> Midnight -> Linen; the order lives in UITokens.cpp
     applyGround();
     _header.restyle();
     _pnlSystem.setSchemeLabel(UI::pal().name);
@@ -953,13 +959,11 @@ void GUIManager::cycleLabel() {
     const CardLabel cur  = cardLabelMode();
     const CardLabel next = (cur == CardLabel::LBL_NAME)  ? CardLabel::LBL_STATE
                          : (cur == CardLabel::LBL_STATE) ? CardLabel::LBL_NONE
-                         : (cur == CardLabel::LBL_NONE)  ? CardLabel::LBL_NO_ICON
                                                          : CardLabel::LBL_NAME;
     cardSetLabelMode(next);
     _binder.restyleAll();
     const char *n = (next == CardLabel::LBL_NAME)  ? "Name"
-                  : (next == CardLabel::LBL_STATE) ? "State"
-                  : (next == CardLabel::LBL_NONE)  ? "No lbl" : "No icon";
+                  : (next == CardLabel::LBL_STATE) ? "State" : "No lbl";
     _pnlSystem.setLabelModeLabel(n);
     Serial.printf("[Cards] state-card label -> %s\n", n);
 }

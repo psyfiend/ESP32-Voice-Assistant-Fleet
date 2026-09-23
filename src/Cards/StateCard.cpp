@@ -182,12 +182,11 @@ void StateCard::render() {
     // the disc sits, and the fill below needs to know that.
     const CardLabel lbl = cardResolveLabel(labelMode());
     const bool showName = (lbl != CardLabel::LBL_NONE);
-    const bool noIcon   = (lbl == CardLabel::LBL_NO_ICON);
 
     // Compact: the name moves up to sit centred between the disc and the
     // card's bottom edge. A translate, so the flex layout - and the disc's
     // position - is untouched. See Card::compactNameShiftPx().
-    const int32_t nameShift = (showName && !noIcon) ? compactNameShiftPx() : 0;
+    const int32_t nameShift = showName ? compactNameShiftPx() : 0;
 
     // --- Brightness, from the source's attributes. cards.md section 13 ----
     //
@@ -216,9 +215,7 @@ void StateCard::render() {
     const int32_t bodyTop = pad + (headerStyle() == CardHeaderStyle::HDR_BAR
                                    ? Card::headerHeight() : 0);
     const int32_t midBottom = pad + status + nameH + Card::midGap();
-    // With no icon the name is alone in the body and flex centres it.
-    const int32_t yName   = noIcon ? pad + (surfH - bodyTop - pad) / 2
-                                   : pad + status + nameH / 2 - nameShift;
+    const int32_t yName   = pad + status + nameH / 2 - nameShift;
     const int32_t yDisc   = (midBottom + (surfH - bodyTop)) / 2;
     const int32_t yCorner = surfH - bodyTop - lv_font_get_line_height(cornerFont()) / 2;
     const int32_t yMixed  = pad + status / 2;
@@ -328,11 +325,6 @@ void StateCard::render() {
     // setting - which, since 2.7, it is: CardLabel.
     if (compact) lv_obj_add_flag  (_statusRow, LV_OBJ_FLAG_HIDDEN);
     else         lv_obj_clear_flag(_statusRow, LV_OBJ_FLAG_HIDDEN);
-
-    // No icon: the middle band - disc and glyph - goes, and flex centres the
-    // name in the card. The corner stays: it says what kind of card this is.
-    if (noIcon) lv_obj_add_flag  (_mid, LV_OBJ_FLAG_HIDDEN);
-    else        lv_obj_clear_flag(_mid, LV_OBJ_FLAG_HIDDEN);
 
     if (showName) {
         lv_label_set_text(_name, lbl == CardLabel::LBL_STATE

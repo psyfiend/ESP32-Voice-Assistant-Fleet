@@ -163,7 +163,6 @@ private:
     CardVariant     _variant = CardVariant::VAR_COMPACT;
     StateCardFill   _fill    = StateCardFill::FILL_SURFACE;
     bool            _showArea = true;
-    uint8_t         _scheme = 1;            // Slate
 
     // PER-BOARD DEFAULT GRID, chosen on the glass by the owner.
     //

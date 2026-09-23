@@ -668,6 +668,20 @@ The owner's verdicts on the first round, and what changed:
 - **Light schemes:** the owner cannot picture the right one but "will know it when I see it", so two
   candidates, Linen (warm) and Frost (cool), are on the scheme knob beside Paper.
 
+### Round three — 2026-09-23
+
+- **"No icon" was tried and rejected**, and removed: "We're not building a minimal dashboard. We're
+  building an awesome dashboard."
+- **Schemes pruned to three: Fleet, Midnight (the default), Linen.** Slate was Midnight with a
+  violet accent; Paper and Frost lost to Linen. The order lives in one place, `UI::cycleScheme()`.
+- **Cards have a drop shadow on Linen** — and it turned out no card had ever shown one. The metrics
+  asked for it; `Card`'s transparent wrapper clipped it. The dark schemes are set to no shadow so
+  they look exactly as before. Linen's border is 2 px and darker, and the drawer's buttons and deck
+  panels take the same width through `UI::paint()`.
+- **The Desk icon's black-or-white ink is ours**, not HA's: `UI::contrastOf()` picks the scheme's
+  ground or text colour against the light's own colour. The owner saw it track the colour he picked
+  in HA and was happy with it.
+
 So only the roles that make a card cramped step with the cell: the **hero value**, the **hero
 icon** and the **corner icon**. Name, unit, tag and status text stay one size per board. Chosen by
 the cell's size in millimetres, so a card looks the same across boards. Absorbs #62.

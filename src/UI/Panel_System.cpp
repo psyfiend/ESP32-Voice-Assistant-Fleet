@@ -132,8 +132,8 @@ static lv_obj_t *knobButton(lv_obj_t *parent, Panel_System *self,
     lv_obj_set_flex_grow          (b, 1);
     lv_obj_add_event_cb           (b, cb, LV_EVENT_CLICKED, self);
     // Shared paints, so a scheme change repaints them - #64.
+    // Border colour AND width come from the paint, so they follow the scheme.
     lv_obj_add_style              (b, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
-    lv_obj_set_style_border_width (b, 1, 0);
 
     lv_obj_t *l = lv_label_create(b);
     lv_label_set_text             (l, text);
@@ -323,7 +323,6 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
                                         if (self) self->requestTokens();
                                      }, LV_EVENT_CLICKED, this);
     lv_obj_add_style                (btnRef, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
-    lv_obj_set_style_border_width   (btnRef, 1, 0);
 
     lv_obj_t* lblRef = lv_label_create(btnRef);
     lv_label_set_text               (lblRef, "Tokens");
@@ -341,7 +340,6 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
                                         if (self) self->requestLog();
                                      }, LV_EVENT_CLICKED, this);
     lv_obj_add_style                (btnLog, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
-    lv_obj_set_style_border_width   (btnLog, 1, 0);
     lv_obj_t* lblLog = lv_label_create(btnLog);
     lv_label_set_text               (lblLog, "Log");
     lv_obj_center                   (lblLog);
@@ -364,7 +362,6 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
                                         if (self) self->requestCards();
                                      }, LV_EVENT_CLICKED, this);
     lv_obj_add_style                (btnCards, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
-    lv_obj_set_style_border_width   (btnCards, 1, 0);
 
     lv_obj_t* lblCards = lv_label_create(btnCards);
     lv_label_set_text               (lblCards, "Cards");
