@@ -22,30 +22,37 @@
     .TINT_HUMID = 0x4A9EDA,                 \
     .TINT_LIGHT = 0xE0A53C,                 \
     .TINT_AIR   = 0x9B7BD4,                 \
-    .TINT_POWER = 0x93C04A
+    .TINT_POWER = 0x93C04A,                 \
+    .TINT_OPENING  = 0x5B8DEF,              \
+    .TINT_PRESENCE = 0x2EC4B6
 
-const UIPalette UI_PAL_SLATE = {
-    .name        = "Slate",
-    .GROUND      = 0x1A1F27,
-    .SURFACE     = 0x212429,
-    .SURFACE_ALT = 0x2B2F36,
-    .TEXT        = 0xF0F2F4,
-    .TEXT_DIM    = 0x98A0AA,
-    .ACCENT      = 0x9B7BD4,   // violet — the owner's pick for the 3248
-    .BORDER      = 0,          // derived: lighten SURFACE
-    FLEET_STATE_AND_TINTS
-};
+// Lighting's corner tint: yellow-white on the dark schemes, where it reads as
+// a bulb; a deeper amber on the light ones, where yellow-white would vanish.
+#define TINT_LIGHTING_DARK  0xFFE3A3
+#define TINT_LIGHTING_LIGHT 0xC98A12
 
-const UIPalette UI_PAL_PAPER = {
-    .name        = "Paper",
-    .GROUND      = 0xE8E9EC,
-    .SURFACE     = 0xFFFFFF,
-    .SURFACE_ALT = 0xF1F2F5,
-    .TEXT        = 0x16181C,
-    .TEXT_DIM    = 0x666D77,
-    .ACCENT      = 0xE0A53C,   // amber — the owner's pick for the large panels
+// THREE SCHEMES, pruned on glass 2026-09-23: Fleet, Midnight, Linen.
+//
+// Slate went because it differed from Midnight only in its accent ("slate is
+// purplish, midnight is blue"). Paper went because Linen replaced it. Frost
+// went because it lost to Linen - "I might have thought Frost would look good
+// but when I saw it it's definitely not for me". All three are in git history.
+
+// LINEN - the light scheme. A candidate from 2026-09-22 that won against Paper
+// and Frost: a sand ground, cream cards, dark brown text, and a copper accent
+// dark enough to read as text on a light surface - which Paper's amber was
+// not (the owner's complaint about the device name and the panel titles).
+const UIPalette UI_PAL_LINEN = {
+    .name        = "Linen",
+    .GROUND      = 0xDDD5C8,
+    .SURFACE     = 0xF8F4EC,
+    .SURFACE_ALT = 0xEDE6DA,
+    .TEXT        = 0x2B2520,
+    .TEXT_DIM    = 0x6E6459,
+    .ACCENT      = 0xA8561C,   // copper
     .BORDER      = 0,
-    FLEET_STATE_AND_TINTS
+    FLEET_STATE_AND_TINTS,
+    .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
 };
 
 // Today's shipped UI, read out of UIToolkit.cpp and Panel_Header.cpp rather
@@ -60,39 +67,51 @@ const UIPalette UI_PAL_FLEET = {
     .TEXT_DIM    = 0x808080,
     .ACCENT      = 0x00A8FF,
     .BORDER      = 0x404040,   // explicit — this one is not derived
-    FLEET_STATE_AND_TINTS
+    FLEET_STATE_AND_TINTS,
+    .TINT_LIGHTING = TINT_LIGHTING_DARK,
 };
 
-// The owner's verdict after seeing all three on glass: Slate's ground, Fleet's
-// blue. This is what the runtime-copy design was for - the same result is
-// reachable with setScheme(UI_PAL_SLATE, ...) + setAccent(0x00A8FF), but a
-// named scheme is easier to pick from a button.
+// The owner's verdict after seeing the dark schemes on glass: the former
+// Slate's ground, Fleet's blue. The DEFAULT since 2026-09-23.
 const UIPalette UI_PAL_MIDNIGHT = {
     .name        = "Midnight",
-    .GROUND      = 0x1A1F27,   // Slate
+    .GROUND      = 0x1A1F27,
     .SURFACE     = 0x212429,
     .SURFACE_ALT = 0x2B2F36,
     .TEXT        = 0xF0F2F4,
     .TEXT_DIM    = 0x98A0AA,
     .ACCENT      = 0x00A8FF,   // Fleet cyan
     .BORDER      = 0,
-    FLEET_STATE_AND_TINTS
+    FLEET_STATE_AND_TINTS,
+    .TINT_LIGHTING = TINT_LIGHTING_DARK,
 };
 
 #undef FLEET_STATE_AND_TINTS
+#undef TINT_LIGHTING_DARK
+#undef TINT_LIGHTING_LIGHT
 
 // Dark schemes take a hairline border because a dark card on a dark ground
 // needs an edge; light schemes lean on the shadow instead. That difference was
 // the only thing separating the owner's light and dark configs.
+//
+// NO CARD SHADOW HAS EVER BEEN VISIBLE, until 2026-09-23. Both metric sets
+// asked for SHADOW = 8, and Card clipped it away: the styled surface sits in a
+// transparent wrapper exactly its own size, and a parent clips its children.
+// The owner put his finger on it from the other end - Linen "looks too flat" -
+// and the fix is one flag on that wrapper (Card::build()). The dark schemes are
+// set to SHADOW 0 so they look exactly as they always have; only the light
+// scheme, where a shadow is what separates a card from the page, gets one.
 const UIMetrics UI_MET_DARK  = {
-    .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 8, .HEADER_H = 14
+    .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 0, .HEADER_H = 14,
+    .SHADOW_Y = 0
 };
-// The light scheme leaned entirely on its shadow and drew no border at all,
-// which on glass left the owner asking whether one was even there. A hairline
-// derived from the surface toward BLACK - UI::border() picks the direction from
-// the surface's own lightness - gives the card an edge without a hard outline.
+// Linen's. A 2 px border, darker than the old hairline (the owner: "make it a
+// bit darker and increase by 1 or 2px", knobs included - the drawer's buttons
+// take BORDER_W through UI::paint()), and a mild DROP shadow - "in HA for most
+// of my custom dashboards I shamelessly use a mild drop shadow".
 const UIMetrics UI_MET_LIGHT = {
-    .RADIUS = 12, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 14, .SHADOW = 8, .HEADER_H = 14
+    .RADIUS = 12, .PAD = 5, .BORDER_W = 2, .BORDER_OPA_PCT = 26, .SHADOW = 12, .HEADER_H = 14,
+    .SHADOW_Y = 4
 };
 
 // ---------------------------------------------------------------------------
@@ -237,10 +256,12 @@ const UIType &type() {
     // harder one to read. Flashed and caught by eye, not by arithmetic.
     static UIType t = {
         .VALUE   = FLEET_FONT_VALUE,
+        .VALUE_SM = FLEET_FONT_VALUE_SM,
         .UNIT    = FLEET_FONT_UNIT,
         .NAME    = FLEET_FONT_NAME,
         .TAG     = FLEET_FONT_TAG,
         .ICON    = FLEET_ICONS_LG,
+        .ICON_MD = FLEET_ICONS_MD,
         .ICON_SM = FLEET_ICONS_SM,
         // HERO shares VALUE's face. Referencing another size pulls a whole
         // extra font into the link for something nothing draws yet - at the
@@ -251,15 +272,79 @@ const UIType &type() {
     return t;
 }
 
+// --- Shared paints. #64 - see the header. -----------------------------------
+static lv_style_t s_paint[(int)UIPaint::PAINT_COUNT];
+static bool       s_paintReady = false;
+
+static void refreshPaints() {
+    if (!s_paintReady) return;   // nothing has asked for one yet
+    auto st = [](UIPaint p) { return &s_paint[(int)p]; };
+    const lv_color_t bd = border();
+
+    // Border WIDTH as well as colour, from the scheme's metrics: Linen's 2 px
+    // edge is meant for the drawer's buttons and the deck panels too (the
+    // owner, 2026-09-23), and a width set locally on each widget would not
+    // follow a scheme change.
+    lv_style_set_bg_color    (st(UIPaint::PAINT_SURFACE),     c(s_pal.SURFACE));
+    lv_style_set_border_color(st(UIPaint::PAINT_SURFACE),     bd);
+    lv_style_set_border_width(st(UIPaint::PAINT_SURFACE),     s_met.BORDER_W);
+    lv_style_set_bg_color    (st(UIPaint::PAINT_SURFACE_ALT), c(s_pal.SURFACE_ALT));
+    lv_style_set_border_color(st(UIPaint::PAINT_SURFACE_ALT), bd);
+    lv_style_set_border_width(st(UIPaint::PAINT_SURFACE_ALT), s_met.BORDER_W);
+    lv_style_set_text_color  (st(UIPaint::PAINT_TEXT),        c(s_pal.TEXT));
+    lv_style_set_text_color  (st(UIPaint::PAINT_TEXT_DIM),    c(s_pal.TEXT_DIM));
+    lv_style_set_text_color  (st(UIPaint::PAINT_ACCENT_TEXT), c(s_pal.ACCENT));
+    lv_style_set_bg_color    (st(UIPaint::PAINT_ACCENT_BG),   c(s_pal.ACCENT));
+
+    // NULL means "every style changed": each object re-reads what it uses and
+    // invalidates itself. A scheme change is a rare, deliberate act, so the
+    // whole-tree walk is the right price for never missing a widget.
+    lv_obj_report_style_change(NULL);
+}
+
+lv_style_t *paint(UIPaint p) {
+    if (!s_paintReady) {
+        for (lv_style_t &s : s_paint) lv_style_init(&s);
+        s_paintReady = true;
+        // The report inside is harmless at first use: nothing is using these
+        // styles yet, so there is nothing for it to repaint.
+        refreshPaints();
+    }
+    const int i = (int)p;
+    return (i >= 0 && i < (int)UIPaint::PAINT_COUNT) ? &s_paint[i]
+                                                     : &s_paint[0];
+}
+
 void setScheme(const UIPalette &p, const UIMetrics &m) {
     s_pal = p;   // copies, so setAccent() can override without touching a const
     s_met = m;
     recomputeGrid();
+    refreshPaints();
     if (s_onChange) s_onChange();
+}
+
+// THE SCHEME KNOB'S ORDER, in one place. Three screens each carried their own
+// copy of this switch - the drawer, the card bench and the reference page -
+// which is how deleting a scheme came to mean editing three files.
+struct SchemeEntry { const UIPalette *pal; const UIMetrics *met; };
+static const SchemeEntry SCHEMES[] = {
+    { &UI_PAL_FLEET,    &UI_MET_DARK  },
+    { &UI_PAL_MIDNIGHT, &UI_MET_DARK  },
+    { &UI_PAL_LINEN,    &UI_MET_LIGHT },
+};
+
+void cycleScheme() {
+    const size_t n = sizeof(SCHEMES) / sizeof(SCHEMES[0]);
+    size_t cur = 0;
+    for (size_t i = 0; i < n; i++)
+        if (strcmp(SCHEMES[i].pal->name, s_pal.name) == 0) { cur = i; break; }
+    const SchemeEntry &next = SCHEMES[(cur + 1) % n];
+    setScheme(*next.pal, *next.met);
 }
 
 void setAccent(uint32_t hex) {
     s_pal.ACCENT = hex;
+    refreshPaints();
     if (s_onChange) s_onChange();
 }
 
@@ -294,6 +379,19 @@ int32_t sc(int32_t logical) { return (int32_t)(logical * bspUiScale()); }
 lv_color_t c(uint32_t hex) { return lv_color_hex(hex); }
 
 uint32_t mix(uint32_t a, uint32_t b, uint8_t pct) { return blend(a, b, pct); }
+
+// Rec. 601 luma, 0-255. Good enough to choose between two inks; not a
+// colour-science claim.
+static int32_t luma(uint32_t c) {
+    return (int32_t)((((c >> 16) & 0xFF) * 299 + ((c >> 8) & 0xFF) * 587 +
+                      (c & 0xFF) * 114) / 1000);
+}
+
+uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b) {
+    const int32_t l = luma(bg);
+    const int32_t da = luma(a) - l, db = luma(b) - l;
+    return (da * da >= db * db) ? a : b;
+}
 
 lv_color_t border() {
     if (s_pal.BORDER) return lv_color_hex(s_pal.BORDER);

@@ -57,7 +57,7 @@ void UIToolkit::init() {
     toast_panel = lv_obj_create(lv_layer_top()); // Use layer_top to float over everything
     lv_obj_set_size             (toast_panel, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_align                (toast_panel, LV_ALIGN_TOP_MID, 0, sc(60)); 
-    lv_obj_set_style_bg_color   (toast_panel, UI::c(UI::pal().SURFACE_ALT), 0);
+    lv_obj_add_style            (toast_panel, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
     lv_obj_set_style_radius     (toast_panel, sc(30), 0);
     lv_obj_set_style_pad_all    (toast_panel, sc(15), 0);
     lv_obj_add_flag             (toast_panel, LV_OBJ_FLAG_HIDDEN);
@@ -65,7 +65,8 @@ void UIToolkit::init() {
 
     toast_label = lv_label_create(toast_panel);
     lv_label_set_text           (toast_label, "Toast");
-    lv_obj_set_style_text_color (toast_label, lv_color_white(), 0);
+    // TEXT, not white: white on Paper's light SURFACE_ALT was unreadable.
+    lv_obj_add_style            (toast_label, UI::paint(UIPaint::PAINT_TEXT), 0);
     lv_obj_set_style_text_font  (toast_label, Font_Hero, 0); // Use semantic font
 }
 
@@ -156,10 +157,10 @@ lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* titl
     lv_obj_set_width            (pnl, 0);       // Set base width to 0 so flex takes over completely
     lv_obj_set_height           (pnl, sc(PANEL_COLLAPSED_H));  // taller than the visible strip - see the header
     lv_obj_set_flex_grow        (pnl, 1);       // Tell flex engine to share available space equally (1:1)
-    lv_obj_set_style_bg_color   (pnl, UI::c(UI::pal().SURFACE), 0);
-    lv_obj_set_style_radius     (pnl, sc(12), 0);
-    lv_obj_set_style_border_width(pnl, 1, 0);
-    lv_obj_set_style_border_color(pnl, UI::border(), 0);
+    // A SHARED paint, not a local colour - #64. A local colour is set once and
+    // never revisited, which is why these panels kept the old scheme.
+    lv_obj_add_style            (pnl, UI::paint(UIPaint::PAINT_SURFACE), 0);
+    lv_obj_set_style_radius     (pnl, sc(12), 0);   // border width: the paint's
     lv_obj_set_style_pad_all    (pnl, 0, 0); 
     lv_obj_set_style_pad_row    (pnl, sc(10), 0);   
     // CLIP_CORNER IS OFF, and this is the whole reason WS_P4_5 froze on boot.
@@ -191,12 +192,12 @@ lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* titl
     lv_label_set_text           (lbl, title);
     lv_obj_align                (lbl, LV_ALIGN_LEFT_MID, 0, 0);
     lv_obj_set_style_text_font  (lbl, Font_PanelHeader, 0); // Use Semantic Font
-    lv_obj_set_style_text_color (lbl, UI::c(UI::pal().ACCENT), 0);
+    lv_obj_add_style            (lbl, UI::paint(UIPaint::PAINT_ACCENT_TEXT), 0);
 
     lv_obj_t * icon = lv_label_create(header);
-    lv_label_set_text           (icon, LV_SYMBOL_UP); 
+    lv_label_set_text           (icon, LV_SYMBOL_UP);
     lv_obj_align                (icon, LV_ALIGN_RIGHT_MID, 0, 0);
-    lv_obj_set_style_text_color (icon, UI::c(UI::pal().TEXT_DIM), 0);
+    lv_obj_add_style            (icon, UI::paint(UIPaint::PAINT_TEXT_DIM), 0);
 
     // Content Container
     *content_container = lv_obj_create(pnl);
@@ -254,7 +255,7 @@ lv_obj_t* UIToolkit::create_slider_col(lv_obj_t* parent, const char* title, lv_o
     lv_label_set_text           (lbl, title);
     lv_obj_set_style_text_align (lbl, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font  (lbl, Font_Label, 0); // Use Semantic Font
-    lv_obj_set_style_text_color (lbl, UI::c(UI::pal().TEXT_DIM), 0);
+    lv_obj_add_style            (lbl, UI::paint(UIPaint::PAINT_TEXT_DIM), 0);
 
     // Row 2 - Slider
     lv_obj_t * slider = lv_slider_create(col);
@@ -267,6 +268,13 @@ lv_obj_t* UIToolkit::create_slider_col(lv_obj_t* parent, const char* title, lv_o
     // lv_obj_set_style_pad_bottom (slider, sc(0), 0);
     lv_slider_set_value         (slider, 50, LV_ANIM_OFF);
     lv_obj_remove_flag          (slider, LV_OBJ_FLAG_SCROLLABLE);
+    // A DRAG ON A SLIDER IS NOT A SWIPE. LVGL classifies a quick flick along
+    // the track as a gesture and, by default, bubbles it up to the screen -
+    // where the swipe handler used to release the touch and freeze the slider
+    // mid-drag (the owner's report, 2026-09-23). With the bubble cleared the
+    // gesture stays on the slider, which ignores it. It matters more at 2.6:
+    // a horizontal drag here must never turn the page.
+    lv_obj_remove_flag          (slider, LV_OBJ_FLAG_GESTURE_BUBBLE);
 
     // --= Assign Pointers =--
     if (out_col != NULL)    *out_col = col;

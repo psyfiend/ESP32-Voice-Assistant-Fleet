@@ -63,7 +63,27 @@ struct EntityDescriptor {
     char unit[ENTITY_SHORT_MAX]        = {0};  // "C", "%", "lx", "W"
     char deviceClass[ENTITY_SHORT_MAX] = {0};  // "temperature", "occupancy"
     char stateClass[ENTITY_SHORT_MAX]  = {0};  // "measurement", "total_increasing"
+    // THE USER'S OVERRIDE, not a copy of what the source says. 2.7.
+    //
+    // For an entity someone else owns this used to hold a transcription of
+    // HA's icon, which then outranked HA's LIVE icon and froze it. cards.md
+    // section 13: the source's live icon is the default, and these fields are
+    // the build sheet's way of overriding it - this descriptor stands in for
+    // the build sheet until 3.2. Leave them empty to follow the source.
+    //
+    // For an entity WE own there is no source to follow, so `icon` is also
+    // what our own HA discovery advertises.
     char icon[ENTITY_ICON_MAX]         = {0};  // "mdi:thermometer"
+
+    // A custom STATE PAIR for the hero - the owner's "could users add their
+    // own open/closed icons". Both must be set to take effect, and together
+    // they outrank everything else, `icon` included. Empty = not overridden.
+    char iconOn[ENTITY_ICON_MAX]       = {0};  // "mdi:garage-open"
+    char iconOff[ENTITY_ICON_MAX]      = {0};  // "mdi:garage"
+
+    // Override for the CORNER icon, which otherwise always comes from our own
+    // table (cards.md section 13: HA has no per-entity "type" icon to follow).
+    char cornerIcon[ENTITY_ICON_MAX]   = {0};
 
     // Can the UI command it? Drives whether a card offers a control at all.
     bool writable = false;
@@ -138,10 +158,42 @@ struct EntityDescriptor {
     char commandRef[ENTITY_TOPIC_MAX] = {0};
 };
 
+// ---------------------------------------------------------------------------
+// What the SOURCE says about an entity besides its value. Milestone 2.7.
+//
+// Runtime, not descriptor: these change while the board runs - a light's
+// brightness moves during a fade, a template sensor's icon flips with its
+// state. Only what a card actually draws is kept, and each field has a value
+// meaning "the source did not say", because silence and zero are different
+// claims (a light that is off reports no brightness at all, not 0).
+//
+// Measured against the owner's instance, 2026-09-22 (cards.md section 13):
+//   icon    present only when a user or an integration set one. HA core does
+//           NOT compute a state-dependent icon into the state object
+//   rgb     HA sends rgb_color for every colour mode, colour temperature
+//           included, so one field covers both
+// ---------------------------------------------------------------------------
+struct EntityAttrs {
+    char     icon[ENTITY_ICON_MAX] = {0};  // attributes.icon; "" = not sent
+    int16_t  brightness = -1;              // 0-255; -1 = not reported
+    uint32_t rgb        = 0;               // 0xRRGGBB, valid when hasRgb
+    bool     hasRgb     = false;
+
+    bool equals(const EntityAttrs &o) const {
+        return brightness == o.brightness && hasRgb == o.hasRgb &&
+               (!hasRgb || rgb == o.rgb) && strcmp(icon, o.icon) == 0;
+    }
+};
+
 struct Entity {
     EntityDescriptor desc;
 
     EntityValue value;
+
+    // Source-supplied attributes. See EntityAttrs. Written by
+    // EntityRegistry::setAttrs(), which dirties the entity only on a change.
+    EntityAttrs attrs;
+
     // WHEN WE LAST HEARD ANYTHING, changed or not. Issue #57.
     //
     // This is a statement about the TRANSPORT, not about the thing: it moves

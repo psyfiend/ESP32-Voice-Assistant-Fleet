@@ -192,6 +192,30 @@ enum class DurationFormat : uint8_t {
 };
 
 // ---------------------------------------------------------------------------
+// What the line under a state card's hero says. Milestone 2.7.
+//
+// The owner, 2026-09-22: state is the icon and the colour, and the NAME is what
+// tells two doors in one area apart - so the name is the default. But a user
+// may prefer the state spelled out, or nothing at all. Resolved like TempUnit:
+// fleet default, then page, then card.
+//
+// The state word comes from the device_class table in CardIcons.cpp - "Open",
+// "Detected", "Locked" - never a raw "on"/"off" off the wire.
+//
+// Compound names per CLAUDE.md's macro hazard; checked against the framework
+// headers with the grep in LESSONS.md, none of these is defined there.
+enum class CardLabel : uint8_t {
+    LBL_INHERIT = 0,  // use the page's setting (on a card) or the fleet's
+    LBL_NAME,         // the card's label - the default
+    LBL_STATE,        // "Open" / "Closed", from the device_class table
+    LBL_NONE,         // nothing; the hero stands alone
+    // A fourth mode, LBL_NO_ICON - name kept, hero and disc dropped - was
+    // built and tried on glass 2026-09-22 and REJECTED by the owner: "We're
+    // not building a minimal dashboard. We're building an awesome dashboard."
+    // Removed rather than left switched off.
+};
+
+// ---------------------------------------------------------------------------
 // Where a card wants to sit, in grid UNITS.
 //
 // CHANGED AT 2.5, and the change is the unit rather than the fields: these

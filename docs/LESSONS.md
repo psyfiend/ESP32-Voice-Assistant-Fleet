@@ -236,6 +236,26 @@ to be cut, "never observed at all" is a better selection criterion than "most li
 fail" — connectivity test 4 was retained on those grounds and immediately exposed the
 `AP_ACTIVE` state bug.
 
+**A measurement of one thing gets quoted as a measurement of the class.** Two found on the same day,
+2026-09-22, both of which had shaped decisions for weeks:
+
+| Written down as | What had actually been measured | What is true |
+|---|---|---|
+| "HA computes the state-dependent icon and ships it" | one occupancy sensor | that sensor is a **template** that sets its own icon; HA core does not |
+| "one referenced font face is ~96 KB" | one large full-ASCII Montserrat | 6-73 KB depending on kind and size |
+
+Neither measurement was wrong. The sentence after it was. **When writing down a measurement, name
+the thing it was taken on**, and when reading one, check whether the claim is about that thing or
+about everything like it. The entity registry (`config/entity_registry/get`: `platform`,
+`original_icon`) and an object-file size are both seconds away.
+
+**A style that is set is not a style that is seen.** Found 2026-09-23: every card had asked for an
+8 px shadow since 2.4, and none had ever drawn one. The styled surface fills a transparent wrapper
+exactly, so its whole shadow lay outside its parent - and LVGL clips children to their parent,
+silently. Nobody noticed because nothing looked broken; the owner only said Linen "looks too flat".
+Same family as the missing `EVENT_BUBBLE` below and the `OVERFLOW_VISIBLE` note after it. **When a
+visual token seems to do nothing, check what clips it before tuning its value.**
+
 ## LVGL, from milestone 2.4
 
 **An out-of-range grid row is a hard freeze, not a wrong layout.** `lv_conf.h` defines

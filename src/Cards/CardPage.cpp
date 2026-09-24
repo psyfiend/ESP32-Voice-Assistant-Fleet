@@ -92,6 +92,8 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, uint8_t subdivision) 
     lv_obj_update_layout(_root);   // _root was created a moment ago; without
                                    // this its content height is still zero
     _availH = (int32_t)lv_obj_get_content_height(_root);
+    _availW = (int32_t)lv_obj_get_content_width(_root);   // 0 if not laid out;
+                                                          // widthOf() copes
     if (_availH <= 0) {
         // Called before the parent has been laid out. Fall back to the token's
         // own arithmetic rather than to zero.
@@ -191,6 +193,16 @@ void CardPage::useRows(uint8_t cellRows) {
 int32_t CardPage::heightOf(uint8_t spanY) const {
     if (spanY < 1) spanY = 1;
     return _unitH * spanY + _gap * (spanY - 1);
+}
+
+// The same for WIDTH. Columns are FR tracks, so a unit's width is the content
+// width less the gaps, shared equally - exactly what LVGL's grid will do. Zero
+// when the page was never laid out; the card then falls back to the token.
+int32_t CardPage::widthOf(uint8_t spanX) const {
+    if (_availW <= 0 || _uCols < 1) return 0;
+    if (spanX < 1) spanX = 1;
+    const int32_t unitW = (_availW - _gap * (_uCols - 1)) / _uCols;
+    return unitW * spanX + _gap * (spanX - 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -409,6 +421,7 @@ void CardPage::commit() {
         // the grid it read is global state that any other page can move. The
         // page knows the answer exactly; handing it over removes the guess.
         c->setCellHeightPx(heightOf(_slot[i].spanY));
+        c->setCellWidthPx (widthOf (_slot[i].spanX));
         c->build(_root);
         lv_obj_set_grid_cell(c->root(),
                              LV_GRID_ALIGN_STRETCH, _slot[i].col, _slot[i].spanX,
@@ -511,6 +524,8 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
         c->setPlacement(cs.place);
         c->setTempUnit(cs.tempUnit == TempUnit::TEMP_INHERIT ? spec.tempUnit
                                                              : cs.tempUnit);
+        c->setLabelMode(cs.labelMode == CardLabel::LBL_INHERIT ? spec.labelMode
+                                                               : cs.labelMode);
         if (cs.longStaleMs) c->setLongStaleMs(cs.longStaleMs);
         if (cs.paused)      c->setPaused(true);
 

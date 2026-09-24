@@ -343,19 +343,29 @@ bool EntityRegistry::setAvailable(const char *id, bool available, uint32_t nowMs
     return true;
 }
 
-bool EntityRegistry::setValue(const char *id, const EntityValue &v, uint32_t nowMs) {
+bool EntityRegistry::setAttrs(const char *id, const EntityAttrs &a) {
     std::lock_guard<std::mutex> lk(_mx);
 
     const int i = indexOf(id);
     if (i < 0) return false;
     Entity &e = _items[i];
 
-    // An authoritative value always clears a pending optimistic write: this IS
-    // the echo we were waiting for. It clears even when the value disagrees
-    // with what we optimistically applied - the source is right and we were
-    // wrong, which is exactly the case the reconcile exists to catch.
-    const bool wasPending = e.pending;
-    e.pending = false;
+    // A paused entity holds still - attributes included, or a paused light's
+    // fill would go on moving under a PAUSED badge. Issue #60's rule.
+    if (e.paused) return false;
+
+    if (e.attrs.equals(a)) return false;
+    e.attrs = a;
+    e.dirty = true;
+    return true;
+}
+
+bool EntityRegistry::setValue(const char *id, const EntityValue &v, uint32_t nowMs) {
+    std::lock_guard<std::mutex> lk(_mx);
+
+    const int i = indexOf(id);
+    if (i < 0) return false;
+    Entity &e = _items[i];
 
     // A VALUE IS ITSELF PROOF OF AVAILABILITY, so recovery needs no separate
     // announcement. HA sends a real state the moment an entity comes back and
@@ -367,32 +377,50 @@ bool EntityRegistry::setValue(const char *id, const EntityValue &v, uint32_t now
         e.dirty     = true;
     }
 
+    // RESOLVE A COMMAND IN FLIGHT - and only a MATCHING echo resolves it. #63.
+    //
+    // This used to treat any echo as the verdict: one carrying something other
+    // than what we optimistically applied meant "it did not take". True for an
+    // instant device, and wrong for a TRANSITIONING one. A light fading from
+    // on to off goes on reporting "on" for the whole fade - HA sends a state
+    // event per brightness step - so the first echo after the tap looked like
+    // a refusal, the card said FAILED, and it corrected itself when the fade
+    // finished. The owner's "Desk" group did exactly this.
+    //
+    // So a non-matching echo is no longer evidence. It is recorded as what the
+    // source currently says (the revert target, should the window expire) and
+    // the command stays pending. Only two things end it: an echo carrying the
+    // commanded value, or the reconcile window running out in tick(). The cost
+    // is the speed of a genuine failure report - it now takes the window rather
+    // than one round trip - and nothing depends on that speed.
+    //
+    // Compared against e.value, which IS the optimistic value while pending -
+    // not against prevValue. A second tap inside the window can legitimately
+    // command the value back to prevValue, and comparing against it declared a
+    // perfectly successful command failed ("Obeys can still show FAILED").
+    if (e.pending) {
+        if (!v.equals(e.value)) {
+            // Replacing prevValue here does not break the rule commandValue()
+            // keeps - "never revert to a state the hardware never had" - it
+            // honours it: this is the hardware's own report, which is exactly
+            // the state a revert should land on.
+            e.prevValue    = v;
+            e.lastUpdateMs = nowMs;
+            e.everSet      = true;
+            return false;   // the display keeps the commanded value meanwhile
+        }
+
+        // Confirmed. The commanded value is already displayed, so nothing is
+        // dirtied below - but it IS a change of state, and lastChangeMs must
+        // say so or "on since 6:03" would read from before the tap.
+        e.pending   = false;
+        e.cmdFailed = false;
+        if (!v.equals(e.prevValue)) e.lastChangeMs = nowMs;
+    }
+
     const bool changed = !e.value.equals(v) || !e.everSet;
 
-    // Resolve the command this echo answers. A cooperative device echoes the
-    // value we optimistically applied, so `changed` is false and the entity is
-    // not even dirtied - which is why the outcome has to be recorded here
-    // rather than left for a listener to infer from a notification that never
-    // arrives.
-    //
-    // The test is against prevValue, the state from BEFORE the command: an
-    // echo carrying that value means the command did not take. That is correct
-    // in both failure modes - a device that silently ignored us and a device
-    // that actively reported it stayed put both report the old value, and both
-    // mean the same thing to whoever is looking at the screen.
-    if (wasPending) {
-        // Compared against what we OPTIMISTICALLY APPLIED, which is e.value at
-        // this moment, not against prevValue.
-        //
-        // prevValue is the state from before the FIRST command in a burst - it
-        // is deliberately not overwritten by a second command inside the same
-        // window, so the revert cannot restore a state the hardware never had.
-        // That makes it the wrong baseline for "did this take": tap a switch
-        // twice quickly and the value legitimately returns to prevValue, and
-        // comparing against it declared a perfectly successful command failed.
-        // That is the residual "Obeys can still show FAILED" case.
-        e.cmdFailed = !v.equals(e.value);
-    } else if (changed) {
+    if (changed) {
         // An unsolicited change means we now know the current state, so an
         // older failure is history rather than news.
         e.cmdFailed = false;

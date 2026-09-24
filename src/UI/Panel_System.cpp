@@ -100,6 +100,10 @@ void Panel_System::setAreaLabel(const char *text) {
     if (_lbl_area && text) lv_label_set_text(_lbl_area, text);
 }
 
+void Panel_System::setLabelModeLabel(const char *text) {
+    if (_lbl_label && text) lv_label_set_text(_lbl_label, text);
+}
+
 // One transparent flex row of buttons. Four of these existed as four
 // copy-pasted blocks the moment #50 added rows 3 and 4, which is three too
 // many places to change a gap.
@@ -127,15 +131,15 @@ static lv_obj_t *knobButton(lv_obj_t *parent, Panel_System *self,
     lv_obj_set_width              (b, LV_SIZE_CONTENT);
     lv_obj_set_flex_grow          (b, 1);
     lv_obj_add_event_cb           (b, cb, LV_EVENT_CLICKED, self);
-    lv_obj_set_style_bg_color     (b, UI::c(UI::pal().SURFACE_ALT), 0);
-    lv_obj_set_style_border_width (b, 1, 0);
-    lv_obj_set_style_border_color (b, UI::border(), 0);
+    // Shared paints, so a scheme change repaints them - #64.
+    // Border colour AND width come from the paint, so they follow the scheme.
+    lv_obj_add_style              (b, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
 
     lv_obj_t *l = lv_label_create(b);
     lv_label_set_text             (l, text);
     lv_obj_center                 (l);
     lv_obj_set_style_text_font    (l, UIToolkit::Font_Button, 0);
-    lv_obj_set_style_text_color   (l, UI::c(UI::pal().TEXT), 0);
+    lv_obj_add_style              (l, UI::paint(UIPaint::PAINT_TEXT), 0);
     return b;
 }
 
@@ -222,7 +226,9 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_set_height               (_ui_content, LV_SIZE_CONTENT);
 
     // Content Style
-    lv_obj_set_style_bg_color       (_ui_content, UI::c(UI::pal().SURFACE), 0);
+    // A SHARED paint rather than a local colour: #64, the drawer kept the old
+    // scheme because nothing ever revisited a colour set here once.
+    lv_obj_add_style                (_ui_content, UI::paint(UIPaint::PAINT_SURFACE), 0);
     
     // -- CORNER HACK --
     // We want square top corners (to connect to header) and rounded bottom corners.
@@ -241,7 +247,6 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // the drawer animates to.
     lv_obj_set_style_pad_top        (_ui_content, radius + UIToolkit::sc(10), 0);
 
-    lv_obj_set_style_border_color   (_ui_content, UI::border(), 0);
     lv_obj_set_style_border_width   (_ui_content, UIToolkit::sc(2), 0);
     // lv_obj_set_style_pad_all        (_ui_content, UIToolkit::sc(10), 0);
     lv_obj_set_style_pad_left       (_ui_content, UIToolkit::sc(10), 0);
@@ -273,14 +278,14 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
         lv_obj_set_height            (r, UIToolkit::sc(1) < 1 ? 1 : UIToolkit::sc(1));
         lv_obj_set_flex_grow         (r, 1);
         lv_obj_set_style_bg_opa      (r, LV_OPA_50, 0);
-        lv_obj_set_style_bg_color    (r, UI::c(UI::pal().ACCENT), 0);
+        lv_obj_add_style             (r, UI::paint(UIPaint::PAINT_ACCENT_BG), 0);
         return r;
     };
 
     rule();
     lbl_stats = lv_label_create     (titleRow);
     lv_label_set_text               (lbl_stats, "SYSTEM  -  DIAGNOSTICS");
-    lv_obj_set_style_text_color     (lbl_stats, UI::c(UI::pal().ACCENT), 0);
+    lv_obj_add_style                (lbl_stats, UI::paint(UIPaint::PAINT_ACCENT_TEXT), 0);
     lv_obj_set_style_text_font      (lbl_stats, UIToolkit::Font_Label, 0);
     lv_obj_set_style_pad_left       (lbl_stats, UIToolkit::sc(10), 0);
     lv_obj_set_style_pad_right      (lbl_stats, UIToolkit::sc(10), 0);
@@ -317,15 +322,13 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
                                         Panel_System *self = (Panel_System *)lv_event_get_user_data(e);
                                         if (self) self->requestTokens();
                                      }, LV_EVENT_CLICKED, this);
-    lv_obj_set_style_bg_color       (btnRef, UI::c(UI::pal().SURFACE_ALT), 0);
-    lv_obj_set_style_border_width   (btnRef, 1, 0);
-    lv_obj_set_style_border_color   (btnRef, UI::border(), 0);
+    lv_obj_add_style                (btnRef, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
 
     lv_obj_t* lblRef = lv_label_create(btnRef);
     lv_label_set_text               (lblRef, "Tokens");
     lv_obj_center                   (lblRef);
     lv_obj_set_style_text_font      (lblRef, UIToolkit::Font_Button, 0);
-    lv_obj_set_style_text_color     (lblRef, UI::c(UI::pal().TEXT), 0);
+    lv_obj_add_style                (lblRef, UI::paint(UIPaint::PAINT_TEXT), 0);
 
     // Button: Log - the System Doctor's output, on its own page now.
     lv_obj_t* btnLog = lv_button_create(_ui_actions);
@@ -336,14 +339,12 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
                                         Panel_System *self = (Panel_System *)lv_event_get_user_data(e);
                                         if (self) self->requestLog();
                                      }, LV_EVENT_CLICKED, this);
-    lv_obj_set_style_bg_color       (btnLog, UI::c(UI::pal().SURFACE_ALT), 0);
-    lv_obj_set_style_border_width   (btnLog, 1, 0);
-    lv_obj_set_style_border_color   (btnLog, UI::border(), 0);
+    lv_obj_add_style                (btnLog, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
     lv_obj_t* lblLog = lv_label_create(btnLog);
     lv_label_set_text               (lblLog, "Log");
     lv_obj_center                   (lblLog);
     lv_obj_set_style_text_font      (lblLog, UIToolkit::Font_Button, 0);
-    lv_obj_set_style_text_color     (lblLog, UI::c(UI::pal().TEXT), 0);
+    lv_obj_add_style                (lblLog, UI::paint(UIPaint::PAINT_TEXT), 0);
 
     // Button: Cards - opens the 2.4 card demo as its own screen.
     //
@@ -360,15 +361,13 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
                                         Panel_System *self = (Panel_System *)lv_event_get_user_data(e);
                                         if (self) self->requestCards();
                                      }, LV_EVENT_CLICKED, this);
-    lv_obj_set_style_bg_color       (btnCards, UI::c(UI::pal().SURFACE_ALT), 0);
-    lv_obj_set_style_border_width   (btnCards, 1, 0);
-    lv_obj_set_style_border_color   (btnCards, UI::border(), 0);
+    lv_obj_add_style                (btnCards, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
 
     lv_obj_t* lblCards = lv_label_create(btnCards);
     lv_label_set_text               (lblCards, "Cards");
     lv_obj_center                   (lblCards);
     lv_obj_set_style_text_font      (lblCards, UIToolkit::Font_Button, 0);
-    lv_obj_set_style_text_color     (lblCards, UI::c(UI::pal().TEXT), 0);
+    lv_obj_add_style                (lblCards, UI::paint(UIPaint::PAINT_TEXT), 0);
 
     // Source order is Tokens, Log, Cards; #50 asks for Log first. Reordered by
     // index rather than by moving ninety lines of button construction around,
@@ -419,7 +418,8 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // layout - docs/design/card-layout.md records the threshold being guessed
     // wrong twice before it was measured. This is how you check the
     // measurement by eye instead of reflashing.
-    lv_obj_t *btnVar = knobButton(_ui_row3, this, "Auto", [](lv_event_t *e) {
+    // Labelled for GUIManager's default, which is compact since 2.7.
+    lv_obj_t *btnVar = knobButton(_ui_row3, this, "Cmpct", [](lv_event_t *e) {
         Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
         if (p) p->requestGrid(Panel_System::GridAction::VARIANT_CYCLE);
     });
@@ -452,6 +452,15 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
         if (p) p->requestGrid(Panel_System::GridAction::AREA_TOGGLE);
     });
     _lbl_area = lv_obj_get_child(btnArea, 0);
+
+    // What a state card says under its hero: name, the state word, or nothing.
+    // 2.7, cards.md section 13. A control so the three can be compared on
+    // glass rather than by rebuilding.
+    lv_obj_t *btnLabel = knobButton(_ui_row4, this, "Name", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestGrid(Panel_System::GridAction::LABEL_CYCLE);
+    });
+    _lbl_label = lv_obj_get_child(btnLabel, 0);
 
     // Scheme, on the dashboard rather than on the reference page. The owner
     // asked for it, and it is also the fix for WHY he was on that page: the

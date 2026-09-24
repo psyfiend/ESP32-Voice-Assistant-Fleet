@@ -47,18 +47,10 @@ void ValueCard::buildBody(lv_obj_t *body) {
     // It does not need a row. It sits top-left and the value is centred, so
     // they never contend for the same space - reserving a row for it was
     // paying for a collision that cannot happen.
-    _icon = lv_label_create(body);
-    lv_obj_add_flag(_icon, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    // FLUSH to the body's top-left, and left alone.
     //
-    // A previous version nudged this up by the label's top leading, reasoning
-    // that a glyph does not fill its line box so a flush label reads as further
-    // from the top than from the side. That is true, but the nudge was applied
-    // in every mode - and it traded a correct arrangement in bar and tag for a
-    // marginally better one in no-header. The body's padding already puts it
-    // the same distance from both edges; whatever leading the font carries is
-    // the font's, and compensating for it here is guesswork dressed as layout.
-    lv_obj_align   (_icon, LV_ALIGN_TOP_LEFT, 0, 0);
+    // Placement is the base class's, shared with StateCard - Card::
+    // renderCornerIcon() explains the corner rule.
+    _icon = makeCornerIcon(body);
 
     // The middle takes whatever is left and centres the HERO in it - the value
     // only, with the name as a sibling BELOW it.
@@ -135,31 +127,30 @@ void ValueCard::render() {
     const bool   compact = (variant() == CardVariant::VAR_COMPACT);
 
     // --- Icon, tinted by what this measures -------------------------------
-    const char *cornerGlyph = cardIconFor(e->desc);
-    lv_label_set_text          (_icon, cornerGlyph);
-    lv_obj_set_style_text_font (_icon, t.ICON_SM, 0);
-
-    // PULL THE LABEL UP BY ITS OWN LEADING, so what lands in the corner is the
-    // GLYPH rather than the glyph's line box. Measured from the font, not
-    // guessed - see cardGlyphTopBearing(). Re-applied on every render because
-    // the face changes with the scheme's type scale.
-    // HDR_NONE ONLY, which is the owner's call and the right one.
-    //
-    // In bar and tag mode the icon already sits the correct distance below the
-    // top of the space the card's contents live in - the bottom of the band in
-    // bar, the top border in tag - and he is happy with both. Only in No-hdr,
-    // where nothing sits above it, does the label's own leading become visible
-    // as the glyph appearing to float away from the corner.
-    const int32_t lift = (headerStyle() == CardHeaderStyle::HDR_NONE)
-                       ? cardGlyphTopBearing(t.ICON_SM, cornerGlyph) : 0;
-    lv_obj_align(_icon, LV_ALIGN_TOP_LEFT, 0, -lift);
-    lv_obj_set_style_text_color(_icon, UI::c(tone(cardTintFor(e->desc))), 0);
+    // false: the corner is this card's ONLY icon - see cardCornerIcon().
+    renderCornerIcon(_icon, cardCornerIcon(*e, false), cardTintFor(e->desc));
 
     // --- The value, dominant, with its unit smaller beside it -------------
     char buf[40];
     cardFormatValue(*e, buf, sizeof(buf), false, tempUnit());  // unit drawn separately
     lv_label_set_text          (_value, buf);
-    lv_obj_set_style_text_font (_value, t.VALUE, 0);
+
+    // The HEIGHT decided the face in resolveVariant(); the WIDTH gets a say
+    // here, because only now is the text known. A long reading ("1024" lux,
+    // "3d 04:15") can overflow a narrow card at VALUE while fitting at
+    // VALUE_SM - the owner's "the values would actually fit if they were
+    // smaller", #62. Measured with the font, not estimated per character.
+    const lv_font_t *vf = valueFont();
+    const int32_t cw = cellWidthPx() > 0
+                     ? cellWidthPx() - UI::sc(UI::met().PAD) * 2 : 0;
+    if (cw > 0 && vf != t.VALUE_SM) {
+        const char *du = cardDisplayUnit(*e, tempUnit());
+        lv_point_t vs, us = {0, 0};
+        lv_text_get_size(&vs, buf, vf, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+        if (du[0]) lv_text_get_size(&us, du, t.UNIT, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+        if (vs.x + us.x + UI::sc(3) > cw) vf = t.VALUE_SM;
+    }
+    lv_obj_set_style_text_font (_value, vf, 0);
 
     // A stale number is still the number - it is the chrome that shouts, not
     // the value. cards.md section 3 rejects dimming precisely so the reading
@@ -180,10 +171,36 @@ void ValueCard::render() {
     }
 
     // --- Name, which is the LOCATION, under the value ---------------------
+    //
+    // The label setting applies here too - the owner found temperatures
+    // keeping their names under "No lbl" and looking odd as the only cards
+    // that did. For a value card the number already IS the state, so State
+    // shows the name.
+    const bool showName = (cardResolveLabel(labelMode()) != CardLabel::LBL_NONE);
+    if (showName) lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
+    else          lv_obj_add_flag  (_name, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_text          (_name, label());
     lv_obj_set_style_text_font (_name, t.NAME, 0);
     lv_obj_set_style_text_color(_name, UI::c(tone(p.TEXT_DIM)), 0);
     lv_obj_set_width           (_name, lv_pct(100));
+
+    // Compact: the same shift a state card's name takes, so a row of mixed
+    // cards keeps its names on one line - Card::compactNameShiftPx() measures
+    // against the state card's disc for exactly that reason. Clamped here so
+    // it can never ride up into this card's own number, which may be taller
+    // than the disc it is measured against.
+    int32_t shift = showName ? compactNameShiftPx() : 0;
+    if (shift < 0) {
+        const int32_t pad   = UI::sc(UI::met().PAD);
+        const int32_t contH = surfaceHeightPx() - bodyTopPx() - pad;
+        const int32_t nameH = lv_font_get_line_height(t.NAME);
+        const int32_t band  = Card::topBandHeight() / 2;      // _mid's pad_top
+        const int32_t midH  = contH - nameH - band - Card::midGap();
+        const int32_t valBottom = band + midH / 2 + lv_font_get_line_height(vf) / 2;
+        const int32_t minShift  = valBottom + UI::sc(2) - (contH - nameH);
+        if (shift < minShift) shift = minShift < 0 ? minShift : 0;
+    }
+    lv_obj_set_style_translate_y(_name, shift, 0);
 
     // --- The status row, which COMPACT does not have room for -------------
     //
@@ -254,10 +271,28 @@ void ValueCard::render() {
         lv_obj_set_style_text_font (_seen, t.TAG, 0);
         lv_obj_set_style_text_color(_seen, UI::c(tone(p.TEXT_DIM)), 0);
 
-        lv_obj_update_layout(_statusRow);
-        const int32_t avail = lv_obj_get_content_width(_statusRow)
-                            - lv_obj_get_width(_battGroup) - UI::sc(6);
-        if (lv_obj_get_width(_seen) > avail) lv_label_set_text(_seen, age);
+        // MEASURED FROM THE TEXT, not from layout. This used to call
+        // lv_obj_update_layout() and read widths back - and right after a page
+        // rebuild the layout is not settled, so the same card measured
+        // differently depending on HOW it was last drawn. The owner saw "Seen:"
+        // appear for every card after the Label knob (a repaint, layout
+        // settled) and vanish at random after Auto -> Full (a rebuild, not
+        // settled). The text's own size and the page-supplied width answer the
+        // same question the same way every time.
+        const int32_t cw = cellWidthPx() > 0
+                         ? cellWidthPx() - UI::sc(UI::met().PAD) * 2 : 0;
+        if (cw > 0) {
+            lv_point_t fs, bs = {0, 0}, bi = {0, 0};
+            lv_text_get_size(&fs, full, t.TAG, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+            if (batt) {
+                lv_text_get_size(&bi, lv_label_get_text(_battIcon), t.ICON_SM, 0, 0,
+                                 LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+                lv_text_get_size(&bs, lv_label_get_text(_battery), t.TAG, 0, 0,
+                                 LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+            }
+            const int32_t battW = batt ? bi.x + UI::sc(3) + bs.x : 0;
+            if (fs.x > cw - battW - UI::sc(6)) lv_label_set_text(_seen, age);
+        }
 
         lv_obj_clear_flag(_seen, LV_OBJ_FLAG_HIDDEN);
     } else {

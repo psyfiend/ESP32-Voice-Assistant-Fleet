@@ -94,7 +94,8 @@ void Panel_Display::init(lv_obj_t* parent) {
     // ROW 2,1 - Label
     lv_obj_t * lbl_viz = lv_label_create(row_viz);
     lv_label_set_text           (lbl_viz, "Show Touches");
-    lv_obj_set_style_text_color (lbl_viz, lv_color_white(), 0);
+    // A shared paint, not hard white: white vanished on Paper's light panel.
+    lv_obj_add_style            (lbl_viz, UI::paint(UIPaint::PAINT_TEXT), 0);
     lv_obj_set_style_text_font  (lbl_viz, UIToolkit::Font_Label, 0); // Semantic Font
 
     // ROW 2,2 - Switch
@@ -132,7 +133,7 @@ void Panel_Display::init(lv_obj_t* parent) {
     lv_label_set_text           (lbl_h, "TOUCH POINTS");
     lv_obj_align                (lbl_h, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_set_style_text_font  (lbl_h, UIToolkit::Font_PanelHeader, 0); // Semantic Font
-    lv_obj_set_style_text_color (lbl_h, UI::c(UI::pal().ACCENT), 0);
+    lv_obj_add_style            (lbl_h, UI::paint(UIPaint::PAINT_ACCENT_TEXT), 0);
 
     count_label = lv_label_create(panel_touch_data);
     lv_label_set_text           (count_label, "ACTIVE: 0");

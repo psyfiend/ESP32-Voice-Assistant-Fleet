@@ -1,5 +1,6 @@
 #include "Cards/Card.h"
 #include "Cards/CardDefaults.h"
+#include "Cards/CardIcons.h"
 #include "UI/UITokens.h"
 #include <Arduino.h>
 #include <string.h>
@@ -130,13 +131,13 @@ int32_t Card::headerHeight() {
 // that CardPage can ask the same question before it decides how many rows to
 // carve the page into - it used to guess, and a guess that disagrees with this
 // function is how a page plans a row no card can live in.
-int32_t Card::fullCellNeedPx(CardHeaderStyle style) {
+int32_t Card::fullCellNeedPx(CardHeaderStyle style, const lv_font_t *hero) {
     const UIType    &t = UI::type();
     const UIMetrics &m = UI::met();
 
     // Counts every band a FULL layout reserves. No top band: the corner icon is
     // out of the flow on both layouts, so it costs the stack nothing.
-    int32_t need = lv_font_get_line_height(t.VALUE)
+    int32_t need = lv_font_get_line_height(hero ? hero : t.VALUE)
                  + midGap()
                  + lv_font_get_line_height(t.NAME)
                  + statusBandHeight()
@@ -172,24 +173,70 @@ int32_t Card::compactCellNeedPx() {
 }
 
 void Card::resolveVariant() {
-    if (_variant != CardVariant::VAR_AUTO) { _resolved = _variant; return; }
-
     int32_t h = cellPx();
 
     // HDR_TAG hangs OUTSIDE the card, so the cell it leaves the body is
     // shorter by exactly the tag.
     if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
 
-    const int32_t need = fullCellNeedPx(_hdrStyle);
+    const UIType &t = UI::type();
+    const int32_t need   = fullCellNeedPx(_hdrStyle, t.VALUE);
+    const int32_t needSm = fullCellNeedPx(_hdrStyle, t.VALUE_SM);
 
-    _resolved = (h >= need) ? CardVariant::VAR_FULL : CardVariant::VAR_COMPACT;
+    // THE HERO STEPS DOWN A SIZE BEFORE THE CARD DROPS A ROW. #62.
+    //
+    // The order used to be "full at VALUE, else compact at VALUE" - draw less,
+    // never the same thing smaller. That rule was written when a page held a
+    // handful of cards; with eighteen on a 4-inch panel the owner found values
+    // and names that "would actually fit if they were smaller". So a cell too
+    // short for a full layout at VALUE now tries VALUE_SM first, and only goes
+    // compact if even that will not seat. Name, unit and tag faces never
+    // change - only the one role that dominates the vertical stack does.
+    //
+    //   full    at VALUE      the cell seats everything at full size
+    //   full    at VALUE_SM   it does with a smaller number
+    //   compact at VALUE_SM   it does not; drop the status row too
+    if (h >= need) {
+        _resolved = CardVariant::VAR_FULL;    _valueSmall = false;
+    } else if (h >= needSm) {
+        _resolved = CardVariant::VAR_FULL;    _valueSmall = true;
+    } else {
+        _resolved = CardVariant::VAR_COMPACT; _valueSmall = true;
+    }
+
+    // A pinned variant still gets the hero size ITS layout can carry. Compact
+    // has no status row, so it keeps the full-size value in cells where full
+    // would have had to shrink it - which is most of the point of compact, and
+    // since 2.7 round two it is the fleet default.
+    if (_variant != CardVariant::VAR_AUTO) {
+        _resolved = _variant;
+        if (_variant == CardVariant::VAR_FULL) {
+            _valueSmall = (h < need);
+        } else {
+            int32_t needC = compactCellNeedPx();
+            if (_hdrStyle == CardHeaderStyle::HDR_BAR) needC += Card::headerHeight();
+            _valueSmall = (h < needC);
+        }
+    }
 
     // Printed once per card, because this decision was guessed at twice and
     // both times the guess was wrong. The numbers are cheap and they end the
     // argument - and they say WHY a card went compact rather than leaving it
     // to be inferred from what is missing on screen.
-    DBG_CARDS("%s: cell %ld need %ld -> %s\n",
-              typeName(), (long)h, (long)need, cardVariantName(_resolved));
+    DBG_CARDS("%s: cell %ld need %ld / %ld (sm) -> %s%s\n",
+              typeName(), (long)h, (long)need, (long)needSm,
+              cardVariantName(_resolved), _valueSmall ? ", small value" : "");
+}
+
+const lv_font_t *Card::valueFont() const {
+    return _valueSmall ? UI::type().VALUE_SM : UI::type().VALUE;
+}
+
+int32_t Card::shortSidePx() const {
+    int32_t h = cellPx();
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+    const int32_t w = _cellWPx > 0 ? _cellWPx : (int32_t)UI::grid().cellW;
+    return (w < h) ? w : h;
 }
 
 // Long press pauses, on every card type.
@@ -241,6 +288,13 @@ void Card::build(lv_obj_t *parent) {
     lv_obj_set_flex_flow          (_root, LV_FLEX_FLOW_COLUMN);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_CLICKABLE);
+    // THE SHADOW LIVES OUTSIDE THIS WRAPPER, so the wrapper must not clip it.
+    // The surface fills _root exactly, which put every pixel of its shadow
+    // outside its parent - and a parent clips its children - so no card has
+    // ever shown one, whatever the metrics asked for. Overflow-visible costs no
+    // layer: it REMOVES a clip rather than adding one. The page's gaps and
+    // inset are where the shadows land.
+    lv_obj_add_flag               (_root, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
 
     if (_hdrStyle == CardHeaderStyle::HDR_TAG) {
         _tagRow = lv_obj_create(_root);
@@ -403,11 +457,18 @@ void Card::restyle() {
     lv_obj_set_style_radius       (_surface, UI::sc(m.RADIUS), 0);
     lv_obj_set_style_border_width (_surface, m.BORDER_W, 0);
     lv_obj_set_style_border_color (_surface, UI::border(), 0);
-    lv_obj_set_style_shadow_width (_surface, UI::sc(m.SHADOW), 0);
-    lv_obj_set_style_shadow_opa   (_surface, m.SHADOW ? LV_OPA_40 : LV_OPA_TRANSP, 0);
+    lv_obj_set_style_shadow_width   (_surface, UI::sc(m.SHADOW), 0);
+    lv_obj_set_style_shadow_offset_y(_surface, UI::sc(m.SHADOW_Y), 0);
+    lv_obj_set_style_shadow_opa     (_surface, m.SHADOW ? LV_OPA_30 : LV_OPA_TRANSP, 0);
 
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
-    if (_hdrStyle != CardHeaderStyle::HDR_TAG) {
+    // BAR ONLY. This said "not TAG", which also reserved a header's height in
+    // HDR_NONE - a mode whose whole point is that it reserves nothing, and
+    // which build() above and fullCellNeedPx() both already treated that way.
+    // restyle() runs at the end of build(), so it silently won: every No-hdr
+    // card carried an invisible empty band, and the corner icon sat a band's
+    // height below the corner. The owner's report, 2026-09-22.
+    if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
         lv_obj_set_style_pad_top  (_body, Card::headerHeight() + UI::sc(m.PAD), 0);
     }
 
@@ -516,6 +577,124 @@ int32_t Card::midHeight() const {
     // And never let a hero touch the edges of its band.
     h -= UI::sc(4);
     return h > 0 ? h : 0;
+}
+
+int32_t Card::surfaceHeightPx() const {
+    int32_t h = cellPx();
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+    return h;
+}
+
+int32_t Card::bodyTopPx() const {
+    const int32_t pad = UI::sc(UI::met().PAD);
+    return pad + (_hdrStyle == CardHeaderStyle::HDR_BAR ? Card::headerHeight() : 0);
+}
+
+// LG, then MD, then SM: the largest glyph that fits the hero band with a
+// margin. See StateCard::render() for the history - a cramped card used to
+// keep LG and lose its disc.
+const lv_font_t *Card::heroIconFace() const {
+    const UIType &t = UI::type();
+    const int32_t room = midHeight();
+    if (room <= 0) return t.ICON;
+    if (room >= lv_font_get_line_height(t.ICON)    + UI::sc(4)) return t.ICON;
+    if (room >= lv_font_get_line_height(t.ICON_MD) + UI::sc(4)) return t.ICON_MD;
+    return t.ICON_SM;
+}
+
+// Twice the glyph's line height is the look on a large card, clamped to the
+// band - a disc sized from the font alone was clipped by its own parent on
+// CYD_S3_3248, and a disc larger than its band forces a layer (LESSONS.md).
+int32_t Card::heroDiscPx() const {
+    const int32_t room = midHeight();
+    int32_t d = lv_font_get_line_height(heroIconFace()) * 2;
+    if (room > 0 && d > room) d = room;
+    return d;
+}
+
+int32_t Card::compactNameShiftPx() const {
+    if (_resolved != CardVariant::VAR_COMPACT) return 0;
+
+    // Everything in BODY CONTENT coordinates: 0 is the top of the padded body.
+    // Compact has no status row, so the stack is [middle band][name], and the
+    // hero is centred in the middle band - which ends a midGap above the name.
+    const int32_t pad   = UI::sc(UI::met().PAD);
+    const int32_t contH = surfaceHeightPx() - bodyTopPx() - pad;
+    const int32_t nameH = lv_font_get_line_height(UI::type().NAME);
+    const int32_t midH  = contH - nameH - midGap();
+    if (contH <= 0 || midH <= 0) return 0;
+
+    // The reference hero is the STATE card's disc, for both layouts, so that
+    // a row mixing lights and temperatures keeps its names on one line.
+    const int32_t heroBottom = midH / 2 + heroDiscPx() / 2;
+    const int32_t cardBottom = contH + pad;            // the surface's edge
+    const int32_t wantTop    = (heroBottom + cardBottom) / 2 - nameH / 2;
+    const int32_t flowTop    = contH - nameH;          // where flex put it
+
+    int32_t dy = wantTop - flowTop;
+    // Never over the hero, never off the card.
+    if (wantTop < heroBottom + UI::sc(2)) dy = heroBottom + UI::sc(2) - flowTop;
+    if (flowTop + dy + nameH > cardBottom - UI::sc(2)) dy = cardBottom - UI::sc(2) - nameH - flowTop;
+    return dy;
+}
+
+lv_obj_t *Card::makeCornerIcon(lv_obj_t *body) {
+    lv_obj_t *o = lv_label_create(body);
+    lv_obj_add_flag(o, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_clear_flag(o, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_align(o, LV_ALIGN_TOP_LEFT, 0, 0);
+    return o;
+}
+
+// THE CORNER ICON SCALES WITH THE CARD, not only with the board. 2.7.
+//
+// The owner: it "looks tiny on the 7B". Every face in the type scale is sized
+// in millimetres, which keeps text the same physical size fleet-wide - right
+// for text, wrong for a mark whose job is to be in proportion to the tile it
+// labels. A 25 mm card and a 15 mm card wore the same 2.66 mm glyph.
+//
+// So: the corner aims at ~15% of the card's SHORT side, and takes whichever of
+// the two faces is nearer - SM (2.66 mm) or MD (3.50 mm). The crossover is a
+// short side of about 20.5 mm. Measured against today's default grids that
+// puts WS_P4_7B and CYD_P4_1060 (~25 mm cells) on MD and every other board on
+// SM, which is what the owner described. A starting ratio, not a measured
+// optimum - the glass decides.
+static constexpr float CORNER_RATIO = 0.15f;
+static constexpr float CORNER_SM_MM = 2.66f;   // gen_icon_font.py SIZES_MM
+static constexpr float CORNER_MD_MM = 3.50f;
+
+const lv_font_t *Card::cornerFont() const {
+    const float ppi = (float)bspPixelDensity();
+    if (ppi <= 0.f) return UI::type().ICON_SM;
+    const float shortMm = (float)shortSidePx() * 25.4f / ppi;
+    const float want    = shortMm * CORNER_RATIO;
+    return (want >= (CORNER_SM_MM + CORNER_MD_MM) * 0.5f) ? UI::type().ICON_MD
+                                                          : UI::type().ICON_SM;
+}
+
+void Card::renderCornerIcon(lv_obj_t *icon, const char *glyph, uint32_t hex) const {
+    if (!icon) return;
+    const lv_font_t *f = cornerFont();
+    lv_label_set_text          (icon, glyph);
+    lv_obj_set_style_text_font (icon, f, 0);
+
+    // GLUED TO THE CORNER: the same distance from the card's left edge as from
+    // whatever bounds its top. The body's padding supplies that distance in
+    // every mode; the label is flush to the body's top-left.
+    //
+    // In No-header mode one more thing is needed. A label's box is a LINE box
+    // with leading above the ink, so a flush box puts the visible glyph lower
+    // than it is far from the side. Measured from the font - see
+    // cardGlyphTopBearing() - and applied in HDR_NONE only, which is the
+    // owner's call: in bar and tag the icon already sits where he wants it.
+    //
+    // The other half of the owner's "too low in No-header" report was not
+    // here at all: restyle() was reserving a header's worth of top padding in
+    // HDR_NONE too. See restyle().
+    const int32_t lift = (_hdrStyle == CardHeaderStyle::HDR_NONE)
+                       ? cardGlyphTopBearing(f, glyph) : 0;
+    lv_obj_align               (icon, LV_ALIGN_TOP_LEFT, 0, -lift);
+    lv_obj_set_style_text_color(icon, UI::c(tone(hex)), 0);
 }
 
 // The area's colour, or the accent when it has none.

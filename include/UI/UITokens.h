@@ -55,6 +55,15 @@ struct UIPalette {
     uint32_t TINT_LIGHT;
     uint32_t TINT_AIR;
     uint32_t TINT_POWER;
+
+    // --- Corner icon tints, by kind of thing. 2.7 round two. ---
+    // The owner: "if the temp and lux are going to be colored then they all
+    // should be". Bulbs yellow-white "like one would picture a light bulb";
+    // doors blue. TINT_LIGHTING is per scheme rather than shared, because a
+    // yellow-white glyph vanishes on a light scheme's white card.
+    uint32_t TINT_OPENING;  // doors, windows, garage doors, locks
+    uint32_t TINT_PRESENCE; // occupancy, motion, presence
+    uint32_t TINT_LIGHTING; // lights, and switches used as lights
 };
 
 // ---------------------------------------------------------------------------
@@ -67,8 +76,12 @@ struct UIMetrics {
     uint8_t PAD;            // card inner padding
     uint8_t BORDER_W;       // 0 on light schemes, 1 on dark
     uint8_t BORDER_OPA_PCT; // strength of the derived border colour
-    uint8_t SHADOW;
+    uint8_t SHADOW;         // blur width. 0 = none
     uint8_t HEADER_H;       // card header bar — covers the border, edge to edge
+    // How far the shadow drops below the card. 0 is a halo; a few pixels is
+    // a DROP shadow, which is what makes a card read as lifted off the page -
+    // the owner's "it looks too flat" on Linen, 2026-09-23.
+    uint8_t SHADOW_Y;
 };
 
 // ---------------------------------------------------------------------------
@@ -121,15 +134,21 @@ struct UIGrid {
 // 4. Type — fleet-wide
 // ---------------------------------------------------------------------------
 // LVGL compiles fixed bitmap faces, so this is a shortlist, not a scale - and
-// the shortlist is a FLASH BUDGET. Measured on WS_P4_5: one referenced face
-// costs ~96 KB. Enabling a size in lv_conf.h is free, because the linker drops
-// unreferenced font objects; REFERENCING one is what costs. Every entry added
-// here is another ~96 KB, and the MDI icon subset competes for the same budget.
-// See docs/design/tokens.md section 3.
+// the shortlist is a FLASH BUDGET. Enabling a size in lv_conf.h is free,
+// because the linker drops unreferenced font objects; REFERENCING one is what
+// costs.
+//
+// HOW MUCH, corrected at 2.7. "~96 KB per face" was measured on ONE large,
+// full-ASCII Montserrat and was then applied to every face for months. From the
+// P4 builds' object files: a generated digits-only VALUE face is 6-10 KB, an
+// MDI icon face 10-73 KB by size, Montserrat 14-24 is 14-29 KB. Still a budget;
+// a much smaller one. See docs/design/cards.md section 13.
 struct UIType {
     const lv_font_t *VALUE;   // the number on a measure card. DIGITS ONLY on
                               // dense boards - it is a generated subset, and
                               // it has no letters and no LV_SYMBOL range
+    const lv_font_t *VALUE_SM;// the number on a CRAMPED card, ~3/4 of VALUE.
+                              // Always the digits-only subset. #62, 2.7
     const lv_font_t *UNIT;    // the unit beside a value, deliberately smaller
     const lv_font_t *NAME;    // card name
     const lv_font_t *TAG;     // header bar, status row
@@ -138,20 +157,34 @@ struct UIType {
     // MDI codepoints sit in the private use area, so these faces can draw
     // nothing but icons and every other face can draw none of them.
     const lv_font_t *ICON;    // the disc glyph on a state card
-    const lv_font_t *ICON_SM; // the tinted glyph on a value card's title row
+    const lv_font_t *ICON_MD; // between the two: the corner on a LARGE card,
+                              // the hero on a CRAMPED one. 2.7
+    const lv_font_t *ICON_SM; // the corner icon on an ordinary card
     const lv_font_t *HERO;    // oversized, for a fullscreen card
 };
 
 // ---------------------------------------------------------------------------
 // Built-in schemes
 // ---------------------------------------------------------------------------
-extern const UIPalette UI_PAL_SLATE;  // dark, the owner's primary
-extern const UIPalette UI_PAL_PAPER;  // light
-extern const UIPalette UI_PAL_FLEET;  // today's shipped UI, for comparison
-extern const UIPalette UI_PAL_MIDNIGHT; // Slate's ground, Fleet's cyan - the owner's pick
+// Three, pruned on glass 2026-09-23. See UITokens.cpp.
+extern const UIPalette UI_PAL_FLEET;    // the original shipped UI
+extern const UIPalette UI_PAL_MIDNIGHT; // dark, the default
+extern const UIPalette UI_PAL_LINEN;    // light
 
 extern const UIMetrics UI_MET_DARK;   // 1px lighten @40% border, no shadow needed
 extern const UIMetrics UI_MET_LIGHT;  // no border, leans on the shadow
+
+// Colour roles for UI::paint() - shared styles that repaint themselves on a
+// scheme change. #64; the full story is at UI::paint() below.
+enum class UIPaint : uint8_t {
+    PAINT_SURFACE = 0,   // bg SURFACE, border UI::border()     - panels
+    PAINT_SURFACE_ALT,   // bg SURFACE_ALT, border UI::border() - buttons
+    PAINT_TEXT,          // text TEXT
+    PAINT_TEXT_DIM,      // text TEXT_DIM
+    PAINT_ACCENT_TEXT,   // text ACCENT                         - panel titles
+    PAINT_ACCENT_BG,     // bg ACCENT
+    PAINT_COUNT
+};
 
 namespace UI {
 
@@ -174,6 +207,9 @@ const UIType    &type();
 // Cards must therefore read UI::pal() when they build or restyle and must never
 // cache a colour — cheap to honour now, invasive to retrofit later.
 void setScheme(const UIPalette &p, const UIMetrics &m);
+// The next scheme in the knob's order - Fleet, Midnight, Linen - with its
+// metrics. Every scheme button calls this; the order lives in UITokens.cpp.
+void cycleScheme();
 void setAccent(uint32_t hex);
 void setTargetCardWidth(uint16_t logicalPx);
 
@@ -208,6 +244,34 @@ lv_color_t border();                     // BORDER, or derived from SURFACE
 // ("lv_draw_layer_alloc_buf: Allocating layer buffer failed"). Mixing toward
 // the ground colour costs nothing.
 uint32_t mix(uint32_t a, uint32_t b, uint8_t pct);
+
+// Whichever of `a` and `b` stands further from `bg` in perceived brightness.
+//
+// For colour the palette does not own - a light's own rgb_color, drawn in its
+// card's disc - where no scheme token can be picked in advance. Passing two
+// scheme tokens (GROUND and TEXT) keeps the answer inside the palette, so the
+// "no colour literals in UI code" rule holds.
+uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b);
+
+// --- Shared paints: chrome that repaints itself on a scheme change. #64 -----
+//
+// Cards re-read UI::pal() in their own restyle(), and CardBinder calls it on
+// every card when the scheme changes. The CHROME around them - deck panels,
+// the system drawer, their buttons - set a local colour once at build time and
+// had no restyle at all, so they kept the old scheme until something rebuilt
+// them. The owner saw it switching Fleet to Slate.
+//
+// Rather than give every panel a restyle() that has to remember each widget
+// it coloured, these are SHARED lv_style_t objects, one per role. A widget
+// adds the style instead of setting a colour; a scheme change updates the
+// style in place and tells LVGL, and every widget using it repaints. One
+// place decides what a scheme change repaints - the same consolidation that
+// fixed the drawer offset in 2.6.
+//
+// A LOCAL style property beats a shared style in LVGL, so a widget painted
+// this way must not also call lv_obj_set_style_*_color for the same property.
+// The roles are UIPaint, declared above the namespace with the other types.
+lv_style_t *paint(UIPaint p);
 
 // Silences the `lv_part_t | lv_state_t` deprecation warning that would
 // otherwise be reproduced in every card type. Issue #13 asked for this.

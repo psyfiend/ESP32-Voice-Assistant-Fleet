@@ -138,7 +138,9 @@ void HaProvider::handle(const char *json, size_t len) {
                               .to<JsonObject>()["to_state"].to<JsonObject>();
         ts["entity_id"]               = true;
         ts["state"]                   = true;
-        ts["attributes"]["icon"]      = true;
+        // icon, brightness, rgb_color. One helper shared with HaRest, so the
+        // two readers cannot disagree about what is kept - see HaValue.h.
+        haAttrFilter(ts["attributes"].to<JsonObject>());
         filter["type"]                = true;
         // Needed to read the subscription's own reply. Without these three the
         // filtered parse drops them and every result looks like success=false.
@@ -241,6 +243,14 @@ void HaProvider::handle(const char *json, size_t len) {
         _handled++;
         return;
     }
+
+    // ATTRIBUTES BEFORE THE VALUE, and read on every event - including the ones
+    // whose value did not change. A light fading down sends "on" per step with
+    // a falling brightness; the value never moves and the attributes are the
+    // whole story. setAttrs() dirties only on a real change.
+    EntityAttrs attrs;
+    haReadAttrs(to["attributes"], attrs);
+    _reg->setAttrs(match->desc.id, attrs);
 
     EntityValue v;
     if (!haCoerceState(match->desc, state, v)) {

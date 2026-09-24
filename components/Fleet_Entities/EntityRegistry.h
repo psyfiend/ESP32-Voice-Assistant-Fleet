@@ -113,6 +113,17 @@ public:
     // that repeats "unavailable" does not repaint the screen.
     bool setAvailable(const char *id, bool available, uint32_t nowMs);
 
+    // Record the source's attributes - live icon, brightness, colour. 2.7.
+    //
+    // Separate from setValue() because the two change independently: a light
+    // fading down sends "on", "on", "on" with a falling brightness, and none of
+    // those is a change of VALUE. Dirties only when an attribute actually
+    // changed, so a sensor whose attributes never move costs no repaints.
+    //
+    // Does not move lastUpdateMs or touch the command bookkeeping - the value
+    // that arrives with the attributes does that, through setValue().
+    bool setAttrs(const char *id, const EntityAttrs &a);
+
     // The user's pause. Issue #60. Persisted to NVS so a reboot does not undo
     // it. Returns false if the id is unknown.
     bool setPaused(const char *id, bool paused, uint32_t nowMs);
@@ -204,8 +215,11 @@ private:
     void       *_cmdCtx = nullptr;
 
     mutable std::mutex _mx;
-    uint32_t _reconcileMs = 5000;   // generous: a round trip through a broker
-                                    // and back via HA can take a moment
+    // 3 s since 2.7 (#63). Was 5 s, sized for a round trip through a broker.
+    // Since #63 only a MATCHING echo confirms, so the window must outlast a
+    // fading light: the owner timed his Desk group at ~1.5 s, and asked for
+    // FAILED after 2-3 s. The websocket echo itself is ~91 ms, measured.
+    uint32_t _reconcileMs = 3000;
 
     int  indexOf(const char *id) const;   // caller holds the lock (or startup)
 };

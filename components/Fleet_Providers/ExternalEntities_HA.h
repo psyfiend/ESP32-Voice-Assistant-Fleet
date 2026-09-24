@@ -19,6 +19,11 @@
 // Every entry is source = HA, advertise = false. Someone else owns these;
 // announcing them to Home Assistant would duplicate entities HA already has.
 //
+// NO `icon` FIELDS, deliberately, since 2.7. They used to transcribe HA's
+// icons, and a descriptor icon OUTRANKS the live one - so they froze whatever
+// HA said on the day they were copied. Empty means "follow HA"; set one only
+// to override. cards.md section 13.
+//
 //
 // THREE DECISIONS ARE ENCODED HERE THAT ARE NOT OBVIOUS FROM THE TABLE.
 //
@@ -92,7 +97,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .kind        = EntityKind::LIGHT,     // a switch.* entity; see note 2
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
-        .icon        = "mdi:ceiling-light-outline",
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -106,7 +110,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .kind        = EntityKind::LIGHT,
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
-        .icon        = "mdi:light-recessed",
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -118,7 +121,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .kind        = EntityKind::LIGHT,
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
-        .icon        = "mdi:light-recessed",
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -135,7 +137,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .unit        = HA_DEG_F,
         .deviceClass = "temperature",
         .stateClass  = "measurement",
-        .icon        = "mdi:thermometer",
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -148,7 +149,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
         .deviceClass = "occupancy",
-        .icon        = "mdi:motion-sensor",
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -165,7 +165,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .unit        = HA_DEG_F,
         .deviceClass = "temperature",
         .stateClass  = "measurement",
-        .icon        = "mdi:thermometer",
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -179,7 +178,13 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .kind        = EntityKind::LIGHT,
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
-        .icon        = "mdi:lightbulb-group",
+        // The GROUP bulb is the HERO, not the corner - the owner's call on glass,
+        // 2026-09-22: "it (mostly) acts and functions just like any other light
+        // card", so the corner is the ordinary bulb every light wears, and what
+        // makes it different "should be prominent, the first and most easy thing
+        // to see". A custom on/off pair - the first real use of one.
+        .iconOn      = "mdi:lightbulb-group",
+        .iconOff     = "mdi:lightbulb-group-outline",
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -194,7 +199,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .kind        = EntityKind::LIGHT,
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
-        .icon        = "mdi:light-recessed",
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -207,7 +211,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
         .deviceClass = "occupancy",
-        .icon        = "mdi:motion-sensor",
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -222,7 +225,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .unit        = HA_DEG_F,
         .deviceClass = "temperature",
         .stateClass  = "measurement",
-        .icon        = "mdi:thermometer",
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -239,7 +241,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .unit        = HA_DEG_F,
         .deviceClass = "temperature",
         .stateClass  = "measurement",
-        .icon        = "mdi:thermometer",
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -256,7 +257,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .unit        = HA_DEG_F,
         .deviceClass = "temperature",
         .stateClass  = "measurement",
-        .icon        = "mdi:thermometer",
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -271,7 +271,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .unit        = HA_DEG_F,
         .deviceClass = "temperature",
         .stateClass  = "measurement",
-        .icon        = "mdi:thermometer",
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -284,7 +283,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .kind        = EntityKind::LIGHT,
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
-        .icon        = "mdi:coach-lamp",
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -299,7 +297,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .unit        = "lx",
         .deviceClass = "illuminance",
         .stateClass  = "measurement",
-        .icon        = "mdi:brightness-5",
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -314,11 +311,10 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .kind        = EntityKind::BINARY_SENSOR,
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
-        // device_class garage_door is the discriminator the `door` card type
-        // needs - dashboard-target-7b.md point 3. There is no door card yet,
-        // so these render as generic binary sensors until 2.7 adds one.
+        // device_class garage_door picks the row in CardIcons.cpp's binary
+        // sensor table: garage corner, garage / garage-open hero, "Open" /
+        // "Closed" words. In HA this is `opening` shown as garage door.
         .deviceClass = "garage_door",
-        .icon        = "mdi:garage",
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -331,7 +327,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
         .deviceClass = "garage_door",
-        .icon        = "mdi:garage",
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
@@ -346,7 +341,6 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .unit        = HA_DEG_F,
         .deviceClass = "temperature",
         .stateClass  = "measurement",
-        .icon        = "mdi:thermometer",
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,

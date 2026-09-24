@@ -149,14 +149,27 @@ The other nine are temperatures and an illuminance with no icon set, which fall 
 | `icon` in a state's **attributes** | live | what HA would draw *right now* |
 
 `binary_sensor.kitchen_occupancy` has no registry icon but its attributes say
-`mdi:motion-sensor-off` while it is `off`. **HA computes the state-dependent glyph and ships it on
-every state update.** So reading `attributes.icon` gets the correct hero icon, state variant
-included, for nothing.
+`mdi:motion-sensor-off` while it is `off`.
+
+> **CORRECTED 2026-09-22 — the next sentence was a generalisation from one entity, and it is
+> wrong.** It read: *"HA computes the state-dependent glyph and ships it on every state update."*
+> Re-measured by querying the entity registry alongside the states: the two occupancy sensors are
+> **template** entities (`platform: template`, `original_icon: mdi:motion-sensor-off`), and it is
+> their template that switches the icon. HA core does not put a state-dependent icon into the state
+> object; its frontend picks default icons client-side. `attributes.icon` exists only when a user or
+> an integration set one — none of the temperatures, and not the garage doors once their override
+> was removed. Our own state pairs are therefore the main source, not a fallback. The decision that
+> follows from this is `cards.md` §13.
 
 **The exception is worth telling the owner about.** The garage doors have a *static* registry
 override of `mdi:garage`, so they will never show `mdi:garage-open` — his own override is
 suppressing the behaviour he asked for. Removing the icon override in HA would give the
 open/closed pair automatically, since the entities already carry `device_class: garage_door`.
+
+> **Update 2026-09-22:** the owner removed the override. He also reported that the panel's garage
+> icons had been switching open/closed correctly all along - because `cardIconForState()` checked
+> `device_class` before any icon and the live icon was never read. The paragraph above describes
+> what HA's frontend does, not what this panel did.
 
 ---
 

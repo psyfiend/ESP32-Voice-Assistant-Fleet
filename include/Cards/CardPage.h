@@ -128,6 +128,9 @@ private:
     // The real pixel height of a card spanning `spanY` units, gaps included.
     int32_t heightOf(uint8_t spanY) const;
 
+    // And width, for spanX units. 0 when the page was never laid out.
+    int32_t widthOf(uint8_t spanX) const;
+
     // How many CELL rows the cards actually need, from their spans and the
     // column count. A lower bound: placement can still need one more when
     // wide cards do not tile neatly.
@@ -165,6 +168,7 @@ private:
     // FEW rows as its cards need and gives the rest of the height to them - it
     // does not fill the space with empty rows. See useRows().
     int32_t  _availH   = 0;
+    int32_t  _availW   = 0;      // content width, for widthOf()
     uint8_t  _maxRows  = 1;
     uint8_t  _rowsOverride = 0;   // 0 = let the cards decide
 

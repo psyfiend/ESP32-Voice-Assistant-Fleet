@@ -83,10 +83,19 @@ public:
     // Zero means nobody said, and the card falls back to one whole cell.
     Card &setCellHeightPx(int32_t px) { _cellPx = px; return *this; }
 
+    // And its real WIDTH, for the same reason. Needed since 2.7: the corner
+    // icon's size follows the card's SHORT side, not only its height.
+    Card &setCellWidthPx(int32_t px) { _cellWPx = px; return *this; }
+
     // Which unit this card renders a temperature in. TEMP_INHERIT defers to
     // the fleet setting - see cardTempUnit() in CardIcons.h.
     Card &setTempUnit(TempUnit u) { _tempUnit = u; return *this; }
     TempUnit tempUnit() const { return _tempUnit; }
+
+    // What a state card's line under the hero says. LBL_INHERIT defers to
+    // the fleet setting - see cardLabelMode() in CardIcons.h.
+    Card &setLabelMode(CardLabel m) { _labelMode = m; return *this; }
+    CardLabel labelMode() const { return _labelMode; }
 
     // The resolved variant - never VAR_AUTO. Valid after build().
     CardVariant variant() const { return _resolved; }
@@ -213,7 +222,11 @@ public:
     //
     //   fullCellNeedPx()    a title row, the hero, an optional row and padding
     //   compactCellNeedPx() the hero alone, which is the least a card can be
-    static int32_t fullCellNeedPx(CardHeaderStyle style);
+    //
+    // `hero` is the face the hero value would be drawn in; nullptr means
+    // UIType::VALUE. Since #62 a card can pick VALUE_SM, and the question
+    // "does a full layout fit" has a different answer for each.
+    static int32_t fullCellNeedPx(CardHeaderStyle style, const lv_font_t *hero = nullptr);
     static int32_t compactCellNeedPx();
 
     // How far an HDR_TAG pill rises above its card, in real pixels. The PAGE
@@ -316,6 +329,51 @@ protected:
     int32_t cellPx() const;              // the page-supplied cell height
     int32_t midHeight() const;
 
+    // THE CORNER ICON, one implementation for every layout. Milestone 2.7.
+    //
+    // It used to exist only on ValueCard, positioned by code of its own; a
+    // state card had none. cards.md section 11 wants one on every card, and
+    // two copies of "where exactly is the corner" is how the two layouts
+    // would drift apart - the same lesson HaValue.h records for parsing.
+    //
+    // makeCornerIcon() at build time, renderCornerIcon() on every render.
+    // Out of the flow, so it costs the vertical stack nothing.
+    lv_obj_t *makeCornerIcon(lv_obj_t *body);
+    void renderCornerIcon(lv_obj_t *icon, const char *glyph, uint32_t hex) const;
+
+    // Which face the corner icon draws in: SM, or MD on a large card. One
+    // place, so the rule is a change here and nowhere else. See Card.cpp.
+    const lv_font_t *cornerFont() const;
+
+    // Which face the hero VALUE draws in: VALUE, or VALUE_SM when the cell
+    // cannot seat a full layout at VALUE. Decided in resolveVariant(). #62.
+    const lv_font_t *valueFont() const;
+
+    // The card's short side in real pixels, from what the page handed over.
+    int32_t shortSidePx() const;
+
+    // The page-supplied cell width, or 0 if the page never said.
+    int32_t cellWidthPx() const { return _cellWPx; }
+
+    // THE HERO'S SIZE, shared by both layouts. Moved up from StateCard at 2.7
+    // round two so a value card can place its name exactly where a state
+    // card's goes - the owner has twice caught the two types disagreeing about
+    // where a name sits. heroIconFace() steps LG -> MD -> SM to fit the band;
+    // heroDiscPx() is the disc drawn behind it, never taller than the band.
+    const lv_font_t *heroIconFace() const;
+    int32_t heroDiscPx() const;
+
+    // COMPACT: how far to shift the name so it sits centred between the
+    // hero's bottom edge and the card's bottom edge - the owner's rule, from
+    // a photo where it sat "a little low". Returned as a translate, applied
+    // without disturbing the flex layout. 0 outside compact.
+    int32_t compactNameShiftPx() const;
+
+    // The surface's height and the body's top inset in real pixels - the
+    // geometry the two helpers above and StateCard's fill all work from.
+    int32_t surfaceHeightPx() const;
+    int32_t bodyTopPx() const;
+
 private:
     void buildHeader();
     void applyState();                 // repaint chrome for _state
@@ -384,7 +442,10 @@ private:
     CardState       _state       = CardState::ST_LIVE;
     uint32_t        _longStaleMs = 0;     // 0 = ask cardLongStaleMs()
     int32_t         _cellPx      = 0;     // set by CardPage::commit()
+    int32_t         _cellWPx     = 0;     // likewise; 0 = nobody said
+    bool            _valueSmall  = false; // resolveVariant(): hero at VALUE_SM
     TempUnit        _tempUnit    = TempUnit::TEMP_INHERIT;
+    CardLabel       _labelMode   = CardLabel::LBL_INHERIT;
     // NO _paused HERE. Issue #60 moved it onto Entity, because pausing is a
     // property of the thing and not of the view - the same reasoning that put
     // cmdFailed on the entity. Two cards on one switch used to be able to
