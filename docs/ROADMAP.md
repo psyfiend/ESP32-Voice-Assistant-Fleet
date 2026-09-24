@@ -644,45 +644,28 @@ The question was framed as "how many cards fit". It turned out to be the wrong q
 headroom, and widget access is frequent enough that PSRAM's slower access is a real cost. Revisit
 only if a future page genuinely fills the pool.
 
-### Ordering change, 2026-09-15 — Home Assistant comes before the rest of Phase 2
+### Running order — current as of 2026-09-24
 
-Agreed with the owner after 2.4 shipped, and it is worth recording because it contradicts the
-numbering above.
-
-**The binding constraint on this project is entity supply, not card features.** The panel can
-render more than it can be fed: eleven entities exist on the device, four of them from one deck
-sensor. Milestone 2.7's remaining half is literally "bind these card types to real HA entities" -
-and *which transport* decides what that binding looks like, so doing it over MQTT means
-hand-crafting topics that #43 exists to delete. The same argument applies to the build sheet:
-designing a format around the fields MQTT happens to carry is the mistake #43 undoes.
-
-So the running order is:
+The numbering above is identity, not sequence. What is actually next, agreed with the owner
+(2.5, #43, #44's websocket leg, 2.6 and 2.7 are done and no longer listed):
 
 | | | |
 |---|---|---|
-| 1 | **2.5 + the boot screen** | done - a usable page from a hand-written table |
-| 2 | **#43, HA over websocket** | the step that makes the panel worth owning |
-| 3 | **#44, outbound commands** | through the same client; display becomes interface |
-| 4 | **2.6 tileview, 2.8 slots** | worth doing once there are enough entities to need pages |
-| 5 | **3.1 + 3.3, the build sheet** | with a schema informed by what HA actually gives |
+| 1 | **#58, LVGL screenshots** | small and self-contained (`lv_snapshot` + PNG + the already-linked HTTP server). Lets a screen be judged from a real framebuffer instead of a photo, and is the capability page transitions and the page overview both need |
+| 2 | **2.10 card popup groundwork** (#65) | the long-press control surface for lights; full content at 4.4 |
+| 3 | **2.8 header slots** (#19) | before group cards, whose header IS the slot mechanism |
+| 4 | **2.11 group cards** (#66) | before 3.1, because the schema depends on how they are declared |
+| 5 | **3.1 schema** (#20) | |
 
-**Revised 2026-09-22, with the owner**, now that #43 and #44's websocket leg are done:
+Held for a measured need rather than a slot: **2.9, the display stack** - PPA and real frame
+buffering. Its first numbers are in the 2.9 row above; the 7B holding up far better than the P4_5
+on the same firmware points at the P4_5's software rotation.
 
-| | | |
-|---|---|---|
-| 1 | **2.7 card types** | in progress |
-| 2 | **2.6 horizontal swipes** | nearly there already, and an extension of recent work |
-| 3 | **2.10 card popup groundwork** | the control surface for lights; full content at 4.4 |
-| 4 | **2.8 header slots** | before group cards, whose header IS the slot mechanism |
-| 5 | **2.11 group cards** | before 3.1, because the schema depends on them |
-| 6 | **3.1 schema** | |
+2.9 is not reused as a number: it is struck through above with its history.
 
-2.9 is not reused: it is struck through above with its history, and a new meaning for the same
-number would muddy that.
-
-Two things pulled forward and one pushed back: screen dimming and brightness out of 4.1 (a wall
-panel at full brightness all night is a daily-use problem, not a settings feature); OTA (5.2)
-becomes urgent the moment a board is physically mounted; and 2.9 leaves the phase as above.
+Two things pulled forward from later phases: screen dimming and brightness out of 4.1 (a wall
+panel at full brightness all night is a daily-use problem, not a settings feature), and OTA (5.2),
+which becomes urgent the moment a board is physically mounted.
 
 ### What 2.5 delivered beyond its own scope
 
