@@ -256,6 +256,14 @@ silently. Nobody noticed because nothing looked broken; the owner only said Line
 Same family as the missing `EVENT_BUBBLE` below and the `OVERFLOW_VISIBLE` note after it. **When a
 visual token seems to do nothing, check what clips it before tuning its value.**
 
+**Never toggle HIDDEN on a screen-sized object at the start of an animation.** 2026-09-24. A
+transparent full-screen tap-away sheet was unhidden (and re-ordered) the moment a deck panel began
+to open. Unhiding invalidates the object's whole area - the whole screen - so every card and shadow
+redrew in the animation's first frame. LVGL animations are time-based, so the result was not
+"slower" but a stall followed by a rush: "a hesitation before the panel begins to accordion, then
+it hurries the animation along". Switching the sheet by `LV_OBJ_FLAG_CLICKABLE` instead costs no
+redraw, and `lv_obj_hit_test()` passes over a non-clickable object, so it is invisible to touch.
+
 ## LVGL, from milestone 2.4
 
 **An out-of-range grid row is a hard freeze, not a wrong layout.** `lv_conf.h` defines

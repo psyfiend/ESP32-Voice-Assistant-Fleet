@@ -12,7 +12,32 @@ does not appear in the source as suspect.
 
 ## Where the project is
 
-### NOW, 2026-09-23: 2.6 built on `feat/17-page-swipes`, 2.7 through round three on `feat/18-card-types`
+### NOW, 2026-09-24: 2.6 and 2.7 SIGNED OFF on glass and merged to `main`
+
+Every test in `docs/TEST_2.7.md` and `docs/TEST_2.6.md` passed on `CYD_S3_3248` and `WS_P4_5`;
+the 7B was flashed for the corner-icon check (#18). Issues #17, #18, #62, #63, #64 closed.
+What landed after the notes below, all on `feat/17-page-swipes`:
+
+- **Linen** is the light scheme and the owner likes it: a real drop shadow on cards and on all
+  floating chrome (toast, header, drawer, deck panels, tag pills, drawer buttons), via the
+  `PAINT_LIFT` / `PAINT_LIFT_SM` paints and `UI::unclipShadows()`. Schemes are Fleet, Midnight
+  (default), Linen.
+- **The shadow was never visible before 2026-09-23** - see LESSONS: overflow-visible clips to the
+  parent's coords PLUS the parent's own ext_draw_size, which a plain container does not have.
+- **Deck panels close on any tap outside them, like the drawer**; a sideways swipe with anything
+  open closes it instead of turning the page.
+- **Both tap-away scrims switch by CLICKABLE, never HIDDEN.** Unhiding a full-screen object
+  redraws the full screen in an animation's first frame - it made the P4_5's deck panels hesitate
+  then hurry. Do not reintroduce a HIDDEN toggle on anything screen-sized.
+- **FPS/CPU overlay**: swipe up from the bottom-right. Its CPU is LVGL's load only.
+- **Shadow corner cache on** (1 KB). Linen still costs frames; the owner's numbers are under
+  ROADMAP 2.9, which now has its first real measurements.
+
+**Next, per ROADMAP §7's running order: 2.10 (#65), long-press popup groundwork.** Then 2.8, 2.11,
+3.1. The three HA test entities (Avail / Reading / Refuse) are still on the Fleet page - remove
+them and the owner's three helpers when no longer wanted.
+
+### Earlier, 2026-09-23: 2.6 built on `feat/17-page-swipes`, 2.7 through round three on `feat/18-card-types`
 
 **Two branches, merge in this order: `feat/18-card-types`, then `feat/17-page-swipes`** (cut from
 18's tip, so it carries 2.7 round four too). Neither is merged; the owner has signed off 2.7's
