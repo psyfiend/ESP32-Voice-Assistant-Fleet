@@ -573,8 +573,10 @@ void GUIManager::begin() {
     lv_obj_set_size               (_dismissScrim, lv_pct(100), lv_pct(100));
     lv_obj_set_pos                (_dismissScrim, 0, 0);
     lv_obj_set_style_bg_opa       (_dismissScrim, LV_OPA_TRANSP, 0);
-    lv_obj_add_flag               (_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_flag               (_dismissScrim, LV_OBJ_FLAG_HIDDEN);
+    // Switched by CLICKABLE, not HIDDEN - unhiding a full-screen object
+    // redraws the full screen in the drawer's first animation frame. See the
+    // deck scrim below for the measurement that found it.
+    lv_obj_clear_flag             (_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(_dismissScrim, [](lv_event_t *ev) {
         (void)ev;
         if (s_self) s_self->_pnlSystem.close();
@@ -600,32 +602,38 @@ void GUIManager::begin() {
     lv_obj_set_size               (_deckScrim, lv_pct(100), lv_pct(100));
     lv_obj_set_pos                (_deckScrim, 0, 0);
     lv_obj_set_style_bg_opa       (_deckScrim, LV_OPA_TRANSP, 0);
-    lv_obj_add_flag               (_deckScrim, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_flag               (_deckScrim, LV_OBJ_FLAG_HIDDEN);
+    // lv_obj_create() makes an object clickable by default, and
+    // remove_style_all() does not touch flags - left alone, this sheet would
+    // swallow every tap on every card from boot.
+    lv_obj_clear_flag             (_deckScrim, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(_deckScrim, [](lv_event_t *ev) {
         (void)ev;
         UIToolkit::closeActiveAccordion();
     }, LV_EVENT_CLICKED, NULL);
+    // ALWAYS PRESENT, switched by CLICKABLE alone - never hidden, never moved.
+    //
+    // The first version unhid the scrim and re-ordered it on every open. Both
+    // invalidate the object's whole area, and this object IS the whole screen:
+    // every card and every shadow redrew in the first frame of the panel's
+    // animation. The owner saw exactly that - "the slightest hesitation before
+    // the panel begins to accordion, and then it hurries the animation along"
+    // - a stalled first frame on a time-based animation.
+    //
+    // A non-clickable object is passed over by the touch search
+    // (lv_obj_hit_test() returns false for it, lv_obj_pos.c), so a transparent
+    // sheet that is merely not clickable is invisible to touch AND costs no
+    // redraw to switch. Its z-order is set once per build, in buildDashboard().
     UIToolkit::registerAccordionChangeCb([](bool open) {
         if (!s_self || !s_self->_deckScrim) return;
-        if (open) {
-            lv_obj_clear_flag(s_self->_deckScrim, LV_OBJ_FLAG_HIDDEN);
-            // Scrim to the back, then the cards behind it: cards, scrim, and
-            // everything else (deck, drawer layer, header) above. Deterministic
-            // from any starting order - lv_obj_move_to_index(deck's index)
-            // lands ABOVE the deck when the scrim starts below it.
-            lv_obj_move_background(s_self->_deckScrim);
-            if (s_self->_dashHost) lv_obj_move_background(s_self->_dashHost);
-        } else {
-            lv_obj_add_flag(s_self->_deckScrim, LV_OBJ_FLAG_HIDDEN);
-        }
+        if (open) lv_obj_add_flag  (s_self->_deckScrim, LV_OBJ_FLAG_CLICKABLE);
+        else      lv_obj_clear_flag(s_self->_deckScrim, LV_OBJ_FLAG_CLICKABLE);
     });
 
     // System open -> hide touch window
     _pnlSystem.setOnToggleCallback([](bool isOpen) {
         if (s_self && s_self->_dismissScrim) {
-            if (isOpen) lv_obj_clear_flag(s_self->_dismissScrim, LV_OBJ_FLAG_HIDDEN);
-            else        lv_obj_add_flag  (s_self->_dismissScrim, LV_OBJ_FLAG_HIDDEN);
+            if (isOpen) lv_obj_add_flag  (s_self->_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
+            else        lv_obj_clear_flag(s_self->_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
         }
         // If System Panel is OPEN (true), Hide Touch Window (false)
         // pnlDisplay.setTouchWindowVisibility(!isOpen);
@@ -882,6 +890,14 @@ void GUIManager::buildDashboard() {
     // move_background() says what is actually meant and cannot rot when the
     // screen's child list changes again.
     lv_obj_move_background(_dashHost);
+
+    // The deck's tap-away scrim sits directly above the cards and below the
+    // deck, set HERE because a build is already a full redraw - see the scrim's
+    // creation for why it must never be re-ordered while a panel animates.
+    if (_deckScrim) {
+        lv_obj_move_background(_deckScrim);
+        lv_obj_move_background(_dashHost);
+    }
 
     if (_deck) {
         if (_showDeck) lv_obj_clear_flag(_deck, LV_OBJ_FLAG_HIDDEN);

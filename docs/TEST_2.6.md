@@ -98,10 +98,13 @@ Round-three results: L1-L3 PASS. Owner's perf readings, P4_5, before this round:
 
 **D1 — Tap away from a deck panel.** Open AUDIO. Tap a card: the panel closes and the card does NOT
 toggle. Tap the empty page: closes. Tap inside the panel, drag its slider: works, stays open.
+
 **D2 — Swipe with a panel open.** Open a deck panel, swipe sideways: the panel closes, the page does
 NOT change. Same with the drawer open. Swipe again: now the page turns.
+
 **D3 — The scrunch.** Should be impossible to reach now (D2), but if a page is ever built with a
 panel open, the grid keeps its normal height.
+
 **D4 — Linen speed.** Same readings as the table above, on Linen. The shadow corner cache is on; a
 page swipe and the drawer should be noticeably better. Expect Tag mode to gain least - each card's
 tag pill and card have different corner radii and evict each other from the one-entry cache - so
