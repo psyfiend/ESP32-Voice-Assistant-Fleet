@@ -23,6 +23,7 @@
 #include "Cards/CardBinder.h"
 #include "Cards/CardPage.h"
 #include "Cards/StateCard.h"   // StateCardFill, for the #50 Fill control
+#include "Cards/PageSpec.h"    // the pages, 2.6
 #include "UI/Panel_Header.h"
 #include "UI/Panel_Display.h"
 #include "UI/Panel_System.h"
@@ -59,6 +60,11 @@ public:
     void nudgeRows(int8_t steps);
     void toggleDeck();
 
+    // LVGL's FPS / CPU overlay, bottom-right. Swipe up from the bottom-right
+    // to toggle; the bottom-left keeps the deck. Hidden at boot. The CPU
+    // figure is LVGL's own load, not the chip's - see lv_conf.h.
+    void togglePerf();
+
     // Cycle the header treatment on the live dashboard: tag -> bar -> none.
     //
     // All three modes ship permanently - cards.md is explicit that picking one
@@ -94,6 +100,19 @@ public:
     void cycleLabel();     // name / state word / none under a state card's hero
     void toggleArea();     // area on every card, or not
     bool deckShown() const { return _showDeck; }
+
+    // --- Pages, milestone 2.6. docs/design/pages.md. -----------------------
+    //
+    // THE ONE WAY TO CHANGE PAGE. A swipe, and later a card link, a gesture
+    // target or the overview, all ask here; nothing else rebuilds a different
+    // page. NINA's navigation arbiter taught the rule: one owner of page
+    // changes, so two sources can never fight over which page is showing.
+    //
+    // `index` is a position in the swipe order, and it WRAPS - the owner:
+    // "with 10 pages, you need to swipe all the way back just to reach page 1?"
+    void goToPage(int16_t index);
+    void nextPage() { goToPage((int16_t)_curPage + 1); }
+    void prevPage() { goToPage((int16_t)_curPage - 1); }
 
     Panel_Header &header()      { return _header; }
     Panel_System &systemPanel() { return _pnlSystem; }
@@ -148,6 +167,7 @@ private:
     // It costs a row of cards on every board, which is a real trade rather
     // than a preference - see buildDashboard().
     bool          _showDeck = false;    // the cards get the height instead
+    bool          _showPerf = false;    // the FPS/CPU overlay
 
     // Overrides PageSpec::headerDefault. The spec is const; this is the live
     // choice laid over it in buildDashboard().
@@ -206,8 +226,46 @@ private:
     uint8_t         _colsOverride = 0;      // 0 = derive from TARGET_CARD_W
     uint8_t         _rowsOverride = 0;      // 0 = let the cards decide
 #endif
+    // WHAT EACH PAGE REMEMBERS. Every drawer knob except Deck and Hide Bar is
+    // PER PAGE - the owner, 2026-09-23: "the header and the deck are
+    // functional components of the dashboard in general so those should
+    // persist across pages", while density, colour, header mode, fill, area,
+    // label and grid belong to the page, because a page built for a fixed set
+    // of cards needs its own arrangement.
+    //
+    // The fields above (_hdr, _variant, _fill, _showArea, _colsOverride,
+    // _rowsOverride) remain the CURRENT page's working set, which is what every
+    // knob already edits. Changing page stores them here and loads the next
+    // page's - the smallest change that makes all the existing knobs per-page
+    // without touching any of them. In RAM only: the build sheet and the
+    // settings pages are what will make them persistent.
+    struct PageLive {
+        const PageSpec *spec;
+        CardHeaderStyle hdr;
+        CardVariant     variant;
+        StateCardFill   fill;
+        CardLabel       label;
+        bool            showArea;
+        uint8_t         cols;
+        uint8_t         rows;
+        uint8_t         scheme;     // UI::schemeIndex()
+    };
+    static constexpr uint8_t GUI_MAX_PAGES = 8;
+    PageLive  _pages[GUI_MAX_PAGES] = {};
+    uint8_t   _nPages  = 0;
+    uint8_t   _curPage = 0;
+
+    void initPages();                // the swipe order, with each page's defaults
+    void savePageState();            // working set -> _pages[_curPage]
+    void loadPageState();            // _pages[_curPage] -> working set, applied
+    void refreshKnobLabels();        // every drawer label from the working set
+
     lv_obj_t       *_hiddenBarTap = nullptr;
     lv_obj_t       *_dismissScrim = nullptr;
+    lv_obj_t       *_deckScrim    = nullptr;   // the deck's tap-away sheet
+    // The deck's height with every panel COLLAPSED, measured on the last
+    // build that had none open. See buildDashboard().
+    int32_t         _deckReserveCollapsed = 0;
     // Where the current press began. lv_indev_get_point() gives the CURRENT
     // point, which for a completed swipe is the far end of it - useless for
     // asking which edge it started from.

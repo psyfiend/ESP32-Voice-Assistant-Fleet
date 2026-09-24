@@ -58,7 +58,12 @@ void UIToolkit::init() {
     lv_obj_set_size             (toast_panel, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_align                (toast_panel, LV_ALIGN_TOP_MID, 0, sc(60)); 
     lv_obj_add_style            (toast_panel, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
+    lv_obj_add_style            (toast_panel, UI::paint(UIPaint::PAINT_LIFT), 0);
     lv_obj_set_style_radius     (toast_panel, sc(30), 0);
+    // A THICK BORDER, locally, overriding the paint's hairline. The owner:
+    // it "used to be much thicker which helped to immediately separate it
+    // from the rest of the screen content". Coloured at show time, below.
+    lv_obj_set_style_border_width(toast_panel, sc(3), 0);
     lv_obj_set_style_pad_all    (toast_panel, sc(15), 0);
     lv_obj_add_flag             (toast_panel, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag           (toast_panel, LV_OBJ_FLAG_CLICKABLE);
@@ -70,11 +75,52 @@ void UIToolkit::init() {
     lv_obj_set_style_text_font  (toast_label, Font_Hero, 0); // Use semantic font
 }
 
-void UIToolkit::show_toast(const char* text, uint32_t duration_ms) {
+void UIToolkit::show_toast(const char* text, uint32_t duration_ms, const char* widthOf) {
     if (!toast_panel || !toast_label) return;
 
     lv_label_set_text           (toast_label, text);
     lv_obj_clear_flag           (toast_panel, LV_OBJ_FLAG_HIDDEN);
+
+    // The border in the ACCENT, read now rather than at init so it follows
+    // the scheme - the toast is rebuilt by nothing, so this is its restyle.
+    lv_obj_set_style_border_color(toast_panel, UI::c(UI::pal().ACCENT), 0);
+
+    // FIXED WIDTH FOR A READOUT. A slider fires a toast per step, and a text
+    // that changes width re-centres every time - the owner: "the whole string
+    // rapidly shifts ... and it makes the borders on the sides dance around".
+    // Given a template of the WIDEST value it will show ("Brightness: 100%"),
+    // the label is sized to that once and its text left-aligned inside it, so
+    // neither the words nor the border move; only the digits change.
+    if (widthOf && widthOf[0]) {
+        lv_point_t sz;
+        lv_text_get_size(&sz, widthOf, Font_Hero, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+        lv_obj_set_width            (toast_label, sz.x + sc(4));
+        lv_obj_set_style_text_align (toast_label, LV_TEXT_ALIGN_LEFT, 0);
+    } else {
+        lv_obj_set_width            (toast_label, LV_SIZE_CONTENT);
+        lv_obj_set_style_text_align (toast_label, LV_TEXT_ALIGN_CENTER, 0);
+    }
+
+    // PLACED ON EVERY SHOW, from the display's own resolution.
+    //
+    // It used to be aligned once, in init(), and the owner found it in three
+    // different places on five boards: right-hand side on the 7B, half-way
+    // down on WS_S3_4B, correct elsewhere. The alignment was computed before
+    // the display's final (rotated) geometry was settled and never again.
+    // Measuring the toast AFTER its text is set and centring it by hand does
+    // not depend on when anything else was sized. Unverified on the two boards
+    // that showed it - 2026-09-23.
+    //
+    // TOP_LEFT, EXPLICITLY. The first version of this used lv_obj_set_pos(),
+    // but the panel still carried the TOP_MID alignment from init() - and in
+    // LVGL x/y are offsets FROM the alignment point, so "(dw - tw) / 2" was
+    // measured from the centre and put the toast hard against the right edge
+    // on every board. The owner saw exactly that at 2.6.
+    lv_obj_update_layout        (toast_panel);
+    const int32_t dw = lv_display_get_horizontal_resolution(NULL);
+    const int32_t tw = lv_obj_get_width(toast_panel);
+    lv_obj_align                (toast_panel, LV_ALIGN_TOP_LEFT, (dw - tw) / 2, sc(60));
+    lv_obj_move_foreground      (toast_panel);
     
     // Reset Timer
     if (toast_timer_handle) {
@@ -91,6 +137,16 @@ lv_obj_t* UIToolkit::getActiveAccordionPanel() {
 
 void UIToolkit::registerSystemCloseCb(UiActionCallback cb) {
     _system_close_cb = cb;
+}
+
+// Told whenever a deck panel opens or the last one closes - GUIManager uses it
+// to show and hide the dismiss scrim, the same rule the system drawer follows.
+static void (*_accordion_change_cb)(bool open) = NULL;
+void UIToolkit::registerAccordionChangeCb(void (*cb)(bool open)) {
+    _accordion_change_cb = cb;
+}
+static void notifyAccordion() {
+    if (_accordion_change_cb) _accordion_change_cb(_active_accordion_panel != NULL);
 }
 
 // --- Panel Animation ---
@@ -123,6 +179,7 @@ void UIToolkit::closeActiveAccordion() {
     if (_active_accordion_panel) {
         execute_panel_toggle(_active_accordion_panel, false);
         _active_accordion_panel = NULL;
+        notifyAccordion();
     }
 }
 
@@ -149,6 +206,7 @@ static void panel_header_click_cb(lv_event_t * e) {
             _active_accordion_panel = NULL;
         }
     }
+    notifyAccordion();
 }
 
 
@@ -160,6 +218,9 @@ lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* titl
     // A SHARED paint, not a local colour - #64. A local colour is set once and
     // never revisited, which is why these panels kept the old scheme.
     lv_obj_add_style            (pnl, UI::paint(UIPaint::PAINT_SURFACE), 0);
+    // Deck panels float like cards do on Linen. No unclip needed: the deck's
+    // own sc(10) padding is where this shadow lands, inside the deck's box.
+    lv_obj_add_style            (pnl, UI::paint(UIPaint::PAINT_LIFT), 0);
     lv_obj_set_style_radius     (pnl, sc(12), 0);   // border width: the paint's
     lv_obj_set_style_pad_all    (pnl, 0, 0); 
     lv_obj_set_style_pad_row    (pnl, sc(10), 0);   

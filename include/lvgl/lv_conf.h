@@ -246,7 +246,17 @@
         /** Allow buffering some shadow calculation.
          *  LV_DRAW_SW_SHADOW_CACHE_SIZE is the maximum shadow size to buffer, where shadow size is
          *  `shadow_width + radius`.  Caching has LV_DRAW_SW_SHADOW_CACHE_SIZE^2 RAM cost. */
-        #define LV_DRAW_SW_SHADOW_CACHE_SIZE 0
+        #define LV_DRAW_SW_SHADOW_CACHE_SIZE 32
+        /* ON since 2026-09-23, 32 (a 1 KB static buffer). Linen's shadows made
+         * the owner's panels visibly chunkier - page switches in single-digit
+         * FPS - and the expensive part of a software shadow is blurring its
+         * CORNER, which lv_draw_sw_box_shadow.c recomputes on every draw unless
+         * cached. The cache is keyed on (width + radius) and radius, NOT on the
+         * object's size, so every card sharing a radius and shadow width hits
+         * the same entry. 32 covers the largest on the fleet: WS_P4_5, 10 px
+         * blur + 20 px radius. It holds ONE entry, so objects with different
+         * radii drawn one after another - a tag pill then its card - evict
+         * each other; that is a limit of the stock cache, not a setting. */
 
         /** Set number of maximally-cached circle data.
          *  The circumference of 1/4 circle are saved for anti-aliasing.
@@ -868,8 +878,13 @@
     /** 0: Light mode; 1: Dark mode */
     #define LV_THEME_DEFAULT_DARK 0
 
-    /** 1: Enable grow on press */
-    #define LV_THEME_DEFAULT_GROW 1
+    /** 1: Enable grow on press
+     *
+     * OFF since 2026-09-23. A pressed button grew 3 px each way, and every
+     * button on this panel sits in a row that clips it - the owner saw the
+     * drawer's buttons with "the top and bottom edges cut off as if clipped"
+     * on every press. The theme's pressed darkening still gives feedback. */
+    #define LV_THEME_DEFAULT_GROW 0
 
     /** Default transition time in ms. */
     #define LV_THEME_DEFAULT_TRANSITION_TIME 80
@@ -1083,8 +1098,18 @@
 /** 1: Enable API to take snapshot for object */
 #define LV_USE_SNAPSHOT 0
 
-/** 1: Enable system monitor component */
-#define LV_USE_SYSMON   0
+/** 1: Enable system monitor component
+ *
+ * ON since 2026-09-23 for the FPS/CPU overlay the owner asked for, toggled by
+ * a swipe up from the bottom-right (GUIManager::togglePerf). LVGL creates it
+ * SHOWING when the display is made; GUIManager hides and pauses it at boot.
+ *
+ * What "CPU" means here, read from lv_os_none.c rather than assumed: with
+ * LV_OS_NONE, LV_SYSMON_GET_IDLE is lv_timer_get_idle() - the share of time
+ * LVGL's own timer handler spent idle. So it is LVGL's load, NOT the chip's:
+ * the websocket task, WiFi and everything else on the other core or between
+ * lv_timer_handler() calls are invisible to it. */
+#define LV_USE_SYSMON   1
 #if LV_USE_SYSMON
     /** Get the idle percentage. E.g. uint32_t my_get_idle(void); */
     #define LV_SYSMON_GET_IDLE lv_os_get_idle_percent
@@ -1098,8 +1123,10 @@
 
     /** 1: Show CPU usage and FPS count.
      *  - Requires `LV_USE_SYSMON = 1` */
-    #define LV_USE_PERF_MONITOR 0
+    #define LV_USE_PERF_MONITOR 1
     #if LV_USE_PERF_MONITOR
+        /* Bottom-right, where the swipe that toggles it starts. On the system
+         * layer, so it draws over the deck and the cards alike. */
         #define LV_USE_PERF_MONITOR_POS LV_ALIGN_BOTTOM_RIGHT
 
         /** 0: Displays performance data on the screen; 1: Prints performance data using log. */

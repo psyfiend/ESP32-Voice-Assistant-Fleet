@@ -41,8 +41,13 @@ void Panel_System::setOnToggleCallback  (ToggleCallback cb) {
 
 void Panel_System::anim_height_cb(void * var, int32_t v) {
     Panel_System* p = (Panel_System*)var;
-    if (!p || !p->_ui_root) return; 
+    if (!p || !p->_ui_root) return;
     lv_obj_set_height(p->_ui_root, v);
+    // HIDDEN AT ZERO, not merely zero-high. Since the drawer casts the
+    // scheme's shadow (Linen), a closed drawer would otherwise leave a thin
+    // shadow line under the header - the shadow of a zero-height box.
+    if (v <= 0) lv_obj_add_flag  (p->_ui_root, LV_OBJ_FLAG_HIDDEN);
+    else        lv_obj_clear_flag(p->_ui_root, LV_OBJ_FLAG_HIDDEN);
 }
 
 void Panel_System::btn_action_cb(lv_event_t* e) {
@@ -120,6 +125,9 @@ static lv_obj_t *makeRow(lv_obj_t *parent) {
     lv_obj_set_style_border_width (r, 0, 0);
     lv_obj_set_style_pad_gap      (r, UIToolkit::sc(8), 0);
     lv_obj_clear_flag             (r, LV_OBJ_FLAG_SCROLLABLE);
+    // The row is exactly its buttons' height, so it would clip their small
+    // Linen shadow - see UI::unclipShadows().
+    UI::unclipShadows(r);
     UI::tameScroll                (r);
     return r;
 }
@@ -134,6 +142,7 @@ static lv_obj_t *knobButton(lv_obj_t *parent, Panel_System *self,
     // Shared paints, so a scheme change repaints them - #64.
     // Border colour AND width come from the paint, so they follow the scheme.
     lv_obj_add_style              (b, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
+    lv_obj_add_style              (b, UI::paint(UIPaint::PAINT_LIFT_SM), 0);
 
     lv_obj_t *l = lv_label_create(b);
     lv_label_set_text             (l, text);
@@ -202,8 +211,17 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // Wrapper Style (Invisible, Clipping)
     lv_obj_set_style_bg_opa         (_ui_root, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width   (_ui_root, 0, 0);
-    lv_obj_set_style_pad_all        (_ui_root, 0, 0); 
-    lv_obj_set_style_radius         (_ui_root, 0, 0);
+    lv_obj_set_style_pad_all        (_ui_root, 0, 0);
+    // THE DRAWER'S SHADOW IS THE WRAPPER'S, not the content's. The wrapper
+    // must clip - it is what reveals the content as it grows - so a shadow on
+    // the content would be cut off at the wrapper's edge. A shadow on the
+    // wrapper itself is drawn by the wrapper, outside its own box, and grows
+    // with the reveal. The radius exists only to shape that shadow: the
+    // wrapper draws no background and radius without clip_corner clips
+    // nothing, so this costs no layer. Zero on schemes without shadows.
+    lv_obj_set_style_radius         (_ui_root, UIToolkit::sc(15), 0);
+    lv_obj_add_style                (_ui_root, UI::paint(UIPaint::PAINT_LIFT), 0);
+    lv_obj_add_flag                 (_ui_root, LV_OBJ_FLAG_HIDDEN);   // closed
     lv_obj_set_scrollbar_mode       (_ui_root, LV_SCROLLBAR_MODE_OFF);
     // clip_corner was set here and has been REMOVED. It did nothing - this
     // object's radius is 0, and clip_corner only masks a radius - but it is
@@ -323,6 +341,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
                                         if (self) self->requestTokens();
                                      }, LV_EVENT_CLICKED, this);
     lv_obj_add_style                (btnRef, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
+    lv_obj_add_style                (btnRef, UI::paint(UIPaint::PAINT_LIFT_SM), 0);
 
     lv_obj_t* lblRef = lv_label_create(btnRef);
     lv_label_set_text               (lblRef, "Tokens");
@@ -340,6 +359,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
                                         if (self) self->requestLog();
                                      }, LV_EVENT_CLICKED, this);
     lv_obj_add_style                (btnLog, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
+    lv_obj_add_style                (btnLog, UI::paint(UIPaint::PAINT_LIFT_SM), 0);
     lv_obj_t* lblLog = lv_label_create(btnLog);
     lv_label_set_text               (lblLog, "Log");
     lv_obj_center                   (lblLog);
@@ -362,6 +382,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
                                         if (self) self->requestCards();
                                      }, LV_EVENT_CLICKED, this);
     lv_obj_add_style                (btnCards, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
+    lv_obj_add_style                (btnCards, UI::paint(UIPaint::PAINT_LIFT_SM), 0);
 
     lv_obj_t* lblCards = lv_label_create(btnCards);
     lv_label_set_text               (lblCards, "Cards");
@@ -550,7 +571,15 @@ void Panel_System::toggle() {
     _expanded = !_expanded;
     if (_onToggle) _onToggle(_expanded);
     if (_expanded) UIToolkit::closeActiveAccordion();
-    
+
+    // Unhidden BEFORE measuring: contentHeight() reads the laid-out content,
+    // and a hidden subtree is not something to trust a measurement from.
+    // anim_height_cb() hides it again when a close reaches zero.
+    if (_expanded) {
+        lv_obj_clear_flag(_ui_root, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_update_layout(_ui_root);
+    }
+
     int32_t start_h = lv_obj_get_height(_ui_root);
     int32_t end_h   = _expanded ? contentHeight() : 0;
 

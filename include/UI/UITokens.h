@@ -82,6 +82,7 @@ struct UIMetrics {
     // a DROP shadow, which is what makes a card read as lifted off the page -
     // the owner's "it looks too flat" on Linen, 2026-09-23.
     uint8_t SHADOW_Y;
+    uint8_t SHADOW_OPA;     // 0-255
 };
 
 // ---------------------------------------------------------------------------
@@ -183,6 +184,13 @@ enum class UIPaint : uint8_t {
     PAINT_TEXT_DIM,      // text TEXT_DIM
     PAINT_ACCENT_TEXT,   // text ACCENT                         - panel titles
     PAINT_ACCENT_BG,     // bg ACCENT
+    // SHADOW ONLY - no colour of their own. The scheme's drop shadow, for the
+    // chrome that should sit above the page like the cards do: toast, header,
+    // drawer, deck panels, card tags. LIFT_SM is a smaller one for buttons.
+    // Both are nothing at all on a scheme whose metrics have SHADOW 0, which
+    // today is every scheme but Linen. The owner, 2026-09-23.
+    PAINT_LIFT,
+    PAINT_LIFT_SM,
     PAINT_COUNT
 };
 
@@ -210,6 +218,11 @@ void setScheme(const UIPalette &p, const UIMetrics &m);
 // The next scheme in the knob's order - Fleet, Midnight, Linen - with its
 // metrics. Every scheme button calls this; the order lives in UITokens.cpp.
 void cycleScheme();
+// The active scheme as a position in that order, and back. Pages remember
+// their own scheme since 2.6 (the owner: colour is per page), and an index is
+// what a page can hold without knowing what a scheme is.
+uint8_t schemeIndex();
+void    setSchemeIndex(uint8_t i);
 void setAccent(uint32_t hex);
 void setTargetCardWidth(uint16_t logicalPx);
 
@@ -272,6 +285,17 @@ uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b);
 // this way must not also call lv_obj_set_style_*_color for the same property.
 // The roles are UIPaint, declared above the namespace with the other types.
 lv_style_t *paint(UIPaint p);
+
+// LET A CONTAINER'S CHILDREN CAST SHADOWS OUTSIDE IT.
+//
+// LVGL clips children to their parent. LV_OBJ_FLAG_OVERFLOW_VISIBLE relaxes
+// that - but only to the parent's coords PLUS THE PARENT'S OWN ext_draw_size
+// (lv_refr.c, lv_obj_redraw), and a plain container's is zero. That is why the
+// card shadow showed only inside the rounded corners until the wrapper
+// declared a margin. This does both halves, with a margin sized from the
+// largest shadow any scheme draws - a fixed number, so a scheme change never
+// leaves a container with a margin computed for the previous one.
+void unclipShadows(lv_obj_t *container);
 
 // Silences the `lv_part_t | lv_state_t` deprecation warning that would
 // otherwise be reproduced in every card type. Issue #13 asked for this.

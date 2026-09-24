@@ -615,12 +615,12 @@ and everything in Phases 4 through 6.
 | 2.3 | Memory budget spike | **DONE 2026-09-10, measured on `CYD_S3_3248`.** ~715 B per card in `lv_mem`; pool steady at 35% with dashboard + reference page. **Decision: neither lazy-loading nor a PSRAM `LV_MEM` is needed** - see below. No longer gates 2.5 |
 | 2.4 | `Card` base class | **DONE 2026-09-15, hardware-verified on `WS_P4_5`, `CYD_S3_3248` and `WS_P4_7B`.** `Card` base + `ValueCard`/`StateCard` layouts + five domain types behind `CardCatalog`; `CardBinder` (the first caller of `drainDirty()` in the project's history); `CardPage` with spans. Type scale and MDI icon subset both generated per board. `src/UI/` and `src/Cards/` introduced. Layout model and every trap behind it written up in `docs/design/card-layout.md` — **read that before moving anything on a card** |
 | 2.5 | Page + grid engine | **DONE 2026-09-18, merged and tagged `v0.2.5`.** A page renders from a `PageSpec`; sub-grid units per Q3b; explicit unit placement with a validator that reports rather than resolves; priority degradation that drops the lowest-priority card and re-plans. The dashboard is the BOOT SCREEN. Row count comes from the CARDS, not from geometry. Confirmed on five panels. The acceptance instrumentation (the "Obeys"/"Ignores" pins and the 3-unit lamp spans) was removed from `Dashboard_Fleet.h` on 2026-09-19 once signed off - the mechanisms are untouched and the group card still exercises the sub-grid. Design: `docs/design/dashboard.md`
-| 2.6 | Tileview navigation | **VERTICAL SWIPES DONE and merged 2026-09-19 (`7d723be`)**, verified on glass across four boards - down-right opens the drawer, down-left the log, up shows the deck, a hidden header peeks for 3 s before a second swipe commits, tap dismisses. Edge-gated, and the swipe DISTANCE is `sc(50)` so it is the same physical gesture on every panel rather than LVGL's 50 *physical* px. **What remains: horizontal swipes between pages, page indicator dots, and the gesture-conflict work in section 5.2.** Nothing technical is blocking it - `PageSpec` already carries `id`/`slug`, `HA_PAGE` is already id 2, and the card engine does not care how many pages exist. The memory ceiling section 5.2 warns about was measured at 2.3 and is softer than it looks: ~715 B per card, so five pages is roughly 52 KB against a 128 KB pool. The owner asked for this directly on 2026-09-21 - he wants more entities on the bigger screens, and an either/or build flag is the stand-in until it lands. See the gesture notes in `GUIManager.cpp` |
-| 2.7 | First 4 card types | **IN PROGRESS on `feat/18-card-types`, 2026-09-22 — built and flashed to `CYD_S3_3248` and `WS_P4_5`, awaiting glass.** Decisions in `cards.md` §13. Delivered so far: HA's live icon, brightness and `rgb_color` read into `EntityAttrs`; corner icon (our table) vs hero icon (user pair -> user icon -> HA live -> our pair) on every card; ONE `binary_sensor` card driven by a `device_class` table instead of a `door` class; a name/state/none label setting; light brightness as a bottom-up fill and the light's colour in the disc; card-size hero and corner faces (#62); #63 and #64 fixed. What follows is the milestone as it was scoped: `sensor`, `binary_sensor`, `switch`, `button` — bound to real HA entities. **UNBLOCKED and now the next milestone, 2026-09-22.** #43 put the owner's 18 real entities on glass on four boards, so every item below has evidence behind it rather than being theoretical: a `door` type (both garage sensors report `device_class: garage_door` and render as generic binary sensors); `LightCard` learning brightness and colour (`light.office` is a group with `['color_temp','xy']`, `light.dining_room_light` is `['brightness']`); the corner-icon/hero split; consuming HA's live `attributes.icon`, whose glyphs are in the font now and which nothing reads. Plus #62 (scale the hero font to the CARD, not just the board), #63 and #64. `Entity::lastChangeMs` (#57) exists for "open for 40 minutes" and has no caller. See `docs/design/dashboard-target-7b.md` |
+| 2.6 | Tileview navigation | **DONE 2026-09-24, signed off on glass and merged** (`feat/17-page-swipes`, #17): two pages on every board (House, Fleet), horizontal swipes from anywhere with wrap-around, per-page settings for every knob except Deck and Hide Bar, page title and dots in the header, a page toast. Design: `docs/design/pages.md`; tests: `docs/TEST_2.6.md`. Not built by decision: card -> page links (2.10), the overview and slide transitions (need snapshots, #58). Earlier history follows. **VERTICAL SWIPES DONE and merged 2026-09-19 (`7d723be`)**, verified on glass across four boards - down-right opens the drawer, down-left the log, up shows the deck, a hidden header peeks for 3 s before a second swipe commits, tap dismisses. Edge-gated, and the swipe DISTANCE is `sc(50)` so it is the same physical gesture on every panel rather than LVGL's 50 *physical* px. **What remains: horizontal swipes between pages, page indicator dots, and the gesture-conflict work in section 5.2.** Nothing technical is blocking it - `PageSpec` already carries `id`/`slug`, `HA_PAGE` is already id 2, and the card engine does not care how many pages exist. The memory ceiling section 5.2 warns about was measured at 2.3 and is softer than it looks: ~715 B per card, so five pages is roughly 52 KB against a 128 KB pool. The owner asked for this directly on 2026-09-21 - he wants more entities on the bigger screens, and an either/or build flag is the stand-in until it lands. See the gesture notes in `GUIManager.cpp` |
+| 2.7 | First 4 card types | **DONE 2026-09-24, signed off on glass and merged** (`feat/18-card-types`, rounds four and five on `feat/17-page-swipes`; #18, #62, #63, #64). Tests: `docs/TEST_2.7.md`. The history of how it got there follows. **Was IN PROGRESS on `feat/18-card-types`, 2026-09-22 — built and flashed to `CYD_S3_3248` and `WS_P4_5`, awaiting glass.** Decisions in `cards.md` §13. Delivered so far: HA's live icon, brightness and `rgb_color` read into `EntityAttrs`; corner icon (our table) vs hero icon (user pair -> user icon -> HA live -> our pair) on every card; ONE `binary_sensor` card driven by a `device_class` table instead of a `door` class; a name/state/none label setting; light brightness as a bottom-up fill and the light's colour in the disc; card-size hero and corner faces (#62); #63 and #64 fixed. What follows is the milestone as it was scoped: `sensor`, `binary_sensor`, `switch`, `button` — bound to real HA entities. **UNBLOCKED and now the next milestone, 2026-09-22.** #43 put the owner's 18 real entities on glass on four boards, so every item below has evidence behind it rather than being theoretical: a `door` type (both garage sensors report `device_class: garage_door` and render as generic binary sensors); `LightCard` learning brightness and colour (`light.office` is a group with `['color_temp','xy']`, `light.dining_room_light` is `['brightness']`); the corner-icon/hero split; consuming HA's live `attributes.icon`, whose glyphs are in the font now and which nothing reads. Plus #62 (scale the hero font to the CARD, not just the board), #63 and #64. `Entity::lastChangeMs` (#57) exists for "open for 40 minutes" and has no caller. See `docs/design/dashboard-target-7b.md` |
 | 2.8 | Header bar v2 | Configurable slot list: clock, WiFi/MQTT status, optional sensor slots. **Build the slot mechanism ONCE and use it three times** — `cards.md` §8: the page header, a group card's header, and a normal card's header are the same idea at different sizes, and a card's is the degenerate two-slot case (area left, STALE right) that 2.4 hardcoded. If 2.8 builds a general named-slot list rather than the page header specifically, the group card gets its header free and the build sheet gets one grammar for all three |
 | 2.10 | Card popup groundwork | **#65. Added 2026-09-22 (owner).** A long press opens a per-card sheet mirroring HA's own entity dialog: for a light, brightness and colour-temperature sliders and a colour picker; for everything, the card's settings and details. Tap stays a one-touch toggle - the owner explicitly rejected two taps to switch a light. Pause moves into the sheet. Needs an overlay, the sliders and picker, and outbound `call_service` with data (brightness, colour) on #44's websocket leg. **Groundwork only**: the full per-type content arrives at 4.4 with the deck/context panels. After 2.6 in the running order |
 | 2.11 | Group cards | **#66. Added 2026-09-22 (owner).** `cards.md` §4's group/room card: several primaries of different kinds in one multi-cell card, each individually interactive, with its own header of promoted values. Distinct from an aggregate light like HA's `light.office` group, which is ONE entity. A group card's long press does something different from a normal card's. Needs 2.8's slot mechanism for its header, and must land before 3.1 because the schema depends on how these cards are declared |
-| ~~2.9~~ | ~~Display stack: Arduino_GFX -> `esp_lcd`~~ | **MOVED OUT OF PHASE 2, 2026-09-15 (owner approved).** It is the largest remaining item in the phase and produces nothing visible on a wall. Now gated on a MEASURED need - a rotation actually required, tearing that can be seen, or an fps number that cannot be lived with - rather than on a schedule slot. See Phase 6 and `docs/research/display-stack-migration.md` |
+| ~~2.9~~ | ~~Display stack: Arduino_GFX -> `esp_lcd`~~ | **MOVED OUT OF PHASE 2, 2026-09-15 (owner approved).** It is the largest remaining item in the phase and produces nothing visible on a wall. Now gated on a MEASURED need - a rotation actually required, tearing that can be seen, or an fps number that cannot be lived with - rather than on a schedule slot. See Phase 6 and `docs/research/display-stack-migration.md`. **FIRST MEASUREMENTS, 2026-09-23**, from LVGL's perf overlay (swipe up, bottom-right), owner on `WS_P4_5`: idle ~30 FPS; the system drawer animating drops to the **teens on Midnight** and **~7 on Linen**, LVGL CPU 50-90%; a page swipe on Linen single digits with a ~1.5 s pause. `CYD_S3_3248` idles at ~50-60 ms per frame. Shadow-corner caching went in the same day - re-measure before deciding. Candidates when taken up: LVGL 9.5's PPA draw unit (`LV_USE_PPA`, off), double-buffered DSI, and not redrawing whole panels during an animation |
 
 **What 2.3 actually found, and why the decision went the way it did.**
 
@@ -644,45 +644,28 @@ The question was framed as "how many cards fit". It turned out to be the wrong q
 headroom, and widget access is frequent enough that PSRAM's slower access is a real cost. Revisit
 only if a future page genuinely fills the pool.
 
-### Ordering change, 2026-09-15 — Home Assistant comes before the rest of Phase 2
+### Running order — current as of 2026-09-24
 
-Agreed with the owner after 2.4 shipped, and it is worth recording because it contradicts the
-numbering above.
-
-**The binding constraint on this project is entity supply, not card features.** The panel can
-render more than it can be fed: eleven entities exist on the device, four of them from one deck
-sensor. Milestone 2.7's remaining half is literally "bind these card types to real HA entities" -
-and *which transport* decides what that binding looks like, so doing it over MQTT means
-hand-crafting topics that #43 exists to delete. The same argument applies to the build sheet:
-designing a format around the fields MQTT happens to carry is the mistake #43 undoes.
-
-So the running order is:
+The numbering above is identity, not sequence. What is actually next, agreed with the owner
+(2.5, #43, #44's websocket leg, 2.6 and 2.7 are done and no longer listed):
 
 | | | |
 |---|---|---|
-| 1 | **2.5 + the boot screen** | done - a usable page from a hand-written table |
-| 2 | **#43, HA over websocket** | the step that makes the panel worth owning |
-| 3 | **#44, outbound commands** | through the same client; display becomes interface |
-| 4 | **2.6 tileview, 2.8 slots** | worth doing once there are enough entities to need pages |
-| 5 | **3.1 + 3.3, the build sheet** | with a schema informed by what HA actually gives |
+| 1 | **#58, LVGL screenshots** | small and self-contained (`lv_snapshot` + PNG + the already-linked HTTP server). Lets a screen be judged from a real framebuffer instead of a photo, and is the capability page transitions and the page overview both need |
+| 2 | **2.10 card popup groundwork** (#65) | the long-press control surface for lights; full content at 4.4 |
+| 3 | **2.8 header slots** (#19) | before group cards, whose header IS the slot mechanism |
+| 4 | **2.11 group cards** (#66) | before 3.1, because the schema depends on how they are declared |
+| 5 | **3.1 schema** (#20) | |
 
-**Revised 2026-09-22, with the owner**, now that #43 and #44's websocket leg are done:
+Held for a measured need rather than a slot: **2.9, the display stack** - PPA and real frame
+buffering. Its first numbers are in the 2.9 row above; the 7B holding up far better than the P4_5
+on the same firmware points at the P4_5's software rotation.
 
-| | | |
-|---|---|---|
-| 1 | **2.7 card types** | in progress |
-| 2 | **2.6 horizontal swipes** | nearly there already, and an extension of recent work |
-| 3 | **2.10 card popup groundwork** | the control surface for lights; full content at 4.4 |
-| 4 | **2.8 header slots** | before group cards, whose header IS the slot mechanism |
-| 5 | **2.11 group cards** | before 3.1, because the schema depends on them |
-| 6 | **3.1 schema** | |
+2.9 is not reused as a number: it is struck through above with its history.
 
-2.9 is not reused: it is struck through above with its history, and a new meaning for the same
-number would muddy that.
-
-Two things pulled forward and one pushed back: screen dimming and brightness out of 4.1 (a wall
-panel at full brightness all night is a daily-use problem, not a settings feature); OTA (5.2)
-becomes urgent the moment a board is physically mounted; and 2.9 leaves the phase as above.
+Two things pulled forward from later phases: screen dimming and brightness out of 4.1 (a wall
+panel at full brightness all night is a daily-use problem, not a settings feature), and OTA (5.2),
+which becomes urgent the moment a board is physically mounted.
 
 ### What 2.5 delivered beyond its own scope
 

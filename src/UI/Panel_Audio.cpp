@@ -55,8 +55,11 @@ void Panel_Audio::slider_vol_cb(lv_event_t * e) {
     p->_audio.setVolume(val);
     
     char buf[32];
-    snprintf(buf, sizeof(buf), "Vol: %d%%", (int)val);
-    UIToolkit::show_toast(buf, 800);
+    // "Volume", not "Vol" - nothing else was abbreviated, least of all the
+    // much longer "Brightness". Fixed width so it does not jitter while the
+    // slider moves; see show_toast().
+    snprintf(buf, sizeof(buf), "Volume: %d%%", (int)val);
+    UIToolkit::show_toast(buf, 800, "Volume: 100%");
 }
 
 void Panel_Audio::btn_tone_cb(lv_event_t * e) {

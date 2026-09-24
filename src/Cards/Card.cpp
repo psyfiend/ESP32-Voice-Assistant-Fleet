@@ -294,7 +294,16 @@ void Card::build(lv_obj_t *parent) {
     // ever shown one, whatever the metrics asked for. Overflow-visible costs no
     // layer: it REMOVES a clip rather than adding one. The page's gaps and
     // inset are where the shadows land.
-    lv_obj_add_flag               (_root, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    //
+    // AND THE FLAG ALONE IS NOT ENOUGH - round three shipped with only the
+    // flag, and the owner saw shadow only in the rounded corners, "like mud
+    // hanging off the corners", cut off sharply at the card's edge. LVGL 9.5's
+    // lv_obj_redraw() (lv_refr.c) clips an overflow-visible object's children
+    // to its coords PLUS ITS OWN ext_draw_size - and a transparent wrapper has
+    // none. So the wrapper declares one, big enough for its surface's shadow -
+    // UI::unclipShadows(), shared with every other container that lets a
+    // child's shadow out (the drawer's button rows, the tag row below).
+    UI::unclipShadows(_root);
 
     if (_hdrStyle == CardHeaderStyle::HDR_TAG) {
         _tagRow = lv_obj_create(_root);
@@ -305,6 +314,9 @@ void Card::build(lv_obj_t *parent) {
         lv_obj_set_style_pad_all      (_tagRow, 0, 0);
         lv_obj_clear_flag             (_tagRow, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_clear_flag             (_tagRow, LV_OBJ_FLAG_CLICKABLE);
+        // The area and STALE pills cast the scheme's shadow (Linen), and the
+        // row they sit in is exactly their height - so it must not clip them.
+        UI::unclipShadows(_tagRow);
     }
 
     _surface = lv_obj_create(_root);
@@ -418,6 +430,12 @@ void Card::buildHeader() {
         _stale = makeStrip(_tagRow);
         lv_obj_set_width (_stale, LV_SIZE_CONTENT);
         lv_obj_align     (_stale, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+
+        // Both pills float above the page like the card does, so they cast
+        // the same shadow - nothing on a scheme without one. The owner's
+        // Linen request, 2026-09-23.
+        lv_obj_add_style (_header, UI::paint(UIPaint::PAINT_LIFT), 0);
+        lv_obj_add_style (_stale,  UI::paint(UIPaint::PAINT_LIFT), 0);
     } else {
         lv_obj_set_width (_header, lv_pct(100));
         lv_obj_align     (_header, LV_ALIGN_TOP_MID, 0, 0);
@@ -459,7 +477,7 @@ void Card::restyle() {
     lv_obj_set_style_border_color (_surface, UI::border(), 0);
     lv_obj_set_style_shadow_width   (_surface, UI::sc(m.SHADOW), 0);
     lv_obj_set_style_shadow_offset_y(_surface, UI::sc(m.SHADOW_Y), 0);
-    lv_obj_set_style_shadow_opa     (_surface, m.SHADOW ? LV_OPA_30 : LV_OPA_TRANSP, 0);
+    lv_obj_set_style_shadow_opa     (_surface, m.SHADOW ? (lv_opa_t)m.SHADOW_OPA : LV_OPA_TRANSP, 0);
 
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
     // BAR ONLY. This said "not TAG", which also reserved a header's height in
@@ -646,30 +664,37 @@ lv_obj_t *Card::makeCornerIcon(lv_obj_t *body) {
     return o;
 }
 
-// THE CORNER ICON SCALES WITH THE CARD, not only with the board. 2.7.
+// THE CORNER ICON SCALES WITH THE PAGE, by ROW COUNT. 2.7 round four.
 //
-// The owner: it "looks tiny on the 7B". Every face in the type scale is sized
-// in millimetres, which keeps text the same physical size fleet-wide - right
-// for text, wrong for a mark whose job is to be in proportion to the tile it
-// labels. A 25 mm card and a 15 mm card wore the same 2.66 mm glyph.
+// The first rule aimed at ~15% of the card's short side. On glass it failed
+// the owner's test in the wrong direction: on the 7B at 6x3 the icons were
+// small with both the header and the deck showing, jumped up when either was
+// hidden, and shrank again at a 7th column. His rule, 2026-09-23, and it is
+// simpler and describes what he actually sees:
 //
-// So: the corner aims at ~15% of the card's SHORT side, and takes whichever of
-// the two faces is nearer - SM (2.66 mm) or MD (3.50 mm). The crossover is a
-// short side of about 20.5 mm. Measured against today's default grids that
-// puts WS_P4_7B and CYD_P4_1060 (~25 mm cells) on MD and every other board on
-// SM, which is what the owner described. A starting ratio, not a measured
-// optimum - the glass decides.
-static constexpr float CORNER_RATIO = 0.15f;
-static constexpr float CORNER_SM_MM = 2.66f;   // gen_icon_font.py SIZES_MM
-static constexpr float CORNER_MD_MM = 3.50f;
+//   "the larger icons should remain if there are 3 or fewer rows no matter
+//    the columns. It's only when you add a 4th row that the hero moves up
+//    towards the icon which requires the smaller icon size."
+//
+// Round five: rows alone gave the P4_5 the large corner too, and there it ran
+// into text ("I don't think the P4_5 needs the larger icons like the 7B did").
+// A row count is not a size - three rows on a 5-inch panel are much shorter
+// cards than three rows on a 7-inch one. What the owner was describing on the
+// 7B is PHYSICAL card height, and what varies with columns (the width) is
+// what he said should not matter.
+//
+// So: MD when the card is at least CORNER_MD_MIN_MM tall, in millimetres on
+// glass, whatever the columns. At the default grids that puts the 7B's
+// three-row cards (~20-23 mm, deck and header or not) on MD and its four-row
+// cards (~15 mm) on SM, and keeps WS_P4_5 (~16 mm) on SM. The 4-inch pair
+// land near 19 mm and get MD - unjudged on glass.
+static constexpr float CORNER_MD_MIN_MM = 17.5f;
 
 const lv_font_t *Card::cornerFont() const {
     const float ppi = (float)bspPixelDensity();
     if (ppi <= 0.f) return UI::type().ICON_SM;
-    const float shortMm = (float)shortSidePx() * 25.4f / ppi;
-    const float want    = shortMm * CORNER_RATIO;
-    return (want >= (CORNER_SM_MM + CORNER_MD_MM) * 0.5f) ? UI::type().ICON_MD
-                                                          : UI::type().ICON_SM;
+    const float hMm = (float)surfaceHeightPx() * 25.4f / ppi;
+    return (hMm >= CORNER_MD_MIN_MM) ? UI::type().ICON_MD : UI::type().ICON_SM;
 }
 
 void Card::renderCornerIcon(lv_obj_t *icon, const char *glyph, uint32_t hex) const {
@@ -843,14 +868,18 @@ void Card::applyDiagonal() {
         lv_obj_clear_flag(_diagonal, LV_OBJ_FLAG_CLICKABLE);
     }
 
-    // Sized from the TOKENS rather than by measuring, for the same reason
-    // resolveVariant() is: a card has no cell when this first runs, and
-    // lv_obj_update_layout() here walked the whole screen once per card per
-    // repaint. The line is redrawn on the next restyle anyway.
-    const UIGrid &g = UI::grid();
-    int32_t w = (int32_t)g.cellW * (_place.prefSpanX ? _place.prefSpanX : 1);
-    int32_t h = (int32_t)g.cellH * (_place.prefSpanY ? _place.prefSpanY : 1);
-    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+    // Sized from what the PAGE handed over, not by measuring: a card has no
+    // laid-out size when this first runs, and lv_obj_update_layout() here
+    // walked the whole screen once per card per repaint.
+    //
+    // The fallback used to be UI::grid().cellW x prefSpanX - which has been
+    // WRONG since 2.5 made spans UNITS: a one-cell card is prefSpan 2, so the
+    // line was drawn for a card twice the size. It only looked right because
+    // a later restyle, with the card laid out, read the real size instead. The
+    // owner caught it at 2.6: reboot with a card already N/A, swipe to it, and
+    // the diagonal was in the wrong place until a knob forced a restyle.
+    int32_t w = cellWidthPx() > 0 ? cellWidthPx() : (int32_t)UI::grid().cellW;
+    int32_t h = surfaceHeightPx();
     const int32_t mw = lv_obj_get_width(_surface);
     const int32_t mh = lv_obj_get_height(_surface);
     if (mw > 8) w = mw;

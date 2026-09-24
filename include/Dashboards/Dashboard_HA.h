@@ -12,13 +12,10 @@
 // spec; ExternalEntities_HA.h is the entity half of the transcription and this
 // is the layout half. If any of the three disagree, the DOC wins.
 //
-// Selected with -D USE_HA_DASHBOARD. Off by default, and deliberately so: it
-// REPLACES the fleet page rather than joining it, because until 2.6's
-// horizontal swipes land a board can only show one page, and 18 + 12 cards do
-// not fit anywhere. Enabled on CYD_S3_3248W535 only, which is the board being
-// used to test #43.
-//
-// When 2.6 arrives this stops being an either/or and becomes page 2.
+// PAGE 1 OF THE SWIPE ORDER on every board since 2.6 - House first, then
+// Fleet (GUIManager::initPages()). It used to REPLACE the fleet page under
+// -D USE_HA_DASHBOARD, because a board could only show one page; that flag is
+// gone. Its id stays 2: ids are frozen identities, order is a separate list.
 //
 //
 // PRIORITY IS THE COLUMN THAT MATTERS, AND THE RULE IS THE SAME ONE

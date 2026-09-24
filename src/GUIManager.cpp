@@ -7,9 +7,7 @@
 #include "UI/ReferencePage.h"
 #include "UI/LogPage.h"
 #include "Dashboards/Dashboard_Fleet.h"
-#ifdef USE_HA_DASHBOARD
-#include "Dashboards/Dashboard_HA.h"
-#endif
+#include "Dashboards/Dashboard_HA.h"   // both pages on every board since 2.6
 #include "bsp_loader.h"
 
 // LVGL's event and callback APIs take plain function pointers with no user
@@ -315,15 +313,42 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
             // three seconds. The owner asked for it and it is the right
             // symmetry: the gesture that brought it down should take it back.
             s_self->unpeekHeader();
+        } else if (rightHalf) {
+            // RIGHT half: the FPS/CPU overlay, which sits in that corner. The
+            // owner's split, 2026-09-23 - the mirror of the top edge, where the
+            // two halves already open different things.
+            s_self->togglePerf();
         } else {
             s_self->toggleDeck();
         }
         break;
 
+    case LV_DIR_LEFT:                        // swipe LEFT  -> next page
+    case LV_DIR_RIGHT:                       // swipe RIGHT -> previous page
+        // FROM ANYWHERE on the page - no edge band. That is the convention on
+        // every phone, and nothing on a card claims a horizontal drag: cards
+        // are not scrollable and the one slider-like control, the deck's
+        // sliders, no longer bubble gestures at all (UIToolkit).
+        //
+        // NOT while anything is open over the page - the drawer, a deck panel
+        // or a peeking header. A sideways swipe then PUTS IT AWAY instead of
+        // turning the page: the owner's rule that panels are closed before a
+        // page swipe can happen, and one rule for the drawer and the deck.
+        if (s_self->_pnlSystem.isExpanded() || s_self->_headerPeeking ||
+            UIToolkit::getActiveAccordionPanel()) {
+            release();
+            if (s_self->_pnlSystem.isExpanded()) s_self->_pnlSystem.close();
+            if (s_self->_headerPeeking)          s_self->unpeekHeader();
+            UIToolkit::closeActiveAccordion();
+            DBG_GESTURE("horizontal swipe closed what was open; page unchanged\n");
+            break;
+        }
+        release();
+        if (dir == LV_DIR_LEFT) s_self->nextPage();
+        else                    s_self->prevPage();
+        break;
+
     default:
-        // Horizontal swipes belong to page navigation, which is the rest of
-        // 2.6 and does not exist yet. Left unclaimed rather than bound to
-        // something plausible.
         DBG_GESTURE("gesture dir %d ignored\n", (int)dir);
         break;
     }
@@ -390,6 +415,12 @@ void GUIManager::begin() {
     // milestone 2.2 lands on.
     SystemCore::heapMark("before UI");
     UIToolkit::init();
+
+    // LVGL shows its FPS/CPU overlay by itself when the display is created
+    // (lv_display.c, LV_USE_PERF_MONITOR). It is an instrument, not chrome:
+    // off until asked for. See togglePerf().
+    lv_sysmon_performance_pause(nullptr);
+    lv_sysmon_hide_performance(nullptr);
 
     // The starting scheme. UITokens defaults to Fleet; the owner's pick is
     // Midnight (Slate, which this used to be, was deleted 2026-09-23 as a
@@ -542,8 +573,10 @@ void GUIManager::begin() {
     lv_obj_set_size               (_dismissScrim, lv_pct(100), lv_pct(100));
     lv_obj_set_pos                (_dismissScrim, 0, 0);
     lv_obj_set_style_bg_opa       (_dismissScrim, LV_OPA_TRANSP, 0);
-    lv_obj_add_flag               (_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_flag               (_dismissScrim, LV_OBJ_FLAG_HIDDEN);
+    // Switched by CLICKABLE, not HIDDEN - unhiding a full-screen object
+    // redraws the full screen in the drawer's first animation frame. See the
+    // deck scrim below for the measurement that found it.
+    lv_obj_clear_flag             (_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(_dismissScrim, [](lv_event_t *ev) {
         (void)ev;
         if (s_self) s_self->_pnlSystem.close();
@@ -552,11 +585,55 @@ void GUIManager::begin() {
     // Bottom panel open -> close system panel
     UIToolkit::registerSystemCloseCb(closeSystemPanelCb);
 
+    // THE DECK'S OWN DISMISS SCRIM - the drawer's rule, applied to the deck.
+    //
+    // The owner, 2026-09-23: "any taps outside of an exposed panel cause it to
+    // close, period. I can't think of any good reason why the system panel
+    // should differ from the deck panels." Same mechanism as _dismissScrim
+    // above, for the same reason: a card consumes its own tap, so only a sheet
+    // over the cards can catch it - and the first tap then MEANS "put the
+    // panel away" rather than also toggling the light underneath.
+    //
+    // On the SCREEN, and slotted in directly ABOVE the cards each time it is
+    // shown: over the cards, under the deck, so the open panel itself (and
+    // its sliders) still take their touches.
+    _deckScrim = lv_obj_create(screen);
+    lv_obj_remove_style_all       (_deckScrim);
+    lv_obj_set_size               (_deckScrim, lv_pct(100), lv_pct(100));
+    lv_obj_set_pos                (_deckScrim, 0, 0);
+    lv_obj_set_style_bg_opa       (_deckScrim, LV_OPA_TRANSP, 0);
+    // lv_obj_create() makes an object clickable by default, and
+    // remove_style_all() does not touch flags - left alone, this sheet would
+    // swallow every tap on every card from boot.
+    lv_obj_clear_flag             (_deckScrim, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(_deckScrim, [](lv_event_t *ev) {
+        (void)ev;
+        UIToolkit::closeActiveAccordion();
+    }, LV_EVENT_CLICKED, NULL);
+    // ALWAYS PRESENT, switched by CLICKABLE alone - never hidden, never moved.
+    //
+    // The first version unhid the scrim and re-ordered it on every open. Both
+    // invalidate the object's whole area, and this object IS the whole screen:
+    // every card and every shadow redrew in the first frame of the panel's
+    // animation. The owner saw exactly that - "the slightest hesitation before
+    // the panel begins to accordion, and then it hurries the animation along"
+    // - a stalled first frame on a time-based animation.
+    //
+    // A non-clickable object is passed over by the touch search
+    // (lv_obj_hit_test() returns false for it, lv_obj_pos.c), so a transparent
+    // sheet that is merely not clickable is invisible to touch AND costs no
+    // redraw to switch. Its z-order is set once per build, in buildDashboard().
+    UIToolkit::registerAccordionChangeCb([](bool open) {
+        if (!s_self || !s_self->_deckScrim) return;
+        if (open) lv_obj_add_flag  (s_self->_deckScrim, LV_OBJ_FLAG_CLICKABLE);
+        else      lv_obj_clear_flag(s_self->_deckScrim, LV_OBJ_FLAG_CLICKABLE);
+    });
+
     // System open -> hide touch window
     _pnlSystem.setOnToggleCallback([](bool isOpen) {
         if (s_self && s_self->_dismissScrim) {
-            if (isOpen) lv_obj_clear_flag(s_self->_dismissScrim, LV_OBJ_FLAG_HIDDEN);
-            else        lv_obj_add_flag  (s_self->_dismissScrim, LV_OBJ_FLAG_HIDDEN);
+            if (isOpen) lv_obj_add_flag  (s_self->_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
+            else        lv_obj_clear_flag(s_self->_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
         }
         // If System Panel is OPEN (true), Hide Touch Window (false)
         // pnlDisplay.setTouchWindowVisibility(!isOpen);
@@ -679,6 +756,11 @@ void GUIManager::begin() {
     // Built LAST so it can read the real geometry of everything above it, and
     // moved to index 1 so the deck's panels expand over the cards rather than
     // pushing them - which is what the owner asked to see.
+    //
+    // The pages first (2.6): which page, and that page's own settings, decide
+    // what buildDashboard() builds. Boot always lands on the first page.
+    initPages();
+    loadPageState();
     buildDashboard();
     SystemCore::heapMark("after dashboard");
 }
@@ -731,6 +813,19 @@ void GUIManager::buildDashboard() {
         }
         deckReserve = screenBottom - topMost;
         if (deckReserve < 0) deckReserve = 0;
+
+        // AN OPEN PANEL IS NOT THE DECK'S HEIGHT. This measures where the
+        // deck's children actually are - and an expanded panel reaches far up
+        // the screen, so a page built while one was open was squeezed into
+        // the space above it. The owner: swipe to the next page with a deck
+        // panel open and "it scrunches the entire grid vertically". So the
+        // measurement is only trusted, and remembered, with every panel
+        // collapsed; with one open, the remembered collapsed value is used.
+        if (UIToolkit::getActiveAccordionPanel() && _deckReserveCollapsed > 0) {
+            deckReserve = _deckReserveCollapsed;
+        } else if (!UIToolkit::getActiveAccordionPanel()) {
+            _deckReserveCollapsed = deckReserve;
+        }
         // NO EXTRA GAP. The page's own INSET already holds the bottom row off
         // the edge of its host, and with the deck hidden that inset is exactly
         // the margin the owner liked ("6x3 sits neatly against the bottom
@@ -767,18 +862,10 @@ void GUIManager::buildDashboard() {
     // laid over a copy of it. PageSpec is a plain aggregate, so this is a copy
     // and an assignment rather than any kind of mechanism - which is the point
     // of the spec being data.
-    // WHICH PAGE THIS BOARD BOOTS INTO.
-    //
-    // An either/or rather than a choice, and only until 2.6. A board can show
-    // exactly one page today, and 18 HA cards plus 12 fleet cards fit nowhere,
-    // so -D USE_HA_DASHBOARD swaps the whole page. When horizontal swipes land
-    // this becomes two pages and the flag goes away - HA_PAGE already carries
-    // id 2 for that day.
-#ifdef USE_HA_DASHBOARD
-    PageSpec page = HA_PAGE;
-#else
-    PageSpec page = FLEET_PAGE;
-#endif
+    // THE CURRENT PAGE, and its own settings laid over its spec. Until 2.6
+    // this was an either/or picked by -D USE_HA_DASHBOARD, because a board
+    // could only show one page; the flag is gone and every board has both.
+    PageSpec page = *_pages[_curPage].spec;
     page.headerDefault  = _hdr;
     page.variantDefault = _variant;
     page.showArea       = _showArea;
@@ -787,6 +874,10 @@ void GUIManager::buildDashboard() {
     _pnlSystem.setHeaderLabel(_hdr == CardHeaderStyle::HDR_TAG  ? "Tag"
                             : _hdr == CardHeaderStyle::HDR_BAR  ? "Bar"
                                                                 : "No hdr");
+
+    // The page indicator: this page's title, centred in the bar, and a dot
+    // per page. Set on every build so a knob that rebuilds cannot lose it.
+    _header.setPage(page.title, _curPage, _nPages);
 
     // THE DASHBOARD GOES TO THE BACK, by role rather than by index.
     //
@@ -799,6 +890,14 @@ void GUIManager::buildDashboard() {
     // move_background() says what is actually meant and cannot rot when the
     // screen's child list changes again.
     lv_obj_move_background(_dashHost);
+
+    // The deck's tap-away scrim sits directly above the cards and below the
+    // deck, set HERE because a build is already a full redraw - see the scrim's
+    // creation for why it must never be re-ordered while a panel animates.
+    if (_deckScrim) {
+        lv_obj_move_background(_deckScrim);
+        lv_obj_move_background(_dashHost);
+    }
 
     if (_deck) {
         if (_showDeck) lv_obj_clear_flag(_deck, LV_OBJ_FLAG_HIDDEN);
@@ -1018,7 +1117,137 @@ void GUIManager::nudgeRows(int8_t steps) {
     _pnlSystem.setRowsLabel(lbl);
 }
 
+// ---------------------------------------------------------------------------
+// Pages - milestone 2.6. docs/design/pages.md.
+// ---------------------------------------------------------------------------
+
+// THE SWIPE ORDER. House first, then Fleet - the owner's call, 2026-09-22.
+// Order is a list and has nothing to do with the page ids, which are frozen
+// identities (Fleet is id 1 and stays id 1 while being page 2).
+//
+// NO OVERFLOW between them, also the owner's call: each page shows what fits
+// and drops the rest by priority, as it did alone. A card never moves pages.
+void GUIManager::initPages() {
+    const PageSpec *order[] = { &HA_PAGE, &FLEET_PAGE };
+    _nPages = 0;
+    for (const PageSpec *s : order) {
+        if (_nPages >= GUI_MAX_PAGES) break;
+        // Every page starts from the SAME defaults the dashboard always had -
+        // the board's grid, compact, bar headers - so the first swipe changes
+        // what is on the page and nothing about how it looks. The working set
+        // at this moment holds exactly those defaults.
+        _pages[_nPages++] = PageLive{
+            .spec = s, .hdr = _hdr, .variant = _variant, .fill = _fill,
+            .label = cardLabelMode(), .showArea = _showArea,
+            .cols = _colsOverride, .rows = _rowsOverride,
+            .scheme = UI::schemeIndex(),
+        };
+    }
+    _curPage = 0;
+}
+
+void GUIManager::savePageState() {
+    if (_curPage >= _nPages) return;
+    PageLive &p = _pages[_curPage];
+    p.hdr      = _hdr;
+    p.variant  = _variant;
+    p.fill     = _fill;
+    p.label    = cardLabelMode();
+    p.showArea = _showArea;
+    p.cols     = _colsOverride;
+    p.rows     = _rowsOverride;
+    p.scheme   = UI::schemeIndex();
+}
+
+void GUIManager::loadPageState() {
+    if (_curPage >= _nPages) return;
+    const PageLive &p = _pages[_curPage];
+    _hdr          = p.hdr;
+    _variant      = p.variant;
+    _fill         = p.fill;
+    _showArea     = p.showArea;
+    _colsOverride = p.cols;
+    _rowsOverride = p.rows;
+
+    // The three that live outside this class, applied where they live.
+    StateCard::setFill(_fill);
+    cardSetLabelMode(p.label);
+    UI::setColumnsOverride(_colsOverride);
+
+    // Colour is per page too. setSchemeIndex() is a no-op when the scheme is
+    // already right, so two pages in the same scheme cost nothing here.
+    if (UI::schemeIndex() != p.scheme) {
+        UI::setSchemeIndex(p.scheme);
+        applyGround();
+        _header.restyle();
+    }
+    refreshKnobLabels();
+}
+
+// Every drawer label from the working set, so the drawer describes the page
+// you are on rather than the last one a knob was pressed on.
+void GUIManager::refreshKnobLabels() {
+    char lbl[12];
+    if (_colsOverride) snprintf(lbl, sizeof(lbl), "Col %u", (unsigned)_colsOverride);
+    else               snprintf(lbl, sizeof(lbl), "Col A");
+    _pnlSystem.setColsLabel(lbl);
+    if (_rowsOverride) snprintf(lbl, sizeof(lbl), "Row %u", (unsigned)_rowsOverride);
+    else               snprintf(lbl, sizeof(lbl), "Row A");
+    _pnlSystem.setRowsLabel(lbl);
+
+    _pnlSystem.setVariantLabel(_variant == CardVariant::VAR_AUTO ? "Auto"
+                             : _variant == CardVariant::VAR_FULL ? "Full" : "Cmpct");
+    _pnlSystem.setFillLabel(_fill == StateCardFill::FILL_SURFACE ? "Fill" : "Icon");
+    _pnlSystem.setAreaLabel(_showArea ? "Area" : "No Area");
+    const CardLabel l = cardLabelMode();
+    _pnlSystem.setLabelModeLabel(l == CardLabel::LBL_NAME  ? "Name"
+                               : l == CardLabel::LBL_STATE ? "State" : "No lbl");
+    _pnlSystem.setSchemeLabel(UI::pal().name);
+    // The header-mode label is set by buildDashboard(), which every page change
+    // goes through.
+}
+
+void GUIManager::goToPage(int16_t index) {
+    if (_nPages < 2) return;
+
+    // WRAP-AROUND, both ways. The owner asked for it to be tested now, whether
+    // or not it stays the default: with many pages, no-wrap means swiping all
+    // the way back to reach page 1.
+    const int16_t n = (int16_t)_nPages;
+    const uint8_t next = (uint8_t)(((index % n) + n) % n);
+    if (next == _curPage) return;
+
+    savePageState();
+    _curPage = next;
+    loadPageState();
+    rebuildDashboard();
+
+    // The toast carries the position whether or not the header bar - and so
+    // the dots - is visible. The owner's idea, 2026-09-22. ASCII only: a
+    // middle dot or an en dash renders as tofu on the panels (CLAUDE.md).
+    char t[40];
+    snprintf(t, sizeof(t), "%s  -  %u of %u",
+             _pages[_curPage].spec->title ? _pages[_curPage].spec->title : "Page",
+             (unsigned)_curPage + 1, (unsigned)_nPages);
+    UIToolkit::show_toast(t, 1500);
+    Serial.printf("[Pages] -> %s (%u of %u)\n", _pages[_curPage].spec->slug,
+                  (unsigned)_curPage + 1, (unsigned)_nPages);
+}
+
+void GUIManager::togglePerf() {
+    _showPerf = !_showPerf;
+    // Paused as well as hidden when off: a hidden label still has a timer
+    // refreshing it, and an instrument should not cost anything while nobody
+    // is looking at it.
+    if (_showPerf) { lv_sysmon_show_performance(nullptr); lv_sysmon_performance_resume(nullptr); }
+    else           { lv_sysmon_performance_pause(nullptr); lv_sysmon_hide_performance(nullptr); }
+    Serial.printf("[UI] perf overlay %s\n", _showPerf ? "shown" : "hidden");
+}
+
 void GUIManager::toggleDeck() {
+    // Put an open panel away first, so the deck never goes into hiding with a
+    // panel half-expanded and the scrim left up behind it.
+    UIToolkit::closeActiveAccordion();
     _showDeck = !_showDeck;
     rebuildDashboard();
     Serial.printf("[Cards] deck %s\n", _showDeck ? "shown" : "hidden");
