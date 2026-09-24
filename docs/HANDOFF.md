@@ -1,680 +1,148 @@
-# Handoff — 2026-09-23
+# Handoff — 2026-09-24
 
-**Start here.** `CLAUDE.md` is the stable how-it-works. This is where we are, what will bite you,
-and what to do next. Kept lean on purpose: anything that is "why we did X and not Y" now lives in
-`docs/LESSONS.md`, and anything that is a design lives in `docs/design/`.
+**Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
+next, what will bite you, and how to work with the owner. It was cut from ~680 lines to this on
+2026-09-24; resolved investigations live in `docs/LESSONS.md` (the conclusions) and git history
+(the detail). If you are about to add a long "how we found it" story here, it belongs in LESSONS.
 
 **A warning about this file.** When it paraphrases a spec, the paraphrase becomes the spec for
-whoever reads it first. Say *which* document a summary is compressing, and treat vocabulary that
-does not appear in the source as suspect.
+whoever reads it first. Say *which* document a summary compresses, and treat vocabulary that does
+not appear in the source as suspect.
 
 ---
 
 ## Where the project is
 
-### NOW, 2026-09-24: 2.6 and 2.7 SIGNED OFF on glass and merged to `main`
+**`v0.2.7`, tagged on `main` 2026-09-24** (merge `c7f082e`). Phases 0, 1 and milestones 2.1–2.7
+are done and signed off on glass. Boards report `v0.2.7.x`.
 
-Every test in `docs/TEST_2.7.md` and `docs/TEST_2.6.md` passed on `CYD_S3_3248` and `WS_P4_5`;
-the 7B was flashed for the corner-icon check (#18). Issues #17, #18, #62, #63, #64 closed.
-What landed after the notes below, all on `feat/17-page-swipes`:
+What a board does today: boots into **two pages** (House = the owner's 18 HA entities over the
+websocket, Fleet = MQTT/system/virtual cards), swiped horizontally with wrap-around; per-page
+settings from the System drawer; three colour schemes (Fleet, **Midnight** default, **Linen** the
+light one, with real drop shadows); card types with corner/hero icons, a `device_class`-driven
+binary-sensor card, light brightness fill and colour; an FPS/CPU overlay.
 
-- **Linen** is the light scheme and the owner likes it: a real drop shadow on cards and on all
-  floating chrome (toast, header, drawer, deck panels, tag pills, drawer buttons), via the
-  `PAINT_LIFT` / `PAINT_LIFT_SM` paints and `UI::unclipShadows()`. Schemes are Fleet, Midnight
-  (default), Linen.
-- **The shadow was never visible before 2026-09-23** - see LESSONS: overflow-visible clips to the
-  parent's coords PLUS the parent's own ext_draw_size, which a plain container does not have.
-- **Deck panels close on any tap outside them, like the drawer**; a sideways swipe with anything
-  open closes it instead of turning the page.
-- **Both tap-away scrims switch by CLICKABLE, never HIDDEN.** Unhiding a full-screen object
-  redraws the full screen in an animation's first frame - it made the P4_5's deck panels hesitate
-  then hurry. Do not reintroduce a HIDDEN toggle on anything screen-sized.
-- **FPS/CPU overlay**: swipe up from the bottom-right. Its CPU is LVGL's load only.
-- **Shadow corner cache on** (1 KB). Linen still costs frames; the owner's numbers are under
-  ROADMAP 2.9, which now has its first real measurements.
+**Five boards attached, all on v0.2.7:**
 
-**Next, per ROADMAP §7's running order: 2.10 (#65), long-press popup groundwork.** Then 2.8, 2.11,
-3.1. The three HA test entities (Avail / Reading / Refuse) are still on the Fleet page - remove
-them and the owner's three helpers when no longer wanted.
-
-### Earlier, 2026-09-23: 2.6 built on `feat/17-page-swipes`, 2.7 through round three on `feat/18-card-types`
-
-**Two branches, merge in this order: `feat/18-card-types`, then `feat/17-page-swipes`** (cut from
-18's tip, so it carries 2.7 round four too). Neither is merged; the owner has signed off 2.7's
-rounds one to three on glass (TEST_2.7.md), 2.6 awaits `docs/TEST_2.6.md`.
-
-2.6: two pages on every board, House then Fleet, swiped horizontally from anywhere, wrapping;
-every drawer knob per page except Deck and Hide Bar (scheme included); page title and dots centred
-in the header; a "Fleet - 2 of 2" toast. `-D USE_HA_DASHBOARD` is gone. One entry point,
-`GUIManager::goToPage()`, per NINA's navigation arbiter. Design: `docs/design/pages.md`.
-Confirmed working on `WS_P4_5` from the log, heap flat across page changes (~133 KB internal).
-
-Also on 17: three HA test entities on the Fleet page (Avail / Reading / Refuse) for T15 and the
-refused-command path; corner icon size by ROW COUNT (MD at 3 rows or fewer); LVGL theme button
-grow and shadow removed (they were being clipped - the drawer's "fuzzy" corners); Linen's shadow
-tighter and darker. **Toast placement fix is unverified** on the two boards that showed the bug.
-
-### Earlier, 2026-09-22: milestone 2.7 in progress on `feat/18-card-types`
-
-Five commits. **All 8 environments build** (clean tree, after `build_cache` was cleared twice for
-struct-layout changes). Flashed to `CYD_S3_3248` and `WS_P4_5`, both boot and report to HA, and
-`WS_P4_5`'s log shows HA accepted + 18/18 initial values. **None of it seen on glass yet.**
-
-The 3248's serial (native USB, COM10) printed nothing to a capture script, even with a reset and DTR
-asserted - and its HA uptime showed the "reset" never happened. It is alive and quiet; use HA's
-`last_updated`, not the cable, to check it. The test sheet is `docs/TEST_2.7.md`. Every design
-decision was agreed with the owner first and is written down in `docs/design/cards.md` §13 — read
-that before touching any card.
-
-- **HA attributes**: live icon, brightness and `rgb_color` land in `Entity::attrs` through ONE
-  filter/reader pair in `HaValue.h`, used by both HaRest and HaProvider.
-- **Icons**: every card has a corner icon (our table) and state cards a hero icon (user's on/off
-  pair -> user's icon -> HA's live icon -> our pair). The HA descriptors no longer copy HA's icons.
-- **Binary sensors**: one card type and a `device_class` table in `CardIcons.cpp` — NOT a `door`
-  class. A new Label knob (Name / State / No lbl) in the drawer.
-- **Lights**: brightness fills the card bottom-up (a hard-edged gradient on the surface, deliberately
-  not a child object — no `clip_corner` layer); the disc takes the light's colour.
-- **#62**: new `VALUE_SM` and `ICON_MD` faces; hero and corner step with the card.
-- **#63**: a non-matching echo is no longer a verdict; only a matching echo or the 5 s window ends a
-  command.
-- **#64**: chrome uses shared `UI::paint()` styles that repaint on a scheme change.
-- **No-header corner**: `Card::restyle()` was reserving a header strip in HDR_NONE. Fixed.
-
-**Measured on the way, and worth knowing:** HA core does NOT compute state-dependent icons into
-`attributes.icon` — only users and integrations set it (`ha-websocket.md` §5 was wrong and is
-corrected). And a font face costs 6-73 KB, not "~96 KB" (CLAUDE.md corrected).
-
-**Two HANDOFF claims below were wrong, found today:**
-- *"#44's outbound leg is written but HAS NEVER RUN"* — the owner's #63 report is a tap on Desk that
-  faded the lights off, so the tap -> `call_service` path works on glass.
-- *"the deck temperature and illuminance appear TWICE on the HA page"* — `Dashboard_HA.h` places only
-  the HA copies; the MQTT `deck_*` cards are on the Fleet page, which `USE_HA_DASHBOARD` replaces.
-  Nothing was removed. Both entities are still REGISTERED, which is harmless.
-
-Phases 0, 1 and 2.1–2.5 are merged and tagged `v0.2.5`. **`fix/49-link-liveness` merged to `main`
-on 2026-09-19** (`7d723be`, 23 commits, `--no-ff` per ROADMAP §3.2's exception — the intermediate
-commits are the diagnostic record, and for #49 that record *is* the finding). It carried #49's
-detection half, #50, #51, the first cut of 2.6's swipe navigation, and a lot of small corrections
-found on glass.
-
-**No new tag.** `C` tracks the roadmap phase and 2.6 is not finished; the build counter `D` moves
-on its own. Boards report `v0.2.5.x`.
-
-**`feat/43-ha-websocket` MERGED to `main` 2026-09-21** (`206de29`, 17 commits, 58 files,
-+9,051/-350, `--no-ff`). Signed off on hardware by the owner: T1, T5, T6, T8, T10, T11, T12 and the
-swipe regression all pass. It carried #43, #44's outbound half, #56, #57, #60, the RSSI poll
-backoff and the log-page rework.
-
-**Closed by it:** #43, #60. **#44 stays open** for the MQTT outbound leg - nothing subscribes to
-our own `/set` topics yet because no entity is both writable AND advertised.
-
-Four boards attached: `CYD_S3_3248` (COM10), `WS_P4_5` (COM15), `WS_S3_4B` (COM8),
-`WS_P4_4B` (COM7). **All four now carry the #43 firmware and the real HA dashboard**
-(`-D USE_HA_DASHBOARD`, set on all five screen environments as of 2026-09-21). `WS_P4_7B` has the
-flag but is not plugged into the PC.
-
-**All four boards work, and the overnight soak confirmed it.** The two P4s were rendering a card
-or two and losing WiFi within seconds to #243; the rebuilt libraries fixed that, and both ran
-through the night of 2026-09-22 without a drop.
-
-### Read in this order
-
-1. `CLAUDE.md` — the HAL/BSP, the startup split, the token rules, **and the file-editing rule at
-   the top, which is not optional.**
-2. **`docs/LESSONS.md`** — read before debugging anything.
-3. `docs/design/dashboard.md` — the page spec, the grid, the two knobs, the unit policy.
-4. `docs/design/card-layout.md` — **before moving anything inside a card.**
-5. `docs/design/ha-websocket.md` — what HA's API actually gives us, measured. Read before #43.
-6. `docs/design/cards.md` — the card spec. Its "Implementation notes" first.
-7. `docs/design/tokens.md`, `docs/design/startup.md` — the design system, and boot order.
-7b. `docs/design/pages.md` — the page model and 2.6's scope. **A proposal as of 2026-09-22**; read
-   which items are DECIDED and which PROPOSED before building on any of it.
-8. `docs/ROADMAP.md` §7 — the milestone list.
-9. `docs/REVIEW_2026-09-20.md` — **historical.** The 2026-09-19/20 work written up for the owner
-   to review cold. Reviewed and signed off 2026-09-21; every test passed. Kept as a narrative, not
-   as a to-do list.
-
----
-
-## THE HEADLINE: #49 IS SOLVED, AND IT WAS NEVER OUR BUG
-
-**[espressif/esp-hosted-mcu#243](https://github.com/espressif/esp-hosted-mcu/issues/243).** Found
-2026-09-21. Our board, our symptom, our log lines, our sdkconfig. Full write-up in `LESSONS.md`.
-
-One failed `MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA` RX-buffer allocation permanently disables host
-RX, because the retry added in 2.12.12 exits at an interrupt gate that was already cleared. Writes
-keep working, so the driver still reports associated - which is exactly why a dead board showed
-full bars.
-
-**FIXED 2026-09-22 by rebuilding the P4 libraries** with `MEMPOOL_PREFER_SPIRAM` and a 64-byte
-L2 cache line. Those are compiled into arduino-esp32's PREBUILT libraries and unreachable with a
-`-D`, so it took a lib-builder run under WSL. Procedure: `docs/REBUILD_P4_LIBS.md`. Result and
-soak: the #61 section under "What is next".
-
-**#41 is dead as a theory** - NVS writes are not the cause; closed 2026-09-21. **#59's C6 update
-was real and worth doing** and was also not the cause. The soak settled it: `WS_P4_5`
-survived on the STOCK C6, so the C6 update is not needed for #243.
-
-**What we keep regardless:** detection (a board now knows it is offline) and the RSSI poll backoff,
-which stops the 10 s UI freezes once a board has stalled. Neither fixes the stall.
-
-### The superseded theory, kept for the record
-
-#### #49 is half solved, and #59 was NOT the other half
-
-**Detection works. Recovery does not.**
-
-The fix on this branch means a board now KNOWS when its link is dead — the WiFi glyph drops to a
-bare red stalk, the dump says `DEGRADED`, and `isOnline()` returns false. Before this week a dead
-board sat showing full green bars for six hours. That part is done and confirmed on hardware.
-
-**What it cannot do is get back on.** Both P4 boards were still off the network the next morning.
-`DEGRADED (none)`, `Offline (last reason: 2)` (`AUTH_EXPIRE`).
-
-### The finding that reframes it — see #59
-
-**Neither S3 board has ever dropped.** The S3s have a built-in radio; the P4s reach WiFi through a
-separate ESP32-C6 over an internal link.
-
-Waveshare's own `docs/P4_C6_HOSTED_WIFI.md` (in two of the vendor trees under
-`reference/Waveshare Official Repos/`) publishes a host/slave compatibility matrix:
-esp_hosted **1.4.x** pairs with ESP-IDF before 6.0; **2.12–3.0** pairs with 6.0 and later. **Our
-host runs 2.12.11.** The C6 runs whatever Waveshare factory-flashed, version unknown — because the
-query for it fails.
-
-That query failing is the boot warning we dismissed as cosmetic for weeks:
-
-    E rpc_core: Response not received for [0x15e](Req_GetCoprocessorFwVersion)
-
-An old slave does not implement that RPC at all. **It is the mismatch announcing itself.**
-
-Waveshare's own doc says to validate *"association, IP traffic, reconnect, and restart behavior"*
-when host dependencies change. **Reconnect** is our exact symptom.
-
-It also explains the detail that puzzled everyone: a failed board could not raise its **own**
-rescue access point either. If the host-to-C6 conversation is broken, every radio command fails —
-not just joining someone else's network.
-
-**DONE on `WS_P4_4B`, 2026-09-19. The C6 was on older firmware; it is now on 2.12.9 and the boot
-warning is GONE** - on a board that printed it every boot for weeks. Procedure, evidence and
-rollback in #59.
-
-**Whether it fixes the dropouts is unproven.** They take 5-6 hours on that board, so only a soak
-answers it. `WS_P4_5` and `WS_P4_7B` are deliberately untouched as controls: if the 4B survives the
-night and they do not, that is as close to conclusive as this project gets. **That soak is the
-single most important thing to check next.**
-
-### SOAK RESULT, 2026-09-20: the C6 update did NOT fix it
-
-Read out of Home Assistant rather than off a serial cable - HA knows when it last heard from each
-board, which is the same question and needs no port:
-
-| Board | C6 | HA last heard |
+| Board | Port | Serial log |
 |---|---|---|
-| `WS_P4_4B` | **updated to 2.12.9** | **9 h 27 m ago** |
-| `WS_P4_5` | untouched | 1 h 09 m ago - **contaminated, see below** |
-| `WS_P4_7B` | untouched | 42 h ago - unplugged from the PC, not evidence |
-| `CYD_S3_3248` | n/a, own radio | seconds |
-| `WS_S3_4B` | n/a, own radio | seconds |
-
-**The 4B dropped anyway.** It lasted about 9.5 hours against the 5-6 it used to manage, which is
-*weak* evidence of improvement and nothing more - one sample, and nobody recorded when its clock
-started. The C6 firmware mismatch was real and worth fixing on its own merits; it was not the cause.
-
-**`WS_P4_5` is a void data point and it is my fault.** It went quiet around the time a flash
-attempt was killed on COM15. The evidence says `pio` crashed before `esptool` ever wrote (no
-`Writing at` lines in its log), but an orphaned `esptool` was found later, so it cannot be ruled
-out. Do not cite that 1 h 09 m for anything.
-
-**What this leaves.** The P4/S3 split still holds perfectly - no S3 board has EVER dropped, both
-P4s do - so the fault is still in the esp_hosted path, just not in the version pairing. #41 (do
-NVS writes disrupt the SDIO transport?) is the next unexamined suspect and is still open.
-
-**A cheap instrument nobody was using:** `scripts/scan_ha_icons.py`'s sibling technique. HA's
-`last_updated` on any entity a board publishes answers "is that board alive" for every board at
-once, from a PC, with no serial cable and no touching the fleet. That is how this result was
-obtained and it is how the next soak should be read.
-
-**Do not read the S3 boards as evidence either way.** `CYD_S3_3248` and `WS_S3_4B` have built-in
-radios, have never once dropped, and are not part of this experiment. A long uptime on the 3248
-says the firmware is not leaking or wedging; it says nothing about #49, because the 3248 does not
-have the hardware that fails. Only the three P4 boards can answer this.
-
-Note the update is a full-flash write and wiped NVS, so the 4B is running on the compile-time
-credentials and its `_proven` flag has reset.
-
-### What the #49 branch actually built
-
-None of this becomes wrong if #59 turns out to be the cause — a wall panel still has to survive a
-router reboot.
-
-- **RSSI is re-polled with an age stamp.** It used to be read once in the `GOT_IP` handler and
-  never again, so the header showed a value from the moment of association for as long as the
-  board stayed up. Not a stale cache — a number nobody ever asked for a second time.
-- **`LinkHealth`** — a second axis beside `ConnState`, because one enum cannot express "the driver
-  says connected and it is wrong". Fed by an ICMP probe ladder (gateway → DNS → off-LAN, rotating
-  on failure so a rate-limiting router cannot convict a healthy link) and by MQTT's verdict
-  relayed down through `SystemCore`.
-- **A three-rung recovery ladder** — re-associate, cycle the radio, hand back to the state machine.
-- **`isOnline()` returns false on `LINK_DEAD`.** This is the line that makes the verdict mean
-  something to the rest of the system: every caller asks `isOnline()` and none asks
-  `getLinkHealth()`.
-
-**Two guards that must not be removed casually:**
-
-- A probe that has **never** been answered is not evidence. Many routers drop ICMP; without this
-  every board would convict its own healthy link within minutes and cycle its radio forever.
-- Each completed recovery ladder widens the cool-off, so a board whose problem is upstream settles
-  into checking occasionally rather than thrashing.
-
-**The probe is demand-driven** — a held MQTT session is continuous evidence, so a healthy board
-sends none at all. That keeps a 2.5 KB task stack out of internal RAM on `CYD_S3_3248`.
-
----
-
-## What is next
-
-### SOAK RESULT, 2026-09-23: BOTH P4 BOARDS SURVIVED. #243 IS FIXED.
-
-The owner, the morning after: *"all boards are online and functional"*.
-
-**It was a one-variable experiment and it answered cleanly.** `WS_P4_5` was running the STOCK C6
-firmware and survived. So **the SPIRAM mempool alone fixed #243** - the C6 update from #59 was not
-needed for it. **Do NOT roll the C6 update out with NINA's updater.** Tried on `WS_P4_5` on 2026-09-23: it hung
-in display init - blank screen, backlight on, task watchdog firing on `esp_timer` - because NINA's
-image is built for NINA's board, which matches our 4B and not the 5 or the 7B. It hung BEFORE
-touching the C6 (the stock `Req_GetCoprocessorFwVersion` timeout was still there afterwards), and
-reflashing our firmware recovered it fully. With #243 fixed, all that remains on stock-C6 boards is
-that one cosmetic boot line; a board-correct C6 image would be needed to remove it, and it is not
-worth building.
-
-### The rebuild itself (#61)
-
-2026-09-22. Both P4 boards are up on rebuilt libraries and neither shows the #243 signature.
-
-**Installed:** `~/.platformio/packages/framework-arduinoespressif32-libs/esp32p4_es`, rebuilt from
-lib-builder master (IDF 5.5.5, exact match). **Stock kept as `esp32p4_es.stock.55.03.311` - the
-rollback is a rename, and this is the one change in the project git cannot undo.**
-
-The four settings, verified in the installed `sdkconfig`:
-
-```
-CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y   the fix
-CONFIG_CACHE_L2_CACHE_LINE_64B=y            required alongside it (#219)
-CONFIG_ESP_HOSTED_USE_MEMPOOL=y             restored to baseline
-CONFIG_CACHE_L2_CACHE_256KB=y               stops the cache silently halving
-```
-
-**First boot, both boards:**
-
-| | `WS_P4_5` | `WS_P4_4B` |
-|---|---|---|
-| Internal heap free | **245.4 KB** | **245.4 KB** |
-| `RX buffer alloc failed` | none | none |
-| `rpc_core` timeout | none | none |
-| HA subscription | accepted | accepted |
-| Initial values | 18 / 18 | 18 / 18 |
-| C6 firmware | **stock** | **updated, 2.12.9** |
-
-**245 KB free is the proof the setting took at runtime.** Upstream reported internal-heap low
-rising from 17-58 KB to ~145 KB when the mempool moved to PSRAM; we are well past that. A config
-file saying `=y` proves nothing on its own.
-
-### The soak: one variable, two boards
-
-Same firmware, same libraries, **only the C6 version differs**.
-
-- **Both survive** -> the SPIRAM mempool is the fix and #59's C6 update was not needed
-- **Only the 4B survives** -> both were needed
-- **Neither survives** -> #243 is not the whole problem
-
-Before this, both died within SECONDS under exactly this workload - 18 REST fetches plus a
-websocket at boot is the bursty inbound TCP in #243's title. Read the result the cheap way:
-HA's `last_updated` on any entity a board publishes, from a PC, without touching anything.
-
-**A clean boot is necessary, not sufficient.** #243 stalls on repeated allocation pressure. Hours,
-not minutes, settle it.
-
-### The superseded plan
-
-### IN FLIGHT RIGHT NOW - the P4 library rebuild (#61)
-
-A lib-builder run is underway in WSL as of 2026-09-21. If you are picking this up cold, this is
-where it got to.
-
-| | |
-|---|---|
-| WSL | Ubuntu-24.04 LTS, WSL2, working |
-| lib-builder | `~/esp32-arduino-lib-builder`, branch **master** (IDF `release/v5.5`) |
-| IDF resolved | **5.5.5** - exact match to our framework, so no version drift |
-| menuconfig | done: PREFER_SPIRAM on, L2 line 64B, USE_MEMPOOL restored to on |
-| build | **running** - `./build.sh -t esp32p4_es qio 80m_200m` |
-
-**Next step when it finishes:**
-
-```bash
-find ~/esp32-arduino-lib-builder -name sdkconfig -newermt '-3 hours'
-python scripts/verify_p4_sdkconfig.py <that path>
-```
-
-**Do not install on a green tick alone.** The judgement is not "is the diff empty" - it is "is
-every difference explainable, and would any of them change behaviour we care about". Build-id and
-version strings are fine. Anything touching memory layout, task stacks or the WiFi/lwIP path needs
-a hard look first.
-
-**Expect more than two differences.** `USE_MEMPOOL` and the L2 cache line BOTH differed from
-Espressif's shipped build before anything was typed, which means lib-builder master has drifted
-from 55.03.311. If the unexplained list is long, the fallback is to pin lib-builder to the
-`idf-release_v5.5` tag rather than master and rebuild - closer to the shipped point, fewer
-incidental changes.
-
-Everything else is in `docs/REBUILD_P4_LIBS.md`, including the two traps that nearly went into it
-as instructions: lib-builder's branches are named after ESP-IDF rather than Arduino, and `-t` takes
-the CHIP VARIANT rather than the target.
-
----
-
-0. ~~**READ THE SOAK.**~~ **Done 2026-09-23 - both survived, see above.** Both P4 boards went on rebuilt libraries at ~02:00 on 2026-09-22 and both
-   booted clean. That is the open question and it needs no hardware to answer - HA's `last_updated`
-   on any entity a board publishes says whether it is alive, for the whole fleet, from a PC.
-   Details and the interpretation table are in the #61 section above.
-
-1. **2.7 card types — IN PROGRESS, see "NOW" at the top.** Next: the owner runs
-   `docs/TEST_2.7.md` on the two benches, then flash the 7B to judge the corner-icon size rule.
-   After 2.7: **2.6 horizontal swipes, then 2.10 popup groundwork, 2.8 slots, 2.11 group cards,
-   3.1** — ROADMAP §7's revised running order. The original scope, kept for reference:
-
-   - a **`door`** type - both garage sensors report `device_class: garage_door` and render as
-     generic binary sensors
-   - **`LightCard` learning brightness and colour** - `light.office` is a group with
-     `['color_temp','xy']`, `light.dining_room_light` is `['brightness']`
-   - the **corner-icon (domain) vs hero (fixture)** split
-   - consuming HA's live **`attributes.icon`** - the glyphs are in the font now and nothing reads
-     the field
-   - **#62**, scaling the hero font to the card rather than only to the board
-   - **#63** and **#64**, the twobugs found on 2026-09-22
-
-   `Entity::lastChangeMs` (#57) exists for "open for 40 minutes" and has no caller yet.
-
-   **Two residuals from the review, both small:** `ST_UNAVAILABLE` has never rendered on hardware
-   (nothing in the house went unavailable while anyone was watching - worth forcing once by
-   unplugging a sensor), and the deck temperature and illuminance appear TWICE on the HA page,
-   once per transport. That duplicate was deliberate, to compare MQTT and the websocket side by
-   side; it has served its purpose and should be removed from `Dashboard_HA.h`.
-
-2. **2.6's remaining half: horizontal swipes, page indicator dots, gesture conflicts.** Nothing
-   technical blocks multi-page - `PageSpec` already carries `id`/`slug`, `HA_PAGE` is already id 2,
-   and 2.3's measurement (~715 B per card) makes ROADMAP §5.2's memory warning far softer than it
-   reads. The owner wants it: he asked for more entities on the bigger screens on 2026-09-21, and
-   the `USE_HA_DASHBOARD` either/or flag is the stand-in until it lands.
-
-   His own framing, worth keeping: **per-entity priority** is what he actually wants, not the
-   domain weighting in `Dashboard_HA.h` - priority is about what you reach for, not what kind of
-   thing it is. And **group cards** ("all garage doors in one 2x1") remove most of the pressure
-   that made priority load-bearing.
-
-3. **#44's MQTT half.** Closing condition is written on the issue: one writable advertised entity,
-   exercised end to end.
-
-4. **2.8 slots** — and the card-corner overhang goes with it, plus #64's "the system header bar
-   needs its own colour, not the scheme's".
-
-**Ideas recorded, not scheduled:** #52 auto-sort, #53 auto-fill, #54 auto-adjust card size,
-#55 fleet peer discovery. The owner's larger vision, stated 2026-09-20: a **web UI that configures
-everything pre-build** and compiles a dashboard exactly as specified, plus a live on-device
-settings page - "a pretty front end to the build sheet". Phase 3's `PageSpec`/`EntityDescriptor`
-data-not-code shape is deliberately aimed at that.
-
-Done 2026-09-19: #50, #51, 2.6's vertical swipes (#17 stays open for the horizontal half).
-Done 2026-09-21: **#43**, **#60** closed; #56, #57 closed; `feat/43-ha-websocket` merged.
-Done 2026-09-22: **#61** - P4 libraries rebuilt, verified and installed; **#41** closed as not the
-cause; **#49** root-caused to esp-hosted-mcu#243.
-
-~~**#44's outbound leg is written but HAS NEVER RUN.**~~ **Wrong as of 2026-09-22**: the owner's
-#63 report is a tap on Desk that faded the lights off, which is this path working on glass. Kept
-struck through so the correction is visible.
-
-**#44 is not finished, deliberately.** Nothing subscribes to our own `/set` topics -
-`MqttManager::subscribeCommand()` exists with no caller - because no entity in the fleet is both
-writable AND advertised. The virtual test switches are `advertise = false` on purpose. The hook is
-where it goes the day a real one exists.
-
-## #43 — WHAT SHIPPED, AND HOW TO CHECK IT
-
-Inbound is code-complete and running on `CYD_S3_3248`. Awaiting owner sign-off, then merge.
-
-**The chain, as the boot log prints it:**
-
-    [HA] auth_ok - session ready
-    [HaProv] subscribe_trigger id 1 for 18 entities (675 B)
-    [HaProv] HA ACCEPTED the subscription (id 1)
-    [HaRest] initial values: 18 fetched, 0 failed
-    [Cards] 8 of 18 cards placed; 10 dropped for space
-
-If all five lines appear, the whole feature works. If `HA ACCEPTED` is missing, nothing else below
-is trustworthy.
-
-**How to read a board without a serial cable.** Only `WS_P4_5` has `ARDUINO_USB_CDC_ON_BOOT=0`;
-the rest route `Serial` to native USB, which on `WS_S3_4B` is not cabled at all. Use HA instead -
-see the soak table above. `pio device monitor -p COM10` works for the 3248.
-
-**Pieces, and where each lives:**
-
-| | |
-|---|---|
-| `components/esp_websocket_client/` | vendored Espressif v1.6.1, unmodified. See its README |
-| `components/Fleet_HA/HaClient` | socket + auth + reassembly + retry ladder |
-| `components/Fleet_HA/HaRest` | initial values, one entity per `loop()` pass |
-| `components/Fleet_HA/HaValue.h` | `haCoerceState()` - ONE copy, shared by both paths |
-| `components/Fleet_Providers/HaProvider` | the subscription and the live feed |
-| `components/Fleet_Providers/ExternalEntities_HA.h` | the 18 entities |
-| `include/Dashboards/Dashboard_HA.h` | the page, behind `-D USE_HA_DASHBOARD` |
-| `scripts/scan_ha_icons.py` | which icons HA actually serves |
-
-### The things that will bite whoever touches this next
-
-- **HaProvider's receive path runs on the WEBSOCKET TASK, not `loop()`.** First asynchronous
-  provider in the project. It must never touch LVGL; it writes through `EntityRegistry`'s mutex.
-  Sends happen on the loop task only - `HaClient::sendText()` refuses otherwise.
-- **Request ids must strictly increase within a connection.** HA answers `id_reuse` per request,
-  not by dropping the socket, so a pooled or recycled id scheme fails looking like an HA bug.
-- **A reconnect is a COLD START.** HA discards subscriptions with the connection. Nothing to clean
-  up; everything to rebuild. `HaProvider` watches `HaClient::sessions()` - a counter, not a
-  boolean, because a drop and recovery between two `loop()` calls is invisible to a boolean.
-- **`staleAfterMs` is 0 on all 18 HA entities and that is deliberate.** `subscribe_trigger` fires
-  on CHANGE, so silence carries no information and a stale window would grey out every quiet
-  sensor overnight. Death is reported by HA saying `unavailable` - that is #56.
-- **HA serves Fahrenheit.** It converts to the user's display unit before sending. The same deck
-  probe reads 53.276 F here and ~11.8 C over Zigbee2MQTT. The page converts only when the source
-  says `C`, so both land on F - but never infer a unit from a `device_class`.
-- **The 8 KB reassembly buffer is a design constraint, not a tuning knob.** It is why the device
-  registry (115 KB) is not fetched and why areas are resolved server-side instead.
-
-### Deliberately NOT built
-
-- **Area resolution at runtime.** Measured and documented (`ha-websocket.md` §7a): one
-  `render_template` resolves all 18 in **818 bytes** against the device registry's 115,742. Not
-  implemented because `Dashboard_HA.h`'s hardcoded areas are already correct, so it changes
-  nothing visible. Build it when pages are grouped by area.
-- **Reading `attributes.icon` live.** The glyphs are now in the font, but nothing consumes the
-  field yet. 2.7.
-- **Outbound.** That is #44.
-
----
-
-### #43's transport — DECIDED 2026-09-19: both, and they are not redundant
-
-**REST does not get replaced by the websocket. They do different jobs, and `ha-websocket.md` §7
-already assumes both.**
-
-| Job | Transport | Why |
-|---|---|---|
-| auth, handshake | **WS** | three messages, milliseconds |
-| area / device / entity registries | **WS** | `get_states` is 787 KB and unusable; the per-entity forms are 842 B |
-| **initial value, per entity** | **REST** | `GET /api/states/<id>`, 399–843 B, 4–25 ms. Explicitly *not* `get_states` |
-| **live changes** | **WS** | `subscribe_trigger`, filtered server-side |
-| outbound commands (#44) | **WS** | `call_service` |
-| sensor history for sparklines | **REST** | `cards.md` §4's "fetch it, do not store it". Unmeasured — see §8 |
-| publishing OUR entities into HA | **MQTT** | discovery; the websocket cannot replace it |
-
-**The 30 s latency goes away, and that is the websocket's doing specifically.** REST is *pull* — the
-reference projects poll on a 30 s task, so a door could take half a minute to appear. WS is *push*,
-so a change lands as fast as the LAN carries it. The 30 s was never a property of REST as such; it
-is what polling costs. REST keeps its place above because one-shot fetches are exactly what it is
-good at.
-
-**Use `subscribe_trigger`, never `subscribe_events`.** Measured on the owner's instance: all
-`state_changed` is 731 events and 913 KB per minute, ~15 KB/s of JSON parsed continuously to find
-the handful that matter. The same window filtered to our 18 entities was **zero bytes**. That is
-~100x and it is the single most important finding in `ha-websocket.md`.
-
-### The library
-
-Checked rather than assumed: **both ESP-IDF reference projects use REST for HA.** NINA does
-`GET /api/states/{entity_id}` per tile; `ha-dashboard` polls on a 30 s task. Neither uses a
-websocket for HA — though NINA pulls `esp_websocket_client` for other feeds.
-
-`esp_websocket_client` is an **official Espressif component from the Component Registry**, not part
-of core IDF — which is exactly why it is absent from the Arduino prebuilt libs. Nobody writes their
-own.
-
-**DECIDED: vendor `esp_websocket_client`** rather than write one. It is plain ESP-IDF C over
-`esp-tls`/lwIP, both already linked here; the only obstacle is that PlatformIO's Arduino build
-cannot run the IDF component manager, so it would be vendored like `bb_captouch_fork`. That is the
-same code an ESP-IDF migration would use later, and it keeps the owner's "avoid Arduino-specific
-libraries" constraint intact.
-
-REST is *pull*: a 30 s poll means up to 30 s before motion or a door shows on screen. Outbound
-commands are fine either way. It is inbound latency that suffers.
-
----
-
-## Deliberately postponed — do not rediscover these
-
-| What | Where it goes |
-|---|---|
-| **The card header band overhangs the rounded corners** — CONFIRMED on glass with a photo, 2026-09-19. `HANDOFF` was right and the code comment in `Card.cpp` was wrong | 2.8, with the slot rework |
-| **RSSI card shows STALE when WiFi is down**, which is the wrong word. `ST_PAUSED` is defined as "the user's own choice", so it must not be overloaded — this wants its own state | with #56 |
-| **Hide the battery glyph when a card is stale** | with #56 |
-| **The system header bar needs its OWN colour**, not the scheme's. Paper makes it unreadable | 2.8 |
-| **Corner icon = the DOMAIN; the hero = the specific fixture** | 2.7 |
-| **State-dependent hero glyphs**. HA ships these in `attributes.icon` | 2.7 |
-| **A `door` card type**; a `LightCard` that handles dimming/RGB/colour-temp | 2.7 |
-| **Icons look undersized on large cards** — faces are picked by density alone, never by cell size | 2.7 |
-| **Per-card full-screen detail page**, long-press, background dimmed | 2.7 / 3.2 / 4.4 |
-| **Horizontal swipes** — left unclaimed on purpose, they belong to page navigation | 2.6 |
-| **Swipe down on the LEFT half below the top band** — currently opens the log from the top band only; nothing else is bound | 2.6 |
-| **Arduino_GFX only uses one draw buffer** | 2.9 / #40 |
-| **Priority's vocabulary** — four bands was never ratified | 3.1 |
-| **OTA** | Phase 5 |
-
----
+| `CYD_S3_3248` | COM10 (native USB) | quiet - read it from HA instead |
+| `WS_P4_5` | COM15 (CH343) | yes, UART0 |
+| `WS_P4_7B` | COM6 (native USB) | - |
+| `WS_P4_4B` | COM7 (CH343) | - |
+| `WS_S3_4B` | COM8 (CH343) | no - `Serial` is native USB, not cabled |
+
+Ports move when boards are re-plugged. **Identify a board by its USB serial**, not its COM number:
+`Get-CimInstance Win32_PnPEntity | ? Name -match 'COM\d+' | select Name, DeviceID`. The P4_5 is
+`...5B90154141`.
+
+**Is a board alive?** Ask Home Assistant, not the cable: each board publishes
+`sensor.<device>_uptime`, and its `last_updated` answers for the whole fleet at once.
+
+## What is next — ROADMAP §7 "Running order"
+
+1. **#58, LVGL screenshots.** `lv_snapshot` (`LV_USE_SNAPSHOT`, off) + PNG via `stb_image_write` +
+   the HTTP server that is already linked. Plan is on the issue. Lets a session judge a screen from
+   the real framebuffer, and is the capability page transitions and the page overview need.
+2. **2.10 (#65)** long-press popup groundwork - brightness/colour sliders, colour picker; pause
+   moves into it. Tap stays a one-touch toggle.
+3. **2.8 (#19)** header slots. 4. **2.11 (#66)** group cards. 5. **3.1 (#20)** schema.
+
+On hold for a measured need: **2.9**, PPA and real frame buffering. First numbers are in its ROADMAP
+row; the 7B runs the same firmware far faster than the P4_5, which points at the P4_5's software
+rotation.
+
+**Loose ends, all small:**
+- Three HA test entities (Avail / Reading / Refuse) sit at the top of the Fleet page, with three
+  helpers in the owner's HA. Remove both when no longer wanted (`ExternalEntities_HA.h`,
+  `Dashboard_Fleet.h`).
+- The toast-placement fix is unverified on `WS_S3_4B` (it sat half-way down there).
+- #44's MQTT half is still open: nothing is both writable AND advertised yet.
+- Ideas recorded, not scheduled: #52-#55; the owner's page ideas (linked pages, custom swipe
+  targets, an alt-tab overview) are in `docs/design/pages.md`.
+
+## Read in this order
+
+1. `CLAUDE.md` — the HAL/BSP, the token and paint rules, **and the file-editing rule at the top**.
+2. `docs/LESSONS.md` — before debugging anything.
+3. `docs/design/cards.md` §13 — every card decision of 2.7, in rounds, and why.
+4. `docs/design/pages.md` — the page model and what 2.6 did and did not build.
+5. `docs/design/dashboard.md`, `card-layout.md` (before moving anything inside a card),
+   `ha-websocket.md` (what HA's API gives us, measured), `tokens.md`, `startup.md`.
+6. `docs/ROADMAP.md` §7.
+
+## Environment state git cannot see
+
+**The ESP32-P4 framework libraries are REBUILT, not stock.** `esp32p4_es` in
+`~/.platformio/packages/framework-arduinoespressif32-libs/` carries `MEMPOOL_PREFER_SPIRAM` and a
+64-byte L2 line - the fix for esp-hosted-mcu#243, the P4 WiFi dropouts (#49). The stock copy is
+kept beside it as `esp32p4_es.stock.55.03.311`; rollback is a rename. A `pio pkg update` or a
+platform reinstall silently puts the bug back. Procedure: `docs/REBUILD_P4_LIBS.md`.
+
+**Do not use NINA's C6 updater** on these boards - it hung `WS_P4_5`. The C6 update is not needed.
 
 ## Things that will bite you
 
-**Read the file-editing rule at the top of `CLAUDE.md` before your first edit.** It cost this
-session three separate incidents in one day, including one where a script reported success and
-changed nothing because its anchor string had been mangled the same way.
-
-**Build from PowerShell, not Git Bash.** pioarduino rejects MSYS shells.
-
-**`pio run` with no `-e` builds ONE environment.** Same for `pio device monitor` — it inherits
-`default_envs` and will try to load a different board's ELF.
-
-**Clear `.pio/build_cache` after editing any BSP header or `lv_conf.h`.**
-
-**A serial monitor resets the board when it opens**, which destroys the evidence of a fault you
-were trying to capture. Use `--rts 0 --dtr 0` to attach without resetting:
-
-    pio device monitor -e WS_P4_TOUCH_LCD_5 -p COM15 -b 115200 --rts 0 --dtr 0
-
-**Six of eight boards are `ARDUINO_USB_CDC_ON_BOOT=1`**, where serial is a buffered USB endpoint:
-the boot log is gone before a monitor can attach, and on a hang everything still in the buffer is
-lost. `SystemReport::line()` and the LVGL log callback both flush for this reason.
-
-**Do not run two `pio` invocations at once.**
-
-**Anything drawn on a panel stays ASCII, except `°`** — and a generated `num` face carries only the
-glyphs `gen_type_scale.py` lists. A colon was missing from it until 2026-09-19, which showed as
-tofu boxes on exactly the three boards using a generated face.
-
-**Verify from outside the device.**
-
----
-
-## What is measured vs. what is assumed
-
-| Measured | |
-|---|---|
-| Card cost | ~2.8 KB in `lv_mem` |
-| `lv_mem` pool | 128 KB static array in internal DRAM. 192 KB on P4 links and breaks the network |
-| One font face | ~96 KB of flash |
-| #49 branch cost on `CYD_S3_3248` | +168 bytes internal RAM, +8,456 flash |
-| System panel, `WS_P4_5` | 640 px wide at x=623 (screen 1280, 740 logical), content 334 px |
-| System panel, `WS_P4_4B` | 540 px wide at x=165 (screen 720, 480 logical), content 298 px |
-| HA `/api/states` | 742 KB across 1,662 entities |
-| HA event rate | 12.2/s on `subscribe_events`; **zero** for the same entities via `subscribe_trigger` |
-| Screenshot PSRAM peak | 0.88 MB on `CYD_S3_3248`, 5.27 MB on `WS_P4_5` |
-| MQTT connect block | up to ~3 s TCP + up to `SOCKET_TIMEOUT_S` for CONNACK, **on the LVGL task** |
-
-**Still assumed:** that the C6 firmware is the cause of #49; that NINA's updater matches our board
-wiring; that the recovery ladder works at all — **it has never once been seen to run to completion
-and succeed.** No swipe gesture has been verified by a finger since the last two fixes.
-
----
+- **Build from PowerShell, not Git Bash** - pioarduino rejects MSYS shells.
+- **`PYTHONIOENCODING=utf-8` before any `pio` whose output you pipe**, or it dies silently
+  (LESSONS). A killed `pio` leaves orphaned `esptool`s holding the port.
+- **Do not run two `pio` at once, and do not edit the tree while one builds** - it compiles your
+  half-finished edit. Docs are safe to edit; source is not.
+- **Clear `.pio/build_cache` after changing a struct's layout, a BSP header or `lv_conf.h`.**
+  Stale objects against a changed struct corrupt memory rather than failing.
+- **`pio run` with no `-e` builds ONE environment.** Before a merge, build all eight.
+- **A serial monitor resets the board when it opens.** Attach with `--rts 0 --dtr 0`.
+- **`Edit` on a CRLF file**: deleting a line by matching a leading `\n` joins two lines. See
+  CLAUDE.md; check `git diff` for a `+` line holding two statements.
+- **HaProvider receives on the WEBSOCKET TASK, not `loop()`.** It must never touch LVGL; it writes
+  through `EntityRegistry`'s mutex. Sends happen on the loop task only. HA request ids must strictly
+  increase per connection, and a reconnect is a cold start (subscriptions are gone) -
+  `ha-websocket.md`.
+- **`staleAfterMs` is 0 on the HA entities on purpose**: `subscribe_trigger` fires on change, so
+  silence means nothing. Death arrives as HA's word "unavailable" (`ST_UNAVAILABLE`).
+- **LVGL clips children to their parent** - shadows, tags, anything that overhangs. Use
+  `UI::unclipShadows()`; the flag alone is not enough (LESSONS).
+- **Never toggle HIDDEN on a screen-sized object when an animation starts** - it redraws the whole
+  screen in the first frame (LESSONS). Switch `CLICKABLE` instead.
+- **Anything drawn on a panel stays ASCII, except `°`.**
+- **Verify from outside the device** - the router, the broker, HA. It is the project's oldest rule.
 
 ## How to work with this owner
 
 He is a hobbyist and an ESP32 enthusiast, not a professional developer, and explicit about that —
 but he reads code, spots real bugs, and has caught several that were not obvious. **Treat his
-instincts as data.** The broker log, the missing colon being a font problem rather than a
-connectivity one, and the "swipe from anywhere" regression were all his.
+instincts as data.** He is also a little colour-blind: never distinguish two states by colour alone.
 
 **What works:**
 
-- **Show, don't spec.** Build something he can react to.
+- **Show, don't spec.** Build something he can react to; he flashes fast and tests thoroughly,
+  reporting back test by test against a sheet. Write `docs/TEST_<milestone>.md` with PASS/FAIL
+  criteria for anything he will judge on glass.
 - **Plain language, not metaphor.** His words: "sometimes I get a little lost in the slang."
-- **Give a recommendation, not a menu.**
-- **Own mistakes plainly and move on.**
-- **He flashes fast** and will often hand you a COM port mid-turn.
-- **Push back on scope when it is real.**
-- **Structure long answers.** He said directly that the what-I-did / caveats / uncertain / next
-  breakdown is his preferred format.
+- **Give a recommendation, not a menu** - but ask before building on an assumption, and discuss a
+  structural choice a turn before implementing it.
+- **Read the tool, not the name.** Check the source before asserting how something behaves.
+- **Own mistakes plainly and move on.** Report negative results as clearly as wins.
+- **Tell him what has NOT been tested.** He acts on it immediately.
+- **Structure long answers**: what was done, what it took, how it looks different, issues hit,
+  what you are unsure of, caveats, test steps with pass/fail.
+- **He is often right about the shape of a thing before he can name it.** "I'm wondering
+  whether..." is usually a design instinct - engage with it.
+- **He will solve your problem if you tell him what you are stuck on.** #49 ended because he found
+  the upstream issue. Say plainly what is unexplained.
 
 **What to avoid:**
 
-- Don't say "we should wait until phase X" as a reflex.
-- Don't trust a browser mock. The bench narrows the options; the glass decides.
-- Don't commit straight to `main`. Feature branch, then merge.
+- Don't commit straight to `main`. Feature branch, then `--no-ff` merge once he signs off.
 - **Don't guess a fourth time.** Instrument it or ask the far end.
-- **Don't claim a script worked because it printed something.** Check the file changed. On
-  2026-09-20 this rule was broken three separate times in one day by the same mechanism: a Python
-  replace whose anchor did not match, followed by a `print("ok")`. It cost a pause guard that
-  silently did nothing, the whole of #56's wire-side detection, and a build flag that never reached
-  `WS_S3_TOUCH_LCD_4B`. **Assert the anchor, then grep the file.** The owner found two of the three
-  within minutes of looking at hardware.
+- **Don't claim a script worked because it printed something.** Assert the anchor, then grep the
+  file. This cost three separate features on 2026-09-20.
+- Don't say "we should wait until phase X" as a reflex, and don't trust a browser mock - the glass
+  decides.
 
-### Added 2026-09-21, from the session that solved #49
+**Versioning:** `A.B.C.D`, where **C is the milestone within the phase**. Tag on `main` at merge
+when a milestone completes (`v0.2.7` = through 2.7), never during development. D is commits since
+the tag; a dirty tree appends `+dirty`.
 
-- **He is often right about the shape of a thing before he can name it.** "Priority should be the
-  entities I actually reach for" arrived as a musing and was a better model than the
-  domain-weighting in `Dashboard_HA.h`. "Can a card group several doors?" was group cards. When he
-  says "I'm wondering whether...", that is usually a design instinct, not a question - engage with
-  it rather than answering narrowly.
-- **A half-remembered detail from him is worth re-checking at the source.** He recalled NINA
-  deferring NVS writes for wear reasons rather than connectivity. He was half right, and going back
-  to find out surfaced a second rationale in a different file that reframed #41 entirely.
-- **He will solve your problem if you tell him what you are stuck on.** Four weeks of #49 theories
-  ended because he went looking for other people with the same symptom and found
-  esp-hosted-mcu#243. Say plainly what is unexplained.
-- **Tell him what has NOT been tested.** He acts on it immediately and without complaint. The tap
-  path, the pause `unavailable` publish and the icon rendering were all flagged as unverified and
-  all were on glass within the hour.
-- **Report negative results as clearly as wins.** "The C6 update did not fix it" and "that data
-  point is void because I killed a flash on that port" were both received as useful. Hedging them
-  would have been worse than useless.
-- **Do not let a background build run while you edit the tree.** Two flashes failed on 2026-09-20
-  because a background `pio` compiled a half-finished edit. Edit first, then flash.
-
-**Versioning:** `A.B.C.D`, where **C is the roadmap phase**. Tag on `main` at merge, never during
-development. A dirty tree appends `+dirty`.
+**The issue tracker is yours to manage**, and keeping it, HANDOFF and ROADMAP current is part of the
+work, not a follow-up.
