@@ -253,12 +253,32 @@ screen, Midnight, page 0, all with `-O2`:
 | `LV_OS_FREERTOS`, 1 draw unit | 182.2 | 114.6 (+20%) | 119.0 KB | the OS switch alone costs ~19 ms: every draw job is handed to a separate thread and waited on |
 | `LV_OS_FREERTOS`, **2 draw units** | 213.2 | **144.8 (+51%)** | 109.8 KB | the second thread makes it worse, not better. One-card update 6.9 -> 8.2 ms |
 
-**Not adopted.** Why the second core hurts is **not established**. Candidates, none tested: LVGL's
-draw threads are unpinned (`lv_freertos.c:93`, plain `xTaskCreate`), so both may share a core; our
-50-line partial buffers give each refresh few independent draw jobs, so dispatch overhead dominates;
-two cores writing one PSRAM buffer contend for the 64-byte-line L2 cache. The first two are cheap to
-test if this is ever revisited - after step 2, whose buffers and chunking are different. The CYD
-was never tried: two 8 KB stacks from internal RAM do not fit it (21-26 KB free).
+**Not adopted - and now we know why** (same day, owner's go-ahead; `/bench?tasks=1` added for it,
+reporting CPU per FreeRTOS task and each core's idle time over the measured frames):
+
+| Config (P4_5) | render | core 0 busy | core 1 busy | work done by draw thread #2 |
+|---|---|---|---|---|
+| `NONE`, 50-line buffers (current) | 95.7 | ~1% | ~100% | n/a |
+| `FREERTOS` 2 units, 50-line | 146.7 | **1%** | 100% | **4.7 ms** of 1,644 |
+| `FREERTOS` 2 units, full-frame buffers | 108.1 | **1%** | 99% | **19.6 ms** of 1,788 |
+| `NONE`, full-frame buffers | 94.6 | 1% | 99% | n/a |
+
+1. **Core 0 was idle the whole time.** When `loop()` hands a job to a draw thread and then waits for
+   it, FreeRTOS runs the higher-priority thread on the core that woke it; nothing ever reached core 0.
+2. **The second draw unit got ~1% of the work, whatever the buffer size.** LVGL only gives a second
+   unit jobs that do not overlap anything still being drawn; our screens - overlapping cards,
+   shadows, labels - are almost one continuous stream of dependent jobs.
+3. Pinning a thread to core 0 was **not tried**, deliberately: with one stream of work, it would
+   only move that stream to the other core while `loop()` waits. No parallelism to gain.
+4. Full-frame buffers do not speed up drawing under `NONE` either (94.6 vs 95.7); they shave the
+   per-chunk copy (62.7 vs 67.1 ms) at a cost of 3.7 MB of PSRAM. Step 2 changes that path anyway.
+
+The owner asked whether a pure ESP-IDF build would behave differently. Arduino-esp32 is ESP-IDF with
+a `loop()` task on top; both framework variants run FreeRTOS on two cores
+(`CONFIG_FREERTOS_NUMBER_OF_CORES 2`; the only "UNICORE" setting is the C6 co-processor's). Nothing
+found in the Arduino layer explains the result; the work itself is not parallel. **Revisit only if
+the UI changes shape** - for example many independent regions animating at once. The CYD was never
+tried: two 8 KB stacks from internal RAM do not fit it (21-26 KB free).
 
 **Why PPA loses** (read in `components/lvgl/src/draw/espressif/ppa/`, then measured): it takes only
 square-cornered, solid, opaque fills and unrotated image copies, so our rounded cards and all text

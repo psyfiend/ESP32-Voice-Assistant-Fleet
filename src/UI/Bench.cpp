@@ -77,6 +77,7 @@ struct Request {
     int  page = -1;   // -1 = leave as it is
     int  deck = -1;
     bool keep = false; // stay on the measured page/deck, so a screenshot can follow
+    bool tasks = false; // report CPU time per FreeRTOS task over the measured frames
 };
 
 struct Agg {
@@ -100,8 +101,66 @@ struct Result {
     uint64_t    chunks = 0, px = 0;
     size_t      heapBefore = 0, heapAfter = 0;
     size_t      lvFreeBefore = 0, lvFreeAfter = 0;
+
+    // ?tasks=1: CPU time per FreeRTOS task across the measured frames, from
+    // the kernel's own run-time counters (esp_timer, microseconds; both
+    // framework variants build with GENERATE_RUN_TIME_STATS). A task's
+    // xCoreID is only its PINNING, not where an unpinned task ran - so each
+    // core's IDLE task, which is pinned, is what shows per-core load:
+    // window - idle = how busy that core was.
+    static constexpr uint8_t TASK_TOP = 8;
+    struct TaskUse { char name[16]; int32_t core; uint32_t us; };
+    bool        haveTasks = false;
+    uint32_t    windowUs = 0;
+    uint32_t    idleUs[2] = {0, 0};
+    uint8_t     taskCount = 0;
+    TaskUse     taskTop[TASK_TOP] = {};
 };
 Result s_res;
+
+// --= Task accounting (?tasks=1) =--
+
+struct TaskSnap { TaskStatus_t *st = nullptr; UBaseType_t n = 0; };
+
+bool snapTasks(TaskSnap &s) {
+    const UBaseType_t cap = uxTaskGetNumberOfTasks() + 8;   // headroom for tasks born mid-run
+    s.st = static_cast<TaskStatus_t *>(
+        heap_caps_malloc(cap * sizeof(TaskStatus_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (!s.st) return false;
+    s.n = uxTaskGetSystemState(s.st, cap, nullptr);
+    return true;
+}
+
+void freeSnap(TaskSnap &s) { heap_caps_free(s.st); s.st = nullptr; s.n = 0; }
+
+void taskUsage(Result &r, const TaskSnap &a, const TaskSnap &b, uint32_t windowUs) {
+    r.windowUs = windowUs;
+    for (UBaseType_t i = 0; i < b.n; i++) {
+        const TaskStatus_t &t = b.st[i];
+        uint32_t before = 0;
+        for (UBaseType_t j = 0; j < a.n; j++) {
+            if (a.st[j].xHandle == t.xHandle) { before = a.st[j].ulRunTimeCounter; break; }
+        }
+        const uint32_t us = t.ulRunTimeCounter - before;   // u32; the subtraction survives a wrap
+        const int32_t core = (t.xCoreID >= 0 && t.xCoreID < 2) ? (int32_t)t.xCoreID : -1;
+
+        if (!strncmp(t.pcTaskName, "IDLE", 4) && core >= 0) { r.idleUs[core] = us; continue; }
+
+        // Keep the busiest TASK_TOP, sorted, by insertion.
+        uint8_t pos = r.taskCount;
+        while (pos > 0 && r.taskTop[pos - 1].us < us) pos--;
+        if (pos >= Result::TASK_TOP) continue;
+        const uint8_t last = r.taskCount < Result::TASK_TOP ? r.taskCount : Result::TASK_TOP - 1;
+        for (uint8_t k = last; k > pos; k--) r.taskTop[k] = r.taskTop[k - 1];
+        Result::TaskUse &u = r.taskTop[pos];
+        strncpy(u.name, t.pcTaskName, sizeof(u.name) - 1);
+        u.name[sizeof(u.name) - 1] = '\0';
+        u.core = core;
+        u.us   = us;
+        if (r.taskCount < Result::TASK_TOP) r.taskCount++;
+    }
+    r.haveTasks = true;
+}
 
 // Run phases, owned by service().
 enum class Phase : uint8_t { PH_START, PH_SETTLE };
@@ -153,6 +212,10 @@ void measure() {
     r.lvFreeBefore = lvMemFree();
     lv_display_add_event_cb(disp, waitCb, LV_EVENT_ALL, nullptr);
 
+    TaskSnap snapA, snapB;
+    const bool tasks = r.req.tasks && snapTasks(snapA);
+    const int64_t tWindow = esp_timer_get_time();
+
     for (int i = 0; i < r.req.n; i++) {
         LVGL_Startup::FlushStats fs;
         s_waitUs = 0;
@@ -174,6 +237,13 @@ void measure() {
 
         vTaskDelay(1);   // outside the timed part: let WiFi and the websocket breathe
     }
+
+    if (tasks) {
+        const uint32_t windowUs = (uint32_t)(esp_timer_get_time() - tWindow);
+        if (snapTasks(snapB)) taskUsage(r, snapA, snapB, windowUs);
+        freeSnap(snapB);
+    }
+    freeSnap(snapA);
 
     lv_display_remove_event_cb_with_user_data(disp, waitCb, nullptr);
     r.heapAfter   = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
@@ -268,6 +338,16 @@ size_t buildJson() {
     // Whether the board rebooted between two runs, and why it last did. A
     // dropped connection mid-matrix is otherwise indistinguishable from a
     // panic (TEST_2.9.md T7).
+    if (r.haveTasks) {
+        o.add("\"tasks\":{\"window_us\":%lu,\"idle_us\":[%lu,%lu],\"top\":[",
+              (unsigned long)r.windowUs, (unsigned long)r.idleUs[0], (unsigned long)r.idleUs[1]);
+        for (uint8_t i = 0; i < r.taskCount; i++) {
+            const Result::TaskUse &u = r.taskTop[i];
+            o.add("%s{\"n\":\"%s\",\"core\":%ld,\"us\":%lu}", i ? "," : "", u.name,
+                  (long)u.core, (unsigned long)u.us);
+        }
+        o.add("]},");
+    }
     o.add("\"uptime_s\":%lu,\"reset_reason\":%d}\n",
           (unsigned long)(esp_timer_get_time() / 1000000), (int)esp_reset_reason());
     return o.len < JSON_CAP ? o.len : JSON_CAP - 1;
@@ -297,6 +377,7 @@ const char *parseQuery(httpd_req_t *req, Request &q) {
         else return "deck must be 0 or 1";
     }
     if (httpd_query_key_value(s, "keep", v, sizeof(v)) == ESP_OK) q.keep = !strcmp(v, "1");
+    if (httpd_query_key_value(s, "tasks", v, sizeof(v)) == ESP_OK) q.tasks = !strcmp(v, "1");
     return nullptr;
 }
 
