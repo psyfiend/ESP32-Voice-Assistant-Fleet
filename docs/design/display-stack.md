@@ -147,7 +147,7 @@ them (`docs/REBUILD_P4_LIBS.md`, which we have done once for the P4).
 | Setting (Espressif's recommendation for LVGL) | Ours today | Kind | Verdict |
 |---|---|---|---|
 | `FREERTOS_HZ=1000` | 1000 | prebuilt | already right |
-| `LV_DRAW_SW_DRAW_UNIT_CNT=2` (draw on both cores) | 1 | ours | Needs `LV_OS_FREERTOS`. **A candidate big win on every dual-core board**, but it changes the threading model. Measure it as its own experiment, not bundled with the migration |
+| `LV_DRAW_SW_DRAW_UNIT_CNT=2` (draw on both cores) | 1 | ours | Needs `LV_OS_FREERTOS`. **Measured 2026-09-26: 51% SLOWER drawing on P4_5** (§8.3). Not adopted |
 | `LV_OS_FREERTOS`, `LV_USE_CLIB_MALLOC` | `LV_OS_NONE`, builtin pool | ours | Not now; see 6.1 |
 | `LV_DEF_REFR_PERIOD=15`, `LV_OBJ_STYLE_CACHE` | 33 ms, off | ours | cheap `/bench` experiments |
 | `COMPILER_OPTIMIZATION_PERF` (-O2), set by every Waveshare P4 demo | **`-Os`** on LVGL and our code (compile DB, 2026-09-25) | ours, for LVGL | **cheap `/bench` experiment on drawing**; costs flash. Survey §2 |
@@ -242,6 +242,23 @@ speed; we built everything we compile, LVGL included, with `-Os`). Full screen, 
 
 `-O2` speeds up the CYD's QSPI send by a quarter: that loop is Arduino_GFX code, which we compile,
 not a prebuilt library. The prebuilt ESP-IDF libraries stay `-Os` either way.
+
+**Drawing on both cores - measured SLOWER, 2026-09-26, `WS_P4_5` only** (branch
+`exp/67-lv-freertos`, not merged; owner deferred D to the recommendation to measure it). Full
+screen, Midnight, page 0, all with `-O2`:
+
+| Config | total | render | internal RAM free | Verdict |
+|---|---|---|---|---|
+| `LV_OS_NONE`, 1 draw unit (current) | 162.9 | **95.7** | 128.9 KB | |
+| `LV_OS_FREERTOS`, 1 draw unit | 182.2 | 114.6 (+20%) | 119.0 KB | the OS switch alone costs ~19 ms: every draw job is handed to a separate thread and waited on |
+| `LV_OS_FREERTOS`, **2 draw units** | 213.2 | **144.8 (+51%)** | 109.8 KB | the second thread makes it worse, not better. One-card update 6.9 -> 8.2 ms |
+
+**Not adopted.** Why the second core hurts is **not established**. Candidates, none tested: LVGL's
+draw threads are unpinned (`lv_freertos.c:93`, plain `xTaskCreate`), so both may share a core; our
+50-line partial buffers give each refresh few independent draw jobs, so dispatch overhead dominates;
+two cores writing one PSRAM buffer contend for the 64-byte-line L2 cache. The first two are cheap to
+test if this is ever revisited - after step 2, whose buffers and chunking are different. The CYD
+was never tried: two 8 KB stacks from internal RAM do not fit it (21-26 KB free).
 
 **Why PPA loses** (read in `components/lvgl/src/draw/espressif/ppa/`, then measured): it takes only
 square-cornered, solid, opaque fills and unrotated image copies, so our rounded cards and all text
