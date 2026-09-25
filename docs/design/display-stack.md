@@ -149,7 +149,8 @@ them (`docs/REBUILD_P4_LIBS.md`, which we have done once for the P4).
 | `FREERTOS_HZ=1000` | 1000 | prebuilt | already right |
 | `LV_DRAW_SW_DRAW_UNIT_CNT=2` (draw on both cores) | 1 | ours | Needs `LV_OS_FREERTOS`. **A candidate big win on every dual-core board**, but it changes the threading model. Measure it as its own experiment, not bundled with the migration |
 | `LV_OS_FREERTOS`, `LV_USE_CLIB_MALLOC` | `LV_OS_NONE`, builtin pool | ours | Not now; see 6.1 |
-| `LV_DEF_REFR_PERIOD=15`, `LV_OBJ_STYLE_CACHE` | check `lv_conf.h` | ours | cheap experiments for step 1 |
+| `LV_DEF_REFR_PERIOD=15`, `LV_OBJ_STYLE_CACHE` | 33 ms, off | ours | cheap `/bench` experiments |
+| `COMPILER_OPTIMIZATION_PERF` (-O2), set by every Waveshare P4 demo | **`-Os`** on LVGL and our code (compile DB, 2026-09-25) | ours, for LVGL | **cheap `/bench` experiment on drawing**; costs flash. Survey §2 |
 | **P4:** `CACHE_L2_CACHE_LINE_128B` | **64B** | prebuilt | **Conflict.** We rebuilt to 64B as part of the #49 WiFi fix (esp-hosted-mcu#219/#243). WiFi stability wins. Only reconsider if measurement blames it, and never without a WiFi soak |
 | **P4:** `CACHE_L2_CACHE_256KB` | 256KB | prebuilt | already right (and it is the one the #49 rebuild nearly halved) |
 | **P4:** `SPIRAM_XIP_FROM_PSRAM` | not set | prebuilt | not needed to start |
@@ -175,6 +176,8 @@ Checked 2026-09-25:
   sequence (`DisplayManager.cpp`, `ch422gRawWrite()`) moves across as-is. `WS_S3_4B`'s ST7701 init
   over the expander's 3-wire SPI needs a replacement for `Arduino_XCA9554SWSPI`, probably a small
   bit-bang over FleetI2C or Espressif's `esp_io_expander` + `esp_lcd_panel_io_3wire_spi`.
+  **Settled 2026-09-25: the latter**, exactly as Waveshare's own S3-4B BSP does it, sharing `Wire`'s
+  bus through arduino-esp32's `i2cBusHandle()` (survey §4).
 - **The one real I2C hazard is unchanged and not 2.9's:** IDF's legacy `driver/i2c.h` and the new
   `i2c_master` driver cannot be linked together (`FleetI2C.cpp`'s header notes). Arduino 3.x `Wire`
   is built on `i2c_master`. Any new code must use `i2c_master` or `Wire`, never the legacy driver.
@@ -273,8 +276,12 @@ rotating CPU copy itself.**
   and back off only if it freezes.** If it does, the fix is a P4 library rebuild on 5.5.5 with the
   patch applied (`docs/REBUILD_P4_LIBS.md`), keeping the #49 settings.
 
-- AXS15231B partial window writes over QSPI (step 5).
-- Which DSI panels can mirror X/Y in their own registers (step 3).
+- AXS15231B partial window writes over QSPI (step 5). No Waveshare source covers it
+  (`docs/research/waveshare-esp-lcd-survey.md` §5).
+- ~~Which DSI panels can mirror X/Y in their own registers (step 3).~~ **Answered on paper
+  2026-09-25** (survey §3): EK79007 (7B) and JD9165 can mirror both axes, ST7703 (4B) only Y, and
+  IDF's DSI panel has no mirror of its own. The 7B's free 180 degrees still has to be seen on
+  glass. **The 4B goes back to rotation 0** (owner, 2026-09-25), with vendor timings, at step 3.
 - Whether `LV_DRAW_SW_DRAW_UNIT_CNT=2` is worth changing the threading model for. That is a
   decision for after step 1's numbers.
 - #40 (diff the GFX fork against the vendor trees) is mostly superseded. The vendor trees are still
