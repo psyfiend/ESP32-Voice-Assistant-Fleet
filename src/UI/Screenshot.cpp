@@ -28,6 +28,9 @@
 #include "UI/Screenshot.h"
 #include "HttpServer.h"
 #include "DeviceIdentity.h"
+#ifdef DISPLAY_ESPLCD
+#include "../LVGL_Flush.h"   // shownFrameBuffer(), for ?fb=1
+#endif
 
 #include <Arduino.h>          // Serial only
 #include <lvgl.h>
@@ -72,7 +75,8 @@ constexpr int DEFAULT_F = 0;
 // REQUESTED -> CAPTURING -> DONE; the handler moves DONE -> IDLE when it has
 // sent the picture. Each move is a compare-exchange, so a handler that gives up
 // and loop() starting the render cannot both win.
-enum : int { ST_IDLE, ST_REQUESTED, ST_CAPTURING, ST_DONE };
+enum : int { ST_IDLE, ST_REQUESTED, ST_CAPTURING, ST_DONE,
+              ST_REQUESTED_FB };   // ?fb=1: the panel's frame buffer (esp_lcd path)
 
 std::atomic<int>  s_state{ST_IDLE};
 SemaphoreHandle_t s_done = nullptr;
@@ -188,9 +192,35 @@ bool layerHasContent(lv_obj_t *layer) {
     return false;
 }
 
-void capture() {
+#ifdef DISPLAY_ESPLCD
+// ?fb=1 on the esp_lcd path (2.9 step 2): the frame buffer the panel is
+// actually showing, copied as-is - physical orientation (WS_P4_5 comes out
+// portrait), no overlays re-rendered, no LVGL involved. The one check of
+// "what is on the glass" that does not trust LVGL, the rotation or the
+// repair bookkeeping: it reads their result.
+void captureFramebuffer() {
+    const int64_t t0 = esp_timer_get_time();
+    uint32_t w = 0, h = 0;
+    const void *fb = LVGL_Flush::shownFrameBuffer(w, h);
+    if (!fb) { s_cap.error = "no frame buffer"; return; }
+    uint8_t *rgb = psramAlloc((size_t)w * h * 3);
+    if (!rgb) { s_cap.error = "not enough PSRAM for the image"; return; }
+    expand565(static_cast<const uint8_t *>(fb), w * 2, rgb, w, h);
+    s_cap.rgb      = rgb;
+    s_cap.w        = w;
+    s_cap.h        = h;
+    s_cap.renderMs = (uint32_t)((esp_timer_get_time() - t0) / 1000);
+}
+#endif
+
+void capture(bool fromFrameBuffer) {
     s_cap = Capture{};
     s_cap.psramBefore = psramFree();
+    #ifdef DISPLAY_ESPLCD
+    if (fromFrameBuffer) { captureFramebuffer(); return; }
+    #else
+    (void)fromFrameBuffer;
+    #endif
     const int64_t t0 = esp_timer_get_time();
 
     lv_display_t *disp = lv_display_get_default();
@@ -335,15 +365,27 @@ esp_err_t sendPng(httpd_req_t *req) {
 }
 
 esp_err_t handleScreenshot(httpd_req_t *req) {
+    // ?fb=1 asks for the panel's frame buffer instead of LVGL's re-render; it
+    // is carried in the request STATE, so loop() can never pick up a request
+    // with the other kind's setting.
+    int want = ST_REQUESTED;
+    {
+        char q[32], v[4];
+        if (httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK &&
+            httpd_query_key_value(q, "fb", v, sizeof(v)) == ESP_OK && !strcmp(v, "1")) {
+            want = ST_REQUESTED_FB;
+        }
+    }
+
     int expected = ST_IDLE;
-    if (!s_state.compare_exchange_strong(expected, ST_REQUESTED)) {
+    if (!s_state.compare_exchange_strong(expected, want)) {
         httpd_resp_set_status(req, "503 Service Unavailable");
         httpd_resp_set_hdr(req, "Retry-After", "2");
         return httpd_resp_sendstr(req, "A screenshot is already in progress; try again.\n");
     }
 
     if (xSemaphoreTake(s_done, pdMS_TO_TICKS(PICKUP_WAIT_MS)) != pdTRUE) {
-        expected = ST_REQUESTED;
+        expected = want;
         if (s_state.compare_exchange_strong(expected, ST_IDLE)) {
             // loop() never picked it up - the UI thread is stalled.
             Serial.println("[Shot] loop() did not pick the request up; gave up");
@@ -384,9 +426,11 @@ void begin(HttpServer &http) {
 }
 
 void service() {
-    int expected = ST_REQUESTED;
+    int expected = s_state.load();
+    if (expected != ST_REQUESTED && expected != ST_REQUESTED_FB) return;
+    const bool fromFrameBuffer = (expected == ST_REQUESTED_FB);
     if (!s_state.compare_exchange_strong(expected, ST_CAPTURING)) return;
-    capture();
+    capture(fromFrameBuffer);
     s_state.store(ST_DONE);
     xSemaphoreGive(s_done);
 }

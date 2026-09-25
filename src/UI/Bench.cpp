@@ -308,7 +308,11 @@ size_t buildJson() {
     Out o;
     o.add("{\"host\":\"%s\",\"fw\":\"%s\",\"board\":\"%s\",\"panel\":\"%s\",\"bus\":\"%s\",",
           DeviceIdentity::hostname(), FW_VERSION, bsp_hw.MODEL, bsp_display.PANEL_MODEL, busName());
+#ifdef DISPLAY_ESPLCD
+    o.add("\"flush_path\":\"esp_lcd\",\"res\":[%ld,%ld],\"rotation\":%u,",
+#else
     o.add("\"flush_path\":\"arduino_gfx\",\"res\":[%ld,%ld],\"rotation\":%u,",
+#endif
           (long)lv_display_get_horizontal_resolution(disp),
           (long)lv_display_get_vertical_resolution(disp), (unsigned)bsp_display.ROTATION);
     o.add("\"buf\":{\"bytes\":%u,\"lines\":%u,\"count\":%u,\"where\":\"%s\"},",

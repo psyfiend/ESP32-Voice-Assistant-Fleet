@@ -1,6 +1,6 @@
 #pragma once
 #include <lvgl.h>
-#include "DisplayManager.h"
+#include "BoardDisplay.h"   // DisplayManager or Fleet_Display, per board (2.9)
 #include "TouchManager.h"
 #include "UI/UIToolkit.h"
 
@@ -8,7 +8,7 @@ class Panel_Display {
 public:
     // Takes the two managers it actually uses rather than reaching through
     // GUIManager for them. Hardware is owned by SystemCore; this panel borrows.
-    Panel_Display(DisplayManager& display, TouchManager& touch);
+    Panel_Display(BoardDisplay& display, TouchManager& touch);
     void init(lv_obj_t* parent);
     void tick();
 
@@ -16,7 +16,7 @@ public:
     void setTouchWindowVisibility(bool visible);
 
 private:
-    DisplayManager& _display;
+    BoardDisplay&   _display;
     TouchManager&   _touch;
     int32_t _briFloor; // Slider's real minimum (per-board artificial brightness floor) - the
                         // toast display remaps [_briFloor, 100] back to a user-facing [0, 100].

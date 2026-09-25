@@ -1,7 +1,7 @@
 #include "UI/Panel_Display.h"
 #include "UI/UITokens.h"
 
-Panel_Display::Panel_Display(DisplayManager& display, TouchManager& touch)
+Panel_Display::Panel_Display(BoardDisplay& display, TouchManager& touch)
     : _display(display), _touch(touch) {
     showTouches = false;
 }

@@ -11,14 +11,16 @@
 // and handed in here. LVGL_Startup borrows the managers, it never owns them.
 //
 #include <lvgl.h>
+#include "BoardDisplayFwd.h"   // DisplayManager or Fleet_Display, per board (2.9)
 
-class DisplayManager;
 class TouchManager;
 
 namespace LVGL_Startup {
 
-// Call after SystemCore::begin() has brought up display and touch.
-bool begin(DisplayManager &display, TouchManager &touch);
+// Call after SystemCore::begin() has brought up display and touch. How pixels
+// reach the panel is LVGL_Flush's job (src/LVGL_Flush.h), one file per
+// display library.
+bool begin(BoardDisplay &display, TouchManager &touch);
 
 // lv_timer_handler(). Call every loop() from the LVGL thread - which, with
 // LV_USE_OS == LV_OS_NONE, is loop() itself.

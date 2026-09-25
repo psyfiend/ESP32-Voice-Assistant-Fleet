@@ -166,8 +166,10 @@
 #define LV_DRAW_BUF_STRIDE_ALIGN                1
 
 /** Align start address of draw_buf addresses to this bytes*/
-#if defined(FLEET_LV_PPA) && defined(CONFIG_IDF_TARGET_ESP32P4)
-    /* 2.9 PPA experiment (see LV_USE_PPA below). LVGL's PPA unit refuses to
+#if (defined(FLEET_LV_PPA) || defined(DISPLAY_ESPLCD)) && defined(CONFIG_IDF_TARGET_ESP32P4)
+    /* The esp_lcd path (2.9 step 2) needs this too: its PPA reads LVGL's draw
+     * buffers by DMA and wants them on its 64-byte cache line.
+     * 2.9 PPA experiment (see LV_USE_PPA below). LVGL's PPA unit refuses to
      * compile unless this equals the P4's L2 cache line - 64 on our rebuilt
      * libs (docs/REBUILD_P4_LIBS.md) - and it reads the KCONFIG name for it,
      * which a non-Kconfig build never defines. LVGL_Startup allocates its draw
