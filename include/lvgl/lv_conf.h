@@ -249,7 +249,9 @@
     /** Set number of draw units.
      *  - > 1 requires operating system to be enabled in `LV_USE_OS`.
      *  - > 1 means multiple threads will render the screen in parallel. */
-    #if defined(FLEET_LV_FREERTOS)
+    #if defined(FLEET_LV_FREERTOS) && defined(FLEET_LV_DRAW_UNITS)
+        #define LV_DRAW_SW_DRAW_UNIT_CNT    FLEET_LV_DRAW_UNITS
+    #elif defined(FLEET_LV_FREERTOS)
         #define LV_DRAW_SW_DRAW_UNIT_CNT    2
     #else
         #define LV_DRAW_SW_DRAW_UNIT_CNT    1
