@@ -193,6 +193,18 @@ local/remote split is our `advertise` flag by another name (entities we own vs. 
 else owns). Worth reading `ARCHITECTURE.md` before finalising the `Card` base class in #15,
 specifically for how it decides which types get a detail page and which do not.
 
+**Borrowed, 2026-09-24 (#58): `components/lvgl_screenshot/`.** This is agillis/esphome-lvgl-screenshot
+(MIT), which is itself a port of an older component. Two separate things came from it, under two
+licences:
+- **`stb_image_write.h`** (Sean Barrett, MIT *or* public domain, your choice) is vendored verbatim
+  at `include/third_party/stb_image_write.h`, licence text intact at the bottom of the file.
+- **The capture design** (snapshot, repack, stb PNG, `esp_http_server`, a request/done handshake
+  with the LVGL thread) was *studied*, not copied. `src/UI/Screenshot.cpp` is new code and says
+  what it took and what it changed. Four of those changes were forced by reading source: its
+  `lv_snapshot_take()` allocates from LVGL's 128 KB pool here, and it leaves out the top/system
+  layers. The RGB888 byte order and stb's allocations were also handled differently.
+The `AI_tools/SDL-lvgl-screenshot.yaml` desktop harness was looked at and passed on by the owner.
+
 Also relevant: the README claims support up to a 4×7 grid on the `WS_P4_7B`. **No confirmed
 screenshots have been found**, so treat that as a claim about what the layout system permits, not
 evidence that it is legible.

@@ -24,6 +24,7 @@
 #include "HaProvider.h"
 #include "HaRest.h"
 #include "CommandRouter.h"
+#include "HttpServer.h"
 #ifdef HAS_AUDIO_HW
 #include "AudioManager.h"
 #endif
@@ -53,6 +54,7 @@ public:
     MqttManager         &mqtt()     { return _mqtt; }
     EntityRegistry      &entities() { return _entities; }
     HaClient            &ha()       { return _ha; }
+    HttpServer          &http()     { return _http; }
 #ifdef HAS_AUDIO_HW
     AudioManager        &audio()    { return _audio; }
 #endif
@@ -123,4 +125,10 @@ private:
     // The outbound leg (#44). The ONLY code that knows a command can travel
     // two ways - the registry stays transport-agnostic, per ROADMAP 4.1.
     CommandRouter       _cmdRouter;
+
+    // The device's one HTTP server (#58; Phase 4's web config joins it). Owned
+    // here because it is a network service, but it serves nothing of its own:
+    // routes are registered by whoever owns them, and it only starts once
+    // somebody has. See HttpServer.h.
+    HttpServer          _http;
 };

@@ -404,6 +404,15 @@ layout code.
 
 ### 5.5 Web config page — use the synchronous server
 
+> **SUPERSEDED 2026-09-24 (owner, #58): the server is ESP-IDF's `esp_http_server`, not Arduino's
+> `WebServer`.** The project avoids Arduino-only facilities so that a later move to ESP-IDF is not a
+> port. `esp_http_server` is already linked in both framework variants, and `src/HttpServer.cpp` now
+> runs it: one instance, port 80, routes registered by their owners, and the web config page and
+> captive portal are to join it. The threading trap described below still applies, because its
+> handlers run on the server's own task. It is answered the same way providers answer it: a handler
+> never touches LVGL and asks the LVGL thread instead. See `src/UI/Screenshot.cpp` for the pattern.
+> The original reasoning is kept below.
+
 `ESPAsyncWebServer` runs handlers on its own task, which walks straight into the §4.2 threading
 trap, and it has had real compatibility churn against arduino-esp32 3.x. For a config page
 serving one browser occasionally, the built-in synchronous `WebServer` pumped from `loop()` is
@@ -651,7 +660,7 @@ The numbering above is identity, not sequence. What is actually next, agreed wit
 
 | | | |
 |---|---|---|
-| 1 | **#58, LVGL screenshots** | small and self-contained (`lv_snapshot` + PNG + the already-linked HTTP server). Lets a screen be judged from a real framebuffer instead of a photo, and is the capability page transitions and the page overview both need |
+| 1 | **#58, LVGL screenshots** | **BUILT 2026-09-24 on `feat/58-screenshots`, awaiting glass (`docs/TEST_58.md`).** `GET /screenshot` on port 80 via `esp_http_server`; the screen plus top and system layers, composited as-is; PNG via `stb_image_write`; `scripts/screenshot.py` fetches the fleet. Verified by fetch on `CYD_S3_3248` and `WS_P4_5`. Lets a screen be judged from a real framebuffer instead of a photo, and is the capability page transitions and the page overview both need |
 | 2 | **2.10 card popup groundwork** (#65) | the long-press control surface for lights; full content at 4.4 |
 | 3 | **2.8 header slots** (#19) | before group cards, whose header IS the slot mechanism |
 | 4 | **2.11 group cards** (#66) | before 3.1, because the schema depends on how they are declared |

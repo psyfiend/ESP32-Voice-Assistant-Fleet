@@ -314,6 +314,13 @@ reasoning: `docs/design/startup.md`.
 | `SystemReport` | The System Doctor, emitting to registered sinks |
 | `LVGL_Startup` | The LVGL engine: buffers, `lv_init()`, tick/log callbacks, flush + touch bridges, driver registration |
 | `GUIManager` | Screen content: root screen, decks, header, panels |
+| `HttpServer` | The one HTTP server (`esp_http_server`, port 80), owned by `SystemCore`. Routes are registered by their owners; it starts only if one exists. **Handlers run on the server's own task: never touch LVGL from one** (see `UI/Screenshot.cpp` for the hand-off to the LVGL thread) |
+
+**Prefer ESP-IDF facilities over Arduino-only ones** (owner, 2026-09-24): a move to ESP-IDF is
+expected eventually, and anything built on an Arduino-only library is something to port then.
+`esp_http_server` over Arduino `WebServer` was the first decision made on that basis. New code
+still logs through `Serial` like the rest of the tree, on the view that it is a mechanical swap
+rather than a port. That view is Claude's, not yet the owner's.
 
 Three rules hold this together, and each is load-bearing rather than stylistic:
 

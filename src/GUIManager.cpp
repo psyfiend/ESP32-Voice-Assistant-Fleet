@@ -6,6 +6,7 @@
 #include "Cards/CardIcons.h"   // cardSetLabelMode(), for the Label knob
 #include "UI/ReferencePage.h"
 #include "UI/LogPage.h"
+#include "UI/Screenshot.h"
 #include "Dashboards/Dashboard_Fleet.h"
 #include "Dashboards/Dashboard_HA.h"   // both pages on every board since 2.6
 #include "bsp_loader.h"
@@ -736,6 +737,11 @@ void GUIManager::begin() {
     // Contribute the one LVGL-dependent section of the report.
     SystemReport::addSection("UI STATE", reportUiSection);
 
+    // GET /screenshot (#58), when built with ENABLE_SCREENSHOT. Registered from
+    // here because the capture needs LVGL and SystemCore must not; the server
+    // itself belongs to SystemCore.
+    Screenshot::begin(_core.http());
+
     // --= Z-INDEX SANDWICH =--
     // 0. Touch overlay (bottom - hidden by default, set in Panel_Display::init)
     // 1. Dashboard (the cards)
@@ -1259,4 +1265,6 @@ void GUIManager::tick() {
 #ifdef HAS_AUDIO_HW
     _pnlAudio.tick();
 #endif
+    // Renders a waiting screenshot request, on this - the LVGL - thread.
+    Screenshot::service();
 }
