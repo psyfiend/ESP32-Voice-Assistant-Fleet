@@ -660,7 +660,7 @@ The numbering above is identity, not sequence. What is actually next, agreed wit
 
 | | | |
 |---|---|---|
-| 1 | **2.9 display stack** (#67) | **Brought back 2026-09-25 (owner).** Arduino_GFX -> raw `esp_lcd`, measured first, one board at a time, `WS_P4_5` first. Plan and decisions: `docs/design/display-stack.md`. Step 1 (`/bench`) built 2026-09-25, awaiting sign-off; step 2 (P4_5 on `esp_lcd` DSI) next |
+| 1 | **2.9 display stack** (#67) | **Brought back 2026-09-25 (owner).** Arduino_GFX -> raw `esp_lcd`, measured first, one board at a time, `WS_P4_5` first. Plan and decisions: `docs/design/display-stack.md`. Step 1 (`/bench`) done and merged 2026-09-25; step 2 (P4_5 on `esp_lcd` DSI, triple-partial + PPA rotation) next |
 | 2 | **2.10 card popup groundwork** (#65) | the long-press control surface for lights; full content at 4.4 |
 | 3 | **2.8 header slots** (#19) | before group cards, whose header IS the slot mechanism |
 | 4 | **2.11 group cards** (#66) | before 3.1, because the schema depends on how they are declared |

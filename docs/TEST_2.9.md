@@ -1,6 +1,7 @@
 # Test sheet — 2.9 (#67), display stack
 
-> **Step 1 (`/bench`), 2026-09-25: T1-T6 PASS (owner). T7 (an hour of CYD network) outstanding.**
+> **Step 1 (`/bench`), 2026-09-25: T1-T6 PASS (owner). Merged to `main` the same day on the owner's
+> word; T7 (the CYD's network over time) is being watched while step 2 is worked on.**
 > Every owner run reproduced `display-stack.md` §8.2 within ~2%. T5: both scripts finished with
 > matching numbers. Because the two interleave request by request, each script's screenshots and its
 > final "put it back" may describe the other's state; the board ended correctly this time, but that

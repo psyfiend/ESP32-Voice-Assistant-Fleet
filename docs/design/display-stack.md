@@ -263,13 +263,15 @@ rotating CPU copy itself.**
   (`reference/esp-registry/`, README "ESP-IDF Patches"). It is a patch to **ESP-IDF's own PPA
   driver** (`esp_driver_ppa/src/ppa_srm.c`, a hardware-bug workaround tagged DIG-734), for "display
   freeze" when all three hold: ESP32-P4, **partial** tear-avoidance mode, and **90/270-degree
-  rotation**. P4_5 is `ROTATION = 1` and step 2 planned partial chunks rotated by the PPA. The patch
-  targets IDF v6.0; **we are on IDF v5.5.5**, prebuilt (`framework-arduinoespressif32-libs/versions.txt`),
-  so we can neither read nor patch that file without another library rebuild. Unknown whether 5.5.5
-  carries the faulty code. Note also that Waveshare's own P4_5 LVGL demo runs `ROTATE_0`. Options
-  before writing step 2's flush: rotate with the PPA in **full-frame** mode (the freeze is specific
-  to partial), mount/rotate differently, or reproduce the freeze deliberately and then decide on a
-  rebuild (`docs/REBUILD_P4_LIBS.md`). This is the first thing step 2 settles.
+  rotation**. P4_5 is `ROTATION = 1` and step 2 planned partial chunks rotated by the PPA. We are on
+  IDF v5.5.5, prebuilt (`framework-arduinoespressif32-libs/versions.txt`). **Checked against
+  esp-idf's GitHub, 2026-09-25: v5.5.5's `ppa_srm.c` carries the same DIG-734 block as v6.0**, so
+  the bug is in our build if the hardware hits it, and the patch (it replaces that block with one
+  line) applies to 5.5.5 by hand. The "v6.0" in its README is only what the patch text was made
+  against. **No IDF 6.0 move is needed for it.**
+  **Owner's decision, 2026-09-25: build step 2 the preferred way, triple-partial with PPA rotation,
+  and back off only if it freezes.** If it does, the fix is a P4 library rebuild on 5.5.5 with the
+  patch applied (`docs/REBUILD_P4_LIBS.md`), keeping the #49 settings.
 
 - AXS15231B partial window writes over QSPI (step 5).
 - Which DSI panels can mirror X/Y in their own registers (step 3).
