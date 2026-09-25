@@ -100,6 +100,16 @@ struct Result {
     uint64_t    chunks = 0, px = 0;
     size_t      heapBefore = 0, heapAfter = 0;
     size_t      lvFreeBefore = 0, lvFreeAfter = 0;
+
+    // #68 - the toast found pushed flush-right. Everything on LVGL's top
+    // layer, as LVGL sees it: the layer's own scroll offset, and each child's
+    // requested alignment and offset beside where it actually landed. Read,
+    // never changed. Remove with the fix once #68 is understood.
+    struct Child { int32_t x1, y1, w, h, sx, sy; uint8_t align; bool hidden; };
+    static constexpr uint8_t TOP_MAX = 6;
+    int32_t     topScrollX = 0, topScrollY = 0;
+    uint8_t     topCount = 0;
+    Child       top[TOP_MAX] = {};
 };
 Result s_res;
 
@@ -138,6 +148,23 @@ void measure() {
     r.pageSlug = s_gui->currentPageSlug();
     r.scheme   = UI::pal().name;   // a string literal in the scheme table; safe to keep
     r.deck     = s_gui->deckShown();
+
+    // #68 snapshot of the top layer, before anything is redrawn.
+    if (lv_obj_t *top = lv_display_get_layer_top(disp)) {
+        r.topScrollX = lv_obj_get_scroll_x(top);
+        r.topScrollY = lv_obj_get_scroll_y(top);
+        const uint32_t n = lv_obj_get_child_count(top);
+        for (uint32_t i = 0; i < n && r.topCount < Result::TOP_MAX; i++) {
+            lv_obj_t *c = lv_obj_get_child(top, i);
+            lv_area_t a;
+            lv_obj_get_coords(c, &a);
+            r.top[r.topCount++] = Result::Child{
+                a.x1, a.y1, lv_area_get_width(&a), lv_area_get_height(&a),
+                lv_obj_get_style_x(c, LV_PART_MAIN), lv_obj_get_style_y(c, LV_PART_MAIN),
+                (uint8_t)lv_obj_get_style_align(c, LV_PART_MAIN),
+                lv_obj_has_flag(c, LV_OBJ_FLAG_HIDDEN)};
+        }
+    }
 
     lv_obj_t *target = r.req.what == What::WHAT_CARD ? s_gui->firstCard()
                                                      : lv_display_get_screen_active(disp);
@@ -195,7 +222,7 @@ bool applyTarget(int page, int deck) {
 // into a PSRAM buffer taken per request. NOT a static: .bss is internal RAM,
 // and CYD_S3_3248 boots with ~22 KB of that free - 2 KB of it idle between
 // benches is 10% of what WiFi and MQTT have left (LESSONS.md).
-constexpr size_t JSON_CAP = 2048;
+constexpr size_t JSON_CAP = 3072;   // ~1.8 KB with six top-layer children (#68)
 char *s_json = nullptr;
 
 struct Out {
@@ -268,6 +295,17 @@ size_t buildJson() {
     // Whether the board rebooted between two runs, and why it last did. A
     // dropped connection mid-matrix is otherwise indistinguishable from a
     // panic (TEST_2.9.md T7).
+    // #68: align is LVGL's lv_align_t (1 = TOP_LEFT, 2 = TOP_MID, 8 = RIGHT_MID;
+    // lv_area.h:51-61).
+    o.add("\"top_layer\":{\"scroll\":[%ld,%ld],\"children\":[",
+          (long)r.topScrollX, (long)r.topScrollY);
+    for (uint8_t i = 0; i < r.topCount; i++) {
+        const Result::Child &c = r.top[i];
+        o.add("%s{\"at\":[%ld,%ld],\"size\":[%ld,%ld],\"align\":%u,\"ofs\":[%ld,%ld],\"hidden\":%s}",
+              i ? "," : "", (long)c.x1, (long)c.y1, (long)c.w, (long)c.h, (unsigned)c.align,
+              (long)c.sx, (long)c.sy, c.hidden ? "true" : "false");
+    }
+    o.add("]},");
     o.add("\"uptime_s\":%lu,\"reset_reason\":%d}\n",
           (unsigned long)(esp_timer_get_time() / 1000000), (int)esp_reset_reason());
     return o.len < JSON_CAP ? o.len : JSON_CAP - 1;
