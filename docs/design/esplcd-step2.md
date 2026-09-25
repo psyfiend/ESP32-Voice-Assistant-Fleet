@@ -1,7 +1,11 @@
 # 2.9 step 2 — `WS_P4_5` on `esp_lcd` DSI, triple-partial with PPA rotation
 
-**Status: DESIGN AGREED 2026-09-26 - the owner's decisions are §7, and §7 overrides §2 where they
-differ. No code yet; it follows the two-core drawing experiment (§7 D).** Parent plan:
+**Status: BUILT 2026-09-26 on `feat/67-step2-p45`, awaiting the owner's glass checks
+(`docs/TEST_2.9.md` step 2); numbers in `display-stack.md` §8.5. The owner's decisions are §7, and
+§7 overrides §2 where they differ.** As built, two things differ from §3: the PPA rotation is
+*queued* for every strip but a frame's last (so LVGL draws while it rotates), and the repair skips
+any stale area this frame's own redraw covers (LVGL's `inv_areas`), which is what took the repair
+from 33.8 ms to ~0. Parent plan:
 `display-stack.md` (decisions D1-D5, the numbers in §8, the PPA-freeze risk in §9). Sources:
 `docs/research/waveshare-esp-lcd-survey.md` §1, and `esp_lvgl_adapter` 0.6.4 read as the reference
 implementation (`reference/esp-registry/`). The four structural choices the owner should make are

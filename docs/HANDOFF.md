@@ -57,8 +57,11 @@ network (`fleet-ws-p4-5` and so on). There is no auth; it is gated by `-D ENABLE
    `LV_OBJ_STYLE_CACHE` (2-4% for pool space P4_5 lacks), and **`LV_OS_FREERTOS` + 2 draw units
    (drawing 51% slower on P4_5)** - all in §8.3, none merged.
 
-   **Step 2 is NEXT, and the design is agreed: `docs/design/esplcd-step2.md` - its §7 holds the
-   owner's decisions and overrides its §2.** Triple-partial with PPA rotation on `WS_P4_5`, in a new
+   **Step 2 is BUILT on `feat/67-step2-p45` (2026-09-26), awaiting the owner's glass checks
+   (`TEST_2.9.md` step 2, S1-S5).** `WS_P4_5` runs on `esp_lcd`: full-screen redraw 162.9 -> 90.1 ms,
+   and `/screenshot?fb=1` (the panel's own buffer) matches LVGL's render to the pixel. Nothing
+   else moved. After sign-off: step 3, the other P4s. The design: `docs/design/esplcd-step2.md` - its
+   §7 holds the owner's decisions and overrides its §2. Triple-partial with PPA rotation on `WS_P4_5`, in a new
    `components/Fleet_Display/` (`DisplayManager` untouched until step 6), HX8394 driver vendored with
    its legacy-I2C code compiled out, `LV_OS_NONE`. Read `docs/research/waveshare-esp-lcd-survey.md`
    first. The branch `spike/67-esplcd-compile` proves every IDF call and the driver compile and link

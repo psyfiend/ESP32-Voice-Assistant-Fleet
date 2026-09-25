@@ -9,6 +9,63 @@
 > one-card drawing 4.9 -> 7.4 ms (+50%), copy unchanged; recorded in §8.2. Linen on the CYD was not run.
 > Steps 2-6 will add their own sections here.
 
+---
+
+## Step 2 — `WS_P4_5` on `esp_lcd` (branch `feat/67-step2-p45`)
+
+> **Awaiting the owner's glass checks, 2026-09-26.** Built, flashed and tested by Claude on
+> `WS_P4_5` only; no other board runs any of it (they build unchanged - `CYD_S3_3248` compiled).
+
+**What changed.** `WS_P4_5` no longer uses Arduino_GFX. Its panel is brought up on raw `esp_lcd`
+(`components/Fleet_Display/`), it has **three** frame buffers instead of one, and the P4's PPA
+rotates each strip LVGL draws into the buffer being built, while LVGL draws the next strip. A
+finished buffer is handed to the panel whole, at the start of its next frame. The one line that
+does it is `-D DISPLAY_ESPLCD` in `WS_P4_5`'s environment; **deleting that line puts the board
+back on Arduino_GFX exactly as before.**
+
+**Already seen by me, not on glass:**
+- Full-screen redraw **162.9 -> 90.1 ms (-45%)**, a ceiling of 11 frames/s instead of 6. Drawing
+  itself 95.7 -> 75.5 ms: the CPU no longer spends its cache on copying. `display-stack.md` §8.5.
+- **The panel's buffer matches LVGL's own picture to the pixel.** New: `/screenshot?fb=1` returns
+  the frame buffer the panel is showing (portrait, as wired). Compared pixel by pixel with the
+  normal screenshot: identical on both pages, with the deck, after card redraws and page changes.
+  The one mismatch seen was the Uptime and Signal values changing between the two captures.
+- That comparison also proves the orientation is **the same as Arduino_GFX's** rotation 1.
+- 30-minute soak for the known PPA freeze: see the result line below.
+- **Never seen by anyone:** the glass itself. Everything above reads memory; only your eyes can
+  confirm the panel shows it upright, in the right colours, without tearing.
+
+**Known cost:** the first two or three small updates after a whole-screen change (a page swipe)
+each pay one full-frame copy (~33 ms): every buffer is two frames behind, and it is brought up to
+date before reuse. After that a card update costs about what it did before.
+
+**S1 — First light.** Power-cycle `WS_P4_5`.
+- PASS: the dashboard comes up **upright, the same way round as before**, colours as before (a
+  red/blue swap would show on the orange cards and the coloured area tags).
+- FAIL: sideways, upside down, mirrored, wrong colours, noise, or a black screen. Note what you see
+  at boot, before the dashboard appears, too (a moment of black is expected).
+
+**S2 — Touch.** Tap a card in each of the four corners, and swipe pages both ways.
+- PASS: every tap lands on the card under your finger; swipes go the right way.
+- FAIL: taps land elsewhere (touch mapping is unchanged, so this would be a surprise worth a photo).
+
+**S3 — Tearing and smoothness.** Swipe pages quickly, open and close the drawer, open the deck
+panels, drag the Touch Points panel around.
+- PASS: no torn frames (a horizontal or vertical seam where two frames meet), no flicker, no stale
+  fragments left behind where something moved.
+- Also tell me: does it *feel* faster than before? Page swipes and the drawer are where it should.
+
+**S4 — The rest of the display.** Brightness slider; switch to Linen and back; take a normal
+`python scripts/screenshot.py fleet-ws-p4-5`.
+- PASS: brightness changes, the scheme switch repaints everything, screenshots look right.
+
+**S5 — Overnight.** Leave it running, then `python scripts/bench.py fleet-ws-p4-5`.
+- PASS: the uptime line shows no reboot, the numbers are near 90 ms full / under 10 ms card.
+- FAIL: a reboot, or `/bench` answering "the UI thread did not respond" (that is what a PPA freeze
+  would look like: the screen stops changing, the network keeps working).
+
+---
+
 Branch `feat/67-bench`. The plan is `docs/design/display-stack.md`; the numbers are its §8; what
 every JSON field means is the header comment of `src/UI/Bench.cpp`.
 

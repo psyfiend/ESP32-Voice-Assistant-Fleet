@@ -308,6 +308,34 @@ rotating CPU copy itself.**
 - **Not yet measured:** Linen on the CYD, and animation frames such as a swipe or the drawer,
   which redraw partial areas every tick rather than one full frame.
 
+### 8.5 Step 2 measured - `WS_P4_5` on `esp_lcd`, 2026-09-26 (`feat/67-step2-p45`)
+
+Full screen, Midnight, page 0, 20 frames; baseline is Arduino_GFX with `-O2`:
+
+| Build | total | render | copy | present | wait | Notes |
+|---|---|---|---|---|---|---|
+| Arduino_GFX (`main`) | 162.9 | 95.7 | 67.1 (CPU) | 0.0 | 0.1 | |
+| esp_lcd, PPA **blocking**, full-frame repair | 169.9 | 73.5 | 62.6 | 33.8 | 0.1 | first working build |
+| + repair skips what the frame redraws | 135.0 | 72.2 | 62.6 | 0.1 | 0.1 | |
+| + PPA **queued** (LVGL draws while it rotates) | **90.1** | **75.5** | 11.6 | 0.1 | 2.9 | **-45%**; `copy` is now the time to queue |
+
+- **Drawing got faster on its own** (95.7 -> ~73 ms) once the CPU stopped copying: the copy was
+  also evicting LVGL's working set from the cache.
+- **The PPA is slower than hoped:** ~62 ms to rotate a whole 1280x720 frame, ~33 ms to copy one
+  unrotated - about 110 MB/s each way. The `data_burst_length` 128 that LVGL's own PPA code uses
+  changed nothing. It stops mattering once queued, because it runs while LVGL draws; it would
+  matter again if drawing ever got faster than ~62 ms. Unexplained; our 64-byte L2 cache line
+  (the #49 WiFi fix) is one suspect, untested.
+- **One-card updates** average 8.6-12.8 ms in the matrix, against 6.9 on Arduino_GFX. The average
+  includes the two or three updates right after a whole-screen frame, each of which repairs a buffer
+  that is two full frames behind (one full-frame copy, ~33 ms). Settled, a card update costs about
+  what it did.
+- **Correctness, measured rather than looked at:** `/screenshot?fb=1` (new) returns the frame buffer
+  the panel is showing; turned upright and compared pixel by pixel with LVGL's own render, it
+  matched exactly on both pages, with the deck, after card redraws and page changes. The one
+  difference seen was the Uptime and Signal values changing between the two captures. The same
+  comparison confirms the orientation equals Arduino_GFX's rotation 1.
+
 ## 9. Open questions
 
 - **STEP 2 RISK, found 2026-09-25: a known PPA freeze matches P4_5's exact configuration.**
