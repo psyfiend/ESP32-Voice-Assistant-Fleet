@@ -1,6 +1,7 @@
 # 2.9 step 2 — `WS_P4_5` on `esp_lcd` DSI, triple-partial with PPA rotation
 
-**Status: PROPOSED 2026-09-25, for the owner's review. No code yet.** Parent plan:
+**Status: DESIGN AGREED 2026-09-26 - the owner's decisions are §7, and §7 overrides §2 where they
+differ. No code yet; it follows the two-core drawing experiment (§7 D).** Parent plan:
 `display-stack.md` (decisions D1-D5, the numbers in §8, the PPA-freeze risk in §9). Sources:
 `docs/research/waveshare-esp-lcd-survey.md` §1, and `esp_lvgl_adapter` 0.6.4 read as the reference
 implementation (`reference/esp-registry/`). The four structural choices the owner should make are
@@ -122,13 +123,13 @@ Arduino_GFX, byte for byte. The other seven boards do not see any of this code.
   during a drawer animation, screenshots unchanged, and a **soak**: `bench.py` in a loop for an hour
   (constant partial rotation) plus page swipes, watching `uptime_s` for a freeze-reboot.
 
-## 7. Choices for the owner
+## 7. Choices — DECIDED 2026-09-26 (owner)
 
-| | Choice | Recommendation |
+| | Choice | Decision |
 |---|---|---|
-| **A** | Panel bring-up inside `DisplayManager` (new file, `#ifdef` branch) vs. a new component | Inside `DisplayManager`: it already owns every panel type, and step 6 deletes the GFX branches beside it |
-| **B** | Vendor Waveshare's HX8394 driver, fed our init commands, vs. writing the DBI init ourselves | Vendor it: it is 350 lines, MIT, and it is exactly what their BSP and demo run |
-| **C** | Repair copies by PPA (public API) vs. declaring the unexported `esp_async_fbcpy` ourselves | PPA: public, documented, one engine to reason about |
-| **D** | Keep `LV_OS_NONE` (flush blocks `loop()` while the PPA works) vs. moving LVGL to its own task now | Keep it. One change of model at a time (`display-stack.md` §6.1) |
+| **A** | Where the `esp_lcd` path lives | **A new library, `components/Fleet_Display/`, holding only the `esp_lcd` path** - named like the other `Fleet_*` components. `DisplayManager` (Arduino_GFX) is **left untouched** until step 6 deletes it; a board uses one or the other by its build flag, never both woven through the same files. The owner: "I'd prefer being able to easily follow the code with my own eyes and not have to wonder if something got updated." LVGL side likewise: today's `disp_flush` moves to its own file, and the triple-partial flush is a separate file; each file is wholly in or wholly out of a build. **This supersedes §2's table**, which proposed `#ifdef` branches inside `DisplayManager` |
+| **B** | The HX8394 driver | **Vendored**, with `CONFIG_ESP_LCD_HX8394_SKIP_I2C_INIT` set so its legacy-I2C code is compiled out entirely - one I2C owner, as today - and the `i2c_bus.h` include guarded (§4a). A later driver that genuinely needs I2C gets our bus through arduino-esp32's `i2cBusHandle()`, never its own |
+| **C** | Repair copies | **PPA** first; the unexported `esp_async_fbcpy` benched against it if it is cheap to try (owner: "maybe we could try both") |
+| **D** | `LV_OS_NONE` vs `LV_OS_FREERTOS` | **Measured before step 2, as its own experiment** (owner deferred to the recommendation): `LV_OS_FREERTOS` with `LV_DRAW_SW_DRAW_UNIT_CNT 2`, LVGL still driven from `loop()` - only the second drawing thread is new. Benched like `-O2`, one board at a time, watching the CYD's internal RAM and the S3's WiFi. Step 2 then starts from whichever baseline wins |
 
 Nothing here needs the owner at the keyboard except first light, which needs eyes on the glass.
