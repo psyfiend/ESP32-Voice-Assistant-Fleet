@@ -231,6 +231,18 @@ first concrete target for "draw less" after step 2. The owner reproduced every M
 | `LV_USE_PPA 1` (`-D FLEET_LV_PPA`) | 192.3 / **119.2** / 73.0 | **11% slower drawing.** Off. Screenshots drew correctly |
 | `AUTO_FLUSH = false` | 171.8 / 110.2 / **60.8** (+0.7 present) | 4% faster. Not adopted: step 2 replaces this path |
 
+**Compiler optimisation, both dev boards, 2026-09-25** (survey §2: every Waveshare P4 demo builds for
+speed; we built everything we compile, LVGL included, with `-Os`). Full screen, Midnight, page 0:
+
+| Change | CYD: total / render / present | P4_5: total / render / copy | Verdict |
+|---|---|---|---|
+| baseline `-Os` | 221.7 / 163.7 / 48.6 | 178.6 / 107.4 / 71.0 | |
+| **`-O2`** | **191.6 / 145.6 / 36.9** | **162.9 / 95.7 / 67.1** | **CYD -14% (card -22%), P4_5 -9%.** Flash +8% (+147 / +161 KB; both under 35%). Heap and pool unchanged. **Kept on the dev boards; fleet-wide is the owner's call** |
+| `-O2` + `LV_OBJ_STYLE_CACHE 1` | 184.9 / 139.0 / 36.6 | 159.3 / 92.2 / 67.0 | 2-4% more, for 1.8 KB (CYD) / 2.7 KB (P4_5) of the `lv_mem` pool, and P4_5 has the least left (36 KB). **Left off** |
+
+`-O2` speeds up the CYD's QSPI send by a quarter: that loop is Arduino_GFX code, which we compile,
+not a prebuilt library. The prebuilt ESP-IDF libraries stay `-Os` either way.
+
 **Why PPA loses** (read in `components/lvgl/src/draw/espressif/ppa/`, then measured): it takes only
 square-cornered, solid, opaque fills and unrotated image copies, so our rounded cards and all text
 stay on the CPU; and for every fill it does take, it cache-syncs the **whole** draw buffer twice

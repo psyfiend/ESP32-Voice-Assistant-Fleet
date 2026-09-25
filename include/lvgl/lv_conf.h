@@ -589,6 +589,8 @@
 #define LV_COLOR_MIX_ROUND_OFS  0
 
 /** Add 2 x 32-bit variables to each `lv_obj_t` to speed up getting style properties */
+/* Measured 2026-09-25 (display-stack.md s8.3): 2-4% faster drawing for 1.8 KB (CYD) and 2.7 KB
+ * (WS_P4_5) of the LV_MEM_SIZE pool - and P4_5's pool is the fleet's fullest. Left off. */
 #define LV_OBJ_STYLE_CACHE      0
 
 /** Add `id` field to `lv_obj_t` */

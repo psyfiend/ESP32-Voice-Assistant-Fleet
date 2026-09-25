@@ -58,6 +58,12 @@ network (`fleet-ws-p4-5` and so on). There is no auth; it is gated by `-D ENABLE
    into `reference/esp-registry/` (`REFERENCE_PROJECTS.md`). **Read
    `docs/research/waveshare-esp-lcd-survey.md` before writing any of it**: the whole Waveshare
    collection, surveyed for `esp_lcd` bring-up, with the exact config to copy for P4_5.
+   **`-O2` (compile for speed)** is on the two dev boards on `exp/67-o2`: -9% (P4_5) to -14% (CYD)
+   per full frame. Fleet-wide adoption is the owner's call, pending `TEST_2.9.md` O1/O2.
+   `reference/Guition Examples/` (owner, 2026-09-25) holds Guition's packs, including a **new,
+   not-yet-onboarded board, `JC4880P433`** (P4, 480x800 ST7701 over DSI, real IDF examples). The CYD
+   panel's TE pin is GPIO 38 and Guition's own driver never sends a row address over QSPI - both
+   matter for step 5 (survey §5).
    Two things from step 1 that the plan did not know: every board runs `AUTO_FLUSH = true`, so the
    cache write-back happens per chunk inside `draw16bitRGBBitmap()` and `gfx->flush()` does nothing
    on DSI/RGB; and `LV_USE_PPA` makes drawing *slower* (gate kept, off: `-D FLEET_LV_PPA`).

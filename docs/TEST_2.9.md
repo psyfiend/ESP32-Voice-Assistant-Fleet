@@ -48,6 +48,31 @@ before; it matters only once `LV_DRAW_BUF_ALIGN` is 64 (the PPA experiment, and 
 
 ---
 
+## Speed optimisation (`-O2`), on `CYD_S3_3248` and `WS_P4_5`
+
+Branch `exp/67-o2`. Both dev boards are now compiled for speed instead of size: 9-14% faster full
+redraws, 22% faster one-card updates on the CYD (`display-stack.md` §8.3). Nothing is supposed to
+look or behave differently except speed. Compiling for speed can expose latent bugs that size
+optimisation happened to hide, which is why these tests exist.
+
+**Already seen by me:** both boards ran four full `/bench` matrices without a reboot (the reply now
+carries `uptime_s` and `reset_reason`, and `bench.py` prints them), and screenshots are correct.
+**One dropped connection on the CYD** mid-matrix, before `uptime_s` existed, so whether it rebooted
+is unknown; it answered normally straight after.
+
+**O1 — Feel.** Use both boards normally for a few minutes: swipe pages, open the drawer and the
+deck, toggle a light.
+- PASS: everything works as before, and the CYD feels at least no slower. Faster is the hope.
+- FAIL: anything that worked before and does not now, however small.
+
+**O2 — Overnight.** Leave both boards running overnight, then run `python scripts/bench.py`.
+- PASS: the `uptime` line shows a number of seconds that covers the night (no reboot), and HA/MQTT
+  cards are still updating.
+- FAIL: a reboot (uptime small, reset reason 4 = panic, 5/6/7 = watchdog), or the board off HA.
+  This one also serves as step 1's T7.
+
+---
+
 ## Step 1 — `/bench`, on `CYD_S3_3248` and `WS_P4_5`
 
 **T1 — Boot.** Power-cycle both boards.
