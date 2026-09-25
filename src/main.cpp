@@ -42,6 +42,12 @@ SET_LOOP_TASK_STACK_SIZE(16 * 1024);
 static SystemCore core;
 static GUIManager gui(core);
 
+#ifdef DISPLAY_ESPLCD_SPIKE
+// SPIKE (spike/67-esplcd-compile, never merged): see src/spike/esplcd_spike.c.
+#include <esp_system.h>
+extern "C" esp_err_t esplcd_spike_bringup(void);
+#endif
+
 // How long to wait for the link before reporting anyway. Generous: a P4 joins
 // through the C6 over SDIO and is slower than an S3, and an over-eager timeout
 // would reintroduce the very "WiFi down" report this exists to avoid.
@@ -51,6 +57,12 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
     Serial.println("\n=== Fleet Hardware Dashboard (Modular) ===");
+
+    #ifdef DISPLAY_ESPLCD_SPIKE
+    // Never true at runtime (no such reset reason), but the compiler cannot
+    // know that - so the spike is linked, and every symbol it uses resolved.
+    if (esp_reset_reason() == (esp_reset_reason_t)0x7F) esplcd_spike_bringup();
+    #endif
 
     // 1. Hardware, then the data layer. Ordering and its reasons live in
     //    SystemCore::begin(), not in line order here.
