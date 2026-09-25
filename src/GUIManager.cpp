@@ -7,6 +7,7 @@
 #include "UI/ReferencePage.h"
 #include "UI/LogPage.h"
 #include "UI/Screenshot.h"
+#include "UI/Bench.h"
 #include "Dashboards/Dashboard_Fleet.h"
 #include "Dashboards/Dashboard_HA.h"   // both pages on every board since 2.6
 #include "bsp_loader.h"
@@ -741,6 +742,8 @@ void GUIManager::begin() {
     // here because the capture needs LVGL and SystemCore must not; the server
     // itself belongs to SystemCore.
     Screenshot::begin(_core.http());
+    // GET /bench (2.9, #67), when built with ENABLE_BENCH. Same reasoning.
+    Bench::begin(_core.http(), *this);
 
     // --= Z-INDEX SANDWICH =--
     // 0. Touch overlay (bottom - hidden by default, set in Panel_Display::init)
@@ -1250,6 +1253,16 @@ void GUIManager::togglePerf() {
     Serial.printf("[UI] perf overlay %s\n", _showPerf ? "shown" : "hidden");
 }
 
+lv_obj_t *GUIManager::firstCard() const {
+    if (!_page || !_page->root()) return nullptr;
+    const uint32_t n = lv_obj_get_child_count(_page->root());
+    for (uint32_t i = 0; i < n; i++) {
+        lv_obj_t *c = lv_obj_get_child(_page->root(), i);
+        if (!lv_obj_has_flag(c, LV_OBJ_FLAG_HIDDEN)) return c;
+    }
+    return nullptr;
+}
+
 void GUIManager::toggleDeck() {
     // Put an open panel away first, so the deck never goes into hiding with a
     // panel half-expanded and the scrim left up behind it.
@@ -1267,4 +1280,6 @@ void GUIManager::tick() {
 #endif
     // Renders a waiting screenshot request, on this - the LVGL - thread.
     Screenshot::service();
+    // Same for GET /bench (2.9), which may also change page first.
+    Bench::service();
 }

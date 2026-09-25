@@ -18,6 +18,12 @@ other projects' code and what it teaches.
 | `ESP32-P4-NINA-Display` (chvvkumar) | **none** | Read only |
 | `ESP32-P4-Allsky-Display` (chvvkumar) | **none** | Read only |
 | `espcontrol` | **PolyForm Noncommercial 1.0.0** | Read only — see below |
+| `esp-registry/waveshare__esp_lcd_hx8394-v2.1.0` | **MIT** (`license.txt`) | Reuse with attribution |
+| `esp-registry/waveshare__esp32_p4_wifi6_touch_lcd_5-v1.0.4` | **Apache-2.0** (`LICENSE`) | Reuse with attribution + NOTICE rules |
+| `esp-registry/espressif__esp_lvgl_adapter-v0.6.4` | **Apache-2.0** (`LICENSE`) | Reuse with attribution + NOTICE rules |
+
+The registry's web page lists the last two as "Custom"; the `LICENSE` file inside each says Apache-2.0.
+Check each file's own header before copying from it, as `display-stack.md` §6.1 says.
 
 **`espcontrol` needs its own warning.** PolyForm Noncommercial is not a permissive licence and is
 not "MIT with a nag". It permits use of *the software* for noncommercial purposes only, and grants
@@ -235,3 +241,21 @@ Component split: `wifi_manager`, `ha_client`, `settings`, `time_sync`, `display`
 `web_server`. Less evolved than either chvvkumar project, but **the only one of the three we may
 actually reuse code from.** Worth checking here first whenever a needed pattern exists in more
 than one of them.
+
+## `esp-registry/` — Espressif component-registry sources for 2.9 step 2
+
+Fetched 2026-09-25 with the owner's permission, straight from `components-file.espressif.com`, at
+the versions Waveshare's P4_5 IDF demo pins (`08_lvgl_demo_v9/main/idf_component.yml`). Their own
+dependencies (`i2c_bus`, `esp_codec_dev`, `esp_lcd_touch_gt911`, ...) were NOT fetched.
+
+- **`esp_lcd_hx8394` 2.1.0** — the P4_5 panel driver: init sequence, reset polarity, DSI config.
+  The thing `esp_lcd_new_panel_dpi` needs beside it.
+- **`esp32_p4_wifi6_touch_lcd_5` 1.0.4** — Waveshare's board support package: DSI bus/PHY setup,
+  timings, backlight, and how it wires the adapter. Compare against our BSP header before trusting
+  either.
+- **`esp_lvgl_adapter` 0.6.4** (0.7.1 exists but needs IDF >= 5.5.5 per its manifest) — the
+  reference implementation `display-stack.md` §6.1 says to read rather than adopt: tear-avoidance
+  modes, PPA rotation, flush callbacks. **Its README's "ESP-IDF Patches" section is required
+  reading before step 2** - see `display-stack.md` §9.
+
+Also relevant to step 2 and already here: Allsky's `ppa_accelerator.h` (above) - read only.

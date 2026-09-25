@@ -114,6 +114,16 @@ public:
     void nextPage() { goToPage((int16_t)_curPage + 1); }
     void prevPage() { goToPage((int16_t)_curPage - 1); }
 
+    // Read-only views for GET /bench (2.9, UI/Bench.cpp), which needs to know
+    // where it is, put things back afterwards, and find one card to redraw.
+    uint8_t     pageCount() const   { return _nPages; }
+    uint8_t     currentPage() const { return _curPage; }
+    const char *currentPageSlug() const {
+        return _curPage < _nPages && _pages[_curPage].spec ? _pages[_curPage].spec->slug : "";
+    }
+    // The first visible card on the page, or nullptr on an empty page.
+    lv_obj_t   *firstCard() const;
+
     Panel_Header &header()      { return _header; }
     Panel_System &systemPanel() { return _pnlSystem; }
     CardBinder   &cards()       { return _binder; }

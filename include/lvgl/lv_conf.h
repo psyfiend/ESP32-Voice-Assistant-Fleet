@@ -166,7 +166,18 @@
 #define LV_DRAW_BUF_STRIDE_ALIGN                1
 
 /** Align start address of draw_buf addresses to this bytes*/
-#define LV_DRAW_BUF_ALIGN                       4
+#if defined(FLEET_LV_PPA) && defined(CONFIG_IDF_TARGET_ESP32P4)
+    /* 2.9 PPA experiment (see LV_USE_PPA below). LVGL's PPA unit refuses to
+     * compile unless this equals the P4's L2 cache line - 64 on our rebuilt
+     * libs (docs/REBUILD_P4_LIBS.md) - and it reads the KCONFIG name for it,
+     * which a non-Kconfig build never defines. LVGL_Startup allocates its draw
+     * buffers to this alignment; without that, lv_display_set_buffers() asserts,
+     * and the assert is while(1). */
+    #define LV_DRAW_BUF_ALIGN                   64
+    #define CONFIG_LV_DRAW_BUF_ALIGN            LV_DRAW_BUF_ALIGN
+#else
+    #define LV_DRAW_BUF_ALIGN                   4
+#endif
 
 /** Using matrix for transformations.
  * Requirements:
@@ -431,9 +442,18 @@
 #endif
 
 /** Draw using espressif PPA accelerator */
-#define LV_USE_PPA  0
+/* 2.9 step 1 experiment, P4 only, per board with -D FLEET_LV_PPA. What it can
+ * take (lv_draw_ppa.c, ppa_evaluate): square-cornered, ungraded, fully opaque
+ * fills, and unrotated, unscaled RGB565/888 image blits. Rounded card surfaces
+ * and all text stay on the CPU. It does NOT rotate the display - that is the
+ * flush's job, step 2. Measured with GET /bench; see display-stack.md s8. */
+#if defined(FLEET_LV_PPA) && defined(CONFIG_IDF_TARGET_ESP32P4)
+    #define LV_USE_PPA  1
+#else
+    #define LV_USE_PPA  0
+#endif
 #if LV_USE_PPA
-    #define LV_USE_PPA_IMG 0
+    #define LV_USE_PPA_IMG 1
 #endif
 
 /* Use EVE FT81X GPU. */

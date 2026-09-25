@@ -28,8 +28,8 @@ buffer" was right in effect, but the cause is the shape of the whole pipeline, n
 
 | Panel type | Boards | After LVGL draws a chunk | Per-frame cost we pay for nothing |
 |---|---|---|---|
-| **DSI** | all four P4s | CPU copies the chunk into GFX's single framebuffer, per pixel, rotating as it goes (`Arduino_DSI_Display.cpp:396-408`). On the last chunk, `esp_cache_msync()` writes back the **whole** framebuffer (`:512`) | A full-screen CPU copy. `WS_P4_5` is `ROTATION = 1`, a 90-degree turn and the most cache-hostile kind. `WS_P4_7B`/`4B` are `2` (180 degrees) |
-| **RGB** | `WS_S3_4B`, `WS_S3_5B`, `CYD_S3_8048` | Same CPU copy into a framebuffer, then `Cache_WriteBack_Addr()` of the whole buffer (`Arduino_RGB_Display.cpp:567`). `num_fbs = 2` is allocated but `getFrameBuffer()` always returns index 1 (`Arduino_ESP32RGBPanel.cpp:74,161`, #40) | A full-screen copy PSRAM-to-PSRAM, plus a whole frame of PSRAM wasted |
+| **DSI** | all four P4s | CPU copies the chunk into GFX's single framebuffer, per pixel, rotating as it goes (`Arduino_DSI_Display.cpp:396-408`), then `esp_cache_msync()`s the rows it touched, **per chunk** (`:413-435`). Every board sets `AUTO_FLUSH = true`, so `flush()` (`:508-512`) does nothing. *Corrected 2026-09-25 by `/bench`: this row used to say the whole framebuffer is synced on the last chunk, which is only the `AUTO_FLUSH = false` path* | A full-screen CPU copy. `WS_P4_5` is `ROTATION = 1`, a 90-degree turn and the most cache-hostile kind: each chunk's sync then spans the whole framebuffer. `WS_P4_7B`/`4B` are `2` (180 degrees) |
+| **RGB** | `WS_S3_4B`, `WS_S3_5B`, `CYD_S3_8048` | Same CPU copy into a framebuffer, then `Cache_WriteBack_Addr()` of the rows touched, per chunk (`Arduino_RGB_Display.cpp:413-435`; `AUTO_FLUSH = true` again, so the whole-buffer write-back at `:567` never runs). `num_fbs = 2` is allocated but `getFrameBuffer()` always returns index 1 (`Arduino_ESP32RGBPanel.cpp:74,161`, #40) | A full-screen copy PSRAM-to-PSRAM, plus a whole frame of PSRAM wasted |
 | **QSPI** | `CYD_S3_3248` | CPU copies the chunk into an `Arduino_Canvas` framebuffer. On the last chunk `Canvas::flush()` sends the **entire 320x480 frame** to the panel (`Arduino_Canvas.cpp:577-582`) | 307 KB over QSPI for every update, even one label |
 
 LVGL's own buffers today, which also matter: P4_5 and 7B use 50-line partial buffers in PSRAM
@@ -58,7 +58,7 @@ on 2026-09-24.
 
 ## 5. The plan
 
-### Step 1 — Measure (both dev boards, no display changes)
+### Step 1 — Measure (both dev boards, no display changes) — BUILT 2026-09-25, results in §8
 
 - **`GET /bench`** beside `/screenshot`, same pattern: the handler asks the LVGL thread, and
   `loop()` does the work. It forces N full-screen redraws (`lv_obj_invalidate(screen)` then
@@ -182,9 +182,96 @@ Checked 2026-09-25:
 
 ## 8. Measurements
 
-*Empty until step 1 runs.*
+### 8.1 How: `GET /bench` and `scripts/bench.py`
+
+`src/UI/Bench.cpp` (field meanings at its top). It forces `n` identical frames with
+`lv_obj_invalidate()` + `lv_refr_now()`, timed in microseconds with `esp_timer`, and
+`LVGL_Startup::disp_flush()` splits the flush in two:
+
+| Field | What it is today (Arduino_GFX) |
+|---|---|
+| `total` | the whole `lv_refr_now()` |
+| `copy` | inside `draw16bitRGBBitmap()`, all chunks: the CPU copy (and rotation), **plus the per-chunk cache write-back** on DSI/RGB (§2) |
+| `present` | inside `gfx->flush()` on the last chunk: nothing on DSI/RGB; the whole-frame QSPI send on the CYD |
+| `wait` | LVGL waiting on the flush: ~0 while it is synchronous. Step 2 makes it real |
+| `render` | `total - copy - present - wait`: LVGL itself |
+
+Two scenarios: **full** = the whole screen (a page change, the worst case) and **card** = one card's
+area including its shadow (a value changing, the common case). `bench.py` runs both on page 0,
+page 1 and page 0 with the deck, 20 frames each, and saves a screenshot of each to `bench/`.
+**Frame time is not FPS**: `fps_ceiling` is what that scenario could never beat.
+
+Repeatability: two runs on each board, reflashed in between, agree within ~1%.
+
+### 8.2 Baseline, 2026-09-25, firmware `0.2.7.6+dirty` (branch `feat/67-bench`), Midnight scheme
+
+Milliseconds per frame, averages of 20. Page 0 = House; page 1 and the deck move these by under 5%.
+
+| Board | Scenario | total | render | copy | present | px | chunks |
+|---|---|---|---|---|---|---|---|
+| `WS_P4_5` DSI 1280x720, rot 1, 2 x 50-line PSRAM bufs | full | **178.6** | 107.4 (60%) | 71.0 (40%) | 0.0 | 921,600 | 15 |
+| | card | **7.7** | 4.9 | 2.8 | 0.0 | 54,356 | 1 |
+| `CYD_S3_3248` QSPI 320x480, rot 0, 1 x 20-line internal buf | full | **221.7** | 163.7 (74%) | 9.1 | 48.6 (22%) | 153,600 | 24 |
+| | card | **64.7** | 14.5 | 1.5 | **48.7 (75%)** | 16,677 | 3 |
+| `WS_P4_5`, **Linen** (owner's run, T6) | full | **215.9** | 144.2 (67%) | 71.6 | 0.0 | 921,600 | 15 |
+| | card | **10.2** | 7.4 | 2.9 | 0.0 | 54,356 | 1 |
+
+**Linen costs drawing, not flushing:** +35% render on a full screen, +50% on a card, copy
+unchanged. Its real drop shadows are the difference. No flush change will touch that; it is the
+first concrete target for "draw less" after step 2. The owner reproduced every Midnight row within
+~2% in the owner's own runs.
+
+### 8.3 Experiments on `WS_P4_5` (each reverted; only the build flag for PPA remains)
+
+| Change | full: total / render / copy | Verdict |
+|---|---|---|
+| `LV_USE_PPA 1` (`-D FLEET_LV_PPA`) | 192.3 / **119.2** / 73.0 | **11% slower drawing.** Off. Screenshots drew correctly |
+| `AUTO_FLUSH = false` | 171.8 / 110.2 / **60.8** (+0.7 present) | 4% faster. Not adopted: step 2 replaces this path |
+
+**Why PPA loses** (read in `components/lvgl/src/draw/espressif/ppa/`, then measured): it takes only
+square-cornered, solid, opaque fills and unrotated image copies, so our rounded cards and all text
+stay on the CPU; and for every fill it does take, it cache-syncs the **whole** draw buffer twice
+(`lv_draw_ppa_buf.c:44`), 125 KB each time on P4_5. The small fills it wins do not pay for the syncs.
+It does not rotate the display: that is step 2's flush, a different use of the same hardware. The
+`lv_conf.h` gate stays in, off, so this can be re-run after step 2 changes the buffers.
+
+`AUTO_FLUSH = false` measured what the per-chunk cache syncs cost: ~10 ms of `copy`. The one
+whole-framebuffer sync that replaces them costs 0.7 ms. **So ~61 ms of P4_5's 71 ms `copy` is the
+rotating CPU copy itself.**
+
+### 8.4 What the numbers say about the plan
+
+- **P4_5, step 2 (DSI + PPA rotation + async flush):** takes the 71 ms `copy` off the CPU. The
+  frame becomes render-bound at ~107 ms: roughly **5.6 -> 9 frames/s** on a full redraw, and a card
+  update from 7.7 to ~5 ms. Worth doing, and it is the ceiling: after it, only drawing less helps.
+- **CYD, step 5 (partial window writes):** a one-card update is **75% QSPI send** of a frame that is
+  90% unchanged. If the AXS15231B accepts partial windows, a card update goes from ~65 ms to about
+  15 ms plus a card-sized send. That is the biggest single ratio anywhere in these numbers. The
+  open question in §9 is now the most valuable one to answer.
+- **Drawing itself is the larger cost on both boards** (60% / 74% of a full frame), and no flush
+  change touches it. The CYD draws at ~1.07 us/px against the P4's ~0.12, with 24 chunks per frame:
+  every chunk walks the whole widget tree again. Larger CYD draw buffers would cut the walks but
+  cost internal RAM it does not have. `LV_DRAW_SW_DRAW_UNIT_CNT=2` (§6.2) is the other lever. Both
+  are separate experiments, after step 2.
+- **Not yet measured:** Linen on the CYD, and animation frames such as a swipe or the drawer,
+  which redraw partial areas every tick rather than one full frame.
 
 ## 9. Open questions
+
+- **STEP 2 RISK, found 2026-09-25: a known PPA freeze matches P4_5's exact configuration.**
+  `esp_lvgl_adapter` 0.6.4 ships `0001-bugfix-ppa-Temporary-fix-for-the-PPA-hang-issue.patch`
+  (`reference/esp-registry/`, README "ESP-IDF Patches"). It is a patch to **ESP-IDF's own PPA
+  driver** (`esp_driver_ppa/src/ppa_srm.c`, a hardware-bug workaround tagged DIG-734), for "display
+  freeze" when all three hold: ESP32-P4, **partial** tear-avoidance mode, and **90/270-degree
+  rotation**. P4_5 is `ROTATION = 1` and step 2 planned partial chunks rotated by the PPA. We are on
+  IDF v5.5.5, prebuilt (`framework-arduinoespressif32-libs/versions.txt`). **Checked against
+  esp-idf's GitHub, 2026-09-25: v5.5.5's `ppa_srm.c` carries the same DIG-734 block as v6.0**, so
+  the bug is in our build if the hardware hits it, and the patch (it replaces that block with one
+  line) applies to 5.5.5 by hand. The "v6.0" in its README is only what the patch text was made
+  against. **No IDF 6.0 move is needed for it.**
+  **Owner's decision, 2026-09-25: build step 2 the preferred way, triple-partial with PPA rotation,
+  and back off only if it freezes.** If it does, the fix is a P4 library rebuild on 5.5.5 with the
+  patch applied (`docs/REBUILD_P4_LIBS.md`), keeping the #49 settings.
 
 - AXS15231B partial window writes over QSPI (step 5).
 - Which DSI panels can mirror X/Y in their own registers (step 3).

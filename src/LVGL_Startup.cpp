@@ -1,6 +1,9 @@
 #include "LVGL_Startup.h"
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
+#include <esp_heap_caps.h>
+#include <esp_memory_utils.h>   // esp_ptr_external_ram
+#include <esp_timer.h>
 #include "DisplayManager.h"
 #include "TouchManager.h"
 #include "SystemReport.h"   // fmtBytes - one memory-reporting convention
@@ -18,6 +21,23 @@ lv_display_t *s_disp      = nullptr;
 lv_indev_t   *s_indev     = nullptr;
 uint16_t     *s_draw_buf  = nullptr;
 uint16_t     *s_draw_buf2 = nullptr;
+LVGL_Startup::DrawBufInfo s_bufInfo;
+
+// Attached only while GET /bench is measuring. See LVGL_Startup.h.
+LVGL_Startup::FlushStats *s_flushStats = nullptr;
+
+// Draw buffers must start on an LV_DRAW_BUF_ALIGN boundary, or
+// lv_display_set_buffers() fails its alignment assert - which on this fleet is
+// `while(1);`, a silent freeze at boot. Plain heap_caps_malloc() only promises
+// 4 (internal) or 16 (PSRAM) bytes, which was enough while LV_DRAW_BUF_ALIGN
+// was 4 and stops being enough the moment it is 64 (the PPA experiment, 2.9).
+// The size is rounded up too, because a cache sync over a buffer wants whole
+// cache lines.
+void *allocDrawBuf(size_t &bytes, uint32_t caps) {
+    constexpr size_t A = LV_DRAW_BUF_ALIGN;
+    bytes = (bytes + A - 1) / A * A;
+    return heap_caps_aligned_alloc(A, bytes, caps);
+}
 
 void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
     Arduino_GFX *gfx = s_display->getGfx();
@@ -41,14 +61,22 @@ void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
     // the pixels from our LVGL buffer into the Arduino_GFX internal driver.
     uint32_t w = (area->x2 - area->x1 + 1);
     uint32_t h = (area->y2 - area->y1 + 1);
+    const int64_t tCopy = s_flushStats ? esp_timer_get_time() : 0;
     gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t *)px_map, w, h);
+    if (s_flushStats) {
+        s_flushStats->copyUs += esp_timer_get_time() - tCopy;
+        s_flushStats->chunks++;
+        s_flushStats->px += w * h;
+    }
 
     // 2. The "Waveshare Logic" (Batching Optimization)
     // We check if this is the LAST chunk of the frame.
     // If it is, we tell the hardware to refresh. This prevents sending
     // partial frames to MIPI/RGB displays which can cause tearing or high bus overhead.
     if (lv_display_flush_is_last(disp)) {
+        const int64_t tPresent = s_flushStats ? esp_timer_get_time() : 0;
         gfx->flush();
+        if (s_flushStats) s_flushStats->presentUs += esp_timer_get_time() - tPresent;
         #ifdef DEBUG_DISPLAY
         static uint32_t frameCount = 0;
         frameCount++;
@@ -157,19 +185,20 @@ bool begin(DisplayManager &display, TouchManager &touch) {
     Serial.printf("[LVGL] Allocating %s per buffer... ",
                   SystemReport::fmtBytes(byte_count, bbuf, sizeof(bbuf)));
 
-    s_draw_buf = (uint16_t *)heap_caps_malloc(byte_count, malloc_flags);
+    s_draw_buf = (uint16_t *)allocDrawBuf(byte_count, malloc_flags);
 
     // Fallback 1: If Internal failed, try PSRAM
     if (!s_draw_buf && (malloc_flags & MALLOC_CAP_INTERNAL)) {
         Serial.print(" (Internal Full! Retrying PSRAM)... ");
         malloc_flags &= ~MALLOC_CAP_INTERNAL;
         malloc_flags |= MALLOC_CAP_SPIRAM;
-        s_draw_buf = (uint16_t *)heap_caps_malloc(byte_count, malloc_flags);
+        s_draw_buf = (uint16_t *)allocDrawBuf(byte_count, malloc_flags);
     }
-    // Fallback 2: Generic Malloc
+    // Fallback 2: anything 8-bit capable, still aligned
     if (!s_draw_buf) {
         Serial.print(" (Struct alloc failed! Retrying generic)... ");
-        s_draw_buf = (uint16_t *)malloc(byte_count);
+        malloc_flags = MALLOC_CAP_8BIT;
+        s_draw_buf = (uint16_t *)allocDrawBuf(byte_count, malloc_flags);
     }
 
     // Allocate Second Buffer - ONLY IF THE BOARD ASKED FOR ONE.
@@ -199,8 +228,8 @@ bool begin(DisplayManager &display, TouchManager &touch) {
     // milestone 2.9's job (Arduino_GFX -> esp_lcd), and it is now one of the
     // concrete things 2.9 buys rather than a general tidy-up.
     if (bsp_lvgl.DOUBLE_BUFFERING) {
-        s_draw_buf2 = (uint16_t *)heap_caps_malloc(byte_count, malloc_flags);
-        if (!s_draw_buf2) s_draw_buf2 = (uint16_t *)malloc(byte_count);
+        s_draw_buf2 = (uint16_t *)allocDrawBuf(byte_count, malloc_flags);
+        if (!s_draw_buf2) s_draw_buf2 = (uint16_t *)allocDrawBuf(byte_count, MALLOC_CAP_8BIT);
     } else {
         s_draw_buf2 = nullptr;
         Serial.print(" (single-buffered, per BSP) ");
@@ -211,6 +240,9 @@ bool begin(DisplayManager &display, TouchManager &touch) {
         return false;
     }
     Serial.println("Success.");
+    s_bufInfo.bytes = byte_count;
+    s_bufInfo.count = s_draw_buf2 ? 2 : 1;
+    s_bufInfo.psram = esp_ptr_external_ram(s_draw_buf);
 
     // --= 3. Driver registration =--
     s_disp = lv_display_create(gfx->width(), gfx->height());
@@ -254,5 +286,8 @@ void unlock() {}
 
 lv_display_t *display() { return s_disp; }
 lv_indev_t   *indev()   { return s_indev; }
+
+void attachFlushStats(FlushStats *stats) { s_flushStats = stats; }
+DrawBufInfo drawBufInfo() { return s_bufInfo; }
 
 } // namespace LVGL_Startup
