@@ -60,6 +60,10 @@ carries `uptime_s` and `reset_reason`, and `bench.py` prints them), and screensh
 **One dropped connection on the CYD** mid-matrix, before `uptime_s` existed, so whether it rebooted
 is unknown; it answered normally straight after.
 
+> **O1: PASS (owner, 2026-09-25)** - "they do seem a touch faster", placebo not ruled out. Found
+> while testing, not caused by `-O2` as far as anyone knows: **#68**, the toast pushed flush-right.
+> **O2: running overnight 2026-09-25/26.** On a clean result, `-O2` goes fleet-wide (owner).
+
 **O1 — Feel.** Use both boards normally for a few minutes: swipe pages, open the drawer and the
 deck, toggle a light.
 - PASS: everything works as before, and the CYD feels at least no slower. Faster is the hope.

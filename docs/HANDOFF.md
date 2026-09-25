@@ -59,7 +59,11 @@ network (`fleet-ws-p4-5` and so on). There is no auth; it is gated by `-D ENABLE
    `docs/research/waveshare-esp-lcd-survey.md` before writing any of it**: the whole Waveshare
    collection, surveyed for `esp_lcd` bring-up, with the exact config to copy for P4_5.
    **`-O2` (compile for speed)** is on the two dev boards on `exp/67-o2`: -9% (P4_5) to -14% (CYD)
-   per full frame. Fleet-wide adoption is the owner's call, pending `TEST_2.9.md` O1/O2.
+   per full frame. **Owner, 2026-09-25: goes fleet-wide if the overnight test (O2) is clean**; O1
+   (feel) came back "a touch faster". The boards were deliberately NOT reflashed that night, so
+   their uptime is the O2 result. Also on that branch: `-D DEBUG_LOGPAGE` dropped (owner).
+   **#68, open:** the toast pushed flush-right after Show Touches + a page swipe. Instrument before
+   fixing - the issue has the measurements and the one theory that does not yet fit them.
    `reference/Guition Examples/` (owner, 2026-09-25) holds Guition's packs, including a **new,
    not-yet-onboarded board, `JC4880P433`** (P4, 480x800 ST7701 over DSI, real IDF examples). The CYD
    panel's TE pin is GPIO 38 and Guition's own driver never sends a row address over QSPI - both
