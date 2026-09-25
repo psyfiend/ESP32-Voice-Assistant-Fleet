@@ -1,5 +1,13 @@
 # Test sheet — #58, LVGL screenshots
 
+> **RESULT, 2026-09-25: T1-T7 PASS on glass (owner). T8 PASS (Claude).** Merged to `main`.
+> The owner's notes: "punch in the IP/screenshot and bam it's in my browser in like a second". The
+> pause on the device is "less than half a second". A capture taken while dragging the Show Touches
+> panel paused briefly and did not drop the panel. `CYD_S3_3248`'s heap stayed steady over many
+> captures, including a 5x3 page. T8: with `ENABLE_SCREENSHOT` undefined the capture code and stb
+> are gone (-9.6 KB of flash on `CYD_S3_3248`) and the server never starts. Its code stays linked
+> but never runs; Phase 4 will use it.
+
 Branch `feat/58-screenshots`. Design and every reason behind it: the header comments of
 `src/UI/Screenshot.cpp` and `src/HttpServer.cpp`.
 

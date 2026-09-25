@@ -203,6 +203,10 @@ reads closer to official ESP-IDF audio examples.
 `DisplayManager::initPanel()` has three mutually-exclusive branches gated by
 `HAS_RGB_PANEL` / `HAS_QSPI_PANEL` / `HAS_MIPI_PANEL`.
 
+**Being replaced board by board in milestone 2.9 (#67)**: Arduino_GFX -> raw `esp_lcd`, behind a
+per-board build flag. Everything below describes the Arduino_GFX path, which is still what every
+board runs until its turn. Plan: `docs/design/display-stack.md`.
+
 - **QSPI boards**: wrapped in `Arduino_Canvas`, a software-rotation layer. The raw panel
   driver (e.g. `Arduino_AXS15231B`) is always constructed with `rotation=0`; `Canvas` alone
   gets the real `bsp_display.ROTATION`. This is intentional, not an oversight — QSPI panel driver

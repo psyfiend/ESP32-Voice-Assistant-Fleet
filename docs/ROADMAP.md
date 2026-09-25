@@ -629,7 +629,7 @@ and everything in Phases 4 through 6.
 | 2.8 | Header bar v2 | Configurable slot list: clock, WiFi/MQTT status, optional sensor slots. **Build the slot mechanism ONCE and use it three times** — `cards.md` §8: the page header, a group card's header, and a normal card's header are the same idea at different sizes, and a card's is the degenerate two-slot case (area left, STALE right) that 2.4 hardcoded. If 2.8 builds a general named-slot list rather than the page header specifically, the group card gets its header free and the build sheet gets one grammar for all three |
 | 2.10 | Card popup groundwork | **#65. Added 2026-09-22 (owner).** A long press opens a per-card sheet mirroring HA's own entity dialog: for a light, brightness and colour-temperature sliders and a colour picker; for everything, the card's settings and details. Tap stays a one-touch toggle - the owner explicitly rejected two taps to switch a light. Pause moves into the sheet. Needs an overlay, the sliders and picker, and outbound `call_service` with data (brightness, colour) on #44's websocket leg. **Groundwork only**: the full per-type content arrives at 4.4 with the deck/context panels. After 2.6 in the running order |
 | 2.11 | Group cards | **#66. Added 2026-09-22 (owner).** `cards.md` §4's group/room card: several primaries of different kinds in one multi-cell card, each individually interactive, with its own header of promoted values. Distinct from an aggregate light like HA's `light.office` group, which is ONE entity. A group card's long press does something different from a normal card's. Needs 2.8's slot mechanism for its header, and must land before 3.1 because the schema depends on how these cards are declared |
-| ~~2.9~~ | ~~Display stack: Arduino_GFX -> `esp_lcd`~~ | **MOVED OUT OF PHASE 2, 2026-09-15 (owner approved).** It is the largest remaining item in the phase and produces nothing visible on a wall. Now gated on a MEASURED need - a rotation actually required, tearing that can be seen, or an fps number that cannot be lived with - rather than on a schedule slot. See Phase 6 and `docs/research/display-stack-migration.md`. **FIRST MEASUREMENTS, 2026-09-23**, from LVGL's perf overlay (swipe up, bottom-right), owner on `WS_P4_5`: idle ~30 FPS; the system drawer animating drops to the **teens on Midnight** and **~7 on Linen**, LVGL CPU 50-90%; a page swipe on Linen single digits with a ~1.5 s pause. `CYD_S3_3248` idles at ~50-60 ms per frame. Shadow-corner caching went in the same day - re-measure before deciding. Candidates when taken up: LVGL 9.5's PPA draw unit (`LV_USE_PPA`, off), double-buffered DSI, and not redrawing whole panels during an animation |
+| 2.9 | Display stack: Arduino_GFX -> `esp_lcd` | **BACK IN PHASE 2 AND NEXT, 2026-09-25 (owner), #67.** Plan, decisions and source-verified findings: `docs/design/display-stack.md`. History follows. **Was MOVED OUT OF PHASE 2, 2026-09-15 (owner approved).** It is the largest remaining item in the phase and produces nothing visible on a wall. Now gated on a MEASURED need - a rotation actually required, tearing that can be seen, or an fps number that cannot be lived with - rather than on a schedule slot. See Phase 6 and `docs/research/display-stack-migration.md`. **FIRST MEASUREMENTS, 2026-09-23**, from LVGL's perf overlay (swipe up, bottom-right), owner on `WS_P4_5`: idle ~30 FPS; the system drawer animating drops to the **teens on Midnight** and **~7 on Linen**, LVGL CPU 50-90%; a page swipe on Linen single digits with a ~1.5 s pause. `CYD_S3_3248` idles at ~50-60 ms per frame. Shadow-corner caching went in the same day - re-measure before deciding. Candidates when taken up: LVGL 9.5's PPA draw unit (`LV_USE_PPA`, off), double-buffered DSI, and not redrawing whole panels during an animation |
 
 **What 2.3 actually found, and why the decision went the way it did.**
 
@@ -653,24 +653,29 @@ The question was framed as "how many cards fit". It turned out to be the wrong q
 headroom, and widget access is frequent enough that PSRAM's slower access is a real cost. Revisit
 only if a future page genuinely fills the pool.
 
-### Running order — current as of 2026-09-24
+### Running order — current as of 2026-09-25
 
 The numbering above is identity, not sequence. What is actually next, agreed with the owner
-(2.5, #43, #44's websocket leg, 2.6 and 2.7 are done and no longer listed):
+(2.5, #43, #44's websocket leg, 2.6, 2.7 and #58 are done and no longer listed):
 
 | | | |
 |---|---|---|
-| 1 | **#58, LVGL screenshots** | **BUILT 2026-09-24 on `feat/58-screenshots`, awaiting glass (`docs/TEST_58.md`).** `GET /screenshot` on port 80 via `esp_http_server`; the screen plus top and system layers, composited as-is; PNG via `stb_image_write`; `scripts/screenshot.py` fetches the fleet. Verified by fetch on `CYD_S3_3248` and `WS_P4_5`. Lets a screen be judged from a real framebuffer instead of a photo, and is the capability page transitions and the page overview both need |
+| 1 | **2.9 display stack** (#67) | **Brought back 2026-09-25 (owner).** Arduino_GFX -> raw `esp_lcd`, measured first, one board at a time, `WS_P4_5` first. Plan and decisions: `docs/design/display-stack.md` |
 | 2 | **2.10 card popup groundwork** (#65) | the long-press control surface for lights; full content at 4.4 |
 | 3 | **2.8 header slots** (#19) | before group cards, whose header IS the slot mechanism |
 | 4 | **2.11 group cards** (#66) | before 3.1, because the schema depends on how they are declared |
 | 5 | **3.1 schema** (#20) | |
 
-Held for a measured need rather than a slot: **2.9, the display stack** - PPA and real frame
-buffering. Its first numbers are in the 2.9 row above; the 7B holding up far better than the P4_5
-on the same firmware points at the P4_5's software rotation.
+**#58, screenshots: DONE 2026-09-25** (T1-T8 PASS, `docs/TEST_58.md`). `GET /screenshot` on
+port 80 via `esp_http_server` returns the screen plus the top and system layers, composited as-is,
+as a PNG via `stb_image_write`. `scripts/screenshot.py` fetches the fleet. The same snapshot is what
+the page overview and snapshot transitions (`pages.md` §6-7) will build on. Those come after 2.9,
+because on the S3s they are only worth building once drawing is fast.
 
-2.9 is not reused as a number: it is struck through above with its history.
+Why 2.9 came back after being held for a measured need: reading the pipeline's source found
+an extra full-frame copy on every board and a synchronous flush that makes LVGL's second buffer
+useless (`display-stack.md` §2). The S3 slowness has become a daily cost, and it is a step
+towards ESP-IDF.
 
 Two things pulled forward from later phases: screen dimming and brightness out of 4.1 (a wall
 panel at full brightness all night is a daily-use problem, not a settings feature), and OTA (5.2),

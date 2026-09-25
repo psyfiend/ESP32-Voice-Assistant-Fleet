@@ -1,5 +1,11 @@
 # Display stack migration — research (esp_lcd, PPA, ESP32_Display_Panel)
 
+> **2026-09-25: the plan built on this research is `docs/design/display-stack.md`, and where they
+> differ, that file wins.** Two things below are out of date. "Do nothing until 2.3" is resolved,
+> since 2.3 is done. The "two `lv_conf.h` files" caveat is resolved: only `include/lvgl/lv_conf.h`
+> exists (CLAUDE.md). The driver survey, the PPA rules (Q3) and the blast-radius analysis (Q5) still
+> stand.
+
 **Status: research only. No code outside this file was changed.** Written to answer whether and
 how to move off Arduino_GFX, and what a hardware-accelerated rotation path would cost. Nothing
 here is scheduled — `FUTURE_IMPROVEMENTS.md` already sequences PPA work *after* milestone 2.3
