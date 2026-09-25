@@ -144,7 +144,16 @@
  * - LV_OS_MQX
  * - LV_OS_SDL2
  * - LV_OS_CUSTOM */
-#define LV_USE_OS   LV_OS_NONE
+/* 2.9 experiment, per board with -D FLEET_LV_FREERTOS: draw on both cores.
+ * LVGL is still driven from loop(); what FREERTOS adds is one drawing THREAD
+ * per draw unit (lv_draw_sw.c:94-99), 8 KB stack each, from INTERNAL RAM and
+ * unpinned (lv_freertos.c:93) - so not for CYD_S3_3248 as it stands (21-26 KB
+ * internal free). See docs/design/esplcd-step2.md s7 D. */
+#if defined(FLEET_LV_FREERTOS)
+    #define LV_USE_OS   LV_OS_FREERTOS
+#else
+    #define LV_USE_OS   LV_OS_NONE
+#endif
 
 #if LV_USE_OS == LV_OS_CUSTOM
     #define LV_OS_CUSTOM_INCLUDE <stdint.h>
@@ -240,7 +249,11 @@
     /** Set number of draw units.
      *  - > 1 requires operating system to be enabled in `LV_USE_OS`.
      *  - > 1 means multiple threads will render the screen in parallel. */
-    #define LV_DRAW_SW_DRAW_UNIT_CNT    1
+    #if defined(FLEET_LV_FREERTOS)
+        #define LV_DRAW_SW_DRAW_UNIT_CNT    2
+    #else
+        #define LV_DRAW_SW_DRAW_UNIT_CNT    1
+    #endif
 
     /** Use Arm-2D to accelerate software (sw) rendering. */
     #define LV_USE_DRAW_ARM2D_SYNC      0
