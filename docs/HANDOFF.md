@@ -50,35 +50,23 @@ network (`fleet-ws-p4-5` and so on). There is no auth; it is gated by `-D ENABLE
 1. **2.9 (#67), display stack: Arduino_GFX -> `esp_lcd`. IN PROGRESS, and the plan is written:
    `docs/design/display-stack.md`. Read all of it first.** Decisions are taken (raw `esp_lcd`;
    measure first; `WS_P4_5` first; one board at a time behind a build flag).
-   **Step 1 is DONE and merged** (2026-09-25, T1-T6 PASS; T7, the CYD's network, is being
-   watched): `GET /bench` + `python scripts/bench.py [host]`, numbers in `display-stack.md` §8.
-   Re-run it after every later step; that is what it is for. **Step 2 is next**: triple-partial
-   with PPA rotation on `WS_P4_5`, the owner's call, despite the known PPA freeze in exactly that
-   configuration (`display-stack.md` §9) - back off only if it freezes. Its libraries are fetched
-   into `reference/esp-registry/` (`REFERENCE_PROJECTS.md`). **Read
-   `docs/research/waveshare-esp-lcd-survey.md` before writing any of it**: the whole Waveshare
-   collection, surveyed for `esp_lcd` bring-up, with the exact config to copy for P4_5.
-   **`-O2` (compile for speed)** is on the two dev boards on `exp/67-o2`: -9% (P4_5) to -14% (CYD)
-   per full frame. **Owner, 2026-09-25: goes fleet-wide if the overnight test (O2) is clean**; O1
-   (feel) came back "a touch faster". The boards were deliberately NOT reflashed that night, so
-   their uptime is the O2 result. Also on that branch: `-D DEBUG_LOGPAGE` dropped (owner).
-   **#68, open:** the toast pushed flush-right after Show Touches + a page swipe. Instrument before
-   fixing - the issue has the measurements and the one theory that does not yet fit them.
+   **Done, all merged (2026-09-25/26):** step 1, `GET /bench` + `python scripts/bench.py [host]`
+   (numbers in `display-stack.md` §8 - re-run it after every step, that is what it is for);
+   **`-O2` fleet-wide** (-9% P4_5, -14% CYD per full frame; overnight soak clean); **#68** (LVGL's
+   top layer scrolled - LESSONS). **Measured and rejected:** `LV_USE_PPA` (drawing 11% slower),
+   `LV_OBJ_STYLE_CACHE` (2-4% for pool space P4_5 lacks), and **`LV_OS_FREERTOS` + 2 draw units
+   (drawing 51% slower on P4_5)** - all in §8.3, none merged.
 
-   **Branch map, end of 2026-09-25 (nothing below is merged; the boards run `exp/67-o2`):**
-   `exp/67-o2` (dev-board `-O2`) <- `exp/67-o2-fleet` (`-O2` for all eight; **all eight build
-   clean**, no new warnings) <- `fix/68-toast` (the `/bench` top-layer readout, **no fix**). Merge
-   order once O2 passes: `exp/67-o2-fleet` to `main`, then flash `fix/68-toast` to reproduce #68.
-   Separately: `docs/67-step2-design` (the step 2 design, `docs/design/esplcd-step2.md`, awaiting the
-   owner's four choices) and `spike/67-esplcd-compile` (throwaway: proves step 2's IDF calls and the
-   HX8394 driver compile and link; never merge).
-   `reference/Guition Examples/` (owner, 2026-09-25) holds Guition's packs, including a **new,
-   not-yet-onboarded board, `JC4880P433`** (P4, 480x800 ST7701 over DSI, real IDF examples). The CYD
-   panel's TE pin is GPIO 38 and Guition's own driver never sends a row address over QSPI - both
-   matter for step 5 (survey §5).
-   Two things from step 1 that the plan did not know: every board runs `AUTO_FLUSH = true`, so the
-   cache write-back happens per chunk inside `draw16bitRGBBitmap()` and `gfx->flush()` does nothing
-   on DSI/RGB; and `LV_USE_PPA` makes drawing *slower* (gate kept, off: `-D FLEET_LV_PPA`).
+   **Step 2 is NEXT, and the design is agreed: `docs/design/esplcd-step2.md` - its §7 holds the
+   owner's decisions and overrides its §2.** Triple-partial with PPA rotation on `WS_P4_5`, in a new
+   `components/Fleet_Display/` (`DisplayManager` untouched until step 6), HX8394 driver vendored with
+   its legacy-I2C code compiled out, `LV_OS_NONE`. Read `docs/research/waveshare-esp-lcd-survey.md`
+   first. The branch `spike/67-esplcd-compile` proves every IDF call and the driver compile and link
+   (never merge it; its §4a lists four vendoring traps). Back off only if the known PPA freeze
+   (`display-stack.md` §9) appears.
+   `reference/Guition Examples/` (owner) holds Guition's packs, including a **new, not-yet-onboarded
+   board, `JC4880P433`** (P4, 480x800 ST7701 over DSI, real IDF examples). The CYD panel's TE pin is
+   GPIO 38 and Guition's own driver never sends a row address over QSPI - both matter for step 5.
 2. **2.10 (#65)** long-press popup groundwork - brightness/colour sliders, colour picker; pause
    moves into it. Tap stays a one-touch toggle.
 3. **2.8 (#19)** header slots. 4. **2.11 (#66)** group cards. 5. **3.1 (#20)** schema.
