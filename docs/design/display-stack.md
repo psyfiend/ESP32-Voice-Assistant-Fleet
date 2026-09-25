@@ -213,6 +213,13 @@ Milliseconds per frame, averages of 20. Page 0 = House; page 1 and the deck move
 | | card | **7.7** | 4.9 | 2.8 | 0.0 | 54,356 | 1 |
 | `CYD_S3_3248` QSPI 320x480, rot 0, 1 x 20-line internal buf | full | **221.7** | 163.7 (74%) | 9.1 | 48.6 (22%) | 153,600 | 24 |
 | | card | **64.7** | 14.5 | 1.5 | **48.7 (75%)** | 16,677 | 3 |
+| `WS_P4_5`, **Linen** (owner's run, T6) | full | **215.9** | 144.2 (67%) | 71.6 | 0.0 | 921,600 | 15 |
+| | card | **10.2** | 7.4 | 2.9 | 0.0 | 54,356 | 1 |
+
+**Linen costs drawing, not flushing:** +35% render on a full screen, +50% on a card, copy
+unchanged. Its real drop shadows are the difference. No flush change will touch that; it is the
+first concrete target for "draw less" after step 2. The owner reproduced every Midnight row within
+~2% in the owner's own runs.
 
 ### 8.3 Experiments on `WS_P4_5` (each reverted; only the build flag for PPA remains)
 
@@ -246,9 +253,8 @@ rotating CPU copy itself.**
   every chunk walks the whole widget tree again. Larger CYD draw buffers would cut the walks but
   cost internal RAM it does not have. `LV_DRAW_SW_DRAW_UNIT_CNT=2` (§6.2) is the other lever. Both
   are separate experiments, after step 2.
-- **Not yet measured:** Linen (per-page scheme; its shadows roughly halved the frame rate in the
-  owner's 2026-09-23 overlay reading), and animation frames such as a swipe or the drawer, which
-  redraw partial areas every tick rather than one full frame.
+- **Not yet measured:** Linen on the CYD, and animation frames such as a swipe or the drawer,
+  which redraw partial areas every tick rather than one full frame.
 
 ## 9. Open questions
 

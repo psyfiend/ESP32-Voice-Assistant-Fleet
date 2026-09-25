@@ -1,6 +1,12 @@
 # Test sheet — 2.9 (#67), display stack
 
-> **Step 1 (`/bench`): awaiting the owner's run.** Steps 2-6 will add their own sections here.
+> **Step 1 (`/bench`), 2026-09-25: T1-T6 PASS (owner). T7 (an hour of CYD network) outstanding.**
+> Every owner run reproduced `display-stack.md` §8.2 within ~2%. T5: both scripts finished with
+> matching numbers. Because the two interleave request by request, each script's screenshots and its
+> final "put it back" may describe the other's state; the board ended correctly this time, but that
+> is by luck, not design. T6, Linen on `WS_P4_5`: full-screen drawing 107 -> 144 ms (+35%),
+> one-card drawing 4.9 -> 7.4 ms (+50%), copy unchanged; recorded in §8.2. Linen on the CYD was not run.
+> Steps 2-6 will add their own sections here.
 
 Branch `feat/67-bench`. The plan is `docs/design/display-stack.md`; the numbers are its §8; what
 every JSON field means is the header comment of `src/UI/Bench.cpp`.
