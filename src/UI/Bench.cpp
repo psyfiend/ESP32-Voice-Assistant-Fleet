@@ -46,6 +46,7 @@
 #include <freertos/task.h>
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
+#include <esp_system.h>       // esp_reset_reason
 
 #ifndef FW_VERSION
     #define FW_VERSION "unknown"
@@ -261,9 +262,14 @@ size_t buildJson() {
     o.add("\"chunks\":%.1f,\"px\":%llu,\"fps_ceiling\":%.1f,",
           n ? (double)r.chunks / n : 0.0, (unsigned long long)(n ? r.px / n : 0),
           avgTotal > 0 ? 1e6 / (double)avgTotal : 0.0);
-    o.add("\"heap\":{\"internal_before\":%u,\"internal_after\":%u,\"lv_mem_free_before\":%u,\"lv_mem_free_after\":%u}}\n",
+    o.add("\"heap\":{\"internal_before\":%u,\"internal_after\":%u,\"lv_mem_free_before\":%u,\"lv_mem_free_after\":%u},",
           (unsigned)r.heapBefore, (unsigned)r.heapAfter,
           (unsigned)r.lvFreeBefore, (unsigned)r.lvFreeAfter);
+    // Whether the board rebooted between two runs, and why it last did. A
+    // dropped connection mid-matrix is otherwise indistinguishable from a
+    // panic (TEST_2.9.md T7).
+    o.add("\"uptime_s\":%lu,\"reset_reason\":%d}\n",
+          (unsigned long)(esp_timer_get_time() / 1000000), (int)esp_reset_reason());
     return o.len < JSON_CAP ? o.len : JSON_CAP - 1;
 }
 

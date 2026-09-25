@@ -23,6 +23,7 @@ The UI freezes while each scenario is measured. Standard library only.
 
 import argparse
 import datetime
+import http.client
 import json
 import pathlib
 import sys
@@ -49,6 +50,15 @@ def get(url, timeout):
                 time.sleep(5)
                 continue
             raise RuntimeError(f"HTTP {e.code}: {e.read().decode(errors='replace').strip()}")
+        except (OSError, http.client.HTTPException) as e:
+            # A dropped connection. Retried once, and said out loud: on the CYD
+            # this has meant low internal heap, and uptime_s in the next reply
+            # tells whether the board rebooted.
+            if attempt == 0:
+                print(f"  (connection dropped: {e!r}; retrying once)")
+                time.sleep(10)
+                continue
+            raise
     raise RuntimeError("busy after 3 attempts")
 
 
@@ -88,6 +98,11 @@ def run_host(host, args, stamp):
     print(f"  {c['board']} / {c['panel']} {c['bus']} {c['res'][0]}x{c['res'][1]} rot {c['rotation']}, "
           f"{c['buf']['count']} x {c['buf']['bytes'] // 1024} KB {c['buf']['where']} ({c['buf']['lines']} lines), "
           f"LV_USE_PPA {c['lv_use_ppa']}, fw {c['fw']}")
+    up = [r.get("uptime_s") for r in replies]
+    if None not in up:
+        rebooted = any(b < a for a, b in zip(up, up[1:]))
+        print(f"  uptime {up[0]} s -> {up[-1]} s, last reset reason {replies[-1].get('reset_reason')}"
+              + ("  ** REBOOTED DURING THE RUN **" if rebooted else ""))
     print(f"  saved {base}.json + {len(SCENARIOS)} screenshots in bench/")
 
 
