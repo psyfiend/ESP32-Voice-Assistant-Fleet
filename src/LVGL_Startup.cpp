@@ -248,6 +248,22 @@ bool begin(DisplayManager &display, TouchManager &touch) {
     s_disp = lv_display_create(gfx->width(), gfx->height());
     lv_display_set_flush_cb(s_disp, disp_flush);
 
+    // THE OVERLAY LAYERS MUST NOT SCROLL. #68.
+    //
+    // LVGL creates the top and system layers scrollable - it only removes
+    // CLICKABLE (lv_display.c:159-172). Drag anything on the top layer (the
+    // Touch Points panel is draggable) and LVGL also tries to SCROLL: the
+    // panel cannot, so the scroll passes up to its parent, the layer, which
+    // can. The layer then scrolls, carrying every child with it. Measured on
+    // both dev boards, 2026-09-26: top layer scrolled (0,-144) on WS_P4_5 and
+    // (-33,-236) on CYD_S3_3248, the toast's own alignment exactly right and
+    // the toast visibly "attached" to the panel. It only happened when the
+    // layer had room to scroll in the drag's direction, which is why it looked
+    // random. An overlay is a sheet of glass over the screen; it has nothing
+    // to scroll to.
+    lv_obj_remove_flag(lv_display_get_layer_top(s_disp), LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(lv_display_get_layer_sys(s_disp), LV_OBJ_FLAG_SCROLLABLE);
+
     // Note: We use PARTIAL mode. This is safer for Arduino_GFX.
     // If we used DIRECT mode, we would need to handle 'strided' memory writes manually
     // because Arduino_GFX expects contiguous bitmaps.
