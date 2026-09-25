@@ -47,10 +47,17 @@ exactly what the board shows. `python scripts/screenshot.py [host]` saves them t
 **Use it to judge a layout before asking the owner for a photo.** Hostnames resolve on the owner's
 network (`fleet-ws-p4-5` and so on). There is no auth; it is gated by `-D ENABLE_SCREENSHOT`.
 
-1. **2.9 (#67), display stack: Arduino_GFX -> `esp_lcd`. NEXT, and the plan is written:
+1. **2.9 (#67), display stack: Arduino_GFX -> `esp_lcd`. IN PROGRESS, and the plan is written:
    `docs/design/display-stack.md`. Read all of it first.** Decisions are taken (raw `esp_lcd`;
-   measure first; `WS_P4_5` first; one board at a time behind a build flag). Step 1 is a `/bench`
-   endpoint that times drawing and flushing separately, on the two dev boards only.
+   measure first; `WS_P4_5` first; one board at a time behind a build flag).
+   **Step 1 is built** on `feat/67-bench` (2026-09-25), awaiting the owner's run of
+   `docs/TEST_2.9.md`: `GET /bench` + `python scripts/bench.py [host]`, numbers in
+   `display-stack.md` §8. Re-run it after every later step; that is what it is for. **Step 2 is
+   next**, and the owner has given permission (2026-09-25) to fetch the libraries it needs
+   (`waveshare/esp_lcd_hx8394`, the P4_5 BSP component, `esp_lvgl_adapter` into `reference/`).
+   Two things from step 1 that the plan did not know: every board runs `AUTO_FLUSH = true`, so the
+   cache write-back happens per chunk inside `draw16bitRGBBitmap()` and `gfx->flush()` does nothing
+   on DSI/RGB; and `LV_USE_PPA` makes drawing *slower* (gate kept, off: `-D FLEET_LV_PPA`).
 2. **2.10 (#65)** long-press popup groundwork - brightness/colour sliders, colour picker; pause
    moves into it. Tap stays a one-touch toggle.
 3. **2.8 (#19)** header slots. 4. **2.11 (#66)** group cards. 5. **3.1 (#20)** schema.

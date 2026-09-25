@@ -59,4 +59,33 @@ private:
 lv_display_t *display();
 lv_indev_t   *indev();
 
+// --= Flush timing, for GET /bench (milestone 2.9, #67) =--
+//
+// The flush callback lives in this file, so the only honest place to time it
+// is here. While a FlushStats is attached, disp_flush() adds to it; with none
+// attached it costs one pointer test per chunk.
+//
+// The two halves are what 2.9 is about, named for what they do on today's
+// Arduino_GFX path so the esp_lcd path can report the same two fields later:
+//   copyUs    - draw16bitRGBBitmap(): the CPU copy (and rotation) of each
+//               chunk into the library's framebuffer or canvas
+//   presentUs - gfx->flush() on the last chunk: the whole-framebuffer cache
+//               write-back on DSI/RGB, the whole-frame QSPI send on the CYD
+struct FlushStats {
+    uint32_t chunks    = 0;
+    uint32_t px        = 0;
+    int64_t  copyUs    = 0;
+    int64_t  presentUs = 0;
+};
+void attachFlushStats(FlushStats *stats);   // nullptr detaches
+
+// What begin() allocated, for reports. `psram` is where the first buffer
+// actually landed, after any fallback.
+struct DrawBufInfo {
+    size_t  bytes = 0;     // per buffer
+    uint8_t count = 0;     // 1 or 2
+    bool    psram = false;
+};
+DrawBufInfo drawBufInfo();
+
 } // namespace LVGL_Startup
