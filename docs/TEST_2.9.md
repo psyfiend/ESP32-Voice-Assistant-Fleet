@@ -62,7 +62,9 @@ is unknown; it answered normally straight after.
 
 > **O1: PASS (owner, 2026-09-25)** - "they do seem a touch faster", placebo not ruled out. Found
 > while testing, not caused by `-O2` as far as anyone knows: **#68**, the toast pushed flush-right.
-> **O2: running overnight 2026-09-25/26.** On a clean result, `-O2` goes fleet-wide (owner).
+> **O2: PASS (owner, 2026-09-26)** - overnight on both dev boards, `bench.py` showed no reboot and
+> WiFi live. Also closes step 1's T7. `-O2` merged fleet-wide the same morning; all eight had
+> already built clean with it.
 
 **O1 — Feel.** Use both boards normally for a few minutes: swipe pages, open the drawer and the
 deck, toggle a light.
