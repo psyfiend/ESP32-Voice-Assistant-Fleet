@@ -41,9 +41,11 @@ Ports move when boards are re-plugged. **Identify a board by its USB serial**, n
 
 ## What is next — ROADMAP §7 "Running order"
 
-1. **#58, LVGL screenshots.** `lv_snapshot` (`LV_USE_SNAPSHOT`, off) + PNG via `stb_image_write` +
-   the HTTP server that is already linked. Plan is on the issue. Lets a session judge a screen from
-   the real framebuffer, and is the capability page transitions and the page overview need.
+1. **#58, LVGL screenshots - BUILT on `feat/58-screenshots`, awaiting the owner's glass test
+   (`docs/TEST_58.md`).** `python scripts/screenshot.py [host]` saves a PNG of exactly what each
+   board shows into `screenshots/`. **Use it to judge a layout before asking for a photo.** The
+   hostnames resolve on the owner's network (`fleet-ws-p4-5` and so on). There is no auth; it is
+   gated by `-D ENABLE_SCREENSHOT` in the shared build options.
 2. **2.10 (#65)** long-press popup groundwork - brightness/colour sliders, colour picker; pause
    moves into it. Tap stays a one-touch toggle.
 3. **2.8 (#19)** header slots. 4. **2.11 (#66)** group cards. 5. **3.1 (#20)** schema.
@@ -56,7 +58,6 @@ rotation.
 - Three HA test entities (Avail / Reading / Refuse) sit at the top of the Fleet page, with three
   helpers in the owner's HA. Remove both when no longer wanted (`ExternalEntities_HA.h`,
   `Dashboard_Fleet.h`).
-- The toast-placement fix is unverified on `WS_S3_4B` (it sat half-way down there).
 - #44's MQTT half is still open: nothing is both writable AND advertised yet.
 - Ideas recorded, not scheduled: #52-#55; the owner's page ideas (linked pages, custom swipe
   targets, an alt-tab overview) are in `docs/design/pages.md`.
@@ -90,8 +91,14 @@ platform reinstall silently puts the bug back. Procedure: `docs/REBUILD_P4_LIBS.
   half-finished edit. Docs are safe to edit; source is not.
 - **Clear `.pio/build_cache` after changing a struct's layout, a BSP header or `lv_conf.h`.**
   Stale objects against a changed struct corrupt memory rather than failing.
-- **`pio run` with no `-e` builds ONE environment.** Before a merge, build all eight.
-- **A serial monitor resets the board when it opens.** Attach with `--rts 0 --dtr 0`.
+- **`pio run` with no `-e` builds ONE environment.** Before a merge, build all eight - but only
+  then. While developing, build and flash just `CYD_S3_3248` and `WS_P4_5` (owner); the all-eight
+  build takes ~25 minutes and blocks source edits while it runs.
+- **A serial monitor resets the board when it opens.** Attach with `--rts 0 --dtr 0`. On
+  `CYD_S3_3248`'s native USB port, even a pyserial open with RTS/DTR set false appeared to reset it
+  (2026-09-24; not proven). Read that board through HA or `/screenshot`, not its port.
+- **Prefer ESP-IDF facilities to Arduino-only ones** (owner): see CLAUDE.md. The HTTP server is
+  `esp_http_server`, and its handlers run on their own task, so they must never touch LVGL.
 - **`Edit` on a CRLF file**: deleting a line by matching a leading `\n` joins two lines. See
   CLAUDE.md; check `git diff` for a `+` line holding two statements.
 - **HaProvider receives on the WEBSOCKET TASK, not `loop()`.** It must never touch LVGL; it writes

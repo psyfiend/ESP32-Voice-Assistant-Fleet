@@ -316,4 +316,8 @@ void SystemCore::loop() {
     _ha.loop(now);
     _haProv.loop(now);
     _haRest.loop(now);
+
+    // Starts the HTTP server the first time the link is up, if any route was
+    // registered; a no-op every call after that.
+    _http.loop(_conn.isOnline());
 }
