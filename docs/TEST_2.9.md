@@ -31,7 +31,10 @@ back on Arduino_GFX exactly as before.**
   normal screenshot: identical on both pages, with the deck, after card redraws and page changes.
   The one mismatch seen was the Uptime and Signal values changing between the two captures.
 - That comparison also proves the orientation is **the same as Arduino_GFX's** rotation 1.
-- 30-minute soak for the known PPA freeze: see the result line below.
+- **30-minute soak for the known PPA freeze: PASS.** 382 `/bench` runs back to back - full
+  screen, single card (odd block sizes, which is what that freeze depends on), both pages, deck
+  open and shut - 19,100 frames, no freeze, no reboot (uptime 176 -> 1969 s). Worst single frame
+  298.8 ms, not explained: probably a full-frame repair coinciding with network work, but unproven.
 - **Never seen by anyone:** the glass itself. Everything above reads memory; only your eyes can
   confirm the panel shows it upright, in the right colours, without tearing.
 
