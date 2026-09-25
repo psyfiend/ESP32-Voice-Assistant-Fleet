@@ -21,6 +21,9 @@ other projects' code and what it teaches.
 | `esp-registry/waveshare__esp_lcd_hx8394-v2.1.0` | **MIT** (`license.txt`) | Reuse with attribution |
 | `esp-registry/waveshare__esp32_p4_wifi6_touch_lcd_5-v1.0.4` | **Apache-2.0** (`LICENSE`) | Reuse with attribution + NOTICE rules |
 | `esp-registry/espressif__esp_lvgl_adapter-v0.6.4` | **Apache-2.0** (`LICENSE`) | Reuse with attribution + NOTICE rules |
+| `esp-registry/waveshare__esp32_s3_touch_lcd_4b-v2.0.0` | **Apache-2.0** | Reuse with attribution + NOTICE rules |
+| `esp-registry/espressif__esp_lcd_st7701-v2.0.2_2`, `..._esp_lcd_panel_io_additions-v1.0.1_1`, `..._esp_lcd_ek79007-v2.0.2`, `..._esp_lcd_jd9165-v2.0.2` | **Apache-2.0** | Reuse with attribution + NOTICE rules |
+| `esp-registry/waveshare__esp_lcd_st7703-v2.0.0` | **MIT** | Reuse with attribution |
 
 The registry's web page lists the last two as "Custom"; the `LICENSE` file inside each says Apache-2.0.
 Check each file's own header before copying from it, as `display-stack.md` §6.1 says.
@@ -259,3 +262,8 @@ dependencies (`i2c_bus`, `esp_codec_dev`, `esp_lcd_touch_gt911`, ...) were NOT f
   reading before step 2** - see `display-stack.md` §9.
 
 Also relevant to step 2 and already here: Allsky's `ppa_accelerator.h` (above) - read only.
+
+Added the same day for the Waveshare survey (`docs/research/waveshare-esp-lcd-survey.md`), for
+steps 3-4: the S3-4B BSP 2.0.0 (its ST7701-over-expander bring-up), `esp_lcd_st7701`,
+`esp_lcd_panel_io_additions` (3-wire SPI through an I/O expander), and the three other P4 panel
+drivers - `esp_lcd_ek79007` (7B), `esp_lcd_st7703` (4B), `esp_lcd_jd9165` (CYD_P4_1060).

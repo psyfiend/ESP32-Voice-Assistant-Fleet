@@ -55,7 +55,9 @@ network (`fleet-ws-p4-5` and so on). There is no auth; it is gated by `-D ENABLE
    Re-run it after every later step; that is what it is for. **Step 2 is next**: triple-partial
    with PPA rotation on `WS_P4_5`, the owner's call, despite the known PPA freeze in exactly that
    configuration (`display-stack.md` §9) - back off only if it freezes. Its libraries are fetched
-   into `reference/esp-registry/` (`REFERENCE_PROJECTS.md`).
+   into `reference/esp-registry/` (`REFERENCE_PROJECTS.md`). **Read
+   `docs/research/waveshare-esp-lcd-survey.md` before writing any of it**: the whole Waveshare
+   collection, surveyed for `esp_lcd` bring-up, with the exact config to copy for P4_5.
    Two things from step 1 that the plan did not know: every board runs `AUTO_FLUSH = true`, so the
    cache write-back happens per chunk inside `draw16bitRGBBitmap()` and `gfx->flush()` does nothing
    on DSI/RGB; and `LV_USE_PPA` makes drawing *slower* (gate kept, off: `-D FLEET_LV_PPA`).

@@ -95,7 +95,9 @@ const DisplayConfig WS_P4_TOUCH_LCD_5_DISPLAY = {
 
     // ---= MIPI Timing =---
     // LCD-5 single screen profile. DSI timing matches the audited
-    // ESP-IDF BSP: 720x1280 @30Hz, DPI 58 MHz, 2 lanes @ 700 Mbps.
+    // ESP-IDF BSP: 720x1280, DPI 58 MHz, 2 lanes @ 700 Mbps. That is 55 Hz:
+    // 58 MHz / (800 x 1318). The vendor macro is NAMED "30HZ"; the arithmetic
+    // says otherwise (docs/research/waveshare-esp-lcd-survey.md).
     .HSYNC_PWIDTH = 20,
     .HSYNC_BPORCH = 20,
     .HSYNC_FPORCH = 40,
