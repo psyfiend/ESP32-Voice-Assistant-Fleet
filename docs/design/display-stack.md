@@ -258,6 +258,19 @@ rotating CPU copy itself.**
 
 ## 9. Open questions
 
+- **STEP 2 RISK, found 2026-09-25: a known PPA freeze matches P4_5's exact configuration.**
+  `esp_lvgl_adapter` 0.6.4 ships `0001-bugfix-ppa-Temporary-fix-for-the-PPA-hang-issue.patch`
+  (`reference/esp-registry/`, README "ESP-IDF Patches"). It is a patch to **ESP-IDF's own PPA
+  driver** (`esp_driver_ppa/src/ppa_srm.c`, a hardware-bug workaround tagged DIG-734), for "display
+  freeze" when all three hold: ESP32-P4, **partial** tear-avoidance mode, and **90/270-degree
+  rotation**. P4_5 is `ROTATION = 1` and step 2 planned partial chunks rotated by the PPA. The patch
+  targets IDF v6.0; **we are on IDF v5.5.5**, prebuilt (`framework-arduinoespressif32-libs/versions.txt`),
+  so we can neither read nor patch that file without another library rebuild. Unknown whether 5.5.5
+  carries the faulty code. Note also that Waveshare's own P4_5 LVGL demo runs `ROTATE_0`. Options
+  before writing step 2's flush: rotate with the PPA in **full-frame** mode (the freeze is specific
+  to partial), mount/rotate differently, or reproduce the freeze deliberately and then decide on a
+  rebuild (`docs/REBUILD_P4_LIBS.md`). This is the first thing step 2 settles.
+
 - AXS15231B partial window writes over QSPI (step 5).
 - Which DSI panels can mirror X/Y in their own registers (step 3).
 - Whether `LV_DRAW_SW_DRAW_UNIT_CNT=2` is worth changing the threading model for. That is a
