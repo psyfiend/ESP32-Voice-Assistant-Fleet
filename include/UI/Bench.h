@@ -14,6 +14,8 @@
 //   deck   0 or 1: deck hidden or shown (default: as it is)
 //   keep   1: stay on that page/deck afterwards (scripts/bench.py uses it to
 //          screenshot what was measured, then puts the board back itself)
+//   tasks  1: also report CPU time per FreeRTOS task, and each core's idle
+//          time, across the measured frames - where the CPU actually went
 //
 // If page or deck differ from what is showing, the bench switches, lets the
 // board settle for SETTLE_MS of ordinary loop() - the rebuild, the page toast,
