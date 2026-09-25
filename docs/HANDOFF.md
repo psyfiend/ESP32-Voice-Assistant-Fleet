@@ -1,4 +1,4 @@
-# Handoff — 2026-09-24
+# Handoff — 2026-09-25
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was cut from ~680 lines to this on
@@ -14,7 +14,8 @@ not appear in the source as suspect.
 ## Where the project is
 
 **`v0.2.7`, tagged on `main` 2026-09-24** (merge `c7f082e`). Phases 0, 1 and milestones 2.1–2.7
-are done and signed off on glass. Boards report `v0.2.7.x`.
+are done and signed off on glass. Boards report `v0.2.7.x`. Since the tag: #58 screenshots (merged
+2026-09-25, not a milestone, so no tag).
 
 What a board does today: boots into **two pages** (House = the owner's 18 HA entities over the
 websocket, Fleet = MQTT/system/virtual cards), swiped horizontally with wrap-around; per-page
@@ -41,18 +42,21 @@ Ports move when boards are re-plugged. **Identify a board by its USB serial**, n
 
 ## What is next — ROADMAP §7 "Running order"
 
-1. **#58, LVGL screenshots - BUILT on `feat/58-screenshots`, awaiting the owner's glass test
-   (`docs/TEST_58.md`).** `python scripts/screenshot.py [host]` saves a PNG of exactly what each
-   board shows into `screenshots/`. **Use it to judge a layout before asking for a photo.** The
-   hostnames resolve on the owner's network (`fleet-ws-p4-5` and so on). There is no auth; it is
-   gated by `-D ENABLE_SCREENSHOT` in the shared build options.
+**#58 screenshots is DONE and merged (2026-09-25).** `http://<board>/screenshot` gives a PNG of
+exactly what the board shows. `python scripts/screenshot.py [host]` saves them to `screenshots/`.
+**Use it to judge a layout before asking the owner for a photo.** Hostnames resolve on the owner's
+network (`fleet-ws-p4-5` and so on). There is no auth; it is gated by `-D ENABLE_SCREENSHOT`.
+
+1. **2.9 (#67), display stack: Arduino_GFX -> `esp_lcd`. NEXT, and the plan is written:
+   `docs/design/display-stack.md`. Read all of it first.** Decisions are taken (raw `esp_lcd`;
+   measure first; `WS_P4_5` first; one board at a time behind a build flag). Step 1 is a `/bench`
+   endpoint that times drawing and flushing separately, on the two dev boards only.
 2. **2.10 (#65)** long-press popup groundwork - brightness/colour sliders, colour picker; pause
    moves into it. Tap stays a one-touch toggle.
 3. **2.8 (#19)** header slots. 4. **2.11 (#66)** group cards. 5. **3.1 (#20)** schema.
 
-On hold for a measured need: **2.9**, PPA and real frame buffering. First numbers are in its ROADMAP
-row; the 7B runs the same firmware far faster than the P4_5, which points at the P4_5's software
-rotation.
+The page overview and snapshot transitions (`pages.md` §6-7) come after 2.9: on the S3s they are
+only worth building once drawing is fast.
 
 **Loose ends, all small:**
 - Three HA test entities (Avail / Reading / Refuse) sit at the top of the Fleet page, with three
