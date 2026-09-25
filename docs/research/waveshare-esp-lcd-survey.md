@@ -87,8 +87,10 @@ shipped, so either should work. The 7B is the one board where "free" is worth te
 **`WS_P4_4B` runs faster than either Waveshare source.** Ours: 46 MHz, porches 20/80/80 H and
 4/12/30 V, lanes 1000 Mbps = **66.7 Hz**. Waveshare's Arduino config
 (`examples/arduino/libraries/displays/displays_config.h:113-116`) and the ST7703 driver agree on
-38 MHz, 20/50/50 and 4/20/20, lanes 480 Mbps = **59.2 Hz**. Ours matches neither. Probably an old
-experiment. Recommendation: vendor values at step 3, with the rotation change.
+38 MHz, 20/50/50 and 4/20/20, lanes 480 Mbps = **59.2 Hz**. Ours matches neither, and that is
+deliberate: the owner keeps every earlier or conflicting value as a comment beside the one in use,
+because published "working" timings disagree - Waveshare's own documents included. Step 3 should
+treat the vendor values as one more candidate to compare on glass, not as a correction.
 
 **`WS_P4_7B`** matches its vendor timing exactly (52 MHz, 60.4 Hz, 1000 Mbps).
 
@@ -123,8 +125,33 @@ candidates: **PSRAM XIP** (`SPIRAM_FETCH_INSTRUCTIONS` + `SPIRAM_RODATA`), **64-
 lines**, 80 MHz octal PSRAM, `FREERTOS_HZ=1000`. Ours: 80 MHz yes, 32 KB/32-byte cache, no XIP.
 That is independent confirmation that the S3 rebuild is worth measuring at step 4.
 
-## 5. Nothing found for step 5
+## 5. For step 5 — the CYD's AXS15231B, from Guition's own demo (added 2026-09-25)
 
-No Waveshare source here drives our QSPI AXS15231B. The AMOLED 2.06 (QSPI, CO5300) does partial
-updates over QSPI and might show the technique, but it is a different controller and was not read.
-Guition's own CYD_S3_3248 examples, if the owner has them, are the better place to look.
+The owner added Guition's packs as `reference/Guition Examples/`. The CYD's
+`Guition-S3-JC3248W535/1-Demo/Demo_Arduino/DEMO_LVGL/` carries an `esp_lcd` driver for the panel.
+**That demo is written for LVGL 8** (owner). So its LVGL-side choices (`full_refresh`, its
+`lv_port.c`) describe an LVGL 8 port, not what LVGL 9 could do; the panel-driver findings below sit
+underneath LVGL and hold either way.
+
+- **Over QSPI the vendor never sends a row address.** `panel_axs15231b_draw_bitmap()`
+  (`esp_lcd_axs15231b.c:287-324`) sets the column window (`CASET`) but skips `RASET` when
+  `use_qspi_interface` is set, then writes with `RAMWR` (0x2C) if the area starts at row 0 and
+  `RAMWRC` (0x3C, "continue") otherwise. So every write either starts at the top or carries on
+  exactly where the last one stopped. **Arbitrary partial windows are not what the vendor does**,
+  and their LVGL port runs `full_refresh = 1` with a full-screen buffer (`lv_port.c:242`,
+  `DEMO_LVGL.ino:35`).
+- **What that leaves for step 5**, unproven, needing the glass: (a) whether `RASET` over QSPI
+  works anyway on this controller revision - some community drivers claim so, and the vendor's
+  choice may be caution; (b) a column-windowed write from row 0 down to the dirty area's bottom
+  row, which is cheap for anything near the top of the screen and a full-height strip for anything
+  near the bottom. The honest expectation is now lower than §8.4 of the plan hoped.
+- **Tearing: QSPI is not out of luck.** The panel has a **TE (tearing effect) pin, GPIO 38**
+  (`esp_bsp.h:41`). Guition's BSP times each write to it (`esp_bsp.c:175-218`, with
+  `time_Tvdl = 13` / `time_Tvdh = 3` ms from `display.h:49-50`), and `esp_lvgl_adapter` has a
+  `TE_SYNC` mode for the same thing (`display_te_sync.c`). Our BSP has no TE field yet.
+
+The other Guition packs: `JC1060P470` (our `CYD_P4_1060`) and `JC8048W550` (`CYD_S3_8048`) are
+Arduino-only demos; not read further. `JC4880P433` is the **new, not-yet-onboarded board**: a P4
+with a 480x800 **ST7701 over MIPI-DSI** (`esp_lcd_st7701_mipi.c`), and real ESP-IDF 5.5.4
+examples built on Espressif's `esp32_p4_function_ev_board` BSP - the best-documented Guition
+board we have, and the natural place to start its onboarding.

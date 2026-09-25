@@ -164,6 +164,11 @@ conditional.
   writing a new board header, list each struct's fields in the same order they appear in
   `Fleet_BSP.h` (skipping unset ones is fine; reordering the ones you do set is not, and
   fails to compile with `designator order for field 'X' does not match declaration order`).
+- **A commented-out value beside a BSP timing field is deliberate, not clutter.** The owner keeps
+  every earlier or conflicting value there, because published "working" panel timings disagree -
+  vendor documentation included. A BSP value that differs from a vendor example is a choice made
+  among candidates, not a mistake; compare on glass before "correcting" it, and never delete the
+  comments.
 - Each board's `BSP_<NAME>.h`:
   1. Defines the short device-identity macro (see Board selection above), then `HAS_X`
      capability flags stay in `platformio.ini`, not here.
