@@ -64,6 +64,14 @@ network (`fleet-ws-p4-5` and so on). There is no auth; it is gated by `-D ENABLE
    their uptime is the O2 result. Also on that branch: `-D DEBUG_LOGPAGE` dropped (owner).
    **#68, open:** the toast pushed flush-right after Show Touches + a page swipe. Instrument before
    fixing - the issue has the measurements and the one theory that does not yet fit them.
+
+   **Branch map, end of 2026-09-25 (nothing below is merged; the boards run `exp/67-o2`):**
+   `exp/67-o2` (dev-board `-O2`) <- `exp/67-o2-fleet` (`-O2` for all eight; **all eight build
+   clean**, no new warnings) <- `fix/68-toast` (the `/bench` top-layer readout, **no fix**). Merge
+   order once O2 passes: `exp/67-o2-fleet` to `main`, then flash `fix/68-toast` to reproduce #68.
+   Separately: `docs/67-step2-design` (the step 2 design, `docs/design/esplcd-step2.md`, awaiting the
+   owner's four choices) and `spike/67-esplcd-compile` (throwaway: proves step 2's IDF calls and the
+   HX8394 driver compile and link; never merge).
    `reference/Guition Examples/` (owner, 2026-09-25) holds Guition's packs, including a **new,
    not-yet-onboarded board, `JC4880P433`** (P4, 480x800 ST7701 over DSI, real IDF examples). The CYD
    panel's TE pin is GPIO 38 and Guition's own driver never sends a row address over QSPI - both
