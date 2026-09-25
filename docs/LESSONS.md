@@ -386,6 +386,21 @@ A corollary found the same week: **a child larger than its parent also forces a 
 the parent has to be composited to clip it. A "floor" on a child size that can exceed its
 container is therefore not a safe fix.
 
+## LVGL's top layer scrolls, and drags everything on it along (#68)
+
+LVGL 9.5 creates `lv_layer_top()` (and the system layer) **scrollable** - it only removes
+`CLICKABLE` (`lv_display.c:159-172`). Drag a clickable child that cannot scroll itself, and LVGL
+hands the scroll up to the first ancestor that can: the layer. The layer then scrolls, and every
+overlay on it - the toast, the Touch Points panel - moves together. On 2026-09-26 the toast sat
+out of place with its own alignment exactly right; the layer was at (0,-144) on `WS_P4_5`.
+
+It looked random because it only happens when the layer has room to scroll in the direction of the
+drag. And it was found only because we **measured** (the layer's scroll offset, from `/bench`)
+instead of adjusting the toast's centring a third time: the toast had been "fixed" twice already
+(2.6, 2026-09-23) and was never the thing that was wrong. `LVGL_Startup::begin()` now removes
+`SCROLLABLE` from both overlay layers. **When an object is in the wrong place but its own position
+is right, check whether its parent has moved.**
+
 ## A knob that moves an input nobody can predict is not a control
 
 The Col/Row buttons originally nudged `TARGET_CARD_W` and `ASPECT_PCT` and hoped the derivation

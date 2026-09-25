@@ -18,8 +18,23 @@ static void drag_event_handler(lv_event_t * e) {
     // Calculate new position based on drag vector
     int32_t x = lv_obj_get_style_x(obj, LV_PART_MAIN) + vect.x;
     int32_t y = lv_obj_get_style_y(obj, LV_PART_MAIN) + vect.y;
-
     lv_obj_set_pos(obj, x, y);
+
+    // KEEP IT ON THE GLASS (#68, owner: keep it draggable). The offsets above
+    // are relative to the panel's RIGHT_MID alignment, so rather than work the
+    // limits out in that frame, place it, measure where it landed, and push
+    // it back by however far it overhangs an edge.
+    lv_obj_update_layout(obj);
+    lv_area_t a;
+    lv_obj_get_coords(obj, &a);
+    const int32_t W = lv_display_get_horizontal_resolution(NULL);
+    const int32_t H = lv_display_get_vertical_resolution(NULL);
+    int32_t dx = 0, dy = 0;
+    if (a.x1 < 0)       dx = -a.x1;
+    else if (a.x2 >= W) dx = (W - 1) - a.x2;
+    if (a.y1 < 0)       dy = -a.y1;
+    else if (a.y2 >= H) dy = (H - 1) - a.y2;
+    if (dx || dy) lv_obj_set_pos(obj, x + dx, y + dy);
 }
 
 void Panel_Display::slider_bri_cb(lv_event_t * e) {
