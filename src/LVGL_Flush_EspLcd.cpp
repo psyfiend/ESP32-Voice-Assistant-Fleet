@@ -402,6 +402,8 @@ const void *shownFrameBuffer(uint32_t &w, uint32_t &h) {
     return fb;
 }
 
+uint32_t panelFramesScanned() { return s_d ? s_d->framesScanned() : 0; }
+
 } // namespace LVGL_Flush
 
 #endif // DISPLAY_ESPLCD

@@ -13,6 +13,8 @@
 //          anim - open one deck panel while the other closes, n times, and
 //                 record every frame LVGL draws meanwhile, unforced (deck
 //                 is shown for it; `tasks` is not available)
+//          page - change page n times as a left swipe does, timing each
+//                 rebuild and recording every frame after it, unforced
 //   page   swipe-order index to measure on (default: the page showing)
 //   deck   0 or 1: deck hidden or shown (default: as it is)
 //   keep   1: stay on that page/deck afterwards (scripts/bench.py uses it to

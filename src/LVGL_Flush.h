@@ -41,6 +41,11 @@ inline void *allocDrawBuf(size_t &bytes, uint32_t caps) {
 // orientation, `w` x `h`. For GET /screenshot?fb=1: the pixels on the glass,
 // not LVGL's re-render of its objects. LVGL thread only.
 const void *shownFrameBuffer(uint32_t &w, uint32_t &h);
+
+// Frames the panel has finished scanning since boot, counted in its
+// frame-complete interrupt. Two readings over a known time give the refresh
+// rate the panel is REALLY running at, not the one its timing implies.
+uint32_t panelFramesScanned();
 #endif
 
 } // namespace LVGL_Flush

@@ -82,6 +82,23 @@ def ms(us):
     return f"{us / 1000:7.1f}"
 
 
+def timing_line(replies):
+    """The panel timing the build used, and (esp_lcd) the rate it really ran at."""
+    c = replies[0]
+    t = c.get("timing")
+    if not t:
+        return ""
+    # The longest measured window gives the finest reading; a 20-frame card
+    # run spans ~0.1 s, too few scans to say more than "about".
+    scans = [r["panel_scan"] for r in replies if isinstance(r.get("panel_scan"), dict)]
+    best = max(scans, key=lambda s: s["window_us"], default=None)
+    real = (f", panel measured {best['hz']:.2f} Hz over {best['window_us'] / 1e6:.1f} s"
+            if best else "")
+    return (f"  timing {t['pclk_hz'] / 1e6:.1f} MHz, lanes {t['lane_mbps']} Mbps, "
+            f"h {t['h'][0]}/{t['h'][1]}/{t['h'][2]}, v {t['v'][0]}/{t['v'][1]}/{t['v'][2]}"
+            f"{real}; LVGL refresh {c.get('refr_period_ms', '?')} ms")
+
+
 def run_host(host, args, stamp):
     base = f"{host}_{stamp}" + (f"_{args.label}" if args.label else "")
     replies = []
@@ -109,6 +126,8 @@ def run_host(host, args, stamp):
     print(f"  {c['board']} / {c['panel']} {c['bus']} {c['res'][0]}x{c['res'][1]} rot {c['rotation']}, "
           f"{c['buf']['count']} x {c['buf']['bytes'] // 1024} KB {c['buf']['where']} ({c['buf']['lines']} lines), "
           f"LV_USE_PPA {c['lv_use_ppa']}, fw {c['fw']}")
+    if timing_line(replies):
+        print(timing_line(replies))
     up = [r.get("uptime_s") for r in replies]
     if None not in up:
         rebooted = any(b < a for a, b in zip(up, up[1:]))
@@ -185,10 +204,42 @@ def run_anim(host, args, stamp):
     print(f"  {c['board']} / {c['panel']} {c['bus']} {c['res'][0]}x{c['res'][1]} rot {c['rotation']}, "
           f"flush {c.get('flush_path', '?')}, {c['buf']['count']} x {c['buf']['bytes'] // 1024} KB {c['buf']['where']}"
           f" ({c['buf']['lines']} lines), fw {c['fw']}")
+    if timing_line(replies):
+        print(timing_line(replies))
     up = [r.get("uptime_s") for r in replies]
     print(f"  uptime {up[0]} s -> {up[-1]} s, last reset reason {replies[-1].get('reset_reason')}"
           + ("  ** REBOOTED DURING THE RUN **" if any(b < a for a, b in zip(up, up[1:])) else ""))
     (OUT_DIR / f"{base}.json").write_text(json.dumps(replies, indent=1))
+    print(f"  saved {base}.json in bench/")
+
+
+def run_page(host, args, stamp):
+    """--page: /bench?what=page. Per page change: the rebuild (widgets
+    destroyed and created, before any drawing), then the first frame, and
+    'on glass' = when that first frame finished, measured from the swipe."""
+    base = f"{host}_{stamp}_page" + (f"_{args.label}" if args.label else "")
+    print(f"\n== {host}  (page: change page as a left swipe does)")
+    r = bench(host, args.timeout, what="page", n=args.swaps, page=0)
+    rows = anim_rows(r)
+    a = r["anim"]
+    for s in range(a["swaps"]):
+        fr = [x for x in rows if x["swap"] == s]
+        build = a["build_us"][s]
+        if not fr:
+            print(f"    change {s}: rebuild {build / 1000:6.1f} ms, no frames drawn")
+            continue
+        f0 = fr[0]
+        big = [x for x in fr if x["px"] > 100000]   # full-page frames, not the toast
+        print(f"    change {s}: rebuild {build / 1000:6.1f} ms | first frame starts {f0['start'] / 1000:6.1f},"
+              f" takes {f0['total'] / 1000:6.1f} (render {f0['render'] / 1000:5.1f}) {f0['px']:7d} px"
+              f" | on glass {(f0['start'] + f0['total']) / 1000:6.1f} ms after the swipe"
+              f" | {len(big)} full-page frame(s), {len(fr)} in all")
+    c = r
+    print(f"  {c['board']} / {c['panel']} {c['res'][0]}x{c['res'][1]} rot {c['rotation']}, "
+          f"flush {c.get('flush_path', '?')}, fw {c['fw']}")
+    if timing_line([r]):
+        print(timing_line([r]))
+    (OUT_DIR / f"{base}.json").write_text(json.dumps([r], indent=1))
     print(f"  saved {base}.json in bench/")
 
 
@@ -199,6 +250,7 @@ def main():
     ap.add_argument("--label", default="", help="tag for the saved files, e.g. 'ppa'")
     ap.add_argument("--timeout", type=float, default=60.0, help="seconds per request (default 60)")
     ap.add_argument("--anim", action="store_true", help="the deck-panel swap test instead of the matrix")
+    ap.add_argument("--page", action="store_true", help="the page-change test instead of the matrix (--swaps changes)")
     ap.add_argument("--swaps", type=int, default=4, help="--anim: panel swaps per page, 1-8 (default 4)")
     ap.add_argument("--pages", type=int, nargs="+", default=[0], help="--anim: pages to run on (default 0)")
     ap.add_argument("--frames", action="store_true", help="--anim: also print every frame")
@@ -210,7 +262,9 @@ def main():
     print("times are ms per frame, averaged; render = total - copy - present - wait")
     for host in args.hosts or DEV_BOARDS:
         try:
-            if args.anim:
+            if args.page:
+                run_page(host, args, stamp)
+            elif args.anim:
                 run_anim(host, args, stamp)
             else:
                 run_host(host, args, stamp)
