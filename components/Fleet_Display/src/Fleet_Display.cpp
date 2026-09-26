@@ -54,11 +54,15 @@ bool Fleet_Display::begin() {
     // audio expect it. Idempotent.
     FleetI2C::begin(bsp_hw.SDA_PIN, bsp_hw.SCL_PIN);
 
-    // One vendored driver per panel controller; each further panel is its own
-    // step of 2.9. Step 2: HX8394 (WS_P4_5). Step 3: ST7703 (WS_P4_4B).
+    // One vendored driver per panel controller. Step 2: HX8394 (WS_P4_5).
+    // Step 3: ST7703 (WS_P4_4B); EK79007 (WS_P4_7B) and JD9165 (CYD_P4_1060)
+    // are vendored and compile, but no board runs them until it is on a desk
+    // to be looked at.
     fleet_dsi_chip_t chip;
-    if      (strcmp(bsp_display.PANEL_MODEL, "HX8394") == 0) chip = FLEET_DSI_HX8394;
-    else if (strcmp(bsp_display.PANEL_MODEL, "ST7703") == 0) chip = FLEET_DSI_ST7703;
+    if      (strcmp(bsp_display.PANEL_MODEL, "HX8394")  == 0) chip = FLEET_DSI_HX8394;
+    else if (strcmp(bsp_display.PANEL_MODEL, "ST7703")  == 0) chip = FLEET_DSI_ST7703;
+    else if (strcmp(bsp_display.PANEL_MODEL, "EK79007") == 0) chip = FLEET_DSI_EK79007;
+    else if (strcmp(bsp_display.PANEL_MODEL, "JD9165")  == 0) chip = FLEET_DSI_JD9165;
     else {
         Serial.printf("[Fleet_Display] No esp_lcd driver for panel %s yet\n", bsp_display.PANEL_MODEL);
         return false;
@@ -67,10 +71,15 @@ bool Fleet_Display::begin() {
     _w = bsp_display.WIDTH;
     _h = bsp_display.HEIGHT;
 
+    // PHY power and lane count: the BSP's where it sets them (the 7B and
+    // CYD_P4_1060 headers do), today's values where it does not - every board
+    // so far agrees on LDO 3 at 2500 mV and two lanes.
     fleet_dsi_cfg_t cfg = {};
-    cfg.ldo_chan           = DSI_PHY_LDO_CHAN;
-    cfg.ldo_mv             = DSI_PHY_LDO_MV;
-    cfg.num_lanes          = 2;
+    cfg.ldo_chan           = bsp_display.TEST_MIPI_DSI_PHY_PWR_LDO_CHAN ? bsp_display.TEST_MIPI_DSI_PHY_PWR_LDO_CHAN
+                                                                        : DSI_PHY_LDO_CHAN;
+    cfg.ldo_mv             = bsp_display.TEST_MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV ? bsp_display.TEST_MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV
+                                                                              : DSI_PHY_LDO_MV;
+    cfg.num_lanes          = bsp_display.NUM_DSI_LANES ? bsp_display.NUM_DSI_LANES : 2;
     cfg.lane_bit_rate_mbps = bsp_display.LANE_BIT_RATE;
     cfg.h_res              = _w;
     cfg.v_res              = _h;

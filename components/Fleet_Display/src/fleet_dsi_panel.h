@@ -56,6 +56,8 @@ typedef struct {
 typedef enum {
     FLEET_DSI_HX8394 = 1,   // WS_P4_5   (2.9 step 2)
     FLEET_DSI_ST7703 = 2,   // WS_P4_4B  (2.9 step 3)
+    FLEET_DSI_EK79007 = 3,  // WS_P4_7B     - vendored, compiles, never run
+    FLEET_DSI_JD9165 = 4,   // CYD_P4_1060  - vendored, compiles, never run
 } fleet_dsi_chip_t;
 
 // Powers the PHY, creates the DSI bus, the command IO and the panel for

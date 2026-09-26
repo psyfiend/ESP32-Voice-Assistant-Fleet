@@ -15,8 +15,23 @@ what to compile, so each file has to be empty on boards that do not use it.
 | `src/fleet_dsi_panel.{h,c}` | MIPI-DSI bring-up in C (the vendor config macros are not valid C++): one sequence for every chip, only the driver's constructor differs |
 | `src/esp_lcd_hx8394.{h,c}` | **Vendored** HX8394 driver, `WS_P4_5`'s panel (2.9 step 2) |
 | `src/esp_lcd_st7703.{h,c}` | **Vendored** ST7703 driver, `WS_P4_4B`'s panel (2.9 step 3) |
+| `src/esp_lcd_ek79007.{h,c}` | **Vendored** EK79007 driver, `WS_P4_7B`'s panel - **compiles, never run** |
+| `src/esp_lcd_jd9165.{h,c}` | **Vendored** JD9165 driver, `CYD_P4_1060`'s panel - **compiles, never run** |
 
-`Fleet_Display::begin()` picks the driver from the BSP's `PANEL_MODEL`.
+`Fleet_Display::begin()` picks the driver from the BSP's `PANEL_MODEL`. The DSI PHY's LDO channel
+and voltage and the lane count come from the BSP's `TEST_MIPI_DSI_PHY_PWR_LDO_*` and
+`NUM_DSI_LANES` where a board sets them (7B, CYD_P4_1060), otherwise LDO 3 / 2500 mV / 2 lanes -
+which is what every board uses today. `PHY_CLK_SRC` is **not** wired through yet: IDF picks.
+
+**Moving the 7B or CYD_P4_1060 over** is one line - `-D DISPLAY_ESPLCD` in its environment - and
+must be done with the board on the desk: nobody has seen either driver drive a panel. Both
+compiled and linked on 2026-09-26 with the flag set for the build only.
+
+## Vendored: `esp_lcd_ek79007`, `esp_lcd_jd9165`
+
+From `espressif/esp_lcd_ek79007` **2.0.2** and `espressif/esp_lcd_jd9165` **2.0.2**, Apache-2.0
+(`LICENSE_esp_lcd_ek79007.txt`, `LICENSE_esp_lcd_jd9165.txt`). **One local change each**, marked
+`FLEET LOCAL CHANGES`: the version macros. Neither does board-level I2C.
 
 ## Vendored: `esp_lcd_st7703`
 

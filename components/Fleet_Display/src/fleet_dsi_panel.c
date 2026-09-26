@@ -17,6 +17,8 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_hx8394.h"
 #include "esp_lcd_st7703.h"
+#include "esp_lcd_ek79007.h"
+#include "esp_lcd_jd9165.h"
 
 static const char *TAG = "fleet_dsi";
 
@@ -82,14 +84,58 @@ static esp_err_t new_st7703(const fleet_dsi_cfg_t *cfg, esp_lcd_dsi_bus_handle_t
     return ret;
 }
 
+static esp_err_t new_ek79007(const fleet_dsi_cfg_t *cfg, esp_lcd_dsi_bus_handle_t bus,
+                             esp_lcd_panel_io_handle_t io, const esp_lcd_dpi_panel_config_t *dpi,
+                             const esp_lcd_panel_dev_config_t *dev_base,
+                             esp_lcd_panel_handle_t *panel)
+{
+    ek79007_lcd_init_cmd_t *cmds;
+    FLEET_COPY_CMDS(ek79007_lcd_init_cmd_t, cfg, cmds);
+    const ek79007_vendor_config_t vendor = {
+        .init_cmds = cmds,
+        .init_cmds_size = (uint16_t)(cmds ? cfg->init_cmds_count : 0),
+        .mipi_config = { .dsi_bus = bus, .dpi_config = dpi, .lane_num = (uint8_t)cfg->num_lanes },
+    };
+    esp_lcd_panel_dev_config_t dev = *dev_base;
+    dev.vendor_config = (void *)&vendor;
+    esp_err_t ret = esp_lcd_new_panel_ek79007(io, &dev, panel);
+    if (ret == ESP_OK) ret = esp_lcd_panel_reset(*panel);
+    if (ret == ESP_OK) ret = esp_lcd_panel_init(*panel);
+    free(cmds);
+    return ret;
+}
+
+static esp_err_t new_jd9165(const fleet_dsi_cfg_t *cfg, esp_lcd_dsi_bus_handle_t bus,
+                            esp_lcd_panel_io_handle_t io, const esp_lcd_dpi_panel_config_t *dpi,
+                            const esp_lcd_panel_dev_config_t *dev_base,
+                            esp_lcd_panel_handle_t *panel)
+{
+    jd9165_lcd_init_cmd_t *cmds;
+    FLEET_COPY_CMDS(jd9165_lcd_init_cmd_t, cfg, cmds);
+    const jd9165_vendor_config_t vendor = {
+        .init_cmds = cmds,
+        .init_cmds_size = (uint16_t)(cmds ? cfg->init_cmds_count : 0),
+        .mipi_config = { .dsi_bus = bus, .dpi_config = dpi },
+    };
+    esp_lcd_panel_dev_config_t dev = *dev_base;
+    dev.vendor_config = (void *)&vendor;
+    esp_err_t ret = esp_lcd_new_panel_jd9165(io, &dev, panel);
+    if (ret == ESP_OK) ret = esp_lcd_panel_reset(*panel);
+    if (ret == ESP_OK) ret = esp_lcd_panel_init(*panel);
+    free(cmds);
+    return ret;
+}
+
 esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, fleet_dsi_chip_t chip,
                               esp_lcd_panel_handle_t *ret_panel, void **fbs)
 {
     ESP_RETURN_ON_FALSE(cfg && ret_panel && fbs, ESP_ERR_INVALID_ARG, TAG, "invalid argument");
     ESP_RETURN_ON_FALSE(cfg->num_fbs >= 1 && cfg->num_fbs <= 3, ESP_ERR_INVALID_ARG, TAG,
                         "num_fbs must be 1-3");
-    const char *name = chip == FLEET_DSI_HX8394 ? "HX8394"
-                     : chip == FLEET_DSI_ST7703 ? "ST7703" : NULL;
+    const char *name = chip == FLEET_DSI_HX8394  ? "HX8394"
+                     : chip == FLEET_DSI_ST7703  ? "ST7703"
+                     : chip == FLEET_DSI_EK79007 ? "EK79007"
+                     : chip == FLEET_DSI_JD9165  ? "JD9165" : NULL;
     ESP_RETURN_ON_FALSE(name, ESP_ERR_NOT_SUPPORTED, TAG, "no driver for chip %d", (int)chip);
 
     esp_err_t ret = ESP_OK;
@@ -152,8 +198,12 @@ esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, fleet_dsi_chip_t chip,
         .vendor_config = NULL,   // each new_*() sets its own
         .flags.reset_active_high = cfg->reset_active_high ? 1 : 0,
     };
-    ret = chip == FLEET_DSI_HX8394 ? new_hx8394(cfg, bus, io, &dpi, &dev, &panel)
-                                   : new_st7703(cfg, bus, io, &dpi, &dev, &panel);
+    switch (chip) {
+    case FLEET_DSI_HX8394:  ret = new_hx8394 (cfg, bus, io, &dpi, &dev, &panel); break;
+    case FLEET_DSI_ST7703:  ret = new_st7703 (cfg, bus, io, &dpi, &dev, &panel); break;
+    case FLEET_DSI_EK79007: ret = new_ek79007(cfg, bus, io, &dpi, &dev, &panel); break;
+    default:                ret = new_jd9165 (cfg, bus, io, &dpi, &dev, &panel); break;   // name check above
+    }
     ESP_GOTO_ON_ERROR(ret, err, TAG, "%s panel", name);
 
     // 6. The frame buffers the panel allocated.
