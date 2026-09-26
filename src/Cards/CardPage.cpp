@@ -5,6 +5,9 @@
 #include "UI/UITokens.h"
 #include "SystemReport.h"
 #include <Arduino.h>
+#ifdef DEBUG_PAGE_TIMING
+#include <esp_timer.h>   // where a page rebuild's time goes - see commit()
+#endif
 
 CardPage::~CardPage() {
     for (uint8_t i = 0; i < _n; i++) {
@@ -378,6 +381,14 @@ Card *CardPage::add(Card *c) {
 
 void CardPage::commit() {
     if (_committed) return;
+#ifdef DEBUG_PAGE_TIMING
+    // -D DEBUG_PAGE_TIMING: one line per commit - placement, building every
+    // card's widgets, and binding them - so a slow page swipe can be split
+    // into its parts. GUIManager::rebuildDashboard() prints the whole.
+    const int64_t tPlan0 = esp_timer_get_time();
+    int64_t tBuild = 0, tBind = 0, tWorst = 0;
+    const char *worst = "";
+#endif
 
     // Spend as few rows as the cards need, and only add more when placement
     // genuinely cannot fit them. Dropping cards is the LAST resort, after the
@@ -403,6 +414,9 @@ void CardPage::commit() {
         }
     }
 
+#ifdef DEBUG_PAGE_TIMING
+    const int64_t tPlan = esp_timer_get_time() - tPlan0;
+#endif
     Serial.printf("[Cards] %u cards want %u rows; using %u of max %u -> cell %ldx%ld px\n",
                   (unsigned)_n, (unsigned)rowsWanted(), (unsigned)(_uRows / _sub),
                   (unsigned)_maxRows,
@@ -412,6 +426,9 @@ void CardPage::commit() {
     for (uint8_t i = 0; i < _n; i++) {
         Card *c = _cards[i];
         if (!c || !_slot[i].placed) continue;
+#ifdef DEBUG_PAGE_TIMING
+        const int64_t t0 = esp_timer_get_time();
+#endif
 
         // THE CARD IS TOLD ITS REAL HEIGHT BEFORE IT IS BUILT.
         //
@@ -426,8 +443,22 @@ void CardPage::commit() {
         lv_obj_set_grid_cell(c->root(),
                              LV_GRID_ALIGN_STRETCH, _slot[i].col, _slot[i].spanX,
                              LV_GRID_ALIGN_STRETCH, _slot[i].row, _slot[i].spanY);
+#ifdef DEBUG_PAGE_TIMING
+        const int64_t t1 = esp_timer_get_time();
+#endif
         if (_binder) _binder->add(c);
+#ifdef DEBUG_PAGE_TIMING
+        const int64_t t2 = esp_timer_get_time();
+        tBuild += t1 - t0;
+        tBind  += t2 - t1;
+        if (t1 - t0 > tWorst) { tWorst = t1 - t0; worst = c->typeName(); }
+#endif
     }
+#ifdef DEBUG_PAGE_TIMING
+    Serial.printf("[PageTiming] plan %lld us | build %u cards %lld us (slowest %s %lld) | bind %lld us\n",
+                  (long long)tPlan, (unsigned)_placed, (long long)tBuild, worst,
+                  (long long)tWorst, (long long)tBind);
+#endif
     // CARDS THAT DID NOT MAKE THE PAGE ARE FREED, not kept around.
     //
     // The owner asked directly: "is the device holding the cards not on the
