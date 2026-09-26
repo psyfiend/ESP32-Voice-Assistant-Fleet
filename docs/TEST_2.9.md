@@ -137,6 +137,12 @@ scripts/screenshot.py <4B's address>`.
 
 > **T3-1..T3-4: PASS (owner, 2026-09-26)**, at rotation 2. The owner then set rotation 0.
 
+> **Soak, 2026-09-26, final firmware on both boards (`b5e3587`+, DEBUG_CARDS off, 4B rotation 0):
+> PASS.** 40 minutes of `/bench` cycling full-screen, one-card (odd block sizes - the PPA freeze's
+> trigger), deck-swap and page-change runs: 392 runs each, 0 failures, 0 reboots. Worst single
+> frame 108 ms on P4_5, 74 ms on the 4B (full-screen redraws, as expected). **All eight
+> environments compile** with every change on the branch (39 min).
+
 ### After the sweep (2026-09-26, owner away) - what is flashed now, and what needs eyes
 
 Both boards: `DEBUG_CARDS` off (page swipes ~90 ms quicker, `display-stack.md` §8.9). 4B: rotation
