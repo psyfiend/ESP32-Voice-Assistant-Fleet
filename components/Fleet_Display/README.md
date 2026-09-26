@@ -12,8 +12,20 @@ what to compile, so each file has to be empty on boards that do not use it.
 | File | What it is |
 |---|---|
 | `src/Fleet_Display.{h,cpp}` | The class `SystemCore` owns: bring-up, backlight, the frame buffers, and which one the panel is showing |
-| `src/fleet_dsi_panel.{h,c}` | MIPI-DSI bring-up in C (the vendor config macros are not valid C++) |
-| `src/esp_lcd_hx8394.{h,c}` | **Vendored** HX8394 driver, `WS_P4_5`'s panel |
+| `src/fleet_dsi_panel.{h,c}` | MIPI-DSI bring-up in C (the vendor config macros are not valid C++): one sequence for every chip, only the driver's constructor differs |
+| `src/esp_lcd_hx8394.{h,c}` | **Vendored** HX8394 driver, `WS_P4_5`'s panel (2.9 step 2) |
+| `src/esp_lcd_st7703.{h,c}` | **Vendored** ST7703 driver, `WS_P4_4B`'s panel (2.9 step 3) |
+
+`Fleet_Display::begin()` picks the driver from the BSP's `PANEL_MODEL`.
+
+## Vendored: `esp_lcd_st7703`
+
+From `waveshare/esp_lcd_st7703` **2.0.0** on the Espressif component registry. The package declares
+MIT (`LICENSE_esp_lcd_st7703.txt`); the source file's own header says Apache-2.0 (Espressif). Both
+are permissive and both are kept exactly as found. **One local change**, marked `FLEET LOCAL
+CHANGES` near the top of `esp_lcd_st7703.c`: the version macros, as for the HX8394. Unlike that
+driver it does no board-level I2C, so nothing needed switching off. Note its `mirror()` supports Y
+only ("Mirror X is not supported"), which is why a 180-degree turn stays with the PPA.
 
 ## Vendored: `esp_lcd_hx8394`
 

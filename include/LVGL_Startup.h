@@ -96,6 +96,7 @@ void attachFlushStats(FlushStats *stats);   // nullptr detaches
 // actually landed, after any fallback.
 struct DrawBufInfo {
     size_t  bytes = 0;     // per buffer
+    uint32_t lines = 0;    // rows per buffer, as allocated (not the BSP's 0 = "default")
     uint8_t count = 0;     // 1 or 2
     bool    psram = false;
 };

@@ -2,6 +2,9 @@
 // P4_5 BSP (bsp_display_new_with_handles(), waveshare/esp32_p4_wifi6_touch_lcd_5
 // 1.0.4, esp32_p4_wifi6_touch_lcd_5.c:427-505), with our BSP's values and init
 // commands in place of theirs. docs/research/waveshare-esp-lcd-survey.md §1.
+// The ST7703 (WS_P4_4B, step 3) goes through the same steps; only the
+// driver's constructor differs (its README's example, reference/esp-registry/
+// waveshare__esp_lcd_st7703-v2.0.0).
 #include "fleet_dsi_panel.h"
 #if SOC_MIPI_DSI_SUPPORTED
 
@@ -13,23 +16,87 @@
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_hx8394.h"
+#include "esp_lcd_st7703.h"
 
 static const char *TAG = "fleet_dsi";
 
-esp_err_t fleet_dsi_panel_new_hx8394(const fleet_dsi_cfg_t *cfg,
-                                     esp_lcd_panel_handle_t *ret_panel,
-                                     void **fbs)
+// Each driver has its own init-command type, laid out exactly like ours.
+// Copied rather than cast, as step 2 decided; `n` is 0 when there is no
+// sequence, and the driver then uses its own default.
+#define FLEET_COPY_CMDS(type, cfg, out)                                         \
+    do {                                                                        \
+        (out) = NULL;                                                           \
+        if ((cfg)->init_cmds && (cfg)->init_cmds_count) {                       \
+            (out) = (type *)calloc((cfg)->init_cmds_count, sizeof(type));       \
+            if (!(out)) return ESP_ERR_NO_MEM;                                  \
+            for (size_t i_ = 0; i_ < (cfg)->init_cmds_count; i_++) {            \
+                (out)[i_].cmd        = (cfg)->init_cmds[i_].cmd;                \
+                (out)[i_].data       = (cfg)->init_cmds[i_].data;               \
+                (out)[i_].data_bytes = (cfg)->init_cmds[i_].data_bytes;         \
+                (out)[i_].delay_ms   = (cfg)->init_cmds[i_].delay_ms;           \
+            }                                                                   \
+        }                                                                       \
+    } while (0)
+
+// Create, reset and initialise the panel. The drivers read the init
+// commands only during init(), so the copies are freed straight after.
+static esp_err_t new_hx8394(const fleet_dsi_cfg_t *cfg, esp_lcd_dsi_bus_handle_t bus,
+                            esp_lcd_panel_io_handle_t io, const esp_lcd_dpi_panel_config_t *dpi,
+                            const esp_lcd_panel_dev_config_t *dev_base,
+                            esp_lcd_panel_handle_t *panel)
+{
+    hx8394_lcd_init_cmd_t *cmds;
+    FLEET_COPY_CMDS(hx8394_lcd_init_cmd_t, cfg, cmds);
+    const hx8394_vendor_config_t vendor = {
+        .init_cmds = cmds,
+        .init_cmds_size = (uint16_t)(cmds ? cfg->init_cmds_count : 0),
+        .mipi_config = { .dsi_bus = bus, .dpi_config = dpi, .lane_num = (uint8_t)cfg->num_lanes },
+    };
+    esp_lcd_panel_dev_config_t dev = *dev_base;
+    dev.vendor_config = (void *)&vendor;
+    esp_err_t ret = esp_lcd_new_panel_hx8394(io, &dev, panel);
+    if (ret == ESP_OK) ret = esp_lcd_panel_reset(*panel);
+    if (ret == ESP_OK) ret = esp_lcd_panel_init(*panel);
+    free(cmds);
+    return ret;
+}
+
+static esp_err_t new_st7703(const fleet_dsi_cfg_t *cfg, esp_lcd_dsi_bus_handle_t bus,
+                            esp_lcd_panel_io_handle_t io, const esp_lcd_dpi_panel_config_t *dpi,
+                            const esp_lcd_panel_dev_config_t *dev_base,
+                            esp_lcd_panel_handle_t *panel)
+{
+    st7703_lcd_init_cmd_t *cmds;
+    FLEET_COPY_CMDS(st7703_lcd_init_cmd_t, cfg, cmds);
+    const st7703_vendor_config_t vendor = {
+        .init_cmds = cmds,
+        .init_cmds_size = (uint16_t)(cmds ? cfg->init_cmds_count : 0),
+        .mipi_config = { .dsi_bus = bus, .dpi_config = dpi },
+    };
+    esp_lcd_panel_dev_config_t dev = *dev_base;
+    dev.vendor_config = (void *)&vendor;
+    esp_err_t ret = esp_lcd_new_panel_st7703(io, &dev, panel);
+    if (ret == ESP_OK) ret = esp_lcd_panel_reset(*panel);
+    if (ret == ESP_OK) ret = esp_lcd_panel_init(*panel);
+    free(cmds);
+    return ret;
+}
+
+esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, fleet_dsi_chip_t chip,
+                              esp_lcd_panel_handle_t *ret_panel, void **fbs)
 {
     ESP_RETURN_ON_FALSE(cfg && ret_panel && fbs, ESP_ERR_INVALID_ARG, TAG, "invalid argument");
     ESP_RETURN_ON_FALSE(cfg->num_fbs >= 1 && cfg->num_fbs <= 3, ESP_ERR_INVALID_ARG, TAG,
                         "num_fbs must be 1-3");
+    const char *name = chip == FLEET_DSI_HX8394 ? "HX8394"
+                     : chip == FLEET_DSI_ST7703 ? "ST7703" : NULL;
+    ESP_RETURN_ON_FALSE(name, ESP_ERR_NOT_SUPPORTED, TAG, "no driver for chip %d", (int)chip);
 
     esp_err_t ret = ESP_OK;
     esp_ldo_channel_handle_t  ldo   = NULL;
     esp_lcd_dsi_bus_handle_t  bus   = NULL;
     esp_lcd_panel_io_handle_t io    = NULL;
     esp_lcd_panel_handle_t    panel = NULL;
-    hx8394_lcd_init_cmd_t    *cmds  = NULL;
 
     // 1. DSI PHY power: the PHY goes from "no power" to "shutdown" once its
     //    LDO is on. Arduino_GFX did this inside Arduino_ESP32DSIPanel; on this
@@ -76,35 +143,18 @@ esp_err_t fleet_dsi_panel_new_hx8394(const fleet_dsi_cfg_t *cfg,
         .flags.use_dma2d = 1,
     };
 
-    // 5. Our BSP's init sequence, converted to the driver's type (same
-    //    layout, but not the same type - copied rather than cast).
-    if (cfg->init_cmds && cfg->init_cmds_count) {
-        cmds = calloc(cfg->init_cmds_count, sizeof(*cmds));
-        ESP_GOTO_ON_FALSE(cmds, ESP_ERR_NO_MEM, err, TAG, "init commands");
-        for (size_t i = 0; i < cfg->init_cmds_count; i++) {
-            cmds[i].cmd        = cfg->init_cmds[i].cmd;
-            cmds[i].data       = cfg->init_cmds[i].data;
-            cmds[i].data_bytes = cfg->init_cmds[i].data_bytes;
-            cmds[i].delay_ms   = cfg->init_cmds[i].delay_ms;
-        }
-    }
-    const hx8394_vendor_config_t vendor = {
-        .init_cmds = cmds,
-        .init_cmds_size = (uint16_t)(cmds ? cfg->init_cmds_count : 0),
-        .mipi_config = { .dsi_bus = bus, .dpi_config = &dpi, .lane_num = (uint8_t)cfg->num_lanes },
-    };
+    // 5. The panel, fed our BSP's init sequence (converted to the driver's
+    //    type), then reset and initialised.
     const esp_lcd_panel_dev_config_t dev = {
         .reset_gpio_num = cfg->reset_gpio,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
         .bits_per_pixel = 16,
-        .vendor_config = (void *)&vendor,
+        .vendor_config = NULL,   // each new_*() sets its own
         .flags.reset_active_high = cfg->reset_active_high ? 1 : 0,
     };
-    ESP_GOTO_ON_ERROR(esp_lcd_new_panel_hx8394(io, &dev, &panel), err, TAG, "HX8394 panel");
-    ESP_GOTO_ON_ERROR(esp_lcd_panel_reset(panel), err, TAG, "panel reset");
-    ESP_GOTO_ON_ERROR(esp_lcd_panel_init(panel), err, TAG, "panel init");
-    free(cmds);   // the driver reads them only during init()
-    cmds = NULL;
+    ret = chip == FLEET_DSI_HX8394 ? new_hx8394(cfg, bus, io, &dpi, &dev, &panel)
+                                   : new_st7703(cfg, bus, io, &dpi, &dev, &panel);
+    ESP_GOTO_ON_ERROR(ret, err, TAG, "%s panel", name);
 
     // 6. The frame buffers the panel allocated.
     switch (cfg->num_fbs) {
@@ -115,13 +165,12 @@ esp_err_t fleet_dsi_panel_new_hx8394(const fleet_dsi_cfg_t *cfg,
     ESP_GOTO_ON_ERROR(ret, err, TAG, "frame buffers");
 
     *ret_panel = panel;
-    ESP_LOGI(TAG, "HX8394 up: %dx%d, %d lanes @ %lu Mbps, %.1f MHz, %d frame buffers",
-             cfg->h_res, cfg->v_res, cfg->num_lanes, (unsigned long)cfg->lane_bit_rate_mbps,
+    ESP_LOGI(TAG, "%s up: %dx%d, %d lanes @ %lu Mbps, %.1f MHz, %d frame buffers",
+             name, cfg->h_res, cfg->v_res, cfg->num_lanes, (unsigned long)cfg->lane_bit_rate_mbps,
              (double)dpi.dpi_clock_freq_mhz, cfg->num_fbs);
     return ESP_OK;
 
 err:
-    free(cmds);
     if (panel) esp_lcd_panel_del(panel);
     if (io)    esp_lcd_panel_io_del(io);
     if (bus)   esp_lcd_del_dsi_bus(bus);

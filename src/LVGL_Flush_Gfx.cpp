@@ -167,6 +167,7 @@ lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info) {
     }
     Serial.println("Success.");
     info.bytes = byte_count;
+    info.lines = (uint32_t)(pixel_count / gfx->width());
     info.count = s_draw_buf2 ? 2 : 1;
     info.psram = esp_ptr_external_ram(s_draw_buf);
 

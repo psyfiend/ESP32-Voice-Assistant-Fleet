@@ -1,5 +1,5 @@
 // LVGL_Flush, esp_lcd path - boards with -D DISPLAY_ESPLCD (WS_P4_5 from
-// 2.9 step 2). See LVGL_Flush.h, and docs/design/esplcd-step2.md §3 for the
+// 2.9 step 2, WS_P4_4B from step 3). See LVGL_Flush.h, and docs/design/esplcd-step2.md §3 for the
 // sequence this implements. esp_lvgl_adapter 0.6.4 (Apache-2.0,
 // reference/esp-registry/) was read as the reference; no code was copied.
 //
@@ -380,6 +380,7 @@ lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info) {
         return nullptr;
     }
     info.bytes = bytes;
+    info.lines = lines;
     info.count = b2 ? 2 : 1;
     info.psram = esp_ptr_external_ram(b1);
 

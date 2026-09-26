@@ -41,7 +41,8 @@ typedef struct {
     uint32_t dpi_clock_hz;
     int      hsync_pulse_width, hsync_back_porch, hsync_front_porch;
     int      vsync_pulse_width, vsync_back_porch, vsync_front_porch;
-    // Reset line and its polarity (1 = assert HIGH; the HX8394's case).
+    // Reset line and its polarity (1 = assert HIGH; the HX8394's case, not
+    // the ST7703's).
     int      reset_gpio;
     int      reset_active_high;
     // The panel's init sequence; NULL = the driver's own default.
@@ -51,12 +52,18 @@ typedef struct {
     int      num_fbs;
 } fleet_dsi_cfg_t;
 
-// Powers the PHY, creates the DSI bus, the command IO and an HX8394 panel,
-// resets and initialises it, and returns the panel with its frame buffers
-// (fbs[0 .. num_fbs-1]). On failure, everything created so far is released.
-esp_err_t fleet_dsi_panel_new_hx8394(const fleet_dsi_cfg_t *cfg,
-                                     esp_lcd_panel_handle_t *ret_panel,
-                                     void **fbs);
+// The panel controllers there is a vendored driver for.
+typedef enum {
+    FLEET_DSI_HX8394 = 1,   // WS_P4_5   (2.9 step 2)
+    FLEET_DSI_ST7703 = 2,   // WS_P4_4B  (2.9 step 3)
+} fleet_dsi_chip_t;
+
+// Powers the PHY, creates the DSI bus, the command IO and the panel for
+// `chip`, resets and initialises it, and returns the panel with its frame
+// buffers (fbs[0 .. num_fbs-1]). Everything but the driver itself is the same
+// for every chip. On failure, everything created so far is released.
+esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, fleet_dsi_chip_t chip,
+                              esp_lcd_panel_handle_t *ret_panel, void **fbs);
 
 #ifdef __cplusplus
 }

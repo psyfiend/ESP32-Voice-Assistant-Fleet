@@ -54,8 +54,12 @@ bool Fleet_Display::begin() {
     // audio expect it. Idempotent.
     FleetI2C::begin(bsp_hw.SDA_PIN, bsp_hw.SCL_PIN);
 
-    if (strcmp(bsp_display.PANEL_MODEL, "HX8394") != 0) {
-        // Step 2 brings up WS_P4_5 only. Each further panel is its own step.
+    // One vendored driver per panel controller; each further panel is its own
+    // step of 2.9. Step 2: HX8394 (WS_P4_5). Step 3: ST7703 (WS_P4_4B).
+    fleet_dsi_chip_t chip;
+    if      (strcmp(bsp_display.PANEL_MODEL, "HX8394") == 0) chip = FLEET_DSI_HX8394;
+    else if (strcmp(bsp_display.PANEL_MODEL, "ST7703") == 0) chip = FLEET_DSI_ST7703;
+    else {
         Serial.printf("[Fleet_Display] No esp_lcd driver for panel %s yet\n", bsp_display.PANEL_MODEL);
         return false;
     }
@@ -86,7 +90,7 @@ bool Fleet_Display::begin() {
     static_assert(sizeof(fleet_dsi_init_cmd_t) == sizeof(lcd_init_cmd_t),
                   "BSP init commands and fleet_dsi_init_cmd_t must share a layout");
 
-    esp_err_t err = fleet_dsi_panel_new_hx8394(&cfg, &_panel, _fb);
+    esp_err_t err = fleet_dsi_panel_new(&cfg, chip, &_panel, _fb);
     if (err != ESP_OK) {
         Serial.printf("[Fleet_Display] Panel bring-up failed: %s\n", esp_err_to_name(err));
         return false;

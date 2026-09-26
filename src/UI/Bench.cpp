@@ -490,7 +490,7 @@ size_t buildJson() {
           (long)lv_display_get_horizontal_resolution(disp),
           (long)lv_display_get_vertical_resolution(disp), (unsigned)bsp_display.ROTATION);
     o.add("\"buf\":{\"bytes\":%u,\"lines\":%u,\"count\":%u,\"where\":\"%s\"},",
-          (unsigned)b.bytes, (unsigned)bsp_lvgl.DRAW_BUF_HEIGHT, (unsigned)b.count,
+          (unsigned)b.bytes, (unsigned)b.lines, (unsigned)b.count,
           b.psram ? "psram" : "internal");
     o.add("\"lv_use_ppa\":%d,\"lv_draw_buf_align\":%d,", (int)LV_USE_PPA, (int)LV_DRAW_BUF_ALIGN);
     const char *what = r.req.what == What::WHAT_CARD ? "card"
