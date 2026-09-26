@@ -28,6 +28,7 @@
 #include "SystemReport.h"       // fmtBytes
 #include "bsp_loader.h"
 #include "src/display/lv_display_private.h"   // inv_areas: what this refresh redraws
+#include "src/misc/lv_area_private.h"         // lv_area_diff
 
 namespace {
 
@@ -40,9 +41,17 @@ int32_t  s_pw = 0, s_ph = 0;         // physical (panel) size
 //
 // Physical coordinates. A frame drawn into buffer T leaves the other two
 // behind by exactly the areas that frame changed. Up to MAX_RECTS areas are
-// kept per buffer; past that, the buffer is simply marked wholly stale and
-// repaired with one full-frame copy - slower, never wrong.
-constexpr uint8_t MAX_RECTS = 8;
+// kept per buffer. An area that overlaps or touches one already kept is
+// MERGED into it (their bounding box), and past MAX_RECTS a new area merges
+// into whichever kept one grows least - so a buffer is only ever wholly stale
+// at boot. A merged area can cover pixels that did not change: copying them
+// is wasted work, never wrong.
+//
+// It used to go wholly stale past 8 areas instead. During a deck-panel
+// animation - 3 areas a frame, a buffer 2-3 frames behind - that meant a
+// whole-frame repair every few frames, ~33 ms of PPA each
+// (/bench?what=anim, 2026-09-26).
+constexpr uint8_t MAX_RECTS = 16;
 struct Stale {
     lv_area_t r[MAX_RECTS];
     uint8_t   n   = 0;
@@ -51,20 +60,47 @@ struct Stale {
 Stale s_stale[Fleet_Display::NUM_FBS];
 // What the frame being drawn redraws: LVGL's own invalidated areas for this
 // refresh (not the 50-line strips it cuts them into for us - a full-screen
-// redraw is one area, not fifteen), converted to physical.
-Stale s_now;
+// redraw is one area, not fifteen), converted to physical. EXACT, never
+// merged: the repair skips whatever these cover, so an enlarged area here
+// would leave pixels unrepaired. LV_INV_BUF_SIZE is LVGL's own limit - past
+// it, LVGL redraws the whole screen as one area.
+lv_area_t s_now[LV_INV_BUF_SIZE];
+uint8_t   s_nowN = 0;
 bool    s_inFrame = false;
 uint8_t s_target  = 0;
+
+bool touchOrOverlap(const lv_area_t &a, const lv_area_t &b) {
+    return a.x1 <= b.x2 + 1 && b.x1 <= a.x2 + 1 && a.y1 <= b.y2 + 1 && b.y1 <= a.y2 + 1;
+}
+lv_area_t boundingBox(const lv_area_t &a, const lv_area_t &b) {
+    return {LV_MIN(a.x1, b.x1), LV_MIN(a.y1, b.y1), LV_MAX(a.x2, b.x2), LV_MAX(a.y2, b.y2)};
+}
 
 void staleClear(Stale &s) { s.n = 0; s.all = false; }
 void staleAdd(Stale &s, const lv_area_t &a) {
     if (s.all) return;
-    if (s.n < MAX_RECTS) s.r[s.n++] = a;
-    else s.all = true;
-}
-void staleMerge(Stale &into, const Stale &from) {
-    if (from.all) { into.all = true; return; }
-    for (uint8_t i = 0; i < from.n; i++) staleAdd(into, from.r[i]);
+    lv_area_t m = a;
+    // Absorb every kept area this one overlaps or touches; the result may now
+    // touch others, so start over after each absorption.
+    for (uint8_t i = 0; i < s.n;) {
+        if (touchOrOverlap(s.r[i], m)) {
+            m = boundingBox(s.r[i], m);
+            s.r[i] = s.r[--s.n];
+            i = 0;
+        } else {
+            i++;
+        }
+    }
+    if (s.n < MAX_RECTS) { s.r[s.n++] = m; return; }
+    // Full: merge into the one kept area whose bounding box grows least.
+    uint8_t  best = 0;
+    uint32_t bestGrow = UINT32_MAX;
+    for (uint8_t i = 0; i < s.n; i++) {
+        const lv_area_t bb = boundingBox(s.r[i], m);
+        const uint32_t grow = (uint32_t)lv_area_get_size(&bb) - (uint32_t)lv_area_get_size(&s.r[i]);
+        if (grow < bestGrow) { bestGrow = grow; best = i; }
+    }
+    s.r[best] = boundingBox(s.r[best], m);
 }
 
 // Logical (as LVGL sees it) -> physical (as the panel is wired). Mirrors
@@ -151,27 +187,55 @@ uint8_t freeBuffer() {
 // is flushing: lv_refr.c clears it only after the last area is drawn. The
 // same list esp_lvgl_adapter reads for the same purpose.
 void captureRedraw(lv_display_t *disp) {
-    staleClear(s_now);
-    for (uint32_t i = 0; i < disp->inv_p; i++) {
+    s_nowN = 0;
+    for (uint32_t i = 0; i < disp->inv_p && s_nowN < LV_INV_BUF_SIZE; i++) {
         if (disp->inv_area_joined[i]) continue;   // merged into another entry
-        staleAdd(s_now, toPhysical(disp->inv_areas[i]));
+        s_now[s_nowN++] = toPhysical(disp->inv_areas[i]);
     }
 }
 
-bool contains(const lv_area_t &outer, const lv_area_t &inner) {
-    return inner.x1 >= outer.x1 && inner.y1 >= outer.y1 &&
-           inner.x2 <= outer.x2 && inner.y2 <= outer.y2;
+// Copy one area from the newest frame into the buffer being built. Queued,
+// not waited for: the rotations queued after it cannot start until it is
+// done. If the queue is full it is done blocking instead - a repair that is
+// silently refused would leave stale pixels on the glass.
+void repairBlit(void *from, void *to, const lv_area_t &r, LVGL_Startup::FlushStats *stats) {
+    const uint32_t w = (uint32_t)(r.x2 - r.x1 + 1), h = (uint32_t)(r.y2 - r.y1 + 1);
+    if (ppaBlit(from, s_pw, s_ph, r.x1, r.y1, w, h, to, r.x1, r.y1,
+                PPA_SRM_ROTATION_ANGLE_0, /*blocking*/ false) != ESP_OK) {
+        ppaBlit(from, s_pw, s_ph, r.x1, r.y1, w, h, to, r.x1, r.y1, PPA_SRM_ROTATION_ANGLE_0);
+    }
+    if (stats) stats->repairPx += w * h;
 }
 
-// True when this frame will redraw all of `r` anyway, so repairing it first
-// would be wasted work. Conservative: only a single area that wholly covers
-// `r` counts; anything less, and `r` is repaired.
-bool redrawnAnyway(const lv_area_t &r) {
-    if (s_now.all) return false;
-    for (uint8_t i = 0; i < s_now.n; i++) {
-        if (contains(s_now.r[i], r)) return true;
+// Repair `r` less everything this frame redraws: LVGL's own lv_area_diff
+// (what it uses for the same job in direct mode, lv_refr.c) cuts each
+// redrawn area out, leaving up to four pieces per cut. During a panel
+// animation consecutive frames overlap almost entirely, so what is left is
+// thin. If the pieces outgrow PIECES_MAX, `r` is repaired whole - more
+// copying, never wrong.
+constexpr uint8_t PIECES_MAX = 32;
+void repairArea(void *from, void *to, const lv_area_t &r, LVGL_Startup::FlushStats *stats) {
+    lv_area_t bufA[PIECES_MAX], bufB[PIECES_MAX];
+    lv_area_t *cur = bufA, *nxt = bufB;
+    uint8_t n = 1;
+    cur[0] = r;
+    for (uint8_t c = 0; c < s_nowN && n > 0; c++) {
+        uint8_t m = 0;
+        for (uint8_t i = 0; i < n; i++) {
+            lv_area_t res[4];
+            const int8_t k = lv_area_diff(res, &cur[i], &s_now[c]);
+            if (k < 0) {                            // untouched by this cut
+                if (m >= PIECES_MAX) { repairBlit(from, to, r, stats); return; }
+                nxt[m++] = cur[i];
+                continue;
+            }
+            if (m + k > PIECES_MAX) { repairBlit(from, to, r, stats); return; }
+            for (int8_t j = 0; j < k; j++) nxt[m++] = res[j];
+        }
+        lv_area_t *t = cur; cur = nxt; nxt = t;
+        n = m;
     }
-    return false;
+    for (uint8_t i = 0; i < n; i++) repairBlit(from, to, cur[i], stats);
 }
 
 // First chunk of a frame: choose the buffer, and bring it up to date from the
@@ -185,21 +249,15 @@ void beginFrame(lv_display_t *disp) {
     void *from = s_d->frameBuffer(src);
     void *to   = s_d->frameBuffer(s_target);
 
+    LVGL_Startup::FlushStats *stats = LVGL_Startup::activeFlushStats();
+    if (stats) stats->areas = s_nowN;
     if (st.all) {
         const lv_area_t whole = {0, 0, s_pw - 1, s_ph - 1};
-        if (!redrawnAnyway(whole)) {
-            ppaBlit(from, s_pw, s_ph, 0, 0, s_pw, s_ph, to, 0, 0, PPA_SRM_ROTATION_ANGLE_0,
-                    /*blocking*/ false);
-        }
+        const uint32_t before = stats ? stats->repairPx : 0;
+        repairArea(from, to, whole, stats);
+        if (stats && stats->repairPx - before == (uint32_t)(s_pw * s_ph)) stats->repairFull = 1;
     } else {
-        for (uint8_t i = 0; i < st.n; i++) {
-            const lv_area_t &r = st.r[i];
-            if (redrawnAnyway(r)) continue;
-            // Queued, not waited for: the rotations queued after it cannot
-            // start until it is done.
-            ppaBlit(from, s_pw, s_ph, r.x1, r.y1, r.x2 - r.x1 + 1, r.y2 - r.y1 + 1,
-                    to, r.x1, r.y1, PPA_SRM_ROTATION_ANGLE_0, /*blocking*/ false);
-        }
+        for (uint8_t i = 0; i < st.n; i++) repairArea(from, to, st.r[i], stats);
     }
     staleClear(st);
     s_inFrame = true;
@@ -209,7 +267,8 @@ void beginFrame(lv_display_t *disp) {
 // hand this one to the panel.
 void endFrame() {
     for (uint8_t i = 0; i < Fleet_Display::NUM_FBS; i++) {
-        if (i != s_target) staleMerge(s_stale[i], s_now);
+        if (i == s_target) continue;
+        for (uint8_t k = 0; k < s_nowN; k++) staleAdd(s_stale[i], s_now[k]);
     }
     s_d->present(s_target);
     s_inFrame = false;
@@ -276,8 +335,10 @@ lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info) {
 
     ppa_client_config_t pc = {};
     pc.oper_type = PPA_OPERATION_SRM;
-    // Room for a frame's repairs (up to MAX_RECTS) plus the strips in flight.
-    pc.max_pending_trans_num = MAX_RECTS + 4;
+    // Room for a frame's repairs plus the strips in flight. A repair area can
+    // be cut into several pieces (repairArea), so this is generous; one that
+    // still does not fit is done blocking, never dropped (repairBlit).
+    pc.max_pending_trans_num = 32;
     // The longest DMA burst, as LVGL's own PPA code uses (lv_draw_ppa.c:51-52,
     // LV_PPA_BURST_LENGTH 128). The default measured barely faster than the CPU.
     pc.data_burst_length = PPA_DATA_BURST_LENGTH_128;
