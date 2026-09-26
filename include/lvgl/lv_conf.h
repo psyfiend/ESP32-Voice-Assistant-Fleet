@@ -125,7 +125,17 @@
  *====================*/
 
 /** Default display refresh, input device read and animation step period. */
-#define LV_DEF_REFR_PERIOD  33      /**< [ms] */
+/* Per-board override: -D FLEET_LV_REFR_PERIOD=16 in an environment's build_flags.
+ * Measured 2026-09-26 (display-stack.md s8.8): 16 ms gives WS_P4_4B on esp_lcd ~16
+ * frames per deck-panel swap instead of 10, none late, at no cost per frame; WS_P4_5
+ * gains nothing (its swap frame takes ~31 ms). It also sets how often touch is polled
+ * and animations step, so it is NOT a free change on the slow S3 boards. No board sets
+ * it yet: the owner's call. */
+#ifdef FLEET_LV_REFR_PERIOD
+    #define LV_DEF_REFR_PERIOD  FLEET_LV_REFR_PERIOD
+#else
+    #define LV_DEF_REFR_PERIOD  33      /**< [ms] */
+#endif
 
 /** Default Dots Per Inch. Used to initialize default sizes such as widgets sized, style paddings.
  * (Not so important, you can adjust it to modify default sizes and spaces.) */
