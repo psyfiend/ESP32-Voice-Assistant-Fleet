@@ -64,7 +64,7 @@ const DisplayConfig WS_P4_TOUCH_LCD_4B_DISPLAY = {
     .PANEL_MODEL = "ST7703",
     .WIDTH       = 720,
     .HEIGHT      = 720,
-    .ROTATION    = 2,     // USB Port on left side
+    .ROTATION    = 0,     // native; owner 2026-09-26: no reason for anything else. Was 2 (USB port on left side - a legacy preference, no longer applicable)
     .AUTO_FLUSH  = true,
 
     .BL_PIN      = 26,
@@ -159,7 +159,11 @@ inline const StorageConfig& bsp_storage = WS_P4_TOUCH_LCD_4B_STORAGE;
 
 const LvglConfig WS_P4_TOUCH_LCD_4B_LVGL = {
     .DOUBLE_BUFFERING = true,
-    .DRAW_BUF_HEIGHT  = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
+    // esp_lcd (2.9 step 3), measured 2026-09-26 - full screen / deck-swap frame:
+    //   25 lines 70.7 / 19.2 ms,  50 lines 51.5 / 17.0,  100 lines 54.8 / 22.0,  720 (full) 77.9 / 25.6
+    // 50 wins on every measure (display-stack.md s8.8). Was 0 ("no override", which on
+    // Arduino_GFX meant full-frame buffers; on esp_lcd, 0 falls back to 50 anyway).
+    .DRAW_BUF_HEIGHT  = 50,
     .BUFFER_SIZE_PX   = 36000, // 720 * 50, // WIDTH * DRAW_BUF_HEIGHT
 };
 inline const LvglConfig& bsp_lvgl = WS_P4_TOUCH_LCD_4B_LVGL;
