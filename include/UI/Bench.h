@@ -7,9 +7,12 @@
 //
 //   GET /bench?n=20&what=full&page=0&deck=1
 //
-//   n      frames to time, 1-100 (default 20)
+//   n      frames to time, 1-100 (default 20); for anim, swaps, 1-8 (default 4)
 //   what   full - redraw the whole screen (a page change, the worst case)
 //          card - redraw one card's area (a value changing, the common case)
+//          anim - open one deck panel while the other closes, n times, and
+//                 record every frame LVGL draws meanwhile, unforced (deck
+//                 is shown for it; `tasks` is not available)
 //   page   swipe-order index to measure on (default: the page showing)
 //   deck   0 or 1: deck hidden or shown (default: as it is)
 //   keep   1: stay on that page/deck afterwards (scripts/bench.py uses it to
@@ -27,7 +30,9 @@
 // loop(), does everything that does.
 //
 // Compiled in only with -D ENABLE_BENCH. No authentication, like /screenshot.
-// The UI freezes for the length of the measurement: n x the frame time.
+// The UI freezes for the length of the measurement: n x the frame time. An
+// anim run does not freeze it - the panels are seen swapping - and takes
+// about 1 s + n x 0.7 s, plus settling if it had to change page or deck.
 //
 class HttpServer;
 class GUIManager;

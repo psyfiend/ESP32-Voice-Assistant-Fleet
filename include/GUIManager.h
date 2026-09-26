@@ -123,6 +123,12 @@ public:
     }
     // The first visible card on the page, or nullptr on an empty page.
     lv_obj_t   *firstCard() const;
+    // The deck's accordion panels in on-screen order (Audio, Display), or
+    // nullptr past the last one. For /bench?what=anim, which opens them the
+    // way a tap does, by clicking their headers.
+    lv_obj_t   *deckPanel(uint8_t i) const {
+        return _deck && i < lv_obj_get_child_count(_deck) ? lv_obj_get_child(_deck, i) : nullptr;
+    }
 
     Panel_Header &header()      { return _header; }
     Panel_System &systemPanel() { return _pnlSystem; }
