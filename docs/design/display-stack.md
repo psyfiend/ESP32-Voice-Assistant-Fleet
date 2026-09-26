@@ -336,6 +336,52 @@ Full screen, Midnight, page 0, 20 frames; baseline is Arduino_GFX with `-O2`:
   difference seen was the Uptime and Signal values changing between the two captures. The same
   comparison confirms the orientation equals Arduino_GFX's rotation 1.
 
+### 8.6 The P4_5 animation stutter, measured and fixed - 2026-09-26 (`feat/67-bench-anim`)
+
+The owner saw P4_5 stutter when one deck panel opens while the other closes; 7B and 4B stay
+smooth. **`/bench?what=anim`** (new; `python scripts/bench.py --anim`) taps the panel headers as a
+finger does and records every frame LVGL draws on its own schedule - nothing forced. 4 swaps each,
+page 0, Midnight, on the laptop's network (HA and MQTT unreachable, so the header's MQTT icon
+blinks: a 2,304 px frame every 33 ms, visible in the raw rows, outside the swap frames).
+
+| Board / path | frames per swap | interval avg / max | late (> 50 ms) | frame = render + flush |
+|---|---|---|---|---|
+| `WS_P4_4B`, Arduino_GFX, 720x720 | 9-10 | 35.7 / 38.0 ms | **0** | 31 = 22 + 10 |
+| `WS_P4_5`, Arduino_GFX | 7 | 51 / 62 ms | 3-4 per swap | 43 = 27 + 16 (CPU copy) |
+| `WS_P4_5`, esp_lcd as built for step 2 | 6-7 | 50-58 / 82 ms | 2-4 per swap | 45 = 22 + 23 (**PPA wait**) |
+| **`WS_P4_5`, esp_lcd, repair fixed** | **9** | **38 / 44 ms** | **0** | **31 = 22 + 9** |
+
+- **The stutter was on both paths**, so it predates step 2. On Arduino_GFX it is drawing plus the
+  CPU copy (~43 ms against a 33 ms period). The leading theory - P4_5 simply draws too many pixels -
+  was half right: a swap redraws ~350k px here against ~160k on the 4B, but on `esp_lcd` drawing
+  alone (~22 ms) fits the period.
+- **On `esp_lcd` the time went to the repair**, measured per frame (`areas`, `repair_px`,
+  `repair_full`, new in the anim rows): 200-500k px of PPA copying per frame, plus a whole-frame
+  copy (~33 ms) every few frames. The rotation and the repair share the PPA queue, so LVGL sat in
+  `wait`. Two causes, both in `LVGL_Flush_EspLcd.cpp`:
+  1. A stale area was skipped only if ONE of this frame's areas covered it entirely. A panel
+     animation's consecutive frames overlap almost completely without either containing the other,
+     so nearly everything was re-copied - and then drawn over.
+  2. Past 8 tracked areas a buffer went wholly stale. A frame often begins before the panel has
+     switched to the previous one, which leaves only the buffer three frames behind: 9+ areas.
+- **Fix, as `esplcd-step2.md` §3 always specified** ("that list minus what was just drawn"): each
+  stale area has this frame's redraw subtracted with LVGL's own `lv_area_diff`, and overlapping
+  stale areas merge into one instead of overflowing (16 kept). Repairs fell to 5-145k px, no
+  whole-frame copies. Also fixed in passing: a repair copy the PPA queue refused was silently
+  dropped (stale pixels on the glass, had it ever happened); it is now done blocking. Queue depth
+  12 -> 32.
+- **Tried first and reverted, no effect:** taking the least-stale free buffer instead of the
+  lowest-numbered one. Cause 2 is timing, not choice.
+- **Correctness, measured:** `/screenshot?fb=1` against `/screenshot`, pixel by pixel at RGB565
+  precision, after five different end states (a panel left open, 3 swaps on page 1, full redraws
+  with the deck hidden, card redraws, a restored anim run): every difference was inside the blinking
+  MQTT icon's 34x34 box. Nothing else differed.
+- **The rest improved too** (standard matrix): full screen 90.1 -> 85 ms, one card 8.6-12.8 ->
+  5.7-8.2 ms.
+- **Not yet done:** eyes on the glass (TEST_2.9 S6), and the owner's rotation-0 experiment, which
+  is now unnecessary for this stutter - the PPA was not the bottleneck, the repair was. The PPA's
+  ~110 MB/s remains unexplained (§8.5).
+
 ## 9. Open questions
 
 - **STEP 2 RISK, found 2026-09-25: a known PPA freeze matches P4_5's exact configuration.**

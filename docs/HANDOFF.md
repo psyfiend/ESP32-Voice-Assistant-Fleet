@@ -30,6 +30,13 @@ drivers, Claude memory); if a P4 drops WiFi, first check the rebuilt `esp32p4_es
 
 **The work, in the owner's order of interest:**
 
+0. **Status, 2026-09-26 (laptop session):** item 1 is **measured and fixed, awaiting glass
+   (`TEST_2.9.md` S6/S7)**, on branch `feat/67-bench-anim` (off `feat/67-step2-p45`). Cause: the
+   esp_lcd repair re-copied nearly everything each frame; it now subtracts what the frame redraws.
+   `display-stack.md` §8.6. Rotation 0 is no longer needed for it. On the laptop's network
+   hostnames do not resolve: P4_5 was `10.0.0.2`, the 4B `10.0.0.83` (find them with
+   `curl http://<ip>/bench?what=x`, which answers with an error naming `anim`). The 4B's BSP is
+   still `ROTATION = 2` on every branch - the rotation-0 decision below was never applied.
 1. **The P4_5 animation stutter** (owner, 2026-09-26): opening one deck panel while the other closes
    stutters slightly on P4_5, while the 7B and 4B stay smooth. Not tearing - frames are late. The
    leading theory, unmeasured: P4_5 draws 1.5x the 7B's pixels at 1.73x UI scale, so a two-panel

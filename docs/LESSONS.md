@@ -264,6 +264,15 @@ redrew in the animation's first frame. LVGL animations are time-based, so the re
 it hurries the animation along". Switching the sheet by `LV_OBJ_FLAG_CLICKABLE` instead costs no
 redraw, and `lv_obj_hit_test()` passes over a non-clickable object, so it is invisible to touch.
 
+**A forced full-screen benchmark cannot see an animation.** 2026-09-26. Step 2 of the display
+migration measured -45% per full frame on `WS_P4_5`, and the owner still saw a deck-panel swap
+stutter. Forced frames redraw one area that covers everything, so the esp_lcd repair (copying what
+a buffer is behind on) had nothing to do. An animation redraws a few overlapping areas every frame,
+and there the repair was re-copying almost all of them: 200-500k px of PPA work per frame, the
+actual bottleneck. It showed only when `/bench?what=anim` recorded the real frames, unforced, with
+the repair's own numbers beside them. **Measure the case the user complains about, the way it
+really runs** - and per frame, since an average hides the late ones.
+
 ## LVGL, from milestone 2.4
 
 **An out-of-range grid row is a hard freeze, not a wrong layout.** `lv_conf.h` defines

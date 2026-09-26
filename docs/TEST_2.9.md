@@ -67,6 +67,34 @@ panels, drag the Touch Points panel around.
 - FAIL: a reboot, or `/bench` answering "the UI thread did not respond" (that is what a PPA freeze
   would look like: the screen stops changing, the network keeps working).
 
+### The deck-panel stutter (branch `feat/67-bench-anim`, 2026-09-26, laptop weekend)
+
+**What changed.** The owner's stutter - one deck panel opening while the other closes - was
+measured on P4_5 with the new `/bench?what=anim` and traced to the esp_lcd flush's *repair* (bringing
+a buffer up to date before drawing into it), which was re-copying almost everything each frame. It
+now skips what the frame redraws anyway. Numbers: `display-stack.md` §8.6. In short: 6-7 frames per
+swap with gaps up to 82 ms became 9 frames, gaps at most 44 ms, none late - the same as the 4B,
+which you called smooth.
+
+**Already seen by me, not on glass:** the anim numbers above, four swaps at a time, repeated; the
+panel's frame buffer matching LVGL's render pixel for pixel in five different states (only the
+blinking MQTT icon differed, which is expected while MQTT is unreachable); the standard matrix a
+little faster than before. **Never seen by anyone:** how it looks.
+
+**S6 — The swap.** Show the deck; open Audio; tap Display; tap Audio; repeat several times, quickly
+and slowly. Compare with the 4B beside it.
+- PASS: the swap looks as smooth as the 4B's, and no fragment of a panel is left behind when the
+  animation ends (look at the cards just above the deck).
+- FAIL: still a visible hitch, or a stale strip or corner anywhere - note where.
+
+**S7 — Everything else still clean.** Swipe pages, open and close the drawer, drag the Touch Points
+panel, change scheme.
+- PASS: no stale fragments anywhere, no tearing (the change is in what gets copied between the
+  three buffers, so a mistake would show as leftovers from two frames ago).
+
+**For measuring yourself:** `python scripts/bench.py --anim fleet-ws-p4-5` (add `--frames` for every
+frame; it saves the JSON in `bench/`). The panels are seen swapping while it runs.
+
 ---
 
 Branch `feat/67-bench`. The plan is `docs/design/display-stack.md`; the numbers are its §8; what
