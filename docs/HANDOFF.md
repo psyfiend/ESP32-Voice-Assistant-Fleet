@@ -11,6 +11,44 @@ not appear in the source as suspect.
 
 ---
 
+## Remote weekend, 2026-09-26 to 28 - read this first if you are on the laptop
+
+The owner is away with **only two boards, `WS_P4_5` and `WS_P4_TOUCH_LCD_4B`, and a laptop**. The
+7B, the S3s and the CYD stayed home and are **unreachable**. Setup was done from
+`Desktop\FleetLaptopKit\README.md` on the home desktop (rebuilt P4 libraries, secrets, fetched
+drivers, Claude memory); if a P4 drops WiFi, first check the rebuilt `esp32p4_es` is really in place.
+
+- **Network:** boards and laptop share a local network (phone hotspot or the host's WiFi). Home
+  Assistant is NOT reachable from the boards - HA cards read unavailable, which is expected. MQTT
+  likewise. Display work needs neither. Hostnames may not resolve; use IPs.
+- **The WiFi SSID is compiled in** from the gitignored `ConnectivityLocalSecrets.h`; the laptop's
+  copy was edited for the weekend network. Never commit it.
+- **"Build the two dev boards" this weekend means `WS_P4_5` and `WS_P4_4B`.** The all-eight build
+  before any merge still applies - it only compiles, no boards needed, ~25 min.
+- **If the laptop's username is not `Marge`,** its `platformio.ini` has a local, uncommitted path
+  replacement. `git status` will show it modified: **never stage it.**
+
+**The work, in the owner's order of interest:**
+
+1. **The P4_5 animation stutter** (owner, 2026-09-26): opening one deck panel while the other closes
+   stutters slightly on P4_5, while the 7B and 4B stay smooth. Not tearing - frames are late. The
+   leading theory, unmeasured: P4_5 draws 1.5x the 7B's pixels at 1.73x UI scale, so a two-panel
+   frame overruns LVGL's 33 ms refresh period (`LV_DEF_REFR_PERIOD`). **Plan agreed with the owner:
+   measure first** - add an animation mode to `/bench` that triggers exactly that two-panel swap and
+   records every frame (count, per-frame time, render vs PPA). Compare P4_5 on `esp_lcd` against P4_5
+   on Arduino_GFX (delete `-D DISPLAY_ESPLCD` to switch), and against the 4B. Rotation 0 on P4_5 is
+   the owner's suggested experiment if the PPA turns out to be the bottleneck.
+2. **2.9 step 3 on the 4B:** `esp_lcd` for the ST7703. The owner set it back to **rotation 0**
+   (2026-09-26; its old reason is forgotten), so no PPA rotation is needed - an angle-0 copy, or
+   `draw_bitmap` with `use_dma2d`. Driver: `reference/esp-registry/waveshare__esp_lcd_st7703-v2.0.0`
+   (MIT); vendor it into `Fleet_Display` like the HX8394 (its README). **Timings:** ours (46 MHz,
+   66.7 Hz) and Waveshare's (38 MHz, 59.2 Hz) are both candidates - the owner keeps alternatives as
+   BSP comments on purpose (CLAUDE.md); compare on glass, never "correct" silently. Survey §3.
+3. **S5** (step 2 overnight) if not done at home: leave P4_5 up overnight, then `bench.py`.
+
+Use `/screenshot?fb=1` plus a pixel diff against `/screenshot` to check a new display path from
+the laptop before asking for eyes - it is how step 2 was verified (`display-stack.md` §8.5).
+
 ## Where the project is
 
 **`v0.2.7`, tagged on `main` 2026-09-24** (merge `c7f082e`). Phases 0, 1 and milestones 2.1–2.7
