@@ -97,6 +97,36 @@ frame; it saves the JSON in `bench/`). The panels are seen swapping while it run
 
 ---
 
+## Step 3 — `WS_P4_4B` on `esp_lcd` (branch `feat/67-bench-anim`, 2026-09-26)
+
+**What changed.** The 4B now runs the same esp_lcd path as P4_5: three frame buffers, the PPA
+turning each strip (180 degrees here) into place, Waveshare's own ST7703 driver fed our BSP's init
+sequence and timings. **Rotation is still 2**, so it should look exactly as before. `-D
+DISPLAY_ESPLCD` in its environment; delete that line to go back.
+
+**Already seen by me, not on glass:** full-screen redraw 87 -> 52 ms; a deck-panel swap frame 31 ->
+18 ms, every frame on LVGL's 33 ms schedule; the frame buffer matching LVGL's render pixel for pixel
+in five states (only the blinking MQTT icon differed). `display-stack.md` §8.7. **Never seen by
+anyone:** the glass.
+
+**T3-1 — First light.** Power-cycle the 4B.
+- PASS: the dashboard comes up the same way round as before (USB port on the left), right colours.
+- FAIL: upside down, mirrored, colours swapped (watch the orange cards), noise, black, or a
+  flicker/roll the old build did not have (that would point at the panel timing).
+
+**T3-2 — Touch.** Tap a card in each corner; swipe pages both ways.
+- PASS: taps land under your finger.
+
+**T3-3 — Smoothness and leftovers.** Swap the deck panels, swipe pages, open the drawer, drag the
+Touch Points panel.
+- PASS: no torn frames, no fragments left behind; at least as smooth as it was.
+
+**T3-4 — Brightness, scheme, screenshot.** Brightness slider; Linen and back; `python
+scripts/screenshot.py <4B's address>`.
+- PASS: all as before.
+
+---
+
 Branch `feat/67-bench`. The plan is `docs/design/display-stack.md`; the numbers are its §8; what
 every JSON field means is the header comment of `src/UI/Bench.cpp`.
 

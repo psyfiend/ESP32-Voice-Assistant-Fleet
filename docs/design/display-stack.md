@@ -382,6 +382,36 @@ blinks: a 2,304 px frame every 33 ms, visible in the raw rows, outside the swap 
   is now unnecessary for this stutter - the PPA was not the bottleneck, the repair was. The PPA's
   ~110 MB/s remains unexplained (§8.5).
 
+### 8.7 Step 3 - `WS_P4_4B` on `esp_lcd`, 2026-09-26 (`feat/67-bench-anim`)
+
+Same flush as P4_5 (triple-partial, PPA, the §8.6 repair), with the vendored Waveshare ST7703
+driver (`components/Fleet_Display/`). `-D DISPLAY_ESPLCD` on the 4B's environment; our BSP's init
+sequence and timings (46 MHz, 66.7 Hz), **rotation unchanged at 2** - so the picture is the same
+way round as before (Arduino_GFX's rotation-2 mapping, `Arduino_DSI_Display.cpp:92-95`, is the
+same as `toPhysical()`'s). Midnight, page 0; one-card rows span all three scenarios:
+
+| 4B | full: total / render / copy | one card | swap frame | swap interval (max) | late |
+|---|---|---|---|---|---|
+| Arduino_GFX (full-frame LVGL buffers) | 87.2 / 55.8 / 31.3 (CPU) | 4.6-5.2 | 31 ms | 35.7 (38.0) | 0 |
+| **esp_lcd** (2 x 50-line buffers, PPA 180) | **51.6** / 44.2 / 6.0 (queue) | 5.4-6.1 | **18 ms** | **33.7 (35.0)** | 0 |
+
+- **Full screen -41%.** As on P4_5, drawing got faster once the CPU stopped copying (55.8 ->
+  44.2 ms).
+- **A panel swap now costs about half the frame budget**, so LVGL's own 33 ms period is the only
+  limit left: 10 frames per swap, all on time.
+- **One-card updates are ~0.8 ms slower** (`wait` ~1.9 ms: LVGL waiting on the PPA for its draw
+  buffer). Negligible, but it is a cost, not a win.
+- **Correctness, measured:** `/screenshot?fb=1` against `/screenshot` at RGB565 precision, rotation
+  2, in five end states (panel left open, 3 swaps on page 1, full redraws deck hidden, card redraws,
+  page 0): only the blinking MQTT icon's 30x30 box differed. A control with the wrong rotation
+  differed on 336,718 pixels, so the comparison does discriminate.
+- **`fleet_dsi_panel` is now one bring-up for both chips** (`fleet_dsi_panel_new(cfg, chip, ...)`);
+  only the driver constructor differs. P4_5 re-verified after the refactor: frame buffer identical
+  to the render (0 pixels differing on the first capture), swap numbers as §8.6.
+- **Not done:** eyes on the glass (TEST_2.9 step 3); the vendor timings (38 MHz, 59.2 Hz, survey §3)
+  as the owner's comparison candidate; rotation 0 (owner's 2026-09-25 decision, never applied -
+  it would turn the picture over, and with it the touch mapping).
+
 ## 9. Open questions
 
 - **STEP 2 RISK, found 2026-09-25: a known PPA freeze matches P4_5's exact configuration.**
