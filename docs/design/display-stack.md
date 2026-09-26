@@ -412,6 +412,88 @@ same as `toPhysical()`'s). Midnight, page 0; one-card rows span all three scenar
   as the owner's comparison candidate; rotation 0 (owner's 2026-09-25 decision, never applied -
   it would turn the picture over, and with it the touch mapping).
 
+### 8.8 `WS_P4_4B` configuration sweep on `esp_lcd`, 2026-09-26 - "take nothing for granted"
+
+Owner's brief: test every valid configuration, one change at a time, current settings kept and
+documented. **Baseline C0 = what the BSP holds now:** rotation 0 (owner, 2026-09-26, was 2), our
+timing 46 MHz / h 20-80-80 / v 4-12-30 / lanes 1000 Mbps (66.7 Hz), 2 x 50-line draw buffers,
+3 frame buffers, `LV_DEF_REFR_PERIOD` 33. Each run: `/screenshot?fb=1` against `/screenshot`
+(always only the blinking MQTT icon differed), the standard matrix, and the anim test. `/bench`
+now also reports the timing the build used and **the refresh rate the panel really ran at**
+(`panel_scan`, counted in the frame-complete interrupt). Midnight, page 0; ms.
+
+| Run | Change | full (render) | one card | swap frame | worst interval | late | frames/swap | panel Hz |
+|---|---|---|---|---|---|---|---|---|
+| C0 | baseline | 51.5 (44.0) | 4.4-5.2 | 17.0 | 34.1 | 0 | 10.0 | 66.7 |
+| - | rotation 2 (before) | 51.6 (44.2) | 5.4-6.1 | 18.0 | 35.0 | 0 | 10.0 | - |
+| T1 | vendor timing: 38 MHz, h 20-50-50, v 4-20-20, lanes 480 | 51.4 (44.1) | 4.4-6.1 | 17.9 | 35.0 | 0 | 10.0 | **59.2** |
+| T2 | our timing, lanes 480 | 51.6 (44.2) | 4.4-6.3 | 17.0 | 34.0 | 0 | 9.8 | 66.7 |
+| T3 | vendor timing, lanes 1000 | 51.5 (44.2) | 4.3-6.1 | 17.7 | 35.0 | 0 | 10.0 | 59.2 |
+| B3 | draw buffers 25 lines | 70.7 (63.3) | 4.4-5.1 | 19.2 | 45.3 | 0 | 9.8 | 66.7 |
+| B1 | draw buffers 100 lines | 54.8 (46.1) | 4.5-5.6 | 22.0 | 75.0 | 2 | 9.5 | 66.7 |
+| B2 | draw buffers full frame (720) | 77.9 (55.6) | 5.4-5.7 | 25.6 | 71.2 | 1 | 9.5 | 66.7 |
+| R1 | `LV_DEF_REFR_PERIOD` 16 | 51.8 (44.3) | 4.4-5.3 | 16.8 | **23.7** | 0 | **15.8** | 66.8 |
+| R1 on P4_5 | `LV_DEF_REFR_PERIOD` 16 | 84.8 (70.8) | 5.6-6.2 | 31.5 | 43.3 | 0 | 9.2 | 54.9 |
+
+- **Rotation 0 vs 2 costs the same** on full frames: the PPA takes about as long for a 180-degree
+  turn as for a copy. One-card updates are ~1 ms cheaper at 0.
+- **Timing does not change speed at all** - four combinations, identical within noise, and every
+  one ran at exactly its computed rate (so each build was genuine). Choosing between ours (66.7 Hz)
+  and Waveshare's (59.2 Hz) is purely about the picture: flicker, colour, stability. **Owner's eyes
+  needed**; the BSP keeps ours.
+- **50-line buffers are the sweet spot.** Fewer lines means more strips and LVGL walks the widget
+  tree more times per frame (25 lines: +37% full frame). More lines means fewer, bigger PPA jobs and
+  less overlap between drawing and rotating, and a buffer that no longer sits in cache with
+  everything else (100 lines: swap frames +29%, 2 late; full frame: worst everywhere). The cache
+  explanation is plausible, not proven. The BSP now says 50 explicitly, results beside it.
+- **The refresh period is the one lever that shows:** at 16 ms the 4B animates at ~48 frames/s
+  instead of 30 (15.8 frames per 300 ms swap, none late), costing nothing per frame. P4_5 gains
+  nothing (its swap frame is ~31 ms, so it is already frame-bound). It is fleet-wide in `lv_conf.h`
+  and also sets touch polling and animation stepping, so it is now a per-board override,
+  `-D FLEET_LV_REFR_PERIOD=16`, **set on no board** - the owner's call. Not measured: idle CPU at
+  16 ms, and anything on the S3s.
+- **A stale build was caught by the measured refresh rate**: the first T1 build reported the new
+  timing (`Bench.cpp` had been edited, so it recompiled) while the panel ran at the old 66.7 Hz
+  (`Fleet_Display.cpp` came from the build cache) - CLAUDE.md's cache warning, live. Every run above
+  was built after clearing `.pio/build_cache`.
+- **Noted, not changed:** the esp_lcd bring-up passes `phy_clk_src = 0` (IDF's choice) and ignores
+  the BSP's `PHY_CLK_SRC`. Harmless on both boards so far; worth wiring through before a board that
+  needs a specific PHY clock moves.
+
+### 8.9 Why a page swipe hesitates - measured 2026-09-26
+
+The owner, both boards side by side: "a slightly longer hesitation on the P4_5 than the 4B" when
+swiping pages. **`/bench?what=page`** (new; `bench.py --page`) changes page as a left swipe does and
+times the rebuild apart from the frames after it. `-D DEBUG_PAGE_TIMING` (new, off) splits the
+rebuild further over serial. P4_5 esp_lcd, page 0 <-> 1, ms:
+
+| Where the time goes (P4_5) | with `DEBUG_CARDS` | without |
+|---|---|---|
+| card debug lines over UART (~3 KB at 115200 baud) | **~90** | 0 |
+| destroy the old page | 5 | 5 |
+| build ~15 cards' widgets (`Card::build`, 7.5 ms each; slowest a sensor card, 12.5) | 106-116 | 106-116 |
+| **lay the new page out** (LVGL layout of every new card) | 111-122 | 111-122 |
+| first frame (the whole screen) | ~90 | ~90 |
+| **swipe to glass** | **~478** | **~398** |
+| same, `WS_P4_4B` | ~388 | ~296 |
+
+- **The display is the smallest part.** The hesitation is building and laying out the page; the P4_5
+  vs 4B difference is ~50 ms of that plus ~30 ms of drawing its larger screen.
+- **`DEBUG_CARDS` was ~90 ms of every swipe**: per-card variant lines, each page change, printed
+  through a UART that blocks once its small buffer fills. It had been left on fleet-wide since the
+  2.7 card work (the 7B's own note: "take it out once the numbers are settled"). **Turned off in
+  `[P4-options]`** (commented, with the reason); the 7B's own explicit line and `[S3-options]` are
+  untouched - not measured there, and the CYD prints over USB-CDC, which behaves differently.
+- **The layout was hiding in `Panel_Header::setPage()`**: its `lv_obj_update_layout(container)`
+  lays out the whole *screen*, not the container (LVGL 9), and it runs right after the cards are
+  created - so it paid for the new page's layout. Moving that cost does not remove it; it is
+  inherent to rebuilding.
+- **What would make a swipe fast** (design, not done - `pages.md` §6-7): not rebuilding. Keep the
+  neighbouring page's widget tree built and switch between them (cost: its cards in `lv_mem`,
+  ~715 B each, and P4_5 has the least pool free), or show a snapshot while the real page builds.
+  Cheaper per-card work (7.5 ms build + 8 ms layout per card is a lot for this CPU) is the other
+  lever; not investigated yet.
+
 ## 9. Open questions
 
 - **STEP 2 RISK, found 2026-09-25: a known PPA freeze matches P4_5's exact configuration.**

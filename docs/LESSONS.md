@@ -273,6 +273,17 @@ actual bottleneck. It showed only when `/bench?what=anim` recorded the real fram
 the repair's own numbers beside them. **Measure the case the user complains about, the way it
 really runs** - and per frame, since an average hides the late ones.
 
+**A debug print is not free, and a flag left on costs every user every time.** 2026-09-26.
+`DEBUG_CARDS` printed ~3 KB per page change; at 115200 baud a UART that has filled its small
+buffer blocks the caller, so ~90 ms of every P4 page swipe was serial output nobody was reading.
+It had been on fleet-wide since the 2.7 card work. The spike-default lesson above, again: **when the
+debugging is done, the flag comes off** - and when something is slow, check what it prints first.
+
+**`lv_obj_update_layout(obj)` lays out the whole SCREEN `obj` is on**, not `obj` (LVGL 9). Called
+anywhere after a page's cards are created - `Panel_Header::setPage()` measuring the header, here -
+it quietly does the entire page's layout, and a profile charges ~115 ms to "the header". Time the
+layout on its own (`DEBUG_PAGE_TIMING` does) before blaming the caller.
+
 ## LVGL, from milestone 2.4
 
 **An out-of-range grid row is a hard freeze, not a wrong layout.** `lv_conf.h` defines

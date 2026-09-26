@@ -40,7 +40,14 @@ drivers, Claude memory); if a P4 drops WiFi, first check the rebuilt `esp32p4_es
    **Item 2 (step 3) is BUILT and verified from outside, awaiting glass (`TEST_2.9.md` step 3):**
    the 4B runs esp_lcd with the vendored ST7703 driver, our timings, rotation still 2 on purpose
    (same picture as before; rotation 0 is a separate, visible change for the owner to see).
-   `display-stack.md` §8.7. Vendor timings not yet tried.
+   `display-stack.md` §8.7. **Owner signed off every functional test on both boards (2026-09-26)**
+   and set the 4B to rotation 0 (done). Then, with the owner away, a configuration sweep on the 4B
+   (§8.8: timing makes no speed difference - a picture-quality choice for the owner's eyes; 50-line
+   buffers are best; a 16 ms refresh period gives the 4B ~48 fps animation, now a per-board
+   `-D FLEET_LV_REFR_PERIOD`, set on no board), and the page-swipe hesitation traced (§8.9:
+   `DEBUG_CARDS` was ~90 ms of every swipe - off in `[P4-options]` now; the rest is building and
+   laying out ~15 cards, ~115 ms each half). The 7B and CYD_P4_1060 drivers (EK79007, JD9165) are
+   vendored and compile; **neither board runs them** - one line each, with the board on the desk.
 1. **The P4_5 animation stutter** (owner, 2026-09-26): opening one deck panel while the other closes
    stutters slightly on P4_5, while the 7B and 4B stay smooth. Not tearing - frames are late. The
    leading theory, unmeasured: P4_5 draws 1.5x the 7B's pixels at 1.73x UI scale, so a two-panel

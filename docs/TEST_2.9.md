@@ -67,6 +67,16 @@ panels, drag the Touch Points panel around.
 - FAIL: a reboot, or `/bench` answering "the UI thread did not respond" (that is what a PPA freeze
   would look like: the screen stops changing, the network keeps working).
 
+> **Owner, 2026-09-26, both boards on `0.2.7.42+dirty` side by side: every functional test signed
+> off** - swiping, taps, panels, sliders "all work the way they should" (S1-S4, S6/S7 here and
+> T3-1..T3-4 below). The swap: "visually the two devices look extremely similar, maybe even the
+> same"; whether the P4_5 stutter is still there is now hard to say. **Two honest observations,
+> both expected rather than bugs:** a page swipe hesitates slightly longer on P4_5 than on the 4B,
+> and the perf overlay's CPU runs a little higher on P4_5 during swipes and swaps. P4_5 draws 1.78x
+> the 4B's pixels (921,600 vs 518,400): a full frame is 85 ms against 52 (`display-stack.md`
+> §8.6-8.7), and drawing is now the whole of the difference. The remaining lever is drawing less,
+> not the flush. The 4B was still at rotation 2 for these checks; the owner then set it to 0.
+
 ### The deck-panel stutter (branch `feat/67-bench-anim`, 2026-09-26, laptop weekend)
 
 **What changed.** The owner's stutter - one deck panel opening while the other closes - was
@@ -124,6 +134,28 @@ Touch Points panel.
 **T3-4 — Brightness, scheme, screenshot.** Brightness slider; Linen and back; `python
 scripts/screenshot.py <4B's address>`.
 - PASS: all as before.
+
+> **T3-1..T3-4: PASS (owner, 2026-09-26)**, at rotation 2. The owner then set rotation 0.
+
+### After the sweep (2026-09-26, owner away) - what is flashed now, and what needs eyes
+
+Both boards: `DEBUG_CARDS` off (page swipes ~90 ms quicker, `display-stack.md` §8.9). 4B: rotation
+0, 50-line buffers stated explicitly, our timing. Nothing else changed in behaviour.
+
+**T3-5 — The 4B at rotation 0.** Power-cycle. Tap the four corners; swipe both ways.
+- PASS: upright with the USB port on the other side from before; every tap lands under the finger.
+  Touch follows `ROTATION` in `TouchManager` (0 = the raw coordinates), untested by anyone at 0.
+- FAIL: taps mirrored (left/right or top/bottom swapped) - a photo and which corner.
+
+**T3-6 — Page swipes.** Swipe back and forth on both boards, side by side.
+- Expect: both a little quicker than this morning; P4_5 still a little behind the 4B (it builds and
+  draws a bigger page - §8.9). Tell me whether it is still noticeable.
+
+**Optional A/B, each a rebuild I can do on request:**
+- **Vendor timing on the 4B** (38 MHz, 59.2 Hz) against ours (46 MHz, 66.7 Hz). Measured identical
+  in speed (§8.8); the question is only whether either looks better - flicker, colour, a shimmer.
+- **16 ms refresh on the 4B** (`-D FLEET_LV_REFR_PERIOD=16`): ~48 frames/s for the deck panels
+  instead of 30. Does it look smoother? Nothing else should change.
 
 ---
 
