@@ -244,7 +244,8 @@ board runs until its turn. Plan: `docs/design/display-stack.md`.
   the include path before reading an `sdkconfig` — reading the wrong one wasted most of a
   session. `BoardHardware.SI_REV` stays `"unconfirmed"` on every P4 board and should: silicon
   revision is a per-chip property, not a per-board-model one, so a BSP header cannot represent
-  it correctly. See `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
+  it correctly. The System Doctor reads the real one at runtime (`[FIRMWARE]`, `esp_chip_info()`),
+  along with the IDF/Arduino versions and whether the rebuilt #49 libraries are in the build. See `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
 - **Panel reset polarity is per-board: `DisplayConfig.RST_ACTIVE_HIGH`.** `0` (the zero-fill
   default) is the generic active-LOW sequence every board used before this field existed; `1`
   selects assert-HIGH / release-LOW, mirroring `esp_lcd panel_hx8394_reset`. The Waveshare

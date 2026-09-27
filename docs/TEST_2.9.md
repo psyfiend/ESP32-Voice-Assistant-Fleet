@@ -148,6 +148,9 @@ scripts/screenshot.py <4B's address>`.
 Both boards: `DEBUG_CARDS` off (page swipes ~90 ms quicker, `display-stack.md` §8.9). 4B: rotation
 0, 50-line buffers stated explicitly, our timing. Nothing else changed in behaviour.
 
+> **T3-5 and T3-6: PASS (owner, 2026-09-26).** Page swiping "may be a bit faster (P4_5 still a bit
+> slower than 4B)"; every touch and action works as expected at rotation 0.
+
 **T3-5 — The 4B at rotation 0.** Power-cycle. Tap the four corners; swipe both ways.
 - PASS: upright with the USB port on the other side from before; every tap lands under the finger.
   Touch follows `ROTATION` in `TouchManager` (0 = the raw coordinates), untested by anyone at 0.

@@ -103,6 +103,13 @@ preferred to a moving branch.
 slightly later patch. **That is what the sdkconfig diff in Step 5 is for** — it will show any
 version drift as a difference, and you decide whether to accept it.
 
+**What the 2026-09-22 rebuild actually is, read from a running board (2026-09-26):** the System
+Doctor's `[FIRMWARE]` line reports `ESP-IDF v5.5.5-832-g2553c5ad432` - 832 commits past the v5.5.5
+tag on `release/v5.5`, where the stock libraries it replaced were `v5.5.5 b774170ff46`
+(`versions.txt` in the kept `esp32p4_es.stock.55.03.311`). Everything has run on it since, so the
+drift was accepted in practice; but a claim checked against "IDF 5.5.5 source" (the PPA DIG-734
+block, `display-stack.md` §9, for one) was checked against the tag, not the commit we run.
+
 ## Step 3 — set the two options
 
 ### `-t` TAKES THE CHIP VARIANT, NOT THE TARGET. Use `esp32p4_es`.
