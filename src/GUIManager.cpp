@@ -2,6 +2,7 @@
 #include "UI/UIToolkit.h"
 #include "UI/UITokens.h"
 #include "SystemReport.h"
+#include "LVGL_Startup.h"                // drawBufInfo(), for [UI STATE]
 #include "Cards/CardDemo.h"
 #include "Cards/CardIcons.h"   // cardSetLabelMode(), for the Label knob
 #include "UI/ReferencePage.h"
@@ -381,6 +382,17 @@ void GUIManager::reportUiSection() {
     if (!s_self) return;
     GUIManager &g = *s_self;
 
+    // LVGL's own version and the engine settings that shape every frame
+    // (display-stack.md s8). Here, not in SystemReport, which includes no LVGL.
+    {
+        const LVGL_Startup::DrawBufInfo b = LVGL_Startup::drawBufInfo();
+        char bb[40];
+        SystemReport::line("  LVGL:        %d.%d.%d, refresh %d ms, draw buffers %u x %s (%lu lines, %s)",
+                           LVGL_VERSION_MAJOR, LVGL_VERSION_MINOR, LVGL_VERSION_PATCH,
+                           (int)LV_DEF_REFR_PERIOD, (unsigned)b.count,
+                           SystemReport::fmtBytes(b.bytes, bb, sizeof(bb)),
+                           (unsigned long)b.lines, b.psram ? "PSRAM" : "internal");
+    }
     SystemReport::line("  Screen:      %ldx%ld  %ld DPI",
                        (long)lv_obj_get_width(lv_screen_active()),
                        (long)lv_obj_get_height(lv_screen_active()),

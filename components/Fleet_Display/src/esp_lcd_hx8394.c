@@ -26,8 +26,8 @@
  *    driver Arduino's Wire uses. Waveshare's own P4_5 BSP skips it too.
  *    "i2c_bus.h" (a registry component we do not carry) is included only if
  *    someone turns the sequence back on, which upstream includes regardless.
- * 2. The version macros IDF's component build would inject are defined here,
- *    because PlatformIO does not inject them.
+ * 2. The version macros IDF's component build would inject come from
+ *    fleet_display_versions.h, because PlatformIO does not inject them.
  * ------------------------------------------------------------------------- */
 #ifndef CONFIG_ESP_LCD_HX8394_SKIP_I2C_INIT
 #define CONFIG_ESP_LCD_HX8394_SKIP_I2C_INIT 1
@@ -35,11 +35,7 @@
 #if !CONFIG_ESP_LCD_HX8394_SKIP_I2C_INIT
 #include "i2c_bus.h"
 #endif
-#ifndef ESP_LCD_HX8394_VER_MAJOR
-#define ESP_LCD_HX8394_VER_MAJOR 2
-#define ESP_LCD_HX8394_VER_MINOR 1
-#define ESP_LCD_HX8394_VER_PATCH 0
-#endif
+#include "fleet_display_versions.h"
 
 #define HX8394_CMD_DSI_INT0 (0xBA)
 #define HX8394_DSI_1_LANE (0x60)

@@ -67,6 +67,11 @@ typedef enum {
 esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, fleet_dsi_chip_t chip,
                               esp_lcd_panel_handle_t *ret_panel, void **fbs);
 
+// The vendored driver behind `chip`, for reports: e.g. "esp_lcd_st7703 2.0.0
+// (waveshare)". Versions from fleet_display_versions.h, the same numbers the
+// driver itself logs. "none" for a chip there is no driver for.
+const char *fleet_dsi_driver_name(fleet_dsi_chip_t chip);
+
 #ifdef __cplusplus
 }
 #endif

@@ -20,7 +20,25 @@
 #include "esp_lcd_ek79007.h"
 #include "esp_lcd_jd9165.h"
 
+#include "fleet_display_versions.h"
+
 static const char *TAG = "fleet_dsi";
+
+#define FLEET_STR_(x) #x
+#define FLEET_STR(x)  FLEET_STR_(x)
+#define FLEET_VER(chip) FLEET_STR(ESP_LCD_##chip##_VER_MAJOR) "." FLEET_STR(ESP_LCD_##chip##_VER_MINOR) \
+                        "." FLEET_STR(ESP_LCD_##chip##_VER_PATCH)
+
+const char *fleet_dsi_driver_name(fleet_dsi_chip_t chip)
+{
+    switch (chip) {
+    case FLEET_DSI_HX8394:  return "esp_lcd_hx8394 "  FLEET_VER(HX8394)  " (waveshare)";
+    case FLEET_DSI_ST7703:  return "esp_lcd_st7703 "  FLEET_VER(ST7703)  " (waveshare)";
+    case FLEET_DSI_EK79007: return "esp_lcd_ek79007 " FLEET_VER(EK79007) " (espressif)";
+    case FLEET_DSI_JD9165:  return "esp_lcd_jd9165 "  FLEET_VER(JD9165)  " (espressif)";
+    default:                return "none";
+    }
+}
 
 // Each driver has its own init-command type, laid out exactly like ours.
 // Copied rather than cast, as step 2 decided; `n` is 0 when there is no

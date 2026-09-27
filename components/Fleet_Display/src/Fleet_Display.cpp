@@ -9,6 +9,7 @@
 #include "driver/ledc.h"
 #include "esp_attr.h"
 #include "esp_cache.h"
+#include "esp_timer.h"
 #include "esp_lcd_mipi_dsi.h"
 #include "esp_lcd_panel_ops.h"
 #include <FleetI2C.h>
@@ -104,6 +105,10 @@ bool Fleet_Display::begin() {
         Serial.printf("[Fleet_Display] Panel bring-up failed: %s\n", esp_err_to_name(err));
         return false;
     }
+    _driver   = fleet_dsi_driver_name(chip);
+    _lanes    = (uint8_t)cfg.num_lanes;
+    _laneMbps = cfg.lane_bit_rate_mbps;
+    _pclkHz   = cfg.dpi_clock_hz;
 
     // Nothing on the CPU may hold a dirty cache line over a frame buffer: the
     // PPA writes them by DMA, and a later write-back of a stale line would
@@ -124,10 +129,13 @@ bool Fleet_Display::begin() {
         Serial.printf("[Fleet_Display] Frame callback refused: %s\n", esp_err_to_name(err));
         return false;
     }
+    _frames      = 0;
+    _scanStartUs = esp_timer_get_time();   // counting starts here
 
     initBacklightPWM();
-    Serial.printf("[Fleet_Display] Ready: %ux%u, %u frame buffers of %u KB\n",
-                  (unsigned)_w, (unsigned)_h, (unsigned)NUM_FBS, (unsigned)(frameBufferBytes() / 1024));
+    Serial.printf("[Fleet_Display] Ready: %ux%u, %u frame buffers of %u KB, driver %s\n",
+                  (unsigned)_w, (unsigned)_h, (unsigned)NUM_FBS, (unsigned)(frameBufferBytes() / 1024),
+                  _driver);
     return true;
 }
 

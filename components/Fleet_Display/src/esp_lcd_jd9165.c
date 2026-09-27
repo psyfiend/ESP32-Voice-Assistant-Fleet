@@ -23,16 +23,12 @@
  * Vendored from espressif/esp_lcd_jd9165 2.0.2 (Apache-2.0,
  * LICENSE_esp_lcd_jd9165.txt). One change, and only this one:
  *
- * 1. The version macros IDF's component build would inject are defined here,
- *    because PlatformIO does not inject them.
+ * 1. The version macros IDF's component build would inject come from
+ *    fleet_display_versions.h, because PlatformIO does not inject them.
  *
  * No board-level I2C in this driver.
  * ------------------------------------------------------------------------- */
-#ifndef ESP_LCD_JD9165_VER_MAJOR
-#define ESP_LCD_JD9165_VER_MAJOR 2
-#define ESP_LCD_JD9165_VER_MINOR 0
-#define ESP_LCD_JD9165_VER_PATCH 2
-#endif
+#include "fleet_display_versions.h"
 
 #define JD9165_CMD_GS_BIT       (1 << 0)
 #define JD9165_CMD_SS_BIT       (1 << 1)

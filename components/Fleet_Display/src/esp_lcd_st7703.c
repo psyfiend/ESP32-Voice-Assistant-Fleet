@@ -25,16 +25,12 @@
  * LICENSE_esp_lcd_st7703.txt; this file's own header says Apache-2.0 - both
  * permissive, both kept as found). One change, and only this one:
  *
- * 1. The version macros IDF's component build would inject are defined here,
- *    because PlatformIO does not inject them.
+ * 1. The version macros IDF's component build would inject come from
+ *    fleet_display_versions.h, because PlatformIO does not inject them.
  *
  * Unlike the HX8394 driver, this one does no board-level I2C of its own.
  * ------------------------------------------------------------------------- */
-#ifndef ESP_LCD_ST7703_VER_MAJOR
-#define ESP_LCD_ST7703_VER_MAJOR 2
-#define ESP_LCD_ST7703_VER_MINOR 0
-#define ESP_LCD_ST7703_VER_PATCH 0
-#endif
+#include "fleet_display_versions.h"
 
 typedef struct
 {

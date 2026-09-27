@@ -1,7 +1,13 @@
 #include "SystemReport.h"
 #include "SystemCore.h"
+#include "BoardDisplay.h"
 #include <FleetI2C.h>
 #include "bsp_loader.h"
+#include <esp_arduino_version.h>
+#include <esp_chip_info.h>
+#include <esp_idf_version.h>
+#include <esp_timer.h>
+#include "sdkconfig.h"
 
 // FW_VERSION/FW_COMMIT are injected from `git describe` by
 // scripts/fw_version.py; the fallbacks keep the build working if that hook is
@@ -216,6 +222,54 @@ void reportDisplay(SystemCore &core) {
     SystemReport::line("  Resolution: %dx%d", bsp_display.WIDTH, bsp_display.HEIGHT);
     SystemReport::line("  Rotation: %d", bsp_display.ROTATION);
     SystemReport::line("  Brightness: %d%%", core.display().getBrightness());
+
+    // WHICH DISPLAY LIBRARY, and what it brought up (2.9, #67). esp_lcd itself
+    // is part of ESP-IDF - its version is the IDF version under [FIRMWARE].
+#ifdef DISPLAY_ESPLCD
+    Fleet_Display &d = core.display();
+    char fb[40];
+    SystemReport::line("  Path: esp_lcd (Fleet_Display), driver %s", d.driverName());
+    SystemReport::line("  Link: %u lanes @ %lu Mbps, pixel clock %.1f MHz",
+                       (unsigned)d.lanes(), (unsigned long)d.laneMbps(), d.pixelClockHz() / 1e6);
+    SystemReport::line("  Frame buffers: %u x %s", (unsigned)Fleet_Display::NUM_FBS,
+                       SystemReport::fmtBytes(d.frameBufferBytes(), fb, sizeof(fb)));
+    // Counted in the panel's frame-complete interrupt, from the moment it
+    // started scanning: the rate it really runs at, not the one its timing
+    // implies.
+    const int64_t scanning = esp_timer_get_time() - d.scanStartUs();
+    if (d.scanStartUs() > 0 && scanning > 0) {
+        SystemReport::line("  Refresh: %.2f Hz measured (%lu frames in %.1f s)",
+                           (double)d.framesScanned() * 1e6 / (double)scanning,
+                           (unsigned long)d.framesScanned(), scanning / 1e6);
+    }
+#else
+    SystemReport::line("  Path: Arduino_GFX (DisplayManager)");
+#endif
+}
+
+// What the firmware was built on and is running on. The silicon revision is
+// READ FROM THE CHIP: BoardHardware.SI_REV cannot know it, because it is a
+// property of each chip, not of a board model (CLAUDE.md).
+void reportPlatform() {
+    SystemReport::line("  Framework: arduino-esp32 %d.%d.%d on ESP-IDF %s",
+                       ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR,
+                       ESP_ARDUINO_VERSION_PATCH, esp_get_idf_version());
+    esp_chip_info_t ci;
+    esp_chip_info(&ci);
+    SystemReport::line("  Chip: %s rev v%u.%u, %u cores", CONFIG_IDF_TARGET,
+                       (unsigned)(ci.revision / 100), (unsigned)(ci.revision % 100),
+                       (unsigned)ci.cores);
+#if CONFIG_IDF_TARGET_ESP32P4
+    // THE #49 WIFI FIX LIVES IN REBUILT FRAMEWORK LIBRARIES, and a `pio pkg
+    // update` or platform reinstall silently puts the stock ones back
+    // (docs/REBUILD_P4_LIBS.md). These are the two settings the rebuild
+    // changed, read from the sdkconfig this firmware was compiled against.
+  #if defined(CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM) && defined(CONFIG_CACHE_L2_CACHE_LINE_64B)
+    SystemReport::line("  P4 libraries: REBUILT - #49 fix in (hosted mempool in PSRAM, 64-byte L2 line)");
+  #else
+    SystemReport::line("  P4 libraries: STOCK - the #49 WiFi fix is NOT in this build (docs/REBUILD_P4_LIBS.md)");
+  #endif
+#endif
 }
 
 void reportI2cScan() {
@@ -320,6 +374,7 @@ void run(SystemCore &core, bool echoSerial) {
     line("  Version: v%s", FW_VERSION);
     line("  Commit: %s", FW_COMMIT);
     line("  Device: %s", bsp_hw.device_name);
+    reportPlatform();
 
     reportConnectivity(core);
     reportEntities(core);

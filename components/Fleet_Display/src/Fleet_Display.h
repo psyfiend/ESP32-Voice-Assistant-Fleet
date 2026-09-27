@@ -52,17 +52,33 @@ public:
     uint8_t scanning()  const { return _scanning; }
     uint8_t submitted() const { return _submitted; }
 
-    // Frames the panel has finished since boot (from the same interrupt).
+    // Frames the panel has finished since boot (from the same interrupt), and
+    // when it started scanning (esp_timer, us) - divide the one by the time
+    // since the other for its real refresh rate. NOT by uptime: the panel
+    // starts seconds into boot.
     uint32_t framesScanned() const { return _frames; }
+    int64_t  scanStartUs() const   { return _scanStartUs; }
+
+    // For the System Doctor: the vendored driver and the link as brought up
+    // (after BSP defaults are applied). "none" / 0 until begin() succeeds.
+    const char *driverName() const { return _driver; }
+    uint8_t  lanes() const        { return _lanes; }
+    uint32_t laneMbps() const     { return _laneMbps; }
+    uint32_t pixelClockHz() const { return _pclkHz; }
 
 private:
     esp_lcd_panel_handle_t _panel = nullptr;
+    const char *_driver   = "none";
+    uint8_t     _lanes    = 0;
+    uint32_t    _laneMbps = 0;
+    uint32_t    _pclkHz   = 0;
     void    *_fb[NUM_FBS] = {};
     uint16_t _w = 0, _h = 0;
 
     volatile uint8_t  _scanning  = 0;
     volatile uint8_t  _submitted = 0;
     volatile uint32_t _frames    = 0;
+    int64_t  _scanStartUs = 0;
 
     int _currentBrightness = 0;
     static constexpr int DEFAULT_BRIGHTNESS = 75;   // as DisplayManager

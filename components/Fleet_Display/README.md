@@ -18,7 +18,12 @@ what to compile, so each file has to be empty on boards that do not use it.
 | `src/esp_lcd_ek79007.{h,c}` | **Vendored** EK79007 driver, `WS_P4_7B`'s panel - **compiles, never run** |
 | `src/esp_lcd_jd9165.{h,c}` | **Vendored** JD9165 driver, `CYD_P4_1060`'s panel - **compiles, never run** |
 
-`Fleet_Display::begin()` picks the driver from the BSP's `PANEL_MODEL`. The DSI PHY's LDO channel
+`Fleet_Display::begin()` picks the driver from the BSP's `PANEL_MODEL`.
+
+**Driver versions live in ONE place, `src/fleet_display_versions.h`.** Each vendored driver
+includes it for the version macros IDF's component build would inject (that include IS each
+driver's version-macro local change), and the System Doctor's `[DISPLAY]` section prints the same
+numbers through `fleet_dsi_driver_name()`. Updating a driver = new upstream files + its line there. The DSI PHY's LDO channel
 and voltage and the lane count come from the BSP's `TEST_MIPI_DSI_PHY_PWR_LDO_*` and
 `NUM_DSI_LANES` where a board sets them (7B, CYD_P4_1060), otherwise LDO 3 / 2500 mV / 2 lanes -
 which is what every board uses today. `PHY_CLK_SRC` is **not** wired through yet: IDF picks.
