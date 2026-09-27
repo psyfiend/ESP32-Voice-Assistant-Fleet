@@ -11,6 +11,48 @@ not appear in the source as suspect.
 
 ---
 
+## Start here - 2026-09-27
+
+**1. The design interview is the next piece of work.** `docs/design/interview-phase2-3.md` is the
+blueprint-to-be for the rest of Phase 2 and all of Phase 3 (including how the build sheet, the
+on-device UI and the web UI live together). **Claude facilitates it; the owner answers.** Follow
+its §0.1a protocol exactly - in short: one section per sitting, in order, starting with §1 (look
+and feel); 3-4 questions at a time with context and a recommendation, in plain words; show a mock
+before asking about looks; push back with evidence where an answer conflicts with a decision or a
+gotcha; write the answers into the section's design doc as you go; close by updating ROADMAP and
+this file and committing (docs only). **Build nothing a session decides until the owner says go.**
+Its §0.2 lists what is already decided - do not ask those again.
+
+**2. The deck is NOT part of the default dashboard** (owner, 2026-09-27) - a throwback to his first
+design, kept in code in case it is worth repurposing (inside popups, or on route-only room pages).
+Device-wide settings come from the system panel at the top. **All three edge-swipe zones are to be
+user-customizable**, a target being a page, a card popup, settings, a deep link into a settings
+view (the log, e.g.), or anything else - one "go to" addressing scheme (interview §5).
+
+**3. The card popup blueprint** is `docs/design/card-sheet.md` (draft 2; decisions D1-D7 open, and
+§2 of the interview).
+
+**4. esp_lcd for the boards not yet moved (7B, CYD_P4_1060) - prep done, runbook here.** Both
+panel drivers (EK79007, JD9165) are vendored in `Fleet_Display` and compile and link (not run);
+DSI lanes and PHY power come from their BSPs. The PHY reference clock: IDF's "0" resolves to
+PLL_F20M on our pre-rev3 build, the same as Arduino_GFX used, so both boards get the clock they rely
+on. **UNCOMMITTED in the laptop's tree:** `Fleet_Display` now also honours an explicit
+`PHY_CLK_SRC` code (no board sets one) - it could not be built because Windows began blocking
+`pio.exe` on 2026-09-27 ("An Application Control policy has blocked this file"). Build it on both
+dev boards, `/bench?what=verify`, then commit - or drop it. To move a board, with it on the desk:
+1. `-D DISPLAY_ESPLCD` in its environment (the committed `platformio.ini` via the blob method if on
+   the laptop - see the laptop memory note; plain edit at home).
+2. Build, flash, read the boot log: `[Fleet_Display] Ready ... driver ...` and
+   `[LVGL] repair copier: DMA2D`. Check `Refresh: NN Hz measured` in the System Doctor.
+3. `/bench?what=verify&n=40&act=anim&gap=100` and `act=page` - `bad_checks` must be 0.
+4. `bench.py`, `--anim`, `--page` with the flag off, then on (the before/after table).
+5. A soak (the 40-minute pattern in TEST_2.9), then the owner's glass checks (a T3-style sheet).
+Open per board: **the 7B is `ROTATION = 2` "USB on left"** - the same legacy reason the 4B had; ask
+the owner whether it goes to 0. The 7B's `TouchManager` passthrough special case (`#ifndef WS_P4_7B`)
+is unverified (CLAUDE.md) and must be re-checked at whatever rotation it runs. **CYD_P4_1060's reset
+pin** is uncertain in its BSP ("0 in schema, 27 in GFX Library, 5 in examples") - if the panel stays
+black, that is the first suspect, then reset polarity (the P4_5 lesson).
+
 ## Remote weekend, 2026-09-26 to 28 - read this first if you are on the laptop
 
 The owner is away with **only two boards, `WS_P4_5` and `WS_P4_TOUCH_LCD_4B`, and a laptop**. The

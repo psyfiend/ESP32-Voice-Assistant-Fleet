@@ -27,6 +27,30 @@ owner's brain dump on card popups (`card-sheet.md`). **It does not reopen decisi
 - **Show, don't spec** (HANDOFF): where a question is about looks, Claude builds a throwaway mock on
   the glass or a screenshot before the owner is asked to choose, rather than asking in the abstract.
 
+### 0.1a For the Claude facilitating it - the protocol
+
+1. **Before a session**: read `CLAUDE.md`, `HANDOFF.md`, this file, and the design doc the section
+   feeds (named in its heading; create it if missing). Check the section's questions against what
+   has changed since - drop any the code or a later decision has already answered, and say so.
+2. **Open the session** by naming the section, its purpose in one sentence, and roughly how many
+   questions. Then ask **3-4 questions at a time**, in the order written, each with its context
+   and recommendation in plain words (the owner dislikes jargon and metaphor - HANDOFF). Never
+   paste the whole section at once.
+3. **Looks questions: show first.** If a question is about how something looks or moves, build a
+   throwaway mock on a board (or a `/screenshot`, or a quick HTML sketch for layout-only questions)
+   and ask him to react to it. Say what the mock is NOT (e.g. "colours are placeholders").
+4. **Engage, don't transcribe.** Push back when an answer conflicts with a decision in §0.2, a
+   measurement, or a gotcha in §10 - name the conflict and the evidence, then let him decide. His
+   "I'm wondering whether..." is usually a design instinct worth following up (HANDOFF).
+5. **Record as you go**: after each batch, write the answers into the section's design doc, dated,
+   in his words where they matter, with the decision and its reason. Mark anything left open as
+   OPEN with what would settle it. Tick the question here (`- [x]` or "ANSWERED -> doc §n").
+6. **Close the session** with a short summary: what was decided, what is open, what it changes in
+   the ROADMAP; update the ROADMAP row and HANDOFF; commit (docs only) and push.
+7. **Do not build** anything a session decides until the owner says go - the interview produces the
+   blueprint, not code (throwaway mocks excepted). Keep a running "new questions" list at the end
+   of this file for anything the answers raise.
+
 ### 0.2 Already decided - not asked again
 
 | Decision | Where |
@@ -133,13 +157,19 @@ card's header (`cards.md` §8).
 - **Edge swipes become shortcuts**: at least **two swipe-up** targets and **swipe-down** targets,
   one of which stays fixed to the system panel / settings. (2.6 already moved the edge gestures into
   a target table, so targets are data, not code.)
+- **Owner, 2026-09-27 (later): all three swipe zones should be user-customizable**, and a target can
+  be **a page, a card popup, the top level of settings, a deep link to a specific settings view or
+  tab (the log, for one), or anything else**. The log gets its own home "at a location that makes
+  sense". So a *target* is a general "go to" address - the same idea as linked pages and card links;
+  it wants ONE addressing scheme used by swipes, cards, slots and the navbar alike.
 
 Questions:
-1. **Which edge gestures, and which are fixed?** Today: down-right = drawer, down-left = log, up =
-   deck. Proposed: down = system panel (fixed); up-left / up-right = two assignable shortcuts.
-   Should the down swipe keep a second target (the log), or is that a system-panel button?
-2. **What can a shortcut target be?** A page (including hidden room pages), the overview, a popup of
-   one entity (e.g. the front door camera, the thermostat), a scene, a "quick controls" sheet?
+1. **The three zones**: which edges/corners exactly (up-left, up-right, down?), their defaults, and
+   whether the system-panel zone is customizable too or only re-pointable to another settings view.
+2. **The "go to" address** (one scheme for swipes, card taps, header slots, navbar): what it must be
+   able to name - page (incl. hidden room pages), card popup (and which tab), settings top level,
+   settings deep link (view/tab, e.g. the log), the overview, a scene/script, a URL? What happens
+   when the target no longer exists (deleted page, renamed entity)?
 3. **Per page or per device?** Can a room page have its own swipe-up targets?
 4. **The deck's future**: which of its three possible homes is worth pursuing - inside popups
    (e.g. a light's extra controls), on room pages (a strip of room controls), or retire it once
