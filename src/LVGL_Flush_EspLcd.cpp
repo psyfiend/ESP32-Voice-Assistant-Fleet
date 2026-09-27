@@ -8,13 +8,17 @@
 //   first chunk   pick a frame buffer the panel is neither showing nor about
 //                 to show, and REPAIR it: copy in, from the newest frame, every
 //                 area it is behind on (it last held a frame two presents ago)
+//                 LESS what this frame redraws - on the DMA2D copier, by a
+//                 worker on core 0, while LVGL draws (display-stack.md s8.10)
 //   every chunk   rotate LVGL's unrotated chunk into that buffer with the PPA
-//   last chunk    hand the buffer to the panel, which switches to it at the
-//                 start of its next frame - no copy, no tearing
+//   last chunk    wait for the repair list, then hand the buffer to the panel,
+//                 which switches to it at the start of its next frame - no
+//                 copy, no tearing
 //
 // With three buffers there is always one free, so LVGL never waits for the
 // panel. /bench reports the rotation as `copy` and repair + hand-over as
-// `present`; `wait` stays ~0.
+// `present`; `wait` stays ~0. /bench?what=verify checks the result against
+// LVGL's own render.
 //
 #if defined(DISPLAY_ESPLCD)
 
@@ -25,6 +29,10 @@
 #include "esp_attr.h"             // IRAM_ATTR
 #include "esp_cache.h"
 #include "driver/ppa.h"
+#include <string.h>               // memcpy, for copyBench
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#include "esp_async_fbcpy_priv.h" // DMA2D frame-buffer copy (IDF-private API)
 #include "SystemReport.h"       // fmtBytes
 #include "bsp_loader.h"
 #include "src/display/lv_display_private.h"   // inv_areas: what this refresh redraws
@@ -139,15 +147,124 @@ bool IRAM_ATTR onPpaDone(ppa_client_handle_t client, ppa_event_data_t *ev, void 
     return false;
 }
 
+// esp_async_fbcpy finished (DMA2D interrupt): wake whoever waits on `sem`.
+bool IRAM_ATTR onFbcpyDone(esp_async_fbcpy_handle_t mcp, esp_async_fbcpy_event_data_t *ev, void *sem) {
+    (void)mcp; (void)ev;
+    BaseType_t woken = pdFALSE;
+    xSemaphoreGiveFromISR(static_cast<SemaphoreHandle_t>(sem), &woken);
+    return woken == pdTRUE;
+}
+
+// --= Repairs on the DMA2D copier (esp_async_fbcpy) =--
+//
+// Measured 2026-09-26 (/bench?what=copy): the DMA2D copier moves frame-buffer
+// memory at ~140-150 MB/s where the PPA manages ~45-50, on both boards - and
+// it runs on its own DMA2D channels, so repairs now run ALONGSIDE the PPA's
+// strip rotations. That is safe because a repair covers only what this frame
+// does NOT redraw (repairArea subtracts the redraw), while every strip lies
+// inside what it does redraw: the two never write the same pixel.
+//
+// AT MOST ONE COPY OUTSTANDING, ANYWHERE. esp_async_fbcpy() hands the DMA2D
+// driver a pointer to ONE static transaction config shared by every handle
+// (esp_lcd/src/esp_async_fbcpy.c at IDF 2553c5ad432), and the driver reads it
+// only when a queued job STARTS. With several copies queued, each start sees
+// the LAST caller's handle: some pieces copied twice, others never. Found
+// 2026-09-26 as stale pixels on WS_P4_5 when this ran a pool of 16 handles
+// (esp_async_fbcpy_priv.h). Espressif's own DPI driver uses one handle, one
+// copy at a time, which is why it never meets it.
+//
+// So a frame's repair pieces go on a list, and one worker task on core 0 -
+// idle while LVGL draws on core 1 (display-stack.md s8.3) - copies them one
+// after another on a single handle. They still run alongside the PPA's strip
+// rotations. endFrame() waits for the whole list: the panel is never handed a
+// buffer that is still being written.
+constexpr uint8_t REPAIR_QUEUE_MAX = 64;
+lv_area_t   s_rq[REPAIR_QUEUE_MAX];
+uint8_t     s_rqN      = 0;
+const void *s_rqFrom   = nullptr;
+void       *s_rqTo     = nullptr;
+bool        s_rqActive = false;      // the worker holds this frame's list
+esp_async_fbcpy_handle_t s_fbc = nullptr;
+SemaphoreHandle_t s_rqStart = nullptr, s_rqDone = nullptr, s_rqPiece = nullptr;
+
+esp_err_t ppaBlit(const void *src, uint32_t srcW, uint32_t srcH,
+                  uint32_t blkX, uint32_t blkY, uint32_t blkW, uint32_t blkH,
+                  void *dst, uint32_t dstX, uint32_t dstY, ppa_srm_rotation_angle_t angle,
+                  bool blocking = true, lv_display_t *doneFor = nullptr);
+
+// The worker. The list is written by the LVGL thread before it gives
+// s_rqStart and not touched again until s_rqDone comes back.
+void repairWorker(void *) {
+    for (;;) {
+        xSemaphoreTake(s_rqStart, portMAX_DELAY);
+        for (uint8_t i = 0; i < s_rqN; i++) {
+            const lv_area_t &r = s_rq[i];
+            const uint32_t w = (uint32_t)(r.x2 - r.x1 + 1), h = (uint32_t)(r.y2 - r.y1 + 1);
+            esp_async_fbcpy_trans_desc_t tr = {};
+            tr.src_buffer = s_rqFrom;
+            tr.dst_buffer = s_rqTo;
+            tr.src_buffer_size_x = tr.dst_buffer_size_x = (size_t)s_pw;
+            tr.src_buffer_size_y = tr.dst_buffer_size_y = (size_t)s_ph;
+            tr.src_offset_x = tr.dst_offset_x = (size_t)r.x1;
+            tr.src_offset_y = tr.dst_offset_y = (size_t)r.y1;
+            tr.copy_size_x = w;
+            tr.copy_size_y = h;
+            tr.pixel_format_unique_id.color_type_id = COLOR_TYPE_ID(COLOR_SPACE_RGB, COLOR_PIXEL_RGB565);
+            if (esp_async_fbcpy(s_fbc, &tr, onFbcpyDone, s_rqPiece) == ESP_OK) {
+                if (xSemaphoreTake(s_rqPiece, pdMS_TO_TICKS(500)) == pdTRUE) continue;
+                // A copy that never finished: say so; the piece may be stale.
+                Serial.println("[LVGL] repair copy did not finish within 500 ms");
+                continue;
+            }
+            // Refused: the PPA does this piece instead (blocking, from here -
+            // PPA clients are thread-safe, and this area is disjoint from any
+            // strip the LVGL thread is rotating).
+            ppaBlit(s_rqFrom, s_pw, s_ph, r.x1, r.y1, w, h, s_rqTo, r.x1, r.y1, PPA_SRM_ROTATION_ANGLE_0);
+        }
+        xSemaphoreGive(s_rqDone);
+    }
+}
+
+void repairFrameBegin(const void *from, void *to) {
+    s_rqN = 0;
+    s_rqFrom = from;
+    s_rqTo = to;
+}
+
+// Put one piece on the frame's list. False when there is no worker or the
+// list is full - the caller then uses the PPA.
+bool repairQueue(const lv_area_t &r) {
+    if (!s_fbc || s_rqN >= REPAIR_QUEUE_MAX) return false;
+    s_rq[s_rqN++] = r;
+    return true;
+}
+
+// Hand the list to the worker (end of beginFrame).
+void repairFrameStart() {
+    if (!s_rqN) return;
+    s_rqActive = true;
+    xSemaphoreGive(s_rqStart);
+}
+
+// Wait for the list (endFrame, before the panel sees the buffer).
+void repairFrameEnd() {
+    if (!s_rqActive) return;
+    if (xSemaphoreTake(s_rqDone, pdMS_TO_TICKS(1000)) != pdTRUE) {
+        Serial.println("[LVGL] repair list did not finish within 1 s");
+    }
+    s_rqActive = false;
+}
+
 // One PPA block transfer into a frame buffer.
 //   blocking            returns when the pixels are there
 //   non-blocking        queued; returns at once. The PPA runs one client's
 //                       jobs in order, so a later job never overtakes this one.
 //                       `doneFor`, if set, is released when it finishes.
+// (Declared above, with its defaults, for the repair worker.)
 esp_err_t ppaBlit(const void *src, uint32_t srcW, uint32_t srcH,
                   uint32_t blkX, uint32_t blkY, uint32_t blkW, uint32_t blkH,
                   void *dst, uint32_t dstX, uint32_t dstY, ppa_srm_rotation_angle_t angle,
-                  bool blocking = true, lv_display_t *doneFor = nullptr) {
+                  bool blocking, lv_display_t *doneFor) {
     ppa_srm_oper_config_t op = {};
     op.in.buffer         = src;
     op.in.pic_w          = srcW;
@@ -200,6 +317,10 @@ void captureRedraw(lv_display_t *disp) {
 // silently refused would leave stale pixels on the glass.
 void repairBlit(void *from, void *to, const lv_area_t &r, LVGL_Startup::FlushStats *stats) {
     const uint32_t w = (uint32_t)(r.x2 - r.x1 + 1), h = (uint32_t)(r.y2 - r.y1 + 1);
+    if (repairQueue(r)) {                 // the DMA2D copier first - 3x the PPA's speed
+        if (stats) stats->repairPx += w * h;
+        return;
+    }
     if (ppaBlit(from, s_pw, s_ph, r.x1, r.y1, w, h, to, r.x1, r.y1,
                 PPA_SRM_ROTATION_ANGLE_0, /*blocking*/ false) != ESP_OK) {
         ppaBlit(from, s_pw, s_ph, r.x1, r.y1, w, h, to, r.x1, r.y1, PPA_SRM_ROTATION_ANGLE_0);
@@ -248,6 +369,7 @@ void beginFrame(lv_display_t *disp) {
     const uint8_t src = s_d->submitted();
     void *from = s_d->frameBuffer(src);
     void *to   = s_d->frameBuffer(s_target);
+    repairFrameBegin(from, to);
 
     LVGL_Startup::FlushStats *stats = LVGL_Startup::activeFlushStats();
     if (stats) stats->areas = s_nowN;
@@ -259,6 +381,7 @@ void beginFrame(lv_display_t *disp) {
     } else {
         for (uint8_t i = 0; i < st.n; i++) repairArea(from, to, st.r[i], stats);
     }
+    repairFrameStart();   // the worker copies the list while LVGL draws
     staleClear(st);
     s_inFrame = true;
 }
@@ -270,6 +393,7 @@ void endFrame() {
         if (i == s_target) continue;
         for (uint8_t k = 0; k < s_nowN; k++) staleAdd(s_stale[i], s_now[k]);
     }
+    repairFrameEnd();   // every repair copy finished before the panel sees the buffer
     s_d->present(s_target);
     s_inFrame = false;
 }
@@ -353,6 +477,21 @@ lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info) {
         return nullptr;
     }
 
+    // The repair copier: one handle, one worker on core 0 (see repairWorker).
+    // If any part is refused, s_fbc stays null and every repair stays on the
+    // PPA, as before - slower, never wrong.
+    s_rqStart = xSemaphoreCreateBinary();
+    s_rqDone  = xSemaphoreCreateBinary();
+    s_rqPiece = xSemaphoreCreateBinary();
+    esp_async_fbcpy_handle_t fbc = nullptr;
+    esp_async_fbcpy_config_t fc = {};
+    if (s_rqStart && s_rqDone && s_rqPiece && esp_async_fbcpy_install(&fc, &fbc) == ESP_OK &&
+        xTaskCreatePinnedToCore(repairWorker, "lcd_repair", 4096, nullptr, 6, nullptr, 0) == pdPASS) {
+        s_fbc = fbc;
+    }
+    Serial.printf("[LVGL] repair copier: %s\n", s_fbc ? "DMA2D (esp_async_fbcpy), worker on core 0"
+                                                      : "unavailable - repairs stay on the PPA");
+
     // LVGL's logical size: the panel's, turned by the rotation.
     const bool swap = (s_rot & 1);
     const int32_t lw = swap ? s_ph : s_pw;
@@ -403,6 +542,212 @@ const void *shownFrameBuffer(uint32_t &w, uint32_t &h) {
 }
 
 uint32_t panelFramesScanned() { return s_d ? s_d->framesScanned() : 0; }
+
+bool copyBench(CopyBench &out, int reps) {
+    if (!s_d || !s_ppa || reps < 1) return false;
+    if (s_inFrame) return false;   // never mid-frame: the target is spoken for
+
+    // Source: the newest complete frame. Destination: a buffer the panel is
+    // neither showing nor about to show. Every test below leaves it holding a
+    // copy of the source (the rotation test is followed by copies), which is
+    // at worst MORE up to date than its repair record says - never less.
+    const uint8_t srcIdx = s_d->submitted();
+    const uint8_t dstIdx = freeBuffer();
+    const void *src = s_d->frameBuffer(srcIdx);
+    void *dst       = s_d->frameBuffer(dstIdx);
+    const size_t bytes = s_d->frameBufferBytes();
+    out.frameBytes = (uint32_t)bytes;
+
+    // 1. PPA rotation, a square block (a whole-frame 90-degree turn would not
+    //    fit a non-square frame). This board's angle; 90 on a rotation-0 board.
+    const uint32_t sq = (uint32_t)LV_MIN(s_pw, s_ph);
+    out.rotBytes = sq * sq * 2;
+    const ppa_srm_rotation_angle_t ang = s_rot ? ppaAngle() : PPA_SRM_ROTATION_ANGLE_90;
+    int64_t t = esp_timer_get_time();
+    for (int i = 0; i < reps; i++) ppaBlit(src, s_pw, s_ph, 0, 0, sq, sq, dst, 0, 0, ang);
+    out.ppaRotUs = (esp_timer_get_time() - t) / reps;
+
+    // 2. PPA copy, angle 0, whole frame - what the repair uses today.
+    t = esp_timer_get_time();
+    for (int i = 0; i < reps; i++) ppaBlit(src, s_pw, s_ph, 0, 0, s_pw, s_ph, dst, 0, 0, PPA_SRM_ROTATION_ANGLE_0);
+    out.ppaCopyUs = (esp_timer_get_time() - t) / reps;
+
+    // 3. esp_async_fbcpy (DMA2D memory-to-memory), whole frame, waited for.
+    static esp_async_fbcpy_handle_t s_fbcpy = nullptr;
+    static SemaphoreHandle_t s_fbDone = nullptr;
+    if (!s_fbDone) s_fbDone = xSemaphoreCreateBinary();
+    if (!s_fbcpy) {
+        esp_async_fbcpy_config_t cfg = {};
+        out.fbcpyErr = esp_async_fbcpy_install(&cfg, &s_fbcpy);
+    }
+    if (s_fbcpy && s_fbDone) {
+        esp_async_fbcpy_trans_desc_t tr = {};
+        tr.src_buffer = src;
+        tr.dst_buffer = dst;
+        tr.src_buffer_size_x = tr.dst_buffer_size_x = tr.copy_size_x = (size_t)s_pw;
+        tr.src_buffer_size_y = tr.dst_buffer_size_y = tr.copy_size_y = (size_t)s_ph;
+        tr.pixel_format_unique_id.color_type_id = COLOR_TYPE_ID(COLOR_SPACE_RGB, COLOR_PIXEL_RGB565);
+        t = esp_timer_get_time();
+        for (int i = 0; i < reps && out.fbcpyErr == ESP_OK; i++) {
+            out.fbcpyErr = esp_async_fbcpy(s_fbcpy, &tr, onFbcpyDone, s_fbDone);
+            if (out.fbcpyErr == ESP_OK && xSemaphoreTake(s_fbDone, pdMS_TO_TICKS(1000)) != pdTRUE) {
+                out.fbcpyErr = ESP_ERR_TIMEOUT;
+            }
+        }
+        out.fbcpyUs = (esp_timer_get_time() - t) / reps;
+    }
+
+    // 3b. IS THE COPIER'S RESULT RIGHT? Clear the destination, copy, compare
+    //     with the CPU - the whole frame, then one band of rows alone (the
+    //     band where WS_P4_5 showed stale pixels: rows 1118-1165, clamped).
+    if (s_fbcpy && s_fbDone && out.fbcpyErr == ESP_OK) {
+        const uint16_t *s16 = static_cast<const uint16_t *>(src);
+        uint16_t *d16 = static_cast<uint16_t *>(dst);
+        auto clearDst = [&]() {
+            memset(dst, 0, bytes);
+            esp_cache_msync(dst, bytes, ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_INVALIDATE);
+        };
+        auto runRect = [&](int32_t x, int32_t y, int32_t w, int32_t h) -> bool {
+            esp_async_fbcpy_trans_desc_t tr = {};
+            tr.src_buffer = src;
+            tr.dst_buffer = dst;
+            tr.src_buffer_size_x = tr.dst_buffer_size_x = (size_t)s_pw;
+            tr.src_buffer_size_y = tr.dst_buffer_size_y = (size_t)s_ph;
+            tr.src_offset_x = tr.dst_offset_x = (size_t)x;
+            tr.src_offset_y = tr.dst_offset_y = (size_t)y;
+            tr.copy_size_x = (size_t)w;
+            tr.copy_size_y = (size_t)h;
+            tr.pixel_format_unique_id.color_type_id = COLOR_TYPE_ID(COLOR_SPACE_RGB, COLOR_PIXEL_RGB565);
+            return esp_async_fbcpy(s_fbcpy, &tr, onFbcpyDone, s_fbDone) == ESP_OK &&
+                   xSemaphoreTake(s_fbDone, pdMS_TO_TICKS(1000)) == pdTRUE;
+        };
+        auto runCopy = [&](int32_t y, int32_t h) -> bool {
+            esp_async_fbcpy_trans_desc_t tr = {};
+            tr.src_buffer = src;
+            tr.dst_buffer = dst;
+            tr.src_buffer_size_x = tr.dst_buffer_size_x = tr.copy_size_x = (size_t)s_pw;
+            tr.src_buffer_size_y = tr.dst_buffer_size_y = (size_t)s_ph;
+            tr.src_offset_y = tr.dst_offset_y = (size_t)y;
+            tr.copy_size_y = (size_t)h;
+            tr.pixel_format_unique_id.color_type_id = COLOR_TYPE_ID(COLOR_SPACE_RGB, COLOR_PIXEL_RGB565);
+            return esp_async_fbcpy(s_fbcpy, &tr, onFbcpyDone, s_fbDone) == ESP_OK &&
+                   xSemaphoreTake(s_fbDone, pdMS_TO_TICKS(1000)) == pdTRUE;
+        };
+        esp_cache_msync((void *)src, bytes, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+
+        clearDst();
+        if (runCopy(0, s_ph)) {
+            esp_cache_msync(dst, bytes, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+            for (int32_t i = 0; i < s_pw * s_ph; i++) {
+                if (d16[i] != s16[i]) {
+                    if (out.fullFirstBadRow < 0) out.fullFirstBadRow = i / s_pw;
+                    out.fullBad++;
+                }
+            }
+        } else {
+            out.fbcpyErr = ESP_FAIL;
+        }
+
+        out.bandH = 48;
+        out.bandY = LV_MIN(1118, s_ph - out.bandH);
+        clearDst();
+        if (runCopy(out.bandY, out.bandH)) {
+            esp_cache_msync(dst, bytes, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+            for (int32_t i = 0; i < s_pw * s_ph; i++) {
+                const int32_t row = i / s_pw;
+                const bool inBand = row >= out.bandY && row < out.bandY + out.bandH;
+                if (inBand && d16[i] != s16[i]) {
+                    if (out.bandFirstBadRow < 0) out.bandFirstBadRow = row;
+                    out.bandBad++;
+                } else if (!inBand && d16[i] != 0) {
+                    out.bandOutside++;
+                }
+            }
+        } else {
+            out.fbcpyErr = ESP_FAIL;
+        }
+        // Rectangles inside the band, odd and even x and width - the shapes
+        // the repair's subtraction produces on a rotated panel.
+        const int32_t pw = s_pw;
+        const int32_t rx[CopyBench::RECTS] = {0,   0,       1,       2,  pw - 5, pw - 6};
+        const int32_t rw[CopyBench::RECTS] = {pw - 53, pw - 54, pw - 54, 64, 5,      6};
+        for (uint8_t k = 0; k < CopyBench::RECTS; k++) {
+            CopyBench::RectCheck &rc = out.rects[k];
+            rc.x = rx[k];
+            rc.w = rw[k];
+            clearDst();
+            if (!runRect(rc.x, out.bandY, rc.w, out.bandH)) { out.fbcpyErr = ESP_FAIL; continue; }
+            esp_cache_msync(dst, bytes, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+            for (int32_t i = 0; i < s_pw * s_ph; i++) {
+                const int32_t row = i / s_pw, col = i % s_pw;
+                const bool in = row >= out.bandY && row < out.bandY + out.bandH &&
+                                col >= rc.x && col < rc.x + rc.w;
+                if (in && d16[i] != s16[i]) rc.bad++;
+                else if (!in && d16[i] != 0) rc.outside++;
+            }
+        }
+        // CONCURRENCY. The flush runs many copies at once; the checks above
+        // ran one at a time. Band rows are clamped to the frame.
+        static esp_async_fbcpy_handle_t s_fbcpy2 = nullptr;
+        static SemaphoreHandle_t s_fbDone2 = nullptr;
+        if (!s_fbDone2) s_fbDone2 = xSemaphoreCreateBinary();
+        if (!s_fbcpy2) { esp_async_fbcpy_config_t cfg2 = {}; esp_async_fbcpy_install(&cfg2, &s_fbcpy2); }
+        auto startRows = [&](esp_async_fbcpy_handle_t h, SemaphoreHandle_t sem, int32_t y, int32_t n) -> bool {
+            esp_async_fbcpy_trans_desc_t tr = {};
+            tr.src_buffer = src;
+            tr.dst_buffer = dst;
+            tr.src_buffer_size_x = tr.dst_buffer_size_x = tr.copy_size_x = (size_t)s_pw;
+            tr.src_buffer_size_y = tr.dst_buffer_size_y = (size_t)s_ph;
+            tr.src_offset_y = tr.dst_offset_y = (size_t)y;
+            tr.copy_size_y = (size_t)n;
+            tr.pixel_format_unique_id.color_type_id = COLOR_TYPE_ID(COLOR_SPACE_RGB, COLOR_PIXEL_RGB565);
+            return esp_async_fbcpy(h, &tr, onFbcpyDone, sem) == ESP_OK;
+        };
+        // Count bad pixels in [y0, y0+n0) and [y1, y1+n1); changed pixels elsewhere.
+        auto verify2 = [&](int32_t y0, int32_t n0, int32_t y1, int32_t n1,
+                           uint32_t &badA, uint32_t &badB, uint32_t &outside) {
+            esp_cache_msync(dst, bytes, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+            for (int32_t i = 0; i < s_pw * s_ph; i++) {
+                const int32_t row = i / s_pw;
+                if (row >= y0 && row < y0 + n0)      { if (d16[i] != s16[i]) badA++; }
+                else if (row >= y1 && row < y1 + n1) { if (d16[i] != s16[i]) badB++; }
+                else if (d16[i] != 0)                outside++;
+            }
+        };
+        const int32_t a0 = 0, an = LV_MIN(200, s_ph / 4);
+        const int32_t b0 = LV_MIN(600, s_ph / 2), bn = LV_MIN(200, s_ph / 4);
+        if (s_fbcpy2 && s_fbDone2) {
+            clearDst();
+            const bool okA = startRows(s_fbcpy, s_fbDone, a0, an);
+            const bool okB = startRows(s_fbcpy2, s_fbDone2, b0, bn);
+            if (okA) xSemaphoreTake(s_fbDone, pdMS_TO_TICKS(1000));
+            if (okB) xSemaphoreTake(s_fbDone2, pdMS_TO_TICKS(1000));
+            if (okA && okB) verify2(a0, an, b0, bn, out.dualA, out.dualB, out.dualOutside);
+            else out.fbcpyErr = ESP_FAIL;
+        }
+        const int32_t f0 = 0, fn = LV_MIN(400, s_ph / 3);
+        const int32_t p0 = LV_MIN(800, s_ph / 2), pn = LV_MIN(400, s_ph / 3);
+        clearDst();
+        const bool okF = startRows(s_fbcpy, s_fbDone, f0, fn);
+        ppaBlit(src, s_pw, s_ph, 0, p0, s_pw, pn, dst, 0, p0, PPA_SRM_ROTATION_ANGLE_0);   // blocking
+        if (okF) xSemaphoreTake(s_fbDone, pdMS_TO_TICKS(1000));
+        if (okF) verify2(f0, fn, p0, pn, out.mixF, out.mixP, out.mixOutside);
+        else out.fbcpyErr = ESP_FAIL;
+        // Step 4 below (CPU copy) leaves the buffer holding the newest frame.
+    }
+
+    // 4. CPU: drop any cached lines of the source (the PPA wrote it behind the
+    //    CPU's back), copy, then write the destination back to memory - the
+    //    same end state as a DMA copy.
+    esp_cache_msync((void *)src, bytes, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+    t = esp_timer_get_time();
+    for (int i = 0; i < reps; i++) {
+        memcpy(dst, src, bytes);
+        esp_cache_msync(dst, bytes, ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_INVALIDATE);
+    }
+    out.cpuUs = (esp_timer_get_time() - t) / reps;
+    return true;
+}
 
 } // namespace LVGL_Flush
 

@@ -12,6 +12,7 @@
 // branch for the other.
 //
 #include <lvgl.h>
+#include <esp_err.h>
 #include <esp_heap_caps.h>
 #include "BoardDisplay.h"
 #include "LVGL_Startup.h"
@@ -46,6 +47,44 @@ const void *shownFrameBuffer(uint32_t &w, uint32_t &h);
 // frame-complete interrupt. Two readings over a known time give the refresh
 // rate the panel is REALLY running at, not the one its timing implies.
 uint32_t panelFramesScanned();
+
+// GET /bench?what=copy: how fast each engine copies frame-buffer memory on
+// this board, PSRAM to PSRAM - the question behind the PPA's unexplained
+// ~110 MB/s (display-stack.md s8.5) and whether esp_async_fbcpy would make
+// a better repair engine. Averages of `reps` runs, microseconds. LVGL thread
+// only; uses the free frame buffer and leaves it holding the newest frame.
+struct CopyBench {
+    uint32_t  frameBytes = 0;     // one whole frame
+    uint32_t  rotBytes   = 0;     // the square block the rotation test moves
+    int64_t   ppaCopyUs  = 0;     // PPA, angle 0, whole frame
+    int64_t   ppaRotUs   = 0;     // PPA, this board's rotation angle (90 if 0), square block
+    int64_t   fbcpyUs    = 0;     // esp_async_fbcpy (DMA2D), whole frame
+    int64_t   cpuUs      = 0;     // memcpy + cache write-back, whole frame
+    esp_err_t fbcpyErr   = ESP_OK;
+    // Correctness of esp_async_fbcpy, checked by the CPU against the source
+    // after the destination was cleared: the whole frame, then one band of
+    // rows (bandY, bandH) alone. -1 = no bad pixel. bandOutside counts pixels
+    // OUTSIDE the band that the band copy changed (it must change none).
+    uint32_t  fullBad = 0;   int32_t fullFirstBadRow = -1;
+    uint32_t  bandBad = 0;   int32_t bandFirstBadRow = -1;
+    uint32_t  bandOutside = 0;
+    int32_t   bandY = 0, bandH = 0;
+    // The same check for rectangles inside that band with odd and even
+    // x/width: {x, w, bad pixels inside, changed pixels outside}.
+    static constexpr uint8_t RECTS = 6;
+    struct RectCheck { int32_t x, w; uint32_t bad, outside; };
+    RectCheck rects[RECTS] = {};
+    // Concurrency, checked the same way: two esp_async_fbcpy copies on two
+    // handles at once (rows 0-199 and 600-799), and one alongside a PPA copy
+    // (fbcpy rows 0-399, PPA rows 800-1199, clamped to the frame). Bad pixels
+    // inside each range; changed pixels outside both. NOTE the dual test
+    // passes only because both copies START at once: a copy that has to QUEUE
+    // behind another is corrupted (esp_async_fbcpy_priv.h) - this test cannot
+    // show that, the flush's verify (what=verify) did.
+    uint32_t  dualA = 0, dualB = 0, dualOutside = 0;
+    uint32_t  mixF = 0, mixP = 0, mixOutside = 0;
+};
+bool copyBench(CopyBench &out, int reps);
 #endif
 
 } // namespace LVGL_Flush

@@ -15,6 +15,16 @@
 //                 is shown for it; `tasks` is not available)
 //          page - change page n times as a left swipe does, timing each
 //                 rebuild and recording every frame after it, unforced
+//          copy - (esp_lcd) how fast the PPA, the DMA2D copier and the CPU
+//                 move frame-buffer memory, and whether the copier's result
+//                 is right; n = repetitions, 1-10
+//          verify - (esp_lcd + screenshot) n checks, 1-100, each comparing
+//                 LVGL's render with the panel's frame buffer in one instant;
+//                 act=none|anim|page is done between checks, gap=ms of
+//                 ordinary frames after it (default 250). Any "bad" pixel is
+//                 a flush error
+//   gap    what=verify only, see above
+//   act    what=verify only, see above
 //   page   swipe-order index to measure on (default: the page showing)
 //   deck   0 or 1: deck hidden or shown (default: as it is)
 //   keep   1: stay on that page/deck afterwards (scripts/bench.py uses it to

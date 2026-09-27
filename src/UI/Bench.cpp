@@ -36,6 +36,7 @@
 #ifdef ENABLE_BENCH
 
 #include "UI/Bench.h"
+#include "UI/Screenshot.h"    // verifyFrameBuffer(), for what=verify
 #include "HttpServer.h"
 #include "GUIManager.h"
 #include "LVGL_Startup.h"
@@ -91,7 +92,7 @@ std::atomic<int>  s_state{ST_IDLE};
 SemaphoreHandle_t s_done = nullptr;
 GUIManager       *s_gui  = nullptr;
 
-enum class What : uint8_t { WHAT_FULL, WHAT_CARD, WHAT_ANIM, WHAT_PAGE };
+enum class What : uint8_t { WHAT_FULL, WHAT_CARD, WHAT_ANIM, WHAT_PAGE, WHAT_COPY, WHAT_VERIFY };
 
 // anim and page both record real frames over several loop()s; they differ
 // only in what starts each episode (a panel tap, or a page change).
@@ -104,6 +105,8 @@ struct Request {
     int  deck = -1;
     bool keep = false; // stay on the measured page/deck, so a screenshot can follow
     bool tasks = false; // report CPU time per FreeRTOS task over the measured frames
+    uint8_t  act = 0;   // what=verify: 0 nothing, 1 swap deck panels, 2 change page, between checks
+    uint16_t gapMs = 250; // what=verify: ordinary loop() time after each action, before the next check
 };
 
 struct Agg {
@@ -151,6 +154,21 @@ struct Result {
     // what=page: how long each page change's rebuild (goToPage) took, before
     // any drawing - destroying the old page's widgets and creating the new.
     int32_t     buildUs[ANIM_N_MAX] = {};
+
+#ifdef DISPLAY_ESPLCD
+    // what=copy: raw copy speeds (LVGL_Flush::copyBench).
+    LVGL_Flush::CopyBench copyRun;
+#endif
+#if defined(DISPLAY_ESPLCD) && defined(ENABLE_SCREENSHOT)
+    // what=verify: Screenshot::verifyFrameBuffer() per check.
+    static constexpr uint8_t VERIFY_MAX = 100;
+    uint16_t verifyBad[VERIFY_MAX] = {};   // differing pixels, per check (saturates)
+    uint8_t  verifyRuns = 0, verifyFailed = 0;
+    uint32_t verifyNearMax = 0;             // most rounding-only pixels in one check
+    uint32_t verifyWorst = 0;
+    int8_t   verifyWorstAt = -1;
+    int32_t  verifyBox[4] = {0, 0, -1, -1};   // worst check's logical box
+#endif
 
     // esp_lcd only: frames the panel scanned across the measured window, and
     // how long that window was - the refresh rate it really ran at.
@@ -245,7 +263,7 @@ void taskUsage(Result &r, const TaskSnap &a, const TaskSnap &b, uint32_t windowU
 }
 
 // Run phases, owned by service().
-enum class Phase : uint8_t { PH_START, PH_SETTLE, PH_ANIM_PREP, PH_ANIM_REC };
+enum class Phase : uint8_t { PH_START, PH_SETTLE, PH_ANIM_PREP, PH_ANIM_REC, PH_VERIFY };
 Phase    s_phase     = Phase::PH_START;
 uint32_t s_settleEnd = 0;
 uint32_t s_settleAt  = 0;
@@ -466,7 +484,9 @@ void animStop() {
 // keep it, and hand the result to the waiting handler.
 void finish() {
     if (!s_res.req.keep) {
-        if (s_res.req.what == What::WHAT_ANIM && s_panelA) {
+        const bool swapped = s_res.req.what == What::WHAT_ANIM ||
+                             (s_res.req.what == What::WHAT_VERIFY && s_res.req.act == 1);
+        if (swapped && s_panelA) {
             lv_obj_t *open = UIToolkit::getActiveAccordionPanel();
             if (open != s_origOpen) {
                 if (s_origOpen) tapPanel(s_origOpen);
@@ -478,6 +498,35 @@ void finish() {
     s_state.store(ST_DONE);
     xSemaphoreGive(s_done);
 }
+
+#if defined(DISPLAY_ESPLCD) && defined(ENABLE_SCREENSHOT)
+// what=verify: one check now (Screenshot::verifyFrameBuffer - LVGL's render
+// against the panel's frame buffer, in one instant); then the action, and
+// ordinary loop()s for gapMs until the next. After n checks, finish() puts
+// the board back as found.
+void verifyStep() {
+    Result &r = s_res;
+    Screenshot::VerifyResult v;
+    const uint8_t i = r.verifyRuns;
+    if (Screenshot::verifyFrameBuffer(v)) {
+        if (i < Result::VERIFY_MAX) r.verifyBad[i] = v.bad > 65535 ? 65535 : (uint16_t)v.bad;
+        if (v.near > r.verifyNearMax) r.verifyNearMax = v.near;
+        if (v.bad > r.verifyWorst) {
+            r.verifyWorst   = v.bad;
+            r.verifyWorstAt = (int8_t)i;
+            r.verifyBox[0] = v.x1; r.verifyBox[1] = v.y1; r.verifyBox[2] = v.x2; r.verifyBox[3] = v.y2;
+        }
+    } else {
+        r.verifyFailed++;
+    }
+    r.verifyRuns++;
+    s_swap++;
+    if (s_swap >= r.req.n) { finish(); return; }
+    if (r.req.act == 1 && s_panelA && s_panelB) tapPanel((s_swap % 2) ? s_panelB : s_panelA);
+    else if (r.req.act == 2) s_gui->nextPage();
+    s_settleEnd = millis() + r.req.gapMs;
+}
+#endif
 
 // --= HTTP server task =--
 
@@ -558,13 +607,60 @@ size_t buildJson() {
     }
     const char *what = r.req.what == What::WHAT_CARD ? "card"
                      : r.req.what == What::WHAT_ANIM ? "anim"
-                     : r.req.what == What::WHAT_PAGE ? "page" : "full";
+                     : r.req.what == What::WHAT_PAGE ? "page"
+                     : r.req.what == What::WHAT_COPY ? "copy"
+                     : r.req.what == What::WHAT_VERIFY ? "verify" : "full";
     o.add("\"scenario\":{\"what\":\"%s\",\"page\":%u,\"page_slug\":\"%s\",\"scheme\":\"%s\",\"deck\":%s,\"n\":%d,\"settled_ms\":%lu},",
           what, (unsigned)r.page, r.pageSlug,
           r.scheme ? r.scheme : "", r.deck ? "true" : "false", n, (unsigned long)r.settledMs);
     o.add("\"was\":{\"page\":%u,\"deck\":%s,\"restored\":%s},\"page_count\":%u,",
           (unsigned)r.wasPage, r.wasDeck ? "true" : "false", r.req.keep ? "false" : "true",
           (unsigned)s_gui->pageCount());
+#if defined(DISPLAY_ESPLCD) && defined(ENABLE_SCREENSHOT)
+    if (r.req.what == What::WHAT_VERIFY) {
+        // Pixels that differ between LVGL's render and the panel's frame
+        // buffer, per check; 0 everywhere = the flush put exactly the right
+        // picture on the glass every time.
+        uint16_t badChecks = 0;
+        for (uint8_t i = 0; i < r.verifyRuns && i < Result::VERIFY_MAX; i++) if (r.verifyBad[i]) badChecks++;
+        o.add("\"verify\":{\"checks\":%u,\"act\":\"%s\",\"gap_ms\":%u,\"failed\":%u,\"bad_checks\":%u,"
+              "\"near_max\":%lu,\"worst_px\":%lu,\"worst_at\":%d,\"worst_box\":[%ld,%ld,%ld,%ld],\"bad\":[",
+              (unsigned)r.verifyRuns, r.req.act == 1 ? "anim" : r.req.act == 2 ? "page" : "none",
+              (unsigned)r.req.gapMs, (unsigned)r.verifyFailed, (unsigned)badChecks,
+              (unsigned long)r.verifyNearMax,
+              (unsigned long)r.verifyWorst, (int)r.verifyWorstAt,
+              (long)r.verifyBox[0], (long)r.verifyBox[1], (long)r.verifyBox[2], (long)r.verifyBox[3]);
+        for (uint8_t i = 0; i < r.verifyRuns && i < Result::VERIFY_MAX; i++) {
+            o.add("%s%u", i ? "," : "", (unsigned)r.verifyBad[i]);
+        }
+        o.add("]},");
+    } else
+#endif
+#ifdef DISPLAY_ESPLCD
+    if (r.req.what == What::WHAT_COPY) {
+        // Microseconds per copy, averaged over n; bytes moved by each.
+        const LVGL_Flush::CopyBench &c = r.copyRun;
+        o.add("\"copy\":{\"reps\":%d,\"frame_bytes\":%lu,\"rot_bytes\":%lu,\"ppa_copy_us\":%lld,"
+              "\"ppa_rot_us\":%lld,\"fbcpy_us\":%lld,\"fbcpy_err\":%d,\"cpu_us\":%lld},",
+              n, (unsigned long)c.frameBytes, (unsigned long)c.rotBytes, (long long)c.ppaCopyUs,
+              (long long)c.ppaRotUs, (long long)c.fbcpyUs, (int)c.fbcpyErr, (long long)c.cpuUs);
+        o.add("\"fbcpy_check\":{\"full_bad\":%lu,\"full_first_bad_row\":%ld,\"band_y\":%ld,\"band_h\":%ld,"
+              "\"band_bad\":%lu,\"band_first_bad_row\":%ld,\"band_outside\":%lu},",
+              (unsigned long)c.fullBad, (long)c.fullFirstBadRow, (long)c.bandY, (long)c.bandH,
+              (unsigned long)c.bandBad, (long)c.bandFirstBadRow, (unsigned long)c.bandOutside);
+        o.add("\"fbcpy_concurrent\":{\"dual_a_bad\":%lu,\"dual_b_bad\":%lu,\"dual_outside\":%lu,"
+              "\"mix_fbcpy_bad\":%lu,\"mix_ppa_bad\":%lu,\"mix_outside\":%lu},",
+              (unsigned long)c.dualA, (unsigned long)c.dualB, (unsigned long)c.dualOutside,
+              (unsigned long)c.mixF, (unsigned long)c.mixP, (unsigned long)c.mixOutside);
+        o.add("\"fbcpy_rects\":[");
+        for (uint8_t k = 0; k < LVGL_Flush::CopyBench::RECTS; k++) {
+            const LVGL_Flush::CopyBench::RectCheck &rc = c.rects[k];
+            o.add("%s{\"x\":%ld,\"w\":%ld,\"bad\":%lu,\"outside\":%lu}", k ? "," : "",
+                  (long)rc.x, (long)rc.w, (unsigned long)rc.bad, (unsigned long)rc.outside);
+        }
+        o.add("],");
+    } else
+#endif
     if (recordsFrames(r.req.what)) {
         // n episodes (panel swaps, or page changes); one row per frame drawn,
         // in `cols` order. render is not sent: it is total - copy - present -
@@ -633,7 +729,36 @@ const char *parseQuery(httpd_req_t *req, Request &q) {
         else if (!strcmp(v, "card")) q.what = What::WHAT_CARD;
         else if (!strcmp(v, "anim")) q.what = What::WHAT_ANIM;
         else if (!strcmp(v, "page")) q.what = What::WHAT_PAGE;
-        else return "what must be full, card, anim or page";
+        else if (!strcmp(v, "copy")) q.what = What::WHAT_COPY;
+        else if (!strcmp(v, "verify")) q.what = What::WHAT_VERIFY;
+        else return "what must be full, card, anim, page, copy or verify";
+    }
+    if (q.what == What::WHAT_VERIFY) {
+#if !(defined(DISPLAY_ESPLCD) && defined(ENABLE_SCREENSHOT))
+        return "verify needs the esp_lcd display path and ENABLE_SCREENSHOT";
+#endif
+        if (httpd_query_key_value(s, "act", v, sizeof(v)) == ESP_OK) {
+            if      (!strcmp(v, "none")) q.act = 0;
+            else if (!strcmp(v, "anim")) q.act = 1;
+            else if (!strcmp(v, "page")) q.act = 2;
+            else return "act must be none, anim or page";
+        }
+        if (httpd_query_key_value(s, "gap", v, sizeof(v)) == ESP_OK) {
+            const int g = atoi(v);
+            if (g < 20 || g > 3000) return "gap must be 20-3000 ms";
+            q.gapMs = (uint16_t)g;
+        }
+    }
+    if (q.what == What::WHAT_COPY) {
+#ifndef DISPLAY_ESPLCD
+        return "copy needs the esp_lcd display path";
+#endif
+        q.n = 3;
+        if (httpd_query_key_value(s, "n", v, sizeof(v)) == ESP_OK) {
+            q.n = atoi(v);
+            if (q.n < 1 || q.n > 10) return "for copy, n counts repetitions: 1-10";
+        }
+        return nullptr;   // page, deck, keep and tasks mean nothing here
     }
     const bool anim = q.what == What::WHAT_ANIM;
     const bool rec  = recordsFrames(q.what);
@@ -661,6 +786,13 @@ const char *parseQuery(httpd_req_t *req, Request &q) {
         if (q.tasks)     return "tasks is not available with anim";
     }
     if (q.what == What::WHAT_PAGE && q.tasks) return "tasks is not available with page";
+    if (q.what == What::WHAT_VERIFY) {
+        if (q.tasks) return "tasks is not available with verify";
+        if (q.act == 1) {                        // swapping panels needs the deck on screen
+            if (q.deck == 0) return "act=anim swaps the deck's panels: deck must be shown";
+            q.deck = 1;
+        }
+    }
     return nullptr;
 }
 
@@ -708,6 +840,14 @@ esp_err_t handleBench(httpd_req_t *req) {
                           (unsigned)s_res.page, n, (unsigned)s_res.frames,
                           (long long)s_res.worstFrameUs, (long long)s_res.worstGapUs,
                           s_res.dropped ? " (frames dropped from the record)" : "");
+#ifdef DISPLAY_ESPLCD
+        } else if (s_res.req.what == What::WHAT_COPY) {
+            const LVGL_Flush::CopyBench &c = s_res.copyRun;
+            Serial.printf("[Bench] copy n=%d | frame %lu B: ppa %lld us, fbcpy %lld us (err %d), cpu %lld us"
+                          " | rotate %lu B: %lld us\n", n, (unsigned long)c.frameBytes,
+                          (long long)c.ppaCopyUs, (long long)c.fbcpyUs, (int)c.fbcpyErr,
+                          (long long)c.cpuUs, (unsigned long)c.rotBytes, (long long)c.ppaRotUs);
+#endif
         } else {
             Serial.printf("[Bench] %s p%u%s n=%d | total %lld us: render %lld, copy %lld, present %lld, wait %lld | %.1f chunks\n",
                           s_res.req.what == What::WHAT_CARD ? "card" : "full", (unsigned)s_res.page,
@@ -780,6 +920,12 @@ void service() {
             finish();
             return;
         }
+#if defined(DISPLAY_ESPLCD) && defined(ENABLE_SCREENSHOT)
+        if (s_phase == Phase::PH_VERIFY) {
+            verifyStep();   // one check, then the action; finishes after n
+            return;
+        }
+#endif
     } else {
         return;
     }
@@ -797,6 +943,27 @@ void service() {
         s_settleEnd = millis() + ANIM_PREP_MS;
         return;
     }
+#ifdef DISPLAY_ESPLCD
+    if (s_res.req.what == What::WHAT_COPY) {
+        if (!LVGL_Flush::copyBench(s_res.copyRun, s_res.req.n)) s_res.error = "copy bench not possible right now";
+        finish();
+        return;
+    }
+#endif
+#if defined(DISPLAY_ESPLCD) && defined(ENABLE_SCREENSHOT)
+    if (s_res.req.what == What::WHAT_VERIFY) {
+        s_res.page     = s_gui->currentPage();
+        s_res.pageSlug = s_gui->currentPageSlug();
+        s_res.scheme   = UI::pal().name;
+        s_res.deck     = s_gui->deckShown();
+        s_panelA = s_gui->deckPanel(0);
+        s_panelB = s_gui->deckPanel(1);
+        s_swap   = 0;
+        s_phase  = Phase::PH_VERIFY;
+        verifyStep();   // the first check straight away
+        return;
+    }
+#endif
     measure();
     finish();
 }
