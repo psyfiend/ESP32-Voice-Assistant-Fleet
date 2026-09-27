@@ -143,6 +143,26 @@ scripts/screenshot.py <4B's address>`.
 > frame 108 ms on P4_5, 74 ms on the 4B (full-screen redraws, as expected). **All eight
 > environments compile** with every change on the branch (39 min).
 
+### The DMA2D repair copier (2026-09-26) - `display-stack.md` §8.10
+
+Repairs (bringing a buffer up to date before drawing into it) now use ESP-IDF's DMA2D copier, 3x
+faster than the PPA. Verified on the device by `/bench?what=verify` (280 checks per board, 0 bad
+pixels). What you might notice: the second or so right after a page swipe is snappier - the frames
+that follow a swipe were paying ~43 ms (P4_5) / ~24 ms (4B) each and now ~14 / ~8. Everything else
+should feel the same.
+
+> **Soak with the copier, 2026-09-26: PASS.** 40 minutes on both boards, the soak cycle plus
+> on-device verification (deck swaps mid-animation, page changes): 348 runs each, 0 failures,
+> 0 reboots, **430 verify checks per board, 0 bad pixels**. Worst single frame 94 ms (P4_5, was 108)
+> and 62.5 ms (4B, was 74). All eight environments compile.
+
+**T3-7 — After a swipe.** Swipe to the other page and immediately open a deck panel, or tap a card.
+- PASS: responds at least as fast as before; no leftover fragments anywhere, especially near the top
+  (where the page toast appears) and the header's right-hand icons.
+
+**For checking the flush yourself:** `http://<board>/bench?what=verify&n=40&act=anim&gap=100` -
+`bad_checks` must be 0 (`near` pixels are overlay rounding, not errors).
+
 ### After the sweep (2026-09-26, owner away) - what is flashed now, and what needs eyes
 
 Both boards: `DEBUG_CARDS` off (page swipes ~90 ms quicker, `display-stack.md` §8.9). 4B: rotation

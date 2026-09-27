@@ -494,6 +494,56 @@ rebuild further over serial. P4_5 esp_lcd, page 0 <-> 1, ms:
   Cheaper per-card work (7.5 ms build + 8 ms layout per card is a lot for this CPU) is the other
   lever; not investigated yet.
 
+### 8.10 The DMA2D copier (`esp_async_fbcpy`) - step 2's "choice C", tried 2026-09-26
+
+`esplcd-step2.md` §7 C: repairs by PPA first, "maybe we could try both". Our `libesp_lcd.a` contains
+`esp_async_fbcpy` but IDF keeps its header private, so `src/esp_async_fbcpy_priv.h` carries the
+declarations verbatim from ESP-IDF **2553c5ad432**, the exact commit our rebuilt libraries report.
+
+**Raw speed** (`/bench?what=copy`, PSRAM to PSRAM, whole frame unless noted):
+
+| MB/s | PPA copy | PPA rotate | CPU `memcpy` | **DMA2D copier** |
+|---|---|---|---|---|
+| `WS_P4_5` (1280x720) | 44 | 44 | 42 | **138** |
+| `WS_P4_4B` (720x720) | 49 | 49 | 46 | **151** |
+
+**This answers §8.5's open question.** The PPA engine itself moves ~45-50 MB/s, rotating or not. The
+same memory copies 3x faster through plain DMA2D, so it is neither PSRAM nor the 64-byte L2 line of
+the #49 fix: it is the PPA. The copier's results were checked by the CPU (whole frame, a band at rows
+1118-1165, odd and even offsets and widths, two at once, one beside a PPA copy): all exact.
+
+**A bug in `esp_async_fbcpy`, found on the way.** The first version ran repairs on a pool of 16
+handles and put stale pixels on `WS_P4_5` (the 4B happened not to show it). `esp_async_fbcpy()`
+hands the DMA2D driver a pointer to one `static dma2d_trans_config_t` shared by every handle, and the
+driver reads it only when a queued job starts - by which time later calls have overwritten it. Queued
+copies ran with the last caller's handle: some pieces twice, some never. Two copies that start at
+once survive, which is why the two-copy check passed. **Rule: at most one copier job outstanding in
+the whole program.** Repairs now go on a list that one worker task on core 0 (idle: §8.3) copies in
+order on one handle, still alongside the PPA's strip rotations; `endFrame()` waits for the list.
+
+**Correctness, measured with a new instrument.** `/bench?what=verify` flushes everything, then
+compares LVGL's render with the panel's frame buffer *in the same instant* on the device, so nothing
+can change in between (the old two-request comparison could not tell a stale buffer from a value
+ticking between captures). Differences of 1-2 colour steps are counted as "near": the verifier blends
+translucent overlays (toast, perf monitor) at 8 bits and the panel at 565. **280 checks per board -
+idle, mid-animation, after animations, across page changes: 0 bad pixels on both.** The only "near"
+pixels were the page toast.
+
+**What it buys:**
+
+| | P4_5 before / after | 4B before / after |
+|---|---|---|
+| each of the ~2 frames after a page change (whole-frame repair) | 43 / **14 ms** | 24 / **7.7 ms** |
+| deck swap frame | 32.6 / 32.0 | 17.3 / 17.6 |
+| worst swap interval | 44.7 / 40.7 | 34.0 / 34.0 |
+| full screen | 85.0 / 84.5 | 52.1 / 51.1 |
+
+Everyday frames barely move - after §8.6 the repair was already small, and drawing is the limit. The
+win is the ~60 ms (P4_5) / ~33 ms (4B) that used to follow every page change: step 2's "known cost"
+(TEST_2.9) is gone. **Not done:** the 4B's strips (rotation 0) could use the copier too instead of the
+PPA; they already overlap drawing, so the gain would be a few ms on full frames, at the price of
+running strips through the one-job worker. Not worth it yet.
+
 ## 9. Open questions
 
 - **STEP 2 RISK, found 2026-09-25: a known PPA freeze matches P4_5's exact configuration.**

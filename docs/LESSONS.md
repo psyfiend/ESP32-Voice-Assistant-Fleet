@@ -284,6 +284,19 @@ anywhere after a page's cards are created - `Panel_Header::setPage()` measuring 
 it quietly does the entire page's layout, and a profile charges ~115 ms to "the header". Time the
 layout on its own (`DEBUG_PAGE_TIMING` does) before blaming the caller.
 
+**A test of the parts does not test the use.** 2026-09-26, `esp_async_fbcpy`. Every isolated check
+passed - whole frame, odd widths, high rows, two copies at once, one beside the PPA - and the flush
+still put stale pixels on the glass, because the flush QUEUED copies and none of the checks did. The
+cause was in Espressif's code (one `static` config shared by every handle, read when a queued job
+starts). What found it: reading the vendor source after the fourth clean isolated test, and then an
+instrument that checks the real thing - `/bench?what=verify` compares LVGL's render with the frame
+buffer in one instant on the device. **When the parts pass and the whole fails, stop testing parts:
+test the whole the way it runs, and read the source of whatever it hands work to.**
+
+**A comparison that takes two snapshots at two times cannot judge a moving picture.** The PC-side
+`fbcompare.py` took the render and the frame buffer ~1.5 s apart, so a ticking value or a fading toast
+looked exactly like a stale buffer. Capture both in the same instant, or the result is noise.
+
 ## LVGL, from milestone 2.4
 
 **An out-of-range grid row is a hard freeze, not a wrong layout.** `lv_conf.h` defines

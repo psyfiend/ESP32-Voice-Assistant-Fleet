@@ -48,6 +48,12 @@ drivers, Claude memory); if a P4 drops WiFi, first check the rebuilt `esp32p4_es
    `DEBUG_CARDS` was ~90 ms of every swipe - off in `[P4-options]` now; the rest is building and
    laying out ~15 cards, ~115 ms each half). The 7B and CYD_P4_1060 drivers (EK79007, JD9165) are
    vendored and compile; **neither board runs them** - one line each, with the board on the desk.
+   **Then (same day): the System Doctor reports versions and silicon** (P4_5 rev v1.3, 4B rev v1.0;
+   rebuilt libs are IDF `v5.5.5-832-g2553c5ad432`), **and repairs moved to the DMA2D copier**
+   (`esp_async_fbcpy`, §8.10): 3x the PPA's speed, the frames after a page swipe 43 -> 14 ms on
+   P4_5. It exposed a bug in Espressif's copier (one static config for every handle): **never more
+   than one copier job outstanding** - `esp_async_fbcpy_priv.h`. New instrument:
+   `/bench?what=verify` checks the panel's buffer against LVGL's render on the device.
 1. **The P4_5 animation stutter** (owner, 2026-09-26): opening one deck panel while the other closes
    stutters slightly on P4_5, while the 7B and 4B stay smooth. Not tearing - frames are late. The
    leading theory, unmeasured: P4_5 draws 1.5x the 7B's pixels at 1.73x UI scale, so a two-panel
