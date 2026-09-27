@@ -118,6 +118,11 @@ description is 2.11's. Its header of promoted values (the area's temperature and
   web-UI (Phase 4) job, not an on-glass one. On the board: long press on the area card's header opens
   the area's own window (members, area colour, area settings).
 
+> **Owner, 2026-09-27: the deck is not part of the default dashboard view** (a throwback to his
+> first design). Where it may reappear - inside popups and detail views, or on room pages reached by
+> a route rather than a swipe - is an open question (`interview-phase2-3.md` §5). Nothing in this
+> blueprint depends on the deck; device-wide settings live in the system panel at the top.
+
 ## 7. Behaviour while the window is open (easy to forget)
 
 - **Modal**: page swipes, edge gestures and the header peek are off; the deck scrim rule applies
@@ -149,7 +154,7 @@ description is 2.11's. Its header of promoted values (the area's temperature and
 | **2.10d** | Stable card ids + saving settings (with the flash-glitch test) | anywhere |
 | **2.10e** | Graph / Activity: HA statistics and history, the local ring, clock | home for HA data |
 | 2.8 -> 2.11 | Header slots, then area and aggregate cards with their windows | - |
-| 4.4 | Deck panels declared per page (mechanism B), built from the same rows | - |
+| 4.4 | Context panels (mechanism B) - wherever the deck is repurposed, if at all (`interview-phase2-3.md` §5) - built from the same rows | - |
 
 ## 10. Decisions
 

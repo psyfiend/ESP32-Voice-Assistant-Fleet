@@ -12,8 +12,11 @@ owner's brain dump on card popups (`card-sheet.md`). **It does not reopen decisi
 
 ### 0.1 Format
 
-- **Sessions by section**, in the order below; one sitting per section is plenty. The owner answers
-  in any form - a sentence, a sketch, a screenshot of something he likes, "your call".
+- **Facilitated by Claude**: one section per sitting, in the order below. Claude asks a few
+  questions at a time in chat, shows a mock or screenshot where the question is about looks, pushes
+  back where it sees a problem, and writes the answers into the named design doc. The owner answers
+  in any form - a sentence, a sketch, a screenshot of something he likes, "your call". Answers
+  jotted straight into this file between sessions are picked up too.
 - **Every question has a recommendation** where Claude has one. "Go with the recommendation" is a
   valid answer, and a fast one.
 - Questions marked **[BLOCKING x.y]** must be answered before milestone x.y starts; the rest can wait
@@ -119,16 +122,33 @@ card's header (`cards.md` §8).
    page? How does "back" work - a header back button, a swipe, or both?
 9. **Area colour**: per area, set once, used by every card in it (`card-sheet.md` §5.4) - agreed?
 
-## 5. The deck and context panels (towards 4.4)  → `docs/design/context-panels.md`
+## 5. Edge gestures, the system panel, and what becomes of the deck  → `docs/design/context-panels.md`
 
-1. **Is the deck still wanted as a permanent strip**, or only on demand (swipe up)? On which boards?
-2. **Per-page decks** (`card-sheet.md` §7): House -> "Lights" (all off, scenes) + "Climate"; Fleet ->
-   System + Display. What would each of your real pages want there?
-3. **Audio and Display panels** (today's deck): developer tools. Move them to Settings (4.1) when
-   per-page decks arrive? **Rec:** yes.
-4. **Scenes and scripts**: should the deck (or a card type) run HA scenes/scripts? That is a new
-   outbound call type.
-5. **Width**: two panels side by side today. More, fewer, or one full-width with tabs?
+**Owner's direction, 2026-09-27 - the working assumption until decided otherwise:**
+- **The deck is NOT part of the default dashboard view.** It is a throwback to the owner's first
+  design, a year old; it stays in code because it may be worth repurposing - inside popups or detail
+  views, or on targeted "room" pages reached by a specific route rather than by swiping pages.
+- **Device-wide settings and anything affecting the whole dashboard come from a system panel at the
+  top**, in keeping with the traditional layout (today's System drawer).
+- **Edge swipes become shortcuts**: at least **two swipe-up** targets and **swipe-down** targets,
+  one of which stays fixed to the system panel / settings. (2.6 already moved the edge gestures into
+  a target table, so targets are data, not code.)
+
+Questions:
+1. **Which edge gestures, and which are fixed?** Today: down-right = drawer, down-left = log, up =
+   deck. Proposed: down = system panel (fixed); up-left / up-right = two assignable shortcuts.
+   Should the down swipe keep a second target (the log), or is that a system-panel button?
+2. **What can a shortcut target be?** A page (including hidden room pages), the overview, a popup of
+   one entity (e.g. the front door camera, the thermostat), a scene, a "quick controls" sheet?
+3. **Per page or per device?** Can a room page have its own swipe-up targets?
+4. **The deck's future**: which of its three possible homes is worth pursuing - inside popups
+   (e.g. a light's extra controls), on room pages (a strip of room controls), or retire it once
+   Audio/Display move into Settings (4.1)?
+5. **Audio and Display panels** (today's deck contents, developer tools): into the system panel /
+   Settings now? **Rec:** yes, when 4.1 starts.
+6. **Scenes and scripts**: runnable from a shortcut or a card? That is a new outbound call type.
+7. **The system panel itself**: what belongs on it (brightness, scheme, page settings, device
+   info, the knobs), and does it grow into Settings pages (4.1) or stay one drawer?
 
 ## 6. Pages and navigation (rest of 2.6's scope, 4.2/4.3)  → `docs/design/pages.md`
 
