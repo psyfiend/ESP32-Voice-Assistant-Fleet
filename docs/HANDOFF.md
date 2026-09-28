@@ -1,4 +1,4 @@
-# Handoff — 2026-09-25
+# Handoff — 2026-09-27 (end of the laptop weekend)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was cut from ~680 lines to this on
@@ -54,6 +54,29 @@ same as rotation 0 on the 4B. The 7B's `TouchManager` passthrough special case (
 is unverified (CLAUDE.md) and must be re-checked on the glass after the move. **CYD_P4_1060's reset
 pin** is uncertain in its BSP ("0 in schema, 27 in GFX Library, 5 in examples") - if the panel stays
 black, that is the first suspect, then reset polarity (the P4_5 lesson).
+
+**6. Order of operations from here:** (1) the desktop sync in item 5; (2) owner's sign-off, then
+merge `feat/67-bench-anim` to `main` (`--no-ff`, all-eight build first); (3) the design interview,
+§1 first; (4) 2.9 continues opportunistically - 7B and CYD_P4_1060 whenever each is on the desk,
+S3s later; (5) whatever the interview orders next (2.10a is drafted and ready to start on go).
+
+**7. NOT tested, NOT built, NOT decided - be honest about these:**
+- **7B and CYD_P4_1060 on esp_lcd**: compile and link only; no panel has ever been driven by these
+  drivers. First light is untested.
+- **`wip/phy-clk-src`**: never built (Windows blocked `pio.exe` on the laptop).
+- **S3 boards on esp_lcd**: not started (steps 4 and 5). They run Arduino_GFX, compile-checked only
+  with this branch's changes - **no S3 was flashed or run this weekend.** Same for the 7B and
+  CYD_P4_1060 on Arduino_GFX: compiled, not run.
+- **`DEBUG_CARDS` off** measured on P4_5/4B only; the 7B keeps its own explicit line; `[S3-options]`
+  untouched.
+- **Waveshare's timing on the 4B** and the **16 ms refresh** (`FLEET_LV_REFR_PERIOD`) - measured,
+  never looked at on the glass; on no board.
+- **Home Assistant with this branch**: nothing was tested against HA or MQTT all weekend (both
+  unreachable from the laptop's network) - at home, check HA and MQTT cards still update.
+- **Card popups, header slots, group cards, the build sheet**: designed or asked about, nothing
+  built. The interview has not started.
+- Unknowns flagged in the designs: wall-clock time (SNTP/TZ) on the boards; whether flash writes
+  glitch the esp_lcd panel; the HA websocket's 8 KB receive buffer vs history replies.
 
 **5. Back at the desktop after the laptop weekend.** Everything is on GitHub; no kit needed.
 - **The work is on branch `feat/67-bench-anim`, NOT merged to `main`** (it contains
