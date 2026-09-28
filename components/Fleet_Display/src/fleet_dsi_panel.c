@@ -171,11 +171,13 @@ esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, fleet_dsi_chip_t chip,
     ESP_GOTO_ON_ERROR(esp_ldo_acquire_channel(&ldo_cfg, &ldo), err, TAG, "DSI PHY LDO");
 
     // 2. The bus. phy_clk_src 0 = let IDF choose for this silicon revision,
-    //    as Waveshare's BSP does.
+    //    as Waveshare's BSP does: on our pre-rev3 build (esp32p4_es) that is
+    //    MIPI_DSI_PHY_PLLREF_CLK_SRC_DEFAULT_LEGACY = PLL_F20M
+    //    (esp_lcd_mipi_dsi_bus.c at IDF 2553c5ad432) - Arduino_GFX's choice too.
     const esp_lcd_dsi_bus_config_t bus_cfg = {
         .bus_id = 0,
         .num_data_lanes = cfg->num_lanes,
-        .phy_clk_src = 0,
+        .phy_clk_src = (mipi_dsi_phy_pllref_clock_source_t)cfg->phy_clk_src,
         .lane_bit_rate_mbps = cfg->lane_bit_rate_mbps,
     };
     ESP_GOTO_ON_ERROR(esp_lcd_new_dsi_bus(&bus_cfg, &bus), err, TAG, "DSI bus");

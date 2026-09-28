@@ -33,7 +33,10 @@ typedef struct {
     // DSI PHY power: an on-chip LDO channel and its voltage.
     int      ldo_chan;
     int      ldo_mv;
-    // Link.
+    // Link. phy_clk_src is a mipi_dsi_phy_pllref_clock_source_t value, 0 =
+    // let IDF choose (PLL_F20M on the pre-rev3 build we use, the same clock
+    // Arduino_GFX used). Fleet_Display maps the BSP's BSP_PHY_CLK_SRC_* here.
+    int      phy_clk_src;
     int      num_lanes;
     uint32_t lane_bit_rate_mbps;
     // Video timing (physical, unrotated).

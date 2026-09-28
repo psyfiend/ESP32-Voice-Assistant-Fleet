@@ -81,6 +81,16 @@ bool Fleet_Display::begin() {
     cfg.ldo_mv             = bsp_display.TEST_MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV ? bsp_display.TEST_MIPI_DSI_PHY_PWR_LDO_VOLTAGE_MV
                                                                               : DSI_PHY_LDO_MV;
     cfg.num_lanes          = bsp_display.NUM_DSI_LANES ? bsp_display.NUM_DSI_LANES : 2;
+    // DSI PHY reference clock: the BSP's code, mapped by name exactly as
+    // Arduino_ESP32DSIPanel does (CLAUDE.md: never store the enum's integers).
+    // DEFAULT and IDF_AUTO both mean "IDF chooses" = PLL_F20M on our build.
+    switch (bsp_display.PHY_CLK_SRC) {
+    case BSP_PHY_CLK_SRC_PLL_F20M: cfg.phy_clk_src = MIPI_DSI_PHY_PLLREF_CLK_SRC_PLL_F20M; break;
+    case BSP_PHY_CLK_SRC_PLL_F25M: cfg.phy_clk_src = MIPI_DSI_PHY_PLLREF_CLK_SRC_PLL_F25M; break;
+    case BSP_PHY_CLK_SRC_RC_FAST:  cfg.phy_clk_src = MIPI_DSI_PHY_PLLREF_CLK_SRC_RC_FAST;  break;
+    case BSP_PHY_CLK_SRC_XTAL:     cfg.phy_clk_src = MIPI_DSI_PHY_PLLREF_CLK_SRC_XTAL;     break;
+    default:                       cfg.phy_clk_src = 0;                                    break;
+    }
     cfg.lane_bit_rate_mbps = bsp_display.LANE_BIT_RATE;
     cfg.h_res              = _w;
     cfg.v_res              = _h;
