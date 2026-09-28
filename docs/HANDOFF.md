@@ -38,8 +38,9 @@ DSI lanes and PHY power come from their BSPs. The PHY reference clock: IDF's "0"
 PLL_F20M on our pre-rev3 build, the same as Arduino_GFX used, so both boards get the clock they rely
 on. **UNCOMMITTED in the laptop's tree:** `Fleet_Display` now also honours an explicit
 `PHY_CLK_SRC` code (no board sets one) - it could not be built because Windows began blocking
-`pio.exe` on 2026-09-27 ("An Application Control policy has blocked this file"). Build it on both
-dev boards, `/bench?what=verify`, then commit - or drop it. To move a board, with it on the desk:
+`pio.exe` on 2026-09-27 ("An Application Control policy has blocked this file"). **It is parked,
+unbuilt, on branch `wip/phy-clk-src`**: build it on both dev boards, `/bench?what=verify`, then merge
+into `feat/67-bench-anim` - or drop it. To move a board, with it on the desk:
 1. `-D DISPLAY_ESPLCD` in its environment (the committed `platformio.ini` via the blob method if on
    the laptop - see the laptop memory note; plain edit at home).
 2. Build, flash, read the boot log: `[Fleet_Display] Ready ... driver ...` and
@@ -47,11 +48,31 @@ dev boards, `/bench?what=verify`, then commit - or drop it. To move a board, wit
 3. `/bench?what=verify&n=40&act=anim&gap=100` and `act=page` - `bad_checks` must be 0.
 4. `bench.py`, `--anim`, `--page` with the flag off, then on (the before/after table).
 5. A soak (the 40-minute pattern in TEST_2.9), then the owner's glass checks (a T3-style sheet).
-Open per board: **the 7B is `ROTATION = 2` "USB on left"** - the same legacy reason the 4B had; ask
-the owner whether it goes to 0. The 7B's `TouchManager` passthrough special case (`#ifndef WS_P4_7B`)
-is unverified (CLAUDE.md) and must be re-checked at whatever rotation it runs. **CYD_P4_1060's reset
+Open per board: **the 7B STAYS at `ROTATION = 2`** (owner, 2026-09-27: its 3D-printed enclosure puts
+the USB on the left; revisit later) - on esp_lcd that is a PPA 180-degree turn, measured to cost the
+same as rotation 0 on the 4B. The 7B's `TouchManager` passthrough special case (`#ifndef WS_P4_7B`)
+is unverified (CLAUDE.md) and must be re-checked on the glass after the move. **CYD_P4_1060's reset
 pin** is uncertain in its BSP ("0 in schema, 27 in GFX Library, 5 in examples") - if the panel stays
 black, that is the first suspect, then reset polarity (the P4_5 lesson).
+
+**5. Back at the desktop after the laptop weekend.** Everything is on GitHub; no kit needed.
+- **The work is on branch `feat/67-bench-anim`, NOT merged to `main`** (it contains
+  `feat/67-step2-p45` too). `git fetch`, `git checkout feat/67-bench-anim`, `git pull`,
+  `git submodule update --init`.
+- **`platformio.ini` needs nothing:** the committed file has the desktop's `c:/Users/Marge/...`
+  paths plus every weekend change (the 4B's `DISPLAY_ESPLCD`, `DEBUG_CARDS` off in `[P4-options]`).
+  The laptop's paths were never committed (skip-worktree there). If `git status` on the desktop shows
+  `platformio.ini` modified from before the weekend, look at the diff before discarding it.
+- **Delete `.pio/build_cache`** before the first build: BSP headers and `lv_conf.h` changed, and the
+  cache serves stale objects for those (CLAUDE.md).
+- The rebuilt P4 libraries and `reference/esp-registry` are already on the desktop. **Do not copy the
+  laptop's `ConnectivityLocalSecrets.h` back** - it holds the weekend network.
+- What changes on the glass: **P4_5 and 4B run esp_lcd** (4B now rotation 0); the 7B, CYD_P4_1060
+  and all S3s build and run exactly as before (Arduino_GFX). The **S3s are not esp_lcd-ready**:
+  `Fleet_Display` drives MIPI-DSI only; RGB (steps 4) and QSPI (step 5) are not started.
+- Optional: the laptop's `bench/` folder (gitignored) holds every measurement JSON from the weekend.
+- Before merging to `main`: the owner's sign-off, then an all-eight build (last done 2026-09-27, all
+  SUCCESS), `--no-ff`.
 
 ## Remote weekend, 2026-09-26 to 28 - read this first if you are on the laptop
 
