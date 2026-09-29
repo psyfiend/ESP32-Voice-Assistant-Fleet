@@ -37,6 +37,10 @@ Updated 2026-09-08.
 | **CYD_S3_3248** Guition JC3248W535 3.5" | `CYD_S3_3248W535` | ✅ **portrait (rot 0) as of 2026-09-10** | ✅ both rotations | ✅ | ✅ | ✅ | ✅ **on current build** |
 | **CYD_S3_8048** Guition JC8048W550 5" | `CYD_S3_8048W550` | ✅ brightness slider dead | ✅ | ✅ notably quiet | ✅ | ✅ | ✅ |
 | **WS_S3_5B** ESP32-S3-Touch-LCD-5B | `WS_S3_TOUCH_LCD_5B` | ✅ visible tearing | ✅ 5 points | N/A no audio hw | N/A | ✅ | ✅ |
+| **CYD_P4_4880** Guition JC4880P443 4.3" | `CYD_P4_4880P443` | **never flashed** - BSP built 2026-09-28 from Guition's pack, compiles | never run | never run | never run | never run | never run |
+
+**2026-09-28: `CYD_S3_3248`'s USB connector broke off the PCB** (owner). Unavailable until
+repaired; it can still be powered by battery/headers and flashed over UART.
 
 **WiFi and the MQTT/HA pipeline: 8 of 8.** The fleet-wide flash pass on 2026-09-08 put the
 full stack on every board — each one joined the network, connected to the broker, published
@@ -277,6 +281,20 @@ Waveshare's own repo:
 
 Has a physical **Ethernet port** in addition to WiFi — worth testing as an alternate
 connectivity path.
+
+### CYD_P4_4880 — Guition P4 4.3" portrait (JC4880P443C_I_W)
+
+**Added 2026-09-28, never flashed.** The owner's intended successor to `CYD_S3_3248` as the
+small portrait board: native 480x800, 217 PPI (UI scale 1.28), ST7701 over 2-lane MIPI-DSI,
+esp_lcd only. Everything in its BSP came from `reference/Guition Examples/Guition-P4-JC4880P433/`
+(folder misnamed P433; the contents are the P443) - the schematic for pins, Guition's modified
+IDF BSP and ST7701 driver for the panel. **Guition's own two examples disagree** on three things,
+and the BSP keeps both values: pixel clock 28 MHz (IDF, 49.8 Hz) vs 34 MHz (Arduino, 60.5 Hz);
+lane rate 750 vs 500 Mbps; panel reset none (IDF) vs GPIO5 (Arduino - and the schematic routes
+GPIO5 to the panel connector, so the BSP uses 5). Also on the board, not yet in the BSP: an
+**OV02C10 camera** on MIPI-CSI, **RS485**, and RMII Ethernet pins on the schematic (whether a PHY
+is fitted on the C_I_W variant is unconfirmed). ES8311 only - the schematic's "ES7210_SDOUT" net
+is the ES8311's own mic output. Battery on GPIO53 through a 68K/100K divider.
 
 ### CYD_S3_8048 — Guition 5" (JC8048W550)
 

@@ -22,6 +22,8 @@
     #define FLEET_BOARD_SLUG "ws-s3-4b"
 #elif defined(CYD_P4_1060)
     #define FLEET_BOARD_SLUG "cyd-p4-1060"
+#elif defined(CYD_P4_4880)
+    #define FLEET_BOARD_SLUG "cyd-p4-4880"
 #elif defined(CYD_S3_3248)
     #define FLEET_BOARD_SLUG "cyd-s3-3248"
 #elif defined(CYD_S3_8048)

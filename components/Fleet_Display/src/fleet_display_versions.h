@@ -27,6 +27,12 @@
 #define ESP_LCD_EK79007_VER_MINOR 0
 #define ESP_LCD_EK79007_VER_PATCH 2
 
+// espressif/esp_lcd_st7701 - CYD_P4_4880 (JC4880P443; vendored 2026-09-28, never run).
+// Also WS_S3_4B's panel, over RGB, at 2.9 step 4.
+#define ESP_LCD_ST7701_VER_MAJOR  2
+#define ESP_LCD_ST7701_VER_MINOR  0
+#define ESP_LCD_ST7701_VER_PATCH  2
+
 // espressif/esp_lcd_jd9165 - CYD_P4_1060 (vendored, never run)
 #define ESP_LCD_JD9165_VER_MAJOR  2
 #define ESP_LCD_JD9165_VER_MINOR  0

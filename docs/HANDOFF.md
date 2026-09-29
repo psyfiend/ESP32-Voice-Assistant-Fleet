@@ -40,6 +40,14 @@ not appear in the source as suspect.
 - `scripts/soak.py` (new): N boards in parallel through `/bench` for `--minutes`; counts failures,
   bad verify checks, reboots, UI-thread freezes. **A 2-hour soak of the 7B and CYD was to start
   2026-09-28 ~19:00** - check `bench/soak_*` for the result.
+- **New board, `CYD_P4_4880` (Guition JC4880P443, 4.3" 480x800 portrait, ST7701 over DSI)** -
+  owner's idea for the 3248's successor. Branch `feat/board-cyd-p4-4880` (off
+  `feat/67-present-mode`): BSP from Guition's pack + schematic, Espressif's `esp_lcd_st7701` 2.0.2
+  vendored with its wrapper, environment `CYD_P4_4880P443` (esp_lcd only), hostname slug, type scale
+  and icons regenerated (one new face, `fleet_icons_38`). **Compiles; never flashed.**
+  `docs/TEST_CYD_P4_4880.md` is the first-flash sheet. **The fleet is now NINE environments** - the
+  pre-merge "all eight" build is all nine. The reference folder is misnamed
+  `Guition-P4-JC4880P433`; its contents are the P443 (left as the owner named it).
 - `reference/esp-registry/` gained `esp_display_present`, `esp_lv_present` and the
   `lvgl_present_benchmark` example (IDF >= 6.0, read-only; `REFERENCE_PROJECTS.md` says what is in
   them for us).

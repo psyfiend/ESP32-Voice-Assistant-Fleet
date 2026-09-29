@@ -107,7 +107,7 @@ second, redundant `-D <BOARDNAME>` build flag (BSP_HEADER already implies exactl
 board it is) — collapsed down to the one flag plus the in-header `#define`. `HAS_X`
 capability flags (`HAS_ES7210`, `HAS_MIPI_PANEL`, etc.) are unrelated to this and stay as
 `build_flags`, unchanged. Board macro names are deliberately short (`WS_P4_7B`, `WS_P4_5`,
-`WS_P4_4B`, `WS_S3_5B`, `WS_S3_4B`, `CYD_P4_1060`, `CYD_S3_3248`, `CYD_S3_8048`) for
+`WS_P4_4B`, `WS_S3_5B`, `WS_S3_4B`, `CYD_P4_1060`, `CYD_P4_4880`, `CYD_S3_3248`, `CYD_S3_8048`) for
 readability at `#ifdef` call sites — shorter than the BSP filename's full model name and
 deliberately distinct from any struct instance name in the same file (see below for why that
 distinction matters).

@@ -17,7 +17,8 @@ what to compile, so each file has to be empty on boards that do not use it.
 | `src/esp_lcd_hx8394.{h,c}` | **Vendored** HX8394 driver, `WS_P4_5`'s panel (2.9 step 2) |
 | `src/esp_lcd_st7703.{h,c}` | **Vendored** ST7703 driver, `WS_P4_4B`'s panel (2.9 step 3) |
 | `src/esp_lcd_ek79007.{h,c}` | **Vendored** EK79007 driver, `WS_P4_7B`'s panel - **compiles, never run** |
-| `src/esp_lcd_jd9165.{h,c}` | **Vendored** JD9165 driver, `CYD_P4_1060`'s panel - **compiles, never run** |
+| `src/esp_lcd_jd9165.{h,c}` | **Vendored** JD9165 driver, `CYD_P4_1060`'s panel (running since 2026-09-28) |
+| `src/esp_lcd_st7701{,_mipi,_rgb}.c`, `esp_lcd_st7701{,_interface}.h` | **Vendored** ST7701 driver (Espressif 2.0.2), `CYD_P4_4880`'s panel over DSI - **compiles, never run**. Also `WS_S3_4B`'s panel over RGB at 2.9 step 4. Two local changes, listed at the top of `esp_lcd_st7701.c` |
 
 **The driver comes from the BSP by name, with no list of chips anywhere.** The board's BSP says
 `#define BSP_PANEL_DRIVER HX8394`, and `Fleet_Display.cpp` pastes that into
@@ -45,6 +46,17 @@ which is what every board uses today. `PHY_CLK_SRC` is **not** wired through yet
 **Moving the 7B or CYD_P4_1060 over** is one line - `-D DISPLAY_ESPLCD` in its environment - and
 must be done with the board on the desk: nobody has seen either driver drive a panel. Both
 compiled and linked on 2026-09-26 with the flag set for the build only.
+
+## Vendored: `esp_lcd_st7701`
+
+From `espressif/esp_lcd_st7701` **2.0.2** (the registry copy in `reference/esp-registry/`),
+Apache-2.0 (`LICENSE_esp_lcd_st7701.txt`), added 2026-09-28 for the Guition JC4880P443. Upstream's
+`priv_include/esp_lcd_st7701_interface.h` sits beside the rest (flattened). **Two local changes**,
+listed in `FLEET LOCAL CHANGES` at the top of `esp_lcd_st7701.c`: the version macros, and the
+driver compiling on MIPI-DSI targets only (the RGB half too), so the S3 environments compile none
+of it - 2.9 step 4 lifts that for `WS_S3_4B`. Guition ships a modified 1.1.3 of this driver; we
+take Espressif's and feed it Guition's init sequence from the BSP instead. The driver sends MADCTL
+and COLMOD itself before the BSP's list, so a BSP list must not contain 0x36 or 0x3A.
 
 ## Vendored: `esp_lcd_ek79007`, `esp_lcd_jd9165`
 
