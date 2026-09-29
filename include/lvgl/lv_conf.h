@@ -118,6 +118,27 @@
         #undef LV_MEM_POOL_INCLUDE
         #undef LV_MEM_POOL_ALLOC
     #endif
+
+    // THE POOL IN PSRAM - per board, -D FLEET_LV_MEM_PSRAM (2026-09-29).
+    //
+    // Everything above is why the pool costs internal RAM: it is a static array
+    // in internal DRAM. With this flag LVGL asks for its pool ONCE, at
+    // lv_init(), from PSRAM instead (lv_mem_core_builtin.c:78). Same size, same
+    // allocator (TLSF), same lv_mem_monitor() - only where the 128 KB lives
+    // changes. It hands 128 KB of internal RAM back to WiFi/LWIP.
+    //
+    // First for WS_S3_4B, which idles at 12-17 KB internal free with the pool
+    // internal (the owner's HA free-heap chart) and drops to ~4 KB under HTTP
+    // load - enough to lose its HA connection and, once, to panic. NINA's
+    // lv_mem_psram.c moves every LVGL allocation to PSRAM through a custom
+    // backend; this keeps LVGL's own allocator and moves only the pool.
+    //
+    // THE COST TO MEASURE, not assumed: widgets and styles live in PSRAM, so
+    // every draw reads them through the cache. /bench before and after.
+    #if defined(FLEET_LV_MEM_PSRAM)
+        #define LV_MEM_POOL_INCLUDE <esp_heap_caps.h>
+        #define LV_MEM_POOL_ALLOC(size) heap_caps_malloc((size), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
+    #endif
 #endif  /*LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN*/
 
 /*====================

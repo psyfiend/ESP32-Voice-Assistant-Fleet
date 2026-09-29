@@ -392,6 +392,23 @@ A second, unrelated trap from the same session: an anchor string for a patch mus
 section it anchors to is followed by a blank line. This one was at the end of the file.
 
 
+## LVGL's 128 KB pool was the biggest thing in the S3s' internal RAM - PSRAM now (S3_4B)
+
+`LV_MEM_SIZE` is a static array in internal DRAM on every board. On `WS_S3_4B` (2026-09-29) that
+left 12-17 KB internal free at idle - fine until the HTTP server (#58, `/bench`) arrived, after
+which request load took it to ~4 KB: HA's websocket could not open a socket (`esp-tls: select()
+timeout`, visible only on the UART console, COM8), long `/bench` runs dropped mid-reply
+(`IncompleteRead`) or hung, and once the board panicked. It looked like three separate bugs.
+**`-D FLEET_LV_MEM_PSRAM`** points LVGL's own allocator at a pool it takes from PSRAM at
+`lv_init()` (`LV_MEM_POOL_ALLOC`, `lv_conf.h`): internal free 7 KB -> 133 KB, drawing ~5-10%
+slower. **The HA free-heap sensor's HISTORY is the instrument** - it answered "is this new" (no:
+v0.2.7 idled at 15-17 KB) in one screenshot.
+
+**Also learned the same night:** passing build flags through `PLATFORMIO_BUILD_FLAGS` makes
+PlatformIO's project checksum disagree with any other pio process (VS Code's extension indexing
+the tree, most likely), and one of them deletes `.pio/build` mid-build ("cannot find the path
+specified" on `lib6b5`). Three builds failed that way. Put the flag in `platformio.ini` instead.
+
 ## Internal heap is the scarcest thing on this fleet, and nothing announces it
 
 Three separate faults in one week all presented as "MQTT keeps dropping" and none of them were

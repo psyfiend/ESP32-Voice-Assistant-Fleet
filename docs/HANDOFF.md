@@ -11,6 +11,24 @@ not appear in the source as suspect.
 
 ---
 
+## 2026-09-29 (night) - 2.9 step 4 started: WS_S3_4B on esp_lcd RGB
+
+**Branches, stacked:** `feat/67-present-mode` (the P4s: present mode, driver-by-name, 7B + 1060 on
+esp_lcd, soaked) <- `feat/board-cyd-p4-4880` (the JC4880P443 board, 2x5 portrait default, the
+native-USB `Serial` freeze fix) <- **`feat/67-step4-s3-4b`** (this). None merged to `main`.
+
+- **S3_4B on esp_lcd: first light PASS**, `DOUBLE_DIRECT`, verify 0 bad. `TEST_2.9.md` step 4 has
+  the numbers and the owner's remaining glass checks.
+- **The S3_4B was starved of internal RAM** (4-12 KB) on this branch on BOTH display paths - HA
+  could not connect, benches died, one panic. Fixed on that board only with
+  **`-D FLEET_LV_MEM_PSRAM`** (LVGL's pool in PSRAM): 7 KB -> 133 KB internal free, drawing ~5-10%
+  slower. LESSONS has it. **Likely wanted on every S3** (the CYDs are tighter still) and maybe the
+  P4s - owner's call after the soak.
+- **6-hour soak of the S3_4B started 03:14** (`bench/soak_s34b_20260929.log`) - also the RGB drift
+  test. Check it first.
+- Not done: glass checks, Waveshare's init list comparison, the S3_4B page-change baseline (lost to
+  the starvation), and why the S3 page rebuild takes ~1 s (P4s: 0.3-0.45 s).
+
 ## 2026-09-28 - back at the desktop
 
 - **Step 5 below is done** for the two P4s: `.pio/build_cache` cleared, `WS_P4_5` and `WS_P4_4B`

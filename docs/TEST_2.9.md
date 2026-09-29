@@ -300,6 +300,44 @@ display path under it has changed. PASS: taps land under your finger.
 
 ---
 
+## Step 4 — `WS_S3_4B` on `esp_lcd` RGB, `DOUBLE_DIRECT` (branch `feat/67-step4-s3-4b`, 2026-09-29)
+
+**What changed.** The first non-DSI board on esp_lcd. The ST7701's init goes over its 3-wire SPI
+through the TCA9554 expander (Espressif's `esp_io_expander` + `esp_lcd_panel_io_3wire_spi`, sharing
+`Wire`'s bus); the panel is a 16-bit RGB panel with two PSRAM frame buffers and the 20-line bounce
+buffers. **Present mode `DOUBLE_DIRECT`**: LVGL draws straight into those frame buffers - no
+draw buffers, no copy; the flush hands the finished buffer over and waits for the switch. Touch
+reset and the amp enable moved from `DisplayManager` to `Fleet_Display`. **Plus, on this board
+only, `-D FLEET_LV_MEM_PSRAM`**: LVGL's 128 KB pool in PSRAM (`lv_conf.h`) - see below.
+
+**First light: PASS (owner, 03:00)** - dashboard up, first build. One panic reboot right after the
+first esp_lcd boot, not seen again, backtrace not captured.
+
+**Internal RAM was the real problem, on both display paths.** The owner's HA chart: v0.2.7 idled
+at 15-17.5 KB internal free all day; this branch ~12 KB idle and ~4 KB under `/bench` HTTP load -
+HA's socket could not open (`esp-tls: select() timeout` on the UART), long bench runs died, one
+panic. **LVGL's pool in PSRAM: 7.2 KB -> 132.9 KB internal free**; static RAM 199,640 -> 68,568 B.
+
+| S3_4B | Arduino_GFX | esp_lcd, pool internal | esp_lcd, pool PSRAM |
+|---|---|---|---|
+| Full redraw p0 | 221 ms (render 183, copy 38) | 200 ms (render 193) | 212 ms (render 198) |
+| One card | 17.4 ms (render 14.2) | 17.4 ms (render 14.4) | 22-26 ms (render 16.2; the rest is the vsync wait) |
+| Deck swap | hangs (starved) | - | 5 frames/swap, ~90 ms each, 3 late |
+| Page change, swipe to glass | lost (starved) | - | ~1.25 s (rebuild ~1.0 s) |
+| verify | - | 10, 0 bad | 20 anim + 10 page, 0 bad |
+
+**Read:** DIRECT removes the 38 ms copy but LVGL now draws into PSRAM (+10 ms); the PSRAM pool
+costs another ~5-10% of drawing. The S3 is draw-bound - deck animation and page rebuild are the
+slow parts, not the flush. **Soak: 6 hours started 03:14** (`bench/soak_s34b_20260929.log`) -
+stability with the new memory layout, and the drift test.
+
+**Owner's glass checks still to do (S1-S4 as for the P4s):** right way round and colours; touch at
+the corners (touch reset now comes from Fleet_Display); deck/drawer/swipes with nothing left
+behind; brightness (active-low GPIO4). Two init lists are in the BSP - ours (running) and
+Waveshare's - to compare by eye.
+
+---
+
 ## Speed optimisation (`-O2`), on `CYD_S3_3248` and `WS_P4_5`
 
 Branch `exp/67-o2`. Both dev boards are now compiled for speed instead of size: 9-14% faster full
