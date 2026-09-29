@@ -92,9 +92,14 @@ The answers here steer every later section, so they come first.
     - **Linen:** find a better card fill colour. **Wi-Fi header icon:** more visible (a box or a
       background behind it?).
     - **Chrome text too small:** header device name and page title, deck panel headers, the system
-      panel, the card's area tag. Claude's belief, unaudited: these are fixed faces that predate the
-      density-derived type scale, so they shrink on dense panels. Audit which text follows the
-      scale, then propose.
+      panel, the card's area tag. **Audited 2026-09-29:** the chrome faces (`UIToolkit::Font_Caption/
+      Label/Button/PanelHeader/Hero`) are NOT on the type scale - `UIToolkit.cpp:40` picks one of two
+      fixed sets by `bspUiScale() >= 1.3` (16/20/22/22/34 above, 10/12/14/14/24 below). The 4880 is
+      1.28, so it gets the small set at 217 PPI: panel headers 14 px = 1.6 mm, captions 10 px =
+      1.2 mm. The comment there says the sizes were to "move into the token header in the next
+      commit"; they never did. **Proposal:** give the chrome roles mm targets in
+      `gen_type_scale.py`, like the card roles, so every board derives them. The card area TAG is
+      derived already, but its 1.90 mm target is small everywhere - one number to agree.
     - **Hero value size vs card size** (owner, on glass): **4B** - 4x4 a bit too big, 3x3 could be
       larger, 3x4/4x3 good. **7" boards** - 6x3 "naked" (bump it up), 7x3 fine, 8x3->8x4 fits.
       **4880 landscape** (screenshots `screenshots/fleet-cyd-p4-4880_20260929-01*.png`): 4x3 excellent,
