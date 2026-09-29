@@ -238,6 +238,12 @@ private:
 #elif defined(WS_P4_4B) || defined(WS_S3_4B)
     uint8_t         _colsOverride = 4;
     uint8_t         _rowsOverride = 3;
+// Owner, 2026-09-29, on glass: portrait 2x5 "regardless of the number of
+// cards" (3x5 also usable); landscape 4x3 "a great fit". Chosen by the BSP's
+// ROTATION, since this board has been run both ways.
+#elif defined(CYD_P4_4880)
+    uint8_t         _colsOverride = (bsp_display.ROTATION & 1) ? 4 : 2;
+    uint8_t         _rowsOverride = (bsp_display.ROTATION & 1) ? 3 : 5;
 #else
     uint8_t         _colsOverride = 0;      // 0 = derive from TARGET_CARD_W
     uint8_t         _rowsOverride = 0;      // 0 = let the cards decide
