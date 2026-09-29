@@ -328,8 +328,14 @@ panic. **LVGL's pool in PSRAM: 7.2 KB -> 132.9 KB internal free**; static RAM 19
 
 **Read:** DIRECT removes the 38 ms copy but LVGL now draws into PSRAM (+10 ms); the PSRAM pool
 costs another ~5-10% of drawing. The S3 is draw-bound - deck animation and page rebuild are the
-slow parts, not the flush. **Soak: 6 hours started 03:14** (`bench/soak_s34b_20260929.log`) -
-stability with the new memory layout, and the drift test.
+slow parts, not the flush.
+
+> **Soak, 2026-09-29 03:14-09:14 (6 hours, `scripts/soak.py`): PASS.** 3,078 runs, 0 failed,
+> 0 UI-thread freezes, 0 reboots (uptime 164 -> 21,771 s); verify 10,260 checks, 0 bad; worst frame
+> 261.6 ms (a page change); **lowest internal heap 130,316 B** - flat all night, no leak.
+> `bench/soak_fleet-ws-s3-4b_20260929-031404.jsonl`. **What it cannot say:** whether the picture
+> drifted. `verify` compares the frame buffer with LVGL's render, which is upstream of the RGB
+> link; a roll or shift is on the glass only. That is the owner's eyes, over days.
 
 **Owner's glass checks still to do (S1-S4 as for the P4s):** right way round and colours; touch at
 the corners (touch reset now comes from Fleet_Display); deck/drawer/swipes with nothing left

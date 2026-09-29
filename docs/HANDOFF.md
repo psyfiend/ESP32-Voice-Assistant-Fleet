@@ -24,8 +24,9 @@ native-USB `Serial` freeze fix) <- **`feat/67-step4-s3-4b`** (this). None merged
   **`-D FLEET_LV_MEM_PSRAM`** (LVGL's pool in PSRAM): 7 KB -> 133 KB internal free, drawing ~5-10%
   slower. LESSONS has it. **Likely wanted on every S3** (the CYDs are tighter still) and maybe the
   P4s - owner's call after the soak.
-- **6-hour soak of the S3_4B started 03:14** (`bench/soak_s34b_20260929.log`) - also the RGB drift
-  test. Check it first.
+- **6-hour soak of the S3_4B, 03:14-09:14: PASS** - 3,078 runs, 10,260 verify checks, 0 failures,
+  0 reboots, internal heap flat at >=130 KB. It cannot see RGB drift (that is on the glass); leave
+  the board running and look at it over the next days.
 - Not done: glass checks, Waveshare's init list comparison, the S3_4B page-change baseline (lost to
   the starvation), and why the S3 page rebuild takes ~1 s (P4s: 0.3-0.45 s).
 
