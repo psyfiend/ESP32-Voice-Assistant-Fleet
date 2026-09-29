@@ -88,6 +88,25 @@ The answers here steer every later section, so they come first.
    hidden? *Today: STALE tag, greyed.* Anything that annoys you now?
 9. **Reference images.** Dashboards you like the look of (HA themes, Tile cards, Mushroom, a
    product). Screenshots welcome - worth more than adjectives.
+10. **Owner's notes, 2026-09-29 - bring these into the section, do not re-ask what they state.**
+    - **Linen:** find a better card fill colour. **Wi-Fi header icon:** more visible (a box or a
+      background behind it?).
+    - **Chrome text too small:** header device name and page title, deck panel headers, the system
+      panel, the card's area tag. Claude's belief, unaudited: these are fixed faces that predate the
+      density-derived type scale, so they shrink on dense panels. Audit which text follows the
+      scale, then propose.
+    - **Hero value size vs card size** (owner, on glass): **4B** - 4x4 a bit too big, 3x3 could be
+      larger, 3x4/4x3 good. **7" boards** - 6x3 "naked" (bump it up), 7x3 fine, 8x3->8x4 fits.
+      **4880 landscape** (screenshots `screenshots/fleet-cyd-p4-4880_20260929-01*.png`): 4x3 excellent,
+      4x3 with deck good; 5x3 too big in places; 4x4 with header and tag not feasible.
+    - **Found in those screenshots (Claude):** cards side by side pick DIFFERENT value faces on a
+      5-column grid - height chooses VALUE vs VALUE_SM (`Card.cpp:199`), then width can force
+      VALUE_SM (`ValueCard.cpp:151`), and "57.6 F" fits where "74.0 F" misses by pixels. And the
+      height check ignores the corner icon, so a big value can collide with it. Candidate answers:
+      one value face per page (the largest every card can take); a third, larger face for roomy
+      cells; the icon in the fit.
+    - **Rotation as a setting** (manual on esp_lcd boards is feasible; auto needs an IMU the 4880
+      does not have) - belongs to §5 settings.
 
 ## 2. Card popups (2.10)  → `docs/design/card-sheet.md`
 

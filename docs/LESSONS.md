@@ -165,6 +165,16 @@ in the display driver compiles out and a failure looks like total silence. It on
 code compiled here; ESP-IDF's own `esp_lcd` internals are prebuilt archives and stay quiet
 regardless.
 
+**A native-USB board plugged into a PC can freeze on every `Serial.print`.** Boards whose
+`Serial` is the chip's own USB port (`ARDUINO_USB_CDC_ON_BOOT=1`: the 7B, CYD_P4_1060, CYD_P4_4880,
+not the CH343-bridged P4_5/4B) use Arduino's `HWCDC`, which - when the PC is attached but has
+stopped reading the port - retries each write for up to 20 x its 100 ms TX timeout. Up to 2 s of
+`loop()` per print. On 2026-09-29 the 4880 froze on every swipe, deck and tap; on a wall adapter,
+never. It came and went while plugged in, depending on whether Windows was draining the port.
+`Serial.setTxTimeoutMs(0)` in `setup()` (main.cpp) makes output drop instead of wait. **Test a
+native-USB board's smoothness off the PC, or with this fix in** - an idle COM port can look
+exactly like a slow display stack.
+
 **A driver's `mirror()` is not proof the panel mirrors.** The EK79007 driver (`WS_P4_7B`)
 implements `mirror()` by sending MADCTL (0x36), and a survey read that as "180 degrees for free".
 On glass (2026-09-28) the picture never moved: after init with both bit pairs, and with 0x36 inside

@@ -5,6 +5,16 @@
 > disagree). It compiles and links with only its own panel driver (ST7701) in the image. Nobody
 > has seen this build on this board.
 
+> **First flash, 2026-09-28/29: FIRST LIGHT PASS.** Right colours, touch, WiFi (second attempt,
+> first ended reason 8), HA entities, audio codec up. Rotation 0 and rotation 1 both benched
+> (`bench/192.168.0.146_20260929-*`): full frame 38 ms portrait / 40 ms landscape, deck-swap frames
+> 10.7 / 16 ms, none late; verify 0 bad in both. Owner: landscape 4x3 "a great fit". **Two
+> problems found:** (1) **freezes on every swipe/tap while plugged into the PC** - the native-USB
+> `Serial` blocking (LESSONS.md, Hardware); fixed by `Serial.setTxTimeoutMs(0)`, flashed, to confirm.
+> (2) **One POWER-ON reset while handheld** (reset reason 1: the chip lost power - not a crash).
+> Unexplained; suspects the cable/connector while handled, or the IP5306 power-bank chip. Watch for
+> a repeat. The 4880 is back in portrait for the owner's font/proportion look.
+
 **Flashing:** the full-speed USB-C (serial is the P4's own USB-Serial-JTAG, like the CYD_P4_1060;
 there is no UART bridge). `pio run -e CYD_P4_4880P443 -t upload --upload-port COMn`. The board
 registers as `fleet-cyd-p4-4880`. Its boot log is on that same port; open the monitor with

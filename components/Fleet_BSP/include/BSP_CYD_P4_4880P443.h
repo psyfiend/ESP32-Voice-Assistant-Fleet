@@ -112,7 +112,7 @@ const DisplayConfig CYD_P4_4880P443_DISPLAY = {
     .PANEL_MODEL = BSP_STR(BSP_PANEL_DRIVER),
     .WIDTH       = 480,
     .HEIGHT      = 800,
-    .ROTATION    = 0,     // native portrait - the CYD_S3_3248's job (owner, 2026-09-28)
+    .ROTATION    = 0,     // native portrait (the CYD_S3_3248's job, owner 2026-09-28). 1 = landscape, benched 2026-09-29: as fast as portrait, 4x3 "a great fit"
     .AUTO_FLUSH  = true,
 
     .BL_PIN      = 23,    // LCD_PWM (schematic p.3)
