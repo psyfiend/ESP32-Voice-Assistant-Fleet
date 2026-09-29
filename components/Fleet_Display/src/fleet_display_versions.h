@@ -33,6 +33,11 @@
 #define ESP_LCD_ST7701_VER_MINOR  0
 #define ESP_LCD_ST7701_VER_PATCH  2
 
+// espressif/esp_lcd_panel_io_additions (3-wire SPI) - WS_S3_4B's ST7701 init through its TCA9554
+#define ESP_LCD_PANEL_IO_ADDITIONS_VER_MAJOR 1
+#define ESP_LCD_PANEL_IO_ADDITIONS_VER_MINOR 0
+#define ESP_LCD_PANEL_IO_ADDITIONS_VER_PATCH 1
+
 // espressif/esp_lcd_jd9165 - CYD_P4_1060 (vendored, never run)
 #define ESP_LCD_JD9165_VER_MAJOR  2
 #define ESP_LCD_JD9165_VER_MINOR  0

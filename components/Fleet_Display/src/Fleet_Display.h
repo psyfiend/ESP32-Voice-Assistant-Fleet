@@ -82,9 +82,10 @@ public:
     // For the System Doctor: the vendored driver and the link as brought up
     // (after BSP defaults are applied). "none" / 0 until begin() succeeds.
     const char *driverName() const { return _driver; }
-    uint8_t  lanes() const        { return _lanes; }
+    uint8_t  lanes() const        { return _lanes; }      // 0 on an RGB panel
     uint32_t laneMbps() const     { return _laneMbps; }
     uint32_t pixelClockHz() const { return _pclkHz; }
+    uint32_t bouncePixels() const { return _bounce; }     // RGB only: the bounce buffer, 0 = none
 
 private:
     esp_lcd_panel_handle_t _panel = nullptr;
@@ -92,6 +93,9 @@ private:
     uint8_t     _lanes    = 0;
     uint32_t    _laneMbps = 0;
     uint32_t    _pclkHz   = 0;
+    uint32_t    _bounce   = 0;
+    void       *_expander = nullptr;   // RGB boards with a TCA9554 (esp_io_expander_handle_t)
+    bool beginRgb();                   // defined on RGB boards only (Fleet_Display.cpp)
     void    *_fb[MAX_FBS] = {};
     uint8_t  _numFbs = 0;
     uint8_t  _swRot = 0;

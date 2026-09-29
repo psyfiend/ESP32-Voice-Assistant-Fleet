@@ -5,9 +5,9 @@
  */
 #include "soc/soc_caps.h"
 
-/* FLEET LOCAL CHANGE: "&& SOC_MIPI_DSI_SUPPORTED" - P4 only for now; see the
+/* FLEET LOCAL CHANGE: the P4, or a board on the esp_lcd RGB path - see the
  * change list at the top of esp_lcd_st7701.c. */
-#if SOC_LCD_RGB_SUPPORTED && SOC_MIPI_DSI_SUPPORTED
+#if SOC_LCD_RGB_SUPPORTED && (SOC_MIPI_DSI_SUPPORTED || (defined(DISPLAY_ESPLCD) && defined(HAS_RGB_PANEL)))
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"

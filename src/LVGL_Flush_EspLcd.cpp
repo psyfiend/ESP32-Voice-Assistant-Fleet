@@ -16,12 +16,13 @@
 //                 copy, no tearing
 //
 // With three buffers there is always one free, so LVGL never waits for the
-// panel. This file IS the TRIPLE_PARTIAL present mode (Fleet_BSP.h); it is
-// the only one built, and Fleet_Display::begin() refuses the others. /bench reports the rotation as `copy` and repair + hand-over as
-// `present`; `wait` stays ~0. /bench?what=verify checks the result against
-// LVGL's own render.
+// panel. This file IS the TRIPLE_PARTIAL present mode (Fleet_BSP.h), the
+// MIPI-DSI boards' flush; the RGB boards' is LVGL_Flush_EspLcdDirect.cpp
+// (DOUBLE_DIRECT). /bench reports the rotation as `copy` and repair +
+// hand-over as `present`; `wait` stays ~0. /bench?what=verify checks the
+// result against LVGL's own render.
 //
-#if defined(DISPLAY_ESPLCD)
+#if defined(DISPLAY_ESPLCD) && defined(HAS_MIPI_PANEL)
 
 #include "LVGL_Flush.h"
 #include <Arduino.h>

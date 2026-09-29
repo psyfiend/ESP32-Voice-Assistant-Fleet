@@ -24,6 +24,7 @@ other projects' code and what it teaches.
 | `esp-registry/waveshare__esp32_s3_touch_lcd_4b-v2.0.0` | **Apache-2.0** | Reuse with attribution + NOTICE rules |
 | `esp-registry/espressif__esp_lcd_st7701-v2.0.2_2`, `..._esp_lcd_panel_io_additions-v1.0.1_1`, `..._esp_lcd_ek79007-v2.0.2`, `..._esp_lcd_jd9165-v2.0.2` | **Apache-2.0** | Reuse with attribution + NOTICE rules |
 | `esp-registry/waveshare__esp_lcd_st7703-v2.0.0` | **MIT** | Reuse with attribution |
+| `esp-registry/espressif__esp_io_expander-v1.2.1`, `..._esp_io_expander_tca9554-v2.0.3` | **Apache-2.0** | Reuse with attribution + NOTICE rules (2.9 step 4, fetched 2026-09-29) |
 | `esp-registry/espressif__esp_display_present-v1.0.2`, `..._esp_lv_present-v0.1.0`, `esp-iot-solution__lvgl_present_benchmark` | **Apache-2.0** | Reuse with attribution + NOTICE rules |
 
 The registry's web page lists the last two as "Custom"; the `LICENSE` file inside each says Apache-2.0.

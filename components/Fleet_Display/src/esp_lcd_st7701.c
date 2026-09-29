@@ -14,14 +14,14 @@
  *
  * 1. The version macros IDF's component build would inject come from
  *    fleet_display_versions.h, because PlatformIO does not inject them.
- * 2. This file and _rgb.c compile on MIPI-DSI targets (the P4) only, so the
- *    S3 environments compile nothing of this driver (every Fleet_Display
- *    file is empty on boards that do not use it). 2.9 step 4 (WS_S3_4B's
- *    ST7701 over RGB) lifts this.
+ * 2. This file and _rgb.c compile on MIPI-DSI targets (the P4), and on boards
+ *    on the esp_lcd RGB path (WS_S3_4B, 2.9 step 4) - so the S3 boards still
+ *    on Arduino_GFX compile nothing of this driver (every Fleet_Display file
+ *    is empty on boards that do not use it).
  *
  * No board-level I2C in this driver.
  * ------------------------------------------------------------------------- */
-#if SOC_MIPI_DSI_SUPPORTED
+#if SOC_MIPI_DSI_SUPPORTED || (defined(DISPLAY_ESPLCD) && defined(HAS_RGB_PANEL))
 #include "fleet_display_versions.h"
 
 #include "esp_check.h"
@@ -57,4 +57,4 @@ esp_err_t esp_lcd_new_panel_st7701(const esp_lcd_panel_io_handle_t io, const esp
     return ret;
 }
 
-#endif // SOC_MIPI_DSI_SUPPORTED (FLEET LOCAL CHANGE 2)
+#endif // SOC_MIPI_DSI_SUPPORTED || esp_lcd RGB (FLEET LOCAL CHANGE 2)

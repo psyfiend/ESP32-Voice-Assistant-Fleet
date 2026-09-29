@@ -229,8 +229,13 @@ void reportDisplay(SystemCore &core) {
     Fleet_Display &d = core.display();
     char fb[40];
     SystemReport::line("  Path: esp_lcd (Fleet_Display), driver %s", d.driverName());
-    SystemReport::line("  Link: %u lanes @ %lu Mbps, pixel clock %.1f MHz",
-                       (unsigned)d.lanes(), (unsigned long)d.laneMbps(), d.pixelClockHz() / 1e6);
+    if (d.lanes()) {
+        SystemReport::line("  Link: %u lanes @ %lu Mbps, pixel clock %.1f MHz",
+                           (unsigned)d.lanes(), (unsigned long)d.laneMbps(), d.pixelClockHz() / 1e6);
+    } else {
+        SystemReport::line("  Link: RGB parallel, pixel clock %.1f MHz, bounce buffer %lu px",
+                           d.pixelClockHz() / 1e6, (unsigned long)d.bouncePixels());
+    }
     SystemReport::line("  Present mode: %s (%s%s)", bspPresentModeName(d.presentMode()),
                        d.presentModeFromBsp() ? "BSP override" : "rule: ",
                        d.presentModeFromBsp() ? "" : d.presentModeReason());

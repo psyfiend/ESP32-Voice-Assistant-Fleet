@@ -223,6 +223,13 @@ struct DisplayConfig {
     // (the zero-fill default) to let bspPresentMode() derive it. See the codes
     // above. Trailing, like DIAGONAL_IN, so no board header has to change.
     uint8_t                PRESENT_MODE;
+
+    // The panel's init sequence for the esp_lcd RGB path (2.9 step 4), as a
+    // structured list. INIT_CMDS_RGB above is Arduino_GFX's byte stream and
+    // shares INIT_CMDS_SIZE with it, so it cannot double as this. The DSI boards
+    // use INIT_CMDS_DSI on both paths; step 6 folds the three into one field.
+    const lcd_init_cmd_t  *INIT_CMDS_ESPLCD;
+    size_t                 INIT_CMDS_ESPLCD_COUNT;
 };
 
 // --= Touch Panel =--
