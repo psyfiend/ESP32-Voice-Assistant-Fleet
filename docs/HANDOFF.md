@@ -30,6 +30,11 @@ not appear in the source as suspect.
   overridable per board by `DisplayConfig.PRESENT_MODE`, framebuffer count following from it,
   shown in the boot log and System Doctor. Only `TRIPLE_PARTIAL` is built. CLAUDE.md and
   `components/Fleet_Display/README.md` describe both.
+- **`CYD_P4_1060` runs esp_lcd** (JD9165, first light ever for that driver): owner signed off
+  C1-C4 on glass, `/bench` verify 0 bad, full frame 104 -> 64 ms (scheme differed between the
+  runs - see `TEST_2.9.md`). Soak not yet run. **The 7B is next** (EK79007, rotation 2); the CYD
+  must come off the desk first (the owner's USB hub). The CYD has a camera - noted in
+  FUTURE_IMPROVEMENTS.
 - `reference/esp-registry/` gained `esp_display_present`, `esp_lv_present` and the
   `lvgl_present_benchmark` example (IDF >= 6.0, read-only; `REFERENCE_PROJECTS.md` says what is in
   them for us).

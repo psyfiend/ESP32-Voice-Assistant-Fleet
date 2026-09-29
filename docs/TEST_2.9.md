@@ -227,6 +227,42 @@ before; it matters only once `LV_DRAW_BUF_ALIGN` is 64 (the PPA experiment, and 
 
 ---
 
+## Step 3 continued — `CYD_P4_1060` on `esp_lcd` (branch `feat/67-present-mode`, 2026-09-28)
+
+**What changed.** The CYD P4 runs the same esp_lcd path as the two Waveshare P4s: three frame
+buffers, Espressif's JD9165 driver fed our BSP's init sequence and timings, present mode
+`TRIPLE_PARTIAL` chosen by the rule. **Rotation 0**, so the PPA only copies, never turns. `-D
+DISPLAY_ESPLCD` in its environment; delete that line to go back. This driver had never driven a
+panel before today. It came up first time with the BSP's reset pin as it stands - whether that
+pin is right, or the panel simply does not need the reset, is not known.
+
+**Measured by Claude** (`bench/fleet-cyd-p4-1060_20260928-*_{gfx,esplcd}.json`). `/bench?what=verify`
+during the deck animation and during page changes: 40 + 40 checks, **0 bad**. Panel refresh
+measured 56.3 Hz.
+
+| | Arduino_GFX | esp_lcd |
+|---|---|---|
+| Full-screen redraw (p0) | 104 ms (render 77, copy 27) | 64 ms (render 56, copy 8) |
+| One card | 3.5 ms | 4.2 ms |
+| Deck swap frame | 25 ms (render 18.5, flush 6.3), 10 per swap, none late | 18 ms (render 14.3, flush 4.0), 10 per swap, none late |
+| Page change, swipe to glass | 451-520 ms | 396-530 ms (the page rebuild, ~330-460 ms, is most of it either way) |
+
+**Not like for like, found after the run:** the Arduino_GFX run drew page 0 in **Midnight**, the
+esp_lcd run in **Fleet** (the scheme had been changed on the glass in between). The copy column is
+scheme-independent (27 -> 8 ms); the render column is not, so part of 77 -> 56 may be the scheme.
+Re-run both in the same scheme before quoting the drawing gain. Arduino_GFX also used full-screen
+draw buffers on this board (`DRAW_BUF_HEIGHT = 0`); esp_lcd uses 50-line strips (12 chunks a frame),
+which is why one card costs a little more (4.2 vs 3.5 ms).
+
+> **C1-C4: PASS (owner, 2026-09-28).** Right way round (landscape, camera hole at the top), right
+> colours, touch lands where it should, every interactive feature works. The owner's words: it now
+> feels at least as smooth as the 7B, "maybe even a tiny bit faster" swiping pages, the log page
+> scrolls smoothly under the finger; in Linen, deck panels and the system panel show no slowdown,
+> but a page swipe onto a Linen page does (expected: Linen's shadows are the expensive draw).
+> **Not yet run:** the 40-minute soak.
+
+---
+
 ## Speed optimisation (`-O2`), on `CYD_S3_3248` and `WS_P4_5`
 
 Branch `exp/67-o2`. Both dev boards are now compiled for speed instead of size: 9-14% faster full
