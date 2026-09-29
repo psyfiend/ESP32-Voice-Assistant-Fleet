@@ -342,6 +342,37 @@ the corners (touch reset now comes from Fleet_Display); deck/drawer/swipes with 
 behind; brightness (active-low GPIO4). Two init lists are in the BSP - ours (running) and
 Waveshare's - to compare by eye.
 
+### Glass glitch returns - panel timing tests (2026-09-29)
+
+**Symptom (owner, after the soak):** S3_4B - vertical roll, many small flickering horizontal lines
+on the left side, an occasional full-width line, with 136 KB internal free. P4_4B - a few similar
+lines at the right edge (log page). The 7B showed the same family during bring-up while porch and
+`PREFER_SPEED` values were being tried. A DSI panel cannot "drift" the way the S3's RGB peripheral
+does, and `CONFIG_LCD_RGB_RESTART_IN_VSYNC` is already on - so the working theory is panel timing
+at the edge of the panel IC's tolerance, which moves with temperature: fine cold, lines warm.
+
+**What the datasheets say** (`reference/datasheets/`, gitignored):
+
+- **ST7701S v1.4 p.75, DE mode:** the host's porches *must match* `C1h PORCTRL`. Ours was `C1 0D 02`
+  (VBP 13, VFP 2) against a host sending V pulse+back 28, front 10. Waveshare's list mismatches too.
+- **ST7701S `C2h` RTNI:** minimum clocks per line = 512 + 16 x RTNI. `C2 31 05` wants 592; our line is
+  8+50+480+10 = 548. (Waveshare: `21 08` wants 640 against their 520.) Not changed yet.
+- **ST7703 `BAh SETMIPI` byte 3 = IHSRX**, the HS receiver drive, x1..x16. Ours `0x05`, Waveshare's
+  driver `0x0F`, and we run the lanes at 1000 Mbps where Waveshare runs 480.
+
+**One change per board, old value kept as a comment, 150-min `soak.py` + owner's eyes:**
+
+| Test | Board | Change | Result |
+|---|---|---|---|
+| T1 | S3_4B | `C1 0D 02` -> `C1 1C 0A` (match host) | **WORSE** (owner, 12:26): same places, flickering more often and reaching further right, idle as well as under soak. Reverted after ~25 min |
+| T1 | P4_4B | `BA` IHSRX `0x05` -> `0x0F` | soak running from 12:25, glass pending |
+| T2 | S3_4B | `C1` back to `0D 02`; `C2 31 05` -> `C2 31 02` (RTNI min 544 <= 548) - the only difference from the original | flashed 12:35, idle (no soak), glass pending |
+| next | P4_4B | lanes 1000 -> 480 Mbps | if T1 is not enough |
+
+T1 on the S3_4B does not refute the theory - it shows the ST7701's porch registers visibly move the
+symptom, which is the lever this table is pulling. The datasheet's "must match" reading was the
+wrong direction for this panel, or `C1`'s VBP does not count the sync pulse (then 20, not 28).
+
 ---
 
 ## Speed optimisation (`-O2`), on `CYD_S3_3248` and `WS_P4_5`
