@@ -80,6 +80,10 @@ const BoardHardware WS_P4_TOUCH_LCD_7B_HARDWARE = {
     .I2C_CLOCK_SPEED = 400000,
 
     .BOOT_BUTTON_PIN = 35,
+    // BAT (J4, ETA6098 charger) through R92 200K / R93 100K -> GPIO20 = ADC1 ch4, the
+    // same circuit as WS_P4_5; the net is unlabelled on this schematic. x3.000.
+    .BAT_ADC         = 20,
+    .BAT_DIV_X1000   = 3000,
     .I2S_AMP_EN      = 53,   // WS_P4_7B
 };
 inline const BoardHardware& bsp_hw = WS_P4_TOUCH_LCD_7B_HARDWARE;
