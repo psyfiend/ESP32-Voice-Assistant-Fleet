@@ -38,8 +38,9 @@ not appear in the source as suspect.
   unverified `#ifndef WS_P4_7B` passthrough) is the one to watch. **Panel-side 180 degrees was tried
   and does not work** (the driver's `mirror()`/MADCTL, three builds) - LESSONS, Hardware.
 - `scripts/soak.py` (new): N boards in parallel through `/bench` for `--minutes`; counts failures,
-  bad verify checks, reboots, UI-thread freezes. **A 2-hour soak of the 7B and CYD was to start
-  2026-09-28 ~19:00** - check `bench/soak_*` for the result.
+  bad verify checks, reboots, UI-thread freezes. **2-hour soak of the 7B and CYD_P4_1060,
+  2026-09-28 19:02-21:02: PASS on both** - 2,859 runs, 9,520 verify checks, 0 failures, 0 bad,
+  0 reboots, worst frame 74 ms (`TEST_2.9.md`). All four P4s now run esp_lcd and have soaked clean.
 - `reference/esp-registry/` gained `esp_display_present`, `esp_lv_present` and the
   `lvgl_present_benchmark` example (IDF >= 6.0, read-only; `REFERENCE_PROJECTS.md` says what is in
   them for us).
