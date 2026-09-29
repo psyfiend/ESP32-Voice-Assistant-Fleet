@@ -366,7 +366,7 @@ at the edge of the panel IC's tolerance, which moves with temperature: fine cold
 |---|---|---|---|
 | T1 | S3_4B | `C1 0D 02` -> `C1 1C 0A` (match host) | **WORSE** (owner, 12:26): same places, flickering more often and reaching further right, idle as well as under soak. Reverted after ~25 min |
 | T1 | P4_4B | `BA` IHSRX `0x05` -> `0x0F` | soak 12:26-14:56 PASS (2,104 runs, 7,000 verify checks, 0 bad, 0 reboots, worst frame 65.6 ms, heap >= 111 KB); glass pending |
-| T2 | S3_4B | `C1` back to `0D 02`; `C2 31 05` -> `C2 31 02` (RTNI min 544 <= 548) - the only difference from the original | flashed 12:35, idle (no soak), glass pending |
+| T2 | S3_4B | `C1` back to `0D 02`; `C2 31 05` -> `C2 31 02` (RTNI min 544 <= 548) - the only difference from the original | flashed 12:35. **No visible glitching** (owner, afternoon) - 7-day watch in #69 |
 | next | P4_4B | lanes 1000 -> 480 Mbps | if T1 is not enough |
 
 T1 on the S3_4B does not refute the theory - it shows the ST7701's porch registers visibly move the
