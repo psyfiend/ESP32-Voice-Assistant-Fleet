@@ -127,6 +127,7 @@ bool SystemCore::begin() {
     // --= 8. Providers =--
     // All three need the registry; two of them also need the broker.
     _sysProvider.begin(&_entities, &_conn);
+    _battProvider.begin(&_entities);   // before _haPub, so discovery includes it
     _haPub.setSwVersion(FW_VERSION);   // see HaPublisher::setSwVersion
     _haPub.begin(&_entities, &_mqtt);
     _mqttProv.begin(&_entities, &_mqtt);
@@ -300,6 +301,7 @@ void SystemCore::loop() {
 
     const uint32_t now = millis();
     _sysProvider.loop(now);
+    _battProvider.loop(now);
     // Expires stale values and reverts optimistic writes whose echo never
     // arrived. Cheap; safe from any task.
     _entities.tick(now);

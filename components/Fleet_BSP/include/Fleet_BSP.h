@@ -68,7 +68,11 @@ struct BoardHardware {
     uint32_t I2C_CLOCK_SPEED;
 
     uint8_t BOOT_BUTTON_PIN;
-    uint8_t BAT_ADC;      // IP5306 (3248W535 / 8048W550) battery management
+    uint8_t BAT_ADC;      // GPIO sensing the battery through a divider (IP5306 on 3248W535 / 8048W550)
+    // Battery mV = pin mV x BAT_DIV_X1000 / 1000, i.e. the divider's (top+bottom)/bottom
+    // x 1000. 0 (the zero-fill default) = no battery ADC: BatteryProvider stays off and
+    // BAT_ADC is not read - which matters, because BAT_ADC's own default of 0 is a real GPIO.
+    uint16_t BAT_DIV_X1000;
 
     // -1 if managed externally (via Expander) or absent; GPIO number if direct.
     int8_t I2S_AMP_EN;    // NS4150B on WS Smart86 boxes // NS4168 on Guition P4.7

@@ -4,6 +4,7 @@
 
 #include "Cards/PageSpec.h"
 #include "SystemEntities.h"
+#include "BatteryEntities.h"
 #include "ExternalEntities.h"
 #include "VirtualEntities.h"
 
@@ -80,6 +81,17 @@ inline const CardSpec FLEET_CARDS[] = {
       .place = { .priority = PRI_CRITICAL + 20 } },
     { .primaries = { "test_refuse" },    .label = "Refuse",  .area = "Test",
       .place = { .priority = PRI_CRITICAL + 20 } },
+
+    // --- This panel's battery (prototype, 2026-09-29) ----------------------
+    //
+    // Only on boards whose BSP declares a battery ADC (BatteryProvider); on
+    // the rest both entities are unregistered and these specs are skipped.
+    // High while it is being tried on glass; the mV card is the calibration
+    // evidence and goes first.
+    { .primaries = { BATT_ENT_PCT }, .label = "Battery", .area = "Panel",
+      .place = { .priority = PRI_CRITICAL } },
+    { .primaries = { BATT_ENT_MV },  .label = "Battery", .area = "Panel",
+      .place = { .priority = PRI_NORMAL } },
 
     // --- Outdoors ---------------------------------------------------------
     //
