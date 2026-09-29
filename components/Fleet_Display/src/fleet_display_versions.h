@@ -5,7 +5,8 @@
 // IDF's component build injects each driver's ESP_LCD_<CHIP>_VER_* macros;
 // PlatformIO does not. Each vendored driver includes this file instead (its
 // one local change - components/Fleet_Display/README.md), and the System
-// Doctor reports the same numbers through fleet_dsi_driver_name(). Updating a
+// Doctor reports the same numbers through each wrapper's name (fleet_dsi_<chip>.c,
+// FLEET_DSI_VER()). Updating a
 // driver means copying the new upstream files over AND changing its line here.
 //
 // Plain C: included from the vendored .c files.

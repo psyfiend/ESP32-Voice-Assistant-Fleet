@@ -19,6 +19,7 @@
 // -------------------------------------------------------------------------
 
 #define WS_S3_5B
+#define BSP_PANEL_DRIVER ST7262   // panel chip, a bare name: sets PANEL_MODEL; picks the esp_lcd driver from 2.9 step 4 (Fleet_BSP.h)
 
 const BoardHardware WS_S3_TOUCH_LCD_5B_HARDWARE = {
     .device_name  = "Waveshare S3-Touch-LCD-5B",
@@ -61,7 +62,7 @@ const ExpanderConfig WS_S3_TOUCH_LCD_5B_EXPANDER = {
 inline const ExpanderConfig& bsp_expander = WS_S3_TOUCH_LCD_5B_EXPANDER;
 
 const DisplayConfig WS_S3_TOUCH_LCD_5B_DISPLAY = {
-    .PANEL_MODEL = "ST7262",
+    .PANEL_MODEL = BSP_STR(BSP_PANEL_DRIVER),
     .WIDTH       = 1024,
     .HEIGHT      = 600,
     .ROTATION    = 0,

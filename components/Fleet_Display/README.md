@@ -13,17 +13,31 @@ what to compile, so each file has to be empty on boards that do not use it.
 |---|---|
 | `src/Fleet_Display.{h,cpp}` | The class `SystemCore` owns: bring-up, backlight, the frame buffers, and which one the panel is showing |
 | `src/fleet_dsi_panel.{h,c}` | MIPI-DSI bring-up in C (the vendor config macros are not valid C++): one sequence for every chip, only the driver's constructor differs |
+| `src/fleet_dsi_<chip>.c` | **Ours.** One small wrapper per vendored driver: its constructor with our BSP's init sequence, and its name/version, as one `fleet_dsi_driver_<CHIP>` |
 | `src/esp_lcd_hx8394.{h,c}` | **Vendored** HX8394 driver, `WS_P4_5`'s panel (2.9 step 2) |
 | `src/esp_lcd_st7703.{h,c}` | **Vendored** ST7703 driver, `WS_P4_4B`'s panel (2.9 step 3) |
 | `src/esp_lcd_ek79007.{h,c}` | **Vendored** EK79007 driver, `WS_P4_7B`'s panel - **compiles, never run** |
 | `src/esp_lcd_jd9165.{h,c}` | **Vendored** JD9165 driver, `CYD_P4_1060`'s panel - **compiles, never run** |
 
-`Fleet_Display::begin()` picks the driver from the BSP's `PANEL_MODEL`.
+**The driver comes from the BSP by name, with no list of chips anywhere.** The board's BSP says
+`#define BSP_PANEL_DRIVER HX8394`, and `Fleet_Display.cpp` pastes that into
+`fleet_dsi_driver_HX8394`, defined in `fleet_dsi_hx8394.c`. **Adding a DSI panel:** vendor its
+driver, copy one of the four wrappers and change the chip name, types and vendor-config fields
+(they differ: the HX8394 and EK79007 take a lane count, the ST7703 and JD9165 do not), add its
+version line to `fleet_display_versions.h`, set `BSP_PANEL_DRIVER`. No edit to `Fleet_Display` or
+`fleet_dsi_panel`. A BSP naming a chip with no wrapper fails to LINK:
+`undefined reference to 'fleet_dsi_driver_<CHIP>'`. Wrappers nothing names are dropped by the
+linker, so each board carries only its own driver.
+
+**How many frame buffers, and how frames reach the panel, is the present mode** - derived by
+`bspPresentMode()` (`bsp_loader.h`), overridable per board with `DisplayConfig.PRESENT_MODE`.
+`TRIPLE_PARTIAL` (`src/LVGL_Flush_EspLcd.cpp`) is the only one built; `begin()` refuses the others
+and runs that, saying so in the boot log and the System Doctor.
 
 **Driver versions live in ONE place, `src/fleet_display_versions.h`.** Each vendored driver
 includes it for the version macros IDF's component build would inject (that include IS each
 driver's version-macro local change), and the System Doctor's `[DISPLAY]` section prints the same
-numbers through `fleet_dsi_driver_name()`. Updating a driver = new upstream files + its line there. The DSI PHY's LDO channel
+numbers through each wrapper's `name`. Updating a driver = new upstream files + its line there. The DSI PHY's LDO channel
 and voltage and the lane count come from the BSP's `TEST_MIPI_DSI_PHY_PWR_LDO_*` and
 `NUM_DSI_LANES` where a board sets them (7B, CYD_P4_1060), otherwise LDO 3 / 2500 mV / 2 lanes -
 which is what every board uses today. `PHY_CLK_SRC` is **not** wired through yet: IDF picks.

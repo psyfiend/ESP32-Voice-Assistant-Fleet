@@ -12,6 +12,7 @@
 // -------------------------------------------------------------------------
 
 #define WS_P4_5
+#define BSP_PANEL_DRIVER HX8394   // panel chip, a bare name: picks Fleet_Display's driver and sets PANEL_MODEL (Fleet_BSP.h)
 
 // Panel init commands (HX8394)
 // NOTE: Must stay here, immediately before the structs below - see
@@ -66,7 +67,7 @@ const BoardHardware WS_P4_TOUCH_LCD_5_HARDWARE = {
 inline const BoardHardware& bsp_hw = WS_P4_TOUCH_LCD_5_HARDWARE;
 
 const DisplayConfig WS_P4_TOUCH_LCD_5_DISPLAY = {
-    .PANEL_MODEL = "HX8394",
+    .PANEL_MODEL = BSP_STR(BSP_PANEL_DRIVER),
     .WIDTH       = 720,
     .HEIGHT      = 1280,
     // 0 = portrait (USB on bottom), 1 = landscape (USB on right), 2 = inverted

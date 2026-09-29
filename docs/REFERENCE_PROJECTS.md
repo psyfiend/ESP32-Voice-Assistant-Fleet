@@ -24,6 +24,7 @@ other projects' code and what it teaches.
 | `esp-registry/waveshare__esp32_s3_touch_lcd_4b-v2.0.0` | **Apache-2.0** | Reuse with attribution + NOTICE rules |
 | `esp-registry/espressif__esp_lcd_st7701-v2.0.2_2`, `..._esp_lcd_panel_io_additions-v1.0.1_1`, `..._esp_lcd_ek79007-v2.0.2`, `..._esp_lcd_jd9165-v2.0.2` | **Apache-2.0** | Reuse with attribution + NOTICE rules |
 | `esp-registry/waveshare__esp_lcd_st7703-v2.0.0` | **MIT** | Reuse with attribution |
+| `esp-registry/espressif__esp_display_present-v1.0.2`, `..._esp_lv_present-v0.1.0`, `esp-iot-solution__lvgl_present_benchmark` | **Apache-2.0** | Reuse with attribution + NOTICE rules |
 
 The registry's web page lists the last two as "Custom"; the `LICENSE` file inside each says Apache-2.0.
 Check each file's own header before copying from it, as `display-stack.md` §6.1 says.
@@ -267,3 +268,18 @@ Added the same day for the Waveshare survey (`docs/research/waveshare-esp-lcd-su
 steps 3-4: the S3-4B BSP 2.0.0 (its ST7701-over-expander bring-up), `esp_lcd_st7701`,
 `esp_lcd_panel_io_additions` (3-wire SPI through an I/O expander), and the three other P4 panel
 drivers - `esp_lcd_ek79007` (7B), `esp_lcd_st7703` (4B), `esp_lcd_jd9165` (CYD_P4_1060).
+
+Added 2026-09-28 (owner's OK), read-only reference, **not buildable here: both declare ESP-IDF
+>= 6.0**, and we are on 5.5.5:
+- **`esp_display_present` 1.0.2** (Apache-2.0) - Espressif's renderer-agnostic "presenter": owns
+  the framebuffers, dirty-area repair, rotation (PPA when present), TE sync and panel submission,
+  and knows nothing about LVGL. Modes `NONE`, `DOUBLE_FULL`, `TRIPLE_FULL`, `DOUBLE_DIRECT`,
+  `DOUBLE_PARTIAL`, `TRIPLE_PARTIAL`, `TE_SYNC`, `AUTO`. Worth mining: `TE_SYNC` for QSPI panels
+  with rotation (step 5, the CYD), `DOUBLE_PARTIAL`, `STATE_MACHINE.md` + `quiesce()` for display
+  off, `set_rotation()` at runtime. Its PPA rotation is blocking and its flush synchronous; ours
+  is not, so it is no faster than what we built for the P4s.
+- **`esp_lv_present` 0.1.0** (Apache-2.0) - its LVGL 9 binding. No task and no lock: LVGL is
+  pumped from the caller's task, which is our `loop()` model.
+- **`esp-iot-solution__lvgl_present_benchmark`** - the example that runs `lv_demo_benchmark` over
+  every mode x rotation the panel allows. Fetched from GitHub (esp-iot-solution `master`,
+  `ee4719d170`), not the registry: examples are not in the component zips.

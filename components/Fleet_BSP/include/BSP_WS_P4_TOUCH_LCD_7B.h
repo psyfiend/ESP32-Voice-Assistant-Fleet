@@ -12,6 +12,7 @@
 // -------------------------------------------------------------------------
 
 #define WS_P4_7B
+#define BSP_PANEL_DRIVER EK79007  // panel chip, a bare name: picks Fleet_Display's driver and sets PANEL_MODEL (Fleet_BSP.h)
 
 // Panel init commands (EK79007)
 // NOTE: Must stay here, immediately before the structs below - INIT_CMDS_SIZE
@@ -84,7 +85,7 @@ const BoardHardware WS_P4_TOUCH_LCD_7B_HARDWARE = {
 inline const BoardHardware& bsp_hw = WS_P4_TOUCH_LCD_7B_HARDWARE;
 
 const DisplayConfig WS_P4_TOUCH_LCD_7B_DISPLAY = {
-    .PANEL_MODEL = "EK79007",
+    .PANEL_MODEL = BSP_STR(BSP_PANEL_DRIVER),
     .WIDTH       = 1024,
     .HEIGHT      = 600,
     .ROTATION    = 2,     // Landscape USB on LEFT

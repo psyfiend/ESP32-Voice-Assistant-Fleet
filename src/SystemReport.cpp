@@ -231,7 +231,15 @@ void reportDisplay(SystemCore &core) {
     SystemReport::line("  Path: esp_lcd (Fleet_Display), driver %s", d.driverName());
     SystemReport::line("  Link: %u lanes @ %lu Mbps, pixel clock %.1f MHz",
                        (unsigned)d.lanes(), (unsigned long)d.laneMbps(), d.pixelClockHz() / 1e6);
-    SystemReport::line("  Frame buffers: %u x %s", (unsigned)Fleet_Display::NUM_FBS,
+    SystemReport::line("  Present mode: %s (%s%s)", bspPresentModeName(d.presentMode()),
+                       d.presentModeFromBsp() ? "BSP override" : "rule: ",
+                       d.presentModeFromBsp() ? "" : d.presentModeReason());
+    if (d.presentModeRequested() != d.presentMode()) {
+        SystemReport::line("  !! Requested %s is not built yet - running %s",
+                           bspPresentModeName(d.presentModeRequested()),
+                           bspPresentModeName(d.presentMode()));
+    }
+    SystemReport::line("  Frame buffers: %u x %s", (unsigned)d.numFrameBuffers(),
                        SystemReport::fmtBytes(d.frameBufferBytes(), fb, sizeof(fb)));
     // Counted in the panel's frame-complete interrupt, from the moment it
     // started scanning: the rate it really runs at, not the one its timing

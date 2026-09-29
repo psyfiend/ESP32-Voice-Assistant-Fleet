@@ -23,11 +23,22 @@
 
 class Fleet_Display {
 public:
-    // Three frame buffers: one being shown, one handed over and waiting for
-    // the next frame, one free to draw into - so a draw never waits.
-    static constexpr uint8_t NUM_FBS = 3;
+    // The most frame buffers any present mode uses (TRIPLE_*), and so the
+    // size of every per-buffer array. How many THIS board has follows from
+    // its present mode: numFrameBuffers().
+    static constexpr uint8_t MAX_FBS = 3;
 
     bool begin();
+
+    // How frames reach the panel (a BSP_PRESENT_* code, Fleet_BSP.h), decided
+    // in begin(): the BSP's override if it sets one, else bspPresentMode()'s
+    // rule. A mode that is not built yet is refused, loudly, in favour of
+    // TRIPLE_PARTIAL - presentModeRequested() keeps what was asked for.
+    uint8_t presentMode() const          { return _mode; }
+    uint8_t presentModeRequested() const { return _modeRequested; }
+    bool    presentModeFromBsp() const   { return _modeFromBsp; }   // false = the rule
+    const char *presentModeReason() const { return _modeReason; }
+    uint8_t numFrameBuffers() const      { return _numFbs; }
 
     // Backlight - identical behaviour to DisplayManager's.
     void setBacklight(bool on);
@@ -38,7 +49,7 @@ public:
     uint16_t panelWidth()  const { return _w; }
     uint16_t panelHeight() const { return _h; }
     esp_lcd_panel_handle_t panel() const { return _panel; }
-    void *frameBuffer(uint8_t i) const { return i < NUM_FBS ? _fb[i] : nullptr; }
+    void *frameBuffer(uint8_t i) const { return i < _numFbs ? _fb[i] : nullptr; }
     size_t frameBufferBytes() const { return (size_t)_w * _h * 2; }
 
     // Hand frame buffer `i` to the panel. It is shown from the start of the
@@ -72,7 +83,11 @@ private:
     uint8_t     _lanes    = 0;
     uint32_t    _laneMbps = 0;
     uint32_t    _pclkHz   = 0;
-    void    *_fb[NUM_FBS] = {};
+    void    *_fb[MAX_FBS] = {};
+    uint8_t  _numFbs = 0;
+    uint8_t  _mode = 0, _modeRequested = 0;
+    bool     _modeFromBsp = false;
+    const char *_modeReason = "";
     uint16_t _w = 0, _h = 0;
 
     volatile uint8_t  _scanning  = 0;

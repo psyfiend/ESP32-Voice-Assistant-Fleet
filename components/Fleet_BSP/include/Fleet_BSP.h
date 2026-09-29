@@ -28,6 +28,13 @@ typedef struct {
 // Naming convention per board (see any BSP_<NAME>.h for a concrete example):
 //   - `#define <BOARD>`               short device-identity macro (e.g. WS_P4_7B),
 //                                       used fleet-wide for #ifdef gating
+//   - `#define BSP_PANEL_DRIVER <CHIP>` the panel controller as a bare NAME, not a
+//                                       string (e.g. HX8394). Fleet_Display pastes it
+//                                       into the name of that chip's driver wrapper
+//                                       (fleet_dsi_driver_HX8394), so there is no
+//                                       per-chip if/else to maintain; and
+//                                       DisplayConfig.PANEL_MODEL is set from it with
+//                                       BSP_STR(), so the two can never disagree.
 //   - `const BoardHardware <BOARD>_LONGNAME_HARDWARE = {...}`
 //     `const DisplayConfig <BOARD>_LONGNAME_DISPLAY  = {...}`   (etc., one per group)
 //   - `inline const BoardHardware& bsp_hw = <BOARD>_LONGNAME_HARDWARE;`
@@ -36,6 +43,12 @@ typedef struct {
 // (bsp_hw.SDA_PIN, bsp_display.WIDTH, bsp_touch.MAX_TOUCH, ...) - never the
 // concrete per-board instance name.
 // -----------------------------------------------------------------------
+
+// A bare name as a string, after expanding any macro it names:
+// BSP_STR(BSP_PANEL_DRIVER) is "HX8394" on WS_P4_5. Two levels, because a
+// single # would give "BSP_PANEL_DRIVER".
+#define BSP_STR_(x) #x
+#define BSP_STR(x)  BSP_STR_(x)
 
 // --= Board Hardware =--
 // Physical-interface-level scalars that don't belong to a specific
@@ -100,6 +113,27 @@ struct ExpanderConfig {
 #define BSP_PHY_CLK_SRC_RC_FAST   4  // explicit; rev < 3.0 only, imprecise - diagnostics only
 #define BSP_PHY_CLK_SRC_XTAL      5  // explicit; ESP32-P4 rev >= 3.0 only
 
+// --- Present modes (DisplayConfig.PRESENT_MODE) - how frames reach the panel ---
+// Only read on the esp_lcd path (-D DISPLAY_ESPLCD); Arduino_GFX boards ignore it.
+// Espressif's own names (esp_lvgl_adapter, esp_display_present), so their docs
+// read straight across. Fleet-defined codes, like BSP_PHY_CLK_SRC_*.
+//
+// 0 means "no override": bspPresentMode() (bsp_loader.h) derives the mode from
+// the bus, the chip and the rotation. Set a code only to override that rule on
+// one board - to test a mode, or where a board is the exception. The number of
+// framebuffers FOLLOWS from the mode (bspPresentFrameBuffers()); it is never
+// set on its own, so no board can ask for a combination that cannot work.
+//
+// A mode that is not built yet falls back to TRIPLE_PARTIAL, loudly (boot log
+// and System Doctor), so a board never goes dark over it.
+#define BSP_PRESENT_AUTO            0  // the rule decides
+#define BSP_PRESENT_TRIPLE_PARTIAL  1  // 3 FBs; LVGL draws strips, copied (and rotated) into the free FB; stale areas repaired. BUILT (P4 DSI)
+#define BSP_PRESENT_DOUBLE_PARTIAL  2  // as above with 2 FBs, waiting for the panel to switch before reusing one - not built
+#define BSP_PRESENT_DOUBLE_DIRECT   3  // 2 FBs; LVGL draws changed areas straight into the FB, no copy; rotation 0 only - not built (S3 RGB, 2.9 step 4)
+#define BSP_PRESENT_TRIPLE_FULL     4  // 3 FBs; LVGL redraws the whole screen every frame - not built
+#define BSP_PRESENT_TE_SYNC         5  // panel with its own RAM (QSPI): one full frame per TE pulse - not built (CYD_S3_3248, 2.9 step 5)
+#define BSP_PRESENT_NONE            6  // no tear protection: 1 FB, or none on a QSPI panel - not built
+
 struct DisplayConfig {
     const char *PANEL_MODEL;   // LCD driver chip, e.g. ST7701, AXS15231B, ST7262, HX8394, EK79007 - NOT the board model (see BoardHardware.MODEL for that)
     uint32_t    WIDTH;
@@ -155,6 +189,8 @@ struct DisplayConfig {
     uint8_t  PHY_CLK_SRC;
     // Number of DPI framebuffers. 0 = leave the DSI library's default (1) alone, so
     // boards predating this field are unchanged. Waveshare's own Arduino library uses 2.
+    // ARDUINO_GFX PATH ONLY. The esp_lcd path ignores it: there the count follows
+    // from PRESENT_MODE (below). Deleted with Arduino_GFX at 2.9 step 6.
     uint8_t  NUM_FB;
 
     // --- Panel init command tables ---
@@ -182,6 +218,11 @@ struct DisplayConfig {
     // existing board header valid. 0 means "unknown", and bspUiScale() falls
     // back to 1.0 rather than guessing.
     uint8_t                DIAGONAL_IN;
+
+    // How frames reach the panel on the esp_lcd path: a BSP_PRESENT_* code, or 0
+    // (the zero-fill default) to let bspPresentMode() derive it. See the codes
+    // above. Trailing, like DIAGONAL_IN, so no board header has to change.
+    uint8_t                PRESENT_MODE;
 };
 
 // --= Touch Panel =--

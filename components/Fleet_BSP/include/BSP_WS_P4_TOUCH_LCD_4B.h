@@ -12,6 +12,7 @@
 // -------------------------------------------------------------------------
 
 #define WS_P4_4B
+#define BSP_PANEL_DRIVER ST7703   // panel chip, a bare name: picks Fleet_Display's driver and sets PANEL_MODEL (Fleet_BSP.h)
 
 // Panel init commands (ST7703)
 // NOTE: Must stay here, immediately before the structs below - see
@@ -61,7 +62,7 @@ const BoardHardware WS_P4_TOUCH_LCD_4B_HARDWARE = {
 inline const BoardHardware& bsp_hw = WS_P4_TOUCH_LCD_4B_HARDWARE;
 
 const DisplayConfig WS_P4_TOUCH_LCD_4B_DISPLAY = {
-    .PANEL_MODEL = "ST7703",
+    .PANEL_MODEL = BSP_STR(BSP_PANEL_DRIVER),
     .WIDTH       = 720,
     .HEIGHT      = 720,
     .ROTATION    = 0,     // native; owner 2026-09-26: no reason for anything else. Was 2 (USB port on left side - a legacy preference, no longer applicable)

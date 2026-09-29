@@ -2,9 +2,8 @@
 // P4_5 BSP (bsp_display_new_with_handles(), waveshare/esp32_p4_wifi6_touch_lcd_5
 // 1.0.4, esp32_p4_wifi6_touch_lcd_5.c:427-505), with our BSP's values and init
 // commands in place of theirs. docs/research/waveshare-esp-lcd-survey.md §1.
-// The ST7703 (WS_P4_4B, step 3) goes through the same steps; only the
-// driver's constructor differs (its README's example, reference/esp-registry/
-// waveshare__esp_lcd_st7703-v2.0.0).
+// Every chip goes through the same steps; only the driver's constructor
+// differs, and that lives in its wrapper (fleet_dsi_<chip>.c).
 #include "fleet_dsi_panel.h"
 #if SOC_MIPI_DSI_SUPPORTED
 
@@ -12,149 +11,19 @@
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_ldo_regulator.h"
-#include "esp_lcd_mipi_dsi.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
-#include "esp_lcd_hx8394.h"
-#include "esp_lcd_st7703.h"
-#include "esp_lcd_ek79007.h"
-#include "esp_lcd_jd9165.h"
-
-#include "fleet_display_versions.h"
 
 static const char *TAG = "fleet_dsi";
 
-#define FLEET_STR_(x) #x
-#define FLEET_STR(x)  FLEET_STR_(x)
-#define FLEET_VER(chip) FLEET_STR(ESP_LCD_##chip##_VER_MAJOR) "." FLEET_STR(ESP_LCD_##chip##_VER_MINOR) \
-                        "." FLEET_STR(ESP_LCD_##chip##_VER_PATCH)
-
-const char *fleet_dsi_driver_name(fleet_dsi_chip_t chip)
-{
-    switch (chip) {
-    case FLEET_DSI_HX8394:  return "esp_lcd_hx8394 "  FLEET_VER(HX8394)  " (waveshare)";
-    case FLEET_DSI_ST7703:  return "esp_lcd_st7703 "  FLEET_VER(ST7703)  " (waveshare)";
-    case FLEET_DSI_EK79007: return "esp_lcd_ek79007 " FLEET_VER(EK79007) " (espressif)";
-    case FLEET_DSI_JD9165:  return "esp_lcd_jd9165 "  FLEET_VER(JD9165)  " (espressif)";
-    default:                return "none";
-    }
-}
-
-// Each driver has its own init-command type, laid out exactly like ours.
-// Copied rather than cast, as step 2 decided; `n` is 0 when there is no
-// sequence, and the driver then uses its own default.
-#define FLEET_COPY_CMDS(type, cfg, out)                                         \
-    do {                                                                        \
-        (out) = NULL;                                                           \
-        if ((cfg)->init_cmds && (cfg)->init_cmds_count) {                       \
-            (out) = (type *)calloc((cfg)->init_cmds_count, sizeof(type));       \
-            if (!(out)) return ESP_ERR_NO_MEM;                                  \
-            for (size_t i_ = 0; i_ < (cfg)->init_cmds_count; i_++) {            \
-                (out)[i_].cmd        = (cfg)->init_cmds[i_].cmd;                \
-                (out)[i_].data       = (cfg)->init_cmds[i_].data;               \
-                (out)[i_].data_bytes = (cfg)->init_cmds[i_].data_bytes;         \
-                (out)[i_].delay_ms   = (cfg)->init_cmds[i_].delay_ms;           \
-            }                                                                   \
-        }                                                                       \
-    } while (0)
-
-// Create, reset and initialise the panel. The drivers read the init
-// commands only during init(), so the copies are freed straight after.
-static esp_err_t new_hx8394(const fleet_dsi_cfg_t *cfg, esp_lcd_dsi_bus_handle_t bus,
-                            esp_lcd_panel_io_handle_t io, const esp_lcd_dpi_panel_config_t *dpi,
-                            const esp_lcd_panel_dev_config_t *dev_base,
-                            esp_lcd_panel_handle_t *panel)
-{
-    hx8394_lcd_init_cmd_t *cmds;
-    FLEET_COPY_CMDS(hx8394_lcd_init_cmd_t, cfg, cmds);
-    const hx8394_vendor_config_t vendor = {
-        .init_cmds = cmds,
-        .init_cmds_size = (uint16_t)(cmds ? cfg->init_cmds_count : 0),
-        .mipi_config = { .dsi_bus = bus, .dpi_config = dpi, .lane_num = (uint8_t)cfg->num_lanes },
-    };
-    esp_lcd_panel_dev_config_t dev = *dev_base;
-    dev.vendor_config = (void *)&vendor;
-    esp_err_t ret = esp_lcd_new_panel_hx8394(io, &dev, panel);
-    if (ret == ESP_OK) ret = esp_lcd_panel_reset(*panel);
-    if (ret == ESP_OK) ret = esp_lcd_panel_init(*panel);
-    free(cmds);
-    return ret;
-}
-
-static esp_err_t new_st7703(const fleet_dsi_cfg_t *cfg, esp_lcd_dsi_bus_handle_t bus,
-                            esp_lcd_panel_io_handle_t io, const esp_lcd_dpi_panel_config_t *dpi,
-                            const esp_lcd_panel_dev_config_t *dev_base,
-                            esp_lcd_panel_handle_t *panel)
-{
-    st7703_lcd_init_cmd_t *cmds;
-    FLEET_COPY_CMDS(st7703_lcd_init_cmd_t, cfg, cmds);
-    const st7703_vendor_config_t vendor = {
-        .init_cmds = cmds,
-        .init_cmds_size = (uint16_t)(cmds ? cfg->init_cmds_count : 0),
-        .mipi_config = { .dsi_bus = bus, .dpi_config = dpi },
-    };
-    esp_lcd_panel_dev_config_t dev = *dev_base;
-    dev.vendor_config = (void *)&vendor;
-    esp_err_t ret = esp_lcd_new_panel_st7703(io, &dev, panel);
-    if (ret == ESP_OK) ret = esp_lcd_panel_reset(*panel);
-    if (ret == ESP_OK) ret = esp_lcd_panel_init(*panel);
-    free(cmds);
-    return ret;
-}
-
-static esp_err_t new_ek79007(const fleet_dsi_cfg_t *cfg, esp_lcd_dsi_bus_handle_t bus,
-                             esp_lcd_panel_io_handle_t io, const esp_lcd_dpi_panel_config_t *dpi,
-                             const esp_lcd_panel_dev_config_t *dev_base,
-                             esp_lcd_panel_handle_t *panel)
-{
-    ek79007_lcd_init_cmd_t *cmds;
-    FLEET_COPY_CMDS(ek79007_lcd_init_cmd_t, cfg, cmds);
-    const ek79007_vendor_config_t vendor = {
-        .init_cmds = cmds,
-        .init_cmds_size = (uint16_t)(cmds ? cfg->init_cmds_count : 0),
-        .mipi_config = { .dsi_bus = bus, .dpi_config = dpi, .lane_num = (uint8_t)cfg->num_lanes },
-    };
-    esp_lcd_panel_dev_config_t dev = *dev_base;
-    dev.vendor_config = (void *)&vendor;
-    esp_err_t ret = esp_lcd_new_panel_ek79007(io, &dev, panel);
-    if (ret == ESP_OK) ret = esp_lcd_panel_reset(*panel);
-    if (ret == ESP_OK) ret = esp_lcd_panel_init(*panel);
-    free(cmds);
-    return ret;
-}
-
-static esp_err_t new_jd9165(const fleet_dsi_cfg_t *cfg, esp_lcd_dsi_bus_handle_t bus,
-                            esp_lcd_panel_io_handle_t io, const esp_lcd_dpi_panel_config_t *dpi,
-                            const esp_lcd_panel_dev_config_t *dev_base,
-                            esp_lcd_panel_handle_t *panel)
-{
-    jd9165_lcd_init_cmd_t *cmds;
-    FLEET_COPY_CMDS(jd9165_lcd_init_cmd_t, cfg, cmds);
-    const jd9165_vendor_config_t vendor = {
-        .init_cmds = cmds,
-        .init_cmds_size = (uint16_t)(cmds ? cfg->init_cmds_count : 0),
-        .mipi_config = { .dsi_bus = bus, .dpi_config = dpi },
-    };
-    esp_lcd_panel_dev_config_t dev = *dev_base;
-    dev.vendor_config = (void *)&vendor;
-    esp_err_t ret = esp_lcd_new_panel_jd9165(io, &dev, panel);
-    if (ret == ESP_OK) ret = esp_lcd_panel_reset(*panel);
-    if (ret == ESP_OK) ret = esp_lcd_panel_init(*panel);
-    free(cmds);
-    return ret;
-}
-
-esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, fleet_dsi_chip_t chip,
+esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, const fleet_dsi_driver_t *drv,
                               esp_lcd_panel_handle_t *ret_panel, void **fbs)
 {
-    ESP_RETURN_ON_FALSE(cfg && ret_panel && fbs, ESP_ERR_INVALID_ARG, TAG, "invalid argument");
+    ESP_RETURN_ON_FALSE(cfg && drv && drv->create && ret_panel && fbs, ESP_ERR_INVALID_ARG, TAG,
+                        "invalid argument");
     ESP_RETURN_ON_FALSE(cfg->num_fbs >= 1 && cfg->num_fbs <= 3, ESP_ERR_INVALID_ARG, TAG,
                         "num_fbs must be 1-3");
-    const char *name = chip == FLEET_DSI_HX8394  ? "HX8394"
-                     : chip == FLEET_DSI_ST7703  ? "ST7703"
-                     : chip == FLEET_DSI_EK79007 ? "EK79007"
-                     : chip == FLEET_DSI_JD9165  ? "JD9165" : NULL;
-    ESP_RETURN_ON_FALSE(name, ESP_ERR_NOT_SUPPORTED, TAG, "no driver for chip %d", (int)chip);
+    const char *name = drv->name;
 
     esp_err_t ret = ESP_OK;
     esp_ldo_channel_handle_t  ldo   = NULL;
@@ -207,21 +76,16 @@ esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, fleet_dsi_chip_t chip,
         .flags.use_dma2d = 1,
     };
 
-    // 5. The panel, fed our BSP's init sequence (converted to the driver's
-    //    type), then reset and initialised.
+    // 5. The panel, through its wrapper: fed our BSP's init sequence
+    //    (converted to the driver's type), then reset and initialised.
     const esp_lcd_panel_dev_config_t dev = {
         .reset_gpio_num = cfg->reset_gpio,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
         .bits_per_pixel = 16,
-        .vendor_config = NULL,   // each new_*() sets its own
+        .vendor_config = NULL,   // each wrapper sets its own
         .flags.reset_active_high = cfg->reset_active_high ? 1 : 0,
     };
-    switch (chip) {
-    case FLEET_DSI_HX8394:  ret = new_hx8394 (cfg, bus, io, &dpi, &dev, &panel); break;
-    case FLEET_DSI_ST7703:  ret = new_st7703 (cfg, bus, io, &dpi, &dev, &panel); break;
-    case FLEET_DSI_EK79007: ret = new_ek79007(cfg, bus, io, &dpi, &dev, &panel); break;
-    default:                ret = new_jd9165 (cfg, bus, io, &dpi, &dev, &panel); break;   // name check above
-    }
+    ret = drv->create(cfg, bus, io, &dpi, &dev, &panel);
     ESP_GOTO_ON_ERROR(ret, err, TAG, "%s panel", name);
 
     // 6. The frame buffers the panel allocated.

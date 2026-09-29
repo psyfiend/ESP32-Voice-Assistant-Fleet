@@ -12,6 +12,7 @@
 // -------------------------------------------------------------------------
 
 #define CYD_P4_1060
+#define BSP_PANEL_DRIVER JD9165   // panel chip, a bare name: picks Fleet_Display's driver and sets PANEL_MODEL (Fleet_BSP.h)
 
 // --- Init Sequence (Extracted from MTK_JD9165BA...dtsi.txt) ---
 // NOTE: Must stay here, immediately before the structs below - see
@@ -112,7 +113,7 @@ const BoardHardware CYD_P4_1060P470_HARDWARE = {
 inline const BoardHardware& bsp_hw = CYD_P4_1060P470_HARDWARE;
 
 const DisplayConfig CYD_P4_1060P470_DISPLAY = {
-    .PANEL_MODEL = "JD9165",
+    .PANEL_MODEL = BSP_STR(BSP_PANEL_DRIVER),
     .WIDTH       = 1024,
     .HEIGHT      = 600,
     .ROTATION    = 0,

@@ -16,7 +16,8 @@
 //                 copy, no tearing
 //
 // With three buffers there is always one free, so LVGL never waits for the
-// panel. /bench reports the rotation as `copy` and repair + hand-over as
+// panel. This file IS the TRIPLE_PARTIAL present mode (Fleet_BSP.h); it is
+// the only one built, and Fleet_Display::begin() refuses the others. /bench reports the rotation as `copy` and repair + hand-over as
 // `present`; `wait` stays ~0. /bench?what=verify checks the result against
 // LVGL's own render.
 //
@@ -65,7 +66,7 @@ struct Stale {
     uint8_t   n   = 0;
     bool      all = true;     // at boot, every buffer is behind on everything
 };
-Stale s_stale[Fleet_Display::NUM_FBS];
+Stale s_stale[Fleet_Display::MAX_FBS];
 // What the frame being drawn redraws: LVGL's own invalidated areas for this
 // refresh (not the 50-line strips it cuts them into for us - a full-screen
 // redraw is one area, not fifteen), converted to physical. EXACT, never
@@ -291,13 +292,18 @@ esp_err_t ppaBlit(const void *src, uint32_t srcW, uint32_t srcH,
 
 // A buffer the panel is neither scanning nor about to scan. With three there
 // is always one; see Fleet_Display::present() for why reading the two
-// indices without a lock is safe.
+// indices without a lock is safe. THIS IS WHERE THE FLUSH IS TRIPLE-ONLY:
+// with two buffers there is often no such buffer, and the fallback would draw
+// into the one on screen. DOUBLE_PARTIAL would wait here for the panel's
+// frame-complete interrupt instead; Fleet_Display::begin() refuses any mode
+// but TRIPLE_PARTIAL until that is built.
 uint8_t freeBuffer() {
+    const uint8_t n = s_d->numFrameBuffers();
     const uint8_t a = s_d->scanning(), b = s_d->submitted();
-    for (uint8_t i = 0; i < Fleet_Display::NUM_FBS; i++) {
+    for (uint8_t i = 0; i < n; i++) {
         if (i != a && i != b) return i;
     }
-    return (uint8_t)((b + 1) % Fleet_Display::NUM_FBS);   // unreachable with 3
+    return (uint8_t)((b + 1) % n);   // unreachable with 3
 }
 
 // LVGL's list of areas this refresh redraws. Still intact while the refresh
@@ -389,7 +395,7 @@ void beginFrame(lv_display_t *disp) {
 // Last chunk: the other two buffers are now behind by what this frame drew;
 // hand this one to the panel.
 void endFrame() {
-    for (uint8_t i = 0; i < Fleet_Display::NUM_FBS; i++) {
+    for (uint8_t i = 0; i < s_d->numFrameBuffers(); i++) {
         if (i == s_target) continue;
         for (uint8_t k = 0; k < s_nowN; k++) staleAdd(s_stale[i], s_now[k]);
     }
@@ -499,8 +505,10 @@ lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info) {
 
     // Draw buffers: BSP height (50 lines on WS_P4_5) of the LOGICAL width, in
     // PSRAM, aligned for the PPA and the cache (LV_DRAW_BUF_ALIGN is 64 on
-    // this path - lv_conf.h). A second one buys nothing while the flush is
-    // synchronous; honoured anyway, as on the Arduino_GFX path.
+    // this path - lv_conf.h). A second one lets LVGL draw the next strip while
+    // the PPA is still rotating this one (the strip rotations are queued, and
+    // onPpaDone releases the buffer), so DOUBLE_BUFFERING matters here. 1 vs 2
+    // has not been measured on this path.
     const uint32_t lines = bsp_lvgl.DRAW_BUF_HEIGHT > 0 ? bsp_lvgl.DRAW_BUF_HEIGHT : 50;
     size_t bytes = (size_t)lw * lines * 2;
     char bbuf[48];

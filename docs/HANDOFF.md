@@ -11,6 +11,29 @@ not appear in the source as suspect.
 
 ---
 
+## 2026-09-28 - back at the desktop
+
+- **Step 5 below is done** for the two P4s: `.pio/build_cache` cleared, `WS_P4_5` and `WS_P4_4B`
+  rebuilt with the desktop's secrets and flashed; both rejoined the home network.
+- **`CYD_S3_3248`'s USB connector broke off the PCB** (owner). Treat it as unavailable; it can
+  still be powered from the battery/headers and flashed over UART. **The slow dev target is now
+  `WS_S3_TOUCH_LCD_4B` (COM8)**; the fast one is still `WS_P4_5` (COM15). The 4B P4 is COM7.
+- **`WS_S3_4B` on Arduino_GFX loses its picture after days of uptime**: flickering horizontal lines,
+  then the image rolls vertically (the header shows at the bottom); a reboot clears it. The owner
+  has seen the same while trying porch/clock values on the 7B and the P4 4B. Leading theory,
+  unconfirmed: the RGB peripheral losing sync ("drift"), not static timing. **Owner's plan: bring
+  it to esp_lcd (2.9 step 4) first, then troubleshoot there** - it has the resync hook and the
+  timing controls. It runs v0.2.7 (no `/screenshot`); HTTP is refused.
+- **Branch `feat/67-present-mode`** (off `feat/67-bench-anim`), owner-approved:
+  `BSP_PANEL_DRIVER` in every BSP (the driver chosen by name, no per-chip if/else;
+  `PANEL_MODEL` derived from it) and the **present mode** - derived by `bspPresentMode()`,
+  overridable per board by `DisplayConfig.PRESENT_MODE`, framebuffer count following from it,
+  shown in the boot log and System Doctor. Only `TRIPLE_PARTIAL` is built. CLAUDE.md and
+  `components/Fleet_Display/README.md` describe both.
+- `reference/esp-registry/` gained `esp_display_present`, `esp_lv_present` and the
+  `lvgl_present_benchmark` example (IDF >= 6.0, read-only; `REFERENCE_PROJECTS.md` says what is in
+  them for us).
+
 ## Start here - 2026-09-27
 
 **1. The design interview is the next piece of work.** `docs/design/interview-phase2-3.md` is the

@@ -15,6 +15,20 @@
 #include <FleetI2C.h>
 #include "bsp_loader.h"
 
+// Fleet_Display drives MIPI-DSI only so far; RGB and QSPI arrive at 2.9 steps
+// 4 and 5. Said at compile time rather than as a dark panel at boot.
+#if !defined(HAS_MIPI_PANEL)
+#error "DISPLAY_ESPLCD is MIPI-DSI only so far (2.9 steps 4-5 add RGB and QSPI) - remove it from this environment"
+#endif
+#ifndef BSP_PANEL_DRIVER
+#error "This board's BSP header must #define BSP_PANEL_DRIVER (its panel chip, e.g. HX8394) - see Fleet_BSP.h"
+#endif
+
+// The board's panel driver, by name: BSP_PANEL_DRIVER HX8394 declares
+// fleet_dsi_driver_HX8394, defined in fleet_dsi_hx8394.c. A chip with no
+// wrapper is a LINK error naming it (fleet_dsi_panel.h).
+extern "C" const fleet_dsi_driver_t FLEET_DSI_DRIVER(BSP_PANEL_DRIVER);
+
 namespace {
 
 // DSI PHY power. The same values Arduino_GFX hardcodes for every P4 board
@@ -55,19 +69,25 @@ bool Fleet_Display::begin() {
     // audio expect it. Idempotent.
     FleetI2C::begin(bsp_hw.SDA_PIN, bsp_hw.SCL_PIN);
 
-    // One vendored driver per panel controller. Step 2: HX8394 (WS_P4_5).
-    // Step 3: ST7703 (WS_P4_4B); EK79007 (WS_P4_7B) and JD9165 (CYD_P4_1060)
+    // The panel driver comes from the BSP by name (above). HX8394 (WS_P4_5)
+    // and ST7703 (WS_P4_4B) run; EK79007 (WS_P4_7B) and JD9165 (CYD_P4_1060)
     // are vendored and compile, but no board runs them until it is on a desk
     // to be looked at.
-    fleet_dsi_chip_t chip;
-    if      (strcmp(bsp_display.PANEL_MODEL, "HX8394")  == 0) chip = FLEET_DSI_HX8394;
-    else if (strcmp(bsp_display.PANEL_MODEL, "ST7703")  == 0) chip = FLEET_DSI_ST7703;
-    else if (strcmp(bsp_display.PANEL_MODEL, "EK79007") == 0) chip = FLEET_DSI_EK79007;
-    else if (strcmp(bsp_display.PANEL_MODEL, "JD9165")  == 0) chip = FLEET_DSI_JD9165;
-    else {
-        Serial.printf("[Fleet_Display] No esp_lcd driver for panel %s yet\n", bsp_display.PANEL_MODEL);
-        return false;
+    const fleet_dsi_driver_t &drv = FLEET_DSI_DRIVER(BSP_PANEL_DRIVER);
+
+    // How frames reach the panel: the BSP's override, else the rule
+    // (bsp_loader.h). Only TRIPLE_PARTIAL is built (LVGL_Flush_EspLcd.cpp);
+    // anything else is refused here, loudly, so the board still lights up.
+    _modeFromBsp   = bspPresentModeOverridden();
+    _modeRequested = bspPresentMode();
+    if (!_modeFromBsp) bspPresentModeRule(&_modeReason);
+    _mode = _modeRequested;
+    if (_mode != BSP_PRESENT_TRIPLE_PARTIAL) {
+        Serial.printf("[Fleet_Display] WARNING: present mode %s is not built yet - running TRIPLE_PARTIAL\n",
+                      bspPresentModeName(_modeRequested));
+        _mode = BSP_PRESENT_TRIPLE_PARTIAL;
     }
+    _numFbs = bspPresentFrameBuffers(_mode);
 
     _w = bsp_display.WIDTH;
     _h = bsp_display.HEIGHT;
@@ -96,16 +116,16 @@ bool Fleet_Display::begin() {
     // Our proven init sequence (the BSP's), not the driver's default.
     cfg.init_cmds          = reinterpret_cast<const fleet_dsi_init_cmd_t *>(bsp_display.INIT_CMDS_DSI);
     cfg.init_cmds_count    = bsp_display.INIT_CMDS_SIZE;
-    cfg.num_fbs            = NUM_FBS;
+    cfg.num_fbs            = _numFbs;
     static_assert(sizeof(fleet_dsi_init_cmd_t) == sizeof(lcd_init_cmd_t),
                   "BSP init commands and fleet_dsi_init_cmd_t must share a layout");
 
-    esp_err_t err = fleet_dsi_panel_new(&cfg, chip, &_panel, _fb);
+    esp_err_t err = fleet_dsi_panel_new(&cfg, &drv, &_panel, _fb);
     if (err != ESP_OK) {
         Serial.printf("[Fleet_Display] Panel bring-up failed: %s\n", esp_err_to_name(err));
         return false;
     }
-    _driver   = fleet_dsi_driver_name(chip);
+    _driver   = drv.name;
     _lanes    = (uint8_t)cfg.num_lanes;
     _laneMbps = cfg.lane_bit_rate_mbps;
     _pclkHz   = cfg.dpi_clock_hz;
@@ -114,7 +134,7 @@ bool Fleet_Display::begin() {
     // PPA writes them by DMA, and a later write-back of a stale line would
     // overwrite its work. The driver cleared them with the CPU; write that
     // back once, and drop the lines.
-    for (uint8_t i = 0; i < NUM_FBS; i++) {
+    for (uint8_t i = 0; i < _numFbs; i++) {
         esp_cache_msync(_fb[i], frameBufferBytes(),
                         ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_INVALIDATE);
     }
@@ -134,8 +154,10 @@ bool Fleet_Display::begin() {
 
     initBacklightPWM();
     Serial.printf("[Fleet_Display] Ready: %ux%u, %u frame buffers of %u KB, driver %s\n",
-                  (unsigned)_w, (unsigned)_h, (unsigned)NUM_FBS, (unsigned)(frameBufferBytes() / 1024),
+                  (unsigned)_w, (unsigned)_h, (unsigned)_numFbs, (unsigned)(frameBufferBytes() / 1024),
                   _driver);
+    Serial.printf("[Fleet_Display] Present mode: %s (%s%s)\n", bspPresentModeName(_mode),
+                  _modeFromBsp ? "BSP override" : "rule: ", _modeFromBsp ? "" : _modeReason);
     return true;
 }
 
@@ -145,7 +167,7 @@ bool Fleet_Display::begin() {
 // when the panel has in fact moved to i - a belief that only ever keeps us
 // off a buffer, never puts us on the one being shown.
 bool Fleet_Display::present(uint8_t i) {
-    if (i >= NUM_FBS || !_panel) return false;
+    if (i >= _numFbs || !_panel) return false;
     const esp_err_t err = esp_lcd_panel_draw_bitmap(_panel, 0, 0, _w, _h, _fb[i]);
     _submitted = i;
     return err == ESP_OK;

@@ -11,6 +11,7 @@
 // -------------------------------------------------------------------------
 
 #define WS_S3_4B
+#define BSP_PANEL_DRIVER ST7701   // panel chip, a bare name: sets PANEL_MODEL; picks the esp_lcd driver from 2.9 step 4 (Fleet_BSP.h)
 
 // Panel init commands (ST7701)
 // NOTE: Must stay here, immediately before the structs below - see
@@ -161,7 +162,7 @@ const ExpanderConfig WS_S3_TOUCH_LCD_4B_EXPANDER = {
 inline const ExpanderConfig& bsp_expander = WS_S3_TOUCH_LCD_4B_EXPANDER;
 
 const DisplayConfig WS_S3_TOUCH_LCD_4B_DISPLAY = {
-    .PANEL_MODEL = "ST7701",
+    .PANEL_MODEL = BSP_STR(BSP_PANEL_DRIVER),
     .WIDTH       = 480,
     .HEIGHT      = 480,
     .ROTATION    = 0,     // 0 = USB Port on right side
