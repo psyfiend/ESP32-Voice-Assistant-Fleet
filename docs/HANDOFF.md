@@ -32,9 +32,14 @@ not appear in the source as suspect.
   `components/Fleet_Display/README.md` describe both.
 - **`CYD_P4_1060` runs esp_lcd** (JD9165, first light ever for that driver): owner signed off
   C1-C4 on glass, `/bench` verify 0 bad, full frame 104 -> 64 ms (scheme differed between the
-  runs - see `TEST_2.9.md`). Soak not yet run. **The 7B is next** (EK79007, rotation 2); the CYD
-  must come off the desk first (the owner's USB hub). The CYD has a camera - noted in
-  FUTURE_IMPROVEMENTS.
+  runs - see `TEST_2.9.md`). The CYD has a camera - noted in FUTURE_IMPROVEMENTS.
+- **`WS_P4_7B` runs esp_lcd** (EK79007, rotation 2 via the PPA): `/bench` verify 0 bad, full frame
+  101 -> 64 ms (same scheme). **Owner's glass checks B1-B4 not yet reported** - B2 (touch, the
+  unverified `#ifndef WS_P4_7B` passthrough) is the one to watch. **Panel-side 180 degrees was tried
+  and does not work** (the driver's `mirror()`/MADCTL, three builds) - LESSONS, Hardware.
+- `scripts/soak.py` (new): N boards in parallel through `/bench` for `--minutes`; counts failures,
+  bad verify checks, reboots, UI-thread freezes. **A 2-hour soak of the 7B and CYD was to start
+  2026-09-28 ~19:00** - check `bench/soak_*` for the result.
 - `reference/esp-registry/` gained `esp_display_present`, `esp_lv_present` and the
   `lvgl_present_benchmark` example (IDF >= 6.0, read-only; `REFERENCE_PROJECTS.md` says what is in
   them for us).

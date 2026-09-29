@@ -165,6 +165,13 @@ in the display driver compiles out and a failure looks like total silence. It on
 code compiled here; ESP-IDF's own `esp_lcd` internals are prebuilt archives and stay quiet
 regardless.
 
+**A driver's `mirror()` is not proof the panel mirrors.** The EK79007 driver (`WS_P4_7B`)
+implements `mirror()` by sending MADCTL (0x36), and a survey read that as "180 degrees for free".
+On glass (2026-09-28) the picture never moved: after init with both bit pairs, and with 0x36 inside
+the init sequence. In DSI video mode this panel ignores MADCTL. A driver function is what the
+vendor wrote, not what the panel does; the glass decides. (Espressif also advises keeping 0x36 out
+of init sequences: the driver tracks MADCTL itself, and an init-list 0x36 overrides its note.)
+
 ---
 
 ## Memory: internal SRAM is the scarce resource, and not evenly

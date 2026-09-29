@@ -263,6 +263,36 @@ which is why one card costs a little more (4.2 vs 3.5 ms).
 
 ---
 
+## Step 3 continued — `WS_P4_7B` on `esp_lcd` (branch `feat/67-present-mode`, 2026-09-28)
+
+**What changed.** The 7B runs the same esp_lcd path: three frame buffers, Espressif's EK79007
+driver fed our BSP's init sequence and timings, `TRIPLE_PARTIAL`. **It stays at rotation 2**
+(owner: the enclosure puts USB on the left), so the PPA turns every strip 180 degrees. `-D
+DISPLAY_ESPLCD` in its environment; delete that line to go back. `DEBUG_CARDS` is still on for this
+board (its own line), which costs page swipes time on both paths alike.
+
+**Measured by Claude, same scheme (Midnight) both runs** (`bench/fleet-ws-p4-7b_20260928-*`):
+`/bench?what=verify` 40 + 40 checks, **0 bad**; panel refresh 60.5 Hz.
+
+| | Arduino_GFX | esp_lcd |
+|---|---|---|
+| Full-screen redraw (p0) | 101 ms (render 69, copy 32) | 64 ms (render 56, copy 8) |
+| One card | 4.1 ms | 4.5 ms |
+| Deck swap frame | 23 ms (render 16, flush 7.3), none late | 18 ms (render 13.6, flush 4.3), none late |
+| Page change, swipe to glass | 453-518 ms | 418-479 ms |
+
+**Panel-side 180 degrees: tried and rejected** (three builds, owner on glass): the driver's
+`mirror()` changes nothing on this panel. LESSONS.md, Hardware.
+
+**B1 — First light.** Right way round with the USB on the LEFT, right colours.
+**B2 — Touch.** A card in each corner; swipes both ways. **This is the one to watch**: the 7B's
+`TouchManager` passthrough special case (`#ifndef WS_P4_7B`) has never been verified, and the
+display path under it has changed. PASS: taps land under your finger.
+**B3 — Smoothness and leftovers.** Deck swaps, page swipes, drawer, Touch Points panel.
+**B4 — Brightness, scheme, screenshot.**
+
+---
+
 ## Speed optimisation (`-O2`), on `CYD_S3_3248` and `WS_P4_5`
 
 Branch `exp/67-o2`. Both dev boards are now compiled for speed instead of size: 9-14% faster full

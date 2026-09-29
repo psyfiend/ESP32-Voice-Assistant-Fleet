@@ -460,7 +460,7 @@ bool verifyFrameBuffer(VerifyResult &out) {
 
     // Logical (x, y) -> physical, as LVGL_Flush_EspLcd.cpp's toPhysical().
     const uint32_t W = lvgl.w, H = lvgl.h, pw = glass.w, ph = glass.h;
-    const uint8_t rot = (uint8_t)(bsp_display.ROTATION & 3);
+    const uint8_t rot = LVGL_Flush::softwareRotation();   // not the BSP's: the panel may turn it
     out.x1 = (int32_t)W; out.y1 = (int32_t)H; out.x2 = -1; out.y2 = -1;
     for (uint32_t y = 0; y < H; y++) {
         for (uint32_t x = 0; x < W; x++) {

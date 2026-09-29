@@ -459,7 +459,7 @@ namespace LVGL_Flush {
 
 lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info) {
     s_d   = &display;
-    s_rot = (uint8_t)(bsp_display.ROTATION & 3);
+    s_rot = display.softwareRotation();   // 0 when the panel turns the picture itself
     s_pw  = display.panelWidth();
     s_ph  = display.panelHeight();
 
@@ -550,6 +550,8 @@ const void *shownFrameBuffer(uint32_t &w, uint32_t &h) {
 }
 
 uint32_t panelFramesScanned() { return s_d ? s_d->framesScanned() : 0; }
+
+uint8_t softwareRotation() { return s_rot; }
 
 bool copyBench(CopyBench &out, int reps) {
     if (!s_d || !s_ppa || reps < 1) return false;

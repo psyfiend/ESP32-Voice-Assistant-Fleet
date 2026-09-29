@@ -40,6 +40,15 @@ public:
     const char *presentModeReason() const { return _modeReason; }
     uint8_t numFrameBuffers() const      { return _numFbs; }
 
+    // The rotation the flush applies between LVGL and the frame buffer (0-3,
+    // the BSP's meaning). Today always the BSP's ROTATION: no panel turns the
+    // picture itself. TRIED 2026-09-28 on WS_P4_7B (EK79007, rotation 2): the
+    // driver's mirror() - MADCTL 0x36 - with both bit pairs after init, and
+    // 0x36 inside the init sequence before sleep-out; the picture never moved.
+    // In DSI video mode this panel ignores MADCTL (docs/LESSONS.md). Kept as
+    // its own value so a panel that CAN do it only has to change this.
+    uint8_t softwareRotation() const     { return _swRot; }
+
     // Backlight - identical behaviour to DisplayManager's.
     void setBacklight(bool on);
     void setBrightness(uint8_t pct);   // 0-100
@@ -85,6 +94,7 @@ private:
     uint32_t    _pclkHz   = 0;
     void    *_fb[MAX_FBS] = {};
     uint8_t  _numFbs = 0;
+    uint8_t  _swRot = 0;
     uint8_t  _mode = 0, _modeRequested = 0;
     bool     _modeFromBsp = false;
     const char *_modeReason = "";

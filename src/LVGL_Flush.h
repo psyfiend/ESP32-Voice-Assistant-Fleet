@@ -48,6 +48,12 @@ const void *shownFrameBuffer(uint32_t &w, uint32_t &h);
 // rate the panel is REALLY running at, not the one its timing implies.
 uint32_t panelFramesScanned();
 
+// The rotation the flush applies between LVGL and the frame buffer (0-3,
+// Arduino_GFX's meaning). Usually the BSP's ROTATION; 0 when the panel turns
+// the picture itself (Fleet_Display::softwareRotation()). For anything that
+// maps LVGL coordinates onto the frame buffer, e.g. /bench?what=verify.
+uint8_t softwareRotation();
+
 // GET /bench?what=copy: how fast each engine copies frame-buffer memory on
 // this board, PSRAM to PSRAM - the question behind the PPA's unexplained
 // ~110 MB/s (display-stack.md s8.5) and whether esp_async_fbcpy would make

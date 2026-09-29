@@ -126,6 +126,10 @@ bool Fleet_Display::begin() {
         return false;
     }
     _driver   = drv.name;
+
+    // Rotation is the flush's job (the PPA). See softwareRotation() in the
+    // header for why no panel does it itself.
+    _swRot = (uint8_t)(bsp_display.ROTATION & 3);
     _lanes    = (uint8_t)cfg.num_lanes;
     _laneMbps = cfg.lane_bit_rate_mbps;
     _pclkHz   = cfg.dpi_clock_hz;
