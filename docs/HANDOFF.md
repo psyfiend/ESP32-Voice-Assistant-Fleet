@@ -38,8 +38,9 @@ not appear in the source as suspect.
   unverified `#ifndef WS_P4_7B` passthrough) is the one to watch. **Panel-side 180 degrees was tried
   and does not work** (the driver's `mirror()`/MADCTL, three builds) - LESSONS, Hardware.
 - `scripts/soak.py` (new): N boards in parallel through `/bench` for `--minutes`; counts failures,
-  bad verify checks, reboots, UI-thread freezes. **A 2-hour soak of the 7B and CYD was to start
-  2026-09-28 ~19:00** - check `bench/soak_*` for the result.
+  bad verify checks, reboots, UI-thread freezes. **2-hour soak of the 7B and CYD_P4_1060,
+  2026-09-28 19:02-21:02: PASS on both** - 2,859 runs, 9,520 verify checks, 0 failures, 0 bad,
+  0 reboots, worst frame 74 ms (`TEST_2.9.md`). All four P4s now run esp_lcd and have soaked clean.
 - **New board, `CYD_P4_4880` (Guition JC4880P443, 4.3" 480x800 portrait, ST7701 over DSI)** -
   owner's idea for the 3248's successor. Branch `feat/board-cyd-p4-4880` (off
   `feat/67-present-mode`): BSP from Guition's pack + schematic, Espressif's `esp_lcd_st7701` 2.0.2

@@ -259,7 +259,9 @@ which is why one card costs a little more (4.2 vs 3.5 ms).
 > feels at least as smooth as the 7B, "maybe even a tiny bit faster" swiping pages, the log page
 > scrolls smoothly under the finger; in Linen, deck panels and the system panel show no slowdown,
 > but a page swipe onto a Linen page does (expected: Linen's shadows are the expensive draw).
-> **Not yet run:** the 40-minute soak.
+> **Soak, 2026-09-28 19:02-21:02 (2 hours, `scripts/soak.py`, beside the 7B): PASS.** 1,359 runs,
+> 0 failed, 0 UI-thread freezes, 0 reboots; verify 4,520 checks, 0 bad; worst frame 71.8 ms (a page
+> change); lowest internal heap 110,484 B. `bench/soak_fleet-cyd-p4-1060_20260928-190232.jsonl`.
 
 ---
 
@@ -283,6 +285,11 @@ board (its own line), which costs page swipes time on both paths alike.
 
 **Panel-side 180 degrees: tried and rejected** (three builds, owner on glass): the driver's
 `mirror()` changes nothing on this panel. LESSONS.md, Hardware.
+
+> **Soak, 2026-09-28 19:02-21:02 (2 hours, `scripts/soak.py`, beside the CYD): PASS.** 1,500 runs,
+> 0 failed, 0 UI-thread freezes, 0 reboots; verify 5,000 checks, 0 bad - with the PPA turning
+> every strip 180 degrees; worst frame 74.1 ms (a page change); lowest internal heap 110,824 B.
+> `bench/soak_fleet-ws-p4-7b_20260928-190232.jsonl`. **Glass checks B1-B4 not yet reported.**
 
 **B1 — First light.** Right way round with the USB on the LEFT, right colours.
 **B2 — Touch.** A card in each corner; swipes both ways. **This is the one to watch**: the 7B's
