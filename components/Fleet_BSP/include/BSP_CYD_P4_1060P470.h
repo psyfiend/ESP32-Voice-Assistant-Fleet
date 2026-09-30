@@ -108,6 +108,11 @@ const BoardHardware CYD_P4_1060P470_HARDWARE = {
     .SCL_PIN = 8,
     .I2C_CLOCK_SPEED = 400000,
 
+    // BAT+ through R52 68K / R57 100K -> GPIO53 = ADC2 ch4; IP5306 charger/boost.
+    // The same circuit as CYD_P4_4880 (schematic JC1060P470C_I_W_Y-V1.0). x1.680.
+    .BAT_ADC       = 53,
+    .BAT_DIV_X1000 = 1680,
+
     .I2S_AMP_EN = 11,   // PA_CTRL in schematic // ES8311_PA in example sketch
 };
 inline const BoardHardware& bsp_hw = CYD_P4_1060P470_HARDWARE;

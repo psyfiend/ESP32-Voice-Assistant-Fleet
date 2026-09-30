@@ -13,10 +13,13 @@
 // the loop task and is plenty against the ADC's own noise.
 static constexpr int BATT_SAMPLES = 64;
 
-// Below this the pin is not looking at a cell (none fitted, or a divider with
-// nothing behind it). Nothing is written: the cards grey out rather than
-// claiming an empty battery - the SystemProvider rule about confident lies.
-static constexpr int BATT_MIN_PLAUSIBLE_MV = 2500;
+// Below this there is no usable cell, so nothing is written and the cards grey
+// out rather than claiming an empty battery - the SystemProvider rule about
+// confident lies. 3.2 V, not lower: with no cell fitted a charger's BAT pin
+// floats at 2.9-3.1 V (measured on CYD_P4_4880, IP5306), and a board running
+// on its battery shuts down near 3.0 V anyway - so a running board that reads
+// under 3.2 V is on USB with no cell, or a dead one.
+static constexpr int BATT_MIN_PLAUSIBLE_MV = 3200;
 
 bool BatteryProvider::begin(EntityRegistry *reg) {
     if (_begun || !reg) return _begun;
