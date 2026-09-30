@@ -7,6 +7,7 @@
 #include <esp_chip_info.h>
 #include <esp_idf_version.h>
 #include <esp_timer.h>
+#include <time.h>
 #include "sdkconfig.h"
 
 // FW_VERSION/FW_COMMIT are injected from `git describe` by
@@ -380,6 +381,23 @@ void run(SystemCore &core, bool echoSerial) {
     #endif
 
     line("=== SYSTEM DIAGNOSTICS ===");
+
+    // When this report was taken: uptime always, wall-clock time once
+    // something has set the clock. Nothing does yet (no SNTP, no RTC read), so
+    // it says so rather than printing 1970.
+    {
+        const uint32_t s = (uint32_t)(esp_timer_get_time() / 1000000);
+        char when[40] = "not set (no time source yet)";
+        const time_t now = time(nullptr);
+        if (now > 1700000000) {   // any real date is past late 2023
+            struct tm tmv;
+            localtime_r(&now, &tmv);
+            strftime(when, sizeof(when), "%Y-%m-%d %H:%M:%S", &tmv);
+        }
+        line("  Uptime: %lud %02lu:%02lu:%02lu   Time: %s",
+             (unsigned long)(s / 86400), (unsigned long)(s / 3600 % 24),
+             (unsigned long)(s / 60 % 60), (unsigned long)(s % 60), when);
+    }
 
     // Firmware identity first, so a photo of the screen or a pasted serial dump
     // always says which build it came from.

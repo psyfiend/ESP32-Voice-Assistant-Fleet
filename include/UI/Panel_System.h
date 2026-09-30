@@ -60,8 +60,8 @@ public:
     // redraw as output arrives rather than only when it is reopened.
     void setLogOnChange(std::function<void(const char *)> cb) { _log_on_change = cb; }
 
-    // Empty the log and tell any listener. The "Clear log" button, so a fresh
-    // dump is not stacked underneath the previous three.
+    // Empty the log and tell any listener. Every Dump runs this first, so the
+    // log page holds exactly one report (GUIManager's dumpFresh).
     void clearLog() {
         _log_text.clear();
         _log_queue.clear();

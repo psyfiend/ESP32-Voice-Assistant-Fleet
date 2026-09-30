@@ -53,10 +53,9 @@ void Panel_System::anim_height_cb(void * var, int32_t v) {
 void Panel_System::btn_action_cb(lv_event_t* e) {
     Panel_System* p = (Panel_System*)lv_event_get_user_data(e);
     
-    if (p) {
-        p->log("> Action: Dump Config...");
-        if (p->_onDumpRequested) p->_onDumpRequested();
-    }
+    // No "> Action" marker line any more: the dump empties the log first, so
+    // the report's own header is the first line.
+    if (p && p->_onDumpRequested) p->_onDumpRequested();
 }
 
 void Panel_System::reportSink(const char *line) {

@@ -10,7 +10,6 @@ lv_obj_t *s_previous = nullptr;
 lv_obj_t *s_label    = nullptr;
 
 std::function<void()> s_onDump  = nullptr;
-std::function<void()> s_onClear = nullptr;
 std::function<void()> s_onClose = nullptr;
 
 lv_obj_t *topButton(lv_obj_t *parent, const char *text, lv_event_cb_t cb) {
@@ -34,7 +33,6 @@ lv_obj_t *topButton(lv_obj_t *parent, const char *text, lv_event_cb_t cb) {
 namespace LogPage {
 
 void setDumpHandler (std::function<void()> cb) { s_onDump  = cb; }
-void setClearHandler(std::function<void()> cb) { s_onClear = cb; }
 void setCloseHandler(std::function<void()> cb) { s_onClose = cb; }
 
 void close() {
@@ -109,12 +107,10 @@ void show(const char *text) {
         // would redraw the text from before the dump - which is exactly what it
         // used to do, and why the owner had to leave the page and come back.
         // The drain notifies us instead, and the log scrolls as it fills.
+        // The handler empties the log first, so the page shows this one report
+        // alone. There is no Clear button: with one report on the page there
+        // is nothing to clear (owner, 2026-09-30).
         if (s_onDump) s_onDump();
-    });
-
-    topButton(bar, "Clear", [](lv_event_t *e) {
-        (void)e;
-        if (s_onClear) s_onClear();
     });
 
     // The report itself. This is the scroller that used to live inside the
