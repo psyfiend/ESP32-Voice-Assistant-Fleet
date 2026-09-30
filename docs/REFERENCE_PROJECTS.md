@@ -265,7 +265,7 @@ dependencies (`i2c_bus`, `esp_codec_dev`, `esp_lcd_touch_gt911`, ...) were NOT f
 
 Also relevant to step 2 and already here: Allsky's `ppa_accelerator.h` (above) - read only.
 
-Added the same day for the Waveshare survey (`docs/research/waveshare-esp-lcd-survey.md`), for
+Added the same day for the Waveshare survey (`docs/archive/display/waveshare-esp-lcd-survey.md`), for
 steps 3-4: the S3-4B BSP 2.0.0 (its ST7701-over-expander bring-up), `esp_lcd_st7701`,
 `esp_lcd_panel_io_additions` (3-wire SPI through an I/O expander), and the three other P4 panel
 drivers - `esp_lcd_ek79007` (7B), `esp_lcd_st7703` (4B), `esp_lcd_jd9165` (CYD_P4_1060).

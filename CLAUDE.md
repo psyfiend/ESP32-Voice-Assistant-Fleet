@@ -16,10 +16,12 @@ elsewhere, and it is worth checking those first for "is X already known or plann
 | `docs/LESSONS.md` | Mistakes that cost real time, written down so they cost it once |
 | `docs/FUTURE_IMPROVEMENTS.md` | Deliberately deferred fleet-wide work |
 | `docs/REFERENCE_PROJECTS.md` | What is in `reference/`, what to mine from it, and its licensing |
+| `docs/display/README.md` | The display stack: status per board, open issues, and which file answers what |
 | `docs/BRINGUP_*.md` | Per-board bring-up history for the two boards that fought back |
 | GitHub issues | What is in flight right now, and what is blocked |
 
-`docs/GUI_FRAMEWORK.md` is superseded by the roadmap and retained only as a pointer.
+`docs/archive/` holds finished test sheets and superseded design/research documents, unchanged, for
+the reasoning behind decisions. Where one disagrees with a live document, the live one wins.
 
 ## STOP — how to edit files in this repo (read before your first edit)
 
@@ -214,8 +216,9 @@ reads closer to official ESP-IDF audio examples.
 `HAS_RGB_PANEL` / `HAS_QSPI_PANEL` / `HAS_MIPI_PANEL`.
 
 **Being replaced board by board in milestone 2.9 (#67)**: Arduino_GFX -> raw `esp_lcd`, behind a
-per-board build flag. Everything below describes the Arduino_GFX path, which is still what every
-board runs until its turn. Plan: `docs/design/display-stack.md`.
+per-board `-D DISPLAY_ESPLCD`. Six boards have moved (all five P4s and `WS_S3_4B`); the esp_lcd path
+is described in `docs/display/architecture.md`. Everything below describes the Arduino_GFX path,
+which `CYD_S3_8048`, `WS_S3_5B` and `CYD_S3_3248` still run.
 
 - **QSPI boards**: wrapped in `Arduino_Canvas`, a software-rotation layer. The raw panel
   driver (e.g. `Arduino_AXS15231B`) is always constructed with `rotation=0`; `Canvas` alone
@@ -455,9 +458,10 @@ add a new `DEBUG_<AREA>` flag for future debugging needs rather than ad-hoc unco
 - **Present mode (esp_lcd path): derived, with a per-board override.** `bspPresentMode()` in
   `bsp_loader.h` picks how frames reach the panel from the bus flag, the rotation and the TE pin;
   `DisplayConfig.PRESENT_MODE` (a `BSP_PRESENT_*` code, 0 = use the rule) overrides it on one
-  board. The framebuffer count follows from the mode and is never set on its own. Only
-  `TRIPLE_PARTIAL` is built; `Fleet_Display::begin()` refuses anything else, loudly, and runs
-  that. The boot log and the System Doctor say which mode and why. `DisplayConfig.NUM_FB` is
+  board. The framebuffer count follows from the mode and is never set on its own. One mode is
+  built per bus - `TRIPLE_PARTIAL` on DSI, `DOUBLE_DIRECT` on RGB; `Fleet_Display::begin()` refuses
+  anything else, loudly, and runs the bus's own. The boot log and the System Doctor say which mode
+  and why. `docs/display/architecture.md` §3. `DisplayConfig.NUM_FB` is
   Arduino_GFX-only and dies at 2.9 step 6.
 - Prefer runtime checks over `static_assert` for validating BSP struct field values — the
   struct instances are declared `const`, not `constexpr`, so they aren't usable in constant

@@ -1,7 +1,7 @@
 #pragma once
 //
 // Fleet_Display - the board's display on raw esp_lcd. Milestone 2.9 (#67):
-// docs/design/esplcd-step2.md, whose §7 A is the owner's decision behind this
+// docs/archive/display/esplcd-step2.md, whose §7 A is the owner's decision behind this
 // library existing at all.
 //
 // Built only with -D DISPLAY_ESPLCD. Every other board uses DisplayManager

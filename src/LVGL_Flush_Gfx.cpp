@@ -151,7 +151,7 @@ lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info) {
     //
     // 2.9 confirmed the owner's caveat from source: this path's flush is
     // synchronous, so the second buffer buys nothing on any board
-    // (docs/design/display-stack.md §2). It stays honoured, not removed, until
+    // (docs/archive/display/display-stack.md §2). It stays honoured, not removed, until
     // each board moves to the esp_lcd path.
     if (bsp_lvgl.DOUBLE_BUFFERING) {
         s_draw_buf2 = (uint16_t *)allocDrawBuf(byte_count, malloc_flags);

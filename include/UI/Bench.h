@@ -2,7 +2,7 @@
 //
 // Bench - GET /bench times where a frame goes: LVGL drawing it, or the flush
 // getting it onto the glass. Milestone 2.9 (#67), step 1 of
-// docs/design/display-stack.md: every later step of the esp_lcd migration is
+// docs/archive/display/display-stack.md: every later step of the esp_lcd migration is
 // judged against these numbers.
 //
 //   GET /bench?n=20&what=full&page=0&deck=1

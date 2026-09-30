@@ -1,7 +1,7 @@
 // fleet_dsi_panel - see fleet_dsi_panel.h. The sequence is Waveshare's own
 // P4_5 BSP (bsp_display_new_with_handles(), waveshare/esp32_p4_wifi6_touch_lcd_5
 // 1.0.4, esp32_p4_wifi6_touch_lcd_5.c:427-505), with our BSP's values and init
-// commands in place of theirs. docs/research/waveshare-esp-lcd-survey.md §1.
+// commands in place of theirs. docs/archive/display/waveshare-esp-lcd-survey.md §1.
 // Every chip goes through the same steps; only the driver's constructor
 // differs, and that lives in its wrapper (fleet_dsi_<chip>.c).
 #include "fleet_dsi_panel.h"

@@ -21,7 +21,7 @@ flashed** — identical on-device behaviour is still unverified.
 > **The three display items below have one answer: move off Arduino_GFX onto `esp_lcd`.**
 > Scheduled as **ROADMAP milestone 2.9**, after the card system and before Phase 3 — deliberately
 > given a slot rather than left as an ephemeral "later". Full analysis in
-> `docs/research/display-stack-migration.md`. The short version is here so this file stands alone.
+> `docs/archive/display/display-stack-migration.md`. The short version is here so this file stands alone.
 
 ### 2.9 — Arduino_GFX to `esp_lcd`
 
@@ -199,7 +199,7 @@ where the fork and the vendors are known to disagree, and the disagreement is no
 > **`Arduino_GFX::getFrameBuffer()` returns a single `uint16_t *`.** No amount of fixing behind
 > that signature produces double buffering; the API shape is the ceiling. That is the concrete,
 > verified argument for going to `esp_lcd` directly rather than patching the wrapper — see
-> `docs/research/display-stack-migration.md`.
+> `docs/archive/display/display-stack-migration.md`.
 
 - **RGB path** — our fork requests `.num_fbs = 2` but `getFrameBuffer()` returns index
   1, so it never actually double-buffers (the item above). Two buffers of PSRAM paid for, one
@@ -383,7 +383,7 @@ Architecture agreed so far:
   `MqttManager` walks it at connect time and publishes discovery payloads with the device ID
   injected centrally (`<device_id>_<object_id>` as `unique_id`), so descriptors stay portable
   across boards and never need to know their own device ID. This is the same underlying
-  problem as `docs/GUI_FRAMEWORK.md`'s manifest/data-source-abstraction vision (layer 3) —
+  problem as `docs/archive/GUI_FRAMEWORK.md`'s manifest/data-source-abstraction vision (layer 3) —
   worth building with an eye toward that reuse, not as a throwaway.
 - **NVS encryption: deferred, not designed out.** The standard scheme ties NVS encryption to
   full flash encryption (irreversible eFuse burn in release mode, not something to flip while

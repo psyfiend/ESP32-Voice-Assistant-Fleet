@@ -1,7 +1,7 @@
 #pragma once
 //
 // LVGL_Flush - how LVGL's finished pixels reach the panel. Private to
-// LVGL_Startup. Milestone 2.9 (#67), docs/design/esplcd-step2.md §7 A.
+// LVGL_Startup. Milestone 2.9 (#67), docs/archive/display/esplcd-step2.md §7 A.
 //
 // Exactly ONE of these is compiled into a build, each wholly inside one #if:
 //

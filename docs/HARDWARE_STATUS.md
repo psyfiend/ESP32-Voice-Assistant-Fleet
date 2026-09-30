@@ -25,7 +25,8 @@ with `-D BSP_HEADER='"BSP_<NAME>.h"'` alone.
 
 ## Per-board test status
 
-Updated 2026-09-08.
+Updated 2026-09-08; the 4880 row 2026-09-29. **The Display column predates 2.9: for each board's
+display path, present mode, soak and glass sign-off, `docs/display/README.md` is current.**
 
 | Board | Env | Display | Touch | Audio out | Audio in | WiFi STA | MQTT + HA |
 |---|---|---|---|---|---|---|---|
@@ -37,7 +38,7 @@ Updated 2026-09-08.
 | **CYD_S3_3248** Guition JC3248W535 3.5" | `CYD_S3_3248W535` | ✅ **portrait (rot 0) as of 2026-09-10** | ✅ both rotations | ✅ | ✅ | ✅ | ✅ **on current build** |
 | **CYD_S3_8048** Guition JC8048W550 5" | `CYD_S3_8048W550` | ✅ brightness slider dead | ✅ | ✅ notably quiet | ✅ | ✅ | ✅ |
 | **WS_S3_5B** ESP32-S3-Touch-LCD-5B | `WS_S3_TOUCH_LCD_5B` | ✅ visible tearing | ✅ 5 points | N/A no audio hw | N/A | ✅ | ✅ |
-| **CYD_P4_4880** Guition JC4880P443 4.3" | `CYD_P4_4880P443` | **never flashed** - BSP built 2026-09-28 from Guition's pack, compiles | never run | never run | never run | never run | never run |
+| **CYD_P4_4880** Guition JC4880P443 4.3" | `CYD_P4_4880P443` | ✅ esp_lcd from bring-up, portrait 2x5 | ✅ | not tested | not tested | ✅ | ✅ |
 
 **2026-09-28: `CYD_S3_3248`'s USB connector broke off the PCB** (owner). Unavailable until
 repaired; it can still be powered by battery/headers and flashed over UART.
