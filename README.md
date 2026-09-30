@@ -8,6 +8,12 @@ Guition, 3.5" to 7", one codebase, the board picked at build time.
 [roadmap](docs/ROADMAP.md)). The dashboard runs on every board; voice is on the roadmap for later.
 MIT licensed - see [License](#license).
 
+<p align="center">
+  <img src="images/ws-p4-5-house-linen.png" width="100%" alt="The House page on the 5-inch Waveshare P4, Linen scheme">
+  <br><em>The House page on the 5" Waveshare P4 (1280x720), in the light Linen scheme - the owner's
+  Home Assistant entities, grouped by area.</em>
+</p>
+
 ## The dashboard idea
 
 The screen is a grid of **cards**, and every card is bound to an **entity** - a light, a
@@ -22,6 +28,12 @@ real pixel density gives the column count, and when a small screen runs out of r
 lowest-priority cards drop first. One page definition gives 7 columns on a 7" panel and 2 on a
 3.5" portrait one: the same page, trimmed to fit. Swipe between pages; tap a card to toggle it
 (long-press controls - brightness, colour - are next on the roadmap).
+
+<p align="center">
+  <img src="images/ws-p4-4b-fleet-page.png" width="480" alt="The Fleet page on the 4-inch Waveshare P4">
+  <br><em>The Fleet page on the 4" 720x720 P4, Midnight scheme: switches, lamps, a sensor with its
+  lux reading, the panel's own telemetry, and two test switches showing a command that failed.</em>
+</p>
 
 ## What makes it interesting
 
@@ -43,6 +55,12 @@ lowest-priority cards drop first. One page definition gives 7 columns on a 7" pa
   (`esp_lcd`, `esp_http_server`, the oneshot ADC driver) to keep a future move to pure ESP-IDF
   straightforward.
 
+<p align="center">
+  <img src="images/ws-p4-7b-display-panel.png" width="100%" alt="The 7-inch Waveshare P4 with the display panel open">
+  <br><em>The 7" 1024x600 P4 with the Display panel open: live brightness, and the Show Touches
+  overlay tracking a finger on the slider.</em>
+</p>
+
 ## The boards
 
 | Environment | Board | SoC | Screen |
@@ -59,6 +77,12 @@ lowest-priority cards drop first. One page definition gives 7 columns on a 7" pa
 
 Per-board status and quirks: [docs/HARDWARE_STATUS.md](docs/HARDWARE_STATUS.md) and, for the
 display, [docs/display/README.md](docs/display/README.md).
+
+<p align="center">
+  <img src="images/cyd-p4-4880-portrait.png" width="300" alt="The House page on the 4.3-inch Guition P4 in portrait">
+  <br><em>The same House page on the 4.3" Guition P4 in portrait (480x800): two columns, derived
+  from the screen, with the lowest-priority cards left off.</em>
+</p>
 
 ## How it is built
 
