@@ -127,6 +127,14 @@ const char *cardCornerIcon(const Entity &e, bool cardHasHero) {
         if (const char *g = mdiGlyph(d.icon))       return g;
         if (const char *g = mdiGlyph(e.attrs.icon)) return g;
     }
+
+    // 3. A battery percentage draws its level, the same six steps the status
+    //    row uses for a secondary battery.
+    if (dc(d, "battery") && e.everSet && strcmp(d.unit, "%") == 0 &&
+        (e.value.type == ValueType::INT || e.value.type == ValueType::FLOAT)) {
+        return cardBatteryGlyph(e.value.type == ValueType::INT ? (int)e.value.i
+                                                               : (int)e.value.f);
+    }
     return classIcon(d);
 }
 

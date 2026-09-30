@@ -103,6 +103,7 @@ const BoardHardware CYD_P4_4880P443_HARDWARE = {
 
     .BOOT_BUTTON_PIN = 35,  // GPIO35 BOOTMODE, SW1 (schematic p.3)
     .BAT_ADC         = 53,  // BAT+ through 68K/100K (x0.595) -> GPIO53 = ADC2 ch4, as Guition's adc_test (schematic p.4)
+    .BAT_DIV_X1000   = 1680, // (68K + 100K) / 100K
 
     .I2S_AMP_EN = 11,   // PA_CTRL (schematic p.3); BSP_POWER_AMP_IO in Guition's BSP
 };

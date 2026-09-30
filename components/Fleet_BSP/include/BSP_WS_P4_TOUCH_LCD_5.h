@@ -62,6 +62,11 @@ const BoardHardware WS_P4_TOUCH_LCD_5_HARDWARE = {
     // any of their own init code) during this board's bring-up.
     .I2C_CLOCK_SPEED = 400000,
 
+    // BAT through R12 200K / R15 100K -> GPIO20 = ADC1 ch4 ("BAT_ADC", schematic);
+    // charger ETA6098. x3.000.
+    .BAT_ADC       = 20,
+    .BAT_DIV_X1000 = 3000,
+
     .I2S_AMP_EN = 53,
 };
 inline const BoardHardware& bsp_hw = WS_P4_TOUCH_LCD_5_HARDWARE;

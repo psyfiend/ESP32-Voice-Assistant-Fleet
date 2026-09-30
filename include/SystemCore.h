@@ -17,6 +17,7 @@
 #include "MqttManager.h"
 #include "EntityRegistry.h"
 #include "SystemProvider.h"
+#include "BatteryProvider.h"
 #include "HaPublisher.h"
 #include "MqttProvider.h"
 #include "VirtualProvider.h"
@@ -55,6 +56,7 @@ public:
     EntityRegistry      &entities() { return _entities; }
     HaClient            &ha()       { return _ha; }
     HttpServer          &http()     { return _http; }
+    BatteryProvider     &battery()  { return _battProvider; }
 #ifdef HAS_AUDIO_HW
     AudioManager        &audio()    { return _audio; }
 #endif
@@ -84,6 +86,9 @@ private:
     // This board's own telemetry into the registry. Writes values only - never
     // renders, never publishes.
     SystemProvider      _sysProvider;
+
+    // Battery % and mV, on boards whose BSP declares a battery ADC. Idle elsewhere.
+    BatteryProvider     _battProvider;
 
     // Announces the entities we own to Home Assistant and publishes their
     // values. Ignores anything with advertise = false.
