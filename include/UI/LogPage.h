@@ -30,14 +30,10 @@ namespace LogPage {
 // text is the accumulated report, owned by the caller and only read here.
 void show(const char *text);
 
-// What the "Dump" button runs - the full System Doctor, re-rendered. Registered
-// by GUIManager, which is the only thing that can reach SystemCore.
+// What the "Dump" button runs - the full System Doctor, re-rendered in place of
+// the previous one (the page holds a single report; there is no Clear button).
+// Registered by GUIManager, which is the only thing that can reach SystemCore.
 void setDumpHandler(std::function<void()> cb);
-
-// What the "Clear" button runs. The log is a tail that keeps growing, so
-// without this a fresh dump lands underneath the previous three and the thing
-// you asked for is the part scrolled off the bottom.
-void setClearHandler(std::function<void()> cb);
 
 // Run when the page closes, so the dashboard can be rebuilt.
 void setCloseHandler(std::function<void()> cb);

@@ -665,12 +665,18 @@ void GUIManager::begin() {
     // into - visible in the owner's photos with Slate on screen. Say the truth.
     _pnlSystem.setSchemeLabel(UI::pal().name);
 
-    // The System panel's "Dump Config" button re-runs the report with Serial
-    // echo on. Registered rather than reached for: Panel_System used to call
-    // an `extern void debug_dump_config(bool)` straight into main.
-    _pnlSystem.setOnDumpRequested([this]() {
-        SystemReport::run(_core, true); // manually triggered - mirror to Serial too
-    });
+    // Every Dump button runs this: the log is emptied first, so the page shows
+    // exactly ONE report, whole, top to bottom (owner, 2026-09-30 - there is no
+    // Clear button any more). Manually triggered, so mirrored to Serial too.
+    auto dumpFresh = [this]() {
+        _pnlSystem.clearLog();
+        SystemReport::run(_core, true);
+    };
+
+    // The System panel's "Dump Config" button. Registered rather than reached
+    // for: Panel_System used to call an `extern void debug_dump_config(bool)`
+    // straight into main.
+    _pnlSystem.setOnDumpRequested(dumpFresh);
 
     // The card binder. Started AFTER UI::begin() because a card reads tokens
     // the moment it is built, and before any page exists because a page
@@ -710,9 +716,7 @@ void GUIManager::begin() {
     // here - see the note on the button in LogPage.cpp. Calling refresh() on
     // this line redrew the text from before the dump, because every line was
     // still queued.
-    LogPage::setDumpHandler([this]() { SystemReport::run(_core, true); });
-
-    LogPage::setClearHandler([this]() { _pnlSystem.clearLog(); });
+    LogPage::setDumpHandler(dumpFresh);
 
     // The single wire that makes the log live: Panel_System drains five lines
     // a tick and tells us, so an open page scrolls as output arrives. It is
@@ -742,7 +746,7 @@ void GUIManager::begin() {
 
     // The card page's own Dump button runs the same report the System panel's
     // does, Serial echo and all.
-    CardDemo::setDumpHandler([this]() { SystemReport::run(_core, true); });
+    CardDemo::setDumpHandler(dumpFresh);
 
     // The bench derives the grid from its own host - a screen minus a button
     // bar - and UI::grid() is global. Rebuilding on the way back is the only

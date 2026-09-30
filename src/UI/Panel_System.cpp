@@ -53,10 +53,9 @@ void Panel_System::anim_height_cb(void * var, int32_t v) {
 void Panel_System::btn_action_cb(lv_event_t* e) {
     Panel_System* p = (Panel_System*)lv_event_get_user_data(e);
     
-    if (p) {
-        p->log("> Action: Dump Config...");
-        if (p->_onDumpRequested) p->_onDumpRequested();
-    }
+    // No "> Action" marker line any more: the dump empties the log first, so
+    // the report's own header is the first line.
+    if (p && p->_onDumpRequested) p->_onDumpRequested();
 }
 
 void Panel_System::reportSink(const char *line) {
@@ -609,11 +608,17 @@ void Panel_System::log(const char* fmt, ...) {
     // No Serial mirroring here. SystemReport owns that decision now, and
     // doing it in both places would double every report line.
 
-    // Push to Queue
-    if (_log_queue.size() < 100) { // Limit queue depth
+    // Push to the queue, bounded by bytes (see _log_queue_bytes). A line that
+    // does not fit is counted, and the count is reported in the log itself
+    // when the queue drains - a cut that says so, not a silent one.
+    const size_t len = strlen(buf) + 1;
+    if (_log_queue_bytes + len <= LOG_TAIL_MAX) {
         _log_queue.push_back(std::string(buf));
-        _log_dirty = true;
+        _log_queue_bytes += len;
+    } else if (_log_dropped < UINT16_MAX) {
+        _log_dropped++;
     }
+    _log_dirty = true;
 }
 
 void Panel_System::updateSystemStats(float voltage, float current, int wifi_rssi) {
@@ -636,10 +641,18 @@ void Panel_System::_tick() {
         // widget five lines per tick whether or not anyone was looking at it.
         int processed = 0;
         while (!_log_queue.empty() && processed < 5) {
+            _log_queue_bytes -= _log_queue.front().size() + 1;
             _log_text += _log_queue.front();
             _log_text += "\n";
             _log_queue.erase(_log_queue.begin());
             processed++;
+        }
+        if (_log_queue.empty() && _log_dropped) {
+            char note[64];
+            snprintf(note, sizeof(note), "(log: %u lines dropped - queue full)\n",
+                     (unsigned)_log_dropped);
+            _log_text += note;
+            _log_dropped = 0;
         }
 
         // A TAIL, TRIMMED FROM THE FRONT - not a bucket that empties itself.
@@ -661,7 +674,7 @@ void Panel_System::_tick() {
             _log_text.erase(0, (nl == std::string::npos) ? cut : nl + 1);
         }
 
-        if (_log_queue.empty()) _log_dirty = false;
+        if (_log_queue.empty() && !_log_dropped) _log_dirty = false;
 
         // REDRAW WHILE THE PAGE IS OPEN.
         //
