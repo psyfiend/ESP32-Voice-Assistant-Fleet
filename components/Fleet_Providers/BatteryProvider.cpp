@@ -41,6 +41,12 @@ static constexpr float BATT_FLAT_MV_MIN  = 1.0f;
 
 bool BatteryProvider::begin(EntityRegistry *reg) {
     if (_begun || !reg) return _begun;
+    // Two conditions, deliberately separate: the BOARD can take a battery (the
+    // BSP's divider), and this UNIT has one fitted (-D HAS_BATTERY in its
+    // environment - owner, 2026-09-30: not every board will carry a cell).
+#ifndef HAS_BATTERY
+    return false;
+#endif
     if (bsp_hw.BAT_DIV_X1000 == 0) return false;   // this board has no battery ADC
 
     adc_unit_t unit;

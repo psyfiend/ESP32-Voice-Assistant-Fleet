@@ -314,6 +314,11 @@ void reportPower(SystemCore &core) {
 
     BatteryProvider &b = core.battery();
     if (!b.active()) {
+#ifndef HAS_BATTERY
+        if (bsp_hw.BAT_DIV_X1000)
+            SystemReport::line("  Battery: this board has an input, but HAS_BATTERY is not set for it");
+        else
+#endif
         SystemReport::line("  Battery: no battery input on this board");
         return;
     }

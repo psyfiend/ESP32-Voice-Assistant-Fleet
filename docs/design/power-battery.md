@@ -1,7 +1,9 @@
 # Power and battery
 
-**Status (2026-09-30): prototype on branch `feat/battery-card`, not merged.** Tracker: #72 (tests
-P1-P6 and every bench result, in its comments). This file is the current picture: what each board's
+**Status (2026-09-30): prototype, merged to `main`.** Tracker: #72 (tests P1-P6 and every bench
+result, in its comments). P1-P3 pass on the 7B; P5 fails (below, §4); P6 not run. The owner's
+direction: do not perfect the voltage inference - use fuel gauges (MAX17043 boards ordered) on the
+units that really carry a battery. This file is the current picture: what each board's
 power hardware is, how it behaves on glass, how the firmware reads it, and what is open. Header
 glyphs: #19. RTC backup cells: #32.
 
@@ -25,6 +27,12 @@ divider above comes from the vendor schematic; the 4880's was checked against a 
 **BSP fields:** `BoardHardware.BAT_ADC` (the pin) and `BAT_DIV_X1000` (the divider's
 (top + bottom) / bottom x 1000). **`BAT_DIV_X1000 = 0` means no battery input** - needed because
 `BAT_ADC`'s own zero-fill default is a real GPIO.
+
+**`-D HAS_BATTERY`** (per environment, `platformio.ini`) says **this unit carries a cell**. The
+BSP says the *board* can take one; the flag says *this device* has one - not every board will
+(owner, 2026-09-30). All battery logic runs only when both hold: the provider, the entities and
+cards, `[POWER]`'s battery lines, and later the header glyph and charging logic. Set on
+`WS_P4_7B` and `CYD_P4_4880` today. The Doctor says so when a board has an input but no flag.
 
 ## 2. Behaviour measured on glass
 
@@ -82,8 +90,14 @@ and at once on a step.
 
 ## 4. Open
 
-- **No-cell detection on the ETA6098 boards** (5, 7B): the pin reads like a full cell. Candidate:
-  the step when a cell is connected or removed on USB power. Untested.
+- **No-cell detection - on BOTH chargers while USB is present** (P5 FAIL, 2026-09-30): pull the
+  cell from a running 4880 and the IP5306 holds BAT at ~4.16 V for as long as USB is there, like
+  the ETA6098; the 2.9-3.1 V "no cell" reading only happens on a cold boot with no cell ever
+  fitted. The removal shows as a +step on external power, which the inference currently misreads
+  as "a charger arrived" - a candidate rule, not worth perfecting (owner): fuel gauges are the
+  answer for units that carry a battery.
+- **MAX17043 fuel gauge** (owner has ordered boards): I2C 0x36, state of charge in % directly - a
+  third source behind the same entities, for the units fitted with one.
 - **Deciding sooner after a mains loss**: a power-on boot with no USB host and a falling voltage
   could be called "on battery" in well under 3 minutes.
 - **The AXP2101 on `WS_S3_4B`**: a second source behind the same entities, with a real charging
