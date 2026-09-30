@@ -1,5 +1,5 @@
 // LVGL_Flush, esp_lcd path - boards with -D DISPLAY_ESPLCD (WS_P4_5 from
-// 2.9 step 2, WS_P4_4B from step 3). See LVGL_Flush.h, and docs/design/esplcd-step2.md §3 for the
+// 2.9 step 2, WS_P4_4B from step 3). See LVGL_Flush.h, and docs/archive/display/esplcd-step2.md §3 for the
 // sequence this implements. esp_lvgl_adapter 0.6.4 (Apache-2.0,
 // reference/esp-registry/) was read as the reference; no code was copied.
 //
@@ -519,7 +519,7 @@ lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info) {
                   bsp_lvgl.DOUBLE_BUFFERING ? 2u : 1u);
     // DMA | SPIRAM, 64-aligned: what the PPA's DMA needs, per the rules
     // recorded from the Allsky/NINA author's working PPA code and LVGL's own
-    // (docs/research/display-stack-migration.md, "Buffer-requirements summary").
+    // (docs/archive/display/display-stack-migration.md, "Buffer-requirements summary").
     const uint32_t caps = MALLOC_CAP_DMA | MALLOC_CAP_SPIRAM;
     void *b1 = allocDrawBuf(bytes, caps);
     void *b2 = bsp_lvgl.DOUBLE_BUFFERING ? allocDrawBuf(bytes, caps) : nullptr;

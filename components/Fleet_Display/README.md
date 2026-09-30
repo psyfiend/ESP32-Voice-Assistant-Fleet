@@ -1,7 +1,8 @@
 # Fleet_Display
 
-The board's display on raw `esp_lcd`, milestone 2.9 (#67). Design and the owner's decisions:
-`docs/design/esplcd-step2.md`. Built only with `-D DISPLAY_ESPLCD`; every other board keeps
+The board's display on raw `esp_lcd`, milestone 2.9 (#67). **How it works:
+`docs/display/architecture.md`; status per board: `docs/display/README.md`.** This file is only
+the library's own inventory. Built only with `-D DISPLAY_ESPLCD`; every other board keeps
 `DisplayManager` (Arduino_GFX), which this library does not touch. `include/BoardDisplay.h` picks
 one per board. Step 6 of 2.9 deletes `DisplayManager` and leaves this.
 
@@ -16,9 +17,11 @@ what to compile, so each file has to be empty on boards that do not use it.
 | `src/fleet_dsi_<chip>.c` | **Ours.** One small wrapper per vendored driver: its constructor with our BSP's init sequence, and its name/version, as one `fleet_dsi_driver_<CHIP>` |
 | `src/esp_lcd_hx8394.{h,c}` | **Vendored** HX8394 driver, `WS_P4_5`'s panel (2.9 step 2) |
 | `src/esp_lcd_st7703.{h,c}` | **Vendored** ST7703 driver, `WS_P4_4B`'s panel (2.9 step 3) |
-| `src/esp_lcd_ek79007.{h,c}` | **Vendored** EK79007 driver, `WS_P4_7B`'s panel - **compiles, never run** |
+| `src/esp_lcd_ek79007.{h,c}` | **Vendored** EK79007 driver, `WS_P4_7B`'s panel (running since 2026-09-28) |
 | `src/esp_lcd_jd9165.{h,c}` | **Vendored** JD9165 driver, `CYD_P4_1060`'s panel (running since 2026-09-28) |
-| `src/esp_lcd_st7701{,_mipi,_rgb}.c`, `esp_lcd_st7701{,_interface}.h` | **Vendored** ST7701 driver (Espressif 2.0.2), `CYD_P4_4880`'s panel over DSI - **compiles, never run**. Also `WS_S3_4B`'s panel over RGB at 2.9 step 4. Two local changes, listed at the top of `esp_lcd_st7701.c` |
+| `src/esp_lcd_st7701{,_mipi,_rgb}.c`, `esp_lcd_st7701{,_interface}.h` | **Vendored** ST7701 driver (Espressif 2.0.2): `CYD_P4_4880`'s panel over DSI and `WS_S3_4B`'s over RGB, both running. Local changes listed at the top of `esp_lcd_st7701.c` |
+| `src/fleet_rgb_panel.{h,c}`, `src/fleet_rgb_st7701.c` | **Ours.** RGB bring-up, and the ST7701's 3-wire SPI init through the TCA9554 expander |
+| `src/esp_io_expander*.{h,c}`, `src/esp_lcd_panel_io_3wire_spi.c`, `esp_lcd_panel_io_additions.h` | **Vendored** (Espressif): the expander driver and the 3-wire SPI panel IO the S3_4B's init runs over |
 
 **The driver comes from the BSP by name, with no list of chips anywhere.** The board's BSP says
 `#define BSP_PANEL_DRIVER HX8394`, and `Fleet_Display.cpp` pastes that into
@@ -32,8 +35,9 @@ linker, so each board carries only its own driver.
 
 **How many frame buffers, and how frames reach the panel, is the present mode** - derived by
 `bspPresentMode()` (`bsp_loader.h`), overridable per board with `DisplayConfig.PRESENT_MODE`.
-`TRIPLE_PARTIAL` (`src/LVGL_Flush_EspLcd.cpp`) is the only one built; `begin()` refuses the others
-and runs that, saying so in the boot log and the System Doctor.
+One is built per bus: `TRIPLE_PARTIAL` on DSI (`src/LVGL_Flush_EspLcd.cpp`), `DOUBLE_DIRECT` on
+RGB (`src/LVGL_Flush_EspLcdDirect.cpp`); `begin()` refuses the others and runs the bus's own,
+saying so in the boot log and the System Doctor.
 
 **Driver versions live in ONE place, `src/fleet_display_versions.h`.** Each vendored driver
 includes it for the version macros IDF's component build would inject (that include IS each
@@ -43,9 +47,8 @@ and voltage and the lane count come from the BSP's `TEST_MIPI_DSI_PHY_PWR_LDO_*`
 `NUM_DSI_LANES` where a board sets them (7B, CYD_P4_1060), otherwise LDO 3 / 2500 mV / 2 lanes -
 which is what every board uses today. `PHY_CLK_SRC` is **not** wired through yet: IDF picks.
 
-**Moving the 7B or CYD_P4_1060 over** is one line - `-D DISPLAY_ESPLCD` in its environment - and
-must be done with the board on the desk: nobody has seen either driver drive a panel. Both
-compiled and linked on 2026-09-26 with the flag set for the build only.
+**Moving a board over** is one line - `-D DISPLAY_ESPLCD` in its environment - done with the board
+on the desk. `CYD_S3_8048` and `WS_S3_5B` (ST7262, plain RGB, no init list) are the last two.
 
 ## Vendored: `esp_lcd_st7701`
 

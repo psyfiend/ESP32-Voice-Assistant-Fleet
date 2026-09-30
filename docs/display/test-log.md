@@ -1,4 +1,11 @@
-# Test sheet — 2.9 (#67), display stack
+# Display test log — 2.9 (#67) and after
+
+Was `docs/TEST_2.9.md` until 2026-09-29. The dated record of every display test run: what was
+built, what was measured, and the owner's verdicts on glass. Sections are in the order they were
+written, not by step. **For where things stand now, read [README.md](README.md)**; numbers are
+summarised in [performance.md](performance.md). New runs are added at the end.
+
+---
 
 > **Step 1 (`/bench`), 2026-09-25: T1-T6 PASS (owner). Merged to `main` the same day on the owner's
 > word; T7 (the CYD's network over time) is being watched while step 2 is worked on.**
@@ -188,7 +195,7 @@ Both boards: `DEBUG_CARDS` off (page swipes ~90 ms quicker, `display-stack.md` �
 
 ---
 
-Branch `feat/67-bench`. The plan is `docs/design/display-stack.md`; the numbers are its §8; what
+Branch `feat/67-bench`. The plan is `docs/archive/display/display-stack.md`; the numbers are its §8; what
 every JSON field means is the header comment of `src/UI/Bench.cpp`.
 
 **What it does.** A board built with `-D ENABLE_BENCH` (every board, beside `ENABLE_SCREENSHOT`)

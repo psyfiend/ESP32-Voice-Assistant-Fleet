@@ -1,7 +1,7 @@
 #pragma once
 //
 // BoardDisplay - which display library this board is built with. Milestone
-// 2.9 (#67), docs/design/esplcd-step2.md §7 A.
+// 2.9 (#67), docs/archive/display/esplcd-step2.md §7 A.
 //
 //   -D DISPLAY_ESPLCD   Fleet_Display   raw esp_lcd          (WS_P4_5 from step 2, WS_P4_4B from step 3)
 //   otherwise           DisplayManager  Arduino_GFX          (every other board)

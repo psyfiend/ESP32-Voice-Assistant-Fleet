@@ -1,7 +1,7 @@
 #pragma once
 //
 // fleet_dsi_panel - MIPI-DSI panel bring-up on raw esp_lcd. Milestone 2.9,
-// step 2: docs/design/esplcd-step2.md.
+// step 2: docs/archive/display/esplcd-step2.md.
 //
 // C, not C++, on purpose: the panel drivers' configuration macros use
 // designated initialisers out of declaration order, which C accepts and C++

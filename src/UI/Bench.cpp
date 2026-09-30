@@ -703,7 +703,7 @@ size_t buildJson() {
           (unsigned)r.lvFreeBefore, (unsigned)r.lvFreeAfter);
     // Whether the board rebooted between two runs, and why it last did. A
     // dropped connection mid-matrix is otherwise indistinguishable from a
-    // panic (TEST_2.9.md T7).
+    // panic (display/test-log.md T7).
     if (r.haveTasks) {
         o.add("\"tasks\":{\"window_us\":%lu,\"idle_us\":[%lu,%lu],\"top\":[",
               (unsigned long)r.windowUs, (unsigned long)r.idleUs[0], (unsigned long)r.idleUs[1]);
