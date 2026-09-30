@@ -84,6 +84,12 @@ display, [docs/display/README.md](docs/display/README.md).
   from the screen, with the lowest-priority cards left off.</em>
 </p>
 
+## FAQ
+
+**Why not just use ESPHome?**
+Because the point was to see how an ESP32 really works behind the scenes - and sometimes doing
+things the hard way is more fun. (Sometimes.)
+
 ## How it is built
 
 - **PlatformIO** with [pioarduino](https://github.com/pioarduino/platform-espressif32)
