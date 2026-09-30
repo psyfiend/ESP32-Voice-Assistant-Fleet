@@ -10,8 +10,8 @@ MIT licensed - see [License](#license).
 
 <p align="center">
   <img src="images/ws-p4-5-house-linen.png" width="100%" alt="The House page on the 5-inch Waveshare P4, Linen scheme">
-  <br><em>The House page on the 5" Waveshare P4 (1280x720), in the light Linen scheme - the owner's
-  Home Assistant entities, grouped by area.</em>
+  <br><em>The House page on the 5" Waveshare P4 (1280x720), in the light Linen scheme - live Home
+  Assistant entities, tagged by area.</em>
 </p>
 
 ## The dashboard idea
