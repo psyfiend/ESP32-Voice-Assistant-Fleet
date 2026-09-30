@@ -65,6 +65,8 @@ public:
     void clearLog() {
         _log_text.clear();
         _log_queue.clear();
+        _log_queue_bytes = 0;
+        _log_dropped = 0;
         _log_dirty = false;
         if (_log_on_change) _log_on_change(_log_text.c_str());
     }
@@ -204,6 +206,13 @@ private:
     // number was picked - at 4 KB a third dump was being cut off mid-report.
     // This is a diagnostic tail, not a history, so it is still bounded.
     static constexpr size_t  LOG_TAIL_MAX = 12000;
+
+    // The queue between log() and the tick that drains it is capped by BYTES,
+    // at the same budget as the text it feeds. It was capped at 100 LINES, and
+    // a report arrives all at once, so once the System Doctor passed 100 lines
+    // (2026-09-30, with [POWER]) the tail of every dump was dropped silently.
+    size_t   _log_queue_bytes = 0;
+    uint16_t _log_dropped     = 0;   // lines refused since the last drain, reported once
 
     std::function<void(const char *)> _log_on_change;
     bool _log_dirty;
