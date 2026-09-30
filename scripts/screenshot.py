@@ -29,6 +29,8 @@ FLEET = [
     "fleet-ws-p4-7b",
     "fleet-ws-p4-4b",
     "fleet-ws-s3-4b",
+    "fleet-cyd-p4-1060",
+    "fleet-cyd-p4-4880",   # Guition JC4880P443 - BSP built 2026-09-28, not yet flashed
 ]
 
 OUT_DIR = pathlib.Path(__file__).resolve().parent.parent / "screenshots"

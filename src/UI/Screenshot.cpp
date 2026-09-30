@@ -28,6 +28,10 @@
 #include "UI/Screenshot.h"
 #include "HttpServer.h"
 #include "DeviceIdentity.h"
+#ifdef DISPLAY_ESPLCD
+#include "../LVGL_Flush.h"   // shownFrameBuffer(), for ?fb=1
+#include "bsp_loader.h"       // bsp_display.ROTATION, for verifyFrameBuffer()
+#endif
 
 #include <Arduino.h>          // Serial only
 #include <lvgl.h>
@@ -72,7 +76,8 @@ constexpr int DEFAULT_F = 0;
 // REQUESTED -> CAPTURING -> DONE; the handler moves DONE -> IDLE when it has
 // sent the picture. Each move is a compare-exchange, so a handler that gives up
 // and loop() starting the render cannot both win.
-enum : int { ST_IDLE, ST_REQUESTED, ST_CAPTURING, ST_DONE };
+enum : int { ST_IDLE, ST_REQUESTED, ST_CAPTURING, ST_DONE,
+              ST_REQUESTED_FB };   // ?fb=1: the panel's frame buffer (esp_lcd path)
 
 std::atomic<int>  s_state{ST_IDLE};
 SemaphoreHandle_t s_done = nullptr;
@@ -188,14 +193,42 @@ bool layerHasContent(lv_obj_t *layer) {
     return false;
 }
 
-void capture() {
-    s_cap = Capture{};
-    s_cap.psramBefore = psramFree();
+#ifdef DISPLAY_ESPLCD
+// ?fb=1 on the esp_lcd path (2.9 step 2): the frame buffer the panel is
+// actually showing, copied as-is - physical orientation (WS_P4_5 comes out
+// portrait), no overlays re-rendered, no LVGL involved. The one check of
+// "what is on the glass" that does not trust LVGL, the rotation or the
+// repair bookkeeping: it reads their result.
+void captureFramebuffer(Capture &cap) {
+    const int64_t t0 = esp_timer_get_time();
+    uint32_t w = 0, h = 0;
+    const void *fb = LVGL_Flush::shownFrameBuffer(w, h);
+    if (!fb) { cap.error = "no frame buffer"; return; }
+    uint8_t *rgb = psramAlloc((size_t)w * h * 3);
+    if (!rgb) { cap.error = "not enough PSRAM for the image"; return; }
+    expand565(static_cast<const uint8_t *>(fb), w * 2, rgb, w, h);
+    cap.rgb      = rgb;
+    cap.w        = w;
+    cap.h        = h;
+    cap.renderMs = (uint32_t)((esp_timer_get_time() - t0) / 1000);
+}
+#endif
+
+// Fills `cap` - s_cap for a request, a local one for verifyFrameBuffer(), so
+// a verify can never overwrite a picture the HTTP task is still encoding.
+void capture(bool fromFrameBuffer, Capture &cap) {
+    cap = Capture{};
+    cap.psramBefore = psramFree();
+    #ifdef DISPLAY_ESPLCD
+    if (fromFrameBuffer) { captureFramebuffer(cap); return; }
+    #else
+    (void)fromFrameBuffer;
+    #endif
     const int64_t t0 = esp_timer_get_time();
 
     lv_display_t *disp = lv_display_get_default();
     lv_obj_t *scr = disp ? lv_display_get_screen_active(disp) : nullptr;
-    if (!scr) { s_cap.error = "no active LVGL screen"; return; }
+    if (!scr) { cap.error = "no active LVGL screen"; return; }
 
     // LOGICAL resolution - what the UI is laid out in, upright on every board
     // whatever the panel's physical orientation.
@@ -203,7 +236,7 @@ void capture() {
     const uint32_t H = lv_display_get_vertical_resolution(disp);
 
     uint8_t *rgb = psramAlloc((size_t)W * H * 3);
-    if (!rgb) { s_cap.error = "not enough PSRAM for the image"; return; }
+    if (!rgb) { cap.error = "not enough PSRAM for the image"; return; }
 
     // 1. The screen, in the display's own format.
     const lv_color_format_t cf =
@@ -211,10 +244,10 @@ void capture() {
                                                                      : LV_COLOR_FORMAT_RGB888;
     const uint32_t sStride = lv_draw_buf_width_to_stride(W, cf);
     uint8_t *base = psramAlloc((size_t)sStride * H);
-    if (!base) { heap_caps_free(rgb); s_cap.error = "not enough PSRAM for the screen render"; return; }
+    if (!base) { heap_caps_free(rgb); cap.error = "not enough PSRAM for the screen render"; return; }
     if (!render(scr, cf, base, sStride, W, H)) {
         heap_caps_free(base); heap_caps_free(rgb);
-        s_cap.error = "rendering the screen failed";
+        cap.error = "rendering the screen failed";
         return;
     }
     if (cf == LV_COLOR_FORMAT_RGB565) expand565(base, sStride, rgb, W, H);
@@ -234,15 +267,15 @@ void capture() {
         }
         if (render(layer, LV_COLOR_FORMAT_ARGB8888, ov, oStride, W, H)) {
             blendOver(ov, oStride, rgb, W, H);
-            s_cap.overlays++;
+            cap.overlays++;
         }
     }
     if (ov) heap_caps_free(ov);
 
-    s_cap.rgb      = rgb;
-    s_cap.w        = W;
-    s_cap.h        = H;
-    s_cap.renderMs = (uint32_t)((esp_timer_get_time() - t0) / 1000);
+    cap.rgb      = rgb;
+    cap.w        = W;
+    cap.h        = H;
+    cap.renderMs = (uint32_t)((esp_timer_get_time() - t0) / 1000);
 }
 
 // --= Encoding and sending (HTTP server task only) =--
@@ -335,15 +368,27 @@ esp_err_t sendPng(httpd_req_t *req) {
 }
 
 esp_err_t handleScreenshot(httpd_req_t *req) {
+    // ?fb=1 asks for the panel's frame buffer instead of LVGL's re-render; it
+    // is carried in the request STATE, so loop() can never pick up a request
+    // with the other kind's setting.
+    int want = ST_REQUESTED;
+    {
+        char q[32], v[4];
+        if (httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK &&
+            httpd_query_key_value(q, "fb", v, sizeof(v)) == ESP_OK && !strcmp(v, "1")) {
+            want = ST_REQUESTED_FB;
+        }
+    }
+
     int expected = ST_IDLE;
-    if (!s_state.compare_exchange_strong(expected, ST_REQUESTED)) {
+    if (!s_state.compare_exchange_strong(expected, want)) {
         httpd_resp_set_status(req, "503 Service Unavailable");
         httpd_resp_set_hdr(req, "Retry-After", "2");
         return httpd_resp_sendstr(req, "A screenshot is already in progress; try again.\n");
     }
 
     if (xSemaphoreTake(s_done, pdMS_TO_TICKS(PICKUP_WAIT_MS)) != pdTRUE) {
-        expected = ST_REQUESTED;
+        expected = want;
         if (s_state.compare_exchange_strong(expected, ST_IDLE)) {
             // loop() never picked it up - the UI thread is stalled.
             Serial.println("[Shot] loop() did not pick the request up; gave up");
@@ -384,12 +429,76 @@ void begin(HttpServer &http) {
 }
 
 void service() {
-    int expected = ST_REQUESTED;
+    int expected = s_state.load();
+    if (expected != ST_REQUESTED && expected != ST_REQUESTED_FB) return;
+    const bool fromFrameBuffer = (expected == ST_REQUESTED_FB);
     if (!s_state.compare_exchange_strong(expected, ST_CAPTURING)) return;
-    capture();
+    capture(fromFrameBuffer, s_cap);
     s_state.store(ST_DONE);
     xSemaphoreGive(s_done);
 }
+
+#ifdef DISPLAY_ESPLCD
+bool verifyFrameBuffer(VerifyResult &out) {
+    out = VerifyResult{};
+    lv_display_t *disp = lv_display_get_default();
+    if (!disp) return false;
+    // Everything pending goes to the panel first: after this, the buffer it
+    // shows is exactly what the object tree describes. Nothing can change
+    // between the two captures below - this is the LVGL thread.
+    lv_refr_now(disp);
+
+    Capture lvgl, glass;
+    capture(false, lvgl);
+    if (lvgl.error || !lvgl.rgb) { if (lvgl.rgb) heap_caps_free(lvgl.rgb); return false; }
+    capture(true, glass);
+    if (glass.error || !glass.rgb) {
+        heap_caps_free(lvgl.rgb);
+        if (glass.rgb) heap_caps_free(glass.rgb);
+        return false;
+    }
+
+    // Logical (x, y) -> physical, as LVGL_Flush_EspLcd.cpp's toPhysical().
+    const uint32_t W = lvgl.w, H = lvgl.h, pw = glass.w, ph = glass.h;
+    const uint8_t rot = LVGL_Flush::softwareRotation();   // not the BSP's: the panel may turn it
+    out.x1 = (int32_t)W; out.y1 = (int32_t)H; out.x2 = -1; out.y2 = -1;
+    for (uint32_t y = 0; y < H; y++) {
+        for (uint32_t x = 0; x < W; x++) {
+            uint32_t px, py;
+            switch (rot) {
+            case 1:  px = pw - 1 - y; py = x;          break;
+            case 2:  px = pw - 1 - x; py = ph - 1 - y; break;
+            case 3:  px = y;          py = ph - 1 - x; break;
+            default: px = x;          py = y;          break;
+            }
+            const uint8_t *a = lvgl.rgb + ((size_t)y * W + x) * 3;
+            const uint8_t *b = glass.rgb + ((size_t)py * pw + px) * 3;
+            // Compared at the panel's precision (RGB565). A difference of up
+            // to 2 steps in a channel is NEAR, not bad: this render blends
+            // the translucent overlays (toast, perf monitor) at 8 bits, the
+            // panel at 565, so their edges round differently. A missed repair
+            // or a misplaced strip is old or foreign content: far more than
+            // 2 steps.
+            const int dr = abs((a[0] >> 3) - (b[0] >> 3));
+            const int dg = abs((a[1] >> 2) - (b[1] >> 2));
+            const int db = abs((a[2] >> 3) - (b[2] >> 3));
+            if (dr == 0 && dg == 0 && db == 0) continue;
+            if (dr <= 2 && dg <= 4 && db <= 2) { out.near++; continue; }   // 6-bit green: 4 steps
+            {
+                out.bad++;
+                if ((int32_t)x < out.x1) out.x1 = x;
+                if ((int32_t)y < out.y1) out.y1 = y;
+                if ((int32_t)x > out.x2) out.x2 = x;
+                if ((int32_t)y > out.y2) out.y2 = y;
+            }
+        }
+    }
+    heap_caps_free(lvgl.rgb);
+    heap_caps_free(glass.rgb);
+    out.ok = true;
+    return true;
+}
+#endif
 
 } // namespace Screenshot
 

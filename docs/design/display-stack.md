@@ -308,6 +308,242 @@ rotating CPU copy itself.**
 - **Not yet measured:** Linen on the CYD, and animation frames such as a swipe or the drawer,
   which redraw partial areas every tick rather than one full frame.
 
+### 8.5 Step 2 measured - `WS_P4_5` on `esp_lcd`, 2026-09-26 (`feat/67-step2-p45`)
+
+Full screen, Midnight, page 0, 20 frames; baseline is Arduino_GFX with `-O2`:
+
+| Build | total | render | copy | present | wait | Notes |
+|---|---|---|---|---|---|---|
+| Arduino_GFX (`main`) | 162.9 | 95.7 | 67.1 (CPU) | 0.0 | 0.1 | |
+| esp_lcd, PPA **blocking**, full-frame repair | 169.9 | 73.5 | 62.6 | 33.8 | 0.1 | first working build |
+| + repair skips what the frame redraws | 135.0 | 72.2 | 62.6 | 0.1 | 0.1 | |
+| + PPA **queued** (LVGL draws while it rotates) | **90.1** | **75.5** | 11.6 | 0.1 | 2.9 | **-45%**; `copy` is now the time to queue |
+
+- **Drawing got faster on its own** (95.7 -> ~73 ms) once the CPU stopped copying: the copy was
+  also evicting LVGL's working set from the cache.
+- **The PPA is slower than hoped:** ~62 ms to rotate a whole 1280x720 frame, ~33 ms to copy one
+  unrotated - about 110 MB/s each way. The `data_burst_length` 128 that LVGL's own PPA code uses
+  changed nothing. It stops mattering once queued, because it runs while LVGL draws; it would
+  matter again if drawing ever got faster than ~62 ms. Unexplained; our 64-byte L2 cache line
+  (the #49 WiFi fix) is one suspect, untested.
+- **One-card updates** average 8.6-12.8 ms in the matrix, against 6.9 on Arduino_GFX. The average
+  includes the two or three updates right after a whole-screen frame, each of which repairs a buffer
+  that is two full frames behind (one full-frame copy, ~33 ms). Settled, a card update costs about
+  what it did.
+- **Correctness, measured rather than looked at:** `/screenshot?fb=1` (new) returns the frame buffer
+  the panel is showing; turned upright and compared pixel by pixel with LVGL's own render, it
+  matched exactly on both pages, with the deck, after card redraws and page changes. The one
+  difference seen was the Uptime and Signal values changing between the two captures. The same
+  comparison confirms the orientation equals Arduino_GFX's rotation 1.
+
+### 8.6 The P4_5 animation stutter, measured and fixed - 2026-09-26 (`feat/67-bench-anim`)
+
+The owner saw P4_5 stutter when one deck panel opens while the other closes; 7B and 4B stay
+smooth. **`/bench?what=anim`** (new; `python scripts/bench.py --anim`) taps the panel headers as a
+finger does and records every frame LVGL draws on its own schedule - nothing forced. 4 swaps each,
+page 0, Midnight, on the laptop's network (HA and MQTT unreachable, so the header's MQTT icon
+blinks: a 2,304 px frame every 33 ms, visible in the raw rows, outside the swap frames).
+
+| Board / path | frames per swap | interval avg / max | late (> 50 ms) | frame = render + flush |
+|---|---|---|---|---|
+| `WS_P4_4B`, Arduino_GFX, 720x720 | 9-10 | 35.7 / 38.0 ms | **0** | 31 = 22 + 10 |
+| `WS_P4_5`, Arduino_GFX | 7 | 51 / 62 ms | 3-4 per swap | 43 = 27 + 16 (CPU copy) |
+| `WS_P4_5`, esp_lcd as built for step 2 | 6-7 | 50-58 / 82 ms | 2-4 per swap | 45 = 22 + 23 (**PPA wait**) |
+| **`WS_P4_5`, esp_lcd, repair fixed** | **9** | **38 / 44 ms** | **0** | **31 = 22 + 9** |
+
+- **The stutter was on both paths**, so it predates step 2. On Arduino_GFX it is drawing plus the
+  CPU copy (~43 ms against a 33 ms period). The leading theory - P4_5 simply draws too many pixels -
+  was half right: a swap redraws ~350k px here against ~160k on the 4B, but on `esp_lcd` drawing
+  alone (~22 ms) fits the period.
+- **On `esp_lcd` the time went to the repair**, measured per frame (`areas`, `repair_px`,
+  `repair_full`, new in the anim rows): 200-500k px of PPA copying per frame, plus a whole-frame
+  copy (~33 ms) every few frames. The rotation and the repair share the PPA queue, so LVGL sat in
+  `wait`. Two causes, both in `LVGL_Flush_EspLcd.cpp`:
+  1. A stale area was skipped only if ONE of this frame's areas covered it entirely. A panel
+     animation's consecutive frames overlap almost completely without either containing the other,
+     so nearly everything was re-copied - and then drawn over.
+  2. Past 8 tracked areas a buffer went wholly stale. A frame often begins before the panel has
+     switched to the previous one, which leaves only the buffer three frames behind: 9+ areas.
+- **Fix, as `esplcd-step2.md` §3 always specified** ("that list minus what was just drawn"): each
+  stale area has this frame's redraw subtracted with LVGL's own `lv_area_diff`, and overlapping
+  stale areas merge into one instead of overflowing (16 kept). Repairs fell to 5-145k px, no
+  whole-frame copies. Also fixed in passing: a repair copy the PPA queue refused was silently
+  dropped (stale pixels on the glass, had it ever happened); it is now done blocking. Queue depth
+  12 -> 32.
+- **Tried first and reverted, no effect:** taking the least-stale free buffer instead of the
+  lowest-numbered one. Cause 2 is timing, not choice.
+- **Correctness, measured:** `/screenshot?fb=1` against `/screenshot`, pixel by pixel at RGB565
+  precision, after five different end states (a panel left open, 3 swaps on page 1, full redraws
+  with the deck hidden, card redraws, a restored anim run): every difference was inside the blinking
+  MQTT icon's 34x34 box. Nothing else differed.
+- **The rest improved too** (standard matrix): full screen 90.1 -> 85 ms, one card 8.6-12.8 ->
+  5.7-8.2 ms.
+- **Not yet done:** eyes on the glass (TEST_2.9 S6), and the owner's rotation-0 experiment, which
+  is now unnecessary for this stutter - the PPA was not the bottleneck, the repair was. The PPA's
+  ~110 MB/s remains unexplained (§8.5).
+
+### 8.7 Step 3 - `WS_P4_4B` on `esp_lcd`, 2026-09-26 (`feat/67-bench-anim`)
+
+Same flush as P4_5 (triple-partial, PPA, the §8.6 repair), with the vendored Waveshare ST7703
+driver (`components/Fleet_Display/`). `-D DISPLAY_ESPLCD` on the 4B's environment; our BSP's init
+sequence and timings (46 MHz, 66.7 Hz), **rotation unchanged at 2** - so the picture is the same
+way round as before (Arduino_GFX's rotation-2 mapping, `Arduino_DSI_Display.cpp:92-95`, is the
+same as `toPhysical()`'s). Midnight, page 0; one-card rows span all three scenarios:
+
+| 4B | full: total / render / copy | one card | swap frame | swap interval (max) | late |
+|---|---|---|---|---|---|
+| Arduino_GFX (full-frame LVGL buffers) | 87.2 / 55.8 / 31.3 (CPU) | 4.6-5.2 | 31 ms | 35.7 (38.0) | 0 |
+| **esp_lcd** (2 x 50-line buffers, PPA 180) | **51.6** / 44.2 / 6.0 (queue) | 5.4-6.1 | **18 ms** | **33.7 (35.0)** | 0 |
+
+- **Full screen -41%.** As on P4_5, drawing got faster once the CPU stopped copying (55.8 ->
+  44.2 ms).
+- **A panel swap now costs about half the frame budget**, so LVGL's own 33 ms period is the only
+  limit left: 10 frames per swap, all on time.
+- **One-card updates are ~0.8 ms slower** (`wait` ~1.9 ms: LVGL waiting on the PPA for its draw
+  buffer). Negligible, but it is a cost, not a win.
+- **Correctness, measured:** `/screenshot?fb=1` against `/screenshot` at RGB565 precision, rotation
+  2, in five end states (panel left open, 3 swaps on page 1, full redraws deck hidden, card redraws,
+  page 0): only the blinking MQTT icon's 30x30 box differed. A control with the wrong rotation
+  differed on 336,718 pixels, so the comparison does discriminate.
+- **`fleet_dsi_panel` is now one bring-up for both chips** (`fleet_dsi_panel_new(cfg, chip, ...)`);
+  only the driver constructor differs. P4_5 re-verified after the refactor: frame buffer identical
+  to the render (0 pixels differing on the first capture), swap numbers as §8.6.
+- **Not done:** eyes on the glass (TEST_2.9 step 3); the vendor timings (38 MHz, 59.2 Hz, survey §3)
+  as the owner's comparison candidate; rotation 0 (owner's 2026-09-25 decision, never applied -
+  it would turn the picture over, and with it the touch mapping).
+
+### 8.8 `WS_P4_4B` configuration sweep on `esp_lcd`, 2026-09-26 - "take nothing for granted"
+
+Owner's brief: test every valid configuration, one change at a time, current settings kept and
+documented. **Baseline C0 = what the BSP holds now:** rotation 0 (owner, 2026-09-26, was 2), our
+timing 46 MHz / h 20-80-80 / v 4-12-30 / lanes 1000 Mbps (66.7 Hz), 2 x 50-line draw buffers,
+3 frame buffers, `LV_DEF_REFR_PERIOD` 33. Each run: `/screenshot?fb=1` against `/screenshot`
+(always only the blinking MQTT icon differed), the standard matrix, and the anim test. `/bench`
+now also reports the timing the build used and **the refresh rate the panel really ran at**
+(`panel_scan`, counted in the frame-complete interrupt). Midnight, page 0; ms.
+
+| Run | Change | full (render) | one card | swap frame | worst interval | late | frames/swap | panel Hz |
+|---|---|---|---|---|---|---|---|---|
+| C0 | baseline | 51.5 (44.0) | 4.4-5.2 | 17.0 | 34.1 | 0 | 10.0 | 66.7 |
+| - | rotation 2 (before) | 51.6 (44.2) | 5.4-6.1 | 18.0 | 35.0 | 0 | 10.0 | - |
+| T1 | vendor timing: 38 MHz, h 20-50-50, v 4-20-20, lanes 480 | 51.4 (44.1) | 4.4-6.1 | 17.9 | 35.0 | 0 | 10.0 | **59.2** |
+| T2 | our timing, lanes 480 | 51.6 (44.2) | 4.4-6.3 | 17.0 | 34.0 | 0 | 9.8 | 66.7 |
+| T3 | vendor timing, lanes 1000 | 51.5 (44.2) | 4.3-6.1 | 17.7 | 35.0 | 0 | 10.0 | 59.2 |
+| B3 | draw buffers 25 lines | 70.7 (63.3) | 4.4-5.1 | 19.2 | 45.3 | 0 | 9.8 | 66.7 |
+| B1 | draw buffers 100 lines | 54.8 (46.1) | 4.5-5.6 | 22.0 | 75.0 | 2 | 9.5 | 66.7 |
+| B2 | draw buffers full frame (720) | 77.9 (55.6) | 5.4-5.7 | 25.6 | 71.2 | 1 | 9.5 | 66.7 |
+| R1 | `LV_DEF_REFR_PERIOD` 16 | 51.8 (44.3) | 4.4-5.3 | 16.8 | **23.7** | 0 | **15.8** | 66.8 |
+| R1 on P4_5 | `LV_DEF_REFR_PERIOD` 16 | 84.8 (70.8) | 5.6-6.2 | 31.5 | 43.3 | 0 | 9.2 | 54.9 |
+
+- **Rotation 0 vs 2 costs the same** on full frames: the PPA takes about as long for a 180-degree
+  turn as for a copy. One-card updates are ~1 ms cheaper at 0.
+- **Timing does not change speed at all** - four combinations, identical within noise, and every
+  one ran at exactly its computed rate (so each build was genuine). Choosing between ours (66.7 Hz)
+  and Waveshare's (59.2 Hz) is purely about the picture: flicker, colour, stability. **Owner's eyes
+  needed**; the BSP keeps ours.
+- **50-line buffers are the sweet spot.** Fewer lines means more strips and LVGL walks the widget
+  tree more times per frame (25 lines: +37% full frame). More lines means fewer, bigger PPA jobs and
+  less overlap between drawing and rotating, and a buffer that no longer sits in cache with
+  everything else (100 lines: swap frames +29%, 2 late; full frame: worst everywhere). The cache
+  explanation is plausible, not proven. The BSP now says 50 explicitly, results beside it.
+- **The refresh period is the one lever that shows:** at 16 ms the 4B animates at ~48 frames/s
+  instead of 30 (15.8 frames per 300 ms swap, none late), costing nothing per frame. P4_5 gains
+  nothing (its swap frame is ~31 ms, so it is already frame-bound). It is fleet-wide in `lv_conf.h`
+  and also sets touch polling and animation stepping, so it is now a per-board override,
+  `-D FLEET_LV_REFR_PERIOD=16`, **set on no board** - the owner's call. Not measured: idle CPU at
+  16 ms, and anything on the S3s.
+- **A stale build was caught by the measured refresh rate**: the first T1 build reported the new
+  timing (`Bench.cpp` had been edited, so it recompiled) while the panel ran at the old 66.7 Hz
+  (`Fleet_Display.cpp` came from the build cache) - CLAUDE.md's cache warning, live. Every run above
+  was built after clearing `.pio/build_cache`.
+- **Noted, not changed:** the esp_lcd bring-up passes `phy_clk_src = 0` (IDF's choice) and ignores
+  the BSP's `PHY_CLK_SRC`. Harmless on both boards so far; worth wiring through before a board that
+  needs a specific PHY clock moves.
+
+### 8.9 Why a page swipe hesitates - measured 2026-09-26
+
+The owner, both boards side by side: "a slightly longer hesitation on the P4_5 than the 4B" when
+swiping pages. **`/bench?what=page`** (new; `bench.py --page`) changes page as a left swipe does and
+times the rebuild apart from the frames after it. `-D DEBUG_PAGE_TIMING` (new, off) splits the
+rebuild further over serial. P4_5 esp_lcd, page 0 <-> 1, ms:
+
+| Where the time goes (P4_5) | with `DEBUG_CARDS` | without |
+|---|---|---|
+| card debug lines over UART (~3 KB at 115200 baud) | **~90** | 0 |
+| destroy the old page | 5 | 5 |
+| build ~15 cards' widgets (`Card::build`, 7.5 ms each; slowest a sensor card, 12.5) | 106-116 | 106-116 |
+| **lay the new page out** (LVGL layout of every new card) | 111-122 | 111-122 |
+| first frame (the whole screen) | ~90 | ~90 |
+| **swipe to glass** | **~478** | **~398** |
+| same, `WS_P4_4B` | ~388 | ~296 |
+
+- **The display is the smallest part.** The hesitation is building and laying out the page; the P4_5
+  vs 4B difference is ~50 ms of that plus ~30 ms of drawing its larger screen.
+- **`DEBUG_CARDS` was ~90 ms of every swipe**: per-card variant lines, each page change, printed
+  through a UART that blocks once its small buffer fills. It had been left on fleet-wide since the
+  2.7 card work (the 7B's own note: "take it out once the numbers are settled"). **Turned off in
+  `[P4-options]`** (commented, with the reason); the 7B's own explicit line and `[S3-options]` are
+  untouched - not measured there, and the CYD prints over USB-CDC, which behaves differently.
+- **The layout was hiding in `Panel_Header::setPage()`**: its `lv_obj_update_layout(container)`
+  lays out the whole *screen*, not the container (LVGL 9), and it runs right after the cards are
+  created - so it paid for the new page's layout. Moving that cost does not remove it; it is
+  inherent to rebuilding.
+- **What would make a swipe fast** (design, not done - `pages.md` §6-7): not rebuilding. Keep the
+  neighbouring page's widget tree built and switch between them (cost: its cards in `lv_mem`,
+  ~715 B each, and P4_5 has the least pool free), or show a snapshot while the real page builds.
+  Cheaper per-card work (7.5 ms build + 8 ms layout per card is a lot for this CPU) is the other
+  lever; not investigated yet.
+
+### 8.10 The DMA2D copier (`esp_async_fbcpy`) - step 2's "choice C", tried 2026-09-26
+
+`esplcd-step2.md` §7 C: repairs by PPA first, "maybe we could try both". Our `libesp_lcd.a` contains
+`esp_async_fbcpy` but IDF keeps its header private, so `src/esp_async_fbcpy_priv.h` carries the
+declarations verbatim from ESP-IDF **2553c5ad432**, the exact commit our rebuilt libraries report.
+
+**Raw speed** (`/bench?what=copy`, PSRAM to PSRAM, whole frame unless noted):
+
+| MB/s | PPA copy | PPA rotate | CPU `memcpy` | **DMA2D copier** |
+|---|---|---|---|---|
+| `WS_P4_5` (1280x720) | 44 | 44 | 42 | **138** |
+| `WS_P4_4B` (720x720) | 49 | 49 | 46 | **151** |
+
+**This answers §8.5's open question.** The PPA engine itself moves ~45-50 MB/s, rotating or not. The
+same memory copies 3x faster through plain DMA2D, so it is neither PSRAM nor the 64-byte L2 line of
+the #49 fix: it is the PPA. The copier's results were checked by the CPU (whole frame, a band at rows
+1118-1165, odd and even offsets and widths, two at once, one beside a PPA copy): all exact.
+
+**A bug in `esp_async_fbcpy`, found on the way.** The first version ran repairs on a pool of 16
+handles and put stale pixels on `WS_P4_5` (the 4B happened not to show it). `esp_async_fbcpy()`
+hands the DMA2D driver a pointer to one `static dma2d_trans_config_t` shared by every handle, and the
+driver reads it only when a queued job starts - by which time later calls have overwritten it. Queued
+copies ran with the last caller's handle: some pieces twice, some never. Two copies that start at
+once survive, which is why the two-copy check passed. **Rule: at most one copier job outstanding in
+the whole program.** Repairs now go on a list that one worker task on core 0 (idle: §8.3) copies in
+order on one handle, still alongside the PPA's strip rotations; `endFrame()` waits for the list.
+
+**Correctness, measured with a new instrument.** `/bench?what=verify` flushes everything, then
+compares LVGL's render with the panel's frame buffer *in the same instant* on the device, so nothing
+can change in between (the old two-request comparison could not tell a stale buffer from a value
+ticking between captures). Differences of 1-2 colour steps are counted as "near": the verifier blends
+translucent overlays (toast, perf monitor) at 8 bits and the panel at 565. **280 checks per board -
+idle, mid-animation, after animations, across page changes: 0 bad pixels on both.** The only "near"
+pixels were the page toast.
+
+**What it buys:**
+
+| | P4_5 before / after | 4B before / after |
+|---|---|---|
+| each of the ~2 frames after a page change (whole-frame repair) | 43 / **14 ms** | 24 / **7.7 ms** |
+| deck swap frame | 32.6 / 32.0 | 17.3 / 17.6 |
+| worst swap interval | 44.7 / 40.7 | 34.0 / 34.0 |
+| full screen | 85.0 / 84.5 | 52.1 / 51.1 |
+
+Everyday frames barely move - after §8.6 the repair was already small, and drawing is the limit. The
+win is the ~60 ms (P4_5) / ~33 ms (4B) that used to follow every page change: step 2's "known cost"
+(TEST_2.9) is gone. **Not done:** the 4B's strips (rotation 0) could use the copier too instead of the
+PPA; they already overlap drawing, so the gain would be a few ms on full frames, at the price of
+running strips through the one-job worker. Not worth it yet.
+
 ## 9. Open questions
 
 - **STEP 2 RISK, found 2026-09-25: a known PPA freeze matches P4_5's exact configuration.**

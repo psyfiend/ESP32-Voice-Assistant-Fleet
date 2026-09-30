@@ -100,5 +100,10 @@ revision is a property of the individual chip, not the board model, so a per-boa
 header cannot represent it correctly. If it is ever made load-bearing, read it at runtime and
 compare — the way `checkAudioBspSanity()` does for the ES7210 enums.
 
+**It is read at runtime now (2026-09-26):** the System Doctor's `[FIRMWARE]` section prints
+`Chip: esp32p4 rev vX.Y` from `esp_chip_info()`. The first two readings prove the point above:
+this `WS_P4_5` is **rev v1.3**, the `WS_P4_4B` beside it **rev v1.0** - two boards, two silicon
+revisions, both pre-rev3 and both correctly served by `esp32p4_es`.
+
 Fuller detail, including the rev3-only `XTAL` PHY clock source that `PHY_CLK_SRC` exists to
 reach, is in `FUTURE_IMPROVEMENTS.md`.

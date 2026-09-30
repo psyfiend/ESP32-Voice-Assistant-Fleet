@@ -75,7 +75,7 @@ down to each chip's driver:
 
 | Board | Panel | Driver's mirror | 180 degrees free in the panel? |
 |---|---|---|---|
-| `WS_P4_7B` | EK79007 | X and Y, MADCTL (`esp_lcd_ek79007.c:234`) | **on paper, yes** |
+| `WS_P4_7B` | EK79007 | X and Y, MADCTL (`esp_lcd_ek79007.c:234`) | on paper, yes - **ON GLASS, NO** (2026-09-28, below) |
 | `CYD_P4_1060` | JD9165 | X and Y, MADCTL (`esp_lcd_jd9165.c:237`) | on paper, yes - but it runs rotation 0, so moot |
 | `WS_P4_4B` | ST7703 | **Y only**: "Mirror X is not supported" (`esp_lcd_st7703.c:319`) | no - **moot: owner, 2026-09-25, set it back to rotation 0** |
 | `WS_P4_5` | HX8394 | no mirror function | n/a - 90 degrees needs the PPA regardless |
@@ -83,6 +83,12 @@ down to each chip's driver:
 "On paper": whether a DSI panel in video mode honours MADCTL has to be seen on glass. Waveshare's
 current 7B BSP rotates through the PPA instead, while its older one used the panel mirror; both
 shipped, so either should work. The 7B is the one board where "free" is worth testing first.
+
+**Tested 2026-09-28 on the 7B: it does not work.** `mirror()` (MADCTL 0x36) after init with
+(x=0, y=1) and with (x=1, y=0), then 0x36 = 0x02 inside the init sequence before sleep-out: the
+picture never moved (owner, on glass, three builds). "Both shipped, so either should work" above
+was an inference, and it was wrong - what the older BSP's mirror actually did on glass was never
+checked. The 7B keeps the PPA 180-degree turn. `docs/LESSONS.md`, Hardware.
 
 **`WS_P4_4B` runs faster than either Waveshare source.** Ours: 46 MHz, porches 20/80/80 H and
 4/12/30 V, lanes 1000 Mbps = **66.7 Hz**. Waveshare's Arduino config

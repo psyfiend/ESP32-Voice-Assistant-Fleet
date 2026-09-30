@@ -575,6 +575,15 @@ clean across all 8 environments; has not been flashed or tested on physical hard
 - Plan is to drive the HUB75 panel using the `mrcodetastic/ESP32-HUB75-MatrixPanel-DMA`
   library (external dependency, not part of this project's existing display stack).
 
+### `CYD_P4_1060`'s camera (owner, 2026-09-28)
+
+The board has a camera, with a through-hole in the front at the top in landscape - the owner had
+forgotten it was there until the esp_lcd bring-up. Get it running. **Nothing checked yet:** the
+sensor model, how it connects (the P4 has a MIPI-CSI camera input, but whether this board uses it
+is unconfirmed), and whether Guition's pack in `reference/Guition Examples/` has an example for it.
+The P4 4B also has a CSI port, unpopulated on our unit (`HARDWARE_STATUS.md`). Uses to think about:
+presence detection, a doorbell-style view, a snapshot to Home Assistant.
+
 ### WaveShare Modbus-RTU-Relay-B (8-channel RS485 relay module)
 
 No microcontroller on this board — a dumb RS485-controlled relay bank, intended to be driven

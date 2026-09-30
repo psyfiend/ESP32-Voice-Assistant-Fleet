@@ -11,7 +11,7 @@
 // a redesign - see docs/design/startup.md section 7.
 //
 #include <Arduino.h>
-#include "DisplayManager.h"
+#include "BoardDisplay.h"   // DisplayManager or Fleet_Display, per board (2.9)
 #include "TouchManager.h"
 #include "ConnectivityManager.h"
 #include "MqttManager.h"
@@ -48,7 +48,7 @@ public:
     // Non-blocking pump for everything above. Call every loop().
     void loop();
 
-    DisplayManager      &display()  { return _display; }
+    BoardDisplay        &display()  { return _display; }
     TouchManager        &touch()    { return _touch; }
     ConnectivityManager &conn()     { return _conn; }
     MqttManager         &mqtt()     { return _mqtt; }
@@ -69,7 +69,7 @@ private:
     // long note at the call site in loop().
     void mqttEvidence();
 
-    DisplayManager      _display;
+    BoardDisplay        _display;
     TouchManager        _touch;
 #ifdef HAS_AUDIO_HW
     AudioManager        _audio;

@@ -9,6 +9,185 @@
 > one-card drawing 4.9 -> 7.4 ms (+50%), copy unchanged; recorded in §8.2. Linen on the CYD was not run.
 > Steps 2-6 will add their own sections here.
 
+---
+
+## Step 2 — `WS_P4_5` on `esp_lcd` (branch `feat/67-step2-p45`)
+
+> **Awaiting the owner's glass checks, 2026-09-26.** Built, flashed and tested by Claude on
+> `WS_P4_5` only; no other board runs any of it (they build unchanged - `CYD_S3_3248` compiled).
+
+**What changed.** `WS_P4_5` no longer uses Arduino_GFX. Its panel is brought up on raw `esp_lcd`
+(`components/Fleet_Display/`), it has **three** frame buffers instead of one, and the P4's PPA
+rotates each strip LVGL draws into the buffer being built, while LVGL draws the next strip. A
+finished buffer is handed to the panel whole, at the start of its next frame. The one line that
+does it is `-D DISPLAY_ESPLCD` in `WS_P4_5`'s environment; **deleting that line puts the board
+back on Arduino_GFX exactly as before.**
+
+**Already seen by me, not on glass:**
+- Full-screen redraw **162.9 -> 90.1 ms (-45%)**, a ceiling of 11 frames/s instead of 6. Drawing
+  itself 95.7 -> 75.5 ms: the CPU no longer spends its cache on copying. `display-stack.md` §8.5.
+- **The panel's buffer matches LVGL's own picture to the pixel.** New: `/screenshot?fb=1` returns
+  the frame buffer the panel is showing (portrait, as wired). Compared pixel by pixel with the
+  normal screenshot: identical on both pages, with the deck, after card redraws and page changes.
+  The one mismatch seen was the Uptime and Signal values changing between the two captures.
+- That comparison also proves the orientation is **the same as Arduino_GFX's** rotation 1.
+- **30-minute soak for the known PPA freeze: PASS.** 382 `/bench` runs back to back - full
+  screen, single card (odd block sizes, which is what that freeze depends on), both pages, deck
+  open and shut - 19,100 frames, no freeze, no reboot (uptime 176 -> 1969 s). Worst single frame
+  298.8 ms, not explained: probably a full-frame repair coinciding with network work, but unproven.
+- **Never seen by anyone:** the glass itself. Everything above reads memory; only your eyes can
+  confirm the panel shows it upright, in the right colours, without tearing.
+
+**Known cost:** the first two or three small updates after a whole-screen change (a page swipe)
+each pay one full-frame copy (~33 ms): every buffer is two frames behind, and it is brought up to
+date before reuse. After that a card update costs about what it did before.
+
+**S1 — First light.** Power-cycle `WS_P4_5`.
+- PASS: the dashboard comes up **upright, the same way round as before**, colours as before (a
+  red/blue swap would show on the orange cards and the coloured area tags).
+- FAIL: sideways, upside down, mirrored, wrong colours, noise, or a black screen. Note what you see
+  at boot, before the dashboard appears, too (a moment of black is expected).
+
+**S2 — Touch.** Tap a card in each of the four corners, and swipe pages both ways.
+- PASS: every tap lands on the card under your finger; swipes go the right way.
+- FAIL: taps land elsewhere (touch mapping is unchanged, so this would be a surprise worth a photo).
+
+**S3 — Tearing and smoothness.** Swipe pages quickly, open and close the drawer, open the deck
+panels, drag the Touch Points panel around.
+- PASS: no torn frames (a horizontal or vertical seam where two frames meet), no flicker, no stale
+  fragments left behind where something moved.
+- Also tell me: does it *feel* faster than before? Page swipes and the drawer are where it should.
+
+**S4 — The rest of the display.** Brightness slider; switch to Linen and back; take a normal
+`python scripts/screenshot.py fleet-ws-p4-5`.
+- PASS: brightness changes, the scheme switch repaints everything, screenshots look right.
+
+**S5 — Overnight.** Leave it running, then `python scripts/bench.py fleet-ws-p4-5`.
+- PASS: the uptime line shows no reboot, the numbers are near 90 ms full / under 10 ms card.
+- FAIL: a reboot, or `/bench` answering "the UI thread did not respond" (that is what a PPA freeze
+  would look like: the screen stops changing, the network keeps working).
+
+> **Owner, 2026-09-26, both boards on `0.2.7.42+dirty` side by side: every functional test signed
+> off** - swiping, taps, panels, sliders "all work the way they should" (S1-S4, S6/S7 here and
+> T3-1..T3-4 below). The swap: "visually the two devices look extremely similar, maybe even the
+> same"; whether the P4_5 stutter is still there is now hard to say. **Two honest observations,
+> both expected rather than bugs:** a page swipe hesitates slightly longer on P4_5 than on the 4B,
+> and the perf overlay's CPU runs a little higher on P4_5 during swipes and swaps. P4_5 draws 1.78x
+> the 4B's pixels (921,600 vs 518,400): a full frame is 85 ms against 52 (`display-stack.md`
+> §8.6-8.7), and drawing is now the whole of the difference. The remaining lever is drawing less,
+> not the flush. The 4B was still at rotation 2 for these checks; the owner then set it to 0.
+
+### The deck-panel stutter (branch `feat/67-bench-anim`, 2026-09-26, laptop weekend)
+
+**What changed.** The owner's stutter - one deck panel opening while the other closes - was
+measured on P4_5 with the new `/bench?what=anim` and traced to the esp_lcd flush's *repair* (bringing
+a buffer up to date before drawing into it), which was re-copying almost everything each frame. It
+now skips what the frame redraws anyway. Numbers: `display-stack.md` §8.6. In short: 6-7 frames per
+swap with gaps up to 82 ms became 9 frames, gaps at most 44 ms, none late - the same as the 4B,
+which you called smooth.
+
+**Already seen by me, not on glass:** the anim numbers above, four swaps at a time, repeated; the
+panel's frame buffer matching LVGL's render pixel for pixel in five different states (only the
+blinking MQTT icon differed, which is expected while MQTT is unreachable); the standard matrix a
+little faster than before. **Never seen by anyone:** how it looks.
+
+**S6 — The swap.** Show the deck; open Audio; tap Display; tap Audio; repeat several times, quickly
+and slowly. Compare with the 4B beside it.
+- PASS: the swap looks as smooth as the 4B's, and no fragment of a panel is left behind when the
+  animation ends (look at the cards just above the deck).
+- FAIL: still a visible hitch, or a stale strip or corner anywhere - note where.
+
+**S7 — Everything else still clean.** Swipe pages, open and close the drawer, drag the Touch Points
+panel, change scheme.
+- PASS: no stale fragments anywhere, no tearing (the change is in what gets copied between the
+  three buffers, so a mistake would show as leftovers from two frames ago).
+
+**For measuring yourself:** `python scripts/bench.py --anim fleet-ws-p4-5` (add `--frames` for every
+frame; it saves the JSON in `bench/`). The panels are seen swapping while it runs.
+
+---
+
+## Step 3 — `WS_P4_4B` on `esp_lcd` (branch `feat/67-bench-anim`, 2026-09-26)
+
+**What changed.** The 4B now runs the same esp_lcd path as P4_5: three frame buffers, the PPA
+turning each strip (180 degrees here) into place, Waveshare's own ST7703 driver fed our BSP's init
+sequence and timings. **Rotation is still 2**, so it should look exactly as before. `-D
+DISPLAY_ESPLCD` in its environment; delete that line to go back.
+
+**Already seen by me, not on glass:** full-screen redraw 87 -> 52 ms; a deck-panel swap frame 31 ->
+18 ms, every frame on LVGL's 33 ms schedule; the frame buffer matching LVGL's render pixel for pixel
+in five states (only the blinking MQTT icon differed). `display-stack.md` §8.7. **Never seen by
+anyone:** the glass.
+
+**T3-1 — First light.** Power-cycle the 4B.
+- PASS: the dashboard comes up the same way round as before (USB port on the left), right colours.
+- FAIL: upside down, mirrored, colours swapped (watch the orange cards), noise, black, or a
+  flicker/roll the old build did not have (that would point at the panel timing).
+
+**T3-2 — Touch.** Tap a card in each corner; swipe pages both ways.
+- PASS: taps land under your finger.
+
+**T3-3 — Smoothness and leftovers.** Swap the deck panels, swipe pages, open the drawer, drag the
+Touch Points panel.
+- PASS: no torn frames, no fragments left behind; at least as smooth as it was.
+
+**T3-4 — Brightness, scheme, screenshot.** Brightness slider; Linen and back; `python
+scripts/screenshot.py <4B's address>`.
+- PASS: all as before.
+
+> **T3-1..T3-4: PASS (owner, 2026-09-26)**, at rotation 2. The owner then set rotation 0.
+
+> **Soak, 2026-09-26, final firmware on both boards (`b5e3587`+, DEBUG_CARDS off, 4B rotation 0):
+> PASS.** 40 minutes of `/bench` cycling full-screen, one-card (odd block sizes - the PPA freeze's
+> trigger), deck-swap and page-change runs: 392 runs each, 0 failures, 0 reboots. Worst single
+> frame 108 ms on P4_5, 74 ms on the 4B (full-screen redraws, as expected). **All eight
+> environments compile** with every change on the branch (39 min).
+
+### The DMA2D repair copier (2026-09-26) - `display-stack.md` §8.10
+
+Repairs (bringing a buffer up to date before drawing into it) now use ESP-IDF's DMA2D copier, 3x
+faster than the PPA. Verified on the device by `/bench?what=verify` (280 checks per board, 0 bad
+pixels). What you might notice: the second or so right after a page swipe is snappier - the frames
+that follow a swipe were paying ~43 ms (P4_5) / ~24 ms (4B) each and now ~14 / ~8. Everything else
+should feel the same.
+
+> **Soak with the copier, 2026-09-26: PASS.** 40 minutes on both boards, the soak cycle plus
+> on-device verification (deck swaps mid-animation, page changes): 348 runs each, 0 failures,
+> 0 reboots, **430 verify checks per board, 0 bad pixels**. Worst single frame 94 ms (P4_5, was 108)
+> and 62.5 ms (4B, was 74). All eight environments compile.
+
+**T3-7 — After a swipe.** Swipe to the other page and immediately open a deck panel, or tap a card.
+- PASS: responds at least as fast as before; no leftover fragments anywhere, especially near the top
+  (where the page toast appears) and the header's right-hand icons.
+
+**For checking the flush yourself:** `http://<board>/bench?what=verify&n=40&act=anim&gap=100` -
+`bad_checks` must be 0 (`near` pixels are overlay rounding, not errors).
+
+### After the sweep (2026-09-26, owner away) - what is flashed now, and what needs eyes
+
+Both boards: `DEBUG_CARDS` off (page swipes ~90 ms quicker, `display-stack.md` §8.9). 4B: rotation
+0, 50-line buffers stated explicitly, our timing. Nothing else changed in behaviour.
+
+> **T3-5 and T3-6: PASS (owner, 2026-09-26).** Page swiping "may be a bit faster (P4_5 still a bit
+> slower than 4B)"; every touch and action works as expected at rotation 0.
+
+**T3-5 — The 4B at rotation 0.** Power-cycle. Tap the four corners; swipe both ways.
+- PASS: upright with the USB port on the other side from before; every tap lands under the finger.
+  Touch follows `ROTATION` in `TouchManager` (0 = the raw coordinates), untested by anyone at 0.
+- FAIL: taps mirrored (left/right or top/bottom swapped) - a photo and which corner.
+
+**T3-6 — Page swipes.** Swipe back and forth on both boards, side by side.
+- Expect: both a little quicker than this morning; P4_5 still a little behind the 4B (it builds and
+  draws a bigger page - §8.9). Tell me whether it is still noticeable.
+
+**Optional A/B, each a rebuild I can do on request:**
+- **Vendor timing on the 4B** (38 MHz, 59.2 Hz) against ours (46 MHz, 66.7 Hz). Measured identical
+  in speed (§8.8); the question is only whether either looks better - flicker, colour, a shimmer.
+- **16 ms refresh on the 4B** (`-D FLEET_LV_REFR_PERIOD=16`): ~48 frames/s for the deck panels
+  instead of 30. Does it look smoother? Nothing else should change.
+
+---
+
 Branch `feat/67-bench`. The plan is `docs/design/display-stack.md`; the numbers are its §8; what
 every JSON field means is the header comment of `src/UI/Bench.cpp`.
 
@@ -45,6 +224,154 @@ before; it matters only once `LV_DRAW_BUF_ALIGN` is 64 (the PPA experiment, and 
   `--timeout 120` if it recurs.
 - **Never tested by anyone:** touching the screen during a run (T4), two runs at once (T5), Linen
   (T6), and the other six boards.
+
+---
+
+## Step 3 continued — `CYD_P4_1060` on `esp_lcd` (branch `feat/67-present-mode`, 2026-09-28)
+
+**What changed.** The CYD P4 runs the same esp_lcd path as the two Waveshare P4s: three frame
+buffers, Espressif's JD9165 driver fed our BSP's init sequence and timings, present mode
+`TRIPLE_PARTIAL` chosen by the rule. **Rotation 0**, so the PPA only copies, never turns. `-D
+DISPLAY_ESPLCD` in its environment; delete that line to go back. This driver had never driven a
+panel before today. It came up first time with the BSP's reset pin as it stands - whether that
+pin is right, or the panel simply does not need the reset, is not known.
+
+**Measured by Claude** (`bench/fleet-cyd-p4-1060_20260928-*_{gfx,esplcd}.json`). `/bench?what=verify`
+during the deck animation and during page changes: 40 + 40 checks, **0 bad**. Panel refresh
+measured 56.3 Hz.
+
+| | Arduino_GFX | esp_lcd |
+|---|---|---|
+| Full-screen redraw (p0) | 104 ms (render 77, copy 27) | 64 ms (render 56, copy 8) |
+| One card | 3.5 ms | 4.2 ms |
+| Deck swap frame | 25 ms (render 18.5, flush 6.3), 10 per swap, none late | 18 ms (render 14.3, flush 4.0), 10 per swap, none late |
+| Page change, swipe to glass | 451-520 ms | 396-530 ms (the page rebuild, ~330-460 ms, is most of it either way) |
+
+**Not like for like, found after the run:** the Arduino_GFX run drew page 0 in **Midnight**, the
+esp_lcd run in **Fleet** (the scheme had been changed on the glass in between). The copy column is
+scheme-independent (27 -> 8 ms); the render column is not, so part of 77 -> 56 may be the scheme.
+Re-run both in the same scheme before quoting the drawing gain. Arduino_GFX also used full-screen
+draw buffers on this board (`DRAW_BUF_HEIGHT = 0`); esp_lcd uses 50-line strips (12 chunks a frame),
+which is why one card costs a little more (4.2 vs 3.5 ms).
+
+> **C1-C4: PASS (owner, 2026-09-28).** Right way round (landscape, camera hole at the top), right
+> colours, touch lands where it should, every interactive feature works. The owner's words: it now
+> feels at least as smooth as the 7B, "maybe even a tiny bit faster" swiping pages, the log page
+> scrolls smoothly under the finger; in Linen, deck panels and the system panel show no slowdown,
+> but a page swipe onto a Linen page does (expected: Linen's shadows are the expensive draw).
+> **Soak, 2026-09-28 19:02-21:02 (2 hours, `scripts/soak.py`, beside the 7B): PASS.** 1,359 runs,
+> 0 failed, 0 UI-thread freezes, 0 reboots; verify 4,520 checks, 0 bad; worst frame 71.8 ms (a page
+> change); lowest internal heap 110,484 B. `bench/soak_fleet-cyd-p4-1060_20260928-190232.jsonl`.
+
+---
+
+## Step 3 continued — `WS_P4_7B` on `esp_lcd` (branch `feat/67-present-mode`, 2026-09-28)
+
+**What changed.** The 7B runs the same esp_lcd path: three frame buffers, Espressif's EK79007
+driver fed our BSP's init sequence and timings, `TRIPLE_PARTIAL`. **It stays at rotation 2**
+(owner: the enclosure puts USB on the left), so the PPA turns every strip 180 degrees. `-D
+DISPLAY_ESPLCD` in its environment; delete that line to go back. `DEBUG_CARDS` is still on for this
+board (its own line), which costs page swipes time on both paths alike.
+
+**Measured by Claude, same scheme (Midnight) both runs** (`bench/fleet-ws-p4-7b_20260928-*`):
+`/bench?what=verify` 40 + 40 checks, **0 bad**; panel refresh 60.5 Hz.
+
+| | Arduino_GFX | esp_lcd |
+|---|---|---|
+| Full-screen redraw (p0) | 101 ms (render 69, copy 32) | 64 ms (render 56, copy 8) |
+| One card | 4.1 ms | 4.5 ms |
+| Deck swap frame | 23 ms (render 16, flush 7.3), none late | 18 ms (render 13.6, flush 4.3), none late |
+| Page change, swipe to glass | 453-518 ms | 418-479 ms |
+
+**Panel-side 180 degrees: tried and rejected** (three builds, owner on glass): the driver's
+`mirror()` changes nothing on this panel. LESSONS.md, Hardware.
+
+> **Soak, 2026-09-28 19:02-21:02 (2 hours, `scripts/soak.py`, beside the CYD): PASS.** 1,500 runs,
+> 0 failed, 0 UI-thread freezes, 0 reboots; verify 5,000 checks, 0 bad - with the PPA turning
+> every strip 180 degrees; worst frame 74.1 ms (a page change); lowest internal heap 110,824 B.
+> `bench/soak_fleet-ws-p4-7b_20260928-190232.jsonl`. **Glass checks B1-B4 not yet reported.**
+
+**B1 — First light.** Right way round with the USB on the LEFT, right colours.
+**B2 — Touch.** A card in each corner; swipes both ways. **This is the one to watch**: the 7B's
+`TouchManager` passthrough special case (`#ifndef WS_P4_7B`) has never been verified, and the
+display path under it has changed. PASS: taps land under your finger.
+**B3 — Smoothness and leftovers.** Deck swaps, page swipes, drawer, Touch Points panel.
+**B4 — Brightness, scheme, screenshot.**
+
+---
+
+## Step 4 — `WS_S3_4B` on `esp_lcd` RGB, `DOUBLE_DIRECT` (branch `feat/67-step4-s3-4b`, 2026-09-29)
+
+**What changed.** The first non-DSI board on esp_lcd. The ST7701's init goes over its 3-wire SPI
+through the TCA9554 expander (Espressif's `esp_io_expander` + `esp_lcd_panel_io_3wire_spi`, sharing
+`Wire`'s bus); the panel is a 16-bit RGB panel with two PSRAM frame buffers and the 20-line bounce
+buffers. **Present mode `DOUBLE_DIRECT`**: LVGL draws straight into those frame buffers - no
+draw buffers, no copy; the flush hands the finished buffer over and waits for the switch. Touch
+reset and the amp enable moved from `DisplayManager` to `Fleet_Display`. **Plus, on this board
+only, `-D FLEET_LV_MEM_PSRAM`**: LVGL's 128 KB pool in PSRAM (`lv_conf.h`) - see below.
+
+**First light: PASS (owner, 03:00)** - dashboard up, first build. One panic reboot right after the
+first esp_lcd boot, not seen again, backtrace not captured.
+
+**Internal RAM was the real problem, on both display paths.** The owner's HA chart: v0.2.7 idled
+at 15-17.5 KB internal free all day; this branch ~12 KB idle and ~4 KB under `/bench` HTTP load -
+HA's socket could not open (`esp-tls: select() timeout` on the UART), long bench runs died, one
+panic. **LVGL's pool in PSRAM: 7.2 KB -> 132.9 KB internal free**; static RAM 199,640 -> 68,568 B.
+
+| S3_4B | Arduino_GFX | esp_lcd, pool internal | esp_lcd, pool PSRAM |
+|---|---|---|---|
+| Full redraw p0 | 221 ms (render 183, copy 38) | 200 ms (render 193) | 212 ms (render 198) |
+| One card | 17.4 ms (render 14.2) | 17.4 ms (render 14.4) | 22-26 ms (render 16.2; the rest is the vsync wait) |
+| Deck swap | hangs (starved) | - | 5 frames/swap, ~90 ms each, 3 late |
+| Page change, swipe to glass | lost (starved) | - | ~1.25 s (rebuild ~1.0 s) |
+| verify | - | 10, 0 bad | 20 anim + 10 page, 0 bad |
+
+**Read:** DIRECT removes the 38 ms copy but LVGL now draws into PSRAM (+10 ms); the PSRAM pool
+costs another ~5-10% of drawing. The S3 is draw-bound - deck animation and page rebuild are the
+slow parts, not the flush.
+
+> **Soak, 2026-09-29 03:14-09:14 (6 hours, `scripts/soak.py`): PASS.** 3,078 runs, 0 failed,
+> 0 UI-thread freezes, 0 reboots (uptime 164 -> 21,771 s); verify 10,260 checks, 0 bad; worst frame
+> 261.6 ms (a page change); **lowest internal heap 130,316 B** - flat all night, no leak.
+> `bench/soak_fleet-ws-s3-4b_20260929-031404.jsonl`. **What it cannot say:** whether the picture
+> drifted. `verify` compares the frame buffer with LVGL's render, which is upstream of the RGB
+> link; a roll or shift is on the glass only. That is the owner's eyes, over days.
+
+**Owner's glass checks still to do (S1-S4 as for the P4s):** right way round and colours; touch at
+the corners (touch reset now comes from Fleet_Display); deck/drawer/swipes with nothing left
+behind; brightness (active-low GPIO4). Two init lists are in the BSP - ours (running) and
+Waveshare's - to compare by eye.
+
+### Glass glitch returns - panel timing tests (2026-09-29)
+
+**Symptom (owner, after the soak):** S3_4B - vertical roll, many small flickering horizontal lines
+on the left side, an occasional full-width line, with 136 KB internal free. P4_4B - a few similar
+lines at the right edge (log page). The 7B showed the same family during bring-up while porch and
+`PREFER_SPEED` values were being tried. A DSI panel cannot "drift" the way the S3's RGB peripheral
+does, and `CONFIG_LCD_RGB_RESTART_IN_VSYNC` is already on - so the working theory is panel timing
+at the edge of the panel IC's tolerance, which moves with temperature: fine cold, lines warm.
+
+**What the datasheets say** (`reference/datasheets/`, gitignored):
+
+- **ST7701S v1.4 p.75, DE mode:** the host's porches *must match* `C1h PORCTRL`. Ours was `C1 0D 02`
+  (VBP 13, VFP 2) against a host sending V pulse+back 28, front 10. Waveshare's list mismatches too.
+- **ST7701S `C2h` RTNI:** minimum clocks per line = 512 + 16 x RTNI. `C2 31 05` wants 592; our line is
+  8+50+480+10 = 548. (Waveshare: `21 08` wants 640 against their 520.) Not changed yet.
+- **ST7703 `BAh SETMIPI` byte 3 = IHSRX**, the HS receiver drive, x1..x16. Ours `0x05`, Waveshare's
+  driver `0x0F`, and we run the lanes at 1000 Mbps where Waveshare runs 480.
+
+**One change per board, old value kept as a comment, 150-min `soak.py` + owner's eyes:**
+
+| Test | Board | Change | Result |
+|---|---|---|---|
+| T1 | S3_4B | `C1 0D 02` -> `C1 1C 0A` (match host) | **WORSE** (owner, 12:26): same places, flickering more often and reaching further right, idle as well as under soak. Reverted after ~25 min |
+| T1 | P4_4B | `BA` IHSRX `0x05` -> `0x0F` | soak 12:26-14:56 PASS (2,104 runs, 7,000 verify checks, 0 bad, 0 reboots, worst frame 65.6 ms, heap >= 111 KB); glass pending |
+| T2 | S3_4B | `C1` back to `0D 02`; `C2 31 05` -> `C2 31 02` (RTNI min 544 <= 548) - the only difference from the original | flashed 12:35. **No visible glitching** (owner, afternoon) - 7-day watch in #69 |
+| next | P4_4B | lanes 1000 -> 480 Mbps | if T1 is not enough |
+
+T1 on the S3_4B does not refute the theory - it shows the ST7701's porch registers visibly move the
+symptom, which is the lever this table is pulling. The datasheet's "must match" reading was the
+wrong direction for this panel, or `C1`'s VBP does not count the sync pulse (then 20, not 28).
 
 ---
 

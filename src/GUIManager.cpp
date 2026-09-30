@@ -2,6 +2,7 @@
 #include "UI/UIToolkit.h"
 #include "UI/UITokens.h"
 #include "SystemReport.h"
+#include "LVGL_Startup.h"                // drawBufInfo(), for [UI STATE]
 #include "Cards/CardDemo.h"
 #include "Cards/CardIcons.h"   // cardSetLabelMode(), for the Label knob
 #include "UI/ReferencePage.h"
@@ -11,6 +12,9 @@
 #include "Dashboards/Dashboard_Fleet.h"
 #include "Dashboards/Dashboard_HA.h"   // both pages on every board since 2.6
 #include "bsp_loader.h"
+#ifdef DEBUG_PAGE_TIMING
+#include <esp_timer.h>   // rebuildDashboard()'s two halves
+#endif
 
 // LVGL's event and callback APIs take plain function pointers with no user
 // context of their own for some of the toolkit hooks, so the single dashboard
@@ -378,6 +382,17 @@ void GUIManager::reportUiSection() {
     if (!s_self) return;
     GUIManager &g = *s_self;
 
+    // LVGL's own version and the engine settings that shape every frame
+    // (display-stack.md s8). Here, not in SystemReport, which includes no LVGL.
+    {
+        const LVGL_Startup::DrawBufInfo b = LVGL_Startup::drawBufInfo();
+        char bb[40];
+        SystemReport::line("  LVGL:        %d.%d.%d, refresh %d ms, draw buffers %u x %s (%lu lines, %s)",
+                           LVGL_VERSION_MAJOR, LVGL_VERSION_MINOR, LVGL_VERSION_PATCH,
+                           (int)LV_DEF_REFR_PERIOD, (unsigned)b.count,
+                           SystemReport::fmtBytes(b.bytes, bb, sizeof(bb)),
+                           (unsigned long)b.lines, b.psram ? "PSRAM" : "internal");
+    }
     SystemReport::line("  Screen:      %ldx%ld  %ld DPI",
                        (long)lv_obj_get_width(lv_screen_active()),
                        (long)lv_obj_get_height(lv_screen_active()),
@@ -859,13 +874,22 @@ void GUIManager::buildDashboard() {
     // on every rotated board and wrong here as well, because the cards do not
     // get the whole screen - the same mistake begin() already documents for
     // UI::begin().
+#ifdef DEBUG_PAGE_TIMING
+    const int64_t tL0 = esp_timer_get_time();
+#endif
     lv_obj_update_layout(screen);
+#ifdef DEBUG_PAGE_TIMING
+    const int64_t tL1 = esp_timer_get_time();
+#endif
     UI::setViewport(lv_obj_get_content_width(_dashHost),
                     lv_obj_get_content_height(_dashHost));
 
     _page = new CardPage();
     _page->begin(_dashHost, &_binder);
     _page->setRowsOverride(_rowsOverride);
+#ifdef DEBUG_PAGE_TIMING
+    const int64_t tL2 = esp_timer_get_time();
+#endif
 
     // The fleet spec is const and carries a header default; the live choice is
     // laid over a copy of it. PageSpec is a plain aggregate, so this is a copy
@@ -879,6 +903,9 @@ void GUIManager::buildDashboard() {
     page.variantDefault = _variant;
     page.showArea       = _showArea;
     _page->applySpec(page, _core.entities());
+#ifdef DEBUG_PAGE_TIMING
+    const int64_t tL3 = esp_timer_get_time();
+#endif
 
     _pnlSystem.setHeaderLabel(_hdr == CardHeaderStyle::HDR_TAG  ? "Tag"
                             : _hdr == CardHeaderStyle::HDR_BAR  ? "Bar"
@@ -886,7 +913,19 @@ void GUIManager::buildDashboard() {
 
     // The page indicator: this page's title, centred in the bar, and a dot
     // per page. Set on every build so a knob that rebuilds cannot lose it.
+#ifdef DEBUG_PAGE_TIMING
+    // Lay the new page out HERE, alone, so its cost is not charged to the
+    // header's own measurement inside setPage() (lv_obj_update_layout lays out
+    // the whole screen an object is on, not only the object).
+    const int64_t tLx = esp_timer_get_time();
+    lv_obj_update_layout(screen);
+    const int64_t tL4 = esp_timer_get_time();
+    Serial.printf("[PageTiming] layout of the new page %lld us\n", (long long)(tL4 - tLx));
+#endif
     _header.setPage(page.title, _curPage, _nPages);
+#ifdef DEBUG_PAGE_TIMING
+    const int64_t tL5 = esp_timer_get_time();
+#endif
 
     // THE DASHBOARD GOES TO THE BACK, by role rather than by index.
     //
@@ -907,11 +946,22 @@ void GUIManager::buildDashboard() {
         lv_obj_move_background(_deckScrim);
         lv_obj_move_background(_dashHost);
     }
+#ifdef DEBUG_PAGE_TIMING
+    const int64_t tL6 = esp_timer_get_time();
+#endif
 
     if (_deck) {
         if (_showDeck) lv_obj_clear_flag(_deck, LV_OBJ_FLAG_HIDDEN);
         else           lv_obj_add_flag  (_deck, LV_OBJ_FLAG_HIDDEN);
     }
+#ifdef DEBUG_PAGE_TIMING
+    const int64_t tL7 = esp_timer_get_time();
+    Serial.printf("[PageTiming] build: layout(screen) %lld | page begin %lld | applySpec %lld | hdrLabel %lld"
+                  " | setPage %lld | moveBg %lld | deck %lld (us)\n",
+                  (long long)(tL1 - tL0), (long long)(tL2 - tL1), (long long)(tL3 - tL2),
+                  (long long)(tL4 - tL3), (long long)(tL5 - tL4), (long long)(tL6 - tL5),
+                  (long long)(tL7 - tL6));
+#endif
 }
 
 void GUIManager::destroyDashboard() {
@@ -923,8 +973,20 @@ void GUIManager::destroyDashboard() {
 }
 
 void GUIManager::rebuildDashboard() {
+#ifdef DEBUG_PAGE_TIMING
+    // -D DEBUG_PAGE_TIMING: the rebuild's two halves (CardPage::commit()
+    // splits the build further). Printed after both, so the print is not timed.
+    const int64_t t0 = esp_timer_get_time();
+    destroyDashboard();
+    const int64_t t1 = esp_timer_get_time();
+    buildDashboard();
+    const int64_t t2 = esp_timer_get_time();
+    Serial.printf("[PageTiming] destroy %lld us | build %lld us\n",
+                  (long long)(t1 - t0), (long long)(t2 - t1));
+#else
     destroyDashboard();
     buildDashboard();
+#endif
     // A rebuild is the one thing that happens over and over on a running
     // board. If internal heap trends down across these, the leak is here.
     SystemCore::heapMark("after rebuild");

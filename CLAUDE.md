@@ -107,7 +107,7 @@ second, redundant `-D <BOARDNAME>` build flag (BSP_HEADER already implies exactl
 board it is) — collapsed down to the one flag plus the in-header `#define`. `HAS_X`
 capability flags (`HAS_ES7210`, `HAS_MIPI_PANEL`, etc.) are unrelated to this and stay as
 `build_flags`, unchanged. Board macro names are deliberately short (`WS_P4_7B`, `WS_P4_5`,
-`WS_P4_4B`, `WS_S3_5B`, `WS_S3_4B`, `CYD_P4_1060`, `CYD_S3_3248`, `CYD_S3_8048`) for
+`WS_P4_4B`, `WS_S3_5B`, `WS_S3_4B`, `CYD_P4_1060`, `CYD_P4_4880`, `CYD_S3_3248`, `CYD_S3_8048`) for
 readability at `#ifdef` call sites — shorter than the BSP filename's full model name and
 deliberately distinct from any struct instance name in the same file (see below for why that
 distinction matters).
@@ -170,8 +170,13 @@ conditional.
   among candidates, not a mistake; compare on glass before "correcting" it, and never delete the
   comments.
 - Each board's `BSP_<NAME>.h`:
-  1. Defines the short device-identity macro (see Board selection above), then `HAS_X`
-     capability flags stay in `platformio.ini`, not here.
+  1. Defines the short device-identity macro (see Board selection above), then
+     `#define BSP_PANEL_DRIVER <CHIP>` - the panel controller as a bare name (`HX8394`), not a
+     string. `Fleet_Display` pastes it into the name of that chip's driver wrapper
+     (`fleet_dsi_driver_HX8394`, in `components/Fleet_Display/src/fleet_dsi_hx8394.c`), so there is
+     no per-chip if/else to maintain; `.PANEL_MODEL = BSP_STR(BSP_PANEL_DRIVER)` makes the reported
+     chip and the built one the same thing. A chip with no wrapper is a link error naming it.
+     `HAS_X` capability flags stay in `platformio.ini`, not here.
   2. Declares the panel init command array next (if any). **This can't move below the struct
      literals** — `.INIT_CMDS_SIZE = sizeof(array)/sizeof(element)` needs the array's
      complete (sized) type at the point it's used; a forward declaration would leave it
@@ -244,7 +249,8 @@ board runs until its turn. Plan: `docs/design/display-stack.md`.
   the include path before reading an `sdkconfig` — reading the wrong one wasted most of a
   session. `BoardHardware.SI_REV` stays `"unconfirmed"` on every P4 board and should: silicon
   revision is a per-chip property, not a per-board-model one, so a BSP header cannot represent
-  it correctly. See `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
+  it correctly. The System Doctor reads the real one at runtime (`[FIRMWARE]`, `esp_chip_info()`),
+  along with the IDF/Arduino versions and whether the rebuilt #49 libraries are in the build. See `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
 - **Panel reset polarity is per-board: `DisplayConfig.RST_ACTIVE_HIGH`.** `0` (the zero-fill
   default) is the generic active-LOW sequence every board used before this field existed; `1`
   selects assert-HIGH / release-LOW, mirroring `esp_lcd panel_hx8394_reset`. The Waveshare
@@ -443,9 +449,16 @@ add a new `DEBUG_<AREA>` flag for future debugging needs rather than ad-hoc unco
 
 ## Working conventions established this session
 
-- BSP header layout: device-identity `#define` → panel init array (forced position, see
-  above) → the seven `const <Type> <BOARD>_<GROUP>` / `inline const <Type>& bsp_<alias>`
-  pairs, skipping any group the board doesn't need.
+- BSP header layout: device-identity `#define` → `BSP_PANEL_DRIVER` → panel init array (forced
+  position, see above) → the seven `const <Type> <BOARD>_<GROUP>` / `inline const <Type>&
+  bsp_<alias>` pairs, skipping any group the board doesn't need.
+- **Present mode (esp_lcd path): derived, with a per-board override.** `bspPresentMode()` in
+  `bsp_loader.h` picks how frames reach the panel from the bus flag, the rotation and the TE pin;
+  `DisplayConfig.PRESENT_MODE` (a `BSP_PRESENT_*` code, 0 = use the rule) overrides it on one
+  board. The framebuffer count follows from the mode and is never set on its own. Only
+  `TRIPLE_PARTIAL` is built; `Fleet_Display::begin()` refuses anything else, loudly, and runs
+  that. The boot log and the System Doctor say which mode and why. `DisplayConfig.NUM_FB` is
+  Arduino_GFX-only and dies at 2.9 step 6.
 - Prefer runtime checks over `static_assert` for validating BSP struct field values — the
   struct instances are declared `const`, not `constexpr`, so they aren't usable in constant
   expressions as-is (confirmed via compiler error, not assumption).

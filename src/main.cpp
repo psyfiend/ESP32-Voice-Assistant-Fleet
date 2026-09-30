@@ -49,6 +49,16 @@ static constexpr uint32_t BOOT_REPORT_MAX_MS = 20000;
 
 void setup() {
     Serial.begin(115200);
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
+    // Serial is the chip's own USB port here (HWCDC), not a UART bridge. With
+    // a PC attached that has stopped reading the port, every write retries for
+    // up to 20 x the TX timeout (100 ms by default: HWCDC::write) - up to 2 s
+    // of loop() per print. That was the CYD_P4_4880's freezing on every page
+    // swipe, deck swipe and tap (2026-09-29): gone on a wall adapter, back
+    // whenever Windows stopped draining the port. 0 = never wait: output
+    // flows while someone is reading and is dropped when nobody is.
+    Serial.setTxTimeoutMs(0);
+#endif
     delay(1000);
     Serial.println("\n=== Fleet Hardware Dashboard (Modular) ===");
 

@@ -165,6 +165,23 @@ in the display driver compiles out and a failure looks like total silence. It on
 code compiled here; ESP-IDF's own `esp_lcd` internals are prebuilt archives and stay quiet
 regardless.
 
+**A native-USB board plugged into a PC can freeze on every `Serial.print`.** Boards whose
+`Serial` is the chip's own USB port (`ARDUINO_USB_CDC_ON_BOOT=1`: the 7B, CYD_P4_1060, CYD_P4_4880,
+not the CH343-bridged P4_5/4B) use Arduino's `HWCDC`, which - when the PC is attached but has
+stopped reading the port - retries each write for up to 20 x its 100 ms TX timeout. Up to 2 s of
+`loop()` per print. On 2026-09-29 the 4880 froze on every swipe, deck and tap; on a wall adapter,
+never. It came and went while plugged in, depending on whether Windows was draining the port.
+`Serial.setTxTimeoutMs(0)` in `setup()` (main.cpp) makes output drop instead of wait. **Test a
+native-USB board's smoothness off the PC, or with this fix in** - an idle COM port can look
+exactly like a slow display stack.
+
+**A driver's `mirror()` is not proof the panel mirrors.** The EK79007 driver (`WS_P4_7B`)
+implements `mirror()` by sending MADCTL (0x36), and a survey read that as "180 degrees for free".
+On glass (2026-09-28) the picture never moved: after init with both bit pairs, and with 0x36 inside
+the init sequence. In DSI video mode this panel ignores MADCTL. A driver function is what the
+vendor wrote, not what the panel does; the glass decides. (Espressif also advises keeping 0x36 out
+of init sequences: the driver tracks MADCTL itself, and an init-list 0x36 overrides its note.)
+
 ---
 
 ## Memory: internal SRAM is the scarce resource, and not evenly
@@ -264,6 +281,39 @@ redrew in the animation's first frame. LVGL animations are time-based, so the re
 it hurries the animation along". Switching the sheet by `LV_OBJ_FLAG_CLICKABLE` instead costs no
 redraw, and `lv_obj_hit_test()` passes over a non-clickable object, so it is invisible to touch.
 
+**A forced full-screen benchmark cannot see an animation.** 2026-09-26. Step 2 of the display
+migration measured -45% per full frame on `WS_P4_5`, and the owner still saw a deck-panel swap
+stutter. Forced frames redraw one area that covers everything, so the esp_lcd repair (copying what
+a buffer is behind on) had nothing to do. An animation redraws a few overlapping areas every frame,
+and there the repair was re-copying almost all of them: 200-500k px of PPA work per frame, the
+actual bottleneck. It showed only when `/bench?what=anim` recorded the real frames, unforced, with
+the repair's own numbers beside them. **Measure the case the user complains about, the way it
+really runs** - and per frame, since an average hides the late ones.
+
+**A debug print is not free, and a flag left on costs every user every time.** 2026-09-26.
+`DEBUG_CARDS` printed ~3 KB per page change; at 115200 baud a UART that has filled its small
+buffer blocks the caller, so ~90 ms of every P4 page swipe was serial output nobody was reading.
+It had been on fleet-wide since the 2.7 card work. The spike-default lesson above, again: **when the
+debugging is done, the flag comes off** - and when something is slow, check what it prints first.
+
+**`lv_obj_update_layout(obj)` lays out the whole SCREEN `obj` is on**, not `obj` (LVGL 9). Called
+anywhere after a page's cards are created - `Panel_Header::setPage()` measuring the header, here -
+it quietly does the entire page's layout, and a profile charges ~115 ms to "the header". Time the
+layout on its own (`DEBUG_PAGE_TIMING` does) before blaming the caller.
+
+**A test of the parts does not test the use.** 2026-09-26, `esp_async_fbcpy`. Every isolated check
+passed - whole frame, odd widths, high rows, two copies at once, one beside the PPA - and the flush
+still put stale pixels on the glass, because the flush QUEUED copies and none of the checks did. The
+cause was in Espressif's code (one `static` config shared by every handle, read when a queued job
+starts). What found it: reading the vendor source after the fourth clean isolated test, and then an
+instrument that checks the real thing - `/bench?what=verify` compares LVGL's render with the frame
+buffer in one instant on the device. **When the parts pass and the whole fails, stop testing parts:
+test the whole the way it runs, and read the source of whatever it hands work to.**
+
+**A comparison that takes two snapshots at two times cannot judge a moving picture.** The PC-side
+`fbcompare.py` took the render and the frame buffer ~1.5 s apart, so a ticking value or a fading toast
+looked exactly like a stale buffer. Capture both in the same instant, or the result is noise.
+
 ## LVGL, from milestone 2.4
 
 **An out-of-range grid row is a hard freeze, not a wrong layout.** `lv_conf.h` defines
@@ -341,6 +391,23 @@ just wrote is worth a byte scan:
 A second, unrelated trap from the same session: an anchor string for a patch must not assume the
 section it anchors to is followed by a blank line. This one was at the end of the file.
 
+
+## LVGL's 128 KB pool was the biggest thing in the S3s' internal RAM - PSRAM now (S3_4B)
+
+`LV_MEM_SIZE` is a static array in internal DRAM on every board. On `WS_S3_4B` (2026-09-29) that
+left 12-17 KB internal free at idle - fine until the HTTP server (#58, `/bench`) arrived, after
+which request load took it to ~4 KB: HA's websocket could not open a socket (`esp-tls: select()
+timeout`, visible only on the UART console, COM8), long `/bench` runs dropped mid-reply
+(`IncompleteRead`) or hung, and once the board panicked. It looked like three separate bugs.
+**`-D FLEET_LV_MEM_PSRAM`** points LVGL's own allocator at a pool it takes from PSRAM at
+`lv_init()` (`LV_MEM_POOL_ALLOC`, `lv_conf.h`): internal free 7 KB -> 133 KB, drawing ~5-10%
+slower. **The HA free-heap sensor's HISTORY is the instrument** - it answered "is this new" (no:
+v0.2.7 idled at 15-17 KB) in one screenshot.
+
+**Also learned the same night:** passing build flags through `PLATFORMIO_BUILD_FLAGS` makes
+PlatformIO's project checksum disagree with any other pio process (VS Code's extension indexing
+the tree, most likely), and one of them deletes `.pio/build` mid-build ("cannot find the path
+specified" on `lib6b5`). Three builds failed that way. Put the flag in `platformio.ini` instead.
 
 ## Internal heap is the scarcest thing on this fleet, and nothing announces it
 

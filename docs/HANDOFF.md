@@ -1,4 +1,4 @@
-# Handoff — 2026-09-25
+# Handoff — 2026-09-27 (end of the laptop weekend)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was cut from ~680 lines to this on
@@ -10,6 +10,215 @@ whoever reads it first. Say *which* document a summary compresses, and treat voc
 not appear in the source as suspect.
 
 ---
+
+## 2026-09-29 (night) - 2.9 step 4 started: WS_S3_4B on esp_lcd RGB
+
+**Branches, stacked:** `feat/67-present-mode` (the P4s: present mode, driver-by-name, 7B + 1060 on
+esp_lcd, soaked) <- `feat/board-cyd-p4-4880` (the JC4880P443 board, 2x5 portrait default, the
+native-USB `Serial` freeze fix) <- **`feat/67-step4-s3-4b`** (this). None merged to `main`.
+
+- **S3_4B on esp_lcd: first light PASS**, `DOUBLE_DIRECT`, verify 0 bad. `TEST_2.9.md` step 4 has
+  the numbers and the owner's remaining glass checks.
+- **The S3_4B was starved of internal RAM** (4-12 KB) on this branch on BOTH display paths - HA
+  could not connect, benches died, one panic. Fixed on that board only with
+  **`-D FLEET_LV_MEM_PSRAM`** (LVGL's pool in PSRAM): 7 KB -> 133 KB internal free, drawing ~5-10%
+  slower. LESSONS has it. **Likely wanted on every S3** (the CYDs are tighter still) and maybe the
+  P4s - owner's call after the soak.
+- **6-hour soak of the S3_4B, 03:14-09:14: PASS** - 3,078 runs, 10,260 verify checks, 0 failures,
+  0 reboots, internal heap flat at >=130 KB. It cannot see RGB drift (that is on the glass); leave
+  the board running and look at it over the next days.
+- Not done: glass checks, Waveshare's init list comparison, the S3_4B page-change baseline (lost to
+  the starvation), and why the S3 page rebuild takes ~1 s (P4s: 0.3-0.45 s).
+
+## 2026-09-28 - back at the desktop
+
+- **Step 5 below is done** for the two P4s: `.pio/build_cache` cleared, `WS_P4_5` and `WS_P4_4B`
+  rebuilt with the desktop's secrets and flashed; both rejoined the home network.
+- **`CYD_S3_3248`'s USB connector broke off the PCB** (owner). Treat it as unavailable; it can
+  still be powered from the battery/headers and flashed over UART. **The slow dev target is now
+  `WS_S3_TOUCH_LCD_4B` (COM8)**; the fast one is still `WS_P4_5` (COM15). The 4B P4 is COM7.
+- **`WS_S3_4B` on Arduino_GFX loses its picture after days of uptime**: flickering horizontal lines,
+  then the image rolls vertically (the header shows at the bottom); a reboot clears it. The owner
+  has seen the same while trying porch/clock values on the 7B and the P4 4B. Leading theory,
+  unconfirmed: the RGB peripheral losing sync ("drift"), not static timing. **Owner's plan: bring
+  it to esp_lcd (2.9 step 4) first, then troubleshoot there** - it has the resync hook and the
+  timing controls. It runs v0.2.7 (no `/screenshot`); HTTP is refused.
+- **Branch `feat/67-present-mode`** (off `feat/67-bench-anim`), owner-approved:
+  `BSP_PANEL_DRIVER` in every BSP (the driver chosen by name, no per-chip if/else;
+  `PANEL_MODEL` derived from it) and the **present mode** - derived by `bspPresentMode()`,
+  overridable per board by `DisplayConfig.PRESENT_MODE`, framebuffer count following from it,
+  shown in the boot log and System Doctor. Only `TRIPLE_PARTIAL` is built. CLAUDE.md and
+  `components/Fleet_Display/README.md` describe both.
+- **`CYD_P4_1060` runs esp_lcd** (JD9165, first light ever for that driver): owner signed off
+  C1-C4 on glass, `/bench` verify 0 bad, full frame 104 -> 64 ms (scheme differed between the
+  runs - see `TEST_2.9.md`). The CYD has a camera - noted in FUTURE_IMPROVEMENTS.
+- **`WS_P4_7B` runs esp_lcd** (EK79007, rotation 2 via the PPA): `/bench` verify 0 bad, full frame
+  101 -> 64 ms (same scheme). **Owner's glass checks B1-B4 not yet reported** - B2 (touch, the
+  unverified `#ifndef WS_P4_7B` passthrough) is the one to watch. **Panel-side 180 degrees was tried
+  and does not work** (the driver's `mirror()`/MADCTL, three builds) - LESSONS, Hardware.
+- `scripts/soak.py` (new): N boards in parallel through `/bench` for `--minutes`; counts failures,
+  bad verify checks, reboots, UI-thread freezes. **2-hour soak of the 7B and CYD_P4_1060,
+  2026-09-28 19:02-21:02: PASS on both** - 2,859 runs, 9,520 verify checks, 0 failures, 0 bad,
+  0 reboots, worst frame 74 ms (`TEST_2.9.md`). All four P4s now run esp_lcd and have soaked clean.
+- **New board, `CYD_P4_4880` (Guition JC4880P443, 4.3" 480x800 portrait, ST7701 over DSI)** -
+  owner's idea for the 3248's successor. Branch `feat/board-cyd-p4-4880` (off
+  `feat/67-present-mode`): BSP from Guition's pack + schematic, Espressif's `esp_lcd_st7701` 2.0.2
+  vendored with its wrapper, environment `CYD_P4_4880P443` (esp_lcd only), hostname slug, type scale
+  and icons regenerated (one new face, `fleet_icons_38`). **Compiles; never flashed.**
+  `docs/TEST_CYD_P4_4880.md` is the first-flash sheet. **The fleet is now NINE environments** - the
+  pre-merge "all eight" build is all nine. The reference folder is misnamed
+  `Guition-P4-JC4880P433`; its contents are the P443 (left as the owner named it).
+- `reference/esp-registry/` gained `esp_display_present`, `esp_lv_present` and the
+  `lvgl_present_benchmark` example (IDF >= 6.0, read-only; `REFERENCE_PROJECTS.md` says what is in
+  them for us).
+
+## Start here - 2026-09-27
+
+**1. The design interview is the next piece of work.** `docs/design/interview-phase2-3.md` is the
+blueprint-to-be for the rest of Phase 2 and all of Phase 3 (including how the build sheet, the
+on-device UI and the web UI live together). **Claude facilitates it; the owner answers.** Follow
+its §0.1a protocol exactly - in short: one section per sitting, in order, starting with §1 (look
+and feel); 3-4 questions at a time with context and a recommendation, in plain words; show a mock
+before asking about looks; push back with evidence where an answer conflicts with a decision or a
+gotcha; write the answers into the section's design doc as you go; close by updating ROADMAP and
+this file and committing (docs only). **Build nothing a session decides until the owner says go.**
+Its §0.2 lists what is already decided - do not ask those again.
+
+**2. The deck is NOT part of the default dashboard** (owner, 2026-09-27) - a throwback to his first
+design, kept in code in case it is worth repurposing (inside popups, or on route-only room pages).
+Device-wide settings come from the system panel at the top. **All three edge-swipe zones are to be
+user-customizable**, a target being a page, a card popup, settings, a deep link into a settings
+view (the log, e.g.), or anything else - one "go to" addressing scheme (interview §5).
+
+**3. The card popup blueprint** is `docs/design/card-sheet.md` (draft 2; decisions D1-D7 open, and
+§2 of the interview).
+
+**4. esp_lcd for the boards not yet moved (7B, CYD_P4_1060) - prep done, runbook here.** Both
+panel drivers (EK79007, JD9165) are vendored in `Fleet_Display` and compile and link (not run);
+DSI lanes and PHY power come from their BSPs. The PHY reference clock: IDF's "0" resolves to
+PLL_F20M on our pre-rev3 build, the same as Arduino_GFX used, so both boards get the clock they rely
+on. **UNCOMMITTED in the laptop's tree:** `Fleet_Display` now also honours an explicit
+`PHY_CLK_SRC` code (no board sets one) - it could not be built because Windows began blocking
+`pio.exe` on 2026-09-27 ("An Application Control policy has blocked this file"). **It is parked,
+unbuilt, on branch `wip/phy-clk-src`**: build it on both dev boards, `/bench?what=verify`, then merge
+into `feat/67-bench-anim` - or drop it. To move a board, with it on the desk:
+1. `-D DISPLAY_ESPLCD` in its environment (the committed `platformio.ini` via the blob method if on
+   the laptop - see the laptop memory note; plain edit at home).
+2. Build, flash, read the boot log: `[Fleet_Display] Ready ... driver ...` and
+   `[LVGL] repair copier: DMA2D`. Check `Refresh: NN Hz measured` in the System Doctor.
+3. `/bench?what=verify&n=40&act=anim&gap=100` and `act=page` - `bad_checks` must be 0.
+4. `bench.py`, `--anim`, `--page` with the flag off, then on (the before/after table).
+5. A soak (the 40-minute pattern in TEST_2.9), then the owner's glass checks (a T3-style sheet).
+Open per board: **the 7B STAYS at `ROTATION = 2`** (owner, 2026-09-27: its 3D-printed enclosure puts
+the USB on the left; revisit later) - on esp_lcd that is a PPA 180-degree turn, measured to cost the
+same as rotation 0 on the 4B. The 7B's `TouchManager` passthrough special case (`#ifndef WS_P4_7B`)
+is unverified (CLAUDE.md) and must be re-checked on the glass after the move. **CYD_P4_1060's reset
+pin** is uncertain in its BSP ("0 in schema, 27 in GFX Library, 5 in examples") - if the panel stays
+black, that is the first suspect, then reset polarity (the P4_5 lesson).
+
+**6. Order of operations from here:** (1) the desktop sync in item 5; (2) owner's sign-off, then
+merge `feat/67-bench-anim` to `main` (`--no-ff`, all-eight build first); (3) the design interview,
+§1 first; (4) 2.9 continues opportunistically - 7B and CYD_P4_1060 whenever each is on the desk,
+S3s later; (5) whatever the interview orders next (2.10a is drafted and ready to start on go).
+
+**7. NOT tested, NOT built, NOT decided - be honest about these:**
+- **7B and CYD_P4_1060 on esp_lcd**: compile and link only; no panel has ever been driven by these
+  drivers. First light is untested.
+- **`wip/phy-clk-src`**: never built (Windows blocked `pio.exe` on the laptop).
+- **S3 boards on esp_lcd**: not started (steps 4 and 5). They run Arduino_GFX, compile-checked only
+  with this branch's changes - **no S3 was flashed or run this weekend.** Same for the 7B and
+  CYD_P4_1060 on Arduino_GFX: compiled, not run.
+- **`DEBUG_CARDS` off** measured on P4_5/4B only; the 7B keeps its own explicit line; `[S3-options]`
+  untouched.
+- **Waveshare's timing on the 4B** and the **16 ms refresh** (`FLEET_LV_REFR_PERIOD`) - measured,
+  never looked at on the glass; on no board.
+- **Home Assistant with this branch**: nothing was tested against HA or MQTT all weekend (both
+  unreachable from the laptop's network) - at home, check HA and MQTT cards still update.
+- **Card popups, header slots, group cards, the build sheet**: designed or asked about, nothing
+  built. The interview has not started.
+- Unknowns flagged in the designs: wall-clock time (SNTP/TZ) on the boards; whether flash writes
+  glitch the esp_lcd panel; the HA websocket's 8 KB receive buffer vs history replies.
+
+**5. Back at the desktop after the laptop weekend.** Everything is on GitHub; no kit needed.
+- **The work is on branch `feat/67-bench-anim`, NOT merged to `main`** (it contains
+  `feat/67-step2-p45` too). `git fetch`, `git checkout feat/67-bench-anim`, `git pull`,
+  `git submodule update --init`.
+- **`platformio.ini` needs nothing:** the committed file has the desktop's `c:/Users/Marge/...`
+  paths plus every weekend change (the 4B's `DISPLAY_ESPLCD`, `DEBUG_CARDS` off in `[P4-options]`).
+  The laptop's paths were never committed (skip-worktree there). If `git status` on the desktop shows
+  `platformio.ini` modified from before the weekend, look at the diff before discarding it.
+- **Delete `.pio/build_cache`** before the first build: BSP headers and `lv_conf.h` changed, and the
+  cache serves stale objects for those (CLAUDE.md).
+- The rebuilt P4 libraries and `reference/esp-registry` are already on the desktop. **Do not copy the
+  laptop's `ConnectivityLocalSecrets.h` back** - it holds the weekend network.
+- What changes on the glass: **P4_5 and 4B run esp_lcd** (4B now rotation 0); the 7B, CYD_P4_1060
+  and all S3s build and run exactly as before (Arduino_GFX). The **S3s are not esp_lcd-ready**:
+  `Fleet_Display` drives MIPI-DSI only; RGB (steps 4) and QSPI (step 5) are not started.
+- Optional: the laptop's `bench/` folder (gitignored) holds every measurement JSON from the weekend.
+- Before merging to `main`: the owner's sign-off, then an all-eight build (last done 2026-09-27, all
+  SUCCESS), `--no-ff`.
+
+## Remote weekend, 2026-09-26 to 28 - read this first if you are on the laptop
+
+The owner is away with **only two boards, `WS_P4_5` and `WS_P4_TOUCH_LCD_4B`, and a laptop**. The
+7B, the S3s and the CYD stayed home and are **unreachable**. Setup was done from
+`Desktop\FleetLaptopKit\README.md` on the home desktop (rebuilt P4 libraries, secrets, fetched
+drivers, Claude memory); if a P4 drops WiFi, first check the rebuilt `esp32p4_es` is really in place.
+
+- **Network:** boards and laptop share a local network (phone hotspot or the host's WiFi). Home
+  Assistant is NOT reachable from the boards - HA cards read unavailable, which is expected. MQTT
+  likewise. Display work needs neither. Hostnames may not resolve; use IPs.
+- **The WiFi SSID is compiled in** from the gitignored `ConnectivityLocalSecrets.h`; the laptop's
+  copy was edited for the weekend network. Never commit it.
+- **"Build the two dev boards" this weekend means `WS_P4_5` and `WS_P4_4B`.** The all-eight build
+  before any merge still applies - it only compiles, no boards needed, ~25 min.
+- **If the laptop's username is not `Marge`,** its `platformio.ini` has a local, uncommitted path
+  replacement. `git status` will show it modified: **never stage it.**
+
+**The work, in the owner's order of interest:**
+
+0. **Status, 2026-09-26 (laptop session):** item 1 is **measured and fixed, awaiting glass
+   (`TEST_2.9.md` S6/S7)**, on branch `feat/67-bench-anim` (off `feat/67-step2-p45`). Cause: the
+   esp_lcd repair re-copied nearly everything each frame; it now subtracts what the frame redraws.
+   `display-stack.md` §8.6. Rotation 0 is no longer needed for it. On the laptop's network
+   hostnames do not resolve: P4_5 was `10.0.0.2`, the 4B `10.0.0.83` (find them with
+   `curl http://<ip>/bench?what=x`, which answers with an error naming `anim`). The 4B's BSP is
+   still `ROTATION = 2` on every branch - the rotation-0 decision below was never applied.
+   **Item 2 (step 3) is BUILT and verified from outside, awaiting glass (`TEST_2.9.md` step 3):**
+   the 4B runs esp_lcd with the vendored ST7703 driver, our timings, rotation still 2 on purpose
+   (same picture as before; rotation 0 is a separate, visible change for the owner to see).
+   `display-stack.md` §8.7. **Owner signed off every functional test on both boards (2026-09-26)**
+   and set the 4B to rotation 0 (done). Then, with the owner away, a configuration sweep on the 4B
+   (§8.8: timing makes no speed difference - a picture-quality choice for the owner's eyes; 50-line
+   buffers are best; a 16 ms refresh period gives the 4B ~48 fps animation, now a per-board
+   `-D FLEET_LV_REFR_PERIOD`, set on no board), and the page-swipe hesitation traced (§8.9:
+   `DEBUG_CARDS` was ~90 ms of every swipe - off in `[P4-options]` now; the rest is building and
+   laying out ~15 cards, ~115 ms each half). The 7B and CYD_P4_1060 drivers (EK79007, JD9165) are
+   vendored and compile; **neither board runs them** - one line each, with the board on the desk.
+   **Then (same day): the System Doctor reports versions and silicon** (P4_5 rev v1.3, 4B rev v1.0;
+   rebuilt libs are IDF `v5.5.5-832-g2553c5ad432`), **and repairs moved to the DMA2D copier**
+   (`esp_async_fbcpy`, §8.10): 3x the PPA's speed, the frames after a page swipe 43 -> 14 ms on
+   P4_5. It exposed a bug in Espressif's copier (one static config for every handle): **never more
+   than one copier job outstanding** - `esp_async_fbcpy_priv.h`. New instrument:
+   `/bench?what=verify` checks the panel's buffer against LVGL's render on the device.
+1. **The P4_5 animation stutter** (owner, 2026-09-26): opening one deck panel while the other closes
+   stutters slightly on P4_5, while the 7B and 4B stay smooth. Not tearing - frames are late. The
+   leading theory, unmeasured: P4_5 draws 1.5x the 7B's pixels at 1.73x UI scale, so a two-panel
+   frame overruns LVGL's 33 ms refresh period (`LV_DEF_REFR_PERIOD`). **Plan agreed with the owner:
+   measure first** - add an animation mode to `/bench` that triggers exactly that two-panel swap and
+   records every frame (count, per-frame time, render vs PPA). Compare P4_5 on `esp_lcd` against P4_5
+   on Arduino_GFX (delete `-D DISPLAY_ESPLCD` to switch), and against the 4B. Rotation 0 on P4_5 is
+   the owner's suggested experiment if the PPA turns out to be the bottleneck.
+2. **2.9 step 3 on the 4B:** `esp_lcd` for the ST7703. The owner set it back to **rotation 0**
+   (2026-09-26; its old reason is forgotten), so no PPA rotation is needed - an angle-0 copy, or
+   `draw_bitmap` with `use_dma2d`. Driver: `reference/esp-registry/waveshare__esp_lcd_st7703-v2.0.0`
+   (MIT); vendor it into `Fleet_Display` like the HX8394 (its README). **Timings:** ours (46 MHz,
+   66.7 Hz) and Waveshare's (38 MHz, 59.2 Hz) are both candidates - the owner keeps alternatives as
+   BSP comments on purpose (CLAUDE.md); compare on glass, never "correct" silently. Survey §3.
+3. **S5** (step 2 overnight) if not done at home: leave P4_5 up overnight, then `bench.py`.
+
+Use `/screenshot?fb=1` plus a pixel diff against `/screenshot` to check a new display path from
+the laptop before asking for eyes - it is how step 2 was verified (`display-stack.md` §8.5).
 
 ## Where the project is
 
@@ -57,8 +266,11 @@ network (`fleet-ws-p4-5` and so on). There is no auth; it is gated by `-D ENABLE
    `LV_OBJ_STYLE_CACHE` (2-4% for pool space P4_5 lacks), and **`LV_OS_FREERTOS` + 2 draw units
    (drawing 51% slower on P4_5)** - all in §8.3, none merged.
 
-   **Step 2 is NEXT, and the design is agreed: `docs/design/esplcd-step2.md` - its §7 holds the
-   owner's decisions and overrides its §2.** Triple-partial with PPA rotation on `WS_P4_5`, in a new
+   **Step 2 is BUILT on `feat/67-step2-p45` (2026-09-26), awaiting the owner's glass checks
+   (`TEST_2.9.md` step 2, S1-S5).** `WS_P4_5` runs on `esp_lcd`: full-screen redraw 162.9 -> 90.1 ms,
+   and `/screenshot?fb=1` (the panel's own buffer) matches LVGL's render to the pixel. Nothing
+   else moved. After sign-off: step 3, the other P4s. The design: `docs/design/esplcd-step2.md` - its
+   §7 holds the owner's decisions and overrides its §2. Triple-partial with PPA rotation on `WS_P4_5`, in a new
    `components/Fleet_Display/` (`DisplayManager` untouched until step 6), HX8394 driver vendored with
    its legacy-I2C code compiled out, `LV_OS_NONE`. Read `docs/research/waveshare-esp-lcd-survey.md`
    first. The branch `spike/67-esplcd-compile` proves every IDF call and the driver compile and link

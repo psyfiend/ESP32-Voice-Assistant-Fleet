@@ -24,6 +24,7 @@ LV_FONT_DECLARE(fleet_icons_30);
 LV_FONT_DECLARE(fleet_icons_32);
 LV_FONT_DECLARE(fleet_icons_34);
 LV_FONT_DECLARE(fleet_icons_36);
+LV_FONT_DECLARE(fleet_icons_38);
 LV_FONT_DECLARE(fleet_icons_42);
 LV_FONT_DECLARE(fleet_icons_46);
 LV_FONT_DECLARE(fleet_icons_52);
@@ -32,6 +33,10 @@ LV_FONT_DECLARE(fleet_icons_52);
     #define FLEET_ICONS_LG (&fleet_icons_30)
     #define FLEET_ICONS_MD (&fleet_icons_24)
     #define FLEET_ICONS_SM (&fleet_icons_18)
+#elif defined(CYD_P4_4880)
+    #define FLEET_ICONS_LG (&fleet_icons_38)
+    #define FLEET_ICONS_MD (&fleet_icons_30)
+    #define FLEET_ICONS_SM (&fleet_icons_24)
 #elif defined(CYD_S3_3248)
     #define FLEET_ICONS_LG (&fleet_icons_30)
     #define FLEET_ICONS_MD (&fleet_icons_24)

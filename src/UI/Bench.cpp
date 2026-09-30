@@ -22,16 +22,32 @@
 // Between frames the task yields for one tick, outside the timed part, so the
 // WiFi and websocket tasks are serviced and nothing times out during a run.
 //
+// what=anim IS DIFFERENT: NOTHING IS FORCED. The owner saw P4_5 stutter when
+// one deck panel opens while the other closes (2026-09-26); 7B and 4B stay
+// smooth. A forced full-screen frame cannot show that, so this mode taps the
+// panel headers exactly as a finger does and lets loop() run as it always
+// does, recording every frame LVGL draws on its own schedule: when it began,
+// the same total/copy/present/wait split per frame, and how tall each panel
+// was when it finished - which is where the animation had got to. The
+// question is whether frames come late (a frame longer than
+// LV_DEF_REFR_PERIOD, or a gap between frames), and if so, whether drawing or
+// the flush is the long part. scripts/bench.py --anim reads it.
+//
 #ifdef ENABLE_BENCH
 
 #include "UI/Bench.h"
+#include "UI/Screenshot.h"    // verifyFrameBuffer(), for what=verify
 #include "HttpServer.h"
 #include "GUIManager.h"
 #include "LVGL_Startup.h"
 #include "UI/UITokens.h"
+#include "UI/UIToolkit.h"     // getActiveAccordionPanel, closeActiveAccordion
 #include "DeviceIdentity.h"
 #include "bsp_loader.h"
 #include "fleet_fw_version.h"
+#ifdef DISPLAY_ESPLCD
+#include "../LVGL_Flush.h"    // panelFramesScanned(): the panel's real refresh rate
+#endif
 
 #include <Arduino.h>          // Serial, millis
 #include <lvgl.h>
@@ -59,6 +75,13 @@ constexpr uint32_t SETTLE_MS      = 2500;   // a rebuild, the 1.5 s page toast, 
 constexpr int      N_DEFAULT      = 20;
 constexpr int      N_MAX          = 100;
 
+// what=anim. `n` counts panel swaps there, not frames.
+constexpr int      ANIM_N_DEFAULT = 4;
+constexpr int      ANIM_N_MAX     = 8;
+constexpr uint32_t ANIM_PREP_MS   = 1000;  // the first panel's own 300 ms open, then quiet
+constexpr uint32_t ANIM_REC_MS    = 700;   // UIToolkit's 300 ms swap, and every frame trailing it
+constexpr uint16_t ANIM_FRAMES_MAX = 48 * ANIM_N_MAX;   // ~21 at 33 ms each fit a swap; room to spare
+
 // One run at a time. The handler moves IDLE -> CLAIMED, fills in the request,
 // then -> REQUESTED; service() moves REQUESTED -> RUNNING -> DONE across as
 // many loop() calls as settling takes; the handler moves DONE -> IDLE once it
@@ -69,7 +92,11 @@ std::atomic<int>  s_state{ST_IDLE};
 SemaphoreHandle_t s_done = nullptr;
 GUIManager       *s_gui  = nullptr;
 
-enum class What : uint8_t { WHAT_FULL, WHAT_CARD };
+enum class What : uint8_t { WHAT_FULL, WHAT_CARD, WHAT_ANIM, WHAT_PAGE, WHAT_COPY, WHAT_VERIFY };
+
+// anim and page both record real frames over several loop()s; they differ
+// only in what starts each episode (a panel tap, or a page change).
+bool recordsFrames(What w) { return w == What::WHAT_ANIM || w == What::WHAT_PAGE; }
 
 struct Request {
     int  n    = N_DEFAULT;
@@ -78,6 +105,8 @@ struct Request {
     int  deck = -1;
     bool keep = false; // stay on the measured page/deck, so a screenshot can follow
     bool tasks = false; // report CPU time per FreeRTOS task over the measured frames
+    uint8_t  act = 0;   // what=verify: 0 nothing, 1 swap deck panels, 2 change page, between checks
+    uint16_t gapMs = 250; // what=verify: ordinary loop() time after each action, before the next check
 };
 
 struct Agg {
@@ -115,8 +144,79 @@ struct Result {
     uint32_t    idleUs[2] = {0, 0};
     uint8_t     taskCount = 0;
     TaskUse     taskTop[TASK_TOP] = {};
+
+    // what=anim: the frames themselves are in s_frames; these summarise them.
+    uint16_t    frames = 0;
+    uint16_t    dropped = 0;       // past ANIM_FRAMES_MAX, not recorded
+    int64_t     worstFrameUs = 0;  // longest single frame
+    int64_t     worstGapUs = 0;    // longest start-to-start interval within a swap
+
+    // what=page: how long each page change's rebuild (goToPage) took, before
+    // any drawing - destroying the old page's widgets and creating the new.
+    int32_t     buildUs[ANIM_N_MAX] = {};
+
+#ifdef DISPLAY_ESPLCD
+    // what=copy: raw copy speeds (LVGL_Flush::copyBench).
+    LVGL_Flush::CopyBench copyRun;
+#endif
+#if defined(DISPLAY_ESPLCD) && defined(ENABLE_SCREENSHOT)
+    // what=verify: Screenshot::verifyFrameBuffer() per check.
+    static constexpr uint8_t VERIFY_MAX = 100;
+    uint16_t verifyBad[VERIFY_MAX] = {};   // differing pixels, per check (saturates)
+    uint8_t  verifyRuns = 0, verifyFailed = 0;
+    uint32_t verifyNearMax = 0;             // most rounding-only pixels in one check
+    uint32_t verifyWorst = 0;
+    int8_t   verifyWorstAt = -1;
+    int32_t  verifyBox[4] = {0, 0, -1, -1};   // worst check's logical box
+#endif
+
+    // esp_lcd only: frames the panel scanned across the measured window, and
+    // how long that window was - the refresh rate it really ran at.
+    uint32_t    panelFrames = 0;
+    int64_t     panelUs = 0;
 };
 Result s_res;
+
+// The panel's scan counter (esp_lcd); 0 where there is none (Arduino_GFX).
+uint32_t panelFrames() {
+#ifdef DISPLAY_ESPLCD
+    return LVGL_Flush::panelFramesScanned();
+#else
+    return 0;
+#endif
+}
+uint32_t s_panelFrames0 = 0;
+int64_t  s_panelT0 = 0;
+void panelWindowStart() { s_panelFrames0 = panelFrames(); s_panelT0 = esp_timer_get_time(); }
+void panelWindowEnd(Result &r) {
+    r.panelFrames = panelFrames() - s_panelFrames0;
+    r.panelUs     = esp_timer_get_time() - s_panelT0;
+}
+
+// --= Animation frames (?what=anim) =--
+//
+// One row per frame LVGL drew (a refresh with nothing to draw is skipped).
+// PSRAM, taken when a run starts and freed once the reply is sent.
+struct Frame {
+    int32_t  startUs;              // since this swap's tap
+    int32_t  totalUs;              // LV_EVENT_REFR_START to REFR_READY: the whole refresh
+    int32_t  copyUs, presentUs, waitUs;
+    uint32_t px;
+    uint16_t chunks;
+    int16_t  hA, hB;               // each panel's height as drawn: where the animation was
+    uint8_t  swap;
+    uint8_t  areas;                // esp_lcd only, see FlushStats: LVGL's areas this frame
+    uint8_t  repairFull;           // esp_lcd only: the repair was a whole-frame copy
+    uint32_t repairPx;             // esp_lcd only: pixels the repair copied
+};
+Frame    *s_frames   = nullptr;
+lv_obj_t *s_panelA   = nullptr;    // deck panel 0 (Audio on the boards with audio)
+lv_obj_t *s_panelB   = nullptr;    // deck panel 1 (Display)
+lv_obj_t *s_origOpen = nullptr;    // the panel open before the run, to put back
+uint8_t   s_swap     = 0;
+int64_t   s_swapT0   = 0;
+int64_t   s_frameT0  = 0;
+LVGL_Startup::FlushStats s_frameFs;
 
 // --= Task accounting (?tasks=1) =--
 
@@ -163,7 +263,7 @@ void taskUsage(Result &r, const TaskSnap &a, const TaskSnap &b, uint32_t windowU
 }
 
 // Run phases, owned by service().
-enum class Phase : uint8_t { PH_START, PH_SETTLE };
+enum class Phase : uint8_t { PH_START, PH_SETTLE, PH_ANIM_PREP, PH_ANIM_REC, PH_VERIFY };
 Phase    s_phase     = Phase::PH_START;
 uint32_t s_settleEnd = 0;
 uint32_t s_settleAt  = 0;
@@ -178,6 +278,43 @@ void waitCb(lv_event_t *e) {
     const lv_event_code_t c = lv_event_get_code(e);
     if (c == LV_EVENT_FLUSH_WAIT_START)       s_waitStart = esp_timer_get_time();
     else if (c == LV_EVENT_FLUSH_WAIT_FINISH) s_waitUs   += esp_timer_get_time() - s_waitStart;
+}
+
+// what=anim: brackets every refresh LVGL makes on its own while recording.
+// REFR_START is sent before layout and drawing, REFR_READY after the last
+// chunk is flushed (lv_refr.c, lv_display_refr_timer), so the two bracket
+// exactly what one frame costs. The heights are read at READY, after the
+// layout the frame drew with.
+void frameCb(lv_event_t *e) {
+    const lv_event_code_t c = lv_event_get_code(e);
+    if (c == LV_EVENT_REFR_START) {
+        s_frameFs = LVGL_Startup::FlushStats{};
+        s_waitUs  = 0;
+        LVGL_Startup::attachFlushStats(&s_frameFs);
+        s_frameT0 = esp_timer_get_time();
+    } else if (c == LV_EVENT_REFR_READY) {
+        const int64_t now = esp_timer_get_time();
+        LVGL_Startup::attachFlushStats(nullptr);
+        if (!s_frameFs.chunks) return;   // a refresh with nothing to draw
+        Result &r = s_res;
+        if (r.frames >= ANIM_FRAMES_MAX) { r.dropped++; return; }
+        Frame &f    = s_frames[r.frames++];
+        f.startUs   = (int32_t)(s_frameT0 - s_swapT0);
+        f.totalUs   = (int32_t)(now - s_frameT0);
+        f.copyUs    = (int32_t)s_frameFs.copyUs;
+        f.presentUs = (int32_t)s_frameFs.presentUs;
+        f.waitUs    = (int32_t)s_waitUs;
+        f.px        = s_frameFs.px;
+        f.chunks    = (uint16_t)s_frameFs.chunks;
+        f.hA        = s_panelA ? (int16_t)lv_obj_get_height(s_panelA) : 0;   // 0 in page mode
+        f.hB        = s_panelB ? (int16_t)lv_obj_get_height(s_panelB) : 0;
+        f.swap      = s_swap;
+        f.areas      = (uint8_t)(s_frameFs.areas > 255 ? 255 : s_frameFs.areas);
+        f.repairFull = s_frameFs.repairFull;
+        f.repairPx   = s_frameFs.repairPx;
+    } else {
+        waitCb(e);
+    }
 }
 
 size_t lvMemFree() {
@@ -215,6 +352,7 @@ void measure() {
     TaskSnap snapA, snapB;
     const bool tasks = r.req.tasks && snapTasks(snapA);
     const int64_t tWindow = esp_timer_get_time();
+    panelWindowStart();
 
     for (int i = 0; i < r.req.n; i++) {
         LVGL_Startup::FlushStats fs;
@@ -237,6 +375,7 @@ void measure() {
 
         vTaskDelay(1);   // outside the timed part: let WiFi and the websocket breathe
     }
+    panelWindowEnd(r);
 
     if (tasks) {
         const uint32_t windowUs = (uint32_t)(esp_timer_get_time() - tWindow);
@@ -259,22 +398,155 @@ bool applyTarget(int page, int deck) {
     return changed;
 }
 
+// --= what=anim: LVGL thread, spread over many loop()s by service() =--
+
+// A tap on a deck panel's header, without the finger: the header's own click
+// handler runs, so the animation is the one a tap starts. The header is the
+// panel's first child (UIToolkit::create_collapsible_panel).
+void tapPanel(lv_obj_t *panel) {
+    lv_obj_t *header = panel ? lv_obj_get_child(panel, 0) : nullptr;
+    if (header) lv_obj_send_event(header, LV_EVENT_CLICKED, nullptr);
+}
+
+// Settled on the page and deck: find the pair, take the frame record, and
+// open the first panel so that every swap starts with exactly one open.
+// False, with the error set, if there is nothing to swap.
+bool animPrepare() {
+    Result &r = s_res;
+    s_frames = static_cast<Frame *>(
+        heap_caps_calloc(ANIM_FRAMES_MAX, sizeof(Frame), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (!s_frames) { r.error = "no PSRAM for the frame record"; return false; }
+    if (r.req.what == What::WHAT_PAGE) {
+        if (s_gui->pageCount() < 2) { r.error = "page needs two pages"; return false; }
+        return true;   // nothing to set up: each episode is one page change
+    }
+    s_panelA = s_gui->deckPanel(0);
+    s_panelB = s_gui->deckPanel(1);
+    if (!s_panelA || !s_panelB) { r.error = "anim needs two deck panels"; return false; }
+    if (UIToolkit::getActiveAccordionPanel() != s_panelA) tapPanel(s_panelA);
+    if (UIToolkit::getActiveAccordionPanel() != s_panelA) {
+        r.error = "tapping the first deck panel did not open it";
+        return false;
+    }
+    return true;
+}
+
+// The owner's case: tap the closed panel, which opens it and closes the open
+// one - both animating at once. Swaps alternate B, A, B, ...
+bool animSwap() {
+    if (s_res.req.what == What::WHAT_PAGE) {
+        // A swipe left, as GUIManager's gesture handler does it. The rebuild
+        // runs right here, synchronously - its cost is timed apart from the
+        // frames that follow. Wraps, so pages alternate on a two-page board.
+        s_swapT0 = esp_timer_get_time();
+        s_gui->nextPage();
+        s_res.buildUs[s_swap] = (int32_t)(esp_timer_get_time() - s_swapT0);
+        return true;
+    }
+    lv_obj_t *opens = (s_swap % 2 == 0) ? s_panelB : s_panelA;
+    s_swapT0 = esp_timer_get_time();
+    tapPanel(opens);
+    if (UIToolkit::getActiveAccordionPanel() != opens) {
+        s_res.error = "a swap tap did not open its panel";
+        return false;
+    }
+    return true;
+}
+
+bool animStart() {
+    Result &r = s_res;
+    r.heapBefore   = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    r.lvFreeBefore = lvMemFree();
+    lv_display_add_event_cb(lv_display_get_default(), frameCb, LV_EVENT_ALL, nullptr);
+    s_swap = 0;
+    panelWindowStart();
+    return animSwap();
+}
+
+void animStop() {
+    Result &r = s_res;
+    lv_display_remove_event_cb_with_user_data(lv_display_get_default(), frameCb, nullptr);
+    LVGL_Startup::attachFlushStats(nullptr);
+    panelWindowEnd(r);
+    r.heapAfter   = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    r.lvFreeAfter = lvMemFree();
+    for (uint16_t i = 0; i < r.frames; i++) {
+        const Frame &f = s_frames[i];
+        if (f.totalUs > r.worstFrameUs) r.worstFrameUs = f.totalUs;
+        if (i > 0 && s_frames[i - 1].swap == f.swap) {
+            const int64_t gap = (int64_t)f.startUs - s_frames[i - 1].startUs;
+            if (gap > r.worstGapUs) r.worstGapUs = gap;
+        }
+    }
+}
+
+// Put the board back as found - panels, then page and deck - unless told to
+// keep it, and hand the result to the waiting handler.
+void finish() {
+    if (!s_res.req.keep) {
+        const bool swapped = s_res.req.what == What::WHAT_ANIM ||
+                             (s_res.req.what == What::WHAT_VERIFY && s_res.req.act == 1);
+        if (swapped && s_panelA) {
+            lv_obj_t *open = UIToolkit::getActiveAccordionPanel();
+            if (open != s_origOpen) {
+                if (s_origOpen) tapPanel(s_origOpen);
+                else            UIToolkit::closeActiveAccordion();
+            }
+        }
+        applyTarget(s_origPage, s_origDeck ? 1 : 0);
+    }
+    s_state.store(ST_DONE);
+    xSemaphoreGive(s_done);
+}
+
+#if defined(DISPLAY_ESPLCD) && defined(ENABLE_SCREENSHOT)
+// what=verify: one check now (Screenshot::verifyFrameBuffer - LVGL's render
+// against the panel's frame buffer, in one instant); then the action, and
+// ordinary loop()s for gapMs until the next. After n checks, finish() puts
+// the board back as found.
+void verifyStep() {
+    Result &r = s_res;
+    Screenshot::VerifyResult v;
+    const uint8_t i = r.verifyRuns;
+    if (Screenshot::verifyFrameBuffer(v)) {
+        if (i < Result::VERIFY_MAX) r.verifyBad[i] = v.bad > 65535 ? 65535 : (uint16_t)v.bad;
+        if (v.near > r.verifyNearMax) r.verifyNearMax = v.near;
+        if (v.bad > r.verifyWorst) {
+            r.verifyWorst   = v.bad;
+            r.verifyWorstAt = (int8_t)i;
+            r.verifyBox[0] = v.x1; r.verifyBox[1] = v.y1; r.verifyBox[2] = v.x2; r.verifyBox[3] = v.y2;
+        }
+    } else {
+        r.verifyFailed++;
+    }
+    r.verifyRuns++;
+    s_swap++;
+    if (s_swap >= r.req.n) { finish(); return; }
+    if (r.req.act == 1 && s_panelA && s_panelB) tapPanel((s_swap % 2) ? s_panelB : s_panelA);
+    else if (r.req.act == 2) s_gui->nextPage();
+    s_settleEnd = millis() + r.req.gapMs;
+}
+#endif
+
 // --= HTTP server task =--
 
 // Everything below is formatted from s_res after DONE, off the LVGL thread,
 // into a PSRAM buffer taken per request. NOT a static: .bss is internal RAM,
 // and CYD_S3_3248 boots with ~22 KB of that free - 2 KB of it idle between
 // benches is 10% of what WiFi and MQTT have left (LESSONS.md).
-constexpr size_t JSON_CAP = 2048;
-char *s_json = nullptr;
+// what=anim carries one row per frame: ~60 bytes x up to ANIM_FRAMES_MAX.
+constexpr size_t JSON_CAP      = 3072;
+constexpr size_t JSON_CAP_ANIM = 3072 + 88 * ANIM_FRAMES_MAX;
+char  *s_json    = nullptr;
+size_t s_jsonCap = 0;
 
 struct Out {
     size_t len = 0;
     void add(const char *fmt, ...) {
-        if (len >= JSON_CAP) return;
+        if (len >= s_jsonCap) return;
         va_list ap;
         va_start(ap, fmt);
-        const int w = vsnprintf(s_json + len, JSON_CAP - len, fmt, ap);
+        const int w = vsnprintf(s_json + len, s_jsonCap - len, fmt, ap);
         va_end(ap);
         if (w > 0) len += (size_t)w;
     }
@@ -308,30 +580,124 @@ size_t buildJson() {
     Out o;
     o.add("{\"host\":\"%s\",\"fw\":\"%s\",\"board\":\"%s\",\"panel\":\"%s\",\"bus\":\"%s\",",
           DeviceIdentity::hostname(), FW_VERSION, bsp_hw.MODEL, bsp_display.PANEL_MODEL, busName());
+#ifdef DISPLAY_ESPLCD
+    o.add("\"flush_path\":\"esp_lcd\",\"res\":[%ld,%ld],\"rotation\":%u,",
+#else
     o.add("\"flush_path\":\"arduino_gfx\",\"res\":[%ld,%ld],\"rotation\":%u,",
+#endif
           (long)lv_display_get_horizontal_resolution(disp),
           (long)lv_display_get_vertical_resolution(disp), (unsigned)bsp_display.ROTATION);
     o.add("\"buf\":{\"bytes\":%u,\"lines\":%u,\"count\":%u,\"where\":\"%s\"},",
-          (unsigned)b.bytes, (unsigned)bsp_lvgl.DRAW_BUF_HEIGHT, (unsigned)b.count,
+          (unsigned)b.bytes, (unsigned)b.lines, (unsigned)b.count,
           b.psram ? "psram" : "internal");
-    o.add("\"lv_use_ppa\":%d,\"lv_draw_buf_align\":%d,", (int)LV_USE_PPA, (int)LV_DRAW_BUF_ALIGN);
+    o.add("\"lv_use_ppa\":%d,\"lv_draw_buf_align\":%d,\"refr_period_ms\":%d,",
+          (int)LV_USE_PPA, (int)LV_DRAW_BUF_ALIGN, (int)LV_DEF_REFR_PERIOD);
+    // What this build told the panel (the BSP), so every saved reply names
+    // the configuration it measured; and, on esp_lcd, the refresh rate the
+    // panel actually ran at over the measured window.
+    o.add("\"timing\":{\"pclk_hz\":%lu,\"lane_mbps\":%lu,\"h\":[%lu,%lu,%lu],\"v\":[%lu,%lu,%lu]},",
+          (unsigned long)bsp_display.PREFER_SPEED, (unsigned long)bsp_display.LANE_BIT_RATE,
+          (unsigned long)bsp_display.HSYNC_PWIDTH, (unsigned long)bsp_display.HSYNC_BPORCH,
+          (unsigned long)bsp_display.HSYNC_FPORCH, (unsigned long)bsp_display.VSYNC_PWIDTH,
+          (unsigned long)bsp_display.VSYNC_BPORCH, (unsigned long)bsp_display.VSYNC_FPORCH);
+    if (r.panelUs > 0 && r.panelFrames) {
+        o.add("\"panel_scan\":{\"frames\":%lu,\"window_us\":%lld,\"hz\":%.2f},",
+              (unsigned long)r.panelFrames, (long long)r.panelUs,
+              (double)r.panelFrames * 1e6 / (double)r.panelUs);
+    }
+    const char *what = r.req.what == What::WHAT_CARD ? "card"
+                     : r.req.what == What::WHAT_ANIM ? "anim"
+                     : r.req.what == What::WHAT_PAGE ? "page"
+                     : r.req.what == What::WHAT_COPY ? "copy"
+                     : r.req.what == What::WHAT_VERIFY ? "verify" : "full";
     o.add("\"scenario\":{\"what\":\"%s\",\"page\":%u,\"page_slug\":\"%s\",\"scheme\":\"%s\",\"deck\":%s,\"n\":%d,\"settled_ms\":%lu},",
-          r.req.what == What::WHAT_CARD ? "card" : "full", (unsigned)r.page, r.pageSlug,
+          what, (unsigned)r.page, r.pageSlug,
           r.scheme ? r.scheme : "", r.deck ? "true" : "false", n, (unsigned long)r.settledMs);
     o.add("\"was\":{\"page\":%u,\"deck\":%s,\"restored\":%s},\"page_count\":%u,",
           (unsigned)r.wasPage, r.wasDeck ? "true" : "false", r.req.keep ? "false" : "true",
           (unsigned)s_gui->pageCount());
-    o.add("\"us\":{");
-    o.agg("total", r.total, n);
-    o.agg("render", r.render, n);
-    o.agg("copy", r.copy, n);
-    o.agg("present", r.present, n);
-    o.agg("wait", r.wait, n, false);
-    o.add("},");
-    const int64_t avgTotal = r.total.avg(n);
-    o.add("\"chunks\":%.1f,\"px\":%llu,\"fps_ceiling\":%.1f,",
-          n ? (double)r.chunks / n : 0.0, (unsigned long long)(n ? r.px / n : 0),
-          avgTotal > 0 ? 1e6 / (double)avgTotal : 0.0);
+#if defined(DISPLAY_ESPLCD) && defined(ENABLE_SCREENSHOT)
+    if (r.req.what == What::WHAT_VERIFY) {
+        // Pixels that differ between LVGL's render and the panel's frame
+        // buffer, per check; 0 everywhere = the flush put exactly the right
+        // picture on the glass every time.
+        uint16_t badChecks = 0;
+        for (uint8_t i = 0; i < r.verifyRuns && i < Result::VERIFY_MAX; i++) if (r.verifyBad[i]) badChecks++;
+        o.add("\"verify\":{\"checks\":%u,\"act\":\"%s\",\"gap_ms\":%u,\"failed\":%u,\"bad_checks\":%u,"
+              "\"near_max\":%lu,\"worst_px\":%lu,\"worst_at\":%d,\"worst_box\":[%ld,%ld,%ld,%ld],\"bad\":[",
+              (unsigned)r.verifyRuns, r.req.act == 1 ? "anim" : r.req.act == 2 ? "page" : "none",
+              (unsigned)r.req.gapMs, (unsigned)r.verifyFailed, (unsigned)badChecks,
+              (unsigned long)r.verifyNearMax,
+              (unsigned long)r.verifyWorst, (int)r.verifyWorstAt,
+              (long)r.verifyBox[0], (long)r.verifyBox[1], (long)r.verifyBox[2], (long)r.verifyBox[3]);
+        for (uint8_t i = 0; i < r.verifyRuns && i < Result::VERIFY_MAX; i++) {
+            o.add("%s%u", i ? "," : "", (unsigned)r.verifyBad[i]);
+        }
+        o.add("]},");
+    } else
+#endif
+#ifdef DISPLAY_ESPLCD
+    if (r.req.what == What::WHAT_COPY) {
+        // Microseconds per copy, averaged over n; bytes moved by each.
+        const LVGL_Flush::CopyBench &c = r.copyRun;
+        o.add("\"copy\":{\"reps\":%d,\"frame_bytes\":%lu,\"rot_bytes\":%lu,\"ppa_copy_us\":%lld,"
+              "\"ppa_rot_us\":%lld,\"fbcpy_us\":%lld,\"fbcpy_err\":%d,\"cpu_us\":%lld},",
+              n, (unsigned long)c.frameBytes, (unsigned long)c.rotBytes, (long long)c.ppaCopyUs,
+              (long long)c.ppaRotUs, (long long)c.fbcpyUs, (int)c.fbcpyErr, (long long)c.cpuUs);
+        o.add("\"fbcpy_check\":{\"full_bad\":%lu,\"full_first_bad_row\":%ld,\"band_y\":%ld,\"band_h\":%ld,"
+              "\"band_bad\":%lu,\"band_first_bad_row\":%ld,\"band_outside\":%lu},",
+              (unsigned long)c.fullBad, (long)c.fullFirstBadRow, (long)c.bandY, (long)c.bandH,
+              (unsigned long)c.bandBad, (long)c.bandFirstBadRow, (unsigned long)c.bandOutside);
+        o.add("\"fbcpy_concurrent\":{\"dual_a_bad\":%lu,\"dual_b_bad\":%lu,\"dual_outside\":%lu,"
+              "\"mix_fbcpy_bad\":%lu,\"mix_ppa_bad\":%lu,\"mix_outside\":%lu},",
+              (unsigned long)c.dualA, (unsigned long)c.dualB, (unsigned long)c.dualOutside,
+              (unsigned long)c.mixF, (unsigned long)c.mixP, (unsigned long)c.mixOutside);
+        o.add("\"fbcpy_rects\":[");
+        for (uint8_t k = 0; k < LVGL_Flush::CopyBench::RECTS; k++) {
+            const LVGL_Flush::CopyBench::RectCheck &rc = c.rects[k];
+            o.add("%s{\"x\":%ld,\"w\":%ld,\"bad\":%lu,\"outside\":%lu}", k ? "," : "",
+                  (long)rc.x, (long)rc.w, (unsigned long)rc.bad, (unsigned long)rc.outside);
+        }
+        o.add("],");
+    } else
+#endif
+    if (recordsFrames(r.req.what)) {
+        // n episodes (panel swaps, or page changes); one row per frame drawn,
+        // in `cols` order. render is not sent: it is total - copy - present -
+        // wait, as everywhere else. build_us: page mode only, each change's
+        // rebuild before its first frame.
+        o.add("\"anim\":{\"swaps\":%d,\"rec_ms\":%lu,\"refr_period_ms\":%d,\"frames\":%u,\"dropped\":%u,"
+              "\"worst_frame_us\":%lld,\"worst_gap_us\":%lld,",
+              n, (unsigned long)ANIM_REC_MS, (int)LV_DEF_REFR_PERIOD, (unsigned)r.frames,
+              (unsigned)r.dropped, (long long)r.worstFrameUs, (long long)r.worstGapUs);
+        if (r.req.what == What::WHAT_PAGE) {
+            o.add("\"build_us\":[");
+            for (int i = 0; i < n && i < ANIM_N_MAX; i++) o.add("%s%ld", i ? "," : "", (long)r.buildUs[i]);
+            o.add("],");
+        }
+        o.add("\"cols\":[\"swap\",\"start\",\"total\",\"copy\",\"present\",\"wait\",\"px\",\"chunks\",\"h_a\",\"h_b\","
+              "\"areas\",\"repair_px\",\"repair_full\"],\"rows\":[");
+        for (uint16_t i = 0; i < r.frames; i++) {
+            const Frame &f = s_frames[i];
+            o.add("%s[%u,%ld,%ld,%ld,%ld,%ld,%lu,%u,%d,%d,%u,%lu,%u]", i ? "," : "", (unsigned)f.swap,
+                  (long)f.startUs, (long)f.totalUs, (long)f.copyUs, (long)f.presentUs,
+                  (long)f.waitUs, (unsigned long)f.px, (unsigned)f.chunks, (int)f.hA, (int)f.hB,
+                  (unsigned)f.areas, (unsigned long)f.repairPx, (unsigned)f.repairFull);
+        }
+        o.add("]},");
+    } else {
+        o.add("\"us\":{");
+        o.agg("total", r.total, n);
+        o.agg("render", r.render, n);
+        o.agg("copy", r.copy, n);
+        o.agg("present", r.present, n);
+        o.agg("wait", r.wait, n, false);
+        o.add("},");
+        const int64_t avgTotal = r.total.avg(n);
+        o.add("\"chunks\":%.1f,\"px\":%llu,\"fps_ceiling\":%.1f,",
+              n ? (double)r.chunks / n : 0.0, (unsigned long long)(n ? r.px / n : 0),
+              avgTotal > 0 ? 1e6 / (double)avgTotal : 0.0);
+    }
     o.add("\"heap\":{\"internal_before\":%u,\"internal_after\":%u,\"lv_mem_free_before\":%u,\"lv_mem_free_after\":%u},",
           (unsigned)r.heapBefore, (unsigned)r.heapAfter,
           (unsigned)r.lvFreeBefore, (unsigned)r.lvFreeAfter);
@@ -350,21 +716,57 @@ size_t buildJson() {
     }
     o.add("\"uptime_s\":%lu,\"reset_reason\":%d}\n",
           (unsigned long)(esp_timer_get_time() / 1000000), (int)esp_reset_reason());
-    return o.len < JSON_CAP ? o.len : JSON_CAP - 1;
+    return o.len < s_jsonCap ? o.len : s_jsonCap - 1;
 }
 
 // Returns an error message for a bad query, nullptr when it is fine.
 const char *parseQuery(httpd_req_t *req, Request &q) {
     char s[96], v[16];
     if (httpd_req_get_url_query_str(req, s, sizeof(s)) != ESP_OK) return nullptr;
-    if (httpd_query_key_value(s, "n", v, sizeof(v)) == ESP_OK) {
-        q.n = atoi(v);
-        if (q.n < 1 || q.n > N_MAX) return "n must be 1-100";
-    }
+    // `what` first: it decides what `n` counts.
     if (httpd_query_key_value(s, "what", v, sizeof(v)) == ESP_OK) {
         if      (!strcmp(v, "full")) q.what = What::WHAT_FULL;
         else if (!strcmp(v, "card")) q.what = What::WHAT_CARD;
-        else return "what must be full or card";
+        else if (!strcmp(v, "anim")) q.what = What::WHAT_ANIM;
+        else if (!strcmp(v, "page")) q.what = What::WHAT_PAGE;
+        else if (!strcmp(v, "copy")) q.what = What::WHAT_COPY;
+        else if (!strcmp(v, "verify")) q.what = What::WHAT_VERIFY;
+        else return "what must be full, card, anim, page, copy or verify";
+    }
+    if (q.what == What::WHAT_VERIFY) {
+#if !(defined(DISPLAY_ESPLCD) && defined(ENABLE_SCREENSHOT))
+        return "verify needs the esp_lcd display path and ENABLE_SCREENSHOT";
+#endif
+        if (httpd_query_key_value(s, "act", v, sizeof(v)) == ESP_OK) {
+            if      (!strcmp(v, "none")) q.act = 0;
+            else if (!strcmp(v, "anim")) q.act = 1;
+            else if (!strcmp(v, "page")) q.act = 2;
+            else return "act must be none, anim or page";
+        }
+        if (httpd_query_key_value(s, "gap", v, sizeof(v)) == ESP_OK) {
+            const int g = atoi(v);
+            if (g < 20 || g > 3000) return "gap must be 20-3000 ms";
+            q.gapMs = (uint16_t)g;
+        }
+    }
+    if (q.what == What::WHAT_COPY) {
+#ifndef DISPLAY_ESPLCD
+        return "copy needs the esp_lcd display path";
+#endif
+        q.n = 3;
+        if (httpd_query_key_value(s, "n", v, sizeof(v)) == ESP_OK) {
+            q.n = atoi(v);
+            if (q.n < 1 || q.n > 10) return "for copy, n counts repetitions: 1-10";
+        }
+        return nullptr;   // page, deck, keep and tasks mean nothing here
+    }
+    const bool anim = q.what == What::WHAT_ANIM;
+    const bool rec  = recordsFrames(q.what);
+    if (rec) q.n = ANIM_N_DEFAULT;
+    if (httpd_query_key_value(s, "n", v, sizeof(v)) == ESP_OK) {
+        q.n = atoi(v);
+        if (!rec && (q.n < 1 || q.n > N_MAX))      return "n must be 1-100";
+        if (rec  && (q.n < 1 || q.n > ANIM_N_MAX)) return "for anim and page, n counts episodes: 1-8";
     }
     if (httpd_query_key_value(s, "page", v, sizeof(v)) == ESP_OK) {
         q.page = atoi(v);
@@ -378,6 +780,19 @@ const char *parseQuery(httpd_req_t *req, Request &q) {
     }
     if (httpd_query_key_value(s, "keep", v, sizeof(v)) == ESP_OK) q.keep = !strcmp(v, "1");
     if (httpd_query_key_value(s, "tasks", v, sizeof(v)) == ESP_OK) q.tasks = !strcmp(v, "1");
+    if (anim) {
+        if (q.deck == 0) return "anim swaps the deck's panels: deck must be shown";
+        q.deck = 1;
+        if (q.tasks)     return "tasks is not available with anim";
+    }
+    if (q.what == What::WHAT_PAGE && q.tasks) return "tasks is not available with page";
+    if (q.what == What::WHAT_VERIFY) {
+        if (q.tasks) return "tasks is not available with verify";
+        if (q.act == 1) {                        // swapping panels needs the deck on screen
+            if (q.deck == 0) return "act=anim swaps the deck's panels: deck must be shown";
+            q.deck = 1;
+        }
+    }
     return nullptr;
 }
 
@@ -409,26 +824,47 @@ esp_err_t handleBench(httpd_req_t *req) {
     }
 
     esp_err_t res;
+    const bool anim = recordsFrames(s_res.req.what);
+    s_jsonCap = anim ? JSON_CAP_ANIM : JSON_CAP;
     if (s_res.error) {
         Serial.printf("[Bench] failed: %s\n", s_res.error);
         res = httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, s_res.error);
-    } else if (!(s_json = static_cast<char *>(heap_caps_malloc(JSON_CAP, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)))) {
+    } else if (!(s_json = static_cast<char *>(heap_caps_malloc(s_jsonCap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)))) {
         res = httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "no PSRAM for the reply");
     } else {
         const size_t len = buildJson();
         const int n = s_res.req.n;
-        Serial.printf("[Bench] %s p%u%s n=%d | total %lld us: render %lld, copy %lld, present %lld, wait %lld | %.1f chunks\n",
-                      s_res.req.what == What::WHAT_CARD ? "card" : "full", (unsigned)s_res.page,
-                      s_res.deck ? "+deck" : "", n,
-                      (long long)s_res.total.avg(n), (long long)s_res.render.avg(n),
-                      (long long)s_res.copy.avg(n), (long long)s_res.present.avg(n),
-                      (long long)s_res.wait.avg(n), n ? (double)s_res.chunks / n : 0.0);
+        if (anim) {
+            Serial.printf("[Bench] %s p%u n=%d | %u frames, worst frame %lld us, worst start-to-start %lld us%s\n",
+                          s_res.req.what == What::WHAT_PAGE ? "page" : "anim",
+                          (unsigned)s_res.page, n, (unsigned)s_res.frames,
+                          (long long)s_res.worstFrameUs, (long long)s_res.worstGapUs,
+                          s_res.dropped ? " (frames dropped from the record)" : "");
+#ifdef DISPLAY_ESPLCD
+        } else if (s_res.req.what == What::WHAT_COPY) {
+            const LVGL_Flush::CopyBench &c = s_res.copyRun;
+            Serial.printf("[Bench] copy n=%d | frame %lu B: ppa %lld us, fbcpy %lld us (err %d), cpu %lld us"
+                          " | rotate %lu B: %lld us\n", n, (unsigned long)c.frameBytes,
+                          (long long)c.ppaCopyUs, (long long)c.fbcpyUs, (int)c.fbcpyErr,
+                          (long long)c.cpuUs, (unsigned long)c.rotBytes, (long long)c.ppaRotUs);
+#endif
+        } else {
+            Serial.printf("[Bench] %s p%u%s n=%d | total %lld us: render %lld, copy %lld, present %lld, wait %lld | %.1f chunks\n",
+                          s_res.req.what == What::WHAT_CARD ? "card" : "full", (unsigned)s_res.page,
+                          s_res.deck ? "+deck" : "", n,
+                          (long long)s_res.total.avg(n), (long long)s_res.render.avg(n),
+                          (long long)s_res.copy.avg(n), (long long)s_res.present.avg(n),
+                          (long long)s_res.wait.avg(n), n ? (double)s_res.chunks / n : 0.0);
+        }
         httpd_resp_set_type(req, "application/json");
         httpd_resp_set_hdr(req, "Cache-Control", "no-store");
         res = httpd_resp_send(req, s_json, (ssize_t)len);
         heap_caps_free(s_json);
         s_json = nullptr;
     }
+    // The frame record was taken by service() for this run; nobody else holds it.
+    heap_caps_free(s_frames);
+    s_frames = nullptr;
     s_state.store(ST_IDLE);
     return res;
 }
@@ -453,6 +889,8 @@ void service() {
         if (!s_state.compare_exchange_strong(st, ST_RUNNING)) return;
         s_origPage = s_res.wasPage = s_gui->currentPage();
         s_origDeck = s_res.wasDeck = s_gui->deckShown();
+        s_origOpen = UIToolkit::getActiveAccordionPanel();
+        s_panelA = s_panelB = nullptr;
         s_settleAt = millis();
         if (applyTarget(s_res.req.page, s_res.req.deck)) {
             s_settleEnd = s_settleAt + SETTLE_MS;
@@ -461,17 +899,73 @@ void service() {
         }
         s_phase = Phase::PH_START;
     } else if (st == ST_RUNNING) {
-        if (s_phase == Phase::PH_SETTLE && (int32_t)(millis() - s_settleEnd) < 0) return;
+        if ((int32_t)(millis() - s_settleEnd) < 0) {
+            if (s_phase != Phase::PH_START) return;   // settling, preparing or recording
+        }
+        // what=anim: every step below returns to loop(), which keeps LVGL
+        // running normally between them - that is the point of the mode.
+        if (s_phase == Phase::PH_ANIM_PREP) {
+            if (!animStart()) { animStop(); finish(); return; }
+            s_phase     = Phase::PH_ANIM_REC;
+            s_settleEnd = millis() + ANIM_REC_MS;
+            return;
+        }
+        if (s_phase == Phase::PH_ANIM_REC) {
+            s_swap++;
+            if (s_swap < s_res.req.n && animSwap()) {
+                s_settleEnd = millis() + ANIM_REC_MS;
+                return;
+            }
+            animStop();
+            finish();
+            return;
+        }
+#if defined(DISPLAY_ESPLCD) && defined(ENABLE_SCREENSHOT)
+        if (s_phase == Phase::PH_VERIFY) {
+            verifyStep();   // one check, then the action; finishes after n
+            return;
+        }
+#endif
     } else {
         return;
     }
 
     s_res.settledMs = millis() - s_settleAt;
+    if (recordsFrames(s_res.req.what)) {
+        // Read now, while settled on the page being measured (page mode: the
+        // one it starts from).
+        s_res.page     = s_gui->currentPage();
+        s_res.pageSlug = s_gui->currentPageSlug();
+        s_res.scheme   = UI::pal().name;
+        s_res.deck     = s_gui->deckShown();
+        if (!animPrepare()) { finish(); return; }
+        s_phase     = Phase::PH_ANIM_PREP;
+        s_settleEnd = millis() + ANIM_PREP_MS;
+        return;
+    }
+#ifdef DISPLAY_ESPLCD
+    if (s_res.req.what == What::WHAT_COPY) {
+        if (!LVGL_Flush::copyBench(s_res.copyRun, s_res.req.n)) s_res.error = "copy bench not possible right now";
+        finish();
+        return;
+    }
+#endif
+#if defined(DISPLAY_ESPLCD) && defined(ENABLE_SCREENSHOT)
+    if (s_res.req.what == What::WHAT_VERIFY) {
+        s_res.page     = s_gui->currentPage();
+        s_res.pageSlug = s_gui->currentPageSlug();
+        s_res.scheme   = UI::pal().name;
+        s_res.deck     = s_gui->deckShown();
+        s_panelA = s_gui->deckPanel(0);
+        s_panelB = s_gui->deckPanel(1);
+        s_swap   = 0;
+        s_phase  = Phase::PH_VERIFY;
+        verifyStep();   // the first check straight away
+        return;
+    }
+#endif
     measure();
-    if (!s_res.req.keep) applyTarget(s_origPage, s_origDeck ? 1 : 0);   // put the board back as found
-
-    s_state.store(ST_DONE);
-    xSemaphoreGive(s_done);
+    finish();
 }
 
 } // namespace Bench

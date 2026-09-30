@@ -12,6 +12,7 @@
 // -------------------------------------------------------------------------
 
 #define CYD_S3_8048
+#define BSP_PANEL_DRIVER ST7262   // panel chip, a bare name: sets PANEL_MODEL; picks the esp_lcd driver from 2.9 step 4 (Fleet_BSP.h)
 
 const BoardHardware CYD_S3_8048W550_HARDWARE = {
     .device_name  = "CYD S3 JC8048W550",
@@ -30,7 +31,7 @@ const BoardHardware CYD_S3_8048W550_HARDWARE = {
 inline const BoardHardware& bsp_hw = CYD_S3_8048W550_HARDWARE;
 
 const DisplayConfig CYD_S3_8048W550_DISPLAY = {
-    .PANEL_MODEL = "ST7262",
+    .PANEL_MODEL = BSP_STR(BSP_PANEL_DRIVER),
     .WIDTH       = 800,
     .HEIGHT      = 480,
     .ROTATION    = 0, // 0 = Landscape (USB on left), 1 = Portrait (USB on bottom), 2 = Landscape Inverted (USB right), 3 = Portrait Inverted (USB top)

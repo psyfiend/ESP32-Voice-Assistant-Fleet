@@ -11,14 +11,16 @@
 // and handed in here. LVGL_Startup borrows the managers, it never owns them.
 //
 #include <lvgl.h>
+#include "BoardDisplayFwd.h"   // DisplayManager or Fleet_Display, per board (2.9)
 
-class DisplayManager;
 class TouchManager;
 
 namespace LVGL_Startup {
 
-// Call after SystemCore::begin() has brought up display and touch.
-bool begin(DisplayManager &display, TouchManager &touch);
+// Call after SystemCore::begin() has brought up display and touch. How pixels
+// reach the panel is LVGL_Flush's job (src/LVGL_Flush.h), one file per
+// display library.
+bool begin(BoardDisplay &display, TouchManager &touch);
 
 // lv_timer_handler(). Call every loop() from the LVGL thread - which, with
 // LV_USE_OS == LV_OS_NONE, is loop() itself.
@@ -71,11 +73,22 @@ lv_indev_t   *indev();
 //               chunk into the library's framebuffer or canvas
 //   presentUs - gfx->flush() on the last chunk: the whole-framebuffer cache
 //               write-back on DSI/RGB, the whole-frame QSPI send on the CYD
+//
+// esp_lcd path only (LVGL_Flush_EspLcd.cpp), zero on Arduino_GFX: what the
+// frame's REPAIR copied - bringing the buffer being drawn up to date with the
+// newest frame - which runs on the PPA ahead of the frame's own strips:
+//   areas       - separate areas LVGL redraws this frame
+//   repairPx    - pixels copied by the repair
+//   repairFull  - 1 when the repair was one whole-frame copy, because the
+//                 buffer was behind on more areas than it keeps track of
 struct FlushStats {
-    uint32_t chunks    = 0;
-    uint32_t px        = 0;
-    int64_t  copyUs    = 0;
-    int64_t  presentUs = 0;
+    uint32_t chunks     = 0;
+    uint32_t px         = 0;
+    int64_t  copyUs     = 0;
+    int64_t  presentUs  = 0;
+    uint32_t areas      = 0;
+    uint32_t repairPx   = 0;
+    uint8_t  repairFull = 0;
 };
 void attachFlushStats(FlushStats *stats);   // nullptr detaches
 
@@ -83,6 +96,7 @@ void attachFlushStats(FlushStats *stats);   // nullptr detaches
 // actually landed, after any fallback.
 struct DrawBufInfo {
     size_t  bytes = 0;     // per buffer
+    uint32_t lines = 0;    // rows per buffer, as allocated (not the BSP's 0 = "default")
     uint8_t count = 0;     // 1 or 2
     bool    psram = false;
 };

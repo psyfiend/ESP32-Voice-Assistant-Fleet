@@ -12,6 +12,7 @@
 // -------------------------------------------------------------------------
 
 #define CYD_S3_3248
+#define BSP_PANEL_DRIVER AXS15231B // panel chip, a bare name: sets PANEL_MODEL; picks the esp_lcd driver from 2.9 step 5 (Fleet_BSP.h)
 
 // Panel init commands (ASX15231B)
 // NOTE: Must stay here, immediately before the structs below - see
@@ -289,7 +290,7 @@ inline const BoardHardware& bsp_hw = CYD_S3_3248W535_HARDWARE;
 const DisplayConfig CYD_S3_3248W535_DISPLAY = {
     // Hardware locked to portrait mode, DisplayManager and TouchManager
     // handle visual orientation and touch mapping.
-    .PANEL_MODEL = "AXS15231B",
+    .PANEL_MODEL = BSP_STR(BSP_PANEL_DRIVER),
     .WIDTH       = 320,
     .HEIGHT      = 480,
     .ROTATION    = 0,    // 0 = Portrait (USB on bottom), 1 = Landscape (USB on right), 2 = Inverted Portrait (USB on left), 3 = Inverted Landscape

@@ -118,6 +118,27 @@
         #undef LV_MEM_POOL_INCLUDE
         #undef LV_MEM_POOL_ALLOC
     #endif
+
+    // THE POOL IN PSRAM - per board, -D FLEET_LV_MEM_PSRAM (2026-09-29).
+    //
+    // Everything above is why the pool costs internal RAM: it is a static array
+    // in internal DRAM. With this flag LVGL asks for its pool ONCE, at
+    // lv_init(), from PSRAM instead (lv_mem_core_builtin.c:78). Same size, same
+    // allocator (TLSF), same lv_mem_monitor() - only where the 128 KB lives
+    // changes. It hands 128 KB of internal RAM back to WiFi/LWIP.
+    //
+    // First for WS_S3_4B, which idles at 12-17 KB internal free with the pool
+    // internal (the owner's HA free-heap chart) and drops to ~4 KB under HTTP
+    // load - enough to lose its HA connection and, once, to panic. NINA's
+    // lv_mem_psram.c moves every LVGL allocation to PSRAM through a custom
+    // backend; this keeps LVGL's own allocator and moves only the pool.
+    //
+    // THE COST TO MEASURE, not assumed: widgets and styles live in PSRAM, so
+    // every draw reads them through the cache. /bench before and after.
+    #if defined(FLEET_LV_MEM_PSRAM)
+        #define LV_MEM_POOL_INCLUDE <esp_heap_caps.h>
+        #define LV_MEM_POOL_ALLOC(size) heap_caps_malloc((size), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
+    #endif
 #endif  /*LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN*/
 
 /*====================
@@ -125,7 +146,17 @@
  *====================*/
 
 /** Default display refresh, input device read and animation step period. */
-#define LV_DEF_REFR_PERIOD  33      /**< [ms] */
+/* Per-board override: -D FLEET_LV_REFR_PERIOD=16 in an environment's build_flags.
+ * Measured 2026-09-26 (display-stack.md s8.8): 16 ms gives WS_P4_4B on esp_lcd ~16
+ * frames per deck-panel swap instead of 10, none late, at no cost per frame; WS_P4_5
+ * gains nothing (its swap frame takes ~31 ms). It also sets how often touch is polled
+ * and animations step, so it is NOT a free change on the slow S3 boards. No board sets
+ * it yet: the owner's call. */
+#ifdef FLEET_LV_REFR_PERIOD
+    #define LV_DEF_REFR_PERIOD  FLEET_LV_REFR_PERIOD
+#else
+    #define LV_DEF_REFR_PERIOD  33      /**< [ms] */
+#endif
 
 /** Default Dots Per Inch. Used to initialize default sizes such as widgets sized, style paddings.
  * (Not so important, you can adjust it to modify default sizes and spaces.) */
@@ -166,8 +197,10 @@
 #define LV_DRAW_BUF_STRIDE_ALIGN                1
 
 /** Align start address of draw_buf addresses to this bytes*/
-#if defined(FLEET_LV_PPA) && defined(CONFIG_IDF_TARGET_ESP32P4)
-    /* 2.9 PPA experiment (see LV_USE_PPA below). LVGL's PPA unit refuses to
+#if (defined(FLEET_LV_PPA) || defined(DISPLAY_ESPLCD)) && defined(CONFIG_IDF_TARGET_ESP32P4)
+    /* The esp_lcd path (2.9 step 2) needs this too: its PPA reads LVGL's draw
+     * buffers by DMA and wants them on its 64-byte cache line.
+     * 2.9 PPA experiment (see LV_USE_PPA below). LVGL's PPA unit refuses to
      * compile unless this equals the P4's L2 cache line - 64 on our rebuilt
      * libs (docs/REBUILD_P4_LIBS.md) - and it reads the KCONFIG name for it,
      * which a non-Kconfig build never defines. LVGL_Startup allocates its draw
