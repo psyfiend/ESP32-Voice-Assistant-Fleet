@@ -64,7 +64,8 @@ No divider board routes a charge status to a GPIO, so the state is worked out fr
 strongest first, and **the System Doctor prints the evidence with the state** (`[POWER]`):
 
 1. **A step** of >= 60 mV between two 5-s readings: a charger arrived (+) or left (-). Measured
-   ~+100 mV on the 7B.
+   +100 and +156 mV on the 7B; **P3 PASS** - the Doctor said "charging (a +step: a charger
+   arrived)" within seconds.
 2. **A PC on the chip's own USB-Serial-JTAG port** means external power (P1 PASS on the 7B).
 3. **A restart by brownout** means power was lost. *In practice it never fires*: losing USB resets
    the 7B as a power-on (P2). Kept, harmless; to be revisited.
