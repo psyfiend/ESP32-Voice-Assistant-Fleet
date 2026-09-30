@@ -2,6 +2,12 @@
 #include "BatteryEntities.h"
 #include "bsp_loader.h"
 #include "esp_adc/adc_cali_scheme.h"
+#include <esp_system.h>   // esp_reset_reason
+#include <math.h>
+#if SOC_USB_SERIAL_JTAG_SUPPORTED && __has_include("driver/usb_serial_jtag.h")
+  #include "driver/usb_serial_jtag.h"
+  #define BATT_HAS_USJ 1
+#endif
 
 // ---------------------------------------------------------------------------
 // The provider half. Same split as SystemProvider: WHAT the entities are is
@@ -20,6 +26,18 @@ static constexpr int BATT_SAMPLES = 64;
 // on its battery shuts down near 3.0 V anyway - so a running board that reads
 // under 3.2 V is on USB with no cell, or a dead one.
 static constexpr int BATT_MIN_PLAUSIBLE_MV = 3200;
+
+// A change of this much between two consecutive 5-s readings is a change of
+// power source, not drift. The 7B's charger arriving measured ~+100 mV; a
+// backlight or radio burst moves the reading by tens at most.
+static constexpr int BATT_STEP_MV = 60;
+
+// Trend thresholds, mV per minute. A cell charging near the top of its curve
+// still rises a few mV a minute; one discharging under a display load falls.
+static constexpr float BATT_TREND_MV_MIN = 1.5f;
+// "Full": external power, at or above this, and flatter than FLAT_MV_MIN.
+static constexpr int   BATT_FULL_MV      = 4150;
+static constexpr float BATT_FLAT_MV_MIN  = 1.0f;
 
 bool BatteryProvider::begin(EntityRegistry *reg) {
     if (_begun || !reg) return _begun;
@@ -74,9 +92,12 @@ bool BatteryProvider::begin(EntityRegistry *reg) {
         }
     }
 
-    _reg        = reg;
-    _begun      = true;
-    _lastPollMs = 0;
+    _reg          = reg;
+    _begun        = true;
+    _lastPollMs   = 0;
+    _unitId       = (int)unit;
+    _state        = PowerState::PWR_UNKNOWN;
+    _bootBrownout = (esp_reset_reason() == ESP_RST_BROWNOUT);
     Serial.printf("[Battery] GPIO%u = ADC%d ch%d, divider x%u.%03u, %s\n",
                   (unsigned)bsp_hw.BAT_ADC, (int)unit + 1, (int)_chan,
                   (unsigned)(bsp_hw.BAT_DIV_X1000 / 1000),
@@ -104,12 +125,19 @@ void BatteryProvider::loop(uint32_t nowMs) {
         pinMv = raw * 3100 / 4095;   // nominal: 12 dB attenuation, 12 bits
     }
     const int battMv = (int)((int32_t)pinMv * bsp_hw.BAT_DIV_X1000 / 1000);
+    _lastRaw = raw;
+    _lastPinMv = pinMv;
 
-    // Log once a minute: the calibration evidence, pin and battery side by side.
-    if (_lastLogMs == 0 || (nowMs - _lastLogMs) >= 60000) {
+    inferState(nowMs, battMv);   // uses the previous reading, so before _lastMv moves
+    _lastMv = battMv;
+
+    // Log once a minute, and at once on a change of power source: the
+    // calibration evidence, pin and battery side by side, and the state.
+    if (_lastLogMs == 0 || (nowMs - _lastLogMs) >= 60000 || _stepAtMs == nowMs) {
         _lastLogMs = nowMs;
-        Serial.printf("[Battery] raw %d  pin %d mV  batt %d mV  %d%%\n",
-                      raw, pinMv, battMv, percentFromMv(_filtMv < 0 ? battMv : (int)_filtMv));
+        Serial.printf("[Battery] raw %d  pin %d mV  batt %d mV  %d%%  %s (%s)\n",
+                      raw, pinMv, battMv, percentFromMv(_filtMv < 0 ? battMv : (int)_filtMv),
+                      stateName(), _why);
     }
 
     if (battMv < BATT_MIN_PLAUSIBLE_MV) { _filtMv = -1; return; }
@@ -120,6 +148,103 @@ void BatteryProvider::loop(uint32_t nowMs) {
 
     _reg->setValue(BATT_ENT_MV,  EntityValue::makeInt(_filtMv), nowMs);
     _reg->setValue(BATT_ENT_PCT, EntityValue::makeInt(percentFromMv((int)_filtMv)), nowMs);
+}
+
+const char *BatteryProvider::stateName() const {
+    switch (_state) {
+        case PowerState::PWR_NO_ADC:     return "no battery input";
+        case PowerState::PWR_NO_BATTERY: return "no battery";
+        case PowerState::PWR_UNKNOWN:    return "battery, source unknown";
+        case PowerState::PWR_ON_BATTERY: return "running on battery";
+        case PowerState::PWR_CHARGING:   return "charging";
+        case PowerState::PWR_FULL:       return "battery fully charged";
+    }
+    return "?";
+}
+
+void BatteryProvider::inferState(uint32_t nowMs, int battMv) {
+    // No usable cell: nothing else matters.
+    if (battMv < BATT_MIN_PLAUSIBLE_MV) {
+        _state = PowerState::PWR_NO_BATTERY;
+        _why   = "reading under 3.2 V";
+        _histCount = _histHead = 0;
+        _trendValid = false;
+        return;
+    }
+
+    // 1. A step from the previous reading is a change of power source. It
+    //    also invalidates the trend, which would otherwise straddle the step.
+    if (_lastMv >= BATT_MIN_PLAUSIBLE_MV) {
+        const int d = battMv - _lastMv;
+        if (d >= BATT_STEP_MV || d <= -BATT_STEP_MV) {
+            _stepMv   = d;
+            _stepAtMs = nowMs;
+            _extPower = d > 0 ? 1 : 0;
+            _histCount = _histHead = 0;
+            _trendValid = false;
+        }
+    }
+
+    // 4. The trend: mean of the oldest six readings in the window against the
+    //    newest six, over the time between them.
+    _hist[_histHead] = (int16_t)battMv;
+    _histHead = (_histHead + 1) % TREND_N;
+    if (_histCount < TREND_N) _histCount++;
+    if (_histCount >= 36) {   // 3 minutes
+        const int oldest = (_histHead + TREND_N - _histCount) % TREND_N;
+        int32_t a = 0, b = 0;
+        for (int i = 0; i < 6; i++) {
+            a += _hist[(oldest + i) % TREND_N];
+            b += _hist[(_histHead + TREND_N - 1 - i) % TREND_N];
+        }
+        const float minutes = (float)(_histCount - 6) * (_intervalMs / 1000.0f) / 60.0f;
+        _trend = ((b - a) / 6.0f) / minutes;
+        _trendValid = true;
+    }
+
+    // 2. A PC on the chip's own USB port proves external power.
+#ifdef BATT_HAS_USJ
+    _usbHost = usb_serial_jtag_is_connected();
+#endif
+
+    // Decide, strongest evidence first.
+    int ext = _extPower;
+    const char *why = _extPower == 1 ? "a +step: a charger arrived"
+                    : _extPower == 0 ? "a -step: the charger left" : "";
+    if (ext != 1 && _usbHost) {
+        ext = 1; why = "a PC is on the USB port";
+    }
+    if (ext < 0 && _bootBrownout) {
+        ext = 0; why = "restarted by brownout: power was lost";
+    }
+    if (ext < 0 && _trendValid) {
+        if (_trend >=  BATT_TREND_MV_MIN) { ext = 1; why = "voltage rising"; }
+        if (_trend <= -BATT_TREND_MV_MIN) { ext = 0; why = "voltage falling"; }
+    }
+
+    if (ext == 0) {
+        _state = PowerState::PWR_ON_BATTERY;
+    } else if (ext == 1) {
+        const bool flat = _trendValid && fabsf(_trend) < BATT_FLAT_MV_MIN;
+        if (battMv >= BATT_FULL_MV && flat) {
+            _state = PowerState::PWR_FULL;
+            // A charger with no cell holds its BAT pin here too (the ETA6098
+            // at ~4.17 V): without a step ever seen, the two look the same.
+            why = _stepAtMs ? "at the charge voltage and flat"
+                            : "at the charge voltage and flat - or no cell: some chargers hold this with none";
+        } else {
+            _state = PowerState::PWR_CHARGING;
+        }
+    } else if (battMv >= BATT_FULL_MV && _trendValid && fabsf(_trend) < BATT_FLAT_MV_MIN) {
+        // No evidence of the source, but pinned at the charge voltage: only
+        // external power holds a cell there.
+        _state = PowerState::PWR_FULL;
+        why = "at the charge voltage and flat - or no cell: some chargers hold this with none";
+    } else {
+        _state = PowerState::PWR_UNKNOWN;
+        why = _trendValid ? "voltage steady, no step seen" : "watching - needs 3 minutes of readings";
+    }
+    _why = why;
 }
 
 int BatteryProvider::percentFromMv(int mv) {

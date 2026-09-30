@@ -8,6 +8,7 @@
 #include <esp_idf_version.h>
 #include <esp_timer.h>
 #include <time.h>
+#include <esp_system.h>   // esp_reset_reason
 #include "sdkconfig.h"
 
 // FW_VERSION/FW_COMMIT are injected from `git describe` by
@@ -286,6 +287,60 @@ void reportPlatform() {
 #endif
 }
 
+const char *resetReasonName(esp_reset_reason_t r) {
+    switch (r) {
+        case ESP_RST_POWERON:   return "power-on";
+        case ESP_RST_BROWNOUT:  return "BROWNOUT (supply dipped - on a battery board, USB power was lost)";
+        case ESP_RST_SW:        return "software restart";
+        case ESP_RST_PANIC:     return "PANIC (crash)";
+        case ESP_RST_INT_WDT:   return "interrupt watchdog";
+        case ESP_RST_TASK_WDT:  return "task watchdog";
+        case ESP_RST_WDT:       return "watchdog";
+        case ESP_RST_DEEPSLEEP: return "wake from deep sleep";
+        case ESP_RST_EXT:       return "external reset pin";
+        case ESP_RST_USB:       return "USB (flashing tool)";
+        case ESP_RST_JTAG:      return "JTAG";
+        default:                return "other";
+    }
+}
+
+// [POWER] - the battery and where power comes from (#72). Every state except
+// "no battery input" is inferred on the divider boards; the evidence line
+// says from what, because the owner acts on this.
+void reportPower(SystemCore &core) {
+    SystemReport::line("[POWER]");
+    const esp_reset_reason_t rr = esp_reset_reason();
+    SystemReport::line("  Last reset: %s (%d)", resetReasonName(rr), (int)rr);
+
+    BatteryProvider &b = core.battery();
+    if (!b.active()) {
+        SystemReport::line("  Battery: no battery input on this board");
+        return;
+    }
+    SystemReport::line("  Sense: GPIO%u = ADC%d ch%d, divider x%u.%03u, %s",
+                       (unsigned)bsp_hw.BAT_ADC, b.unitNumber(), b.channel(),
+                       (unsigned)(bsp_hw.BAT_DIV_X1000 / 1000),
+                       (unsigned)(bsp_hw.BAT_DIV_X1000 % 1000),
+                       b.calibrated() ? "calibrated" : "UNCALIBRATED");
+    if (b.lastMv() < 0) {
+        SystemReport::line("  Battery: no reading yet");
+        return;
+    }
+    SystemReport::line("  Battery: %d mV (pin %d mV, raw %d), %d%%",
+                       b.lastMv(), b.lastPinMv(), b.lastRaw(),
+                       BatteryProvider::percentFromMv(b.smoothedMv() > 0 ? b.smoothedMv() : b.lastMv()));
+    SystemReport::line("  State: %s (inferred: %s)", b.stateName(), b.evidence());
+    if (b.trendValid()) {
+        SystemReport::line("  Trend: %+.1f mV/min", (double)b.trendMvPerMin());
+    }
+    const uint32_t now = millis();
+    if (b.lastStepMv()) {
+        SystemReport::line("  Last step: %+d mV, %lu s ago", b.lastStepMv(),
+                           (unsigned long)b.lastStepAgeS(now));
+    }
+    if (b.usbHostSeen()) SystemReport::line("  USB: a PC is attached to the chip's USB port");
+}
+
 void reportI2cScan() {
     SystemReport::line("[I2C BUS SCAN]");
     int nDevices = 0;
@@ -410,6 +465,7 @@ void run(SystemCore &core, bool echoSerial) {
     reportConnectivity(core);
     reportEntities(core);
     reportHardware(core);
+    reportPower(core);
     reportDisplay(core);
 
     // Caller-registered sections - today just [UI STATE] from GUIManager.

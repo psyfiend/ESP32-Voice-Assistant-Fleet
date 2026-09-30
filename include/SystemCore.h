@@ -56,6 +56,7 @@ public:
     EntityRegistry      &entities() { return _entities; }
     HaClient            &ha()       { return _ha; }
     HttpServer          &http()     { return _http; }
+    BatteryProvider     &battery()  { return _battProvider; }
 #ifdef HAS_AUDIO_HW
     AudioManager        &audio()    { return _audio; }
 #endif
