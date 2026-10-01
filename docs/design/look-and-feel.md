@@ -23,6 +23,11 @@ section) is tested against this file.
   and the corner icon is not in the fit. **#73**.
 - **Rotation as a setting** -> interview §5 / **#71**.
 
+**Mock for the Linen fill and the Wi-Fi icon, prepared 2026-10-01 for the next batch:** artifact
+**Linen Fill and Header Glyphs** (https://claude.ai/artifact/6aAnSsb4eLjXdy1EQ4L3Ev) - six fill
+candidates (A = today) with contrast against the ground, five icon treatments on both schemes.
+Browser colours; pick two for glass.
+
 ### 1.2 Owner, 2026-09-30: the grid is not the goal
 
 In the owner's words, paraphrased from the session prompt: the owner goes back and forth on whether
