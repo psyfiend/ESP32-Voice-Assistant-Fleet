@@ -256,9 +256,34 @@ The owner's thinking, close to the owner's own words:
 - **Q-L3 - DECIDED: single cards never auto-span or change size class.** "EVERY card and cluster
   should scale evenly to fill the space", as cards do today when rows and columns change - within
   reason. So the arranger fills a page by choosing the **grid size** (bigger cells), within a
-  maximum cell size. OPEN: the playground also lets a *cluster* absorb leftover neighbouring cells
-  (cards never do) - the owner to say whether that reads as "filling" or as a cluster changing
-  shape on its own.
+  maximum cell size. ~~OPEN~~ **ANSWERED 2026-10-01 (afternoon):** "it should be preferred that a
+  cluster grow into dead space rather than a card suddenly growing twice as wide/tall." Clusters
+  absorb leftover cells; cards stay near today's size.
+
+**Owner on the playground, 2026-10-01 (afternoon) - and what changed in it (version 2):**
+
+- "Damn bro it is amazing! I love playing with this." Confused by how a cluster's internal grid
+  relates to the page grid. **The rule, now explained in the playground itself:** a cluster always
+  covers whole page cells; inside it, member tiles have a minimum size, so the cell size decides how
+  many tiles one cell holds, and so how many cells a cluster needs. Changing the grid changes the
+  cell size - which is why 2x3 and 4x3 give different layouts.
+- **"3x3 on the 4B says the blocks do not fit??"** At 3x3 a 4B cell is ~21 x 19 mm. After the
+  cluster header there was room for 1 x 0 tiles at the old 13 x 11 mm minimum, so every 2-member
+  cluster needed 2 cells: 4 clusters + 2 cards = 10 cells on a 9-cell page. The playground now says
+  this per block when a grid does not fit. **What it reveals (Claude):** at a 13 mm minimum tile, a
+  cluster is NOT denser than loose cards at today's ~20 mm cells; the density gain comes only from
+  moving sensors into the header. Real density needs smaller member tiles (icon + short label).
+- **Preferred proportions with clusters: 4x3 on the 4B; 4x5 looks good too.**
+- **Area display is uniform:** tag / bar / none applies to clusters exactly as to cards. A cluster
+  still carries its temperature / occupancy / lux in its header; the AREA appears where it does on
+  a card. (Playground: the "Area" switch now has Float / Tag / Folder / Bar / None for both.)
+- **Changes in version 2:** tags are paid for inside the cell (the device rule above); single cards
+  are charged for drifting from today's ~20 mm and spare cells cost little, so clusters take the
+  space; **each board's recommended grid** (the owner's glass picks: 5x3, 6x3, 4x3, 2x5...) is where
+  the arranger starts, and leaving it must buy a better layout; knob defaults retuned to tiles
+  12 x 9 mm (9 mm is the touch minimum), header 5 mm, smallest cell 14 mm (the 4B's 4x3 is 15 mm).
+  With those, the 4B lands on 4x3, the 7B on 6x3, the 4880 portrait on 2x5. These weights are
+  guesses to tune by eye, not decisions.
 
 ### 3.9 Page transitions from pre-rendered pictures (owner, 2026-10-01) - feasible, to measure
 
@@ -306,8 +331,9 @@ Transitions wanted: **slide, dissolve / fade, shrink / grow, wipe**.
   partition, so a LittleFS configuration **survives an ordinary firmware update by itself**; only a
   full erase or a partition-table change loses it - that is when an off-device backup is needed.
   (3) A changed template arriving with new firmware is then just "an import the user did not ask
-  for", and "Restore previous settings when flashed" decides it. OPEN: a better name than "build
-  sheet" (candidates: *profile*, *dashboard config*, *template*).
+  for", and "Restore previous settings when flashed" decides it. **Name: keep "build sheet"**
+  (owner, 2026-10-01 afternoon: "actually not that bad... as a whole build_sheet actually makes
+  sense"); it may later break into components such as settings and page layouts.
 - **Web UI parity:** "I don't see any reason why the web UI shouldn't be able to configure as much
   as the build sheet." Import / export of configurations goes through the web UI, after v1.0.
 - **First-boot setup wizard** like NINA's: joins Wi-Fi via a QR code (`reference/` -
@@ -336,3 +362,26 @@ The owner liked that the mocks' area tag partly overlaps its card. Decisions:
   default (knob: Float -> Tag -> Bar -> None) and the bar corner fix. Seen on CYD_P4_4880 portrait,
   Midnight. File folder not built: LVGL 9 has one radius for all four corners, so it needs ~3-4
   extra objects per card - measure `lv_mem` first.
+
+**Owner on glass (CYD_P4_4880), 2026-10-01 afternoon, and round two (`4274a6f`):**
+
+- **"The floating tag looks great! Shadows look good."** The corner icon's spacing (matching the
+  left border and the tag inside the card) was right.
+- **Equal gaps on all sides.** The gap between cards is measured from the tag, vertically already;
+  "this same math needs to be applied to horizontal spacing" - sticking the tag out the side makes
+  the card narrower. **Fixed:** the card moves right inside its cell by the overhang and every
+  width-based fit measures the narrower surface. Seen on WS_P4_5 and WS_P4_4B: ~21 px from a tag to
+  the card above and to the card on its left.
+- **Status pills (STALE, FAILED, PAUSED) stay within the card's visual borders** - mirrored, they
+  overlapped the next card's tag. **Fixed:** top right, inside the card, level with the corner
+  icon. (Straddling the top edge was tried first and collided with the card's own tag on the 4B.)
+  On the 4B's narrowest card the pill just touches the top of the hero disc - for the owner's eye.
+- **The bar band:** "careful about what appear to be simple fixes" - the history is `cards.md` §12
+  (the band overhangs; `clip_corner`, the obvious fix, froze WS_P4_5). The first fix rounded all
+  four corners; the owner wants the bottom edge straight. **Fixed without a layer:** the band is
+  rounded like the card and a radius-0 "skirt" over its lower half squares the bottom - one small
+  object per card. Seen on WS_P4_4B in bar mode (a temporary build).
+- **Side effect to watch (#73):** the narrower card makes the value-face mismatch a little more
+  likely - on the 4B, "68.4" drew in the smaller face beside "69.5" in the larger.
+- **Recorded separately:** the system panel should slide like the deck panels - its contents move
+  with its edge - instead of being uncovered in place (#81).

@@ -37,11 +37,22 @@ the best we can do is a simple grid of uniformly sized squares").
 - **Artifacts:** "Beyond the Grid" (four layouts, card sizes) and **"Layout Playground"** (the
   arranger prototype, interactive) - links in `look-and-feel.md` §3.7-3.8. The owner was playing
   with the playground at the end of the session; ask what was learned.
-- **Code, not merged:** `feat/card-tag-float` (#80) - the floating tag as the default header and
-  the header bar's corner fix. **Flashed on CYD_P4_4880 only** (WS_P4_5 was not on USB; WS_S3_4B
-  not flashed because of #69's watch). Seen there on Midnight; Linen, STALE pill and bar mode unseen.
+- **Code, not merged, each branch off `main`:**
+  - `feat/card-tag-float` (#80): floating tag as the default, round two after the owner's glass
+    notes (equal gaps, status pill inside, bar band round-top/straight-bottom). **Flashed on WS_P4_5
+    and WS_P4_4B** (the 4B on its Fleet page via `/bench?...&page=1&keep=1`); the 4880 still runs
+    round one. Awaits the owner's sign-off, then merge.
+  - `feat/74-sntp` (#74): `TimeService`, SNTP + POSIX zone, the Doctor's `Time:` line. Verified on
+    WS_P4_5 (PDT correct), then the P4_5 was reflashed with the tag branch. Merge when the owner says.
+  - WS_S3_4B builds on both and is flashed with neither (#69's watch).
+- **Playground v2** (same link): area modes on clusters, recommended grid per board, tile minimums
+  retuned, "why it does not fit" per block. The owner's notes on v1 are in `look-and-feel.md` §3.8.
 - **New issues:** #75 night mode, #76 HA alerts, #77 media player, #78 page arranger (reopens Q3b),
-  #79 transitions from pre-rendered pictures, #80 tag styles. Comments on #6, #20, #35, #52-54, #74.
+  #79 transitions from pre-rendered pictures, #80 tag styles, #81 system panel should slide.
+  Comments on #6, #20, #35, #52-54, #74.
+- **Reading a board's boot log without a monitor:** `scratchpad`-style script with pyserial that
+  pulses RTS with DTR low (resets into a normal boot) and filters lines - PowerShell 5.1 strips
+  quotes from `python -c "..."`, so write the script to a file.
 
 ## What is next — the new session's job
 
