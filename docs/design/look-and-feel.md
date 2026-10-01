@@ -324,6 +324,10 @@ The owner liked that the mocks' area tag partly overlaps its card. Decisions:
 - **Shadow cost (Claude):** in LVGL the tag is its own object, so its shadow is a style on that
   object, drawn onto whatever lies under it - no extra layer. Shadow cost grows with the shadow's
   area, and a tag is small, so it should be cheap; to be measured with `/bench` on Linen.
-- **The header bar's corners** sticking out past the card's rounded corners is a bug to fix, not a
-  style - issue opened.
+- **The header bar's corners** sticking out past the card's rounded corners was a bug: `applyState()`
+  reset the band's radius to 0 after `buildHeader()` had set the card's radius.
 - The mocks with all three: Layout Playground (§3.8), Tag switch.
+- **Built 2026-10-01 (#80), branch `feat/card-tag-float`, not merged:** `HDR_TAG_FLOAT` as the
+  default (knob: Float -> Tag -> Bar -> None) and the bar corner fix. Seen on CYD_P4_4880 portrait,
+  Midnight. File folder not built: LVGL 9 has one radius for all four corners, so it needs ~3-4
+  extra objects per card - measure `lv_mem` first.

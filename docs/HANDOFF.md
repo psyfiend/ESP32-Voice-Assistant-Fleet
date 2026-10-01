@@ -21,6 +21,28 @@ Fleet = MQTT/system/virtual cards), swiped with wrap-around; three colour scheme
 default, Fleet, Linen with real shadows); card types with state icons; an FPS/CPU overlay;
 `/screenshot` and `/bench` over HTTP.
 
+## Where the interview stands — 2026-10-01, 4 am
+
+**§1 (look and feel) is about two-thirds done**, on branch `docs/interview-s1-look-and-feel`
+(not merged; merge at the end of §1). Answers: `docs/design/look-and-feel.md`. Read its §2 first:
+the owner's two standing rules (keep all HA functionality; eye candy matters - "I will be sad if
+the best we can do is a simple grid of uniformly sized squares").
+
+- **Answered:** items 1-4 (who / feel / motion / night), 11 (beyond the grid: direction agreed), and
+  the arranger questions Q-L1..Q-L3, the build sheet's nature (Q-L4), card tags.
+- **Still to ask in §1:** item 5 (sound), 6 (icons), 7 (dense vs airy - mostly answered by the
+  arranger), 8 (broken look), 10's fixes (Linen card fill, Wi-Fi icon, chrome text #73, hero size
+  per card size), per-device viewing distance, the three words ("clear, alive, crafted" - not
+  objected to), and Q-L3's open point: may a *cluster* absorb leftover cells?
+- **Artifacts:** "Beyond the Grid" (four layouts, card sizes) and **"Layout Playground"** (the
+  arranger prototype, interactive) - links in `look-and-feel.md` §3.7-3.8. The owner was playing
+  with the playground at the end of the session; ask what was learned.
+- **Code, not merged:** `feat/card-tag-float` (#80) - the floating tag as the default header and
+  the header bar's corner fix. **Flashed on CYD_P4_4880 only** (WS_P4_5 was not on USB; WS_S3_4B
+  not flashed because of #69's watch). Seen there on Midnight; Linen, STALE pill and bar mode unseen.
+- **New issues:** #75 night mode, #76 HA alerts, #77 media player, #78 page arranger (reopens Q3b),
+  #79 transitions from pre-rendered pictures, #80 tag styles. Comments on #6, #20, #35, #52-54, #74.
+
 ## What is next — the new session's job
 
 **The design interview, then 2.10 (#65).** The owner wants the next session to focus on 2.10 and
@@ -115,6 +137,8 @@ silently puts the bug back. `docs/REBUILD_P4_LIBS.md`. The S3 libraries are stoc
 - **Prefer ESP-IDF facilities to Arduino-only ones** (owner). HTTP handlers run on their own task:
   never touch LVGL from one. HaProvider receives on the websocket task: never touch LVGL there.
 - **`Edit` on a CRLF file**: deleting a line by matching a leading newline joins two lines.
+- **`gh ... --body $text` in PowerShell 5.1 drops double quotes** inside the text (native argument
+  passing), silently. Pipe it instead: `$text | gh issue create ... --body-file -`, or write a file.
 - **LVGL clips children to their parent** - use `UI::unclipShadows()`. **Never toggle HIDDEN on a
   screen-sized object when an animation starts.** Anything drawn stays ASCII, except `°`.
 - **Verify from outside the device** - the router, the broker, HA, `/bench?what=verify`. The

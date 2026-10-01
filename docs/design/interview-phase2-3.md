@@ -119,6 +119,8 @@ The answers here steer every later section, so they come first.
     it hold clusters with their own shapes - a room, a function, a group - drawn as something other
     than cards? *Touches ROADMAP Q3b (unit placement, free positioning rejected) and 2.11.* Claude
     sketches two or three alternatives before asking. **[BLOCKING 2.11]**
+    **DIRECTION AGREED 2026-10-01 -> `look-and-feel.md` §3.7-3.8** (B + C as the base, an arranger
+    with pins, #78); scoring rules still to settle in the Layout Playground.
 
 ## 2. Card popups (2.10)  → `docs/design/card-sheet.md`
 
@@ -275,6 +277,12 @@ Questions:
 ## 9. Build sheet vs on-device UI vs web UI - living together  → `docs/design/build-sheet.md` §layers
 
 The precedence is decided (§0.2). What is not:
+
+> **Owner, 2026-10-01 (asked early, in §1):** a build sheet is "just a template with entity data
+> and settings" - the same thing as an exported configuration, applied on first boot or imported
+> any time; export/import at levels; "Restore previous settings when flashed"; a hard reset to
+> factory; the web UI configures everything the sheet can. Recorded in `look-and-feel.md` §3.10.
+> This answers most of items 1, 3, 4 and 5 below in spirit; confirm the details when §9 is reached.
 
 1. **Where runtime edits are stored**: NVS keys, or a runtime overrides JSON on LittleFS mirroring
    the sheet's shape? **Rec:** an overrides JSON - one format, exportable, diffable.
