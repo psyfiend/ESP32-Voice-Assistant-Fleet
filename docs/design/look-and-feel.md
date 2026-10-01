@@ -385,3 +385,42 @@ The owner liked that the mocks' area tag partly overlaps its card. Decisions:
   likely - on the 4B, "68.4" drew in the smaller face beside "69.5" in the larger.
 - **Recorded separately:** the system panel should slide like the deck panels - its contents move
   with its edge - instead of being uncovered in place (#81).
+
+**Round three (`ad42c4b`), owner 2026-10-01 evening:**
+
+- **Half the side overhang.** "Pushing it to the side makes a 4x3 on the square screens rather
+  narrow. We'll split the difference: same height sticking up above the card, but halve the
+  distance that it sticks out to the left" - a more "tacked on" look, and a little width back.
+- **Status pills follow the header chosen.** In floating mode they float on the top edge like the
+  area pill; the only fault in round one was sticking out past the right edge. Inset half a radius
+  from the right corner. While a status shows, a long area name shortens with an ellipsis ("O..."
+  beside STALE on the 4B's narrow cards) - Claude's call, to be judged on glass.
+- **File folder:** offset the tab toward the middle "just a hair", so it meets the card with a
+  rounded inside corner on BOTH sides and the card keeps its rounded top-left corner. In the
+  playground (v3); not built on the device.
+- **Clusters never wear a tag** - see §3.8 and #66.
+
+### 3.12 Batch 4 - the rest of §1 (owner, 2026-10-01 evening)
+
+- **Sound on tap (item 5): yes, off by default**, a per-device setting (#23).
+- **Viewing distance: "close" / "far" per device - agreed, part of #73.**
+- **Linen (item 10):**
+  - "Cooler colors are a bit harsh on these screens", and **the 7B is "wildly more cool" than any
+    other screen** - tune its colour (init commands, or a per-board palette correction) - #82.
+  - **Ground: C** (the darker sand, `CFC4B2`), and it would be fine to **darken the card a hair**
+    (mock "C+", `F3EEE4`).
+  - **The real complaint was the "on" colour**, not the card: the orange that fills an active light
+    or door. A more suitable active colour for Linen is wanted. Eight candidates in the mock
+    (round 2). This would make `ST_ACTIVE` a per-scheme value for Linen (today it is shared by all
+    schemes, as "content, not decoration" - `UITokens.cpp`); "on" stays a filled card with a lit
+    disc, so the state never rests on colour alone. OPEN: the owner's pick, then two on glass.
+- **Header glyphs:** treatments **2 (chip) and 4 (filled circle)**, with **more pronounced**
+  shading than the first mock - it will blend in on glass. The **clock is a toggleable slot, hard
+  right by default**, the icons shifting left. All of this is 2.8's reusable slot system (#19) for
+  the system header and card / cluster headers alike.
+- **Clusters (2.11):** always a **bar** header, whatever the cards wear, but only with content to
+  put there (area or custom name, temperature, lux, occupancy); otherwise just a container. Their
+  status entities are **icon only, like a card's hero, clearly distinct when active** - prototyped
+  as a filled white disc (active) vs a faint outline (idle). OPEN: temperature and lux icon-only
+  too, or keep the number? (#66)
+- Mock: artifact **Linen Fill and Header Glyphs**, round 2 (same link as §1.1).
