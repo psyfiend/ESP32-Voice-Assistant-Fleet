@@ -1,5 +1,6 @@
 #include "SystemReport.h"
 #include "SystemCore.h"
+#include "TimeService.h"
 #include "BoardDisplay.h"
 #include <FleetI2C.h>
 #include "bsp_loader.h"
@@ -442,18 +443,12 @@ void run(SystemCore &core, bool echoSerial) {
 
     line("=== SYSTEM DIAGNOSTICS ===");
 
-    // When this report was taken: uptime always, wall-clock time once
-    // something has set the clock. Nothing does yet (no SNTP, no RTC read), so
-    // it says so rather than printing 1970.
+    // When this report was taken: uptime always, and the wall-clock time with
+    // where it came from (#74) - or why there is none, never 1970.
     {
         const uint32_t s = (uint32_t)(esp_timer_get_time() / 1000000);
-        char when[40] = "not set (no time source yet)";
-        const time_t now = time(nullptr);
-        if (now > 1700000000) {   // any real date is past late 2023
-            struct tm tmv;
-            localtime_r(&now, &tmv);
-            strftime(when, sizeof(when), "%Y-%m-%d %H:%M:%S", &tmv);
-        }
+        char when[112];
+        TimeService::describe(when, sizeof(when));
         line("  Uptime: %lud %02lu:%02lu:%02lu   Time: %s",
              (unsigned long)(s / 86400), (unsigned long)(s / 3600 % 24),
              (unsigned long)(s / 60 % 60), (unsigned long)(s % 60), when);
