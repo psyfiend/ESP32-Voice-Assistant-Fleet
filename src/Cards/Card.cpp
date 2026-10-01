@@ -236,7 +236,7 @@ const lv_font_t *Card::valueFont() const {
 int32_t Card::shortSidePx() const {
     int32_t h = cellPx();
     h -= tagRowPx() + tagInsetPx();
-    const int32_t w = _cellWPx > 0 ? _cellWPx : (int32_t)UI::grid().cellW;
+    const int32_t w = surfaceWidthPx();
     return (w < h) ? w : h;
 }
 
@@ -305,6 +305,9 @@ void Card::build(lv_obj_t *parent) {
     // UI::unclipShadows(), shared with every other container that lets a
     // child's shadow out (the drawer's button rows, the tag row below).
     UI::unclipShadows(_root);
+    // A floating tag's side overhang comes out of the card's width, not out of
+    // the gap: see buildHeader() and tagSidePx().
+    lv_obj_set_style_pad_left     (_root, tagSidePx(), 0);
 
     if (cardHeaderIsTag(_hdrStyle)) {
         _tagRow = lv_obj_create(_root);
@@ -406,11 +409,6 @@ static lv_obj_t *makeStrip(lv_obj_t *parent) {
     return o;
 }
 
-// How far a floating pill sticks out past the card's side: the same amount it
-// rises above the card's top edge, which is the owner's whole description of
-// the style - "sticking half off the top and the same amount off the left".
-static int32_t floatOverhangPx() { return Card::headerHeight() / 2; }
-
 void Card::buildHeader() {
     const bool tag   = cardHeaderIsTag(_hdrStyle);
     const bool float_ = (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT);
@@ -431,30 +429,35 @@ void Card::buildHeader() {
         // - after the surface - so they draw ON TOP of it, and kept out of the
         // root's flex column. In the row above they would be drawn first and
         // the surface would paint over the half of each pill that lies on the
-        // card. Each hangs over its corner: up by the row, out by the same.
+        // card.
+        //
+        // The AREA pill hangs over the top-left corner, up by the row and out
+        // by the same. The out part is paid for INSIDE the cell: the root's
+        // left padding (build()) moves the card right by tagSidePx(), and the
+        // pill sits at the cell's own left edge, so the gap to the card on the
+        // left is the page's ordinary gap - the owner's rule, 2026-10-01.
         _header = makeStrip(_root);
-        _stale  = makeStrip(_root);
         lv_obj_add_flag  (_header, LV_OBJ_FLAG_IGNORE_LAYOUT);
-        lv_obj_add_flag  (_stale,  LV_OBJ_FLAG_IGNORE_LAYOUT);
         lv_obj_set_width (_header, LV_SIZE_CONTENT);
-        lv_obj_set_width (_stale,  LV_SIZE_CONTENT);
-        lv_obj_align     (_header, LV_ALIGN_TOP_LEFT,  -floatOverhangPx(), 0);
-        lv_obj_align     (_stale,  LV_ALIGN_TOP_RIGHT,  floatOverhangPx(), 0);
+        lv_obj_align     (_header, LV_ALIGN_TOP_LEFT, -tagSidePx(), 0);
+
+        // The STATUS pill (STALE, FAILED, PAUSED...) does NOT mirror it. The
+        // owner: it should stay within the card's visual borders - mirrored, it
+        // stuck out to the right and collided with the next card's area tag.
+        // Straddling the top edge instead collided with this card's OWN area
+        // tag on a narrow card (WS_P4_4B, "Outd" under STALE). So it sits
+        // wholly inside, in the top-right corner, level with the corner icon.
+        _stale = makeStrip(_root);
+        lv_obj_add_flag  (_stale, LV_OBJ_FLAG_IGNORE_LAYOUT);
+        lv_obj_set_width (_stale, LV_SIZE_CONTENT);
+        lv_obj_align     (_stale, LV_ALIGN_TOP_RIGHT, -UI::sc(UI::met().PAD),
+                          tagRowPx() + tagInsetPx() + UI::sc(UI::met().PAD));
 
         // Lying on the card, they cast their shadow ONTO it on Linen - the
-        // owner's hope for this style. Same paint as the attached pills.
+        // owner's hope for this style, confirmed on glass. Same paint as the
+        // attached pills.
         lv_obj_add_style (_header, UI::paint(UIPaint::PAINT_LIFT), 0);
         lv_obj_add_style (_stale,  UI::paint(UIPaint::PAINT_LIFT), 0);
-
-        // The pills stick out past the root's sides, and an overflow-visible
-        // object still clips its children to its coords plus its own
-        // ext_draw_size (see build() on the shadow). UI::unclipShadows() sized
-        // that for a shadow - zero on the dark schemes - so the root declares
-        // the overhang as well. LVGL keeps the largest size any handler asks.
-        lv_obj_add_event_cb(_root, [](lv_event_t *e) {
-            lv_event_set_ext_draw_size(e, floatOverhangPx() + UI::sc(UI::met().SHADOW));
-        }, LV_EVENT_REFR_EXT_DRAW_SIZE, nullptr);
-        lv_obj_refresh_ext_draw_size(_root);
     } else if (tag) {
         _header = makeStrip(_tagRow);
 
@@ -479,19 +482,42 @@ void Card::buildHeader() {
         lv_obj_set_width (_header, lv_pct(100));
         lv_obj_align     (_header, LV_ALIGN_TOP_MID, 0, 0);
 
-        // The band carries the card's own radius now that the card no longer
-        // clips it. Its lower corners round where they used to be square -
-        // the visible cost of not allocating a layer per card. See build().
-        lv_obj_set_style_radius(_header, UI::sc(UI::met().RADIUS), 0);
+        // ROUND TOP, STRAIGHT BOTTOM, AND NO LAYER. cards.md section 12: the
+        // band used to poke square corners past the card's rounded top, and
+        // clip_corner - the obvious fix - renders the card to a layer and froze
+        // WS_P4_5 (LESSONS.md). Giving the band the card's radius rounds all
+        // four of its corners, which the owner rejected on glass 2026-10-01:
+        // "the bottom of the colored band should be completely straight all
+        // the way across the card".
+        //
+        // So two plain rectangles: the band, rounded like the card (applyState
+        // sets it), and a SKIRT over its lower half with radius 0, in the same
+        // colour, squaring the bottom corners. One small object per card; no
+        // clipping, no layer. Created first so the labels draw over it. The
+        // band's side padding moves onto the labels so the skirt can span the
+        // band edge to edge.
+        lv_obj_set_style_pad_left (_header, 0, 0);
+        lv_obj_set_style_pad_right(_header, 0, 0);
+        _bandSkirt = lv_obj_create(_header);
+        lv_obj_remove_style_all(_bandSkirt);
+        lv_obj_add_flag  (_bandSkirt, LV_OBJ_FLAG_IGNORE_LAYOUT);
+        lv_obj_clear_flag(_bandSkirt, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_clear_flag(_bandSkirt, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_size  (_bandSkirt, lv_pct(100), lv_pct(50));
+        lv_obj_align     (_bandSkirt, LV_ALIGN_BOTTOM_MID, 0, 0);
+        lv_obj_set_style_bg_opa(_bandSkirt, LV_OPA_COVER, 0);
     }
 
     // Area left, STALE right - fixed in every mode, per cards.md section 2.
+    // In bar mode the band has no side padding (see the skirt above), so the
+    // labels carry the inset makeStrip() would have given them.
+    const int32_t inset = _bandSkirt ? UI::sc(7) : 0;
     _lblArea = lv_label_create(_header);
     lv_label_set_long_mode(_lblArea, LV_LABEL_LONG_DOT);
-    lv_obj_align (_lblArea, LV_ALIGN_LEFT_MID, 0, 0);
+    lv_obj_align (_lblArea, LV_ALIGN_LEFT_MID, inset, 0);
 
     _badge = lv_label_create(_stale ? _stale : _header);
-    lv_obj_align (_badge, _stale ? LV_ALIGN_CENTER : LV_ALIGN_RIGHT_MID, 0, 0);
+    lv_obj_align (_badge, _stale ? LV_ALIGN_CENTER : LV_ALIGN_RIGHT_MID, -inset, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -662,6 +688,15 @@ int32_t Card::tagInsetPx() const {
     if (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT)
         return Card::headerHeight() - Card::headerHeight() / 2;
     return 0;
+}
+
+int32_t Card::tagSidePx() const {
+    return (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT) ? Card::headerHeight() / 2 : 0;
+}
+
+int32_t Card::surfaceWidthPx() const {
+    const int32_t w = _cellWPx > 0 ? _cellWPx : (int32_t)UI::grid().cellW;
+    return w - tagSidePx();
 }
 
 // LG, then MD, then SM: the largest glyph that fits the hero band with a
@@ -870,12 +905,12 @@ void Card::applyState() {
         // should turn yellow around STALE".
         lv_obj_set_style_bg_color  (_header, UI::c(headerColor()), 0);
         lv_obj_set_style_bg_opa    (_header, LV_OPA_COVER, 0);
-        // THE CARD'S OWN RADIUS. This line said 0, and it ran after
-        // buildHeader() had set the radius - so the 2026-09-18 fix there never
-        // took effect, and a square band stuck out past the card's rounded
-        // corners on every card in bar mode. The owner, 2026-10-01: "can't
-        // stand how it sticks out in the corners!"
+        // THE CARD'S OWN RADIUS on top, the skirt squaring the bottom - see
+        // buildHeader(). This line said 0, and it ran after buildHeader() had
+        // set a radius, so the 2026-09-18 attempt never took effect and a
+        // square band stuck out past the card's rounded corners in bar mode.
         lv_obj_set_style_radius    (_header, UI::sc(m.RADIUS), 0);
+        if (_bandSkirt) lv_obj_set_style_bg_color(_bandSkirt, UI::c(headerColor()), 0);
         // Text in the card's BACKGROUND colour - dark on a light accent, light
         // on a dark one, without anyone picking per scheme. cards.md section 2.
         lv_obj_set_style_text_color(_lblArea, UI::c(p.SURFACE), 0);
@@ -939,7 +974,7 @@ void Card::applyDiagonal() {
     // a later restyle, with the card laid out, read the real size instead. The
     // owner caught it at 2.6: reboot with a card already N/A, swipe to it, and
     // the diagonal was in the wrong place until a knob forced a restyle.
-    int32_t w = cellWidthPx() > 0 ? cellWidthPx() : (int32_t)UI::grid().cellW;
+    int32_t w = surfaceWidthPx();
     int32_t h = surfaceHeightPx();
     const int32_t mw = lv_obj_get_width(_surface);
     const int32_t mh = lv_obj_get_height(_surface);
