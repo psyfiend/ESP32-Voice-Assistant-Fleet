@@ -328,3 +328,9 @@ proposes the running order for the rest of Phase 2 and Phase 3 in one table for 
 | §1, 2026-10-01 | **Clock card** with several faces, flipping as time changes; **weather card** with small animations | card library (Phase 2/4) |
 | §1, 2026-10-01 | **Night mode** pulls #74 (SNTP) ahead of 2.10? | ROADMAP order |
 | §1, 2026-10-01 | **Irrigation interface** (next summer): fleet firmware with an irrigation page set, or its own project? | later |
+| §1, 2026-10-01 | **Media player**: Music Assistant, Sendspin, Spotify (NINA reference), SoundCloud; album art | card library; new issue |
+| §1, 2026-10-01 | **Auto layout** (packer) with pins, reopening ROADMAP Q3b; dense clusters with a derived internal grid; grow-to-max then spread | `look-and-feel.md` §3.8; §4, §8 |
+| §1, 2026-10-01 | **Idle pre-rendered page pictures** for slide / fade / grow / wipe transitions | `look-and-feel.md` §3.9; §6 item 2 |
+| §1, 2026-10-01 | **Link cards and function pages** (weather page, all lights); navbar hot-links | §5 item 2, §6 item 4 |
+| §1, 2026-10-01 | **First-boot setup wizard** with a Wi-Fi QR code (NINA); web UI configures everything the sheet can; import/export after v1.0 | §8.2, §9 |
+| §1, 2026-10-01 | **A changed build sheet over a board with user edits**: keep, replace, or ask on the glass? | §9 item 4 (asked early, batch 3) |

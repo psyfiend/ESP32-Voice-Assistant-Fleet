@@ -38,7 +38,7 @@ cluster. Raised as a new §1 question (item 11) so it is settled before 2.11, no
 ### 1.3 Decided elsewhere, so §1 does not ask
 
 - **Stale / failed look** (item 8, in part): dimming rejected; a STALE tag, escalating; a failed
-  command jumps straight to the loud state (`cards.md` §3). Item 8 asks only what annoys him now.
+  command jumps straight to the loud state (`cards.md` §3). Item 8 asks only what annoys the owner now.
 - **Icons** (item 6): MDI is live fleet-wide (2.4). Item 6 asks only for dislikes.
 
 ## 2. The owner's two standing rules (2026-10-01)
@@ -50,12 +50,21 @@ Stated by the owner while answering batch 1, to be held against everything in th
 2. **"I'm a sucker for eye candy. I will be sad if the best we can do for a dashboard is a simple
    grid of uniformly sized squares."**
 
-**Claude's reading of rule 1, proposed - OPEN until the owner confirms:** every HA function of an
-entity we show is *reachable* on the board - on the card's face, in its popup, or as a service
-call - in domain priority order (lights, switches, covers, climate, sensors, weather, media,
-scenes/scripts). Some HA features cannot work at all inside 128 KB of `lv_mem` and an 8 KB
-websocket buffer (G1, G5): live camera video, maps, media artwork are the likely ones. Each is
-measured before being ruled out, never ruled out by assumption.
+**Rule 1, as agreed 2026-10-01:** every HA function of an entity we show is *reachable* on the
+board - on the card's face, in its popup, or as a service call - in domain priority order (lights,
+switches, covers, climate, sensors, weather, media, scenes/scripts). Anything ruled out is measured
+first, never ruled out by assumption.
+
+- **Ruled out, owner agrees:** live camera video (snapshots on events are acceptable; no cameras are
+  installed yet) and maps.
+- **Album art is IN - Claude retracted it.** Claude had listed it as unlikely; that was wrong. Art
+  comes from HA's media proxy over plain HTTP (not the websocket, so the 8 KB buffer is not the
+  limit), is decoded into PSRAM (the P4 has a hardware JPEG decoder; the S3s decode in software),
+  and a 300x300 picture is ~180 KB of PSRAM, not `lv_mem`. To be measured when the media card is
+  built.
+- **A media player is wanted** (owner): through Music Assistant, Sendspin, or one-offs for Spotify
+  (NINA has a Spotify page - `reference/`) or SoundCloud. New card / page kind; see §12 of the
+  interview.
 
 ## 3. Answers
 
@@ -91,7 +100,7 @@ The owner declined to pick three words ("both", "dynamic", "optional") and gave 
 **Claude's test for every later choice, proposed:** (1) at minimum size, state or function is
 unmistakable; (2) an effect is allowed when it is tied to something real - time passing, weather,
 an action the user took - never idle decoration; (3) every effect can be turned off per device.
-Three words proposed: **clear, alive, crafted.**
+Three words proposed: **clear, alive, crafted** (not objected to, 2026-10-01).
 
 ### 3.3 Motion (item 3) - ANSWERED 2026-10-01
 
@@ -159,3 +168,97 @@ clusters (a header with promoted values, members as tiles or rows; a plain card 
 one); **D** fluid shapes (a sky panel driven by `sun.sun`, a temperature dial with glowing light
 orbs, an L-shaped kitchen, garage doors drawn as doors). Plus one light and one sensor at 1x1 /
 2x1 / 2x2. Claude's framing: these are rungs of one ladder that can mix on a page, not rivals.
+
+**Owner, 2026-10-01: "your mockup is KILLING IT".** Answers:
+
+- **11a - B and C are the base.** D has interesting ideas; the specific layouts these responsive
+  cards could have are to be discussed separately before any is built.
+- **11b - who sets a card's size:** see §3.10 (authority) and §3.8 (auto layout). The owner reads
+  it as "who has the final say".
+- **11c - option 1: a slider on a card face takes the drag only when the finger starts on it**;
+  swipes anywhere else change the page. Horizontal is preferred over vertical for most card faces.
+  **Popups may use vertical sliders**, as HA's details dialog does for brightness and colour
+  temperature (`card-sheet.md` §3 already puts a big vertical slider on the light's Control tab).
+- **11d - rectangles.** "I honestly can't conceive of any reasons why an L shaped cluster would be
+  REQUIRED. Chosen, perhaps." L-shapes are deferred, not rejected. The real question the owner sees
+  is how members are arranged inside a rectangle - §3.8.
+
+### 3.8 Auto layout and dense clusters (owner, 2026-10-01) - design direction, OPEN items below
+
+The owner's thinking, close to the owner's own words:
+
+1. **A cluster does not cost the cells its members would cost alone.** Inside a shared border the
+   members lose their own borders and sit closer together, on the cluster's own **internal grid**:
+   4 standalone cards fill 2x2 cells, but a cluster in the same 2x2 cells might hold a 3x3 grid of
+   9 members. The tightest fit is to be found by test (perhaps 4 members across 3 cells, not 3
+   across 2). The cluster's **header** holds secondary entities (temperature, occupancy, lux) that
+   would otherwise each take a whole 1x1 cell - so clusters can be both more logical *and* denser.
+2. **Or more spacious:** a page for one room with fewer entities than cells keeps them in one
+   shared border, centred, with big margins.
+3. **Empty cells, when a page has too few cards:** cards grow, but only to a **predefined maximum
+   size**; past that they spread evenly over the grid with spacing and margins (as the HA swipe-view
+   mods the owner has used do). Four cards stretched to quarters of a 7" screen "will probably look
+   ridiculous". Which kinds grow, and in what priority - perhaps user-settable.
+4. **Auto-arrangement prefers proportional shapes.** In landscape, a 3x2 cluster over a 6x1; two
+   2x3 clusters look better than two 6x1. An odd count (5 members) raises: is 5x1 the only shape?
+   Where does the empty slot go, and why there?
+5. **The user can still demand a shape** (a 6x1 cluster), and the dashboard then rearranges the
+   other clusters and their shapes to fit.
+6. **Drag-and-drop of entities and of clusters** - "would absolutely love to see".
+
+**Claude, on what this means:**
+
+- **It reopens ROADMAP Q3b.** Q3b chose explicit placement plus a validator and rejected "a
+  constraint solver" because a layout that moves things by itself is hard to predict ("why did that
+  card move?"). Points 3-5 ask for exactly that kind of automatic arrangement. Proposed resolution:
+  **auto layout is the default; any card or cluster can be pinned** to a position and shape, and
+  pins are what Q3b's validator checks. The packer is **deterministic** - the same cards in the same
+  order on the same screen always give the same layout - so "why did it move?" always has the answer
+  "because something on the page changed". Drag-and-drop then means "change the order or set a pin
+  and re-run the packer". OPEN.
+- **The search is small.** A page holds roughly 3-12 blocks, each with a handful of candidate shapes,
+  so the packer can try every combination and score each (closest to square, fewest empty units,
+  reading order kept). To be prototyped in the browser first.
+- **The internal grid is derived, never declared** - the tokens rule. The smallest member tile is
+  `UI::minTouch()` (9 mm) plus its label, so the same cluster holds more members on the 7" (170 PPI,
+  60 px minimum) than on the P4_5 (294 PPI, 104 px).
+- **Odd member counts - Claude's recommendation:** no hole. The cluster's primary member (the first,
+  or one marked primary) takes two slots, so 5 members fill a 3x2 with one wide tile. OPEN.
+- **Growing cards** needs a **max span** per card kind beside ROADMAP Q4's `preferred_span` /
+  `min_span` / `priority`; a light can grow to its 2x2 face, a garage door perhaps to 2x1.
+
+### 3.9 Page transitions from pre-rendered pictures (owner, 2026-10-01) - feasible, to measure
+
+**Owner's idea:** while the board is idle (no taps for a while), build each page out of sight and
+take its picture, on a schedule, so a fresh picture of every page is always ready for a transition.
+Transitions wanted: **slide, dissolve / fade, shrink / grow, wipe**.
+
+**Claude:** this fits `pages.md` §7 and §6 (the overview needs the same pictures). What it costs:
+
+- **Time:** a card builds in ~7.5 ms plus ~8 ms of layout (`display-stack.md`), so a 15-card page is
+  ~250 ms during which `loop()` is busy. Done only after an idle period, and abandoned if a touch
+  arrives, so a tap is never kept waiting more than one card's build.
+- **`lv_mem`:** the hidden page and the visible one exist at the same time. Two numbers on record
+  disagree - ~715 B a card (2.3, measured on the CYD) and ~2.8 KB (`pages.md` §7) - and P4_5 has
+  ~36 KB free. One measurement settles whether a whole second page fits or must be built in parts.
+- **PSRAM:** a full-screen picture is 1.8 MB on `WS_P4_5` (1280x720, 16-bit); a set of pages is a
+  few MB. Comfortable on the P4s; to be checked on the S3s.
+- **The picture is a little old** when shown; the slide lasts ~250 ms and the live page replaces it.
+- All four effects work on pictures without the full-screen layer that froze P4_5: slide and wipe
+  move or clip the picture, fade sets the picture's opacity, shrink / grow scales it (the P4's PPA
+  accelerates that; on the S3s it is the effect to cut first).
+
+### 3.10 Navigation, authority, setup (owner, 2026-10-01) - recorded for §5, §6, §9
+
+- **Fewer cards per page makes navigation matter more:** a navbar with hot-links to pages or rooms;
+  a card of any size that **links to a room page** or a **function page** (a weather page, all the
+  house lights). Goes to interview §5 (the "go to" address) and §6 (navbar).
+- **Authority:** the build sheet "sets the stage for the first boot after flashing". After that,
+  the user's own configuration is what every ordinary restart returns to. A **hard reset** wipes
+  customizations back to factory settings. Consistent with ROADMAP Q2 (defaults < sheet < runtime
+  edits; factory reset = the sheet). Still to settle: what happens when a **changed** sheet is
+  flashed onto a board that already has user edits (interview §9 item 4). OPEN.
+- **Web UI parity:** "I don't see any reason why the web UI shouldn't be able to configure as much
+  as the build sheet." Import / export of configurations goes through the web UI, after v1.0.
+- **First-boot setup wizard** like NINA's: joins Wi-Fi via a QR code (`reference/` -
+  `wifi_qr_code.h`, `REFERENCE_PROJECTS.md`), sets the basics, then the web UI manages the device.
