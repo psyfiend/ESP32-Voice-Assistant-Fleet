@@ -431,9 +431,9 @@ void Card::buildHeader() {
         // the surface would paint over the half of each pill that lies on the
         // card.
         //
-        // The AREA pill hangs over the top-left corner, up by the row and out
-        // by the same. The out part is paid for INSIDE the cell: the root's
-        // left padding (build()) moves the card right by tagSidePx(), and the
+        // The AREA pill hangs over the top-left corner: up by the row, out by
+        // tagSidePx() (half that). The out part is paid for INSIDE the cell:
+        // the root's left padding (build()) moves the card right by it, and the
         // pill sits at the cell's own left edge, so the gap to the card on the
         // left is the page's ordinary gap - the owner's rule, 2026-10-01.
         _header = makeStrip(_root);
@@ -441,17 +441,17 @@ void Card::buildHeader() {
         lv_obj_set_width (_header, LV_SIZE_CONTENT);
         lv_obj_align     (_header, LV_ALIGN_TOP_LEFT, -tagSidePx(), 0);
 
-        // The STATUS pill (STALE, FAILED, PAUSED...) does NOT mirror it. The
-        // owner: it should stay within the card's visual borders - mirrored, it
-        // stuck out to the right and collided with the next card's area tag.
-        // Straddling the top edge instead collided with this card's OWN area
-        // tag on a narrow card (WS_P4_4B, "Outd" under STALE). So it sits
-        // wholly inside, in the top-right corner, level with the corner icon.
+        // The STATUS pill (STALE, FAILED, PAUSED...) FOLLOWS the header style -
+        // it floats on the top edge like the area pill - but never sticks out
+        // past the card's right edge. The owner, round three: the only thing
+        // wrong with the first version was the right overhang (it hit the next
+        // card's tag); moving it inside the card was a step too far. Inset by
+        // half the card's radius so it clears the rounded corner. A long area
+        // name gives way to it - see applyState().
         _stale = makeStrip(_root);
         lv_obj_add_flag  (_stale, LV_OBJ_FLAG_IGNORE_LAYOUT);
         lv_obj_set_width (_stale, LV_SIZE_CONTENT);
-        lv_obj_align     (_stale, LV_ALIGN_TOP_RIGHT, -UI::sc(UI::met().PAD),
-                          tagRowPx() + tagInsetPx() + UI::sc(UI::met().PAD));
+        lv_obj_align     (_stale, LV_ALIGN_TOP_RIGHT, -UI::sc(UI::met().RADIUS) / 2, 0);
 
         // Lying on the card, they cast their shadow ONTO it on Linen - the
         // owner's hope for this style, confirmed on glass. Same paint as the
@@ -561,6 +561,11 @@ void Card::restyle() {
     if (_header) {
         lv_obj_set_height          (_header, Card::headerHeight());
         lv_obj_set_style_text_font (_lblArea, UI::type().TAG, 0);
+        // ONE LINE, fixed. LV_LABEL_LONG_DOT only shortens text that overflows
+        // the label's HEIGHT; a content-height label wraps instead, and a
+        // narrowed area name ("Outdoor" beside STALE on WS_P4_4B) showed as its
+        // middle line, "doo". See the stale holder in applyState().
+        lv_obj_set_height(_lblArea, lv_font_get_line_height(UI::type().TAG));
     }
     lv_obj_set_style_text_font (_badge, UI::type().TAG, 0);
     if (_stale) lv_obj_set_height(_stale, Card::headerHeight());
@@ -690,8 +695,12 @@ int32_t Card::tagInsetPx() const {
     return 0;
 }
 
+// HALF the rise. The owner, round three (2026-10-01): sticking out as far to
+// the left as above made a 4x3 on the square boards narrow, so "split the
+// difference" - the same height above, half the distance to the side. It looks
+// more tacked on than precisely set, and gives the card a little width back.
 int32_t Card::tagSidePx() const {
-    return (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT) ? Card::headerHeight() / 2 : 0;
+    return (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT) ? Card::headerHeight() / 4 : 0;
 }
 
 int32_t Card::surfaceWidthPx() const {
@@ -939,6 +948,27 @@ void Card::applyState() {
         lv_obj_set_style_text_color(_badge, UI::c(p.SURFACE), 0);
         if (mark[0]) lv_obj_clear_flag(_stale, LV_OBJ_FLAG_HIDDEN);
         else         lv_obj_add_flag  (_stale, LV_OBJ_FLAG_HIDDEN);
+
+        // THE AREA GIVES WAY TO THE STATUS. Both pills share one edge, and on a
+        // narrow card (WS_P4_4B at 4x3) "Outdoor" and "STALE" overlapped. The
+        // status is the news, so the area name is shortened with an ellipsis
+        // while a status is showing, and gets its full width back after.
+        // Measured from the text, not from layout - see applyDiagonal() on why
+        // a card does not lay itself out per repaint.
+        int32_t maxW = LV_COORD_MAX;
+        if (mark[0]) {
+            const int32_t padH = UI::sc(7) * 2;   // makeStrip()'s side padding
+            lv_point_t ts;
+            lv_text_get_size(&ts, mark, UI::type().TAG, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+            const int32_t staleW = ts.x + padH;
+            const int32_t right  = (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT)
+                                 ? UI::sc(m.RADIUS) / 2 : 0;
+            maxW = tagSidePx() + surfaceWidthPx() - right - staleW - UI::sc(4);
+            if (maxW < padH) maxW = padH;
+        }
+        lv_obj_set_style_max_width(_header,  maxW, 0);
+        lv_obj_set_style_max_width(_lblArea, maxW == LV_COORD_MAX ? LV_COORD_MAX
+                                                                  : maxW - UI::sc(7) * 2, 0);
     }
 
     applyDiagonal();
