@@ -191,7 +191,10 @@ private:
     // knob on the System panel, and every one of them becomes a stored setting
     // at 4.1 - these are the values a fresh flash starts from, not decisions
     // that have been closed.
-    CardHeaderStyle _hdr    = CardHeaderStyle::HDR_BAR;
+    // FLOATING TAG since 2026-10-01 (design interview §1): the owner wants the
+    // tag as the default "until we fix the card header bar", floating
+    // preferred.
+    CardHeaderStyle _hdr    = CardHeaderStyle::HDR_TAG_FLOAT;
     // COMPACT by default since 2.7 round two - the owner, on glass: the "Seen"
     // line was less useful than expected (HA's own tiles do not surface it),
     // and without it the icons, disc and text all breathe. Auto and Full stay

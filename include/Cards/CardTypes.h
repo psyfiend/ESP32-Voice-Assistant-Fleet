@@ -134,11 +134,38 @@ inline bool cardStateMayDim(CardState s) { return s == CardState::ST_PAUSED; }
 // which the owner was explicit about: "in order for this to look good the
 // cards must not differ in shape or size because of the tag."
 // ---------------------------------------------------------------------------
+//
+// HDR_TAG_FLOAT (owner, 2026-10-01, design interview §1): the same pills, but
+// lying ACROSS the card's top corners - half above the card's top edge and
+// sticking out the same amount past its side - so a tag reads as resting on
+// the card and, on Linen, casts its shadow onto it. The owner's new default.
+// It costs the card exactly what HDR_TAG does (one headerHeight()), split
+// between the row above the card and an inset at the top of the body that
+// keeps the corner icon out from under the pill. Appended, so the values
+// already stored as uint8_t keep their meaning.
 enum class CardHeaderStyle : uint8_t {
     HDR_NONE = 0,   // plain text in the card's top strip
     HDR_BAR,        // a filled band inside the card, edge to edge
     HDR_TAG,        // pills hanging outside, above the card
+    HDR_TAG_FLOAT,  // pills lying across the card's top corners
 };
+
+// Either tag mode. Most questions - does this card have pills, does the cell
+// pay for a tag - have the same answer for both.
+inline bool cardHeaderIsTag(CardHeaderStyle s) {
+    return s == CardHeaderStyle::HDR_TAG || s == CardHeaderStyle::HDR_TAG_FLOAT;
+}
+
+// For logs and the System Doctor.
+inline const char *cardHeaderName(CardHeaderStyle s) {
+    switch (s) {
+        case CardHeaderStyle::HDR_TAG_FLOAT: return "floating tag";
+        case CardHeaderStyle::HDR_TAG:       return "tag";
+        case CardHeaderStyle::HDR_BAR:       return "bar";
+        case CardHeaderStyle::HDR_NONE:      return "none";
+    }
+    return "?";
+}
 
 // Which unit a temperature is DISPLAYED in, whatever the source reports.
 //

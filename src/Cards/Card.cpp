@@ -176,8 +176,9 @@ void Card::resolveVariant() {
     int32_t h = cellPx();
 
     // HDR_TAG hangs OUTSIDE the card, so the cell it leaves the body is
-    // shorter by exactly the tag.
-    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+    // shorter by exactly the tag. HDR_TAG_FLOAT pays the same total, half of
+    // it as a top inset inside the body - see tagRowPx().
+    h -= tagRowPx() + tagInsetPx();
 
     const UIType &t = UI::type();
     const int32_t need   = fullCellNeedPx(_hdrStyle, t.VALUE);
@@ -234,7 +235,7 @@ const lv_font_t *Card::valueFont() const {
 
 int32_t Card::shortSidePx() const {
     int32_t h = cellPx();
-    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+    h -= tagRowPx() + tagInsetPx();
     const int32_t w = _cellWPx > 0 ? _cellWPx : (int32_t)UI::grid().cellW;
     return (w < h) ? w : h;
 }
@@ -305,10 +306,10 @@ void Card::build(lv_obj_t *parent) {
     // child's shadow out (the drawer's button rows, the tag row below).
     UI::unclipShadows(_root);
 
-    if (_hdrStyle == CardHeaderStyle::HDR_TAG) {
+    if (cardHeaderIsTag(_hdrStyle)) {
         _tagRow = lv_obj_create(_root);
         lv_obj_set_width              (_tagRow, lv_pct(100));
-        lv_obj_set_height             (_tagRow, Card::headerHeight());
+        lv_obj_set_height             (_tagRow, tagRowPx());
         lv_obj_set_style_bg_opa       (_tagRow, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width (_tagRow, 0, 0);
         lv_obj_set_style_pad_all      (_tagRow, 0, 0);
@@ -382,6 +383,8 @@ void Card::build(lv_obj_t *parent) {
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_CLICKABLE);
     if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
         lv_obj_set_style_pad_top(_body, Card::headerHeight() + UI::sc(m.PAD), 0);
+    } else if (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT) {
+        lv_obj_set_style_pad_top(_body, tagInsetPx() + UI::sc(m.PAD), 0);
     }
 
     buildBody(_body);
@@ -403,8 +406,14 @@ static lv_obj_t *makeStrip(lv_obj_t *parent) {
     return o;
 }
 
+// How far a floating pill sticks out past the card's side: the same amount it
+// rises above the card's top edge, which is the owner's whole description of
+// the style - "sticking half off the top and the same amount off the left".
+static int32_t floatOverhangPx() { return Card::headerHeight() / 2; }
+
 void Card::buildHeader() {
-    const bool tag = (_hdrStyle == CardHeaderStyle::HDR_TAG);
+    const bool tag   = cardHeaderIsTag(_hdrStyle);
+    const bool float_ = (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT);
 
     // HDR_NONE builds no area holder at all. The owner was explicit: "no header
     // mode: Area is not displayed." There is nowhere in that mode for an area
@@ -417,9 +426,38 @@ void Card::buildHeader() {
     }
 
     // A tag's pills sit in the row above the card; a bar sits inside it.
-    _header = makeStrip(tag ? _tagRow : _surface);
+    if (float_) {
+        // A FLOATING tag's pills are children of the card's root, created here
+        // - after the surface - so they draw ON TOP of it, and kept out of the
+        // root's flex column. In the row above they would be drawn first and
+        // the surface would paint over the half of each pill that lies on the
+        // card. Each hangs over its corner: up by the row, out by the same.
+        _header = makeStrip(_root);
+        _stale  = makeStrip(_root);
+        lv_obj_add_flag  (_header, LV_OBJ_FLAG_IGNORE_LAYOUT);
+        lv_obj_add_flag  (_stale,  LV_OBJ_FLAG_IGNORE_LAYOUT);
+        lv_obj_set_width (_header, LV_SIZE_CONTENT);
+        lv_obj_set_width (_stale,  LV_SIZE_CONTENT);
+        lv_obj_align     (_header, LV_ALIGN_TOP_LEFT,  -floatOverhangPx(), 0);
+        lv_obj_align     (_stale,  LV_ALIGN_TOP_RIGHT,  floatOverhangPx(), 0);
 
-    if (tag) {
+        // Lying on the card, they cast their shadow ONTO it on Linen - the
+        // owner's hope for this style. Same paint as the attached pills.
+        lv_obj_add_style (_header, UI::paint(UIPaint::PAINT_LIFT), 0);
+        lv_obj_add_style (_stale,  UI::paint(UIPaint::PAINT_LIFT), 0);
+
+        // The pills stick out past the root's sides, and an overflow-visible
+        // object still clips its children to its coords plus its own
+        // ext_draw_size (see build() on the shadow). UI::unclipShadows() sized
+        // that for a shadow - zero on the dark schemes - so the root declares
+        // the overhang as well. LVGL keeps the largest size any handler asks.
+        lv_obj_add_event_cb(_root, [](lv_event_t *e) {
+            lv_event_set_ext_draw_size(e, floatOverhangPx() + UI::sc(UI::met().SHADOW));
+        }, LV_EVENT_REFR_EXT_DRAW_SIZE, nullptr);
+        lv_obj_refresh_ext_draw_size(_root);
+    } else if (tag) {
+        _header = makeStrip(_tagRow);
+
         // FLUSH with the card's left edge. They were inset and crowded each
         // other in the middle; the owner wants them "at the side edges of the
         // cards... and push inwards depending on width".
@@ -437,6 +475,7 @@ void Card::buildHeader() {
         lv_obj_add_style (_header, UI::paint(UIPaint::PAINT_LIFT), 0);
         lv_obj_add_style (_stale,  UI::paint(UIPaint::PAINT_LIFT), 0);
     } else {
+        _header = makeStrip(_surface);
         lv_obj_set_width (_header, lv_pct(100));
         lv_obj_align     (_header, LV_ALIGN_TOP_MID, 0, 0);
 
@@ -488,7 +527,10 @@ void Card::restyle() {
     // height below the corner. The owner's report, 2026-09-22.
     if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
         lv_obj_set_style_pad_top  (_body, Card::headerHeight() + UI::sc(m.PAD), 0);
+    } else if (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT) {
+        lv_obj_set_style_pad_top  (_body, tagInsetPx() + UI::sc(m.PAD), 0);
     }
+    if (_tagRow) lv_obj_set_height(_tagRow, tagRowPx());
 
     if (_header) {
         lv_obj_set_height          (_header, Card::headerHeight());
@@ -598,14 +640,28 @@ int32_t Card::midHeight() const {
 }
 
 int32_t Card::surfaceHeightPx() const {
-    int32_t h = cellPx();
-    if (_hdrStyle == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
-    return h;
+    return cellPx() - tagRowPx();
 }
 
 int32_t Card::bodyTopPx() const {
     const int32_t pad = UI::sc(UI::met().PAD);
-    return pad + (_hdrStyle == CardHeaderStyle::HDR_BAR ? Card::headerHeight() : 0);
+    return pad + (_hdrStyle == CardHeaderStyle::HDR_BAR ? Card::headerHeight() : 0)
+               + tagInsetPx();
+}
+
+// Half the pill above the card's edge, half on it. The ROW takes the upper
+// half so the page's ordinary row gap still separates a tag from the card
+// above it, exactly as in HDR_TAG.
+int32_t Card::tagRowPx() const {
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG)       return Card::headerHeight();
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT) return Card::headerHeight() / 2;
+    return 0;
+}
+
+int32_t Card::tagInsetPx() const {
+    if (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT)
+        return Card::headerHeight() - Card::headerHeight() / 2;
+    return 0;
 }
 
 // LG, then MD, then SM: the largest glyph that fits the hero band with a
@@ -741,7 +797,7 @@ void Card::applyState() {
     if (!_root) return;
     const UIPalette &p  = UI::pal();
     const UIMetrics &m  = UI::met();
-    const bool tag      = (_hdrStyle == CardHeaderStyle::HDR_TAG);
+    const bool tag      = cardHeaderIsTag(_hdrStyle);
     const uint32_t tc   = tagColor();
 
     // Staleness NEVER dims - cards.md section 3 rejects it outright, because a
@@ -814,7 +870,12 @@ void Card::applyState() {
         // should turn yellow around STALE".
         lv_obj_set_style_bg_color  (_header, UI::c(headerColor()), 0);
         lv_obj_set_style_bg_opa    (_header, LV_OPA_COVER, 0);
-        lv_obj_set_style_radius    (_header, 0, 0);
+        // THE CARD'S OWN RADIUS. This line said 0, and it ran after
+        // buildHeader() had set the radius - so the 2026-09-18 fix there never
+        // took effect, and a square band stuck out past the card's rounded
+        // corners on every card in bar mode. The owner, 2026-10-01: "can't
+        // stand how it sticks out in the corners!"
+        lv_obj_set_style_radius    (_header, UI::sc(m.RADIUS), 0);
         // Text in the card's BACKGROUND colour - dark on a light accent, light
         // on a dark one, without anyone picking per scheme. cards.md section 2.
         lv_obj_set_style_text_color(_lblArea, UI::c(p.SURFACE), 0);

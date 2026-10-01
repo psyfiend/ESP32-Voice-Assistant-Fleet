@@ -79,8 +79,7 @@ bool StateCard::onFill(int32_t fromBottom, int pct) const {
     if (pct <= 0)   return false;
     // The surface's height, from the page-supplied cell. A tag hangs outside
     // the card, so it is not part of the surface.
-    int32_t h = cellPx();
-    if (headerStyle() == CardHeaderStyle::HDR_TAG) h -= Card::headerHeight();
+    const int32_t h = surfaceHeightPx();
     return fromBottom * 100 < h * pct;
 }
 
@@ -210,10 +209,8 @@ void StateCard::render() {
     const int32_t pad    = UI::sc(m.PAD);
     const int32_t status = compact ? 0 : Card::statusBandHeight();
     const int32_t nameH  = showName ? lv_font_get_line_height(t.NAME) : 0;
-    int32_t surfH = cellPx();
-    if (headerStyle() == CardHeaderStyle::HDR_TAG) surfH -= Card::headerHeight();
-    const int32_t bodyTop = pad + (headerStyle() == CardHeaderStyle::HDR_BAR
-                                   ? Card::headerHeight() : 0);
+    const int32_t surfH   = surfaceHeightPx();
+    const int32_t bodyTop = bodyTopPx();
     const int32_t midBottom = pad + status + nameH + Card::midGap();
     const int32_t yName   = pad + status + nameH / 2 - nameShift;
     const int32_t yDisc   = (midBottom + (surfH - bodyTop)) / 2;
