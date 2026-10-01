@@ -226,6 +226,34 @@ The owner's thinking, close to the owner's own words:
   or one marked primary) takes two slots, so 5 members fill a 3x2 with one wide tile. OPEN.
 - **Growing cards** needs a **max span** per card kind beside ROADMAP Q4's `preferred_span` /
   `min_span` / `priority`; a light can grow to its 2x2 face, a garage door perhaps to 2x1.
+  *Superseded by Q-L3 below: single cards do not change span.*
+
+**Answers, 2026-10-01 (batch 3, Q-L1 to Q-L3):**
+
+- **Q-L1 - the owner's scenario, and the direction it sets.** First boot; the user opens the web
+  UI, connects HA, sees the recommended grid (6x3 on the 7B), picks 18 entities, groups them into
+  clusters by hand or turns on **"organize clusters by area"**, and saves. The owner's questions:
+  do we know how many cells that takes before saving, and do we show it? Can the best shape for
+  each cluster on its own stop the others fitting - so that the most entities per page needs an
+  odd shape like 6x1? And: Q3b's "why did that card move?" was really about **page overflow**
+  pushing cards onto a next page nobody can predict. The owner's priority: **no dead space** - "less
+  'oh no I put too many cards on the page' and more 'I need to find an entity to fill this
+  space!'" - so a fill-the-space arranger beats meticulous hand curation that any change breaks.
+  **Direction agreed:** an arranger fills the page; it searches the whole page at once, so shapes
+  are chosen together, not per cluster (yes, an odd shape sometimes wins - the playground shows
+  when); the **web UI previews the result before saving**; **overflow is reported, never spilled to
+  another page** (Q3b's "reports, never resolves" survives); pins remain for the user who wants a
+  6x1. Prototype: artifact **Layout Playground** (https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp).
+- **Q-L2 - odd member counts: DECIDED.** The short row's members stretch to share the row (5
+  members in a 3-wide cluster: the 2 in the short row take 1.5 slots each). The user picks whether
+  the short row is at the **top or bottom**. Drag-and-drop within a cluster: a dropped member
+  pushes the others along, wrapping to the next row. (Built that way in the playground.)
+- **Q-L3 - DECIDED: single cards never auto-span or change size class.** "EVERY card and cluster
+  should scale evenly to fill the space", as cards do today when rows and columns change - within
+  reason. So the arranger fills a page by choosing the **grid size** (bigger cells), within a
+  maximum cell size. OPEN: the playground also lets a *cluster* absorb leftover neighbouring cells
+  (cards never do) - the owner to say whether that reads as "filling" or as a cluster changing
+  shape on its own.
 
 ### 3.9 Page transitions from pre-rendered pictures (owner, 2026-10-01) - feasible, to measure
 
@@ -256,9 +284,46 @@ Transitions wanted: **slide, dissolve / fade, shrink / grow, wipe**.
 - **Authority:** the build sheet "sets the stage for the first boot after flashing". After that,
   the user's own configuration is what every ordinary restart returns to. A **hard reset** wipes
   customizations back to factory settings. Consistent with ROADMAP Q2 (defaults < sheet < runtime
-  edits; factory reset = the sheet). Still to settle: what happens when a **changed** sheet is
-  flashed onto a board that already has user edits (interview §9 item 4). OPEN.
+  edits; factory reset = the sheet).
+- **What a build sheet IS (owner, 2026-10-01, answering Q-L4) - this reframes interview §8-§9.**
+  "A build_sheet is nothing special, it's just a template with entity data and settings." Applying
+  one at compile time has exactly the same effect as importing an exported one. It holds page
+  layouts, settings, anything customizable; it is applied automatically on first boot, or at any
+  time by **import**. The device and the web UI both **export and import**, perhaps at levels -
+  "save all" (personal settings, layouts, entities) or "settings only" (Wi-Fi credentials, scheme).
+  A setting **"Restore previous settings when flashed"** keeps the user's configuration across a
+  firmware update; with OTA, a small UI can offer "save" or "hard reset" when updating. A user
+  could even build a whole configuration in a web UI before flashing - the public would flash stock
+  firmware and then upload it. The owner finds the name "build sheet" misleading for this.
+  **Claude's notes:** (1) the current configuration belongs in a LittleFS file, not NVS - the same
+  JSON shape as an exported template, so export is a file copy (interview §9 item 1's
+  recommendation, confirmed by this). (2) A normal `pio run -t upload` or OTA writes only the app
+  partition, so a LittleFS configuration **survives an ordinary firmware update by itself**; only a
+  full erase or a partition-table change loses it - that is when an off-device backup is needed.
+  (3) A changed template arriving with new firmware is then just "an import the user did not ask
+  for", and "Restore previous settings when flashed" decides it. OPEN: a better name than "build
+  sheet" (candidates: *profile*, *dashboard config*, *template*).
 - **Web UI parity:** "I don't see any reason why the web UI shouldn't be able to configure as much
   as the build sheet." Import / export of configurations goes through the web UI, after v1.0.
 - **First-boot setup wizard** like NINA's: joins Wi-Fi via a QR code (`reference/` -
   `wifi_qr_code.h`, `REFERENCE_PROJECTS.md`), sets the basics, then the web UI manages the device.
+
+### 3.11 The card tag (owner, 2026-10-01) - DECIDED, three styles
+
+The owner liked that the mocks' area tag partly overlaps its card. Decisions:
+
+- **The default card header becomes the TAG** ("until we fix the card header bar - can't stand how
+  it sticks out in the corners!"). **Floating** preferred.
+- **A new knob, Tag:**
+  - **Attached** - as today: the pill sits on the card's top edge, flush with its left edge.
+  - **Floating** - the pill hangs over the top-left **corner**, sticking out by the same amount
+    over the top and over the left, so it reads as lying on top of the card. With Linen's shadows,
+    the tag should cast a shadow on the card.
+  - **File folder** - like the tab of a manila folder: the card's left edge runs straight up to the
+    top of the tab, and a rounded inside corner joins the tab to the card's top edge.
+- **Shadow cost (Claude):** in LVGL the tag is its own object, so its shadow is a style on that
+  object, drawn onto whatever lies under it - no extra layer. Shadow cost grows with the shadow's
+  area, and a tag is small, so it should be cheap; to be measured with `/bench` on Linen.
+- **The header bar's corners** sticking out past the card's rounded corners is a bug to fix, not a
+  style - issue opened.
+- The mocks with all three: Layout Playground (§3.8), Tag switch.
