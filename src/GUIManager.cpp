@@ -414,8 +414,7 @@ void GUIManager::reportUiSection() {
     }
 
     SystemReport::line("  Card header: %s   variant: %s   area: %s",
-                       g._hdr == CardHeaderStyle::HDR_TAG  ? "tag"
-                     : g._hdr == CardHeaderStyle::HDR_BAR  ? "bar" : "none",
+                       cardHeaderName(g._hdr),
                        cardVariantName(g._variant),
                        g._showArea ? "shown" : "hidden");
 
@@ -911,9 +910,10 @@ void GUIManager::buildDashboard() {
     const int64_t tL3 = esp_timer_get_time();
 #endif
 
-    _pnlSystem.setHeaderLabel(_hdr == CardHeaderStyle::HDR_TAG  ? "Tag"
-                            : _hdr == CardHeaderStyle::HDR_BAR  ? "Bar"
-                                                                : "No hdr");
+    _pnlSystem.setHeaderLabel(_hdr == CardHeaderStyle::HDR_TAG_FLOAT ? "Float"
+                            : _hdr == CardHeaderStyle::HDR_TAG       ? "Tag"
+                            : _hdr == CardHeaderStyle::HDR_BAR       ? "Bar"
+                                                                     : "No hdr");
 
     // The page indicator: this page's title, centred in the bar, and a dot
     // per page. Set on every build so a knob that rebuilds cannot lose it.
@@ -1160,13 +1160,13 @@ void GUIManager::cycleHeader() {
     // than styled in restyle(), and that is correct - it is a structural choice
     // a card makes once, not a live style. CardDemo's own header button has
     // always worked this way for the same reason.
-    _hdr = (_hdr == CardHeaderStyle::HDR_TAG) ? CardHeaderStyle::HDR_BAR
-         : (_hdr == CardHeaderStyle::HDR_BAR) ? CardHeaderStyle::HDR_NONE
-                                              : CardHeaderStyle::HDR_TAG;
+    // Float -> Tag -> Bar -> None, starting from the default.
+    _hdr = (_hdr == CardHeaderStyle::HDR_TAG_FLOAT) ? CardHeaderStyle::HDR_TAG
+         : (_hdr == CardHeaderStyle::HDR_TAG)       ? CardHeaderStyle::HDR_BAR
+         : (_hdr == CardHeaderStyle::HDR_BAR)       ? CardHeaderStyle::HDR_NONE
+                                                    : CardHeaderStyle::HDR_TAG_FLOAT;
     rebuildDashboard();
-    Serial.printf("[Cards] header mode -> %s\n",
-                  _hdr == CardHeaderStyle::HDR_TAG ? "tag"
-                : _hdr == CardHeaderStyle::HDR_BAR ? "bar" : "none");
+    Serial.printf("[Cards] header mode -> %s\n", cardHeaderName(_hdr));
 }
 
 void GUIManager::nudgeColumns(int8_t steps) {

@@ -158,7 +158,7 @@ inline const PageSpec HA_PAGE = {
     .cards = HA_CARDS,
     .count = (uint8_t)(sizeof(HA_CARDS) / sizeof(HA_CARDS[0])),
 
-    .headerDefault = CardHeaderStyle::HDR_BAR,
+    .headerDefault = CardHeaderStyle::HDR_TAG_FLOAT,   // owner 2026-10-01
     .showArea      = true,
     .areaColor     = true,
 

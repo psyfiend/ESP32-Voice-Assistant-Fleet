@@ -374,6 +374,26 @@ protected:
     int32_t surfaceHeightPx() const;
     int32_t bodyTopPx() const;
 
+    // What a tag costs, split by where it is paid. HDR_TAG pays it all in the
+    // row above the card; HDR_TAG_FLOAT pays half there (the part of the pill
+    // above the card's edge) and half as extra inset at the top of the body
+    // (the part lying on the card). The two always sum to headerHeight() in
+    // either tag mode and to 0 otherwise, so a cell's budget is the same.
+    int32_t tagRowPx() const;
+    int32_t tagInsetPx() const;
+
+    // How far a floating tag sticks out past the card's LEFT side, and so how
+    // much narrower than its cell the card is. The owner, on glass 2026-10-01:
+    // the gap between cards is measured from the tag, so it must be equal on
+    // all sides - a tag sticking out sideways comes out of the card's width,
+    // exactly as one sticking out upwards comes out of its height. 0 in every
+    // other mode.
+    int32_t tagSidePx() const;
+
+    // The surface's width: the cell less tagSidePx(). What every width-based
+    // fit (the value face, the diagonal, the short side) must measure.
+    int32_t surfaceWidthPx() const;
+
 private:
     void buildHeader();
     void applyState();                 // repaint chrome for _state
@@ -408,7 +428,8 @@ private:
     // Two objects rather than one in tag mode because the two pills are sized
     // to their own content and sit at opposite ends of a strip the card does
     // not own - there is nothing for them to share.
-    lv_obj_t *_tagRow   = nullptr;   // HDR_TAG only: the strip above the card
+    lv_obj_t *_tagRow   = nullptr;   // tag modes only: the strip above the card
+    lv_obj_t *_bandSkirt = nullptr;  // HDR_BAR only: squares the band's bottom corners
     lv_obj_t *_header   = nullptr;   // area holder
     lv_obj_t *_stale    = nullptr;   // HDR_TAG only: the badge's own pill
     lv_obj_t *_lblArea  = nullptr;

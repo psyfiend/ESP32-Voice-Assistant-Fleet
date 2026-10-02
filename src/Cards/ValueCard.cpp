@@ -142,7 +142,7 @@ void ValueCard::render() {
     // smaller", #62. Measured with the font, not estimated per character.
     const lv_font_t *vf = valueFont();
     const int32_t cw = cellWidthPx() > 0
-                     ? cellWidthPx() - UI::sc(UI::met().PAD) * 2 : 0;
+                     ? surfaceWidthPx() - UI::sc(UI::met().PAD) * 2 : 0;
     if (cw > 0 && vf != t.VALUE_SM) {
         const char *du = cardDisplayUnit(*e, tempUnit());
         lv_point_t vs, us = {0, 0};
@@ -280,7 +280,7 @@ void ValueCard::render() {
         // settled). The text's own size and the page-supplied width answer the
         // same question the same way every time.
         const int32_t cw = cellWidthPx() > 0
-                         ? cellWidthPx() - UI::sc(UI::met().PAD) * 2 : 0;
+                         ? surfaceWidthPx() - UI::sc(UI::met().PAD) * 2 : 0;
         if (cw > 0) {
             lv_point_t fs, bs = {0, 0}, bi = {0, 0};
             lv_text_get_size(&fs, full, t.TAG, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
