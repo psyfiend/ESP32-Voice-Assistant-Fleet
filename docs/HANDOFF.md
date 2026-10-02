@@ -1,4 +1,4 @@
-# Handoff — 2026-09-29
+# Handoff — 2026-10-02
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was rewritten from scratch on
@@ -21,19 +21,46 @@ Fleet = MQTT/system/virtual cards), swiped with wrap-around; three colour scheme
 default, Fleet, Linen with real shadows); card types with state icons; an FPS/CPU overlay;
 `/screenshot` and `/bench` over HTTP.
 
-## Where the interview stands — 2026-10-01, night
+## What is next — the new session's job: BUILD 2.10a (#65)
 
-**§1 (look and feel) is CLOSED**; the docs branch was merged to `main` at its close. Answers:
-`docs/design/look-and-feel.md` - read its §2 first (the owner's two standing rules: keep all HA
-functionality; eye candy matters - "I will be sad if the best we can do is a simple grid of
-uniformly sized squares"), then §3.14, the summary of what was decided and what stays open.
+The design interview's §1 and §2 are closed; the owner chose to start building the card popup.
+**Read, in this order:** `CLAUDE.md` (the file-editing rule at the top), this file,
+`docs/design/card-sheet.md` **§11-12** (the decided popup - §1-10 are draft 2, superseded wherever
+§11 differs), `docs/design/look-and-feel.md` §2 and §3.14 (the owner's standing rules and §1's
+decisions), `docs/LESSONS.md` (layers, `lv_mem`, events not bubbling, HIDDEN on screen-sized
+objects). Then **open the artifact "Card Popup Mock"**
+(https://claude.ai/artifact/Lt6NmxMYLc7xrWzaomEqDm, v3) - it is the owner's approved design;
+build what it shows.
 
-**Next: §2, card popups (2.10)** - D1-D7 in `card-sheet.md` §10 are blocking. Several are
-pre-answered by §1: motion on long press (D1), the deck not on the default view (D2), the
-configuration as a LittleFS file shaped like the build sheet (D5).
-- **Artifacts:** "Beyond the Grid" (four layouts, card sizes) and **"Layout Playground"** (the
-  arranger prototype, interactive) - links in `look-and-feel.md` §3.7-3.8. The owner was playing
-  with the playground at the end of the session; ask what was learned.
+**2.10a's scope (card-sheet §9, as revised by §11):** long press opens a centred window over a dim
+fill (`bg_opa` on a scrim, never an object `opa`); the frame **grows** from the card as an empty
+rectangle, then the contents appear; header = X top left (back arrow on inner views), "Area >
+name" centred, history / members icons top right; modal (no page swipes, no edge gestures);
+closing by X, tap outside, drag down, auto-close 60 s; the **settings deck peeks up from the
+bottom of the screen** when the window opens and retracts with it (pathway 1); the window holds
+the entity, not the card. The light / switch controls themselves are 2.10b, HA attributes and
+calls 2.10c, stable ids and saving 2.10d, history 2.10e.
+
+**How to run it:** one feature branch off `main` (e.g. `feat/65-popup-frame`). Develop on
+**WS_P4_5 (COM15)** - the owner is away for the weekend with the laptop and that one board, so
+expect short sessions and keep each one ending in a commit. Before merge: the **all-nine compile
+gate** plus a look on glass (merge discipline below). WS_S3_4B stays unflashed until #69's watch
+ends. Measure `lv_mem` with the window open (G1 in the interview) and frame time during the grow
+(`/bench`).
+
+**After 2.10:** interview §3 (header slots, 2.8), §4 (groups - `group-cards.md` has the draft),
+§5-§9. ROADMAP §7 has the order.
+
+## Where the interview stands — 2026-10-02
+
+- **§1 look and feel: CLOSED**, merged. `look-and-feel.md`.
+- **§2 card popups: CLOSED 2026-10-02.** `card-sheet.md` §11-12. Settings model: precedence device
+  < page < area/group < card, inheritance per setting with the source named and a Reset, LOCKED
+  keeps ROADMAP Q2's meaning, the coloured label type is called **"band"**.
+- **Group taxonomy draft** for §4: `group-cards.md` (source x presentation x tap behaviour; Hue
+  group members verified from `light.office`'s attributes).
+- **Artifacts:** "Card Popup Mock" (the 2.10 design), "Layout Playground" (the arranger, #78),
+  "Beyond the Grid", "Linen Fill and Header Glyphs" - links in the design docs.
 - **Merged to `main` 2026-10-01 (`0de94d3`), all nine environments compiled (28 min gate):**
   - `feat/74-sntp` (#74): `TimeService`, SNTP + POSIX zone; the boot report waits up to 10 s for the
     first sync, and the Doctor's `Time:` line shows the time and source. Owner confirmed on WS_P4_5.
@@ -57,22 +84,6 @@ configuration as a LittleFS file shaped like the build sheet (D5).
 - **Reading a board's boot log without a monitor:** `scratchpad`-style script with pyserial that
   pulses RTS with DTR low (resets into a normal boot) and filters lines - PowerShell 5.1 strips
   quotes from `python -c "..."`, so write the script to a file.
-
-## What is next — the new session's job
-
-**The design interview, then 2.10 (#65).** The owner wants the next session to focus on 2.10 and
-what follows, not the display.
-
-1. **Run the interview**: `docs/design/interview-phase2-3.md`. Its §0.1a is the protocol - read it
-   first. It produces the blueprint for 2.8, 2.10, 2.11 and Phase 3. §1 item 10 holds the owner's
-   notes from glass on 2026-09-29 (Linen card fill, a more visible Wi-Fi icon, chrome text too small
-   -> #73, hero value size per grid, rotation as a setting -> #71) - bring them in, do not re-ask.
-2. **2.10 card popup groundwork (#65)** - design drafted in `docs/design/card-sheet.md` (draft 2),
-   decisions D1-D7 in its §10 are blocking.
-3. Then **2.8 header slots (#19)** - battery glyphs already designed (artifact "Fleet Status
-   Glyphs", linked on #19), data from #72. Then **2.11 group cards (#66)**, then **3.1 schema (#20)**.
-
-ROADMAP §7 has the same order.
 
 ## Fires still burning — each has an owner doc or issue, none needs the next session
 

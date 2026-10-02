@@ -167,3 +167,170 @@ description is 2.11's. Its header of promoted values (the area's temperature and
 | **D5** | Card settings before the build sheet exists | Saved on the board, keyed by a stable card id, designed to become overrides at 3.1 |
 | **D6** | Auto-close after idle | **60 s** |
 | **D7** | Colour choice | Hue + swatches first (LVGL 9 has no colour wheel); a drawn wheel later if wanted |
+
+## 11. Interview §2 answers (owner, 2026-10-01)
+
+**Reference:** the owner's HA details dialog for the Office light group ("Desk", a Hue group) -
+header with area and name, close / history / settings (gear) / menu icons; "100%" and "22 minutes
+ago"; a big vertical brightness slider; a mode row (power, brightness, colour wheel, colour
+temperature); eight swatches; then each member light as a row with its own slider. This is the
+layout the popup mock follows, turned sideways for landscape.
+
+- **D2 - tabs AND the deck, for different things (refines the recommendation).** The deck "isn't
+  part of the default dashboard" meant there is no reason for it on a standard page; inside a
+  popup, or on a special page (an area page holding one cluster of the room), deck panels can be
+  useful. **Tabs** hold the entity's HA-style features - controls, history, colour, show / hide.
+  **Deck panels** hold settings about the device or dashboard: style / scheme, header colour, an
+  alternate cluster name, renaming entities, which entities feed the card header (temperature
+  etc.) - the things behind HA's gear icon. Claude's notes: the deck then becomes a component a
+  popup or page can carry (interview §5 item 4 - "inside popups" - answered by this); on a 3.5-4"
+  screen a deck panel opened inside a popup covers most of its body, which is acceptable for
+  settings; `lv_mem` for a deck inside a popup is to be measured with the rest of the window (G1).
+- **D5 - RECOMMENDED, accepted.** Saved into the configuration file (LittleFS, the build sheet's
+  shape - `look-and-feel.md` §3.10), keyed by a stable card id, written when the popup closes.
+- **Which kinds first (item 2) - accepted:** lights and switches (2.10a-c), sensors after HA
+  history (2.10e), media / climate / the rest with their card types.
+- **Custom name (item 9) - an on-device keyboard IS wanted, as an option.** "Less than ideal but
+  should be available for those that want it." The web UI remains the comfortable way. Plus a
+  **label choice: HA device name / custom name / status (state) / no label.** (Today's label modes
+  are name / state / none - this adds "custom".) Claude's notes on the keyboard: LVGL's keyboard
+  widget costs some `lv_mem` only while it is open; the panels draw ASCII plus the degree sign
+  only, so a name typed with other characters would show boxes - the keyboard should offer ASCII.
+- **Mock for the next batch:** artifact **Card Popup Mock** (https://claude.ai/artifact/Lt6NmxMYLc7xrWzaomEqDm)
+  - grow vs pop (D1), a switch landing on Activity (D3), group members in the window with
+  long-press-to-drill-in (D4), X / tap outside / drag down plus an auto-close timer (D6), hue strip
+  plus swatches and a colour-temperature strip (D7), the gear opening a settings deck inside the
+  window (D2). **Found while building it (Claude):** the P4_5 is ~110 x 62 mm, so at touch-safe
+  sizes HA's dialog does not fit in one view - in landscape the tabs move into the header row and
+  the members get their own column; on the 4B the members scroll under the swatches.
+### 11.1 Batch 2 answers (owner, 2026-10-02) - the popup layout
+
+"Card Popup Mockup is terrific! Form and function is excellent!" Decisions:
+
+- **D1 - GROW.** "Looks amazing in the mockup!"
+- **D3 - open directly where actions can be taken**, with **no toggle in the header**. A switch's
+  window opens on its control: the hero IS a big toggle (HA's own switch dialog: "On, 2 seconds
+  ago", a tall toggle). Activity is behind the history icon.
+- **D4 - members NOT on the first view** (crowded). A card representing several members gets a
+  **members icon** (the multi-bulb hero icon) that navigates to a members view.
+- **D6 - all four**: X, tap outside, drag down, auto-close.
+- **D7 - hue control yes; the swatches move OFF the first view** into the colour (RGB) mode.
+- **Layout (owner's proposal, built in mock v2):**
+  - **Top left: X** to close. Any view reached from the first one (history, members, a member's
+    own controls) shows a **back arrow** there instead.
+  - **Top middle: "Area > entity"**, or "Group > entity" for a member.
+  - **Top right: navigation icons** like HA's - the graph icon for history; the multi-bulb icon
+    when the card has members.
+  - **The hero is the control** - the slider, or the toggle. **Tapping anywhere along the slider
+    moves it there**; optionally a setting "tap the slider to toggle on/off" - feasible, because a
+    press that does not move is told apart from a grab-and-drag (mock v2 has both).
+  - **Beside the hero:** the label of what it controls ("Brightness", "Colour", "Temperature") or
+    the state; under it the value (percent / state / kelvin); under that the **selector:
+    Power | Brightness, Colour, Temperature** with a small vertical divider after Power, as in HA.
+    Power makes a header toggle redundant. Modes the light does not support are hidden (from HA's
+    `supported_color_modes`) - a dimmable-only light shows Power | Brightness (answers §2 item 3).
+  - Everything justified against the hero, the whole group centred in the window.
+- **The deck in a popup - pathway 1 (the owner's preference), built in mock v2:** when the window
+  springs up, the deck panel animates up from the bottom of the screen to show only its header
+  ("SETTINGS"), as the hidden system header peeks down when swiped. Tap the header to open it; tap
+  the header or anywhere inside the window to fold it back; a tap outside the window closes the
+  panel and the window together. On close the header retracts so it is out of sight by the time the
+  window has gone - quickly if the panel was open, more slowly if only the header showed.
+  (Pathway 2, a gear icon with the deck fully hidden, is the alternative not chosen.)
+- **Sensor cards get a second deck panel header - CHART:** span (24 h / 12 h / 6 h / 1 h), min / max
+  on the card, legend, chart behind the card, units.
+- **Hue groups verified (owner, Developer Tools):** `light.office` carries `is_hue_group: true`,
+  `hue_type: room`, `lights:` (names), **`entity_id:` (the member entity ids)**, and
+  **`hue_scenes:`** (Nightlight, Energize, Bright, Honolulu, Relax, Concentrate, Read), plus
+  `supported_color_modes: [color_temp, xy]`. Members come straight from attributes; no registry
+  lookup. Mock v2 shows the scenes as chips in the colour mode - OPEN whether they belong there.
+
+### 11.2 Batch 3 answers (owner, 2026-10-02 night)
+
+- **Mock bug the owner caught:** Desk's settings offered "Card header shows (temperature /
+  occupancy)" - because the mock's rule was "has members". The setting belongs only to clusters
+  and areas that have such a member. Fixed in mock v3.
+- **Hue scenes:** the owner wonders whether they belong on the first view, for one-tap scene
+  loading, and suggests a tap or long press could be configured to **load a specific scene or
+  cycle through scenes** (as with the cycling temperature group). Second choice: **a target in the
+  selector - Power | Brightness / Colour / Temp / Scenes**. Claude's recommendation, built in mock
+  v3: **the selector target** (one tap away, the same place as every mode - uniform navigation, the
+  owner's own rule below) **plus** the per-card tap behaviour "load scene X" / "cycle scenes"
+  (`group-cards.md` §2C) for true one-tap loading from the dashboard. OPEN for confirmation.
+- **Colour presets (item 4) - agreed:** eight defaults like HA's; long-press a swatch to save the
+  current colour into it, per light, in the configuration file.
+- **History (item 6) - agreed:** 24 h default with 1 / 6 / 12 h; 10 activity rows then "Show
+  more"; fetched from HA when the view opens.
+- **Virtual / system cards (item 7) - agreed**, and the reason generalises: **"I want all cards to
+  behave as uniformly as possible so you don't need to remember navigation for every type of
+  card."** Long press always opens a window; the same header, the same back arrow, the same deck.
+- **Light effects (item 5): later.**
+
+### 11.3 Settings scope (item 10) - the owner's model, and Claude's review
+
+**The owner's proposal (2026-10-02):**
+
+- **Separate the tag from the area.** The tag's shape is the **card label type** (tag / float /
+  band / folder / none); its words are the **card label text**, defaulting to the card's area. A
+  card with no area still shows its label type, with blank text.
+- **Inheritance as per-card checkboxes:** "Disable page inheritance", "Disable area or group
+  inheritance", "LOCKED - disable all inheritance".
+- **Per page (every card on it):** variant (default compact), label type (default float), label
+  text on/off (default on = area), entity label (name / state / none; default name), colour
+  scheme, fill (default fill).
+- **Per area or group:** label type, label text, label colour. Not changeable on a card unless it
+  has disabled inheritance; re-enabling restores the area's settings.
+- **Per card within a group:** variant, entity label, visibility.
+- **Per card that has blocked inheritance:** variant, label type, label text (area / custom),
+  label colour (ideally not one already used by another area or card), entity label (name /
+  state / none / custom), visibility.
+- "Much of this is a moot point as soon as clusters enter the picture" - tiles inside a cluster
+  wear no per-card decoration.
+
+**Claude's review - viable, and mostly a good idea; four corrections:**
+
+1. **Precedence must be stated.** Page and area both set label type. Proposed: **device defaults <
+   page < area / group < card** - the more specific wins - which is ROADMAP Q2's order with the
+   area added.
+2. **Inherit per SETTING, not per card.** Instead of checkboxes that must be ticked before a value
+   can change, every setting shows where its value comes from - "Float (from page)" or "Band (from
+   Kitchen)" - and changing it on the card simply overrides that one setting, with a **Reset**
+   that returns it to inheriting. Same safety (the source is always named; reset restores), one
+   fewer step, and no hidden state where a control refuses to change. It is how the build sheet
+   already works (`*Defaults` < sheet < runtime overrides, stored sparse). The owner's "disable
+   all inheritance" becomes a "Detach" button that copies the current values onto the card.
+3. **"LOCKED" is already taken.** ROADMAP Q2's lock means the opposite: a PARENT forbids children
+   to override (a kiosk page, a guest board). Keep that word for that.
+4. **Unique label colours: warn, do not forbid.** A palette has only so many colours the owner can
+   tell apart (G9); forbidding a used colour runs out fast. Show "Kitchen uses this colour" and let
+   the user choose.
+
+**DECIDED (owner, 2026-10-02):** "I'll go with your suggestions regarding the corrections."
+So: precedence **device defaults < page < area / group < card**; inheritance **per setting**, with
+the source named and a **Reset**; "Detach" instead of a per-card "disable all inheritance";
+**LOCKED** keeps ROADMAP Q2's meaning; label colours **warn** rather than forbid. A card with no
+area **hides its pill and keeps its space** (today's behaviour - cards stay lined up). The coloured
+label type is called **"band"** - "bar" is confusing beside the system header bar. Label types:
+**tag / float / band / folder / none**. (The code still says `HDR_BAR`; rename when it is next
+touched.)
+
+## 12. Section 2 CLOSED - 2026-10-02
+
+**Decided:** D1 grow; D2 tabs for the entity's features, deck panels for dashboard settings; D3
+open on the control, no header toggle; D4 members behind their own icon; D5 settings in the
+configuration file by stable card id, written on close; D6 X / tap outside / drag down /
+auto-close; D7 hue control, swatches in the colour mode. The window layout is the owner's (§11.1),
+the deck peeks up from the bottom (pathway 1), sensors get a CHART panel, scenes are a selector
+target plus a per-card tap action (§11.2 - recommended, not objected to), presets / history /
+uniform popups (§11.2), the settings model (§11.3).
+
+**Still open, none blocking 2.10a:** the group taxonomy's confirmations (`group-cards.md` §4, for
+interview §4); `render_template` for area members (verify); light effects (later).
+
+**The build order is unchanged** (§9): 2.10a frame, 2.10b light controls, 2.10c HA attributes
+and calls, 2.10d stable ids + saving, 2.10e history - with this section's answers replacing draft
+2's guesses wherever they differ.
+
+- **D4 - opened a larger question: what kinds of "group" exist.** Recorded and answered as a draft
+  taxonomy in `group-cards.md` (source x presentation x behaviour). The members-inside-the-popup
+  part of D4 matches the HA reference above.
