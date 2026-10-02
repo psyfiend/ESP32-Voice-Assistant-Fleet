@@ -68,6 +68,8 @@ owner's brain dump on card popups (`card-sheet.md`). **It does not reopen decisi
 
 ## 1. Look and feel - the whole product  → `docs/design/look-and-feel.md`
 
+**CLOSED 2026-10-01** - summary and what stays open: `look-and-feel.md` §3.14.
+
 The answers here steer every later section, so they come first.
 
 1. **Who looks at these screens, from where, for how long?** (Walking past at 2 m? Standing at arm's
@@ -84,13 +86,17 @@ The answers here steer every later section, so they come first.
    clock, by room light (a lux sensor), or by HA's sun? *Screen dimming was pulled forward from 4.1
    as a daily-use problem.* **ANSWERED 2026-10-01 -> `look-and-feel.md` §3.4**
 5. **Sound and touch feedback.** Boards have speakers. A soft click on tap, nothing, or only on
-   errors? **Recommendation:** off by default, a setting.
+   errors? **Recommendation:** off by default, a setting. **ANSWERED: off by default (§3.12)**
 6. **Icons.** MDI everywhere (HA's own set, today) - any you dislike, want bigger, or want replaced?
+   **ANSWERED: no complaints; custom HA icon packs wanted, #83 (§3.13)**
 7. **Dense vs airy.** On the big panels, more cards per page or larger cards? (`TARGET_CARD_W` today.)
+   **ANSWERED by the arranger direction (§3.8) and uniformity (§3.13)**
 8. **What does "broken" look like?** Unavailable / stale / offline entities: greyed, struck, a badge,
    hidden? *Today: STALE tag, greyed.* Anything that annoys you now?
+   **ANSWERED: status pills follow the header style, never inside a floating-tag card (§3.11, §3.13)**
 9. **Reference images.** Dashboards you like the look of (HA themes, Tile cards, Mushroom, a
-   product). Screenshots welcome - worth more than adjectives.
+   product). Screenshots welcome - worth more than adjectives. **IN PART: the irrigation
+   dashboard (§3.5); more welcome any time**
 10. **Owner's notes, 2026-09-29 - bring these into the section, do not re-ask what they state.**
     - **Linen:** find a better card fill colour. **Wi-Fi header icon:** more visible (a box or a
       background behind it?).

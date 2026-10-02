@@ -21,19 +21,16 @@ Fleet = MQTT/system/virtual cards), swiped with wrap-around; three colour scheme
 default, Fleet, Linen with real shadows); card types with state icons; an FPS/CPU overlay;
 `/screenshot` and `/bench` over HTTP.
 
-## Where the interview stands — 2026-10-01, 4 am
+## Where the interview stands — 2026-10-01, night
 
-**§1 (look and feel) is about two-thirds done**, on branch `docs/interview-s1-look-and-feel`
-(not merged; merge at the end of §1). Answers: `docs/design/look-and-feel.md`. Read its §2 first:
-the owner's two standing rules (keep all HA functionality; eye candy matters - "I will be sad if
-the best we can do is a simple grid of uniformly sized squares").
+**§1 (look and feel) is CLOSED**; the docs branch was merged to `main` at its close. Answers:
+`docs/design/look-and-feel.md` - read its §2 first (the owner's two standing rules: keep all HA
+functionality; eye candy matters - "I will be sad if the best we can do is a simple grid of
+uniformly sized squares"), then §3.14, the summary of what was decided and what stays open.
 
-- **Answered:** items 1-4 (who / feel / motion / night), 11 (beyond the grid: direction agreed), and
-  the arranger questions Q-L1..Q-L3, the build sheet's nature (Q-L4), card tags.
-- **Still to ask in §1:** item 5 (sound), 6 (icons), 7 (dense vs airy - mostly answered by the
-  arranger), 8 (broken look), 10's fixes (Linen card fill, Wi-Fi icon, chrome text #73, hero size
-  per card size), per-device viewing distance, the three words ("clear, alive, crafted" - not
-  objected to), and Q-L3's open point: may a *cluster* absorb leftover cells?
+**Next: §2, card popups (2.10)** - D1-D7 in `card-sheet.md` §10 are blocking. Several are
+pre-answered by §1: motion on long press (D1), the deck not on the default view (D2), the
+configuration as a LittleFS file shaped like the build sheet (D5).
 - **Artifacts:** "Beyond the Grid" (four layouts, card sizes) and **"Layout Playground"** (the
   arranger prototype, interactive) - links in `look-and-feel.md` §3.7-3.8. The owner was playing
   with the playground at the end of the session; ask what was learned.

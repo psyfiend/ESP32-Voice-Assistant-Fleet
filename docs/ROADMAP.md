@@ -662,7 +662,7 @@ recommendation and await the owner's yes.
 
 | | | |
 |---|---|---|
-| 1 | **The design interview, then 2.10** (#65) | `docs/design/interview-phase2-3.md` (Claude facilitates, protocol §0.1a): the blueprint for 2.8, 2.10, 2.11 and Phase 3. **§1 in progress** - answers in `docs/design/look-and-feel.md`. 2.10's design is drafted in `docs/design/card-sheet.md` (draft 2); fonts are #73 |
+| 1 | **The design interview, then 2.10** (#65) | `docs/design/interview-phase2-3.md` (Claude facilitates, protocol §0.1a): the blueprint for 2.8, 2.10, 2.11 and Phase 3. **§1 CLOSED 2026-10-01** - answers in `docs/design/look-and-feel.md` (summary §3.14); **§2 (card popups) next**. 2.10's design is drafted in `docs/design/card-sheet.md` (draft 2); fonts are #73 |
 | 1a | ~~**Floating tag** (#80)~~ | **MERGED 2026-10-01** (`0de94d3`, all-nine gate). File folder style still open on #80 |
 | 1b | ~~**#74 SNTP**~~ | **MERGED 2026-10-01** with the tag and Linen round two. RTC fallback and settings still open on #74 |
 | 2 | **2.8 header slots** (#19) | before group cards, whose header IS the slot mechanism. Battery glyphs designed (artifact "Fleet Status Glyphs"); data from #72 |

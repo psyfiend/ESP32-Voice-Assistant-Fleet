@@ -447,3 +447,50 @@ The owner liked that the mocks' area tag partly overlaps its card. Decisions:
   running the tag build, which has no SNTP, and the boot report fired at link-up, a second before
   the first sync. Fixed on `feat/74-sntp`: the boot report waits for the first sync (up to 10 s).
   "If time is actually working then it should always be shown in this location at a minimum."
+
+### 3.13 Batch 5 - text sizes, uniformity, cluster header, icons (owner, 2026-10-01 night)
+
+- **Chrome text (item 10, #73) - recommendation accepted.** The owner's own framing: text is "more
+  or less fine for most devices, apart from the 4880", where the card area tag, header bar, deck
+  panels and system panel are quite small; and on the 7" boards text could be bigger whenever a
+  page has 6 or fewer columns or 3 or fewer rows. **Decision:** chrome roles (header device name
+  and page title, panel titles, captions) get millimetre targets like the card roles - **titles
+  2.5 mm, captions 2.0 mm** - which fixes the 4880 without a per-board multiplier (its panel
+  titles go from 14 to ~21 px). A device name that does not fit is shortened, never wrapped (the 4B
+  header wraps today). The 7" "bigger when roomy" case is the card side - see uniformity below.
+  Numbers to be checked on glass when #73 is built.
+- **Area tag text: 2.2 mm** (was 1.90). The owner: clusters will carry more of the density than
+  single cards, so the area text deserves to be a bit bigger.
+- **Uniformity: "Cards should be uniform in font/icon size as much as possible."** One value face
+  per page - the largest every value card on it can take, with the corner icon counted in the fit -
+  stepping up to a larger face when EVERY card can take it (the 7" roomy pages). Icons follow the
+  same rule: one hero / corner icon size per page. Close / far viewing distance scales the set.
+- **Cluster header content: status only, no descriptive words.** Occupancy as an icon (filled
+  when present, outline when clear); temperature as its value; lux as its value; units only if the
+  user selected them. (The playground's "Occupied" / "Clear" words are gone from the rule.)
+  **How the header icons are encapsulated** - in a circle, a rounded square, or naked - is OPEN for
+  2.8. The owner's leaning: on a coloured bar, put them in a circle or rounded square matching the
+  system header's status-icon style; perhaps a user choice (round / rounded square / naked).
+  Claude's recommendation: ONE "status icon style" setting shared by the system header and every
+  card / cluster header, since 2.8 builds them as one slot system.
+- **Icons (item 6): no complaints with MDI.** But: the owner runs a **custom Philips Hue icon pack
+  in HA** and wants those icons on the glass where an entity uses one - #83.
+- **Broken states (item 8):** "I don't think the broken states should be inside the card when in
+  tag / floating mode." That matches what is merged: in floating mode the status pill floats on the
+  top edge (round three); inside the card was round two, superseded before the merge. The
+  CYD_P4_4880 still runs an older tag build and does not show the merged behaviour. OPEN only if the
+  owner saw it inside on a board running `main`.
+
+### 3.14 Section 1 closed - 2026-10-01
+
+**Decided:** who looks and from where (§3.1), the feel rule and "clear, alive, crafted" (§3.2),
+motion for the P4s with S3 cuts (§3.3), night mode (§3.4, #75), card sizes and the arranger
+direction with clusters (§3.6-3.8, #78), transitions from pre-rendered pictures (§3.9, #79), the
+build sheet as a configuration template (§3.10), the floating tag (§3.11, merged), Linen C+ and the
+"on" colour (§3.12, merged; earth-tone direction), sound off by default, close / far viewing
+distance, text targets and uniformity (§3.13, #73), cluster headers clear unless Bar mode.
+
+**Open, with what settles them:** the arranger's scoring weights (play with the Layout Playground);
+cluster-header icon encapsulation (2.8, #19); a better Linen "on" between olive and terracotta
+(two or three candidates on glass); folder-tab style on the device (#80); panel colour per board
+(#82); custom HA icon packs (#83).
