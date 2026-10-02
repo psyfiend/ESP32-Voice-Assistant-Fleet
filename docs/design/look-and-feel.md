@@ -424,3 +424,20 @@ The owner liked that the mocks' area tag partly overlaps its card. Decisions:
   as a filled white disc (active) vs a faint outline (idle). OPEN: temperature and lux icon-only
   too, or keep the number? (#66)
 - Mock: artifact **Linen Fill and Header Glyphs**, round 2 (same link as §1.1).
+
+**Picks from round 2 (owner, 2026-10-01 night):**
+
+- **Linen: C+** - ground `CFC4B2`, card a hair darker `F3EEE4`.
+- **"On" colour on Linen: butter (`F1D27E`) as the default**; burnt amber, terracotta, copper and
+  olive (3-7 in the mock, with butter) to be **choices the user can pick** once settings exist
+  (4.1). Built on `feat/linen-butter`: `ST_ACTIVE` is now per scheme, the dark schemes keep the
+  orange. Known gap: with the card fill switched off, butter text on cream is faint.
+- **Header icons: 2+ (stronger chip), 4 (filled circle) and 2+ with the clock** are all good -
+  for 2.8 (#19).
+- **Cluster header bars are CLEAR unless the page is in Bar mode** - "users (I) might not want
+  color in the header unless intentionally enabled". Clear = the scheme's own text and icon
+  colours, a hairline under it, no area colour. Playground v4.
+- **SNTP sign-off condition:** the System Doctor showed "Time: not set". Two causes - the P4_5 was
+  running the tag build, which has no SNTP, and the boot report fired at link-up, a second before
+  the first sync. Fixed on `feat/74-sntp`: the boot report waits for the first sync (up to 10 s).
+  "If time is actually working then it should always be shown in this location at a minimum."
