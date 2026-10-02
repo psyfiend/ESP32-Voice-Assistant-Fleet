@@ -196,6 +196,13 @@ layout the popup mock follows, turned sideways for landscape.
   are name / state / none - this adds "custom".) Claude's notes on the keyboard: LVGL's keyboard
   widget costs some `lv_mem` only while it is open; the panels draw ASCII plus the degree sign
   only, so a name typed with other characters would show boxes - the keyboard should offer ASCII.
+- **Mock for the next batch:** artifact **Card Popup Mock** (https://claude.ai/artifact/Lt6NmxMYLc7xrWzaomEqDm)
+  - grow vs pop (D1), a switch landing on Activity (D3), group members in the window with
+  long-press-to-drill-in (D4), X / tap outside / drag down plus an auto-close timer (D6), hue strip
+  plus swatches and a colour-temperature strip (D7), the gear opening a settings deck inside the
+  window (D2). **Found while building it (Claude):** the P4_5 is ~110 x 62 mm, so at touch-safe
+  sizes HA's dialog does not fit in one view - in landscape the tabs move into the header row and
+  the members get their own column; on the 4B the members scroll under the swatches.
 - **D4 - opened a larger question: what kinds of "group" exist.** Recorded and answered as a draft
   taxonomy in `group-cards.md` (source x presentation x behaviour). The members-inside-the-popup
   part of D4 matches the HA reference above.
