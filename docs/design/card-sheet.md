@@ -167,3 +167,35 @@ description is 2.11's. Its header of promoted values (the area's temperature and
 | **D5** | Card settings before the build sheet exists | Saved on the board, keyed by a stable card id, designed to become overrides at 3.1 |
 | **D6** | Auto-close after idle | **60 s** |
 | **D7** | Colour choice | Hue + swatches first (LVGL 9 has no colour wheel); a drawn wheel later if wanted |
+
+## 11. Interview §2 answers (owner, 2026-10-01)
+
+**Reference:** the owner's HA details dialog for the Office light group ("Desk", a Hue group) -
+header with area and name, close / history / settings (gear) / menu icons; "100%" and "22 minutes
+ago"; a big vertical brightness slider; a mode row (power, brightness, colour wheel, colour
+temperature); eight swatches; then each member light as a row with its own slider. This is the
+layout the popup mock follows, turned sideways for landscape.
+
+- **D2 - tabs AND the deck, for different things (refines the recommendation).** The deck "isn't
+  part of the default dashboard" meant there is no reason for it on a standard page; inside a
+  popup, or on a special page (an area page holding one cluster of the room), deck panels can be
+  useful. **Tabs** hold the entity's HA-style features - controls, history, colour, show / hide.
+  **Deck panels** hold settings about the device or dashboard: style / scheme, header colour, an
+  alternate cluster name, renaming entities, which entities feed the card header (temperature
+  etc.) - the things behind HA's gear icon. Claude's notes: the deck then becomes a component a
+  popup or page can carry (interview §5 item 4 - "inside popups" - answered by this); on a 3.5-4"
+  screen a deck panel opened inside a popup covers most of its body, which is acceptable for
+  settings; `lv_mem` for a deck inside a popup is to be measured with the rest of the window (G1).
+- **D5 - RECOMMENDED, accepted.** Saved into the configuration file (LittleFS, the build sheet's
+  shape - `look-and-feel.md` §3.10), keyed by a stable card id, written when the popup closes.
+- **Which kinds first (item 2) - accepted:** lights and switches (2.10a-c), sensors after HA
+  history (2.10e), media / climate / the rest with their card types.
+- **Custom name (item 9) - an on-device keyboard IS wanted, as an option.** "Less than ideal but
+  should be available for those that want it." The web UI remains the comfortable way. Plus a
+  **label choice: HA device name / custom name / status (state) / no label.** (Today's label modes
+  are name / state / none - this adds "custom".) Claude's notes on the keyboard: LVGL's keyboard
+  widget costs some `lv_mem` only while it is open; the panels draw ASCII plus the degree sign
+  only, so a name typed with other characters would show boxes - the keyboard should offer ASCII.
+- **D4 - opened a larger question: what kinds of "group" exist.** Recorded and answered as a draft
+  taxonomy in `group-cards.md` (source x presentation x behaviour). The members-inside-the-popup
+  part of D4 matches the HA reference above.
