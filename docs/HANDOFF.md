@@ -28,9 +28,13 @@ default, Fleet, Linen with real shadows); card types with state icons; an FPS/CP
 functionality; eye candy matters - "I will be sad if the best we can do is a simple grid of
 uniformly sized squares"), then §3.14, the summary of what was decided and what stays open.
 
-**Next: §2, card popups (2.10)** - D1-D7 in `card-sheet.md` §10 are blocking. Several are
-pre-answered by §1: motion on long press (D1), the deck not on the default view (D2), the
-configuration as a LittleFS file shaped like the build sheet (D5).
+**§2, card popups (2.10), is nearly closed** - on `docs/interview-s2-card-popups` (not merged).
+D1-D7 are decided (`card-sheet.md` §11-11.2); the popup layout is the owner's own, built in the
+artifact **Card Popup Mock** (https://claude.ai/artifact/Lt6NmxMYLc7xrWzaomEqDm, v3). Group
+taxonomy draft: `group-cards.md`. **Left to settle:** the owner's settings-inheritance model and
+Claude's four corrections (`card-sheet.md` §11.3), the Hue-scenes placement, and two small
+naming points. Then close §2, merge the docs branch, and the owner decides: build 2.10a, or
+interview §3 (header slots, 2.8) first.
 - **Artifacts:** "Beyond the Grid" (four layouts, card sizes) and **"Layout Playground"** (the
   arranger prototype, interactive) - links in `look-and-feel.md` §3.7-3.8. The owner was playing
   with the playground at the end of the session; ask what was learned.

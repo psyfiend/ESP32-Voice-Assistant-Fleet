@@ -245,6 +245,70 @@ layout the popup mock follows, turned sideways for landscape.
   `supported_color_modes: [color_temp, xy]`. Members come straight from attributes; no registry
   lookup. Mock v2 shows the scenes as chips in the colour mode - OPEN whether they belong there.
 
+### 11.2 Batch 3 answers (owner, 2026-10-02 night)
+
+- **Mock bug the owner caught:** Desk's settings offered "Card header shows (temperature /
+  occupancy)" - because the mock's rule was "has members". The setting belongs only to clusters
+  and areas that have such a member. Fixed in mock v3.
+- **Hue scenes:** the owner wonders whether they belong on the first view, for one-tap scene
+  loading, and suggests a tap or long press could be configured to **load a specific scene or
+  cycle through scenes** (as with the cycling temperature group). Second choice: **a target in the
+  selector - Power | Brightness / Colour / Temp / Scenes**. Claude's recommendation, built in mock
+  v3: **the selector target** (one tap away, the same place as every mode - uniform navigation, the
+  owner's own rule below) **plus** the per-card tap behaviour "load scene X" / "cycle scenes"
+  (`group-cards.md` §2C) for true one-tap loading from the dashboard. OPEN for confirmation.
+- **Colour presets (item 4) - agreed:** eight defaults like HA's; long-press a swatch to save the
+  current colour into it, per light, in the configuration file.
+- **History (item 6) - agreed:** 24 h default with 1 / 6 / 12 h; 10 activity rows then "Show
+  more"; fetched from HA when the view opens.
+- **Virtual / system cards (item 7) - agreed**, and the reason generalises: **"I want all cards to
+  behave as uniformly as possible so you don't need to remember navigation for every type of
+  card."** Long press always opens a window; the same header, the same back arrow, the same deck.
+- **Light effects (item 5): later.**
+
+### 11.3 Settings scope (item 10) - the owner's model, and Claude's review
+
+**The owner's proposal (2026-10-02):**
+
+- **Separate the tag from the area.** The tag's shape is the **card label type** (tag / float /
+  band / folder / none); its words are the **card label text**, defaulting to the card's area. A
+  card with no area still shows its label type, with blank text.
+- **Inheritance as per-card checkboxes:** "Disable page inheritance", "Disable area or group
+  inheritance", "LOCKED - disable all inheritance".
+- **Per page (every card on it):** variant (default compact), label type (default float), label
+  text on/off (default on = area), entity label (name / state / none; default name), colour
+  scheme, fill (default fill).
+- **Per area or group:** label type, label text, label colour. Not changeable on a card unless it
+  has disabled inheritance; re-enabling restores the area's settings.
+- **Per card within a group:** variant, entity label, visibility.
+- **Per card that has blocked inheritance:** variant, label type, label text (area / custom),
+  label colour (ideally not one already used by another area or card), entity label (name /
+  state / none / custom), visibility.
+- "Much of this is a moot point as soon as clusters enter the picture" - tiles inside a cluster
+  wear no per-card decoration.
+
+**Claude's review - viable, and mostly a good idea; four corrections:**
+
+1. **Precedence must be stated.** Page and area both set label type. Proposed: **device defaults <
+   page < area / group < card** - the more specific wins - which is ROADMAP Q2's order with the
+   area added.
+2. **Inherit per SETTING, not per card.** Instead of checkboxes that must be ticked before a value
+   can change, every setting shows where its value comes from - "Float (from page)" or "Band (from
+   Kitchen)" - and changing it on the card simply overrides that one setting, with a **Reset**
+   that returns it to inheriting. Same safety (the source is always named; reset restores), one
+   fewer step, and no hidden state where a control refuses to change. It is how the build sheet
+   already works (`*Defaults` < sheet < runtime overrides, stored sparse). The owner's "disable
+   all inheritance" becomes a "Detach" button that copies the current values onto the card.
+3. **"LOCKED" is already taken.** ROADMAP Q2's lock means the opposite: a PARENT forbids children
+   to override (a kiosk page, a guest board). Keep that word for that.
+4. **Unique label colours: warn, do not forbid.** A palette has only so many colours the owner can
+   tell apart (G9); forbidding a used colour runs out fast. Show "Kitchen uses this colour" and let
+   the user choose.
+
+**OPEN for the owner:** a card with no area - blank text in a visible pill (the proposal), or the
+pill hidden while its space is kept (today's behaviour, so cards still line up)? And the label
+type's name for the bar: "band" (the owner's word here) or "bar".
+
 - **D4 - opened a larger question: what kinds of "group" exist.** Recorded and answered as a draft
   taxonomy in `group-cards.md` (source x presentation x behaviour). The members-inside-the-popup
   part of D4 matches the HA reference above.
