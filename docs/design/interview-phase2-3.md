@@ -130,6 +130,9 @@ The answers here steer every later section, so they come first.
 
 ## 2. Card popups (2.10)  → `docs/design/card-sheet.md`
 
+**CLOSED 2026-10-02** - answers in `card-sheet.md` §11-12; the group question it raised is drafted
+in `group-cards.md` for §4.
+
 The blueprint exists (draft 2). Open decisions D1-D7 are there; these are the rest.
 
 1. **D1-D7** from `card-sheet.md` §10 - answer or "recommended". **[BLOCKING 2.10]**

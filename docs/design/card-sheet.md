@@ -305,9 +305,31 @@ layout the popup mock follows, turned sideways for landscape.
    tell apart (G9); forbidding a used colour runs out fast. Show "Kitchen uses this colour" and let
    the user choose.
 
-**OPEN for the owner:** a card with no area - blank text in a visible pill (the proposal), or the
-pill hidden while its space is kept (today's behaviour, so cards still line up)? And the label
-type's name for the bar: "band" (the owner's word here) or "bar".
+**DECIDED (owner, 2026-10-02):** "I'll go with your suggestions regarding the corrections."
+So: precedence **device defaults < page < area / group < card**; inheritance **per setting**, with
+the source named and a **Reset**; "Detach" instead of a per-card "disable all inheritance";
+**LOCKED** keeps ROADMAP Q2's meaning; label colours **warn** rather than forbid. A card with no
+area **hides its pill and keeps its space** (today's behaviour - cards stay lined up). The coloured
+label type is called **"band"** - "bar" is confusing beside the system header bar. Label types:
+**tag / float / band / folder / none**. (The code still says `HDR_BAR`; rename when it is next
+touched.)
+
+## 12. Section 2 CLOSED - 2026-10-02
+
+**Decided:** D1 grow; D2 tabs for the entity's features, deck panels for dashboard settings; D3
+open on the control, no header toggle; D4 members behind their own icon; D5 settings in the
+configuration file by stable card id, written on close; D6 X / tap outside / drag down /
+auto-close; D7 hue control, swatches in the colour mode. The window layout is the owner's (§11.1),
+the deck peeks up from the bottom (pathway 1), sensors get a CHART panel, scenes are a selector
+target plus a per-card tap action (§11.2 - recommended, not objected to), presets / history /
+uniform popups (§11.2), the settings model (§11.3).
+
+**Still open, none blocking 2.10a:** the group taxonomy's confirmations (`group-cards.md` §4, for
+interview §4); `render_template` for area members (verify); light effects (later).
+
+**The build order is unchanged** (§9): 2.10a frame, 2.10b light controls, 2.10c HA attributes
+and calls, 2.10d stable ids + saving, 2.10e history - with this section's answers replacing draft
+2's guesses wherever they differ.
 
 - **D4 - opened a larger question: what kinds of "group" exist.** Recorded and answered as a draft
   taxonomy in `group-cards.md` (source x presentation x behaviour). The members-inside-the-popup
