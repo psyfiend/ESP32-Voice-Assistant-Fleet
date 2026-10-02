@@ -12,8 +12,15 @@
 // Shared across every scheme: state colours and sensor tints are content, not
 // decoration, so they do not change when the scheme does. A warning is amber
 // whether the dashboard is dark or light.
+//
+// EXCEPT "ON" (ST_ACTIVE), since 2026-10-01. The owner, on Linen: the orange
+// that fills a light or door that is on reads wrong on sand, and "there may
+// be a more suitable color to depict active states in Linen". It is still the
+// same MEANING on every scheme - a filled card with a lit disc - so the state
+// never rests on colour alone (cards.md section 0); only the paint differs.
+// Each scheme now sets it just before this block.
+#define ST_ACTIVE_ORANGE  0xF0A63C          // the dark schemes, unchanged
 #define FLEET_STATE_AND_TINTS               \
-    .ST_ACTIVE  = 0xF0A63C,                 \
     .ST_IDLE    = 0x64748B,                 \
     .ST_OK      = 0x4ADE80,                 \
     .ST_WARN    = 0xFBBF24,                 \
@@ -42,15 +49,32 @@
 // and Frost: a sand ground, cream cards, dark brown text, and a copper accent
 // dark enough to read as text on a light surface - which Paper's amber was
 // not (the owner's complaint about the device name and the panel titles).
+//
+// Round two, 2026-10-01 (design interview §1, artifact "Linen Fill and Header
+// Glyphs"): the DARKER sand ground the owner picked as "C" (was DDD5C8), and
+// the card "a hair darker" (was F8F4EC) - only the shadow used to separate a
+// cream card from a pale ground. And "on" is OLIVE rather than signal orange.
+//
+// Butter (F1D27E) was tried first and lasted one look on glass: "looks like
+// piss lol" - a very light colour does not work on an already light scheme.
+// The owner's second pick, as an executive decision, 2026-10-01: olive. Burnt
+// amber D98A3A and terracotta CF7350 were close seconds; those two and copper
+// B8662E (dark enough to turn the ink white) are to be choices for the user
+// once settings exist (4.1).
+//
+// The panels disagree with the screenshots: on WS_P4_5 the glass looked much
+// lighter and warmer than /screenshot of the same frame. Judge these on glass
+// (#82 is the 7B's cool cast; the P4_5 may need the same look).
 const UIPalette UI_PAL_LINEN = {
     .name        = "Linen",
-    .GROUND      = 0xDDD5C8,
-    .SURFACE     = 0xF8F4EC,
+    .GROUND      = 0xCFC4B2,
+    .SURFACE     = 0xF3EEE4,
     .SURFACE_ALT = 0xEDE6DA,
     .TEXT        = 0x2B2520,
     .TEXT_DIM    = 0x6E6459,
     .ACCENT      = 0xA8561C,   // copper
     .BORDER      = 0,
+    .ST_ACTIVE   = 0x9AA35A,   // olive
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
 };
@@ -67,6 +91,7 @@ const UIPalette UI_PAL_FLEET = {
     .TEXT_DIM    = 0x808080,
     .ACCENT      = 0x00A8FF,
     .BORDER      = 0x404040,   // explicit — this one is not derived
+    .ST_ACTIVE   = ST_ACTIVE_ORANGE,
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_DARK,
 };
@@ -82,11 +107,13 @@ const UIPalette UI_PAL_MIDNIGHT = {
     .TEXT_DIM    = 0x98A0AA,
     .ACCENT      = 0x00A8FF,   // Fleet cyan
     .BORDER      = 0,
+    .ST_ACTIVE   = ST_ACTIVE_ORANGE,
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_DARK,
 };
 
 #undef FLEET_STATE_AND_TINTS
+#undef ST_ACTIVE_ORANGE
 #undef TINT_LIGHTING_DARK
 #undef TINT_LIGHTING_LIGHT
 
