@@ -203,6 +203,48 @@ layout the popup mock follows, turned sideways for landscape.
   window (D2). **Found while building it (Claude):** the P4_5 is ~110 x 62 mm, so at touch-safe
   sizes HA's dialog does not fit in one view - in landscape the tabs move into the header row and
   the members get their own column; on the 4B the members scroll under the swatches.
+### 11.1 Batch 2 answers (owner, 2026-10-02) - the popup layout
+
+"Card Popup Mockup is terrific! Form and function is excellent!" Decisions:
+
+- **D1 - GROW.** "Looks amazing in the mockup!"
+- **D3 - open directly where actions can be taken**, with **no toggle in the header**. A switch's
+  window opens on its control: the hero IS a big toggle (HA's own switch dialog: "On, 2 seconds
+  ago", a tall toggle). Activity is behind the history icon.
+- **D4 - members NOT on the first view** (crowded). A card representing several members gets a
+  **members icon** (the multi-bulb hero icon) that navigates to a members view.
+- **D6 - all four**: X, tap outside, drag down, auto-close.
+- **D7 - hue control yes; the swatches move OFF the first view** into the colour (RGB) mode.
+- **Layout (owner's proposal, built in mock v2):**
+  - **Top left: X** to close. Any view reached from the first one (history, members, a member's
+    own controls) shows a **back arrow** there instead.
+  - **Top middle: "Area > entity"**, or "Group > entity" for a member.
+  - **Top right: navigation icons** like HA's - the graph icon for history; the multi-bulb icon
+    when the card has members.
+  - **The hero is the control** - the slider, or the toggle. **Tapping anywhere along the slider
+    moves it there**; optionally a setting "tap the slider to toggle on/off" - feasible, because a
+    press that does not move is told apart from a grab-and-drag (mock v2 has both).
+  - **Beside the hero:** the label of what it controls ("Brightness", "Colour", "Temperature") or
+    the state; under it the value (percent / state / kelvin); under that the **selector:
+    Power | Brightness, Colour, Temperature** with a small vertical divider after Power, as in HA.
+    Power makes a header toggle redundant. Modes the light does not support are hidden (from HA's
+    `supported_color_modes`) - a dimmable-only light shows Power | Brightness (answers §2 item 3).
+  - Everything justified against the hero, the whole group centred in the window.
+- **The deck in a popup - pathway 1 (the owner's preference), built in mock v2:** when the window
+  springs up, the deck panel animates up from the bottom of the screen to show only its header
+  ("SETTINGS"), as the hidden system header peeks down when swiped. Tap the header to open it; tap
+  the header or anywhere inside the window to fold it back; a tap outside the window closes the
+  panel and the window together. On close the header retracts so it is out of sight by the time the
+  window has gone - quickly if the panel was open, more slowly if only the header showed.
+  (Pathway 2, a gear icon with the deck fully hidden, is the alternative not chosen.)
+- **Sensor cards get a second deck panel header - CHART:** span (24 h / 12 h / 6 h / 1 h), min / max
+  on the card, legend, chart behind the card, units.
+- **Hue groups verified (owner, Developer Tools):** `light.office` carries `is_hue_group: true`,
+  `hue_type: room`, `lights:` (names), **`entity_id:` (the member entity ids)**, and
+  **`hue_scenes:`** (Nightlight, Energize, Bright, Honolulu, Relax, Concentrate, Read), plus
+  `supported_color_modes: [color_temp, xy]`. Members come straight from attributes; no registry
+  lookup. Mock v2 shows the scenes as chips in the colour mode - OPEN whether they belong there.
+
 - **D4 - opened a larger question: what kinds of "group" exist.** Recorded and answered as a draft
   taxonomy in `group-cards.md` (source x presentation x behaviour). The members-inside-the-popup
   part of D4 matches the HA reference above.

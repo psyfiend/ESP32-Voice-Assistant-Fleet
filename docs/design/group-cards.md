@@ -81,4 +81,7 @@ and stays mixed). `cards.md` §4 already chose "tap toggles all; mixed state has
   *card*, *cluster*, *page*.
 - Area tap default: the area's lights only (domain-scoped)? With per-area exclusions?
 - Does a board group live in the build sheet only (3.1), or also on the glass?
-- Verify: Hue group member attributes on `light.office`; `render_template` for `area_entities()`.
+- ~~Verify: Hue group member attributes on `light.office`~~ **VERIFIED 2026-10-02 (owner):**
+  `entity_id: [light.office_right, light.office_lamp, light.office_left]`, plus `is_hue_group`,
+  `hue_type: room` and `hue_scenes` - see `card-sheet.md` §11.1.
+- Verify: `render_template` for `area_entities()`.
