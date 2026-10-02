@@ -432,6 +432,12 @@ The owner liked that the mocks' area tag partly overlaps its card. Decisions:
   olive (3-7 in the mock, with butter) to be **choices the user can pick** once settings exist
   (4.1). Built on `feat/linen-butter`: `ST_ACTIVE` is now per scheme, the dark schemes keep the
   orange. Known gap: with the card fill switched off, butter text on cream is faint.
+- **Butter failed on glass** ("looks like piss lol" - a very light "on" does not work on a light
+  scheme). **Olive merged instead** (`0de94d3`, the owner's executive decision). Verdict on glass,
+  2026-10-01 evening: "doesn't look too bad", but **much greener on the LCD than on a PC monitor**.
+  **Direction for later:** an earth / neutral tone, "something in between olive and terracotta",
+  not a jewel tone like the deep teal. Colours come out notably different on the device (#82), so
+  the next try is chosen on glass from two or three candidates, not from a mock.
 - **Header icons: 2+ (stronger chip), 4 (filled circle) and 2+ with the clock** are all good -
   for 2.8 (#19).
 - **Cluster header bars are CLEAR unless the page is in Bar mode** - "users (I) might not want
