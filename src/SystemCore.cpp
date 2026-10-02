@@ -5,6 +5,7 @@
 #include "esp_heap_caps.h"
 #include "esp_memory_utils.h"   // esp_ptr_external_ram()
 #include "SystemReport.h"   // fmtBytes - one memory-reporting convention
+#include "TimeService.h"
 #include "bsp_loader.h"
 
 // Normally injected by scripts/fw_version.py via extra_scripts (derived from
@@ -112,6 +113,10 @@ bool SystemCore::begin() {
     // ordering trap documented inside ConnectivityManager itself.
     _conn.begin();
     heapMark("after wifi");
+
+    // The time zone now; SNTP itself starts in loop() once the link is up,
+    // because it needs a network interface that exists. Issue #74.
+    TimeService::begin();
 
     // --= 6. Broker session =--
     // Needs the link object. Does nothing until it reports online, and stays
@@ -322,4 +327,7 @@ void SystemCore::loop() {
     // Starts the HTTP server the first time the link is up, if any route was
     // registered; a no-op every call after that.
     _http.loop(_conn.isOnline());
+
+    // Same shape: SNTP starts the first time the link is up (#74).
+    TimeService::loop(_conn.isOnline());
 }

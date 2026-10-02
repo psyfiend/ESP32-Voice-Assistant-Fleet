@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include "SystemCore.h"
 #include "SystemReport.h"
+#include "TimeService.h"
 #include "LVGL_Startup.h"
 #include "GUIManager.h"
 
@@ -110,8 +111,19 @@ void setup() {
 // MQTT is deliberately not waited for. A board can be perfectly online with no
 // broker configured, and #49 is a long argument for not treating one subsystem
 // as a proxy for another.
+//
+// THE CLOCK IS waited for, briefly (#74). SNTP starts the moment the link is up
+// - the same loop() that would fire this report - so a report taken then said
+// "Time: not set" on a board whose clock was a second away from being right.
+// The same trap the link itself was, one step later. The owner caught it.
+// Once the link is up the report holds for the first sync, but no longer than
+// BOOT_REPORT_CLOCK_WAIT_MS: a board whose SNTP never answers still reports,
+// and says why its clock is not set.
+static constexpr uint32_t BOOT_REPORT_CLOCK_WAIT_MS = 10000;
+
 static void bootReport() {
-    static bool done = false;
+    static bool     done     = false;
+    static uint32_t onlineAt = 0;
     if (done) return;
 
     const uint32_t now = millis();
@@ -120,10 +132,16 @@ static void bootReport() {
 
     if (!online && !expired) return;
 
+    if (online && !expired) {
+        if (!onlineAt) onlineAt = now ? now : 1;
+        if (!TimeService::isSet() && (now - onlineAt) < BOOT_REPORT_CLOCK_WAIT_MS) return;
+    }
+
     done = true;
-    Serial.printf("[Main] Boot report at %lu ms (%s)\n",
+    Serial.printf("[Main] Boot report at %lu ms (%s, clock %s)\n",
                   (unsigned long)now,
-                  online ? "link up" : "timed out waiting for the link");
+                  online ? "link up" : "timed out waiting for the link",
+                  TimeService::isSet() ? "set" : "not set");
     SystemReport::run(core, false);   // false = automatic, not user-requested
 }
 
