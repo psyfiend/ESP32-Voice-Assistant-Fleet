@@ -653,17 +653,21 @@ The question was framed as "how many cards fit". It turned out to be the wrong q
 headroom, and widget access is frequent enough that PSRAM's slower access is a real cost. Revisit
 only if a future page genuinely fills the pool.
 
-### Running order — current as of 2026-09-29
+### Running order — current as of 2026-10-01
 
 The numbering above is identity, not sequence. What is actually next, agreed with the owner
-2026-09-29 (2.5, #43, #44's websocket leg, 2.6, 2.7 and #58 are done and no longer listed):
+2026-09-29 (2.5, #43, #44's websocket leg, 2.6, 2.7 and #58 are done and no longer listed), with
+the design interview's first answers (2026-10-01) folded in. Rows marked *proposed* are Claude's
+recommendation and await the owner's yes.
 
 | | | |
 |---|---|---|
-| 1 | **The design interview, then 2.10** (#65) | `docs/design/interview-phase2-3.md` (Claude facilitates, protocol §0.1a): the blueprint for 2.8, 2.10, 2.11 and Phase 3. 2.10's design is drafted in `docs/design/card-sheet.md` (draft 2). The owner's glass notes of 2026-09-29 are in the interview's §1 item 10; fonts are #73 |
+| 1 | **The design interview, then 2.10** (#65) | `docs/design/interview-phase2-3.md` (Claude facilitates, protocol §0.1a): the blueprint for 2.8, 2.10, 2.11 and Phase 3. **§1 CLOSED 2026-10-01** - answers in `docs/design/look-and-feel.md` (summary §3.14); **§2 (card popups) next**. 2.10's design is drafted in `docs/design/card-sheet.md` (draft 2); fonts are #73 |
+| 1a | ~~**Floating tag** (#80)~~ | **MERGED 2026-10-01** (`0de94d3`, all-nine gate). File folder style still open on #80 |
+| 1b | ~~**#74 SNTP**~~ | **MERGED 2026-10-01** with the tag and Linen round two. RTC fallback and settings still open on #74 |
 | 2 | **2.8 header slots** (#19) | before group cards, whose header IS the slot mechanism. Battery glyphs designed (artifact "Fleet Status Glyphs"); data from #72 |
-| 3 | **2.11 group cards** (#66) | before 3.1, because the schema depends on how they are declared |
-| 4 | **3.1 schema** (#20) | |
+| 3 | **2.11 group cards** (#66) **with the page arranger** (#78) | clusters and the arranger are one design (`look-and-feel.md` §3.8); the arranger reopens Q3b. Prototype: artifact "Layout Playground" |
+| 4 | **3.1 schema** (#20) | now framed as a configuration template, the same file as an export (`look-and-feel.md` §3.10) |
 | - | **2.9 display stack** (#67) | Six of nine boards on `esp_lcd`, merged 2026-09-29 (`75a43c8`). Left: `CYD_S3_8048`, `WS_S3_5B` when on the desk; then #67 closes. Status: `docs/display/README.md`. Split out: #69 panel timing (watch), #70 S3 LVGL tuning (paused, resume soon), #71 rotation setting |
 | - | **Battery** (#72) | prototype on `feat/battery-card`, being tested on the 4880 and 7B |
 
@@ -902,7 +906,13 @@ AP IP/subnet, idle timeout, connect timeout, retry count, TX power cap, timezone
 
 Scoped into milestone 3.1 (schema).
 
-### Q3b — Sub-cell / fractional grid placement — **DECIDED 2026-09-03**
+### Q3b — Sub-cell / fractional grid placement — **DECIDED 2026-09-03, REOPENED 2026-10-01**
+
+> **Reopened by the design interview §1 (2026-10-01, #78).** The owner wants an arranger that fills
+> each page with no dead space, choosing the grid size and cluster shapes together. The units below
+> stay; what changes is that automatic arrangement is the default and explicit placement becomes a
+> *pin*. What survives of this decision: the validator reports and never resolves, and nothing ever
+> spills to another page. Direction and reasoning: `docs/design/look-and-feel.md` §3.8.
 
 You raised the case of a 3x3 page with a special card occupying "a quarter of the grid." Worth
 solving up front, as you said, because it's very expensive to retrofit.

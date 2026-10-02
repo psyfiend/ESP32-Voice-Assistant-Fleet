@@ -21,6 +21,43 @@ Fleet = MQTT/system/virtual cards), swiped with wrap-around; three colour scheme
 default, Fleet, Linen with real shadows); card types with state icons; an FPS/CPU overlay;
 `/screenshot` and `/bench` over HTTP.
 
+## Where the interview stands — 2026-10-01, night
+
+**§1 (look and feel) is CLOSED**; the docs branch was merged to `main` at its close. Answers:
+`docs/design/look-and-feel.md` - read its §2 first (the owner's two standing rules: keep all HA
+functionality; eye candy matters - "I will be sad if the best we can do is a simple grid of
+uniformly sized squares"), then §3.14, the summary of what was decided and what stays open.
+
+**Next: §2, card popups (2.10)** - D1-D7 in `card-sheet.md` §10 are blocking. Several are
+pre-answered by §1: motion on long press (D1), the deck not on the default view (D2), the
+configuration as a LittleFS file shaped like the build sheet (D5).
+- **Artifacts:** "Beyond the Grid" (four layouts, card sizes) and **"Layout Playground"** (the
+  arranger prototype, interactive) - links in `look-and-feel.md` §3.7-3.8. The owner was playing
+  with the playground at the end of the session; ask what was learned.
+- **Merged to `main` 2026-10-01 (`0de94d3`), all nine environments compiled (28 min gate):**
+  - `feat/74-sntp` (#74): `TimeService`, SNTP + POSIX zone; the boot report waits up to 10 s for the
+    first sync, and the Doctor's `Time:` line shows the time and source. Owner confirmed on WS_P4_5.
+    Still open on #74: the RTC fallback, zone/servers as settings.
+  - `feat/card-tag-float` (#80): floating tag as the default (rises half its height, sticks out a
+    quarter to the side, paid for inside the cell); status pills float on the top edge and the area
+    name shortens beside them; bar band round-top/straight-bottom. Owner signed off. File folder
+    not built (#80).
+  - `feat/linen-butter`: Linen ground C+ (`CFC4B2`), card a hair darker (`F3EEE4`), and Linen's own
+    "on" colour - **olive** `9AA35A` (butter was rejected on glass). Owner's executive decision,
+    to be judged when back; other choices for 4.1 in `UITokens.cpp`.
+  - Flashed: WS_P4_5 and WS_P4_4B. WS_S3_4B not flashed (#69's watch). The 4880 runs an old tag build.
+- **Merge discipline (owner, 2026-10-01):** nothing reaches `main` without the all-nine compile gate
+  and a look on glass; no quick-fix branches during the interview (mocks instead); demos on one
+  board.
+- **Playground v4** (same link): half-side floating tag, folder tab offset, clusters never tagged
+  and their header bar clear unless the page is in Bar mode, status as icons. Notes: `look-and-feel.md`.
+- **New issues:** #75 night mode, #76 HA alerts, #77 media player, #78 page arranger (reopens Q3b),
+  #79 transitions from pre-rendered pictures, #80 tag styles, #81 system panel should slide.
+  Comments on #6, #20, #35, #52-54, #74.
+- **Reading a board's boot log without a monitor:** `scratchpad`-style script with pyserial that
+  pulses RTS with DTR low (resets into a normal boot) and filters lines - PowerShell 5.1 strips
+  quotes from `python -c "..."`, so write the script to a file.
+
 ## What is next — the new session's job
 
 **The design interview, then 2.10 (#65).** The owner wants the next session to focus on 2.10 and
@@ -115,6 +152,8 @@ silently puts the bug back. `docs/REBUILD_P4_LIBS.md`. The S3 libraries are stoc
 - **Prefer ESP-IDF facilities to Arduino-only ones** (owner). HTTP handlers run on their own task:
   never touch LVGL from one. HaProvider receives on the websocket task: never touch LVGL there.
 - **`Edit` on a CRLF file**: deleting a line by matching a leading newline joins two lines.
+- **`gh ... --body $text` in PowerShell 5.1 drops double quotes** inside the text (native argument
+  passing), silently. Pipe it instead: `$text | gh issue create ... --body-file -`, or write a file.
 - **LVGL clips children to their parent** - use `UI::unclipShadows()`. **Never toggle HIDDEN on a
   screen-sized object when an animation starts.** Anything drawn stays ASCII, except `°`.
 - **Verify from outside the device** - the router, the broker, HA, `/bench?what=verify`. The

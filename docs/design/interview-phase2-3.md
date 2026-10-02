@@ -68,26 +68,35 @@ owner's brain dump on card popups (`card-sheet.md`). **It does not reopen decisi
 
 ## 1. Look and feel - the whole product  → `docs/design/look-and-feel.md`
 
+**CLOSED 2026-10-01** - summary and what stays open: `look-and-feel.md` §3.14.
+
 The answers here steer every later section, so they come first.
 
 1. **Who looks at these screens, from where, for how long?** (Walking past at 2 m? Standing at arm's
    length? Guests?) *Sets text sizes, contrast, how much a card may say.* **[BLOCKING 2.8]**
+   **ANSWERED 2026-10-01 -> `look-and-feel.md` §3.1**
 2. **Three words for the feel** (e.g. "calm, legible, quick" vs "rich, alive, playful"). Claude will
-   test every later choice against them.
+   test every later choice against them. **ANSWERED 2026-10-01 -> `look-and-feel.md` §3.2** (the
+   rule, not three words)
 3. **Motion budget.** Everything slides/grows (HA-like), or motion only where it explains something
    (a panel opening), or almost none? *Motion costs frames on the S3s; the P4s can afford more.*
    **Recommendation:** motion only where it explains a change of place, 150-250 ms, never decorative.
+   **ANSWERED 2026-10-01 -> `look-and-feel.md` §3.3** (design for P4, cut for S3)
 4. **Night.** Should screens dim, switch to a dark/red-shifted scheme, or turn off at night; by
    clock, by room light (a lux sensor), or by HA's sun? *Screen dimming was pulled forward from 4.1
-   as a daily-use problem.*
+   as a daily-use problem.* **ANSWERED 2026-10-01 -> `look-and-feel.md` §3.4**
 5. **Sound and touch feedback.** Boards have speakers. A soft click on tap, nothing, or only on
-   errors? **Recommendation:** off by default, a setting.
+   errors? **Recommendation:** off by default, a setting. **ANSWERED: off by default (§3.12)**
 6. **Icons.** MDI everywhere (HA's own set, today) - any you dislike, want bigger, or want replaced?
+   **ANSWERED: no complaints; custom HA icon packs wanted, #83 (§3.13)**
 7. **Dense vs airy.** On the big panels, more cards per page or larger cards? (`TARGET_CARD_W` today.)
+   **ANSWERED by the arranger direction (§3.8) and uniformity (§3.13)**
 8. **What does "broken" look like?** Unavailable / stale / offline entities: greyed, struck, a badge,
    hidden? *Today: STALE tag, greyed.* Anything that annoys you now?
+   **ANSWERED: status pills follow the header style, never inside a floating-tag card (§3.11, §3.13)**
 9. **Reference images.** Dashboards you like the look of (HA themes, Tile cards, Mushroom, a
-   product). Screenshots welcome - worth more than adjectives.
+   product). Screenshots welcome - worth more than adjectives. **IN PART: the irrigation
+   dashboard (§3.5); more welcome any time**
 10. **Owner's notes, 2026-09-29 - bring these into the section, do not re-ask what they state.**
     - **Linen:** find a better card fill colour. **Wi-Fi header icon:** more visible (a box or a
       background behind it?).
@@ -112,6 +121,12 @@ The answers here steer every later section, so they come first.
       cells; the icon in the fit.
     - **Rotation as a setting** (manual on esp_lcd boards is feasible; auto needs an IMU the 4880
       does not have) - belongs to §5 settings.
+11. **Beyond the grid (added 2026-09-30, owner).** Is a page always a grid of equal cards, or can
+    it hold clusters with their own shapes - a room, a function, a group - drawn as something other
+    than cards? *Touches ROADMAP Q3b (unit placement, free positioning rejected) and 2.11.* Claude
+    sketches two or three alternatives before asking. **[BLOCKING 2.11]**
+    **DIRECTION AGREED 2026-10-01 -> `look-and-feel.md` §3.7-3.8** (B + C as the base, an arranger
+    with pins, #78); scoring rules still to settle in the Layout Playground.
 
 ## 2. Card popups (2.10)  → `docs/design/card-sheet.md`
 
@@ -269,6 +284,12 @@ Questions:
 
 The precedence is decided (§0.2). What is not:
 
+> **Owner, 2026-10-01 (asked early, in §1):** a build sheet is "just a template with entity data
+> and settings" - the same thing as an exported configuration, applied on first boot or imported
+> any time; export/import at levels; "Restore previous settings when flashed"; a hard reset to
+> factory; the web UI configures everything the sheet can. Recorded in `look-and-feel.md` §3.10.
+> This answers most of items 1, 3, 4 and 5 below in spirit; confirm the details when §9 is reached.
+
 1. **Where runtime edits are stored**: NVS keys, or a runtime overrides JSON on LittleFS mirroring
    the sheet's shape? **Rec:** an overrides JSON - one format, exportable, diffable.
    **[BLOCKING 2.10d]** (saved card settings are the first runtime edits)
@@ -309,3 +330,21 @@ The precedence is decided (§0.2). What is not:
 Each section's answers go into its named design doc; ROADMAP Phase 2/3 rows are rewritten from
 them with acceptance criteria; new issues are opened for anything the answers add. Claude then
 proposes the running order for the rest of Phase 2 and Phase 3 in one table for sign-off.
+
+## 12. New questions raised by the answers (running list)
+
+| Raised | Question | Goes to |
+|---|---|---|
+| §1, 2026-10-01 | **Card sizes**: a card at 1x1 / 2x1 / 2x2 shows more on its face (a light's slider); who picks the size - sheet, glass, both? | §1 item 11 |
+| §1, 2026-10-01 | **Drag-and-drop layout editing on the glass** (owner): an edit mode on the board, or web UI only? How it meets locks and the build sheet | §6 / §9 |
+| §1, 2026-10-01 | **Per-device role and viewing distance** (nightstand, kitchen, garage): a setting that scales hero text | §1 batch 2 |
+| §1, 2026-10-01 | **HA alerts on the devices**, customizable, also on the night screen: what is an alert, where it shows, how it is dismissed | new issue; §3 / §5 |
+| §1, 2026-10-01 | **Clock card** with several faces, flipping as time changes; **weather card** with small animations | card library (Phase 2/4) |
+| §1, 2026-10-01 | **Night mode** pulls #74 (SNTP) ahead of 2.10? | ROADMAP order |
+| §1, 2026-10-01 | **Irrigation interface** (next summer): fleet firmware with an irrigation page set, or its own project? | later |
+| §1, 2026-10-01 | **Media player**: Music Assistant, Sendspin, Spotify (NINA reference), SoundCloud; album art | card library; new issue |
+| §1, 2026-10-01 | **Auto layout** (packer) with pins, reopening ROADMAP Q3b; dense clusters with a derived internal grid; grow-to-max then spread | `look-and-feel.md` §3.8; §4, §8 |
+| §1, 2026-10-01 | **Idle pre-rendered page pictures** for slide / fade / grow / wipe transitions | `look-and-feel.md` §3.9; §6 item 2 |
+| §1, 2026-10-01 | **Link cards and function pages** (weather page, all lights); navbar hot-links | §5 item 2, §6 item 4 |
+| §1, 2026-10-01 | **First-boot setup wizard** with a Wi-Fi QR code (NINA); web UI configures everything the sheet can; import/export after v1.0 | §8.2, §9 |
+| §1, 2026-10-01 | **A changed build sheet over a board with user edits**: keep, replace, or ask on the glass? | §9 item 4 (asked early, batch 3) |
