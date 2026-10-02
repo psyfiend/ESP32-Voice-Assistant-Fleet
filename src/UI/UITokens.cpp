@@ -53,12 +53,18 @@
 // Round two, 2026-10-01 (design interview §1, artifact "Linen Fill and Header
 // Glyphs"): the DARKER sand ground the owner picked as "C" (was DDD5C8), and
 // the card "a hair darker" (was F8F4EC) - only the shadow used to separate a
-// cream card from a pale ground. And "on" is BUTTER, lamplight rather than
-// signal orange. The owner liked four more and wants them as choices for the
-// user once settings exist (4.1): burnt amber D98A3A, terracotta CF7350,
-// copper B8662E, olive 9AA35A. Butter is light, so an on card differs from an
-// off one more by its lit disc and dark ink than by brightness - the owner
-// chose it knowing that; judge it on glass.
+// cream card from a pale ground. And "on" is OLIVE rather than signal orange.
+//
+// Butter (F1D27E) was tried first and lasted one look on glass: "looks like
+// piss lol" - a very light colour does not work on an already light scheme.
+// The owner's second pick, as an executive decision, 2026-10-01: olive. Burnt
+// amber D98A3A and terracotta CF7350 were close seconds; those two and copper
+// B8662E (dark enough to turn the ink white) are to be choices for the user
+// once settings exist (4.1).
+//
+// The panels disagree with the screenshots: on WS_P4_5 the glass looked much
+// lighter and warmer than /screenshot of the same frame. Judge these on glass
+// (#82 is the 7B's cool cast; the P4_5 may need the same look).
 const UIPalette UI_PAL_LINEN = {
     .name        = "Linen",
     .GROUND      = 0xCFC4B2,
@@ -68,7 +74,7 @@ const UIPalette UI_PAL_LINEN = {
     .TEXT_DIM    = 0x6E6459,
     .ACCENT      = 0xA8561C,   // copper
     .BORDER      = 0,
-    .ST_ACTIVE   = 0xF1D27E,   // butter
+    .ST_ACTIVE   = 0x9AA35A,   // olive
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
 };

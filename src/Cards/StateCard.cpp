@@ -172,14 +172,14 @@ void StateCard::render() {
     //
     // ST_IDLE is shared across every scheme on purpose: a light being off is
     // content, not decoration. ST_ACTIVE was too until 2026-10-01, when Linen
-    // got its own (butter - UITokens.cpp); the MEANING is the same everywhere,
+    // got its own (olive - UITokens.cpp); the MEANING is the same everywhere,
     // a filled card with a lit disc, so it never rests on colour alone.
     //
     // KNOWN GAP: with the fill switched off (the branch below that lights only
-    // the icon and name in ST_ACTIVE), butter on Linen's cream surface is very
-    // faint. The default fill mode is unaffected. Address it with the
-    // user-selectable active colours (4.1) - a light active colour needs a
-    // darker ink for that mode.
+    // the icon and name in ST_ACTIVE), a mid-tone active colour on Linen's
+    // cream surface is weak (olive on cream is ~2.4:1). The default fill mode
+    // is unaffected. Address it with the user-selectable active colours (4.1):
+    // each needs a darker ink for that mode.
     const uint32_t chrome = stateColor();   // stale/refused override, or 0
     const bool fill = (s_fill == StateCardFill::FILL_SURFACE);
     const bool compact = (variant() == CardVariant::VAR_COMPACT);
