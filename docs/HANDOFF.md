@@ -37,16 +37,23 @@ the best we can do is a simple grid of uniformly sized squares").
 - **Artifacts:** "Beyond the Grid" (four layouts, card sizes) and **"Layout Playground"** (the
   arranger prototype, interactive) - links in `look-and-feel.md` §3.7-3.8. The owner was playing
   with the playground at the end of the session; ask what was learned.
-- **Code, not merged, each branch off `main`:**
-  - `feat/card-tag-float` (#80): floating tag as the default, round two after the owner's glass
-    notes (equal gaps, status pill inside, bar band round-top/straight-bottom). **Flashed on WS_P4_5
-    and WS_P4_4B** (the 4B on its Fleet page via `/bench?...&page=1&keep=1`); the 4880 still runs
-    round one. Awaits the owner's sign-off, then merge.
-  - `feat/74-sntp` (#74): `TimeService`, SNTP + POSIX zone, the Doctor's `Time:` line. Verified on
-    WS_P4_5 (PDT correct), then the P4_5 was reflashed with the tag branch. Merge when the owner says.
-  - WS_S3_4B builds on both and is flashed with neither (#69's watch).
-- **Playground v2** (same link): area modes on clusters, recommended grid per board, tile minimums
-  retuned, "why it does not fit" per block. The owner's notes on v1 are in `look-and-feel.md` §3.8.
+- **Merged to `main` 2026-10-01 (`0de94d3`), all nine environments compiled (28 min gate):**
+  - `feat/74-sntp` (#74): `TimeService`, SNTP + POSIX zone; the boot report waits up to 10 s for the
+    first sync, and the Doctor's `Time:` line shows the time and source. Owner confirmed on WS_P4_5.
+    Still open on #74: the RTC fallback, zone/servers as settings.
+  - `feat/card-tag-float` (#80): floating tag as the default (rises half its height, sticks out a
+    quarter to the side, paid for inside the cell); status pills float on the top edge and the area
+    name shortens beside them; bar band round-top/straight-bottom. Owner signed off. File folder
+    not built (#80).
+  - `feat/linen-butter`: Linen ground C+ (`CFC4B2`), card a hair darker (`F3EEE4`), and Linen's own
+    "on" colour - **olive** `9AA35A` (butter was rejected on glass). Owner's executive decision,
+    to be judged when back; other choices for 4.1 in `UITokens.cpp`.
+  - Flashed: WS_P4_5 and WS_P4_4B. WS_S3_4B not flashed (#69's watch). The 4880 runs an old tag build.
+- **Merge discipline (owner, 2026-10-01):** nothing reaches `main` without the all-nine compile gate
+  and a look on glass; no quick-fix branches during the interview (mocks instead); demos on one
+  board.
+- **Playground v4** (same link): half-side floating tag, folder tab offset, clusters never tagged
+  and their header bar clear unless the page is in Bar mode, status as icons. Notes: `look-and-feel.md`.
 - **New issues:** #75 night mode, #76 HA alerts, #77 media player, #78 page arranger (reopens Q3b),
   #79 transitions from pre-rendered pictures, #80 tag styles, #81 system panel should slide.
   Comments on #6, #20, #35, #52-54, #74.
