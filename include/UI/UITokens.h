@@ -64,6 +64,11 @@ struct UIPalette {
     uint32_t TINT_OPENING;  // doors, windows, garage doors, locks
     uint32_t TINT_PRESENCE; // occupancy, motion, presence
     uint32_t TINT_LIGHTING; // lights, and switches used as lights
+
+    // The dim laid over the page behind a card's popup (2.10a). Dark on every
+    // scheme, Linen included - a light dim reads as fog, not as "behind".
+    // Drawn as a translucent BACKGROUND, never an object opa (LESSONS: layers).
+    uint32_t SCRIM;
 };
 
 // ---------------------------------------------------------------------------

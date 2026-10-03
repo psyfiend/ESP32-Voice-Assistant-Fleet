@@ -5,6 +5,7 @@
 #include "LVGL_Startup.h"                // drawBufInfo(), for [UI STATE]
 #include "Cards/CardDemo.h"
 #include "Cards/CardIcons.h"   // cardSetLabelMode(), for the Label knob
+#include "Cards/CardPopup.h"   // modal: gestures stand down while it is open
 #include "UI/ReferencePage.h"
 #include "UI/LogPage.h"
 #include "UI/Screenshot.h"
@@ -209,6 +210,11 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
 
     lv_indev_t *indev = lv_indev_active();
     if (!indev) return;
+
+    // THE CARD POPUP IS MODAL (2.10a). Its scrim on the top layer already
+    // takes every touch, so a gesture should never get here while it is open;
+    // this makes sure no page swipe or edge pull can happen underneath it.
+    if (CardPopup::isOpen()) return;
 
     const lv_dir_t dir = lv_indev_get_gesture_dir(indev);
 
@@ -520,6 +526,10 @@ void GUIManager::begin() {
         // Every press, whatever it lands on. See screenPressCb().
         lv_indev_add_event_cb(indev, screenPressCb, LV_EVENT_PRESSED, NULL);
     }
+
+    // The card popup's own press hook: where a long press began, and when
+    // anything was last touched (its auto-close). Cards/CardPopup.h.
+    CardPopup::begin();
 
     // Bottom deck height = screen height - header height.
     int32_t header_h = UIToolkit::systemHeaderPx();

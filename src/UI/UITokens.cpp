@@ -38,6 +38,9 @@
 #define TINT_LIGHTING_DARK  0xFFE3A3
 #define TINT_LIGHTING_LIGHT 0xC98A12
 
+// The popup's dim, the same near-black on every scheme (Card Popup Mock v3).
+#define SCRIM_DARK 0x05080C
+
 // THREE SCHEMES, pruned on glass 2026-09-23: Fleet, Midnight, Linen.
 //
 // Slate went because it differed from Midnight only in its accent ("slate is
@@ -77,6 +80,7 @@ const UIPalette UI_PAL_LINEN = {
     .ST_ACTIVE   = 0x9AA35A,   // olive
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
+    .SCRIM       = SCRIM_DARK,
 };
 
 // Today's shipped UI, read out of UIToolkit.cpp and Panel_Header.cpp rather
@@ -94,6 +98,7 @@ const UIPalette UI_PAL_FLEET = {
     .ST_ACTIVE   = ST_ACTIVE_ORANGE,
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_DARK,
+    .SCRIM       = SCRIM_DARK,
 };
 
 // The owner's verdict after seeing the dark schemes on glass: the former
@@ -110,12 +115,14 @@ const UIPalette UI_PAL_MIDNIGHT = {
     .ST_ACTIVE   = ST_ACTIVE_ORANGE,
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_DARK,
+    .SCRIM       = SCRIM_DARK,
 };
 
 #undef FLEET_STATE_AND_TINTS
 #undef ST_ACTIVE_ORANGE
 #undef TINT_LIGHTING_DARK
 #undef TINT_LIGHTING_LIGHT
+#undef SCRIM_DARK
 
 // Dark schemes take a hairline border because a dark card on a dark ground
 // needs an edge; light schemes lean on the shadow instead. That difference was

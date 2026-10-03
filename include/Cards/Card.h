@@ -50,6 +50,12 @@
 // ---------------------------------------------------------------------------
 
 class Card {
+    // The popup reads what a card already knows - its entities, area, label
+    // and where it sits on the screen - and commands through the same
+    // registry. A friend rather than a row of public getters, because none of
+    // those are anybody else's business. Cards/CardPopup.h.
+    friend class CardPopup;
+
 public:
     virtual ~Card();
 
@@ -252,15 +258,13 @@ protected:
     // a read-only sensor.
     virtual void onTap() {}
 
-    // Long press. The BASE class implements this rather than leaving it empty,
-    // because pausing is a property of every card regardless of type - cards.md
-    // section 3's "per-card pause / ignore this entity", the one state allowed
-    // to go quiet because it is the user's own choice rather than a failure.
+    // Long press opens the card's popup window, on every card type (2.10a,
+    // card-sheet.md section 13). The owner's rule, section 11.2: "I want all
+    // cards to behave as uniformly as possible so you don't need to remember
+    // navigation for every type of card."
     //
-    // cards.md section 4 eventually wants a long press on a group to open a
-    // sheet of per-light cards. That needs an overlay this milestone does not
-    // have; when it arrives, a group card overrides this and everything else
-    // keeps pausing.
+    // It used to PAUSE the card. Pause now lives in the popup's SETTINGS deck,
+    // so a paused card is still one long press and one tap away.
     virtual void onLongPress();
 
     // --- Helpers for subclasses -------------------------------------------

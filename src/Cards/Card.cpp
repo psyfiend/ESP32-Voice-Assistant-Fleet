@@ -1,6 +1,7 @@
 #include "Cards/Card.h"
 #include "Cards/CardDefaults.h"
 #include "Cards/CardIcons.h"
+#include "Cards/CardPopup.h"
 #include "UI/UITokens.h"
 #include <Arduino.h>
 #include <string.h>
@@ -240,17 +241,13 @@ int32_t Card::shortSidePx() const {
     return (w < h) ? w : h;
 }
 
-// Long press pauses, on every card type.
+// Long press opens the popup, on every card type. 2.10a.
 //
-// cards.md section 3: a paused card is "the user's own choice rather than a
-// failure, so quiet is correct" - it is the one state allowed to dim, and the
-// one the user causes deliberately. Binding it to a long press makes PAUSED
-// reachable on a real card rather than only through a test button, and it is
-// the only whole-card action that makes sense on a read-only sensor as well as
-// on a switch.
+// It used to toggle PAUSE - cards.md section 3's "the user's own choice rather
+// than a failure". Pause is still reachable on every card, one tap further in:
+// the popup's SETTINGS deck (card-sheet.md section 13).
 void Card::onLongPress() {
-    setPaused(!isPaused());
-    pollState(millis());
+    CardPopup::open(*this);
 }
 
 // ---------------------------------------------------------------------------
