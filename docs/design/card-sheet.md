@@ -334,3 +334,28 @@ and calls, 2.10d stable ids + saving, 2.10e history - with this section's answer
 - **D4 - opened a larger question: what kinds of "group" exist.** Recorded and answered as a draft
   taxonomy in `group-cards.md` (source x presentation x behaviour). The members-inside-the-popup
   part of D4 matches the HA reference above.
+
+## 13. 2.10a build decisions (owner, 2026-10-02)
+
+Asked before building; the owner took every recommendation. These replace §9's 2.10a line where
+they differ (it still says "Settings tab" and "pause moved into it" without saying where).
+
+- **Body:** a switch gets its real big toggle (simple enough to build now); every other kind shows a
+  read-only value / state with "N minutes ago". Lights' sliders are 2.10b.
+- **Pause** moves from long press to a **"Paused: Off / On" row in the SETTINGS deck**.
+- **Drag down to close starts on the header row only**, so it never fights 2.10b's tall vertical
+  slider.
+- **The window's deck is a new, small part** owned by the popup. Reshaping the page deck
+  (`GUIManager`'s Audio / Display accordion) waits until interview §5 decides where the deck lives.
+- **History and members icons** are shown and lead to an empty placeholder view with a working back
+  arrow, so the navigation is testable before 2.10e and the group work fill them.
+- **Deck contents in 2.10a:** label choice (HA name / custom / state / none), Shown / Hidden, Paused.
+  Custom name shows the option; the keyboard is later.
+- **The window sits on LVGL's top layer**, above the header and the system drawer. The page under
+  the dim keeps updating live.
+- **The dim appears at once, not faded**: each frame of a fade redraws the whole screen (~85 ms a
+  frame on P4_5); appearing costs one redraw. The grow runs over it. If it looks abrupt on glass, a
+  fade is the thing to try.
+- **Long press opens the window on every card type** (§11.2's uniform rule); tap is unchanged.
+- **Deck settings live in RAM** and are lost at reboot - except Paused, which already persists
+  through #60's pause store. Saving by stable card id is 2.10d.
