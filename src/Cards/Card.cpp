@@ -1177,6 +1177,10 @@ bool Card::command(uint8_t slot, const EntityValue &v) {
 void Card::eventCb(lv_event_t *e) {
     Card *self = (Card *)lv_event_get_user_data(e);
     if (!self) return;
+    // Modal. While the popup's walls are in motion there is no dim over the
+    // page to catch a touch (it arrives with the window), so a card that is
+    // tapped mid-animation must not toggle or open a second window.
+    if (CardPopup::isOpen()) return;
     switch (lv_event_get_code(e)) {
         case LV_EVENT_SHORT_CLICKED: self->onTap();       break;
         case LV_EVENT_LONG_PRESSED:  self->onLongPress(); break;

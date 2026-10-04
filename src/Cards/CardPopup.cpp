@@ -98,7 +98,14 @@ struct Popup {
     // card under its whole area, every frame: 19 ms small, 66 ms full size.
     // Four thin walls change four thin strips; the inside does not change and
     // is not redrawn. The filled window appears once, when they arrive.
+    //
+    // ROUNDED, like the window it becomes (owner, round 2): the straight
+    // walls stop short of each corner and a quarter-arc fills it, its radius
+    // growing from the card's rounding to the window's. Each arc redraws only
+    // its own small square.
     lv_obj_t *walls[4] = {nullptr, nullptr, nullptr, nullptr};
+    lv_obj_t *arcs[4]  = {nullptr, nullptr, nullptr, nullptr};
+    int32_t   radA = 0, radB = 0, radNow = 0;
 
     lv_obj_t *scrim = nullptr, *win = nullptr;
     lv_obj_t *btnLeft = nullptr, *lblLeft = nullptr;
@@ -255,23 +262,52 @@ void makeWalls() {
         lv_obj_set_style_bg_color(w, col, 0);
         lv_obj_set_style_bg_opa  (w, LV_OPA_COVER, 0);
     }
-}
-
-void deleteWalls() {
-    for (lv_obj_t *&w : s.walls) {
-        if (w) { lv_obj_delete(w); w = nullptr; }
+    // LVGL's arc angles: 0 is three o'clock, increasing clockwise. Top-left,
+    // top-right, bottom-right, bottom-left.
+    static const int16_t from[4] = {180, 270,  0,  90};
+    static const int16_t to[4]   = {270, 360, 90, 180};
+    for (uint8_t i = 0; i < 4; i++) {
+        lv_obj_t *a = lv_arc_create(lv_layer_top());
+        lv_obj_remove_style_all(a);
+        lv_obj_clear_flag(a, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_clear_flag(a, LV_OBJ_FLAG_SCROLLABLE);
+        lv_arc_set_bg_angles(a, from[i], to[i]);
+        lv_arc_set_value(a, lv_arc_get_min_value(a));   // no indicator
+        lv_obj_set_style_arc_color  (a, col, 0);
+        lv_obj_set_style_arc_opa    (a, LV_OPA_COVER, 0);
+        lv_obj_set_style_arc_width  (a, wallPx(), 0);
+        lv_obj_set_style_arc_rounded(a, false, 0);
+        s.arcs[i] = a;
     }
 }
 
-// Top, bottom, left, right - each a strip along one edge of r.
-void placeWalls(const lv_area_t &r) {
+void deleteWalls() {
+    for (lv_obj_t *&w : s.walls) { if (w) { lv_obj_delete(w); w = nullptr; } }
+    for (lv_obj_t *&a : s.arcs)  { if (a) { lv_obj_delete(a); a = nullptr; } }
+}
+
+// The outline of r with corners of radius rad: four straight walls between
+// four quarter-arcs. Each arc is a 2*rad square centred on its corner's
+// circle, so it draws exactly the quarter that belongs to that corner.
+void placeWalls(const lv_area_t &r, int32_t rad) {
     if (!s.walls[0]) return;
     const int32_t t = wallPx();
     const int32_t w = lv_area_get_width(&r), h = lv_area_get_height(&r);
-    lv_obj_set_pos(s.walls[0], r.x1, r.y1);         lv_obj_set_size(s.walls[0], w, t);
-    lv_obj_set_pos(s.walls[1], r.x1, r.y2 - t + 1); lv_obj_set_size(s.walls[1], w, t);
-    lv_obj_set_pos(s.walls[2], r.x1, r.y1);         lv_obj_set_size(s.walls[2], t, h);
-    lv_obj_set_pos(s.walls[3], r.x2 - t + 1, r.y1); lv_obj_set_size(s.walls[3], t, h);
+    const int32_t lim = (w < h ? w : h) / 2;
+    if (rad > lim) rad = lim;
+    if (rad < t)   rad = t;
+    const int32_t d = 2 * rad;
+
+    lv_obj_set_pos(s.walls[0], r.x1 + rad, r.y1);         lv_obj_set_size(s.walls[0], w - d, t);
+    lv_obj_set_pos(s.walls[1], r.x1 + rad, r.y2 - t + 1); lv_obj_set_size(s.walls[1], w - d, t);
+    lv_obj_set_pos(s.walls[2], r.x1, r.y1 + rad);         lv_obj_set_size(s.walls[2], t, h - d);
+    lv_obj_set_pos(s.walls[3], r.x2 - t + 1, r.y1 + rad); lv_obj_set_size(s.walls[3], t, h - d);
+
+    lv_obj_set_pos(s.arcs[0], r.x1,         r.y1);         // top-left
+    lv_obj_set_pos(s.arcs[1], r.x2 - d + 1, r.y1);         // top-right
+    lv_obj_set_pos(s.arcs[2], r.x2 - d + 1, r.y2 - d + 1); // bottom-right
+    lv_obj_set_pos(s.arcs[3], r.x1,         r.y2 - d + 1); // bottom-left
+    for (lv_obj_t *a : s.arcs) lv_obj_set_size(a, d, d);
 }
 
 void animExec(void *var, int32_t v) {
@@ -281,7 +317,8 @@ void animExec(void *var, int32_t v) {
     s.animNow.y1 = lerp(s.animA.y1, s.animB.y1);
     s.animNow.x2 = lerp(s.animA.x2, s.animB.x2);
     s.animNow.y2 = lerp(s.animA.y2, s.animB.y2);
-    placeWalls(s.animNow);
+    s.radNow = lerp(s.radA, s.radB);
+    placeWalls(s.animNow, s.radNow);
     dbgMark();
 }
 
@@ -729,13 +766,35 @@ void makeWindow() {
     lv_obj_add_style(s.win, UI::paint(UIPaint::PAINT_LIFT), 0);
 }
 
+void scrimClickCb(lv_event_t *ev);
+
+// THE DIM ONLY WHILE THE WINDOW IS OPEN AND STILL (owner, round 2). It used to
+// go up before the walls moved and stay until they had shrunk away, which put
+// two full-screen redraws (~114 ms each) on the edges of the motion - the
+// hesitation at both ends the owner saw - and left the screen dim around an
+// empty wireframe. Now the dim and the window arrive together and leave
+// together, so the expensive frames happen where the motion stops and starts.
+// Tapping it is "tap outside", the second close route.
+void makeScrim() {
+    lv_obj_t *scr = lv_screen_active();
+    s.scrim = plain(lv_layer_top());
+    lv_obj_set_size  (s.scrim, lv_obj_get_width(scr), lv_obj_get_height(scr));
+    lv_obj_set_pos   (s.scrim, 0, 0);
+    lv_obj_set_style_bg_color(s.scrim, UI::c(UI::pal().SCRIM), 0);
+    lv_obj_set_style_bg_opa  (s.scrim, POPUP_SCRIM_OPA, 0);
+    lv_obj_add_flag  (s.scrim, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(s.scrim, scrimClickCb, LV_EVENT_CLICKED, nullptr);
+}
+
 void growDone(lv_anim_t *a) {
     (void)a;
     if (s.phase != PopupPhase::PHASE_GROWING) return;
     dbgReport("grow");
     s.phase = PopupPhase::PHASE_OPEN;
-    // Window and contents in one frame, then the walls go. That frame is the
-    // expensive one (the whole window area); the motion before it was cheap.
+    // Dim, window and contents in one frame, then the walls go. That frame is
+    // the expensive one; the motion before it was cheap. Created in this
+    // order so the dim lies under the window on the top layer.
+    makeScrim();
     makeWindow();
     buildContents();
     deleteWalls();
@@ -748,9 +807,7 @@ void shrinkDone(lv_anim_t *a) {
     (void)a;
     dbgReport("shrink");
     deleteWalls();
-    // The dim goes last, in one redraw, so the page never shows undimmed
-    // around a window that is still on its way back.
-    if (s.scrim) { lv_obj_delete(s.scrim); s.scrim = nullptr; }
+    if (s.scrim) { lv_obj_delete(s.scrim); s.scrim = nullptr; }   // normally gone already
     s.phase = PopupPhase::PHASE_CLOSED;
     s.nEnt = 0;
 }
@@ -768,17 +825,24 @@ void closeNow(void *unused) {
         // Closed mid-grow: the walls reverse from wherever they are.
         if (s.walls[0]) lv_anim_delete(s.walls[0], animExec);
         s.animA = s.animNow;
+        s.radA  = s.radNow;
     } else {
-        // The window and its contents go in one frame, and the walls take
-        // over at its edges and shrink back - the grow in reverse.
-        if (s.win) { lv_obj_delete(s.win); s.win = nullptr; }
+        // The dim, the window and its contents go in one frame, and the walls
+        // take over at its edges and shrink back over the undimmed page - the
+        // grow in reverse.
+        if (s.win)   { lv_obj_delete(s.win);   s.win = nullptr; }
+        if (s.scrim) { lv_obj_delete(s.scrim); s.scrim = nullptr; }
         forgetWidgets();
         s.animA = s.winRect;
+        s.radA  = s.winRadius;
         makeWalls();
     }
     if (!s.walls[0]) { shrinkDone(nullptr); return; }
+    s.animB = s.animA;    // so the first placement below sits at the start
+    s.radB  = s.radA;
     animExec(nullptr, 0);
     s.animB = s.cardRect;
+    s.radB  = UI::sc(UI::met().RADIUS);
     s.phase = PopupPhase::PHASE_SHRINKING;
     startAnim(POPUP_SHRINK_MS, lv_anim_path_ease_in, shrinkDone);
 }
@@ -864,20 +928,8 @@ void CardPopup::open(Card &card) {
     // corner" (H1). Still clear of the 2.4 mm corner radius.
     s.pad        = mm(1.2f);
 
-    const UIPalette &p = UI::pal();
-
-    // --- The dim: at once, not faded (card-sheet 13) ------------------------
-    // One full-screen redraw instead of one per frame of a fade (~85 ms each on
-    // P4_5). Tapping it is "tap outside", the second close route.
-    s.scrim = plain(lv_layer_top());
-    lv_obj_set_size  (s.scrim, sw, sh);
-    lv_obj_set_pos   (s.scrim, 0, 0);
-    lv_obj_set_style_bg_color(s.scrim, UI::c(p.SCRIM), 0);
-    lv_obj_set_style_bg_opa  (s.scrim, POPUP_SCRIM_OPA, 0);
-    lv_obj_add_flag  (s.scrim, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(s.scrim, scrimClickCb, LV_EVENT_CLICKED, nullptr);
-
     // --- The walls, starting at the card (or a point in the middle) --------
+    // Over the UNDIMMED page: the dim arrives with the window (makeScrim()).
     // cardRect is only ever the animation's far end, so the centre option
     // simply replaces it - and the shrink goes back to the same point.
     if (!POPUP_GROW_FROM_CARD) {
@@ -888,18 +940,10 @@ void CardPopup::open(Card &card) {
     }
     s.animA = s.cardRect;
     s.animB = s.winRect;
+    s.radA  = UI::sc(UI::met().RADIUS);   // the card's own rounding
+    s.radB  = s.winRadius;
     makeWalls();
     animExec(nullptr, 0);
-
-    // DRAW THE DIM NOW, BEFORE THE CLOCK STARTS. The dim is a full-screen
-    // redraw (~90 ms on P4_5); left to the next refresh it lands in the
-    // animation's first frame and eats half of a 200 ms grow - the owner saw
-    // "only a few frames" (O2). Paying it here, synchronously, means the grow
-    // starts from a screen that is already dim.
-    const uint32_t tDim = millis();
-    lv_refr_now(nullptr);
-    DBG_POPUP("dim frame: %lu ms\n", (unsigned long)(millis() - tDim));
-    (void)tDim;
 #ifdef DEBUG_POPUP
     s_dbgN = 0;
 #endif
