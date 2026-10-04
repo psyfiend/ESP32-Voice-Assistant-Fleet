@@ -57,15 +57,12 @@ enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_GROWING, PHASE_OPEN, PHASE
 // D6: auto-close after 60 s untouched. The owner chose all four close routes.
 constexpr uint32_t POPUP_AUTOCLOSE_MS = 60000;
 constexpr uint32_t POPUP_TICK_MS      = 250;
-// About the length of a deck panel's slide (9 frames at 32 ms on P4_5), which
-// the owner holds up as what smooth looks like. The mock's 0.2 s was ~6
-// frames at LVGL's 33 ms refresh period, whatever each frame cost.
-constexpr uint32_t POPUP_GROW_MS      = 300;
-constexpr uint32_t POPUP_SHRINK_MS    = 250;
-// Where the walls start: the card that was pressed (D1), or a point in the
-// middle of the window (the owner's alternative, 2026-10-03). Either costs
-// the same; this is purely how it looks.
-constexpr bool     POPUP_GROW_FROM_CARD = true;
+// SNAPPY FIRST (owner, 2026-10-04: "more than anything I want everything to be
+// responsive and as snappy as possible, decoration and eye candy flourishes
+// are secondary"). Every millisecond here is between the long press and a
+// window that can be used: ~7 frames at LVGL's 33 ms refresh period.
+constexpr uint32_t POPUP_GROW_MS      = 220;
+constexpr uint32_t POPUP_SHRINK_MS    = 180;
 // ~62%, the mock's dim. A BACKGROUND opacity on the scrim, which is ordinary
 // blending - not an object opa, which would composite a screen-sized layer.
 constexpr lv_opa_t POPUP_SCRIM_OPA    = 158;
@@ -88,24 +85,36 @@ struct Popup {
     int32_t   winRadius = 0;
     int32_t   pad = 0;
 
-    // The two ends of whichever animation is running, and where it is now.
-    lv_area_t animA = {}, animB = {}, animNow = {};
+    // The grow's two ends: the first ring's rectangle and the window's.
+    lv_area_t animA = {}, animB = {};
 
-    // THE ANIMATION IS FOUR WALLS, NOT A BOX (the owner's idea, 2026-10-03).
-    // Anything on lv_layer_top() is drawn OVER the page, never instead of it
-    // (lv_refr.c: the screen is drawn from its topmost covering object, then
-    // the top layer unconditionally). So a growing box made LVGL redraw every
-    // card under its whole area, every frame: 19 ms small, 66 ms full size.
-    // Four thin walls change four thin strips; the inside does not change and
-    // is not redrawn. The filled window appears once, when they arrive.
+    // THE GROW IS PAINTED IN RINGS (2026-10-04). The history, because each
+    // step was measured:
+    //   - a growing filled box on lv_layer_top(): LVGL draws the page under
+    //     the top layer in full (lv_refr.c:1049/1081), so every card under the
+    //     box was redrawn every frame - 19 -> 66 ms, ~6 frames. Choppy.
+    //   - four walls and corner arcs: 33 ms frames, but an outline, "not a
+    //     popup" (owner).
+    //   - the page as a picture under a filled box: 84-180 ms frames - copying
+    //     the picture from PSRAM every frame cost more than drawing cards - and
+    //     a frozen background the owner did not want. Reverted.
+    // A frame costs about the area that changes. A filled box that is resized
+    // changes its whole area; a box that only GROWS changes just the new ring
+    // around it. So each step adds four thin filled strips covering exactly
+    // the ring between the last rectangle and the new one, and the strips
+    // already painted are never touched again. The page stays live underneath.
     //
-    // ROUNDED, like the window it becomes (owner, round 2): the straight
-    // walls stop short of each corner and a quarter-arc fills it, its radius
-    // growing from the card's rounding to the window's. Each arc redraws only
-    // its own small square.
-    lv_obj_t *walls[4] = {nullptr, nullptr, nullptr, nullptr};
-    lv_obj_t *arcs[4]  = {nullptr, nullptr, nullptr, nullptr};
-    int32_t   radA = 0, radB = 0, radNow = 0;
+    // Rings can add area, never move it, so the window grows OUTWARD from a
+    // strip inside its own final rectangle, on the side nearest the pressed
+    // card - not out of the card itself. Square corners in motion; the window
+    // rounds them when it lands.
+    static constexpr uint8_t RING_STEPS_MAX = 24;
+    static constexpr uint8_t RING_OBJS_MAX  = 4 * RING_STEPS_MAX + 1;
+    lv_area_t ringRect[RING_STEPS_MAX] = {};   // the rectangle after each step
+    uint8_t   nSteps = 0;
+    lv_obj_t *ringObj[RING_OBJS_MAX] = {nullptr};
+    uint8_t   ringEnd[RING_STEPS_MAX] = {0};   // ringObj count after each step
+    uint8_t   nRingObj = 0;
 
     lv_obj_t *scrim = nullptr, *win = nullptr;
     lv_obj_t *btnLeft = nullptr, *lblLeft = nullptr;
@@ -245,91 +254,87 @@ const char *whatWord(const Entity &e, char *buf, size_t cap) {
 }
 
 // ---------------------------------------------------------------------------
-// The grow and the shrink: four walls tracing a rectangle that moves from one
-// area to another. See Popup::walls for why it is walls and not a box.
+// The grow and the shrink, painted in rings. See Popup::ringRect for why.
 // ---------------------------------------------------------------------------
 
-// The window's own border width, at least 2 px so the walls read in motion.
-int32_t wallPx() {
-    const int32_t b = UI::met().BORDER_W;
-    return b > 2 ? b : 2;
+// One filled strip in the window's colour. Empty strips are skipped - a step
+// that moved only two edges paints only two strips.
+void paintPiece(int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
+    if (x2 < x1 || y2 < y1 || s.nRingObj >= Popup::RING_OBJS_MAX) return;
+    lv_obj_t *o = plain(lv_layer_top());
+    lv_obj_set_pos (o, x1, y1);
+    lv_obj_set_size(o, x2 - x1 + 1, y2 - y1 + 1);
+    lv_obj_set_style_bg_color(o, UI::c(UI::pal().SURFACE_ALT), 0);
+    lv_obj_set_style_bg_opa  (o, LV_OPA_COVER, 0);
+    s.ringObj[s.nRingObj++] = o;
 }
 
-void makeWalls() {
-    const lv_color_t col = UI::border();
-    for (lv_obj_t *&w : s.walls) {
-        w = plain(lv_layer_top());
-        lv_obj_set_style_bg_color(w, col, 0);
-        lv_obj_set_style_bg_opa  (w, LV_OPA_COVER, 0);
+// Paint step i: the whole first rectangle, or the ring between step i-1 and
+// step i - top and bottom across the full width, left and right between them.
+void paintStep(uint8_t i) {
+    const lv_area_t &n = s.ringRect[i];
+    if (i == 0) {
+        paintPiece(n.x1, n.y1, n.x2, n.y2);
+    } else {
+        const lv_area_t &o = s.ringRect[i - 1];
+        paintPiece(n.x1, n.y1, n.x2, o.y1 - 1);   // top
+        paintPiece(n.x1, o.y2 + 1, n.x2, n.y2);   // bottom
+        paintPiece(n.x1, o.y1, o.x1 - 1, o.y2);   // left
+        paintPiece(o.x2 + 1, o.y1, n.x2, o.y2);   // right
     }
-    // LVGL's arc angles: 0 is three o'clock, increasing clockwise. Top-left,
-    // top-right, bottom-right, bottom-left.
-    static const int16_t from[4] = {180, 270,  0,  90};
-    static const int16_t to[4]   = {270, 360, 90, 180};
-    for (uint8_t i = 0; i < 4; i++) {
-        lv_obj_t *a = lv_arc_create(lv_layer_top());
-        lv_obj_remove_style_all(a);
-        lv_obj_clear_flag(a, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_clear_flag(a, LV_OBJ_FLAG_SCROLLABLE);
-        lv_arc_set_bg_angles(a, from[i], to[i]);
-        lv_arc_set_value(a, lv_arc_get_min_value(a));   // no indicator
-        lv_obj_set_style_arc_color  (a, col, 0);
-        lv_obj_set_style_arc_opa    (a, LV_OPA_COVER, 0);
-        lv_obj_set_style_arc_width  (a, wallPx(), 0);
-        lv_obj_set_style_arc_rounded(a, false, 0);
-        s.arcs[i] = a;
+    s.ringEnd[i] = s.nRingObj;
+}
+
+// Remove every strip from step `from` outward; steps below it stay painted.
+void unpaintFrom(uint8_t from) {
+    const uint8_t keep = from ? s.ringEnd[from - 1] : 0;
+    while (s.nRingObj > keep) {
+        lv_obj_delete(s.ringObj[--s.nRingObj]);
+        s.ringObj[s.nRingObj] = nullptr;
     }
 }
 
-void deleteWalls() {
-    for (lv_obj_t *&w : s.walls) { if (w) { lv_obj_delete(w); w = nullptr; } }
-    for (lv_obj_t *&a : s.arcs)  { if (a) { lv_obj_delete(a); a = nullptr; } }
-}
-
-// The outline of r with corners of radius rad: four straight walls between
-// four quarter-arcs. Each arc is a 2*rad square centred on its corner's
-// circle, so it draws exactly the quarter that belongs to that corner.
-void placeWalls(const lv_area_t &r, int32_t rad) {
-    if (!s.walls[0]) return;
-    const int32_t t = wallPx();
-    const int32_t w = lv_area_get_width(&r), h = lv_area_get_height(&r);
-    const int32_t lim = (w < h ? w : h) / 2;
-    if (rad > lim) rad = lim;
-    if (rad < t)   rad = t;
-    const int32_t d = 2 * rad;
-
-    lv_obj_set_pos(s.walls[0], r.x1 + rad, r.y1);         lv_obj_set_size(s.walls[0], w - d, t);
-    lv_obj_set_pos(s.walls[1], r.x1 + rad, r.y2 - t + 1); lv_obj_set_size(s.walls[1], w - d, t);
-    lv_obj_set_pos(s.walls[2], r.x1, r.y1 + rad);         lv_obj_set_size(s.walls[2], t, h - d);
-    lv_obj_set_pos(s.walls[3], r.x2 - t + 1, r.y1 + rad); lv_obj_set_size(s.walls[3], t, h - d);
-
-    lv_obj_set_pos(s.arcs[0], r.x1,         r.y1);         // top-left
-    lv_obj_set_pos(s.arcs[1], r.x2 - d + 1, r.y1);         // top-right
-    lv_obj_set_pos(s.arcs[2], r.x2 - d + 1, r.y2 - d + 1); // bottom-right
-    lv_obj_set_pos(s.arcs[3], r.x1,         r.y2 - d + 1); // bottom-left
-    for (lv_obj_t *a : s.arcs) lv_obj_set_size(a, d, d);
-}
-
-void animExec(void *var, int32_t v) {
+// The grow: one step per animation tick, from animA (a strip inside the
+// window) out to the window. An eased lerp between nested rectangles is
+// monotonic, so each step contains the last; the clamp only guards rounding.
+void growExec(void *var, int32_t v) {
     (void)var;
     auto lerp = [v](int32_t a, int32_t b) { return a + (int32_t)(((int64_t)(b - a) * v) >> 10); };
-    s.animNow.x1 = lerp(s.animA.x1, s.animB.x1);
-    s.animNow.y1 = lerp(s.animA.y1, s.animB.y1);
-    s.animNow.x2 = lerp(s.animA.x2, s.animB.x2);
-    s.animNow.y2 = lerp(s.animA.y2, s.animB.y2);
-    s.radNow = lerp(s.radA, s.radB);
-    placeWalls(s.animNow, s.radNow);
+    lv_area_t r = { lerp(s.animA.x1, s.animB.x1), lerp(s.animA.y1, s.animB.y1),
+                    lerp(s.animA.x2, s.animB.x2), lerp(s.animA.y2, s.animB.y2) };
+    if (s.nSteps) {
+        const lv_area_t &o = s.ringRect[s.nSteps - 1];
+        r.x1 = LV_MIN(r.x1, o.x1); r.y1 = LV_MIN(r.y1, o.y1);
+        r.x2 = LV_MAX(r.x2, o.x2); r.y2 = LV_MAX(r.y2, o.y2);
+        if (r.x1 == o.x1 && r.y1 == o.y1 && r.x2 == o.x2 && r.y2 == o.y2) return;   // nothing new
+        // Keep the last slot for the final rectangle, however many ticks come.
+        if (s.nSteps >= Popup::RING_STEPS_MAX - 1 && v < 1024) return;
+    }
+    if (s.nSteps >= Popup::RING_STEPS_MAX) return;
+    s.ringRect[s.nSteps] = r;
+    paintStep(s.nSteps);
+    s.nSteps++;
     dbgMark();
 }
 
-void startAnim(uint32_t ms, lv_anim_path_cb_t path, lv_anim_completed_cb_t done) {
+// The shrink: the grow's own rings come off, outermost first. The value runs
+// from the number of painted steps down to 0.
+void shrinkExec(void *var, int32_t v) {
+    (void)var;
+    if (v < 0) v = 0;
+    if (v < (int32_t)s.nSteps) unpaintFrom((uint8_t)v);
+    dbgMark();
+}
+
+void startAnim(lv_anim_exec_xcb_t exec, int32_t from, int32_t to, uint32_t ms,
+               lv_anim_path_cb_t path, lv_anim_completed_cb_t done) {
     lv_anim_t a;
     lv_anim_init(&a);
-    lv_anim_set_var        (&a, s.walls[0]);
-    lv_anim_set_values     (&a, 0, 1024);
+    lv_anim_set_var        (&a, &s);
+    lv_anim_set_values     (&a, from, to);
     lv_anim_set_duration   (&a, ms);
     lv_anim_set_path_cb    (&a, path);
-    lv_anim_set_exec_cb    (&a, animExec);
+    lv_anim_set_exec_cb    (&a, exec);
     lv_anim_set_completed_cb(&a, done);
     lv_anim_start(&a);
 }
@@ -746,7 +751,7 @@ void tickCb(lv_timer_t *t) {
     }
 }
 
-// The filled window, created only once the walls have arrived. The scheme's
+// The filled window, created only once the rings have arrived. The scheme's
 // raised surface (the mock's window is Midnight's SURFACE_ALT exactly) and
 // the border token. No clip_corner: it would cost a window-sized layer
 // (card-sheet 8). Clickable, so a tap inside never falls through to the scrim.
@@ -769,10 +774,9 @@ void makeWindow() {
 void scrimClickCb(lv_event_t *ev);
 
 // THE DIM ONLY WHILE THE WINDOW IS OPEN AND STILL (owner, round 2). It used to
-// go up before the walls moved and stay until they had shrunk away, which put
-// two full-screen redraws (~114 ms each) on the edges of the motion - the
-// hesitation at both ends the owner saw - and left the screen dim around an
-// empty wireframe. Now the dim and the window arrive together and leave
+// go up before the motion and stay until it ended, which put two full-screen
+// redraws (~114 ms each) on the edges of the motion - the hesitation at both
+// ends the owner saw. Now the dim and the window arrive together and leave
 // together, so the expensive frames happen where the motion stops and starts.
 // Tapping it is "tap outside", the second close route.
 void makeScrim() {
@@ -791,13 +795,15 @@ void growDone(lv_anim_t *a) {
     if (s.phase != PopupPhase::PHASE_GROWING) return;
     dbgReport("grow");
     s.phase = PopupPhase::PHASE_OPEN;
-    // Dim, window and contents in one frame, then the walls go. That frame is
-    // the expensive one; the motion before it was cheap. Created in this
-    // order so the dim lies under the window on the top layer.
+    // Dim, window and contents in one frame, and the rings go - the window
+    // covers exactly where they were, rounded, and they would show square at
+    // its corners. That frame is the expensive one; the motion before it was
+    // cheap. The steps' rectangles are kept: the shrink repaints them.
+    // Created in this order so the dim lies under the window.
     makeScrim();
     makeWindow();
     buildContents();
-    deleteWalls();
+    unpaintFrom(0);
     s.lastTouchMs = millis();
     s.lastAgeMs   = s.lastTouchMs;
     s.timer = lv_timer_create(tickCb, POPUP_TICK_MS, nullptr);
@@ -806,7 +812,8 @@ void growDone(lv_anim_t *a) {
 void shrinkDone(lv_anim_t *a) {
     (void)a;
     dbgReport("shrink");
-    deleteWalls();
+    unpaintFrom(0);
+    s.nSteps = 0;
     if (s.scrim) { lv_obj_delete(s.scrim); s.scrim = nullptr; }   // normally gone already
     s.phase = PopupPhase::PHASE_CLOSED;
     s.nEnt = 0;
@@ -822,29 +829,24 @@ void closeNow(void *unused) {
     if (s.timer) { lv_timer_delete(s.timer); s.timer = nullptr; }
 
     if (s.phase == PopupPhase::PHASE_GROWING) {
-        // Closed mid-grow: the walls reverse from wherever they are.
-        if (s.walls[0]) lv_anim_delete(s.walls[0], animExec);
-        s.animA = s.animNow;
-        s.radA  = s.radNow;
+        // Closed mid-grow: the rings painted so far come off from here.
+        lv_anim_delete(&s, growExec);
     } else {
-        // The dim, the window and its contents go in one frame, and the walls
-        // take over at its edges and shrink back over the undimmed page - the
-        // grow in reverse.
+        // The dim, the window and its contents go in one frame, and the rings
+        // are repainted under where the window was - the same frame, so the
+        // page never shows through - then come off outermost first, over the
+        // undimmed page: the grow in reverse.
         if (s.win)   { lv_obj_delete(s.win);   s.win = nullptr; }
         if (s.scrim) { lv_obj_delete(s.scrim); s.scrim = nullptr; }
         forgetWidgets();
-        s.animA = s.winRect;
-        s.radA  = s.winRadius;
-        makeWalls();
+        s.nRingObj = 0;
+        for (uint8_t i = 0; i < s.nSteps; i++) paintStep(i);
     }
-    if (!s.walls[0]) { shrinkDone(nullptr); return; }
-    s.animB = s.animA;    // so the first placement below sits at the start
-    s.radB  = s.radA;
-    animExec(nullptr, 0);
-    s.animB = s.cardRect;
-    s.radB  = UI::sc(UI::met().RADIUS);
+    if (!s.nSteps) { shrinkDone(nullptr); return; }
     s.phase = PopupPhase::PHASE_SHRINKING;
-    startAnim(POPUP_SHRINK_MS, lv_anim_path_ease_in, shrinkDone);
+    // Linear over STEPS: the steps were laid down on the grow's ease-out, so
+    // removing them at an even rate replays that curve backwards.
+    startAnim(shrinkExec, s.nSteps, 0, POPUP_SHRINK_MS, lv_anim_path_linear, shrinkDone);
 }
 
 void pressCb(lv_event_t *ev) {
@@ -928,22 +930,27 @@ void CardPopup::open(Card &card) {
     // corner" (H1). Still clear of the 2.4 mm corner radius.
     s.pad        = mm(1.2f);
 
-    // --- The walls, starting at the card (or a point in the middle) --------
-    // Over the UNDIMMED page: the dim arrives with the window (makeScrim()).
-    // cardRect is only ever the animation's far end, so the centre option
-    // simply replaces it - and the shrink goes back to the same point.
-    if (!POPUP_GROW_FROM_CARD) {
-        const int32_t cx = (s.winRect.x1 + s.winRect.x2) / 2;
-        const int32_t cy = (s.winRect.y1 + s.winRect.y2) / 2;
-        const int32_t t  = wallPx();
-        s.cardRect = { cx - t, cy - t, cx + t, cy + t };
+    // --- Where the rings start: the card, pulled inside the window --------
+    // Rings only add area, so the first rectangle must lie inside the
+    // window. The card's rectangle clamped into it: a card under the window
+    // starts as itself; one beside the window starts as a strip on the near
+    // edge, at the card's height. Never thinner than 6 mm either way.
+    const lv_area_t &W = s.winRect;
+    lv_area_t a = { LV_CLAMP(W.x1, s.cardRect.x1, W.x2), LV_CLAMP(W.y1, s.cardRect.y1, W.y2),
+                    LV_CLAMP(W.x1, s.cardRect.x2, W.x2), LV_CLAMP(W.y1, s.cardRect.y2, W.y2) };
+    const int32_t minSide = mm(6);
+    if (a.x2 - a.x1 + 1 < minSide) {
+        a.x1 = LV_CLAMP(W.x1, (a.x1 + a.x2) / 2 - minSide / 2, W.x2 - minSide + 1);
+        a.x2 = a.x1 + minSide - 1;
     }
-    s.animA = s.cardRect;
-    s.animB = s.winRect;
-    s.radA  = UI::sc(UI::met().RADIUS);   // the card's own rounding
-    s.radB  = s.winRadius;
-    makeWalls();
-    animExec(nullptr, 0);
+    if (a.y2 - a.y1 + 1 < minSide) {
+        a.y1 = LV_CLAMP(W.y1, (a.y1 + a.y2) / 2 - minSide / 2, W.y2 - minSide + 1);
+        a.y2 = a.y1 + minSide - 1;
+    }
+    s.animA    = a;
+    s.animB    = s.winRect;
+    s.nSteps   = 0;
+    s.nRingObj = 0;
 #ifdef DEBUG_POPUP
     s_dbgN = 0;
 #endif
@@ -951,5 +958,7 @@ void CardPopup::open(Card &card) {
     s.view        = PopupView::VIEW_MAIN;
     s.closeQueued = false;
     s.phase       = PopupPhase::PHASE_GROWING;
-    startAnim(POPUP_GROW_MS, lv_anim_path_ease_out, growDone);
+    // Over the UNDIMMED page: the dim arrives with the window (makeScrim()).
+    // growExec paints the first rectangle on its first tick.
+    startAnim(growExec, 0, 1024, POPUP_GROW_MS, lv_anim_path_ease_out, growDone);
 }
