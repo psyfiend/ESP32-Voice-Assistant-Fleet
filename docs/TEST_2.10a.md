@@ -81,6 +81,23 @@ command, so it shows a refusal), **All Lamps** (four lamps on one card) and the 
 | L2 | Linen (cycle the scheme first, then open a window) | Readable; the dim is dark, not foggy |
 | L3 | Text | Nothing renders as an empty box |
 
+## Round 1 results (owner, 2026-10-03) and what changed
+
+O1, O3-O5, H2, H5, C2, C4-C6, B2-B4, V1, V2, L1, L3 PASS. Fixed since: **C3** (drag down never
+arrived - LVGL hands a gesture to the first object WITHOUT GESTURE_BUBBLE), **V3** (title clipped /
+wrapped), **B1** (group shifted on the first tap), **H1/H3/H4** (bigger icons in discs, nearer the
+corner), **L2** (Linen's shadow on the window). **O2/C1** (choppy grow): now a rounded outline that
+grows from the card, the dim only while the window is open - smoother, but the owner wants a filled
+window (see HANDOFF). **B5/B8** are #84, not 2.10a: the board had no network, so nothing ever had a
+reading. Long press is 300 ms.
+
+## Round 3 - to test
+
+| # | Do this | PASS if |
+|---|---|---|
+| R1 | Open and close popups from cards on the far left, far right, top and bottom rows | No lines are left on the screen afterwards |
+| R2 | Open the deck, the drawer and peek the header | Nothing left behind there either (same display fix) |
+
 ## Measured (Claude, from the board) - pending
 
 - `lv_mem` with the window open (interview G1).

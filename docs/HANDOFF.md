@@ -21,6 +21,47 @@ Fleet = MQTT/system/virtual cards), swiped with wrap-around; three colour scheme
 default, Fleet, Linen with real shadows); card types with state icons; an FPS/CPU overlay;
 `/screenshot` and `/bench` over HTTP.
 
+## 2.10a status - 2026-10-04 (laptop, hotel, WS_P4_5 on COM6, no network for the board)
+
+**Branch `feat/65-popup-frame`** (off `main`). Built on WS_P4_5 only. Decisions taken before building:
+`card-sheet.md` section 13.
+
+**Built and seen on glass:** long press (now **300 ms**) opens a window on every card type; header X /
+"Area > name" / history (clock icon - the chart glyph needs a font regeneration on the desktop, no
+Node.js on the laptop) / members (multi-entity cards); closes by X, tap on the dim, drag down on the
+header row, 60 s idle with a shrinking bar; modal; a switch gets its real toggle, everything else a
+read-only value + "Changed N ago"; history and members are placeholder views with a back arrow.
+Owner's round 1 results are in `docs/TEST_2.10a.md` terms (O/H/C/B/V/L); C3, V3, B1, H1 fixed.
+
+**The animation, and what was learned (put this in LESSONS when 2.10a closes):**
+- Anything on `lv_layer_top()` is drawn OVER the page, never instead of it (`lv_refr.c:1049/1081`), so a
+  growing filled box redrew every card under its area each frame: 19 -> 66 ms, ~6 frames. Now the
+  owner's **four walls + quarter-arc corners** outline grows from the card (10 frames at a steady
+  33 ms, LVGL's refresh cap) and the filled window appears at the end. The dim comes and goes WITH the
+  window (owner). Remaining cost: ~122 ms for the frame the window appears in, ~90 ms the frame it goes.
+- **Owner's verdict so far: smoother, but an outline is not a popup.** He wants a FILLED, rounded
+  window growing and shrinking. Claude's proposal, **awaiting the owner's go**: snapshot the page once,
+  show the popup on its own screen over that picture (dim, and later blur, baked in), so LVGL stops
+  redrawing live cards under it - the background freezes while the popup is open (reverses the
+  "page keeps updating" decision), ~90-110 ms to take the picture, ~1.8 MB PSRAM.
+- `-D DEBUG_FRAMES` (GUIManager.cpp): every frame of every burst of motion over serial. Measured: the
+  deck, drawer and header peek run at the same 33 ms cadence, 1-30 ms of drawing per frame.
+
+**Display-stack bug found and fixed (all esp_lcd DSI boards), NOT YET VERIFIED ON GLASS:** the repair
+path's whole-area fallback (`repairArea`, more than PIECES_MAX pieces) was QUEUED on the DMA2D copier
+and raced the PPA's strip rotations, sometimes putting the previous frame back over fresh pixels -
+the popup's outline left straight lines with rounded ends behind. Now done synchronously before the
+frame's first strip (`repairBlitNow`), PIECES_MAX 32 -> 64. Test: open/close popups from cards on
+both edges; no lines may remain. Then add it to LESSONS and `docs/display/history.md`.
+
+**Next, in order:** (1) owner tests the repair fix; (2) owner's go/no-go on the snapshot screen for a
+filled grow; (3) the settings deck that peeks up, with **Pause** in it - long press no longer pauses,
+so nothing on the board can pause a card until this lands; (4) `lv_mem` with the window open;
+(5) all-nine compile gate, look on glass, merge.
+
+**Laptop-local, never committed:** `platformio.ini` (skip-worktree) carries `-D DEBUG_POPUP` and
+`-D DEBUG_FRAMES` on WS_P4_5. #84 (cards never say "no data yet") was filed from this testing.
+
 ## What is next — the new session's job: BUILD 2.10a (#65)
 
 The design interview's §1 and §2 are closed; the owner chose to start building the card popup.
