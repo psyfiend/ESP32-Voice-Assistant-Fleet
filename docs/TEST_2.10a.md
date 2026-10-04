@@ -91,12 +91,13 @@ grows from the card, the dim only while the window is open - smoother, but the o
 window (see HANDOFF). **B5/B8** are #84, not 2.10a: the board had no network, so nothing ever had a
 reading. Long press is 300 ms.
 
-## Round 3 - to test
+## Round 3 (owner, 2026-10-04)
 
-| # | Do this | PASS if |
+| # | Do this | Result |
 |---|---|---|
-| R1 | Open and close popups from cards on the far left, far right, top and bottom rows | No lines are left on the screen afterwards |
-| R2 | Open the deck, the drawer and peek the header | Nothing left behind there either (same display fix) |
+| R1 | Open and close popups from cards on the far left, far right, top and bottom rows | **PASS** - no lines left behind |
+| R2 | The page-picture backdrop (filled window over a snapshot) | **Rejected**: slower (4 frames) and the background froze. Reverted |
+| R3 | The ring-painted grow | **"Looks pretty good"**, no gaps seen. Wanted: a border and rounded corners while it moves |
 
 ## Measured (Claude, from the board) - pending
 

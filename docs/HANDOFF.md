@@ -33,34 +33,50 @@ header row, 60 s idle with a shrinking bar; modal; a switch gets its real toggle
 read-only value + "Changed N ago"; history and members are placeholder views with a back arrow.
 Owner's round 1 results are in `docs/TEST_2.10a.md` terms (O/H/C/B/V/L); C3, V3, B1, H1 fixed.
 
-**The animation, and what was learned (put this in LESSONS when 2.10a closes):**
-- Anything on `lv_layer_top()` is drawn OVER the page, never instead of it (`lv_refr.c:1049/1081`), so a
-  growing filled box redrew every card under its area each frame: 19 -> 66 ms, ~6 frames. Now the
-  owner's **four walls + quarter-arc corners** outline grows from the card (10 frames at a steady
-  33 ms, LVGL's refresh cap) and the filled window appears at the end. The dim comes and goes WITH the
-  window (owner). Remaining cost: ~122 ms for the frame the window appears in, ~90 ms the frame it goes.
-- **Owner's verdict so far: smoother, but an outline is not a popup.** He wants a FILLED, rounded
-  window growing and shrinking. Claude's proposal, **awaiting the owner's go**: snapshot the page once,
-  show the popup on its own screen over that picture (dim, and later blur, baked in), so LVGL stops
-  redrawing live cards under it - the background freezes while the popup is open (reverses the
-  "page keeps updating" decision), ~90-110 ms to take the picture, ~1.8 MB PSRAM.
-- `-D DEBUG_FRAMES` (GUIManager.cpp): every frame of every burst of motion over serial. Measured: the
-  deck, drawer and header peek run at the same 33 ms cadence, 1-30 ms of drawing per frame.
+**The animation - CURRENT: painted in rings (`4f220ad`). Owner: "actually looks pretty good now!"**
+The owner's priority, 2026-10-04: **snappy first**, eye candy second ("I'm not going to lose sleep if
+we can't do this growing animation"). What was tried, each measured on WS_P4_5 with `DEBUG_POPUP` /
+`DEBUG_FRAMES` (put the conclusions in LESSONS when 2.10a closes):
 
-**Display-stack bug found and fixed (all esp_lcd DSI boards), NOT YET VERIFIED ON GLASS:** the repair
+| Version | Frames per grow | Verdict |
+|---|---|---|
+| Filled box on `lv_layer_top()` | ~6, 19 -> 66 ms each | choppy. The top layer is drawn OVER the page, never instead of it (`lv_refr.c:1049/1081`), so every card under the box redrew every frame |
+| Four walls + corner arcs (outline) | 10, steady 33 ms | smooth, but "a wireframe, not a popup" |
+| Page snapshot as the screen's top object, filled box over it | **4, 84-180 ms each** | worse, AND froze the background. LVGL's draw buffers are in PSRAM on the esp_lcd path (`LVGL_Flush_EspLcd.cpp:564`), so the picture is a PSRAM-to-PSRAM copy every frame; LVGL's builtin `memcpy` is also byte-wise when alignments differ. Reverted (`243c31d`); owner wants cards behind the popup to stay live |
+| **Rings**: each step paints only the new ring between the last rectangle and the next as filled strips; old strips are never touched; shrink removes them outermost first | **8-9 at 33-40 ms, 5-30 ms drawing**, grow 220 ms / shrink 180 ms | **current.** Live page underneath. Grows outward from the card's rectangle clamped inside the window (rings can only add area) |
+
+Still expensive and unchanged: the frame the dim + window + contents appear in (~122 ms) and the first
+shrink frame (~95 ms). **Owner's next ask: a BORDER and ROUNDED corners while it grows** (today the
+moving panel is a plain square-cornered fill). Ideas: (a) the four-walls outline from `8158c5b`
+(walls + `lv_arc` corners, cheap) drawn on top of the rings; (b) rounded fill corners - leave each
+ring's four corner squares unpainted, put a filled quarter-disc (`lv_arc`, `arc_width` = radius) there
+that moves with the edge, and fill the previous step's corner squares as they become interior. Watch
+for the case where a step is smaller than the radius (end of the ease-out). Measure both with the
+logging flags.
+
+`-D DEBUG_FRAMES` (GUIManager.cpp): every frame of every burst of motion over serial. Measured: the
+deck, drawer and header peek run at the same 33 ms cadence, 1-30 ms of drawing per frame.
+
+**Display-stack bug found and fixed (all esp_lcd DSI boards), VERIFIED ON GLASS by the owner
+2026-10-04 ("No lines left behind"):** the repair
 path's whole-area fallback (`repairArea`, more than PIECES_MAX pieces) was QUEUED on the DMA2D copier
 and raced the PPA's strip rotations, sometimes putting the previous frame back over fresh pixels -
 the popup's outline left straight lines with rounded ends behind. Now done synchronously before the
-frame's first strip (`repairBlitNow`), PIECES_MAX 32 -> 64. Test: open/close popups from cards on
-both edges; no lines may remain. Then add it to LESSONS and `docs/display/history.md`.
+frame's first strip (`repairBlitNow`), PIECES_MAX 32 -> 64. Add it to LESSONS and
+`docs/display/history.md`. The other esp_lcd DSI boards (7B, 4B, CYD_P4_1060, 4880) carry the same fix
+and have not been flashed with it.
 
-**Next, in order:** (1) owner tests the repair fix; (2) owner's go/no-go on the snapshot screen for a
-filled grow; (3) the settings deck that peeks up, with **Pause** in it - long press no longer pauses,
-so nothing on the board can pause a card until this lands; (4) `lv_mem` with the window open;
-(5) all-nine compile gate, look on glass, merge.
+**Next, in order (back at the desktop):** (1) border + rounded corners on the growing panel (above);
+(2) the settings deck that peeks up, with **Pause** in it - long press no longer pauses, so nothing on
+the board can pause a card until this lands; small touches the owner liked the sound of: the deck
+tab peeking up, the toggle knob sliding, contents settling in; (3) `lv_mem` with the window open;
+(4) the chart icon (font regeneration needs Node.js - the desktop has it); (5) all-nine compile gate,
+look on glass, merge. At home the board has WiFi again, so `/screenshot` and `/bench` work.
 
-**Laptop-local, never committed:** `platformio.ini` (skip-worktree) carries `-D DEBUG_POPUP` and
-`-D DEBUG_FRAMES` on WS_P4_5. #84 (cards never say "no data yet") was filed from this testing.
+**The debug flags are laptop-local:** at the desktop add `-D DEBUG_POPUP` and `-D DEBUG_FRAMES` to
+`WS_P4_TOUCH_LCD_5` by hand if wanted (plain edit, never committed with them on).
+
+#84 (cards never say "no data yet") was filed from this testing.
 
 ## What is next — the new session's job: BUILD 2.10a (#65)
 
