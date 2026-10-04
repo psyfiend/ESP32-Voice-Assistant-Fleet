@@ -12,7 +12,42 @@
 // window, its header, the four ways to close, the body and the inner views.
 // The settings deck comes next.
 
+// Per the repo's debug-flag convention (CLAUDE.md). How many frames the grow
+// and shrink really get, and what the dim frame costs - the owner saw "only a
+// few frames" (O2, 2026-10-03), and the next step is decided by these numbers.
+#ifdef DEBUG_POPUP
+    #define DBG_POPUP(...) Serial.printf("[Popup:debug] " __VA_ARGS__)
+#else
+    #define DBG_POPUP(...) do {} while (0)
+#endif
+
 namespace {
+
+#ifdef DEBUG_POPUP
+constexpr uint8_t DBG_MARKS = 48;
+uint32_t s_dbgMark[DBG_MARKS];
+uint8_t  s_dbgN = 0;
+
+// One timestamp per animation step. An exec call happens once per LVGL timer
+// pass, so the gaps between them ARE the frame times the eye sees.
+void dbgMark() { if (s_dbgN < DBG_MARKS) s_dbgMark[s_dbgN++] = millis(); }
+
+void dbgReport(const char *what) {
+    if (s_dbgN < 2) { DBG_POPUP("%s: %u step(s)\n", what, (unsigned)s_dbgN); s_dbgN = 0; return; }
+    char line[200];
+    int n = 0;
+    for (uint8_t i = 1; i < s_dbgN && n < (int)sizeof(line) - 8; i++) {
+        n += snprintf(line + n, sizeof(line) - n, " %lu",
+                      (unsigned long)(s_dbgMark[i] - s_dbgMark[i - 1]));
+    }
+    DBG_POPUP("%s: %u frames in %lu ms; gaps ms:%s\n", what, (unsigned)s_dbgN,
+              (unsigned long)(s_dbgMark[s_dbgN - 1] - s_dbgMark[0]), line);
+    s_dbgN = 0;
+}
+#else
+inline void dbgMark() {}
+inline void dbgReport(const char *) {}
+#endif
 
 // Compound names, never a bare ALL-CAPS word - Arduino's pin-mode macros eat
 // those (CLAUDE.md, "Arduino's global macro namespace will eat your enum").
@@ -56,6 +91,7 @@ struct Popup {
     lv_obj_t *btnLeft = nullptr, *lblLeft = nullptr;
     lv_obj_t *btnHistory = nullptr, *btnMembers = nullptr;
     lv_obj_t *lblTitleArea = nullptr, *lblTitleName = nullptr;
+    int32_t   titleW = 0;      // what the two title labels may use together
     lv_obj_t *stage = nullptr, *autoBar = nullptr;
 
     // The main view's widgets; null while another view is showing.
@@ -104,7 +140,16 @@ void setText(lv_obj_t *l, const char *t) {
     lv_label_set_text(l, t);
 }
 
-// A round icon button at the minimum touch size, with a pressed tint.
+// How wide a line of text draws, in pixels.
+int32_t textW(const char *txt, const lv_font_t *f) {
+    lv_point_t sz = {0, 0};
+    lv_text_get_size(&sz, txt, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    return sz.x;
+}
+
+// A round icon button at the minimum touch size: a visible disc in the card
+// surface colour, so it reads as a button and not a stray glyph (owner, H1),
+// a shade lighter while pressed.
 lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f,
                      lv_event_cb_t cb, lv_obj_t **outLabel = nullptr) {
     const UIPalette &p = UI::pal();
@@ -113,8 +158,10 @@ lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f,
     lv_obj_set_size  (b, sz, sz);
     lv_obj_add_flag  (b, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(b, UI::c(p.TEXT), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
-    lv_obj_set_style_bg_opa  (b, LV_OPA_20,     UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+    lv_obj_set_style_bg_color(b, UI::c(p.SURFACE), 0);
+    lv_obj_set_style_bg_opa  (b, LV_OPA_COVER,     0);
+    lv_obj_set_style_bg_color(b, UI::c(UI::mix(p.SURFACE, p.TEXT, 20)),
+                              UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
     lv_obj_t *l = makeLabel(b, f, p.TEXT);
     lv_label_set_text(l, glyph);
     lv_obj_center(l);
@@ -188,6 +235,7 @@ void animExec(void *var, int32_t v) {
     lv_obj_set_pos (o, x1, y1);
     lv_obj_set_size(o, x2 - x1 + 1, y2 - y1 + 1);
     lv_obj_set_style_radius(o, lerp(s.radA, s.radB), 0);
+    dbgMark();
 }
 
 void startAnim(uint32_t ms, lv_anim_path_cb_t path, lv_anim_completed_cb_t done) {
@@ -357,6 +405,14 @@ void buildMain() {
     // ellipsises instead of running out of the window.
     const int32_t colMax = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - mm(4);
     lv_obj_set_style_max_width(col, colMax, 0);
+    // AND NEVER NARROWER THAN ITS LONGEST ORDINARY WORDS. The row is centred,
+    // so a column that changed width moved the whole group - the owner's B1:
+    // the first tap turned "Changed 12m ago" into "Changed just now" and the
+    // hero jumped left. Sized for the longest lines it will normally show.
+    int32_t colMin = textW("Changed just now", t.TAG);
+    if (textW("No reading yet", t.TAG) > colMin) colMin = textW("No reading yet", t.TAG);
+    if (textW("Unavailable", UIToolkit::Font_Hero) > colMin) colMin = textW("Unavailable", UIToolkit::Font_Hero);
+    lv_obj_set_style_min_width(col, colMin < colMax ? colMin : colMax, 0);
 
     s.lblWhat = makeLabel(col, t.TAG, p.TEXT_DIM);
 
@@ -416,6 +472,24 @@ void buildMembers() {
     lv_label_set_text(note, "Member controls arrive with the group work");
 }
 
+// Share the title row between "Area > " and the name. Both fit: each gets its
+// own width. Otherwise the NAME keeps at least 60% - it is what the window is
+// about - and the area gives way first, ellipsised.
+void layoutTitle() {
+    if (!s.lblTitleArea || !s.lblTitleName) return;
+    const lv_font_t *f = UI::type().NAME;
+    int32_t aw = textW(lv_label_get_text(s.lblTitleArea), f) + 1;
+    int32_t nw = textW(lv_label_get_text(s.lblTitleName), f) + 1;
+    if (aw + nw > s.titleW) {
+        const int32_t nameFloor = s.titleW * 60 / 100;
+        if (nw > s.titleW - aw) nw = (s.titleW - aw > nameFloor) ? s.titleW - aw : nameFloor;
+        if (nw > s.titleW) nw = s.titleW;
+        aw = s.titleW - nw;
+    }
+    lv_obj_set_width(s.lblTitleArea, aw > 0 ? aw : 0);
+    lv_obj_set_width(s.lblTitleName, nw);
+}
+
 void showView(PopupView v) {
     s.view = v;
     s.hero = s.knob = s.heroIcon = nullptr;
@@ -444,6 +518,7 @@ void showView(PopupView v) {
         if (v == PopupView::VIEW_HISTORY) buildHistory();
         else                              buildMembers();
     }
+    layoutTitle();
     s.lastSig = signature();
 }
 
@@ -456,8 +531,8 @@ void historyCb(lv_event_t *ev) { (void)ev; showView(PopupView::VIEW_HISTORY); }
 void membersCb(lv_event_t *ev) { (void)ev; showView(PopupView::VIEW_MEMBERS); }
 
 // D6's drag down, on the HEADER ROW only (card-sheet 13): the light's tall
-// slider in 2.10b would fight a drag that could start anywhere. LVGL sends the
-// gesture to the pressed object and bubbles it here from the header's buttons.
+// slider in 2.10b would fight a drag that could start anywhere. How the
+// gesture gets here is in buildContents() - it is not the obvious way.
 void headerGestureCb(lv_event_t *ev) {
     (void)ev;
     lv_indev_t *in = lv_indev_active();
@@ -487,6 +562,14 @@ void buildContents() {
     lv_obj_set_style_pad_column(hdr, gap, 0);
     // Clickable so a press on the title lands HERE and can become a drag.
     lv_obj_add_flag(hdr, LV_OBJ_FLAG_CLICKABLE);
+    // AND IT MUST NOT BUBBLE GESTURES. LVGL does not deliver a gesture to the
+    // pressed object and bubble it up; it walks UP from the pressed object
+    // PAST every one that has GESTURE_BUBBLE - on by default - and sends it to
+    // the first that does not (lv_indev.c, indev_gesture()). With the flag
+    // left on, the drag went past this row, the window and the top layer, and
+    // reached nobody. The owner's C3, 2026-10-03. The buttons in the row keep
+    // the flag, so a drag that starts on the X still arrives here.
+    lv_obj_clear_flag(hdr, LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_event_cb(hdr, headerGestureCb, LV_EVENT_GESTURE, nullptr);
 
     // Both ends the same width, so the title sits in the true middle.
@@ -495,7 +578,9 @@ void buildContents() {
 
     lv_obj_t *left = plain(hdr);
     lv_obj_set_size(left, slotW, btn);
-    s.btnLeft = iconButton(left, LV_SYMBOL_CLOSE, t.NAME, leftCb, &s.lblLeft);
+    // The X and the back arrow are LVGL's own symbols, which every built-in
+    // Montserrat carries; the hero face is the largest one already linked.
+    s.btnLeft = iconButton(left, LV_SYMBOL_CLOSE, UIToolkit::Font_Hero, leftCb, &s.lblLeft);
 
     lv_obj_t *title = plain(hdr);
     lv_obj_set_height   (title, btn);
@@ -504,15 +589,16 @@ void buildContents() {
     lv_obj_set_flex_align(title, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     s.lblTitleArea = makeLabel(title, t.NAME, p.TEXT_DIM);
     s.lblTitleName = makeLabel(title, t.NAME, p.TEXT);
+    // ONE LINE EACH, ellipsised, at widths layoutTitle() works out per view.
+    // A DOT label with a content height wraps instead of ellipsising, which is
+    // how "Members" ended up on two lines and "All Lamps >" overflowed the
+    // centred row and lost its left half (owner's V3).
+    const int32_t lh = lv_font_get_line_height(t.NAME);
+    lv_label_set_long_mode(s.lblTitleArea, LV_LABEL_LONG_DOT);
     lv_label_set_long_mode(s.lblTitleName, LV_LABEL_LONG_DOT);
-    // What the name may use: the row less both slots, the gaps, and the area.
-    lv_point_t areaSz = {0, 0};
-    char areaTxt[ENTITY_SHORT_MAX + 4];
-    snprintf(areaTxt, sizeof(areaTxt), "%s > ", s.area[0] ? s.area : s.name);
-    lv_text_get_size(&areaSz, areaTxt, t.NAME, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-    int32_t nameMax = lv_area_get_width(&s.winRect) - 2 * s.pad - 2 * slotW - 2 * gap - areaSz.x;
-    if (nameMax < btn) nameMax = btn;
-    lv_obj_set_style_max_width(s.lblTitleName, nameMax, 0);
+    lv_obj_set_height(s.lblTitleArea, lh);
+    lv_obj_set_height(s.lblTitleName, lh);
+    s.titleW = lv_area_get_width(&s.winRect) - 2 * s.pad - 2 * slotW - 2 * gap;
 
     lv_obj_t *right = plain(hdr);
     lv_obj_set_size     (right, slotW, btn);
@@ -521,9 +607,9 @@ void buildContents() {
     lv_obj_set_style_pad_column(right, gap, 0);
     // The mock's chart icon is not in the board's icon subset, and this laptop
     // cannot regenerate it (no Node.js). clock-outline stands in until it can.
-    s.btnHistory = iconButton(right, MDI_CLOCK_OUTLINE, t.ICON_SM, historyCb);
+    s.btnHistory = iconButton(right, MDI_CLOCK_OUTLINE, t.ICON_MD, historyCb);
     // D4: a card standing for several things gets the members icon.
-    if (s.nEnt > 1) s.btnMembers = iconButton(right, MDI_LIGHTBULB_GROUP, t.ICON_SM, membersCb);
+    if (s.nEnt > 1) s.btnMembers = iconButton(right, MDI_LIGHTBULB_GROUP, t.ICON_MD, membersCb);
 
     // --- The stage: whichever view is showing -------------------------------
     s.stage = plain(s.win);
@@ -579,7 +665,13 @@ void tickCb(lv_timer_t *t) {
 void growDone(lv_anim_t *a) {
     (void)a;
     if (s.phase != PopupPhase::PHASE_GROWING) return;
+    dbgReport("grow");
     s.phase = PopupPhase::PHASE_OPEN;
+    // The scheme's lift - a real shadow on Linen, nothing on the dark schemes
+    // (owner, L2). Only now, never during the grow: a window-sized shadow
+    // redrawn every frame is the most expensive thing the animation could
+    // carry (card-sheet 8).
+    lv_obj_add_style(s.win, UI::paint(UIPaint::PAINT_LIFT), 0);
     buildContents();
     s.lastTouchMs = millis();
     s.lastAgeMs   = s.lastTouchMs;
@@ -588,6 +680,7 @@ void growDone(lv_anim_t *a) {
 
 void shrinkDone(lv_anim_t *a) {
     (void)a;
+    dbgReport("shrink");
     if (s.win)   { lv_obj_delete(s.win);   s.win = nullptr; }
     // The dim goes last, in one redraw, so the page never shows undimmed
     // around a window that is still on its way back.
@@ -607,10 +700,12 @@ void closeNow(void *unused) {
     lv_anim_delete(s.win, animExec);    // a close during the grow reverses it
     if (s.timer) { lv_timer_delete(s.timer); s.timer = nullptr; }
 
-    // The contents go first: the frame shrinks back empty, as it grew.
+    // The contents go first: the frame shrinks back empty, as it grew. And so
+    // does the shadow, for the same reason it waited until the grow was done.
     lv_obj_clean(s.win);
     forgetWidgets();
     lv_obj_set_style_pad_all(s.win, 0, 0);
+    lv_obj_remove_style(s.win, UI::paint(UIPaint::PAINT_LIFT), 0);
 
     lv_obj_get_coords(s.win, &s.animA);
     s.animB = s.cardRect;
@@ -698,7 +793,9 @@ void CardPopup::open(Card &card) {
     s.winRect.y1 = top;
     s.winRect.y2 = bottom - 1;
     s.winRadius  = mm(2.4f);
-    s.pad        = mm(2.2f);
+    // 1.2 mm, down from the mock's 2.2: the owner wanted the X "closer to the
+    // corner" (H1). Still clear of the 2.4 mm corner radius.
+    s.pad        = mm(1.2f);
 
     const UIPalette &p = UI::pal();
 
@@ -728,6 +825,19 @@ void CardPopup::open(Card &card) {
     s.animA = s.cardRect;  s.radA = s.cardRadius;
     s.animB = s.winRect;   s.radB = s.winRadius;
     animExec(s.win, 0);
+
+    // DRAW THE DIM NOW, BEFORE THE CLOCK STARTS. The dim is a full-screen
+    // redraw (~90 ms on P4_5); left to the next refresh it lands in the
+    // animation's first frame and eats half of a 200 ms grow - the owner saw
+    // "only a few frames" (O2). Paying it here, synchronously, means the grow
+    // starts from a screen that is already dim.
+    const uint32_t tDim = millis();
+    lv_refr_now(nullptr);
+    DBG_POPUP("dim frame: %lu ms\n", (unsigned long)(millis() - tDim));
+    (void)tDim;
+#ifdef DEBUG_POPUP
+    s_dbgN = 0;
+#endif
 
     s.view        = PopupView::VIEW_MAIN;
     s.closeQueued = false;
