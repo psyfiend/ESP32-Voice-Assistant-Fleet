@@ -489,6 +489,19 @@ next piece of eye candy:
 - **So: animate small things.** A tab, a knob, one card - tens of thousands of pixels - move at full
   frame rate. Anything that covers the screen costs a full redraw per change, whatever it looks like.
 
+## Never keep a pointer to an LVGL object you do not own - ask it to tell you when it goes
+
+2026-10-04, the popup's hold. CardPopup kept the pressed card's surface pointer while the hold
+animated. A swipe that started on a card rebuilt the page, the card was deleted, and the finger's
+release then restyled it: a load access fault inside `lv_realloc` (`lv_obj_set_local_style_prop`),
+twice in one evening, seen by the owner as a full-screen teal flash and a reboot. The backtrace
+(`riscv32-esp-elf-addr2line`, two seconds) named the line at once.
+
+**`lv_obj_is_valid()` is not the fix**: a rebuild allocates new objects from the same pool, so the
+old address soon belongs to a live, different object, and the check passes. The fix is an
+`LV_EVENT_DELETE` callback on the object that clears the pointer, removed again when the pointer is
+let go. (An animation whose `var` is the object is safe: LVGL deletes it with the object.)
+
 ## LVGL's top layer scrolls, and drags everything on it along (#68)
 
 LVGL 9.5 creates `lv_layer_top()` (and the system layer) **scrollable** - it only removes

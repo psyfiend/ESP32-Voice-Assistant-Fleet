@@ -24,16 +24,20 @@
 // evening, drawn around the window a frame after it, and the owner chose
 // speed - "the delay seems like an eternity and adds very little".
 //
-// What the eye gets instead is cheap because it is small: the held card's
-// border fades to the accent while the finger is down, the card leaps, and the
-// switch's knob slides (see "The hold, and the leap").
+// What the eye gets instead is cheap because it is small: the held card is
+// pressed in while its border fades to the accent (see "The hold"), the
+// window's edge crackles for a moment like a projection settling (see
+// "Interference"), and the switch's knob slides.
 
 // Per the repo's debug-flag convention (CLAUDE.md). What opening and closing
-// cost on this side of the frame: building the window and tearing it down.
-// The frames themselves are -D DEBUG_FRAMES (GUIManager.cpp). With this flag,
-// a long press on the window's title also cycles the leap: 2 frames, 1, none.
+// cost on this side of the frame: building the window and tearing it down,
+// and what the window's frame redrew. The frames themselves are
+// -D DEBUG_FRAMES (GUIManager.cpp). With this flag, a long press on the
+// window's title also cycles the interference: open + idle, open only, off.
 #ifdef DEBUG_POPUP
     #define DBG_POPUP(...) Serial.printf("[Popup:debug] " __VA_ARGS__)
+    #include "src/display/lv_display_private.h"   // inv_areas: what a frame redraws
+    #include "src/core/lv_refr_private.h"         // lv_refr_get_top_obj()
 #else
     #define DBG_POPUP(...) do {} while (0)
 #endif
@@ -48,9 +52,25 @@ uint32_t s_dbgFrameMs   = 0;   // how long the next frame took to draw
 uint32_t s_dbgGlassMs   = 0;   // long press to that frame drawn
 bool     s_dbgWantFrame = false;
 
+// What that frame redraws: if the window's own frame costs more than the
+// window, these say why (round 6: ~77 ms on Midnight where ~25 was expected).
+constexpr uint8_t DBG_AREAS = 4;
+lv_area_t s_dbgArea[DBG_AREAS];
+uint8_t   s_dbgNArea = 0, s_dbgAllAreas = 0;
+
 // The frame after a window appears or goes. -D DEBUG_FRAMES cannot see it: it
 // only prints bursts of three frames or more, and closing is one.
-void dbgRenderStart(lv_event_t *e) { (void)e; if (s_dbgWantFrame) s_dbgRenderT0 = millis(); }
+void dbgRenderStart(lv_event_t *e) {
+    if (!s_dbgWantFrame) return;
+    s_dbgRenderT0 = millis();
+    lv_display_t *d = (lv_display_t *)lv_event_get_current_target(e);
+    s_dbgNArea = s_dbgAllAreas = 0;
+    for (uint32_t i = 0; d && i < d->inv_p; i++) {
+        if (d->inv_area_joined[i]) continue;
+        s_dbgAllAreas++;
+        if (s_dbgNArea < DBG_AREAS) s_dbgArea[s_dbgNArea++] = d->inv_areas[i];
+    }
+}
 void dbgRenderReady(lv_event_t *e) {
     (void)e;
     if (!s_dbgWantFrame || !s_dbgRenderT0) return;
@@ -60,11 +80,20 @@ void dbgRenderReady(lv_event_t *e) {
     s_dbgRenderT0  = 0;
 }
 
+void dbgProbe();   // below, where the window is known
+
 void dbgPrint(lv_timer_t *t) {
     (void)t;
     if (s_dbgGlassMs) DBG_POPUP("%s; its frame drew in %lu ms; long press to glass %lu ms\n", s_dbgLine,
                                 (unsigned long)s_dbgFrameMs, (unsigned long)s_dbgGlassMs);
     else              DBG_POPUP("%s; its frame drew in %lu ms\n", s_dbgLine, (unsigned long)s_dbgFrameMs);
+    for (uint8_t i = 0; i < s_dbgNArea; i++) {
+        const lv_area_t &a = s_dbgArea[i];
+        DBG_POPUP("  redrew %ld,%ld..%ld,%ld (%ldx%ld)\n", (long)a.x1, (long)a.y1, (long)a.x2, (long)a.y2,
+                  (long)lv_area_get_width(&a), (long)lv_area_get_height(&a));
+    }
+    if (s_dbgAllAreas > s_dbgNArea) DBG_POPUP("  ...%u areas in all\n", (unsigned)s_dbgAllAreas);
+    dbgProbe();
     s_dbgPressMs = s_dbgGlassMs = 0;
 }
 
@@ -86,25 +115,28 @@ void dbgLater(const char *fmt, ...) {
 // Compound names, never a bare ALL-CAPS word - Arduino's pin-mode macros eat
 // those (CLAUDE.md, "Arduino's global macro namespace will eat your enum").
 enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS };
-// LEAP: the long press has fired and the card is leaping; the window comes
-// after LEAP_FRAMES frames. Modal from here, like OPEN.
-enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_LEAP, PHASE_OPEN };
-// Where the held card is. OWNED: its window is open, and it keeps the accent
-// border until the window closes.
-enum class HoldPhase  : uint8_t { HOLD_NONE, HOLD_PRESSING, HOLD_LETTING_GO, HOLD_LEAPING, HOLD_OWNED };
+enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
+// Where the held card is. OWNED: its window is open, and it stays pressed in,
+// with the accent border, until the window closes.
+enum class HoldPhase  : uint8_t { HOLD_NONE, HOLD_PRESSING, HOLD_LETTING_GO, HOLD_OWNED };
+// When the window's edge crackles (see "Interference"): as it appears and now
+// and then while it is open; only as it appears; never.
+enum class IntfMode   : uint8_t { INTF_OPEN_AND_IDLE, INTF_OPEN_ONLY, INTF_OFF };
 
 // D6: auto-close after 60 s untouched. The owner chose all four close routes.
 constexpr uint32_t POPUP_AUTOCLOSE_MS = 60000;
 constexpr uint32_t POPUP_TICK_MS      = 250;
 
-// The hold and the leap, in millimetres so they look the same on every board.
-constexpr float    HOLD_SINK_MM    = 0.4f;   // how far the card sinks by the long press
-constexpr float    LEAP_GROW_MM    = 1.0f;   // how much larger than normal it leaps
+// The hold, in millimetres so it looks the same on every board. THE LEAP IS
+// GONE (owner, round 6): it was clipped by the card's wrapper, and the window
+// waiting two frames for it made the popup feel slower than it was - "the
+// simple pressing down further visual effect of a long-press is by itself a
+// really catchy visual".
+constexpr float    HOLD_SINK_MM    = 0.4f;   // how far the card is pressed in at the long press
 constexpr uint32_t HOLD_LETGO_MS   = 120;    // a tap lets go this fast, from full
 constexpr uint32_t KNOB_SLIDE_MS   = 160;
-// Frames of leap before the window. 2 = ~66 ms the window waits for it. With
-// DEBUG_POPUP a long press on the window's title cycles 2 -> 1 -> 0.
-uint8_t s_leapFrames = 2;
+
+IntfMode s_intfMode = IntfMode::INTF_OPEN_AND_IDLE;
 
 struct Popup {
     PopupPhase phase = PopupPhase::PHASE_CLOSED;
@@ -147,14 +179,13 @@ struct Popup {
 Popup s;
 
 // The card under the finger. `surface` is a card's own LVGL object, which a
-// page rebuild can delete at any moment - so it is checked with
-// lv_obj_is_valid() before it is touched outside an animation (an animation
-// whose var is the surface is deleted with it, by LVGL).
+// page rebuild can delete at any moment: a delete hook clears it the moment
+// that happens (surfaceDeletedCb), and an animation whose var is the surface
+// is deleted with it, by LVGL.
 struct Hold {
     HoldPhase phase = HoldPhase::HOLD_NONE;
     lv_obj_t *surface = nullptr;
     int32_t   v = 0;          // 0..255: how far toward the accent
-    uint8_t   leapStep = 0;
 };
 Hold h;
 lv_indev_t *s_indev = nullptr;
@@ -606,15 +637,17 @@ void headerGestureCb(lv_event_t *ev) {
 }
 
 #ifdef DEBUG_POPUP
-// The leap trial: a long press on the title cycles how many frames the card
-// leaps for before the window appears - 2, 1, none - from the next window.
-// Debug builds only: the trial ends in a decision, not a setting.
-void leapCycleCb(lv_event_t *ev) {
+// The interference trial: a long press on the title cycles when the edge
+// crackles - on open and now and then, on open only, never - from the next
+// window. Debug builds only, until the owner chooses (a setting, later).
+void intfCycleCb(lv_event_t *ev) {
     (void)ev;
-    s_leapFrames = (s_leapFrames == 0) ? 2 : (uint8_t)(s_leapFrames - 1);
-    UIToolkit::show_toast(s_leapFrames == 2 ? "Leap: 2 frames - from the next window"
-                        : s_leapFrames == 1 ? "Leap: 1 frame - from the next window"
-                                            : "Leap: none - from the next window");
+    s_intfMode = (s_intfMode == IntfMode::INTF_OPEN_AND_IDLE) ? IntfMode::INTF_OPEN_ONLY
+               : (s_intfMode == IntfMode::INTF_OPEN_ONLY)     ? IntfMode::INTF_OFF
+                                                              : IntfMode::INTF_OPEN_AND_IDLE;
+    UIToolkit::show_toast(s_intfMode == IntfMode::INTF_OPEN_AND_IDLE ? "Interference: open + now and then"
+                        : s_intfMode == IntfMode::INTF_OPEN_ONLY     ? "Interference: on open only"
+                                                                     : "Interference: off");
 }
 #endif
 
@@ -649,7 +682,7 @@ void buildContents() {
     lv_obj_clear_flag(hdr, LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_event_cb(hdr, headerGestureCb, LV_EVENT_GESTURE, nullptr);
 #ifdef DEBUG_POPUP
-    lv_obj_add_event_cb(hdr, leapCycleCb, LV_EVENT_LONG_PRESSED, nullptr);
+    lv_obj_add_event_cb(hdr, intfCycleCb, LV_EVENT_LONG_PRESSED, nullptr);
 #endif
 
     // Both ends the same width, so the title sits in the true middle.
@@ -770,42 +803,30 @@ void makeWindow() {
 }
 
 // ---------------------------------------------------------------------------
-// The hold, and the leap (owner, 2026-10-04)
+// The hold (owner, 2026-10-04)
 //
-// From touch-down the card's border fades toward the scheme's ACCENT over the
-// long-press time, a little wider, while the card sinks slightly - so a tap
-// shows the start of it, and a hold shows it arriving. At the long press the
-// card LEAPS, larger than normal, for s_leapFrames frames, and then the window
-// appears. The card keeps the accent border while its window is open, which
-// says which card the window belongs to.
+// From touch-down the card is pressed in while its border fades toward the
+// scheme's ACCENT over the long-press time, a little wider - so a tap shows the
+// start of it, and a hold shows it arriving. The card STAYS pressed in, with
+// the accent, while its window is open: that says which card the window
+// belongs to, and it does not snap back the moment the window appears (the
+// owner found the snap-back "funky" with the leap).
 //
-// ALL OF IT IS transform_width/height AND THE BORDER - NEVER A SCALE. A scale
-// renders the card to an intermediate layer every frame (~175 KB for a P4_5
-// card, more than LVGL's whole 128 KB pool - LESSONS, "LVGL allocates a
-// LAYER"). transform_width/height only draws the card's own background,
-// border and shadow larger or smaller (lv_obj.c, LV_EVENT_DRAW_MAIN), with no
-// layer; its contents stay where they are, which nobody sees in a frame or
-// two. One card redraw per frame: 5-8 ms on WS_P4_5 in Midnight.
+// The look itself is the card's: Card::pressLook(), which also moves what is
+// attached to the card's edges. Here is only the timing. One card redraw per
+// frame: 5-8 ms on WS_P4_5 in Midnight.
 // ---------------------------------------------------------------------------
 
-// The look at `v` (0..255 toward the accent), with the card `grow` px larger
-// on every side (negative: sinking).
-void holdLook(lv_obj_t *sf, int32_t v, int32_t grow) {
-    const int32_t base = UI::met().BORDER_W;
-    const int32_t wide = LV_MAX(base, UI::sc(2));
-    lv_obj_set_style_border_color(sf, lv_color_mix(UI::c(UI::pal().ACCENT), UI::border(), (uint8_t)v), 0);
-    lv_obj_set_style_border_width(sf, base + (wide - base) * v / 255, 0);
-    lv_obj_set_style_transform_width (sf, grow, 0);
-    lv_obj_set_style_transform_height(sf, grow, 0);
+// The card behind a surface. Card::build() puts it in the user data.
+Card *cardOf(lv_obj_t *sf) { return sf ? (Card *)lv_obj_get_user_data(sf) : nullptr; }
+
+// The look at `v` (0..255 of the way into the hold).
+void holdLook(lv_obj_t *sf, int32_t v) {
+    if (Card *c = cardOf(sf)) c->pressLook((uint8_t)v, mm(HOLD_SINK_MM) * v / 255);
 }
 
-// Back to exactly what Card::restyle() gives every card: the border token at
-// the scheme's width, no transform.
 void holdRestore(lv_obj_t *sf) {
-    lv_obj_set_style_border_color(sf, UI::border(), 0);
-    lv_obj_set_style_border_width(sf, UI::met().BORDER_W, 0);
-    lv_obj_set_style_transform_width (sf, 0, 0);
-    lv_obj_set_style_transform_height(sf, 0, 0);
+    if (Card *c = cardOf(sf)) c->pressClear();
 }
 
 bool movedTooFar() {
@@ -823,19 +844,45 @@ void letGo();
 // or a swipe, not a hold: the card lets go at once.
 void holdExec(void *var, int32_t v) {
     h.v = v;
-    holdLook((lv_obj_t *)var, v, -(mm(HOLD_SINK_MM) * v) / 255);
+    holdLook((lv_obj_t *)var, v);
     if (h.phase == HoldPhase::HOLD_PRESSING && movedTooFar()) letGo();
 }
 
 void letGoExec(void *var, int32_t v) {
     h.v = v;
-    holdLook((lv_obj_t *)var, v, -(mm(HOLD_SINK_MM) * v) / 255);
+    holdLook((lv_obj_t *)var, v);
+}
+
+// THE HELD CARD CAN BE DELETED UNDER THE FINGER - a swipe that started on it
+// rebuilds the page. Twice on 2026-10-04 that left h.surface pointing at freed
+// memory, and the finger's release then styled it: a load access fault inside
+// lv_realloc (lv_obj_set_local_style_prop). Checking lv_obj_is_valid() is not
+// enough either: the rebuild allocates new cards from the same pool, so the old
+// address is soon a live, different object. So the card says when it goes.
+void surfaceDeletedCb(lv_event_t *e) {
+    if ((lv_obj_t *)lv_event_get_target(e) == h.surface) h = Hold();
+}
+
+// Make `sf` the held card, with its delete hook.
+void holdAttach(lv_obj_t *sf) {
+    h.surface = sf;
+    lv_obj_add_event_cb(sf, surfaceDeletedCb, LV_EVENT_DELETE, nullptr);
+}
+
+// Let the held card go: its look back to normal, its hook off. The card is
+// alive here - surfaceDeletedCb() clears h.surface the moment it is not.
+void holdDetach() {
+    if (h.surface) {
+        lv_anim_delete(h.surface, holdExec);    // a hold or let-go still running
+        lv_anim_delete(h.surface, letGoExec);
+        holdRestore(h.surface);
+        lv_obj_remove_event_cb(h.surface, surfaceDeletedCb);
+    }
+    h = Hold();
 }
 
 void letGoDone(lv_anim_t *a) {
-    lv_obj_t *sf = (lv_obj_t *)a->var;
-    holdRestore(sf);
-    if (h.surface == sf && h.phase == HoldPhase::HOLD_LETTING_GO) h = Hold();
+    if (h.surface == (lv_obj_t *)a->var && h.phase == HoldPhase::HOLD_LETTING_GO) holdDetach();
 }
 
 // The finger came up (a tap) or moved off: fade back from wherever the hold
@@ -857,20 +904,10 @@ void letGo() {
     lv_anim_start(&a);
 }
 
-// Drop whatever card was held, at once - a new press, or the window closing.
-void holdDrop() {
-    if (h.surface && lv_obj_is_valid(h.surface)) {
-        lv_anim_delete(h.surface, holdExec);
-        lv_anim_delete(h.surface, letGoExec);
-        holdRestore(h.surface);
-    }
-    h = Hold();
-}
-
 void holdStart(lv_obj_t *sf) {
-    holdDrop();
-    h.surface = sf;
-    h.phase   = HoldPhase::HOLD_PRESSING;
+    holdDetach();
+    holdAttach(sf);
+    h.phase = HoldPhase::HOLD_PRESSING;
     lv_anim_t a;
     lv_anim_init(&a);
     lv_anim_set_var     (&a, sf);
@@ -881,25 +918,196 @@ void holdStart(lv_obj_t *sf) {
     lv_anim_start(&a);
 }
 
-void showWindow();
+// ---------------------------------------------------------------------------
+// Interference (owner, 2026-10-04)
+//
+// The window is a projection that has not quite settled: for a moment as it
+// appears - and now and then while it is open - its edge crackles. Short
+// bright sparks run along the border line, flecks jump off it, and here and
+// there a stretch of the border drops out and comes back, as if the line
+// wavered thin. Positions, lengths, colours and timing are random every time,
+// and it dies away over the burst (the owner: it would be tiresome if it
+// always happened "in the exact same place in the same manner").
+//
+// CHEAP BECAUSE IT IS SMALL - the rule from LESSONS, "Effects that cover the
+// screen". A pool of INTF_POOL plain objects on the screen, above the window,
+// each a few thousand pixels at most and alive for one to three frames. Off is
+// a size of 0x0 rather than HIDDEN, so nothing is ever toggled. The window is
+// usable from its first frame; this starts in the frame after.
+//
+// When and how often are the owner's to tune (a setting, later). Today:
+//   - on open, always (unless off): a burst of INTF_OPEN_MS
+//   - while open, with INTF_OPEN_AND_IDLE: a shorter, weaker flicker every
+//     INTF_IDLE_MIN_MS..INTF_IDLE_MAX_MS, never within INTF_QUIET_MS of a touch
+// ---------------------------------------------------------------------------
+constexpr uint8_t  INTF_POOL        = 10;
+constexpr uint32_t INTF_OPEN_MS     = 360;
+constexpr uint8_t  INTF_OPEN_PEAK   = 255;
+constexpr uint32_t INTF_IDLE_MS     = 180;
+constexpr uint8_t  INTF_IDLE_PEAK   = 140;
+constexpr uint32_t INTF_IDLE_MIN_MS = 6000;
+constexpr uint32_t INTF_IDLE_MAX_MS = 15000;
+constexpr uint32_t INTF_QUIET_MS    = 2500;
 
-// After every refresh: steps the leap, one look per frame actually drawn, then
-// asks for the window. The first refresh after the long press is the frame
-// that drew the first leap step.
-void displayRefrReadyCb(lv_event_t *e) {
-    (void)e;
-    if (s.phase != PopupPhase::PHASE_LEAP || h.phase != HoldPhase::HOLD_LEAPING) return;
-    if (!lv_obj_is_valid(h.surface)) { h = Hold(); showWindow(); return; }
-    h.leapStep++;
-    if (h.leapStep < s_leapFrames) {
-        holdLook(h.surface, 255, mm(LEAP_GROW_MM) * (h.leapStep + 1) / s_leapFrames);
+struct Interference {
+    lv_obj_t   *o[INTF_POOL]    = {nullptr};
+    uint8_t     life[INTF_POOL] = {0};    // frames this piece has left; 0 = off
+    lv_timer_t *timer      = nullptr;
+    uint32_t    burstStart = 0;
+    uint32_t    burstLen   = 0;           // 0: no burst running
+    uint8_t     burstPeak  = 0;
+    uint32_t    nextIdle   = 0;
+};
+Interference g;
+
+void intfOff(uint8_t i) {
+    if (!g.o[i] || !g.life[i]) return;
+    g.life[i] = 0;
+    lv_obj_set_size(g.o[i], 0, 0);
+}
+
+// The spark colour: the accent run toward white on a dark scheme, where
+// that reads as light; toward the text colour on a light one, where white
+// would vanish against the window.
+uint32_t sparkHex() {
+    const UIPalette &p = UI::pal();
+    const uint32_t w = p.SURFACE_ALT;
+    const bool light = ((w >> 16) & 0xFF) + ((w >> 8) & 0xFF) + (w & 0xFF) > 3 * 128;
+    return light ? UI::mix(p.ACCENT, p.TEXT, (uint8_t)lv_rand(0, 35))
+                 : UI::mix(p.ACCENT, 0xFFFFFF, (uint8_t)lv_rand(20, 65));
+}
+
+// One piece, somewhere on the window's edge, away from the rounded corners.
+void intfPlace(uint8_t i, int32_t strength) {
+    const lv_area_t &W = s.winRect;
+    const int32_t r  = s.winRadius;
+    const int32_t bw = UI::met().BORDER_W ? UI::met().BORDER_W : 1;
+    const uint32_t edge = lv_rand(0, 3);                  // top, bottom, left, right
+    const bool horiz = edge < 2;
+    const int32_t span = horiz ? (W.x2 - W.x1 - 2 * r) : (W.y2 - W.y1 - 2 * r);
+    if (span < 8) return;
+    const int32_t line = (edge == 0) ? W.y1 : (edge == 1) ? W.y2 : (edge == 2) ? W.x1 : W.x2;
+    const int32_t outward = (edge == 0 || edge == 2) ? -1 : 1;
+
+    int32_t len, thick, along, across;
+    uint32_t hex;
+    const uint32_t kind = lv_rand(0, 99);
+    if (kind < 55) {
+        // A spark along the line: thicker and longer the stronger the burst.
+        len   = mm(1.5f) + (int32_t)lv_rand(0, (uint32_t)(mm(9.0f) * strength / 255 + 1));
+        thick = LV_MAX(bw + 1, mm(0.15f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(0.25f))));
+        across = line - thick / 2;
+        hex = sparkHex();
+    } else if (kind < 82) {
+        // A fleck jumping off the line.
+        len   = LV_MAX(2, mm(0.25f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(0.35f))));
+        thick = len;
+        const int32_t jump = (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(2.2f) * strength / 255));
+        across = line + outward * jump - thick / 2;
+        hex = sparkHex();
+    } else {
+        // A drop-out: a stretch of border painted out in the window's own
+        // colour, so the line looks thinner or broken for a frame or two.
+        len   = mm(2.0f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(6.0f)));
+        thick = bw + 1;
+        across = (outward < 0) ? line : line - thick + 1;
+        hex = UI::pal().SURFACE_ALT;
+    }
+    if (len > span) len = span;
+    const int32_t start = (horiz ? W.x1 : W.y1) + r + (int32_t)lv_rand(0, (uint32_t)(span - len));
+    along = start;
+
+    lv_obj_t *o = g.o[i];
+    lv_obj_set_style_bg_color(o, UI::c(hex), 0);
+    if (horiz) { lv_obj_set_pos(o, along, across); lv_obj_set_size(o, len, thick); }
+    else       { lv_obj_set_pos(o, across, along); lv_obj_set_size(o, thick, len); }
+    g.life[i] = (uint8_t)lv_rand(1, 3);
+}
+
+void intfStartBurst(uint32_t ms, uint8_t peak) {
+    g.burstStart = millis();
+    g.burstLen   = ms;
+    g.burstPeak  = peak;
+}
+
+// Every frame while the window is open.
+void intfTick(lv_timer_t *t) {
+    (void)t;
+    if (s.phase != PopupPhase::PHASE_OPEN) return;
+    const uint32_t now = millis();
+
+    if (!g.burstLen && s_intfMode == IntfMode::INTF_OPEN_AND_IDLE && (int32_t)(now - g.nextIdle) >= 0) {
+        if (now - s.lastTouchMs >= INTF_QUIET_MS) intfStartBurst(INTF_IDLE_MS, INTF_IDLE_PEAK);
+        else g.nextIdle = now + 1000;   // a finger is busy in the window: later
+    }
+
+    // Pieces already showing count down; at zero they go.
+    for (uint8_t i = 0; i < INTF_POOL; i++) {
+        if (g.life[i] && --g.life[i] == 0) lv_obj_set_size(g.o[i], 0, 0);
+    }
+    if (!g.burstLen) return;
+
+    const uint32_t el = now - g.burstStart;
+    if (el >= g.burstLen) {
+        for (uint8_t i = 0; i < INTF_POOL; i++) intfOff(i);
+        g.burstLen = 0;
+        g.nextIdle = now + lv_rand(INTF_IDLE_MIN_MS, INTF_IDLE_MAX_MS);
         return;
     }
-    // Seen: back to its own size, the accent kept, and the window.
-    holdLook(h.surface, 255, 0);
-    h.phase = HoldPhase::HOLD_OWNED;
-    showWindow();
+    // Strength dies away on a curve: busy at first, the odd spark at the end.
+    const int32_t left = 255 - (int32_t)(el * 255 / g.burstLen);
+    const int32_t strength = g.burstPeak * left / 255 * left / 255;
+    for (uint8_t i = 0; i < INTF_POOL; i++) {
+        if (!g.life[i] && (int32_t)lv_rand(0, 255) < strength) intfPlace(i, strength);
+    }
 }
+
+// The pool, made with the window, above it. Each piece is created at 0x0 with
+// invalidation off: a new object costs a redraw of LVGL's default size at
+// (0,0) - here the header - for nothing. The window's own layout is settled
+// first, with invalidation on, so it loses nothing it was owed.
+void intfBegin() {
+    for (uint8_t i = 0; i < INTF_POOL; i++) { g.o[i] = nullptr; g.life[i] = 0; }
+    g.burstLen = 0;
+    if (s_intfMode == IntfMode::INTF_OFF) return;
+    lv_obj_t *scr = lv_screen_active();
+    lv_obj_update_layout(scr);
+    lv_display_enable_invalidation(nullptr, false);
+    for (uint8_t i = 0; i < INTF_POOL; i++) {
+        g.o[i] = plain(scr);
+        lv_obj_set_size(g.o[i], 0, 0);
+        lv_obj_set_style_bg_opa(g.o[i], LV_OPA_COVER, 0);
+    }
+    lv_obj_update_layout(scr);
+    lv_display_enable_invalidation(nullptr, true);
+    intfStartBurst(INTF_OPEN_MS, INTF_OPEN_PEAK);
+    g.timer = lv_timer_create(intfTick, LV_DEF_REFR_PERIOD, nullptr);
+}
+
+void intfEnd() {
+    if (g.timer) { lv_timer_delete(g.timer); g.timer = nullptr; }
+    for (uint8_t i = 0; i < INTF_POOL; i++) {
+        if (g.o[i]) lv_obj_delete(g.o[i]);
+        g.o[i] = nullptr;
+        g.life[i] = 0;
+    }
+    g.burstLen = 0;
+}
+
+#ifdef DEBUG_POPUP
+// Is the window what LVGL finds covering a strip across its middle? If not,
+// every redraw inside it draws the page underneath first.
+void dbgProbe() {
+    if (!s.win) return;
+    const lv_area_t &W = s.winRect;
+    const int32_t mid = (W.y1 + W.y2) / 2;
+    const lv_area_t strip = { W.x1, mid, W.x2, mid + 40 };
+    lv_obj_t *top = lv_refr_get_top_obj(&strip, lv_screen_active());
+    DBG_POPUP("  a strip across the window is covered by %s; window is child %ld of %lu\n",
+              top == s.win ? "the window" : top ? "something else" : "nothing",
+              (long)lv_obj_get_index(s.win), (unsigned long)lv_obj_get_child_count(lv_screen_active()));
+}
+#endif
 
 // The deferred half of close(). Runs from LVGL's own timer handler, outside any
 // event callback, so deleting the window's children here is safe. Everything
@@ -912,9 +1120,10 @@ void closeNow(void *unused) {
     const uint32_t t0 = micros();
 #endif
     if (s.timer) { lv_timer_delete(s.timer); s.timer = nullptr; }
+    intfEnd();
     if (s.win)   { lv_obj_delete(s.win);     s.win = nullptr; }
     forgetWidgets();
-    holdDrop();
+    holdDetach();
     if (s_catcher) lv_obj_clear_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
     s.phase = PopupPhase::PHASE_CLOSED;
     s.nEnt = 0;
@@ -961,8 +1170,8 @@ void catcherCb(lv_event_t *ev) {
     }
 }
 
-// The window itself: built, made modal, and the clock started. Straight from
-// open() with no leap, or from displayRefrReadyCb() once the leap was seen.
+// The window itself: built, made modal, the clock started, and the
+// interference begun (it draws from the frame after the window's).
 void showWindow() {
 #ifdef DEBUG_POPUP
     const uint32_t t0 = micros();
@@ -974,9 +1183,9 @@ void showWindow() {
     s.lastTouchMs = millis();
     s.lastAgeMs   = s.lastTouchMs;
     s.timer = lv_timer_create(tickCb, POPUP_TICK_MS, nullptr);
+    intfBegin();
 #ifdef DEBUG_POPUP
-    dbgLater("open: window built in %lu us after a %u-frame leap",
-             (unsigned long)(micros() - t0), (unsigned)s_leapFrames);
+    dbgLater("open: window built in %lu us", (unsigned long)(micros() - t0));
 #endif
 }
 
@@ -995,14 +1204,13 @@ void CardPopup::begin() {
         lv_indev_add_event_cb(in, pressCb,   LV_EVENT_PRESSED,  nullptr);
         lv_indev_add_event_cb(in, releaseCb, LV_EVENT_RELEASED, nullptr);
     }
-    // After each frame is drawn: what steps the leap.
-    if (lv_display_t *d = lv_display_get_default()) {
-        lv_display_add_event_cb(d, displayRefrReadyCb, LV_EVENT_REFR_READY, nullptr);
 #ifdef DEBUG_POPUP
+    // What the window's own frames cost, and what they redrew.
+    if (lv_display_t *d = lv_display_get_default()) {
         lv_display_add_event_cb(d, dbgRenderStart, LV_EVENT_RENDER_START, nullptr);
         lv_display_add_event_cb(d, dbgRenderReady, LV_EVENT_RENDER_READY, nullptr);
-#endif
     }
+#endif
     // The tap catcher, once, for the life of the device. See s_catcher.
     s_catcher = plain(lv_layer_top());
     lv_obj_set_size(s_catcher, lv_pct(100), lv_pct(100));
@@ -1067,25 +1275,18 @@ void CardPopup::open(Card &card) {
 
     s.view        = PopupView::VIEW_MAIN;
     s.closeQueued = false;
-    s.phase       = PopupPhase::PHASE_LEAP;   // modal from here
 
-    // --- The leap -----------------------------------------------------------
-    // The held card stops where its hold got to and takes the full accent; a
-    // card that somehow was not the held one gets the accent all the same.
-    if (h.surface == card._surface && lv_obj_is_valid(h.surface)) {
+    // --- The card stays pressed in, with the accent, while its window is open.
+    // The held card stops where its hold got to and finishes it; a card that
+    // somehow was not the held one gets the same look.
+    if (h.surface == card._surface) {
         lv_anim_delete(h.surface, holdExec);
         lv_anim_delete(h.surface, letGoExec);
     } else {
-        holdDrop();
-        h.surface = card._surface;
+        holdDetach();
+        holdAttach(card._surface);
     }
-    if (s_leapFrames) {
-        h.phase    = HoldPhase::HOLD_LEAPING;
-        h.leapStep = 0;
-        holdLook(h.surface, 255, mm(LEAP_GROW_MM) / s_leapFrames);
-    } else {
-        holdLook(h.surface, 255, 0);
-        h.phase = HoldPhase::HOLD_OWNED;
-        showWindow();
-    }
+    holdLook(h.surface, 255);
+    h.phase = HoldPhase::HOLD_OWNED;
+    showWindow();
 }

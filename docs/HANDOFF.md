@@ -37,29 +37,37 @@ every touch outside it. **What was learned is in LESSONS, "Effects that cover th
 **No dim - DECIDED (owner, round 5):** tried it, "the delay seems like an eternity and adds very
 little". Removed; nothing is drawn behind the window. Blur was never built (LESSONS).
 
-**Built, round 6 (owner asked for each):** the held card's border fades to the ACCENT over the
-250 ms hold while the card sinks slightly (a tap shows the start and fades back in 120 ms); at the
-long press the card LEAPS larger for 2 frames, then the window appears; the card keeps the accent
-border while its window is open (Claude's addition - easy to drop); the switch's knob slides.
-All `transform_width/height` + border - never a scale (a layer bigger than LVGL's pool).
-`DEBUG_POPUP` prints each open/close frame's draw time and "long press to glass"; a long press on
-the window's title cycles the leap 2 -> 1 -> 0 frames.
+**Built (rounds 6-7):** the held card is pressed in (0.4 mm) while its border fades to the ACCENT
+over the 250 ms hold - a tap shows the start and fades back; the card STAYS pressed in with the
+accent while its window is open; the press moves the card's edge-attached parts too (band, tag
+pills, badge, corner icon - `Card::pressLook()`; the floating tag stays, owner). **No leap**
+(owner, round 6: it made the popup feel slower). The switch's knob slides. **Interference**: the
+window's edge crackles for ~360 ms as it opens, and (default) a weaker flicker every 6-15 s while
+it sits untouched - a pool of 10 tiny objects, random every time (CardPopup.cpp, "Interference");
+a long press on the title cycles open+idle / open only / off (`DEBUG_POPUP`). All of it
+`transform_width/height`, translate, border and small rects - never a scale or a layer.
+**Round 7 is built but NOT FLASHED**: the P4_5 stopped answering (no serial sync, no ping).
+
+**Crash fixed (round 6, 2-3 on glass):** a swipe started on a card rebuilt the page and the hold
+restyled the deleted card - LESSONS, "Never keep a pointer to an LVGL object you do not own".
 
 **Open with the owner:**
-- **A "projection" effect for the way in** (owner's idea, round 6, with a sci-fi reference image):
-  (a) a line that draws the window out (scan-on); (b) brief random interference at the edges that
-  "repairs itself", different every time. Claude's view: (b) first - it costs almost nothing and
-  delays nothing (the window is usable in frame one); (a) as a comparison. A window-sized accordion
-  would cost about what the deck's does (the window is ~1.4x an open deck panel), since the window
-  is now an opaque object on the screen like the deck. Not built - waiting on the owner's pick.
+- **Interference**: built (above), first look pending. The owner chose it over a scan-on ("may be
+  more expensive... or too much of a distraction"); when and how often become a setting later.
+- **The switch's knob** (round 6, P7): a slide the user cannot perform is "jarring" - make the
+  toggle draggable, or drop the slide. Claude recommends draggable (2.10b's slider needs the same
+  mechanics). Not decided.
+- **Card borders in colour, a custom scheme, and the system drawer's old pages** (owner, round 6):
+  #85, not for 2.10a.
 - **Scaling** (owner): the toggle is "too big" on the 1060 and the 4B (it is sized from the window's
   height, so ~57 mm tall on the 1060 vs ~30 mm on the P4_5); the occupancy hero's circle is huge for
   its icon, by a different ratio per board. Placeholder visuals; the owner: not this step's focus.
   Claude's suggestion: cap heroes at the P4_5's physical size when 2.10b designs the controls.
-- **To verify:** the window's own frame took ~140 ms in the DIM trial. Suspect: on Linen the
-  window's shadow makes the area LVGL redraws wider than the window, so no 50-line strip lies inside
-  it and the page under the whole window is drawn too. The round 6 build measures every open frame;
-  compare Midnight and Linen before believing it.
+- **To find out:** the window's own frame costs ~77 ms on Midnight (~140 Linen) where ~25 was
+  expected - as if the page under the window is drawn too, which putting the window on the screen
+  was meant to stop. Round 7's `DEBUG_POPUP` prints what that frame redrew and whether LVGL finds
+  the window covering a strip across it. Read that before guessing; if the page IS drawn under the
+  window, fixing it takes ~45 ms off every open.
 
 **Built and seen on glass:** long press (now **250 ms**) opens a window on every card type; header X /
 "Area > name" / history (clock icon - the chart glyph needs a font regeneration on the desktop, no

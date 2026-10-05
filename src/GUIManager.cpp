@@ -986,7 +986,7 @@ void GUIManager::buildDashboard() {
 
     _pnlSystem.setHeaderLabel(_hdr == CardHeaderStyle::HDR_TAG_FLOAT ? "Float"
                             : _hdr == CardHeaderStyle::HDR_TAG       ? "Tag"
-                            : _hdr == CardHeaderStyle::HDR_BAR       ? "Bar"
+                            : _hdr == CardHeaderStyle::HDR_BAND      ? "Band"
                                                                      : "No hdr");
 
     // The page indicator: this page's title, centred in the bar, and a dot
@@ -1236,8 +1236,8 @@ void GUIManager::cycleHeader() {
     // always worked this way for the same reason.
     // Float -> Tag -> Bar -> None, starting from the default.
     _hdr = (_hdr == CardHeaderStyle::HDR_TAG_FLOAT) ? CardHeaderStyle::HDR_TAG
-         : (_hdr == CardHeaderStyle::HDR_TAG)       ? CardHeaderStyle::HDR_BAR
-         : (_hdr == CardHeaderStyle::HDR_BAR)       ? CardHeaderStyle::HDR_NONE
+         : (_hdr == CardHeaderStyle::HDR_TAG)       ? CardHeaderStyle::HDR_BAND
+         : (_hdr == CardHeaderStyle::HDR_BAND)      ? CardHeaderStyle::HDR_NONE
                                                     : CardHeaderStyle::HDR_TAG_FLOAT;
     rebuildDashboard();
     Serial.printf("[Cards] header mode -> %s\n", cardHeaderName(_hdr));

@@ -144,10 +144,10 @@ int32_t Card::fullCellNeedPx(CardHeaderStyle style, const lv_font_t *hero) {
                  + statusBandHeight()
                  + UI::sc(m.PAD) * 2;
 
-    // HDR_BAR reserves a strip inside the card. HDR_TAG takes its room from
+    // HDR_BAND reserves a strip inside the card. HDR_TAG takes its room from
     // OUTSIDE, so the caller subtracts it from the cell instead - see
     // resolveVariant(). HDR_NONE costs nothing.
-    if (style == CardHeaderStyle::HDR_BAR) need += Card::headerHeight();
+    if (style == CardHeaderStyle::HDR_BAND) need += Card::headerHeight();
 
     // A MARGIN, because "it exactly fits" is not a safe answer. A font's line
     // box is taller than the ink in it, labels round up, and the body's own
@@ -216,7 +216,7 @@ void Card::resolveVariant() {
             _valueSmall = (h < need);
         } else {
             int32_t needC = compactCellNeedPx();
-            if (_hdrStyle == CardHeaderStyle::HDR_BAR) needC += Card::headerHeight();
+            if (_hdrStyle == CardHeaderStyle::HDR_BAND) needC += Card::headerHeight();
             _valueSmall = (h < needC);
         }
     }
@@ -345,7 +345,7 @@ void Card::build(lv_obj_t *parent) {
     // come from lv_mem, not the heap, which is why the heap looked healthy.
     //
     // This was already a known liability, logged against 2.8. It became a
-    // FREEZE rather than a risk the moment HDR_BAR became the default header
+    // FREEZE rather than a risk the moment HDR_BAND became the default header
     // mode, because every card now wants the layer.
     //
     // The band gets the card's own radius instead. Its lower corners round too
@@ -374,8 +374,9 @@ void Card::build(lv_obj_t *parent) {
     // A press here starts the popup's hold - the border fading to the accent
     // (CardPopup.cpp, "The hold, and the leap"). A flag rather than four more
     // event registrations per card: CardPopup hears every press on the input
-    // device already.
+    // device already. The surface carries its card, for the press look.
     lv_obj_add_flag       (_surface, CardPopup::CARD_SURFACE_FLAG);
+    lv_obj_set_user_data  (_surface, this);
 
     buildHeader();
 
@@ -386,7 +387,7 @@ void Card::build(lv_obj_t *parent) {
     lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_CLICKABLE);
-    if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
+    if (_hdrStyle == CardHeaderStyle::HDR_BAND) {
         lv_obj_set_style_pad_top(_body, Card::headerHeight() + UI::sc(m.PAD), 0);
     } else if (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT) {
         lv_obj_set_style_pad_top(_body, tagInsetPx() + UI::sc(m.PAD), 0);
@@ -553,7 +554,7 @@ void Card::restyle() {
     // restyle() runs at the end of build(), so it silently won: every No-hdr
     // card carried an invisible empty band, and the corner icon sat a band's
     // height below the corner. The owner's report, 2026-09-22.
-    if (_hdrStyle == CardHeaderStyle::HDR_BAR) {
+    if (_hdrStyle == CardHeaderStyle::HDR_BAND) {
         lv_obj_set_style_pad_top  (_body, Card::headerHeight() + UI::sc(m.PAD), 0);
     } else if (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT) {
         lv_obj_set_style_pad_top  (_body, tagInsetPx() + UI::sc(m.PAD), 0);
@@ -678,7 +679,7 @@ int32_t Card::surfaceHeightPx() const {
 
 int32_t Card::bodyTopPx() const {
     const int32_t pad = UI::sc(UI::met().PAD);
-    return pad + (_hdrStyle == CardHeaderStyle::HDR_BAR ? Card::headerHeight() : 0)
+    return pad + (_hdrStyle == CardHeaderStyle::HDR_BAND ? Card::headerHeight() : 0)
                + tagInsetPx();
 }
 
@@ -763,7 +764,52 @@ lv_obj_t *Card::makeCornerIcon(lv_obj_t *body) {
     lv_obj_add_flag(o, LV_OBJ_FLAG_IGNORE_LAYOUT);
     lv_obj_clear_flag(o, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_align(o, LV_ALIGN_TOP_LEFT, 0, 0);
+    _corner = o;
     return o;
+}
+
+// See Card.h. Every part is set every time, so the look at any (toAccent,
+// sink) does not depend on the steps before it.
+void Card::pressLook(uint8_t toAccent, int32_t sink) {
+    if (!_surface) return;
+    const int32_t base = UI::met().BORDER_W;
+    const int32_t wide = LV_MAX(base, UI::sc(2));
+    lv_obj_set_style_border_color(_surface,
+        lv_color_mix(UI::c(UI::pal().ACCENT), UI::border(), toAccent), 0);
+    lv_obj_set_style_border_width(_surface, base + (wide - base) * toAccent / 255, 0);
+    lv_obj_set_style_transform_width (_surface, -sink, 0);
+    lv_obj_set_style_transform_height(_surface, -sink, 0);
+
+    // What hangs on the edges goes in with them.
+    if (_hdrStyle == CardHeaderStyle::HDR_BAND && _header) {
+        // Down with the top edge, narrower with the sides. The skirt is the
+        // band's own child, so it moves with it but must narrow by itself.
+        lv_obj_set_style_translate_y     (_header, sink, 0);
+        lv_obj_set_style_transform_width (_header, -sink, 0);
+        if (_bandSkirt) lv_obj_set_style_transform_width(_bandSkirt, -sink, 0);
+    } else if (_hdrStyle == CardHeaderStyle::HDR_TAG) {
+        // Pills standing on the top edge, flush with the sides.
+        if (_header) { lv_obj_set_style_translate_x(_header,  sink, 0);
+                       lv_obj_set_style_translate_y(_header,  sink, 0); }
+        if (_stale)  { lv_obj_set_style_translate_x(_stale,  -sink, 0);
+                       lv_obj_set_style_translate_y(_stale,   sink, 0); }
+    } else if (_hdrStyle == CardHeaderStyle::HDR_NONE && _badge) {
+        lv_obj_set_style_translate_x(_badge, -sink, 0);
+        lv_obj_set_style_translate_y(_badge,  sink, 0);
+    }
+    if (_corner) {
+        lv_obj_set_style_translate_x(_corner, sink, 0);
+        lv_obj_set_style_translate_y(_corner, sink, 0);
+    }
+}
+
+// Back to exactly what restyle() gives every card.
+void Card::pressClear() {
+    pressLook(0, 0);
+    if (_surface) {
+        lv_obj_set_style_border_color(_surface, UI::border(), 0);
+        lv_obj_set_style_border_width(_surface, UI::met().BORDER_W, 0);
+    }
 }
 
 // THE CORNER ICON SCALES WITH THE PAGE, by ROW COUNT. 2.7 round four.
@@ -910,7 +956,7 @@ void Card::applyState() {
         if (wantArea) lv_obj_clear_flag(_header, LV_OBJ_FLAG_HIDDEN);
         else          lv_obj_add_flag  (_header, LV_OBJ_FLAG_HIDDEN);
     } else {
-        // HDR_BAR. The band keeps the ACCENT and only the BADGE takes the state
+        // HDR_BAND. The band keeps the ACCENT and only the BADGE takes the state
         // colour - the owner's call after seeing a whole header go yellow:
         // "instead of the entire bar changing color only the badge section
         // should turn yellow around STALE".
@@ -1182,9 +1228,8 @@ bool Card::command(uint8_t slot, const EntityValue &v) {
 void Card::eventCb(lv_event_t *e) {
     Card *self = (Card *)lv_event_get_user_data(e);
     if (!self) return;
-    // Modal. While the card leaps there is no window yet, and nothing to catch
-    // a touch, so a card tapped in those frames must not toggle or open a
-    // second window.
+    // Modal. CardPopup's catcher takes every touch outside an open window
+    // before a card sees it; this is the second lock on the same door.
     if (CardPopup::isOpen()) return;
     switch (lv_event_get_code(e)) {
         case LV_EVENT_SHORT_CLICKED: self->onTap();       break;

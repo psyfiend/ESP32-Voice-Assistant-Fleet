@@ -59,6 +59,18 @@ class Card {
 public:
     virtual ~Card();
 
+    // THE PRESS LOOK (2.10a, owner 2026-10-04): how a card looks under a
+    // finger, driven by CardPopup's hold. `toAccent` 0..255 fades the border
+    // toward the scheme's ACCENT and widens it; `sink` px presses the card in -
+    // its plate draws smaller on every side, and what is attached to its edges
+    // (a band, attached tag pills, the corner badge, the corner icon) moves in
+    // with it. A FLOATING tag stays put: it is drawn lying on the card, not as
+    // part of it (owner). transform_width/height and translate only - never a
+    // scale, which would render the card to a layer bigger than LVGL's pool.
+    // pressClear() puts back exactly what restyle() gave.
+    void pressLook(uint8_t toAccent, int32_t sink);
+    void pressClear();
+
     // --- Definition. Call before build(); chainable. ----------------------
 
     // A primary is what the card is ABOUT. More than one means the card
@@ -409,6 +421,8 @@ private:
                                        // stateColor() - see ST_PARTIAL
     static void eventCb(lv_event_t *e);
 
+    lv_obj_t *_corner = nullptr;       // makeCornerIcon()'s, for pressLook()
+
     // --- Widget tree ------------------------------------------------------
     //
     // _root is a TRANSPARENT wrapper filling the grid cell, and _surface is
@@ -424,7 +438,7 @@ private:
     // The top section. Every card has one in every mode; what differs is where
     // it is parented and how it is painted.
     //
-    //   HDR_BAR / HDR_NONE   _header spans the card's top strip and holds BOTH
+    //   HDR_BAND / HDR_NONE   _header spans the card's top strip and holds BOTH
     //                        labels - area left, badge right. _stale is unused.
     //   HDR_TAG              _header is the area pill and _stale is a second
     //                        pill on the right, both OUTSIDE the card.
@@ -433,7 +447,7 @@ private:
     // to their own content and sit at opposite ends of a strip the card does
     // not own - there is nothing for them to share.
     lv_obj_t *_tagRow   = nullptr;   // tag modes only: the strip above the card
-    lv_obj_t *_bandSkirt = nullptr;  // HDR_BAR only: squares the band's bottom corners
+    lv_obj_t *_bandSkirt = nullptr;  // HDR_BAND only: squares the band's bottom corners
     lv_obj_t *_header   = nullptr;   // area holder
     lv_obj_t *_stale    = nullptr;   // HDR_TAG only: the badge's own pill
     lv_obj_t *_lblArea  = nullptr;

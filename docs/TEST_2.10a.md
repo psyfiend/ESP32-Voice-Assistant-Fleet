@@ -148,6 +148,29 @@ building the window 5 ms, tearing it down 0.5 ms, one close frame seen at 46 ms.
 | P8 | Stuck's window: tap the toggle | The knob slides, then a few seconds later slides back |
 | P9 | Repeat P2 in Midnight and in Linen | Note any difference in how fast the window appears |
 
+**Round 6 results (owner):** P1, P3, P4, P5, P8 PASS. **P2 partial**: the leap was clipped by the
+card's wrapper (it only lets a shadow's width out). **P6**: the leap made the popup FEEL slower - the
+jump, then a visible wait for the window; with no leap it felt faster. **Decided: no leap**; the
+press-in alone "is by itself a really catchy visual". **P7**: passes, but a knob that slides when it
+cannot be dragged is "jarring" - either make it draggable or drop the slide (open). **P9**: no
+difference seen between Midnight and Linen (measured: the window's frame ~77 ms Midnight, ~140 ms
+Linen; closing ~48 / ~92). **Bug: a teal screen and a reboot, 2-3 times** - found in the log and
+fixed: a swipe started on a card rebuilt the page and the hold restyled the deleted card (LESSONS).
+The owner also asked that the press move a card's edge-attached parts with it (band, tag pills,
+badge, corner icon - not the floating tag).
+
+## Round 7 - press-in only, interference (2026-10-04 night, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| Q1 | Hold a card | It presses in and its border goes to the accent; the window appears; the card STAYS pressed in with the accent while the window is open, and comes back when it closes |
+| Q2 | Repeat Q1 in each label type (cycle the header knob: Float, Tag, Band, None) | The band, the tag pills, the status badge and the corner icon move in with the card; the floating tag stays where it is |
+| Q3 | Start swipes on cards, a dozen times; change scheme a few times | No teal screen, no reboot |
+| Q4 | Open a window | For about a third of a second its edge crackles - sparks along the border, flecks jumping off it, short stretches of border dropping out - then it settles. Different each time |
+| Q5 | Leave a window open without touching it | Now and then (every 6-15 s) a shorter, weaker flicker; never just after you touched it |
+| Q6 | Long press the window's title | Toast cycles "Interference: on open only", "off", "open + now and then" |
+| Q7 | Linen | The crackle reads on the light window too (it uses the accent toward the text colour there) |
+
 ## Measured (Claude, from the board) - pending
 
 - `lv_mem` with the window open (interview G1).
