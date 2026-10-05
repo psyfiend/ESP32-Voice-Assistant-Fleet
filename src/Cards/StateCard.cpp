@@ -83,24 +83,6 @@ bool StateCard::onFill(int32_t fromBottom, int pct) const {
     return fromBottom * 100 < h * pct;
 }
 
-uint8_t StateCard::activeCount() const {
-    uint8_t n = 0;
-    for (uint8_t i = 0; i < primaryCount(); i++) {
-        const Entity *e = primary(i);
-        if (!e || !e->everSet) continue;
-        // A state entity is a bool. Anything numeric that reached an actor
-        // card - a dimmable light reporting brightness - is on when nonzero,
-        // which is the same question asked of a different type.
-        switch (e->value.type) {
-            case ValueType::BOOL:  if (e->value.b)        n++; break;
-            case ValueType::INT:   if (e->value.i != 0)   n++; break;
-            case ValueType::FLOAT: if (e->value.f != 0.f) n++; break;
-            default: break;
-        }
-    }
-    return n;
-}
-
 void StateCard::render() {
     const Entity *e = primary();
     if (!e) return;
@@ -110,7 +92,7 @@ void StateCard::render() {
 
     const uint8_t total  = primaryCount();
     const uint8_t active = activeCount();
-    const bool    isOn    = active > 0;
+    const bool    isOn    = groupIsOn();   // any, or all - GroupOn (2.10b)
     const bool    isMixed = active > 0 && active < total;
 
     // --- Disc geometry, derived from the type scale -----------------------

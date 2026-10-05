@@ -173,6 +173,27 @@ public:
     typedef void (*CommandSink)(const Entity &e, const EntityValue &v, void *ctx);
     void setCommandSink(CommandSink fn, void *ctx) { _cmdFn = fn; _cmdCtx = ctx; }
 
+    // A LIGHT'S LEVELS - brightness, colour temperature, colour. 2.10b (#65).
+    //
+    // The same contract as commandValue(): applied at once so the control and
+    // the card answer the finger, then handed to the sink, then confirmed or
+    // reverted by what the source says. A level implies ON (as in HA), and the
+    // on half goes through the value's own bookkeeping, so "is it on" and "is
+    // it at 40%" resolve independently - see Entity::attrPending.
+    //
+    // Only a MATCHING report ends the wait (within the rounding HA's own
+    // conversions introduce: brightness +-3, kelvin +-3%, hue and saturation
+    // +-3). A slider sends a command every 300 ms; the echoes of the earlier
+    // ones, and a light's reports while it fades, are recorded as the fall-back
+    // and change nothing on screen.
+    //
+    // For on/off alone use commandValue(): it is the path every source already
+    // speaks. Returns false if unknown, not writable or paused.
+    bool commandLight(const char *id, const LightCommand &c, uint32_t nowMs);
+
+    typedef void (*LightSink)(const Entity &e, const LightCommand &c, void *ctx);
+    void setLightSink(LightSink fn, void *ctx) { _lightFn = fn; _lightCtx = ctx; }
+
     // Drain the dirty set. Call from the LVGL task only.
     //
     // The callback is invoked OUTSIDE the lock, with a snapshot, so a slow
@@ -213,6 +234,8 @@ private:
 
     CommandSink _cmdFn  = nullptr;
     void       *_cmdCtx = nullptr;
+    LightSink   _lightFn  = nullptr;
+    void       *_lightCtx = nullptr;
 
     mutable std::mutex _mx;
     // 3 s since 2.7 (#63). Was 5 s, sized for a round trip through a broker.

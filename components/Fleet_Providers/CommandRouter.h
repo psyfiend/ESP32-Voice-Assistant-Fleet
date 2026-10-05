@@ -66,6 +66,12 @@ private:
     static void onCommand(const Entity &e, const EntityValue &v, void *ctx);
     void route(const Entity &e, const EntityValue &v);
 
+    // The registry's LightSink (2.10b): a light's levels. VIRTUAL lamps answer
+    // themselves; Home Assistant's light.turn_on with data is 2.10c, so until
+    // then an HA light command is refused here, loudly, and the registry's
+    // window reverts it and the card says FAILED - never a silent success.
+    static void onLight(const Entity &e, const LightCommand &c, void *ctx);
+
     bool sendHa(const Entity &e, const EntityValue &v);
     bool sendMqtt(const Entity &e, const EntityValue &v);
 

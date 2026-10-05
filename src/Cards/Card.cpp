@@ -87,6 +87,36 @@ Card &Card::setPaused(bool p) {
 
 // Is this card paused? Asked of the ENTITIES, so a card built after the pause -
 // or a second card on the same entity - reports it correctly without being told.
+Card &Card::setGroupOn(GroupOn g) {
+    if (g == _groupOn) return *this;
+    _groupOn = g;
+    if (_surface) render();
+    return *this;
+}
+
+uint8_t Card::activeCount() const {
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < _nPrimary; i++) {
+        const Entity *e = _primary[i];
+        if (!e || !e->everSet) continue;
+        // A state entity is a bool. Anything numeric that reached an actor
+        // card - a dimmable light reporting brightness - is on when nonzero,
+        // which is the same question asked of a different type.
+        switch (e->value.type) {
+            case ValueType::BOOL:  if (e->value.b)        n++; break;
+            case ValueType::INT:   if (e->value.i != 0)   n++; break;
+            case ValueType::FLOAT: if (e->value.f != 0.f) n++; break;
+            default: break;
+        }
+    }
+    return n;
+}
+
+bool Card::groupIsOn() const {
+    const uint8_t n = activeCount();
+    return _groupOn == GroupOn::GROUP_ON_ALL ? (_nPrimary && n == _nPrimary) : n > 0;
+}
+
 bool Card::isPaused() const {
     for (uint8_t i = 0; i < _nPrimary; i++) {
         const Entity *e = _primary[i];
