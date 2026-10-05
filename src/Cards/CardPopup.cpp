@@ -638,7 +638,11 @@ void renderLight() {
             setText(s.lblValue, "Unavailable");
             lv_obj_set_style_text_color(s.lblValue, UI::c(p.ST_BAD), 0);
         } else {
-            if (v < 0)                       setText(s.lblValue, on ? "--" : "Off");
+            // On but no temperature: it is showing a colour, and a light in a
+            // colour reports no kelvin (HA the same) - so no ring, and the
+            // words say why (owner, round 1, L7).
+            if (v < 0)                       setText(s.lblValue, !on ? "Off"
+                                                     : L.mode == LightMode::LMODE_COLOUR ? "A colour" : "--");
             else if (s.lightCtl == LCTL_DIM) { snprintf(buf, sizeof(buf), "%ld%%", (long)v); setText(s.lblValue, buf); }
             else                             { snprintf(buf, sizeof(buf), "%ld K", (long)v); setText(s.lblValue, buf); }
             lv_obj_set_style_text_color(s.lblValue, UI::c(p.TEXT), 0);
@@ -664,22 +668,30 @@ void renderLight() {
         lv_obj_set_y     (s.fill, s.heroH - fh);
         lv_obj_set_height(s.fill, fh);
         // The grip: a short bar near the top of the fill, where a finger takes it.
+        // Small, so HIDDEN costs only its own few pixels (the HIDDEN lesson is
+        // about screen-sized objects). Its x from the width it is GIVEN: read
+        // back with lv_obj_get_width() before LVGL had laid it out, it was 0
+        // on the first draw, and the grip sat half a slider to the right until
+        // the next redraw a second later (owner, round 1).
         if (s.grip) {
-            const bool show = fh >= pm(5);
+            const int32_t gw = s.heroW * 34 / 100;
             lv_obj_set_style_bg_color(s.grip, UI::c(UI::contrastOf(fillHex, p.GROUND, p.TEXT)), 0);
-            lv_obj_set_y(s.grip, s.heroH - fh + pm(1.4f));
-            lv_obj_set_width(s.grip, show ? s.heroW * 34 / 100 : 0);
-            lv_obj_set_x(s.grip, (s.heroW - lv_obj_get_width(s.grip)) / 2);
+            lv_obj_set_pos  (s.grip, (s.heroW - gw) / 2, s.heroH - fh + pm(1.4f));
+            lv_obj_set_width(s.grip, gw);
+            if (fh >= pm(5)) lv_obj_clear_flag(s.grip, LV_OBJ_FLAG_HIDDEN);
+            else             lv_obj_add_flag  (s.grip, LV_OBJ_FLAG_HIDDEN);
         }
     } else if (s.mark) {
+        // HIDDEN, not 0 wide: a 0-wide ring still drew its outline, the
+        // stray vertical line beside the strip (owner, round 1, L7/L9).
         const int32_t mh = lv_obj_get_height(s.mark);
         if (v < 0) {
-            lv_obj_set_width(s.mark, 0);   // 0 wide, never HIDDEN (no redraw of the whole)
+            lv_obj_add_flag(s.mark, LV_OBJ_FLAG_HIDDEN);
         } else {
             const int32_t in = stripInset();
             const int32_t y  = in + (1000 - permilleOf(L, v)) * (s.heroH - 2 * in) / 1000 - mh / 2;
-            lv_obj_set_width(s.mark, s.heroW * 80 / 100);
-            lv_obj_set_pos  (s.mark, s.heroW * 10 / 100, LV_CLAMP(0, y, s.heroH - mh));
+            lv_obj_set_pos(s.mark, s.heroW * 10 / 100, LV_CLAMP(0, y, s.heroH - mh));
+            lv_obj_clear_flag(s.mark, LV_OBJ_FLAG_HIDDEN);
         }
     }
 
@@ -816,7 +828,8 @@ void buildLightHero(lv_obj_t *row) {
         lv_obj_set_style_radius(s.fill, r, 0);
         lv_obj_set_style_bg_opa(s.fill, LV_OPA_COVER, 0);
         s.grip = plain(s.hero);
-        lv_obj_set_size(s.grip, 0, LV_MAX(3, pm(0.5f)));
+        lv_obj_set_size(s.grip, s.heroW * 34 / 100, LV_MAX(3, pm(0.5f)));
+        lv_obj_add_flag(s.grip, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_radius(s.grip, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_opa(s.grip, LV_OPA_COVER, 0);
         return;
@@ -833,7 +846,8 @@ void buildLightHero(lv_obj_t *row) {
     }
     // The marker: a white ring with a dark edge, which reads on every colour.
     s.mark = plain(s.hero);
-    lv_obj_set_size(s.mark, 0, LV_MAX(8, pm(2.6f)));
+    lv_obj_set_size(s.mark, s.heroW * 80 / 100, LV_MAX(8, pm(2.6f)));
+    lv_obj_add_flag(s.mark, LV_OBJ_FLAG_HIDDEN);   // until renderLight() places it
     lv_obj_set_style_radius      (s.mark, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_border_width(s.mark, LV_MAX(2, pm(0.35f)), 0);
     lv_obj_set_style_border_color(s.mark, UI::c(0xFFFFFF), 0);
