@@ -258,6 +258,21 @@ see; the two-panel rules in `card-sheet.md` section 14.
 | F7 | The chips | Filled, like the X and chart buttons; the chosen live one in the accent |
 | F8 | Linen | The tab and pane cast the scheme's shadow, like the page deck's panels |
 
+**Round 11 results (owner, 2026-10-05):** F2-F4 and F6-F8 PASS. F1: the inner corner "looks
+perfect", but it sat too high - folded, it and the sliver of the pane's edge (F5) should be below
+the screen, so that only the tab pokes up. Open, the pane's bottom border should be below the screen
+too. The tab's height and the SETTINGS label's place, folded, were right.
+
+## Round 12 - only the tab (2026-10-05, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| E1 | Open a window | Folded, only the tab shows: no curve, no pane edge. Same height and label place as round 11 |
+| E2 | Open the deck | The curve and the pane's top edge as in round 11; no border along the bottom of the screen |
+| E3 | Look at the open deck's rows | All four rows and the note fit, with no scrolling (rows are 7.2 mm now, from 8) |
+| E4 | Tap the tab twice; close with the deck folded, then open | As before (D6, T3, T4) |
+| E5 | Linen, folded and open | No shadow or edge showing along the bottom of the screen |
+
 ## Measured (Claude, from the board)
 
 **The window's first frame, before and after building it quiet (round 9, 2026-10-05):**

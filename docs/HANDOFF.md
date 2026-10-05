@@ -103,11 +103,12 @@ lines behind - `docs/display/history.md`. Verified on WS_P4_5; WS_P4_4B and CYD_
 it 2026-10-04, nothing reported; the 7B and 4880 not flashed.
 
 **Round 10 PASSED**; round 11 (the folder tab, a window out of reach while the deck is open,
-filled chips, the tab's colour and Linen shadow) flashed on WS_P4_5 2026-10-05, not yet seen. The
-deck as it now stands, and the owner's rules for a second panel: `card-sheet.md` section 14. Deck
-speed: kept (owner). Memory: wait and see (owner).
+filled chips, the tab's colour and Linen shadow) passed but for one thing: folded, only the tab
+should show, and open, the pane's bottom edge should be below the screen. Round 12 does that;
+flashed on WS_P4_5 2026-10-05, not yet seen. The deck as it now stands, and the owner's rules for a
+second panel: `card-sheet.md` section 14. Deck speed: kept (owner). Memory: wait and see (owner).
 
-**Next, in order:** (1) round 11 on glass (`TEST_2.10a.md`) - the owner's last look; (2) remove the
+**Next, in order:** (1) round 12 on glass (`TEST_2.10a.md`) - the owner's last look; (2) remove the
 two local debug flags, all-nine compile gate (detached, ~30 min), merge with `--no-ff`, tag
 `v0.2.8`, date the CHANGELOG entry - then 2.10a is done.
 

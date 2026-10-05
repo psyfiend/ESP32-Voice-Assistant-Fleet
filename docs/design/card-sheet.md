@@ -368,8 +368,9 @@ the sections above, this wins.
 - **The window appears complete at once and closes at once** - no grow, no dim (owner: speed first).
   The held card is pressed in with an accent border, and stays so while its window is open.
 - **Each deck panel is the window's full width when open; only its TAB is offset.** A folder-tab
-  shape: the pane has its own top edge, the tab rises from it with a curved inner corner, and folded
-  the tab and that corner show at the bottom of the screen, at the page deck's header height.
+  shape: the pane has its own top edge, the tab rises from it with a curved inner corner. Folded,
+  only the tab shows at the bottom of the screen, at the page deck's header height; the corner and
+  the pane's edge sit just below the screen. Open, the pane's bottom edge stays below the screen.
 - **SETTINGS always takes the right half.** A card that needs a second panel (a sensor's CHART,
   11.1) puts it in the left half - so SETTINGS is never pushed around.
 - **With two panels (not built yet):** both tabs sit at the bottom when closed; each panel has its

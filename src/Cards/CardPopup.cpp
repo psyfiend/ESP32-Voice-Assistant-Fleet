@@ -179,6 +179,7 @@ struct Popup {
     lv_obj_t *deck = nullptr, *deckTab = nullptr, *deckTabLbl = nullptr, *deckPane = nullptr;
     lv_obj_t *chipPause[2] = {nullptr, nullptr};   // Off, On
     int32_t   deckH = 0, deckHead = 0;
+    int32_t   deckHide = 0;   // how much of the pane stays below the screen when open
     uint8_t   deckState = 0;                       // DeckState
 
     lv_timer_t *timer = nullptr;
@@ -1243,12 +1244,15 @@ void intfEnd() {
 // ---------------------------------------------------------------------------
 constexpr uint32_t DECK_PEEK_MS = 200;   // the tab peeking up: a small touch the owner liked
 constexpr uint32_t DECK_OPEN_MS = 220;
+// 7.2 mm, from 8: the folder tab grew by twice its curve (round 11), and the
+// rows paid for it, so an open deck still reaches the same height on the window.
+constexpr float    DECK_ROW_MM  = 7.2f;
 
 void deckExec(void *var, int32_t v) { lv_obj_set_y((lv_obj_t *)var, v); }
 
 int32_t deckY(uint8_t state) {
     const int32_t sh = lv_obj_get_height(lv_screen_active());
-    return state == DECK_OPEN ? sh - s.deckH : state == DECK_PEEK ? sh - s.deckHead : sh;
+    return state == DECK_OPEN ? sh - (s.deckH - s.deckHide) : state == DECK_PEEK ? sh - s.deckHead : sh;
 }
 
 void deckSet(uint8_t state) {
@@ -1354,7 +1358,7 @@ void pauseChipCb(lv_event_t *ev) {
 // A row: what it is on the left, its choices on the right.
 lv_obj_t *deckRow(lv_obj_t *pane, const char *what) {
     lv_obj_t *r = plain(pane);
-    lv_obj_set_size     (r, lv_pct(100), mm(8.0f));
+    lv_obj_set_size     (r, lv_pct(100), mm(DECK_ROW_MM));
     lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_t *l = makeLabel(r, UI::type().NAME, UI::pal().TEXT);
@@ -1382,12 +1386,16 @@ void deckCreate() {
     // A FOLDER TAB (owner, round 10). The pane has a top edge of its own, and
     // the tab rises from it in the right half, the join curving in like a
     // file folder's - so an open deck is closed off from the window's body.
-    // Folded, the tab and that curve show, and a sliver of the pane's top
-    // edge, "a tabbed panel that is hiding additional content off screen".
-    // The strip that shows when folded is still the page deck's header height.
-    const int32_t rf       = r;                        // the inner curve; also the sliver
-    const int32_t tabAbove = s.deckHead - rf;          // the tab's part above the pane's edge
-    s.deckH    = tabAbove + rf + 4 * mm(8.0f) + 2 * mm(1.6f) + mm(4.0f);
+    //
+    // FOLDED, ONLY THE TAB SHOWS (owner, round 11): the strip above the screen's
+    // edge is the page deck's header height, and the pane's edge and the curve
+    // sit just below it. So the tab reaches a curve's height further down than
+    // what shows. OPEN, the pane's own bottom edge stays below the screen too:
+    // the deck is deckHide taller than what it uncovers.
+    const int32_t rf       = r;                        // the inner curve
+    const int32_t tabAbove = s.deckHead + rf;          // the tab's part above the pane's edge
+    s.deckHide = r + 2 * bw;
+    s.deckH    = tabAbove + (rf + mm(1.6f)) + 4 * mm(DECK_ROW_MM) + mm(4.0f) + mm(1.6f) + s.deckHide;
 
     // What the label row shows: the card's own choice, or what it inherits.
     CardLabel lbl = CardLabel::LBL_NAME;
@@ -1419,13 +1427,9 @@ void deckCreate() {
     // The pane's padding keeps its rows below the tab's join.
     lv_obj_set_style_pad_hor(pane, mm(2.4f), 0);
     lv_obj_set_style_pad_top(pane, rf + mm(1.6f), 0);
-    lv_obj_set_style_pad_bottom(pane, mm(1.6f), 0);
+    lv_obj_set_style_pad_bottom(pane, mm(1.6f) + s.deckHide, 0);   // nothing in the part that stays hidden
     lv_obj_set_flex_flow(pane, LV_FLEX_FLOW_COLUMN);
-    // Clickable so a tap on the pane stays on the pane; folded, a tap on its
-    // showing sliver opens the deck, like the tab.
-    lv_obj_add_flag(pane, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(pane, [](lv_event_t *) { if (s.deckState == DECK_PEEK) deckSet(DECK_OPEN); },
-                        LV_EVENT_CLICKED, nullptr);
+    lv_obj_add_flag(pane, LV_OBJ_FLAG_CLICKABLE);   // a tap on the pane stays on the pane
 
     // The tab: THE RIGHT HALF, ALWAYS (owner, round 9). Some cards will get a
     // second panel (a sensor's CHART, card-sheet 11.1); it takes the left half,
@@ -1446,7 +1450,8 @@ void deckCreate() {
     s.deckTabLbl = makeLabel(s.deckTab, t.TAG, p.ACCENT);
     lv_label_set_text(s.deckTabLbl, "SETTINGS");
     lv_obj_set_style_text_letter_space(s.deckTabLbl, mm(0.4f), 0);
-    lv_obj_align(s.deckTabLbl, LV_ALIGN_TOP_MID, 0, (tabAbove - lv_font_get_line_height(t.TAG)) / 2);
+    // Where round 11 had it, which the owner called right.
+    lv_obj_align(s.deckTabLbl, LV_ALIGN_TOP_MID, 0, (s.deckHead - rf - lv_font_get_line_height(t.TAG)) / 2);
 
     // The block: the tab's lower corners, bottom border and (on Linen) the
     // shadow it casts downward, all of which lie inside the pane - painted out
