@@ -247,6 +247,18 @@ Component split: `wifi_manager`, `ha_client`, `settings`, `time_sync`, `display`
 actually reuse code from.** Worth checking here first whenever a needed pattern exists in more
 than one of them.
 
+## `HomeTiles` (Sebastian) — MIT, Arduino, tiles dashboard with an HA-side Bridge
+
+In `reference/Examples and related projects/HomeTiles`, cloned by the owner 2026-10-05; **not yet
+read beyond `ARCHITECTURE.md`**. A tile dashboard for ESP32 boards (P4 among them) talking MQTT to
+a **Bridge integration installed in Home Assistant**, which also installs automations, scripts and
+helpers that exist only to serve the panels. The owner: "a terrific concept" - the HA side doing
+work for the panel instead of the panel doing everything over the websocket. Worth reading for:
+the Bridge's entity metadata and indexes (`src/network/bridge/`), its popups per type
+(`src/ui/popups/<type>/`, the light popup before 2.10c), packed tile persistence with stable ids
+(`src/tiles/config/`, before 2.10d), and `lvgl_psram_alloc.*` (its LVGL memory in PSRAM). MIT:
+reusable with attribution.
+
 ## `esp-registry/` — Espressif component-registry sources for 2.9 step 2
 
 Fetched 2026-09-25 with the owner's permission, straight from `components-file.espressif.com`, at

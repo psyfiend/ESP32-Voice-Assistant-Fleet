@@ -107,6 +107,29 @@ but was not connected.
 | R5 | 4B | Lamp 3: Colour | The swatches and selector fit beside the strip |
 | R6 | 1060 (when connected) | Open the Switch, then a lamp | The window is wider than tall (~108 x 75 mm); the toggle ~48 mm - the same share of the window as on the P4_5 |
 
+**Round 2 results (owner, 2026-10-05):** R1-R5 PASS. R6 (1060) not yet - it would not flash (COM9 busy).
+
+## Round 3 - paused members, group brightness, a member's own controls
+
+Asked for in round 1 (owner, 2026-10-05). Flashed: **WS_P4_5** and **WS_P4_4B** (`229f0bf`).
+The 1060 has the build but could not be flashed (COM9 busy).
+
+| # | Do this | PASS if |
+|---|---|---|
+| P1 | Pause Lamp 3 (its window's SETTINGS) | Lamp 3's own window: a PAUSED pill above "Brightness", the slider and selector greyed |
+| P2 | In that window, tap the slider, Power, a swatch | Nothing changes; a toast says "Paused - turn it off in SETTINGS" |
+| P3 | The All Lamps card on the page | NOT paused - no PAUSED badge, normal colours |
+| P4 | Open All Lamps | No Colour button (only Lamp 3 had colour); the status line ends ", 1 paused" |
+| P5 | Turn All Lamps on and off | Lamp 3 does not change; the others do |
+| P6 | All Lamps' members view | Lamp 3 listed, reading "Paused" |
+| P7 | Pause all four (All Lamps' SETTINGS, Paused On) | The All Lamps card now shows PAUSED; its window greyed with the pill |
+| P8 | Resume (Paused Off) while the window is open | The pill goes and the controls come back to colour within a second |
+| B1 | Lamp 1 at 100%, Lamp 2 at 50% (their own windows), Lamps 3 and 4 off | The All Lamps CARD fills to 75%; its window says 75% |
+| M1 | All Lamps, members view, tap Lamp 2 | "All Lamps > Lamp 2", back arrow, Lamp 2's own controls (Power \| Brightness, Temperature) |
+| M2 | Change Lamp 2's brightness there, then the back arrow | Back on Members, Lamp 2's row shows the new level |
+| M3 | Tap Lamp 4 | "All Lamps > Lamp 4", the big toggle (on/off only); it works though Lamp 4 has no card |
+| M4 | In a member's view, open SETTINGS and set Paused On | Only that member pauses (check Members) |
+
 ## Not tested (by Claude)
 
 Everything below was driven over `/popup` with no finger on the glass, so **nothing about touch has

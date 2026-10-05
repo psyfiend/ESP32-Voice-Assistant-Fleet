@@ -429,6 +429,19 @@ it is first opened, and only the chosen control is built. The pool in PSRAM was 
 internal heap; full-screen frames ~10% slower, the popup's opening frame ~2 ms) and reverted - the
 owner's call, below.
 
+**Round 1 additions (owner, 2026-10-05):**
+- **A paused member is out of its group**: not counted for on or off, not offered (a mode only it
+  has leaves the selector), not commanded. The group is PAUSED only when every member is; its
+  status line says "1 paused"; Members still lists it, reading "Paused". The card follows the same
+  rule (`Card::counts()`).
+- **A paused window**: greyed controls, a PAUSED pill, and a touch on a control explains itself.
+- **A group card fills to the members' mean brightness**, HA's rule read from its source
+  (`group/light.py`: brightness and colour temperature are the mean over the members that are ON,
+  hue a circular mean, the mode the most common, the capabilities the union).
+- **Members: a tap opens that member's own controls** in the same window ("Group > member", back
+  arrow to Members) - section 11.1's member view, reached by a tap (owner) rather than the mock's
+  long press. It needs no card of its own.
+
 **Still open:**
 - **Memory beyond 2.10b**: stay on the internal pool while it holds, or move the P4s' pool to PSRAM
   (and make it larger) when 2.10c-e need more. Numbers in `TEST_2.10b.md`.

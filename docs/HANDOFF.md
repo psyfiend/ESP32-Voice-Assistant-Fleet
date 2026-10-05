@@ -77,9 +77,12 @@ local debug flags. **What was decided and built: `card-sheet.md` §15. The owner
   +128 KB internal heap. Reverted pending the owner's choice.
 - **Sizes**: P4_5 verified unchanged. Round 2 flashed the 4B too; the 1060 is built, not flashed
   (not connected). Round 1 passed except three slider glitches, fixed in `6a629e7`.
-- **Paused members (owner, round 1), proposed, not built:** a paused member is left out of a group
-  (its state, what the group offers, its commands); the group shows PAUSED only when every member
-  is; a paused card's own window gets a PAUSED badge and greyed controls. Awaiting the owner's yes.
+- **Round 3 built (`229f0bf`)**: paused members leave the group, a paused window is greyed with a
+  PAUSED pill, the group card shows the mean brightness (HA's rule), Members rows open a member's
+  own controls. Flashed P4_5 and 4B; **the 1060 would not flash (COM9 busy)** - R6 and round 3 on it
+  wait. Rounds and results: `TEST_2.10b.md`.
+- **HomeTiles** (owner, 2026-10-05): MIT reference with an HA-side Bridge that installs helpers and
+  automations for the panels - `REFERENCE_PROJECTS.md`. Read it before 2.10c's HA work.
 - Next after round 1: 2.10c (HA attributes and `light.turn_on` with data - CommandRouter refuses HA
   light levels until then, loudly), then 2.10d saving, 2.10e history. Interview §3 onward after 2.10.
 
