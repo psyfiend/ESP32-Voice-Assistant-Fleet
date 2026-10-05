@@ -16,7 +16,7 @@ command, so it shows a refusal), **All Lamps** (four lamps on one card) and the 
 
 | # | Do this | PASS if |
 |---|---|---|
-| O1 | Long press any card (hold ~half a second) | The page dims at once, an empty frame grows out of that card into a centred window, then the contents appear |
+| O1 | Long press any card (hold a quarter second) | The page dims at once, an empty frame grows out of that card into a centred window, then the contents appear |
 | O2 | Watch the grow on a card in a corner, then one in the middle | It starts on the card each time and ends in the same centred place. Note any stutter: smooth / slight / bad |
 | O3 | Press a card and slowly drag your finger a little, keeping it down past half a second | No window opens |
 | O4 | Tap a card (quick) | It toggles or does whatever it did before - no window |
@@ -98,6 +98,15 @@ reading. Long press is 300 ms.
 | R1 | Open and close popups from cards on the far left, far right, top and bottom rows | **PASS** - no lines left behind |
 | R2 | The page-picture backdrop (filled window over a snapshot) | **Rejected**: slower (4 frames) and the background froze. Reverted |
 | R3 | The ring-painted grow | **"Looks pretty good"**, no gaps seen. Wanted: a border and rounded corners while it moves |
+
+## Round 4 (owner, 2026-10-04 evening, home)
+
+The grow itself "isn't that bad", but opening as a whole is not smooth: a delay between the long
+press registering and the motion starting, then "an untenable delay" between full size and a usable
+window (the dim and the contents arrive together, late). Closing is as bad in reverse: contents
+cleared, then the dim lifts, then the empty frame shrinks. **Owner's verdict: unless performance
+improves drastically, this way of adding flair is not viable; snappy first.** Long press 300 -> **250
+ms**. Border and rounded corners on the grow are on hold until the direction is chosen (HANDOFF).
 
 ## Measured (Claude, from the board) - pending
 

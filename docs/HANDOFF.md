@@ -26,7 +26,14 @@ default, Fleet, Linen with real shadows); card types with state icons; an FPS/CP
 **Branch `feat/65-popup-frame`** (off `main`). Built on WS_P4_5 only. Decisions taken before building:
 `card-sheet.md` section 13.
 
-**Built and seen on glass:** long press (now **300 ms**) opens a window on every card type; header X /
+**Round 4, 2026-10-04 evening (home, WS_P4_5 on COM15, WiFi): the owner finds opening and closing
+NOT smooth as a whole** - a wait before the motion starts, then "an untenable delay" between full
+size and a usable window; closing in three visible stages (contents, dim, empty frame). "Unless we
+can make some drastic performance improvements I'm not sure this particular approach to adding flair
+to the popup is viable." Long press **250 ms**. The direction is being discussed; the border /
+rounded-corner work below is ON HOLD until it is chosen. `TEST_2.10a.md` round 4.
+
+**Built and seen on glass:** long press (now **250 ms**) opens a window on every card type; header X /
 "Area > name" / history (clock icon - the chart glyph needs a font regeneration on the desktop, no
 Node.js on the laptop) / members (multi-entity cards); closes by X, tap on the dim, drag down on the
 header row, 60 s idle with a shrinking bar; modal; a switch gets its real toggle, everything else a

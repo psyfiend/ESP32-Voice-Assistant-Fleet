@@ -578,11 +578,12 @@ void GUIManager::begin() {
         // Every press, whatever it lands on. See screenPressCb().
         lv_indev_add_event_cb(indev, screenPressCb, LV_EVENT_PRESSED, NULL);
 
-        // LONG PRESS AT 300 ms, not LVGL's default 400 (lv_indev.c). The owner,
+        // LONG PRESS AT 250 ms, not LVGL's default 400 (lv_indev.c). The owner,
         // 2026-10-03, once long press became the way into every card's popup:
-        // "could it be shortened just a hair?" The cost is that a slow tap held
-        // past ~1/3 s opens the window instead of toggling; 350 is the fallback.
-        lv_indev_set_long_press_time(indev, 300);
+        // "could it be shortened just a hair?" - 300 ms, then 250 (2026-10-04).
+        // The cost is that a slow tap held past a quarter second opens the
+        // window instead of toggling; 300 is the fallback.
+        lv_indev_set_long_press_time(indev, 250);
     }
 
 #ifdef DEBUG_FRAMES
