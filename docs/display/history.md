@@ -24,6 +24,14 @@ DMA2D driver a pointer to one `static` config shared by every handle, read only 
 starts. **Fix and rule: at most one copier job outstanding in the program** - one worker, one
 handle. Isolated tests of the copier all passed; only the real use failed. Archive: §8.10.
 
+## Straight lines with rounded ends left behind by the popup (2026-10-04)
+The popup's moving outline (2.10a) left lines on screen. When a frame's stale areas exceeded
+`PIECES_MAX`, the repair fell back to copying the whole area - QUEUED on the DMA2D copier, where it
+raced the PPA's strip rotations and sometimes put the previous frame back over fresh pixels. **Fix:**
+the fallback runs synchronously before the frame's first strip (`repairBlitNow`), and `PIECES_MAX`
+32 -> 64. Verified on `WS_P4_5` ("no lines left behind"); flashed on `WS_P4_4B` and `CYD_P4_1060` the
+same day, nothing reported; the 7B and 4880 carry the same code, unflashed. Commit `93c46b8`.
+
 ## A PPA freeze that matched our exact configuration (risk, never seen)
 `esp_lvgl_adapter` ships an ESP-IDF patch for a PPA hang with partial mode and 90/270 rotation - the
 P4_5's setup. The same code is in our IDF 5.5.5. Built anyway (owner); 30-minute and later soaks

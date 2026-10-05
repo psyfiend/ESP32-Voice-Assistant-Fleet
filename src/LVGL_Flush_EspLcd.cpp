@@ -194,6 +194,21 @@ esp_err_t ppaBlit(const void *src, uint32_t srcW, uint32_t srcH,
                   void *dst, uint32_t dstX, uint32_t dstY, ppa_srm_rotation_angle_t angle,
                   bool blocking = true, lv_display_t *doneFor = nullptr);
 
+// One DMA2D copy of area r, the same place in both buffers.
+esp_async_fbcpy_trans_desc_t fbcpyDesc(const void *from, void *to, const lv_area_t &r) {
+    esp_async_fbcpy_trans_desc_t tr = {};
+    tr.src_buffer = from;
+    tr.dst_buffer = to;
+    tr.src_buffer_size_x = tr.dst_buffer_size_x = (size_t)s_pw;
+    tr.src_buffer_size_y = tr.dst_buffer_size_y = (size_t)s_ph;
+    tr.src_offset_x = tr.dst_offset_x = (size_t)r.x1;
+    tr.src_offset_y = tr.dst_offset_y = (size_t)r.y1;
+    tr.copy_size_x = (size_t)(r.x2 - r.x1 + 1);
+    tr.copy_size_y = (size_t)(r.y2 - r.y1 + 1);
+    tr.pixel_format_unique_id.color_type_id = COLOR_TYPE_ID(COLOR_SPACE_RGB, COLOR_PIXEL_RGB565);
+    return tr;
+}
+
 // The worker. The list is written by the LVGL thread before it gives
 // s_rqStart and not touched again until s_rqDone comes back.
 void repairWorker(void *) {
@@ -202,16 +217,7 @@ void repairWorker(void *) {
         for (uint8_t i = 0; i < s_rqN; i++) {
             const lv_area_t &r = s_rq[i];
             const uint32_t w = (uint32_t)(r.x2 - r.x1 + 1), h = (uint32_t)(r.y2 - r.y1 + 1);
-            esp_async_fbcpy_trans_desc_t tr = {};
-            tr.src_buffer = s_rqFrom;
-            tr.dst_buffer = s_rqTo;
-            tr.src_buffer_size_x = tr.dst_buffer_size_x = (size_t)s_pw;
-            tr.src_buffer_size_y = tr.dst_buffer_size_y = (size_t)s_ph;
-            tr.src_offset_x = tr.dst_offset_x = (size_t)r.x1;
-            tr.src_offset_y = tr.dst_offset_y = (size_t)r.y1;
-            tr.copy_size_x = w;
-            tr.copy_size_y = h;
-            tr.pixel_format_unique_id.color_type_id = COLOR_TYPE_ID(COLOR_SPACE_RGB, COLOR_PIXEL_RGB565);
+            esp_async_fbcpy_trans_desc_t tr = fbcpyDesc(s_rqFrom, s_rqTo, r);
             if (esp_async_fbcpy(s_fbc, &tr, onFbcpyDone, s_rqPiece) == ESP_OK) {
                 if (xSemaphoreTake(s_rqPiece, pdMS_TO_TICKS(500)) == pdTRUE) continue;
                 // A copy that never finished: say so; the piece may be stale.
@@ -335,15 +341,50 @@ void repairBlit(void *from, void *to, const lv_area_t &r, LVGL_Startup::FlushSta
     if (stats) stats->repairPx += w * h;
 }
 
+// THE WHOLE-AREA FALLBACK, DONE NOW AND WAITED FOR - never queued.
+//
+// A whole-area repair overlaps what this frame redraws. Queued, it ran on the
+// DMA2D copier ALONGSIDE the PPA's strip rotations - breaking the one rule
+// that makes that overlap safe (see "Repairs on the DMA2D copier" above) - and
+// whichever finished second won. When the copy won, it put the PREVIOUS
+// frame's pixels back over freshly drawn ones. Found 2026-10-03 by the owner
+// as straight lines with rounded ends left on screen after the card popup's
+// outline shrank away: its eight moving pieces change ~16 thin areas a frame,
+// which cut a stale area into more than PIECES_MAX pieces. A deck panel
+// changes 3 and never reached the fallback.
+//
+// Done synchronously here it cannot race: beginFrame() runs before the frame's
+// first strip is rotated (disp_flush), so every strip lands on top of it. The
+// worker is idle at this point - endFrame() waited for the previous frame's
+// list and this frame's has not been handed over yet - so using the one DMA2D
+// handle from this thread keeps "one copy outstanding, anywhere".
+void repairBlitNow(const void *from, void *to, const lv_area_t &r, LVGL_Startup::FlushStats *stats) {
+    const uint32_t w = (uint32_t)(r.x2 - r.x1 + 1), h = (uint32_t)(r.y2 - r.y1 + 1);
+    if (stats) stats->repairPx += w * h;
+    if (s_fbc) {
+        esp_async_fbcpy_trans_desc_t tr = fbcpyDesc(from, to, r);
+        if (esp_async_fbcpy(s_fbc, &tr, onFbcpyDone, s_rqPiece) == ESP_OK &&
+            xSemaphoreTake(s_rqPiece, pdMS_TO_TICKS(500)) == pdTRUE) {
+            return;
+        }
+    }
+    ppaBlit(from, s_pw, s_ph, r.x1, r.y1, w, h, to, r.x1, r.y1, PPA_SRM_ROTATION_ANGLE_0);
+}
+
 // Repair `r` less everything this frame redraws: LVGL's own lv_area_diff
 // (what it uses for the same job in direct mode, lv_refr.c) cuts each
 // redrawn area out, leaving up to four pieces per cut. During a panel
 // animation consecutive frames overlap almost entirely, so what is left is
-// thin. If the pieces outgrow PIECES_MAX, `r` is repaired whole - more
-// copying, never wrong.
-constexpr uint8_t PIECES_MAX = 32;
+// thin. If the pieces outgrow PIECES_MAX, `r` is repaired whole, at once,
+// before any strip is drawn - see repairBlitNow().
+//
+// 64 since 2026-10-03 (was 32), so the popup's outline - ~16 thin areas a
+// frame - normally stays on the fast, parallel path. Static rather than on
+// the stack: 2 KB of pieces is too much for the loop task's stack, and this
+// only ever runs on the LVGL thread.
+constexpr uint8_t PIECES_MAX = 64;
 void repairArea(void *from, void *to, const lv_area_t &r, LVGL_Startup::FlushStats *stats) {
-    lv_area_t bufA[PIECES_MAX], bufB[PIECES_MAX];
+    static lv_area_t bufA[PIECES_MAX], bufB[PIECES_MAX];
     lv_area_t *cur = bufA, *nxt = bufB;
     uint8_t n = 1;
     cur[0] = r;
@@ -353,11 +394,11 @@ void repairArea(void *from, void *to, const lv_area_t &r, LVGL_Startup::FlushSta
             lv_area_t res[4];
             const int8_t k = lv_area_diff(res, &cur[i], &s_now[c]);
             if (k < 0) {                            // untouched by this cut
-                if (m >= PIECES_MAX) { repairBlit(from, to, r, stats); return; }
+                if (m >= PIECES_MAX) { repairBlitNow(from, to, r, stats); return; }
                 nxt[m++] = cur[i];
                 continue;
             }
-            if (m + k > PIECES_MAX) { repairBlit(from, to, r, stats); return; }
+            if (m + k > PIECES_MAX) { repairBlitNow(from, to, r, stats); return; }
             for (int8_t j = 0; j < k; j++) nxt[m++] = res[j];
         }
         lv_area_t *t = cur; cur = nxt; nxt = t;

@@ -1,0 +1,310 @@
+# TEST 2.10a - the card popup window (#65)
+
+**DONE: signed off 2026-10-05 after round 12, merged and tagged `v0.2.8`.** What was built is
+`docs/design/card-sheet.md` section 14.
+
+Branch `feat/65-popup-frame`. Board: **WS_P4_5**. Design: `docs/design/card-sheet.md` sections 11-13
+and the artifact "Card Popup Mock" (v3).
+
+Mark each line PASS or FAIL, with a note for anything that looks wrong even if it passes.
+
+**Step 1 (this build): the window.** The settings deck that peeks up from the bottom, and Pause
+inside it, come in step 2. **Until then nothing on the board can pause a card** - long press used
+to do that and now opens the window.
+
+The Fleet page has the useful test cards: **Switch** (echoes its command), **Stuck** (ignores its
+command, so it shows a refusal), **All Lamps** (four lamps on one card) and the sensor cards.
+
+## Opening
+
+| # | Do this | PASS if |
+|---|---|---|
+| O1 | Long press any card (hold a quarter second) | The page dims at once, an empty frame grows out of that card into a centred window, then the contents appear |
+| O2 | Watch the grow on a card in a corner, then one in the middle | It starts on the card each time and ends in the same centred place. Note any stutter: smooth / slight / bad |
+| O3 | Press a card and slowly drag your finger a little, keeping it down past half a second | No window opens |
+| O4 | Tap a card (quick) | It toggles or does whatever it did before - no window |
+| O5 | Swipe pages left and right after closing a window | Pages still change |
+
+## The header
+
+| # | Look at | PASS if |
+|---|---|---|
+| H1 | Top left | An X |
+| H2 | Middle | "Area > Name", area dimmer than the name, e.g. "Office > Switch" |
+| H3 | Top right | A clock icon (stands in for the mock's chart icon - see notes) |
+| H4 | All Lamps' window | A second icon top right, the light-bulb group |
+| H5 | Any single-entity card's window | No bulb-group icon |
+
+## Closing - the four ways
+
+| # | Do this | PASS if |
+|---|---|---|
+| C1 | Tap the X | The contents vanish, the empty frame shrinks back into the card, then the dim lifts |
+| C2 | Tap anywhere on the dim, outside the window | Closes the same way. The card you tapped on does NOT toggle |
+| C3 | Drag down starting on the header row (the title) | Closes |
+| C4 | Drag down starting lower, in the body | Does NOT close |
+| C5 | Open a window and leave it | A thin bar along the bottom of the window shrinks; at 60 s the window closes by itself |
+| C6 | Open, wait ~30 s, touch inside the window | The bar jumps back to full |
+
+## Modal
+
+| # | Do this, with a window open | PASS if |
+|---|---|---|
+| M1 | Swipe left or right on the dim | Page does not change (the swipe's tap closes the window - that is fine) |
+| M2 | Swipe down from the very top edge | No drawer, no header peek, no log page |
+| M3 | Swipe up from the bottom edge | No deck, no FPS overlay |
+
+## The body
+
+| # | Open | PASS if |
+|---|---|---|
+| B1 | **Switch** | A tall toggle on the left with the knob at the TOP when on, BOTTOM when off. Beside it "Power", "On"/"Off" and "Changed N ago" |
+| B2 | Tap the toggle | The knob moves and the word changes; the Switch card under the dim follows |
+| B3 | **Stuck**, tap its toggle | The knob moves, then a few seconds later jumps back (the command was refused) |
+| B4 | A temperature or other sensor card | An icon in a circle, the reading's kind ("Temperature"), the number with its unit, "Changed N ago" |
+| B5 | Leave B4 open for a minute | "Changed N ago" counts up |
+| B6 | A motion / door card | The state word ("Detected", "Clear", "Open") |
+| B7 | A lamp | Read-only for now (its controls are 2.10b): icon, "State", On/Off |
+| B8 | An HA card (no HA reachable from here) | "Unavailable" in the warning colour |
+
+## Inner views
+
+| # | Do this | PASS if |
+|---|---|---|
+| V1 | Tap the clock icon | Title reads "Name > History", a note says history arrives with 2.10e, the X becomes a back arrow, the right icons go away |
+| V2 | Tap the back arrow | Back on the main view, X restored |
+| V3 | All Lamps: tap the bulb-group icon | Title "All Lamps > Members", a row per lamp with its state |
+| V4 | From V3, toggle a lamp's own card later and reopen | The members rows show the new states |
+
+## Looks
+
+| # | Check | PASS if |
+|---|---|---|
+| L1 | Midnight | Window a step lighter than the cards, thin border, no shadow |
+| L2 | Linen (cycle the scheme first, then open a window) | Readable; the dim is dark, not foggy |
+| L3 | Text | Nothing renders as an empty box |
+
+## Round 1 results (owner, 2026-10-03) and what changed
+
+O1, O3-O5, H2, H5, C2, C4-C6, B2-B4, V1, V2, L1, L3 PASS. Fixed since: **C3** (drag down never
+arrived - LVGL hands a gesture to the first object WITHOUT GESTURE_BUBBLE), **V3** (title clipped /
+wrapped), **B1** (group shifted on the first tap), **H1/H3/H4** (bigger icons in discs, nearer the
+corner), **L2** (Linen's shadow on the window). **O2/C1** (choppy grow): now a rounded outline that
+grows from the card, the dim only while the window is open - smoother, but the owner wants a filled
+window (see HANDOFF). **B5/B8** are #84, not 2.10a: the board had no network, so nothing ever had a
+reading. Long press is 300 ms.
+
+## Round 3 (owner, 2026-10-04)
+
+| # | Do this | Result |
+|---|---|---|
+| R1 | Open and close popups from cards on the far left, far right, top and bottom rows | **PASS** - no lines left behind |
+| R2 | The page-picture backdrop (filled window over a snapshot) | **Rejected**: slower (4 frames) and the background froze. Reverted |
+| R3 | The ring-painted grow | **"Looks pretty good"**, no gaps seen. Wanted: a border and rounded corners while it moves |
+
+## Round 4 (owner, 2026-10-04 evening, home)
+
+The grow itself "isn't that bad", but opening as a whole is not smooth: a delay between the long
+press registering and the motion starting, then "an untenable delay" between full size and a usable
+window (the dim and the contents arrive together, late). Closing is as bad in reverse: contents
+cleared, then the dim lifts, then the empty frame shrinks. **Owner's verdict: unless performance
+improves drastically, this way of adding flair is not viable; snappy first.** Long press 300 -> **250
+ms**. Border and rounded corners on the grow are on hold until the direction is chosen (HANDOFF).
+
+## Round 5 - usable first (2026-10-04 evening, WS_P4_5)
+
+No grow: the window appears complete and closes in one step. Backdrop NONE to start. A long press on
+the window's title switches NONE / DIM for the next window (debug build only).
+
+| # | Do this | PASS if |
+|---|---|---|
+| U1 | Long press a card (a quarter second) | The window appears complete - frame, title, X, contents - in one step |
+| U2 | Tap the X | The window is gone in one step, page back as it was |
+| U3 | Tap a card outside the window | Closes; that card does NOT toggle |
+| U4 | Drag down on the title row; then open again and drag down in the body | The first closes; the second does not |
+| U5 | With the window open: swipe left/right, down from the top edge, up from the bottom | No page change, no drawer, no deck (the tap may close the window - fine) |
+| U6 | Open a card beside other live cards (sensor, Uptime) | Cards outside the window keep updating |
+| U7 | Long press the window's title | Toast "Backdrop: DIM - from the next window" |
+| U8 | Close, open another card (DIM) | The window first, then the page around it darkens a moment later. Say how the gap feels |
+| U9 | DIM: look at the window's four rounded corners | Dim right into the corners - no bright specks |
+| U10 | DIM: close | Window and dim go together |
+| U11 | Linen: repeat U1 and U8 | Note how much slower, if at all |
+| U12 | After a dozen opens and closes | No lines or leftovers on screen |
+
+**Round 5 results (owner):** the instant window is "a much better experience" than any grow - "the
+speed alone makes the entire experience vastly preferable". DIM: "the delay seems like an eternity
+and adds very little" - **decided: no dim.** Measured from the owner's DIM trial (scheme not
+recorded): the window's frame 136-143 ms, the dim's frame 98-102 ms, closing 147-149 ms. NONE:
+building the window 5 ms, tearing it down 0.5 ms, one close frame seen at 46 ms.
+
+## Round 6 - the hold, the leap, the knob (2026-10-04 night, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| P1 | Tap a card quickly | Its border starts toward the accent colour and fades back; the card does what a tap does |
+| P2 | Press and hold a card | The border fades to the accent over the quarter second and the card sinks slightly; then it jumps a little larger for a moment, then the window appears |
+| P3 | With the window open | The card you held (if visible beside the window) keeps the accent border |
+| P4 | Close the window | The card's border returns to normal with it |
+| P5 | Start a swipe on a card | The border lets go as soon as the finger moves; the page changes as before |
+| P6 | Long press the window's title | Toast "Leap: 1 frame"; again "Leap: none"; again "Leap: 2 frames". Compare how each feels |
+| P7 | Switch's window: tap the toggle | The knob SLIDES to the other end |
+| P8 | Stuck's window: tap the toggle | The knob slides, then a few seconds later slides back |
+| P9 | Repeat P2 in Midnight and in Linen | Note any difference in how fast the window appears |
+
+**Round 6 results (owner):** P1, P3, P4, P5, P8 PASS. **P2 partial**: the leap was clipped by the
+card's wrapper (it only lets a shadow's width out). **P6**: the leap made the popup FEEL slower - the
+jump, then a visible wait for the window; with no leap it felt faster. **Decided: no leap**; the
+press-in alone "is by itself a really catchy visual". **P7**: passes, but a knob that slides when it
+cannot be dragged is "jarring" - either make it draggable or drop the slide (open). **P9**: no
+difference seen between Midnight and Linen (measured: the window's frame ~77 ms Midnight, ~140 ms
+Linen; closing ~48 / ~92). **Bug: a teal screen and a reboot, 2-3 times** - found in the log and
+fixed: a swipe started on a card rebuilt the page and the hold restyled the deleted card (LESSONS).
+The owner also asked that the press move a card's edge-attached parts with it (band, tag pills,
+badge, corner icon - not the floating tag).
+
+## Round 7 - press-in only, interference (2026-10-04 night, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| Q1 | Hold a card | It presses in and its border goes to the accent; the window appears; the card STAYS pressed in with the accent while the window is open, and comes back when it closes |
+| Q2 | Repeat Q1 in each label type (cycle the header knob: Float, Tag, Band, None) | The band, the tag pills, the status badge and the corner icon move in with the card; the floating tag stays where it is |
+| Q3 | Start swipes on cards, a dozen times; change scheme a few times | No teal screen, no reboot |
+| Q4 | Open a window | For about a third of a second its edge crackles - sparks along the border, flecks jumping off it, short stretches of border dropping out - then it settles. Different each time |
+| Q5 | Leave a window open without touching it | Now and then (every 6-15 s) a shorter, weaker flicker; never just after you touched it |
+| Q6 | Long press the window's title | Toast cycles "Interference: on open only", "off", "open + now and then" |
+| Q7 | Linen | The crackle reads on the light window too (it uses the accent toward the text colour there) |
+
+**Round 7 results (owner, 2026-10-05):** Q1, Q3, Q6 PASS - the crash is gone. **Q2 passes but**: in
+Band, black pixels between the band's rounded corner and the accent border when pressed (the band
+used the card's radius; it sits inside the border, so it needs the border's inner radius - fixed).
+**Q4 partial**: the crackle read like a display timing fault ("porch timing issues or the wrong
+pclk"), not electricity - too fast and too scattered; the owner sketched a slower, localized spark
+that travels a short stretch of edge. **Q5**: the burst on opening looked like a render problem;
+wait a few seconds before the first. **Q7**: invisible on Linen. Owner: "otherwise I'm super happy
+with what we've got right now in terms of function and form." The knob: keep the slide on a tap
+AND let a finger drag it; let go, and it goes to whichever half it is in.
+
+## Round 8 - the travelling spark, the draggable knob (2026-10-05, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| S1 | Open a window and wait | Nothing for 1.5-3.5 s; then ONE spark runs along a short stretch of one edge - a bright core in a glow with a fading tail - often running again a little further on. It reads as electricity, not a fault |
+| S2 | Leave it open | Another spark every 5-12 s, somewhere else each time; none within 2 s of touching the window |
+| S3 | Linen | The spark is visible (deep blues and violet on a light window) |
+| S4 | Long press the title | Toast cycles "Sparks: once per window", "off", "now and then" |
+| K1 | Switch's window: tap the toggle | The knob slides to the other end, as before |
+| K2 | Drag the knob all the way down (or up) | It follows the finger; the switch changes when you let go |
+| K3 | Drag it two thirds of the way, let go | It slides the rest of the way and the switch changes |
+| K4 | Drag it two fifths of the way, let go | It slides back; the switch does not change |
+| K5 | Stuck's window: drag it across | It goes across, then a few seconds later slides back (refused) |
+| B1 | Band label type: press a card | The band's corners meet the accent border with no dark pixels between |
+
+**Round 8 results (owner, 2026-10-05):** S2-S4, K1-K5 PASS, **B1 PASS**. **S1 partial**: "much
+better", visible on Linen too. Last round of tweaks asked for: keep the section's size; vary the
+length and the width from run to run, not both at once; faster and more frenetic, more overlap on
+the same stretch; each run its own dice (a slow spark repeated 3-4 times read as a loop). Linen
+deserves its own kind of animated chrome some day (the sparks suit the dark schemes' look).
+
+## Round 9 - the settings deck, the chart icon, a faster window (2026-10-05, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| D1 | Open a window | A SETTINGS tab slides up from the bottom of the screen, under the window, the window's width |
+| D2 | Tap the tab | The deck slides up over the window's lower part: Paused, Label, Custom name, On the dashboard |
+| D3 | Paused: tap On | The chip fills; the window says "Paused"; the card under or beside the window shows PAUSED and quiets |
+| D4 | Close the window, reboot the board, open the same card | Still paused (kept on the device). Set it back to Off |
+| D5 | With the deck open, tap anywhere in the window | The deck folds back to its tab |
+| D6 | Tap the tab twice | Opens, then folds |
+| D7 | With the deck showing, tap outside both | Window and deck close together |
+| D8 | The Label / Custom name / On the dashboard chips | Drawn quieter, and do nothing (they arrive with saving, 2.10d) |
+| D9 | Top right of any window | The history button is a bar chart now, not a clock |
+| W1 | Open windows in Midnight and Linen | Feels at least as quick as before - should be quicker (see Measured) |
+| S5 | Sparks | Faster, more frantic runs over the same short stretch, each run a little different |
+
+**Round 9 results (owner, 2026-10-05):** D1-D9 and W1 PASS - "PASS PASS PASS!!" on Pause, which
+also held through a state change from another device and a reboot. Asked for: the tab the same
+height as the page deck's panels (it was 6 mm; theirs are 45 logical px, ~6.7 mm); on closing,
+an open deck vanishes with the window but a tab that was only peeking slides back down; a spark's
+runs all go the same way round (CW or CCW). Decided: SETTINGS always in the right half, so a second
+panel (a sensor's CHART) can take the left without moving it. The owner felt page swipes were faster
+on Linen - nothing in this build touches page swipes (unmeasured).
+
+## Round 10 - deck details (2026-10-05, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| T1 | Open a window on a page with the deck showing | The SETTINGS tab is the same height as the page deck's panels |
+| T2 | Look at the tab | Right half of the window's width; the left half of that strip is empty |
+| T3 | Close a window while only the tab shows | The window vanishes; the tab slides back down below the screen |
+| T4 | Open the deck, then close the window | Window and deck vanish together |
+| T5 | Watch a few sparks | Each one's runs all travel the same way round the window |
+| T6 | With the deck folded, tap beside the tab (its empty left half) | Closes the window, like any tap outside |
+
+**Round 10 results (owner, 2026-10-05):** T1-T6 PASS. Asked for: with the deck open, a tap in the
+window must ONLY fold it (it also pressed whatever was under the finger: the X closed the window
+before the deck had folded, the chart icon and back arrow navigated); the tab one colour folded and
+open; the deck's buttons filled like the window's X and chart discs; the tab's shadow on Linen like
+the page deck's; and a folder-tab shape - the open pane closed off at the top, the tab joining it with
+a curved inner corner that also shows when folded. Decided: the deck's speed stays; memory, wait and
+see; the two-panel rules in `card-sheet.md` section 14.
+
+## Round 11 - the folder tab (2026-10-05, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| F1 | Open a window | Folded: the tab, its curved inner corner, and a sliver of the pane's top edge running left along the bottom of the screen |
+| F2 | Open the deck | The pane has a top edge left of the tab, joined to the tab by the curve - closed off from the window |
+| F3 | With the deck open, tap the X, the chart icon, the title, the toggle | Each only folds the deck; nothing else happens |
+| F4 | With the deck open, tap a chip | The chip works; the deck stays open |
+| F5 | Folded, tap the sliver left of the tab | The deck opens |
+| F6 | Tab colour, folded and open | The same - the window's colour |
+| F7 | The chips | Filled, like the X and chart buttons; the chosen live one in the accent |
+| F8 | Linen | The tab and pane cast the scheme's shadow, like the page deck's panels |
+
+**Round 11 results (owner, 2026-10-05):** F2-F4 and F6-F8 PASS. F1: the inner corner "looks
+perfect", but it sat too high - folded, it and the sliver of the pane's edge (F5) should be below
+the screen, so that only the tab pokes up. Open, the pane's bottom border should be below the screen
+too. The tab's height and the SETTINGS label's place, folded, were right.
+
+## Round 12 - only the tab (2026-10-05, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| E1 | Open a window | Folded, only the tab shows: no curve, no pane edge. Same height and label place as round 11 |
+| E2 | Open the deck | The curve and the pane's top edge as in round 11; no border along the bottom of the screen |
+| E3 | Look at the open deck's rows | All four rows and the note fit, with no scrolling (rows are 7.2 mm now, from 8) |
+| E4 | Tap the tab twice; close with the deck folded, then open | As before (D6, T3, T4) |
+| E5 | Linen, folded and open | No shadow or edge showing along the bottom of the screen |
+
+**Round 12 results (owner, 2026-10-05):** E1-E5 PASS. **2.10a signed off** - merged and tagged
+`v0.2.8` the same day, after the all-nine compile gate.
+
+## Measured (Claude, from the board)
+
+**The window's first frame, before and after building it quiet (round 9, 2026-10-05):**
+
+| | Midnight / Fleet | Linen |
+|---|---|---|
+| Before (rounds 6-8): the frame redrew from the screen's corner | 73-87 ms | 136-151 ms |
+| After: only the window (and, on Linen, thin shadow bands) | **42-48 ms** | **69-79 ms** |
+| Long press to the window on glass, after | 69-75 ms | 95-105 ms |
+| Closing (the page under the window must be redrawn) | 53-62 ms | ~90-105 ms |
+
+Building the window and its deck takes 25-26 ms (the deck added ~11 ms). What is left of the open
+frame is mostly the window's own pixels on this rotated panel: drawing them, and the PPA turning
+them for the frame buffer.
+
+**G1 - LVGL's pool with a window open (Fleet page, 14 cards):** 98-99 KB used of 115 KB, biggest
+free block 16 KB, fragmentation 3%. After closing: 87 KB used, biggest free block still 16 KB,
+fragmentation 46%. **A window costs ~11-12 KB; with one open ~16 KB is left.** Enough for 2.10a; a
+warning for 2.10b-e, which add sliders, swatches, history rows and member rows to the same window.
+Options for then: build the deck's pane only when it is first opened (~5 KB while folded), or move
+the P4s' pool to PSRAM as on WS_S3_4B (`-D FLEET_LV_MEM_PSRAM`, drawing ~5-10% slower).
+
+## Notes and known gaps
+
+- **History icon:** `mdi:chart-bar` since 2026-10-05 (font regenerated at home); `clock-outline`
+  stood in before.
+- **Big words** ("On", "Unavailable") use the toolkit's existing hero face, smaller than the mock's
+  6.5 mm; a bigger face costs flash (14-29 KB) and is a choice for later.
+- Lights are read-only in this window until 2.10b.

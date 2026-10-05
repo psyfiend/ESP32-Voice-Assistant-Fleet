@@ -136,8 +136,8 @@ void headerCb(lv_event_t *e) {
     // A header bar is created in Card::build(), not styled in restyle(), so
     // changing the treatment means rebuilding. That is correct: this is a
     // structural choice a card makes once, not a live style.
-    s_hdr = (s_hdr == CardHeaderStyle::HDR_TAG) ? CardHeaderStyle::HDR_BAR
-          : (s_hdr == CardHeaderStyle::HDR_BAR) ? CardHeaderStyle::HDR_NONE
+    s_hdr = (s_hdr == CardHeaderStyle::HDR_TAG) ? CardHeaderStyle::HDR_BAND
+          : (s_hdr == CardHeaderStyle::HDR_BAND) ? CardHeaderStyle::HDR_NONE
                                                      : CardHeaderStyle::HDR_TAG;
     CardDemo::show(*s_reg, *s_binder);
 }
@@ -245,7 +245,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     topButton(bar, LV_SYMBOL_LEFT " Back", backCb);
     topButton(bar, UI::pal().name, schemeCb);
     topButton(bar, s_hdr == CardHeaderStyle::HDR_TAG ? "Tag"
-                 : s_hdr == CardHeaderStyle::HDR_BAR ? "Bar" : "No hdr", headerCb);
+                 : s_hdr == CardHeaderStyle::HDR_BAND ? "Band" : "No hdr", headerCb);
     topButton(bar, s_showArea ? "Area on" : "Area off", areaCb);
     topButton(bar, s_areaColor ? "Colour" : "Mono", colorCb);
     topButton(bar, s_actorStyle == StateCardFill::FILL_SURFACE ? "Fill" : "Icon", actorCb);

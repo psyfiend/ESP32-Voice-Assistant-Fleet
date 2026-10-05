@@ -283,6 +283,10 @@ Waveshare's own repo:
 Has a physical **Ethernet port** in addition to WiFi — worth testing as an alternate
 connectivity path.
 
+**Its panel looks better than the 7B's** (owner, 2026-10-04, side by side, same 1024x600 and 7"):
+colours closer to the rest of the fleet, and "notably less fuzzy, more crisp". The owner had expected
+the 7B to be the better board for its features and its maker. Unexplained; nobody has looked at why.
+
 ### CYD_P4_4880 — Guition P4 4.3" portrait (JC4880P443C_I_W)
 
 **Added 2026-09-28, never flashed.** The owner's intended successor to `CYD_S3_3248` as the

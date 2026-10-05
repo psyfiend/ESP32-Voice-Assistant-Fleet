@@ -120,7 +120,9 @@ inline bool cardStateMayDim(CardState s) { return s == CardState::ST_PAUSED; }
 // STALE marker on the right. What changes between these three is only how that
 // section is PRESENTED:
 //
-//   HDR_BAR    a filled band inside the card, edge to edge
+//   HDR_BAND   a filled band inside the card, edge to edge (was HDR_BAR; the
+//              owner named it "band", card-sheet 11.3 - "bar" read like the
+//              system header bar)
 //   HDR_TAG    a pill hanging OUTSIDE, above the card's top-left corner, with
 //              a second pill on the right when the card needs a STALE marker
 //   HDR_NONE   plain text in the top strip inside the card, no fill
@@ -145,7 +147,7 @@ inline bool cardStateMayDim(CardState s) { return s == CardState::ST_PAUSED; }
 // already stored as uint8_t keep their meaning.
 enum class CardHeaderStyle : uint8_t {
     HDR_NONE = 0,   // plain text in the card's top strip
-    HDR_BAR,        // a filled band inside the card, edge to edge
+    HDR_BAND,       // a filled band inside the card, edge to edge
     HDR_TAG,        // pills hanging outside, above the card
     HDR_TAG_FLOAT,  // pills lying across the card's top corners
 };
@@ -161,7 +163,7 @@ inline const char *cardHeaderName(CardHeaderStyle s) {
     switch (s) {
         case CardHeaderStyle::HDR_TAG_FLOAT: return "floating tag";
         case CardHeaderStyle::HDR_TAG:       return "tag";
-        case CardHeaderStyle::HDR_BAR:       return "bar";
+        case CardHeaderStyle::HDR_BAND:      return "band";
         case CardHeaderStyle::HDR_NONE:      return "none";
     }
     return "?";

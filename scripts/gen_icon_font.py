@@ -145,6 +145,12 @@ GLYPHS = [
     "alert", "alert-circle", "check-circle", "close-circle", "help-circle",
     "pause-circle", "wifi-off", "lan-disconnect", "sync", "sync-alert",
     "chevron-right", "dots-horizontal",
+
+    # --- the card popup (2.10a) --------------------------------------------
+    # The history button: axes and bars, the glyph the approved Card Popup Mock
+    # draws. clock-outline stood in until this regeneration (no Node.js on the
+    # laptop).
+    "chart-bar",
 ]
 
 

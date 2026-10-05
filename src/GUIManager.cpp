@@ -5,6 +5,7 @@
 #include "LVGL_Startup.h"                // drawBufInfo(), for [UI STATE]
 #include "Cards/CardDemo.h"
 #include "Cards/CardIcons.h"   // cardSetLabelMode(), for the Label knob
+#include "Cards/CardPopup.h"   // modal: gestures stand down while it is open
 #include "UI/ReferencePage.h"
 #include "UI/LogPage.h"
 #include "UI/Screenshot.h"
@@ -31,6 +32,58 @@ static GUIManager *s_self = nullptr;
     #define DBG_GESTURE(...) Serial.printf("[Gesture:debug] " __VA_ARGS__)
 #else
     #define DBG_GESTURE(...) do {} while (0)
+#endif
+
+#ifdef DEBUG_FRAMES
+// ---------------------------------------------------------------------------
+// Every frame of every burst of motion, over serial (2026-10-03).
+//
+// The owner asked whether we were certain how the deck, the drawer and the
+// header peek perform. Only the deck had ever been measured, and only by
+// /bench's own swap. This times whatever is on screen as a finger drives it:
+// each rendered frame's gap from the previous one and its render time, printed
+// as one line once the screen has been still for 200 ms. A burst is any run
+// of frames less than 200 ms apart - an animation plus its first and last
+// frames, which is exactly where the hesitations hide.
+// ---------------------------------------------------------------------------
+namespace {
+constexpr uint8_t FL_MAX = 40;
+uint32_t s_flStart[FL_MAX], s_flRender[FL_MAX];
+uint8_t  s_flN = 0;
+uint32_t s_flT0 = 0;
+
+void flRenderStart(lv_event_t *e) {
+    (void)e;
+    s_flT0 = millis();
+}
+void flRenderReady(lv_event_t *e) {
+    (void)e;
+    if (s_flN < FL_MAX) { s_flStart[s_flN] = s_flT0; s_flRender[s_flN] = millis() - s_flT0; s_flN++; }
+}
+void flFlush(lv_timer_t *t) {
+    (void)t;
+    if (!s_flN || millis() - s_flStart[s_flN - 1] < 200) return;
+    if (s_flN >= 3) {
+        char line[400];
+        int n = 0;
+        for (uint8_t i = 0; i < s_flN && n < (int)sizeof(line) - 16; i++) {
+            const uint32_t gap = i ? s_flStart[i] - s_flStart[i - 1] : 0;
+            n += snprintf(line + n, sizeof(line) - n, " %lu/%lu",
+                          (unsigned long)gap, (unsigned long)s_flRender[i]);
+        }
+        Serial.printf("[Frames] %u frames in %lu ms (gap/render ms):%s\n", (unsigned)s_flN,
+                      (unsigned long)(s_flStart[s_flN - 1] + s_flRender[s_flN - 1] - s_flStart[0]), line);
+    }
+    s_flN = 0;
+}
+void startFrameLog() {
+    lv_display_t *d = lv_display_get_default();
+    if (!d) return;
+    lv_display_add_event_cb(d, flRenderStart, LV_EVENT_RENDER_START, nullptr);
+    lv_display_add_event_cb(d, flRenderReady, LV_EVENT_RENDER_READY, nullptr);
+    lv_timer_create(flFlush, 50, nullptr);
+}
+} // namespace
 #endif
 
 GUIManager::GUIManager(SystemCore &core)
@@ -209,6 +262,11 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
 
     lv_indev_t *indev = lv_indev_active();
     if (!indev) return;
+
+    // THE CARD POPUP IS MODAL (2.10a). Its scrim on the top layer already
+    // takes every touch, so a gesture should never get here while it is open;
+    // this makes sure no page swipe or edge pull can happen underneath it.
+    if (CardPopup::isOpen()) return;
 
     const lv_dir_t dir = lv_indev_get_gesture_dir(indev);
 
@@ -519,7 +577,23 @@ void GUIManager::begin() {
 
         // Every press, whatever it lands on. See screenPressCb().
         lv_indev_add_event_cb(indev, screenPressCb, LV_EVENT_PRESSED, NULL);
+
+        // LONG PRESS AT 250 ms, not LVGL's default 400 (lv_indev.c). The owner,
+        // 2026-10-03, once long press became the way into every card's popup:
+        // "could it be shortened just a hair?" - 300 ms, then 250 (2026-10-04).
+        // The cost is that a slow tap held past a quarter second opens the
+        // window instead of toggling; 300 is the fallback. The value lives in
+        // CardPopup, whose hold fades over exactly this long.
+        lv_indev_set_long_press_time(indev, CardPopup::LONG_PRESS_MS);
     }
+
+#ifdef DEBUG_FRAMES
+    startFrameLog();
+#endif
+
+    // The card popup's own press hook: where a long press began, and when
+    // anything was last touched (its auto-close). Cards/CardPopup.h.
+    CardPopup::begin();
 
     // Bottom deck height = screen height - header height.
     int32_t header_h = UIToolkit::systemHeaderPx();
@@ -912,7 +986,7 @@ void GUIManager::buildDashboard() {
 
     _pnlSystem.setHeaderLabel(_hdr == CardHeaderStyle::HDR_TAG_FLOAT ? "Float"
                             : _hdr == CardHeaderStyle::HDR_TAG       ? "Tag"
-                            : _hdr == CardHeaderStyle::HDR_BAR       ? "Bar"
+                            : _hdr == CardHeaderStyle::HDR_BAND      ? "Band"
                                                                      : "No hdr");
 
     // The page indicator: this page's title, centred in the bar, and a dot
@@ -1162,8 +1236,8 @@ void GUIManager::cycleHeader() {
     // always worked this way for the same reason.
     // Float -> Tag -> Bar -> None, starting from the default.
     _hdr = (_hdr == CardHeaderStyle::HDR_TAG_FLOAT) ? CardHeaderStyle::HDR_TAG
-         : (_hdr == CardHeaderStyle::HDR_TAG)       ? CardHeaderStyle::HDR_BAR
-         : (_hdr == CardHeaderStyle::HDR_BAR)       ? CardHeaderStyle::HDR_NONE
+         : (_hdr == CardHeaderStyle::HDR_TAG)       ? CardHeaderStyle::HDR_BAND
+         : (_hdr == CardHeaderStyle::HDR_BAND)      ? CardHeaderStyle::HDR_NONE
                                                     : CardHeaderStyle::HDR_TAG_FLOAT;
     rebuildDashboard();
     Serial.printf("[Cards] header mode -> %s\n", cardHeaderName(_hdr));

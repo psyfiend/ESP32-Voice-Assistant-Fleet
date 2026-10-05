@@ -5,7 +5,7 @@ Versioning scheme is A.B.C.D (see docs/ROADMAP.md section 3.3):
 
     A  major   breaking changes            \
     B  minor   new features, compatible     >  you set these by tagging: `git tag v0.1.0`
-    C  patch   fixes, performance          /
+    C  release each tagged merge to main    /   (B is the roadmap phase; ROADMAP 3.3)
     D  build   every commit                  <- AUTOMATIC, never typed by hand
 
 D is the number of commits since the most recent tag, so it increments on its own and

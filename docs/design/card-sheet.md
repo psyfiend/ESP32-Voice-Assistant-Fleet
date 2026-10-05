@@ -334,3 +334,54 @@ and calls, 2.10d stable ids + saving, 2.10e history - with this section's answer
 - **D4 - opened a larger question: what kinds of "group" exist.** Recorded and answered as a draft
   taxonomy in `group-cards.md` (source x presentation x behaviour). The members-inside-the-popup
   part of D4 matches the HA reference above.
+
+## 13. 2.10a build decisions (owner, 2026-10-02)
+
+Asked before building; the owner took every recommendation. These replace §9's 2.10a line where
+they differ (it still says "Settings tab" and "pause moved into it" without saying where).
+
+- **Body:** a switch gets its real big toggle (simple enough to build now); every other kind shows a
+  read-only value / state with "N minutes ago". Lights' sliders are 2.10b.
+- **Pause** moves from long press to a **"Paused: Off / On" row in the SETTINGS deck**.
+- **Drag down to close starts on the header row only**, so it never fights 2.10b's tall vertical
+  slider.
+- **The window's deck is a new, small part** owned by the popup. Reshaping the page deck
+  (`GUIManager`'s Audio / Display accordion) waits until interview §5 decides where the deck lives.
+- **History and members icons** are shown and lead to an empty placeholder view with a working back
+  arrow, so the navigation is testable before 2.10e and the group work fill them.
+- **Deck contents in 2.10a:** label choice (HA name / custom / state / none), Shown / Hidden, Paused.
+  Custom name shows the option; the keyboard is later.
+- **The window sits on LVGL's top layer**, above the header and the system drawer. The page under
+  the dim keeps updating live.
+- **The dim appears at once, not faded**: each frame of a fade redraws the whole screen (~85 ms a
+  frame on P4_5); appearing costs one redraw. The grow runs over it. If it looks abrupt on glass, a
+  fade is the thing to try.
+- **Long press opens the window on every card type** (§11.2's uniform rule); tap is unchanged.
+- **Deck settings live in RAM** and are lost at reboot - except Paused, which already persists
+  through #60's pause store. Saving by stable card id is 2.10d.
+
+## 14. The popup's deck, as built and tested (owner, 2026-10-05)
+
+What 2.10a ended up with, after rounds 4-12 on glass (`docs/TEST_2.10a.md`); signed off and merged
+2026-10-05 (`v0.2.8`). Where it differs from the sections above, this wins.
+
+- **The window appears complete at once and closes at once** - no grow, no dim (owner: speed first).
+  The held card is pressed in with an accent border, and stays so while its window is open.
+- **Each deck panel is the window's full width when open; only its TAB is offset.** A folder-tab
+  shape: the pane has its own top edge, the tab rises from it with a curved inner corner. Folded,
+  only the tab shows at the bottom of the screen, at the page deck's header height; the corner and
+  the pane's edge sit just below the screen. Open, the pane's bottom edge stays below the screen.
+- **SETTINGS always takes the right half.** A card that needs a second panel (a sensor's CHART,
+  11.1) puts it in the left half - so SETTINGS is never pushed around.
+- **With two panels (not built yet):** both tabs sit at the bottom when closed; each panel has its
+  own open and close animation; opening one hides the other's tab; only one can be open at a time.
+- **While a panel is open, the window is out of reach**: a tap anywhere in the window only folds
+  the panel. A tap outside both closes everything.
+- **Closing**: an open panel vanishes with the window; a tab that was only peeking slides back down.
+- **Speed**: the deck is quicker than the page deck's panels (220 ms vs 300 ms, over a longer
+  travel) and that is kept - settings should be quick to reach. Other expanding menus are judged as
+  they come (no one-size rule).
+- **Contents in 2.10a**: Paused works (kept on the device); Label, Custom name and On the dashboard
+  are shown, quieter, and inactive - "fine for now", which settings exist is not settled.
+- **Memory**: a window with its deck costs ~11-12 KB of LVGL's pool, ~16 KB left with one open;
+  watched as 2.10b-e add to it (owner: wait and see).

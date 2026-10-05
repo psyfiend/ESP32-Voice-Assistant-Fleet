@@ -1,4 +1,4 @@
-# Handoff — 2026-10-02
+# Handoff — 2026-10-05
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was rewritten from scratch on
@@ -13,43 +13,84 @@ to the doc that owns it. This file says where things are, not how they got there
 
 ## Where the project is
 
-**`v0.2.7` tagged 2026-09-24** (through milestone 2.7). Since then, all on `main`: #58 screenshots,
-and **2.9's display stack on six of nine boards** (merge `75a43c8`, 2026-09-29).
+**`v0.2.8` tagged 2026-10-05** at the 2.10a merge; `CHANGELOG.md` matches versions to milestones.
+It also carries everything merged since `v0.2.7`: #58 screenshots, **2.9's display stack on six of
+nine boards** (merge `75a43c8`, 2026-09-29), the battery prototype, SNTP, the floating tag, Linen
+round two.
 
 What a board does: boots into two pages (House = the owner's 18 HA entities over the websocket,
 Fleet = MQTT/system/virtual cards), swiped with wrap-around; three colour schemes (Midnight
 default, Fleet, Linen with real shadows); card types with state icons; an FPS/CPU overlay;
-`/screenshot` and `/bench` over HTTP.
+`/screenshot` and `/bench` over HTTP; **a long press opens a card's popup window** (2.10a).
 
-## What is next — the new session's job: BUILD 2.10a (#65)
+## 2.10a - DONE (merged 2026-10-05, `v0.2.8`)
 
-The design interview's §1 and §2 are closed; the owner chose to start building the card popup.
-**Read, in this order:** `CLAUDE.md` (the file-editing rule at the top), this file,
-`docs/design/card-sheet.md` **§11-12** (the decided popup - §1-10 are draft 2, superseded wherever
-§11 differs), `docs/design/look-and-feel.md` §2 and §3.14 (the owner's standing rules and §1's
-decisions), `docs/LESSONS.md` (layers, `lv_mem`, events not bubbling, HIDDEN on screen-sized
-objects). Then **open the artifact "Card Popup Mock"**
-(https://claude.ai/artifact/Lt6NmxMYLc7xrWzaomEqDm, v3) - it is the owner's approved design;
-build what it shows.
+The card popup's frame, signed off on WS_P4_5 after twelve rounds on glass - every result and
+measurement is in `docs/TEST_2.10a.md`. **What it is now: `card-sheet.md` section 14** - read it
+before touching the popup; where it differs from sections 9-13, it wins. In short:
 
-**2.10a's scope (card-sheet §9, as revised by §11):** long press opens a centred window over a dim
-fill (`bg_opa` on a scrim, never an object `opa`); the frame **grows** from the card as an empty
-rectangle, then the contents appear; header = X top left (back arrow on inner views), "Area >
-name" centred, history / members icons top right; modal (no page swipes, no edge gestures);
-closing by X, tap outside, drag down, auto-close 60 s; the **settings deck peeks up from the
-bottom of the screen** when the window opens and retracts with it (pathway 1); the window holds
-the entity, not the card. The light / switch controls themselves are 2.10b, HA attributes and
-calls 2.10c, stable ids and saving 2.10d, history 2.10e.
+- **Usable first** (owner): the window appears complete in the first frame after a 250 ms long
+  press and closes in one frame. No grow, no dim - both were built, measured and rejected on glass.
+  It sits on the SCREEN as its topmost object; a transparent catcher on `lv_layer_top()` takes the
+  touches outside it. Why, and the traps: LESSONS, "Effects that cover the screen". The grow's
+  history (filled box, four walls, page picture, rings) is in git, `f21ece6`..`4f220ad`.
+- **The held card** presses in with an accent border (`Card::pressLook()`) and stays so while its
+  window is open. A switch gets a toggle that slides on a tap and can be dragged.
+- **The SETTINGS deck**: a folder tab in the right half, peeking up from the bottom of the screen.
+  Paused works and is kept on the device (#60); Label / Custom name / On the dashboard are shown,
+  quieter and inactive, until 2.10d. The rules for a second panel (a sensor's CHART): section 14.
+- **Sparks** travel along the window's edge now and then (CardPopup.cpp, "Interference"). Settled
+  unless the owner asks again; when and how often become a setting later.
+- **Measured:** the open frame 42-48 ms (Midnight), 69-79 ms (Linen). **G1: a window costs ~11-12 KB
+  of LVGL's pool, and ~16 KB is left with one open** - fine for 2.10a, a warning for 2.10b-e.
 
-**How to run it:** one feature branch off `main` (e.g. `feat/65-popup-frame`). Develop on
-**WS_P4_5 (COM15)** - the owner is away for the weekend with the laptop and that one board, so
-expect short sessions and keep each one ending in a commit. Before merge: the **all-nine compile
-gate** plus a look on glass (merge discipline below). WS_S3_4B stays unflashed until #69's watch
-ends. Measure `lv_mem` with the window open (G1 in the interview) and frame time during the grow
-(`/bench`).
+**On glass with v0.2.8: WS_P4_5 only.** WS_P4_4B and CYD_P4_1060 run builds from earlier rounds
+(they carry the #67 repair fix - `docs/display/history.md` - nothing reported); the 7B and the 4880
+have not been flashed since before it. All nine compile.
 
-**After 2.10:** interview §3 (header slots, 2.8), §4 (groups - `group-cards.md` has the draft),
-§5-§9. ROADMAP §7 has the order.
+**Carried forward:**
+- **Scaling** (owner): the switch's toggle is "too big" on the 1060 and the 4B (it is sized from the
+  window's height: ~57 mm tall on the 1060, ~30 mm on the P4_5); the occupancy hero's circle is
+  huge for its icon. Claude's suggestion: cap heroes at the P4_5's physical size when 2.10b designs
+  the controls.
+- **#85**: card borders in colour, a custom scheme page, retiring the system drawer's Cards and Log
+  pages (owner, round 6). **#84**: cards never say "no data yet" (filed from this testing).
+- Linen may get its own kind of animated chrome some day (owner).
+- **The debug flags are local-only:** `-D DEBUG_POPUP` (what building the window costs, printed
+  300 ms later so the print is not timed; `dbgMem` for G1; a long press on the window's title cycles
+  the sparks: now and then / once / off) and `-D DEBUG_FRAMES` (GUIManager.cpp: every frame of every
+  burst of motion). Add them to `WS_P4_TOUCH_LCD_5` in `platformio.ini` when measuring; never commit
+  them.
+
+## What is next — the new session's job: 2.10b, the light controls (#65)
+
+**Not started; confirm with the owner first.** The build order (card-sheet §9, §12): 2.10b light
+controls, 2.10c HA attributes and calls, 2.10d stable ids and saving, 2.10e history. Interview §3
+onward (2.8 header slots, then 2.11 groups) comes after 2.10. ROADMAP §7 has the order.
+
+**2.10b's scope:** a light's window gets its controls, on the virtual lamps (Fleet page) -
+brightness, colour temperature, colour (a hue control and swatches; LVGL 9 has no colour wheel, D7),
+opening on the control (D3). Nothing goes to HA until 2.10c. The layout is the owner's (card-sheet
+§11.1) and the artifact **"Card Popup Mock"** (https://claude.ai/artifact/Lt6NmxMYLc7xrWzaomEqDm,
+v3), built from the owner's HA light dialog.
+
+**Read first:** `card-sheet.md` §11-14, `TEST_2.10a.md` (how the owner tests, and Measured),
+`LESSONS.md` ("Effects that cover the screen", layers, `lv_mem`, events not bubbling, "Never keep a
+pointer to an LVGL object you do not own"), then `src/Cards/CardPopup.cpp`.
+
+**To settle with the owner before building:**
+- **Memory.** ~16 KB of LVGL's pool is left with a window open, and sliders and swatches add to it.
+  Measure first (`dbgMem`). Options: build the deck's pane only when it is first opened (~5 KB while
+  folded), or move the P4s' pool to PSRAM as on WS_S3_4B (`-D FLEET_LV_MEM_PSRAM`, drawing ~5-10%
+  slower).
+- **Sizes per board** - Carried forward, Scaling.
+- **A tall vertical slider against the window's gestures.** Drag-down-to-close starts on the header
+  row only (§13) for this reason; page swipes are already blocked while the window is open.
+
+**How to run it:** one branch off `main` (e.g. `feat/65-light-controls`). While the owner tests,
+build and flash **WS_P4_5 only** (COM15) unless told otherwise; WS_S3_4B stays unflashed until
+#69's watch ends. Before merge: the all-nine compile gate and a look on glass, then `--no-ff`, a tag
+and a CHANGELOG entry (Versioning, below).
 
 ## Where the interview stands — 2026-10-02
 
@@ -165,6 +206,7 @@ silently puts the bug back. `docs/REBUILD_P4_LIBS.md`. The S3 libraries are stoc
 - **`Edit` on a CRLF file**: deleting a line by matching a leading newline joins two lines.
 - **`gh ... --body $text` in PowerShell 5.1 drops double quotes** inside the text (native argument
   passing), silently. Pipe it instead: `$text | gh issue create ... --body-file -`, or write a file.
+  `git commit -m` has the same problem: write the message to a file and use `git commit -F`.
 - **LVGL clips children to their parent** - use `UI::unclipShadows()`. **Never toggle HIDDEN on a
   screen-sized object when an animation starts.** Anything drawn stays ASCII, except `°`.
 - **Verify from outside the device** - the router, the broker, HA, `/bench?what=verify`. The
@@ -178,7 +220,12 @@ as data.** A little colour-blind: never distinguish two states by colour alone.
 
 **What works:**
 - **Show, don't spec.** Build something to react to; the owner flashes fast and tests
-  thoroughly, test by test against a sheet with PASS/FAIL criteria.
+  thoroughly, test by test against a sheet with PASS/FAIL criteria (`TEST_2.10a.md` is the model:
+  a numbered table per round, then the owner's results under it).
+- **Snappy and responsive first, eye candy second** (owner). 2.10a dropped its grow and its dim for
+  it. Measure a frame before and after anything visual (`DEBUG_FRAMES`, `/bench`).
+- **When the owner is testing, give ONE report when they say they are done** - not a message per
+  serial line.
 - **Plain language, not metaphor** ("sometimes I get a little lost in the slang").
 - **Never assume. Give the top 2-3 options with a recommendation, and ask** before building on an
   assumption; discuss a structural choice a turn before implementing it.
@@ -189,6 +236,7 @@ as data.** A little colour-blind: never distinguish two states by colour alone.
   seconds; over a minute is a problem.
 - **"I'm wondering whether..." is usually a design instinct** - engage with it.
 - **Say plainly what is unexplained**; the owner often finds the answer (#49 ended that way).
+- **Commit at the end of each step**, and push.
 - **Avoid compacting context**: the owner would rather end a session with a clean handoff.
 
 **What to avoid:**
@@ -196,9 +244,12 @@ as data.** A little colour-blind: never distinguish two states by colour alone.
 - Guessing a fourth time. Instrument it or ask the far end.
 - Claiming a script worked because it printed something. Assert the anchor, then check the file.
 
-**Versioning:** `A.B.C.D`, where C is the milestone within the phase. Tag on `main` at merge when a
-milestone completes, never during development. D is commits since the tag; a dirty tree appends
-`+dirty`.
+**Versioning (changed 2026-10-05, owner):** `A.B.C.D` - B is the roadmap PHASE, C counts RELEASES:
+one more each time a signed-off merge to `main` is tagged, whatever milestones it holds. Add a
+`CHANGELOG.md` entry with the tag, naming the milestones and issues in it. Never tag during
+development. D is commits since the tag; a dirty tree appends `+dirty`. **`v0.2.8` was tagged at
+the 2.10a merge (2026-10-05); the next signed-off merge in Phase 2 is `v0.2.9`**, whatever
+milestones it holds. ROADMAP 3.3.
 
 **The issue tracker is yours to manage**, and keeping it, HANDOFF and ROADMAP current is part of the
 work, not a follow-up.
