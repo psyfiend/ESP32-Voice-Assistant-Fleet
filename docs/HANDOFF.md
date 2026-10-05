@@ -50,10 +50,9 @@ three with the #67 repair fix (`docs/display/history.md`). Signed off on glass o
 older builds. **WS_S3_4B was found locked up** and left as found (#69). All nine compile.
 
 **Carried forward:**
-- **Scaling** (owner): the switch's toggle is "too big" on the 1060 and the 4B (it is sized from the
-  window's height: ~57 mm tall on the 1060, ~30 mm on the P4_5); the occupancy hero's circle is
-  huge for its icon. Claude's suggestion: cap heroes at the P4_5's physical size when 2.10b designs
-  the controls.
+- **Scaling**: answered at 2.10b (card-sheet §15, proportional to the P4_5). Still open: the
+  sensor hero's disc grows with the window while its icon is a fixed face, so on a 7" it is large
+  for its glyph; a bigger icon face costs flash.
 - **#85**: card borders in colour, a custom scheme page, retiring the system drawer's Cards and Log
   pages (owner, round 6). **#84**: cards never say "no data yet" (filed from this testing).
 - Linen may get its own kind of animated chrome some day (owner).
@@ -63,35 +62,32 @@ older builds. **WS_S3_4B was found locked up** and left as found (#69). All nine
   burst of motion). Add them to `WS_P4_TOUCH_LCD_5` in `platformio.ini` when measuring; never commit
   them.
 
-## What is next — the new session's job: 2.10b, the light controls (#65)
+## Now — 2.10b, the light controls (#65): BUILT, round 1 waiting for the owner
 
-**Not started; confirm with the owner first.** The build order (card-sheet §9, §12): 2.10b light
-controls, 2.10c HA attributes and calls, 2.10d stable ids and saving, 2.10e history. Interview §3
-onward (2.8 header slots, then 2.11 groups) comes after 2.10. ROADMAP §7 has the order.
+Branch **`feat/65-light-controls`** (pushed), three commits: the proportional window, light state in
+the registry (four kinds of virtual lamp, HA's group rule), the controls. Flashed to WS_P4_5 with the
+local debug flags. **What was decided and built: `card-sheet.md` §15. The owner's test sheet:
+`docs/TEST_2.10b.md` round 1**, with what Claude could and could not test, and the measurements.
 
-**2.10b's scope:** a light's window gets its controls, on the virtual lamps (Fleet page) -
-brightness, colour temperature, colour (a hue control and swatches; LVGL 9 has no colour wheel, D7),
-opening on the control (D3). Nothing goes to HA until 2.10c. The layout is the owner's (card-sheet
-§11.1) and the artifact **"Card Popup Mock"** (https://claude.ai/artifact/Lt6NmxMYLc7xrWzaomEqDm,
-v3), built from the owner's HA light dialog.
+- **Nothing touch-related has been tried** - everything was driven over `GET /popup` (DEBUG_POPUP
+  only; `CardPopup.h` lists its parameters). It opens windows, switches controls, sends values and
+  reads LVGL's pool and every lamp's levels, with nobody at the panel. Use it.
+- **Memory, for the owner to decide:** internal pool, a lamp window leaves 21-24 KB free (15 with the
+  deck open); PSRAM pool measured at +10% per full-screen frame, ~2 ms on the popup's opening frame,
+  +128 KB internal heap. Reverted pending the owner's choice.
+- **Sizes**: P4_5 verified unchanged; the 7" and 4B windows only worked out on paper. Flashing them
+  needs the owner's go-ahead (WS_P4_5 only while testing).
+- Next after round 1: 2.10c (HA attributes and `light.turn_on` with data - CommandRouter refuses HA
+  light levels until then, loudly), then 2.10d saving, 2.10e history. Interview §3 onward after 2.10.
 
-**Read first:** `card-sheet.md` §11-14, `TEST_2.10a.md` (how the owner tests, and Measured),
+**Read first** for any popup work: `card-sheet.md` §11-15, `TEST_2.10a.md` and `TEST_2.10b.md`,
 `LESSONS.md` ("Effects that cover the screen", layers, `lv_mem`, events not bubbling, "Never keep a
 pointer to an LVGL object you do not own"), then `src/Cards/CardPopup.cpp`.
 
-**To settle with the owner before building:**
-- **Memory.** ~16 KB of LVGL's pool is left with a window open, and sliders and swatches add to it.
-  Measure first (`dbgMem`). Options: build the deck's pane only when it is first opened (~5 KB while
-  folded), or move the P4s' pool to PSRAM as on WS_S3_4B (`-D FLEET_LV_MEM_PSRAM`, drawing ~5-10%
-  slower).
-- **Sizes per board** - Carried forward, Scaling.
-- **A tall vertical slider against the window's gestures.** Drag-down-to-close starts on the header
-  row only (§13) for this reason; page swipes are already blocked while the window is open.
-
-**How to run it:** one branch off `main` (e.g. `feat/65-light-controls`). While the owner tests,
-build and flash **WS_P4_5 only** (COM15) unless told otherwise. WS_S3_4B is locked up and waiting
-to be troubleshot (#69): leave it until the owner says. Before merge: the all-nine compile gate and a look on glass, then `--no-ff`, a tag
-and a CHANGELOG entry (Versioning, below).
+**How to run it:** while the owner tests, build and flash **WS_P4_5 only** (COM15) unless told
+otherwise. WS_S3_4B is locked up and waiting to be troubleshot (#69): leave it until the owner says.
+Before merge: the all-nine compile gate and a look on glass, then `--no-ff`, a tag (`v0.2.9`) and a
+CHANGELOG entry (Versioning, below).
 
 ## Where the interview stands — 2026-10-02
 
