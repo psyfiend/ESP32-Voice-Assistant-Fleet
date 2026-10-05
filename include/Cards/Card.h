@@ -125,6 +125,11 @@ public:
     bool groupIsOn() const;
     uint8_t activeCount() const;
 
+    // Does this member count? A paused member is out of its group - not on,
+    // not off, not commanded - unless every member is paused (2.10b).
+    bool counts(const Entity *e) const;
+    uint8_t liveCount() const;   // the members that count
+
     // The resolved variant - never VAR_AUTO. Valid after build().
     CardVariant variant() const { return _resolved; }
 

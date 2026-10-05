@@ -85,8 +85,6 @@ Card &Card::setPaused(bool p) {
     return *this;
 }
 
-// Is this card paused? Asked of the ENTITIES, so a card built after the pause -
-// or a second card on the same entity - reports it correctly without being told.
 Card &Card::setGroupOn(GroupOn g) {
     if (g == _groupOn) return *this;
     _groupOn = g;
@@ -94,11 +92,25 @@ Card &Card::setGroupOn(GroupOn g) {
     return *this;
 }
 
+// A PAUSED MEMBER IS OUT OF THE GROUP (owner, 2.10b round 1): not counted for
+// on or off, not commanded, not failed, not stale - as if it were not there.
+// Only when EVERY member is paused is the card itself paused, and then it shows
+// the members as they were frozen.
+bool Card::counts(const Entity *e) const {
+    return e && (!e->paused || isPaused());
+}
+
+uint8_t Card::liveCount() const {
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < _nPrimary; i++) if (counts(_primary[i])) n++;
+    return n;
+}
+
 uint8_t Card::activeCount() const {
     uint8_t n = 0;
     for (uint8_t i = 0; i < _nPrimary; i++) {
         const Entity *e = _primary[i];
-        if (!e || !e->everSet) continue;
+        if (!counts(e) || !e->everSet) continue;
         // A state entity is a bool. Anything numeric that reached an actor
         // card - a dimmable light reporting brightness - is on when nonzero,
         // which is the same question asked of a different type.
@@ -113,16 +125,21 @@ uint8_t Card::activeCount() const {
 }
 
 bool Card::groupIsOn() const {
-    const uint8_t n = activeCount();
-    return _groupOn == GroupOn::GROUP_ON_ALL ? (_nPrimary && n == _nPrimary) : n > 0;
+    const uint8_t n = activeCount(), live = liveCount();
+    return _groupOn == GroupOn::GROUP_ON_ALL ? (live && n == live) : n > 0;
 }
 
+// Is this card paused? Asked of the ENTITIES, so a card built after the pause -
+// or a second card on the same entity - reports it correctly without being told.
+// EVERY primary: a group with one paused member is not paused (owner, 2.10b) -
+// that member is simply out of it (counts()).
 bool Card::isPaused() const {
+    if (!_nPrimary) return false;
     for (uint8_t i = 0; i < _nPrimary; i++) {
         const Entity *e = _primary[i];
-        if (e && e->paused) return true;
+        if (e && !e->paused) return false;
     }
-    return false;
+    return true;
 }
 
 const char *Card::label() const {
@@ -1149,9 +1166,10 @@ CardState Card::deriveState(uint32_t nowMs) const {
     //
     // ANY primary being unavailable is enough. A card showing two things, one
     // of which is gone, is not a card that can be trusted at a glance.
+    // A paused member is out of the group (counts()), here and below.
     for (uint8_t i = 0; i < _nPrimary; i++) {
         const Entity *e = _primary[i];
-        if (e && !e->available) return CardState::ST_UNAVAILABLE;
+        if (counts(e) && !e->available) return CardState::ST_UNAVAILABLE;
     }
 
     // THE FAILURE STATE IS READ OFF THE ENTITIES, NOT OFF THIS CARD.
@@ -1167,7 +1185,7 @@ CardState Card::deriveState(uint32_t nowMs) const {
     uint8_t failed = 0, commandable = 0;
     for (uint8_t i = 0; i < _nPrimary; i++) {
         const Entity *e = _primary[i];
-        if (!e || !e->desc.writable) continue;
+        if (!counts(e) || !e->desc.writable) continue;
         commandable++;                     // counted whether or not it resolved
         if (!e->pending && e->cmdFailed) failed++;
     }
@@ -1188,7 +1206,7 @@ CardState Card::deriveState(uint32_t nowMs) const {
     CardState worst = CardState::ST_LIVE;
     for (uint8_t i = 0; i < _nPrimary; i++) {
         const Entity *e = _primary[i];
-        if (!e) continue;
+        if (!counts(e)) continue;
         if (!e->desc.staleAfterMs) continue;   // 0 = never goes stale
         if (!e->everSet) { worst = CardState::ST_STALE; continue; }
 

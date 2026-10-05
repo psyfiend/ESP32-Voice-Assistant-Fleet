@@ -120,7 +120,8 @@ void dbgLater(const char *fmt, ...) {
 
 // Compound names, never a bare ALL-CAPS word - Arduino's pin-mode macros eat
 // those (CLAUDE.md, "Arduino's global macro namespace will eat your enum").
-enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS };
+// VIEW_MEMBER: one member's own controls, reached from VIEW_MEMBERS (2.10b).
+enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER };
 enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
@@ -192,6 +193,13 @@ struct Popup {
 
     // A light's controls (2.10b): see "The light's controls".
     GroupOn   groupOn = GroupOn::GROUP_ON_ANY;   // copied from the card at open
+    bool      builtPaused = false, rebuildQueued = false;   // "A paused window"
+    uint8_t   builtCaps = 0;                     // what the selector was built for
+    lv_obj_t *pill = nullptr;                    // PAUSED
+    // A member's own controls, reached from Members (2.10b): the group's
+    // entities are kept here while ent[] holds the one member.
+    const Entity *groupEnt[CARD_PRIMARY_MAX] = {nullptr};
+    uint8_t   groupN = 0;
     bool      lightHero = false;
     uint8_t   lightCtl = 0;                      // LightCtl: which control the hero is
     lv_obj_t *fill = nullptr, *grip = nullptr, *mark = nullptr;
@@ -318,20 +326,36 @@ lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f,
 // ---------------------------------------------------------------------------
 struct Agg {
     bool on = false, anyBool = false, available = true, paused = false, everSet = false;
+    uint8_t nPaused = 0;   // members left out because they are paused
     uint32_t lastChangeMs = 0;
 };
+
+// Every member paused? Then the window is paused, and shows them as frozen.
+bool allPaused() {
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < s.nEnt; i++) if (s.ent[i] && s.ent[i]->paused) n++;
+    return s.nEnt && n == s.nEnt;
+}
+
+// A PAUSED MEMBER IS OUT OF THE GROUP (owner, 2.10b round 1) - not counted,
+// not offered, not commanded - unless every member is; Card::counts() is the
+// same rule for the card.
+bool counts(const Entity *e) {
+    return e && (!e->paused || allPaused());
+}
 
 // ON BY THE CARD'S GROUP RULE (2.10b): any member, or all of them - GroupOn,
 // what an HA group helper offers. One entity is the same rule with one member.
 Agg aggregate() {
     Agg a;
     uint8_t nBool = 0, nOn = 0;
+    a.paused = allPaused();
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
         if (!e) continue;
+        if (!counts(e)) { a.nPaused++; continue; }
         if (e->value.type == ValueType::BOOL) { a.anyBool = true; nBool++; if (e->value.b) nOn++; }
         if (!e->available) a.available = false;
-        if (e->paused)     a.paused = true;
         if (e->everSet) {
             a.everSet = true;
             if (e->lastChangeMs > a.lastChangeMs) a.lastChangeMs = e->lastChangeMs;
@@ -361,7 +385,7 @@ LightAgg lightAggregate() {
     float hx = 0.f, hy = 0.f;
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
-        if (!e) continue;
+        if (!counts(e)) continue;   // a paused member offers nothing (owner)
         const EntityAttrs &at = e->attrs;
         L.caps |= at.lightCaps;
         if (at.minTempK && (!L.minK || at.minTempK < L.minK)) L.minK = at.minTempK;
@@ -428,7 +452,7 @@ const char *whatWord(const Entity &e, char *buf, size_t cap) {
 void forgetMainWidgets() {
     s.hero = s.knob = s.heroIcon = nullptr;
     s.lblWhat = s.lblValue = s.lblUnit = s.lblAgo = nullptr;
-    s.fill = s.grip = s.mark = nullptr;
+    s.fill = s.grip = s.mark = s.pill = nullptr;
     for (lv_obj_t *&b : s.btnCtl) b = nullptr;
     for (lv_obj_t *&w : s.swatch) w = nullptr;
     s.sliding = false;
@@ -470,23 +494,59 @@ void placeKnob(int32_t y) {
 }
 
 // "Changed 3m ago", "Paused", "No reading yet" - under the value, every view.
+// A group with members left out says how many (owner, 2.10b): a group must
+// never quietly do less than it seems to.
 void renderAgo(const Agg &a) {
     if (!s.lblAgo) return;
-    char buf[48];
+    char buf[64];
     if (a.paused) {
         setText(s.lblAgo, "Paused");
     } else if (!a.everSet) {
         setText(s.lblAgo, "No reading yet");
     } else {
-        char age[16];
+        char age[16], tail[20] = "";
         cardFormatAge(millis() - a.lastChangeMs, age, sizeof(age));
-        if (strcmp(age, "now") == 0) snprintf(buf, sizeof(buf), "Changed just now");
-        else                         snprintf(buf, sizeof(buf), "Changed %s ago", age);
+        if (a.nPaused) snprintf(tail, sizeof(tail), ", %u paused", (unsigned)a.nPaused);
+        if (strcmp(age, "now") == 0) snprintf(buf, sizeof(buf), "Changed just now%s", tail);
+        else                         snprintf(buf, sizeof(buf), "Changed %s ago%s", age, tail);
         setText(s.lblAgo, buf);
     }
 }
 
+// --- A PAUSED WINDOW (owner, 2.10b round 1) ---------------------------------
+// Its controls are greyed - every colour mixed toward the window - and a
+// PAUSED pill, the card's own badge, sits at the top of the column. Built
+// in at build time (the strips' colours are baked into their pieces), so a
+// change of pause rebuilds the view.
+uint32_t quiet(uint32_t hex) {
+    return s.builtPaused ? UI::mix(hex, UI::pal().SURFACE_ALT, 65) : hex;
+}
+
+void makePausedPill(lv_obj_t *col) {
+    const UIPalette &p = UI::pal();
+    s.pill = makeLabel(col, UI::type().TAG, UI::contrastOf(p.ST_IDLE, p.GROUND, p.TEXT));
+    lv_label_set_text(s.pill, "PAUSED");
+    lv_obj_set_style_bg_color(s.pill, UI::c(p.ST_IDLE), 0);
+    lv_obj_set_style_bg_opa  (s.pill, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius  (s.pill, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_pad_hor (s.pill, mm(1.6f), 0);
+    lv_obj_set_style_pad_ver (s.pill, mm(0.3f), 0);
+    lv_obj_set_style_text_letter_space(s.pill, mm(0.2f), 0);
+    if (!s.builtPaused) lv_obj_add_flag(s.pill, LV_OBJ_FLAG_HIDDEN);
+}
+
+void rebuildMainAsync(void *unused);   // below
+
+// Called from every render: a pause that came or went since the view was
+// built rebuilds it, once.
+void checkPausedChange(const Agg &a) {
+    if (a.paused == s.builtPaused || s.rebuildQueued) return;
+    s.rebuildQueued = true;
+    lv_async_call(rebuildMainAsync, nullptr);
+}
+
 void showView(PopupView v);   // below
+bool pausedBlocks();          // below, with the toggle
 
 // ---------------------------------------------------------------------------
 // The light's controls (2.10b; card-sheet 11.1, Card Popup Mock v3)
@@ -580,7 +640,7 @@ void lightSend(int32_t v, int8_t sat = -1) {
     const uint32_t now = millis();
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
-        if (!e || !e->desc.writable) continue;
+        if (!e || !e->desc.writable || e->paused) continue;
         const EntityAttrs &at = e->attrs;
         LightCommand c;
         if (s.lightCtl == LCTL_DIM) {
@@ -621,6 +681,12 @@ void renderLight() {
     const LightAgg L = lightAggregate();
     const bool on = a.available && a.on;
     char buf[32];
+    checkPausedChange(a);
+    // A member paused or resumed changes what the group offers: rebuild once.
+    if (L.caps != s.builtCaps && !s.rebuildQueued) {
+        s.rebuildQueued = true;
+        lv_async_call(rebuildMainAsync, nullptr);
+    }
 
     setText(s.lblWhat, s.lightCtl == LCTL_DIM ? "Brightness" : s.lightCtl == LCTL_TEMP ? "Temperature" : "Colour");
 
@@ -653,7 +719,7 @@ void renderLight() {
     // --- The slider --------------------------------------------------------
     if (s.lightCtl == LCTL_DIM && s.fill) {
         const uint32_t track = UI::mix(p.SURFACE_ALT, p.TEXT, 10);
-        lv_obj_set_style_bg_color(s.hero, UI::c(track), 0);
+        lv_obj_set_style_bg_color(s.hero, UI::c(quiet(track)), 0);
         // In the light's own colour when it has one that shows against the
         // track; the scheme's "on" colour otherwise.
         EntityAttrs shown;
@@ -661,6 +727,7 @@ void renderLight() {
         shown.hue = (int16_t)L.hue; shown.sat = (int8_t)L.sat;
         uint32_t fillHex = lightShownRgb(shown);
         if (!fillHex || LV_ABS(lumOf(fillHex) - lumOf(track)) < 60) fillHex = p.ST_ACTIVE;
+        fillHex = quiet(fillHex);
         // Never shorter than its own rounded end: at 1% a 3 px fill was a flat
         // line wider than the slider's rounded bottom. The value says 1%.
         const int32_t fh = v > 0 ? LV_MAX(s.heroH * v / 100, 2 * s.heroR) : 0;
@@ -701,9 +768,10 @@ void renderLight() {
         if (!b) continue;
         const bool chosen = (k > 0 && k - 1 == s.lightCtl);
         lv_obj_set_style_bg_opa  (b, chosen ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-        lv_obj_set_style_bg_color(b, UI::c(p.TEXT), 0);
+        lv_obj_set_style_bg_color(b, UI::c(quiet(p.TEXT)), 0);
         if (lv_obj_t *l = lv_obj_get_child(b, 0))
-            lv_obj_set_style_text_color(l, UI::c(chosen ? p.SURFACE_ALT : (k == 0 && on) ? p.ST_ACTIVE : p.TEXT), 0);
+            lv_obj_set_style_text_color(l, UI::c(chosen ? p.SURFACE_ALT
+                                                        : quiet((k == 0 && on) ? p.ST_ACTIVE : p.TEXT)), 0);
     }
 
     // --- The swatches: a ring round the one the light is showing -----------
@@ -725,11 +793,13 @@ void lightSlideCb(lv_event_t *ev) {
     const LightAgg L = lightAggregate();
     const uint32_t now = millis();
     if (code == LV_EVENT_PRESSED) {
+        if (pausedBlocks()) return;     // greyed, and says why
         s.sliding  = true;
         s.slideVal = valueAtFinger(L);
         lightSend(s.slideVal);          // a tap jumps there
         renderLight();
     } else if (code == LV_EVENT_PRESSING) {
+        if (!s.sliding) return;
         const int32_t v = valueAtFinger(L);
         if (v == s.slideVal) return;
         s.slideVal = v;
@@ -747,13 +817,15 @@ void commandAll(bool on);   // below: what Power does
 
 void rebuildMainAsync(void *unused) {
     (void)unused;
-    if (s.phase == PopupPhase::PHASE_OPEN && s.stage && s.view == PopupView::VIEW_MAIN)
-        showView(PopupView::VIEW_MAIN);
+    s.rebuildQueued = false;
+    if (s.phase == PopupPhase::PHASE_OPEN && s.stage &&
+        (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER))
+        showView(s.view);
 }
 
 void ctlCb(lv_event_t *ev) {
     const uint8_t k = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
-    if (k == 0) { commandAll(!aggregate().on); return; }
+    if (k == 0) { if (!pausedBlocks()) commandAll(!aggregate().on); return; }
     if (k - 1 == s.lightCtl) return;
     s.lightCtl = k - 1;
     // Only what is showing is built, so the view is rebuilt - deferred: this
@@ -764,7 +836,7 @@ void ctlCb(lv_event_t *ev) {
 
 void swatchCb(lv_event_t *ev) {
     const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
-    if (i >= 8) return;
+    if (i >= 8 || pausedBlocks()) return;
     lightSend(SWATCHES[i].hue, SWATCHES[i].sat);
     renderLight();
 }
@@ -783,8 +855,8 @@ void stripPieces(const uint32_t *cols, int n) {
     const int32_t in = stripInset();
     const int32_t span = s.heroH - 2 * in;
     lv_obj_set_style_bg_opa       (s.hero, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color     (s.hero, UI::c(cols[n - 1]), 0);   // top
-    lv_obj_set_style_bg_grad_color(s.hero, UI::c(cols[0]), 0);       // bottom
+    lv_obj_set_style_bg_color     (s.hero, UI::c(quiet(cols[n - 1])), 0);   // top
+    lv_obj_set_style_bg_grad_color(s.hero, UI::c(quiet(cols[0])), 0);       // bottom
     lv_obj_set_style_bg_grad_dir  (s.hero, LV_GRAD_DIR_VER, 0);
     lv_obj_set_style_bg_main_stop (s.hero, (uint8_t)(255 * in / s.heroH), 0);
     lv_obj_set_style_bg_grad_stop (s.hero, (uint8_t)(255 * (s.heroH - in) / s.heroH), 0);
@@ -796,8 +868,8 @@ void stripPieces(const uint32_t *cols, int n) {
         lv_obj_set_pos (o, 0, yTop);
         lv_obj_set_size(o, s.heroW, yBot - yTop);
         lv_obj_set_style_bg_opa       (o, LV_OPA_COVER, 0);
-        lv_obj_set_style_bg_color     (o, UI::c(cols[i + 1]), 0);   // top
-        lv_obj_set_style_bg_grad_color(o, UI::c(cols[i]), 0);       // bottom
+        lv_obj_set_style_bg_color     (o, UI::c(quiet(cols[i + 1])), 0);   // top
+        lv_obj_set_style_bg_grad_color(o, UI::c(quiet(cols[i])), 0);       // bottom
         lv_obj_set_style_bg_grad_dir  (o, LV_GRAD_DIR_VER, 0);
     }
 }
@@ -850,7 +922,7 @@ void buildLightHero(lv_obj_t *row) {
     lv_obj_add_flag(s.mark, LV_OBJ_FLAG_HIDDEN);   // until renderLight() places it
     lv_obj_set_style_radius      (s.mark, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_border_width(s.mark, LV_MAX(2, pm(0.35f)), 0);
-    lv_obj_set_style_border_color(s.mark, UI::c(0xFFFFFF), 0);
+    lv_obj_set_style_border_color(s.mark, UI::c(quiet(0xFFFFFF)), 0);
     lv_obj_set_style_outline_width(s.mark, 1, 0);
     lv_obj_set_style_outline_color(s.mark, UI::c(0x000000), 0);
     lv_obj_set_style_outline_opa (s.mark, LV_OPA_50, 0);
@@ -891,7 +963,7 @@ void buildLightColumn(lv_obj_t *col) {
             lv_obj_set_size(w, sz, sz);
             lv_obj_set_style_radius      (w, LV_RADIUS_CIRCLE, 0);
             lv_obj_set_style_bg_opa      (w, LV_OPA_COVER, 0);
-            lv_obj_set_style_bg_color    (w, UI::c(lightHsToRgb(SWATCHES[i].hue, SWATCHES[i].sat)), 0);
+            lv_obj_set_style_bg_color    (w, UI::c(quiet(lightHsToRgb(SWATCHES[i].hue, SWATCHES[i].sat))), 0);
             lv_obj_set_style_border_width(w, LV_MAX(1, mm(0.2f)), 0);
             lv_obj_set_style_border_color(w, UI::border(), 0);
             lv_obj_set_style_outline_pad (w, LV_MAX(2, mm(0.3f)), 0);
@@ -934,6 +1006,7 @@ void renderMain() {
     const Entity    &e = *s.ent[0];
     const Agg a = aggregate();
     char buf[48], wbuf[32];
+    checkPausedChange(a);
 
     // --- What it is --------------------------------------------------------
     setText(s.lblWhat, s.toggleHero ? "Power" : (a.anyBool ? "State" : whatWord(e, wbuf, sizeof(wbuf))));
@@ -976,17 +1049,17 @@ void renderMain() {
         // HA's switch dialog, stood upright: a tall track, the knob at the top
         // when on and the bottom when off. Never colour alone (the owner is a
         // little colour-blind): the knob's position says it too.
-        lv_obj_set_style_bg_color(s.hero, UI::c(lit ? UI::mix(p.ST_ACTIVE, p.SURFACE_ALT, 70)
-                                                    : UI::mix(p.SURFACE_ALT, p.TEXT, 10)), 0);
-        lv_obj_set_style_bg_color(s.knob, UI::c(lit ? p.ST_ACTIVE
-                                                    : UI::mix(p.SURFACE_ALT, p.TEXT, 25)), 0);
+        lv_obj_set_style_bg_color(s.hero, UI::c(quiet(lit ? UI::mix(p.ST_ACTIVE, p.SURFACE_ALT, 70)
+                                                          : UI::mix(p.SURFACE_ALT, p.TEXT, 10))), 0);
+        lv_obj_set_style_bg_color(s.knob, UI::c(quiet(lit ? p.ST_ACTIVE
+                                                          : UI::mix(p.SURFACE_ALT, p.TEXT, 25))), 0);
         placeKnob(lit ? s.knobInset : s.heroH - s.knobH - s.knobInset);
         lv_obj_set_style_text_color(s.heroIcon,
-            UI::c(lit ? UI::contrastOf(p.ST_ACTIVE, p.GROUND, p.TEXT) : p.TEXT), 0);
+            UI::c(quiet(lit ? UI::contrastOf(p.ST_ACTIVE, p.GROUND, p.TEXT) : p.TEXT)), 0);
     } else {
-        lv_obj_set_style_bg_color(s.hero, UI::c(lit ? p.ST_ACTIVE : p.SURFACE), 0);
+        lv_obj_set_style_bg_color(s.hero, UI::c(quiet(lit ? p.ST_ACTIVE : p.SURFACE)), 0);
         lv_obj_set_style_text_color(s.heroIcon,
-            UI::c(lit ? UI::contrastOf(p.ST_ACTIVE, p.GROUND, p.TEXT) : cardTintFor(e.desc)), 0);
+            UI::c(quiet(lit ? UI::contrastOf(p.ST_ACTIVE, p.GROUND, p.TEXT) : cardTintFor(e.desc))), 0);
     }
 }
 
@@ -997,15 +1070,25 @@ void commandAll(bool on) {
     const uint32_t now = millis();
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
-        if (e && e->desc.writable) s.reg->commandValue(e->desc.id, EntityValue::makeBool(on), now);
+        if (e && e->desc.writable && !e->paused)   // a paused member is out of the group
+            s.reg->commandValue(e->desc.id, EntityValue::makeBool(on), now);
     }
     renderMain();
+}
+
+// A PAUSED window's controls are greyed and do nothing (owner, 2.10b round 1);
+// a touch on one says why, rather than leaving the finger wondering.
+bool pausedBlocks() {
+    if (!aggregate().paused) return false;
+    UIToolkit::show_toast("Paused - turn it off in SETTINGS");
+    return true;
 }
 
 void toggleCb(lv_event_t *ev) {
     (void)ev;
     // A drag has already decided (knobDragCb); this is the click that ends it.
     if (s.swallowClick) { s.swallowClick = false; return; }
+    if (pausedBlocks()) return;
     commandAll(!aggregate().on);
 }
 
@@ -1017,6 +1100,7 @@ void toggleCb(lv_event_t *ev) {
 // back. A press that does not move is a tap, and toggleCb() has it.
 void knobDragCb(lv_event_t *ev) {
     if (!s.knob || !s.hero) return;
+    if (aggregate().paused) return;   // greyed: the click says why (toggleCb)
     const lv_event_code_t code = lv_event_get_code(ev);
     lv_indev_t *in = lv_indev_active();
     lv_point_t p = {0, 0};
@@ -1070,17 +1154,27 @@ void buildMain() {
     // controls"); a switch, an on/off light, and a light whose source has not
     // said what it can do (an HA light until 2.10c) get the big toggle, which
     // is HA's own dialog for those.
+    s.builtPaused   = aggregate().paused;
+    s.rebuildQueued = false;
     const bool writableLight = (e.desc.kind == EntityKind::LIGHT && e.desc.writable);
-    s.lightHero  = writableLight && canSlide(lightAggregate().caps);
+    const uint8_t caps = lightAggregate().caps;   // paused members offer nothing
+    s.lightHero  = writableLight && canSlide(caps);
     s.toggleHero = !s.lightHero && e.desc.writable &&
                    (e.desc.kind == EntityKind::SWITCH || writableLight);
     if (s.lightHero) {
+        // A control no counting member has any more (its lamp was paused)
+        // falls back to the first one there is.
+        const uint8_t bit = s.lightCtl == LCTL_DIM ? LIGHT_CAN_DIM : s.lightCtl == LCTL_TEMP ? LIGHT_CAN_TEMP
+                                                                                          : LIGHT_CAN_COLOUR;
+        if (!(caps & bit)) s.lightCtl = firstCtl(caps);
+        s.builtCaps = caps;
         buildLightHero(row);
         lv_obj_t *col = plain(row);
         lv_obj_set_size     (col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
         lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
         lv_obj_set_style_pad_row(col, mm(1.0f), 0);
+        makePausedPill(col);
         buildLightColumn(col);
         renderLight();
         return;
@@ -1137,6 +1231,8 @@ void buildMain() {
     if (textW("Unavailable", UIToolkit::Font_Hero) > colMin) colMin = textW("Unavailable", UIToolkit::Font_Hero);
     lv_obj_set_style_min_width(col, colMin < colMax ? colMin : colMax, 0);
 
+    makePausedPill(col);
+
     s.lblWhat = makeLabel(col, t.TAG, p.TEXT_DIM);
 
     lv_obj_t *vrow = plain(col);
@@ -1166,11 +1262,17 @@ void buildHistory() {
     lv_label_set_text(l, "History arrives with 2.10e");
 }
 
+void memberRowCb(lv_event_t *ev);   // below, with the member view
+void deckRender();                  // below, with the deck
+
 void buildMembers() {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
+    // The stage's height, scrolling if a group has more members than fit.
     lv_obj_t *list = plain(s.stage);
-    lv_obj_set_size     (list, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_size     (list, lv_pct(100), lv_pct(100));
+    lv_obj_add_flag     (list, LV_OBJ_FLAG_SCROLLABLE);
+    UI::tameScroll(list);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(list, mm(1.4f), 0);
     for (uint8_t i = 0; i < s.nEnt; i++) {
@@ -1184,12 +1286,20 @@ void buildMembers() {
         lv_obj_set_style_radius (r, UI::sc(UI::met().RADIUS), 0);
         lv_obj_set_style_bg_color(r, UI::c(p.SURFACE), 0);
         lv_obj_set_style_bg_opa (r, LV_OPA_COVER, 0);
+        // A tap opens that member's own controls (owner, 2.10b).
+        lv_obj_add_flag(r, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_bg_color(r, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)),
+                                  UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+        lv_obj_add_event_cb(r, memberRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
         lv_obj_t *n = makeLabel(r, t.NAME, p.TEXT);
         lv_label_set_text(n, e->desc.name);
         lv_obj_t *v = makeLabel(r, t.TAG, p.TEXT_DIM);
         char buf[48];
         const EntityAttrs &at = e->attrs;
-        if (!e->available) {
+        if (e->paused) {
+            // Out of the group, but still listed and saying why (owner, 2.10b).
+            lv_label_set_text(v, "Paused");
+        } else if (!e->available) {
             lv_label_set_text(v, "Unavailable");
         } else if (e->desc.kind == EntityKind::LIGHT && e->value.type == ValueType::BOOL && e->value.b &&
                    at.brightness >= 0) {
@@ -1211,7 +1321,7 @@ void buildMembers() {
         }
     }
     lv_obj_t *note = makeLabel(list, t.TAG, p.TEXT_DIM);
-    lv_label_set_text(note, "Member controls arrive with the group work");
+    lv_label_set_text(note, "Tap one for its own controls");
 }
 
 // Share the title row between "Area > " and the name. Both fit: each gets its
@@ -1252,6 +1362,12 @@ void showView(PopupView v) {
         else           setText(s.lblTitleArea, "");
         setText(s.lblTitleName, s.name);
         buildMain();
+    } else if (v == PopupView::VIEW_MEMBER) {
+        // "Group > member" (card-sheet 11.1).
+        snprintf(title, sizeof(title), "%s > ", s.name);
+        setText(s.lblTitleArea, title);
+        setText(s.lblTitleName, s.ent[0] ? s.ent[0]->desc.name : "");
+        buildMain();
     } else {
         snprintf(title, sizeof(title), "%s > ", s.name);
         setText(s.lblTitleArea, title);
@@ -1260,13 +1376,52 @@ void showView(PopupView v) {
         else                              buildMembers();
     }
     layoutTitle();
+    deckRender();   // Paused follows whatever the window is showing now
     s.lastSig = signature();
+}
+
+// --- A MEMBER'S OWN CONTROLS (2.10b; owner: tap a row in Members) -----------
+// The same window and the same views, pointed at one member: the group's
+// entities are set aside, and the back arrow puts them back and returns to
+// Members. It needs no card of its own, so Lamp 4 works too.
+uint8_t s_memberPick = 0;
+uint8_t s_groupCtl   = 0;   // the group's control, restored on the way back
+
+void enterMemberAsync(void *unused) {
+    (void)unused;
+    if (s.phase != PopupPhase::PHASE_OPEN || s.view != PopupView::VIEW_MEMBERS) return;
+    if (s_memberPick >= s.nEnt || !s.ent[s_memberPick]) return;
+    for (uint8_t i = 0; i < CARD_PRIMARY_MAX; i++) s.groupEnt[i] = s.ent[i];
+    s.groupN = s.nEnt;
+    s_groupCtl = s.lightCtl;
+    const Entity *m = s.ent[s_memberPick];
+    for (uint8_t i = 0; i < CARD_PRIMARY_MAX; i++) s.ent[i] = nullptr;
+    s.ent[0] = m;
+    s.nEnt   = 1;
+    s.lightCtl = firstCtl(lightAggregate().caps);
+    showView(PopupView::VIEW_MEMBER);
+}
+
+// A row in Members. Deferred: the row is in the stage that is about to be
+// cleaned, and an event callback must not delete its own object.
+void memberRowCb(lv_event_t *ev) {
+    s_memberPick = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+    lv_async_call(enterMemberAsync, nullptr);
+}
+
+void leaveMember() {
+    for (uint8_t i = 0; i < CARD_PRIMARY_MAX; i++) s.ent[i] = s.groupEnt[i];
+    s.nEnt     = s.groupN;
+    s.groupN   = 0;
+    s.lightCtl = s_groupCtl;
+    showView(PopupView::VIEW_MEMBERS);
 }
 
 void leftCb(lv_event_t *ev) {
     (void)ev;
-    if (s.view == PopupView::VIEW_MAIN) CardPopup::close();
-    else                                showView(PopupView::VIEW_MAIN);
+    if (s.view == PopupView::VIEW_MAIN)        CardPopup::close();
+    else if (s.view == PopupView::VIEW_MEMBER) leaveMember();
+    else                                       showView(PopupView::VIEW_MAIN);
 }
 void historyCb(lv_event_t *ev) { (void)ev; showView(PopupView::VIEW_HISTORY); }
 void membersCb(lv_event_t *ev) { (void)ev; showView(PopupView::VIEW_MEMBERS); }
@@ -1946,7 +2101,10 @@ void groupChipCb(lv_event_t *ev) {
 // once, and every card on the same entities follows through the registry).
 void pauseChipCb(lv_event_t *ev) {
     const bool on = lv_event_get_user_data(ev) != nullptr;
-    if (Card *c = cardOf(h.surface)) {
+    // In a member's own view, only that member (2.10b) - the registry, and
+    // every card on it follows.
+    Card *c = (s.view == PopupView::VIEW_MEMBER) ? nullptr : cardOf(h.surface);
+    if (c) {
         c->setPaused(on);
     } else if (s.reg) {
         const uint32_t now = millis();
@@ -2218,6 +2376,8 @@ void closeNow(void *unused) {
     if (s_catcher) lv_obj_clear_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
     s.phase = PopupPhase::PHASE_CLOSED;
     s.nEnt = 0;
+    s.groupN = 0;
+    s.rebuildQueued = false;
 #ifdef DEBUG_POPUP
     char mem[96];
     dbgMem(mem, sizeof(mem));
@@ -2471,7 +2631,8 @@ void CardPopup::open(Card &card) {
 namespace {
 enum DbgReqState : int { DREQ_IDLE, DREQ_CLAIMED, DREQ_PENDING, DREQ_CLOSING, DREQ_DONE };
 std::atomic<int> s_dreq{DREQ_IDLE};
-struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; bool close = false, power = false; };
+struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
+                int member = -1; bool close = false, power = false; };
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
 size_t s_dreqLen = 0;
@@ -2506,6 +2667,8 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "set",   v, sizeof(v)) == ESP_OK) a.set   = atoi(v);
         if (httpd_query_key_value(q, "view",  v, sizeof(v)) == ESP_OK) a.view  = atoi(v);
         if (httpd_query_key_value(q, "power", v, sizeof(v)) == ESP_OK) a.power = true;
+        if (httpd_query_key_value(q, "pause", v, sizeof(v)) == ESP_OK) a.pause = atoi(v);
+        if (httpd_query_key_value(q, "member", v, sizeof(v)) == ESP_OK) a.member = atoi(v);
         if (httpd_query_key_value(q, "close", v, sizeof(v)) == ESP_OK) a.close = atoi(v) != 0;
     }
     int expected = DREQ_IDLE;
@@ -2549,6 +2712,23 @@ void CardPopup::debugService(lv_timer_t *t) {
         if (!isOpen()) { dbgOut("no window open\n"); s_dreq.store(DREQ_DONE); return; }
         close();
         s_dreq.store(DREQ_CLOSING);
+        return;
+    }
+    if (a.pause >= 0 || a.member >= 0) {
+        if (!isOpen()) dbgOut("no window open\n");
+        else if (a.member >= 0) {
+            // As a tap on row N of Members (opens Members first if needed).
+            if (s.view != PopupView::VIEW_MEMBERS) showView(PopupView::VIEW_MEMBERS);
+            s_memberPick = (uint8_t)a.member;
+            enterMemberAsync(nullptr);
+            dbgOut("member %d: %s\n", a.member, s.view == PopupView::VIEW_MEMBER ? "open" : "not open");
+        } else {
+            // Pause (1) or resume (0) whatever the window is showing, as the deck's chip.
+            const uint32_t now = millis();
+            for (uint8_t i = 0; i < s.nEnt; i++) if (s.ent[i]) s.reg->setPaused(s.ent[i]->desc.id, a.pause != 0, now);
+            dbgOut("pause %d\n", a.pause);
+        }
+        s_dreq.store(DREQ_DONE);
         return;
     }
     if (a.power) {

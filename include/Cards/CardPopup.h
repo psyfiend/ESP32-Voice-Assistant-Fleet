@@ -78,6 +78,8 @@ public:
     //   /popup?set=V        as a tap on that control's slider at V (%, K, hue)
     //   /popup?view=N       0 main, 1 history, 2 members; lists each entity's levels
     //   /popup?power=1      as a tap on Power
+    //   /popup?pause=1|0    pause / resume what the window shows
+    //   /popup?member=N     as a tap on row N of Members
     //   /popup?close=1      close it; replies with the pool afterwards
     // The handler hands the work to the LVGL thread and waits for it, as
     // /screenshot does - it never touches LVGL itself.
