@@ -67,6 +67,20 @@ public:
     // True from the long press until the window has gone. GUIManager asks
     // this before acting on a gesture: the popup is modal.
     static bool isOpen();
+
+#ifdef DEBUG_POPUP
+    // GET /popup - open, drive and measure a window from a PC, with nobody at
+    // the panel. Debug builds only (-D DEBUG_POPUP, never committed):
+    //   /popup              the cards on this page, numbered
+    //   /popup?card=N       open card N's window; replies with LVGL's pool
+    //   /popup?deck=1       open (or fold, deck=0) the settings deck
+    //   /popup?close=1      close it; replies with the pool afterwards
+    // The handler hands the work to the LVGL thread and waits for it, as
+    // /screenshot does - it never touches LVGL itself.
+    static void beginDebug(class HttpServer &http);
+private:
+    static void debugService(lv_timer_t *t);   // the LVGL-thread half
+#endif
 };
 
 #endif // CARD_POPUP_H

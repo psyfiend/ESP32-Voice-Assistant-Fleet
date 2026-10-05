@@ -39,6 +39,10 @@
     #define DBG_POPUP(...) Serial.printf("[Popup:debug] " __VA_ARGS__)
     #include "src/display/lv_display_private.h"   // inv_areas: what a frame redraws
     #include "src/core/lv_refr_private.h"         // lv_refr_get_top_obj()
+    #include "HttpServer.h"                       // GET /popup
+    #include <atomic>
+    #include "freertos/FreeRTOS.h"
+    #include "freertos/task.h"
 #else
     #define DBG_POPUP(...) do {} while (0)
 #endif
@@ -128,6 +132,15 @@ enum class IntfMode   : uint8_t { INTF_NOW_AND_THEN, INTF_ONCE, INTF_OFF };
 constexpr uint32_t POPUP_AUTOCLOSE_MS = 60000;
 constexpr uint32_t POPUP_TICK_MS      = 250;
 
+// THE P4_5 IS THE REFERENCE (owner, 2026-10-05: its toggle "is the perfect
+// size"). Its window is 787 x 545 px (68.1 x 47.1 mm) with the system header
+// showing, and its hero 349 px of that height (30.2 mm, measured with calipers
+// at 30). Every board's window takes this shape where the screen allows, and
+// what is inside it the same share of it - see open(), propH and pm().
+constexpr float POPUP_ASPECT  = 787.0f / 545.0f;
+constexpr float REF_WIN_H_MM  = 47.1f;   // the P4_5 window's height, header showing
+constexpr float HERO_H_MM     = 30.2f;   // its hero's
+
 // The hold, in millimetres so it looks the same on every board. THE LEAP IS
 // GONE (owner, round 6): it was clipped by the card's wrapper, and the window
 // waiting two frames for it made the popup feel slower than it was - "the
@@ -155,6 +168,7 @@ struct Popup {
     lv_area_t winRect = {};
     int32_t   winRadius = 0;
     int32_t   pad = 0;
+    int32_t   propH = 0;   // the height the contents are sized from - see open()
 
     lv_obj_t *win = nullptr;
     lv_obj_t *btnLeft = nullptr, *lblLeft = nullptr;
@@ -217,6 +231,15 @@ lv_obj_t *s_catcher = nullptr;
 // UI::minTouch(), so the window is the same physical size on every board.
 int32_t mm(float v) {
     return (int32_t)lroundf(v * (float)UIToolkit::ppi() / 25.4f);
+}
+
+// "P4_5 millimetres": a length that is `v` mm in the P4_5's window, the same
+// SHARE of this one (owner, 2026-10-05: the hero the same proportion of the
+// window on every board). For the hero and what is laid out around it; touch
+// targets and text stay real millimetres, so they are the same size under a
+// finger everywhere.
+int32_t pm(float v) {
+    return (int32_t)lroundf(v * (float)s.propH / REF_WIN_H_MM);
 }
 
 // A bare object: no theme styles, no scrolling, not clickable until asked.
@@ -507,12 +530,13 @@ void buildMain() {
     lv_obj_set_size     (row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(row, mm(4), 0);
+    lv_obj_set_style_pad_column(row, pm(4), 0);
 
-    // The stage is not laid out yet, so its height is worked out from the
-    // window's: everything but the header row, the padding and a margin.
-    const int32_t winH = lv_area_get_height(&s.winRect);
-    s.heroH = winH - 2 * s.pad - UI::minTouch() - mm(1.6f) - mm(4);
+    // THE SAME SHARE OF THE WINDOW ON EVERY BOARD (owner, 2026-10-05). It used
+    // to be the window's height less the header row and margins, which on a
+    // 7" panel made a toggle twice the P4_5's (60 mm on calipers) and on the 4B
+    // nearly 40 mm.
+    s.heroH = pm(HERO_H_MM);
     if (s.heroH < UI::minTouch()) s.heroH = UI::minTouch();
 
     // D3: a SWITCH opens on its control - the hero IS a big toggle. Lights get
@@ -540,8 +564,9 @@ void buildMain() {
         s.heroIcon = makeLabel(s.knob, t.ICON, p.TEXT);
         lv_obj_center(s.heroIcon);
     } else {
-        int32_t d = s.heroH * 60 / 100;
-        if (d > mm(24)) d = mm(24);
+        // A share of the hero's height, like the toggle. The icon inside is a
+        // fixed face, so on a 7" panel the disc grows around the same glyph.
+        const int32_t d = s.heroH * 60 / 100;
         s.heroW = s.heroH = d;
         s.hero = plain(row);
         lv_obj_set_size(s.hero, d, d);
@@ -558,7 +583,7 @@ void buildMain() {
     lv_obj_set_style_pad_row(col, mm(0.8f), 0);
     // Never wider than what is left beside the hero, so a long text value
     // ellipsises instead of running out of the window.
-    const int32_t colMax = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - mm(4);
+    const int32_t colMax = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4);
     lv_obj_set_style_max_width(col, colMax, 0);
     // AND NEVER NARROWER THAN ITS LONGEST ORDINARY WORDS. The row is centred,
     // so a column that changed width moved the whole group - the owner's B1:
@@ -1778,18 +1803,32 @@ void CardPopup::open(Card &card) {
     snprintf(s.name, sizeof(s.name), "%s", card.label());
 
     // --- Where the window goes ---------------------------------------------
-    // The mock: ~68 mm wide (62% of the P4_5, nearly all of the 4B), from just
-    // under the system header to just above the deck's peeking header.
+    // Tall: from just under the system header to just above the deck's tab.
+    //
+    // WIDE: THE P4_5'S PROPORTIONS, WHEREVER THE SCREEN ALLOWS (owner,
+    // 2026-10-05). It used to be 68 mm on every board, which on the 7" panels
+    // made a window taller than wide, its toggle the biggest share of it. Now
+    // the width is the height times the P4_5 window's aspect (POPUP_ASPECT),
+    // capped by the screen - which on the 4B it is. The height used is the one
+    // WITH the system header showing, so hiding the header makes the window
+    // taller but never wider.
     lv_obj_t *scr = lv_screen_active();
     const int32_t sw = lv_obj_get_width(scr), sh = lv_obj_get_height(scr);
-    int32_t w = mm(68);
-    if (w > sw - 2 * mm(3)) w = sw - 2 * mm(3);
     const int32_t top    = UIToolkit::systemHeaderPx() + mm(2);
-    const int32_t bottom = sh - mm(6) - mm(2);   // mm(6): the deck's header, step 2
+    const int32_t bottom = sh - mm(6) - mm(2);   // mm(6): the deck's tab
+    const int32_t refH   = bottom - (UIToolkit::systemHeaderFullPx() + mm(2));
+    int32_t w = (int32_t)lroundf((float)refH * POPUP_ASPECT);
+    if (w > sw - 2 * mm(3)) w = sw - 2 * mm(3);
     s.winRect.x1 = (sw - w) / 2;
     s.winRect.x2 = s.winRect.x1 + w - 1;
     s.winRect.y1 = top;
     s.winRect.y2 = bottom - 1;
+    // What the contents are sized from: the height of the biggest window of
+    // the P4_5's shape that fits inside this one. The P4_5 itself gives its own
+    // height (with the header shown); the 7" panels theirs; the 4B, whose width
+    // is capped, less than its height. So the hero is the same share of the
+    // window everywhere (owner), and the 4B's shrinks.
+    s.propH = LV_MIN(refH, (int32_t)lroundf((float)w / POPUP_ASPECT));
     s.winRadius  = mm(2.4f);
     // 1.2 mm, down from the mock's 2.2: the owner wanted the X "closer to the
     // corner" (H1). Still clear of the 2.4 mm corner radius.
@@ -1812,3 +1851,134 @@ void CardPopup::open(Card &card) {
     h.phase = HoldPhase::HOLD_OWNED;
     showWindow();
 }
+
+#ifdef DEBUG_POPUP
+// ---------------------------------------------------------------------------
+// GET /popup (CardPopup.h): open, drive and measure a window from a PC. The
+// handler runs on the HTTP server's task and never touches LVGL: it posts the
+// request and waits; debugService(), an lv_timer on the LVGL thread, does the
+// work and writes the reply.
+// ---------------------------------------------------------------------------
+namespace {
+enum DbgReqState : int { DREQ_IDLE, DREQ_CLAIMED, DREQ_PENDING, DREQ_CLOSING, DREQ_DONE };
+std::atomic<int> s_dreq{DREQ_IDLE};
+struct DbgReq { int card = -1; int deck = -1; bool close = false; };
+DbgReq s_dreqArgs;
+char   s_dreqOut[2048];
+size_t s_dreqLen = 0;
+
+void dbgOut(const char *fmt, ...) {
+    if (s_dreqLen >= sizeof(s_dreqOut) - 1) return;
+    va_list ap;
+    va_start(ap, fmt);
+    const int n = vsnprintf(s_dreqOut + s_dreqLen, sizeof(s_dreqOut) - s_dreqLen, fmt, ap);
+    va_end(ap);
+    if (n > 0) s_dreqLen = LV_MIN(sizeof(s_dreqOut) - 1, s_dreqLen + (size_t)n);
+}
+
+// The cards on the screen, in tree order - the surfaces CARD_SURFACE_FLAG marks.
+int dbgCards(lv_obj_t *o, lv_obj_t **out, int n, int cap) {
+    const uint32_t cnt = lv_obj_get_child_count(o);
+    for (uint32_t i = 0; i < cnt && n < cap; i++) {
+        lv_obj_t *c = lv_obj_get_child(o, (int32_t)i);
+        if (lv_obj_has_flag(c, CardPopup::CARD_SURFACE_FLAG)) out[n++] = c;
+        else n = dbgCards(c, out, n, cap);
+    }
+    return n;
+}
+
+esp_err_t handlePopup(httpd_req_t *req) {
+    DbgReq a;
+    char q[64], v[8];
+    if (httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK) {
+        if (httpd_query_key_value(q, "card",  v, sizeof(v)) == ESP_OK) a.card  = atoi(v);
+        if (httpd_query_key_value(q, "deck",  v, sizeof(v)) == ESP_OK) a.deck  = atoi(v);
+        if (httpd_query_key_value(q, "close", v, sizeof(v)) == ESP_OK) a.close = atoi(v) != 0;
+    }
+    int expected = DREQ_IDLE;
+    if (!s_dreq.compare_exchange_strong(expected, DREQ_CLAIMED)) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        return httpd_resp_sendstr(req, "Busy; try again.\n");
+    }
+    s_dreqArgs = a;                 // written before the LVGL thread can see it
+    s_dreq.store(DREQ_PENDING);
+    for (int i = 0; i < 300 && s_dreq.load() != DREQ_DONE; i++) vTaskDelay(pdMS_TO_TICKS(10));
+    expected = DREQ_PENDING;
+    if (s_dreq.compare_exchange_strong(expected, DREQ_IDLE)) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        return httpd_resp_sendstr(req, "The UI thread did not pick it up within 3 s.\n");
+    }
+    while (s_dreq.load() != DREQ_DONE) vTaskDelay(pdMS_TO_TICKS(10));   // a close always ends
+    httpd_resp_set_type(req, "text/plain");
+    const esp_err_t r = httpd_resp_send(req, s_dreqOut, (ssize_t)s_dreqLen);
+    s_dreq.store(DREQ_IDLE);
+    return r;
+}
+} // namespace
+
+void CardPopup::debugService(lv_timer_t *t) {
+    (void)t;
+    char mem[96];
+    const int st = s_dreq.load();
+    if (st == DREQ_CLOSING) {
+        if (isOpen()) return;   // closeNow() runs from lv_async_call
+        dbgMem(mem, sizeof(mem));
+        dbgOut("closed; %s\n", mem);
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (st != DREQ_PENDING) return;
+    const DbgReq a = s_dreqArgs;
+    s_dreqLen = 0;
+    s_dreqOut[0] = '\0';
+
+    if (a.close) {
+        if (!isOpen()) { dbgOut("no window open\n"); s_dreq.store(DREQ_DONE); return; }
+        close();
+        s_dreq.store(DREQ_CLOSING);
+        return;
+    }
+    if (a.deck >= 0) {
+        if (!isOpen()) dbgOut("no window open\n");
+        else { deckSet(a.deck ? DECK_OPEN : DECK_PEEK); dbgOut("deck %s\n", a.deck ? "open" : "folded"); }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+
+    lv_obj_t *cards[48];
+    const int n = dbgCards(lv_screen_active(), cards, 0, 48);
+    if (a.card < 0) {
+        dbgMem(mem, sizeof(mem));
+        dbgOut("%s; window %s\n", mem, isOpen() ? "open" : "closed");
+        for (int i = 0; i < n; i++) {
+            Card *c = cardOf(cards[i]);
+            if (c) dbgOut("%2d  %-16s %-12s %u entit%s\n", i, c->label(), c->_area,
+                          (unsigned)c->_nPrimary, c->_nPrimary == 1 ? "y" : "ies");
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.card >= n || !cardOf(cards[a.card])) dbgOut("no card %d (%d on this page)\n", a.card, n);
+    else if (isOpen())                          dbgOut("a window is already open; /popup?close=1 first\n");
+    else {
+        dbgMem(mem, sizeof(mem));
+        dbgOut("before: %s\n", mem);
+        // A finger that moved is a drag (open() checks): there is no finger,
+        // so where it "began" is wherever the input device last was.
+        if (s_indev) lv_indev_get_point(s_indev, &s.pressStart);
+        const uint32_t t0 = micros();
+        open(*cardOf(cards[a.card]));
+        const uint32_t us = micros() - t0;
+        dbgMem(mem, sizeof(mem));
+        dbgOut("open card %d: built in %lu us; window %ldx%ld px, propH %ld, hero %ldx%ld; %s\n",
+               a.card, (unsigned long)us, (long)lv_area_get_width(&s.winRect),
+               (long)lv_area_get_height(&s.winRect), (long)s.propH, (long)s.heroW, (long)s.heroH, mem);
+    }
+    s_dreq.store(DREQ_DONE);
+}
+
+void CardPopup::beginDebug(HttpServer &http) {
+    http.addRoute("/popup", HTTP_GET, handlePopup);
+    lv_timer_create(debugService, 20, nullptr);
+}
+#endif

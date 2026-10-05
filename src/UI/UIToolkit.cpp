@@ -13,7 +13,7 @@ static UiActionCallback _system_close_cb = NULL;
 const lv_font_t* UIToolkit::Font_Caption = NULL;
 
 // 35, chosen on the glass. The button still cycles it.
-uint8_t UIToolkit::systemHeaderH = 35;
+uint8_t UIToolkit::systemHeaderH = UIToolkit::SYSTEM_HEADER_FULL_H;
 const lv_font_t* UIToolkit::Font_Label = NULL;
 const lv_font_t* UIToolkit::Font_Button = NULL;
 const lv_font_t* UIToolkit::Font_PanelHeader = NULL;
