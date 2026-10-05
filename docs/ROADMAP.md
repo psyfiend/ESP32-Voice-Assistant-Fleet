@@ -662,7 +662,7 @@ recommendation and await the owner's yes.
 
 | | | |
 |---|---|---|
-| 1 | **The design interview, then 2.10** (#65) | `docs/design/interview-phase2-3.md` (Claude facilitates, protocol §0.1a): the blueprint for 2.8, 2.10, 2.11 and Phase 3. **§1 CLOSED 2026-10-01** - answers in `docs/design/look-and-feel.md` (summary §3.14); **§2 CLOSED 2026-10-02** - `card-sheet.md` §11-12. **2.10a (the popup frame) is next to BUILD**, owner's choice; interview §3 onward after 2.10. 2.10's design is drafted in `docs/design/card-sheet.md` (draft 2); fonts are #73 |
+| 1 | **The design interview, then 2.10** (#65) | `docs/design/interview-phase2-3.md` (Claude facilitates, protocol §0.1a): the blueprint for 2.8, 2.10, 2.11 and Phase 3. **§1 CLOSED 2026-10-01** - answers in `docs/design/look-and-feel.md` (summary §3.14); **§2 CLOSED 2026-10-02** - `card-sheet.md` §11-12. **2.10a (the popup frame) IN PROGRESS** on `feat/65-popup-frame` (2026-10-02 to 04, WS_P4_5): the window, header, four close routes, switch toggle, placeholder inner views and a ring-painted grow are built and seen on glass; the growing panel's border and rounded corners, and the settings deck with Pause, are still to do - `docs/HANDOFF.md` "2.10a status". Interview §3 onward after 2.10. 2.10's design is drafted in `docs/design/card-sheet.md` (draft 2); fonts are #73 |
 | 1a | ~~**Floating tag** (#80)~~ | **MERGED 2026-10-01** (`0de94d3`, all-nine gate). File folder style still open on #80 |
 | 1b | ~~**#74 SNTP**~~ | **MERGED 2026-10-01** with the tag and Linen round two. RTC fallback and settings still open on #74 |
 | 2 | **2.8 header slots** (#19) | before group cards, whose header IS the slot mechanism. Battery glyphs designed (artifact "Fleet Status Glyphs"); data from #72 |
