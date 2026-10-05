@@ -171,6 +171,31 @@ badge, corner icon - not the floating tag).
 | Q6 | Long press the window's title | Toast cycles "Interference: on open only", "off", "open + now and then" |
 | Q7 | Linen | The crackle reads on the light window too (it uses the accent toward the text colour there) |
 
+**Round 7 results (owner, 2026-10-05):** Q1, Q3, Q6 PASS - the crash is gone. **Q2 passes but**: in
+Band, black pixels between the band's rounded corner and the accent border when pressed (the band
+used the card's radius; it sits inside the border, so it needs the border's inner radius - fixed).
+**Q4 partial**: the crackle read like a display timing fault ("porch timing issues or the wrong
+pclk"), not electricity - too fast and too scattered; the owner sketched a slower, localized spark
+that travels a short stretch of edge. **Q5**: the burst on opening looked like a render problem;
+wait a few seconds before the first. **Q7**: invisible on Linen. Owner: "otherwise I'm super happy
+with what we've got right now in terms of function and form." The knob: keep the slide on a tap
+AND let a finger drag it; let go, and it goes to whichever half it is in.
+
+## Round 8 - the travelling spark, the draggable knob (2026-10-05, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| S1 | Open a window and wait | Nothing for 1.5-3.5 s; then ONE spark runs along a short stretch of one edge - a bright core in a glow with a fading tail - often running again a little further on. It reads as electricity, not a fault |
+| S2 | Leave it open | Another spark every 5-12 s, somewhere else each time; none within 2 s of touching the window |
+| S3 | Linen | The spark is visible (deep blues and violet on a light window) |
+| S4 | Long press the title | Toast cycles "Sparks: once per window", "off", "now and then" |
+| K1 | Switch's window: tap the toggle | The knob slides to the other end, as before |
+| K2 | Drag the knob all the way down (or up) | It follows the finger; the switch changes when you let go |
+| K3 | Drag it two thirds of the way, let go | It slides the rest of the way and the switch changes |
+| K4 | Drag it two fifths of the way, let go | It slides back; the switch does not change |
+| K5 | Stuck's window: drag it across | It goes across, then a few seconds later slides back (refused) |
+| B1 | Band label type: press a card | The band's corners meet the accent border with no dark pixels between |
+
 ## Measured (Claude, from the board) - pending
 
 - `lv_mem` with the window open (interview G1).

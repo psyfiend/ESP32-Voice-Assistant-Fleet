@@ -19,7 +19,8 @@ class Card;
 //   - nothing behind it: no dim (owner, after trying one: speed wins)
 //   - the way in: the held card is pressed in while its border fades to the
 //     accent, and stays so while its window is open (CardPopup.cpp, "The
-//     hold"); the window's edge crackles a moment ("Interference")
+//     hold"); now and then a spark runs along the window's edge
+//     ("Interference")
 //   - header: X top left (a back arrow on inner views), "Area > name" in the
 //     middle, history and members icons top right
 //   - modal: nothing outside the window takes a touch or a gesture

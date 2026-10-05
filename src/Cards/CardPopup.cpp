@@ -25,9 +25,9 @@
 // speed - "the delay seems like an eternity and adds very little".
 //
 // What the eye gets instead is cheap because it is small: the held card is
-// pressed in while its border fades to the accent (see "The hold"), the
-// window's edge crackles for a moment like a projection settling (see
-// "Interference"), and the switch's knob slides.
+// pressed in while its border fades to the accent (see "The hold"), now and
+// then a spark runs along the window's edge (see "Interference"), and the
+// switch's knob slides - and can be dragged.
 
 // Per the repo's debug-flag convention (CLAUDE.md). What opening and closing
 // cost on this side of the frame: building the window and tearing it down,
@@ -119,9 +119,9 @@ enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
 enum class HoldPhase  : uint8_t { HOLD_NONE, HOLD_PRESSING, HOLD_LETTING_GO, HOLD_OWNED };
-// When the window's edge crackles (see "Interference"): as it appears and now
-// and then while it is open; only as it appears; never.
-enum class IntfMode   : uint8_t { INTF_OPEN_AND_IDLE, INTF_OPEN_ONLY, INTF_OFF };
+// How often a spark runs along the window's edge (see "Interference"): now
+// and then while it is open; once per window; never.
+enum class IntfMode   : uint8_t { INTF_NOW_AND_THEN, INTF_ONCE, INTF_OFF };
 
 // D6: auto-close after 60 s untouched. The owner chose all four close routes.
 constexpr uint32_t POPUP_AUTOCLOSE_MS = 60000;
@@ -136,7 +136,7 @@ constexpr float    HOLD_SINK_MM    = 0.4f;   // how far the card is pressed in a
 constexpr uint32_t HOLD_LETGO_MS   = 120;    // a tap lets go this fast, from full
 constexpr uint32_t KNOB_SLIDE_MS   = 160;
 
-IntfMode s_intfMode = IntfMode::INTF_OPEN_AND_IDLE;
+IntfMode s_intfMode = IntfMode::INTF_NOW_AND_THEN;
 
 struct Popup {
     PopupPhase phase = PopupPhase::PHASE_CLOSED;
@@ -169,6 +169,10 @@ struct Popup {
     bool      toggleHero = false;
     bool      knobPlaced = false;   // the first placement jumps; every later one slides
     int32_t   knobTarget = 0;
+    // The knob under a finger (knobDragCb): where the drag began, where the
+    // knob was then, and whether the CLICKED that ends a drag must be ignored.
+    bool      knobDragging = false, swallowClick = false;
+    int32_t   dragStartY = 0, dragKnobY0 = 0;
 
     lv_timer_t *timer = nullptr;
     uint32_t    lastTouchMs = 0;
@@ -428,17 +432,61 @@ void renderMain() {
     }
 }
 
-void toggleCb(lv_event_t *ev) {
-    (void)ev;
+// Switch every primary to `on` - what a tap on the card itself does with any
+// on -> all off, else all on.
+void commandAll(bool on) {
     if (!s.reg) return;
-    // Any on -> all off, else all on: what a tap on the card itself does.
-    const bool want = !aggregate().on;
     const uint32_t now = millis();
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
-        if (e && e->desc.writable) s.reg->commandValue(e->desc.id, EntityValue::makeBool(want), now);
+        if (e && e->desc.writable) s.reg->commandValue(e->desc.id, EntityValue::makeBool(on), now);
     }
     renderMain();
+}
+
+void toggleCb(lv_event_t *ev) {
+    (void)ev;
+    // A drag has already decided (knobDragCb); this is the click that ends it.
+    if (s.swallowClick) { s.swallowClick = false; return; }
+    commandAll(!aggregate().on);
+}
+
+// THE KNOB CAN BE DRAGGED (owner, round 7): a knob that slides on a tap but
+// cannot be moved by a finger is "jarring". It follows the finger up and down
+// the track; let go, and it goes to whichever half it is in - the rest of the
+// way by the same slide a tap uses - and the switch follows it. Dragged all the
+// way, or most of the way, the switch changes; less than half, the knob slides
+// back. A press that does not move is a tap, and toggleCb() has it.
+void knobDragCb(lv_event_t *ev) {
+    if (!s.knob || !s.hero) return;
+    const lv_event_code_t code = lv_event_get_code(ev);
+    lv_indev_t *in = lv_indev_active();
+    lv_point_t p = {0, 0};
+    if (in) lv_indev_get_point(in, &p);
+    const int32_t topY    = s.knobInset;
+    const int32_t bottomY = s.heroH - s.knobH - s.knobInset;
+
+    if (code == LV_EVENT_PRESSED) {
+        lv_anim_delete(s.knob, knobExec);
+        s.dragStartY   = p.y;
+        s.dragKnobY0   = lv_obj_get_y(s.knob);
+        s.knobDragging = false;
+        s.swallowClick = false;
+    } else if (code == LV_EVENT_PRESSING) {
+        const int32_t dy = p.y - s.dragStartY;
+        if (!s.knobDragging && LV_ABS(dy) > mm(1.2f)) s.knobDragging = true;
+        if (!s.knobDragging) return;
+        const int32_t y = LV_CLAMP(topY, s.dragKnobY0 + dy, bottomY);
+        lv_obj_set_y(s.knob, y);
+        s.knobTarget = y;   // so the next placeKnob() slides from here
+    } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+        if (!s.knobDragging) return;
+        s.knobDragging = false;
+        s.swallowClick = (code == LV_EVENT_RELEASED);
+        const bool wantOn = lv_obj_get_y(s.knob) + s.knobH / 2 < s.heroH / 2;   // top half = on
+        if (wantOn != aggregate().on) commandAll(wantOn);
+        else                          renderMain();   // slides back where it was
+    }
 }
 
 void buildMain() {
@@ -470,7 +518,11 @@ void buildMain() {
         lv_obj_set_style_radius(s.hero, s.heroW * 30 / 100, 0);
         lv_obj_set_style_bg_opa(s.hero, LV_OPA_COVER, 0);
         lv_obj_add_flag(s.hero, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(s.hero, toggleCb, LV_EVENT_CLICKED, nullptr);
+        lv_obj_add_event_cb(s.hero, toggleCb,   LV_EVENT_CLICKED,    nullptr);
+        lv_obj_add_event_cb(s.hero, knobDragCb, LV_EVENT_PRESSED,    nullptr);
+        lv_obj_add_event_cb(s.hero, knobDragCb, LV_EVENT_PRESSING,   nullptr);
+        lv_obj_add_event_cb(s.hero, knobDragCb, LV_EVENT_RELEASED,   nullptr);
+        lv_obj_add_event_cb(s.hero, knobDragCb, LV_EVENT_PRESS_LOST, nullptr);
         s.knob = plain(s.hero);
         lv_obj_set_size(s.knob, s.heroW - 2 * s.knobInset, s.knobH);
         lv_obj_set_x   (s.knob, s.knobInset);
@@ -637,17 +689,17 @@ void headerGestureCb(lv_event_t *ev) {
 }
 
 #ifdef DEBUG_POPUP
-// The interference trial: a long press on the title cycles when the edge
-// crackles - on open and now and then, on open only, never - from the next
+// The interference trial: a long press on the title cycles how often a spark
+// runs along the edge - now and then, once per window, never - from the next
 // window. Debug builds only, until the owner chooses (a setting, later).
 void intfCycleCb(lv_event_t *ev) {
     (void)ev;
-    s_intfMode = (s_intfMode == IntfMode::INTF_OPEN_AND_IDLE) ? IntfMode::INTF_OPEN_ONLY
-               : (s_intfMode == IntfMode::INTF_OPEN_ONLY)     ? IntfMode::INTF_OFF
-                                                              : IntfMode::INTF_OPEN_AND_IDLE;
-    UIToolkit::show_toast(s_intfMode == IntfMode::INTF_OPEN_AND_IDLE ? "Interference: open + now and then"
-                        : s_intfMode == IntfMode::INTF_OPEN_ONLY     ? "Interference: on open only"
-                                                                     : "Interference: off");
+    s_intfMode = (s_intfMode == IntfMode::INTF_NOW_AND_THEN) ? IntfMode::INTF_ONCE
+               : (s_intfMode == IntfMode::INTF_ONCE)         ? IntfMode::INTF_OFF
+                                                             : IntfMode::INTF_NOW_AND_THEN;
+    UIToolkit::show_toast(s_intfMode == IntfMode::INTF_NOW_AND_THEN ? "Sparks: now and then"
+                        : s_intfMode == IntfMode::INTF_ONCE         ? "Sparks: once per window"
+                                                                    : "Sparks: off");
 }
 #endif
 
@@ -919,115 +971,132 @@ void holdStart(lv_obj_t *sf) {
 }
 
 // ---------------------------------------------------------------------------
-// Interference (owner, 2026-10-04)
+// Interference: a spark that travels the window's edge (owner, 2026-10-04)
 //
-// The window is a projection that has not quite settled: for a moment as it
-// appears - and now and then while it is open - its edge crackles. Short
-// bright sparks run along the border line, flecks jump off it, and here and
-// there a stretch of the border drops out and comes back, as if the line
-// wavered thin. Positions, lengths, colours and timing are random every time,
-// and it dies away over the burst (the owner: it would be tiresome if it
-// always happened "in the exact same place in the same manner").
+// The window is a projection, and now and then a spark of it runs along a
+// short stretch of its border: a bright core in a wider glow, a fading tail
+// behind, the odd fleck thrown off. It travels a section of the edge, then
+// often runs again a little further on, overlapping the last run - so it reads
+// as something CRAWLING along the border.
 //
-// CHEAP BECAUSE IT IS SMALL - the rule from LESSONS, "Effects that cover the
-// screen". A pool of INTF_POOL plain objects on the screen, above the window,
-// each a few thousand pixels at most and alive for one to three frames. Off is
-// a size of 0x0 rather than HIDDEN, so nothing is ever toggled. The window is
-// usable from its first frame; this starts in the frame after.
+// Round 1 was ten scattered pieces living one to three frames, all over the
+// edge, all at once. The owner: it looked like "small porch timing issues or
+// the wrong pclk frequency" - a real fault - not like electricity, and on a
+// light scheme it could not be seen at all. So now: ONE spark at a time, slow
+// enough to follow (a run is 250-600 ms), in one place (a quarter of a side
+// or less), in electric colours - whites and pale blues on a dark scheme,
+// deep blues and violet on a light one. Every roll of the dice is new: which
+// edge, where on it, how long the section, the spark's length, its width, its
+// colours, its speed, how many runs.
 //
-// When and how often are the owner's to tune (a setting, later). Today:
-//   - on open, always (unless off): a burst of INTF_OPEN_MS
-//   - while open, with INTF_OPEN_AND_IDLE: a shorter, weaker flicker every
-//     INTF_IDLE_MIN_MS..INTF_IDLE_MAX_MS, never within INTF_QUIET_MS of a touch
+// When: never as the window appears - the owner read an immediate one as a
+// render problem - but INTF_FIRST_MIN_MS..MAX after, then every
+// INTF_GAP_MIN_MS..MAX, and never within INTF_QUIET_MS of a touch. A setting,
+// later; the trial switch (title long press) has "now and then", "once", off.
+//
+// CHEAP BECAUSE IT IS SMALL (LESSONS, "Effects that cover the screen"): five
+// plain objects on the screen above the window, a few thousand pixels each,
+// moved once a frame. Off is a size of 0x0, never HIDDEN.
 // ---------------------------------------------------------------------------
-constexpr uint8_t  INTF_POOL        = 10;
-constexpr uint32_t INTF_OPEN_MS     = 360;
-constexpr uint8_t  INTF_OPEN_PEAK   = 255;
-constexpr uint32_t INTF_IDLE_MS     = 180;
-constexpr uint8_t  INTF_IDLE_PEAK   = 140;
-constexpr uint32_t INTF_IDLE_MIN_MS = 6000;
-constexpr uint32_t INTF_IDLE_MAX_MS = 15000;
-constexpr uint32_t INTF_QUIET_MS    = 2500;
+constexpr uint32_t INTF_FIRST_MIN_MS = 1500;
+constexpr uint32_t INTF_FIRST_MAX_MS = 3500;
+constexpr uint32_t INTF_GAP_MIN_MS   = 5000;
+constexpr uint32_t INTF_GAP_MAX_MS   = 12000;
+constexpr uint32_t INTF_QUIET_MS     = 2000;
+
+enum IntfPiece : uint8_t { PIECE_GLOW, PIECE_TAIL1, PIECE_TAIL2, PIECE_CORE, PIECE_FLECK, PIECE_COUNT };
 
 struct Interference {
-    lv_obj_t   *o[INTF_POOL]    = {nullptr};
-    uint8_t     life[INTF_POOL] = {0};    // frames this piece has left; 0 = off
-    lv_timer_t *timer      = nullptr;
-    uint32_t    burstStart = 0;
-    uint32_t    burstLen   = 0;           // 0: no burst running
-    uint8_t     burstPeak  = 0;
-    uint32_t    nextIdle   = 0;
+    lv_obj_t   *o[PIECE_COUNT] = {nullptr};
+    lv_timer_t *timer   = nullptr;
+    uint32_t    nextAt  = 0;        // when the next spark starts
+    bool        running = false;
+    uint8_t     sparks  = 0;        // sparks so far in this window
+
+    // The spark being drawn. `along` runs the length of one edge.
+    uint8_t  edge = 0;              // 0 top, 1 bottom, 2 left, 3 right
+    int32_t  runFrom = 0, runTo = 0;   // this run's section, in px along the edge
+    int32_t  limit = 0;             // where the straight part of the edge ends
+    int32_t  secLen = 0;
+    uint8_t  runsLeft = 0;
+    uint32_t runStart = 0, runMs = 0;
+    int32_t  len = 0, thick = 0;    // the spark's head: length along, width across
+    uint32_t core = 0, glow = 0, tail = 0;   // its colours
 };
 Interference g;
 
-void intfOff(uint8_t i) {
-    if (!g.o[i] || !g.life[i]) return;
-    g.life[i] = 0;
-    lv_obj_set_size(g.o[i], 0, 0);
+// A dark window wants light sparks; a light one, deep ones.
+bool lightWindow() {
+    const uint32_t w = UI::pal().SURFACE_ALT;
+    return ((w >> 16) & 0xFF) + ((w >> 8) & 0xFF) + (w & 0xFF) > 3 * 128;
 }
 
-// The spark colour: the accent run toward white on a dark scheme, where
-// that reads as light; toward the text colour on a light one, where white
-// would vanish against the window.
-uint32_t sparkHex() {
-    const UIPalette &p = UI::pal();
-    const uint32_t w = p.SURFACE_ALT;
-    const bool light = ((w >> 16) & 0xFF) + ((w >> 8) & 0xFF) + (w & 0xFF) > 3 * 128;
-    return light ? UI::mix(p.ACCENT, p.TEXT, (uint8_t)lv_rand(0, 35))
-                 : UI::mix(p.ACCENT, 0xFFFFFF, (uint8_t)lv_rand(20, 65));
+// The palette: [core, glow] pairs. Fixed colours, not tokens - these are the
+// colours of electricity, the same on every scheme of a kind. Mixed into the
+// window's colour for the tail, so the tail always fades into the window.
+void pickColours() {
+    static const uint32_t DARK[][2] = {
+        {0xFFFFFF, 0x6CC8FF}, {0xF2FBFF, 0x00A8FF}, {0xE6F4FF, 0x5B8CFF},
+        {0xFFFFFF, 0x9FE6FF}, {0xEAF0FF, 0x8C7BFF},
+    };
+    static const uint32_t LIGHT[][2] = {
+        {0x1030D0, 0x3D7BFF}, {0x2A1690, 0x6A4DFF}, {0x003C9E, 0x0090D8},
+        {0x10107A, 0x4A6CFF},
+    };
+    const bool light = lightWindow();
+    const uint32_t n = light ? sizeof(LIGHT) / sizeof(LIGHT[0]) : sizeof(DARK) / sizeof(DARK[0]);
+    const uint32_t k = lv_rand(0, n - 1);
+    g.core = light ? LIGHT[k][0] : DARK[k][0];
+    g.glow = light ? LIGHT[k][1] : DARK[k][1];
+    g.tail = UI::mix(g.glow, UI::pal().SURFACE_ALT, 45);
 }
 
-// One piece, somewhere on the window's edge, away from the rounded corners.
-void intfPlace(uint8_t i, int32_t strength) {
-    const lv_area_t &W = s.winRect;
-    const int32_t r  = s.winRadius;
-    const int32_t bw = UI::met().BORDER_W ? UI::met().BORDER_W : 1;
-    const uint32_t edge = lv_rand(0, 3);                  // top, bottom, left, right
-    const bool horiz = edge < 2;
-    const int32_t span = horiz ? (W.x2 - W.x1 - 2 * r) : (W.y2 - W.y1 - 2 * r);
-    if (span < 8) return;
-    const int32_t line = (edge == 0) ? W.y1 : (edge == 1) ? W.y2 : (edge == 2) ? W.x1 : W.x2;
-    const int32_t outward = (edge == 0 || edge == 2) ? -1 : 1;
-
-    int32_t len, thick, along, across;
-    uint32_t hex;
-    const uint32_t kind = lv_rand(0, 99);
-    if (kind < 55) {
-        // A spark along the line: thicker and longer the stronger the burst.
-        len   = mm(1.5f) + (int32_t)lv_rand(0, (uint32_t)(mm(9.0f) * strength / 255 + 1));
-        thick = LV_MAX(bw + 1, mm(0.15f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(0.25f))));
-        across = line - thick / 2;
-        hex = sparkHex();
-    } else if (kind < 82) {
-        // A fleck jumping off the line.
-        len   = LV_MAX(2, mm(0.25f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(0.35f))));
-        thick = len;
-        const int32_t jump = (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(2.2f) * strength / 255));
-        across = line + outward * jump - thick / 2;
-        hex = sparkHex();
-    } else {
-        // A drop-out: a stretch of border painted out in the window's own
-        // colour, so the line looks thinner or broken for a frame or two.
-        len   = mm(2.0f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(6.0f)));
-        thick = bw + 1;
-        across = (outward < 0) ? line : line - thick + 1;
-        hex = UI::pal().SURFACE_ALT;
-    }
-    if (len > span) len = span;
-    const int32_t start = (horiz ? W.x1 : W.y1) + r + (int32_t)lv_rand(0, (uint32_t)(span - len));
-    along = start;
-
+// Put piece `i` `at` px along the edge, `l` long and `t` across, centred on
+// the border line. l or t of 0 turns it off.
+void intfPut(uint8_t i, int32_t at, int32_t l, int32_t t, uint32_t hex) {
     lv_obj_t *o = g.o[i];
+    if (!o) return;
+    if (l <= 0 || t <= 0) { lv_obj_set_size(o, 0, 0); return; }
+    const lv_area_t &W = s.winRect;
+    const int32_t bw = UI::met().BORDER_W ? UI::met().BORDER_W : 1;
     lv_obj_set_style_bg_color(o, UI::c(hex), 0);
-    if (horiz) { lv_obj_set_pos(o, along, across); lv_obj_set_size(o, len, thick); }
-    else       { lv_obj_set_pos(o, across, along); lv_obj_set_size(o, thick, len); }
-    g.life[i] = (uint8_t)lv_rand(1, 3);
+    switch (g.edge) {
+        case 0:  lv_obj_set_pos(o, W.x1 + at, W.y1 + bw / 2 - t / 2); lv_obj_set_size(o, l, t); break;
+        case 1:  lv_obj_set_pos(o, W.x1 + at, W.y2 - bw / 2 - t / 2); lv_obj_set_size(o, l, t); break;
+        case 2:  lv_obj_set_pos(o, W.x1 + bw / 2 - t / 2, W.y1 + at); lv_obj_set_size(o, t, l); break;
+        default: lv_obj_set_pos(o, W.x2 - bw / 2 - t / 2, W.y1 + at); lv_obj_set_size(o, t, l); break;
+    }
 }
 
-void intfStartBurst(uint32_t ms, uint8_t peak) {
-    g.burstStart = millis();
-    g.burstLen   = ms;
-    g.burstPeak  = peak;
+void intfAllOff() {
+    for (uint8_t i = 0; i < PIECE_COUNT; i++) if (g.o[i]) lv_obj_set_size(g.o[i], 0, 0);
+}
+
+void intfNextRun() {
+    g.runMs    = lv_rand(250, 600);
+    g.runStart = millis();
+}
+
+// Roll the dice for a new spark.
+void intfStartSpark() {
+    const lv_area_t &W = s.winRect;
+    const int32_t r = s.winRadius;
+    g.edge = (uint8_t)lv_rand(0, 3);
+    const bool horiz = g.edge < 2;
+    const int32_t side = horiz ? (W.x2 - W.x1 + 1) : (W.y2 - W.y1 + 1);
+    g.limit = side - r;                                  // stay off the rounded corners
+    // The section: an eighth to a quarter of the side, never under 8 mm.
+    g.secLen = LV_MAX(mm(8.0f), side / 8 + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, side / 8)));
+    if (g.secLen > g.limit - r) g.secLen = g.limit - r;
+    if (g.secLen < mm(3.0f)) return;
+    g.runFrom = r + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, g.limit - r - g.secLen));
+    g.runTo   = g.runFrom + g.secLen;
+    g.runsLeft = (uint8_t)lv_rand(1, 3);
+    g.len   = mm(1.5f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(3.0f)));
+    g.thick = LV_MAX(3, mm(0.35f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(0.45f))));
+    pickColours();
+    intfNextRun();
+    g.running = true;
 }
 
 // Every frame while the window is open.
@@ -1036,62 +1105,92 @@ void intfTick(lv_timer_t *t) {
     if (s.phase != PopupPhase::PHASE_OPEN) return;
     const uint32_t now = millis();
 
-    if (!g.burstLen && s_intfMode == IntfMode::INTF_OPEN_AND_IDLE && (int32_t)(now - g.nextIdle) >= 0) {
-        if (now - s.lastTouchMs >= INTF_QUIET_MS) intfStartBurst(INTF_IDLE_MS, INTF_IDLE_PEAK);
-        else g.nextIdle = now + 1000;   // a finger is busy in the window: later
+    if (!g.running) {
+        if ((int32_t)(now - g.nextAt) < 0) return;
+        if (s_intfMode == IntfMode::INTF_ONCE && g.sparks) return;
+        if (now - s.lastTouchMs < INTF_QUIET_MS) { g.nextAt = now + 1000; return; }
+        intfStartSpark();
+        if (!g.running) { g.nextAt = now + 1000; return; }
+        g.sparks++;
     }
 
-    // Pieces already showing count down; at zero they go.
-    for (uint8_t i = 0; i < INTF_POOL; i++) {
-        if (g.life[i] && --g.life[i] == 0) lv_obj_set_size(g.o[i], 0, 0);
-    }
-    if (!g.burstLen) return;
-
-    const uint32_t el = now - g.burstStart;
-    if (el >= g.burstLen) {
-        for (uint8_t i = 0; i < INTF_POOL; i++) intfOff(i);
-        g.burstLen = 0;
-        g.nextIdle = now + lv_rand(INTF_IDLE_MIN_MS, INTF_IDLE_MAX_MS);
+    const uint32_t el = now - g.runStart;
+    if (el >= g.runMs) {
+        // This run is over: another, overlapping and further on, or done.
+        if (--g.runsLeft && g.runTo + g.secLen / 3 < g.limit) {
+            const int32_t step = g.secLen * (int32_t)lv_rand(40, 80) / 100;
+            g.runFrom += step;
+            g.runTo    = LV_MIN(g.runFrom + g.secLen, g.limit);
+            intfNextRun();
+            intfAllOff();
+            return;
+        }
+        intfAllOff();
+        g.running = false;
+        g.nextAt  = now + lv_rand(INTF_GAP_MIN_MS, INTF_GAP_MAX_MS);
         return;
     }
-    // Strength dies away on a curve: busy at first, the odd spark at the end.
-    const int32_t left = 255 - (int32_t)(el * 255 / g.burstLen);
-    const int32_t strength = g.burstPeak * left / 255 * left / 255;
-    for (uint8_t i = 0; i < INTF_POOL; i++) {
-        if (!g.life[i] && (int32_t)lv_rand(0, 255) < strength) intfPlace(i, strength);
+
+    // Where the head is: eased along the section, with a little jitter.
+    const int32_t q    = (int32_t)(el * 1024 / g.runMs);
+    const int32_t ease = q < 512 ? 2 * q * q / 1024 : 1024 - 2 * (1024 - q) * (1024 - q) / 1024;
+    int32_t head = g.runFrom + (g.runTo - g.runFrom - g.len) * ease / 1024;
+    head += (int32_t)lv_rand(0, 2) - 1;
+
+    // Crackle: the odd frame the core drops out, the glow flares or the
+    // fleck jumps off the line.
+    const bool coreOn  = lv_rand(0, 99) < 85;
+    const int32_t flare = lv_rand(0, 99) < 20 ? g.thick / 2 : 0;
+    const int32_t gap   = LV_MAX(2, g.len / 3);
+    intfPut(PIECE_GLOW,  head, g.len, g.thick + flare, g.glow);
+    intfPut(PIECE_TAIL1, head - g.len * 3 / 4 - gap, g.len * 3 / 4, LV_MAX(2, g.thick * 2 / 3), g.tail);
+    intfPut(PIECE_TAIL2, head - g.len * 5 / 4 - 2 * gap, g.len / 2, LV_MAX(1, g.thick / 3), g.tail);
+    intfPut(PIECE_CORE,  head + g.len / 6, coreOn ? g.len * 2 / 3 : 0, LV_MAX(1, g.thick / 3), g.core);
+    if (lv_rand(0, 99) < 12) {
+        const int32_t sz = LV_MAX(2, g.thick / 2);
+        const int32_t off = (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(1.8f)));
+        const int32_t sign = (g.edge == 0 || g.edge == 2) ? -1 : 1;
+        // Thrown off the line: the same edge, shifted outward by `off`.
+        intfPut(PIECE_FLECK, head + g.len / 2, sz, sz, g.core);
+        lv_obj_t *f = g.o[PIECE_FLECK];
+        if (g.edge < 2) lv_obj_set_y(f, lv_obj_get_y(f) + sign * off);
+        else            lv_obj_set_x(f, lv_obj_get_x(f) + sign * off);
+    } else {
+        intfPut(PIECE_FLECK, 0, 0, 0, 0);
     }
 }
 
-// The pool, made with the window, above it. Each piece is created at 0x0 with
+// The pieces, made with the window, above it. Each is created at 0x0 with
 // invalidation off: a new object costs a redraw of LVGL's default size at
 // (0,0) - here the header - for nothing. The window's own layout is settled
 // first, with invalidation on, so it loses nothing it was owed.
 void intfBegin() {
-    for (uint8_t i = 0; i < INTF_POOL; i++) { g.o[i] = nullptr; g.life[i] = 0; }
-    g.burstLen = 0;
+    for (uint8_t i = 0; i < PIECE_COUNT; i++) g.o[i] = nullptr;
+    g.running = false;
+    g.sparks  = 0;
     if (s_intfMode == IntfMode::INTF_OFF) return;
     lv_obj_t *scr = lv_screen_active();
     lv_obj_update_layout(scr);
     lv_display_enable_invalidation(nullptr, false);
-    for (uint8_t i = 0; i < INTF_POOL; i++) {
+    for (uint8_t i = 0; i < PIECE_COUNT; i++) {
         g.o[i] = plain(scr);
         lv_obj_set_size(g.o[i], 0, 0);
         lv_obj_set_style_bg_opa(g.o[i], LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(g.o[i], LV_RADIUS_CIRCLE, 0);
     }
     lv_obj_update_layout(scr);
     lv_display_enable_invalidation(nullptr, true);
-    intfStartBurst(INTF_OPEN_MS, INTF_OPEN_PEAK);
-    g.timer = lv_timer_create(intfTick, LV_DEF_REFR_PERIOD, nullptr);
+    g.nextAt = millis() + lv_rand(INTF_FIRST_MIN_MS, INTF_FIRST_MAX_MS);
+    g.timer  = lv_timer_create(intfTick, LV_DEF_REFR_PERIOD, nullptr);
 }
 
 void intfEnd() {
     if (g.timer) { lv_timer_delete(g.timer); g.timer = nullptr; }
-    for (uint8_t i = 0; i < INTF_POOL; i++) {
+    for (uint8_t i = 0; i < PIECE_COUNT; i++) {
         if (g.o[i]) lv_obj_delete(g.o[i]);
         g.o[i] = nullptr;
-        g.life[i] = 0;
     }
-    g.burstLen = 0;
+    g.running = false;
 }
 
 #ifdef DEBUG_POPUP

@@ -774,9 +774,10 @@ void Card::pressLook(uint8_t toAccent, int32_t sink) {
     if (!_surface) return;
     const int32_t base = UI::met().BORDER_W;
     const int32_t wide = LV_MAX(base, UI::sc(2));
+    const int32_t bw   = base + (wide - base) * toAccent / 255;
     lv_obj_set_style_border_color(_surface,
         lv_color_mix(UI::c(UI::pal().ACCENT), UI::border(), toAccent), 0);
-    lv_obj_set_style_border_width(_surface, base + (wide - base) * toAccent / 255, 0);
+    lv_obj_set_style_border_width(_surface, bw, 0);
     lv_obj_set_style_transform_width (_surface, -sink, 0);
     lv_obj_set_style_transform_height(_surface, -sink, 0);
 
@@ -784,8 +785,11 @@ void Card::pressLook(uint8_t toAccent, int32_t sink) {
     if (_hdrStyle == CardHeaderStyle::HDR_BAND && _header) {
         // Down with the top edge, narrower with the sides. The skirt is the
         // band's own child, so it moves with it but must narrow by itself.
+        // The wider border pushes the band in by itself (children sit inside
+        // the border), so its corner follows the border's inner curve.
         lv_obj_set_style_translate_y     (_header, sink, 0);
         lv_obj_set_style_transform_width (_header, -sink, 0);
+        lv_obj_set_style_radius          (_header, UI::sc(UI::met().RADIUS) - bw, 0);
         if (_bandSkirt) lv_obj_set_style_transform_width(_bandSkirt, -sink, 0);
     } else if (_hdrStyle == CardHeaderStyle::HDR_TAG) {
         // Pills standing on the top edge, flush with the sides.
@@ -962,11 +966,18 @@ void Card::applyState() {
         // should turn yellow around STALE".
         lv_obj_set_style_bg_color  (_header, UI::c(headerColor()), 0);
         lv_obj_set_style_bg_opa    (_header, LV_OPA_COVER, 0);
-        // THE CARD'S OWN RADIUS on top, the skirt squaring the bottom - see
+        // THE CARD'S OWN CURVE on top, the skirt squaring the bottom - see
         // buildHeader(). This line said 0, and it ran after buildHeader() had
         // set a radius, so the 2026-09-18 attempt never took effect and a
         // square band stuck out past the card's rounded corners in bar mode.
-        lv_obj_set_style_radius    (_header, UI::sc(m.RADIUS), 0);
+        //
+        // The card's radius LESS ITS BORDER: LVGL places children inside the
+        // border (lv_obj_get_style_space_left), so the band's corner meets the
+        // border's INNER curve, whose radius is the card's minus the border
+        // width. With the full radius there was a sliver of card showing in
+        // each corner - invisible at 1 px, plain when the press widened the
+        // border (owner, round 7 Q2). pressLook() keeps it in step.
+        lv_obj_set_style_radius    (_header, UI::sc(m.RADIUS) - m.BORDER_W, 0);
         if (_bandSkirt) lv_obj_set_style_bg_color(_bandSkirt, UI::c(headerColor()), 0);
         // Text in the card's BACKGROUND colour - dark on a light accent, light
         // on a dark one, without anyone picking per scheme. cards.md section 2.

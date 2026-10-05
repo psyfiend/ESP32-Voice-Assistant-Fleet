@@ -41,22 +41,27 @@ little". Removed; nothing is drawn behind the window. Blur was never built (LESS
 over the 250 ms hold - a tap shows the start and fades back; the card STAYS pressed in with the
 accent while its window is open; the press moves the card's edge-attached parts too (band, tag
 pills, badge, corner icon - `Card::pressLook()`; the floating tag stays, owner). **No leap**
-(owner, round 6: it made the popup feel slower). The switch's knob slides. **Interference**: the
-window's edge crackles for ~360 ms as it opens, and (default) a weaker flicker every 6-15 s while
-it sits untouched - a pool of 10 tiny objects, random every time (CardPopup.cpp, "Interference");
-a long press on the title cycles open+idle / open only / off (`DEBUG_POPUP`). All of it
+(owner, round 6: it made the popup feel slower). The switch's knob slides on a tap and can be
+DRAGGED (round 8; let go, it goes to whichever half it is in). **Interference, round 8**: one spark
+at a time travels a short stretch of the window's edge (core, glow, fading tail, the odd fleck),
+often running again further on; first 1.5-3.5 s after opening, then every 5-12 s, never within 2 s
+of a touch; electric whites/blues on dark schemes, deep blues/violet on light (CardPopup.cpp,
+"Interference"). Round 7's version - scattered one-frame pieces - read as a display fault (owner).
+A long press on the title cycles now and then / once / off (`DEBUG_POPUP`). All of it
 `transform_width/height`, translate, border and small rects - never a scale or a layer.
-**Round 7 is built but NOT FLASHED**: the P4_5 stopped answering (no serial sync, no ping).
+Round 8 flashed on WS_P4_5 2026-10-05; not yet seen.
 
 **Crash fixed (round 6, 2-3 on glass):** a swipe started on a card rebuilt the page and the hold
 restyled the deleted card - LESSONS, "Never keep a pointer to an LVGL object you do not own".
 
 **Open with the owner:**
-- **Interference**: built (above), first look pending. The owner chose it over a scan-on ("may be
-  more expensive... or too much of a distraction"); when and how often become a setting later.
-- **The switch's knob** (round 6, P7): a slide the user cannot perform is "jarring" - make the
-  toggle draggable, or drop the slide. Claude recommends draggable (2.10b's slider needs the same
-  mechanics). Not decided.
+- **Interference**: round 8 on glass. The owner chose it over a scan-on ("may be more expensive...
+  or too much of a distraction"); when and how often become a setting later. The owner is "super
+  happy" with function and form without it - it is a nice-to-have.
+- **Versioning** (owner, 2026-10-05): tying the tag's third number to milestones has frozen the
+  build at v0.2.7.x while milestones finish out of order. Claude recommended counting RELEASES
+  (one tag per signed-off merge, the tag and a CHANGELOG line naming the milestones in it) - no
+  milestone renumbering. Not decided.
 - **Card borders in colour, a custom scheme, and the system drawer's old pages** (owner, round 6):
   #85, not for 2.10a.
 - **Scaling** (owner): the toggle is "too big" on the 1060 and the 4B (it is sized from the window's
@@ -86,8 +91,8 @@ what building and tearing down the window costs, printed 300 ms later so the pri
 lines behind - `docs/display/history.md`. Verified on WS_P4_5; WS_P4_4B and CYD_P4_1060 flashed with
 it 2026-10-04, nothing reported; the 7B and 4880 not flashed.
 
-**Next, in order:** (1) round 6 on glass (hold, leap, knob - `TEST_2.10a.md`); the owner picks a
-projection effect to prototype; (2) the settings deck that peeks up, with **Pause** in it - long
+**Next, in order:** (1) round 8 on glass (spark, draggable knob, band corners - `TEST_2.10a.md`);
+(2) the settings deck that peeks up, with **Pause** in it - long
 press no longer pauses, so nothing on the board can pause a card until this lands; small touches the
 owner liked the sound of: the deck tab peeking up, the toggle knob sliding; (3) `lv_mem` with the
 window open; (4) the chart icon (font regeneration - this PC has Node.js); (5) all-nine compile gate,
