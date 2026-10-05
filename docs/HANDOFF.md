@@ -1,4 +1,4 @@
-# Handoff — 2026-10-02
+# Handoff — 2026-10-05
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was rewritten from scratch on
@@ -13,139 +13,84 @@ to the doc that owns it. This file says where things are, not how they got there
 
 ## Where the project is
 
-**`v0.2.7` tagged 2026-09-24** (through milestone 2.7). Since then, all on `main`: #58 screenshots,
-and **2.9's display stack on six of nine boards** (merge `75a43c8`, 2026-09-29).
+**`v0.2.8` tagged 2026-10-05** at the 2.10a merge; `CHANGELOG.md` matches versions to milestones.
+It also carries everything merged since `v0.2.7`: #58 screenshots, **2.9's display stack on six of
+nine boards** (merge `75a43c8`, 2026-09-29), the battery prototype, SNTP, the floating tag, Linen
+round two.
 
 What a board does: boots into two pages (House = the owner's 18 HA entities over the websocket,
 Fleet = MQTT/system/virtual cards), swiped with wrap-around; three colour schemes (Midnight
 default, Fleet, Linen with real shadows); card types with state icons; an FPS/CPU overlay;
-`/screenshot` and `/bench` over HTTP.
+`/screenshot` and `/bench` over HTTP; **a long press opens a card's popup window** (2.10a).
 
-## 2.10a status - 2026-10-04 evening (home: WS_P4_5 on COM15, WiFi)
+## 2.10a - DONE (merged 2026-10-05, `v0.2.8`)
 
-**Branch `feat/65-popup-frame`** (off `main`). Decisions taken before building: `card-sheet.md`
-section 13. **While testing, build and flash WS_P4_5 only** (owner, 2026-10-04), until told otherwise.
+The card popup's frame, signed off on WS_P4_5 after twelve rounds on glass - every result and
+measurement is in `docs/TEST_2.10a.md`. **What it is now: `card-sheet.md` section 14** - read it
+before touching the popup; where it differs from sections 9-13, it wins. In short:
 
-**THE GROW IS GONE - "usable first" (owner, round 4).** Every version of the grow was smooth in
-motion and slow at its ends: the frame the window landed in (dim + window + contents) took ~120 ms
-on Midnight, ~200 ms on Linen, after ~240 ms of growing; closing took 2-3 stages. "Function before
-form." The window now appears complete in the first frame after the long press (250 ms) and closes
-in one frame. It sits on the SCREEN as its topmost object, so LVGL draws only the window where it
-covers the page; a transparent catcher on `lv_layer_top()` (made once, switched by CLICKABLE) takes
-every touch outside it. **What was learned is in LESSONS, "Effects that cover the screen".**
+- **Usable first** (owner): the window appears complete in the first frame after a 250 ms long
+  press and closes in one frame. No grow, no dim - both were built, measured and rejected on glass.
+  It sits on the SCREEN as its topmost object; a transparent catcher on `lv_layer_top()` takes the
+  touches outside it. Why, and the traps: LESSONS, "Effects that cover the screen". The grow's
+  history (filled box, four walls, page picture, rings) is in git, `f21ece6`..`4f220ad`.
+- **The held card** presses in with an accent border (`Card::pressLook()`) and stays so while its
+  window is open. A switch gets a toggle that slides on a tap and can be dragged.
+- **The SETTINGS deck**: a folder tab in the right half, peeking up from the bottom of the screen.
+  Paused works and is kept on the device (#60); Label / Custom name / On the dashboard are shown,
+  quieter and inactive, until 2.10d. The rules for a second panel (a sensor's CHART): section 14.
+- **Sparks** travel along the window's edge now and then (CardPopup.cpp, "Interference"). Settled
+  unless the owner asks again; when and how often become a setting later.
+- **Measured:** the open frame 42-48 ms (Midnight), 69-79 ms (Linen). **G1: a window costs ~11-12 KB
+  of LVGL's pool, and ~16 KB is left with one open** - fine for 2.10a, a warning for 2.10b-e.
 
-**No dim - DECIDED (owner, round 5):** tried it, "the delay seems like an eternity and adds very
-little". Removed; nothing is drawn behind the window. Blur was never built (LESSONS).
+**On glass with v0.2.8: WS_P4_5 only.** WS_P4_4B and CYD_P4_1060 run builds from earlier rounds
+(they carry the #67 repair fix - `docs/display/history.md` - nothing reported); the 7B and the 4880
+have not been flashed since before it. All nine compile.
 
-**Built (rounds 6-7):** the held card is pressed in (0.4 mm) while its border fades to the ACCENT
-over the 250 ms hold - a tap shows the start and fades back; the card STAYS pressed in with the
-accent while its window is open; the press moves the card's edge-attached parts too (band, tag
-pills, badge, corner icon - `Card::pressLook()`; the floating tag stays, owner). **No leap**
-(owner, round 6: it made the popup feel slower). The switch's knob slides on a tap and can be
-DRAGGED (round 8; let go, it goes to whichever half it is in). **Interference, round 8**: one spark
-at a time travels a short stretch of the window's edge (core, glow, fading tail, the odd fleck),
-often running again further on; first 1.5-3.5 s after opening, then every 5-12 s, never within 2 s
-of a touch; electric whites/blues on dark schemes, deep blues/violet on light (CardPopup.cpp,
-"Interference"). Round 7's version - scattered one-frame pieces - read as a display fault (owner).
-A long press on the title cycles now and then / once / off (`DEBUG_POPUP`). All of it
-`transform_width/height`, translate, border and small rects - never a scale or a layer.
-Round 8 PASSED except S1 (sparks): the owner's last tweaks (each run its own dice, faster, more
-overlap) are in round 9 - "then we'll leave it alone for now either way".
+**Carried forward:**
+- **Scaling** (owner): the switch's toggle is "too big" on the 1060 and the 4B (it is sized from the
+  window's height: ~57 mm tall on the 1060, ~30 mm on the P4_5); the occupancy hero's circle is
+  huge for its icon. Claude's suggestion: cap heroes at the P4_5's physical size when 2.10b designs
+  the controls.
+- **#85**: card borders in colour, a custom scheme page, retiring the system drawer's Cards and Log
+  pages (owner, round 6). **#84**: cards never say "no data yet" (filed from this testing).
+- Linen may get its own kind of animated chrome some day (owner).
+- **The debug flags are local-only:** `-D DEBUG_POPUP` (what building the window costs, printed
+  300 ms later so the print is not timed; `dbgMem` for G1; a long press on the window's title cycles
+  the sparks: now and then / once / off) and `-D DEBUG_FRAMES` (GUIManager.cpp: every frame of every
+  burst of motion). Add them to `WS_P4_TOUCH_LCD_5` in `platformio.ini` when measuring; never commit
+  them.
 
-**Built, round 9 (2026-10-05), flashed on WS_P4_5, not yet seen:**
-- **The settings deck** (pathway 1, Card Popup Mock v3): a SETTINGS tab the window's width peeks up
-  under the window; tap to open over the window's lower part; tap in the window or the tab to fold;
-  tap outside closes both. Rows: **Paused (works, kept on the device - #60)**, Label, Custom name,
-  On the dashboard (shown quieter and inactive: they need a card id that survives a rebuild to be
-  kept - 2.10d - and a hidden card needs a way back - #78). CardPopup.cpp, "The settings deck".
-- **The chart icon** (`mdi:chart-bar`, font regenerated) on the history button.
-- **The window's frame**: it was redrawing from the screen's corner (LESSONS, the (0,0) bullet);
-  now built quiet and only its rectangle invalidated. Measured: 73-87 -> 42-48 ms (Midnight),
-  136-151 -> 69-79 ms (Linen). `TEST_2.10a.md`, Measured.
-- **G1 MEASURED**: a window costs ~11-12 KB of LVGL's pool; with one open ~16 KB is left (98-99 of
-  115 KB used). Fine for 2.10a, a warning for 2.10b-e - options in `TEST_2.10a.md`.
+## What is next — the new session's job: 2.10b, the light controls (#65)
 
-**Round 9 PASSED** (owner); round 10 (2026-10-05) builds the owner's details: the tab at the page
-deck's height, SETTINGS always in the right half (a second panel, e.g. CHART, takes the left), a
-peeking tab slides back down on close (an open deck vanishes with the window), a spark's runs all go
-one way round. Flashed on WS_P4_5, not yet seen.
+**Not started; confirm with the owner first.** The build order (card-sheet §9, §12): 2.10b light
+controls, 2.10c HA attributes and calls, 2.10d stable ids and saving, 2.10e history. Interview §3
+onward (2.8 header slots, then 2.11 groups) comes after 2.10. ROADMAP §7 has the order.
 
-**Crash fixed (round 6, 2-3 on glass):** a swipe started on a card rebuilt the page and the hold
-restyled the deleted card - LESSONS, "Never keep a pointer to an LVGL object you do not own".
+**2.10b's scope:** a light's window gets its controls, on the virtual lamps (Fleet page) -
+brightness, colour temperature, colour (a hue control and swatches; LVGL 9 has no colour wheel, D7),
+opening on the control (D3). Nothing goes to HA until 2.10c. The layout is the owner's (card-sheet
+§11.1) and the artifact **"Card Popup Mock"** (https://claude.ai/artifact/Lt6NmxMYLc7xrWzaomEqDm,
+v3), built from the owner's HA light dialog.
 
-**Open with the owner:**
-- **Interference**: settled after round 9 unless the owner asks again. When and how often become a
-  setting later. Linen may get its own kind of animated chrome some day (owner).
-- **The deck's inactive rows**: "fine for now" (owner, round 9) - which settings exist is not firmed
-  up yet. They stay inactive until 2.10d.
-- **Versioning: DECIDED** (owner, 2026-10-05) - see "Versioning" at the end of this file.
-- **Card borders in colour, a custom scheme, and the system drawer's old pages** (owner, round 6):
-  #85, not for 2.10a.
-- **Scaling** (owner): the toggle is "too big" on the 1060 and the 4B (it is sized from the window's
-  height, so ~57 mm tall on the 1060 vs ~30 mm on the P4_5); the occupancy hero's circle is huge for
-  its icon, by a different ratio per board. Placeholder visuals; the owner: not this step's focus.
-  Claude's suggestion: cap heroes at the P4_5's physical size when 2.10b designs the controls.
+**Read first:** `card-sheet.md` §11-14, `TEST_2.10a.md` (how the owner tests, and Measured),
+`LESSONS.md` ("Effects that cover the screen", layers, `lv_mem`, events not bubbling, "Never keep a
+pointer to an LVGL object you do not own"), then `src/Cards/CardPopup.cpp`.
 
-**Built and seen on glass:** long press (now **250 ms**) opens a window on every card type; header X /
-"Area > name" / history (chart icon since round 9) / members (multi-entity cards); closes by X, tap outside, drag down on the
-header row, 60 s idle with a shrinking bar; modal; a switch gets its real toggle, everything else a
-read-only value + "Changed N ago"; history and members are placeholder views with a back arrow.
-Owner's round 1 results are in `docs/TEST_2.10a.md` terms (O/H/C/B/V/L); C3, V3, B1, H1 fixed.
+**To settle with the owner before building:**
+- **Memory.** ~16 KB of LVGL's pool is left with a window open, and sliders and swatches add to it.
+  Measure first (`dbgMem`). Options: build the deck's pane only when it is first opened (~5 KB while
+  folded), or move the P4s' pool to PSRAM as on WS_S3_4B (`-D FLEET_LV_MEM_PSRAM`, drawing ~5-10%
+  slower).
+- **Sizes per board** - Carried forward, Scaling.
+- **A tall vertical slider against the window's gestures.** Drag-down-to-close starts on the header
+  row only (§13) for this reason; page swipes are already blocked while the window is open.
 
-The grow's history (filled box, four walls, page picture, rings - each measured) is in git
-(`f21ece6`..`4f220ad`) and its conclusions in LESSONS.
-
-`-D DEBUG_FRAMES` (GUIManager.cpp): every frame of every burst of motion over serial. `-D DEBUG_POPUP`:
-what building and tearing down the window costs, printed 300 ms later so the print is not timed.
-
-**Display-stack bug fixed (all esp_lcd DSI boards):** the repair fallback raced the PPA and left
-lines behind - `docs/display/history.md`. Verified on WS_P4_5; WS_P4_4B and CYD_P4_1060 flashed with
-it 2026-10-04, nothing reported; the 7B and 4880 not flashed.
-
-**Round 10 PASSED**; round 11 (the folder tab, a window out of reach while the deck is open,
-filled chips, the tab's colour and Linen shadow) passed but for one thing: folded, only the tab
-should show, and open, the pane's bottom edge should be below the screen. Round 12 does that;
-flashed on WS_P4_5 2026-10-05, not yet seen. The deck as it now stands, and the owner's rules for a
-second panel: `card-sheet.md` section 14. Deck speed: kept (owner). Memory: wait and see (owner).
-
-**Next, in order:** (1) round 12 on glass (`TEST_2.10a.md`) - the owner's last look; (2) remove the
-two local debug flags, all-nine compile gate (detached, ~30 min), merge with `--no-ff`, tag
-`v0.2.8`, date the CHANGELOG entry - then 2.10a is done.
-
-**The debug flags are local:** `-D DEBUG_POPUP` and `-D DEBUG_FRAMES` are in `WS_P4_TOUCH_LCD_5` in
-this PC's working copy of `platformio.ini`, uncommitted. Never commit them on.
-
-#84 (cards never say "no data yet") was filed from this testing.
-
-## What is next — the new session's job: BUILD 2.10a (#65)
-
-The design interview's §1 and §2 are closed; the owner chose to start building the card popup.
-**Read, in this order:** `CLAUDE.md` (the file-editing rule at the top), this file,
-`docs/design/card-sheet.md` **§11-12** (the decided popup - §1-10 are draft 2, superseded wherever
-§11 differs), `docs/design/look-and-feel.md` §2 and §3.14 (the owner's standing rules and §1's
-decisions), `docs/LESSONS.md` (layers, `lv_mem`, events not bubbling, HIDDEN on screen-sized
-objects). Then **open the artifact "Card Popup Mock"**
-(https://claude.ai/artifact/Lt6NmxMYLc7xrWzaomEqDm, v3) - it is the owner's approved design;
-build what it shows.
-
-**2.10a's scope (card-sheet §9, as revised by §11):** long press opens a centred window over a dim
-fill (`bg_opa` on a scrim, never an object `opa`); the frame **grows** from the card as an empty
-rectangle, then the contents appear; header = X top left (back arrow on inner views), "Area >
-name" centred, history / members icons top right; modal (no page swipes, no edge gestures);
-closing by X, tap outside, drag down, auto-close 60 s; the **settings deck peeks up from the
-bottom of the screen** when the window opens and retracts with it (pathway 1); the window holds
-the entity, not the card. The light / switch controls themselves are 2.10b, HA attributes and
-calls 2.10c, stable ids and saving 2.10d, history 2.10e.
-
-**How to run it:** one feature branch off `main` (e.g. `feat/65-popup-frame`). Develop on
-**WS_P4_5 (COM15)** - the owner is away for the weekend with the laptop and that one board, so
-expect short sessions and keep each one ending in a commit. Before merge: the **all-nine compile
-gate** plus a look on glass (merge discipline below). WS_S3_4B stays unflashed until #69's watch
-ends. Measure `lv_mem` with the window open (G1 in the interview) and frame time during the grow
-(`/bench`).
-
-**After 2.10:** interview §3 (header slots, 2.8), §4 (groups - `group-cards.md` has the draft),
-§5-§9. ROADMAP §7 has the order.
+**How to run it:** one branch off `main` (e.g. `feat/65-light-controls`). While the owner tests,
+build and flash **WS_P4_5 only** (COM15) unless told otherwise; WS_S3_4B stays unflashed until
+#69's watch ends. Before merge: the all-nine compile gate and a look on glass, then `--no-ff`, a tag
+and a CHANGELOG entry (Versioning, below).
 
 ## Where the interview stands — 2026-10-02
 
@@ -261,6 +206,7 @@ silently puts the bug back. `docs/REBUILD_P4_LIBS.md`. The S3 libraries are stoc
 - **`Edit` on a CRLF file**: deleting a line by matching a leading newline joins two lines.
 - **`gh ... --body $text` in PowerShell 5.1 drops double quotes** inside the text (native argument
   passing), silently. Pipe it instead: `$text | gh issue create ... --body-file -`, or write a file.
+  `git commit -m` has the same problem: write the message to a file and use `git commit -F`.
 - **LVGL clips children to their parent** - use `UI::unclipShadows()`. **Never toggle HIDDEN on a
   screen-sized object when an animation starts.** Anything drawn stays ASCII, except `°`.
 - **Verify from outside the device** - the router, the broker, HA, `/bench?what=verify`. The
@@ -274,7 +220,12 @@ as data.** A little colour-blind: never distinguish two states by colour alone.
 
 **What works:**
 - **Show, don't spec.** Build something to react to; the owner flashes fast and tests
-  thoroughly, test by test against a sheet with PASS/FAIL criteria.
+  thoroughly, test by test against a sheet with PASS/FAIL criteria (`TEST_2.10a.md` is the model:
+  a numbered table per round, then the owner's results under it).
+- **Snappy and responsive first, eye candy second** (owner). 2.10a dropped its grow and its dim for
+  it. Measure a frame before and after anything visual (`DEBUG_FRAMES`, `/bench`).
+- **When the owner is testing, give ONE report when they say they are done** - not a message per
+  serial line.
 - **Plain language, not metaphor** ("sometimes I get a little lost in the slang").
 - **Never assume. Give the top 2-3 options with a recommendation, and ask** before building on an
   assumption; discuss a structural choice a turn before implementing it.
@@ -285,6 +236,7 @@ as data.** A little colour-blind: never distinguish two states by colour alone.
   seconds; over a minute is a problem.
 - **"I'm wondering whether..." is usually a design instinct** - engage with it.
 - **Say plainly what is unexplained**; the owner often finds the answer (#49 ended that way).
+- **Commit at the end of each step**, and push.
 - **Avoid compacting context**: the owner would rather end a session with a clean handoff.
 
 **What to avoid:**
@@ -295,8 +247,9 @@ as data.** A little colour-blind: never distinguish two states by colour alone.
 **Versioning (changed 2026-10-05, owner):** `A.B.C.D` - B is the roadmap PHASE, C counts RELEASES:
 one more each time a signed-off merge to `main` is tagged, whatever milestones it holds. Add a
 `CHANGELOG.md` entry with the tag, naming the milestones and issues in it. Never tag during
-development. D is commits since the tag; a dirty tree appends `+dirty`. The next tag is **`v0.2.8`
-at the 2.10a merge** (not milestone 2.8). ROADMAP 3.3.
+development. D is commits since the tag; a dirty tree appends `+dirty`. **`v0.2.8` was tagged at
+the 2.10a merge (2026-10-05); the next signed-off merge in Phase 2 is `v0.2.9`**, whatever
+milestones it holds. ROADMAP 3.3.
 
 **The issue tracker is yours to manage**, and keeping it, HANDOFF and ROADMAP current is part of the
 work, not a follow-up.

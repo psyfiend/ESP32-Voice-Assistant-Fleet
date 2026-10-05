@@ -362,8 +362,8 @@ they differ (it still says "Settings tab" and "pause moved into it" without sayi
 
 ## 14. The popup's deck, as built and tested (owner, 2026-10-05)
 
-What 2.10a ended up with, after rounds 4-11 on glass (`docs/TEST_2.10a.md`). Where it differs from
-the sections above, this wins.
+What 2.10a ended up with, after rounds 4-12 on glass (`docs/TEST_2.10a.md`); signed off and merged
+2026-10-05 (`v0.2.8`). Where it differs from the sections above, this wins.
 
 - **The window appears complete at once and closes at once** - no grow, no dim (owner: speed first).
   The held card is pressed in with an accent border, and stays so while its window is open.

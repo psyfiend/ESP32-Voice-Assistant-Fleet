@@ -1,5 +1,8 @@
 # TEST 2.10a - the card popup window (#65)
 
+**DONE: signed off 2026-10-05 after round 12, merged and tagged `v0.2.8`.** What was built is
+`docs/design/card-sheet.md` section 14.
+
 Branch `feat/65-popup-frame`. Board: **WS_P4_5**. Design: `docs/design/card-sheet.md` sections 11-13
 and the artifact "Card Popup Mock" (v3).
 
@@ -272,6 +275,9 @@ too. The tab's height and the SETTINGS label's place, folded, were right.
 | E3 | Look at the open deck's rows | All four rows and the note fit, with no scrolling (rows are 7.2 mm now, from 8) |
 | E4 | Tap the tab twice; close with the deck folded, then open | As before (D6, T3, T4) |
 | E5 | Linen, folded and open | No shadow or edge showing along the bottom of the screen |
+
+**Round 12 results (owner, 2026-10-05):** E1-E5 PASS. **2.10a signed off** - merged and tagged
+`v0.2.8` the same day, after the all-nine compile gate.
 
 ## Measured (Claude, from the board)
 
