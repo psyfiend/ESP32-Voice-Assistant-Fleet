@@ -74,6 +74,10 @@ public:
     //   /popup              the cards on this page, numbered
     //   /popup?card=N       open card N's window; replies with LVGL's pool
     //   /popup?deck=1       open (or fold, deck=0) the settings deck
+    //   /popup?ctl=N        a light's control: 0 brightness, 1 temperature, 2 colour
+    //   /popup?set=V        as a tap on that control's slider at V (%, K, hue)
+    //   /popup?view=N       0 main, 1 history, 2 members; lists each entity's levels
+    //   /popup?power=1      as a tap on Power
     //   /popup?close=1      close it; replies with the pool afterwards
     // The handler hands the work to the LVGL thread and waits for it, as
     // /screenshot does - it never touches LVGL itself.
