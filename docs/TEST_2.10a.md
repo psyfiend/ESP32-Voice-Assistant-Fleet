@@ -218,12 +218,46 @@ deserves its own kind of animated chrome some day (the sparks suit the dark sche
 | W1 | Open windows in Midnight and Linen | Feels at least as quick as before - should be quicker (see Measured) |
 | S5 | Sparks | Faster, more frantic runs over the same short stretch, each run a little different |
 
+**Round 9 results (owner, 2026-10-05):** D1-D9 and W1 PASS - "PASS PASS PASS!!" on Pause, which
+also held through a state change from another device and a reboot. Asked for: the tab the same
+height as the page deck's panels (it was 6 mm; theirs are 45 logical px, ~6.7 mm); on closing,
+an open deck vanishes with the window but a tab that was only peeking slides back down; a spark's
+runs all go the same way round (CW or CCW). Decided: SETTINGS always in the right half, so a second
+panel (a sensor's CHART) can take the left without moving it. The owner felt page swipes were faster
+on Linen - nothing in this build touches page swipes (unmeasured).
+
+## Round 10 - deck details (2026-10-05, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| T1 | Open a window on a page with the deck showing | The SETTINGS tab is the same height as the page deck's panels |
+| T2 | Look at the tab | Right half of the window's width; the left half of that strip is empty |
+| T3 | Close a window while only the tab shows | The window vanishes; the tab slides back down below the screen |
+| T4 | Open the deck, then close the window | Window and deck vanish together |
+| T5 | Watch a few sparks | Each one's runs all travel the same way round the window |
+| T6 | With the deck folded, tap beside the tab (its empty left half) | Closes the window, like any tap outside |
+
 ## Measured (Claude, from the board)
 
-- **The window's own frame, before the quiet build: 73-87 ms on Midnight**, because it redrew the
-  screen from (0,0) to the window's far corner (LESSONS). Closing: 46-55 ms (the page under the
-  window, which must be drawn). After the fix: to be read from round 9's log.
-- **`lv_mem` with the window open (G1)**: logged at every open and close from round 9 - pending.
+**The window's first frame, before and after building it quiet (round 9, 2026-10-05):**
+
+| | Midnight / Fleet | Linen |
+|---|---|---|
+| Before (rounds 6-8): the frame redrew from the screen's corner | 73-87 ms | 136-151 ms |
+| After: only the window (and, on Linen, thin shadow bands) | **42-48 ms** | **69-79 ms** |
+| Long press to the window on glass, after | 69-75 ms | 95-105 ms |
+| Closing (the page under the window must be redrawn) | 53-62 ms | ~90-105 ms |
+
+Building the window and its deck takes 25-26 ms (the deck added ~11 ms). What is left of the open
+frame is mostly the window's own pixels on this rotated panel: drawing them, and the PPA turning
+them for the frame buffer.
+
+**G1 - LVGL's pool with a window open (Fleet page, 14 cards):** 98-99 KB used of 115 KB, biggest
+free block 16 KB, fragmentation 3%. After closing: 87 KB used, biggest free block still 16 KB,
+fragmentation 46%. **A window costs ~11-12 KB; with one open ~16 KB is left.** Enough for 2.10a; a
+warning for 2.10b-e, which add sliders, swatches, history rows and member rows to the same window.
+Options for then: build the deck's pane only when it is first opened (~5 KB while folded), or move
+the P4s' pool to PSRAM as on WS_S3_4B (`-D FLEET_LV_MEM_PSRAM`, drawing ~5-10% slower).
 
 ## Notes and known gaps
 

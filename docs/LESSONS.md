@@ -492,9 +492,10 @@ next piece of eye candy:
   before its POSITION (`lv_obj_refr_size`, then `lv_obj_refr_pos`), so a 787x545 window created at
   (246,83) also invalidated (0,0)..(786,544), and LVGL joined the two into one area from the screen's
   corner - wider than the window, so not covered by it, so every card under the window and the
-  header were drawn too: the popup's frame took ~77 ms where ~25 was expected (2026-10-05, found by
-  logging the frame's `inv_areas`). **Build such things quiet**: invalidation off, create, lay out,
-  invalidation on, then invalidate exactly the rectangle that changed. CardPopup's `showWindow()`.
+  header were drawn too (2026-10-05, found by logging the frame's `inv_areas`). **Build such things
+  quiet**: invalidation off, create, lay out, invalidation on, then invalidate exactly the rectangle
+  that changed. CardPopup's `showWindow()`. Measured on `WS_P4_5`: the frame went from 73-87 to 42-48
+  ms on Midnight, and with the shadow bands below from 136-151 to 69-79 ms on Linen.
 - **A shadow makes an object's redraw area wider than the object** (its ext draw size), which defeats
   covering the same way. Invalidate the object's own rectangle and thin bands for the shadow
   separately (`invalidateWindow()`).

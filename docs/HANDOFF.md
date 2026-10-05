@@ -60,8 +60,15 @@ overlap) are in round 9 - "then we'll leave it alone for now either way".
   kept - 2.10d - and a hidden card needs a way back - #78). CardPopup.cpp, "The settings deck".
 - **The chart icon** (`mdi:chart-bar`, font regenerated) on the history button.
 - **The window's frame**: it was redrawing from the screen's corner (LESSONS, the (0,0) bullet);
-  now built quiet and only its rectangle invalidated. Expected ~45 ms off every open; the log says.
-- **G1 (`lv_mem` with the window open)**: logged at every open and close (`DEBUG_POPUP`).
+  now built quiet and only its rectangle invalidated. Measured: 73-87 -> 42-48 ms (Midnight),
+  136-151 -> 69-79 ms (Linen). `TEST_2.10a.md`, Measured.
+- **G1 MEASURED**: a window costs ~11-12 KB of LVGL's pool; with one open ~16 KB is left (98-99 of
+  115 KB used). Fine for 2.10a, a warning for 2.10b-e - options in `TEST_2.10a.md`.
+
+**Round 9 PASSED** (owner); round 10 (2026-10-05) builds the owner's details: the tab at the page
+deck's height, SETTINGS always in the right half (a second panel, e.g. CHART, takes the left), a
+peeking tab slides back down on close (an open deck vanishes with the window), a spark's runs all go
+one way round. Flashed on WS_P4_5, not yet seen.
 
 **Crash fixed (round 6, 2-3 on glass):** a swipe started on a card rebuilt the page and the hold
 restyled the deleted card - LESSONS, "Never keep a pointer to an LVGL object you do not own".
@@ -69,12 +76,9 @@ restyled the deleted card - LESSONS, "Never keep a pointer to an LVGL object you
 **Open with the owner:**
 - **Interference**: settled after round 9 unless the owner asks again. When and how often become a
   setting later. Linen may get its own kind of animated chrome some day (owner).
-- **The deck's inactive rows**: Claude built them inactive; the owner may want Label working now (in
-  RAM, keyed by page and slot, lost at reboot - card-sheet 13 allows that). Asked.
-- **Versioning** (owner, 2026-10-05): tying the tag's third number to milestones has frozen the
-  build at v0.2.7.x while milestones finish out of order. Claude recommended counting RELEASES
-  (one tag per signed-off merge, the tag and a CHANGELOG line naming the milestones in it) - no
-  milestone renumbering. Not decided.
+- **The deck's inactive rows**: "fine for now" (owner, round 9) - which settings exist is not firmed
+  up yet. They stay inactive until 2.10d.
+- **Versioning: DECIDED** (owner, 2026-10-05) - see "Versioning" at the end of this file.
 - **Card borders in colour, a custom scheme, and the system drawer's old pages** (owner, round 6):
   #85, not for 2.10a.
 - **Scaling** (owner): the toggle is "too big" on the 1060 and the 4B (it is sized from the window's
@@ -98,10 +102,10 @@ what building and tearing down the window costs, printed 300 ms later so the pri
 lines behind - `docs/display/history.md`. Verified on WS_P4_5; WS_P4_4B and CYD_P4_1060 flashed with
 it 2026-10-04, nothing reported; the 7B and 4880 not flashed.
 
-**Next, in order:** (1) round 9 on glass (deck with Pause, chart icon, the faster window, sparks -
-`TEST_2.10a.md`); read G1 (`lv_mem`) and the window's new frame time from the log; (2) the owner's
-call on the deck's inactive rows and on versioning; (3) all-nine compile gate, look on glass, merge
-with `--no-ff` - then 2.10a is done.
+**Next, in order:** (1) round 10 on glass (`TEST_2.10a.md`); (2) the owner's call on the deck
+animation speeds (the page deck: 300 ms ease-in-out; SETTINGS: 220 ms ease-out over a longer
+travel - asked whether to match them); (3) all-nine compile gate, look on glass, merge with
+`--no-ff`, tag `v0.2.8`, CHANGELOG - then 2.10a is done.
 
 **The debug flags are local:** `-D DEBUG_POPUP` and `-D DEBUG_FRAMES` are in `WS_P4_TOUCH_LCD_5` in
 this PC's working copy of `platformio.ini`, uncommitted. Never commit them on.
@@ -283,9 +287,11 @@ as data.** A little colour-blind: never distinguish two states by colour alone.
 - Guessing a fourth time. Instrument it or ask the far end.
 - Claiming a script worked because it printed something. Assert the anchor, then check the file.
 
-**Versioning:** `A.B.C.D`, where C is the milestone within the phase. Tag on `main` at merge when a
-milestone completes, never during development. D is commits since the tag; a dirty tree appends
-`+dirty`.
+**Versioning (changed 2026-10-05, owner):** `A.B.C.D` - B is the roadmap PHASE, C counts RELEASES:
+one more each time a signed-off merge to `main` is tagged, whatever milestones it holds. Add a
+`CHANGELOG.md` entry with the tag, naming the milestones and issues in it. Never tag during
+development. D is commits since the tag; a dirty tree appends `+dirty`. The next tag is **`v0.2.8`
+at the 2.10a merge** (not milestone 2.8). ROADMAP 3.3.
 
 **The issue tracker is yours to manage**, and keeping it, HANDOFF and ROADMAP current is part of the
 work, not a follow-up.

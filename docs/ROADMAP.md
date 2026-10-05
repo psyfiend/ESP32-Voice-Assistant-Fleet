@@ -177,10 +177,17 @@ counter is useful there in a way it isn't for libraries.
 
 | Level | Name | Bumped when | Set by |
 |---|---|---|---|
-| **A** | Major | Breaking changes — UI overhaul, architecture rewrite, build-sheet schema break | you, by tagging |
-| **B** | Minor | New features, new card types, new tools — backwards compatible within the same A | you, by tagging |
-| **C** | Phase | **The roadmap sub-phase just completed.** Finishing 2.1 tags `v0.2.1`; finishing 2.2 tags `v0.2.2` | you, by tagging |
+| **A** | Major | `1.0` after the phases - release candidates once Phase 6 is done, unless more phases are found | you, by tagging |
+| **B** | Phase | **The roadmap phase**: Phase 2 is `v0.2`, Phase 3 `v0.3`. The only level that follows the roadmap | you, by tagging |
+| **C** | Release | **One more each time a signed-off merge to `main` is tagged**, in the order they happen, whatever milestones it holds. `CHANGELOG.md` says which | you, by tagging |
 | **D** | Build | Hotfixes, typos, padding tweaks — every commit | **automatic** |
+
+**C stopped meaning a milestone on 2026-10-05 (owner).** Milestones began finishing out of order -
+2.9 on six of nine boards, 2.10a before 2.8 - so "C = the milestone just finished" had no next
+number to give, and every build since 2026-09-24 reported `v0.2.7.x`. Renumbering milestones would
+have meant rewriting dozens of references across the docs; counting releases instead needed nothing
+renumbered. The next tag, at the 2.10a merge, is `v0.2.8` - which is NOT milestone 2.8; the
+changelog is where a version is matched to its milestones.
 
 **D auto-increments**, which is the part you said you liked. It's derived from
 `git describe --tags --long`: tag `v0.1.0`, make 14 commits, and it reports `v0.1.0-14-gabc1234`,
@@ -188,11 +195,9 @@ which becomes version `0.1.0.14`. Monotonic, never typed by hand, and it can't d
 nobody maintains it. You only ever tag `A.B.C`; `D` takes care of itself.
 
 - Tag on `main` only. Start at `v0.1.0` — pre-1.0 honestly signals "schema may still change."
-- **C tracks the roadmap, revised 2026-09-10.** It was originally "patch / stability fixes", but
-  this project's version has one real job: telling you where you are. Mapping `B.C` onto the phase
-  number does that for free and never needs a judgement call — `v0.2.1` *is* Phase 2.1. The cost is
-  that a mid-phase stability fix has nowhere of its own to go; it lands in `D` with everything
-  else, which is fine because `D` is what the firmware actually reports.
+- **History of C:** "patch / stability fixes" at first; from 2026-09-10 to 2026-10-05 the roadmap
+  sub-phase just completed (`v0.2.1` was Phase 2.1), which worked while milestones finished in
+  order; from 2026-10-05 a release counter (above).
 - Retroactive: `v0.2.1` tags the Phase 2.1 merge (`b5fc6d7`). Phase 1 keeps `v0.2.0`.
 - A small `extra_scripts` Python hook runs `git describe` at build time and injects
   `-D FW_VERSION='"0.1.0.14"'`, so the firmware always knows exactly which commit it is.

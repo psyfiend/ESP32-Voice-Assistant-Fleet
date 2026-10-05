@@ -176,7 +176,7 @@ struct Popup {
     int32_t   dragStartY = 0, dragKnobY0 = 0;
 
     // The settings deck (pathway 1, card-sheet 11.1): see "The settings deck".
-    lv_obj_t *deck = nullptr, *deckTab = nullptr, *deckTabLbl = nullptr;
+    lv_obj_t *deck = nullptr, *deckTab = nullptr, *deckTabLbl = nullptr, *deckPane = nullptr;
     lv_obj_t *chipPause[2] = {nullptr, nullptr};   // Off, On
     int32_t   deckH = 0, deckHead = 0;
     uint8_t   deckState = 0;                       // DeckState
@@ -1107,7 +1107,12 @@ void intfStartSpark() {
     g.runFrom = r + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, g.limit - r - g.secLen));
     g.runTo   = g.runFrom + g.secLen;
     g.runsLeft = (uint8_t)lv_rand(2, 5);
-    g.reverse  = false;
+    // ONE DIRECTION PER SPARK (owner, round 9): clockwise or anticlockwise
+    // round the window, every run the same way - never back and forth over
+    // itself. Along the top and right edges clockwise is the way `along`
+    // counts; along the bottom and left it is the other way.
+    const bool cw = lv_rand(0, 1);
+    g.reverse = (g.edge == 0 || g.edge == 3) ? !cw : cw;
     g.len   = rollLen();
     g.thick = rollThick();
     pickColours();
@@ -1133,15 +1138,16 @@ void intfTick(lv_timer_t *t) {
     const uint32_t el = now - g.runStart;
     if (el >= g.runMs) {
         // This run is over. EACH RUN ROLLS ITS OWN DICE (owner, round 8: the
-        // same spark repeated three times read as a loop): a new speed, a new
-        // direction, and EITHER a new length OR a new width - never both at
-        // once, so the runs still look like one spark. It mostly lands over the
-        // same stretch again: a step of -20% to +50% of the section.
+        // same spark repeated three times read as a loop): a new speed, and
+        // EITHER a new length OR a new width - never both at once, so the runs
+        // still look like one spark. It keeps its direction (round 9) and
+        // edges on along it: a step of 0-45% of the section, so each run
+        // mostly overlaps the last.
         if (--g.runsLeft) {
-            const int32_t step = g.secLen * ((int32_t)lv_rand(0, 70) - 20) / 100;
+            int32_t step = g.secLen * (int32_t)lv_rand(0, 45) / 100;
+            if (g.reverse) step = -step;
             g.runFrom = LV_CLAMP(s.winRadius, g.runFrom + step, g.limit - g.secLen);
             g.runTo   = g.runFrom + g.secLen;
-            g.reverse = lv_rand(0, 99) < 30;
             if (lv_rand(0, 1)) g.len = rollLen(); else g.thick = rollThick();
             intfNextRun();
             intfAllOff();
@@ -1264,12 +1270,19 @@ void deckSet(uint8_t state) {
     if (s.deckTabLbl) lv_obj_set_style_text_color(s.deckTabLbl, UI::c(state == DECK_OPEN ? p.TEXT : p.ACCENT), 0);
 }
 
-// Inside the deck's part of the screen, as it stands right now?
+// On the deck's tab or its pane, as they stand right now? The deck's own
+// object is transparent and wider than the tab: a press beside the tab is a
+// press on the page, which the catcher must take.
 bool inDeck(const lv_point_t &pt) {
     if (!s.deck || s.deckState == DECK_HIDDEN) return false;
-    lv_area_t a;
-    lv_obj_get_coords(s.deck, &a);
-    return pt.x >= a.x1 && pt.x <= a.x2 && pt.y >= a.y1 && pt.y <= a.y2;
+    lv_obj_t *parts[2] = { s.deckTab, s.deckPane };
+    for (lv_obj_t *o : parts) {
+        if (!o) continue;
+        lv_area_t a;
+        lv_obj_get_coords(o, &a);
+        if (pt.x >= a.x1 && pt.x <= a.x2 && pt.y >= a.y1 && pt.y <= a.y2) return true;
+    }
+    return false;
 }
 
 void deckTabCb(lv_event_t *ev) {
@@ -1353,7 +1366,10 @@ void deckCreate() {
     const int32_t w  = lv_area_get_width(&W);
     const int32_t r  = mm(1.6f);
     const int32_t bw = UI::met().BORDER_W ? UI::met().BORDER_W : 1;
-    s.deckHead = mm(6.0f);
+    // The page deck's own header height (owner, round 9: its panels "are
+    // already the perfect height to sit neatly under the bottom border of the
+    // popup").
+    s.deckHead = UIToolkit::sc(UIToolkit::PANEL_HEADER_H);
     s.deckH    = s.deckHead + 4 * mm(8.0f) + 2 * mm(1.6f) + mm(4.0f);
 
     // What the label row shows: the card's own choice, or what it inherits.
@@ -1365,10 +1381,15 @@ void deckCreate() {
     lv_obj_set_pos (s.deck, W.x1, deckY(DECK_HIDDEN));
     lv_obj_set_size(s.deck, w, s.deckH);
 
-    // The tab: rounded on top, the pane covering its lower corners.
+    // The tab: rounded on top, the pane covering its lower corners. THE RIGHT
+    // HALF, ALWAYS (owner, round 9): some cards will get a second panel (a
+    // sensor's CHART, card-sheet 11.1), and it takes the left half - so
+    // SETTINGS is always in the same place, whether or not a second tab is
+    // there. The pane, open, is the deck's full width.
+    const int32_t tabW = w / 2;
     s.deckTab = plain(s.deck);
-    lv_obj_set_pos (s.deckTab, 0, 0);
-    lv_obj_set_size(s.deckTab, w, s.deckHead + r);
+    lv_obj_set_pos (s.deckTab, w - tabW, 0);
+    lv_obj_set_size(s.deckTab, tabW, s.deckHead + r);
     lv_obj_set_style_radius      (s.deckTab, r, 0);
     lv_obj_set_style_bg_opa      (s.deckTab, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(s.deckTab, UI::border(), 0);
@@ -1381,6 +1402,7 @@ void deckCreate() {
     lv_obj_align(s.deckTabLbl, LV_ALIGN_TOP_MID, 0, (s.deckHead - lv_font_get_line_height(t.TAG)) / 2);
 
     lv_obj_t *pane = plain(s.deck);
+    s.deckPane = pane;
     lv_obj_set_pos (pane, 0, s.deckHead);
     lv_obj_set_size(pane, w, s.deckH - s.deckHead);
     lv_obj_set_style_bg_color    (pane, UI::c(p.SURFACE_ALT), 0);
@@ -1417,9 +1439,33 @@ void deckCreate() {
     s.deckState = DECK_HIDDEN;
 }
 
+void deckGoneCb(lv_anim_t *a) { lv_obj_delete_async((lv_obj_t *)a->var); }
+
+// The deck goes with the window - but HOW depends on how it was showing
+// (owner, round 9): open, it vanishes with the window in the same frame;
+// showing only its tab, the tab slides back down as fast as it came up, on
+// its own, after the window has gone. It is no longer the popup's then: the
+// pointers are cleared at once, its tab stops taking taps, and it deletes
+// itself when it is out of sight. A window opened meanwhile builds its own.
 void deckEnd() {
-    if (s.deck) { lv_anim_delete(s.deck, deckExec); lv_obj_delete(s.deck); }
-    s.deck = s.deckTab = s.deckTabLbl = nullptr;
+    if (s.deck) {
+        lv_anim_delete(s.deck, deckExec);
+        if (s.deckState == DECK_PEEK) {
+            if (s.deckTab) lv_obj_clear_flag(s.deckTab, LV_OBJ_FLAG_CLICKABLE);
+            lv_anim_t a;
+            lv_anim_init(&a);
+            lv_anim_set_var         (&a, s.deck);
+            lv_anim_set_values      (&a, lv_obj_get_y(s.deck), deckY(DECK_HIDDEN));
+            lv_anim_set_duration    (&a, DECK_PEEK_MS);
+            lv_anim_set_path_cb     (&a, lv_anim_path_ease_in);
+            lv_anim_set_exec_cb     (&a, deckExec);
+            lv_anim_set_completed_cb(&a, deckGoneCb);
+            lv_anim_start(&a);
+        } else {
+            lv_obj_delete(s.deck);
+        }
+    }
+    s.deck = s.deckTab = s.deckTabLbl = s.deckPane = nullptr;
     s.chipPause[0] = s.chipPause[1] = nullptr;
     s.deckState = DECK_HIDDEN;
 }
