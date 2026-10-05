@@ -488,6 +488,16 @@ next piece of eye candy:
   Read from the source, not tried on glass.
 - **So: animate small things.** A tab, a knob, one card - tens of thousands of pixels - move at full
   frame rate. Anything that covers the screen costs a full redraw per change, whatever it looks like.
+- **A new big object is briefly invalidated at (0,0), full size.** LVGL lays out an object's SIZE
+  before its POSITION (`lv_obj_refr_size`, then `lv_obj_refr_pos`), so a 787x545 window created at
+  (246,83) also invalidated (0,0)..(786,544), and LVGL joined the two into one area from the screen's
+  corner - wider than the window, so not covered by it, so every card under the window and the
+  header were drawn too: the popup's frame took ~77 ms where ~25 was expected (2026-10-05, found by
+  logging the frame's `inv_areas`). **Build such things quiet**: invalidation off, create, lay out,
+  invalidation on, then invalidate exactly the rectangle that changed. CardPopup's `showWindow()`.
+- **A shadow makes an object's redraw area wider than the object** (its ext draw size), which defeats
+  covering the same way. Invalidate the object's own rectangle and thin bands for the shadow
+  separately (`invalidateWindow()`).
 
 ## Never keep a pointer to an LVGL object you do not own - ask it to tell you when it goes
 

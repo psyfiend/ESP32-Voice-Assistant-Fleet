@@ -4,6 +4,7 @@
 #include "UI/UITokens.h"
 #include "UI/UIToolkit.h"
 #include "src/core/lv_obj_event_private.h"   // lv_hit_test_info_t: the tap catcher's hit test
+#include "src/core/lv_obj_draw_private.h"    // lv_obj_get_ext_draw_size: the window's shadow
 #include <Arduino.h>
 #include <math.h>
 #include <stdarg.h>
@@ -174,6 +175,12 @@ struct Popup {
     bool      knobDragging = false, swallowClick = false;
     int32_t   dragStartY = 0, dragKnobY0 = 0;
 
+    // The settings deck (pathway 1, card-sheet 11.1): see "The settings deck".
+    lv_obj_t *deck = nullptr, *deckTab = nullptr, *deckTabLbl = nullptr;
+    lv_obj_t *chipPause[2] = {nullptr, nullptr};   // Off, On
+    int32_t   deckH = 0, deckHead = 0;
+    uint8_t   deckState = 0;                       // DeckState
+
     lv_timer_t *timer = nullptr;
     uint32_t    lastTouchMs = 0;
     uint32_t    lastSig = 0;
@@ -181,6 +188,7 @@ struct Popup {
     lv_point_t  pressStart = {0, 0};
 };
 Popup s;
+enum DeckState : uint8_t { DECK_HIDDEN, DECK_PEEK, DECK_OPEN };
 
 // The card under the finger. `surface` is a card's own LVGL object, which a
 // page rebuild can delete at any moment: a delete hook clears it the moment
@@ -770,9 +778,9 @@ void buildContents() {
     lv_obj_set_flex_flow(right, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(right, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(right, gap, 0);
-    // The mock's chart icon is not in the board's icon subset, and this laptop
-    // cannot regenerate it (no Node.js). clock-outline stands in until it can.
-    s.btnHistory = iconButton(right, MDI_CLOCK_OUTLINE, t.ICON_MD, historyCb);
+    // The mock's chart icon - axes and bars (mdi:chart-bar, generated
+    // 2026-10-05; clock-outline stood in until then).
+    s.btnHistory = iconButton(right, MDI_CHART_BAR, t.ICON_MD, historyCb);
     // D4: a card standing for several things gets the members icon.
     if (s.nEnt > 1) s.btnMembers = iconButton(right, MDI_LIGHTBULB_GROUP, t.ICON_MD, membersCb);
 
@@ -977,7 +985,8 @@ void holdStart(lv_obj_t *sf) {
 // short stretch of its border: a bright core in a wider glow, a fading tail
 // behind, the odd fleck thrown off. It travels a section of the edge, then
 // often runs again a little further on, overlapping the last run - so it reads
-// as something CRAWLING along the border.
+// as something CRAWLING along the border. Round 3 (owner, 2026-10-05): faster
+// and more frenetic, more runs, each with its own dice - see intfTick().
 //
 // Round 1 was ten scattered pieces living one to three frames, all over the
 // edge, all at once. The owner: it looked like "small porch timing issues or
@@ -1020,10 +1029,15 @@ struct Interference {
     int32_t  secLen = 0;
     uint8_t  runsLeft = 0;
     uint32_t runStart = 0, runMs = 0;
+    bool     reverse = false;       // this run travels back along the edge
     int32_t  len = 0, thick = 0;    // the spark's head: length along, width across
     uint32_t core = 0, glow = 0, tail = 0;   // its colours
 };
 Interference g;
+
+// The dice for a spark's size, in millimetres so it looks alike on every board.
+int32_t rollLen()   { return mm(1.2f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(3.3f))); }
+int32_t rollThick() { return LV_MAX(3, mm(0.3f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(0.55f)))); }
 
 // A dark window wants light sparks; a light one, deep ones.
 bool lightWindow() {
@@ -1072,8 +1086,9 @@ void intfAllOff() {
     for (uint8_t i = 0; i < PIECE_COUNT; i++) if (g.o[i]) lv_obj_set_size(g.o[i], 0, 0);
 }
 
+// Fast and frenetic (owner, round 8): a run is 120-300 ms.
 void intfNextRun() {
-    g.runMs    = lv_rand(250, 600);
+    g.runMs    = lv_rand(120, 300);
     g.runStart = millis();
 }
 
@@ -1091,9 +1106,10 @@ void intfStartSpark() {
     if (g.secLen < mm(3.0f)) return;
     g.runFrom = r + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, g.limit - r - g.secLen));
     g.runTo   = g.runFrom + g.secLen;
-    g.runsLeft = (uint8_t)lv_rand(1, 3);
-    g.len   = mm(1.5f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(3.0f)));
-    g.thick = LV_MAX(3, mm(0.35f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(0.45f))));
+    g.runsLeft = (uint8_t)lv_rand(2, 5);
+    g.reverse  = false;
+    g.len   = rollLen();
+    g.thick = rollThick();
     pickColours();
     intfNextRun();
     g.running = true;
@@ -1116,11 +1132,17 @@ void intfTick(lv_timer_t *t) {
 
     const uint32_t el = now - g.runStart;
     if (el >= g.runMs) {
-        // This run is over: another, overlapping and further on, or done.
-        if (--g.runsLeft && g.runTo + g.secLen / 3 < g.limit) {
-            const int32_t step = g.secLen * (int32_t)lv_rand(40, 80) / 100;
-            g.runFrom += step;
-            g.runTo    = LV_MIN(g.runFrom + g.secLen, g.limit);
+        // This run is over. EACH RUN ROLLS ITS OWN DICE (owner, round 8: the
+        // same spark repeated three times read as a loop): a new speed, a new
+        // direction, and EITHER a new length OR a new width - never both at
+        // once, so the runs still look like one spark. It mostly lands over the
+        // same stretch again: a step of -20% to +50% of the section.
+        if (--g.runsLeft) {
+            const int32_t step = g.secLen * ((int32_t)lv_rand(0, 70) - 20) / 100;
+            g.runFrom = LV_CLAMP(s.winRadius, g.runFrom + step, g.limit - g.secLen);
+            g.runTo   = g.runFrom + g.secLen;
+            g.reverse = lv_rand(0, 99) < 30;
+            if (lv_rand(0, 1)) g.len = rollLen(); else g.thick = rollThick();
             intfNextRun();
             intfAllOff();
             return;
@@ -1131,20 +1153,25 @@ void intfTick(lv_timer_t *t) {
         return;
     }
 
-    // Where the head is: eased along the section, with a little jitter.
+    // Where the head is: eased along the section, either way, with jitter.
     const int32_t q    = (int32_t)(el * 1024 / g.runMs);
     const int32_t ease = q < 512 ? 2 * q * q / 1024 : 1024 - 2 * (1024 - q) * (1024 - q) / 1024;
-    int32_t head = g.runFrom + (g.runTo - g.runFrom - g.len) * ease / 1024;
-    head += (int32_t)lv_rand(0, 2) - 1;
+    const int32_t travel = (g.runTo - g.runFrom - g.len) * ease / 1024;
+    int32_t head = g.reverse ? g.runTo - g.len - travel : g.runFrom + travel;
+    const int32_t jit = LV_MAX(1, mm(0.3f));
+    head += (int32_t)lv_rand(0, (uint32_t)(2 * jit)) - jit;
 
     // Crackle: the odd frame the core drops out, the glow flares or the
-    // fleck jumps off the line.
+    // fleck jumps off the line. The tail trails behind, whichever way it runs.
     const bool coreOn  = lv_rand(0, 99) < 85;
     const int32_t flare = lv_rand(0, 99) < 20 ? g.thick / 2 : 0;
     const int32_t gap   = LV_MAX(2, g.len / 3);
+    const int32_t l1 = g.len * 3 / 4, l2 = g.len / 2;
+    const int32_t t1 = g.reverse ? head + g.len + gap          : head - gap - l1;
+    const int32_t t2 = g.reverse ? head + g.len + 2 * gap + l1 : head - 2 * gap - l1 - l2;
     intfPut(PIECE_GLOW,  head, g.len, g.thick + flare, g.glow);
-    intfPut(PIECE_TAIL1, head - g.len * 3 / 4 - gap, g.len * 3 / 4, LV_MAX(2, g.thick * 2 / 3), g.tail);
-    intfPut(PIECE_TAIL2, head - g.len * 5 / 4 - 2 * gap, g.len / 2, LV_MAX(1, g.thick / 3), g.tail);
+    intfPut(PIECE_TAIL1, t1, l1, LV_MAX(2, g.thick * 2 / 3), g.tail);
+    intfPut(PIECE_TAIL2, t2, l2, LV_MAX(1, g.thick / 3), g.tail);
     intfPut(PIECE_CORE,  head + g.len / 6, coreOn ? g.len * 2 / 3 : 0, LV_MAX(1, g.thick / 3), g.core);
     if (lv_rand(0, 99) < 12) {
         const int32_t sz = LV_MAX(2, g.thick / 2);
@@ -1160,26 +1187,24 @@ void intfTick(lv_timer_t *t) {
     }
 }
 
-// The pieces, made with the window, above it. Each is created at 0x0 with
-// invalidation off: a new object costs a redraw of LVGL's default size at
-// (0,0) - here the header - for nothing. The window's own layout is settled
-// first, with invalidation on, so it loses nothing it was owed.
-void intfBegin() {
+// The pieces, made with the window, above it, at 0x0. Called inside
+// showWindow()'s quiet build (invalidation off), so making them costs nothing.
+void intfCreate() {
     for (uint8_t i = 0; i < PIECE_COUNT; i++) g.o[i] = nullptr;
     g.running = false;
     g.sparks  = 0;
     if (s_intfMode == IntfMode::INTF_OFF) return;
     lv_obj_t *scr = lv_screen_active();
-    lv_obj_update_layout(scr);
-    lv_display_enable_invalidation(nullptr, false);
     for (uint8_t i = 0; i < PIECE_COUNT; i++) {
         g.o[i] = plain(scr);
         lv_obj_set_size(g.o[i], 0, 0);
         lv_obj_set_style_bg_opa(g.o[i], LV_OPA_COVER, 0);
         lv_obj_set_style_radius(g.o[i], LV_RADIUS_CIRCLE, 0);
     }
-    lv_obj_update_layout(scr);
-    lv_display_enable_invalidation(nullptr, true);
+}
+
+void intfStart() {
+    if (s_intfMode == IntfMode::INTF_OFF) return;
     g.nextAt = millis() + lv_rand(INTF_FIRST_MIN_MS, INTF_FIRST_MAX_MS);
     g.timer  = lv_timer_create(intfTick, LV_DEF_REFR_PERIOD, nullptr);
 }
@@ -1193,7 +1218,222 @@ void intfEnd() {
     g.running = false;
 }
 
+// ---------------------------------------------------------------------------
+// The settings deck (card-sheet 11.1 pathway 1, section 13; Card Popup Mock v3)
+//
+// A SETTINGS tab the width of the window peeks up from the bottom of the
+// screen, under the window, as the window appears. Tap it and the deck opens
+// up over the window's lower part; tap it again, or anywhere in the window,
+// and it folds back to the tab; a tap outside closes the deck and the window
+// together. It goes with the window, in the same frame.
+//
+// In 2.10a (section 13): Paused works - the flag is the entity's, kept on the
+// device through #60's pause store, which is why long press could give it up.
+// The label choice, the custom name and "on the dashboard" are shown but not
+// yet live: their answers need a card id that survives a rebuild to be kept
+// anywhere (2.10d), and a hidden card needs a way back (the arranger, #78).
+//
+// Opaque and on the screen, like the window, so moving it redraws only it.
+// ---------------------------------------------------------------------------
+constexpr uint32_t DECK_PEEK_MS = 200;   // the tab peeking up: a small touch the owner liked
+constexpr uint32_t DECK_OPEN_MS = 220;
+
+void deckExec(void *var, int32_t v) { lv_obj_set_y((lv_obj_t *)var, v); }
+
+int32_t deckY(uint8_t state) {
+    const int32_t sh = lv_obj_get_height(lv_screen_active());
+    return state == DECK_OPEN ? sh - s.deckH : state == DECK_PEEK ? sh - s.deckHead : sh;
+}
+
+void deckSet(uint8_t state) {
+    if (!s.deck) return;
+    const uint8_t was = s.deckState;
+    s.deckState = state;
+    lv_anim_delete(s.deck, deckExec);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var     (&a, s.deck);
+    lv_anim_set_values  (&a, lv_obj_get_y(s.deck), deckY(state));
+    lv_anim_set_duration(&a, (was == DECK_HIDDEN) ? DECK_PEEK_MS : DECK_OPEN_MS);
+    lv_anim_set_path_cb (&a, lv_anim_path_ease_out);
+    lv_anim_set_exec_cb (&a, deckExec);
+    lv_anim_start(&a);
+    // The open tab reads as the top of the pane; the folded one as a tab.
+    const UIPalette &p = UI::pal();
+    if (s.deckTab) lv_obj_set_style_bg_color(s.deckTab, UI::c(state == DECK_OPEN ? p.SURFACE_ALT : p.SURFACE), 0);
+    if (s.deckTabLbl) lv_obj_set_style_text_color(s.deckTabLbl, UI::c(state == DECK_OPEN ? p.TEXT : p.ACCENT), 0);
+}
+
+// Inside the deck's part of the screen, as it stands right now?
+bool inDeck(const lv_point_t &pt) {
+    if (!s.deck || s.deckState == DECK_HIDDEN) return false;
+    lv_area_t a;
+    lv_obj_get_coords(s.deck, &a);
+    return pt.x >= a.x1 && pt.x <= a.x2 && pt.y >= a.y1 && pt.y <= a.y2;
+}
+
+void deckTabCb(lv_event_t *ev) {
+    (void)ev;
+    deckSet(s.deckState == DECK_OPEN ? DECK_PEEK : DECK_OPEN);
+}
+
+// One choice in a row. `live` false: drawn quieter, and taps do nothing.
+lv_obj_t *deckChip(lv_obj_t *row, const char *text, bool live, bool selected,
+                   lv_event_cb_t cb, void *user) {
+    const UIPalette &p = UI::pal();
+    lv_obj_t *c = plain(row);
+    lv_obj_set_size(c, LV_SIZE_CONTENT, mm(6.0f));
+    lv_obj_set_style_pad_hor(c, mm(2.0f), 0);
+    lv_obj_set_style_radius(c, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_border_width(c, LV_MAX(1, mm(0.2f)), 0);
+    const uint32_t ink = live ? p.ACCENT : p.TEXT_DIM;
+    lv_obj_set_style_border_color(c, UI::c(live ? ink : UI::mix(p.SURFACE_ALT, p.TEXT, 30)), 0);
+    lv_obj_set_style_bg_color(c, UI::c(ink), 0);
+    lv_obj_set_style_bg_opa(c, selected ? (live ? LV_OPA_COVER : LV_OPA_30) : LV_OPA_TRANSP, 0);
+    lv_obj_t *l = makeLabel(c, UI::type().TAG, selected && live ? p.SURFACE_ALT : (live ? p.ACCENT : p.TEXT_DIM));
+    lv_label_set_text(l, text);
+    lv_obj_center(l);
+    if (live && cb) {
+        lv_obj_add_flag(c, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(c, cb, LV_EVENT_CLICKED, user);
+    }
+    return c;
+}
+
+// Paint a live chip as chosen or not, after a change.
+void deckChipSelect(lv_obj_t *c, bool selected) {
+    if (!c) return;
+    const UIPalette &p = UI::pal();
+    lv_obj_set_style_bg_opa(c, selected ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+    lv_obj_t *l = lv_obj_get_child(c, 0);
+    if (l) lv_obj_set_style_text_color(l, UI::c(selected ? p.SURFACE_ALT : p.ACCENT), 0);
+}
+
+void deckRender() {
+    const bool paused = aggregate().paused;
+    deckChipSelect(s.chipPause[0], !paused);
+    deckChipSelect(s.chipPause[1],  paused);
+}
+
+// Paused: Off / On. Through the card when it is the held one (it repaints at
+// once, and every card on the same entities follows through the registry).
+void pauseChipCb(lv_event_t *ev) {
+    const bool on = lv_event_get_user_data(ev) != nullptr;
+    if (Card *c = cardOf(h.surface)) {
+        c->setPaused(on);
+    } else if (s.reg) {
+        const uint32_t now = millis();
+        for (uint8_t i = 0; i < s.nEnt; i++) if (s.ent[i]) s.reg->setPaused(s.ent[i]->desc.id, on, now);
+    }
+    deckRender();
+    renderMain();
+}
+
+// A row: what it is on the left, its choices on the right.
+lv_obj_t *deckRow(lv_obj_t *pane, const char *what) {
+    lv_obj_t *r = plain(pane);
+    lv_obj_set_size     (r, lv_pct(100), mm(8.0f));
+    lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_t *l = makeLabel(r, UI::type().NAME, UI::pal().TEXT);
+    lv_label_set_text(l, what);
+    lv_obj_t *chips = plain(r);
+    lv_obj_set_size     (chips, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(chips, LV_FLEX_FLOW_ROW);
+    lv_obj_set_style_pad_column(chips, mm(1.2f), 0);
+    return chips;
+}
+
+// Built with the window, below the bottom of the screen, inside showWindow()'s
+// quiet build (invalidation off); showWindow() then slides it up to its tab.
+void deckCreate() {
+    const UIPalette &p = UI::pal();
+    const UIType    &t = UI::type();
+    const lv_area_t &W = s.winRect;
+    const int32_t w  = lv_area_get_width(&W);
+    const int32_t r  = mm(1.6f);
+    const int32_t bw = UI::met().BORDER_W ? UI::met().BORDER_W : 1;
+    s.deckHead = mm(6.0f);
+    s.deckH    = s.deckHead + 4 * mm(8.0f) + 2 * mm(1.6f) + mm(4.0f);
+
+    // What the label row shows: the card's own choice, or what it inherits.
+    CardLabel lbl = CardLabel::LBL_NAME;
+    if (Card *c = cardOf(h.surface)) lbl = (c->labelMode() != CardLabel::LBL_INHERIT) ? c->labelMode() : cardLabelMode();
+    const bool paused = aggregate().paused;
+
+    s.deck = plain(lv_screen_active());
+    lv_obj_set_pos (s.deck, W.x1, deckY(DECK_HIDDEN));
+    lv_obj_set_size(s.deck, w, s.deckH);
+
+    // The tab: rounded on top, the pane covering its lower corners.
+    s.deckTab = plain(s.deck);
+    lv_obj_set_pos (s.deckTab, 0, 0);
+    lv_obj_set_size(s.deckTab, w, s.deckHead + r);
+    lv_obj_set_style_radius      (s.deckTab, r, 0);
+    lv_obj_set_style_bg_opa      (s.deckTab, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(s.deckTab, UI::border(), 0);
+    lv_obj_set_style_border_width(s.deckTab, bw, 0);
+    lv_obj_add_flag(s.deckTab, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(s.deckTab, deckTabCb, LV_EVENT_CLICKED, nullptr);
+    s.deckTabLbl = makeLabel(s.deckTab, t.TAG, p.ACCENT);
+    lv_label_set_text(s.deckTabLbl, "SETTINGS");
+    lv_obj_set_style_text_letter_space(s.deckTabLbl, mm(0.4f), 0);
+    lv_obj_align(s.deckTabLbl, LV_ALIGN_TOP_MID, 0, (s.deckHead - lv_font_get_line_height(t.TAG)) / 2);
+
+    lv_obj_t *pane = plain(s.deck);
+    lv_obj_set_pos (pane, 0, s.deckHead);
+    lv_obj_set_size(pane, w, s.deckH - s.deckHead);
+    lv_obj_set_style_bg_color    (pane, UI::c(p.SURFACE_ALT), 0);
+    lv_obj_set_style_bg_opa      (pane, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(pane, UI::border(), 0);
+    lv_obj_set_style_border_width(pane, bw, 0);
+    lv_obj_set_style_border_side (pane, (lv_border_side_t)(LV_BORDER_SIDE_LEFT | LV_BORDER_SIDE_RIGHT), 0);
+    lv_obj_set_style_pad_hor(pane, mm(2.4f), 0);
+    lv_obj_set_style_pad_ver(pane, mm(1.6f), 0);
+    lv_obj_set_flex_flow(pane, LV_FLEX_FLOW_COLUMN);
+    lv_obj_add_flag(pane, LV_OBJ_FLAG_CLICKABLE);   // a tap on the pane stays on the pane
+
+    // Paused first: the one that works, and the one a person comes for.
+    lv_obj_t *row = deckRow(pane, "Paused");
+    s.chipPause[0] = deckChip(row, "Off", true, !paused, pauseChipCb, nullptr);
+    s.chipPause[1] = deckChip(row, "On",  true,  paused, pauseChipCb, (void *)1);
+
+    row = deckRow(pane, "Label");
+    deckChip(row, "HA name", false, lbl == CardLabel::LBL_NAME,  nullptr, nullptr);
+    deckChip(row, "Custom",  false, false,                        nullptr, nullptr);
+    deckChip(row, "State",   false, lbl == CardLabel::LBL_STATE, nullptr, nullptr);
+    deckChip(row, "None",    false, lbl == CardLabel::LBL_NONE,  nullptr, nullptr);
+
+    row = deckRow(pane, "Custom name");
+    deckChip(row, "Edit with keyboard", false, false, nullptr, nullptr);
+
+    row = deckRow(pane, "On the dashboard");
+    deckChip(row, "Shown",  false, true,  nullptr, nullptr);
+    deckChip(row, "Hidden", false, false, nullptr, nullptr);
+
+    lv_obj_t *note = makeLabel(pane, t.TAG, p.TEXT_DIM);
+    lv_label_set_text(note, "Paused is kept on the device. The rest arrives with saving (2.10d).");
+
+    s.deckState = DECK_HIDDEN;
+}
+
+void deckEnd() {
+    if (s.deck) { lv_anim_delete(s.deck, deckExec); lv_obj_delete(s.deck); }
+    s.deck = s.deckTab = s.deckTabLbl = nullptr;
+    s.chipPause[0] = s.chipPause[1] = nullptr;
+    s.deckState = DECK_HIDDEN;
+}
+
 #ifdef DEBUG_POPUP
+// What LVGL's own pool holds right now (interview G1: a window, open).
+void dbgMem(char *buf, size_t cap) {
+    lv_mem_monitor_t m;
+    lv_mem_monitor(&m);
+    snprintf(buf, cap, "lv_mem %lu KB used of %lu, biggest free %lu KB, frag %u%%",
+             (unsigned long)((m.total_size - m.free_size) / 1024), (unsigned long)(m.total_size / 1024),
+             (unsigned long)(m.free_biggest_size / 1024), (unsigned)m.frag_pct);
+}
+
 // Is the window what LVGL finds covering a strip across its middle? If not,
 // every redraw inside it draws the page underneath first.
 void dbgProbe() {
@@ -1220,6 +1460,7 @@ void closeNow(void *unused) {
 #endif
     if (s.timer) { lv_timer_delete(s.timer); s.timer = nullptr; }
     intfEnd();
+    deckEnd();
     if (s.win)   { lv_obj_delete(s.win);     s.win = nullptr; }
     forgetWidgets();
     holdDetach();
@@ -1227,7 +1468,9 @@ void closeNow(void *unused) {
     s.phase = PopupPhase::PHASE_CLOSED;
     s.nEnt = 0;
 #ifdef DEBUG_POPUP
-    dbgLater("close: torn down in %lu us", (unsigned long)(micros() - t0));
+    char mem[96];
+    dbgMem(mem, sizeof(mem));
+    dbgLater("close: torn down in %lu us; %s", (unsigned long)(micros() - t0), mem);
 #endif
 }
 
@@ -1244,6 +1487,13 @@ void pressCb(lv_event_t *ev) {
         lv_obj_has_flag(obj, CardPopup::CARD_SURFACE_FLAG)) {
         holdStart(obj);
     }
+    // An open deck folds back to its tab at a press anywhere in the window
+    // (the press still does whatever it does there).
+    if (s.phase == PopupPhase::PHASE_OPEN && s.deckState == DECK_OPEN && !inDeck(s.pressStart)) {
+        const lv_area_t &W = s.winRect;
+        const lv_point_t &pt = s.pressStart;
+        if (pt.x >= W.x1 && pt.x <= W.x2 && pt.y >= W.y1 && pt.y <= W.y2) deckSet(DECK_PEEK);
+    }
 }
 
 // The finger came up. A swipe that LVGL was told to wait out ends with no
@@ -1254,8 +1504,8 @@ void releaseCb(lv_event_t *ev) {
     if (h.phase == HoldPhase::HOLD_PRESSING) letGo();
 }
 
-// The catcher's two jobs: let presses on the window through, and close on a
-// tap anywhere else.
+// The catcher's two jobs: let presses on the window and its deck through, and
+// close on a tap anywhere else.
 void catcherCb(lv_event_t *ev) {
     const lv_event_code_t code = lv_event_get_code(ev);
     if (code == LV_EVENT_HIT_TEST) {
@@ -1263,28 +1513,70 @@ void catcherCb(lv_event_t *ev) {
         if (!info || !s.win) return;
         const lv_point_t *pt = info->point;
         const lv_area_t  &W  = s.winRect;
-        if (pt->x >= W.x1 && pt->x <= W.x2 && pt->y >= W.y1 && pt->y <= W.y2) info->res = false;
+        if ((pt->x >= W.x1 && pt->x <= W.x2 && pt->y >= W.y1 && pt->y <= W.y2) || inDeck(*pt)) info->res = false;
     } else if (code == LV_EVENT_CLICKED) {
         CardPopup::close();
     }
 }
 
-// The window itself: built, made modal, the clock started, and the
-// interference begun (it draws from the frame after the window's).
+// What the window's first frame must draw: the window's own rectangle, and -
+// only where the scheme gives it a shadow - four thin bands around it. NOT one
+// area of the window plus its shadow: LVGL draws an area in strips as wide as
+// the area, and a strip that sticks out past the window is not covered by it,
+// so the cards under the whole window would be drawn first (LESSONS, "Effects
+// that cover the screen").
+void invalidateWindow() {
+    lv_obj_t *scr = lv_screen_active();
+    const lv_area_t &W = s.winRect;
+    lv_obj_invalidate_area(scr, &W);
+    const int32_t e = lv_obj_get_ext_draw_size(s.win);
+    if (e <= 0) return;
+    const lv_area_t bands[4] = {
+        { W.x1 - e, W.y1 - e, W.x2 + e, W.y1 - 1 },   // above
+        { W.x1 - e, W.y2 + 1, W.x2 + e, W.y2 + e },   // below
+        { W.x1 - e, W.y1,     W.x1 - 1, W.y2     },   // left
+        { W.x2 + 1, W.y1,     W.x2 + e, W.y2     },   // right
+    };
+    for (const lv_area_t &b : bands) lv_obj_invalidate_area(scr, &b);
+}
+
+// The window itself: built, made modal, the clock started, the deck sliding
+// up and the sparks waiting their turn.
+//
+// BUILT QUIET (2026-10-05). The window's frame took ~77 ms where ~25 was
+// expected, and DEBUG_POPUP showed why: it redrew 0,0..1032,627, not the
+// window. LVGL lays out a new object's SIZE before its POSITION
+// (lv_obj_refr_size, then lv_obj_refr_pos), so for one step the full-size
+// window sat at (0,0) and that area was invalidated too; joined with the real
+// one, it covered the cards under the window and the header, and every strip
+// of it was wider than the window. So: everything is made and laid out with
+// invalidation off, and then exactly what must be drawn is asked for.
 void showWindow() {
 #ifdef DEBUG_POPUP
     const uint32_t t0 = micros();
 #endif
     s.phase = PopupPhase::PHASE_OPEN;
+    lv_obj_t *scr = lv_screen_active();
+    lv_obj_update_layout(scr);                        // settle anything pending, aloud
+    lv_display_enable_invalidation(nullptr, false);
     makeWindow();
     buildContents();
+    intfCreate();
+    deckCreate();
+    lv_obj_update_layout(scr);
+    lv_display_enable_invalidation(nullptr, true);
+    invalidateWindow();
+
     if (s_catcher) lv_obj_add_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
     s.lastTouchMs = millis();
     s.lastAgeMs   = s.lastTouchMs;
     s.timer = lv_timer_create(tickCb, POPUP_TICK_MS, nullptr);
-    intfBegin();
+    intfStart();
+    deckSet(DECK_PEEK);
 #ifdef DEBUG_POPUP
-    dbgLater("open: window built in %lu us", (unsigned long)(micros() - t0));
+    char mem[96];
+    dbgMem(mem, sizeof(mem));
+    dbgLater("open: window and deck built in %lu us; %s", (unsigned long)(micros() - t0), mem);
 #endif
 }
 

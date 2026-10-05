@@ -196,16 +196,39 @@ AND let a finger drag it; let go, and it goes to whichever half it is in.
 | K5 | Stuck's window: drag it across | It goes across, then a few seconds later slides back (refused) |
 | B1 | Band label type: press a card | The band's corners meet the accent border with no dark pixels between |
 
-## Measured (Claude, from the board) - pending
+**Round 8 results (owner, 2026-10-05):** S2-S4, K1-K5 PASS, **B1 PASS**. **S1 partial**: "much
+better", visible on Linen too. Last round of tweaks asked for: keep the section's size; vary the
+length and the width from run to run, not both at once; faster and more frenetic, more overlap on
+the same stretch; each run its own dice (a slow spark repeated 3-4 times read as a loop). Linen
+deserves its own kind of animated chrome some day (the sparks suit the dark schemes' look).
 
-- `lv_mem` with the window open (interview G1).
-- Frame time during the grow (`/bench`) - needs the board on a network the laptop can reach.
+## Round 9 - the settings deck, the chart icon, a faster window (2026-10-05, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| D1 | Open a window | A SETTINGS tab slides up from the bottom of the screen, under the window, the window's width |
+| D2 | Tap the tab | The deck slides up over the window's lower part: Paused, Label, Custom name, On the dashboard |
+| D3 | Paused: tap On | The chip fills; the window says "Paused"; the card under or beside the window shows PAUSED and quiets |
+| D4 | Close the window, reboot the board, open the same card | Still paused (kept on the device). Set it back to Off |
+| D5 | With the deck open, tap anywhere in the window | The deck folds back to its tab |
+| D6 | Tap the tab twice | Opens, then folds |
+| D7 | With the deck showing, tap outside both | Window and deck close together |
+| D8 | The Label / Custom name / On the dashboard chips | Drawn quieter, and do nothing (they arrive with saving, 2.10d) |
+| D9 | Top right of any window | The history button is a bar chart now, not a clock |
+| W1 | Open windows in Midnight and Linen | Feels at least as quick as before - should be quicker (see Measured) |
+| S5 | Sparks | Faster, more frantic runs over the same short stretch, each run a little different |
+
+## Measured (Claude, from the board)
+
+- **The window's own frame, before the quiet build: 73-87 ms on Midnight**, because it redrew the
+  screen from (0,0) to the window's far corner (LESSONS). Closing: 46-55 ms (the page under the
+  window, which must be drawn). After the fix: to be read from round 9's log.
+- **`lv_mem` with the window open (G1)**: logged at every open and close from round 9 - pending.
 
 ## Notes and known gaps
 
-- **History icon:** the mock's chart glyph is not in the board's icon font, and the laptop cannot
-  regenerate the font (no Node.js). `clock-outline` stands in until the next font regeneration at
-  home.
+- **History icon:** `mdi:chart-bar` since 2026-10-05 (font regenerated at home); `clock-outline`
+  stood in before.
 - **Big words** ("On", "Unavailable") use the toolkit's existing hero face, smaller than the mock's
   6.5 mm; a bigger face costs flash (14-29 KB) and is a choice for later.
 - Lights are read-only in this window until 2.10b.

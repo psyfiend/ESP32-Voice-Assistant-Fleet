@@ -49,15 +49,28 @@ of a touch; electric whites/blues on dark schemes, deep blues/violet on light (C
 "Interference"). Round 7's version - scattered one-frame pieces - read as a display fault (owner).
 A long press on the title cycles now and then / once / off (`DEBUG_POPUP`). All of it
 `transform_width/height`, translate, border and small rects - never a scale or a layer.
-Round 8 flashed on WS_P4_5 2026-10-05; not yet seen.
+Round 8 PASSED except S1 (sparks): the owner's last tweaks (each run its own dice, faster, more
+overlap) are in round 9 - "then we'll leave it alone for now either way".
+
+**Built, round 9 (2026-10-05), flashed on WS_P4_5, not yet seen:**
+- **The settings deck** (pathway 1, Card Popup Mock v3): a SETTINGS tab the window's width peeks up
+  under the window; tap to open over the window's lower part; tap in the window or the tab to fold;
+  tap outside closes both. Rows: **Paused (works, kept on the device - #60)**, Label, Custom name,
+  On the dashboard (shown quieter and inactive: they need a card id that survives a rebuild to be
+  kept - 2.10d - and a hidden card needs a way back - #78). CardPopup.cpp, "The settings deck".
+- **The chart icon** (`mdi:chart-bar`, font regenerated) on the history button.
+- **The window's frame**: it was redrawing from the screen's corner (LESSONS, the (0,0) bullet);
+  now built quiet and only its rectangle invalidated. Expected ~45 ms off every open; the log says.
+- **G1 (`lv_mem` with the window open)**: logged at every open and close (`DEBUG_POPUP`).
 
 **Crash fixed (round 6, 2-3 on glass):** a swipe started on a card rebuilt the page and the hold
 restyled the deleted card - LESSONS, "Never keep a pointer to an LVGL object you do not own".
 
 **Open with the owner:**
-- **Interference**: round 8 on glass. The owner chose it over a scan-on ("may be more expensive...
-  or too much of a distraction"); when and how often become a setting later. The owner is "super
-  happy" with function and form without it - it is a nice-to-have.
+- **Interference**: settled after round 9 unless the owner asks again. When and how often become a
+  setting later. Linen may get its own kind of animated chrome some day (owner).
+- **The deck's inactive rows**: Claude built them inactive; the owner may want Label working now (in
+  RAM, keyed by page and slot, lost at reboot - card-sheet 13 allows that). Asked.
 - **Versioning** (owner, 2026-10-05): tying the tag's third number to milestones has frozen the
   build at v0.2.7.x while milestones finish out of order. Claude recommended counting RELEASES
   (one tag per signed-off merge, the tag and a CHANGELOG line naming the milestones in it) - no
@@ -68,15 +81,9 @@ restyled the deleted card - LESSONS, "Never keep a pointer to an LVGL object you
   height, so ~57 mm tall on the 1060 vs ~30 mm on the P4_5); the occupancy hero's circle is huge for
   its icon, by a different ratio per board. Placeholder visuals; the owner: not this step's focus.
   Claude's suggestion: cap heroes at the P4_5's physical size when 2.10b designs the controls.
-- **To find out:** the window's own frame costs ~77 ms on Midnight (~140 Linen) where ~25 was
-  expected - as if the page under the window is drawn too, which putting the window on the screen
-  was meant to stop. Round 7's `DEBUG_POPUP` prints what that frame redrew and whether LVGL finds
-  the window covering a strip across it. Read that before guessing; if the page IS drawn under the
-  window, fixing it takes ~45 ms off every open.
 
 **Built and seen on glass:** long press (now **250 ms**) opens a window on every card type; header X /
-"Area > name" / history (clock icon - the chart glyph needs a font regeneration on the desktop, no
-Node.js on the laptop) / members (multi-entity cards); closes by X, tap outside, drag down on the
+"Area > name" / history (chart icon since round 9) / members (multi-entity cards); closes by X, tap outside, drag down on the
 header row, 60 s idle with a shrinking bar; modal; a switch gets its real toggle, everything else a
 read-only value + "Changed N ago"; history and members are placeholder views with a back arrow.
 Owner's round 1 results are in `docs/TEST_2.10a.md` terms (O/H/C/B/V/L); C3, V3, B1, H1 fixed.
@@ -91,12 +98,10 @@ what building and tearing down the window costs, printed 300 ms later so the pri
 lines behind - `docs/display/history.md`. Verified on WS_P4_5; WS_P4_4B and CYD_P4_1060 flashed with
 it 2026-10-04, nothing reported; the 7B and 4880 not flashed.
 
-**Next, in order:** (1) round 8 on glass (spark, draggable knob, band corners - `TEST_2.10a.md`);
-(2) the settings deck that peeks up, with **Pause** in it - long
-press no longer pauses, so nothing on the board can pause a card until this lands; small touches the
-owner liked the sound of: the deck tab peeking up, the toggle knob sliding; (3) `lv_mem` with the
-window open; (4) the chart icon (font regeneration - this PC has Node.js); (5) all-nine compile gate,
-look on glass, merge.
+**Next, in order:** (1) round 9 on glass (deck with Pause, chart icon, the faster window, sparks -
+`TEST_2.10a.md`); read G1 (`lv_mem`) and the window's new frame time from the log; (2) the owner's
+call on the deck's inactive rows and on versioning; (3) all-nine compile gate, look on glass, merge
+with `--no-ff` - then 2.10a is done.
 
 **The debug flags are local:** `-D DEBUG_POPUP` and `-D DEBUG_FRAMES` are in `WS_P4_TOUCH_LCD_5` in
 this PC's working copy of `platformio.ini`, uncommitted. Never commit them on.
