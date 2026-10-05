@@ -237,6 +237,27 @@ on Linen - nothing in this build touches page swipes (unmeasured).
 | T5 | Watch a few sparks | Each one's runs all travel the same way round the window |
 | T6 | With the deck folded, tap beside the tab (its empty left half) | Closes the window, like any tap outside |
 
+**Round 10 results (owner, 2026-10-05):** T1-T6 PASS. Asked for: with the deck open, a tap in the
+window must ONLY fold it (it also pressed whatever was under the finger: the X closed the window
+before the deck had folded, the chart icon and back arrow navigated); the tab one colour folded and
+open; the deck's buttons filled like the window's X and chart discs; the tab's shadow on Linen like
+the page deck's; and a folder-tab shape - the open pane closed off at the top, the tab joining it with
+a curved inner corner that also shows when folded. Decided: the deck's speed stays; memory, wait and
+see; the two-panel rules in `card-sheet.md` section 14.
+
+## Round 11 - the folder tab (2026-10-05, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| F1 | Open a window | Folded: the tab, its curved inner corner, and a sliver of the pane's top edge running left along the bottom of the screen |
+| F2 | Open the deck | The pane has a top edge left of the tab, joined to the tab by the curve - closed off from the window |
+| F3 | With the deck open, tap the X, the chart icon, the title, the toggle | Each only folds the deck; nothing else happens |
+| F4 | With the deck open, tap a chip | The chip works; the deck stays open |
+| F5 | Folded, tap the sliver left of the tab | The deck opens |
+| F6 | Tab colour, folded and open | The same - the window's colour |
+| F7 | The chips | Filled, like the X and chart buttons; the chosen live one in the accent |
+| F8 | Linen | The tab and pane cast the scheme's shadow, like the page deck's panels |
+
 ## Measured (Claude, from the board)
 
 **The window's first frame, before and after building it quiet (round 9, 2026-10-05):**

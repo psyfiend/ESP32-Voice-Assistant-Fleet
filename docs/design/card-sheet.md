@@ -359,3 +359,28 @@ they differ (it still says "Settings tab" and "pause moved into it" without sayi
 - **Long press opens the window on every card type** (§11.2's uniform rule); tap is unchanged.
 - **Deck settings live in RAM** and are lost at reboot - except Paused, which already persists
   through #60's pause store. Saving by stable card id is 2.10d.
+
+## 14. The popup's deck, as built and tested (owner, 2026-10-05)
+
+What 2.10a ended up with, after rounds 4-11 on glass (`docs/TEST_2.10a.md`). Where it differs from
+the sections above, this wins.
+
+- **The window appears complete at once and closes at once** - no grow, no dim (owner: speed first).
+  The held card is pressed in with an accent border, and stays so while its window is open.
+- **Each deck panel is the window's full width when open; only its TAB is offset.** A folder-tab
+  shape: the pane has its own top edge, the tab rises from it with a curved inner corner, and folded
+  the tab and that corner show at the bottom of the screen, at the page deck's header height.
+- **SETTINGS always takes the right half.** A card that needs a second panel (a sensor's CHART,
+  11.1) puts it in the left half - so SETTINGS is never pushed around.
+- **With two panels (not built yet):** both tabs sit at the bottom when closed; each panel has its
+  own open and close animation; opening one hides the other's tab; only one can be open at a time.
+- **While a panel is open, the window is out of reach**: a tap anywhere in the window only folds
+  the panel. A tap outside both closes everything.
+- **Closing**: an open panel vanishes with the window; a tab that was only peeking slides back down.
+- **Speed**: the deck is quicker than the page deck's panels (220 ms vs 300 ms, over a longer
+  travel) and that is kept - settings should be quick to reach. Other expanding menus are judged as
+  they come (no one-size rule).
+- **Contents in 2.10a**: Paused works (kept on the device); Label, Custom name and On the dashboard
+  are shown, quieter, and inactive - "fine for now", which settings exist is not settled.
+- **Memory**: a window with its deck costs ~11-12 KB of LVGL's pool, ~16 KB left with one open;
+  watched as 2.10b-e add to it (owner: wait and see).

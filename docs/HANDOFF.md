@@ -102,10 +102,14 @@ what building and tearing down the window costs, printed 300 ms later so the pri
 lines behind - `docs/display/history.md`. Verified on WS_P4_5; WS_P4_4B and CYD_P4_1060 flashed with
 it 2026-10-04, nothing reported; the 7B and 4880 not flashed.
 
-**Next, in order:** (1) round 10 on glass (`TEST_2.10a.md`); (2) the owner's call on the deck
-animation speeds (the page deck: 300 ms ease-in-out; SETTINGS: 220 ms ease-out over a longer
-travel - asked whether to match them); (3) all-nine compile gate, look on glass, merge with
-`--no-ff`, tag `v0.2.8`, CHANGELOG - then 2.10a is done.
+**Round 10 PASSED**; round 11 (the folder tab, a window out of reach while the deck is open,
+filled chips, the tab's colour and Linen shadow) flashed on WS_P4_5 2026-10-05, not yet seen. The
+deck as it now stands, and the owner's rules for a second panel: `card-sheet.md` section 14. Deck
+speed: kept (owner). Memory: wait and see (owner).
+
+**Next, in order:** (1) round 11 on glass (`TEST_2.10a.md`) - the owner's last look; (2) remove the
+two local debug flags, all-nine compile gate (detached, ~30 min), merge with `--no-ff`, tag
+`v0.2.8`, date the CHANGELOG entry - then 2.10a is done.
 
 **The debug flags are local:** `-D DEBUG_POPUP` and `-D DEBUG_FRAMES` are in `WS_P4_TOUCH_LCD_5` in
 this PC's working copy of `platformio.ini`, uncommitted. Never commit them on.

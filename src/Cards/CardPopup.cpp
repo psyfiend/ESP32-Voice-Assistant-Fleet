@@ -1264,10 +1264,6 @@ void deckSet(uint8_t state) {
     lv_anim_set_path_cb (&a, lv_anim_path_ease_out);
     lv_anim_set_exec_cb (&a, deckExec);
     lv_anim_start(&a);
-    // The open tab reads as the top of the pane; the folded one as a tab.
-    const UIPalette &p = UI::pal();
-    if (s.deckTab) lv_obj_set_style_bg_color(s.deckTab, UI::c(state == DECK_OPEN ? p.SURFACE_ALT : p.SURFACE), 0);
-    if (s.deckTabLbl) lv_obj_set_style_text_color(s.deckTabLbl, UI::c(state == DECK_OPEN ? p.TEXT : p.ACCENT), 0);
 }
 
 // On the deck's tab or its pane, as they stand right now? The deck's own
@@ -1291,6 +1287,10 @@ void deckTabCb(lv_event_t *ev) {
 }
 
 // One choice in a row. `live` false: drawn quieter, and taps do nothing.
+//
+// FILLED, like the window's X and chart buttons (owner, round 10): a chip in
+// the pane's own colour did not read as a button. Unchosen ones take the card
+// surface, as those discs do; a chosen live one, the accent.
 lv_obj_t *deckChip(lv_obj_t *row, const char *text, bool live, bool selected,
                    lv_event_cb_t cb, void *user) {
     const UIPalette &p = UI::pal();
@@ -1299,27 +1299,36 @@ lv_obj_t *deckChip(lv_obj_t *row, const char *text, bool live, bool selected,
     lv_obj_set_style_pad_hor(c, mm(2.0f), 0);
     lv_obj_set_style_radius(c, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_border_width(c, LV_MAX(1, mm(0.2f)), 0);
-    const uint32_t ink = live ? p.ACCENT : p.TEXT_DIM;
-    lv_obj_set_style_border_color(c, UI::c(live ? ink : UI::mix(p.SURFACE_ALT, p.TEXT, 30)), 0);
-    lv_obj_set_style_bg_color(c, UI::c(ink), 0);
-    lv_obj_set_style_bg_opa(c, selected ? (live ? LV_OPA_COVER : LV_OPA_30) : LV_OPA_TRANSP, 0);
-    lv_obj_t *l = makeLabel(c, UI::type().TAG, selected && live ? p.SURFACE_ALT : (live ? p.ACCENT : p.TEXT_DIM));
+    lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
+    lv_obj_t *l = makeLabel(c, UI::type().TAG, p.TEXT);
     lv_label_set_text(l, text);
     lv_obj_center(l);
-    if (live && cb) {
-        lv_obj_add_flag(c, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(c, cb, LV_EVENT_CLICKED, user);
+    if (live) {
+        lv_obj_set_style_border_color(c, UI::c(p.ACCENT), 0);
+        lv_obj_set_style_bg_color(c, UI::c(selected ? p.ACCENT : p.SURFACE), 0);
+        lv_obj_set_style_text_color(l, UI::c(selected ? UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT)
+                                                      : p.ACCENT), 0);
+        if (cb) {
+            lv_obj_add_flag(c, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_add_event_cb(c, cb, LV_EVENT_CLICKED, user);
+        }
+    } else {
+        // Quieter: a soft edge, dim words, and the chosen one only a shade
+        // darker than the rest.
+        lv_obj_set_style_border_color(c, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 25)), 0);
+        lv_obj_set_style_bg_color(c, UI::c(selected ? UI::mix(p.SURFACE, p.TEXT_DIM, 35) : p.SURFACE), 0);
+        lv_obj_set_style_text_color(l, UI::c(p.TEXT_DIM), 0);
     }
     return c;
 }
 
-// Paint a live chip as chosen or not, after a change.
+// Paint a live chip as chosen or not.
 void deckChipSelect(lv_obj_t *c, bool selected) {
     if (!c) return;
     const UIPalette &p = UI::pal();
-    lv_obj_set_style_bg_opa(c, selected ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_color(c, UI::c(selected ? p.ACCENT : p.SURFACE), 0);
     lv_obj_t *l = lv_obj_get_child(c, 0);
-    if (l) lv_obj_set_style_text_color(l, UI::c(selected ? p.SURFACE_ALT : p.ACCENT), 0);
+    if (l) lv_obj_set_style_text_color(l, UI::c(selected ? UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT) : p.ACCENT), 0);
 }
 
 void deckRender() {
@@ -1370,7 +1379,15 @@ void deckCreate() {
     // already the perfect height to sit neatly under the bottom border of the
     // popup").
     s.deckHead = UIToolkit::sc(UIToolkit::PANEL_HEADER_H);
-    s.deckH    = s.deckHead + 4 * mm(8.0f) + 2 * mm(1.6f) + mm(4.0f);
+    // A FOLDER TAB (owner, round 10). The pane has a top edge of its own, and
+    // the tab rises from it in the right half, the join curving in like a
+    // file folder's - so an open deck is closed off from the window's body.
+    // Folded, the tab and that curve show, and a sliver of the pane's top
+    // edge, "a tabbed panel that is hiding additional content off screen".
+    // The strip that shows when folded is still the page deck's header height.
+    const int32_t rf       = r;                        // the inner curve; also the sliver
+    const int32_t tabAbove = s.deckHead - rf;          // the tab's part above the pane's edge
+    s.deckH    = tabAbove + rf + 4 * mm(8.0f) + 2 * mm(1.6f) + mm(4.0f);
 
     // What the label row shows: the card's own choice, or what it inherits.
     CardLabel lbl = CardLabel::LBL_NAME;
@@ -1381,39 +1398,90 @@ void deckCreate() {
     lv_obj_set_pos (s.deck, W.x1, deckY(DECK_HIDDEN));
     lv_obj_set_size(s.deck, w, s.deckH);
 
-    // The tab: rounded on top, the pane covering its lower corners. THE RIGHT
-    // HALF, ALWAYS (owner, round 9): some cards will get a second panel (a
-    // sensor's CHART, card-sheet 11.1), and it takes the left half - so
-    // SETTINGS is always in the same place, whether or not a second tab is
-    // there. The pane, open, is the deck's full width.
-    const int32_t tabW = w / 2;
+    // Built back to front: the pane, the tab over it, a block hiding the
+    // tab's bottom where it overlaps the pane, and the inner curve. One colour
+    // throughout - the tab used to be the card colour folded and the window's
+    // open (owner, round 10). The scheme's lift on the pane and the tab: a
+    // shadow on Linen, like the page deck's panels; nothing on the dark ones.
+    const int32_t tabW = w / 2;                        // THE RIGHT HALF - see below
+    const int32_t tabX = w - tabW;
+
+    lv_obj_t *pane = plain(s.deck);
+    s.deckPane = pane;
+    lv_obj_set_pos (pane, 0, tabAbove);
+    lv_obj_set_size(pane, w, s.deckH - tabAbove);
+    lv_obj_set_style_radius      (pane, r, 0);
+    lv_obj_set_style_bg_color    (pane, UI::c(p.SURFACE_ALT), 0);
+    lv_obj_set_style_bg_opa      (pane, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(pane, UI::border(), 0);
+    lv_obj_set_style_border_width(pane, bw, 0);
+    lv_obj_add_style             (pane, UI::paint(UIPaint::PAINT_LIFT), 0);
+    // The pane's padding keeps its rows below the tab's join.
+    lv_obj_set_style_pad_hor(pane, mm(2.4f), 0);
+    lv_obj_set_style_pad_top(pane, rf + mm(1.6f), 0);
+    lv_obj_set_style_pad_bottom(pane, mm(1.6f), 0);
+    lv_obj_set_flex_flow(pane, LV_FLEX_FLOW_COLUMN);
+    // Clickable so a tap on the pane stays on the pane; folded, a tap on its
+    // showing sliver opens the deck, like the tab.
+    lv_obj_add_flag(pane, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(pane, [](lv_event_t *) { if (s.deckState == DECK_PEEK) deckSet(DECK_OPEN); },
+                        LV_EVENT_CLICKED, nullptr);
+
+    // The tab: THE RIGHT HALF, ALWAYS (owner, round 9). Some cards will get a
+    // second panel (a sensor's CHART, card-sheet 11.1); it takes the left half,
+    // so SETTINGS is always in the same place. Each panel is the deck's full
+    // width when open. It reaches a radius past the pane's edge, its lower
+    // corners hidden by the block below.
     s.deckTab = plain(s.deck);
-    lv_obj_set_pos (s.deckTab, w - tabW, 0);
-    lv_obj_set_size(s.deckTab, tabW, s.deckHead + r);
+    lv_obj_set_pos (s.deckTab, tabX, 0);
+    lv_obj_set_size(s.deckTab, tabW, tabAbove + r + bw);
     lv_obj_set_style_radius      (s.deckTab, r, 0);
+    lv_obj_set_style_bg_color    (s.deckTab, UI::c(p.SURFACE_ALT), 0);
     lv_obj_set_style_bg_opa      (s.deckTab, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(s.deckTab, UI::border(), 0);
     lv_obj_set_style_border_width(s.deckTab, bw, 0);
+    lv_obj_add_style             (s.deckTab, UI::paint(UIPaint::PAINT_LIFT), 0);
     lv_obj_add_flag(s.deckTab, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(s.deckTab, deckTabCb, LV_EVENT_CLICKED, nullptr);
     s.deckTabLbl = makeLabel(s.deckTab, t.TAG, p.ACCENT);
     lv_label_set_text(s.deckTabLbl, "SETTINGS");
     lv_obj_set_style_text_letter_space(s.deckTabLbl, mm(0.4f), 0);
-    lv_obj_align(s.deckTabLbl, LV_ALIGN_TOP_MID, 0, (s.deckHead - lv_font_get_line_height(t.TAG)) / 2);
+    lv_obj_align(s.deckTabLbl, LV_ALIGN_TOP_MID, 0, (tabAbove - lv_font_get_line_height(t.TAG)) / 2);
 
-    lv_obj_t *pane = plain(s.deck);
-    s.deckPane = pane;
-    lv_obj_set_pos (pane, 0, s.deckHead);
-    lv_obj_set_size(pane, w, s.deckH - s.deckHead);
-    lv_obj_set_style_bg_color    (pane, UI::c(p.SURFACE_ALT), 0);
-    lv_obj_set_style_bg_opa      (pane, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(pane, UI::border(), 0);
-    lv_obj_set_style_border_width(pane, bw, 0);
-    lv_obj_set_style_border_side (pane, (lv_border_side_t)(LV_BORDER_SIDE_LEFT | LV_BORDER_SIDE_RIGHT), 0);
-    lv_obj_set_style_pad_hor(pane, mm(2.4f), 0);
-    lv_obj_set_style_pad_ver(pane, mm(1.6f), 0);
-    lv_obj_set_flex_flow(pane, LV_FLEX_FLOW_COLUMN);
-    lv_obj_add_flag(pane, LV_OBJ_FLAG_CLICKABLE);   // a tap on the pane stays on the pane
+    // The block: the tab's lower corners, bottom border and (on Linen) the
+    // shadow it casts downward, all of which lie inside the pane - painted out
+    // in the pane's colour. Kept one border-width clear of the pane's right
+    // edge, which carries on down past the tab.
+    const UIMetrics &m = UI::met();
+    const int32_t reach = m.SHADOW ? UI::sc(m.SHADOW) + UI::sc(m.SHADOW_Y) + 2 : 0;
+    lv_obj_t *block = plain(s.deck);
+    lv_obj_set_pos (block, tabX, tabAbove + bw);
+    lv_obj_set_size(block, tabW - bw, r + bw + reach);
+    lv_obj_set_style_bg_color(block, UI::c(p.SURFACE_ALT), 0);
+    lv_obj_set_style_bg_opa  (block, LV_OPA_COVER, 0);
+
+    // The inner curve where the tab meets the pane's edge: a concave corner,
+    // which LVGL has no shape for. Two quarter arcs centred a radius out from
+    // the join: a thick one in the pane's colour fills the corner outside the
+    // curve, and a border-width one draws the edge along it. Their spill onto
+    // the tab and the pane is the same colour, so it does not show.
+    const lv_point_t ctr = { tabX - rf, tabAbove - rf };
+    const int32_t ro = (rf * 1415 + 999) / 1000 + 1;   // reaches the join, rf * sqrt(2)
+    auto quarter = [&](int32_t outer, int32_t width, lv_color_t col) {
+        lv_obj_t *a = lv_arc_create(s.deck);
+        lv_obj_remove_style_all(a);
+        lv_obj_clear_flag(a, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_pos (a, ctr.x - outer, ctr.y - outer);
+        lv_obj_set_size(a, 2 * outer, 2 * outer);
+        lv_arc_set_bg_angles(a, 0, 90);                // from +x round to +y: the join's side
+        lv_obj_set_style_arc_width  (a, width, LV_PART_MAIN);
+        lv_obj_set_style_arc_color  (a, col, LV_PART_MAIN);
+        lv_obj_set_style_arc_opa    (a, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_arc_rounded(a, false, LV_PART_MAIN);
+        lv_obj_set_style_arc_opa    (a, LV_OPA_TRANSP, LV_PART_INDICATOR);
+    };
+    quarter(ro, ro - rf, UI::c(p.SURFACE_ALT));
+    quarter(rf + bw, bw, UI::border());
 
     // Paused first: the one that works, and the one a person comes for.
     lv_obj_t *row = deckRow(pane, "Paused");
@@ -1533,13 +1601,6 @@ void pressCb(lv_event_t *ev) {
         lv_obj_has_flag(obj, CardPopup::CARD_SURFACE_FLAG)) {
         holdStart(obj);
     }
-    // An open deck folds back to its tab at a press anywhere in the window
-    // (the press still does whatever it does there).
-    if (s.phase == PopupPhase::PHASE_OPEN && s.deckState == DECK_OPEN && !inDeck(s.pressStart)) {
-        const lv_area_t &W = s.winRect;
-        const lv_point_t &pt = s.pressStart;
-        if (pt.x >= W.x1 && pt.x <= W.x2 && pt.y >= W.y1 && pt.y <= W.y2) deckSet(DECK_PEEK);
-    }
 }
 
 // The finger came up. A swipe that LVGL was told to wait out ends with no
@@ -1550,17 +1611,35 @@ void releaseCb(lv_event_t *ev) {
     if (h.phase == HoldPhase::HOLD_PRESSING) letGo();
 }
 
-// The catcher's two jobs: let presses on the window and its deck through, and
-// close on a tap anywhere else.
+bool inWindow(const lv_point_t &pt) {
+    const lv_area_t &W = s.winRect;
+    return pt.x >= W.x1 && pt.x <= W.x2 && pt.y >= W.y1 && pt.y <= W.y2;
+}
+
+// Did this touch, on the catcher, fold the deck? Then its click is spent.
+bool s_catcherFolded = false;
+
+// The catcher's jobs: let presses on the window and its deck through, and
+// close on a tap anywhere else. AND WHILE THE DECK IS OPEN, THE WINDOW IS OUT
+// OF REACH (owner, round 10): the topmost thing on the screen is the deck, so
+// a press anywhere in the window only folds it - it used to fold the deck and
+// also press whatever lay under the finger, the X closing the window before
+// the deck had finished folding, the back arrow leaving the view.
 void catcherCb(lv_event_t *ev) {
     const lv_event_code_t code = lv_event_get_code(ev);
     if (code == LV_EVENT_HIT_TEST) {
         lv_hit_test_info_t *info = lv_event_get_hit_test_info(ev);
         if (!info || !s.win) return;
-        const lv_point_t *pt = info->point;
-        const lv_area_t  &W  = s.winRect;
-        if ((pt->x >= W.x1 && pt->x <= W.x2 && pt->y >= W.y1 && pt->y <= W.y2) || inDeck(*pt)) info->res = false;
+        const lv_point_t &pt = *info->point;
+        if (inDeck(pt) || (s.deckState != DECK_OPEN && inWindow(pt))) info->res = false;
+    } else if (code == LV_EVENT_PRESSED) {
+        s_catcherFolded = false;
+        if (s.deckState == DECK_OPEN && inWindow(s.pressStart)) {
+            s_catcherFolded = true;
+            deckSet(DECK_PEEK);
+        }
     } else if (code == LV_EVENT_CLICKED) {
+        if (s_catcherFolded) { s_catcherFolded = false; return; }
         CardPopup::close();
     }
 }
@@ -1653,6 +1732,7 @@ void CardPopup::begin() {
     lv_obj_set_size(s_catcher, lv_pct(100), lv_pct(100));
     lv_obj_add_flag(s_catcher, LV_OBJ_FLAG_ADV_HITTEST);
     lv_obj_add_event_cb(s_catcher, catcherCb, LV_EVENT_HIT_TEST, nullptr);
+    lv_obj_add_event_cb(s_catcher, catcherCb, LV_EVENT_PRESSED,  nullptr);
     lv_obj_add_event_cb(s_catcher, catcherCb, LV_EVENT_CLICKED,  nullptr);
 }
 
