@@ -75,8 +75,11 @@ local debug flags. **What was decided and built: `card-sheet.md` §15. The owner
 - **Memory, for the owner to decide:** internal pool, a lamp window leaves 21-24 KB free (15 with the
   deck open); PSRAM pool measured at +10% per full-screen frame, ~2 ms on the popup's opening frame,
   +128 KB internal heap. Reverted pending the owner's choice.
-- **Sizes**: P4_5 verified unchanged; the 7" and 4B windows only worked out on paper. Flashing them
-  needs the owner's go-ahead (WS_P4_5 only while testing).
+- **Sizes**: P4_5 verified unchanged. Round 2 flashed the 4B too; the 1060 is built, not flashed
+  (not connected). Round 1 passed except three slider glitches, fixed in `6a629e7`.
+- **Paused members (owner, round 1), proposed, not built:** a paused member is left out of a group
+  (its state, what the group offers, its commands); the group shows PAUSED only when every member
+  is; a paused card's own window gets a PAUSED badge and greyed controls. Awaiting the owner's yes.
 - Next after round 1: 2.10c (HA attributes and `light.turn_on` with data - CommandRouter refuses HA
   light levels until then, loudly), then 2.10d saving, 2.10e history. Interview §3 onward after 2.10.
 
