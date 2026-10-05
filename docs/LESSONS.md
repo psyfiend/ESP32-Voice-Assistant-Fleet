@@ -453,6 +453,42 @@ A corollary found the same week: **a child larger than its parent also forces a 
 the parent has to be composited to clip it. A "floor" on a child size that can exceed its
 container is therefore not a safe fix.
 
+## Effects that cover the screen: what the popup's grow taught (2.10a, 2026-10-04)
+
+The card popup's grow was built four ways on `WS_P4_5` and measured frame by frame (`-D DEBUG_POPUP
+-D DEBUG_FRAMES`), then dropped for a window that appears at once (owner: "snappy first"). For the
+next piece of eye candy:
+
+- **A frame costs about the area that changes, times what lies under it.** A full-screen redraw on
+  `WS_P4_5` is ~100 ms in Midnight and ~165 ms in Linen (its shadows: +35 % full screen, +50 % per
+  card, `docs/display/test-log.md` T6); one card is 5-8 ms.
+- **LVGL's top layer never hides anything.** It is drawn OVER the screen, never instead of it
+  (`lv_refr.c:1049/1081`), so a redraw under a top-layer object draws the cards beneath it first. An
+  opaque object that is the SCREEN's topmost child is what `lv_refr_get_top_obj()` finds covering an
+  area, and then nothing under it is drawn. Opaque windows go on the screen; the top layer is for
+  things that are small or transparent.
+- **A dim is a full-screen redraw at both ends**, however it is drawn: the page must be drawn under
+  it the frame it appears, and drawn again the frame it goes. That was the popup's "untenable" pause:
+  the frame it landed in took ~120 ms (Midnight) / ~200 ms (Linen) after ~240 ms of growing, and the
+  first frame of closing ~95 / ~155 ms.
+- **LVGL draws an invalidated area in full-width strips** (ours are 50 lines), so an opaque window
+  in the middle saves nothing inside a full-screen invalidation. To keep a window out of a dim, dim
+  the bands around it, never one full-screen object.
+- **A growing filled box costs its whole area every frame; painting only each step's new ring costs
+  the ring** - 8-9 smooth frames at 33-40 ms. The motion was never the slow part; its ends were.
+- **A picture of the page under moving objects is slower than drawing the cards** (84-180 ms per
+  frame): LVGL's draw buffers are in PSRAM on the esp_lcd path, and the picture is copied PSRAM to
+  PSRAM every frame. And the page stops being live, which the owner rejected on sight.
+- **An animation scheduled by time collapses behind one slow frame.** The close's first frame ate
+  ~155 ms of a 180 ms shrink, so the rest came off at once: 2-3 frames instead of 6.
+- **LVGL 9.5's backdrop blur would be worse than a dim** on a live page: whenever anything under a
+  blurred object changes, LVGL invalidates the whole blurred object (`lv_obj_pos.c:1331`), so every
+  card update would mean a full-screen redraw plus the blur. It also blurs only inside the strip being
+  drawn (`lv_draw_sw_blur.c` clips to the task's area), so 50-line strips would likely show seams.
+  Read from the source, not tried on glass.
+- **So: animate small things.** A tab, a knob, one card - tens of thousands of pixels - move at full
+  frame rate. Anything that covers the screen costs a full redraw per change, whatever it looks like.
+
 ## LVGL's top layer scrolls, and drags everything on it along (#68)
 
 LVGL 9.5 creates `lv_layer_top()` (and the system layer) **scrollable** - it only removes

@@ -108,6 +108,26 @@ cleared, then the dim lifts, then the empty frame shrinks. **Owner's verdict: un
 improves drastically, this way of adding flair is not viable; snappy first.** Long press 300 -> **250
 ms**. Border and rounded corners on the grow are on hold until the direction is chosen (HANDOFF).
 
+## Round 5 - usable first (2026-10-04 evening, WS_P4_5)
+
+No grow: the window appears complete and closes in one step. Backdrop NONE to start. A long press on
+the window's title switches NONE / DIM for the next window (debug build only).
+
+| # | Do this | PASS if |
+|---|---|---|
+| U1 | Long press a card (a quarter second) | The window appears complete - frame, title, X, contents - in one step |
+| U2 | Tap the X | The window is gone in one step, page back as it was |
+| U3 | Tap a card outside the window | Closes; that card does NOT toggle |
+| U4 | Drag down on the title row; then open again and drag down in the body | The first closes; the second does not |
+| U5 | With the window open: swipe left/right, down from the top edge, up from the bottom | No page change, no drawer, no deck (the tap may close the window - fine) |
+| U6 | Open a card beside other live cards (sensor, Uptime) | Cards outside the window keep updating |
+| U7 | Long press the window's title | Toast "Backdrop: DIM - from the next window" |
+| U8 | Close, open another card (DIM) | The window first, then the page around it darkens a moment later. Say how the gap feels |
+| U9 | DIM: look at the window's four rounded corners | Dim right into the corners - no bright specks |
+| U10 | DIM: close | Window and dim go together |
+| U11 | Linen: repeat U1 and U8 | Note how much slower, if at all |
+| U12 | After a dozen opens and closes | No lines or leftovers on screen |
+
 ## Measured (Claude, from the board) - pending
 
 - `lv_mem` with the window open (interview G1).

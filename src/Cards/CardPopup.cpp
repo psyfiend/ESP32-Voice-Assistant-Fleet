@@ -3,18 +3,29 @@
 #include "Cards/CardIcons.h"
 #include "UI/UITokens.h"
 #include "UI/UIToolkit.h"
+#include "src/core/lv_obj_event_private.h"   // lv_hit_test_info_t: the tap catcher's hit test
 #include <Arduino.h>
 #include <math.h>
+#include <stdarg.h>
 #include <string.h>
 
 // See CardPopup.h for what this is and docs/design/card-sheet.md sections 11-13
-// for why it looks the way it does. Step 1 of 2.10a: the dim, the grow, the
-// window, its header, the four ways to close, the body and the inner views.
-// The settings deck comes next.
+// for why it looks the way it does. Step 1 of 2.10a: the window, its header,
+// the four ways to close, the body and the inner views. The settings deck
+// comes next.
+//
+// USABLE FIRST (owner, 2026-10-04 evening). The window used to grow out of the
+// card and land with the dim; every version of that was measured, and the
+// motion was never the slow part - the frame it landed in was (a full-screen
+// redraw for the dim, ~120 ms on Midnight, ~200 ms on Linen, after ~240 ms of
+// growing). The window now appears complete in the first frame after the long
+// press, and closes in one. What was learned is in docs/LESSONS.md, "Effects
+// that cover the screen".
 
-// Per the repo's debug-flag convention (CLAUDE.md). How many frames the grow
-// and shrink really get, and what the dim frame costs - the owner saw "only a
-// few frames" (O2, 2026-10-03), and the next step is decided by these numbers.
+// Per the repo's debug-flag convention (CLAUDE.md). What opening and closing
+// cost on this side of the frame: building the window and tearing it down.
+// The frames themselves are -D DEBUG_FRAMES (GUIManager.cpp). With this flag,
+// a long press on the window's title also switches the backdrop (the trial).
 #ifdef DEBUG_POPUP
     #define DBG_POPUP(...) Serial.printf("[Popup:debug] " __VA_ARGS__)
 #else
@@ -24,47 +35,42 @@
 namespace {
 
 #ifdef DEBUG_POPUP
-constexpr uint8_t DBG_MARKS = 48;
-uint32_t s_dbgMark[DBG_MARKS];
-uint8_t  s_dbgN = 0;
+char s_dbgLine[120];
 
-// One timestamp per animation step. An exec call happens once per LVGL timer
-// pass, so the gaps between them ARE the frame times the eye sees.
-void dbgMark() { if (s_dbgN < DBG_MARKS) s_dbgMark[s_dbgN++] = millis(); }
+void dbgPrint(lv_timer_t *t) { (void)t; DBG_POPUP("%s\n", s_dbgLine); }
 
-void dbgReport(const char *what) {
-    if (s_dbgN < 2) { DBG_POPUP("%s: %u step(s)\n", what, (unsigned)s_dbgN); s_dbgN = 0; return; }
-    char line[200];
-    int n = 0;
-    for (uint8_t i = 1; i < s_dbgN && n < (int)sizeof(line) - 8; i++) {
-        n += snprintf(line + n, sizeof(line) - n, " %lu",
-                      (unsigned long)(s_dbgMark[i] - s_dbgMark[i - 1]));
-    }
-    DBG_POPUP("%s: %u frames in %lu ms; gaps ms:%s\n", what, (unsigned)s_dbgN,
-              (unsigned long)(s_dbgMark[s_dbgN - 1] - s_dbgMark[0]), line);
-    s_dbgN = 0;
+// Printed 300 ms later, not now: a line written in the middle of the frames
+// it describes blocks on the UART and becomes one of them (LESSONS, "A debug
+// print is not free").
+void dbgLater(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(s_dbgLine, sizeof(s_dbgLine), fmt, ap);
+    va_end(ap);
+    lv_timer_t *t = lv_timer_create(dbgPrint, 300, nullptr);
+    lv_timer_set_repeat_count(t, 1);
 }
-#else
-inline void dbgMark() {}
-inline void dbgReport(const char *) {}
 #endif
 
 // Compound names, never a bare ALL-CAPS word - Arduino's pin-mode macros eat
 // those (CLAUDE.md, "Arduino's global macro namespace will eat your enum").
 enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS };
-enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_GROWING, PHASE_OPEN, PHASE_SHRINKING };
+enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
+
+// WHAT LIES BEHIND THE WINDOW - a trial (owner, 2026-10-04). NONE is the
+// fastest the popup can be: nothing outside the window is drawn at all. DIM is
+// the mock's dim, drawn only where the page shows - never under the window -
+// and one frame AFTER the window, so the window is up and usable while the
+// page darkens. With DEBUG_POPUP, a long press on the window's title switches
+// between them; the next window uses the new choice.
+enum class PopupBackdrop : uint8_t { BACKDROP_NONE, BACKDROP_DIM };
+PopupBackdrop s_backdrop = PopupBackdrop::BACKDROP_NONE;
 
 // D6: auto-close after 60 s untouched. The owner chose all four close routes.
 constexpr uint32_t POPUP_AUTOCLOSE_MS = 60000;
 constexpr uint32_t POPUP_TICK_MS      = 250;
-// SNAPPY FIRST (owner, 2026-10-04: "more than anything I want everything to be
-// responsive and as snappy as possible, decoration and eye candy flourishes
-// are secondary"). Every millisecond here is between the long press and a
-// window that can be used: ~7 frames at LVGL's 33 ms refresh period.
-constexpr uint32_t POPUP_GROW_MS      = 220;
-constexpr uint32_t POPUP_SHRINK_MS    = 180;
-// ~62%, the mock's dim. A BACKGROUND opacity on the scrim, which is ordinary
-// blending - not an object opa, which would composite a screen-sized layer.
+// ~62%, the mock's dim. A BACKGROUND opacity on plain objects, which is
+// ordinary blending - not an object opa, which would composite a layer.
 constexpr lv_opa_t POPUP_SCRIM_OPA    = 158;
 
 struct Popup {
@@ -80,43 +86,18 @@ struct Popup {
     char area[ENTITY_SHORT_MAX] = {0};
     char name[ENTITY_NAME_MAX]  = {0};
 
-    lv_area_t cardRect = {};   // where the card's surface sat, screen coords
     lv_area_t winRect = {};
     int32_t   winRadius = 0;
     int32_t   pad = 0;
 
-    // The grow's two ends: the first ring's rectangle and the window's.
-    lv_area_t animA = {}, animB = {};
+    // The dim: four bands around the window and a square under each of its
+    // rounded corners. Lit one frame after the window (dimPending).
+    static constexpr uint8_t DIM_MAX = 8;
+    lv_obj_t *dim[DIM_MAX] = {nullptr};
+    uint8_t   nDim = 0;
+    bool      dimPending = false;
 
-    // THE GROW IS PAINTED IN RINGS (2026-10-04). The history, because each
-    // step was measured:
-    //   - a growing filled box on lv_layer_top(): LVGL draws the page under
-    //     the top layer in full (lv_refr.c:1049/1081), so every card under the
-    //     box was redrawn every frame - 19 -> 66 ms, ~6 frames. Choppy.
-    //   - four walls and corner arcs: 33 ms frames, but an outline, "not a
-    //     popup" (owner).
-    //   - the page as a picture under a filled box: 84-180 ms frames - copying
-    //     the picture from PSRAM every frame cost more than drawing cards - and
-    //     a frozen background the owner did not want. Reverted.
-    // A frame costs about the area that changes. A filled box that is resized
-    // changes its whole area; a box that only GROWS changes just the new ring
-    // around it. So each step adds four thin filled strips covering exactly
-    // the ring between the last rectangle and the new one, and the strips
-    // already painted are never touched again. The page stays live underneath.
-    //
-    // Rings can add area, never move it, so the window grows OUTWARD from a
-    // strip inside its own final rectangle, on the side nearest the pressed
-    // card - not out of the card itself. Square corners in motion; the window
-    // rounds them when it lands.
-    static constexpr uint8_t RING_STEPS_MAX = 24;
-    static constexpr uint8_t RING_OBJS_MAX  = 4 * RING_STEPS_MAX + 1;
-    lv_area_t ringRect[RING_STEPS_MAX] = {};   // the rectangle after each step
-    uint8_t   nSteps = 0;
-    lv_obj_t *ringObj[RING_OBJS_MAX] = {nullptr};
-    uint8_t   ringEnd[RING_STEPS_MAX] = {0};   // ringObj count after each step
-    uint8_t   nRingObj = 0;
-
-    lv_obj_t *scrim = nullptr, *win = nullptr;
+    lv_obj_t *win = nullptr;
     lv_obj_t *btnLeft = nullptr, *lblLeft = nullptr;
     lv_obj_t *btnHistory = nullptr, *btnMembers = nullptr;
     lv_obj_t *lblTitleArea = nullptr, *lblTitleName = nullptr;
@@ -136,6 +117,16 @@ struct Popup {
     lv_point_t  pressStart = {0, 0};
 };
 Popup s;
+
+// THE TAP CATCHER: "tap outside" and the modal rule, with nothing drawn. A
+// transparent full-screen object on lv_layer_top(), made once at begin() and
+// never deleted, hidden or moved - each of those would invalidate the whole
+// screen (LESSONS, "Never toggle HIDDEN on a screen-sized object"). It is
+// switched by CLICKABLE alone, which costs no redraw. Its hit test says "not
+// here" inside the window, so LVGL goes on to search the screen, where the
+// window is (pointer_search_obj() in lv_indev.c: system layer, top layer,
+// then the screen).
+lv_obj_t *s_catcher = nullptr;
 
 // Millimetres on glass to this panel's pixels - the same derivation as
 // UI::minTouch(), so the window is the same physical size on every board.
@@ -251,92 +242,6 @@ const char *whatWord(const Entity &e, char *buf, size_t cap) {
     buf[n] = '\0';
     if (buf[0] >= 'a' && buf[0] <= 'z') buf[0] = (char)(buf[0] - 'a' + 'A');
     return buf;
-}
-
-// ---------------------------------------------------------------------------
-// The grow and the shrink, painted in rings. See Popup::ringRect for why.
-// ---------------------------------------------------------------------------
-
-// One filled strip in the window's colour. Empty strips are skipped - a step
-// that moved only two edges paints only two strips.
-void paintPiece(int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
-    if (x2 < x1 || y2 < y1 || s.nRingObj >= Popup::RING_OBJS_MAX) return;
-    lv_obj_t *o = plain(lv_layer_top());
-    lv_obj_set_pos (o, x1, y1);
-    lv_obj_set_size(o, x2 - x1 + 1, y2 - y1 + 1);
-    lv_obj_set_style_bg_color(o, UI::c(UI::pal().SURFACE_ALT), 0);
-    lv_obj_set_style_bg_opa  (o, LV_OPA_COVER, 0);
-    s.ringObj[s.nRingObj++] = o;
-}
-
-// Paint step i: the whole first rectangle, or the ring between step i-1 and
-// step i - top and bottom across the full width, left and right between them.
-void paintStep(uint8_t i) {
-    const lv_area_t &n = s.ringRect[i];
-    if (i == 0) {
-        paintPiece(n.x1, n.y1, n.x2, n.y2);
-    } else {
-        const lv_area_t &o = s.ringRect[i - 1];
-        paintPiece(n.x1, n.y1, n.x2, o.y1 - 1);   // top
-        paintPiece(n.x1, o.y2 + 1, n.x2, n.y2);   // bottom
-        paintPiece(n.x1, o.y1, o.x1 - 1, o.y2);   // left
-        paintPiece(o.x2 + 1, o.y1, n.x2, o.y2);   // right
-    }
-    s.ringEnd[i] = s.nRingObj;
-}
-
-// Remove every strip from step `from` outward; steps below it stay painted.
-void unpaintFrom(uint8_t from) {
-    const uint8_t keep = from ? s.ringEnd[from - 1] : 0;
-    while (s.nRingObj > keep) {
-        lv_obj_delete(s.ringObj[--s.nRingObj]);
-        s.ringObj[s.nRingObj] = nullptr;
-    }
-}
-
-// The grow: one step per animation tick, from animA (a strip inside the
-// window) out to the window. An eased lerp between nested rectangles is
-// monotonic, so each step contains the last; the clamp only guards rounding.
-void growExec(void *var, int32_t v) {
-    (void)var;
-    auto lerp = [v](int32_t a, int32_t b) { return a + (int32_t)(((int64_t)(b - a) * v) >> 10); };
-    lv_area_t r = { lerp(s.animA.x1, s.animB.x1), lerp(s.animA.y1, s.animB.y1),
-                    lerp(s.animA.x2, s.animB.x2), lerp(s.animA.y2, s.animB.y2) };
-    if (s.nSteps) {
-        const lv_area_t &o = s.ringRect[s.nSteps - 1];
-        r.x1 = LV_MIN(r.x1, o.x1); r.y1 = LV_MIN(r.y1, o.y1);
-        r.x2 = LV_MAX(r.x2, o.x2); r.y2 = LV_MAX(r.y2, o.y2);
-        if (r.x1 == o.x1 && r.y1 == o.y1 && r.x2 == o.x2 && r.y2 == o.y2) return;   // nothing new
-        // Keep the last slot for the final rectangle, however many ticks come.
-        if (s.nSteps >= Popup::RING_STEPS_MAX - 1 && v < 1024) return;
-    }
-    if (s.nSteps >= Popup::RING_STEPS_MAX) return;
-    s.ringRect[s.nSteps] = r;
-    paintStep(s.nSteps);
-    s.nSteps++;
-    dbgMark();
-}
-
-// The shrink: the grow's own rings come off, outermost first. The value runs
-// from the number of painted steps down to 0.
-void shrinkExec(void *var, int32_t v) {
-    (void)var;
-    if (v < 0) v = 0;
-    if (v < (int32_t)s.nSteps) unpaintFrom((uint8_t)v);
-    dbgMark();
-}
-
-void startAnim(lv_anim_exec_xcb_t exec, int32_t from, int32_t to, uint32_t ms,
-               lv_anim_path_cb_t path, lv_anim_completed_cb_t done) {
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var        (&a, &s);
-    lv_anim_set_values     (&a, from, to);
-    lv_anim_set_duration   (&a, ms);
-    lv_anim_set_path_cb    (&a, path);
-    lv_anim_set_exec_cb    (&a, exec);
-    lv_anim_set_completed_cb(&a, done);
-    lv_anim_start(&a);
 }
 
 void forgetWidgets() {
@@ -630,8 +535,21 @@ void headerGestureCb(lv_event_t *ev) {
     CardPopup::close();
 }
 
+#ifdef DEBUG_POPUP
+// The backdrop trial: a long press on the title switches it for the NEXT
+// window. Debug builds only - the trial ends in a decision, not a setting.
+void backdropCycleCb(lv_event_t *ev) {
+    (void)ev;
+    s_backdrop = (s_backdrop == PopupBackdrop::BACKDROP_NONE) ? PopupBackdrop::BACKDROP_DIM
+                                                             : PopupBackdrop::BACKDROP_NONE;
+    UIToolkit::show_toast(s_backdrop == PopupBackdrop::BACKDROP_DIM
+                              ? "Backdrop: DIM - from the next window"
+                              : "Backdrop: NONE - from the next window");
+}
+#endif
+
 // ---------------------------------------------------------------------------
-// The window's contents, built once the frame has finished growing
+// The window's contents
 // ---------------------------------------------------------------------------
 void buildContents() {
     const UIPalette &p = UI::pal();
@@ -660,6 +578,9 @@ void buildContents() {
     // the flag, so a drag that starts on the X still arrives here.
     lv_obj_clear_flag(hdr, LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_event_cb(hdr, headerGestureCb, LV_EVENT_GESTURE, nullptr);
+#ifdef DEBUG_POPUP
+    lv_obj_add_event_cb(hdr, backdropCycleCb, LV_EVENT_LONG_PRESSED, nullptr);
+#endif
 
     // Both ends the same width, so the title sits in the true middle.
     const uint8_t nRight = (s.nEnt > 1) ? 2 : 1;
@@ -751,13 +672,20 @@ void tickCb(lv_timer_t *t) {
     }
 }
 
-// The filled window, created only once the rings have arrived. The scheme's
-// raised surface (the mock's window is Midnight's SURFACE_ALT exactly) and
-// the border token. No clip_corner: it would cost a window-sized layer
-// (card-sheet 8). Clickable, so a tap inside never falls through to the scrim.
+// The window, ON THE SCREEN AS ITS TOPMOST OBJECT - not lv_layer_top(). LVGL
+// draws the top layer OVER the page, never instead of it (lv_refr.c:1049/1081),
+// so with the window up there every redraw inside it - opening, a toggle, the
+// countdown bar - drew the cards beneath it first. On the screen, an opaque
+// window is what lv_refr_get_top_obj() finds covering those areas, and LVGL
+// draws only the window. Created last, so it is above the header, the deck and
+// the drawer; a page rebuild moves only the cards to the back.
+//
+// The scheme's raised surface (the mock's window is Midnight's SURFACE_ALT
+// exactly) and the border token. No clip_corner: it would cost a window-sized
+// layer (card-sheet 8). Clickable, so a tap inside never reaches the catcher.
 void makeWindow() {
     const UIPalette &p = UI::pal();
-    s.win = plain(lv_layer_top());
+    s.win = plain(lv_screen_active());
     lv_obj_add_flag(s.win, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_pos (s.win, s.winRect.x1, s.winRect.y1);
     lv_obj_set_size(s.win, lv_area_get_width(&s.winRect), lv_area_get_height(&s.winRect));
@@ -767,86 +695,95 @@ void makeWindow() {
     lv_obj_set_style_border_color(s.win, UI::border(), 0);
     lv_obj_set_style_border_width(s.win, UI::met().BORDER_W ? UI::met().BORDER_W : 1, 0);
     // The scheme's lift - a real shadow on Linen, nothing on the dark schemes
-    // (owner, L2). It exists only while the window does, never in motion.
+    // (owner, L2).
     lv_obj_add_style(s.win, UI::paint(UIPaint::PAINT_LIFT), 0);
 }
 
-void scrimClickCb(lv_event_t *ev);
+// One piece of the dim, created TRANSPARENT. See makeDim().
+void dimPiece(int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
+    if (x2 < x1 || y2 < y1 || s.nDim >= Popup::DIM_MAX) return;
+    lv_obj_t *o = plain(lv_screen_active());
+    lv_obj_set_pos (o, x1, y1);
+    lv_obj_set_size(o, x2 - x1 + 1, y2 - y1 + 1);
+    lv_obj_set_style_bg_color(o, UI::c(UI::pal().SCRIM), 0);
+    lv_obj_set_style_bg_opa  (o, LV_OPA_TRANSP, 0);
+    s.dim[s.nDim++] = o;
+}
 
-// THE DIM ONLY WHILE THE WINDOW IS OPEN AND STILL (owner, round 2). It used to
-// go up before the motion and stay until it ended, which put two full-screen
-// redraws (~114 ms each) on the edges of the motion - the hesitation at both
-// ends the owner saw. Now the dim and the window arrive together and leave
-// together, so the expensive frames happen where the motion stops and starts.
-// Tapping it is "tap outside", the second close route.
-void makeScrim() {
+// THE DIM, AS THE PAGE AROUND THE WINDOW. One full-screen scrim would put the
+// window's whole area into the frame that draws the dim, and LVGL renders a
+// full-screen area in full-width strips that no window covers - so the cards
+// under the window would all be drawn too. Four bands around the window, and
+// a square under each rounded corner so the corner's outside dims as well,
+// leave the window's own area out of it.
+//
+// They must lie UNDER the window, so they are created before it - but a new
+// object costs a redraw of its area even while transparent, which here would
+// be most of the page, in the window's frame. So they are made with
+// invalidation off, laid out at once (the layout pass is what would otherwise
+// invalidate them, at the next refresh), and lit one frame AFTER the window by
+// displayRefrReadyCb(). Any layout already pending is settled first, with
+// invalidation on, so nothing else loses a redraw it was owed.
+void makeDim() {
     lv_obj_t *scr = lv_screen_active();
-    s.scrim = plain(lv_layer_top());
-    lv_obj_set_size  (s.scrim, lv_obj_get_width(scr), lv_obj_get_height(scr));
-    lv_obj_set_pos   (s.scrim, 0, 0);
-    lv_obj_set_style_bg_color(s.scrim, UI::c(UI::pal().SCRIM), 0);
-    lv_obj_set_style_bg_opa  (s.scrim, POPUP_SCRIM_OPA, 0);
-    lv_obj_add_flag  (s.scrim, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(s.scrim, scrimClickCb, LV_EVENT_CLICKED, nullptr);
+    const int32_t sw = lv_obj_get_width(scr), sh = lv_obj_get_height(scr);
+    const lv_area_t &W = s.winRect;
+    const int32_t r = s.winRadius;
+
+    lv_obj_update_layout(scr);
+    lv_display_enable_invalidation(nullptr, false);
+    dimPiece(0, 0, sw - 1, W.y1 - 1);                         // above
+    dimPiece(0, W.y2 + 1, sw - 1, sh - 1);                    // below
+    dimPiece(0, W.y1, W.x1 - 1, W.y2);                        // left
+    dimPiece(W.x2 + 1, W.y1, sw - 1, W.y2);                   // right
+    dimPiece(W.x1, W.y1, W.x1 + r - 1, W.y1 + r - 1);         // under the corners
+    dimPiece(W.x2 - r + 1, W.y1, W.x2, W.y1 + r - 1);
+    dimPiece(W.x1, W.y2 - r + 1, W.x1 + r - 1, W.y2);
+    dimPiece(W.x2 - r + 1, W.y2 - r + 1, W.x2, W.y2);
+    lv_obj_update_layout(scr);
+    lv_display_enable_invalidation(nullptr, true);
+    s.dimPending = true;
 }
 
-void growDone(lv_anim_t *a) {
-    (void)a;
-    if (s.phase != PopupPhase::PHASE_GROWING) return;
-    dbgReport("grow");
-    s.phase = PopupPhase::PHASE_OPEN;
-    // Dim, window and contents in one frame, and the rings go - the window
-    // covers exactly where they were, rounded, and they would show square at
-    // its corners. That frame is the expensive one; the motion before it was
-    // cheap. The steps' rectangles are kept: the shrink repaints them.
-    // Created in this order so the dim lies under the window.
-    makeScrim();
-    makeWindow();
-    buildContents();
-    unpaintFrom(0);
-    s.lastTouchMs = millis();
-    s.lastAgeMs   = s.lastTouchMs;
-    s.timer = lv_timer_create(tickCb, POPUP_TICK_MS, nullptr);
+// After every refresh. The first one after open() is the frame that drew the
+// window; the dim is lit now and drawn in the next.
+void displayRefrReadyCb(lv_event_t *e) {
+    (void)e;
+    if (!s.dimPending) return;
+    s.dimPending = false;
+    if (s.phase != PopupPhase::PHASE_OPEN) return;
+    for (uint8_t i = 0; i < s.nDim; i++) lv_obj_set_style_bg_opa(s.dim[i], POPUP_SCRIM_OPA, 0);
 }
 
-void shrinkDone(lv_anim_t *a) {
-    (void)a;
-    dbgReport("shrink");
-    unpaintFrom(0);
-    s.nSteps = 0;
-    if (s.scrim) { lv_obj_delete(s.scrim); s.scrim = nullptr; }   // normally gone already
-    s.phase = PopupPhase::PHASE_CLOSED;
-    s.nEnt = 0;
+void deleteDim() {
+    for (uint8_t i = 0; i < s.nDim; i++) {
+        lv_obj_delete(s.dim[i]);
+        s.dim[i] = nullptr;
+    }
+    s.nDim = 0;
+    s.dimPending = false;
 }
 
 // The deferred half of close(). Runs from LVGL's own timer handler, outside any
-// event callback, so deleting the window's children here is safe.
+// event callback, so deleting the window's children here is safe. Everything
+// goes in one frame.
 void closeNow(void *unused) {
     (void)unused;
     s.closeQueued = false;
-    if (s.phase != PopupPhase::PHASE_GROWING && s.phase != PopupPhase::PHASE_OPEN) return;
-
+    if (s.phase != PopupPhase::PHASE_OPEN) return;
+#ifdef DEBUG_POPUP
+    const uint32_t t0 = micros();
+#endif
     if (s.timer) { lv_timer_delete(s.timer); s.timer = nullptr; }
-
-    if (s.phase == PopupPhase::PHASE_GROWING) {
-        // Closed mid-grow: the rings painted so far come off from here.
-        lv_anim_delete(&s, growExec);
-    } else {
-        // The dim, the window and its contents go in one frame, and the rings
-        // are repainted under where the window was - the same frame, so the
-        // page never shows through - then come off outermost first, over the
-        // undimmed page: the grow in reverse.
-        if (s.win)   { lv_obj_delete(s.win);   s.win = nullptr; }
-        if (s.scrim) { lv_obj_delete(s.scrim); s.scrim = nullptr; }
-        forgetWidgets();
-        s.nRingObj = 0;
-        for (uint8_t i = 0; i < s.nSteps; i++) paintStep(i);
-    }
-    if (!s.nSteps) { shrinkDone(nullptr); return; }
-    s.phase = PopupPhase::PHASE_SHRINKING;
-    // Linear over STEPS: the steps were laid down on the grow's ease-out, so
-    // removing them at an even rate replays that curve backwards.
-    startAnim(shrinkExec, s.nSteps, 0, POPUP_SHRINK_MS, lv_anim_path_linear, shrinkDone);
+    if (s.win)   { lv_obj_delete(s.win);     s.win = nullptr; }
+    deleteDim();
+    forgetWidgets();
+    if (s_catcher) lv_obj_clear_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
+    s.phase = PopupPhase::PHASE_CLOSED;
+    s.nEnt = 0;
+#ifdef DEBUG_POPUP
+    dbgLater("close: torn down in %lu us", (unsigned long)(micros() - t0));
+#endif
 }
 
 void pressCb(lv_event_t *ev) {
@@ -856,7 +793,20 @@ void pressCb(lv_event_t *ev) {
     s.lastTouchMs = millis();
 }
 
-void scrimClickCb(lv_event_t *ev) { (void)ev; CardPopup::close(); }
+// The catcher's two jobs: let presses on the window through, and close on a
+// tap anywhere else.
+void catcherCb(lv_event_t *ev) {
+    const lv_event_code_t code = lv_event_get_code(ev);
+    if (code == LV_EVENT_HIT_TEST) {
+        lv_hit_test_info_t *info = lv_event_get_hit_test_info(ev);
+        if (!info || !s.win) return;
+        const lv_point_t *pt = info->point;
+        const lv_area_t  &W  = s.winRect;
+        if (pt->x >= W.x1 && pt->x <= W.x2 && pt->y >= W.y1 && pt->y <= W.y2) info->res = false;
+    } else if (code == LV_EVENT_CLICKED) {
+        CardPopup::close();
+    }
+}
 
 } // namespace
 
@@ -870,13 +820,23 @@ void CardPopup::begin() {
     if (lv_indev_t *in = lv_indev_get_next(nullptr)) {
         lv_indev_add_event_cb(in, pressCb, LV_EVENT_PRESSED, nullptr);
     }
+    // The frame after the window's: when the dim is lit.
+    if (lv_display_t *d = lv_display_get_default()) {
+        lv_display_add_event_cb(d, displayRefrReadyCb, LV_EVENT_REFR_READY, nullptr);
+    }
+    // The tap catcher, once, for the life of the device. See s_catcher.
+    s_catcher = plain(lv_layer_top());
+    lv_obj_set_size(s_catcher, lv_pct(100), lv_pct(100));
+    lv_obj_add_flag(s_catcher, LV_OBJ_FLAG_ADV_HITTEST);
+    lv_obj_add_event_cb(s_catcher, catcherCb, LV_EVENT_HIT_TEST, nullptr);
+    lv_obj_add_event_cb(s_catcher, catcherCb, LV_EVENT_CLICKED,  nullptr);
 }
 
 bool CardPopup::isOpen() { return s.phase != PopupPhase::PHASE_CLOSED; }
 
 void CardPopup::close() {
     if (s.closeQueued) return;
-    if (s.phase != PopupPhase::PHASE_GROWING && s.phase != PopupPhase::PHASE_OPEN) return;
+    if (s.phase != PopupPhase::PHASE_OPEN) return;
     s.closeQueued = true;
     lv_async_call(closeNow, nullptr);
 }
@@ -896,9 +856,12 @@ void CardPopup::open(Card &card) {
         const int32_t lim = mm(4);
         if (dx * dx + dy * dy > lim * lim) return;
         // Release the touch BEFORE building anything (LESSONS): the finger is
-        // still down, and its release must not land on the new scrim.
+        // still down, and its release must not land on the window.
         lv_indev_wait_release(in);
     }
+#ifdef DEBUG_POPUP
+    const uint32_t t0 = micros();
+#endif
 
     // --- Copy what the window needs; never keep the card -------------------
     s.nEnt = 0;
@@ -910,7 +873,6 @@ void CardPopup::open(Card &card) {
     s.tempUnit = card.tempUnit();
     snprintf(s.area, sizeof(s.area), "%s", card._area);
     snprintf(s.name, sizeof(s.name), "%s", card.label());
-    lv_obj_get_coords(card._surface, &s.cardRect);
 
     // --- Where the window goes ---------------------------------------------
     // The mock: ~68 mm wide (62% of the P4_5, nearly all of the 4B), from just
@@ -930,35 +892,23 @@ void CardPopup::open(Card &card) {
     // corner" (H1). Still clear of the 2.4 mm corner radius.
     s.pad        = mm(1.2f);
 
-    // --- Where the rings start: the card, pulled inside the window --------
-    // Rings only add area, so the first rectangle must lie inside the
-    // window. The card's rectangle clamped into it: a card under the window
-    // starts as itself; one beside the window starts as a strip on the near
-    // edge, at the card's height. Never thinner than 6 mm either way.
-    const lv_area_t &W = s.winRect;
-    lv_area_t a = { LV_CLAMP(W.x1, s.cardRect.x1, W.x2), LV_CLAMP(W.y1, s.cardRect.y1, W.y2),
-                    LV_CLAMP(W.x1, s.cardRect.x2, W.x2), LV_CLAMP(W.y1, s.cardRect.y2, W.y2) };
-    const int32_t minSide = mm(6);
-    if (a.x2 - a.x1 + 1 < minSide) {
-        a.x1 = LV_CLAMP(W.x1, (a.x1 + a.x2) / 2 - minSide / 2, W.x2 - minSide + 1);
-        a.x2 = a.x1 + minSide - 1;
-    }
-    if (a.y2 - a.y1 + 1 < minSide) {
-        a.y1 = LV_CLAMP(W.y1, (a.y1 + a.y2) / 2 - minSide / 2, W.y2 - minSide + 1);
-        a.y2 = a.y1 + minSide - 1;
-    }
-    s.animA    = a;
-    s.animB    = s.winRect;
-    s.nSteps   = 0;
-    s.nRingObj = 0;
-#ifdef DEBUG_POPUP
-    s_dbgN = 0;
-#endif
-
     s.view        = PopupView::VIEW_MAIN;
     s.closeQueued = false;
-    s.phase       = PopupPhase::PHASE_GROWING;
-    // Over the UNDIMMED page: the dim arrives with the window (makeScrim()).
-    // growExec paints the first rectangle on its first tick.
-    startAnim(growExec, 0, 1024, POPUP_GROW_MS, lv_anim_path_ease_out, growDone);
+    s.phase       = PopupPhase::PHASE_OPEN;
+
+    // The dim first, so it lies under the window - transparent and costing
+    // nothing until the frame after the window's.
+    s.nDim = 0;
+    if (s_backdrop == PopupBackdrop::BACKDROP_DIM) makeDim();
+    makeWindow();
+    buildContents();
+    if (s_catcher) lv_obj_add_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
+
+    s.lastTouchMs = millis();
+    s.lastAgeMs   = s.lastTouchMs;
+    s.timer = lv_timer_create(tickCb, POPUP_TICK_MS, nullptr);
+#ifdef DEBUG_POPUP
+    dbgLater("open: built in %lu us, backdrop %s", (unsigned long)(micros() - t0),
+             s_backdrop == PopupBackdrop::BACKDROP_DIM ? "DIM" : "NONE");
+#endif
 }
