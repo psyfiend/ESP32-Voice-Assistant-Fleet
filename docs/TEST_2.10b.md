@@ -82,6 +82,31 @@ G6-G9's choice is kept in RAM only: a reboot or a page rebuild puts it back to "
 | K1 | Linen: a lamp's window in each control | The slider's track, the fill, the strips' ring and the selector are all clear |
 | K2 | Text | Nothing renders as an empty box |
 
+### Round 1 results (owner, 2026-10-05)
+
+Z1-Z2, L1-L6, L8, L10-L14, G1-G9, D1-D2, K1-K2 PASS - "looks amazing". D1: no hesitation on the
+first opening of the deck. G2: Lamp 4 has no card of its own but shows under Members (by design).
+**L7 FAIL / L9 PARTIAL**: a stray vertical line beside the strip's left edge (the hidden ring's
+outline - a 0-wide object still drew it), and sometimes no ring in Temperature (the lamp was showing
+a colour, which reports no kelvin). **Slider grip** opened off to the right on All Lamps and Lamp 3
+and moved to the middle a second later (placed from a width LVGL had not laid out yet). All three
+fixed in `6a629e7`. **Raised**: a paused member makes All Lamps PAUSED, and a paused card's own
+window should say so more strongly - discussion in HANDOFF, not built.
+
+## Round 2 - the fixes, and the other sizes
+
+Flashed 2026-10-05: **WS_P4_5** (with the debug flags) and **WS_P4_4B**. **CYD_P4_1060** is built
+but was not connected.
+
+| # | Board | Do this | PASS if |
+|---|---|---|---|
+| R1 | P4_5 | Open All Lamps and Lamp 3 a few times, lamps on | The grip is in the middle from the first moment |
+| R2 | P4_5 | Lamp 3: Temperature, then Colour, a few times each | No line beside the strip |
+| R3 | P4_5 | Lamp 3 showing a colour (tap a swatch), then Temperature | No ring; the value reads "A colour". Tap the strip: the ring appears, the K shows |
+| R4 | 4B | Open the Switch, then a lamp | The toggle and the slider are smaller than before (~29 mm, about the P4_5's); the window still screen-wide |
+| R5 | 4B | Lamp 3: Colour | The swatches and selector fit beside the strip |
+| R6 | 1060 (when connected) | Open the Switch, then a lamp | The window is wider than tall (~108 x 75 mm); the toggle ~48 mm - the same share of the window as on the P4_5 |
+
 ## Not tested (by Claude)
 
 Everything below was driven over `/popup` with no finger on the glass, so **nothing about touch has
