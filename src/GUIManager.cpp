@@ -582,8 +582,9 @@ void GUIManager::begin() {
         // 2026-10-03, once long press became the way into every card's popup:
         // "could it be shortened just a hair?" - 300 ms, then 250 (2026-10-04).
         // The cost is that a slow tap held past a quarter second opens the
-        // window instead of toggling; 300 is the fallback.
-        lv_indev_set_long_press_time(indev, 250);
+        // window instead of toggling; 300 is the fallback. The value lives in
+        // CardPopup, whose hold fades over exactly this long.
+        lv_indev_set_long_press_time(indev, CardPopup::LONG_PRESS_MS);
     }
 
 #ifdef DEBUG_FRAMES

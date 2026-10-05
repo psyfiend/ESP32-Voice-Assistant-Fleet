@@ -20,12 +20,18 @@
 // redraw for the dim, ~120 ms on Midnight, ~200 ms on Linen, after ~240 ms of
 // growing). The window now appears complete in the first frame after the long
 // press, and closes in one. What was learned is in docs/LESSONS.md, "Effects
-// that cover the screen".
+// that cover the screen". Nothing is drawn behind it: the dim was tried that
+// evening, drawn around the window a frame after it, and the owner chose
+// speed - "the delay seems like an eternity and adds very little".
+//
+// What the eye gets instead is cheap because it is small: the held card's
+// border fades to the accent while the finger is down, the card leaps, and the
+// switch's knob slides (see "The hold, and the leap").
 
 // Per the repo's debug-flag convention (CLAUDE.md). What opening and closing
 // cost on this side of the frame: building the window and tearing it down.
 // The frames themselves are -D DEBUG_FRAMES (GUIManager.cpp). With this flag,
-// a long press on the window's title also switches the backdrop (the trial).
+// a long press on the window's title also cycles the leap: 2 frames, 1, none.
 #ifdef DEBUG_POPUP
     #define DBG_POPUP(...) Serial.printf("[Popup:debug] " __VA_ARGS__)
 #else
@@ -35,9 +41,32 @@
 namespace {
 
 #ifdef DEBUG_POPUP
-char s_dbgLine[120];
+char     s_dbgLine[120];
+uint32_t s_dbgPressMs   = 0;   // when the long press fired
+uint32_t s_dbgRenderT0  = 0;
+uint32_t s_dbgFrameMs   = 0;   // how long the next frame took to draw
+uint32_t s_dbgGlassMs   = 0;   // long press to that frame drawn
+bool     s_dbgWantFrame = false;
 
-void dbgPrint(lv_timer_t *t) { (void)t; DBG_POPUP("%s\n", s_dbgLine); }
+// The frame after a window appears or goes. -D DEBUG_FRAMES cannot see it: it
+// only prints bursts of three frames or more, and closing is one.
+void dbgRenderStart(lv_event_t *e) { (void)e; if (s_dbgWantFrame) s_dbgRenderT0 = millis(); }
+void dbgRenderReady(lv_event_t *e) {
+    (void)e;
+    if (!s_dbgWantFrame || !s_dbgRenderT0) return;
+    s_dbgFrameMs   = millis() - s_dbgRenderT0;
+    s_dbgGlassMs   = s_dbgPressMs ? millis() - s_dbgPressMs : 0;
+    s_dbgWantFrame = false;
+    s_dbgRenderT0  = 0;
+}
+
+void dbgPrint(lv_timer_t *t) {
+    (void)t;
+    if (s_dbgGlassMs) DBG_POPUP("%s; its frame drew in %lu ms; long press to glass %lu ms\n", s_dbgLine,
+                                (unsigned long)s_dbgFrameMs, (unsigned long)s_dbgGlassMs);
+    else              DBG_POPUP("%s; its frame drew in %lu ms\n", s_dbgLine, (unsigned long)s_dbgFrameMs);
+    s_dbgPressMs = s_dbgGlassMs = 0;
+}
 
 // Printed 300 ms later, not now: a line written in the middle of the frames
 // it describes blocks on the UART and becomes one of them (LESSONS, "A debug
@@ -47,6 +76,8 @@ void dbgLater(const char *fmt, ...) {
     va_start(ap, fmt);
     vsnprintf(s_dbgLine, sizeof(s_dbgLine), fmt, ap);
     va_end(ap);
+    s_dbgWantFrame = true;
+    s_dbgFrameMs   = 0;
     lv_timer_t *t = lv_timer_create(dbgPrint, 300, nullptr);
     lv_timer_set_repeat_count(t, 1);
 }
@@ -55,23 +86,25 @@ void dbgLater(const char *fmt, ...) {
 // Compound names, never a bare ALL-CAPS word - Arduino's pin-mode macros eat
 // those (CLAUDE.md, "Arduino's global macro namespace will eat your enum").
 enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS };
-enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
-
-// WHAT LIES BEHIND THE WINDOW - a trial (owner, 2026-10-04). NONE is the
-// fastest the popup can be: nothing outside the window is drawn at all. DIM is
-// the mock's dim, drawn only where the page shows - never under the window -
-// and one frame AFTER the window, so the window is up and usable while the
-// page darkens. With DEBUG_POPUP, a long press on the window's title switches
-// between them; the next window uses the new choice.
-enum class PopupBackdrop : uint8_t { BACKDROP_NONE, BACKDROP_DIM };
-PopupBackdrop s_backdrop = PopupBackdrop::BACKDROP_NONE;
+// LEAP: the long press has fired and the card is leaping; the window comes
+// after LEAP_FRAMES frames. Modal from here, like OPEN.
+enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_LEAP, PHASE_OPEN };
+// Where the held card is. OWNED: its window is open, and it keeps the accent
+// border until the window closes.
+enum class HoldPhase  : uint8_t { HOLD_NONE, HOLD_PRESSING, HOLD_LETTING_GO, HOLD_LEAPING, HOLD_OWNED };
 
 // D6: auto-close after 60 s untouched. The owner chose all four close routes.
 constexpr uint32_t POPUP_AUTOCLOSE_MS = 60000;
 constexpr uint32_t POPUP_TICK_MS      = 250;
-// ~62%, the mock's dim. A BACKGROUND opacity on plain objects, which is
-// ordinary blending - not an object opa, which would composite a layer.
-constexpr lv_opa_t POPUP_SCRIM_OPA    = 158;
+
+// The hold and the leap, in millimetres so they look the same on every board.
+constexpr float    HOLD_SINK_MM    = 0.4f;   // how far the card sinks by the long press
+constexpr float    LEAP_GROW_MM    = 1.0f;   // how much larger than normal it leaps
+constexpr uint32_t HOLD_LETGO_MS   = 120;    // a tap lets go this fast, from full
+constexpr uint32_t KNOB_SLIDE_MS   = 160;
+// Frames of leap before the window. 2 = ~66 ms the window waits for it. With
+// DEBUG_POPUP a long press on the window's title cycles 2 -> 1 -> 0.
+uint8_t s_leapFrames = 2;
 
 struct Popup {
     PopupPhase phase = PopupPhase::PHASE_CLOSED;
@@ -90,13 +123,6 @@ struct Popup {
     int32_t   winRadius = 0;
     int32_t   pad = 0;
 
-    // The dim: four bands around the window and a square under each of its
-    // rounded corners. Lit one frame after the window (dimPending).
-    static constexpr uint8_t DIM_MAX = 8;
-    lv_obj_t *dim[DIM_MAX] = {nullptr};
-    uint8_t   nDim = 0;
-    bool      dimPending = false;
-
     lv_obj_t *win = nullptr;
     lv_obj_t *btnLeft = nullptr, *lblLeft = nullptr;
     lv_obj_t *btnHistory = nullptr, *btnMembers = nullptr;
@@ -109,6 +135,8 @@ struct Popup {
     lv_obj_t *lblWhat = nullptr, *lblValue = nullptr, *lblUnit = nullptr, *lblAgo = nullptr;
     int32_t   heroW = 0, heroH = 0, knobH = 0, knobInset = 0;
     bool      toggleHero = false;
+    bool      knobPlaced = false;   // the first placement jumps; every later one slides
+    int32_t   knobTarget = 0;
 
     lv_timer_t *timer = nullptr;
     uint32_t    lastTouchMs = 0;
@@ -117,6 +145,19 @@ struct Popup {
     lv_point_t  pressStart = {0, 0};
 };
 Popup s;
+
+// The card under the finger. `surface` is a card's own LVGL object, which a
+// page rebuild can delete at any moment - so it is checked with
+// lv_obj_is_valid() before it is touched outside an animation (an animation
+// whose var is the surface is deleted with it, by LVGL).
+struct Hold {
+    HoldPhase phase = HoldPhase::HOLD_NONE;
+    lv_obj_t *surface = nullptr;
+    int32_t   v = 0;          // 0..255: how far toward the accent
+    uint8_t   leapStep = 0;
+};
+Hold h;
+lv_indev_t *s_indev = nullptr;
 
 // THE TAP CATCHER: "tap outside" and the modal rule, with nothing drawn. A
 // transparent full-screen object on lv_layer_top(), made once at begin() and
@@ -252,6 +293,34 @@ void forgetWidgets() {
     s.lblWhat = s.lblValue = s.lblUnit = s.lblAgo = nullptr;
 }
 
+void knobExec(void *var, int32_t v) { lv_obj_set_y((lv_obj_t *)var, v); }
+
+// The switch's knob SLIDES to its new end (owner, 2026-10-04: "absolutely" on
+// the control giving feedback), except when the view is first built, where it
+// is simply placed. The knob is inside the window, which covers the page, so
+// each frame redraws only the toggle. The animation's var is the knob, so
+// LVGL deletes it with the window.
+void placeKnob(int32_t y) {
+    if (!s.knob) return;
+    if (!s.knobPlaced) {
+        lv_obj_set_y(s.knob, y);
+        s.knobPlaced = true;
+        s.knobTarget = y;
+        return;
+    }
+    if (y == s.knobTarget) return;
+    s.knobTarget = y;
+    lv_anim_delete(s.knob, knobExec);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var     (&a, s.knob);
+    lv_anim_set_values  (&a, lv_obj_get_y(s.knob), y);
+    lv_anim_set_duration(&a, KNOB_SLIDE_MS);
+    lv_anim_set_path_cb (&a, lv_anim_path_ease_in_out);
+    lv_anim_set_exec_cb (&a, knobExec);
+    lv_anim_start(&a);
+}
+
 // ---------------------------------------------------------------------------
 // The main view: the hero beside what it shows (card-sheet 11.1)
 // ---------------------------------------------------------------------------
@@ -318,7 +387,7 @@ void renderMain() {
                                                     : UI::mix(p.SURFACE_ALT, p.TEXT, 10)), 0);
         lv_obj_set_style_bg_color(s.knob, UI::c(lit ? p.ST_ACTIVE
                                                     : UI::mix(p.SURFACE_ALT, p.TEXT, 25)), 0);
-        lv_obj_set_y(s.knob, lit ? s.knobInset : s.heroH - s.knobH - s.knobInset);
+        placeKnob(lit ? s.knobInset : s.heroH - s.knobH - s.knobInset);
         lv_obj_set_style_text_color(s.heroIcon,
             UI::c(lit ? UI::contrastOf(p.ST_ACTIVE, p.GROUND, p.TEXT) : p.TEXT), 0);
     } else {
@@ -423,6 +492,7 @@ void buildMain() {
 
     s.lblAgo = makeLabel(col, t.TAG, p.TEXT_DIM);
 
+    s.knobPlaced = false;
     renderMain();
 }
 
@@ -536,15 +606,15 @@ void headerGestureCb(lv_event_t *ev) {
 }
 
 #ifdef DEBUG_POPUP
-// The backdrop trial: a long press on the title switches it for the NEXT
-// window. Debug builds only - the trial ends in a decision, not a setting.
-void backdropCycleCb(lv_event_t *ev) {
+// The leap trial: a long press on the title cycles how many frames the card
+// leaps for before the window appears - 2, 1, none - from the next window.
+// Debug builds only: the trial ends in a decision, not a setting.
+void leapCycleCb(lv_event_t *ev) {
     (void)ev;
-    s_backdrop = (s_backdrop == PopupBackdrop::BACKDROP_NONE) ? PopupBackdrop::BACKDROP_DIM
-                                                             : PopupBackdrop::BACKDROP_NONE;
-    UIToolkit::show_toast(s_backdrop == PopupBackdrop::BACKDROP_DIM
-                              ? "Backdrop: DIM - from the next window"
-                              : "Backdrop: NONE - from the next window");
+    s_leapFrames = (s_leapFrames == 0) ? 2 : (uint8_t)(s_leapFrames - 1);
+    UIToolkit::show_toast(s_leapFrames == 2 ? "Leap: 2 frames - from the next window"
+                        : s_leapFrames == 1 ? "Leap: 1 frame - from the next window"
+                                            : "Leap: none - from the next window");
 }
 #endif
 
@@ -579,7 +649,7 @@ void buildContents() {
     lv_obj_clear_flag(hdr, LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_event_cb(hdr, headerGestureCb, LV_EVENT_GESTURE, nullptr);
 #ifdef DEBUG_POPUP
-    lv_obj_add_event_cb(hdr, backdropCycleCb, LV_EVENT_LONG_PRESSED, nullptr);
+    lv_obj_add_event_cb(hdr, leapCycleCb, LV_EVENT_LONG_PRESSED, nullptr);
 #endif
 
     // Both ends the same width, so the title sits in the true middle.
@@ -699,74 +769,141 @@ void makeWindow() {
     lv_obj_add_style(s.win, UI::paint(UIPaint::PAINT_LIFT), 0);
 }
 
-// One piece of the dim, created TRANSPARENT. See makeDim().
-void dimPiece(int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
-    if (x2 < x1 || y2 < y1 || s.nDim >= Popup::DIM_MAX) return;
-    lv_obj_t *o = plain(lv_screen_active());
-    lv_obj_set_pos (o, x1, y1);
-    lv_obj_set_size(o, x2 - x1 + 1, y2 - y1 + 1);
-    lv_obj_set_style_bg_color(o, UI::c(UI::pal().SCRIM), 0);
-    lv_obj_set_style_bg_opa  (o, LV_OPA_TRANSP, 0);
-    s.dim[s.nDim++] = o;
-}
-
-// THE DIM, AS THE PAGE AROUND THE WINDOW. One full-screen scrim would put the
-// window's whole area into the frame that draws the dim, and LVGL renders a
-// full-screen area in full-width strips that no window covers - so the cards
-// under the window would all be drawn too. Four bands around the window, and
-// a square under each rounded corner so the corner's outside dims as well,
-// leave the window's own area out of it.
+// ---------------------------------------------------------------------------
+// The hold, and the leap (owner, 2026-10-04)
 //
-// They must lie UNDER the window, so they are created before it - but a new
-// object costs a redraw of its area even while transparent, which here would
-// be most of the page, in the window's frame. So they are made with
-// invalidation off, laid out at once (the layout pass is what would otherwise
-// invalidate them, at the next refresh), and lit one frame AFTER the window by
-// displayRefrReadyCb(). Any layout already pending is settled first, with
-// invalidation on, so nothing else loses a redraw it was owed.
-void makeDim() {
-    lv_obj_t *scr = lv_screen_active();
-    const int32_t sw = lv_obj_get_width(scr), sh = lv_obj_get_height(scr);
-    const lv_area_t &W = s.winRect;
-    const int32_t r = s.winRadius;
+// From touch-down the card's border fades toward the scheme's ACCENT over the
+// long-press time, a little wider, while the card sinks slightly - so a tap
+// shows the start of it, and a hold shows it arriving. At the long press the
+// card LEAPS, larger than normal, for s_leapFrames frames, and then the window
+// appears. The card keeps the accent border while its window is open, which
+// says which card the window belongs to.
+//
+// ALL OF IT IS transform_width/height AND THE BORDER - NEVER A SCALE. A scale
+// renders the card to an intermediate layer every frame (~175 KB for a P4_5
+// card, more than LVGL's whole 128 KB pool - LESSONS, "LVGL allocates a
+// LAYER"). transform_width/height only draws the card's own background,
+// border and shadow larger or smaller (lv_obj.c, LV_EVENT_DRAW_MAIN), with no
+// layer; its contents stay where they are, which nobody sees in a frame or
+// two. One card redraw per frame: 5-8 ms on WS_P4_5 in Midnight.
+// ---------------------------------------------------------------------------
 
-    lv_obj_update_layout(scr);
-    lv_display_enable_invalidation(nullptr, false);
-    dimPiece(0, 0, sw - 1, W.y1 - 1);                         // above
-    dimPiece(0, W.y2 + 1, sw - 1, sh - 1);                    // below
-    dimPiece(0, W.y1, W.x1 - 1, W.y2);                        // left
-    dimPiece(W.x2 + 1, W.y1, sw - 1, W.y2);                   // right
-    dimPiece(W.x1, W.y1, W.x1 + r - 1, W.y1 + r - 1);         // under the corners
-    dimPiece(W.x2 - r + 1, W.y1, W.x2, W.y1 + r - 1);
-    dimPiece(W.x1, W.y2 - r + 1, W.x1 + r - 1, W.y2);
-    dimPiece(W.x2 - r + 1, W.y2 - r + 1, W.x2, W.y2);
-    lv_obj_update_layout(scr);
-    lv_display_enable_invalidation(nullptr, true);
-    s.dimPending = true;
+// The look at `v` (0..255 toward the accent), with the card `grow` px larger
+// on every side (negative: sinking).
+void holdLook(lv_obj_t *sf, int32_t v, int32_t grow) {
+    const int32_t base = UI::met().BORDER_W;
+    const int32_t wide = LV_MAX(base, UI::sc(2));
+    lv_obj_set_style_border_color(sf, lv_color_mix(UI::c(UI::pal().ACCENT), UI::border(), (uint8_t)v), 0);
+    lv_obj_set_style_border_width(sf, base + (wide - base) * v / 255, 0);
+    lv_obj_set_style_transform_width (sf, grow, 0);
+    lv_obj_set_style_transform_height(sf, grow, 0);
 }
 
-// After every refresh. The first one after open() is the frame that drew the
-// window; the dim is lit now and drawn in the next.
+// Back to exactly what Card::restyle() gives every card: the border token at
+// the scheme's width, no transform.
+void holdRestore(lv_obj_t *sf) {
+    lv_obj_set_style_border_color(sf, UI::border(), 0);
+    lv_obj_set_style_border_width(sf, UI::met().BORDER_W, 0);
+    lv_obj_set_style_transform_width (sf, 0, 0);
+    lv_obj_set_style_transform_height(sf, 0, 0);
+}
+
+bool movedTooFar() {
+    if (!s_indev) return false;
+    lv_point_t now;
+    lv_indev_get_point(s_indev, &now);
+    const int32_t dx = now.x - s.pressStart.x, dy = now.y - s.pressStart.y;
+    const int32_t lim = mm(4);
+    return dx * dx + dy * dy > lim * lim;
+}
+
+void letGo();
+
+// One step of the hold, from the animation. A finger that has moved is a drag
+// or a swipe, not a hold: the card lets go at once.
+void holdExec(void *var, int32_t v) {
+    h.v = v;
+    holdLook((lv_obj_t *)var, v, -(mm(HOLD_SINK_MM) * v) / 255);
+    if (h.phase == HoldPhase::HOLD_PRESSING && movedTooFar()) letGo();
+}
+
+void letGoExec(void *var, int32_t v) {
+    h.v = v;
+    holdLook((lv_obj_t *)var, v, -(mm(HOLD_SINK_MM) * v) / 255);
+}
+
+void letGoDone(lv_anim_t *a) {
+    lv_obj_t *sf = (lv_obj_t *)a->var;
+    holdRestore(sf);
+    if (h.surface == sf && h.phase == HoldPhase::HOLD_LETTING_GO) h = Hold();
+}
+
+// The finger came up (a tap) or moved off: fade back from wherever the hold
+// had got to, at the same rate a full hold would take HOLD_LETGO_MS to undo.
+void letGo() {
+    if (!h.surface || h.phase != HoldPhase::HOLD_PRESSING) return;
+    lv_obj_t *sf = h.surface;
+    lv_anim_delete(sf, holdExec);
+    h.phase = HoldPhase::HOLD_LETTING_GO;
+    const uint32_t ms = HOLD_LETGO_MS * (uint32_t)h.v / 255;
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var         (&a, sf);
+    lv_anim_set_values      (&a, h.v, 0);
+    lv_anim_set_duration    (&a, ms ? ms : 1);
+    lv_anim_set_path_cb     (&a, lv_anim_path_ease_out);
+    lv_anim_set_exec_cb     (&a, letGoExec);
+    lv_anim_set_completed_cb(&a, letGoDone);
+    lv_anim_start(&a);
+}
+
+// Drop whatever card was held, at once - a new press, or the window closing.
+void holdDrop() {
+    if (h.surface && lv_obj_is_valid(h.surface)) {
+        lv_anim_delete(h.surface, holdExec);
+        lv_anim_delete(h.surface, letGoExec);
+        holdRestore(h.surface);
+    }
+    h = Hold();
+}
+
+void holdStart(lv_obj_t *sf) {
+    holdDrop();
+    h.surface = sf;
+    h.phase   = HoldPhase::HOLD_PRESSING;
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var     (&a, sf);
+    lv_anim_set_values  (&a, 0, 255);
+    lv_anim_set_duration(&a, CardPopup::LONG_PRESS_MS);
+    lv_anim_set_path_cb (&a, lv_anim_path_linear);   // it is a progress bar
+    lv_anim_set_exec_cb (&a, holdExec);
+    lv_anim_start(&a);
+}
+
+void showWindow();
+
+// After every refresh: steps the leap, one look per frame actually drawn, then
+// asks for the window. The first refresh after the long press is the frame
+// that drew the first leap step.
 void displayRefrReadyCb(lv_event_t *e) {
     (void)e;
-    if (!s.dimPending) return;
-    s.dimPending = false;
-    if (s.phase != PopupPhase::PHASE_OPEN) return;
-    for (uint8_t i = 0; i < s.nDim; i++) lv_obj_set_style_bg_opa(s.dim[i], POPUP_SCRIM_OPA, 0);
-}
-
-void deleteDim() {
-    for (uint8_t i = 0; i < s.nDim; i++) {
-        lv_obj_delete(s.dim[i]);
-        s.dim[i] = nullptr;
+    if (s.phase != PopupPhase::PHASE_LEAP || h.phase != HoldPhase::HOLD_LEAPING) return;
+    if (!lv_obj_is_valid(h.surface)) { h = Hold(); showWindow(); return; }
+    h.leapStep++;
+    if (h.leapStep < s_leapFrames) {
+        holdLook(h.surface, 255, mm(LEAP_GROW_MM) * (h.leapStep + 1) / s_leapFrames);
+        return;
     }
-    s.nDim = 0;
-    s.dimPending = false;
+    // Seen: back to its own size, the accent kept, and the window.
+    holdLook(h.surface, 255, 0);
+    h.phase = HoldPhase::HOLD_OWNED;
+    showWindow();
 }
 
 // The deferred half of close(). Runs from LVGL's own timer handler, outside any
 // event callback, so deleting the window's children here is safe. Everything
-// goes in one frame.
+// goes in one frame, the card's border with it.
 void closeNow(void *unused) {
     (void)unused;
     s.closeQueued = false;
@@ -776,8 +913,8 @@ void closeNow(void *unused) {
 #endif
     if (s.timer) { lv_timer_delete(s.timer); s.timer = nullptr; }
     if (s.win)   { lv_obj_delete(s.win);     s.win = nullptr; }
-    deleteDim();
     forgetWidgets();
+    holdDrop();
     if (s_catcher) lv_obj_clear_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
     s.phase = PopupPhase::PHASE_CLOSED;
     s.nEnt = 0;
@@ -786,11 +923,27 @@ void closeNow(void *unused) {
 #endif
 }
 
+// Every press, whatever it lands on: where it began, when anything was last
+// touched, and - on a card, with no window open - the start of a hold. The
+// input device hears PRESSED and RELEASED before the object does, with the
+// pressed object as the parameter (send_event() in lv_indev.c).
 void pressCb(lv_event_t *ev) {
-    (void)ev;
     lv_indev_t *in = lv_indev_active();
     if (in) lv_indev_get_point(in, &s.pressStart);
     s.lastTouchMs = millis();
+    lv_obj_t *obj = (lv_obj_t *)lv_event_get_param(ev);
+    if (s.phase == PopupPhase::PHASE_CLOSED && obj &&
+        lv_obj_has_flag(obj, CardPopup::CARD_SURFACE_FLAG)) {
+        holdStart(obj);
+    }
+}
+
+// The finger came up. A swipe that LVGL was told to wait out ends with no
+// RELEASED here (lv_indev.c, indev_proc_release: PRESS_LOST to the object
+// only) - but a swipe has moved, and holdExec() has already let go.
+void releaseCb(lv_event_t *ev) {
+    (void)ev;
+    if (h.phase == HoldPhase::HOLD_PRESSING) letGo();
 }
 
 // The catcher's two jobs: let presses on the window through, and close on a
@@ -808,6 +961,25 @@ void catcherCb(lv_event_t *ev) {
     }
 }
 
+// The window itself: built, made modal, and the clock started. Straight from
+// open() with no leap, or from displayRefrReadyCb() once the leap was seen.
+void showWindow() {
+#ifdef DEBUG_POPUP
+    const uint32_t t0 = micros();
+#endif
+    s.phase = PopupPhase::PHASE_OPEN;
+    makeWindow();
+    buildContents();
+    if (s_catcher) lv_obj_add_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
+    s.lastTouchMs = millis();
+    s.lastAgeMs   = s.lastTouchMs;
+    s.timer = lv_timer_create(tickCb, POPUP_TICK_MS, nullptr);
+#ifdef DEBUG_POPUP
+    dbgLater("open: window built in %lu us after a %u-frame leap",
+             (unsigned long)(micros() - t0), (unsigned)s_leapFrames);
+#endif
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -815,14 +987,21 @@ void catcherCb(lv_event_t *ev) {
 // ---------------------------------------------------------------------------
 
 void CardPopup::begin() {
-    // Every press, whatever it lands on - the same reason GUIManager hooks the
-    // input device rather than the screen (screenPressCb()).
+    // Every press and release, whatever it lands on - the same reason
+    // GUIManager hooks the input device rather than the screen
+    // (screenPressCb()). It also spares every card four event registrations.
     if (lv_indev_t *in = lv_indev_get_next(nullptr)) {
-        lv_indev_add_event_cb(in, pressCb, LV_EVENT_PRESSED, nullptr);
+        s_indev = in;
+        lv_indev_add_event_cb(in, pressCb,   LV_EVENT_PRESSED,  nullptr);
+        lv_indev_add_event_cb(in, releaseCb, LV_EVENT_RELEASED, nullptr);
     }
-    // The frame after the window's: when the dim is lit.
+    // After each frame is drawn: what steps the leap.
     if (lv_display_t *d = lv_display_get_default()) {
         lv_display_add_event_cb(d, displayRefrReadyCb, LV_EVENT_REFR_READY, nullptr);
+#ifdef DEBUG_POPUP
+        lv_display_add_event_cb(d, dbgRenderStart, LV_EVENT_RENDER_START, nullptr);
+        lv_display_add_event_cb(d, dbgRenderReady, LV_EVENT_RENDER_READY, nullptr);
+#endif
     }
     // The tap catcher, once, for the life of the device. See s_catcher.
     s_catcher = plain(lv_layer_top());
@@ -848,19 +1027,9 @@ void CardPopup::open(Card &card) {
     // A FINGER THAT MOVED IS A DRAG, NOT A LONG PRESS (card-sheet 7). LVGL
     // fires LONG_PRESSED for a slow drag that never crossed the gesture
     // distance; it must not open a window.
-    lv_indev_t *in = lv_indev_active();
-    if (in) {
-        lv_point_t now;
-        lv_indev_get_point(in, &now);
-        const int32_t dx = now.x - s.pressStart.x, dy = now.y - s.pressStart.y;
-        const int32_t lim = mm(4);
-        if (dx * dx + dy * dy > lim * lim) return;
-        // Release the touch BEFORE building anything (LESSONS): the finger is
-        // still down, and its release must not land on the window.
-        lv_indev_wait_release(in);
-    }
+    if (movedTooFar()) { letGo(); return; }
 #ifdef DEBUG_POPUP
-    const uint32_t t0 = micros();
+    s_dbgPressMs = millis();
 #endif
 
     // --- Copy what the window needs; never keep the card -------------------
@@ -868,7 +1037,11 @@ void CardPopup::open(Card &card) {
     for (uint8_t i = 0; i < card._nPrimary && i < CARD_PRIMARY_MAX; i++) {
         if (card._primary[i]) s.ent[s.nEnt++] = card._primary[i];
     }
-    if (!s.nEnt) return;
+    if (!s.nEnt) { letGo(); return; }
+    // Release the touch BEFORE building anything (LESSONS): the finger is still
+    // down, and its release must not land on the window. (It also means LVGL
+    // sends no RELEASED for this touch - PRESS_LOST to the card instead.)
+    if (lv_indev_t *in = lv_indev_active()) lv_indev_wait_release(in);
     s.reg      = Card::s_reg;
     s.tempUnit = card.tempUnit();
     snprintf(s.area, sizeof(s.area), "%s", card._area);
@@ -894,21 +1067,25 @@ void CardPopup::open(Card &card) {
 
     s.view        = PopupView::VIEW_MAIN;
     s.closeQueued = false;
-    s.phase       = PopupPhase::PHASE_OPEN;
+    s.phase       = PopupPhase::PHASE_LEAP;   // modal from here
 
-    // The dim first, so it lies under the window - transparent and costing
-    // nothing until the frame after the window's.
-    s.nDim = 0;
-    if (s_backdrop == PopupBackdrop::BACKDROP_DIM) makeDim();
-    makeWindow();
-    buildContents();
-    if (s_catcher) lv_obj_add_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
-
-    s.lastTouchMs = millis();
-    s.lastAgeMs   = s.lastTouchMs;
-    s.timer = lv_timer_create(tickCb, POPUP_TICK_MS, nullptr);
-#ifdef DEBUG_POPUP
-    dbgLater("open: built in %lu us, backdrop %s", (unsigned long)(micros() - t0),
-             s_backdrop == PopupBackdrop::BACKDROP_DIM ? "DIM" : "NONE");
-#endif
+    // --- The leap -----------------------------------------------------------
+    // The held card stops where its hold got to and takes the full accent; a
+    // card that somehow was not the held one gets the accent all the same.
+    if (h.surface == card._surface && lv_obj_is_valid(h.surface)) {
+        lv_anim_delete(h.surface, holdExec);
+        lv_anim_delete(h.surface, letGoExec);
+    } else {
+        holdDrop();
+        h.surface = card._surface;
+    }
+    if (s_leapFrames) {
+        h.phase    = HoldPhase::HOLD_LEAPING;
+        h.leapStep = 0;
+        holdLook(h.surface, 255, mm(LEAP_GROW_MM) / s_leapFrames);
+    } else {
+        holdLook(h.surface, 255, 0);
+        h.phase = HoldPhase::HOLD_OWNED;
+        showWindow();
+    }
 }

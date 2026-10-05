@@ -371,6 +371,11 @@ void Card::build(lv_obj_t *parent) {
     lv_obj_add_flag       (_surface, LV_OBJ_FLAG_EVENT_BUBBLE);
     lv_obj_add_event_cb   (_surface, eventCb, LV_EVENT_SHORT_CLICKED, this);
     lv_obj_add_event_cb   (_surface, eventCb, LV_EVENT_LONG_PRESSED,  this);
+    // A press here starts the popup's hold - the border fading to the accent
+    // (CardPopup.cpp, "The hold, and the leap"). A flag rather than four more
+    // event registrations per card: CardPopup hears every press on the input
+    // device already.
+    lv_obj_add_flag       (_surface, CardPopup::CARD_SURFACE_FLAG);
 
     buildHeader();
 
@@ -1177,9 +1182,9 @@ bool Card::command(uint8_t slot, const EntityValue &v) {
 void Card::eventCb(lv_event_t *e) {
     Card *self = (Card *)lv_event_get_user_data(e);
     if (!self) return;
-    // Modal. While the popup's walls are in motion there is no dim over the
-    // page to catch a touch (it arrives with the window), so a card that is
-    // tapped mid-animation must not toggle or open a second window.
+    // Modal. While the card leaps there is no window yet, and nothing to catch
+    // a touch, so a card tapped in those frames must not toggle or open a
+    // second window.
     if (CardPopup::isOpen()) return;
     switch (lv_event_get_code(e)) {
         case LV_EVENT_SHORT_CLICKED: self->onTap();       break;

@@ -34,19 +34,32 @@ in one frame. It sits on the SCREEN as its topmost object, so LVGL draws only th
 covers the page; a transparent catcher on `lv_layer_top()` (made once, switched by CLICKABLE) takes
 every touch outside it. **What was learned is in LESSONS, "Effects that cover the screen".**
 
-**The backdrop trial (built, `DEBUG_POPUP` only):** NONE (default - nothing outside the window is
-drawn) or DIM (the mock's dim, drawn around the window one frame AFTER it, never under it). A long
-press on the window's title switches it for the next window. Blur: costs more than a dim and
-re-blurs on every card update (LESSONS); not built. The owner wants to feel NONE first.
+**No dim - DECIDED (owner, round 5):** tried it, "the delay seems like an eternity and adds very
+little". Removed; nothing is drawn behind the window. Blur was never built (LESSONS).
 
-**Open with the owner (2026-10-04):** (a) **press feedback + "leap"** - the owner's idea: a card
-shows a pressed state on touch, and on long press it briefly jumps up and larger before the window
-appears; Claude's proposal is `transform_width/height` (no layer, unlike a scale) for 1-2 frames.
-(b) **Scaling across boards** - the owner's screenshots (P4_5, 1060, 4B): the window is 68 mm wide
-everywhere, so ~44 % of the 1060's width but ~92 % of the 4B's; its height (and the switch's toggle,
-derived from it) follows the screen, so the toggle is ~30 mm tall on the P4_5 and ~57 mm on the
-1060; hero icons are small in their discs. Which of these the owner meant is unconfirmed.
-(c) What "contents settling in" should look like.
+**Built, round 6 (owner asked for each):** the held card's border fades to the ACCENT over the
+250 ms hold while the card sinks slightly (a tap shows the start and fades back in 120 ms); at the
+long press the card LEAPS larger for 2 frames, then the window appears; the card keeps the accent
+border while its window is open (Claude's addition - easy to drop); the switch's knob slides.
+All `transform_width/height` + border - never a scale (a layer bigger than LVGL's pool).
+`DEBUG_POPUP` prints each open/close frame's draw time and "long press to glass"; a long press on
+the window's title cycles the leap 2 -> 1 -> 0 frames.
+
+**Open with the owner:**
+- **A "projection" effect for the way in** (owner's idea, round 6, with a sci-fi reference image):
+  (a) a line that draws the window out (scan-on); (b) brief random interference at the edges that
+  "repairs itself", different every time. Claude's view: (b) first - it costs almost nothing and
+  delays nothing (the window is usable in frame one); (a) as a comparison. A window-sized accordion
+  would cost about what the deck's does (the window is ~1.4x an open deck panel), since the window
+  is now an opaque object on the screen like the deck. Not built - waiting on the owner's pick.
+- **Scaling** (owner): the toggle is "too big" on the 1060 and the 4B (it is sized from the window's
+  height, so ~57 mm tall on the 1060 vs ~30 mm on the P4_5); the occupancy hero's circle is huge for
+  its icon, by a different ratio per board. Placeholder visuals; the owner: not this step's focus.
+  Claude's suggestion: cap heroes at the P4_5's physical size when 2.10b designs the controls.
+- **To verify:** the window's own frame took ~140 ms in the DIM trial. Suspect: on Linen the
+  window's shadow makes the area LVGL redraws wider than the window, so no 50-line strip lies inside
+  it and the page under the whole window is drawn too. The round 6 build measures every open frame;
+  compare Midnight and Linen before believing it.
 
 **Built and seen on glass:** long press (now **250 ms**) opens a window on every card type; header X /
 "Area > name" / history (clock icon - the chart glyph needs a font regeneration on the desktop, no
@@ -65,8 +78,8 @@ what building and tearing down the window costs, printed 300 ms later so the pri
 lines behind - `docs/display/history.md`. Verified on WS_P4_5; WS_P4_4B and CYD_P4_1060 flashed with
 it 2026-10-04, nothing reported; the 7B and 4880 not flashed.
 
-**Next, in order:** (1) the owner tries the usable-first window, NONE then DIM, and decides; then
-the press feedback / leap if wanted; (2) the settings deck that peeks up, with **Pause** in it - long
+**Next, in order:** (1) round 6 on glass (hold, leap, knob - `TEST_2.10a.md`); the owner picks a
+projection effect to prototype; (2) the settings deck that peeks up, with **Pause** in it - long
 press no longer pauses, so nothing on the board can pause a card until this lands; small touches the
 owner liked the sound of: the deck tab peeking up, the toggle knob sliding; (3) `lv_mem` with the
 window open; (4) the chart icon (font regeneration - this PC has Node.js); (5) all-nine compile gate,

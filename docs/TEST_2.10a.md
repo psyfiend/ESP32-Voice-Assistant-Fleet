@@ -128,6 +128,26 @@ the window's title switches NONE / DIM for the next window (debug build only).
 | U11 | Linen: repeat U1 and U8 | Note how much slower, if at all |
 | U12 | After a dozen opens and closes | No lines or leftovers on screen |
 
+**Round 5 results (owner):** the instant window is "a much better experience" than any grow - "the
+speed alone makes the entire experience vastly preferable". DIM: "the delay seems like an eternity
+and adds very little" - **decided: no dim.** Measured from the owner's DIM trial (scheme not
+recorded): the window's frame 136-143 ms, the dim's frame 98-102 ms, closing 147-149 ms. NONE:
+building the window 5 ms, tearing it down 0.5 ms, one close frame seen at 46 ms.
+
+## Round 6 - the hold, the leap, the knob (2026-10-04 night, WS_P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| P1 | Tap a card quickly | Its border starts toward the accent colour and fades back; the card does what a tap does |
+| P2 | Press and hold a card | The border fades to the accent over the quarter second and the card sinks slightly; then it jumps a little larger for a moment, then the window appears |
+| P3 | With the window open | The card you held (if visible beside the window) keeps the accent border |
+| P4 | Close the window | The card's border returns to normal with it |
+| P5 | Start a swipe on a card | The border lets go as soon as the finger moves; the page changes as before |
+| P6 | Long press the window's title | Toast "Leap: 1 frame"; again "Leap: none"; again "Leap: 2 frames". Compare how each feels |
+| P7 | Switch's window: tap the toggle | The knob SLIDES to the other end |
+| P8 | Stuck's window: tap the toggle | The knob slides, then a few seconds later slides back |
+| P9 | Repeat P2 in Midnight and in Linen | Note any difference in how fast the window appears |
+
 ## Measured (Claude, from the board) - pending
 
 - `lv_mem` with the window open (interview G1).

@@ -16,8 +16,9 @@ class Card;
 //     and all, in the first frame after the long press, and closes in one.
 //     The mock's grow was built and measured four ways and dropped - LESSONS,
 //     "Effects that cover the screen"
-//   - behind it, during the trial: nothing, or a dim drawn around the window
-//     one frame after it (CardPopup.cpp, PopupBackdrop)
+//   - nothing behind it: no dim (owner, after trying one: speed wins)
+//   - the way in: the held card's border fades to the accent, the card leaps,
+//     then the window (CardPopup.cpp, "The hold, and the leap")
 //   - header: X top left (a back arrow on inner views), "Area > name" in the
 //     middle, history and members icons top right
 //   - modal: nothing outside the window takes a touch or a gesture
@@ -35,15 +36,26 @@ class Card;
 // ---------------------------------------------------------------------------
 class CardPopup {
 public:
+    // How long a press must be held to open a window: 250 ms (owner,
+    // 2026-10-04; LVGL's default is 400). GUIManager gives it to the input
+    // device, and the card's hold fades to the accent over exactly this long.
+    static constexpr uint32_t LONG_PRESS_MS = 250;
+
+    // Marks a card's surface, so a press on one starts the hold (the border
+    // fading to the accent). Card::build() sets it; nothing else uses USER_1.
+    static constexpr lv_obj_flag_t CARD_SURFACE_FLAG = LV_OBJ_FLAG_USER_1;
+
     // Once, from GUIManager::begin(), after the input device exists. Hooks every
     // press so the popup knows where a long press began (a finger that moved
     // is a drag, not a long press) and when the user last touched anything
-    // (the auto-close); hooks the display's refresh, for the dim; and makes
-    // the tap catcher, which lives for the life of the device.
+    // (the auto-close), and starts the hold on a card; hooks the display's
+    // refresh, which steps the leap; and makes the tap catcher, which lives
+    // for the life of the device.
     static void begin();
 
-    // Open the window for this card. Ignored while one is already open or
-    // closing, and when the finger has moved since it went down.
+    // Open the window for this card: the card leaps, then the window appears.
+    // Ignored while one is already open, and when the finger has moved since
+    // it went down.
     static void open(Card &card);
 
     // Close it, by whichever of the four routes. Safe to call from an event
