@@ -44,9 +44,10 @@ before touching the popup; where it differs from sections 9-13, it wins. In shor
 - **Measured:** the open frame 42-48 ms (Midnight), 69-79 ms (Linen). **G1: a window costs ~11-12 KB
   of LVGL's pool, and ~16 KB is left with one open** - fine for 2.10a, a warning for 2.10b-e.
 
-**On glass with v0.2.8: WS_P4_5 only.** WS_P4_4B and CYD_P4_1060 run builds from earlier rounds
-(they carry the #67 repair fix - `docs/display/history.md` - nothing reported); the 7B and the 4880
-have not been flashed since before it. All nine compile.
+**Flashed with v0.2.8 (reports `0.2.8.0`), 2026-10-05:** WS_P4_5, WS_P4_4B and CYD_P4_1060, all
+three with the #67 repair fix (`docs/display/history.md`). Signed off on glass on WS_P4_5 only; the
+4B and the 1060 have not been looked at with it. The 7B and the 4880 were not connected and run
+older builds. **WS_S3_4B was found locked up** and left as found (#69). All nine compile.
 
 **Carried forward:**
 - **Scaling** (owner): the switch's toggle is "too big" on the 1060 and the 4B (it is sized from the
@@ -88,8 +89,8 @@ pointer to an LVGL object you do not own"), then `src/Cards/CardPopup.cpp`.
   row only (§13) for this reason; page swipes are already blocked while the window is open.
 
 **How to run it:** one branch off `main` (e.g. `feat/65-light-controls`). While the owner tests,
-build and flash **WS_P4_5 only** (COM15) unless told otherwise; WS_S3_4B stays unflashed until
-#69's watch ends. Before merge: the all-nine compile gate and a look on glass, then `--no-ff`, a tag
+build and flash **WS_P4_5 only** (COM15) unless told otherwise. WS_S3_4B is locked up and waiting
+to be troubleshot (#69): leave it until the owner says. Before merge: the all-nine compile gate and a look on glass, then `--no-ff`, a tag
 and a CHANGELOG entry (Versioning, below).
 
 ## Where the interview stands — 2026-10-02
@@ -132,7 +133,7 @@ and a CHANGELOG entry (Versioning, below).
 |---|---|---|
 | **Battery** | **prototype merged** (`a283fd0`, 2026-09-30). Everything current: **`docs/design/power-battery.md`**. Runs only with `-D HAS_BATTERY` (7B, 4880). Voltage good; the inferred power state works for charging / on battery (P1-P3 pass) but cannot see a missing cell while USB is present (P5 fail). **Owner's direction: do not perfect the inference; fuel gauges (MAX17043, ordered) on the units that carry a battery.** Also open: the AXP2101 on the S3_4B, a power-state entity for the header (#19) | #72 |
 | **2.9 last boards** | `CYD_S3_8048`, `WS_S3_5B` to move to esp_lcd when on the desk; then #67 closes | #67, `docs/display/README.md` |
-| **4B panel timing** | S3_4B clean after `C2 31 02`; P4_4B faint lines at the right edge on the log page. 7-day watch | #69 |
+| **4B panel timing** | S3_4B clean after `C2 31 02`; P4_4B faint lines at the right edge on the log page. 7-day watch. **S3_4B found locked up 2026-10-05** after days untouched; left as found, to troubleshoot later (owner). What to check first, before resetting it: #69's latest comment | #69 |
 | **S3 LVGL speed** | S3_4B feels heavier since LVGL's pool moved to PSRAM. Paused by the owner; resume soon | #70 (full reasoning in its comments) |
 | Rotation setting / IMU | recorded | #71 |
 | Fonts / type ladder | recorded, feeds the interview | #73 |
@@ -150,7 +151,7 @@ Never start a branch on an unmerged one without asking.
 | `WS_P4_7B` | COM6 (native USB) | **needs two USB cables** or it browns out on boot |
 | `CYD_P4_1060` | COM9 | also needs two cables |
 | `CYD_P4_4880` | COM19 (native USB) | LiPo fitted; browned out on the PC's USB alone |
-| `WS_S3_4B` | COM8 (CH343) | the slow dev target; `Serial` is native USB, not the CH343 |
+| `WS_S3_4B` | COM8 (CH343) | the slow dev target; `Serial` is native USB, not the CH343. **Locked up 2026-10-05** - #69 |
 | `CYD_S3_3248` | - | **USB broken** (2026-09-28); out of commission |
 | `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in |
 
