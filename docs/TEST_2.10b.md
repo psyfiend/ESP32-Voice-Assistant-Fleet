@@ -1,5 +1,8 @@
 # TEST 2.10b - the light controls (#65)
 
+**DONE: signed off 2026-10-06 after round 7 (and one last speck), merged and tagged `v0.2.9`.**
+What was built is `docs/design/card-sheet.md` section 15.
+
 Branch `feat/65-light-controls`. Board: **WS_P4_5** (flashed 2026-10-05 with `-D DEBUG_POPUP -D
 DEBUG_FRAMES`, local only). Design: `docs/design/card-sheet.md` sections 11.1 and 15, the artifact
 "Card Popup Mock" (v3).

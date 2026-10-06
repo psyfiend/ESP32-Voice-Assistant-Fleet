@@ -1,4 +1,4 @@
-# Handoff — 2026-10-05
+# Handoff — 2026-10-06
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was rewritten from scratch on
@@ -13,41 +13,42 @@ to the doc that owns it. This file says where things are, not how they got there
 
 ## Where the project is
 
-**`v0.2.8` tagged 2026-10-05** at the 2.10a merge; `CHANGELOG.md` matches versions to milestones.
-It also carries everything merged since `v0.2.7`: #58 screenshots, **2.9's display stack on six of
-nine boards** (merge `75a43c8`, 2026-09-29), the battery prototype, SNTP, the floating tag, Linen
-round two.
+**`v0.2.9` tagged 2026-10-06** at the 2.10b merge (`v0.2.8` was 2.10a); `CHANGELOG.md` matches
+versions to milestones.
 
 What a board does: boots into two pages (House = the owner's 18 HA entities over the websocket,
 Fleet = MQTT/system/virtual cards), swiped with wrap-around; three colour schemes (Midnight
 default, Fleet, Linen with real shadows); card types with state icons; an FPS/CPU overlay;
-`/screenshot` and `/bench` over HTTP; **a long press opens a card's popup window** (2.10a).
+`/screenshot` and `/bench` over HTTP; **a long press opens a card's popup window**, and a light's
+window has its controls (2.10b) - working on the virtual lamps; HA lights get on/off until 2.10c.
 
-## 2.10a - DONE (merged 2026-10-05, `v0.2.8`)
+## The card popup: 2.10a DONE (`v0.2.8`), 2.10b DONE (`v0.2.9`)
 
-The card popup's frame, signed off on WS_P4_5 after twelve rounds on glass - every result and
-measurement is in `docs/TEST_2.10a.md`. **What it is now: `card-sheet.md` section 14** - read it
-before touching the popup; where it differs from sections 9-13, it wins. In short:
+**What the popup is now: `card-sheet.md` §14 (the frame, the deck) and §15 (the light controls,
+sizes, groups, pause)** - read both before touching it; where they differ from §9-13, they win.
+Every round, result and measurement: `docs/TEST_2.10a.md` (twelve rounds) and `docs/TEST_2.10b.md`
+(seven). The rules that cost the most to learn:
 
-- **Usable first** (owner): the window appears complete in the first frame after a 250 ms long
-  press and closes in one frame. No grow, no dim - both were built, measured and rejected on glass.
-  It sits on the SCREEN as its topmost object; a transparent catcher on `lv_layer_top()` takes the
-  touches outside it. Why, and the traps: LESSONS, "Effects that cover the screen". The grow's
-  history (filled box, four walls, page picture, rings) is in git, `f21ece6`..`4f220ad`.
-- **The held card** presses in with an accent border (`Card::pressLook()`) and stays so while its
-  window is open. A switch gets a toggle that slides on a tap and can be dragged.
-- **The SETTINGS deck**: a folder tab in the right half, peeking up from the bottom of the screen.
-  Paused works and is kept on the device (#60); Label / Custom name / On the dashboard are shown,
-  quieter and inactive, until 2.10d. The rules for a second panel (a sensor's CHART): section 14.
-- **Sparks** travel along the window's edge now and then (CardPopup.cpp, "Interference"). Settled
-  unless the owner asks again; when and how often become a setting later.
-- **Measured:** the open frame 42-48 ms (Midnight), 69-79 ms (Linen). **G1: a window costs ~11-12 KB
-  of LVGL's pool, and ~16 KB is left with one open** - fine for 2.10a, a warning for 2.10b-e.
+- **Usable first** (owner): the window is complete in its first frame and closes in one; no grow,
+  no dim (LESSONS, "Effects that cover the screen"). **Nothing moves** within one window (§15).
+- **Sizes are shares of the P4_5's window** (`pm()`, "P4_5 millimetres"); touch targets and text
+  stay real millimetres. Windows up to 2:1, at most 100 mm, with side gaps.
+- **Light state is in the registry**; a light command is confirmed only by a matching report.
+  **Groups act as HA's light group** (read from HA's `group/light.py`). A paused member is out of
+  its group.
+- **`GET /popup`** (DEBUG_POPUP only; parameters in `CardPopup.h`) drives a window from a PC: open,
+  switch control, send values, pause, open a member, read LVGL's pool and every lamp's levels.
+  Most of 2.10b was checked that way before the owner touched it. Touch itself it cannot test.
 
-**Flashed with v0.2.8 (reports `0.2.8.0`), 2026-10-05:** WS_P4_5, WS_P4_4B and CYD_P4_1060, all
-three with the #67 repair fix (`docs/display/history.md`). Signed off on glass on WS_P4_5 only; the
-4B and the 1060 have not been looked at with it. The 7B and the 4880 were not connected and run
-older builds. **WS_S3_4B was found locked up** and left as found (#69). All nine compile.
+**Flashed with v0.2.9, 2026-10-06:** WS_P4_5, WS_P4_4B, CYD_P4_1060. Signed off on WS_P4_5; seen on
+the 4B and the 1060. The 7B and the 4880 were not connected and run older builds. **WS_S3_4B is
+still locked up**, left as found (#69). All nine compile.
+
+**Memory: DECIDED 2026-10-06 (owner)** - LVGL's pool is in PSRAM at 512 KB on every P4
+(`[P4-options]`: `FLEET_LV_MEM_PSRAM`, `FLEET_LV_MEM_KB=512`; WS_S3_4B keeps 128 KB in PSRAM).
+Internal heap free at boot 233 -> 361 KB; a popup's biggest free block 13 -> 399 KB; full-screen
+frames ~10% slower. LVGL's own allocator kept: NINA's `lv_mem_psram.c` header records why system
+malloc for LVGL is a trap on this hardware. LVGL 9.6: after 2.10 (#88).
 
 **Carried forward:**
 - **Scaling**: answered at 2.10b (card-sheet §15, proportional to the P4_5). Still open: the
@@ -62,48 +63,33 @@ older builds. **WS_S3_4B was found locked up** and left as found (#69). All nine
   burst of motion). Add them to `WS_P4_TOUCH_LCD_5` in `platformio.ini` when measuring; never commit
   them.
 
-## Now — 2.10b, the light controls (#65): BUILT, round 1 waiting for the owner
+## What is next — the new session's job: 2.10c, HA light attributes and calls (#65)
 
-Branch **`feat/65-light-controls`** (pushed), three commits: the proportional window, light state in
-the registry (four kinds of virtual lamp, HA's group rule), the controls. Flashed to WS_P4_5 with the
-local debug flags. **What was decided and built: `card-sheet.md` §15. The owner's test sheet:
-`docs/TEST_2.10b.md` round 1**, with what Claude could and could not test, and the measurements.
+**Not started; confirm with the owner first.** The build order (card-sheet §9): 2.10c HA, 2.10d
+stable ids and saving, 2.10e history. Interview §3 onward (2.8 header slots, then 2.11 groups)
+after 2.10. ROADMAP §7 has the order.
 
-- **Nothing touch-related has been tried** - everything was driven over `GET /popup` (DEBUG_POPUP
-  only; `CardPopup.h` lists its parameters). It opens windows, switches controls, sends values and
-  reads LVGL's pool and every lamp's levels, with nobody at the panel. Use it.
-- **Memory: DECIDED 2026-10-06 (owner), `b89f98e`** - LVGL's pool is in PSRAM at 512 KB on every P4
-  (`[P4-options]`: `FLEET_LV_MEM_PSRAM`, `FLEET_LV_MEM_KB=512`; WS_S3_4B keeps its 128 KB PSRAM
-  pool). Internal heap free at boot 233 -> 361 KB; the popup's biggest free block 13 -> 399 KB;
-  full-screen frames ~10% slower. LVGL's own allocator kept - NINA's `lv_mem_psram.c` header
-  records why system malloc for LVGL is a trap on this hardware. LVGL 9.6: after 2.10 (#88).
-- **Sizes**: P4_5 verified unchanged. Round 2 flashed the 4B too; the 1060 is built, not flashed
-  (not connected). Round 1 passed except three slider glitches, fixed in `6a629e7`.
-- **Round 3 built (`229f0bf`)**: paused members leave the group, a paused window is greyed with a
-  PAUSED pill, the group card shows the mean brightness (HA's rule), Members rows open a member's
-  own controls. Flashed P4_5 and 4B; **the 1060 would not flash (COM9 busy)** - R6 and round 3 on it
-  wait. Rounds and results: `TEST_2.10b.md`.
-- **Round 5 built (`514b86e`, 2026-10-06)**: window up to 2:1, the group centred by its real width,
-  chart in the corner, Paused as a switch. Flashed to P4_5, 4B and 1060 (COM9 is sometimes "busy";
-  a retry a few seconds later has always worked). `TEST_2.10b.md` round 5.
-- **HomeTiles** (owner, 2026-10-05): MIT reference with an HA-side Bridge that installs helpers and
-  automations for the panels - `REFERENCE_PROJECTS.md`. Read it before 2.10c's HA work. Its LVGL
-  pool is in PSRAM (2 or 12 MB).
-- **Direction (owner, 2026-10-06)**: a companion web app with a true preview that sends the config
-  to the device (#87) - the build sheet becomes its output format, not the user's interface; and
-  presentation (group/room cards) as the way this project stands apart. Filed with it: #86 (card
-  control styles, from HomeTiles), #88 (LVGL pool in PSRAM, then an LVGL 9.6 evaluation).
-- Next after round 1: 2.10c (HA attributes and `light.turn_on` with data - CommandRouter refuses HA
-  light levels until then, loudly), then 2.10d saving, 2.10e history. Interview §3 onward after 2.10.
+**2.10c's scope:** HaProvider reads a light's attributes into `EntityAttrs` (`supported_color_modes`
+-> `lightCaps`, `color_mode`, `brightness`, `color_temp_kelvin` and its min/max, `hs_color`), so
+HA lights get the slider the virtual lamps have; CommandRouter's light sink sends `light.turn_on`
+with data (today it refuses HA light levels, loudly, and the registry reverts them). Scenes
+(`hue_scenes` on `light.office`) as a selector target (§11.2) are in reach.
 
-**Read first** for any popup work: `card-sheet.md` §11-15, `TEST_2.10a.md` and `TEST_2.10b.md`,
-`LESSONS.md` ("Effects that cover the screen", layers, `lv_mem`, events not bubbling, "Never keep a
-pointer to an LVGL object you do not own"), then `src/Cards/CardPopup.cpp`.
+**Read first:** HomeTiles' Bridge and light popup (`REFERENCE_PROJECTS.md`, MIT) - the owner was
+struck by its HA-side helpers; `docs/design/ha-websocket.md`; `card-sheet.md` §11-15;
+`components/Fleet_Providers/HaProvider.cpp` and `CommandRouter.cpp`.
 
-**How to run it:** while the owner tests, build and flash **WS_P4_5 only** (COM15) unless told
-otherwise. WS_S3_4B is locked up and waiting to be troubleshot (#69): leave it until the owner says.
-Before merge: the all-nine compile gate and a look on glass, then `--no-ff`, a tag (`v0.2.9`) and a
-CHANGELOG entry (Versioning, below).
+**Direction (owner, 2026-10-06)**: a companion web app with a true preview that sends the config to
+the device (#87) - the build sheet becomes its output, not the user's interface; and presentation
+(group/room cards) as how this project stands apart. Also filed: #86 (card control styles, from
+HomeTiles), #88 (LVGL 9.6 evaluation, after 2.10). An HA-side companion is a separate, later
+choice; HA's `recorder/statistics_during_period` already reduces history for 2.10e.
+
+**How to run it:** one branch off `main` (e.g. `feat/65-ha-lights`). While the owner tests, build and
+flash WS_P4_5 only (COM15) unless told otherwise; the owner had the 4B (COM7) and 1060 (COM9, which
+is sometimes "busy" - retry after a few seconds) connected for 2.10b. WS_S3_4B is locked up (#69):
+leave it until the owner says. Before merge: the all-nine compile gate and a look on glass, then
+`--no-ff`, a tag (`v0.2.10`) and a CHANGELOG entry (Versioning, below).
 
 ## Where the interview stands — 2026-10-02
 
@@ -260,8 +246,8 @@ as data.** A little colour-blind: never distinguish two states by colour alone.
 **Versioning (changed 2026-10-05, owner):** `A.B.C.D` - B is the roadmap PHASE, C counts RELEASES:
 one more each time a signed-off merge to `main` is tagged, whatever milestones it holds. Add a
 `CHANGELOG.md` entry with the tag, naming the milestones and issues in it. Never tag during
-development. D is commits since the tag; a dirty tree appends `+dirty`. **`v0.2.8` was tagged at
-the 2.10a merge (2026-10-05); the next signed-off merge in Phase 2 is `v0.2.9`**, whatever
+development. D is commits since the tag; a dirty tree appends `+dirty`. **`v0.2.9` was tagged at
+the 2.10b merge (2026-10-06); the next signed-off merge in Phase 2 is `v0.2.10`**, whatever
 milestones it holds. ROADMAP 3.3.
 
 **The issue tracker is yours to manage**, and keeping it, HANDOFF and ROADMAP current is part of the
