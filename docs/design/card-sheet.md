@@ -442,8 +442,9 @@ owner's call, below.
   wider, and the hero tall, with the label line at the top and the selector level with the hero's
   bottom; the row is centred. A toggle and its words sit centred; four controls are centred as a
   whole; two move in from the edge. For one light nothing moves - control, pause or words.
-- **The window is up to 2:1 (owner, 2026-10-06)**, keeping a side gap of at least 6 mm or 8% of the
-  screen: P4_5 93 mm, 7" ~129 mm, 4B ~60 mm. Supersedes the P4_5-shape rule above for the width;
+- **The window is up to 2:1 and never wider than 100 mm (owner, 2026-10-06)**, keeping a side gap
+  of at least 6 mm or 8% of the screen: P4_5 93 mm, 7" 100 mm (129 mm made every reach long), 4B
+  ~60 mm. A group's column is sized for everything its members can do, paused or not. Supersedes the P4_5-shape rule above for the width;
   the hero stays tied to the height. The rearranged layout (selector centred along the bottom) was
   declined: the P4_5 lacks the height (62 mm tall at 294 PPI; text and buttons are real
   millimetres). Covering the system header: decide at 2.10e, with the charts.

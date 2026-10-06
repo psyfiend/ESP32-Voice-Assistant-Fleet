@@ -167,6 +167,20 @@ Flashed 2026-10-06: **WS_P4_5** (debug flags), **WS_P4_4B**, **CYD_P4_1060** (`5
 | W5 | Open any SETTINGS deck | Paused is a switch: knob left, grey = live; tap it - knob right, accent = paused, the card pauses. Tap again to resume |
 | W6 | Linen, one window | The switch and the layout read clearly |
 
+**Round 5 results (owner, 2026-10-06):** all PASS except: with All Lamps paused, the whole group
+shifted (its hidden buttons narrowed the column); and the 7" window at ~129 mm made every reach
+longer - the X especially - and left less room to tap outside.
+
+## Round 6 - the last before the merge gate
+
+Flashed 2026-10-06: **WS_P4_5** (debug flags), **WS_P4_4B**, **CYD_P4_1060**.
+
+| # | Do this | PASS if |
+|---|---|---|
+| Y1 | All Lamps: pause it, resume it, pause Lamp 3 alone | The slider, the words and Power never move (the column is sized for everything the members can do) |
+| Y2 | 1060: open any window | ~100 mm wide (round 5: ~129); the X within an easy reach |
+| Y3 | P4_5 and 4B: open any window | Unchanged from round 5 (93 mm and ~60 mm) |
+
 ## Not tested (by Claude)
 
 Everything below was driven over `/popup` with no finger on the glass, so **nothing about touch has

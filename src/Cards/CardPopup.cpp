@@ -143,6 +143,7 @@ constexpr uint32_t POPUP_TICK_MS      = 250;
 constexpr float POPUP_ASPECT  = 787.0f / 545.0f;
 constexpr float REF_WIN_H_MM  = 47.1f;   // the P4_5 window's height, header showing
 constexpr float HERO_H_MM     = 30.2f;   // its hero's
+constexpr float POPUP_MAX_W_MM = 100.0f; // the widest any window gets - see open()
 
 // The hold, in millimetres so it looks the same on every board. THE LEAP IS
 // GONE (owner, round 6): it was clipped by the card's wrapper, and the window
@@ -1247,7 +1248,10 @@ void buildMain() {
         s.builtCaps = caps;
         buildLightHero(row);
         lv_obj_t *col = plain(row);
-        fixColumn(col, colWidth(true, caps));
+        // Sized for everything the members CAN do, paused or not: a pause
+        // hides buttons, and a narrower column re-centred the whole group
+        // (owner, round 5 - All Lamps paused).
+        fixColumn(col, colWidth(true, LA.allCaps));
         buildLightColumn(col);
         renderLight();
         return;
@@ -2687,8 +2691,12 @@ void CardPopup::open(Card &card) {
     const int32_t top    = UIToolkit::systemHeaderPx() + mm(2);
     const int32_t bottom = sh - mm(6) - mm(2);   // mm(6): the deck's tab
     const int32_t refH   = bottom - (UIToolkit::systemHeaderFullPx() + mm(2));
+    // AND NEVER WIDER THAN 100 mm (owner, round 5): on a 7" panel the 2:1
+    // window was ~129 mm, and every reach to the X or across the window got
+    // longer while the space to tap outside it shrank. 100 mm is the P4_5's
+    // window and a little - a hand's span.
     const int32_t side   = LV_MAX(mm(6), sw * 8 / 100);
-    int32_t w = 2 * refH;
+    int32_t w = LV_MIN(2 * refH, mm(POPUP_MAX_W_MM));
     if (w > sw - 2 * side) w = sw - 2 * side;
     s.winRect.x1 = (sw - w) / 2;
     s.winRect.x2 = s.winRect.x1 + w - 1;
