@@ -434,7 +434,12 @@ owner's call, below.
   has leaves the selector), not commanded. The group is PAUSED only when every member is; its
   status line says "1 paused"; Members still lists it, reading "Paused". The card follows the same
   rule (`Card::counts()`).
-- **A paused window**: greyed controls, a PAUSED pill, and a touch on a control explains itself.
+- **A paused window**: greyed controls, a PAUSED pill beside the label, and a touch on a control
+  explains itself. In a group a paused member never offers a mode, even when all are paused (round
+  3, P4); a fully paused group keeps its greyed slider and offers only Power.
+- **Nothing moves (owner, round 3)**: the column beside a slider or toggle is one size - a full
+  selector wide, the hero tall - with the label line at the top and the selector level with the
+  hero's bottom, in every light, every control, paused or not.
 - **A group card fills to the members' mean brightness**, HA's rule read from its source
   (`group/light.py`: brightness and colour temperature are the mean over the members that are ON,
   hue a circular mean, the mode the most common, the capabilities the union).
