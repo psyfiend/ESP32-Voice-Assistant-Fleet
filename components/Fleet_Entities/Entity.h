@@ -46,6 +46,7 @@ static constexpr uint8_t ENTITY_SHORT_MAX  = 20;  // unit, device_class, state_c
 static constexpr uint8_t ENTITY_ICON_MAX   = 32;  // "mdi:ceiling-light-outline"
 static constexpr uint8_t ENTITY_TOPIC_MAX  = 128; // external topic / HA entity id
 static constexpr uint8_t ENTITY_MEMBERS_MAX = 8;  // members of one HA-defined group (2.10c)
+static constexpr uint8_t ENTITY_SCENES_MAX  = 12; // scenes of one light (2.10c)
 
 struct EntityDescriptor {
     // Stable key a card binds to. Never renumbered, never reused - the same
@@ -407,6 +408,14 @@ struct Entity {
     uint8_t     members[ENTITY_MEMBERS_MAX] = {0};
     uint8_t     nMembers       = 0;
     bool        learnt         = false;   // registered from a group's member list
+
+    // A LIGHT'S SCENES, learnt the same way (2.10c, DECISIONS K15): HA's scene
+    // entities on the light's own device - for a Hue room, the scenes made in
+    // the Hue app. Each is a learnt entity of kind BUTTON: loaded with
+    // press(), never shown as on, because HA does not say which scene is
+    // showing.
+    uint8_t     scenes[ENTITY_SCENES_MAX] = {0};
+    uint8_t     nScenes        = 0;
 };
 
 #endif // ENTITY_H

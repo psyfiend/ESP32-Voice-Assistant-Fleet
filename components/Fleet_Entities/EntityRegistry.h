@@ -115,8 +115,25 @@ public:
         return (i < g.nMembers) ? at(g.members[i]) : nullptr;
     }
 
+    // A light's scenes (2.10c): the same, with each scene's name as the source
+    // gives it ("Relax"), registered as a BUTTON with a TEXT value (HA's
+    // scene state is when it was last activated).
+    uint8_t learnScenes(const char *lightId, const char *const *refs,
+                        const char *const *names, uint8_t n);
+    const Entity *sceneOf(const Entity &l, uint8_t i) const {
+        return (i < l.nScenes) ? at(l.scenes[i]) : nullptr;
+    }
+
+    // LOAD A SCENE, OR PRESS A BUTTON: handed to the command sink with no
+    // optimistic value and nothing to confirm - a scene says nothing back
+    // about whether it is still showing. A refusal by the source still marks
+    // it FAILED (failCommand()). False if unknown, not a writable BUTTON, or
+    // paused.
+    bool press(const char *id, uint32_t nowMs);
+
     // A learnt entity's name, from the source's own word for it (HA's
-    // friendly_name). Only learnt entities: a declared name is the user's.
+    // friendly_name) - only while it still has the placeholder it was learnt
+    // with (its ref). A declared name is the user's; a scene's is its own.
     bool adoptName(const char *id, const char *name);
 
     // True once after learnMembers() added anything: the caller (the loop
@@ -284,6 +301,11 @@ private:
     uint32_t _reconcileMs = 3000;
 
     int  indexOf(const char *id) const;   // caller holds the lock (or startup)
+
+    // learnMembers() and learnScenes(): find or register each ref as a copy of
+    // `like`'s source, then set `dst`. Caller holds the lock.
+    uint8_t learnInto(int gi, const char *const *refs, const char *const *names, uint8_t n,
+                      EntityKind kind, ValueType vt, uint8_t *dst, uint8_t &dstN, uint8_t max);
 };
 
 #endif // ENTITY_REGISTRY_H

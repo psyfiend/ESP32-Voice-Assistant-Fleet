@@ -161,6 +161,11 @@ IntfMode s_intfMode = IntfMode::INTF_NOW_AND_THEN;
 constexpr uint8_t POPUP_ENT_MAX = (CARD_PRIMARY_MAX > ENTITY_MEMBERS_MAX) ? CARD_PRIMARY_MAX
                                                                           : ENTITY_MEMBERS_MAX;
 
+// The selector's fifth target (2.10c, K15), alongside the LightCapBits: the
+// light has scenes. The window's own bit - a scene is not something a light
+// can do, it is something HA keeps beside it.
+constexpr uint8_t CAP_SCENES = 1u << 4;
+
 struct Popup {
     PopupPhase phase = PopupPhase::PHASE_CLOSED;
     PopupView  view  = PopupView::VIEW_MAIN;
@@ -218,8 +223,13 @@ struct Popup {
     bool      lightHero = false;
     uint8_t   lightCtl = 0;                      // LightCtl: which control the hero is
     lv_obj_t *fill = nullptr, *grip = nullptr, *mark = nullptr;
-    lv_obj_t *btnCtl[4] = {nullptr, nullptr, nullptr, nullptr};   // power, dim, temp, colour
+    lv_obj_t *btnCtl[5] = {nullptr};             // power, dim, temp, colour, scenes
     lv_obj_t *swatch[8] = {nullptr};
+    // Scenes (2.10c): their buttons, the one loaded from this window (-1:
+    // none), and whether the selector sits under the row (a narrow window).
+    lv_obj_t *sceneBtn[ENTITY_SCENES_MAX] = {nullptr};
+    int8_t    lastScene = -1;
+    bool      stacked = false;
     bool      sliding = false;                   // a finger is on the slider
     int32_t   slideVal = 0, sentVal = -1;        // what it shows; what was last sent
     uint32_t  sentMs = 0;
@@ -520,6 +530,7 @@ void forgetMainWidgets() {
     s.fill = s.grip = s.mark = s.pill = nullptr;
     for (lv_obj_t *&b : s.btnCtl) b = nullptr;
     for (lv_obj_t *&w : s.swatch) w = nullptr;
+    for (lv_obj_t *&b : s.sceneBtn) b = nullptr;
     s.sliding = false;
 }
 
@@ -623,12 +634,15 @@ int32_t selectorW(uint8_t caps) {
     if (caps & LIGHT_CAN_DIM)    n++;
     if (caps & LIGHT_CAN_TEMP)   n++;
     if (caps & LIGHT_CAN_COLOUR) n++;
+    if (caps & CAP_SCENES)       n++;
     const bool div = n > 1;
     const uint8_t children = n + (div ? 1 : 0);
     return 2 * g + n * UI::minTouch() + (children - 1) * g + (div ? LV_MAX(2, mm(0.25f)) : 0);
 }
 
-int32_t colWidth(bool light, uint8_t caps) {
+// What the column wants, unclamped. `selector`: whether the selector is in it
+// (beside the slider) or under the row (stacked, 2.10c).
+int32_t colNeed(bool light, uint8_t caps, bool selector = true) {
     const UIType &t = UI::type();
     int32_t w = textW(hasMembers() ? "Changed 59m ago, 9 paused" : "Changed 59m ago", t.TAG);
     w = LV_MAX(w, textW("Unavailable", UIToolkit::Font_Hero));
@@ -636,12 +650,27 @@ int32_t colWidth(bool light, uint8_t caps) {
     const int32_t pill = textW("PAUSED", t.TAG) + 2 * mm(1.2f) + 6 * mm(0.2f);
     w = LV_MAX(w, textW("Temperature", t.TAG) + mm(1.6f) + pill);
     if (light) {
-        w = LV_MAX(w, selectorW(caps));
+        if (selector) w = LV_MAX(w, selectorW(caps));
         if (caps & LIGHT_CAN_COLOUR) w = LV_MAX(w, 4 * mm(6.5f) + 3 * mm(1.6f) + 2 * mm(0.6f));
     }
-    const int32_t room = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4);
-    return LV_MIN(room, w);
+    return w;
 }
+
+// Beside the hero, as far as the window allows.
+int32_t colRoom() { return lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4); }
+
+int32_t colWidth(bool light, uint8_t caps, bool selector = true) {
+    return LV_MIN(colRoom(), colNeed(light, caps, selector));
+}
+
+// The stage's height: the window less its padding, the header row and the gap
+// under it (buildContents()). Known before LVGL lays anything out.
+int32_t stageH() {
+    return lv_area_get_height(&s.winRect) - 2 * s.pad - UI::minTouch() - mm(1.6f);
+}
+
+// The selector's height: its buttons and its own padding.
+int32_t selectorH() { return UI::minTouch() + 2 * mm(0.6f); }
 
 void fixColumn(lv_obj_t *col, int32_t width) {
     lv_obj_set_width     (col, width);
@@ -694,7 +723,7 @@ bool pausedBlocks();          // below, with the toggle
 // Cheap to move because it is small: a drag redraws the slider and the value
 // - tens of thousands of pixels - never the window.
 // ---------------------------------------------------------------------------
-enum LightCtl : uint8_t { LCTL_DIM, LCTL_TEMP, LCTL_COLOUR };
+enum LightCtl : uint8_t { LCTL_DIM, LCTL_TEMP, LCTL_COLOUR, LCTL_SCENES };
 
 constexpr uint32_t LIGHT_SEND_MS = 300;   // owner: "300ms sounds about right"
 
@@ -715,6 +744,30 @@ uint8_t firstCtl(uint8_t caps) {
     if (caps & LIGHT_CAN_DIM)  return LCTL_DIM;
     if (caps & LIGHT_CAN_TEMP) return LCTL_TEMP;
     return LCTL_COLOUR;
+}
+
+// THE LIGHT WHOSE SCENES ARE OFFERED (2.10c): the one light the window shows -
+// a card's own, or a group defined in HA as itself. None while the window
+// works through a group's members (a scene would reach the paused one), in a
+// member's own view, or for a group defined here.
+const Entity *sceneHost() {
+    if (!s.reg || s.view == PopupView::VIEW_MEMBER) return nullptr;
+    if (s.native) return s.expanded ? nullptr : s.native;
+    return (s.nEnt == 1) ? s.ent[0] : nullptr;
+}
+
+// What the selector offers. `all`: everything it could ever offer in this
+// window, scenes included while a member's pause hides them - what the column
+// is sized for, so nothing moves (section 15).
+uint8_t ctlCaps(const LightAgg &L, bool all) {
+    const Entity *h = sceneHost();
+    if (all && s.view != PopupView::VIEW_MEMBER) h = s.native ? s.native : (s.nEnt == 1 ? s.ent[0] : nullptr);
+    return (all ? L.allCaps : L.caps) | ((h && h->nScenes) ? CAP_SCENES : 0);
+}
+
+uint8_t ctlBit(uint8_t ctl) {
+    return ctl == LCTL_DIM ? LIGHT_CAN_DIM : ctl == LCTL_TEMP ? LIGHT_CAN_TEMP
+         : ctl == LCTL_COLOUR ? LIGHT_CAN_COLOUR : CAP_SCENES;
 }
 
 // The slider's range for the control showing.
@@ -802,12 +855,14 @@ void renderLight() {
     char buf[32];
     checkPausedChange(a);
     // A member paused or resumed changes what the group offers: rebuild once.
-    if (L.caps != s.builtCaps && !s.rebuildQueued) {
+    // So do scenes learnt while the window is open.
+    if (ctlCaps(L, false) != s.builtCaps && !s.rebuildQueued) {
         s.rebuildQueued = true;
         lv_async_call(rebuildMainAsync, nullptr);
     }
 
-    setText(s.lblWhat, s.lightCtl == LCTL_DIM ? "Brightness" : s.lightCtl == LCTL_TEMP ? "Temperature" : "Colour");
+    setText(s.lblWhat, s.lightCtl == LCTL_DIM ? "Brightness" : s.lightCtl == LCTL_TEMP ? "Temperature"
+                     : s.lightCtl == LCTL_COLOUR ? "Colour" : "Scenes");
 
     // What the slider shows: the finger while it is down, otherwise the
     // light. -1: nothing to mark (off, or the light has not said).
@@ -882,7 +937,7 @@ void renderLight() {
     }
 
     // --- The selector ------------------------------------------------------
-    for (uint8_t k = 0; k < 4; k++) {
+    for (uint8_t k = 0; k < 5; k++) {
         lv_obj_t *b = s.btnCtl[k];
         if (!b) continue;
         const bool chosen = (k > 0 && k - 1 == s.lightCtl);
@@ -902,6 +957,15 @@ void renderLight() {
                           LV_ABS((int32_t)SWATCHES[i].sat - L.sat) <= 3;
         lv_obj_set_style_outline_width(s.swatch[i], here ? LV_MAX(2, mm(0.4f)) : 0, 0);
         lv_obj_set_style_outline_color(s.swatch[i], UI::c(p.TEXT), 0);
+    }
+
+    // --- Scenes: a ring round the one loaded from this window --------------
+    // Only that: HA does not say which scene is showing, and the lights may
+    // have been changed since (K15).
+    for (uint8_t i = 0; i < ENTITY_SCENES_MAX; i++) {
+        if (!s.sceneBtn[i]) continue;
+        lv_obj_set_style_outline_width(s.sceneBtn[i], (i == s.lastScene) ? LV_MAX(2, mm(0.4f)) : 0, 0);
+        lv_obj_set_style_outline_color(s.sceneBtn[i], UI::c(p.ACCENT), 0);
     }
 }
 
@@ -960,6 +1024,17 @@ void swatchCb(lv_event_t *ev) {
     renderLight();
 }
 
+// A scene button: load it (scene.turn_on), and ring it until the window closes.
+void sceneCb(lv_event_t *ev) {
+    const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+    if (pausedBlocks()) return;
+    const Entity *h  = sceneHost();
+    const Entity *sc = (h && s.reg) ? s.reg->sceneOf(*h, i) : nullptr;
+    if (!sc || !s.reg->press(sc->desc.id, millis())) return;
+    s.lastScene = (int8_t)i;
+    renderLight();
+}
+
 // The strip's colours run between the rounded ends: a radius in from each.
 // The brightness fill uses the whole height.
 int32_t stripInset() { return s.lightCtl == LCTL_DIM ? 0 : s.heroR; }
@@ -1000,6 +1075,10 @@ void buildLightHero(lv_obj_t *row) {
     s.heroR = r;
     s.hero = plain(row);
     lv_obj_set_size(s.hero, s.heroW, s.heroH);
+    // SCENES: the slider's place is kept, empty - the scene buttons are laid
+    // over it and the column (buildSceneGrid()), so the column and the
+    // selector stay exactly where they are in every other control.
+    if (s.lightCtl == LCTL_SCENES) return;
     lv_obj_set_style_radius(s.hero, r, 0);
     lv_obj_add_flag(s.hero, LV_OBJ_FLAG_CLICKABLE);
     // A drag on the slider is the slider's: no gesture walks up from it to the
@@ -1061,12 +1140,17 @@ lv_obj_t *ctlButton(lv_obj_t *parent, const char *glyph, uint8_t k) {
     return b;
 }
 
-void buildLightColumn(lv_obj_t *col) {
+// `selParent`: the column itself (the selector at its bottom, level with the
+// slider's), or a row under the slider and column (stacked, 2.10c).
+void buildLightColumn(lv_obj_t *col, lv_obj_t *selParent) {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const LightAgg   L = lightAggregate();
+    const uint8_t    caps = ctlCaps(L, false);
     makeLabelRow(col);
-    if (s.lightCtl != LCTL_COLOUR) {
+    if (s.lightCtl == LCTL_SCENES) {
+        // Nothing more in the column: the scene buttons lie over it.
+    } else if (s.lightCtl != LCTL_COLOUR) {
         s.lblValue = makeLabel(col, UIToolkit::Font_Hero, p.TEXT);
         s.lblAgo   = makeLabel(col, t.TAG, p.TEXT_DIM);
         lv_label_set_long_mode(s.lblAgo, LV_LABEL_LONG_DOT);   // "..., 3 paused" stays one line
@@ -1098,14 +1182,16 @@ void buildLightColumn(lv_obj_t *col) {
 
     // The selector sits at the BOTTOM of the column, level with the bottom of
     // the slider, whatever is above it (owner, round 3).
-    lv_obj_t *spacer = plain(col);
-    lv_obj_set_size(spacer, 1, 0);
-    lv_obj_set_flex_grow(spacer, 1);
+    if (selParent == col) {
+        lv_obj_t *spacer = plain(col);
+        lv_obj_set_size(spacer, 1, 0);
+        lv_obj_set_flex_grow(spacer, 1);
+    }
 
     // Power | the controls this light (any member) has, with a divider after
     // Power as in HA. A light with only one of them still shows it, so the
     // selector always says what the slider is.
-    lv_obj_t *sel = plain(col);
+    lv_obj_t *sel = plain(selParent);
     lv_obj_set_size     (sel, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(sel, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(sel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -1115,15 +1201,72 @@ void buildLightColumn(lv_obj_t *col) {
     lv_obj_set_style_pad_all   (sel, mm(0.6f), 0);
     lv_obj_set_style_pad_column(sel, mm(0.6f), 0);
     ctlButton(sel, MDI_POWER, 0);
-    if (L.caps & (LIGHT_CAN_DIM | LIGHT_CAN_TEMP | LIGHT_CAN_COLOUR)) {
+    if (caps & (LIGHT_CAN_DIM | LIGHT_CAN_TEMP | LIGHT_CAN_COLOUR | CAP_SCENES)) {
         lv_obj_t *div = plain(sel);
         lv_obj_set_size(div, LV_MAX(2, mm(0.25f)), UI::minTouch() * 60 / 100);
         lv_obj_set_style_bg_color(div, UI::border(), 0);
         lv_obj_set_style_bg_opa  (div, LV_OPA_COVER, 0);
     }
-    if (L.caps & LIGHT_CAN_DIM)    ctlButton(sel, MDI_BRIGHTNESS_5, 1 + LCTL_DIM);
-    if (L.caps & LIGHT_CAN_TEMP)   ctlButton(sel, MDI_SUN_THERMOMETER, 1 + LCTL_TEMP);
-    if (L.caps & LIGHT_CAN_COLOUR) ctlButton(sel, MDI_PALETTE, 1 + LCTL_COLOUR);
+    if (caps & LIGHT_CAN_DIM)    ctlButton(sel, MDI_BRIGHTNESS_5, 1 + LCTL_DIM);
+    if (caps & LIGHT_CAN_TEMP)   ctlButton(sel, MDI_SUN_THERMOMETER, 1 + LCTL_TEMP);
+    if (caps & LIGHT_CAN_COLOUR) ctlButton(sel, MDI_PALETTE, 1 + LCTL_COLOUR);
+    // Scenes: mdi:movie-open, a clapperboard - already in the icon faces, so
+    // no font is regenerated for it (mdi:palette, HA's own scene icon, is
+    // Colour's here).
+    if (caps & CAP_SCENES)       ctlButton(sel, MDI_MOVIE_OPEN, 1 + LCTL_SCENES);
+}
+
+// THE SCENE BUTTONS (2.10c, K15): laid over the slider's place and the
+// column's middle - from under the label line to above the selector - as one
+// floating grid, so nothing else moves when Scenes is chosen. Two rows when
+// they fit at a touch target's height or a little under; it scrolls if a light
+// has more. Names as the source gives them, sorted ("Bright", "Relax").
+void buildSceneGrid(lv_obj_t *row, int32_t rowW) {
+    const UIPalette &p = UI::pal();
+    const UIType    &t = UI::type();
+    const Entity    *h = sceneHost();
+    if (!h || !s.reg) return;
+    const int32_t gap = mm(1.4f);
+    // The grid's own padding holds the ring (outline pad + width), which the
+    // grid's edge would otherwise clip.
+    const int32_t pad = LV_MAX(2, mm(0.3f)) + LV_MAX(2, mm(0.4f)) + 1;
+    const int32_t top = lv_font_get_line_height(t.TAG) + mm(0.8f);
+    const int32_t bot = s.stacked ? 0 : selectorH() + mm(0.8f);
+    const int32_t gh  = s.heroH - top - bot;
+    const int32_t ch  = LV_CLAMP(mm(6.5f), (gh - gap - 2 * pad) / 2, UI::minTouch());
+
+    lv_obj_t *grid = plain(row);
+    lv_obj_add_flag(grid, LV_OBJ_FLAG_FLOATING);
+    lv_obj_set_pos (grid, 0, top);
+    lv_obj_set_size(grid, rowW, gh);
+    lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_column(grid, gap, 0);
+    lv_obj_set_style_pad_row   (grid, gap, 0);
+    lv_obj_set_style_pad_all   (grid, pad, 0);   // room for the ring
+    lv_obj_add_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
+    UI::tameScroll(grid);
+
+    for (uint8_t i = 0; i < h->nScenes; i++) {
+        const Entity *sc = s.reg->sceneOf(*h, i);
+        if (!sc) continue;
+        lv_obj_t *b = plain(grid);
+        lv_obj_set_size(b, LV_SIZE_CONTENT, ch);
+        lv_obj_set_style_min_width(b, ch * 2, 0);
+        lv_obj_set_style_pad_hor  (b, mm(2.4f), 0);
+        lv_obj_set_style_radius   (b, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_opa   (b, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color (b, UI::c(quiet(p.SURFACE)), 0);
+        lv_obj_set_style_bg_color (b, UI::c(UI::mix(p.SURFACE, p.TEXT, 20)),
+                                   UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+        lv_obj_set_style_outline_pad(b, LV_MAX(2, mm(0.3f)), 0);
+        lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(b, sceneCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
+        lv_obj_t *l = makeLabel(b, t.TAG, quiet(p.TEXT));
+        lv_label_set_text(l, sc->desc.name);
+        lv_obj_center(l);
+        s.sceneBtn[i] = b;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1297,18 +1440,40 @@ void buildMain() {
                    (e.desc.kind == EntityKind::SWITCH || writableLight);
     if (s.lightHero) {
         // A control no counting member has any more (its lamp was paused)
-        // falls back to the first one there is.
-        const uint8_t bit = s.lightCtl == LCTL_DIM ? LIGHT_CAN_DIM : s.lightCtl == LCTL_TEMP ? LIGHT_CAN_TEMP
-                                                                                          : LIGHT_CAN_COLOUR;
-        if (!(caps & bit)) s.lightCtl = firstCtl(caps);
-        s.builtCaps = caps;
+        // falls back to the first one there is. Scenes too, when a member's
+        // pause takes them away.
+        const uint8_t offered = ctlCaps(LA, false);
+        const uint8_t sized   = ctlCaps(LA, true);
+        if (!(offered & ctlBit(s.lightCtl))) s.lightCtl = firstCtl(caps);
+        s.builtCaps = offered;
+
+        // STACKED WHEN THE SELECTOR DOES NOT FIT BESIDE THE SLIDER (owner,
+        // 2026-10-06: the 4B with Scenes' fifth button). The slider and its
+        // words stay a row, centred; the selector moves under it, centred; the
+        // slider is shortened by what the selector needs. Decided from
+        // everything the window could offer, so it never changes within one.
+        s.heroW   = s.heroH * 42 / 100;
+        s.stacked = colNeed(true, sized) > colRoom();
+        if (s.stacked) {
+            const int32_t fit = stageH() - selectorH() - mm(1.6f);
+            if (s.heroH > fit) s.heroH = LV_MAX(UI::minTouch(), fit);
+            s.heroW = s.heroH * 42 / 100;
+            lv_obj_set_style_pad_row(s.stage, mm(1.6f), 0);
+        }
         buildLightHero(row);
         lv_obj_t *col = plain(row);
         // Sized for everything the members CAN do, paused or not: a pause
         // hides buttons, and a narrower column re-centred the whole group
         // (owner, round 5 - All Lamps paused).
-        fixColumn(col, colWidth(true, LA.allCaps));
-        buildLightColumn(col);
+        const int32_t colW = colWidth(true, sized, !s.stacked);
+        fixColumn(col, colW);
+        lv_obj_t *selParent = col;
+        if (s.stacked) {
+            selParent = plain(s.stage);
+            lv_obj_set_size(selParent, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        }
+        buildLightColumn(col, selParent);
+        if (s.lightCtl == LCTL_SCENES) buildSceneGrid(row, s.heroW + pm(4) + colW);
         renderLight();
         return;
     }
@@ -2569,6 +2734,7 @@ void closeNow(void *unused) {
     s.groupN = 0;
     s.native = nullptr;
     s.expanded = false;
+    s.lastScene = -1;
     s.rebuildQueued = false;
 #ifdef DEBUG_POPUP
     char mem[96];
@@ -2834,7 +3000,7 @@ namespace {
 enum DbgReqState : int { DREQ_IDLE, DREQ_CLAIMED, DREQ_PENDING, DREQ_CLOSING, DREQ_DONE };
 std::atomic<int> s_dreq{DREQ_IDLE};
 struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
-                int member = -1; bool close = false, power = false; };
+                int member = -1; int scene = -1; bool close = false, power = false; };
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
 size_t s_dreqLen = 0;
@@ -2871,6 +3037,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "power", v, sizeof(v)) == ESP_OK) a.power = true;
         if (httpd_query_key_value(q, "pause", v, sizeof(v)) == ESP_OK) a.pause = atoi(v);
         if (httpd_query_key_value(q, "member", v, sizeof(v)) == ESP_OK) a.member = atoi(v);
+        if (httpd_query_key_value(q, "scene", v, sizeof(v)) == ESP_OK) a.scene = atoi(v);
         if (httpd_query_key_value(q, "close", v, sizeof(v)) == ESP_OK) a.close = atoi(v) != 0;
     }
     int expected = DREQ_IDLE;
@@ -2939,6 +3106,24 @@ void CardPopup::debugService(lv_timer_t *t) {
         s_dreq.store(DREQ_DONE);
         return;
     }
+    if (a.scene >= 0) {
+        // As a tap on scene N (2.10c). Lists the light's scenes either way.
+        const Entity *h = isOpen() ? sceneHost() : nullptr;
+        if (!h || !h->nScenes) dbgOut("no scenes in this window\n");
+        else {
+            for (uint8_t i = 0; i < h->nScenes; i++) {
+                const Entity *sc = s.reg->sceneOf(*h, i);
+                dbgOut("  %u %-12s %s%s\n", (unsigned)i, sc ? sc->desc.name : "?",
+                       sc ? sc->desc.externalRef : "", sc && sc->cmdFailed ? " FAILED" : "");
+            }
+            const Entity *sc = s.reg->sceneOf(*h, (uint8_t)a.scene);
+            const bool ok = sc && s.reg->press(sc->desc.id, millis());
+            if (ok) { s.lastScene = (int8_t)a.scene; renderMain(); }
+            dbgOut("scene %d: %s\n", a.scene, ok ? "loaded" : "not loaded");
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
     if (a.power) {
         // As a tap on Power (or on a switch's toggle).
         if (!isOpen()) dbgOut("no window open\n");
@@ -2995,7 +3180,7 @@ void CardPopup::debugService(lv_timer_t *t) {
     if (a.ctl >= 0) {
         if (!isOpen() || !s.lightHero) dbgOut("no light window open\n");
         else {
-            s.lightCtl = (uint8_t)LV_MIN(a.ctl, (int)LCTL_COLOUR);
+            s.lightCtl = (uint8_t)LV_MIN(a.ctl, (int)LCTL_SCENES);
             const uint32_t t0 = micros();
             showView(PopupView::VIEW_MAIN);
             const uint32_t us = micros() - t0;

@@ -3,6 +3,7 @@
 #define HA_PROVIDER_H
 
 #include <Arduino.h>
+#include <atomic>
 #include "EntityRegistry.h"
 #include "HaClient.h"
 #include "HaRest.h"
@@ -86,6 +87,14 @@ private:
     // Returns how many it named, 0 for none, -1 if it could not be sent.
     int sendSubscribe(uint8_t from, uint8_t to);
 
+    // THE SCENES OF EVERY LIGHT ON THE BOARD (2.10c): one render_template,
+    // ha-websocket.md section 7a's pattern - HA's scene entities on each
+    // light's own device ("light>scene>Name|..."), learnt into the registry.
+    // A template is a subscription, so it is cancelled once answered. False
+    // only when the frame could not be sent.
+    bool sendSceneQuery();
+    void parseScenes(const char *result);   // websocket task
+
     EntityRegistry *_reg  = nullptr;
     HaClient       *_ha   = nullptr;
     HaRest         *_rest = nullptr;
@@ -104,6 +113,12 @@ private:
 
     ResultFn _resultFn  = nullptr;
     void    *_resultCtx = nullptr;
+
+    // The scene query: the session it was sent for, its id (read on the
+    // websocket task to match the answer), and whether it has answered.
+    uint32_t              _scenesForSession = 0;
+    std::atomic<uint32_t> _tplId{0};
+    std::atomic<bool>     _tplDone{false};
 
     uint16_t _handled    = 0;
     uint16_t _unmatched  = 0;

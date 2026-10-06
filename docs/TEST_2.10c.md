@@ -59,6 +59,30 @@ the room first reports, about 15 s after boot, so give the board that long befor
 | G13 | Desk's SETTINGS | No "On when" row (HA decides that for its own groups) |
 | G14 | Fleet page: All Lamps, pause Lamp 3, drag | Unchanged from v0.2.9 (the card code changed underneath) |
 
+## Round 3 - scenes (step 3)
+
+Desk's seven Hue scenes are found in HA when the board connects (about 15 s after boot). **WS_P4_4B
+(COM7) is flashed with this build too**, for S8 - the only board where Desk's window stacks.
+
+| # | Do this | PASS if |
+|---|---|---|
+| S1 | Open Desk | Five controls: Power \| Brightness, Temperature, Colour, and Scenes (a clapperboard) at the end |
+| S2 | Tap Scenes | "Scenes" where "Brightness" was; seven buttons, Bright to Relax by name, in two rows; the selector has not moved |
+| S3 | Tap Relax | The room goes to Relax; a ring round Relax |
+| S4 | Tap Brightness | The slider is back, at the scene's level; nothing else moved |
+| S5 | Close, reopen, Scenes | No ring: HA does not say which scene is showing |
+| S6 | Pause Office lamp (Members > Office lamp > SETTINGS). Back to Desk | No Scenes button (a scene would reach the paused bulb); the slider and words have not moved. Resume it: Scenes is back |
+| S7 | Office lamp's own view | No Scenes (scenes belong to the room) |
+| S8 | **4B**: open Desk | The slider and its words centred on top; the five controls centred underneath. Scenes: two per row, the seventh reached by scrolling |
+| S9 | Table (Kitchen), Overhead, the Fleet page's lamps | No Scenes button; laid out as before (Desk's own row is wider than in v0.2.9, for its fifth button) |
+| S10 | The clapperboard | Say whether it reads as "scenes". Another glyph costs regenerating the icon font; HA's own scene icon (the palette) is Colour's here |
+
+## Not tested (by Claude) - round 3
+
+Driven over `/popup`: no finger has scrolled the 4B's scene grid or tapped a scene button. Not tried:
+HA refusing a scene; scenes kept in HA's `scenes.yaml` (they belong to no device, so they are not
+offered); a light with more than 12 scenes (the rest are left out); the 7" panels.
+
 ## Not tested (by Claude) - round 2
 
 Driven over `/popup` (G2-G13's logic, against the real bulbs, compared with HA) - no finger on the
@@ -111,3 +135,11 @@ The boot log: `subscribe_trigger id 2 for 3 entities, learnt since`, then `initi
 fetched, 0 failed` (21 declared + 3 learnt). The first build kept a paused member's levels out at
 boot (its on/off came through, its brightness did not); fixed - a paused entity now takes its first
 reading whole. All three bulbs put back at 100%, 2710 K, none paused.
+
+**Round 3 (scenes):** the boot log - `render_template id 2: the scenes of 5 lights (389 B)`, `scenes:
+7 for 1 lights`, then their subscription, and `initial values: 31 fetched, 0 failed` (21 declared,
+7 scenes, 3 members). Relax loaded from the window twice: HA's room went to it (the bulbs 2240-2440
+K, 56-76%). Desk's window on Scenes: built in 9.6 ms, LVGL's pool 96 -> 99 KB. On the 4B the window is
+600 x 568 px; Desk stacks with the slider at its full 267 px (the window had the height). One flaw
+fixed on the way: the grid's edge clipped the ring round a bottom-row scene. The room put back at
+100%, 2710 K.

@@ -157,10 +157,30 @@ uint8_t EntityRegistry::learnMembers(const char *groupId, const char *const *ref
     const int gi = indexOf(groupId);
     if (gi < 0 || !refs) return 0;
     Entity &g = _items[gi];
+    return learnInto(gi, refs, nullptr, n, g.desc.kind, g.desc.valueType,
+                     g.members, g.nMembers, ENTITY_MEMBERS_MAX);
+}
 
-    uint8_t idx[ENTITY_MEMBERS_MAX];
+uint8_t EntityRegistry::learnScenes(const char *lightId, const char *const *refs,
+                                    const char *const *names, uint8_t n) {
+    std::lock_guard<std::mutex> lk(_mx);
+    const int li = indexOf(lightId);
+    if (li < 0 || !refs) return 0;
+    Entity &l = _items[li];
+    return learnInto(li, refs, names, n, EntityKind::BUTTON, ValueType::TEXT_VAL,
+                     l.scenes, l.nScenes, ENTITY_SCENES_MAX);
+}
+
+uint8_t EntityRegistry::learnInto(int gi, const char *const *refs, const char *const *names,
+                                  uint8_t n, EntityKind kind, ValueType vt,
+                                  uint8_t *dst, uint8_t &dstN, uint8_t max) {
+    Entity &g = _items[gi];
+    const char *groupId = g.desc.id;
+
+    uint8_t idx[ENTITY_SCENES_MAX > ENTITY_MEMBERS_MAX ? ENTITY_SCENES_MAX : ENTITY_MEMBERS_MAX];
+    if (max > sizeof(idx)) max = sizeof(idx);
     uint8_t k = 0, added = 0;
-    for (uint8_t r = 0; r < n && k < ENTITY_MEMBERS_MAX; r++) {
+    for (uint8_t r = 0; r < n && k < max; r++) {
         const char *ref = refs[r];
         if (!ref || !ref[0]) continue;
 
@@ -183,12 +203,14 @@ uint8_t EntityRegistry::learnMembers(const char *groupId, const char *const *ref
                 else { d.id[len] = (char)('1' + tries); d.id[len + 1] = '\0'; }
             }
             if (indexOf(d.id) >= 0) continue;
-            // Its name is its ref until the source says otherwise (adoptName).
-            snprintf(d.name, sizeof(d.name), "%s", ref);
+            // Its name: the one given (a scene's), else its ref until the
+            // source says otherwise (adoptName).
+            const char *nm = (names && names[r] && names[r][0]) ? names[r] : ref;
+            snprintf(d.name, sizeof(d.name), "%s", nm);
             snprintf(d.externalRef, sizeof(d.externalRef), "%s", ref);
-            d.kind      = g.desc.kind;
+            d.kind      = kind;
             d.source    = g.desc.source;
-            d.valueType = g.desc.valueType;
+            d.valueType = vt;
             d.writable  = g.desc.writable;
             d.advertise = false;   // someone else's, like the group
 
@@ -202,19 +224,35 @@ uint8_t EntityRegistry::learnMembers(const char *groupId, const char *const *ref
             _count.store((uint8_t)(slot + 1), std::memory_order_release);
             m = slot;
             added++;
-            ESP_LOGI(ENT_TAG, "learnt %s (%s), a member of %s", d.id, ref, groupId);
+            ESP_LOGI(ENT_TAG, "learnt %s (%s) for %s", d.id, ref, groupId);
         }
         idx[k++] = (uint8_t)m;
     }
 
     // The list first, then its length, for a reader on the LVGL thread.
-    if (k != g.nMembers || memcmp(idx, g.members, k) != 0) {
-        memcpy(g.members, idx, k);
-        g.nMembers = k;
-        g.dirty    = true;
+    if (k != dstN || memcmp(idx, dst, k) != 0) {
+        memcpy(dst, idx, k);
+        dstN    = k;
+        g.dirty = true;
     }
     if (added) _learnt.store(true);
     return added;
+}
+
+bool EntityRegistry::press(const char *id, uint32_t nowMs) {
+    Entity snapshot;
+    {
+        std::lock_guard<std::mutex> lk(_mx);
+        const int i = indexOf(id);
+        if (i < 0) return false;
+        Entity &e = _items[i];
+        if (e.desc.kind != EntityKind::BUTTON || !e.desc.writable || e.paused) return false;
+        e.cmdFailed    = false;
+        e.lastUpdateMs = nowMs;
+        snapshot = e;
+    }   // the sink may block on a socket (#44)
+    if (_cmdFn) _cmdFn(snapshot, EntityValue::makeBool(true), _cmdCtx);
+    return true;
 }
 
 bool EntityRegistry::adoptName(const char *id, const char *name) {
@@ -223,7 +261,9 @@ bool EntityRegistry::adoptName(const char *id, const char *name) {
     const int i = indexOf(id);
     if (i < 0 || !_items[i].learnt) return false;
     Entity &e = _items[i];
-    if (strncmp(e.desc.name, name, sizeof(e.desc.name) - 1) == 0) return false;
+    // Only over the placeholder: once named, by the source or at learning
+    // (a scene's "Relax", where friendly_name says "Office Relax"), it stays.
+    if (strcmp(e.desc.name, e.desc.externalRef) != 0) return false;
     snprintf(e.desc.name, sizeof(e.desc.name), "%s", name);
     e.dirty = true;
     return true;
@@ -715,7 +755,9 @@ bool EntityRegistry::failCommand(const char *id) {
     const int i = indexOf(id);
     if (i < 0) return false;
     Entity &e = _items[i];
-    if (!e.pending && !e.attrPending) return false;
+    // A pressed button (a scene) waits for nothing, so its refusal is
+    // reported however long after the press it comes.
+    if (!e.pending && !e.attrPending && e.desc.kind != EntityKind::BUTTON) return false;
     if (e.pending)     { e.value = e.prevValue; e.pending = false; }
     if (e.attrPending) { e.attrs = e.prevAttrs; e.attrPending = false; }
     e.cmdFailed = true;

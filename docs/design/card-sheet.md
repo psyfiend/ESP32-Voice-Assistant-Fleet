@@ -502,3 +502,25 @@ one bulb's own controls - exactly as All Lamps does with Lamp 4, which has no ca
 - A member's pause is saved like any other and applied once the member is learnt after a reboot.
 - Adding a member as a card of its own: later (owner) - it needs a place on the page (#78) and
   saving (2.10d).
+
+**Step 3 - scenes (K15, K19).** A light's scenes are HA's scene entities on the light's own device -
+for a Hue room, the scenes made in the Hue app - found by one `render_template` per session
+(`ha-websocket.md` section 7a's pattern, cancelled once answered) and learnt like members, each a
+BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept in HA's own
+`scenes.yaml` belong to no device and are not offered.
+
+- **Scenes is the selector's fifth target** (`mdi:movie-open`, a clapperboard - already in the icon
+  faces; HA's own scene icon, the palette, is Colour's here). Shown only for a light that has scenes,
+  and not while the window works through a group's members: a scene would reach the paused one.
+- **Chosen, its buttons lie over the slider's place and the column's middle**, sorted by name, two
+  rows high, scrolling if there are more. The label line and the selector stay exactly where they
+  are; the slider's place is kept, empty.
+- **A tap loads the scene** (`scene.turn_on`) and rings that button until the window closes. Nothing
+  else: HA records only when a scene was last activated, not whether it is still showing, so no
+  scene is ever shown as on. A refusal by HA marks it FAILED.
+- **Stacked where the selector does not fit beside the slider** (owner's suggestion, 2026-10-06):
+  the slider and its words stay a row, centred, and the selector moves under it, centred; the slider
+  is shortened only if the window lacks the height. Decided from everything the window could offer,
+  so it never changes within one window. On the 4B, Desk stacks; every window on the P4_5 and the 7"
+  panels stays side by side. Section 15 declined a rearranged layout for the P4_5 for lack of
+  height - that stands; this is only for windows too narrow for their selector.

@@ -74,7 +74,8 @@ public:
     //   /popup              the cards on this page, numbered
     //   /popup?card=N       open card N's window; replies with LVGL's pool
     //   /popup?deck=1       open (or fold, deck=0) the settings deck
-    //   /popup?ctl=N        a light's control: 0 brightness, 1 temperature, 2 colour
+    //   /popup?ctl=N        a light's control: 0 brightness, 1 temperature, 2 colour, 3 scenes
+    //   /popup?scene=N      as a tap on scene N; lists the light's scenes (2.10c)
     //   /popup?set=V        as a tap on that control's slider at V (%, K, hue)
     //   /popup?view=N       0 main, 1 history, 2 members; lists each entity's levels
     //                       (and a group defined in HA's members, 2.10c); 3 only lists
