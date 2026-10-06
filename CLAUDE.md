@@ -11,7 +11,10 @@ elsewhere, and it is worth checking those first for "is X already known or plann
 | Doc | Answers |
 |---|---|
 | `docs/HANDOFF.md` | Where we left off, what to know that the other docs do not say. **Start here.** |
-| `docs/ROADMAP.md` | What we are building, in what order, and what is done |
+| `docs/ROADMAP.md` | What we are building, in what order, what is done - and **where each kind of note belongs** |
+| `docs/DECISIONS.md` | Every decision that shapes later work, one line each, pointing at its reasoning |
+| `CHANGELOG.md` | What each tagged version contains |
+| `docs/TEST_<milestone>.md` | The owner's test sheet for the milestone in progress (archived when done) |
 | `docs/HARDWARE_STATUS.md` | Which board does what, what is untested, build-environment issues |
 | `docs/LESSONS.md` | Mistakes that cost real time, written down so they cost it once |
 | `docs/FUTURE_IMPROVEMENTS.md` | Deliberately deferred fleet-wide work |
@@ -282,10 +285,14 @@ The live file is on the include path via `-I include/lvgl` in the shared `[S3-op
 had `LV_USE_LOG 0` and `LV_MEM_SIZE 64KB`, and the fleet demonstrably prints `[LVGL] [Warn]` lines
 and behaves like a 128KB pool.
 
-**`LV_MEM_SIZE` is 128 KB fleet-wide and 256 KB does not link on P4.** Tried 2026-09-17: the RAM
-report says 3% of 512,000 bytes, which is the whole internal SRAM and not what a static array can
-have. The linker came up 32,983 bytes short. 192 KB is the next value worth trying and it needs a
-link test, not a calculation.
+**LVGL's pool: 512 KB in PSRAM on every P4, 128 KB elsewhere** (owner, 2026-10-06, #88).
+`[P4-options]` sets `-D FLEET_LV_MEM_PSRAM -D FLEET_LV_MEM_KB=512`: LVGL keeps its own allocator
+(TLSF, `lv_mem_monitor()`) but takes the pool from PSRAM at `lv_init()`, so its size costs no
+internal RAM - WS_P4_5 went from 233 to 361 KB internal free, full-screen frames ~10% slower.
+WS_S3_4B has the PSRAM pool at 128 KB; the other S3s keep a 128 KB static array in internal RAM,
+where 192 KB once broke the network and 256 KB does not link (LESSONS). **Never hand LVGL to the
+system `malloc` on the P4** - NINA's `lv_mem_psram.c` records it fragmenting the internal heap until
+esp-hosted's WiFi receive buffer failed (LESSONS, "Small LVGL traps from 2.10b").
 
 ## PlatformIO build cache can silently ignore BSP header edits
 
@@ -421,8 +428,8 @@ are derived rather than guessed per board.
   reason.
 - **Card-size faces (2.7, #62).** `VALUE_SM` and `ICON_MD` let a card step its hero and corner with
   its own cell. Name, unit and tag faces never change per card. See `cards.md` §13.
-- **A card costs ~715 bytes of `lv_mem`**, LVGL's own 128 KB pool — which is a static array in
-  internal DRAM, not the system heap. `ESP.getFreeHeap()` barely moves when a widget is created;
+- **A card costs ~715 bytes of `lv_mem`**, LVGL's own pool (512 KB in PSRAM on the P4s, a 128 KB
+  static array in internal DRAM on most S3s - see above), not the system heap. `ESP.getFreeHeap()` barely moves when a widget is created;
   `lv_mem_monitor()` is the instrument.
 
 ### Anything drawn on a panel stays ASCII, except the degree sign

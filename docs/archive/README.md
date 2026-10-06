@@ -13,6 +13,8 @@ live one wins. Moved here 2026-09-29, unchanged, so section numbers quoted elsew
 | `display/waveshare-esp-lcd-survey.md` | What Waveshare's and Guition's IDF code knew that ours did not | `docs/display/panels.md` |
 | `TEST_2.4.md`, `TEST_2.6.md`, `TEST_2.7.md` | Sign-off sheets for milestones 2.4, 2.6, 2.7 | done - ROADMAP |
 | `TEST_58.md` | Screenshots (#58) sign-off | done |
+| `TEST_2.10a.md`, `TEST_2.10b.md` | The card popup's frame (12 rounds) and light controls (7 rounds), with every measurement | `docs/design/card-sheet.md` §14-15 |
+| `ROADMAP_to_2026-10-06.md` | The roadmap as it grew: the 2026-09-03 blueprint (§2-6: working contract, git, architecture, technology choices, UI risks), each milestone's history, and the Q1-Q11 decisions with their reasoning | `docs/ROADMAP.md` (the plan, rewritten lean), `docs/DECISIONS.md` (the decisions) |
 | `TEST_CYD_P4_4880.md` | The JC4880P443's first flash | `docs/HARDWARE_STATUS.md`, `docs/display/README.md` |
 | `REVIEW_2026-09-20.md` | A review written while the owner was away | closed 2026-09-21 |
 | `GUI_FRAMEWORK.md` | The first UI vision sketch | `docs/ROADMAP.md` |

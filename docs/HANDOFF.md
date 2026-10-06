@@ -26,7 +26,7 @@ window has its controls (2.10b) - working on the virtual lamps; HA lights get on
 
 **What the popup is now: `card-sheet.md` §14 (the frame, the deck) and §15 (the light controls,
 sizes, groups, pause)** - read both before touching it; where they differ from §9-13, they win.
-Every round, result and measurement: `docs/TEST_2.10a.md` (twelve rounds) and `docs/TEST_2.10b.md`
+Every round, result and measurement: `docs/archive/TEST_2.10a.md` (twelve rounds) and `docs/archive/TEST_2.10b.md`
 (seven). The rules that cost the most to learn:
 
 - **Usable first** (owner): the window is complete in its first frame and closes in one; no grow,
@@ -61,13 +61,16 @@ malloc for LVGL is a trap on this hardware. LVGL 9.6: after 2.10 (#88).
   300 ms later so the print is not timed; `dbgMem` for G1; a long press on the window's title cycles
   the sparks: now and then / once / off) and `-D DEBUG_FRAMES` (GUIManager.cpp: every frame of every
   burst of motion). Add them to `WS_P4_TOUCH_LCD_5` in `platformio.ini` when measuring; never commit
-  them.
+  them. `DEBUG_POPUP` also brings `GET /popup` (above).
+- **Reading a board's boot log without a monitor:** a pyserial script that pulses RTS with DTR low
+  (a normal boot) and filters lines; PlatformIO's Python has pyserial. PowerShell 5.1 strips quotes
+  from `python -c "..."`, so write the script to a file.
 
 ## What is next — the new session's job: 2.10c, HA light attributes and calls (#65)
 
 **Not started; confirm with the owner first.** The build order (card-sheet §9): 2.10c HA, 2.10d
 stable ids and saving, 2.10e history. Interview §3 onward (2.8 header slots, then 2.11 groups)
-after 2.10. ROADMAP §7 has the order.
+after 2.10. `docs/ROADMAP.md`'s running order has it.
 
 **2.10c's scope:** HaProvider reads a light's attributes into `EntityAttrs` (`supported_color_modes`
 -> `lightCaps`, `color_mode`, `brightness`, `color_temp_kelvin` and its min/max, `hs_color`), so
@@ -91,39 +94,16 @@ is sometimes "busy" - retry after a few seconds) connected for 2.10b. WS_S3_4B i
 leave it until the owner says. Before merge: the all-nine compile gate and a look on glass, then
 `--no-ff`, a tag (`v0.2.10`) and a CHANGELOG entry (Versioning, below).
 
-## Where the interview stands — 2026-10-02
+## Where the design interview stands
 
-- **§1 look and feel: CLOSED**, merged. `look-and-feel.md`.
-- **§2 card popups: CLOSED 2026-10-02.** `card-sheet.md` §11-12. Settings model: precedence device
-  < page < area/group < card, inheritance per setting with the source named and a Reset, LOCKED
-  keeps ROADMAP Q2's meaning, the coloured label type is called **"band"**.
-- **Group taxonomy draft** for §4: `group-cards.md` (source x presentation x tap behaviour; Hue
-  group members verified from `light.office`'s attributes).
-- **Artifacts:** "Card Popup Mock" (the 2.10 design), "Layout Playground" (the arranger, #78),
-  "Beyond the Grid", "Linen Fill and Header Glyphs" - links in the design docs.
-- **Merged to `main` 2026-10-01 (`0de94d3`), all nine environments compiled (28 min gate):**
-  - `feat/74-sntp` (#74): `TimeService`, SNTP + POSIX zone; the boot report waits up to 10 s for the
-    first sync, and the Doctor's `Time:` line shows the time and source. Owner confirmed on WS_P4_5.
-    Still open on #74: the RTC fallback, zone/servers as settings.
-  - `feat/card-tag-float` (#80): floating tag as the default (rises half its height, sticks out a
-    quarter to the side, paid for inside the cell); status pills float on the top edge and the area
-    name shortens beside them; bar band round-top/straight-bottom. Owner signed off. File folder
-    not built (#80).
-  - `feat/linen-butter`: Linen ground C+ (`CFC4B2`), card a hair darker (`F3EEE4`), and Linen's own
-    "on" colour - **olive** `9AA35A` (butter was rejected on glass). Owner's executive decision,
-    to be judged when back; other choices for 4.1 in `UITokens.cpp`.
-  - Flashed: WS_P4_5 and WS_P4_4B. WS_S3_4B not flashed (#69's watch). The 4880 runs an old tag build.
-- **Merge discipline (owner, 2026-10-01):** nothing reaches `main` without the all-nine compile gate
-  and a look on glass; no quick-fix branches during the interview (mocks instead); demos on one
-  board.
-- **Playground v4** (same link): half-side floating tag, folder tab offset, clusters never tagged
-  and their header bar clear unless the page is in Bar mode, status as icons. Notes: `look-and-feel.md`.
-- **New issues:** #75 night mode, #76 HA alerts, #77 media player, #78 page arranger (reopens Q3b),
-  #79 transitions from pre-rendered pictures, #80 tag styles, #81 system panel should slide.
-  Comments on #6, #20, #35, #52-54, #74.
-- **Reading a board's boot log without a monitor:** `scratchpad`-style script with pyserial that
-  pulses RTS with DTR low (resets into a normal boot) and filters lines - PowerShell 5.1 strips
-  quotes from `python -c "..."`, so write the script to a file.
+`docs/design/interview-phase2-3.md` is the blueprint for 2.8, 2.11 and Phase 3; Claude facilitates.
+**§1 look and feel CLOSED 2026-10-01** (`look-and-feel.md`); **§2 card popups CLOSED 2026-10-02**
+(`card-sheet.md` §11-12, built as §14-15). **§3 onward is next after 2.10**, and #87 (the companion
+web app) should be scoped there, before 3.1. The group taxonomy draft for §4 is `group-cards.md`.
+Artifacts on claude.ai: "Card Popup Mock" (2.10), "Layout Playground" v4 (the arranger, #78),
+"Beyond the Grid", "Linen Fill and Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
+Linen's "on" colour (olive `9AA35A`) was the owner's executive decision; alternatives for 4.1 are in
+`UITokens.cpp`.
 
 ## Fires still burning — each has an owner doc or issue, none needs the next session
 
@@ -136,9 +116,8 @@ leave it until the owner says. Before merge: the all-nine compile gate and a loo
 | Rotation setting / IMU | recorded | #71 |
 | Fonts / type ladder | recorded, feeds the interview | #73 |
 
-**Branch rule (owner, 2026-09-29): branch every piece of work off `main` and merge it when done.**
-The display work became a four-deep stack and forced unfinished work into `main` with the finished.
-Never start a branch on an unmerged one without asking.
+**Branch rule and merge gate: `docs/DECISIONS.md` W1-W2.** Never start a branch on an unmerged one
+without asking.
 
 ## Boards on the desk
 
@@ -164,12 +143,13 @@ size - not a CR1220). S3_5B's 927 holder is unconfirmed. Nothing reads an RTC ye
 ## Read in this order
 
 1. `CLAUDE.md` — the HAL/BSP, the token and paint rules, **and the file-editing rule at the top**.
-2. `docs/LESSONS.md` — before debugging anything.
-3. For UI work: `docs/design/interview-phase2-3.md`, `card-sheet.md`, `cards.md` §13, `pages.md`,
+2. `docs/ROADMAP.md` (the plan, and where each kind of note belongs) and `docs/DECISIONS.md` (every
+   decision in one line) - both short.
+3. `docs/LESSONS.md` — before debugging anything.
+4. For UI work: `docs/design/interview-phase2-3.md`, `card-sheet.md`, `cards.md` §13, `pages.md`,
    `card-layout.md` (before moving anything inside a card), `tokens.md`, `dashboard.md`,
    `ha-websocket.md`, `startup.md`.
-4. For the display: `docs/display/README.md` only - it indexes the rest.
-5. `docs/ROADMAP.md` §7.
+5. For the display: `docs/display/README.md` only - it indexes the rest.
 
 ## Environment state git cannot see
 
@@ -219,7 +199,7 @@ as data.** A little colour-blind: never distinguish two states by colour alone.
 
 **What works:**
 - **Show, don't spec.** Build something to react to; the owner flashes fast and tests
-  thoroughly, test by test against a sheet with PASS/FAIL criteria (`TEST_2.10a.md` is the model:
+  thoroughly, test by test against a sheet with PASS/FAIL criteria (`docs/archive/TEST_2.10b.md` is the model:
   a numbered table per round, then the owner's results under it).
 - **Snappy and responsive first, eye candy second** (owner). 2.10a dropped its grow and its dim for
   it. Measure a frame before and after anything visual (`DEBUG_FRAMES`, `/bench`).
@@ -248,7 +228,7 @@ one more each time a signed-off merge to `main` is tagged, whatever milestones i
 `CHANGELOG.md` entry with the tag, naming the milestones and issues in it. Never tag during
 development. D is commits since the tag; a dirty tree appends `+dirty`. **`v0.2.9` was tagged at
 the 2.10b merge (2026-10-06); the next signed-off merge in Phase 2 is `v0.2.10`**, whatever
-milestones it holds. ROADMAP 3.3.
+milestones it holds. `docs/DECISIONS.md` W3.
 
 **The issue tracker is yours to manage**, and keeping it, HANDOFF and ROADMAP current is part of the
 work, not a follow-up.
