@@ -82,7 +82,9 @@ private:
     // shared with HaRest's initial fetch. It is NOT a method here on purpose:
     // two copies would let the boot value and the live value for one entity
     // disagree about what "closed" means, and only after something changed.
-    bool sendSubscribe();
+    // One subscribe_trigger for the HA entities at registry indices [from, to).
+    // Returns how many it named, 0 for none, -1 if it could not be sent.
+    int sendSubscribe(uint8_t from, uint8_t to);
 
     EntityRegistry *_reg  = nullptr;
     HaClient       *_ha   = nullptr;
@@ -91,6 +93,9 @@ private:
     // The session counter this provider last subscribed for. Zero means "not
     // subscribed"; HaClient::sessions() starts at 1 on the first auth_ok.
     uint32_t _subscribedForSession = 0;
+    // How much of the registry the session's subscriptions cover: entities
+    // learnt later (2.10c) sit beyond it and get a subscription of their own.
+    uint8_t  _subscribedCount = 0;
 
     // The id of the subscribe_trigger awaiting a reply, and whether the last
     // one was accepted.

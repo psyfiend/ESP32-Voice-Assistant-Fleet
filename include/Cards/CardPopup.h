@@ -77,6 +77,7 @@ public:
     //   /popup?ctl=N        a light's control: 0 brightness, 1 temperature, 2 colour
     //   /popup?set=V        as a tap on that control's slider at V (%, K, hue)
     //   /popup?view=N       0 main, 1 history, 2 members; lists each entity's levels
+    //                       (and a group defined in HA's members, 2.10c); 3 only lists
     //   /popup?power=1      as a tap on Power
     //   /popup?pause=1|0    pause / resume what the window shows
     //   /popup?member=N     as a tap on row N of Members

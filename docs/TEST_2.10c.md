@@ -37,6 +37,36 @@ Every light on the House page now reads what HA says it can do, and the window o
 When you are done, put the Office room back the way you like it - I restore it after my own tests,
 but not after yours.
 
+## Round 2 - the members of Desk (step 2)
+
+Desk (`light.office`, a Hue room) now has a members icon. Its three bulbs are learnt from HA when
+the room first reports, about 15 s after boot, so give the board that long before G1.
+
+| # | Do this | PASS if |
+|---|---|---|
+| G1 | Open Desk | The members icon (the bulbs) is beside the chart, top right |
+| G2 | Tap it | "Desk > Members": Office Right, Office lamp, Office Left (HA's own names), each "On, N%, NNNN K" |
+| G3 | Tap Office lamp | "Desk > Office lamp", its own slider and Power \| Brightness, Temperature, Colour |
+| G4 | Drag it to about 30% | Only that bulb dims. Back arrow: Members shows it at ~30% |
+| G5 | In the lamp's view, SETTINGS, Paused On. Back, back | Members reads "Paused" for the lamp. Desk's main view says ", 1 paused" |
+| G6 | Desk: drag to about 60% | Right and Left dim; the lamp stays where it was |
+| G7 | Desk: Power, Power | Right and Left go off and on; the lamp stays on throughout |
+| G8 | Close; look at the Desk card | Its fill is the mean of Right and Left only |
+| G9 | Tap the Desk card | Right and Left switch; the lamp does not |
+| G10 | Reboot the board (or wait for one), then open Desk | The lamp is still paused, with its levels showing in Members |
+| G11 | Resume the lamp (its own view, SETTINGS). Back to Desk, drag | All three move together again |
+| G12 | Desk's SETTINGS: Paused On | The whole window greys with PAUSED; Members lists all three as Paused. Paused Off brings it all back |
+| G13 | Desk's SETTINGS | No "On when" row (HA decides that for its own groups) |
+| G14 | Fleet page: All Lamps, pause Lamp 3, drag | Unchanged from v0.2.9 (the card code changed underneath) |
+
+## Not tested (by Claude) - round 2
+
+Driven over `/popup` (G2-G13's logic, against the real bulbs, compared with HA) - no finger on the
+glass, and nothing on the Fleet page: All Lamps (G14) could not be reached from the PC. Not tried: a
+group whose members differ in what they can do (all three Office bulbs are alike), a group with more
+than 8 members (the rest are left out), a member that is also a group, a bulb removed from the room
+in Hue (it should leave Desk's Members, but stays in the entity table until a reboot), and anything learnt while a window is open.
+
 ## Not tested (by Claude) - round 1
 
 Everything was driven over `/popup` from the PC, so **no finger has touched these windows**: the drag
@@ -64,3 +94,20 @@ recorded from the PC, HA reported the room's means in rising order (238, 247, 25
 ended at 255. The 248 is unexplained.
 
 Opening Desk's window: built in 21 ms, LVGL's pool 87 -> 95 KB used of 500.
+
+**Round 2 (members), against the Office bulbs, compared with HA after each step:**
+
+| Step | HA | The window |
+|---|---|---|
+| The lamp to 30% from its own view | lamp 77, the others 255 | the same |
+| Lamp paused, Desk opened | - | "through its members", the lamp PAUSED |
+| Desk to 60% | right and left 153, lamp 77 | the same |
+| Power, Power | right and left off then on (at 153), lamp on at 77 throughout | the same |
+| Lamp resumed | - | "as one" again, showing HA's room (128) |
+| Desk paused, resumed | - | the room and all three paused, then all resumed |
+| Reboot with the lamp paused | - | learnt at 15.0 s, its pause re-applied, its levels fetched |
+
+The boot log: `subscribe_trigger id 2 for 3 entities, learnt since`, then `initial values: 24
+fetched, 0 failed` (21 declared + 3 learnt). The first build kept a paused member's levels out at
+boot (its on/off came through, its brightness did not); fixed - a paused entity now takes its first
+reading whole. All three bulbs put back at 100%, 2710 K, none paused.

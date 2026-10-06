@@ -22,8 +22,8 @@ void HaProvider::begin(EntityRegistry *reg, HaClient *ha, HaRest *rest) {
 // Subscription - loop task
 // ---------------------------------------------------------------------------
 
-bool HaProvider::sendSubscribe() {
-    if (!_reg || !_ha) return false;
+int HaProvider::sendSubscribe(uint8_t from, uint8_t to) {
+    if (!_reg || !_ha) return -1;
 
     // Built from the REGISTRY, not from a list, so an entity added anywhere
     // gets subscribed without touching this file.
@@ -41,7 +41,7 @@ bool HaProvider::sendSubscribe() {
                      (unsigned long)id);
 
     uint8_t named = 0;
-    for (uint8_t i = 0; i < _reg->count(); i++) {
+    for (uint8_t i = from; i < to; i++) {
         const Entity *e = _reg->at(i);
         if (!e) continue;
         if (e->desc.source != EntitySource::HA) continue;
@@ -57,7 +57,7 @@ bool HaProvider::sendSubscribe() {
             Serial.printf("[HaProv] subscription frame full at %u entities; "
                           "raise the buffer or split the request.\n",
                           (unsigned)named);
-            return false;
+            return -1;
         }
         n += add;
         named++;
@@ -65,22 +65,22 @@ bool HaProvider::sendSubscribe() {
 
     if (named == 0) {
         DBG_HAP("no HA-sourced entities registered; nothing to subscribe to\n");
-        return false;
+        return 0;
     }
 
     int tail = snprintf(frame + n, sizeof(frame) - n, "]}}");
-    if (tail < 0 || n + tail >= (int)sizeof(frame)) return false;
+    if (tail < 0 || n + tail >= (int)sizeof(frame)) return -1;
     n += tail;
 
-    if (!_ha->sendText(frame, n)) return false;
+    if (!_ha->sendText(frame, n)) return -1;
 
     // Remembered so the reply can be matched. Cleared when it arrives.
     _pendingSubId = id;
     _subAccepted  = false;
 
-    Serial.printf("[HaProv] subscribe_trigger id %lu for %u entities (%d B)\n",
-                  (unsigned long)id, (unsigned)named, n);
-    return true;
+    Serial.printf("[HaProv] subscribe_trigger id %lu for %u entities (%d B)%s\n",
+                  (unsigned long)id, (unsigned)named, n, from ? ", learnt since" : "");
+    return named;
 }
 
 void HaProvider::loop(uint32_t nowMs) {
@@ -96,10 +96,26 @@ void HaProvider::loop(uint32_t nowMs) {
     // both happen between two loop() calls would be invisible to a boolean.
     if (!_ha->isReady() || session == 0) return;
 
-    if (_subscribedForSession == session) return;
+    if (_subscribedForSession == session) {
+        // ENTITIES LEARNT SINCE (2.10c): the members of a group, registered
+        // when it reported. A second subscribe_trigger for just them - HA keeps
+        // both - and HaRest fetches their values on its own, since it walks
+        // the table to its end whenever the table has grown.
+        const uint8_t count = _reg->count();
+        if (count > _subscribedCount) {
+            if (sendSubscribe(_subscribedCount, count) < 0) return;   // retried next loop
+            _subscribedCount = count;
+        }
+        // A pause saved for a member could not be applied at boot: it did not
+        // exist yet.
+        if (_reg->takeLearnt()) _reg->restorePaused();
+        return;
+    }
 
-    if (!sendSubscribe()) return;
+    const uint8_t count = _reg->count();
+    if (sendSubscribe(0, count) <= 0) return;
     _subscribedForSession = session;
+    _subscribedCount      = count;
 
     // Subscribing and re-fetching are ONE event, so they happen in one place.
     //
@@ -138,9 +154,12 @@ void HaProvider::handle(const char *json, size_t len) {
                               .to<JsonObject>()["to_state"].to<JsonObject>();
         ts["entity_id"]               = true;
         ts["state"]                   = true;
-        // icon, brightness, rgb_color. One helper shared with HaRest, so the
-        // two readers cannot disagree about what is kept - see HaValue.h.
-        haAttrFilter(ts["attributes"].to<JsonObject>());
+        // A light's attributes, and a group's members. Helpers shared with
+        // HaRest, so the two readers cannot disagree about what is kept - see
+        // HaValue.h. One object: to<JsonObject>() would clear it a second time.
+        JsonObject attrs = ts["attributes"].to<JsonObject>();
+        haAttrFilter(attrs);
+        haEntityFilter(attrs);
         filter["type"]                = true;
         // Needed to read the subscription's own reply. Without these three the
         // filtered parse drops them and every result looks like success=false.
@@ -255,6 +274,9 @@ void HaProvider::handle(const char *json, size_t len) {
     EntityAttrs attrs;
     haReadAttrs(to["attributes"], attrs);
     _reg->setAttrs(match->desc.id, attrs);
+    // A learnt member's name; a group's members (2.10c). Anything learnt here
+    // is subscribed to by loop(), on the loop task.
+    haLearn(*_reg, *match, to["attributes"]);
 
     EntityValue v;
     if (!haCoerceState(match->desc, state, v)) {

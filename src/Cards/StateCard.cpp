@@ -188,8 +188,10 @@ void StateCard::render() {
     int pct = 100;
     if (isOn) {
         int32_t sum = 0, n = 0;
-        for (uint8_t i = 0; i < primaryCount(); i++) {
-            const Entity *m = primary(i);
+        const Entity *live[CARD_LIVE_MAX];
+        const uint8_t nLive = liveEntities(live);   // 2.10c: an HA group's members, when one is paused
+        for (uint8_t i = 0; i < nLive; i++) {
+            const Entity *m = live[i];
             if (!counts(m) || !(m->value.type == ValueType::BOOL && m->value.b)) continue;
             if (m->attrs.brightness >= 0) { sum += m->attrs.brightness; n++; }
         }
@@ -349,8 +351,12 @@ void StateCard::render() {
 }
 
 void StateCard::commandAll(bool on) {
-    for (uint8_t i = 0; i < primaryCount(); i++) {
-        if (!counts(primary(i))) continue;   // a paused member is out of the group
-        command(i, EntityValue::makeBool(on));
+    // liveEntities(): a group defined in HA is commanded as itself, unless a
+    // member is paused - then its other members, one by one (2.10c).
+    const Entity *live[CARD_LIVE_MAX];
+    const uint8_t nLive = liveEntities(live);
+    for (uint8_t i = 0; i < nLive; i++) {
+        if (!counts(live[i])) continue;   // a paused member is out of the group
+        commandEntity(live[i], EntityValue::makeBool(on));
     }
 }

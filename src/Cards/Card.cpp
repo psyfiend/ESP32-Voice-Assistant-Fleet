@@ -74,15 +74,39 @@ Card &Card::setPaused(bool p) {
     //
     // Applied to every primary. A card showing two things pauses both, because
     // a half-paused card is not a state anyone can read at a glance.
+    // A group defined at the source pauses with its members (2.10c): paused
+    // as a whole means every member is, as in a group defined here, and its
+    // own report stops too.
     if (s_reg) {
         const uint32_t now = millis();
         for (uint8_t i = 0; i < _nPrimary; i++) {
             const Entity *e = _primary[i];
-            if (e) s_reg->setPaused(e->desc.id, p, now);
+            if (!e) continue;
+            s_reg->setPaused(e->desc.id, p, now);
+            for (uint8_t k = 0; k < e->nMembers; k++)
+                if (const Entity *m = s_reg->memberOf(*e, k)) s_reg->setPaused(m->desc.id, p, now);
         }
     }
     if (_root) { applyState(); render(); }
     return *this;
+}
+
+uint8_t Card::liveEntities(const Entity **out) const {
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < _nPrimary && n < CARD_LIVE_MAX; i++) {
+        const Entity *e = _primary[i];
+        if (!e) continue;
+        bool anyPaused = false;
+        if (s_reg && !e->paused)
+            for (uint8_t k = 0; k < e->nMembers; k++) {
+                const Entity *m = s_reg->memberOf(*e, k);
+                if (m && m->paused) { anyPaused = true; break; }
+            }
+        if (!anyPaused) { out[n++] = e; continue; }
+        for (uint8_t k = 0; k < e->nMembers && n < CARD_LIVE_MAX; k++)
+            if (const Entity *m = s_reg->memberOf(*e, k)) out[n++] = m;
+    }
+    return n;
 }
 
 Card &Card::setGroupOn(GroupOn g) {
@@ -101,15 +125,19 @@ bool Card::counts(const Entity *e) const {
 }
 
 uint8_t Card::liveCount() const {
+    const Entity *live[CARD_LIVE_MAX];
+    const uint8_t nLive = liveEntities(live);
     uint8_t n = 0;
-    for (uint8_t i = 0; i < _nPrimary; i++) if (counts(_primary[i])) n++;
+    for (uint8_t i = 0; i < nLive; i++) if (counts(live[i])) n++;
     return n;
 }
 
 uint8_t Card::activeCount() const {
+    const Entity *live[CARD_LIVE_MAX];
+    const uint8_t nLive = liveEntities(live);
     uint8_t n = 0;
-    for (uint8_t i = 0; i < _nPrimary; i++) {
-        const Entity *e = _primary[i];
+    for (uint8_t i = 0; i < nLive; i++) {
+        const Entity *e = live[i];
         if (!counts(e) || !e->everSet) continue;
         // A state entity is a bool. Anything numeric that reached an actor
         // card - a dimmable light reporting brightness - is on when nonzero,
@@ -134,11 +162,10 @@ bool Card::groupIsOn() const {
 // EVERY primary: a group with one paused member is not paused (owner, 2.10b) -
 // that member is simply out of it (counts()).
 bool Card::isPaused() const {
-    if (!_nPrimary) return false;
-    for (uint8_t i = 0; i < _nPrimary; i++) {
-        const Entity *e = _primary[i];
-        if (e && !e->paused) return false;
-    }
+    const Entity *live[CARD_LIVE_MAX];
+    const uint8_t nLive = liveEntities(live);
+    if (!nLive) return false;
+    for (uint8_t i = 0; i < nLive; i++) if (!live[i]->paused) return false;
     return true;
 }
 
@@ -1166,9 +1193,12 @@ CardState Card::deriveState(uint32_t nowMs) const {
     //
     // ANY primary being unavailable is enough. A card showing two things, one
     // of which is gone, is not a card that can be trusted at a glance.
-    // A paused member is out of the group (counts()), here and below.
-    for (uint8_t i = 0; i < _nPrimary; i++) {
-        const Entity *e = _primary[i];
+    // A paused member is out of the group (counts()), here and below - a
+    // member of a group defined at the source too (liveEntities(), 2.10c).
+    const Entity *live[CARD_LIVE_MAX];
+    const uint8_t nLive = liveEntities(live);
+    for (uint8_t i = 0; i < nLive; i++) {
+        const Entity *e = live[i];
         if (counts(e) && !e->available) return CardState::ST_UNAVAILABLE;
     }
 
@@ -1183,8 +1213,8 @@ CardState Card::deriveState(uint32_t nowMs) const {
     // there, and reading Entity::cmdFailed makes that true by construction:
     // every card bound to an entity reads the identical fact.
     uint8_t failed = 0, commandable = 0;
-    for (uint8_t i = 0; i < _nPrimary; i++) {
-        const Entity *e = _primary[i];
+    for (uint8_t i = 0; i < nLive; i++) {
+        const Entity *e = live[i];
         if (!counts(e) || !e->desc.writable) continue;
         commandable++;                     // counted whether or not it resolved
         if (!e->pending && e->cmdFailed) failed++;
@@ -1204,8 +1234,8 @@ CardState Card::deriveState(uint32_t nowMs) const {
     }
 
     CardState worst = CardState::ST_LIVE;
-    for (uint8_t i = 0; i < _nPrimary; i++) {
-        const Entity *e = _primary[i];
+    for (uint8_t i = 0; i < nLive; i++) {
+        const Entity *e = live[i];
         if (!counts(e)) continue;
         if (!e->desc.staleAfterMs) continue;   // 0 = never goes stale
         if (!e->everSet) { worst = CardState::ST_STALE; continue; }
@@ -1252,8 +1282,17 @@ void Card::pollState(uint32_t nowMs) {
 
 bool Card::owns(const char *entityId) const {
     if (!entityId || !entityId[0]) return false;
-    for (uint8_t i = 0; i < _nPrimary; i++)
-        if (_primary[i] && strcmp(_primary[i]->desc.id, entityId) == 0) return true;
+    for (uint8_t i = 0; i < _nPrimary; i++) {
+        const Entity *e = _primary[i];
+        if (!e) continue;
+        if (strcmp(e->desc.id, entityId) == 0) return true;
+        // A member of a group defined at the source repaints the card too
+        // (2.10c): pausing one changes what the card stands for.
+        for (uint8_t k = 0; s_reg && k < e->nMembers; k++) {
+            const Entity *m = s_reg->memberOf(*e, k);
+            if (m && strcmp(m->desc.id, entityId) == 0) return true;
+        }
+    }
     for (uint8_t i = 0; i < _nSecondary; i++)
         if (_secondary[i] && strcmp(_secondary[i]->desc.id, entityId) == 0) return true;
     return false;
@@ -1273,7 +1312,10 @@ void Card::onSnapshot(const Entity &snap) {
 
 bool Card::command(uint8_t slot, const EntityValue &v) {
     if (slot >= _nPrimary) return false;
-    const Entity *e = _primary[slot];
+    return commandEntity(_primary[slot], v);
+}
+
+bool Card::commandEntity(const Entity *e, const EntityValue &v) {
     if (!e || !e->desc.writable) return false;
     if (!s_reg) return false;
 

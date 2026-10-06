@@ -156,14 +156,27 @@ constexpr uint32_t KNOB_SLIDE_MS   = 160;
 
 IntfMode s_intfMode = IntfMode::INTF_NOW_AND_THEN;
 
+// A window's entities: a card's primaries, or the members of a group defined
+// at the source (2.10c), whichever list is longer.
+constexpr uint8_t POPUP_ENT_MAX = (CARD_PRIMARY_MAX > ENTITY_MEMBERS_MAX) ? CARD_PRIMARY_MAX
+                                                                          : ENTITY_MEMBERS_MAX;
+
 struct Popup {
     PopupPhase phase = PopupPhase::PHASE_CLOSED;
     PopupView  view  = PopupView::VIEW_MAIN;
     bool       closeQueued = false;
 
     // Copied from the card at open - see "the window holds the entities".
-    const Entity   *ent[CARD_PRIMARY_MAX] = {nullptr};
+    const Entity   *ent[POPUP_ENT_MAX] = {nullptr};
     uint8_t         nEnt = 0;
+    // A GROUP DEFINED AT THE SOURCE (2.10c, DECISIONS K17): the card's one
+    // entity - light.office - whose members the registry learnt. With none of
+    // them paused, ent[] is the group itself: HA's report is shown and a
+    // command goes to the group, which keeps its bulbs in step. While any
+    // member is paused, ent[] holds the members (`expanded`) and the window
+    // works exactly as for All Lamps: the paused one is out (K14).
+    const Entity   *native = nullptr;
+    bool            expanded = false;
     EntityRegistry *reg  = nullptr;
     TempUnit        tempUnit = TempUnit::TEMP_INHERIT;
     char area[ENTITY_SHORT_MAX] = {0};
@@ -200,7 +213,7 @@ struct Popup {
     lv_obj_t *pill = nullptr;                    // PAUSED
     // A member's own controls, reached from Members (2.10b): the group's
     // entities are kept here while ent[] holds the one member.
-    const Entity *groupEnt[CARD_PRIMARY_MAX] = {nullptr};
+    const Entity *groupEnt[POPUP_ENT_MAX] = {nullptr};
     uint8_t   groupN = 0;
     bool      lightHero = false;
     uint8_t   lightCtl = 0;                      // LightCtl: which control the hero is
@@ -323,6 +336,41 @@ lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f,
 }
 
 // ---------------------------------------------------------------------------
+// The members of what the window stands for (2.10c): a group defined here -
+// the card's entities - or at the source - the members the registry learnt.
+// The Members view lists these, and a tap on one opens it.
+// ---------------------------------------------------------------------------
+uint8_t memberCount() { return s.native ? s.native->nMembers : s.nEnt; }
+
+const Entity *memberAt(uint8_t i) {
+    if (s.native) return s.reg ? s.reg->memberOf(*s.native, i) : nullptr;
+    return (i < s.nEnt) ? s.ent[i] : nullptr;
+}
+
+bool hasMembers() { return s.native ? s.native->nMembers > 0 : s.nEnt > 1; }
+
+// Should ent[] hold the members? While any is paused - and the group itself is
+// not, which is a group paused as a whole (Card::setPaused pauses both).
+bool nativeWantsMembers() {
+    if (!s.native || s.native->paused) return false;
+    for (uint8_t i = 0; i < s.native->nMembers; i++) {
+        const Entity *m = memberAt(i);
+        if (m && m->paused) return true;
+    }
+    return false;
+}
+
+void applyNative() {
+    if (!s.native) return;
+    s.expanded = nativeWantsMembers();
+    for (const Entity *&e : s.ent) e = nullptr;
+    s.nEnt = 0;
+    if (!s.expanded) { s.ent[s.nEnt++] = s.native; return; }
+    for (uint8_t i = 0; i < s.native->nMembers && s.nEnt < POPUP_ENT_MAX; i++)
+        if (const Entity *m = memberAt(i)) s.ent[s.nEnt++] = m;
+}
+
+// ---------------------------------------------------------------------------
 // What the entities say, aggregated the way StateCard aggregates them: a card
 // with several primaries is "on" when any of them is.
 // ---------------------------------------------------------------------------
@@ -427,8 +475,16 @@ LightAgg lightAggregate() {
 uint32_t signature() {
     uint32_t h = 2166136261u;
     auto mixIn = [&h](uint32_t v) { h = (h ^ v) * 16777619u; };
-    for (uint8_t i = 0; i < s.nEnt; i++) {
-        const Entity *e = s.ent[i];
+    // The entities shown, and - for a group defined at the source - its
+    // members, whose rows the Members view shows and whose pauses change what
+    // the window stands for (2.10c).
+    const Entity *all[2 * POPUP_ENT_MAX];
+    uint8_t nAll = 0;
+    for (uint8_t i = 0; i < s.nEnt; i++) all[nAll++] = s.ent[i];
+    if (s.native) for (uint8_t i = 0; i < s.native->nMembers && nAll < 2 * POPUP_ENT_MAX; i++)
+        all[nAll++] = memberAt(i);
+    for (uint8_t i = 0; i < nAll; i++) {
+        const Entity *e = all[i];
         if (!e) continue;
         mixIn(e->lastChangeMs);
         mixIn(e->lastUpdateMs);
@@ -574,7 +630,7 @@ int32_t selectorW(uint8_t caps) {
 
 int32_t colWidth(bool light, uint8_t caps) {
     const UIType &t = UI::type();
-    int32_t w = textW(s.nEnt > 1 ? "Changed 59m ago, 9 paused" : "Changed 59m ago", t.TAG);
+    int32_t w = textW(hasMembers() ? "Changed 59m ago, 9 paused" : "Changed 59m ago", t.TAG);
     w = LV_MAX(w, textW("Unavailable", UIToolkit::Font_Hero));
     // The label line with the PAUSED pill beside it (makeLabelRow()).
     const int32_t pill = textW("PAUSED", t.TAG) + 2 * mm(1.2f) + 6 * mm(0.2f);
@@ -1357,8 +1413,8 @@ void buildMembers() {
     UI::tameScroll(list);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(list, mm(1.4f), 0);
-    for (uint8_t i = 0; i < s.nEnt; i++) {
-        const Entity *e = s.ent[i];
+    for (uint8_t i = 0; i < memberCount(); i++) {
+        const Entity *e = memberAt(i);
         if (!e) continue;
         lv_obj_t *r = plain(list);
         lv_obj_set_size     (r, lv_pct(100), LV_SIZE_CONTENT);
@@ -1472,12 +1528,12 @@ uint8_t s_groupCtl   = 0;   // the group's control, restored on the way back
 void enterMemberAsync(void *unused) {
     (void)unused;
     if (s.phase != PopupPhase::PHASE_OPEN || s.view != PopupView::VIEW_MEMBERS) return;
-    if (s_memberPick >= s.nEnt || !s.ent[s_memberPick]) return;
-    for (uint8_t i = 0; i < CARD_PRIMARY_MAX; i++) s.groupEnt[i] = s.ent[i];
+    const Entity *m = (s_memberPick < memberCount()) ? memberAt(s_memberPick) : nullptr;
+    if (!m) return;
+    for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.groupEnt[i] = s.ent[i];
     s.groupN = s.nEnt;
     s_groupCtl = s.lightCtl;
-    const Entity *m = s.ent[s_memberPick];
-    for (uint8_t i = 0; i < CARD_PRIMARY_MAX; i++) s.ent[i] = nullptr;
+    for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.ent[i] = nullptr;
     s.ent[0] = m;
     s.nEnt   = 1;
     s.lightCtl = firstCtl(lightAggregate().caps);
@@ -1492,9 +1548,10 @@ void memberRowCb(lv_event_t *ev) {
 }
 
 void leaveMember() {
-    for (uint8_t i = 0; i < CARD_PRIMARY_MAX; i++) s.ent[i] = s.groupEnt[i];
+    for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.ent[i] = s.groupEnt[i];
     s.nEnt     = s.groupN;
     s.groupN   = 0;
+    applyNative();   // the member may have been paused or resumed meanwhile
     s.lightCtl = s_groupCtl;
     showView(PopupView::VIEW_MEMBERS);
 }
@@ -1569,7 +1626,7 @@ void buildContents() {
 #endif
 
     // Both ends the same width, so the title sits in the true middle.
-    const uint8_t nRight = (s.nEnt > 1) ? 2 : 1;
+    const uint8_t nRight = hasMembers() ? 2 : 1;
     const int32_t slotW  = btn * nRight + gap * (nRight - 1);
 
     lv_obj_t *left = plain(hdr);
@@ -1607,7 +1664,7 @@ void buildContents() {
     // the chart, which is always in the corner (owner, 2026-10-06: nearly
     // every window has a chart, few have members). Made first: the row is
     // end-aligned, so the last made is the one in the corner.
-    if (s.nEnt > 1) s.btnMembers = iconButton(right, MDI_LIGHTBULB_GROUP, t.ICON_MD, membersCb);
+    if (hasMembers()) s.btnMembers = iconButton(right, MDI_LIGHTBULB_GROUP, t.ICON_MD, membersCb);
     s.btnHistory = iconButton(right, MDI_CHART_BAR, t.ICON_MD, historyCb);
 
     // --- The stage: whichever view is showing -------------------------------
@@ -1646,6 +1703,18 @@ void tickCb(lv_timer_t *t) {
             lv_obj_set_width(s.autoBar, w < 1 ? 1 : w);
             lv_obj_align(s.autoBar, LV_ALIGN_BOTTOM_MID, 0, s.pad / 2);
         }
+    }
+
+    // A MEMBER OF A GROUP DEFINED IN HA PAUSED OR RESUMED (2.10c): the window
+    // now stands for the members, or for the group again. Checked every tick,
+    // not only on a change, because leaving a member's own view settles the
+    // signature before this could see it. Not in a member's own view, whose
+    // ent[] is that member.
+    if (s.native && s.view != PopupView::VIEW_MEMBER && nativeWantsMembers() != s.expanded) {
+        applyNative();
+        showView(s.view);
+        s.lastAgeMs = now;
+        return;
     }
 
     // The window is live (card-sheet 7): it follows the entity while open.
@@ -2240,8 +2309,9 @@ void deckCreate() {
     const int32_t rf       = r;                        // the inner curve
     const int32_t tabAbove = s.deckHead + rf;          // the tab's part above the pane's edge
     s.deckHide = r + 2 * bw;
-    // A group card has one more row: when it counts as on (2.10b).
-    const int32_t rows = (s.nEnt > 1) ? 5 : 4;
+    // A group card has one more row: when it counts as on (2.10b) - a group
+    // defined here only; HA or Hue decides that for its own (2.10c).
+    const int32_t rows = (s.nEnt > 1 && !s.native) ? 5 : 4;
     s.deckH    = tabAbove + (rf + mm(1.6f)) + rows * mm(DECK_ROW_MM) + mm(4.0f) + mm(1.6f) + s.deckHide;
 
     s.deck = plain(lv_screen_active());
@@ -2388,8 +2458,9 @@ void deckFill() {
     lv_obj_add_event_cb(s.swPause, pauseSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
 
     // A card for several things: HA's group helper option (owner, 2026-10-05).
-    // Live, and kept in RAM until saving arrives (2.10d).
-    if (s.nEnt > 1) {
+    // Live, and kept in RAM until saving arrives (2.10d). Not for a group
+    // defined in HA or Hue: the source decides when it is on (2.10c).
+    if (s.nEnt > 1 && !s.native) {
         const bool all = (s.groupOn == GroupOn::GROUP_ON_ALL);
         row = deckRow(pane, "On when");
         s.chipGroup[0] = deckChip(row, "Any is on",  true, !all, groupChipCb, nullptr);
@@ -2496,6 +2567,8 @@ void closeNow(void *unused) {
     s.phase = PopupPhase::PHASE_CLOSED;
     s.nEnt = 0;
     s.groupN = 0;
+    s.native = nullptr;
+    s.expanded = false;
     s.rebuildQueued = false;
 #ifdef DEBUG_POPUP
     char mem[96];
@@ -2684,6 +2757,9 @@ void CardPopup::open(Card &card) {
     // sends no RELEASED for this touch - PRESS_LOST to the card instead.)
     if (lv_indev_t *in = lv_indev_active()) lv_indev_wait_release(in);
     s.reg      = Card::s_reg;
+    // One entity that HA defines as a group, with its members learnt (2.10c).
+    s.native   = (s.nEnt == 1 && s.ent[0]->nMembers) ? s.ent[0] : nullptr;
+    applyNative();
     s.tempUnit = card.tempUnit();
     s.groupOn  = card.groupOn();
     s.lightCtl = firstCtl(lightAggregate().caps);   // D3: open on the control
@@ -2852,6 +2928,12 @@ void CardPopup::debugService(lv_timer_t *t) {
             // Pause (1) or resume (0) whatever the window is showing, as the deck's chip.
             const uint32_t now = millis();
             for (uint8_t i = 0; i < s.nEnt; i++) if (s.ent[i]) s.reg->setPaused(s.ent[i]->desc.id, a.pause != 0, now);
+            // A group defined in HA pauses with its members, as Card::setPaused does.
+            if (s.native && s.view != PopupView::VIEW_MEMBER) {
+                s.reg->setPaused(s.native->desc.id, a.pause != 0, now);
+                for (uint8_t i = 0; i < s.native->nMembers; i++)
+                    if (const Entity *m = memberAt(i)) s.reg->setPaused(m->desc.id, a.pause != 0, now);
+            }
             dbgOut("pause %d\n", a.pause);
         }
         s_dreq.store(DREQ_DONE);
@@ -2867,19 +2949,37 @@ void CardPopup::debugService(lv_timer_t *t) {
     if (a.view >= 0) {
         if (!isOpen()) dbgOut("no window open\n");
         else {
-            showView(a.view == 1 ? PopupView::VIEW_HISTORY : a.view == 2 ? PopupView::VIEW_MEMBERS
-                                                                          : PopupView::VIEW_MAIN);
+            // view=3 only lists, wherever the window is. Any other view from a
+            // member's own view goes back to the group first, as the back
+            // arrow does - otherwise the group's view would hold the member.
+            if (a.view != 3) {
+                if (s.view == PopupView::VIEW_MEMBER) leaveMember();
+                showView(a.view == 1 ? PopupView::VIEW_HISTORY : a.view == 2 ? PopupView::VIEW_MEMBERS
+                                                                              : PopupView::VIEW_MAIN);
+            }
             dbgMem(mem, sizeof(mem));
             dbgOut("view %d; %s\n", a.view, mem);
-            for (uint8_t i = 0; i < s.nEnt; i++) {
-                const Entity *e = s.ent[i];
+            // What the window stands for, then a group defined in HA's members
+            // ("m"), and whether it is working through them (2.10c).
+            const Entity *list[2 * POPUP_ENT_MAX];
+            uint8_t nList = 0;
+            for (uint8_t i = 0; i < s.nEnt; i++) list[nList++] = s.ent[i];
+            const uint8_t nShown = nList;
+            if (s.native) {
+                dbgOut("  group defined in HA: %s, %u members, %s\n", s.native->desc.externalRef,
+                       (unsigned)s.native->nMembers, s.expanded ? "through its members" : "as one");
+                for (uint8_t i = 0; i < s.native->nMembers; i++) list[nList++] = memberAt(i);
+            }
+            for (uint8_t i = 0; i < nList; i++) {
+                const Entity *e = list[i];
                 if (!e) continue;
+                if (i >= nShown) dbgOut("m");
                 const EntityAttrs &at = e->attrs;
-                dbgOut("  %-12s %s caps %x mode %d bri %d K %d hue %d sat %d%s%s%s\n", e->desc.id,
+                dbgOut("  %-12s %s caps %x mode %d bri %d K %d hue %d sat %d%s%s%s%s\n", e->desc.id,
                        e->value.type == ValueType::BOOL && e->value.b ? "on " : "off", at.lightCaps,
                        (int)at.lightMode, at.brightness, at.colorTempK, at.hue, at.sat,
                        e->pending ? " pending" : "", e->attrPending ? " levels-pending" : "",
-                       e->cmdFailed ? " FAILED" : "");
+                       e->cmdFailed ? " FAILED" : "", e->paused ? " PAUSED" : "");
             }
         }
         s_dreq.store(DREQ_DONE);

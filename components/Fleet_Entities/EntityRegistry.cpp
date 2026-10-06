@@ -15,6 +15,11 @@
 #include <stdio.h>
 #include <new>   // placement new over caller-provided storage
 
+// ESP-IDF logging rather than Serial: this translation unit deliberately pulls
+// in no Arduino header, which is the point of using nvs.h here in the first
+// place. The output lands on the same console either way.
+static const char *ENT_TAG = "Entities";
+
 // ---------------------------------------------------------------------------
 // Names. Kept in the .cpp so the header stays free of string tables.
 // ---------------------------------------------------------------------------
@@ -134,6 +139,97 @@ const Entity *EntityRegistry::find(const char *id) const {
 }
 
 // ---------------------------------------------------------------------------
+// Groups defined at the source - 2.10c (#65)
+// ---------------------------------------------------------------------------
+
+// "light.office_lamp" -> "ha_light_office_lamp": stable across reboots, since
+// it is made from the source's own id, so a saved pause (and, at 2.10d, a saved
+// setting) finds the member again. A clash, which needs two refs that differ
+// only after the 36th character, gets a digit.
+static void learntId(const char *ref, char *out, size_t cap) {
+    size_t n = (size_t)snprintf(out, cap, "ha_");
+    for (const char *p = ref; *p && n < cap - 1; p++) out[n++] = (*p == '.') ? '_' : *p;
+    out[n] = '\0';
+}
+
+uint8_t EntityRegistry::learnMembers(const char *groupId, const char *const *refs, uint8_t n) {
+    std::lock_guard<std::mutex> lk(_mx);
+    const int gi = indexOf(groupId);
+    if (gi < 0 || !refs) return 0;
+    Entity &g = _items[gi];
+
+    uint8_t idx[ENTITY_MEMBERS_MAX];
+    uint8_t k = 0, added = 0;
+    for (uint8_t r = 0; r < n && k < ENTITY_MEMBERS_MAX; r++) {
+        const char *ref = refs[r];
+        if (!ref || !ref[0]) continue;
+
+        int m = -1;
+        for (uint8_t i = 0; i < _count; i++) {
+            if (_items[i].desc.source == g.desc.source &&
+                strcmp(_items[i].desc.externalRef, ref) == 0) { m = i; break; }
+        }
+        if (m == gi) continue;   // a group never lists itself, but never loop
+        if (m < 0) {
+            if (_count >= _capacity) {
+                ESP_LOGW(ENT_TAG, "table full; member %s of %s not learnt", ref, groupId);
+                break;
+            }
+            EntityDescriptor d;
+            learntId(ref, d.id, sizeof(d.id));
+            for (uint8_t tries = 0; indexOf(d.id) >= 0 && tries < 9; tries++) {
+                const size_t len = strlen(d.id);
+                if (len >= sizeof(d.id) - 1) d.id[len - 1] = (char)('1' + tries);
+                else { d.id[len] = (char)('1' + tries); d.id[len + 1] = '\0'; }
+            }
+            if (indexOf(d.id) >= 0) continue;
+            // Its name is its ref until the source says otherwise (adoptName).
+            snprintf(d.name, sizeof(d.name), "%s", ref);
+            snprintf(d.externalRef, sizeof(d.externalRef), "%s", ref);
+            d.kind      = g.desc.kind;
+            d.source    = g.desc.source;
+            d.valueType = g.desc.valueType;
+            d.writable  = g.desc.writable;
+            d.advertise = false;   // someone else's, like the group
+
+            // The slot is complete before the count admits it - see count().
+            const uint8_t slot = _count;
+            Entity &e = _items[slot];
+            e = Entity{};
+            e.desc       = d;
+            e.value.type = d.valueType;
+            e.learnt     = true;
+            _count.store((uint8_t)(slot + 1), std::memory_order_release);
+            m = slot;
+            added++;
+            ESP_LOGI(ENT_TAG, "learnt %s (%s), a member of %s", d.id, ref, groupId);
+        }
+        idx[k++] = (uint8_t)m;
+    }
+
+    // The list first, then its length, for a reader on the LVGL thread.
+    if (k != g.nMembers || memcmp(idx, g.members, k) != 0) {
+        memcpy(g.members, idx, k);
+        g.nMembers = k;
+        g.dirty    = true;
+    }
+    if (added) _learnt.store(true);
+    return added;
+}
+
+bool EntityRegistry::adoptName(const char *id, const char *name) {
+    if (!name || !name[0]) return false;
+    std::lock_guard<std::mutex> lk(_mx);
+    const int i = indexOf(id);
+    if (i < 0 || !_items[i].learnt) return false;
+    Entity &e = _items[i];
+    if (strncmp(e.desc.name, name, sizeof(e.desc.name) - 1) == 0) return false;
+    snprintf(e.desc.name, sizeof(e.desc.name), "%s", name);
+    e.dirty = true;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // Provider side
 // ---------------------------------------------------------------------------
 
@@ -153,11 +249,6 @@ const Entity *EntityRegistry::find(const char *id) const {
 // Pausing is a deliberate long-press, so it is rare by construction and nothing
 // like the slider-drag case that motivated that warning. One write per press is
 // the correct cost, and it is bounded.
-
-// ESP-IDF logging rather than Serial: this translation unit deliberately pulls
-// in no Arduino header, which is the point of using nvs.h here in the first
-// place. The output lands on the same console either way.
-static const char *ENT_TAG = "Entities";
 
 static const char *PAUSE_NS  = "fleet_ent";
 static const char *PAUSE_KEY = "paused";
@@ -282,8 +373,30 @@ bool EntityRegistry::setPaused(const char *id, bool paused, uint32_t nowMs) {
     char list[PAUSE_BLOB_MAX];
     size_t used = 0;
     list[0] = '\0';
+    // A PAUSE FOR AN ENTITY NOT LEARNT YET (2.10c) must survive this rewrite:
+    // a member of an HA group is registered only once its group reports, so
+    // for the first seconds after boot its id is in the saved list but not in
+    // the table. Those ids are carried over from what was saved.
+    char saved[PAUSE_BLOB_MAX];
+    loadPauseList(saved, sizeof(saved));
     {
         std::lock_guard<std::mutex> lk(_mx);
+        for (const char *p = saved; *p; ) {
+            const char *end = strchr(p, ',');
+            const size_t len = end ? (size_t)(end - p) : strlen(p);
+            char eid[ENTITY_ID_MAX];
+            if (len && len < sizeof(eid)) {
+                memcpy(eid, p, len);
+                eid[len] = '\0';
+                if (indexOf(eid) < 0 && used + len + 2 < sizeof(list)) {
+                    if (used) list[used++] = ',';
+                    memcpy(list + used, eid, len + 1);
+                    used += len;
+                }
+            }
+            if (!end) break;
+            p = end + 1;
+        }
         for (uint8_t i = 0; i < _count; i++) {
             if (!_items[i].paused) continue;
             const char *eid = _items[i].desc.id;
@@ -371,8 +484,12 @@ bool EntityRegistry::setAttrs(const char *id, const EntityAttrs &a) {
     Entity &e = _items[i];
 
     // A paused entity holds still - attributes included, or a paused light's
-    // fill would go on moving under a PAUSED badge. Issue #60's rule.
-    if (e.paused) return false;
+    // fill would go on moving under a PAUSED badge. Issue #60's rule. EXCEPT
+    // its first reading: a pause restored at boot reaches the entity before
+    // HaRest's fetch, and setValue() takes that fetch's value - so the levels
+    // come with it, rather than a paused light that is "on" at no brightness
+    // (2.10c, a paused member of light.office after a reboot).
+    if (e.paused && e.everSet) return false;
 
     // A LIGHT COMMAND IN FLIGHT (2.10b): only a report carrying the latest
     // commanded levels ends it - the same rule #63 gave the value. Anything

@@ -46,6 +46,7 @@ How to use it:
 | A10 | The P4 framework libraries are rebuilt for esp-hosted-mcu#243 (#49) | 2026-09-22 | `docs/REBUILD_P4_LIBS.md` |
 | A11 | **LVGL's pool: 512 KB in PSRAM on every P4** (`FLEET_LV_MEM_PSRAM`); LVGL's own allocator kept, never the system `malloc`. Supersedes 2.3's "PSRAM pool not needed" | 2026-10-06 | #88, CLAUDE.md, LESSONS |
 | A12 | Voice assistant parked, not abandoned: audio code is protected during the UI work (Q8) | 2026-09-03 | Archive §8 Q8 |
+| A13 | The entity table learns entities while running: the members a source names for a group (HA's `entity_id`), with ids made from the source's own (`ha_light_office_lamp`), so pauses and settings find them after a reboot | 2026-10-06 | `card-sheet.md` §16, `EntityRegistry.h` |
 
 ## Connectivity and Home Assistant
 
@@ -92,3 +93,4 @@ How to use it:
 | K15 | Scenes: a selector target plus a per-card "load / cycle scene" tap behaviour (recommended, not objected to). **Confirmed 2026-10-06: the selector target is built as 2.10c's last step**; a scene is only ever loaded (`scene.turn_on`), never shown as on | 2026-10-02 / 10-06 | `card-sheet.md` §11.2, #65 |
 | K16 | Card control styles (Automatic / Dimmer / Switch / Button) are card settings and variants, for the card-library work | 2026-10-06 | #86 |
 | K17 | A group defined in HA or Hue (`light.office`) gets the Members view like a group defined on the device: each member can be opened and controlled. Adding a member as a card of its own: later | 2026-10-06 | #65 |
+| K18 | Such a group is commanded as itself (the bridge keeps its bulbs in step) unless a member is paused - then through its other members one by one, so K14 holds. Pausing the group pauses its members. "On when" is the source's to decide | 2026-10-06 | `card-sheet.md` §16 |

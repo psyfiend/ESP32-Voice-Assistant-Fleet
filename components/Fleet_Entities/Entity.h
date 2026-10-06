@@ -45,6 +45,7 @@ static constexpr uint8_t ENTITY_SHORT_MAX  = 20;  // unit, device_class, state_c
 // paying for it.
 static constexpr uint8_t ENTITY_ICON_MAX   = 32;  // "mdi:ceiling-light-outline"
 static constexpr uint8_t ENTITY_TOPIC_MAX  = 128; // external topic / HA entity id
+static constexpr uint8_t ENTITY_MEMBERS_MAX = 8;  // members of one HA-defined group (2.10c)
 
 struct EntityDescriptor {
     // Stable key a card binds to. Never renumbered, never reused - the same
@@ -393,6 +394,19 @@ struct Entity {
     // how. Whichever provider owns the entity decides what that means and
     // clears the flag. A transport with no way to re-ask simply clears it.
     bool        needsRefresh   = false;
+
+    // --- A group defined at the SOURCE. 2.10c (#65, DECISIONS K17). ---------
+    //
+    // `light.office` is one entity to HA - a Hue room - and HA (or the Hue
+    // bridge) sends each command on to its bulbs. The source names them, in
+    // the group's `entity_id` attribute, and the registry learns them: each
+    // member becomes an entity of its own (`learnt`), registered while the
+    // board runs, so a window can list it, open it and command it, card or
+    // no card - as Lamp 4 is in All Lamps. Registry indices, which never move:
+    // nothing is ever removed from the table. Written by learnMembers() only.
+    uint8_t     members[ENTITY_MEMBERS_MAX] = {0};
+    uint8_t     nMembers       = 0;
+    bool        learnt         = false;   // registered from a group's member list
 };
 
 #endif // ENTITY_H

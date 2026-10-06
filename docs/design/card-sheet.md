@@ -471,3 +471,34 @@ P4** (owner, 2026-10-06, #88): internal heap free 233 -> 361 KB, a window's bigg
 attributes - 2.10c; saving a swatch with a long press needs the settings store - 2.10d; covering the
 system header - 2.10e. The sensor hero's disc grows with the window around a fixed-size icon face,
 so on a 7" it is large for its glyph (a bigger face costs flash).
+
+## 16. 2.10c - Home Assistant's lights, as built (in progress, `TEST_2.10c.md`)
+
+Measured before building: `ha-websocket.md` section 9. Decisions: `DECISIONS.md` C5, K12, K15, K17.
+
+**Step 1 - levels.** An HA light reports what it can do (`supported_color_modes`, folded into the
+four capability bits of section 15), what it is showing (`color_mode`) and its levels; one reader
+(`HaValue.h`) serves the boot fetch and the live feed. So an HA light gets exactly the window a
+virtual lamp of the same kind gets, and a light HA reports as on/off only - or a `switch.*` - keeps
+the big toggle. Commands are `light.turn_on` with `brightness` (0-255), `color_temp_kelvin` or
+`hs_color`; confirmed by the light's own report as before. HA's reply to the call is read: a
+refusal (`success: false`, which means HA sent nothing) shows FAILED at once instead of after 3 s.
+On the owner's Hue bulbs a colour confirms on the first report, then the bridge may correct it to
+what the bulb can really make (blue 240 -> 255) about 1.4 s later, and the window follows.
+
+**Step 2 - groups defined in HA or Hue (K17).** `light.office` is one entity to HA. Its `entity_id`
+attribute names its bulbs; the registry LEARNS them - registers each as an entity of its own while
+the board runs (id `ha_light_office_lamp`, name from its own `friendly_name`), subscribes and
+fetches it. So Desk's window has the members icon, Members lists the three bulbs, and a tap opens
+one bulb's own controls - exactly as All Lamps does with Lamp 4, which has no card either.
+
+- **With no member paused, the window and the card stand for the group itself**: HA's own report
+  is shown, and a command goes to `light.office` once, so the Hue bridge changes the bulbs together.
+- **While any member is paused, they stand for the members** (section 15's rule, K14): the paused
+  bulb is out - not shown in the mean, not commanded - and the others are commanded one by one
+  (they may change a moment apart). The card does the same (`Card::liveEntities()`).
+- **Pausing Desk itself pauses the group and every member**; resuming resumes them all.
+- **"On when: any / all" is not offered** for such a group: HA or Hue decides when it is on.
+- A member's pause is saved like any other and applied once the member is learnt after a reboot.
+- Adding a member as a card of its own: later (owner) - it needs a place on the page (#78) and
+  saving (2.10d).

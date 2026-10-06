@@ -4,6 +4,7 @@
 
 #include "Entity.h"
 #include <mutex>
+#include <atomic>
 
 // ---------------------------------------------------------------------------
 // The Entity Registry. ROADMAP section 4.1 (what it is) and 4.2 (the rule that
@@ -80,7 +81,9 @@ public:
     Entity       *find(const char *id);
     const Entity *find(const char *id) const;
 
-    uint8_t       count() const { return _count; }
+    // Acquire: a reader on another task that sees the new count also sees the
+    // entity add() or learnMembers() wrote into that slot before raising it.
+    uint8_t       count() const { return _count.load(std::memory_order_acquire); }
 
     // Raw access by index, for diagnostics and for iterating at startup.
     //
@@ -94,7 +97,32 @@ public:
     // find() a copy. Kept unlocked rather than made safe-by-default because a
     // locking accessor invites exactly the pattern 4.2 forbids: holding the
     // registry lock while doing LVGL work.
-    const Entity *at(uint8_t i) const { return (i < _count) ? &_items[i] : nullptr; }
+    const Entity *at(uint8_t i) const { return (i < count()) ? &_items[i] : nullptr; }
+
+    // --- Groups defined at the source, 2.10c (#65) -------------------------
+    //
+    // A group's members, as the source names them (HA's `entity_id` attribute
+    // on light.office). Each ref not yet in the table is REGISTERED NOW - the
+    // one way an entity is added after startup - as a copy of the group's
+    // kind, source and writability, with a stable id derived from the ref
+    // ("ha_light_office_lamp") so a pause or a saved setting finds it again
+    // after a reboot. Then the group's member list is set. Any task; under the
+    // lock. Returns how many entities were added.
+    uint8_t learnMembers(const char *groupId, const char *const *refs, uint8_t n);
+
+    // Member `i` of a group, or null.
+    const Entity *memberOf(const Entity &g, uint8_t i) const {
+        return (i < g.nMembers) ? at(g.members[i]) : nullptr;
+    }
+
+    // A learnt entity's name, from the source's own word for it (HA's
+    // friendly_name). Only learnt entities: a declared name is the user's.
+    bool adoptName(const char *id, const char *name);
+
+    // True once after learnMembers() added anything: the caller (the loop
+    // task) then re-applies the saved pauses, which could not reach an entity
+    // that did not exist at boot.
+    bool takeLearnt() { return _learnt.exchange(false); }
 
     // --- Provider side (any task) -----------------------------------------
 
@@ -238,7 +266,10 @@ private:
     // which is the point - only the table is large, and only the table moves.
     Entity *_items    = nullptr;
     uint8_t _capacity = 0;
-    uint8_t _count    = 0;
+    // Atomic since 2.10c: learnMembers() adds entities while other tasks walk
+    // the table with at(). The slot is written first, then the count raised.
+    std::atomic<uint8_t> _count{0};
+    std::atomic<bool>    _learnt{false};
 
     CommandSink _cmdFn  = nullptr;
     void       *_cmdCtx = nullptr;
