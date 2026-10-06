@@ -373,7 +373,8 @@ Agg aggregate() {
 // is off reports no levels, as in HA.
 // ---------------------------------------------------------------------------
 struct LightAgg {
-    uint8_t   caps = 0;                       // LightCapBits, the union
+    uint8_t   caps = 0;                       // LightCapBits, the union of what is offered
+    uint8_t   allCaps = 0;                    // ... of every member, paused or not
     int32_t   bri = -1, kelvin = -1, hue = -1, sat = -1;
     LightMode mode = LightMode::LMODE_UNKNOWN;
     int32_t   minK = 0, maxK = 0;
@@ -383,11 +384,17 @@ LightAgg lightAggregate() {
     LightAgg L;
     int32_t briSum = 0, briN = 0, kSum = 0, kN = 0, satSum = 0, hN = 0;
     float hx = 0.f, hy = 0.f;
+    const bool group = s.nEnt > 1;
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
-        if (!counts(e)) continue;   // a paused member offers nothing (owner)
+        if (!e) continue;
         const EntityAttrs &at = e->attrs;
-        L.caps |= at.lightCaps;
+        L.allCaps |= at.lightCaps;
+        // IN A GROUP A PAUSED MEMBER NEVER OFFERS A MODE - not even when every
+        // member is paused (owner, round 3 P4: pausing the last one brought
+        // Lamp 3's Colour back). One paused light keeps its own, greyed.
+        if (!group || !e->paused) L.caps |= at.lightCaps;
+        if (!counts(e)) continue;   // and its levels are left out too
         if (at.minTempK && (!L.minK || at.minTempK < L.minK)) L.minK = at.minTempK;
         if (at.maxTempK > L.maxK) L.maxK = at.maxTempK;
         if (!(e->value.type == ValueType::BOOL && e->value.b)) continue;
@@ -522,17 +529,47 @@ uint32_t quiet(uint32_t hex) {
     return s.builtPaused ? UI::mix(hex, UI::pal().SURFACE_ALT, 65) : hex;
 }
 
-void makePausedPill(lv_obj_t *col) {
+// The column's first line: what it is ("Brightness"), and the PAUSED pill
+// BESIDE it - on the same line, the same height, so nothing below moves when
+// it comes or goes (owner, round 3: it used to sit above and push the rest down).
+void makeLabelRow(lv_obj_t *col) {
     const UIPalette &p = UI::pal();
-    s.pill = makeLabel(col, UI::type().TAG, UI::contrastOf(p.ST_IDLE, p.GROUND, p.TEXT));
+    const UIType    &t = UI::type();
+    lv_obj_t *row = plain(col);
+    lv_obj_set_size     (row, LV_SIZE_CONTENT, lv_font_get_line_height(t.TAG));
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(row, mm(1.6f), 0);
+    s.lblWhat = makeLabel(row, t.TAG, p.TEXT_DIM);
+    s.pill = makeLabel(row, t.TAG, UI::contrastOf(p.ST_IDLE, p.GROUND, p.TEXT));
     lv_label_set_text(s.pill, "PAUSED");
     lv_obj_set_style_bg_color(s.pill, UI::c(p.ST_IDLE), 0);
     lv_obj_set_style_bg_opa  (s.pill, LV_OPA_COVER, 0);
     lv_obj_set_style_radius  (s.pill, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_pad_hor (s.pill, mm(1.6f), 0);
-    lv_obj_set_style_pad_ver (s.pill, mm(0.3f), 0);
+    lv_obj_set_style_pad_hor (s.pill, mm(1.2f), 0);
     lv_obj_set_style_text_letter_space(s.pill, mm(0.2f), 0);
     if (!s.builtPaused) lv_obj_add_flag(s.pill, LV_OBJ_FLAG_HIDDEN);
+}
+
+// THE COLUMN BESIDE A TOGGLE OR SLIDER HAS ONE SIZE (owner, round 3: "all of
+// the text locations should be fixed"): as wide as a full selector - Power and
+// three controls - and as tall as the hero. A light with fewer controls, a
+// pause, a different control: nothing moves, the slider included (the row is
+// centred, so a narrower column used to slide the whole row sideways).
+int32_t fixedColW() {
+    const int32_t g = mm(0.6f);
+    const int32_t sel = 2 * g + 4 * UI::minTouch() + 4 * g + LV_MAX(2, mm(0.25f));
+    const int32_t room = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4);
+    return LV_MIN(room, sel + mm(6));
+}
+
+void fixColumn(lv_obj_t *col) {
+    lv_obj_set_width     (col, fixedColW());
+    lv_obj_set_height    (col, LV_SIZE_CONTENT);
+    lv_obj_set_style_min_height(col, s.heroH, 0);
+    lv_obj_set_flex_flow (col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_row(col, mm(0.8f), 0);
 }
 
 void rebuildMainAsync(void *unused);   // below
@@ -591,8 +628,10 @@ constexpr Swatch SWATCHES[8] = {
 
 bool canSlide(uint8_t caps) { return caps & (LIGHT_CAN_DIM | LIGHT_CAN_TEMP | LIGHT_CAN_COLOUR); }
 
-// D3: open on the control - brightness first, as HA's dialog does.
+// D3: open on the control - brightness first, as HA's dialog does. Nothing
+// offered (a group with every member paused): brightness, greyed.
 uint8_t firstCtl(uint8_t caps) {
+    if (!caps)                 return LCTL_DIM;
     if (caps & LIGHT_CAN_DIM)  return LCTL_DIM;
     if (caps & LIGHT_CAN_TEMP) return LCTL_TEMP;
     return LCTL_COLOUR;
@@ -946,12 +985,16 @@ void buildLightColumn(lv_obj_t *col) {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const LightAgg   L = lightAggregate();
-    s.lblWhat = makeLabel(col, t.TAG, p.TEXT_DIM);
+    makeLabelRow(col);
     if (s.lightCtl != LCTL_COLOUR) {
         s.lblValue = makeLabel(col, UIToolkit::Font_Hero, p.TEXT);
         s.lblAgo   = makeLabel(col, t.TAG, p.TEXT_DIM);
+        lv_label_set_long_mode(s.lblAgo, LV_LABEL_LONG_DOT);   // "..., 3 paused" stays one line
+        lv_obj_set_width(s.lblAgo, lv_pct(100));
     } else {
-        const int32_t sz = mm(7.0f), gap = mm(1.6f);
+        // 6.5 mm: with the label and the selector they fill the P4_5's 30 mm
+        // column exactly, so the selector stays where it is in every control.
+        const int32_t sz = mm(6.5f), gap = mm(1.6f);
         lv_obj_t *grid = plain(col);
         lv_obj_set_size     (grid, 4 * sz + 3 * gap + 2 * mm(0.6f), LV_SIZE_CONTENT);
         lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
@@ -973,6 +1016,12 @@ void buildLightColumn(lv_obj_t *col) {
         }
     }
 
+    // The selector sits at the BOTTOM of the column, level with the bottom of
+    // the slider, whatever is above it (owner, round 3).
+    lv_obj_t *spacer = plain(col);
+    lv_obj_set_size(spacer, 1, 0);
+    lv_obj_set_flex_grow(spacer, 1);
+
     // Power | the controls this light (any member) has, with a divider after
     // Power as in HA. A light with only one of them still shows it, so the
     // selector always says what the slider is.
@@ -986,10 +1035,12 @@ void buildLightColumn(lv_obj_t *col) {
     lv_obj_set_style_pad_all   (sel, mm(0.6f), 0);
     lv_obj_set_style_pad_column(sel, mm(0.6f), 0);
     ctlButton(sel, MDI_POWER, 0);
-    lv_obj_t *div = plain(sel);
-    lv_obj_set_size(div, LV_MAX(2, mm(0.25f)), UI::minTouch() * 60 / 100);
-    lv_obj_set_style_bg_color(div, UI::border(), 0);
-    lv_obj_set_style_bg_opa  (div, LV_OPA_COVER, 0);
+    if (L.caps & (LIGHT_CAN_DIM | LIGHT_CAN_TEMP | LIGHT_CAN_COLOUR)) {
+        lv_obj_t *div = plain(sel);
+        lv_obj_set_size(div, LV_MAX(2, mm(0.25f)), UI::minTouch() * 60 / 100);
+        lv_obj_set_style_bg_color(div, UI::border(), 0);
+        lv_obj_set_style_bg_opa  (div, LV_OPA_COVER, 0);
+    }
     if (L.caps & LIGHT_CAN_DIM)    ctlButton(sel, MDI_BRIGHTNESS_5, 1 + LCTL_DIM);
     if (L.caps & LIGHT_CAN_TEMP)   ctlButton(sel, MDI_SUN_THERMOMETER, 1 + LCTL_TEMP);
     if (L.caps & LIGHT_CAN_COLOUR) ctlButton(sel, MDI_PALETTE, 1 + LCTL_COLOUR);
@@ -1157,8 +1208,11 @@ void buildMain() {
     s.builtPaused   = aggregate().paused;
     s.rebuildQueued = false;
     const bool writableLight = (e.desc.kind == EntityKind::LIGHT && e.desc.writable);
-    const uint8_t caps = lightAggregate().caps;   // paused members offer nothing
-    s.lightHero  = writableLight && canSlide(caps);
+    const LightAgg LA = lightAggregate();
+    const uint8_t caps = LA.caps;   // paused members offer nothing
+    // The slider stays for a group whose members are all paused (greyed, no
+    // controls offered): what the window IS does not change with a pause.
+    s.lightHero  = writableLight && canSlide(LA.allCaps);
     s.toggleHero = !s.lightHero && e.desc.writable &&
                    (e.desc.kind == EntityKind::SWITCH || writableLight);
     if (s.lightHero) {
@@ -1170,11 +1224,7 @@ void buildMain() {
         s.builtCaps = caps;
         buildLightHero(row);
         lv_obj_t *col = plain(row);
-        lv_obj_set_size     (col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-        lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-        lv_obj_set_style_pad_row(col, mm(1.0f), 0);
-        makePausedPill(col);
+        fixColumn(col);
         buildLightColumn(col);
         renderLight();
         return;
@@ -1230,10 +1280,11 @@ void buildMain() {
     if (textW("No reading yet", t.TAG) > colMin) colMin = textW("No reading yet", t.TAG);
     if (textW("Unavailable", UIToolkit::Font_Hero) > colMin) colMin = textW("Unavailable", UIToolkit::Font_Hero);
     lv_obj_set_style_min_width(col, colMin < colMax ? colMin : colMax, 0);
+    // A toggle's column is the slider's: the same size, the lines in the
+    // same places (owner, round 3).
+    if (s.toggleHero) fixColumn(col);
 
-    makePausedPill(col);
-
-    s.lblWhat = makeLabel(col, t.TAG, p.TEXT_DIM);
+    makeLabelRow(col);
 
     lv_obj_t *vrow = plain(col);
     lv_obj_set_size     (vrow, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -1247,6 +1298,10 @@ void buildMain() {
     s.lblUnit  = makeLabel(vrow, t.UNIT, p.TEXT_DIM);
 
     s.lblAgo = makeLabel(col, t.TAG, p.TEXT_DIM);
+    if (s.toggleHero) {
+        lv_label_set_long_mode(s.lblAgo, LV_LABEL_LONG_DOT);
+        lv_obj_set_width(s.lblAgo, lv_pct(100));
+    }
 
     s.knobPlaced = false;
     renderMain();

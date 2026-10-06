@@ -130,6 +130,25 @@ The 1060 has the build but could not be flashed (COM9 busy).
 | M3 | Tap Lamp 4 | "All Lamps > Lamp 4", the big toggle (on/off only); it works though Lamp 4 has no card |
 | M4 | In a member's view, open SETTINGS and set Paused On | Only that member pauses (check Members) |
 
+**Round 3 results (owner, 2026-10-05):** P1-P3, P5-P8, B1, M1-M4 PASS. **P4 FAIL**: with every
+member paused, Colour came back (the "all paused shows them frozen" rule counted Lamp 3 again).
+**Raised**: the selector moved down when the PAUSED pill appeared, and the whole row slid sideways
+between lights with different controls - "all of the text locations should be fixed". Both fixed
+(round 4).
+
+## Round 4 - nothing moves
+
+Flashed 2026-10-05: **WS_P4_5** (debug flags), **WS_P4_4B**, **CYD_P4_1060** (R6 from round 2 is
+on this build too).
+
+| # | Do this | PASS if |
+|---|---|---|
+| F1 | Pause Lamp 3, then pause the other three one by one, watching All Lamps' window | Colour never comes back. With all four paused: a greyed slider and a greyed Power, no other buttons |
+| F2 | Open Lamp 1, Lamp 2, Lamp 3, All Lamps, the Switch, one after another | The slider (or toggle), "Brightness"/"Power", the value and "Changed..." are in the same place in every window |
+| F3 | Lamp 3: Brightness, Temperature, Colour | The selector stays put; in Colour the swatches fit between the label and the selector |
+| F4 | Pause and resume Lamp 3 with its window open | PAUSED appears BESIDE "Brightness"; nothing else moves |
+| F5 | 4B and 1060: repeat F2 and F3 | The same on each board (the 1060 window is wider than tall) |
+
 ## Not tested (by Claude)
 
 Everything below was driven over `/popup` with no finger on the glass, so **nothing about touch has
