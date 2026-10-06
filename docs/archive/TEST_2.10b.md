@@ -204,7 +204,9 @@ LVGL's pool is in PSRAM at 512 KB on every P4** (#88) - the internal pool was 12
 Measured on WS_P4_5 (Fleet page): internal heap free at boot 361 KB (was 233). LVGL's pool 500 KB
 usable; with All Lamps' window and deck open 99 KB used, biggest free block 399 KB (was 13 KB).
 
-## Not tested (by Claude)
+## Not tested (by Claude) - written at round 1
+
+(Later rounds covered Linen and the 4B and 1060 on glass; touch was always the owner's.)
 
 Everything below was driven over `/popup` with no finger on the glass, so **nothing about touch has
 been tried**: dragging smoothness, flicks, a finger leaving the slider, the gestures in L12-L13.

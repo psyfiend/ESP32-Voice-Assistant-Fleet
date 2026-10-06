@@ -88,7 +88,8 @@ only has to fill it in.
 ## 6. The overview ("alt-tab")
 
 **Possible, with one honest limit: the thumbnails would not be live.** Only one page's widgets
-exist at a time — a page is rebuilt on arrival, which is what keeps `lv_mem` inside its 128 KB — so
+exist at a time — a page is rebuilt on arrival, which is what kept `lv_mem` inside its 128 KB (512 KB
+in PSRAM on the P4s since 2026-10-06, #88; still 128 KB on the S3s) — so
 there is nothing to render a second page from. What is possible is a **snapshot taken each time a
 page is left**, scaled down and kept in PSRAM, then shown as a grid of thumbnails. A thumbnail at a
 quarter size is ~115 KB on `WS_P4_5`, ~19 KB on the 3248.
@@ -101,7 +102,7 @@ Today: an instant swap. What else is possible, and what each costs:
 
 | Effect | How | Cost / risk |
 |---|---|---|
-| **Slide, two live pages** (what NINA does) | both pages built, animate `translate_x` | both pages' cards in `lv_mem` at once - ~2.8 KB a card, ~85 KB for House + Fleet against a 128 KB pool. Too tight |
+| **Slide, two live pages** (what NINA does) | both pages built, animate `translate_x` | both pages' cards in `lv_mem` at once - ~2.8 KB a card, ~85 KB for House + Fleet against a 128 KB pool. Too tight on the S3s; the P4s' 512 KB PSRAM pool (#88) has the room, so this is worth re-weighing there |
 | **Slide, snapshot** | snapshot the old page into PSRAM, build the new one, slide the picture off | one live page, no `lv_mem` spike, no layer. Drawing a full-screen image per frame: fine on P4, slow on the S3s |
 | **Fade** of a page object | `opa` on the page | forces a full-screen LAYER - the allocation that froze `WS_P4_5` (LESSONS.md). No |
 | **Fade** of a snapshot | `image_opa` on the picture | no layer needed. Cheap |

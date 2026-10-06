@@ -83,8 +83,9 @@ so an S3 rebuild cannot touch the P4s.
 
 ## 5. Memory
 
-- **LVGL's pool (`lv_mem`) is 128 KB fleet-wide**, a static array in internal RAM except on
-  `WS_S3_4B` (`-D FLEET_LV_MEM_PSRAM`). 256 KB does not link on the P4. A card costs ~715 B of it;
+- **LVGL's pool (`lv_mem`)**: 512 KB in PSRAM on every P4 (2026-10-06, #88 - full-screen frames
+  ~10% slower, measured on WS_P4_5: 91-97 -> 100-108 ms; a card frame unchanged), 128 KB in PSRAM on
+  `WS_S3_4B`, a 128 KB static array in internal RAM on the other S3s. A card costs ~715 B of it;
   `lv_mem_monitor()` is the instrument, not `ESP.getFreeHeap()`.
 - **S3_4B peak pool use over a 6-hour soak: ~78 KB** (never under 50 KB free) - the pool is
   oversized for today's pages, which is what makes "back in SRAM, smaller" plausible (#70).

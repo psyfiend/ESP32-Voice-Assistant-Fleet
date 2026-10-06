@@ -1,6 +1,12 @@
-# The card popup — long press, milestones 2.10 / 2.11 — BLUEPRINT (draft 2)
+# The card popup — long press, milestones 2.10 / 2.11
 
-**Status: design, 2026-09-27, owner and Claude. Nothing built.** Draft 1 (a bottom sheet) was
+**Status, 2026-10-06: 2.10a (the frame) and 2.10b (the light controls) are BUILT and merged -
+§14 and §15 say what they are, and win over everything above them.** §1-13 are the design and
+the interview answers that led there, kept for the reasoning; where they disagree with §14-15
+(the grow, the dim, the P4_5-shaped window), they are history. Decisions, one line each:
+`docs/DECISIONS.md` K3-K16. Next: 2.10c-e (§9).
+
+The original status - **design, 2026-09-27, owner and Claude**: draft 1 (a bottom sheet) was
 replaced the same morning by the owner's brain dump, with HA's own dialogs as the reference
 (light, switch, switch history, temperature graph). Sources: ROADMAP 2.10 (#65), 2.11 (#66), 2.8;
 `context-panels.md` (mechanism A = invoked by a card, B = declared by a page); `pages.md` (linked
@@ -157,6 +163,9 @@ description is 2.11's. Its header of promoted values (the area's temperature and
 | 4.4 | Context panels (mechanism B) - wherever the deck is repurposed, if at all (`interview-phase2-3.md` §5) - built from the same rows | - |
 
 ## 10. Decisions
+
+As drafted on 2026-09-27. How each was finally decided - D1 was reversed on glass - is in
+`docs/DECISIONS.md` K4-K10.
 
 | | Question | Recommendation |
 |---|---|---|
@@ -362,7 +371,7 @@ they differ (it still says "Settings tab" and "pause moved into it" without sayi
 
 ## 14. The popup's deck, as built and tested (owner, 2026-10-05)
 
-What 2.10a ended up with, after rounds 4-12 on glass (`docs/TEST_2.10a.md`); signed off and merged
+What 2.10a ended up with, after rounds 4-12 on glass (`docs/archive/TEST_2.10a.md`); signed off and merged
 2026-10-05 (`v0.2.8`). Where it differs from the sections above, this wins.
 
 - **The window appears complete at once and closes at once** - no grow, no dim (owner: speed first).
@@ -383,20 +392,31 @@ What 2.10a ended up with, after rounds 4-12 on glass (`docs/TEST_2.10a.md`); sig
   they come (no one-size rule).
 - **Contents in 2.10a**: Paused works (kept on the device); Label, Custom name and On the dashboard
   are shown, quieter, and inactive - "fine for now", which settings exist is not settled.
-- **Memory**: a window with its deck costs ~11-12 KB of LVGL's pool, ~16 KB left with one open;
-  watched as 2.10b-e add to it (owner: wait and see).
+- **Memory**: a window with its deck costs ~11-12 KB of LVGL's pool; with the pool at 128 KB in
+  internal RAM, ~16 KB was left with one open. Answered at 2.10b: the pool is in PSRAM (§15).
 
-## 15. 2.10b - the light controls (owner's answers 2026-10-05; built, round 1 not yet on glass)
+## 15. 2.10b - the light controls, as built and signed off (2026-10-06, `v0.2.9`)
 
-Tests and measurements: `docs/TEST_2.10b.md`. Where this differs from sections 9-14, it wins.
+Signed off on WS_P4_5 after seven rounds, and seen on WS_P4_4B and CYD_P4_1060; every round and
+measurement is in `docs/archive/TEST_2.10b.md`. Where this differs from sections 9-14, it wins.
 
-**Size - proportional to the P4_5 (owner).** The P4_5's window (68 x 47 mm, toggle 30 mm on
-calipers, "the perfect size") is the reference. Every board's window takes its shape - width = the
-window's height (with the system header shown) x 787:545 - capped by the screen, so the 7" panels
-get a ~108 mm window and the 4B stays screen-wide. The hero is the same share of the window
-everywhere (`pm()`, "P4_5 millimetres"): ~48 mm on a 7", ~29 mm on the 4B. Touch targets and text
-stay real millimetres. Hiding the header makes the window taller, never wider. Portrait boards
-(the 4880) are left for later (owner).
+**Size.** The P4_5's hero (the toggle or slider, 30 mm on calipers, "the perfect size") is the
+reference: on every board the hero is the same share of the window as on the P4_5 (`pm()`, "P4_5
+millimetres", from the height of the biggest P4_5-shaped window that fits). Touch targets and text
+stay real millimetres. **The window is up to 2:1, never wider than 100 mm, with a side gap of at
+least 6 mm or 8% of the screen**: P4_5 93 x 47 mm, 7" 100 x 75 mm, 4B ~60 mm. (Round 1 gave every
+board the P4_5 window's 787:545 shape; the owner then asked for width on the P4_5, and round 5's
+~129 mm on the 7" made every reach long.) Hiding the system header makes the window taller, never
+wider. The rearranged layout (the selector centred along the bottom) was declined: the P4_5 lacks
+the height (62 mm tall at 294 PPI). Covering the system header: decide at 2.10e, with the charts.
+Portrait boards (the 4880) are left for later (owner).
+
+**Nothing moves within one window** (owner, rounds 3-5). The column beside the slider or toggle is
+as wide as that light's selector - for a group, everything its members can do, paused or not - or
+a fixed allowance for its words, whichever is wider, and as tall as the hero: the label line at the
+top (the PAUSED pill beside the label, the same height), the selector level with the hero's bottom.
+The row is centred, so a toggle and its words sit centred, four controls are centred as a whole,
+and two move in from the edge.
 
 **Light state lives in the registry (owner).** What a light can do (HA's `supported_color_modes`
 folded into dim / temperature / colour) arrives from the source with every report, so nothing is
@@ -424,43 +444,30 @@ group helper option) is a card setting, `GroupOn`, in the deck of a card standin
 things; a tap on a group that is on turns all off, otherwise all on (it was "the inverse of the
 majority"). Native HA groups are one entity, and HA decides for them.
 
-**Memory (owner: try every reasonable saving without side effects):** the deck's rows are built when
-it is first opened, and only the chosen control is built. The pool in PSRAM was measured (+128 KB
-internal heap; full-screen frames ~10% slower, the popup's opening frame ~2 ms) and reverted - the
-owner's call, below.
+HA's own rules, read from its source (`group/light.py`): brightness and colour temperature are the
+mean over the members that are ON, hue a circular mean, the mode the most common, the capabilities
+the union. **The group card fills to that mean brightness** (one at 100%, one at 50%: 75%).
 
-**Round 1 additions (owner, 2026-10-05):**
-- **A paused member is out of its group**: not counted for on or off, not offered (a mode only it
-  has leaves the selector), not commanded. The group is PAUSED only when every member is; its
-  status line says "1 paused"; Members still lists it, reading "Paused". The card follows the same
-  rule (`Card::counts()`).
-- **A paused window**: greyed controls, a PAUSED pill beside the label, and a touch on a control
-  explains itself. In a group a paused member never offers a mode, even when all are paused (round
-  3, P4); a fully paused group keeps its greyed slider and offers only Power.
-- **Nothing moves, and the group is balanced (owner, rounds 3-4)**: the column beside a slider or
-  toggle is as wide as that light's selector or a fixed allowance for its words, whichever is
-  wider, and the hero tall, with the label line at the top and the selector level with the hero's
-  bottom; the row is centred. A toggle and its words sit centred; four controls are centred as a
-  whole; two move in from the edge. For one light nothing moves - control, pause or words.
-- **The window is up to 2:1 and never wider than 100 mm (owner, 2026-10-06)**, keeping a side gap
-  of at least 6 mm or 8% of the screen: P4_5 93 mm, 7" 100 mm (129 mm made every reach long), 4B
-  ~60 mm. A group's column is sized for everything its members can do, paused or not. Supersedes the P4_5-shape rule above for the width;
-  the hero stays tied to the height. The rearranged layout (selector centred along the bottom) was
-  declined: the P4_5 lacks the height (62 mm tall at 294 PPI; text and buttons are real
-  millimetres). Covering the system header: decide at 2.10e, with the charts.
-- **The chart button is always in the corner**; Members sits inside it. **Paused is a switch** in
-  the deck ("Off / On" read two ways).
-- **A group card fills to the members' mean brightness**, HA's rule read from its source
-  (`group/light.py`: brightness and colour temperature are the mean over the members that are ON,
-  hue a circular mean, the mode the most common, the capabilities the union).
-- **Members: a tap opens that member's own controls** in the same window ("Group > member", back
-  arrow to Members) - section 11.1's member view, reached by a tap (owner) rather than the mock's
-  long press. It needs no card of its own.
+**Paused.** A paused member is out of its group: not counted for on or off, not offered (a mode
+only it has leaves the selector, even when every member is paused), not commanded. The group is
+PAUSED only when every member is - a fully paused group keeps its greyed slider and offers only
+Power; its status line says "1 paused" otherwise; Members lists the member, reading "Paused". The
+card follows the same rule (`Card::counts()`). A paused window: controls greyed, a PAUSED pill
+beside the label, a touch on a control explains itself. **Paused in the deck is a switch** ("Off /
+On" read two ways).
 
-**Still open:**
-- **Memory beyond 2.10b**: stay on the internal pool while it holds, or move the P4s' pool to PSRAM
-  (and make it larger) when 2.10c-e need more. Numbers in `TEST_2.10b.md`.
-- **Scenes** (`hue_scenes`, Desk): need HA's attributes, so 2.10c at the earliest; a selector target
-  (section 11.2's recommendation).
-- **Saving a swatch** with a long press: needs the settings store, 2.10d.
-- **The 7" and 4B windows** have not been seen on glass.
+**Members.** A tap on a member row opens that member's own controls in the same window ("Group >
+member", the back arrow returns to Members) - section 11.1's member view, reached by a tap (owner)
+rather than the mock's long press. It needs no card of its own.
+
+**The header.** The chart button is always in the corner; the members icon sits inside it.
+
+**Memory.** The deck's rows are built when it is first opened, and only the chosen control is built
+(owner: every reasonable saving without side effects). **LVGL's pool is in PSRAM at 512 KB on every
+P4** (owner, 2026-10-06, #88): internal heap free 233 -> 361 KB, a window's biggest free block
+13 -> 399 KB, full-screen frames ~10% slower.
+
+**Open, for 2.10c-e:** scenes (`hue_scenes` on `light.office`) as a selector target (11.2) need HA's
+attributes - 2.10c; saving a swatch with a long press needs the settings store - 2.10d; covering the
+system header - 2.10e. The sensor hero's disc grows with the window around a fixed-size icon face,
+so on a 7" it is large for its glyph (a bigger face costs flash).

@@ -317,7 +317,7 @@ The precedence is decided (§0.2). What is not:
 
 | | Gotcha | Consequence |
 |---|---|---|
-| G1 | **`lv_mem` is 128 KB and P4_5 has ~36 KB free.** Popups, area cards, a second page for transitions and the overview all compete for it | each feature budgets its widgets; lazily built tabs; maybe `LV_MEM` in PSRAM one day (measured unnecessary so far) |
+| G1 | ~~**`lv_mem` is 128 KB and P4_5 has ~36 KB free.**~~ **ANSWERED 2026-10-06 (#88):** the P4s' pool is 512 KB in PSRAM (~400 KB free with a popup open); the S3s still have 128 KB | on the S3s each feature still budgets its widgets; lazily built panels stay the habit |
 | G2 | **Flash writes (NVS/LittleFS) pause the flash cache**; the esp_lcd panel interrupt is not IRAM-safe | saving settings may glitch the panel - test before relying on it; batch writes |
 | G3 | **Stable ids** for cards, pages, areas are the foundation of overrides, saved settings, locks, links and export | must be in schema v1, never retrofitted |
 | G4 | **HA renames entities**; a sheet pointing at `light.office_left` breaks silently | an "unknown entity" card, and a report in the System Doctor |

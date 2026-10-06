@@ -3,7 +3,7 @@
 Versions are `v0.<phase>.<release>`; a build adds the commits since that tag, and `+dirty` for a
 modified tree (`v0.2.8.14+dirty`). The phase follows the roadmap. The release number counts tagged,
 signed-off merges to `main` in the order they happen - it does not follow milestone numbers, which
-began finishing out of order (decided 2026-10-05; `docs/ROADMAP.md` 3.3). This file is where a
+began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
 ## v0.2.9 - 2026-10-06
@@ -21,7 +21,7 @@ version is matched to its milestones.
   board, the group centred and nothing moving within one window; a paused window greyed with a
   PAUSED pill; Paused is a switch; the chart button always in the corner; the deck's rows built on
   first open; the tab's corner specks gone. Signed off on WS_P4_5 after seven rounds
-  (`docs/TEST_2.10b.md`), also seen on WS_P4_4B and CYD_P4_1060.
+  (`docs/archive/TEST_2.10b.md`), also seen on WS_P4_4B and CYD_P4_1060.
 - **LVGL's pool in PSRAM on every P4, 512 KB (#88)**: +128 KB internal heap; full-screen frames ~10%
   slower.
 - **The system drawer's contents slide with its edge (#81).**
@@ -35,7 +35,7 @@ version is matched to its milestones.
   slides and can be dragged; a SETTINGS deck shaped like a folder tab, with Pause (kept on the
   device) and the label / custom name / shown rows waiting for 2.10d; sparks along the window's
   edge; history and members views as placeholders; the chart icon. Long press no longer pauses a
-  card. Signed off on WS_P4_5 after twelve rounds (`docs/TEST_2.10a.md`).
+  card. Signed off on WS_P4_5 after twelve rounds (`docs/archive/TEST_2.10a.md`).
 - **Fixed on every esp_lcd DSI board (#67):** the repair fallback raced the PPA's strip rotations
   and left stale lines on glass (`docs/display/history.md`).
 - Already on `main` since v0.2.7, untagged until now: `GET /screenshot` (#58); 2.9's esp_lcd display

@@ -128,7 +128,8 @@ worth doing before a board that needs a specific PHY clock. Reset polarity is pe
   paths). Bounce buffers from `BOUNCE_BUFFER_SIZE_PX`. The framework already has
   `CONFIG_LCD_RGB_RESTART_IN_VSYNC`.
 - The ST7262 boards (8048, S3_5B) have no init commands: plain RGB timing.
-- `WS_S3_4B` only: `-D FLEET_LV_MEM_PSRAM` puts LVGL's 128 KB pool in PSRAM (`lv_conf.h`). #70.
+- `-D FLEET_LV_MEM_PSRAM` puts LVGL's pool in PSRAM (`lv_conf.h`): every P4 at 512 KB
+  (`[P4-options]`, 2026-10-06, #88), and `WS_S3_4B` at 128 KB (#70).
 
 **QSPI (`CYD_S3_3248`):** not moved. The vendor never sends a row address over QSPI (writes start
 at row 0 or continue), so arbitrary partial windows are unproven; the panel has a TE pin (GPIO 38).
