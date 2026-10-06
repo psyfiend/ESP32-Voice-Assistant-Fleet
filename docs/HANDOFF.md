@@ -72,9 +72,11 @@ local debug flags. **What was decided and built: `card-sheet.md` §15. The owner
 - **Nothing touch-related has been tried** - everything was driven over `GET /popup` (DEBUG_POPUP
   only; `CardPopup.h` lists its parameters). It opens windows, switches controls, sends values and
   reads LVGL's pool and every lamp's levels, with nobody at the panel. Use it.
-- **Memory, for the owner to decide:** internal pool, a lamp window leaves 21-24 KB free (15 with the
-  deck open); PSRAM pool measured at +10% per full-screen frame, ~2 ms on the popup's opening frame,
-  +128 KB internal heap. Reverted pending the owner's choice.
+- **Memory: DECIDED 2026-10-06 (owner), `b89f98e`** - LVGL's pool is in PSRAM at 512 KB on every P4
+  (`[P4-options]`: `FLEET_LV_MEM_PSRAM`, `FLEET_LV_MEM_KB=512`; WS_S3_4B keeps its 128 KB PSRAM
+  pool). Internal heap free at boot 233 -> 361 KB; the popup's biggest free block 13 -> 399 KB;
+  full-screen frames ~10% slower. LVGL's own allocator kept - NINA's `lv_mem_psram.c` header
+  records why system malloc for LVGL is a trap on this hardware. LVGL 9.6: after 2.10 (#88).
 - **Sizes**: P4_5 verified unchanged. Round 2 flashed the 4B too; the 1060 is built, not flashed
   (not connected). Round 1 passed except three slider glitches, fixed in `6a629e7`.
 - **Round 3 built (`229f0bf`)**: paused members leave the group, a paused window is greyed with a
