@@ -437,9 +437,18 @@ owner's call, below.
 - **A paused window**: greyed controls, a PAUSED pill beside the label, and a touch on a control
   explains itself. In a group a paused member never offers a mode, even when all are paused (round
   3, P4); a fully paused group keeps its greyed slider and offers only Power.
-- **Nothing moves (owner, round 3)**: the column beside a slider or toggle is one size - a full
-  selector wide, the hero tall - with the label line at the top and the selector level with the
-  hero's bottom, in every light, every control, paused or not.
+- **Nothing moves, and the group is balanced (owner, rounds 3-4)**: the column beside a slider or
+  toggle is as wide as that light's selector or a fixed allowance for its words, whichever is
+  wider, and the hero tall, with the label line at the top and the selector level with the hero's
+  bottom; the row is centred. A toggle and its words sit centred; four controls are centred as a
+  whole; two move in from the edge. For one light nothing moves - control, pause or words.
+- **The window is up to 2:1 (owner, 2026-10-06)**, keeping a side gap of at least 6 mm or 8% of the
+  screen: P4_5 93 mm, 7" ~129 mm, 4B ~60 mm. Supersedes the P4_5-shape rule above for the width;
+  the hero stays tied to the height. The rearranged layout (selector centred along the bottom) was
+  declined: the P4_5 lacks the height (62 mm tall at 294 PPI; text and buttons are real
+  millimetres). Covering the system header: decide at 2.10e, with the charts.
+- **The chart button is always in the corner**; Members sits inside it. **Paused is a switch** in
+  the deck ("Off / On" read two ways).
 - **A group card fills to the members' mean brightness**, HA's rule read from its source
   (`group/light.py`: brightness and colour temperature are the mean over the members that are ON,
   hue a circular mean, the mode the most common, the capabilities the union).

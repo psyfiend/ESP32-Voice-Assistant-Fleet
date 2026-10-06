@@ -81,8 +81,16 @@ local debug flags. **What was decided and built: `card-sheet.md` §15. The owner
   PAUSED pill, the group card shows the mean brightness (HA's rule), Members rows open a member's
   own controls. Flashed P4_5 and 4B; **the 1060 would not flash (COM9 busy)** - R6 and round 3 on it
   wait. Rounds and results: `TEST_2.10b.md`.
+- **Round 5 built (`514b86e`, 2026-10-06)**: window up to 2:1, the group centred by its real width,
+  chart in the corner, Paused as a switch. Flashed to P4_5, 4B and 1060 (COM9 is sometimes "busy";
+  a retry a few seconds later has always worked). `TEST_2.10b.md` round 5.
 - **HomeTiles** (owner, 2026-10-05): MIT reference with an HA-side Bridge that installs helpers and
-  automations for the panels - `REFERENCE_PROJECTS.md`. Read it before 2.10c's HA work.
+  automations for the panels - `REFERENCE_PROJECTS.md`. Read it before 2.10c's HA work. Its LVGL
+  pool is in PSRAM (2 or 12 MB).
+- **Direction (owner, 2026-10-06)**: a companion web app with a true preview that sends the config
+  to the device (#87) - the build sheet becomes its output format, not the user's interface; and
+  presentation (group/room cards) as the way this project stands apart. Filed with it: #86 (card
+  control styles, from HomeTiles), #88 (LVGL pool in PSRAM, then an LVGL 9.6 evaluation).
 - Next after round 1: 2.10c (HA attributes and `light.turn_on` with data - CommandRouter refuses HA
   light levels until then, loudly), then 2.10d saving, 2.10e history. Interview §3 onward after 2.10.
 

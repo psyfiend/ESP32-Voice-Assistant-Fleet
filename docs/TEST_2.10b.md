@@ -149,6 +149,24 @@ on this build too).
 | F4 | Pause and resume Lamp 3 with its window open | PAUSED appears BESIDE "Brightness"; nothing else moves |
 | F5 | 4B and 1060: repeat F2 and F3 | The same on each board (the 1060 window is wider than tall) |
 
+**Round 4 results (owner, 2026-10-06):** F1, F3-F5 PASS. **F2 PASS, but** the slider sat hard
+against the left edge on lights with few controls, and even four controls were not centred. Asked
+for: centre by real width (not the rearranged layout), the window up to 2:1 with notable side gaps,
+the chart always in the corner with Members inside it, and Paused as a real switch.
+
+## Round 5 - balance, width, the Paused switch
+
+Flashed 2026-10-06: **WS_P4_5** (debug flags), **WS_P4_4B**, **CYD_P4_1060** (`514b86e`).
+
+| # | Do this | PASS if |
+|---|---|---|
+| W1 | Open any window on each board | P4_5 ~93 mm wide (was 68), the title no longer ellipsised; 1060 ~129 mm; 4B ~60 mm. A clear gap to the screen's sides on every board |
+| W2 | The Switch, then Lamp 1, then Lamp 3, then All Lamps | The toggle and its words centred; Lamp 1's slider well in from the left edge; Lamp 3 and All Lamps centred as a whole |
+| W3 | Lamp 3: Brightness, Temperature, Colour; pause and resume it | Nothing moves within that one window |
+| W4 | All Lamps' window, top right | The chart in the corner, the members icon beside it towards the middle |
+| W5 | Open any SETTINGS deck | Paused is a switch: knob left, grey = live; tap it - knob right, accent = paused, the card pauses. Tap again to resume |
+| W6 | Linen, one window | The switch and the layout read clearly |
+
 ## Not tested (by Claude)
 
 Everything below was driven over `/popup` with no finger on the glass, so **nothing about touch has
