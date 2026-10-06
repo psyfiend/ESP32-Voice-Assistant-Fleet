@@ -2875,10 +2875,11 @@ void CardPopup::debugService(lv_timer_t *t) {
                 const Entity *e = s.ent[i];
                 if (!e) continue;
                 const EntityAttrs &at = e->attrs;
-                dbgOut("  %-12s %s caps %x mode %d bri %d K %d hue %d sat %d%s%s\n", e->desc.id,
+                dbgOut("  %-12s %s caps %x mode %d bri %d K %d hue %d sat %d%s%s%s\n", e->desc.id,
                        e->value.type == ValueType::BOOL && e->value.b ? "on " : "off", at.lightCaps,
                        (int)at.lightMode, at.brightness, at.colorTempK, at.hue, at.sat,
-                       e->pending ? " pending" : "", e->attrPending ? " levels-pending" : "");
+                       e->pending ? " pending" : "", e->attrPending ? " levels-pending" : "",
+                       e->cmdFailed ? " FAILED" : "");
             }
         }
         s_dreq.store(DREQ_DONE);

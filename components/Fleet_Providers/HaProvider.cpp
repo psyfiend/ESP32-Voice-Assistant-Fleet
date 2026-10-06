@@ -186,6 +186,10 @@ void HaProvider::handle(const char *json, size_t len) {
                 Serial.printf("[HaProv] HA REFUSED the subscription (id %lu): %s - %s\n",
                               (unsigned long)rid, code, msg);
             }
+        } else if (rid != 0 && _resultFn) {
+            const bool ok = doc["success"] | false;
+            _resultFn(rid, ok, ok ? "" : (doc["error"]["code"] | "?"),
+                      ok ? "" : (doc["error"]["message"] | ""), _resultCtx);
         }
         return;
     }

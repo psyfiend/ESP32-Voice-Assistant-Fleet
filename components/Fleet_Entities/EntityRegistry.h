@@ -194,6 +194,14 @@ public:
     typedef void (*LightSink)(const Entity &e, const LightCommand &c, void *ctx);
     void setLightSink(LightSink fn, void *ctx) { _lightFn = fn; _lightCtx = ctx; }
 
+    // THE SOURCE REFUSED A COMMAND - end the wait now instead of in 3 s. 2.10c.
+    //
+    // For a transport that can say so: HA answers call_service with
+    // success:false when it sent nothing (ha-websocket.md section 9). Reverts
+    // whatever is still waiting, value and levels alike, and marks FAILED, as
+    // tick() would. Does nothing if nothing is waiting. Any task.
+    bool failCommand(const char *id);
+
     // Drain the dirty set. Call from the LVGL task only.
     //
     // The callback is invoked OUTSIDE the lock, with a snapshot, so a slow

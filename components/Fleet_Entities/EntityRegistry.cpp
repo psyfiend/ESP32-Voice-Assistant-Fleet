@@ -593,6 +593,19 @@ bool EntityRegistry::commandLight(const char *id, const LightCommand &c, uint32_
     return true;
 }
 
+bool EntityRegistry::failCommand(const char *id) {
+    std::lock_guard<std::mutex> lk(_mx);
+    const int i = indexOf(id);
+    if (i < 0) return false;
+    Entity &e = _items[i];
+    if (!e.pending && !e.attrPending) return false;
+    if (e.pending)     { e.value = e.prevValue; e.pending = false; }
+    if (e.attrPending) { e.attrs = e.prevAttrs; e.attrPending = false; }
+    e.cmdFailed = true;
+    e.dirty     = true;
+    return true;
+}
+
 void EntityRegistry::drainDirty(DirtyFn fn, void *ctx) {
     if (!fn) return;
 

@@ -124,8 +124,8 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
-        // Dimmable - supported_color_modes is ['brightness']. LightCard is
-        // still identical to SwitchCard, so brightness is invisible for now.
+        // Dimmable - supported_color_modes is ['brightness']. What a light can
+        // do is read from HA with every report (2.10c), never declared here.
         .externalRef = "light.dining_room_light",
     },
     {
@@ -188,9 +188,9 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
-        // A GROUP entity, ['color_temp','xy']. The most demanding card on the
-        // dashboard and the one that will force LightCard to stop being a
-        // SwitchCard. cards.md section 4.
+        // A GROUP entity (a Hue room), ['color_temp','xy']. HA and the Hue
+        // bridge send each command on to its three bulbs. cards.md section 4,
+        // ha-websocket.md section 9.
         .externalRef = "light.office",
     },
     {

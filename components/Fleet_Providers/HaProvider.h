@@ -65,6 +65,13 @@ public:
     // house unless something asks this.
     bool     subscriptionAccepted() const { return _subAccepted; }
 
+    // HA's REPLY TO ANY OTHER REQUEST, 2.10c. Every message arrives here, so the
+    // replies to CommandRouter's call_service do too; they are handed on by id.
+    // Called ON THE WEBSOCKET TASK, like everything this class receives.
+    // `code` and `msg` are "" on success and valid only during the call.
+    typedef void (*ResultFn)(uint32_t id, bool ok, const char *code, const char *msg, void *ctx);
+    void setResultHook(ResultFn fn, void *ctx) { _resultFn = fn; _resultCtx = ctx; }
+
 private:
     // HaClient hands out a bare function pointer, so the instance is reached
     // through the ctx argument - same shape MqttProvider uses for PubSubClient.
@@ -89,6 +96,9 @@ private:
     // one was accepted.
     uint32_t _pendingSubId = 0;
     bool     _subAccepted  = false;
+
+    ResultFn _resultFn  = nullptr;
+    void    *_resultCtx = nullptr;
 
     uint16_t _handled    = 0;
     uint16_t _unmatched  = 0;

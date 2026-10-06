@@ -96,6 +96,38 @@ inline void haAttrFilter(JsonObject attrs) {
     attrs["icon"]       = true;
     attrs["brightness"] = true;
     attrs["rgb_color"]  = true;
+    // A light's, 2.10c (#65). ha-websocket.md section 9 has what the owner's
+    // lights send; xy_color is left out - hs_color says the same in our terms.
+    attrs["supported_color_modes"] = true;
+    attrs["color_mode"]            = true;
+    attrs["color_temp_kelvin"]     = true;
+    attrs["min_color_temp_kelvin"] = true;
+    attrs["max_color_temp_kelvin"] = true;
+    attrs["hs_color"]              = true;
+}
+
+inline int haClamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+// One of HA's colour modes, as what it lets a control do. onoff is the only
+// mode that cannot be dimmed; hs, xy and the rgb family all mean "has a hue".
+inline uint8_t haModeCaps(const char *m) {
+    if (!m || !m[0])                   return 0;
+    if (strcmp(m, "onoff") == 0)       return LIGHT_CAN_ONOFF;
+    if (strcmp(m, "brightness") == 0 ||
+        strcmp(m, "white") == 0)       return LIGHT_CAN_ONOFF | LIGHT_CAN_DIM;
+    if (strcmp(m, "color_temp") == 0)  return LIGHT_CAN_ONOFF | LIGHT_CAN_DIM | LIGHT_CAN_TEMP;
+    if (strcmp(m, "hs") == 0 || strcmp(m, "xy") == 0 || strncmp(m, "rgb", 3) == 0)
+                                       return LIGHT_CAN_ONOFF | LIGHT_CAN_DIM | LIGHT_CAN_COLOUR;
+    return 0;   // "unknown", or a mode HA adds later: offer nothing we cannot back
+}
+
+inline LightMode haLightMode(const char *m) {
+    const uint8_t caps = haModeCaps(m);
+    if (caps & LIGHT_CAN_COLOUR) return LightMode::LMODE_COLOUR;
+    if (caps & LIGHT_CAN_TEMP)   return LightMode::LMODE_TEMP;
+    if (caps & LIGHT_CAN_DIM)    return LightMode::LMODE_DIM;
+    if (caps)                    return LightMode::LMODE_ONOFF;
+    return LightMode::LMODE_UNKNOWN;
 }
 
 inline void haReadAttrs(JsonVariantConst attrs, EntityAttrs &out) {
@@ -120,6 +152,36 @@ inline void haReadAttrs(JsonVariantConst attrs, EntityAttrs &out) {
         const uint32_t r = rgb[0] | 0, g = rgb[1] | 0, bl = rgb[2] | 0;
         out.rgb    = ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (bl & 0xFF);
         out.hasRgb = true;
+    }
+
+    // WHAT A LIGHT CAN DO, 2.10c: the union of its supported modes. Sent with
+    // every state, off included, so it is never remembered between reports.
+    // Absent (a switch, a sensor) leaves 0: "not reported", the big toggle.
+    JsonArrayConst modes = attrs["supported_color_modes"];
+    if (!modes.isNull()) {
+        for (JsonVariantConst m : modes) out.lightCaps |= haModeCaps(m | "");
+        if (!out.lightCaps) out.lightCaps = LIGHT_CAN_ONOFF;
+    }
+
+    // Null while off, like the levels.
+    out.lightMode = haLightMode(attrs["color_mode"] | "");
+
+    JsonVariantConst k = attrs["color_temp_kelvin"];
+    if (k.is<int>()) out.colorTempK = (int16_t)haClamp(k.as<int>(), 1, 32767);
+    JsonVariantConst kMin = attrs["min_color_temp_kelvin"];
+    JsonVariantConst kMax = attrs["max_color_temp_kelvin"];
+    if (kMin.is<int>()) out.minTempK = (uint16_t)haClamp(kMin.as<int>(), 0, 65535);
+    if (kMax.is<int>()) out.maxTempK = (uint16_t)haClamp(kMax.as<int>(), 0, 65535);
+
+    // [hue 0-360, saturation 0-100] as floats; HA sends it in a temperature
+    // mode too (the white's nearest hue), which is what the virtual lamps copy.
+    JsonArrayConst hs = attrs["hs_color"];
+    if (!hs.isNull() && hs.size() == 2) {
+        const float h = hs[0] | -1.0f, sat = hs[1] | -1.0f;
+        if (h >= 0.0f && sat >= 0.0f) {
+            out.hue = (int16_t)(((int)(h + 0.5f)) % 360);
+            out.sat = (int8_t)haClamp((int)(sat + 0.5f), 0, 100);
+        }
     }
 }
 

@@ -17,10 +17,40 @@ void CommandRouter::begin(EntityRegistry *reg, MqttManager *mqtt, HaClient *ha) 
 void CommandRouter::onLight(const Entity &e, const LightCommand &c, void *ctx) {
     CommandRouter *self = (CommandRouter *)ctx;
     if (!self) return;
-    if (e.desc.source == EntitySource::VIRTUAL) { self->_sent++; return; }
-    Serial.printf("[Cmd] %s: light levels (bri %d, %d K, hue %d) reach %s at 2.10c; refused\n",
-                  e.desc.id, c.brightness, c.colorTempK, c.hue, entitySourceName(e.desc.source));
-    self->_refused++;
+    bool ok = false;
+    switch (e.desc.source) {
+        case EntitySource::VIRTUAL: ok = true; break;
+        case EntitySource::HA:      ok = self->sendHaLight(e, c); break;
+        default:
+            // MQTT lights (Zigbee2MQTT's JSON schema) would go here; none
+            // exists yet. Loud, and the registry's window marks it FAILED.
+            Serial.printf("[Cmd] %s: no light levels over %s yet; refused\n",
+                          e.desc.id, entitySourceName(e.desc.source));
+            break;
+    }
+    if (ok) self->_sent++;
+    else    self->_refused++;
+}
+
+void CommandRouter::onHaResult(uint32_t id, bool ok, const char *code, const char *msg, void *ctx) {
+    CommandRouter *self = (CommandRouter *)ctx;
+    if (!self) return;
+    char entity[ENTITY_ID_MAX] = {0};
+    {
+        std::lock_guard<std::mutex> lk(self->_callMx);
+        for (HaCall &c : self->_calls) {
+            if (c.id != id) continue;
+            memcpy(entity, c.entity, sizeof(entity));
+            c.id = 0;
+            break;
+        }
+    }
+    if (!entity[0] || ok) return;   // not ours, or accepted: the report decides
+
+    self->_haRefused++;
+    Serial.printf("[Cmd] %s: HA REFUSED call %lu: %s - %s\n",
+                  entity, (unsigned long)id, code, msg);
+    if (self->_reg) self->_reg->failCommand(entity);
 }
 
 void CommandRouter::onCommand(const Entity &e, const EntityValue &v, void *ctx) {
@@ -64,7 +94,23 @@ void CommandRouter::route(const Entity &e, const EntityValue &v) {
 // Home Assistant
 // ---------------------------------------------------------------------------
 
-bool CommandRouter::sendHa(const Entity &e, const EntityValue &v) {
+// The domain is the part of the entity id before the dot. See the header:
+// this is HA's documented format, not an inference about naming.
+static bool haDomain(const Entity &e, char *out, size_t cap) {
+    const char *dot = strchr(e.desc.externalRef, '.');
+    if (!dot || (size_t)(dot - e.desc.externalRef) >= cap) {
+        Serial.printf("[Cmd] %s: malformed entity id '%s'\n",
+                      e.desc.id, e.desc.externalRef);
+        return false;
+    }
+    const size_t dlen = (size_t)(dot - e.desc.externalRef);
+    memcpy(out, e.desc.externalRef, dlen);
+    out[dlen] = '\0';
+    return true;
+}
+
+bool CommandRouter::callService(const Entity &e, const char *domain, const char *service,
+                                const char *data) {
     if (!_ha || !_ha->isReady()) {
         Serial.printf("[Cmd] %s: no HA session; command dropped\n", e.desc.id);
         return false;
@@ -74,41 +120,27 @@ bool CommandRouter::sendHa(const Entity &e, const EntityValue &v) {
         return false;
     }
 
-    // The domain is the part of the entity id before the dot. See the header:
-    // this is HA's documented format, not an inference about naming.
-    char domain[32];
-    const char *dot = strchr(e.desc.externalRef, '.');
-    if (!dot || (size_t)(dot - e.desc.externalRef) >= sizeof(domain)) {
-        Serial.printf("[Cmd] %s: malformed entity id '%s'\n",
-                      e.desc.id, e.desc.externalRef);
-        return false;
-    }
-    const size_t dlen = (size_t)(dot - e.desc.externalRef);
-    memcpy(domain, e.desc.externalRef, dlen);
-    domain[dlen] = '\0';
-
-    // Only on/off is expressible today. Brightness and colour are LightCard's
-    // job (2.7) and will add fields to `service_data` here rather than a second
-    // code path - `light.turn_on` carries them on the same call.
-    const char *service = nullptr;
-    if (v.type == ValueType::BOOL) {
-        service = v.b ? "turn_on" : "turn_off";
-    } else {
-        Serial.printf("[Cmd] %s: no HA service for value type %d yet\n",
-                      e.desc.id, (int)v.type);
-        return false;
-    }
-
-    char frame[320];
+    const uint32_t id = _ha->nextId();
+    char frame[384];
     int n = snprintf(frame, sizeof(frame),
                      "{\"id\":%lu,\"type\":\"call_service\","
                      "\"domain\":\"%s\",\"service\":\"%s\","
-                     "\"target\":{\"entity_id\":\"%s\"}}",
-                     (unsigned long)_ha->nextId(), domain, service,
-                     e.desc.externalRef);
+                     "\"target\":{\"entity_id\":\"%s\"}%s%s%s}",
+                     (unsigned long)id, domain, service, e.desc.externalRef,
+                     data[0] ? ",\"service_data\":{" : "", data, data[0] ? "}" : "");
     if (n <= 0 || n >= (int)sizeof(frame)) {
         Serial.printf("[Cmd] %s: call_service frame did not fit\n", e.desc.id);
         return false;
+    }
+
+    // Remembered BEFORE sending: the reply can arrive on the websocket task
+    // before sendText() has even returned here.
+    {
+        std::lock_guard<std::mutex> lk(_callMx);
+        HaCall &c = _calls[_callNext];
+        _callNext = (uint8_t)((_callNext + 1) % HA_CALLS);
+        c.id = id;
+        snprintf(c.entity, sizeof(c.entity), "%s", e.desc.id);
     }
 
     if (!_ha->sendText(frame, n)) {
@@ -116,8 +148,54 @@ bool CommandRouter::sendHa(const Entity &e, const EntityValue &v) {
         return false;
     }
 
-    Serial.printf("[Cmd] %s -> %s.%s\n", e.desc.id, domain, service);
+    Serial.printf("[Cmd] %s -> %s.%s%s%s\n", e.desc.id, domain, service,
+                  data[0] ? " " : "", data);
     return true;
+}
+
+bool CommandRouter::sendHa(const Entity &e, const EntityValue &v) {
+    char domain[32];
+    if (!haDomain(e, domain, sizeof(domain))) return false;
+
+    // On/off. A light's levels come through sendHaLight() - the same
+    // light.turn_on, with service_data.
+    if (v.type != ValueType::BOOL) {
+        Serial.printf("[Cmd] %s: no HA service for value type %d yet\n",
+                      e.desc.id, (int)v.type);
+        return false;
+    }
+    return callService(e, domain, v.b ? "turn_on" : "turn_off", "");
+}
+
+// light.turn_on with brightness (0-255, the registry's own scale, so nothing is
+// rounded twice), color_temp_kelvin or hs_color - DECISIONS C5. A level means
+// ON, as in HA; temperature and colour are exclusive and colour wins, as in
+// LightCommand. Measured on the owner's Hue bulbs: the first report matches
+// within the registry's tolerances (ha-websocket.md section 9).
+bool CommandRouter::sendHaLight(const Entity &e, const LightCommand &c) {
+    char domain[32];
+    if (!haDomain(e, domain, sizeof(domain))) return false;
+    if (strcmp(domain, "light") != 0) {
+        // A switch.* drawn as a light never reports levels, so the popup never
+        // offers them; this is the guard if one ever arrives anyway.
+        Serial.printf("[Cmd] %s: levels for a %s entity; refused\n", e.desc.id, domain);
+        return false;
+    }
+
+    if (!c.wantsOn()) return callService(e, domain, "turn_off", "");
+
+    // Three fields at most, each under 30 characters: 96 cannot overflow.
+    char bri[24] = "", col[40] = "";
+    if (c.brightness > 0)
+        snprintf(bri, sizeof(bri), "\"brightness\":%d", c.brightness > 255 ? 255 : c.brightness);
+    if (c.hue >= 0)
+        snprintf(col, sizeof(col), "\"hs_color\":[%d,%d]", c.hue, c.sat >= 0 ? c.sat : 100);
+    else if (c.colorTempK > 0)
+        snprintf(col, sizeof(col), "\"color_temp_kelvin\":%d", c.colorTempK);
+
+    char data[96];
+    snprintf(data, sizeof(data), "%s%s%s", bri, (bri[0] && col[0]) ? "," : "", col);
+    return callService(e, domain, "turn_on", data);
 }
 
 // ---------------------------------------------------------------------------

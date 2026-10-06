@@ -199,6 +199,9 @@ bool SystemCore::begin() {
     // After the transports exist and before the pause restore, which only
     // touches flags.
     _cmdRouter.begin(&_entities, &_mqtt, &_ha);
+    // HA's replies to those calls reach the router through the provider, which
+    // receives every message (2.10c): a refused call fails at once.
+    _haProv.setResultHook(&CommandRouter::onHaResult, &_cmdRouter);
 
     // --= 13. Restore the user's pauses =--
     //
