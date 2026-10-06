@@ -28,6 +28,7 @@ How to use it:
 | W6 | Snappy and responsive first, eye candy second | 2026-10-04 | `card-sheet.md` §14, LESSONS |
 | W7 | Recommend one option, ask before building on an assumption, discuss a structural choice a turn before building it; plain language | standing | HANDOFF |
 | W8 | Files are written with Edit/Write, never piped through a shell | 2026-09-18 | CLAUDE.md |
+| W9 | Real lights while testing: any Office light may be commanded and is put back as found; ask before anything in the Kitchen | 2026-10-06 | HANDOFF |
 
 ## Platform and architecture
 
@@ -54,6 +55,7 @@ How to use it:
 | C2 | HA naming: `device_id = fleet_<board>_<last6 of MAC>`, `unique_id = <device_id>_<object_id>` (Q5) | 2026-09-07 | Archive §8 Q5 |
 | C3 | One HA device per board, no fleet parent; device-based discovery (Q6) | 2026-09-07 | Archive §8 Q6 |
 | C4 | Works with stock HA is the baseline; an HA-side companion (as HomeTiles' Bridge) is a separate, later choice. HA's `recorder/statistics_during_period` serves history (2.10e) | 2026-10-06 | #87, HANDOFF |
+| C5 | HA light levels go as `light.turn_on` with `brightness` (0-255), `color_temp_kelvin` or `hs_color`; HA's `success: false` fails a command at once, `success: true` still waits for the report | 2026-10-06 | `ha-websocket.md` §9 |
 
 ## Dashboards, pages and the build sheet
 
@@ -84,8 +86,9 @@ How to use it:
 | K9 | D6: closes four ways - X, tap outside, drag down on the header row, 60 s | 2026-10-02 | `card-sheet.md` §13 |
 | K10 | D7: colour by hue strip and eight swatches (LVGL has no colour wheel) | 2026-10-02 | `card-sheet.md` §11.1 |
 | K11 | The popup is up to 2:1 and at most 100 mm wide with side gaps; its contents are the same share of it as on the P4_5; nothing moves within one window | 2026-10-05/06 | `card-sheet.md` §15 |
-| K12 | A light's commands go every 300 ms while dragging and once on release | 2026-10-05 | `card-sheet.md` §15 |
+| K12 | A light's commands go every 300 ms while dragging and once on release; kept for HA lights after measuring the owner's Hue bridge | 2026-10-05 / 10-06 | `card-sheet.md` §15, `ha-websocket.md` §9 |
 | K13 | Groups act as HA's light group: union of capabilities, mean levels of members that are on, "On when: any / all" (`GroupOn`), HA's tap rule | 2026-10-05 | `card-sheet.md` §15 |
 | K14 | A paused member is out of its group; a paused window is greyed with a PAUSED pill; Paused is a switch | 2026-10-05/06 | `card-sheet.md` §15 |
-| K15 | Scenes: a selector target plus a per-card "load / cycle scene" tap behaviour (recommended, not objected to) | 2026-10-02 | `card-sheet.md` §11.2 |
+| K15 | Scenes: a selector target plus a per-card "load / cycle scene" tap behaviour (recommended, not objected to). **Confirmed 2026-10-06: the selector target is built as 2.10c's last step**; a scene is only ever loaded (`scene.turn_on`), never shown as on | 2026-10-02 / 10-06 | `card-sheet.md` §11.2, #65 |
 | K16 | Card control styles (Automatic / Dimmer / Switch / Button) are card settings and variants, for the card-library work | 2026-10-06 | #86 |
+| K17 | A group defined in HA or Hue (`light.office`) gets the Members view like a group defined on the device: each member can be opened and controlled. Adding a member as a card of its own: later | 2026-10-06 | #65 |
