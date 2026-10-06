@@ -53,6 +53,11 @@ public:
 
     static uint8_t      systemHeaderH;
     static int32_t      systemHeaderPx() { return systemHeaderH ? sc(systemHeaderH) : 0; }
+    // Its height when shown (owner, 2026-09-19: only hide/show remains). For
+    // anything that must not change size when the header is hidden - the card
+    // popup's width is worked out from it (CardPopup::open()).
+    static constexpr uint8_t SYSTEM_HEADER_FULL_H = 35;
+    static int32_t      systemHeaderFullPx() { return sc(SYSTEM_HEADER_FULL_H); }
 
     // The derived values behind sc(), exposed for diagnostics and for LVGL's
     // own DPI setting. ppi() returns 0 if the board declares no DIAGONAL_IN.

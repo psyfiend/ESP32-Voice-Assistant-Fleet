@@ -385,3 +385,82 @@ What 2.10a ended up with, after rounds 4-12 on glass (`docs/TEST_2.10a.md`); sig
   are shown, quieter, and inactive - "fine for now", which settings exist is not settled.
 - **Memory**: a window with its deck costs ~11-12 KB of LVGL's pool, ~16 KB left with one open;
   watched as 2.10b-e add to it (owner: wait and see).
+
+## 15. 2.10b - the light controls (owner's answers 2026-10-05; built, round 1 not yet on glass)
+
+Tests and measurements: `docs/TEST_2.10b.md`. Where this differs from sections 9-14, it wins.
+
+**Size - proportional to the P4_5 (owner).** The P4_5's window (68 x 47 mm, toggle 30 mm on
+calipers, "the perfect size") is the reference. Every board's window takes its shape - width = the
+window's height (with the system header shown) x 787:545 - capped by the screen, so the 7" panels
+get a ~108 mm window and the 4B stays screen-wide. The hero is the same share of the window
+everywhere (`pm()`, "P4_5 millimetres"): ~48 mm on a 7", ~29 mm on the 4B. Touch targets and text
+stay real millimetres. Hiding the header makes the window taller, never wider. Portrait boards
+(the 4880) are left for later (owner).
+
+**Light state lives in the registry (owner).** What a light can do (HA's `supported_color_modes`
+folded into dim / temperature / colour) arrives from the source with every report, so nothing is
+saved to flash; levels are null while off, as HA reports them. A brightness, temperature or colour
+command is applied at once and confirmed only by a matching report, exactly as on/off is (#63);
+three seconds without one, it reverts and the card says FAILED. That is the "trust but verify" the
+owner asked for: after a reboot, or while the link is down, nothing is shown as confirmed that the
+source has not said.
+
+**Commands while dragging: every 300 ms, and once on release (owner: "300ms sounds about right").**
+The slider and the value follow the finger every frame; toggles still command on release.
+
+**The window (mock v3, owner):** the slider is the hero, a tap jumps to that point; beside it what it
+controls, the value, when it changed, and Power | Brightness, Temperature, Colour, showing only what
+the light can do. Colour shows eight default swatches in place of the value line (the column must
+fit 34 mm on the P4_5). A switch, an on/off light and a light whose source has not said what it can
+do get the big toggle.
+
+**Groups behave as in HA (owner):** what is offered is everything any member can do; each member is
+sent what it can take (a brightness turns an on/off member on - the owner's 1% test; a temperature
+becomes the nearest hue for a member with colour but no temperature, as HA converts; a colour leaves
+the others on). Shown levels are the mean of the members that are on. A lamp comes back on at its
+remembered levels (the owner saw HA restore a member's brightness). **"On when: any / all"** (HA's
+group helper option) is a card setting, `GroupOn`, in the deck of a card standing for several
+things; a tap on a group that is on turns all off, otherwise all on (it was "the inverse of the
+majority"). Native HA groups are one entity, and HA decides for them.
+
+**Memory (owner: try every reasonable saving without side effects):** the deck's rows are built when
+it is first opened, and only the chosen control is built. The pool in PSRAM was measured (+128 KB
+internal heap; full-screen frames ~10% slower, the popup's opening frame ~2 ms) and reverted - the
+owner's call, below.
+
+**Round 1 additions (owner, 2026-10-05):**
+- **A paused member is out of its group**: not counted for on or off, not offered (a mode only it
+  has leaves the selector), not commanded. The group is PAUSED only when every member is; its
+  status line says "1 paused"; Members still lists it, reading "Paused". The card follows the same
+  rule (`Card::counts()`).
+- **A paused window**: greyed controls, a PAUSED pill beside the label, and a touch on a control
+  explains itself. In a group a paused member never offers a mode, even when all are paused (round
+  3, P4); a fully paused group keeps its greyed slider and offers only Power.
+- **Nothing moves, and the group is balanced (owner, rounds 3-4)**: the column beside a slider or
+  toggle is as wide as that light's selector or a fixed allowance for its words, whichever is
+  wider, and the hero tall, with the label line at the top and the selector level with the hero's
+  bottom; the row is centred. A toggle and its words sit centred; four controls are centred as a
+  whole; two move in from the edge. For one light nothing moves - control, pause or words.
+- **The window is up to 2:1 and never wider than 100 mm (owner, 2026-10-06)**, keeping a side gap
+  of at least 6 mm or 8% of the screen: P4_5 93 mm, 7" 100 mm (129 mm made every reach long), 4B
+  ~60 mm. A group's column is sized for everything its members can do, paused or not. Supersedes the P4_5-shape rule above for the width;
+  the hero stays tied to the height. The rearranged layout (selector centred along the bottom) was
+  declined: the P4_5 lacks the height (62 mm tall at 294 PPI; text and buttons are real
+  millimetres). Covering the system header: decide at 2.10e, with the charts.
+- **The chart button is always in the corner**; Members sits inside it. **Paused is a switch** in
+  the deck ("Off / On" read two ways).
+- **A group card fills to the members' mean brightness**, HA's rule read from its source
+  (`group/light.py`: brightness and colour temperature are the mean over the members that are ON,
+  hue a circular mean, the mode the most common, the capabilities the union).
+- **Members: a tap opens that member's own controls** in the same window ("Group > member", back
+  arrow to Members) - section 11.1's member view, reached by a tap (owner) rather than the mock's
+  long press. It needs no card of its own.
+
+**Still open:**
+- **Memory beyond 2.10b**: stay on the internal pool while it holds, or move the P4s' pool to PSRAM
+  (and make it larger) when 2.10c-e need more. Numbers in `TEST_2.10b.md`.
+- **Scenes** (`hue_scenes`, Desk): need HA's attributes, so 2.10c at the earliest; a selector target
+  (section 11.2's recommendation).
+- **Saving a swatch** with a long press: needs the settings store, 2.10d.
+- **The 7" and 4B windows** have not been seen on glass.

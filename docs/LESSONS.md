@@ -500,6 +500,28 @@ next piece of eye candy:
   covering the same way. Invalidate the object's own rectangle and thin bands for the shadow
   separately (`invalidateWindow()`).
 
+## Small LVGL traps from 2.10b, and one that would have been large (2026-10-05/06)
+
+- **`lv_obj_get_width()` right after `lv_obj_set_width()` returns the OLD width** until LVGL lays the
+  object out. Centring the slider's grip from it put the grip half a slider to the right on the
+  first frame. Position from the width you just gave, not the one you read back.
+- **A 0-wide object still draws its outline.** Hiding a ring by setting its width to 0 left a 1 px
+  line beside the strip. Small objects: use HIDDEN (it redraws only their own pixels; the HIDDEN
+  lesson is about screen-sized objects).
+- **A shadow spreads sideways too.** A block painting out a tab's foot stopped at the tab's edge, and
+  the tab's Linen shadow showed as a crescent beside it - "crud on the glass" for weeks.
+- **Rounded ends on a multi-stop strip**: with `LV_GRADIENT_MAX_STOPS 2`, let the slider draw its
+  rounded ends flat in the end colours and lay square pieces over the straight middle; end pieces
+  that carry the rounding and reach into their neighbours hide most of the next piece.
+- **The one that would have been large: do not hand LVGL to the system `malloc` on the P4.** It looks
+  like the ideal split (the framework already sends allocations under 4 KB to internal RAM, larger
+  to PSRAM), but NINA's `lv_mem_psram.c` records what it did on this hardware: thousands of small
+  LVGL pieces fragmented the internal heap until esp-hosted's 4.6 KB WiFi receive buffer could not
+  be found, and the board rebooted - #49's family. LVGL's own pool, in PSRAM, keeps it apart (#88).
+- **Method: drive the UI from the PC.** `GET /popup` (DEBUG_POPUP) opened windows, switched controls,
+  paused members and read the pool, so most of 2.10b was checked before the owner touched it, and
+  the owner's rounds found layout and feel instead of plumbing. What it cannot test is touch.
+
 ## Never keep a pointer to an LVGL object you do not own - ask it to tell you when it goes
 
 2026-10-04, the popup's hold. CardPopup kept the pressed card's surface pointer while the hold

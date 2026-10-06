@@ -836,6 +836,10 @@ void GUIManager::begin() {
     Screenshot::begin(_core.http());
     // GET /bench (2.9, #67), when built with ENABLE_BENCH. Same reasoning.
     Bench::begin(_core.http(), *this);
+#ifdef DEBUG_POPUP
+    // GET /popup: drive the card popup from a PC (CardPopup.h).
+    CardPopup::beginDebug(_core.http());
+#endif
 
     // --= Z-INDEX SANDWICH =--
     // 0. Touch overlay (bottom - hidden by default, set in Panel_Display::init)

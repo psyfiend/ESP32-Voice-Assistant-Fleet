@@ -24,6 +24,7 @@
 #include "Cards/CardPage.h"
 #include "Cards/StateCard.h"   // StateCardFill, for the #50 Fill control
 #include "Cards/PageSpec.h"    // the pages, 2.6
+#include "UI/UIToolkit.h"       // SYSTEM_HEADER_FULL_H
 #include "UI/Panel_Header.h"
 #include "UI/Panel_Display.h"
 #include "UI/Panel_System.h"
@@ -302,7 +303,7 @@ private:
     bool            _headerHidden  = false;
     // THE permanent system header height. Owner's decision 2026-09-19: the
     // size cycle is gone, only hide/show remains.
-    static constexpr uint8_t UI_HEADER_H = 35;
+    static constexpr uint8_t UI_HEADER_H = UIToolkit::SYSTEM_HEADER_FULL_H;
     lv_timer_t     *_peekTimer     = nullptr;
     lv_obj_t     *_deck     = nullptr;
 

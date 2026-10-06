@@ -1,21 +1,18 @@
 #include "Cards/CardCatalog.h"
 
-// A switch and a light do the same thing today, and both do it by asking every
-// bound entity for the inverse of what the majority currently reports.
-static bool wantOnFor(uint8_t active, uint8_t total) {
-    return active * 2 <= total;
-}
-
+// A switch and a light do the same thing, and since 2.10b it is what an HA
+// group does (owner, 2026-10-05): a card that is ON - by its GroupOn rule,
+// any member or all of them - turns every member off; one that is off turns
+// them all on. It was "the inverse of the majority", which no HA group does.
+// One entity is the same rule with one member.
 void SwitchCard::onTap() {
-    const uint8_t total = primaryCount();
-    if (!total) return;
-    commandAll(wantOnFor(activeCount(), total));
+    if (!primaryCount()) return;
+    commandAll(!groupIsOn());
 }
 
 void LightCard::onTap() {
-    const uint8_t total = primaryCount();
-    if (!total) return;
-    commandAll(wantOnFor(activeCount(), total));
+    if (!primaryCount()) return;
+    commandAll(!groupIsOn());
 }
 
 void ButtonCard::onTap() {

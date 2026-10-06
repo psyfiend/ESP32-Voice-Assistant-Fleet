@@ -11,6 +11,16 @@ void CommandRouter::begin(EntityRegistry *reg, MqttManager *mqtt, HaClient *ha) 
     _mqtt = mqtt;
     _ha   = ha;
     if (_reg) _reg->setCommandSink(&CommandRouter::onCommand, this);
+    if (_reg) _reg->setLightSink(&CommandRouter::onLight, this);
+}
+
+void CommandRouter::onLight(const Entity &e, const LightCommand &c, void *ctx) {
+    CommandRouter *self = (CommandRouter *)ctx;
+    if (!self) return;
+    if (e.desc.source == EntitySource::VIRTUAL) { self->_sent++; return; }
+    Serial.printf("[Cmd] %s: light levels (bri %d, %d K, hue %d) reach %s at 2.10c; refused\n",
+                  e.desc.id, c.brightness, c.colorTempK, c.hue, entitySourceName(e.desc.source));
+    self->_refused++;
 }
 
 void CommandRouter::onCommand(const Entity &e, const EntityValue &v, void *ctx) {

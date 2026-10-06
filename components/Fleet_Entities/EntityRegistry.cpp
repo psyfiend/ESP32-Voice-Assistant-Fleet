@@ -1,4 +1,5 @@
 #include "EntityRegistry.h"
+#include "LightColor.h"
 
 // ESP-IDF's NVS directly, NOT Arduino's Preferences.
 //
@@ -245,8 +246,9 @@ bool EntityRegistry::setPaused(const char *id, bool paused, uint32_t nowMs) {
         // a failure the user did not cause - the owner's rule is that a paused
         // entity changes no state at all.
         if (paused) {
-            e.pending   = false;
-            e.cmdFailed = false;
+            e.pending     = false;
+            e.attrPending = false;
+            e.cmdFailed   = false;
         } else {
             // UNPAUSING LEAVES US HOLDING A VALUE FROM THE PAST.
             //
@@ -343,6 +345,24 @@ bool EntityRegistry::setAvailable(const char *id, bool available, uint32_t nowMs
     return true;
 }
 
+// Does a report carry what a light command asked for? Within the rounding
+// HA's own conversions bring: brightness through percent, kelvin through
+// mireds, hue and saturation through xy for a Hue bulb.
+static bool lightAttrsMatch(const EntityAttrs &a, const LightCommand &c) {
+    auto near = [](int x, int y, int tol) { return (x > y ? x - y : y - x) <= tol; };
+    if (c.brightness > 0 && !near(a.brightness, c.brightness, 3)) return false;
+    if (c.hue >= 0) {
+        if (a.lightMode != LightMode::LMODE_COLOUR || a.hue < 0) return false;
+        const int dh = ((a.hue - c.hue) % 360 + 360) % 360;
+        if (dh > 3 && dh < 357) return false;
+        if (c.sat >= 0 && !near(a.sat, c.sat, 3)) return false;
+    } else if (c.colorTempK > 0) {
+        if (a.lightMode != LightMode::LMODE_TEMP) return false;
+        if (!near(a.colorTempK, c.colorTempK, c.colorTempK * 3 / 100)) return false;
+    }
+    return true;
+}
+
 bool EntityRegistry::setAttrs(const char *id, const EntityAttrs &a) {
     std::lock_guard<std::mutex> lk(_mx);
 
@@ -353,6 +373,23 @@ bool EntityRegistry::setAttrs(const char *id, const EntityAttrs &a) {
     // A paused entity holds still - attributes included, or a paused light's
     // fill would go on moving under a PAUSED badge. Issue #60's rule.
     if (e.paused) return false;
+
+    // A LIGHT COMMAND IN FLIGHT (2.10b): only a report carrying the latest
+    // commanded levels ends it - the same rule #63 gave the value. Anything
+    // else is the source's current word, kept as the fall-back; the screen
+    // keeps showing what the finger asked for. The icon and what the light can
+    // do are not levels, and follow the source at once.
+    if (e.attrPending) {
+        if (!lightAttrsMatch(a, e.attrCmd)) {
+            e.prevAttrs = a;
+            bool changed = false;
+            if (strcmp(e.attrs.icon, a.icon) != 0) { memcpy(e.attrs.icon, a.icon, sizeof(a.icon)); changed = true; }
+            if (e.attrs.lightCaps != a.lightCaps)  { e.attrs.lightCaps = a.lightCaps; changed = true; }
+            if (changed) e.dirty = true;
+            return changed;
+        }
+        e.attrPending = false;   // confirmed; take the report as it is
+    }
 
     if (e.attrs.equals(a)) return false;
     e.attrs = a;
@@ -496,6 +533,66 @@ bool EntityRegistry::commandValue(const char *id, const EntityValue &v, uint32_t
     return true;
 }
 
+bool EntityRegistry::commandLight(const char *id, const LightCommand &c, uint32_t nowMs) {
+    Entity snapshot;
+    {
+    std::lock_guard<std::mutex> lk(_mx);
+
+    const int i = indexOf(id);
+    if (i < 0) return false;
+    Entity &e = _items[i];
+    if (!e.desc.writable || e.paused) return false;   // as commandValue()
+
+    // --- On or off: the value's own bookkeeping ---------------------------
+    const bool wantOn = c.wantsOn();
+    if (c.on >= 0 || wantOn) {
+        if (!e.pending) e.prevValue = e.value;
+        e.value          = EntityValue::makeBool(wantOn);
+        e.pending        = true;
+        e.pendingSinceMs = nowMs;
+        e.cmdFailed      = false;
+    }
+
+    // --- The levels -------------------------------------------------------
+    // Applied as HA would report them once the light has them, so the card
+    // and the popup draw the result at once.
+    const bool levels = c.brightness > 0 || c.colorTempK > 0 || c.hue >= 0;
+    if (levels && wantOn) {
+        if (!e.attrPending) { e.prevAttrs = e.attrs; e.attrCmd = LightCommand(); }
+        EntityAttrs &a = e.attrs;
+        LightCommand &pc = e.attrCmd;
+        if (c.brightness > 0) { a.brightness = c.brightness; pc.brightness = c.brightness; }
+        if (c.hue >= 0) {
+            a.hue = c.hue;
+            a.sat = (c.sat >= 0) ? c.sat : (a.sat >= 0 ? a.sat : 100);
+            a.colorTempK = -1;                         // HA: null in a colour mode
+            a.lightMode  = LightMode::LMODE_COLOUR;
+            pc.hue = c.hue; pc.sat = a.sat; pc.colorTempK = -1;
+        } else if (c.colorTempK > 0) {
+            a.colorTempK = c.colorTempK;
+            lightKelvinToHs(c.colorTempK, a.hue, a.sat);   // HA sends hs_color in every mode
+            a.lightMode  = LightMode::LMODE_TEMP;
+            pc.colorTempK = c.colorTempK; pc.hue = -1; pc.sat = -1;
+        }
+        if (a.lightMode == LightMode::LMODE_UNKNOWN || a.lightMode == LightMode::LMODE_ONOFF)
+            a.lightMode = LightMode::LMODE_DIM;
+        a.rgb    = lightShownRgb(a);
+        a.hasRgb = (a.rgb != 0);
+        e.attrPending        = true;
+        e.attrPendingSinceMs = nowMs;
+        e.cmdFailed          = false;
+    }
+
+    e.lastUpdateMs = nowMs;
+    e.everSet      = true;
+    e.dirty        = true;
+    snapshot       = e;
+    }   // lock released: the sink may block on a socket (#44)
+
+    if (_lightFn) _lightFn(snapshot, c, _lightCtx);
+    return true;
+}
+
 void EntityRegistry::drainDirty(DirtyFn fn, void *ctx) {
     if (!fn) return;
 
@@ -538,6 +635,13 @@ void EntityRegistry::tick(uint32_t nowMs) {
             e.pending   = false;
             e.cmdFailed = true;   // the echo never came: it did not take
             e.dirty     = true;
+        }
+        // The same for a light's levels: back to what the source last said.
+        if (e.attrPending && (nowMs - e.attrPendingSinceMs) > _reconcileMs) {
+            e.attrs       = e.prevAttrs;
+            e.attrPending = false;
+            e.cmdFailed   = true;
+            e.dirty       = true;
         }
     }
 }

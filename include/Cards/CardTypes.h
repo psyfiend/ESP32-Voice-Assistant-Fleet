@@ -221,6 +221,17 @@ enum class DurationFormat : uint8_t {
 };
 
 // ---------------------------------------------------------------------------
+// When a card standing for several things is ON. 2.10b (#65), owner
+// 2026-10-05: a group defined on the device behaves as an HA group does, and
+// HA's group helper has exactly this choice - "The group's entity state is only
+// ON if all members are on", off by default. A tap follows the same answer: a
+// group that is on turns every member off; one that is off turns them all on.
+// Native HA groups (light.office) are ONE entity and HA decides for them.
+enum class GroupOn : uint8_t {
+    GROUP_ON_ANY = 0,   // on when any member is on - HA's default
+    GROUP_ON_ALL,       // on only when every member is on
+};
+
 // What the line under a state card's hero says. Milestone 2.7.
 //
 // The owner, 2026-09-22: state is the icon and the colour, and the NAME is what

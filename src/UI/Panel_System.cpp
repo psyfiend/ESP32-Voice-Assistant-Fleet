@@ -43,6 +43,12 @@ void Panel_System::anim_height_cb(void * var, int32_t v) {
     Panel_System* p = (Panel_System*)var;
     if (!p || !p->_ui_root) return;
     lv_obj_set_height(p->_ui_root, v);
+    // THE CONTENTS RIDE ON THE EDGE (owner, #81, 2026-10-06): the wrapper
+    // grows and clips as before, and the contents move with its bottom edge -
+    // their bottom stays on it - so the drawer slides down like the deck's
+    // panels instead of uncovering contents that stand still ("like window
+    // blinds, backwards"). Open, y is -radius: the corner hack below.
+    if (p->_ui_content) lv_obj_set_y(p->_ui_content, v - p->_openH - UIToolkit::sc(15));
     // HIDDEN AT ZERO, not merely zero-high. Since the drawer casts the
     // scheme's shadow (Linen), a closed drawer would otherwise leave a thin
     // shadow line under the header - the shadow of a zero-height box.
@@ -580,7 +586,8 @@ void Panel_System::toggle() {
     }
 
     int32_t start_h = lv_obj_get_height(_ui_root);
-    int32_t end_h   = _expanded ? contentHeight() : 0;
+    if (_expanded) _openH = contentHeight();   // what anim_height_cb() rides the contents on
+    int32_t end_h   = _expanded ? _openH : 0;
 
     lv_anim_del(this, anim_height_cb); 
 

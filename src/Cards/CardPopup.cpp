@@ -1,6 +1,7 @@
 #include "Cards/CardPopup.h"
 #include "Cards/Card.h"
 #include "Cards/CardIcons.h"
+#include "LightColor.h"
 #include "UI/UITokens.h"
 #include "UI/UIToolkit.h"
 #include "src/core/lv_obj_event_private.h"   // lv_hit_test_info_t: the tap catcher's hit test
@@ -39,6 +40,10 @@
     #define DBG_POPUP(...) Serial.printf("[Popup:debug] " __VA_ARGS__)
     #include "src/display/lv_display_private.h"   // inv_areas: what a frame redraws
     #include "src/core/lv_refr_private.h"         // lv_refr_get_top_obj()
+    #include "HttpServer.h"                       // GET /popup
+    #include <atomic>
+    #include "freertos/FreeRTOS.h"
+    #include "freertos/task.h"
 #else
     #define DBG_POPUP(...) do {} while (0)
 #endif
@@ -115,7 +120,8 @@ void dbgLater(const char *fmt, ...) {
 
 // Compound names, never a bare ALL-CAPS word - Arduino's pin-mode macros eat
 // those (CLAUDE.md, "Arduino's global macro namespace will eat your enum").
-enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS };
+// VIEW_MEMBER: one member's own controls, reached from VIEW_MEMBERS (2.10b).
+enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER };
 enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
@@ -127,6 +133,17 @@ enum class IntfMode   : uint8_t { INTF_NOW_AND_THEN, INTF_ONCE, INTF_OFF };
 // D6: auto-close after 60 s untouched. The owner chose all four close routes.
 constexpr uint32_t POPUP_AUTOCLOSE_MS = 60000;
 constexpr uint32_t POPUP_TICK_MS      = 250;
+
+// THE P4_5 IS THE REFERENCE (owner, 2026-10-05: its toggle "is the perfect
+// size"). Its window is 787 x 545 px (68.1 x 47.1 mm) with the system header
+// showing, and its hero 349 px of that height (30.2 mm, measured with calipers
+// at 30). What is inside a window is sized as the same share of the biggest
+// window of THIS shape that fits in it - see open(), propH and pm(). (The
+// window itself has been up to 2:1 since 2026-10-06.)
+constexpr float POPUP_ASPECT  = 787.0f / 545.0f;
+constexpr float REF_WIN_H_MM  = 47.1f;   // the P4_5 window's height, header showing
+constexpr float HERO_H_MM     = 30.2f;   // its hero's
+constexpr float POPUP_MAX_W_MM = 100.0f; // the widest any window gets - see open()
 
 // The hold, in millimetres so it looks the same on every board. THE LEAP IS
 // GONE (owner, round 6): it was clipped by the card's wrapper, and the window
@@ -155,6 +172,7 @@ struct Popup {
     lv_area_t winRect = {};
     int32_t   winRadius = 0;
     int32_t   pad = 0;
+    int32_t   propH = 0;   // the height the contents are sized from - see open()
 
     lv_obj_t *win = nullptr;
     lv_obj_t *btnLeft = nullptr, *lblLeft = nullptr;
@@ -166,7 +184,7 @@ struct Popup {
     // The main view's widgets; null while another view is showing.
     lv_obj_t *hero = nullptr, *knob = nullptr, *heroIcon = nullptr;
     lv_obj_t *lblWhat = nullptr, *lblValue = nullptr, *lblUnit = nullptr, *lblAgo = nullptr;
-    int32_t   heroW = 0, heroH = 0, knobH = 0, knobInset = 0;
+    int32_t   heroW = 0, heroH = 0, heroR = 0, knobH = 0, knobInset = 0;
     bool      toggleHero = false;
     bool      knobPlaced = false;   // the first placement jumps; every later one slides
     int32_t   knobTarget = 0;
@@ -175,12 +193,32 @@ struct Popup {
     bool      knobDragging = false, swallowClick = false;
     int32_t   dragStartY = 0, dragKnobY0 = 0;
 
+    // A light's controls (2.10b): see "The light's controls".
+    GroupOn   groupOn = GroupOn::GROUP_ON_ANY;   // copied from the card at open
+    bool      builtPaused = false, rebuildQueued = false;   // "A paused window"
+    uint8_t   builtCaps = 0;                     // what the selector was built for
+    lv_obj_t *pill = nullptr;                    // PAUSED
+    // A member's own controls, reached from Members (2.10b): the group's
+    // entities are kept here while ent[] holds the one member.
+    const Entity *groupEnt[CARD_PRIMARY_MAX] = {nullptr};
+    uint8_t   groupN = 0;
+    bool      lightHero = false;
+    uint8_t   lightCtl = 0;                      // LightCtl: which control the hero is
+    lv_obj_t *fill = nullptr, *grip = nullptr, *mark = nullptr;
+    lv_obj_t *btnCtl[4] = {nullptr, nullptr, nullptr, nullptr};   // power, dim, temp, colour
+    lv_obj_t *swatch[8] = {nullptr};
+    bool      sliding = false;                   // a finger is on the slider
+    int32_t   slideVal = 0, sentVal = -1;        // what it shows; what was last sent
+    uint32_t  sentMs = 0;
+
     // The settings deck (pathway 1, card-sheet 11.1): see "The settings deck".
     lv_obj_t *deck = nullptr, *deckTab = nullptr, *deckTabLbl = nullptr, *deckPane = nullptr;
-    lv_obj_t *chipPause[2] = {nullptr, nullptr};   // Off, On
+    lv_obj_t *swPause = nullptr;                   // the Paused switch
+    lv_obj_t *chipGroup[2] = {nullptr, nullptr};   // Any, All
     int32_t   deckH = 0, deckHead = 0;
     int32_t   deckHide = 0;   // how much of the pane stays below the screen when open
     uint8_t   deckState = 0;                       // DeckState
+    bool      deckFilled = false;                  // its rows exist (built at first open)
 
     lv_timer_t *timer = nullptr;
     uint32_t    lastTouchMs = 0;
@@ -217,6 +255,15 @@ lv_obj_t *s_catcher = nullptr;
 // UI::minTouch(), so the window is the same physical size on every board.
 int32_t mm(float v) {
     return (int32_t)lroundf(v * (float)UIToolkit::ppi() / 25.4f);
+}
+
+// "P4_5 millimetres": a length that is `v` mm in the P4_5's window, the same
+// SHARE of this one (owner, 2026-10-05: the hero the same proportion of the
+// window on every board). For the hero and what is laid out around it; touch
+// targets and text stay real millimetres, so they are the same size under a
+// finger everywhere.
+int32_t pm(float v) {
+    return (int32_t)lroundf(v * (float)s.propH / REF_WIN_H_MM);
 }
 
 // A bare object: no theme styles, no scrolling, not clickable until asked.
@@ -281,23 +328,98 @@ lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f,
 // ---------------------------------------------------------------------------
 struct Agg {
     bool on = false, anyBool = false, available = true, paused = false, everSet = false;
+    uint8_t nPaused = 0;   // members left out because they are paused
     uint32_t lastChangeMs = 0;
 };
 
+// Every member paused? Then the window is paused, and shows them as frozen.
+bool allPaused() {
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < s.nEnt; i++) if (s.ent[i] && s.ent[i]->paused) n++;
+    return s.nEnt && n == s.nEnt;
+}
+
+// A PAUSED MEMBER IS OUT OF THE GROUP (owner, 2.10b round 1) - not counted,
+// not offered, not commanded - unless every member is; Card::counts() is the
+// same rule for the card.
+bool counts(const Entity *e) {
+    return e && (!e->paused || allPaused());
+}
+
+// ON BY THE CARD'S GROUP RULE (2.10b): any member, or all of them - GroupOn,
+// what an HA group helper offers. One entity is the same rule with one member.
 Agg aggregate() {
     Agg a;
+    uint8_t nBool = 0, nOn = 0;
+    a.paused = allPaused();
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
         if (!e) continue;
-        if (e->value.type == ValueType::BOOL) { a.anyBool = true; if (e->value.b) a.on = true; }
+        if (!counts(e)) { a.nPaused++; continue; }
+        if (e->value.type == ValueType::BOOL) { a.anyBool = true; nBool++; if (e->value.b) nOn++; }
         if (!e->available) a.available = false;
-        if (e->paused)     a.paused = true;
         if (e->everSet) {
             a.everSet = true;
             if (e->lastChangeMs > a.lastChangeMs) a.lastChangeMs = e->lastChangeMs;
         }
     }
+    a.on = (s.groupOn == GroupOn::GROUP_ON_ALL) ? (nBool && nOn == nBool) : nOn > 0;
     return a;
+}
+
+// ---------------------------------------------------------------------------
+// A light's levels, aggregated the way HA's light group does it: what the
+// members can do is the UNION (any mode any member supports is offered); the
+// levels are the mean over the members that are on and report one - the hue
+// a circular mean, so red and magenta do not average to green. A member that
+// is off reports no levels, as in HA.
+// ---------------------------------------------------------------------------
+struct LightAgg {
+    uint8_t   caps = 0;                       // LightCapBits, the union of what is offered
+    uint8_t   allCaps = 0;                    // ... of every member, paused or not
+    int32_t   bri = -1, kelvin = -1, hue = -1, sat = -1;
+    LightMode mode = LightMode::LMODE_UNKNOWN;
+    int32_t   minK = 0, maxK = 0;
+};
+
+LightAgg lightAggregate() {
+    LightAgg L;
+    int32_t briSum = 0, briN = 0, kSum = 0, kN = 0, satSum = 0, hN = 0;
+    float hx = 0.f, hy = 0.f;
+    const bool group = s.nEnt > 1;
+    for (uint8_t i = 0; i < s.nEnt; i++) {
+        const Entity *e = s.ent[i];
+        if (!e) continue;
+        const EntityAttrs &at = e->attrs;
+        L.allCaps |= at.lightCaps;
+        // IN A GROUP A PAUSED MEMBER NEVER OFFERS A MODE - not even when every
+        // member is paused (owner, round 3 P4: pausing the last one brought
+        // Lamp 3's Colour back). One paused light keeps its own, greyed.
+        if (!group || !e->paused) L.caps |= at.lightCaps;
+        if (!counts(e)) continue;   // and its levels are left out too
+        if (at.minTempK && (!L.minK || at.minTempK < L.minK)) L.minK = at.minTempK;
+        if (at.maxTempK > L.maxK) L.maxK = at.maxTempK;
+        if (!(e->value.type == ValueType::BOOL && e->value.b)) continue;
+        if (at.brightness >= 0) { briSum += at.brightness; briN++; }
+        if (at.lightMode == LightMode::LMODE_TEMP && at.colorTempK > 0) { kSum += at.colorTempK; kN++; }
+        if (at.lightMode == LightMode::LMODE_COLOUR && at.hue >= 0) {
+            const float r = (float)at.hue * 0.0174533f;
+            hx += cosf(r); hy += sinf(r);
+            satSum += at.sat >= 0 ? at.sat : 100;
+            hN++;
+        }
+    }
+    if (briN) L.bri    = (briSum + briN / 2) / briN;
+    if (kN)   L.kelvin = (kSum + kN / 2) / kN;
+    if (hN) {
+        int32_t h = (int32_t)lroundf(atan2f(hy, hx) * 57.2958f);
+        L.hue = (h + 360) % 360;
+        L.sat = (satSum + hN / 2) / hN;
+    }
+    L.mode = (hN > kN) ? LightMode::LMODE_COLOUR : kN ? LightMode::LMODE_TEMP
+           : briN      ? LightMode::LMODE_DIM    : LightMode::LMODE_UNKNOWN;
+    if (!L.minK || L.maxK <= L.minK) { L.minK = 2000; L.maxK = 6500; }   // HA's own defaults
+    return L;
 }
 
 // Changes whenever anything the window shows could have changed. An FNV-1a
@@ -311,9 +433,15 @@ uint32_t signature() {
         mixIn(e->lastChangeMs);
         mixIn(e->lastUpdateMs);
         mixIn((e->available ? 1u : 0u) | (e->paused ? 2u : 0u) | (e->pending ? 4u : 0u) |
-              (e->cmdFailed ? 8u : 0u) | (e->everSet ? 16u : 0u));
+              (e->cmdFailed ? 8u : 0u) | (e->everSet ? 16u : 0u) | (e->attrPending ? 32u : 0u));
         if (e->value.type == ValueType::BOOL) mixIn(e->value.b ? 1u : 0u);
+        // A light's levels move without its value changing (2.10b).
+        const EntityAttrs &at = e->attrs;
+        mixIn((uint32_t)(uint16_t)at.brightness | ((uint32_t)at.lightCaps << 16) | ((uint32_t)at.lightMode << 24));
+        mixIn((uint32_t)(uint16_t)at.colorTempK | ((uint32_t)(uint16_t)at.hue << 16));
+        mixIn((uint32_t)(uint8_t)at.sat);
     }
+    mixIn((uint32_t)s.groupOn);
     return h;
 }
 
@@ -329,12 +457,21 @@ const char *whatWord(const Entity &e, char *buf, size_t cap) {
     return buf;
 }
 
+// The main view's widgets, before its stage is cleaned or the window goes.
+void forgetMainWidgets() {
+    s.hero = s.knob = s.heroIcon = nullptr;
+    s.lblWhat = s.lblValue = s.lblUnit = s.lblAgo = nullptr;
+    s.fill = s.grip = s.mark = s.pill = nullptr;
+    for (lv_obj_t *&b : s.btnCtl) b = nullptr;
+    for (lv_obj_t *&w : s.swatch) w = nullptr;
+    s.sliding = false;
+}
+
 void forgetWidgets() {
     s.btnLeft = s.lblLeft = s.btnHistory = s.btnMembers = nullptr;
     s.lblTitleArea = s.lblTitleName = nullptr;
     s.stage = s.autoBar = nullptr;
-    s.hero = s.knob = s.heroIcon = nullptr;
-    s.lblWhat = s.lblValue = s.lblUnit = s.lblAgo = nullptr;
+    forgetMainWidgets();
 }
 
 void knobExec(void *var, int32_t v) { lv_obj_set_y((lv_obj_t *)var, v); }
@@ -365,16 +502,586 @@ void placeKnob(int32_t y) {
     lv_anim_start(&a);
 }
 
+// "Changed 3m ago", "Paused", "No reading yet" - under the value, every view.
+// A group with members left out says how many (owner, 2.10b): a group must
+// never quietly do less than it seems to.
+void renderAgo(const Agg &a) {
+    if (!s.lblAgo) return;
+    char buf[64];
+    if (a.paused) {
+        setText(s.lblAgo, "Paused");
+    } else if (!a.everSet) {
+        setText(s.lblAgo, "No reading yet");
+    } else {
+        char age[16], tail[20] = "";
+        cardFormatAge(millis() - a.lastChangeMs, age, sizeof(age));
+        if (a.nPaused) snprintf(tail, sizeof(tail), ", %u paused", (unsigned)a.nPaused);
+        if (strcmp(age, "now") == 0) snprintf(buf, sizeof(buf), "Changed just now%s", tail);
+        else                         snprintf(buf, sizeof(buf), "Changed %s ago%s", age, tail);
+        setText(s.lblAgo, buf);
+    }
+}
+
+// --- A PAUSED WINDOW (owner, 2.10b round 1) ---------------------------------
+// Its controls are greyed - every colour mixed toward the window - and a
+// PAUSED pill, the card's own badge, sits at the top of the column. Built
+// in at build time (the strips' colours are baked into their pieces), so a
+// change of pause rebuilds the view.
+uint32_t quiet(uint32_t hex) {
+    return s.builtPaused ? UI::mix(hex, UI::pal().SURFACE_ALT, 65) : hex;
+}
+
+// The column's first line: what it is ("Brightness"), and the PAUSED pill
+// BESIDE it - on the same line, the same height, so nothing below moves when
+// it comes or goes (owner, round 3: it used to sit above and push the rest down).
+void makeLabelRow(lv_obj_t *col) {
+    const UIPalette &p = UI::pal();
+    const UIType    &t = UI::type();
+    lv_obj_t *row = plain(col);
+    lv_obj_set_size     (row, LV_SIZE_CONTENT, lv_font_get_line_height(t.TAG));
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(row, mm(1.6f), 0);
+    s.lblWhat = makeLabel(row, t.TAG, p.TEXT_DIM);
+    s.pill = makeLabel(row, t.TAG, UI::contrastOf(p.ST_IDLE, p.GROUND, p.TEXT));
+    lv_label_set_text(s.pill, "PAUSED");
+    lv_obj_set_style_bg_color(s.pill, UI::c(p.ST_IDLE), 0);
+    lv_obj_set_style_bg_opa  (s.pill, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius  (s.pill, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_pad_hor (s.pill, mm(1.2f), 0);
+    lv_obj_set_style_text_letter_space(s.pill, mm(0.2f), 0);
+    if (!s.builtPaused) lv_obj_add_flag(s.pill, LV_OBJ_FLAG_HIDDEN);
+}
+
+// THE COLUMN BESIDE A TOGGLE OR SLIDER: as wide as THIS light's selector, or
+// a fixed allowance for the words, whichever is wider - and as tall as the
+// hero - and the row is centred in the window (owner, round 4, "centre by real
+// width"). So a toggle and its words sit centred; a light with four or five
+// controls is centred as a whole; one with two or three moves in from the
+// left edge. For any one light nothing moves - not with the control showing,
+// a pause, or changing words, which the allowance covers (a round 3 lesson:
+// a column sized from its text moved the slider every time the text changed).
+int32_t selectorW(uint8_t caps) {
+    const int32_t g = mm(0.6f);
+    uint8_t n = 1;   // Power
+    if (caps & LIGHT_CAN_DIM)    n++;
+    if (caps & LIGHT_CAN_TEMP)   n++;
+    if (caps & LIGHT_CAN_COLOUR) n++;
+    const bool div = n > 1;
+    const uint8_t children = n + (div ? 1 : 0);
+    return 2 * g + n * UI::minTouch() + (children - 1) * g + (div ? LV_MAX(2, mm(0.25f)) : 0);
+}
+
+int32_t colWidth(bool light, uint8_t caps) {
+    const UIType &t = UI::type();
+    int32_t w = textW(s.nEnt > 1 ? "Changed 59m ago, 9 paused" : "Changed 59m ago", t.TAG);
+    w = LV_MAX(w, textW("Unavailable", UIToolkit::Font_Hero));
+    // The label line with the PAUSED pill beside it (makeLabelRow()).
+    const int32_t pill = textW("PAUSED", t.TAG) + 2 * mm(1.2f) + 6 * mm(0.2f);
+    w = LV_MAX(w, textW("Temperature", t.TAG) + mm(1.6f) + pill);
+    if (light) {
+        w = LV_MAX(w, selectorW(caps));
+        if (caps & LIGHT_CAN_COLOUR) w = LV_MAX(w, 4 * mm(6.5f) + 3 * mm(1.6f) + 2 * mm(0.6f));
+    }
+    const int32_t room = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4);
+    return LV_MIN(room, w);
+}
+
+void fixColumn(lv_obj_t *col, int32_t width) {
+    lv_obj_set_width     (col, width);
+    lv_obj_set_height    (col, LV_SIZE_CONTENT);
+    lv_obj_set_style_min_height(col, s.heroH, 0);
+    lv_obj_set_flex_flow (col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_row(col, mm(0.8f), 0);
+}
+
+void rebuildMainAsync(void *unused);   // below
+
+// Called from every render: a pause that came or went since the view was
+// built rebuilds it, once.
+void checkPausedChange(const Agg &a) {
+    if (a.paused == s.builtPaused || s.rebuildQueued) return;
+    s.rebuildQueued = true;
+    lv_async_call(rebuildMainAsync, nullptr);
+}
+
+void showView(PopupView v);   // below
+bool pausedBlocks();          // below, with the toggle
+
+// ---------------------------------------------------------------------------
+// The light's controls (2.10b; card-sheet 11.1, Card Popup Mock v3)
+//
+// The hero is a tall slider for whichever control is chosen below it:
+// brightness (filled from the bottom, in the light's own colour), colour
+// temperature (warm at the bottom, cool at the top) or colour (a hue strip).
+// Beside it: what it controls, the value, when it changed, and the selector -
+// Power | Brightness, Temperature, Colour - showing only what the light (or,
+// for a group, ANY member) can do. Colour shows eight swatches in place of the
+// value line: a hue in degrees says nothing a swatch does not.
+//
+// A TAP JUMPS THERE, A DRAG FOLLOWS THE FINGER (owner, 2026-10-05). While a
+// finger is on it, the slider and the value follow the finger every frame,
+// and a command goes out at most every LIGHT_SEND_MS - "enough so that a user
+// could adjust brightness and see the level change" - plus once on release,
+// with where it ended. Power is the selector's first button.
+//
+// A GROUP ACTS AS HA'S LIGHT GROUP (owner, 2026-10-05): each member is sent
+// what it can take. A brightness to a member that only switches turns it on;
+// a temperature to a member with colour but no temperature becomes the
+// nearest hue (HA's conversion); a colour to a member without one turns it
+// on. Levels shown are the mean over the members that are on.
+//
+// ONLY WHAT IS SHOWING IS BUILT: choosing another control rebuilds the view,
+// so the swatches exist only in Colour (owner: memory first).
+//
+// Cheap to move because it is small: a drag redraws the slider and the value
+// - tens of thousands of pixels - never the window.
+// ---------------------------------------------------------------------------
+enum LightCtl : uint8_t { LCTL_DIM, LCTL_TEMP, LCTL_COLOUR };
+
+constexpr uint32_t LIGHT_SEND_MS = 300;   // owner: "300ms sounds about right"
+
+// Eight defaults, like HA's (card-sheet 11.2). Saving the current colour into
+// one with a long press needs the settings store (2.10d).
+struct Swatch { int16_t hue; int8_t sat; };
+constexpr Swatch SWATCHES[8] = {
+    {   0, 100 }, {  30, 100 }, {  55, 100 }, { 120,  90 },
+    { 180,  90 }, { 225, 100 }, { 275,  90 }, { 320,  85 },
+};
+
+bool canSlide(uint8_t caps) { return caps & (LIGHT_CAN_DIM | LIGHT_CAN_TEMP | LIGHT_CAN_COLOUR); }
+
+// D3: open on the control - brightness first, as HA's dialog does. Nothing
+// offered (a group with every member paused): brightness, greyed.
+uint8_t firstCtl(uint8_t caps) {
+    if (!caps)                 return LCTL_DIM;
+    if (caps & LIGHT_CAN_DIM)  return LCTL_DIM;
+    if (caps & LIGHT_CAN_TEMP) return LCTL_TEMP;
+    return LCTL_COLOUR;
+}
+
+// The slider's range for the control showing.
+void ctlRange(const LightAgg &L, int32_t &lo, int32_t &hi) {
+    switch (s.lightCtl) {
+        case LCTL_DIM:  lo = 1;      hi = 100;    break;
+        case LCTL_TEMP: lo = L.minK; hi = L.maxK; break;
+        default:        lo = 0;      hi = 359;    break;
+    }
+}
+
+// Where `v` sits on the slider: 0 at the bottom, 1000 at the top.
+int32_t permilleOf(const LightAgg &L, int32_t v) {
+    int32_t lo, hi;
+    ctlRange(L, lo, hi);
+    return LV_CLAMP(0, (v - lo) * 1000 / LV_MAX(1, hi - lo), 1000);
+}
+
+int32_t stripInset();   // below, with the strip
+
+// The value under the finger.
+int32_t valueAtFinger(const LightAgg &L) {
+    lv_indev_t *indev = lv_indev_active();
+    lv_point_t pt = {0, 0};
+    if (indev) lv_indev_get_point(indev, &pt);
+    lv_area_t a;
+    lv_obj_get_coords(s.hero, &a);
+    const int32_t in = stripInset();
+    const int32_t h  = lv_area_get_height(&a) - 2 * in;
+    const int32_t permille = LV_CLAMP(0, 1000 - (pt.y - a.y1 - in) * 1000 / LV_MAX(1, h - 1), 1000);
+    int32_t lo, hi;
+    ctlRange(L, lo, hi);
+    int32_t v = lo + (int32_t)((int64_t)(hi - lo) * permille / 1000);
+    if (s.lightCtl == LCTL_TEMP) v = (v + 5) / 10 * 10;   // 10 K: finer than any eye
+    return v;
+}
+
+// Send `v` for the control showing to every member, each what it can take.
+// `sat` for a swatch; the strip itself is drawn - and sent - at full colour.
+void lightSend(int32_t v, int8_t sat = -1) {
+    if (!s.reg) return;
+    const uint32_t now = millis();
+    for (uint8_t i = 0; i < s.nEnt; i++) {
+        const Entity *e = s.ent[i];
+        if (!e || !e->desc.writable || e->paused) continue;
+        const EntityAttrs &at = e->attrs;
+        LightCommand c;
+        if (s.lightCtl == LCTL_DIM) {
+            if (at.lightCaps & LIGHT_CAN_DIM) c.brightness = (int16_t)LV_MAX(1, (v * 255 + 50) / 100);
+        } else if (s.lightCtl == LCTL_TEMP) {
+            if (at.lightCaps & LIGHT_CAN_TEMP) {
+                int32_t k = v;
+                if (at.minTempK) k = LV_MAX(k, (int32_t)at.minTempK);
+                if (at.maxTempK) k = LV_MIN(k, (int32_t)at.maxTempK);
+                c.colorTempK = (int16_t)k;
+            } else if (at.lightCaps & LIGHT_CAN_COLOUR) {
+                lightKelvinToHs(v, c.hue, c.sat);
+            }
+        } else if (at.lightCaps & LIGHT_CAN_COLOUR) {
+            c.hue = (int16_t)v;
+            c.sat = sat >= 0 ? sat : 100;
+        }
+        if (c.brightness > 0 || c.colorTempK > 0 || c.hue >= 0) {
+            s.reg->commandLight(e->desc.id, c, now);
+        } else if (!(e->value.type == ValueType::BOOL && e->value.b)) {
+            // What it cannot take, it ignores - and is turned on (HA).
+            s.reg->commandValue(e->desc.id, EntityValue::makeBool(true), now);
+        }
+    }
+    s.sentVal = v;
+    s.sentMs  = now;
+}
+
+// Rough luminance, to keep the fill visible against its track.
+int32_t lumOf(uint32_t hex) {
+    return (int32_t)(((hex >> 16) & 0xFF) * 299 + ((hex >> 8) & 0xFF) * 587 + (hex & 0xFF) * 114) / 1000;
+}
+
+void renderLight() {
+    if (!s.hero) return;
+    const UIPalette &p = UI::pal();
+    const Agg      a = aggregate();
+    const LightAgg L = lightAggregate();
+    const bool on = a.available && a.on;
+    char buf[32];
+    checkPausedChange(a);
+    // A member paused or resumed changes what the group offers: rebuild once.
+    if (L.caps != s.builtCaps && !s.rebuildQueued) {
+        s.rebuildQueued = true;
+        lv_async_call(rebuildMainAsync, nullptr);
+    }
+
+    setText(s.lblWhat, s.lightCtl == LCTL_DIM ? "Brightness" : s.lightCtl == LCTL_TEMP ? "Temperature" : "Colour");
+
+    // What the slider shows: the finger while it is down, otherwise the
+    // light. -1: nothing to mark (off, or the light has not said).
+    int32_t v;
+    if (s.sliding)                    v = s.slideVal;
+    else if (!on)                     v = -1;
+    else if (s.lightCtl == LCTL_DIM)  v = L.bri >= 0 ? LV_MAX(1, (L.bri * 100 + 127) / 255) : 100;
+    else if (s.lightCtl == LCTL_TEMP) v = L.kelvin;
+    else                              v = L.hue;
+
+    if (s.lblValue) {
+        if (!a.available) {
+            setText(s.lblValue, "Unavailable");
+            lv_obj_set_style_text_color(s.lblValue, UI::c(p.ST_BAD), 0);
+        } else {
+            // On but no temperature: it is showing a colour, and a light in a
+            // colour reports no kelvin (HA the same) - so no ring, and the
+            // words say why (owner, round 1, L7).
+            if (v < 0)                       setText(s.lblValue, !on ? "Off"
+                                                     : L.mode == LightMode::LMODE_COLOUR ? "A colour" : "--");
+            else if (s.lightCtl == LCTL_DIM) { snprintf(buf, sizeof(buf), "%ld%%", (long)v); setText(s.lblValue, buf); }
+            else                             { snprintf(buf, sizeof(buf), "%ld K", (long)v); setText(s.lblValue, buf); }
+            lv_obj_set_style_text_color(s.lblValue, UI::c(p.TEXT), 0);
+        }
+    }
+    renderAgo(a);
+
+    // --- The slider --------------------------------------------------------
+    if (s.lightCtl == LCTL_DIM && s.fill) {
+        const uint32_t track = UI::mix(p.SURFACE_ALT, p.TEXT, 10);
+        lv_obj_set_style_bg_color(s.hero, UI::c(quiet(track)), 0);
+        // In the light's own colour when it has one that shows against the
+        // track; the scheme's "on" colour otherwise.
+        EntityAttrs shown;
+        shown.lightMode = L.mode; shown.colorTempK = (int16_t)L.kelvin;
+        shown.hue = (int16_t)L.hue; shown.sat = (int8_t)L.sat;
+        uint32_t fillHex = lightShownRgb(shown);
+        if (!fillHex || LV_ABS(lumOf(fillHex) - lumOf(track)) < 60) fillHex = p.ST_ACTIVE;
+        fillHex = quiet(fillHex);
+        // Never shorter than its own rounded end: at 1% a 3 px fill was a flat
+        // line wider than the slider's rounded bottom. The value says 1%.
+        const int32_t fh = v > 0 ? LV_MAX(s.heroH * v / 100, 2 * s.heroR) : 0;
+        lv_obj_set_style_bg_color(s.fill, UI::c(fillHex), 0);
+        lv_obj_set_y     (s.fill, s.heroH - fh);
+        lv_obj_set_height(s.fill, fh);
+        // The grip: a short bar near the top of the fill, where a finger takes it.
+        // Small, so HIDDEN costs only its own few pixels (the HIDDEN lesson is
+        // about screen-sized objects). Its x from the width it is GIVEN: read
+        // back with lv_obj_get_width() before LVGL had laid it out, it was 0
+        // on the first draw, and the grip sat half a slider to the right until
+        // the next redraw a second later (owner, round 1).
+        if (s.grip) {
+            const int32_t gw = s.heroW * 34 / 100;
+            lv_obj_set_style_bg_color(s.grip, UI::c(UI::contrastOf(fillHex, p.GROUND, p.TEXT)), 0);
+            lv_obj_set_pos  (s.grip, (s.heroW - gw) / 2, s.heroH - fh + pm(1.4f));
+            lv_obj_set_width(s.grip, gw);
+            if (fh >= pm(5)) lv_obj_clear_flag(s.grip, LV_OBJ_FLAG_HIDDEN);
+            else             lv_obj_add_flag  (s.grip, LV_OBJ_FLAG_HIDDEN);
+        }
+    } else if (s.mark) {
+        // HIDDEN, not 0 wide: a 0-wide ring still drew its outline, the
+        // stray vertical line beside the strip (owner, round 1, L7/L9).
+        const int32_t mh = lv_obj_get_height(s.mark);
+        if (v < 0) {
+            lv_obj_add_flag(s.mark, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            const int32_t in = stripInset();
+            const int32_t y  = in + (1000 - permilleOf(L, v)) * (s.heroH - 2 * in) / 1000 - mh / 2;
+            lv_obj_set_pos(s.mark, s.heroW * 10 / 100, LV_CLAMP(0, y, s.heroH - mh));
+            lv_obj_clear_flag(s.mark, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    // --- The selector ------------------------------------------------------
+    for (uint8_t k = 0; k < 4; k++) {
+        lv_obj_t *b = s.btnCtl[k];
+        if (!b) continue;
+        const bool chosen = (k > 0 && k - 1 == s.lightCtl);
+        lv_obj_set_style_bg_opa  (b, chosen ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+        lv_obj_set_style_bg_color(b, UI::c(quiet(p.TEXT)), 0);
+        if (lv_obj_t *l = lv_obj_get_child(b, 0))
+            lv_obj_set_style_text_color(l, UI::c(chosen ? p.SURFACE_ALT
+                                                        : quiet((k == 0 && on) ? p.ST_ACTIVE : p.TEXT)), 0);
+    }
+
+    // --- The swatches: a ring round the one the light is showing -----------
+    for (uint8_t i = 0; i < 8; i++) {
+        if (!s.swatch[i]) continue;
+        int32_t dh = LV_ABS((int32_t)SWATCHES[i].hue - L.hue) % 360;
+        if (dh > 180) dh = 360 - dh;
+        const bool here = on && L.mode == LightMode::LMODE_COLOUR && L.hue >= 0 && dh <= 3 &&
+                          LV_ABS((int32_t)SWATCHES[i].sat - L.sat) <= 3;
+        lv_obj_set_style_outline_width(s.swatch[i], here ? LV_MAX(2, mm(0.4f)) : 0, 0);
+        lv_obj_set_style_outline_color(s.swatch[i], UI::c(p.TEXT), 0);
+    }
+}
+
+// The finger on the slider. See the section comment for the rules.
+void lightSlideCb(lv_event_t *ev) {
+    if (!s.hero) return;
+    const lv_event_code_t code = lv_event_get_code(ev);
+    const LightAgg L = lightAggregate();
+    const uint32_t now = millis();
+    if (code == LV_EVENT_PRESSED) {
+        if (pausedBlocks()) return;     // greyed, and says why
+        s.sliding  = true;
+        s.slideVal = valueAtFinger(L);
+        lightSend(s.slideVal);          // a tap jumps there
+        renderLight();
+    } else if (code == LV_EVENT_PRESSING) {
+        if (!s.sliding) return;
+        const int32_t v = valueAtFinger(L);
+        if (v == s.slideVal) return;
+        s.slideVal = v;
+        if (v != s.sentVal && now - s.sentMs >= LIGHT_SEND_MS) lightSend(v);
+        renderLight();
+    } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+        if (!s.sliding) return;
+        if (s.slideVal != s.sentVal) lightSend(s.slideVal);   // where it ended
+        s.sliding = false;
+        renderLight();
+    }
+}
+
+void commandAll(bool on);   // below: what Power does
+
+void rebuildMainAsync(void *unused) {
+    (void)unused;
+    s.rebuildQueued = false;
+    if (s.phase == PopupPhase::PHASE_OPEN && s.stage &&
+        (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER))
+        showView(s.view);
+}
+
+void ctlCb(lv_event_t *ev) {
+    const uint8_t k = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+    if (k == 0) { if (!pausedBlocks()) commandAll(!aggregate().on); return; }
+    if (k - 1 == s.lightCtl) return;
+    s.lightCtl = k - 1;
+    // Only what is showing is built, so the view is rebuilt - deferred: this
+    // button is in the stage being cleaned, and an event callback must not
+    // delete its own object.
+    lv_async_call(rebuildMainAsync, nullptr);
+}
+
+void swatchCb(lv_event_t *ev) {
+    const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+    if (i >= 8 || pausedBlocks()) return;
+    lightSend(SWATCHES[i].hue, SWATCHES[i].sat);
+    renderLight();
+}
+
+// The strip's colours run between the rounded ends: a radius in from each.
+// The brightness fill uses the whole height.
+int32_t stripInset() { return s.lightCtl == LCTL_DIM ? 0 : s.heroR; }
+
+// A strip of `n` colours, bottom to top. LVGL is built with two gradient
+// stops (LV_GRADIENT_MAX_STOPS), so it is n-1 square two-stop pieces over the
+// straight middle of the slider; the slider itself draws the rounded ends, in
+// the end colours, flat. No clip_corner, which would cost a layer (LESSONS).
+// (Round 1 of this had the end pieces carry the rounding and reach into their
+// neighbours; at a radius 3/4 of a piece tall that hid most of the next hue.)
+void stripPieces(const uint32_t *cols, int n) {
+    const int32_t in = stripInset();
+    const int32_t span = s.heroH - 2 * in;
+    lv_obj_set_style_bg_opa       (s.hero, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color     (s.hero, UI::c(quiet(cols[n - 1])), 0);   // top
+    lv_obj_set_style_bg_grad_color(s.hero, UI::c(quiet(cols[0])), 0);       // bottom
+    lv_obj_set_style_bg_grad_dir  (s.hero, LV_GRAD_DIR_VER, 0);
+    lv_obj_set_style_bg_main_stop (s.hero, (uint8_t)(255 * in / s.heroH), 0);
+    lv_obj_set_style_bg_grad_stop (s.hero, (uint8_t)(255 * (s.heroH - in) / s.heroH), 0);
+    const int p = n - 1;
+    for (int i = 0; i < p; i++) {
+        const int32_t yTop = in + span - (int32_t)((int64_t)span * (i + 1) / p);
+        const int32_t yBot = in + span - (int32_t)((int64_t)span * i / p);
+        lv_obj_t *o = plain(s.hero);
+        lv_obj_set_pos (o, 0, yTop);
+        lv_obj_set_size(o, s.heroW, yBot - yTop);
+        lv_obj_set_style_bg_opa       (o, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color     (o, UI::c(quiet(cols[i + 1])), 0);   // top
+        lv_obj_set_style_bg_grad_color(o, UI::c(quiet(cols[i])), 0);       // bottom
+        lv_obj_set_style_bg_grad_dir  (o, LV_GRAD_DIR_VER, 0);
+    }
+}
+
+void buildLightHero(lv_obj_t *row) {
+    const LightAgg L = lightAggregate();
+    s.heroW = s.heroH * 42 / 100;   // the toggle's proportions
+    const int32_t r = s.heroW * 30 / 100;
+    s.heroR = r;
+    s.hero = plain(row);
+    lv_obj_set_size(s.hero, s.heroW, s.heroH);
+    lv_obj_set_style_radius(s.hero, r, 0);
+    lv_obj_add_flag(s.hero, LV_OBJ_FLAG_CLICKABLE);
+    // A drag on the slider is the slider's: no gesture walks up from it to the
+    // window or the screen, and no scroll is handed to a parent (LESSONS,
+    // "Events do not reach the screen", and #68's scrolling layer).
+    lv_obj_clear_flag(s.hero, LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_clear_flag(s.hero, LV_OBJ_FLAG_SCROLL_CHAIN);
+    lv_obj_add_event_cb(s.hero, lightSlideCb, LV_EVENT_PRESSED,    nullptr);
+    lv_obj_add_event_cb(s.hero, lightSlideCb, LV_EVENT_PRESSING,   nullptr);
+    lv_obj_add_event_cb(s.hero, lightSlideCb, LV_EVENT_RELEASED,   nullptr);
+    lv_obj_add_event_cb(s.hero, lightSlideCb, LV_EVENT_PRESS_LOST, nullptr);
+
+    if (s.lightCtl == LCTL_DIM) {
+        lv_obj_set_style_bg_opa(s.hero, LV_OPA_COVER, 0);
+        s.fill = plain(s.hero);
+        lv_obj_set_size(s.fill, s.heroW, 0);
+        lv_obj_set_style_radius(s.fill, r, 0);
+        lv_obj_set_style_bg_opa(s.fill, LV_OPA_COVER, 0);
+        s.grip = plain(s.hero);
+        lv_obj_set_size(s.grip, s.heroW * 34 / 100, LV_MAX(3, pm(0.5f)));
+        lv_obj_add_flag(s.grip, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_radius(s.grip, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_opa(s.grip, LV_OPA_COVER, 0);
+        return;
+    }
+    if (s.lightCtl == LCTL_TEMP) {
+        // The light's own range, warm at the bottom (HA's dialog the same way).
+        const uint32_t cols[3] = { lightKelvinToRgb(L.minK), lightKelvinToRgb((L.minK + L.maxK) / 2),
+                                   lightKelvinToRgb(L.maxK) };
+        stripPieces(cols, 3);
+    } else {
+        uint32_t cols[7];
+        for (int i = 0; i < 7; i++) cols[i] = lightHsToRgb(i * 60, 100);
+        stripPieces(cols, 7);
+    }
+    // The marker: a white ring with a dark edge, which reads on every colour.
+    s.mark = plain(s.hero);
+    lv_obj_set_size(s.mark, s.heroW * 80 / 100, LV_MAX(8, pm(2.6f)));
+    lv_obj_add_flag(s.mark, LV_OBJ_FLAG_HIDDEN);   // until renderLight() places it
+    lv_obj_set_style_radius      (s.mark, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_border_width(s.mark, LV_MAX(2, pm(0.35f)), 0);
+    lv_obj_set_style_border_color(s.mark, UI::c(quiet(0xFFFFFF)), 0);
+    lv_obj_set_style_outline_width(s.mark, 1, 0);
+    lv_obj_set_style_outline_color(s.mark, UI::c(0x000000), 0);
+    lv_obj_set_style_outline_opa (s.mark, LV_OPA_50, 0);
+}
+
+lv_obj_t *ctlButton(lv_obj_t *parent, const char *glyph, uint8_t k) {
+    const int32_t sz = UI::minTouch();
+    lv_obj_t *b = plain(parent);
+    lv_obj_set_size(b, sz, sz);
+    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
+    lv_obj_t *l = makeLabel(b, UI::type().ICON_MD, UI::pal().TEXT);
+    lv_label_set_text(l, glyph);
+    lv_obj_center(l);
+    lv_obj_add_event_cb(b, ctlCb, LV_EVENT_CLICKED, (void *)(uintptr_t)k);
+    s.btnCtl[k] = b;
+    return b;
+}
+
+void buildLightColumn(lv_obj_t *col) {
+    const UIPalette &p = UI::pal();
+    const UIType    &t = UI::type();
+    const LightAgg   L = lightAggregate();
+    makeLabelRow(col);
+    if (s.lightCtl != LCTL_COLOUR) {
+        s.lblValue = makeLabel(col, UIToolkit::Font_Hero, p.TEXT);
+        s.lblAgo   = makeLabel(col, t.TAG, p.TEXT_DIM);
+        lv_label_set_long_mode(s.lblAgo, LV_LABEL_LONG_DOT);   // "..., 3 paused" stays one line
+        lv_obj_set_width(s.lblAgo, lv_pct(100));
+    } else {
+        // 6.5 mm: with the label and the selector they fill the P4_5's 30 mm
+        // column exactly, so the selector stays where it is in every control.
+        const int32_t sz = mm(6.5f), gap = mm(1.6f);
+        lv_obj_t *grid = plain(col);
+        lv_obj_set_size     (grid, 4 * sz + 3 * gap + 2 * mm(0.6f), LV_SIZE_CONTENT);
+        lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
+        lv_obj_set_style_pad_all   (grid, mm(0.6f), 0);   // room for the ring
+        lv_obj_set_style_pad_column(grid, gap, 0);
+        lv_obj_set_style_pad_row   (grid, gap, 0);
+        for (uint8_t i = 0; i < 8; i++) {
+            lv_obj_t *w = plain(grid);
+            lv_obj_set_size(w, sz, sz);
+            lv_obj_set_style_radius      (w, LV_RADIUS_CIRCLE, 0);
+            lv_obj_set_style_bg_opa      (w, LV_OPA_COVER, 0);
+            lv_obj_set_style_bg_color    (w, UI::c(quiet(lightHsToRgb(SWATCHES[i].hue, SWATCHES[i].sat))), 0);
+            lv_obj_set_style_border_width(w, LV_MAX(1, mm(0.2f)), 0);
+            lv_obj_set_style_border_color(w, UI::border(), 0);
+            lv_obj_set_style_outline_pad (w, LV_MAX(2, mm(0.3f)), 0);
+            lv_obj_add_flag(w, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_add_event_cb(w, swatchCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
+            s.swatch[i] = w;
+        }
+    }
+
+    // The selector sits at the BOTTOM of the column, level with the bottom of
+    // the slider, whatever is above it (owner, round 3).
+    lv_obj_t *spacer = plain(col);
+    lv_obj_set_size(spacer, 1, 0);
+    lv_obj_set_flex_grow(spacer, 1);
+
+    // Power | the controls this light (any member) has, with a divider after
+    // Power as in HA. A light with only one of them still shows it, so the
+    // selector always says what the slider is.
+    lv_obj_t *sel = plain(col);
+    lv_obj_set_size     (sel, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(sel, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(sel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_radius    (sel, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color  (sel, UI::c(p.SURFACE), 0);
+    lv_obj_set_style_bg_opa    (sel, LV_OPA_COVER, 0);
+    lv_obj_set_style_pad_all   (sel, mm(0.6f), 0);
+    lv_obj_set_style_pad_column(sel, mm(0.6f), 0);
+    ctlButton(sel, MDI_POWER, 0);
+    if (L.caps & (LIGHT_CAN_DIM | LIGHT_CAN_TEMP | LIGHT_CAN_COLOUR)) {
+        lv_obj_t *div = plain(sel);
+        lv_obj_set_size(div, LV_MAX(2, mm(0.25f)), UI::minTouch() * 60 / 100);
+        lv_obj_set_style_bg_color(div, UI::border(), 0);
+        lv_obj_set_style_bg_opa  (div, LV_OPA_COVER, 0);
+    }
+    if (L.caps & LIGHT_CAN_DIM)    ctlButton(sel, MDI_BRIGHTNESS_5, 1 + LCTL_DIM);
+    if (L.caps & LIGHT_CAN_TEMP)   ctlButton(sel, MDI_SUN_THERMOMETER, 1 + LCTL_TEMP);
+    if (L.caps & LIGHT_CAN_COLOUR) ctlButton(sel, MDI_PALETTE, 1 + LCTL_COLOUR);
+}
+
 // ---------------------------------------------------------------------------
 // The main view: the hero beside what it shows (card-sheet 11.1)
 // ---------------------------------------------------------------------------
 void renderMain() {
+    if (s.lightHero) { renderLight(); return; }
     if (!s.lblValue || !s.nEnt || !s.ent[0]) return;
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const Entity    &e = *s.ent[0];
     const Agg a = aggregate();
     char buf[48], wbuf[32];
+    checkPausedChange(a);
 
     // --- What it is --------------------------------------------------------
     setText(s.lblWhat, s.toggleHero ? "Power" : (a.anyBool ? "State" : whatWord(e, wbuf, sizeof(wbuf))));
@@ -408,17 +1115,7 @@ void renderMain() {
     else         lv_obj_add_flag  (s.lblUnit, LV_OBJ_FLAG_HIDDEN);
 
     // --- When --------------------------------------------------------------
-    if (a.paused) {
-        setText(s.lblAgo, "Paused");
-    } else if (!a.everSet) {
-        setText(s.lblAgo, "No reading yet");
-    } else {
-        char age[16];
-        cardFormatAge(millis() - a.lastChangeMs, age, sizeof(age));
-        if (strcmp(age, "now") == 0) snprintf(buf, sizeof(buf), "Changed just now");
-        else                         snprintf(buf, sizeof(buf), "Changed %s ago", age);
-        setText(s.lblAgo, buf);
-    }
+    renderAgo(a);
 
     // --- The hero ----------------------------------------------------------
     const bool lit = a.available && a.anyBool && a.on;
@@ -427,17 +1124,17 @@ void renderMain() {
         // HA's switch dialog, stood upright: a tall track, the knob at the top
         // when on and the bottom when off. Never colour alone (the owner is a
         // little colour-blind): the knob's position says it too.
-        lv_obj_set_style_bg_color(s.hero, UI::c(lit ? UI::mix(p.ST_ACTIVE, p.SURFACE_ALT, 70)
-                                                    : UI::mix(p.SURFACE_ALT, p.TEXT, 10)), 0);
-        lv_obj_set_style_bg_color(s.knob, UI::c(lit ? p.ST_ACTIVE
-                                                    : UI::mix(p.SURFACE_ALT, p.TEXT, 25)), 0);
+        lv_obj_set_style_bg_color(s.hero, UI::c(quiet(lit ? UI::mix(p.ST_ACTIVE, p.SURFACE_ALT, 70)
+                                                          : UI::mix(p.SURFACE_ALT, p.TEXT, 10))), 0);
+        lv_obj_set_style_bg_color(s.knob, UI::c(quiet(lit ? p.ST_ACTIVE
+                                                          : UI::mix(p.SURFACE_ALT, p.TEXT, 25))), 0);
         placeKnob(lit ? s.knobInset : s.heroH - s.knobH - s.knobInset);
         lv_obj_set_style_text_color(s.heroIcon,
-            UI::c(lit ? UI::contrastOf(p.ST_ACTIVE, p.GROUND, p.TEXT) : p.TEXT), 0);
+            UI::c(quiet(lit ? UI::contrastOf(p.ST_ACTIVE, p.GROUND, p.TEXT) : p.TEXT)), 0);
     } else {
-        lv_obj_set_style_bg_color(s.hero, UI::c(lit ? p.ST_ACTIVE : p.SURFACE), 0);
+        lv_obj_set_style_bg_color(s.hero, UI::c(quiet(lit ? p.ST_ACTIVE : p.SURFACE)), 0);
         lv_obj_set_style_text_color(s.heroIcon,
-            UI::c(lit ? UI::contrastOf(p.ST_ACTIVE, p.GROUND, p.TEXT) : cardTintFor(e.desc)), 0);
+            UI::c(quiet(lit ? UI::contrastOf(p.ST_ACTIVE, p.GROUND, p.TEXT) : cardTintFor(e.desc))), 0);
     }
 }
 
@@ -448,15 +1145,25 @@ void commandAll(bool on) {
     const uint32_t now = millis();
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
-        if (e && e->desc.writable) s.reg->commandValue(e->desc.id, EntityValue::makeBool(on), now);
+        if (e && e->desc.writable && !e->paused)   // a paused member is out of the group
+            s.reg->commandValue(e->desc.id, EntityValue::makeBool(on), now);
     }
     renderMain();
+}
+
+// A PAUSED window's controls are greyed and do nothing (owner, 2.10b round 1);
+// a touch on one says why, rather than leaving the finger wondering.
+bool pausedBlocks() {
+    if (!aggregate().paused) return false;
+    UIToolkit::show_toast("Paused - turn it off in SETTINGS");
+    return true;
 }
 
 void toggleCb(lv_event_t *ev) {
     (void)ev;
     // A drag has already decided (knobDragCb); this is the click that ends it.
     if (s.swallowClick) { s.swallowClick = false; return; }
+    if (pausedBlocks()) return;
     commandAll(!aggregate().on);
 }
 
@@ -468,6 +1175,7 @@ void toggleCb(lv_event_t *ev) {
 // back. A press that does not move is a tap, and toggleCb() has it.
 void knobDragCb(lv_event_t *ev) {
     if (!s.knob || !s.hero) return;
+    if (aggregate().paused) return;   // greyed: the click says why (toggleCb)
     const lv_event_code_t code = lv_event_get_code(ev);
     lv_indev_t *in = lv_indev_active();
     lv_point_t p = {0, 0};
@@ -507,17 +1215,47 @@ void buildMain() {
     lv_obj_set_size     (row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(row, mm(4), 0);
+    lv_obj_set_style_pad_column(row, pm(4), 0);
 
-    // The stage is not laid out yet, so its height is worked out from the
-    // window's: everything but the header row, the padding and a margin.
-    const int32_t winH = lv_area_get_height(&s.winRect);
-    s.heroH = winH - 2 * s.pad - UI::minTouch() - mm(1.6f) - mm(4);
+    // THE SAME SHARE OF THE WINDOW ON EVERY BOARD (owner, 2026-10-05). It used
+    // to be the window's height less the header row and margins, which on a
+    // 7" panel made a toggle twice the P4_5's (60 mm on calipers) and on the 4B
+    // nearly 40 mm.
+    s.heroH = pm(HERO_H_MM);
     if (s.heroH < UI::minTouch()) s.heroH = UI::minTouch();
 
-    // D3: a SWITCH opens on its control - the hero IS a big toggle. Lights get
-    // their slider in 2.10b; until then they read like everything else.
-    s.toggleHero = (e.desc.kind == EntityKind::SWITCH && e.desc.writable);
+    // D3: every writable thing opens on its control. A light that can dim, or
+    // has a white range or a colour, gets its slider (2.10b - "The light's
+    // controls"); a switch, an on/off light, and a light whose source has not
+    // said what it can do (an HA light until 2.10c) get the big toggle, which
+    // is HA's own dialog for those.
+    s.builtPaused   = aggregate().paused;
+    s.rebuildQueued = false;
+    const bool writableLight = (e.desc.kind == EntityKind::LIGHT && e.desc.writable);
+    const LightAgg LA = lightAggregate();
+    const uint8_t caps = LA.caps;   // paused members offer nothing
+    // The slider stays for a group whose members are all paused (greyed, no
+    // controls offered): what the window IS does not change with a pause.
+    s.lightHero  = writableLight && canSlide(LA.allCaps);
+    s.toggleHero = !s.lightHero && e.desc.writable &&
+                   (e.desc.kind == EntityKind::SWITCH || writableLight);
+    if (s.lightHero) {
+        // A control no counting member has any more (its lamp was paused)
+        // falls back to the first one there is.
+        const uint8_t bit = s.lightCtl == LCTL_DIM ? LIGHT_CAN_DIM : s.lightCtl == LCTL_TEMP ? LIGHT_CAN_TEMP
+                                                                                          : LIGHT_CAN_COLOUR;
+        if (!(caps & bit)) s.lightCtl = firstCtl(caps);
+        s.builtCaps = caps;
+        buildLightHero(row);
+        lv_obj_t *col = plain(row);
+        // Sized for everything the members CAN do, paused or not: a pause
+        // hides buttons, and a narrower column re-centred the whole group
+        // (owner, round 5 - All Lamps paused).
+        fixColumn(col, colWidth(true, LA.allCaps));
+        buildLightColumn(col);
+        renderLight();
+        return;
+    }
     if (s.toggleHero) {
         s.heroW     = s.heroH * 42 / 100;
         s.knobInset = s.heroW * 6 / 100;
@@ -540,8 +1278,9 @@ void buildMain() {
         s.heroIcon = makeLabel(s.knob, t.ICON, p.TEXT);
         lv_obj_center(s.heroIcon);
     } else {
-        int32_t d = s.heroH * 60 / 100;
-        if (d > mm(24)) d = mm(24);
+        // A share of the hero's height, like the toggle. The icon inside is a
+        // fixed face, so on a 7" panel the disc grows around the same glyph.
+        const int32_t d = s.heroH * 60 / 100;
         s.heroW = s.heroH = d;
         s.hero = plain(row);
         lv_obj_set_size(s.hero, d, d);
@@ -558,7 +1297,7 @@ void buildMain() {
     lv_obj_set_style_pad_row(col, mm(0.8f), 0);
     // Never wider than what is left beside the hero, so a long text value
     // ellipsises instead of running out of the window.
-    const int32_t colMax = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - mm(4);
+    const int32_t colMax = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4);
     lv_obj_set_style_max_width(col, colMax, 0);
     // AND NEVER NARROWER THAN ITS LONGEST ORDINARY WORDS. The row is centred,
     // so a column that changed width moved the whole group - the owner's B1:
@@ -568,8 +1307,11 @@ void buildMain() {
     if (textW("No reading yet", t.TAG) > colMin) colMin = textW("No reading yet", t.TAG);
     if (textW("Unavailable", UIToolkit::Font_Hero) > colMin) colMin = textW("Unavailable", UIToolkit::Font_Hero);
     lv_obj_set_style_min_width(col, colMin < colMax ? colMin : colMax, 0);
+    // A toggle's column is the slider's: the same size, the lines in the
+    // same places (owner, round 3).
+    if (s.toggleHero) fixColumn(col, colWidth(false, 0));
 
-    s.lblWhat = makeLabel(col, t.TAG, p.TEXT_DIM);
+    makeLabelRow(col);
 
     lv_obj_t *vrow = plain(col);
     lv_obj_set_size     (vrow, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -583,6 +1325,10 @@ void buildMain() {
     s.lblUnit  = makeLabel(vrow, t.UNIT, p.TEXT_DIM);
 
     s.lblAgo = makeLabel(col, t.TAG, p.TEXT_DIM);
+    if (s.toggleHero) {
+        lv_label_set_long_mode(s.lblAgo, LV_LABEL_LONG_DOT);
+        lv_obj_set_width(s.lblAgo, lv_pct(100));
+    }
 
     s.knobPlaced = false;
     renderMain();
@@ -598,11 +1344,17 @@ void buildHistory() {
     lv_label_set_text(l, "History arrives with 2.10e");
 }
 
+void memberRowCb(lv_event_t *ev);   // below, with the member view
+void deckRender();                  // below, with the deck
+
 void buildMembers() {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
+    // The stage's height, scrolling if a group has more members than fit.
     lv_obj_t *list = plain(s.stage);
-    lv_obj_set_size     (list, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_size     (list, lv_pct(100), lv_pct(100));
+    lv_obj_add_flag     (list, LV_OBJ_FLAG_SCROLLABLE);
+    UI::tameScroll(list);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(list, mm(1.4f), 0);
     for (uint8_t i = 0; i < s.nEnt; i++) {
@@ -616,16 +1368,42 @@ void buildMembers() {
         lv_obj_set_style_radius (r, UI::sc(UI::met().RADIUS), 0);
         lv_obj_set_style_bg_color(r, UI::c(p.SURFACE), 0);
         lv_obj_set_style_bg_opa (r, LV_OPA_COVER, 0);
+        // A tap opens that member's own controls (owner, 2.10b).
+        lv_obj_add_flag(r, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_bg_color(r, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)),
+                                  UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+        lv_obj_add_event_cb(r, memberRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
         lv_obj_t *n = makeLabel(r, t.NAME, p.TEXT);
         lv_label_set_text(n, e->desc.name);
         lv_obj_t *v = makeLabel(r, t.TAG, p.TEXT_DIM);
         char buf[48];
-        if (!e->available)                       lv_label_set_text(v, "Unavailable");
-        else if (e->value.type == ValueType::BOOL) lv_label_set_text(v, cardStateWord(e->desc, e->value.b));
-        else { cardFormatValue(*e, buf, sizeof(buf), true, s.tempUnit); lv_label_set_text(v, buf); }
+        const EntityAttrs &at = e->attrs;
+        if (e->paused) {
+            // Out of the group, but still listed and saying why (owner, 2.10b).
+            lv_label_set_text(v, "Paused");
+        } else if (!e->available) {
+            lv_label_set_text(v, "Unavailable");
+        } else if (e->desc.kind == EntityKind::LIGHT && e->value.type == ValueType::BOOL && e->value.b &&
+                   at.brightness >= 0) {
+            // A light's levels, so a group's commands can be checked member by
+            // member (2.10b): "On, 40%, 2700 K", "On, 40%, colour 30".
+            const int pct = LV_MAX(1, (at.brightness * 100 + 127) / 255);
+            if (at.lightMode == LightMode::LMODE_TEMP && at.colorTempK > 0)
+                snprintf(buf, sizeof(buf), "On, %d%%, %d K", pct, at.colorTempK);
+            else if (at.lightMode == LightMode::LMODE_COLOUR && at.hue >= 0)
+                snprintf(buf, sizeof(buf), "On, %d%%, colour %d", pct, at.hue);
+            else
+                snprintf(buf, sizeof(buf), "On, %d%%", pct);
+            lv_label_set_text(v, buf);
+        } else if (e->value.type == ValueType::BOOL) {
+            lv_label_set_text(v, cardStateWord(e->desc, e->value.b));
+        } else {
+            cardFormatValue(*e, buf, sizeof(buf), true, s.tempUnit);
+            lv_label_set_text(v, buf);
+        }
     }
     lv_obj_t *note = makeLabel(list, t.TAG, p.TEXT_DIM);
-    lv_label_set_text(note, "Member controls arrive with the group work");
+    lv_label_set_text(note, "Tap one for its own controls");
 }
 
 // Share the title row between "Area > " and the name. Both fit: each gets its
@@ -648,8 +1426,7 @@ void layoutTitle() {
 
 void showView(PopupView v) {
     s.view = v;
-    s.hero = s.knob = s.heroIcon = nullptr;
-    s.lblWhat = s.lblValue = s.lblUnit = s.lblAgo = nullptr;
+    forgetMainWidgets();
     lv_obj_clean(s.stage);
 
     // X on the first view, a back arrow on any view reached from it; the
@@ -667,6 +1444,12 @@ void showView(PopupView v) {
         else           setText(s.lblTitleArea, "");
         setText(s.lblTitleName, s.name);
         buildMain();
+    } else if (v == PopupView::VIEW_MEMBER) {
+        // "Group > member" (card-sheet 11.1).
+        snprintf(title, sizeof(title), "%s > ", s.name);
+        setText(s.lblTitleArea, title);
+        setText(s.lblTitleName, s.ent[0] ? s.ent[0]->desc.name : "");
+        buildMain();
     } else {
         snprintf(title, sizeof(title), "%s > ", s.name);
         setText(s.lblTitleArea, title);
@@ -675,13 +1458,52 @@ void showView(PopupView v) {
         else                              buildMembers();
     }
     layoutTitle();
+    deckRender();   // Paused follows whatever the window is showing now
     s.lastSig = signature();
+}
+
+// --- A MEMBER'S OWN CONTROLS (2.10b; owner: tap a row in Members) -----------
+// The same window and the same views, pointed at one member: the group's
+// entities are set aside, and the back arrow puts them back and returns to
+// Members. It needs no card of its own, so Lamp 4 works too.
+uint8_t s_memberPick = 0;
+uint8_t s_groupCtl   = 0;   // the group's control, restored on the way back
+
+void enterMemberAsync(void *unused) {
+    (void)unused;
+    if (s.phase != PopupPhase::PHASE_OPEN || s.view != PopupView::VIEW_MEMBERS) return;
+    if (s_memberPick >= s.nEnt || !s.ent[s_memberPick]) return;
+    for (uint8_t i = 0; i < CARD_PRIMARY_MAX; i++) s.groupEnt[i] = s.ent[i];
+    s.groupN = s.nEnt;
+    s_groupCtl = s.lightCtl;
+    const Entity *m = s.ent[s_memberPick];
+    for (uint8_t i = 0; i < CARD_PRIMARY_MAX; i++) s.ent[i] = nullptr;
+    s.ent[0] = m;
+    s.nEnt   = 1;
+    s.lightCtl = firstCtl(lightAggregate().caps);
+    showView(PopupView::VIEW_MEMBER);
+}
+
+// A row in Members. Deferred: the row is in the stage that is about to be
+// cleaned, and an event callback must not delete its own object.
+void memberRowCb(lv_event_t *ev) {
+    s_memberPick = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+    lv_async_call(enterMemberAsync, nullptr);
+}
+
+void leaveMember() {
+    for (uint8_t i = 0; i < CARD_PRIMARY_MAX; i++) s.ent[i] = s.groupEnt[i];
+    s.nEnt     = s.groupN;
+    s.groupN   = 0;
+    s.lightCtl = s_groupCtl;
+    showView(PopupView::VIEW_MEMBERS);
 }
 
 void leftCb(lv_event_t *ev) {
     (void)ev;
-    if (s.view == PopupView::VIEW_MAIN) CardPopup::close();
-    else                                showView(PopupView::VIEW_MAIN);
+    if (s.view == PopupView::VIEW_MAIN)        CardPopup::close();
+    else if (s.view == PopupView::VIEW_MEMBER) leaveMember();
+    else                                       showView(PopupView::VIEW_MAIN);
 }
 void historyCb(lv_event_t *ev) { (void)ev; showView(PopupView::VIEW_HISTORY); }
 void membersCb(lv_event_t *ev) { (void)ev; showView(PopupView::VIEW_MEMBERS); }
@@ -781,9 +1603,12 @@ void buildContents() {
     lv_obj_set_style_pad_column(right, gap, 0);
     // The mock's chart icon - axes and bars (mdi:chart-bar, generated
     // 2026-10-05; clock-outline stood in until then).
-    s.btnHistory = iconButton(right, MDI_CHART_BAR, t.ICON_MD, historyCb);
-    // D4: a card standing for several things gets the members icon.
+    // D4: a card standing for several things gets the members icon - INSIDE
+    // the chart, which is always in the corner (owner, 2026-10-06: nearly
+    // every window has a chart, few have members). Made first: the row is
+    // end-aligned, so the last made is the one in the corner.
     if (s.nEnt > 1) s.btnMembers = iconButton(right, MDI_LIGHTBULB_GROUP, t.ICON_MD, membersCb);
+    s.btnHistory = iconButton(right, MDI_CHART_BAR, t.ICON_MD, historyCb);
 
     // --- The stage: whichever view is showing -------------------------------
     s.stage = plain(s.win);
@@ -1285,9 +2110,13 @@ bool inDeck(const lv_point_t &pt) {
     return false;
 }
 
+void deckFill();
+void deckOpen();
+
 void deckTabCb(lv_event_t *ev) {
     (void)ev;
-    deckSet(s.deckState == DECK_OPEN ? DECK_PEEK : DECK_OPEN);
+    if (s.deckState == DECK_OPEN) deckSet(DECK_PEEK);
+    else                          deckOpen();
 }
 
 // One choice in a row. `live` false: drawn quieter, and taps do nothing.
@@ -1336,16 +2165,32 @@ void deckChipSelect(lv_obj_t *c, bool selected) {
 }
 
 void deckRender() {
-    const bool paused = aggregate().paused;
-    deckChipSelect(s.chipPause[0], !paused);
-    deckChipSelect(s.chipPause[1],  paused);
+    if (s.swPause) {
+        if (aggregate().paused) lv_obj_add_state  (s.swPause, LV_STATE_CHECKED);
+        else                    lv_obj_remove_state(s.swPause, LV_STATE_CHECKED);
+    }
+    const bool all = (s.groupOn == GroupOn::GROUP_ON_ALL);
+    deckChipSelect(s.chipGroup[0], !all);
+    deckChipSelect(s.chipGroup[1],  all);
+}
+
+// On when: any member / all members. On the held card too, so it repaints at
+// once and its tap follows the same rule.
+void groupChipCb(lv_event_t *ev) {
+    s.groupOn = lv_event_get_user_data(ev) ? GroupOn::GROUP_ON_ALL : GroupOn::GROUP_ON_ANY;
+    if (Card *c = cardOf(h.surface)) c->setGroupOn(s.groupOn);
+    deckRender();
+    renderMain();
 }
 
 // Paused: Off / On. Through the card when it is the held one (it repaints at
 // once, and every card on the same entities follows through the registry).
-void pauseChipCb(lv_event_t *ev) {
-    const bool on = lv_event_get_user_data(ev) != nullptr;
-    if (Card *c = cardOf(h.surface)) {
+void pauseSwitchCb(lv_event_t *ev) {
+    const bool on = lv_obj_has_state((lv_obj_t *)lv_event_get_target(ev), LV_STATE_CHECKED);
+    // In a member's own view, only that member (2.10b) - the registry, and
+    // every card on it follows.
+    Card *c = (s.view == PopupView::VIEW_MEMBER) ? nullptr : cardOf(h.surface);
+    if (c) {
         c->setPaused(on);
     } else if (s.reg) {
         const uint32_t now = millis();
@@ -1395,12 +2240,9 @@ void deckCreate() {
     const int32_t rf       = r;                        // the inner curve
     const int32_t tabAbove = s.deckHead + rf;          // the tab's part above the pane's edge
     s.deckHide = r + 2 * bw;
-    s.deckH    = tabAbove + (rf + mm(1.6f)) + 4 * mm(DECK_ROW_MM) + mm(4.0f) + mm(1.6f) + s.deckHide;
-
-    // What the label row shows: the card's own choice, or what it inherits.
-    CardLabel lbl = CardLabel::LBL_NAME;
-    if (Card *c = cardOf(h.surface)) lbl = (c->labelMode() != CardLabel::LBL_INHERIT) ? c->labelMode() : cardLabelMode();
-    const bool paused = aggregate().paused;
+    // A group card has one more row: when it counts as on (2.10b).
+    const int32_t rows = (s.nEnt > 1) ? 5 : 4;
+    s.deckH    = tabAbove + (rf + mm(1.6f)) + rows * mm(DECK_ROW_MM) + mm(4.0f) + mm(1.6f) + s.deckHide;
 
     s.deck = plain(lv_screen_active());
     lv_obj_set_pos (s.deck, W.x1, deckY(DECK_HIDDEN));
@@ -1457,13 +2299,29 @@ void deckCreate() {
     // shadow it casts downward, all of which lie inside the pane - painted out
     // in the pane's colour. Kept one border-width clear of the pane's right
     // edge, which carries on down past the tab.
+    // AND THE SHADOW IT CASTS TO THE LEFT: a shadow spreads sideways too, and
+    // round the tab's lower-left corner it showed below the pane's edge as a
+    // small grey crescent at the foot of the inner curve (owner, 2026-10-06 -
+    // "thought it was crud on the glass"). The block reaches left by the
+    // shadow's width; the curve's arcs are drawn over it.
     const UIMetrics &m = UI::met();
     const int32_t reach = m.SHADOW ? UI::sc(m.SHADOW) + UI::sc(m.SHADOW_Y) + 2 : 0;
     lv_obj_t *block = plain(s.deck);
-    lv_obj_set_pos (block, tabX, tabAbove + bw);
-    lv_obj_set_size(block, tabW - bw, r + bw + reach);
+    lv_obj_set_pos (block, tabX - reach, tabAbove + bw);
+    lv_obj_set_size(block, tabW - bw + reach, r + bw + reach);
     lv_obj_set_style_bg_color(block, UI::c(p.SURFACE_ALT), 0);
     lv_obj_set_style_bg_opa  (block, LV_OPA_COVER, 0);
+
+    // THE SEAM: the tip of the tab's left border, on the pane's edge line at
+    // the foot of the curve. The curve's fill arc covers it only up to its own
+    // anti-aliased rim, so a 3-pixel speck was left (owner, round 7: "now that
+    // I know about it I can't ignore it"). Painted out here; the arcs below are
+    // drawn after, so nothing of the curve is lost.
+    lv_obj_t *seam = plain(s.deck);
+    lv_obj_set_pos (seam, tabX - 2, tabAbove - bw - 1);
+    lv_obj_set_size(seam, 3 * bw + 4, 2 * bw + 2);
+    lv_obj_set_style_bg_color(seam, UI::c(p.SURFACE_ALT), 0);
+    lv_obj_set_style_bg_opa  (seam, LV_OPA_COVER, 0);
 
     // The inner curve where the tab meets the pane's edge: a concave corner,
     // which LVGL has no shape for. Two quarter arcs centred a radius out from
@@ -1488,10 +2346,55 @@ void deckCreate() {
     quarter(ro, ro - rf, UI::c(p.SURFACE_ALT));
     quarter(rf + bw, bw, UI::border());
 
+    s.deckState  = DECK_HIDDEN;
+    s.deckFilled = false;
+}
+
+// The pane's rows, BUILT WHEN THE DECK IS FIRST OPENED (2.10b, owner: try
+// every reasonable saving). Folded, only the tab shows, and the rows were
+// ~5 KB of LVGL's pool that most windows never needed.
+void deckFill() {
+    if (!s.deckPane || s.deckFilled) return;
+    s.deckFilled = true;
+    const UIType &t = UI::type();
+    const UIPalette &p = UI::pal();
+    lv_obj_t *pane = s.deckPane;
+
+    // What the label row shows: the card's own choice, or what it inherits.
+    CardLabel lbl = CardLabel::LBL_NAME;
+    if (Card *c = cardOf(h.surface)) lbl = (c->labelMode() != CardLabel::LBL_INHERIT) ? c->labelMode() : cardLabelMode();
+    const bool paused = aggregate().paused;
+
     // Paused first: the one that works, and the one a person comes for.
+    // A SWITCH, NOT "Off / On" (owner, 2026-10-06): "On" could be read as
+    // "updates on" as easily as "paused on". A switch beside the word Paused
+    // has one reading. Knob right, in the accent: paused.
     lv_obj_t *row = deckRow(pane, "Paused");
-    s.chipPause[0] = deckChip(row, "Off", true, !paused, pauseChipCb, nullptr);
-    s.chipPause[1] = deckChip(row, "On",  true,  paused, pauseChipCb, (void *)1);
+    s.swPause = lv_switch_create(row);
+    lv_obj_remove_style_all(s.swPause);
+    lv_obj_set_size(s.swPause, mm(11.0f), mm(6.0f));
+    lv_obj_set_style_radius  (s.swPause, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(s.swPause, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 18)), LV_PART_MAIN);
+    lv_obj_set_style_radius  (s.swPause, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_TRANSP, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_COVER, UI::part(LV_PART_INDICATOR, LV_STATE_CHECKED));
+    lv_obj_set_style_bg_color(s.swPause, UI::c(p.ACCENT), UI::part(LV_PART_INDICATOR, LV_STATE_CHECKED));
+    lv_obj_set_style_radius  (s.swPause, LV_RADIUS_CIRCLE, LV_PART_KNOB);
+    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_COVER, LV_PART_KNOB);
+    lv_obj_set_style_bg_color(s.swPause, UI::c(p.TEXT), LV_PART_KNOB);
+    lv_obj_set_style_pad_all (s.swPause, -mm(0.6f), LV_PART_KNOB);
+    if (paused) lv_obj_add_state(s.swPause, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(s.swPause, pauseSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
+
+    // A card for several things: HA's group helper option (owner, 2026-10-05).
+    // Live, and kept in RAM until saving arrives (2.10d).
+    if (s.nEnt > 1) {
+        const bool all = (s.groupOn == GroupOn::GROUP_ON_ALL);
+        row = deckRow(pane, "On when");
+        s.chipGroup[0] = deckChip(row, "Any is on",  true, !all, groupChipCb, nullptr);
+        s.chipGroup[1] = deckChip(row, "All are on", true,  all, groupChipCb, (void *)1);
+    }
 
     row = deckRow(pane, "Label");
     deckChip(row, "HA name", false, lbl == CardLabel::LBL_NAME,  nullptr, nullptr);
@@ -1508,8 +2411,12 @@ void deckCreate() {
 
     lv_obj_t *note = makeLabel(pane, t.TAG, p.TEXT_DIM);
     lv_label_set_text(note, "Paused is kept on the device. The rest arrives with saving (2.10d).");
+}
 
-    s.deckState = DECK_HIDDEN;
+// Open the deck, building its rows the first time.
+void deckOpen() {
+    deckFill();
+    deckSet(DECK_OPEN);
 }
 
 void deckGoneCb(lv_anim_t *a) { lv_obj_delete_async((lv_obj_t *)a->var); }
@@ -1539,8 +2446,10 @@ void deckEnd() {
         }
     }
     s.deck = s.deckTab = s.deckTabLbl = s.deckPane = nullptr;
-    s.chipPause[0] = s.chipPause[1] = nullptr;
-    s.deckState = DECK_HIDDEN;
+    s.swPause = nullptr;
+    s.chipGroup[0] = s.chipGroup[1] = nullptr;
+    s.deckState  = DECK_HIDDEN;
+    s.deckFilled = false;
 }
 
 #ifdef DEBUG_POPUP
@@ -1586,6 +2495,8 @@ void closeNow(void *unused) {
     if (s_catcher) lv_obj_clear_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
     s.phase = PopupPhase::PHASE_CLOSED;
     s.nEnt = 0;
+    s.groupN = 0;
+    s.rebuildQueued = false;
 #ifdef DEBUG_POPUP
     char mem[96];
     dbgMem(mem, sizeof(mem));
@@ -1774,22 +2685,45 @@ void CardPopup::open(Card &card) {
     if (lv_indev_t *in = lv_indev_active()) lv_indev_wait_release(in);
     s.reg      = Card::s_reg;
     s.tempUnit = card.tempUnit();
+    s.groupOn  = card.groupOn();
+    s.lightCtl = firstCtl(lightAggregate().caps);   // D3: open on the control
     snprintf(s.area, sizeof(s.area), "%s", card._area);
     snprintf(s.name, sizeof(s.name), "%s", card.label());
 
     // --- Where the window goes ---------------------------------------------
-    // The mock: ~68 mm wide (62% of the P4_5, nearly all of the 4B), from just
-    // under the system header to just above the deck's peeking header.
+    // Tall: from just under the system header to just above the deck's tab.
+    //
+    // WIDE: UP TO TWICE AS WIDE AS TALL, AND NEVER NEAR THE SCREEN'S SIDES
+    // (owner, 2026-10-06). Round 1 of 2.10b gave every board the P4_5
+    // window's 787:545 shape - itself inherited from the mock, which was drawn
+    // for the 4B - and that held the P4_5 to 68 mm on a 110 mm screen, its
+    // title ellipsised, with room to spare. Now 2:1, capped so a gap of at
+    // least 6 mm or 8% of the screen's width stays on each side: P4_5 ~93 mm,
+    // the 7" panels ~129 mm, the 4B ~60 mm. The height used is the one WITH
+    // the system header showing, so hiding the header makes the window taller
+    // but never wider. The hero stays tied to the height (propH, below).
     lv_obj_t *scr = lv_screen_active();
     const int32_t sw = lv_obj_get_width(scr), sh = lv_obj_get_height(scr);
-    int32_t w = mm(68);
-    if (w > sw - 2 * mm(3)) w = sw - 2 * mm(3);
     const int32_t top    = UIToolkit::systemHeaderPx() + mm(2);
-    const int32_t bottom = sh - mm(6) - mm(2);   // mm(6): the deck's header, step 2
+    const int32_t bottom = sh - mm(6) - mm(2);   // mm(6): the deck's tab
+    const int32_t refH   = bottom - (UIToolkit::systemHeaderFullPx() + mm(2));
+    // AND NEVER WIDER THAN 100 mm (owner, round 5): on a 7" panel the 2:1
+    // window was ~129 mm, and every reach to the X or across the window got
+    // longer while the space to tap outside it shrank. 100 mm is the P4_5's
+    // window and a little - a hand's span.
+    const int32_t side   = LV_MAX(mm(6), sw * 8 / 100);
+    int32_t w = LV_MIN(2 * refH, mm(POPUP_MAX_W_MM));
+    if (w > sw - 2 * side) w = sw - 2 * side;
     s.winRect.x1 = (sw - w) / 2;
     s.winRect.x2 = s.winRect.x1 + w - 1;
     s.winRect.y1 = top;
     s.winRect.y2 = bottom - 1;
+    // What the contents are sized from: the height of the biggest window of
+    // the P4_5's shape that fits inside this one. The P4_5 itself gives its own
+    // height (with the header shown); the 7" panels theirs; the 4B, whose width
+    // is capped, less than its height. So the hero is the same share of the
+    // window everywhere (owner), and the 4B's shrinks.
+    s.propH = LV_MIN(refH, (int32_t)lroundf((float)w / POPUP_ASPECT));
     s.winRadius  = mm(2.4f);
     // 1.2 mm, down from the mock's 2.2: the owner wanted the X "closer to the
     // corner" (H1). Still clear of the 2.4 mm corner radius.
@@ -1812,3 +2746,209 @@ void CardPopup::open(Card &card) {
     h.phase = HoldPhase::HOLD_OWNED;
     showWindow();
 }
+
+#ifdef DEBUG_POPUP
+// ---------------------------------------------------------------------------
+// GET /popup (CardPopup.h): open, drive and measure a window from a PC. The
+// handler runs on the HTTP server's task and never touches LVGL: it posts the
+// request and waits; debugService(), an lv_timer on the LVGL thread, does the
+// work and writes the reply.
+// ---------------------------------------------------------------------------
+namespace {
+enum DbgReqState : int { DREQ_IDLE, DREQ_CLAIMED, DREQ_PENDING, DREQ_CLOSING, DREQ_DONE };
+std::atomic<int> s_dreq{DREQ_IDLE};
+struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
+                int member = -1; bool close = false, power = false; };
+DbgReq s_dreqArgs;
+char   s_dreqOut[2048];
+size_t s_dreqLen = 0;
+
+void dbgOut(const char *fmt, ...) {
+    if (s_dreqLen >= sizeof(s_dreqOut) - 1) return;
+    va_list ap;
+    va_start(ap, fmt);
+    const int n = vsnprintf(s_dreqOut + s_dreqLen, sizeof(s_dreqOut) - s_dreqLen, fmt, ap);
+    va_end(ap);
+    if (n > 0) s_dreqLen = LV_MIN(sizeof(s_dreqOut) - 1, s_dreqLen + (size_t)n);
+}
+
+// The cards on the screen, in tree order - the surfaces CARD_SURFACE_FLAG marks.
+int dbgCards(lv_obj_t *o, lv_obj_t **out, int n, int cap) {
+    const uint32_t cnt = lv_obj_get_child_count(o);
+    for (uint32_t i = 0; i < cnt && n < cap; i++) {
+        lv_obj_t *c = lv_obj_get_child(o, (int32_t)i);
+        if (lv_obj_has_flag(c, CardPopup::CARD_SURFACE_FLAG)) out[n++] = c;
+        else n = dbgCards(c, out, n, cap);
+    }
+    return n;
+}
+
+esp_err_t handlePopup(httpd_req_t *req) {
+    DbgReq a;
+    char q[64], v[8];
+    if (httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK) {
+        if (httpd_query_key_value(q, "card",  v, sizeof(v)) == ESP_OK) a.card  = atoi(v);
+        if (httpd_query_key_value(q, "deck",  v, sizeof(v)) == ESP_OK) a.deck  = atoi(v);
+        if (httpd_query_key_value(q, "ctl",   v, sizeof(v)) == ESP_OK) a.ctl   = atoi(v);
+        if (httpd_query_key_value(q, "set",   v, sizeof(v)) == ESP_OK) a.set   = atoi(v);
+        if (httpd_query_key_value(q, "view",  v, sizeof(v)) == ESP_OK) a.view  = atoi(v);
+        if (httpd_query_key_value(q, "power", v, sizeof(v)) == ESP_OK) a.power = true;
+        if (httpd_query_key_value(q, "pause", v, sizeof(v)) == ESP_OK) a.pause = atoi(v);
+        if (httpd_query_key_value(q, "member", v, sizeof(v)) == ESP_OK) a.member = atoi(v);
+        if (httpd_query_key_value(q, "close", v, sizeof(v)) == ESP_OK) a.close = atoi(v) != 0;
+    }
+    int expected = DREQ_IDLE;
+    if (!s_dreq.compare_exchange_strong(expected, DREQ_CLAIMED)) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        return httpd_resp_sendstr(req, "Busy; try again.\n");
+    }
+    s_dreqArgs = a;                 // written before the LVGL thread can see it
+    s_dreq.store(DREQ_PENDING);
+    for (int i = 0; i < 300 && s_dreq.load() != DREQ_DONE; i++) vTaskDelay(pdMS_TO_TICKS(10));
+    expected = DREQ_PENDING;
+    if (s_dreq.compare_exchange_strong(expected, DREQ_IDLE)) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        return httpd_resp_sendstr(req, "The UI thread did not pick it up within 3 s.\n");
+    }
+    while (s_dreq.load() != DREQ_DONE) vTaskDelay(pdMS_TO_TICKS(10));   // a close always ends
+    httpd_resp_set_type(req, "text/plain");
+    const esp_err_t r = httpd_resp_send(req, s_dreqOut, (ssize_t)s_dreqLen);
+    s_dreq.store(DREQ_IDLE);
+    return r;
+}
+} // namespace
+
+void CardPopup::debugService(lv_timer_t *t) {
+    (void)t;
+    char mem[96];
+    const int st = s_dreq.load();
+    if (st == DREQ_CLOSING) {
+        if (isOpen()) return;   // closeNow() runs from lv_async_call
+        dbgMem(mem, sizeof(mem));
+        dbgOut("closed; %s\n", mem);
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (st != DREQ_PENDING) return;
+    const DbgReq a = s_dreqArgs;
+    s_dreqLen = 0;
+    s_dreqOut[0] = '\0';
+
+    if (a.close) {
+        if (!isOpen()) { dbgOut("no window open\n"); s_dreq.store(DREQ_DONE); return; }
+        close();
+        s_dreq.store(DREQ_CLOSING);
+        return;
+    }
+    if (a.pause >= 0 || a.member >= 0) {
+        if (!isOpen()) dbgOut("no window open\n");
+        else if (a.member >= 0) {
+            // As a tap on row N of Members (opens Members first if needed).
+            if (s.view != PopupView::VIEW_MEMBERS) showView(PopupView::VIEW_MEMBERS);
+            s_memberPick = (uint8_t)a.member;
+            enterMemberAsync(nullptr);
+            dbgOut("member %d: %s\n", a.member, s.view == PopupView::VIEW_MEMBER ? "open" : "not open");
+        } else {
+            // Pause (1) or resume (0) whatever the window is showing, as the deck's chip.
+            const uint32_t now = millis();
+            for (uint8_t i = 0; i < s.nEnt; i++) if (s.ent[i]) s.reg->setPaused(s.ent[i]->desc.id, a.pause != 0, now);
+            dbgOut("pause %d\n", a.pause);
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.power) {
+        // As a tap on Power (or on a switch's toggle).
+        if (!isOpen()) dbgOut("no window open\n");
+        else { const bool on = !aggregate().on; commandAll(on); dbgOut("power %s\n", on ? "on" : "off"); }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.view >= 0) {
+        if (!isOpen()) dbgOut("no window open\n");
+        else {
+            showView(a.view == 1 ? PopupView::VIEW_HISTORY : a.view == 2 ? PopupView::VIEW_MEMBERS
+                                                                          : PopupView::VIEW_MAIN);
+            dbgMem(mem, sizeof(mem));
+            dbgOut("view %d; %s\n", a.view, mem);
+            for (uint8_t i = 0; i < s.nEnt; i++) {
+                const Entity *e = s.ent[i];
+                if (!e) continue;
+                const EntityAttrs &at = e->attrs;
+                dbgOut("  %-12s %s caps %x mode %d bri %d K %d hue %d sat %d%s%s\n", e->desc.id,
+                       e->value.type == ValueType::BOOL && e->value.b ? "on " : "off", at.lightCaps,
+                       (int)at.lightMode, at.brightness, at.colorTempK, at.hue, at.sat,
+                       e->pending ? " pending" : "", e->attrPending ? " levels-pending" : "");
+            }
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.set >= 0) {
+        // As if a finger tapped the slider at this value (percent, kelvin, hue).
+        if (!isOpen() || !s.lightHero) dbgOut("no light window open\n");
+        else { lightSend(a.set); renderLight(); dbgOut("sent %d to control %d\n", a.set, (int)s.lightCtl); }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.ctl >= 0) {
+        if (!isOpen() || !s.lightHero) dbgOut("no light window open\n");
+        else {
+            s.lightCtl = (uint8_t)LV_MIN(a.ctl, (int)LCTL_COLOUR);
+            const uint32_t t0 = micros();
+            showView(PopupView::VIEW_MAIN);
+            const uint32_t us = micros() - t0;
+            dbgMem(mem, sizeof(mem));
+            dbgOut("control %d built in %lu us; %s\n", (int)s.lightCtl, (unsigned long)us, mem);
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.deck >= 0) {
+        if (!isOpen()) dbgOut("no window open\n");
+        else {
+            if (a.deck) deckOpen(); else deckSet(DECK_PEEK);
+            dbgMem(mem, sizeof(mem));
+            dbgOut("deck %s; %s\n", a.deck ? "open" : "folded", mem);
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+
+    lv_obj_t *cards[48];
+    const int n = dbgCards(lv_screen_active(), cards, 0, 48);
+    if (a.card < 0) {
+        dbgMem(mem, sizeof(mem));
+        dbgOut("%s; window %s\n", mem, isOpen() ? "open" : "closed");
+        for (int i = 0; i < n; i++) {
+            Card *c = cardOf(cards[i]);
+            if (c) dbgOut("%2d  %-16s %-12s %u entit%s\n", i, c->label(), c->_area,
+                          (unsigned)c->_nPrimary, c->_nPrimary == 1 ? "y" : "ies");
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.card >= n || !cardOf(cards[a.card])) dbgOut("no card %d (%d on this page)\n", a.card, n);
+    else if (isOpen())                          dbgOut("a window is already open; /popup?close=1 first\n");
+    else {
+        dbgMem(mem, sizeof(mem));
+        dbgOut("before: %s\n", mem);
+        // A finger that moved is a drag (open() checks): there is no finger,
+        // so where it "began" is wherever the input device last was.
+        if (s_indev) lv_indev_get_point(s_indev, &s.pressStart);
+        const uint32_t t0 = micros();
+        open(*cardOf(cards[a.card]));
+        const uint32_t us = micros() - t0;
+        dbgMem(mem, sizeof(mem));
+        dbgOut("open card %d: built in %lu us; window %ldx%ld px, propH %ld, hero %ldx%ld; %s\n",
+               a.card, (unsigned long)us, (long)lv_area_get_width(&s.winRect),
+               (long)lv_area_get_height(&s.winRect), (long)s.propH, (long)s.heroW, (long)s.heroH, mem);
+    }
+    s_dreq.store(DREQ_DONE);
+}
+
+void CardPopup::beginDebug(HttpServer &http) {
+    http.addRoute("/popup", HTTP_GET, handlePopup);
+    lv_timer_create(debugService, 20, nullptr);
+}
+#endif

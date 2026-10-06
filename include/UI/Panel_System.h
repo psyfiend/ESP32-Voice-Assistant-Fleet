@@ -189,6 +189,7 @@ private:
     
     // -- Logic --
     bool _expanded;
+    int32_t _openH = 0;    // the drawer's open height: anim_height_cb() keeps the contents' bottom on the edge
     ToggleCallback _onToggle;
 
     // -- Animation --

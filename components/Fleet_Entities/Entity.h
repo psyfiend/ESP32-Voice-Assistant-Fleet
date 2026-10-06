@@ -173,15 +173,83 @@ struct EntityDescriptor {
 //   rgb     HA sends rgb_color for every colour mode, colour temperature
 //           included, so one field covers both
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// What a LIGHT can do - HA's `supported_color_modes`, folded into four bits.
+// 2.10b (#65).
+//
+// HA's modes are onoff, brightness, color_temp, hs, xy, rgb, rgbw, rgbww and
+// white. Every one but onoff can be dimmed, and every colour mode (hs, xy,
+// rgb*) means "has a hue", which is all a control needs to know - so:
+//
+//   LIGHT_CAN_DIM     brightness           (any mode but onoff)
+//   LIGHT_CAN_TEMP    colour temperature   (color_temp)
+//   LIGHT_CAN_COLOUR  a hue                (hs, xy, rgb, rgbw, rgbww)
+//
+// 0 means NOT REPORTED, which is different from "on/off only"
+// (LIGHT_CAN_ONOFF alone): a light whose source has not said what it can do
+// gets only the controls that are always safe - on and off.
+//
+// Capabilities come from the source every time it reports - HA sends
+// supported_color_modes with every state - so nothing here is saved to flash.
+// ---------------------------------------------------------------------------
+enum LightCapBits : uint8_t {
+    LIGHT_CAN_ONOFF  = 1u << 0,
+    LIGHT_CAN_DIM    = 1u << 1,
+    LIGHT_CAN_TEMP   = 1u << 2,
+    LIGHT_CAN_COLOUR = 1u << 3,
+};
+
+// Which of those the light is showing right now - HA's `color_mode`.
+enum class LightMode : uint8_t {
+    LMODE_UNKNOWN = 0,
+    LMODE_ONOFF,
+    LMODE_DIM,       // brightness only
+    LMODE_TEMP,      // a white, by colour temperature
+    LMODE_COLOUR,    // a hue
+};
+
 struct EntityAttrs {
     char     icon[ENTITY_ICON_MAX] = {0};  // attributes.icon; "" = not sent
     int16_t  brightness = -1;              // 0-255; -1 = not reported
     uint32_t rgb        = 0;               // 0xRRGGBB, valid when hasRgb
     bool     hasRgb     = false;
 
+    // A light's, 2.10b. HA reports these as null while the light is off, and
+    // so does VirtualProvider: -1 / LMODE_UNKNOWN then, never a remembered
+    // value - the BULB remembers its brightness, and says so when it is on.
+    uint8_t   lightCaps  = 0;              // LightCapBits; 0 = not reported
+    LightMode lightMode  = LightMode::LMODE_UNKNOWN;
+    int16_t   colorTempK = -1;             // kelvin
+    uint16_t  minTempK   = 0, maxTempK = 0;   // the light's range; 0 = not reported
+    int16_t   hue        = -1;             // 0-359
+    int8_t    sat        = -1;             // 0-100
+
     bool equals(const EntityAttrs &o) const {
         return brightness == o.brightness && hasRgb == o.hasRgb &&
-               (!hasRgb || rgb == o.rgb) && strcmp(icon, o.icon) == 0;
+               (!hasRgb || rgb == o.rgb) && strcmp(icon, o.icon) == 0 &&
+               lightCaps == o.lightCaps && lightMode == o.lightMode &&
+               colorTempK == o.colorTempK && minTempK == o.minTempK &&
+               maxTempK == o.maxTempK && hue == o.hue && sat == o.sat;
+    }
+};
+
+// ---------------------------------------------------------------------------
+// A command to a light: HA's light.turn_on / turn_off with their data. Each
+// field left at its "not set" value is not sent, and the light keeps it.
+//
+// A brightness, temperature or colour means ON - as in HA, where sending one
+// to a light that is off turns it on. Temperature and colour are exclusive;
+// if both are set, colour wins.
+// ---------------------------------------------------------------------------
+struct LightCommand {
+    int8_t  on         = -1;   // -1 not set, 0 off, 1 on
+    int16_t brightness = -1;   // 1-255
+    int16_t colorTempK = -1;
+    int16_t hue        = -1;   // 0-359, with sat
+    int8_t  sat        = -1;   // 0-100
+
+    bool wantsOn() const {
+        return on == 1 || brightness > 0 || colorTempK > 0 || hue >= 0;
     }
 };
 
@@ -231,6 +299,18 @@ struct Entity {
     bool        pending        = false;
     EntityValue prevValue;             // value before the optimistic write
     uint32_t    pendingSinceMs = 0;
+
+    // THE SAME, FOR A LIGHT'S LEVELS (2.10b): a brightness, temperature or
+    // colour command applies at once and waits for the source to agree. Kept
+    // apart from `pending` because the two resolve separately - "on" can be
+    // confirmed while the brightness is still fading toward its target.
+    // `attrCmd` is the LATEST command: while a slider is dragged, commands go
+    // out every 300 ms and echoes of the earlier ones arrive late; only one
+    // matching the latest ends the wait (EntityRegistry::setAttrs()).
+    bool         attrPending        = false;
+    LightCommand attrCmd;
+    EntityAttrs  prevAttrs;            // what to fall back to
+    uint32_t     attrPendingSinceMs = 0;
 
     // Did the LAST command on this entity fail to take?
     //

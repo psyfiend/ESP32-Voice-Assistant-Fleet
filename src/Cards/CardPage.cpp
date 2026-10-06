@@ -557,6 +557,7 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
                                                              : cs.tempUnit);
         c->setLabelMode(cs.labelMode == CardLabel::LBL_INHERIT ? spec.labelMode
                                                                : cs.labelMode);
+        c->setGroupOn(cs.groupOn);
         if (cs.longStaleMs) c->setLongStaleMs(cs.longStaleMs);
         if (cs.paused)      c->setPaused(true);
 

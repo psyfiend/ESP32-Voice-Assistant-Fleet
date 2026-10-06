@@ -83,24 +83,6 @@ bool StateCard::onFill(int32_t fromBottom, int pct) const {
     return fromBottom * 100 < h * pct;
 }
 
-uint8_t StateCard::activeCount() const {
-    uint8_t n = 0;
-    for (uint8_t i = 0; i < primaryCount(); i++) {
-        const Entity *e = primary(i);
-        if (!e || !e->everSet) continue;
-        // A state entity is a bool. Anything numeric that reached an actor
-        // card - a dimmable light reporting brightness - is on when nonzero,
-        // which is the same question asked of a different type.
-        switch (e->value.type) {
-            case ValueType::BOOL:  if (e->value.b)        n++; break;
-            case ValueType::INT:   if (e->value.i != 0)   n++; break;
-            case ValueType::FLOAT: if (e->value.f != 0.f) n++; break;
-            default: break;
-        }
-    }
-    return n;
-}
-
 void StateCard::render() {
     const Entity *e = primary();
     if (!e) return;
@@ -108,9 +90,9 @@ void StateCard::render() {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
 
-    const uint8_t total  = primaryCount();
+    const uint8_t total  = liveCount();    // paused members are out (2.10b)
     const uint8_t active = activeCount();
-    const bool    isOn    = active > 0;
+    const bool    isOn    = groupIsOn();   // any, or all - GroupOn (2.10b)
     const bool    isMixed = active > 0 && active < total;
 
     // --- Disc geometry, derived from the type scale -----------------------
@@ -196,16 +178,25 @@ void StateCard::render() {
 
     // --- Brightness, from the source's attributes. cards.md section 13 ----
     //
-    // Only a single-entity card: an aggregate of several lights has no one
-    // brightness to show, and averaging them would draw a level no light is
-    // actually at. -1 means the entity does not report one - an on/off light,
-    // a door - and such a card fills completely when on, exactly as before.
+    // A GROUP SHOWS THE MEAN, AS HA'S LIGHT GROUP DOES (owner, 2.10b; read
+    // from HA's group/light.py: brightness = the mean over the members that
+    // are ON and report one). One at 100% and one at 50% fills to 75%. It used
+    // to be single-entity only. -1 means no member reports one - an on/off
+    // light, a door - and the card fills completely when on, as before.
     const EntityAttrs &a = e->attrs;
-    const bool single = (total == 1);
+    const bool single = (primaryCount() == 1);
     int pct = 100;
-    if (single && isOn && a.brightness >= 0) {
-        pct = (a.brightness * 100 + 127) / 255;
-        if (pct < 1) pct = 1;   // on is never drawn as empty
+    if (isOn) {
+        int32_t sum = 0, n = 0;
+        for (uint8_t i = 0; i < primaryCount(); i++) {
+            const Entity *m = primary(i);
+            if (!counts(m) || !(m->value.type == ValueType::BOOL && m->value.b)) continue;
+            if (m->attrs.brightness >= 0) { sum += m->attrs.brightness; n++; }
+        }
+        if (n) {
+            pct = (int)((sum / n * 100 + 127) / 255);
+            if (pct < 1) pct = 1;   // on is never drawn as empty
+        }
     }
 
     // Where each element's centre sits, measured up from the surface's bottom
@@ -359,6 +350,7 @@ void StateCard::render() {
 
 void StateCard::commandAll(bool on) {
     for (uint8_t i = 0; i < primaryCount(); i++) {
+        if (!counts(primary(i))) continue;   // a paused member is out of the group
         command(i, EntityValue::makeBool(on));
     }
 }

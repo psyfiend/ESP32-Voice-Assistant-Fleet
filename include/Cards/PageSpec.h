@@ -86,6 +86,9 @@ struct CardSpec {
     // What the line under a state card's hero says. See CardLabel.
     CardLabel     labelMode = CardLabel::LBL_INHERIT;
 
+    // With several primaries: on when any of them is, or only when all are.
+    GroupOn       groupOn = GroupOn::GROUP_ON_ANY;
+
     // 0 = use cardLongStaleMs() for this entity's kind.
     uint32_t longStaleMs = 0;
 

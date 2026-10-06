@@ -77,13 +77,9 @@ protected:
     void buildBody(lv_obj_t *body) override;
     void render() override;
 
-    // How many bound primaries are currently on. Returns the count rather than
-    // a bool so a caller can tell all / none / some apart in one read, which is
-    // what the mixed-state indicator needs.
-    //
-    // Protected rather than private because the domain types built on this
-    // layout need it to decide what a tap should ask for.
-    uint8_t activeCount() const;
+    // How many bound primaries are on: Card::activeCount() (moved up at 2.10b,
+    // so the popup and the GroupOn rule share it). A count rather than a bool,
+    // so all / none / some are told apart in one read - the mixed indicator.
 
     // Command every bound primary to `on`. The shared half of what a tap does;
     // WHETHER a tap does anything is the domain type's business, which is why

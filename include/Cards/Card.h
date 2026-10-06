@@ -115,6 +115,21 @@ public:
     Card &setLabelMode(CardLabel m) { _labelMode = m; return *this; }
     CardLabel labelMode() const { return _labelMode; }
 
+    // With several primaries: on when any is, or only when all are. See
+    // GroupOn. Changing it repaints (the popup's deck changes it live).
+    Card &setGroupOn(GroupOn g);
+    GroupOn groupOn() const { return _groupOn; }
+
+    // Is this card ON, by its GroupOn rule? Counts the bound primaries that
+    // are on - a bool that is true, or a number that is not zero.
+    bool groupIsOn() const;
+    uint8_t activeCount() const;
+
+    // Does this member count? A paused member is out of its group - not on,
+    // not off, not commanded - unless every member is paused (2.10b).
+    bool counts(const Entity *e) const;
+    uint8_t liveCount() const;   // the members that count
+
     // The resolved variant - never VAR_AUTO. Valid after build().
     CardVariant variant() const { return _resolved; }
 
@@ -485,6 +500,7 @@ private:
     bool            _valueSmall  = false; // resolveVariant(): hero at VALUE_SM
     TempUnit        _tempUnit    = TempUnit::TEMP_INHERIT;
     CardLabel       _labelMode   = CardLabel::LBL_INHERIT;
+    GroupOn         _groupOn     = GroupOn::GROUP_ON_ANY;
     // NO _paused HERE. Issue #60 moved it onto Entity, because pausing is a
     // property of the thing and not of the view - the same reasoning that put
     // cmdFailed on the entity. Two cards on one switch used to be able to
