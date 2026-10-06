@@ -2299,11 +2299,16 @@ void deckCreate() {
     // shadow it casts downward, all of which lie inside the pane - painted out
     // in the pane's colour. Kept one border-width clear of the pane's right
     // edge, which carries on down past the tab.
+    // AND THE SHADOW IT CASTS TO THE LEFT: a shadow spreads sideways too, and
+    // round the tab's lower-left corner it showed below the pane's edge as a
+    // small grey crescent at the foot of the inner curve (owner, 2026-10-06 -
+    // "thought it was crud on the glass"). The block reaches left by the
+    // shadow's width; the curve's arcs are drawn over it.
     const UIMetrics &m = UI::met();
     const int32_t reach = m.SHADOW ? UI::sc(m.SHADOW) + UI::sc(m.SHADOW_Y) + 2 : 0;
     lv_obj_t *block = plain(s.deck);
-    lv_obj_set_pos (block, tabX, tabAbove + bw);
-    lv_obj_set_size(block, tabW - bw, r + bw + reach);
+    lv_obj_set_pos (block, tabX - reach, tabAbove + bw);
+    lv_obj_set_size(block, tabW - bw + reach, r + bw + reach);
     lv_obj_set_style_bg_color(block, UI::c(p.SURFACE_ALT), 0);
     lv_obj_set_style_bg_opa  (block, LV_OPA_COVER, 0);
 

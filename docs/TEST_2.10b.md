@@ -181,6 +181,26 @@ Flashed 2026-10-06: **WS_P4_5** (debug flags), **WS_P4_4B**, **CYD_P4_1060**.
 | Y2 | 1060: open any window | ~100 mm wide (round 5: ~129); the X within an easy reach |
 | Y3 | P4_5 and 4B: open any window | Unchanged from round 5 (93 mm and ~60 mm) |
 
+**Round 6 results (owner, 2026-10-06):** passed; asked for two more before the merge: a small grey
+crescent at the foot of the SETTINGS tab's inner curve (seen on every board, in screenshots too),
+and the system drawer's contents standing still while its edge moves (#81).
+
+## Round 7 - before the merge gate
+
+Flashed 2026-10-06: **WS_P4_5** (debug flags), **WS_P4_4B**, **CYD_P4_1060**. **New in this build:
+LVGL's pool is in PSRAM at 512 KB on every P4** (#88) - the internal pool was 128 KB.
+
+| # | Do this | PASS if |
+|---|---|---|
+| X1 | Linen: open any window's SETTINGS deck, look at the foot of the inner curve | No grey crescent below the pane's edge |
+| X2 | Midnight: the same | Nothing there either (Midnight casts no shadow; say if you saw it there before) |
+| X3 | Open and close the system drawer (swipe down, right half) | The contents slide down WITH the bottom edge, like the deck's panels, and slide back up with it |
+| X4 | Use the board normally for a few minutes: swipe pages, open windows, scheme changes | Feels as before. Page swipes and scheme changes may be a little slower (full-screen frames ~10%); say if you notice |
+| X5 | HA free-heap sensor over the next hours | Internal free heap ~128 KB higher than before |
+
+Measured on WS_P4_5 (Fleet page): internal heap free at boot 361 KB (was 233). LVGL's pool 500 KB
+usable; with All Lamps' window and deck open 99 KB used, biggest free block 399 KB (was 13 KB).
+
 ## Not tested (by Claude)
 
 Everything below was driven over `/popup` with no finger on the glass, so **nothing about touch has
