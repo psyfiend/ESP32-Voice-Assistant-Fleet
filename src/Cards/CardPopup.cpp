@@ -2312,6 +2312,17 @@ void deckCreate() {
     lv_obj_set_style_bg_color(block, UI::c(p.SURFACE_ALT), 0);
     lv_obj_set_style_bg_opa  (block, LV_OPA_COVER, 0);
 
+    // THE SEAM: the tip of the tab's left border, on the pane's edge line at
+    // the foot of the curve. The curve's fill arc covers it only up to its own
+    // anti-aliased rim, so a 3-pixel speck was left (owner, round 7: "now that
+    // I know about it I can't ignore it"). Painted out here; the arcs below are
+    // drawn after, so nothing of the curve is lost.
+    lv_obj_t *seam = plain(s.deck);
+    lv_obj_set_pos (seam, tabX - 2, tabAbove - bw - 1);
+    lv_obj_set_size(seam, 3 * bw + 4, 2 * bw + 2);
+    lv_obj_set_style_bg_color(seam, UI::c(p.SURFACE_ALT), 0);
+    lv_obj_set_style_bg_opa  (seam, LV_OPA_COVER, 0);
+
     // The inner curve where the tab meets the pane's edge: a concave corner,
     // which LVGL has no shape for. Two quarter arcs centred a radius out from
     // the join: a thick one in the pane's colour fills the corner outside the
