@@ -137,8 +137,9 @@ constexpr uint32_t POPUP_TICK_MS      = 250;
 // THE P4_5 IS THE REFERENCE (owner, 2026-10-05: its toggle "is the perfect
 // size"). Its window is 787 x 545 px (68.1 x 47.1 mm) with the system header
 // showing, and its hero 349 px of that height (30.2 mm, measured with calipers
-// at 30). Every board's window takes this shape where the screen allows, and
-// what is inside it the same share of it - see open(), propH and pm().
+// at 30). What is inside a window is sized as the same share of the biggest
+// window of THIS shape that fits in it - see open(), propH and pm(). (The
+// window itself has been up to 2:1 since 2026-10-06.)
 constexpr float POPUP_ASPECT  = 787.0f / 545.0f;
 constexpr float REF_WIN_H_MM  = 47.1f;   // the P4_5 window's height, header showing
 constexpr float HERO_H_MM     = 30.2f;   // its hero's
@@ -211,7 +212,7 @@ struct Popup {
 
     // The settings deck (pathway 1, card-sheet 11.1): see "The settings deck".
     lv_obj_t *deck = nullptr, *deckTab = nullptr, *deckTabLbl = nullptr, *deckPane = nullptr;
-    lv_obj_t *chipPause[2] = {nullptr, nullptr};   // Off, On
+    lv_obj_t *swPause = nullptr;                   // the Paused switch
     lv_obj_t *chipGroup[2] = {nullptr, nullptr};   // Any, All
     int32_t   deckH = 0, deckHead = 0;
     int32_t   deckHide = 0;   // how much of the pane stays below the screen when open
@@ -551,20 +552,42 @@ void makeLabelRow(lv_obj_t *col) {
     if (!s.builtPaused) lv_obj_add_flag(s.pill, LV_OBJ_FLAG_HIDDEN);
 }
 
-// THE COLUMN BESIDE A TOGGLE OR SLIDER HAS ONE SIZE (owner, round 3: "all of
-// the text locations should be fixed"): as wide as a full selector - Power and
-// three controls - and as tall as the hero. A light with fewer controls, a
-// pause, a different control: nothing moves, the slider included (the row is
-// centred, so a narrower column used to slide the whole row sideways).
-int32_t fixedColW() {
+// THE COLUMN BESIDE A TOGGLE OR SLIDER: as wide as THIS light's selector, or
+// a fixed allowance for the words, whichever is wider - and as tall as the
+// hero - and the row is centred in the window (owner, round 4, "centre by real
+// width"). So a toggle and its words sit centred; a light with four or five
+// controls is centred as a whole; one with two or three moves in from the
+// left edge. For any one light nothing moves - not with the control showing,
+// a pause, or changing words, which the allowance covers (a round 3 lesson:
+// a column sized from its text moved the slider every time the text changed).
+int32_t selectorW(uint8_t caps) {
     const int32_t g = mm(0.6f);
-    const int32_t sel = 2 * g + 4 * UI::minTouch() + 4 * g + LV_MAX(2, mm(0.25f));
-    const int32_t room = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4);
-    return LV_MIN(room, sel + mm(6));
+    uint8_t n = 1;   // Power
+    if (caps & LIGHT_CAN_DIM)    n++;
+    if (caps & LIGHT_CAN_TEMP)   n++;
+    if (caps & LIGHT_CAN_COLOUR) n++;
+    const bool div = n > 1;
+    const uint8_t children = n + (div ? 1 : 0);
+    return 2 * g + n * UI::minTouch() + (children - 1) * g + (div ? LV_MAX(2, mm(0.25f)) : 0);
 }
 
-void fixColumn(lv_obj_t *col) {
-    lv_obj_set_width     (col, fixedColW());
+int32_t colWidth(bool light, uint8_t caps) {
+    const UIType &t = UI::type();
+    int32_t w = textW(s.nEnt > 1 ? "Changed 59m ago, 9 paused" : "Changed 59m ago", t.TAG);
+    w = LV_MAX(w, textW("Unavailable", UIToolkit::Font_Hero));
+    // The label line with the PAUSED pill beside it (makeLabelRow()).
+    const int32_t pill = textW("PAUSED", t.TAG) + 2 * mm(1.2f) + 6 * mm(0.2f);
+    w = LV_MAX(w, textW("Temperature", t.TAG) + mm(1.6f) + pill);
+    if (light) {
+        w = LV_MAX(w, selectorW(caps));
+        if (caps & LIGHT_CAN_COLOUR) w = LV_MAX(w, 4 * mm(6.5f) + 3 * mm(1.6f) + 2 * mm(0.6f));
+    }
+    const int32_t room = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4);
+    return LV_MIN(room, w);
+}
+
+void fixColumn(lv_obj_t *col, int32_t width) {
+    lv_obj_set_width     (col, width);
     lv_obj_set_height    (col, LV_SIZE_CONTENT);
     lv_obj_set_style_min_height(col, s.heroH, 0);
     lv_obj_set_flex_flow (col, LV_FLEX_FLOW_COLUMN);
@@ -1224,7 +1247,7 @@ void buildMain() {
         s.builtCaps = caps;
         buildLightHero(row);
         lv_obj_t *col = plain(row);
-        fixColumn(col);
+        fixColumn(col, colWidth(true, caps));
         buildLightColumn(col);
         renderLight();
         return;
@@ -1282,7 +1305,7 @@ void buildMain() {
     lv_obj_set_style_min_width(col, colMin < colMax ? colMin : colMax, 0);
     // A toggle's column is the slider's: the same size, the lines in the
     // same places (owner, round 3).
-    if (s.toggleHero) fixColumn(col);
+    if (s.toggleHero) fixColumn(col, colWidth(false, 0));
 
     makeLabelRow(col);
 
@@ -1576,9 +1599,12 @@ void buildContents() {
     lv_obj_set_style_pad_column(right, gap, 0);
     // The mock's chart icon - axes and bars (mdi:chart-bar, generated
     // 2026-10-05; clock-outline stood in until then).
-    s.btnHistory = iconButton(right, MDI_CHART_BAR, t.ICON_MD, historyCb);
-    // D4: a card standing for several things gets the members icon.
+    // D4: a card standing for several things gets the members icon - INSIDE
+    // the chart, which is always in the corner (owner, 2026-10-06: nearly
+    // every window has a chart, few have members). Made first: the row is
+    // end-aligned, so the last made is the one in the corner.
     if (s.nEnt > 1) s.btnMembers = iconButton(right, MDI_LIGHTBULB_GROUP, t.ICON_MD, membersCb);
+    s.btnHistory = iconButton(right, MDI_CHART_BAR, t.ICON_MD, historyCb);
 
     // --- The stage: whichever view is showing -------------------------------
     s.stage = plain(s.win);
@@ -2135,9 +2161,10 @@ void deckChipSelect(lv_obj_t *c, bool selected) {
 }
 
 void deckRender() {
-    const bool paused = aggregate().paused;
-    deckChipSelect(s.chipPause[0], !paused);
-    deckChipSelect(s.chipPause[1],  paused);
+    if (s.swPause) {
+        if (aggregate().paused) lv_obj_add_state  (s.swPause, LV_STATE_CHECKED);
+        else                    lv_obj_remove_state(s.swPause, LV_STATE_CHECKED);
+    }
     const bool all = (s.groupOn == GroupOn::GROUP_ON_ALL);
     deckChipSelect(s.chipGroup[0], !all);
     deckChipSelect(s.chipGroup[1],  all);
@@ -2154,8 +2181,8 @@ void groupChipCb(lv_event_t *ev) {
 
 // Paused: Off / On. Through the card when it is the held one (it repaints at
 // once, and every card on the same entities follows through the registry).
-void pauseChipCb(lv_event_t *ev) {
-    const bool on = lv_event_get_user_data(ev) != nullptr;
+void pauseSwitchCb(lv_event_t *ev) {
+    const bool on = lv_obj_has_state((lv_obj_t *)lv_event_get_target(ev), LV_STATE_CHECKED);
     // In a member's own view, only that member (2.10b) - the registry, and
     // every card on it follows.
     Card *c = (s.view == PopupView::VIEW_MEMBER) ? nullptr : cardOf(h.surface);
@@ -2319,9 +2346,26 @@ void deckFill() {
     const bool paused = aggregate().paused;
 
     // Paused first: the one that works, and the one a person comes for.
+    // A SWITCH, NOT "Off / On" (owner, 2026-10-06): "On" could be read as
+    // "updates on" as easily as "paused on". A switch beside the word Paused
+    // has one reading. Knob right, in the accent: paused.
     lv_obj_t *row = deckRow(pane, "Paused");
-    s.chipPause[0] = deckChip(row, "Off", true, !paused, pauseChipCb, nullptr);
-    s.chipPause[1] = deckChip(row, "On",  true,  paused, pauseChipCb, (void *)1);
+    s.swPause = lv_switch_create(row);
+    lv_obj_remove_style_all(s.swPause);
+    lv_obj_set_size(s.swPause, mm(11.0f), mm(6.0f));
+    lv_obj_set_style_radius  (s.swPause, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(s.swPause, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 18)), LV_PART_MAIN);
+    lv_obj_set_style_radius  (s.swPause, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_TRANSP, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_COVER, UI::part(LV_PART_INDICATOR, LV_STATE_CHECKED));
+    lv_obj_set_style_bg_color(s.swPause, UI::c(p.ACCENT), UI::part(LV_PART_INDICATOR, LV_STATE_CHECKED));
+    lv_obj_set_style_radius  (s.swPause, LV_RADIUS_CIRCLE, LV_PART_KNOB);
+    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_COVER, LV_PART_KNOB);
+    lv_obj_set_style_bg_color(s.swPause, UI::c(p.TEXT), LV_PART_KNOB);
+    lv_obj_set_style_pad_all (s.swPause, -mm(0.6f), LV_PART_KNOB);
+    if (paused) lv_obj_add_state(s.swPause, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(s.swPause, pauseSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
 
     // A card for several things: HA's group helper option (owner, 2026-10-05).
     // Live, and kept in RAM until saving arrives (2.10d).
@@ -2382,7 +2426,7 @@ void deckEnd() {
         }
     }
     s.deck = s.deckTab = s.deckTabLbl = s.deckPane = nullptr;
-    s.chipPause[0] = s.chipPause[1] = nullptr;
+    s.swPause = nullptr;
     s.chipGroup[0] = s.chipGroup[1] = nullptr;
     s.deckState  = DECK_HIDDEN;
     s.deckFilled = false;
@@ -2629,20 +2673,23 @@ void CardPopup::open(Card &card) {
     // --- Where the window goes ---------------------------------------------
     // Tall: from just under the system header to just above the deck's tab.
     //
-    // WIDE: THE P4_5'S PROPORTIONS, WHEREVER THE SCREEN ALLOWS (owner,
-    // 2026-10-05). It used to be 68 mm on every board, which on the 7" panels
-    // made a window taller than wide, its toggle the biggest share of it. Now
-    // the width is the height times the P4_5 window's aspect (POPUP_ASPECT),
-    // capped by the screen - which on the 4B it is. The height used is the one
-    // WITH the system header showing, so hiding the header makes the window
-    // taller but never wider.
+    // WIDE: UP TO TWICE AS WIDE AS TALL, AND NEVER NEAR THE SCREEN'S SIDES
+    // (owner, 2026-10-06). Round 1 of 2.10b gave every board the P4_5
+    // window's 787:545 shape - itself inherited from the mock, which was drawn
+    // for the 4B - and that held the P4_5 to 68 mm on a 110 mm screen, its
+    // title ellipsised, with room to spare. Now 2:1, capped so a gap of at
+    // least 6 mm or 8% of the screen's width stays on each side: P4_5 ~93 mm,
+    // the 7" panels ~129 mm, the 4B ~60 mm. The height used is the one WITH
+    // the system header showing, so hiding the header makes the window taller
+    // but never wider. The hero stays tied to the height (propH, below).
     lv_obj_t *scr = lv_screen_active();
     const int32_t sw = lv_obj_get_width(scr), sh = lv_obj_get_height(scr);
     const int32_t top    = UIToolkit::systemHeaderPx() + mm(2);
     const int32_t bottom = sh - mm(6) - mm(2);   // mm(6): the deck's tab
     const int32_t refH   = bottom - (UIToolkit::systemHeaderFullPx() + mm(2));
-    int32_t w = (int32_t)lroundf((float)refH * POPUP_ASPECT);
-    if (w > sw - 2 * mm(3)) w = sw - 2 * mm(3);
+    const int32_t side   = LV_MAX(mm(6), sw * 8 / 100);
+    int32_t w = 2 * refH;
+    if (w > sw - 2 * side) w = sw - 2 * side;
     s.winRect.x1 = (sw - w) / 2;
     s.winRect.x2 = s.winRect.x1 + w - 1;
     s.winRect.y1 = top;
