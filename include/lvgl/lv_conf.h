@@ -106,7 +106,18 @@
     // composite a 615 px panel, and that is fixed at the source. Do not raise
     // this again without watching ESP.getFreeHeap() on a board that is trying
     // to hold a socket - "it links" is not the test.
-    #define LV_MEM_SIZE (128 * 1024U)          /**< [bytes] */
+    //
+    // ALL OF THAT IS ABOUT THE POOL IN INTERNAL RAM. In PSRAM
+    // (-D FLEET_LV_MEM_PSRAM, below) its size costs no internal RAM, so a board
+    // may give it more: -D FLEET_LV_MEM_KB=512 on every P4 since 2026-10-06
+    // (#88, 2.10b) - ~4x the peak a popup reached, and a few percent of the
+    // PSRAM. Measured on WS_P4_5: internal heap free 233 -> 361 KB; full-screen
+    // frames ~10% slower, the popup's opening frame ~2 ms, a card's no change.
+    #if defined(FLEET_LV_MEM_PSRAM) && defined(FLEET_LV_MEM_KB)
+        #define LV_MEM_SIZE (FLEET_LV_MEM_KB * 1024U)
+    #else
+        #define LV_MEM_SIZE (128 * 1024U)          /**< [bytes] */
+    #endif
 
     /** Size of the memory expand for `lv_malloc()` in bytes */
     #define LV_MEM_POOL_EXPAND_SIZE 0
