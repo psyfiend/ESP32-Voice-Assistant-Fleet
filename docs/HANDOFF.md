@@ -1,4 +1,4 @@
-# Handoff — 2026-10-06
+# Handoff — 2026-10-06 (2.10c built, before the owner's test)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was rewritten from scratch on
@@ -20,7 +20,8 @@ What a board does: boots into two pages (House = the owner's 18 HA entities over
 Fleet = MQTT/system/virtual cards), swiped with wrap-around; three colour schemes (Midnight
 default, Fleet, Linen with real shadows); card types with state icons; an FPS/CPU overlay;
 `/screenshot` and `/bench` over HTTP; **a long press opens a card's popup window**, and a light's
-window has its controls (2.10b) - working on the virtual lamps; HA lights get on/off until 2.10c.
+window has its controls (2.10b) - on the virtual lamps in `v0.2.9`, and on HA's lights, with
+members and scenes, on the 2.10c branch (below).
 
 ## The card popup: 2.10a DONE (`v0.2.8`), 2.10b DONE (`v0.2.9`)
 
@@ -39,8 +40,13 @@ Every round, result and measurement: `docs/archive/TEST_2.10a.md` (twelve rounds
 - **`GET /popup`** (DEBUG_POPUP only; parameters in `CardPopup.h`) drives a window from a PC: open,
   switch control, send values, pause, open a member, read LVGL's pool and every lamp's levels.
   Most of 2.10b was checked that way before the owner touched it. Touch itself it cannot test.
+  **`view=3` lists without navigating**; any other `view=` from a member's own view first goes back
+  to the group (a listing that navigated cost one 2.10c round - LESSONS). `ctl=3` is Scenes,
+  `scene=N` loads one. `/bench?what=page` puts the page back afterwards, so the Fleet page cannot be
+  reached from the PC.
 
-**Flashed with v0.2.9, 2026-10-06:** WS_P4_5, WS_P4_4B, CYD_P4_1060. Signed off on WS_P4_5; seen on
+**Flashed with v0.2.9, 2026-10-06:** WS_P4_5, WS_P4_4B, CYD_P4_1060 (the P4_5 and the 4B have since
+been flashed with the 2.10c branch). Signed off on WS_P4_5; seen on
 the 4B and the 1060. The 7B and the 4880 were not connected and run older builds. **WS_S3_4B is
 still locked up**, left as found (#69). All nine compile.
 
@@ -66,21 +72,28 @@ malloc for LVGL is a trap on this hardware. LVGL 9.6: after 2.10 (#88).
   (a normal boot) and filters lines; PlatformIO's Python has pyserial. PowerShell 5.1 strips quotes
   from `python -c "..."`, so write the script to a file.
 
-## What is next — the new session's job: 2.10c, HA light attributes and calls (#65)
+## What is next: 2.10c is BUILT, waiting for the owner's test (#65)
 
-**Not started; confirm with the owner first.** The build order (card-sheet §9): 2.10c HA, 2.10d
-stable ids and saving, 2.10e history. Interview §3 onward (2.8 header slots, then 2.11 groups)
-after 2.10. `docs/ROADMAP.md`'s running order has it.
+**Branch `feat/65-ha-lights`, three steps, each committed:** (1) HA lights get their levels and
+`light.turn_on` with data; (2) the members of a group defined in HA (`light.office`'s three bulbs)
+are learnt and get the Members view, with a paused member taken out (K18); (3) scenes as the
+selector's fifth target, and a stacked window where the selector does not fit (the 4B). What was
+built: **`card-sheet.md` §16**. What HA does, measured from the PC: **`ha-websocket.md` §9**.
+Decisions: DECISIONS C5, K12, K15, K17-K19, A13, W9.
 
-**2.10c's scope:** HaProvider reads a light's attributes into `EntityAttrs` (`supported_color_modes`
--> `lightCaps`, `color_mode`, `brightness`, `color_temp_kelvin` and its min/max, `hs_color`), so
-HA lights get the slider the virtual lamps have; CommandRouter's light sink sends `light.turn_on`
-with data (today it refuses HA light levels, loudly, and the registry reverts them). Scenes
-(`hue_scenes` on `light.office`) as a selector target (§11.2) are in reach.
+**The owner's next job: `docs/TEST_2.10c.md`, rounds 1-3** (H, G, S). Flashed 2026-10-06: **WS_P4_5**
+(COM15) and **WS_P4_4B** (COM7, for S8), both with local debug flags (`platformio.ini` is modified
+and NOT committed: `DEBUG_POPUP` + `DEBUG_FRAMES` on P4_5, `DEBUG_POPUP` on 4B - put it back before
+the merge gate). Everything was driven over `/popup` against the real Office lights; **no finger has
+touched any of it**, and All Lamps (Fleet page) was not re-checked after the card code changed.
 
-**Read first:** HomeTiles' Bridge and light popup (`REFERENCE_PROJECTS.md`, MIT) - the owner was
-struck by its HA-side helpers; `docs/design/ha-websocket.md`; `card-sheet.md` §11-15;
-`components/Fleet_Providers/HaProvider.cpp` and `CommandRouter.cpp`.
+**Then:** fix what the rounds find, the all-nine gate, merge `--no-ff`, tag `v0.2.10`, CHANGELOG.
+After 2.10c: 2.10d stable ids and saving (which also unlocks "add a member as a card", K17), 2.10e
+history; then interview §3 onward. `docs/ROADMAP.md`'s running order has it.
+
+**Real lights (W9):** any Office light may be commanded while testing, and is put back as found
+(100%, 2710 K when last left); **ask before the Kitchen.** PC scripts that drive them are easy to
+rebuild from `ha-websocket.md` §9; the long-lived token is in `ConnectivityLocalSecrets.h`.
 
 **Direction (owner, 2026-10-06)**: a companion web app with a true preview that sends the config to
 the device (#87) - the build sheet becomes its output, not the user's interface; and presentation

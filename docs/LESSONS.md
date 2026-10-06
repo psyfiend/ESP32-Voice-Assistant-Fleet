@@ -521,6 +521,14 @@ next piece of eye candy:
 - **Method: drive the UI from the PC.** `GET /popup` (DEBUG_POPUP) opened windows, switched controls,
   paused members and read the pool, so most of 2.10b was checked before the owner touched it, and
   the owner's rounds found layout and feel instead of plumbing. What it cannot test is touch.
+- **A probe must not move what it measures (2.10c).** The `/popup` listing call also switched the
+  window to its main view. Called from a member's own view, it left the group's view holding the
+  member, so the next "pause" paused the whole room, and every result after it looked like a bug in
+  the code under test - a run of a dozen steps, all wrong for one reason. Now `view=3` only lists.
+  When a whole run fails at once, suspect the instrument first.
+- **HA's reply order is not the bridge's.** After a command to the Hue room, a bulb's report can lag
+  the room's by a second or more: the board showed 2304 K on one bulb for a few seconds after 2710 K
+  had landed. Read HA again before calling a mismatch a bug.
 
 ## Never keep a pointer to an LVGL object you do not own - ask it to tell you when it goes
 
