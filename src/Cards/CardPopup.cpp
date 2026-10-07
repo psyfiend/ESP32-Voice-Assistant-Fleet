@@ -212,8 +212,7 @@ struct Popup {
     // A light's controls (2.10b): see "The light's controls".
     GroupOn   groupOn = GroupOn::GROUP_ON_ANY;   // copied from the card at open
     SceneShow sceneShow = SceneShow::SCENES_VISIBLE;   // likewise (2.10c)
-    lv_obj_t *chipScenes[3] = {nullptr, nullptr, nullptr};   // Visible, All, Off
-    lv_obj_t *chipLook[4] = {nullptr, nullptr, nullptr, nullptr};   // debug: the deck's looks
+    lv_obj_t *ddGroup = nullptr, *ddScenes = nullptr;   // SETTINGS' live dropdowns
     bool      builtPaused = false, rebuildQueued = false;   // "A paused window"
     uint8_t   builtCaps = 0;                     // what the selector was built for
     lv_obj_t *pill = nullptr;                    // PAUSED
@@ -242,8 +241,7 @@ struct Popup {
 
     // The settings deck (pathway 1, card-sheet 11.1): see "The settings deck".
     lv_obj_t *deck = nullptr, *deckTab = nullptr, *deckTabLbl = nullptr, *deckPane = nullptr;
-    lv_obj_t *swPause = nullptr;                   // the Paused switch
-    lv_obj_t *chipGroup[2] = {nullptr, nullptr};   // Any, All
+    lv_obj_t *swPause = nullptr;                   // the Paused checkbox
     int32_t   deckH = 0, deckHead = 0;
     int32_t   deckHide = 0;   // how much of the pane stays below the screen when open
     uint8_t   deckState = 0;                       // DeckState
@@ -2765,49 +2763,159 @@ void deckTabCb(lv_event_t *ev) {
     else                          deckOpen();
 }
 
-// One choice in a row. `live` false: drawn quieter, and taps do nothing.
+// ---------------------------------------------------------------------------
+// THE SETTINGS PANEL'S ROWS (owner, 2026-10-07)
 //
-// FILLED, like the window's X and chart buttons (owner, round 10): a chip in
-// the pane's own colour did not read as a button. Unchosen ones take the card
-// surface, as those discs do; a chosen live one, the accent.
-lv_obj_t *deckChip(lv_obj_t *row, const char *text, bool live, bool selected,
-                   lv_event_cb_t cb, void *user) {
-    const UIPalette &p = UI::pal();
-    lv_obj_t *c = plain(row);
-    lv_obj_set_size(c, LV_SIZE_CONTENT, mm(6.0f));
-    lv_obj_set_style_pad_hor(c, mm(2.0f), 0);
-    lv_obj_set_style_radius(c, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_border_width(c, LV_MAX(1, mm(0.2f)), 0);
-    lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
-    lv_obj_t *l = makeLabel(c, UI::type().TAG, p.TEXT);
-    lv_label_set_text(l, text);
-    lv_obj_center(l);
-    if (live) {
-        lv_obj_set_style_border_color(c, UI::c(p.ACCENT), 0);
-        lv_obj_set_style_bg_color(c, UI::c(selected ? p.ACCENT : p.SURFACE), 0);
-        lv_obj_set_style_text_color(l, UI::c(selected ? UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT)
-                                                      : p.ACCENT), 0);
-        if (cb) {
-            lv_obj_add_flag(c, LV_OBJ_FLAG_CLICKABLE);
-            lv_obj_add_event_cb(c, cb, LV_EVENT_CLICKED, user);
-        }
-    } else {
-        // Quieter: a soft edge, dim words, and the chosen one only a shade
-        // darker than the rest.
-        lv_obj_set_style_border_color(c, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 25)), 0);
-        lv_obj_set_style_bg_color(c, UI::c(selected ? UI::mix(p.SURFACE, p.TEXT_DIM, 35) : p.SURFACE), 0);
-        lv_obj_set_style_text_color(l, UI::c(p.TEXT_DIM), 0);
-    }
-    return c;
+// One list says what the rows are, and both the panel's size and its contents
+// are read from it, so the two cannot disagree. Choices are DROPDOWNS (the row
+// is shorter than a line of chips, and a list of choices can grow); Paused is
+// a CHECKBOX. A row that does not work yet (until saving, 2.10d) is shown,
+// greyed, so the owner can see the whole list.
+// ---------------------------------------------------------------------------
+enum class DeckRowKind : uint8_t { ROW_CHECK, ROW_DROP };
+
+struct DeckRowSpec {
+    const char   *label;
+    DeckRowKind   kind;
+    const char   *opts;     // a dropdown's choices, one per line
+    uint16_t      sel;      // its chosen one, or the checkbox's state
+    bool          live;     // false: shown greyed, does nothing yet
+    lv_event_cb_t cb;
+    lv_obj_t    **out;      // where the control is kept, or null
+};
+constexpr uint8_t DECK_ROWS_MAX = 8;
+
+void pauseCheckCb(lv_event_t *ev);
+void groupDropCb(lv_event_t *ev);
+void scenesDropCb(lv_event_t *ev);
+#ifdef DEBUG_POPUP
+void lookDropCb(lv_event_t *ev);
+#endif
+
+uint8_t deckSpecs(DeckRowSpec *r) {
+    uint8_t n = 0;
+    CardLabel lbl = CardLabel::LBL_INHERIT;
+    if (Card *c = cardOf(h.surface)) lbl = c->labelMode();
+    const uint16_t lblSel = lbl == CardLabel::LBL_NAME ? 1 : lbl == CardLabel::LBL_STATE ? 2
+                          : lbl == CardLabel::LBL_NONE ? 4 : 0;
+    r[n++] = { "Paused", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)aggregate().paused, true,
+               pauseCheckCb, &s.swPause };
+    // When a group defined here counts as on - HA's group helper option.
+    // Not for a group defined in HA or Hue: the source decides (2.10c).
+    if (s.nEnt > 1 && !s.native && !inMember())
+        r[n++] = { "Active state", DeckRowKind::ROW_DROP, "Any members are on\nAll members are on",
+                   (uint16_t)(s.groupOn == GroupOn::GROUP_ON_ALL), true, groupDropCb, &s.ddGroup };
+    r[n++] = { "Label", DeckRowKind::ROW_DROP, "Default\nFrom HA\nState\nCustom\nNone",
+               lblSel, false, nullptr, nullptr };
+    // "Custom name" joins the list when Label can be set to Custom (2.10d).
+    r[n++] = { "Visibility", DeckRowKind::ROW_DROP,
+               "Show on dashboard\nShow only in group\nShow only as member\nHidden", 0, false, nullptr, nullptr };
+    r[n++] = { "Tap action", DeckRowKind::ROW_DROP,
+               "Toggle\nDetails view\nMembers view\nHistory view\nCycle scenes\nNothing", 0, false, nullptr, nullptr };
+    const Entity *sh = sceneHost();
+    if (sh && sh->nScenes && !inMember())
+        r[n++] = { "Scenes", DeckRowKind::ROW_DROP, "Visible scenes only\nShow all scenes\nDisabled",
+                   (uint16_t)(s.sceneShow == SceneShow::SCENES_ALL ? 1 : s.sceneShow == SceneShow::SCENES_OFF ? 2 : 0),
+                   true, scenesDropCb, &s.ddScenes };
+#ifdef DEBUG_POPUP
+    // The control deck's looks to compare on glass (debug builds only).
+    r[n++] = { "Deck look", DeckRowKind::ROW_DROP, "Square\nRound\nSquare, silver\nRound, silver",
+               s_deckLook, true, lookDropCb, nullptr };
+#endif
+    return n;
 }
 
-// Paint a live chip as chosen or not.
-void deckChipSelect(lv_obj_t *c, bool selected) {
-    if (!c) return;
+int32_t deckCtlH() { return mm(6.0f); }
+
+// The widest line of a dropdown's choices.
+int32_t widestLine(const char *opts, const lv_font_t *f) {
+    char line[48];
+    int32_t w = 0;
+    while (opts && *opts) {
+        const char *e = strchr(opts, '\n');
+        const size_t len = e ? (size_t)(e - opts) : strlen(opts);
+        const size_t k = len < sizeof(line) - 1 ? len : sizeof(line) - 1;
+        memcpy(line, opts, k);
+        line[k] = '\0';
+        w = LV_MAX(w, textW(line, f));
+        opts = e ? e + 1 : nullptr;
+    }
+    return w;
+}
+
+int32_t deckCtlW(const DeckRowSpec &r) {
+    if (r.kind == DeckRowKind::ROW_CHECK) return deckCtlH();
+    const lv_font_t *f = UI::type().TAG;
+    return widestLine(r.opts, f) + 2 * mm(1.6f) + textW(LV_SYMBOL_DOWN, f) + mm(1.6f);
+}
+
+constexpr float DECK_PAD_MM = 2.4f;   // the pane's sides
+
+// AS WIDE AS ITS LONGEST ROW (owner): each row's words, a gap, its control.
+int32_t deckNeedW() {
+    DeckRowSpec r[DECK_ROWS_MAX];
+    const uint8_t n = deckSpecs(r);
+    int32_t w = 0;
+    for (uint8_t i = 0; i < n; i++)
+        w = LV_MAX(w, textW(r[i].label, UI::type().NAME) + mm(4.0f) + deckCtlW(r[i]));
+    return w + 2 * mm(DECK_PAD_MM);
+}
+
+lv_obj_t *deckDropdown(lv_obj_t *parent, const DeckRowSpec &r) {
     const UIPalette &p = UI::pal();
-    lv_obj_set_style_bg_color(c, UI::c(selected ? p.ACCENT : p.SURFACE), 0);
-    lv_obj_t *l = lv_obj_get_child(c, 0);
-    if (l) lv_obj_set_style_text_color(l, UI::c(selected ? UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT) : p.ACCENT), 0);
+    const UIType    &t = UI::type();
+    lv_obj_t *dd = lv_dropdown_create(parent);
+    lv_dropdown_set_options(dd, r.opts);
+    lv_dropdown_set_selected(dd, r.sel);
+    lv_obj_set_size(dd, deckCtlW(r), deckCtlH());
+    const int32_t lh = lv_font_get_line_height(t.TAG);
+    lv_obj_set_style_text_font   (dd, t.TAG, 0);
+    lv_obj_set_style_text_font   (dd, t.TAG, LV_PART_INDICATOR);
+    lv_obj_set_style_text_color  (dd, UI::c(r.live ? p.TEXT : p.TEXT_DIM), 0);
+    lv_obj_set_style_bg_color    (dd, UI::c(p.SURFACE), 0);
+    lv_obj_set_style_bg_opa      (dd, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius      (dd, mm(1.2f), 0);
+    lv_obj_set_style_border_width(dd, LV_MAX(1, mm(0.2f)), 0);
+    lv_obj_set_style_border_color(dd, UI::c(r.live ? p.ACCENT : UI::mix(p.SURFACE_ALT, p.TEXT, 25)), 0);
+    lv_obj_set_style_pad_hor     (dd, mm(1.6f), 0);
+    lv_obj_set_style_pad_ver     (dd, LV_MAX(0, (deckCtlH() - lh) / 2 - 1), 0);
+    lv_obj_set_style_shadow_width(dd, 0, 0);
+    if (lv_obj_t *list = lv_dropdown_get_list(dd)) {
+        lv_obj_set_style_text_font   (list, t.TAG, 0);
+        lv_obj_set_style_text_color  (list, UI::c(p.TEXT), 0);
+        lv_obj_set_style_bg_color    (list, UI::c(p.SURFACE), 0);
+        lv_obj_set_style_border_color(list, UI::c(p.ACCENT), 0);
+        lv_obj_set_style_border_width(list, LV_MAX(1, mm(0.2f)), 0);
+        lv_obj_set_style_radius      (list, mm(1.2f), 0);
+        lv_obj_set_style_shadow_width(list, 0, 0);
+        lv_obj_set_style_bg_color    (list, UI::c(p.ACCENT), UI::part(LV_PART_SELECTED, LV_STATE_CHECKED));
+        lv_obj_set_style_text_color  (list, UI::c(UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT)),
+                                      UI::part(LV_PART_SELECTED, LV_STATE_CHECKED));
+        lv_obj_set_style_bg_color    (list, UI::c(UI::mix(p.SURFACE, p.TEXT, 20)),
+                                      UI::part(LV_PART_SELECTED, LV_STATE_PRESSED));
+    }
+    if (!r.live) lv_obj_add_state(dd, LV_STATE_DISABLED);
+    else if (r.cb) lv_obj_add_event_cb(dd, r.cb, LV_EVENT_VALUE_CHANGED, nullptr);
+    return dd;
+}
+
+lv_obj_t *deckCheckbox(lv_obj_t *parent, const DeckRowSpec &r) {
+    const UIPalette &p = UI::pal();
+    lv_obj_t *cb = lv_checkbox_create(parent);
+    lv_checkbox_set_text(cb, "");
+    lv_obj_set_style_text_font   (cb, UI::type().NAME, 0);
+    lv_obj_set_style_pad_column  (cb, 0, 0);
+    lv_obj_set_style_radius      (cb, mm(1.2f), LV_PART_INDICATOR);
+    lv_obj_set_style_border_width(cb, LV_MAX(2, mm(0.3f)), LV_PART_INDICATOR);
+    lv_obj_set_style_border_color(cb, UI::c(p.ACCENT), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color    (cb, UI::c(p.SURFACE), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa      (cb, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color    (cb, UI::c(p.ACCENT), UI::part(LV_PART_INDICATOR, LV_STATE_CHECKED));
+    lv_obj_set_style_text_color  (cb, UI::c(UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT)),
+                                  UI::part(LV_PART_INDICATOR, LV_STATE_CHECKED));
+    if (r.sel) lv_obj_add_state(cb, LV_STATE_CHECKED);
+    if (r.cb) lv_obj_add_event_cb(cb, r.cb, LV_EVENT_VALUE_CHANGED, nullptr);
+    return cb;
 }
 
 void deckRender() {
@@ -2815,24 +2923,21 @@ void deckRender() {
         if (aggregate().paused) lv_obj_add_state  (s.swPause, LV_STATE_CHECKED);
         else                    lv_obj_remove_state(s.swPause, LV_STATE_CHECKED);
     }
-    const bool all = (s.groupOn == GroupOn::GROUP_ON_ALL);
-    deckChipSelect(s.chipGroup[0], !all);
-    deckChipSelect(s.chipGroup[1],  all);
+    if (s.ddGroup) lv_dropdown_set_selected(s.ddGroup, s.groupOn == GroupOn::GROUP_ON_ALL ? 1 : 0);
 }
 
-// On when: any member / all members. On the held card too, so it repaints at
-// once and its tap follows the same rule.
-void groupChipCb(lv_event_t *ev) {
-    s.groupOn = lv_event_get_user_data(ev) ? GroupOn::GROUP_ON_ALL : GroupOn::GROUP_ON_ANY;
+// Active state: any member / all members. On the held card too, so it
+// repaints at once and its tap follows the same rule.
+void groupDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    s.groupOn = k ? GroupOn::GROUP_ON_ALL : GroupOn::GROUP_ON_ANY;
     if (Card *c = cardOf(h.surface)) c->setGroupOn(s.groupOn);
-    deckRender();
     renderMain();
 }
 
 #ifdef DEBUG_POPUP
-void lookChipCb(lv_event_t *ev) {
-    s_deckLook = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
-    for (uint8_t i = 0; i < 4; i++) deckChipSelect(s.chipLook[i], i == s_deckLook);
+void lookDropCb(lv_event_t *ev) {
+    s_deckLook = (uint8_t)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     // The deck is built with the view; the chips' lit look follows at once.
     if (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER) lv_async_call(rebuildMainAsync, nullptr);
     else showView(s.view);
@@ -2841,11 +2946,10 @@ void lookChipCb(lv_event_t *ev) {
 
 // Scenes: Visible / All / Off (2.10c). On the held card, and the window follows
 // at once: the clapperboard comes or goes, and Scenes rebuilds or gives way.
-void scenesChipCb(lv_event_t *ev) {
-    const uintptr_t k = (uintptr_t)lv_event_get_user_data(ev);
+void scenesDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     s.sceneShow = k == 1 ? SceneShow::SCENES_ALL : k == 2 ? SceneShow::SCENES_OFF : SceneShow::SCENES_VISIBLE;
     if (Card *c = cardOf(h.surface)) c->setSceneShow(s.sceneShow);
-    for (uint8_t i = 0; i < 3; i++) deckChipSelect(s.chipScenes[i], i == k);
     s.lastScene = -1;   // the offered list changed under the ring
     if (s.view == PopupView::VIEW_SCENES)
         showView(hasScenes() ? PopupView::VIEW_SCENES : controlsView());
@@ -2854,9 +2958,9 @@ void scenesChipCb(lv_event_t *ev) {
                                 hasScenes(), false);
 }
 
-// Paused: Off / On. Through the card when it is the held one (it repaints at
+// Paused, a checkbox. Through the card when it is the held one (it repaints at
 // once, and every card on the same entities follows through the registry).
-void pauseSwitchCb(lv_event_t *ev) {
+void pauseCheckCb(lv_event_t *ev) {
     const bool on = lv_obj_has_state((lv_obj_t *)lv_event_get_target(ev), LV_STATE_CHECKED);
     // In a member's own view, only that member (2.10b) - the registry, and
     // every card on it follows.
@@ -2871,19 +2975,15 @@ void pauseSwitchCb(lv_event_t *ev) {
     renderMain();
 }
 
-// A row: what it is on the left, its choices on the right.
-lv_obj_t *deckRow(lv_obj_t *pane, const char *what) {
+// A row: what it is on the left, its control on the right.
+lv_obj_t *deckRow(lv_obj_t *pane, const char *what, bool live) {
     lv_obj_t *r = plain(pane);
     lv_obj_set_size     (r, lv_pct(100), mm(DECK_ROW_MM));
     lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_t *l = makeLabel(r, UI::type().NAME, UI::pal().TEXT);
+    lv_obj_t *l = makeLabel(r, UI::type().NAME, live ? UI::pal().TEXT : UI::pal().TEXT_DIM);
     lv_label_set_text(l, what);
-    lv_obj_t *chips = plain(r);
-    lv_obj_set_size     (chips, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(chips, LV_FLEX_FLOW_ROW);
-    lv_obj_set_style_pad_column(chips, mm(1.2f), 0);
-    return chips;
+    return r;
 }
 
 // Built with the window, below the bottom of the screen, inside showWindow()'s
@@ -2914,12 +3014,17 @@ void deckCreate() {
     // A group card has one more row: when it counts as on (2.10b) - a group
     // defined here only; HA or Hue decides that for its own (2.10c).
     // And one for a light's Scenes (2.10c).
-    const Entity *sh = sceneHost();
-    int32_t rows = ((s.nEnt > 1 && !s.native) ? 5 : 4) + ((sh && sh->nScenes && !inMember()) ? 1 : 0);
-#ifdef DEBUG_POPUP
-    rows++;   // Deck look
-#endif
-    s.deckH    = tabAbove + (rf + mm(1.6f)) + rows * mm(DECK_ROW_MM) + mm(4.0f) + mm(1.6f) + s.deckHide;
+    // (The rows come from one list - deckSpecs() - read here for the size and
+    // again by deckFill() for the contents.)
+    DeckRowSpec specs[DECK_ROWS_MAX];
+    const int32_t rows = deckSpecs(specs);
+    s.deckH    = tabAbove + (rf + mm(1.6f)) + rows * mm(DECK_ROW_MM) + mm(1.6f) + s.deckHide;
+    // NEVER TALLER THAN THE WINDOW (owner, 2026-10-07): open, the tab's top
+    // stays at or below the window's top edge. More rows than that: the pane
+    // scrolls.
+    const int32_t maxH = lv_obj_get_height(lv_screen_active()) - s.winRect.y1 + s.deckHide;
+    const bool scroll = s.deckH > maxH;
+    if (scroll) s.deckH = maxH;
 
     s.deck = plain(lv_screen_active());
     lv_obj_set_pos (s.deck, W.x1, deckY(DECK_HIDDEN));
@@ -2933,10 +3038,20 @@ void deckCreate() {
     const int32_t tabW = w / 2;                        // THE RIGHT HALF - see below
     const int32_t tabX = w - tabW;
 
+    // AS WIDE AS ITS LONGEST ROW (owner, 2026-10-07), its right edge on the
+    // window's, never narrower than its own tab. Within a curve's width of the
+    // tab it is made the tab's width: the two then share one straight left
+    // edge, and there is no inner curve to draw.
+    int32_t paneW = LV_CLAMP(tabW, deckNeedW(), w);
+    const bool flush = paneW < tabW + 2 * r;
+    if (flush) paneW = tabW;
+    const int32_t paneX = w - paneW;
+
     lv_obj_t *pane = plain(s.deck);
     s.deckPane = pane;
-    lv_obj_set_pos (pane, 0, tabAbove);
-    lv_obj_set_size(pane, w, s.deckH - tabAbove);
+    lv_obj_set_pos (pane, paneX, tabAbove);
+    lv_obj_set_size(pane, paneW, s.deckH - tabAbove);
+    if (scroll) { lv_obj_add_flag(pane, LV_OBJ_FLAG_SCROLLABLE); UI::tameScroll(pane); }
     lv_obj_set_style_radius      (pane, r, 0);
     lv_obj_set_style_bg_color    (pane, UI::c(p.SURFACE_ALT), 0);
     lv_obj_set_style_bg_opa      (pane, LV_OPA_COVER, 0);
@@ -2944,7 +3059,7 @@ void deckCreate() {
     lv_obj_set_style_border_width(pane, bw, 0);
     lv_obj_add_style             (pane, UI::paint(UIPaint::PAINT_LIFT), 0);
     // The pane's padding keeps its rows below the tab's join.
-    lv_obj_set_style_pad_hor(pane, mm(2.4f), 0);
+    lv_obj_set_style_pad_hor(pane, mm(DECK_PAD_MM), 0);
     lv_obj_set_style_pad_top(pane, rf + mm(1.6f), 0);
     lv_obj_set_style_pad_bottom(pane, mm(1.6f) + s.deckHide, 0);   // nothing in the part that stays hidden
     lv_obj_set_flex_flow(pane, LV_FLEX_FLOW_COLUMN);
@@ -2981,13 +3096,17 @@ void deckCreate() {
     // small grey crescent at the foot of the inner curve (owner, 2026-10-06 -
     // "thought it was crud on the glass"). The block reaches left by the
     // shadow's width; the curve's arcs are drawn over it.
+    // FLUSH (the pane no wider than the tab): there is no pane to the tab's
+    // left, so the block stays one border-width inside both edges, and there
+    // is no seam or curve.
     const UIMetrics &m = UI::met();
-    const int32_t reach = m.SHADOW ? UI::sc(m.SHADOW) + UI::sc(m.SHADOW_Y) + 2 : 0;
+    const int32_t reach = flush ? -bw : (m.SHADOW ? UI::sc(m.SHADOW) + UI::sc(m.SHADOW_Y) + 2 : 0);
     lv_obj_t *block = plain(s.deck);
     lv_obj_set_pos (block, tabX - reach, tabAbove + bw);
-    lv_obj_set_size(block, tabW - bw + reach, r + bw + reach);
+    lv_obj_set_size(block, tabW - bw + reach, r + bw + LV_MAX(0, reach));
     lv_obj_set_style_bg_color(block, UI::c(p.SURFACE_ALT), 0);
     lv_obj_set_style_bg_opa  (block, LV_OPA_COVER, 0);
+    if (flush) { s.deckState = DECK_HIDDEN; s.deckFilled = false; return; }
 
     // THE SEAM: the tip of the tab's left border, on the pane's edge line at
     // the foot of the curve. The curve's fill arc covers it only up to its own
@@ -3033,80 +3152,15 @@ void deckCreate() {
 void deckFill() {
     if (!s.deckPane || s.deckFilled) return;
     s.deckFilled = true;
-    const UIType &t = UI::type();
-    const UIPalette &p = UI::pal();
-    lv_obj_t *pane = s.deckPane;
-
-    // What the label row shows: the card's own choice, or what it inherits.
-    CardLabel lbl = CardLabel::LBL_NAME;
-    if (Card *c = cardOf(h.surface)) lbl = (c->labelMode() != CardLabel::LBL_INHERIT) ? c->labelMode() : cardLabelMode();
-    const bool paused = aggregate().paused;
-
-    // Paused first: the one that works, and the one a person comes for.
-    // A SWITCH, NOT "Off / On" (owner, 2026-10-06): "On" could be read as
-    // "updates on" as easily as "paused on". A switch beside the word Paused
-    // has one reading. Knob right, in the accent: paused.
-    lv_obj_t *row = deckRow(pane, "Paused");
-    s.swPause = lv_switch_create(row);
-    lv_obj_remove_style_all(s.swPause);
-    lv_obj_set_size(s.swPause, mm(11.0f), mm(6.0f));
-    lv_obj_set_style_radius  (s.swPause, LV_RADIUS_CIRCLE, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(s.swPause, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 18)), LV_PART_MAIN);
-    lv_obj_set_style_radius  (s.swPause, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
-    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_TRANSP, LV_PART_INDICATOR);
-    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_COVER, UI::part(LV_PART_INDICATOR, LV_STATE_CHECKED));
-    lv_obj_set_style_bg_color(s.swPause, UI::c(p.ACCENT), UI::part(LV_PART_INDICATOR, LV_STATE_CHECKED));
-    lv_obj_set_style_radius  (s.swPause, LV_RADIUS_CIRCLE, LV_PART_KNOB);
-    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_COVER, LV_PART_KNOB);
-    lv_obj_set_style_bg_color(s.swPause, UI::c(p.TEXT), LV_PART_KNOB);
-    lv_obj_set_style_pad_all (s.swPause, -mm(0.6f), LV_PART_KNOB);
-    if (paused) lv_obj_add_state(s.swPause, LV_STATE_CHECKED);
-    lv_obj_add_event_cb(s.swPause, pauseSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
-
-    // A card for several things: HA's group helper option (owner, 2026-10-05).
-    // Live, and kept in RAM until saving arrives (2.10d). Not for a group
-    // defined in HA or Hue: the source decides when it is on (2.10c).
-    if (s.nEnt > 1 && !s.native) {
-        const bool all = (s.groupOn == GroupOn::GROUP_ON_ALL);
-        row = deckRow(pane, "On when");
-        s.chipGroup[0] = deckChip(row, "Any is on",  true, !all, groupChipCb, nullptr);
-        s.chipGroup[1] = deckChip(row, "All are on", true,  all, groupChipCb, (void *)1);
+    // The rows, from the one list (deckSpecs()): Paused first - the one that
+    // works, and the one a person comes for - then the card's settings.
+    DeckRowSpec r[DECK_ROWS_MAX];
+    const uint8_t n = deckSpecs(r);
+    for (uint8_t i = 0; i < n; i++) {
+        lv_obj_t *row = deckRow(s.deckPane, r[i].label, r[i].live);
+        lv_obj_t *ctl = (r[i].kind == DeckRowKind::ROW_CHECK) ? deckCheckbox(row, r[i]) : deckDropdown(row, r[i]);
+        if (r[i].out) *r[i].out = ctl;
     }
-
-    row = deckRow(pane, "Label");
-    deckChip(row, "HA name", false, lbl == CardLabel::LBL_NAME,  nullptr, nullptr);
-    deckChip(row, "Custom",  false, false,                        nullptr, nullptr);
-    deckChip(row, "State",   false, lbl == CardLabel::LBL_STATE, nullptr, nullptr);
-    deckChip(row, "None",    false, lbl == CardLabel::LBL_NONE,  nullptr, nullptr);
-
-    row = deckRow(pane, "Custom name");
-    deckChip(row, "Edit with keyboard", false, false, nullptr, nullptr);
-
-    row = deckRow(pane, "On the dashboard");
-    deckChip(row, "Shown",  false, true,  nullptr, nullptr);
-    deckChip(row, "Hidden", false, false, nullptr, nullptr);
-
-    // Which scenes the window offers (owner, 2026-10-07): those not hidden in
-    // HA's UI by default. Live, and kept in RAM until saving arrives (2.10d).
-    // Only for a light that has scenes at all.
-    const Entity *sh = sceneHost();
-    if (sh && sh->nScenes && !inMember()) {
-        row = deckRow(pane, "Scenes");
-        s.chipScenes[0] = deckChip(row, "Visible", true, s.sceneShow == SceneShow::SCENES_VISIBLE, scenesChipCb, (void *)0);
-        s.chipScenes[1] = deckChip(row, "All",     true, s.sceneShow == SceneShow::SCENES_ALL,     scenesChipCb, (void *)1);
-        s.chipScenes[2] = deckChip(row, "Off",     true, s.sceneShow == SceneShow::SCENES_OFF,     scenesChipCb, (void *)2);
-    }
-#ifdef DEBUG_POPUP
-    // The control deck's selector, four looks to compare on glass (owner,
-    // 2026-10-07): round / square, without / with an edge in the accent.
-    // Debug builds only; the choice lasts until the board restarts.
-    row = deckRow(pane, "Deck look");
-    static const char *const LOOKS[4] = { "Square", "Round", "Sq. silver", "Rd. silver" };
-    for (uint8_t i = 0; i < 4; i++)
-        s.chipLook[i] = deckChip(row, LOOKS[i], true, s_deckLook == i, lookChipCb, (void *)(uintptr_t)i);
-#endif
-    (void)t; (void)p;
 }
 
 // Open the deck, building its rows the first time.
@@ -3143,9 +3197,7 @@ void deckEnd() {
     }
     s.deck = s.deckTab = s.deckTabLbl = s.deckPane = nullptr;
     s.swPause = nullptr;
-    s.chipGroup[0] = s.chipGroup[1] = nullptr;
-    s.chipScenes[0] = s.chipScenes[1] = s.chipScenes[2] = nullptr;
-    for (lv_obj_t *&c : s.chipLook) c = nullptr;
+    s.ddGroup = s.ddScenes = nullptr;
     s.deckState  = DECK_HIDDEN;
     s.deckFilled = false;
 }

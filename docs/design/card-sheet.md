@@ -564,6 +564,16 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   rounded squares by default. Icons in the text colour, the chosen one in the accent. **Lit corner
   chips take the same metal.** Looks to compare on glass from a debug-only SETTINGS row, "Deck look":
   square / round, gunmetal / silver.
+- **The SETTINGS panel, reworked** (owner, 2026-10-07, K25): one list of rows (`deckSpecs()`) gives
+  both its size and its contents. **As wide as its longest row**, its right edge on the window's,
+  never narrower than its tab (within a curve's width of the tab it is the tab's width, one straight
+  edge, no inner curve). **Never taller than the window**: open, the tab's top stops at the window's
+  top; more rows scroll. **Dropdowns** for choices, **a checkbox** for Paused. Rows: Paused; Active
+  state (Any / All members are on - groups defined here only); Label (Default / From HA / State /
+  Custom / None); Visibility (Show on dashboard / only in group / only as member / Hidden); Tap action
+  (Toggle / Details / Members / History view / Cycle scenes / Nothing); Scenes (Visible scenes only /
+  Show all / Disabled); and in debug builds, Deck look. Label, Visibility and Tap action are shown
+  greyed until saving (2.10d); Custom name joins when Label can be Custom.
 - **Scenes and Colour (wide): the slider and the buttons or swatches are one group**, centred, the
   content centred top to bottom between the chips and the deck. Scenes are **a stack**: one column of
   buttons as wide as the longest name, a second column only when one is full, then scrolling.

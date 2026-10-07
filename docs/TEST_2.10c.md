@@ -154,6 +154,30 @@ Flashed: **WS_P4_5**, **WS_P4_4B**, **CYD_P4_1060**.
 | L9 | Linen | The ribbon, selector and lit chips read clearly |
 | L10 | Members | "Tap a member for more details"; SETTINGS has no note at the bottom |
 
+## Round 6 - after round 5's screenshots, and the SETTINGS panel
+
+Not run as round 5 (the owner looked at screenshots only); this build replaces it. Flashed: **WS_P4_5,
+WS_P4_4B, CYD_P4_1060**. Round 5's L1-L4, L7 and L10 still apply; these replace the rest.
+
+| # | Do this | PASS if |
+|---|---|---|
+| M1 | Colour, then Scenes, on each board | The slider and the swatches (or scene buttons) are one group, centred left to right, the content centred between the chips and the deck |
+| M2 | Scenes | One column of equal-width buttons, centred; a second column only if one would be full (SETTINGS > Scenes > Show all scenes: seven) |
+| M3 | The control deck | No divider: Power on its own short ribbon, a break, then the modes. Rounded squares |
+| M4 | The selector, and a lit corner chip | Metal, not a flat dark block: gunmetal with a lighter top and a sharp step below the middle; the chosen icon in the accent. SETTINGS > Deck look: Square, Round, Square silver, Round silver - which do you like? |
+| M5 | Linen | The ribbon darker than the window, the selector silver, still clear |
+| S1 | Open SETTINGS on Desk | Only as wide as it needs (here its tab's width on the P4_5), its right edge on the window's; open, it never reaches above the window's top |
+| S2 | Paused | A checkbox; ticking it pauses Desk as the switch did |
+| S3 | Scenes dropdown | Opens a list; picking "Show all scenes" or "Disabled" works as round 5's L7 |
+| S4 | Label, Visibility, Tap action | Greyed and not tappable (they work after saving, 2.10d) |
+| S5 | All Lamps (Fleet page) | One more row, Active state (Any / All members are on), and it works as G6-G9 did |
+| S6 | A dropdown near the screen's bottom | Its list opens where it can be read |
+
+## Not tested (by Claude) - round 6
+
+The dropdown lists (`/popup` cannot open them), scrolling a panel taller than the window (no card has
+that many rows yet), All Lamps' Active state, Linen, and everything by finger.
+
 ## Not tested (by Claude) - round 5
 
 The drag and the glide (L3, L4) by finger - `/popup` cannot drag; the looks were screenshotted on

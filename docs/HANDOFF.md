@@ -82,15 +82,13 @@ tabs (K19 superseded, K20), and every FAILED now records why (G8). What was buil
 §16**. What HA does, measured from the PC: **`ha-websocket.md` §9**. Decisions: DECISIONS C5, K12,
 K15, K17-K20, A13, W9.
 
-**The owner's next job: `docs/TEST_2.10c.md` round 5** (L). If G8's FAILED comes back, read the
-reason with `/popup?view=3` before theorising. **Still to build in 2.10c (owner's list, 2026-10-07):**
-the SETTINGS panel rework - no taller than the window (scroll), as wide as its longest row (right edge
-on the window's, never narrower than its tab), dropdowns for the choices, Paused a checkbox, the rows:
-Paused, Active state (All / Any members on), Label (Default / From HA / State / Custom / None),
-Custom name (only for Custom), Visibility (Show on dashboard / Only in group / Only as member /
-Hidden), Tap action (Toggle / Details / Members / History / Cycle scenes / Nothing), Scenes (Visible
-/ All / Off). Then, measured first, live switching while the selector is dragged. Words for the
-window's parts: `card-sheet.md` "Words" (K22) - "deck" now means the control deck.
+**The owner's next job: `docs/TEST_2.10c.md` round 6** (M, S; round 5 was looked at from screenshots
+only). If G8's FAILED comes back, read the reason with `/popup?view=3` before theorising. **Built since
+round 4** (owner's list, 2026-10-07): the hidden-scene filter, the deck under the hero on tall windows,
+the TouchFLO-3D control deck (metal selector, split ribbon, four debug looks), centred wide groups,
+scenes as a stack, and the SETTINGS panel rework (K25). **Still open in 2.10c:** live switching while
+the selector is dragged (measure a control switch with `DEBUG_FRAMES` first), then the merge gate.
+Words for the window's parts: `card-sheet.md` "Words" (K22) - "deck" now means the control deck.
 
 **Boards flashed for the owner's testing: WS_P4_5 (COM15), WS_P4_4B (COM7), CYD_P4_1060 (COM9)** - all
 with local `DEBUG_POPUP` (P4_5 also `DEBUG_FRAMES`) in the uncommitted `platformio.ini`. Flashed 2026-10-06: **WS_P4_5**
