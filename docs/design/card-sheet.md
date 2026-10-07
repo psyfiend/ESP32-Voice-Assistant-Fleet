@@ -531,9 +531,15 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
 views of their own; their icons stay on every view they belong to, the one showing is lit (as a
 chosen selector button is), and a tap on a lit one goes back to the controls. Members on the
 window's own views; Scenes on the light's controls and scenes; the chart everywhere - **the group's
-from the group's views, a member's from that member's own** ("Office lamp > History"). The X closes
-from every view of the window; inside one member the arrow goes back to Members. **Members' rows**
-are as wide as the controls view's slider and words together, centred (round 2, G2).
+from the group's views, a member's from that member's own** ("Office lamp > History").
+
+**Back is hard-linked, not a history** (owner, round 4 - the first build had only the X, and the
+way back to the controls was to close and reopen). The X is on the controls only; every other view
+has the back arrow, and it always goes to the same place: History, Members, Scenes -> the controls;
+a member -> Members; a member's History -> that member. **The title's first part is a link up**:
+"Desk >" goes to Desk's controls from any view below it, "Office lamp >" to the bulb's. **Members'
+rows** are as wide as the controls view's slider and words together, and centred both ways (rounds
+2 and 4).
 
 **When a command fails, the board records why** (round 2, G8 - Desk said FAILED once, not
 reproduced): no matching report in 3 s, with what was asked and what the light last said, or HA's

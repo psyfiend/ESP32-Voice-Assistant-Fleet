@@ -1580,8 +1580,11 @@ void buildMembers() {
     // wide as the controls view's slider and words together, centred, so the
     // rows line up with them (owner, 2.10c G2: full width looked awkward on
     // the P4_5).
+    // Centred vertically too (owner, round 4): as tall as its rows, never
+    // taller than the stage, which centres it.
     lv_obj_t *list = plain(s.stage);
-    lv_obj_set_size     (list, s.mainRowW > 0 ? s.mainRowW : lv_pct(100), lv_pct(100));
+    lv_obj_set_size     (list, s.mainRowW > 0 ? s.mainRowW : lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_max_height(list, lv_pct(100), 0);
     lv_obj_add_flag     (list, LV_OBJ_FLAG_SCROLLABLE);
     UI::tameScroll(list);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
@@ -1689,7 +1692,8 @@ void showView(PopupView v) {
 
     const bool member   = inMember();
     const bool controls = (v == PopupView::VIEW_MAIN || v == PopupView::VIEW_MEMBER);
-    setText(s.lblLeft, member ? LV_SYMBOL_LEFT : LV_SYMBOL_CLOSE);
+    // X on the controls, the back arrow everywhere else (owner, round 4).
+    setText(s.lblLeft, v == PopupView::VIEW_MAIN ? LV_SYMBOL_CLOSE : LV_SYMBOL_LEFT);
     cornerLook(s.btnHistory, true, v == PopupView::VIEW_HISTORY);
     cornerLook(s.btnMembers, !member && hasMembers(), v == PopupView::VIEW_MEMBERS);
     cornerLook(s.btnScenes, (controls || v == PopupView::VIEW_SCENES) && hasScenes(),
@@ -1759,7 +1763,9 @@ void memberRowCb(lv_event_t *ev) {
     lv_async_call(enterMemberAsync, nullptr);
 }
 
-void leaveMember() {
+// Out of a member, to the group's Members (the back arrow) or its controls
+// (the "Desk" in the title).
+void leaveMember(PopupView to = PopupView::VIEW_MEMBERS) {
     if (!inMember()) return;
     for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.ent[i] = s.groupEnt[i];
     s.nEnt     = s.groupN;
@@ -1767,15 +1773,33 @@ void leaveMember() {
     applyNative();   // the member may have been paused or resumed meanwhile
     s.view     = PopupView::VIEW_MEMBERS;   // not Scenes: its slider swap is the member's
     s.lightCtl = s_groupCtl;
-    showView(PopupView::VIEW_MEMBERS);
+    showView(to);
 }
 
-// The X closes from every view of the window; inside one member the arrow
-// goes back to Members.
-void leftCb(lv_event_t *ev) {
+// BACK IS HARD-LINKED, NOT A HISTORY (owner, round 4): every view has one
+// fixed place it goes back to, so "back" never depends on how you got there.
+//   History, Members, Scenes  -> the controls
+//   a member                  -> Members
+//   a member's History/Scenes -> that member
+// On the controls it is the X, and closes the window.
+void goBack() {
+    switch (s.view) {
+        case PopupView::VIEW_MAIN:   CardPopup::close();     break;
+        case PopupView::VIEW_MEMBER: leaveMember();          break;
+        default:                     showView(controlsView()); break;
+    }
+}
+
+void leftCb(lv_event_t *ev) { (void)ev; goBack(); }
+
+// THE TITLE'S FIRST PART IS A LINK (owner, round 4): "Desk >" goes to Desk's
+// controls, "Office lamp >" to that member's - from any view below them. On
+// the controls themselves it is the area, which leads nowhere yet.
+void crumbCb(lv_event_t *ev) {
     (void)ev;
-    if (inMember()) leaveMember();
-    else            CardPopup::close();
+    if (s.view == PopupView::VIEW_MAIN) return;
+    if (s.view == PopupView::VIEW_MEMBER) { leaveMember(PopupView::VIEW_MAIN); return; }
+    showView(controlsView());
 }
 void historyCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_HISTORY); }
 void membersCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_MEMBERS); }
@@ -1868,6 +1892,13 @@ void buildContents() {
     lv_obj_set_height(s.lblTitleArea, lh);
     lv_obj_set_height(s.lblTitleName, lh);
     s.titleW = lv_area_get_width(&s.winRect) - 2 * s.pad - 2 * slotW - 2 * gap;
+    // The first part is a link (crumbCb()): the whole header row's height
+    // takes the tap, and it brightens while pressed. Gestures still bubble to
+    // the row, so a drag down that starts on it still closes the window.
+    lv_obj_add_flag(s.lblTitleArea, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_ext_click_area(s.lblTitleArea, (btn - lh) / 2);
+    lv_obj_set_style_text_color(s.lblTitleArea, UI::c(p.TEXT), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+    lv_obj_add_event_cb(s.lblTitleArea, crumbCb, LV_EVENT_CLICKED, nullptr);
 
     lv_obj_t *right = plain(hdr);
     lv_obj_set_size     (right, slotW, btn);

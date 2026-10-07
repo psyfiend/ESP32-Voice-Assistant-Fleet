@@ -111,6 +111,28 @@ Flashed: **WS_P4_5** and **WS_P4_4B**.
 | T10 | **4B**: Desk | Side by side again, as in 2.10b. Scenes: smaller buttons than round 3, the slider kept, the grid centred, scrolling for the rest |
 | T11 | If anything says FAILED | Note the time; the reason is now kept on the board (`/popup?view=3`, or ask me to read it) |
 
+### Round 4 results (owner, 2026-10-06)
+
+T1-T4, T6, T7, T9-T11 PASS (no FAILED seen). **Spotted at once**: the back arrow was gone from
+almost every view - the only way back to the controls was to close and reopen. **T5 / T8**: the lit
+icon taking you back works but is not discoverable, and "back" behaving differently per view is
+confusing - back should be hard-linked (History, Members -> controls; a member -> Members; a
+member's History -> the member), and the title could link up. **Asked for**: Members centred
+vertically; and a rethink of the layout - the controls under the slider and words on every board but
+the P4_5, Scenes and Colour pushing the slider aside for their buttons, with Scenes tried both ways
+(the corner icon and a selector button). On the 4B, Colour's swatches pushed the selector down.
+
+**Fixed straight away, flashed on both boards:** back hard-linked as asked, the title's first part a
+link up, Members centred vertically.
+
+| # | Do this | PASS if |
+|---|---|---|
+| N1 | Desk: History, Members, Scenes in turn | Each has the back arrow, and it returns to Desk's controls |
+| N2 | Members > Office lamp; back | Members |
+| N3 | Office lamp > its History; back; back | The lamp's controls, then Members |
+| N4 | From the lamp's History, tap "Office lamp" in the title; from the lamp's controls, tap "Desk" | The lamp's controls; Desk's controls |
+| N5 | Members | The list centred up and down |
+
 ## Not tested (by Claude) - round 3
 
 Driven over `/popup`: no finger has scrolled the 4B's scene grid or tapped a scene button. Not tried:

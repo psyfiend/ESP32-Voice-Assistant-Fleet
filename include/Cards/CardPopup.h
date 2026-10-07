@@ -21,9 +21,10 @@ class Card;
 //     accent, and stays so while its window is open (CardPopup.cpp, "The
 //     hold"); now and then a spark runs along the window's edge
 //     ("Interference")
-//   - header: X top left (a back arrow inside one member), "Area > name" in
-//     the middle, history and members icons top right - tabs, lit on their
-//     own view - and scenes under the chart (2.10c)
+//   - header: X top left on the controls, a back arrow on every other view -
+//     each with one fixed place to go back to (2.10c); "Area > name" in the
+//     middle, its first part a link up; history and members icons top right -
+//     tabs, lit on their own view - and scenes under the chart
 //   - modal: nothing outside the window takes a touch or a gesture
 //   - closes four ways: the X, a tap outside, a drag down on the header row,
 //     and 60 s without a touch
