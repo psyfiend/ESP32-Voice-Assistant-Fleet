@@ -234,6 +234,7 @@ struct Popup {
     uint32_t  sceneSettled = 0;   // a signature of the levels; 0 = not taken yet
     uint8_t   ctlBeforeScenes = 0;
     int32_t   mainRowW = 0;       // the main view's slider and words together (Members' width)
+    bool      stacked = false;    // the control deck under the hero (a tall window)
     bool      sliding = false;                   // a finger is on the slider
     int32_t   slideVal = 0, sentVal = -1;        // what it shows; what was last sent
     uint32_t  sentMs = 0;
@@ -643,20 +644,31 @@ int32_t selectorW(uint8_t caps) {
     return 2 * g + n * UI::minTouch() + (children - 1) * g + (div ? LV_MAX(2, mm(0.25f)) : 0);
 }
 
-int32_t colWidth(bool light, uint8_t caps) {
+// `deck`: whether the control deck is in the column (beside the hero) or under
+// the hero (a tall window, below), which leaves the column only its words.
+int32_t colWidth(bool light, uint8_t caps, bool deck = true) {
     const UIType &t = UI::type();
     int32_t w = textW(hasMembers() ? "Changed 59m ago, 9 paused" : "Changed 59m ago", t.TAG);
     w = LV_MAX(w, textW("Unavailable", UIToolkit::Font_Hero));
     // The label line with the PAUSED pill beside it (makeLabelRow()).
     const int32_t pill = textW("PAUSED", t.TAG) + 2 * mm(1.2f) + 6 * mm(0.2f);
     w = LV_MAX(w, textW("Temperature", t.TAG) + mm(1.6f) + pill);
-    if (light) {
+    if (light && deck) {
         w = LV_MAX(w, selectorW(caps));
         if (caps & LIGHT_CAN_COLOUR) w = LV_MAX(w, 4 * mm(6.5f) + 3 * mm(1.6f) + 2 * mm(0.6f));
     }
     const int32_t room = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4);
     return LV_MIN(room, w);
 }
+
+// The stage's height: the window less its padding, the header row and the gap
+// under it (buildContents()). Known before LVGL lays anything out.
+int32_t stageH() {
+    return lv_area_get_height(&s.winRect) - 2 * s.pad - UI::minTouch() - mm(1.6f);
+}
+
+// The control deck's height: its switches and its own padding.
+int32_t controlDeckH() { return UI::minTouch() + 2 * mm(0.6f); }
 
 void fixColumn(lv_obj_t *col, int32_t width) {
     lv_obj_set_width     (col, width);
@@ -1175,7 +1187,9 @@ lv_obj_t *ctlButton(lv_obj_t *parent, const char *glyph, uint8_t k) {
     return b;
 }
 
-void buildLightColumn(lv_obj_t *col) {
+// `deckParent`: the column itself (the control deck at its bottom, level with
+// the slider's) or a row under the hero (a tall window, 2.10c).
+void buildLightColumn(lv_obj_t *col, lv_obj_t *deckParent) {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const LightAgg   L = lightAggregate();
@@ -1213,14 +1227,16 @@ void buildLightColumn(lv_obj_t *col) {
 
     // The selector sits at the BOTTOM of the column, level with the bottom of
     // the slider, whatever is above it (owner, round 3).
-    lv_obj_t *spacer = plain(col);
-    lv_obj_set_size(spacer, 1, 0);
-    lv_obj_set_flex_grow(spacer, 1);
+    if (deckParent == col) {
+        lv_obj_t *spacer = plain(col);
+        lv_obj_set_size(spacer, 1, 0);
+        lv_obj_set_flex_grow(spacer, 1);
+    }
 
     // Power | the controls this light (any member) has, with a divider after
     // Power as in HA. A light with only one of them still shows it, so the
     // selector always says what the slider is.
-    lv_obj_t *sel = plain(col);
+    lv_obj_t *sel = plain(deckParent);
     lv_obj_set_size     (sel, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(sel, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(sel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -1285,7 +1301,10 @@ void buildSceneGrid(lv_obj_t *col, int32_t colW) {
     lv_obj_t *grid = plain(col);
     lv_obj_set_size(grid, colW, s.heroH);
     lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    // Centred both ways (owner, round 4): the rows as a block, in the middle
+    // of the slider's height. More than fit, and it scrolls from the top.
+    lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                          rowsAt(ch) > 3 ? LV_FLEX_ALIGN_START : LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(grid, gap, 0);
     lv_obj_set_style_pad_row   (grid, gap, 0);
     lv_obj_set_style_pad_all   (grid, pad, 0);   // room for the ring
@@ -1491,16 +1510,59 @@ void buildMain() {
                                                                                           : LIGHT_CAN_COLOUR;
         if (!(caps & bit)) s.lightCtl = firstCtl(caps);
         s.builtCaps = caps;
+
+        // THE CONTROL DECK UNDER THE HERO WHERE THE WINDOW HAS THE HEIGHT
+        // (owner, 2026-10-07): the 4B and the 7" panels. The P4_5 is the one
+        // board too short for it - its screen is the widest shape - and keeps
+        // the deck beside the slider. Worked out from the window, not a list
+        // of boards. The slider, its words and the deck are centred.
+        //
+        // SCENES, AND COLOUR UNDER A TALL WINDOW, PUSH THE SLIDER ASIDE (owner):
+        // it goes to the stage's left edge and the buttons or swatches take
+        // the rest. The slider may move - "a large, very distinct thing that
+        // does not care where your finger lands" - while the control deck
+        // stays exactly where it is in every control.
+        const bool    scenes = (s.view == PopupView::VIEW_SCENES);
+        const int32_t gapV   = pm(3.0f);
+        const int32_t stageW = lv_area_get_width(&s.winRect) - 2 * s.pad;
+        s.heroW   = s.heroH * 42 / 100;
+        s.stacked = stageH() >= s.heroH + gapV + controlDeckH();
+        const bool wide = scenes || (s.stacked && s.lightCtl == LCTL_COLOUR);
+        lv_obj_set_style_pad_row(s.stage, s.stacked ? gapV : 0, 0);
+
         buildLightHero(row);
         lv_obj_t *col = plain(row);
         // Sized for everything the members CAN do, paused or not: a pause
         // hides buttons, and a narrower column re-centred the whole group
         // (owner, round 5 - All Lamps paused).
-        const int32_t colW = colWidth(true, LA.allCaps);
+        int32_t colW;
+        if (wide) {
+            lv_obj_set_width(row, stageW);
+            lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+            // Clear of the clapperboard chip in the stage's top-right corner.
+            const int32_t chip = hasScenes() ? UI::minTouch() + pm(2) : 0;
+            colW = stageW - s.heroW - pm(4) - chip;
+        } else {
+            colW = colWidth(true, LA.allCaps, !s.stacked);
+            s.mainRowW = s.heroW + pm(4) + colW;
+        }
         fixColumn(col, colW);
-        s.mainRowW = s.heroW + pm(4) + colW;
-        if (s.view == PopupView::VIEW_SCENES) buildSceneGrid(col, colW);
-        else                                  buildLightColumn(col);
+        if (wide && !scenes)   // Colour's swatches, centred in their room
+            lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+        if (scenes) {
+            buildSceneGrid(col, colW);
+            // No deck in Scenes, but its room is kept, so the slider stays at
+            // the same height as on the controls.
+            if (s.stacked) { lv_obj_t *keep = plain(s.stage); lv_obj_set_size(keep, 1, controlDeckH()); }
+        } else {
+            lv_obj_t *deckParent = col;
+            if (s.stacked) {
+                deckParent = plain(s.stage);
+                lv_obj_set_size(deckParent, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            }
+            buildLightColumn(col, deckParent);
+        }
         renderLight();
         return;
     }
@@ -3298,7 +3360,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             if (a.view == 2) { if (inMember()) leaveMember(); showView(PopupView::VIEW_MEMBERS); }
             else if (a.view == 0) showView(controlsView());
             else if (a.view == 1) showView(PopupView::VIEW_HISTORY);
-            else if (a.view == 4) showView(PopupView::VIEW_SCENES);
+            else if (a.view == 4 && hasScenes()) showView(PopupView::VIEW_SCENES);
             dbgMem(mem, sizeof(mem));
             dbgOut("view %d; %s\n", a.view, mem);
             // Why the last commands failed, newest first (G8).

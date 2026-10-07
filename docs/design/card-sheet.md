@@ -544,6 +544,14 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   marks it FAILED.
 - A stacked layout for windows too narrow for a fifth selector button was built for the 4B and
   removed with the button.
+- **The control deck under the hero where the window has the height** (owner, 2026-10-07, K23): the
+  4B and the 7" panels; the P4_5, the one board too short (its screen is the widest shape), keeps it
+  beside the slider. Worked out from the window's height. The slider, its words and the deck are
+  centred. **Scenes - and Colour under a tall window - push the slider to the stage's left edge** and
+  the scene buttons or swatches take the rest, centred both ways and clear of the clapperboard chip.
+  The slider may move ("a large, very distinct thing that does not care where your finger lands");
+  the control deck never does - in Scenes, where there is no deck, its room is kept so the slider
+  stays at the same height.
 - **Scenes hidden in HA's UI are hidden here too** (owner, 2026-10-07, K21): the scene query asks HA's
   `is_hidden_entity` per scene (the entity registry's `hidden_by`). A card setting in SETTINGS,
   "Scenes: Visible / All / Off", Visible by default; live, in RAM until 2.10d. Office: Bright,
