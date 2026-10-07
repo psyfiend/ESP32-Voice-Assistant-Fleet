@@ -2031,8 +2031,14 @@ void buildMain() {
         } else {
             lv_obj_t *deckParent = col;
             if (s.stacked) {
+                // THE STAGE'S FULL WIDTH, the deck centred in it (L5, measured
+                // on the 1060): content-sized, it was centred inside a "track"
+                // as wide as the widest child, itself centred in the stage -
+                // two roundings, and Color's wider row moved the deck a pixel.
                 deckParent = plain(s.stage);
-                lv_obj_set_size(deckParent, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                lv_obj_set_size(deckParent, lv_pct(100), LV_SIZE_CONTENT);
+                lv_obj_set_flex_flow(deckParent, LV_FLEX_FLOW_ROW);
+                lv_obj_set_flex_align(deckParent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
             }
             buildLightColumn(col, deckParent);
         }
@@ -2991,7 +2997,9 @@ void intfEnd() {
 // Opaque and on the screen, like the window, so moving it redraws only it.
 // ---------------------------------------------------------------------------
 constexpr uint32_t DECK_PEEK_MS = 200;   // the tab peeking up: a small touch the owner liked
-constexpr uint32_t DECK_OPEN_MS = 220;
+// 260 ms, from 220 (owner, round 7: choppier now that the panel opens further;
+// the page deck's panels take 300). Try 300 if it still stutters.
+constexpr uint32_t DECK_OPEN_MS = 260;
 // 7.2 mm, from 8: the folder tab grew by twice its curve (round 11), and the
 // rows paid for it, so an open deck still reaches the same height on the window.
 constexpr float    DECK_ROW_MM  = 7.2f;
@@ -3024,13 +3032,16 @@ void deckSet(uint8_t state) {
 // THE SECOND PANEL: CHART (owner, round 7 - a demo). The left half, where
 // round 9 kept room for it: up from the bottom as SETTINGS is, but only while
 // the chart (History) is showing, and back down when the window goes to
-// another view. It has no settings yet; open, it says so. It is made the first
-// time the chart shows and lives with the window; when the window closes it
-// goes in the same frame, open or not (owner: "abruptly").
+// another view. It is made the first time the chart shows and lives with the
+// window, and goes with it as SETTINGS does (chartEnd()).
 //
-// One piece, as SETTINGS is when flush: the tab is the pane's own top.
+// SETTINGS' mirror image, built by the same buildFolder() (round 7, after the
+// owner's N9: "I want to see how the tab effect works"), with demo rows so its
+// pane is wider and taller than its tab. Its tab stops a millimetre short of
+// SETTINGS' (owner, round 7): two tabs side by side read as two.
 // ---------------------------------------------------------------------------
-struct ChartPanel { lv_obj_t *obj = nullptr; uint8_t state = DECK_HIDDEN; int32_t h = 0; };
+struct ChartPanel { lv_obj_t *root = nullptr, *tab = nullptr, *pane = nullptr;
+                    uint8_t state = DECK_HIDDEN; int32_t h = 0; };
 ChartPanel s_chart;
 
 int32_t chartY(uint8_t state) {
@@ -3038,96 +3049,24 @@ int32_t chartY(uint8_t state) {
     return state == DECK_OPEN ? sh - (s_chart.h - s.deckHide) : state == DECK_PEEK ? sh - s.deckHead : sh;
 }
 
-void chartTabCb(lv_event_t *ev) {
-    (void)ev;
-    chartSet(s_chart.state == DECK_OPEN ? DECK_PEEK : DECK_OPEN);
-}
-
-void chartCreate() {
-    const UIPalette &p = UI::pal();
-    const UIType    &t = UI::type();
-    const lv_area_t &W = s.winRect;
-    const int32_t r  = mm(1.6f);
-    const int32_t bw = UI::met().BORDER_W ? UI::met().BORDER_W : 1;
-    if (!s.deckHead) s.deckHead = UIToolkit::sc(UIToolkit::PANEL_HEADER_H);
-    const int32_t lh = lv_font_get_line_height(t.NAME);
-    s_chart.h = s.deckHead + mm(1.6f) + 2 * lh + mm(1.6f) + s.deckHide;
-
-    lv_obj_t *o = plain(lv_screen_active());
-    s_chart.obj = o;
-    lv_obj_set_pos (o, W.x1, chartY(DECK_HIDDEN));
-    // Stops a millimetre short of SETTINGS' tab: two tabs side by side read
-    // as two, not one bar (owner, round 7).
-    lv_obj_set_size(o, lv_area_get_width(&W) - lv_area_get_width(&W) / 2 - mm(1.0f), s_chart.h);
-    lv_obj_set_style_radius      (o, r, 0);
-    lv_obj_set_style_bg_color    (o, UI::c(p.SURFACE_ALT), 0);
-    lv_obj_set_style_bg_opa      (o, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(o, UI::border(), 0);
-    lv_obj_set_style_border_width(o, bw, 0);
-    lv_obj_add_style             (o, UI::paint(UIPaint::PAINT_LIFT), 0);
-    lv_obj_add_flag(o, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(o, chartTabCb, LV_EVENT_CLICKED, nullptr);
-
-    // The tab's word where SETTINGS has its own.
-    lv_obj_t *l = makeLabel(o, t.TAG, p.ACCENT);
-    lv_label_set_text(l, "CHART");
-    lv_obj_set_style_text_letter_space(l, mm(0.4f), 0);
-    lv_obj_align(l, LV_ALIGN_TOP_MID, 0, (s.deckHead - r - lv_font_get_line_height(t.TAG)) / 2);
-
-    lv_obj_t *say = makeLabel(o, t.NAME, p.TEXT_DIM);
-    lv_label_set_text(say, "A demo panel:\nthe chart's own settings go here");
-    lv_obj_set_style_text_align(say, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(say, LV_ALIGN_TOP_MID, 0, s.deckHead + mm(1.6f) - bw);
-}
-
 void chartExec(void *var, int32_t v) { lv_obj_set_y((lv_obj_t *)var, v); }
-
-void chartSet(uint8_t state) {
-    if (state == DECK_HIDDEN && !s_chart.obj) return;
-    if (!s_chart.obj) chartCreate();
-    if (state == s_chart.state) return;
-    const uint8_t was = s_chart.state;
-    s_chart.state = state;
-    if (state == DECK_OPEN) { lv_obj_move_foreground(s_chart.obj); if (s.deckState == DECK_OPEN) deckSet(DECK_PEEK); }
-    lv_anim_delete(s_chart.obj, chartExec);
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var     (&a, s_chart.obj);
-    lv_anim_set_values  (&a, lv_obj_get_y(s_chart.obj), chartY(state));
-    lv_anim_set_duration(&a, (was == DECK_HIDDEN || state == DECK_HIDDEN) ? DECK_PEEK_MS : DECK_OPEN_MS);
-    lv_anim_set_path_cb (&a, state == DECK_HIDDEN ? lv_anim_path_ease_in : lv_anim_path_ease_out);
-    lv_anim_set_exec_cb (&a, chartExec);
-    lv_anim_start(&a);
-}
-
-void chartFold() { if (s_chart.state == DECK_OPEN) chartSet(DECK_PEEK); }
-
-void chartEnd() {
-    if (s_chart.obj) { lv_anim_delete(s_chart.obj, chartExec); lv_obj_delete(s_chart.obj); }
-    s_chart = ChartPanel();
-}
 
 // Either panel open: the window is out of reach until it folds.
 bool panelOpen() { return s.deckState == DECK_OPEN || s_chart.state == DECK_OPEN; }
 
-// On the deck's tab or its pane, or the CHART panel, as they stand right now?
-// The deck's own object is transparent and wider than the tab: a press beside
-// the tab is a press on the page, which the catcher must take.
+// On a panel's tab or its pane, as they stand right now? A panel's own object
+// is transparent and as wide as the window: a press beside its tab is a press
+// on the page, which the catcher must take.
 bool inDeck(const lv_point_t &pt) {
-    if (s_chart.obj && s_chart.state != DECK_HIDDEN) {
-        lv_area_t a;
-        lv_obj_get_coords(s_chart.obj, &a);
-        if (pt.x >= a.x1 && pt.x <= a.x2 && pt.y >= a.y1 && pt.y <= a.y2) return true;
-    }
-    if (!s.deck || s.deckState == DECK_HIDDEN) return false;
-    lv_obj_t *parts[2] = { s.deckTab, s.deckPane };
-    for (lv_obj_t *o : parts) {
-        if (!o) continue;
+    auto in = [&](lv_obj_t *o) {
+        if (!o) return false;
         lv_area_t a;
         lv_obj_get_coords(o, &a);
-        if (pt.x >= a.x1 && pt.x <= a.x2 && pt.y >= a.y1 && pt.y <= a.y2) return true;
-    }
-    return false;
+        return pt.x >= a.x1 && pt.x <= a.x2 && pt.y >= a.y1 && pt.y <= a.y2;
+    };
+    if (s_chart.root && s_chart.state != DECK_HIDDEN && (in(s_chart.tab) || in(s_chart.pane))) return true;
+    if (!s.deck || s.deckState == DECK_HIDDEN) return false;
+    return in(s.deckTab) || in(s.deckPane);
 }
 
 void deckFill();
@@ -3228,13 +3167,16 @@ int32_t deckCtlW(const DeckRowSpec &r) {
 constexpr float DECK_PAD_MM = 2.4f;   // the pane's sides
 
 // AS WIDE AS ITS LONGEST ROW (owner): each row's words, a gap, its control.
-int32_t deckNeedW() {
-    DeckRowSpec r[DECK_ROWS_MAX];
-    const uint8_t n = deckSpecs(r);
+int32_t rowsNeedW(const DeckRowSpec *r, uint8_t n) {
     int32_t w = 0;
     for (uint8_t i = 0; i < n; i++)
         w = LV_MAX(w, textW(r[i].label, UI::type().NAME) + mm(4.0f) + deckCtlW(r[i]));
     return w + 2 * mm(DECK_PAD_MM);
+}
+
+int32_t deckNeedW() {
+    DeckRowSpec r[DECK_ROWS_MAX];
+    return rowsNeedW(r, deckSpecs(r));
 }
 
 lv_obj_t *deckDropdown(lv_obj_t *parent, const DeckRowSpec &r) {
@@ -3366,9 +3308,16 @@ lv_obj_t *deckRow(lv_obj_t *pane, const char *what, bool live) {
     return r;
 }
 
-// Built with the window, below the bottom of the screen, inside showWindow()'s
-// quiet build (invalidation off); showWindow() then slides it up to its tab.
-void deckCreate() {
+// A FOLDER PANEL: SETTINGS in the right half, and its mirror image CHART in
+// the left (round 7 - "I want to see how the tab effect works"). One builder,
+// so the two are the same shape by construction.
+struct Folder { lv_obj_t *root = nullptr, *tab = nullptr, *tabLbl = nullptr, *pane = nullptr; int32_t h = 0; };
+
+// Built below the bottom of the screen. `left`: the tab at the window's left
+// edge and the pane growing rightwards from it; otherwise both on the right.
+// `needW`: the widest row; `rows`: how many.
+void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t rows,
+                 int32_t tabW, lv_event_cb_t tabCb) {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const lv_area_t &W = s.winRect;
@@ -3380,52 +3329,44 @@ void deckCreate() {
     // popup").
     s.deckHead = UIToolkit::sc(UIToolkit::PANEL_HEADER_H);
     // A FOLDER TAB (owner, round 10). The pane has a top edge of its own, and
-    // the tab rises from it in the right half, the join curving in like a
-    // file folder's - so an open deck is closed off from the window's body.
+    // the tab rises from it, the join curving in like a file folder's - so an
+    // open panel is closed off from the window's body.
     //
     // FOLDED, ONLY THE TAB SHOWS (owner, round 11): the strip above the screen's
     // edge is the page deck's header height, and the pane's edge and the curve
     // sit just below it. So the tab reaches a curve's height further down than
     // what shows. OPEN, the pane's own bottom edge stays below the screen too:
-    // the deck is deckHide taller than what it uncovers.
+    // the panel is deckHide taller than what it uncovers.
     const int32_t rf       = r;                        // the inner curve
     const int32_t tabAbove = s.deckHead + rf;          // the tab's part above the pane's edge
     s.deckHide = r + 2 * bw;
-    // A group card has one more row: when it counts as on (2.10b) - a group
-    // defined here only; HA or Hue decides that for its own (2.10c).
-    // And one for a light's Scenes (2.10c).
-    // (The rows come from one list - deckSpecs() - read here for the size and
-    // again by deckFill() for the contents.)
-    DeckRowSpec specs[DECK_ROWS_MAX];
-    const int32_t rows = deckSpecs(specs);
-    s.deckH    = tabAbove + (rf + mm(1.6f)) + rows * mm(DECK_ROW_MM) + mm(1.6f) + s.deckHide;
+    F.h = tabAbove + (rf + mm(1.6f)) + rows * mm(DECK_ROW_MM) + mm(1.6f) + s.deckHide;
     // NEVER TALLER THAN THE WINDOW (owner, 2026-10-07): open, the tab's top
     // stays at or below the window's top edge. More rows than that: the pane
     // scrolls.
     const int32_t maxH = lv_obj_get_height(lv_screen_active()) - s.winRect.y1 + s.deckHide;
-    const bool scroll = s.deckH > maxH;
-    if (scroll) s.deckH = maxH;
+    const bool scroll = F.h > maxH;
+    if (scroll) F.h = maxH;
 
-    s.deck = plain(lv_screen_active());
-    lv_obj_set_pos (s.deck, W.x1, deckY(DECK_HIDDEN));
-    lv_obj_set_size(s.deck, w, s.deckH);
+    F.root = plain(lv_screen_active());
+    lv_obj_set_pos (F.root, W.x1, lv_obj_get_height(lv_screen_active()));   // out of sight
+    lv_obj_set_size(F.root, w, F.h);
 
     // Built back to front: the pane, the tab over it, a block hiding the
     // tab's bottom where it overlaps the pane, and the inner curve. One colour
     // throughout - the tab used to be the card colour folded and the window's
     // open (owner, round 10). The scheme's lift on the pane and the tab: a
     // shadow on Linen, like the page deck's panels; nothing on the dark ones.
-    const int32_t tabW = w / 2;                        // THE RIGHT HALF - see below
-    const int32_t tabX = w - tabW;
+    const int32_t tabX = left ? 0 : w - tabW;
 
-    // AS WIDE AS ITS LONGEST ROW (owner, 2026-10-07), its right edge on the
+    // AS WIDE AS ITS LONGEST ROW (owner, 2026-10-07), its outer edge on the
     // window's, never narrower than its own tab. Within a curve's width of the
-    // tab it is made the tab's width: the two then share one straight left
+    // tab it is made the tab's width: the two then share one straight inner
     // edge, and there is no inner curve to draw.
-    int32_t paneW = LV_CLAMP(tabW, deckNeedW(), w);
+    int32_t paneW = LV_CLAMP(tabW, needW, w);
     const bool flush = paneW < tabW + 2 * r;
     if (flush) paneW = tabW;
-    const int32_t paneX = w - paneW;
+    const int32_t paneX = left ? 0 : w - paneW;
 
     // FLUSH: ONE PIECE (owner, 2026-10-07: a break in the left edge under the
     // title on the P4_5 and the 1060, a line under it on Linen). A tab exactly
@@ -3433,10 +3374,10 @@ void deckCreate() {
     // at the top and is the tab's shape itself; the tab below is only its
     // label and its touch area.
     const int32_t paneY = flush ? 0 : tabAbove;
-    lv_obj_t *pane = plain(s.deck);
-    s.deckPane = pane;
+    lv_obj_t *pane = plain(F.root);
+    F.pane = pane;
     lv_obj_set_pos (pane, paneX, paneY);
-    lv_obj_set_size(pane, paneW, s.deckH - paneY);
+    lv_obj_set_size(pane, paneW, F.h - paneY);
     if (scroll) { lv_obj_add_flag(pane, LV_OBJ_FLAG_SCROLLABLE); UI::tameScroll(pane); }
     lv_obj_set_style_radius      (pane, r, 0);
     lv_obj_set_style_bg_color    (pane, UI::c(p.SURFACE_ALT), 0);
@@ -3451,61 +3392,58 @@ void deckCreate() {
     lv_obj_set_flex_flow(pane, LV_FLEX_FLOW_COLUMN);
     lv_obj_add_flag(pane, LV_OBJ_FLAG_CLICKABLE);   // a tap on the pane stays on the pane
 
-    // The tab: THE RIGHT HALF, ALWAYS (owner, round 9). Some cards will get a
-    // second panel (a sensor's CHART, card-sheet 11.1); it takes the left half,
-    // so SETTINGS is always in the same place. Each panel is the deck's full
-    // width when open. It reaches a radius past the pane's edge, its lower
-    // corners hidden by the block below.
-    s.deckTab = plain(s.deck);
-    lv_obj_set_pos (s.deckTab, tabX, 0);
-    lv_obj_set_size(s.deckTab, tabW, tabAbove + r + bw);
-    lv_obj_set_style_radius      (s.deckTab, r, 0);
-    lv_obj_set_style_bg_color    (s.deckTab, UI::c(p.SURFACE_ALT), 0);
-    lv_obj_set_style_bg_opa      (s.deckTab, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(s.deckTab, UI::border(), 0);
-    lv_obj_set_style_border_width(s.deckTab, bw, 0);
-    lv_obj_add_style             (s.deckTab, UI::paint(UIPaint::PAINT_LIFT), 0);
-    lv_obj_add_flag(s.deckTab, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(s.deckTab, deckTabCb, LV_EVENT_CLICKED, nullptr);
-    s.deckTabLbl = makeLabel(s.deckTab, t.TAG, p.ACCENT);
-    lv_label_set_text(s.deckTabLbl, "SETTINGS");
-    lv_obj_set_style_text_letter_space(s.deckTabLbl, mm(0.4f), 0);
+    // The tab: SETTINGS IN THE RIGHT HALF, ALWAYS (owner, round 9); a second
+    // panel (CHART) takes the left half, so SETTINGS is always in the same
+    // place. It reaches a radius past the pane's edge, its lower corners
+    // hidden by the block below.
+    F.tab = plain(F.root);
+    lv_obj_set_pos (F.tab, tabX, 0);
+    lv_obj_set_size(F.tab, tabW, tabAbove + r + bw);
+    lv_obj_set_style_radius      (F.tab, r, 0);
+    lv_obj_set_style_bg_color    (F.tab, UI::c(p.SURFACE_ALT), 0);
+    lv_obj_set_style_bg_opa      (F.tab, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(F.tab, UI::border(), 0);
+    lv_obj_set_style_border_width(F.tab, bw, 0);
+    lv_obj_add_style             (F.tab, UI::paint(UIPaint::PAINT_LIFT), 0);
+    lv_obj_add_flag(F.tab, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(F.tab, tabCb, LV_EVENT_CLICKED, nullptr);
+    F.tabLbl = makeLabel(F.tab, t.TAG, p.ACCENT);
+    lv_label_set_text(F.tabLbl, title);
+    lv_obj_set_style_text_letter_space(F.tabLbl, mm(0.4f), 0);
     // Where round 11 had it, which the owner called right.
-    lv_obj_align(s.deckTabLbl, LV_ALIGN_TOP_MID, 0, (s.deckHead - rf - lv_font_get_line_height(t.TAG)) / 2);
+    lv_obj_align(F.tabLbl, LV_ALIGN_TOP_MID, 0, (s.deckHead - rf - lv_font_get_line_height(t.TAG)) / 2);
     if (flush) {
         // The pane is the shape; the tab draws nothing of its own.
-        lv_obj_remove_style(s.deckTab, UI::paint(UIPaint::PAINT_LIFT), 0);
-        lv_obj_set_style_bg_opa      (s.deckTab, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(s.deckTab, 0, 0);
-        s.deckState  = DECK_HIDDEN;
-        s.deckFilled = false;
+        lv_obj_remove_style(F.tab, UI::paint(UIPaint::PAINT_LIFT), 0);
+        lv_obj_set_style_bg_opa      (F.tab, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(F.tab, 0, 0);
         return;
     }
 
     // The block: the tab's lower corners, bottom border and (on Linen) the
     // shadow it casts downward, all of which lie inside the pane - painted out
-    // in the pane's colour. Kept one border-width clear of the pane's right
+    // in the pane's colour. Kept one border-width clear of the pane's outer
     // edge, which carries on down past the tab.
-    // AND THE SHADOW IT CASTS TO THE LEFT: a shadow spreads sideways too, and
-    // round the tab's lower-left corner it showed below the pane's edge as a
+    // AND THE SHADOW IT CASTS INWARDS: a shadow spreads sideways too, and
+    // round the tab's inner lower corner it showed below the pane's edge as a
     // small grey crescent at the foot of the inner curve (owner, 2026-10-06 -
-    // "thought it was crud on the glass"). The block reaches left by the
+    // "thought it was crud on the glass"). The block reaches in by the
     // shadow's width; the curve's arcs are drawn over it.
     const UIMetrics &m = UI::met();
     const int32_t reach = m.SHADOW ? UI::sc(m.SHADOW) + UI::sc(m.SHADOW_Y) + 2 : 0;
-    lv_obj_t *block = plain(s.deck);
-    lv_obj_set_pos (block, tabX - reach, tabAbove + bw);
+    lv_obj_t *block = plain(F.root);
+    lv_obj_set_pos (block, left ? tabX + bw : tabX - reach, tabAbove + bw);
     lv_obj_set_size(block, tabW - bw + reach, r + bw + reach);
     lv_obj_set_style_bg_color(block, UI::c(p.SURFACE_ALT), 0);
     lv_obj_set_style_bg_opa  (block, LV_OPA_COVER, 0);
 
-    // THE SEAM: the tip of the tab's left border, on the pane's edge line at
+    // THE SEAM: the tip of the tab's inner border, on the pane's edge line at
     // the foot of the curve. The curve's fill arc covers it only up to its own
     // anti-aliased rim, so a 3-pixel speck was left (owner, round 7: "now that
     // I know about it I can't ignore it"). Painted out here; the arcs below are
     // drawn after, so nothing of the curve is lost.
-    lv_obj_t *seam = plain(s.deck);
-    lv_obj_set_pos (seam, tabX - 2, tabAbove - bw - 1);
+    lv_obj_t *seam = plain(F.root);
+    lv_obj_set_pos (seam, left ? tabX + tabW - 3 * bw - 2 : tabX - 2, tabAbove - bw - 1);
     lv_obj_set_size(seam, 3 * bw + 4, 2 * bw + 2);
     lv_obj_set_style_bg_color(seam, UI::c(p.SURFACE_ALT), 0);
     lv_obj_set_style_bg_opa  (seam, LV_OPA_COVER, 0);
@@ -3514,16 +3452,19 @@ void deckCreate() {
     // which LVGL has no shape for. Two quarter arcs centred a radius out from
     // the join: a thick one in the pane's colour fills the corner outside the
     // curve, and a border-width one draws the edge along it. Their spill onto
-    // the tab and the pane is the same colour, so it does not show.
-    const lv_point_t ctr = { tabX - rf, tabAbove - rf };
+    // the tab and the pane is the same colour, so it does not show. Mirrored
+    // for a tab on the left: the centre a radius to the tab's right, the
+    // quarter from +y round to -x.
+    const lv_point_t ctr = { left ? tabX + tabW + rf : tabX - rf, tabAbove - rf };
     const int32_t ro = (rf * 1415 + 999) / 1000 + 1;   // reaches the join, rf * sqrt(2)
     auto quarter = [&](int32_t outer, int32_t width, lv_color_t col) {
-        lv_obj_t *a = lv_arc_create(s.deck);
+        lv_obj_t *a = lv_arc_create(F.root);
         lv_obj_remove_style_all(a);
         lv_obj_clear_flag(a, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_pos (a, ctr.x - outer, ctr.y - outer);
         lv_obj_set_size(a, 2 * outer, 2 * outer);
-        lv_arc_set_bg_angles(a, 0, 90);                // from +x round to +y: the join's side
+        if (left) lv_arc_set_bg_angles(a, 90, 180);   // from +y round to -x
+        else      lv_arc_set_bg_angles(a, 0, 90);     // from +x round to +y: the join's side
         lv_obj_set_style_arc_width  (a, width, LV_PART_MAIN);
         lv_obj_set_style_arc_color  (a, col, LV_PART_MAIN);
         lv_obj_set_style_arc_opa    (a, LV_OPA_COVER, LV_PART_MAIN);
@@ -3532,7 +3473,20 @@ void deckCreate() {
     };
     quarter(ro, ro - rf, UI::c(p.SURFACE_ALT));
     quarter(rf + bw, bw, UI::border());
+}
 
+// SETTINGS: built with the window, below the bottom of the screen, inside
+// showWindow()'s quiet build (invalidation off); showWindow() then slides it
+// up to its tab. Its rows come from one list - deckSpecs() - read here for the
+// size and again by deckFill() for the contents.
+void deckCreate() {
+    DeckRowSpec specs[DECK_ROWS_MAX];
+    const int32_t rows = deckSpecs(specs);
+    const int32_t w = lv_area_get_width(&s.winRect);
+    Folder F;
+    buildFolder(F, false, "SETTINGS", deckNeedW(), rows, w / 2, deckTabCb);
+    s.deck = F.root; s.deckTab = F.tab; s.deckTabLbl = F.tabLbl; s.deckPane = F.pane;
+    s.deckH = F.h;
     s.deckState  = DECK_HIDDEN;
     s.deckFilled = false;
 }
@@ -3591,6 +3545,89 @@ void deckEnd() {
     s.ddGroup = s.ddScenes = nullptr;
     s.deckState  = DECK_HIDDEN;
     s.deckFilled = false;
+}
+
+// --- CHART: the demo rows, and its life -------------------------------------
+// Rows a chart could plausibly have, so the panel has a real size: they work
+// as controls and change nothing.
+uint8_t chartSpecs(DeckRowSpec *r) {
+    uint8_t n = 0;
+    r[n++] = { "Time range", DeckRowKind::ROW_DROP, "Last 24 hours\nLast hour\nLast 7 days\nLast 30 days",
+               0, true, nullptr, nullptr };
+    r[n++] = { "Chart style", DeckRowKind::ROW_DROP, "Line\nBars\nSteps", 0, true, nullptr, nullptr };
+    // Long enough that the pane is wider than its tab on the P4_5 too.
+    r[n++] = { "Shading", DeckRowKind::ROW_DROP, "Above and below the average\nBy hour of day\nNone",
+               0, true, nullptr, nullptr };
+    r[n++] = { "Show min and max", DeckRowKind::ROW_CHECK, nullptr, 1, true, nullptr, nullptr };
+    r[n++] = { "Compare with yesterday", DeckRowKind::ROW_CHECK, nullptr, 0, true, nullptr, nullptr };
+    return n;
+}
+
+void chartTabCb(lv_event_t *ev) {
+    (void)ev;
+    chartSet(s_chart.state == DECK_OPEN ? DECK_PEEK : DECK_OPEN);
+}
+
+// Made the first time the chart shows, rows and all (a demo; SETTINGS builds
+// its rows on first open).
+void chartCreate() {
+    DeckRowSpec r[DECK_ROWS_MAX];
+    const uint8_t n = chartSpecs(r);
+    const int32_t w = lv_area_get_width(&s.winRect);
+    Folder F;
+    buildFolder(F, true, "CHART", rowsNeedW(r, n), n, w - w / 2 - mm(1.0f), chartTabCb);
+    s_chart.root = F.root; s_chart.tab = F.tab; s_chart.pane = F.pane; s_chart.h = F.h;
+    for (uint8_t i = 0; i < n; i++) {
+        lv_obj_t *row = deckRow(F.pane, r[i].label, r[i].live);
+        if (r[i].kind == DeckRowKind::ROW_CHECK) deckCheckbox(row, r[i]); else deckDropdown(row, r[i]);
+    }
+}
+
+void chartSet(uint8_t state) {
+    if (state == DECK_HIDDEN && !s_chart.root) return;
+    // A panel just made has not been laid out: lv_obj_get_y() would say 0, and
+    // the first slide came down from the top of the screen (owner, N9).
+    const bool made = !s_chart.root;
+    if (made) chartCreate();
+    if (state == s_chart.state) return;
+    const uint8_t was = s_chart.state;
+    s_chart.state = state;
+    if (state == DECK_OPEN) { lv_obj_move_foreground(s_chart.root); if (s.deckState == DECK_OPEN) deckSet(DECK_PEEK); }
+    lv_anim_delete(s_chart.root, chartExec);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var     (&a, s_chart.root);
+    lv_anim_set_values  (&a, made ? chartY(DECK_HIDDEN) : lv_obj_get_y(s_chart.root), chartY(state));
+    lv_anim_set_duration(&a, (was == DECK_HIDDEN || state == DECK_HIDDEN) ? DECK_PEEK_MS : DECK_OPEN_MS);
+    lv_anim_set_path_cb (&a, state == DECK_HIDDEN ? lv_anim_path_ease_in : lv_anim_path_ease_out);
+    lv_anim_set_exec_cb (&a, chartExec);
+    lv_anim_start(&a);
+}
+
+void chartFold() { if (s_chart.state == DECK_OPEN) chartSet(DECK_PEEK); }
+
+// With the window, as SETTINGS goes (owner, N11): open, it vanishes in the
+// same frame; showing its tab (or on its way down), it slides out of sight on
+// its own and deletes itself there.
+void chartEnd() {
+    if (lv_obj_t *o = s_chart.root) {
+        lv_anim_delete(o, chartExec);
+        if (s_chart.state == DECK_OPEN) {
+            lv_obj_delete(o);
+        } else {
+            if (s_chart.tab) lv_obj_clear_flag(s_chart.tab, LV_OBJ_FLAG_CLICKABLE);
+            lv_anim_t a;
+            lv_anim_init(&a);
+            lv_anim_set_var         (&a, o);
+            lv_anim_set_values      (&a, lv_obj_get_y(o), chartY(DECK_HIDDEN));
+            lv_anim_set_duration    (&a, DECK_PEEK_MS);
+            lv_anim_set_path_cb     (&a, lv_anim_path_ease_in);
+            lv_anim_set_exec_cb     (&a, chartExec);
+            lv_anim_set_completed_cb(&a, deckGoneCb);
+            lv_anim_start(&a);
+        }
+    }
+    s_chart = ChartPanel();
 }
 
 #ifdef DEBUG_POPUP
@@ -4132,6 +4169,18 @@ void CardPopup::debugService(lv_timer_t *t) {
             const uint32_t us = micros() - t0;
             dbgMem(mem, sizeof(mem));
             dbgOut("control %d built in %lu us; %s\n", (int)s.lightCtl, (unsigned long)us, mem);
+            // Where the stage's children landed (L5: the deck moving on Color).
+            lv_obj_update_layout(s.win);
+            for (uint32_t i = 0; i < lv_obj_get_child_count(s.stage); i++) {
+                lv_area_t c; lv_obj_get_coords(lv_obj_get_child(s.stage, (int32_t)i), &c);
+                dbgOut("  stage child %lu: x %ld..%ld y %ld..%ld\n", (unsigned long)i,
+                       (long)c.x1, (long)c.x2, (long)c.y1, (long)c.y2);
+            }
+            lv_area_t st; lv_obj_get_content_coords(s.stage, &st);
+            dbgOut("  stage content x %ld..%ld, scroll %ld,%ld\n", (long)st.x1, (long)st.x2,
+                   (long)lv_obj_get_scroll_x(s.stage), (long)lv_obj_get_scroll_y(s.stage));
+            if (d.obj) { lv_area_t c; lv_obj_get_coords(d.obj, &c);
+                         dbgOut("  deck x %ld..%ld\n", (long)c.x1, (long)c.x2); }
         }
         s_dreq.store(DREQ_DONE);
         return;
