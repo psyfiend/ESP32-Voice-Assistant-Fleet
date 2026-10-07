@@ -247,7 +247,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     topButton(bar, s_hdr == CardHeaderStyle::HDR_TAG ? "Tag"
                  : s_hdr == CardHeaderStyle::HDR_BAND ? "Band" : "No hdr", headerCb);
     topButton(bar, s_showArea ? "Area on" : "Area off", areaCb);
-    topButton(bar, s_areaColor ? "Colour" : "Mono", colorCb);
+    topButton(bar, s_areaColor ? "Color" : "Mono", colorCb);
     topButton(bar, s_actorStyle == StateCardFill::FILL_SURFACE ? "Fill" : "Icon", actorCb);
     s_btnState = topButton(bar, FORCED_LABEL[s_forced], stateCb);
     // The System panel's Dump Config is unreachable while this screen is up,
