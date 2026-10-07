@@ -599,10 +599,20 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   smooth grey ramp truncated to RGB565 banded pink and green, because green steps twice as finely as
   red and blue. The selector's icon is scaled 1.4x (the largest icon face is not big enough); lit
   chips use the next face up. Pressed chips tint.
-- **CHART, a second panel** (owner, round 7, K28 - a demo): the left half, a millimetre short of
-  SETTINGS' tab, one piece. It peeks up when History shows and slides down when the window goes to
-  another view; tapped, it opens on a demo line. Opening either panel brings it to the front and
-  folds the other; a tap in the window folds whichever is open. It goes with the window at once.
+- **CHART, a second panel** (owner, rounds 7-8, K28 - a demo): **SETTINGS' mirror image**, both
+  made by one builder (`buildFolder()`): its tab in the left half, a millimetre short of SETTINGS'
+  tab, its pane growing rightwards from the window's left edge, the inner curve on the tab's right.
+  Five demo rows (time range, chart style, shading, min/max, compare) that work as controls and
+  change nothing, so the pane is wider than its tab on every board. It peeks up when History shows
+  and slides down when the window goes to another view. Opening either panel brings it to the front
+  and folds the other; a tap in the window folds whichever is open. It leaves with the window as
+  SETTINGS does: folded, its tab slides down on its own; open, it goes at once. Both open and fold
+  in 260 ms (from 220 - round 7 found them choppier now that SETTINGS opens further; the page deck's
+  panels take 300).
+- **The stacked control deck is centred against the stage itself** (L5, measured on the 1060): a
+  content-sized holder was centred inside a flex "track" as wide as the widest child, itself
+  centred in the stage, and Color's wider row moved the deck by a pixel of rounding. Its holder is
+  now the stage's full width.
 - **The title gives way in steps** (owner, round 7, K29): centred when "Area > Name" fits between
   ends of equal width; else it takes the room beside the X (a window with two chips on the right has
   a chip's width spare on the left), left of centre; else the name alone - the back arrow still goes

@@ -82,20 +82,22 @@ tabs (K19 superseded, K20), and every FAILED now records why (G8). What was buil
 §16**. What HA does, measured from the PC: **`ha-websocket.md` §9**. Decisions: DECISIONS C5, K12,
 K15, K17-K30, A13, W9.
 
-**The owner's next job: `docs/TEST_2.10c.md` round 7** (N1-N15; rounds 5-6 results are recorded
-there). If G8's FAILED comes back, read the reason with `/popup?view=3` before theorising. **Built in
+**The owner's next job: `docs/TEST_2.10c.md` round 8** (P1-P7: CHART as a real folder, the panels'
+speed, the 1060; round 7's results are recorded there). If G8's FAILED comes back, read the reason with `/popup?view=3` before theorising. **Built in
 round 7** (2026-10-07): hand-drawn faces (curved metal selector, dent chips, dithered - K27), the four
 named looks with per-scheme defaults, the slider's place (K26, `placeWide()`), the CHART demo panel on
 History (K28), the title that gives way in steps (K29), flush SETTINGS, no "Color" word, US spelling
-(K30). **Two questions are open with the owner**: what S3's "???" meant, and Linen's default look
-(Silver - Square built; round 5 said Silver - Round). **Still open in 2.10c:** the 1060's deck nudging
-left on Color (L5; not looked at - see below), live switching while the selector is dragged (measure
-with `DEBUG_FRAMES` first), then the merge gate. Words for the window's parts: `card-sheet.md`
+(K30). **Round 8**: CHART rebuilt as SETTINGS' mirror image (`buildFolder()`), leaving with the
+window as SETTINGS does; panels at 260 ms; the 1060's L5 found and fixed (LESSONS, "A flex column
+centres its children twice"). **Open with the owner**: Linen's default look (Silver - Square built;
+round 5 said Silver - Round), and whether 260 ms is smooth enough (300 is the next step). **Still
+open in 2.10c:** live switching while the selector is dragged (measure with `DEBUG_FRAMES` first),
+then the merge gate. `/popup?ctl=` now also prints where the stage's children landed. Words for the window's parts: `card-sheet.md`
 "Words" (K22) - "deck" means the control deck. `/popup` gained `show=0|1|2` (which scenes) and
 `deck=2` (CHART open, on History); `look=4` returns to the scheme's own look.
 
-**Boards: WS_P4_5 (COM15) and WS_P4_4B (COM7) carry round 7. CYD_P4_1060 (COM9) still has round 6** -
-COM9 was held by another program on the PC all of 2026-10-07's afternoon; flash it first. All with
+**Boards: WS_P4_5 (COM15), WS_P4_4B (COM7) and CYD_P4_1060 (COM9) all carry round 8.** COM9 is
+sometimes held by another program on the PC (most of 2026-10-07's afternoon); retry later. All with
 local `DEBUG_POPUP` (P4_5 also `DEBUG_FRAMES`) in the uncommitted `platformio.ini` - put it back
 before the merge gate. Everything was driven over `/popup` against the real Office lights; **no finger has
 touched any of it**, and All Lamps (Fleet page) was not re-checked after the card code changed.

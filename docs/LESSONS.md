@@ -537,6 +537,14 @@ next piece of eye candy:
   as red and blue, so a truncated ramp is not grey at every step. An ARGB8888 face painted by hand
   needs dithering to the 565 grid (an ordered 4x4, the same threshold on every channel) - LVGL's own
   gradients do not help here.
+- **A flex column centres its children twice.** With `LV_FLEX_ALIGN_CENTER` on the cross axis, LVGL
+  centres a "track" as wide as the widest child in the parent, then each child in the track. Two
+  integer roundings: the 1060's control deck moved a pixel whenever a sibling (the slider's row)
+  changed width. To centre something against the parent alone, give it the parent's full width and
+  centre inside that. Found by printing the stage's children's coordinates over `/popup?ctl=`.
+- **A newly made object reports y = 0 until LVGL lays it out** (the same trap as the width one
+  above). An animation started from `lv_obj_get_y()` of a panel made in the same call slid it down
+  from the top of the screen. Start a new object's animation from the value you just set.
 
 ## Never keep a pointer to an LVGL object you do not own - ask it to tell you when it goes
 

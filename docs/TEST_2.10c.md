@@ -212,8 +212,40 @@ program all session (a serial monitor?), so its lines wait. Round 6's S1, S2, S4
 | N14 | The title on the 4B: Desk, its Scenes, its History, a member | The whole "Area > Name" shows, left of centre where it needs the room. If it could not fit even so, the name alone |
 | N15 | The checkbox (Paused) | Larger than round 6's |
 
-**Asked (not yet answered)**: S3 was "???" - what was wrong with the Scenes dropdown? And Linen's
-default: Silver - Square (round 6) or Silver - Round (round 5)? Built as Silver - Square.
+**Asked**: Linen's default - Silver - Square (round 6) or Silver - Round (round 5)? Built as
+Silver - Square; not answered yet.
+
+### Round 7 results (owner, 2026-10-07)
+
+N1-N8, N10, N12, N14, N15 PASS; N13 PASS on the P4_5 and 4B (1060 to do). S3 (round 6) PASS - the
+"???" was not understanding it at first. **N9 PARTIAL**: the first time History showed, CHART flew
+down from the top of the screen to its tab (P4_5 and 4B); on the 4B the pane did not grow to fit its
+words; the owner wants it to open further, with dummy rows, to see two folder tabs side by side.
+**N11 FAIL**: folded, CHART should slide down off the screen with the window, as SETTINGS does; only
+open should it vanish at once. **Noted**: SETTINGS opens and folds choppier than before on both
+boards, the P4_5 a little worse - try it slower, between its old speed and the page deck's.
+
+## Round 8 - CHART as a real folder, the panels' speed, the 1060
+
+Flashed: **WS_P4_5, WS_P4_4B, CYD_P4_1060** (COM9 free again).
+
+| # | Do this | PASS if |
+|---|---|---|
+| P1 | History, the first time after opening a window | CHART rises from below the screen to its tab, as SETTINGS does - nothing comes down from the top |
+| P2 | Tap CHART | It opens as SETTINGS does: a folder tab on the left, its pane wider than the tab with the curve where they join (a mirror image of SETTINGS), five demo rows that work and change nothing |
+| P3 | Close the window with CHART folded | Its tab slides down off the screen after the window, as SETTINGS' does |
+| P4 | Close the window with CHART open | It goes at once with the window |
+| P5 | Open and fold SETTINGS, and CHART, on the P4_5 and 4B | Smoother than round 7 (260 ms, from 220; the page deck's panels take 300) - say if it is still choppy, and the next step is 300 |
+| P6 | The 1060: Brightness, Temperature, Color | The control deck does not move at all (L5); the slider does not move either |
+| P7 | The 1060: round 7's N1-N15 | As on the other two |
+
+## Not tested (by Claude) - round 8
+
+The animations' smoothness (screenshots cannot show it; not measured with `DEBUG_FRAMES`), CHART by
+finger, its dropdowns opening, and closing the window with CHART folded (N11's fix: driven only by
+reading the code - `/popup?close` closes as a tap outside does, but nothing was watched on glass).
+Measured on the 1060 over `/popup`: the deck at x 373..649 on all three controls (it was 372..648 on
+Color), the slider at 326.
 
 ## Not tested (by Claude) - round 7
 
