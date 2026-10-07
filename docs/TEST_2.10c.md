@@ -173,6 +173,56 @@ WS_P4_4B, CYD_P4_1060**. Round 5's L1-L4, L7 and L10 still apply; these replace 
 | S5 | All Lamps (Fleet page) | One more row, Active state (Any / All members are on), and it works as G6-G9 did |
 | S6 | A dropdown near the screen's bottom | Its list opens where it can be read |
 
+### Rounds 5-6 results (owner, 2026-10-07)
+
+L1-L4, L6-L10, M2, M3, M5, S1, S2, S4-S6 PASS. **L5 FAIL**: the control deck moves on choosing Color -
+slightly left on the 1060, 1-2 px down on the P4_5. **L8 / M4**: all four looks liked; keep all four,
+named "Black - Square / Black - Round / Silver - Square / Silver - Round"; default Black - Square on
+Midnight and Fleet, Silver on Linen (round 6 said Silver - Square, round 5 Silver - Round). **S2**: the
+checkbox could be larger. **S3**: "???" - not answered. **S6**: the list opens upwards.
+**M1 and notes**: the slider should keep its own place where it can - in Scenes the buttons move to
+it, and only more columns than fit move the slider; on the 4B the swatches could sit lower and to the
+right instead of the slider moving; the 4B's second column of all seven scenes ran under the
+clapperboard chip; the 1060's slider and deck both nudge left on Color. SETTINGS: a line under its
+title on the 1060 and on Linen, and a break in its left border on the P4_5. **Asked for**: no "Colour"
+label over the swatches, and US spelling ("Color"); a selector face whose light/dark line curves up
+in the middle, for a raised look; inactive chips as soft dents; and a demo second panel that slides up
+with the History view.
+
+## Round 7 - faces, the slider's place, the CHART panel, the title
+
+Flashed: **WS_P4_5, WS_P4_4B**. The 1060 is **not** flashed this round: COM9 was held by another
+program all session (a serial monitor?), so its lines wait. Round 6's S1, S2, S4-S6 still apply.
+
+| # | Do this | PASS if |
+|---|---|---|
+| N1 | Desk: the selector | Its light/dark line curves up in the middle; faint brushed streaks; no pink or green banding. Its icon larger, filling more of it |
+| N2 | The corner chips | Unlit: soft dents in the window, darker at the top, no border. Lit (e.g. the chart on History): the selector's metal, the icon in the accent and a size larger |
+| N3 | Press and hold a chip | It tints while pressed |
+| N4 | SETTINGS > Deck look | Black - Square, Black - Round, Silver - Square, Silver - Round; Midnight opens on Black - Square, Linen on Silver - Square |
+| N5 | Brightness, Color, Scenes on the P4_5 | The slider never moves; in Color no "Color" word above the swatches; the deck does not move (L5) |
+| N6 | Scenes on the 4B | The slider where the controls put it, the three buttons just right of it |
+| N7 | Color on the 4B | The slider stays; the swatches sit low, clear of the clapperboard |
+| N8 | SETTINGS > Scenes > Show all scenes | P4_5: three columns, the slider moved left only as far as they need. 4B: one column that scrolls, nothing under the clapperboard, the slider unmoved |
+| N9 | The chart chip (History) | A CHART tab slides up in the left half, a small gap from SETTINGS. Tap it: it opens with a demo line; tap again or in the window: it folds |
+| N10 | From History go back, or to Scenes | CHART slides back down |
+| N11 | History with CHART showing (open or not), then close the window | CHART goes at once with the window |
+| N12 | Open SETTINGS while CHART is open, and the other way round | The one opened comes to the front; the other folds to its tab |
+| N13 | SETTINGS on the P4_5, 1060 and Linen | One shape: no line under the title, no break in the left border |
+| N14 | The title on the 4B: Desk, its Scenes, its History, a member | The whole "Area > Name" shows, left of centre where it needs the room. If it could not fit even so, the name alone |
+| N15 | The checkbox (Paused) | Larger than round 6's |
+
+**Asked (not yet answered)**: S3 was "???" - what was wrong with the Scenes dropdown? And Linen's
+default: Silver - Square (round 6) or Silver - Round (round 5)? Built as Silver - Square.
+
+## Not tested (by Claude) - round 7
+
+Everything on the 1060 (not flashed), including whether its deck still shifts left on Color (L5 -
+the P4_5's cause was the "Colour" line, now gone; the 1060's was not found). Pressing a chip, the
+CHART panel by finger, the two panels opening over each other (N12), Linen, the dropdown lists, and
+a member's title (N14). The faces were checked on screenshots only, which read the framebuffer, so
+they are what the panel draws - but not how the glass shows it.
+
 ## Not tested (by Claude) - round 6
 
 The dropdown lists (`/popup` cannot open them), scrolling a panel taller than the window (no card has

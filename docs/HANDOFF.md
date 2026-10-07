@@ -1,4 +1,4 @@
-# Handoff — 2026-10-06 (2.10c built, before the owner's test)
+# Handoff — 2026-10-07 (2.10c round 7 built, before the owner's test)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was rewritten from scratch on
@@ -80,21 +80,24 @@ with a paused member taken out (K18); (3) scenes. **Rounds 1-3 tested by the own
 G8 once and S5); after them Scenes became a view of its own under the chart, the corner icons became
 tabs (K19 superseded, K20), and every FAILED now records why (G8). What was built: **`card-sheet.md`
 §16**. What HA does, measured from the PC: **`ha-websocket.md` §9**. Decisions: DECISIONS C5, K12,
-K15, K17-K20, A13, W9.
+K15, K17-K30, A13, W9.
 
-**The owner's next job: `docs/TEST_2.10c.md` round 6** (M, S; round 5 was looked at from screenshots
-only). If G8's FAILED comes back, read the reason with `/popup?view=3` before theorising. **Built since
-round 4** (owner's list, 2026-10-07): the hidden-scene filter, the deck under the hero on tall windows,
-the TouchFLO-3D control deck (metal selector, split ribbon, four debug looks), centred wide groups,
-scenes as a stack, and the SETTINGS panel rework (K25). **Still open in 2.10c:** live switching while
-the selector is dragged (measure a control switch with `DEBUG_FRAMES` first), then the merge gate.
-Words for the window's parts: `card-sheet.md` "Words" (K22) - "deck" now means the control deck.
+**The owner's next job: `docs/TEST_2.10c.md` round 7** (N1-N15; rounds 5-6 results are recorded
+there). If G8's FAILED comes back, read the reason with `/popup?view=3` before theorising. **Built in
+round 7** (2026-10-07): hand-drawn faces (curved metal selector, dent chips, dithered - K27), the four
+named looks with per-scheme defaults, the slider's place (K26, `placeWide()`), the CHART demo panel on
+History (K28), the title that gives way in steps (K29), flush SETTINGS, no "Color" word, US spelling
+(K30). **Two questions are open with the owner**: what S3's "???" meant, and Linen's default look
+(Silver - Square built; round 5 said Silver - Round). **Still open in 2.10c:** the 1060's deck nudging
+left on Color (L5; not looked at - see below), live switching while the selector is dragged (measure
+with `DEBUG_FRAMES` first), then the merge gate. Words for the window's parts: `card-sheet.md`
+"Words" (K22) - "deck" means the control deck. `/popup` gained `show=0|1|2` (which scenes) and
+`deck=2` (CHART open, on History); `look=4` returns to the scheme's own look.
 
-**Boards flashed for the owner's testing: WS_P4_5 (COM15), WS_P4_4B (COM7), CYD_P4_1060 (COM9)** - all
-with local `DEBUG_POPUP` (P4_5 also `DEBUG_FRAMES`) in the uncommitted `platformio.ini`. Flashed 2026-10-06: **WS_P4_5**
-(COM15) and **WS_P4_4B** (COM7, for S8), both with local debug flags (`platformio.ini` is modified
-and NOT committed: `DEBUG_POPUP` + `DEBUG_FRAMES` on P4_5, `DEBUG_POPUP` on 4B - put it back before
-the merge gate). Everything was driven over `/popup` against the real Office lights; **no finger has
+**Boards: WS_P4_5 (COM15) and WS_P4_4B (COM7) carry round 7. CYD_P4_1060 (COM9) still has round 6** -
+COM9 was held by another program on the PC all of 2026-10-07's afternoon; flash it first. All with
+local `DEBUG_POPUP` (P4_5 also `DEBUG_FRAMES`) in the uncommitted `platformio.ini` - put it back
+before the merge gate. Everything was driven over `/popup` against the real Office lights; **no finger has
 touched any of it**, and All Lamps (Fleet page) was not re-checked after the card code changed.
 
 **Then:** fix what the rounds find, the all-nine gate, merge `--no-ff`, tag `v0.2.10`, CHANGELOG.

@@ -529,6 +529,14 @@ next piece of eye candy:
 - **HA's reply order is not the bridge's.** After a command to the Hue room, a bulb's report can lag
   the room's by a second or more: the board showed 2304 K on one bulb for a few seconds after 2710 K
   had landed. Read HA again before calling a mismatch a bug.
+- **A DOT label rewrites its own text (2.10c round 7).** `LV_LABEL_LONG_DOT` puts the "..." into the
+  label's text buffer, so `lv_label_get_text()` after a layout at too small a width returns "Sce...",
+  not "Scenes". A layout pass that ran before the title was sized made it measure the dotted text
+  and keep it. Measure from your own string, or size the label before anything lays it out.
+- **A smooth grey ramp bands pink and green on a 16-bit panel.** RGB565 steps green twice as finely
+  as red and blue, so a truncated ramp is not grey at every step. An ARGB8888 face painted by hand
+  needs dithering to the 565 grid (an ordered 4x4, the same threshold on every channel) - LVGL's own
+  gradients do not help here.
 
 ## Never keep a pointer to an LVGL object you do not own - ask it to tell you when it goes
 

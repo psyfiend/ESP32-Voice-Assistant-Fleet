@@ -23,8 +23,9 @@ with a recommendation.
 | **hero** | the view's main content: on the controls, the slider (or toggle) with its label, value and swatches; on Members, the list |
 | **control deck** | the bar of **switches** under or beside the hero - Power \| Brightness, Temperature, Colour. It says which modes the light supports and which one the slider is set to |
 | **switch** | one of the control deck's options |
-| **selector** | how the chosen switch is shown - today a white disc with an inverted icon |
-| **SETTINGS panel** | the folder-tab panel that rises from the bottom of the screen |
+| **selector** | how the chosen switch is shown - a metal face over the chosen switch, its icon in the accent |
+| **SETTINGS panel** | the folder-tab panel that rises from the bottom of the screen, in the right half |
+| **CHART panel** | its neighbour in the left half, up only while History shows (a demo for now) |
 
 Older sections and the code say "deck" for the SETTINGS panel (`s.deck`, `deckFill()`, "The settings
 deck") and "chips" for its choice buttons (`deckChip()`); from 2.10c, "deck" in conversation means the
@@ -547,11 +548,9 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
 - **The control deck under the hero where the window has the height** (owner, 2026-10-07, K23): the
   4B and the 7" panels; the P4_5, the one board too short (its screen is the widest shape), keeps it
   beside the slider. Worked out from the window's height. The slider, its words and the deck are
-  centred. **Scenes - and Colour under a tall window - push the slider to the stage's left edge** and
-  the scene buttons or swatches take the rest, centred both ways and clear of the clapperboard chip.
-  The slider may move ("a large, very distinct thing that does not care where your finger lands");
-  the control deck never does - in Scenes, where there is no deck, its room is kept so the slider
-  stays at the same height.
+  centred. ~~Scenes - and Colour under a tall window - push the slider to the stage's left edge~~
+  (see "The slider's place", below, K26). The control deck never moves - in Scenes, where there is
+  no deck, its room is kept so the slider stays at the same height.
 - **The control deck after HTC's TouchFLO 3D** (owner, 2026-10-07, K24): a **ribbon** three quarters
   of a switch tall, and on it the **selector**, as tall as the deck, carrying the chosen switch's icon
   a size up (the LG icon face) in the accent. The selector can be grabbed and slid: its icon becomes
@@ -574,11 +573,43 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   (Toggle / Details / Members / History view / Cycle scenes / Nothing); Scenes (Visible scenes only /
   Show all / Disabled); and in debug builds, Deck look. Label, Visibility and Tap action are shown
   greyed until saving (2.10d); Custom name joins when Label can be Custom.
-- **Scenes and Colour (wide): the slider and the buttons or swatches are one group**, centred, the
-  content centred top to bottom between the chips and the deck. Scenes are **a stack**: one column of
+- ~~**Scenes and Colour (wide): the slider and the buttons or swatches are one group**, centred~~
+  (superseded in round 7 by the slider's place, below). Scenes are **a stack**: one column of
   buttons as wide as the longest name, a second column only when one is full, then scrolling.
   Not yet: switching the control live while dragging (to be measured first), and the inverted-icon
   variant.
+- **The slider's place** (owner, round 7, K26 - `placeWide()`): in Scenes, and Color under a tall
+  window, the slider stays exactly where the controls put it and the buttons or swatches sit just to
+  its right, centred top to bottom in its height. Only what does not fit moves anything, and only as
+  far as it must: wider than the room (more scene columns), the slider goes left by the difference;
+  running under the clapperboard chip, the content first drops to the bottom of the slider's height,
+  then the slider goes left until it clears; and when neither is enough (the 4B's seven scenes: their
+  rows fill the height, and two columns do not fit beside the chip even with the slider at the
+  edge), the scenes take the columns that fit beside the chip and scroll. The row is moved with
+  `translate_x`, so taps land where it is drawn.
+- **Four looks, hand-drawn faces** (owner, round 6-7, K27): Black - Square, Black - Round, Silver -
+  Square, Silver - Round, all kept; unchosen, Black - Square on Midnight and Fleet, Silver - Square on
+  Linen. LVGL's gradient has two stops and runs straight, and the owner asked for the line between
+  the selector's light and dark halves to **curve up in the middle** (in the upper two fifths, a
+  raised look) and for unlit chips to be **soft dents**, so the faces are ARGB8888 images painted per
+  pixel (`paintFace()`): the curved line, faint brushed row streaks, a fine edge, corners
+  anti-aliased in the alpha; a dent is shaded at the top, gone by the middle, a whisper of light at
+  the bottom, in the window's colour, no border. Painted the first time a size is needed and kept in
+  PSRAM (12 slots, ~40-55 KB each on the P4_5). **Dithered to the 16-bit grid** (4x4 ordered): a
+  smooth grey ramp truncated to RGB565 banded pink and green, because green steps twice as finely as
+  red and blue. The selector's icon is scaled 1.4x (the largest icon face is not big enough); lit
+  chips use the next face up. Pressed chips tint.
+- **CHART, a second panel** (owner, round 7, K28 - a demo): the left half, a millimetre short of
+  SETTINGS' tab, one piece. It peeks up when History shows and slides down when the window goes to
+  another view; tapped, it opens on a demo line. Opening either panel brings it to the front and
+  folds the other; a tap in the window folds whichever is open. It goes with the window at once.
+- **The title gives way in steps** (owner, round 7, K29): centred when "Area > Name" fits between
+  ends of equal width; else it takes the room beside the X (a window with two chips on the right has
+  a chip's width spare on the left), left of centre; else the name alone - the back arrow still goes
+  up. Sized before the view is built: a DOT label laid out at the last view's width rewrites its own
+  text ("Sce..."), and measuring that kept it.
+- **No word over the swatches**: Color shows only the swatches (and the PAUSED pill when paused).
+  Text on the panels is US English (K30).
 - **Scenes hidden in HA's UI are hidden here too** (owner, 2026-10-07, K21): the scene query asks HA's
   `is_hidden_entity` per scene (the entity registry's `hidden_by`). A card setting in SETTINGS,
   "Scenes: Visible / All / Off", Visible by default; live, in RAM until 2.10d. Office: Bright,
