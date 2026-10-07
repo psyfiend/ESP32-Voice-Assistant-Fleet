@@ -213,6 +213,7 @@ struct Popup {
     GroupOn   groupOn = GroupOn::GROUP_ON_ANY;   // copied from the card at open
     SceneShow sceneShow = SceneShow::SCENES_VISIBLE;   // likewise (2.10c)
     lv_obj_t *chipScenes[3] = {nullptr, nullptr, nullptr};   // Visible, All, Off
+    lv_obj_t *chipLook[4] = {nullptr, nullptr, nullptr, nullptr};   // debug: the deck's looks
     bool      builtPaused = false, rebuildQueued = false;   // "A paused window"
     uint8_t   builtCaps = 0;                     // what the selector was built for
     lv_obj_t *pill = nullptr;                    // PAUSED
@@ -528,8 +529,11 @@ const char *whatWord(const Entity &e, char *buf, size_t cap) {
     return buf;
 }
 
+void forgetDeck();   // below, with the control deck
+
 // The main view's widgets, before its stage is cleaned or the window goes.
 void forgetMainWidgets() {
+    forgetDeck();
     s.hero = s.knob = s.heroIcon = nullptr;
     s.lblWhat = s.lblValue = s.lblUnit = s.lblAgo = nullptr;
     s.fill = s.grip = s.mark = s.pill = nullptr;
@@ -953,16 +957,11 @@ void renderLight() {
     }
 
     // --- The selector ------------------------------------------------------
-    for (uint8_t k = 0; k < 4; k++) {
-        lv_obj_t *b = s.btnCtl[k];
-        if (!b) continue;
-        const bool chosen = (k > 0 && k - 1 == s.lightCtl);
-        lv_obj_set_style_bg_opa  (b, chosen ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-        lv_obj_set_style_bg_color(b, UI::c(quiet(p.TEXT)), 0);
-        if (lv_obj_t *l = lv_obj_get_child(b, 0))
-            lv_obj_set_style_text_color(l, UI::c(chosen ? p.SURFACE_ALT
-                                                        : quiet((k == 0 && on) ? p.ST_ACTIVE : p.TEXT)), 0);
-    }
+    // Power says whether the light is on; the chosen switch is the selector's
+    // (buildControlDeck()).
+    if (s.btnCtl[0])
+        if (lv_obj_t *l = lv_obj_get_child(s.btnCtl[0], 0))
+            lv_obj_set_style_text_color(l, UI::c(quiet(on ? p.ST_ACTIVE : p.TEXT)), 0);
 
     // --- The swatches: a ring round the one the light is showing -----------
     for (uint8_t i = 0; i < 8; i++) {
@@ -1023,16 +1022,6 @@ void rebuildMainAsync(void *unused) {
         showView(s.view);
 }
 
-void ctlCb(lv_event_t *ev) {
-    const uint8_t k = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
-    if (k == 0) { if (!pausedBlocks()) commandAll(!aggregate().on); return; }
-    if (k - 1 == s.lightCtl) return;
-    s.lightCtl = k - 1;
-    // Only what is showing is built, so the view is rebuilt - deferred: this
-    // button is in the stage being cleaned, and an event callback must not
-    // delete its own object.
-    lv_async_call(rebuildMainAsync, nullptr);
-}
 
 void swatchCb(lv_event_t *ev) {
     const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
@@ -1173,18 +1162,219 @@ void buildLightHero(lv_obj_t *row) {
     lv_obj_set_style_outline_opa (s.mark, LV_OPA_50, 0);
 }
 
-lv_obj_t *ctlButton(lv_obj_t *parent, const char *glyph, uint8_t k) {
-    const int32_t sz = UI::minTouch();
-    lv_obj_t *b = plain(parent);
-    lv_obj_set_size(b, sz, sz);
-    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
-    lv_obj_t *l = makeLabel(b, UI::type().ICON_MD, UI::pal().TEXT);
-    lv_label_set_text(l, glyph);
-    lv_obj_center(l);
-    lv_obj_add_event_cb(b, ctlCb, LV_EVENT_CLICKED, (void *)(uintptr_t)k);
-    s.btnCtl[k] = b;
-    return b;
+// ---------------------------------------------------------------------------
+// THE CONTROL DECK (owner, 2026-10-07 - after HTC's TouchFLO 3D)
+//
+// A RIBBON a little shorter than the switches, and on it a SELECTOR as tall as
+// the deck, which can be grabbed and slid along it. The selector carries the
+// chosen switch's icon at the next size up, in the accent; its icon changes
+// to a neighbour's once the selector is more than halfway over it, and on
+// release it snaps to the nearest switch, which is then chosen. A tap on a
+// switch glides the selector there. Power is an action, not a mode, so it is
+// a plain button at the start, and the selector never lands on it.
+//
+// The deck is the same size as before - the ribbon is what got shorter - so
+// nothing around it moves.
+// ---------------------------------------------------------------------------
+constexpr uint32_t DECK_GLIDE_MS = 140;
+
+// Looks to try on glass (owner): the selector round or square, and with or
+// without an edge in the accent. Debug builds cycle them from SETTINGS.
+uint8_t s_deckLook = 0;   // bit 0: square, bit 1: accent edge
+
+struct DeckColours { uint32_t ribbon, selector, icon, chosen; };
+
+// From the scheme, never written down (tokens.md): on the dark schemes a
+// ribbon lighter than the window and a selector notably darker; on Linen a
+// ribbon darker than the window and a selector of medium silver. Icons in the
+// text colour; the chosen one in the accent.
+DeckColours deckColours() {
+    const UIPalette &p = UI::pal();
+    const bool dark = lumOf(p.SURFACE_ALT) < 128;
+    DeckColours c;
+    c.ribbon   = UI::mix(p.SURFACE_ALT, p.TEXT, dark ? 14 : 12);
+    c.selector = dark ? p.GROUND : UI::mix(p.SURFACE_ALT, p.TEXT, 26);
+    c.icon     = p.TEXT;
+    c.chosen   = p.ACCENT;
+    return c;
+}
+
+struct Deck {
+    lv_obj_t *obj = nullptr, *sel = nullptr, *selIcon = nullptr;
+    uint8_t   n = 0;                    // mode switches
+    int32_t   x[3] = {0, 0, 0};         // their centres
+    uint8_t   ctl[3] = {0, 0, 0};       // the LightCtl each is
+    const char *glyph[3] = {nullptr, nullptr, nullptr};
+    int32_t   selW = 0;
+    uint8_t   shown = 0;                // the switch whose icon the selector carries
+    bool      dragging = false;
+    int32_t   pressX = 0, selX0 = 0;
+} d;
+
+void forgetDeck() { d = Deck{}; }
+
+int32_t deckSelX(uint8_t i) { return d.x[i] - d.selW / 2; }
+
+// The switch nearest the selector's centre - more than halfway over it.
+uint8_t deckNearest(int32_t selX) {
+    const int32_t c = selX + d.selW / 2;
+    uint8_t best = 0;
+    for (uint8_t i = 1; i < d.n; i++)
+        if (LV_ABS(d.x[i] - c) < LV_ABS(d.x[best] - c)) best = i;
+    return best;
+}
+
+// Move the selector; its icon follows the nearest switch.
+void deckPlace(int32_t x) {
+    if (!d.sel) return;
+    lv_obj_set_x(d.sel, x);
+    const uint8_t i = deckNearest(x);
+    if (i != d.shown && d.selIcon) { d.shown = i; lv_label_set_text(d.selIcon, d.glyph[i]); }
+}
+
+void deckGlideExec(void *var, int32_t v) { (void)var; deckPlace(v); }
+
+// The selector has arrived: that switch is chosen. Only what is showing is
+// built, so a new control rebuilds the view - after the glide, never during.
+void deckChoose(uint8_t i) {
+    if (i >= d.n || d.ctl[i] == s.lightCtl) return;
+    s.lightCtl = d.ctl[i];
+    lv_async_call(rebuildMainAsync, nullptr);
+}
+
+void deckGlideDone(lv_anim_t *a) { (void)a; deckChoose(d.shown); }
+
+void deckGlideTo(uint8_t i) {
+    if (!d.sel || i >= d.n) return;
+    lv_anim_delete(d.sel, deckGlideExec);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var        (&a, d.sel);
+    lv_anim_set_values     (&a, lv_obj_get_x(d.sel), deckSelX(i));
+    lv_anim_set_duration   (&a, DECK_GLIDE_MS);
+    lv_anim_set_path_cb    (&a, lv_anim_path_ease_out);
+    lv_anim_set_exec_cb    (&a, deckGlideExec);
+    lv_anim_set_completed_cb(&a, deckGlideDone);
+    lv_anim_start(&a);
+}
+
+// A tap on a mode switch.
+void deckTapCb(lv_event_t *ev) {
+    if (pausedBlocks()) return;
+    deckGlideTo((uint8_t)(uintptr_t)lv_event_get_user_data(ev));
+}
+
+// The finger on the selector: it follows along the ribbon, clamped to the
+// first and last switch, and snaps on release.
+void deckDragCb(lv_event_t *ev) {
+    const lv_event_code_t code = lv_event_get_code(ev);
+    lv_indev_t *in = lv_indev_active();
+    lv_point_t pt = {0, 0};
+    if (in) lv_indev_get_point(in, &pt);
+    if (code == LV_EVENT_PRESSED) {
+        lv_anim_delete(d.sel, deckGlideExec);
+        d.pressX = pt.x;
+        d.selX0  = lv_obj_get_x(d.sel);
+        d.dragging = false;
+    } else if (code == LV_EVENT_PRESSING) {
+        const int32_t dx = pt.x - d.pressX;
+        if (!d.dragging && LV_ABS(dx) < mm(1.0f)) return;
+        if (!d.dragging && pausedBlocks()) { if (in) lv_indev_wait_release(in); return; }
+        d.dragging = true;
+        deckPlace(LV_CLAMP(deckSelX(0), d.selX0 + dx, deckSelX(d.n - 1)));
+    } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+        if (!d.dragging) return;
+        d.dragging = false;
+        deckGlideTo(deckNearest(lv_obj_get_x(d.sel)));
+    }
+}
+
+// Power: a plain button.
+void deckPowerCb(lv_event_t *ev) {
+    (void)ev;
+    if (!pausedBlocks()) commandAll(!aggregate().on);
+}
+
+void buildControlDeck(lv_obj_t *parent, uint8_t caps) {
+    const UIType &t = UI::type();
+    const DeckColours col = deckColours();
+    const int32_t slot = UI::minTouch(), g = mm(0.6f), divW = LV_MAX(2, mm(0.25f));
+    const int32_t H = controlDeckH();
+
+    forgetDeck();
+    if (caps & LIGHT_CAN_DIM)    { d.ctl[d.n] = LCTL_DIM;    d.glyph[d.n++] = MDI_BRIGHTNESS_5; }
+    if (caps & LIGHT_CAN_TEMP)   { d.ctl[d.n] = LCTL_TEMP;   d.glyph[d.n++] = MDI_SUN_THERMOMETER; }
+    if (caps & LIGHT_CAN_COLOUR) { d.ctl[d.n] = LCTL_COLOUR; d.glyph[d.n++] = MDI_PALETTE; }
+    const int32_t W = selectorW(caps);
+
+    d.obj = plain(parent);
+    lv_obj_set_size(d.obj, W, H);
+
+    // The ribbon: three quarters of a switch tall, centred.
+    const int32_t rh = slot * 72 / 100;
+    lv_obj_t *rib = plain(d.obj);
+    lv_obj_set_pos (rib, 0, (H - rh) / 2);
+    lv_obj_set_size(rib, W, rh);
+    lv_obj_set_style_radius  (rib, (s_deckLook & 1) ? mm(1.6f) : LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(rib, UI::c(quiet(col.ribbon)), 0);
+    lv_obj_set_style_bg_opa  (rib, LV_OPA_COVER, 0);
+
+    auto iconAt = [&](int32_t x, const char *glyph, lv_event_cb_t cb, void *user) {
+        lv_obj_t *b = plain(d.obj);
+        lv_obj_set_pos (b, x, 0);
+        lv_obj_set_size(b, slot, H);
+        lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, user);
+        lv_obj_t *l = makeLabel(b, t.ICON_MD, quiet(col.icon));
+        lv_label_set_text(l, glyph);
+        lv_obj_center(l);
+        return b;
+    };
+
+    int32_t x = g;
+    s.btnCtl[0] = iconAt(x, MDI_POWER, deckPowerCb, nullptr);
+    x += slot + g;
+    if (d.n) {
+        lv_obj_t *div = plain(d.obj);
+        lv_obj_set_pos (div, x, (H - slot * 60 / 100) / 2);
+        lv_obj_set_size(div, divW, slot * 60 / 100);
+        lv_obj_set_style_bg_color(div, UI::border(), 0);
+        lv_obj_set_style_bg_opa  (div, LV_OPA_COVER, 0);
+        x += divW + g;
+    }
+    uint8_t chosen = 0;
+    for (uint8_t i = 0; i < d.n; i++) {
+        s.btnCtl[1 + d.ctl[i]] = iconAt(x, d.glyph[i], deckTapCb, (void *)(uintptr_t)i);
+        d.x[i] = x + slot / 2;
+        if (d.ctl[i] == s.lightCtl) chosen = i;
+        x += slot + g;
+    }
+    if (!d.n) return;
+
+    // The selector: the deck's height, a little wider than a switch, over the
+    // ribbon - with the chosen switch's icon, a size up, in the accent.
+    d.selW = slot + 2 * g;
+    d.sel = plain(d.obj);
+    lv_obj_set_size(d.sel, d.selW, H);
+    lv_obj_set_style_radius  (d.sel, (s_deckLook & 1) ? mm(1.6f) : LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(d.sel, UI::c(quiet(col.selector)), 0);
+    lv_obj_set_style_bg_opa  (d.sel, LV_OPA_COVER, 0);
+    if (s_deckLook & 2) {
+        lv_obj_set_style_border_width(d.sel, LV_MAX(2, mm(0.35f)), 0);
+        lv_obj_set_style_border_color(d.sel, UI::c(quiet(col.chosen)), 0);
+    }
+    lv_obj_add_flag  (d.sel, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(d.sel, LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_clear_flag(d.sel, LV_OBJ_FLAG_SCROLL_CHAIN);
+    lv_obj_add_event_cb(d.sel, deckDragCb, LV_EVENT_PRESSED,    nullptr);
+    lv_obj_add_event_cb(d.sel, deckDragCb, LV_EVENT_PRESSING,   nullptr);
+    lv_obj_add_event_cb(d.sel, deckDragCb, LV_EVENT_RELEASED,   nullptr);
+    lv_obj_add_event_cb(d.sel, deckDragCb, LV_EVENT_PRESS_LOST, nullptr);
+    d.selIcon = makeLabel(d.sel, t.ICON, quiet(col.chosen));
+    lv_obj_center(d.selIcon);
+    d.shown = chosen;
+    lv_label_set_text(d.selIcon, d.glyph[chosen]);
+    lv_obj_set_pos(d.sel, deckSelX(chosen), 0);
 }
 
 // `deckParent`: the column itself (the control deck at its bottom, level with
@@ -1235,26 +1425,8 @@ void buildLightColumn(lv_obj_t *col, lv_obj_t *deckParent) {
 
     // Power | the controls this light (any member) has, with a divider after
     // Power as in HA. A light with only one of them still shows it, so the
-    // selector always says what the slider is.
-    lv_obj_t *sel = plain(deckParent);
-    lv_obj_set_size     (sel, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(sel, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(sel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_radius    (sel, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color  (sel, UI::c(p.SURFACE), 0);
-    lv_obj_set_style_bg_opa    (sel, LV_OPA_COVER, 0);
-    lv_obj_set_style_pad_all   (sel, mm(0.6f), 0);
-    lv_obj_set_style_pad_column(sel, mm(0.6f), 0);
-    ctlButton(sel, MDI_POWER, 0);
-    if (caps & (LIGHT_CAN_DIM | LIGHT_CAN_TEMP | LIGHT_CAN_COLOUR)) {
-        lv_obj_t *div = plain(sel);
-        lv_obj_set_size(div, LV_MAX(2, mm(0.25f)), UI::minTouch() * 60 / 100);
-        lv_obj_set_style_bg_color(div, UI::border(), 0);
-        lv_obj_set_style_bg_opa  (div, LV_OPA_COVER, 0);
-    }
-    if (caps & LIGHT_CAN_DIM)    ctlButton(sel, MDI_BRIGHTNESS_5, 1 + LCTL_DIM);
-    if (caps & LIGHT_CAN_TEMP)   ctlButton(sel, MDI_SUN_THERMOMETER, 1 + LCTL_TEMP);
-    if (caps & LIGHT_CAN_COLOUR) ctlButton(sel, MDI_PALETTE, 1 + LCTL_COLOUR);
+    // control deck always says what the slider is.
+    buildControlDeck(deckParent, caps);
 }
 
 // THE SCENES VIEW (2.10c; owner, 2026-10-06): the brightness slider stays where
@@ -1750,14 +1922,19 @@ void layoutTitle() {
 // everywhere - the group's from the group's views, a member's from its own.
 // The X closes from every view of the window; inside one member the arrow goes
 // back to Members.
+// Lit as the control deck's selector is (owner, 2026-10-07): its colour, the
+// icon in the accent, and its edge when the look has one.
 void cornerLook(lv_obj_t *b, bool shown, bool lit) {
     if (!b) return;
     if (!shown) { lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN); return; }
     lv_obj_clear_flag(b, LV_OBJ_FLAG_HIDDEN);
-    const UIPalette &p = UI::pal();
-    lv_obj_set_style_bg_color(b, UI::c(lit ? p.TEXT : p.SURFACE), 0);
+    const UIPalette  &p   = UI::pal();
+    const DeckColours col = deckColours();
+    lv_obj_set_style_bg_color(b, UI::c(lit ? col.selector : p.SURFACE), 0);
+    lv_obj_set_style_border_width(b, (lit && (s_deckLook & 2)) ? LV_MAX(2, mm(0.35f)) : 0, 0);
+    lv_obj_set_style_border_color(b, UI::c(col.chosen), 0);
     if (lv_obj_t *l = lv_obj_get_child(b, 0))
-        lv_obj_set_style_text_color(l, UI::c(lit ? p.SURFACE_ALT : p.TEXT), 0);
+        lv_obj_set_style_text_color(l, UI::c(lit ? col.chosen : p.TEXT), 0);
 }
 
 void showView(PopupView v) {
@@ -2603,6 +2780,16 @@ void groupChipCb(lv_event_t *ev) {
     renderMain();
 }
 
+#ifdef DEBUG_POPUP
+void lookChipCb(lv_event_t *ev) {
+    s_deckLook = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+    for (uint8_t i = 0; i < 4; i++) deckChipSelect(s.chipLook[i], i == s_deckLook);
+    // The deck is built with the view; the chips' lit look follows at once.
+    if (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER) lv_async_call(rebuildMainAsync, nullptr);
+    else showView(s.view);
+}
+#endif
+
 // Scenes: Visible / All / Off (2.10c). On the held card, and the window follows
 // at once: the clapperboard comes or goes, and Scenes rebuilds or gives way.
 void scenesChipCb(lv_event_t *ev) {
@@ -2679,7 +2866,10 @@ void deckCreate() {
     // defined here only; HA or Hue decides that for its own (2.10c).
     // And one for a light's Scenes (2.10c).
     const Entity *sh = sceneHost();
-    const int32_t rows = ((s.nEnt > 1 && !s.native) ? 5 : 4) + ((sh && sh->nScenes && !inMember()) ? 1 : 0);
+    int32_t rows = ((s.nEnt > 1 && !s.native) ? 5 : 4) + ((sh && sh->nScenes && !inMember()) ? 1 : 0);
+#ifdef DEBUG_POPUP
+    rows++;   // Deck look
+#endif
     s.deckH    = tabAbove + (rf + mm(1.6f)) + rows * mm(DECK_ROW_MM) + mm(4.0f) + mm(1.6f) + s.deckHide;
 
     s.deck = plain(lv_screen_active());
@@ -2858,6 +3048,15 @@ void deckFill() {
         s.chipScenes[1] = deckChip(row, "All",     true, s.sceneShow == SceneShow::SCENES_ALL,     scenesChipCb, (void *)1);
         s.chipScenes[2] = deckChip(row, "Off",     true, s.sceneShow == SceneShow::SCENES_OFF,     scenesChipCb, (void *)2);
     }
+#ifdef DEBUG_POPUP
+    // The control deck's selector, four looks to compare on glass (owner,
+    // 2026-10-07): round / square, without / with an edge in the accent.
+    // Debug builds only; the choice lasts until the board restarts.
+    row = deckRow(pane, "Deck look");
+    static const char *const LOOKS[4] = { "Round", "Square", "Round+", "Square+" };
+    for (uint8_t i = 0; i < 4; i++)
+        s.chipLook[i] = deckChip(row, LOOKS[i], true, s_deckLook == i, lookChipCb, (void *)(uintptr_t)i);
+#endif
     (void)t; (void)p;
 }
 
@@ -2897,6 +3096,7 @@ void deckEnd() {
     s.swPause = nullptr;
     s.chipGroup[0] = s.chipGroup[1] = nullptr;
     s.chipScenes[0] = s.chipScenes[1] = s.chipScenes[2] = nullptr;
+    for (lv_obj_t *&c : s.chipLook) c = nullptr;
     s.deckState  = DECK_HIDDEN;
     s.deckFilled = false;
 }
@@ -3214,7 +3414,7 @@ namespace {
 enum DbgReqState : int { DREQ_IDLE, DREQ_CLAIMED, DREQ_PENDING, DREQ_CLOSING, DREQ_DONE };
 std::atomic<int> s_dreq{DREQ_IDLE};
 struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
-                int member = -1; int scene = -1; bool close = false, power = false; };
+                int member = -1; int scene = -1; int look = -1; bool close = false, power = false; };
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
 size_t s_dreqLen = 0;
@@ -3252,6 +3452,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "pause", v, sizeof(v)) == ESP_OK) a.pause = atoi(v);
         if (httpd_query_key_value(q, "member", v, sizeof(v)) == ESP_OK) a.member = atoi(v);
         if (httpd_query_key_value(q, "scene", v, sizeof(v)) == ESP_OK) a.scene = atoi(v);
+        if (httpd_query_key_value(q, "look",  v, sizeof(v)) == ESP_OK) a.look  = atoi(v);
         if (httpd_query_key_value(q, "close", v, sizeof(v)) == ESP_OK) a.close = atoi(v) != 0;
     }
     int expected = DREQ_IDLE;
@@ -3317,6 +3518,14 @@ void CardPopup::debugService(lv_timer_t *t) {
             }
             dbgOut("pause %d\n", a.pause);
         }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.look >= 0) {
+        // The control deck's look (0 round, 1 square, 2 round + edge, 3 square + edge).
+        s_deckLook = (uint8_t)(a.look & 3);
+        if (isOpen()) showView(s.view);
+        dbgOut("deck look %d\n", (int)s_deckLook);
         s_dreq.store(DREQ_DONE);
         return;
     }

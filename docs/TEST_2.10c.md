@@ -133,6 +133,32 @@ link up, Members centred vertically.
 | N4 | From the lamp's History, tap "Office lamp" in the title; from the lamp's controls, tap "Desk" | The lamp's controls; Desk's controls |
 | N5 | Members | The list centred up and down |
 
+**N1-N5 PASS** (owner, 2026-10-07). Then the owner's design pass: names for the window's parts, the
+Scenes view without a control deck and with the slider pushed aside, the deck under the hero on tall
+windows, a TouchFLO-3D-style deck, scenes hidden in HA hidden here, and a SETTINGS panel rework (next).
+
+## Round 5 - the new layout and the control deck
+
+Flashed: **WS_P4_5**, **WS_P4_4B**, **CYD_P4_1060**.
+
+| # | Do this | PASS if |
+|---|---|---|
+| L1 | Desk on each board | 4B and 1060: the slider and its words centred, the control deck under them. P4_5: the deck beside the slider, as before |
+| L2 | The deck | A ribbon shorter than the switches; the selector taller, darker (Midnight) or silver (Linen), the chosen icon a size up in the accent; Power a plain button |
+| L3 | Tap Temperature, then Colour | The selector glides to each and the slider changes after it arrives. The deck itself never moves |
+| L4 | Drag the selector slowly from Brightness to Colour | It follows the finger; its icon changes as it passes halfway over each switch; let go and it snaps to the nearest, which is chosen |
+| L5 | Colour on the 4B and 1060 | The slider moves to the left; the swatches have the room; the deck stays put |
+| L6 | Scenes on each board | The slider at the left, no deck, the buttons centred and clear of the clapperboard. Only Bright, Concentrate and Relax (the others are hidden in HA) |
+| L7 | SETTINGS > Scenes: All, then Off, then Visible | All: seven. Off: no clapperboard (from Scenes, back to the controls). Visible: three |
+| L8 | SETTINGS > Deck look: try all four | Round / Square, with and without the accent edge - say which you like; the lit corner chips follow |
+| L9 | Linen | The ribbon, selector and lit chips read clearly |
+| L10 | Members | "Tap a member for more details"; SETTINGS has no note at the bottom |
+
+## Not tested (by Claude) - round 5
+
+The drag and the glide (L3, L4) by finger - `/popup` cannot drag; the looks were screenshotted on
+Midnight only, not Linen or Fleet; the 1060 was checked by screenshot only.
+
 ## Not tested (by Claude) - round 3
 
 Driven over `/popup`: no finger has scrolled the 4B's scene grid or tapped a scene button. Not tried:

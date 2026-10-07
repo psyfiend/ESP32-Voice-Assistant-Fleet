@@ -552,6 +552,18 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   The slider may move ("a large, very distinct thing that does not care where your finger lands");
   the control deck never does - in Scenes, where there is no deck, its room is kept so the slider
   stays at the same height.
+- **The control deck after HTC's TouchFLO 3D** (owner, 2026-10-07, K24): a **ribbon** three quarters
+  of a switch tall, and on it the **selector**, as tall as the deck, carrying the chosen switch's icon
+  a size up (the LG icon face) in the accent. The selector can be grabbed and slid: its icon becomes
+  a neighbour's once it is more than halfway over it, and on release it snaps to the nearest switch,
+  which is chosen. A tap on a switch glides it there (140 ms); the view is rebuilt after the glide.
+  Power is an action, a plain button at the start, never selected. Colours from the scheme: dark
+  schemes - ribbon lighter than the window, selector the screen's ground colour; Linen - ribbon
+  darker than the window, selector a medium silver; icons in the text colour, the chosen one in the
+  accent. **Lit corner chips take the selector's look.** Four selector looks to compare on glass
+  (round / square, with or without an accent edge) - a debug-only row in SETTINGS ("Deck look").
+  Not yet: switching the control live while dragging (to be measured first), and the inverted-icon
+  variant.
 - **Scenes hidden in HA's UI are hidden here too** (owner, 2026-10-07, K21): the scene query asks HA's
   `is_hidden_entity` per scene (the entity registry's `hidden_by`). A card setting in SETTINGS,
   "Scenes: Visible / All / Off", Visible by default; live, in RAM until 2.10d. Office: Bright,
