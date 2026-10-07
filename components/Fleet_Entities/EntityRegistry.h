@@ -118,8 +118,9 @@ public:
     // A light's scenes (2.10c): the same, with each scene's name as the source
     // gives it ("Relax"), registered as a BUTTON with a TEXT value (HA's
     // scene state is when it was last activated).
+    // `hidden` (may be null): hidden in the source's own UI - sourceHidden.
     uint8_t learnScenes(const char *lightId, const char *const *refs,
-                        const char *const *names, uint8_t n);
+                        const char *const *names, const bool *hidden, uint8_t n);
     const Entity *sceneOf(const Entity &l, uint8_t i) const {
         return (i < l.nScenes) ? at(l.scenes[i]) : nullptr;
     }
@@ -324,8 +325,9 @@ private:
 
     // learnMembers() and learnScenes(): find or register each ref as a copy of
     // `like`'s source, then set `dst`. Caller holds the lock.
-    uint8_t learnInto(int gi, const char *const *refs, const char *const *names, uint8_t n,
-                      EntityKind kind, ValueType vt, uint8_t *dst, uint8_t &dstN, uint8_t max);
+    uint8_t learnInto(int gi, const char *const *refs, const char *const *names,
+                      const bool *hidden, uint8_t n, EntityKind kind, ValueType vt,
+                      uint8_t *dst, uint8_t &dstN, uint8_t max);
 };
 
 #endif // ENTITY_REGISTRY_H

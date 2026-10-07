@@ -157,22 +157,22 @@ uint8_t EntityRegistry::learnMembers(const char *groupId, const char *const *ref
     const int gi = indexOf(groupId);
     if (gi < 0 || !refs) return 0;
     Entity &g = _items[gi];
-    return learnInto(gi, refs, nullptr, n, g.desc.kind, g.desc.valueType,
+    return learnInto(gi, refs, nullptr, nullptr, n, g.desc.kind, g.desc.valueType,
                      g.members, g.nMembers, ENTITY_MEMBERS_MAX);
 }
 
 uint8_t EntityRegistry::learnScenes(const char *lightId, const char *const *refs,
-                                    const char *const *names, uint8_t n) {
+                                    const char *const *names, const bool *hidden, uint8_t n) {
     std::lock_guard<std::mutex> lk(_mx);
     const int li = indexOf(lightId);
     if (li < 0 || !refs) return 0;
     Entity &l = _items[li];
-    return learnInto(li, refs, names, n, EntityKind::BUTTON, ValueType::TEXT_VAL,
+    return learnInto(li, refs, names, hidden, n, EntityKind::BUTTON, ValueType::TEXT_VAL,
                      l.scenes, l.nScenes, ENTITY_SCENES_MAX);
 }
 
 uint8_t EntityRegistry::learnInto(int gi, const char *const *refs, const char *const *names,
-                                  uint8_t n, EntityKind kind, ValueType vt,
+                                  const bool *hidden, uint8_t n, EntityKind kind, ValueType vt,
                                   uint8_t *dst, uint8_t &dstN, uint8_t max) {
     Entity &g = _items[gi];
     const char *groupId = g.desc.id;
@@ -225,6 +225,13 @@ uint8_t EntityRegistry::learnInto(int gi, const char *const *refs, const char *c
             m = slot;
             added++;
             ESP_LOGI(ENT_TAG, "learnt %s (%s) for %s", d.id, ref, groupId);
+        }
+        // Hidden in the source's UI: may change between sessions, so set on
+        // every learning, new or not. The LVGL thread reads it unlocked; a
+        // bool is written whole.
+        if (hidden && _items[m].sourceHidden != hidden[r]) {
+            _items[m].sourceHidden = hidden[r];
+            g.dirty = true;
         }
         idx[k++] = (uint8_t)m;
     }

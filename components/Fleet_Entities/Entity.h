@@ -416,6 +416,11 @@ struct Entity {
     // showing.
     uint8_t     scenes[ENTITY_SCENES_MAX] = {0};
     uint8_t     nScenes        = 0;
+
+    // Hidden in the SOURCE's own UI (HA's entity registry, hidden_by): a
+    // scene the owner hid in HA is hidden on the panel too, unless the card
+    // says show all (SceneShow). Learnt with the scenes, each session.
+    bool        sourceHidden   = false;
 };
 
 #endif // ENTITY_H

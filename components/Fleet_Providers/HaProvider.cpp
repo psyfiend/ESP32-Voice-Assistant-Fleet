@@ -110,11 +110,15 @@ bool HaProvider::sendSceneQuery() {
     if (!named) return true;   // no lights, no scenes: done for this session
 
     // Measured from the PC, 2026-10-06: 367 characters of template, 300 bytes
-    // back for light.office's seven Hue scenes, sorted by name.
+    // back for light.office's seven Hue scenes, sorted by name. The last field
+    // says whether the owner hid the scene in HA's UI (is_hidden_entity, HA's
+    // own test of the entity registry's hidden_by - checked 2026-10-07: four
+    // of Office's seven are hidden).
     const int tail = snprintf(frame + n, sizeof(frame) - n,
         "] %%}{%% set d = device_id(l) %%}{%% if d %%}"
         "{%% for s in device_entities(d) | sort if s.startswith('scene.') %%}"
-        "{{ l }}>{{ s }}>{{ state_attr(s,'name') or state_attr(s,'friendly_name') }}|"
+        "{{ l }}>{{ s }}>{{ state_attr(s,'name') or state_attr(s,'friendly_name') }}>"
+        "{{ 'H' if is_hidden_entity(s) else 'V' }}|"
         "{%% endfor %%}{%% endif %%}{%% endfor %%}\"}");
     if (tail < 0 || n + tail >= (int)sizeof(frame)) return false;
     n += tail;
@@ -127,14 +131,16 @@ bool HaProvider::sendSceneQuery() {
     return true;
 }
 
-// "light.office>scene.office_bright>Bright|light.office>scene...|". Grouped by
-// light, as the template writes them; each group is learnt in one call.
+// "light.office>scene.office_bright>Bright>V|light.office>scene...>H|".
+// Grouped by light, as the template writes them; each group is learnt in one
+// call. The last field: V visible, H hidden in HA's UI.
 void HaProvider::parseScenes(const char *result) {
     static char buf[2048];   // websocket task only
     snprintf(buf, sizeof(buf), "%s", result ? result : "");
 
     const char *refs[ENTITY_SCENES_MAX], *names[ENTITY_SCENES_MAX];
-    uint8_t n = 0, lights = 0, scenes = 0;
+    bool hidden[ENTITY_SCENES_MAX];
+    uint8_t n = 0, lights = 0, scenes = 0, nHidden = 0;
     const char *light = nullptr;
 
     auto flush = [&]() {
@@ -143,7 +149,7 @@ void HaProvider::parseScenes(const char *result) {
             const Entity *e = _reg->at(i);
             if (!e || e->desc.source != EntitySource::HA) continue;
             if (strcmp(e->desc.externalRef, light) != 0) continue;
-            _reg->learnScenes(e->desc.id, refs, names, n);
+            _reg->learnScenes(e->desc.id, refs, names, hidden, n);
             lights++;
             scenes += n;
             break;
@@ -156,13 +162,22 @@ void HaProvider::parseScenes(const char *result) {
         char *a = strchr(tok, '>');
         char *b = a ? strchr(a + 1, '>') : nullptr;
         if (!a || !b) continue;
+        char *c = strchr(b + 1, '>');   // absent from an older template: visible
         *a = '\0';
         *b = '\0';
+        if (c) *c = '\0';
         if (!light || strcmp(light, tok) != 0) { flush(); light = tok; }
-        if (n < ENTITY_SCENES_MAX) { refs[n] = a + 1; names[n] = b + 1; n++; }
+        if (n < ENTITY_SCENES_MAX) {
+            refs[n] = a + 1;
+            names[n] = b + 1;
+            hidden[n] = c && c[1] == 'H';
+            if (hidden[n]) nHidden++;
+            n++;
+        }
     }
     flush();
-    Serial.printf("[HaProv] scenes: %u for %u lights\n", (unsigned)scenes, (unsigned)lights);
+    Serial.printf("[HaProv] scenes: %u for %u lights, %u hidden in HA\n",
+                  (unsigned)scenes, (unsigned)lights, (unsigned)nHidden);
 }
 
 void HaProvider::loop(uint32_t nowMs) {

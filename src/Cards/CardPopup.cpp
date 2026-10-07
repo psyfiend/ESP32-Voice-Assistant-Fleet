@@ -211,6 +211,8 @@ struct Popup {
 
     // A light's controls (2.10b): see "The light's controls".
     GroupOn   groupOn = GroupOn::GROUP_ON_ANY;   // copied from the card at open
+    SceneShow sceneShow = SceneShow::SCENES_VISIBLE;   // likewise (2.10c)
+    lv_obj_t *chipScenes[3] = {nullptr, nullptr, nullptr};   // Visible, All, Off
     bool      builtPaused = false, rebuildQueued = false;   // "A paused window"
     uint8_t   builtCaps = 0;                     // what the selector was built for
     lv_obj_t *pill = nullptr;                    // PAUSED
@@ -746,10 +748,32 @@ const Entity *sceneHost() {
     return (s.nEnt == 1) ? s.ent[0] : nullptr;
 }
 
-bool hasScenes() {
+// THE SCENES OFFERED, by the card's Scenes setting (owner, 2026-10-07): those
+// not hidden in HA's own UI, all of them, or none. `i` counts offered scenes.
+uint8_t shownScenes() {
     const Entity *h = sceneHost();
-    return h && h->nScenes && h->desc.kind == EntityKind::LIGHT && h->desc.writable;
+    if (!h || s.sceneShow == SceneShow::SCENES_OFF ||
+        h->desc.kind != EntityKind::LIGHT || !h->desc.writable) return 0;
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < h->nScenes; i++) {
+        const Entity *sc = s.reg->sceneOf(*h, i);
+        if (sc && (s.sceneShow == SceneShow::SCENES_ALL || !sc->sourceHidden)) n++;
+    }
+    return n;
 }
+
+const Entity *shownScene(uint8_t i) {
+    const Entity *h = sceneHost();
+    if (!h) return nullptr;
+    for (uint8_t k = 0; k < h->nScenes; k++) {
+        const Entity *sc = s.reg->sceneOf(*h, k);
+        if (!sc || (s.sceneShow != SceneShow::SCENES_ALL && sc->sourceHidden)) continue;
+        if (i-- == 0) return sc;
+    }
+    return nullptr;
+}
+
+bool hasScenes() { return shownScenes() > 0; }
 
 // The slider's range for the control showing.
 void ctlRange(const LightAgg &L, int32_t &lo, int32_t &hi) {
@@ -1044,8 +1068,7 @@ bool sceneRingCheck(uint32_t now) {
 void sceneCb(lv_event_t *ev) {
     const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
     if (pausedBlocks()) return;
-    const Entity *h  = sceneHost();
-    const Entity *sc = (h && s.reg) ? s.reg->sceneOf(*h, i) : nullptr;
+    const Entity *sc = shownScene(i);
     if (!sc || !s.reg->press(sc->desc.id, millis())) return;
     sceneLoaded(i);
     renderLight();
@@ -1248,8 +1271,8 @@ void buildSceneGrid(lv_obj_t *col, int32_t colW) {
     auto rowsAt = [&](int32_t bh) {
         int32_t rows = 1, x = 0;
         const int32_t inner = colW - 2 * pad;
-        for (uint8_t i = 0; i < h->nScenes; i++) {
-            const Entity *sc = s.reg->sceneOf(*h, i);
+        for (uint8_t i = 0; i < shownScenes(); i++) {
+            const Entity *sc = shownScene(i);
             if (!sc) continue;
             const int32_t bw = LV_MAX(textW(sc->desc.name, t.TAG) + 2 * padH, bh * 16 / 10);
             if (x > 0 && x + gap + bw > inner) { rows++; x = bw; }
@@ -1269,8 +1292,8 @@ void buildSceneGrid(lv_obj_t *col, int32_t colW) {
     lv_obj_add_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
     UI::tameScroll(grid);
 
-    for (uint8_t i = 0; i < h->nScenes; i++) {
-        const Entity *sc = s.reg->sceneOf(*h, i);
+    for (uint8_t i = 0; i < shownScenes() && i < ENTITY_SCENES_MAX; i++) {
+        const Entity *sc = shownScene(i);
         if (!sc) continue;
         lv_obj_t *b = plain(grid);
         lv_obj_set_size(b, LV_SIZE_CONTENT, ch);
@@ -1635,7 +1658,7 @@ void buildMembers() {
         }
     }
     lv_obj_t *note = makeLabel(list, t.TAG, p.TEXT_DIM);
-    lv_label_set_text(note, "Tap one for its own controls");
+    lv_label_set_text(note, "Tap a member for more details");   // owner's words, 2026-10-07
 }
 
 // Share the title row between "Area > " and the name. Both fit: each gets its
@@ -2518,6 +2541,21 @@ void groupChipCb(lv_event_t *ev) {
     renderMain();
 }
 
+// Scenes: Visible / All / Off (2.10c). On the held card, and the window follows
+// at once: the clapperboard comes or goes, and Scenes rebuilds or gives way.
+void scenesChipCb(lv_event_t *ev) {
+    const uintptr_t k = (uintptr_t)lv_event_get_user_data(ev);
+    s.sceneShow = k == 1 ? SceneShow::SCENES_ALL : k == 2 ? SceneShow::SCENES_OFF : SceneShow::SCENES_VISIBLE;
+    if (Card *c = cardOf(h.surface)) c->setSceneShow(s.sceneShow);
+    for (uint8_t i = 0; i < 3; i++) deckChipSelect(s.chipScenes[i], i == k);
+    s.lastScene = -1;   // the offered list changed under the ring
+    if (s.view == PopupView::VIEW_SCENES)
+        showView(hasScenes() ? PopupView::VIEW_SCENES : controlsView());
+    else
+        cornerLook(s.btnScenes, (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER) &&
+                                hasScenes(), false);
+}
+
 // Paused: Off / On. Through the card when it is the held one (it repaints at
 // once, and every card on the same entities follows through the registry).
 void pauseSwitchCb(lv_event_t *ev) {
@@ -2577,7 +2615,9 @@ void deckCreate() {
     s.deckHide = r + 2 * bw;
     // A group card has one more row: when it counts as on (2.10b) - a group
     // defined here only; HA or Hue decides that for its own (2.10c).
-    const int32_t rows = (s.nEnt > 1 && !s.native) ? 5 : 4;
+    // And one for a light's Scenes (2.10c).
+    const Entity *sh = sceneHost();
+    const int32_t rows = ((s.nEnt > 1 && !s.native) ? 5 : 4) + ((sh && sh->nScenes && !inMember()) ? 1 : 0);
     s.deckH    = tabAbove + (rf + mm(1.6f)) + rows * mm(DECK_ROW_MM) + mm(4.0f) + mm(1.6f) + s.deckHide;
 
     s.deck = plain(lv_screen_active());
@@ -2746,8 +2786,17 @@ void deckFill() {
     deckChip(row, "Shown",  false, true,  nullptr, nullptr);
     deckChip(row, "Hidden", false, false, nullptr, nullptr);
 
-    lv_obj_t *note = makeLabel(pane, t.TAG, p.TEXT_DIM);
-    lv_label_set_text(note, "Paused is kept on the device. The rest arrives with saving (2.10d).");
+    // Which scenes the window offers (owner, 2026-10-07): those not hidden in
+    // HA's UI by default. Live, and kept in RAM until saving arrives (2.10d).
+    // Only for a light that has scenes at all.
+    const Entity *sh = sceneHost();
+    if (sh && sh->nScenes && !inMember()) {
+        row = deckRow(pane, "Scenes");
+        s.chipScenes[0] = deckChip(row, "Visible", true, s.sceneShow == SceneShow::SCENES_VISIBLE, scenesChipCb, (void *)0);
+        s.chipScenes[1] = deckChip(row, "All",     true, s.sceneShow == SceneShow::SCENES_ALL,     scenesChipCb, (void *)1);
+        s.chipScenes[2] = deckChip(row, "Off",     true, s.sceneShow == SceneShow::SCENES_OFF,     scenesChipCb, (void *)2);
+    }
+    (void)t; (void)p;
 }
 
 // Open the deck, building its rows the first time.
@@ -2785,6 +2834,7 @@ void deckEnd() {
     s.deck = s.deckTab = s.deckTabLbl = s.deckPane = nullptr;
     s.swPause = nullptr;
     s.chipGroup[0] = s.chipGroup[1] = nullptr;
+    s.chipScenes[0] = s.chipScenes[1] = s.chipScenes[2] = nullptr;
     s.deckState  = DECK_HIDDEN;
     s.deckFilled = false;
 }
@@ -3029,6 +3079,7 @@ void CardPopup::open(Card &card) {
     applyNative();
     s.tempUnit = card.tempUnit();
     s.groupOn  = card.groupOn();
+    s.sceneShow = card.sceneShow();
     s.lightCtl = firstCtl(lightAggregate().caps);   // D3: open on the control
     snprintf(s.area, sizeof(s.area), "%s", card._area);
     snprintf(s.name, sizeof(s.name), "%s", card.label());
@@ -3208,16 +3259,22 @@ void CardPopup::debugService(lv_timer_t *t) {
         return;
     }
     if (a.scene >= 0) {
-        // As a tap on scene N (2.10c). Lists the light's scenes either way.
+        // As a tap on offered scene N (2.10c). Lists every scene the light has,
+        // the offered ones numbered, either way.
         const Entity *h = isOpen() ? sceneHost() : nullptr;
         if (!h || !h->nScenes) dbgOut("no scenes in this window\n");
         else {
-            for (uint8_t i = 0; i < h->nScenes; i++) {
+            for (uint8_t i = 0, k = 0; i < h->nScenes; i++) {
                 const Entity *sc = s.reg->sceneOf(*h, i);
-                dbgOut("  %u %-12s %s%s\n", (unsigned)i, sc ? sc->desc.name : "?",
-                       sc ? sc->desc.externalRef : "", sc && sc->cmdFailed ? " FAILED" : "");
+                if (!sc) continue;
+                const bool shown = s.sceneShow == SceneShow::SCENES_ALL ||
+                                   (s.sceneShow == SceneShow::SCENES_VISIBLE && !sc->sourceHidden);
+                if (shown) dbgOut("  %u ", (unsigned)k++);
+                else       dbgOut("  - ");
+                dbgOut("%-12s %s%s%s\n", sc->desc.name, sc->desc.externalRef,
+                       sc->sourceHidden ? " (hidden in HA)" : "", sc->cmdFailed ? " FAILED" : "");
             }
-            const Entity *sc = s.reg->sceneOf(*h, (uint8_t)a.scene);
+            const Entity *sc = shownScene((uint8_t)a.scene);
             const bool ok = sc && s.reg->press(sc->desc.id, millis());
             if (ok) { sceneLoaded((uint8_t)a.scene); renderMain(); }
             dbgOut("scene %d: %s\n", a.scene, ok ? "loaded" : "not loaded");

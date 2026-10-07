@@ -15,7 +15,7 @@ other projects' code and what it teaches.
 |---|---|---|
 | `ha-dashboard` (Tommzn) | **MIT** | Reuse with attribution |
 | `esphome-modular-lvgl-buttons` (Andrew Gillis) | **MIT** | Reuse with attribution |
-| `ESP32-P4-NINA-Display` (chvvkumar) | **none** | Read only - owner asked the author for a license, 2026-09-30 (issue on their repo); check for a reply before reusing anything |
+| `ESP32-P4-NINA-Display` (chvvkumar) | **no file; permission granted for non-commercial use** | The author answered the owner's request on 2026-10-06 ([chvvkumar/ESP32-P4-NINA-Display#326](https://github.com/chvvkumar/ESP32-P4-NINA-Display/issues/326)): "go ahead and use what you need as long as it is not for a commercial product". Reuse with credit. **The condition travels with whatever is taken**: a commercial use of this project, or a licence for it that allows one, would need the author's agreement again for any NINA-derived code |
 | `ESP32-P4-Allsky-Display` (chvvkumar) | **none** | Read only |
 | `espcontrol` | **PolyForm Noncommercial 1.0.0** | Read only — see below |
 | `esp-registry/waveshare__esp_lcd_hx8394-v2.1.0` | **MIT** (`license.txt`) | Reuse with attribution |

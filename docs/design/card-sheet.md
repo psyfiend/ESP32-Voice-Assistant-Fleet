@@ -13,6 +13,24 @@ replaced the same morning by the owner's brain dump, with HA's own dialogs as th
 pages, one-deep back); `cards.md`. Open decisions are marked **D1..D7** and collected in §10, each
 with a recommendation.
 
+### Words for the window's parts (owner, 2026-10-07)
+
+| Word | Means |
+|---|---|
+| **window** | the popup a long press opens |
+| **title** | the text at the top centre: what the window or view is ("Desk"), with the view it came from in front ("Desk > Members") - the **breadcrumbs**; its first part is a link up |
+| **chips** | the round navigation buttons in the corners: X, back, chart, members, clapperboard |
+| **hero** | the view's main content: on the controls, the slider (or toggle) with its label, value and swatches; on Members, the list |
+| **control deck** | the bar of **switches** under or beside the hero - Power \| Brightness, Temperature, Colour. It says which modes the light supports and which one the slider is set to |
+| **switch** | one of the control deck's options |
+| **selector** | how the chosen switch is shown - today a white disc with an inverted icon |
+| **SETTINGS panel** | the folder-tab panel that rises from the bottom of the screen |
+
+Older sections and the code say "deck" for the SETTINGS panel (`s.deck`, `deckFill()`, "The settings
+deck") and "chips" for its choice buttons (`deckChip()`); from 2.10c, "deck" in conversation means the
+control deck. The code's `s.hero` is the slider or toggle alone. Code names change when the code is
+next reworked, not before.
+
 ---
 
 ## 1. Presentation: a centred window over a dimmed page (owner's instinct, agreed)
@@ -526,6 +544,10 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   marks it FAILED.
 - A stacked layout for windows too narrow for a fifth selector button was built for the 4B and
   removed with the button.
+- **Scenes hidden in HA's UI are hidden here too** (owner, 2026-10-07, K21): the scene query asks HA's
+  `is_hidden_entity` per scene (the entity registry's `hidden_by`). A card setting in SETTINGS,
+  "Scenes: Visible / All / Off", Visible by default; live, in RAM until 2.10d. Office: Bright,
+  Concentrate and Relax visible, four hidden.
 
 **The corner icons are tabs (owner, after round 3).** History (the chart), Members and Scenes are
 views of their own; their icons stay on every view they belong to, the one showing is lit (as a

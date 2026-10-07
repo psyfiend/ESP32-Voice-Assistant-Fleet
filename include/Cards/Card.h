@@ -120,6 +120,10 @@ public:
     Card &setGroupOn(GroupOn g);
     GroupOn groupOn() const { return _groupOn; }
 
+    // Which scenes the card's window offers (2.10c). See SceneShow.
+    Card &setSceneShow(SceneShow v) { _sceneShow = v; return *this; }
+    SceneShow sceneShow() const { return _sceneShow; }
+
     // Is this card ON, by its GroupOn rule? Counts the bound primaries that
     // are on - a bool that is true, or a number that is not zero.
     bool groupIsOn() const;
@@ -513,6 +517,7 @@ private:
     TempUnit        _tempUnit    = TempUnit::TEMP_INHERIT;
     CardLabel       _labelMode   = CardLabel::LBL_INHERIT;
     GroupOn         _groupOn     = GroupOn::GROUP_ON_ANY;
+    SceneShow       _sceneShow   = SceneShow::SCENES_VISIBLE;
     // NO _paused HERE. Issue #60 moved it onto Entity, because pausing is a
     // property of the thing and not of the view - the same reasoning that put
     // cmdFailed on the entity. Two cards on one switch used to be able to
