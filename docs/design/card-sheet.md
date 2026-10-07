@@ -557,11 +557,16 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   a size up (the LG icon face) in the accent. The selector can be grabbed and slid: its icon becomes
   a neighbour's once it is more than halfway over it, and on release it snaps to the nearest switch,
   which is chosen. A tap on a switch glides it there (140 ms); the view is rebuilt after the glide.
-  Power is an action, a plain button at the start, never selected. Colours from the scheme: dark
-  schemes - ribbon lighter than the window, selector the screen's ground colour; Linen - ribbon
-  darker than the window, selector a medium silver; icons in the text colour, the chosen one in the
-  accent. **Lit corner chips take the selector's look.** Four selector looks to compare on glass
-  (round / square, with or without an accent edge) - a debug-only row in SETTINGS ("Deck look").
+  Power is an action, never selected: it has **a short ribbon of its own, with a break before the
+  modes' ribbon** (no divider line). **The selector is metal** (owner: the plain dark one "looks like
+  a void"): a two-tone face with a sharp step a little below the middle - a polished bevel, from
+  LVGL's two-stop gradient - and a fine lighter edge; gunmetal on the dark schemes, silver on Linen;
+  rounded squares by default. Icons in the text colour, the chosen one in the accent. **Lit corner
+  chips take the same metal.** Looks to compare on glass from a debug-only SETTINGS row, "Deck look":
+  square / round, gunmetal / silver.
+- **Scenes and Colour (wide): the slider and the buttons or swatches are one group**, centred, the
+  content centred top to bottom between the chips and the deck. Scenes are **a stack**: one column of
+  buttons as wide as the longest name, a second column only when one is full, then scrolling.
   Not yet: switching the control live while dragging (to be measured first), and the inverted-icon
   variant.
 - **Scenes hidden in HA's UI are hidden here too** (owner, 2026-10-07, K21): the scene query asks HA's

@@ -637,15 +637,17 @@ void makeLabelRow(lv_obj_t *col) {
 // left edge. For any one light nothing moves - not with the control showing,
 // a pause, or changing words, which the allowance covers (a round 3 lesson:
 // a column sized from its text moved the slider every time the text changed).
+// The control deck's width (buildControlDeck()): Power on a ribbon of its own,
+// a break, then the modes' ribbon.
+int32_t deckBreak() { return mm(2.0f); }
 int32_t selectorW(uint8_t caps) {
-    const int32_t g = mm(0.6f);
-    uint8_t n = 1;   // Power
+    const int32_t g = mm(0.6f), slot = UI::minTouch();
+    uint8_t n = 0;
     if (caps & LIGHT_CAN_DIM)    n++;
     if (caps & LIGHT_CAN_TEMP)   n++;
     if (caps & LIGHT_CAN_COLOUR) n++;
-    const bool div = n > 1;
-    const uint8_t children = n + (div ? 1 : 0);
-    return 2 * g + n * UI::minTouch() + (children - 1) * g + (div ? LV_MAX(2, mm(0.25f)) : 0);
+    const int32_t power = slot + 2 * g;
+    return n ? power + deckBreak() + n * slot + (n + 1) * g : power;
 }
 
 // `deck`: whether the control deck is in the column (beside the hero) or under
@@ -1178,26 +1180,59 @@ void buildLightHero(lv_obj_t *row) {
 // ---------------------------------------------------------------------------
 constexpr uint32_t DECK_GLIDE_MS = 140;
 
-// Looks to try on glass (owner): the selector round or square, and with or
-// without an edge in the accent. Debug builds cycle them from SETTINGS.
-uint8_t s_deckLook = 0;   // bit 0: square, bit 1: accent edge
+// Looks to try on glass (owner): rounded squares (the owner's pick, the
+// default) or round; and on the dark schemes, gunmetal or silver. Debug
+// builds cycle them from SETTINGS.
+uint8_t s_deckLook = 0;   // bit 0: round, bit 1: silver on a dark scheme
 
-struct DeckColours { uint32_t ribbon, selector, icon, chosen; };
+struct DeckColours { uint32_t ribbon, top, bottom, edge, icon, chosen; };
 
-// From the scheme, never written down (tokens.md): on the dark schemes a
-// ribbon lighter than the window and a selector notably darker; on Linen a
-// ribbon darker than the window and a selector of medium silver. Icons in the
-// text colour; the chosen one in the accent.
+// From the scheme, never written down (tokens.md). The ribbon: lighter than
+// the window on the dark schemes, darker on Linen. THE SELECTOR IS METAL
+// (owner: the plain dark one "looks like a void"; TouchFLO 3D's was brushed
+// metal): a two-tone face with a sharp step a little below the middle - the
+// look of a polished bevel, from LVGL's two-stop gradient and nothing else -
+// and a fine lighter edge. Gunmetal on the dark schemes, silver on Linen.
+// Icons in the text colour; the chosen one in the accent.
 DeckColours deckColours() {
     const UIPalette &p = UI::pal();
-    const bool dark = lumOf(p.SURFACE_ALT) < 128;
+    const bool dark   = lumOf(p.SURFACE_ALT) < 128;
+    const bool silver = !dark || (s_deckLook & 2);
     DeckColours c;
-    c.ribbon   = UI::mix(p.SURFACE_ALT, p.TEXT, dark ? 14 : 12);
-    c.selector = dark ? p.GROUND : UI::mix(p.SURFACE_ALT, p.TEXT, 26);
-    c.icon     = p.TEXT;
-    c.chosen   = p.ACCENT;
+    c.ribbon = UI::mix(p.SURFACE_ALT, p.TEXT, dark ? 14 : 12);
+    if (silver && dark) {
+        c.top    = UI::mix(p.TEXT, p.SURFACE_ALT, 18);
+        c.bottom = UI::mix(p.TEXT, p.GROUND, 45);
+        c.edge   = UI::mix(p.TEXT, p.SURFACE_ALT, 8);
+    } else if (silver) {          // Linen
+        c.top    = p.SURFACE;
+        c.bottom = UI::mix(p.SURFACE_ALT, p.TEXT, 30);
+        c.edge   = UI::mix(p.SURFACE_ALT, p.TEXT, 45);
+    } else {
+        c.top    = UI::mix(p.GROUND, p.TEXT, 34);
+        c.bottom = UI::mix(p.GROUND, p.TEXT, 8);
+        c.edge   = UI::mix(p.GROUND, p.TEXT, 48);
+    }
+    c.icon   = p.TEXT;
+    c.chosen = p.ACCENT;
     return c;
 }
+
+// The metal face, on the selector and on a lit chip.
+void paintMetal(lv_obj_t *o, const DeckColours &c, bool paused = false) {
+    auto q = [&](uint32_t hex) { return paused ? quiet(hex) : hex; };
+    lv_obj_set_style_bg_color     (o, UI::c(q(c.top)), 0);
+    lv_obj_set_style_bg_grad_color(o, UI::c(q(c.bottom)), 0);
+    lv_obj_set_style_bg_grad_dir  (o, LV_GRAD_DIR_VER, 0);
+    lv_obj_set_style_bg_main_stop (o, 118, 0);
+    lv_obj_set_style_bg_grad_stop (o, 138, 0);
+    lv_obj_set_style_bg_opa       (o, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width (o, 1, 0);
+    lv_obj_set_style_border_color (o, UI::c(q(c.edge)), 0);
+}
+
+// Rounded squares (the default) or round, for the deck and the lit chips.
+int32_t deckRadius() { return (s_deckLook & 1) ? LV_RADIUS_CIRCLE : mm(1.6f); }
 
 struct Deck {
     lv_obj_t *obj = nullptr, *sel = nullptr, *selIcon = nullptr;
@@ -1298,7 +1333,7 @@ void deckPowerCb(lv_event_t *ev) {
 void buildControlDeck(lv_obj_t *parent, uint8_t caps) {
     const UIType &t = UI::type();
     const DeckColours col = deckColours();
-    const int32_t slot = UI::minTouch(), g = mm(0.6f), divW = LV_MAX(2, mm(0.25f));
+    const int32_t slot = UI::minTouch(), g = mm(0.6f);
     const int32_t H = controlDeckH();
 
     forgetDeck();
@@ -1310,14 +1345,21 @@ void buildControlDeck(lv_obj_t *parent, uint8_t caps) {
     d.obj = plain(parent);
     lv_obj_set_size(d.obj, W, H);
 
-    // The ribbon: three quarters of a switch tall, centred.
+    // The ribbon: three quarters of a switch tall, centred - IN TWO PIECES
+    // (owner: no divider line - the selector never goes to Power anyway).
+    // Power has a short ribbon of its own; a break; then the modes'.
     const int32_t rh = slot * 72 / 100;
-    lv_obj_t *rib = plain(d.obj);
-    lv_obj_set_pos (rib, 0, (H - rh) / 2);
-    lv_obj_set_size(rib, W, rh);
-    lv_obj_set_style_radius  (rib, (s_deckLook & 1) ? mm(1.6f) : LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(rib, UI::c(quiet(col.ribbon)), 0);
-    lv_obj_set_style_bg_opa  (rib, LV_OPA_COVER, 0);
+    const int32_t powerW = slot + 2 * g;
+    auto ribbon = [&](int32_t x0, int32_t w) {
+        lv_obj_t *rib = plain(d.obj);
+        lv_obj_set_pos (rib, x0, (H - rh) / 2);
+        lv_obj_set_size(rib, w, rh);
+        lv_obj_set_style_radius  (rib, deckRadius(), 0);
+        lv_obj_set_style_bg_color(rib, UI::c(quiet(col.ribbon)), 0);
+        lv_obj_set_style_bg_opa  (rib, LV_OPA_COVER, 0);
+    };
+    ribbon(0, powerW);
+    if (d.n) ribbon(powerW + deckBreak(), W - powerW - deckBreak());
 
     auto iconAt = [&](int32_t x, const char *glyph, lv_event_cb_t cb, void *user) {
         lv_obj_t *b = plain(d.obj);
@@ -1333,15 +1375,7 @@ void buildControlDeck(lv_obj_t *parent, uint8_t caps) {
 
     int32_t x = g;
     s.btnCtl[0] = iconAt(x, MDI_POWER, deckPowerCb, nullptr);
-    x += slot + g;
-    if (d.n) {
-        lv_obj_t *div = plain(d.obj);
-        lv_obj_set_pos (div, x, (H - slot * 60 / 100) / 2);
-        lv_obj_set_size(div, divW, slot * 60 / 100);
-        lv_obj_set_style_bg_color(div, UI::border(), 0);
-        lv_obj_set_style_bg_opa  (div, LV_OPA_COVER, 0);
-        x += divW + g;
-    }
+    x = powerW + deckBreak() + g;
     uint8_t chosen = 0;
     for (uint8_t i = 0; i < d.n; i++) {
         s.btnCtl[1 + d.ctl[i]] = iconAt(x, d.glyph[i], deckTapCb, (void *)(uintptr_t)i);
@@ -1356,13 +1390,8 @@ void buildControlDeck(lv_obj_t *parent, uint8_t caps) {
     d.selW = slot + 2 * g;
     d.sel = plain(d.obj);
     lv_obj_set_size(d.sel, d.selW, H);
-    lv_obj_set_style_radius  (d.sel, (s_deckLook & 1) ? mm(1.6f) : LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(d.sel, UI::c(quiet(col.selector)), 0);
-    lv_obj_set_style_bg_opa  (d.sel, LV_OPA_COVER, 0);
-    if (s_deckLook & 2) {
-        lv_obj_set_style_border_width(d.sel, LV_MAX(2, mm(0.35f)), 0);
-        lv_obj_set_style_border_color(d.sel, UI::c(quiet(col.chosen)), 0);
-    }
+    lv_obj_set_style_radius(d.sel, deckRadius(), 0);
+    paintMetal(d.sel, col, s.builtPaused);
     lv_obj_add_flag  (d.sel, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag(d.sel, LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_clear_flag(d.sel, LV_OBJ_FLAG_SCROLL_CHAIN);
@@ -1440,56 +1469,67 @@ void buildLightColumn(lv_obj_t *col, lv_obj_t *deckParent) {
 // the P4_5 - never under the swatches' 6.5 mm, and three rows at most in the
 // slider's height. Centred; it scrolls if a light has more than fit. Names as
 // the source gives them, sorted ("Bright" .. "Relax").
+// A STACK, NOT A FLOW (owner, after round 5: wrapped like text, the buttons
+// looked scattered). One column of buttons all as wide as the longest name,
+// centred in the slider's height; a second column only when one is full, and
+// so on while the room lasts - then it scrolls. Measured before building, so
+// the slider can sit beside exactly what is there.
+struct SceneStack { int32_t ch, bw, gap, pad, rowsFit, cols, w; bool scroll; };
+
+SceneStack sceneStack(int32_t maxW) {
+    const UIType &t = UI::type();
+    SceneStack k;
+    k.gap = pm(1.4f);
+    // The stack's own padding holds the ring (outline pad + width), which its
+    // edge would otherwise clip.
+    k.pad = LV_MAX(2, mm(0.3f)) + LV_MAX(2, mm(0.4f)) + 1;
+    k.ch  = LV_MAX(mm(6.5f), LV_MIN(pm(9.0f), (s.heroH - 2 * k.gap - 2 * k.pad) / 3));
+    k.bw  = k.ch * 16 / 10;
+    const uint8_t n = shownScenes();
+    for (uint8_t i = 0; i < n; i++)
+        if (const Entity *sc = shownScene(i))
+            k.bw = LV_MAX(k.bw, textW(sc->desc.name, t.TAG) + 2 * pm(2.4f));
+    k.rowsFit = LV_MAX(1, (s.heroH - 2 * k.pad + k.gap) / (k.ch + k.gap));
+    k.cols    = LV_MAX(1, (n + k.rowsFit - 1) / k.rowsFit);
+    const int32_t maxCols = LV_MAX(1, (maxW - 2 * k.pad + k.gap) / (k.bw + k.gap));
+    k.scroll = k.cols > maxCols;
+    if (k.scroll) k.cols = maxCols;
+    k.w = k.cols * k.bw + (k.cols - 1) * k.gap + 2 * k.pad;
+    return k;
+}
+
+int32_t sceneGridW(int32_t maxW) { return sceneStack(maxW).w; }
+
 void buildSceneGrid(lv_obj_t *col, int32_t colW) {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const Entity    *h = sceneHost();
     if (!h || !s.reg) return;
-    const int32_t gap = pm(1.4f);
-    // The grid's own padding holds the ring (outline pad + width), which the
-    // grid's edge would otherwise clip.
-    const int32_t pad = LV_MAX(2, mm(0.3f)) + LV_MAX(2, mm(0.4f)) + 1;
-    const int32_t padH = pm(2.4f);
-    int32_t ch = LV_MAX(mm(6.5f), LV_MIN(pm(9.0f), (s.heroH - 2 * gap - 2 * pad) / 3));
-
-    // MORE THAN THREE ROWS? Then half of a fourth shows, so it is plain there
-    // is more to scroll to - three full rows hid the P4_5's seventh scene with
-    // nothing to say it was there. The rows are counted as the flex layout
-    // will wrap them: each button its name's width, or 1.6 heights at least.
-    auto rowsAt = [&](int32_t bh) {
-        int32_t rows = 1, x = 0;
-        const int32_t inner = colW - 2 * pad;
-        for (uint8_t i = 0; i < shownScenes(); i++) {
-            const Entity *sc = shownScene(i);
-            if (!sc) continue;
-            const int32_t bw = LV_MAX(textW(sc->desc.name, t.TAG) + 2 * padH, bh * 16 / 10);
-            if (x > 0 && x + gap + bw > inner) { rows++; x = bw; }
-            else x += (x > 0 ? gap : 0) + bw;
-        }
-        return rows;
-    };
-    if (rowsAt(ch) > 3) ch = LV_MAX(mm(6.5f), (s.heroH - 3 * gap - 2 * pad) * 2 / 7);
+    const SceneStack k = sceneStack(colW + 1);
+    const int32_t ch = k.ch, gap = k.gap, pad = k.pad;
 
     lv_obj_t *grid = plain(col);
-    lv_obj_set_size(grid, colW, s.heroH);
-    lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
-    // Centred both ways (owner, round 4): the rows as a block, in the middle
-    // of the slider's height. More than fit, and it scrolls from the top.
-    lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
-                          rowsAt(ch) > 3 ? LV_FLEX_ALIGN_START : LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_size(grid, k.w, s.heroH);
+    if (k.scroll) {
+        // More than the room holds: rows, scrolling, the names in order.
+        lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
+        lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+        lv_obj_add_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
+        UI::tameScroll(grid);
+    } else {
+        // Down each column, then the next; each column centred top to bottom.
+        lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_COLUMN_WRAP);
+        lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+    }
     lv_obj_set_style_pad_column(grid, gap, 0);
     lv_obj_set_style_pad_row   (grid, gap, 0);
     lv_obj_set_style_pad_all   (grid, pad, 0);   // room for the ring
-    lv_obj_add_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
-    UI::tameScroll(grid);
 
     for (uint8_t i = 0; i < shownScenes() && i < ENTITY_SCENES_MAX; i++) {
         const Entity *sc = shownScene(i);
         if (!sc) continue;
         lv_obj_t *b = plain(grid);
-        lv_obj_set_size(b, LV_SIZE_CONTENT, ch);
-        lv_obj_set_style_min_width(b, ch * 16 / 10, 0);
-        lv_obj_set_style_pad_hor  (b, padH, 0);
+        lv_obj_set_size(b, k.bw, ch);
         lv_obj_set_style_radius   (b, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_opa   (b, LV_OPA_COVER, 0);
         lv_obj_set_style_bg_color (b, UI::c(quiet(p.SURFACE)), 0);
@@ -1707,20 +1747,25 @@ void buildMain() {
         // Sized for everything the members CAN do, paused or not: a pause
         // hides buttons, and a narrower column re-centred the whole group
         // (owner, round 5 - All Lamps paused).
+        // WIDE: THE SLIDER AND WHAT IT SITS BESIDE ARE ONE GROUP, CENTRED (owner,
+        // after round 5's screenshots: the slider hard against the window's
+        // edge and the swatches high up looked placed at random). The column
+        // is as wide as what it holds - the swatches, or the scene buttons -
+        // and centres them between the chips above and the deck below. (The
+        // clapperboard chip sits in the stage's top corner, above where the
+        // centred content starts; reserving its width as well clipped the
+        // 4B's swatches.)
         int32_t colW;
         if (wide) {
-            lv_obj_set_width(row, stageW);
-            lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-            // Clear of the clapperboard chip in the stage's top-right corner.
-            const int32_t chip = hasScenes() ? UI::minTouch() + pm(2) : 0;
-            colW = stageW - s.heroW - pm(4) - chip;
+            const int32_t maxW = stageW - s.heroW - pm(4);
+            colW = scenes ? sceneGridW(maxW)
+                          : LV_MIN(maxW, 4 * mm(6.5f) + 3 * mm(1.6f) + 2 * mm(0.6f));
         } else {
             colW = colWidth(true, LA.allCaps, !s.stacked);
             s.mainRowW = s.heroW + pm(4) + colW;
         }
         fixColumn(col, colW);
-        if (wide && !scenes)   // Colour's swatches, centred in their room
-            lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        if (wide) lv_obj_set_flex_align(col, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
         if (scenes) {
             buildSceneGrid(col, colW);
@@ -1922,17 +1967,21 @@ void layoutTitle() {
 // everywhere - the group's from the group's views, a member's from its own.
 // The X closes from every view of the window; inside one member the arrow goes
 // back to Members.
-// Lit as the control deck's selector is (owner, 2026-10-07): its colour, the
-// icon in the accent, and its edge when the look has one.
+// Lit as the control deck's selector is (owner, 2026-10-07): the same metal,
+// the icon in the accent. Unlit: the plain disc it always was.
 void cornerLook(lv_obj_t *b, bool shown, bool lit) {
     if (!b) return;
     if (!shown) { lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN); return; }
     lv_obj_clear_flag(b, LV_OBJ_FLAG_HIDDEN);
     const UIPalette  &p   = UI::pal();
     const DeckColours col = deckColours();
-    lv_obj_set_style_bg_color(b, UI::c(lit ? col.selector : p.SURFACE), 0);
-    lv_obj_set_style_border_width(b, (lit && (s_deckLook & 2)) ? LV_MAX(2, mm(0.35f)) : 0, 0);
-    lv_obj_set_style_border_color(b, UI::c(col.chosen), 0);
+    if (lit) {
+        paintMetal(b, col);
+    } else {
+        lv_obj_set_style_bg_color    (b, UI::c(p.SURFACE), 0);
+        lv_obj_set_style_bg_grad_dir (b, LV_GRAD_DIR_NONE, 0);
+        lv_obj_set_style_border_width(b, 0, 0);
+    }
     if (lv_obj_t *l = lv_obj_get_child(b, 0))
         lv_obj_set_style_text_color(l, UI::c(lit ? col.chosen : p.TEXT), 0);
 }
@@ -3053,7 +3102,7 @@ void deckFill() {
     // 2026-10-07): round / square, without / with an edge in the accent.
     // Debug builds only; the choice lasts until the board restarts.
     row = deckRow(pane, "Deck look");
-    static const char *const LOOKS[4] = { "Round", "Square", "Round+", "Square+" };
+    static const char *const LOOKS[4] = { "Square", "Round", "Sq. silver", "Rd. silver" };
     for (uint8_t i = 0; i < 4; i++)
         s.chipLook[i] = deckChip(row, LOOKS[i], true, s_deckLook == i, lookChipCb, (void *)(uintptr_t)i);
 #endif
