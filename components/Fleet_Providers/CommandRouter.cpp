@@ -36,6 +36,7 @@ void CommandRouter::onHaResult(uint32_t id, bool ok, const char *code, const cha
     CommandRouter *self = (CommandRouter *)ctx;
     if (!self) return;
     char entity[ENTITY_ID_MAX] = {0};
+    bool superseded = false;
     {
         std::lock_guard<std::mutex> lk(self->_callMx);
         for (HaCall &c : self->_calls) {
@@ -44,13 +45,22 @@ void CommandRouter::onHaResult(uint32_t id, bool ok, const char *code, const cha
             c.id = 0;
             break;
         }
+        // A LATER CALL FOR THE SAME ENTITY OUTRANKS THIS ONE (G8). While a
+        // slider is dragged a call goes every 300 ms; a refusal of an earlier
+        // one says nothing about the latest, which the registry is waiting on.
+        if (entity[0])
+            for (const HaCall &c : self->_calls)
+                if (c.id > id && strcmp(c.entity, entity) == 0) { superseded = true; break; }
     }
     if (!entity[0] || ok) return;   // not ours, or accepted: the report decides
 
     self->_haRefused++;
-    Serial.printf("[Cmd] %s: HA REFUSED call %lu: %s - %s\n",
-                  entity, (unsigned long)id, code, msg);
-    if (self->_reg) self->_reg->failCommand(entity);
+    Serial.printf("[Cmd] %s: HA REFUSED call %lu%s: %s - %s\n", entity, (unsigned long)id,
+                  superseded ? " (a later call stands)" : "", code, msg);
+    if (superseded || !self->_reg) return;
+    char why[80];
+    snprintf(why, sizeof(why), "HA refused: %s - %s", code, msg);
+    self->_reg->failCommand(entity, why);
 }
 
 void CommandRouter::onCommand(const Entity &e, const EntityValue &v, void *ctx) {

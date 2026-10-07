@@ -21,8 +21,9 @@ class Card;
 //     accent, and stays so while its window is open (CardPopup.cpp, "The
 //     hold"); now and then a spark runs along the window's edge
 //     ("Interference")
-//   - header: X top left (a back arrow on inner views), "Area > name" in the
-//     middle, history and members icons top right
+//   - header: X top left (a back arrow inside one member), "Area > name" in
+//     the middle, history and members icons top right - tabs, lit on their
+//     own view - and scenes under the chart (2.10c)
 //   - modal: nothing outside the window takes a touch or a gesture
 //   - closes four ways: the X, a tap outside, a drag down on the header row,
 //     and 60 s without a touch
@@ -74,11 +75,12 @@ public:
     //   /popup              the cards on this page, numbered
     //   /popup?card=N       open card N's window; replies with LVGL's pool
     //   /popup?deck=1       open (or fold, deck=0) the settings deck
-    //   /popup?ctl=N        a light's control: 0 brightness, 1 temperature, 2 colour, 3 scenes
+    //   /popup?ctl=N        a light's control: 0 brightness, 1 temperature, 2 colour
     //   /popup?scene=N      as a tap on scene N; lists the light's scenes (2.10c)
     //   /popup?set=V        as a tap on that control's slider at V (%, K, hue)
-    //   /popup?view=N       0 main, 1 history, 2 members; lists each entity's levels
-    //                       (and a group defined in HA's members, 2.10c); 3 only lists
+    //   /popup?view=N       as the corner icons: 0 the controls (a member's, inside
+    //                       one), 1 history, 2 members, 4 scenes; 3 only lists. Each
+    //                       lists the entities' levels (and an HA group's members)
     //   /popup?power=1      as a tap on Power
     //   /popup?pause=1|0    pause / resume what the window shows
     //   /popup?member=N     as a tap on row N of Members

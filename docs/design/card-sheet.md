@@ -509,18 +509,33 @@ for a Hue room, the scenes made in the Hue app - found by one `render_template` 
 BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept in HA's own
 `scenes.yaml` belong to no device and are not offered.
 
-- **Scenes is the selector's fifth target** (`mdi:movie-open`, a clapperboard - already in the icon
-  faces; HA's own scene icon, the palette, is Colour's here). Shown only for a light that has scenes,
-  and not while the window works through a group's members: a scene would reach the paused one.
-- **Chosen, its buttons lie over the slider's place and the column's middle**, sorted by name, two
-  rows high, scrolling if there are more. The label line and the selector stay exactly where they
-  are; the slider's place is kept, empty.
-- **A tap loads the scene** (`scene.turn_on`) and rings that button until the window closes. Nothing
-  else: HA records only when a scene was last activated, not whether it is still showing, so no
-  scene is ever shown as on. A refusal by HA marks it FAILED.
-- **Stacked where the selector does not fit beside the slider** (owner's suggestion, 2026-10-06):
-  the slider and its words stay a row, centred, and the selector moves under it, centred; the slider
-  is shortened only if the window lacks the height. Decided from everything the window could offer,
-  so it never changes within one window. On the 4B, Desk stacks; every window on the P4_5 and the 7"
-  panels stays side by side. Section 15 declined a rearranged layout for the P4_5 for lack of
-  height - that stands; this is only for windows too narrow for their selector.
+- **Scenes is a view of its own** (owner, after round 3 - it was first built as a fifth selector
+  button, and the off-centre selector looked awkward). Its icon (`mdi:movie-open`, a clapperboard,
+  already in the icon faces; HA's own scene icon, the palette, is Colour's here) sits **under the
+  chart** in the window's corner, on the light's controls and its scenes only, and only for a light
+  with scenes - not while the window works through a group's members, as a scene would reach the
+  paused one.
+- **The brightness slider stays where it is; the scene buttons take the column** - the label, the
+  value and the selector give way. Sized as a share of the window (9 "P4_5 millimetres", never under
+  the swatches' 6.5 mm), three rows in the slider's height; when there are more, half a fourth row
+  shows so it is plain there is more to scroll to. Centred, sorted by name.
+- **A tap loads the scene** (`scene.turn_on`) and rings that button. The ring means "as the scene
+  left it", so it goes with any command from the window, with a change from elsewhere once the
+  scene has held still for 3 s (its own fade reports come within ~1.5 s), and with the window. HA
+  records only when a scene was last activated, so no scene is ever shown as on. A refusal by HA
+  marks it FAILED.
+- A stacked layout for windows too narrow for a fifth selector button was built for the 4B and
+  removed with the button.
+
+**The corner icons are tabs (owner, after round 3).** History (the chart), Members and Scenes are
+views of their own; their icons stay on every view they belong to, the one showing is lit (as a
+chosen selector button is), and a tap on a lit one goes back to the controls. Members on the
+window's own views; Scenes on the light's controls and scenes; the chart everywhere - **the group's
+from the group's views, a member's from that member's own** ("Office lamp > History"). The X closes
+from every view of the window; inside one member the arrow goes back to Members. **Members' rows**
+are as wide as the controls view's slider and words together, centred (round 2, G2).
+
+**When a command fails, the board records why** (round 2, G8 - Desk said FAILED once, not
+reproduced): no matching report in 3 s, with what was asked and what the light last said, or HA's
+refusal and its message. The last four are logged and listed by `/popup?view=3`. A refusal of an
+earlier call while a newer one is in flight (a drag) no longer fails the newer one.

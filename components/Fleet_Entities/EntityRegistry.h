@@ -244,8 +244,22 @@ public:
     // For a transport that can say so: HA answers call_service with
     // success:false when it sent nothing (ha-websocket.md section 9). Reverts
     // whatever is still waiting, value and levels alike, and marks FAILED, as
-    // tick() would. Does nothing if nothing is waiting. Any task.
-    bool failCommand(const char *id);
+    // tick() would. Does nothing if nothing is waiting. Any task. `why` goes
+    // into the failure record below.
+    bool failCommand(const char *id, const char *why = "refused by the source");
+
+    // WHY THE LAST FEW COMMANDS FAILED (2.10c, the owner's G8: Desk said FAILED
+    // once and it could not be reproduced). Each FAILED - a confirming report
+    // that never came, or a refusal - is recorded with what was asked and what
+    // the source last said, and logged. The newest first. Any task.
+    struct FailNote {
+        char     id[ENTITY_ID_MAX];
+        char     why[80];
+        uint32_t atMs;
+    };
+    static constexpr uint8_t FAIL_NOTES = 4;
+    uint8_t  failNotes(FailNote *out, uint8_t cap) const;
+    uint16_t failTotal() const { return _failTotal; }
 
     // Drain the dirty set. Call from the LVGL task only.
     //
@@ -301,6 +315,12 @@ private:
     uint32_t _reconcileMs = 3000;
 
     int  indexOf(const char *id) const;   // caller holds the lock (or startup)
+
+    // Record a failure (caller holds the lock). See failNotes().
+    void noteFail(const Entity &e, const char *why, uint32_t nowMs);
+    FailNote _fails[FAIL_NOTES] = {};
+    uint8_t  _failNext  = 0;
+    uint16_t _failTotal = 0;
 
     // learnMembers() and learnScenes(): find or register each ref as a copy of
     // `like`'s source, then set `dst`. Caller holds the lock.

@@ -74,14 +74,16 @@ malloc for LVGL is a trap on this hardware. LVGL 9.6: after 2.10 (#88).
 
 ## What is next: 2.10c is BUILT, waiting for the owner's test (#65)
 
-**Branch `feat/65-ha-lights`, three steps, each committed:** (1) HA lights get their levels and
-`light.turn_on` with data; (2) the members of a group defined in HA (`light.office`'s three bulbs)
-are learnt and get the Members view, with a paused member taken out (K18); (3) scenes as the
-selector's fifth target, and a stacked window where the selector does not fit (the 4B). What was
-built: **`card-sheet.md` §16**. What HA does, measured from the PC: **`ha-websocket.md` §9**.
-Decisions: DECISIONS C5, K12, K15, K17-K19, A13, W9.
+**Branch `feat/65-ha-lights`:** (1) HA lights get their levels and `light.turn_on` with data; (2) the
+members of a group defined in HA (`light.office`'s three bulbs) are learnt and get the Members view,
+with a paused member taken out (K18); (3) scenes. **Rounds 1-3 tested by the owner** (all pass but
+G8 once and S5); after them Scenes became a view of its own under the chart, the corner icons became
+tabs (K19 superseded, K20), and every FAILED now records why (G8). What was built: **`card-sheet.md`
+§16**. What HA does, measured from the PC: **`ha-websocket.md` §9**. Decisions: DECISIONS C5, K12,
+K15, K17-K20, A13, W9.
 
-**The owner's next job: `docs/TEST_2.10c.md`, rounds 1-3** (H, G, S). Flashed 2026-10-06: **WS_P4_5**
+**The owner's next job: `docs/TEST_2.10c.md` round 4** (T). If G8's FAILED comes back, read the
+reason with `/popup?view=3` before theorising. Flashed 2026-10-06: **WS_P4_5**
 (COM15) and **WS_P4_4B** (COM7, for S8), both with local debug flags (`platformio.ini` is modified
 and NOT committed: `DEBUG_POPUP` + `DEBUG_FRAMES` on P4_5, `DEBUG_POPUP` on 4B - put it back before
 the merge gate). Everything was driven over `/popup` against the real Office lights; **no finger has

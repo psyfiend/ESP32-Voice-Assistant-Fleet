@@ -750,7 +750,7 @@ bool EntityRegistry::commandLight(const char *id, const LightCommand &c, uint32_
     return true;
 }
 
-bool EntityRegistry::failCommand(const char *id) {
+bool EntityRegistry::failCommand(const char *id, const char *why) {
     std::lock_guard<std::mutex> lk(_mx);
     const int i = indexOf(id);
     if (i < 0) return false;
@@ -762,7 +762,28 @@ bool EntityRegistry::failCommand(const char *id) {
     if (e.attrPending) { e.attrs = e.prevAttrs; e.attrPending = false; }
     e.cmdFailed = true;
     e.dirty     = true;
+    noteFail(e, why, e.lastUpdateMs);
     return true;
+}
+
+void EntityRegistry::noteFail(const Entity &e, const char *why, uint32_t nowMs) {
+    FailNote &n = _fails[_failNext];
+    _failNext = (uint8_t)((_failNext + 1) % FAIL_NOTES);
+    snprintf(n.id,  sizeof(n.id),  "%s", e.desc.id);
+    snprintf(n.why, sizeof(n.why), "%s", why ? why : "?");
+    n.atMs = nowMs;
+    _failTotal++;
+    ESP_LOGW(ENT_TAG, "FAILED %s: %s", n.id, n.why);
+}
+
+uint8_t EntityRegistry::failNotes(FailNote *out, uint8_t cap) const {
+    std::lock_guard<std::mutex> lk(_mx);
+    uint8_t n = 0;
+    for (uint8_t k = 1; k <= FAIL_NOTES && n < cap; k++) {
+        const FailNote &f = _fails[(_failNext + FAIL_NOTES - k) % FAIL_NOTES];
+        if (f.id[0]) out[n++] = f;
+    }
+    return n;
 }
 
 void EntityRegistry::drainDirty(DirtyFn fn, void *ctx) {
@@ -803,17 +824,31 @@ void EntityRegistry::tick(uint32_t nowMs) {
         // when the command was never acted upon is precisely the class of lie
         // this project has already been bitten by three times.
         if (e.pending && (nowMs - e.pendingSinceMs) > _reconcileMs) {
+            char why[80];
+            snprintf(why, sizeof(why), "no matching report in %lu ms (on/off; last said %s)",
+                     (unsigned long)_reconcileMs,
+                     e.prevValue.type == ValueType::BOOL ? (e.prevValue.b ? "on" : "off") : "?");
             e.value     = e.prevValue;
             e.pending   = false;
             e.cmdFailed = true;   // the echo never came: it did not take
             e.dirty     = true;
+            noteFail(e, why, nowMs);
         }
         // The same for a light's levels: back to what the source last said.
+        // Recorded with both, since a near miss and no report at all look the
+        // same on the card (G8).
         if (e.attrPending && (nowMs - e.attrPendingSinceMs) > _reconcileMs) {
+            const LightCommand &c = e.attrCmd;
+            const EntityAttrs  &a = e.prevAttrs;
+            char why[80];
+            snprintf(why, sizeof(why), "no match in %lus: asked b%d k%d h%d; last b%d k%d h%d m%d",
+                     (unsigned long)(_reconcileMs / 1000), c.brightness, c.colorTempK, c.hue,
+                     a.brightness, a.colorTempK, a.hue, (int)a.lightMode);
             e.attrs       = e.prevAttrs;
             e.attrPending = false;
             e.cmdFailed   = true;
             e.dirty       = true;
+            noteFail(e, why, nowMs);
         }
     }
 }

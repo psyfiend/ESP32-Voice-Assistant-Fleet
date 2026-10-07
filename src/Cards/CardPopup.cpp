@@ -121,7 +121,10 @@ void dbgLater(const char *fmt, ...) {
 // Compound names, never a bare ALL-CAPS word - Arduino's pin-mode macros eat
 // those (CLAUDE.md, "Arduino's global macro namespace will eat your enum").
 // VIEW_MEMBER: one member's own controls, reached from VIEW_MEMBERS (2.10b).
-enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER };
+// VIEW_SCENES: the light's scenes beside its brightness slider (2.10c).
+// History, Members and Scenes are reached by the corner icons, which work as
+// tabs (owner, 2026-10-06): see "The corner icons".
+enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER, VIEW_SCENES };
 enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
@@ -160,12 +163,6 @@ IntfMode s_intfMode = IntfMode::INTF_NOW_AND_THEN;
 // at the source (2.10c), whichever list is longer.
 constexpr uint8_t POPUP_ENT_MAX = (CARD_PRIMARY_MAX > ENTITY_MEMBERS_MAX) ? CARD_PRIMARY_MAX
                                                                           : ENTITY_MEMBERS_MAX;
-
-// The selector's fifth target (2.10c, K15), alongside the LightCapBits: the
-// light has scenes. The window's own bit - a scene is not something a light
-// can do, it is something HA keeps beside it.
-constexpr uint8_t CAP_SCENES = 1u << 4;
-
 struct Popup {
     PopupPhase phase = PopupPhase::PHASE_CLOSED;
     PopupView  view  = PopupView::VIEW_MAIN;
@@ -195,6 +192,7 @@ struct Popup {
     lv_obj_t *win = nullptr;
     lv_obj_t *btnLeft = nullptr, *lblLeft = nullptr;
     lv_obj_t *btnHistory = nullptr, *btnMembers = nullptr;
+    lv_obj_t *btnScenes = nullptr;   // under the chart, on the light's own views (2.10c)
     lv_obj_t *lblTitleArea = nullptr, *lblTitleName = nullptr;
     int32_t   titleW = 0;      // what the two title labels may use together
     lv_obj_t *stage = nullptr, *autoBar = nullptr;
@@ -223,13 +221,17 @@ struct Popup {
     bool      lightHero = false;
     uint8_t   lightCtl = 0;                      // LightCtl: which control the hero is
     lv_obj_t *fill = nullptr, *grip = nullptr, *mark = nullptr;
-    lv_obj_t *btnCtl[5] = {nullptr};             // power, dim, temp, colour, scenes
+    lv_obj_t *btnCtl[4] = {nullptr, nullptr, nullptr, nullptr};   // power, dim, temp, colour
     lv_obj_t *swatch[8] = {nullptr};
-    // Scenes (2.10c): their buttons, the one loaded from this window (-1:
-    // none), and whether the selector sits under the row (a narrow window).
+    // Scenes (2.10c): their buttons; the one loaded from this window (-1:
+    // none), when, and the light's levels once that scene had settled - see
+    // sceneRingCheck(); and the control the slider showed before Scenes.
     lv_obj_t *sceneBtn[ENTITY_SCENES_MAX] = {nullptr};
     int8_t    lastScene = -1;
-    bool      stacked = false;
+    uint32_t  sceneMs = 0;
+    uint32_t  sceneSettled = 0;   // a signature of the levels; 0 = not taken yet
+    uint8_t   ctlBeforeScenes = 0;
+    int32_t   mainRowW = 0;       // the main view's slider and words together (Members' width)
     bool      sliding = false;                   // a finger is on the slider
     int32_t   slideVal = 0, sentVal = -1;        // what it shows; what was last sent
     uint32_t  sentMs = 0;
@@ -535,7 +537,7 @@ void forgetMainWidgets() {
 }
 
 void forgetWidgets() {
-    s.btnLeft = s.lblLeft = s.btnHistory = s.btnMembers = nullptr;
+    s.btnLeft = s.lblLeft = s.btnHistory = s.btnMembers = s.btnScenes = nullptr;
     s.lblTitleArea = s.lblTitleName = nullptr;
     s.stage = s.autoBar = nullptr;
     forgetMainWidgets();
@@ -634,15 +636,12 @@ int32_t selectorW(uint8_t caps) {
     if (caps & LIGHT_CAN_DIM)    n++;
     if (caps & LIGHT_CAN_TEMP)   n++;
     if (caps & LIGHT_CAN_COLOUR) n++;
-    if (caps & CAP_SCENES)       n++;
     const bool div = n > 1;
     const uint8_t children = n + (div ? 1 : 0);
     return 2 * g + n * UI::minTouch() + (children - 1) * g + (div ? LV_MAX(2, mm(0.25f)) : 0);
 }
 
-// What the column wants, unclamped. `selector`: whether the selector is in it
-// (beside the slider) or under the row (stacked, 2.10c).
-int32_t colNeed(bool light, uint8_t caps, bool selector = true) {
+int32_t colWidth(bool light, uint8_t caps) {
     const UIType &t = UI::type();
     int32_t w = textW(hasMembers() ? "Changed 59m ago, 9 paused" : "Changed 59m ago", t.TAG);
     w = LV_MAX(w, textW("Unavailable", UIToolkit::Font_Hero));
@@ -650,27 +649,12 @@ int32_t colNeed(bool light, uint8_t caps, bool selector = true) {
     const int32_t pill = textW("PAUSED", t.TAG) + 2 * mm(1.2f) + 6 * mm(0.2f);
     w = LV_MAX(w, textW("Temperature", t.TAG) + mm(1.6f) + pill);
     if (light) {
-        if (selector) w = LV_MAX(w, selectorW(caps));
+        w = LV_MAX(w, selectorW(caps));
         if (caps & LIGHT_CAN_COLOUR) w = LV_MAX(w, 4 * mm(6.5f) + 3 * mm(1.6f) + 2 * mm(0.6f));
     }
-    return w;
+    const int32_t room = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4);
+    return LV_MIN(room, w);
 }
-
-// Beside the hero, as far as the window allows.
-int32_t colRoom() { return lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4); }
-
-int32_t colWidth(bool light, uint8_t caps, bool selector = true) {
-    return LV_MIN(colRoom(), colNeed(light, caps, selector));
-}
-
-// The stage's height: the window less its padding, the header row and the gap
-// under it (buildContents()). Known before LVGL lays anything out.
-int32_t stageH() {
-    return lv_area_get_height(&s.winRect) - 2 * s.pad - UI::minTouch() - mm(1.6f);
-}
-
-// The selector's height: its buttons and its own padding.
-int32_t selectorH() { return UI::minTouch() + 2 * mm(0.6f); }
 
 void fixColumn(lv_obj_t *col, int32_t width) {
     lv_obj_set_width     (col, width);
@@ -723,7 +707,7 @@ bool pausedBlocks();          // below, with the toggle
 // Cheap to move because it is small: a drag redraws the slider and the value
 // - tens of thousands of pixels - never the window.
 // ---------------------------------------------------------------------------
-enum LightCtl : uint8_t { LCTL_DIM, LCTL_TEMP, LCTL_COLOUR, LCTL_SCENES };
+enum LightCtl : uint8_t { LCTL_DIM, LCTL_TEMP, LCTL_COLOUR };
 
 constexpr uint32_t LIGHT_SEND_MS = 300;   // owner: "300ms sounds about right"
 
@@ -746,28 +730,25 @@ uint8_t firstCtl(uint8_t caps) {
     return LCTL_COLOUR;
 }
 
+// Inside one member's own views (its controls, its history): the group's
+// entities are set aside in groupEnt while ent[] holds the member.
+bool inMember() { return s.groupN > 0; }
+
 // THE LIGHT WHOSE SCENES ARE OFFERED (2.10c): the one light the window shows -
-// a card's own, or a group defined in HA as itself. None while the window
-// works through a group's members (a scene would reach the paused one), in a
-// member's own view, or for a group defined here.
+// a card's own, a group defined in HA as itself, or a member in its own view
+// (a bulb has none, a room does). None while the window works through a
+// group's members (a scene would reach the paused one), or for a group
+// defined here.
 const Entity *sceneHost() {
-    if (!s.reg || s.view == PopupView::VIEW_MEMBER) return nullptr;
+    if (!s.reg) return nullptr;
+    if (inMember()) return s.ent[0];
     if (s.native) return s.expanded ? nullptr : s.native;
     return (s.nEnt == 1) ? s.ent[0] : nullptr;
 }
 
-// What the selector offers. `all`: everything it could ever offer in this
-// window, scenes included while a member's pause hides them - what the column
-// is sized for, so nothing moves (section 15).
-uint8_t ctlCaps(const LightAgg &L, bool all) {
+bool hasScenes() {
     const Entity *h = sceneHost();
-    if (all && s.view != PopupView::VIEW_MEMBER) h = s.native ? s.native : (s.nEnt == 1 ? s.ent[0] : nullptr);
-    return (all ? L.allCaps : L.caps) | ((h && h->nScenes) ? CAP_SCENES : 0);
-}
-
-uint8_t ctlBit(uint8_t ctl) {
-    return ctl == LCTL_DIM ? LIGHT_CAN_DIM : ctl == LCTL_TEMP ? LIGHT_CAN_TEMP
-         : ctl == LCTL_COLOUR ? LIGHT_CAN_COLOUR : CAP_SCENES;
+    return h && h->nScenes && h->desc.kind == EntityKind::LIGHT && h->desc.writable;
 }
 
 // The slider's range for the control showing.
@@ -810,6 +791,7 @@ int32_t valueAtFinger(const LightAgg &L) {
 void lightSend(int32_t v, int8_t sat = -1) {
     if (!s.reg) return;
     const uint32_t now = millis();
+    s.lastScene = -1;   // the light is no longer as a scene left it (S5)
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
         if (!e || !e->desc.writable || e->paused) continue;
@@ -855,14 +837,12 @@ void renderLight() {
     char buf[32];
     checkPausedChange(a);
     // A member paused or resumed changes what the group offers: rebuild once.
-    // So do scenes learnt while the window is open.
-    if (ctlCaps(L, false) != s.builtCaps && !s.rebuildQueued) {
+    if (L.caps != s.builtCaps && !s.rebuildQueued) {
         s.rebuildQueued = true;
         lv_async_call(rebuildMainAsync, nullptr);
     }
 
-    setText(s.lblWhat, s.lightCtl == LCTL_DIM ? "Brightness" : s.lightCtl == LCTL_TEMP ? "Temperature"
-                     : s.lightCtl == LCTL_COLOUR ? "Colour" : "Scenes");
+    setText(s.lblWhat, s.lightCtl == LCTL_DIM ? "Brightness" : s.lightCtl == LCTL_TEMP ? "Temperature" : "Colour");
 
     // What the slider shows: the finger while it is down, otherwise the
     // light. -1: nothing to mark (off, or the light has not said).
@@ -937,7 +917,7 @@ void renderLight() {
     }
 
     // --- The selector ------------------------------------------------------
-    for (uint8_t k = 0; k < 5; k++) {
+    for (uint8_t k = 0; k < 4; k++) {
         lv_obj_t *b = s.btnCtl[k];
         if (!b) continue;
         const bool chosen = (k > 0 && k - 1 == s.lightCtl);
@@ -1002,7 +982,8 @@ void rebuildMainAsync(void *unused) {
     (void)unused;
     s.rebuildQueued = false;
     if (s.phase == PopupPhase::PHASE_OPEN && s.stage &&
-        (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER))
+        (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER ||
+         s.view == PopupView::VIEW_SCENES))
         showView(s.view);
 }
 
@@ -1024,14 +1005,49 @@ void swatchCb(lv_event_t *ev) {
     renderLight();
 }
 
-// A scene button: load it (scene.turn_on), and ring it until the window closes.
+// THE RING ROUND A LOADED SCENE (owner, 2.10c S5) says "the light is as that
+// scene left it", so it lasts only while that is true: until the window
+// closes, any command from the window, or a change from elsewhere. A scene
+// fades in over a second or two and the bridge reports as it goes, so a
+// change is only counted once the levels have held still for SCENE_SETTLE_MS.
+constexpr uint32_t SCENE_SETTLE_MS = 3000;
+
+void sceneLoaded(uint8_t i) {
+    s.lastScene    = (int8_t)i;
+    s.sceneMs      = millis();
+    s.sceneSettled = 0;
+}
+
+uint32_t sceneLevels() {
+    const Entity *h = sceneHost();
+    if (!h) return 1;
+    const EntityAttrs &a = h->attrs;
+    uint32_t v = 2166136261u;
+    auto mixIn = [&v](uint32_t x) { v = (v ^ x) * 16777619u; };
+    mixIn(h->value.type == ValueType::BOOL && h->value.b);
+    mixIn((uint32_t)(uint16_t)a.brightness); mixIn((uint32_t)(uint16_t)a.colorTempK);
+    mixIn((uint32_t)(uint16_t)a.hue);        mixIn((uint32_t)(uint8_t)a.sat);
+    return v | 1;   // never 0, which means "not taken yet"
+}
+
+// From the tick: false when the ring has just gone.
+bool sceneRingCheck(uint32_t now) {
+    if (s.lastScene < 0 || now - s.sceneMs < SCENE_SETTLE_MS) return true;
+    const uint32_t lv = sceneLevels();
+    if (!s.sceneSettled) { s.sceneSettled = lv; return true; }
+    if (lv == s.sceneSettled) return true;
+    s.lastScene = -1;
+    return false;
+}
+
+// A scene button: load it (scene.turn_on), and ring it - see above.
 void sceneCb(lv_event_t *ev) {
     const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
     if (pausedBlocks()) return;
     const Entity *h  = sceneHost();
     const Entity *sc = (h && s.reg) ? s.reg->sceneOf(*h, i) : nullptr;
     if (!sc || !s.reg->press(sc->desc.id, millis())) return;
-    s.lastScene = (int8_t)i;
+    sceneLoaded(i);
     renderLight();
 }
 
@@ -1075,10 +1091,6 @@ void buildLightHero(lv_obj_t *row) {
     s.heroR = r;
     s.hero = plain(row);
     lv_obj_set_size(s.hero, s.heroW, s.heroH);
-    // SCENES: the slider's place is kept, empty - the scene buttons are laid
-    // over it and the column (buildSceneGrid()), so the column and the
-    // selector stay exactly where they are in every other control.
-    if (s.lightCtl == LCTL_SCENES) return;
     lv_obj_set_style_radius(s.hero, r, 0);
     lv_obj_add_flag(s.hero, LV_OBJ_FLAG_CLICKABLE);
     // A drag on the slider is the slider's: no gesture walks up from it to the
@@ -1140,17 +1152,13 @@ lv_obj_t *ctlButton(lv_obj_t *parent, const char *glyph, uint8_t k) {
     return b;
 }
 
-// `selParent`: the column itself (the selector at its bottom, level with the
-// slider's), or a row under the slider and column (stacked, 2.10c).
-void buildLightColumn(lv_obj_t *col, lv_obj_t *selParent) {
+void buildLightColumn(lv_obj_t *col) {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const LightAgg   L = lightAggregate();
-    const uint8_t    caps = ctlCaps(L, false);
+    const uint8_t    caps = L.caps;
     makeLabelRow(col);
-    if (s.lightCtl == LCTL_SCENES) {
-        // Nothing more in the column: the scene buttons lie over it.
-    } else if (s.lightCtl != LCTL_COLOUR) {
+    if (s.lightCtl != LCTL_COLOUR) {
         s.lblValue = makeLabel(col, UIToolkit::Font_Hero, p.TEXT);
         s.lblAgo   = makeLabel(col, t.TAG, p.TEXT_DIM);
         lv_label_set_long_mode(s.lblAgo, LV_LABEL_LONG_DOT);   // "..., 3 paused" stays one line
@@ -1182,16 +1190,14 @@ void buildLightColumn(lv_obj_t *col, lv_obj_t *selParent) {
 
     // The selector sits at the BOTTOM of the column, level with the bottom of
     // the slider, whatever is above it (owner, round 3).
-    if (selParent == col) {
-        lv_obj_t *spacer = plain(col);
-        lv_obj_set_size(spacer, 1, 0);
-        lv_obj_set_flex_grow(spacer, 1);
-    }
+    lv_obj_t *spacer = plain(col);
+    lv_obj_set_size(spacer, 1, 0);
+    lv_obj_set_flex_grow(spacer, 1);
 
     // Power | the controls this light (any member) has, with a divider after
     // Power as in HA. A light with only one of them still shows it, so the
     // selector always says what the slider is.
-    lv_obj_t *sel = plain(selParent);
+    lv_obj_t *sel = plain(col);
     lv_obj_set_size     (sel, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(sel, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(sel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -1201,7 +1207,7 @@ void buildLightColumn(lv_obj_t *col, lv_obj_t *selParent) {
     lv_obj_set_style_pad_all   (sel, mm(0.6f), 0);
     lv_obj_set_style_pad_column(sel, mm(0.6f), 0);
     ctlButton(sel, MDI_POWER, 0);
-    if (caps & (LIGHT_CAN_DIM | LIGHT_CAN_TEMP | LIGHT_CAN_COLOUR | CAP_SCENES)) {
+    if (caps & (LIGHT_CAN_DIM | LIGHT_CAN_TEMP | LIGHT_CAN_COLOUR)) {
         lv_obj_t *div = plain(sel);
         lv_obj_set_size(div, LV_MAX(2, mm(0.25f)), UI::minTouch() * 60 / 100);
         lv_obj_set_style_bg_color(div, UI::border(), 0);
@@ -1210,37 +1216,53 @@ void buildLightColumn(lv_obj_t *col, lv_obj_t *selParent) {
     if (caps & LIGHT_CAN_DIM)    ctlButton(sel, MDI_BRIGHTNESS_5, 1 + LCTL_DIM);
     if (caps & LIGHT_CAN_TEMP)   ctlButton(sel, MDI_SUN_THERMOMETER, 1 + LCTL_TEMP);
     if (caps & LIGHT_CAN_COLOUR) ctlButton(sel, MDI_PALETTE, 1 + LCTL_COLOUR);
-    // Scenes: mdi:movie-open, a clapperboard - already in the icon faces, so
-    // no font is regenerated for it (mdi:palette, HA's own scene icon, is
-    // Colour's here).
-    if (caps & CAP_SCENES)       ctlButton(sel, MDI_MOVIE_OPEN, 1 + LCTL_SCENES);
 }
 
-// THE SCENE BUTTONS (2.10c, K15): laid over the slider's place and the
-// column's middle - from under the label line to above the selector - as one
-// floating grid, so nothing else moves when Scenes is chosen. Two rows when
-// they fit at a touch target's height or a little under; it scrolls if a light
-// has more. Names as the source gives them, sorted ("Bright", "Relax").
-void buildSceneGrid(lv_obj_t *row, int32_t rowW) {
+// THE SCENES VIEW (2.10c; owner, 2026-10-06): the brightness slider stays where
+// it is on the controls view, and the scene buttons take the column - the
+// label, the value and the selector all give way, so three rows fit. Reached
+// by the scenes icon under the chart, like the other views; the column is the
+// controls view's own width, so the slider does not move.
+//
+// SIZED AS A SHARE OF THE WINDOW, like the slider (owner: on the 4B they were
+// large for their window): 9 "P4_5 millimetres" tall - a full touch target on
+// the P4_5 - never under the swatches' 6.5 mm, and three rows at most in the
+// slider's height. Centred; it scrolls if a light has more than fit. Names as
+// the source gives them, sorted ("Bright" .. "Relax").
+void buildSceneGrid(lv_obj_t *col, int32_t colW) {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const Entity    *h = sceneHost();
     if (!h || !s.reg) return;
-    const int32_t gap = mm(1.4f);
+    const int32_t gap = pm(1.4f);
     // The grid's own padding holds the ring (outline pad + width), which the
     // grid's edge would otherwise clip.
     const int32_t pad = LV_MAX(2, mm(0.3f)) + LV_MAX(2, mm(0.4f)) + 1;
-    const int32_t top = lv_font_get_line_height(t.TAG) + mm(0.8f);
-    const int32_t bot = s.stacked ? 0 : selectorH() + mm(0.8f);
-    const int32_t gh  = s.heroH - top - bot;
-    const int32_t ch  = LV_CLAMP(mm(6.5f), (gh - gap - 2 * pad) / 2, UI::minTouch());
+    const int32_t padH = pm(2.4f);
+    int32_t ch = LV_MAX(mm(6.5f), LV_MIN(pm(9.0f), (s.heroH - 2 * gap - 2 * pad) / 3));
 
-    lv_obj_t *grid = plain(row);
-    lv_obj_add_flag(grid, LV_OBJ_FLAG_FLOATING);
-    lv_obj_set_pos (grid, 0, top);
-    lv_obj_set_size(grid, rowW, gh);
+    // MORE THAN THREE ROWS? Then half of a fourth shows, so it is plain there
+    // is more to scroll to - three full rows hid the P4_5's seventh scene with
+    // nothing to say it was there. The rows are counted as the flex layout
+    // will wrap them: each button its name's width, or 1.6 heights at least.
+    auto rowsAt = [&](int32_t bh) {
+        int32_t rows = 1, x = 0;
+        const int32_t inner = colW - 2 * pad;
+        for (uint8_t i = 0; i < h->nScenes; i++) {
+            const Entity *sc = s.reg->sceneOf(*h, i);
+            if (!sc) continue;
+            const int32_t bw = LV_MAX(textW(sc->desc.name, t.TAG) + 2 * padH, bh * 16 / 10);
+            if (x > 0 && x + gap + bw > inner) { rows++; x = bw; }
+            else x += (x > 0 ? gap : 0) + bw;
+        }
+        return rows;
+    };
+    if (rowsAt(ch) > 3) ch = LV_MAX(mm(6.5f), (s.heroH - 3 * gap - 2 * pad) * 2 / 7);
+
+    lv_obj_t *grid = plain(col);
+    lv_obj_set_size(grid, colW, s.heroH);
     lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_column(grid, gap, 0);
     lv_obj_set_style_pad_row   (grid, gap, 0);
     lv_obj_set_style_pad_all   (grid, pad, 0);   // room for the ring
@@ -1252,8 +1274,8 @@ void buildSceneGrid(lv_obj_t *row, int32_t rowW) {
         if (!sc) continue;
         lv_obj_t *b = plain(grid);
         lv_obj_set_size(b, LV_SIZE_CONTENT, ch);
-        lv_obj_set_style_min_width(b, ch * 2, 0);
-        lv_obj_set_style_pad_hor  (b, mm(2.4f), 0);
+        lv_obj_set_style_min_width(b, ch * 16 / 10, 0);
+        lv_obj_set_style_pad_hor  (b, padH, 0);
         lv_obj_set_style_radius   (b, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_opa   (b, LV_OPA_COVER, 0);
         lv_obj_set_style_bg_color (b, UI::c(quiet(p.SURFACE)), 0);
@@ -1342,6 +1364,7 @@ void renderMain() {
 void commandAll(bool on) {
     if (!s.reg) return;
     const uint32_t now = millis();
+    s.lastScene = -1;   // S5, as lightSend()
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
         if (e && e->desc.writable && !e->paused)   // a paused member is out of the group
@@ -1440,40 +1463,21 @@ void buildMain() {
                    (e.desc.kind == EntityKind::SWITCH || writableLight);
     if (s.lightHero) {
         // A control no counting member has any more (its lamp was paused)
-        // falls back to the first one there is. Scenes too, when a member's
-        // pause takes them away.
-        const uint8_t offered = ctlCaps(LA, false);
-        const uint8_t sized   = ctlCaps(LA, true);
-        if (!(offered & ctlBit(s.lightCtl))) s.lightCtl = firstCtl(caps);
-        s.builtCaps = offered;
-
-        // STACKED WHEN THE SELECTOR DOES NOT FIT BESIDE THE SLIDER (owner,
-        // 2026-10-06: the 4B with Scenes' fifth button). The slider and its
-        // words stay a row, centred; the selector moves under it, centred; the
-        // slider is shortened by what the selector needs. Decided from
-        // everything the window could offer, so it never changes within one.
-        s.heroW   = s.heroH * 42 / 100;
-        s.stacked = colNeed(true, sized) > colRoom();
-        if (s.stacked) {
-            const int32_t fit = stageH() - selectorH() - mm(1.6f);
-            if (s.heroH > fit) s.heroH = LV_MAX(UI::minTouch(), fit);
-            s.heroW = s.heroH * 42 / 100;
-            lv_obj_set_style_pad_row(s.stage, mm(1.6f), 0);
-        }
+        // falls back to the first one there is.
+        const uint8_t bit = s.lightCtl == LCTL_DIM ? LIGHT_CAN_DIM : s.lightCtl == LCTL_TEMP ? LIGHT_CAN_TEMP
+                                                                                          : LIGHT_CAN_COLOUR;
+        if (!(caps & bit)) s.lightCtl = firstCtl(caps);
+        s.builtCaps = caps;
         buildLightHero(row);
         lv_obj_t *col = plain(row);
         // Sized for everything the members CAN do, paused or not: a pause
         // hides buttons, and a narrower column re-centred the whole group
         // (owner, round 5 - All Lamps paused).
-        const int32_t colW = colWidth(true, sized, !s.stacked);
+        const int32_t colW = colWidth(true, LA.allCaps);
         fixColumn(col, colW);
-        lv_obj_t *selParent = col;
-        if (s.stacked) {
-            selParent = plain(s.stage);
-            lv_obj_set_size(selParent, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-        }
-        buildLightColumn(col, selParent);
-        if (s.lightCtl == LCTL_SCENES) buildSceneGrid(row, s.heroW + pm(4) + colW);
+        s.mainRowW = s.heroW + pm(4) + colW;
+        if (s.view == PopupView::VIEW_SCENES) buildSceneGrid(col, colW);
+        else                                  buildLightColumn(col);
         renderLight();
         return;
     }
@@ -1531,6 +1535,7 @@ void buildMain() {
     // A toggle's column is the slider's: the same size, the lines in the
     // same places (owner, round 3).
     if (s.toggleHero) fixColumn(col, colWidth(false, 0));
+    s.mainRowW = s.toggleHero ? s.heroW + pm(4) + colWidth(false, 0) : 0;
 
     makeLabelRow(col);
 
@@ -1571,9 +1576,12 @@ void deckRender();                  // below, with the deck
 void buildMembers() {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
-    // The stage's height, scrolling if a group has more members than fit.
+    // The stage's height, scrolling if a group has more members than fit. As
+    // wide as the controls view's slider and words together, centred, so the
+    // rows line up with them (owner, 2.10c G2: full width looked awkward on
+    // the P4_5).
     lv_obj_t *list = plain(s.stage);
-    lv_obj_set_size     (list, lv_pct(100), lv_pct(100));
+    lv_obj_set_size     (list, s.mainRowW > 0 ? s.mainRowW : lv_pct(100), lv_pct(100));
     lv_obj_add_flag     (list, LV_OBJ_FLAG_SCROLLABLE);
     UI::tameScroll(list);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
@@ -1645,20 +1653,50 @@ void layoutTitle() {
     lv_obj_set_width(s.lblTitleName, nw);
 }
 
+// --- THE CORNER ICONS (owner, 2026-10-06) ------------------------------------
+// History (the chart), Members and Scenes are views of their own, and the icons
+// in the corner work as tabs: shown on every view they belong to, the one
+// showing is lit (as a chosen selector button is), and a tap on a lit one goes
+// back to the controls. Members on the window's own views, not inside one
+// member; Scenes only on a light's controls and its scenes; the chart
+// everywhere - the group's from the group's views, a member's from its own.
+// The X closes from every view of the window; inside one member the arrow goes
+// back to Members.
+void cornerLook(lv_obj_t *b, bool shown, bool lit) {
+    if (!b) return;
+    if (!shown) { lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN); return; }
+    lv_obj_clear_flag(b, LV_OBJ_FLAG_HIDDEN);
+    const UIPalette &p = UI::pal();
+    lv_obj_set_style_bg_color(b, UI::c(lit ? p.TEXT : p.SURFACE), 0);
+    if (lv_obj_t *l = lv_obj_get_child(b, 0))
+        lv_obj_set_style_text_color(l, UI::c(lit ? p.SURFACE_ALT : p.TEXT), 0);
+}
+
 void showView(PopupView v) {
+    const PopupView was = s.view;
     s.view = v;
     forgetMainWidgets();
     lv_obj_clean(s.stage);
 
-    // X on the first view, a back arrow on any view reached from it; the
-    // navigation icons only on the first (card-sheet 11.1, mock v3).
-    const bool inner = (v != PopupView::VIEW_MAIN);
-    setText(s.lblLeft, inner ? LV_SYMBOL_LEFT : LV_SYMBOL_CLOSE);
-    if (s.btnHistory) { if (inner) lv_obj_add_flag(s.btnHistory, LV_OBJ_FLAG_HIDDEN);
-                        else       lv_obj_clear_flag(s.btnHistory, LV_OBJ_FLAG_HIDDEN); }
-    if (s.btnMembers) { if (inner) lv_obj_add_flag(s.btnMembers, LV_OBJ_FLAG_HIDDEN);
-                        else       lv_obj_clear_flag(s.btnMembers, LV_OBJ_FLAG_HIDDEN); }
+    // SCENES SHOWS THE BRIGHTNESS SLIDER (owner): whatever the slider showed
+    // before comes back with the controls.
+    if (v == PopupView::VIEW_SCENES && was != PopupView::VIEW_SCENES) {
+        s.ctlBeforeScenes = s.lightCtl;
+        if (lightAggregate().caps & LIGHT_CAN_DIM) s.lightCtl = LCTL_DIM;
+    } else if (v != PopupView::VIEW_SCENES && was == PopupView::VIEW_SCENES) {
+        s.lightCtl = s.ctlBeforeScenes;
+    }
 
+    const bool member   = inMember();
+    const bool controls = (v == PopupView::VIEW_MAIN || v == PopupView::VIEW_MEMBER);
+    setText(s.lblLeft, member ? LV_SYMBOL_LEFT : LV_SYMBOL_CLOSE);
+    cornerLook(s.btnHistory, true, v == PopupView::VIEW_HISTORY);
+    cornerLook(s.btnMembers, !member && hasMembers(), v == PopupView::VIEW_MEMBERS);
+    cornerLook(s.btnScenes, (controls || v == PopupView::VIEW_SCENES) && hasScenes(),
+               v == PopupView::VIEW_SCENES);
+
+    // Whose view it is: the window's, or (inside one) the member's.
+    const char *who = (member && s.ent[0]) ? s.ent[0]->desc.name : s.name;
     char title[ENTITY_NAME_MAX + 16];
     if (v == PopupView::VIEW_MAIN) {
         if (s.area[0]) { snprintf(title, sizeof(title), "%s > ", s.area); setText(s.lblTitleArea, title); }
@@ -1669,19 +1707,28 @@ void showView(PopupView v) {
         // "Group > member" (card-sheet 11.1).
         snprintf(title, sizeof(title), "%s > ", s.name);
         setText(s.lblTitleArea, title);
-        setText(s.lblTitleName, s.ent[0] ? s.ent[0]->desc.name : "");
+        setText(s.lblTitleName, who);
         buildMain();
     } else {
-        snprintf(title, sizeof(title), "%s > ", s.name);
+        snprintf(title, sizeof(title), "%s > ", who);
         setText(s.lblTitleArea, title);
-        setText(s.lblTitleName, v == PopupView::VIEW_HISTORY ? "History" : "Members");
-        if (v == PopupView::VIEW_HISTORY) buildHistory();
-        else                              buildMembers();
+        setText(s.lblTitleName, v == PopupView::VIEW_HISTORY ? "History"
+                              : v == PopupView::VIEW_SCENES  ? "Scenes" : "Members");
+        if (v == PopupView::VIEW_HISTORY)     buildHistory();
+        else if (v == PopupView::VIEW_SCENES) buildMain();
+        else                                  buildMembers();
     }
     layoutTitle();
     deckRender();   // Paused follows whatever the window is showing now
     s.lastSig = signature();
 }
+
+// The controls view of whatever the window is showing: the window's, or one
+// member's.
+PopupView controlsView() { return inMember() ? PopupView::VIEW_MEMBER : PopupView::VIEW_MAIN; }
+
+// A corner icon: its view, or - when lit - back to the controls.
+void cornerTap(PopupView v) { showView(s.view == v ? controlsView() : v); }
 
 // --- A MEMBER'S OWN CONTROLS (2.10b; owner: tap a row in Members) -----------
 // The same window and the same views, pointed at one member: the group's
@@ -1692,7 +1739,7 @@ uint8_t s_groupCtl   = 0;   // the group's control, restored on the way back
 
 void enterMemberAsync(void *unused) {
     (void)unused;
-    if (s.phase != PopupPhase::PHASE_OPEN || s.view != PopupView::VIEW_MEMBERS) return;
+    if (s.phase != PopupPhase::PHASE_OPEN || s.view != PopupView::VIEW_MEMBERS || inMember()) return;
     const Entity *m = (s_memberPick < memberCount()) ? memberAt(s_memberPick) : nullptr;
     if (!m) return;
     for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.groupEnt[i] = s.ent[i];
@@ -1713,22 +1760,26 @@ void memberRowCb(lv_event_t *ev) {
 }
 
 void leaveMember() {
+    if (!inMember()) return;
     for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.ent[i] = s.groupEnt[i];
     s.nEnt     = s.groupN;
     s.groupN   = 0;
     applyNative();   // the member may have been paused or resumed meanwhile
+    s.view     = PopupView::VIEW_MEMBERS;   // not Scenes: its slider swap is the member's
     s.lightCtl = s_groupCtl;
     showView(PopupView::VIEW_MEMBERS);
 }
 
+// The X closes from every view of the window; inside one member the arrow
+// goes back to Members.
 void leftCb(lv_event_t *ev) {
     (void)ev;
-    if (s.view == PopupView::VIEW_MAIN)        CardPopup::close();
-    else if (s.view == PopupView::VIEW_MEMBER) leaveMember();
-    else                                       showView(PopupView::VIEW_MAIN);
+    if (inMember()) leaveMember();
+    else            CardPopup::close();
 }
-void historyCb(lv_event_t *ev) { (void)ev; showView(PopupView::VIEW_HISTORY); }
-void membersCb(lv_event_t *ev) { (void)ev; showView(PopupView::VIEW_MEMBERS); }
+void historyCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_HISTORY); }
+void membersCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_MEMBERS); }
+void scenesCb (lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_SCENES); }
 
 // D6's drag down, on the HEADER ROW only (card-sheet 13): the light's tall
 // slider in 2.10b would fight a drag that could start anywhere. How the
@@ -1839,6 +1890,16 @@ void buildContents() {
     lv_obj_set_flex_flow(s.stage, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(s.stage, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
+    // --- Scenes: under the chart (owner, 2026-10-06) ------------------------
+    // Out of the flow, in the corner of the window's contents, a header row
+    // and its gap down - so it never pushes the stage. Shown by showView()
+    // when the light has scenes; mdi:movie-open, a clapperboard, already in
+    // the icon faces (HA's own scene icon, the palette, is Colour's here).
+    s.btnScenes = iconButton(s.win, MDI_MOVIE_OPEN, t.ICON_MD, scenesCb);
+    lv_obj_add_flag(s.btnScenes, LV_OBJ_FLAG_FLOATING);
+    lv_obj_align(s.btnScenes, LV_ALIGN_TOP_RIGHT, 0, btn + mm(1.6f));
+    lv_obj_add_flag(s.btnScenes, LV_OBJ_FLAG_HIDDEN);
+
     // --- The auto-close bar: how long until the window gives up -------------
     s.autoBar = plain(s.win);
     lv_obj_add_flag(s.autoBar, LV_OBJ_FLAG_FLOATING);
@@ -1875,12 +1936,21 @@ void tickCb(lv_timer_t *t) {
     // not only on a change, because leaving a member's own view settles the
     // signature before this could see it. Not in a member's own view, whose
     // ent[] is that member.
-    if (s.native && s.view != PopupView::VIEW_MEMBER && nativeWantsMembers() != s.expanded) {
+    if (s.native && !inMember() && nativeWantsMembers() != s.expanded) {
         applyNative();
-        showView(s.view);
+        // Scenes go while a member is paused: from their view, back to the controls.
+        showView((s.view == PopupView::VIEW_SCENES && !hasScenes()) ? controlsView() : s.view);
         s.lastAgeMs = now;
         return;
     }
+
+    // A scene's ring goes when the light no longer looks as the scene left it.
+    if (!sceneRingCheck(now)) renderMain();
+
+    // Scenes learnt after the window opened: its icon appears.
+    if (s.btnScenes && lv_obj_has_flag(s.btnScenes, LV_OBJ_FLAG_HIDDEN) && hasScenes() &&
+        (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER))
+        cornerLook(s.btnScenes, true, false);
 
     // The window is live (card-sheet 7): it follows the entity while open.
     const uint32_t sig = signature();
@@ -2423,7 +2493,7 @@ void pauseSwitchCb(lv_event_t *ev) {
     const bool on = lv_obj_has_state((lv_obj_t *)lv_event_get_target(ev), LV_STATE_CHECKED);
     // In a member's own view, only that member (2.10b) - the registry, and
     // every card on it follows.
-    Card *c = (s.view == PopupView::VIEW_MEMBER) ? nullptr : cardOf(h.surface);
+    Card *c = inMember() ? nullptr : cardOf(h.surface);
     if (c) {
         c->setPaused(on);
     } else if (s.reg) {
@@ -3096,7 +3166,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             const uint32_t now = millis();
             for (uint8_t i = 0; i < s.nEnt; i++) if (s.ent[i]) s.reg->setPaused(s.ent[i]->desc.id, a.pause != 0, now);
             // A group defined in HA pauses with its members, as Card::setPaused does.
-            if (s.native && s.view != PopupView::VIEW_MEMBER) {
+            if (s.native && !inMember()) {
                 s.reg->setPaused(s.native->desc.id, a.pause != 0, now);
                 for (uint8_t i = 0; i < s.native->nMembers; i++)
                     if (const Entity *m = memberAt(i)) s.reg->setPaused(m->desc.id, a.pause != 0, now);
@@ -3118,7 +3188,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             }
             const Entity *sc = s.reg->sceneOf(*h, (uint8_t)a.scene);
             const bool ok = sc && s.reg->press(sc->desc.id, millis());
-            if (ok) { s.lastScene = (int8_t)a.scene; renderMain(); }
+            if (ok) { sceneLoaded((uint8_t)a.scene); renderMain(); }
             dbgOut("scene %d: %s\n", a.scene, ok ? "loaded" : "not loaded");
         }
         s_dreq.store(DREQ_DONE);
@@ -3134,16 +3204,21 @@ void CardPopup::debugService(lv_timer_t *t) {
     if (a.view >= 0) {
         if (!isOpen()) dbgOut("no window open\n");
         else {
-            // view=3 only lists, wherever the window is. Any other view from a
-            // member's own view goes back to the group first, as the back
-            // arrow does - otherwise the group's view would hold the member.
-            if (a.view != 3) {
-                if (s.view == PopupView::VIEW_MEMBER) leaveMember();
-                showView(a.view == 1 ? PopupView::VIEW_HISTORY : a.view == 2 ? PopupView::VIEW_MEMBERS
-                                                                              : PopupView::VIEW_MAIN);
-            }
+            // As the corner icons do: 0 the controls of whatever is showing (a
+            // member's, inside one), 1 its history, 4 its scenes, 2 Members
+            // (back out of a member first, as the arrow does). 3 only lists.
+            if (a.view == 2) { if (inMember()) leaveMember(); showView(PopupView::VIEW_MEMBERS); }
+            else if (a.view == 0) showView(controlsView());
+            else if (a.view == 1) showView(PopupView::VIEW_HISTORY);
+            else if (a.view == 4) showView(PopupView::VIEW_SCENES);
             dbgMem(mem, sizeof(mem));
             dbgOut("view %d; %s\n", a.view, mem);
+            // Why the last commands failed, newest first (G8).
+            EntityRegistry::FailNote notes[EntityRegistry::FAIL_NOTES];
+            const uint8_t nn = s.reg ? s.reg->failNotes(notes, EntityRegistry::FAIL_NOTES) : 0;
+            for (uint8_t i = 0; i < nn; i++)
+                dbgOut("  failed %lus ago: %s: %s\n", (unsigned long)((millis() - notes[i].atMs) / 1000),
+                       notes[i].id, notes[i].why);
             // What the window stands for, then a group defined in HA's members
             // ("m"), and whether it is working through them (2.10c).
             const Entity *list[2 * POPUP_ENT_MAX];
@@ -3180,7 +3255,7 @@ void CardPopup::debugService(lv_timer_t *t) {
     if (a.ctl >= 0) {
         if (!isOpen() || !s.lightHero) dbgOut("no light window open\n");
         else {
-            s.lightCtl = (uint8_t)LV_MIN(a.ctl, (int)LCTL_SCENES);
+            s.lightCtl = (uint8_t)LV_MIN(a.ctl, (int)LCTL_COLOUR);
             const uint32_t t0 = micros();
             showView(PopupView::VIEW_MAIN);
             const uint32_t us = micros() - t0;

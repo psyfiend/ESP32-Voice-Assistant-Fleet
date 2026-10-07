@@ -77,6 +77,40 @@ Desk's seven Hue scenes are found in HA when the board connects (about 15 s afte
 | S9 | Table (Kitchen), Overhead, the Fleet page's lamps | No Scenes button; laid out as before (Desk's own row is wider than in v0.2.9, for its fifth button) |
 | S10 | The clapperboard | Say whether it reads as "scenes". Another glyph costs regenerating the icon font; HA's own scene icon (the palette) is Colour's here |
 
+### Rounds 1-3 results (owner, 2026-10-06)
+
+All PASS except: **H10** not run (the Kitchen). **G2** PASS, but the member rows need not be the
+window's full width (awkward on the P4_5). **G8 FAIL, once, not reproduced**: one member paused, Desk
+raised to 75%, the window closed - the Desk card said FAILED; a later command cleared it. **S5
+PARTIAL**: the ring round a loaded scene stayed after the brightness was changed - it should last
+only while the light is as the scene left it, and until the window closes. **On the layout**: the
+selector off-centre beside the slider looked awkward with five buttons; asked for Scenes as an icon
+under the chart and a view of its own, the slider kept, three rows of buttons on the P4_5, buttons
+sized to the window (large on the 4B), the corner icons as tabs on every view (yes - History for the
+group from its views, a member's from its own).
+
+**G8, investigated (Claude):** not HA refusing calls - 40 calls to two bulbs at 300 ms and 60 at
+150 ms, all accepted. But at 150 ms one bulb's last report came 2 s after its last command, close to
+the 3 s window. Unproven; round 4 records the reason for every FAILED.
+
+## Round 4 - Scenes as a view, the corner icons as tabs
+
+Flashed: **WS_P4_5** and **WS_P4_4B**.
+
+| # | Do this | PASS if |
+|---|---|---|
+| T1 | Open Desk | Power \| Brightness, Temperature, Colour (four again), the selector centred as in 2.10b. Corner: members, chart; **the clapperboard under the chart** |
+| T2 | Tap the clapperboard | It lights; "Desk > Scenes"; the slider where it was, at the room's brightness; the scene buttons where the words and selector were. P4_5: three rows, half a fourth showing (Relax, scroll to it) |
+| T3 | Tap Relax, then drag the slider | Relax rings, then the ring goes when you drag |
+| T4 | Tap Relax; change the room in the Hue app after a few seconds | The ring goes within a second or so of the change |
+| T5 | Tap the lit clapperboard | Back to the controls, on the control you had before |
+| T6 | Tap the members icon, then the chart, then the chart again | Each lights on its own view; the lit chart returns to the controls. The X closes from any of them |
+| T7 | Members | The rows are the width of the slider and its words, centred |
+| T8 | Members > Office lamp, then the chart | "Office lamp > History"; the arrow returns to Members |
+| T9 | Pause Office lamp; back to Desk | No clapperboard (as S6). From Scenes, pausing a member returns to the controls |
+| T10 | **4B**: Desk | Side by side again, as in 2.10b. Scenes: smaller buttons than round 3, the slider kept, the grid centred, scrolling for the rest |
+| T11 | If anything says FAILED | Note the time; the reason is now kept on the board (`/popup?view=3`, or ask me to read it) |
+
 ## Not tested (by Claude) - round 3
 
 Driven over `/popup`: no finger has scrolled the 4B's scene grid or tapped a scene button. Not tried:
