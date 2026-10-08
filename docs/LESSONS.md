@@ -562,6 +562,22 @@ next piece of eye candy:
   above). An animation started from `lv_obj_get_y()` of a panel made in the same call slid it down
   from the top of the screen. Start a new object's animation from the value you just set.
 
+## A flash write from a task whose stack is in PSRAM reboots the board (2.10d, 2026-10-08)
+
+A flash write turns the CPU cache off, and ESP-IDF asserts that the calling task's stack is not in
+PSRAM (`cache_utils.c`, `esp_task_stack_is_sane_cache_disabled()`). The HTTP server's task stack IS
+in PSRAM, on purpose (`HttpServer.cpp`, `task_caps`), so the first flash-write test, run from a
+handler, rebooted WS_P4_5 twice - an NVS write as surely as an erase. **Anything that writes flash
+runs on a task made with `xTaskCreate()`** (its stack in internal RAM): the settings save, any
+handler that saves, the `/panel?flash=` test. The loop task is fine, which is why Pause never hit it.
+
+Also learnt the same night, for whoever chases a panel glitch next: the P4's DSI bridge latches an
+underrun (`MIPI_DSI_BRIDGE.int_raw`), ESP-IDF enables its own interrupt for it and prints "underrun
+happens" from it, and the bridge **masks underruns in a frame's first 413 lines** (`fifo_underrun_
+discard_vcnt`) - so a late frame START, which is what a flash write would cause, is invisible to it.
+Turning the cache off by hand (`spi_flash_disable_interrupts_caches_and_other_cpu()`) is not a
+stand-in for a flash write: it panicked with a cache error. `PanelDebug.cpp` has the details.
+
 ## Never keep a pointer to an LVGL object you do not own - ask it to tell you when it goes
 
 2026-10-04, the popup's hold. CardPopup kept the pressed card's surface pointer while the hold

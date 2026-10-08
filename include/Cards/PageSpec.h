@@ -62,6 +62,19 @@ static constexpr int8_t PAGE_FLOW = -1;
 // does not draw that card rather than failing to build a page.
 // ---------------------------------------------------------------------------
 struct CardSpec {
+    // STABLE IDENTITY (2.10d, DECISIONS K33). Saved settings are keyed by it,
+    // so it never changes once a card exists - not when the card is relabelled,
+    // moved to another page or given other entities - and is never reused.
+    // Unique across every page on the device. Never shown in normal use.
+    //
+    // Made when the card is created: area and label, then the creation stamp,
+    // <area>_<label>_<yymmdd>_<hhmm>, the label left out where it repeats the
+    // area ("kitchen_261008_0310"); a second card with the same name in the
+    // same minute takes a letter ("..._0310b"). Lowercase letters, digits and
+    // '_' only. Checked at boot (checkCardIds()): a card with no id, a bad one
+    // or a duplicate still draws, but its settings cannot be saved.
+    const char *id = nullptr;
+
     // 1..6 primaries. More than one is the aggregate case - every light in a
     // room behind a single tile, which CardTypes.h explains at length. The
     // FIRST primary decides the card's type.
@@ -146,6 +159,19 @@ struct PageSpec {
     TempUnit tempUnit    = TempUnit::TEMP_INHERIT;
     CardLabel labelMode  = CardLabel::LBL_INHERIT;
 };
+
+// ---------------------------------------------------------------------------
+// Card ids (2.10d). checkCardIds() runs once at boot over every page: it logs
+// each card with no id, a malformed one or one used twice, and returns how many
+// problems it found. cardIdUsable() is then false for those, and such a card
+// draws but is never given its id, so nothing is ever saved under an id that
+// could mean two cards. Implemented in CardPage.cpp.
+// ---------------------------------------------------------------------------
+static constexpr uint8_t CARD_ID_MAX = 47;   // characters, without the terminator
+
+bool    cardIdWellFormed(const char *id);
+uint8_t checkCardIds(const PageSpec *const *pages, uint8_t n);
+bool    cardIdUsable(const char *id);
 
 // Author-facing span constants, for the default subdivision of 2.
 //

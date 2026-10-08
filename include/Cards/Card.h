@@ -120,6 +120,13 @@ public:
     Card &setGroupOn(GroupOn g);
     GroupOn groupOn() const { return _groupOn; }
 
+    // The card's stable id (CardSpec::id), or "" when it has none usable -
+    // then its settings cannot be saved. Points at the spec's string, which
+    // lives as long as the firmware.
+    Card &setId(const char *id) { _id = id; return *this; }
+    const char *id() const { return _id ? _id : ""; }
+    bool hasId() const { return _id && *_id; }
+
     // Which scenes the card's window offers (2.10c). See SceneShow.
     Card &setSceneShow(SceneShow v) { _sceneShow = v; return *this; }
     SceneShow sceneShow() const { return _sceneShow; }
@@ -527,6 +534,7 @@ private:
     bool            _dimmed      = false;   // paused, mixed not opa'd
 
     char _label[ENTITY_NAME_MAX] = {0};
+    const char *_id = nullptr;   // CardSpec::id, when usable
     char _area[ENTITY_SHORT_MAX] = {0};
     uint32_t _areaColor = 0;   // 0 = use the accent
 

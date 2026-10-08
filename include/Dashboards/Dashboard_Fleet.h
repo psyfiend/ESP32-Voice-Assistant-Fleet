@@ -75,11 +75,14 @@ inline const CardSpec FLEET_CARDS[] = {
     //   Avail    tap to make "Reading" go unavailable and come back (T15)
     //   Reading  should show N/A with the diagonal while unavailable
     //   Refuse   tap it: nothing will ever change, so FAILED after 3 s (R9)
-    { .primaries = { "test_available" }, .label = "Avail",   .area = "Test",
+    { .id = "test_avail_261008_0310",
+      .primaries = { "test_available" }, .label = "Avail",   .area = "Test",
       .place = { .priority = PRI_CRITICAL + 20 } },
-    { .primaries = { "test_reading" },   .label = "Reading", .area = "Test",
+    { .id = "test_reading_261008_0310",
+      .primaries = { "test_reading" },   .label = "Reading", .area = "Test",
       .place = { .priority = PRI_CRITICAL + 20 } },
-    { .primaries = { "test_refuse" },    .label = "Refuse",  .area = "Test",
+    { .id = "test_refuse_261008_0310",
+      .primaries = { "test_refuse" },    .label = "Refuse",  .area = "Test",
       .place = { .priority = PRI_CRITICAL + 20 } },
 
     // --- This panel's battery (prototype, 2026-09-29) ----------------------
@@ -88,9 +91,11 @@ inline const CardSpec FLEET_CARDS[] = {
     // the rest both entities are unregistered and these specs are skipped.
     // High while it is being tried on glass; the mV card is the calibration
     // evidence and goes first.
-    { .primaries = { BATT_ENT_PCT }, .label = "Battery", .area = "Panel",
+    { .id = "panel_battery_261008_0310",
+      .primaries = { BATT_ENT_PCT }, .label = "Battery", .area = "Panel",
       .place = { .priority = PRI_CRITICAL } },
-    { .primaries = { BATT_ENT_MV },  .label = "Battery", .area = "Panel",
+    { .id = "panel_battery_261008_0310b",
+      .primaries = { BATT_ENT_MV },  .label = "Battery", .area = "Panel",
       .place = { .priority = PRI_NORMAL } },
 
     // --- Outdoors ---------------------------------------------------------
@@ -101,6 +106,7 @@ inline const CardSpec FLEET_CARDS[] = {
     // CardSpec::secondaries exists for. The battery rides along on the
     // temperature card rather than taking a cell of its own.
     {
+        .id          = "outdoor_deck_261008_0310",
         .primaries   = { "deck_temp" },
         .secondaries = { "deck_battery" },
         .label       = "Deck",          // the LOCATION. The tinted icon
@@ -108,12 +114,14 @@ inline const CardSpec FLEET_CARDS[] = {
         .place       = { .priority = PRI_CRITICAL },
     },
     {
+        .id        = "outdoor_deck_261008_0310b",
         .primaries = { "deck_motion" },
         .label     = "Deck",
         .area      = "Outdoor",
         .place     = { .priority = PRI_NORMAL },
     },
     {
+        .id        = "outdoor_deck_261008_0310c",
         .primaries = { "deck_lux" },
         .label     = "Deck",
         .area      = "Outdoor",
@@ -127,6 +135,7 @@ inline const CardSpec FLEET_CARDS[] = {
     // case CARD_PRIMARY_MAX exists for. It earns a double-width cell because
     // it stands for four things.
     {
+        .id        = "kitchen_all_lamps_261008_0310",
         .primaries = { VIRT_ENT_L1, VIRT_ENT_L2, VIRT_ENT_L3, VIRT_ENT_L4 },
         .label     = "All Lamps",
         .area      = "Kitchen",
@@ -146,11 +155,14 @@ inline const CardSpec FLEET_CARDS[] = {
     // The mechanism is untouched. A unit is still half a cell, `prefSpanX` and
     // `minSpanX` are still ordinary fields, and "All Lamps" above still spans
     // U_2 - so the sub-grid remains exercised by the group card on every boot.
-    { .primaries = { VIRT_ENT_L1 }, .label = "Lamp 1", .area = "Kitchen",
+    { .id = "kitchen_lamp_1_261008_0310",
+      .primaries = { VIRT_ENT_L1 }, .label = "Lamp 1", .area = "Kitchen",
       .place = { .priority = PRI_NICE } },
-    { .primaries = { VIRT_ENT_L2 }, .label = "Lamp 2", .area = "Kitchen",
+    { .id = "kitchen_lamp_2_261008_0310",
+      .primaries = { VIRT_ENT_L2 }, .label = "Lamp 2", .area = "Kitchen",
       .place = { .priority = PRI_NICE } },
-    { .primaries = { VIRT_ENT_L3 }, .label = "Lamp 3", .area = "Lounge",
+    { .id = "lounge_lamp_3_261008_0310",
+      .primaries = { VIRT_ENT_L3 }, .label = "Lamp 3", .area = "Lounge",
       .place = { .priority = PRI_NICE } },
     // Lamp 4's CARD is gone (owner, 2026-09-19) - 13 cards to 12, and with
     // All Lamps narrowed, 15 cells to 13.
@@ -182,9 +194,11 @@ inline const CardSpec FLEET_CARDS[] = {
     // ordinary fields any page may set - so nothing was removed but the
     // evidence. The two switches stay because they are the only writable
     // entities on the device, and they leave with #44.
-    { .primaries = { VIRT_ENT_SWITCH }, .label = "Switch", .area = "Office",
+    { .id = "office_switch_261008_0310",
+      .primaries = { VIRT_ENT_SWITCH }, .label = "Switch", .area = "Office",
       .place = { .priority = PRI_NICE } },
-    { .primaries = { VIRT_ENT_STUCK },  .label = "Stuck",  .area = "Office",
+    { .id = "office_stuck_261008_0310",
+      .primaries = { VIRT_ENT_STUCK },  .label = "Stuck",  .area = "Office",
       .place = { .priority = PRI_NICE } },
 
     // --- This panel -------------------------------------------------------
@@ -193,6 +207,7 @@ inline const CardSpec FLEET_CARDS[] = {
     // board should lose first, and dropping them is how the degradation gets
     // exercised on hardware rather than argued about.
     {
+        .id        = "panel_signal_261008_0310",
         .primaries = { SYS_ENT_RSSI },
         .label     = "Signal",
         .area      = "Panel",
@@ -215,6 +230,7 @@ inline const CardSpec FLEET_CARDS[] = {
     // fit. That matters on CYD_S3_3248, whose rows are only four units wide:
     // a 3-unit card there would strand a unit beside it every time.
     {
+        .id        = "panel_free_heap_261008_0310",
         .primaries = { SYS_ENT_HEAP },
         .label     = "Free Heap",
         .area      = "Panel",
@@ -222,6 +238,7 @@ inline const CardSpec FLEET_CARDS[] = {
                        .priority  = PRI_DEBUG },
     },
     {
+        .id        = "panel_uptime_261008_0310",
         .primaries = { SYS_ENT_UPTIME },
         .label     = "Uptime",
         .area      = "Panel",

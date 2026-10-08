@@ -1282,6 +1282,9 @@ void GUIManager::nudgeRows(int8_t steps) {
 // and drops the rest by priority, as it did alone. A card never moves pages.
 void GUIManager::initPages() {
     const PageSpec *order[] = { &HA_PAGE, &FLEET_PAGE };
+    // Before any page is built: CardPage gives a card its id only if this
+    // found it usable (PageSpec.h, 2.10d).
+    checkCardIds(order, (uint8_t)(sizeof(order) / sizeof(order[0])));
     _nPages = 0;
     for (const PageSpec *s : order) {
         if (_nPages >= GUI_MAX_PAGES) break;

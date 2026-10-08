@@ -652,3 +652,63 @@ rows** are as wide as the controls view's slider and words together, and centred
 reproduced): no matching report in 3 s, with what was asked and what the light last said, or HA's
 refusal and its message. The last four are logged and listed by `/popup?view=3`. A refusal of an
 earlier call while a newer one is in flight (a drag) no longer fails the newer one.
+
+## 17. 2.10d - stable card ids and saved settings (in progress, from 2026-10-08)
+
+Decided with the owner on 2026-10-08: `DECISIONS.md` K33-K38. What the problem is, in the owner's
+words: how does a device stay customised instead of reverting to its compiled configuration at every
+reset?
+
+**How it works.** The board boots from the compiled dashboard, then applies the owner's saved
+changes from one file on top. A value comes from the first layer that sets it: the file, the card's
+spec, the page's spec, the built-in default (D-7's order). New firmware with a changed dashboard
+keeps every saved change for cards that are still there; new cards simply appear. At 3.1 the build
+sheet replaces the two spec layers and the file stays on top, unchanged - Q2's runtime layer.
+
+**Ids (K33).** Every saved change says which card it belongs to. Before 2.10d a card was "the Nth
+entry of its page", so inserting a card above Desk would have moved Desk's settings onto Overhead.
+An id is a name for the card made once, at creation, never changed and never reused - as HA makes
+an area's id from its name and keeps it through renames. It is made automatically, so a fresh build
+sheet just makes new ones and nobody looks anything up. Format
+`<area>_<label>_<yymmdd>_<hhmm>`, e.g. `office_desk_261008_0310`; the label is dropped where it
+repeats the area (`kitchen_261008_0310`), a same-minute twin takes a letter (`..._0310b`). The 35
+compiled cards were given theirs on 2026-10-08. `checkCardIds()` runs at boot: a card with no id, a
+malformed one or a duplicate draws but is never given its id, so it saves nothing.
+
+**A card's life (K35, the owner's page-pool idea).**
+
+| State | Its saved settings |
+|---|---|
+| Shown | - |
+| Dropped because the grid is too small | still on its page; nothing changes |
+| Hidden (Visibility - greyed until 2.11) | on its page, in the page's pool, can be brought back |
+| Removed from the page (page editing, later) | in the pool, kept |
+| Deleted | only by the owner, from the pool; gone |
+| No longer in the dashboard definition | kept, listed as "unclaimed", cleared only by the owner |
+| Its entity gone from HA | kept, listed as "entity missing" - the board cannot tell "gone" from "HA restarting" or "renamed" |
+
+**The file (K34).** JSON on LittleFS, in the unused data partition. Only what was changed is stored;
+choices by name, never by enum number, so reordering an enum cannot change what a saved choice
+means; keys this firmware does not know are kept when it rewrites the file. Credentials stay in NVS.
+Written whole to a temporary file and renamed, once, when the window closes, only if something
+changed - on a task of its own with its stack in internal RAM (LESSONS: a flash write from a task
+with a PSRAM stack reboots the board).
+
+```json
+{ "schema": 1,
+  "schemes":  { "linen": { "selector": "silver_round" } },
+  "entities": { "ha_light_office_lamp": { "paused": true } },
+  "cards":    { "office_desk_261008_0310": { "label": "custom", "name": "Desk lamp", "scenes": "all" } } }
+```
+
+**The flash-write test (step 1, `/panel?flash=`).** On WS_P4_5: NVS writes of 512 B took 2-5 ms,
+38 ms when NVS erased a page; 4 KB erases 15-17 ms; 64 KB 32 ms; 256 KB 117-360 ms. The DSI bridge
+latched no underrun in any of them - but it masks underruns in a frame's first 413 lines, which is
+where a write's late frame start would land, so whether a write is visible takes the owner's eyes.
+HomeTiles saw a blue flash on every P4 panel during writes and fixed it by rebuilding three IDF
+objects cache-safe (`HomeTiles/tools/esp-idf-3.3.7-p4-cache-safe/README.md`); our libraries have
+the same setting off (`CONFIG_LCD_DSI_ISR_CACHE_SAFE`). The owner had paused cards many times
+without seeing a flash.
+
+**The owner's white flash (P4_5 only, now and then, no action it follows).** Not yet explained.
+`/panel` now lists any underrun the bridge does see, with its time; read it right after a flash.

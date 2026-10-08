@@ -540,6 +540,7 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
             if (const Entity *e = reg.find(cs.secondaries[k])) c->bindSecondary(e);
         }
 
+        if (cardIdUsable(cs.id)) c->setId(cs.id);
         if (cs.label) c->setLabel(cs.label);
         if (cs.area) {
             c->setArea(cs.area);
@@ -594,4 +595,77 @@ void CardPage::report() const {
                                (unsigned)p.priority);
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Card ids - see PageSpec.h. Duplicates are remembered by pointer to the first
+// spec's string and compared by content, so both copies are refused.
+// ---------------------------------------------------------------------------
+namespace {
+constexpr uint8_t ID_DUPES_MAX = 16;
+const char *s_idDupes[ID_DUPES_MAX] = {};
+uint8_t     s_idDupeCount = 0;
+}
+
+bool cardIdWellFormed(const char *id) {
+    if (!id || !*id) return false;
+    size_t n = 0;
+    for (const char *p = id; *p; p++, n++) {
+        const char ch = *p;
+        const bool ok = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_';
+        if (!ok || n >= CARD_ID_MAX) return false;
+    }
+    return true;
+}
+
+uint8_t checkCardIds(const PageSpec *const *pages, uint8_t n) {
+    s_idDupeCount = 0;
+    uint8_t problems = 0, total = 0;
+    for (uint8_t pi = 0; pi < n; pi++) {
+        const PageSpec *pg = pages[pi];
+        if (!pg) continue;
+        for (uint8_t ci = 0; ci < pg->count; ci++) {
+            const CardSpec &cs = pg->cards[ci];
+            total++;
+            const char *what = cs.label ? cs.label : (cs.primaries[0] ? cs.primaries[0] : "?");
+            if (!cs.id || !*cs.id) {
+                Serial.printf("[CardIds] %s card %u (%s) has no id - its settings cannot be saved\n",
+                              pg->slug, (unsigned)ci, what);
+                problems++;
+                continue;
+            }
+            if (!cardIdWellFormed(cs.id)) {
+                Serial.printf("[CardIds] %s card %u (%s): id \"%s\" is not lowercase letters, digits and _ "
+                              "(at most %u) - its settings cannot be saved\n",
+                              pg->slug, (unsigned)ci, what, cs.id, (unsigned)CARD_ID_MAX);
+                problems++;
+                continue;
+            }
+            // Seen earlier, on this page or one before it?
+            bool dupe = false;
+            for (uint8_t pj = 0; pj <= pi && !dupe; pj++) {
+                const PageSpec *q = pages[pj];
+                if (!q) continue;
+                const uint8_t end = (pj == pi) ? ci : q->count;
+                for (uint8_t cj = 0; cj < end; cj++)
+                    if (q->cards[cj].id && strcmp(q->cards[cj].id, cs.id) == 0) { dupe = true; break; }
+            }
+            if (dupe) {
+                Serial.printf("[CardIds] id \"%s\" is used twice (again on %s, card %u, %s) - "
+                              "neither card's settings can be saved\n", cs.id, pg->slug, (unsigned)ci, what);
+                problems++;
+                if (s_idDupeCount < ID_DUPES_MAX) s_idDupes[s_idDupeCount++] = cs.id;
+            }
+        }
+    }
+    Serial.printf("[CardIds] %u cards on %u pages, %u id problem%s\n",
+                  (unsigned)total, (unsigned)n, (unsigned)problems, problems == 1 ? "" : "s");
+    return problems;
+}
+
+bool cardIdUsable(const char *id) {
+    if (!cardIdWellFormed(id)) return false;
+    for (uint8_t i = 0; i < s_idDupeCount; i++)
+        if (strcmp(s_idDupes[i], id) == 0) return false;
+    return true;
 }
