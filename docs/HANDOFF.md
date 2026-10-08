@@ -205,8 +205,9 @@ size - not a CR1220). S3_5B's 927 holder is unconfirmed. Nothing reads an RTC ye
 
 **The ESP32-P4 framework libraries are REBUILT, not stock.** `esp32p4_es` in
 `~/.platformio/packages/framework-arduinoespressif32-libs/` carries `MEMPOOL_PREFER_SPIRAM` and a
-64-byte L2 line - the fix for esp-hosted-mcu#243 (#49). The stock copy sits beside it as
-`esp32p4_es.stock.55.03.311`; rollback is a rename. A `pio pkg update` or platform reinstall
+64-byte L2 line - the fix for esp-hosted-mcu#243 (#49) - and, since 2026-10-08,
+`LCD_DSI_ISR_CACHE_SAFE` (flash writes flashed the panels blue; A14). The #49 build sits beside it as
+`esp32p4_es.hosted_fix`, the stock copy as `esp32p4_es.stock.55.03.311`; rollback is a rename. A `pio pkg update` or platform reinstall
 silently puts the bug back. `docs/REBUILD_P4_LIBS.md`. The S3 libraries are stock.
 
 **Do not use NINA's C6 updater** - it hung `WS_P4_5`.
