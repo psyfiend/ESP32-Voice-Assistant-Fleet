@@ -721,7 +721,17 @@ without seeing a flash.
 | 2 | Card ids and `checkCardIds()` | "35 cards on 2 pages, 0 id problems"; the failure paths not yet tried |
 | 3 | `Settings.h`: the file, `GET /settings` (`?stats=1`); Active state, Scenes and Selector kept | mount 52 ms the first time, 3-11 ms after; a save 7-66 ms (66 when LittleFS erased a block), once per close; Desk's Scenes and a Midnight selector back after a reset; internal heap -6.6 KB |
 | 3b | Paused in the file (`EntityRegistry::PauseStore`), #60's NVS list imported once | Garage North paused, PAUSED after a reset, resumed and the entry gone |
+| 4 | Label: Inherit / From HA / State / Custom / None (K40); `Entity::sourceName`; custom names from a PC (`/settings?card=..&name=..`) | after a reset: Desk "From HA" -> "Office", Overhead "Ceiling lamp", Sink "State" -> "Off" |
 
 Active state and Scenes are read every time a page is built, so they also survive a page swipe -
-before 2.10d a swipe lost them. Next: Label and Custom name, then Tap action (Cycle scenes, Load
-scene), then K17.
+before 2.10d a swipe lost them.
+
+**The flash writes flash the panel** (owner, on glass): all three `/panel?flash=` tests, more with
+the longer erases, light blue. The fix is built and verified, not installed: `REBUILD_P4_LIBS.md`,
+"The second rebuild". Until it is installed, every save flashes the P4 panels once.
+
+**A lost setting, once.** One boot started with an empty store although the file was there, and the
+next save replaced it (Desk's Scenes). Not explained; a file that will not read now makes the boot
+read-only instead, and `/settings?stats=1` says what the boot saw.
+
+Next: Tap action (Cycle scenes, Load scene - the scenes the window shows, K39), then K17.

@@ -330,6 +330,28 @@ That is a real cost and it is worth stating in the README when this lands.
 verified workaround on different hardware is genuinely useful to the upstream issue. Worth posting
 back to esp-hosted-mcu#243 when it is done.
 
+## The second rebuild: DSI cache-safe (2.10d, 2026-10-08, DECISIONS A14)
+
+**Every flash write flashed the P4 panels light blue** (owner, on glass, with `/panel?flash=`):
+the DSI DMA stops after each frame and its interrupt restarts it, and that interrupt is not built
+cache-safe, so it waits out any flash write and the bridge sends its filler colour. HomeTiles found
+the same (`reference/.../HomeTiles/tools/esp-idf-3.3.7-p4-cache-safe/README.md`). IDF's own fix is
+one option, which selects the DMA ones it needs:
+
+```
+configs/defconfig.cache_safe:   CONFIG_LCD_DSI_ISR_CACHE_SAFE=y
+./build.sh -s -t esp32p4_es -b idf-libs qio 80m_200m hosted_fix cache_safe
+```
+
+Built in the same WSL tree, at the same IDF commit (`v5.5.5-832-g2553c5ad432`); the earlier output
+kept as `out.hosted_fix_2026-09`. **Compared with the installed #49 sdkconfig, exactly four lines
+differ** - `LCD_DSI_ISR_CACHE_SAFE`, `LCD_DSI_ISR_IRAM_SAFE`, `DW_GDMA_ISR_IRAM_SAFE`,
+`DW_GDMA_OBJ_DRAM_SAFE`, all now `y` - and the #49 settings, the variant (`REV_LESS_V3`, `REV_MIN_1`)
+and the 256 KB L2 are unchanged. Our frame callback (`Fleet_Display.cpp`, `onFrameComplete`) is
+`IRAM_ATTR` and touches only the display object in internal RAM, which a cache-safe interrupt
+requires. Install as in step 6, keeping the #49 folder as `esp32p4_es.hosted_fix` (and the stock one
+where it is); then clear `.pio/build_cache`. Test: `/panel?flash=8&kb=256` while watching the panel.
+
 ## The alternative, and why it is not the first choice
 
 `framework = arduino, espidf` — Arduino as an ESP-IDF component — compiles IDF from source with a

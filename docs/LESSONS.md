@@ -570,6 +570,8 @@ in PSRAM, on purpose (`HttpServer.cpp`, `task_caps`), so the first flash-write t
 handler, rebooted WS_P4_5 twice - an NVS write as surely as an erase. **Anything that writes flash
 runs on a task made with `xTaskCreate()`** (its stack in internal RAM): the settings save, any
 handler that saves, the `/panel?flash=` test. The loop task is fine, which is why Pause never hit it.
+**Reading LittleFS counts too** - a directory listing in a `/settings` handler rebooted the board
+the same way the same night. A handler serves what such a task left in RAM.
 
 Also learnt the same night, for whoever chases a panel glitch next: the P4's DSI bridge latches an
 underrun (`MIPI_DSI_BRIDGE.int_raw`), ESP-IDF enables its own interrupt for it and prints "underrun
