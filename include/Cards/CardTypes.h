@@ -232,6 +232,15 @@ enum class GroupOn : uint8_t {
     GROUP_ON_ALL,       // on only when every member is on
 };
 
+// Which of a light's scenes its window offers (owner, 2026-10-07): the ones
+// not hidden in HA's own UI (its entity registry's hidden_by), all of them,
+// or none. A card setting, kept in RAM until saving arrives (2.10d).
+enum class SceneShow : uint8_t {
+    SCENES_VISIBLE = 0,   // the default
+    SCENES_ALL,
+    SCENES_OFF,
+};
+
 // What the line under a state card's hero says. Milestone 2.7.
 //
 // The owner, 2026-09-22: state is the icon and the colour, and the NAME is what

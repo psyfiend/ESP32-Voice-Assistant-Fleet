@@ -6,6 +6,27 @@ signed-off merges to `main` in the order they happen - it does not follow milest
 began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
+## v0.2.10 - 2026-10-07
+
+- **2.10c, Home Assistant's lights get the controls (#65)**: an HA light's levels (brightness,
+  colour temperature, hue) are read from its attributes and set with `light.turn_on` and its data;
+  a refused call is FAILED at once and says why. A group defined in HA or Hue (`light.office`) has
+  its members learnt and gets the Members view, commanded as itself unless a member is paused; a
+  group is paused exactly when all its members are. A light's scenes are learnt from HA (hidden ones
+  hidden, a card setting Visible / All / Off) and shown in a Scenes view under the chart.
+- **The window, redesigned over nine rounds** (`docs/archive/TEST_2.10c.md`): corner chips as tabs with
+  hard-linked back navigation and a title that links up (and gives way on narrow windows); a control
+  deck after HTC's TouchFLO 3D - a selector that slides and snaps, in four hand-drawn metal looks
+  that follow the scheme; unlit chips as soft dents; the slider keeps its place in Scenes and Color;
+  a SETTINGS panel as wide as its rows with dropdowns and a checkbox, and a CHART panel (a demo)
+  beside it on History; US spelling on screen.
+- **Measured and fixed**: the panels' slides on the P4_5 (35-105 ms frames to 8-40), the 1060's deck
+  moving a pixel on Color, faces drawn flat once a cache filled.
+- **`GET /panel?resend=1`** on DSI boards: the panel's init sequence again, for the 4B's
+  intermittent washed-out picture. Reading from a DSI panel that shows a picture blanks it (LESSONS).
+- Signed off by the owner on WS_P4_5, WS_P4_4B and CYD_P4_1060, also seen on WS_P4_7B and
+  CYD_P4_4880 (the window in portrait for the first time); all nine environments build.
+
 ## v0.2.9 - 2026-10-06
 
 - **2.10b, the light controls (#65)**: a light's window opens on a tall slider - brightness, colour

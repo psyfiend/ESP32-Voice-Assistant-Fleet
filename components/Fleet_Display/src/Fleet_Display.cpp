@@ -17,6 +17,7 @@
 #if defined(HAS_MIPI_PANEL)
 #include "fleet_dsi_panel.h"
 #include "esp_lcd_mipi_dsi.h"
+#include "esp_lcd_panel_io.h"
 #elif defined(HAS_RGB_PANEL)
 #include "fleet_rgb_panel.h"
 #include "esp_lcd_panel_rgb.h"
@@ -259,7 +260,7 @@ bool Fleet_Display::begin() {
     static_assert(sizeof(fleet_dsi_init_cmd_t) == sizeof(lcd_init_cmd_t),
                   "BSP init commands and fleet_dsi_init_cmd_t must share a layout");
 
-    err = fleet_dsi_panel_new(&cfg, &drv, &_panel, _fb);
+    err = fleet_dsi_panel_new(&cfg, &drv, &_panel, &_io, _fb);
     if (err != ESP_OK) {
         Serial.printf("[Fleet_Display] Panel bring-up failed: %s\n", esp_err_to_name(err));
         return false;
@@ -323,6 +324,21 @@ bool Fleet_Display::present(uint8_t i) {
     const esp_err_t err = esp_lcd_panel_draw_bitmap(_panel, 0, 0, _w, _h, _fb[i]);
     _submitted = i;
     return err == ESP_OK;
+}
+
+int Fleet_Display::resendPanelInit() {
+#if defined(HAS_MIPI_PANEL)
+    const lcd_init_cmd_t *cmds = bsp_display.INIT_CMDS_DSI;
+    const size_t n = bsp_display.INIT_CMDS_SIZE;
+    if (!_io || !cmds || !n) return -1;
+    for (size_t i = 0; i < n; i++) {
+        if (esp_lcd_panel_io_tx_param(_io, cmds[i].cmd, cmds[i].data, cmds[i].data_bytes) != ESP_OK) return -1;
+        if (cmds[i].delay_ms) vTaskDelay(pdMS_TO_TICKS(cmds[i].delay_ms));
+    }
+    return (int)n;
+#else
+    return -1;
+#endif
 }
 
 void Fleet_Display::initBacklightPWM() {

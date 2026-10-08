@@ -13,6 +13,25 @@ replaced the same morning by the owner's brain dump, with HA's own dialogs as th
 pages, one-deep back); `cards.md`. Open decisions are marked **D1..D7** and collected in §10, each
 with a recommendation.
 
+### Words for the window's parts (owner, 2026-10-07)
+
+| Word | Means |
+|---|---|
+| **window** | the popup a long press opens |
+| **title** | the text at the top centre: what the window or view is ("Desk"), with the view it came from in front ("Desk > Members") - the **breadcrumbs**; its first part is a link up |
+| **chips** | the round navigation buttons in the corners: X, back, chart, members, clapperboard |
+| **hero** | the view's main content: on the controls, the slider (or toggle) with its label, value and swatches; on Members, the list |
+| **control deck** | the bar of **switches** under or beside the hero - Power \| Brightness, Temperature, Colour. It says which modes the light supports and which one the slider is set to |
+| **switch** | one of the control deck's options |
+| **selector** | how the chosen switch is shown - a metal face over the chosen switch, its icon in the accent |
+| **SETTINGS panel** | the folder-tab panel that rises from the bottom of the screen, in the right half |
+| **CHART panel** | its neighbour in the left half, up only while History shows (a demo for now) |
+
+Older sections and the code say "deck" for the SETTINGS panel (`s.deck`, `deckFill()`, "The settings
+deck") and "chips" for its choice buttons (`deckChip()`); from 2.10c, "deck" in conversation means the
+control deck. The code's `s.hero` is the slider or toggle alone. Code names change when the code is
+next reworked, not before.
+
 ---
 
 ## 1. Presentation: a centred window over a dimmed page (owner's instinct, agreed)
@@ -452,7 +471,10 @@ the union. **The group card fills to that mean brightness** (one at 100%, one at
 only it has leaves the selector, even when every member is paused), not commanded. The group is
 PAUSED only when every member is - a fully paused group keeps its greyed slider and offers only
 Power; its status line says "1 paused" otherwise; Members lists the member, reading "Paused". The
-card follows the same rule (`Card::counts()`). A paused window: controls greyed, a PAUSED pill
+card follows the same rule (`Card::counts()`). For a group defined at the source the registry
+keeps the group's own pause in step with its members both ways (2.10c round 9, K32): pausing every
+member pauses the group, and resuming any member resumes it - before that, a group paused from
+its own window stayed PAUSED after each member was resumed from its own. A paused window: controls greyed, a PAUSED pill
 beside the label, a touch on a control explains itself. **Paused in the deck is a switch** ("Off /
 On" read two ways).
 
@@ -471,3 +493,162 @@ P4** (owner, 2026-10-06, #88): internal heap free 233 -> 361 KB, a window's bigg
 attributes - 2.10c; saving a swatch with a long press needs the settings store - 2.10d; covering the
 system header - 2.10e. The sensor hero's disc grows with the window around a fixed-size icon face,
 so on a 7" it is large for its glyph (a bigger face costs flash).
+
+## 16. 2.10c - Home Assistant's lights, as built (signed off 2026-10-07, `archive/TEST_2.10c.md`)
+
+Measured before building: `ha-websocket.md` section 9. Decisions: `DECISIONS.md` C5, K12, K15, K17.
+
+**Step 1 - levels.** An HA light reports what it can do (`supported_color_modes`, folded into the
+four capability bits of section 15), what it is showing (`color_mode`) and its levels; one reader
+(`HaValue.h`) serves the boot fetch and the live feed. So an HA light gets exactly the window a
+virtual lamp of the same kind gets, and a light HA reports as on/off only - or a `switch.*` - keeps
+the big toggle. Commands are `light.turn_on` with `brightness` (0-255), `color_temp_kelvin` or
+`hs_color`; confirmed by the light's own report as before. HA's reply to the call is read: a
+refusal (`success: false`, which means HA sent nothing) shows FAILED at once instead of after 3 s.
+On the owner's Hue bulbs a colour confirms on the first report, then the bridge may correct it to
+what the bulb can really make (blue 240 -> 255) about 1.4 s later, and the window follows.
+
+**Step 2 - groups defined in HA or Hue (K17).** `light.office` is one entity to HA. Its `entity_id`
+attribute names its bulbs; the registry LEARNS them - registers each as an entity of its own while
+the board runs (id `ha_light_office_lamp`, name from its own `friendly_name`), subscribes and
+fetches it. So Desk's window has the members icon, Members lists the three bulbs, and a tap opens
+one bulb's own controls - exactly as All Lamps does with Lamp 4, which has no card either.
+
+- **With no member paused, the window and the card stand for the group itself**: HA's own report
+  is shown, and a command goes to `light.office` once, so the Hue bridge changes the bulbs together.
+- **While any member is paused, they stand for the members** (section 15's rule, K14): the paused
+  bulb is out - not shown in the mean, not commanded - and the others are commanded one by one
+  (they may change a moment apart). The card does the same (`Card::liveEntities()`).
+- **Pausing Desk itself pauses the group and every member**; resuming resumes them all.
+- **"On when: any / all" is not offered** for such a group: HA or Hue decides when it is on.
+- A member's pause is saved like any other and applied once the member is learnt after a reboot.
+- Adding a member as a card of its own: later (owner) - it needs a place on the page (#78) and
+  saving (2.10d).
+
+**Step 3 - scenes (K15, K19).** A light's scenes are HA's scene entities on the light's own device -
+for a Hue room, the scenes made in the Hue app - found by one `render_template` per session
+(`ha-websocket.md` section 7a's pattern, cancelled once answered) and learnt like members, each a
+BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept in HA's own
+`scenes.yaml` belong to no device and are not offered.
+
+- **Scenes is a view of its own** (owner, after round 3 - it was first built as a fifth selector
+  button, and the off-centre selector looked awkward). Its icon (`mdi:movie-open`, a clapperboard,
+  already in the icon faces; HA's own scene icon, the palette, is Colour's here) sits **under the
+  chart** in the window's corner, on the light's controls and its scenes only, and only for a light
+  with scenes - not while the window works through a group's members, as a scene would reach the
+  paused one.
+- **The brightness slider stays where it is; the scene buttons take the column** - the label, the
+  value and the selector give way. Sized as a share of the window (9 "P4_5 millimetres", never under
+  the swatches' 6.5 mm), three rows in the slider's height; when there are more, half a fourth row
+  shows so it is plain there is more to scroll to. Centred, sorted by name.
+- **A tap loads the scene** (`scene.turn_on`) and rings that button. The ring means "as the scene
+  left it", so it goes with any command from the window, with a change from elsewhere once the
+  scene has held still for 3 s (its own fade reports come within ~1.5 s), and with the window. HA
+  records only when a scene was last activated, so no scene is ever shown as on. A refusal by HA
+  marks it FAILED.
+- A stacked layout for windows too narrow for a fifth selector button was built for the 4B and
+  removed with the button.
+- **The control deck under the hero where the window has the height** (owner, 2026-10-07, K23): the
+  4B and the 7" panels; the P4_5, the one board too short (its screen is the widest shape), keeps it
+  beside the slider. Worked out from the window's height. The slider, its words and the deck are
+  centred. ~~Scenes - and Colour under a tall window - push the slider to the stage's left edge~~
+  (see "The slider's place", below, K26). The control deck never moves - in Scenes, where there is
+  no deck, its room is kept so the slider stays at the same height.
+- **The control deck after HTC's TouchFLO 3D** (owner, 2026-10-07, K24): a **ribbon** three quarters
+  of a switch tall, and on it the **selector**, as tall as the deck, carrying the chosen switch's icon
+  a size up (the LG icon face) in the accent. The selector can be grabbed and slid: its icon becomes
+  a neighbour's once it is more than halfway over it, and on release it snaps to the nearest switch,
+  which is chosen. A tap on a switch glides it there (140 ms); the view is rebuilt after the glide.
+  Power is an action, never selected: it has **a short ribbon of its own, with a break before the
+  modes' ribbon** (no divider line). **The selector is metal** (owner: the plain dark one "looks like
+  a void"): a two-tone face with a sharp step a little below the middle - a polished bevel, from
+  LVGL's two-stop gradient - and a fine lighter edge; gunmetal on the dark schemes, silver on Linen;
+  rounded squares by default. Icons in the text colour, the chosen one in the accent. **Lit corner
+  chips take the same metal.** Looks to compare on glass from a debug-only SETTINGS row, "Deck look":
+  square / round, gunmetal / silver.
+- **The SETTINGS panel, reworked** (owner, 2026-10-07, K25): one list of rows (`deckSpecs()`) gives
+  both its size and its contents. **As wide as its longest row**, its right edge on the window's,
+  never narrower than its tab (within a curve's width of the tab it is the tab's width, one straight
+  edge, no inner curve). **Never taller than the window**: open, the tab's top stops at the window's
+  top; more rows scroll. **Dropdowns** for choices, **a checkbox** for Paused. Rows: Paused; Active
+  state (Any / All members are on - groups defined here only); Label (Default / From HA / State /
+  Custom / None); Visibility (Show on dashboard / only in group / only as member / Hidden); Tap action
+  (Toggle / Details / Members / History view / Cycle scenes / Nothing); Scenes (Visible scenes only /
+  Show all / Disabled); and in debug builds, Deck look. Label, Visibility and Tap action are shown
+  greyed until saving (2.10d); Custom name joins when Label can be Custom.
+- ~~**Scenes and Colour (wide): the slider and the buttons or swatches are one group**, centred~~
+  (superseded in round 7 by the slider's place, below). Scenes are **a stack**: one column of
+  buttons as wide as the longest name, a second column only when one is full, then scrolling.
+  Not yet: switching the control live while dragging (to be measured first), and the inverted-icon
+  variant.
+- **The slider's place** (owner, round 7, K26 - `placeWide()`): in Scenes, and Color under a tall
+  window, the slider stays exactly where the controls put it and the buttons or swatches sit just to
+  its right, centred top to bottom in its height. Only what does not fit moves anything, and only as
+  far as it must: wider than the room (more scene columns), the slider goes left by the difference;
+  running under the clapperboard chip, the content first drops to the bottom of the slider's height,
+  then the slider goes left until it clears; and when neither is enough (the 4B's seven scenes: their
+  rows fill the height, and two columns do not fit beside the chip even with the slider at the
+  edge), the scenes take the columns that fit beside the chip and scroll. The row is moved with
+  `translate_x`, so taps land where it is drawn.
+- **Four looks, hand-drawn faces** (owner, round 6-7, K27): Black - Square, Black - Round, Silver -
+  Square, Silver - Round, all kept; unchosen, Black - Square on Midnight and Fleet, Silver - Round on
+  Linen (round 9). **Chosen per scheme** (K31, SETTINGS' "Selector" row, in every build): a choice
+  holds for the scheme it was made in, so a Linen page and a Fleet page each keep their own. LVGL's gradient has two stops and runs straight, and the owner asked for the line between
+  the selector's light and dark halves to **curve up in the middle** (in the upper two fifths, a
+  raised look) and for unlit chips to be **soft dents**, so the faces are ARGB8888 images painted per
+  pixel (`paintFace()`): the curved line, faint brushed row streaks, a fine edge, corners
+  anti-aliased in the alpha; a dent is shaded at the top, gone by the middle, a whisper of light at
+  the bottom, in the window's colour, no border. Painted the first time a size is needed and kept in
+  PSRAM (12 slots, ~40-55 KB each on the P4_5), **taken back when full** (round 9): a slot painted in
+  another scheme's colours first, else the one asked for longest ago by an earlier window - never
+  one the open window may be showing. (Never giving them back filled the cache after a few swipes
+  between pages of different schemes, and faces came out flat.) **Dithered to the 16-bit grid** (4x4 ordered): a
+  smooth grey ramp truncated to RGB565 banded pink and green, because green steps twice as finely as
+  red and blue. The selector's icon is scaled 1.4x (the largest icon face is not big enough); lit
+  chips use the next face up. Pressed chips tint.
+- **CHART, a second panel** (owner, rounds 7-8, K28 - a demo): **SETTINGS' mirror image**, both
+  made by one builder (`buildFolder()`): its tab in the left half, a millimetre short of SETTINGS'
+  tab, its pane growing rightwards from the window's left edge, the inner curve on the tab's right.
+  Five demo rows (time range, chart style, shading, min/max, compare) that work as controls and
+  change nothing, so the pane is wider than its tab on every board. It peeks up when History shows
+  and slides down when the window goes to another view. Opening either panel brings it to the front
+  and folds the other; a tap in the window folds whichever is open. It leaves with the window as
+  SETTINGS does: folded, its tab slides down on its own; open, it goes at once. Both open and fold
+  in 260 ms (from 220 - round 7 found them choppier now that SETTINGS opens further; the page deck's
+  panels take 300). **Each panel's holder is only as wide as its tab and pane** (round 9, measured on
+  the P4_5): a window-wide transparent holder made every frame of a slide redraw the cards and the
+  window under it - 35-105 ms a frame; now 8-40.
+- **The stacked control deck is centred against the stage itself** (L5, measured on the 1060): a
+  content-sized holder was centred inside a flex "track" as wide as the widest child, itself
+  centred in the stage, and Color's wider row moved the deck by a pixel of rounding. Its holder is
+  now the stage's full width.
+- **The title gives way in steps** (owner, round 7, K29): centred when "Area > Name" fits between
+  ends of equal width; else it takes the room beside the X (a window with two chips on the right has
+  a chip's width spare on the left), left of centre; else the name alone - the back arrow still goes
+  up. Sized before the view is built: a DOT label laid out at the last view's width rewrites its own
+  text ("Sce..."), and measuring that kept it.
+- **No word over the swatches**: Color shows only the swatches (and the PAUSED pill when paused).
+  Text on the panels is US English (K30).
+- **Scenes hidden in HA's UI are hidden here too** (owner, 2026-10-07, K21): the scene query asks HA's
+  `is_hidden_entity` per scene (the entity registry's `hidden_by`). A card setting in SETTINGS,
+  "Scenes: Visible / All / Off", Visible by default; live, in RAM until 2.10d. Office: Bright,
+  Concentrate and Relax visible, four hidden.
+
+**The corner icons are tabs (owner, after round 3).** History (the chart), Members and Scenes are
+views of their own; their icons stay on every view they belong to, the one showing is lit (as a
+chosen selector button is), and a tap on a lit one goes back to the controls. Members on the
+window's own views; Scenes on the light's controls and scenes; the chart everywhere - **the group's
+from the group's views, a member's from that member's own** ("Office lamp > History").
+
+**Back is hard-linked, not a history** (owner, round 4 - the first build had only the X, and the
+way back to the controls was to close and reopen). The X is on the controls only; every other view
+has the back arrow, and it always goes to the same place: History, Members, Scenes -> the controls;
+a member -> Members; a member's History -> that member. **The title's first part is a link up**:
+"Desk >" goes to Desk's controls from any view below it, "Office lamp >" to the bulb's. **Members'
+rows** are as wide as the controls view's slider and words together, and centred both ways (rounds
+2 and 4).
+
+**When a command fails, the board records why** (round 2, G8 - Desk said FAILED once, not
+reproduced): no matching report in 3 s, with what was asked and what the light last said, or HA's
+refusal and its message. The last four are logged and listed by `/popup?view=3`. A refusal of an
+earlier call while a newer one is in flight (a drag) no longer fails the newer one.

@@ -65,6 +65,7 @@ private:
 
     uint8_t  _cursor  = 0;      // index into the registry
     bool     _done    = true;   // nothing to do until restart()
+    bool     _started = false;  // a pass has begun: entities learnt later are fetched too
     uint32_t _nextAtMs = 0;     // small gap between requests
 
     uint16_t _fetched = 0;

@@ -22,8 +22,8 @@ void HaProvider::begin(EntityRegistry *reg, HaClient *ha, HaRest *rest) {
 // Subscription - loop task
 // ---------------------------------------------------------------------------
 
-bool HaProvider::sendSubscribe() {
-    if (!_reg || !_ha) return false;
+int HaProvider::sendSubscribe(uint8_t from, uint8_t to) {
+    if (!_reg || !_ha) return -1;
 
     // Built from the REGISTRY, not from a list, so an entity added anywhere
     // gets subscribed without touching this file.
@@ -41,7 +41,7 @@ bool HaProvider::sendSubscribe() {
                      (unsigned long)id);
 
     uint8_t named = 0;
-    for (uint8_t i = 0; i < _reg->count(); i++) {
+    for (uint8_t i = from; i < to; i++) {
         const Entity *e = _reg->at(i);
         if (!e) continue;
         if (e->desc.source != EntitySource::HA) continue;
@@ -57,7 +57,7 @@ bool HaProvider::sendSubscribe() {
             Serial.printf("[HaProv] subscription frame full at %u entities; "
                           "raise the buffer or split the request.\n",
                           (unsigned)named);
-            return false;
+            return -1;
         }
         n += add;
         named++;
@@ -65,22 +65,119 @@ bool HaProvider::sendSubscribe() {
 
     if (named == 0) {
         DBG_HAP("no HA-sourced entities registered; nothing to subscribe to\n");
-        return false;
+        return 0;
     }
 
     int tail = snprintf(frame + n, sizeof(frame) - n, "]}}");
-    if (tail < 0 || n + tail >= (int)sizeof(frame)) return false;
+    if (tail < 0 || n + tail >= (int)sizeof(frame)) return -1;
     n += tail;
 
-    if (!_ha->sendText(frame, n)) return false;
+    if (!_ha->sendText(frame, n)) return -1;
 
     // Remembered so the reply can be matched. Cleared when it arrives.
     _pendingSubId = id;
     _subAccepted  = false;
 
-    Serial.printf("[HaProv] subscribe_trigger id %lu for %u entities (%d B)\n",
+    Serial.printf("[HaProv] subscribe_trigger id %lu for %u entities (%d B)%s\n",
+                  (unsigned long)id, (unsigned)named, n, from ? ", learnt since" : "");
+    return named;
+}
+
+bool HaProvider::sendSceneQuery() {
+    if (!_reg || !_ha) return false;
+
+    // The lights we were given (not learnt members - a single bulb's device
+    // carries no scenes). Single quotes inside, so the JSON needs no escapes.
+    static char frame[1536];
+    const uint32_t id = _ha->nextId();
+    int n = snprintf(frame, sizeof(frame),
+                     "{\"id\":%lu,\"type\":\"render_template\",\"template\":\"{%% for l in [",
+                     (unsigned long)id);
+    uint8_t named = 0;
+    for (uint8_t i = 0; i < _reg->count(); i++) {
+        const Entity *e = _reg->at(i);
+        if (!e || e->learnt || e->desc.source != EntitySource::HA) continue;
+        if (strncmp(e->desc.externalRef, "light.", 6) != 0) continue;
+        const int add = snprintf(frame + n, sizeof(frame) - n, "%s'%s'", named ? "," : "",
+                                 e->desc.externalRef);
+        if (add < 0 || n + add >= (int)sizeof(frame) - 400) {
+            Serial.printf("[HaProv] scene query frame full at %u lights\n", (unsigned)named);
+            break;
+        }
+        n += add;
+        named++;
+    }
+    if (!named) return true;   // no lights, no scenes: done for this session
+
+    // Measured from the PC, 2026-10-06: 367 characters of template, 300 bytes
+    // back for light.office's seven Hue scenes, sorted by name. The last field
+    // says whether the owner hid the scene in HA's UI (is_hidden_entity, HA's
+    // own test of the entity registry's hidden_by - checked 2026-10-07: four
+    // of Office's seven are hidden).
+    const int tail = snprintf(frame + n, sizeof(frame) - n,
+        "] %%}{%% set d = device_id(l) %%}{%% if d %%}"
+        "{%% for s in device_entities(d) | sort if s.startswith('scene.') %%}"
+        "{{ l }}>{{ s }}>{{ state_attr(s,'name') or state_attr(s,'friendly_name') }}>"
+        "{{ 'H' if is_hidden_entity(s) else 'V' }}|"
+        "{%% endfor %%}{%% endif %%}{%% endfor %%}\"}");
+    if (tail < 0 || n + tail >= (int)sizeof(frame)) return false;
+    n += tail;
+
+    _tplDone.store(false);
+    _tplId.store(id);
+    if (!_ha->sendText(frame, n)) { _tplId.store(0); return false; }
+    Serial.printf("[HaProv] render_template id %lu: the scenes of %u lights (%d B)\n",
                   (unsigned long)id, (unsigned)named, n);
     return true;
+}
+
+// "light.office>scene.office_bright>Bright>V|light.office>scene...>H|".
+// Grouped by light, as the template writes them; each group is learnt in one
+// call. The last field: V visible, H hidden in HA's UI.
+void HaProvider::parseScenes(const char *result) {
+    static char buf[2048];   // websocket task only
+    snprintf(buf, sizeof(buf), "%s", result ? result : "");
+
+    const char *refs[ENTITY_SCENES_MAX], *names[ENTITY_SCENES_MAX];
+    bool hidden[ENTITY_SCENES_MAX];
+    uint8_t n = 0, lights = 0, scenes = 0, nHidden = 0;
+    const char *light = nullptr;
+
+    auto flush = [&]() {
+        if (!light || !n) return;
+        for (uint8_t i = 0; i < _reg->count(); i++) {
+            const Entity *e = _reg->at(i);
+            if (!e || e->desc.source != EntitySource::HA) continue;
+            if (strcmp(e->desc.externalRef, light) != 0) continue;
+            _reg->learnScenes(e->desc.id, refs, names, hidden, n);
+            lights++;
+            scenes += n;
+            break;
+        }
+        n = 0;
+    };
+
+    char *save = nullptr;
+    for (char *tok = strtok_r(buf, "|", &save); tok; tok = strtok_r(nullptr, "|", &save)) {
+        char *a = strchr(tok, '>');
+        char *b = a ? strchr(a + 1, '>') : nullptr;
+        if (!a || !b) continue;
+        char *c = strchr(b + 1, '>');   // absent from an older template: visible
+        *a = '\0';
+        *b = '\0';
+        if (c) *c = '\0';
+        if (!light || strcmp(light, tok) != 0) { flush(); light = tok; }
+        if (n < ENTITY_SCENES_MAX) {
+            refs[n] = a + 1;
+            names[n] = b + 1;
+            hidden[n] = c && c[1] == 'H';
+            if (hidden[n]) nHidden++;
+            n++;
+        }
+    }
+    flush();
+    Serial.printf("[HaProv] scenes: %u for %u lights, %u hidden in HA\n",
+                  (unsigned)scenes, (unsigned)lights, (unsigned)nHidden);
 }
 
 void HaProvider::loop(uint32_t nowMs) {
@@ -96,10 +193,41 @@ void HaProvider::loop(uint32_t nowMs) {
     // both happen between two loop() calls would be invisible to a boolean.
     if (!_ha->isReady() || session == 0) return;
 
-    if (_subscribedForSession == session) return;
+    if (_subscribedForSession == session) {
+        // ENTITIES LEARNT SINCE (2.10c): the members of a group, registered
+        // when it reported. A second subscribe_trigger for just them - HA keeps
+        // both - and HaRest fetches their values on its own, since it walks
+        // the table to its end whenever the table has grown.
+        const uint8_t count = _reg->count();
+        if (count > _subscribedCount) {
+            if (sendSubscribe(_subscribedCount, count) < 0) return;   // retried next loop
+            _subscribedCount = count;
+        }
+        // A pause saved for a member could not be applied at boot: it did not
+        // exist yet.
+        if (_reg->takeLearnt()) _reg->restorePaused();
 
-    if (!sendSubscribe()) return;
+        // The lights' scenes, once per session; then cancel the template,
+        // which would otherwise go on re-rendering.
+        if (_scenesForSession != session && sendSceneQuery()) _scenesForSession = session;
+        const uint32_t tpl = _tplId.load();
+        if (tpl && _tplDone.exchange(false)) {
+            char frame[96];
+            const int n = snprintf(frame, sizeof(frame),
+                                   "{\"id\":%lu,\"type\":\"unsubscribe_events\",\"subscription\":%lu}",
+                                   (unsigned long)_ha->nextId(), (unsigned long)tpl);
+            _ha->sendText(frame, n);
+            _tplId.store(0);
+        }
+        return;
+    }
+
+    const uint8_t count = _reg->count();
+    if (sendSubscribe(0, count) <= 0) return;
     _subscribedForSession = session;
+    _subscribedCount      = count;
+    _tplId.store(0);   // a template from the last session died with it
+    _tplDone.store(false);
 
     // Subscribing and re-fetching are ONE event, so they happen in one place.
     //
@@ -138,9 +266,13 @@ void HaProvider::handle(const char *json, size_t len) {
                               .to<JsonObject>()["to_state"].to<JsonObject>();
         ts["entity_id"]               = true;
         ts["state"]                   = true;
-        // icon, brightness, rgb_color. One helper shared with HaRest, so the
-        // two readers cannot disagree about what is kept - see HaValue.h.
-        haAttrFilter(ts["attributes"].to<JsonObject>());
+        // A light's attributes, and a group's members. Helpers shared with
+        // HaRest, so the two readers cannot disagree about what is kept - see
+        // HaValue.h. One object: to<JsonObject>() would clear it a second time.
+        JsonObject attrs = ts["attributes"].to<JsonObject>();
+        haAttrFilter(attrs);
+        haEntityFilter(attrs);
+        filter["event"]["result"]     = true;   // a template's answer (2.10c)
         filter["type"]                = true;
         // Needed to read the subscription's own reply. Without these three the
         // filtered parse drops them and every result looks like success=false.
@@ -186,11 +318,29 @@ void HaProvider::handle(const char *json, size_t len) {
                 Serial.printf("[HaProv] HA REFUSED the subscription (id %lu): %s - %s\n",
                               (unsigned long)rid, code, msg);
             }
+        } else if (rid != 0 && rid == _tplId.load()) {
+            if (!(doc["success"] | false)) {
+                Serial.printf("[HaProv] HA REFUSED the scene query: %s - %s\n",
+                              doc["error"]["code"] | "?", doc["error"]["message"] | "");
+                _tplId.store(0);
+            }
+        } else if (rid != 0 && _resultFn) {
+            const bool ok = doc["success"] | false;
+            _resultFn(rid, ok, ok ? "" : (doc["error"]["code"] | "?"),
+                      ok ? "" : (doc["error"]["message"] | ""), _resultCtx);
         }
         return;
     }
 
     if (strcmp(type, "event") != 0) return;
+
+    // The scene query's answer: learnt here, unsubscribed by loop().
+    const uint32_t tpl = _tplId.load();
+    if (tpl && (doc["id"] | 0UL) == tpl) {
+        if (!_tplDone.load()) parseScenes(doc["event"]["result"] | "");
+        _tplDone.store(true);
+        return;
+    }
 
     JsonVariantConst to = doc["event"]["variables"]["trigger"]["to_state"];
     if (to.isNull()) return;
@@ -251,6 +401,9 @@ void HaProvider::handle(const char *json, size_t len) {
     EntityAttrs attrs;
     haReadAttrs(to["attributes"], attrs);
     _reg->setAttrs(match->desc.id, attrs);
+    // A learnt member's name; a group's members (2.10c). Anything learnt here
+    // is subscribed to by loop(), on the loop task.
+    haLearn(*_reg, *match, to["attributes"]);
 
     EntityValue v;
     if (!haCoerceState(match->desc, state, v)) {

@@ -120,6 +120,10 @@ public:
     Card &setGroupOn(GroupOn g);
     GroupOn groupOn() const { return _groupOn; }
 
+    // Which scenes the card's window offers (2.10c). See SceneShow.
+    Card &setSceneShow(SceneShow v) { _sceneShow = v; return *this; }
+    SceneShow sceneShow() const { return _sceneShow; }
+
     // Is this card ON, by its GroupOn rule? Counts the bound primaries that
     // are on - a bool that is true, or a number that is not zero.
     bool groupIsOn() const;
@@ -129,6 +133,16 @@ public:
     // not off, not commanded - unless every member is paused (2.10b).
     bool counts(const Entity *e) const;
     uint8_t liveCount() const;   // the members that count
+
+    // WHAT THE CARD STANDS FOR NOW (2.10c, DECISIONS K14 / K17): its
+    // primaries - except that a group defined at the source (light.office,
+    // whose members the registry learnt) is replaced by its members while ANY
+    // of them is paused, so the paused one is out of it exactly as in a group
+    // defined here. With none paused the group's own report is used and a
+    // command goes to the group itself, which keeps its bulbs in step. Every
+    // "for each member" in the card asks this, never the primaries.
+    static constexpr uint8_t CARD_LIVE_MAX = 16;
+    uint8_t liveEntities(const Entity **out) const;
 
     // The resolved variant - never VAR_AUTO. Valid after build().
     CardVariant variant() const { return _resolved; }
@@ -319,6 +333,8 @@ protected:
     // entities can tell afterwards WHICH of them refused. That distinction is
     // the whole of the owner's partial-failure rule.
     bool command(uint8_t slot, const EntityValue &v);
+    // The same for one of liveEntities() - a learnt member has no slot.
+    bool commandEntity(const Entity *e, const EntityValue &v);
 
     // The card surface, for a subclass that tints its whole body - which
     // cards.md section 4 requires of a light ("reflects state across its whole
@@ -501,6 +517,7 @@ private:
     TempUnit        _tempUnit    = TempUnit::TEMP_INHERIT;
     CardLabel       _labelMode   = CardLabel::LBL_INHERIT;
     GroupOn         _groupOn     = GroupOn::GROUP_ON_ANY;
+    SceneShow       _sceneShow   = SceneShow::SCENES_VISIBLE;
     // NO _paused HERE. Issue #60 moved it onto Entity, because pausing is a
     // property of the thing and not of the view - the same reasoning that put
     // cmdFailed on the entity. Two cards on one switch used to be able to

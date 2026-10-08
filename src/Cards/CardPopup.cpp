@@ -7,6 +7,8 @@
 #include "src/core/lv_obj_event_private.h"   // lv_hit_test_info_t: the tap catcher's hit test
 #include "src/core/lv_obj_draw_private.h"    // lv_obj_get_ext_draw_size: the window's shadow
 #include <Arduino.h>
+#include "esp_heap_caps.h"   // the hand-drawn faces live in PSRAM
+#include "src/misc/cache/instance/lv_image_cache.h"   // lv_image_cache_drop(): not in lvgl.h
 #include <math.h>
 #include <stdarg.h>
 #include <string.h>
@@ -121,7 +123,10 @@ void dbgLater(const char *fmt, ...) {
 // Compound names, never a bare ALL-CAPS word - Arduino's pin-mode macros eat
 // those (CLAUDE.md, "Arduino's global macro namespace will eat your enum").
 // VIEW_MEMBER: one member's own controls, reached from VIEW_MEMBERS (2.10b).
-enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER };
+// VIEW_SCENES: the light's scenes beside its brightness slider (2.10c).
+// History, Members and Scenes are reached by the corner icons, which work as
+// tabs (owner, 2026-10-06): see "The corner icons".
+enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER, VIEW_SCENES };
 enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
@@ -156,14 +161,30 @@ constexpr uint32_t KNOB_SLIDE_MS   = 160;
 
 IntfMode s_intfMode = IntfMode::INTF_NOW_AND_THEN;
 
+// A window's entities: a card's primaries, or the members of a group defined
+// at the source (2.10c), whichever list is longer.
+constexpr uint8_t POPUP_ENT_MAX = (CARD_PRIMARY_MAX > ENTITY_MEMBERS_MAX) ? CARD_PRIMARY_MAX
+                                                                          : ENTITY_MEMBERS_MAX;
+
+// The hand-drawn faces (see "Faces drawn by hand", with the control deck).
+enum class FaceKind : uint8_t { FACE_BLACK, FACE_SILVER, FACE_DENT };
+lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t flat);
 struct Popup {
     PopupPhase phase = PopupPhase::PHASE_CLOSED;
     PopupView  view  = PopupView::VIEW_MAIN;
     bool       closeQueued = false;
 
     // Copied from the card at open - see "the window holds the entities".
-    const Entity   *ent[CARD_PRIMARY_MAX] = {nullptr};
+    const Entity   *ent[POPUP_ENT_MAX] = {nullptr};
     uint8_t         nEnt = 0;
+    // A GROUP DEFINED AT THE SOURCE (2.10c, DECISIONS K17): the card's one
+    // entity - light.office - whose members the registry learnt. With none of
+    // them paused, ent[] is the group itself: HA's report is shown and a
+    // command goes to the group, which keeps its bulbs in step. While any
+    // member is paused, ent[] holds the members (`expanded`) and the window
+    // works exactly as for All Lamps: the paused one is out (K14).
+    const Entity   *native = nullptr;
+    bool            expanded = false;
     EntityRegistry *reg  = nullptr;
     TempUnit        tempUnit = TempUnit::TEMP_INHERIT;
     char area[ENTITY_SHORT_MAX] = {0};
@@ -177,8 +198,11 @@ struct Popup {
     lv_obj_t *win = nullptr;
     lv_obj_t *btnLeft = nullptr, *lblLeft = nullptr;
     lv_obj_t *btnHistory = nullptr, *btnMembers = nullptr;
+    lv_obj_t *btnScenes = nullptr;   // under the chart, on the light's own views (2.10c)
     lv_obj_t *lblTitleArea = nullptr, *lblTitleName = nullptr;
-    int32_t   titleW = 0;      // what the two title labels may use together
+    int32_t   titleW = 0;      // what the two title labels may use together, centred
+    lv_obj_t *titleLeft = nullptr;   // the X's slot: as wide as the right one, so the title centres
+    int32_t   titleSlotW = 0, titleSlack = 0;   // its width, and the room in it beside the X
     lv_obj_t *stage = nullptr, *autoBar = nullptr;
 
     // The main view's widgets; null while another view is showing.
@@ -195,26 +219,37 @@ struct Popup {
 
     // A light's controls (2.10b): see "The light's controls".
     GroupOn   groupOn = GroupOn::GROUP_ON_ANY;   // copied from the card at open
+    SceneShow sceneShow = SceneShow::SCENES_VISIBLE;   // likewise (2.10c)
+    lv_obj_t *ddGroup = nullptr, *ddScenes = nullptr;   // SETTINGS' live dropdowns
     bool      builtPaused = false, rebuildQueued = false;   // "A paused window"
     uint8_t   builtCaps = 0;                     // what the selector was built for
     lv_obj_t *pill = nullptr;                    // PAUSED
     // A member's own controls, reached from Members (2.10b): the group's
     // entities are kept here while ent[] holds the one member.
-    const Entity *groupEnt[CARD_PRIMARY_MAX] = {nullptr};
+    const Entity *groupEnt[POPUP_ENT_MAX] = {nullptr};
     uint8_t   groupN = 0;
     bool      lightHero = false;
     uint8_t   lightCtl = 0;                      // LightCtl: which control the hero is
     lv_obj_t *fill = nullptr, *grip = nullptr, *mark = nullptr;
     lv_obj_t *btnCtl[4] = {nullptr, nullptr, nullptr, nullptr};   // power, dim, temp, colour
     lv_obj_t *swatch[8] = {nullptr};
+    // Scenes (2.10c): their buttons; the one loaded from this window (-1:
+    // none), when, and the light's levels once that scene had settled - see
+    // sceneRingCheck(); and the control the slider showed before Scenes.
+    lv_obj_t *sceneBtn[ENTITY_SCENES_MAX] = {nullptr};
+    int8_t    lastScene = -1;
+    uint32_t  sceneMs = 0;
+    uint32_t  sceneSettled = 0;   // a signature of the levels; 0 = not taken yet
+    uint8_t   ctlBeforeScenes = 0;
+    int32_t   mainRowW = 0;       // the main view's slider and words together (Members' width)
+    bool      stacked = false;    // the control deck under the hero (a tall window)
     bool      sliding = false;                   // a finger is on the slider
     int32_t   slideVal = 0, sentVal = -1;        // what it shows; what was last sent
     uint32_t  sentMs = 0;
 
     // The settings deck (pathway 1, card-sheet 11.1): see "The settings deck".
     lv_obj_t *deck = nullptr, *deckTab = nullptr, *deckTabLbl = nullptr, *deckPane = nullptr;
-    lv_obj_t *swPause = nullptr;                   // the Paused switch
-    lv_obj_t *chipGroup[2] = {nullptr, nullptr};   // Any, All
+    lv_obj_t *swPause = nullptr;                   // the Paused checkbox
     int32_t   deckH = 0, deckHead = 0;
     int32_t   deckHide = 0;   // how much of the pane stays below the screen when open
     uint8_t   deckState = 0;                       // DeckState
@@ -299,9 +334,21 @@ int32_t textW(const char *txt, const lv_font_t *f) {
     return sz.x;
 }
 
-// A round icon button at the minimum touch size: a visible disc in the card
-// surface colour, so it reads as a button and not a stray glyph (owner, H1),
-// a shade lighter while pressed.
+// Pressed feedback for a button whose face is an image: the face tinted
+// towards the text colour while a finger is on it.
+void facePressCb(lv_event_t *ev) {
+    lv_obj_t *b = (lv_obj_t *)lv_event_get_current_target(ev);
+    if (lv_obj_get_child_count(b) == 0) return;
+    lv_obj_t *img = lv_obj_get_child(b, 0);
+    if (!lv_obj_check_type(img, &lv_image_class)) return;
+    const bool down = lv_event_get_code(ev) == LV_EVENT_PRESSED;
+    lv_obj_set_style_image_recolor    (img, UI::c(UI::pal().TEXT), 0);
+    lv_obj_set_style_image_recolor_opa(img, down ? LV_OPA_20 : LV_OPA_TRANSP, 0);
+}
+
+// A round icon button at the minimum touch size: a soft dent in the card
+// surface (owner, round 6), so it reads as a button and not a stray glyph
+// (owner, H1), tinted while pressed.
 lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f,
                      lv_event_cb_t cb, lv_obj_t **outLabel = nullptr) {
     const UIPalette &p = UI::pal();
@@ -310,16 +357,51 @@ lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f,
     lv_obj_set_size  (b, sz, sz);
     lv_obj_add_flag  (b, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(b, UI::c(p.SURFACE), 0);
-    lv_obj_set_style_bg_opa  (b, LV_OPA_COVER,     0);
-    lv_obj_set_style_bg_color(b, UI::c(UI::mix(p.SURFACE, p.TEXT, 20)),
-                              UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
     lv_obj_t *l = makeLabel(b, f, p.TEXT);
     lv_label_set_text(l, glyph);
     lv_obj_center(l);
+    setFace(b, sz, sz, sz / 2, FaceKind::FACE_DENT, p.SURFACE);
+    lv_obj_add_event_cb(b, facePressCb, LV_EVENT_PRESSED,    nullptr);
+    lv_obj_add_event_cb(b, facePressCb, LV_EVENT_RELEASED,   nullptr);
+    lv_obj_add_event_cb(b, facePressCb, LV_EVENT_PRESS_LOST, nullptr);
     lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, nullptr);
     if (outLabel) *outLabel = l;
     return b;
+}
+
+// ---------------------------------------------------------------------------
+// The members of what the window stands for (2.10c): a group defined here -
+// the card's entities - or at the source - the members the registry learnt.
+// The Members view lists these, and a tap on one opens it.
+// ---------------------------------------------------------------------------
+uint8_t memberCount() { return s.native ? s.native->nMembers : s.nEnt; }
+
+const Entity *memberAt(uint8_t i) {
+    if (s.native) return s.reg ? s.reg->memberOf(*s.native, i) : nullptr;
+    return (i < s.nEnt) ? s.ent[i] : nullptr;
+}
+
+bool hasMembers() { return s.native ? s.native->nMembers > 0 : s.nEnt > 1; }
+
+// Should ent[] hold the members? While any is paused - and the group itself is
+// not, which is a group paused as a whole (Card::setPaused pauses both).
+bool nativeWantsMembers() {
+    if (!s.native || s.native->paused) return false;
+    for (uint8_t i = 0; i < s.native->nMembers; i++) {
+        const Entity *m = memberAt(i);
+        if (m && m->paused) return true;
+    }
+    return false;
+}
+
+void applyNative() {
+    if (!s.native) return;
+    s.expanded = nativeWantsMembers();
+    for (const Entity *&e : s.ent) e = nullptr;
+    s.nEnt = 0;
+    if (!s.expanded) { s.ent[s.nEnt++] = s.native; return; }
+    for (uint8_t i = 0; i < s.native->nMembers && s.nEnt < POPUP_ENT_MAX; i++)
+        if (const Entity *m = memberAt(i)) s.ent[s.nEnt++] = m;
 }
 
 // ---------------------------------------------------------------------------
@@ -427,8 +509,16 @@ LightAgg lightAggregate() {
 uint32_t signature() {
     uint32_t h = 2166136261u;
     auto mixIn = [&h](uint32_t v) { h = (h ^ v) * 16777619u; };
-    for (uint8_t i = 0; i < s.nEnt; i++) {
-        const Entity *e = s.ent[i];
+    // The entities shown, and - for a group defined at the source - its
+    // members, whose rows the Members view shows and whose pauses change what
+    // the window stands for (2.10c).
+    const Entity *all[2 * POPUP_ENT_MAX];
+    uint8_t nAll = 0;
+    for (uint8_t i = 0; i < s.nEnt; i++) all[nAll++] = s.ent[i];
+    if (s.native) for (uint8_t i = 0; i < s.native->nMembers && nAll < 2 * POPUP_ENT_MAX; i++)
+        all[nAll++] = memberAt(i);
+    for (uint8_t i = 0; i < nAll; i++) {
+        const Entity *e = all[i];
         if (!e) continue;
         mixIn(e->lastChangeMs);
         mixIn(e->lastUpdateMs);
@@ -457,19 +547,24 @@ const char *whatWord(const Entity &e, char *buf, size_t cap) {
     return buf;
 }
 
+void forgetDeck();   // below, with the control deck
+
 // The main view's widgets, before its stage is cleaned or the window goes.
 void forgetMainWidgets() {
+    forgetDeck();
     s.hero = s.knob = s.heroIcon = nullptr;
     s.lblWhat = s.lblValue = s.lblUnit = s.lblAgo = nullptr;
     s.fill = s.grip = s.mark = s.pill = nullptr;
     for (lv_obj_t *&b : s.btnCtl) b = nullptr;
     for (lv_obj_t *&w : s.swatch) w = nullptr;
+    for (lv_obj_t *&b : s.sceneBtn) b = nullptr;
     s.sliding = false;
 }
 
 void forgetWidgets() {
-    s.btnLeft = s.lblLeft = s.btnHistory = s.btnMembers = nullptr;
+    s.btnLeft = s.lblLeft = s.btnHistory = s.btnMembers = s.btnScenes = nullptr;
     s.lblTitleArea = s.lblTitleName = nullptr;
+    s.titleLeft = nullptr;
     s.stage = s.autoBar = nullptr;
     forgetMainWidgets();
 }
@@ -561,31 +656,44 @@ void makeLabelRow(lv_obj_t *col) {
 // left edge. For any one light nothing moves - not with the control showing,
 // a pause, or changing words, which the allowance covers (a round 3 lesson:
 // a column sized from its text moved the slider every time the text changed).
+// The control deck's width (buildControlDeck()): Power on a ribbon of its own,
+// a break, then the modes' ribbon.
+int32_t deckBreak() { return mm(2.0f); }
 int32_t selectorW(uint8_t caps) {
-    const int32_t g = mm(0.6f);
-    uint8_t n = 1;   // Power
+    const int32_t g = mm(0.6f), slot = UI::minTouch();
+    uint8_t n = 0;
     if (caps & LIGHT_CAN_DIM)    n++;
     if (caps & LIGHT_CAN_TEMP)   n++;
     if (caps & LIGHT_CAN_COLOUR) n++;
-    const bool div = n > 1;
-    const uint8_t children = n + (div ? 1 : 0);
-    return 2 * g + n * UI::minTouch() + (children - 1) * g + (div ? LV_MAX(2, mm(0.25f)) : 0);
+    const int32_t power = slot + 2 * g;
+    return n ? power + deckBreak() + n * slot + (n + 1) * g : power;
 }
 
-int32_t colWidth(bool light, uint8_t caps) {
+// `deck`: whether the control deck is in the column (beside the hero) or under
+// the hero (a tall window, below), which leaves the column only its words.
+int32_t colWidth(bool light, uint8_t caps, bool deck = true) {
     const UIType &t = UI::type();
-    int32_t w = textW(s.nEnt > 1 ? "Changed 59m ago, 9 paused" : "Changed 59m ago", t.TAG);
+    int32_t w = textW(hasMembers() ? "Changed 59m ago, 9 paused" : "Changed 59m ago", t.TAG);
     w = LV_MAX(w, textW("Unavailable", UIToolkit::Font_Hero));
     // The label line with the PAUSED pill beside it (makeLabelRow()).
     const int32_t pill = textW("PAUSED", t.TAG) + 2 * mm(1.2f) + 6 * mm(0.2f);
     w = LV_MAX(w, textW("Temperature", t.TAG) + mm(1.6f) + pill);
-    if (light) {
+    if (light && deck) {
         w = LV_MAX(w, selectorW(caps));
         if (caps & LIGHT_CAN_COLOUR) w = LV_MAX(w, 4 * mm(6.5f) + 3 * mm(1.6f) + 2 * mm(0.6f));
     }
     const int32_t room = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4);
     return LV_MIN(room, w);
 }
+
+// The stage's height: the window less its padding, the header row and the gap
+// under it (buildContents()). Known before LVGL lays anything out.
+int32_t stageH() {
+    return lv_area_get_height(&s.winRect) - 2 * s.pad - UI::minTouch() - mm(1.6f);
+}
+
+// The control deck's height: its switches and its own padding.
+int32_t controlDeckH() { return UI::minTouch() + 2 * mm(0.6f); }
 
 void fixColumn(lv_obj_t *col, int32_t width) {
     lv_obj_set_width     (col, width);
@@ -661,6 +769,49 @@ uint8_t firstCtl(uint8_t caps) {
     return LCTL_COLOUR;
 }
 
+// Inside one member's own views (its controls, its history): the group's
+// entities are set aside in groupEnt while ent[] holds the member.
+bool inMember() { return s.groupN > 0; }
+
+// THE LIGHT WHOSE SCENES ARE OFFERED (2.10c): the one light the window shows -
+// a card's own, a group defined in HA as itself, or a member in its own view
+// (a bulb has none, a room does). None while the window works through a
+// group's members (a scene would reach the paused one), or for a group
+// defined here.
+const Entity *sceneHost() {
+    if (!s.reg) return nullptr;
+    if (inMember()) return s.ent[0];
+    if (s.native) return s.expanded ? nullptr : s.native;
+    return (s.nEnt == 1) ? s.ent[0] : nullptr;
+}
+
+// THE SCENES OFFERED, by the card's Scenes setting (owner, 2026-10-07): those
+// not hidden in HA's own UI, all of them, or none. `i` counts offered scenes.
+uint8_t shownScenes() {
+    const Entity *h = sceneHost();
+    if (!h || s.sceneShow == SceneShow::SCENES_OFF ||
+        h->desc.kind != EntityKind::LIGHT || !h->desc.writable) return 0;
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < h->nScenes; i++) {
+        const Entity *sc = s.reg->sceneOf(*h, i);
+        if (sc && (s.sceneShow == SceneShow::SCENES_ALL || !sc->sourceHidden)) n++;
+    }
+    return n;
+}
+
+const Entity *shownScene(uint8_t i) {
+    const Entity *h = sceneHost();
+    if (!h) return nullptr;
+    for (uint8_t k = 0; k < h->nScenes; k++) {
+        const Entity *sc = s.reg->sceneOf(*h, k);
+        if (!sc || (s.sceneShow != SceneShow::SCENES_ALL && sc->sourceHidden)) continue;
+        if (i-- == 0) return sc;
+    }
+    return nullptr;
+}
+
+bool hasScenes() { return shownScenes() > 0; }
+
 // The slider's range for the control showing.
 void ctlRange(const LightAgg &L, int32_t &lo, int32_t &hi) {
     switch (s.lightCtl) {
@@ -701,6 +852,7 @@ int32_t valueAtFinger(const LightAgg &L) {
 void lightSend(int32_t v, int8_t sat = -1) {
     if (!s.reg) return;
     const uint32_t now = millis();
+    s.lastScene = -1;   // the light is no longer as a scene left it (S5)
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
         if (!e || !e->desc.writable || e->paused) continue;
@@ -751,7 +903,9 @@ void renderLight() {
         lv_async_call(rebuildMainAsync, nullptr);
     }
 
-    setText(s.lblWhat, s.lightCtl == LCTL_DIM ? "Brightness" : s.lightCtl == LCTL_TEMP ? "Temperature" : "Colour");
+    // US spelling on screen (owner). Color shows no label at all - the
+    // swatches say what it is - unless the PAUSED pill needs the line.
+    setText(s.lblWhat, s.lightCtl == LCTL_DIM ? "Brightness" : s.lightCtl == LCTL_TEMP ? "Temperature" : "");
 
     // What the slider shows: the finger while it is down, otherwise the
     // light. -1: nothing to mark (off, or the light has not said).
@@ -771,7 +925,7 @@ void renderLight() {
             // colour reports no kelvin (HA the same) - so no ring, and the
             // words say why (owner, round 1, L7).
             if (v < 0)                       setText(s.lblValue, !on ? "Off"
-                                                     : L.mode == LightMode::LMODE_COLOUR ? "A colour" : "--");
+                                                     : L.mode == LightMode::LMODE_COLOUR ? "A color" : "--");
             else if (s.lightCtl == LCTL_DIM) { snprintf(buf, sizeof(buf), "%ld%%", (long)v); setText(s.lblValue, buf); }
             else                             { snprintf(buf, sizeof(buf), "%ld K", (long)v); setText(s.lblValue, buf); }
             lv_obj_set_style_text_color(s.lblValue, UI::c(p.TEXT), 0);
@@ -826,16 +980,11 @@ void renderLight() {
     }
 
     // --- The selector ------------------------------------------------------
-    for (uint8_t k = 0; k < 4; k++) {
-        lv_obj_t *b = s.btnCtl[k];
-        if (!b) continue;
-        const bool chosen = (k > 0 && k - 1 == s.lightCtl);
-        lv_obj_set_style_bg_opa  (b, chosen ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-        lv_obj_set_style_bg_color(b, UI::c(quiet(p.TEXT)), 0);
-        if (lv_obj_t *l = lv_obj_get_child(b, 0))
-            lv_obj_set_style_text_color(l, UI::c(chosen ? p.SURFACE_ALT
-                                                        : quiet((k == 0 && on) ? p.ST_ACTIVE : p.TEXT)), 0);
-    }
+    // Power says whether the light is on; the chosen switch is the selector's
+    // (buildControlDeck()).
+    if (s.btnCtl[0])
+        if (lv_obj_t *l = lv_obj_get_child(s.btnCtl[0], 0))
+            lv_obj_set_style_text_color(l, UI::c(quiet(on ? p.ST_ACTIVE : p.TEXT)), 0);
 
     // --- The swatches: a ring round the one the light is showing -----------
     for (uint8_t i = 0; i < 8; i++) {
@@ -846,6 +995,15 @@ void renderLight() {
                           LV_ABS((int32_t)SWATCHES[i].sat - L.sat) <= 3;
         lv_obj_set_style_outline_width(s.swatch[i], here ? LV_MAX(2, mm(0.4f)) : 0, 0);
         lv_obj_set_style_outline_color(s.swatch[i], UI::c(p.TEXT), 0);
+    }
+
+    // --- Scenes: a ring round the one loaded from this window --------------
+    // Only that: HA does not say which scene is showing, and the lights may
+    // have been changed since (K15).
+    for (uint8_t i = 0; i < ENTITY_SCENES_MAX; i++) {
+        if (!s.sceneBtn[i]) continue;
+        lv_obj_set_style_outline_width(s.sceneBtn[i], (i == s.lastScene) ? LV_MAX(2, mm(0.4f)) : 0, 0);
+        lv_obj_set_style_outline_color(s.sceneBtn[i], UI::c(p.ACCENT), 0);
     }
 }
 
@@ -882,25 +1040,61 @@ void rebuildMainAsync(void *unused) {
     (void)unused;
     s.rebuildQueued = false;
     if (s.phase == PopupPhase::PHASE_OPEN && s.stage &&
-        (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER))
+        (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER ||
+         s.view == PopupView::VIEW_SCENES))
         showView(s.view);
 }
 
-void ctlCb(lv_event_t *ev) {
-    const uint8_t k = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
-    if (k == 0) { if (!pausedBlocks()) commandAll(!aggregate().on); return; }
-    if (k - 1 == s.lightCtl) return;
-    s.lightCtl = k - 1;
-    // Only what is showing is built, so the view is rebuilt - deferred: this
-    // button is in the stage being cleaned, and an event callback must not
-    // delete its own object.
-    lv_async_call(rebuildMainAsync, nullptr);
-}
 
 void swatchCb(lv_event_t *ev) {
     const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
     if (i >= 8 || pausedBlocks()) return;
     lightSend(SWATCHES[i].hue, SWATCHES[i].sat);
+    renderLight();
+}
+
+// THE RING ROUND A LOADED SCENE (owner, 2.10c S5) says "the light is as that
+// scene left it", so it lasts only while that is true: until the window
+// closes, any command from the window, or a change from elsewhere. A scene
+// fades in over a second or two and the bridge reports as it goes, so a
+// change is only counted once the levels have held still for SCENE_SETTLE_MS.
+constexpr uint32_t SCENE_SETTLE_MS = 3000;
+
+void sceneLoaded(uint8_t i) {
+    s.lastScene    = (int8_t)i;
+    s.sceneMs      = millis();
+    s.sceneSettled = 0;
+}
+
+uint32_t sceneLevels() {
+    const Entity *h = sceneHost();
+    if (!h) return 1;
+    const EntityAttrs &a = h->attrs;
+    uint32_t v = 2166136261u;
+    auto mixIn = [&v](uint32_t x) { v = (v ^ x) * 16777619u; };
+    mixIn(h->value.type == ValueType::BOOL && h->value.b);
+    mixIn((uint32_t)(uint16_t)a.brightness); mixIn((uint32_t)(uint16_t)a.colorTempK);
+    mixIn((uint32_t)(uint16_t)a.hue);        mixIn((uint32_t)(uint8_t)a.sat);
+    return v | 1;   // never 0, which means "not taken yet"
+}
+
+// From the tick: false when the ring has just gone.
+bool sceneRingCheck(uint32_t now) {
+    if (s.lastScene < 0 || now - s.sceneMs < SCENE_SETTLE_MS) return true;
+    const uint32_t lv = sceneLevels();
+    if (!s.sceneSettled) { s.sceneSettled = lv; return true; }
+    if (lv == s.sceneSettled) return true;
+    s.lastScene = -1;
+    return false;
+}
+
+// A scene button: load it (scene.turn_on), and ring it - see above.
+void sceneCb(lv_event_t *ev) {
+    const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+    if (pausedBlocks()) return;
+    const Entity *sc = shownScene(i);
+    if (!sc || !s.reg->press(sc->desc.id, millis())) return;
+    sceneLoaded(i);
     renderLight();
 }
 
@@ -991,25 +1185,467 @@ void buildLightHero(lv_obj_t *row) {
     lv_obj_set_style_outline_opa (s.mark, LV_OPA_50, 0);
 }
 
-lv_obj_t *ctlButton(lv_obj_t *parent, const char *glyph, uint8_t k) {
-    const int32_t sz = UI::minTouch();
-    lv_obj_t *b = plain(parent);
-    lv_obj_set_size(b, sz, sz);
-    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
-    lv_obj_t *l = makeLabel(b, UI::type().ICON_MD, UI::pal().TEXT);
-    lv_label_set_text(l, glyph);
-    lv_obj_center(l);
-    lv_obj_add_event_cb(b, ctlCb, LV_EVENT_CLICKED, (void *)(uintptr_t)k);
-    s.btnCtl[k] = b;
-    return b;
+// ---------------------------------------------------------------------------
+// THE CONTROL DECK (owner, 2026-10-07 - after HTC's TouchFLO 3D)
+//
+// A RIBBON a little shorter than the switches, and on it a SELECTOR as tall as
+// the deck, which can be grabbed and slid along it. The selector carries the
+// chosen switch's icon at the next size up, in the accent; its icon changes
+// to a neighbour's once the selector is more than halfway over it, and on
+// release it snaps to the nearest switch, which is then chosen. A tap on a
+// switch glides the selector there. Power is an action, not a mode, so it is
+// a plain button at the start, and the selector never lands on it.
+//
+// The deck is the same size as before - the ribbon is what got shorter - so
+// nothing around it moves.
+// ---------------------------------------------------------------------------
+constexpr uint32_t DECK_GLIDE_MS = 140;
+
+// FOUR LOOKS, ALL KEPT (owner, round 6: "they all look so good"): Black or
+// Silver, Square or Round. Unchosen, each scheme has its own: Black - Square
+// on Midnight and Fleet, Silver - Round on Linen (owner, round 9). Chosen in
+// SETTINGS' "Selector" row (every build; it belongs on the device's own
+// settings page, 4.1) - and chosen FOR THE SCHEME SHOWING (owner, round 9:
+// "the selector should follow the scheme"). Schemes are per page, so a page in
+// Linen and a page in Fleet each keep their own; a page that changes scheme
+// takes that scheme's.
+constexpr uint8_t LOOK_SCHEMES = 4;   // UITokens' schemes, with room for one more
+int8_t s_deckLook[LOOK_SCHEMES] = { -1, -1, -1, -1 };   // -1: the scheme's own; else bit 0 round, bit 1 silver
+
+int8_t &chosenLook() {
+    const uint8_t i = UI::schemeIndex();
+    return s_deckLook[i < LOOK_SCHEMES ? i : 0];
 }
 
-void buildLightColumn(lv_obj_t *col) {
+uint8_t deckLook() {
+    if (chosenLook() >= 0) return (uint8_t)chosenLook();
+    return lumOf(UI::pal().SURFACE_ALT) < 128 ? 0 : 3;
+}
+
+struct DeckColours { uint32_t ribbon, icon, chosen; };
+
+// From the scheme, never written down (tokens.md). The ribbon: lighter than
+// the window on the dark schemes, darker on Linen. Icons in the text colour;
+// the chosen one in the accent. The selector's own colours are in its face
+// (metalFace()).
+DeckColours deckColours() {
+    const UIPalette &p = UI::pal();
+    const bool dark = lumOf(p.SURFACE_ALT) < 128;
+    DeckColours c;
+    c.ribbon = UI::mix(p.SURFACE_ALT, p.TEXT, dark ? 14 : 12);
+    c.icon   = p.TEXT;
+    c.chosen = p.ACCENT;
+    return c;
+}
+
+// Rounded squares or round, for the deck and its selector.
+int32_t deckRadius() { return (deckLook() & 1) ? LV_RADIUS_CIRCLE : mm(1.6f); }
+
+// ---------------------------------------------------------------------------
+// FACES DRAWN BY HAND (owner, round 6): the selector's metal, and the chips'.
+//
+// LVGL's gradient has two stops and runs straight across; the owner asked for
+// the line between the selector's light and dark halves to CURVE UP in the
+// middle - "a slight raised appearance" - in the upper two fifths, and for
+// the unlit chips to look like soft DENTS in the surface rather than flat
+// discs. So these faces are images, painted pixel by pixel when a window
+// first needs them and kept in PSRAM (a few, ~40 KB each): a raised metal
+// face - light above a curved line, dark below, faint horizontal streaks for
+// a brushed finish, a fine edge - and a dent - darker at the top, fading out
+// downwards, no edge. Black or silver (the owner's four looks); the corners
+// anti-aliased in the alpha, so no clip_corner and no layer.
+// ---------------------------------------------------------------------------
+struct FaceSlot {
+    int16_t  w = 0, h = 0, r = 0;
+    FaceKind kind = FaceKind::FACE_BLACK;
+    uint32_t key = 0;               // the colours it was painted with
+    uint32_t used = 0;              // the window (s_faceEpoch) that last asked for it
+    size_t   cap = 0;               // bytes held
+    uint8_t *buf = nullptr;
+    lv_image_dsc_t dsc = {};
+};
+constexpr uint8_t FACE_SLOTS = 12;
+FaceSlot s_faces[FACE_SLOTS];
+uint32_t s_faceEpoch = 1;           // one per window opened (showWindow())
+uint32_t s_faceFlat  = 0;           // faces that could not be had and came out flat (debug readout)
+
+inline uint8_t ch8(uint32_t hex, int sh) { return (uint8_t)((hex >> sh) & 0xFF); }
+
+// a..b by t (0..1), per channel.
+uint32_t lerpHex(uint32_t a, uint32_t b, float t) {
+    t = t < 0.f ? 0.f : t > 1.f ? 1.f : t;
+    auto c = [&](int sh) { return (uint32_t)lroundf(ch8(a, sh) + (ch8(b, sh) - ch8(a, sh)) * t) << sh; };
+    return c(16) | c(8) | c(0);
+}
+
+void paintFace(FaceSlot &f) {
+    const UIPalette &p = UI::pal();
+    // The darkest and lightest the scheme has, whichever way round it is.
+    const bool darkScheme = lumOf(p.SURFACE_ALT) < 128;
+    const uint32_t dk = darkScheme ? p.GROUND : p.TEXT;
+    const uint32_t lt = darkScheme ? p.TEXT : p.SURFACE;
+    uint32_t topA, topB, botA, botB, edge;
+    if (f.kind == FaceKind::FACE_SILVER) {
+        topA = UI::mix(lt, dk, 4);  topB = UI::mix(lt, dk, 16);
+        botA = UI::mix(lt, dk, 42); botB = UI::mix(lt, dk, 30);
+        edge = UI::mix(lt, dk, 52);
+    } else {   // black (and the dent's colours are set below)
+        topA = UI::mix(dk, lt, 40); topB = UI::mix(dk, lt, 24);
+        botA = UI::mix(dk, lt, 6);  botB = UI::mix(dk, lt, 12);
+        edge = UI::mix(dk, lt, 52);
+    }
+    const uint32_t base = p.SURFACE_ALT;   // a dent is pressed into the window
+
+    // The panels are 16-bit: red and blue in steps of 8, green in steps of 4.
+    // A smooth grey ramp truncated to that grid bands, and the bands go pink
+    // and green where green steps and the others do not (seen on glass, round
+    // 7). So each pixel is rounded to the grid itself, by a 4x4 ordered
+    // dither, the same threshold for every channel.
+    static const uint8_t BAYER[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
+
+    const int w = f.w, h = f.h, r = LV_MIN(f.r, LV_MIN(w, h) / 2);
+    uint8_t *px = f.buf;
+    for (int y = 0; y < h; y++) {
+        // Brushed: each row a touch lighter or darker, the same every time.
+        uint32_t hs = (uint32_t)y * 2654435761u;
+        const int streak = (f.kind == FaceKind::FACE_DENT) ? 0 : (int)((hs >> 28) & 7) - 3;
+        const float cy = y + 0.5f;
+        for (int x = 0; x < w; x++) {
+            const float cx = x + 0.5f;
+            // Distance inside the rounded rectangle's edge (negative: outside).
+            const float qx = cx < r ? r - cx : cx > w - r ? cx - (w - r) : 0.f;
+            const float qy = cy < r ? r - cy : cy > h - r ? cy - (h - r) : 0.f;
+            float inside;
+            if (qx > 0.f && qy > 0.f) inside = r - sqrtf(qx * qx + qy * qy);
+            else inside = LV_MIN(LV_MIN(cx, w - cx), LV_MIN(cy, h - cy));
+            const float cover = inside + 0.5f;
+            const uint8_t a = cover <= 0.f ? 0 : cover >= 1.f ? 255 : (uint8_t)(cover * 255.f);
+
+            uint32_t col;
+            if (f.kind == FaceKind::FACE_DENT) {
+                // Pressed in: shade at the top, gone by the middle, a whisper
+                // of light at the bottom - the selector's light and dark the
+                // other way up, and softer.
+                const float t = cy / h;
+                col = (t < 0.5f) ? lerpHex(UI::mix(base, dk, 45), base, t / 0.5f)
+                                 : lerpHex(base, UI::mix(base, lt, 7), (t - 0.5f) / 0.5f);
+            } else {
+                // The line: two fifths down at the sides, rising in the middle.
+                const float u = (cx - w * 0.5f) / (w * 0.5f);
+                const float line = h * 0.40f - h * 0.09f * (1.f - u * u);
+                const uint32_t above = lerpHex(topA, topB, cy / line);
+                const uint32_t below = lerpHex(botA, botB, (cy - line) / (h - line));
+                const float d = cy - line;   // anti-aliased across one pixel
+                col = d <= -0.5f ? above : d >= 0.5f ? below : lerpHex(above, below, d + 0.5f);
+                if (inside < 1.3f) col = lerpHex(col, edge, 0.75f);   // the fine edge
+            }
+            const float th = (BAYER[(y & 3) * 4 + (x & 3)] + 0.5f) / 16.f;
+            auto chan = [&](int sh, int step) {
+                const int v = ch8(col, sh) + streak;
+                const int q = (int)floorf(v / (float)step + th) * step;
+                return (uint8_t)(q < 0 ? 0 : q > 256 - step ? 256 - step : q);
+            };
+            px[0] = chan(0, 8); px[1] = chan(8, 4); px[2] = chan(16, 8); px[3] = a;   // B, G, R, A
+            px += 4;
+        }
+    }
+}
+
+// A face of this size and kind in the scheme's colours: found, or painted.
+// TWELVE SLOTS, REUSED (round 8, the 1060 on Linen): each scheme, look and
+// size takes one, and trying the looks in two schemes filled all twelve -
+// after which every face came out flat (a white disc for a lit chip on
+// Linen). A slot is taken back only if no object can be showing it: one
+// painted in another scheme's colours first (the window that used it has
+// closed - a scheme changes from the dashboard), else the one asked for
+// longest ago by a window that is not this one. Full of this window's own:
+// null, and the caller paints flat.
+const lv_image_dsc_t *face(int32_t w, int32_t h, int32_t r, FaceKind kind) {
+    const UIPalette &p = UI::pal();
+    const uint32_t key = p.GROUND ^ (p.SURFACE << 1) ^ (p.TEXT << 2) ^ (p.SURFACE_ALT << 3);
+    FaceSlot *spare = nullptr;
+    for (FaceSlot &f : s_faces) {
+        if (f.buf && f.w == w && f.h == h && f.r == r && f.kind == kind && f.key == key) {
+            f.used = s_faceEpoch;
+            return &f.dsc;
+        }
+        if (!f.buf && !spare) spare = &f;
+    }
+    if (!spare)
+        for (FaceSlot &f : s_faces)
+            if (f.key != key && f.used < s_faceEpoch && (!spare || f.used < spare->used)) spare = &f;
+    if (!spare)
+        for (FaceSlot &f : s_faces)
+            if (f.used < s_faceEpoch && (!spare || f.used < spare->used)) spare = &f;
+    if (!spare) { s_faceFlat++; return nullptr; }
+    const size_t bytes = (size_t)w * h * 4;
+    if (spare->buf) {
+        // LVGL keeps what it decoded from a source, by its address: forget
+        // it before the same descriptor shows something else.
+        lv_image_cache_drop(&spare->dsc);
+        if (spare->cap < bytes) { heap_caps_free(spare->buf); spare->buf = nullptr; spare->cap = 0; }
+    }
+    if (!spare->buf) {
+        spare->buf = (uint8_t *)heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM);
+        if (!spare->buf) { s_faceFlat++; return nullptr; }
+        spare->cap = bytes;
+    }
+    spare->used = s_faceEpoch;
+    spare->w = (int16_t)w; spare->h = (int16_t)h; spare->r = (int16_t)r;
+    spare->kind = kind; spare->key = key;
+    paintFace(*spare);
+    lv_image_dsc_t &d = spare->dsc;
+    d = lv_image_dsc_t{};
+    d.header.magic  = LV_IMAGE_HEADER_MAGIC;
+    d.header.cf     = LV_COLOR_FORMAT_ARGB8888;
+    d.header.w      = (uint32_t)w;
+    d.header.h      = (uint32_t)h;
+    d.header.stride = (uint32_t)w * 4;
+    d.data_size     = (uint32_t)bytes;
+    d.data          = spare->buf;
+    return &d;
+}
+
+FaceKind metalKind() { return (deckLook() & 2) ? FaceKind::FACE_SILVER : FaceKind::FACE_BLACK; }
+
+// Put a face behind an object's contents: an image as its first child, the
+// object's own background off. Returns the image (null if none could be had,
+// and the object keeps a flat colour).
+lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t flat) {
+    lv_obj_t *img = nullptr;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(o); i++) {
+        lv_obj_t *c = lv_obj_get_child(o, (int32_t)i);
+        if (lv_obj_check_type(c, &lv_image_class)) { img = c; break; }
+    }
+    const lv_image_dsc_t *src = face(w, h, r, kind);
+    if (!src) {
+        if (img) lv_obj_add_flag(img, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_bg_color(o, UI::c(flat), 0);
+        lv_obj_set_style_bg_opa  (o, LV_OPA_COVER, 0);
+        return nullptr;
+    }
+    if (!img) {
+        img = lv_image_create(o);
+        lv_obj_clear_flag(img, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_flag  (img, LV_OBJ_FLAG_IGNORE_LAYOUT);
+        lv_obj_move_to_index(img, 0);
+        lv_obj_center(img);
+    }
+    lv_obj_clear_flag(img, LV_OBJ_FLAG_HIDDEN);
+    lv_image_set_src(img, src);
+    lv_obj_set_style_bg_opa(o, LV_OPA_TRANSP, 0);
+    return img;
+}
+
+// The label inside a chip or button (its face image sits before it).
+lv_obj_t *labelIn(lv_obj_t *o) {
+    for (uint32_t i = 0; i < lv_obj_get_child_count(o); i++) {
+        lv_obj_t *c = lv_obj_get_child(o, (int32_t)i);
+        if (lv_obj_check_type(c, &lv_label_class)) return c;
+    }
+    return nullptr;
+}
+
+struct Deck {
+    lv_obj_t *obj = nullptr, *sel = nullptr, *selIcon = nullptr;
+    uint8_t   n = 0;                    // mode switches
+    int32_t   x[3] = {0, 0, 0};         // their centres
+    uint8_t   ctl[3] = {0, 0, 0};       // the LightCtl each is
+    const char *glyph[3] = {nullptr, nullptr, nullptr};
+    int32_t   selW = 0;
+    uint8_t   shown = 0;                // the switch whose icon the selector carries
+    bool      dragging = false;
+    int32_t   pressX = 0, selX0 = 0;
+} d;
+
+void forgetDeck() { d = Deck{}; }
+
+int32_t deckSelX(uint8_t i) { return d.x[i] - d.selW / 2; }
+
+// The switch nearest the selector's centre - more than halfway over it.
+uint8_t deckNearest(int32_t selX) {
+    const int32_t c = selX + d.selW / 2;
+    uint8_t best = 0;
+    for (uint8_t i = 1; i < d.n; i++)
+        if (LV_ABS(d.x[i] - c) < LV_ABS(d.x[best] - c)) best = i;
+    return best;
+}
+
+// Move the selector; its icon follows the nearest switch.
+void deckPlace(int32_t x) {
+    if (!d.sel) return;
+    lv_obj_set_x(d.sel, x);
+    const uint8_t i = deckNearest(x);
+    if (i != d.shown && d.selIcon) { d.shown = i; lv_label_set_text(d.selIcon, d.glyph[i]); }
+}
+
+void deckGlideExec(void *var, int32_t v) { (void)var; deckPlace(v); }
+
+// The selector has arrived: that switch is chosen. Only what is showing is
+// built, so a new control rebuilds the view - after the glide, never during.
+void deckChoose(uint8_t i) {
+    if (i >= d.n || d.ctl[i] == s.lightCtl) return;
+    s.lightCtl = d.ctl[i];
+    lv_async_call(rebuildMainAsync, nullptr);
+}
+
+void deckGlideDone(lv_anim_t *a) { (void)a; deckChoose(d.shown); }
+
+void deckGlideTo(uint8_t i) {
+    if (!d.sel || i >= d.n) return;
+    lv_anim_delete(d.sel, deckGlideExec);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var        (&a, d.sel);
+    lv_anim_set_values     (&a, lv_obj_get_x(d.sel), deckSelX(i));
+    lv_anim_set_duration   (&a, DECK_GLIDE_MS);
+    lv_anim_set_path_cb    (&a, lv_anim_path_ease_out);
+    lv_anim_set_exec_cb    (&a, deckGlideExec);
+    lv_anim_set_completed_cb(&a, deckGlideDone);
+    lv_anim_start(&a);
+}
+
+// A tap on a mode switch.
+void deckTapCb(lv_event_t *ev) {
+    if (pausedBlocks()) return;
+    deckGlideTo((uint8_t)(uintptr_t)lv_event_get_user_data(ev));
+}
+
+// The finger on the selector: it follows along the ribbon, clamped to the
+// first and last switch, and snaps on release.
+void deckDragCb(lv_event_t *ev) {
+    const lv_event_code_t code = lv_event_get_code(ev);
+    lv_indev_t *in = lv_indev_active();
+    lv_point_t pt = {0, 0};
+    if (in) lv_indev_get_point(in, &pt);
+    if (code == LV_EVENT_PRESSED) {
+        lv_anim_delete(d.sel, deckGlideExec);
+        d.pressX = pt.x;
+        d.selX0  = lv_obj_get_x(d.sel);
+        d.dragging = false;
+    } else if (code == LV_EVENT_PRESSING) {
+        const int32_t dx = pt.x - d.pressX;
+        if (!d.dragging && LV_ABS(dx) < mm(1.0f)) return;
+        if (!d.dragging && pausedBlocks()) { if (in) lv_indev_wait_release(in); return; }
+        d.dragging = true;
+        deckPlace(LV_CLAMP(deckSelX(0), d.selX0 + dx, deckSelX(d.n - 1)));
+    } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+        if (!d.dragging) return;
+        d.dragging = false;
+        deckGlideTo(deckNearest(lv_obj_get_x(d.sel)));
+    }
+}
+
+// Power: a plain button.
+void deckPowerCb(lv_event_t *ev) {
+    (void)ev;
+    if (!pausedBlocks()) commandAll(!aggregate().on);
+}
+
+void buildControlDeck(lv_obj_t *parent, uint8_t caps) {
+    const UIType &t = UI::type();
+    const DeckColours col = deckColours();
+    const int32_t slot = UI::minTouch(), g = mm(0.6f);
+    const int32_t H = controlDeckH();
+
+    forgetDeck();
+    if (caps & LIGHT_CAN_DIM)    { d.ctl[d.n] = LCTL_DIM;    d.glyph[d.n++] = MDI_BRIGHTNESS_5; }
+    if (caps & LIGHT_CAN_TEMP)   { d.ctl[d.n] = LCTL_TEMP;   d.glyph[d.n++] = MDI_SUN_THERMOMETER; }
+    if (caps & LIGHT_CAN_COLOUR) { d.ctl[d.n] = LCTL_COLOUR; d.glyph[d.n++] = MDI_PALETTE; }
+    const int32_t W = selectorW(caps);
+
+    d.obj = plain(parent);
+    lv_obj_set_size(d.obj, W, H);
+
+    // The ribbon: three quarters of a switch tall, centred - IN TWO PIECES
+    // (owner: no divider line - the selector never goes to Power anyway).
+    // Power has a short ribbon of its own; a break; then the modes'.
+    const int32_t rh = slot * 72 / 100;
+    const int32_t powerW = slot + 2 * g;
+    auto ribbon = [&](int32_t x0, int32_t w) {
+        lv_obj_t *rib = plain(d.obj);
+        lv_obj_set_pos (rib, x0, (H - rh) / 2);
+        lv_obj_set_size(rib, w, rh);
+        lv_obj_set_style_radius  (rib, deckRadius(), 0);
+        lv_obj_set_style_bg_color(rib, UI::c(quiet(col.ribbon)), 0);
+        lv_obj_set_style_bg_opa  (rib, LV_OPA_COVER, 0);
+    };
+    ribbon(0, powerW);
+    if (d.n) ribbon(powerW + deckBreak(), W - powerW - deckBreak());
+
+    auto iconAt = [&](int32_t x, const char *glyph, lv_event_cb_t cb, void *user) {
+        lv_obj_t *b = plain(d.obj);
+        lv_obj_set_pos (b, x, 0);
+        lv_obj_set_size(b, slot, H);
+        lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, user);
+        lv_obj_t *l = makeLabel(b, t.ICON_MD, quiet(col.icon));
+        lv_label_set_text(l, glyph);
+        lv_obj_center(l);
+        return b;
+    };
+
+    int32_t x = g;
+    s.btnCtl[0] = iconAt(x, MDI_POWER, deckPowerCb, nullptr);
+    x = powerW + deckBreak() + g;
+    uint8_t chosen = 0;
+    for (uint8_t i = 0; i < d.n; i++) {
+        s.btnCtl[1 + d.ctl[i]] = iconAt(x, d.glyph[i], deckTapCb, (void *)(uintptr_t)i);
+        d.x[i] = x + slot / 2;
+        if (d.ctl[i] == s.lightCtl) chosen = i;
+        x += slot + g;
+    }
+    if (!d.n) return;
+
+    // The selector: the deck's height, a little wider than a switch, over the
+    // ribbon - with the chosen switch's icon, a size up, in the accent.
+    d.selW = slot + 2 * g;
+    d.sel = plain(d.obj);
+    lv_obj_set_size(d.sel, d.selW, H);
+    lv_obj_set_style_radius(d.sel, deckRadius(), 0);
+    // Its face is metal, curved and brushed (faces, above). Greyed when the
+    // window is paused, as everything else is.
+    const int32_t selR = (deckLook() & 1) ? LV_MIN(d.selW, H) / 2 : mm(1.6f);
+    if (lv_obj_t *img = setFace(d.sel, d.selW, H, selR, metalKind(), quiet(UI::pal().GROUND))) {
+        if (s.builtPaused) {
+            lv_obj_set_style_image_recolor    (img, UI::c(UI::pal().SURFACE_ALT), 0);
+            lv_obj_set_style_image_recolor_opa(img, (lv_opa_t)166, 0);
+        }
+    }
+    lv_obj_add_flag  (d.sel, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(d.sel, LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_clear_flag(d.sel, LV_OBJ_FLAG_SCROLL_CHAIN);
+    lv_obj_add_event_cb(d.sel, deckDragCb, LV_EVENT_PRESSED,    nullptr);
+    lv_obj_add_event_cb(d.sel, deckDragCb, LV_EVENT_PRESSING,   nullptr);
+    lv_obj_add_event_cb(d.sel, deckDragCb, LV_EVENT_RELEASED,   nullptr);
+    lv_obj_add_event_cb(d.sel, deckDragCb, LV_EVENT_PRESS_LOST, nullptr);
+    d.selIcon = makeLabel(d.sel, t.ICON, quiet(col.chosen));
+    lv_obj_center(d.selIcon);
+    // LARGER, TO FILL MORE OF THE SELECTOR (owner, round 7). ICON is the
+    // largest icon face there is, so it is scaled up 1.4x about its centre -
+    // drawn through a layer, the size of the icon. If that is visibly soft on
+    // glass, the answer is a face of just the deck's few glyphs at this size
+    // (a few KB), from scripts/gen_icon_font.py.
+    lv_obj_set_style_transform_scale  (d.selIcon, 358, 0);
+    lv_obj_set_style_transform_pivot_x(d.selIcon, lv_pct(50), 0);
+    lv_obj_set_style_transform_pivot_y(d.selIcon, lv_pct(50), 0);
+    d.shown = chosen;
+    lv_label_set_text(d.selIcon, d.glyph[chosen]);
+    lv_obj_set_pos(d.sel, deckSelX(chosen), 0);
+}
+
+// `deckParent`: the column itself (the control deck at its bottom, level with
+// the slider's) or a row under the hero (a tall window, 2.10c).
+void buildLightColumn(lv_obj_t *col, lv_obj_t *deckParent) {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const LightAgg   L = lightAggregate();
-    makeLabelRow(col);
+    const uint8_t    caps = L.caps;
+    // Color has no label line (owner, round 6) - except when paused, for the
+    // PAUSED pill. Without it the swatches and the deck fit the P4_5's column
+    // with room to spare; with it the column was a few pixels too tall and
+    // the deck moved down (L5).
+    if (s.lightCtl != LCTL_COLOUR || s.builtPaused) makeLabelRow(col);
     if (s.lightCtl != LCTL_COLOUR) {
         s.lblValue = makeLabel(col, UIToolkit::Font_Hero, p.TEXT);
         s.lblAgo   = makeLabel(col, t.TAG, p.TEXT_DIM);
@@ -1042,32 +1678,107 @@ void buildLightColumn(lv_obj_t *col) {
 
     // The selector sits at the BOTTOM of the column, level with the bottom of
     // the slider, whatever is above it (owner, round 3).
-    lv_obj_t *spacer = plain(col);
-    lv_obj_set_size(spacer, 1, 0);
-    lv_obj_set_flex_grow(spacer, 1);
+    if (deckParent == col) {
+        lv_obj_t *spacer = plain(col);
+        lv_obj_set_size(spacer, 1, 0);
+        lv_obj_set_flex_grow(spacer, 1);
+    }
 
     // Power | the controls this light (any member) has, with a divider after
     // Power as in HA. A light with only one of them still shows it, so the
-    // selector always says what the slider is.
-    lv_obj_t *sel = plain(col);
-    lv_obj_set_size     (sel, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(sel, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(sel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_radius    (sel, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color  (sel, UI::c(p.SURFACE), 0);
-    lv_obj_set_style_bg_opa    (sel, LV_OPA_COVER, 0);
-    lv_obj_set_style_pad_all   (sel, mm(0.6f), 0);
-    lv_obj_set_style_pad_column(sel, mm(0.6f), 0);
-    ctlButton(sel, MDI_POWER, 0);
-    if (L.caps & (LIGHT_CAN_DIM | LIGHT_CAN_TEMP | LIGHT_CAN_COLOUR)) {
-        lv_obj_t *div = plain(sel);
-        lv_obj_set_size(div, LV_MAX(2, mm(0.25f)), UI::minTouch() * 60 / 100);
-        lv_obj_set_style_bg_color(div, UI::border(), 0);
-        lv_obj_set_style_bg_opa  (div, LV_OPA_COVER, 0);
+    // control deck always says what the slider is.
+    buildControlDeck(deckParent, caps);
+}
+
+// THE SCENES VIEW (2.10c; owner, 2026-10-06): the brightness slider stays where
+// it is on the controls view, and the scene buttons take the column - the
+// label, the value and the selector all give way, so three rows fit. Reached
+// by the scenes icon under the chart, like the other views; the column is the
+// controls view's own width, so the slider does not move.
+//
+// SIZED AS A SHARE OF THE WINDOW, like the slider (owner: on the 4B they were
+// large for their window): 9 "P4_5 millimetres" tall - a full touch target on
+// the P4_5 - never under the swatches' 6.5 mm, and three rows at most in the
+// slider's height. Centred; it scrolls if a light has more than fit. Names as
+// the source gives them, sorted ("Bright" .. "Relax").
+// A STACK, NOT A FLOW (owner, after round 5: wrapped like text, the buttons
+// looked scattered). One column of buttons all as wide as the longest name,
+// centred in the slider's height; a second column only when one is full, and
+// so on while the room lasts - then it scrolls. Measured before building, so
+// the slider can sit beside exactly what is there.
+struct SceneStack { int32_t ch, bw, gap, pad, rowsFit, cols, w, h; bool scroll; };
+
+SceneStack sceneStack(int32_t maxW) {
+    const UIType &t = UI::type();
+    SceneStack k;
+    k.gap = pm(1.4f);
+    // The stack's own padding holds the ring (outline pad + width), which its
+    // edge would otherwise clip.
+    k.pad = LV_MAX(2, mm(0.3f)) + LV_MAX(2, mm(0.4f)) + 1;
+    k.ch  = LV_MAX(mm(6.5f), LV_MIN(pm(9.0f), (s.heroH - 2 * k.gap - 2 * k.pad) / 3));
+    k.bw  = k.ch * 16 / 10;
+    const uint8_t n = shownScenes();
+    for (uint8_t i = 0; i < n; i++)
+        if (const Entity *sc = shownScene(i))
+            k.bw = LV_MAX(k.bw, textW(sc->desc.name, t.TAG) + 2 * pm(2.4f));
+    k.rowsFit = LV_MAX(1, (s.heroH - 2 * k.pad + k.gap) / (k.ch + k.gap));
+    k.cols    = LV_MAX(1, (n + k.rowsFit - 1) / k.rowsFit);
+    const int32_t maxCols = LV_MAX(1, (maxW - 2 * k.pad + k.gap) / (k.bw + k.gap));
+    k.scroll = k.cols > maxCols;
+    if (k.scroll) k.cols = maxCols;
+    k.w = k.cols * k.bw + (k.cols - 1) * k.gap + 2 * k.pad;
+    // Only as tall as its rows (the column centres it in the slider's
+    // height), so placeWide() can see where the buttons really are.
+    const int32_t rows = LV_MAX(1, LV_MIN((int32_t)n, k.rowsFit));
+    k.h = k.scroll ? s.heroH : rows * k.ch + (rows - 1) * k.gap + 2 * k.pad;
+    return k;
+}
+
+int32_t sceneGridW(int32_t maxW) { return sceneStack(maxW).w; }
+
+void buildSceneGrid(lv_obj_t *col, int32_t colW) {
+    const UIPalette &p = UI::pal();
+    const UIType    &t = UI::type();
+    const Entity    *h = sceneHost();
+    if (!h || !s.reg) return;
+    const SceneStack k = sceneStack(colW + 1);
+    const int32_t ch = k.ch, gap = k.gap, pad = k.pad;
+
+    lv_obj_t *grid = plain(col);
+    lv_obj_set_size(grid, k.w, k.h);
+    if (k.scroll) {
+        // More than the room holds: rows, scrolling, the names in order.
+        lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
+        lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+        lv_obj_add_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
+        UI::tameScroll(grid);
+    } else {
+        // Down each column, then the next; each column centred top to bottom.
+        lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_COLUMN_WRAP);
+        lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
     }
-    if (L.caps & LIGHT_CAN_DIM)    ctlButton(sel, MDI_BRIGHTNESS_5, 1 + LCTL_DIM);
-    if (L.caps & LIGHT_CAN_TEMP)   ctlButton(sel, MDI_SUN_THERMOMETER, 1 + LCTL_TEMP);
-    if (L.caps & LIGHT_CAN_COLOUR) ctlButton(sel, MDI_PALETTE, 1 + LCTL_COLOUR);
+    lv_obj_set_style_pad_column(grid, gap, 0);
+    lv_obj_set_style_pad_row   (grid, gap, 0);
+    lv_obj_set_style_pad_all   (grid, pad, 0);   // room for the ring
+
+    for (uint8_t i = 0; i < shownScenes() && i < ENTITY_SCENES_MAX; i++) {
+        const Entity *sc = shownScene(i);
+        if (!sc) continue;
+        lv_obj_t *b = plain(grid);
+        lv_obj_set_size(b, k.bw, ch);
+        lv_obj_set_style_radius   (b, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_opa   (b, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color (b, UI::c(quiet(p.SURFACE)), 0);
+        lv_obj_set_style_bg_color (b, UI::c(UI::mix(p.SURFACE, p.TEXT, 20)),
+                                   UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+        lv_obj_set_style_outline_pad(b, LV_MAX(2, mm(0.3f)), 0);
+        lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(b, sceneCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
+        lv_obj_t *l = makeLabel(b, t.TAG, quiet(p.TEXT));
+        lv_label_set_text(l, sc->desc.name);
+        lv_obj_center(l);
+        s.sceneBtn[i] = b;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1143,6 +1854,7 @@ void renderMain() {
 void commandAll(bool on) {
     if (!s.reg) return;
     const uint32_t now = millis();
+    s.lastScene = -1;   // S5, as lightSend()
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
         if (e && e->desc.writable && !e->paused)   // a paused member is out of the group
@@ -1206,6 +1918,57 @@ void knobDragCb(lv_event_t *ev) {
     }
 }
 
+// WHERE THE SLIDER GOES IN A WIDE VIEW (owner, round 7). Where the controls
+// put it, whenever that works: one column of scenes, or the swatches, sit
+// just beside it. Only what does not fit moves it, and only as far as it must:
+//  - wider than the room to the right (extra scene columns): the slider goes
+//    left by the difference;
+//  - running under the clapperboard chip in the top corner: the content goes
+//    DOWN first, to the bottom of the slider's height, if that clears it;
+//    otherwise the slider goes left until the content clears the chip.
+// The row is a flex item, centred; it is moved with translate_x, which LVGL
+// applies to the coordinates (taps land where it is drawn).
+void placeWide(lv_obj_t *row, lv_obj_t *col, int32_t colW, int32_t stageW) {
+    lv_obj_update_layout(s.win);
+    lv_area_t st;  lv_obj_get_content_coords(s.stage, &st);
+    lv_area_t rw;  lv_obj_get_coords(row, &rw);
+    // The stage as LVGL laid it out: the controls' row was centred in this,
+    // and a width a pixel off moved the slider a pixel.
+    stageW = lv_area_get_width(&st);
+
+    const int32_t gapH  = pm(4);
+    const int32_t rowW  = s.heroW + gapH + colW;
+    const int32_t homeX = (stageW - s.mainRowW) / 2;   // the controls' slider
+    int32_t x = homeX;
+    if (x + rowW > stageW) x = stageW - rowW;
+    if (x < 0) x = 0;
+
+    // The content's real extent, top to bottom, from what the column holds.
+    int32_t top = LV_COORD_MAX, bot = LV_COORD_MIN;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(col); i++) {
+        lv_obj_t *c = lv_obj_get_child(col, (int32_t)i);
+        if (lv_obj_has_flag(c, LV_OBJ_FLAG_HIDDEN)) continue;
+        lv_area_t a; lv_obj_get_coords(c, &a);
+        if (a.y2 - a.y1 < 2) continue;   // a spacer
+        top = LV_MIN(top, a.y1); bot = LV_MAX(bot, a.y2);
+    }
+    if (s.btnScenes && !lv_obj_has_flag(s.btnScenes, LV_OBJ_FLAG_HIDDEN) && top <= bot) {
+        lv_area_t chip; lv_obj_get_coords(s.btnScenes, &chip);
+        const int32_t m = mm(1.0f);
+        const int32_t right = st.x1 + x + s.heroW + gapH + colW;
+        if (right > chip.x1 - m && top < chip.y2 + m) {
+            const int32_t downTop = rw.y1 + s.heroH - (bot - top + 1);
+            if (downTop >= chip.y2 + m) {
+                lv_obj_set_flex_align(col, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+            } else {
+                x -= right - (chip.x1 - m);
+                if (x < 0) x = 0;
+            }
+        }
+    }
+    lv_obj_set_style_translate_x(row, st.x1 + x - rw.x1, 0);
+}
+
 void buildMain() {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
@@ -1246,13 +2009,80 @@ void buildMain() {
                                                                                           : LIGHT_CAN_COLOUR;
         if (!(caps & bit)) s.lightCtl = firstCtl(caps);
         s.builtCaps = caps;
+
+        // THE CONTROL DECK UNDER THE HERO WHERE THE WINDOW HAS THE HEIGHT
+        // (owner, 2026-10-07): the 4B and the 7" panels. The P4_5 is the one
+        // board too short for it - its screen is the widest shape - and keeps
+        // the deck beside the slider. Worked out from the window, not a list
+        // of boards. The slider, its words and the deck are centred.
+        //
+        // SCENES, AND COLOUR UNDER A TALL WINDOW, ARE "WIDE": the buttons or
+        // swatches take the column beside the slider, as wide as they need,
+        // and placeWide() keeps the slider where the controls put it unless
+        // they do not fit. The control deck stays exactly where it is in
+        // every control.
+        const bool    scenes = (s.view == PopupView::VIEW_SCENES);
+        const int32_t gapV   = pm(3.0f);
+        const int32_t stageW = lv_area_get_width(&s.winRect) - 2 * s.pad;
+        s.heroW   = s.heroH * 42 / 100;
+        s.stacked = stageH() >= s.heroH + gapV + controlDeckH();
+        const bool wide = scenes || (s.stacked && s.lightCtl == LCTL_COLOUR);
+        lv_obj_set_style_pad_row(s.stage, s.stacked ? gapV : 0, 0);
+
         buildLightHero(row);
         lv_obj_t *col = plain(row);
         // Sized for everything the members CAN do, paused or not: a pause
         // hides buttons, and a narrower column re-centred the whole group
         // (owner, round 5 - All Lamps paused).
-        fixColumn(col, colWidth(true, LA.allCaps));
-        buildLightColumn(col);
+        // WIDE: the column is as wide as what it holds - the swatches, or the
+        // scene buttons - and starts where the controls' column starts.
+        const int32_t ctlColW = colWidth(true, LA.allCaps, !s.stacked);
+        s.mainRowW = s.heroW + pm(4) + ctlColW;
+        int32_t colW = ctlColW;
+        if (wide) {
+            int32_t maxW = stageW - s.heroW - pm(4);
+            // THE THIRD WAY CLEAR OF THE CHIP (round 7, the 4B's "show all"):
+            // when the scenes can neither drop below the clapperboard (their
+            // rows fill the slider's height) nor clear it with the slider at
+            // the edge, they get fewer columns - those that fit beside the
+            // chip - and scroll. Chip and stage share a top and a right edge
+            // (buildContents()), so this is known before anything is laid out.
+            if (scenes && s.btnScenes && !lv_obj_has_flag(s.btnScenes, LV_OBJ_FLAG_HIDDEN)) {
+                const SceneStack k = sceneStack(maxW);
+                const int32_t m      = mm(1.0f);
+                const int32_t chipL  = stageW - UI::minTouch() - m;
+                const int32_t chipB  = UI::minTouch() + m;
+                const int32_t rowTop = (stageH() - s.heroH - (s.stacked ? gapV + controlDeckH() : 0)) / 2;
+                const bool downOK = rowTop + s.heroH - k.h >= chipB;
+                const bool leftOK = s.heroW + pm(4) + k.w <= chipL;
+                if (!downOK && !leftOK) maxW = chipL - s.heroW - pm(4);
+            }
+            colW = scenes ? sceneGridW(maxW)
+                          : LV_MIN(maxW, 4 * mm(6.5f) + 3 * mm(1.6f) + 2 * mm(0.6f));
+        }
+        fixColumn(col, colW);
+        if (wide) lv_obj_set_flex_align(col, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+
+        if (scenes) {
+            buildSceneGrid(col, colW);
+            // No deck in Scenes, but its room is kept, so the slider stays at
+            // the same height as on the controls.
+            if (s.stacked) { lv_obj_t *keep = plain(s.stage); lv_obj_set_size(keep, 1, controlDeckH()); }
+        } else {
+            lv_obj_t *deckParent = col;
+            if (s.stacked) {
+                // THE STAGE'S FULL WIDTH, the deck centred in it (L5, measured
+                // on the 1060): content-sized, it was centred inside a "track"
+                // as wide as the widest child, itself centred in the stage -
+                // two roundings, and Color's wider row moved the deck a pixel.
+                deckParent = plain(s.stage);
+                lv_obj_set_size(deckParent, lv_pct(100), LV_SIZE_CONTENT);
+                lv_obj_set_flex_flow(deckParent, LV_FLEX_FLOW_ROW);
+                lv_obj_set_flex_align(deckParent, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+            }
+            buildLightColumn(col, deckParent);
+        }
+        if (wide) placeWide(row, col, colW, stageW);
         renderLight();
         return;
     }
@@ -1310,6 +2140,7 @@ void buildMain() {
     // A toggle's column is the slider's: the same size, the lines in the
     // same places (owner, round 3).
     if (s.toggleHero) fixColumn(col, colWidth(false, 0));
+    s.mainRowW = s.toggleHero ? s.heroW + pm(4) + colWidth(false, 0) : 0;
 
     makeLabelRow(col);
 
@@ -1346,19 +2177,27 @@ void buildHistory() {
 
 void memberRowCb(lv_event_t *ev);   // below, with the member view
 void deckRender();                  // below, with the deck
+void chartSet(uint8_t state);       // below, with the deck: the CHART panel
+void chartFold();                   // open: back to its tab
 
 void buildMembers() {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
-    // The stage's height, scrolling if a group has more members than fit.
+    // The stage's height, scrolling if a group has more members than fit. As
+    // wide as the controls view's slider and words together, centred, so the
+    // rows line up with them (owner, 2.10c G2: full width looked awkward on
+    // the P4_5).
+    // Centred vertically too (owner, round 4): as tall as its rows, never
+    // taller than the stage, which centres it.
     lv_obj_t *list = plain(s.stage);
-    lv_obj_set_size     (list, lv_pct(100), lv_pct(100));
+    lv_obj_set_size     (list, s.mainRowW > 0 ? s.mainRowW : lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_max_height(list, lv_pct(100), 0);
     lv_obj_add_flag     (list, LV_OBJ_FLAG_SCROLLABLE);
     UI::tameScroll(list);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(list, mm(1.4f), 0);
-    for (uint8_t i = 0; i < s.nEnt; i++) {
-        const Entity *e = s.ent[i];
+    for (uint8_t i = 0; i < memberCount(); i++) {
+        const Entity *e = memberAt(i);
         if (!e) continue;
         lv_obj_t *r = plain(list);
         lv_obj_set_size     (r, lv_pct(100), LV_SIZE_CONTENT);
@@ -1391,7 +2230,7 @@ void buildMembers() {
             if (at.lightMode == LightMode::LMODE_TEMP && at.colorTempK > 0)
                 snprintf(buf, sizeof(buf), "On, %d%%, %d K", pct, at.colorTempK);
             else if (at.lightMode == LightMode::LMODE_COLOUR && at.hue >= 0)
-                snprintf(buf, sizeof(buf), "On, %d%%, colour %d", pct, at.hue);
+                snprintf(buf, sizeof(buf), "On, %d%%, color %d", pct, at.hue);
             else
                 snprintf(buf, sizeof(buf), "On, %d%%", pct);
             lv_label_set_text(v, buf);
@@ -1403,64 +2242,128 @@ void buildMembers() {
         }
     }
     lv_obj_t *note = makeLabel(list, t.TAG, p.TEXT_DIM);
-    lv_label_set_text(note, "Tap one for its own controls");
+    lv_label_set_text(note, "Tap a member for more details");   // owner's words, 2026-10-07
 }
 
-// Share the title row between "Area > " and the name. Both fit: each gets its
-// own width. Otherwise the NAME keeps at least 60% - it is what the window is
-// about - and the area gives way first, ellipsised.
+// Share the title row between "Area > " and the name.
+//  - Both fit in the middle, between ends of equal width: centred, as always.
+//  - They fit if the title takes the room beside the X (a window with two
+//    chips on the right has a chip's width spare on the left): the X's slot
+//    shrinks to the X, and the title sits left of centre (owner, round 7).
+//  - Neither: THE NAME ALONE (owner, round 7, the 4B: "Offi...Desk" was hard to
+//    read). The link back goes with it; the back arrow still does that job.
 void layoutTitle() {
     if (!s.lblTitleArea || !s.lblTitleName) return;
     const lv_font_t *f = UI::type().NAME;
-    int32_t aw = textW(lv_label_get_text(s.lblTitleArea), f) + 1;
+    const char *area = lv_label_get_text(s.lblTitleArea);
+    const int32_t aw = (area && area[0]) ? textW(area, f) + 1 : 0;
     int32_t nw = textW(lv_label_get_text(s.lblTitleName), f) + 1;
+    bool crumb = true, wide = false;
     if (aw + nw > s.titleW) {
-        const int32_t nameFloor = s.titleW * 60 / 100;
-        if (nw > s.titleW - aw) nw = (s.titleW - aw > nameFloor) ? s.titleW - aw : nameFloor;
-        if (nw > s.titleW) nw = s.titleW;
-        aw = s.titleW - nw;
+        if (aw + nw <= s.titleW + s.titleSlack) wide = true;
+        else { crumb = false; wide = nw > s.titleW; }
     }
-    lv_obj_set_width(s.lblTitleArea, aw > 0 ? aw : 0);
+    const int32_t room = s.titleW + (wide ? s.titleSlack : 0);
+    if (s.titleLeft) lv_obj_set_width(s.titleLeft, s.titleSlotW - (wide ? s.titleSlack : 0));
+    if (nw > room) nw = room;
+    if (crumb && aw) {
+        lv_obj_clear_flag(s.lblTitleArea, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_width(s.lblTitleArea, aw);
+    } else {
+        lv_obj_add_flag(s.lblTitleArea, LV_OBJ_FLAG_HIDDEN);
+    }
     lv_obj_set_width(s.lblTitleName, nw);
 }
 
+// --- THE CORNER ICONS (owner, 2026-10-06) ------------------------------------
+// History (the chart), Members and Scenes are views of their own, and the icons
+// in the corner work as tabs: shown on every view they belong to, the one
+// showing is lit (as a chosen selector button is), and a tap on a lit one goes
+// back to the controls. Members on the window's own views, not inside one
+// member; Scenes only on a light's controls and its scenes; the chart
+// everywhere - the group's from the group's views, a member's from its own.
+// The X closes from every view of the window; inside one member the arrow goes
+// back to Members.
+// Lit as the control deck's selector is (owner, 2026-10-07): the same metal,
+// the icon in the accent. Unlit: a soft dent in the surface (round 6).
+void cornerLook(lv_obj_t *b, bool shown, bool lit) {
+    if (!b) return;
+    if (!shown) { lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN); return; }
+    lv_obj_clear_flag(b, LV_OBJ_FLAG_HIDDEN);
+    const UIPalette  &p   = UI::pal();
+    const DeckColours col = deckColours();
+    const int32_t sz = UI::minTouch();
+    setFace(b, sz, sz, sz / 2, lit ? metalKind() : FaceKind::FACE_DENT, p.SURFACE);
+    // Lit, the icon a face up too (owner, round 7), as the selector's is.
+    if (lv_obj_t *l = labelIn(b)) {
+        lv_obj_set_style_text_color(l, UI::c(lit ? col.chosen : p.TEXT), 0);
+        lv_obj_set_style_text_font (l, lit ? UI::type().ICON : UI::type().ICON_MD, 0);
+        lv_obj_center(l);
+    }
+}
+
 void showView(PopupView v) {
+    const PopupView was = s.view;
     s.view = v;
     forgetMainWidgets();
     lv_obj_clean(s.stage);
 
-    // X on the first view, a back arrow on any view reached from it; the
-    // navigation icons only on the first (card-sheet 11.1, mock v3).
-    const bool inner = (v != PopupView::VIEW_MAIN);
-    setText(s.lblLeft, inner ? LV_SYMBOL_LEFT : LV_SYMBOL_CLOSE);
-    if (s.btnHistory) { if (inner) lv_obj_add_flag(s.btnHistory, LV_OBJ_FLAG_HIDDEN);
-                        else       lv_obj_clear_flag(s.btnHistory, LV_OBJ_FLAG_HIDDEN); }
-    if (s.btnMembers) { if (inner) lv_obj_add_flag(s.btnMembers, LV_OBJ_FLAG_HIDDEN);
-                        else       lv_obj_clear_flag(s.btnMembers, LV_OBJ_FLAG_HIDDEN); }
+    // SCENES SHOWS THE BRIGHTNESS SLIDER (owner): whatever the slider showed
+    // before comes back with the controls.
+    if (v == PopupView::VIEW_SCENES && was != PopupView::VIEW_SCENES) {
+        s.ctlBeforeScenes = s.lightCtl;
+        if (lightAggregate().caps & LIGHT_CAN_DIM) s.lightCtl = LCTL_DIM;
+    } else if (v != PopupView::VIEW_SCENES && was == PopupView::VIEW_SCENES) {
+        s.lightCtl = s.ctlBeforeScenes;
+    }
 
+    const bool member   = inMember();
+    const bool controls = (v == PopupView::VIEW_MAIN || v == PopupView::VIEW_MEMBER);
+    // X on the controls, the back arrow everywhere else (owner, round 4).
+    setText(s.lblLeft, v == PopupView::VIEW_MAIN ? LV_SYMBOL_CLOSE : LV_SYMBOL_LEFT);
+    cornerLook(s.btnHistory, true, v == PopupView::VIEW_HISTORY);
+    cornerLook(s.btnMembers, !member && hasMembers(), v == PopupView::VIEW_MEMBERS);
+    cornerLook(s.btnScenes, (controls || v == PopupView::VIEW_SCENES) && hasScenes(),
+               v == PopupView::VIEW_SCENES);
+    // The CHART panel belongs to the chart: up with it, down when it goes.
+    if (v == PopupView::VIEW_HISTORY)      chartSet(DECK_PEEK);
+    else if (was == PopupView::VIEW_HISTORY) chartSet(DECK_HIDDEN);
+
+    // Whose view it is: the window's, or (inside one) the member's.
+    const char *who = (member && s.ent[0]) ? s.ent[0]->desc.name : s.name;
     char title[ENTITY_NAME_MAX + 16];
     if (v == PopupView::VIEW_MAIN) {
         if (s.area[0]) { snprintf(title, sizeof(title), "%s > ", s.area); setText(s.lblTitleArea, title); }
         else           setText(s.lblTitleArea, "");
         setText(s.lblTitleName, s.name);
-        buildMain();
     } else if (v == PopupView::VIEW_MEMBER) {
         // "Group > member" (card-sheet 11.1).
         snprintf(title, sizeof(title), "%s > ", s.name);
         setText(s.lblTitleArea, title);
-        setText(s.lblTitleName, s.ent[0] ? s.ent[0]->desc.name : "");
-        buildMain();
+        setText(s.lblTitleName, who);
     } else {
-        snprintf(title, sizeof(title), "%s > ", s.name);
+        snprintf(title, sizeof(title), "%s > ", who);
         setText(s.lblTitleArea, title);
-        setText(s.lblTitleName, v == PopupView::VIEW_HISTORY ? "History" : "Members");
-        if (v == PopupView::VIEW_HISTORY) buildHistory();
-        else                              buildMembers();
+        setText(s.lblTitleName, v == PopupView::VIEW_HISTORY ? "History"
+                              : v == PopupView::VIEW_SCENES  ? "Scenes" : "Members");
     }
+    // SIZED BEFORE THE VIEW IS BUILT: placeWide() lays the window out, and a
+    // DOT label laid out at the last view's width rewrites its own text -
+    // layoutTitle() then measured "Sce..." and kept it (round 7, the 4B).
     layoutTitle();
+    if (v == PopupView::VIEW_HISTORY)      buildHistory();
+    else if (v == PopupView::VIEW_MEMBERS) buildMembers();
+    else                                   buildMain();
     deckRender();   // Paused follows whatever the window is showing now
     s.lastSig = signature();
 }
+
+// The controls view of whatever the window is showing: the window's, or one
+// member's.
+PopupView controlsView() { return inMember() ? PopupView::VIEW_MEMBER : PopupView::VIEW_MAIN; }
+
+// A corner icon: its view, or - when lit - back to the controls.
+void cornerTap(PopupView v) { showView(s.view == v ? controlsView() : v); }
 
 // --- A MEMBER'S OWN CONTROLS (2.10b; owner: tap a row in Members) -----------
 // The same window and the same views, pointed at one member: the group's
@@ -1471,13 +2374,13 @@ uint8_t s_groupCtl   = 0;   // the group's control, restored on the way back
 
 void enterMemberAsync(void *unused) {
     (void)unused;
-    if (s.phase != PopupPhase::PHASE_OPEN || s.view != PopupView::VIEW_MEMBERS) return;
-    if (s_memberPick >= s.nEnt || !s.ent[s_memberPick]) return;
-    for (uint8_t i = 0; i < CARD_PRIMARY_MAX; i++) s.groupEnt[i] = s.ent[i];
+    if (s.phase != PopupPhase::PHASE_OPEN || s.view != PopupView::VIEW_MEMBERS || inMember()) return;
+    const Entity *m = (s_memberPick < memberCount()) ? memberAt(s_memberPick) : nullptr;
+    if (!m) return;
+    for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.groupEnt[i] = s.ent[i];
     s.groupN = s.nEnt;
     s_groupCtl = s.lightCtl;
-    const Entity *m = s.ent[s_memberPick];
-    for (uint8_t i = 0; i < CARD_PRIMARY_MAX; i++) s.ent[i] = nullptr;
+    for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.ent[i] = nullptr;
     s.ent[0] = m;
     s.nEnt   = 1;
     s.lightCtl = firstCtl(lightAggregate().caps);
@@ -1491,22 +2394,47 @@ void memberRowCb(lv_event_t *ev) {
     lv_async_call(enterMemberAsync, nullptr);
 }
 
-void leaveMember() {
-    for (uint8_t i = 0; i < CARD_PRIMARY_MAX; i++) s.ent[i] = s.groupEnt[i];
+// Out of a member, to the group's Members (the back arrow) or its controls
+// (the "Desk" in the title).
+void leaveMember(PopupView to = PopupView::VIEW_MEMBERS) {
+    if (!inMember()) return;
+    for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.ent[i] = s.groupEnt[i];
     s.nEnt     = s.groupN;
     s.groupN   = 0;
+    applyNative();   // the member may have been paused or resumed meanwhile
+    s.view     = PopupView::VIEW_MEMBERS;   // not Scenes: its slider swap is the member's
     s.lightCtl = s_groupCtl;
-    showView(PopupView::VIEW_MEMBERS);
+    showView(to);
 }
 
-void leftCb(lv_event_t *ev) {
-    (void)ev;
-    if (s.view == PopupView::VIEW_MAIN)        CardPopup::close();
-    else if (s.view == PopupView::VIEW_MEMBER) leaveMember();
-    else                                       showView(PopupView::VIEW_MAIN);
+// BACK IS HARD-LINKED, NOT A HISTORY (owner, round 4): every view has one
+// fixed place it goes back to, so "back" never depends on how you got there.
+//   History, Members, Scenes  -> the controls
+//   a member                  -> Members
+//   a member's History/Scenes -> that member
+// On the controls it is the X, and closes the window.
+void goBack() {
+    switch (s.view) {
+        case PopupView::VIEW_MAIN:   CardPopup::close();     break;
+        case PopupView::VIEW_MEMBER: leaveMember();          break;
+        default:                     showView(controlsView()); break;
+    }
 }
-void historyCb(lv_event_t *ev) { (void)ev; showView(PopupView::VIEW_HISTORY); }
-void membersCb(lv_event_t *ev) { (void)ev; showView(PopupView::VIEW_MEMBERS); }
+
+void leftCb(lv_event_t *ev) { (void)ev; goBack(); }
+
+// THE TITLE'S FIRST PART IS A LINK (owner, round 4): "Desk >" goes to Desk's
+// controls, "Office lamp >" to that member's - from any view below them. On
+// the controls themselves it is the area, which leads nowhere yet.
+void crumbCb(lv_event_t *ev) {
+    (void)ev;
+    if (s.view == PopupView::VIEW_MAIN) return;
+    if (s.view == PopupView::VIEW_MEMBER) { leaveMember(PopupView::VIEW_MAIN); return; }
+    showView(controlsView());
+}
+void historyCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_HISTORY); }
+void membersCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_MEMBERS); }
+void scenesCb (lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_SCENES); }
 
 // D6's drag down, on the HEADER ROW only (card-sheet 13): the light's tall
 // slider in 2.10b would fight a drag that could start anywhere. How the
@@ -1569,11 +2497,14 @@ void buildContents() {
 #endif
 
     // Both ends the same width, so the title sits in the true middle.
-    const uint8_t nRight = (s.nEnt > 1) ? 2 : 1;
+    const uint8_t nRight = hasMembers() ? 2 : 1;
     const int32_t slotW  = btn * nRight + gap * (nRight - 1);
 
     lv_obj_t *left = plain(hdr);
     lv_obj_set_size(left, slotW, btn);
+    s.titleLeft  = left;
+    s.titleSlotW = slotW;
+    s.titleSlack = slotW - btn;
     // The X and the back arrow are LVGL's own symbols, which every built-in
     // Montserrat carries; the hero face is the largest one already linked.
     s.btnLeft = iconButton(left, LV_SYMBOL_CLOSE, UIToolkit::Font_Hero, leftCb, &s.lblLeft);
@@ -1595,6 +2526,13 @@ void buildContents() {
     lv_obj_set_height(s.lblTitleArea, lh);
     lv_obj_set_height(s.lblTitleName, lh);
     s.titleW = lv_area_get_width(&s.winRect) - 2 * s.pad - 2 * slotW - 2 * gap;
+    // The first part is a link (crumbCb()): the whole header row's height
+    // takes the tap, and it brightens while pressed. Gestures still bubble to
+    // the row, so a drag down that starts on it still closes the window.
+    lv_obj_add_flag(s.lblTitleArea, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_ext_click_area(s.lblTitleArea, (btn - lh) / 2);
+    lv_obj_set_style_text_color(s.lblTitleArea, UI::c(p.TEXT), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+    lv_obj_add_event_cb(s.lblTitleArea, crumbCb, LV_EVENT_CLICKED, nullptr);
 
     lv_obj_t *right = plain(hdr);
     lv_obj_set_size     (right, slotW, btn);
@@ -1607,7 +2545,7 @@ void buildContents() {
     // the chart, which is always in the corner (owner, 2026-10-06: nearly
     // every window has a chart, few have members). Made first: the row is
     // end-aligned, so the last made is the one in the corner.
-    if (s.nEnt > 1) s.btnMembers = iconButton(right, MDI_LIGHTBULB_GROUP, t.ICON_MD, membersCb);
+    if (hasMembers()) s.btnMembers = iconButton(right, MDI_LIGHTBULB_GROUP, t.ICON_MD, membersCb);
     s.btnHistory = iconButton(right, MDI_CHART_BAR, t.ICON_MD, historyCb);
 
     // --- The stage: whichever view is showing -------------------------------
@@ -1616,6 +2554,16 @@ void buildContents() {
     lv_obj_set_flex_grow(s.stage, 1);
     lv_obj_set_flex_flow(s.stage, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(s.stage, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // --- Scenes: under the chart (owner, 2026-10-06) ------------------------
+    // Out of the flow, in the corner of the window's contents, a header row
+    // and its gap down - so it never pushes the stage. Shown by showView()
+    // when the light has scenes; mdi:movie-open, a clapperboard, already in
+    // the icon faces (HA's own scene icon, the palette, is Colour's here).
+    s.btnScenes = iconButton(s.win, MDI_MOVIE_OPEN, t.ICON_MD, scenesCb);
+    lv_obj_add_flag(s.btnScenes, LV_OBJ_FLAG_FLOATING);
+    lv_obj_align(s.btnScenes, LV_ALIGN_TOP_RIGHT, 0, btn + mm(1.6f));
+    lv_obj_add_flag(s.btnScenes, LV_OBJ_FLAG_HIDDEN);
 
     // --- The auto-close bar: how long until the window gives up -------------
     s.autoBar = plain(s.win);
@@ -1647,6 +2595,27 @@ void tickCb(lv_timer_t *t) {
             lv_obj_align(s.autoBar, LV_ALIGN_BOTTOM_MID, 0, s.pad / 2);
         }
     }
+
+    // A MEMBER OF A GROUP DEFINED IN HA PAUSED OR RESUMED (2.10c): the window
+    // now stands for the members, or for the group again. Checked every tick,
+    // not only on a change, because leaving a member's own view settles the
+    // signature before this could see it. Not in a member's own view, whose
+    // ent[] is that member.
+    if (s.native && !inMember() && nativeWantsMembers() != s.expanded) {
+        applyNative();
+        // Scenes go while a member is paused: from their view, back to the controls.
+        showView((s.view == PopupView::VIEW_SCENES && !hasScenes()) ? controlsView() : s.view);
+        s.lastAgeMs = now;
+        return;
+    }
+
+    // A scene's ring goes when the light no longer looks as the scene left it.
+    if (!sceneRingCheck(now)) renderMain();
+
+    // Scenes learnt after the window opened: its icon appears.
+    if (s.btnScenes && lv_obj_has_flag(s.btnScenes, LV_OBJ_FLAG_HIDDEN) && hasScenes() &&
+        (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER))
+        cornerLook(s.btnScenes, true, false);
 
     // The window is live (card-sheet 7): it follows the entity while open.
     const uint32_t sig = signature();
@@ -2068,7 +3037,9 @@ void intfEnd() {
 // Opaque and on the screen, like the window, so moving it redraws only it.
 // ---------------------------------------------------------------------------
 constexpr uint32_t DECK_PEEK_MS = 200;   // the tab peeking up: a small touch the owner liked
-constexpr uint32_t DECK_OPEN_MS = 220;
+// 260 ms, from 220 (owner, round 7: choppier now that the panel opens further;
+// the page deck's panels take 300). Try 300 if it still stutters.
+constexpr uint32_t DECK_OPEN_MS = 260;
 // 7.2 mm, from 8: the folder tab grew by twice its curve (round 11), and the
 // rows paid for it, so an open deck still reaches the same height on the window.
 constexpr float    DECK_ROW_MM  = 7.2f;
@@ -2084,6 +3055,8 @@ void deckSet(uint8_t state) {
     if (!s.deck) return;
     const uint8_t was = s.deckState;
     s.deckState = state;
+    // Open, on top of the other panel, which folds to its tab.
+    if (state == DECK_OPEN) { lv_obj_move_foreground(s.deck); chartFold(); }
     lv_anim_delete(s.deck, deckExec);
     lv_anim_t a;
     lv_anim_init(&a);
@@ -2095,19 +3068,45 @@ void deckSet(uint8_t state) {
     lv_anim_start(&a);
 }
 
-// On the deck's tab or its pane, as they stand right now? The deck's own
-// object is transparent and wider than the tab: a press beside the tab is a
-// press on the page, which the catcher must take.
+// ---------------------------------------------------------------------------
+// THE SECOND PANEL: CHART (owner, round 7 - a demo). The left half, where
+// round 9 kept room for it: up from the bottom as SETTINGS is, but only while
+// the chart (History) is showing, and back down when the window goes to
+// another view. It is made the first time the chart shows and lives with the
+// window, and goes with it as SETTINGS does (chartEnd()).
+//
+// SETTINGS' mirror image, built by the same buildFolder() (round 7, after the
+// owner's N9: "I want to see how the tab effect works"), with demo rows so its
+// pane is wider and taller than its tab. Its tab stops a millimetre short of
+// SETTINGS' (owner, round 7): two tabs side by side read as two.
+// ---------------------------------------------------------------------------
+struct ChartPanel { lv_obj_t *root = nullptr, *tab = nullptr, *pane = nullptr;
+                    uint8_t state = DECK_HIDDEN; int32_t h = 0; };
+ChartPanel s_chart;
+
+int32_t chartY(uint8_t state) {
+    const int32_t sh = lv_obj_get_height(lv_screen_active());
+    return state == DECK_OPEN ? sh - (s_chart.h - s.deckHide) : state == DECK_PEEK ? sh - s.deckHead : sh;
+}
+
+void chartExec(void *var, int32_t v) { lv_obj_set_y((lv_obj_t *)var, v); }
+
+// Either panel open: the window is out of reach until it folds.
+bool panelOpen() { return s.deckState == DECK_OPEN || s_chart.state == DECK_OPEN; }
+
+// On a panel's tab or its pane, as they stand right now? A panel's own object
+// is transparent and as wide as the window: a press beside its tab is a press
+// on the page, which the catcher must take.
 bool inDeck(const lv_point_t &pt) {
-    if (!s.deck || s.deckState == DECK_HIDDEN) return false;
-    lv_obj_t *parts[2] = { s.deckTab, s.deckPane };
-    for (lv_obj_t *o : parts) {
-        if (!o) continue;
+    auto in = [&](lv_obj_t *o) {
+        if (!o) return false;
         lv_area_t a;
         lv_obj_get_coords(o, &a);
-        if (pt.x >= a.x1 && pt.x <= a.x2 && pt.y >= a.y1 && pt.y <= a.y2) return true;
-    }
-    return false;
+        return pt.x >= a.x1 && pt.x <= a.x2 && pt.y >= a.y1 && pt.y <= a.y2;
+    };
+    if (s_chart.root && s_chart.state != DECK_HIDDEN && (in(s_chart.tab) || in(s_chart.pane))) return true;
+    if (!s.deck || s.deckState == DECK_HIDDEN) return false;
+    return in(s.deckTab) || in(s.deckPane);
 }
 
 void deckFill();
@@ -2119,49 +3118,164 @@ void deckTabCb(lv_event_t *ev) {
     else                          deckOpen();
 }
 
-// One choice in a row. `live` false: drawn quieter, and taps do nothing.
+// ---------------------------------------------------------------------------
+// THE SETTINGS PANEL'S ROWS (owner, 2026-10-07)
 //
-// FILLED, like the window's X and chart buttons (owner, round 10): a chip in
-// the pane's own colour did not read as a button. Unchosen ones take the card
-// surface, as those discs do; a chosen live one, the accent.
-lv_obj_t *deckChip(lv_obj_t *row, const char *text, bool live, bool selected,
-                   lv_event_cb_t cb, void *user) {
-    const UIPalette &p = UI::pal();
-    lv_obj_t *c = plain(row);
-    lv_obj_set_size(c, LV_SIZE_CONTENT, mm(6.0f));
-    lv_obj_set_style_pad_hor(c, mm(2.0f), 0);
-    lv_obj_set_style_radius(c, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_border_width(c, LV_MAX(1, mm(0.2f)), 0);
-    lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
-    lv_obj_t *l = makeLabel(c, UI::type().TAG, p.TEXT);
-    lv_label_set_text(l, text);
-    lv_obj_center(l);
-    if (live) {
-        lv_obj_set_style_border_color(c, UI::c(p.ACCENT), 0);
-        lv_obj_set_style_bg_color(c, UI::c(selected ? p.ACCENT : p.SURFACE), 0);
-        lv_obj_set_style_text_color(l, UI::c(selected ? UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT)
-                                                      : p.ACCENT), 0);
-        if (cb) {
-            lv_obj_add_flag(c, LV_OBJ_FLAG_CLICKABLE);
-            lv_obj_add_event_cb(c, cb, LV_EVENT_CLICKED, user);
-        }
-    } else {
-        // Quieter: a soft edge, dim words, and the chosen one only a shade
-        // darker than the rest.
-        lv_obj_set_style_border_color(c, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 25)), 0);
-        lv_obj_set_style_bg_color(c, UI::c(selected ? UI::mix(p.SURFACE, p.TEXT_DIM, 35) : p.SURFACE), 0);
-        lv_obj_set_style_text_color(l, UI::c(p.TEXT_DIM), 0);
-    }
-    return c;
+// One list says what the rows are, and both the panel's size and its contents
+// are read from it, so the two cannot disagree. Choices are DROPDOWNS (the row
+// is shorter than a line of chips, and a list of choices can grow); Paused is
+// a CHECKBOX. A row that does not work yet (until saving, 2.10d) is shown,
+// greyed, so the owner can see the whole list.
+// ---------------------------------------------------------------------------
+enum class DeckRowKind : uint8_t { ROW_CHECK, ROW_DROP };
+
+struct DeckRowSpec {
+    const char   *label;
+    DeckRowKind   kind;
+    const char   *opts;     // a dropdown's choices, one per line
+    uint16_t      sel;      // its chosen one, or the checkbox's state
+    bool          live;     // false: shown greyed, does nothing yet
+    lv_event_cb_t cb;
+    lv_obj_t    **out;      // where the control is kept, or null
+};
+constexpr uint8_t DECK_ROWS_MAX = 8;
+
+void pauseCheckCb(lv_event_t *ev);
+void groupDropCb(lv_event_t *ev);
+void scenesDropCb(lv_event_t *ev);
+void lookDropCb(lv_event_t *ev);
+
+uint8_t deckSpecs(DeckRowSpec *r) {
+    uint8_t n = 0;
+    CardLabel lbl = CardLabel::LBL_INHERIT;
+    if (Card *c = cardOf(h.surface)) lbl = c->labelMode();
+    const uint16_t lblSel = lbl == CardLabel::LBL_NAME ? 1 : lbl == CardLabel::LBL_STATE ? 2
+                          : lbl == CardLabel::LBL_NONE ? 4 : 0;
+    r[n++] = { "Paused", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)aggregate().paused, true,
+               pauseCheckCb, &s.swPause };
+    // When a group defined here counts as on - HA's group helper option.
+    // Not for a group defined in HA or Hue: the source decides (2.10c).
+    if (s.nEnt > 1 && !s.native && !inMember())
+        r[n++] = { "Active state", DeckRowKind::ROW_DROP, "Any members are on\nAll members are on",
+                   (uint16_t)(s.groupOn == GroupOn::GROUP_ON_ALL), true, groupDropCb, &s.ddGroup };
+    r[n++] = { "Label", DeckRowKind::ROW_DROP, "Default\nFrom HA\nState\nCustom\nNone",
+               lblSel, false, nullptr, nullptr };
+    // "Custom name" joins the list when Label can be set to Custom (2.10d).
+    r[n++] = { "Visibility", DeckRowKind::ROW_DROP,
+               "Show on dashboard\nShow only in group\nShow only as member\nHidden", 0, false, nullptr, nullptr };
+    r[n++] = { "Tap action", DeckRowKind::ROW_DROP,
+               "Toggle\nDetails view\nMembers view\nHistory view\nCycle scenes\nNothing", 0, false, nullptr, nullptr };
+    const Entity *sh = sceneHost();
+    if (sh && sh->nScenes && !inMember())
+        r[n++] = { "Scenes", DeckRowKind::ROW_DROP, "Visible scenes only\nShow all scenes\nDisabled",
+                   (uint16_t)(s.sceneShow == SceneShow::SCENES_ALL ? 1 : s.sceneShow == SceneShow::SCENES_OFF ? 2 : 0),
+                   true, scenesDropCb, &s.ddScenes };
+    // The selector's looks, for the scheme showing (K31). In every build since
+    // round 9 (owner: "I'd like to keep that for a bit"); a device-wide
+    // setting in a card's panel until the device's own settings page (4.1).
+    r[n++] = { "Selector", DeckRowKind::ROW_DROP, "Black - Square\nBlack - Round\nSilver - Square\nSilver - Round",
+               deckLook(), true, lookDropCb, nullptr };
+    return n;
 }
 
-// Paint a live chip as chosen or not.
-void deckChipSelect(lv_obj_t *c, bool selected) {
-    if (!c) return;
+int32_t deckCtlH() { return mm(6.0f); }
+
+// The widest line of a dropdown's choices.
+int32_t widestLine(const char *opts, const lv_font_t *f) {
+    char line[48];
+    int32_t w = 0;
+    while (opts && *opts) {
+        const char *e = strchr(opts, '\n');
+        const size_t len = e ? (size_t)(e - opts) : strlen(opts);
+        const size_t k = len < sizeof(line) - 1 ? len : sizeof(line) - 1;
+        memcpy(line, opts, k);
+        line[k] = '\0';
+        w = LV_MAX(w, textW(line, f));
+        opts = e ? e + 1 : nullptr;
+    }
+    return w;
+}
+
+int32_t deckCtlW(const DeckRowSpec &r) {
+    if (r.kind == DeckRowKind::ROW_CHECK) return deckCtlH() + mm(1.0f);
+    const lv_font_t *f = UI::type().TAG;
+    return widestLine(r.opts, f) + 2 * mm(1.6f) + textW(LV_SYMBOL_DOWN, f) + mm(1.6f);
+}
+
+constexpr float DECK_PAD_MM = 2.4f;   // the pane's sides
+
+// AS WIDE AS ITS LONGEST ROW (owner): each row's words, a gap, its control.
+int32_t rowsNeedW(const DeckRowSpec *r, uint8_t n) {
+    int32_t w = 0;
+    for (uint8_t i = 0; i < n; i++)
+        w = LV_MAX(w, textW(r[i].label, UI::type().NAME) + mm(4.0f) + deckCtlW(r[i]));
+    return w + 2 * mm(DECK_PAD_MM);
+}
+
+int32_t deckNeedW() {
+    DeckRowSpec r[DECK_ROWS_MAX];
+    return rowsNeedW(r, deckSpecs(r));
+}
+
+lv_obj_t *deckDropdown(lv_obj_t *parent, const DeckRowSpec &r) {
     const UIPalette &p = UI::pal();
-    lv_obj_set_style_bg_color(c, UI::c(selected ? p.ACCENT : p.SURFACE), 0);
-    lv_obj_t *l = lv_obj_get_child(c, 0);
-    if (l) lv_obj_set_style_text_color(l, UI::c(selected ? UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT) : p.ACCENT), 0);
+    const UIType    &t = UI::type();
+    lv_obj_t *dd = lv_dropdown_create(parent);
+    lv_dropdown_set_options(dd, r.opts);
+    lv_dropdown_set_selected(dd, r.sel);
+    lv_obj_set_size(dd, deckCtlW(r), deckCtlH());
+    const int32_t lh = lv_font_get_line_height(t.TAG);
+    lv_obj_set_style_text_font   (dd, t.TAG, 0);
+    lv_obj_set_style_text_font   (dd, t.TAG, LV_PART_INDICATOR);
+    lv_obj_set_style_text_color  (dd, UI::c(r.live ? p.TEXT : p.TEXT_DIM), 0);
+    lv_obj_set_style_bg_color    (dd, UI::c(p.SURFACE), 0);
+    lv_obj_set_style_bg_opa      (dd, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius      (dd, mm(1.2f), 0);
+    lv_obj_set_style_border_width(dd, LV_MAX(1, mm(0.2f)), 0);
+    lv_obj_set_style_border_color(dd, UI::c(r.live ? p.ACCENT : UI::mix(p.SURFACE_ALT, p.TEXT, 25)), 0);
+    lv_obj_set_style_pad_hor     (dd, mm(1.6f), 0);
+    lv_obj_set_style_pad_ver     (dd, LV_MAX(0, (deckCtlH() - lh) / 2 - 1), 0);
+    lv_obj_set_style_shadow_width(dd, 0, 0);
+    if (lv_obj_t *list = lv_dropdown_get_list(dd)) {
+        lv_obj_set_style_text_font   (list, t.TAG, 0);
+        lv_obj_set_style_text_color  (list, UI::c(p.TEXT), 0);
+        lv_obj_set_style_bg_color    (list, UI::c(p.SURFACE), 0);
+        lv_obj_set_style_border_color(list, UI::c(p.ACCENT), 0);
+        lv_obj_set_style_border_width(list, LV_MAX(1, mm(0.2f)), 0);
+        lv_obj_set_style_radius      (list, mm(1.2f), 0);
+        lv_obj_set_style_shadow_width(list, 0, 0);
+        lv_obj_set_style_bg_color    (list, UI::c(p.ACCENT), UI::part(LV_PART_SELECTED, LV_STATE_CHECKED));
+        lv_obj_set_style_text_color  (list, UI::c(UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT)),
+                                      UI::part(LV_PART_SELECTED, LV_STATE_CHECKED));
+        lv_obj_set_style_bg_color    (list, UI::c(UI::mix(p.SURFACE, p.TEXT, 20)),
+                                      UI::part(LV_PART_SELECTED, LV_STATE_PRESSED));
+    }
+    if (!r.live) lv_obj_add_state(dd, LV_STATE_DISABLED);
+    else if (r.cb) lv_obj_add_event_cb(dd, r.cb, LV_EVENT_VALUE_CHANGED, nullptr);
+    return dd;
+}
+
+lv_obj_t *deckCheckbox(lv_obj_t *parent, const DeckRowSpec &r) {
+    const UIPalette &p = UI::pal();
+    lv_obj_t *cb = lv_checkbox_create(parent);
+    lv_checkbox_set_text(cb, "");
+    lv_obj_set_style_text_font   (cb, UI::type().NAME, 0);
+    lv_obj_set_style_pad_column  (cb, 0, 0);
+    // As tall as a dropdown (owner, S2: larger). The box is the font's line
+    // height plus its own padding.
+    const int32_t grow = LV_MAX(0, (deckCtlH() - lv_font_get_line_height(UI::type().NAME)) / 2);
+    lv_obj_set_style_pad_all     (cb, grow, LV_PART_INDICATOR);
+    lv_obj_set_style_radius      (cb, mm(1.2f), LV_PART_INDICATOR);
+    lv_obj_set_style_border_width(cb, LV_MAX(2, mm(0.3f)), LV_PART_INDICATOR);
+    lv_obj_set_style_border_color(cb, UI::c(p.ACCENT), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color    (cb, UI::c(p.SURFACE), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa      (cb, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color    (cb, UI::c(p.ACCENT), UI::part(LV_PART_INDICATOR, LV_STATE_CHECKED));
+    lv_obj_set_style_text_color  (cb, UI::c(UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT)),
+                                  UI::part(LV_PART_INDICATOR, LV_STATE_CHECKED));
+    if (r.sel) lv_obj_add_state(cb, LV_STATE_CHECKED);
+    if (r.cb) lv_obj_add_event_cb(cb, r.cb, LV_EVENT_VALUE_CHANGED, nullptr);
+    return cb;
 }
 
 void deckRender() {
@@ -2169,27 +3283,46 @@ void deckRender() {
         if (aggregate().paused) lv_obj_add_state  (s.swPause, LV_STATE_CHECKED);
         else                    lv_obj_remove_state(s.swPause, LV_STATE_CHECKED);
     }
-    const bool all = (s.groupOn == GroupOn::GROUP_ON_ALL);
-    deckChipSelect(s.chipGroup[0], !all);
-    deckChipSelect(s.chipGroup[1],  all);
+    if (s.ddGroup) lv_dropdown_set_selected(s.ddGroup, s.groupOn == GroupOn::GROUP_ON_ALL ? 1 : 0);
 }
 
-// On when: any member / all members. On the held card too, so it repaints at
-// once and its tap follows the same rule.
-void groupChipCb(lv_event_t *ev) {
-    s.groupOn = lv_event_get_user_data(ev) ? GroupOn::GROUP_ON_ALL : GroupOn::GROUP_ON_ANY;
+// Active state: any member / all members. On the held card too, so it
+// repaints at once and its tap follows the same rule.
+void groupDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    s.groupOn = k ? GroupOn::GROUP_ON_ALL : GroupOn::GROUP_ON_ANY;
     if (Card *c = cardOf(h.surface)) c->setGroupOn(s.groupOn);
-    deckRender();
     renderMain();
 }
 
-// Paused: Off / On. Through the card when it is the held one (it repaints at
+void lookDropCb(lv_event_t *ev) {
+    chosenLook() = (int8_t)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    // The deck is built with the view; the chips' lit look follows at once.
+    if (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER) lv_async_call(rebuildMainAsync, nullptr);
+    else showView(s.view);
+}
+
+// Scenes: Visible / All / Off (2.10c). On the held card, and the window follows
+// at once: the clapperboard comes or goes, and Scenes rebuilds or gives way.
+void scenesDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    s.sceneShow = k == 1 ? SceneShow::SCENES_ALL : k == 2 ? SceneShow::SCENES_OFF : SceneShow::SCENES_VISIBLE;
+    if (Card *c = cardOf(h.surface)) c->setSceneShow(s.sceneShow);
+    s.lastScene = -1;   // the offered list changed under the ring
+    if (s.view == PopupView::VIEW_SCENES)
+        showView(hasScenes() ? PopupView::VIEW_SCENES : controlsView());
+    else
+        cornerLook(s.btnScenes, (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER) &&
+                                hasScenes(), false);
+}
+
+// Paused, a checkbox. Through the card when it is the held one (it repaints at
 // once, and every card on the same entities follows through the registry).
-void pauseSwitchCb(lv_event_t *ev) {
+void pauseCheckCb(lv_event_t *ev) {
     const bool on = lv_obj_has_state((lv_obj_t *)lv_event_get_target(ev), LV_STATE_CHECKED);
     // In a member's own view, only that member (2.10b) - the registry, and
     // every card on it follows.
-    Card *c = (s.view == PopupView::VIEW_MEMBER) ? nullptr : cardOf(h.surface);
+    Card *c = inMember() ? nullptr : cardOf(h.surface);
     if (c) {
         c->setPaused(on);
     } else if (s.reg) {
@@ -2200,24 +3333,27 @@ void pauseSwitchCb(lv_event_t *ev) {
     renderMain();
 }
 
-// A row: what it is on the left, its choices on the right.
-lv_obj_t *deckRow(lv_obj_t *pane, const char *what) {
+// A row: what it is on the left, its control on the right.
+lv_obj_t *deckRow(lv_obj_t *pane, const char *what, bool live) {
     lv_obj_t *r = plain(pane);
     lv_obj_set_size     (r, lv_pct(100), mm(DECK_ROW_MM));
     lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_t *l = makeLabel(r, UI::type().NAME, UI::pal().TEXT);
+    lv_obj_t *l = makeLabel(r, UI::type().NAME, live ? UI::pal().TEXT : UI::pal().TEXT_DIM);
     lv_label_set_text(l, what);
-    lv_obj_t *chips = plain(r);
-    lv_obj_set_size     (chips, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(chips, LV_FLEX_FLOW_ROW);
-    lv_obj_set_style_pad_column(chips, mm(1.2f), 0);
-    return chips;
+    return r;
 }
 
-// Built with the window, below the bottom of the screen, inside showWindow()'s
-// quiet build (invalidation off); showWindow() then slides it up to its tab.
-void deckCreate() {
+// A FOLDER PANEL: SETTINGS in the right half, and its mirror image CHART in
+// the left (round 7 - "I want to see how the tab effect works"). One builder,
+// so the two are the same shape by construction.
+struct Folder { lv_obj_t *root = nullptr, *tab = nullptr, *tabLbl = nullptr, *pane = nullptr; int32_t h = 0; };
+
+// Built below the bottom of the screen. `left`: the tab at the window's left
+// edge and the pane growing rightwards from it; otherwise both on the right.
+// `needW`: the widest row; `rows`: how many.
+void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t rows,
+                 int32_t tabW, lv_event_cb_t tabCb) {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const lv_area_t &W = s.winRect;
@@ -2229,37 +3365,69 @@ void deckCreate() {
     // popup").
     s.deckHead = UIToolkit::sc(UIToolkit::PANEL_HEADER_H);
     // A FOLDER TAB (owner, round 10). The pane has a top edge of its own, and
-    // the tab rises from it in the right half, the join curving in like a
-    // file folder's - so an open deck is closed off from the window's body.
+    // the tab rises from it, the join curving in like a file folder's - so an
+    // open panel is closed off from the window's body.
     //
     // FOLDED, ONLY THE TAB SHOWS (owner, round 11): the strip above the screen's
     // edge is the page deck's header height, and the pane's edge and the curve
     // sit just below it. So the tab reaches a curve's height further down than
     // what shows. OPEN, the pane's own bottom edge stays below the screen too:
-    // the deck is deckHide taller than what it uncovers.
+    // the panel is deckHide taller than what it uncovers.
     const int32_t rf       = r;                        // the inner curve
     const int32_t tabAbove = s.deckHead + rf;          // the tab's part above the pane's edge
     s.deckHide = r + 2 * bw;
-    // A group card has one more row: when it counts as on (2.10b).
-    const int32_t rows = (s.nEnt > 1) ? 5 : 4;
-    s.deckH    = tabAbove + (rf + mm(1.6f)) + rows * mm(DECK_ROW_MM) + mm(4.0f) + mm(1.6f) + s.deckHide;
-
-    s.deck = plain(lv_screen_active());
-    lv_obj_set_pos (s.deck, W.x1, deckY(DECK_HIDDEN));
-    lv_obj_set_size(s.deck, w, s.deckH);
+    F.h = tabAbove + (rf + mm(1.6f)) + rows * mm(DECK_ROW_MM) + mm(1.6f) + s.deckHide;
+    // NEVER TALLER THAN THE WINDOW (owner, 2026-10-07): open, the tab's top
+    // stays at or below the window's top edge. More rows than that: the pane
+    // scrolls.
+    const int32_t maxH = lv_obj_get_height(lv_screen_active()) - s.winRect.y1 + s.deckHide;
+    const bool scroll = F.h > maxH;
+    if (scroll) F.h = maxH;
 
     // Built back to front: the pane, the tab over it, a block hiding the
     // tab's bottom where it overlaps the pane, and the inner curve. One colour
     // throughout - the tab used to be the card colour folded and the window's
     // open (owner, round 10). The scheme's lift on the pane and the tab: a
     // shadow on Linen, like the page deck's panels; nothing on the dark ones.
-    const int32_t tabW = w / 2;                        // THE RIGHT HALF - see below
-    const int32_t tabX = w - tabW;
+    const int32_t tabXw = left ? 0 : w - tabW;          // in the window's width
 
-    lv_obj_t *pane = plain(s.deck);
-    s.deckPane = pane;
-    lv_obj_set_pos (pane, 0, tabAbove);
-    lv_obj_set_size(pane, w, s.deckH - tabAbove);
+    // AS WIDE AS ITS LONGEST ROW (owner, 2026-10-07), its outer edge on the
+    // window's, never narrower than its own tab. Within a curve's width of the
+    // tab it is made the tab's width: the two then share one straight inner
+    // edge, and there is no inner curve to draw.
+    int32_t paneW = LV_CLAMP(tabW, needW, w);
+    const bool flush = paneW < tabW + 2 * r;
+    if (flush) paneW = tabW;
+    const int32_t paneXw = left ? 0 : w - paneW;
+
+    // THE HOLDER IS ONLY AS WIDE AS THE TAB AND PANE (round 8, measured on the
+    // P4_5: 35-105 ms a frame while sliding). Moving an object redraws its
+    // whole area, and a holder as wide as the window, transparent, made LVGL
+    // draw the cards, the window and the panel in every strip of every frame.
+    // Sized to the panel, most strips lie inside the opaque pane, and LVGL
+    // starts drawing there. Widened by the shadow's reach on Linen, so the
+    // holder does not clip it.
+    const UIMetrics &m = UI::met();
+    const int32_t reach = m.SHADOW ? UI::sc(m.SHADOW) + UI::sc(m.SHADOW_Y) + 2 : 0;
+    const int32_t x0 = LV_MAX(0, LV_MIN(tabXw, paneXw) - reach);
+    const int32_t x1 = LV_MIN(w, LV_MAX(tabXw + tabW, paneXw + paneW) + reach);
+    const int32_t tabX  = tabXw - x0;                   // from here on, in the holder
+    const int32_t paneX = paneXw - x0;
+    F.root = plain(lv_screen_active());
+    lv_obj_set_pos (F.root, W.x1 + x0, lv_obj_get_height(lv_screen_active()));   // out of sight
+    lv_obj_set_size(F.root, x1 - x0, F.h);
+
+    // FLUSH: ONE PIECE (owner, 2026-10-07: a break in the left edge under the
+    // title on the P4_5 and the 1060, a line under it on Linen). A tab exactly
+    // as wide as its pane met it corner to rounded corner. So the pane starts
+    // at the top and is the tab's shape itself; the tab below is only its
+    // label and its touch area.
+    const int32_t paneY = flush ? 0 : tabAbove;
+    lv_obj_t *pane = plain(F.root);
+    F.pane = pane;
+    lv_obj_set_pos (pane, paneX, paneY);
+    lv_obj_set_size(pane, paneW, F.h - paneY);
+    if (scroll) { lv_obj_add_flag(pane, LV_OBJ_FLAG_SCROLLABLE); UI::tameScroll(pane); }
     lv_obj_set_style_radius      (pane, r, 0);
     lv_obj_set_style_bg_color    (pane, UI::c(p.SURFACE_ALT), 0);
     lv_obj_set_style_bg_opa      (pane, LV_OPA_COVER, 0);
@@ -2267,58 +3435,62 @@ void deckCreate() {
     lv_obj_set_style_border_width(pane, bw, 0);
     lv_obj_add_style             (pane, UI::paint(UIPaint::PAINT_LIFT), 0);
     // The pane's padding keeps its rows below the tab's join.
-    lv_obj_set_style_pad_hor(pane, mm(2.4f), 0);
-    lv_obj_set_style_pad_top(pane, rf + mm(1.6f), 0);
+    lv_obj_set_style_pad_hor(pane, mm(DECK_PAD_MM), 0);
+    lv_obj_set_style_pad_top(pane, (tabAbove - paneY) + rf + mm(1.6f), 0);
     lv_obj_set_style_pad_bottom(pane, mm(1.6f) + s.deckHide, 0);   // nothing in the part that stays hidden
     lv_obj_set_flex_flow(pane, LV_FLEX_FLOW_COLUMN);
     lv_obj_add_flag(pane, LV_OBJ_FLAG_CLICKABLE);   // a tap on the pane stays on the pane
 
-    // The tab: THE RIGHT HALF, ALWAYS (owner, round 9). Some cards will get a
-    // second panel (a sensor's CHART, card-sheet 11.1); it takes the left half,
-    // so SETTINGS is always in the same place. Each panel is the deck's full
-    // width when open. It reaches a radius past the pane's edge, its lower
-    // corners hidden by the block below.
-    s.deckTab = plain(s.deck);
-    lv_obj_set_pos (s.deckTab, tabX, 0);
-    lv_obj_set_size(s.deckTab, tabW, tabAbove + r + bw);
-    lv_obj_set_style_radius      (s.deckTab, r, 0);
-    lv_obj_set_style_bg_color    (s.deckTab, UI::c(p.SURFACE_ALT), 0);
-    lv_obj_set_style_bg_opa      (s.deckTab, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(s.deckTab, UI::border(), 0);
-    lv_obj_set_style_border_width(s.deckTab, bw, 0);
-    lv_obj_add_style             (s.deckTab, UI::paint(UIPaint::PAINT_LIFT), 0);
-    lv_obj_add_flag(s.deckTab, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(s.deckTab, deckTabCb, LV_EVENT_CLICKED, nullptr);
-    s.deckTabLbl = makeLabel(s.deckTab, t.TAG, p.ACCENT);
-    lv_label_set_text(s.deckTabLbl, "SETTINGS");
-    lv_obj_set_style_text_letter_space(s.deckTabLbl, mm(0.4f), 0);
+    // The tab: SETTINGS IN THE RIGHT HALF, ALWAYS (owner, round 9); a second
+    // panel (CHART) takes the left half, so SETTINGS is always in the same
+    // place. It reaches a radius past the pane's edge, its lower corners
+    // hidden by the block below.
+    F.tab = plain(F.root);
+    lv_obj_set_pos (F.tab, tabX, 0);
+    lv_obj_set_size(F.tab, tabW, tabAbove + r + bw);
+    lv_obj_set_style_radius      (F.tab, r, 0);
+    lv_obj_set_style_bg_color    (F.tab, UI::c(p.SURFACE_ALT), 0);
+    lv_obj_set_style_bg_opa      (F.tab, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(F.tab, UI::border(), 0);
+    lv_obj_set_style_border_width(F.tab, bw, 0);
+    lv_obj_add_style             (F.tab, UI::paint(UIPaint::PAINT_LIFT), 0);
+    lv_obj_add_flag(F.tab, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(F.tab, tabCb, LV_EVENT_CLICKED, nullptr);
+    F.tabLbl = makeLabel(F.tab, t.TAG, p.ACCENT);
+    lv_label_set_text(F.tabLbl, title);
+    lv_obj_set_style_text_letter_space(F.tabLbl, mm(0.4f), 0);
     // Where round 11 had it, which the owner called right.
-    lv_obj_align(s.deckTabLbl, LV_ALIGN_TOP_MID, 0, (s.deckHead - rf - lv_font_get_line_height(t.TAG)) / 2);
+    lv_obj_align(F.tabLbl, LV_ALIGN_TOP_MID, 0, (s.deckHead - rf - lv_font_get_line_height(t.TAG)) / 2);
+    if (flush) {
+        // The pane is the shape; the tab draws nothing of its own.
+        lv_obj_remove_style(F.tab, UI::paint(UIPaint::PAINT_LIFT), 0);
+        lv_obj_set_style_bg_opa      (F.tab, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(F.tab, 0, 0);
+        return;
+    }
 
     // The block: the tab's lower corners, bottom border and (on Linen) the
     // shadow it casts downward, all of which lie inside the pane - painted out
-    // in the pane's colour. Kept one border-width clear of the pane's right
+    // in the pane's colour. Kept one border-width clear of the pane's outer
     // edge, which carries on down past the tab.
-    // AND THE SHADOW IT CASTS TO THE LEFT: a shadow spreads sideways too, and
-    // round the tab's lower-left corner it showed below the pane's edge as a
+    // AND THE SHADOW IT CASTS INWARDS: a shadow spreads sideways too, and
+    // round the tab's inner lower corner it showed below the pane's edge as a
     // small grey crescent at the foot of the inner curve (owner, 2026-10-06 -
-    // "thought it was crud on the glass"). The block reaches left by the
+    // "thought it was crud on the glass"). The block reaches in by the
     // shadow's width; the curve's arcs are drawn over it.
-    const UIMetrics &m = UI::met();
-    const int32_t reach = m.SHADOW ? UI::sc(m.SHADOW) + UI::sc(m.SHADOW_Y) + 2 : 0;
-    lv_obj_t *block = plain(s.deck);
-    lv_obj_set_pos (block, tabX - reach, tabAbove + bw);
+    lv_obj_t *block = plain(F.root);
+    lv_obj_set_pos (block, left ? tabX + bw : tabX - reach, tabAbove + bw);
     lv_obj_set_size(block, tabW - bw + reach, r + bw + reach);
     lv_obj_set_style_bg_color(block, UI::c(p.SURFACE_ALT), 0);
     lv_obj_set_style_bg_opa  (block, LV_OPA_COVER, 0);
 
-    // THE SEAM: the tip of the tab's left border, on the pane's edge line at
+    // THE SEAM: the tip of the tab's inner border, on the pane's edge line at
     // the foot of the curve. The curve's fill arc covers it only up to its own
     // anti-aliased rim, so a 3-pixel speck was left (owner, round 7: "now that
     // I know about it I can't ignore it"). Painted out here; the arcs below are
     // drawn after, so nothing of the curve is lost.
-    lv_obj_t *seam = plain(s.deck);
-    lv_obj_set_pos (seam, tabX - 2, tabAbove - bw - 1);
+    lv_obj_t *seam = plain(F.root);
+    lv_obj_set_pos (seam, left ? tabX + tabW - 3 * bw - 2 : tabX - 2, tabAbove - bw - 1);
     lv_obj_set_size(seam, 3 * bw + 4, 2 * bw + 2);
     lv_obj_set_style_bg_color(seam, UI::c(p.SURFACE_ALT), 0);
     lv_obj_set_style_bg_opa  (seam, LV_OPA_COVER, 0);
@@ -2327,16 +3499,19 @@ void deckCreate() {
     // which LVGL has no shape for. Two quarter arcs centred a radius out from
     // the join: a thick one in the pane's colour fills the corner outside the
     // curve, and a border-width one draws the edge along it. Their spill onto
-    // the tab and the pane is the same colour, so it does not show.
-    const lv_point_t ctr = { tabX - rf, tabAbove - rf };
+    // the tab and the pane is the same colour, so it does not show. Mirrored
+    // for a tab on the left: the centre a radius to the tab's right, the
+    // quarter from +y round to -x.
+    const lv_point_t ctr = { left ? tabX + tabW + rf : tabX - rf, tabAbove - rf };
     const int32_t ro = (rf * 1415 + 999) / 1000 + 1;   // reaches the join, rf * sqrt(2)
     auto quarter = [&](int32_t outer, int32_t width, lv_color_t col) {
-        lv_obj_t *a = lv_arc_create(s.deck);
+        lv_obj_t *a = lv_arc_create(F.root);
         lv_obj_remove_style_all(a);
         lv_obj_clear_flag(a, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_pos (a, ctr.x - outer, ctr.y - outer);
         lv_obj_set_size(a, 2 * outer, 2 * outer);
-        lv_arc_set_bg_angles(a, 0, 90);                // from +x round to +y: the join's side
+        if (left) lv_arc_set_bg_angles(a, 90, 180);   // from +y round to -x
+        else      lv_arc_set_bg_angles(a, 0, 90);     // from +x round to +y: the join's side
         lv_obj_set_style_arc_width  (a, width, LV_PART_MAIN);
         lv_obj_set_style_arc_color  (a, col, LV_PART_MAIN);
         lv_obj_set_style_arc_opa    (a, LV_OPA_COVER, LV_PART_MAIN);
@@ -2345,7 +3520,20 @@ void deckCreate() {
     };
     quarter(ro, ro - rf, UI::c(p.SURFACE_ALT));
     quarter(rf + bw, bw, UI::border());
+}
 
+// SETTINGS: built with the window, below the bottom of the screen, inside
+// showWindow()'s quiet build (invalidation off); showWindow() then slides it
+// up to its tab. Its rows come from one list - deckSpecs() - read here for the
+// size and again by deckFill() for the contents.
+void deckCreate() {
+    DeckRowSpec specs[DECK_ROWS_MAX];
+    const int32_t rows = deckSpecs(specs);
+    const int32_t w = lv_area_get_width(&s.winRect);
+    Folder F;
+    buildFolder(F, false, "SETTINGS", deckNeedW(), rows, w / 2, deckTabCb);
+    s.deck = F.root; s.deckTab = F.tab; s.deckTabLbl = F.tabLbl; s.deckPane = F.pane;
+    s.deckH = F.h;
     s.deckState  = DECK_HIDDEN;
     s.deckFilled = false;
 }
@@ -2356,61 +3544,15 @@ void deckCreate() {
 void deckFill() {
     if (!s.deckPane || s.deckFilled) return;
     s.deckFilled = true;
-    const UIType &t = UI::type();
-    const UIPalette &p = UI::pal();
-    lv_obj_t *pane = s.deckPane;
-
-    // What the label row shows: the card's own choice, or what it inherits.
-    CardLabel lbl = CardLabel::LBL_NAME;
-    if (Card *c = cardOf(h.surface)) lbl = (c->labelMode() != CardLabel::LBL_INHERIT) ? c->labelMode() : cardLabelMode();
-    const bool paused = aggregate().paused;
-
-    // Paused first: the one that works, and the one a person comes for.
-    // A SWITCH, NOT "Off / On" (owner, 2026-10-06): "On" could be read as
-    // "updates on" as easily as "paused on". A switch beside the word Paused
-    // has one reading. Knob right, in the accent: paused.
-    lv_obj_t *row = deckRow(pane, "Paused");
-    s.swPause = lv_switch_create(row);
-    lv_obj_remove_style_all(s.swPause);
-    lv_obj_set_size(s.swPause, mm(11.0f), mm(6.0f));
-    lv_obj_set_style_radius  (s.swPause, LV_RADIUS_CIRCLE, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(s.swPause, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 18)), LV_PART_MAIN);
-    lv_obj_set_style_radius  (s.swPause, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
-    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_TRANSP, LV_PART_INDICATOR);
-    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_COVER, UI::part(LV_PART_INDICATOR, LV_STATE_CHECKED));
-    lv_obj_set_style_bg_color(s.swPause, UI::c(p.ACCENT), UI::part(LV_PART_INDICATOR, LV_STATE_CHECKED));
-    lv_obj_set_style_radius  (s.swPause, LV_RADIUS_CIRCLE, LV_PART_KNOB);
-    lv_obj_set_style_bg_opa  (s.swPause, LV_OPA_COVER, LV_PART_KNOB);
-    lv_obj_set_style_bg_color(s.swPause, UI::c(p.TEXT), LV_PART_KNOB);
-    lv_obj_set_style_pad_all (s.swPause, -mm(0.6f), LV_PART_KNOB);
-    if (paused) lv_obj_add_state(s.swPause, LV_STATE_CHECKED);
-    lv_obj_add_event_cb(s.swPause, pauseSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
-
-    // A card for several things: HA's group helper option (owner, 2026-10-05).
-    // Live, and kept in RAM until saving arrives (2.10d).
-    if (s.nEnt > 1) {
-        const bool all = (s.groupOn == GroupOn::GROUP_ON_ALL);
-        row = deckRow(pane, "On when");
-        s.chipGroup[0] = deckChip(row, "Any is on",  true, !all, groupChipCb, nullptr);
-        s.chipGroup[1] = deckChip(row, "All are on", true,  all, groupChipCb, (void *)1);
+    // The rows, from the one list (deckSpecs()): Paused first - the one that
+    // works, and the one a person comes for - then the card's settings.
+    DeckRowSpec r[DECK_ROWS_MAX];
+    const uint8_t n = deckSpecs(r);
+    for (uint8_t i = 0; i < n; i++) {
+        lv_obj_t *row = deckRow(s.deckPane, r[i].label, r[i].live);
+        lv_obj_t *ctl = (r[i].kind == DeckRowKind::ROW_CHECK) ? deckCheckbox(row, r[i]) : deckDropdown(row, r[i]);
+        if (r[i].out) *r[i].out = ctl;
     }
-
-    row = deckRow(pane, "Label");
-    deckChip(row, "HA name", false, lbl == CardLabel::LBL_NAME,  nullptr, nullptr);
-    deckChip(row, "Custom",  false, false,                        nullptr, nullptr);
-    deckChip(row, "State",   false, lbl == CardLabel::LBL_STATE, nullptr, nullptr);
-    deckChip(row, "None",    false, lbl == CardLabel::LBL_NONE,  nullptr, nullptr);
-
-    row = deckRow(pane, "Custom name");
-    deckChip(row, "Edit with keyboard", false, false, nullptr, nullptr);
-
-    row = deckRow(pane, "On the dashboard");
-    deckChip(row, "Shown",  false, true,  nullptr, nullptr);
-    deckChip(row, "Hidden", false, false, nullptr, nullptr);
-
-    lv_obj_t *note = makeLabel(pane, t.TAG, p.TEXT_DIM);
-    lv_label_set_text(note, "Paused is kept on the device. The rest arrives with saving (2.10d).");
 }
 
 // Open the deck, building its rows the first time.
@@ -2447,9 +3589,92 @@ void deckEnd() {
     }
     s.deck = s.deckTab = s.deckTabLbl = s.deckPane = nullptr;
     s.swPause = nullptr;
-    s.chipGroup[0] = s.chipGroup[1] = nullptr;
+    s.ddGroup = s.ddScenes = nullptr;
     s.deckState  = DECK_HIDDEN;
     s.deckFilled = false;
+}
+
+// --- CHART: the demo rows, and its life -------------------------------------
+// Rows a chart could plausibly have, so the panel has a real size: they work
+// as controls and change nothing.
+uint8_t chartSpecs(DeckRowSpec *r) {
+    uint8_t n = 0;
+    r[n++] = { "Time range", DeckRowKind::ROW_DROP, "Last 24 hours\nLast hour\nLast 7 days\nLast 30 days",
+               0, true, nullptr, nullptr };
+    r[n++] = { "Chart style", DeckRowKind::ROW_DROP, "Line\nBars\nSteps", 0, true, nullptr, nullptr };
+    // Long enough that the pane is wider than its tab on the P4_5 too.
+    r[n++] = { "Shading", DeckRowKind::ROW_DROP, "Above and below the average\nBy hour of day\nNone",
+               0, true, nullptr, nullptr };
+    r[n++] = { "Show min and max", DeckRowKind::ROW_CHECK, nullptr, 1, true, nullptr, nullptr };
+    r[n++] = { "Compare with yesterday", DeckRowKind::ROW_CHECK, nullptr, 0, true, nullptr, nullptr };
+    return n;
+}
+
+void chartTabCb(lv_event_t *ev) {
+    (void)ev;
+    chartSet(s_chart.state == DECK_OPEN ? DECK_PEEK : DECK_OPEN);
+}
+
+// Made the first time the chart shows, rows and all (a demo; SETTINGS builds
+// its rows on first open).
+void chartCreate() {
+    DeckRowSpec r[DECK_ROWS_MAX];
+    const uint8_t n = chartSpecs(r);
+    const int32_t w = lv_area_get_width(&s.winRect);
+    Folder F;
+    buildFolder(F, true, "CHART", rowsNeedW(r, n), n, w - w / 2 - mm(1.0f), chartTabCb);
+    s_chart.root = F.root; s_chart.tab = F.tab; s_chart.pane = F.pane; s_chart.h = F.h;
+    for (uint8_t i = 0; i < n; i++) {
+        lv_obj_t *row = deckRow(F.pane, r[i].label, r[i].live);
+        if (r[i].kind == DeckRowKind::ROW_CHECK) deckCheckbox(row, r[i]); else deckDropdown(row, r[i]);
+    }
+}
+
+void chartSet(uint8_t state) {
+    if (state == DECK_HIDDEN && !s_chart.root) return;
+    // A panel just made has not been laid out: lv_obj_get_y() would say 0, and
+    // the first slide came down from the top of the screen (owner, N9).
+    const bool made = !s_chart.root;
+    if (made) chartCreate();
+    if (state == s_chart.state) return;
+    const uint8_t was = s_chart.state;
+    s_chart.state = state;
+    if (state == DECK_OPEN) { lv_obj_move_foreground(s_chart.root); if (s.deckState == DECK_OPEN) deckSet(DECK_PEEK); }
+    lv_anim_delete(s_chart.root, chartExec);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var     (&a, s_chart.root);
+    lv_anim_set_values  (&a, made ? chartY(DECK_HIDDEN) : lv_obj_get_y(s_chart.root), chartY(state));
+    lv_anim_set_duration(&a, (was == DECK_HIDDEN || state == DECK_HIDDEN) ? DECK_PEEK_MS : DECK_OPEN_MS);
+    lv_anim_set_path_cb (&a, state == DECK_HIDDEN ? lv_anim_path_ease_in : lv_anim_path_ease_out);
+    lv_anim_set_exec_cb (&a, chartExec);
+    lv_anim_start(&a);
+}
+
+void chartFold() { if (s_chart.state == DECK_OPEN) chartSet(DECK_PEEK); }
+
+// With the window, as SETTINGS goes (owner, N11): open, it vanishes in the
+// same frame; showing its tab (or on its way down), it slides out of sight on
+// its own and deletes itself there.
+void chartEnd() {
+    if (lv_obj_t *o = s_chart.root) {
+        lv_anim_delete(o, chartExec);
+        if (s_chart.state == DECK_OPEN) {
+            lv_obj_delete(o);
+        } else {
+            if (s_chart.tab) lv_obj_clear_flag(s_chart.tab, LV_OBJ_FLAG_CLICKABLE);
+            lv_anim_t a;
+            lv_anim_init(&a);
+            lv_anim_set_var         (&a, o);
+            lv_anim_set_values      (&a, lv_obj_get_y(o), chartY(DECK_HIDDEN));
+            lv_anim_set_duration    (&a, DECK_PEEK_MS);
+            lv_anim_set_path_cb     (&a, lv_anim_path_ease_in);
+            lv_anim_set_exec_cb     (&a, chartExec);
+            lv_anim_set_completed_cb(&a, deckGoneCb);
+            lv_anim_start(&a);
+        }
+    }
+    s_chart = ChartPanel();
 }
 
 #ifdef DEBUG_POPUP
@@ -2488,6 +3713,7 @@ void closeNow(void *unused) {
 #endif
     if (s.timer) { lv_timer_delete(s.timer); s.timer = nullptr; }
     intfEnd();
+    chartEnd();
     deckEnd();
     if (s.win)   { lv_obj_delete(s.win);     s.win = nullptr; }
     forgetWidgets();
@@ -2496,6 +3722,9 @@ void closeNow(void *unused) {
     s.phase = PopupPhase::PHASE_CLOSED;
     s.nEnt = 0;
     s.groupN = 0;
+    s.native = nullptr;
+    s.expanded = false;
+    s.lastScene = -1;
     s.rebuildQueued = false;
 #ifdef DEBUG_POPUP
     char mem[96];
@@ -2547,12 +3776,13 @@ void catcherCb(lv_event_t *ev) {
         lv_hit_test_info_t *info = lv_event_get_hit_test_info(ev);
         if (!info || !s.win) return;
         const lv_point_t &pt = *info->point;
-        if (inDeck(pt) || (s.deckState != DECK_OPEN && inWindow(pt))) info->res = false;
+        if (inDeck(pt) || (!panelOpen() && inWindow(pt))) info->res = false;
     } else if (code == LV_EVENT_PRESSED) {
         s_catcherFolded = false;
-        if (s.deckState == DECK_OPEN && inWindow(s.pressStart)) {
+        if (panelOpen() && inWindow(s.pressStart)) {
             s_catcherFolded = true;
-            deckSet(DECK_PEEK);
+            if (s.deckState == DECK_OPEN) deckSet(DECK_PEEK);
+            chartFold();
         }
     } else if (code == LV_EVENT_CLICKED) {
         if (s_catcherFolded) { s_catcherFolded = false; return; }
@@ -2597,6 +3827,7 @@ void showWindow() {
     const uint32_t t0 = micros();
 #endif
     s.phase = PopupPhase::PHASE_OPEN;
+    s_faceEpoch++;                                    // faces the last window used may be taken back
     lv_obj_t *scr = lv_screen_active();
     lv_obj_update_layout(scr);                        // settle anything pending, aloud
     lv_display_enable_invalidation(nullptr, false);
@@ -2684,8 +3915,12 @@ void CardPopup::open(Card &card) {
     // sends no RELEASED for this touch - PRESS_LOST to the card instead.)
     if (lv_indev_t *in = lv_indev_active()) lv_indev_wait_release(in);
     s.reg      = Card::s_reg;
+    // One entity that HA defines as a group, with its members learnt (2.10c).
+    s.native   = (s.nEnt == 1 && s.ent[0]->nMembers) ? s.ent[0] : nullptr;
+    applyNative();
     s.tempUnit = card.tempUnit();
     s.groupOn  = card.groupOn();
+    s.sceneShow = card.sceneShow();
     s.lightCtl = firstCtl(lightAggregate().caps);   // D3: open on the control
     snprintf(s.area, sizeof(s.area), "%s", card._area);
     snprintf(s.name, sizeof(s.name), "%s", card.label());
@@ -2758,7 +3993,8 @@ namespace {
 enum DbgReqState : int { DREQ_IDLE, DREQ_CLAIMED, DREQ_PENDING, DREQ_CLOSING, DREQ_DONE };
 std::atomic<int> s_dreq{DREQ_IDLE};
 struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
-                int member = -1; bool close = false, power = false; };
+                int member = -1; int scene = -1; int look = -1; int show = -1; int scheme = -1;
+                bool close = false, power = false; };
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
 size_t s_dreqLen = 0;
@@ -2795,6 +4031,10 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "power", v, sizeof(v)) == ESP_OK) a.power = true;
         if (httpd_query_key_value(q, "pause", v, sizeof(v)) == ESP_OK) a.pause = atoi(v);
         if (httpd_query_key_value(q, "member", v, sizeof(v)) == ESP_OK) a.member = atoi(v);
+        if (httpd_query_key_value(q, "scene", v, sizeof(v)) == ESP_OK) a.scene = atoi(v);
+        if (httpd_query_key_value(q, "look",  v, sizeof(v)) == ESP_OK) a.look  = atoi(v);
+        if (httpd_query_key_value(q, "show",  v, sizeof(v)) == ESP_OK) a.show  = atoi(v);
+        if (httpd_query_key_value(q, "scheme", v, sizeof(v)) == ESP_OK) a.scheme = atoi(v);
         if (httpd_query_key_value(q, "close", v, sizeof(v)) == ESP_OK) a.close = atoi(v) != 0;
     }
     int expected = DREQ_IDLE;
@@ -2852,7 +4092,69 @@ void CardPopup::debugService(lv_timer_t *t) {
             // Pause (1) or resume (0) whatever the window is showing, as the deck's chip.
             const uint32_t now = millis();
             for (uint8_t i = 0; i < s.nEnt; i++) if (s.ent[i]) s.reg->setPaused(s.ent[i]->desc.id, a.pause != 0, now);
+            // A group defined in HA pauses with its members, as Card::setPaused does.
+            if (s.native && !inMember()) {
+                s.reg->setPaused(s.native->desc.id, a.pause != 0, now);
+                for (uint8_t i = 0; i < s.native->nMembers; i++)
+                    if (const Entity *m = memberAt(i)) s.reg->setPaused(m->desc.id, a.pause != 0, now);
+            }
             dbgOut("pause %d\n", a.pause);
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.scheme >= 0) {
+        // The colour scheme, as the drawer's button sets it (0 Fleet, 1
+        // Midnight, 2 Linen) - with no window open, as from the dashboard.
+        if (isOpen()) dbgOut("close the window first\n");
+        else { UI::setSchemeIndex((uint8_t)a.scheme); dbgOut("scheme %d\n", a.scheme); }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.show >= 0) {
+        // Which scenes the window offers, as SETTINGS' Scenes row: 0 visible
+        // only, 1 all, 2 none. On the held card, as the row does.
+        if (!isOpen()) dbgOut("no window open\n");
+        else {
+            s.sceneShow = a.show == 1 ? SceneShow::SCENES_ALL : a.show == 2 ? SceneShow::SCENES_OFF
+                                                                           : SceneShow::SCENES_VISIBLE;
+            if (Card *c = cardOf(h.surface)) c->setSceneShow(s.sceneShow);
+            s.lastScene = -1;
+            showView(s.view == PopupView::VIEW_SCENES && !hasScenes() ? controlsView() : s.view);
+            dbgOut("scenes shown %d, %u of them\n", a.show, (unsigned)shownScenes());
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.look >= 0) {
+        // The selector's look for the scheme showing: 0 Black - Square,
+        // 1 Black - Round, 2 Silver - Square, 3 Silver - Round; 4 the scheme's own.
+        chosenLook() = a.look >= 4 ? (int8_t)-1 : (int8_t)(a.look & 3);
+        if (isOpen()) showView(s.view);
+        dbgOut("selector %d for scheme %u\n", (int)chosenLook(), (unsigned)UI::schemeIndex());
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.scene >= 0) {
+        // As a tap on offered scene N (2.10c). Lists every scene the light has,
+        // the offered ones numbered, either way.
+        const Entity *h = isOpen() ? sceneHost() : nullptr;
+        if (!h || !h->nScenes) dbgOut("no scenes in this window\n");
+        else {
+            for (uint8_t i = 0, k = 0; i < h->nScenes; i++) {
+                const Entity *sc = s.reg->sceneOf(*h, i);
+                if (!sc) continue;
+                const bool shown = s.sceneShow == SceneShow::SCENES_ALL ||
+                                   (s.sceneShow == SceneShow::SCENES_VISIBLE && !sc->sourceHidden);
+                if (shown) dbgOut("  %u ", (unsigned)k++);
+                else       dbgOut("  - ");
+                dbgOut("%-12s %s%s%s\n", sc->desc.name, sc->desc.externalRef,
+                       sc->sourceHidden ? " (hidden in HA)" : "", sc->cmdFailed ? " FAILED" : "");
+            }
+            const Entity *sc = shownScene((uint8_t)a.scene);
+            const bool ok = sc && s.reg->press(sc->desc.id, millis());
+            if (ok) { sceneLoaded((uint8_t)a.scene); renderMain(); }
+            dbgOut("scene %d: %s\n", a.scene, ok ? "loaded" : "not loaded");
         }
         s_dreq.store(DREQ_DONE);
         return;
@@ -2867,18 +4169,42 @@ void CardPopup::debugService(lv_timer_t *t) {
     if (a.view >= 0) {
         if (!isOpen()) dbgOut("no window open\n");
         else {
-            showView(a.view == 1 ? PopupView::VIEW_HISTORY : a.view == 2 ? PopupView::VIEW_MEMBERS
-                                                                          : PopupView::VIEW_MAIN);
+            // As the corner icons do: 0 the controls of whatever is showing (a
+            // member's, inside one), 1 its history, 4 its scenes, 2 Members
+            // (back out of a member first, as the arrow does). 3 only lists.
+            if (a.view == 2) { if (inMember()) leaveMember(); showView(PopupView::VIEW_MEMBERS); }
+            else if (a.view == 0) showView(controlsView());
+            else if (a.view == 1) showView(PopupView::VIEW_HISTORY);
+            else if (a.view == 4 && hasScenes()) showView(PopupView::VIEW_SCENES);
             dbgMem(mem, sizeof(mem));
             dbgOut("view %d; %s\n", a.view, mem);
-            for (uint8_t i = 0; i < s.nEnt; i++) {
-                const Entity *e = s.ent[i];
+            // Why the last commands failed, newest first (G8).
+            EntityRegistry::FailNote notes[EntityRegistry::FAIL_NOTES];
+            const uint8_t nn = s.reg ? s.reg->failNotes(notes, EntityRegistry::FAIL_NOTES) : 0;
+            for (uint8_t i = 0; i < nn; i++)
+                dbgOut("  failed %lus ago: %s: %s\n", (unsigned long)((millis() - notes[i].atMs) / 1000),
+                       notes[i].id, notes[i].why);
+            // What the window stands for, then a group defined in HA's members
+            // ("m"), and whether it is working through them (2.10c).
+            const Entity *list[2 * POPUP_ENT_MAX];
+            uint8_t nList = 0;
+            for (uint8_t i = 0; i < s.nEnt; i++) list[nList++] = s.ent[i];
+            const uint8_t nShown = nList;
+            if (s.native) {
+                dbgOut("  group defined in HA: %s, %u members, %s\n", s.native->desc.externalRef,
+                       (unsigned)s.native->nMembers, s.expanded ? "through its members" : "as one");
+                for (uint8_t i = 0; i < s.native->nMembers; i++) list[nList++] = memberAt(i);
+            }
+            for (uint8_t i = 0; i < nList; i++) {
+                const Entity *e = list[i];
                 if (!e) continue;
+                if (i >= nShown) dbgOut("m");
                 const EntityAttrs &at = e->attrs;
-                dbgOut("  %-12s %s caps %x mode %d bri %d K %d hue %d sat %d%s%s\n", e->desc.id,
+                dbgOut("  %-12s %s caps %x mode %d bri %d K %d hue %d sat %d%s%s%s%s\n", e->desc.id,
                        e->value.type == ValueType::BOOL && e->value.b ? "on " : "off", at.lightCaps,
                        (int)at.lightMode, at.brightness, at.colorTempK, at.hue, at.sat,
-                       e->pending ? " pending" : "", e->attrPending ? " levels-pending" : "");
+                       e->pending ? " pending" : "", e->attrPending ? " levels-pending" : "",
+                       e->cmdFailed ? " FAILED" : "", e->paused ? " PAUSED" : "");
             }
         }
         s_dreq.store(DREQ_DONE);
@@ -2900,6 +4226,18 @@ void CardPopup::debugService(lv_timer_t *t) {
             const uint32_t us = micros() - t0;
             dbgMem(mem, sizeof(mem));
             dbgOut("control %d built in %lu us; %s\n", (int)s.lightCtl, (unsigned long)us, mem);
+            // Where the stage's children landed (L5: the deck moving on Color).
+            lv_obj_update_layout(s.win);
+            for (uint32_t i = 0; i < lv_obj_get_child_count(s.stage); i++) {
+                lv_area_t c; lv_obj_get_coords(lv_obj_get_child(s.stage, (int32_t)i), &c);
+                dbgOut("  stage child %lu: x %ld..%ld y %ld..%ld\n", (unsigned long)i,
+                       (long)c.x1, (long)c.x2, (long)c.y1, (long)c.y2);
+            }
+            lv_area_t st; lv_obj_get_content_coords(s.stage, &st);
+            dbgOut("  stage content x %ld..%ld, scroll %ld,%ld\n", (long)st.x1, (long)st.x2,
+                   (long)lv_obj_get_scroll_x(s.stage), (long)lv_obj_get_scroll_y(s.stage));
+            if (d.obj) { lv_area_t c; lv_obj_get_coords(d.obj, &c);
+                         dbgOut("  deck x %ld..%ld\n", (long)c.x1, (long)c.x2); }
         }
         s_dreq.store(DREQ_DONE);
         return;
@@ -2907,9 +4245,12 @@ void CardPopup::debugService(lv_timer_t *t) {
     if (a.deck >= 0) {
         if (!isOpen()) dbgOut("no window open\n");
         else {
-            if (a.deck) deckOpen(); else deckSet(DECK_PEEK);
+            // 2: the CHART panel open (History only).
+            if (a.deck == 2)  { if (s.view == PopupView::VIEW_HISTORY) chartSet(DECK_OPEN); }
+            else if (a.deck)  deckOpen();
+            else            { deckSet(DECK_PEEK); chartFold(); }
             dbgMem(mem, sizeof(mem));
-            dbgOut("deck %s; %s\n", a.deck ? "open" : "folded", mem);
+            dbgOut("deck %s; %s\n", a.deck == 2 ? "chart open" : a.deck ? "open" : "folded", mem);
         }
         s_dreq.store(DREQ_DONE);
         return;
@@ -2919,7 +4260,8 @@ void CardPopup::debugService(lv_timer_t *t) {
     const int n = dbgCards(lv_screen_active(), cards, 0, 48);
     if (a.card < 0) {
         dbgMem(mem, sizeof(mem));
-        dbgOut("%s; window %s\n", mem, isOpen() ? "open" : "closed");
+        dbgOut("%s; window %s; scheme %u; faces flat so far %lu\n", mem, isOpen() ? "open" : "closed",
+               (unsigned)UI::schemeIndex(), (unsigned long)s_faceFlat);
         for (int i = 0; i < n; i++) {
             Card *c = cardOf(cards[i]);
             if (c) dbgOut("%2d  %-16s %-12s %u entit%s\n", i, c->label(), c->_area,

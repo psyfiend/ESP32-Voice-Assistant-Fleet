@@ -7,6 +7,7 @@
 #include "SystemReport.h"   // fmtBytes - one memory-reporting convention
 #include "TimeService.h"
 #include "bsp_loader.h"
+#include "PanelDebug.h"
 
 // Normally injected by scripts/fw_version.py via extra_scripts (derived from
 // `git describe`). Defined defensively here so a build still succeeds if that
@@ -91,6 +92,11 @@ bool SystemCore::begin() {
         Serial.println("[Core] Display init FAILED.");
         return false;
     }
+#if defined(DISPLAY_ESPLCD) && defined(HAS_MIPI_PANEL)
+    // GET /panel: the panel's own status, and its init sequence again
+    // (PanelDebug.h - the 4B's washed-out picture).
+    PanelDebug::begin(_http, _display);
+#endif
 
     // --= 3. Touch =--
     // Needs the I2C bus, and on several boards needs the panel's reset line to
@@ -199,6 +205,9 @@ bool SystemCore::begin() {
     // After the transports exist and before the pause restore, which only
     // touches flags.
     _cmdRouter.begin(&_entities, &_mqtt, &_ha);
+    // HA's replies to those calls reach the router through the provider, which
+    // receives every message (2.10c): a refused call fails at once.
+    _haProv.setResultHook(&CommandRouter::onHaResult, &_cmdRouter);
 
     // --= 13. Restore the user's pauses =--
     //

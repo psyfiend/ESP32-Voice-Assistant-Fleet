@@ -324,3 +324,67 @@ entity list small.
   magnitude of slack. The HA half of #44 now has no unknowns left in it.
 - **Sensor history** (`history/stream` or the REST history endpoint) for the sparkline `cards.md`
   §4 wants. Not looked at.
+
+---
+
+## 9. Lights with levels, measured 2026-10-06 (2.10c, #65)
+
+Run from a PC against HA 2026.9.2, with the owner's permission to command any Office light.
+`light.office_lamp` (a Hue bulb) and then `light.office` (a Hue room of three bulbs, bridge at
+least five years old) were commanded; all four were put back as found (100%, 2710 K) and checked.
+
+### What the dashboard's lights report
+
+| Entity | `supported_color_modes` | Notes |
+|---|---|---|
+| `light.office` | `color_temp`, `xy` | `is_hue_group`, `hue_type: room`, `entity_id` (three members), `lights` (their names), `hue_scenes`; 2000-6535 K; 853 B over REST |
+| `light.dining_room_light` | `brightness` | |
+| `light.kitchen_switch_1`, `light.office_overhead`, `light.porch_switch_1` | `onoff` | |
+| `switch.tv_room_switch_1` | - | was `unavailable` at the time |
+
+`hs_color` is present in every mode, colour temperature included ([28.4, 65.4] at 2710 K).
+`min_color_temp_kelvin` / `max_color_temp_kelvin` were seen on lights that were on; not checked on
+one that is off. **`lights` is not in the same order as `entity_id`** (right, left, lamp against
+right, lamp, left): a member's name comes from its own state, never from `lights` by position.
+A `subscribe_trigger` event for a light is ~2 KB; the 8 KB buffer holds it.
+
+Hue scenes are entities: `scene.office_relax` and six more, each with `group_name: "Office"` and
+its state the time it was last activated. HA does not say which scene is showing now.
+
+### The round trip (`light.turn_on` on one bulb)
+
+| Sent | First report | When |
+|---|---|---|
+| `brightness` 128 / 1 / 64 / 200 / 255 | 128 / 1 / 63 / 200 / 255 | 125-250 ms |
+| `color_temp_kelvin` 2000 / 2200 / 3000 / 4000 / 5000 / 6500 | 2000 / 2202 / 3003 / 4000 / 5000 / 6535 | 125 ms (2200: 937 ms) |
+| `hs_color`, the eight swatches and every 30 degrees at 100% | within 2.6 degrees and 2.7 saturation | 110-140 ms (three at 0.4-1 s) |
+
+**The first report always matched the command** within the registry's tolerances (brightness +-3,
+kelvin +-3%, hue and saturation +-3). Twice the bridge sent a **second report ~1.4 s later with the
+colour the bulb really shows**: 240 degrees became 255 (blue is outside a Hue bulb's range), and
+cyan's saturation 90 became 78. A card will move to that colour after confirming the command.
+
+**A fade is not reported step by step:** 255 -> 10 brought one report, of 10, at 108 ms.
+
+### Dragging at 300 ms (12 commands, 20 -> 255 over 3.4 s)
+
+| | One bulb | The Hue room |
+|---|---|---|
+| HA's reply to each call | ~47 ms | ~90 ms |
+| Reports | about once a second, whatever the rate | the same, per bulb, plus the room's own |
+| Values reported | only values that were sent | the same; the room reports means while its bulbs update one by one |
+| The last value | arrived 0.77 s after the last send | on every bulb 0.86 s after it |
+
+Nothing was lost and nothing queued up: the bridge reports at its own pace and the newest value
+wins. K12's 300 ms stands on this bridge.
+
+### What HA's reply to `call_service` means
+
+| Call | Reply |
+|---|---|
+| a misspelt field (`hs_colour`) | `success: false`, `invalid_format`, with HA's message |
+| `brightness: 300` | `success: true` - HA clamped it to 255 |
+| an entity that does not exist | `success: true` - and nothing happens |
+
+`success: false` is reliable (HA sent nothing); `success: true` means only that HA accepted the
+call. Not tried: a call to an entity that is `unavailable`, and any light that is not Hue.

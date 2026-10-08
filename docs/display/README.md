@@ -30,6 +30,7 @@ test"; tuning and features were split into their own issues.
 | #70 | S3 LVGL performance: LVGL's pool back in SRAM, S3 framework settings |
 | #71 | Rotation as a setting; auto-rotate from the S3_4B's IMU |
 | #73 | Type ladder - chrome text sizes (seen first on the 4880) |
+| (no issue yet) | `WS_P4_4B` washed out twice (2.10a, 2.10c): whole picture near-white and lurid while `/screenshot` was right - the panel, not the frame buffer. `GET /panel?resend=1` waits for the next time (below) |
 
 ## Which file answers what
 
@@ -47,6 +48,13 @@ few lines, not a narrative; a test run goes in `test-log.md`. The original desig
 documents are in `docs/archive/display/`, unchanged, for the full reasoning behind a decision.
 
 ## Instruments
+
+- `GET /panel?resend=1` (DSI boards on esp_lcd; `src/PanelDebug.cpp`) - sends the BSP's init
+  sequence again, without a reset. **It reads nothing from the panel**: a version that read DCS
+  0Ah-0Dh at the end of boot left all three P4s black with the backlight on (LESSONS). The readings
+  it got before that, through `/panel` on running boards (power, MADCTL, pixel format, image mode):
+  ST7703 `9C 00 70 00`, HX8394 `1C 00 55 00`, JD9165 `14 00 00 00` - and those reads may themselves
+  be what blanked the screens; nobody was looking at the glass.
 
 - `GET /bench` (`src/UI/Bench.cpp`, field meanings at its top) and `python scripts/bench.py <host>` -
   full, card, anim, page, copy and verify runs.

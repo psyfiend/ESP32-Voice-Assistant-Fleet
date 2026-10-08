@@ -17,7 +17,8 @@
 static const char *TAG = "fleet_dsi";
 
 esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, const fleet_dsi_driver_t *drv,
-                              esp_lcd_panel_handle_t *ret_panel, void **fbs)
+                              esp_lcd_panel_handle_t *ret_panel, esp_lcd_panel_io_handle_t *ret_io,
+                              void **fbs)
 {
     ESP_RETURN_ON_FALSE(cfg && drv && drv->create && ret_panel && fbs, ESP_ERR_INVALID_ARG, TAG,
                         "invalid argument");
@@ -97,6 +98,7 @@ esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, const fleet_dsi_driver
     ESP_GOTO_ON_ERROR(ret, err, TAG, "frame buffers");
 
     *ret_panel = panel;
+    if (ret_io) *ret_io = io;
     ESP_LOGI(TAG, "%s up: %dx%d, %d lanes @ %lu Mbps, %.1f MHz, %d frame buffers",
              name, cfg->h_res, cfg->v_res, cfg->num_lanes, (unsigned long)cfg->lane_bit_rate_mbps,
              (double)dpi.dpi_clock_freq_mhz, cfg->num_fbs);

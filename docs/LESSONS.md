@@ -521,6 +521,46 @@ next piece of eye candy:
 - **Method: drive the UI from the PC.** `GET /popup` (DEBUG_POPUP) opened windows, switched controls,
   paused members and read the pool, so most of 2.10b was checked before the owner touched it, and
   the owner's rounds found layout and feel instead of plumbing. What it cannot test is touch.
+- **A probe must not move what it measures (2.10c).** The `/popup` listing call also switched the
+  window to its main view. Called from a member's own view, it left the group's view holding the
+  member, so the next "pause" paused the whole room, and every result after it looked like a bug in
+  the code under test - a run of a dozen steps, all wrong for one reason. Now `view=3` only lists.
+  When a whole run fails at once, suspect the instrument first.
+- **HA's reply order is not the bridge's.** After a command to the Hue room, a bulb's report can lag
+  the room's by a second or more: the board showed 2304 K on one bulb for a few seconds after 2710 K
+  had landed. Read HA again before calling a mismatch a bug.
+- **A DOT label rewrites its own text (2.10c round 7).** `LV_LABEL_LONG_DOT` puts the "..." into the
+  label's text buffer, so `lv_label_get_text()` after a layout at too small a width returns "Sce...",
+  not "Scenes". A layout pass that ran before the title was sized made it measure the dotted text
+  and keep it. Measure from your own string, or size the label before anything lays it out.
+- **A smooth grey ramp bands pink and green on a 16-bit panel.** RGB565 steps green twice as finely
+  as red and blue, so a truncated ramp is not grey at every step. An ARGB8888 face painted by hand
+  needs dithering to the 565 grid (an ordered 4x4, the same threshold on every channel) - LVGL's own
+  gradients do not help here.
+- **A flex column centres its children twice.** With `LV_FLEX_ALIGN_CENTER` on the cross axis, LVGL
+  centres a "track" as wide as the widest child in the parent, then each child in the track. Two
+  integer roundings: the 1060's control deck moved a pixel whenever a sibling (the slider's row)
+  changed width. To centre something against the parent alone, give it the parent's full width and
+  centre inside that. Found by printing the stage's children's coordinates over `/popup?ctl=`.
+- **A moving object redraws its whole area - so a transparent holder costs everything under it.**
+  The SETTINGS panel sat in a transparent object as wide as the window. Every frame of its slide
+  redrew that width, and since nothing opaque covered the strips, LVGL drew the cards, the window
+  and the panel in each: 35-105 ms a frame on the P4_5. Sized to the tab and pane, most strips lie
+  inside the opaque pane and LVGL starts drawing there: 8-40 ms. Keep moving things tight.
+- **A cache that never gives anything back fills up in a way testing on one screen never shows.**
+  The hand-drawn faces had twelve slots, one per scheme x look x size, never freed. Fine on any one
+  page; but schemes are per page, so swiping filled it, and every face after that came out flat.
+  Found on the owner's 1060, not on the board it was built on.
+- **Never read from a DSI panel that is showing a picture.** To diagnose the 4B's washed-out
+  screen, `/panel` read the panel's status registers (DCS 0Ah-0Dh) with
+  `esp_lcd_panel_io_rx_param()`, and then the same read went into the end of boot so there would be
+  a healthy reading to compare with. All three P4s came up with the backlight on and a black
+  screen, otherwise running. The read worked and returned sensible values - and the picture
+  stopped. The drivers read the panel's ID only before the video starts; that is the only safe
+  time. Writes (re-sending the init sequence) were not seen to do harm, but nobody was watching.
+- **A newly made object reports y = 0 until LVGL lays it out** (the same trap as the width one
+  above). An animation started from `lv_obj_get_y()` of a panel made in the same call slid it down
+  from the top of the screen. Start a new object's animation from the value you just set.
 
 ## Never keep a pointer to an LVGL object you do not own - ask it to tell you when it goes
 

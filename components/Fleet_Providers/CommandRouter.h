@@ -3,6 +3,7 @@
 #define COMMAND_ROUTER_H
 
 #include <Arduino.h>
+#include <mutex>
 #include "EntityRegistry.h"
 
 class MqttManager;
@@ -45,7 +46,8 @@ class HaClient;
 //
 // Nothing here waits for a reply. `call_service` returns a result and MQTT
 // returns nothing at all, and neither says the light actually changed - only
-// the state coming back does. That arrives through the ordinary inbound path
+// the state coming back does. (Since 2.10c a REFUSAL is read: HA's
+// success:false fails the command at once - see onHaResult().) That arrives through the ordinary inbound path
 // and clears `pending` exactly as an unsolicited change would. Measured against
 // the owner's instance on 2026-09-20: a `light.turn_on` echoes back through
 // `subscribe_trigger` in **~91 ms**, so the reconcile window has orders of
@@ -60,6 +62,13 @@ public:
 
     uint16_t sent()     const { return _sent; }
     uint16_t refused()  const { return _refused; }
+    uint16_t haRefused() const { return _haRefused; }
+
+    // HaProvider's result hook (2.10c): HA's reply to one of our calls. ON THE
+    // WEBSOCKET TASK. success:false means HA sent nothing (ha-websocket.md
+    // section 9), so the command fails at once; success:true only means HA
+    // accepted it, and the entity's own report still decides.
+    static void onHaResult(uint32_t id, bool ok, const char *code, const char *msg, void *ctx);
 
 private:
     // The registry's CommandSink. Called with the registry lock RELEASED.
@@ -67,13 +76,27 @@ private:
     void route(const Entity &e, const EntityValue &v);
 
     // The registry's LightSink (2.10b): a light's levels. VIRTUAL lamps answer
-    // themselves; Home Assistant's light.turn_on with data is 2.10c, so until
-    // then an HA light command is refused here, loudly, and the registry's
-    // window reverts it and the card says FAILED - never a silent success.
+    // themselves; an HA light gets light.turn_on with its data (2.10c).
     static void onLight(const Entity &e, const LightCommand &c, void *ctx);
 
     bool sendHa(const Entity &e, const EntityValue &v);
+    bool sendHaLight(const Entity &e, const LightCommand &c);
     bool sendMqtt(const Entity &e, const EntityValue &v);
+
+    // One call_service frame to HA, remembered by id so its reply can be
+    // matched. `data` is the service_data object's inside, or "" for none.
+    bool callService(const Entity &e, const char *domain, const char *service,
+                     const char *data);
+
+    // Calls awaiting HA's reply: written on the loop task, read on the
+    // websocket task, hence the lock. Eight is plenty - a reply takes ~50-90 ms
+    // and a drag sends one call every 300 ms.
+    struct HaCall { uint32_t id; char entity[ENTITY_ID_MAX]; };
+    static constexpr uint8_t HA_CALLS = 8;
+    HaCall     _calls[HA_CALLS] = {};
+    uint8_t    _callNext = 0;
+    std::mutex _callMx;
+    uint16_t   _haRefused = 0;
 
     EntityRegistry *_reg  = nullptr;
     MqttManager    *_mqtt = nullptr;

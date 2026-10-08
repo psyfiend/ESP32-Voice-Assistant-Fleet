@@ -38,6 +38,7 @@ void HaRest::begin(EntityRegistry *reg) {
 void HaRest::restart() {
     _cursor   = 0;
     _done     = false;
+    _started  = true;
     _nextAtMs = 0;
     _fetched  = 0;
     _failed   = 0;
@@ -72,7 +73,13 @@ void HaRest::loop(uint32_t nowMs) {
         }
     }
 
-    if (_done) return;
+    // THE TABLE CAN GROW (2.10c): a group's members are registered when the
+    // group reports. Once a pass has run, an entity beyond the cursor is one
+    // learnt since, and gets its initial value the same way.
+    if (_done) {
+        if (!_started || _cursor >= _reg->count()) return;
+        _done = false;
+    }
 
     // Walk forward to the next HA-sourced entity. Non-HA entities are skipped
     // without costing a loop pass, since skipping is free and only the HTTP
@@ -145,8 +152,10 @@ bool HaRest::fetchOne(const char *entityRef, const char *ourId) {
                 filter["state"] = true;
                 // FIRST, because to<JsonObject>() CLEARS an existing object in
                 // ArduinoJson 7 - after the unit line it would silently drop it.
-                haAttrFilter(filter["attributes"].to<JsonObject>());
-                filter["attributes"]["unit_of_measurement"] = true;
+                JsonObject attrs = filter["attributes"].to<JsonObject>();
+                haAttrFilter(attrs);
+                haEntityFilter(attrs);
+                attrs["unit_of_measurement"] = true;
             }
 
             JsonDocument doc;
@@ -159,6 +168,7 @@ bool HaRest::fetchOne(const char *entityRef, const char *ourId) {
                 EntityAttrs attrs;
                 haReadAttrs(doc["attributes"], attrs);
                 _reg->setAttrs(ourId, attrs);
+                if (e) haLearn(*_reg, *e, doc["attributes"]);   // 2.10c
 
                 EntityValue v;
                 if (e && haCoerceState(e->desc, state, v)) {

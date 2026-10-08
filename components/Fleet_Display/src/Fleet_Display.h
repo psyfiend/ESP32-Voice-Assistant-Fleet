@@ -79,6 +79,18 @@ public:
     uint32_t framesScanned() const { return _frames; }
     int64_t  scanStartUs() const   { return _scanStartUs; }
 
+    // TALKING TO THE PANEL AFTER BOOT (DSI boards; 2.10c round 9). The 4B was
+    // seen twice with the whole picture washed out while its frame buffer was
+    // right - the panel itself showing it wrong, as if its own settings
+    // (gamma, power) had been lost. resendPanelInit() sends the BSP's init
+    // sequence again, exactly as at boot, without a reset: the number of
+    // commands sent; -1 if there is no sequence or one failed. Not from an
+    // interrupt.
+    // NEVER READ FROM THE PANEL ONCE IT IS SHOWING A PICTURE. A version that
+    // read DCS 0Ah-0Dh at the end of begin() left all three P4s with the
+    // backlight on and a black screen (2.10c round 9, LESSONS).
+    int  resendPanelInit();
+
     // For the System Doctor: the vendored driver and the link as brought up
     // (after BSP defaults are applied). "none" / 0 until begin() succeeds.
     const char *driverName() const { return _driver; }
@@ -89,6 +101,7 @@ public:
 
 private:
     esp_lcd_panel_handle_t _panel = nullptr;
+    esp_lcd_panel_io_handle_t _io = nullptr;   // DSI command path (MIPI boards)
     const char *_driver   = "none";
     uint8_t     _lanes    = 0;
     uint32_t    _laneMbps = 0;

@@ -3,6 +3,7 @@
 #define HA_PROVIDER_H
 
 #include <Arduino.h>
+#include <atomic>
 #include "EntityRegistry.h"
 #include "HaClient.h"
 #include "HaRest.h"
@@ -65,6 +66,13 @@ public:
     // house unless something asks this.
     bool     subscriptionAccepted() const { return _subAccepted; }
 
+    // HA's REPLY TO ANY OTHER REQUEST, 2.10c. Every message arrives here, so the
+    // replies to CommandRouter's call_service do too; they are handed on by id.
+    // Called ON THE WEBSOCKET TASK, like everything this class receives.
+    // `code` and `msg` are "" on success and valid only during the call.
+    typedef void (*ResultFn)(uint32_t id, bool ok, const char *code, const char *msg, void *ctx);
+    void setResultHook(ResultFn fn, void *ctx) { _resultFn = fn; _resultCtx = ctx; }
+
 private:
     // HaClient hands out a bare function pointer, so the instance is reached
     // through the ctx argument - same shape MqttProvider uses for PubSubClient.
@@ -75,7 +83,17 @@ private:
     // shared with HaRest's initial fetch. It is NOT a method here on purpose:
     // two copies would let the boot value and the live value for one entity
     // disagree about what "closed" means, and only after something changed.
-    bool sendSubscribe();
+    // One subscribe_trigger for the HA entities at registry indices [from, to).
+    // Returns how many it named, 0 for none, -1 if it could not be sent.
+    int sendSubscribe(uint8_t from, uint8_t to);
+
+    // THE SCENES OF EVERY LIGHT ON THE BOARD (2.10c): one render_template,
+    // ha-websocket.md section 7a's pattern - HA's scene entities on each
+    // light's own device ("light>scene>Name|..."), learnt into the registry.
+    // A template is a subscription, so it is cancelled once answered. False
+    // only when the frame could not be sent.
+    bool sendSceneQuery();
+    void parseScenes(const char *result);   // websocket task
 
     EntityRegistry *_reg  = nullptr;
     HaClient       *_ha   = nullptr;
@@ -84,11 +102,23 @@ private:
     // The session counter this provider last subscribed for. Zero means "not
     // subscribed"; HaClient::sessions() starts at 1 on the first auth_ok.
     uint32_t _subscribedForSession = 0;
+    // How much of the registry the session's subscriptions cover: entities
+    // learnt later (2.10c) sit beyond it and get a subscription of their own.
+    uint8_t  _subscribedCount = 0;
 
     // The id of the subscribe_trigger awaiting a reply, and whether the last
     // one was accepted.
     uint32_t _pendingSubId = 0;
     bool     _subAccepted  = false;
+
+    ResultFn _resultFn  = nullptr;
+    void    *_resultCtx = nullptr;
+
+    // The scene query: the session it was sent for, its id (read on the
+    // websocket task to match the answer), and whether it has answered.
+    uint32_t              _scenesForSession = 0;
+    std::atomic<uint32_t> _tplId{0};
+    std::atomic<bool>     _tplDone{false};
 
     uint16_t _handled    = 0;
     uint16_t _unmatched  = 0;
