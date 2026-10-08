@@ -60,6 +60,12 @@ public:
     // when the finger has moved since it went down.
     static void open(Card &card);
 
+    // Open it from a TAP (2.10d, Tap action): on its controls, its History or
+    // its Members (Members only where the card has some; else the controls).
+    // The finger is already up, so the touch is not held as open() holds it.
+    static constexpr uint8_t OPEN_CONTROLS = 0, OPEN_HISTORY = 1, OPEN_MEMBERS = 2;
+    static void openOn(Card &card, uint8_t view);
+
     // Close it, by whichever of the four routes. Safe to call from an event
     // callback of an object inside the window: the work is deferred to
     // lv_async_call, because deleting the object whose event is running is

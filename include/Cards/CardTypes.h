@@ -241,6 +241,41 @@ enum class SceneShow : uint8_t {
     SCENES_OFF,
 };
 
+// WHAT A TAP DOES (2.10d, DECISIONS K37, K39). A long press always opens the
+// window (K3); this is the tap. TAP_DEFAULT is the card type's own - toggle on
+// a switch, a light or a button, nothing on a sensor - and is what an unsaved
+// card does. The scenes are the ones the card's window offers (its Scenes
+// setting); Cycle starts from the first after each boot.
+enum class TapAction : uint8_t {
+    TAP_DEFAULT = 0,
+    TAP_TOGGLE,
+    TAP_DETAILS,        // opens the window, as a long press does
+    TAP_MEMBERS,        // opens it on Members
+    TAP_HISTORY,        // opens it on History
+    TAP_CYCLE_SCENES,   // loads the next scene, with a toast naming it
+    TAP_LOAD_SCENE,     // loads one chosen scene ("tap_scene"), with a toast
+    TAP_NOTHING,
+};
+
+inline const char *tapActionName(TapAction t) {
+    switch (t) {
+        case TapAction::TAP_TOGGLE:       return "toggle";
+        case TapAction::TAP_DETAILS:      return "details";
+        case TapAction::TAP_MEMBERS:      return "members";
+        case TapAction::TAP_HISTORY:      return "history";
+        case TapAction::TAP_CYCLE_SCENES: return "cycle_scenes";
+        case TapAction::TAP_LOAD_SCENE:   return "load_scene";
+        case TapAction::TAP_NOTHING:      return "nothing";
+        default:                          return "default";
+    }
+}
+inline bool tapActionFromName(const char *n, TapAction &out) {
+    if (!n) return false;
+    for (uint8_t i = 1; i <= (uint8_t)TapAction::TAP_NOTHING; i++)
+        if (!strcmp(n, tapActionName((TapAction)i))) { out = (TapAction)i; return true; }
+    return false;
+}
+
 // The names these are saved under (2.10d, Settings.h): a saved choice is a
 // NAME, so reordering an enum never changes what it means. A name this
 // firmware does not know reads as "not set".

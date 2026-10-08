@@ -276,20 +276,21 @@ esp_err_t handleSettings(httpd_req_t *req) {
     // an empty name= removes it (the Reset). Kept and written like any other
     // change; the card shows it the next time its page is built.
     char id[CARD_ID_ARG], name[64];
-    // label= too, as SETTINGS' Label row would set it - for tests from a PC.
-    if (haveQ && httpd_query_key_value(q, "card", id, sizeof(id)) == ESP_OK &&
-        httpd_query_key_value(q, "label", name, sizeof(name)) == ESP_OK) {
-        const bool known = !strcmp(name, "inherit") || !strcmp(name, "ha") || !strcmp(name, "state") ||
-                           !strcmp(name, "custom") || !strcmp(name, "none");
+    // The other card settings too, as SETTINGS' rows would set them - for
+    // tests from a PC: label=, tap=, tap_scene= (the scene's HA id). The
+    // value is not checked against the choices here; a name the firmware
+    // does not know reads as "not set". An empty value removes the key.
+    static const char *const KEYS[] = { "label", "tap", "tap_scene" };
+    for (const char *key : KEYS) {
+        if (!haveQ || httpd_query_key_value(q, "card", id, sizeof(id)) != ESP_OK ||
+            httpd_query_key_value(q, key, name, sizeof(name)) != ESP_OK) continue;
+        urlDecode(name);
+        const bool reset = !name[0] || !strcmp(name, "inherit") || !strcmp(name, "default");
+        Settings::setCard(id, key, reset ? nullptr : name);
+        Settings::save();
         char out[160];
-        int n;
-        if (!known) {
-            n = snprintf(out, sizeof(out), "refused: label is inherit, ha, state, custom or none\n");
-        } else {
-            Settings::setCard(id, "label", strcmp(name, "inherit") ? name : nullptr);
-            Settings::save();
-            n = snprintf(out, sizeof(out), "%s: label %s - shown when its page is next built\n", id, name);
-        }
+        const int n = snprintf(out, sizeof(out), "%s: %s %s - in effect when its page is next built\n",
+                               id, key, reset ? "removed" : name);
         httpd_resp_set_type(req, "text/plain");
         return httpd_resp_send(req, out, n);
     }

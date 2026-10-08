@@ -130,6 +130,21 @@ public:
     const char *id() const { return _id ? _id : ""; }
     bool hasId() const { return _id && *_id; }
 
+    // What a tap does (2.10d, TapAction). The scene for Load scene is named
+    // by its source's id ("scene.office_relax"), which outlives a session.
+    Card &setTapAction(TapAction t) { _tap = t; return *this; }
+    TapAction tapAction() const { return _tap; }
+    Card &setTapScene(const char *ref);
+    const char *tapScene() const { return _tapScene; }
+    // Does this card's own tap toggle (switch, light, button)? Decides what
+    // TAP_DEFAULT means and whether "Toggle" is offered.
+    virtual bool tapToggles() const { return false; }
+    // The tap, as the card's setting says. From the card's event handler.
+    void tap();
+    // The scenes this card's window would offer, in its order: the card's one
+    // light, filtered by its Scenes setting. Fills `out`, returns the count.
+    uint8_t offeredScenes(const Entity **out, uint8_t cap) const;
+
     // Which scenes the card's window offers (2.10c). See SceneShow.
     Card &setSceneShow(SceneShow v) { _sceneShow = v; return *this; }
     SceneShow sceneShow() const { return _sceneShow; }
@@ -538,6 +553,8 @@ private:
 
     char _label[ENTITY_NAME_MAX] = {0};
     const char *_id = nullptr;   // CardSpec::id, when usable
+    TapAction   _tap = TapAction::TAP_DEFAULT;
+    char        _tapScene[ENTITY_TOPIC_MAX] = {0};   // as EntityDescriptor::externalRef
     char _area[ENTITY_SHORT_MAX] = {0};
     uint32_t _areaColor = 0;   // 0 = use the accent
 

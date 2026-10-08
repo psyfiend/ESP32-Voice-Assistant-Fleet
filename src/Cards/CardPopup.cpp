@@ -223,6 +223,7 @@ struct Popup {
     GroupOn   groupOn = GroupOn::GROUP_ON_ANY;   // copied from the card at open
     SceneShow sceneShow = SceneShow::SCENES_VISIBLE;   // likewise (2.10c)
     lv_obj_t *ddGroup = nullptr, *ddScenes = nullptr;   // SETTINGS' live dropdowns
+    lv_obj_t *ddTapScene = nullptr;                     // greyed unless Tap action is Load scene
     bool      builtPaused = false, rebuildQueued = false;   // "A paused window"
     uint8_t   builtCaps = 0;                     // what the selector was built for
     lv_obj_t *pill = nullptr;                    // PAUSED
@@ -287,6 +288,7 @@ lv_indev_t *s_indev = nullptr;
 // window is (pointer_search_obj() in lv_indev.c: system layer, top layer,
 // then the screen).
 lv_obj_t *s_catcher = nullptr;
+bool      s_openFromTap = false;   // open() called by openOn(): the finger is already up
 
 // Millimetres on glass to this panel's pixels - the same derivation as
 // UI::minTouch(), so the window is the same physical size on every board.
@@ -3171,7 +3173,7 @@ struct DeckRowSpec {
     lv_event_cb_t cb;
     lv_obj_t    **out;      // where the control is kept, or null
 };
-constexpr uint8_t DECK_ROWS_MAX = 8;
+constexpr uint8_t DECK_ROWS_MAX = 10;   // 8 at most today (a light with scenes: 7)
 
 void pauseCheckCb(lv_event_t *ev);
 void groupDropCb(lv_event_t *ev);
@@ -3186,6 +3188,76 @@ const CardLabel LABEL_ROW[5] = { CardLabel::LBL_INHERIT, CardLabel::LBL_HA, Card
 uint16_t labelRowIndex(CardLabel l) {
     for (uint16_t k = 0; k < 5; k++) if (LABEL_ROW[k] == l) return k;
     return 0;
+}
+
+// SETTINGS' Tap action row (2.10d, K37, K39): only what the held card can do -
+// Toggle where its tap toggles, Members where it has members, the two scene
+// actions where its light offers scenes. Rebuilt with the rows; the map says
+// which action each line is.
+void tapDropCb(lv_event_t *ev);
+void tapSceneDropCb(lv_event_t *ev);
+TapAction s_tapMap[8];
+uint8_t   s_tapN = 0;
+char      s_tapOpts[128];
+
+TapAction tapShown(const Card &c) {
+    const TapAction t = c.tapAction();
+    if (t != TapAction::TAP_DEFAULT) return t;
+    return c.tapToggles() ? TapAction::TAP_TOGGLE : TapAction::TAP_NOTHING;
+}
+
+uint16_t tapRowBuild(const Card &c) {
+    s_tapN = 0;
+    size_t used = 0;
+    s_tapOpts[0] = '\0';
+    auto add = [&used](TapAction t, const char *word) {
+        if (s_tapN >= 8) return;
+        used += snprintf(s_tapOpts + used, sizeof(s_tapOpts) - used, "%s%s", s_tapN ? "\n" : "", word);
+        s_tapMap[s_tapN++] = t;
+    };
+    const Entity *sc[ENTITY_SCENES_MAX];
+    if (c.tapToggles()) add(TapAction::TAP_TOGGLE, "Toggle");
+    add(TapAction::TAP_DETAILS, "Details view");
+    if (hasMembers())   add(TapAction::TAP_MEMBERS, "Members view");
+    add(TapAction::TAP_HISTORY, "History view");
+    if (c.offeredScenes(sc, ENTITY_SCENES_MAX)) {
+        add(TapAction::TAP_CYCLE_SCENES, "Cycle scenes");
+        add(TapAction::TAP_LOAD_SCENE,   "Load scene");
+    }
+    add(TapAction::TAP_NOTHING, "Nothing");
+    const TapAction cur = tapShown(c);
+    for (uint8_t i = 0; i < s_tapN; i++) if (s_tapMap[i] == cur) return i;
+    return 0;
+}
+
+// The scene row: the offered scenes by name, in the window's order.
+char s_tapSceneOpts[ENTITY_SCENES_MAX * (ENTITY_NAME_MAX + 1)];
+uint16_t tapSceneRowBuild(const Card &c, uint8_t &n) {
+    const Entity *sc[ENTITY_SCENES_MAX];
+    n = c.offeredScenes(sc, ENTITY_SCENES_MAX);
+    size_t used = 0;
+    uint16_t sel = 0;
+    s_tapSceneOpts[0] = '\0';
+    for (uint8_t i = 0; i < n; i++) {
+        used += snprintf(s_tapSceneOpts + used, sizeof(s_tapSceneOpts) - used, "%s%s", i ? "\n" : "",
+                         sc[i]->desc.name);
+        if (!strcmp(sc[i]->desc.externalRef, c.tapScene())) sel = i;
+    }
+    return sel;
+}
+
+// A row's control made live or greyed after it was built (the scene row, as
+// Tap action changes): the dropdown's state and colours, and the row's words.
+void rowLive(lv_obj_t *dd, bool live) {
+    if (!dd) return;
+    const UIPalette &p = UI::pal();
+    if (live) lv_obj_remove_state(dd, LV_STATE_DISABLED);
+    else      lv_obj_add_state   (dd, LV_STATE_DISABLED);
+    lv_obj_set_style_text_color  (dd, UI::c(live ? p.TEXT : p.TEXT_DIM), 0);
+    lv_obj_set_style_border_color(dd, UI::c(live ? p.ACCENT : UI::mix(p.SURFACE_ALT, p.TEXT, 25)), 0);
+    if (lv_obj_t *row = lv_obj_get_parent(dd))
+        if (lv_obj_t *words = lv_obj_get_child(row, 0))
+            lv_obj_set_style_text_color(words, UI::c(live ? p.TEXT : p.TEXT_DIM), 0);
 }
 
 uint8_t deckSpecs(DeckRowSpec *r) {
@@ -3214,8 +3286,18 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     // &name=..); the web UI does it properly later (K37).
     r[n++] = { "Visibility", DeckRowKind::ROW_DROP,
                "Show on dashboard\nShow only in group\nShow only as member\nHidden", 0, false, nullptr, nullptr };
-    r[n++] = { "Tap action", DeckRowKind::ROW_DROP,
-               "Toggle\nDetails view\nMembers view\nHistory view\nCycle scenes\nNothing", 0, false, nullptr, nullptr };
+    // Tap action (2.10d). Long press always opens the window (K39), whatever
+    // this says. Greyed in a member's own view: it is the card's.
+    const bool cardRows = held && held->hasId() && !inMember();
+    if (held) {
+        const uint16_t sel = tapRowBuild(*held);
+        r[n++] = { "Tap action", DeckRowKind::ROW_DROP, s_tapOpts, sel, cardRows, tapDropCb, nullptr };
+        uint8_t nSc = 0;
+        const uint16_t scSel = tapSceneRowBuild(*held, nSc);
+        if (nSc && !inMember())
+            r[n++] = { "Tap scene", DeckRowKind::ROW_DROP, s_tapSceneOpts, scSel,
+                       cardRows && held->tapAction() == TapAction::TAP_LOAD_SCENE, tapSceneDropCb, &s.ddTapScene };
+    }
     const Entity *sh = sceneHost();
     if (sh && sh->nScenes && !inMember())
         r[n++] = { "Scenes", DeckRowKind::ROW_DROP, "Visible scenes only\nShow all scenes\nDisabled",
@@ -3302,7 +3384,9 @@ lv_obj_t *deckDropdown(lv_obj_t *parent, const DeckRowSpec &r) {
                                       UI::part(LV_PART_SELECTED, LV_STATE_PRESSED));
     }
     if (!r.live) lv_obj_add_state(dd, LV_STATE_DISABLED);
-    else if (r.cb) lv_obj_add_event_cb(dd, r.cb, LV_EVENT_VALUE_CHANGED, nullptr);
+    // A greyed row may come alive in the same window (rowLive(): the Tap scene
+    // row), so its callback is attached anyway; a disabled dropdown sends none.
+    if (r.cb) lv_obj_add_event_cb(dd, r.cb, LV_EVENT_VALUE_CHANGED, nullptr);
     return dd;
 }
 
@@ -3352,6 +3436,37 @@ void groupDropCb(lv_event_t *ev) {
     if (Card *c = cardOf(h.surface)) c->setGroupOn(s.groupOn);
     keepCardSetting("active", groupOnName(s.groupOn));
     renderMain();
+}
+
+// Tap action: on the held card at once (the next tap does it), kept under its
+// id. Load scene with no scene chosen yet takes the first offered, and the
+// scene row comes alive.
+void tapDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    Card *c = cardOf(h.surface);
+    if (!c || k >= s_tapN) return;
+    const TapAction t = s_tapMap[k];
+    c->setTapAction(t);
+    keepCardSetting("tap", tapActionName(t));
+    if (t == TapAction::TAP_LOAD_SCENE && !c->tapScene()[0]) {
+        const Entity *sc[ENTITY_SCENES_MAX];
+        if (c->offeredScenes(sc, ENTITY_SCENES_MAX)) {
+            c->setTapScene(sc[0]->desc.externalRef);
+            keepCardSetting("tap_scene", sc[0]->desc.externalRef);
+            if (s.ddTapScene) lv_dropdown_set_selected(s.ddTapScene, 0);
+        }
+    }
+    rowLive(s.ddTapScene, t == TapAction::TAP_LOAD_SCENE);
+}
+
+void tapSceneDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    Card *c = cardOf(h.surface);
+    const Entity *sc[ENTITY_SCENES_MAX];
+    const uint8_t n = c ? c->offeredScenes(sc, ENTITY_SCENES_MAX) : 0;
+    if (k >= n) return;
+    c->setTapScene(sc[k]->desc.externalRef);
+    keepCardSetting("tap_scene", sc[k]->desc.externalRef);
 }
 
 // Label: on the held card at once, kept under its id. Inherit removes the
@@ -3659,7 +3774,7 @@ void deckEnd() {
     }
     s.deck = s.deckTab = s.deckTabLbl = s.deckPane = nullptr;
     s.swPause = nullptr;
-    s.ddGroup = s.ddScenes = nullptr;
+    s.ddGroup = s.ddScenes = s.ddTapScene = nullptr;
     s.deckState  = DECK_HIDDEN;
     s.deckFilled = false;
 }
@@ -3987,7 +4102,10 @@ void CardPopup::open(Card &card) {
     // Release the touch BEFORE building anything (LESSONS): the finger is still
     // down, and its release must not land on the window. (It also means LVGL
     // sends no RELEASED for this touch - PRESS_LOST to the card instead.)
-    if (lv_indev_t *in = lv_indev_active()) lv_indev_wait_release(in);
+    // Not from a tap (openOn()): that finger is already up, and waiting for a
+    // release would swallow the next touch - the first tap in the window.
+    if (!s_openFromTap)
+        if (lv_indev_t *in = lv_indev_active()) lv_indev_wait_release(in);
     s.reg      = Card::s_reg;
     // One entity that HA defines as a group, with its members learnt (2.10c).
     s.native   = (s.nEnt == 1 && s.ent[0]->nMembers) ? s.ent[0] : nullptr;
@@ -4056,6 +4174,15 @@ void CardPopup::open(Card &card) {
     showWindow();
 }
 
+void CardPopup::openOn(Card &card, uint8_t view) {
+    s_openFromTap = true;
+    open(card);
+    s_openFromTap = false;
+    if (!isOpen()) return;
+    if (view == OPEN_HISTORY)                      showView(PopupView::VIEW_HISTORY);
+    else if (view == OPEN_MEMBERS && hasMembers()) showView(PopupView::VIEW_MEMBERS);
+}
+
 #ifdef DEBUG_POPUP
 // ---------------------------------------------------------------------------
 // GET /popup (CardPopup.h): open, drive and measure a window from a PC. The
@@ -4068,6 +4195,7 @@ enum DbgReqState : int { DREQ_IDLE, DREQ_CLAIMED, DREQ_PENDING, DREQ_CLOSING, DR
 std::atomic<int> s_dreq{DREQ_IDLE};
 struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
                 int member = -1; int scene = -1; int look = -1; int show = -1; int scheme = -1;
+                int tap = -1;
                 bool close = false, power = false; };
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
@@ -4110,6 +4238,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "show",  v, sizeof(v)) == ESP_OK) a.show  = atoi(v);
         if (httpd_query_key_value(q, "scheme", v, sizeof(v)) == ESP_OK) a.scheme = atoi(v);
         if (httpd_query_key_value(q, "close", v, sizeof(v)) == ESP_OK) a.close = atoi(v) != 0;
+        if (httpd_query_key_value(q, "tap", v, sizeof(v)) == ESP_OK) a.tap = atoi(v);
     }
     int expected = DREQ_IDLE;
     if (!s_dreq.compare_exchange_strong(expected, DREQ_CLAIMED)) {
@@ -4334,6 +4463,23 @@ void CardPopup::debugService(lv_timer_t *t) {
 
     lv_obj_t *cards[48];
     const int n = dbgCards(lv_screen_active(), cards, 0, 48);
+    if (a.tap >= 0) {
+        // As a TAP on card N (2.10d): whatever its Tap action says - toggle,
+        // open the window on a view, load a scene, or nothing.
+        Card *c = (a.tap < n) ? cardOf(cards[a.tap]) : nullptr;
+        if (!c)            dbgOut("no card %d (%d on this page)\n", a.tap, n);
+        else if (isOpen()) dbgOut("a window is already open; /popup?close=1 first\n");
+        else {
+            if (s_indev) lv_indev_get_point(s_indev, &s.pressStart);
+            c->tap();
+            dbgOut("tap card %d (%s): tap action %s%s%s; window %s\n", a.tap, c->label(),
+                   tapActionName(c->tapAction()), c->tapScene()[0] ? ", scene " : "", c->tapScene(),
+                   isOpen() ? (s.view == PopupView::VIEW_HISTORY ? "open on History"
+                               : s.view == PopupView::VIEW_MEMBERS ? "open on Members" : "open") : "closed");
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
     if (a.card < 0) {
         dbgMem(mem, sizeof(mem));
         dbgOut("%s; window %s; scheme %u, selector %d (-1: the scheme's own); faces flat so far %lu\n", mem,

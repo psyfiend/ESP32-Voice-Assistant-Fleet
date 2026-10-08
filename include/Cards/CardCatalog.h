@@ -61,6 +61,7 @@ public:
 class SwitchCard : public StateCard {
 public:
     const char *typeName() const override { return "switch"; }
+    bool tapToggles() const override { return true; }
 protected:
     void onTap() override;
 };
@@ -74,6 +75,7 @@ protected:
 class LightCard : public StateCard {
 public:
     const char *typeName() const override { return "light"; }
+    bool tapToggles() const override { return true; }
 protected:
     void onTap() override;
 };
@@ -86,6 +88,7 @@ protected:
 class ButtonCard : public StateCard {
 public:
     const char *typeName() const override { return "button"; }
+    bool tapToggles() const override { return true; }   // it fires; "Toggle" in the list
 protected:
     void onTap() override;
 };

@@ -574,6 +574,10 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
             if (Settings::card(c->id(), "label", v, sizeof(v)) && cardLabelFromName(v, lm)) c->setLabelMode(lm);
             // A custom name set on the device replaces the dashboard's (K40).
             if (Settings::card(c->id(), "name", v, sizeof(v)) && v[0]) c->setLabel(v);
+            TapAction ta;
+            if (Settings::card(c->id(), "tap", v, sizeof(v)) && tapActionFromName(v, ta)) c->setTapAction(ta);
+            char ref[ENTITY_TOPIC_MAX];
+            if (Settings::card(c->id(), "tap_scene", ref, sizeof(ref))) c->setTapScene(ref);
         }
         if (cs.longStaleMs) c->setLongStaleMs(cs.longStaleMs);
         if (cs.paused)      c->setPaused(true);

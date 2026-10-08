@@ -3,6 +3,7 @@
 #include "Cards/CardIcons.h"
 #include "Cards/CardPopup.h"
 #include "UI/UITokens.h"
+#include "UI/UIToolkit.h"   // the scene toast (2.10d; NINA's toasts after 2.10d)
 #include <Arduino.h>
 #include <string.h>
 
@@ -173,6 +174,81 @@ const char *Card::label() const {
     if (_label[0]) return _label;
     const Entity *p = primary();
     return p ? p->desc.name : "";
+}
+
+Card &Card::setTapScene(const char *ref) {
+    copyBounded(_tapScene, sizeof(_tapScene), ref ? ref : "");
+    return *this;
+}
+
+// THE SCENES THIS CARD OFFERS: its one light's, filtered as its window filters
+// them (CardPopup.cpp, shownScenes()) - so a tap and the window agree (K39).
+uint8_t Card::offeredScenes(const Entity **out, uint8_t cap) const {
+    if (!s_reg || _nPrimary != 1 || _sceneShow == SceneShow::SCENES_OFF) return 0;
+    const Entity *h = _primary[0];
+    if (!h || h->desc.kind != EntityKind::LIGHT || !h->desc.writable) return 0;
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < h->nScenes && n < cap; i++) {
+        const Entity *sc = s_reg->sceneOf(*h, i);
+        if (sc && (_sceneShow == SceneShow::SCENES_ALL || !sc->sourceHidden)) out[n++] = sc;
+    }
+    return n;
+}
+
+namespace {
+// Where each card's Cycle scenes has got to, by card id: the card object is
+// rebuilt with its page, the place in the cycle is not. RAM only, so every
+// boot starts from the first scene (owner, K37).
+struct CyclePos { const char *id; uint8_t next; };
+CyclePos s_cycle[16] = {};
+
+uint8_t &cycleNext(const char *id) {
+    static uint8_t spare = 0;
+    if (!id || !*id) return spare;
+    for (CyclePos &c : s_cycle) if (c.id && !strcmp(c.id, id)) return c.next;
+    for (CyclePos &c : s_cycle) if (!c.id) { c.id = id; c.next = 0; return c.next; }
+    return spare;
+}
+
+void sceneToast(const char *card, const char *scene) {
+    char msg[96];
+    snprintf(msg, sizeof(msg), "Scene: %s - %s", card, scene);
+    UIToolkit::show_toast(msg);
+}
+}  // namespace
+
+void Card::tap() {
+    switch (_tap) {
+        case TapAction::TAP_DEFAULT:
+        case TapAction::TAP_TOGGLE:  onTap(); return;
+        case TapAction::TAP_DETAILS: CardPopup::openOn(*this, CardPopup::OPEN_CONTROLS); return;
+        case TapAction::TAP_MEMBERS: CardPopup::openOn(*this, CardPopup::OPEN_MEMBERS);  return;
+        case TapAction::TAP_HISTORY: CardPopup::openOn(*this, CardPopup::OPEN_HISTORY);  return;
+        case TapAction::TAP_NOTHING: return;
+        case TapAction::TAP_CYCLE_SCENES:
+        case TapAction::TAP_LOAD_SCENE: break;
+    }
+    // A scene. Not on a paused card: a paused light changes no state (K14).
+    if (isPaused() || !s_reg) return;
+    const Entity *sc[ENTITY_SCENES_MAX];
+    const uint8_t n = offeredScenes(sc, ENTITY_SCENES_MAX);
+    if (!n) {
+        const Entity *p = primary();
+        sceneToast(label(), (p && p->nScenes) ? "none offered" : "not loaded yet");
+        return;
+    }
+    const Entity *pick = nullptr;
+    if (_tap == TapAction::TAP_CYCLE_SCENES) {
+        uint8_t &next = cycleNext(_id);
+        pick = sc[next % n];
+        next = (uint8_t)((next % n) + 1);
+    } else {
+        for (uint8_t i = 0; i < n && !pick; i++)
+            if (!strcmp(sc[i]->desc.externalRef, _tapScene)) pick = sc[i];
+        if (!pick) { sceneToast(label(), "not available"); return; }
+    }
+    const bool ok = s_reg->press(pick->desc.id, millis());
+    sceneToast(label(), ok ? pick->desc.name : "refused");
 }
 
 // The name the card shows for a resolved Label (2.10d, K40). "From HA" is the
@@ -1344,7 +1420,7 @@ void Card::eventCb(lv_event_t *e) {
     // before a card sees it; this is the second lock on the same door.
     if (CardPopup::isOpen()) return;
     switch (lv_event_get_code(e)) {
-        case LV_EVENT_SHORT_CLICKED: self->onTap();       break;
+        case LV_EVENT_SHORT_CLICKED: self->tap();         break;   // the setting, then onTap()
         case LV_EVENT_LONG_PRESSED:  self->onLongPress(); break;
         default: break;
     }
