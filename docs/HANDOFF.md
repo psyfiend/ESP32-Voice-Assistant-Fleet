@@ -77,7 +77,18 @@ malloc for LVGL is a trap on this hardware. LVGL 9.6: after 2.10 (#88).
   (a normal boot) and filters lines; PlatformIO's Python has pyserial. PowerShell 5.1 strips quotes
   from `python -c "..."`, so write the script to a file.
 
-## What is next: 2.10d, stable card ids and saving (#65)
+## 2.10d IN PROGRESS on `feat/65-saving` (from 2026-10-08)
+
+Decided with the owner: `DECISIONS.md` K33-K38. Design, steps built and their measurements:
+**`card-sheet.md` §17**. Card ids, the settings file (`include/Settings.h`, LittleFS, `GET
+/settings`), and Active state, Scenes, Selector and Paused saved - all checked on WS_P4_5 from the PC
+only. **Anything that writes flash runs on a task with an internal-RAM stack** (LESSONS, 2.10d).
+Still open with the owner: Long press as a setting, NINA's toasts now or after, which scenes Cycle
+and Load offer, what Label's "Default" and "From HA" mean, and whether a flash write shows on the
+glass (`/panel?flash=`). The owner's occasional white flash on the P4_5 is unexplained; `/panel`
+lists underruns.
+
+## What 2.10d started from (#65)
 
 **2.10c is done** (`v0.2.10`): HA lights with their levels, the members of an HA group (K17-K18,
 K32), HA scenes (K19, K21), and the window redesigned over nine rounds (K20-K31). What was built:

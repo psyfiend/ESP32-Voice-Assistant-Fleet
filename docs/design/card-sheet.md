@@ -712,3 +712,16 @@ without seeing a flash.
 
 **The owner's white flash (P4_5 only, now and then, no action it follows).** Not yet explained.
 `/panel` now lists any underrun the bridge does see, with its time; read it right after a flash.
+
+**Built so far** (WS_P4_5, driven from the PC with `/popup`; nothing yet touched on the glass):
+
+| Step | What | Measured |
+|---|---|---|
+| 1 | `/panel?flash=` and the underrun recorder (`PanelDebug.h`) | above |
+| 2 | Card ids and `checkCardIds()` | "35 cards on 2 pages, 0 id problems"; the failure paths not yet tried |
+| 3 | `Settings.h`: the file, `GET /settings` (`?stats=1`); Active state, Scenes and Selector kept | mount 52 ms the first time, 3-11 ms after; a save 7-66 ms (66 when LittleFS erased a block), once per close; Desk's Scenes and a Midnight selector back after a reset; internal heap -6.6 KB |
+| 3b | Paused in the file (`EntityRegistry::PauseStore`), #60's NVS list imported once | Garage North paused, PAUSED after a reset, resumed and the entry gone |
+
+Active state and Scenes are read every time a page is built, so they also survive a page swipe -
+before 2.10d a swipe lost them. Next: Label and Custom name, then Tap action (Cycle scenes, Load
+scene), then K17.
