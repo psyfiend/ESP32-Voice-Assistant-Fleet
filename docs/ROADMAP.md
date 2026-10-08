@@ -72,7 +72,7 @@ device reads, and the backup format - not something a user edits.
 
 | # | Milestone | Status |
 |---|---|---|
-| 4.1 | Standard settings pages (**#23**) | not started; screen dimming pulled forward when it is needed daily |
+| 4.1 | Standard settings pages (**#23**) | not started; screen dimming pulled forward when it is needed daily; the settings that matter also as HA entities (FUTURE_IMPROVEMENTS, owner 2026-10-07) |
 | 4.2 | Live layout settings (**#24**) | not started |
 | 4.3 | Navbar (**#25**) | not started |
 | 4.4 | Context panels (**#26**) | not started - `design/context-panels.md` |

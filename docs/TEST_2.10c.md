@@ -266,6 +266,19 @@ the P4_5 prints where it was stuck to a log on the PC.
 | Q6 | Once, on the 4B, while watching it: open `http://fleet-ws-p4-4b/panel?resend=1` in a browser | The page says "resent 19 init commands"; the picture stays as it was. If it goes black or changes, say so, and reset the board |
 | Q7 | **If the 4B washes out again - before resetting it:** open `http://fleet-ws-p4-4b/panel?resend=1` | Say whether the picture came back. If it does, the panel had lost its settings |
 
+### Round 9 results (owner, 2026-10-07)
+
+Q0, Q1, Q3, Q5, Q6 PASS. **Q2 PASS** - the P4_5's panels clearly smoother; Linen still a little
+choppier than the dark schemes, "totally passable". Q4: no reboots reported; no watchdog panic in
+the P4_5's serial log. **Found**: (1) a group paused, then each member resumed from its own view -
+the group card stayed PAUSED; (2) a selector look chosen in SETTINGS applied on every page, whatever
+its scheme. **Asked**: rename "Deck look" to "Selector"; the look should follow the scheme; and the
+panel's settings that matter as HA entities, for automations (recorded in FUTURE_IMPROVEMENTS).
+
+Fixed and checked over `/popup` on the P4_5 (Desk): a group pauses with its last member and
+resumes with its first, either way round, including paused from its own window and resumed member
+by member; a look chosen on Midnight stays on Midnight, and Linen still opens on Silver - Round.
+
 **The black screens (round 9, owner):** the build with `/panel`'s register read also done at the
 end of boot left all three P4s with the backlight on and a black screen, the boards otherwise
 answering. Reading a DSI panel while it shows a picture stops the picture; `/panel` reads nothing now

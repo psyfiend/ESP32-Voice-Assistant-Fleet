@@ -291,6 +291,17 @@ not have moved the too-small text of 2.4's first flash by a single pixel.
 
 ## Connectivity (WiFi / MQTT / Home Assistant)
 
+### The panel's own settings as HA entities (owner, 2026-10-07)
+
+Seeing how much of a board could be driven from the PC during 2.10c (`/popup`, `/panel`, schemes),
+the owner asked for the settings that matter to be **entities in HA**, published over MQTT discovery
+as the device already publishes its own sensors: screen brightness (a `number`), dimming and the
+screen timeout (a `select` / `number`), perhaps the colour scheme. Then HA automations can use the
+house's own sensors - a room's lux sensor setting the panel's brightness, the screen sleeping when the
+room is empty. Belongs with the settings model (4.1, #23, DECISIONS D-7): each setting gets one
+definition, and the settings page, the build sheet and HA all read and write that one. Not the
+`/popup`-style debug endpoints themselves - those stay debug.
+
 ### MQTT is the wrong transport for Home Assistant ENTITIES - websocket is the real path
 
 Owner's conclusion, 2026-09-13, and it reframes issue #43 from "an alternative

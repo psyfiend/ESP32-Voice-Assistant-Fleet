@@ -471,7 +471,10 @@ the union. **The group card fills to that mean brightness** (one at 100%, one at
 only it has leaves the selector, even when every member is paused), not commanded. The group is
 PAUSED only when every member is - a fully paused group keeps its greyed slider and offers only
 Power; its status line says "1 paused" otherwise; Members lists the member, reading "Paused". The
-card follows the same rule (`Card::counts()`). A paused window: controls greyed, a PAUSED pill
+card follows the same rule (`Card::counts()`). For a group defined at the source the registry
+keeps the group's own pause in step with its members both ways (2.10c round 9, K32): pausing every
+member pauses the group, and resuming any member resumes it - before that, a group paused from
+its own window stayed PAUSED after each member was resumed from its own. A paused window: controls greyed, a PAUSED pill
 beside the label, a touch on a control explains itself. **Paused in the deck is a switch** ("Off /
 On" read two ways).
 
@@ -589,7 +592,8 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   `translate_x`, so taps land where it is drawn.
 - **Four looks, hand-drawn faces** (owner, round 6-7, K27): Black - Square, Black - Round, Silver -
   Square, Silver - Round, all kept; unchosen, Black - Square on Midnight and Fleet, Silver - Round on
-  Linen (round 9). LVGL's gradient has two stops and runs straight, and the owner asked for the line between
+  Linen (round 9). **Chosen per scheme** (K31, SETTINGS' "Selector" row, debug builds): a choice
+  holds for the scheme it was made in, so a Linen page and a Fleet page each keep their own. LVGL's gradient has two stops and runs straight, and the owner asked for the line between
   the selector's light and dark halves to **curve up in the middle** (in the upper two fifths, a
   raised look) and for unlit chips to be **soft dents**, so the faces are ARGB8888 images painted per
   pixel (`paintFace()`): the curved line, faint brushed row streaks, a fine edge, corners

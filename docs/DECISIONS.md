@@ -106,3 +106,5 @@ How to use it:
 | K28 | A second panel, CHART: SETTINGS' mirror image (the same folder builder), its tab in the left half a millimetre from SETTINGS', up only while History shows (demo rows until the chart has settings); either panel opening folds the other; it leaves with the window as SETTINGS does (folded: slides down; open: at once). The panels open and fold in 260 ms (from 220) | 2026-10-07 | `card-sheet.md` §16 |
 | K29 | The title is centred when "Area > Name" fits; else it takes the room beside the X, left of centre; else the name alone (the back arrow still goes up) | 2026-10-07 | `card-sheet.md` §16 |
 | K30 | Text on the panels is US English ("Color"); code and docs keep their own spelling | 2026-10-07 | - |
+| K31 | The selector's look follows the scheme: chosen per scheme (SETTINGS' row is "Selector"), each scheme's default until one is chosen; schemes are per page, so the look is too | 2026-10-07 | `card-sheet.md` §16 |
+| K32 | A group defined at the source is paused exactly when all its members are - the registry keeps the group's own flag in step both ways (K18 is the other direction) | 2026-10-07 | `card-sheet.md` §16 |
