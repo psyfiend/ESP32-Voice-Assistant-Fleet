@@ -8,6 +8,7 @@
 #include "src/core/lv_obj_draw_private.h"    // lv_obj_get_ext_draw_size: the window's shadow
 #include <Arduino.h>
 #include "esp_heap_caps.h"   // the hand-drawn faces live in PSRAM
+#include "src/misc/cache/instance/lv_image_cache.h"   // lv_image_cache_drop(): not in lvgl.h
 #include <math.h>
 #include <stdarg.h>
 #include <string.h>
@@ -1248,11 +1249,15 @@ struct FaceSlot {
     int16_t  w = 0, h = 0, r = 0;
     FaceKind kind = FaceKind::FACE_BLACK;
     uint32_t key = 0;               // the colours it was painted with
+    uint32_t used = 0;              // the window (s_faceEpoch) that last asked for it
+    size_t   cap = 0;               // bytes held
     uint8_t *buf = nullptr;
     lv_image_dsc_t dsc = {};
 };
 constexpr uint8_t FACE_SLOTS = 12;
 FaceSlot s_faces[FACE_SLOTS];
+uint32_t s_faceEpoch = 1;           // one per window opened (showWindow())
+uint32_t s_faceFlat  = 0;           // faces that could not be had and came out flat (debug readout)
 
 inline uint8_t ch8(uint32_t hex, int sh) { return (uint8_t)((hex >> sh) & 0xFF); }
 
@@ -1337,20 +1342,45 @@ void paintFace(FaceSlot &f) {
 }
 
 // A face of this size and kind in the scheme's colours: found, or painted.
-// Never freed - a window's objects may still show one - and few: one size per
-// selector, chip and look on a board. Full: null, and the caller paints flat.
+// TWELVE SLOTS, REUSED (round 8, the 1060 on Linen): each scheme, look and
+// size takes one, and trying the looks in two schemes filled all twelve -
+// after which every face came out flat (a white disc for a lit chip on
+// Linen). A slot is taken back only if no object can be showing it: one
+// painted in another scheme's colours first (the window that used it has
+// closed - a scheme changes from the dashboard), else the one asked for
+// longest ago by a window that is not this one. Full of this window's own:
+// null, and the caller paints flat.
 const lv_image_dsc_t *face(int32_t w, int32_t h, int32_t r, FaceKind kind) {
     const UIPalette &p = UI::pal();
     const uint32_t key = p.GROUND ^ (p.SURFACE << 1) ^ (p.TEXT << 2) ^ (p.SURFACE_ALT << 3);
     FaceSlot *spare = nullptr;
     for (FaceSlot &f : s_faces) {
-        if (f.buf && f.w == w && f.h == h && f.r == r && f.kind == kind && f.key == key) return &f.dsc;
+        if (f.buf && f.w == w && f.h == h && f.r == r && f.kind == kind && f.key == key) {
+            f.used = s_faceEpoch;
+            return &f.dsc;
+        }
         if (!f.buf && !spare) spare = &f;
     }
-    if (!spare) return nullptr;
+    if (!spare)
+        for (FaceSlot &f : s_faces)
+            if (f.key != key && f.used < s_faceEpoch && (!spare || f.used < spare->used)) spare = &f;
+    if (!spare)
+        for (FaceSlot &f : s_faces)
+            if (f.used < s_faceEpoch && (!spare || f.used < spare->used)) spare = &f;
+    if (!spare) { s_faceFlat++; return nullptr; }
     const size_t bytes = (size_t)w * h * 4;
-    spare->buf = (uint8_t *)heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM);
-    if (!spare->buf) return nullptr;
+    if (spare->buf) {
+        // LVGL keeps what it decoded from a source, by its address: forget
+        // it before the same descriptor shows something else.
+        lv_image_cache_drop(&spare->dsc);
+        if (spare->cap < bytes) { heap_caps_free(spare->buf); spare->buf = nullptr; spare->cap = 0; }
+    }
+    if (!spare->buf) {
+        spare->buf = (uint8_t *)heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM);
+        if (!spare->buf) { s_faceFlat++; return nullptr; }
+        spare->cap = bytes;
+    }
+    spare->used = s_faceEpoch;
     spare->w = (int16_t)w; spare->h = (int16_t)h; spare->r = (int16_t)r;
     spare->kind = kind; spare->key = key;
     paintFace(*spare);
@@ -3348,16 +3378,12 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
     const bool scroll = F.h > maxH;
     if (scroll) F.h = maxH;
 
-    F.root = plain(lv_screen_active());
-    lv_obj_set_pos (F.root, W.x1, lv_obj_get_height(lv_screen_active()));   // out of sight
-    lv_obj_set_size(F.root, w, F.h);
-
     // Built back to front: the pane, the tab over it, a block hiding the
     // tab's bottom where it overlaps the pane, and the inner curve. One colour
     // throughout - the tab used to be the card colour folded and the window's
     // open (owner, round 10). The scheme's lift on the pane and the tab: a
     // shadow on Linen, like the page deck's panels; nothing on the dark ones.
-    const int32_t tabX = left ? 0 : w - tabW;
+    const int32_t tabXw = left ? 0 : w - tabW;          // in the window's width
 
     // AS WIDE AS ITS LONGEST ROW (owner, 2026-10-07), its outer edge on the
     // window's, never narrower than its own tab. Within a curve's width of the
@@ -3366,7 +3392,24 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
     int32_t paneW = LV_CLAMP(tabW, needW, w);
     const bool flush = paneW < tabW + 2 * r;
     if (flush) paneW = tabW;
-    const int32_t paneX = left ? 0 : w - paneW;
+    const int32_t paneXw = left ? 0 : w - paneW;
+
+    // THE HOLDER IS ONLY AS WIDE AS THE TAB AND PANE (round 8, measured on the
+    // P4_5: 35-105 ms a frame while sliding). Moving an object redraws its
+    // whole area, and a holder as wide as the window, transparent, made LVGL
+    // draw the cards, the window and the panel in every strip of every frame.
+    // Sized to the panel, most strips lie inside the opaque pane, and LVGL
+    // starts drawing there. Widened by the shadow's reach on Linen, so the
+    // holder does not clip it.
+    const UIMetrics &m = UI::met();
+    const int32_t reach = m.SHADOW ? UI::sc(m.SHADOW) + UI::sc(m.SHADOW_Y) + 2 : 0;
+    const int32_t x0 = LV_MAX(0, LV_MIN(tabXw, paneXw) - reach);
+    const int32_t x1 = LV_MIN(w, LV_MAX(tabXw + tabW, paneXw + paneW) + reach);
+    const int32_t tabX  = tabXw - x0;                   // from here on, in the holder
+    const int32_t paneX = paneXw - x0;
+    F.root = plain(lv_screen_active());
+    lv_obj_set_pos (F.root, W.x1 + x0, lv_obj_get_height(lv_screen_active()));   // out of sight
+    lv_obj_set_size(F.root, x1 - x0, F.h);
 
     // FLUSH: ONE PIECE (owner, 2026-10-07: a break in the left edge under the
     // title on the P4_5 and the 1060, a line under it on Linen). A tab exactly
@@ -3429,8 +3472,6 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
     // small grey crescent at the foot of the inner curve (owner, 2026-10-06 -
     // "thought it was crud on the glass"). The block reaches in by the
     // shadow's width; the curve's arcs are drawn over it.
-    const UIMetrics &m = UI::met();
-    const int32_t reach = m.SHADOW ? UI::sc(m.SHADOW) + UI::sc(m.SHADOW_Y) + 2 : 0;
     lv_obj_t *block = plain(F.root);
     lv_obj_set_pos (block, left ? tabX + bw : tabX - reach, tabAbove + bw);
     lv_obj_set_size(block, tabW - bw + reach, r + bw + reach);
@@ -3780,6 +3821,7 @@ void showWindow() {
     const uint32_t t0 = micros();
 #endif
     s.phase = PopupPhase::PHASE_OPEN;
+    s_faceEpoch++;                                    // faces the last window used may be taken back
     lv_obj_t *scr = lv_screen_active();
     lv_obj_update_layout(scr);                        // settle anything pending, aloud
     lv_display_enable_invalidation(nullptr, false);
@@ -3945,7 +3987,7 @@ namespace {
 enum DbgReqState : int { DREQ_IDLE, DREQ_CLAIMED, DREQ_PENDING, DREQ_CLOSING, DREQ_DONE };
 std::atomic<int> s_dreq{DREQ_IDLE};
 struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
-                int member = -1; int scene = -1; int look = -1; int show = -1;
+                int member = -1; int scene = -1; int look = -1; int show = -1; int scheme = -1;
                 bool close = false, power = false; };
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
@@ -3986,6 +4028,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "scene", v, sizeof(v)) == ESP_OK) a.scene = atoi(v);
         if (httpd_query_key_value(q, "look",  v, sizeof(v)) == ESP_OK) a.look  = atoi(v);
         if (httpd_query_key_value(q, "show",  v, sizeof(v)) == ESP_OK) a.show  = atoi(v);
+        if (httpd_query_key_value(q, "scheme", v, sizeof(v)) == ESP_OK) a.scheme = atoi(v);
         if (httpd_query_key_value(q, "close", v, sizeof(v)) == ESP_OK) a.close = atoi(v) != 0;
     }
     int expected = DREQ_IDLE;
@@ -4051,6 +4094,14 @@ void CardPopup::debugService(lv_timer_t *t) {
             }
             dbgOut("pause %d\n", a.pause);
         }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.scheme >= 0) {
+        // The colour scheme, as the drawer's button sets it (0 Fleet, 1
+        // Midnight, 2 Linen) - with no window open, as from the dashboard.
+        if (isOpen()) dbgOut("close the window first\n");
+        else { UI::setSchemeIndex((uint8_t)a.scheme); dbgOut("scheme %d\n", a.scheme); }
         s_dreq.store(DREQ_DONE);
         return;
     }
@@ -4203,7 +4254,8 @@ void CardPopup::debugService(lv_timer_t *t) {
     const int n = dbgCards(lv_screen_active(), cards, 0, 48);
     if (a.card < 0) {
         dbgMem(mem, sizeof(mem));
-        dbgOut("%s; window %s\n", mem, isOpen() ? "open" : "closed");
+        dbgOut("%s; window %s; scheme %u; faces flat so far %lu\n", mem, isOpen() ? "open" : "closed",
+               (unsigned)UI::schemeIndex(), (unsigned long)s_faceFlat);
         for (int i = 0; i < n; i++) {
             Card *c = cardOf(cards[i]);
             if (c) dbgOut("%2d  %-16s %-12s %u entit%s\n", i, c->label(), c->_area,
