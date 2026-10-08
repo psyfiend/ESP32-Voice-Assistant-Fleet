@@ -82,24 +82,14 @@ public:
     // TALKING TO THE PANEL AFTER BOOT (DSI boards; 2.10c round 9). The 4B was
     // seen twice with the whole picture washed out while its frame buffer was
     // right - the panel itself showing it wrong, as if its own settings
-    // (gamma, power) had been lost. These two are for catching it in the act:
-    //  - readPanelStatus(): the panel's own registers over DSI - DCS 0Ah power
-    //    mode, 0Bh address mode (MADCTL), 0Ch pixel format, 0Dh image mode, in
-    //    that order. false if the panel would not answer.
-    //  - resendPanelInit(): the BSP's init sequence again, exactly as at boot,
-    //    without a reset. The number of commands sent; -1 if there is no
-    //    sequence or one failed.
-    // Not from an interrupt. Safe from another task: commands go over the DSI
-    // command path, the picture over the video path.
-    bool readPanelStatus(uint8_t out[4]);
+    // (gamma, power) had been lost. resendPanelInit() sends the BSP's init
+    // sequence again, exactly as at boot, without a reset: the number of
+    // commands sent; -1 if there is no sequence or one failed. Not from an
+    // interrupt.
+    // NEVER READ FROM THE PANEL ONCE IT IS SHOWING A PICTURE. A version that
+    // read DCS 0Ah-0Dh at the end of begin() left all three P4s with the
+    // backlight on and a black screen (2.10c round 9, LESSONS).
     int  resendPanelInit();
-    // The same four registers as read at the end of begin(): this panel's own
-    // healthy reading, to compare with (chips differ - the HX8394 and JD9165
-    // never set the 0Ah booster bit the ST7703 does). false if unread.
-    bool bootPanelStatus(uint8_t out[4]) const {
-        for (uint8_t i = 0; i < 4; i++) out[i] = _bootStatus[i];
-        return _bootStatusOk;
-    }
 
     // For the System Doctor: the vendored driver and the link as brought up
     // (after BSP defaults are applied). "none" / 0 until begin() succeeds.
@@ -112,8 +102,6 @@ public:
 private:
     esp_lcd_panel_handle_t _panel = nullptr;
     esp_lcd_panel_io_handle_t _io = nullptr;   // DSI command path (MIPI boards)
-    uint8_t  _bootStatus[4] = {};
-    bool     _bootStatusOk  = false;
     const char *_driver   = "none";
     uint8_t     _lanes    = 0;
     uint32_t    _laneMbps = 0;

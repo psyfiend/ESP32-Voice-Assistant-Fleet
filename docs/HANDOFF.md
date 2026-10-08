@@ -88,10 +88,12 @@ that sheet's round 9 notes: (1) **a hang** - the P4_5's UI loop froze for good o
 first run of a face-cache stress test after flashing; not reproduced in nine passes since. The face
 cache's slot reuse is the first suspect. (2) **The 4B washed out once** (twice ever): the whole
 screen near-white and lurid while `/screenshot` looked normal - so the frame buffer was right and
-the panel itself was showing it wrong. **`GET /panel`** (built at the owner's request; `src/PanelDebug.cpp`,
-`docs/display/README.md` Instruments) reads the panel's own status against its boot reading, and
-`?resend=1` sends its init sequence again; the owner runs it the next time, before resetting (Q7).
-If a resend cures it, the fix is a periodic check that re-sends on a change.
+the panel itself was showing it wrong. **`GET /panel?resend=1`** (built at the owner's request;
+`src/PanelDebug.cpp`, `docs/display/README.md` Instruments) sends the panel its init sequence again;
+the owner runs it the next time, before resetting (Q7). If that cures it, the fix is to re-send it
+now and then. **It reads nothing from the panel, and nothing must**: a build that read the panel's
+status registers at the end of boot blanked all three P4s (LESSONS) - so a "re-send on a change"
+cannot detect the change by reading; it would have to re-send blind, or not at all.
 
 **LOCAL ONLY, NEVER COMMIT: `src/main.cpp` arms Arduino's loop watchdog 60 s after boot** (`enableLoopWDT()`
 in `loop()`) for the hang hunt - all three P4s are flashed with it. A frozen loop now panics with

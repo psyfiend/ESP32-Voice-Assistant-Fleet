@@ -551,6 +551,13 @@ next piece of eye candy:
   The hand-drawn faces had twelve slots, one per scheme x look x size, never freed. Fine on any one
   page; but schemes are per page, so swiping filled it, and every face after that came out flat.
   Found on the owner's 1060, not on the board it was built on.
+- **Never read from a DSI panel that is showing a picture.** To diagnose the 4B's washed-out
+  screen, `/panel` read the panel's status registers (DCS 0Ah-0Dh) with
+  `esp_lcd_panel_io_rx_param()`, and then the same read went into the end of boot so there would be
+  a healthy reading to compare with. All three P4s came up with the backlight on and a black
+  screen, otherwise running. The read worked and returned sensible values - and the picture
+  stopped. The drivers read the panel's ID only before the video starts; that is the only safe
+  time. Writes (re-sending the init sequence) were not seen to do harm, but nobody was watching.
 - **A newly made object reports y = 0 until LVGL lays it out** (the same trap as the width one
   above). An animation started from `lv_obj_get_y()` of a panel made in the same call slid it down
   from the top of the screen. Start a new object's animation from the value you just set.
