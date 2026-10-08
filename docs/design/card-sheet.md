@@ -588,8 +588,8 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   edge), the scenes take the columns that fit beside the chip and scroll. The row is moved with
   `translate_x`, so taps land where it is drawn.
 - **Four looks, hand-drawn faces** (owner, round 6-7, K27): Black - Square, Black - Round, Silver -
-  Square, Silver - Round, all kept; unchosen, Black - Square on Midnight and Fleet, Silver - Square on
-  Linen. LVGL's gradient has two stops and runs straight, and the owner asked for the line between
+  Square, Silver - Round, all kept; unchosen, Black - Square on Midnight and Fleet, Silver - Round on
+  Linen (round 9). LVGL's gradient has two stops and runs straight, and the owner asked for the line between
   the selector's light and dark halves to **curve up in the middle** (in the upper two fifths, a
   raised look) and for unlit chips to be **soft dents**, so the faces are ARGB8888 images painted per
   pixel (`paintFace()`): the curved line, faint brushed row streaks, a fine edge, corners

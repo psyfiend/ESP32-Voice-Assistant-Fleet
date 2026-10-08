@@ -261,6 +261,9 @@ the P4_5 prints where it was stuck to a log on the PC.
 | Q2 | SETTINGS and CHART on the P4_5 | Clearly smoother than round 8 (each frame measured at 8-40 ms, from 35-105) |
 | Q3 | The same on the 4B and 1060, Linen included | As smooth as round 8, and the panels' shadows on Linen look as they did |
 | Q4 | Use the boards as usual | No freeze. A reboot out of nowhere is the watchdog catching one - say when |
+| Q5 | Linen, no look chosen (or `/popup?look=4` on a debug board) | Silver - Round (owner's choice, round 9); Midnight and Fleet still Black - Square |
+| Q6 | Once, on the 4B, now: open `http://fleet-ws-p4-4b/panel?resend=1` in a browser | The page says "the same as at boot" twice and "resent 19 init commands"; say whether the screen flickered or changed |
+| Q7 | **If the 4B washes out again - before resetting it:** open `http://fleet-ws-p4-4b/panel`, then `http://fleet-ws-p4-4b/panel?resend=1` | Copy both pages to Claude, and say whether the picture came back after the second. A reading "DIFFERENT FROM BOOT", or a picture that comes back, means the panel lost its settings |
 
 ## Not tested (by Claude) - round 8
 
