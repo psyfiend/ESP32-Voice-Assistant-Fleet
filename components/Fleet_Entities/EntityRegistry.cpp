@@ -296,6 +296,10 @@ bool EntityRegistry::adoptName(const char *id, const char *name) {
 // Pausing is a deliberate long-press, so it is rare by construction and nothing
 // like the slider-drag case that motivated that warning. One write per press is
 // the correct cost, and it is bounded.
+//
+// Since 2.10d the list goes through a PauseStore when one is set: SystemCore
+// keeps it in the owner's settings file, written by the settings task. The NVS
+// functions below are the default and the one-time import's source.
 
 static const char *PAUSE_NS  = "fleet_ent";
 static const char *PAUSE_KEY = "paused";
@@ -333,6 +337,19 @@ static bool savePauseList(const char *list) {
     if (err == ESP_OK) err = nvs_commit(h);
     nvs_close(h);
     return err == ESP_OK;
+}
+
+bool EntityRegistry::readNvsPauseList(char *out, size_t cap) { return loadPauseList(out, cap); }
+
+// Through the store SystemCore set, else NVS as before (2.10d).
+bool EntityRegistry::loadPauses(char *out, size_t cap) const {
+    if (_pauseStore.load) return _pauseStore.load(out, cap, _pauseStore.ctx);
+    return loadPauseList(out, cap);
+}
+
+bool EntityRegistry::savePauses(const char *list) const {
+    if (_pauseStore.save) return _pauseStore.save(list, _pauseStore.ctx);
+    return savePauseList(list);
 }
 
 bool EntityRegistry::isPaused(const char *id) const {
@@ -447,7 +464,7 @@ bool EntityRegistry::setPaused(const char *id, bool paused, uint32_t nowMs) {
     // for the first seconds after boot its id is in the saved list but not in
     // the table. Those ids are carried over from what was saved.
     char saved[PAUSE_BLOB_MAX];
-    loadPauseList(saved, sizeof(saved));
+    loadPauses(saved, sizeof(saved));
     {
         std::lock_guard<std::mutex> lk(_mx);
         for (const char *p = saved; *p; ) {
@@ -483,16 +500,16 @@ bool EntityRegistry::setPaused(const char *id, bool paused, uint32_t nowMs) {
         }
     }
 
-    if (!savePauseList(list)) {
-        ESP_LOGW(ENT_TAG, "NVS write failed; pause is live but will not "
-                          "survive a reboot.");
+    if (!savePauses(list)) {
+        ESP_LOGW(ENT_TAG, "pause store write failed; pause is live but will "
+                          "not survive a reboot.");
     }
     return true;
 }
 
 void EntityRegistry::restorePaused() {
     char list[PAUSE_BLOB_MAX];
-    if (!loadPauseList(list, sizeof(list)) || !list[0]) return;
+    if (!loadPauses(list, sizeof(list)) || !list[0]) return;
 
     uint8_t n = 0;
     {
@@ -505,7 +522,7 @@ void EntityRegistry::restorePaused() {
             }
         }
     }
-    if (n) ESP_LOGI(ENT_TAG, "restored %u paused entities from NVS", (unsigned)n);
+    if (n) ESP_LOGI(ENT_TAG, "restored %u paused entities", (unsigned)n);
 }
 
 bool EntityRegistry::setAvailable(const char *id, bool available, uint32_t nowMs) {

@@ -71,6 +71,75 @@ void SystemCore::heapMark(const char *stage) {
     last = now;
 }
 
+// The registry's pause list, kept in the settings file (2.10d, K38). The
+// registry speaks a comma-delimited list of entity ids (EntityRegistry::
+// PauseStore); the file holds entities.<id>.paused = true, an entity that is
+// not paused having no entry.
+namespace {
+bool listContains(const char *list, const char *id) {
+    const size_t n = strlen(id);
+    for (const char *p = list; *p; ) {
+        const char *e = strchr(p, ',');
+        const size_t len = e ? (size_t)(e - p) : strlen(p);
+        if (len == n && strncmp(p, id, n) == 0) return true;
+        if (!e) break;
+        p = e + 1;
+    }
+    return false;
+}
+
+struct ListOut { char *out; size_t cap, used; };
+
+bool pauseStoreLoad(char *out, size_t cap, void *) {
+    if (!cap) return false;
+    out[0] = '\0';
+    ListOut a{ out, cap, 0 };
+    Settings::forEachEntityFlag("paused", [](const char *id, void *ctx) {
+        ListOut &a = *(ListOut *)ctx;
+        const size_t n = strlen(id);
+        if (a.used + n + 2 > a.cap) return;
+        if (a.used) a.out[a.used++] = ',';
+        memcpy(a.out + a.used, id, n + 1);
+        a.used += n;
+    }, &a);
+    return true;
+}
+
+// Called by setPaused() with the whole list. Written by the settings task a
+// second later; the card window's close asks too, so a pause made there is
+// one write with the rest of the window's changes.
+bool pauseStoreSave(const char *list, void *) {
+    char cur[512];
+    pauseStoreLoad(cur, sizeof(cur), nullptr);
+    for (const char *p = cur; *p; ) {           // no longer paused
+        const char *e = strchr(p, ',');
+        const size_t len = e ? (size_t)(e - p) : strlen(p);
+        char id[64];
+        if (len && len < sizeof(id)) {
+            memcpy(id, p, len);
+            id[len] = '\0';
+            if (!listContains(list, id)) Settings::setEntityFlag(id, "paused", false, false);
+        }
+        if (!e) break;
+        p = e + 1;
+    }
+    for (const char *p = list; *p; ) {          // paused
+        const char *e = strchr(p, ',');
+        const size_t len = e ? (size_t)(e - p) : strlen(p);
+        char id[64];
+        if (len && len < sizeof(id)) {
+            memcpy(id, p, len);
+            id[len] = '\0';
+            Settings::setEntityFlag(id, "paused", true, false);
+        }
+        if (!e) break;
+        p = e + 1;
+    }
+    Settings::save(1000);
+    return Settings::persistent();
+}
+}  // namespace
+
 bool SystemCore::begin() {
     // --= 0. Identity =--
     printIdentity();
@@ -225,6 +294,21 @@ bool SystemCore::begin() {
     // Issue #60 - "if I want a card paused I do not want a reboot to unpause
     // it." A pause that survived the user but not the power cut would be worse
     // than no pause at all.
+    //
+    // SINCE 2.10d THE PAUSES LIVE IN THE SETTINGS FILE (K38): entities.<id>.
+    // paused, alongside every other saved choice, so one export carries them.
+    // #60's NVS list is imported once and left where it is (older firmware
+    // still finds it).
+    if (!Settings::imported("nvs_paused")) {
+        char old[512];
+        if (EntityRegistry::readNvsPauseList(old, sizeof(old)) && old[0]) {
+            pauseStoreSave(old, nullptr);
+            Serial.printf("[Settings] imported the paused list from NVS: %s\n", old);
+        }
+        Settings::markImported("nvs_paused");
+        Settings::save();
+    }
+    _entities.setPauseStore({ pauseStoreLoad, pauseStoreSave, nullptr });
     _entities.restorePaused();
 
     heapMark("core ready");

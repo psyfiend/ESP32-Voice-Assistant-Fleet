@@ -322,6 +322,22 @@ bool setEntityFlag(const char *entityId, const char *key, bool value, bool dflt)
     return changed;
 }
 
+bool imported(const char *name) {
+    if (!s_doc || !name) return false;
+    Lock l;
+    JsonVariantConst v = (*s_doc)["imported"][name];
+    return v.is<bool>() && v.as<bool>();
+}
+
+void markImported(const char *name) {
+    if (!s_doc || !name) return;
+    Lock l;
+    JsonObject imp = objectAt(s_doc->as<JsonObject>(), "imported");
+    if (imp[name].is<bool>() && imp[name].as<bool>()) return;
+    imp[name] = true;
+    s_dirty = true;
+}
+
 void save(uint32_t delayMs) {
     if (!s_task) return;
     s_delayMs = delayMs;

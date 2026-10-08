@@ -67,6 +67,10 @@ bool setCard(const char *cardId, const char *key, const char *value);
 bool setScheme(const char *schemeName, const char *key, const char *value);
 bool setEntityFlag(const char *entityId, const char *key, bool value, bool dflt);
 
+// One-time imports, so each happens once per file: "imported": {"<name>": true}.
+bool imported(const char *name);
+void markImported(const char *name);
+
 // Ask the save task to write the file, `delayMs` from now, if anything has
 // changed since the last write. Cheap; call it freely.
 void save(uint32_t delayMs = 0);

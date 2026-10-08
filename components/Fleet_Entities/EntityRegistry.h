@@ -175,9 +175,24 @@ public:
     bool setPaused(const char *id, bool paused, uint32_t nowMs);
     bool isPaused(const char *id) const;
 
-    // Restore paused ids from NVS. Call AFTER every provider has registered,
-    // because an id that is not in the table yet cannot be marked.
+    // Restore paused ids from the pause store. Call AFTER every provider has
+    // registered, because an id that is not in the table yet cannot be marked.
     void restorePaused();
+
+    // WHERE PAUSES ARE KEPT (2.10d). A comma-delimited list of entity ids,
+    // loaded and saved through these two functions. Unset, the registry keeps
+    // it in NVS itself (fleet_ent/paused), as it did from #60; SystemCore
+    // points it at the owner's settings file (Settings.h) - the registry knows
+    // nothing about that file. save() may be called on any task that already
+    // calls setPaused().
+    struct PauseStore {
+        bool (*load)(char *out, size_t cap, void *ctx) = nullptr;
+        bool (*save)(const char *list, void *ctx) = nullptr;
+        void *ctx = nullptr;
+    };
+    void setPauseStore(const PauseStore &s) { _pauseStore = s; }
+    // The list as #60 left it in NVS, for a one-time import. "" if none.
+    static bool readNvsPauseList(char *out, size_t cap);
 
     // How many entities are currently paused - for the system dump, which is
     // the only place a pause that outlives a reboot is discoverable from.
@@ -309,6 +324,9 @@ private:
     void       *_lightCtx = nullptr;
 
     mutable std::mutex _mx;
+    PauseStore _pauseStore;   // unset: NVS, see setPauseStore()
+    bool loadPauses(char *out, size_t cap) const;
+    bool savePauses(const char *list) const;
     // 3 s since 2.7 (#63). Was 5 s, sized for a round trip through a broker.
     // Since #63 only a MATCHING echo confirms, so the window must outlast a
     // fading light: the owner timed his Desk group at ~1.5 s, and asked for
