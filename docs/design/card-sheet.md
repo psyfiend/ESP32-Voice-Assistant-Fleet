@@ -592,7 +592,7 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   `translate_x`, so taps land where it is drawn.
 - **Four looks, hand-drawn faces** (owner, round 6-7, K27): Black - Square, Black - Round, Silver -
   Square, Silver - Round, all kept; unchosen, Black - Square on Midnight and Fleet, Silver - Round on
-  Linen (round 9). **Chosen per scheme** (K31, SETTINGS' "Selector" row, debug builds): a choice
+  Linen (round 9). **Chosen per scheme** (K31, SETTINGS' "Selector" row, in every build): a choice
   holds for the scheme it was made in, so a Linen page and a Fleet page each keep their own. LVGL's gradient has two stops and runs straight, and the owner asked for the line between
   the selector's light and dark halves to **curve up in the middle** (in the upper two fifths, a
   raised look) and for unlit chips to be **soft dents**, so the faces are ARGB8888 images painted per

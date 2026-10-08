@@ -1204,8 +1204,8 @@ constexpr uint32_t DECK_GLIDE_MS = 140;
 // FOUR LOOKS, ALL KEPT (owner, round 6: "they all look so good"): Black or
 // Silver, Square or Round. Unchosen, each scheme has its own: Black - Square
 // on Midnight and Fleet, Silver - Round on Linen (owner, round 9). Chosen in
-// SETTINGS' "Selector" row (debug builds for now; it belongs on the device's
-// own settings page, 4.1) - and chosen FOR THE SCHEME SHOWING (owner, round 9:
+// SETTINGS' "Selector" row (every build; it belongs on the device's own
+// settings page, 4.1) - and chosen FOR THE SCHEME SHOWING (owner, round 9:
 // "the selector should follow the scheme"). Schemes are per page, so a page in
 // Linen and a page in Fleet each keep their own; a page that changes scheme
 // takes that scheme's.
@@ -3143,9 +3143,7 @@ constexpr uint8_t DECK_ROWS_MAX = 8;
 void pauseCheckCb(lv_event_t *ev);
 void groupDropCb(lv_event_t *ev);
 void scenesDropCb(lv_event_t *ev);
-#ifdef DEBUG_POPUP
 void lookDropCb(lv_event_t *ev);
-#endif
 
 uint8_t deckSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
@@ -3172,11 +3170,11 @@ uint8_t deckSpecs(DeckRowSpec *r) {
         r[n++] = { "Scenes", DeckRowKind::ROW_DROP, "Visible scenes only\nShow all scenes\nDisabled",
                    (uint16_t)(s.sceneShow == SceneShow::SCENES_ALL ? 1 : s.sceneShow == SceneShow::SCENES_OFF ? 2 : 0),
                    true, scenesDropCb, &s.ddScenes };
-#ifdef DEBUG_POPUP
-    // The selector's looks, for the scheme showing (debug builds only).
+    // The selector's looks, for the scheme showing (K31). In every build since
+    // round 9 (owner: "I'd like to keep that for a bit"); a device-wide
+    // setting in a card's panel until the device's own settings page (4.1).
     r[n++] = { "Selector", DeckRowKind::ROW_DROP, "Black - Square\nBlack - Round\nSilver - Square\nSilver - Round",
                deckLook(), true, lookDropCb, nullptr };
-#endif
     return n;
 }
 
@@ -3297,14 +3295,12 @@ void groupDropCb(lv_event_t *ev) {
     renderMain();
 }
 
-#ifdef DEBUG_POPUP
 void lookDropCb(lv_event_t *ev) {
     chosenLook() = (int8_t)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     // The deck is built with the view; the chips' lit look follows at once.
     if (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER) lv_async_call(rebuildMainAsync, nullptr);
     else showView(s.view);
 }
-#endif
 
 // Scenes: Visible / All / Off (2.10c). On the held card, and the window follows
 // at once: the clapperboard comes or goes, and Scenes rebuilds or gives way.
