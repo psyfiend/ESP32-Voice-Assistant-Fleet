@@ -3092,6 +3092,10 @@ void deckSet(uint8_t state) {
     s.deckState = state;
     // Open, on top of the other panel, which folds to its tab.
     if (state == DECK_OPEN) { lv_obj_move_foreground(s.deck); chartFold(); }
+    // FOLDING, BACK TO THE TOP (owner, 2.10d): a pane folded while scrolled
+    // kept its offset, and the rows it had scrolled to showed in the strip of
+    // the tab left peeking at the bottom of the screen.
+    else if (s.deckPane) lv_obj_scroll_to_y(s.deckPane, 0, LV_ANIM_OFF);
     lv_anim_delete(s.deck, deckExec);
     lv_anim_t a;
     lv_anim_init(&a);
@@ -3825,6 +3829,7 @@ void chartSet(uint8_t state) {
     const uint8_t was = s_chart.state;
     s_chart.state = state;
     if (state == DECK_OPEN) { lv_obj_move_foreground(s_chart.root); if (s.deckState == DECK_OPEN) deckSet(DECK_PEEK); }
+    else if (s_chart.pane) lv_obj_scroll_to_y(s_chart.pane, 0, LV_ANIM_OFF);   // as SETTINGS (deckSet())
     lv_anim_delete(s_chart.root, chartExec);
     lv_anim_t a;
     lv_anim_init(&a);
