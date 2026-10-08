@@ -4,11 +4,13 @@
 #include "LightColor.h"
 #include "UI/UITokens.h"
 #include "UI/UIToolkit.h"
+#include "Settings.h"   // 2.10d: SETTINGS' rows are kept by card id
 #include "src/core/lv_obj_event_private.h"   // lv_hit_test_info_t: the tap catcher's hit test
 #include "src/core/lv_obj_draw_private.h"    // lv_obj_get_ext_draw_size: the window's shadow
 #include <Arduino.h>
 #include "esp_heap_caps.h"   // the hand-drawn faces live in PSRAM
 #include "src/misc/cache/instance/lv_image_cache.h"   // lv_image_cache_drop(): not in lvgl.h
+#include <ctype.h>
 #include <math.h>
 #include <stdarg.h>
 #include <string.h>
@@ -1212,9 +1214,40 @@ constexpr uint32_t DECK_GLIDE_MS = 140;
 constexpr uint8_t LOOK_SCHEMES = 4;   // UITokens' schemes, with room for one more
 int8_t s_deckLook[LOOK_SCHEMES] = { -1, -1, -1, -1 };   // -1: the scheme's own; else bit 0 round, bit 1 silver
 
+// Saved as a setting of the scheme (2.10d, DECISIONS K36): schemes.<name>.
+// selector, by name, in the order of SETTINGS' row. The scheme's name is its
+// palette's, lower case ("linen").
+const char *const LOOK_NAMES[4] = { "black_square", "black_round", "silver_square", "silver_round" };
+uint8_t s_lookLoaded = 0;   // bit per scheme index: read from the settings file yet
+
+void schemeKey(char *out, size_t cap) {
+    const char *n = UI::pal().name ? UI::pal().name : "scheme";
+    size_t k = 0;
+    for (; n[k] && k + 1 < cap; k++) out[k] = (char)tolower((unsigned char)n[k]);
+    out[k] = '\0';
+}
+
 int8_t &chosenLook() {
-    const uint8_t i = UI::schemeIndex();
-    return s_deckLook[i < LOOK_SCHEMES ? i : 0];
+    uint8_t i = UI::schemeIndex();
+    if (i >= LOOK_SCHEMES) i = 0;
+    if (!(s_lookLoaded & (1u << i))) {
+        s_lookLoaded |= (uint8_t)(1u << i);
+        char key[16], v[20];
+        schemeKey(key, sizeof(key));
+        if (Settings::scheme(key, "selector", v, sizeof(v)))
+            for (int8_t k = 0; k < 4; k++)
+                if (!strcmp(v, LOOK_NAMES[k])) s_deckLook[i] = k;
+    }
+    return s_deckLook[i];
+}
+
+// Choose the look for the scheme showing, and keep it; -1 is the scheme's
+// own, which removes the saved choice (the Reset).
+void keepLook(int8_t look) {
+    chosenLook() = look;
+    char key[16];
+    schemeKey(key, sizeof(key));
+    Settings::setScheme(key, "selector", look < 0 ? nullptr : LOOK_NAMES[look & 3]);
 }
 
 uint8_t deckLook() {
@@ -3286,17 +3319,26 @@ void deckRender() {
     if (s.ddGroup) lv_dropdown_set_selected(s.ddGroup, s.groupOn == GroupOn::GROUP_ON_ALL ? 1 : 0);
 }
 
+// A card setting changed in SETTINGS, kept for the held card under its id
+// (2.10d). In RAM until the window closes - closeNow() asks for the write.
+void keepCardSetting(const char *key, const char *value) {
+    Card *c = cardOf(h.surface);
+    if (c && c->hasId()) Settings::setCard(c->id(), key, value);
+}
+
 // Active state: any member / all members. On the held card too, so it
 // repaints at once and its tap follows the same rule.
 void groupDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     s.groupOn = k ? GroupOn::GROUP_ON_ALL : GroupOn::GROUP_ON_ANY;
     if (Card *c = cardOf(h.surface)) c->setGroupOn(s.groupOn);
+    keepCardSetting("active", groupOnName(s.groupOn));
     renderMain();
 }
 
 void lookDropCb(lv_event_t *ev) {
-    chosenLook() = (int8_t)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    const uint16_t k = (uint16_t)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    keepLook((int8_t)(k & 3));
     // The deck is built with the view; the chips' lit look follows at once.
     if (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER) lv_async_call(rebuildMainAsync, nullptr);
     else showView(s.view);
@@ -3308,6 +3350,7 @@ void scenesDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     s.sceneShow = k == 1 ? SceneShow::SCENES_ALL : k == 2 ? SceneShow::SCENES_OFF : SceneShow::SCENES_VISIBLE;
     if (Card *c = cardOf(h.surface)) c->setSceneShow(s.sceneShow);
+    keepCardSetting("scenes", sceneShowName(s.sceneShow));
     s.lastScene = -1;   // the offered list changed under the ring
     if (s.view == PopupView::VIEW_SCENES)
         showView(hasScenes() ? PopupView::VIEW_SCENES : controlsView());
@@ -3726,6 +3769,10 @@ void closeNow(void *unused) {
     s.expanded = false;
     s.lastScene = -1;
     s.rebuildQueued = false;
+    // K8: settings are written when the window closes - once, if anything
+    // changed, on the settings task, 400 ms on so the write never lands in
+    // the frames of the close or of SETTINGS' slide.
+    Settings::save(400);
 #ifdef DEBUG_POPUP
     char mem[96];
     dbgMem(mem, sizeof(mem));
@@ -4119,6 +4166,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             s.sceneShow = a.show == 1 ? SceneShow::SCENES_ALL : a.show == 2 ? SceneShow::SCENES_OFF
                                                                            : SceneShow::SCENES_VISIBLE;
             if (Card *c = cardOf(h.surface)) c->setSceneShow(s.sceneShow);
+            keepCardSetting("scenes", sceneShowName(s.sceneShow));   // as the row does
             s.lastScene = -1;
             showView(s.view == PopupView::VIEW_SCENES && !hasScenes() ? controlsView() : s.view);
             dbgOut("scenes shown %d, %u of them\n", a.show, (unsigned)shownScenes());
@@ -4129,8 +4177,9 @@ void CardPopup::debugService(lv_timer_t *t) {
     if (a.look >= 0) {
         // The selector's look for the scheme showing: 0 Black - Square,
         // 1 Black - Round, 2 Silver - Square, 3 Silver - Round; 4 the scheme's own.
-        chosenLook() = a.look >= 4 ? (int8_t)-1 : (int8_t)(a.look & 3);
+        keepLook(a.look >= 4 ? (int8_t)-1 : (int8_t)(a.look & 3));   // kept as the row keeps it
         if (isOpen()) showView(s.view);
+        else          Settings::save();   // no window to close and ask for it
         dbgOut("selector %d for scheme %u\n", (int)chosenLook(), (unsigned)UI::schemeIndex());
         s_dreq.store(DREQ_DONE);
         return;
@@ -4260,8 +4309,9 @@ void CardPopup::debugService(lv_timer_t *t) {
     const int n = dbgCards(lv_screen_active(), cards, 0, 48);
     if (a.card < 0) {
         dbgMem(mem, sizeof(mem));
-        dbgOut("%s; window %s; scheme %u; faces flat so far %lu\n", mem, isOpen() ? "open" : "closed",
-               (unsigned)UI::schemeIndex(), (unsigned long)s_faceFlat);
+        dbgOut("%s; window %s; scheme %u, selector %d (-1: the scheme's own); faces flat so far %lu\n", mem,
+               isOpen() ? "open" : "closed", (unsigned)UI::schemeIndex(), (int)chosenLook(),
+               (unsigned long)s_faceFlat);
         for (int i = 0; i < n; i++) {
             Card *c = cardOf(cards[i]);
             if (c) dbgOut("%2d  %-16s %-12s %u entit%s\n", i, c->label(), c->_area,

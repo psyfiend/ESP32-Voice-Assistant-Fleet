@@ -8,6 +8,7 @@
 #include "TimeService.h"
 #include "bsp_loader.h"
 #include "PanelDebug.h"
+#include "Settings.h"
 
 // Normally injected by scripts/fw_version.py via extra_scripts (derived from
 // `git describe`). Defined defensively here so a build still succeeds if that
@@ -134,6 +135,12 @@ bool SystemCore::begin() {
     // Must precede every provider.
     beginEntityStorage();
     heapMark("after registry");
+
+    // --= 7a. The owner's saved settings (2.10d, Settings.h) =--
+    // Before anything reads a setting: the pause restore below, and every page
+    // GUIManager builds.
+    Settings::begin(_http);
+    heapMark("after settings");
 
     // --= 8. Providers =--
     // All three need the registry; two of them also need the broker.

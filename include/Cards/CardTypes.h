@@ -241,6 +241,27 @@ enum class SceneShow : uint8_t {
     SCENES_OFF,
 };
 
+// The names these are saved under (2.10d, Settings.h): a saved choice is a
+// NAME, so reordering an enum never changes what it means. A name this
+// firmware does not know reads as "not set".
+inline const char *groupOnName(GroupOn g) { return g == GroupOn::GROUP_ON_ALL ? "all" : "any"; }
+inline bool groupOnFromName(const char *n, GroupOn &out) {
+    if (!n) return false;
+    if (!strcmp(n, "any")) { out = GroupOn::GROUP_ON_ANY; return true; }
+    if (!strcmp(n, "all")) { out = GroupOn::GROUP_ON_ALL; return true; }
+    return false;
+}
+inline const char *sceneShowName(SceneShow v) {
+    return v == SceneShow::SCENES_ALL ? "all" : v == SceneShow::SCENES_OFF ? "off" : "visible";
+}
+inline bool sceneShowFromName(const char *n, SceneShow &out) {
+    if (!n) return false;
+    if (!strcmp(n, "visible")) { out = SceneShow::SCENES_VISIBLE; return true; }
+    if (!strcmp(n, "all"))     { out = SceneShow::SCENES_ALL;     return true; }
+    if (!strcmp(n, "off"))     { out = SceneShow::SCENES_OFF;     return true; }
+    return false;
+}
+
 // What the line under a state card's hero says. Milestone 2.7.
 //
 // The owner, 2026-09-22: state is the icon and the colour, and the NAME is what

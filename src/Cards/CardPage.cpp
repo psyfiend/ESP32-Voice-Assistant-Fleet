@@ -4,6 +4,7 @@
 #include "Cards/CardIcons.h"
 #include "UI/UITokens.h"
 #include "SystemReport.h"
+#include "Settings.h"
 #include <Arduino.h>
 #ifdef DEBUG_PAGE_TIMING
 #include <esp_timer.h>   // where a page rebuild's time goes - see commit()
@@ -559,6 +560,17 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
         c->setLabelMode(cs.labelMode == CardLabel::LBL_INHERIT ? spec.labelMode
                                                                : cs.labelMode);
         c->setGroupOn(cs.groupOn);
+
+        // The owner's saved changes, over the spec (2.10d, Settings.h): the
+        // file is the top layer. Read every time the page is built, which is
+        // what makes a choice survive a page swipe as well as a reboot.
+        if (c->hasId()) {
+            char v[24];
+            GroupOn g;
+            SceneShow ss;
+            if (Settings::card(c->id(), "active", v, sizeof(v)) && groupOnFromName(v, g)) c->setGroupOn(g);
+            if (Settings::card(c->id(), "scenes", v, sizeof(v)) && sceneShowFromName(v, ss)) c->setSceneShow(ss);
+        }
         if (cs.longStaleMs) c->setLongStaleMs(cs.longStaleMs);
         if (cs.paused)      c->setPaused(true);
 
