@@ -47,6 +47,7 @@ How to use it:
 | A11 | **LVGL's pool: 512 KB in PSRAM on every P4** (`FLEET_LV_MEM_PSRAM`); LVGL's own allocator kept, never the system `malloc`. Supersedes 2.3's "PSRAM pool not needed" | 2026-10-06 | #88, CLAUDE.md, LESSONS |
 | A12 | Voice assistant parked, not abandoned: audio code is protected during the UI work (Q8) | 2026-09-03 | Archive §8 Q8 |
 | A13 | The entity table learns entities while running: the members a source names for a group (HA's `entity_id`), with ids made from the source's own (`ha_light_office_lamp`), so pauses and settings find them after a reboot | 2026-10-06 | `card-sheet.md` §16, `EntityRegistry.h` |
+| A14 | **Flash writes flash the P4 panels light blue** (owner, on glass, 2026-10-08, `/panel?flash=`), as HomeTiles found: the per-frame DSI DMA restart waits for the cache. Fixed the IDF way - `CONFIG_LCD_DSI_ISR_CACHE_SAFE=y` added to the #49 library rebuild (`defconfig.cache_safe`); installed only with the owner's OK | 2026-10-08 | `REBUILD_P4_LIBS.md`, `card-sheet.md` §17 |
 
 ## Connectivity and Home Assistant
 
@@ -114,3 +115,5 @@ How to use it:
 | K36 | The Selector look is a setting of the scheme in the file (`schemes.<scheme>.selector`), its default the scheme's own (K31) | 2026-10-08 | `card-sheet.md` §17 |
 | K37 | 2.10d's rows: Visibility stays greyed until page editing (2.11), "Only in group / only as member" with it; Custom name set through a debug address until the web UI (keyboard later, lower priority); Tap action gets Cycle scenes (a toast "Scene: Desk - Bright", the first scene after each boot) and Load scene with a chooser | 2026-10-08 | `card-sheet.md` §17 |
 | K38 | Paused moves from NVS into the settings file, the old list read once (Claude's, not objected to) | 2026-10-08 | `card-sheet.md` §17 |
+| K39 | Long press always opens the window, whatever the Tap action (K3 stands; no Long press setting). NINA's toasts after 2.10d. Cycle scenes and Load scene offer the scenes the window shows (the card's Scenes setting) | 2026-10-08 | `card-sheet.md` §17 |
+| K40 | Label's choices: **Inherit** (the page's, later the group's) / From HA / State / Custom / None - any of them can be a page's default. The dashboard's hard-coded labels ("Desk") are custom names supplied by the build sheet; a name set on the device replaces them | 2026-10-08 | `card-sheet.md` §17 |
