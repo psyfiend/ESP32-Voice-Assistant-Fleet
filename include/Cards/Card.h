@@ -114,6 +114,9 @@ public:
     // the fleet setting - see cardLabelMode() in CardIcons.h.
     Card &setLabelMode(CardLabel m) { _labelMode = m; return *this; }
     CardLabel labelMode() const { return _labelMode; }
+    // The words for the name line under a resolved mode: "From HA" is the
+    // source's own name, everything else the card's label().
+    const char *shownName(CardLabel lbl) const;
 
     // With several primaries: on when any is, or only when all are. See
     // GroupOn. Changing it repaints (the popup's deck changes it live).

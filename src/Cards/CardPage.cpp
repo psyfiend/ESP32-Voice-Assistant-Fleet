@@ -565,11 +565,15 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
         // file is the top layer. Read every time the page is built, which is
         // what makes a choice survive a page swipe as well as a reboot.
         if (c->hasId()) {
-            char v[24];
+            char v[ENTITY_NAME_MAX];
             GroupOn g;
             SceneShow ss;
+            CardLabel lm;
             if (Settings::card(c->id(), "active", v, sizeof(v)) && groupOnFromName(v, g)) c->setGroupOn(g);
             if (Settings::card(c->id(), "scenes", v, sizeof(v)) && sceneShowFromName(v, ss)) c->setSceneShow(ss);
+            if (Settings::card(c->id(), "label", v, sizeof(v)) && cardLabelFromName(v, lm)) c->setLabelMode(lm);
+            // A custom name set on the device replaces the dashboard's (K40).
+            if (Settings::card(c->id(), "name", v, sizeof(v)) && v[0]) c->setLabel(v);
         }
         if (cs.longStaleMs) c->setLongStaleMs(cs.longStaleMs);
         if (cs.paused)      c->setPaused(true);

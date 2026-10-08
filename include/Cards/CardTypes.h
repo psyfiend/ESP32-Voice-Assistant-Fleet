@@ -276,14 +276,38 @@ inline bool sceneShowFromName(const char *n, SceneShow &out) {
 // headers with the grep in LESSONS.md, none of these is defined there.
 enum class CardLabel : uint8_t {
     LBL_INHERIT = 0,  // use the page's setting (on a card) or the fleet's
-    LBL_NAME,         // the card's label - the default
+    LBL_NAME,         // "Custom": the card's own name - one set on the device,
+                      // else the dashboard's ("Desk"), else the source's.
+                      // The default
     LBL_STATE,        // "Open" / "Closed", from the device_class table
     LBL_NONE,         // nothing; the hero stands alone
+    LBL_HA,           // "From HA": the source's own name (Entity::sourceName,
+                      // HA's friendly_name), else the card's (2.10d, K40)
     // A fourth mode, LBL_NO_ICON - name kept, hero and disc dropped - was
     // built and tried on glass 2026-09-22 and REJECTED by the owner: "We're
     // not building a minimal dashboard. We're building an awesome dashboard."
     // Removed rather than left switched off.
 };
+
+// Saved by name (Settings.h). "inherit" is never saved: it is the absence of
+// a choice, so choosing it removes the key.
+inline const char *cardLabelName(CardLabel l) {
+    switch (l) {
+        case CardLabel::LBL_NAME:  return "custom";
+        case CardLabel::LBL_STATE: return "state";
+        case CardLabel::LBL_NONE:  return "none";
+        case CardLabel::LBL_HA:    return "ha";
+        default:                   return "inherit";
+    }
+}
+inline bool cardLabelFromName(const char *n, CardLabel &out) {
+    if (!n) return false;
+    if (!strcmp(n, "custom")) { out = CardLabel::LBL_NAME;  return true; }
+    if (!strcmp(n, "state"))  { out = CardLabel::LBL_STATE; return true; }
+    if (!strcmp(n, "none"))   { out = CardLabel::LBL_NONE;  return true; }
+    if (!strcmp(n, "ha"))     { out = CardLabel::LBL_HA;    return true; }
+    return false;
+}
 
 // ---------------------------------------------------------------------------
 // Where a card wants to sit, in grid UNITS.

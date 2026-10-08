@@ -137,6 +137,10 @@ public:
     // with (its ref). A declared name is the user's; a scene's is its own.
     bool adoptName(const char *id, const char *name);
 
+    // The source's own name (Entity::sourceName), for any entity. Marks it
+    // dirty only when it changed, so a card showing "From HA" repaints.
+    bool setSourceName(const char *id, const char *name);
+
     // True once after learnMembers() added anything: the caller (the loop
     // task) then re-applies the saved pauses, which could not reach an entity
     // that did not exist at boot.

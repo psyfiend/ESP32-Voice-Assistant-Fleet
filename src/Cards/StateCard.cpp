@@ -325,7 +325,7 @@ void StateCard::render() {
 
     if (showName) {
         lv_label_set_text(_name, lbl == CardLabel::LBL_STATE
-                                 ? cardStateWord(e->desc, isOn) : label());
+                                 ? cardStateWord(e->desc, isOn) : shownName(lbl));
         lv_obj_set_style_text_font(_name, t.NAME, 0);
         lv_obj_set_style_translate_y(_name, nameShift, 0);
         lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);

@@ -175,6 +175,17 @@ const char *Card::label() const {
     return p ? p->desc.name : "";
 }
 
+// The name the card shows for a resolved Label (2.10d, K40). "From HA" is the
+// source's own name once it has said one; until then, and for anything not
+// from HA, the card's own.
+const char *Card::shownName(CardLabel lbl) const {
+    if (lbl == CardLabel::LBL_HA) {
+        const Entity *p = primary();
+        if (p && p->sourceName[0]) return p->sourceName;
+    }
+    return label();
+}
+
 // The header band's real height.
 //
 // UIMetrics::HEADER_H is a token and stays one, but a fixed 14 logical px is a

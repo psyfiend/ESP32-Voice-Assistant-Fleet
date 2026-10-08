@@ -276,6 +276,18 @@ bool EntityRegistry::adoptName(const char *id, const char *name) {
     return true;
 }
 
+bool EntityRegistry::setSourceName(const char *id, const char *name) {
+    if (!name || !name[0]) return false;
+    std::lock_guard<std::mutex> lk(_mx);
+    const int i = indexOf(id);
+    if (i < 0) return false;
+    Entity &e = _items[i];
+    if (strncmp(e.sourceName, name, sizeof(e.sourceName) - 1) == 0) return false;
+    snprintf(e.sourceName, sizeof(e.sourceName), "%s", name);
+    e.dirty = true;
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 // Provider side
 // ---------------------------------------------------------------------------

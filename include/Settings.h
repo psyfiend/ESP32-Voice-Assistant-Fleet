@@ -26,7 +26,9 @@
 //   - A file with a newer "schema" than this firmware's is read but never
 //     overwritten. A file that does not parse is kept as settings.bad.
 //   - No credentials here, ever - they stay in NVS. The file is served as-is
-//     at GET /settings.
+//     at GET /settings (?stats=1: its counters). Until the web UI, a card's
+//     custom name is set from a PC: /settings?card=<id>&name=<text> (an empty
+//     name removes it).
 //
 // Writing: set*() changes RAM only. save() wakes the save task, which writes
 // the whole file to settings.tmp and renames it over settings.json (a power

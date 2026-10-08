@@ -2,9 +2,15 @@
 #include "Settings.h"
 
 #include <Arduino.h>   // Serial, millis()
+#include <ctype.h>
+#include <errno.h>
+#include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <new>         // placement new into PSRAM
+#include <dirent.h>
+#include <sys/stat.h>
 #include <ArduinoJson.h>   // header-only, plain C++ - nothing Arduino-specific is used
 #include "esp_heap_caps.h"
 #include "esp_littlefs.h"
@@ -23,6 +29,7 @@ constexpr const char *PATH          = "/cfg/settings.json";
 constexpr const char *TMP_PATH      = "/cfg/settings.tmp";
 constexpr const char *BAD_PATH      = "/cfg/settings.bad";
 constexpr size_t      FILE_MAX      = 64 * 1024;  // refuse anything larger at read
+constexpr size_t      CARD_ID_ARG   = 48;         // CARD_ID_MAX (PageSpec.h) + 1
 
 // The document lives in PSRAM: it is small, but internal RAM is the scarce
 // thing on this fleet (LESSONS) and nothing here is on a hot path.
@@ -40,8 +47,10 @@ SemaphoreHandle_t s_mutex   = nullptr;
 TaskHandle_t      s_task    = nullptr;
 volatile uint32_t s_delayMs = 0;
 
+char     s_bootNote[96] = "not started";   // what readFile() found, for ?stats=1
+char     s_listing[256] = "";              // the files in BASE, as of boot or the last save
 bool     s_mounted  = false;
-bool     s_readOnly = false;   // a newer schema: read, never overwritten
+bool     s_readOnly = false;   // a newer schema, or a file that would not read: never overwritten
 bool     s_dirty    = false;
 uint32_t s_saves = 0, s_failures = 0, s_lastMs = 0, s_lastUs = 0, s_bytes = 0;
 
@@ -102,6 +111,27 @@ char *serialise(size_t &len) {
     return buf;
 }
 
+// The files in BASE with their sizes, into s_listing. Reads the flash, so only
+// from a task whose stack is in internal RAM: begin()'s caller or the save task.
+void listFiles() {
+    char buf[sizeof(s_listing)];
+    int n = 0;
+    buf[0] = '\0';
+    if (DIR *d = s_mounted ? opendir(BASE) : nullptr) {
+        while (struct dirent *de = readdir(d)) {
+            char p[96];
+            snprintf(p, sizeof(p), "%s/%s", BASE, de->d_name);
+            struct stat st = {};
+            stat(p, &st);
+            if (n < (int)sizeof(buf) - 48)
+                n += snprintf(buf + n, sizeof(buf) - n, "  %-20s %ld bytes\n", de->d_name, (long)st.st_size);
+        }
+        closedir(d);
+    }
+    Lock l;
+    snprintf(s_listing, sizeof(s_listing), "%s", buf);
+}
+
 void writeIfDirty() {
     size_t len = 0;
     char *buf = nullptr;
@@ -131,6 +161,7 @@ void writeIfDirty() {
         if (ok) { s_saves++; s_lastMs = millis(); s_lastUs = us; s_bytes = (uint32_t)len; }
         else    { s_failures++; s_dirty = true; }
     }
+    listFiles();
     if (ok) Serial.printf("[Settings] saved %u bytes in %.1f ms\n", (unsigned)len, us / 1000.0);
     else    Serial.printf("[Settings] SAVE FAILED (%u bytes) - the change stays in RAM\n", (unsigned)len);
 }
@@ -144,15 +175,35 @@ void saveTask(void *) {
     }
 }
 
+// One line about what the file was at boot: printed, and kept for ?stats=1.
+void note(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(s_bootNote, sizeof(s_bootNote), fmt, ap);
+    va_end(ap);
+    Serial.printf("[Settings] %s\n", s_bootNote);
+}
+
+// A FILE THAT EXISTS BUT CANNOT BE READ IS NEVER OVERWRITTEN. 2026-10-08: one
+// boot of WS_P4_5 started with an empty store although the file was there (no
+// settings.bad, so it was not bad JSON), and the next save replaced it - a
+// card's saved Scenes was lost. Whatever the cause, the cure is the same:
+// such a boot is read-only, and says so.
 void readFile() {
+    errno = 0;
     FILE *f = fopen(PATH, "r");
-    if (!f) { Serial.println("[Settings] no settings file yet - every value is the dashboard's"); return; }
+    if (!f) {
+        if (errno == ENOENT) { note("no settings file yet - every value is the dashboard's"); return; }
+        s_readOnly = true;
+        note("settings file did not open (errno %d) - read-only this boot, the file is kept", errno);
+        return;
+    }
     fseek(f, 0, SEEK_END);
     const long size = ftell(f);
     fseek(f, 0, SEEK_SET);
     if (size <= 0 || (size_t)size > FILE_MAX) {
         fclose(f);
-        Serial.printf("[Settings] settings file is %ld bytes - ignored, kept as %s\n", size, BAD_PATH);
+        note("settings file is %ld bytes - ignored, kept as %s", size, BAD_PATH);
         remove(BAD_PATH);
         rename(PATH, BAD_PATH);
         return;
@@ -160,13 +211,18 @@ void readFile() {
     char *buf = (char *)heap_caps_malloc((size_t)size + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     const size_t got = buf ? fread(buf, 1, (size_t)size, f) : 0;
     fclose(f);
-    if (!buf || got != (size_t)size) { heap_caps_free(buf); Serial.println("[Settings] could not read the file"); return; }
+    if (!buf || got != (size_t)size) {
+        heap_caps_free(buf);
+        s_readOnly = true;
+        note("could not read the file (%u of %ld bytes) - read-only this boot, the file is kept", (unsigned)got, size);
+        return;
+    }
     buf[size] = '\0';
     const DeserializationError err = deserializeJson(*s_doc, buf, (size_t)size);
     heap_caps_free(buf);
     if (err || !s_doc->is<JsonObject>()) {
-        Serial.printf("[Settings] settings file does not parse (%s) - kept as %s, starting empty\n",
-                      err ? err.c_str() : "not an object", BAD_PATH);
+        note("settings file does not parse (%s) - kept as %s, starting empty",
+             err ? err.c_str() : "not an object", BAD_PATH);
         s_doc->clear();
         s_doc->to<JsonObject>();
         remove(BAD_PATH);
@@ -182,26 +238,90 @@ void readFile() {
     }
     const size_t cards = (*s_doc)["cards"].size(), schemes = (*s_doc)["schemes"].size(),
                  ents = (*s_doc)["entities"].size();
-    Serial.printf("[Settings] %s: %ld bytes - %u card(s), %u scheme(s), %u entit%s\n", PATH, size,
-                  (unsigned)cards, (unsigned)schemes, (unsigned)ents, ents == 1 ? "y" : "ies");
+    note("%s: %ld bytes - %u card(s), %u scheme(s), %u entit%s", PATH, size,
+         (unsigned)cards, (unsigned)schemes, (unsigned)ents, ents == 1 ? "y" : "ies");
+}
+
+// %XX and '+' in a query value, in place. No escapes are written anywhere.
+void urlDecode(char *s) {
+    char *o = s;
+    for (const char *p = s; *p; p++) {
+        if (*p == '+') { *o++ = ' '; continue; }
+        if (*p == '%' && isxdigit((unsigned char)p[1]) && isxdigit((unsigned char)p[2])) {
+            const char hex[3] = { p[1], p[2], 0 };
+            *o++ = (char)strtol(hex, nullptr, 16);
+            p += 2;
+            continue;
+        }
+        *o++ = *p;
+    }
+    *o = '\0';
+}
+
+// The panels draw ASCII and the degree sign only (CLAUDE.md): anything else
+// would show as boxes, so a name is refused rather than stored broken.
+bool printableAscii(const char *s) {
+    for (; *s; s++) if ((unsigned char)*s < 0x20 || (unsigned char)*s > 0x7E) return false;
+    return true;
 }
 
 esp_err_t handleSettings(httpd_req_t *req) {
-    char q[24], v[4];
+    char q[160], v[4];
     bool stats = false;
-    if (httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK &&
-        httpd_query_key_value(q, "stats", v, sizeof(v)) == ESP_OK)
+    const bool haveQ = httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK;
+    if (haveQ && httpd_query_key_value(q, "stats", v, sizeof(v)) == ESP_OK)
         stats = atoi(v) != 0;
+
+    // A card's custom name, from a PC (K37, until the web UI): name= sets it,
+    // an empty name= removes it (the Reset). Kept and written like any other
+    // change; the card shows it the next time its page is built.
+    char id[CARD_ID_ARG], name[64];
+    // label= too, as SETTINGS' Label row would set it - for tests from a PC.
+    if (haveQ && httpd_query_key_value(q, "card", id, sizeof(id)) == ESP_OK &&
+        httpd_query_key_value(q, "label", name, sizeof(name)) == ESP_OK) {
+        const bool known = !strcmp(name, "inherit") || !strcmp(name, "ha") || !strcmp(name, "state") ||
+                           !strcmp(name, "custom") || !strcmp(name, "none");
+        char out[160];
+        int n;
+        if (!known) {
+            n = snprintf(out, sizeof(out), "refused: label is inherit, ha, state, custom or none\n");
+        } else {
+            Settings::setCard(id, "label", strcmp(name, "inherit") ? name : nullptr);
+            Settings::save();
+            n = snprintf(out, sizeof(out), "%s: label %s - shown when its page is next built\n", id, name);
+        }
+        httpd_resp_set_type(req, "text/plain");
+        return httpd_resp_send(req, out, n);
+    }
+    if (haveQ && httpd_query_key_value(q, "card", id, sizeof(id)) == ESP_OK &&
+        httpd_query_key_value(q, "name", name, sizeof(name)) == ESP_OK) {
+        urlDecode(name);
+        char out[200];
+        int n;
+        if (strlen(name) >= 40 || !printableAscii(name)) {
+            n = snprintf(out, sizeof(out), "refused: a name is at most 39 characters of plain ASCII\n");
+        } else {
+            const bool changed = Settings::setCard(id, "name", name[0] ? name : nullptr);
+            Settings::save();
+            n = snprintf(out, sizeof(out), "%s: name %s%s%s%s - shown when its page is next built\n", id,
+                         name[0] ? "\"" : "removed", name, name[0] ? "\"" : "", changed ? "" : " (no change)");
+        }
+        httpd_resp_set_type(req, "text/plain");
+        return httpd_resp_send(req, out, n);
+    }
     if (stats) {
         const Settings::Stats s = Settings::stats();
-        char out[256];
-        const int n = snprintf(out, sizeof(out),
+        char out[768];
+        int n = snprintf(out, sizeof(out),
                                "file %s (%s)%s\nsaves %lu, failures %lu, pending %s\nlast save at %lu ms, "
                                "took %.1f ms, %lu bytes\n",
                                PATH, s_mounted ? "mounted" : "NOT MOUNTED - RAM only",
-                               s_readOnly ? ", newer schema: read only" : "",
+                               s_readOnly ? ", READ-ONLY this boot (see boot:)" : "",
                                (unsigned long)s.saves, (unsigned long)s.failures, s.pending ? "yes" : "no",
                                (unsigned long)s.lastMs, s.lastUs / 1000.0, (unsigned long)s.bytes);
+        // The listing was taken by the settings task (listFiles()): reading the
+        // flash from this task, whose stack is in PSRAM, reboots the board.
+        { Lock l; n += snprintf(out + n, sizeof(out) - n, "boot: %s\nfiles in %s:\n%s", s_bootNote, BASE, s_listing); }
         httpd_resp_set_type(req, "text/plain");
         return httpd_resp_send(req, out, n);
     }
@@ -239,9 +359,9 @@ bool begin(HttpServer &http) {
         Serial.printf("[Settings] LittleFS on \"%s\" mounted at %s in %.1f ms: %u KB, %u KB used\n", PARTITION,
                       BASE, (esp_timer_get_time() - t0) / 1000.0, (unsigned)(total / 1024), (unsigned)(used / 1024));
         readFile();
+        listFiles();
     } else {
-        Serial.printf("[Settings] no LittleFS (%s) - settings live in RAM this boot and are lost at a reset\n",
-                      esp_err_to_name(err));
+        note("no LittleFS (%s) - settings live in RAM this boot and are lost at a reset", esp_err_to_name(err));
     }
     if (!s_readOnly) (*s_doc)["schema"] = SCHEMA;
 

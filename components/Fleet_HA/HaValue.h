@@ -190,7 +190,8 @@ inline void haReadAttrs(JsonVariantConst attrs, EntityAttrs &out) {
 // What a state says about the ENTITY rather than its value - 2.10c (#65).
 // Read by both paths for the same reason as the two above.
 //
-//   friendly_name  a learnt member's name (a declared entity keeps its own)
+//   friendly_name  a learnt member's name (a declared entity keeps its own);
+//                  for every entity, Entity::sourceName (Label "From HA")
 //   entity_id      a light group's members, as HA or Hue define them. On the
 //                  owner's light.office: three bulbs. Its `lights` list holds
 //                  their names in a DIFFERENT order, so it is never read:
@@ -205,6 +206,7 @@ inline void haEntityFilter(JsonObject attrs) {
 inline void haLearn(EntityRegistry &reg, const Entity &e, JsonVariantConst attrs) {
     if (attrs.isNull()) return;
     if (e.learnt) reg.adoptName(e.desc.id, attrs["friendly_name"] | "");
+    reg.setSourceName(e.desc.id, attrs["friendly_name"] | "");   // Label "From HA" (2.10d)
 
     // Lights only: a group of lights is commanded as one light, which is what
     // the window does with it. Other domains' groups wait for their cards.

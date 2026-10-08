@@ -421,6 +421,12 @@ struct Entity {
     // scene the owner hid in HA is hidden on the panel too, unless the card
     // says show all (SceneShow). Learnt with the scenes, each session.
     bool        sourceHidden   = false;
+
+    // The source's own name for it (HA's friendly_name), for every entity -
+    // declared ones included, whose desc.name is the user's (2.10d, K40:
+    // Label "From HA"). Empty until the source has said. Written by
+    // setSourceName() only.
+    char        sourceName[ENTITY_NAME_MAX] = {0};
 };
 
 #endif // ENTITY_H
