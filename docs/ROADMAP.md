@@ -54,7 +54,7 @@ levels arrive with 2.10c), **#47** discovery payload size, **#48** reason 36.
 | 2.7 | First card types | DONE 2026-09-24, `v0.2.7` - `design/cards.md` §13 |
 | 2.8 | Header bar v2 (**#19**) | not started - the slot mechanism, built once for the page, group and card headers |
 | 2.9 | Display stack: esp_lcd (**#67**) | six of nine boards, merged 2026-09-29; left: CYD_S3_8048, WS_S3_5B - `display/README.md` |
-| 2.10 | Card popup (**#65**) | **2.10a DONE `v0.2.8`; 2.10b DONE `v0.2.9`** (`design/card-sheet.md` §14-15). **2.10c IN PROGRESS** (HA light levels, members of HA groups, scenes - `TEST_2.10c.md`). Then 2.10d stable ids and saving, 2.10e history |
+| 2.10 | Card popup (**#65**) | **2.10a DONE `v0.2.8`; 2.10b DONE `v0.2.9`; 2.10c DONE `v0.2.10`** (HA light levels, members of HA groups, scenes, the window redesigned - `design/card-sheet.md` §14-16, `archive/TEST_2.10c.md`). **Next: 2.10d** stable ids and saving, then 2.10e history |
 | 2.11 | Group cards (**#66**) | not started - with the page arranger (#78); must land before 3.1 |
 
 ## Phase 3 — Build sheet
@@ -95,7 +95,7 @@ RS485/Modbus, **#34** weather station, **#35** alarm clock.
 
 The numbers above are identity, not sequence. Agreed with the owner:
 
-1. **2.10c, 2.10d, 2.10e** (#65) - HANDOFF has 2.10c's brief.
+1. **2.10d, 2.10e** (#65; 2.10c done 2026-10-07) - HANDOFF has what 2.10d inherits.
 2. **The design interview §3 onward** (`design/interview-phase2-3.md`), then **2.8** header slots (#19).
 3. **2.11 group cards with the page arranger** (#66, #78; prototype: artifact "Layout Playground").
 4. **3.1 schema** (#20), scoped together with **the companion web app** (#87).

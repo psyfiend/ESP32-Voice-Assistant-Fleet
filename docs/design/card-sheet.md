@@ -494,7 +494,7 @@ attributes - 2.10c; saving a swatch with a long press needs the settings store -
 system header - 2.10e. The sensor hero's disc grows with the window around a fixed-size icon face,
 so on a 7" it is large for its glyph (a bigger face costs flash).
 
-## 16. 2.10c - Home Assistant's lights, as built (in progress, `TEST_2.10c.md`)
+## 16. 2.10c - Home Assistant's lights, as built (signed off 2026-10-07, `archive/TEST_2.10c.md`)
 
 Measured before building: `ha-websocket.md` section 9. Decisions: `DECISIONS.md` C5, K12, K15, K17.
 

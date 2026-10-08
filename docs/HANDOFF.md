@@ -1,4 +1,4 @@
-# Handoff — 2026-10-07 (2.10c round 7 built, before the owner's test)
+# Handoff — 2026-10-07 (2.10c merged as `v0.2.10`; 2.10d next)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was rewritten from scratch on
@@ -13,22 +13,23 @@ to the doc that owns it. This file says where things are, not how they got there
 
 ## Where the project is
 
-**`v0.2.9` tagged 2026-10-06** at the 2.10b merge (`v0.2.8` was 2.10a); `CHANGELOG.md` matches
-versions to milestones.
+**`v0.2.10` tagged 2026-10-07** at the 2.10c merge (`v0.2.9` was 2.10b, `v0.2.8` 2.10a);
+`CHANGELOG.md` matches versions to milestones.
 
 What a board does: boots into two pages (House = the owner's 18 HA entities over the websocket,
 Fleet = MQTT/system/virtual cards), swiped with wrap-around; three colour schemes (Midnight
 default, Fleet, Linen with real shadows); card types with state icons; an FPS/CPU overlay;
-`/screenshot` and `/bench` over HTTP; **a long press opens a card's popup window**, and a light's
-window has its controls (2.10b) - on the virtual lamps in `v0.2.9`, and on HA's lights, with
-members and scenes, on the 2.10c branch (below).
+`/screenshot`, `/bench` and `/panel?resend=1` over HTTP; **a long press opens a card's popup
+window**; a light's window has its controls, on the virtual lamps and on HA's lights, with the
+members of an HA group and the light's HA scenes.
 
-## The card popup: 2.10a DONE (`v0.2.8`), 2.10b DONE (`v0.2.9`)
+## The card popup: 2.10a, 2.10b, 2.10c DONE (`v0.2.8` - `v0.2.10`)
 
-**What the popup is now: `card-sheet.md` §14 (the frame, the deck) and §15 (the light controls,
-sizes, groups, pause)** - read both before touching it; where they differ from §9-13, they win.
-Every round, result and measurement: `docs/archive/TEST_2.10a.md` (twelve rounds) and `docs/archive/TEST_2.10b.md`
-(seven). The rules that cost the most to learn:
+**What the popup is now: `card-sheet.md` §14 (the frame, the panels), §15 (the light controls,
+sizes, groups, pause) and §16 (HA lights, members, scenes, and the window as redesigned in 2.10c)**
+- read all three before touching it; where §16 differs from §14-15, it wins; the window's parts have
+names ("Words", K22). Every round, result and measurement: `docs/archive/TEST_2.10a.md` (twelve
+rounds), `TEST_2.10b.md` (seven), `TEST_2.10c.md` (nine). The rules that cost the most to learn:
 
 - **Usable first** (owner): the window is complete in its first frame and closes in one; no grow,
   no dim (LESSONS, "Effects that cover the screen"). **Nothing moves** within one window (§15).
@@ -45,10 +46,14 @@ Every round, result and measurement: `docs/archive/TEST_2.10a.md` (twelve rounds
   `scene=N` loads one. `/bench?what=page` puts the page back afterwards, so the Fleet page cannot be
   reached from the PC.
 
-**Flashed with v0.2.9, 2026-10-06:** WS_P4_5, WS_P4_4B, CYD_P4_1060 (the P4_5 and the 4B have since
-been flashed with the 2.10c branch). Signed off on WS_P4_5; seen on
-the 4B and the 1060. The 7B and the 4880 were not connected and run older builds. **WS_S3_4B is
-still locked up**, left as found (#69). All nine compile.
+- **Hand-drawn faces are cached, and the cache must give slots back** (it filled after a few page
+  swipes once - LESSONS). **Never read from a DSI panel that shows a picture** - it blanked all
+  three P4s (LESSONS). **Keep moving objects tight**: a transparent holder as wide as the window made
+  each frame of a panel's slide redraw everything under it.
+
+**Flashed with the `v0.2.10` code, 2026-10-07 (release flags):** WS_P4_5, WS_P4_4B, CYD_P4_1060,
+WS_P4_7B, CYD_P4_4880 - all five P4s, all seen on glass. **WS_S3_4B is still locked up**, left as
+found (#69). All nine compile.
 
 **Memory: DECIDED 2026-10-06 (owner)** - LVGL's pool is in PSRAM at 512 KB on every P4
 (`[P4-options]`: `FLEET_LV_MEM_PSRAM`, `FLEET_LV_MEM_KB=512`; WS_S3_4B keeps 128 KB in PSRAM).
@@ -72,55 +77,44 @@ malloc for LVGL is a trap on this hardware. LVGL 9.6: after 2.10 (#88).
   (a normal boot) and filters lines; PlatformIO's Python has pyserial. PowerShell 5.1 strips quotes
   from `python -c "..."`, so write the script to a file.
 
-## What is next: 2.10c is BUILT, waiting for the owner's test (#65)
+## What is next: 2.10d, stable card ids and saving (#65)
 
-**Branch `feat/65-ha-lights`:** (1) HA lights get their levels and `light.turn_on` with data; (2) the
-members of a group defined in HA (`light.office`'s three bulbs) are learnt and get the Members view,
-with a paused member taken out (K18); (3) scenes. **Rounds 1-3 tested by the owner** (all pass but
-G8 once and S5); after them Scenes became a view of its own under the chart, the corner icons became
-tabs (K19 superseded, K20), and every FAILED now records why (G8). What was built: **`card-sheet.md`
-§16**. What HA does, measured from the PC: **`ha-websocket.md` §9**. Decisions: DECISIONS C5, K12,
-K15, K17-K30, A13, W9.
+**2.10c is done** (`v0.2.10`): HA lights with their levels, the members of an HA group (K17-K18,
+K32), HA scenes (K19, K21), and the window redesigned over nine rounds (K20-K31). What was built:
+**`card-sheet.md` §16**; what HA does, measured from the PC: **`ha-websocket.md` §9**.
 
-**The owner's next job: `docs/TEST_2.10c.md` round 9** (Q1-Q4: faces that ran out, the P4_5's
-panels, a hang; round 8's results are recorded there). **Two open problems**, both written up in
-that sheet's round 9 notes: (1) **a hang** - the P4_5's UI loop froze for good once, during the
-first run of a face-cache stress test after flashing; not reproduced in nine passes since. The face
-cache's slot reuse is the first suspect. (2) **The 4B washed out once** (twice ever): the whole
-screen near-white and lurid while `/screenshot` looked normal - so the frame buffer was right and
-the panel itself was showing it wrong. **`GET /panel?resend=1`** (built at the owner's request;
-`src/PanelDebug.cpp`, `docs/display/README.md` Instruments) sends the panel its init sequence again;
-the owner runs it the next time, before resetting (Q7). If that cures it, the fix is to re-send it
-now and then. **It reads nothing from the panel, and nothing must**: a build that read the panel's
-status registers at the end of boot blanked all three P4s (LESSONS) - so a "re-send on a change"
-cannot detect the change by reading; it would have to re-send blind, or not at all.
+**What 2.10d inherits** - everything below is live in RAM today and lost at a reboot:
+- SETTINGS' rows that wait for saving, shown greyed: **Label** (with Custom name), **Visibility**,
+  **Tap action** (K8: settings saved by a stable card id, written on close).
+- Rows that already work but are not kept: **Active state** (`GroupOn`), **Scenes** (Visible / All /
+  Off), and **Selector** - a device-wide choice made per colour scheme (K31), in every build at the
+  owner's request; it belongs on the device's own settings page (4.1).
+- **Adding a member as a card of its own** (K17) needs the stable ids.
+- Paused is already kept on the device (#60) - by entity, not by card.
 
-**LOCAL ONLY, NEVER COMMIT: `src/main.cpp` arms Arduino's loop watchdog 60 s after boot** (`enableLoopWDT()`
-in `loop()`) for the hang hunt - all three P4s are flashed with it. A frozen loop now panics with
-`MEPC`/`RA` on serial; log the P4_5 with `scratchpad`-style `tail.py` (pyserial from PlatformIO's
-own Python; DTR/RTS low so opening the port does not reset the board). Armed in `setup()` it
-boot-looped the P4_5 - boot takes longer than the watchdog's 5 s. Revert before any merge. If G8's FAILED comes back, read the reason with `/popup?view=3` before theorising. **Built in
-round 7** (2026-10-07): hand-drawn faces (curved metal selector, dent chips, dithered - K27), the four
-named looks with per-scheme defaults, the slider's place (K26, `placeWide()`), the CHART demo panel on
-History (K28), the title that gives way in steps (K29), flush SETTINGS, no "Color" word, US spelling
-(K30). **Round 8**: CHART rebuilt as SETTINGS' mirror image (`buildFolder()`), leaving with the
-window as SETTINGS does; panels at 260 ms; the 1060's L5 found and fixed (LESSONS, "A flex column
-centres its children twice"). **Open with the owner**: Linen's default look (Silver - Square built;
-round 5 said Silver - Round), and whether 260 ms is smooth enough (300 is the next step). **Still
-open in 2.10c:** live switching while the selector is dragged (measure with `DEBUG_FRAMES` first),
-then the merge gate. `/popup?ctl=` now also prints where the stage's children landed. Words for the window's parts: `card-sheet.md`
-"Words" (K22) - "deck" means the control deck. `/popup` gained `show=0|1|2` (which scenes) and
-`deck=2` (CHART open, on History); `look=4` returns to the scheme's own look.
+**Still open from 2.10c, none blocking:**
+- **A hang, once**: the P4_5's UI loop froze for good during the first run of a face-cache stress
+  test; not seen in nine passes or hours of use since. The face cache's slot reuse is the first
+  suspect. The loop watchdog that would catch it is gone (local only, never committed); to bring it
+  back: `enableLoopWDT()` in `loop()` once `millis()` passes 60 s - **not in `setup()`**, which
+  boot-looped the P4_5 - and log serial with pyserial from PlatformIO's own Python, DTR and RTS low.
+- **The 4B washed out, twice ever**: the picture near-white and lurid while `/screenshot` was right -
+  the panel, not the frame buffer. The next time, before resetting: `http://fleet-ws-p4-4b/panel?resend=1`
+  (`src/PanelDebug.cpp`). If that cures it, the fix is to re-send now and then, blind - **reading the
+  panel to detect it is not an option** (it blanks the picture - LESSONS).
+- Switching the control live while the selector is dragged (measure with `DEBUG_FRAMES` first).
+- Linen's panel slides are a little choppier than the dark schemes' on the P4_5 ("totally
+  passable"); each frame measured 8-40 ms.
+- The 4880 showed the window in portrait for the first time; nothing was tuned for it.
+- **The panel's own settings as HA entities** (owner's idea; FUTURE_IMPROVEMENTS, with 4.1).
 
-**Boards: WS_P4_5 (COM15), WS_P4_4B (COM7) and CYD_P4_1060 (COM9) all carry round 8.** COM9 is
-sometimes held by another program on the PC (most of 2026-10-07's afternoon); retry later. All with
-local `DEBUG_POPUP` (P4_5 also `DEBUG_FRAMES`) in the uncommitted `platformio.ini` - put it back
-before the merge gate. Everything was driven over `/popup` against the real Office lights; **no finger has
-touched any of it**, and All Lamps (Fleet page) was not re-checked after the card code changed.
+**Debugging the window from the PC:** `/popup` (DEBUG_POPUP) also takes `show=0|1|2` (which scenes),
+`deck=2` (CHART open, on History), `look=0..4` (the selector for the scheme showing; 4 = its own),
+`scheme=0|1|2`, and `ctl=` prints where the stage's children landed; its listing says how many faces
+came out flat.
 
-**Then:** fix what the rounds find, the all-nine gate, merge `--no-ff`, tag `v0.2.10`, CHANGELOG.
-After 2.10c: 2.10d stable ids and saving (which also unlocks "add a member as a card", K17), 2.10e
-history; then interview §3 onward. `docs/ROADMAP.md`'s running order has it.
+Then 2.10e history; then interview §3 onward. `docs/ROADMAP.md`'s running order has it.
+
 
 **Real lights (W9):** any Office light may be commanded while testing, and is put back as found
 (100%, 2710 K when last left); **ask before the Kitchen.** PC scripts that drive them are easy to
@@ -132,11 +126,12 @@ the device (#87) - the build sheet becomes its output, not the user's interface;
 HomeTiles), #88 (LVGL 9.6 evaluation, after 2.10). An HA-side companion is a separate, later
 choice; HA's `recorder/statistics_during_period` already reduces history for 2.10e.
 
-**How to run it:** one branch off `main` (e.g. `feat/65-ha-lights`). While the owner tests, build and
-flash WS_P4_5 only (COM15) unless told otherwise; the owner had the 4B (COM7) and 1060 (COM9, which
-is sometimes "busy" - retry after a few seconds) connected for 2.10b. WS_S3_4B is locked up (#69):
-leave it until the owner says. Before merge: the all-nine compile gate and a look on glass, then
-`--no-ff`, a tag (`v0.2.10`) and a CHANGELOG entry (Versioning, below).
+**How to run it:** one branch off `main` (e.g. `feat/65-saving`). While the owner tests, build and
+flash WS_P4_5 only (COM15) unless told otherwise; through 2.10c the owner also had the 4B (COM7) and
+1060 (COM9, which is sometimes "busy" or held by another program - retry later) connected and
+tested on all three. WS_S3_4B is locked up (#69): leave it until the owner says. Before merge: the
+all-nine compile gate and a look on glass, then `--no-ff`, a tag (`v0.2.11`) and a CHANGELOG entry
+(Versioning, below).
 
 ## Where the design interview stands
 
@@ -270,8 +265,8 @@ as data.** A little colour-blind: never distinguish two states by colour alone.
 **Versioning (changed 2026-10-05, owner):** `A.B.C.D` - B is the roadmap PHASE, C counts RELEASES:
 one more each time a signed-off merge to `main` is tagged, whatever milestones it holds. Add a
 `CHANGELOG.md` entry with the tag, naming the milestones and issues in it. Never tag during
-development. D is commits since the tag; a dirty tree appends `+dirty`. **`v0.2.9` was tagged at
-the 2.10b merge (2026-10-06); the next signed-off merge in Phase 2 is `v0.2.10`**, whatever
+development. D is commits since the tag; a dirty tree appends `+dirty`. **`v0.2.10` was tagged at
+the 2.10c merge (2026-10-07); the next signed-off merge in Phase 2 is `v0.2.11`**, whatever
 milestones it holds. `docs/DECISIONS.md` W3.
 
 **The issue tracker is yours to manage**, and keeping it, HANDOFF and ROADMAP current is part of the

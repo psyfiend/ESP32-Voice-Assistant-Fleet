@@ -279,6 +279,12 @@ Fixed and checked over `/popup` on the P4_5 (Desk): a group pauses with its last
 resumes with its first, either way round, including paused from its own window and resumed member
 by member; a look chosen on Midnight stays on Midnight, and Linen still opens on Silver - Round.
 
+**The merge gate (2026-10-07):** the group-pause fix confirmed by the owner on glass; all nine
+environments build (release flags: no `DEBUG_POPUP`, no watchdog); flashed and seen on glass on
+WS_P4_5, WS_P4_4B, CYD_P4_1060, WS_P4_7B ("running like a champ") and CYD_P4_4880 - the window seen
+in portrait for the first time, "totally usable". The Selector row moved out of the debug build at
+the owner's request. **2.10c signed off.**
+
 **The black screens (round 9, owner):** the build with `/panel`'s register read also done at the
 end of boot left all three P4s with the backlight on and a black screen, the boards otherwise
 answering. Reading a DSI panel while it shows a picture stops the picture; `/panel` reads nothing now
