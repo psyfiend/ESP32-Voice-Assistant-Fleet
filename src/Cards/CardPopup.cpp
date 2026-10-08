@@ -1204,12 +1204,21 @@ constexpr uint32_t DECK_GLIDE_MS = 140;
 // FOUR LOOKS, ALL KEPT (owner, round 6: "they all look so good"): Black or
 // Silver, Square or Round. Unchosen, each scheme has its own: Black - Square
 // on Midnight and Fleet, Silver - Round on Linen (owner, round 9). Chosen in
-// SETTINGS (debug builds for now; it belongs on the device's own settings
-// page, 4.1).
-int8_t s_deckLook = -1;   // -1: the scheme's own; else bit 0 round, bit 1 silver
+// SETTINGS' "Selector" row (debug builds for now; it belongs on the device's
+// own settings page, 4.1) - and chosen FOR THE SCHEME SHOWING (owner, round 9:
+// "the selector should follow the scheme"). Schemes are per page, so a page in
+// Linen and a page in Fleet each keep their own; a page that changes scheme
+// takes that scheme's.
+constexpr uint8_t LOOK_SCHEMES = 4;   // UITokens' schemes, with room for one more
+int8_t s_deckLook[LOOK_SCHEMES] = { -1, -1, -1, -1 };   // -1: the scheme's own; else bit 0 round, bit 1 silver
+
+int8_t &chosenLook() {
+    const uint8_t i = UI::schemeIndex();
+    return s_deckLook[i < LOOK_SCHEMES ? i : 0];
+}
 
 uint8_t deckLook() {
-    if (s_deckLook >= 0) return (uint8_t)s_deckLook;
+    if (chosenLook() >= 0) return (uint8_t)chosenLook();
     return lumOf(UI::pal().SURFACE_ALT) < 128 ? 0 : 3;
 }
 
@@ -3164,8 +3173,8 @@ uint8_t deckSpecs(DeckRowSpec *r) {
                    (uint16_t)(s.sceneShow == SceneShow::SCENES_ALL ? 1 : s.sceneShow == SceneShow::SCENES_OFF ? 2 : 0),
                    true, scenesDropCb, &s.ddScenes };
 #ifdef DEBUG_POPUP
-    // The control deck's looks to compare on glass (debug builds only).
-    r[n++] = { "Deck look", DeckRowKind::ROW_DROP, "Black - Square\nBlack - Round\nSilver - Square\nSilver - Round",
+    // The selector's looks, for the scheme showing (debug builds only).
+    r[n++] = { "Selector", DeckRowKind::ROW_DROP, "Black - Square\nBlack - Round\nSilver - Square\nSilver - Round",
                deckLook(), true, lookDropCb, nullptr };
 #endif
     return n;
@@ -3290,7 +3299,7 @@ void groupDropCb(lv_event_t *ev) {
 
 #ifdef DEBUG_POPUP
 void lookDropCb(lv_event_t *ev) {
-    s_deckLook = (int8_t)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    chosenLook() = (int8_t)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     // The deck is built with the view; the chips' lit look follows at once.
     if (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER) lv_async_call(rebuildMainAsync, nullptr);
     else showView(s.view);
@@ -4122,11 +4131,11 @@ void CardPopup::debugService(lv_timer_t *t) {
         return;
     }
     if (a.look >= 0) {
-        // The control deck's look: 0 Black - Square, 1 Black - Round,
-        // 2 Silver - Square, 3 Silver - Round; 4 the scheme's own.
-        s_deckLook = a.look >= 4 ? (int8_t)-1 : (int8_t)(a.look & 3);
+        // The selector's look for the scheme showing: 0 Black - Square,
+        // 1 Black - Round, 2 Silver - Square, 3 Silver - Round; 4 the scheme's own.
+        chosenLook() = a.look >= 4 ? (int8_t)-1 : (int8_t)(a.look & 3);
         if (isOpen()) showView(s.view);
-        dbgOut("deck look %d\n", (int)s_deckLook);
+        dbgOut("selector %d for scheme %u\n", (int)chosenLook(), (unsigned)UI::schemeIndex());
         s_dreq.store(DREQ_DONE);
         return;
     }

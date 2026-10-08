@@ -412,6 +412,28 @@ bool EntityRegistry::setPaused(const char *id, bool paused, uint32_t nowMs) {
 
         e.lastUpdateMs = nowMs;
         e.dirty        = true;
+
+        // A GROUP DEFINED AT THE SOURCE IS PAUSED EXACTLY WHEN ALL ITS MEMBERS
+        // ARE (2.10c round 9). Pausing the group pauses its members (K18);
+        // this is the other direction. Without it the group's own flag could
+        // outlive its members' - set from the group's window, then each
+        // member resumed from its own - and the card stayed PAUSED with every
+        // member running (owner). One level: the groups this entity is in.
+        for (uint8_t g = 0; g < _count; g++) {
+            Entity &G = _items[g];
+            if (!G.nMembers) continue;
+            bool isMember = false, all = true;
+            for (uint8_t k = 0; k < G.nMembers; k++) {
+                if (G.members[k] == (uint8_t)i) isMember = true;
+                if (G.members[k] >= _count || !_items[G.members[k]].paused) all = false;
+            }
+            if (!isMember || G.paused == all) continue;
+            G.paused = all;
+            if (all) { G.pending = false; G.attrPending = false; G.cmdFailed = false; }
+            else     G.needsRefresh = true;
+            G.lastUpdateMs = nowMs;
+            G.dirty        = true;
+        }
     }
 
     // Rebuild and persist OUTSIDE the lock: the NVS write can take hundreds of
