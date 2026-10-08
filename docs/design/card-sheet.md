@@ -722,16 +722,17 @@ without seeing a flash.
 | 3 | `Settings.h`: the file, `GET /settings` (`?stats=1`); Active state, Scenes and Selector kept | mount 52 ms the first time, 3-11 ms after; a save 7-66 ms (66 when LittleFS erased a block), once per close; Desk's Scenes and a Midnight selector back after a reset; internal heap -6.6 KB |
 | 3b | Paused in the file (`EntityRegistry::PauseStore`), #60's NVS list imported once | Garage North paused, PAUSED after a reset, resumed and the entry gone |
 | 4 | Label: Inherit / From HA / State / Custom / None (K40); `Entity::sourceName`; custom names from a PC (`/settings?card=..&name=..`) | after a reset: Desk "From HA" -> "Office", Overhead "Ceiling lamp", Sink "State" -> "Off" |
+| 5 | Tap action (K37, K39): Toggle / Details / Members / History / Cycle scenes / Load scene / Nothing, only what the card can do; a Tap scene row, greyed unless Load scene; `CardPopup::openOn()`; the toast "Scene: Desk - Bright" | Desk History -> History, Overhead Details -> window, North -> nothing; Cycle x4 = Bright, Concentrate, Relax, Bright (HA's last-activated times), hidden scenes untouched; Load Relax -> Relax |
 
 Active state and Scenes are read every time a page is built, so they also survive a page swipe -
 before 2.10d a swipe lost them.
 
-**The flash writes flash the panel** (owner, on glass): all three `/panel?flash=` tests, more with
-the longer erases, light blue. The fix is built and verified, not installed: `REBUILD_P4_LIBS.md`,
-"The second rebuild". Until it is installed, every save flashes the P4 panels once.
+**The flash writes flashed the panel** (owner, on glass): all three `/panel?flash=` tests, more with
+the longer erases, light blue. Fixed by the cache-safe library rebuild (`REBUILD_P4_LIBS.md`, "The
+second rebuild"), installed 2026-10-08; the owner's look at the same tests afterwards is pending.
 
 **A lost setting, once.** One boot started with an empty store although the file was there, and the
 next save replaced it (Desk's Scenes). Not explained; a file that will not read now makes the boot
 read-only instead, and `/settings?stats=1` says what the boot saw.
 
-Next: Tap action (Cycle scenes, Load scene - the scenes the window shows, K39), then K17.
+Next: Area as a card setting (K41), then K17.
