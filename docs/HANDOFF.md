@@ -82,8 +82,19 @@ tabs (K19 superseded, K20), and every FAILED now records why (G8). What was buil
 §16**. What HA does, measured from the PC: **`ha-websocket.md` §9**. Decisions: DECISIONS C5, K12,
 K15, K17-K30, A13, W9.
 
-**The owner's next job: `docs/TEST_2.10c.md` round 8** (P1-P7: CHART as a real folder, the panels'
-speed, the 1060; round 7's results are recorded there). If G8's FAILED comes back, read the reason with `/popup?view=3` before theorising. **Built in
+**The owner's next job: `docs/TEST_2.10c.md` round 9** (Q1-Q4: faces that ran out, the P4_5's
+panels, a hang; round 8's results are recorded there). **Two open problems**, both written up in
+that sheet's round 9 notes: (1) **a hang** - the P4_5's UI loop froze for good once, during the
+first run of a face-cache stress test after flashing; not reproduced in nine passes since. The face
+cache's slot reuse is the first suspect. (2) **The 4B washed out once** (twice ever): the whole
+screen near-white and lurid while `/screenshot` looked normal - so the frame buffer was right and
+the panel itself was showing it wrong. A proposal is with the owner (see below).
+
+**LOCAL ONLY, NEVER COMMIT: `src/main.cpp` arms Arduino's loop watchdog 60 s after boot** (`enableLoopWDT()`
+in `loop()`) for the hang hunt - all three P4s are flashed with it. A frozen loop now panics with
+`MEPC`/`RA` on serial; log the P4_5 with `scratchpad`-style `tail.py` (pyserial from PlatformIO's
+own Python; DTR/RTS low so opening the port does not reset the board). Armed in `setup()` it
+boot-looped the P4_5 - boot takes longer than the watchdog's 5 s. Revert before any merge. If G8's FAILED comes back, read the reason with `/popup?view=3` before theorising. **Built in
 round 7** (2026-10-07): hand-drawn faces (curved metal selector, dent chips, dithered - K27), the four
 named looks with per-scheme defaults, the slider's place (K26, `placeWide()`), the CHART demo panel on
 History (K28), the title that gives way in steps (K29), flush SETTINGS, no "Color" word, US spelling

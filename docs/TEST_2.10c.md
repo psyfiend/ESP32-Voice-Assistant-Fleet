@@ -239,6 +239,29 @@ Flashed: **WS_P4_5, WS_P4_4B, CYD_P4_1060** (COM9 free again).
 | P6 | The 1060: Brightness, Temperature, Color | The control deck does not move at all (L5); the slider does not move either |
 | P7 | The 1060: round 7's N1-N15 | As on the other two |
 
+### Round 8 results (owner, 2026-10-07)
+
+P1-P4 and P6 PASS. **P5**: both panels slide smoothly on the 1060 and 4B in every scheme; the P4_5
+a little better than round 7 but still notably slower. **N1 on the 1060, Linen: FAIL, intermittent**
+- Black - Square and Silver - Round drew flat (a plain grey selector, lit chips a white disc with the
+accent icon); after a reset they drew, but the lit chips did not. Round 6's lines otherwise PASS on
+the 1060. **Seen once on the 4B** (and once before, in 2.10a): the whole screen suddenly washed out,
+almost white, no depth, the colours lurid - a `/screenshot` at the time looked normal, so a photo was
+taken; a reset cured it.
+
+## Round 9 - faces that run out, the P4_5's panels, a hang
+
+Flashed: **WS_P4_5, WS_P4_4B, CYD_P4_1060**. All three carry a TEMPORARY loop watchdog (armed 60 s
+after boot, not committed): if the hang below comes back, the board reboots instead of freezing, and
+the P4_5 prints where it was stuck to a log on the PC.
+
+| # | Do this | PASS if |
+|---|---|---|
+| Q1 | On the 1060: Linen, all four looks, then swipe to a page in another scheme and back, several times, opening Desk each time | Every look's selector and the lit chips are metal every time - never a flat disc |
+| Q2 | SETTINGS and CHART on the P4_5 | Clearly smoother than round 8 (each frame measured at 8-40 ms, from 35-105) |
+| Q3 | The same on the 4B and 1060, Linen included | As smooth as round 8, and the panels' shadows on Linen look as they did |
+| Q4 | Use the boards as usual | No freeze. A reboot out of nowhere is the watchdog catching one - say when |
+
 ## Not tested (by Claude) - round 8
 
 The animations' smoothness (screenshots cannot show it; not measured with `DEBUG_FRAMES`), CHART by
@@ -246,6 +269,28 @@ finger, its dropdowns opening, and closing the window with CHART folded (N11's f
 reading the code - `/popup?close` closes as a tap outside does, but nothing was watched on glass).
 Measured on the 1060 over `/popup`: the deck at x 373..649 on all three controls (it was 372..648 on
 Color), the slider at 326.
+
+## Measured, and not tested (by Claude) - round 9
+
+- **The flat faces were the face cache running out**: twelve slots, never freed, one per scheme x
+  look x size - two schemes' worth (schemes are per page, so a swipe changes it) filled them, and
+  every face after that was drawn flat. Slots are now taken back (another scheme's first, then the
+  oldest not used by the open window). Driven on the P4_5 over `/popup` (new: `scheme=0|1|2`), every
+  scheme x every look x controls, Scenes and History, five times over: no face drawn flat (the count
+  is in `/popup`'s listing), Linen's Black - Square and Silver - Round correct on screenshots. Not run
+  on the 1060 itself (COM9 kept refusing), nor by finger.
+- **The P4_5's panels**, timed per frame over serial (`DEBUG_FRAMES`): opening and folding SETTINGS
+  drew 35-105 ms frames, the same over the nearly empty History view - so not the faces. The
+  panel's holder was as wide as the window and transparent, so every frame redrew the cards, the
+  window and the panel together. Sized to the tab and pane: **8-40 ms a frame**, about nine frames a
+  slide instead of five. Not measured on the 4B or 1060 (already smooth), not seen on glass.
+- **A hang, twice, not reproduced since.** During the first run of that test after flashing, the
+  P4_5 froze for good (its HTTP server answered "busy" - the UI loop never came back; the owner
+  reset it) and the 1060 took over 10 s over one request at the same step (opening Scenes on the
+  second pass) but recovered. Three later runs on the P4_5 - nine passes, one straight after a
+  reset - ran clean. Cause unknown; the face cache's reuse is the new code on that path,
+  and the first suspect. Hence the watchdog.
+- **The 4B washed out**: not reproduced, not investigated beyond the owner's photos (see the report).
 
 ## Not tested (by Claude) - round 7
 

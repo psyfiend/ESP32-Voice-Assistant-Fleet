@@ -595,7 +595,10 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   pixel (`paintFace()`): the curved line, faint brushed row streaks, a fine edge, corners
   anti-aliased in the alpha; a dent is shaded at the top, gone by the middle, a whisper of light at
   the bottom, in the window's colour, no border. Painted the first time a size is needed and kept in
-  PSRAM (12 slots, ~40-55 KB each on the P4_5). **Dithered to the 16-bit grid** (4x4 ordered): a
+  PSRAM (12 slots, ~40-55 KB each on the P4_5), **taken back when full** (round 9): a slot painted in
+  another scheme's colours first, else the one asked for longest ago by an earlier window - never
+  one the open window may be showing. (Never giving them back filled the cache after a few swipes
+  between pages of different schemes, and faces came out flat.) **Dithered to the 16-bit grid** (4x4 ordered): a
   smooth grey ramp truncated to RGB565 banded pink and green, because green steps twice as finely as
   red and blue. The selector's icon is scaled 1.4x (the largest icon face is not big enough); lit
   chips use the next face up. Pressed chips tint.
@@ -608,7 +611,9 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   and folds the other; a tap in the window folds whichever is open. It leaves with the window as
   SETTINGS does: folded, its tab slides down on its own; open, it goes at once. Both open and fold
   in 260 ms (from 220 - round 7 found them choppier now that SETTINGS opens further; the page deck's
-  panels take 300).
+  panels take 300). **Each panel's holder is only as wide as its tab and pane** (round 9, measured on
+  the P4_5): a window-wide transparent holder made every frame of a slide redraw the cards and the
+  window under it - 35-105 ms a frame; now 8-40.
 - **The stacked control deck is centred against the stage itself** (L5, measured on the 1060): a
   content-sized holder was centred inside a flex "track" as wide as the widest child, itself
   centred in the stage, and Color's wider row moved the deck by a pixel of rounding. Its holder is

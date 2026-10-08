@@ -44,6 +44,10 @@ lowest internal heap. **Frame time is not FPS.** Two runs reflashed in between a
   on the P4_5) and laying them out. The fix is design, not flush: keep the neighbour page built, or
   show a snapshot while it builds (`docs/design/pages.md` §6-7).
 - The S3_4B's numbers are #70's baseline.
+- **The card window's folder panels (SETTINGS, CHART) sliding, `WS_P4_5`** (2.10c round 9, timed per
+  frame with `DEBUG_FRAMES`): 35-105 ms a frame while the holder was window-wide and transparent;
+  **8-40 ms** sized to the tab and pane. A moving object redraws its whole area; where nothing
+  opaque covers a strip, LVGL draws everything beneath it (LESSONS).
 
 ## 3. Levers tried, and the verdict
 

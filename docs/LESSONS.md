@@ -542,6 +542,15 @@ next piece of eye candy:
   integer roundings: the 1060's control deck moved a pixel whenever a sibling (the slider's row)
   changed width. To centre something against the parent alone, give it the parent's full width and
   centre inside that. Found by printing the stage's children's coordinates over `/popup?ctl=`.
+- **A moving object redraws its whole area - so a transparent holder costs everything under it.**
+  The SETTINGS panel sat in a transparent object as wide as the window. Every frame of its slide
+  redrew that width, and since nothing opaque covered the strips, LVGL drew the cards, the window
+  and the panel in each: 35-105 ms a frame on the P4_5. Sized to the tab and pane, most strips lie
+  inside the opaque pane and LVGL starts drawing there: 8-40 ms. Keep moving things tight.
+- **A cache that never gives anything back fills up in a way testing on one screen never shows.**
+  The hand-drawn faces had twelve slots, one per scheme x look x size, never freed. Fine on any one
+  page; but schemes are per page, so swiping filled it, and every face after that came out flat.
+  Found on the owner's 1060, not on the board it was built on.
 - **A newly made object reports y = 0 until LVGL lays it out** (the same trap as the width one
   above). An animation started from `lv_obj_get_y()` of a panel made in the same call slid it down
   from the top of the screen. Start a new object's animation from the value you just set.
