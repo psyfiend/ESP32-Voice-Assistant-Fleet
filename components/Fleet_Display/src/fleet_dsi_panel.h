@@ -87,11 +87,14 @@ typedef struct {
 #define FLEET_DSI_DRIVER(chip)  FLEET_DSI_DRIVER_(chip)   // expands BSP_PANEL_DRIVER first
 
 // Powers the PHY, creates the DSI bus, the command IO and the panel through
-// `drv`, and returns the panel with its frame buffers (fbs[0 .. num_fbs-1]).
-// Everything but the driver itself is the same for every chip. On failure,
-// everything created so far is released.
+// `drv`, and returns the panel with its frame buffers (fbs[0 .. num_fbs-1])
+// and the command IO (`ret_io`, may be NULL) - kept for talking to the panel
+// after boot (Fleet_Display::readPanelStatus()). Everything but the driver
+// itself is the same for every chip. On failure, everything created so far is
+// released.
 esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, const fleet_dsi_driver_t *drv,
-                              esp_lcd_panel_handle_t *ret_panel, void **fbs);
+                              esp_lcd_panel_handle_t *ret_panel, esp_lcd_panel_io_handle_t *ret_io,
+                              void **fbs);
 
 // For the wrappers: `out` = a calloc'd copy of cfg's init sequence in the
 // driver's own init-command `type`, field by field (so a driver whose type

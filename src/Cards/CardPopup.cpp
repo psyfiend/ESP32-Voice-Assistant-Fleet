@@ -1203,13 +1203,14 @@ constexpr uint32_t DECK_GLIDE_MS = 140;
 
 // FOUR LOOKS, ALL KEPT (owner, round 6: "they all look so good"): Black or
 // Silver, Square or Round. Unchosen, each scheme has its own: Black - Square
-// on Midnight and Fleet, Silver - Square on Linen. Chosen in SETTINGS (debug
-// builds for now; it belongs on the device's own settings page, 4.1).
+// on Midnight and Fleet, Silver - Round on Linen (owner, round 9). Chosen in
+// SETTINGS (debug builds for now; it belongs on the device's own settings
+// page, 4.1).
 int8_t s_deckLook = -1;   // -1: the scheme's own; else bit 0 round, bit 1 silver
 
 uint8_t deckLook() {
     if (s_deckLook >= 0) return (uint8_t)s_deckLook;
-    return lumOf(UI::pal().SURFACE_ALT) < 128 ? 0 : 2;
+    return lumOf(UI::pal().SURFACE_ALT) < 128 ? 0 : 3;
 }
 
 struct DeckColours { uint32_t ribbon, icon, chosen; };

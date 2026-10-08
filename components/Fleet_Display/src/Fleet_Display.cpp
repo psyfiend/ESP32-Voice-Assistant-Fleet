@@ -17,6 +17,7 @@
 #if defined(HAS_MIPI_PANEL)
 #include "fleet_dsi_panel.h"
 #include "esp_lcd_mipi_dsi.h"
+#include "esp_lcd_panel_io.h"
 #elif defined(HAS_RGB_PANEL)
 #include "fleet_rgb_panel.h"
 #include "esp_lcd_panel_rgb.h"
@@ -259,7 +260,7 @@ bool Fleet_Display::begin() {
     static_assert(sizeof(fleet_dsi_init_cmd_t) == sizeof(lcd_init_cmd_t),
                   "BSP init commands and fleet_dsi_init_cmd_t must share a layout");
 
-    err = fleet_dsi_panel_new(&cfg, &drv, &_panel, _fb);
+    err = fleet_dsi_panel_new(&cfg, &drv, &_panel, &_io, _fb);
     if (err != ESP_OK) {
         Serial.printf("[Fleet_Display] Panel bring-up failed: %s\n", esp_err_to_name(err));
         return false;
@@ -310,6 +311,14 @@ bool Fleet_Display::begin() {
                   _driver);
     Serial.printf("[Fleet_Display] Present mode: %s (%s%s)\n", bspPresentModeName(_mode),
                   _modeFromBsp ? "BSP override" : "rule: ", _modeFromBsp ? "" : _modeReason);
+#if defined(HAS_MIPI_PANEL)
+    // The panel's own status as it starts: the healthy reading GET /panel
+    // compares with (PanelDebug.h).
+    _bootStatusOk = readPanelStatus(_bootStatus);
+    if (_bootStatusOk)
+        Serial.printf("[Fleet_Display] Panel status: power %02X, MADCTL %02X, pixel format %02X, image mode %02X\n",
+                      _bootStatus[0], _bootStatus[1], _bootStatus[2], _bootStatus[3]);
+#endif
     return true;
 }
 
@@ -323,6 +332,36 @@ bool Fleet_Display::present(uint8_t i) {
     const esp_err_t err = esp_lcd_panel_draw_bitmap(_panel, 0, 0, _w, _h, _fb[i]);
     _submitted = i;
     return err == ESP_OK;
+}
+
+bool Fleet_Display::readPanelStatus(uint8_t out[4]) {
+#if defined(HAS_MIPI_PANEL)
+    if (!_io) return false;
+    static const int REGS[4] = { 0x0A, 0x0B, 0x0C, 0x0D };   // DCS: power, MADCTL, pixel format, image mode
+    for (uint8_t i = 0; i < 4; i++) {
+        out[i] = 0;
+        if (esp_lcd_panel_io_rx_param(_io, REGS[i], &out[i], 1) != ESP_OK) return false;
+    }
+    return true;
+#else
+    (void)out;
+    return false;
+#endif
+}
+
+int Fleet_Display::resendPanelInit() {
+#if defined(HAS_MIPI_PANEL)
+    const lcd_init_cmd_t *cmds = bsp_display.INIT_CMDS_DSI;
+    const size_t n = bsp_display.INIT_CMDS_SIZE;
+    if (!_io || !cmds || !n) return -1;
+    for (size_t i = 0; i < n; i++) {
+        if (esp_lcd_panel_io_tx_param(_io, cmds[i].cmd, cmds[i].data, cmds[i].data_bytes) != ESP_OK) return -1;
+        if (cmds[i].delay_ms) vTaskDelay(pdMS_TO_TICKS(cmds[i].delay_ms));
+    }
+    return (int)n;
+#else
+    return -1;
+#endif
 }
 
 void Fleet_Display::initBacklightPWM() {
