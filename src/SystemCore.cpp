@@ -290,6 +290,11 @@ void SystemCore::mqttEvidence() {
 }
 
 void SystemCore::loop() {
+#if defined(DISPLAY_ESPLCD) && defined(HAS_MIPI_PANEL)
+    // A register read: records a panel feed underrun (PanelDebug.h).
+    PanelDebug::poll();
+#endif
+
     // Non-blocking: advances connect deadlines, retry escalation, AP fallback,
     // the AP idle timer and async scan collection. Must be called every loop -
     // ConnectivityManager deliberately never spins on WiFi.status() itself.
