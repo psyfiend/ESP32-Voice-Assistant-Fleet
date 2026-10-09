@@ -85,9 +85,13 @@ measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "S
 `DEBUG_POPUP`, local, and the cache-safe libraries). Everything was checked from the PC with
 `/popup`, `/settings` and screenshots; **nothing has been touched on the glass yet.**
 
-Open, for the owner: whether Desk's Tap action on the P4_5 (Load scene, Bright) was set by hand;
-whether an HA area and a dashboard area of the same name are one group; the random white flash on
-the P4_5 (`/panel` lists underruns; the flash-write blue is fixed, A14, to be confirmed on glass).
+Open: **Desk's Tap action on the P4_5 (Load scene, Bright) was set with nobody at the panel**
+(owner away; only the Tap action dropdown writes that pair) - unexplained; every change is now
+logged with its task (`/settings?stats=1`), so the next one will say where it came from. The
+colour-by-name collision (Garage and Kitchen both lime) against K46's "colour is the key" - the
+owner's call. The random white flash on the P4_5 (`/panel` lists underruns; the flash-write blue is
+fixed, A14, to be confirmed on glass). Groups were reworked to K46 on 2026-10-09; round 4 of the
+test sheet matches it.
 **The S3 RGB boards** (S3_4B, S3_5B, 8048) probably flash on writes too
 (`CONFIG_LCD_RGB_ISR_IRAM_SAFE` off, stock libraries) - untested, none on the desk working.
 After the owner's rounds: the all-nine gate, `--no-ff`, `v0.2.11`, CHANGELOG. K17 after 2.10d.
