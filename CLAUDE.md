@@ -390,8 +390,11 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
 - **Anything that reads or writes flash runs on a task whose stack is in internal RAM** - the
   settings task, never an HTTP handler (their stacks are in PSRAM) - or the board reboots (LESSONS).
 - **A file that exists but will not read makes the boot read-only**; it is never overwritten.
-- **Groups for card labels** are `CardGroups` (K44): a card's `group` setting picks the words and the
-  colour of its card label; a group's colour belongs to the group.
+- **Groups for card labels** are `CardGroups` (K46): one kind of group, device-wide, HA areas linked
+  in as groups; a card's card label shows its group's name (or its own words) in the group's colour.
+  **Colour is the key to a group and never follows a rename.**
+- **Every change is logged** with its time and task (`loopTask` = the card window, `httpd` = a
+  browser); the last ten are in `/settings?stats=1`.
 - `GET /settings` serves the file; `?stats=1` its counters, files and anything unclaimed. The PC
   addresses that set things until the web UI exists are listed in `Settings.h` and §17.
 

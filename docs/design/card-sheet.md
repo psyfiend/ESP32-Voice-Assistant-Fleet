@@ -739,14 +739,32 @@ second rebuild"), installed 2026-10-08; the owner's look at the same tests after
 next save replaced it (Desk's Scenes). Not explained; a file that will not read now makes the boot
 read-only instead, and `/settings?stats=1` says what the boot saw.
 
-**Groups as built (K44).** A card's saved `group`: nothing (the dashboard's area, `sheet_<name>`),
-`ha_area` (followed as HA reports it), a group id (the dashboard's areas, or custom groups
-`<name>_<stamp>` in the file's `groups`), `own` (`label_text`, may be empty, shown anyway, out of
-every group's colour), or `none`. A group's colour is `groups.<id>.color` or its colour-by-name, so
-an untouched dashboard looks exactly as before. Made from a PC until the web UI:
-`/settings?group=new&name=..`, `group=<id>&color=RRGGBB`, `group=<id>&delete=1`,
-`card=<id>&group=..`, `card=<id>&label_text=..`. Open: whether an HA area and a dashboard area of
-the same name are one group (they are separate today).
+**Groups as built (K46, which replaced the first model the next day).** One kind of group: the
+dashboard's own version of an area - a name, a colour, perhaps a link to an HA area - belonging to
+the device, so it spans pages. Colour is the default key to a group; a card's words are the group's
+name unless it has its own.
+
+| Group id | What it is | Its name |
+|---|---|---|
+| `ha_<area_id>` | every HA area an entity here is in (HA's `area_id()`, learnt with the scenes) | a local rename (saved), else the dashboard's name for it, else HA's |
+| `sheet_<name>` | a dashboard area that is not one HA area | the dashboard's |
+| `<name>_<stamp>` | made by the owner (kept), or by "Own group" for one card (`kind: solo`, deleted when its last card leaves) | saved |
+
+A dashboard area IS an HA area when every HA card in it sits in that one HA area; on the owner's
+pages all eight are (Living = "Living Room", Front = "Front Room", Bedroom = "Eric Bedroom").
+A card's group: its saved `group` (an id or `none`), else its dashboard area's. Its words:
+`label_text` if it has its own (rename a, the group's colour kept), else the group's name. A group's
+colour: saved, else the colour of its own name (the dashboard's or HA's, or its id for one made
+here) - **so a rename never changes it** (it did, for one build: renaming Office to "Work" turned it
+lime). "Own group" (rename b) takes a colour no other group uses while one is left; another card
+choosing that group joins it. Renaming a group (rename c) renames every card in it. From a PC until
+the web UI: `/settings?group=new&name=..`, `group=<id>&name=..` (empty: its own name again),
+`group=<id>&color=RRGGBB`, `group=<id>&delete=1`, `card=<id>&group=..`, `card=<id>&label_text=..`.
+The System Doctor's [SETTINGS] lists every group, HA or local; `/popup?groups=1` (debug) lists the
+groups and each card's.
+
+**Known:** the colour-by-name collides - Garage and Kitchen have always both been lime. With colour
+as the key, that wants deciding (owner).
 
 The owner's test sheet: `docs/TEST_2.10d.md`. Next, after it: the all-nine gate and the merge. K17
 waits until after 2.10d (K45).

@@ -56,28 +56,30 @@ The words under the hero. The row is now called **Entity label**: Inherit / HA n
 | L4 | Restart with Overhead on HA name | Still HA's name |
 | L5 | From a browser: `http://fleet-ws-p4-5/settings?card=office_overhead_261008_0310&name=Ceiling+lamp`, set Entity label to Custom, swipe away and back | "Ceiling lamp". Then `...&name=` (empty) and Inherit to put it back |
 
-## Round 4 - Card label and groups (K44)
+## Round 4 - Card label and groups (K46)
 
-The coloured label at the card's top. The row is **Card label**: HA area (with its name) / the
-dashboard's areas / your groups / Custom / None. With nothing chosen, every card looks as it did.
+The coloured label at the card's top shows the card's **group**, and the group owns the colour. Your
+dashboard's areas are now HA's areas under your shorter names (Living = "Living Room", Front = "Front
+Room", Bedroom = "Eric Bedroom"). The row is **Card label**: every group, then **Own group**, then
+**None**. With nothing chosen, every card looks as it did.
 
 | # | Do this | PASS if |
 |---|---|---|
 | G1 | Look at the House page | Every card label exactly as in v0.2.10 |
-| G2 | **Office temperature**: Card label -> HA area (Office) | It reads "Office" in the Office purple |
-| G3 | **Thermo**: Card label -> Custom | It keeps "Front" in its colour - it has left the Front group |
-| G4 | From a browser: `http://fleet-ws-p4-5/settings?group=sheet_office&color=2E9E4F`, swipe away and back | Desk, Overhead and Office occupancy turn green; the Office temperature card from G2 does **not** (an HA area is its own group - see the question below) |
-| G5 | `http://fleet-ws-p4-5/settings?group=new&name=Temperature` | It answers with the new group's id |
-| G6 | Deck, Front and Kitchen temperatures: Card label -> **Temperature** | All three read "Temperature" in one colour |
-| G7 | `...settings?group=<the id from G5>&color=E06C75`, swipe away and back | All three turn red together |
-| G8 | **Garage South**: Card label -> Custom, then from a browser `...settings?card=garage_south_261008_0310&label_text=` (empty), swipe away and back | A small card label in its own colour, no words |
-| G9 | **Garage North**: Card label -> None | No card label; the card keeps its place and size |
-| G10 | Restart | G2-G9 all still as you left them |
-| G11 | Put it back: each card's Card label to its own area (Garage, Outside, Front, Kitchen, Office), `...?group=sheet_office&color=` (empty) and `...?group=<id>&delete=1` | Back to G1. Anything you missed: `/settings?stats=1` |
+| G2 | **Thermo**: Card label -> **Own group** | Still "Front", in a new colour no other group has |
+| G3 | **Kitchen temperature**: open its Card label row | Two "Front" lines: one "Front (HA)", one "Front" (Thermo's). Choose the plain "Front" | 
+| G4 | Look at the page | Thermo and Kitchen temperature: one label, one colour - a group of two, made without creating anything |
+| G5 | From a browser: `http://fleet-ws-p4-5/settings?group=ha_office&name=Work`, swipe away and back | Desk, Overhead, Office occupancy and Office temperature all read "Work" - **still purple** |
+| G6 | `...settings?card=office_261008_0310b&label_text=Study`, swipe away and back | Office temperature reads "Study", still purple (its own words, still in the group) |
+| G7 | `...settings?group=ha_office&color=2E9E4F`, swipe away and back | All four Office cards turn green, "Study" included |
+| G8 | **Garage North**: Card label -> None | No card label; the card keeps its place and size |
+| G9 | Restart | G2-G8 all still as you left them |
+| G10 | Put Thermo back on "Front (HA)" and Kitchen temperature on "Kitchen" | Thermo's group disappears from the rows (its last card left) |
+| G11 | Put the rest back: `...?group=ha_office&name=` and `&color=` (both empty), `...?card=office_261008_0310b&label_text=` (empty), North -> Garage | Back to G1. `/settings?stats=1` shows what is left, and the last ten changes |
 
-**Question for G4:** should an HA area and one of the dashboard's areas with the same name be ONE
-group (one colour), or stay separate as now? Your dashboard's areas were renamed for brevity, so the
-names do not always match HA's.
+**Question:** Garage and Kitchen have always shared the same green (the colour-by-name collides).
+With colour as the key to a group, should groups that collide be given different colours
+automatically? It would change one of them on screen.
 
 ## Round 5 - Tap action (K37, K39)
 
