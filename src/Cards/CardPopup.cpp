@@ -3307,12 +3307,15 @@ uint8_t deckSpecs(DeckRowSpec *r) {
                lblSel, held && held->hasId() && !inMember(), labelDropCb, nullptr };
     // The custom name itself is set from a PC for now (GET /settings?card=..
     // &name=..); the web UI does it properly later (K37).
-    // Card label: the card's group, or its own words, or none (K44).
+    // Card label: the card's group, or its own words, or none (K44). GREYED
+    // (owner, 2026-10-09, K48): its choices become Current group / None /
+    // Custom with a name-entry window, after 2.10d. It shows the card's group;
+    // groups are still set from a PC (/settings?card=..&group=..).
     if (held) {
         uint16_t clSel = 0;
         s_clN = CardGroups::rowChoices(*held, s_clMap, 24, s_clOpts, sizeof(s_clOpts), clSel);
         r[n++] = { "Card label", DeckRowKind::ROW_DROP, s_clOpts, clSel,
-                   held->hasId() && !inMember(), cardLabelDropCb, nullptr };
+                   false, cardLabelDropCb, nullptr };
     }
     r[n++] = { "Visibility", DeckRowKind::ROW_DROP,
                "Show on dashboard\nShow only in group\nShow only as member\nHidden", 0, false, nullptr, nullptr };
