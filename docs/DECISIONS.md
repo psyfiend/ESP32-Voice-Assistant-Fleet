@@ -48,6 +48,7 @@ How to use it:
 | A12 | Voice assistant parked, not abandoned: audio code is protected during the UI work (Q8) | 2026-09-03 | Archive §8 Q8 |
 | A13 | The entity table learns entities while running: the members a source names for a group (HA's `entity_id`), with ids made from the source's own (`ha_light_office_lamp`), so pauses and settings find them after a reboot | 2026-10-06 | `card-sheet.md` §16, `EntityRegistry.h` |
 | A14 | **Flash writes flash the P4 panels light blue** (owner, on glass, 2026-10-08, `/panel?flash=`), as HomeTiles found: the per-frame DSI DMA restart waits for the cache. Fixed the IDF way - `CONFIG_LCD_DSI_ISR_CACHE_SAFE=y` added to the #49 library rebuild (`defconfig.cache_safe`); **installed 2026-10-08 with the owner's OK**, the #49 build kept as `esp32p4_es.hosted_fix` | 2026-10-08 | `REBUILD_P4_LIBS.md`, `card-sheet.md` §17 |
+| A15 | **The P4 freezes were the PPA hanging on a rotated strip** (IDF #19023, DIG-734): `ppa_do_scale_rotate_mirror()` never returns for some block sizes at 90/270 degrees, which every P4_5 strip is. Fixed on IDF master (`469aa16c350`), not on release/v5.5; **the P4 libraries are rebuilt again with that one source change** (`scripts/idf-patches/`), **installed 2026-10-09 with the owner's OK**, the cache-safe build kept as `esp32p4_es.cache_safe`. Drop the patch when an IDF update carries the fix | 2026-10-09 | `REBUILD_P4_LIBS.md`, LESSONS |
 
 ## Connectivity and Home Assistant
 

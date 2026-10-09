@@ -352,6 +352,35 @@ and the 256 KB L2 are unchanged. Our frame callback (`Fleet_Display.cpp`, `onFra
 requires. Install as in step 6, keeping the #49 folder as `esp32p4_es.hosted_fix` (and the stock one
 where it is); then clear `.pio/build_cache`. Test: `/panel?flash=8&kb=256` while watching the panel.
 
+## The third rebuild: the PPA rotation hang (2.10d, 2026-10-09, DECISIONS A15)
+
+**The P4_5 froze three times in one afternoon** with the picture stopped mid-animation and the
+network still answering. HangWatch (`-D DEBUG_HANG`, `/hang`) caught the third: `loop()` blocked in
+`ppa_do_operation()`, waiting for the PPA's scale-rotate engine to finish a strip rotation that never
+finished. That is IDF issue **espressif/esp-idf#19023** (DIG-734): for some block sizes the DMA2D
+miscounts a small leftover batch, never raises EOF, and `ppa_do_scale_rotate_mirror()` never returns.
+IDF has a workaround (bypass the macro-block order), but in v5.5 it measures the leftover with the
+block's width and height **unswapped** - wrong for a 90/270 rotation, which is what every strip on
+the P4_5 is. Master fixed that on 2026-09-08 (`469aa16c350`); release/v5.5 had not taken it.
+
+**A source patch this time, no config change**: `scripts/idf-patches/ppa_srm_rotation_fix.diff`,
+applied to `esp-idf/components/esp_driver_ppa/src/ppa_srm.c` in the WSL tree (master's change, kept
+on v5.5's `color_hal_pixel_format_get_bit_depth()`), then the same command as the second rebuild.
+**Load IDF's environment first**: with `-s`, `build.sh` does not, and the first attempt ended at
+once with `idf.py: command not found` and exit code 0.
+
+```
+cd ~/esp32-arduino-lib-builder/esp-idf && git apply /path/to/ppa_srm_rotation_fix.diff
+cd .. && . ./esp-idf/export.sh
+./build.sh -s -t esp32p4_es -b idf-libs qio 80m_200m hosted_fix cache_safe
+```
+
+Verify: the sdkconfig must be **identical** to the installed cache-safe one, and among the libraries
+only `libesp_driver_ppa.a` should differ. The previous output is kept in WSL as
+`out.cache_safe_2026-10-08`; installed, the cache-safe folder is kept as `esp32p4_es.cache_safe`.
+**A future IDF update that includes `469aa16c350` makes this patch unnecessary** - check for it
+before applying it again.
+
 ## The alternative, and why it is not the first choice
 
 `framework = arduino, espidf` — Arduino as an ESP-IDF component — compiles IDF from source with a

@@ -2,8 +2,10 @@
 
 Branch `feat/65-saving`. Boards: **WS_P4_5** (COM15), **WS_P4_4B** (COM7) and **CYD_P4_1060** (COM9),
 all flashed 2026-10-09 with `-D DEBUG_POPUP` (local only) and the **new cache-safe P4 libraries**.
+**Reflashed 2026-10-09 ~14:40 with the PPA rotation fix (A15)** - the freezes. If any board still
+freezes, that is the most important result of the session: on the P4_5, `/hang` before resetting.
 Design and what each step measured: `docs/design/card-sheet.md` section 17; decisions:
-`docs/DECISIONS.md` K33-K46, A14.
+`docs/DECISIONS.md` K33-K49, A14, A15.
 
 Mark each line PASS or FAIL, with a note for anything that looks wrong even if it passes. Rounds 1
 and 2 matter most; the rest can be done in any order. About an hour for all of it.

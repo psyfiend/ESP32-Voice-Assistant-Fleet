@@ -868,3 +868,21 @@ whole technique, and it generalises:
   `esp-idf/export.sh` first.
 - **Keep the stock folder.** The rollback for this is a rename. It is the only change in this
   project that git cannot undo.
+
+## A frozen screen: catch where it stopped, then search upstream's MASTER, not its release
+
+2026-10-09, the P4_5's freezes (#65). Reading the card window's code for a cause found nothing in
+the time it took to write a watcher: a task on the other core that notices `loop()` stop for 3 s,
+suspends it, and records its program counter and the code addresses on its stack (`HangWatch`,
+`-D DEBUG_HANG`, `/hang`). Checked first with a stall made on purpose, so the report could be
+trusted. The next freeze decoded at once to `ppa_do_operation()` waiting forever for the PPA - not
+our window at all - and a search of IDF's history found the bug (#19023) **fixed on master and not
+on release/v5.5**, the branch our libraries are built from. Searching the release branch alone would
+have said "no known fix".
+
+- A hang with the network still up is a **blocked or spinning loop task**. Record where it is before
+  theorising; one capture beat an afternoon of reading.
+- When the stack ends in a vendor driver, read the vendor's **master** history for that file
+  (`git log origin/master -- <file>`), as #49 taught for the issue tracker.
+- Re-read the rebuild traps above before rebuilding: this session lost a run to the `-s` trap that
+  was already written down here.
