@@ -206,15 +206,13 @@ public:
     Card &setAreaColor(uint32_t hex) { _areaColor = hex; return *this; }
     const char *area() const { return _area; }
 
-    // THE CARD LABEL (2.10d, K44; "area" in the code's older words). The
-    // dashboard's area for this card - its group when the owner chose none -
-    // is kept so the window can offer it. Following the HA area, the text and
-    // colour change when HA's area for the primary arrives or changes
-    // (onSnapshot()). A card label in its own colour shows even with no text.
+    // THE CARD LABEL (2.10d, K44, K46; "area" in the code's older words) shows
+    // the card's group (CardGroups.h). The dashboard's area for this card - its
+    // group when the owner chose none - is kept so the group can be worked
+    // out again: HA's areas arrive after the page is built (onSnapshot()). A
+    // card label with its own empty words shows anyway, in the group's colour.
     Card &setSheetArea(const char *a);
     const char *sheetArea() const { return _sheetArea; }
-    Card &setFollowHaArea(bool on) { _followHaArea = on; return *this; }
-    bool followHaArea() const { return _followHaArea; }
     Card &setLabelAlways(bool on) { _labelAlways = on; return *this; }
     // Its primary entity's HA area ("" until learnt, or when HA has none).
     const char *haArea() const;
@@ -576,7 +574,7 @@ private:
     char _area[ENTITY_SHORT_MAX] = {0};
     uint32_t _areaColor = 0;   // 0 = use the accent
     char _sheetArea[ENTITY_SHORT_MAX] = {0};   // the dashboard's (CardSpec::area)
-    bool _followHaArea = false;
+    char _seenAreaId[ENTITY_NAME_MAX] = {0};   // its primary's HA area id when its group was last worked out
     bool _labelAlways  = false;
     bool _pageAreaColor = true;
 

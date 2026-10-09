@@ -73,6 +73,29 @@ JsonObject objectAt(JsonObject parent, const char *key) {
     return parent[key].to<JsonObject>();
 }
 
+// WHO CHANGED WHAT (2.10d). Desk's Tap action was found set on the P4_5 with
+// nobody at the panel, and nothing said how. Every change is now logged with
+// its time and the task that made it - "loopTask" is the card window (the LVGL
+// thread), "httpd" a browser - and the last few are kept for ?stats=1.
+constexpr uint8_t CHANGES_KEPT = 10;
+char    s_changes[CHANGES_KEPT][112];
+uint8_t s_changeHead = 0, s_changeN = 0;
+
+void noteChange(const char *section, const char *id, const char *key, const char *value, bool remove) {
+    char when[24] = "";
+    time_t now = time(nullptr);
+    struct tm tmv;
+    if (now > 1700000000 && localtime_r(&now, &tmv)) strftime(when, sizeof(when), "%m-%d %H:%M:%S", &tmv);
+    else snprintf(when, sizeof(when), "%lus", (unsigned long)(millis() / 1000));
+    const char *task = pcTaskGetName(nullptr);
+    char *line = s_changes[s_changeHead];
+    snprintf(line, sizeof(s_changes[0]), "%s %s: %s.%s.%s %s%s", when, task ? task : "?", section, id, key,
+             remove ? "removed" : "= ", remove ? "" : (value ? value : "?"));
+    s_changeHead = (uint8_t)((s_changeHead + 1) % CHANGES_KEPT);
+    if (s_changeN < CHANGES_KEPT) s_changeN++;
+    Serial.printf("[Settings] %s\n", line);
+}
+
 // Set or remove doc[section][id][key]; drops [id], then [section], once empty.
 // Caller holds the lock. True when the document changed.
 bool setValue(const char *section, const char *id, const char *key, const char *str,
@@ -90,6 +113,7 @@ bool setValue(const char *section, const char *id, const char *key, const char *
         ent.remove(key);
         if (ent.size() == 0) sec.remove(id);
         if (sec.size() == 0) root.remove(section);
+        noteChange(section, id, key, nullptr, true);
         return true;
     }
     JsonObject ent = objectAt(objectAt(root, section), id);
@@ -101,6 +125,7 @@ bool setValue(const char *section, const char *id, const char *key, const char *
         if (cur.is<const char *>() && strcmp(cur.as<const char *>(), str) == 0) return false;
         ent[key] = str;   // copied into the document
     }
+    noteChange(section, id, key, isBool ? (b ? "true" : "false") : str, false);
     return true;
 }
 
@@ -304,10 +329,22 @@ esp_err_t handleSettings(httpd_req_t *req) {
                     Settings::save();
                     len = snprintf(out, sizeof(out), "group %s: color %s\n", gid, val[0] ? val : "by name");
                 }
+            } else if (httpd_query_key_value(q, "name", val, sizeof(val)) == ESP_OK) {
+                // Rename a group - every card in it (K46, rename c); for an HA
+                // area, a local rename that keeps the link. Empty: its own name.
+                urlDecode(val);
+                if (strlen(val) >= 40 || !printableAscii(val))
+                    len = snprintf(out, sizeof(out), "refused: a group name is up to 39 characters of plain ASCII\n");
+                else {
+                    Settings::setGroup(gid, "name", val[0] ? val : nullptr);
+                    Settings::save();
+                    len = snprintf(out, sizeof(out), "group %s: name %s\n", gid, val[0] ? val : "its own again");
+                }
             } else if (httpd_query_key_value(q, "delete", val, sizeof(val)) == ESP_OK && atoi(val)) {
                 // A card still pointing at it shows its dashboard area again
                 // (CardGroups::apply()) until the owner chooses.
-                const bool gone = Settings::setGroup(gid, "name", nullptr) | Settings::setGroup(gid, "color", nullptr);
+                const bool gone = Settings::setGroup(gid, "name", nullptr) | Settings::setGroup(gid, "color", nullptr) |
+                                  Settings::setGroup(gid, "kind", nullptr);
                 Settings::save();
                 len = snprintf(out, sizeof(out), "group %s: %s\n", gid, gone ? "deleted" : "not found");
             } else {
@@ -368,7 +405,7 @@ esp_err_t handleSettings(httpd_req_t *req) {
     }
     if (stats) {
         const Settings::Stats s = Settings::stats();
-        char out[768];
+        static char out[2048];   // the server has one task: one request at a time
         int n = snprintf(out, sizeof(out),
                                "file %s (%s)%s\nsaves %lu, failures %lu, pending %s\nlast save at %lu ms, "
                                "took %.1f ms, %lu bytes\n",
@@ -379,6 +416,14 @@ esp_err_t handleSettings(httpd_req_t *req) {
         // The listing was taken by the settings task (listFiles()): reading the
         // flash from this task, whose stack is in PSRAM, reboots the board.
         { Lock l; n += snprintf(out + n, sizeof(out) - n, "boot: %s\nfiles in %s:\n%s", s_bootNote, BASE, s_listing); }
+        {
+            Lock l;
+            if (s_changeN) n += snprintf(out + n, sizeof(out) - n, "last changes (newest last):\n");
+            for (uint8_t i = 0; i < s_changeN && n < (int)sizeof(out) - 120; i++) {
+                const uint8_t k = (uint8_t)((s_changeHead + CHANGES_KEPT - s_changeN + i) % CHANGES_KEPT);
+                n += snprintf(out + n, sizeof(out) - n, "  %s\n", s_changes[k]);
+            }
+        }
         struct Acc { char *out; int n; int cap; } acc{ out, n, (int)sizeof(out) };
         Settings::forEachUnclaimed([](const char *sec, const char *id, void *c) {
             Acc &a = *(Acc *)c;
@@ -526,6 +571,18 @@ bool newGroup(const char *name, char *id, size_t cap) {
         }
     }
     return false;
+}
+
+uint8_t countCards(const char *key, const char *value) {
+    if (!s_doc || !key || !value) return 0;
+    Lock l;
+    uint8_t n = 0;
+    JsonObjectConst cards = (*s_doc)["cards"];
+    for (JsonPairConst kv : cards) {
+        JsonVariantConst v = kv.value()[key];
+        if (v.is<const char *>() && !strcmp(v.as<const char *>(), value)) n++;
+    }
+    return n;
 }
 
 bool entityFlag(const char *entityId, const char *key, bool dflt) {

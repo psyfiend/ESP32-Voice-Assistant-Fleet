@@ -74,6 +74,8 @@ void forEachGroup(void (*fn)(const char *id, const char *name, void *ctx), void 
 // A new custom group named `name`; its id into `id`. False if the store is full
 // or the name is empty.
 bool newGroup(const char *name, char *id, size_t cap);
+// How many cards have `key` set to `value` (whether a group still has members).
+uint8_t countCards(const char *key, const char *value);
 
 // Writing, in RAM. nullptr = Reset (removes the key, and the card's or
 // scheme's object once empty). True when the document changed.

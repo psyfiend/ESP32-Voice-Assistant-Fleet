@@ -125,9 +125,9 @@ bool HaProvider::sendSceneQuery() {
     if (tail < 0 || n + tail >= (int)sizeof(frame)) return false;
     n += tail;
 
-    // EVERY ENTITY'S AREA (2.10d, K44): "@>sensor.x>Office|" - HA's
-    // area_name(), the entity's own area or else its device's; empty when it
-    // has none. For a card label set to "HA area". Learnt members are asked
+    // EVERY ENTITY'S AREA (2.10d, K44, K46): "@>sensor.x>office>Office|" -
+    // HA's area_id() and area_name(), the entity's own area or else its
+    // device's; empty when it has none. For a card label set to "HA area". Learnt members are asked
     // too: a member can be a card's primary one day (K17).
     int add = snprintf(frame + n, sizeof(frame) - n, "{%% for e in [");
     if (add < 0 || n + add >= (int)sizeof(frame)) return false;
@@ -145,7 +145,7 @@ bool HaProvider::sendSceneQuery() {
         asked++;
     }
     add = snprintf(frame + n, sizeof(frame) - n,
-                   "] %%}@>{{ e }}>{{ area_name(e) or '' }}|{%% endfor %%}\"}");
+                   "] %%}@>{{ e }}>{{ area_id(e) or '' }}>{{ area_name(e) or '' }}|{%% endfor %%}\"}");
     if (add < 0 || n + add >= (int)sizeof(frame)) return false;
     n += add;
     if (!named && !asked) return true;   // nothing to ask this session
@@ -190,14 +190,17 @@ void HaProvider::parseScenes(const char *result) {
         char *a = strchr(tok, '>');
         char *b = a ? strchr(a + 1, '>') : nullptr;
         if (!a || !b) continue;
-        // "@>sensor.x>Office": an entity's area (2.10d), not a scene.
+        // "@>sensor.x>office>Office": an entity's area id and name (2.10d),
+        // not a scene.
         if (tok[0] == '@' && a == tok + 1) {
             *b = '\0';
-            const char *ref = a + 1, *area = b + 1;
+            char *c2 = strchr(b + 1, '>');
+            if (c2) *c2 = '\0';
+            const char *ref = a + 1, *areaId = b + 1, *area = c2 ? c2 + 1 : "";
             for (uint8_t i = 0; i < _reg->count(); i++) {
                 const Entity *e = _reg->at(i);
                 if (!e || e->desc.source != EntitySource::HA || strcmp(e->desc.externalRef, ref) != 0) continue;
-                _reg->setSourceArea(e->desc.id, area);
+                _reg->setSourceArea(e->desc.id, areaId, area);
                 areas++;
                 if (area[0]) withArea++;
                 break;

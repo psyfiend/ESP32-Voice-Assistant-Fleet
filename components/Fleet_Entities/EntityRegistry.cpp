@@ -288,14 +288,17 @@ bool EntityRegistry::setSourceName(const char *id, const char *name) {
     return true;
 }
 
-bool EntityRegistry::setSourceArea(const char *id, const char *area) {
+bool EntityRegistry::setSourceArea(const char *id, const char *areaId, const char *area) {
     if (!area) area = "";
+    if (!areaId) areaId = "";
     std::lock_guard<std::mutex> lk(_mx);
     const int i = indexOf(id);
     if (i < 0) return false;
     Entity &e = _items[i];
-    if (strncmp(e.sourceArea, area, sizeof(e.sourceArea) - 1) == 0) return false;
+    if (strncmp(e.sourceArea, area, sizeof(e.sourceArea) - 1) == 0 &&
+        strncmp(e.sourceAreaId, areaId, sizeof(e.sourceAreaId) - 1) == 0) return false;
     snprintf(e.sourceArea, sizeof(e.sourceArea), "%s", area);
+    snprintf(e.sourceAreaId, sizeof(e.sourceAreaId), "%s", areaId);
     e.dirty = true;
     return true;
 }

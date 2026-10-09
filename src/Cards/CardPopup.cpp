@@ -4266,7 +4266,7 @@ enum DbgReqState : int { DREQ_IDLE, DREQ_CLAIMED, DREQ_PENDING, DREQ_CLOSING, DR
 std::atomic<int> s_dreq{DREQ_IDLE};
 struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
                 int member = -1; int scene = -1; int look = -1; int show = -1; int scheme = -1;
-                int tap = -1;
+                int tap = -1; int groups = -1; int clabel = -1;
                 bool close = false, power = false; };
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
@@ -4310,6 +4310,8 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "scheme", v, sizeof(v)) == ESP_OK) a.scheme = atoi(v);
         if (httpd_query_key_value(q, "close", v, sizeof(v)) == ESP_OK) a.close = atoi(v) != 0;
         if (httpd_query_key_value(q, "tap", v, sizeof(v)) == ESP_OK) a.tap = atoi(v);
+        if (httpd_query_key_value(q, "groups", v, sizeof(v)) == ESP_OK) a.groups = atoi(v);
+        if (httpd_query_key_value(q, "clabel", v, sizeof(v)) == ESP_OK) a.clabel = atoi(v);
     }
     int expected = DREQ_IDLE;
     if (!s_dreq.compare_exchange_strong(expected, DREQ_CLAIMED)) {
@@ -4534,6 +4536,40 @@ void CardPopup::debugService(lv_timer_t *t) {
 
     lv_obj_t *cards[48];
     const int n = dbgCards(lv_screen_active(), cards, 0, 48);
+    if (a.clabel >= 0) {
+        // As choosing line N of the open window's Card label row (K46).
+        Card *c = isOpen() ? cardOf(h.surface) : nullptr;
+        if (!c) { dbgOut("no window open\n"); s_dreq.store(DREQ_DONE); return; }
+        uint16_t sel = 0;
+        s_clN = CardGroups::rowChoices(*c, s_clMap, 24, s_clOpts, sizeof(s_clOpts), sel);
+        if (a.clabel < s_clN) {
+            CardGroups::choose(*c, s_clMap[a.clabel], c->pageAreaColor());
+            c->restyle();
+        }
+        uint16_t now = 0;
+        s_clN = CardGroups::rowChoices(*c, s_clMap, 24, s_clOpts, sizeof(s_clOpts), now);
+        dbgOut("card label: \"%s\" #%06lX; the row, now on line %u:\n%s\n", c->area(),
+               (unsigned long)c->headerColor(), (unsigned)now, s_clOpts);
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.groups >= 0) {
+        // The groups for card labels (K46), and each card's on this page.
+        CardGroups::forEach([](const CardGroups::Group &g, void *) {
+            dbgOut("group %-28s %-14s #%06lX %s%s%s\n", g.id, g.name, (unsigned long)g.color,
+                   g.haName[0] ? "HA area " : "local", g.haName, g.solo ? " (solo)" : "");
+        }, nullptr);
+        for (int i = 0; i < n; i++) {
+            Card *c = cardOf(cards[i]);
+            if (!c) continue;
+            CardGroups::Group g;
+            const bool has = CardGroups::ofCard(*c, g);
+            dbgOut("%2d %-12s label \"%s\" #%06lX  group %s\n", i, c->label(), c->area(),
+                   (unsigned long)c->headerColor(), has ? g.id : "none");
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
     if (a.tap >= 0) {
         // As a TAP on card N (2.10d): whatever its Tap action says - toggle,
         // open the window on a view, load a scene, or nothing.

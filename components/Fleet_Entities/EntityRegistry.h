@@ -140,8 +140,9 @@ public:
     // The source's own name (Entity::sourceName), for any entity. Marks it
     // dirty only when it changed, so a card showing "From HA" repaints.
     bool setSourceName(const char *id, const char *name);
-    // Entity::sourceArea, the same way; "" clears it (HA says no area).
-    bool setSourceArea(const char *id, const char *area);
+    // Entity::sourceArea and sourceAreaId, the same way; "" clears them (HA
+    // says no area).
+    bool setSourceArea(const char *id, const char *areaId, const char *area);
 
     // True once after learnMembers() added anything: the caller (the loop
     // task) then re-applies the saved pauses, which could not reach an entity

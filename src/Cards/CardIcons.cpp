@@ -203,26 +203,28 @@ const char *cardBatteryGlyph(int pct) {
     return MDI_BATTERY_ALERT;
 }
 
+// Hues chosen to stay distinguishable from each other AND from the semantic
+// state palette - an area must never be mistaken for a warning. Nothing here is
+// amber or red for that reason. Eight hues spread right around the wheel,
+// deliberately far apart rather than merely different - two areas next to each
+// other on a page have to be told apart at a glance, not on inspection. At file
+// scope since 2.10d: a new group takes one no other group is using (K46).
+static const uint32_t AREA_HUES[] = {
+    0x3E8FD9,   // blue
+    0x38B24A,   // green
+    0xA05FD6,   // violet
+    0x11A8A8,   // teal
+    0xD45A9E,   // magenta
+    0x8FBF3F,   // lime
+    0x5C6BC0,   // indigo
+    0xE07A3F,   // ochre
+};
+
+uint8_t  cardAreaHueCount()    { return sizeof(AREA_HUES) / sizeof(AREA_HUES[0]); }
+uint32_t cardAreaHue(uint8_t i) { return AREA_HUES[i % cardAreaHueCount()]; }
+
 uint32_t cardAreaColor(const char *area) {
     if (!area || !area[0]) return 0;
-
-    // Hues chosen to stay distinguishable from each other AND from the
-    // semantic state palette - an area must never be mistaken for a warning.
-    // Nothing here is amber or red for that reason.
-    // Eight hues spread right around the wheel, deliberately far apart rather
-    // than merely different - two areas next to each other on a page have to
-    // be told apart at a glance, not on inspection. None of them is amber or
-    // red: an area must never be mistaken for a warning.
-    static const uint32_t AREA_HUES[] = {
-        0x3E8FD9,   // blue
-        0x38B24A,   // green
-        0xA05FD6,   // violet
-        0x11A8A8,   // teal
-        0xD45A9E,   // magenta
-        0x8FBF3F,   // lime
-        0x5C6BC0,   // indigo
-        0xE07A3F,   // ochre
-    };
     static const uint32_t N = sizeof(AREA_HUES) / sizeof(AREA_HUES[0]);
 
     // FNV-1a. Small, well-spread, and deterministic - which is the only

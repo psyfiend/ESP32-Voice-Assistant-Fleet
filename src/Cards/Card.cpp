@@ -1399,16 +1399,14 @@ void Card::onSnapshot(const Entity &snap) {
     // arrive at all - so resolution deliberately does NOT live in this method.
     // It is polled, from pollState(). See the command masks in the header.
 
-    // Following the HA area (K44): it is learnt after the page is built, once
-    // per session, and HA may move the entity.
-    if (_followHaArea) {
-        const Entity *p = primary();
-        if (p && strncmp(p->sourceArea, _area, sizeof(_area) - 1) != 0) {
-            setArea(p->sourceArea);
-            // By the page's setting, not by whether it had a colour: before HA
-            // said, it had no words and so no colour (found on WS_P4_5: the
-            // card label stayed in the accent).
-            setAreaColor(_pageAreaColor ? CardGroups::colorFor(CardGroups::HA_PREFIX, p->sourceArea) : 0);
+    // ITS GROUP CAN HANG ON HA'S AREAS (K46), learnt after the page is built,
+    // once per session: whether its dashboard area is an HA area, and which.
+    // Worked out again when its own entity's area arrives or changes - once,
+    // not on every value.
+    if (const Entity *p = primary()) {
+        if (strncmp(p->sourceAreaId, _seenAreaId, sizeof(_seenAreaId) - 1) != 0) {
+            copyBounded(_seenAreaId, sizeof(_seenAreaId), p->sourceAreaId);
+            CardGroups::apply(*this, _pageAreaColor);
             applyState();
         }
     }

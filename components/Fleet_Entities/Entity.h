@@ -433,6 +433,9 @@ struct Entity {
     // until learnt - once per session, with the scenes - or when HA has none.
     // Written by setSourceArea() only.
     char        sourceArea[ENTITY_NAME_MAX] = {0};
+    // ...and its id (HA's area_id(): "office"), which does not change when the
+    // area is renamed in HA. The key of the group linked to that area (K46).
+    char        sourceAreaId[ENTITY_NAME_MAX] = {0};
 };
 
 #endif // ENTITY_H

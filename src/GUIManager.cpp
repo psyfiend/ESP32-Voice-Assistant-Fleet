@@ -60,6 +60,15 @@ static void reportSettingsSection() {
         (*(uint8_t *)c)++;
         SystemReport::line("  Unclaimed %s: %s", sec, id);
     }, &n);
+    // The groups for card labels (K46): which are HA areas, which are local.
+    CardGroups::forEach([](const CardGroups::Group &g, void *) {
+        if (g.haName[0])
+            SystemReport::line("  Group %-14s #%06lX  HA area \"%s\"%s", g.name, (unsigned long)g.color, g.haName,
+                               strcmp(g.name, g.haName) ? " (renamed here)" : "");
+        else
+            SystemReport::line("  Group %-14s #%06lX  local%s", g.name, (unsigned long)g.color,
+                               g.solo ? ", one card's own" : "");
+    }, nullptr);
     if (!n) SystemReport::line("  Nothing unclaimed");
     else    SystemReport::line("  Clear with /settings?prune=cards or prune=entities (a paused member may only "
                                "look missing until HA reports its group)");
@@ -1340,7 +1349,7 @@ void GUIManager::initPages() {
     // Before any page is built: CardPage gives a card its id only if this
     // found it usable (PageSpec.h, 2.10d).
     checkCardIds(order, DASH_PAGE_N);
-    CardGroups::setPages(order, DASH_PAGE_N);   // the dashboard's areas are groups (K44)
+    CardGroups::setSources(order, DASH_PAGE_N, &_core.entities());   // groups for card labels (K46)
     _nPages = 0;
     for (uint8_t pi = 0; pi < DASH_PAGE_N; pi++) {
         const PageSpec *s = order[pi];
