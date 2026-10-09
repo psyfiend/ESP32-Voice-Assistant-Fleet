@@ -125,7 +125,7 @@ T4 and T6 change the Office lights (scenes); I leave them at 100%, 2710 K after 
 | # | Do this | PASS if |
 |---|---|---|
 | P1 | Desk's SETTINGS on the P4_5, the 4B and the 1060 | Paused, Entity label, Card label, Visibility (greyed), Tap action - and **no scrolling** on any of them |
-| P1b | P4_5 (reflashed 2026-10-09 12:40): open Tap action, then Entity label | **Every choice shows at once**, Toggle included; nothing to scroll. (The 4B gets this with the next flash) |
+| P1b | P4_5 (reflashed 2026-10-09 12:40): open Tap action, then Entity label | **Every choice shows at once**, Toggle included; nothing to scroll. The same on the 4B (reflashed 12:50) |
 | P2 | Desk -> Scenes | A **SCENES** panel peeks up on the left, as CHART does on History |
 | P3 | Open it: Show hidden scenes, tick it | The four hidden scenes join the buttons. Untick: they go |
 | P4 | Go from Scenes to History | SCENES goes down, CHART comes up |
