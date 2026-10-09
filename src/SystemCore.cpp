@@ -8,6 +8,7 @@
 #include "TimeService.h"
 #include "bsp_loader.h"
 #include "PanelDebug.h"
+#include "HangWatch.h"
 #include "Settings.h"
 
 // Normally injected by scripts/fw_version.py via extra_scripts (derived from
@@ -166,6 +167,9 @@ bool SystemCore::begin() {
     // GET /panel: the panel's own status, and its init sequence again
     // (PanelDebug.h - the 4B's washed-out picture).
     PanelDebug::begin(_http, _display);
+#endif
+#ifdef DEBUG_HANG
+    HangWatch::begin(_http);   // GET /hang: where loop() stopped (HangWatch.h)
 #endif
 
     // --= 3. Touch =--

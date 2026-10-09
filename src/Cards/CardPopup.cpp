@@ -3395,6 +3395,13 @@ lv_obj_t *deckDropdown(lv_obj_t *parent, const DeckRowSpec &r) {
         lv_obj_set_style_border_width(list, LV_MAX(1, mm(0.2f)), 0);
         lv_obj_set_style_radius      (list, mm(1.2f), 0);
         lv_obj_set_style_shadow_width(list, 0, 0);
+        // EVERY CHOICE IN SIGHT (owner, 2.10d): the default theme caps a list
+        // at 260 px, which on the P4_5 and the 4B is five rows - Tap action's
+        // Toggle sat above the top, scrolled out of view. Only the screen
+        // limits it now (lv_dropdown_open() fits it above or below), and what
+        // still has to scroll does not spring back.
+        lv_obj_set_style_max_height  (list, lv_display_get_vertical_resolution(NULL), 0);
+        UI::tameScroll(list);
         lv_obj_set_style_bg_color    (list, UI::c(p.ACCENT), UI::part(LV_PART_SELECTED, LV_STATE_CHECKED));
         lv_obj_set_style_text_color  (list, UI::c(UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT)),
                                       UI::part(LV_PART_SELECTED, LV_STATE_CHECKED));

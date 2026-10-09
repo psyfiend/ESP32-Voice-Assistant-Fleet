@@ -35,6 +35,10 @@ page is built: swipe to the other page and back.
 **If something fails**, send me the line number, what you saw, and - if the board is still up - the
 `/settings?stats=1` page and a `/screenshot`.
 
+**If the P4_5 freezes** (your two freezes of 2026-10-09): open `http://fleet-ws-p4-5/hang` **before**
+resetting it, and send me what it says. Three seconds after the screen stops, the board writes down
+where it is stuck; a reset forgets it. It is on the P4_5 only, and the PC is also logging its serial port.
+
 ## Round 1 - the flash fix (A14)
 
 Before the new libraries, every flash write made the P4 screens flash light blue (your test on
@@ -121,6 +125,7 @@ T4 and T6 change the Office lights (scenes); I leave them at 100%, 2710 K after 
 | # | Do this | PASS if |
 |---|---|---|
 | P1 | Desk's SETTINGS on the P4_5, the 4B and the 1060 | Paused, Entity label, Card label, Visibility (greyed), Tap action - and **no scrolling** on any of them |
+| P1b | P4_5 (reflashed 2026-10-09 12:40): open Tap action, then Entity label | **Every choice shows at once**, Toggle included; nothing to scroll. (The 4B gets this with the next flash) |
 | P2 | Desk -> Scenes | A **SCENES** panel peeks up on the left, as CHART does on History |
 | P3 | Open it: Show hidden scenes, tick it | The four hidden scenes join the buttons. Untick: they go |
 | P4 | Go from Scenes to History | SCENES goes down, CHART comes up |
