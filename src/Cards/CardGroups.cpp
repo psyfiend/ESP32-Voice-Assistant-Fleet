@@ -5,6 +5,7 @@
 #include "Cards/PageSpec.h"
 #include "EntityRegistry.h"
 #include "Settings.h"
+#include <Arduino.h>   // millis(): autoColour()'s refresh
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -147,6 +148,98 @@ void setSources(const PageSpec *const *pages, uint8_t n, const EntityRegistry *r
     s_reg    = reg;
 }
 
+namespace {   // file-local helpers inside CardGroups
+
+// A GROUP'S OWN NAME: the dashboard's for a dashboard area (linked or not),
+// else HA's for an HA area; "" for a group made here, whose own name is its id.
+void baseName(const char *gid, char *out, size_t cap) {
+    out[0] = '\0';
+    const char *areas[32];
+    const uint8_t na = sheetAreas(areas, 32);
+    char id[48];
+    for (uint8_t i = 0; i < na; i++) {
+        sheetGroupId(areas[i], id, sizeof(id));
+        if (!strcmp(id, gid)) { snprintf(out, cap, "%s", areas[i]); return; }
+    }
+    if (startsWith(gid, HA_PREFIX)) haNameOf(gid + strlen(HA_PREFIX), out, cap);
+}
+
+bool savedColour(const char *gid, uint32_t &c) {
+    char hex[12];
+    if (!Settings::group(gid, "color", hex, sizeof(hex)) || strlen(hex) != 6) return false;
+    c = (uint32_t)strtoul(hex, nullptr, 16);
+    return true;
+}
+
+// GROUPS TRY TO HAVE COLOURS OF THEIR OWN (owner, 2026-10-09), unless one was
+// set on purpose to match another. The order decides who keeps what: the
+// dashboard's areas page by page, then the other HA areas, then the groups
+// made here. A colour set on purpose is taken first; then each group keeps the
+// colour of its own name if nobody has it yet, else takes the next free one;
+// with more groups than colours, the rest keep their own and share. Worked out
+// afresh at most twice a second - it depends on HA's areas and the file.
+struct AutoColour { char id[48]; uint32_t color; };
+AutoColour s_auto[32];
+uint8_t    s_autoN = 0;
+uint32_t   s_autoMs = 0;
+bool       s_autoBuilt = false;
+
+void autoAdd(const char *gid) {
+    for (uint8_t i = 0; i < s_autoN; i++) if (!strcmp(s_auto[i].id, gid)) return;
+    if (s_autoN < 32) snprintf(s_auto[s_autoN++].id, sizeof(s_auto[0].id), "%s", gid);
+}
+
+void buildAuto() {
+    s_autoN = 0;
+    const char *areas[32];
+    const uint8_t na = sheetAreas(areas, 32);
+    char gid[48];
+    for (uint8_t i = 0; i < na; i++) { sheetGroupId(areas[i], gid, sizeof(gid)); autoAdd(gid); }
+    if (s_reg)
+        for (uint8_t i = 0; i < s_reg->count(); i++) {
+            const Entity *e = s_reg->at(i);
+            if (!e || !e->sourceAreaId[0]) continue;
+            snprintf(gid, sizeof(gid), "%s%s", CardGroups::HA_PREFIX, e->sourceAreaId);
+            autoAdd(gid);
+        }
+    Settings::forEachGroup([](const char *id, const char *, void *) { autoAdd(id); }, nullptr);
+
+    // Three passes, so as few groups move as possible: colours set on purpose;
+    // then each group its own name's colour if no group before it has that;
+    // then the ones that lost out, the free colours in palette order.
+    uint8_t state[32] = {};   // 0 not yet, 1 has a colour
+    for (uint8_t i = 0; i < s_autoN; i++)
+        if (savedColour(s_auto[i].id, s_auto[i].color)) state[i] = 1;
+    auto taken = [&](uint32_t c) {
+        for (uint8_t k = 0; k < s_autoN; k++) if (state[k] && s_auto[k].color == c) return true;
+        return false;
+    };
+    for (uint8_t i = 0; i < s_autoN; i++) {
+        if (state[i]) continue;
+        char base[40];
+        baseName(s_auto[i].id, base, sizeof(base));
+        const uint32_t own = cardAreaColor(base[0] ? base : s_auto[i].id);
+        if (!taken(own)) { s_auto[i].color = own; state[i] = 1; }
+        else             s_auto[i].color = own;   // kept if nothing is free
+    }
+    for (uint8_t i = 0; i < s_autoN; i++) {
+        if (state[i]) continue;
+        for (uint8_t h = 0; h < cardAreaHueCount(); h++)
+            if (!taken(cardAreaHue(h))) { s_auto[i].color = cardAreaHue(h); break; }
+        state[i] = 1;
+    }
+    s_autoMs = millis();
+    s_autoBuilt = true;
+}
+
+uint32_t autoColour(const char *gid, const char *base) {
+    if (!s_autoBuilt || millis() - s_autoMs > 500) buildAuto();
+    for (uint8_t i = 0; i < s_autoN; i++) if (!strcmp(s_auto[i].id, gid)) return s_auto[i].color;
+    return cardAreaColor(base[0] ? base : gid);
+}
+
+}  // namespace (file-local helpers)
+
 bool byId(const char *gid, Group &g) {
     if (!gid || !gid[0]) return false;
     memset(&g, 0, sizeof(g));
@@ -154,29 +247,19 @@ bool byId(const char *gid, Group &g) {
     const bool ha = startsWith(gid, HA_PREFIX);
     if (ha) haNameOf(gid + strlen(HA_PREFIX), g.haName, sizeof(g.haName));
 
-    // ITS OWN NAME: the dashboard's for a dashboard area (linked or not), else
-    // HA's for an HA area; a group made here has none but its id.
-    char base[40] = "";
-    const char *areas[32];
-    const uint8_t na = sheetAreas(areas, 32);
-    char id[48];
-    for (uint8_t i = 0; i < na && !base[0]; i++) {
-        sheetGroupId(areas[i], id, sizeof(id));
-        if (!strcmp(id, gid)) snprintf(base, sizeof(base), "%s", areas[i]);
-    }
-    if (!base[0] && ha) snprintf(base, sizeof(base), "%s", g.haName);
+    char base[40];
+    baseName(gid, base, sizeof(base));
 
     // The name shown: a saved one (a rename, or a group made here) first.
     if (!Settings::group(gid, "name", g.name, sizeof(g.name))) {
         if (!base[0]) return false;   // a group nobody knows
         snprintf(g.name, sizeof(g.name), "%s", base);
     }
-    // THE COLOUR NEVER FOLLOWS A RENAME (K46: colour is the group). A saved
-    // one, else the colour of its own name - or of its id, for a group made
-    // here. Found on WS_P4_5: renaming Office to "Work" turned it lime.
-    char hex[12];
-    g.color = (Settings::group(gid, "color", hex, sizeof(hex)) && strlen(hex) == 6)
-            ? (uint32_t)strtoul(hex, nullptr, 16) : cardAreaColor(base[0] ? base : gid);
+    // THE COLOUR NEVER FOLLOWS A RENAME (K46: colour is the group): one set on
+    // purpose, else the one worked out for it (autoColour(): its own name's,
+    // unless another group has that). Found on WS_P4_5: renaming Office to
+    // "Work" turned it lime, when the colour came from the shown name.
+    if (!savedColour(gid, g.color)) g.color = autoColour(gid, base);
     char kind[8];
     g.solo = Settings::group(gid, "kind", kind, sizeof(kind)) && !strcmp(kind, "solo");
     return true;
