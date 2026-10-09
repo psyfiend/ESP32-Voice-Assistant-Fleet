@@ -378,7 +378,9 @@ esp_err_t handleSettings(httpd_req_t *req) {
         if (!haveQ || httpd_query_key_value(q, "card", id, sizeof(id)) != ESP_OK ||
             httpd_query_key_value(q, key, name, sizeof(name)) != ESP_OK) continue;
         urlDecode(name);
-        const bool reset = !name[0] || !strcmp(name, "inherit") || !strcmp(name, "default");
+        // label=inherit is kept since K49 (a named card's default is Custom).
+        const bool reset = !name[0] || !strcmp(name, "default") ||
+                           (strcmp(key, "label") && !strcmp(name, "inherit"));
         Settings::setCard(id, key, reset ? nullptr : name);
         Settings::save();
         char out[160];

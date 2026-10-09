@@ -558,8 +558,12 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
         c->setPlacement(cs.place);
         c->setTempUnit(cs.tempUnit == TempUnit::TEMP_INHERIT ? spec.tempUnit
                                                              : cs.tempUnit);
-        c->setLabelMode(cs.labelMode == CardLabel::LBL_INHERIT ? spec.labelMode
-                                                               : cs.labelMode);
+        // A NAMED CARD SAYS CUSTOM (owner, 2026-10-09, K49): a name the
+        // dashboard gives ("Desk" for HA's "Office") is a custom name, and
+        // the Entity label row says so. A card it does not name inherits.
+        CardLabel lmDef = cs.labelMode == CardLabel::LBL_INHERIT ? spec.labelMode : cs.labelMode;
+        if (lmDef == CardLabel::LBL_INHERIT && cs.label && cs.label[0]) lmDef = CardLabel::LBL_NAME;
+        c->setLabelMode(lmDef);
         c->setGroupOn(cs.groupOn);
 
         // The owner's saved changes, over the spec (2.10d, Settings.h): the
@@ -572,9 +576,14 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
             CardLabel lm;
             if (Settings::card(c->id(), "active", v, sizeof(v)) && groupOnFromName(v, g)) c->setGroupOn(g);
             if (Settings::card(c->id(), "scenes", v, sizeof(v)) && sceneShowFromName(v, ss)) c->setSceneShow(ss);
-            if (Settings::card(c->id(), "label", v, sizeof(v)) && cardLabelFromName(v, lm)) c->setLabelMode(lm);
-            // A custom name set on the device replaces the dashboard's (K40).
-            if (Settings::card(c->id(), "name", v, sizeof(v)) && v[0]) c->setLabel(v);
+            const bool lmSaved = Settings::card(c->id(), "label", v, sizeof(v)) && cardLabelFromName(v, lm);
+            if (lmSaved) c->setLabelMode(lm);
+            // A custom name set on the device replaces the dashboard's (K40),
+            // and makes the card Custom unless a label choice was saved (K49).
+            if (Settings::card(c->id(), "name", v, sizeof(v)) && v[0]) {
+                c->setLabel(v);
+                if (!lmSaved) c->setLabelMode(CardLabel::LBL_NAME);
+            }
             TapAction ta;
             if (Settings::card(c->id(), "tap", v, sizeof(v)) && tapActionFromName(v, ta)) c->setTapAction(ta);
             char ref[ENTITY_TOPIC_MAX];

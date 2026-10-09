@@ -68,14 +68,20 @@ Before the new libraries, every flash write made the P4 screens flash light blue
 ## Round 3 - Entity label (K40, K45)
 
 The words under the hero. The row is now called **Entity label**: Inherit / HA name / State / Custom / None.
+Changed 2026-10-09 (K49, P4_5 only so far): a card the dashboard names reads **Custom**; Inherit means
+"no name of its own", so it shows HA's; and the system panel's label knob is a test tool - State or
+None shows the whole page that way, Name shows each card's own choice.
 
 | # | Do this | PASS if |
 |---|---|---|
-| L1 | **Overhead (Office)**: Entity label -> HA name | The card reads HA's own name for that light (not "Overhead") |
+| L0 | Open Desk's, Overhead's and Thermo's Entity label | Each reads **Custom** |
+| L1 | **Overhead (Office)**: Entity label -> HA name | "Light - Office overhead" (HA's name) |
 | L2 | -> State | "On" or "Off" |
-| L3 | -> None, then -> Inherit | No words; then "Overhead" again |
-| L4 | Restart with Overhead on HA name | Still HA's name |
-| L5 | From a browser: `http://fleet-ws-p4-5/settings?card=office_overhead_261008_0310&name=Ceiling+lamp`, set Entity label to Custom, swipe away and back | "Ceiling lamp". Then `...&name=` (empty) and Inherit to put it back |
+| L3 | -> None, then -> Custom | No words; then "Overhead" again |
+| L3b | -> Inherit | HA's name, as in L1 |
+| L4 | Restart with Overhead on Inherit | Still HA's name, the row still Inherit. Then back to Custom |
+| L4b | System panel, the label knob: Name -> State -> No lbl -> Name | State: every card shows its state. No lbl: no words. Name: each card back to its own choice |
+| L5 | From a browser: `http://fleet-ws-p4-5/settings?card=office_overhead_261008_0310&name=Ceiling+lamp`, swipe away and back | "Ceiling lamp", the row Custom. Then `...&name=` (empty) to put it back |
 
 ## Round 4 - Card label and groups (K46)
 
@@ -98,6 +104,9 @@ are all different. With eight colours, the Fleet page's four test areas share wi
 | G9 | Restart | G2-G8 all still as you left them |
 | G10 | Put Thermo back on "Front (HA)" and Kitchen temperature on "Kitchen" | Thermo's group disappears from the rows (its last card left) |
 | G11 | Put the rest back: `...?group=ha_office&name=` and `&color=` (both empty), `...?card=office_261008_0310b&label_text=` (empty), North -> Garage | Back to G1. `/settings?stats=1` shows what is left, and the last ten changes |
+
+**Skip G2, G3, G4 and G10** (2026-10-09, K48): the Card label row is greyed until after 2.10d.
+G8 is done from a browser now: `...settings?card=garage_north_261008_0310&group=none`, and back with `&group=`.
 
 G5-G7 rename and recolour Office only to show it works; G11 undoes them. Skip them if you would
 rather not touch the names.

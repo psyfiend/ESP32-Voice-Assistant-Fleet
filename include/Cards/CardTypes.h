@@ -343,6 +343,8 @@ inline bool cardLabelFromName(const char *n, CardLabel &out) {
     if (!strcmp(n, "state"))  { out = CardLabel::LBL_STATE; return true; }
     if (!strcmp(n, "none"))   { out = CardLabel::LBL_NONE;  return true; }
     if (!strcmp(n, "ha"))     { out = CardLabel::LBL_HA;    return true; }
+    // Saved since K49: a named card's default is Custom, so Inherit is a choice.
+    if (!strcmp(n, "inherit")) { out = CardLabel::LBL_INHERIT; return true; }
     return false;
 }
 

@@ -3285,16 +3285,10 @@ void rowLive(lv_obj_t *dd, bool live) {
 
 uint8_t deckSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
-    // Label (2.10d, K40): what the CARD chose, from the settings file - not
-    // the mode it resolved to, so a card that inherits says Inherit.
-    uint16_t lblSel = 0;
+    // Label (2.10d, K40, K49): what the CARD chose - saved, else its default
+    // (Custom when the dashboard names it) - never what the knob makes of it.
     Card *held = cardOf(h.surface);
-    if (held && held->hasId()) {
-        char v[16];
-        CardLabel lm;
-        if (Settings::card(held->id(), "label", v, sizeof(v)) && cardLabelFromName(v, lm))
-            lblSel = labelRowIndex(lm);
-    }
+    const uint16_t lblSel = held ? labelRowIndex(held->labelMode()) : 0;
     r[n++] = { "Paused", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)aggregate().paused, true,
                pauseCheckCb, &s.swPause };
     // When a group defined here counts as on - HA's group helper option.
@@ -3505,12 +3499,12 @@ void cardLabelDropCb(lv_event_t *ev) {
     c->restyle();
 }
 
-// Label: on the held card at once, kept under its id. Inherit removes the
-// saved choice, and the card goes back to the page's.
+// Label: on the held card at once, kept under its id - Inherit too, since K49
+// (a card the dashboard names is Custom unless told otherwise).
 void labelDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     const CardLabel l = LABEL_ROW[k < 5 ? k : 0];
-    keepCardSetting("label", l == CardLabel::LBL_INHERIT ? nullptr : cardLabelName(l));
+    keepCardSetting("label", cardLabelName(l));
     if (Card *c = cardOf(h.surface)) { c->setLabelMode(l); c->restyle(); }
 }
 

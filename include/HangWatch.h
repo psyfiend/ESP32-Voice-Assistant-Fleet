@@ -18,9 +18,14 @@
 // to be turned into function names with addr2line against that build's
 // firmware.elf. One report per freeze; the board is left frozen, as found.
 //
+#include <stddef.h>
+
 class HttpServer;
 
 namespace HangWatch {
 void begin(HttpServer &http);   // from loopTask (SystemCore::begin())
 void beat();                    // every loop()
+// Something else to write into the report at a hang (the flush's PPA record).
+// Called from the watcher task: it must not wait on anything.
+void setExtra(int (*fn)(char *out, size_t cap));
 }

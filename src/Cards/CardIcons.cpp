@@ -188,9 +188,15 @@ static CardLabel s_labelMode = CardLabel::LBL_NAME;
 void      cardSetLabelMode(CardLabel m) { s_labelMode = m; }
 CardLabel cardLabelMode()               { return s_labelMode; }
 
+// THE KNOB IS A TEST TOOL (owner, 2026-10-09, K49), not the page- or
+// device-wide setting it will one day be: State or None shows the whole page
+// that way, whatever each card chose; Name shows each card's own choice -
+// Custom its custom name, HA name HA's. A card left on Inherit has no name of
+// its own, so its name is HA's (Card::shownName() falls back to the card's
+// for anything not from HA).
 CardLabel cardResolveLabel(CardLabel want) {
-    if (want == CardLabel::LBL_INHERIT) want = s_labelMode;
-    if (want == CardLabel::LBL_INHERIT) want = CardLabel::LBL_NAME;
+    if (s_labelMode == CardLabel::LBL_STATE || s_labelMode == CardLabel::LBL_NONE) return s_labelMode;
+    if (want == CardLabel::LBL_INHERIT) want = CardLabel::LBL_HA;
     return want;
 }
 

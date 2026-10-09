@@ -19,7 +19,8 @@ constexpr uint8_t  STACK_MAX  = 48;      // code addresses kept from the stack
 TaskHandle_t          s_loop = nullptr;
 std::atomic<uint32_t> s_beat{0};
 std::atomic<bool>     s_test{false};
-char                  s_report[1600] = "no hang seen since boot\n";
+char                  s_report[4096] = "no hang seen since boot\n";
+int                 (*s_extra)(char *, size_t) = nullptr;
 
 // Flash-mapped code (and read-only data, which shares the range on the P4:
 // addr2line answers "??" for those). Return addresses are 2-byte aligned.
@@ -80,6 +81,7 @@ void watchTask(void *) {
             vTaskDelay(pdMS_TO_TICKS(150));
         }
         n += snprintf(out + n, sizeof(out) - n, "decode: addr2line -pfiaC -e firmware.elf <addresses>\n");
+        if (s_extra && n < (int)sizeof(out) - 1) n += s_extra(out + n, sizeof(out) - n);
         memcpy(s_report, out, sizeof(s_report));
         Serial.print(s_report);
     }
@@ -106,6 +108,8 @@ void begin(HttpServer &http) {
     http.addRoute("/hang", HTTP_GET, handleHang);
     Serial.println("[Hang] watching loop() - a stall of 3 s is reported at /hang");
 }
+
+void setExtra(int (*fn)(char *, size_t)) { s_extra = fn; }
 
 void beat() {
     s_beat.store(millis() | 1u);
