@@ -4,6 +4,7 @@
 #include "Cards/CardPopup.h"
 #include "UI/UITokens.h"
 #include "UI/UIToolkit.h"   // the scene toast (2.10d; NINA's toasts after 2.10d)
+#include "Cards/CardGroups.h"   // the card label's colour, following the HA area (K44)
 #include <Arduino.h>
 #include <string.h>
 
@@ -64,6 +65,8 @@ static void copyBounded(char *dst, size_t cap, const char *src) {
 
 Card &Card::setLabel(const char *l) { copyBounded(_label, sizeof(_label), l); return *this; }
 Card &Card::setArea (const char *a) { copyBounded(_area,  sizeof(_area),  a); return *this; }
+Card &Card::setSheetArea(const char *a) { copyBounded(_sheetArea, sizeof(_sheetArea), a ? a : ""); return *this; }
+const char *Card::haArea() const { const Entity *p = primary(); return p ? p->sourceArea : ""; }
 
 Card &Card::setPaused(bool p) {
     // THE FLAG LIVES ON THE ENTITY, NOT HERE. Issue #60.
@@ -1105,7 +1108,8 @@ void Card::applyState() {
         return;
     }
 
-    const bool wantArea = _showArea && _area[0];
+    // A card label in its own colour shows even with no words (K44).
+    const bool wantArea = _showArea && (_area[0] || _labelAlways);
     lv_label_set_text(_lblArea, wantArea ? _area : "");
     lv_label_set_text(_badge,   mark);
 
@@ -1394,6 +1398,20 @@ void Card::onSnapshot(const Entity &snap) {
     // A revert arrives here as a dirty snapshot, but a confirmation does not
     // arrive at all - so resolution deliberately does NOT live in this method.
     // It is polled, from pollState(). See the command masks in the header.
+
+    // Following the HA area (K44): it is learnt after the page is built, once
+    // per session, and HA may move the entity.
+    if (_followHaArea) {
+        const Entity *p = primary();
+        if (p && strncmp(p->sourceArea, _area, sizeof(_area) - 1) != 0) {
+            setArea(p->sourceArea);
+            // By the page's setting, not by whether it had a colour: before HA
+            // said, it had no words and so no colour (found on WS_P4_5: the
+            // card label stayed in the accent).
+            setAreaColor(_pageAreaColor ? CardGroups::colorFor(CardGroups::HA_PREFIX, p->sourceArea) : 0);
+            applyState();
+        }
+    }
     render();
 }
 

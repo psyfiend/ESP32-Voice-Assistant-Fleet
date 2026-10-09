@@ -427,6 +427,12 @@ struct Entity {
     // Label "From HA"). Empty until the source has said. Written by
     // setSourceName() only.
     char        sourceName[ENTITY_NAME_MAX] = {0};
+
+    // The source's AREA for it (HA's area_name(): the entity's own area, else
+    // its device's), for a card label set to "HA area" (2.10d, K44). Empty
+    // until learnt - once per session, with the scenes - or when HA has none.
+    // Written by setSourceArea() only.
+    char        sourceArea[ENTITY_NAME_MAX] = {0};
 };
 
 #endif // ENTITY_H

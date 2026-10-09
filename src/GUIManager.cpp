@@ -14,6 +14,7 @@
 #include "Dashboards/Dashboard_HA.h"   // both pages on every board since 2.6
 #include "bsp_loader.h"
 #include "Settings.h"   // 2.10d: the claims on saved settings, and [SETTINGS]
+#include "Cards/CardGroups.h"
 #include <string.h>
 #ifdef DEBUG_PAGE_TIMING
 #include <esp_timer.h>   // rebuildDashboard()'s two halves
@@ -1339,6 +1340,7 @@ void GUIManager::initPages() {
     // Before any page is built: CardPage gives a card its id only if this
     // found it usable (PageSpec.h, 2.10d).
     checkCardIds(order, DASH_PAGE_N);
+    CardGroups::setPages(order, DASH_PAGE_N);   // the dashboard's areas are groups (K44)
     _nPages = 0;
     for (uint8_t pi = 0; pi < DASH_PAGE_N; pi++) {
         const PageSpec *s = order[pi];

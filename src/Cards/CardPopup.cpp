@@ -5,6 +5,7 @@
 #include "UI/UITokens.h"
 #include "UI/UIToolkit.h"
 #include "Settings.h"   // 2.10d: SETTINGS' rows are kept by card id
+#include "Cards/CardGroups.h"   // the Card label row (K44)
 #include "src/core/lv_obj_event_private.h"   // lv_hit_test_info_t: the tap catcher's hit test
 #include "src/core/lv_obj_draw_private.h"    // lv_obj_get_ext_draw_size: the window's shadow
 #include <Arduino.h>
@@ -3199,6 +3200,14 @@ uint16_t labelRowIndex(CardLabel l) {
     return 0;
 }
 
+// SETTINGS' Card label row (2.10d, K44, K45): HA area / the dashboard's areas
+// and the owner's groups / Custom / None (CardGroups.h). Built with the rows;
+// the map says what each line is.
+void cardLabelDropCb(lv_event_t *ev);
+CardGroups::Choice s_clMap[24];
+uint8_t s_clN = 0;
+char    s_clOpts[24 * 44];
+
 // SETTINGS' Tap action row (2.10d, K37, K39): only what the held card can do -
 // Toggle where its tap toggles, Members where it has members, the two scene
 // actions where its light offers scenes. Rebuilt with the rows; the map says
@@ -3298,6 +3307,13 @@ uint8_t deckSpecs(DeckRowSpec *r) {
                lblSel, held && held->hasId() && !inMember(), labelDropCb, nullptr };
     // The custom name itself is set from a PC for now (GET /settings?card=..
     // &name=..); the web UI does it properly later (K37).
+    // Card label: the card's group, or its own words, or none (K44).
+    if (held) {
+        uint16_t clSel = 0;
+        s_clN = CardGroups::rowChoices(*held, s_clMap, 24, s_clOpts, sizeof(s_clOpts), clSel);
+        r[n++] = { "Card label", DeckRowKind::ROW_DROP, s_clOpts, clSel,
+                   held->hasId() && !inMember(), cardLabelDropCb, nullptr };
+    }
     r[n++] = { "Visibility", DeckRowKind::ROW_DROP,
                "Show on dashboard\nShow only in group\nShow only as member\nHidden", 0, false, nullptr, nullptr };
     // Tap action (2.10d). Long press always opens the window (K39), whatever
@@ -3467,6 +3483,16 @@ void tapSceneDropCb(lv_event_t *ev) {
     if (!c || k >= s_tapSceneN) return;
     c->setTapScene(s_tapSceneRefs[k]);   // the scene on that line when the row was made
     keepCardSetting("tap_scene", s_tapSceneRefs[k]);
+}
+
+// Card label: kept and applied to the held card at once (CardGroups::choose()).
+// The window's title keeps the words it opened with until it is reopened.
+void cardLabelDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    Card *c = cardOf(h.surface);
+    if (!c || k >= s_clN) return;
+    CardGroups::choose(*c, s_clMap[k], c->pageAreaColor());
+    c->restyle();
 }
 
 // Label: on the held card at once, kept under its id. Inherit removes the

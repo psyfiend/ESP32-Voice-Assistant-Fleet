@@ -5,6 +5,7 @@
 #include "UI/UITokens.h"
 #include "SystemReport.h"
 #include "Settings.h"
+#include "Cards/CardGroups.h"
 #include <Arduino.h>
 #ifdef DEBUG_PAGE_TIMING
 #include <esp_timer.h>   // where a page rebuild's time goes - see commit()
@@ -543,12 +544,12 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
 
         if (cardIdUsable(cs.id)) c->setId(cs.id);
         if (cs.label) c->setLabel(cs.label);
-        if (cs.area) {
-            c->setArea(cs.area);
-            // Derived from the NAME, so two cards in one area always agree and
-            // the colour survives a reboot. See cardAreaColor().
-            if (spec.areaColor) c->setAreaColor(cardAreaColor(cs.area));
-        }
+        // THE CARD LABEL (2.10d, K44): the dashboard's area is the card's
+        // group unless the owner chose another - CardGroups applies it, with
+        // the group's colour (its colour-by-name unless one was saved, so two
+        // cards in one area always agree and the colour survives a reboot).
+        c->setSheetArea(cs.area);
+        CardGroups::apply(*c, spec.areaColor);
         c->setHeaderStyle(cs.header == CARD_HDR_INHERIT
                           ? spec.headerDefault
                           : (CardHeaderStyle)cs.header);

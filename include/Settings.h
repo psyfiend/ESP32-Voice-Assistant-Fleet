@@ -63,6 +63,18 @@ bool entityFlag(const char *entityId, const char *key, bool dflt);
 // Every entity whose `key` is true, for a restore at boot. Calls fn(id, ctx).
 void forEachEntityFlag(const char *key, void (*fn)(const char *entityId, void *ctx), void *ctx);
 
+// GROUPS for card labels (K44): "groups": {"<group id>": {"name": "...",
+// "color": "RRGGBB"}}. A custom group has a name; any group may have a colour
+// that overrides its colour-by-name. Ids: "sheet_<name>" for the dashboard's
+// own areas, "ha_<name>" for HA areas, "<name>_<yymmdd>_<hhmm>" for custom
+// groups (as card ids, K33). forEachGroup() gives each group that has a name.
+bool group(const char *groupId, const char *key, char *out, size_t cap);
+bool setGroup(const char *groupId, const char *key, const char *value);
+void forEachGroup(void (*fn)(const char *id, const char *name, void *ctx), void *ctx);
+// A new custom group named `name`; its id into `id`. False if the store is full
+// or the name is empty.
+bool newGroup(const char *name, char *id, size_t cap);
+
 // Writing, in RAM. nullptr = Reset (removes the key, and the card's or
 // scheme's object once empty). True when the document changed.
 bool setCard(const char *cardId, const char *key, const char *value);

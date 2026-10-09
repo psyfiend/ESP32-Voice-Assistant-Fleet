@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <new>         // placement new into PSRAM
 #include <dirent.h>
 #include <sys/stat.h>
@@ -275,6 +276,48 @@ esp_err_t handleSettings(httpd_req_t *req) {
     // A card's custom name, from a PC (K37, until the web UI): name= sets it,
     // an empty name= removes it (the Reset). Kept and written like any other
     // change; the card shows it the next time its page is built.
+    // Groups (K44), from a PC until the web UI: group=new&name=Temperature
+    // makes a custom group and answers its id; group=<id>&color=RRGGBB sets a
+    // group's colour (empty: back to its colour-by-name). Cards already built
+    // show it when their page is next built.
+    {
+        char gid[48], val[48];
+        if (haveQ && httpd_query_key_value(q, "card", gid, sizeof(gid)) != ESP_OK &&
+            httpd_query_key_value(q, "group", gid, sizeof(gid)) == ESP_OK) {
+            char out[160];
+            int len;
+            if (!strcmp(gid, "new") && httpd_query_key_value(q, "name", val, sizeof(val)) == ESP_OK) {
+                urlDecode(val);
+                char id[48];
+                if (strlen(val) >= 40 || !printableAscii(val) || !Settings::newGroup(val, id, sizeof(id)))
+                    len = snprintf(out, sizeof(out), "refused: a group name is 1-39 characters of plain ASCII\n");
+                else {
+                    Settings::save();
+                    len = snprintf(out, sizeof(out), "new group \"%s\": %s\n", val, id);
+                }
+            } else if (httpd_query_key_value(q, "color", val, sizeof(val)) == ESP_OK) {
+                bool hex = strlen(val) == 6;
+                for (const char *p = val; *p && hex; p++) hex = isxdigit((unsigned char)*p);
+                if (val[0] && !hex) len = snprintf(out, sizeof(out), "refused: color is RRGGBB, or empty\n");
+                else {
+                    Settings::setGroup(gid, "color", val[0] ? val : nullptr);
+                    Settings::save();
+                    len = snprintf(out, sizeof(out), "group %s: color %s\n", gid, val[0] ? val : "by name");
+                }
+            } else if (httpd_query_key_value(q, "delete", val, sizeof(val)) == ESP_OK && atoi(val)) {
+                // A card still pointing at it shows its dashboard area again
+                // (CardGroups::apply()) until the owner chooses.
+                const bool gone = Settings::setGroup(gid, "name", nullptr) | Settings::setGroup(gid, "color", nullptr);
+                Settings::save();
+                len = snprintf(out, sizeof(out), "group %s: %s\n", gid, gone ? "deleted" : "not found");
+            } else {
+                len = snprintf(out, sizeof(out), "group=new&name=..., group=<id>&color=RRGGBB, group=<id>&delete=1\n");
+            }
+            httpd_resp_set_type(req, "text/plain");
+            return httpd_resp_send(req, out, len);
+        }
+    }
+
     // Clear what nobody claims (K35): prune=cards or prune=entities.
     char what[12];
     if (haveQ && httpd_query_key_value(q, "prune", what, sizeof(what)) == ESP_OK) {
@@ -291,7 +334,9 @@ esp_err_t handleSettings(httpd_req_t *req) {
     // tests from a PC: label=, tap=, tap_scene= (the scene's HA id). The
     // value is not checked against the choices here; a name the firmware
     // does not know reads as "not set". An empty value removes the key.
-    static const char *const KEYS[] = { "label", "tap", "tap_scene" };
+    // group= (ha_area / own / none / a group id) and label_text= (the card
+    // label's own text, with group=own) are the card label's (K44).
+    static const char *const KEYS[] = { "label", "tap", "tap_scene", "group", "label_text" };
     for (const char *key : KEYS) {
         if (!haveQ || httpd_query_key_value(q, "card", id, sizeof(id)) != ESP_OK ||
             httpd_query_key_value(q, key, name, sizeof(name)) != ESP_OK) continue;
@@ -408,6 +453,79 @@ bool scheme(const char *schemeName, const char *key, char *out, size_t cap) {
     Lock l;
     copyOut((*s_doc)["schemes"][schemeName][key], out, cap, found);
     return found;
+}
+
+bool group(const char *groupId, const char *key, char *out, size_t cap) {
+    bool found = false;
+    if (cap) out[0] = '\0';
+    if (!s_doc || !groupId || !*groupId) return false;
+    Lock l;
+    copyOut((*s_doc)["groups"][groupId][key], out, cap, found);
+    return found;
+}
+
+bool setGroup(const char *groupId, const char *key, const char *value) {
+    if (!s_doc) return false;
+    Lock l;
+    const bool changed = setValue("groups", groupId, key, value, false, false, value == nullptr);
+    if (changed) s_dirty = true;
+    return changed;
+}
+
+void forEachGroup(void (*fn)(const char *, const char *, void *), void *ctx) {
+    if (!s_doc || !fn) return;
+    constexpr uint8_t MAXN = 24;
+    struct G { char id[48]; char name[40]; };
+    G *g = (G *)heap_caps_malloc(MAXN * sizeof(G), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!g) return;
+    uint8_t n = 0;
+    {
+        Lock l;
+        JsonObjectConst groups = (*s_doc)["groups"];
+        for (JsonPairConst kv : groups) {
+            if (n >= MAXN) break;
+            const char *name = kv.value()["name"] | "";
+            if (!name[0]) continue;
+            snprintf(g[n].id, sizeof(g[n].id), "%s", kv.key().c_str());
+            snprintf(g[n].name, sizeof(g[n].name), "%s", name);
+            n++;
+        }
+    }
+    for (uint8_t i = 0; i < n; i++) fn(g[i].id, g[i].name, ctx);
+    heap_caps_free(g);
+}
+
+bool newGroup(const char *name, char *id, size_t cap) {
+    if (!s_doc || !name || !*name || !cap) return false;
+    // <name>_<yymmdd>_<hhmm>, as card ids (K33); a letter when taken.
+    char slug[24];
+    size_t k = 0;
+    for (const char *p = name; *p && k < sizeof(slug) - 1; p++) {
+        const char ch = (char)tolower((unsigned char)*p);
+        if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) slug[k++] = ch;
+        else if (k && slug[k - 1] != '_') slug[k++] = '_';
+    }
+    while (k && slug[k - 1] == '_') k--;
+    slug[k] = '\0';
+    if (!k) snprintf(slug, sizeof(slug), "group");
+    char stamp[16] = "000000_0000";
+    time_t now = time(nullptr);
+    struct tm tmv;
+    if (now > 1700000000 && localtime_r(&now, &tmv))
+        strftime(stamp, sizeof(stamp), "%y%m%d_%H%M", &tmv);
+    Lock l;
+    JsonObject groups = objectAt(s_doc->as<JsonObject>(), "groups");
+    for (char suffix = 0; suffix <= 'z'; suffix = suffix ? (char)(suffix + 1) : 'b') {
+        if (suffix) snprintf(id, cap, "%s_%s%c", slug, stamp, suffix);
+        else        snprintf(id, cap, "%s_%s", slug, stamp);
+        if (!groups[id].is<JsonObject>()) {
+            JsonObject g = groups[id].to<JsonObject>();
+            g["name"] = name;
+            s_dirty = true;
+            return true;
+        }
+    }
+    return false;
 }
 
 bool entityFlag(const char *entityId, const char *key, bool dflt) {

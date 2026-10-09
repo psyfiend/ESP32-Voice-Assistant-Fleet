@@ -204,6 +204,24 @@ public:
     // accent". Independent of setShowArea(): the owner wants colour coding
     // available whether or not the area's NAME is displayed.
     Card &setAreaColor(uint32_t hex) { _areaColor = hex; return *this; }
+    const char *area() const { return _area; }
+
+    // THE CARD LABEL (2.10d, K44; "area" in the code's older words). The
+    // dashboard's area for this card - its group when the owner chose none -
+    // is kept so the window can offer it. Following the HA area, the text and
+    // colour change when HA's area for the primary arrives or changes
+    // (onSnapshot()). A card label in its own colour shows even with no text.
+    Card &setSheetArea(const char *a);
+    const char *sheetArea() const { return _sheetArea; }
+    Card &setFollowHaArea(bool on) { _followHaArea = on; return *this; }
+    bool followHaArea() const { return _followHaArea; }
+    Card &setLabelAlways(bool on) { _labelAlways = on; return *this; }
+    // Its primary entity's HA area ("" until learnt, or when HA has none).
+    const char *haArea() const;
+    // The page's "colour the card label" setting, as it was applied, so the
+    // window can re-apply a choice the same way.
+    Card &setPageAreaColor(bool on) { _pageAreaColor = on; return *this; }
+    bool pageAreaColor() const { return _pageAreaColor; }
 
     // The page-wide default, so a build sheet can set this once rather than on
     // every card. Same pattern as StateCard::setFill().
@@ -557,6 +575,10 @@ private:
     char        _tapScene[ENTITY_TOPIC_MAX] = {0};   // as EntityDescriptor::externalRef
     char _area[ENTITY_SHORT_MAX] = {0};
     uint32_t _areaColor = 0;   // 0 = use the accent
+    char _sheetArea[ENTITY_SHORT_MAX] = {0};   // the dashboard's (CardSpec::area)
+    bool _followHaArea = false;
+    bool _labelAlways  = false;
+    bool _pageAreaColor = true;
 
     // Refusal detection lives on the ENTITY now, not here - see
     // Entity::cmdFailed and deriveState(). A card asks the entities it is
