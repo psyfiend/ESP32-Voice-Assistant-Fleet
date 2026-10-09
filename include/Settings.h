@@ -69,6 +69,18 @@ bool setCard(const char *cardId, const char *key, const char *value);
 bool setScheme(const char *schemeName, const char *key, const char *value);
 bool setEntityFlag(const char *entityId, const char *key, bool value, bool dflt);
 
+// SAVED SETTINGS NOBODY CLAIMS (K35). A card's entry whose id is on no page,
+// an entity's whose id is not in the table. Never removed on their own: listed
+// (forEachUnclaimed(), the System Doctor's [SETTINGS]) and cleared only when
+// asked - GET /settings?prune=cards, or prune=entities (a group's member is
+// only learnt once HA reports the group, so right after boot a paused member
+// can look missing). The claims come from whoever knows the cards and the
+// entities - GUIManager - as two predicates; until set, everything is claimed.
+using ClaimFn = bool (*)(const char *id);
+void setClaims(ClaimFn card, ClaimFn entity);
+void forEachUnclaimed(void (*fn)(const char *section, const char *id, void *ctx), void *ctx);
+uint8_t prune(const char *section);   // "cards" or "entities"; asks for a save
+
 // One-time imports, so each happens once per file: "imported": {"<name>": true}.
 bool imported(const char *name);
 void markImported(const char *name);

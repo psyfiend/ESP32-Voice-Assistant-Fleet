@@ -13,6 +13,8 @@
 #include "Dashboards/Dashboard_Fleet.h"
 #include "Dashboards/Dashboard_HA.h"   // both pages on every board since 2.6
 #include "bsp_loader.h"
+#include "Settings.h"   // 2.10d: the claims on saved settings, and [SETTINGS]
+#include <string.h>
 #ifdef DEBUG_PAGE_TIMING
 #include <esp_timer.h>   // rebuildDashboard()'s two halves
 #endif
@@ -23,6 +25,44 @@
 // construction; if that ever stops being true these become member callbacks
 // with user_data, which LVGL does support for lv_event_cb.
 static GUIManager *s_self = nullptr;
+
+// THE DASHBOARD'S PAGES, in swipe order - initPages() builds from it, and the
+// settings file's claims (K35) ask it which card ids exist.
+static const PageSpec *const DASH_PAGES[] = { &HA_PAGE, &FLEET_PAGE };
+static constexpr uint8_t DASH_PAGE_N = sizeof(DASH_PAGES) / sizeof(DASH_PAGES[0]);
+
+// Saved settings nobody claims (2.10d, K35). A card's entry is claimed when
+// its id is on a page - on ANY page, so a card this board skips (its entity not
+// here) or drops for room still claims its settings. An entity's is claimed
+// when the registry has it.
+static EntityRegistry *s_claimReg = nullptr;
+
+static bool claimCard(const char *id) {
+    for (uint8_t p = 0; p < DASH_PAGE_N; p++)
+        for (uint8_t i = 0; i < DASH_PAGES[p]->count; i++) {
+            const char *cid = DASH_PAGES[p]->cards[i].id;
+            if (cid && !strcmp(cid, id)) return true;
+        }
+    return false;
+}
+
+static bool claimEntity(const char *id) { return s_claimReg && s_claimReg->find(id); }
+
+static void reportSettingsSection() {
+    const Settings::Stats st = Settings::stats();
+    SystemReport::line("  File: %s, %lu bytes; %lu saves this boot, %lu failed%s",
+                       Settings::persistent() ? "/cfg/settings.json" : "NOT SAVING (RAM only or read-only)",
+                       (unsigned long)st.bytes, (unsigned long)st.saves, (unsigned long)st.failures,
+                       st.pending ? ", a change pending" : "");
+    uint8_t n = 0;
+    Settings::forEachUnclaimed([](const char *sec, const char *id, void *c) {
+        (*(uint8_t *)c)++;
+        SystemReport::line("  Unclaimed %s: %s", sec, id);
+    }, &n);
+    if (!n) SystemReport::line("  Nothing unclaimed");
+    else    SystemReport::line("  Clear with /settings?prune=cards or prune=entities (a paused member may only "
+                               "look missing until HA reports its group)");
+}
 
 // Per the repo's debug-flag convention (CLAUDE.md): a diagnostic worth keeping
 // rather than deleting, off unless an environment asks for it. Gesture work is
@@ -830,6 +870,12 @@ void GUIManager::begin() {
     // Contribute the one LVGL-dependent section of the report.
     SystemReport::addSection("UI STATE", reportUiSection);
 
+    // Saved settings nobody claims (2.10d, K35): Settings knows the file, this
+    // knows the cards and the entities, so the claims come from here.
+    s_claimReg = &_core.entities();
+    Settings::setClaims(claimCard, claimEntity);
+    SystemReport::addSection("SETTINGS", reportSettingsSection);
+
     // GET /screenshot (#58), when built with ENABLE_SCREENSHOT. Registered from
     // here because the capture needs LVGL and SystemCore must not; the server
     // itself belongs to SystemCore.
@@ -1281,12 +1327,13 @@ void GUIManager::nudgeRows(int8_t steps) {
 // NO OVERFLOW between them, also the owner's call: each page shows what fits
 // and drops the rest by priority, as it did alone. A card never moves pages.
 void GUIManager::initPages() {
-    const PageSpec *order[] = { &HA_PAGE, &FLEET_PAGE };
+    const PageSpec *const *order = DASH_PAGES;
     // Before any page is built: CardPage gives a card its id only if this
     // found it usable (PageSpec.h, 2.10d).
-    checkCardIds(order, (uint8_t)(sizeof(order) / sizeof(order[0])));
+    checkCardIds(order, DASH_PAGE_N);
     _nPages = 0;
-    for (const PageSpec *s : order) {
+    for (uint8_t pi = 0; pi < DASH_PAGE_N; pi++) {
+        const PageSpec *s = order[pi];
         if (_nPages >= GUI_MAX_PAGES) break;
         // Every page starts from the SAME defaults the dashboard always had -
         // the board's grid, compact, bar headers - so the first swipe changes

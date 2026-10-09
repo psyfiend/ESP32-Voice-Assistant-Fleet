@@ -275,6 +275,17 @@ esp_err_t handleSettings(httpd_req_t *req) {
     // A card's custom name, from a PC (K37, until the web UI): name= sets it,
     // an empty name= removes it (the Reset). Kept and written like any other
     // change; the card shows it the next time its page is built.
+    // Clear what nobody claims (K35): prune=cards or prune=entities.
+    char what[12];
+    if (haveQ && httpd_query_key_value(q, "prune", what, sizeof(what)) == ESP_OK) {
+        const uint8_t n = Settings::prune(what);
+        char out[96];
+        const int len = snprintf(out, sizeof(out), "pruned %u unclaimed %s\n", (unsigned)n,
+                                 strcmp(what, "entities") ? "card(s)" : "entit(ies)");
+        httpd_resp_set_type(req, "text/plain");
+        return httpd_resp_send(req, out, len);
+    }
+
     char id[CARD_ID_ARG], name[64];
     // The other card settings too, as SETTINGS' rows would set them - for
     // tests from a PC: label=, tap=, tap_scene= (the scene's HA id). The
@@ -323,6 +334,12 @@ esp_err_t handleSettings(httpd_req_t *req) {
         // The listing was taken by the settings task (listFiles()): reading the
         // flash from this task, whose stack is in PSRAM, reboots the board.
         { Lock l; n += snprintf(out + n, sizeof(out) - n, "boot: %s\nfiles in %s:\n%s", s_bootNote, BASE, s_listing); }
+        struct Acc { char *out; int n; int cap; } acc{ out, n, (int)sizeof(out) };
+        Settings::forEachUnclaimed([](const char *sec, const char *id, void *c) {
+            Acc &a = *(Acc *)c;
+            if (a.n < a.cap - 64) a.n += snprintf(a.out + a.n, a.cap - a.n, "unclaimed %s: %s\n", sec, id);
+        }, &acc);
+        n = acc.n;
         httpd_resp_set_type(req, "text/plain");
         return httpd_resp_send(req, out, n);
     }
@@ -441,6 +458,70 @@ bool setEntityFlag(const char *entityId, const char *key, bool value, bool dflt)
     const bool changed = setValue("entities", entityId, key, nullptr, true, value, value == dflt);
     if (changed) s_dirty = true;
     return changed;
+}
+
+// --- Unclaimed entries (K35) -------------------------------------------------
+namespace {
+ClaimFn s_claimCard = nullptr, s_claimEntity = nullptr;
+
+// The ids under a section that its claim does not know, copied out under the
+// lock so the claim (which may take the registry's lock) runs without ours.
+uint8_t unclaimedIn(const char *section, ClaimFn claim, char (*out)[48], uint8_t cap) {
+    if (!s_doc || !claim) return 0;
+    // In PSRAM: 3 KB is a lot for the HTTP task's 8 KB stack.
+    constexpr uint8_t MAXN = 64;
+    char (*ids)[48] = (char (*)[48])heap_caps_malloc(MAXN * 48, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!ids) return 0;
+    uint8_t n = 0, k = 0;
+    {
+        Lock l;
+        JsonObjectConst sec = (*s_doc)[section];
+        for (JsonPairConst kv : sec) {
+            if (n >= MAXN) break;
+            snprintf(ids[n++], 48, "%s", kv.key().c_str());
+        }
+    }
+    for (uint8_t i = 0; i < n && k < cap; i++)
+        if (!claim(ids[i])) snprintf(out[k++], 48, "%s", ids[i]);
+    heap_caps_free(ids);
+    return k;
+}
+}  // namespace
+
+void setClaims(ClaimFn card, ClaimFn entity) {
+    s_claimCard   = card;
+    s_claimEntity = entity;
+}
+
+void forEachUnclaimed(void (*fn)(const char *, const char *, void *), void *ctx) {
+    if (!fn) return;
+    char ids[32][48];
+    uint8_t n = unclaimedIn("cards", s_claimCard, ids, 32);
+    for (uint8_t i = 0; i < n; i++) fn("cards", ids[i], ctx);
+    n = unclaimedIn("entities", s_claimEntity, ids, 32);
+    for (uint8_t i = 0; i < n; i++) fn("entities", ids[i], ctx);
+}
+
+uint8_t prune(const char *section) {
+    const bool cards = section && !strcmp(section, "cards");
+    if (!cards && !(section && !strcmp(section, "entities"))) return 0;
+    char ids[32][48];
+    const uint8_t n = unclaimedIn(section, cards ? s_claimCard : s_claimEntity, ids, 32);
+    if (!n) return 0;
+    {
+        Lock l;
+        JsonObject root = s_doc->as<JsonObject>();
+        JsonVariant secV = root[section];
+        if (secV.is<JsonObject>()) {
+            JsonObject sec = secV.as<JsonObject>();
+            for (uint8_t i = 0; i < n; i++) sec.remove(ids[i]);
+            if (sec.size() == 0) root.remove(section);
+        }
+        s_dirty = true;
+    }
+    for (uint8_t i = 0; i < n; i++) Serial.printf("[Settings] pruned %s.%s\n", section, ids[i]);
+    save();
+    return n;
 }
 
 bool imported(const char *name) {
