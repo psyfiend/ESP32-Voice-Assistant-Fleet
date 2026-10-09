@@ -79,14 +79,18 @@ malloc for LVGL is a trap on this hardware. LVGL 9.6: after 2.10 (#88).
 
 ## 2.10d IN PROGRESS on `feat/65-saving` (from 2026-10-08)
 
-Decided with the owner: `DECISIONS.md` K33-K38. Design, steps built and their measurements:
-**`card-sheet.md` §17**. Card ids, the settings file (`include/Settings.h`, LittleFS, `GET
-/settings`), and Active state, Scenes, Selector and Paused saved - all checked on WS_P4_5 from the PC
-only. **Anything that writes flash runs on a task with an internal-RAM stack** (LESSONS, 2.10d).
-Still open with the owner: Long press as a setting, NINA's toasts now or after, which scenes Cycle
-and Load offer, what Label's "Default" and "From HA" mean, and whether a flash write shows on the
-glass (`/panel?flash=`). The owner's occasional white flash on the P4_5 is unexplained; `/panel`
-lists underruns.
+Decided with the owner: `DECISIONS.md` K33-K45, A14. Design, the nine steps built and their
+measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "Saved settings".
+**The owner's test sheet: `docs/TEST_2.10d.md`** (P4_5, 4B and 1060 all flashed 2026-10-09 with
+`DEBUG_POPUP`, local, and the cache-safe libraries). Everything was checked from the PC with
+`/popup`, `/settings` and screenshots; **nothing has been touched on the glass yet.**
+
+Open, for the owner: whether Desk's Tap action on the P4_5 (Load scene, Bright) was set by hand;
+whether an HA area and a dashboard area of the same name are one group; the random white flash on
+the P4_5 (`/panel` lists underruns; the flash-write blue is fixed, A14, to be confirmed on glass).
+**The S3 RGB boards** (S3_4B, S3_5B, 8048) probably flash on writes too
+(`CONFIG_LCD_RGB_ISR_IRAM_SAFE` off, stock libraries) - untested, none on the desk working.
+After the owner's rounds: the all-nine gate, `--no-ff`, `v0.2.11`, CHANGELOG. K17 after 2.10d.
 
 ## What 2.10d started from (#65)
 

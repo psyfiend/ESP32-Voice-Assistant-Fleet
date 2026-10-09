@@ -1,0 +1,118 @@
+# TEST 2.10d - stable card ids and saved settings (#65)
+
+Branch `feat/65-saving`. Boards: **WS_P4_5** (COM15), **WS_P4_4B** (COM7) and **CYD_P4_1060** (COM9),
+all flashed 2026-10-09 with `-D DEBUG_POPUP` (local only) and the **new cache-safe P4 libraries**.
+Design and what each step measured: `docs/design/card-sheet.md` section 17; decisions:
+`docs/DECISIONS.md` K33-K45, A14.
+
+Mark each line PASS or FAIL, with a note for anything that looks wrong even if it passes.
+**Which lights are safe**: anything in the Office. Lines touching the Kitchen are marked **(Kitchen)**.
+
+**Each board has its own settings file.** What you choose on the P4_5 does not appear on the 4B.
+To see a board's file from a browser: `http://fleet-ws-p4-5/settings` (the 4B: `fleet-ws-p4-4b`,
+the 1060: `fleet-cyd-p4-1060`); `/settings?stats=1` adds how many saves, the files, and anything
+unclaimed. **A choice made from a browser** (the PC addresses below) shows on the card the next time
+its page is built: swipe to the other page and back.
+
+**Before you start, one question:** the P4_5's file already says Desk's Tap action is Load scene,
+with Bright. It was chosen on the glass after I had cleared it on 2026-10-08. Was that you? If not,
+something set it on its own, and that is a bug to chase.
+
+## Round 1 - the flash fix (A14)
+
+Before the new libraries, every flash write made the P4 screens flash light blue (your test on
+2026-10-08). Open each link while watching that board's screen.
+
+| # | Do this | PASS if |
+|---|---|---|
+| F1 | P4_5: `http://fleet-ws-p4-5/panel?flash=20&nvs=1` | No flash. (20 writes like a Pause) |
+| F2 | P4_5: `http://fleet-ws-p4-5/panel?flash=20` | No flash |
+| F3 | P4_5: `http://fleet-ws-p4-5/panel?flash=8&kb=256` | No flash. (The worst case: up to a third of a second each) |
+| F4 | The same three on the 4B (`fleet-ws-p4-4b`) and the 1060 (`fleet-cyd-p4-1060`) | No flash on either |
+| F5 | Through the whole session: the P4_5's **random white flash** | Say if you see one, and open `http://fleet-ws-p4-5/panel` right after: does it list an underrun near that time? |
+
+## Round 2 - things are kept (P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| S1 | Pause **Garage North** (long press, SETTINGS, Paused). Close the window | No flash as it closes. `/settings?stats=1` says one more save |
+| S2 | Swipe to Fleet and back; then restart the board (unplug, or the reset button) | North is still PAUSED after both. Resume it afterwards |
+| S3 | Fleet page: **All Lamps**, SETTINGS, Active state -> All members are on. Close. Swipe away and back | Still "All". (Before 2.10d a swipe forgot it) |
+| S4 | Restart. All Lamps' Active state | Still "All". Put it back to Any |
+| S5 | Open a window, change nothing, close it | `/settings?stats=1`: the save count does not move (nothing changed, nothing written) |
+| S6 | Open SETTINGS, scroll it if it can scroll, close the window | Nothing of the pane shows at the bottom of the screen afterwards (your bug from 2026-10-08) |
+| S7 | System drawer: the new **Sel Own** button, next to the scheme | Each tap: Blk Sq -> Blk Rd -> Slv Sq -> Slv Rd -> Sel Own. Open Desk: the selector has that look |
+| S8 | Choose Slv Rd on this page's scheme. Restart | Still Slv Rd. Back to Sel Own after |
+
+## Round 3 - Entity label (K40, K45)
+
+The words under the hero. The row is now called **Entity label**: Inherit / HA name / State / Custom / None.
+
+| # | Do this | PASS if |
+|---|---|---|
+| L1 | **Overhead (Office)**: Entity label -> HA name | The card reads HA's own name for that light (not "Overhead") |
+| L2 | -> State | "On" or "Off" |
+| L3 | -> None, then -> Inherit | No words; then "Overhead" again |
+| L4 | Restart with Overhead on HA name | Still HA's name |
+| L5 | From a browser: `http://fleet-ws-p4-5/settings?card=office_overhead_261008_0310&name=Ceiling+lamp`, set Entity label to Custom, swipe away and back | "Ceiling lamp". Then `...&name=` (empty) and Inherit to put it back |
+
+## Round 4 - Card label and groups (K44)
+
+The coloured label at the card's top. The row is **Card label**: HA area (with its name) / the
+dashboard's areas / your groups / Custom / None. With nothing chosen, every card looks as it did.
+
+| # | Do this | PASS if |
+|---|---|---|
+| G1 | Look at the House page | Every card label exactly as in v0.2.10 |
+| G2 | **Office temperature**: Card label -> HA area (Office) | It reads "Office" in the Office purple |
+| G3 | **Thermo**: Card label -> Custom | It keeps "Front" in its colour - it has left the Front group |
+| G4 | From a browser: `http://fleet-ws-p4-5/settings?group=sheet_office&color=2E9E4F`, swipe away and back | Desk, Overhead and Office occupancy turn green; the Office temperature card from G2 does **not** (an HA area is its own group - see the question below) |
+| G5 | `http://fleet-ws-p4-5/settings?group=new&name=Temperature` | It answers with the new group's id |
+| G6 | Deck, Front and Kitchen temperatures: Card label -> **Temperature** | All three read "Temperature" in one colour |
+| G7 | `...settings?group=<the id from G5>&color=E06C75`, swipe away and back | All three turn red together |
+| G8 | **Garage South**: Card label -> Custom, then from a browser `...settings?card=garage_south_261008_0310&label_text=` (empty), swipe away and back | A small card label in its own colour, no words |
+| G9 | **Garage North**: Card label -> None | No card label; the card keeps its place and size |
+| G10 | Restart | G2-G9 all still as you left them |
+| G11 | Put it back: each card's Card label to its own area (Garage, Outside, Front, Kitchen, Office), `...?group=sheet_office&color=` (empty) and `...?group=<id>&delete=1` | Back to G1. Anything you missed: `/settings?stats=1` |
+
+**Question for G4:** should an HA area and one of the dashboard's areas with the same name be ONE
+group (one colour), or stay separate as now? Your dashboard's areas were renamed for brevity, so the
+names do not always match HA's.
+
+## Round 5 - Tap action (K37, K39)
+
+A long press always opens the window. The tap does what Tap action says; the list only offers what
+that card can do.
+
+| # | Do this | PASS if |
+|---|---|---|
+| T1 | **Overhead (Office)**: Tap action -> Details view. Close. Tap the card | Its window opens. The first tap inside it works (not swallowed) |
+| T2 | -> History view. Tap | The window opens on History |
+| T3 | -> Nothing. Tap | Nothing happens. Long press still opens the window |
+| T4 | **Desk**: Tap action -> Cycle scenes. Tap the card three times, a second apart | Bright, Concentrate, Relax - each with a toast "Scene: Desk - ..."; only the scenes the window shows |
+| T5 | Restart; tap Desk once | Bright again (the cycle starts from the first after each boot) |
+| T6 | Desk -> Load scene. Go to Scenes; open the **SCENES** panel; Tap scene -> Relax. Tap the card | Relax, with its toast |
+| T7 | **All Lamps** (Fleet): Tap action -> Members view. Tap | The window opens on Members |
+| T8 | Put Desk and Overhead back to Toggle; the Office back as you like it | - |
+
+## Round 6 - the panels (K43, K45)
+
+| # | Do this | PASS if |
+|---|---|---|
+| P1 | Desk's SETTINGS on the P4_5, the 4B and the 1060 | Paused, Entity label, Card label, Visibility (greyed), Tap action - and **no scrolling** on any of them |
+| P2 | Desk -> Scenes | A **SCENES** panel peeks up on the left, as CHART does on History |
+| P3 | Open it: Show hidden scenes, tick it | The four hidden scenes join the buttons. Untick: they go |
+| P4 | Go from Scenes to History | SCENES goes down, CHART comes up |
+| P5 | Restart with Show hidden ticked | Still ticked. Untick it after |
+
+## Round 7 - left-over settings (K35)
+
+| # | Do this | PASS if |
+|---|---|---|
+| U1 | `http://fleet-ws-p4-5/settings?card=old_card_261001_0900&label=ha`, then `/settings?stats=1` | It lists "unclaimed cards: old_card_261001_0900" |
+| U2 | System drawer, Log: the System Doctor's **[SETTINGS]** section | The same entry (not checked by me: the PC cannot open the drawer) |
+| U3 | `/settings?prune=cards` | "pruned 1"; the entry gone, nothing else touched |
+
+## Your results
+
+(Write them under each round, as in `archive/TEST_2.10c.md`.)

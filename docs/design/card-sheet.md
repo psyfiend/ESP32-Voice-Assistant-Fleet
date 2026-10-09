@@ -723,6 +723,10 @@ without seeing a flash.
 | 3b | Paused in the file (`EntityRegistry::PauseStore`), #60's NVS list imported once | Garage North paused, PAUSED after a reset, resumed and the entry gone |
 | 4 | Label: Inherit / From HA / State / Custom / None (K40); `Entity::sourceName`; custom names from a PC (`/settings?card=..&name=..`) | after a reset: Desk "From HA" -> "Office", Overhead "Ceiling lamp", Sink "State" -> "Off" |
 | 5 | Tap action (K37, K39): Toggle / Details / Members / History / Cycle scenes / Load scene / Nothing, only what the card can do; a Tap scene row, greyed unless Load scene; `CardPopup::openOn()`; the toast "Scene: Desk - Bright" | Desk History -> History, Overhead Details -> window, North -> nothing; Cycle x4 = Bright, Concentrate, Relax, Bright (HA's last-activated times), hidden scenes untouched; Load Relax -> Relax |
+| 6 | The SCENES panel (K43): the left panel is CHART on History, SCENES on Scenes - Show hidden scenes, Tap scene; Scenes "Off" dropped. SETTINGS loses both scene rows; a folded pane goes back to its top | screenshots on the P4_5 and the 4B |
+| 7 | Unclaimed settings (K35): `Settings::setClaims()`, `/settings?prune=`, the System Doctor's [SETTINGS] | a made-up card id listed, pruned |
+| 8 | Selector to the system panel; "Entity label" (K45) | SETTINGS: Paused, Entity label, (Card label), Visibility, Tap action - no scrolling on the P4_5, 4B and 1060 (screenshots) |
+| 9 | Groups for card labels (K44): HA areas learnt with the scenes; `CardGroups`; the Card label row; groups from a PC | nothing chosen = as before; a custom group, HA area, Custom with and without words, None; a group recoloured and a detached card not (screenshots) |
 
 Active state and Scenes are read every time a page is built, so they also survive a page swipe -
 before 2.10d a swipe lost them.
@@ -735,4 +739,14 @@ second rebuild"), installed 2026-10-08; the owner's look at the same tests after
 next save replaced it (Desk's Scenes). Not explained; a file that will not read now makes the boot
 read-only instead, and `/settings?stats=1` says what the boot saw.
 
-Next: Area as a card setting (K41), then K17.
+**Groups as built (K44).** A card's saved `group`: nothing (the dashboard's area, `sheet_<name>`),
+`ha_area` (followed as HA reports it), a group id (the dashboard's areas, or custom groups
+`<name>_<stamp>` in the file's `groups`), `own` (`label_text`, may be empty, shown anyway, out of
+every group's colour), or `none`. A group's colour is `groups.<id>.color` or its colour-by-name, so
+an untouched dashboard looks exactly as before. Made from a PC until the web UI:
+`/settings?group=new&name=..`, `group=<id>&color=RRGGBB`, `group=<id>&delete=1`,
+`card=<id>&group=..`, `card=<id>&label_text=..`. Open: whether an HA area and a dashboard area of
+the same name are one group (they are separate today).
+
+The owner's test sheet: `docs/TEST_2.10d.md`. Next, after it: the all-nine gate and the merge. K17
+waits until after 2.10d (K45).
