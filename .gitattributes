@@ -1,0 +1,3 @@
+# Patches are applied in WSL with git apply, which needs them byte for byte:
+# never CRLF, whatever core.autocrlf says on the Windows checkout.
+*.diff eol=lf
