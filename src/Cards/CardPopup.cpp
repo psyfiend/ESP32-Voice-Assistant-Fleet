@@ -3187,11 +3187,11 @@ constexpr uint8_t DECK_ROWS_MAX = 10;   // 8 at most today (a light with scenes:
 
 void pauseCheckCb(lv_event_t *ev);
 void groupDropCb(lv_event_t *ev);
-void lookDropCb(lv_event_t *ev);
 void labelDropCb(lv_event_t *ev);
 
-// SETTINGS' Label row, in the owner's order (K40). Index 0 is Inherit.
-const char *const LABEL_ROW_OPTS = "Inherit\nFrom HA\nState\nCustom\nNone";
+// SETTINGS' Entity label row (the words under the hero), in the owner's order
+// (K40; named K45, "HA name" K44). Index 0 is Inherit.
+const char *const LABEL_ROW_OPTS = "Inherit\nHA name\nState\nCustom\nNone";
 const CardLabel LABEL_ROW[5] = { CardLabel::LBL_INHERIT, CardLabel::LBL_HA, CardLabel::LBL_STATE,
                                  CardLabel::LBL_NAME, CardLabel::LBL_NONE };
 uint16_t labelRowIndex(CardLabel l) {
@@ -3294,7 +3294,7 @@ uint8_t deckSpecs(DeckRowSpec *r) {
         r[n++] = { "Active state", DeckRowKind::ROW_DROP, "Any members are on\nAll members are on",
                    (uint16_t)(s.groupOn == GroupOn::GROUP_ON_ALL), true, groupDropCb, &s.ddGroup };
     // Live since 2.10d; a card without a usable id cannot keep it, so stays grey.
-    r[n++] = { "Label", DeckRowKind::ROW_DROP, LABEL_ROW_OPTS,
+    r[n++] = { "Entity label", DeckRowKind::ROW_DROP, LABEL_ROW_OPTS,
                lblSel, held && held->hasId() && !inMember(), labelDropCb, nullptr };
     // The custom name itself is set from a PC for now (GET /settings?card=..
     // &name=..); the web UI does it properly later (K37).
@@ -3308,12 +3308,8 @@ uint8_t deckSpecs(DeckRowSpec *r) {
         r[n++] = { "Tap action", DeckRowKind::ROW_DROP, s_tapOpts, sel, cardRows, tapDropCb, nullptr };
     }
     // Show hidden scenes and Tap scene are in the SCENES panel, in the Scenes
-    // view (K43); Scenes "Off" was dropped.
-    // The selector's looks, for the scheme showing (K31). In every build since
-    // round 9 (owner: "I'd like to keep that for a bit"); a device-wide
-    // setting in a card's panel until the device's own settings page (4.1).
-    r[n++] = { "Selector", DeckRowKind::ROW_DROP, "Black - Square\nBlack - Round\nSilver - Square\nSilver - Round",
-               deckLook(), true, lookDropCb, nullptr };
+    // view (K43); Scenes "Off" was dropped. The Selector look moved to the
+    // system panel (K45): it is device-wide, per scheme.
     return n;
 }
 
@@ -3480,14 +3476,6 @@ void labelDropCb(lv_event_t *ev) {
     const CardLabel l = LABEL_ROW[k < 5 ? k : 0];
     keepCardSetting("label", l == CardLabel::LBL_INHERIT ? nullptr : cardLabelName(l));
     if (Card *c = cardOf(h.surface)) { c->setLabelMode(l); c->restyle(); }
-}
-
-void lookDropCb(lv_event_t *ev) {
-    const uint16_t k = (uint16_t)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
-    keepLook((int8_t)(k & 3));
-    // The deck is built with the view; the chips' lit look follows at once.
-    if (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER) lv_async_call(rebuildMainAsync, nullptr);
-    else showView(s.view);
 }
 
 // Paused, a checkbox. Through the card when it is the held one (it repaints at
@@ -4217,6 +4205,18 @@ void CardPopup::open(Card &card) {
     holdLook(h.surface, 255);
     h.phase = HoldPhase::HOLD_OWNED;
     showWindow();
+}
+
+void CardPopup::cycleSelectorLook() {
+    const int8_t cur = chosenLook();
+    keepLook(cur < 0 ? 0 : cur >= 3 ? (int8_t)-1 : (int8_t)(cur + 1));
+    Settings::save();   // no window closes to ask for it
+}
+
+const char *CardPopup::selectorLookShort() {
+    static const char *const SHORT[5] = { "Sel Own", "Blk Sq", "Blk Rd", "Slv Sq", "Slv Rd" };
+    const int8_t l = chosenLook();
+    return SHORT[(l < 0 || l > 3) ? 0 : l + 1];
 }
 
 void CardPopup::openOn(Card &card, uint8_t view) {

@@ -777,6 +777,7 @@ void GUIManager::begin() {
     // The scheme button was built reading "Fleet" whatever the board booted
     // into - visible in the owner's photos with Slate on screen. Say the truth.
     _pnlSystem.setSchemeLabel(UI::pal().name);
+    _pnlSystem.setSelectorLabel(CardPopup::selectorLookShort());   // per scheme (K45)
 
     // Every Dump button runs this: the log is emptied first, so the page shows
     // exactly ONE report, whole, top to bottom (owner, 2026-09-30 - there is no
@@ -838,6 +839,12 @@ void GUIManager::begin() {
     _pnlSystem.setLogOnChange([](const char *text) { LogPage::refresh(text); });
     LogPage::setCloseHandler([this]() { rebuildDashboard(); });
     _pnlSystem.setOnSchemeRequested([this]() { cycleScheme(); });
+    // The card window's Selector look, per scheme (2.10d, K45).
+    _pnlSystem.setOnSelectorRequested([this]() {
+        CardPopup::cycleSelectorLook();
+        _pnlSystem.setSelectorLabel(CardPopup::selectorLookShort());
+    });
+    _pnlSystem.setSelectorLabel(CardPopup::selectorLookShort());
 
     // The grid knobs. The panel knows a button was pressed; what a column is
     // remains entirely this class's business.
@@ -1153,6 +1160,7 @@ void GUIManager::cycleScheme() {
     applyGround();
     _header.restyle();
     _pnlSystem.setSchemeLabel(UI::pal().name);
+    _pnlSystem.setSelectorLabel(CardPopup::selectorLookShort());   // per scheme (K45)
 
     // A rebuild rather than a restyle. Cards would survive restyleAll() - that
     // is what "never cache a colour" buys - but a METRICS change moves radii
@@ -1406,6 +1414,7 @@ void GUIManager::refreshKnobLabels() {
     _pnlSystem.setLabelModeLabel(l == CardLabel::LBL_NAME  ? "Name"
                                : l == CardLabel::LBL_STATE ? "State" : "No lbl");
     _pnlSystem.setSchemeLabel(UI::pal().name);
+    _pnlSystem.setSelectorLabel(CardPopup::selectorLookShort());   // per scheme (K45)
     // The header-mode label is set by buildDashboard(), which every page change
     // goes through.
 }

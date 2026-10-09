@@ -72,6 +72,12 @@ public:
     // the one thing an event callback must not do.
     static void close();
 
+    // The Selector look for the scheme showing (K31; moved to the system
+    // panel, K45): the next one - the scheme's own, then the four looks - kept
+    // in the settings file at once; and a short name for a button.
+    static void cycleSelectorLook();
+    static const char *selectorLookShort();
+
     // True from the long press until the window has gone. GUIManager asks
     // this before acting on a gesture: the popup is modal.
     static bool isOpen();
