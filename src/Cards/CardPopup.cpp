@@ -222,8 +222,8 @@ struct Popup {
     // A light's controls (2.10b): see "The light's controls".
     GroupOn   groupOn = GroupOn::GROUP_ON_ANY;   // copied from the card at open
     SceneShow sceneShow = SceneShow::SCENES_VISIBLE;   // likewise (2.10c)
-    lv_obj_t *ddGroup = nullptr, *ddScenes = nullptr;   // SETTINGS' live dropdowns
-    lv_obj_t *ddTapScene = nullptr;                     // greyed unless Tap action is Load scene
+    lv_obj_t *ddGroup = nullptr;      // SETTINGS' live dropdown
+    lv_obj_t *ddTapScene = nullptr;   // SCENES' Tap scene: greyed unless Tap action is Load scene
     bool      builtPaused = false, rebuildQueued = false;   // "A paused window"
     uint8_t   builtCaps = 0;                     // what the selector was built for
     lv_obj_t *pill = nullptr;                    // PAUSED
@@ -2214,6 +2214,7 @@ void memberRowCb(lv_event_t *ev);   // below, with the member view
 void deckRender();                  // below, with the deck
 void chartSet(uint8_t state);       // below, with the deck: the CHART panel
 void chartFold();                   // open: back to its tab
+void sideFor(PopupView v);          // below: the left panel a view wants (CHART / SCENES)
 
 void buildMembers() {
     const UIPalette &p = UI::pal();
@@ -2360,9 +2361,8 @@ void showView(PopupView v) {
     cornerLook(s.btnMembers, !member && hasMembers(), v == PopupView::VIEW_MEMBERS);
     cornerLook(s.btnScenes, (controls || v == PopupView::VIEW_SCENES) && hasScenes(),
                v == PopupView::VIEW_SCENES);
-    // The CHART panel belongs to the chart: up with it, down when it goes.
-    if (v == PopupView::VIEW_HISTORY)      chartSet(DECK_PEEK);
-    else if (was == PopupView::VIEW_HISTORY) chartSet(DECK_HIDDEN);
+    // The left panel belongs to its view: CHART to History, SCENES to Scenes.
+    sideFor(v);
 
     // Whose view it is: the window's, or (inside one) the member's.
     const char *who = (member && s.ent[0]) ? s.ent[0]->desc.name : s.name;
@@ -3119,9 +3119,15 @@ void deckSet(uint8_t state) {
 // pane is wider and taller than its tab. Its tab stops a millimetre short of
 // SETTINGS' (owner, round 7): two tabs side by side read as two.
 // ---------------------------------------------------------------------------
+// THE LEFT PANEL IS ALSO SCENES (2.10d, DECISIONS K43). History and Scenes are
+// never showing at once, so one panel in the left half serves both: CHART's
+// rows on History, SCENES' on Scenes. A different view's panel is ended and
+// made afresh (showView()).
+enum : uint8_t { SIDE_NONE, SIDE_CHART, SIDE_SCENES };
 struct ChartPanel { lv_obj_t *root = nullptr, *tab = nullptr, *pane = nullptr;
-                    uint8_t state = DECK_HIDDEN; int32_t h = 0; };
+                    uint8_t state = DECK_HIDDEN; int32_t h = 0; uint8_t kind = SIDE_NONE; };
 ChartPanel s_chart;
+uint8_t    s_sideWant = SIDE_CHART;   // what chartCreate() makes next
 
 int32_t chartY(uint8_t state) {
     const int32_t sh = lv_obj_get_height(lv_screen_active());
@@ -3181,7 +3187,6 @@ constexpr uint8_t DECK_ROWS_MAX = 10;   // 8 at most today (a light with scenes:
 
 void pauseCheckCb(lv_event_t *ev);
 void groupDropCb(lv_event_t *ev);
-void scenesDropCb(lv_event_t *ev);
 void lookDropCb(lv_event_t *ev);
 void labelDropCb(lv_event_t *ev);
 
@@ -3234,8 +3239,11 @@ uint16_t tapRowBuild(const Card &c) {
     return 0;
 }
 
-// The scene row: the offered scenes by name, in the window's order.
-char s_tapSceneOpts[ENTITY_SCENES_MAX * (ENTITY_NAME_MAX + 1)];
+// The scene row: the offered scenes by name, in the window's order - and, kept
+// with it, their HA ids, so a pick means the scene that was on that line.
+char    s_tapSceneOpts[ENTITY_SCENES_MAX * (ENTITY_NAME_MAX + 1)];
+char    s_tapSceneRefs[ENTITY_SCENES_MAX][ENTITY_TOPIC_MAX];
+uint8_t s_tapSceneN = 0;
 uint16_t tapSceneRowBuild(const Card &c, uint8_t &n) {
     const Entity *sc[ENTITY_SCENES_MAX];
     n = c.offeredScenes(sc, ENTITY_SCENES_MAX);
@@ -3245,8 +3253,10 @@ uint16_t tapSceneRowBuild(const Card &c, uint8_t &n) {
     for (uint8_t i = 0; i < n; i++) {
         used += snprintf(s_tapSceneOpts + used, sizeof(s_tapSceneOpts) - used, "%s%s", i ? "\n" : "",
                          sc[i]->desc.name);
+        snprintf(s_tapSceneRefs[i], sizeof(s_tapSceneRefs[i]), "%s", sc[i]->desc.externalRef);
         if (!strcmp(sc[i]->desc.externalRef, c.tapScene())) sel = i;
     }
+    s_tapSceneN = n;
     return sel;
 }
 
@@ -3296,17 +3306,9 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     if (held) {
         const uint16_t sel = tapRowBuild(*held);
         r[n++] = { "Tap action", DeckRowKind::ROW_DROP, s_tapOpts, sel, cardRows, tapDropCb, nullptr };
-        uint8_t nSc = 0;
-        const uint16_t scSel = tapSceneRowBuild(*held, nSc);
-        if (nSc && !inMember())
-            r[n++] = { "Tap scene", DeckRowKind::ROW_DROP, s_tapSceneOpts, scSel,
-                       cardRows && held->tapAction() == TapAction::TAP_LOAD_SCENE, tapSceneDropCb, &s.ddTapScene };
     }
-    const Entity *sh = sceneHost();
-    if (sh && sh->nScenes && !inMember())
-        r[n++] = { "Scenes", DeckRowKind::ROW_DROP, "Visible scenes only\nShow all scenes\nDisabled",
-                   (uint16_t)(s.sceneShow == SceneShow::SCENES_ALL ? 1 : s.sceneShow == SceneShow::SCENES_OFF ? 2 : 0),
-                   true, scenesDropCb, &s.ddScenes };
+    // Show hidden scenes and Tap scene are in the SCENES panel, in the Scenes
+    // view (K43); Scenes "Off" was dropped.
     // The selector's looks, for the scheme showing (K31). In every build since
     // round 9 (owner: "I'd like to keep that for a bit"); a device-wide
     // setting in a card's panel until the device's own settings page (4.1).
@@ -3466,11 +3468,9 @@ void tapDropCb(lv_event_t *ev) {
 void tapSceneDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     Card *c = cardOf(h.surface);
-    const Entity *sc[ENTITY_SCENES_MAX];
-    const uint8_t n = c ? c->offeredScenes(sc, ENTITY_SCENES_MAX) : 0;
-    if (k >= n) return;
-    c->setTapScene(sc[k]->desc.externalRef);
-    keepCardSetting("tap_scene", sc[k]->desc.externalRef);
+    if (!c || k >= s_tapSceneN) return;
+    c->setTapScene(s_tapSceneRefs[k]);   // the scene on that line when the row was made
+    keepCardSetting("tap_scene", s_tapSceneRefs[k]);
 }
 
 // Label: on the held card at once, kept under its id. Inherit removes the
@@ -3488,21 +3488,6 @@ void lookDropCb(lv_event_t *ev) {
     // The deck is built with the view; the chips' lit look follows at once.
     if (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER) lv_async_call(rebuildMainAsync, nullptr);
     else showView(s.view);
-}
-
-// Scenes: Visible / All / Off (2.10c). On the held card, and the window follows
-// at once: the clapperboard comes or goes, and Scenes rebuilds or gives way.
-void scenesDropCb(lv_event_t *ev) {
-    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
-    s.sceneShow = k == 1 ? SceneShow::SCENES_ALL : k == 2 ? SceneShow::SCENES_OFF : SceneShow::SCENES_VISIBLE;
-    if (Card *c = cardOf(h.surface)) c->setSceneShow(s.sceneShow);
-    keepCardSetting("scenes", sceneShowName(s.sceneShow));
-    s.lastScene = -1;   // the offered list changed under the ring
-    if (s.view == PopupView::VIEW_SCENES)
-        showView(hasScenes() ? PopupView::VIEW_SCENES : controlsView());
-    else
-        cornerLook(s.btnScenes, (s.view == PopupView::VIEW_MAIN || s.view == PopupView::VIEW_MEMBER) &&
-                                hasScenes(), false);
 }
 
 // Paused, a checkbox. Through the card when it is the held one (it repaints at
@@ -3778,7 +3763,7 @@ void deckEnd() {
     }
     s.deck = s.deckTab = s.deckTabLbl = s.deckPane = nullptr;
     s.swPause = nullptr;
-    s.ddGroup = s.ddScenes = s.ddTapScene = nullptr;
+    s.ddGroup = nullptr;
     s.deckState  = DECK_HIDDEN;
     s.deckFilled = false;
 }
@@ -3799,23 +3784,50 @@ uint8_t chartSpecs(DeckRowSpec *r) {
     return n;
 }
 
+// --- SCENES: the Scenes view's own options (K43) ----------------------------
+// Show hidden scenes, a checkbox (the card's Scenes setting: Visible / All -
+// "Off" was dropped), and the scene a tap loads (Tap action: Load scene; greyed
+// otherwise). The scene row's choices are kept by their HA id when the row is
+// made, so a later change to the list cannot make a pick land on another scene.
+void hiddenScenesCb(lv_event_t *ev);
+lv_obj_t *s_cbHidden = nullptr;
+
+uint8_t scenesSpecs(DeckRowSpec *r) {
+    uint8_t n = 0;
+    r[n++] = { "Show hidden scenes", DeckRowKind::ROW_CHECK, nullptr,
+               (uint16_t)(s.sceneShow == SceneShow::SCENES_ALL), true, hiddenScenesCb, &s_cbHidden };
+    Card *held = cardOf(h.surface);
+    if (held) {
+        uint8_t nSc = 0;
+        const uint16_t sel = tapSceneRowBuild(*held, nSc);
+        if (nSc)
+            r[n++] = { "Tap scene", DeckRowKind::ROW_DROP, s_tapSceneOpts, sel,
+                       held->hasId() && held->tapAction() == TapAction::TAP_LOAD_SCENE, tapSceneDropCb,
+                       &s.ddTapScene };
+    }
+    return n;
+}
+
 void chartTabCb(lv_event_t *ev) {
     (void)ev;
     chartSet(s_chart.state == DECK_OPEN ? DECK_PEEK : DECK_OPEN);
 }
 
-// Made the first time the chart shows, rows and all (a demo; SETTINGS builds
-// its rows on first open).
+// Made the first time its view shows, rows and all: CHART's (a demo) or
+// SCENES' (s_sideWant). SETTINGS builds its rows on first open.
 void chartCreate() {
     DeckRowSpec r[DECK_ROWS_MAX];
-    const uint8_t n = chartSpecs(r);
+    const bool scenes = (s_sideWant == SIDE_SCENES);
+    const uint8_t n = scenes ? scenesSpecs(r) : chartSpecs(r);
     const int32_t w = lv_area_get_width(&s.winRect);
     Folder F;
-    buildFolder(F, true, "CHART", rowsNeedW(r, n), n, w - w / 2 - mm(1.0f), chartTabCb);
+    buildFolder(F, true, scenes ? "SCENES" : "CHART", rowsNeedW(r, n), n, w - w / 2 - mm(1.0f), chartTabCb);
     s_chart.root = F.root; s_chart.tab = F.tab; s_chart.pane = F.pane; s_chart.h = F.h;
+    s_chart.kind = s_sideWant;
     for (uint8_t i = 0; i < n; i++) {
         lv_obj_t *row = deckRow(F.pane, r[i].label, r[i].live);
-        if (r[i].kind == DeckRowKind::ROW_CHECK) deckCheckbox(row, r[i]); else deckDropdown(row, r[i]);
+        lv_obj_t *ctl = (r[i].kind == DeckRowKind::ROW_CHECK) ? deckCheckbox(row, r[i]) : deckDropdown(row, r[i]);
+        if (r[i].out) *r[i].out = ctl;
     }
 }
 
@@ -3865,6 +3877,34 @@ void chartEnd() {
         }
     }
     s_chart = ChartPanel();
+    s.ddTapScene = nullptr;   // SCENES' rows went with it
+    s_cbHidden   = nullptr;
+}
+
+// The left panel belongs to its view (K43): CHART to History, SCENES to
+// Scenes - up with it, gone when it goes. Another view's panel is ended and the
+// right one made; the same view rebuilt (a scene list that changed) keeps its
+// panel, open or not.
+void sideFor(PopupView v) {
+    const uint8_t side = (v == PopupView::VIEW_HISTORY) ? SIDE_CHART
+                       : (v == PopupView::VIEW_SCENES)  ? SIDE_SCENES : SIDE_NONE;
+    if (s_chart.root && s_chart.kind != side) chartEnd();
+    if (side != SIDE_NONE && !s_chart.root) { s_sideWant = side; chartSet(DECK_PEEK); }
+}
+
+// Show hidden scenes: the card's Scenes setting, Visible or All (K21, K43).
+// The view follows at once; with nothing left to show, back to the controls.
+void hiddenScenesCb(lv_event_t *ev) {
+    const bool all = lv_obj_has_state((lv_obj_t *)lv_event_get_target(ev), LV_STATE_CHECKED);
+    s.sceneShow = all ? SceneShow::SCENES_ALL : SceneShow::SCENES_VISIBLE;
+    if (Card *c = cardOf(h.surface)) c->setSceneShow(s.sceneShow);
+    keepCardSetting("scenes", sceneShowName(s.sceneShow));
+    s.lastScene = -1;   // the offered list changed under the ring
+    if (s.view != PopupView::VIEW_SCENES) return;
+    if (hasScenes()) showView(PopupView::VIEW_SCENES);   // the stage only; this panel stays
+    // Leaving Scenes ends this panel - and the checkbox whose event is
+    // running. Not from inside the event (LESSONS): afterwards.
+    else lv_async_call([](void *) { if (CardPopup::isOpen()) showView(controlsView()); }, nullptr);
 }
 
 #ifdef DEBUG_POPUP
@@ -4456,7 +4496,7 @@ void CardPopup::debugService(lv_timer_t *t) {
         if (!isOpen()) dbgOut("no window open\n");
         else {
             // 2: the CHART panel open (History only).
-            if (a.deck == 2)  { if (s.view == PopupView::VIEW_HISTORY) chartSet(DECK_OPEN); }
+            if (a.deck == 2)  { if (s_chart.root) chartSet(DECK_OPEN); }   // CHART or SCENES (K43)
             else if (a.deck)  deckOpen();
             else            { deckSet(DECK_PEEK); chartFold(); }
             dbgMem(mem, sizeof(mem));

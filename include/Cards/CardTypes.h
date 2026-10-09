@@ -293,7 +293,9 @@ inline bool sceneShowFromName(const char *n, SceneShow &out) {
     if (!n) return false;
     if (!strcmp(n, "visible")) { out = SceneShow::SCENES_VISIBLE; return true; }
     if (!strcmp(n, "all"))     { out = SceneShow::SCENES_ALL;     return true; }
-    if (!strcmp(n, "off"))     { out = SceneShow::SCENES_OFF;     return true; }
+    // "Off" was dropped (K43): nothing offers it, so a saved one reads as
+    // Visible rather than leaving a card whose scenes nobody can bring back.
+    if (!strcmp(n, "off"))     { out = SceneShow::SCENES_VISIBLE; return true; }
     return false;
 }
 
