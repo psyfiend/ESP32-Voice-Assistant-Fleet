@@ -3,20 +3,37 @@
 Branch `feat/65-saving`. Boards: **WS_P4_5** (COM15), **WS_P4_4B** (COM7) and **CYD_P4_1060** (COM9),
 all flashed 2026-10-09 with `-D DEBUG_POPUP` (local only) and the **new cache-safe P4 libraries**.
 Design and what each step measured: `docs/design/card-sheet.md` section 17; decisions:
-`docs/DECISIONS.md` K33-K45, A14.
+`docs/DECISIONS.md` K33-K46, A14.
 
-Mark each line PASS or FAIL, with a note for anything that looks wrong even if it passes.
-**Which lights are safe**: anything in the Office. Lines touching the Kitchen are marked **(Kitchen)**.
+Mark each line PASS or FAIL, with a note for anything that looks wrong even if it passes. Rounds 1
+and 2 matter most; the rest can be done in any order. About an hour for all of it.
+**Which lights are safe**: anything in the Office. Nothing here needs the Kitchen.
 
-**Each board has its own settings file.** What you choose on the P4_5 does not appear on the 4B.
-To see a board's file from a browser: `http://fleet-ws-p4-5/settings` (the 4B: `fleet-ws-p4-4b`,
-the 1060: `fleet-cyd-p4-1060`); `/settings?stats=1` adds how many saves, the files, and anything
-unclaimed. **A choice made from a browser** (the PC addresses below) shows on the card the next time
-its page is built: swipe to the other page and back.
+**How it works, in three lines.** Each board keeps your choices in its own settings file - what you
+choose on the P4_5 does not appear on the 4B. A choice made in a card's window is written when the
+window closes. A choice made from a browser (the addresses below) shows on the card the next time its
+page is built: swipe to the other page and back.
 
-**Before you start, one question:** the P4_5's file already says Desk's Tap action is Load scene,
-with Bright. It was chosen on the glass after I had cleared it on 2026-10-08. Was that you? If not,
-something set it on its own, and that is a bug to chase.
+**Useful addresses** (P4_5 shown; the 4B is `fleet-ws-p4-4b`, the 1060 `fleet-cyd-p4-1060`):
+- `http://fleet-ws-p4-5/settings` - the board's settings file, as it is
+- `http://fleet-ws-p4-5/settings?stats=1` - how many saves, the files, anything unclaimed, and the
+  **last ten changes**, each with its time and where it came from (`loopTask` = a card window,
+  `httpd` = a browser)
+- `http://fleet-ws-p4-5/panel` - any panel underrun the board has seen, with its time
+- `http://fleet-ws-p4-5/screenshot` - what the screen shows
+
+**Watch for, all through:**
+- **Any flash** - light blue, white, or a blink - especially as a window closes (that is when it
+  saves). Note the time and open `/panel`.
+- **A change you did not make** in `/settings?stats=1`'s last changes. Desk's Tap action on the P4_5
+  (Load scene, Bright) was set on 2026-10-08 with nobody at the panel, and it is still unexplained;
+  leave it until T4 changes it, and tell me if anything like it appears.
+- **A card label changing colour** when you did not ask for it.
+- **A restart you did not cause** (the screen goes dark and comes back).
+- **Anything slow**: a window that opens or closes late, a stutter as it saves.
+
+**If something fails**, send me the line number, what you saw, and - if the board is still up - the
+`/settings?stats=1` page and a `/screenshot`.
 
 ## Round 1 - the flash fix (A14)
 
@@ -61,12 +78,13 @@ The words under the hero. The row is now called **Entity label**: Inherit / HA n
 The coloured label at the card's top shows the card's **group**, and the group owns the colour. Your
 dashboard's areas are now HA's areas under your shorter names (Living = "Living Room", Front = "Front
 Room", Bedroom = "Eric Bedroom"). The row is **Card label**: every group, then **Own group**, then
-**None**. With nothing chosen, every card looks as it did.
+**None**. **Groups now get colours of their own** (your call this morning): the House page's seven
+are all different. With eight colours, the Fleet page's four test areas share with others.
 
 | # | Do this | PASS if |
 |---|---|---|
-| G1 | Look at the House page | Every card label exactly as in v0.2.10 |
-| G2 | **Thermo**: Card label -> **Own group** | Still "Front", in a new colour no other group has |
+| G1 | Look at the House page | Every card label as in v0.2.10, except **Kitchen, now orange** (it shared Garage's green). Same words everywhere |
+| G2 | **Thermo**: Card label -> **Own group** | Still "Front", in a colour no House group has |
 | G3 | **Kitchen temperature**: open its Card label row | Two "Front" lines: one "Front (HA)", one "Front" (Thermo's). Choose the plain "Front" | 
 | G4 | Look at the page | Thermo and Kitchen temperature: one label, one colour - a group of two, made without creating anything |
 | G5 | From a browser: `http://fleet-ws-p4-5/settings?group=ha_office&name=Work`, swipe away and back | Desk, Overhead, Office occupancy and Office temperature all read "Work" - **still purple** |
@@ -77,9 +95,8 @@ Room", Bedroom = "Eric Bedroom"). The row is **Card label**: every group, then *
 | G10 | Put Thermo back on "Front (HA)" and Kitchen temperature on "Kitchen" | Thermo's group disappears from the rows (its last card left) |
 | G11 | Put the rest back: `...?group=ha_office&name=` and `&color=` (both empty), `...?card=office_261008_0310b&label_text=` (empty), North -> Garage | Back to G1. `/settings?stats=1` shows what is left, and the last ten changes |
 
-**Question:** Garage and Kitchen have always shared the same green (the colour-by-name collides).
-With colour as the key to a group, should groups that collide be given different colours
-automatically? It would change one of them on screen.
+G5-G7 rename and recolour Office only to show it works; G11 undoes them. Skip them if you would
+rather not touch the names.
 
 ## Round 5 - Tap action (K37, K39)
 
@@ -95,7 +112,9 @@ that card can do.
 | T5 | Restart; tap Desk once | Bright again (the cycle starts from the first after each boot) |
 | T6 | Desk -> Load scene. Go to Scenes; open the **SCENES** panel; Tap scene -> Relax. Tap the card | Relax, with its toast |
 | T7 | **All Lamps** (Fleet): Tap action -> Members view. Tap | The window opens on Members |
-| T8 | Put Desk and Overhead back to Toggle; the Office back as you like it | - |
+| T8 | Put Desk and Overhead back to Toggle; the Office lights back as you like them | - |
+
+T4 and T6 change the Office lights (scenes); I leave them at 100%, 2710 K after my own tests.
 
 ## Round 6 - the panels (K43, K45)
 
