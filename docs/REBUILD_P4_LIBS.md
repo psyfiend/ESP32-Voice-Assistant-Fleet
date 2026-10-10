@@ -381,6 +381,10 @@ only `libesp_driver_ppa.a` should differ. The previous output is kept in WSL as
 **A future IDF update that includes `469aa16c350` makes this patch unnecessary** - check for it
 before applying it again.
 
+**Another machine gets the result from a GitHub pre-release, not a rebuild**:
+`p4-libs-2026-10-09` holds the installed `esp32p4_es` folder as a zip, with its SHA-256 and the
+install steps. Each future rebuild gets its own dated pre-release; the folder never goes into git.
+
 ## The alternative, and why it is not the first choice
 
 `framework = arduino, espidf` — Arduino as an ESP-IDF component — compiles IDF from source with a

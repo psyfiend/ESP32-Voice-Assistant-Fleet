@@ -250,11 +250,13 @@ rollback is a rename. A `pio pkg update` or platform reinstall silently puts the
 `docs/REBUILD_P4_LIBS.md`; the build tree is in WSL on the desktop PC (`~/esp32-arduino-lib-builder`,
 `esp-idf` carries the patch, so its version reads `-dirty`). The S3 libraries are stock.
 
-**This is per machine.** The rebuilt libraries exist **only on the desktop PC** (user Marge). A
-build on any other machine (the laptop) links the stock or older libraries: the freezes, the
-flash-write flash and #49 come back. **Flash boards from the desktop PC**, or copy the
-`esp32p4_es` folder across first (it is self-contained), and check: the firmware's IDF version
-string ends `-dirty` (`grep -a -o "v5.5.5-832-g2553c5ad432[-a-z]*" .pio/build/<env>/firmware.bin`).
+**This is per machine.** A build on a machine with the stock or older libraries brings back the
+freezes, the flash-write flash and #49. **The folder is published as a GitHub pre-release**:
+<https://github.com/psyfiend/ESP32-Voice-Assistant-Fleet/releases/tag/p4-libs-2026-10-09>
+(`esp32p4_es-2026-10-09.zip`, 97 MB, SHA-256 `E30C92D7...2043307` in the notes; install steps there).
+Check after a build: the firmware's IDF version string ends `-dirty`
+(`grep -a -o "v5.5.5-832-g2553c5ad432[-a-z]*" .pio/build/<env>/firmware.bin`). A new rebuild gets a
+new pre-release, never git (the folder is 367 MB; one library is over 50 MB).
 The local debug flags in `platformio.ini` are on the desktop PC only too.
 
 **Do not use NINA's C6 updater** - it hung `WS_P4_5`.
