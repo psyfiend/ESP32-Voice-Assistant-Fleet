@@ -104,10 +104,16 @@ measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "S
 - **Desk's Tap action set with nobody there**: the owner checked HA's log and says not to worry -
   closed. Every change is logged with its task (`/settings?stats=1`) anyway.
 - **The P4_5's random white flash**: seen twice on 2026-10-09 while using dropdowns, **0 underruns
-  each time** in `/panel` and no save running - unexplained. Asked the owner what it looks like
-  (whole screen or part, colour, how long); no answer yet.
+  each time** in `/panel` and no save running - unexplained. Owner (2026-10-10): it looks like all
+  the earlier flashes; in one of the deliberate flash-write tests a few builds ago it looked very light
+  blue; a single flash is too quick to judge. Not new. Still unexplained: it was seen on the
+  cache-safe libraries (A14), with no save running.
+- **2026-10-10, laptop session:** the owner tests the **P4_5 only**, on the desktop's 2026-10-09
+  ~14:40 build (`DEBUG_POPUP` + `DEBUG_HANG`), not reflashed - the 4B and 1060 are not with the owner,
+  so F4 and P1's 4B/1060 parts wait.
 - **A Wi-Fi recovery that never finished (P4_5, serial log, 2026-10-09).** 17:26:59 link lost and
-  "M&M Motors" **not found** three times (the AP itself gone? ask the owner); the board's own AP came
+  "M&M Motors" **not found** three times (owner, 2026-10-10: **the router was unplugged** while being
+  moved); the board's own AP came
   up; 17:29:11 back online. 17:32 a remote host stopped answering, 17:33:14 "Link health DEAD",
   **"RECOVERY 1/3: re-associating"** - and then no `[Conn]` line at all for 33 minutes, only
   `RPC_WRAP: rpc_wifi_sta_get_ap_info: failed, status [12303]` every 5 min, until the log ends at
