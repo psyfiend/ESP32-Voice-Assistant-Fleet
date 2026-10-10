@@ -152,4 +152,30 @@ T4 and T6 change the Office lights (scenes); I leave them at 100%, 2710 K after 
 
 ## Your results
 
-(Write them under each round, as in `archive/TEST_2.10c.md`.)
+### Run 1 - 2026-10-10, P4_5 only, away from home (no HA)
+
+The P4_5 reflashed from the laptop (`2b738e6`, `DEBUG_POPUP` + `DEBUG_HANG`, the
+p4-libs-2026-10-09 libraries) to join the Wi-Fi there, at `http://10.0.0.2` (the router does not
+resolve `fleet-ws-p4-5`). The 4B and 1060 were not there. **No freeze; `/hang` empty.**
+
+| Round | Result |
+|---|---|
+| 1 | F1 F2 F3 PASS. F4 not there. **F5: two flashes** - one during L1 (`/panel` right after: 0 underruns, 50 s after a restart), one during T1-T3 (0 underruns, at 8559 s). Both while changing a card setting in its window |
+| 2 | S1-S8 all PASS |
+| 3 | L0 L2 L3 L5 PASS. L1, L3b, L4 need HA (HA's name) |
+| 4 | G1 PASS, G6 PASS (the Card label row still reads Office, greyed - expected, K48). G2-G4, G8-G11 skipped (K48). **G5, G7 "no effect": not a fault - the group is only `ha_office` when HA has said which area Office's lights are in; with no HA it is `sheet_office`, so the addresses named a group no card is in** (`CardGroups.cpp` `sheetGroupId()`). G7 left `groups.ha_office.color = 2E9E4F` in the file, which WILL turn Office green once the board sees HA again |
+| 5 | T1 T2 T3 T7 PASS. T4-T6, T8 need HA |
+| 6 | P1 PASS. **P1b FAIL** (below). P2-P5 need HA |
+| 7 | U1 U2 U3 PASS |
+
+**P1b, owner:** SETTINGS scrolls, barely - every row shows when it opens, but the gap under the
+last row pushes it over. A scroll that is not visible is not obvious: when a popup panel has more
+than it shows, it needs a small scroll bar. Scrolled to its end, the rows slide under the tab
+(Linen cuts the top off the Paused box). And the rows could be pulled past the end, held there,
+and slid back on letting go: **no springy, bouncy effects - the content locked within the space
+it needs**. For the popup's panels (SETTINGS, CHART, SCENES), not a rule for all scrolling.
+
+**Fixed (to retest):** the panels' rows sit in a body of their own, which is what scrolls: cut off
+at a straight line under the join, stopping dead at both ends, with a thin bar in the right margin
+whenever there is more to see. A panel only just too tall (up to 1.6 mm, as SETTINGS on the P4_5)
+takes it from the gaps above and below the rows instead, and does not scroll.

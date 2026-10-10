@@ -253,6 +253,7 @@ struct Popup {
 
     // The settings deck (pathway 1, card-sheet 11.1): see "The settings deck".
     lv_obj_t *deck = nullptr, *deckTab = nullptr, *deckTabLbl = nullptr, *deckPane = nullptr;
+    lv_obj_t *deckBody = nullptr;                  // the pane's rows, and what scrolls (buildFolder())
     lv_obj_t *swPause = nullptr;                   // the Paused checkbox
     int32_t   deckH = 0, deckHead = 0;
     int32_t   deckHide = 0;   // how much of the pane stays below the screen when open
@@ -3096,7 +3097,7 @@ void deckSet(uint8_t state) {
     // FOLDING, BACK TO THE TOP (owner, 2.10d): a pane folded while scrolled
     // kept its offset, and the rows it had scrolled to showed in the strip of
     // the tab left peeking at the bottom of the screen.
-    else if (s.deckPane) lv_obj_scroll_to_y(s.deckPane, 0, LV_ANIM_OFF);
+    else if (s.deckBody) lv_obj_scroll_to_y(s.deckBody, 0, LV_ANIM_OFF);
     lv_anim_delete(s.deck, deckExec);
     lv_anim_t a;
     lv_anim_init(&a);
@@ -3125,7 +3126,7 @@ void deckSet(uint8_t state) {
 // rows on History, SCENES' on Scenes. A different view's panel is ended and
 // made afresh (showView()).
 enum : uint8_t { SIDE_NONE, SIDE_CHART, SIDE_SCENES };
-struct ChartPanel { lv_obj_t *root = nullptr, *tab = nullptr, *pane = nullptr;
+struct ChartPanel { lv_obj_t *root = nullptr, *tab = nullptr, *pane = nullptr, *body = nullptr;
                     uint8_t state = DECK_HIDDEN; int32_t h = 0; uint8_t kind = SIDE_NONE; };
 ChartPanel s_chart;
 uint8_t    s_sideWant = SIDE_CHART;   // what chartCreate() makes next
@@ -3539,7 +3540,8 @@ lv_obj_t *deckRow(lv_obj_t *pane, const char *what, bool live) {
 // A FOLDER PANEL: SETTINGS in the right half, and its mirror image CHART in
 // the left (round 7 - "I want to see how the tab effect works"). One builder,
 // so the two are the same shape by construction.
-struct Folder { lv_obj_t *root = nullptr, *tab = nullptr, *tabLbl = nullptr, *pane = nullptr; int32_t h = 0; };
+struct Folder { lv_obj_t *root = nullptr, *tab = nullptr, *tabLbl = nullptr, *pane = nullptr, *body = nullptr;
+                int32_t h = 0; };
 
 // Built below the bottom of the screen. `left`: the tab at the window's left
 // edge and the pane growing rightwards from it; otherwise both on the right.
@@ -3568,11 +3570,22 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
     const int32_t rf       = r;                        // the inner curve
     const int32_t tabAbove = s.deckHead + rf;          // the tab's part above the pane's edge
     s.deckHide = r + 2 * bw;
-    F.h = tabAbove + (rf + mm(1.6f)) + rows * mm(DECK_ROW_MM) + mm(1.6f) + s.deckHide;
+    int32_t gapTop = mm(1.6f), gapBot = mm(1.6f);       // above the first row, below the last
+    F.h = tabAbove + (rf + gapTop) + rows * mm(DECK_ROW_MM) + gapBot + s.deckHide;
     // NEVER TALLER THAN THE WINDOW (owner, 2026-10-07): open, the tab's top
     // stays at or below the window's top edge. More rows than that: the pane
     // scrolls.
     const int32_t maxH = lv_obj_get_height(lv_screen_active()) - s.winRect.y1 + s.deckHide;
+    // ONLY JUST TOO TALL: THE GAPS GIVE WAY, NOT A SCROLL (owner, 2.10d P1b).
+    // SETTINGS' six rows on the P4_5 were ~16 px over - every row in sight, a
+    // scroll only for the gap under the last one. Up to one gap's worth is
+    // taken from the two gaps, half each, and the pane does not scroll.
+    const int32_t over = F.h - maxH;
+    if (over > 0 && over <= gapBot) {
+        gapTop -= over / 2;
+        gapBot -= over - over / 2;
+        F.h = maxH;
+    }
     const bool scroll = F.h > maxH;
     if (scroll) F.h = maxH;
 
@@ -3619,19 +3632,49 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
     F.pane = pane;
     lv_obj_set_pos (pane, paneX, paneY);
     lv_obj_set_size(pane, paneW, F.h - paneY);
-    if (scroll) { lv_obj_add_flag(pane, LV_OBJ_FLAG_SCROLLABLE); UI::tameScroll(pane); }
     lv_obj_set_style_radius      (pane, r, 0);
     lv_obj_set_style_bg_color    (pane, UI::c(p.SURFACE_ALT), 0);
     lv_obj_set_style_bg_opa      (pane, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(pane, UI::border(), 0);
     lv_obj_set_style_border_width(pane, bw, 0);
     lv_obj_add_style             (pane, UI::paint(UIPaint::PAINT_LIFT), 0);
-    // The pane's padding keeps its rows below the tab's join.
-    lv_obj_set_style_pad_hor(pane, mm(DECK_PAD_MM), 0);
-    lv_obj_set_style_pad_top(pane, (tabAbove - paneY) + rf + mm(1.6f), 0);
-    lv_obj_set_style_pad_bottom(pane, mm(1.6f) + s.deckHide, 0);   // nothing in the part that stays hidden
-    lv_obj_set_flex_flow(pane, LV_FLEX_FLOW_COLUMN);
+    // The pane's padding keeps its rows below the tab's join. Its right margin
+    // is the body's own (below), so a scroll bar can sit in it.
+    lv_obj_set_style_pad_left(pane, mm(DECK_PAD_MM), 0);
+    lv_obj_set_style_pad_top(pane, (tabAbove - paneY) + rf + gapTop, 0);
+    lv_obj_set_style_pad_bottom(pane, gapBot + s.deckHide, 0);   // nothing in the part that stays hidden
     lv_obj_add_flag(pane, LV_OBJ_FLAG_CLICKABLE);   // a tap on the pane stays on the pane
+
+    // THE ROWS HAVE A BODY OF THEIR OWN, AND IT IS WHAT SCROLLS (owner, 2.10d
+    // P1b). The pane used to scroll itself: its rows slid up under the tab and
+    // the join, and nothing said there was more to see. The body is exactly the
+    // part of the pane that shows between the join and the screen's edge, so a
+    // row is cut off at a straight line there. It stops dead at both ends - no
+    // elastic, and nothing passed on to what is behind - and while there is
+    // more to see, a thin bar in the pane's right margin says so from the
+    // moment it opens. The popup's panels only: tameScroll()'s no-bar rule
+    // stands everywhere else (owner).
+    lv_obj_t *body = plain(pane);
+    F.body = body;
+    lv_obj_set_size(body, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_pad_right(body, mm(DECK_PAD_MM), 0);
+    lv_obj_set_flex_flow(body, LV_FLEX_FLOW_COLUMN);
+    // LVGL scrolls the object pressed or one of its parents, so a drag on a
+    // row must land on the body, not the pane behind it.
+    lv_obj_add_flag(body, LV_OBJ_FLAG_CLICKABLE);
+    if (scroll) {
+        lv_obj_add_flag(body, LV_OBJ_FLAG_SCROLLABLE);
+        UI::tameScroll(body);
+        lv_obj_clear_flag(body, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
+        lv_obj_set_scrollbar_mode(body, LV_SCROLLBAR_MODE_AUTO);   // AUTO: drawn whenever there is more to see
+        const int32_t barW = LV_MAX(2, mm(0.6f));
+        lv_obj_set_style_width    (body, barW, LV_PART_SCROLLBAR);
+        lv_obj_set_style_radius   (body, LV_RADIUS_CIRCLE, LV_PART_SCROLLBAR);
+        lv_obj_set_style_bg_color (body, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 35)), LV_PART_SCROLLBAR);
+        lv_obj_set_style_bg_opa   (body, LV_OPA_COVER, LV_PART_SCROLLBAR);
+        lv_obj_set_style_pad_right(body, (mm(DECK_PAD_MM) - barW) / 2, LV_PART_SCROLLBAR);
+        lv_obj_set_style_pad_ver  (body, mm(0.5f), LV_PART_SCROLLBAR);
+    }
 
     // The tab: SETTINGS IN THE RIGHT HALF, ALWAYS (owner, round 9); a second
     // panel (CHART) takes the left half, so SETTINGS is always in the same
@@ -3725,6 +3768,7 @@ void deckCreate() {
     Folder F;
     buildFolder(F, false, "SETTINGS", deckNeedW(), rows, w / 2, deckTabCb);
     s.deck = F.root; s.deckTab = F.tab; s.deckTabLbl = F.tabLbl; s.deckPane = F.pane;
+    s.deckBody = F.body;
     s.deckH = F.h;
     s.deckState  = DECK_HIDDEN;
     s.deckFilled = false;
@@ -3734,14 +3778,14 @@ void deckCreate() {
 // every reasonable saving). Folded, only the tab shows, and the rows were
 // ~5 KB of LVGL's pool that most windows never needed.
 void deckFill() {
-    if (!s.deckPane || s.deckFilled) return;
+    if (!s.deckBody || s.deckFilled) return;
     s.deckFilled = true;
     // The rows, from the one list (deckSpecs()): Paused first - the one that
     // works, and the one a person comes for - then the card's settings.
     DeckRowSpec r[DECK_ROWS_MAX];
     const uint8_t n = deckSpecs(r);
     for (uint8_t i = 0; i < n; i++) {
-        lv_obj_t *row = deckRow(s.deckPane, r[i].label, r[i].live);
+        lv_obj_t *row = deckRow(s.deckBody, r[i].label, r[i].live);
         lv_obj_t *ctl = (r[i].kind == DeckRowKind::ROW_CHECK) ? deckCheckbox(row, r[i]) : deckDropdown(row, r[i]);
         if (r[i].out) *r[i].out = ctl;
     }
@@ -3779,7 +3823,7 @@ void deckEnd() {
             lv_obj_delete(s.deck);
         }
     }
-    s.deck = s.deckTab = s.deckTabLbl = s.deckPane = nullptr;
+    s.deck = s.deckTab = s.deckTabLbl = s.deckPane = s.deckBody = nullptr;
     s.swPause = nullptr;
     s.ddGroup = nullptr;
     s.deckState  = DECK_HIDDEN;
@@ -3840,10 +3884,10 @@ void chartCreate() {
     const int32_t w = lv_area_get_width(&s.winRect);
     Folder F;
     buildFolder(F, true, scenes ? "SCENES" : "CHART", rowsNeedW(r, n), n, w - w / 2 - mm(1.0f), chartTabCb);
-    s_chart.root = F.root; s_chart.tab = F.tab; s_chart.pane = F.pane; s_chart.h = F.h;
+    s_chart.root = F.root; s_chart.tab = F.tab; s_chart.pane = F.pane; s_chart.body = F.body; s_chart.h = F.h;
     s_chart.kind = s_sideWant;
     for (uint8_t i = 0; i < n; i++) {
-        lv_obj_t *row = deckRow(F.pane, r[i].label, r[i].live);
+        lv_obj_t *row = deckRow(F.body, r[i].label, r[i].live);
         lv_obj_t *ctl = (r[i].kind == DeckRowKind::ROW_CHECK) ? deckCheckbox(row, r[i]) : deckDropdown(row, r[i]);
         if (r[i].out) *r[i].out = ctl;
     }
@@ -3859,7 +3903,7 @@ void chartSet(uint8_t state) {
     const uint8_t was = s_chart.state;
     s_chart.state = state;
     if (state == DECK_OPEN) { lv_obj_move_foreground(s_chart.root); if (s.deckState == DECK_OPEN) deckSet(DECK_PEEK); }
-    else if (s_chart.pane) lv_obj_scroll_to_y(s_chart.pane, 0, LV_ANIM_OFF);   // as SETTINGS (deckSet())
+    else if (s_chart.body) lv_obj_scroll_to_y(s_chart.body, 0, LV_ANIM_OFF);   // as SETTINGS (deckSet())
     lv_anim_delete(s_chart.root, chartExec);
     lv_anim_t a;
     lv_anim_init(&a);

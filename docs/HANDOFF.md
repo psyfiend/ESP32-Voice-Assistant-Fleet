@@ -115,6 +115,15 @@ measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "S
   in this firmware stores them in NVS). It is at **`http://10.0.0.2`**: that router does not
   resolve `fleet-ws-p4-5`, nor `.local`. Its settings file was kept (276 bytes: Desk's Tap action
   Toggle, Midnight's selector Slv Sq).
+- **Run 1 done (2026-10-10, P4_5, no HA)** - results in `TEST_2.10d.md`. No freeze. One FAIL, P1b
+  (popup panels' scrolling), **fixed and flashed, to retest**: the rows are in a body of their own
+  that scrolls (`buildFolder()`: cut off under the join, stops dead, a thin bar while there is
+  more); up to 1.6 mm over comes out of the gaps instead. Verified by screenshot on 5-row SETTINGS
+  only; the 6-row one (All Lamps) is on the Fleet page, which `/popup` cannot reach. **Nothing on
+  the P4_5 scrolls now**, so the bar is unseen until a smaller board or a longer panel.
+  Two flashes (F5), both while changing a setting in a window, 0 underruns - open, see the report.
+  Needs HA, so waits for home: L1, L3b, L4, T4-T6, T8, P2-P5. G5/G7 could not work without HA (the
+  group is `sheet_office` then, not `ha_office`); G7 left `groups.ha_office.color` in the file.
 - **A Wi-Fi recovery that looked stuck (P4_5, serial log, 2026-10-09) - CLOSED, not evidence.**
   The log showed "RECOVERY 1/3: re-associating" and then no `[Conn]` line for 33 minutes. Owner
   (2026-10-10): the router was unplugged and plugged back in several times while cables were moved
