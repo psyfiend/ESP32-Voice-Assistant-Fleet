@@ -257,7 +257,11 @@ freezes, the flash-write flash and #49. **The folder is published as a GitHub pr
 Check after a build: the firmware's IDF version string ends `-dirty`
 (`grep -a -o "v5.5.5-832-g2553c5ad432[-a-z]*" .pio/build/<env>/firmware.bin`). A new rebuild gets a
 new pre-release, never git (the folder is 367 MB; one library is over 50 MB).
-The local debug flags in `platformio.ini` are on the desktop PC only too.
+**The laptop** has the `p4-libs-2026-10-09` folder too (installed 2026-10-10, SHA-256 checked;
+`WS_P4_TOUCH_LCD_5` built and its firmware reads `-dirty`). Its older folders have different names
+from the desktop's: `esp32p4_es.a10-2026-09-22` (#49 only) and `esp32p4_es.stock.55.03.311`.
+The local debug flags in `platformio.ini` are per machine too: the laptop's (skip-worktree, its own
+path prefix) has `DEBUG_POPUP` and `DEBUG_FRAMES` on `WS_P4_TOUCH_LCD_5`.
 
 **Do not use NINA's C6 updater** - it hung `WS_P4_5`.
 
