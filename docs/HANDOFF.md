@@ -108,9 +108,13 @@ measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "S
   the earlier flashes; in one of the deliberate flash-write tests a few builds ago it looked very light
   blue; a single flash is too quick to judge. Not new. Still unexplained: it was seen on the
   cache-safe libraries (A14), with no save running.
-- **2026-10-10, laptop session:** the owner tests the **P4_5 only**, on the desktop's 2026-10-09
-  ~14:40 build (`DEBUG_POPUP` + `DEBUG_HANG`), not reflashed - the 4B and 1060 are not with the owner,
-  so F4 and P1's 4B/1060 parts wait.
+- **2026-10-10, laptop session:** the owner tests the **P4_5 only** - the 4B and 1060 are not with
+  the owner, so F4 and P1's 4B/1060 parts wait. **The P4_5 was reflashed from the laptop** (COM6,
+  `feat/65-saving` at `2b738e6`, `DEBUG_POPUP` + `DEBUG_HANG` as on the desktop, the
+  p4-libs-2026-10-09 libraries) so it joins the Wi-Fi there (the compiled-in credentials; nothing
+  in this firmware stores them in NVS). It is at **`http://10.0.0.2`**: that router does not
+  resolve `fleet-ws-p4-5`, nor `.local`. Its settings file was kept (276 bytes: Desk's Tap action
+  Toggle, Midnight's selector Slv Sq).
 - **A Wi-Fi recovery that looked stuck (P4_5, serial log, 2026-10-09) - CLOSED, not evidence.**
   The log showed "RECOVERY 1/3: re-associating" and then no `[Conn]` line for 33 minutes. Owner
   (2026-10-10): the router was unplugged and plugged back in several times while cables were moved
