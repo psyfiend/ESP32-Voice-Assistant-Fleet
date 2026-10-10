@@ -713,7 +713,8 @@ without seeing a flash.
 **The owner's white flash (P4_5 only, now and then, no action it follows).** Not yet explained.
 `/panel` now lists any underrun the bridge does see, with its time; read it right after a flash.
 
-**Built so far** (WS_P4_5, driven from the PC with `/popup`; nothing yet touched on the glass):
+**Built so far** (WS_P4_5, driven from the PC with `/popup`; the owner's testing on glass began
+2026-10-09):
 
 | Step | What | Measured |
 |---|---|---|
@@ -727,6 +728,8 @@ without seeing a flash.
 | 7 | Unclaimed settings (K35): `Settings::setClaims()`, `/settings?prune=`, the System Doctor's [SETTINGS] | a made-up card id listed, pruned |
 | 8 | Selector to the system panel; "Entity label" (K45) | SETTINGS: Paused, Entity label, (Card label), Visibility, Tap action - no scrolling on the P4_5, 4B and 1060 (screenshots) |
 | 9 | Groups for card labels (K44): HA areas learnt with the scenes; `CardGroups`; the Card label row; groups from a PC | nothing chosen = as before; a custom group, HA area, Custom with and without words, None; a group recoloured and a detached card not (screenshots) |
+| 10 | Groups get colours of their own (K47): saved colours first, then each group its name's colour if free, then a free one | House page: only Kitchen moved (lime -> ochre `E07A3F`), seven groups, seven colours |
+| 11 | From the owner's first touches (2026-10-09): dropdown lists as tall as the screen (the theme capped them at 260 px - five rows on the P4_5 and 4B); the Card label row greyed (K48); Entity label settled (K49: a dashboard-named card is Custom, Inherit shows HA's name, the label knob a test tool); HangWatch (`-D DEBUG_HANG`, `/hang`) | the freeze caught and decoded (A15); the rest awaits the owner's sheet |
 
 Active state and Scenes are read every time a page is built, so they also survive a page swipe -
 before 2.10d a swipe lost them.
@@ -763,8 +766,12 @@ the web UI: `/settings?group=new&name=..`, `group=<id>&name=..` (empty: its own 
 The System Doctor's [SETTINGS] lists every group, HA or local; `/popup?groups=1` (debug) lists the
 groups and each card's.
 
-**Known:** the colour-by-name collides - Garage and Kitchen have always both been lime. With colour
-as the key, that wants deciding (owner).
+**Colours are unique (K47)**: Garage and Kitchen were both lime by name; groups now take colours of
+their own unless one is set on purpose to match another.
+
+**The P4 freezes were not this window's** (A15): the PPA hanging on a rotated strip, IDF #19023,
+patched in the framework libraries. **The Card label row is greyed** for 2.10d (K48); its redesign
+and the move-to-group window come after.
 
 The owner's test sheet: `docs/TEST_2.10d.md`. Next, after it: the all-nine gate and the merge. K17
 waits until after 2.10d (K45).

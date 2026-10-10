@@ -1,4 +1,4 @@
-# Handoff — 2026-10-07 (2.10c merged as `v0.2.10`; 2.10d next)
+# Handoff — 2026-10-10 (2.10d in the owner's testing on `feat/65-saving`; `v0.2.10` is the last tag)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was rewritten from scratch on
@@ -72,29 +72,60 @@ malloc for LVGL is a trap on this hardware. LVGL 9.6: after 2.10 (#88).
   300 ms later so the print is not timed; `dbgMem` for G1; a long press on the window's title cycles
   the sparks: now and then / once / off) and `-D DEBUG_FRAMES` (GUIManager.cpp: every frame of every
   burst of motion). Add them to `WS_P4_TOUCH_LCD_5` in `platformio.ini` when measuring; never commit
-  them. `DEBUG_POPUP` also brings `GET /popup` (above).
+  them. **`-D DEBUG_HANG`** (2.10d): HangWatch, `GET /hang` - where `loop()` stopped, the last PPA
+  jobs and the DMA2D registers; `/hang?test=1` makes a 4 s stall to check it. `DEBUG_POPUP` also brings `GET /popup` (above).
 - **Reading a board's boot log without a monitor:** a pyserial script that pulses RTS with DTR low
   (a normal boot) and filters lines; PlatformIO's Python has pyserial. PowerShell 5.1 strips quotes
   from `python -c "..."`, so write the script to a file.
 
 ## 2.10d IN PROGRESS on `feat/65-saving` (from 2026-10-08)
 
-Decided with the owner: `DECISIONS.md` K33-K45, A14. Design, the nine steps built and their
+Decided with the owner: `DECISIONS.md` **K33-K49, A14, A15**. Design, the steps built and their
 measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "Saved settings".
-**The owner's test sheet: `docs/TEST_2.10d.md`** (P4_5, 4B and 1060 all flashed 2026-10-09 with
-`DEBUG_POPUP`, local, and the cache-safe libraries). Everything was checked from the PC with
-`/popup`, `/settings` and screenshots; **nothing has been touched on the glass yet.**
+**The owner's test sheet: `docs/TEST_2.10d.md`** - the owner is working through it now (started
+2026-10-09). **Wait for the owner's "done testing", then one report**; fix what failed.
 
-Open: **Desk's Tap action on the P4_5 (Load scene, Bright) was set with nobody at the panel**
-(owner away; only the Tap action dropdown writes that pair) - unexplained; every change is now
-logged with its task (`/settings?stats=1`), so the next one will say where it came from. The
-colour-by-name collision (Garage and Kitchen both lime) against K46's "colour is the key" - the
-owner's call. The random white flash on the P4_5 (`/panel` lists underruns; the flash-write blue is
-fixed, A14, to be confirmed on glass). Groups were reworked to K46 on 2026-10-09; round 4 of the
-test sheet matches it.
-**The S3 RGB boards** (S3_4B, S3_5B, 8048) probably flash on writes too
-(`CONFIG_LCD_RGB_ISR_IRAM_SAFE` off, stock libraries) - untested, none on the desk working.
-After the owner's rounds: the all-nine gate, `--no-ff`, `v0.2.11`, CHANGELOG. K17 after 2.10d.
+**State at 2026-10-10** (last commit on `feat/65-saving` is this handoff):
+- **P4_5, 4B and 1060 flashed 2026-10-09 ~14:40** with everything below, `DEBUG_POPUP` on all three
+  and `DEBUG_HANG` on the P4_5 (both local, in the desktop PC's uncommitted `platformio.ini`).
+- **The freezes (A15) - the most important open result.** The P4_5 froze three times on 2026-10-09
+  in card windows. HangWatch (`include/HangWatch.h`, `-D DEBUG_HANG`, `GET /hang`) caught the third:
+  `loop()` blocked in `ppa_do_operation()` - **IDF issue #19023**, the PPA never finishing a
+  90/270-degree strip rotation. Fixed on IDF master, not v5.5; the P4 libraries were rebuilt with that
+  one patch (`scripts/idf-patches/`, REBUILD_P4_LIBS "third rebuild") and installed with the owner's
+  OK. **Not yet proven on glass**: if any P4 freezes again, `/hang` on the P4_5 before a reset (it now
+  also lists the last 16 PPA jobs and the DMA2D registers). The 2.10c "hang, once" (below) was
+  probably the same bug.
+- **Done today, from the owner's first touches:** every dropdown choice in sight (the theme capped
+  lists at 260 px); the **Card label row greyed** for 2.10d (K48 - its redesign, Current group /
+  None / Custom with a name window, comes after); **Entity label settled** (K49 - a dashboard-named
+  card is Custom, Inherit shows HA's name, the system panel's label knob is a test tool that
+  overrides at State/None).
+- **Desk's Tap action set with nobody there**: the owner checked HA's log and says not to worry -
+  closed. Every change is logged with its task (`/settings?stats=1`) anyway.
+- **The P4_5's random white flash**: seen twice on 2026-10-09 while using dropdowns, **0 underruns
+  each time** in `/panel` and no save running - unexplained. Asked the owner what it looks like
+  (whole screen or part, colour, how long); no answer yet.
+- **A Wi-Fi recovery that never finished (P4_5, serial log, 2026-10-09).** 17:26:59 link lost and
+  "M&M Motors" **not found** three times (the AP itself gone? ask the owner); the board's own AP came
+  up; 17:29:11 back online. 17:32 a remote host stopped answering, 17:33:14 "Link health DEAD",
+  **"RECOVERY 1/3: re-associating"** - and then no `[Conn]` line at all for 33 minutes, only
+  `RPC_WRAP: rpc_wifi_sta_get_ap_info: failed, status [12303]` every 5 min, until the log ends at
+  18:06. The recovery ladder (`ConnectivityManager`) looks stuck after its first rung. At 00:34 on
+  2026-10-10 none of the three boards answered HTTP - powered off, or the same thing; unknown.
+  Not 2.10d's code; check with the owner, then read the recovery path.
+- **The S3 RGB boards** (S3_4B, S3_5B, 8048) probably flash on writes too
+  (`CONFIG_LCD_RGB_ISR_IRAM_SAFE` off, stock libraries) - untested, none on the desk working.
+- **After the owner's rounds:** remove the local debug lines from `platformio.ini` (never commit
+  them), the all-nine compile gate, a look on glass, `--no-ff` merge, tag `v0.2.11`, CHANGELOG
+  entry, archive the test sheet, HANDOFF/ROADMAP. Then K17 (a member as a card of its own), then
+  2.10e history. **HangWatch stays** (committed, gated by its flag).
+
+**Owner's notes for later, not 2.10d** (K48): moving a card to another group gets its own row and
+window (a list of groups, each openable to its members; "change the label" or "move into a group
+panel"), and the three things now called "group" need names - the shared label, a group card like
+Desk, a group panel on the dashboard. Also: NINA-style toasts (after 2.10d), the grid arranger with
+2.11 (#78), scene secondary info (#89), the web UI for names and groups.
 
 ## What 2.10d started from (#65)
 
@@ -113,10 +144,8 @@ K32), HA scenes (K19, K21), and the window redesigned over nine rounds (K20-K31)
 
 **Still open from 2.10c, none blocking:**
 - **A hang, once**: the P4_5's UI loop froze for good during the first run of a face-cache stress
-  test; not seen in nine passes or hours of use since. The face cache's slot reuse is the first
-  suspect. The loop watchdog that would catch it is gone (local only, never committed); to bring it
-  back: `enableLoopWDT()` in `loop()` once `millis()` passes 60 s - **not in `setup()`**, which
-  boot-looped the P4_5 - and log serial with pyserial from PlatformIO's own Python, DTR and RTS low.
+  test. Most likely the PPA rotation hang found in 2.10d (A15), which is now patched; `-D DEBUG_HANG`
+  (HangWatch, `/hang`) is the instrument for the next one.
 - **The 4B washed out, twice ever**: the picture near-white and lurid while `/screenshot` was right -
   the panel, not the frame buffer. The next time, before resetting: `http://fleet-ws-p4-4b/panel?resend=1`
   (`src/PanelDebug.cpp`). If that cures it, the fix is to re-send now and then, blind - **reading the
@@ -214,9 +243,19 @@ size - not a CR1220). S3_5B's 927 holder is unconfirmed. Nothing reads an RTC ye
 **The ESP32-P4 framework libraries are REBUILT, not stock.** `esp32p4_es` in
 `~/.platformio/packages/framework-arduinoespressif32-libs/` carries `MEMPOOL_PREFER_SPIRAM` and a
 64-byte L2 line - the fix for esp-hosted-mcu#243 (#49) - and, since 2026-10-08,
-`LCD_DSI_ISR_CACHE_SAFE` (flash writes flashed the panels blue; A14). The #49 build sits beside it as
-`esp32p4_es.hosted_fix`, the stock copy as `esp32p4_es.stock.55.03.311`; rollback is a rename. A `pio pkg update` or platform reinstall
-silently puts the bug back. `docs/REBUILD_P4_LIBS.md`. The S3 libraries are stock.
+`LCD_DSI_ISR_CACHE_SAFE` (flash writes flashed the panels blue; A14), and since 2026-10-09 IDF's
+**PPA rotation fix** (the freezes; A15, a source patch in `scripts/idf-patches/`). Beside it:
+`esp32p4_es.cache_safe` (before A15), `esp32p4_es.hosted_fix` (#49 only), `esp32p4_es.stock.55.03.311`;
+rollback is a rename. A `pio pkg update` or platform reinstall silently puts the bugs back.
+`docs/REBUILD_P4_LIBS.md`; the build tree is in WSL on the desktop PC (`~/esp32-arduino-lib-builder`,
+`esp-idf` carries the patch, so its version reads `-dirty`). The S3 libraries are stock.
+
+**This is per machine.** The rebuilt libraries exist **only on the desktop PC** (user Marge). A
+build on any other machine (the laptop) links the stock or older libraries: the freezes, the
+flash-write flash and #49 come back. **Flash boards from the desktop PC**, or copy the
+`esp32p4_es` folder across first (it is self-contained), and check: the firmware's IDF version
+string ends `-dirty` (`grep -a -o "v5.5.5-832-g2553c5ad432[-a-z]*" .pio/build/<env>/firmware.bin`).
+The local debug flags in `platformio.ini` are on the desktop PC only too.
 
 **Do not use NINA's C6 updater** - it hung `WS_P4_5`.
 
