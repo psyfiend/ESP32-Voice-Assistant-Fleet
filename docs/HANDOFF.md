@@ -111,15 +111,11 @@ measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "S
 - **2026-10-10, laptop session:** the owner tests the **P4_5 only**, on the desktop's 2026-10-09
   ~14:40 build (`DEBUG_POPUP` + `DEBUG_HANG`), not reflashed - the 4B and 1060 are not with the owner,
   so F4 and P1's 4B/1060 parts wait.
-- **A Wi-Fi recovery that never finished (P4_5, serial log, 2026-10-09).** 17:26:59 link lost and
-  "M&M Motors" **not found** three times (owner, 2026-10-10: **the router was unplugged** while being
-  moved); the board's own AP came
-  up; 17:29:11 back online. 17:32 a remote host stopped answering, 17:33:14 "Link health DEAD",
-  **"RECOVERY 1/3: re-associating"** - and then no `[Conn]` line at all for 33 minutes, only
-  `RPC_WRAP: rpc_wifi_sta_get_ap_info: failed, status [12303]` every 5 min, until the log ends at
-  18:06. The recovery ladder (`ConnectivityManager`) looks stuck after its first rung. At 00:34 on
-  2026-10-10 none of the three boards answered HTTP - powered off, or the same thing; unknown.
-  Not 2.10d's code; check with the owner, then read the recovery path.
+- **A Wi-Fi recovery that looked stuck (P4_5, serial log, 2026-10-09) - CLOSED, not evidence.**
+  The log showed "RECOVERY 1/3: re-associating" and then no `[Conn]` line for 33 minutes. Owner
+  (2026-10-10): the router was unplugged and plugged back in several times while cables were moved
+  around the desk, so the log does not show the recovery ladder failing. Nothing to chase unless it
+  happens again with the network steady.
 - **The S3 RGB boards** (S3_4B, S3_5B, 8048) probably flash on writes too
   (`CONFIG_LCD_RGB_ISR_IRAM_SAFE` off, stock libraries) - untested, none on the desk working.
 - **After the owner's rounds:** remove the local debug lines from `platformio.ini` (never commit
