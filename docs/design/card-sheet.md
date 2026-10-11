@@ -810,6 +810,18 @@ later. Decisions K52-K55.
   its rows in from the sides. SETTINGS adds **Units** (°C/°F per card, `units`) and an **Entity
   properties** button opening a read-only view (HA's name, entity id, HA's area, source, class,
   unit, members, the card's group and id). A card that toggles nothing taps to History.
+- **Round 3 (owner, the same afternoon): axes in round steps.** Values: a label every ~2.4 lines
+  of text of plot height, each step 1 / 2 / 2.5 / 5 x 10^n, the range widened to whole steps, the
+  labels in a gutter left of the plot, the unit on the top one; times: ticks on the local clock
+  (5, 10, 15, 30 min, 1, 2, 3, 4, 6, 12 h - the shortest whose labels fit), a faint grid line at
+  every tick both ways. More room - the 1060, the span buttons hidden - gives more ticks. With the
+  buttons hidden, the span in words takes their place. Legend chooses which labels; the grid stays.
+- **Open, the owner's to decide: a fixed range.** "Auto" uses the span's own min and max (one
+  entity or, later, many); a user may want a "normal" range so charts look alike (e.g. 15-90 °F
+  for a year of Seattle). The owner's idea: a popup with a number wheel for high and low. LVGL has
+  one (`lv_roller`). Claude's proposal: CHART "Scale: Auto / Fixed"; Fixed opens a small window
+  with two wheels (Low, High) in round steps, first set to the range showing; kept per card - and
+  later per multi-entity chart, which is why it should be designed with 3.x's chart cards.
 
 **Where the data comes from** (K53; measured from the PC on 2026-10-11, the owner's HA):
 

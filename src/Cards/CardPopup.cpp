@@ -2264,6 +2264,7 @@ struct HistView {
     uint16_t  m = 0;             // how many
     uint32_t  t0 = 0, spanSec = 1;   // the drawn span's start and length
     int32_t   plotTop = 0, plotBot = 0;
+    int32_t   plotL = 0, plotW = 1;   // the plot's left (past the value labels) and width
 };
 HistView s_hv;
 lv_obj_t *s_histList = nullptr;   // activity's rows, while they show
@@ -2362,6 +2363,7 @@ void histAsk();
 void histDraw();
 void histChartCb(lv_event_t *ev);
 int32_t histX(uint32_t t);
+float histNice(float raw);
 lv_obj_t *histVLine(lv_obj_t *parent, lv_point_precise_t *pts, int32_t x, uint32_t col, int32_t width);
 void spanChipCb(lv_event_t *ev);
 void histMoreCb(lv_event_t *ev);
@@ -2485,20 +2487,21 @@ void histDrawChart(lv_obj_t *body) {
     lv_obj_set_size(top, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(top, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(top, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    if (s_hv.chips) histChips(top);
+    // Without the chips, what span this is takes their place (owner, round 3),
+    // and Now stays at the right either way.
     char buf[96], nowTxt[32];
+    if (s_hv.chips) histChips(top);
+    else {
+        static const char *const SPAN_WORDS[HIST_SPANS] = { "24 hours", "12 hours", "6 hours", "1 hour" };
+        lv_obj_t *sl = makeLabel(top, t.TAG, p.TEXT_DIM);
+        lv_label_set_text(sl, SPAN_WORDS[s_hv.span]);
+    }
     cardFormatValue(e, nowTxt, sizeof(nowTxt), true, s.tempUnit);
-    snprintf(buf, sizeof(buf), "Now %s", nowTxt);
+    snprintf(buf, sizeof(buf), "Now %s%s", nowTxt, H.fromStatistics() ? " (5-minute averages)" : "");
     lv_obj_t *read = makeLabel(top, t.TAG, p.TEXT);
     lv_label_set_text(read, buf);
 
     if (lo > hi) { histNote(body, "Nothing recorded in this span"); return; }
-
-    // The y range: the span's own, a tenth more each side; a flat line gets one
-    // unit either way. Values in tenths, the chart's integers.
-    float ymin = lo, ymax = hi;
-    const float padY = (ymax - ymin) * 0.1f;
-    if (padY < 0.05f) { ymin -= 1.0f; ymax += 1.0f; } else { ymin -= padY; ymax += padY; }
 
     lv_obj_t *area = plain(body);
     lv_obj_set_width(area, lv_pct(100));
@@ -2507,6 +2510,9 @@ void histDrawChart(lv_obj_t *body) {
     lv_obj_add_flag(area, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(area, histChartCb, LV_EVENT_PRESSED, nullptr);
     lv_obj_add_event_cb(area, histChartCb, LV_EVENT_PRESSING, nullptr);
+    lv_obj_update_layout(area);
+    const int32_t w  = lv_obj_get_width(area);
+    const int32_t ah = lv_obj_get_height(area);
 
     // A strip above the plot for the min, max and finger's values; one below
     // it for the times, when the Legend shows them.
@@ -2514,26 +2520,114 @@ void histDrawChart(lv_obj_t *body) {
     const bool    xLeg = s_hv.legend != LEGEND_Y, yLeg = s_hv.legend != LEGEND_X;
     const int32_t topH = lh + mm(0.6f);
     const int32_t botH = xLeg ? lh + mm(0.6f) : mm(0.8f);
+    const int32_t plotH = LV_MAX(10, ah - topH - botH);
+
+    // THE VALUE SCALE, IN ROUND STEPS (owner, round 3): as many lines as the
+    // plot's height has room for - a label every ~2.4 lines of text - each step
+    // 1, 2, 2.5 or 5 times a power of ten, the range widened to whole steps. So
+    // 0-100 gets lines every 20 or 25, 40-60 every 5; a taller chart (the 1060,
+    // no span buttons) gets more.
+    const int32_t wantY = LV_CLAMP(2, plotH / (lh * 12 / 5), 8);
+    float rng = hi - lo;
+    if (rng < 0.001f) rng = 2.0f;
+    const float step = histNice(rng / (float)wantY);
+    float ymin = floorf(lo / step) * step, ymax = ceilf(hi / step) * step;
+    if (ymax - ymin < step * 0.5f) { ymin -= step; ymax += step; }
+    const int dec = step >= 1.0f ? 0 : step >= 0.1f ? 1 : 2;
+
+    // The value labels' gutter, as wide as the widest of them.
+    int32_t gutter = 0;
+    if (yLeg) {
+        for (float v = ymin; v <= ymax + step * 0.01f; v += step) {
+            snprintf(buf, sizeof(buf), "%.*f%s", dec, (double)v, v + step > ymax + step * 0.01f ? unit : "");
+            gutter = LV_MAX(gutter, textW(buf, t.TAG));
+        }
+        gutter += mm(1.5f);
+    }
+    const int32_t plotW = LV_MAX(10, w - gutter);
+    s_hv.plotL = gutter; s_hv.plotW = plotW;
+    s_hv.plotTop = topH; s_hv.plotBot = topH + plotH;
+    s_hv.area = area; s_hv.t0 = t0; s_hv.spanSec = span;
+
+    // The grid, under the line: made before the chart, so drawn first.
+    const lv_color_t gridCol = UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 14));
+    auto gridLine = [&](int32_t x, int32_t y, int32_t gw, int32_t gh) {
+        lv_obj_t *g = plain(area);
+        lv_obj_set_pos(g, x, y);
+        lv_obj_set_size(g, gw, gh);
+        lv_obj_set_style_bg_color(g, gridCol, 0);
+        lv_obj_set_style_bg_opa(g, LV_OPA_COVER, 0);
+    };
+    int32_t lastLblY = INT32_MIN;
+    for (float v = ymax; v >= ymin - step * 0.01f; v -= step) {
+        const int32_t y = topH + (int32_t)lroundf((ymax - v) / (ymax - ymin) * (float)(plotH - 1));
+        gridLine(gutter, y, plotW, 1);
+        if (!yLeg) continue;
+        snprintf(buf, sizeof(buf), "%.*f%s", dec, (double)v, v >= ymax - step * 0.01f ? unit : "");
+        const int32_t ly = LV_CLAMP(0, y - lh / 2, ah - lh);
+        if (ly < lastLblY + lh) continue;   // never two on top of each other
+        lv_obj_t *yl = makeLabel(area, t.TAG, p.TEXT_DIM);
+        lv_label_set_text(yl, buf);
+        lv_obj_set_pos(yl, gutter - mm(1.5f) - textW(buf, t.TAG), ly);
+        lastLblY = ly;
+    }
+
+    // THE TIME SCALE ON THE CLOCK (owner, round 3): ticks on whole hours, half
+    // hours or minutes, as many as fit their labels across the plot - every 2
+    // or 3 hours on a day, 10 or 15 minutes on an hour. A faint line at each.
+    {
+        static const uint32_t IV[] = { 300, 600, 900, 1800, 3600, 7200, 10800, 14400, 21600, 43200, 86400 };
+        const int32_t lblW = textW("12 PM", t.TAG) + mm(3.0f);
+        const uint32_t fit = (uint32_t)LV_MAX(2, plotW / lblW);
+        uint32_t iv = IV[sizeof(IV) / sizeof(IV[0]) - 1];
+        for (uint32_t c : IV) if (span / c <= fit) { iv = c; break; }
+        // The local clock's offset from UTC, so ticks land on local hours.
+        const time_t tt = (time_t)t0;
+        struct tm lt;
+        localtime_r(&tt, &lt);
+        const int32_t local = lt.tm_hour * 3600 + lt.tm_min * 60 + lt.tm_sec;
+        int32_t off = local - (int32_t)(t0 % 86400);
+        if (off > 50400) off -= 86400;
+        if (off < -50400) off += 86400;
+        const int64_t first = (((int64_t)t0 + off + iv - 1) / iv) * iv - off;
+        int32_t lastRight = INT32_MIN;
+        for (int64_t tk = first; tk <= (int64_t)t1; tk += iv) {
+            const int32_t x = gutter + (int32_t)((uint64_t)(tk - t0) * (uint32_t)(plotW - 1) / span);
+            gridLine(x, topH, 1, plotH);
+            if (!xLeg) continue;
+            const time_t tl = (time_t)tk;
+            struct tm a;
+            localtime_r(&tl, &a);
+            int hr = a.tm_hour % 12;
+            if (!hr) hr = 12;
+            if (iv >= 3600) snprintf(buf, sizeof(buf), "%d %s", hr, a.tm_hour < 12 ? "AM" : "PM");
+            else            snprintf(buf, sizeof(buf), "%d:%02d", hr, a.tm_min);
+            const int32_t bw = textW(buf, t.TAG);
+            const int32_t bx = LV_CLAMP(0, x - bw / 2, w - bw);
+            if (bx < lastRight + mm(1.5f)) continue;
+            lv_obj_t *xl = makeLabel(area, t.TAG, p.TEXT_DIM);
+            lv_label_set_text(xl, buf);
+            lv_obj_set_pos(xl, bx, topH + plotH + mm(0.6f));
+            lastRight = bx + bw;
+        }
+    }
 
     lv_obj_t *ch = lv_chart_create(area);
     lv_obj_remove_style_all(ch);
     lv_obj_set_size(ch, lv_pct(100), lv_pct(100));
     lv_obj_set_style_pad_all(ch, 0, 0);
+    lv_obj_set_style_pad_left(ch, gutter, 0);
     lv_obj_set_style_pad_top(ch, topH, 0);
-    lv_obj_set_style_pad_bottom(ch, botH, 0);
-    lv_obj_set_style_line_color(ch, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 14)), LV_PART_MAIN);
-    lv_obj_set_style_line_width(ch, 1, LV_PART_MAIN);
+    lv_obj_set_style_pad_bottom(ch, ah - topH - plotH, 0);
     lv_obj_set_style_line_width(ch, LV_MAX(2, mm(0.45f)), LV_PART_ITEMS);
     lv_obj_set_style_width (ch, 0, LV_PART_INDICATOR);   // no dots on the points
     lv_obj_set_style_height(ch, 0, LV_PART_INDICATOR);
     lv_obj_clear_flag(ch, LV_OBJ_FLAG_CLICKABLE);
     lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
-    lv_chart_set_div_line_count(ch, 4, 0);
+    lv_chart_set_div_line_count(ch, 0, 0);   // the grid above is ours
     lv_chart_set_axis_range(ch, LV_CHART_AXIS_PRIMARY_Y, (int32_t)lroundf(ymin * 10), (int32_t)lroundf(ymax * 10));
 
-    lv_obj_update_layout(area);
-    const int32_t w = lv_obj_get_width(area);
-    const uint16_t m = (uint16_t)LV_CLAMP(48, w / 4, 240);
+    const uint16_t m = (uint16_t)LV_CLAMP(48, plotW / 4, 240);
     lv_chart_set_point_count(ch, m);
     lv_chart_series_t *ser = lv_chart_add_series(ch, UI::c(p.ACCENT), LV_CHART_AXIS_PRIMARY_Y);
     int32_t *ys = lv_chart_get_series_y_array(ch, ser);
@@ -2548,40 +2642,9 @@ void histDrawChart(lv_obj_t *body) {
     }
     lv_chart_refresh(ch);
 
-    // Kept for the finger (histScrub()).
-    const int32_t ah = lv_obj_get_height(area);
-    s_hv.area = area; s_hv.ys = ys; s_hv.m = m; s_hv.t0 = t0; s_hv.spanSec = span;
-    s_hv.plotTop = topH; s_hv.plotBot = ah - botH;
+    // Kept for the finger (histScrub()); the plot's place was kept above.
+    s_hv.ys = ys; s_hv.m = m;
     s_hv.scrubLine = s_hv.scrubLbl = nullptr;
-
-    // THE Y SCALE (Legend: Y axis or Both): the top and bottom values, small,
-    // inside the plot's corners.
-    if (yLeg) {
-        snprintf(buf, sizeof(buf), "%.1f%s", (double)ymax, unit);
-        lv_obj_t *yl = makeLabel(area, t.TAG, p.TEXT_DIM);
-        lv_label_set_text(yl, buf);
-        lv_obj_align(yl, LV_ALIGN_TOP_LEFT, 0, topH);
-        snprintf(buf, sizeof(buf), "%.1f%s", (double)ymin, unit);
-        yl = makeLabel(area, t.TAG, p.TEXT_DIM);
-        lv_label_set_text(yl, buf);
-        lv_obj_align(yl, LV_ALIGN_BOTTOM_LEFT, 0, -botH);
-    }
-
-    // THE TIME SCALE (Legend: X axis or Both): the span's start, its middle, now.
-    if (xLeg) {
-        char tm[32];
-        histTime(tm, sizeof(tm), t0, false);
-        lv_obj_t *xl = makeLabel(area, t.TAG, p.TEXT_DIM);
-        lv_label_set_text(xl, tm);
-        lv_obj_align(xl, LV_ALIGN_BOTTOM_LEFT, 0, 0);
-        histTime(tm, sizeof(tm), t0 + span / 2, false);
-        xl = makeLabel(area, t.TAG, p.TEXT_DIM);
-        lv_label_set_text(xl, tm);
-        lv_obj_align(xl, LV_ALIGN_BOTTOM_MID, 0, 0);
-        xl = makeLabel(area, t.TAG, p.TEXT_DIM);
-        lv_label_set_text(xl, H.fromStatistics() ? "Now (5-minute averages)" : "Now");
-        lv_obj_align(xl, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
-    }
 
     // MIN AND MAX WHERE THEY HAPPENED (owner, round 2): a faint dotted line
     // across the plot at each, its value in the strip above. Two labels that
@@ -2616,12 +2679,20 @@ void histDrawChart(lv_obj_t *body) {
 // the value in the strip above the plot - never under the finger. Slide to move
 // it; it stays where the finger lifts, until the span changes.
 
-// A time to the plot's x.
+// A time to the plot's x (in the chart area, past the value labels' gutter).
 int32_t histX(uint32_t t) {
     if (!s_hv.area) return 0;
-    const int32_t w = lv_obj_get_width(s_hv.area);
     const uint32_t d = t > s_hv.t0 ? t - s_hv.t0 : 0;
-    return LV_CLAMP(0, (int32_t)((uint64_t)d * (uint32_t)(w - 1) / LV_MAX(1u, s_hv.spanSec)), w - 1);
+    const int32_t pw = LV_MAX(2, s_hv.plotW);
+    return s_hv.plotL + LV_CLAMP(0, (int32_t)((uint64_t)d * (uint32_t)(pw - 1) / LV_MAX(1u, s_hv.spanSec)), pw - 1);
+}
+
+// A round step near `raw`: 1, 2, 2.5 or 5 times a power of ten.
+float histNice(float raw) {
+    if (raw <= 0.0f) return 1.0f;
+    const float e = powf(10.0f, floorf(log10f(raw)));
+    const float f = raw / e;
+    return (f <= 1.0f ? 1.0f : f <= 2.0f ? 2.0f : f <= 2.5f ? 2.5f : f <= 5.0f ? 5.0f : 10.0f) * e;
 }
 
 // A dotted line down the plot at x. `pts` must outlive the line (LVGL keeps the
@@ -2647,10 +2718,11 @@ void histScrub(int32_t x) {
     if (!s_hv.area || !s_hv.ys || s_hv.m < 2) return;
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
-    const int32_t w = lv_obj_get_width(s_hv.area);
-    x = LV_CLAMP(0, x, w - 1);
-    const uint16_t i = (uint16_t)LV_CLAMP(0, (x * (s_hv.m - 1) + (w - 1) / 2) / LV_MAX(1, w - 1), s_hv.m - 1);
-    const int32_t xi = (int32_t)i * (w - 1) / (s_hv.m - 1);   // where the chart drew point i
+    const int32_t w  = lv_obj_get_width(s_hv.area);
+    const int32_t pw = LV_MAX(2, s_hv.plotW);
+    const int32_t xp = LV_CLAMP(0, x - s_hv.plotL, pw - 1);
+    const uint16_t i = (uint16_t)LV_CLAMP(0, (xp * (s_hv.m - 1) + (pw - 1) / 2) / (pw - 1), s_hv.m - 1);
+    const int32_t xi = s_hv.plotL + (int32_t)i * (pw - 1) / (s_hv.m - 1);   // where the chart drew point i
     const uint32_t at = s_hv.t0 + (uint32_t)(((uint64_t)s_hv.spanSec * (2 * i + 1)) / (2 * s_hv.m));
 
     static lv_point_precise_t ptsScrub[2];
@@ -2720,12 +2792,17 @@ void histDrawActivity(lv_obj_t *body) {
     const UIType    &t = UI::type();
     const HaHistory &H = *s_hist;
     const uint16_t n = H.events();
-    // The span buttons, as on the chart (owner, round 2) - unless turned off.
-    if (s_hv.actChips) {
+    // The span buttons, as on the chart (owner, round 2); turned off, the span
+    // in words in their place (round 3).
+    {
         lv_obj_t *top = plain(body);
         lv_obj_set_size(top, lv_pct(100), LV_SIZE_CONTENT);
         lv_obj_set_style_pad_hor(top, mm(5.0f), 0);
-        histChips(top);
+        if (s_hv.actChips) histChips(top);
+        else {
+            lv_obj_t *sl = makeLabel(top, t.TAG, p.TEXT_DIM);
+            lv_label_set_text(sl, s_hv.period ? "Last 7 days" : "Last 24 hours");
+        }
     }
     if (!n) {
         histNote(body, s_hv.period ? "No changes in the last 7 days" : "No changes in the last 24 hours");

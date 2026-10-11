@@ -95,3 +95,19 @@ kept per card.
 | R8 | Desk -> SETTINGS -> Entity properties -> View | "Desk > Properties": HA's name, light.office, HA's area, Home Assistant, 3 members, the card's group and id. Back arrow: the controls |
 | R9 | A sensor card you never set a Tap action on (Thermo, an occupancy): tap it | Its window opens on History. A light still toggles |
 | R10 | The 4B: a chart | The chips and "Now" side by side, nothing running under them |
+
+**Round 2 results (owner, 2026-10-11 afternoon): R1-R10 all PASS** (R8: "Love this!" - fleet and
+local entities too). R4 note: Legend was meant as **regular intervals** on the axes - hours along
+the bottom, values up the side - not two or three labels. Also asked: the span in words where the
+buttons were when they are hidden, Now staying right; and a **fixed range** option (open, below).
+
+## Round 3 - axes in round steps (all three boards, flashed 2026-10-11 ~15:30)
+
+| # | Do this | PASS if |
+|---|---|---|
+| X1 | Thermo, 24 h | Values up the left in round steps (here every 2°F), a faint line at each; hours along the bottom on the clock (every 3 h on the P4_5), a faint line at each; the unit on the top value only |
+| X2 | 12 h, 6 h, 1 h | The time steps shorten (hours, then 10-15 minutes), the values re-step to the range |
+| X3 | The same chart on the 4B and the 1060 | Fewer ticks on the 4B, more on the 1060; labels never on top of each other |
+| X4 | CHART: untick Show span buttons | "24 hours" (or the span) at the left where the buttons were, Now still at the right; the chart taller, maybe a line more |
+| X5 | ACTIVITY: untick Show span buttons | "Last 24 hours" / "Last 7 days" where the buttons were |
+| X6 | Legend X axis / Y axis / Both | The grid stays; only the time labels / only the value labels / both |
