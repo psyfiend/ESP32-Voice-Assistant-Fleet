@@ -6,6 +6,7 @@
 #include "UI/UIToolkit.h"
 #include "Settings.h"   // 2.10d: SETTINGS' rows are kept by card id
 #include "Cards/CardGroups.h"   // the Card label row (K44)
+#include "HaHistory.h"          // the History view's source (2.10e); no LVGL in it
 #include "src/core/lv_obj_event_private.h"   // lv_hit_test_info_t: the tap catcher's hit test
 #include "src/core/lv_obj_draw_private.h"    // lv_obj_get_ext_draw_size: the window's shadow
 #include <Arduino.h>
@@ -15,6 +16,7 @@
 #include <math.h>
 #include <stdarg.h>
 #include <string.h>
+#include <time.h>
 
 // See CardPopup.h for what this is and docs/design/card-sheet.md sections 11-13
 // for why it looks the way it does. Step 1 of 2.10a: the window, its header,
@@ -2205,13 +2207,484 @@ void buildMain() {
 }
 
 // ---------------------------------------------------------------------------
-// The inner views. 2.10a builds the navigation; 2.10e and the group work fill
-// them (card-sheet section 13).
+// HISTORY (2.10e, card-sheet section 18). What the view shows follows the
+// entity: a NUMBER gets a chart over a span picked right on the view (24 / 12 /
+// 6 / 1 h - owner: quick to switch), with now, min and max; anything that turns
+// ON AND OFF gets its ACTIVITY - each change, newest first, with what caused it
+// (a person, an automation, another entity), 10 rows then "Show more", a tap on
+// a row for its details. The left panel is CHART or ACTIVITY to match.
+//
+// HA entities only, tonight's scope (owner, 2026-10-11): the board's own and
+// MQTT entities keep a local log later. A group defined in HA is ITS OWN
+// entity here, as in HA (owner): its members' histories are reached through
+// Members, from each member's own window.
+//
+// HaHistory does the asking, on the loop task, and its answer is parsed on the
+// websocket task; tickCb() notices it and draws it here.
 // ---------------------------------------------------------------------------
+HaHistory *s_hist = nullptr;
+
+constexpr uint8_t  HIST_SPANS = 4;
+constexpr uint32_t HIST_SPAN_SEC[HIST_SPANS] = { 86400, 43200, 21600, 3600 };
+const char *const  HIST_SPAN_CHIP[HIST_SPANS] = { "24 h", "12 h", "6 h", "1 h" };
+constexpr uint8_t  HIST_PERIODS = 2;
+constexpr uint32_t HIST_PERIOD_SEC[HIST_PERIODS] = { 86400, 7 * 86400 };
+constexpr uint8_t  HIST_ROWS_FIRST = 10;   // owner, 2026-10-02: 10 rows, then "Show more"
+constexpr uint8_t  HIST_ROWS_MAX   = 60;   // what "Show more" draws at most (LVGL's pool)
+
+struct HistView {
+    const Entity *e = nullptr;   // whose history: see histSubject()
+    bool     chart = false;      // a number: the chart; anything else: activity
+    uint8_t  span = 0;           // HIST_SPAN_SEC index (the chart)
+    uint8_t  period = 0;         // HIST_PERIOD_SEC index (activity)
+    bool     minMax = true;      // the chart's min and max
+    bool     causes = true;      // activity's "by ..." lines
+    bool     more = false;       // "Show more" was tapped
+    uint32_t gen = 0;            // HaHistory's request this view made
+    uint8_t  drawn = 0xFF;       // the HistState last drawn
+    int16_t  openRow = -1;       // the activity row whose details show
+    lv_obj_t *body = nullptr;    // the view's contents, redrawn whole
+};
+HistView s_hv;
+
+// Whose history the view shows: one member, inside it; an HA group as itself;
+// a card's one entity. A card standing for several (All Lamps) has none of its
+// own.
+const Entity *histSubject() {
+    if (inMember()) return s.ent[0];
+    if (s.native) return s.native;
+    return s.nEnt == 1 ? s.ent[0] : nullptr;
+}
+
+bool histFromHa(const Entity *e) {
+    return e && e->desc.source == EntitySource::HA && e->desc.externalRef[0];
+}
+
+bool histIsChart(const Entity *e) {
+    return e && e->desc.kind == EntityKind::SENSOR &&
+           (e->value.type == ValueType::FLOAT || e->value.type == ValueType::INT);
+}
+
+// The subject changed (another card, a member): its choices start afresh. True
+// when they did - the left panel then shows the new subject's.
+bool histSync() {
+    const Entity *e = histSubject();
+    if (e == s_hv.e) return false;
+    s_hv = HistView{};
+    s_hv.e = e;
+    s_hv.chart = histIsChart(e);
+    return true;
+}
+
+// "1:32 AM", "Yesterday 11:02 PM", "Oct 8, 3:04 PM" - local time. With seconds
+// for a row's details.
+void histTime(char *out, size_t n, uint32_t t, bool secs) {
+    static const char *const MON[12] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+    const time_t tt = (time_t)t, now = time(nullptr);
+    struct tm a, b;
+    localtime_r(&tt, &a);
+    localtime_r(&now, &b);
+    int h = a.tm_hour % 12;
+    if (!h) h = 12;
+    char clock[20];
+    if (secs) snprintf(clock, sizeof(clock), "%d:%02d:%02d %s", h, a.tm_min, a.tm_sec, a.tm_hour < 12 ? "AM" : "PM");
+    else      snprintf(clock, sizeof(clock), "%d:%02d %s", h, a.tm_min, a.tm_hour < 12 ? "AM" : "PM");
+    const int days = (b.tm_year - a.tm_year) * 366 + (b.tm_yday - a.tm_yday);
+    if (days == 0)      snprintf(out, n, "%s", clock);
+    else if (days == 1) snprintf(out, n, "Yesterday %s", clock);
+    else                snprintf(out, n, "%s %d, %s", MON[a.tm_mon], a.tm_mday, clock);
+}
+
+// "2 h 14 min", "35 min", "40 s".
+void histSpan(char *out, size_t n, uint32_t sec) {
+    if (sec < 60)         snprintf(out, n, "%lu s", (unsigned long)sec);
+    else if (sec < 3600)  snprintf(out, n, "%lu min", (unsigned long)(sec / 60));
+    else if (sec < 86400) snprintf(out, n, "%lu h %lu min", (unsigned long)(sec / 3600), (unsigned long)(sec % 3600 / 60));
+    else                  snprintf(out, n, "%lu d %lu h", (unsigned long)(sec / 86400), (unsigned long)(sec % 86400 / 3600));
+}
+
+void histAsk();
+void histDraw();
+void spanChipCb(lv_event_t *ev);
+void histMoreCb(lv_event_t *ev);
+void histRowCb(lv_event_t *ev);
+void histSyncPanel();   // below, with the panels: the left panel's rows follow the view
+
+// A centred line of words in the view - loading, nothing, a failure.
+void histNote(lv_obj_t *parent, const char *text) {
+    lv_obj_t *l = makeLabel(parent, UI::type().NAME, UI::pal().TEXT_DIM);
+    lv_label_set_text(l, text);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(l, lv_pct(90));
+    lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
+}
+
+const char *histFailText(HistFail f) {
+    switch (f) {
+        case HistFail::FAIL_NO_LINK:   return "Not connected to Home Assistant";
+        case HistFail::FAIL_NO_CLOCK:  return "Waiting for the clock to be set";
+        case HistFail::FAIL_TIMEOUT:   return "Home Assistant did not answer";
+        case HistFail::FAIL_TOO_BIG:   return "Too much history to show here";
+        case HistFail::FAIL_REFUSED:   return "Home Assistant could not give this history";
+        case HistFail::FAIL_NO_MEMORY: return "No room to show history";
+        case HistFail::FAIL_NO_DATA:   return "Home Assistant keeps no history for this";
+        default:                       return "No history";
+    }
+}
+
 void buildHistory() {
+    histSync();
+    s_hv.body = nullptr;
+    s_hv.drawn = 0xFF;
+    const Entity *e = s_hv.e;
+    if (!histFromHa(e)) {
+        histNote(s.stage, e ? "History for this card comes later: only Home Assistant's is shown so far"
+                            : "A group made here has no history of its own. Open Members for each one's");
+        return;
+    }
+    s_hv.body = plain(s.stage);
+    lv_obj_set_size(s_hv.body, lv_pct(100), lv_pct(100));
+    lv_obj_set_flex_flow(s_hv.body, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(s_hv.body, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(s_hv.body, mm(1.2f), 0);
+    histAsk();
+    histDraw();
+}
+
+void histAsk() {
+    if (!s_hist || !histFromHa(s_hv.e)) return;
+    s_hv.openRow = -1;
+    if (s_hv.chart) s_hist->requestChart(s_hv.e->desc.externalRef, HIST_SPAN_SEC[s_hv.span]);
+    else            s_hist->requestActivity(s_hv.e->desc.externalRef, HIST_PERIOD_SEC[s_hv.period]);
+    s_hv.gen   = s_hist->gen();
+    s_hv.drawn = 0xFF;
+}
+
+// --- The chart -------------------------------------------------------------
+
+// The span chips: a row of small buttons, the chosen one lit in the accent.
+void histChips(lv_obj_t *parent) {
     const UIPalette &p = UI::pal();
-    lv_obj_t *l = makeLabel(s.stage, UI::type().NAME, p.TEXT_DIM);
-    lv_label_set_text(l, "History arrives with 2.10e");
+    lv_obj_t *row = plain(parent);
+    lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_style_pad_column(row, mm(1.2f), 0);
+    for (uint8_t i = 0; i < HIST_SPANS; i++) {
+        const bool lit = (i == s_hv.span);
+        lv_obj_t *b = plain(row);
+        lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_size(b, LV_SIZE_CONTENT, mm(6.0f));
+        lv_obj_set_style_pad_hor(b, mm(2.2f), 0);
+        lv_obj_set_style_radius(b, mm(3.0f), 0);
+        lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(b, UI::c(lit ? UI::mix(p.SURFACE, p.ACCENT, 25) : p.SURFACE), 0);
+        lv_obj_set_style_border_width(b, lit ? LV_MAX(1, mm(0.25f)) : 0, 0);
+        lv_obj_set_style_border_color(b, UI::c(p.ACCENT), 0);
+        lv_obj_set_style_bg_color(b, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+        lv_obj_add_event_cb(b, spanChipCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
+        lv_obj_t *l = makeLabel(b, UI::type().TAG, lit ? p.ACCENT : p.TEXT);
+        lv_label_set_text(l, HIST_SPAN_CHIP[i]);
+        lv_obj_center(l);
+    }
+}
+
+// The chart itself: HA's points sampled at even steps across the span, each
+// step holding the last value at or before it - the changes are steps in
+// time, as HA's own graph draws a sensor's history.
+void histDrawChart(lv_obj_t *body) {
+    const UIPalette &p = UI::pal();
+    const UIType    &t = UI::type();
+    const Entity    &e = *s_hv.e;
+    const HaHistory &H = *s_hist;
+    const uint32_t t0 = H.startSec(), t1 = H.endSec(), span = t1 > t0 ? t1 - t0 : 1;
+    const uint16_t n = H.points();
+
+    // Min and max over the span: the buckets' own when from statistics.
+    float lo = INFINITY, hi = -INFINITY;
+    for (uint16_t i = 0; i < n; i++) {
+        const HistPoint &q = H.point(i);
+        const float a = isnan(q.lo) ? q.v : q.lo, b = isnan(q.hi) ? q.v : q.hi;
+        if (!isnan(a)) lo = LV_MIN(lo, cardDisplayNumber(e, a, s.tempUnit));
+        if (!isnan(b)) hi = LV_MAX(hi, cardDisplayNumber(e, b, s.tempUnit));
+    }
+    const char *unit = cardDisplayUnit(e, s.tempUnit);
+
+    // The top line: the chips, then now / min / max.
+    lv_obj_t *top = plain(body);
+    lv_obj_set_size(top, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(top, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(top, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    histChips(top);
+    char buf[96], nowTxt[32];
+    cardFormatValue(e, nowTxt, sizeof(nowTxt), true, s.tempUnit);
+    if (s_hv.minMax && lo <= hi)
+        snprintf(buf, sizeof(buf), "Now %s   Min %.1f   Max %.1f", nowTxt, (double)lo, (double)hi);
+    else
+        snprintf(buf, sizeof(buf), "Now %s", nowTxt);
+    lv_obj_t *read = makeLabel(top, t.TAG, p.TEXT);
+    lv_label_set_text(read, buf);
+
+    if (lo > hi) { histNote(body, "Nothing recorded in this span"); return; }
+
+    // The y range: the span's own, a tenth more each side; a flat line gets one
+    // unit either way. Values in tenths, the chart's integers.
+    float ymin = lo, ymax = hi;
+    const float padY = (ymax - ymin) * 0.1f;
+    if (padY < 0.05f) { ymin -= 1.0f; ymax += 1.0f; } else { ymin -= padY; ymax += padY; }
+
+    lv_obj_t *area = plain(body);
+    lv_obj_set_width(area, lv_pct(100));
+    lv_obj_set_flex_grow(area, 1);
+
+    lv_obj_t *ch = lv_chart_create(area);
+    lv_obj_remove_style_all(ch);
+    lv_obj_set_size(ch, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_pad_all(ch, 0, 0);
+    lv_obj_set_style_pad_top(ch, lv_font_get_line_height(t.TAG), 0);
+    lv_obj_set_style_pad_bottom(ch, lv_font_get_line_height(t.TAG) + mm(0.6f), 0);
+    lv_obj_set_style_line_color(ch, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 14)), LV_PART_MAIN);
+    lv_obj_set_style_line_width(ch, 1, LV_PART_MAIN);
+    lv_obj_set_style_line_width(ch, LV_MAX(2, mm(0.45f)), LV_PART_ITEMS);
+    lv_obj_set_style_width (ch, 0, LV_PART_INDICATOR);   // no dots on the points
+    lv_obj_set_style_height(ch, 0, LV_PART_INDICATOR);
+    lv_obj_clear_flag(ch, LV_OBJ_FLAG_CLICKABLE);
+    lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
+    lv_chart_set_div_line_count(ch, 4, 0);
+    lv_chart_set_axis_range(ch, LV_CHART_AXIS_PRIMARY_Y, (int32_t)lroundf(ymin * 10), (int32_t)lroundf(ymax * 10));
+
+    lv_obj_update_layout(area);
+    const int32_t w = lv_obj_get_width(area);
+    const uint16_t m = (uint16_t)LV_CLAMP(48, w / 4, 240);
+    lv_chart_set_point_count(ch, m);
+    lv_chart_series_t *ser = lv_chart_add_series(ch, UI::c(p.ACCENT), LV_CHART_AXIS_PRIMARY_Y);
+    int32_t *ys = lv_chart_get_series_y_array(ch, ser);
+    uint16_t k = 0;
+    float last = NAN;
+    for (uint16_t i = 0; i < m; i++) {
+        const uint32_t at = t0 + (uint32_t)(((uint64_t)span * (2 * i + 1)) / (2 * m));
+        bool seen = (k > 0);
+        while (k < n && H.point(k).t <= at) { last = H.point(k).v; k++; seen = true; }
+        ys[i] = (!seen || isnan(last)) ? LV_CHART_POINT_NONE
+                                       : (int32_t)lroundf(cardDisplayNumber(e, last, s.tempUnit) * 10);
+    }
+    lv_chart_refresh(ch);
+
+    // The y scale: the top and bottom values, small, in the chart's corners.
+    snprintf(buf, sizeof(buf), "%.1f%s", (double)ymax, unit);
+    lv_obj_t *yl = makeLabel(area, t.TAG, p.TEXT_DIM);
+    lv_label_set_text(yl, buf);
+    lv_obj_align(yl, LV_ALIGN_TOP_LEFT, 0, 0);
+    snprintf(buf, sizeof(buf), "%.1f%s", (double)ymin, unit);
+    yl = makeLabel(area, t.TAG, p.TEXT_DIM);
+    lv_label_set_text(yl, buf);
+    lv_obj_align(yl, LV_ALIGN_BOTTOM_LEFT, 0, -(lv_font_get_line_height(t.TAG) + mm(0.6f)));
+
+    // The time scale: the span's start, its middle, and now.
+    char tm[32];
+    histTime(tm, sizeof(tm), t0, false);
+    lv_obj_t *xl = makeLabel(area, t.TAG, p.TEXT_DIM);
+    lv_label_set_text(xl, tm);
+    lv_obj_align(xl, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+    histTime(tm, sizeof(tm), t0 + span / 2, false);
+    xl = makeLabel(area, t.TAG, p.TEXT_DIM);
+    lv_label_set_text(xl, tm);
+    lv_obj_align(xl, LV_ALIGN_BOTTOM_MID, 0, 0);
+    xl = makeLabel(area, t.TAG, p.TEXT_DIM);
+    lv_label_set_text(xl, H.fromStatistics() ? "Now (5-minute averages)" : "Now");
+    lv_obj_align(xl, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+}
+
+// --- Activity --------------------------------------------------------------
+
+// What caused a change, in a few words; "" when HA recorded nothing.
+void histCause(const HistEvent &ev, char *out, size_t n) {
+    out[0] = '\0';
+    switch (ev.cause) {
+        case CauseKind::CAUSE_USER: {
+            const char *who = s_hist ? s_hist->personName(ev.who) : nullptr;
+            snprintf(out, n, "By %s", who ? who : "a person");
+            break;
+        }
+        case CauseKind::CAUSE_AUTOMATION: snprintf(out, n, "Automation: %s", ev.who); break;
+        case CauseKind::CAUSE_ENTITY:     snprintf(out, n, "By %s", ev.who); break;
+        case CauseKind::CAUSE_ACTION:     snprintf(out, n, "Action %s", ev.who); break;
+        case CauseKind::CAUSE_OTHER:      snprintf(out, n, "By %s", ev.who); break;
+        default: break;
+    }
+}
+
+// The state as the card says it: On / Off, Open / Closed... - else HA's word.
+void histStateWord(const HistEvent &ev, char *out, size_t n) {
+    const EntityDescriptor &d = s_hv.e->desc;
+    if (!strcmp(ev.state, "on"))       snprintf(out, n, "%s", cardStateWord(d, true));
+    else if (!strcmp(ev.state, "off")) snprintf(out, n, "%s", cardStateWord(d, false));
+    else if (!strcmp(ev.state, "unavailable")) snprintf(out, n, "Unavailable");
+    else {
+        snprintf(out, n, "%s", ev.state);
+        if (out[0] >= 'a' && out[0] <= 'z') out[0] = (char)(out[0] - 'a' + 'A');
+    }
+}
+
+void histDrawActivity(lv_obj_t *body) {
+    const UIPalette &p = UI::pal();
+    const UIType    &t = UI::type();
+    const HaHistory &H = *s_hist;
+    const uint16_t n = H.events();
+    if (!n) {
+        histNote(body, s_hv.period ? "No changes in the last 7 days" : "No changes in the last 24 hours");
+        return;
+    }
+    lv_obj_t *list = plain(body);
+    lv_obj_set_width(list, lv_pct(100));
+    lv_obj_set_flex_grow(list, 1);
+    lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
+    UI::tameScroll(list);
+    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(list, mm(1.0f), 0);
+
+    const uint16_t show = s_hv.more ? LV_MIN(n, HIST_ROWS_MAX) : LV_MIN(n, HIST_ROWS_FIRST);
+    const uint32_t now = (uint32_t)time(nullptr);
+    char word[24], cause[96], when[40], buf[200], lasted[24];
+    for (uint16_t r = 0; r < show; r++) {
+        const uint16_t i = n - 1 - r;   // newest first
+        const HistEvent &ev = H.event(i);
+        lv_obj_t *row = plain(list);
+        lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
+        lv_obj_set_flex_flow(row, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_style_pad_all(row, mm(1.2f), 0);
+        lv_obj_set_style_pad_row(row, mm(0.6f), 0);
+        lv_obj_set_style_radius(row, UI::sc(UI::met().RADIUS), 0);
+        lv_obj_set_style_bg_color(row, UI::c(p.SURFACE), 0);
+        lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
+        lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_bg_color(row, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+        lv_obj_add_event_cb(row, histRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
+
+        lv_obj_t *line = plain(row);
+        lv_obj_set_size(line, lv_pct(100), LV_SIZE_CONTENT);
+        lv_obj_set_flex_flow(line, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(line, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(line, mm(2.0f), 0);
+        lv_obj_t *col = plain(line);
+        lv_obj_set_size(col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_flex_grow(col, 1);
+        lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
+        histStateWord(ev, word, sizeof(word));
+        lv_obj_t *l = makeLabel(col, t.NAME, p.TEXT);
+        lv_label_set_text(l, word);
+        histCause(ev, cause, sizeof(cause));
+        if (s_hv.causes && cause[0]) {
+            l = makeLabel(col, t.TAG, p.TEXT_DIM);
+            lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
+            lv_obj_set_width(l, lv_pct(100));
+            lv_label_set_text(l, cause);
+        }
+        histTime(when, sizeof(when), ev.t, false);
+        l = makeLabel(line, t.TAG, p.TEXT_DIM);
+        lv_label_set_text(l, when);
+
+        // THE DETAILS (owner: HA's "Activity details"): the exact time, how
+        // long it stayed so, and HA's own words for the cause.
+        if (s_hv.openRow == (int16_t)i) {
+            const uint32_t until = (i + 1 < n) ? H.event(i + 1).t : now;
+            histSpan(lasted, sizeof(lasted), until > ev.t ? until - ev.t : 0);
+            histTime(when, sizeof(when), ev.t, true);
+            int k = snprintf(buf, sizeof(buf), "%s - %s %s", when, (i + 1 < n) ? "lasted" : "so far", lasted);
+            if (cause[0] && !s_hv.causes) k += snprintf(buf + k, sizeof(buf) - k, "\n%s", cause);
+            if (ev.detail[0] && k < (int)sizeof(buf)) snprintf(buf + k, sizeof(buf) - k, "\n%s", ev.detail);
+            l = makeLabel(row, t.TAG, p.TEXT_DIM);
+            lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+            lv_obj_set_width(l, lv_pct(100));
+            lv_label_set_text(l, buf);
+        }
+    }
+    // More than shows: "Show more", or - shown all there is room for - how many
+    // older ones are left out.
+    if (!s_hv.more && n > HIST_ROWS_FIRST) {
+        lv_obj_t *b = plain(list);
+        lv_obj_set_size(b, lv_pct(100), mm(7.0f));
+        lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_radius(b, UI::sc(UI::met().RADIUS), 0);
+        lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(b, UI::c(p.SURFACE), 0);
+        lv_obj_set_style_bg_color(b, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+        lv_obj_add_event_cb(b, histMoreCb, LV_EVENT_CLICKED, nullptr);
+        snprintf(buf, sizeof(buf), "Show more (%u)", (unsigned)(n - HIST_ROWS_FIRST));
+        lv_obj_t *l = makeLabel(b, t.TAG, p.ACCENT);
+        lv_label_set_text(l, buf);
+        lv_obj_center(l);
+    } else {
+        const uint32_t left = (uint32_t)(n - show) + H.eventsDropped();
+        if (left) {
+            snprintf(buf, sizeof(buf), "%lu older not shown", (unsigned long)left);
+            lv_obj_t *l = makeLabel(list, t.TAG, p.TEXT_DIM);
+            lv_label_set_text(l, buf);
+        }
+    }
+}
+
+// Whatever HaHistory has for this view now: loading, the answer, or why not.
+void histDraw() {
+    if (!s_hv.body) return;
+    lv_obj_clean(s_hv.body);
+    const HistState st = s_hist ? s_hist->state() : HistState::HIST_FAILED;
+    s_hv.drawn = (uint8_t)st;
+    const bool ours = s_hist && s_hist->gen() == s_hv.gen;
+    if (st == HistState::HIST_READY && ours) {
+        if (s_hv.chart) histDrawChart(s_hv.body);
+        else            histDrawActivity(s_hv.body);
+        return;
+    }
+    // Still asking, or no answer: the chips stay, so another span can be tried.
+    if (s_hv.chart) {
+        lv_obj_t *top = plain(s_hv.body);
+        lv_obj_set_size(top, lv_pct(100), LV_SIZE_CONTENT);
+        histChips(top);
+    }
+    lv_obj_t *mid = plain(s_hv.body);
+    lv_obj_set_width(mid, lv_pct(100));
+    lv_obj_set_flex_grow(mid, 1);
+    lv_obj_set_flex_flow(mid, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(mid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    histNote(mid, (st == HistState::HIST_WAITING || !ours) ? "Loading..."
+                                                          : histFailText(s_hist ? s_hist->fail() : HistFail::FAIL_NO_LINK));
+}
+
+// tickCb(): the answer arrived (or failed) since the last draw.
+void histPoll() {
+    if (s.view != PopupView::VIEW_HISTORY || !s_hv.body || !s_hist) return;
+    if (s_hist->gen() != s_hv.gen) return;
+    if ((uint8_t)s_hist->state() != s_hv.drawn) histDraw();
+}
+
+void spanChipCb(lv_event_t *ev) {
+    const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+    if (i == s_hv.span || i >= HIST_SPANS) return;
+    s_hv.span = i;
+    histSyncPanel();
+    histAsk();
+    lv_async_call([](void *) { histDraw(); }, nullptr);   // the chip's own row is redrawn
+}
+
+void histMoreCb(lv_event_t *ev) {
+    (void)ev;
+    s_hv.more = true;
+    lv_async_call([](void *) { histDraw(); }, nullptr);
+}
+
+// A row's details, one row at a time; a second tap folds them.
+void histRowCb(lv_event_t *ev) {
+    const int16_t i = (int16_t)(uintptr_t)lv_event_get_user_data(ev);
+    s_hv.openRow = (s_hv.openRow == i) ? -1 : i;
+    lv_async_call([](void *) {
+        // Redrawn whole; the list keeps its place.
+        lv_obj_t *list = (s_hv.body && lv_obj_get_child_count(s_hv.body)) ? lv_obj_get_child(s_hv.body, 0) : nullptr;
+        const int32_t y = list ? lv_obj_get_scroll_y(list) : 0;
+        histDraw();
+        list = (s_hv.body && lv_obj_get_child_count(s_hv.body)) ? lv_obj_get_child(s_hv.body, 0) : nullptr;
+        if (list && y) { lv_obj_update_layout(list); lv_obj_scroll_to_y(list, y, LV_ANIM_OFF); }
+    }, nullptr);
 }
 
 void memberRowCb(lv_event_t *ev);   // below, with the member view
@@ -2647,6 +3120,9 @@ void tickCb(lv_timer_t *t) {
         s.lastAgeMs = now;
         return;
     }
+
+    // History's answer (2.10e), drawn when it arrives.
+    histPoll();
 
     // A scene's ring goes when the light no longer looks as the scene left it.
     if (!sceneRingCheck(now)) renderMain();
@@ -3207,7 +3683,7 @@ void deckSet(uint8_t state) {
 // never showing at once, so one panel in the left half serves both: CHART's
 // rows on History, SCENES' on Scenes. A different view's panel is ended and
 // made afresh (showView()).
-enum : uint8_t { SIDE_NONE, SIDE_CHART, SIDE_SCENES };
+enum : uint8_t { SIDE_NONE, SIDE_CHART, SIDE_SCENES, SIDE_ACTIVITY };
 struct ChartPanel { lv_obj_t *root = nullptr, *tab = nullptr, *pane = nullptr, *body = nullptr;
                     lv_obj_t *track = nullptr, *up = nullptr, *down = nullptr;
                     uint8_t state = DECK_HIDDEN; int32_t h = 0; uint8_t kind = SIDE_NONE; };
@@ -3953,19 +4429,58 @@ void deckEnd() {
     s.deckFilled = false;
 }
 
-// --- CHART: the demo rows, and its life -------------------------------------
-// Rows a chart could plausibly have, so the panel has a real size: they work
-// as controls and change nothing.
+// --- CHART and ACTIVITY: History's own options (2.10e) ----------------------
+// CHART, for a number: the span (as the chips on the view - the two follow
+// each other) and the min and max. ACTIVITY, for anything that turns on and
+// off: how far back, and whether each change says what caused it. Neither is
+// saved yet: a window opens on 24 hours (owner undecided, 2026-10-11).
+lv_obj_t *s_ddSpan = nullptr;   // CHART's Span, kept in step with the chips
+
+void spanDropCb(lv_event_t *ev) {
+    const uint8_t i = (uint8_t)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    if (i == s_hv.span || i >= HIST_SPANS) return;
+    s_hv.span = i;
+    histAsk();
+    histDraw();
+}
+
+void minMaxCb(lv_event_t *ev) {
+    s_hv.minMax = lv_obj_has_state((lv_obj_t *)lv_event_get_target(ev), LV_STATE_CHECKED);
+    histDraw();
+}
+
+void periodDropCb(lv_event_t *ev) {
+    const uint8_t i = (uint8_t)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    if (i == s_hv.period || i >= HIST_PERIODS) return;
+    s_hv.period = i;
+    s_hv.more = false;
+    histAsk();
+    histDraw();
+}
+
+void causesCb(lv_event_t *ev) {
+    s_hv.causes = lv_obj_has_state((lv_obj_t *)lv_event_get_target(ev), LV_STATE_CHECKED);
+    histDraw();
+}
+
+// A chip was tapped: the panel's Span says the same.
+void histSyncPanel() {
+    if (s_ddSpan && lv_dropdown_get_selected(s_ddSpan) != s_hv.span) lv_dropdown_set_selected(s_ddSpan, s_hv.span);
+}
+
 uint8_t chartSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
-    r[n++] = { "Time range", DeckRowKind::ROW_DROP, "Last 24 hours\nLast hour\nLast 7 days\nLast 30 days",
-               0, true, nullptr, nullptr };
-    r[n++] = { "Chart style", DeckRowKind::ROW_DROP, "Line\nBars\nSteps", 0, true, nullptr, nullptr };
-    // Long enough that the pane is wider than its tab on the P4_5 too.
-    r[n++] = { "Shading", DeckRowKind::ROW_DROP, "Above and below the average\nBy hour of day\nNone",
-               0, true, nullptr, nullptr };
-    r[n++] = { "Show min and max", DeckRowKind::ROW_CHECK, nullptr, 1, true, nullptr, nullptr };
-    r[n++] = { "Compare with yesterday", DeckRowKind::ROW_CHECK, nullptr, 0, true, nullptr, nullptr };
+    r[n++] = { "Span", DeckRowKind::ROW_DROP, "24 hours\n12 hours\n6 hours\n1 hour", s_hv.span, true,
+               spanDropCb, &s_ddSpan };
+    r[n++] = { "Show min and max", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)s_hv.minMax, true, minMaxCb, nullptr };
+    return n;
+}
+
+uint8_t activitySpecs(DeckRowSpec *r) {
+    uint8_t n = 0;
+    r[n++] = { "Period", DeckRowKind::ROW_DROP, "Last 24 hours\nLast 7 days", s_hv.period, true,
+               periodDropCb, nullptr };
+    r[n++] = { "Show causes", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)s_hv.causes, true, causesCb, nullptr };
     return n;
 }
 
@@ -4002,11 +4517,13 @@ void chartTabCb(lv_event_t *ev) {
 // SCENES' (s_sideWant). SETTINGS builds its rows on first open.
 void chartCreate() {
     DeckRowSpec r[DECK_ROWS_MAX];
-    const bool scenes = (s_sideWant == SIDE_SCENES);
-    const uint8_t n = scenes ? scenesSpecs(r) : chartSpecs(r);
+    const bool scenes   = (s_sideWant == SIDE_SCENES);
+    const bool activity = (s_sideWant == SIDE_ACTIVITY);
+    const uint8_t n = scenes ? scenesSpecs(r) : activity ? activitySpecs(r) : chartSpecs(r);
     const int32_t w = lv_area_get_width(&s.winRect);
     Folder F;
-    buildFolder(F, true, scenes ? "SCENES" : "CHART", rowsNeedW(r, n), n, w - w / 2 - mm(1.0f), chartTabCb);
+    buildFolder(F, true, scenes ? "SCENES" : activity ? "ACTIVITY" : "CHART", rowsNeedW(r, n), n,
+                w - w / 2 - mm(1.0f), chartTabCb);
     s_chart.root = F.root; s_chart.tab = F.tab; s_chart.pane = F.pane; s_chart.body = F.body; s_chart.h = F.h;
     s_chart.track = F.track; s_chart.up = F.up; s_chart.down = F.down;
     s_chart.kind = s_sideWant;
@@ -4102,6 +4619,7 @@ void chartEnd() {
     s_chart = ChartPanel();
     s.ddTapScene = nullptr;   // SCENES' rows went with it
     s_cbHidden   = nullptr;
+    s_ddSpan     = nullptr;   // and CHART's
 }
 
 // The left panel belongs to its view (K43): CHART to History, SCENES to
@@ -4109,8 +4627,16 @@ void chartEnd() {
 // right one made; the same view rebuilt (a scene list that changed) keeps its
 // panel, open or not.
 void sideFor(PopupView v) {
-    const uint8_t side = (v == PopupView::VIEW_HISTORY) ? SIDE_CHART
-                       : (v == PopupView::VIEW_SCENES)  ? SIDE_SCENES : SIDE_NONE;
+    // History's panel follows its subject (2.10e): CHART for a number, ACTIVITY
+    // for the rest, none where there is no HA history. Another subject (a
+    // member's history after the group's) gets its panel made afresh.
+    uint8_t side = SIDE_NONE;
+    if (v == PopupView::VIEW_HISTORY) {
+        if (histSync() && s_chart.root) chartEnd();
+        if (histFromHa(s_hv.e)) side = s_hv.chart ? SIDE_CHART : SIDE_ACTIVITY;
+    } else if (v == PopupView::VIEW_SCENES) {
+        side = SIDE_SCENES;
+    }
     if (s_chart.root && s_chart.kind != side) chartEnd();
     if (side != SIDE_NONE && !s_chart.root) { s_sideWant = side; chartSet(DECK_PEEK); }
 }
@@ -4288,6 +4814,7 @@ void showWindow() {
     lv_obj_t *scr = lv_screen_active();
     lv_obj_update_layout(scr);                        // settle anything pending, aloud
     lv_display_enable_invalidation(nullptr, false);
+    s_hv = HistView{};   // History starts on 24 hours in every window (2.10e)
     makeWindow();
     buildContents();
     intfCreate();
@@ -4314,6 +4841,8 @@ void showWindow() {
 // ---------------------------------------------------------------------------
 // Public
 // ---------------------------------------------------------------------------
+
+void CardPopup::setHistory(HaHistory *history) { s_hist = history; }
 
 void CardPopup::begin() {
     // Every press and release, whatever it lands on - the same reason
@@ -4475,8 +5004,8 @@ enum DbgReqState : int { DREQ_IDLE, DREQ_CLAIMED, DREQ_PENDING, DREQ_CLOSING, DR
 std::atomic<int> s_dreq{DREQ_IDLE};
 struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
                 int member = -1; int scene = -1; int look = -1; int show = -1; int scheme = -1;
-                int tap = -1; int groups = -1; int clabel = -1;
-                bool close = false, power = false; };
+                int tap = -1; int groups = -1; int clabel = -1; int span = -1; int row = -1;
+                bool close = false, power = false, more = false, hist = false; };
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
 size_t s_dreqLen = 0;
@@ -4521,6 +5050,10 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "tap", v, sizeof(v)) == ESP_OK) a.tap = atoi(v);
         if (httpd_query_key_value(q, "groups", v, sizeof(v)) == ESP_OK) a.groups = atoi(v);
         if (httpd_query_key_value(q, "clabel", v, sizeof(v)) == ESP_OK) a.clabel = atoi(v);
+        if (httpd_query_key_value(q, "span", v, sizeof(v)) == ESP_OK) a.span = atoi(v);
+        if (httpd_query_key_value(q, "more", v, sizeof(v)) == ESP_OK) a.more = atoi(v) != 0;
+        if (httpd_query_key_value(q, "hist", v, sizeof(v)) == ESP_OK) a.hist = true;
+        if (httpd_query_key_value(q, "row", v, sizeof(v)) == ESP_OK) a.row = atoi(v);
         // rows=N: test rows for SETTINGS, from the next window built (a byte
         // the LVGL thread reads; nothing else to hand over).
         if (httpd_query_key_value(q, "rows", v, sizeof(v)) == ESP_OK) {
@@ -4749,6 +5282,33 @@ void CardPopup::debugService(lv_timer_t *t) {
             dbgMem(mem, sizeof(mem));
             dbgOut("deck %s; %s\n", a.deck == 2 ? "chart open" : a.deck ? "open" : "folded", mem);
         }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+
+    // HISTORY (2.10e): the span or period, "Show more", and what HaHistory has.
+    if (a.span >= 0 || a.more || a.row >= 0) {
+        if (!isOpen() || s.view != PopupView::VIEW_HISTORY) { dbgOut("History is not showing\n"); s_dreq.store(DREQ_DONE); return; }
+        // row=N: as a tap on activity row N from the top (its details).
+        if (a.row >= 0 && s_hist && a.row < s_hist->events()) {
+            const int16_t i = (int16_t)(s_hist->events() - 1 - a.row);
+            s_hv.openRow = (s_hv.openRow == i) ? -1 : i;
+        }
+        if (a.span >= 0) {
+            if (s_hv.chart && a.span < HIST_SPANS)        { s_hv.span = (uint8_t)a.span; histSyncPanel(); }
+            else if (!s_hv.chart && a.span < HIST_PERIODS) { s_hv.period = (uint8_t)a.span; s_hv.more = false; }
+            histAsk();
+        }
+        if (a.more) s_hv.more = true;
+        histDraw();
+    }
+    if ((a.span >= 0 || a.more || a.hist || a.row >= 0) && s_hist) {
+        dbgOut("history: %s %s, state %u fail %u gen %lu/%lu, %u points%s, %u events (+%u older), last answer %lu B in %lu ms\n",
+               s_hv.e ? s_hv.e->desc.externalRef : "-", s_hv.chart ? "chart" : "activity",
+               (unsigned)s_hist->state(), (unsigned)s_hist->fail(), (unsigned long)s_hv.gen,
+               (unsigned long)s_hist->gen(), (unsigned)s_hist->points(), s_hist->fromStatistics() ? " (statistics)" : "",
+               (unsigned)s_hist->events(), (unsigned)s_hist->eventsDropped(), (unsigned long)s_hist->lastBytes(),
+               (unsigned long)s_hist->lastMs());
         s_dreq.store(DREQ_DONE);
         return;
     }

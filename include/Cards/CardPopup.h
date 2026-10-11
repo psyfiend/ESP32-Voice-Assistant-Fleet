@@ -56,6 +56,11 @@ public:
     // catcher, which lives for the life of the device.
     static void begin();
 
+    // Where the History view asks HA for an entity's past (2.10e): SystemCore's
+    // HaHistory, handed down by GUIManager - UI asks a lower layer, never the
+    // reverse. Without it, History says it has nothing to show.
+    static void setHistory(class HaHistory *history);
+
     // Open the window for this card. Ignored while one is already open, and
     // when the finger has moved since it went down.
     static void open(Card &card);
@@ -98,6 +103,13 @@ public:
     //   /popup?pause=1|0    pause / resume what the window shows
     //   /popup?member=N     as a tap on row N of Members
     //   /popup?close=1      close it; replies with the pool afterwards
+    //   /popup?rows=N       N greyed test rows in SETTINGS from the next window
+    //                       (to try dragging a tall panel); rows=0 undoes it
+    //   /popup?span=N       History: the chart's span (0 24 h, 1 12 h, 2 6 h,
+    //                       3 1 h) or activity's period (0 24 h, 1 7 days)
+    //   /popup?more=1       History: as a tap on "Show more"
+    //   /popup?hist=1       History: what HaHistory has (state, points, events, size)
+    //   /popup?row=N        History: as a tap on activity row N from the top (details)
     // The handler hands the work to the LVGL thread and waits for it, as
     // /screenshot does - it never touches LVGL itself.
     static void beginDebug(class HttpServer &http);

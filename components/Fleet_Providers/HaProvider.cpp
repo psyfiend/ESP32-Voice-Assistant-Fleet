@@ -297,6 +297,7 @@ void HaProvider::onMessage(const char *json, size_t len, void *ctx) {
 
 void HaProvider::handle(const char *json, size_t len) {
     if (!_reg) return;
+    if (_rawFn && _rawFn(json, len, _rawCtx)) return;   // HaHistory's answer (2.10e)
 
     // A FILTERED PARSE, because ~95% of every trigger event is discardable.
     //

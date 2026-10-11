@@ -288,6 +288,9 @@ bool SystemCore::begin() {
     // HA's replies to those calls reach the router through the provider, which
     // receives every message (2.10c): a refused call fails at once.
     _haProv.setResultHook(&CommandRouter::onHaResult, &_cmdRouter);
+    // History's answers are its own, and it sees every message first (2.10e).
+    _haHist.begin(&_ha);
+    _haProv.setRawHook(&HaHistory::onRaw, &_haHist);
 
     // --= 13. Restore the user's pauses =--
     //
@@ -432,6 +435,7 @@ void SystemCore::loop() {
     _ha.loop(now);
     _haProv.loop(now);
     _haRest.loop(now);
+    _haHist.loop(now);
 
     // Starts the HTTP server the first time the link is up, if any route was
     // registered; a no-op every call after that.

@@ -1,4 +1,5 @@
 #include "Cards/CardBinder.h"
+#include "Cards/CardGroups.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -75,5 +76,20 @@ void CardBinder::tick() {
     const uint32_t now = millis();
     for (uint8_t i = 0; i < _n; i++) {
         if (_cards[i]) _cards[i]->pollState(now);
+    }
+
+    // EVERY CARD'S GROUP AGAIN WHEN HA'S AREAS CHANGE (2.10d). A group's colour
+    // depends on every group's (K47: who has which colour first), so the area
+    // of an entity on one card can recolour cards on others. A card re-applied
+    // only its own on its own entity's area - and Kitchen's four cards kept
+    // Garage's green on the P4_5 (2026-10-11) when Garage's area arrived after
+    // theirs. The areas arrive together in one answer: applied once they have
+    // been still for 300 ms, with the colours worked out afresh.
+    const uint32_t ep = _reg->areaEpoch();
+    if (ep != _areaEpoch) { _areaEpoch = ep; _areaMs = now; _areaPending = true; }
+    else if (_areaPending && now - _areaMs >= 300) {
+        _areaPending = false;
+        CardGroups::forgetColours();
+        for (uint8_t i = 0; i < _n; i++) if (_cards[i]) _cards[i]->reapplyGroup();
     }
 }

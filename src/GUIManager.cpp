@@ -644,6 +644,7 @@ void GUIManager::begin() {
     // The card popup's own press hook: where a long press began, and when
     // anything was last touched (its auto-close). Cards/CardPopup.h.
     CardPopup::begin();
+    CardPopup::setHistory(&_core.history());   // History's source (2.10e)
 
     // Bottom deck height = screen height - header height.
     int32_t header_h = UIToolkit::systemHeaderPx();

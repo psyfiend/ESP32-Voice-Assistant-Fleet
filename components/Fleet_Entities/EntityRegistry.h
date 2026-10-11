@@ -143,6 +143,9 @@ public:
     // Entity::sourceArea and sourceAreaId, the same way; "" clears them (HA
     // says no area).
     bool setSourceArea(const char *id, const char *areaId, const char *area);
+    // Counts area changes on any entity: a group's colour depends on every
+    // group's, so one entity's area can recolour cards on others (2.10d).
+    uint32_t areaEpoch() const { return _areaEpoch.load(); }
 
     // True once after learnMembers() added anything: the caller (the loop
     // task) then re-applies the saved pauses, which could not reach an entity
@@ -324,6 +327,7 @@ private:
     // the table with at(). The slot is written first, then the count raised.
     std::atomic<uint8_t> _count{0};
     std::atomic<bool>    _learnt{false};
+    std::atomic<uint32_t> _areaEpoch{0};
 
     CommandSink _cmdFn  = nullptr;
     void       *_cmdCtx = nullptr;

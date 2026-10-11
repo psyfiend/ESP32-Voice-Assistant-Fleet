@@ -240,6 +240,8 @@ uint32_t autoColour(const char *gid, const char *base) {
 
 }  // namespace (file-local helpers)
 
+void forgetColours() { s_autoBuilt = false; }
+
 bool byId(const char *gid, Group &g) {
     if (!gid || !gid[0]) return false;
     memset(&g, 0, sizeof(g));

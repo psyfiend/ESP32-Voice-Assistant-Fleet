@@ -243,6 +243,10 @@ public:
     // Re-read every token and repaint. Registered scheme-change hook.
     void restyle();
 
+    // Work out its group's words and colour again and repaint the card label
+    // (CardBinder: HA's areas changed, so every group's colour may have).
+    void reapplyGroup();
+
     lv_obj_t *root() const { return _root; }
     const CardPlacement &placement() const { return _place; }
     CardState state() const { return _state; }

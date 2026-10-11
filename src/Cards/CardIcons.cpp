@@ -467,6 +467,16 @@ static float displayValue(const Entity &e, TempUnit want, bool &converted) {
     return v;
 }
 
+float cardDisplayNumber(const Entity &e, float v, TempUnit want) {
+    if (!isTemperature(e.desc)) return v;
+    const char src = sourceTempLetter(e.desc);
+    if (!src) return v;
+    const TempUnit w = resolveWant(want);
+    if (w == TempUnit::TEMP_F && src == 'C') return v * 9.0f / 5.0f + 32.0f;
+    if (w == TempUnit::TEMP_C && src == 'F') return (v - 32.0f) * 5.0f / 9.0f;
+    return v;
+}
+
 void cardFormatValue(const Entity &e, char *out, size_t cap, bool withUnit, TempUnit want) {
     out[0] = '\0';
 

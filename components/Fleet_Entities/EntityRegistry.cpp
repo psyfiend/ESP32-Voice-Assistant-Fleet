@@ -300,6 +300,7 @@ bool EntityRegistry::setSourceArea(const char *id, const char *areaId, const cha
     snprintf(e.sourceArea, sizeof(e.sourceArea), "%s", area);
     snprintf(e.sourceAreaId, sizeof(e.sourceAreaId), "%s", areaId);
     e.dirty = true;
+    _areaEpoch.fetch_add(1);
     return true;
 }
 

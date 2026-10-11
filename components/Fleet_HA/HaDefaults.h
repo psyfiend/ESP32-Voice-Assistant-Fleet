@@ -44,6 +44,14 @@ struct HaDefaultsT {
     // that look like a server bug.
     uint32_t RX_BUFFER_BYTES;
 
+    // HISTORY (2.10e) IS THE ONE DESIGNED READ THAT IS BIGGER, so a board with
+    // PSRAM takes this much there instead. Measured on the owner's HA,
+    // 2026-10-11: a day of 5-minute statistics with min and max 22.7 KB, a week
+    // of the Office group's logbook 20.5 KB, a day of the deck's light level
+    // 5.5 KB. 48 KB is twice the largest. Still a designed limit: an answer
+    // past it is dropped and counted, and HaHistory falls back or says so.
+    uint32_t RX_BUFFER_PSRAM_BYTES;
+
     // esp_websocket_client's own per-read buffer. Independent of the above:
     // this is how much it hands us per WEBSOCKET_EVENT_DATA, and anything
     // larger arrives as several fragments that we reassemble.
@@ -109,6 +117,7 @@ inline const HaDefaultsT &haDefaults() {
         .PATH                 = "/api/websocket",
 
         .RX_BUFFER_BYTES      = 8192,
+        .RX_BUFFER_PSRAM_BYTES = 49152,
         .WS_RX_CHUNK_BYTES    = 2048,
 
         .TASK_STACK_BYTES     = 6144,

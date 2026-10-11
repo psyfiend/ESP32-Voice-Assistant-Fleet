@@ -131,4 +131,8 @@ const char *cardDisplayUnit(const Entity &e, TempUnit want = TempUnit::TEMP_INHE
 void cardFormatValue(const Entity &e, char *out, size_t cap, bool withUnit = true,
                      TempUnit want = TempUnit::TEMP_INHERIT);
 
+// A number in this entity's source unit, as the card shows it: a temperature
+// converted when the card's unit differs (2.10e: a history chart's points).
+float cardDisplayNumber(const Entity &e, float v, TempUnit want = TempUnit::TEMP_INHERIT);
+
 #endif // CARD_ICONS_H

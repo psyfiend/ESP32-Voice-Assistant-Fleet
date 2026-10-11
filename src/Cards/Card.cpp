@@ -1389,6 +1389,12 @@ bool Card::owns(const char *entityId) const {
     return false;
 }
 
+void Card::reapplyGroup() {
+    if (!_root) return;
+    CardGroups::apply(*this, _pageAreaColor);
+    applyState();
+}
+
 void Card::onSnapshot(const Entity &snap) {
     (void)snap;   // see the threading note in Card.h: render() re-reads, and
                   // the snapshot is carried so that caching it later is a

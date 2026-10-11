@@ -75,4 +75,8 @@ void choose(Card &c, const Choice &ch, bool areaColor);
 // Every known group, for the System Doctor and /settings?stats=1.
 void forEach(void (*fn)(const Group &g, void *ctx), void *ctx);
 
+// Forget the colours worked out so far: the next asking works them out from
+// HA's areas as they are now (CardBinder, when the areas have changed).
+void forgetColours();
+
 }  // namespace CardGroups
