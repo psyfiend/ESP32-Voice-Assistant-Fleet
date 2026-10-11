@@ -81,6 +81,10 @@ public:
     bool requestActivity(const char *entityRef, uint32_t spanSec);
 
     HistState state() const { return (HistState)_state.load(); }
+    // Counts answers and failures. A window redraws when it moves, not on a
+    // change of state(): an old answer finishing just as a new request went out
+    // leaves READY standing, and only this says the new one has come since.
+    uint32_t  doneSeq() const { return _doneSeq.load(); }
     HistFail  fail()  const { return (HistFail)_fail.load(); }
     uint32_t  gen()   const { return _gen; }
     HistKind  kind()  const { return _kind; }
@@ -133,6 +137,7 @@ private:
     std::atomic<uint8_t>  _state{(uint8_t)HistState::HIST_IDLE};
     std::atomic<uint8_t>  _fail{(uint8_t)HistFail::FAIL_NONE};
     std::atomic<uint32_t> _wantId{0};
+    std::atomic<uint32_t> _doneSeq{0};
 
     // The tables, allocated on the first request: in PSRAM where there is any.
     HistPoint *_points = nullptr;

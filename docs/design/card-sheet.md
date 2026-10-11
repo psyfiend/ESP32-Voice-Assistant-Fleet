@@ -94,7 +94,8 @@ next reworked, not before.
   hundreds of KB of JSON - against an 8 KB websocket receive buffer today.
 - **On/off entities: `history/history_during_period`** with `minimal_response` and
   `no_attributes`: few rows, since they change rarely. **The Activity list is built from the same
-  reply** - no second request.
+  reply** - no second request. *(As built in 2.10e: `logbook/get_events` instead, which also says
+  what caused each change, and numbers use history first with statistics as the fallback - §18.)*
 - **Entities HA does not own (virtual, MQTT, system)** have no HA history: the board keeps its own
   ring of samples in PSRAM (e.g. every 5 min for 24 h), **lost at reboot** - to be said on screen.
 - **Clock.** "8 minutes ago" and axis times need wall-clock time and a time zone (SNTP + TZ). To be
@@ -775,3 +776,60 @@ and the move-to-group window come after.
 
 The owner's test sheet: `docs/TEST_2.10d.md`. Next, after it: the all-nine gate and the merge. K17
 waits until after 2.10d (K45).
+
+**Late in 2.10d (2026-10-11):** the panels are dragged whole (K50, `TEST_2.10d.md` round D); a
+group's colour is worked out again for every card when any of HA's areas changes (the P4_5's
+Kitchen cards kept Garage's green when Garage's area arrived after theirs - `CardBinder::tick()`).
+
+## 18. 2.10e - History, as built (2026-10-11, overnight; branch `feat/65-history`, K51)
+
+**Scope (owner):** Home Assistant's entities; the board's own and MQTT entities keep a local log
+later. Decisions K52-K55.
+
+**What the view shows follows the entity** (K52):
+- **A number** (a sensor whose value is a number): a chart over a span picked on the view - chips
+  24 h / 12 h / 6 h / 1 h (owner: quick to switch) - with now, min and max over the span. The
+  left panel is **CHART**: Span (follows the chips) and Show min and max.
+- **Anything that turns on and off** (light, switch, binary sensor, input boolean, a text
+  sensor): its **activity** - each change, newest first, the state in the card's own words
+  (On / Off, Detected / Clear, Open / Closed), the time ("2:12 AM", "Yesterday 8:58 PM"), and
+  what caused it: "By psyki" (a person), "Automation: Office: Occupancy Lighting Control", "By
+  <entity>", "Action light.turn_on". 10 rows, then "Show more (N)" (up to 60 drawn). A tap on
+  a row shows its details - the time to the second, how long it lasted (or "so far"), and HA's
+  own words (`triggered by state of binary_sensor.office_occupancy`, `light.turn_off`). The left
+  panel is **ACTIVITY**: Period (Last 24 hours / Last 7 days) and Show causes.
+- **A group defined in HA** (Desk = `light.office`) is its own entity, as in HA (owner): its
+  members' histories are each member's, reached through Members. A card standing for several
+  entities made here (All Lamps) has none of its own and says so.
+- Neither panel's choices are saved: every window opens on 24 hours (owner undecided).
+
+**Where the data comes from** (K53; measured from the PC on 2026-10-11, the owner's HA):
+
+| Ask | What | Size, a day |
+|---|---|---|
+| `history/history_during_period`, minimal, no attributes | a number's real changes, as HA's own graph | thermostat 0.5 KB, deck light level 5.5 KB |
+| `recorder/statistics_during_period`, 5-minute mean/min/max | the fallback for a sensor too chatty for the buffer | 22.7 KB (16.3 KB means only) |
+| `logbook/get_events` | each change WITH its cause - history has no cause | 0.5-2.3 KB; a week of Office 20.5 KB |
+| `render_template` over `states.person` | user id -> person name, once a session; no admin rights | 281 B |
+
+A week of the Office group's logbook had three kinds of cause: a person's call_service (50), an
+automation with what triggered it (21), nothing at all (24 - the Hue app, a wall switch). Every
+numeric sensor on the dashboard has statistics. A light's brightness over time would need history
+WITH attributes (~350 B a change, every attribute repeated): not built.
+
+**How** (K54): `HaHistory` (`components/Fleet_HA`, no LVGL) asks on the loop task; its answers
+are told from everything else by their id (HA writes it first) through a raw hook HaProvider
+offers before its filtered parse, and parsed on the websocket task - with ArduinoJson's pool in
+PSRAM - into tables in PSRAM (1,024 points, 120 events). The window's tick notices the answer
+and draws. One request at a time; a new one replaces the last, and a late answer is dropped by
+its id. HaClient's receive buffer is **48 KB in PSRAM** where the board has it (twice the largest
+measured), 8 KB internal otherwise; an answer past it is dropped and counted as before, and a
+chart then asks for statistics, while activity says "Too much history to show here".
+
+**The chart** samples HA's points at even steps across the span (a quarter of the chart's width,
+48-240 steps), each step holding the last value at or before it - so changes are steps, as HA
+draws a sensor; the y range is the span's own plus a tenth; values follow the card's °C/°F.
+
+**Not built, for later:** a brightness chart for lights (owner: "value in it", default stays the
+list); a custom range (owner: "Range" in CHART); saving the span per card; the local log for
+non-HA entities; a full-screen chart (owner: not over the header now, maybe a toggle one day).

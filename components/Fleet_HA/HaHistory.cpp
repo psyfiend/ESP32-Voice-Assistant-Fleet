@@ -80,6 +80,7 @@ bool HaHistory::start(HistKind kind, const char *entityRef, uint32_t spanSec) {
     auto failNow = [&](HistFail why) {
         _fail.store((uint8_t)why);
         _state.store((uint8_t)HistState::HIST_FAILED);
+        _doneSeq.fetch_add(1);
         return false;
     };
     if (!ensureTables()) return failNow(HistFail::FAIL_NO_MEMORY);
@@ -98,8 +99,7 @@ bool HaHistory::start(HistKind kind, const char *entityRef, uint32_t spanSec) {
 bool HaHistory::requestChart(const char *entityRef, uint32_t spanSec) {
     if (!start(HistKind::HIST_CHART, entityRef, spanSec)) return false;
     if (sendHistory()) return true;
-    _fail.store((uint8_t)HistFail::FAIL_NO_LINK);
-    _state.store((uint8_t)HistState::HIST_FAILED);
+    finish(HistFail::FAIL_NO_LINK);
     return false;
 }
 
@@ -108,8 +108,7 @@ bool HaHistory::requestActivity(const char *entityRef, uint32_t spanSec) {
     // People's names, once a session, ahead of the first activity asked for.
     if (_namesSession != _ha->sessions()) sendNames();
     if (sendLogbook()) return true;
-    _fail.store((uint8_t)HistFail::FAIL_NO_LINK);
-    _state.store((uint8_t)HistState::HIST_FAILED);
+    finish(HistFail::FAIL_NO_LINK);
     return false;
 }
 
@@ -197,8 +196,7 @@ void HaHistory::loop(uint32_t nowMs) {
     if (state() != HistState::HIST_WAITING) return;
     auto failLoop = [&](HistFail why) {
         _wantId.store(0);
-        _fail.store((uint8_t)why);
-        _state.store((uint8_t)HistState::HIST_FAILED);
+        finish(why);
         Serial.printf("[HaHist] %s: failed (%u)\n", _ref, (unsigned)why);
     };
     // HaClient dropped a message too big for its buffer while we waited: ours.
@@ -269,6 +267,7 @@ bool HaHistory::handle(const char *json, size_t len) {
 void HaHistory::finish(HistFail why) {
     _fail.store((uint8_t)why);
     _state.store((uint8_t)(why == HistFail::FAIL_NONE ? HistState::HIST_READY : HistState::HIST_FAILED));
+    _doneSeq.fetch_add(1);
 }
 
 // Keeps every point up to the table's size; past it, every second one, then

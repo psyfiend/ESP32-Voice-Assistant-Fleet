@@ -227,5 +227,6 @@ drag down (`elastic_diff()`: `scroll_end - diff < 0` can never be true with `dif
 step of a drag up went past the end. **Fixed:** the track pulls itself back to its ceiling on every
 scroll step, before anything is drawn. **The carets now point the way to drag** (owner): rows below,
 a caret pointing up; the pane off the top, one pointing down. Drag down to fold stays on every panel
-(owner). **Retest D3, D8 and the carets.** D9 not yet run.
+(owner). **Retest D3, D8 and the carets; D9 not yet run - all four are round 0 of
+`TEST_2.10e.md`.**
 **Flashes while dragging** - many, sometimes several in quick succession: see #91.

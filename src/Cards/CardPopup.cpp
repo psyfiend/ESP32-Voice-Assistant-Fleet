@@ -2241,7 +2241,7 @@ struct HistView {
     bool     causes = true;      // activity's "by ..." lines
     bool     more = false;       // "Show more" was tapped
     uint32_t gen = 0;            // HaHistory's request this view made
-    uint8_t  drawn = 0xFF;       // the HistState last drawn
+    uint32_t drawnSeq = 0;       // HaHistory::doneSeq() when last drawn
     int16_t  openRow = -1;       // the activity row whose details show
     lv_obj_t *body = nullptr;    // the view's contents, redrawn whole
 };
@@ -2336,7 +2336,6 @@ const char *histFailText(HistFail f) {
 void buildHistory() {
     histSync();
     s_hv.body = nullptr;
-    s_hv.drawn = 0xFF;
     const Entity *e = s_hv.e;
     if (!histFromHa(e)) {
         histNote(s.stage, e ? "History for this card comes later: only Home Assistant's is shown so far"
@@ -2357,8 +2356,7 @@ void histAsk() {
     s_hv.openRow = -1;
     if (s_hv.chart) s_hist->requestChart(s_hv.e->desc.externalRef, HIST_SPAN_SEC[s_hv.span]);
     else            s_hist->requestActivity(s_hv.e->desc.externalRef, HIST_PERIOD_SEC[s_hv.period]);
-    s_hv.gen   = s_hist->gen();
-    s_hv.drawn = 0xFF;
+    s_hv.gen = s_hist->gen();
 }
 
 // --- The chart -------------------------------------------------------------
@@ -2629,7 +2627,7 @@ void histDraw() {
     if (!s_hv.body) return;
     lv_obj_clean(s_hv.body);
     const HistState st = s_hist ? s_hist->state() : HistState::HIST_FAILED;
-    s_hv.drawn = (uint8_t)st;
+    s_hv.drawnSeq = s_hist ? s_hist->doneSeq() : 0;
     const bool ours = s_hist && s_hist->gen() == s_hv.gen;
     if (st == HistState::HIST_READY && ours) {
         if (s_hv.chart) histDrawChart(s_hv.body);
@@ -2655,7 +2653,7 @@ void histDraw() {
 void histPoll() {
     if (s.view != PopupView::VIEW_HISTORY || !s_hv.body || !s_hist) return;
     if (s_hist->gen() != s_hv.gen) return;
-    if ((uint8_t)s_hist->state() != s_hv.drawn) histDraw();
+    if (s_hist->doneSeq() != s_hv.drawnSeq) histDraw();
 }
 
 void spanChipCb(lv_event_t *ev) {

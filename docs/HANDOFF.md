@@ -1,4 +1,4 @@
-# Handoff — 2026-10-10 (2.10d in the owner's testing on `feat/65-saving`; `v0.2.10` is the last tag)
+# Handoff — 2026-10-11 (2.10e built overnight on `feat/65-history`, off 2.10d's `feat/65-saving`; `v0.2.10` is the last tag)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was rewritten from scratch on
@@ -78,7 +78,22 @@ malloc for LVGL is a trap on this hardware. LVGL 9.6: after 2.10 (#88).
   (a normal boot) and filters lines; PlatformIO's Python has pyserial. PowerShell 5.1 strips quotes
   from `python -c "..."`, so write the script to a file.
 
-## 2.10d IN PROGRESS on `feat/65-saving` (from 2026-10-08)
+## 2.10e IN TESTING on `feat/65-history` (built overnight 2026-10-11)
+
+**The owner's morning sheet: `docs/TEST_2.10e.md`** (it starts with 2.10d round D's retest).
+What was built: **`card-sheet.md` §18**; decisions **K52-K55**. In short: History shows a number
+as a chart (span chips on the view; CHART panel) and anything on/off as its activity, with what
+caused each change (ACTIVITY panel); HA entities only. `HaHistory` (`components/Fleet_HA`) asks;
+HaClient's buffer is 48 KB in PSRAM. `/popup?hist=1|span=|more=|row=` drive it from a PC.
+Checked by screenshot on the P4_5: Thermo's and Kitchen's charts (24 h, 1 h), Desk's activity
+(24 h and 7 days - 99 changes, 21 KB in 416 ms), a row's details, Office occupancy, Garage
+North's empty day. **Not seen by anyone on glass yet**, and nothing tested by touch.
+**Also fixed overnight, a 2.10d bug:** card label colours when HA's areas arrive in an unlucky
+order (CardBinder re-applies every card's group). The 4B and 1060 have this build too, so
+dragging panels on them says whether #91's flashes are the P4_5's alone.
+**Then:** the owner's report, fixes, the all-nine gate, one `--no-ff` merge of both, `v0.2.11`.
+
+## 2.10d (from 2026-10-08) - tested; round D's retest is the first round of `TEST_2.10e.md`
 
 Decided with the owner: `DECISIONS.md` **K33-K49, A14, A15**. Design, the steps built and their
 measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "Saved settings".
@@ -146,8 +161,8 @@ measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "S
   (`CONFIG_LCD_RGB_ISR_IRAM_SAFE` off, stock libraries) - untested, none on the desk working.
 - **After the owner's rounds:** remove the local debug lines from `platformio.ini` (never commit
   them), the all-nine compile gate, a look on glass, `--no-ff` merge, tag `v0.2.11`, CHANGELOG
-  entry, archive the test sheet, HANDOFF/ROADMAP. Then K17 (a member as a card of its own), then
-  2.10e history. **HangWatch stays** (committed, gated by its flag).
+  entry, archive both test sheets, HANDOFF/ROADMAP - once, for 2.10d and 2.10e together (K51).
+  Then K17 (a member as a card of its own). **HangWatch stays** (committed, gated by its flag).
 
 **Owner's notes for later, not 2.10d** (K48): moving a card to another group gets its own row and
 window (a list of groups, each openable to its members; "change the label" or "move into a group
@@ -189,7 +204,7 @@ K32), HA scenes (K19, K21), and the window redesigned over nine rounds (K20-K31)
 `scheme=0|1|2`, and `ctl=` prints where the stage's children landed; its listing says how many faces
 came out flat.
 
-Then 2.10e history; then interview §3 onward. `docs/ROADMAP.md`'s running order has it.
+Then interview §3 onward. `docs/ROADMAP.md`'s running order has it.
 
 
 **Real lights (W9):** any Office light may be commanded while testing, and is put back as found
@@ -200,7 +215,7 @@ rebuild from `ha-websocket.md` §9; the long-lived token is in `ConnectivityLoca
 the device (#87) - the build sheet becomes its output, not the user's interface; and presentation
 (group/room cards) as how this project stands apart. Also filed: #86 (card control styles, from
 HomeTiles), #88 (LVGL 9.6 evaluation, after 2.10). An HA-side companion is a separate, later
-choice; HA's `recorder/statistics_during_period` already reduces history for 2.10e.
+choice; stock HA served everything 2.10e needed (`card-sheet.md` §18).
 
 **How to run it:** one branch off `main` (e.g. `feat/65-saving`). While the owner tests, build and
 flash WS_P4_5 only (COM15) unless told otherwise; through 2.10c the owner also had the 4B (COM7) and
