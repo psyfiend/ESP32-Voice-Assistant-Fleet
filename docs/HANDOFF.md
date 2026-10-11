@@ -123,7 +123,11 @@ measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "S
   the P4_5 scrolls now**, so the bar is unseen until a smaller board or a longer panel.
   Two flashes (F5), both while changing a setting in a window, 0 underruns - open, see the report.
   Needs HA, so waits for home: L1, L3b, L4, T4-T6, T8, P2-P5. G5/G7 could not work without HA (the
-  group is `sheet_office` then, not `ha_office`); G7 left `groups.ha_office.color` in the file.
+  group is `sheet_office` then, not `ha_office`); G7's `groups.ha_office.color` and Overhead's own
+  name were cleared from the file afterwards (owner's OK).
+- **Back home: reflash the P4_5 from the desktop** (`git pull` on `feat/65-saving` first). The
+  laptop's build carries the laptop location's Wi-Fi in its compiled-in credentials, so at home it
+  will not join "M&M Motors" (it falls back to its own AP).
 - **A Wi-Fi recovery that looked stuck (P4_5, serial log, 2026-10-09) - CLOSED, not evidence.**
   The log showed "RECOVERY 1/3: re-associating" and then no `[Conn]` line for 33 minutes. Owner
   (2026-10-10): the router was unplugged and plugged back in several times while cables were moved
