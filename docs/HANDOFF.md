@@ -91,6 +91,8 @@ North's empty day. **Not seen by anyone on glass yet**, and nothing tested by to
 **Also fixed overnight, a 2.10d bug:** card label colours when HA's areas arrive in an unlucky
 order (CardBinder re-applies every card's group). The 4B and 1060 have this build too, so
 dragging panels on them says whether #91's flashes are the P4_5's alone.
+**All nine compiled at `a9db07f`** (2026-10-11 ~05:00, 22 min) - with the desktop's local debug
+lines still in, so the release gate before the merge is still to run without them.
 **Then:** the owner's report, fixes, the all-nine gate, one `--no-ff` merge of both, `v0.2.11`.
 
 ## 2.10d (from 2026-10-08) - tested; round D's retest is the first round of `TEST_2.10e.md`
