@@ -125,9 +125,14 @@ measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "S
   Needs HA, so waits for home: L1, L3b, L4, T4-T6, T8, P2-P5. G5/G7 could not work without HA (the
   group is `sheet_office` then, not `ha_office`); G7's `groups.ha_office.color` and Overhead's own
   name were cleared from the file afterwards (owner's OK).
-- **Back home: reflash the P4_5 from the desktop** (`git pull` on `feat/65-saving` first). The
-  laptop's build carries the laptop location's Wi-Fi in its compiled-in credentials, so at home it
-  will not join "M&M Motors" (it falls back to its own AP).
+- **Back home, 2026-10-10 evening (desktop):** `feat/65-saving` pulled to `7bb90f8` (the desktop's
+  local debug flags kept, uncommitted), `.pio/build_cache` cleared, the desktop's
+  p4-libs-2026-10-09 folder checked (`LCD_DSI_ISR_CACHE_SAFE`, `ESP_HOSTED_MEMPOOL_PREFER_SPIRAM`;
+  the build uses `qio_qspi`, which has both - `dio_qspi` was never rebuilt and nothing uses it).
+  **P4_5, 4B and 1060 reflashed from the desktop** (each firmware reads `-dirty`), all three back
+  on "M&M Motors"; the P4_5 on HA. The 4B and 1060 now have the P1b fix too. Its
+  settings file as the owner left it: All Lamps Tap action Members view, Active state Any; Overhead
+  Custom; no groups.
 - **A Wi-Fi recovery that looked stuck (P4_5, serial log, 2026-10-09) - CLOSED, not evidence.**
   The log showed "RECOVERY 1/3: re-associating" and then no `[Conn]` line for 33 minutes. Owner
   (2026-10-10): the router was unplugged and plugged back in several times while cables were moved
@@ -229,12 +234,12 @@ without asking.
 
 | Board | Port | Notes |
 |---|---|---|
-| `WS_P4_5` | COM15 (CH343) | dev board; **screwed into its enclosure** - no battery test |
-| `WS_P4_4B` | COM7 (CH343) | |
+| `WS_P4_5` | COM15 (CH343 `5B90154141`) | dev board; **screwed into its enclosure** - no battery test |
+| `WS_P4_4B` | COM7 (CH343 `5AAF289419`) | P4 rev v1.0 (`esptool read-mac`), the only one on a CH343 |
 | `WS_P4_7B` | COM6 (native USB) | **needs two USB cables** or it browns out on boot |
-| `CYD_P4_1060` | COM9 | also needs two cables |
+| `CYD_P4_1060` | COM9 (native USB, serial `30:ED:A0:E3:2C:7B`) | also needs two cables; its log names it |
 | `CYD_P4_4880` | COM19 (native USB) | LiPo fitted; browned out on the PC's USB alone |
-| `WS_S3_4B` | COM8 (CH343) | the slow dev target; `Serial` is native USB, not the CH343. **Locked up 2026-10-05** - #69 |
+| `WS_S3_4B` | COM8 (CH343 `5A67166678`, not probed) | the slow dev target; `Serial` is native USB, not the CH343. **Locked up 2026-10-05** - #69 |
 | `CYD_S3_3248` | - | **USB broken** (2026-09-28); out of commission |
 | `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in |
 

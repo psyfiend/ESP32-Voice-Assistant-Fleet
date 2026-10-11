@@ -4,6 +4,8 @@ Branch `feat/65-saving`. Boards: **WS_P4_5** (COM15), **WS_P4_4B** (COM7) and **
 all flashed 2026-10-09 with `-D DEBUG_POPUP` (local only) and the **new cache-safe P4 libraries**.
 **Reflashed 2026-10-09 ~14:40 with the PPA rotation fix (A15)** - the freezes. If any board still
 freezes, that is the most important result of the session: on the P4_5, `/hang` before resetting.
+**Run 2 build (2026-10-10 evening, desktop):** all three reflashed at `7bb90f8`, the P1b scroll fix
+included, `DEBUG_POPUP` on all three and `DEBUG_HANG` on the P4_5; each firmware reads `-dirty`.
 Design and what each step measured: `docs/design/card-sheet.md` section 17; decisions:
 `docs/DECISIONS.md` K33-K49, A14, A15.
 
