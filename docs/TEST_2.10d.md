@@ -196,4 +196,36 @@ takes it from the gaps above and below the rows instead, and does not scroll.
 time against the flash), and both point away from a flash write: the flashes come with panel and
 dropdown motion, not with saves. What `/panel` cannot see: underruns in a frame's first 413 lines are
 masked by the bridge (`PanelDebug.cpp`, "What the recorder cannot see"), so a late frame start, or a
-starved feed in the top third of the screen, reads 0. Open.
+starved feed in the top third of the screen, reads 0. Open: **#91**.
+
+### Round D - the panels are dragged whole (P1b round 2, 2026-10-11, P4_5)
+
+Owner, on seeing the scroll bar's design: rows sliding inside a panel that itself slides up "totally
+kills the illusion" - so an open panel taller than the room is now **dragged whole**: up to show its
+hidden rows (it stays where it is let go, at most until the last row is on screen), down to fold it
+(let go past a third of the way to its tab: it folds; less: back up), on every panel. Carets at the
+screen's edges instead of a bar. A folded tab still opens by a tap only. Tested with
+`/popup?rows=4` (4 greyed test rows, so Desk's SETTINGS is 9 rows; `rows=0` to undo).
+
+| # | Do this | PASS if |
+|---|---|---|
+| D1 | Open Desk -> SETTINGS | Rests with its tab at the window's top; a caret at the screen's bottom |
+| D2 | Drag up - from a row's words, a gap, a dropdown | The whole panel moves; rows never slide inside it; a dropdown does not open |
+| D3 | Keep going up | Stops dead with the last row in sight; the bottom caret goes; a caret at the top once the pane is off the top |
+| D4 | Let go part way | It stays |
+| D5 | Drag down a little / past a third, let go | Back up / folds to its tab |
+| D6 | Tap Paused, a dropdown | Work as before |
+| D7 | Drag up, tap the tab to fold, open again | Folds whole, nothing in the tab's strip; reopens at rest |
+| D8 | Scenes -> SCENES (short) | Cannot go up; down as D5 |
+| D9 | `/popup?rows=0`, reopen | Normal, no carets |
+
+**Owner, 2026-10-11 ~01:00:** "so slick". D1 D2 D4 D5 D6 D7 PASS. **D3 FAIL**: dragged up, the panel
+went a little past its stop - far enough to show its rounded bottom - and settled back when let go.
+**D8 FAIL**: SCENES and CHART would not move up, but dragged down and then up without lifting, they
+went a long way up, a large gap under them. Both were LVGL: its non-elastic clamp holds only for a
+drag down (`elastic_diff()`: `scroll_end - diff < 0` can never be true with `diff` negative), so one
+step of a drag up went past the end. **Fixed:** the track pulls itself back to its ceiling on every
+scroll step, before anything is drawn. **The carets now point the way to drag** (owner): rows below,
+a caret pointing up; the pane off the top, one pointing down. Drag down to fold stays on every panel
+(owner). **Retest D3, D8 and the carets.** D9 not yet run.
+**Flashes while dragging** - many, sometimes several in quick succession: see #91.

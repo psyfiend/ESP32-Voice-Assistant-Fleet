@@ -116,15 +116,8 @@ measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "S
   resolve `fleet-ws-p4-5`, nor `.local`. Its settings file was kept (276 bytes: Desk's Tap action
   Toggle, Midnight's selector Slv Sq).
 - **Run 1 done (2026-10-10, P4_5, no HA)** - results in `TEST_2.10d.md`. No freeze. One FAIL, P1b
-  (popup panels' scrolling), **fixed and flashed, to retest**: the rows are in a body of their own
-  that scrolls (`buildFolder()`: cut off under the join, stops dead, a thin bar while there is
-  more); up to 1.6 mm over comes out of the gaps instead. Verified by screenshot on 5-row SETTINGS
-  only; the 6-row one (All Lamps) is on the Fleet page, which `/popup` cannot reach. **Nothing on
-  the P4_5 scrolls now**, so the bar is unseen until a smaller board or a longer panel.
-  Two flashes (F5), both while changing a setting in a window, 0 underruns - open, see the report.
-  Needs HA, so waits for home: L1, L3b, L4, T4-T6, T8, P2-P5. G5/G7 could not work without HA (the
-  group is `sheet_office` then, not `ha_office`); G7's `groups.ha_office.color` and Overhead's own
-  name were cleared from the file afterwards (owner's OK).
+  (popup panels' scrolling): first a scrolling body with a bar, then - the owner's call on seeing
+  it - panels dragged whole (K50, round D). Up to 1.6 mm over still comes out of the gaps instead.
 - **Back home, 2026-10-10 evening (desktop):** `feat/65-saving` pulled to `7bb90f8` (the desktop's
   local debug flags kept, uncommitted), `.pio/build_cache` cleared, the desktop's
   p4-libs-2026-10-09 folder checked (`LCD_DSI_ISR_CACHE_SAFE`, `ESP_HOSTED_MEMPOOL_PREFER_SPIRAM`;
@@ -133,10 +126,15 @@ measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "S
   on "M&M Motors"; the P4_5 on HA. The 4B and 1060 now have the P1b fix too. Its
   settings file as the owner left it: All Lamps Tap action Members view, Active state Any; Overhead
   Custom; no groups.
+- **2026-10-11 ~01:00: 2.10d wrapped, pending a retest.** The panels are now dragged whole (K50,
+  round D in `TEST_2.10d.md`); D3/D8 failed on LVGL's one-way clamp, fixed and flashed to the P4_5
+  (`/popup?rows=4` still set until its next reboot), **to retest: D3, D8, the flipped carets, D9**.
+  F5 is #91, now with a near-repro (flashes while dragging). **2.10e is being built on
+  `feat/65-history`, branched off `feat/65-saving`; both merge together (K51).**
 - **Run 2 done (2026-10-10 evening, all three, with HA)** - every remaining line PASS (`TEST_2.10d.md`).
   Open: **F5**, the P4_5's flash, seen several times with panel and dropdown motion and **no save
   near it** - the flash-write suspect is weakened; `/panel` is blind to the first 413 lines of a
-  frame. No panel scrolls on any board, so the scroll bar is unseen on glass. #90 filed (the window
+  frame. #90 filed (the window
   title shows the current name, after HA's names are tidied). The owner's ideas for the window's
   panels and a group's own window are in `interview-phase2-3.md` §12.
 - **A Wi-Fi recovery that looked stuck (P4_5, serial log, 2026-10-09) - CLOSED, not evidence.**
