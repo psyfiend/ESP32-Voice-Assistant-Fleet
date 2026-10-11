@@ -133,6 +133,12 @@ measurements: **`card-sheet.md` §17**; how saving works, for good: CLAUDE.md "S
   on "M&M Motors"; the P4_5 on HA. The 4B and 1060 now have the P1b fix too. Its
   settings file as the owner left it: All Lamps Tap action Members view, Active state Any; Overhead
   Custom; no groups.
+- **Run 2 done (2026-10-10 evening, all three, with HA)** - every remaining line PASS (`TEST_2.10d.md`).
+  Open: **F5**, the P4_5's flash, seen several times with panel and dropdown motion and **no save
+  near it** - the flash-write suspect is weakened; `/panel` is blind to the first 413 lines of a
+  frame. No panel scrolls on any board, so the scroll bar is unseen on glass. #90 filed (the window
+  title shows the current name, after HA's names are tidied). The owner's ideas for the window's
+  panels and a group's own window are in `interview-phase2-3.md` §12.
 - **A Wi-Fi recovery that looked stuck (P4_5, serial log, 2026-10-09) - CLOSED, not evidence.**
   The log showed "RECOVERY 1/3: re-associating" and then no `[Conn]` line for 33 minutes. Owner
   (2026-10-10): the router was unplugged and plugged back in several times while cables were moved

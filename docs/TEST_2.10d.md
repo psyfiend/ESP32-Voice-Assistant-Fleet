@@ -181,3 +181,19 @@ it needs**. For the popup's panels (SETTINGS, CHART, SCENES), not a rule for all
 at a straight line under the join, stopping dead at both ends, with a thin bar in the right margin
 whenever there is more to see. A panel only just too tall (up to 1.6 mm, as SETTINGS on the P4_5)
 takes it from the gaps above and below the rows instead, and does not scroll.
+
+### Run 2 - 2026-10-10 evening, home, with HA; P4_5, 4B and 1060 at `7bb90f8`
+
+| Round | Result |
+|---|---|
+| 1 | **F4 PASS** (4B and 1060). `/panel?flash=20` while swiping pages on the P4_5: no flash. **F5: still seen, P4_5 only** - several times while opening and closing Desk's panels and tapping dropdowns; one right as SCENES was opened on the Scenes view and SETTINGS tapped straight after. Each time: `/panel` 0 underruns, `/settings?stats=1` nothing unusual. For that one, the last save was at 1675 s and `/panel` read at 2131 s: **no settings write anywhere near it** |
+| 3 | L1 L3b L4 PASS. L1 note: the window's title should show the card's current name ("Office > Light - Office overhead") - after the owner tidies HA's entity names (#90) |
+| 4 | G5 G7 G11 PASS |
+| 5 | T4 T5 T6 T8 PASS |
+| 6 | P1 PASS on all three, P1b PASS (P4_5 and 4B), P2-P5 PASS. **No SETTINGS panel scrolls on any of the three** - so the scroll bar and the dead stops (P1b's fix) are unseen on glass |
+
+**F5, what the numbers say.** Both pending tests are now done (`/panel?flash=20` while swiping; a save
+time against the flash), and both point away from a flash write: the flashes come with panel and
+dropdown motion, not with saves. What `/panel` cannot see: underruns in a frame's first 413 lines are
+masked by the bridge (`PanelDebug.cpp`, "What the recorder cannot see"), so a late frame start, or a
+starved feed in the top third of the screen, reads 0. Open.
