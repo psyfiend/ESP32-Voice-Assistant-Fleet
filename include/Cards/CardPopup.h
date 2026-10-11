@@ -97,7 +97,7 @@ public:
     //   /popup?scene=N      as a tap on scene N; lists the light's scenes (2.10c)
     //   /popup?set=V        as a tap on that control's slider at V (%, K, hue)
     //   /popup?view=N       as the corner icons: 0 the controls (a member's, inside
-    //                       one), 1 history, 2 members, 4 scenes; 3 only lists. Each
+    //                       one), 1 history, 2 members, 4 scenes, 5 properties; 3 only lists. Each
     //                       lists the entities' levels (and an HA group's members)
     //   /popup?power=1      as a tap on Power
     //   /popup?pause=1|0    pause / resume what the window shows
@@ -110,6 +110,7 @@ public:
     //   /popup?more=1       History: as a tap on "Show more"
     //   /popup?hist=1       History: what HaHistory has (state, points, events, size)
     //   /popup?row=N        History: as a tap on activity row N from the top (details)
+    //   /popup?x=N          History: as a finger on the chart, N px from its left
     // The handler hands the work to the LVGL thread and waits for it, as
     // /screenshot does - it never touches LVGL itself.
     static void beginDebug(class HttpServer &http);

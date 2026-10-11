@@ -243,8 +243,8 @@ enum class SceneShow : uint8_t {
 
 // WHAT A TAP DOES (2.10d, DECISIONS K37, K39). A long press always opens the
 // window (K3); this is the tap. TAP_DEFAULT is the card type's own - toggle on
-// a switch, a light or a button, nothing on a sensor - and is what an unsaved
-// card does. The scenes are the ones the card's window offers (its Scenes
+// a switch, a light or a button, History on anything else (owner, 2.10e round
+// 2; it was nothing) - and is what an unsaved card does. The scenes are the ones the card's window offers (its Scenes
 // setting); Cycle starts from the first after each boot.
 enum class TapAction : uint8_t {
     TAP_DEFAULT = 0,
@@ -279,6 +279,21 @@ inline bool tapActionFromName(const char *n, TapAction &out) {
 // The names these are saved under (2.10d, Settings.h): a saved choice is a
 // NAME, so reordering an enum never changes what it means. A name this
 // firmware does not know reads as "not set".
+inline const char *tempUnitName(TempUnit u) {
+    switch (u) {
+        case TempUnit::TEMP_SOURCE: return "source";
+        case TempUnit::TEMP_C:      return "c";
+        case TempUnit::TEMP_F:      return "f";
+        default:                    return "inherit";
+    }
+}
+inline bool tempUnitFromName(const char *n, TempUnit &out) {
+    if (!n) return false;
+    for (uint8_t i = 1; i <= (uint8_t)TempUnit::TEMP_F; i++)
+        if (!strcmp(n, tempUnitName((TempUnit)i))) { out = (TempUnit)i; return true; }
+    return false;
+}
+
 inline const char *groupOnName(GroupOn g) { return g == GroupOn::GROUP_ON_ALL ? "all" : "any"; }
 inline bool groupOnFromName(const char *n, GroupOn &out) {
     if (!n) return false;

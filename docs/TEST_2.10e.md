@@ -61,3 +61,37 @@ restart: `http://fleet-ws-p4-5/popup?rows=4`.
 | B4 | Any freeze | `/hang` on the P4_5 before a reset |
 
 ## Your results
+
+### Run 1 - 2026-10-11 morning, all three boards
+
+| Round | Result |
+|---|---|
+| 0 | D3 D8 D10 D9 PASS - 2.10d round D is done |
+| 1 | H1 H2 H4 H5 H6 PASS. **H3 PARTIAL**: Span and the chips follow each other, but a reopened window was back on 24 h - the owner expected it kept (K55 had it unsaved). **Now kept per card** (K56) |
+| 2 | A1-A10 PASS |
+| 3 | **B1**: on the 4B the span chips ran over "Now .. Min .. Max .." - min and max are now in the chart (below). B2: the P4_5 flashed once or twice while dragging; **the 4B and 1060 never did** (#91). B3 PASS so far. B4: watching |
+
+**Owner's additions, built the same morning** (round 2 below): SETTINGS gets **Units** (°C / °F,
+where the card shows a temperature) and an **Entity properties** button (a view of its own, no
+corner icon - no room on the 4B); a card that toggles nothing taps to **History** by default;
+CHART gets **Legend** (X axis / Y axis / Both) and **Show span buttons**; ACTIVITY's Period is
+renamed **Span**, gets **24 h / 7 d** chips and its own **Show span buttons**; activity rows sit
+in from the window's sides; **a finger on the chart** puts a dotted line at that time, its time and
+value at the top (slide to move it); **min and max** are faint dotted lines where they happened,
+their values at the top of the chart, and "Now" stays beside the chips. Every History choice is
+kept per card.
+
+## Round 2 - the additions (all three boards, flashed 2026-10-11 ~12:40)
+
+| # | Do this | PASS if |
+|---|---|---|
+| R1 | Thermo -> History: 6 h; CHART: Legend -> X axis, untick Show span buttons. Close the window, reopen History (and once after a restart) | Still 6 h, X axis, no buttons. Put them back after |
+| R2 | Thermo's chart: put a finger on it and slide | A dotted line follows, "time  value" at the top, never under the finger; it stays when you lift |
+| R3 | Min and max | Faint dotted lines where each happened, "Min .." / "Max .." above them; untick Show min and max: gone |
+| R4 | Legend: X axis / Y axis / Both | Only the times / only the top and bottom values / both |
+| R5 | Show span buttons off (CHART), and on ACTIVITY too | The chips go, the chart (or list) gets the room. Back on after |
+| R6 | Desk -> History | 24 h / 7 d chips over the list; the rows in from the sides; ACTIVITY's first row says **Span** |
+| R7 | Thermo -> SETTINGS -> Units -> °C, close | The card and the window read °C, and the chart too. Restart: still °C. Back to °F |
+| R8 | Desk -> SETTINGS -> Entity properties -> View | "Desk > Properties": HA's name, light.office, HA's area, Home Assistant, 3 members, the card's group and id. Back arrow: the controls |
+| R9 | A sensor card you never set a Tap action on (Thermo, an occupancy): tap it | Its window opens on History. A light still toggles |
+| R10 | The 4B: a chart | The chips and "Now" side by side, nothing running under them |

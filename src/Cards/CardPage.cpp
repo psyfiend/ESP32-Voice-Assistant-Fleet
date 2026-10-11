@@ -586,6 +586,8 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
             }
             TapAction ta;
             if (Settings::card(c->id(), "tap", v, sizeof(v)) && tapActionFromName(v, ta)) c->setTapAction(ta);
+            TempUnit tu;   // SETTINGS' Units row (2.10e round 2)
+            if (Settings::card(c->id(), "units", v, sizeof(v)) && tempUnitFromName(v, tu)) c->setTempUnit(tu);
             char ref[ENTITY_TOPIC_MAX];
             if (Settings::card(c->id(), "tap_scene", ref, sizeof(ref))) c->setTapScene(ref);
         }

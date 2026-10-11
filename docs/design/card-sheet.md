@@ -801,7 +801,15 @@ later. Decisions K52-K55.
 - **A group defined in HA** (Desk = `light.office`) is its own entity, as in HA (owner): its
   members' histories are each member's, reached through Members. A card standing for several
   entities made here (All Lamps) has none of its own and says so.
-- Neither panel's choices are saved: every window opens on 24 hours (owner undecided).
+- **Round 2 (owner, 2026-10-11 morning; K56-K58):** every History choice is kept per card;
+  "Now" beside the chips, and **min and max in the chart** - faint dotted lines where each
+  happened, their values in a strip above the plot (on the 4B the old readout ran under the
+  chips); **a finger on the chart** puts a dotted line at that time with its time and value in
+  the same strip, and slides; CHART adds **Legend** (X axis / Y axis / Both) and **Show span
+  buttons**; ACTIVITY's Period is **Span**, with 24 h / 7 d chips and its own Show span buttons,
+  its rows in from the sides. SETTINGS adds **Units** (°C/°F per card, `units`) and an **Entity
+  properties** button opening a read-only view (HA's name, entity id, HA's area, source, class,
+  unit, members, the card's group and id). A card that toggles nothing taps to History.
 
 **Where the data comes from** (K53; measured from the PC on 2026-10-11, the owner's HA):
 

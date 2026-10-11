@@ -91,6 +91,11 @@ North's empty day. **Not seen by anyone on glass yet**, and nothing tested by to
 **Also fixed overnight, a 2.10d bug:** card label colours when HA's areas arrive in an unlucky
 order (CardBinder re-applies every card's group). The 4B and 1060 have this build too, so
 dragging panels on them says whether #91's flashes are the P4_5's alone.
+**Run 1 (owner, 2026-10-11 morning): all PASS** but H3 (span not kept) and B1 (the 4B's chips
+over the readout) - both fixed in **round 2**, which also builds the owner's ten additions (K56-K58:
+Units, Entity properties, Tap default History for sensors, Legend, span buttons on/off, activity
+chips and Span, inset rows, a finger reading the chart, min/max in the chart). All three flashed
+~12:40; `TEST_2.10e.md` round 2 is the owner's next. #91: only the P4_5 flashes.
 **All nine compiled at `a9db07f`** (2026-10-11 ~05:00, 22 min) - with the desktop's local debug
 lines still in, so the release gate before the merge is still to run without them.
 **Then:** the owner's report, fixes, the all-nine gate, one `--no-ff` merge of both, `v0.2.11`.
