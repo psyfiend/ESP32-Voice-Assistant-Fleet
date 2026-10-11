@@ -95,7 +95,9 @@ dragging panels on them says whether #91's flashes are the P4_5's alone.
 over the readout) - both fixed in **round 2**, which also builds the owner's ten additions (K56-K58:
 Units, Entity properties, Tap default History for sensors, Legend, span buttons on/off, activity
 chips and Span, inset rows, a finger reading the chart, min/max in the chart). All three flashed
-~12:40; `TEST_2.10e.md` round 2 is the owner's next. #91: only the P4_5 flashes.
+~12:40; round 2 all PASS. **Round 3** (axes in round steps, the span in words without the buttons)
+flashed to all three ~15:30 - `TEST_2.10e.md` X1-X6 next. Open for the owner: a fixed chart range
+(card-sheet §18). #91: only the P4_5 flashes.
 **All nine compiled at `a9db07f`** (2026-10-11 ~05:00, 22 min) - with the desktop's local debug
 lines still in, so the release gate before the merge is still to run without them.
 **Then:** the owner's report, fixes, the all-nine gate, one `--no-ff` merge of both, `v0.2.11`.
