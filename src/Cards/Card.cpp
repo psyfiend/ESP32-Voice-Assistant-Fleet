@@ -1394,10 +1394,17 @@ bool Card::owns(const char *entityId) const {
     return false;
 }
 
+// AND RENDERS. applyState() paints the surface its plain colour; render() is
+// what puts an on card's fill back over it. Without it, a card that was on
+// when HA's areas settled kept its dark on-fill icon and name on a plain
+// surface until its next value (owner, 2026-10-12: Office occupancy and Desk
+// at boot, some boots and not others - whichever came first, the values or
+// the areas).
 void Card::reapplyGroup() {
     if (!_root) return;
     CardGroups::apply(*this, _pageAreaColor);
     applyState();
+    render();
 }
 
 void Card::onSnapshot(const Entity &snap) {
