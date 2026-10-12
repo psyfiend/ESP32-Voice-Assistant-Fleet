@@ -111,3 +111,21 @@ buttons were when they are hidden, Now staying right; and a **fixed range** opti
 | X4 | CHART: untick Show span buttons | "24 hours" (or the span) at the left where the buttons were, Now still at the right; the chart taller, maybe a line more |
 | X5 | ACTIVITY: untick Show span buttons | "Last 24 hours" / "Last 7 days" where the buttons were |
 | X6 | Legend X axis / Y axis / Both | The grid stays; only the time labels / only the value labels / both |
+
+**Round 3 results (owner, 2026-10-11 evening):** "it looks so good" - asked for the round 4 changes
+below before the last round of testing.
+
+## Round 4 - the last round (all three boards, flashed 2026-10-11 ~21:45)
+
+| # | Do this | PASS if |
+|---|---|---|
+| Y1 | CHART: the rows | Span, Legend (None / X axis / Y axis / Both), Show min/max, Span buttons - in that order |
+| Y2 | Legend: None | No labels on either axis; the grid stays |
+| Y3 | Span buttons off | "Showing: last 24 hours" (or the span) in the middle, larger; Now still at the right. The same on ACTIVITY ("Showing: last 7 days") |
+| Y4 | Min and max | Their values inside the chart, beside their dotted lines - the max above the line, the min below, moved to the other side where there is no room; never on the line |
+| Y5 | The chart | A soft fill in the accent under the line, fading toward the bottom |
+| Y6 | ACTIVITY: the rows | Span, Details (Basic / Extra), Show triggers, Span buttons |
+| Y7 | Details: Basic | The state on the left; on the right "14 minutes ago" over "9:16 PM" ("Yesterday" over the time; "3 days ago" over "Oct 8, 5:27 PM"). Tap a row: it reads "Off for 10 min" |
+| Y8 | Details: Extra | Days as headings ("Today, October 11, 2026", "Yesterday, October 10, 2026"); each row "Closed for 2 hrs 38 min" (the newest "... so far"), the time on the right. Tap a row: "At 9:05:34 PM" and HA's own words for the trigger |
+| Y9 | Close and reopen | Details and the rest kept |
+| Y10 | Entity properties on Thermo, Desk, a lamp | A **Device** line: "THERMOSTAT", "Office", "Office lamp"; "This board" on the board's own entities |

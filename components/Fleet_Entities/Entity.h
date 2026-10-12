@@ -436,6 +436,10 @@ struct Entity {
     // ...and its id (HA's area_id(): "office"), which does not change when the
     // area is renamed in HA. The key of the group linked to that area (K46).
     char        sourceAreaId[ENTITY_NAME_MAX] = {0};
+    // The DEVICE it belongs to in HA (its name as the owner set it, else the
+    // device's own), for the window's Properties (2.10e). Learnt with the area;
+    // empty for an entity with no device (a helper). Written by setSourceArea().
+    char        sourceDevice[ENTITY_NAME_MAX] = {0};
 };
 
 #endif // ENTITY_H

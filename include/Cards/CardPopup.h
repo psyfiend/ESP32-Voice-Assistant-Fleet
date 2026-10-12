@@ -111,6 +111,8 @@ public:
     //   /popup?hist=1       History: what HaHistory has (state, points, events, size)
     //   /popup?row=N        History: as a tap on activity row N from the top (details)
     //   /popup?x=N          History: as a finger on the chart, N px from its left
+    //   /popup?extra=0|1    History: activity's Details, Basic or Extra (not kept)
+    //   /popup?chips=0|1    History: the span buttons off or on (not kept)
     // The handler hands the work to the LVGL thread and waits for it, as
     // /screenshot does - it never touches LVGL itself.
     static void beginDebug(class HttpServer &http);

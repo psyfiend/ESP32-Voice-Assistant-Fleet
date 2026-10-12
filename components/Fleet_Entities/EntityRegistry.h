@@ -142,7 +142,8 @@ public:
     bool setSourceName(const char *id, const char *name);
     // Entity::sourceArea and sourceAreaId, the same way; "" clears them (HA
     // says no area).
-    bool setSourceArea(const char *id, const char *areaId, const char *area);
+    // `device` (2.10e): its HA device's name, or null to leave it as it is.
+    bool setSourceArea(const char *id, const char *areaId, const char *area, const char *device = nullptr);
     // Counts area changes on any entity: a group's colour depends on every
     // group's, so one entity's area can recolour cards on others (2.10d).
     uint32_t areaEpoch() const { return _areaEpoch.load(); }

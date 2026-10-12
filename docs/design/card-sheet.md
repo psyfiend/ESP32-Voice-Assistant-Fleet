@@ -816,7 +816,14 @@ later. Decisions K52-K55.
   (5, 10, 15, 30 min, 1, 2, 3, 4, 6, 12 h - the shortest whose labels fit), a faint grid line at
   every tick both ways. More room - the 1060, the span buttons hidden - gives more ticks. With the
   buttons hidden, the span in words takes their place. Legend chooses which labels; the grid stays.
-- **Open, the owner's to decide: a fixed range.** "Auto" uses the span's own min and max (one
+- **Round 4 (owner, that evening; K59-K61):** CHART rows Span, Legend (+ None), Show min/max,
+  Span buttons; "Showing: last 24 hours" centred when the buttons are hidden; min and max labels
+  inside the plot, above or below the line where it runs under them, never on it; a gradient fill
+  under the line (LVGL's `lv_example_chart_5` approach, `histFillCb()`). ACTIVITY rows Span,
+  Details (Basic / Extra), Show triggers, Span buttons; wording through `TimeFormat`. Properties
+  shows the HA **device** (the area template asks `device_attr(device_id(e), 'name_by_user')` or
+  `'name'`). Deferred to #92: fixed range, bars/steps, compare to yesterday, more shading.
+- **Open, the owner's to decide: a fixed range (#92).** "Auto" uses the span's own min and max (one
   entity or, later, many); a user may want a "normal" range so charts look alike (e.g. 15-90 °F
   for a year of Seattle). The owner's idea: a popup with a number wheel for high and low. LVGL has
   one (`lv_roller`). Claude's proposal: CHART "Scale: Auto / Fixed"; Fixed opens a small window

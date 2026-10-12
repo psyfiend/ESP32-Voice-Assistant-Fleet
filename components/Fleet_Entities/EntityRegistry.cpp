@@ -288,13 +288,15 @@ bool EntityRegistry::setSourceName(const char *id, const char *name) {
     return true;
 }
 
-bool EntityRegistry::setSourceArea(const char *id, const char *areaId, const char *area) {
+bool EntityRegistry::setSourceArea(const char *id, const char *areaId, const char *area, const char *device) {
     if (!area) area = "";
     if (!areaId) areaId = "";
     std::lock_guard<std::mutex> lk(_mx);
     const int i = indexOf(id);
     if (i < 0) return false;
     Entity &e = _items[i];
+    // The device is shown, never keyed on: written, but not a change of area.
+    if (device) snprintf(e.sourceDevice, sizeof(e.sourceDevice), "%s", device);
     if (strncmp(e.sourceArea, area, sizeof(e.sourceArea) - 1) == 0 &&
         strncmp(e.sourceAreaId, areaId, sizeof(e.sourceAreaId) - 1) == 0) return false;
     snprintf(e.sourceArea, sizeof(e.sourceArea), "%s", area);

@@ -137,15 +137,20 @@ bool HaProvider::sendSceneQuery() {
         const Entity *e = _reg->at(i);
         if (!e || e->desc.source != EntitySource::HA || e->desc.kind == EntityKind::BUTTON) continue;
         add = snprintf(frame + n, sizeof(frame) - n, "%s'%s'", asked ? "," : "", e->desc.externalRef);
-        if (add < 0 || n + add >= (int)sizeof(frame) - 120) {
+        if (add < 0 || n + add >= (int)sizeof(frame) - 260) {
             Serial.printf("[HaProv] area query frame full at %u entities\n", (unsigned)asked);
             break;
         }
         n += add;
         asked++;
     }
+    // ...and its DEVICE's name (2.10e, the window's Properties): the owner's
+    // name for it, else the device's own; empty without a device. Measured
+    // 2026-10-11: light.office -> "Office", the thermostat -> "THERMOSTAT".
     add = snprintf(frame + n, sizeof(frame) - n,
-                   "] %%}@>{{ e }}>{{ area_id(e) or '' }}>{{ area_name(e) or '' }}|{%% endfor %%}\"}");
+                   "] %%}@>{{ e }}>{{ area_id(e) or '' }}>{{ area_name(e) or '' }}>"
+                   "{%% set d = device_id(e) %%}{{ (device_attr(d,'name_by_user') or device_attr(d,'name')) if d else '' }}"
+                   "|{%% endfor %%}\"}");
     if (add < 0 || n + add >= (int)sizeof(frame)) return false;
     n += add;
     if (!named && !asked) return true;   // nothing to ask this session
@@ -196,11 +201,13 @@ void HaProvider::parseScenes(const char *result) {
             *b = '\0';
             char *c2 = strchr(b + 1, '>');
             if (c2) *c2 = '\0';
-            const char *ref = a + 1, *areaId = b + 1, *area = c2 ? c2 + 1 : "";
+            char *c3 = c2 ? strchr(c2 + 1, '>') : nullptr;   // the device (2.10e)
+            if (c3) *c3 = '\0';
+            const char *ref = a + 1, *areaId = b + 1, *area = c2 ? c2 + 1 : "", *device = c3 ? c3 + 1 : "";
             for (uint8_t i = 0; i < _reg->count(); i++) {
                 const Entity *e = _reg->at(i);
                 if (!e || e->desc.source != EntitySource::HA || strcmp(e->desc.externalRef, ref) != 0) continue;
-                _reg->setSourceArea(e->desc.id, areaId, area);
+                _reg->setSourceArea(e->desc.id, areaId, area, device);
                 areas++;
                 if (area[0]) withArea++;
                 break;
