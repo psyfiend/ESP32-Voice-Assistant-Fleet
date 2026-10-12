@@ -149,3 +149,24 @@ I love the gradient!" Asked for round 5 below, then a final test before the merg
 | Z10 | Show triggers on | "Automation: Office: Occupancy Lighting Control" under the duration (when HA recorded one) |
 | Z11 | Show triggers off, tap a row | The trigger appears under it ("Home Assistant recorded no trigger" when there is none); tap again folds it |
 | Z12 | Show triggers on, tap a row | HA's own words appear under the trigger ("triggered by state of binary_sensor.office_occupancy") |
+
+**Round 5 results (owner, 2026-10-12):** Z1, Z3, Z5-Z12 PASS. Z2 FAIL: "Showing:" sat far below the
+title, and jumped down a few pixels when the chart arrived. Z3 note: it rose while the new span
+loaded. Z4 PARTIAL: keep "Min:" / "Max:" beside the times. Z8 note: rows needlessly wide on the
+P4_5 and 1060. Also: the chart got no taller without the buttons; activity's buttons to the
+middle and up, "Showing:" tappable there too; Properties cut "Card id" off on the P4_5.
+**Why it jumped:** while loading, the top line was one line tall and its words centred in it;
+the chart's was taller, so they moved when the answer came - both now build one top line.
+
+## Round 6 - before the merge (all three flashed 2026-10-12 ~02:00)
+
+| # | Do this | PASS if |
+|---|---|---|
+| W1 | Thermo's chart, buttons on, then off | The buttons, or "Showing:", a small gap under the title (not touching it); Min/Max and Now under the back and chart buttons. Nothing moves when the chart arrives or a new span loads |
+| W2 | The chart | Closer under the top line than in round 5 (half a line); a finger at the far left puts its reading just under Max, not on it |
+| W3 | The dotted min/max lines | "Max: 3:53 PM" / "Min: 9:09 AM" |
+| W4 | Desk's activity, buttons on | The 24 h / 7 d buttons in the middle, as high as the chart's |
+| W5 | Buttons off, tap "Showing: last 24 hours" | Switches to "last 7 days" and back; the panel's Span follows; nothing jumps while it loads |
+| W6 | Activity rows on the P4_5 and the 1060 | No wider than about 7 cm, centred; the 4B's as before |
+| W7 | Thermo: SETTINGS, Entity properties on the P4_5 | Every row in sight, Card id included |
+| W8 | The other views (controls, members, scenes) | Unchanged - the header gap is History's alone |

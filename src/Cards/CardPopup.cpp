@@ -2340,7 +2340,6 @@ void histAsk();
 void histDraw();
 void histChartCb(lv_event_t *ev);
 void histFillCb(lv_event_t *ev);
-void histShowing(lv_obj_t *row, int32_t raise = 0);
 int32_t histX(uint32_t t);
 float histNice(float raw);
 lv_obj_t *histVLine(lv_obj_t *parent, lv_point_precise_t *pts, int32_t x, uint32_t col, int32_t width);
@@ -2442,36 +2441,68 @@ lv_obj_t *histChips(lv_obj_t *parent, int32_t room = 0) {
     return row;
 }
 
-// The span in words, centred in `row` (owner, round 4) - where the chips were
-// when they are hidden. Its words are out of the flow, so they sit in the
-// middle whatever else is in the row. A row with no height of its own gets a
-// line's. `raise`: this far above the middle, never past the row's top.
+// THE TOP LINE (owner, rounds 5 and 6), one shape for the chart and activity,
+// loading or drawn, so nothing moves when the answer arrives: the span chips
+// or "Showing: ..." in the middle; on the chart, Min / Max in the left corner
+// and Now in the right. History's stage REACHES UP INTO THE HEADER ROW's empty
+// lower half (showView() gives the window a negative gap there), so the middle
+// sits a small gap under the title. The corners start `histLift()` lower, under
+// the back and chart buttons. Nothing in the stage's top strip but the middle
+// is clickable, so a tap there still reaches those buttons. Without the chips
+// the line is only as tall as Min / Max (or, on activity, "Showing:"), so the
+// chart or the list below gets the room.
 //
-// ON THE CHART, A TAP STEPS THE SPAN (owner, round 5): 24 -> 12 -> 6 -> 1 hour
-// and round again, as the chips would.
+// Not LV_OBJ_FLAG_OVERFLOW_VISIBLE: LVGL draws in strips and skips a child
+// whose parent is outside the strip, and never hit-tests outside the parent -
+// the first try was cut off at the stage's top.
+
+// How far the stage reaches up into the header row.
+int32_t histLift() {
+    const int32_t lh = lv_font_get_line_height(UI::type().NAME);
+    return LV_MAX(0, (UI::minTouch() - lh) / 2 - mm(2.0f));
+}
+
+bool histChipsOn() { return s_hv.chart ? s_hv.chips : s_hv.actChips; }
+
+lv_obj_t *histTopRow(lv_obj_t *body) {
+    const UIType &t = UI::type();
+    const int32_t corners = s_hv.chart ? histLift() + 2 * lv_font_get_line_height(t.TAG) + mm(1.0f) : 0;
+    const int32_t middle  = histChipsOn() ? mm(6.0f) : lv_font_get_line_height(t.NAME);
+    lv_obj_t *row = plain(body);
+    lv_obj_set_size(row, lv_pct(100), LV_MAX(corners, middle));
+    return row;
+}
+
+// A corner of the top line: out of the buttons' way, in the middle of the rest.
+void histCorner(lv_obj_t *o, lv_align_t where) { lv_obj_align(o, where, 0, histLift() / 2); }
+
+// The span in words (owner, round 4) where the chips were when they are
+// hidden. A TAP STEPS THE SPAN (owner, rounds 5 and 6): 24 -> 12 -> 6 -> 1 hour
+// on the chart, 24 hours <-> 7 days on activity, round again, as the chips do.
 void histShowingCb(lv_event_t *ev);
-void histShowing(lv_obj_t *row, int32_t raise) {
+void histShowing(lv_obj_t *row) {
     static const char *const CHART_WORDS[HIST_SPANS] = { "last 24 hours", "last 12 hours", "last 6 hours", "last hour" };
     static const char *const ACT_WORDS[HIST_PERIODS] = { "last 24 hours", "last 7 days" };
     const UIType    &t = UI::type();
     const UIPalette &p = UI::pal();
-    const int32_t lh = lv_font_get_line_height(t.NAME);
-    lv_obj_update_layout(row);
-    int32_t rh = lv_obj_get_height(row);
-    if (rh < lh) { lv_obj_set_height(row, lh); rh = lh; }
     char buf[40];
     snprintf(buf, sizeof(buf), "Showing: %s", s_hv.chart ? CHART_WORDS[s_hv.span] : ACT_WORDS[s_hv.period]);
     lv_obj_t *l = makeLabel(row, t.NAME, p.TEXT);
     lv_label_set_text(l, buf);
-    lv_obj_add_flag(l, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    lv_obj_align(l, LV_ALIGN_CENTER, 0, -LV_MIN(raise, (rh - lh) / 2));
-    if (s_hv.chart) {
-        // The whole line, and a finger's height of it.
-        lv_obj_add_flag(l, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_ext_click_area(l, LV_MAX(0, (UI::minTouch() - lh) / 2));
-        lv_obj_set_style_text_color(l, UI::c(p.ACCENT), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
-        lv_obj_add_event_cb(l, histShowingCb, LV_EVENT_CLICKED, nullptr);
-    }
+    lv_obj_align(l, LV_ALIGN_TOP_MID, 0, 0);
+    // The whole line, and a little round it - not so much that it takes taps
+    // meant for the title just above.
+    lv_obj_add_flag(l, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_ext_click_area(l, mm(1.0f));
+    lv_obj_set_style_text_color(l, UI::c(p.ACCENT), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+    lv_obj_add_event_cb(l, histShowingCb, LV_EVENT_CLICKED, nullptr);
+}
+
+// The middle of the top line. `room`: the width the chips may take (0, any).
+void histTopMiddle(lv_obj_t *row, int32_t room = 0) {
+    if (!histChipsOn()) { histShowing(row); return; }
+    lv_obj_t *chips = histChips(row, room);
+    lv_obj_align(chips, LV_ALIGN_TOP_MID, 0, 0);
 }
 
 // The chart itself: HA's points sampled at even steps across the span, each
@@ -2506,21 +2537,17 @@ void histDrawChart(lv_obj_t *body) {
         }
     }
 
-    // THE TOP LINE (owner, round 5), the same shape on every board: Min over
-    // Max in the left corner, Now in the right, and between them the span
-    // chips - or, turned off, the span in words half a line higher. Two lines
-    // of the small text tall, whichever of them shows. The chips keep clear of
-    // the corners, narrowing to fit on a small window (the 4B).
+    // THE TOP LINE (histTopRow()), the same shape on every board: Min over Max
+    // in the left corner, Now in the right, the chips or "Showing:" between.
+    // The chips keep clear of the corners, narrowing to fit (the 4B).
     char buf[96], nowTxt[32];
-    const int32_t lhTag = lv_font_get_line_height(t.TAG);
-    lv_obj_t *top = plain(body);
-    lv_obj_set_size(top, lv_pct(100), LV_MAX(2 * lhTag, mm(6.0f)));
+    lv_obj_t *top = histTopRow(body);
     cardFormatValue(e, nowTxt, sizeof(nowTxt), true, s.tempUnit);
     snprintf(buf, sizeof(buf), "Now: %s%s", nowTxt, H.fromStatistics() ? "\n5-minute averages" : "");
     lv_obj_t *read = makeLabel(top, t.TAG, p.TEXT);
     lv_label_set_text(read, buf);
     lv_obj_set_style_text_align(read, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_align(read, LV_ALIGN_RIGHT_MID, 0, 0);
+    histCorner(read, LV_ALIGN_RIGHT_MID);
     // Min and Max, their numbers lined up: the words in one label, the numbers
     // in another beside it, right-aligned (owner, round 5).
     lv_obj_update_layout(top);
@@ -2529,7 +2556,7 @@ void histDrawChart(lv_obj_t *body) {
     if (s_hv.minMax && lo <= hi) {
         lv_obj_t *words = makeLabel(top, t.TAG, p.TEXT);
         lv_label_set_text(words, "Min:\nMax:");
-        lv_obj_align(words, LV_ALIGN_LEFT_MID, 0, 0);
+        histCorner(words, LV_ALIGN_LEFT_MID);
         snprintf(buf, sizeof(buf), "%.1f%s\n%.1f%s", (double)lo, unit, (double)hi, unit);
         lv_obj_t *nums = makeLabel(top, t.TAG, p.TEXT);
         lv_label_set_text(nums, buf);
@@ -2538,19 +2565,17 @@ void histDrawChart(lv_obj_t *body) {
         lv_obj_update_layout(top);
         leftEnd = lv_obj_get_width(words) + mm(1.0f) + lv_obj_get_width(nums);
     }
-    if (s_hv.chips) {
-        const int32_t half = LV_MIN(topW / 2 - leftEnd, topW / 2 - lv_obj_get_width(read)) - mm(1.5f);
-        lv_obj_t *chips = histChips(top, 2 * LV_MAX(half, 1));
-        lv_obj_align(chips, LV_ALIGN_CENTER, 0, 0);
-    } else {
-        histShowing(top, lv_font_get_line_height(t.NAME) / 2);
-    }
+    const int32_t half = LV_MIN(topW / 2 - leftEnd, topW / 2 - lv_obj_get_width(read)) - mm(1.5f);
+    histTopMiddle(top, 2 * LV_MAX(half, 1));
 
     if (lo > hi) { histNote(body, "Nothing recorded in this span"); return; }
 
     lv_obj_t *area = plain(body);
     lv_obj_set_width(area, lv_pct(100));
     lv_obj_set_flex_grow(area, 1);
+    // Half a line closer to the top line (owner, round 6): the strip for the
+    // finger's reading, empty until a finger is down, made the gap look a line.
+    lv_obj_set_style_margin_top(area, -lv_font_get_line_height(t.TAG) / 2, 0);
     // A FINGER READS THE CHART (owner, round 2): see histScrub().
     lv_obj_add_flag(area, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(area, histChartCb, LV_EVENT_PRESSED, nullptr);
@@ -2738,10 +2763,13 @@ void histDrawChart(lv_obj_t *body) {
             if (y < top || y > bot) y = above ? yBot + gap : yTop - gap - lh;   // no room: the other side
             lv_obj_set_pos(l, lx, LV_CLAMP(top, y, bot));
         };
-        // When, at each (owner, round 5): the values are in the top line.
-        char a[24], b[24];
-        tfClock(a, sizeof(a), (time_t)tHi);
-        tfClock(b, sizeof(b), (time_t)tLo);
+        // Which, and when (owner, rounds 5 and 6): "Max: 3:53 PM" - the values
+        // are in the top line.
+        char a[32], b[32], c[16];
+        tfClock(c, sizeof(c), (time_t)tHi);
+        snprintf(a, sizeof(a), "Max: %s", c);
+        tfClock(c, sizeof(c), (time_t)tLo);
+        snprintf(b, sizeof(b), "Min: %s", c);
         place(a, xHi, true);
         place(b, xLo, false);
     }
@@ -2914,25 +2942,23 @@ void histDrawActivity(lv_obj_t *body) {
     const UIType    &t = UI::type();
     const HaHistory &H = *s_hist;
     const uint16_t n = H.events();
-    // The span buttons, as on the chart (owner, round 2); turned off, the span
-    // in words in their place (round 3).
-    {
-        lv_obj_t *top = plain(body);
-        lv_obj_set_size(top, lv_pct(100), LV_SIZE_CONTENT);
-        lv_obj_set_style_pad_hor(top, mm(5.0f), 0);
-        if (s_hv.actChips) histChips(top);
-        else               histShowing(top);
-    }
+    // The span buttons, as on the chart (owner, round 2), centred (round 6);
+    // turned off, the span in words in their place (round 3).
+    histTopMiddle(histTopRow(body));
     if (!n) {
         histNote(body, s_hv.period ? "No changes in the last 7 days" : "No changes in the last 24 hours");
         return;
     }
     // In from the window's sides (owner, round 2: the rows were wider than
-    // they need be, even on the 4B).
+    // they need be, even on the 4B), and NO WIDER THAN ROWS_W (round 6: on the
+    // P4_5 and the 1060 the state and its time sat a long way apart). The 4B's
+    // window is narrower than that, so it keeps its rows.
+    constexpr float ROWS_W_MM = 70.0f;
+    lv_obj_update_layout(body);
     lv_obj_t *list = plain(body);
     s_histList = list;
     lv_obj_set_width(list, lv_pct(100));
-    lv_obj_set_style_pad_hor(list, mm(5.0f), 0);
+    lv_obj_set_style_pad_hor(list, LV_MAX(mm(5.0f), (lv_obj_get_width(body) - mm(ROWS_W_MM)) / 2), 0);
     lv_obj_set_flex_grow(list, 1);
     lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
     UI::tameScroll(list);
@@ -3072,14 +3098,9 @@ void histDraw() {
         else            histDrawActivity(s_hv.body);
         return;
     }
-    // Still asking, or no answer: the chips stay, so another span can be tried.
-    {
-        lv_obj_t *top = plain(s_hv.body);
-        lv_obj_set_size(top, lv_pct(100), LV_SIZE_CONTENT);
-        if (!s_hv.chart) lv_obj_set_style_pad_hor(top, mm(5.0f), 0);
-        if (s_hv.chart ? s_hv.chips : s_hv.actChips) histChips(top);
-        else                                         histShowing(top);
-    }
+    // Still asking, or no answer: the chips stay, so another span can be tried
+    // - in the same top line as the answer's, so nothing moves when it comes.
+    histTopMiddle(histTopRow(s_hv.body));
     lv_obj_t *mid = plain(s_hv.body);
     lv_obj_set_width(mid, lv_pct(100));
     lv_obj_set_flex_grow(mid, 1);
@@ -3113,12 +3134,17 @@ void spanChipCb(lv_event_t *ev) {
     lv_async_call([](void *) { histDraw(); }, nullptr);   // the chip's own row is redrawn
 }
 
-// "Showing: last 24 hours" tapped: the next span down, round again after 1 hour.
+// "Showing: ..." tapped: the next span, round again after the last.
 void histShowingCb(lv_event_t *ev) {
     (void)ev;
-    if (!s_hv.chart) return;
-    s_hv.span = (uint8_t)((s_hv.span + 1) % HIST_SPANS);
-    histKeep("hist_span", HIST_SPAN_NAME[s_hv.span]);
+    if (s_hv.chart) {
+        s_hv.span = (uint8_t)((s_hv.span + 1) % HIST_SPANS);
+        histKeep("hist_span", HIST_SPAN_NAME[s_hv.span]);
+    } else {
+        s_hv.period = (uint8_t)((s_hv.period + 1) % HIST_PERIODS);
+        s_hv.more = false;
+        histKeep("act_span", HIST_PERIOD_NAME[s_hv.period]);
+    }
     histSyncPanel();
     histAsk();
     lv_async_call([](void *) { histDraw(); }, nullptr);   // its own row is redrawn
@@ -3274,6 +3300,17 @@ void buildProps() {
         propRow(list, "Card group", CardGroups::ofCard(*c, g) ? g.name : "None");
         propRow(list, "Card id", c->hasId() ? c->id() : "");
     }
+    // ALL OF IT IN SIGHT where it can be (owner, round 6: the P4_5 cut "Card
+    // id" in half): the gaps between the rows close up, as far as a third of
+    // their size; past that the list scrolls, as before.
+    lv_obj_update_layout(list);
+    const uint32_t cnt = lv_obj_get_child_count(list);
+    if (cnt > 1) {
+        int32_t used = 0;
+        for (uint32_t i = 0; i < cnt; i++) used += lv_obj_get_height(lv_obj_get_child(list, (int32_t)i));
+        const int32_t fit = (lv_obj_get_content_height(list) - used) / (int32_t)(cnt - 1);
+        if (fit < mm(1.6f)) lv_obj_set_style_pad_row(list, LV_MAX(fit, mm(0.55f)), 0);
+    }
 }
 
 // Share the title row between "Area > " and the name.
@@ -3338,6 +3375,8 @@ void showView(PopupView v) {
     s.view = v;
     forgetMainWidgets();
     lv_obj_clean(s.stage);
+    // HISTORY REACHES UP INTO THE HEADER ROW (owner, round 6): see histTopRow().
+    lv_obj_set_style_pad_row(s.win, v == PopupView::VIEW_HISTORY ? -histLift() : mm(1.6f), 0);
 
     // SCENES SHOWS THE BRIGHTNESS SLIDER (owner): whatever the slider showed
     // before comes back with the controls.

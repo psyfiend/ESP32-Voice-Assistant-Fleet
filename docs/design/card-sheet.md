@@ -837,6 +837,17 @@ later. Decisions K52-K55.
   Span, Show duration, Show triggers, Span buttons. Humidity beside temperature waits for
   multi-sensor charts (#92); a popup timeout choice and hiding the countdown bar for the device
   settings pages (#23).
+- **Round 6 (owner, 2026-10-12; K64).** History's stage reaches up into the header row's empty
+  lower half (`s.win`'s row gap is `-histLift()` in History only), so the chips or "Showing:"
+  sit a small gap under the title while the corners (Min/Max, Now) stay under the back and chart
+  buttons; nothing there but the middle is clickable, so those buttons still take their taps.
+  `histTopRow()` is the one top line for chart, activity and loading - "Showing:" used to jump
+  when the answer arrived because the loading line was shorter. LV_OBJ_FLAG_OVERFLOW_VISIBLE was
+  tried first and failed: LVGL draws in strips and skips a child whose parent is outside the
+  strip, and never hit-tests outside a parent. Activity's chips are centred and its "Showing:"
+  steps 24 h / 7 d. The chart sits half a line closer to the top line (the finger's strip looked
+  like a blank line). Min/max lines say "Max: 3:53 PM". Activity rows are at most 70 mm wide.
+  Properties closes its row gaps (to a third) so everything fits where it can.
 - **Open, the owner's to decide: a fixed range (#92).** "Auto" uses the span's own min and max (one
   entity or, later, many); a user may want a "normal" range so charts look alike (e.g. 15-90 °F
   for a year of Seattle). The owner's idea: a popup with a number wheel for high and low. LVGL has
