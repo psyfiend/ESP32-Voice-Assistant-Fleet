@@ -96,7 +96,7 @@ RS485/Modbus, **#34** weather station, **#35** alarm clock.
 The numbers above are identity, not sequence. Agreed with the owner:
 
 1. ~~**2.10d + 2.10e, one merge**~~ - DONE, `v0.2.11`. Its small follow-up, **K17** (a group's
-   member added as a card of its own), comes first.
+   member added as a card of its own) - IN TESTING, `feat/17-member-card`, `TEST_K17.md`.
 2. **The design interview §3 onward** (`design/interview-phase2-3.md`), then **2.8** header slots (#19).
 3. **2.11 group cards with the page arranger** (#66, #78; prototype: artifact "Layout Playground").
 4. **3.1 schema** (#20), scoped together with **the companion web app** (#87).

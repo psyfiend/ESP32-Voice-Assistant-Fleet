@@ -14,6 +14,8 @@
 //     "schemes":  { "<scheme>": { "selector": "silver_round" } },
 //     "entities": { "<entity id>": { "paused": true } },
 //     "cards":    { "<card id>": { "scenes": "all", "active": "all" } } }
+//   A card added on the device (K17) is a card entry with "page", "after" and
+//   "entity" as well - see Cards/CardAdded.h.
 //
 // Rules that are load-bearing:
 //   - Only what was changed is stored; a missing key means "inherit". Setting a
@@ -76,6 +78,10 @@ void forEachGroup(void (*fn)(const char *id, const char *name, void *ctx), void 
 bool newGroup(const char *name, char *id, size_t cap);
 // How many cards have `key` set to `value` (whether a group still has members).
 uint8_t countCards(const char *key, const char *value);
+// Every card that has `key` set, in the file's order (the order they were
+// added): fn(card id, its value). Collected first, called after - fn may call
+// back into the store. CardAdded's way to find the cards added on the device.
+void forEachCardWith(const char *key, void (*fn)(const char *cardId, const char *value, void *ctx), void *ctx);
 
 // Writing, in RAM. nullptr = Reset (removes the key, and the card's or
 // scheme's object once empty). True when the document changed.

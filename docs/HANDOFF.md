@@ -27,7 +27,13 @@ anything on/off as its activity - from HA; the owner's choices saved by card id 
 
 ## What is next
 
-1. **K17** - a group's member added as a card of its own (it needed 2.10d's stable ids).
+1. **K17 IN TESTING** on `feat/17-member-card` - a group's member added as a card of its own
+   (K65-K67; the owner's group model: `group-cards.md` §5). Built 2026-10-12: SETTINGS "Add as a
+   card" in a member's own view and "Remove card" on an added card; `CardAdded`
+   (`include/Cards/CardAdded.h`) keeps them in the settings file and merges them into their page
+   after the card they came from; the page is rebuilt when the window closes, and again once a
+   late-learnt member exists. `/popup?addcard=1|removecard=1` from a PC. Flashed to the P4_5 only;
+   the owner's sheet: `docs/TEST_K17.md`. Then the all-nine gate and `v0.2.12`.
 2. **The design interview §3 onward** (below), then 2.8 header slots (#19), then 2.11 group cards
    with the page arranger (#66, #78). `ROADMAP.md`'s running order.
 Owner's ideas parked for after 2.10 has settled: the light controls' sliding selector for the

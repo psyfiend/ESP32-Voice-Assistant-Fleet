@@ -6,6 +6,8 @@
 #include "UI/UIToolkit.h"
 #include "Settings.h"   // 2.10d: SETTINGS' rows are kept by card id
 #include "Cards/CardGroups.h"   // the Card label row (K44)
+#include "Cards/CardAdded.h"    // K17: Add as a card, Remove card
+#include "Cards/PageSpec.h"     // CARD_ID_MAX
 #include "HaHistory.h"          // the History view's source (2.10e); no LVGL in it
 #include "TimeFormat.h"         // every time and duration it says (2.10e round 4)
 #include "src/core/lv_obj_event_private.h"   // lv_hit_test_info_t: the tap catcher's hit test
@@ -4420,6 +4422,9 @@ bool unitsShownF() {
 }
 void unitsDropCb(lv_event_t *ev);
 void propsCb(lv_event_t *ev);
+void addCardCb(lv_event_t *ev);
+void removeCardCb(lv_event_t *ev);
+bool s_removeArmed = false;   // "Remove card" tapped once: the next tap removes
 
 uint8_t deckSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
@@ -4470,6 +4475,17 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     // ENTITY PROPERTIES (owner): a view of its own, from here - no room for
     // another corner icon.
     r[n++] = { "Entity properties", DeckRowKind::ROW_BUTTON, "View", 0, true, propsCb, nullptr };
+    // K17 (K65): a member of a group card made a card of its own - a copy,
+    // right after the group card, in its group. Once made, the row says so.
+    if (inMember() && held && held->hasId() && s.ent[0]) {
+        const bool made = CardAdded::addedFor(held->id(), s.ent[0]->desc.id) != nullptr;
+        r[n++] = { "Add as a card", DeckRowKind::ROW_BUTTON, made ? "Added" : "Add", 0, !made, addCardCb, nullptr };
+    }
+    // A card added on the device can be removed (K66) - to the page's pool. A
+    // second tap, on "Sure?", does it.
+    if (!inMember() && held && CardAdded::isAdded(held->id()))
+        r[n++] = { "Remove card", DeckRowKind::ROW_BUTTON, s_removeArmed ? "Sure?" : "Remove", 0, true,
+                   removeCardCb, nullptr };
 #ifdef DEBUG_POPUP
     // GET /popup?rows=N: N greyed test rows, so SETTINGS is too tall for the
     // screen and the panel's drag can be tried (P1b round 2).
@@ -4600,11 +4616,13 @@ lv_obj_t *deckButton(lv_obj_t *parent, const DeckRowSpec &r) {
     lv_obj_set_style_bg_color    (b, UI::c(p.SURFACE), 0);
     lv_obj_set_style_bg_color    (b, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
     lv_obj_set_style_border_width(b, LV_MAX(1, mm(0.2f)), 0);
-    lv_obj_set_style_border_color(b, UI::c(p.ACCENT), 0);
-    lv_obj_t *l = makeLabel(b, UI::type().TAG, p.TEXT);
+    // Greyed (K17's "Added"): no accent, dim words, nothing to tap.
+    lv_obj_set_style_border_color(b, UI::c(r.live ? p.ACCENT : UI::mix(p.SURFACE, p.TEXT, 25)), 0);
+    lv_obj_t *l = makeLabel(b, UI::type().TAG, r.live ? p.TEXT : p.TEXT_DIM);
     lv_label_set_text(l, r.opts);
     lv_obj_center(l);
-    if (r.cb) lv_obj_add_event_cb(b, r.cb, LV_EVENT_CLICKED, nullptr);
+    if (!r.live) lv_obj_clear_flag(b, LV_OBJ_FLAG_CLICKABLE);
+    else if (r.cb) lv_obj_add_event_cb(b, r.cb, LV_EVENT_CLICKED, nullptr);
     return b;
 }
 
@@ -4705,6 +4723,30 @@ void propsCb(lv_event_t *ev) {
     (void)ev;
     deckSet(DECK_PEEK);
     lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_PROPS); }, nullptr);
+}
+
+// "Add as a card" (K17): made now, kept in the file, shown when the window
+// closes - the page is built again then (GUIManager::tick()), not under the
+// window, which holds the page's cards.
+void addCardCb(lv_event_t *ev) {
+    (void)ev;
+    Card *held = cardOf(h.surface);
+    if (!held || !inMember() || !s.ent[0]) return;
+    char id[CARD_ID_MAX + 1];
+    if (!CardAdded::add(*held, *s.ent[0], id, sizeof(id))) return;
+    deckRender();   // the row now says "Added"
+}
+
+// "Remove card" (K66): the first tap asks, the second removes and closes the
+// window; the page is built again without it.
+void removeCardCb(lv_event_t *ev) {
+    (void)ev;
+    Card *held = cardOf(h.surface);
+    if (!held) return;
+    if (!s_removeArmed) { s_removeArmed = true; deckRender(); return; }
+    s_removeArmed = false;
+    if (!CardAdded::remove(held->id())) return;
+    lv_async_call([](void *) { CardPopup::close(); }, nullptr);
 }
 
 // Paused, a checkbox. Through the card when it is the held one (it repaints at
@@ -5363,6 +5405,7 @@ void closeNow(void *unused) {
     (void)unused;
     s.closeQueued = false;
     if (s.phase != PopupPhase::PHASE_OPEN) return;
+    s_removeArmed = false;
 #ifdef DEBUG_POPUP
     const uint32_t t0 = micros();
 #endif
@@ -5681,7 +5724,7 @@ std::atomic<int> s_dreq{DREQ_IDLE};
 struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
                 int member = -1; int scene = -1; int look = -1; int show = -1; int scheme = -1;
                 int tap = -1; int groups = -1; int clabel = -1; int span = -1; int row = -1; int x = -1;
-                int dur = -1; int chips = -1;
+                int dur = -1; int chips = -1; int addCard = -1; int removeCard = -1;
                 bool close = false, power = false, more = false, hist = false; };
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
@@ -5733,6 +5776,8 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "row", v, sizeof(v)) == ESP_OK) a.row = atoi(v);
         if (httpd_query_key_value(q, "x", v, sizeof(v)) == ESP_OK) a.x = atoi(v);
         if (httpd_query_key_value(q, "dur", v, sizeof(v)) == ESP_OK) a.dur = atoi(v);
+        if (httpd_query_key_value(q, "addcard", v, sizeof(v)) == ESP_OK) a.addCard = atoi(v);
+        if (httpd_query_key_value(q, "removecard", v, sizeof(v)) == ESP_OK) a.removeCard = atoi(v);
         if (httpd_query_key_value(q, "chips", v, sizeof(v)) == ESP_OK) a.chips = atoi(v);
         // rows=N: test rows for SETTINGS, from the next window built (a byte
         // the LVGL thread reads; nothing else to hand over).
@@ -5786,6 +5831,24 @@ void CardPopup::debugService(lv_timer_t *t) {
         if (!isOpen()) { dbgOut("no window open\n"); s_dreq.store(DREQ_DONE); return; }
         close();
         s_dreq.store(DREQ_CLOSING);
+        return;
+    }
+    // K17: addcard=1 as SETTINGS' "Add as a card" in a member's own view;
+    // removecard=1 as "Remove card" tapped twice, on a card added here.
+    if (a.addCard > 0 || a.removeCard > 0) {
+        Card *held = isOpen() ? cardOf(h.surface) : nullptr;
+        char id[CARD_ID_MAX + 1] = "";
+        if (!held) dbgOut("no window open\n");
+        else if (a.addCard > 0) {
+            if (!inMember() || !s.ent[0]) dbgOut("not in a member's own view\n");
+            else if (CardAdded::add(*held, *s.ent[0], id, sizeof(id))) { dbgOut("added %s\n", id); deckRender(); }
+            else dbgOut("not added\n");
+        } else {
+            snprintf(id, sizeof(id), "%s", held->id());
+            if (CardAdded::remove(id)) { dbgOut("removed %s\n", id); close(); s_dreq.store(DREQ_CLOSING); return; }
+            dbgOut("%s is not a card added here\n", id);
+        }
+        s_dreq.store(DREQ_DONE);
         return;
     }
     if (a.pause >= 0 || a.member >= 0) {

@@ -15,6 +15,7 @@
 #include "bsp_loader.h"
 #include "Settings.h"   // 2.10d: the claims on saved settings, and [SETTINGS]
 #include "Cards/CardGroups.h"
+#include "Cards/CardAdded.h"   // K17: cards added on the device
 #include <string.h>
 #ifdef DEBUG_PAGE_TIMING
 #include <esp_timer.h>   // rebuildDashboard()'s two halves
@@ -38,7 +39,7 @@ static constexpr uint8_t DASH_PAGE_N = sizeof(DASH_PAGES) / sizeof(DASH_PAGES[0]
 // when the registry has it.
 static EntityRegistry *s_claimReg = nullptr;
 
-static bool claimCard(const char *id) {
+static bool compiledCard(const char *id) {
     for (uint8_t p = 0; p < DASH_PAGE_N; p++)
         for (uint8_t i = 0; i < DASH_PAGES[p]->count; i++) {
             const char *cid = DASH_PAGES[p]->cards[i].id;
@@ -46,6 +47,21 @@ static bool claimCard(const char *id) {
         }
     return false;
 }
+
+// A card on a page, or one added on the device (K17) - removed ones too: they
+// are the page's pool (K66), not unclaimed.
+static bool claimCard(const char *id) { return compiledCard(id) || CardAdded::known(id); }
+
+// The current page as built: its compiled cards with the ones added on the
+// device among them (CardAdded::merge()). Static: the page's cards keep
+// pointers into the specs' strings only through CardAdded's own records.
+static constexpr uint8_t PAGE_CARDS_MAX = 64;
+static CardSpec s_pageCards[PAGE_CARDS_MAX];
+// Added cards on the page just built whose entity was not in the table yet (a
+// group's member, learnt once HA answers): the page is built again when the
+// table grows (tick()).
+static uint8_t s_addedWaiting = 0;
+static uint8_t s_regCountAtBuild = 0;
 
 static bool claimEntity(const char *id) { return s_claimReg && s_claimReg->find(id); }
 
@@ -1047,6 +1063,15 @@ void GUIManager::buildDashboard() {
     page.headerDefault  = _hdr;
     page.variantDefault = _variant;
     page.showArea       = _showArea;
+    // The cards added on the device among the compiled ones (K17).
+    page.count = CardAdded::merge(*_pages[_curPage].spec, s_pageCards, PAGE_CARDS_MAX);
+    page.cards = s_pageCards;
+    CardAdded::setPage(page.slug);
+    s_regCountAtBuild = _core.entities().count();
+    s_addedWaiting = 0;
+    for (uint8_t i = 0; i < page.count; i++)
+        if (CardAdded::isAdded(s_pageCards[i].id) && !_core.entities().find(s_pageCards[i].primaries[0]))
+            s_addedWaiting++;
     _page->applySpec(page, _core.entities());
 #ifdef DEBUG_PAGE_TIMING
     const int64_t tL3 = esp_timer_get_time();
@@ -1350,6 +1375,7 @@ void GUIManager::initPages() {
     // Before any page is built: CardPage gives a card its id only if this
     // found it usable (PageSpec.h, 2.10d).
     checkCardIds(order, DASH_PAGE_N);
+    CardAdded::begin(compiledCard);   // the cards added on the device (K17)
     CardGroups::setSources(order, DASH_PAGE_N, &_core.entities());   // groups for card labels (K46)
     _nPages = 0;
     for (uint8_t pi = 0; pi < DASH_PAGE_N; pi++) {
@@ -1493,6 +1519,13 @@ void GUIManager::tick() {
 #ifdef HAS_AUDIO_HW
     _pnlAudio.tick();
 #endif
+    // K17: a card added or removed shows once no card window is open (the
+    // window holds the page's cards); an added card whose entity was learnt
+    // after the page was built shows once the table has grown.
+    if (!CardPopup::isOpen()) {
+        const bool learnt = s_addedWaiting && _core.entities().count() != s_regCountAtBuild;
+        if (CardAdded::takeChanged() || learnt) rebuildDashboard();
+    }
     // Renders a waiting screenshot request, on this - the LVGL - thread.
     Screenshot::service();
     // Same for GET /bench (2.9), which may also change page first.

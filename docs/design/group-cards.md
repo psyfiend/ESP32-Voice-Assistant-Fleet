@@ -85,3 +85,49 @@ and stays mixed). `cards.md` §4 already chose "tap toggles all; mixed state has
   `entity_id: [light.office_right, light.office_lamp, light.office_left]`, plus `is_hue_group`,
   `hue_type: room` and `hue_scenes` - see `card-sheet.md` §11.1.
 - Verify: `render_template` for `area_entities()`.
+
+## 5. The owner's model, 2026-10-12 (before K17; DECISIONS K65-K67)
+
+**Three ways a set of entities shows up**, each a place the user may want "make this a card":
+
+1. **A group card for a group defined at the source** (Desk = `light.office`, a Hue room): one
+   entity; a command to it acts on every member. The only kind on an HA page today.
+2. **A group card made on the device or in the web app**: one 1x1 card for several entities;
+   commands go to the list of entity ids (HA members), one by one otherwise. Exists compiled -
+   the Fleet page's All Lamps (virtual lamps); HA members not yet.
+3. **A cluster** (group panel): one bordered card larger than 1x1 holding members that would
+   otherwise be cards of their own, **without their own borders** - clear logical groupings,
+   denser than a cell each. (`look-and-feel.md` §3.8.)
+
+In §2's terms 1 and 2 are two SOURCES shown as one card, and 3 is a PRESENTATION of any source.
+
+**"Open"** (a group card's tap action): (a) as a cluster; (b) a bordered window of the members as
+ordinary cards; (c) a page holding only the members; (d) the Members view. A user may keep the
+members off the dashboard entirely and reach them only this way.
+
+**Groups** (the card label's relationship, K46): device-native; an HA area becomes a group. A card
+is in exactly one group, every card is in one (a group may have one card). A card label has
+words, colour and type; the colour and type follow the group, the words may be the card's own
+while it stays in (e.g. Desk's three members as cards, Office's blue, each worded "Desk": grouped
+by colour truthfully, by words visually). All members of a group card share its group - a member
+made into a card (K17) takes it. Groups honour inheritance (device / page / group / card, each
+layer may opt out - D-7) and may be LOCKED (D-7, Q2). **HA areas are never commanded**: an area
+may hold entities that are not on the dashboard. "Kitchen lights at one tap" is a group card of
+exactly those lights.
+
+**Actions**: add a card to another card (a group card is made); make a card from a member - a
+copy for a source group (its membership is the source's, and its scenes stay with it); two
+cards on one entity are separate cards with their own settings (K33) - except Paused, which is
+the entity's (#60): pausing the member's card pauses it in the group card too. Remove any card
+(to the page's pool, K35/K66). Move a card to another group or found a new one: 2.11.
+
+**Open for 2.11 (Claude):**
+- "Every card is in a group" and "a card's colour and type are its own only outside a group" meet
+  in K46's solo group: a card that wants its own colour founds a group of one. So SETTINGS' Card
+  label "None" (K44, K48) would go - or "None" means no label shown, while the group stays.
+- The card label **type** follows the group: today it is the page's (`headerDefault`) or the
+  card's. A group would need a type of its own, inherited from the page.
+- Layout: there is no arranger yet (#78); cards flow in the page's order and the lowest priority
+  drops first. K17 places a new card after its parent, with the parent's priority.
+- In HA a group entity's members may sit in other areas than the group (areas are per entity);
+  irrelevant to K17 - a member made a card takes the group card's group.
