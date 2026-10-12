@@ -33,6 +33,9 @@ enum class TfAgo : uint8_t {
     // "A few moments ago", "12 minutes ago", "2 hours ago" (within 15 min of
     // the hour) or "2+ hours ago", "Yesterday", "3 days ago".
     AGO_WORDS,
+    // As AGO_WORDS, with the date past yesterday: "3 days ago - Oct 8" (owner,
+    // round 5 - activity's rows, under the clock time).
+    AGO_DATED,
 };
 void tfAgo(char *out, size_t n, time_t t, time_t now, TfAgo style = TfAgo::AGO_WORDS);
 

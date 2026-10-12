@@ -2243,7 +2243,6 @@ enum : uint8_t { LEGEND_NONE = 0, LEGEND_X, LEGEND_Y, LEGEND_BOTH };   // None: 
 const char *const HIST_SPAN_NAME[HIST_SPANS]     = { "24h", "12h", "6h", "1h" };
 const char *const HIST_PERIOD_NAME[HIST_PERIODS] = { "24h", "7d" };
 const char *const HIST_LEGEND_NAME[4]            = { "none", "x", "y", "both" };
-const char *const HIST_DETAILS_NAME[2]           = { "basic", "extra" };
 
 struct HistView {
     const Entity *e = nullptr;   // whose history: see histSubject()
@@ -2251,11 +2250,12 @@ struct HistView {
     uint8_t  span = 0;           // HIST_SPAN_SEC index (the chart)
     uint8_t  period = 0;         // HIST_PERIOD_SEC index (activity)
     bool     minMax = true;      // the chart's min and max
+    bool     shade = true;       // the fill under the line (Shading: under line)
     uint8_t  legend = LEGEND_BOTH;
     bool     chips = true;       // the span buttons on the chart
     bool     actChips = true;    // and on activity
     bool     causes = true;      // activity's "by ..." lines (Show triggers)
-    bool     extra = false;      // activity's Details: Basic (false) or Extra
+    bool     duration = false;   // activity's "for: 2 hrs 38 min" lines (Show duration)
     bool     more = false;       // "Show more" was tapped
     uint32_t gen = 0;            // HaHistory's request this view made
     uint32_t drawnSeq = 0;       // HaHistory::doneSeq() when last drawn
@@ -2327,8 +2327,9 @@ bool histSync() {
     s_hv.span     = histLoad("hist_span", HIST_SPAN_NAME, HIST_SPANS, 0);
     s_hv.period   = histLoad("act_span", HIST_PERIOD_NAME, HIST_PERIODS, 0);
     s_hv.legend   = histLoad("hist_legend", HIST_LEGEND_NAME, 4, LEGEND_BOTH);
-    s_hv.extra    = histLoad("act_details", HIST_DETAILS_NAME, 2, 0) == 1;
+    s_hv.duration = histLoadOn("act_duration", false);
     s_hv.minMax   = histLoadOn("hist_minmax", true);
+    s_hv.shade    = histLoadOn("hist_shade", true);
     s_hv.chips    = histLoadOn("hist_chips", true);
     s_hv.actChips = histLoadOn("act_chips", true);
     s_hv.causes   = histLoadOn("act_causes", true);
@@ -2339,7 +2340,7 @@ void histAsk();
 void histDraw();
 void histChartCb(lv_event_t *ev);
 void histFillCb(lv_event_t *ev);
-void histShowing(lv_obj_t *row);
+void histShowing(lv_obj_t *row, int32_t raise = 0);
 int32_t histX(uint32_t t);
 float histNice(float raw);
 lv_obj_t *histVLine(lv_obj_t *parent, lv_point_precise_t *pts, int32_t x, uint32_t col, int32_t width);
@@ -2400,19 +2401,33 @@ void histAsk() {
 
 // The span chips: a row of small buttons, the chosen one lit in the accent -
 // the chart's four spans, or activity's two (owner, round 2).
-void histChips(lv_obj_t *parent) {
+// `room`: the most width they may take (0, any) - their padding and the gaps
+// between them shrink to fit it, as far as half.
+lv_obj_t *histChips(lv_obj_t *parent, int32_t room = 0) {
     const UIPalette &p = UI::pal();
     lv_obj_t *row = plain(parent);
     lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_style_pad_column(row, mm(1.2f), 0);
-    const uint8_t n = s_hv.chart ? HIST_SPANS : HIST_PERIODS;
-    for (uint8_t i = 0; i < n; i++) {
+    const uint8_t cnt = s_hv.chart ? HIST_SPANS : HIST_PERIODS;
+    int32_t padH = mm(2.2f), gap = mm(1.2f);
+    if (room > 0) {
+        int32_t text = 0;
+        for (uint8_t i = 0; i < cnt; i++) text += textW(s_hv.chart ? HIST_SPAN_CHIP[i] : HIST_PERIOD_CHIP[i], UI::type().TAG);
+        const int32_t spare = room - text;   // for 2*cnt paddings and cnt-1 gaps
+        const int32_t full  = 2 * cnt * padH + (cnt - 1) * gap;
+        if (spare < full) {
+            const int32_t s = LV_MAX(spare, full / 2);
+            padH = padH * s / full;
+            gap  = gap * s / full;
+        }
+    }
+    lv_obj_set_style_pad_column(row, gap, 0);
+    for (uint8_t i = 0; i < cnt; i++) {
         const bool lit = (i == (s_hv.chart ? s_hv.span : s_hv.period));
         lv_obj_t *b = plain(row);
         lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_size(b, LV_SIZE_CONTENT, mm(6.0f));
-        lv_obj_set_style_pad_hor(b, mm(2.2f), 0);
+        lv_obj_set_style_pad_hor(b, padH, 0);
         lv_obj_set_style_radius(b, mm(3.0f), 0);
         lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
         lv_obj_set_style_bg_color(b, UI::c(lit ? UI::mix(p.SURFACE, p.ACCENT, 25) : p.SURFACE), 0);
@@ -2424,22 +2439,39 @@ void histChips(lv_obj_t *parent) {
         lv_label_set_text(l, s_hv.chart ? HIST_SPAN_CHIP[i] : HIST_PERIOD_CHIP[i]);
         lv_obj_center(l);
     }
+    return row;
 }
 
 // The span in words, centred in `row` (owner, round 4) - where the chips were
-// when they are hidden. The row gets a fixed height: its words are out of the
-// flow, so they sit in the middle whatever else is in it.
-void histShowing(lv_obj_t *row) {
+// when they are hidden. Its words are out of the flow, so they sit in the
+// middle whatever else is in the row. A row with no height of its own gets a
+// line's. `raise`: this far above the middle, never past the row's top.
+//
+// ON THE CHART, A TAP STEPS THE SPAN (owner, round 5): 24 -> 12 -> 6 -> 1 hour
+// and round again, as the chips would.
+void histShowingCb(lv_event_t *ev);
+void histShowing(lv_obj_t *row, int32_t raise) {
     static const char *const CHART_WORDS[HIST_SPANS] = { "last 24 hours", "last 12 hours", "last 6 hours", "last hour" };
     static const char *const ACT_WORDS[HIST_PERIODS] = { "last 24 hours", "last 7 days" };
-    const UIType &t = UI::type();
-    lv_obj_set_height(row, lv_font_get_line_height(t.NAME));
+    const UIType    &t = UI::type();
+    const UIPalette &p = UI::pal();
+    const int32_t lh = lv_font_get_line_height(t.NAME);
+    lv_obj_update_layout(row);
+    int32_t rh = lv_obj_get_height(row);
+    if (rh < lh) { lv_obj_set_height(row, lh); rh = lh; }
     char buf[40];
     snprintf(buf, sizeof(buf), "Showing: %s", s_hv.chart ? CHART_WORDS[s_hv.span] : ACT_WORDS[s_hv.period]);
-    lv_obj_t *l = makeLabel(row, t.NAME, UI::pal().TEXT);
+    lv_obj_t *l = makeLabel(row, t.NAME, p.TEXT);
     lv_label_set_text(l, buf);
     lv_obj_add_flag(l, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    lv_obj_align(l, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align(l, LV_ALIGN_CENTER, 0, -LV_MIN(raise, (rh - lh) / 2));
+    if (s_hv.chart) {
+        // The whole line, and a finger's height of it.
+        lv_obj_add_flag(l, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_ext_click_area(l, LV_MAX(0, (UI::minTouch() - lh) / 2));
+        lv_obj_set_style_text_color(l, UI::c(p.ACCENT), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+        lv_obj_add_event_cb(l, histShowingCb, LV_EVENT_CLICKED, nullptr);
+    }
 }
 
 // The chart itself: HA's points sampled at even steps across the span, each
@@ -2474,25 +2506,44 @@ void histDrawChart(lv_obj_t *body) {
         }
     }
 
-    // The top line: the chips (unless the owner turned them off), and Now.
-    // Min and max are in the chart, where they happened (owner, round 2 - on
-    // the 4B the old "Now .. Min .. Max .." ran under the chips).
-    lv_obj_t *top = plain(body);
-    lv_obj_set_size(top, lv_pct(100), LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(top, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(top, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    // Without the chips, the span takes their place, IN THE MIDDLE and plain to
-    // see (owner, round 4: "Showing: last 24 hours"); Now stays at the right.
+    // THE TOP LINE (owner, round 5), the same shape on every board: Min over
+    // Max in the left corner, Now in the right, and between them the span
+    // chips - or, turned off, the span in words half a line higher. Two lines
+    // of the small text tall, whichever of them shows. The chips keep clear of
+    // the corners, narrowing to fit on a small window (the 4B).
     char buf[96], nowTxt[32];
-    if (s_hv.chips) histChips(top);
-    else            histShowing(top);
+    const int32_t lhTag = lv_font_get_line_height(t.TAG);
+    lv_obj_t *top = plain(body);
+    lv_obj_set_size(top, lv_pct(100), LV_MAX(2 * lhTag, mm(6.0f)));
     cardFormatValue(e, nowTxt, sizeof(nowTxt), true, s.tempUnit);
-    snprintf(buf, sizeof(buf), "Now %s%s", nowTxt, H.fromStatistics() ? " (5-minute averages)" : "");
+    snprintf(buf, sizeof(buf), "Now: %s%s", nowTxt, H.fromStatistics() ? "\n5-minute averages" : "");
     lv_obj_t *read = makeLabel(top, t.TAG, p.TEXT);
     lv_label_set_text(read, buf);
-    if (!s_hv.chips) {
-        lv_obj_add_flag(read, LV_OBJ_FLAG_IGNORE_LAYOUT);
-        lv_obj_align(read, LV_ALIGN_RIGHT_MID, 0, 0);
+    lv_obj_set_style_text_align(read, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_align(read, LV_ALIGN_RIGHT_MID, 0, 0);
+    // Min and Max, their numbers lined up: the words in one label, the numbers
+    // in another beside it, right-aligned (owner, round 5).
+    lv_obj_update_layout(top);
+    const int32_t topW = lv_obj_get_width(top);
+    int32_t leftEnd = 0;
+    if (s_hv.minMax && lo <= hi) {
+        lv_obj_t *words = makeLabel(top, t.TAG, p.TEXT);
+        lv_label_set_text(words, "Min:\nMax:");
+        lv_obj_align(words, LV_ALIGN_LEFT_MID, 0, 0);
+        snprintf(buf, sizeof(buf), "%.1f%s\n%.1f%s", (double)lo, unit, (double)hi, unit);
+        lv_obj_t *nums = makeLabel(top, t.TAG, p.TEXT);
+        lv_label_set_text(nums, buf);
+        lv_obj_set_style_text_align(nums, LV_TEXT_ALIGN_RIGHT, 0);
+        lv_obj_align_to(nums, words, LV_ALIGN_OUT_RIGHT_MID, mm(1.0f), 0);
+        lv_obj_update_layout(top);
+        leftEnd = lv_obj_get_width(words) + mm(1.0f) + lv_obj_get_width(nums);
+    }
+    if (s_hv.chips) {
+        const int32_t half = LV_MIN(topW / 2 - leftEnd, topW / 2 - lv_obj_get_width(read)) - mm(1.5f);
+        lv_obj_t *chips = histChips(top, 2 * LV_MAX(half, 1));
+        lv_obj_align(chips, LV_ALIGN_CENTER, 0, 0);
+    } else {
+        histShowing(top, lv_font_get_line_height(t.NAME) / 2);
     }
 
     if (lo > hi) { histNote(body, "Nothing recorded in this span"); return; }
@@ -2508,7 +2559,7 @@ void histDrawChart(lv_obj_t *body) {
     const int32_t w  = lv_obj_get_width(area);
     const int32_t ah = lv_obj_get_height(area);
 
-    // A strip above the plot for the min, max and finger's values; one below
+    // A strip above the plot for the finger's reading; one below
     // it for the times, when the Legend shows them.
     const int32_t lh   = lv_font_get_line_height(t.TAG);
     const bool    xLeg = s_hv.legend == LEGEND_X || s_hv.legend == LEGEND_BOTH;
@@ -2621,8 +2672,10 @@ void histDrawChart(lv_obj_t *body) {
     lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
     lv_chart_set_div_line_count(ch, 0, 0);   // the grid above is ours
     lv_chart_set_axis_range(ch, LV_CHART_AXIS_PRIMARY_Y, (int32_t)lroundf(ymin * 10), (int32_t)lroundf(ymax * 10));
-    lv_obj_add_flag(ch, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);   // the fill under the line
-    lv_obj_add_event_cb(ch, histFillCb, LV_EVENT_DRAW_TASK_ADDED, nullptr);
+    if (s_hv.shade) {   // the fill under the line (Shading: under line, round 5)
+        lv_obj_add_flag(ch, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
+        lv_obj_add_event_cb(ch, histFillCb, LV_EVENT_DRAW_TASK_ADDED, nullptr);
+    }
 
     const uint16_t m = (uint16_t)LV_CLAMP(48, plotW / 4, 240);
     lv_chart_set_point_count(ch, m);
@@ -2643,8 +2696,8 @@ void histDrawChart(lv_obj_t *body) {
     s_hv.ys = ys; s_hv.m = m;
     s_hv.scrubLine = s_hv.scrubLbl = nullptr;
 
-    // MIN AND MAX WHERE THEY HAPPENED (owner, rounds 2 and 4): a faint dotted
-    // line down the plot at each, its value IN THE PLOT - the max just above
+    // MIN AND MAX WHERE THEY HAPPENED (owner, rounds 2, 4 and 5): a faint dotted
+    // line down the plot at each, its time IN THE PLOT - the max just above
     // the line where its label stands, the min just below, each moved to the
     // other side if there is no room, so a label never sits on the line.
     if (s_hv.minMax) {
@@ -2685,9 +2738,10 @@ void histDrawChart(lv_obj_t *body) {
             if (y < top || y > bot) y = above ? yBot + gap : yTop - gap - lh;   // no room: the other side
             lv_obj_set_pos(l, lx, LV_CLAMP(top, y, bot));
         };
+        // When, at each (owner, round 5): the values are in the top line.
         char a[24], b[24];
-        snprintf(a, sizeof(a), "Max %.1f", (double)hi);
-        snprintf(b, sizeof(b), "Min %.1f", (double)lo);
+        tfClock(a, sizeof(a), (time_t)tHi);
+        tfClock(b, sizeof(b), (time_t)tLo);
         place(a, xHi, true);
         place(b, xLo, false);
     }
@@ -2885,29 +2939,31 @@ void histDrawActivity(lv_obj_t *body) {
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(list, mm(1.0f), 0);
 
-    // DETAILS (owner, round 4). Basic: the state, and on the right how long ago
-    // over the time ("2 hours ago" / "3:14 PM"). Extra: how long each state
-    // lasted ("Closed for 2 hrs 38 min"), the days as headings between them
-    // ("Yesterday, October 10, 2026"), the time alone on the right. A tap on a
-    // row in Basic shows that row as Extra would; in Extra, what HA says
-    // triggered it, in full, and the time to the second. Words: TimeFormat.
+    // ONE VIEW (owner, round 5). The state and when are what matter: the state
+    // on the left in the larger text; on the right the time in the larger
+    // text over how long ago ("12 minutes ago", "Yesterday", "3 days ago - Oct
+    // 8"). Under the state, in the small text: how long it lasted (Show
+    // duration) and what triggered it (Show triggers). A tap adds the next
+    // thing down - the trigger when they are off, HA's own words about it when
+    // they are on. The days as headings between them. Words: TimeFormat.
     const uint16_t show = s_hv.more ? LV_MIN(n, HIST_ROWS_MAX) : LV_MIN(n, HIST_ROWS_FIRST);
     const time_t now = time(nullptr);
-    char word[24], cause[96], when[40], ago[32], buf[200], lasted[24];
+    char word[24], cause[96], when[40], ago[40], buf[200], lasted[24];
     int lastDay = INT32_MIN;
     for (uint16_t r = 0; r < show; r++) {
         const uint16_t i = n - 1 - r;   // newest first
         const HistEvent &ev = H.event(i);
-        const bool open  = (s_hv.openRow == (int16_t)i);
-        const bool asExtra = s_hv.extra || open;   // Basic's tapped row reads as Extra
-        // A heading where a new day starts (Extra).
-        if (s_hv.extra) {
+        const bool open = (s_hv.openRow == (int16_t)i);
+        // A heading where a new day starts, centred, the state's size.
+        {
             const int d = tfDaysAgo((time_t)ev.t, now);
             if (d != lastDay) {
                 lastDay = d;
                 tfDay(buf, sizeof(buf), (time_t)ev.t, now);
-                lv_obj_t *hd = makeLabel(list, t.TAG, p.TEXT_DIM);
+                lv_obj_t *hd = makeLabel(list, t.NAME, p.TEXT_DIM);
                 lv_label_set_text(hd, buf);
+                lv_obj_set_width(hd, lv_pct(100));
+                lv_obj_set_style_text_align(hd, LV_TEXT_ALIGN_CENTER, 0);
                 lv_obj_set_style_pad_top(hd, r ? mm(1.2f) : 0, 0);
             }
         }
@@ -2926,60 +2982,55 @@ void histDrawActivity(lv_obj_t *body) {
         lv_obj_t *line = plain(row);
         lv_obj_set_size(line, lv_pct(100), LV_SIZE_CONTENT);
         lv_obj_set_flex_flow(line, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align(line, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_column(line, mm(2.0f), 0);
         lv_obj_t *col = plain(line);
         lv_obj_set_size(col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
         lv_obj_set_flex_grow(col, 1);
         lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
         histStateWord(ev, word, sizeof(word));
-        if (asExtra) {
-            // "Closed for 2 hrs 38 min"; the newest, still going, "so far".
+        lv_obj_t *l = makeLabel(col, t.NAME, p.TEXT);
+        lv_label_set_text(l, word);
+        // The small lines under the state; a long one wraps.
+        auto small = [&](const char *txt) {
+            lv_obj_t *s2 = makeLabel(col, t.TAG, p.TEXT_DIM);
+            lv_label_set_long_mode(s2, LV_LABEL_LONG_WRAP);
+            lv_obj_set_width(s2, lv_pct(100));
+            lv_label_set_text(s2, txt);
+        };
+        uint8_t lines = 1;
+        if (s_hv.duration) {
+            // "for: 2 hrs 38 min"; the newest, still going, "(and counting)".
             const time_t until = (i + 1 < n) ? (time_t)H.event(i + 1).t : now;
             tfDuration(lasted, sizeof(lasted), until > (time_t)ev.t ? (int32_t)(until - (time_t)ev.t) : 0);
-            snprintf(buf, sizeof(buf), "%s for %s%s", word, lasted, (i + 1 < n) ? "" : " so far");
-        } else {
-            snprintf(buf, sizeof(buf), "%s", word);
+            snprintf(buf, sizeof(buf), "for: %s%s", lasted, (i + 1 < n) ? "" : " (and counting)");
+            small(buf);
+            lines++;
         }
-        lv_obj_t *l = makeLabel(col, t.NAME, p.TEXT);
-        lv_label_set_text(l, buf);
         histCause(ev, cause, sizeof(cause));
-        if (s_hv.causes && cause[0]) {
-            l = makeLabel(col, t.TAG, p.TEXT_DIM);
-            lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
-            lv_obj_set_width(l, lv_pct(100));
-            lv_label_set_text(l, cause);
+        const char *none = "Home Assistant recorded no trigger";
+        if (s_hv.causes) {
+            if (cause[0]) { small(cause); lines++; }
+            if (open) { small(ev.detail[0] ? ev.detail : cause[0] ? "Home Assistant recorded nothing more" : none); lines++; }
+        } else if (open) {
+            small(cause[0] ? cause : none);
+            lines++;
         }
-        // The right side: Extra, the time (the day is the heading); Basic, how
-        // long ago over the time (owner, round 4: two lines, fits the 4B).
+        // The state alone stands in the middle of the row; with lines under
+        // it, the two sides line up from the top - the larger texts together,
+        // the smaller ones together.
+        lv_obj_set_flex_align(line, LV_FLEX_ALIGN_SPACE_BETWEEN,
+                              lines > 1 ? LV_FLEX_ALIGN_START : LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        // The right side: the time over how long ago, or the day's word and date.
         lv_obj_t *right = plain(line);
         lv_obj_set_size(right, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
         lv_obj_set_flex_flow(right, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_flex_align(right, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
-        if (s_hv.extra) {
-            tfClock(when, sizeof(when), (time_t)ev.t);
-        } else {
-            tfAgo(ago, sizeof(ago), (time_t)ev.t, now);
-            l = makeLabel(right, t.TAG, p.TEXT);
-            lv_label_set_text(l, ago);
-            tfWhen(when, sizeof(when), (time_t)ev.t, now);
-        }
-        l = makeLabel(right, t.TAG, p.TEXT_DIM);
+        lv_obj_set_flex_align(right, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
+        tfClock(when, sizeof(when), (time_t)ev.t);
+        l = makeLabel(right, t.NAME, p.TEXT);
         lv_label_set_text(l, when);
-
-        // EXTRA'S TAP (owner, round 4): what HA says triggered it, in full, and
-        // the time to the second.
-        if (open && s_hv.extra) {
-            tfClock(when, sizeof(when), (time_t)ev.t, TfClock::CLOCK_HMS);
-            int k = snprintf(buf, sizeof(buf), "At %s", when);
-            if (cause[0] && !s_hv.causes) k += snprintf(buf + k, sizeof(buf) - k, "\n%s", cause);
-            if (ev.detail[0] && k < (int)sizeof(buf)) k += snprintf(buf + k, sizeof(buf) - k, "\n%s", ev.detail);
-            else if (!cause[0] && k < (int)sizeof(buf)) snprintf(buf + k, sizeof(buf) - k, "\nHome Assistant recorded no trigger");
-            l = makeLabel(row, t.TAG, p.TEXT_DIM);
-            lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
-            lv_obj_set_width(l, lv_pct(100));
-            lv_label_set_text(l, buf);
-        }
+        tfAgo(ago, sizeof(ago), (time_t)ev.t, now, TfAgo::AGO_DATED);
+        l = makeLabel(right, t.TAG, p.TEXT_DIM);
+        lv_label_set_text(l, ago);
     }
     // More than shows: "Show more", or - shown all there is room for - how many
     // older ones are left out.
@@ -3060,6 +3111,17 @@ void spanChipCb(lv_event_t *ev) {
     histSyncPanel();
     histAsk();
     lv_async_call([](void *) { histDraw(); }, nullptr);   // the chip's own row is redrawn
+}
+
+// "Showing: last 24 hours" tapped: the next span down, round again after 1 hour.
+void histShowingCb(lv_event_t *ev) {
+    (void)ev;
+    if (!s_hv.chart) return;
+    s_hv.span = (uint8_t)((s_hv.span + 1) % HIST_SPANS);
+    histKeep("hist_span", HIST_SPAN_NAME[s_hv.span]);
+    histSyncPanel();
+    histAsk();
+    lv_async_call([](void *) { histDraw(); }, nullptr);   // its own row is redrawn
 }
 
 void histMoreCb(lv_event_t *ev) {
@@ -4960,9 +5022,10 @@ void deckEnd() {
 
 // --- CHART and ACTIVITY: History's own options (2.10e) ----------------------
 // CHART, for a number: the span (as the chips on the view - the two follow
-// each other), the min and max, the Legend, the span buttons. ACTIVITY, for
-// anything that turns on and off: its Span (named so since round 2, as the
-// chart's), whether each change says what caused it, the span buttons. Every
+// each other), the Legend, the min and max, the shading, the span buttons.
+// ACTIVITY, for anything that turns on and off: its Span (named so since round
+// 2, as the chart's), whether each change says how long it lasted and what
+// caused it, the span buttons. Every
 // choice is kept under the card's id (owner, round 2 - H3).
 lv_obj_t *s_ddSpan = nullptr;   // the panel's Span, kept in step with the chips
 
@@ -4992,13 +5055,17 @@ void legendDropCb(lv_event_t *ev) {
     histDraw();
 }
 
-// ACTIVITY's Details (owner, round 4): Basic - the time and how long ago;
-// Extra - how long each state lasted, and the days as headings.
-void detailsDropCb(lv_event_t *ev) {
-    const uint8_t i = (uint8_t)lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
-    s_hv.extra = (i == 1);
-    s_hv.openRow = -1;
-    histKeep("act_details", HIST_DETAILS_NAME[s_hv.extra ? 1 : 0]);
+// Shading: under line (owner, round 5) - the chart's gradient fill.
+void shadeCb(lv_event_t *ev) {
+    s_hv.shade = checked(ev);
+    histKeep("hist_shade", onOff(s_hv.shade));
+    histDraw();
+}
+
+// ACTIVITY's Show duration (owner, round 5 - it replaced Details).
+void durationCb(lv_event_t *ev) {
+    s_hv.duration = checked(ev);
+    histKeep("act_duration", onOff(s_hv.duration));
     histDraw();
 }
 
@@ -5034,11 +5101,12 @@ void histSyncPanel() {
 
 uint8_t chartSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
-    // The owner's order and words (round 4).
+    // The owner's order and words (rounds 4 and 5).
     r[n++] = { "Span", DeckRowKind::ROW_DROP, "24 hours\n12 hours\n6 hours\n1 hour", s_hv.span, true,
                spanDropCb, &s_ddSpan };
-    r[n++] = { "Legend", DeckRowKind::ROW_DROP, "None\nX axis\nY axis\nBoth", s_hv.legend, true, legendDropCb, nullptr };
+    r[n++] = { "Legend", DeckRowKind::ROW_DROP, "None\nX axis\nY axis\nX / Y axes", s_hv.legend, true, legendDropCb, nullptr };
     r[n++] = { "Show min/max", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)s_hv.minMax, true, minMaxCb, nullptr };
+    r[n++] = { "Shading: under line", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)s_hv.shade, true, shadeCb, nullptr };
     r[n++] = { "Span buttons", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)s_hv.chips, true, chipsCb, nullptr };
     return n;
 }
@@ -5047,7 +5115,7 @@ uint8_t activitySpecs(DeckRowSpec *r) {
     uint8_t n = 0;
     r[n++] = { "Span", DeckRowKind::ROW_DROP, "Last 24 hours\nLast 7 days", s_hv.period, true,
                periodDropCb, &s_ddSpan };
-    r[n++] = { "Details", DeckRowKind::ROW_DROP, "Basic\nExtra", (uint16_t)s_hv.extra, true, detailsDropCb, nullptr };
+    r[n++] = { "Show duration", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)s_hv.duration, true, durationCb, nullptr };
     r[n++] = { "Show triggers", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)s_hv.causes, true, causesCb, nullptr };
     r[n++] = { "Span buttons", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)s_hv.actChips, true, chipsCb, nullptr };
     return n;
@@ -5574,7 +5642,7 @@ std::atomic<int> s_dreq{DREQ_IDLE};
 struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
                 int member = -1; int scene = -1; int look = -1; int show = -1; int scheme = -1;
                 int tap = -1; int groups = -1; int clabel = -1; int span = -1; int row = -1; int x = -1;
-                int extra = -1; int chips = -1;
+                int dur = -1; int chips = -1;
                 bool close = false, power = false, more = false, hist = false; };
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
@@ -5625,7 +5693,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "hist", v, sizeof(v)) == ESP_OK) a.hist = true;
         if (httpd_query_key_value(q, "row", v, sizeof(v)) == ESP_OK) a.row = atoi(v);
         if (httpd_query_key_value(q, "x", v, sizeof(v)) == ESP_OK) a.x = atoi(v);
-        if (httpd_query_key_value(q, "extra", v, sizeof(v)) == ESP_OK) a.extra = atoi(v);
+        if (httpd_query_key_value(q, "dur", v, sizeof(v)) == ESP_OK) a.dur = atoi(v);
         if (httpd_query_key_value(q, "chips", v, sizeof(v)) == ESP_OK) a.chips = atoi(v);
         // rows=N: test rows for SETTINGS, from the next window built (a byte
         // the LVGL thread reads; nothing else to hand over).
@@ -5861,10 +5929,10 @@ void CardPopup::debugService(lv_timer_t *t) {
     }
 
     // HISTORY (2.10e): the span or period, "Show more", and what HaHistory has.
-    if (a.span >= 0 || a.more || a.row >= 0 || a.extra >= 0 || a.chips >= 0) {
+    if (a.span >= 0 || a.more || a.row >= 0 || a.dur >= 0 || a.chips >= 0) {
         if (!isOpen() || s.view != PopupView::VIEW_HISTORY) { dbgOut("History is not showing\n"); s_dreq.store(DREQ_DONE); return; }
-        // extra=0|1: activity's Details; chips=0|1: the span buttons (neither kept).
-        if (a.extra >= 0) { s_hv.extra = a.extra != 0; s_hv.openRow = -1; }
+        // dur=0|1: activity's Show duration; chips=0|1: the span buttons (neither kept).
+        if (a.dur >= 0) s_hv.duration = a.dur != 0;
         if (a.chips >= 0) { if (s_hv.chart) s_hv.chips = a.chips != 0; else s_hv.actChips = a.chips != 0; }
         // row=N: as a tap on activity row N from the top (its details).
         if (a.row >= 0 && s_hist && a.row < s_hist->events()) {
@@ -5884,7 +5952,7 @@ void CardPopup::debugService(lv_timer_t *t) {
         if (!isOpen() || s.view != PopupView::VIEW_HISTORY || !s_hv.area) { dbgOut("no chart showing\n"); s_dreq.store(DREQ_DONE); return; }
         histScrub(a.x);
     }
-    if ((a.span >= 0 || a.more || a.hist || a.row >= 0 || a.x >= 0 || a.extra >= 0 || a.chips >= 0) && s_hist) {
+    if ((a.span >= 0 || a.more || a.hist || a.row >= 0 || a.x >= 0 || a.dur >= 0 || a.chips >= 0) && s_hist) {
         dbgOut("history: %s %s, state %u fail %u gen %lu/%lu, %u points%s, %u events (+%u older), last answer %lu B in %lu ms\n",
                s_hv.e ? s_hv.e->desc.externalRef : "-", s_hv.chart ? "chart" : "activity",
                (unsigned)s_hist->state(), (unsigned)s_hist->fail(), (unsigned long)s_hv.gen,

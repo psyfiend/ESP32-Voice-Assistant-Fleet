@@ -129,3 +129,23 @@ below before the last round of testing.
 | Y8 | Details: Extra | Days as headings ("Today, October 11, 2026", "Yesterday, October 10, 2026"); each row "Closed for 2 hrs 38 min" (the newest "... so far"), the time on the right. Tap a row: "At 9:05:34 PM" and HA's own words for the trigger |
 | Y9 | Close and reopen | Details and the rest kept |
 | Y10 | Entity properties on Thermo, Desk, a lamp | A **Device** line: "THERMOSTAT", "Office", "Office lamp"; "This board" on the board's own entities |
+
+**Round 3 and 4 results (owner, 2026-10-11 late):** X1-X6 PASS, Y1-Y10 PASS - "Bravo on the chart!
+I love the gradient!" Asked for round 5 below, then a final test before the merge.
+
+## Round 5 - the final round (P4_5 and 4B flashed 2026-10-12 ~00:30; the 1060 would not take a flash - see below)
+
+| # | Do this | PASS if |
+|---|---|---|
+| Z1 | Thermo's chart, span buttons on | One top line: "Min:" over "Max:" in the left corner, their numbers lined up; the buttons in the middle; "Now: 72.0°F" at the right. On the 4B nothing touches (the buttons narrow to fit) |
+| Z2 | Span buttons off | "Showing: last 24 hours" in the middle, about half a line higher than Now; Min/Max and Now where they were |
+| Z3 | Tap "Showing: ..." | Steps 24 -> 12 -> 6 -> 1 hour -> 24; the panel's Span follows; kept when the window reopens |
+| Z4 | The dotted min/max lines | Their **times** in the chart ("9:18 AM"), above / below the line as before |
+| Z5 | CHART: the rows | Span, Legend (None / X axis / Y axis / **X / Y axes**), Show min/max, **Shading: under line**, Span buttons |
+| Z6 | Untick Shading: under line | The fill goes; the line stays. Kept per card |
+| Z7 | ACTIVITY: the rows | Span, **Show duration** (off at first), Show triggers, Span buttons; no Details |
+| Z8 | Desk's activity | Day headings always, centred, the state's size. Each row: the state on the left, centred; on the right the time ("9:49 PM") over "12 minutes ago" today, "Yesterday", or "3 days ago - Oct 8" |
+| Z9 | Show duration on | "for: 38 sec" under the state; the newest "for: 2 hrs 22 min (and counting)" |
+| Z10 | Show triggers on | "Automation: Office: Occupancy Lighting Control" under the duration (when HA recorded one) |
+| Z11 | Show triggers off, tap a row | The trigger appears under it ("Home Assistant recorded no trigger" when there is none); tap again folds it |
+| Z12 | Show triggers on, tap a row | HA's own words appear under the trigger ("triggered by state of binary_sensor.office_occupancy") |

@@ -823,6 +823,20 @@ later. Decisions K52-K55.
   Details (Basic / Extra), Show triggers, Span buttons; wording through `TimeFormat`. Properties
   shows the HA **device** (the area template asks `device_attr(device_id(e), 'name_by_user')` or
   `'name'`). Deferred to #92: fixed range, bars/steps, compare to yesterday, more shading.
+- **Round 5 (owner, 2026-10-12; K62-K63), the final one.** CHART: one top line - Min over Max
+  in the left corner (the words in one label, the numbers right-aligned in another), "Now: ..."
+  in the right, the span chips centred between them, their padding narrowing to fit (the 4B), or
+  "Showing: ..." half a line higher, which a tap steps through the spans. The dotted min/max
+  lines carry their **times**. Rows: Span, Legend (None / X axis / Y axis / X / Y axes), Show
+  min/max, Shading: under line, Span buttons. ACTIVITY is **one view** - Details retired: the
+  state on the left (centred when alone), the time in the larger text over `TfAgo::AGO_DATED`
+  ("12 minutes ago", "Yesterday", "3 days ago - Oct 8") on the right, day headings always,
+  centred. Show duration ("for: 2 hrs 38 min", the newest "(and counting)", off by default) and
+  Show triggers add small lines under the state; with lines under it the two sides line up from
+  the top. A tap adds the next thing down: the trigger, or with triggers on HA's own words. Rows:
+  Span, Show duration, Show triggers, Span buttons. Humidity beside temperature waits for
+  multi-sensor charts (#92); a popup timeout choice and hiding the countdown bar for the device
+  settings pages (#23).
 - **Open, the owner's to decide: a fixed range (#92).** "Auto" uses the span's own min and max (one
   entity or, later, many); a user may want a "normal" range so charts look alike (e.g. 15-90 °F
   for a year of Seattle). The owner's idea: a popup with a number wheel for high and low. LVGL has

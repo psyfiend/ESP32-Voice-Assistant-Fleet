@@ -45,11 +45,14 @@ int tfDaysAgo(time_t t, time_t now) {
 }
 
 void tfAgo(char *out, size_t n, time_t t, time_t now, TfAgo style) {
-    (void)style;
     if (!out || !n) return;
     const int days = tfDaysAgo(t, now);
     const long mins = now > t ? (long)((now - t) / 60) : 0;
-    if (days >= 2)       snprintf(out, n, "%d days ago", days);
+    if (days >= 2 && style == TfAgo::AGO_DATED) {
+        const struct tm a = local(t);
+        snprintf(out, n, "%d days ago - %s %d", days, MON_SHORT[a.tm_mon], a.tm_mday);
+    }
+    else if (days >= 2)  snprintf(out, n, "%d days ago", days);
     else if (days == 1)  snprintf(out, n, "Yesterday");
     else if (mins >= 60) {
         const long hrs = mins / 60;

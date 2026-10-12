@@ -98,8 +98,13 @@ chips and Span, inset rows, a finger reading the chart, min/max in the chart). A
 ~12:40; round 2 all PASS. **Round 3** (axes in round steps, the span in words without the buttons)
 flashed to all three ~15:30, liked. **Round 4, the owner's last** (K59-K61: TimeFormat, activity
 Details Basic/Extra, min/max in the plot, the gradient, "Showing:", Legend None, Device in
-Properties) flashed ~21:45 - `TEST_2.10e.md` Y1-Y10. Deferred chart options: #92. #91: only the
-P4_5 flashes.
+Properties) flashed ~21:45 - `TEST_2.10e.md` Y1-Y10, all PASS with round 3's X1-X6.
+**Round 5, the final one** (K62-K63: activity as one view with Show duration, Details retired; the
+chart's top line Min/Max - chips or tappable "Showing:" - Now; min/max times in the plot;
+Shading checkbox) flashed to the P4_5 and 4B 2026-10-12 ~00:30 - `TEST_2.10e.md` Z1-Z12. **The
+1060 refused the flash** (COM9: "device not functioning", then "failed to set baud rate") - it
+needs a replug, then `pio run -e CYD_P4_1060P470 -t upload --upload-port COM9`. `/popup?dur=0|1`
+replaces `extra=`. Deferred chart options: #92. #91: only the P4_5 flashes.
 **All nine compiled at `a9db07f`** (2026-10-11 ~05:00, 22 min) - with the desktop's local debug
 lines still in, so the release gate before the merge is still to run without them.
 **Then:** the owner's report, fixes, the all-nine gate, one `--no-ff` merge of both, `v0.2.11`.
