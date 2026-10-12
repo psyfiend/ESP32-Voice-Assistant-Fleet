@@ -171,3 +171,7 @@ the chart's was taller, so they moved when the answer came - both now build one 
 | W7 | Thermo: SETTINGS, Entity properties on the P4_5 | Every row in sight, Card id included |
 | W8 | The other views (controls, members, scenes) | Unchanged - the header gap is History's alone |
 | W9 | Power-cycle the 4B several times with Office occupancy detected and Desk on | Both cards filled every boot - never a dark icon and name on an unfilled card (the owner's report, 2026-10-12: `Card::reapplyGroup()`, new in 2.10e, repainted the surface plain and never re-rendered the fill) |
+
+**Round 6 results (owner, 2026-10-12): W1-W9 all PASS** - "All tests pass and everything works
+great!" 2.10e signed off. Idea for later (owner): the light controls' sliding switch selector for
+the chart's span chips - #92.

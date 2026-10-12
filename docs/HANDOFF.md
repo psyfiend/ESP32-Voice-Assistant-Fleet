@@ -107,9 +107,13 @@ Properties fits) flashed to all three 2026-10-12 ~02:00 - `TEST_2.10e.md` W1-W8,
 last before the merge. (COM9 refused flashes once - "device not functioning" - and took them
 after a replug.) `/popup?dur=0|1` replaces `extra=`. Deferred chart options: #92. #91: only the
 P4_5 flashes.
-**All nine compiled at `a9db07f`** (2026-10-11 ~05:00, 22 min) - with the desktop's local debug
-lines still in, so the release gate before the merge is still to run without them.
-**Then:** the owner's report, fixes, the all-nine gate, one `--no-ff` merge of both, `v0.2.11`.
+**Round 6: W1-W9 all PASS (2026-10-12) - 2.10d and 2.10e signed off.** Plus a fix found by the
+owner on the way: `Card::reapplyGroup()` lost an on card's fill (`f1810ea`).
+**The release gate PASSED 2026-10-12 at `f1810ea`:** all nine compile from the committed
+`platformio.ini` (the local debug lines stashed and restored; 34 min), and the P4_5 has that
+release build for the owner's last look on glass.
+**Then:** the owner's look, one `--no-ff` merge of both, tag `v0.2.11` (FW_VERSION comes from the
+tag), CHANGELOG, archive both test sheets, flash the P4 boards again.
 
 ## 2.10d (from 2026-10-08) - tested; round D's retest is the first round of `TEST_2.10e.md`
 
