@@ -774,14 +774,14 @@ their own unless one is set on purpose to match another.
 patched in the framework libraries. **The Card label row is greyed** for 2.10d (K48); its redesign
 and the move-to-group window come after.
 
-The owner's test sheet: `docs/TEST_2.10d.md`. Next, after it: the all-nine gate and the merge. K17
-waits until after 2.10d (K45).
+The owner's test sheet: `docs/archive/TEST_2.10d.md`. Signed off and merged with 2.10e as `v0.2.11`
+(2026-10-12). K17 waits until after 2.10d (K45).
 
-**Late in 2.10d (2026-10-11):** the panels are dragged whole (K50, `TEST_2.10d.md` round D); a
+**Late in 2.10d (2026-10-11):** the panels are dragged whole (K50, `archive/TEST_2.10d.md` round D); a
 group's colour is worked out again for every card when any of HA's areas changes (the P4_5's
 Kitchen cards kept Garage's green when Garage's area arrived after theirs - `CardBinder::tick()`).
 
-## 18. 2.10e - History, as built (2026-10-11, overnight; branch `feat/65-history`, K51)
+## 18. 2.10e - History, as built (2026-10-11 to 12; signed off, `v0.2.11`, `archive/TEST_2.10e.md`)
 
 **Scope (owner):** Home Assistant's entities; the board's own and MQTT entities keep a local log
 later. Decisions K52-K55.
