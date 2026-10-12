@@ -137,6 +137,17 @@ public:
     // with (its ref). A declared name is the user's; a scene's is its own.
     bool adoptName(const char *id, const char *name);
 
+    // The source's own name (Entity::sourceName), for any entity. Marks it
+    // dirty only when it changed, so a card showing "From HA" repaints.
+    bool setSourceName(const char *id, const char *name);
+    // Entity::sourceArea and sourceAreaId, the same way; "" clears them (HA
+    // says no area).
+    // `device` (2.10e): its HA device's name, or null to leave it as it is.
+    bool setSourceArea(const char *id, const char *areaId, const char *area, const char *device = nullptr);
+    // Counts area changes on any entity: a group's colour depends on every
+    // group's, so one entity's area can recolour cards on others (2.10d).
+    uint32_t areaEpoch() const { return _areaEpoch.load(); }
+
     // True once after learnMembers() added anything: the caller (the loop
     // task) then re-applies the saved pauses, which could not reach an entity
     // that did not exist at boot.
@@ -175,9 +186,24 @@ public:
     bool setPaused(const char *id, bool paused, uint32_t nowMs);
     bool isPaused(const char *id) const;
 
-    // Restore paused ids from NVS. Call AFTER every provider has registered,
-    // because an id that is not in the table yet cannot be marked.
+    // Restore paused ids from the pause store. Call AFTER every provider has
+    // registered, because an id that is not in the table yet cannot be marked.
     void restorePaused();
+
+    // WHERE PAUSES ARE KEPT (2.10d). A comma-delimited list of entity ids,
+    // loaded and saved through these two functions. Unset, the registry keeps
+    // it in NVS itself (fleet_ent/paused), as it did from #60; SystemCore
+    // points it at the owner's settings file (Settings.h) - the registry knows
+    // nothing about that file. save() may be called on any task that already
+    // calls setPaused().
+    struct PauseStore {
+        bool (*load)(char *out, size_t cap, void *ctx) = nullptr;
+        bool (*save)(const char *list, void *ctx) = nullptr;
+        void *ctx = nullptr;
+    };
+    void setPauseStore(const PauseStore &s) { _pauseStore = s; }
+    // The list as #60 left it in NVS, for a one-time import. "" if none.
+    static bool readNvsPauseList(char *out, size_t cap);
 
     // How many entities are currently paused - for the system dump, which is
     // the only place a pause that outlives a reboot is discoverable from.
@@ -302,6 +328,7 @@ private:
     // the table with at(). The slot is written first, then the count raised.
     std::atomic<uint8_t> _count{0};
     std::atomic<bool>    _learnt{false};
+    std::atomic<uint32_t> _areaEpoch{0};
 
     CommandSink _cmdFn  = nullptr;
     void       *_cmdCtx = nullptr;
@@ -309,6 +336,9 @@ private:
     void       *_lightCtx = nullptr;
 
     mutable std::mutex _mx;
+    PauseStore _pauseStore;   // unset: NVS, see setPauseStore()
+    bool loadPauses(char *out, size_t cap) const;
+    bool savePauses(const char *list) const;
     // 3 s since 2.7 (#63). Was 5 s, sized for a round trip through a broker.
     // Since #63 only a MATCHING echo confirms, so the window must outlast a
     // fading light: the owner timed his Desk group at ~1.5 s, and asked for

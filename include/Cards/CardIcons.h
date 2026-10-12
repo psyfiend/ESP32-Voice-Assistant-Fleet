@@ -64,6 +64,9 @@ const char *cardBatteryGlyph(int pct);
 // house must agree about what "Kitchen" looks like. Returns 0 for an empty
 // name, meaning "no area, use the accent".
 uint32_t cardAreaColor(const char *area);
+// The card-label palette itself, for a new group's colour (K46).
+uint8_t  cardAreaHueCount();
+uint32_t cardAreaHue(uint8_t i);
 
 // Compact age, written into `out`: "now", "45s", "12m", "3h", "2d".
 //
@@ -127,5 +130,9 @@ const char *cardDisplayUnit(const Entity &e, TempUnit want = TempUnit::TEMP_INHE
 
 void cardFormatValue(const Entity &e, char *out, size_t cap, bool withUnit = true,
                      TempUnit want = TempUnit::TEMP_INHERIT);
+
+// A number in this entity's source unit, as the card shows it: a temperature
+// converted when the card's unit differs (2.10e: a history chart's points).
+float cardDisplayNumber(const Entity &e, float v, TempUnit want = TempUnit::TEMP_INHERIT);
 
 #endif // CARD_ICONS_H

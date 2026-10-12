@@ -176,10 +176,11 @@ void ValueCard::render() {
     // keeping their names under "No lbl" and looking odd as the only cards
     // that did. For a value card the number already IS the state, so State
     // shows the name.
-    const bool showName = (cardResolveLabel(labelMode()) != CardLabel::LBL_NONE);
+    const CardLabel lbl = cardResolveLabel(labelMode());
+    const bool showName = (lbl != CardLabel::LBL_NONE);
     if (showName) lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
     else          lv_obj_add_flag  (_name, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_text          (_name, label());
+    lv_label_set_text          (_name, shownName(lbl));
     lv_obj_set_style_text_font (_name, t.NAME, 0);
     lv_obj_set_style_text_color(_name, UI::c(tone(p.TEXT_DIM)), 0);
     lv_obj_set_width           (_name, lv_pct(100));

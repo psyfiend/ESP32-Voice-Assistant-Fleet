@@ -188,9 +188,15 @@ static CardLabel s_labelMode = CardLabel::LBL_NAME;
 void      cardSetLabelMode(CardLabel m) { s_labelMode = m; }
 CardLabel cardLabelMode()               { return s_labelMode; }
 
+// THE KNOB IS A TEST TOOL (owner, 2026-10-09, K49), not the page- or
+// device-wide setting it will one day be: State or None shows the whole page
+// that way, whatever each card chose; Name shows each card's own choice -
+// Custom its custom name, HA name HA's. A card left on Inherit has no name of
+// its own, so its name is HA's (Card::shownName() falls back to the card's
+// for anything not from HA).
 CardLabel cardResolveLabel(CardLabel want) {
-    if (want == CardLabel::LBL_INHERIT) want = s_labelMode;
-    if (want == CardLabel::LBL_INHERIT) want = CardLabel::LBL_NAME;
+    if (s_labelMode == CardLabel::LBL_STATE || s_labelMode == CardLabel::LBL_NONE) return s_labelMode;
+    if (want == CardLabel::LBL_INHERIT) want = CardLabel::LBL_HA;
     return want;
 }
 
@@ -203,26 +209,28 @@ const char *cardBatteryGlyph(int pct) {
     return MDI_BATTERY_ALERT;
 }
 
+// Hues chosen to stay distinguishable from each other AND from the semantic
+// state palette - an area must never be mistaken for a warning. Nothing here is
+// amber or red for that reason. Eight hues spread right around the wheel,
+// deliberately far apart rather than merely different - two areas next to each
+// other on a page have to be told apart at a glance, not on inspection. At file
+// scope since 2.10d: a new group takes one no other group is using (K46).
+static const uint32_t AREA_HUES[] = {
+    0x3E8FD9,   // blue
+    0x38B24A,   // green
+    0xA05FD6,   // violet
+    0x11A8A8,   // teal
+    0xD45A9E,   // magenta
+    0x8FBF3F,   // lime
+    0x5C6BC0,   // indigo
+    0xE07A3F,   // ochre
+};
+
+uint8_t  cardAreaHueCount()    { return sizeof(AREA_HUES) / sizeof(AREA_HUES[0]); }
+uint32_t cardAreaHue(uint8_t i) { return AREA_HUES[i % cardAreaHueCount()]; }
+
 uint32_t cardAreaColor(const char *area) {
     if (!area || !area[0]) return 0;
-
-    // Hues chosen to stay distinguishable from each other AND from the
-    // semantic state palette - an area must never be mistaken for a warning.
-    // Nothing here is amber or red for that reason.
-    // Eight hues spread right around the wheel, deliberately far apart rather
-    // than merely different - two areas next to each other on a page have to
-    // be told apart at a glance, not on inspection. None of them is amber or
-    // red: an area must never be mistaken for a warning.
-    static const uint32_t AREA_HUES[] = {
-        0x3E8FD9,   // blue
-        0x38B24A,   // green
-        0xA05FD6,   // violet
-        0x11A8A8,   // teal
-        0xD45A9E,   // magenta
-        0x8FBF3F,   // lime
-        0x5C6BC0,   // indigo
-        0xE07A3F,   // ochre
-    };
     static const uint32_t N = sizeof(AREA_HUES) / sizeof(AREA_HUES[0]);
 
     // FNV-1a. Small, well-spread, and deterministic - which is the only
@@ -456,6 +464,16 @@ static float displayValue(const Entity &e, TempUnit want, bool &converted) {
     const TempUnit w = resolveWant(want);
     if (w == TempUnit::TEMP_F && src == 'C') { converted = true; return v * 9.0f / 5.0f + 32.0f; }
     if (w == TempUnit::TEMP_C && src == 'F') { converted = true; return (v - 32.0f) * 5.0f / 9.0f; }
+    return v;
+}
+
+float cardDisplayNumber(const Entity &e, float v, TempUnit want) {
+    if (!isTemperature(e.desc)) return v;
+    const char src = sourceTempLetter(e.desc);
+    if (!src) return v;
+    const TempUnit w = resolveWant(want);
+    if (w == TempUnit::TEMP_F && src == 'C') return v * 9.0f / 5.0f + 32.0f;
+    if (w == TempUnit::TEMP_C && src == 'F') return (v - 32.0f) * 5.0f / 9.0f;
     return v;
 }
 

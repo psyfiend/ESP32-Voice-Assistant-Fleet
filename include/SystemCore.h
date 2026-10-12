@@ -24,6 +24,7 @@
 #include "HaClient.h"
 #include "HaProvider.h"
 #include "HaRest.h"
+#include "HaHistory.h"
 #include "CommandRouter.h"
 #include "HttpServer.h"
 #ifdef HAS_AUDIO_HW
@@ -55,6 +56,7 @@ public:
     MqttManager         &mqtt()     { return _mqtt; }
     EntityRegistry      &entities() { return _entities; }
     HaClient            &ha()       { return _ha; }
+    HaHistory           &history()  { return _haHist; }
     HttpServer          &http()     { return _http; }
     BatteryProvider     &battery()  { return _battProvider; }
 #ifdef HAS_AUDIO_HW
@@ -126,6 +128,10 @@ private:
     // entity table rather than a hardcoded list. Also owns the decision that a
     // new session has begun, and tells _haRest to re-fetch when it does.
     HaProvider          _haProv;
+
+    // An entity's past, for a card window's History view (2.10e): asked on the
+    // same session, answered through _haProv's raw hook. See HaHistory.h.
+    HaHistory           _haHist;
 
     // The outbound leg (#44). The ONLY code that knows a command can travel
     // two ways - the registry stays transport-agnostic, per ROADMAP 4.1.

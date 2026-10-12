@@ -1,0 +1,232 @@
+# TEST 2.10d - stable card ids and saved settings (#65)
+
+Branch `feat/65-saving`. Boards: **WS_P4_5** (COM15), **WS_P4_4B** (COM7) and **CYD_P4_1060** (COM9),
+all flashed 2026-10-09 with `-D DEBUG_POPUP` (local only) and the **new cache-safe P4 libraries**.
+**Reflashed 2026-10-09 ~14:40 with the PPA rotation fix (A15)** - the freezes. If any board still
+freezes, that is the most important result of the session: on the P4_5, `/hang` before resetting.
+**Run 2 build (2026-10-10 evening, desktop):** all three reflashed at `7bb90f8`, the P1b scroll fix
+included, `DEBUG_POPUP` on all three and `DEBUG_HANG` on the P4_5; each firmware reads `-dirty`.
+Design and what each step measured: `docs/design/card-sheet.md` section 17; decisions:
+`docs/DECISIONS.md` K33-K49, A14, A15.
+
+Mark each line PASS or FAIL, with a note for anything that looks wrong even if it passes. Rounds 1
+and 2 matter most; the rest can be done in any order. About an hour for all of it.
+**Which lights are safe**: anything in the Office. Nothing here needs the Kitchen.
+
+**How it works, in three lines.** Each board keeps your choices in its own settings file - what you
+choose on the P4_5 does not appear on the 4B. A choice made in a card's window is written when the
+window closes. A choice made from a browser (the addresses below) shows on the card the next time its
+page is built: swipe to the other page and back.
+
+**Useful addresses** (P4_5 shown; the 4B is `fleet-ws-p4-4b`, the 1060 `fleet-cyd-p4-1060`):
+- `http://fleet-ws-p4-5/settings` - the board's settings file, as it is
+- `http://fleet-ws-p4-5/settings?stats=1` - how many saves, the files, anything unclaimed, and the
+  **last ten changes**, each with its time and where it came from (`loopTask` = a card window,
+  `httpd` = a browser)
+- `http://fleet-ws-p4-5/panel` - any panel underrun the board has seen, with its time
+- `http://fleet-ws-p4-5/screenshot` - what the screen shows
+
+**Watch for, all through:**
+- **Any flash** - light blue, white, or a blink - especially as a window closes (that is when it
+  saves). Note the time and open `/panel`.
+- **A change you did not make** in `/settings?stats=1`'s last changes. Desk's Tap action on the P4_5
+  (Load scene, Bright) was set on 2026-10-08 with nobody at the panel, and it is still unexplained;
+  leave it until T4 changes it, and tell me if anything like it appears.
+- **A card label changing colour** when you did not ask for it.
+- **A restart you did not cause** (the screen goes dark and comes back).
+- **Anything slow**: a window that opens or closes late, a stutter as it saves.
+
+**If something fails**, send me the line number, what you saw, and - if the board is still up - the
+`/settings?stats=1` page and a `/screenshot`.
+
+**If the P4_5 freezes** (your two freezes of 2026-10-09): open `http://fleet-ws-p4-5/hang` **before**
+resetting it, and send me what it says. Three seconds after the screen stops, the board writes down
+where it is stuck; a reset forgets it. It is on the P4_5 only, and the PC is also logging its serial port.
+
+## Round 1 - the flash fix (A14)
+
+Before the new libraries, every flash write made the P4 screens flash light blue (your test on
+2026-10-08). Open each link while watching that board's screen.
+
+| # | Do this | PASS if |
+|---|---|---|
+| F1 | P4_5: `http://fleet-ws-p4-5/panel?flash=20&nvs=1` | No flash. (20 writes like a Pause) |
+| F2 | P4_5: `http://fleet-ws-p4-5/panel?flash=20` | No flash |
+| F3 | P4_5: `http://fleet-ws-p4-5/panel?flash=8&kb=256` | No flash. (The worst case: up to a third of a second each) |
+| F4 | The same three on the 4B (`fleet-ws-p4-4b`) and the 1060 (`fleet-cyd-p4-1060`) | No flash on either |
+| F5 | Through the whole session: the P4_5's **random white flash** | Say if you see one, and open `http://fleet-ws-p4-5/panel` right after: does it list an underrun near that time? |
+
+## Round 2 - things are kept (P4_5)
+
+| # | Do this | PASS if |
+|---|---|---|
+| S1 | Pause **Garage North** (long press, SETTINGS, Paused). Close the window | No flash as it closes. `/settings?stats=1` says one more save |
+| S2 | Swipe to Fleet and back; then restart the board (unplug, or the reset button) | North is still PAUSED after both. Resume it afterwards |
+| S3 | Fleet page: **All Lamps**, SETTINGS, Active state -> All members are on. Close. Swipe away and back | Still "All". (Before 2.10d a swipe forgot it) |
+| S4 | Restart. All Lamps' Active state | Still "All". Put it back to Any |
+| S5 | Open a window, change nothing, close it | `/settings?stats=1`: the save count does not move (nothing changed, nothing written) |
+| S6 | Open SETTINGS, scroll it if it can scroll, close the window | Nothing of the pane shows at the bottom of the screen afterwards (your bug from 2026-10-08) |
+| S7 | System drawer: the new **Sel Own** button, next to the scheme | Each tap: Blk Sq -> Blk Rd -> Slv Sq -> Slv Rd -> Sel Own. Open Desk: the selector has that look |
+| S8 | Choose Slv Rd on this page's scheme. Restart | Still Slv Rd. Back to Sel Own after |
+
+## Round 3 - Entity label (K40, K45)
+
+The words under the hero. The row is now called **Entity label**: Inherit / HA name / State / Custom / None.
+Changed 2026-10-09 (K49, P4_5 only so far): a card the dashboard names reads **Custom**; Inherit means
+"no name of its own", so it shows HA's; and the system panel's label knob is a test tool - State or
+None shows the whole page that way, Name shows each card's own choice.
+
+| # | Do this | PASS if |
+|---|---|---|
+| L0 | Open Desk's, Overhead's and Thermo's Entity label | Each reads **Custom** |
+| L1 | **Overhead (Office)**: Entity label -> HA name | "Light - Office overhead" (HA's name) |
+| L2 | -> State | "On" or "Off" |
+| L3 | -> None, then -> Custom | No words; then "Overhead" again |
+| L3b | -> Inherit | HA's name, as in L1 |
+| L4 | Restart with Overhead on Inherit | Still HA's name, the row still Inherit. Then back to Custom |
+| L4b | System panel, the label knob: Name -> State -> No lbl -> Name | State: every card shows its state. No lbl: no words. Name: each card back to its own choice |
+| L5 | From a browser: `http://fleet-ws-p4-5/settings?card=office_overhead_261008_0310&name=Ceiling+lamp`, swipe away and back | "Ceiling lamp", the row Custom. Then `...&name=` (empty) to put it back |
+
+## Round 4 - Card label and groups (K46)
+
+The coloured label at the card's top shows the card's **group**, and the group owns the colour. Your
+dashboard's areas are now HA's areas under your shorter names (Living = "Living Room", Front = "Front
+Room", Bedroom = "Eric Bedroom"). The row is **Card label**: every group, then **Own group**, then
+**None**. **Groups now get colours of their own** (your call this morning): the House page's seven
+are all different. With eight colours, the Fleet page's four test areas share with others.
+
+| # | Do this | PASS if |
+|---|---|---|
+| G1 | Look at the House page | Every card label as in v0.2.10, except **Kitchen, now orange** (it shared Garage's green). Same words everywhere |
+| G2 | **Thermo**: Card label -> **Own group** | Still "Front", in a colour no House group has |
+| G3 | **Kitchen temperature**: open its Card label row | Two "Front" lines: one "Front (HA)", one "Front" (Thermo's). Choose the plain "Front" | 
+| G4 | Look at the page | Thermo and Kitchen temperature: one label, one colour - a group of two, made without creating anything |
+| G5 | From a browser: `http://fleet-ws-p4-5/settings?group=ha_office&name=Work`, swipe away and back | Desk, Overhead, Office occupancy and Office temperature all read "Work" - **still purple** |
+| G6 | `...settings?card=office_261008_0310b&label_text=Study`, swipe away and back | Office temperature reads "Study", still purple (its own words, still in the group) |
+| G7 | `...settings?group=ha_office&color=2E9E4F`, swipe away and back | All four Office cards turn green, "Study" included |
+| G8 | **Garage North**: Card label -> None | No card label; the card keeps its place and size |
+| G9 | Restart | G2-G8 all still as you left them |
+| G10 | Put Thermo back on "Front (HA)" and Kitchen temperature on "Kitchen" | Thermo's group disappears from the rows (its last card left) |
+| G11 | Put the rest back: `...?group=ha_office&name=` and `&color=` (both empty), `...?card=office_261008_0310b&label_text=` (empty), North -> Garage | Back to G1. `/settings?stats=1` shows what is left, and the last ten changes |
+
+**Skip G2, G3, G4 and G10** (2026-10-09, K48): the Card label row is greyed until after 2.10d.
+G8 is done from a browser now: `...settings?card=garage_north_261008_0310&group=none`, and back with `&group=`.
+
+G5-G7 rename and recolour Office only to show it works; G11 undoes them. Skip them if you would
+rather not touch the names.
+
+## Round 5 - Tap action (K37, K39)
+
+A long press always opens the window. The tap does what Tap action says; the list only offers what
+that card can do.
+
+| # | Do this | PASS if |
+|---|---|---|
+| T1 | **Overhead (Office)**: Tap action -> Details view. Close. Tap the card | Its window opens. The first tap inside it works (not swallowed) |
+| T2 | -> History view. Tap | The window opens on History |
+| T3 | -> Nothing. Tap | Nothing happens. Long press still opens the window |
+| T4 | **Desk**: Tap action -> Cycle scenes. Tap the card three times, a second apart | Bright, Concentrate, Relax - each with a toast "Scene: Desk - ..."; only the scenes the window shows |
+| T5 | Restart; tap Desk once | Bright again (the cycle starts from the first after each boot) |
+| T6 | Desk -> Load scene. Go to Scenes; open the **SCENES** panel; Tap scene -> Relax. Tap the card | Relax, with its toast |
+| T7 | **All Lamps** (Fleet): Tap action -> Members view. Tap | The window opens on Members |
+| T8 | Put Desk and Overhead back to Toggle; the Office lights back as you like them | - |
+
+T4 and T6 change the Office lights (scenes); I leave them at 100%, 2710 K after my own tests.
+
+## Round 6 - the panels (K43, K45)
+
+| # | Do this | PASS if |
+|---|---|---|
+| P1 | Desk's SETTINGS on the P4_5, the 4B and the 1060 | Paused, Entity label, Card label, Visibility (greyed), Tap action - and **no scrolling** on any of them |
+| P1b | P4_5 (reflashed 2026-10-09 12:40): open Tap action, then Entity label | **Every choice shows at once**, Toggle included; nothing to scroll. The same on the 4B (reflashed 12:50) |
+| P2 | Desk -> Scenes | A **SCENES** panel peeks up on the left, as CHART does on History |
+| P3 | Open it: Show hidden scenes, tick it | The four hidden scenes join the buttons. Untick: they go |
+| P4 | Go from Scenes to History | SCENES goes down, CHART comes up |
+| P5 | Restart with Show hidden ticked | Still ticked. Untick it after |
+
+## Round 7 - left-over settings (K35)
+
+| # | Do this | PASS if |
+|---|---|---|
+| U1 | `http://fleet-ws-p4-5/settings?card=old_card_261001_0900&label=ha`, then `/settings?stats=1` | It lists "unclaimed cards: old_card_261001_0900" |
+| U2 | System drawer, Log: the System Doctor's **[SETTINGS]** section | The same entry (not checked by me: the PC cannot open the drawer) |
+| U3 | `/settings?prune=cards` | "pruned 1"; the entry gone, nothing else touched |
+
+## Your results
+
+### Run 1 - 2026-10-10, P4_5 only, away from home (no HA)
+
+The P4_5 reflashed from the laptop (`2b738e6`, `DEBUG_POPUP` + `DEBUG_HANG`, the
+p4-libs-2026-10-09 libraries) to join the Wi-Fi there, at `http://10.0.0.2` (the router does not
+resolve `fleet-ws-p4-5`). The 4B and 1060 were not there. **No freeze; `/hang` empty.**
+
+| Round | Result |
+|---|---|
+| 1 | F1 F2 F3 PASS. F4 not there. **F5: two flashes** - one during L1 (`/panel` right after: 0 underruns, 50 s after a restart), one during T1-T3 (0 underruns, at 8559 s). Both while changing a card setting in its window |
+| 2 | S1-S8 all PASS |
+| 3 | L0 L2 L3 L5 PASS. L1, L3b, L4 need HA (HA's name) |
+| 4 | G1 PASS, G6 PASS (the Card label row still reads Office, greyed - expected, K48). G2-G4, G8-G11 skipped (K48). **G5, G7 "no effect": not a fault - the group is only `ha_office` when HA has said which area Office's lights are in; with no HA it is `sheet_office`, so the addresses named a group no card is in** (`CardGroups.cpp` `sheetGroupId()`). G7 left `groups.ha_office.color = 2E9E4F` in the file, which WILL turn Office green once the board sees HA again |
+| 5 | T1 T2 T3 T7 PASS. T4-T6, T8 need HA |
+| 6 | P1 PASS. **P1b FAIL** (below). P2-P5 need HA |
+| 7 | U1 U2 U3 PASS |
+
+**P1b, owner:** SETTINGS scrolls, barely - every row shows when it opens, but the gap under the
+last row pushes it over. A scroll that is not visible is not obvious: when a popup panel has more
+than it shows, it needs a small scroll bar. Scrolled to its end, the rows slide under the tab
+(Linen cuts the top off the Paused box). And the rows could be pulled past the end, held there,
+and slid back on letting go: **no springy, bouncy effects - the content locked within the space
+it needs**. For the popup's panels (SETTINGS, CHART, SCENES), not a rule for all scrolling.
+
+**Fixed (to retest):** the panels' rows sit in a body of their own, which is what scrolls: cut off
+at a straight line under the join, stopping dead at both ends, with a thin bar in the right margin
+whenever there is more to see. A panel only just too tall (up to 1.6 mm, as SETTINGS on the P4_5)
+takes it from the gaps above and below the rows instead, and does not scroll.
+
+### Run 2 - 2026-10-10 evening, home, with HA; P4_5, 4B and 1060 at `7bb90f8`
+
+| Round | Result |
+|---|---|
+| 1 | **F4 PASS** (4B and 1060). `/panel?flash=20` while swiping pages on the P4_5: no flash. **F5: still seen, P4_5 only** - several times while opening and closing Desk's panels and tapping dropdowns; one right as SCENES was opened on the Scenes view and SETTINGS tapped straight after. Each time: `/panel` 0 underruns, `/settings?stats=1` nothing unusual. For that one, the last save was at 1675 s and `/panel` read at 2131 s: **no settings write anywhere near it** |
+| 3 | L1 L3b L4 PASS. L1 note: the window's title should show the card's current name ("Office > Light - Office overhead") - after the owner tidies HA's entity names (#90) |
+| 4 | G5 G7 G11 PASS |
+| 5 | T4 T5 T6 T8 PASS |
+| 6 | P1 PASS on all three, P1b PASS (P4_5 and 4B), P2-P5 PASS. **No SETTINGS panel scrolls on any of the three** - so the scroll bar and the dead stops (P1b's fix) are unseen on glass |
+
+**F5, what the numbers say.** Both pending tests are now done (`/panel?flash=20` while swiping; a save
+time against the flash), and both point away from a flash write: the flashes come with panel and
+dropdown motion, not with saves. What `/panel` cannot see: underruns in a frame's first 413 lines are
+masked by the bridge (`PanelDebug.cpp`, "What the recorder cannot see"), so a late frame start, or a
+starved feed in the top third of the screen, reads 0. Open: **#91**.
+
+### Round D - the panels are dragged whole (P1b round 2, 2026-10-11, P4_5)
+
+Owner, on seeing the scroll bar's design: rows sliding inside a panel that itself slides up "totally
+kills the illusion" - so an open panel taller than the room is now **dragged whole**: up to show its
+hidden rows (it stays where it is let go, at most until the last row is on screen), down to fold it
+(let go past a third of the way to its tab: it folds; less: back up), on every panel. Carets at the
+screen's edges instead of a bar. A folded tab still opens by a tap only. Tested with
+`/popup?rows=4` (4 greyed test rows, so Desk's SETTINGS is 9 rows; `rows=0` to undo).
+
+| # | Do this | PASS if |
+|---|---|---|
+| D1 | Open Desk -> SETTINGS | Rests with its tab at the window's top; a caret at the screen's bottom |
+| D2 | Drag up - from a row's words, a gap, a dropdown | The whole panel moves; rows never slide inside it; a dropdown does not open |
+| D3 | Keep going up | Stops dead with the last row in sight; the bottom caret goes; a caret at the top once the pane is off the top |
+| D4 | Let go part way | It stays |
+| D5 | Drag down a little / past a third, let go | Back up / folds to its tab |
+| D6 | Tap Paused, a dropdown | Work as before |
+| D7 | Drag up, tap the tab to fold, open again | Folds whole, nothing in the tab's strip; reopens at rest |
+| D8 | Scenes -> SCENES (short) | Cannot go up; down as D5 |
+| D9 | `/popup?rows=0`, reopen | Normal, no carets |
+
+**Owner, 2026-10-11 ~01:00:** "so slick". D1 D2 D4 D5 D6 D7 PASS. **D3 FAIL**: dragged up, the panel
+went a little past its stop - far enough to show its rounded bottom - and settled back when let go.
+**D8 FAIL**: SCENES and CHART would not move up, but dragged down and then up without lifting, they
+went a long way up, a large gap under them. Both were LVGL: its non-elastic clamp holds only for a
+drag down (`elastic_diff()`: `scroll_end - diff < 0` can never be true with `diff` negative), so one
+step of a drag up went past the end. **Fixed:** the track pulls itself back to its ceiling on every
+scroll step, before anything is drawn. **The carets now point the way to drag** (owner): rows below,
+a caret pointing up; the pane off the top, one pointing down. Drag down to fold stays on every panel
+(owner). **Retest D3, D8 and the carets; D9 not yet run - all four are round 0 of
+`TEST_2.10e.md`.**
+**Flashes while dragging** - many, sometimes several in quick succession: see #91.

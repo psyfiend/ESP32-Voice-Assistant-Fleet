@@ -94,7 +94,8 @@ next reworked, not before.
   hundreds of KB of JSON - against an 8 KB websocket receive buffer today.
 - **On/off entities: `history/history_during_period`** with `minimal_response` and
   `no_attributes`: few rows, since they change rarely. **The Activity list is built from the same
-  reply** - no second request.
+  reply** - no second request. *(As built in 2.10e: `logbook/get_events` instead, which also says
+  what caused each change, and numbers use history first with statistics as the fallback - §18.)*
 - **Entities HA does not own (virtual, MQTT, system)** have no HA history: the board keeps its own
   ring of samples in PSRAM (e.g. every 5 min for 24 h), **lost at reboot** - to be said on screen.
 - **Clock.** "8 minutes ago" and axis times need wall-clock time and a time zone (SNTP + TZ). To be
@@ -652,3 +653,235 @@ rows** are as wide as the controls view's slider and words together, and centred
 reproduced): no matching report in 3 s, with what was asked and what the light last said, or HA's
 refusal and its message. The last four are logged and listed by `/popup?view=3`. A refusal of an
 earlier call while a newer one is in flight (a drag) no longer fails the newer one.
+
+## 17. 2.10d - stable card ids and saved settings (in progress, from 2026-10-08)
+
+Decided with the owner on 2026-10-08: `DECISIONS.md` K33-K38. What the problem is, in the owner's
+words: how does a device stay customised instead of reverting to its compiled configuration at every
+reset?
+
+**How it works.** The board boots from the compiled dashboard, then applies the owner's saved
+changes from one file on top. A value comes from the first layer that sets it: the file, the card's
+spec, the page's spec, the built-in default (D-7's order). New firmware with a changed dashboard
+keeps every saved change for cards that are still there; new cards simply appear. At 3.1 the build
+sheet replaces the two spec layers and the file stays on top, unchanged - Q2's runtime layer.
+
+**Ids (K33).** Every saved change says which card it belongs to. Before 2.10d a card was "the Nth
+entry of its page", so inserting a card above Desk would have moved Desk's settings onto Overhead.
+An id is a name for the card made once, at creation, never changed and never reused - as HA makes
+an area's id from its name and keeps it through renames. It is made automatically, so a fresh build
+sheet just makes new ones and nobody looks anything up. Format
+`<area>_<label>_<yymmdd>_<hhmm>`, e.g. `office_desk_261008_0310`; the label is dropped where it
+repeats the area (`kitchen_261008_0310`), a same-minute twin takes a letter (`..._0310b`). The 35
+compiled cards were given theirs on 2026-10-08. `checkCardIds()` runs at boot: a card with no id, a
+malformed one or a duplicate draws but is never given its id, so it saves nothing.
+
+**A card's life (K35, the owner's page-pool idea).**
+
+| State | Its saved settings |
+|---|---|
+| Shown | - |
+| Dropped because the grid is too small | still on its page; nothing changes |
+| Hidden (Visibility - greyed until 2.11) | on its page, in the page's pool, can be brought back |
+| Removed from the page (page editing, later) | in the pool, kept |
+| Deleted | only by the owner, from the pool; gone |
+| No longer in the dashboard definition | kept, listed as "unclaimed", cleared only by the owner |
+| Its entity gone from HA | kept, listed as "entity missing" - the board cannot tell "gone" from "HA restarting" or "renamed" |
+
+**The file (K34).** JSON on LittleFS, in the unused data partition. Only what was changed is stored;
+choices by name, never by enum number, so reordering an enum cannot change what a saved choice
+means; keys this firmware does not know are kept when it rewrites the file. Credentials stay in NVS.
+Written whole to a temporary file and renamed, once, when the window closes, only if something
+changed - on a task of its own with its stack in internal RAM (LESSONS: a flash write from a task
+with a PSRAM stack reboots the board).
+
+```json
+{ "schema": 1,
+  "schemes":  { "linen": { "selector": "silver_round" } },
+  "entities": { "ha_light_office_lamp": { "paused": true } },
+  "cards":    { "office_desk_261008_0310": { "label": "custom", "name": "Desk lamp", "scenes": "all" } } }
+```
+
+**The flash-write test (step 1, `/panel?flash=`).** On WS_P4_5: NVS writes of 512 B took 2-5 ms,
+38 ms when NVS erased a page; 4 KB erases 15-17 ms; 64 KB 32 ms; 256 KB 117-360 ms. The DSI bridge
+latched no underrun in any of them - but it masks underruns in a frame's first 413 lines, which is
+where a write's late frame start would land, so whether a write is visible takes the owner's eyes.
+HomeTiles saw a blue flash on every P4 panel during writes and fixed it by rebuilding three IDF
+objects cache-safe (`HomeTiles/tools/esp-idf-3.3.7-p4-cache-safe/README.md`); our libraries have
+the same setting off (`CONFIG_LCD_DSI_ISR_CACHE_SAFE`). The owner had paused cards many times
+without seeing a flash.
+
+**The owner's white flash (P4_5 only, now and then, no action it follows).** Not yet explained.
+`/panel` now lists any underrun the bridge does see, with its time; read it right after a flash.
+
+**Built so far** (WS_P4_5, driven from the PC with `/popup`; the owner's testing on glass began
+2026-10-09):
+
+| Step | What | Measured |
+|---|---|---|
+| 1 | `/panel?flash=` and the underrun recorder (`PanelDebug.h`) | above |
+| 2 | Card ids and `checkCardIds()` | "35 cards on 2 pages, 0 id problems"; the failure paths not yet tried |
+| 3 | `Settings.h`: the file, `GET /settings` (`?stats=1`); Active state, Scenes and Selector kept | mount 52 ms the first time, 3-11 ms after; a save 7-66 ms (66 when LittleFS erased a block), once per close; Desk's Scenes and a Midnight selector back after a reset; internal heap -6.6 KB |
+| 3b | Paused in the file (`EntityRegistry::PauseStore`), #60's NVS list imported once | Garage North paused, PAUSED after a reset, resumed and the entry gone |
+| 4 | Label: Inherit / From HA / State / Custom / None (K40); `Entity::sourceName`; custom names from a PC (`/settings?card=..&name=..`) | after a reset: Desk "From HA" -> "Office", Overhead "Ceiling lamp", Sink "State" -> "Off" |
+| 5 | Tap action (K37, K39): Toggle / Details / Members / History / Cycle scenes / Load scene / Nothing, only what the card can do; a Tap scene row, greyed unless Load scene; `CardPopup::openOn()`; the toast "Scene: Desk - Bright" | Desk History -> History, Overhead Details -> window, North -> nothing; Cycle x4 = Bright, Concentrate, Relax, Bright (HA's last-activated times), hidden scenes untouched; Load Relax -> Relax |
+| 6 | The SCENES panel (K43): the left panel is CHART on History, SCENES on Scenes - Show hidden scenes, Tap scene; Scenes "Off" dropped. SETTINGS loses both scene rows; a folded pane goes back to its top | screenshots on the P4_5 and the 4B |
+| 7 | Unclaimed settings (K35): `Settings::setClaims()`, `/settings?prune=`, the System Doctor's [SETTINGS] | a made-up card id listed, pruned |
+| 8 | Selector to the system panel; "Entity label" (K45) | SETTINGS: Paused, Entity label, (Card label), Visibility, Tap action - no scrolling on the P4_5, 4B and 1060 (screenshots) |
+| 9 | Groups for card labels (K44): HA areas learnt with the scenes; `CardGroups`; the Card label row; groups from a PC | nothing chosen = as before; a custom group, HA area, Custom with and without words, None; a group recoloured and a detached card not (screenshots) |
+| 10 | Groups get colours of their own (K47): saved colours first, then each group its name's colour if free, then a free one | House page: only Kitchen moved (lime -> ochre `E07A3F`), seven groups, seven colours |
+| 11 | From the owner's first touches (2026-10-09): dropdown lists as tall as the screen (the theme capped them at 260 px - five rows on the P4_5 and 4B); the Card label row greyed (K48); Entity label settled (K49: a dashboard-named card is Custom, Inherit shows HA's name, the label knob a test tool); HangWatch (`-D DEBUG_HANG`, `/hang`) | the freeze caught and decoded (A15); the rest awaits the owner's sheet |
+
+Active state and Scenes are read every time a page is built, so they also survive a page swipe -
+before 2.10d a swipe lost them.
+
+**The flash writes flashed the panel** (owner, on glass): all three `/panel?flash=` tests, more with
+the longer erases, light blue. Fixed by the cache-safe library rebuild (`REBUILD_P4_LIBS.md`, "The
+second rebuild"), installed 2026-10-08; the owner's look at the same tests afterwards is pending.
+
+**A lost setting, once.** One boot started with an empty store although the file was there, and the
+next save replaced it (Desk's Scenes). Not explained; a file that will not read now makes the boot
+read-only instead, and `/settings?stats=1` says what the boot saw.
+
+**Groups as built (K46, which replaced the first model the next day).** One kind of group: the
+dashboard's own version of an area - a name, a colour, perhaps a link to an HA area - belonging to
+the device, so it spans pages. Colour is the default key to a group; a card's words are the group's
+name unless it has its own.
+
+| Group id | What it is | Its name |
+|---|---|---|
+| `ha_<area_id>` | every HA area an entity here is in (HA's `area_id()`, learnt with the scenes) | a local rename (saved), else the dashboard's name for it, else HA's |
+| `sheet_<name>` | a dashboard area that is not one HA area | the dashboard's |
+| `<name>_<stamp>` | made by the owner (kept), or by "Own group" for one card (`kind: solo`, deleted when its last card leaves) | saved |
+
+A dashboard area IS an HA area when every HA card in it sits in that one HA area; on the owner's
+pages all eight are (Living = "Living Room", Front = "Front Room", Bedroom = "Eric Bedroom").
+A card's group: its saved `group` (an id or `none`), else its dashboard area's. Its words:
+`label_text` if it has its own (rename a, the group's colour kept), else the group's name. A group's
+colour: saved, else the colour of its own name (the dashboard's or HA's, or its id for one made
+here) - **so a rename never changes it** (it did, for one build: renaming Office to "Work" turned it
+lime). "Own group" (rename b) takes a colour no other group uses while one is left; another card
+choosing that group joins it. Renaming a group (rename c) renames every card in it. From a PC until
+the web UI: `/settings?group=new&name=..`, `group=<id>&name=..` (empty: its own name again),
+`group=<id>&color=RRGGBB`, `group=<id>&delete=1`, `card=<id>&group=..`, `card=<id>&label_text=..`.
+The System Doctor's [SETTINGS] lists every group, HA or local; `/popup?groups=1` (debug) lists the
+groups and each card's.
+
+**Colours are unique (K47)**: Garage and Kitchen were both lime by name; groups now take colours of
+their own unless one is set on purpose to match another.
+
+**The P4 freezes were not this window's** (A15): the PPA hanging on a rotated strip, IDF #19023,
+patched in the framework libraries. **The Card label row is greyed** for 2.10d (K48); its redesign
+and the move-to-group window come after.
+
+The owner's test sheet: `docs/archive/TEST_2.10d.md`. Signed off and merged with 2.10e as `v0.2.11`
+(2026-10-12). K17 waits until after 2.10d (K45).
+
+**Late in 2.10d (2026-10-11):** the panels are dragged whole (K50, `archive/TEST_2.10d.md` round D); a
+group's colour is worked out again for every card when any of HA's areas changes (the P4_5's
+Kitchen cards kept Garage's green when Garage's area arrived after theirs - `CardBinder::tick()`).
+
+## 18. 2.10e - History, as built (2026-10-11 to 12; signed off, `v0.2.11`, `archive/TEST_2.10e.md`)
+
+**Scope (owner):** Home Assistant's entities; the board's own and MQTT entities keep a local log
+later. Decisions K52-K55.
+
+**What the view shows follows the entity** (K52):
+- **A number** (a sensor whose value is a number): a chart over a span picked on the view - chips
+  24 h / 12 h / 6 h / 1 h (owner: quick to switch) - with now, min and max over the span. The
+  left panel is **CHART**: Span (follows the chips) and Show min and max.
+- **Anything that turns on and off** (light, switch, binary sensor, input boolean, a text
+  sensor): its **activity** - each change, newest first, the state in the card's own words
+  (On / Off, Detected / Clear, Open / Closed), the time ("2:12 AM", "Yesterday 8:58 PM"), and
+  what caused it: "By psyki" (a person), "Automation: Office: Occupancy Lighting Control", "By
+  <entity>", "Action light.turn_on". 10 rows, then "Show more (N)" (up to 60 drawn). A tap on
+  a row shows its details - the time to the second, how long it lasted (or "so far"), and HA's
+  own words (`triggered by state of binary_sensor.office_occupancy`, `light.turn_off`). The left
+  panel is **ACTIVITY**: Period (Last 24 hours / Last 7 days) and Show causes.
+- **A group defined in HA** (Desk = `light.office`) is its own entity, as in HA (owner): its
+  members' histories are each member's, reached through Members. A card standing for several
+  entities made here (All Lamps) has none of its own and says so.
+- **Round 2 (owner, 2026-10-11 morning; K56-K58):** every History choice is kept per card;
+  "Now" beside the chips, and **min and max in the chart** - faint dotted lines where each
+  happened, their values in a strip above the plot (on the 4B the old readout ran under the
+  chips); **a finger on the chart** puts a dotted line at that time with its time and value in
+  the same strip, and slides; CHART adds **Legend** (X axis / Y axis / Both) and **Show span
+  buttons**; ACTIVITY's Period is **Span**, with 24 h / 7 d chips and its own Show span buttons,
+  its rows in from the sides. SETTINGS adds **Units** (°C/°F per card, `units`) and an **Entity
+  properties** button opening a read-only view (HA's name, entity id, HA's area, source, class,
+  unit, members, the card's group and id). A card that toggles nothing taps to History.
+- **Round 3 (owner, the same afternoon): axes in round steps.** Values: a label every ~2.4 lines
+  of text of plot height, each step 1 / 2 / 2.5 / 5 x 10^n, the range widened to whole steps, the
+  labels in a gutter left of the plot, the unit on the top one; times: ticks on the local clock
+  (5, 10, 15, 30 min, 1, 2, 3, 4, 6, 12 h - the shortest whose labels fit), a faint grid line at
+  every tick both ways. More room - the 1060, the span buttons hidden - gives more ticks. With the
+  buttons hidden, the span in words takes their place. Legend chooses which labels; the grid stays.
+- **Round 4 (owner, that evening; K59-K61):** CHART rows Span, Legend (+ None), Show min/max,
+  Span buttons; "Showing: last 24 hours" centred when the buttons are hidden; min and max labels
+  inside the plot, above or below the line where it runs under them, never on it; a gradient fill
+  under the line (LVGL's `lv_example_chart_5` approach, `histFillCb()`). ACTIVITY rows Span,
+  Details (Basic / Extra), Show triggers, Span buttons; wording through `TimeFormat`. Properties
+  shows the HA **device** (the area template asks `device_attr(device_id(e), 'name_by_user')` or
+  `'name'`). Deferred to #92: fixed range, bars/steps, compare to yesterday, more shading.
+- **Round 5 (owner, 2026-10-12; K62-K63), the final one.** CHART: one top line - Min over Max
+  in the left corner (the words in one label, the numbers right-aligned in another), "Now: ..."
+  in the right, the span chips centred between them, their padding narrowing to fit (the 4B), or
+  "Showing: ..." half a line higher, which a tap steps through the spans. The dotted min/max
+  lines carry their **times**. Rows: Span, Legend (None / X axis / Y axis / X / Y axes), Show
+  min/max, Shading: under line, Span buttons. ACTIVITY is **one view** - Details retired: the
+  state on the left (centred when alone), the time in the larger text over `TfAgo::AGO_DATED`
+  ("12 minutes ago", "Yesterday", "3 days ago - Oct 8") on the right, day headings always,
+  centred. Show duration ("for: 2 hrs 38 min", the newest "(and counting)", off by default) and
+  Show triggers add small lines under the state; with lines under it the two sides line up from
+  the top. A tap adds the next thing down: the trigger, or with triggers on HA's own words. Rows:
+  Span, Show duration, Show triggers, Span buttons. Humidity beside temperature waits for
+  multi-sensor charts (#92); a popup timeout choice and hiding the countdown bar for the device
+  settings pages (#23).
+- **Round 6 (owner, 2026-10-12; K64).** History's stage reaches up into the header row's empty
+  lower half (`s.win`'s row gap is `-histLift()` in History only), so the chips or "Showing:"
+  sit a small gap under the title while the corners (Min/Max, Now) stay under the back and chart
+  buttons; nothing there but the middle is clickable, so those buttons still take their taps.
+  `histTopRow()` is the one top line for chart, activity and loading - "Showing:" used to jump
+  when the answer arrived because the loading line was shorter. LV_OBJ_FLAG_OVERFLOW_VISIBLE was
+  tried first and failed: LVGL draws in strips and skips a child whose parent is outside the
+  strip, and never hit-tests outside a parent. Activity's chips are centred and its "Showing:"
+  steps 24 h / 7 d. The chart sits half a line closer to the top line (the finger's strip looked
+  like a blank line). Min/max lines say "Max: 3:53 PM". Activity rows are at most 70 mm wide.
+  Properties closes its row gaps (to a third) so everything fits where it can.
+- **Open, the owner's to decide: a fixed range (#92).** "Auto" uses the span's own min and max (one
+  entity or, later, many); a user may want a "normal" range so charts look alike (e.g. 15-90 °F
+  for a year of Seattle). The owner's idea: a popup with a number wheel for high and low. LVGL has
+  one (`lv_roller`). Claude's proposal: CHART "Scale: Auto / Fixed"; Fixed opens a small window
+  with two wheels (Low, High) in round steps, first set to the range showing; kept per card - and
+  later per multi-entity chart, which is why it should be designed with 3.x's chart cards.
+
+**Where the data comes from** (K53; measured from the PC on 2026-10-11, the owner's HA):
+
+| Ask | What | Size, a day |
+|---|---|---|
+| `history/history_during_period`, minimal, no attributes | a number's real changes, as HA's own graph | thermostat 0.5 KB, deck light level 5.5 KB |
+| `recorder/statistics_during_period`, 5-minute mean/min/max | the fallback for a sensor too chatty for the buffer | 22.7 KB (16.3 KB means only) |
+| `logbook/get_events` | each change WITH its cause - history has no cause | 0.5-2.3 KB; a week of Office 20.5 KB |
+| `render_template` over `states.person` | user id -> person name, once a session; no admin rights | 281 B |
+
+A week of the Office group's logbook had three kinds of cause: a person's call_service (50), an
+automation with what triggered it (21), nothing at all (24 - the Hue app, a wall switch). Every
+numeric sensor on the dashboard has statistics. A light's brightness over time would need history
+WITH attributes (~350 B a change, every attribute repeated): not built.
+
+**How** (K54): `HaHistory` (`components/Fleet_HA`, no LVGL) asks on the loop task; its answers
+are told from everything else by their id (HA writes it first) through a raw hook HaProvider
+offers before its filtered parse, and parsed on the websocket task - with ArduinoJson's pool in
+PSRAM - into tables in PSRAM (1,024 points, 120 events). The window's tick notices the answer
+and draws. One request at a time; a new one replaces the last, and a late answer is dropped by
+its id. HaClient's receive buffer is **48 KB in PSRAM** where the board has it (twice the largest
+measured), 8 KB internal otherwise; an answer past it is dropped and counted as before, and a
+chart then asks for statistics, while activity says "Too much history to show here".
+
+**The chart** samples HA's points at even steps across the span (a quarter of the chart's width,
+48-240 steps), each step holding the last value at or before it - so changes are steps, as HA
+draws a sensor; the y range is the span's own plus a tenth; values follow the card's °C/°F.
+
+**Not built, for later:** a brightness chart for lights (owner: "value in it", default stays the
+list); a custom range (owner: "Range" in CHART); saving the span per card; the local log for
+non-HA entities; a full-screen chart (owner: not over the header now, maybe a toggle one day).

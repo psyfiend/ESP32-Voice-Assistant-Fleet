@@ -4,6 +4,8 @@
 #include "Cards/CardIcons.h"
 #include "UI/UITokens.h"
 #include "SystemReport.h"
+#include "Settings.h"
+#include "Cards/CardGroups.h"
 #include <Arduino.h>
 #ifdef DEBUG_PAGE_TIMING
 #include <esp_timer.h>   // where a page rebuild's time goes - see commit()
@@ -540,13 +542,14 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
             if (const Entity *e = reg.find(cs.secondaries[k])) c->bindSecondary(e);
         }
 
+        if (cardIdUsable(cs.id)) c->setId(cs.id);
         if (cs.label) c->setLabel(cs.label);
-        if (cs.area) {
-            c->setArea(cs.area);
-            // Derived from the NAME, so two cards in one area always agree and
-            // the colour survives a reboot. See cardAreaColor().
-            if (spec.areaColor) c->setAreaColor(cardAreaColor(cs.area));
-        }
+        // THE CARD LABEL (2.10d, K44): the dashboard's area is the card's
+        // group unless the owner chose another - CardGroups applies it, with
+        // the group's colour (its colour-by-name unless one was saved, so two
+        // cards in one area always agree and the colour survives a reboot).
+        c->setSheetArea(cs.area);
+        CardGroups::apply(*c, spec.areaColor);
         c->setHeaderStyle(cs.header == CARD_HDR_INHERIT
                           ? spec.headerDefault
                           : (CardHeaderStyle)cs.header);
@@ -555,9 +558,39 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
         c->setPlacement(cs.place);
         c->setTempUnit(cs.tempUnit == TempUnit::TEMP_INHERIT ? spec.tempUnit
                                                              : cs.tempUnit);
-        c->setLabelMode(cs.labelMode == CardLabel::LBL_INHERIT ? spec.labelMode
-                                                               : cs.labelMode);
+        // A NAMED CARD SAYS CUSTOM (owner, 2026-10-09, K49): a name the
+        // dashboard gives ("Desk" for HA's "Office") is a custom name, and
+        // the Entity label row says so. A card it does not name inherits.
+        CardLabel lmDef = cs.labelMode == CardLabel::LBL_INHERIT ? spec.labelMode : cs.labelMode;
+        if (lmDef == CardLabel::LBL_INHERIT && cs.label && cs.label[0]) lmDef = CardLabel::LBL_NAME;
+        c->setLabelMode(lmDef);
         c->setGroupOn(cs.groupOn);
+
+        // The owner's saved changes, over the spec (2.10d, Settings.h): the
+        // file is the top layer. Read every time the page is built, which is
+        // what makes a choice survive a page swipe as well as a reboot.
+        if (c->hasId()) {
+            char v[ENTITY_NAME_MAX];
+            GroupOn g;
+            SceneShow ss;
+            CardLabel lm;
+            if (Settings::card(c->id(), "active", v, sizeof(v)) && groupOnFromName(v, g)) c->setGroupOn(g);
+            if (Settings::card(c->id(), "scenes", v, sizeof(v)) && sceneShowFromName(v, ss)) c->setSceneShow(ss);
+            const bool lmSaved = Settings::card(c->id(), "label", v, sizeof(v)) && cardLabelFromName(v, lm);
+            if (lmSaved) c->setLabelMode(lm);
+            // A custom name set on the device replaces the dashboard's (K40),
+            // and makes the card Custom unless a label choice was saved (K49).
+            if (Settings::card(c->id(), "name", v, sizeof(v)) && v[0]) {
+                c->setLabel(v);
+                if (!lmSaved) c->setLabelMode(CardLabel::LBL_NAME);
+            }
+            TapAction ta;
+            if (Settings::card(c->id(), "tap", v, sizeof(v)) && tapActionFromName(v, ta)) c->setTapAction(ta);
+            TempUnit tu;   // SETTINGS' Units row (2.10e round 2)
+            if (Settings::card(c->id(), "units", v, sizeof(v)) && tempUnitFromName(v, tu)) c->setTempUnit(tu);
+            char ref[ENTITY_TOPIC_MAX];
+            if (Settings::card(c->id(), "tap_scene", ref, sizeof(ref))) c->setTapScene(ref);
+        }
         if (cs.longStaleMs) c->setLongStaleMs(cs.longStaleMs);
         if (cs.paused)      c->setPaused(true);
 
@@ -594,4 +627,77 @@ void CardPage::report() const {
                                (unsigned)p.priority);
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Card ids - see PageSpec.h. Duplicates are remembered by pointer to the first
+// spec's string and compared by content, so both copies are refused.
+// ---------------------------------------------------------------------------
+namespace {
+constexpr uint8_t ID_DUPES_MAX = 16;
+const char *s_idDupes[ID_DUPES_MAX] = {};
+uint8_t     s_idDupeCount = 0;
+}
+
+bool cardIdWellFormed(const char *id) {
+    if (!id || !*id) return false;
+    size_t n = 0;
+    for (const char *p = id; *p; p++, n++) {
+        const char ch = *p;
+        const bool ok = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_';
+        if (!ok || n >= CARD_ID_MAX) return false;
+    }
+    return true;
+}
+
+uint8_t checkCardIds(const PageSpec *const *pages, uint8_t n) {
+    s_idDupeCount = 0;
+    uint8_t problems = 0, total = 0;
+    for (uint8_t pi = 0; pi < n; pi++) {
+        const PageSpec *pg = pages[pi];
+        if (!pg) continue;
+        for (uint8_t ci = 0; ci < pg->count; ci++) {
+            const CardSpec &cs = pg->cards[ci];
+            total++;
+            const char *what = cs.label ? cs.label : (cs.primaries[0] ? cs.primaries[0] : "?");
+            if (!cs.id || !*cs.id) {
+                Serial.printf("[CardIds] %s card %u (%s) has no id - its settings cannot be saved\n",
+                              pg->slug, (unsigned)ci, what);
+                problems++;
+                continue;
+            }
+            if (!cardIdWellFormed(cs.id)) {
+                Serial.printf("[CardIds] %s card %u (%s): id \"%s\" is not lowercase letters, digits and _ "
+                              "(at most %u) - its settings cannot be saved\n",
+                              pg->slug, (unsigned)ci, what, cs.id, (unsigned)CARD_ID_MAX);
+                problems++;
+                continue;
+            }
+            // Seen earlier, on this page or one before it?
+            bool dupe = false;
+            for (uint8_t pj = 0; pj <= pi && !dupe; pj++) {
+                const PageSpec *q = pages[pj];
+                if (!q) continue;
+                const uint8_t end = (pj == pi) ? ci : q->count;
+                for (uint8_t cj = 0; cj < end; cj++)
+                    if (q->cards[cj].id && strcmp(q->cards[cj].id, cs.id) == 0) { dupe = true; break; }
+            }
+            if (dupe) {
+                Serial.printf("[CardIds] id \"%s\" is used twice (again on %s, card %u, %s) - "
+                              "neither card's settings can be saved\n", cs.id, pg->slug, (unsigned)ci, what);
+                problems++;
+                if (s_idDupeCount < ID_DUPES_MAX) s_idDupes[s_idDupeCount++] = cs.id;
+            }
+        }
+    }
+    Serial.printf("[CardIds] %u cards on %u pages, %u id problem%s\n",
+                  (unsigned)total, (unsigned)n, (unsigned)problems, problems == 1 ? "" : "s");
+    return problems;
+}
+
+bool cardIdUsable(const char *id) {
+    if (!cardIdWellFormed(id)) return false;
+    for (uint8_t i = 0; i < s_idDupeCount; i++)
+        if (strcmp(s_idDupes[i], id) == 0) return false;
+    return true;
 }

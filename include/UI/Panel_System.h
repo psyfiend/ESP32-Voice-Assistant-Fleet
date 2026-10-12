@@ -51,6 +51,13 @@ public:
     void setSchemeLabel(const char *text);
     void setBarLabel(const char *text);
 
+    // The card window's Selector look, for the scheme showing (2.10d, K45:
+    // moved here from the card's SETTINGS - it is device-wide, per scheme).
+    using SelectorCallback = std::function<void()>;
+    void setOnSelectorRequested(SelectorCallback cb) { _onSelectorRequested = cb; }
+    void requestSelector() { if (_onSelectorRequested) _onSelectorRequested(); }
+    void setSelectorLabel(const char *text);
+
     // The accumulated report, as plain text. The panel BUFFERS the log; it no
     // longer displays it - LogPage does. Keeping the buffer here means the
     // boot-time dump is already waiting when the page is first opened.
@@ -179,6 +186,7 @@ private:
     lv_obj_t* _lbl_label = nullptr;   // name / state / none
     lv_obj_t* _lbl_hdr;    // label inside the header-mode button
     lv_obj_t* _lbl_scheme; // label inside the scheme button
+    lv_obj_t* _lbl_selector = nullptr;   // label inside the Selector button
     lv_obj_t* _lbl_bar;    // label inside the header-size button
     lv_obj_t* _lbl_cols;
     lv_obj_t* _lbl_rows;
@@ -223,6 +231,7 @@ private:
     TokensCallback _onTokensRequested = nullptr;
     LogCallback    _onLogRequested    = nullptr;
     SchemeCallback _onSchemeRequested = nullptr;
+    SelectorCallback _onSelectorRequested = nullptr;
 
     // Sink registered with SystemReport in init(), so report lines land in this
     // panel. Serial mirroring is SystemReport's job now, not log()'s.

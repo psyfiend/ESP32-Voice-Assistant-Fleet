@@ -6,6 +6,33 @@ signed-off merges to `main` in the order they happen - it does not follow milest
 began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
+## v0.2.11 - 2026-10-12
+
+2.10d and 2.10e, merged together (K51) - the card popup is done (#65).
+
+- **2.10d, choices saved (#65)**: every card has a stable id (`<area>_<label>_<yymmdd>_<hhmm>`,
+  K33) and the owner's choices live in one file on LittleFS (`/cfg/settings.json`), by name, applied
+  over the compiled dashboard and written once when the window closes (`docs/design/card-sheet.md`
+  §17, CLAUDE.md "Saved settings"). Groups for card labels, HA areas linked in, colour as the key
+  (K46-K47). A file that will not read makes the boot read-only. The window's panels are dragged
+  whole - up to show hidden rows, down to fold (K50).
+- **2.10e, History from Home Assistant (#65)**: a number's chart and anything on/off as its
+  activity (`card-sheet.md` §18, K52-K64). The chart: 24 / 12 / 6 / 1 h, axes in round steps on
+  the local clock, a gradient under the line, min and max in the top line and as dotted lines at
+  their times, a finger reading any point, history first and 5-minute statistics as the fallback.
+  The activity: day headings, the time and how long ago, how long each state lasted and what HA
+  says triggered it, 24 h / 7 days. Span buttons or "Showing: ..." that a tap steps; every choice
+  kept per card. `HaHistory` asks HA's websocket; its 48 KB buffer is in PSRAM. `TimeFormat`, after
+  NINA's `time_parse`, says every time and duration.
+- **SETTINGS**: Units (°C / °F per card) and an Entity properties view (HA's name, id, area,
+  device). A card whose tap toggles nothing opens on History.
+- **Fixed**: the P4 freezes (A15) - the PPA hanging on a rotated strip, IDF #19023, patched in the
+  rebuilt P4 libraries, with no freeze seen since; `-D DEBUG_HANG` (HangWatch, `GET /hang`) for the next one. Card label
+  colours when HA's areas arrive late; an on card's fill lost when they did.
+- Open, filed: the P4_5's white flash (#91), the window title's name (#90), chart options (#92).
+- Signed off by the owner on WS_P4_5, WS_P4_4B and CYD_P4_1060 (`docs/archive/TEST_2.10d.md`,
+  `TEST_2.10e.md`); all nine environments build.
+
 ## v0.2.10 - 2026-10-07
 
 - **2.10c, Home Assistant's lights get the controls (#65)**: an HA light's levels (brightness,

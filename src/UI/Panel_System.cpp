@@ -78,6 +78,10 @@ void Panel_System::setSchemeLabel(const char *text) {
     if (_lbl_scheme && text) lv_label_set_text(_lbl_scheme, text);
 }
 
+void Panel_System::setSelectorLabel(const char *text) {
+    if (_lbl_selector && text) lv_label_set_text(_lbl_selector, text);
+}
+
 void Panel_System::setBarLabel(const char *text) {
     if (_lbl_bar && text) lv_label_set_text(_lbl_bar, text);
 }
@@ -496,6 +500,16 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
         if (p) p->requestScheme();
     });
     _lbl_scheme = lv_obj_get_child(btnScheme, 0);
+
+    // The card window's Selector look for the scheme showing (2.10d, K45),
+    // beside the scheme it belongs to: the scheme's own, then the four looks.
+    // A fourth button in this row, for now - the drawer is a stand-in for the
+    // device's settings page (4.1).
+    lv_obj_t *btnSel = knobButton(_ui_row3, this, "Sel Own", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestSelector();
+    });
+    _lbl_selector = lv_obj_get_child(btnSel, 0);
 
     // System header bar height: 50 -> 45 -> 40 -> 35 -> 30 -> none -> 50.
     // Hide / show the header. NOT a size cycle - the owner fixed the height at

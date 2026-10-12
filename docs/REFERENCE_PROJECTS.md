@@ -149,6 +149,14 @@ lock; the arbiter takes it internally" versus "all ops are called with the displ
 held". Given ROADMAP §4.2 calls threading our biggest trap, this per-API convention is worth
 adopting wholesale.
 
+### `time_parse.c/h` — taken as a pattern (2.10e, 2026-10-11)
+
+One pure module (no ESP-IDF), and a duration enum whose every value names the exact text it writes
+(`FMT_DUR_HM_COMPACT` "2h 05m", ...), negatives clamped to zero. The fleet's `TimeFormat.h/.cpp`
+follows the pattern - written fresh, no lines copied - for times, "how long ago" and durations in
+the window's History (K59). Credit stays in `TimeFormat.h`; the non-commercial condition above
+applies to it like anything else NINA-derived.
+
 ### `nina_nav_arbiter.h` — navigation as a resolution ladder
 
 ROADMAP §5.2 flags gesture conflicts as a risk. Their answer is a **single owner of page-commit

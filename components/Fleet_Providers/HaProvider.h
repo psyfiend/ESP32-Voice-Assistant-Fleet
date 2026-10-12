@@ -73,6 +73,12 @@ public:
     typedef void (*ResultFn)(uint32_t id, bool ok, const char *code, const char *msg, void *ctx);
     void setResultHook(ResultFn fn, void *ctx) { _resultFn = fn; _resultCtx = ctx; }
 
+    // A RAW LOOK AT EVERY MESSAGE FIRST (2.10e): HaHistory's answers are big and
+    // its own to parse, so it sees each message before the filtered parse and
+    // returns true for the ones that were its. Websocket task.
+    typedef bool (*RawFn)(const char *json, size_t len, void *ctx);
+    void setRawHook(RawFn fn, void *ctx) { _rawFn = fn; _rawCtx = ctx; }
+
 private:
     // HaClient hands out a bare function pointer, so the instance is reached
     // through the ctx argument - same shape MqttProvider uses for PubSubClient.
@@ -113,6 +119,8 @@ private:
 
     ResultFn _resultFn  = nullptr;
     void    *_resultCtx = nullptr;
+    RawFn    _rawFn     = nullptr;
+    void    *_rawCtx    = nullptr;
 
     // The scene query: the session it was sent for, its id (read on the
     // websocket task to match the answer), and whether it has answered.

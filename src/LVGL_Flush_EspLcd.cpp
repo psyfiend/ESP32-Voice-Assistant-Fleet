@@ -39,6 +39,11 @@
 #include "bsp_loader.h"
 #include "src/display/lv_display_private.h"   // inv_areas: what this refresh redraws
 #include "src/misc/lv_area_private.h"         // lv_area_diff
+#ifdef DEBUG_HANG
+#include "HangWatch.h"
+#include "soc/dma2d_struct.h"
+#include "soc/ppa_struct.h"
+#endif
 
 namespace {
 
@@ -143,8 +148,24 @@ ppa_srm_rotation_angle_t ppaAngle() {
 // flush the strip it has been drawing meanwhile. lv_display_flush_ready() is
 // this single store (lv_display.c:656-659), written here directly so the
 // interrupt calls nothing in flash.
+#ifdef DEBUG_HANG
+// WHAT THE PPA WAS LAST ASKED (2.10d, HangWatch). The P4_5 froze three times
+// on 2026-10-09 with loop() waiting forever inside ppa_do_operation() - for
+// the SRM engine to finish a job that never finished. This keeps the last
+// jobs, which one never returned, how many were asked and finished, and the
+// PPA's and DMA2D's registers at the hang (hangReport(), in /hang).
+struct PpaRec { uint32_t ms; uint16_t x, y, w, h, dx, dy; uint8_t angle, blocking; int32_t ret; };
+constexpr uint8_t PPA_RECS = 16;
+constexpr int32_t PPA_PENDING = 0x7fffffff;
+PpaRec s_ppaRec[PPA_RECS];
+volatile uint32_t s_ppaCalls = 0, s_ppaDone = 0, s_fbcCalls = 0, s_fbcDone = 0;
+#endif
+
 bool IRAM_ATTR onPpaDone(ppa_client_handle_t client, ppa_event_data_t *ev, void *user) {
     (void)client; (void)ev;
+#ifdef DEBUG_HANG
+    s_ppaDone = s_ppaDone + 1;
+#endif
     if (user) static_cast<lv_display_t *>(user)->flushing = 0;
     return false;
 }
@@ -152,6 +173,9 @@ bool IRAM_ATTR onPpaDone(ppa_client_handle_t client, ppa_event_data_t *ev, void 
 // esp_async_fbcpy finished (DMA2D interrupt): wake whoever waits on `sem`.
 bool IRAM_ATTR onFbcpyDone(esp_async_fbcpy_handle_t mcp, esp_async_fbcpy_event_data_t *ev, void *sem) {
     (void)mcp; (void)ev;
+#ifdef DEBUG_HANG
+    s_fbcDone = s_fbcDone + 1;
+#endif
     BaseType_t woken = pdFALSE;
     xSemaphoreGiveFromISR(static_cast<SemaphoreHandle_t>(sem), &woken);
     return woken == pdTRUE;
@@ -196,6 +220,9 @@ esp_err_t ppaBlit(const void *src, uint32_t srcW, uint32_t srcH,
 
 // One DMA2D copy of area r, the same place in both buffers.
 esp_async_fbcpy_trans_desc_t fbcpyDesc(const void *from, void *to, const lv_area_t &r) {
+#ifdef DEBUG_HANG
+    s_fbcCalls = s_fbcCalls + 1;   // every fbcpyDesc() is followed by a copy
+#endif
     esp_async_fbcpy_trans_desc_t tr = {};
     tr.src_buffer = from;
     tr.dst_buffer = to;
@@ -294,8 +321,57 @@ esp_err_t ppaBlit(const void *src, uint32_t srcW, uint32_t srcH,
     op.scale_y = 1.0f;
     op.mode      = blocking ? PPA_TRANS_MODE_BLOCKING : PPA_TRANS_MODE_NON_BLOCKING;
     op.user_data = doneFor;
+#ifdef DEBUG_HANG
+    // Two tasks blit (this one and the repair worker): each takes its own slot.
+    const uint32_t k = __atomic_fetch_add(&s_ppaCalls, 1, __ATOMIC_RELAXED);
+    PpaRec &rec = s_ppaRec[k % PPA_RECS];
+    rec = {millis(), (uint16_t)blkX, (uint16_t)blkY, (uint16_t)blkW, (uint16_t)blkH,
+           (uint16_t)dstX, (uint16_t)dstY, (uint8_t)angle, (uint8_t)blocking, PPA_PENDING};
+    const esp_err_t e = ppa_do_scale_rotate_mirror(s_ppa, &op);
+    rec.ret = e;
+    return e;
+#else
     return ppa_do_scale_rotate_mirror(s_ppa, &op);
+#endif
 }
+
+#ifdef DEBUG_HANG
+int hangReport(char *o, size_t cap) {
+    int n = snprintf(o, cap, "PPA jobs asked %lu, finished %lu; DMA2D copies asked %lu, finished %lu\n",
+                     (unsigned long)s_ppaCalls, (unsigned long)s_ppaDone,
+                     (unsigned long)s_fbcCalls, (unsigned long)s_fbcDone);
+    n += snprintf(o + n, cap - n, "last PPA jobs, oldest first: ms, block x,y wxh -> dst x,y, angle, mode, result\n");
+    const uint32_t calls = s_ppaCalls;
+    for (uint8_t i = 0; i < PPA_RECS && n < (int)cap - 100; i++) {
+        const PpaRec &r = s_ppaRec[(calls + i) % PPA_RECS];
+        if (!r.ms) continue;
+        char res[16];
+        if (r.ret == PPA_PENDING) snprintf(res, sizeof(res), "NOT RETURNED");
+        else if (r.ret == 0)      snprintf(res, sizeof(res), "ok");
+        else                      snprintf(res, sizeof(res), "err 0x%lx", (unsigned long)r.ret);
+        n += snprintf(o + n, cap - n, "  %8lu  %4u,%4u %4ux%-4u -> %4u,%4u  a%u %s  %s\n",
+                      (unsigned long)r.ms, r.x, r.y, r.w, r.h, r.dx, r.dy, (unsigned)r.angle,
+                      r.blocking ? "wait " : "queue", res);
+    }
+    n += snprintf(o + n, cap - n, "PPA int_raw 0x%08lx int_ena 0x%08lx sr_status 0x%08lx\n",
+                  (unsigned long)PPA.int_raw.val, (unsigned long)PPA.int_ena.val, (unsigned long)PPA.sr_status.val);
+    for (uint8_t c = 0; c < 3 && n < (int)cap - 120; c++) {
+        const volatile dma2d_out_chn_reg_t &ch = DMA2D.out_channel[c];
+        n += snprintf(o + n, cap - n, "DMA2D out%u state 0x%08lx raw 0x%08lx ena 0x%08lx peri %lu link 0x%08lx dscr 0x%08lx\n",
+                      (unsigned)c, (unsigned long)ch.out_state.val, (unsigned long)ch.out_int_raw.val,
+                      (unsigned long)ch.out_int_ena.val, (unsigned long)ch.out_peri_sel.val,
+                      (unsigned long)ch.out_link_addr.val, (unsigned long)ch.out_dscr.val);
+    }
+    for (uint8_t c = 0; c < 2 && n < (int)cap - 120; c++) {
+        const volatile dma2d_in_chn_reg_t &ch = DMA2D.in_channel[c];
+        n += snprintf(o + n, cap - n, "DMA2D in%u  state 0x%08lx raw 0x%08lx ena 0x%08lx peri %lu link 0x%08lx dscr 0x%08lx\n",
+                      (unsigned)c, (unsigned long)ch.in_state.val, (unsigned long)ch.in_int_raw.val,
+                      (unsigned long)ch.in_int_ena.val, (unsigned long)ch.in_peri_sel.val,
+                      (unsigned long)ch.in_link_addr.val, (unsigned long)ch.in_dscr.val);
+    }
+    return n;
+}
+#endif
 
 // A buffer the panel is neither scanning nor about to scan. With three there
 // is always one; see Fleet_Display::present() for why reading the two
@@ -524,6 +600,9 @@ lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info) {
         Serial.println("[LVGL] PPA callback refused");
         return nullptr;
     }
+#ifdef DEBUG_HANG
+    HangWatch::setExtra(hangReport);   // the PPA's side of a freeze, in /hang
+#endif
 
     // The repair copier: one handle, one worker on core 0 (see repairWorker).
     // If any part is refused, s_fbc stays null and every repair stays on the

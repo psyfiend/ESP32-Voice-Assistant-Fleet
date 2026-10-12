@@ -88,7 +88,8 @@ bool HaProvider::sendSceneQuery() {
 
     // The lights we were given (not learnt members - a single bulb's device
     // carries no scenes). Single quotes inside, so the JSON needs no escapes.
-    static char frame[1536];
+    // 3 KB since 2.10d: the same template also asks each entity's area.
+    static char frame[3072];
     const uint32_t id = _ha->nextId();
     int n = snprintf(frame, sizeof(frame),
                      "{\"id\":%lu,\"type\":\"render_template\",\"template\":\"{%% for l in [",
@@ -100,14 +101,15 @@ bool HaProvider::sendSceneQuery() {
         if (strncmp(e->desc.externalRef, "light.", 6) != 0) continue;
         const int add = snprintf(frame + n, sizeof(frame) - n, "%s'%s'", named ? "," : "",
                                  e->desc.externalRef);
-        if (add < 0 || n + add >= (int)sizeof(frame) - 400) {
+        if (add < 0 || n + add >= (int)sizeof(frame) - 1400) {
             Serial.printf("[HaProv] scene query frame full at %u lights\n", (unsigned)named);
             break;
         }
         n += add;
         named++;
     }
-    if (!named) return true;   // no lights, no scenes: done for this session
+    // No lights is no longer "nothing to ask": the areas below are asked of
+    // every entity, and an empty list is a loop that does nothing.
 
     // Measured from the PC, 2026-10-06: 367 characters of template, 300 bytes
     // back for light.office's seven Hue scenes, sorted by name. The last field
@@ -119,15 +121,45 @@ bool HaProvider::sendSceneQuery() {
         "{%% for s in device_entities(d) | sort if s.startswith('scene.') %%}"
         "{{ l }}>{{ s }}>{{ state_attr(s,'name') or state_attr(s,'friendly_name') }}>"
         "{{ 'H' if is_hidden_entity(s) else 'V' }}|"
-        "{%% endfor %%}{%% endif %%}{%% endfor %%}\"}");
+        "{%% endfor %%}{%% endif %%}{%% endfor %%}");
     if (tail < 0 || n + tail >= (int)sizeof(frame)) return false;
     n += tail;
+
+    // EVERY ENTITY'S AREA (2.10d, K44, K46): "@>sensor.x>office>Office|" -
+    // HA's area_id() and area_name(), the entity's own area or else its
+    // device's; empty when it has none. For a card label set to "HA area". Learnt members are asked
+    // too: a member can be a card's primary one day (K17).
+    int add = snprintf(frame + n, sizeof(frame) - n, "{%% for e in [");
+    if (add < 0 || n + add >= (int)sizeof(frame)) return false;
+    n += add;
+    uint8_t asked = 0;
+    for (uint8_t i = 0; i < _reg->count(); i++) {
+        const Entity *e = _reg->at(i);
+        if (!e || e->desc.source != EntitySource::HA || e->desc.kind == EntityKind::BUTTON) continue;
+        add = snprintf(frame + n, sizeof(frame) - n, "%s'%s'", asked ? "," : "", e->desc.externalRef);
+        if (add < 0 || n + add >= (int)sizeof(frame) - 260) {
+            Serial.printf("[HaProv] area query frame full at %u entities\n", (unsigned)asked);
+            break;
+        }
+        n += add;
+        asked++;
+    }
+    // ...and its DEVICE's name (2.10e, the window's Properties): the owner's
+    // name for it, else the device's own; empty without a device. Measured
+    // 2026-10-11: light.office -> "Office", the thermostat -> "THERMOSTAT".
+    add = snprintf(frame + n, sizeof(frame) - n,
+                   "] %%}@>{{ e }}>{{ area_id(e) or '' }}>{{ area_name(e) or '' }}>"
+                   "{%% set d = device_id(e) %%}{{ (device_attr(d,'name_by_user') or device_attr(d,'name')) if d else '' }}"
+                   "|{%% endfor %%}\"}");
+    if (add < 0 || n + add >= (int)sizeof(frame)) return false;
+    n += add;
+    if (!named && !asked) return true;   // nothing to ask this session
 
     _tplDone.store(false);
     _tplId.store(id);
     if (!_ha->sendText(frame, n)) { _tplId.store(0); return false; }
-    Serial.printf("[HaProv] render_template id %lu: the scenes of %u lights (%d B)\n",
-                  (unsigned long)id, (unsigned)named, n);
+    Serial.printf("[HaProv] render_template id %lu: the scenes of %u lights, the areas of %u entities (%d B)\n",
+                  (unsigned long)id, (unsigned)named, (unsigned)asked, n);
     return true;
 }
 
@@ -135,7 +167,7 @@ bool HaProvider::sendSceneQuery() {
 // Grouped by light, as the template writes them; each group is learnt in one
 // call. The last field: V visible, H hidden in HA's UI.
 void HaProvider::parseScenes(const char *result) {
-    static char buf[2048];   // websocket task only
+    static char buf[4096];   // websocket task only; the areas (2.10d) follow the scenes
     snprintf(buf, sizeof(buf), "%s", result ? result : "");
 
     const char *refs[ENTITY_SCENES_MAX], *names[ENTITY_SCENES_MAX];
@@ -157,11 +189,31 @@ void HaProvider::parseScenes(const char *result) {
         n = 0;
     };
 
+    uint8_t areas = 0, withArea = 0;
     char *save = nullptr;
     for (char *tok = strtok_r(buf, "|", &save); tok; tok = strtok_r(nullptr, "|", &save)) {
         char *a = strchr(tok, '>');
         char *b = a ? strchr(a + 1, '>') : nullptr;
         if (!a || !b) continue;
+        // "@>sensor.x>office>Office": an entity's area id and name (2.10d),
+        // not a scene.
+        if (tok[0] == '@' && a == tok + 1) {
+            *b = '\0';
+            char *c2 = strchr(b + 1, '>');
+            if (c2) *c2 = '\0';
+            char *c3 = c2 ? strchr(c2 + 1, '>') : nullptr;   // the device (2.10e)
+            if (c3) *c3 = '\0';
+            const char *ref = a + 1, *areaId = b + 1, *area = c2 ? c2 + 1 : "", *device = c3 ? c3 + 1 : "";
+            for (uint8_t i = 0; i < _reg->count(); i++) {
+                const Entity *e = _reg->at(i);
+                if (!e || e->desc.source != EntitySource::HA || strcmp(e->desc.externalRef, ref) != 0) continue;
+                _reg->setSourceArea(e->desc.id, areaId, area, device);
+                areas++;
+                if (area[0]) withArea++;
+                break;
+            }
+            continue;
+        }
         char *c = strchr(b + 1, '>');   // absent from an older template: visible
         *a = '\0';
         *b = '\0';
@@ -176,8 +228,8 @@ void HaProvider::parseScenes(const char *result) {
         }
     }
     flush();
-    Serial.printf("[HaProv] scenes: %u for %u lights, %u hidden in HA\n",
-                  (unsigned)scenes, (unsigned)lights, (unsigned)nHidden);
+    Serial.printf("[HaProv] scenes: %u for %u lights, %u hidden in HA; areas: %u of %u entities have one\n",
+                  (unsigned)scenes, (unsigned)lights, (unsigned)nHidden, (unsigned)withArea, (unsigned)areas);
 }
 
 void HaProvider::loop(uint32_t nowMs) {
@@ -252,6 +304,7 @@ void HaProvider::onMessage(const char *json, size_t len, void *ctx) {
 
 void HaProvider::handle(const char *json, size_t len) {
     if (!_reg) return;
+    if (_rawFn && _rawFn(json, len, _rawCtx)) return;   // HaHistory's answer (2.10e)
 
     // A FILTERED PARSE, because ~95% of every trigger event is discardable.
     //

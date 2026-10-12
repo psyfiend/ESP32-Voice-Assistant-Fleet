@@ -241,6 +241,79 @@ enum class SceneShow : uint8_t {
     SCENES_OFF,
 };
 
+// WHAT A TAP DOES (2.10d, DECISIONS K37, K39). A long press always opens the
+// window (K3); this is the tap. TAP_DEFAULT is the card type's own - toggle on
+// a switch, a light or a button, History on anything else (owner, 2.10e round
+// 2; it was nothing) - and is what an unsaved card does. The scenes are the ones the card's window offers (its Scenes
+// setting); Cycle starts from the first after each boot.
+enum class TapAction : uint8_t {
+    TAP_DEFAULT = 0,
+    TAP_TOGGLE,
+    TAP_DETAILS,        // opens the window, as a long press does
+    TAP_MEMBERS,        // opens it on Members
+    TAP_HISTORY,        // opens it on History
+    TAP_CYCLE_SCENES,   // loads the next scene, with a toast naming it
+    TAP_LOAD_SCENE,     // loads one chosen scene ("tap_scene"), with a toast
+    TAP_NOTHING,
+};
+
+inline const char *tapActionName(TapAction t) {
+    switch (t) {
+        case TapAction::TAP_TOGGLE:       return "toggle";
+        case TapAction::TAP_DETAILS:      return "details";
+        case TapAction::TAP_MEMBERS:      return "members";
+        case TapAction::TAP_HISTORY:      return "history";
+        case TapAction::TAP_CYCLE_SCENES: return "cycle_scenes";
+        case TapAction::TAP_LOAD_SCENE:   return "load_scene";
+        case TapAction::TAP_NOTHING:      return "nothing";
+        default:                          return "default";
+    }
+}
+inline bool tapActionFromName(const char *n, TapAction &out) {
+    if (!n) return false;
+    for (uint8_t i = 1; i <= (uint8_t)TapAction::TAP_NOTHING; i++)
+        if (!strcmp(n, tapActionName((TapAction)i))) { out = (TapAction)i; return true; }
+    return false;
+}
+
+// The names these are saved under (2.10d, Settings.h): a saved choice is a
+// NAME, so reordering an enum never changes what it means. A name this
+// firmware does not know reads as "not set".
+inline const char *tempUnitName(TempUnit u) {
+    switch (u) {
+        case TempUnit::TEMP_SOURCE: return "source";
+        case TempUnit::TEMP_C:      return "c";
+        case TempUnit::TEMP_F:      return "f";
+        default:                    return "inherit";
+    }
+}
+inline bool tempUnitFromName(const char *n, TempUnit &out) {
+    if (!n) return false;
+    for (uint8_t i = 1; i <= (uint8_t)TempUnit::TEMP_F; i++)
+        if (!strcmp(n, tempUnitName((TempUnit)i))) { out = (TempUnit)i; return true; }
+    return false;
+}
+
+inline const char *groupOnName(GroupOn g) { return g == GroupOn::GROUP_ON_ALL ? "all" : "any"; }
+inline bool groupOnFromName(const char *n, GroupOn &out) {
+    if (!n) return false;
+    if (!strcmp(n, "any")) { out = GroupOn::GROUP_ON_ANY; return true; }
+    if (!strcmp(n, "all")) { out = GroupOn::GROUP_ON_ALL; return true; }
+    return false;
+}
+inline const char *sceneShowName(SceneShow v) {
+    return v == SceneShow::SCENES_ALL ? "all" : v == SceneShow::SCENES_OFF ? "off" : "visible";
+}
+inline bool sceneShowFromName(const char *n, SceneShow &out) {
+    if (!n) return false;
+    if (!strcmp(n, "visible")) { out = SceneShow::SCENES_VISIBLE; return true; }
+    if (!strcmp(n, "all"))     { out = SceneShow::SCENES_ALL;     return true; }
+    // "Off" was dropped (K43): nothing offers it, so a saved one reads as
+    // Visible rather than leaving a card whose scenes nobody can bring back.
+    if (!strcmp(n, "off"))     { out = SceneShow::SCENES_VISIBLE; return true; }
+    return false;
+}
+
 // What the line under a state card's hero says. Milestone 2.7.
 //
 // The owner, 2026-09-22: state is the icon and the colour, and the NAME is what
@@ -255,14 +328,40 @@ enum class SceneShow : uint8_t {
 // headers with the grep in LESSONS.md, none of these is defined there.
 enum class CardLabel : uint8_t {
     LBL_INHERIT = 0,  // use the page's setting (on a card) or the fleet's
-    LBL_NAME,         // the card's label - the default
+    LBL_NAME,         // "Custom": the card's own name - one set on the device,
+                      // else the dashboard's ("Desk"), else the source's.
+                      // The default
     LBL_STATE,        // "Open" / "Closed", from the device_class table
     LBL_NONE,         // nothing; the hero stands alone
+    LBL_HA,           // "From HA": the source's own name (Entity::sourceName,
+                      // HA's friendly_name), else the card's (2.10d, K40)
     // A fourth mode, LBL_NO_ICON - name kept, hero and disc dropped - was
     // built and tried on glass 2026-09-22 and REJECTED by the owner: "We're
     // not building a minimal dashboard. We're building an awesome dashboard."
     // Removed rather than left switched off.
 };
+
+// Saved by name (Settings.h). "inherit" is never saved: it is the absence of
+// a choice, so choosing it removes the key.
+inline const char *cardLabelName(CardLabel l) {
+    switch (l) {
+        case CardLabel::LBL_NAME:  return "custom";
+        case CardLabel::LBL_STATE: return "state";
+        case CardLabel::LBL_NONE:  return "none";
+        case CardLabel::LBL_HA:    return "ha";
+        default:                   return "inherit";
+    }
+}
+inline bool cardLabelFromName(const char *n, CardLabel &out) {
+    if (!n) return false;
+    if (!strcmp(n, "custom")) { out = CardLabel::LBL_NAME;  return true; }
+    if (!strcmp(n, "state"))  { out = CardLabel::LBL_STATE; return true; }
+    if (!strcmp(n, "none"))   { out = CardLabel::LBL_NONE;  return true; }
+    if (!strcmp(n, "ha"))     { out = CardLabel::LBL_HA;    return true; }
+    // Saved since K49: a named card's default is Custom, so Inherit is a choice.
+    if (!strcmp(n, "inherit")) { out = CardLabel::LBL_INHERIT; return true; }
+    return false;
+}
 
 // ---------------------------------------------------------------------------
 // Where a card wants to sit, in grid UNITS.

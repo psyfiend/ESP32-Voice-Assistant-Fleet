@@ -330,6 +330,61 @@ That is a real cost and it is worth stating in the README when this lands.
 verified workaround on different hardware is genuinely useful to the upstream issue. Worth posting
 back to esp-hosted-mcu#243 when it is done.
 
+## The second rebuild: DSI cache-safe (2.10d, 2026-10-08, DECISIONS A14)
+
+**Every flash write flashed the P4 panels light blue** (owner, on glass, with `/panel?flash=`):
+the DSI DMA stops after each frame and its interrupt restarts it, and that interrupt is not built
+cache-safe, so it waits out any flash write and the bridge sends its filler colour. HomeTiles found
+the same (`reference/.../HomeTiles/tools/esp-idf-3.3.7-p4-cache-safe/README.md`). IDF's own fix is
+one option, which selects the DMA ones it needs:
+
+```
+configs/defconfig.cache_safe:   CONFIG_LCD_DSI_ISR_CACHE_SAFE=y
+./build.sh -s -t esp32p4_es -b idf-libs qio 80m_200m hosted_fix cache_safe
+```
+
+Built in the same WSL tree, at the same IDF commit (`v5.5.5-832-g2553c5ad432`); the earlier output
+kept as `out.hosted_fix_2026-09`. **Compared with the installed #49 sdkconfig, exactly four lines
+differ** - `LCD_DSI_ISR_CACHE_SAFE`, `LCD_DSI_ISR_IRAM_SAFE`, `DW_GDMA_ISR_IRAM_SAFE`,
+`DW_GDMA_OBJ_DRAM_SAFE`, all now `y` - and the #49 settings, the variant (`REV_LESS_V3`, `REV_MIN_1`)
+and the 256 KB L2 are unchanged. Our frame callback (`Fleet_Display.cpp`, `onFrameComplete`) is
+`IRAM_ATTR` and touches only the display object in internal RAM, which a cache-safe interrupt
+requires. Install as in step 6, keeping the #49 folder as `esp32p4_es.hosted_fix` (and the stock one
+where it is); then clear `.pio/build_cache`. Test: `/panel?flash=8&kb=256` while watching the panel.
+
+## The third rebuild: the PPA rotation hang (2.10d, 2026-10-09, DECISIONS A15)
+
+**The P4_5 froze three times in one afternoon** with the picture stopped mid-animation and the
+network still answering. HangWatch (`-D DEBUG_HANG`, `/hang`) caught the third: `loop()` blocked in
+`ppa_do_operation()`, waiting for the PPA's scale-rotate engine to finish a strip rotation that never
+finished. That is IDF issue **espressif/esp-idf#19023** (DIG-734): for some block sizes the DMA2D
+miscounts a small leftover batch, never raises EOF, and `ppa_do_scale_rotate_mirror()` never returns.
+IDF has a workaround (bypass the macro-block order), but in v5.5 it measures the leftover with the
+block's width and height **unswapped** - wrong for a 90/270 rotation, which is what every strip on
+the P4_5 is. Master fixed that on 2026-09-08 (`469aa16c350`); release/v5.5 had not taken it.
+
+**A source patch this time, no config change**: `scripts/idf-patches/ppa_srm_rotation_fix.diff`,
+applied to `esp-idf/components/esp_driver_ppa/src/ppa_srm.c` in the WSL tree (master's change, kept
+on v5.5's `color_hal_pixel_format_get_bit_depth()`), then the same command as the second rebuild.
+**Load IDF's environment first**: with `-s`, `build.sh` does not, and the first attempt ended at
+once with `idf.py: command not found` and exit code 0.
+
+```
+cd ~/esp32-arduino-lib-builder/esp-idf && git apply /path/to/ppa_srm_rotation_fix.diff
+cd .. && . ./esp-idf/export.sh
+./build.sh -s -t esp32p4_es -b idf-libs qio 80m_200m hosted_fix cache_safe
+```
+
+Verify: the sdkconfig must be **identical** to the installed cache-safe one, and among the libraries
+only `libesp_driver_ppa.a` should differ. The previous output is kept in WSL as
+`out.cache_safe_2026-10-08`; installed, the cache-safe folder is kept as `esp32p4_es.cache_safe`.
+**A future IDF update that includes `469aa16c350` makes this patch unnecessary** - check for it
+before applying it again.
+
+**Another machine gets the result from a GitHub pre-release, not a rebuild**:
+`p4-libs-2026-10-09` holds the installed `esp32p4_es` folder as a zip, with its SHA-256 and the
+install steps. Each future rebuild gets its own dated pre-release; the folder never goes into git.
+
 ## The alternative, and why it is not the first choice
 
 `framework = arduino, espidf` — Arduino as an ESP-IDF component — compiles IDF from source with a

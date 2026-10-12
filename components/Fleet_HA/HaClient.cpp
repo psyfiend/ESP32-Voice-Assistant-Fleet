@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 #include "esp_websocket_client.h"
+#include "esp_heap_caps.h"
 
 #include "ConnectivityManager.h"
 #include "EntityRegistry.h"
@@ -65,8 +66,14 @@ bool HaClient::begin(ConnectivityManager *conn, EntityRegistry *reg) {
     // other allocation rather than appearing later as unexplained
     // fragmentation. 8 KB is a real amount of internal RAM on the S3 boards and
     // it should be visible at the moment it is taken, not discovered.
-    _rxCap = d.RX_BUFFER_BYTES;
-    _rx    = (char *)malloc(_rxCap);
+    // In PSRAM, and bigger, where the board has it (2.10e: history - see
+    // HaDefaults.h); 8 KB of internal RAM otherwise.
+    _rxCap = d.RX_BUFFER_PSRAM_BYTES;
+    _rx    = (char *)heap_caps_malloc(_rxCap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!_rx) {
+        _rxCap = d.RX_BUFFER_BYTES;
+        _rx    = (char *)malloc(_rxCap);
+    }
     if (!_rx) {
         Serial.printf("[HA] FATAL: could not allocate the %lu byte receive buffer.\n",
                       (unsigned long)_rxCap);

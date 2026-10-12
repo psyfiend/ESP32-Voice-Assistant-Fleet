@@ -421,6 +421,25 @@ struct Entity {
     // scene the owner hid in HA is hidden on the panel too, unless the card
     // says show all (SceneShow). Learnt with the scenes, each session.
     bool        sourceHidden   = false;
+
+    // The source's own name for it (HA's friendly_name), for every entity -
+    // declared ones included, whose desc.name is the user's (2.10d, K40:
+    // Label "From HA"). Empty until the source has said. Written by
+    // setSourceName() only.
+    char        sourceName[ENTITY_NAME_MAX] = {0};
+
+    // The source's AREA for it (HA's area_name(): the entity's own area, else
+    // its device's), for a card label set to "HA area" (2.10d, K44). Empty
+    // until learnt - once per session, with the scenes - or when HA has none.
+    // Written by setSourceArea() only.
+    char        sourceArea[ENTITY_NAME_MAX] = {0};
+    // ...and its id (HA's area_id(): "office"), which does not change when the
+    // area is renamed in HA. The key of the group linked to that area (K46).
+    char        sourceAreaId[ENTITY_NAME_MAX] = {0};
+    // The DEVICE it belongs to in HA (its name as the owner set it, else the
+    // device's own), for the window's Properties (2.10e). Learnt with the area;
+    // empty for an entity with no device (a helper). Written by setSourceArea().
+    char        sourceDevice[ENTITY_NAME_MAX] = {0};
 };
 
 #endif // ENTITY_H

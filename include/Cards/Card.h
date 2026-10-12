@@ -114,11 +114,36 @@ public:
     // the fleet setting - see cardLabelMode() in CardIcons.h.
     Card &setLabelMode(CardLabel m) { _labelMode = m; return *this; }
     CardLabel labelMode() const { return _labelMode; }
+    // The words for the name line under a resolved mode: "From HA" is the
+    // source's own name, everything else the card's label().
+    const char *shownName(CardLabel lbl) const;
 
     // With several primaries: on when any is, or only when all are. See
     // GroupOn. Changing it repaints (the popup's deck changes it live).
     Card &setGroupOn(GroupOn g);
     GroupOn groupOn() const { return _groupOn; }
+
+    // The card's stable id (CardSpec::id), or "" when it has none usable -
+    // then its settings cannot be saved. Points at the spec's string, which
+    // lives as long as the firmware.
+    Card &setId(const char *id) { _id = id; return *this; }
+    const char *id() const { return _id ? _id : ""; }
+    bool hasId() const { return _id && *_id; }
+
+    // What a tap does (2.10d, TapAction). The scene for Load scene is named
+    // by its source's id ("scene.office_relax"), which outlives a session.
+    Card &setTapAction(TapAction t) { _tap = t; return *this; }
+    TapAction tapAction() const { return _tap; }
+    Card &setTapScene(const char *ref);
+    const char *tapScene() const { return _tapScene; }
+    // Does this card's own tap toggle (switch, light, button)? Decides what
+    // TAP_DEFAULT means and whether "Toggle" is offered.
+    virtual bool tapToggles() const { return false; }
+    // The tap, as the card's setting says. From the card's event handler.
+    void tap();
+    // The scenes this card's window would offer, in its order: the card's one
+    // light, filtered by its Scenes setting. Fills `out`, returns the count.
+    uint8_t offeredScenes(const Entity **out, uint8_t cap) const;
 
     // Which scenes the card's window offers (2.10c). See SceneShow.
     Card &setSceneShow(SceneShow v) { _sceneShow = v; return *this; }
@@ -179,6 +204,22 @@ public:
     // accent". Independent of setShowArea(): the owner wants colour coding
     // available whether or not the area's NAME is displayed.
     Card &setAreaColor(uint32_t hex) { _areaColor = hex; return *this; }
+    const char *area() const { return _area; }
+
+    // THE CARD LABEL (2.10d, K44, K46; "area" in the code's older words) shows
+    // the card's group (CardGroups.h). The dashboard's area for this card - its
+    // group when the owner chose none - is kept so the group can be worked
+    // out again: HA's areas arrive after the page is built (onSnapshot()). A
+    // card label with its own empty words shows anyway, in the group's colour.
+    Card &setSheetArea(const char *a);
+    const char *sheetArea() const { return _sheetArea; }
+    Card &setLabelAlways(bool on) { _labelAlways = on; return *this; }
+    // Its primary entity's HA area ("" until learnt, or when HA has none).
+    const char *haArea() const;
+    // The page's "colour the card label" setting, as it was applied, so the
+    // window can re-apply a choice the same way.
+    Card &setPageAreaColor(bool on) { _pageAreaColor = on; return *this; }
+    bool pageAreaColor() const { return _pageAreaColor; }
 
     // The page-wide default, so a build sheet can set this once rather than on
     // every card. Same pattern as StateCard::setFill().
@@ -201,6 +242,10 @@ public:
 
     // Re-read every token and repaint. Registered scheme-change hook.
     void restyle();
+
+    // Work out its group's words and colour again and repaint the card label
+    // (CardBinder: HA's areas changed, so every group's colour may have).
+    void reapplyGroup();
 
     lv_obj_t *root() const { return _root; }
     const CardPlacement &placement() const { return _place; }
@@ -527,8 +572,15 @@ private:
     bool            _dimmed      = false;   // paused, mixed not opa'd
 
     char _label[ENTITY_NAME_MAX] = {0};
+    const char *_id = nullptr;   // CardSpec::id, when usable
+    TapAction   _tap = TapAction::TAP_DEFAULT;
+    char        _tapScene[ENTITY_TOPIC_MAX] = {0};   // as EntityDescriptor::externalRef
     char _area[ENTITY_SHORT_MAX] = {0};
     uint32_t _areaColor = 0;   // 0 = use the accent
+    char _sheetArea[ENTITY_SHORT_MAX] = {0};   // the dashboard's (CardSpec::area)
+    char _seenAreaId[ENTITY_NAME_MAX] = {0};   // its primary's HA area id when its group was last worked out
+    bool _labelAlways  = false;
+    bool _pageAreaColor = true;
 
     // Refusal detection lives on the ENTITY now, not here - see
     // Entity::cmdFailed and deriveState(). A card asks the entities it is

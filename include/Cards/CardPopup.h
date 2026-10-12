@@ -56,15 +56,32 @@ public:
     // catcher, which lives for the life of the device.
     static void begin();
 
+    // Where the History view asks HA for an entity's past (2.10e): SystemCore's
+    // HaHistory, handed down by GUIManager - UI asks a lower layer, never the
+    // reverse. Without it, History says it has nothing to show.
+    static void setHistory(class HaHistory *history);
+
     // Open the window for this card. Ignored while one is already open, and
     // when the finger has moved since it went down.
     static void open(Card &card);
+
+    // Open it from a TAP (2.10d, Tap action): on its controls, its History or
+    // its Members (Members only where the card has some; else the controls).
+    // The finger is already up, so the touch is not held as open() holds it.
+    static constexpr uint8_t OPEN_CONTROLS = 0, OPEN_HISTORY = 1, OPEN_MEMBERS = 2;
+    static void openOn(Card &card, uint8_t view);
 
     // Close it, by whichever of the four routes. Safe to call from an event
     // callback of an object inside the window: the work is deferred to
     // lv_async_call, because deleting the object whose event is running is
     // the one thing an event callback must not do.
     static void close();
+
+    // The Selector look for the scheme showing (K31; moved to the system
+    // panel, K45): the next one - the scheme's own, then the four looks - kept
+    // in the settings file at once; and a short name for a button.
+    static void cycleSelectorLook();
+    static const char *selectorLookShort();
 
     // True from the long press until the window has gone. GUIManager asks
     // this before acting on a gesture: the popup is modal.
@@ -80,12 +97,22 @@ public:
     //   /popup?scene=N      as a tap on scene N; lists the light's scenes (2.10c)
     //   /popup?set=V        as a tap on that control's slider at V (%, K, hue)
     //   /popup?view=N       as the corner icons: 0 the controls (a member's, inside
-    //                       one), 1 history, 2 members, 4 scenes; 3 only lists. Each
+    //                       one), 1 history, 2 members, 4 scenes, 5 properties; 3 only lists. Each
     //                       lists the entities' levels (and an HA group's members)
     //   /popup?power=1      as a tap on Power
     //   /popup?pause=1|0    pause / resume what the window shows
     //   /popup?member=N     as a tap on row N of Members
     //   /popup?close=1      close it; replies with the pool afterwards
+    //   /popup?rows=N       N greyed test rows in SETTINGS from the next window
+    //                       (to try dragging a tall panel); rows=0 undoes it
+    //   /popup?span=N       History: the chart's span (0 24 h, 1 12 h, 2 6 h,
+    //                       3 1 h) or activity's period (0 24 h, 1 7 days)
+    //   /popup?more=1       History: as a tap on "Show more"
+    //   /popup?hist=1       History: what HaHistory has (state, points, events, size)
+    //   /popup?row=N        History: as a tap on activity row N from the top (details)
+    //   /popup?x=N          History: as a finger on the chart, N px from its left
+    //   /popup?extra=0|1    History: activity's Details, Basic or Extra (not kept)
+    //   /popup?chips=0|1    History: the span buttons off or on (not kept)
     // The handler hands the work to the LVGL thread and waits for it, as
     // /screenshot does - it never touches LVGL itself.
     static void beginDebug(class HttpServer &http);

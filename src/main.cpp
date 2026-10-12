@@ -8,6 +8,7 @@
 #include "TimeService.h"
 #include "LVGL_Startup.h"
 #include "GUIManager.h"
+#include "HangWatch.h"
 
 // --= FORCE DEPENDENCIES =--
 // PlatformIO's LDF only builds libraries something #includes. These are here to
@@ -162,6 +163,9 @@ void loop() {
     core.loop();           // connectivity, MQTT, providers, registry staleness
 
     bootReport();
+#ifdef DEBUG_HANG
+    HangWatch::beat();
+#endif
 
     delay(2);
 }

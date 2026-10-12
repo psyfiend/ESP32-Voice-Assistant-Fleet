@@ -69,6 +69,12 @@ private:
     lv_timer_t     *_timer = nullptr;
     Card           *_cards[CARD_BINDER_MAX] = {nullptr};
     uint8_t         _n = 0;
+
+    // HA's areas as last applied to the cards' groups (2.10d), and when they
+    // last changed: re-applied once they have been still a moment.
+    uint32_t        _areaEpoch = 0;
+    uint32_t        _areaMs = 0;
+    bool            _areaPending = false;
 };
 
 #endif // CARD_BINDER_H

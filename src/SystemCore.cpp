@@ -8,6 +8,8 @@
 #include "TimeService.h"
 #include "bsp_loader.h"
 #include "PanelDebug.h"
+#include "HangWatch.h"
+#include "Settings.h"
 
 // Normally injected by scripts/fw_version.py via extra_scripts (derived from
 // `git describe`). Defined defensively here so a build still succeeds if that
@@ -70,6 +72,75 @@ void SystemCore::heapMark(const char *stage) {
     last = now;
 }
 
+// The registry's pause list, kept in the settings file (2.10d, K38). The
+// registry speaks a comma-delimited list of entity ids (EntityRegistry::
+// PauseStore); the file holds entities.<id>.paused = true, an entity that is
+// not paused having no entry.
+namespace {
+bool listContains(const char *list, const char *id) {
+    const size_t n = strlen(id);
+    for (const char *p = list; *p; ) {
+        const char *e = strchr(p, ',');
+        const size_t len = e ? (size_t)(e - p) : strlen(p);
+        if (len == n && strncmp(p, id, n) == 0) return true;
+        if (!e) break;
+        p = e + 1;
+    }
+    return false;
+}
+
+struct ListOut { char *out; size_t cap, used; };
+
+bool pauseStoreLoad(char *out, size_t cap, void *) {
+    if (!cap) return false;
+    out[0] = '\0';
+    ListOut a{ out, cap, 0 };
+    Settings::forEachEntityFlag("paused", [](const char *id, void *ctx) {
+        ListOut &a = *(ListOut *)ctx;
+        const size_t n = strlen(id);
+        if (a.used + n + 2 > a.cap) return;
+        if (a.used) a.out[a.used++] = ',';
+        memcpy(a.out + a.used, id, n + 1);
+        a.used += n;
+    }, &a);
+    return true;
+}
+
+// Called by setPaused() with the whole list. Written by the settings task a
+// second later; the card window's close asks too, so a pause made there is
+// one write with the rest of the window's changes.
+bool pauseStoreSave(const char *list, void *) {
+    char cur[512];
+    pauseStoreLoad(cur, sizeof(cur), nullptr);
+    for (const char *p = cur; *p; ) {           // no longer paused
+        const char *e = strchr(p, ',');
+        const size_t len = e ? (size_t)(e - p) : strlen(p);
+        char id[64];
+        if (len && len < sizeof(id)) {
+            memcpy(id, p, len);
+            id[len] = '\0';
+            if (!listContains(list, id)) Settings::setEntityFlag(id, "paused", false, false);
+        }
+        if (!e) break;
+        p = e + 1;
+    }
+    for (const char *p = list; *p; ) {          // paused
+        const char *e = strchr(p, ',');
+        const size_t len = e ? (size_t)(e - p) : strlen(p);
+        char id[64];
+        if (len && len < sizeof(id)) {
+            memcpy(id, p, len);
+            id[len] = '\0';
+            Settings::setEntityFlag(id, "paused", true, false);
+        }
+        if (!e) break;
+        p = e + 1;
+    }
+    Settings::save(1000);
+    return Settings::persistent();
+}
+}  // namespace
+
 bool SystemCore::begin() {
     // --= 0. Identity =--
     printIdentity();
@@ -96,6 +167,9 @@ bool SystemCore::begin() {
     // GET /panel: the panel's own status, and its init sequence again
     // (PanelDebug.h - the 4B's washed-out picture).
     PanelDebug::begin(_http, _display);
+#endif
+#ifdef DEBUG_HANG
+    HangWatch::begin(_http);   // GET /hang: where loop() stopped (HangWatch.h)
 #endif
 
     // --= 3. Touch =--
@@ -134,6 +208,12 @@ bool SystemCore::begin() {
     // Must precede every provider.
     beginEntityStorage();
     heapMark("after registry");
+
+    // --= 7a. The owner's saved settings (2.10d, Settings.h) =--
+    // Before anything reads a setting: the pause restore below, and every page
+    // GUIManager builds.
+    Settings::begin(_http);
+    heapMark("after settings");
 
     // --= 8. Providers =--
     // All three need the registry; two of them also need the broker.
@@ -208,6 +288,9 @@ bool SystemCore::begin() {
     // HA's replies to those calls reach the router through the provider, which
     // receives every message (2.10c): a refused call fails at once.
     _haProv.setResultHook(&CommandRouter::onHaResult, &_cmdRouter);
+    // History's answers are its own, and it sees every message first (2.10e).
+    _haHist.begin(&_ha);
+    _haProv.setRawHook(&HaHistory::onRaw, &_haHist);
 
     // --= 13. Restore the user's pauses =--
     //
@@ -218,6 +301,21 @@ bool SystemCore::begin() {
     // Issue #60 - "if I want a card paused I do not want a reboot to unpause
     // it." A pause that survived the user but not the power cut would be worse
     // than no pause at all.
+    //
+    // SINCE 2.10d THE PAUSES LIVE IN THE SETTINGS FILE (K38): entities.<id>.
+    // paused, alongside every other saved choice, so one export carries them.
+    // #60's NVS list is imported once and left where it is (older firmware
+    // still finds it).
+    if (!Settings::imported("nvs_paused")) {
+        char old[512];
+        if (EntityRegistry::readNvsPauseList(old, sizeof(old)) && old[0]) {
+            pauseStoreSave(old, nullptr);
+            Serial.printf("[Settings] imported the paused list from NVS: %s\n", old);
+        }
+        Settings::markImported("nvs_paused");
+        Settings::save();
+    }
+    _entities.setPauseStore({ pauseStoreLoad, pauseStoreSave, nullptr });
     _entities.restorePaused();
 
     heapMark("core ready");
@@ -290,6 +388,11 @@ void SystemCore::mqttEvidence() {
 }
 
 void SystemCore::loop() {
+#if defined(DISPLAY_ESPLCD) && defined(HAS_MIPI_PANEL)
+    // A register read: records a panel feed underrun (PanelDebug.h).
+    PanelDebug::poll();
+#endif
+
     // Non-blocking: advances connect deadlines, retry escalation, AP fallback,
     // the AP idle timer and async scan collection. Must be called every loop -
     // ConnectivityManager deliberately never spins on WiFi.status() itself.
@@ -332,6 +435,7 @@ void SystemCore::loop() {
     _ha.loop(now);
     _haProv.loop(now);
     _haRest.loop(now);
+    _haHist.loop(now);
 
     // Starts the HTTP server the first time the link is up, if any route was
     // registered; a no-op every call after that.

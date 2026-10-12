@@ -374,6 +374,30 @@ the card library starts adding files. See `docs/design/startup.md` §3.5 — it 
 that break (`WS_S3_TOUCH_LCD_5B`'s `build_src_filter` exclusion, and `include/` subfolders not
 being on the include path automatically).
 
+## Saved settings (`include/Settings.h`, since 2.10d)
+
+The owner's changes live in **one JSON file, `/cfg/settings.json`, on LittleFS** (the 16 MB layout's
+`spiffs` partition), applied over the compiled dashboard: a value comes from the file, else the
+card's spec, else the page's, else the default. It is Q2's runtime layer, so the 3.1 build sheet
+replaces the specs underneath it with nothing to convert. Design: `docs/design/card-sheet.md` §17.
+
+- **Cards are keyed by `CardSpec::id`** (`<area>_<label>_<yymmdd>_<hhmm>`, K33), never by position.
+  A new card in a dashboard file needs one; `checkCardIds()` refuses duplicates at boot.
+- **Choices are saved by name** (`"custom"`, never an enum number), so an enum can be reordered.
+  New settings get a name table beside their enum (`CardTypes.h` has the pattern).
+- **Set in RAM, written once when the card window closes** (`Settings::save(400)` in `closeNow()`),
+  only if something changed. A setting changed outside a window calls `Settings::save()` itself.
+- **Anything that reads or writes flash runs on a task whose stack is in internal RAM** - the
+  settings task, never an HTTP handler (their stacks are in PSRAM) - or the board reboots (LESSONS).
+- **A file that exists but will not read makes the boot read-only**; it is never overwritten.
+- **Groups for card labels** are `CardGroups` (K46): one kind of group, device-wide, HA areas linked
+  in as groups; a card's card label shows its group's name (or its own words) in the group's colour.
+  **Colour is the key to a group and never follows a rename.**
+- **Every change is logged** with its time and task (`loopTask` = the card window, `httpd` = a
+  browser); the last ten are in `/settings?stats=1`.
+- `GET /settings` serves the file; `?stats=1` its counters, files and anything unclaimed. The PC
+  addresses that set things until the web UI exists are listed in `Settings.h` and §17.
+
 ## Design tokens — no colour or size literals in UI code
 
 Since Phase 2.2 (2026-09-10). `include/UITokens.h` is the single source for how anything looks.
