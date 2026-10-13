@@ -151,3 +151,14 @@ How to use it:
 | K70 | **Scenes on a tap, reorganised** (the owner's 2.10d idea, `interview-phase2-3.md` §12, built 2026-10-13): Tap action offers one **"Scenes..."**; SCENES has **Default scene** (the offered scenes) and **Scene action** (Load default / Cycle scenes), which says what "Scenes..." does - kept per card (`scene_action`, `tap_scene`). Entity properties in the owner's order: Source, Name in HA, Entity ID, Area in HA, Card group, Device, Device class, State class, Unit, Card ID. A member's SETTINGS says **"Add card to dashboard"** | 2026-10-13 | owner |
 | K69 | **The icon subset covers every MDI icon the owner's HA serves**, not just the dashboard's declared entities - a card can now be made from an entity nobody declared (Desk's lamps drew plain bulbs). `scan_ha_icons.py` also checks the declared groups' members. A **removal asks in a dialog** over everything (not a button that changes to "Sure?"). **A name never shrinks the hero**: one line's room in the column, a second line only where it fits under the disc, else "..." | 2026-10-12 | owner (K17 run 2) |
 | K58 | **SETTINGS: Units (°C/°F, per card) and Entity properties** - a read-only view reached by a button in SETTINGS, not a corner icon (no room on the 4B). CHART: Legend, Show span buttons; ACTIVITY: Span (renamed), 24 h / 7 d chips, Show span buttons. Min and max are dotted lines in the chart; a finger scrubs a dotted line with the time and value above the plot | 2026-10-11 | owner; `card-sheet.md` §18 |
+
+## Proposed in 2.12 - the owner's to accept
+
+The UI foundation refactor (`docs/design/ui-foundation.md`) makes structural choices the brief left
+open. Each is built and verified (no tree or pixel differences on three boards), and each is a
+**proposal** until the owner accepts it; accepted, it moves to its area with a K or A number.
+
+| # | Proposal | Date | Where |
+|---|---|---|---|
+| U1 | **The card window is one folder, `src/Cards/Popup/`**: a file per concern (18, each under ~850 lines), sharing one internal header `PopupState.h` in `namespace popup`; `CardPopup.cpp` keeps the frame and the public interface, `CardPopup.h` is unchanged | 2026-10-13 | `ui-foundation.md` §6 (P1) |
+| U2 | **Shape tokens in millimetres**: `UIShape` through `UI::shape()` - radii, a ten-step spacing scale, lines, sizes, finger travel - fleet-wide and separate from the per-scheme `UIMetrics` (the brief said `UIMetrics`); no number in the window's code; near-equal values kept apart until the owner merges them | 2026-10-13 | `tokens.md` §7 |

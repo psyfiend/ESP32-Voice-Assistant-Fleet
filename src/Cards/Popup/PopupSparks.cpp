@@ -19,7 +19,8 @@ IntfMode s_intfMode = IntfMode::INTF_NOW_AND_THEN;
 // edge, all at once. The owner: it looked like "small porch timing issues or
 // the wrong pclk frequency" - a real fault - not like electricity, and on a
 // light scheme it could not be seen at all. So now: ONE spark at a time, slow
-// enough to follow (a run is 250-600 ms), in one place (a quarter of a side
+// enough to follow (a run was 250-600 ms; 120-300 ms since round 8, see
+// intfNextRun()), in one place (a quarter of a side
 // or less), in electric colours - whites and pale blues on a dark scheme,
 // deep blues and violet on a light one. Every roll of the dice is new: which
 // edge, where on it, how long the section, the spark's length, its width, its
@@ -39,6 +40,17 @@ constexpr uint32_t INTF_FIRST_MAX_MS = 3500;
 constexpr uint32_t INTF_GAP_MIN_MS   = 5000;
 constexpr uint32_t INTF_GAP_MAX_MS   = 12000;
 constexpr uint32_t INTF_QUIET_MS     = 2000;
+
+// The dice, in millimetres so a spark looks alike on every board. They are the
+// effect's own, not shape tokens (2.12 P2): nothing else draws a spark.
+constexpr float SPARK_LEN_MM        = 1.2f;    // the head's length: this, plus up to
+constexpr float SPARK_LEN_RAND_MM   = 3.3f;    //   this much more
+constexpr float SPARK_THICK_MM      = 0.3f;    // its width: this, plus up to
+constexpr float SPARK_THICK_RAND_MM = 0.55f;   //   this much more
+constexpr float SPARK_SECTION_MM    = 8.0f;    // the section a spark runs along, at least
+constexpr float SPARK_SECTION_MIN_MM = 3.0f;   // no spark where the side leaves less than this
+constexpr float SPARK_JITTER_MM     = 0.3f;    // the head's shake, each way
+constexpr float SPARK_FLECK_MM      = 1.8f;    // how far a fleck is thrown off the line, at most
 
 enum IntfPiece : uint8_t { PIECE_GLOW, PIECE_TAIL1, PIECE_TAIL2, PIECE_CORE, PIECE_FLECK, PIECE_COUNT };
 
@@ -62,9 +74,9 @@ struct Interference {
 };
 Interference g;
 
-// The dice for a spark's size, in millimetres so it looks alike on every board.
-int32_t rollLen()   { return mm(1.2f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(3.3f))); }
-int32_t rollThick() { return LV_MAX(3, mm(0.3f) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(0.55f)))); }
+// The dice for a spark's size.
+int32_t rollLen()   { return mm(SPARK_LEN_MM) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(SPARK_LEN_RAND_MM))); }
+int32_t rollThick() { return LV_MAX(3, mm(SPARK_THICK_MM) + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(SPARK_THICK_RAND_MM)))); }
 
 // A dark window wants light sparks; a light one, deep ones.
 bool lightWindow() {
@@ -127,10 +139,10 @@ void intfStartSpark() {
     const bool horiz = g.edge < 2;
     const int32_t side = horiz ? (W.x2 - W.x1 + 1) : (W.y2 - W.y1 + 1);
     g.limit = side - r;                                  // stay off the rounded corners
-    // The section: an eighth to a quarter of the side, never under 8 mm.
-    g.secLen = LV_MAX(mm(8.0f), side / 8 + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, side / 8)));
+    // The section: an eighth to a quarter of the side, never under SPARK_SECTION_MM.
+    g.secLen = LV_MAX(mm(SPARK_SECTION_MM), side / 8 + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, side / 8)));
     if (g.secLen > g.limit - r) g.secLen = g.limit - r;
-    if (g.secLen < mm(3.0f)) return;
+    if (g.secLen < mm(SPARK_SECTION_MIN_MM)) return;
     g.runFrom = r + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, g.limit - r - g.secLen));
     g.runTo   = g.runFrom + g.secLen;
     g.runsLeft = (uint8_t)lv_rand(2, 5);
@@ -191,7 +203,7 @@ void intfTick(lv_timer_t *t) {
     const int32_t ease = q < 512 ? 2 * q * q / 1024 : 1024 - 2 * (1024 - q) * (1024 - q) / 1024;
     const int32_t travel = (g.runTo - g.runFrom - g.len) * ease / 1024;
     int32_t head = g.reverse ? g.runTo - g.len - travel : g.runFrom + travel;
-    const int32_t jit = LV_MAX(1, mm(0.3f));
+    const int32_t jit = LV_MAX(1, mm(SPARK_JITTER_MM));
     head += (int32_t)lv_rand(0, (uint32_t)(2 * jit)) - jit;
 
     // Crackle: the odd frame the core drops out, the glow flares or the
@@ -208,7 +220,7 @@ void intfTick(lv_timer_t *t) {
     intfPut(PIECE_CORE,  head + g.len / 6, coreOn ? g.len * 2 / 3 : 0, LV_MAX(1, g.thick / 3), g.core);
     if (lv_rand(0, 99) < 12) {
         const int32_t sz = LV_MAX(2, g.thick / 2);
-        const int32_t off = (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(1.8f)));
+        const int32_t off = (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, mm(SPARK_FLECK_MM)));
         const int32_t sign = (g.edge == 0 || g.edge == 2) ? -1 : 1;
         // Thrown off the line: the same edge, shifted outward by `off`.
         intfPut(PIECE_FLECK, head + g.len / 2, sz, sz, g.core);

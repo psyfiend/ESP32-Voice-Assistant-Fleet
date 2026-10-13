@@ -199,9 +199,9 @@ void renderLight() {
         if (s.grip) {
             const int32_t gw = s.heroW * 34 / 100;
             lv_obj_set_style_bg_color(s.grip, UI::c(UI::contrastOf(fillHex, p.GROUND, p.TEXT)), 0);
-            lv_obj_set_pos  (s.grip, (s.heroW - gw) / 2, s.heroH - fh + pm(1.4f));
+            lv_obj_set_pos  (s.grip, (s.heroW - gw) / 2, s.heroH - fh + pm(UI::shape().P_GRIP_INSET));
             lv_obj_set_width(s.grip, gw);
-            if (fh >= pm(5)) lv_obj_clear_flag(s.grip, LV_OBJ_FLAG_HIDDEN);
+            if (fh >= pm(UI::shape().P_GRIP_MIN)) lv_obj_clear_flag(s.grip, LV_OBJ_FLAG_HIDDEN);
             else             lv_obj_add_flag  (s.grip, LV_OBJ_FLAG_HIDDEN);
         }
     } else if (s.mark) {
@@ -232,7 +232,7 @@ void renderLight() {
         if (dh > 180) dh = 360 - dh;
         const bool here = on && L.mode == LightMode::LMODE_COLOUR && L.hue >= 0 && dh <= 3 &&
                           LV_ABS((int32_t)SWATCHES[i].sat - L.sat) <= 3;
-        lv_obj_set_style_outline_width(s.swatch[i], here ? LV_MAX(2, mm(0.4f)) : 0, 0);
+        lv_obj_set_style_outline_width(s.swatch[i], here ? LV_MAX(2, mm(UI::shape().RING_W)) : 0, 0);
         lv_obj_set_style_outline_color(s.swatch[i], UI::c(p.TEXT), 0);
     }
 
@@ -241,7 +241,7 @@ void renderLight() {
     // have been changed since (K15).
     for (uint8_t i = 0; i < ENTITY_SCENES_MAX; i++) {
         if (!s.sceneBtn[i]) continue;
-        lv_obj_set_style_outline_width(s.sceneBtn[i], (i == s.lastScene) ? LV_MAX(2, mm(0.4f)) : 0, 0);
+        lv_obj_set_style_outline_width(s.sceneBtn[i], (i == s.lastScene) ? LV_MAX(2, mm(UI::shape().RING_W)) : 0, 0);
         lv_obj_set_style_outline_color(s.sceneBtn[i], UI::c(p.ACCENT), 0);
     }
 }
@@ -351,7 +351,7 @@ void buildLightHero(lv_obj_t *row) {
         lv_obj_set_style_radius(s.fill, r, 0);
         lv_obj_set_style_bg_opa(s.fill, LV_OPA_COVER, 0);
         s.grip = plain(s.hero);
-        lv_obj_set_size(s.grip, s.heroW * 34 / 100, LV_MAX(3, pm(0.5f)));
+        lv_obj_set_size(s.grip, s.heroW * 34 / 100, LV_MAX(3, pm(UI::shape().P_GRIP_H)));
         lv_obj_add_flag(s.grip, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_radius(s.grip, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_opa(s.grip, LV_OPA_COVER, 0);
@@ -369,12 +369,12 @@ void buildLightHero(lv_obj_t *row) {
     }
     // The marker: a white ring with a dark edge, which reads on every colour.
     s.mark = plain(s.hero);
-    lv_obj_set_size(s.mark, s.heroW * 80 / 100, LV_MAX(8, pm(2.6f)));
+    lv_obj_set_size(s.mark, s.heroW * 80 / 100, LV_MAX(8, pm(UI::shape().P_MARK_H)));
     lv_obj_add_flag(s.mark, LV_OBJ_FLAG_HIDDEN);   // until renderLight() places it
     lv_obj_set_style_radius      (s.mark, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_border_width(s.mark, LV_MAX(2, pm(0.35f)), 0);
+    lv_obj_set_style_border_width(s.mark, LV_MAX(2, pm(UI::shape().P_MARK_LINE)), 0);
     lv_obj_set_style_border_color(s.mark, UI::c(quiet(0xFFFFFF)), 0);
-    lv_obj_set_style_outline_width(s.mark, 1, 0);
+    lv_obj_set_style_outline_width(s.mark, 1, 0);   // one pixel on every board: an edge, not a line
     lv_obj_set_style_outline_color(s.mark, UI::c(0x000000), 0);
     lv_obj_set_style_outline_opa (s.mark, LV_OPA_50, 0);
 }
@@ -399,11 +399,12 @@ void buildLightColumn(lv_obj_t *col, lv_obj_t *deckParent) {
     } else {
         // 6.5 mm: with the label and the selector they fill the P4_5's 30 mm
         // column exactly, so the selector stays where it is in every control.
-        const int32_t sz = mm(6.5f), gap = mm(1.6f);
+        const UIShape &k = UI::shape();
+        const int32_t sz = mm(k.SWATCH), gap = mm(k.S5);
         lv_obj_t *grid = plain(col);
-        lv_obj_set_size     (grid, 4 * sz + 3 * gap + 2 * mm(0.6f), LV_SIZE_CONTENT);
+        lv_obj_set_size     (grid, 4 * sz + 3 * gap + 2 * mm(k.S1), LV_SIZE_CONTENT);
         lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
-        lv_obj_set_style_pad_all   (grid, mm(0.6f), 0);   // room for the ring
+        lv_obj_set_style_pad_all   (grid, mm(k.S1), 0);   // room for the ring
         lv_obj_set_style_pad_column(grid, gap, 0);
         lv_obj_set_style_pad_row   (grid, gap, 0);
         for (uint8_t i = 0; i < 8; i++) {
@@ -412,9 +413,9 @@ void buildLightColumn(lv_obj_t *col, lv_obj_t *deckParent) {
             lv_obj_set_style_radius      (w, LV_RADIUS_CIRCLE, 0);
             lv_obj_set_style_bg_opa      (w, LV_OPA_COVER, 0);
             lv_obj_set_style_bg_color    (w, UI::c(quiet(lightHsToRgb(SWATCHES[i].hue, SWATCHES[i].sat))), 0);
-            lv_obj_set_style_border_width(w, LV_MAX(1, mm(0.2f)), 0);
+            lv_obj_set_style_border_width(w, LV_MAX(1, mm(k.LINE_HAIR)), 0);
             lv_obj_set_style_border_color(w, UI::border(), 0);
-            lv_obj_set_style_outline_pad (w, LV_MAX(2, mm(0.3f)), 0);
+            lv_obj_set_style_outline_pad (w, LV_MAX(2, mm(k.RING_PAD)), 0);
             lv_obj_add_flag(w, LV_OBJ_FLAG_CLICKABLE);
             lv_obj_add_event_cb(w, swatchCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
             s.swatch[i] = w;

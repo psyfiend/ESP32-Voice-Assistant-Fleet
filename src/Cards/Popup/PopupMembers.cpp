@@ -25,7 +25,7 @@ void buildMembers() {
     lv_obj_add_flag     (list, LV_OBJ_FLAG_SCROLLABLE);
     UI::tameScroll(list);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(list, mm(1.4f), 0);
+    lv_obj_set_style_pad_row(list, mm(UI::shape().S_MEMBERS), 0);
     for (uint8_t i = 0; i < memberCount(); i++) {
         const Entity *e = memberAt(i);
         if (!e) continue;
@@ -33,7 +33,7 @@ void buildMembers() {
         lv_obj_set_size     (r, lv_pct(100), LV_SIZE_CONTENT);
         lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_all(r, mm(1.4f), 0);
+        lv_obj_set_style_pad_all(r, mm(UI::shape().S_MEMBERS), 0);
         lv_obj_set_style_radius (r, UI::sc(UI::met().RADIUS), 0);
         lv_obj_set_style_bg_color(r, UI::c(p.SURFACE), 0);
         lv_obj_set_style_bg_opa (r, LV_OPA_COVER, 0);

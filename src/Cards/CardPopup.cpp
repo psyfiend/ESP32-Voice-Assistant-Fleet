@@ -149,7 +149,7 @@ void showView(PopupView v) {
     forgetMainWidgets();
     lv_obj_clean(s.stage);
     // HISTORY REACHES UP INTO THE HEADER ROW (owner, round 6): see histTopRow().
-    lv_obj_set_style_pad_row(s.win, v == PopupView::VIEW_HISTORY ? -histLift() : mm(1.6f), 0);
+    lv_obj_set_style_pad_row(s.win, v == PopupView::VIEW_HISTORY ? -histLift() : mm(UI::shape().S5), 0);
 
     // SCENES SHOWS THE BRIGHTNESS SLIDER (owner): whatever the slider showed
     // before comes back with the controls.
@@ -271,12 +271,13 @@ void intfCycleCb(lv_event_t *ev) {
 void buildContents() {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
+    const UIShape   &k = UI::shape();
     const int32_t btn  = UI::minTouch();
-    const int32_t gap  = mm(1.5f);
+    const int32_t gap  = mm(k.S_GUTTER);
 
     lv_obj_set_flex_flow(s.win, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_all(s.win, s.pad, 0);
-    lv_obj_set_style_pad_row(s.win, mm(1.6f), 0);
+    lv_obj_set_style_pad_row(s.win, mm(k.S5), 0);
 
     // --- Header row --------------------------------------------------------
     lv_obj_t *hdr = plain(s.win);
@@ -365,13 +366,13 @@ void buildContents() {
     // the icon faces (HA's own scene icon, the palette, is Colour's here).
     s.btnScenes = iconButton(s.win, MDI_MOVIE_OPEN, t.ICON_MD, scenesCb);
     lv_obj_add_flag(s.btnScenes, LV_OBJ_FLAG_FLOATING);
-    lv_obj_align(s.btnScenes, LV_ALIGN_TOP_RIGHT, 0, btn + mm(1.6f));
+    lv_obj_align(s.btnScenes, LV_ALIGN_TOP_RIGHT, 0, btn + mm(k.S5));
     lv_obj_add_flag(s.btnScenes, LV_OBJ_FLAG_HIDDEN);
 
     // --- The auto-close bar: how long until the window gives up -------------
     s.autoBar = plain(s.win);
     lv_obj_add_flag(s.autoBar, LV_OBJ_FLAG_FLOATING);
-    lv_obj_set_size(s.autoBar, lv_area_get_width(&s.winRect) - 2 * s.pad, mm(0.5f) < 3 ? 3 : mm(0.5f));
+    lv_obj_set_size(s.autoBar, lv_area_get_width(&s.winRect) - 2 * s.pad, mm(k.H_BAR) < 3 ? 3 : mm(k.H_BAR));
     lv_obj_set_style_radius(s.autoBar, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(s.autoBar, UI::c(p.ACCENT), 0);
     lv_obj_set_style_bg_opa  (s.autoBar, LV_OPA_COVER, 0);
@@ -656,15 +657,16 @@ void CardPopup::open(Card &card) {
     // but never wider. The hero stays tied to the height (propH, below).
     lv_obj_t *scr = lv_screen_active();
     const int32_t sw = lv_obj_get_width(scr), sh = lv_obj_get_height(scr);
-    const int32_t top    = UIToolkit::systemHeaderPx() + mm(2);
-    const int32_t bottom = sh - mm(6) - mm(2);   // mm(6): the deck's tab
-    const int32_t refH   = bottom - (UIToolkit::systemHeaderFullPx() + mm(2));
+    const UIShape &k = UI::shape();
+    const int32_t top    = UIToolkit::systemHeaderPx() + mm(k.S6);
+    const int32_t bottom = sh - mm(k.H_TABS) - mm(k.S6);
+    const int32_t refH   = bottom - (UIToolkit::systemHeaderFullPx() + mm(k.S6));
     // AND NEVER WIDER THAN 100 mm (owner, round 5): on a 7" panel the 2:1
     // window was ~129 mm, and every reach to the X or across the window got
     // longer while the space to tap outside it shrank. 100 mm is the P4_5's
     // window and a little - a hand's span.
-    const int32_t side   = LV_MAX(mm(6), sw * 8 / 100);
-    int32_t w = LV_MIN(2 * refH, mm(POPUP_MAX_W_MM));
+    const int32_t side   = LV_MAX(mm(k.W_SIDE_MIN), sw * 8 / 100);
+    int32_t w = LV_MIN(2 * refH, mm(k.W_WINDOW_MAX));
     if (w > sw - 2 * side) w = sw - 2 * side;
     s.winRect.x1 = (sw - w) / 2;
     s.winRect.x2 = s.winRect.x1 + w - 1;
@@ -676,10 +678,10 @@ void CardPopup::open(Card &card) {
     // is capped, less than its height. So the hero is the same share of the
     // window everywhere (owner), and the 4B's shrinks.
     s.propH = LV_MIN(refH, (int32_t)lroundf((float)w / POPUP_ASPECT));
-    s.winRadius  = mm(2.4f);
+    s.winRadius  = mm(k.R_WINDOW);
     // 1.2 mm, down from the mock's 2.2: the owner wanted the X "closer to the
     // corner" (H1). Still clear of the 2.4 mm corner radius.
-    s.pad        = mm(1.2f);
+    s.pad        = mm(k.S4);
 
     s.view        = PopupView::VIEW_MAIN;
     s.closeQueued = false;

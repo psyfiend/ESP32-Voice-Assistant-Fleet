@@ -89,7 +89,7 @@ DeckColours deckColours() {
 }
 
 // Rounded squares or round, for the deck and its selector.
-int32_t deckRadius() { return (deckLook() & 1) ? LV_RADIUS_CIRCLE : mm(1.6f); }
+int32_t deckRadius() { return (deckLook() & 1) ? LV_RADIUS_CIRCLE : mm(UI::shape().R_BUTTON); }
 
 // ---------------------------------------------------------------------------
 // FACES DRAWN BY HAND (owner, round 6): the selector's metal, and the chips'.
@@ -364,7 +364,7 @@ void deckDragCb(lv_event_t *ev) {
         d.dragging = false;
     } else if (code == LV_EVENT_PRESSING) {
         const int32_t dx = pt.x - d.pressX;
-        if (!d.dragging && LV_ABS(dx) < mm(1.0f)) return;
+        if (!d.dragging && LV_ABS(dx) < mm(UI::shape().SLOP_SELECTOR)) return;
         if (!d.dragging && pausedBlocks()) { if (in) lv_indev_wait_release(in); return; }
         d.dragging = true;
         deckPlace(LV_CLAMP(deckSelX(0), d.selX0 + dx, deckSelX(d.n - 1)));
@@ -384,7 +384,7 @@ void deckPowerCb(lv_event_t *ev) {
 void buildControlDeck(lv_obj_t *parent, uint8_t caps) {
     const UIType &t = UI::type();
     const DeckColours col = deckColours();
-    const int32_t slot = UI::minTouch(), g = mm(0.6f);
+    const int32_t slot = UI::minTouch(), g = mm(UI::shape().S1);
     const int32_t H = controlDeckH();
 
     forgetDeck();
@@ -444,7 +444,7 @@ void buildControlDeck(lv_obj_t *parent, uint8_t caps) {
     lv_obj_set_style_radius(d.sel, deckRadius(), 0);
     // Its face is metal, curved and brushed (faces, above). Greyed when the
     // window is paused, as everything else is.
-    const int32_t selR = (deckLook() & 1) ? LV_MIN(d.selW, H) / 2 : mm(1.6f);
+    const int32_t selR = (deckLook() & 1) ? LV_MIN(d.selW, H) / 2 : mm(UI::shape().R_BUTTON);
     if (lv_obj_t *img = setFace(d.sel, d.selW, H, selR, metalKind(), quiet(UI::pal().GROUND))) {
         if (s.builtPaused) {
             lv_obj_set_style_image_recolor    (img, UI::c(UI::pal().SURFACE_ALT), 0);

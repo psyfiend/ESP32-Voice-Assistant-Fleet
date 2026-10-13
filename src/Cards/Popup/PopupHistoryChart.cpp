@@ -59,11 +59,11 @@ void histDrawChart(lv_obj_t *body) {
         lv_obj_t *nums = makeLabel(top, t.TAG, p.TEXT);
         lv_label_set_text(nums, buf);
         lv_obj_set_style_text_align(nums, LV_TEXT_ALIGN_RIGHT, 0);
-        lv_obj_align_to(nums, words, LV_ALIGN_OUT_RIGHT_MID, mm(1.0f), 0);
+        lv_obj_align_to(nums, words, LV_ALIGN_OUT_RIGHT_MID, mm(UI::shape().S3), 0);
         lv_obj_update_layout(top);
-        leftEnd = lv_obj_get_width(words) + mm(1.0f) + lv_obj_get_width(nums);
+        leftEnd = lv_obj_get_width(words) + mm(UI::shape().S3) + lv_obj_get_width(nums);
     }
-    const int32_t half = LV_MIN(topW / 2 - leftEnd, topW / 2 - lv_obj_get_width(read)) - mm(1.5f);
+    const int32_t half = LV_MIN(topW / 2 - leftEnd, topW / 2 - lv_obj_get_width(read)) - mm(UI::shape().S_GUTTER);
     histTopMiddle(top, 2 * LV_MAX(half, 1));
 
     if (lo > hi) { histNote(body, "Nothing recorded in this span"); return; }
@@ -87,8 +87,8 @@ void histDrawChart(lv_obj_t *body) {
     const int32_t lh   = lv_font_get_line_height(t.TAG);
     const bool    xLeg = s_hv.legend == LEGEND_X || s_hv.legend == LEGEND_BOTH;
     const bool    yLeg = s_hv.legend == LEGEND_Y || s_hv.legend == LEGEND_BOTH;
-    const int32_t topH = lh + mm(0.6f);
-    const int32_t botH = xLeg ? lh + mm(0.6f) : mm(0.8f);
+    const int32_t topH = lh + mm(UI::shape().S1);
+    const int32_t botH = xLeg ? lh + mm(UI::shape().S1) : mm(UI::shape().S2);
     const int32_t plotH = LV_MAX(10, ah - topH - botH);
 
     // THE VALUE SCALE, IN ROUND STEPS (owner, round 3): as many lines as the
@@ -111,7 +111,7 @@ void histDrawChart(lv_obj_t *body) {
             snprintf(buf, sizeof(buf), "%.*f%s", dec, (double)v, v + step > ymax + step * 0.01f ? unit : "");
             gutter = LV_MAX(gutter, textW(buf, t.TAG));
         }
-        gutter += mm(1.5f);
+        gutter += mm(UI::shape().S_GUTTER);
     }
     const int32_t plotW = LV_MAX(10, w - gutter);
     s_hv.plotL = gutter; s_hv.plotW = plotW;
@@ -137,7 +137,7 @@ void histDrawChart(lv_obj_t *body) {
         if (ly < lastLblY + lh) continue;   // never two on top of each other
         lv_obj_t *yl = makeLabel(area, t.TAG, p.TEXT_DIM);
         lv_label_set_text(yl, buf);
-        lv_obj_set_pos(yl, gutter - mm(1.5f) - textW(buf, t.TAG), ly);
+        lv_obj_set_pos(yl, gutter - mm(UI::shape().S_GUTTER) - textW(buf, t.TAG), ly);
         lastLblY = ly;
     }
 
@@ -146,7 +146,7 @@ void histDrawChart(lv_obj_t *body) {
     // or 3 hours on a day, 10 or 15 minutes on an hour. A faint line at each.
     {
         static const uint32_t IV[] = { 300, 600, 900, 1800, 3600, 7200, 10800, 14400, 21600, 43200, 86400 };
-        const int32_t lblW = textW("12 PM", t.TAG) + mm(3.0f);
+        const int32_t lblW = textW("12 PM", t.TAG) + mm(UI::shape().S8);
         const uint32_t fit = (uint32_t)LV_MAX(2, plotW / lblW);
         uint32_t iv = IV[sizeof(IV) / sizeof(IV[0]) - 1];
         for (uint32_t c : IV) if (span / c <= fit) { iv = c; break; }
@@ -173,10 +173,10 @@ void histDrawChart(lv_obj_t *body) {
             else            snprintf(buf, sizeof(buf), "%d:%02d", hr, a.tm_min);
             const int32_t bw = textW(buf, t.TAG);
             const int32_t bx = LV_CLAMP(0, x - bw / 2, w - bw);
-            if (bx < lastRight + mm(1.5f)) continue;
+            if (bx < lastRight + mm(UI::shape().S_GUTTER)) continue;
             lv_obj_t *xl = makeLabel(area, t.TAG, p.TEXT_DIM);
             lv_label_set_text(xl, buf);
-            lv_obj_set_pos(xl, bx, topH + plotH + mm(0.6f));
+            lv_obj_set_pos(xl, bx, topH + plotH + mm(UI::shape().S1));
             lastRight = bx + bw;
         }
     }
@@ -188,7 +188,7 @@ void histDrawChart(lv_obj_t *body) {
     lv_obj_set_style_pad_left(ch, gutter, 0);
     lv_obj_set_style_pad_top(ch, topH, 0);
     lv_obj_set_style_pad_bottom(ch, ah - topH - plotH, 0);
-    lv_obj_set_style_line_width(ch, LV_MAX(2, mm(0.45f)), LV_PART_ITEMS);
+    lv_obj_set_style_line_width(ch, LV_MAX(2, mm(UI::shape().LINE_PLOT)), LV_PART_ITEMS);
     lv_obj_set_style_width (ch, 0, LV_PART_INDICATOR);   // no dots on the points
     lv_obj_set_style_height(ch, 0, LV_PART_INDICATOR);
     lv_obj_clear_flag(ch, LV_OBJ_FLAG_CLICKABLE);
@@ -227,9 +227,9 @@ void histDrawChart(lv_obj_t *body) {
         static lv_point_precise_t ptsLo[2], ptsHi[2];
         const uint32_t faint = UI::mix(p.SURFACE_ALT, p.TEXT, 35);
         const int32_t xLo = histX(tLo), xHi = histX(tHi);
-        histVLine(area, ptsLo, xLo, faint, LV_MAX(1, mm(0.25f)));
-        histVLine(area, ptsHi, xHi, faint, LV_MAX(1, mm(0.25f)));
-        const int32_t pad = mm(0.6f), gap = mm(0.8f);
+        histVLine(area, ptsLo, xLo, faint, LV_MAX(1, mm(UI::shape().LINE_FINE)));
+        histVLine(area, ptsHi, xHi, faint, LV_MAX(1, mm(UI::shape().LINE_FINE)));
+        const int32_t pad = mm(UI::shape().S1), gap = mm(UI::shape().S2);
         // Where the line runs under columns x0..x1: its highest and lowest y.
         auto lineSpan = [&](int32_t x0, int32_t x1, int32_t &yTop, int32_t &yBot) {
             const int32_t pw = LV_MAX(2, plotW);
@@ -356,8 +356,8 @@ lv_obj_t *histVLine(lv_obj_t *parent, lv_point_precise_t *pts, int32_t x, uint32
     lv_obj_set_pos(l, x - width / 2, s_hv.plotTop);
     lv_obj_set_style_line_width     (l, width, 0);
     lv_obj_set_style_line_color     (l, UI::c(col), 0);
-    lv_obj_set_style_line_dash_width(l, LV_MAX(2, mm(0.6f)), 0);
-    lv_obj_set_style_line_dash_gap  (l, LV_MAX(2, mm(0.6f)), 0);
+    lv_obj_set_style_line_dash_width(l, LV_MAX(2, mm(UI::shape().DASH)), 0);
+    lv_obj_set_style_line_dash_gap  (l, LV_MAX(2, mm(UI::shape().DASH)), 0);
     lv_obj_clear_flag(l, LV_OBJ_FLAG_CLICKABLE);
     return l;
 }
@@ -375,12 +375,12 @@ void histScrub(int32_t x) {
 
     static lv_point_precise_t ptsScrub[2];
     if (!s_hv.scrubLine) {
-        s_hv.scrubLine = histVLine(s_hv.area, ptsScrub, xi, UI::mix(p.SURFACE_ALT, p.TEXT, 70), LV_MAX(2, mm(0.3f)));
+        s_hv.scrubLine = histVLine(s_hv.area, ptsScrub, xi, UI::mix(p.SURFACE_ALT, p.TEXT, 70), LV_MAX(2, mm(UI::shape().LINE_MID)));
         s_hv.scrubLbl  = makeLabel(s_hv.area, t.TAG, p.TEXT);
         // Opaque, over the min and max labels it may cover.
         lv_obj_set_style_bg_color(s_hv.scrubLbl, UI::c(p.SURFACE_ALT), 0);
         lv_obj_set_style_bg_opa  (s_hv.scrubLbl, LV_OPA_COVER, 0);
-        lv_obj_set_style_pad_hor (s_hv.scrubLbl, mm(0.8f), 0);
+        lv_obj_set_style_pad_hor (s_hv.scrubLbl, mm(UI::shape().S2), 0);
     } else {
         lv_obj_set_x(s_hv.scrubLine, xi - lv_obj_get_width(s_hv.scrubLine) / 2);
     }
@@ -389,7 +389,7 @@ void histScrub(int32_t x) {
     if (s_hv.ys[i] == LV_CHART_POINT_NONE) snprintf(buf, sizeof(buf), "%s  no value", tm);
     else snprintf(buf, sizeof(buf), "%s  %.1f%s", tm, s_hv.ys[i] / 10.0, cardDisplayUnit(*s_hv.e, s.tempUnit));
     lv_label_set_text(s_hv.scrubLbl, buf);
-    const int32_t lw = textW(buf, t.TAG) + 2 * mm(0.8f) + 2;
+    const int32_t lw = textW(buf, t.TAG) + 2 * mm(UI::shape().S2) + 2;
     lv_obj_set_pos(s_hv.scrubLbl, LV_CLAMP(0, xi - lw / 2, w - lw), 0);
 }
 

@@ -35,7 +35,7 @@ bool movedTooFar() {
     lv_point_t now;
     lv_indev_get_point(s_indev, &now);
     const int32_t dx = now.x - s.pressStart.x, dy = now.y - s.pressStart.y;
-    const int32_t lim = mm(4);
+    const int32_t lim = mm(UI::shape().SLOP_HOLD);
     return dx * dx + dy * dy > lim * lim;
 }
 

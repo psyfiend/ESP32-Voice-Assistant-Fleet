@@ -17,7 +17,7 @@ void propRow(lv_obj_t *list, const char *what, const char *value) {
     lv_obj_set_size(r, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(r, mm(3.0f), 0);
+    lv_obj_set_style_pad_column(r, mm(UI::shape().S8), 0);
     lv_obj_t *a = makeLabel(r, t.TAG, p.TEXT_DIM);
     lv_label_set_text(a, what);
     lv_obj_t *b = makeLabel(r, t.TAG, p.TEXT);
@@ -29,13 +29,14 @@ void propRow(lv_obj_t *list, const char *what, const char *value) {
 
 void buildProps() {
     const Entity *e = inMember() ? s.ent[0] : s.native ? s.native : (s.nEnt == 1 ? s.ent[0] : nullptr);
+    const UIShape &k = UI::shape();
     lv_obj_t *list = plain(s.stage);
     lv_obj_set_size(list, lv_pct(100), lv_pct(100));
-    lv_obj_set_style_pad_hor(list, mm(5.0f), 0);
+    lv_obj_set_style_pad_hor(list, mm(k.S10), 0);
     lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
     UI::tameScroll(list);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(list, mm(1.6f), 0);
+    lv_obj_set_style_pad_row(list, mm(k.S5), 0);
     char buf[96];
     if (!e) {
         // A card standing for several entities made here: each one's id.
@@ -79,7 +80,7 @@ void buildProps() {
         int32_t used = 0;
         for (uint32_t i = 0; i < cnt; i++) used += lv_obj_get_height(lv_obj_get_child(list, (int32_t)i));
         const int32_t fit = (lv_obj_get_content_height(list) - used) / (int32_t)(cnt - 1);
-        if (fit < mm(1.6f)) lv_obj_set_style_pad_row(list, LV_MAX(fit, mm(0.55f)), 0);
+        if (fit < mm(k.S5)) lv_obj_set_style_pad_row(list, LV_MAX(fit, mm(k.S_ROW_MIN)), 0);
     }
 }
 

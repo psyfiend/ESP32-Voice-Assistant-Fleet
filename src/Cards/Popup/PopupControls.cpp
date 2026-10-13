@@ -63,15 +63,15 @@ void makeLabelRow(lv_obj_t *col) {
     lv_obj_set_size     (row, LV_SIZE_CONTENT, lv_font_get_line_height(t.TAG));
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(row, mm(1.6f), 0);
+    lv_obj_set_style_pad_column(row, mm(UI::shape().S5), 0);
     s.lblWhat = makeLabel(row, t.TAG, p.TEXT_DIM);
     s.pill = makeLabel(row, t.TAG, UI::contrastOf(p.ST_IDLE, p.GROUND, p.TEXT));
     lv_label_set_text(s.pill, "PAUSED");
     lv_obj_set_style_bg_color(s.pill, UI::c(p.ST_IDLE), 0);
     lv_obj_set_style_bg_opa  (s.pill, LV_OPA_COVER, 0);
     lv_obj_set_style_radius  (s.pill, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_pad_hor (s.pill, mm(1.2f), 0);
-    lv_obj_set_style_text_letter_space(s.pill, mm(0.2f), 0);
+    lv_obj_set_style_pad_hor (s.pill, mm(UI::shape().S4), 0);
+    lv_obj_set_style_text_letter_space(s.pill, mm(UI::shape().TRACK_PILL), 0);
     if (!s.builtPaused) lv_obj_add_flag(s.pill, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -85,9 +85,9 @@ void makeLabelRow(lv_obj_t *col) {
 // a column sized from its text moved the slider every time the text changed).
 // The control deck's width (buildControlDeck()): Power on a ribbon of its own,
 // a break, then the modes' ribbon.
-int32_t deckBreak() { return mm(2.0f); }
+int32_t deckBreak() { return mm(UI::shape().S6); }
 int32_t selectorW(uint8_t caps) {
-    const int32_t g = mm(0.6f), slot = UI::minTouch();
+    const int32_t g = mm(UI::shape().S1), slot = UI::minTouch();
     uint8_t n = 0;
     if (caps & LIGHT_CAN_DIM)    n++;
     if (caps & LIGHT_CAN_TEMP)   n++;
@@ -100,27 +100,28 @@ int32_t selectorW(uint8_t caps) {
 // the hero (a tall window, below), which leaves the column only its words.
 int32_t colWidth(bool light, uint8_t caps, bool deck = true) {
     const UIType &t = UI::type();
+    const UIShape &k = UI::shape();
     int32_t w = textW(hasMembers() ? "Changed 59m ago, 9 paused" : "Changed 59m ago", t.TAG);
     w = LV_MAX(w, textW("Unavailable", UIToolkit::Font_Hero));
     // The label line with the PAUSED pill beside it (makeLabelRow()).
-    const int32_t pill = textW("PAUSED", t.TAG) + 2 * mm(1.2f) + 6 * mm(0.2f);
-    w = LV_MAX(w, textW("Temperature", t.TAG) + mm(1.6f) + pill);
+    const int32_t pill = textW("PAUSED", t.TAG) + 2 * mm(k.S4) + 6 * mm(k.TRACK_PILL);
+    w = LV_MAX(w, textW("Temperature", t.TAG) + mm(k.S5) + pill);
     if (light && deck) {
         w = LV_MAX(w, selectorW(caps));
-        if (caps & LIGHT_CAN_COLOUR) w = LV_MAX(w, 4 * mm(6.5f) + 3 * mm(1.6f) + 2 * mm(0.6f));
+        if (caps & LIGHT_CAN_COLOUR) w = LV_MAX(w, 4 * mm(k.SWATCH) + 3 * mm(k.S5) + 2 * mm(k.S1));
     }
-    const int32_t room = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4);
+    const int32_t room = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(k.P_GAP);
     return LV_MIN(room, w);
 }
 
 // The stage's height: the window less its padding, the header row and the gap
 // under it (buildContents()). Known before LVGL lays anything out.
 int32_t stageH() {
-    return lv_area_get_height(&s.winRect) - 2 * s.pad - UI::minTouch() - mm(1.6f);
+    return lv_area_get_height(&s.winRect) - 2 * s.pad - UI::minTouch() - mm(UI::shape().S5);
 }
 
 // The control deck's height: its switches and its own padding.
-int32_t controlDeckH() { return UI::minTouch() + 2 * mm(0.6f); }
+int32_t controlDeckH() { return UI::minTouch() + 2 * mm(UI::shape().S1); }
 
 void fixColumn(lv_obj_t *col, int32_t width) {
     lv_obj_set_width     (col, width);
@@ -128,7 +129,7 @@ void fixColumn(lv_obj_t *col, int32_t width) {
     lv_obj_set_style_min_height(col, s.heroH, 0);
     lv_obj_set_flex_flow (col, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_pad_row(col, mm(0.8f), 0);
+    lv_obj_set_style_pad_row(col, mm(UI::shape().S2), 0);
 }
 
 void rebuildMainAsync(void *unused);   // below
@@ -266,7 +267,7 @@ void knobDragCb(lv_event_t *ev) {
         s.swallowClick = false;
     } else if (code == LV_EVENT_PRESSING) {
         const int32_t dy = p.y - s.dragStartY;
-        if (!s.knobDragging && LV_ABS(dy) > mm(1.2f)) s.knobDragging = true;
+        if (!s.knobDragging && LV_ABS(dy) > mm(UI::shape().SLOP_KNOB)) s.knobDragging = true;
         if (!s.knobDragging) return;
         const int32_t y = LV_CLAMP(topY, s.dragKnobY0 + dy, bottomY);
         lv_obj_set_y(s.knob, y);
@@ -299,7 +300,7 @@ void placeWide(lv_obj_t *row, lv_obj_t *col, int32_t colW, int32_t stageW) {
     // and a width a pixel off moved the slider a pixel.
     stageW = lv_area_get_width(&st);
 
-    const int32_t gapH  = pm(4);
+    const int32_t gapH  = pm(UI::shape().P_GAP);
     const int32_t rowW  = s.heroW + gapH + colW;
     const int32_t homeX = (stageW - s.mainRowW) / 2;   // the controls' slider
     int32_t x = homeX;
@@ -317,7 +318,7 @@ void placeWide(lv_obj_t *row, lv_obj_t *col, int32_t colW, int32_t stageW) {
     }
     if (s.btnScenes && !lv_obj_has_flag(s.btnScenes, LV_OBJ_FLAG_HIDDEN) && top <= bot) {
         lv_area_t chip; lv_obj_get_coords(s.btnScenes, &chip);
-        const int32_t m = mm(1.0f);
+        const int32_t m = mm(UI::shape().S3);
         const int32_t right = st.x1 + x + s.heroW + gapH + colW;
         if (right > chip.x1 - m && top < chip.y2 + m) {
             const int32_t downTop = rw.y1 + s.heroH - (bot - top + 1);
@@ -341,7 +342,7 @@ void buildMain() {
     lv_obj_set_size     (row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(row, pm(4), 0);
+    lv_obj_set_style_pad_column(row, pm(UI::shape().P_GAP), 0);
 
     // THE SAME SHARE OF THE WINDOW ON EVERY BOARD (owner, 2026-10-05). It used
     // to be the window's height less the header row and margins, which on a
@@ -385,7 +386,7 @@ void buildMain() {
         // they do not fit. The control deck stays exactly where it is in
         // every control.
         const bool    scenes = (s.view == PopupView::VIEW_SCENES);
-        const int32_t gapV   = pm(3.0f);
+        const int32_t gapV   = pm(UI::shape().P_STACK_GAP);
         const int32_t stageW = lv_area_get_width(&s.winRect) - 2 * s.pad;
         s.heroW   = s.heroH * 42 / 100;
         s.stacked = stageH() >= s.heroH + gapV + controlDeckH();
@@ -400,10 +401,10 @@ void buildMain() {
         // WIDE: the column is as wide as what it holds - the swatches, or the
         // scene buttons - and starts where the controls' column starts.
         const int32_t ctlColW = colWidth(true, LA.allCaps, !s.stacked);
-        s.mainRowW = s.heroW + pm(4) + ctlColW;
+        s.mainRowW = s.heroW + pm(UI::shape().P_GAP) + ctlColW;
         int32_t colW = ctlColW;
         if (wide) {
-            int32_t maxW = stageW - s.heroW - pm(4);
+            int32_t maxW = stageW - s.heroW - pm(UI::shape().P_GAP);
             // THE THIRD WAY CLEAR OF THE CHIP (round 7, the 4B's "show all"):
             // when the scenes can neither drop below the clapperboard (their
             // rows fill the slider's height) nor clear it with the slider at
@@ -412,16 +413,16 @@ void buildMain() {
             // (buildContents()), so this is known before anything is laid out.
             if (scenes && s.btnScenes && !lv_obj_has_flag(s.btnScenes, LV_OBJ_FLAG_HIDDEN)) {
                 const SceneStack k = sceneStack(maxW);
-                const int32_t m      = mm(1.0f);
+                const int32_t m      = mm(UI::shape().S3);
                 const int32_t chipL  = stageW - UI::minTouch() - m;
                 const int32_t chipB  = UI::minTouch() + m;
                 const int32_t rowTop = (stageH() - s.heroH - (s.stacked ? gapV + controlDeckH() : 0)) / 2;
                 const bool downOK = rowTop + s.heroH - k.h >= chipB;
-                const bool leftOK = s.heroW + pm(4) + k.w <= chipL;
-                if (!downOK && !leftOK) maxW = chipL - s.heroW - pm(4);
+                const bool leftOK = s.heroW + pm(UI::shape().P_GAP) + k.w <= chipL;
+                if (!downOK && !leftOK) maxW = chipL - s.heroW - pm(UI::shape().P_GAP);
             }
             colW = scenes ? sceneGridW(maxW)
-                          : LV_MIN(maxW, 4 * mm(6.5f) + 3 * mm(1.6f) + 2 * mm(0.6f));
+                          : LV_MIN(maxW, 4 * mm(UI::shape().SWATCH) + 3 * mm(UI::shape().S5) + 2 * mm(UI::shape().S1));
         }
         fixColumn(col, colW);
         if (wide) lv_obj_set_flex_align(col, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -487,10 +488,10 @@ void buildMain() {
     lv_obj_set_size     (col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_pad_row(col, mm(0.8f), 0);
+    lv_obj_set_style_pad_row(col, mm(UI::shape().S2), 0);
     // Never wider than what is left beside the hero, so a long text value
     // ellipsises instead of running out of the window.
-    const int32_t colMax = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(4);
+    const int32_t colMax = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(UI::shape().P_GAP);
     lv_obj_set_style_max_width(col, colMax, 0);
     // AND NEVER NARROWER THAN ITS LONGEST ORDINARY WORDS. The row is centred,
     // so a column that changed width moved the whole group - the owner's B1:
@@ -503,7 +504,7 @@ void buildMain() {
     // A toggle's column is the slider's: the same size, the lines in the
     // same places (owner, round 3).
     if (s.toggleHero) fixColumn(col, colWidth(false, 0));
-    s.mainRowW = s.toggleHero ? s.heroW + pm(4) + colWidth(false, 0) : 0;
+    s.mainRowW = s.toggleHero ? s.heroW + pm(UI::shape().P_GAP) + colWidth(false, 0) : 0;
 
     makeLabelRow(col);
 
@@ -511,7 +512,7 @@ void buildMain() {
     lv_obj_set_size     (vrow, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(vrow, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(vrow, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
-    lv_obj_set_style_pad_column(vrow, mm(0.8f), 0);
+    lv_obj_set_style_pad_column(vrow, mm(UI::shape().S2), 0);
     lv_obj_set_style_max_width(vrow, colMax, 0);
     s.lblValue = makeLabel(vrow, UIToolkit::Font_Hero, p.TEXT);
     lv_label_set_long_mode(s.lblValue, LV_LABEL_LONG_DOT);

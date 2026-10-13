@@ -107,7 +107,6 @@ constexpr uint32_t POPUP_TICK_MS      = 250;
 constexpr float POPUP_ASPECT  = 787.0f / 545.0f;
 constexpr float REF_WIN_H_MM  = 47.1f;   // the P4_5 window's height, header showing
 constexpr float HERO_H_MM     = 30.2f;   // its hero's
-constexpr float POPUP_MAX_W_MM = 100.0f; // the widest any window gets - see open()
 
 // The hold, in millimetres so it looks the same on every board. THE LEAP IS
 // GONE (owner, round 6): it was clipped by the card's wrapper, and the window
@@ -126,8 +125,7 @@ constexpr uint8_t POPUP_ENT_MAX = (CARD_PRIMARY_MAX > ENTITY_MEMBERS_MAX) ? CARD
                                                                           : ENTITY_MEMBERS_MAX;
 
 // The hand-drawn faces (see "Faces drawn by hand", with the control deck).
-enum class FaceKind : uint8_t { FACE_BLACK, FACE_SILVER, FACE_DENT };
-lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t flat);
+enum class FaceKind : uint8_t { FACE_BLACK, FACE_SILVER, FACE_DENT };   // setFace(): PopupDeck.cpp
 struct Popup {
     PopupPhase phase = PopupPhase::PHASE_CLOSED;
     PopupView  view  = PopupView::VIEW_MAIN;
@@ -343,7 +341,7 @@ struct DeckRowSpec {
     lv_event_cb_t cb;
     lv_obj_t    **out;      // where the control is kept, or null
 };
-constexpr uint8_t DECK_ROWS_MAX = 12;   // 6 at most today; room for /popup?rows=
+constexpr uint8_t DECK_ROWS_MAX = 12;   // 7 at most today; room for /popup?rows=
 
 // ---------------------------------------------------------------------------
 // The shared state - each defined once, in the file named

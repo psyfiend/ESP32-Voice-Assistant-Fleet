@@ -26,9 +26,9 @@ constexpr uint32_t DECK_PEEK_MS = 200;   // the tab peeking up: a small touch th
 // 260 ms, from 220 (owner, round 7: choppier now that the panel opens further;
 // the page deck's panels take 300). Try 300 if it still stutters.
 constexpr uint32_t DECK_OPEN_MS = 260;
-// 7.2 mm, from 8: the folder tab grew by twice its curve (round 11), and the
-// rows paid for it, so an open deck still reaches the same height on the window.
-constexpr float    DECK_ROW_MM  = 7.2f;
+// A row is UI::shape().H_ROW, 7.2 mm - from 8: the folder tab grew by twice its
+// curve (round 11), and the rows paid for it, so an open deck still reaches the
+// same height on the window.
 
 void deckExec(void *var, int32_t v) { lv_obj_set_y((lv_obj_t *)var, v); }
 
@@ -191,7 +191,7 @@ void deckTabCb(lv_event_t *ev) {
     else                          deckOpen();
 }
 
-int32_t deckCtlH() { return mm(6.0f); }
+int32_t deckCtlH() { return mm(UI::shape().H_CONTROL); }
 
 // The widest line of a dropdown's choices.
 int32_t widestLine(const char *opts, const lv_font_t *f) {
@@ -210,20 +210,21 @@ int32_t widestLine(const char *opts, const lv_font_t *f) {
 }
 
 int32_t deckCtlW(const DeckRowSpec &r) {
-    if (r.kind == DeckRowKind::ROW_CHECK) return deckCtlH() + mm(1.0f);
+    const UIShape &k = UI::shape();
+    if (r.kind == DeckRowKind::ROW_CHECK) return deckCtlH() + mm(k.S3);
     const lv_font_t *f = UI::type().TAG;
-    if (r.kind == DeckRowKind::ROW_BUTTON) return textW(r.opts, f) + 2 * mm(2.4f);
-    return widestLine(r.opts, f) + 2 * mm(1.6f) + textW(LV_SYMBOL_DOWN, f) + mm(1.6f);
+    if (r.kind == DeckRowKind::ROW_BUTTON) return textW(r.opts, f) + 2 * mm(k.S7);
+    return widestLine(r.opts, f) + 2 * mm(k.S5) + textW(LV_SYMBOL_DOWN, f) + mm(k.S5);
 }
 
-constexpr float DECK_PAD_MM = 2.4f;   // the pane's sides
+// The pane's sides are UI::shape().S7 (2.4 mm).
 
 // AS WIDE AS ITS LONGEST ROW (owner): each row's words, a gap, its control.
 int32_t rowsNeedW(const DeckRowSpec *r, uint8_t n) {
     int32_t w = 0;
     for (uint8_t i = 0; i < n; i++)
-        w = LV_MAX(w, textW(r[i].label, UI::type().NAME) + mm(4.0f) + deckCtlW(r[i]));
-    return w + 2 * mm(DECK_PAD_MM);
+        w = LV_MAX(w, textW(r[i].label, UI::type().NAME) + mm(UI::shape().S9) + deckCtlW(r[i]));
+    return w + 2 * mm(UI::shape().S7);
 }
 
 int32_t deckNeedW() {
@@ -244,10 +245,10 @@ lv_obj_t *deckDropdown(lv_obj_t *parent, const DeckRowSpec &r) {
     lv_obj_set_style_text_color  (dd, UI::c(r.live ? p.TEXT : p.TEXT_DIM), 0);
     lv_obj_set_style_bg_color    (dd, UI::c(p.SURFACE), 0);
     lv_obj_set_style_bg_opa      (dd, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius      (dd, mm(1.2f), 0);
-    lv_obj_set_style_border_width(dd, LV_MAX(1, mm(0.2f)), 0);
+    lv_obj_set_style_radius      (dd, mm(UI::shape().R_CONTROL), 0);
+    lv_obj_set_style_border_width(dd, LV_MAX(1, mm(UI::shape().LINE_HAIR)), 0);
     lv_obj_set_style_border_color(dd, UI::c(r.live ? p.ACCENT : UI::mix(p.SURFACE_ALT, p.TEXT, 25)), 0);
-    lv_obj_set_style_pad_hor     (dd, mm(1.6f), 0);
+    lv_obj_set_style_pad_hor     (dd, mm(UI::shape().S5), 0);
     lv_obj_set_style_pad_ver     (dd, LV_MAX(0, (deckCtlH() - lh) / 2 - 1), 0);
     lv_obj_set_style_shadow_width(dd, 0, 0);
     if (lv_obj_t *list = lv_dropdown_get_list(dd)) {
@@ -255,8 +256,8 @@ lv_obj_t *deckDropdown(lv_obj_t *parent, const DeckRowSpec &r) {
         lv_obj_set_style_text_color  (list, UI::c(p.TEXT), 0);
         lv_obj_set_style_bg_color    (list, UI::c(p.SURFACE), 0);
         lv_obj_set_style_border_color(list, UI::c(p.ACCENT), 0);
-        lv_obj_set_style_border_width(list, LV_MAX(1, mm(0.2f)), 0);
-        lv_obj_set_style_radius      (list, mm(1.2f), 0);
+        lv_obj_set_style_border_width(list, LV_MAX(1, mm(UI::shape().LINE_HAIR)), 0);
+        lv_obj_set_style_radius      (list, mm(UI::shape().R_CONTROL), 0);
         lv_obj_set_style_shadow_width(list, 0, 0);
         // EVERY CHOICE IN SIGHT (owner, 2.10d): the default theme caps a list
         // at 260 px, which on the P4_5 and the 4B is five rows - Tap action's
@@ -288,8 +289,8 @@ lv_obj_t *deckCheckbox(lv_obj_t *parent, const DeckRowSpec &r) {
     // height plus its own padding.
     const int32_t grow = LV_MAX(0, (deckCtlH() - lv_font_get_line_height(UI::type().NAME)) / 2);
     lv_obj_set_style_pad_all     (cb, grow, LV_PART_INDICATOR);
-    lv_obj_set_style_radius      (cb, mm(1.2f), LV_PART_INDICATOR);
-    lv_obj_set_style_border_width(cb, LV_MAX(2, mm(0.3f)), LV_PART_INDICATOR);
+    lv_obj_set_style_radius      (cb, mm(UI::shape().R_CONTROL), LV_PART_INDICATOR);
+    lv_obj_set_style_border_width(cb, LV_MAX(2, mm(UI::shape().LINE_MID)), LV_PART_INDICATOR);
     lv_obj_set_style_border_color(cb, UI::c(p.ACCENT), LV_PART_INDICATOR);
     lv_obj_set_style_bg_color    (cb, UI::c(p.SURFACE), LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa      (cb, LV_OPA_COVER, LV_PART_INDICATOR);
@@ -307,11 +308,11 @@ lv_obj_t *deckButton(lv_obj_t *parent, const DeckRowSpec &r) {
     lv_obj_t *b = plain(parent);
     lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_size(b, deckCtlW(r), deckCtlH());
-    lv_obj_set_style_radius      (b, mm(1.2f), 0);
+    lv_obj_set_style_radius      (b, mm(UI::shape().R_CONTROL), 0);
     lv_obj_set_style_bg_opa      (b, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color    (b, UI::c(p.SURFACE), 0);
     lv_obj_set_style_bg_color    (b, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
-    lv_obj_set_style_border_width(b, LV_MAX(1, mm(0.2f)), 0);
+    lv_obj_set_style_border_width(b, LV_MAX(1, mm(UI::shape().LINE_HAIR)), 0);
     // Greyed (K17's "Added"): no accent, dim words, nothing to tap.
     lv_obj_set_style_border_color(b, UI::c(r.live ? p.ACCENT : UI::mix(p.SURFACE, p.TEXT, 25)), 0);
     lv_obj_t *l = makeLabel(b, UI::type().TAG, r.live ? p.TEXT : p.TEXT_DIM);
@@ -331,7 +332,7 @@ lv_obj_t *deckControl(lv_obj_t *row, const DeckRowSpec &r) {
 // A row: what it is on the left, its control on the right.
 lv_obj_t *deckRow(lv_obj_t *pane, const char *what, bool live) {
     lv_obj_t *r = plain(pane);
-    lv_obj_set_size     (r, lv_pct(100), mm(DECK_ROW_MM));
+    lv_obj_set_size     (r, lv_pct(100), mm(UI::shape().H_ROW));
     lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_t *l = makeLabel(r, UI::type().NAME, live ? UI::pal().TEXT : UI::pal().TEXT_DIM);
@@ -353,9 +354,10 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
                  int32_t tabW, lv_event_cb_t tabCb) {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
+    const UIShape   &k = UI::shape();
     const lv_area_t &W = s.winRect;
     const int32_t w  = lv_area_get_width(&W);
-    const int32_t r  = mm(1.6f);
+    const int32_t r  = mm(k.R_PANEL);
     const int32_t bw = UI::met().BORDER_W ? UI::met().BORDER_W : 1;
     // The page deck's own header height (owner, round 9: its panels "are
     // already the perfect height to sit neatly under the bottom border of the
@@ -373,8 +375,8 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
     const int32_t rf       = r;                        // the inner curve
     const int32_t tabAbove = s.deckHead + rf;          // the tab's part above the pane's edge
     s.deckHide = r + 2 * bw;
-    int32_t gapTop = mm(1.6f), gapBot = mm(1.6f);       // above the first row, below the last
-    F.h = tabAbove + (rf + gapTop) + rows * mm(DECK_ROW_MM) + gapBot + s.deckHide;
+    int32_t gapTop = mm(k.S5), gapBot = mm(k.S5);       // above the first row, below the last
+    F.h = tabAbove + (rf + gapTop) + rows * mm(k.H_ROW) + gapBot + s.deckHide;
     // OPENS NO TALLER THAN THE WINDOW (owner, 2026-10-07): open, the tab's top
     // rests at or below the window's top edge. More rows than that: the panel
     // is dragged (see "Dragging a panel").
@@ -448,7 +450,7 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
     // the track scrolls; drawn over the pane, in its middle.
     {
         static lv_point_precise_t ptsDown[3], ptsUp[3];
-        const int32_t cw = mm(2.4f), ch = mm(1.0f), lw = LV_MAX(2, mm(0.45f)), o = lw / 2;
+        const int32_t cw = mm(k.CARET_W), ch = mm(k.CARET_H), lw = LV_MAX(2, mm(k.LINE_PLOT)), o = lw / 2;
         ptsDown[0] = { o, o };      ptsDown[1] = { o + cw / 2, o + ch }; ptsDown[2] = { o + cw, o };
         ptsUp[0]   = { o, o + ch }; ptsUp[1]   = { o + cw / 2, o };      ptsUp[2]   = { o + cw, o + ch };
         auto caret = [&](const lv_point_precise_t *pts, int32_t y) {
@@ -468,8 +470,8 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
         // POINTING THE WAY TO DRAG (owner, P1b round 2): rows below the screen
         // show a caret pointing UP - "drag me up" - and a panel gone off the
         // top one pointing down.
-        F.down = caret(ptsUp, sh - (ch + lw) - mm(1.2f));
-        F.up   = caret(ptsDown, mm(1.2f));
+        F.down = caret(ptsUp, sh - (ch + lw) - mm(k.S4));
+        F.up   = caret(ptsDown, mm(k.S4));
     }
 
     // FLUSH: ONE PIECE (owner, 2026-10-07: a break in the left edge under the
@@ -490,7 +492,7 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
     lv_obj_add_style             (pane, UI::paint(UIPaint::PAINT_LIFT), 0);
     // The pane's padding keeps its rows below the tab's join. Its right margin
     // is the body's own (below).
-    lv_obj_set_style_pad_left(pane, mm(DECK_PAD_MM), 0);
+    lv_obj_set_style_pad_left(pane, mm(k.S7), 0);
     lv_obj_set_style_pad_top(pane, (tabAbove - paneY) + rf + gapTop, 0);
     lv_obj_set_style_pad_bottom(pane, gapBot + s.deckHide, 0);   // nothing in the part that stays hidden
     lv_obj_add_flag(pane, LV_OBJ_FLAG_CLICKABLE);   // a tap on the pane stays on the pane
@@ -501,7 +503,7 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
     lv_obj_t *body = plain(pane);
     F.body = body;
     lv_obj_set_size(body, lv_pct(100), lv_pct(100));
-    lv_obj_set_style_pad_right(body, mm(DECK_PAD_MM), 0);
+    lv_obj_set_style_pad_right(body, mm(k.S7), 0);
     lv_obj_set_flex_flow(body, LV_FLEX_FLOW_COLUMN);
     lv_obj_add_flag(body, LV_OBJ_FLAG_CLICKABLE);
 
@@ -522,7 +524,7 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
     lv_obj_add_event_cb(F.tab, tabCb, LV_EVENT_CLICKED, nullptr);
     F.tabLbl = makeLabel(F.tab, t.TAG, p.ACCENT);
     lv_label_set_text(F.tabLbl, title);
-    lv_obj_set_style_text_letter_space(F.tabLbl, mm(0.4f), 0);
+    lv_obj_set_style_text_letter_space(F.tabLbl, mm(k.TRACK_TAB), 0);
     // Where round 11 had it, which the owner called right.
     lv_obj_align(F.tabLbl, LV_ALIGN_TOP_MID, 0, (s.deckHead - rf - lv_font_get_line_height(t.TAG)) / 2);
     if (flush) {
@@ -717,7 +719,7 @@ void chartCreate() {
     const int32_t w = lv_area_get_width(&s.winRect);
     Folder F;
     buildFolder(F, true, scenes ? "SCENES" : activity ? "ACTIVITY" : "CHART", rowsNeedW(r, n), n,
-                w - w / 2 - mm(1.0f), chartTabCb);
+                w - w / 2 - mm(UI::shape().S3), chartTabCb);
     s_chart.root = F.root; s_chart.tab = F.tab; s_chart.pane = F.pane; s_chart.body = F.body; s_chart.h = F.h;
     s_chart.track = F.track; s_chart.up = F.up; s_chart.down = F.down;
     s_chart.kind = s_sideWant;

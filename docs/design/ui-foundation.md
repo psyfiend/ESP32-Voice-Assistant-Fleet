@@ -273,6 +273,39 @@ Findings for the owner, none changed (zero-change rule):
 - **WS_P4_4B: All Lamps' Members view titles "All Lamp..." when opened straight from a fresh
   window**, and "All Lamps >" when reached through Properties first - present at `v0.2.12` (seen in
   the baselines). The DOT-label trap of 2.10c round 7 (LESSONS), on another path.
+- The auditor's inventory also found two stale comments (the sparks' run time, SETTINGS' most rows)
+  and `setFace()` declared twice; fixed in P2. The round selector is drawn two ways (the control
+  deck's and SETTINGS'); that is P3's Selector.
+
+**P2 - DONE (2026-10-13).** `UIShape` (`include/UI/UITokens.h` §2b, values in
+`src/UI/UITokens.cpp`, read through `UI::shape()`): 56 tokens in millimetres - five radii, a
+ten-step spacing scale and four values between its steps, ten line and letter-spacing weights,
+fourteen sizes, three finger-travel distances, and ten hero values in P4_5 millimetres. 157
+literals replaced; no `mm(<number>)` or `pm(<number>)` is left in the window's code - the sparks'
+dice are named constants beside the effect, and the one remaining number (a 1 px outline) says why.
+Its own struct rather than `UIMetrics` as the brief said: `tokens.md` §7 gives the reasons, and
+DECISIONS U2 proposes it. "Any repeated durations": the window's are already named constants, each
+used in one place, so none moved.
+
+Checks: WS_P4_5 and WS_S3_4B build; **no tree or pixel differences against `p1` or `p0c` on all
+three boards** (label `p2`); every window's fastest build within 0.5 ms of `p0c` (the 1060's Deck
+read 32.0 in the first run and 31.3 in a second); medians move 0-2.5 ms between runs of the same
+firmware (P1 showed the same - the boards' own HA traffic during a run); LVGL's pool per window
+within 70 B of `p0c` (a label's text length - the trees are identical). **Never run two harness
+commands at one board**: each turns the sparks off for its run and back on at its end, so the
+other's numbers then include the sparks (+500 B and ~0.7 ms a window, seen once here).
+
+| Window, fastest of 7 (ms) | WS_P4_5 p0c / p2 | WS_P4_4B p0c / p2 | CYD_P4_1060 p0c / p2 |
+|---|---|---|---|
+| Desk | 36.4 / 36.4 | 37.5 / 37.5 | 36.4 / 36.3 |
+| Deck | 31.0 / 31.0 | 32.0 / 31.9 | 31.2 / 31.3 |
+| North | 30.0 / 29.9 | 30.7 / 30.8 | 30.4 / 30.4 |
+| Overhead | 32.1 / 32.0 | 32.9 / 32.8 | 32.0 / 31.9 |
+| All Lamps | 37.1 / 37.1 | 36.9 / 37.0 | 36.7 / 36.7 |
+| Lamp 1 | 33.9 / 33.6 | 34.8 / 35.0 | 33.4 / 33.4 |
+
+The candidates to merge (`S_GUTTER` into `S5`, and six more) are in `tokens.md` §7 with each
+one's pixels on the three boards and a recommendation. **The owner decides; nothing is merged.**
 
 ## 7. For the owner
 

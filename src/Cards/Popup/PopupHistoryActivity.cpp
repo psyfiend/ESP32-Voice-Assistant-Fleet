@@ -47,20 +47,20 @@ void histDrawActivity(lv_obj_t *body) {
         return;
     }
     // In from the window's sides (owner, round 2: the rows were wider than
-    // they need be, even on the 4B), and NO WIDER THAN ROWS_W (round 6: on the
-    // P4_5 and the 1060 the state and its time sat a long way apart). The 4B's
-    // window is narrower than that, so it keeps its rows.
-    constexpr float ROWS_W_MM = 70.0f;
+    // they need be, even on the 4B), and NO WIDER THAN W_ROWS_MAX (round 6: on
+    // the P4_5 and the 1060 the state and its time sat a long way apart). The
+    // 4B's window is narrower than that, so it keeps its rows.
+    const UIShape &k = UI::shape();
     lv_obj_update_layout(body);
     lv_obj_t *list = plain(body);
     s_histList = list;
     lv_obj_set_width(list, lv_pct(100));
-    lv_obj_set_style_pad_hor(list, LV_MAX(mm(5.0f), (lv_obj_get_width(body) - mm(ROWS_W_MM)) / 2), 0);
+    lv_obj_set_style_pad_hor(list, LV_MAX(mm(k.S10), (lv_obj_get_width(body) - mm(k.W_ROWS_MAX)) / 2), 0);
     lv_obj_set_flex_grow(list, 1);
     lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
     UI::tameScroll(list);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(list, mm(1.0f), 0);
+    lv_obj_set_style_pad_row(list, mm(k.S3), 0);
 
     // ONE VIEW (owner, round 5). The state and when are what matter: the state
     // on the left in the larger text; on the right the time in the larger
@@ -87,14 +87,14 @@ void histDrawActivity(lv_obj_t *body) {
                 lv_label_set_text(hd, buf);
                 lv_obj_set_width(hd, lv_pct(100));
                 lv_obj_set_style_text_align(hd, LV_TEXT_ALIGN_CENTER, 0);
-                lv_obj_set_style_pad_top(hd, r ? mm(1.2f) : 0, 0);
+                lv_obj_set_style_pad_top(hd, r ? mm(k.S4) : 0, 0);
             }
         }
         lv_obj_t *row = plain(list);
         lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
         lv_obj_set_flex_flow(row, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_style_pad_all(row, mm(1.2f), 0);
-        lv_obj_set_style_pad_row(row, mm(0.6f), 0);
+        lv_obj_set_style_pad_all(row, mm(k.S4), 0);
+        lv_obj_set_style_pad_row(row, mm(k.S1), 0);
         lv_obj_set_style_radius(row, UI::sc(UI::met().RADIUS), 0);
         lv_obj_set_style_bg_color(row, UI::c(p.SURFACE), 0);
         lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
@@ -105,7 +105,7 @@ void histDrawActivity(lv_obj_t *body) {
         lv_obj_t *line = plain(row);
         lv_obj_set_size(line, lv_pct(100), LV_SIZE_CONTENT);
         lv_obj_set_flex_flow(line, LV_FLEX_FLOW_ROW);
-        lv_obj_set_style_pad_column(line, mm(2.0f), 0);
+        lv_obj_set_style_pad_column(line, mm(k.S6), 0);
         lv_obj_t *col = plain(line);
         lv_obj_set_size(col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
         lv_obj_set_flex_grow(col, 1);
@@ -159,7 +159,7 @@ void histDrawActivity(lv_obj_t *body) {
     // older ones are left out.
     if (!s_hv.more && n > HIST_ROWS_FIRST) {
         lv_obj_t *b = plain(list);
-        lv_obj_set_size(b, lv_pct(100), mm(7.0f));
+        lv_obj_set_size(b, lv_pct(100), mm(k.H_MORE));
         lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_style_radius(b, UI::sc(UI::met().RADIUS), 0);
         lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);

@@ -107,17 +107,18 @@ void sceneCb(lv_event_t *ev) {
 
 SceneStack sceneStack(int32_t maxW) {
     const UIType &t = UI::type();
+    const UIShape &u = UI::shape();
     SceneStack k;
-    k.gap = pm(1.4f);
+    k.gap = pm(u.P_SCENE_GAP);
     // The stack's own padding holds the ring (outline pad + width), which its
     // edge would otherwise clip.
-    k.pad = LV_MAX(2, mm(0.3f)) + LV_MAX(2, mm(0.4f)) + 1;
-    k.ch  = LV_MAX(mm(6.5f), LV_MIN(pm(9.0f), (s.heroH - 2 * k.gap - 2 * k.pad) / 3));
+    k.pad = LV_MAX(2, mm(u.RING_PAD)) + LV_MAX(2, mm(u.RING_W)) + 1;
+    k.ch  = LV_MAX(mm(u.SWATCH), LV_MIN(pm(u.P_SCENE_H), (s.heroH - 2 * k.gap - 2 * k.pad) / 3));
     k.bw  = k.ch * 16 / 10;
     const uint8_t n = shownScenes();
     for (uint8_t i = 0; i < n; i++)
         if (const Entity *sc = shownScene(i))
-            k.bw = LV_MAX(k.bw, textW(sc->desc.name, t.TAG) + 2 * pm(2.4f));
+            k.bw = LV_MAX(k.bw, textW(sc->desc.name, t.TAG) + 2 * pm(u.P_SCENE_PAD));
     k.rowsFit = LV_MAX(1, (s.heroH - 2 * k.pad + k.gap) / (k.ch + k.gap));
     k.cols    = LV_MAX(1, (n + k.rowsFit - 1) / k.rowsFit);
     const int32_t maxCols = LV_MAX(1, (maxW - 2 * k.pad + k.gap) / (k.bw + k.gap));
@@ -168,7 +169,7 @@ void buildSceneGrid(lv_obj_t *col, int32_t colW) {
         lv_obj_set_style_bg_color (b, UI::c(quiet(p.SURFACE)), 0);
         lv_obj_set_style_bg_color (b, UI::c(UI::mix(p.SURFACE, p.TEXT, 20)),
                                    UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
-        lv_obj_set_style_outline_pad(b, LV_MAX(2, mm(0.3f)), 0);
+        lv_obj_set_style_outline_pad(b, LV_MAX(2, mm(UI::shape().RING_PAD)), 0);
         lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(b, sceneCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
         lv_obj_t *l = makeLabel(b, t.TAG, quiet(p.TEXT));

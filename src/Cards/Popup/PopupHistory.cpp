@@ -136,7 +136,7 @@ void buildHistory() {
     lv_obj_set_size(s_hv.body, lv_pct(100), lv_pct(100));
     lv_obj_set_flex_flow(s_hv.body, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(s_hv.body, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(s_hv.body, mm(1.2f), 0);
+    lv_obj_set_style_pad_row(s_hv.body, mm(UI::shape().S4), 0);
     histAsk();
     histDraw();
 }
@@ -161,7 +161,8 @@ lv_obj_t *histChips(lv_obj_t *parent, int32_t room) {
     lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     const uint8_t cnt = s_hv.chart ? HIST_SPANS : HIST_PERIODS;
-    int32_t padH = mm(2.2f), gap = mm(1.2f);
+    const UIShape &k = UI::shape();
+    int32_t padH = mm(k.S_CHIP_SIDE), gap = mm(k.S4);
     if (room > 0) {
         int32_t text = 0;
         for (uint8_t i = 0; i < cnt; i++) text += textW(s_hv.chart ? HIST_SPAN_CHIP[i] : HIST_PERIOD_CHIP[i], UI::type().TAG);
@@ -178,12 +179,12 @@ lv_obj_t *histChips(lv_obj_t *parent, int32_t room) {
         const bool lit = (i == (s_hv.chart ? s_hv.span : s_hv.period));
         lv_obj_t *b = plain(row);
         lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_size(b, LV_SIZE_CONTENT, mm(6.0f));
+        lv_obj_set_size(b, LV_SIZE_CONTENT, mm(k.H_CHIP));
         lv_obj_set_style_pad_hor(b, padH, 0);
-        lv_obj_set_style_radius(b, mm(3.0f), 0);
+        lv_obj_set_style_radius(b, mm(k.R_CHIP), 0);
         lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
         lv_obj_set_style_bg_color(b, UI::c(lit ? UI::mix(p.SURFACE, p.ACCENT, 25) : p.SURFACE), 0);
-        lv_obj_set_style_border_width(b, lit ? LV_MAX(1, mm(0.25f)) : 0, 0);
+        lv_obj_set_style_border_width(b, lit ? LV_MAX(1, mm(k.LINE_FINE)) : 0, 0);
         lv_obj_set_style_border_color(b, UI::c(p.ACCENT), 0);
         lv_obj_set_style_bg_color(b, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
         lv_obj_add_event_cb(b, spanChipCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
@@ -212,15 +213,15 @@ lv_obj_t *histChips(lv_obj_t *parent, int32_t room) {
 // How far the stage reaches up into the header row.
 int32_t histLift() {
     const int32_t lh = lv_font_get_line_height(UI::type().NAME);
-    return LV_MAX(0, (UI::minTouch() - lh) / 2 - mm(2.0f));
+    return LV_MAX(0, (UI::minTouch() - lh) / 2 - mm(UI::shape().S6));
 }
 
 bool histChipsOn() { return s_hv.chart ? s_hv.chips : s_hv.actChips; }
 
 lv_obj_t *histTopRow(lv_obj_t *body) {
     const UIType &t = UI::type();
-    const int32_t corners = s_hv.chart ? histLift() + 2 * lv_font_get_line_height(t.TAG) + mm(1.0f) : 0;
-    const int32_t middle  = histChipsOn() ? mm(6.0f) : lv_font_get_line_height(t.NAME);
+    const int32_t corners = s_hv.chart ? histLift() + 2 * lv_font_get_line_height(t.TAG) + mm(UI::shape().S3) : 0;
+    const int32_t middle  = histChipsOn() ? mm(UI::shape().H_CHIP) : lv_font_get_line_height(t.NAME);
     lv_obj_t *row = plain(body);
     lv_obj_set_size(row, lv_pct(100), LV_MAX(corners, middle));
     return row;
@@ -246,7 +247,7 @@ void histShowing(lv_obj_t *row) {
     // The whole line, and a little round it - not so much that it takes taps
     // meant for the title just above.
     lv_obj_add_flag(l, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_ext_click_area(l, mm(1.0f));
+    lv_obj_set_ext_click_area(l, mm(UI::shape().S3));
     lv_obj_set_style_text_color(l, UI::c(p.ACCENT), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
     lv_obj_add_event_cb(l, histShowingCb, LV_EVENT_CLICKED, nullptr);
 }

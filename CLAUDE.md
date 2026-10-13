@@ -443,13 +443,14 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
 
 ## Design tokens — no colour or size literals in UI code
 
-Since Phase 2.2 (2026-09-10). `include/UITokens.h` is the single source for how anything looks.
+Since Phase 2.2 (2026-09-10). `include/UI/UITokens.h` is the single source for how anything looks.
 Design and the measurements behind it: `docs/design/tokens.md`; what a card *contains* is
 `docs/design/cards.md`.
 
-Four flat struct groups in the `Fleet_BSP` idiom — `UIPalette` (surfaces, accent, the **semantic
-state palette**, sensor tints), `UIMetrics` (radius, padding, border, shadow), `UIGrid`, `UIType` —
-reached through one namespace: `UI::pal()`, `UI::met()`, `UI::grid()`, `UI::type()`.
+Five flat struct groups in the `Fleet_BSP` idiom — `UIPalette` (surfaces, accent, the **semantic
+state palette**, sensor tints), `UIMetrics` (radius, padding, border, shadow), `UIShape` (the card
+window's radii, spacing, lines and sizes, in millimetres - 2.12), `UIGrid`, `UIType` — reached
+through one namespace: `UI::pal()`, `UI::met()`, `UI::shape()`, `UI::grid()`, `UI::type()`.
 
 Rules that are load-bearing rather than stylistic:
 
@@ -463,8 +464,13 @@ Rules that are load-bearing rather than stylistic:
   and system drawer kept the old scheme. A shared paint is updated in place by `setScheme()`, and
   everything using it repaints. A local colour property beats a shared style in LVGL, so never set
   both on one widget.
-- **All token values are logical pixels.** Run them through `UI::sc()` at the point of use. Never
-  store a scaled value — the scale is per board.
+- **All token values are logical pixels** - except `UIShape`'s. Run them through `UI::sc()` at the
+  point of use. Never store a scaled value — the scale is per board.
+- **The card window's sizes are `UIShape` millimetres, never a number** (since 2.12 P2). The
+  window draws in real millimetres - `mm(UI::shape().S5)`, or `pm()` for the `P_` group (P4_5
+  millimetres, a share of the window). A new radius, gap, line or size is a new token in
+  `UITokens.h` §2b with a comment saying what uses it, and a row in `tokens.md` §7. Tokens close in
+  value are kept apart on purpose until the owner merges them (`tokens.md` §7).
 - **Columns and rows are derived, never declared.** Pick `TARGET_CARD_W`; the page fits as many
   whole cards as the screen allows and stretches row height to fill. One token set gives 5x3 on
   `WS_P4_5` and 2x3 on `CYD_S3_3248` portrait.

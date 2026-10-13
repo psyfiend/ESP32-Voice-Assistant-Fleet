@@ -18,14 +18,15 @@ void confirmClose() {
 lv_obj_t *confirmButton(lv_obj_t *parent, const char *txt, uint32_t bg, uint32_t ink, uint32_t edge,
                         lv_event_cb_t cb) {
     const UIPalette &p = UI::pal();
+    const UIShape   &k = UI::shape();
     lv_obj_t *b = plain(parent);
     lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_size(b, mm(24.0f), UI::minTouch());
-    lv_obj_set_style_radius(b, mm(1.6f), 0);
+    lv_obj_set_size(b, mm(k.W_DIALOG_BTN), UI::minTouch());
+    lv_obj_set_style_radius(b, mm(k.R_BUTTON), 0);
     lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(b, UI::c(bg), 0);
     lv_obj_set_style_bg_color(b, UI::c(UI::mix(bg, p.TEXT, 20)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
-    lv_obj_set_style_border_width(b, LV_MAX(1, mm(0.25f)), 0);
+    lv_obj_set_style_border_width(b, LV_MAX(1, mm(k.LINE_FINE)), 0);
     lv_obj_set_style_border_color(b, UI::c(edge), 0);
     lv_obj_t *l = makeLabel(b, UI::type().NAME, ink);
     lv_label_set_text(l, txt);
@@ -39,6 +40,7 @@ void confirmRemove() {
     if (!CardPopup::isOpen() || !cardOf(h.surface)) return;
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
+    const UIShape   &k = UI::shape();
     // The dim, which also takes every tap that misses the box: Cancel.
     s_confirm = plain(lv_layer_top());
     lv_obj_set_size(s_confirm, lv_pct(100), lv_pct(100));
@@ -51,16 +53,16 @@ void confirmRemove() {
 
     lv_obj_t *box = plain(s_confirm);
     lv_obj_add_flag(box, LV_OBJ_FLAG_CLICKABLE);   // a tap on it is not a tap outside
-    lv_obj_set_width(box, LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(90.0f)));
+    lv_obj_set_width(box, LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(k.W_DIALOG_MAX)));
     lv_obj_set_height(box, LV_SIZE_CONTENT);
     lv_obj_center(box);
     lv_obj_set_style_radius(box, UI::sc(UI::met().RADIUS), 0);
     lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(box, UI::c(p.SURFACE_ALT), 0);
-    lv_obj_set_style_border_width(box, LV_MAX(2, mm(0.4f)), 0);
+    lv_obj_set_style_border_width(box, LV_MAX(2, mm(k.LINE_HEAVY)), 0);
     lv_obj_set_style_border_color(box, UI::c(p.ST_BAD), 0);
-    lv_obj_set_style_pad_all(box, mm(4.0f), 0);
-    lv_obj_set_style_pad_row(box, mm(2.4f), 0);
+    lv_obj_set_style_pad_all(box, mm(k.S9), 0);
+    lv_obj_set_style_pad_row(box, mm(k.S7), 0);
     lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
@@ -82,7 +84,7 @@ void confirmRemove() {
     lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_top(row, mm(1.2f), 0);
+    lv_obj_set_style_pad_top(row, mm(k.S4), 0);
     confirmButton(row, "Cancel", p.SURFACE, p.TEXT, UI::mix(p.SURFACE, p.TEXT, 30), [](lv_event_t *) {
         lv_async_call([](void *) { confirmClose(); }, nullptr);
     });
