@@ -3172,6 +3172,7 @@ void histRowCb(lv_event_t *ev) {
 
 void memberRowCb(lv_event_t *ev);   // below, with the member view
 void deckRender();                  // below, with the deck
+void deckSync();                    // below: SETTINGS made again when its rows change
 void chartSet(uint8_t state);       // below, with the deck: the CHART panel
 void chartFold();                   // open: back to its tab
 void sideFor(PopupView v);          // below: the left panel a view wants (CHART / SCENES)
@@ -3427,6 +3428,7 @@ void showView(PopupView v) {
     else if (v == PopupView::VIEW_MEMBERS) buildMembers();
     else if (v == PopupView::VIEW_PROPS)   buildProps();
     else                                   buildMain();
+    deckSync();     // SETTINGS' rows are the view's (a member's own has more)
     deckRender();   // Paused follows whatever the window is showing now
     s.lastSig = signature();
 }
@@ -4734,7 +4736,7 @@ void addCardCb(lv_event_t *ev) {
     if (!held || !inMember() || !s.ent[0]) return;
     char id[CARD_ID_MAX + 1];
     if (!CardAdded::add(*held, *s.ent[0], id, sizeof(id))) return;
-    deckRender();   // the row now says "Added"
+    lv_async_call([](void *) { deckSync(); }, nullptr);   // the row now says "Added" - not from its own button's event
 }
 
 // "Remove card" (K66): the first tap asks, the second removes and closes the
@@ -4743,7 +4745,7 @@ void removeCardCb(lv_event_t *ev) {
     (void)ev;
     Card *held = cardOf(h.surface);
     if (!held) return;
-    if (!s_removeArmed) { s_removeArmed = true; deckRender(); return; }
+    if (!s_removeArmed) { s_removeArmed = true; lv_async_call([](void *) { deckSync(); }, nullptr); return; }
     s_removeArmed = false;
     if (!CardAdded::remove(held->id())) return;
     lv_async_call([](void *) { CardPopup::close(); }, nullptr);
@@ -5028,9 +5030,19 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
 // showWindow()'s quiet build (invalidation off); showWindow() then slides it
 // up to its tab. Its rows come from one list - deckSpecs() - read here for the
 // size and again by deckFill() for the contents.
+// What the rows are, as a number: their words, choices and whether each is live.
+uint32_t s_deckSig = 0;   // the rows SETTINGS was built for
+uint32_t deckSig(const DeckRowSpec *r, uint8_t n) {
+    uint32_t h = 2166136261u;   // FNV-1a
+    auto mix = [&](const char *p) { for (; p && *p; p++) { h ^= (uint8_t)*p; h *= 16777619u; } h ^= 0xFF; h *= 16777619u; };
+    for (uint8_t i = 0; i < n; i++) { mix(r[i].label); mix(r[i].opts); h ^= r[i].live ? 1u : 2u; h *= 16777619u; }
+    return h;
+}
+
 void deckCreate() {
     DeckRowSpec specs[DECK_ROWS_MAX];
     const int32_t rows = deckSpecs(specs);
+    s_deckSig = deckSig(specs, (uint8_t)rows);
     const int32_t w = lv_area_get_width(&s.winRect);
     Folder F;
     buildFolder(F, false, "SETTINGS", deckNeedW(), rows, w / 2, deckTabCb);
@@ -5055,6 +5067,35 @@ void deckFill() {
         lv_obj_t *row = deckRow(s.deckBody, r[i].label, r[i].live);
         lv_obj_t *ctl = deckControl(row, r[i]);
         if (r[i].out) *r[i].out = ctl;
+    }
+}
+
+// SETTINGS FOLLOWS ITS ROWS (K17 testing, owner: "Add as a card" came and went).
+// The panel is sized for its rows when it is made and filled when first opened,
+// so rows that change later - another view (a member's own adds "Add as a
+// card"), "Added", "Sure?" - were missing or cut off. When the rows are not
+// the ones it was made for, it is made again in place: same state, no slide.
+void deckSync() {
+    if (!s.deck) return;
+    DeckRowSpec r[DECK_ROWS_MAX];
+    if (deckSig(r, deckSpecs(r)) == s_deckSig) return;
+    const uint8_t st = s.deckState;
+    lv_anim_delete(s.deck, deckExec);
+    lv_anim_delete(s.deckTrack, nullptr);
+    lv_obj_remove_event_cb(s.deckTrack, panelTrackCb);
+    lv_obj_delete(s.deckTrack);   // the holder and its rows with it
+    s.deck = s.deckTab = s.deckTabLbl = s.deckPane = s.deckBody = nullptr;
+    s.deckTrack = s.deckUp = s.deckDown = nullptr;
+    s.swPause = nullptr;
+    s.ddGroup = nullptr;
+    deckCreate();
+    if (st == DECK_HIDDEN) return;
+    s.deckState = st;
+    if (st == DECK_OPEN) { deckFill(); lv_obj_move_foreground(s.deckTrack); }
+    lv_obj_set_y(s.deck, deckY(st));
+    if (st == DECK_OPEN) {
+        panelArm(s.deckTrack, s.deck, s.deckH);
+        panelCarets(s.deckTrack, s.deck, s.deckPane, s.deckUp, s.deckDown);
     }
 }
 
@@ -5841,7 +5882,7 @@ void CardPopup::debugService(lv_timer_t *t) {
         if (!held) dbgOut("no window open\n");
         else if (a.addCard > 0) {
             if (!inMember() || !s.ent[0]) dbgOut("not in a member's own view\n");
-            else if (CardAdded::add(*held, *s.ent[0], id, sizeof(id))) { dbgOut("added %s\n", id); deckRender(); }
+            else if (CardAdded::add(*held, *s.ent[0], id, sizeof(id))) { dbgOut("added %s\n", id); deckSync(); }
             else dbgOut("not added\n");
         } else {
             snprintf(id, sizeof(id), "%s", held->id());

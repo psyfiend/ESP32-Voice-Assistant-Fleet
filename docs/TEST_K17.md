@@ -24,3 +24,14 @@ removed and kept in the file as the page's pool. Nothing tested by touch.
 stand after it in the order they were added - the first one added is next to Desk.
 
 ## Your results
+
+**Run 1 (owner, 2026-10-12):** "Add as a card" never showed for Desk's members and came and went
+for All Lamps' Lamp 4 (added, removed, then not offered, then offered again). **Cause:** SETTINGS
+was sized for its rows when the window opened and filled the first time it opened - so it held
+the rows of whichever view it first opened in; a member's own view has one row more. **Fixed:**
+SETTINGS is made again, in place, whenever its rows would change (`deckSync()`: another view,
+"Added", "Sure?"). In a member's own view on the P4_5 the new row is under the caret - drag up.
+Lamps 1-3 have compiled cards of their own on the Fleet page (Lamp 4's was removed 2026-09-19):
+opened from those cards, they are not in a member's own view, so no "Add as a card"; and a
+compiled card cannot be removed until page editing (2.11, K66). From All Lamps > Members > Lamp 1
+it is offered - a second card for Lamp 1 (allowed, K33). Retest A1-A10.
