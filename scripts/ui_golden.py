@@ -58,6 +58,10 @@ HIST = "hist"   # a step's wait: until History's answer has arrived and been dra
 # label and area on the page) or none (the dashboard), then walks its steps: (state, queries,
 # wait). A state of None acts without capturing. tree "page" captures the whole screen.
 # Cards a board does not show (its grid drops them) are recorded as absent.
+#
+# A WINDOW CLOSES ITSELF AFTER 60 S WITHOUT A TOUCH, and /popup is not a touch: a group must be
+# done well inside that on the slowest board (the 1060 takes ~6 s a state), so the long ones are
+# split and each opens the window afresh.
 # ---------------------------------------------------------------------------------------------
 PLAN = [
     {"page": 0, "card": None, "tree": "page", "steps": [("house_page", [], 0.5)]},
@@ -67,18 +71,24 @@ PLAN = [
         (None, ["deck=0"], 0.6),
         ("desk_temp", ["ctl=1"], 0.6),
         ("desk_color", ["ctl=2"], 0.6),
-        (None, ["ctl=0"], 0.5),
+    ]},
+    {"page": 0, "card": ("Desk", "Office", 0), "steps": [
         ("desk_scenes", ["view=4"], 0.9),
         ("desk_scenes_panel", ["deck=2"], 0.9),
-        (None, ["deck=0"], 0.6),
+    ]},
+    {"page": 0, "card": ("Desk", "Office", 0), "steps": [
         ("desk_history", ["view=1"], HIST),
         ("desk_history_panel", ["deck=2"], 0.9),
-        (None, ["deck=0"], 0.6),
+    ]},
+    {"page": 0, "card": ("Desk", "Office", 0), "steps": [
         ("desk_props", ["view=5"], 0.6),
         ("desk_members", ["view=2"], 0.6),
         ("desk_member", ["member=0"], 0.6),
         ("desk_member_settings", ["deck=1"], 0.9),
-        (None, ["deck=0"], 0.6),
+    ]},
+    {"page": 0, "card": ("Desk", "Office", 0), "steps": [
+        (None, ["view=2"], 0.4),
+        (None, ["member=0"], 0.4),
         ("desk_member_history", ["view=1"], HIST),
     ]},
     {"page": 0, "card": ("Desk", "Office", 0), "steps": [("desk_dialog", ["removecard=3"], 0.6)]},
@@ -111,6 +121,8 @@ PLAN = [
         (None, ["deck=0"], 0.6),
         ("lamps_history", ["view=1"], HIST),
         ("lamps_props", ["view=5"], 0.6),
+    ]},
+    {"page": 1, "card": ("All Lamps", "Kitchen", 0), "steps": [
         ("lamps_members", ["view=2"], 0.6),
         ("lamps_member", ["member=0"], 0.6),
         ("lamps_member_settings", ["deck=1"], 0.9),
@@ -305,6 +317,7 @@ def capture(args):
                         print(f"  {s:<26} absent: {label_} ({area}) is not on this board's page")
                     continue
                 reply = b.popup(f"card={idx}")
+                opened_at = time.time()
                 build = built_us(reply)
                 if "open card" not in reply:
                     for s in names:
@@ -325,6 +338,8 @@ def capture(args):
                 if not state or (only and state not in only):
                     continue
                 tree = b.tree(page=whole)
+                if group["card"] and "# window" not in tree:
+                    raise RuntimeError(f"{state}: the window is not open (closed itself?) - not captured")
                 (out / f"{state}.txt").write_text(tree, encoding="utf-8", newline="\n")
                 info = {"page": cur_page, "queries": queries, "lv_mem_used": tree_mem(tree),
                         "objects": sum(1 for ln in tree.splitlines() if ln and ln[0] not in "#@")}
@@ -338,6 +353,14 @@ def capture(args):
                     info["truncated"] = True
                 if not args.no_png:
                     (out / f"{state}.png").write_bytes(b.screenshot())
+                    # The picture must be of the same window the tree was.
+                    if group["card"] and "window open" not in b.popup("mem=1"):
+                        raise RuntimeError(f"{state}: the window closed before its screenshot")
+                if group["card"]:
+                    info["since_open_s"] = round(time.time() - opened_at, 1)
+                    if info["since_open_s"] > 50:
+                        print(f"  WARNING: {state} was {info['since_open_s']} s after the window opened;"
+                              " it closes itself at 60")
                 run["states"][state] = info
                 group_states.append(state)
                 print(f"  {state:<26} {info['objects']:4d} objects, lv_mem {info['lv_mem_used']}"
@@ -482,6 +505,7 @@ def path_of(node):
 # compare
 # ---------------------------------------------------------------------------------------------
 DIGITS = re.compile(r"\d+")
+ROW_TIME = re.compile(r"\bago\b|just now|yesterday|today|\bAM\b|\bPM\b", re.I)
 TIME_WORDS = re.compile(r"\d|\bago\b|just now|yesterday|today|tomorrow|\bnow\b|\bAM\b|\bPM\b", re.I)
 # Places and sizes, wherever they show (a style's x/y/w/h, pads that fit a row to its room).
 GEOM_STYLE = {"x", "y", "w", "h", "minw", "maxw", "minh", "maxh", "tx", "ty", "pt", "pb", "pl", "pr",
@@ -606,9 +630,29 @@ def compare_trees(ta, tb):
         if twin is not None and datalike(n):
             mark(absorb_from(twin))
 
+    # A CARD ON THE PAGE whose words changed shows the house, not the code: a value, its unit,
+    # a STALE badge, a light turned off. Everything inside such a card is the data's - except
+    # the card's own place and size, which are the page's layout. A card is the wrapper round a
+    # surface, which carries LV_OBJ_FLAG_USER_1 (CardPopup::CARD_SURFACE_FLAG).
+    data = set()   # ids of A's nodes
+    changed_texts = {id(a) for a, b in pairs if a.text != b.text}
+    gone_or_new = {id(pa) for pa, _ in dels} | {id(to_a[id(pb)]) for pb, _ in adds if id(pb) in to_a}
+    for a, b in pairs:
+        if not any(int(c.fields.get("fl", "0"), 16) & 0x8000000 for c in a.children):
+            continue
+        inner = [x for x in walk(a) if x is not a]
+        if any(id(x) in changed_texts or id(x) in gone_or_new for x in walk(a)):
+            for x in inner:
+                data.add(id(x))
+
     for a, b in pairs:
         p = path_of(b)
         excused = id(a) in scope
+        if id(a) in data:
+            if (a.cls, a.text, a.x, a.y, a.w, a.h, a.fields, a.style) != (b.cls, b.text, b.x, b.y, b.w, b.h,
+                                                                          b.fields, b.style):
+                vol.append(("DATA", p, f"inside a card whose data changed ({b.describe()})"))
+            continue
         if a.cls != b.cls:
             real.append(("CLASS", p, f"{a.cls} -> {b.cls}"))
             continue
@@ -624,23 +668,29 @@ def compare_trees(ta, tb):
             va, vb = a.fields.get(k), b.fields.get(k)
             if va != vb:
                 item = ("FIELD", p, f"{k}: {va} -> {vb}  ({b.describe()})")
-                (vol if (excused and k in GEOM_FIELDS) else real).append(item)
+                # An activity row's tap carries its event's place in HA's list, which moves when
+                # an event joins or leaves the span: the same events, the codes the same.
+                rowdata = k == "ev" and va and vb and re.sub(r":\d+", "", va) == re.sub(r":\d+", "", vb) \
+                    and any(x.text and ROW_TIME.search(x.text) for x in walk(b))
+                (vol if ((excused and k in GEOM_FIELDS) or rowdata) else real).append(item)
+        # A value whose words changed may step its face to fit (a card's value does).
+        refit = a.text is not None and volatile_text(a.text, b.text)
         for blk in sorted(set(a.style) | set(b.style)):
             sa, sb = a.style.get(blk, {}), b.style.get(blk, {})
             for k in sorted(set(sa) | set(sb)):
                 va, vb = sa.get(k), sb.get(k)
                 if va != vb:
                     item = ("STYLE", p, f"{blk} {k}: {va} -> {vb}  ({b.describe()})")
-                    (vol if (excused and k in GEOM_STYLE) else real).append(item)
+                    (vol if ((excused and k in GEOM_STYLE) or (refit and k == "font")) else real).append(item)
     for pa, n in dels:
         item = ("GONE", path_of(n), n.describe())
-        (vol if id(n) in scope else real).append(item)
+        (vol if id(n) in scope or id(pa) in data else real).append(item)
     for pb, n in adds:
         item = ("NEW", path_of(n), n.describe())
         twin = to_a.get(id(pb))   # excused when what holds it is in a volatile scope
-        excused = pb.volkids or (twin is not None and (id(twin) in scope or twin.volkids))
+        excused = pb.volkids or (twin is not None and (id(twin) in scope or twin.volkids or id(twin) in data))
         (vol if excused else real).append(item)
-    return real, vol, pairs, scope
+    return real, vol, pairs, scope | data
 
 
 # --- screenshots: just enough PNG to read the board's own (8-bit RGB / RGBA) and write a diff --
@@ -721,36 +771,55 @@ def compare_pixels(pa, pb, tb, scope_rects, window_state, diff_path):
     # what the window's tree describes.
     considered = None
     if window_state:
-        considered = []
+        considered = []   # (x1, y1, x2, y2, corner radius): the page shows in a rounded corner
         for root in tb["roots"].values():
             for n in walk(root):
                 if n.parent is None:
                     continue
                 if n.style.get("main", {}).get("bgopa") == "255" or n.cls == "image":
-                    considered.append(n.rect())
+                    r = int(n.style.get("main", {}).get("r", "0") or 0)
+                    considered.append(n.rect() + (min(r, min(n.w, n.h) // 2),))
 
-    def overlaps(tx, ty, rects, pad=1):
-        """Does the tile at tx,ty touch any of these rectangles?"""
-        x2, y2 = tx + TILE - 1, ty + TILE - 1
-        return any(r[0] - pad <= x2 and tx <= r[2] + pad and r[1] - pad <= y2 and ty <= r[3] + pad
+    def overlaps(box, rects, pad=1):
+        """Does the box (x1, y1, x2, y2) touch any of these rectangles?"""
+        return any(r[0] - pad <= box[2] and box[0] <= r[2] + pad and r[1] - pad <= box[3] and box[1] <= r[3] + pad
                    for r in rects)
 
+    def inside(x, y, rects):
+        for r in rects:
+            if not (r[0] <= x <= r[2] and r[1] <= y <= r[3]):
+                continue
+            rad = r[4] if len(r) > 4 else 0
+            cx = r[0] + rad if x < r[0] + rad else r[2] - rad if x > r[2] - rad else x
+            cy = r[1] + rad if y < r[1] + rad else r[3] - rad if y > r[3] - rad else y
+            if (x - cx) ** 2 + (y - cy) ** 2 <= rad * rad:
+                return True
+        return False
+
+    # Per pixel: a tile counts only for the pixels that differ IN WHAT IS CONSIDERED (a value on
+    # a card just past the window's corner shares a tile with the window), and it is explained
+    # when the box round those pixels touches a volatile object.
     diff_tiles, unexplained = 0, []
     for ty in range(0, h, TILE):
         for tx in range(0, w, TILE):
-            differs = False
+            box = None
             for y in range(ty, min(ty + TILE, h)):
                 o = (y * w + tx) * 3
                 e = (y * w + min(tx + TILE, w)) * 3
-                if A[o:e] != B[o:e]:
-                    differs = True
-                    break
-            if not differs:
-                continue
-            if considered is not None and not overlaps(tx, ty, considered, 0):
+                if A[o:e] == B[o:e]:
+                    continue
+                for x in range(tx, min(tx + TILE, w)):
+                    p = (y * w + x) * 3
+                    if A[p:p + 3] == B[p:p + 3]:
+                        continue
+                    if considered is not None and not inside(x, y, considered):
+                        continue
+                    box = [x, y, x, y] if box is None else [min(box[0], x), min(box[1], y),
+                                                             max(box[2], x), max(box[3], y)]
+            if box is None:
                 continue
             diff_tiles += 1
-            if not overlaps(tx, ty, scope_rects):
+            if not overlaps(box, scope_rects):
                 unexplained.append((tx, ty))
     # Merge unexplained tiles into boxes, row-runs first.
     boxes = []
