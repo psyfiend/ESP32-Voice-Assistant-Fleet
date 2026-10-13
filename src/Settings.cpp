@@ -587,6 +587,29 @@ uint8_t countCards(const char *key, const char *value) {
     return n;
 }
 
+void forEachCardWith(const char *key, void (*fn)(const char *, const char *, void *), void *ctx) {
+    if (!s_doc || !key || !fn) return;
+    constexpr uint8_t MAXN = 96;   // in PSRAM: the pool of removed cards counts too
+    struct C { char id[48]; char v[48]; };
+    C *c = (C *)heap_caps_malloc(MAXN * sizeof(C), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!c) return;
+    uint8_t n = 0;
+    {
+        Lock l;
+        JsonObjectConst cards = (*s_doc)["cards"];
+        for (JsonPairConst kv : cards) {
+            if (n >= MAXN) break;
+            JsonVariantConst v = kv.value()[key];
+            if (!v.is<const char *>()) continue;
+            snprintf(c[n].id, sizeof(c[n].id), "%s", kv.key().c_str());
+            snprintf(c[n].v, sizeof(c[n].v), "%s", v.as<const char *>());
+            n++;
+        }
+    }
+    for (uint8_t i = 0; i < n; i++) fn(c[i].id, c[i].v, ctx);
+    heap_caps_free(c);
+}
+
 bool entityFlag(const char *entityId, const char *key, bool dflt) {
     if (!s_doc || !entityId) return dflt;
     Lock l;

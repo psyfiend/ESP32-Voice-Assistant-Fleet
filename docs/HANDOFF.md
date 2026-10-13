@@ -1,4 +1,4 @@
-# Handoff — 2026-10-12 (2.10 DONE: 2.10d + 2.10e merged as `v0.2.11`; next K17, then interview §3)
+# Handoff — 2026-10-13 (K17 DONE as `v0.2.12`; next: 2.12 UI foundation, the refactor - `design/ui-foundation.md`)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was rewritten from scratch on
@@ -13,9 +13,10 @@ to the doc that owns it. This file says where things are, not how they got there
 
 ## Where the project is
 
-**`v0.2.11` tagged 2026-10-12** at the merge of 2.10d and 2.10e - **milestone 2.10, the card
-popup, is done** (`v0.2.10` was 2.10c, `v0.2.9` 2.10b, `v0.2.8` 2.10a); `CHANGELOG.md` matches
-versions to milestones.
+**`v0.2.12` tagged 2026-10-13** at the K17 merge (a group's member as a card of its own);
+**`v0.2.11`** 2026-10-12 at the merge of 2.10d and 2.10e - **milestone 2.10, the card popup, is
+done** (`v0.2.10` was 2.10c, `v0.2.9` 2.10b, `v0.2.8` 2.10a); `CHANGELOG.md` matches versions to
+milestones.
 
 What a board does: boots into two pages (House = the owner's 18 HA entities over the websocket,
 Fleet = MQTT/system/virtual cards), swiped with wrap-around; three colour schemes (Midnight
@@ -27,9 +28,21 @@ anything on/off as its activity - from HA; the owner's choices saved by card id 
 
 ## What is next
 
-1. **K17** - a group's member added as a card of its own (it needed 2.10d's stable ids).
+1. **2.12 UI foundation - the refactor** (proposed by Claude, asked for by the owner 2026-10-13).
+   **The brief, the roadmap and the working rules: `docs/design/ui-foundation.md` - read all of
+   it first.** In short: `src/Cards/CardPopup.cpp` is 6,325 lines in one file with half its shapes
+   as literals; P0 a safety net (`/popup?tree=1` + a golden-screenshot harness, baseline at
+   `v0.2.12`), P1 split it by concern, P2 shape and spacing tokens, P3 a component kit, P4 the
+   window as a reusable Sheet, P5 the layout engine interface, P6 the hand-off - **no look or
+   behaviour change**, on `refactor/ui-foundation`, never merged without the owner.
 2. **The design interview §3 onward** (below), then 2.8 header slots (#19), then 2.11 group cards
    with the page arranger (#66, #78). `ROADMAP.md`'s running order.
+
+**K17 DONE** (`v0.2.12`, K65-K70): `CardAdded` (`include/Cards/CardAdded.h`) keeps cards made on the
+device in the settings file and merges them into their page after the card they came from; Remove
+asks in a dialog; removed cards are the file's pool. `/popup?addcard=1|removecard=1|2`. Open from
+it: a group's member shows Area in HA / Device "None" - HA's area template runs before the members
+are learnt (#93). Sheet: `docs/archive/TEST_K17.md`.
 Owner's ideas parked for after 2.10 has settled: the light controls' sliding selector for the
 chart's span chips (#92); a window timeout and the countdown bar, device-wide (#23).
 

@@ -393,6 +393,9 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
 - **Groups for card labels** are `CardGroups` (K46): one kind of group, device-wide, HA areas linked
   in as groups; a card's card label shows its group's name (or its own words) in the group's colour.
   **Colour is the key to a group and never follows a rename.**
+- **Cards added on the device** (K17, `CardAdded`) are card entries with `page`, `after` and `entity`
+  keys (and `removed` once removed - the page's pool, never built), merged into their page right
+  after the card they came from when it is built. Their ids are made as K33's.
 - **Every change is logged** with its time and task (`loopTask` = the card window, `httpd` = a
   browser); the last ten are in `/settings?stats=1`.
 - `GET /settings` serves the file; `?stats=1` its counters, files and anything unclaimed. The PC

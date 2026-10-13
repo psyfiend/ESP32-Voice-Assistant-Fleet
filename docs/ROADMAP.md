@@ -56,6 +56,7 @@ levels arrive with 2.10c), **#47** discovery payload size, **#48** reason 36.
 | 2.9 | Display stack: esp_lcd (**#67**) | six of nine boards, merged 2026-09-29; left: CYD_S3_8048, WS_S3_5B - `display/README.md` |
 | 2.10 | Card popup (**#65**) | **DONE 2026-10-12.** 2.10a `v0.2.8`; 2.10b `v0.2.9`; 2.10c `v0.2.10` (HA light levels, members of HA groups, scenes, the window redesigned - `design/card-sheet.md` §14-16). **2.10d + 2.10e `v0.2.11`** (merged together, K51): stable ids and saving (§17), History from HA - charts and activity (§18). Sheets in `archive/`. Left over, filed: K17 (a member as a card of its own, next), #90, #91, #92 |
 | 2.11 | Group cards (**#66**) | not started - with the page arranger (#78); must land before 3.1 |
+| 2.12 | UI foundation - the refactor | **proposed 2026-10-13**, before 2.8: `design/ui-foundation.md` (the brief, phases P0-P6) |
 
 ## Phase 3 — Build sheet
 
@@ -91,15 +92,19 @@ device reads, and the backup format - not something a user edits.
 **#31** card library (with #86 control styles, #77 media), **#32** WS_S3_4B onboard hardware, **#33**
 RS485/Modbus, **#34** weather station, **#35** alarm clock.
 
-## Running order — 2026-10-06 (item 1 done 2026-10-12)
+## Running order — 2026-10-06 (item 1 done 2026-10-13; 2.12 inserted 2026-10-13)
 
 The numbers above are identity, not sequence. Agreed with the owner:
 
-1. ~~**2.10d + 2.10e, one merge**~~ - DONE, `v0.2.11`. Its small follow-up, **K17** (a group's
-   member added as a card of its own), comes first.
-2. **The design interview §3 onward** (`design/interview-phase2-3.md`), then **2.8** header slots (#19).
-3. **2.11 group cards with the page arranger** (#66, #78; prototype: artifact "Layout Playground").
-4. **3.1 schema** (#20), scoped together with **the companion web app** (#87).
+1. ~~**2.10d + 2.10e, one merge**~~ - DONE, `v0.2.11`; ~~**K17**~~ (a group's member as a card of
+   its own) - DONE, `v0.2.12`.
+2. **2.12 UI foundation - the refactor** (proposed 2026-10-13, `design/ui-foundation.md`): a
+   safety net (tree dumps + golden screenshots), `CardPopup.cpp` (6,325 lines) split by concern,
+   shape and spacing tokens, a component kit, the window as a reusable Sheet, the layout engine
+   interface. No look or behaviour change. Before 2.8, which builds on the kit.
+3. **The design interview §3 onward** (`design/interview-phase2-3.md`), then **2.8** header slots (#19).
+4. **2.11 group cards with the page arranger** (#66, #78; prototype: artifact "Layout Playground").
+5. **3.1 schema** (#20), scoped together with **the companion web app** (#87).
 
 Alongside, when the hardware is on the desk: #67's last two boards; #72 battery (fuel gauges
 ordered); #69 4B panel timing (WS_S3_4B locked up, waiting to be troubleshot); #70 S3 LVGL speed;

@@ -6,6 +6,8 @@
 #include "UI/UIToolkit.h"
 #include "Settings.h"   // 2.10d: SETTINGS' rows are kept by card id
 #include "Cards/CardGroups.h"   // the Card label row (K44)
+#include "Cards/CardAdded.h"    // K17: Add as a card, Remove card
+#include "Cards/PageSpec.h"     // CARD_ID_MAX
 #include "HaHistory.h"          // the History view's source (2.10e); no LVGL in it
 #include "TimeFormat.h"         // every time and duration it says (2.10e round 4)
 #include "src/core/lv_obj_event_private.h"   // lv_hit_test_info_t: the tap catcher's hit test
@@ -228,7 +230,7 @@ struct Popup {
     GroupOn   groupOn = GroupOn::GROUP_ON_ANY;   // copied from the card at open
     SceneShow sceneShow = SceneShow::SCENES_VISIBLE;   // likewise (2.10c)
     lv_obj_t *ddGroup = nullptr;      // SETTINGS' live dropdown
-    lv_obj_t *ddTapScene = nullptr;   // SCENES' Tap scene: greyed unless Tap action is Load scene
+    lv_obj_t *ddTapScene = nullptr;   // SCENES' Default scene
     bool      builtPaused = false, rebuildQueued = false;   // "A paused window"
     uint8_t   builtCaps = 0;                     // what the selector was built for
     lv_obj_t *pill = nullptr;                    // PAUSED
@@ -3170,6 +3172,7 @@ void histRowCb(lv_event_t *ev) {
 
 void memberRowCb(lv_event_t *ev);   // below, with the member view
 void deckRender();                  // below, with the deck
+void deckSync();                    // below: SETTINGS made again when its rows change
 void chartSet(uint8_t state);       // below, with the deck: the CHART panel
 void chartFold();                   // open: back to its tab
 void sideFor(PopupView v);          // below: the left panel a view wants (CHART / SCENES)
@@ -3281,24 +3284,30 @@ void buildProps() {
             if (s.ent[i]) propRow(list, s.ent[i]->desc.name,
                                   s.ent[i]->desc.externalRef[0] ? s.ent[i]->desc.externalRef : s.ent[i]->desc.id);
     } else {
+        // The owner's order (2026-10-13): where it comes from, what it is
+        // called and where it lives, then what kind of thing, then the card's.
+        Card *c = inMember() ? nullptr : cardOf(h.surface);
         const bool ha = e->desc.source == EntitySource::HA;
+        static const char *const SRC[] = { "This board (a sensor)", "This board", "MQTT", "Home Assistant", "Virtual" };
+        propRow(list, "Source", SRC[(uint8_t)e->desc.source < 5 ? (uint8_t)e->desc.source : 0]);
         propRow(list, "Name in HA", ha ? (e->sourceName[0] ? e->sourceName : e->desc.name) : "");
         propRow(list, "Entity ID", e->desc.externalRef[0] ? e->desc.externalRef : e->desc.id);
         propRow(list, "Area in HA", ha ? (e->sourceArea[0] ? e->sourceArea : "None") : "");
+        CardGroups::Group g;   // its group on this dashboard (K46)
+        if (c) propRow(list, "Card group", CardGroups::ofCard(*c, g) ? g.name : "None");
         const bool mine = e->desc.source == EntitySource::SYSTEM || e->desc.source == EntitySource::LOCAL;
         propRow(list, "Device", ha ? (e->sourceDevice[0] ? e->sourceDevice : "None") : mine ? "This board" : "");
-        static const char *const SRC[] = { "This board (a sensor)", "This board", "MQTT", "Home Assistant", "Virtual" };
-        propRow(list, "Source", SRC[(uint8_t)e->desc.source < 5 ? (uint8_t)e->desc.source : 0]);
         propRow(list, "Device class", e->desc.deviceClass);
-        propRow(list, "Unit", e->desc.unit);
         propRow(list, "State class", e->desc.stateClass);
+        propRow(list, "Unit", e->desc.unit);
         if (e->nMembers) { snprintf(buf, sizeof(buf), "%u", (unsigned)e->nMembers); propRow(list, "Members", buf); }
+        if (c) propRow(list, "Card ID", c->hasId() ? c->id() : "");   // K33
     }
-    // The card's own: its group on this dashboard (K46) and its id (K33).
-    if (Card *c = inMember() ? nullptr : cardOf(h.surface)) {
+    // A card standing for several entities made here: its group and id after them.
+    if (Card *c = (!e && !inMember()) ? cardOf(h.surface) : nullptr) {
         CardGroups::Group g;
         propRow(list, "Card group", CardGroups::ofCard(*c, g) ? g.name : "None");
-        propRow(list, "Card id", c->hasId() ? c->id() : "");
+        propRow(list, "Card ID", c->hasId() ? c->id() : "");
     }
     // ALL OF IT IN SIGHT where it can be (owner, round 6: the P4_5 cut "Card
     // id" in half): the gaps between the rows close up, as far as a third of
@@ -3425,6 +3434,7 @@ void showView(PopupView v) {
     else if (v == PopupView::VIEW_MEMBERS) buildMembers();
     else if (v == PopupView::VIEW_PROPS)   buildProps();
     else                                   buildMain();
+    deckSync();     // SETTINGS' rows are the view's (a member's own has more)
     deckRender();   // Paused follows whatever the window is showing now
     s.lastSig = signature();
 }
@@ -4348,6 +4358,18 @@ TapAction tapShown(const Card &c) {
     return c.tapToggles() ? TapAction::TAP_TOGGLE : TapAction::TAP_HISTORY;
 }
 
+// WHAT "Scenes..." DOES (owner, 2026-10-13; interview §12): SCENES' Scene
+// action row - Load default or Cycle scenes. The card's own when its Tap
+// action is a scene's, else the choice kept for when it becomes one.
+TapAction sceneActionOf(const Card &c) {
+    const TapAction t = c.tapAction();
+    if (t == TapAction::TAP_CYCLE_SCENES || t == TapAction::TAP_LOAD_SCENE) return t;
+    char v[12];
+    if (c.hasId() && Settings::card(c.id(), "scene_action", v, sizeof(v)) && !strcmp(v, "cycle"))
+        return TapAction::TAP_CYCLE_SCENES;
+    return TapAction::TAP_LOAD_SCENE;
+}
+
 uint16_t tapRowBuild(const Card &c) {
     s_tapN = 0;
     size_t used = 0;
@@ -4362,10 +4384,8 @@ uint16_t tapRowBuild(const Card &c) {
     add(TapAction::TAP_DETAILS, "Details view");
     if (hasMembers())   add(TapAction::TAP_MEMBERS, "Members view");
     add(TapAction::TAP_HISTORY, "History view");
-    if (c.offeredScenes(sc, ENTITY_SCENES_MAX)) {
-        add(TapAction::TAP_CYCLE_SCENES, "Cycle scenes");
-        add(TapAction::TAP_LOAD_SCENE,   "Load scene");
-    }
+    // One line for both (owner, 2026-10-13): which one is SCENES' Scene action.
+    if (c.offeredScenes(sc, ENTITY_SCENES_MAX)) add(sceneActionOf(c), "Scenes...");
     add(TapAction::TAP_NOTHING, "Nothing");
     const TapAction cur = tapShown(c);
     for (uint8_t i = 0; i < s_tapN; i++) if (s_tapMap[i] == cur) return i;
@@ -4420,6 +4440,8 @@ bool unitsShownF() {
 }
 void unitsDropCb(lv_event_t *ev);
 void propsCb(lv_event_t *ev);
+void addCardCb(lv_event_t *ev);
+void removeCardCb(lv_event_t *ev);
 
 uint8_t deckSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
@@ -4449,8 +4471,9 @@ uint8_t deckSpecs(DeckRowSpec *r) {
         r[n++] = { "Card label", DeckRowKind::ROW_DROP, s_clOpts, clSel,
                    false, cardLabelDropCb, nullptr };
     }
-    r[n++] = { "Visibility", DeckRowKind::ROW_DROP,
-               "Show on dashboard\nShow only in group\nShow only as member\nHidden", 0, false, nullptr, nullptr };
+    // Visibility is NOT SHOWN (owner, 2026-10-12, K68): it belongs to cards in
+    // a group shown as a cluster, a group panel or a group page, and none
+    // exists yet. It comes back with them, offered only there.
     // Tap action (2.10d). Long press always opens the window (K39), whatever
     // this says. Greyed in a member's own view: it is the card's.
     const bool cardRows = held && held->hasId() && !inMember();
@@ -4470,6 +4493,16 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     // ENTITY PROPERTIES (owner): a view of its own, from here - no room for
     // another corner icon.
     r[n++] = { "Entity properties", DeckRowKind::ROW_BUTTON, "View", 0, true, propsCb, nullptr };
+    // K17 (K65): a member of a group card made a card of its own - a copy,
+    // right after the group card, in its group. Once made, the row says so.
+    if (inMember() && held && held->hasId() && s.ent[0]) {
+        const bool made = CardAdded::addedFor(held->id(), s.ent[0]->desc.id) != nullptr;
+        r[n++] = { "Add card to dashboard", DeckRowKind::ROW_BUTTON, made ? "Added" : "Add", 0, !made, addCardCb, nullptr };
+    }
+    // A card added on the device can be removed (K66) - to the page's pool,
+    // after a dialog that asks (confirmRemove()).
+    if (!inMember() && held && CardAdded::isAdded(held->id()))
+        r[n++] = { "Remove card", DeckRowKind::ROW_BUTTON, "Remove", 0, true, removeCardCb, nullptr };
 #ifdef DEBUG_POPUP
     // GET /popup?rows=N: N greyed test rows, so SETTINGS is too tall for the
     // screen and the panel's drag can be tried (P1b round 2).
@@ -4600,11 +4633,13 @@ lv_obj_t *deckButton(lv_obj_t *parent, const DeckRowSpec &r) {
     lv_obj_set_style_bg_color    (b, UI::c(p.SURFACE), 0);
     lv_obj_set_style_bg_color    (b, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
     lv_obj_set_style_border_width(b, LV_MAX(1, mm(0.2f)), 0);
-    lv_obj_set_style_border_color(b, UI::c(p.ACCENT), 0);
-    lv_obj_t *l = makeLabel(b, UI::type().TAG, p.TEXT);
+    // Greyed (K17's "Added"): no accent, dim words, nothing to tap.
+    lv_obj_set_style_border_color(b, UI::c(r.live ? p.ACCENT : UI::mix(p.SURFACE, p.TEXT, 25)), 0);
+    lv_obj_t *l = makeLabel(b, UI::type().TAG, r.live ? p.TEXT : p.TEXT_DIM);
     lv_label_set_text(l, r.opts);
     lv_obj_center(l);
-    if (r.cb) lv_obj_add_event_cb(b, r.cb, LV_EVENT_CLICKED, nullptr);
+    if (!r.live) lv_obj_clear_flag(b, LV_OBJ_FLAG_CLICKABLE);
+    else if (r.cb) lv_obj_add_event_cb(b, r.cb, LV_EVENT_CLICKED, nullptr);
     return b;
 }
 
@@ -4639,9 +4674,19 @@ void groupDropCb(lv_event_t *ev) {
     renderMain();
 }
 
+// The default scene: the one chosen, else the first offered - kept, so Load
+// default always has one.
+void ensureDefaultScene(Card &c) {
+    if (c.tapScene()[0]) return;
+    const Entity *sc[ENTITY_SCENES_MAX];
+    if (!c.offeredScenes(sc, ENTITY_SCENES_MAX)) return;
+    c.setTapScene(sc[0]->desc.externalRef);
+    keepCardSetting("tap_scene", sc[0]->desc.externalRef);
+    if (s.ddTapScene) lv_dropdown_set_selected(s.ddTapScene, 0);
+}
+
 // Tap action: on the held card at once (the next tap does it), kept under its
-// id. Load scene with no scene chosen yet takes the first offered, and the
-// scene row comes alive.
+// id. "Scenes..." is SCENES' Scene action, with a default scene ready.
 void tapDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     Card *c = cardOf(h.surface);
@@ -4649,15 +4694,23 @@ void tapDropCb(lv_event_t *ev) {
     const TapAction t = s_tapMap[k];
     c->setTapAction(t);
     keepCardSetting("tap", tapActionName(t));
-    if (t == TapAction::TAP_LOAD_SCENE && !c->tapScene()[0]) {
-        const Entity *sc[ENTITY_SCENES_MAX];
-        if (c->offeredScenes(sc, ENTITY_SCENES_MAX)) {
-            c->setTapScene(sc[0]->desc.externalRef);
-            keepCardSetting("tap_scene", sc[0]->desc.externalRef);
-            if (s.ddTapScene) lv_dropdown_set_selected(s.ddTapScene, 0);
-        }
+    if (t == TapAction::TAP_LOAD_SCENE) ensureDefaultScene(*c);
+}
+
+// SCENES' Scene action (owner, 2026-10-13): Load default / Cycle scenes. Kept
+// for the card; and when its Tap action is "Scenes...", the tap does it now.
+void sceneActionDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    Card *c = cardOf(h.surface);
+    if (!c) return;
+    const TapAction want = k ? TapAction::TAP_CYCLE_SCENES : TapAction::TAP_LOAD_SCENE;
+    keepCardSetting("scene_action", k ? "cycle" : "load");
+    const TapAction t = c->tapAction();
+    if (t == TapAction::TAP_CYCLE_SCENES || t == TapAction::TAP_LOAD_SCENE) {
+        c->setTapAction(want);
+        keepCardSetting("tap", tapActionName(want));
     }
-    rowLive(s.ddTapScene, t == TapAction::TAP_LOAD_SCENE);
+    if (want == TapAction::TAP_LOAD_SCENE) ensureDefaultScene(*c);
 }
 
 void tapSceneDropCb(lv_event_t *ev) {
@@ -4705,6 +4758,115 @@ void propsCb(lv_event_t *ev) {
     (void)ev;
     deckSet(DECK_PEEK);
     lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_PROPS); }, nullptr);
+}
+
+// "Add as a card" (K17): made now, kept in the file, shown when the window
+// closes - the page is built again then (GUIManager::tick()), not under the
+// window, which holds the page's cards.
+void addCardCb(lv_event_t *ev) {
+    (void)ev;
+    Card *held = cardOf(h.surface);
+    if (!held || !inMember() || !s.ent[0]) return;
+    char id[CARD_ID_MAX + 1];
+    if (!CardAdded::add(*held, *s.ent[0], id, sizeof(id))) return;
+    lv_async_call([](void *) { deckSync(); }, nullptr);   // the row now says "Added" - not from its own button's event
+}
+
+// "Remove card" (K66) ASKS IN A DIALOG YOU CANNOT MISS (owner, K17 run 2: a
+// button that changed to "Sure?" was easy to overlook). Over everything - the
+// window, its panels - on the top layer, the rest dimmed; Cancel, or a tap
+// outside, leaves it; Remove removes and closes the window, and the page is
+// built again without the card. Rare, so the dim's one full-screen redraw is
+// worth it here (the window itself has none - "Usable first").
+lv_obj_t *s_confirm = nullptr;
+
+void confirmClose() {
+    if (s_confirm) { lv_obj_delete(s_confirm); s_confirm = nullptr; }
+}
+
+lv_obj_t *confirmButton(lv_obj_t *parent, const char *txt, uint32_t bg, uint32_t ink, uint32_t edge,
+                        lv_event_cb_t cb) {
+    const UIPalette &p = UI::pal();
+    lv_obj_t *b = plain(parent);
+    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(b, mm(24.0f), UI::minTouch());
+    lv_obj_set_style_radius(b, mm(1.6f), 0);
+    lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(b, UI::c(bg), 0);
+    lv_obj_set_style_bg_color(b, UI::c(UI::mix(bg, p.TEXT, 20)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+    lv_obj_set_style_border_width(b, LV_MAX(1, mm(0.25f)), 0);
+    lv_obj_set_style_border_color(b, UI::c(edge), 0);
+    lv_obj_t *l = makeLabel(b, UI::type().NAME, ink);
+    lv_label_set_text(l, txt);
+    lv_obj_center(l);
+    lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, nullptr);
+    return b;
+}
+
+void confirmRemove() {
+    confirmClose();
+    if (!CardPopup::isOpen() || !cardOf(h.surface)) return;
+    const UIPalette &p = UI::pal();
+    const UIType    &t = UI::type();
+    // The dim, which also takes every tap that misses the box: Cancel.
+    s_confirm = plain(lv_layer_top());
+    lv_obj_set_size(s_confirm, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_bg_color(s_confirm, UI::c(p.GROUND), 0);
+    lv_obj_set_style_bg_opa(s_confirm, LV_OPA_60, 0);
+    lv_obj_add_flag(s_confirm, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(s_confirm, [](lv_event_t *e) {
+        if (lv_event_get_target(e) == lv_event_get_current_target(e)) lv_async_call([](void *) { confirmClose(); }, nullptr);
+    }, LV_EVENT_CLICKED, nullptr);
+
+    lv_obj_t *box = plain(s_confirm);
+    lv_obj_add_flag(box, LV_OBJ_FLAG_CLICKABLE);   // a tap on it is not a tap outside
+    lv_obj_set_width(box, LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(90.0f)));
+    lv_obj_set_height(box, LV_SIZE_CONTENT);
+    lv_obj_center(box);
+    lv_obj_set_style_radius(box, UI::sc(UI::met().RADIUS), 0);
+    lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(box, UI::c(p.SURFACE_ALT), 0);
+    lv_obj_set_style_border_width(box, LV_MAX(2, mm(0.4f)), 0);
+    lv_obj_set_style_border_color(box, UI::c(p.ST_BAD), 0);
+    lv_obj_set_style_pad_all(box, mm(4.0f), 0);
+    lv_obj_set_style_pad_row(box, mm(2.4f), 0);
+    lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_t *title = makeLabel(box, t.NAME, p.TEXT);
+    lv_label_set_text(title, "Remove this card?");
+    // The owner's words (K17 round 3).
+    char buf[200];
+    snprintf(buf, sizeof(buf), "The card \"%s\" will be removed from the dashboard, any other "
+                               "instances of this card will be unaffected.", s.name);
+    for (const char *txt : { (const char *)buf, "Removed cards can be restored at any time." }) {
+        lv_obj_t *body = makeLabel(box, t.TAG, p.TEXT_DIM);
+        lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(body, lv_pct(100));
+        lv_obj_set_style_text_align(body, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(body, txt);
+    }
+
+    lv_obj_t *row = plain(box);
+    lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_top(row, mm(1.2f), 0);
+    confirmButton(row, "Cancel", p.SURFACE, p.TEXT, UI::mix(p.SURFACE, p.TEXT, 30), [](lv_event_t *) {
+        lv_async_call([](void *) { confirmClose(); }, nullptr);
+    });
+    confirmButton(row, "Remove", p.ST_BAD, p.SURFACE, p.ST_BAD, [](lv_event_t *) {
+        lv_async_call([](void *) {
+            confirmClose();
+            Card *held = CardPopup::isOpen() ? cardOf(h.surface) : nullptr;
+            if (held && CardAdded::remove(held->id())) CardPopup::close();
+        }, nullptr);
+    });
+}
+
+void removeCardCb(lv_event_t *ev) {
+    (void)ev;
+    lv_async_call([](void *) { confirmRemove(); }, nullptr);
 }
 
 // Paused, a checkbox. Through the card when it is the held one (it repaints at
@@ -4986,9 +5148,19 @@ void buildFolder(Folder &F, bool left, const char *title, int32_t needW, int32_t
 // showWindow()'s quiet build (invalidation off); showWindow() then slides it
 // up to its tab. Its rows come from one list - deckSpecs() - read here for the
 // size and again by deckFill() for the contents.
+// What the rows are, as a number: their words, choices and whether each is live.
+uint32_t s_deckSig = 0;   // the rows SETTINGS was built for
+uint32_t deckSig(const DeckRowSpec *r, uint8_t n) {
+    uint32_t h = 2166136261u;   // FNV-1a
+    auto mix = [&](const char *p) { for (; p && *p; p++) { h ^= (uint8_t)*p; h *= 16777619u; } h ^= 0xFF; h *= 16777619u; };
+    for (uint8_t i = 0; i < n; i++) { mix(r[i].label); mix(r[i].opts); h ^= r[i].live ? 1u : 2u; h *= 16777619u; }
+    return h;
+}
+
 void deckCreate() {
     DeckRowSpec specs[DECK_ROWS_MAX];
     const int32_t rows = deckSpecs(specs);
+    s_deckSig = deckSig(specs, (uint8_t)rows);
     const int32_t w = lv_area_get_width(&s.winRect);
     Folder F;
     buildFolder(F, false, "SETTINGS", deckNeedW(), rows, w / 2, deckTabCb);
@@ -5013,6 +5185,35 @@ void deckFill() {
         lv_obj_t *row = deckRow(s.deckBody, r[i].label, r[i].live);
         lv_obj_t *ctl = deckControl(row, r[i]);
         if (r[i].out) *r[i].out = ctl;
+    }
+}
+
+// SETTINGS FOLLOWS ITS ROWS (K17 testing, owner: "Add as a card" came and went).
+// The panel is sized for its rows when it is made and filled when first opened,
+// so rows that change later - another view (a member's own adds "Add as a
+// card"), "Added", "Sure?" - were missing or cut off. When the rows are not
+// the ones it was made for, it is made again in place: same state, no slide.
+void deckSync() {
+    if (!s.deck) return;
+    DeckRowSpec r[DECK_ROWS_MAX];
+    if (deckSig(r, deckSpecs(r)) == s_deckSig) return;
+    const uint8_t st = s.deckState;
+    lv_anim_delete(s.deck, deckExec);
+    lv_anim_delete(s.deckTrack, nullptr);
+    lv_obj_remove_event_cb(s.deckTrack, panelTrackCb);
+    lv_obj_delete(s.deckTrack);   // the holder and its rows with it
+    s.deck = s.deckTab = s.deckTabLbl = s.deckPane = s.deckBody = nullptr;
+    s.deckTrack = s.deckUp = s.deckDown = nullptr;
+    s.swPause = nullptr;
+    s.ddGroup = nullptr;
+    deckCreate();
+    if (st == DECK_HIDDEN) return;
+    s.deckState = st;
+    if (st == DECK_OPEN) { deckFill(); lv_obj_move_foreground(s.deckTrack); }
+    lv_obj_set_y(s.deck, deckY(st));
+    if (st == DECK_OPEN) {
+        panelArm(s.deckTrack, s.deck, s.deckH);
+        panelCarets(s.deckTrack, s.deck, s.deckPane, s.deckUp, s.deckDown);
     }
 }
 
@@ -5160,12 +5361,14 @@ uint8_t activitySpecs(DeckRowSpec *r) {
     return n;
 }
 
-// --- SCENES: the Scenes view's own options (K43) ----------------------------
+// --- SCENES: the Scenes view's own options (K43; owner, 2026-10-13) ---------
 // Show hidden scenes, a checkbox (the card's Scenes setting: Visible / All -
-// "Off" was dropped), and the scene a tap loads (Tap action: Load scene; greyed
-// otherwise). The scene row's choices are kept by their HA id when the row is
-// made, so a later change to the list cannot make a pick land on another scene.
+// "Off" was dropped); the Default scene; and the Scene action - what SETTINGS'
+// Tap action "Scenes..." does: Load default or Cycle scenes. The default
+// scene's choices are kept by their HA id when the row is made, so a later
+// change to the list cannot make a pick land on another scene.
 void hiddenScenesCb(lv_event_t *ev);
+void sceneActionDropCb(lv_event_t *ev);
 lv_obj_t *s_cbHidden = nullptr;
 
 uint8_t scenesSpecs(DeckRowSpec *r) {
@@ -5176,10 +5379,13 @@ uint8_t scenesSpecs(DeckRowSpec *r) {
     if (held) {
         uint8_t nSc = 0;
         const uint16_t sel = tapSceneRowBuild(*held, nSc);
-        if (nSc)
-            r[n++] = { "Tap scene", DeckRowKind::ROW_DROP, s_tapSceneOpts, sel,
-                       held->hasId() && held->tapAction() == TapAction::TAP_LOAD_SCENE, tapSceneDropCb,
-                       &s.ddTapScene };
+        if (nSc) {
+            r[n++] = { "Default scene", DeckRowKind::ROW_DROP, s_tapSceneOpts, sel, held->hasId(),
+                       tapSceneDropCb, &s.ddTapScene };
+            r[n++] = { "Scene action", DeckRowKind::ROW_DROP, "Load default\nCycle scenes",
+                       (uint16_t)(sceneActionOf(*held) == TapAction::TAP_CYCLE_SCENES), held->hasId(),
+                       sceneActionDropCb, nullptr };
+        }
     }
     return n;
 }
@@ -5363,6 +5569,7 @@ void closeNow(void *unused) {
     (void)unused;
     s.closeQueued = false;
     if (s.phase != PopupPhase::PHASE_OPEN) return;
+    confirmClose();   // Remove card's dialog, if it was up
 #ifdef DEBUG_POPUP
     const uint32_t t0 = micros();
 #endif
@@ -5681,7 +5888,7 @@ std::atomic<int> s_dreq{DREQ_IDLE};
 struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
                 int member = -1; int scene = -1; int look = -1; int show = -1; int scheme = -1;
                 int tap = -1; int groups = -1; int clabel = -1; int span = -1; int row = -1; int x = -1;
-                int dur = -1; int chips = -1;
+                int dur = -1; int chips = -1; int addCard = -1; int removeCard = -1;
                 bool close = false, power = false, more = false, hist = false; };
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
@@ -5733,6 +5940,8 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "row", v, sizeof(v)) == ESP_OK) a.row = atoi(v);
         if (httpd_query_key_value(q, "x", v, sizeof(v)) == ESP_OK) a.x = atoi(v);
         if (httpd_query_key_value(q, "dur", v, sizeof(v)) == ESP_OK) a.dur = atoi(v);
+        if (httpd_query_key_value(q, "addcard", v, sizeof(v)) == ESP_OK) a.addCard = atoi(v);
+        if (httpd_query_key_value(q, "removecard", v, sizeof(v)) == ESP_OK) a.removeCard = atoi(v);
         if (httpd_query_key_value(q, "chips", v, sizeof(v)) == ESP_OK) a.chips = atoi(v);
         // rows=N: test rows for SETTINGS, from the next window built (a byte
         // the LVGL thread reads; nothing else to hand over).
@@ -5786,6 +5995,28 @@ void CardPopup::debugService(lv_timer_t *t) {
         if (!isOpen()) { dbgOut("no window open\n"); s_dreq.store(DREQ_DONE); return; }
         close();
         s_dreq.store(DREQ_CLOSING);
+        return;
+    }
+    // K17: addcard=1 as SETTINGS' "Add as a card" in a member's own view;
+    // removecard=1 as "Remove card" tapped twice, on a card added here.
+    if (a.addCard > 0 || a.removeCard > 0) {
+        Card *held = isOpen() ? cardOf(h.surface) : nullptr;
+        char id[CARD_ID_MAX + 1] = "";
+        if (!held) dbgOut("no window open\n");
+        else if (a.addCard > 0) {
+            if (!inMember() || !s.ent[0]) dbgOut("not in a member's own view\n");
+            else if (CardAdded::add(*held, *s.ent[0], id, sizeof(id))) { dbgOut("added %s\n", id); deckSync(); }
+            else dbgOut("not added\n");
+        } else if (a.removeCard == 2) {
+            // removecard=2: the dialog, as "Remove card" opens it.
+            if (CardAdded::isAdded(held->id())) { confirmRemove(); dbgOut("dialog up\n"); }
+            else dbgOut("%s is not a card added here\n", held->id());
+        } else {
+            snprintf(id, sizeof(id), "%s", held->id());
+            if (CardAdded::remove(id)) { dbgOut("removed %s\n", id); close(); s_dreq.store(DREQ_CLOSING); return; }
+            dbgOut("%s is not a card added here\n", id);
+        }
+        s_dreq.store(DREQ_DONE);
         return;
     }
     if (a.pause >= 0 || a.member >= 0) {
