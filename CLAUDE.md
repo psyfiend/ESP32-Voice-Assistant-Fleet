@@ -111,7 +111,13 @@ guard blocks something that is genuinely needed, stop and ask the owner to run i
 | Claude Code hook | `.claude/settings.json` -> `scripts/hooks/claude_guard.py` (self-test: `python scripts/hooks/claude_guard.py --test`) | before every Bash/PowerShell call, **in subagents too**: force push, deleting `main` or a tag, `reset --hard`, `git clean`, discarding changes (`checkout --`, `restore`), dropping a stash, skipping or re-pointing git hooks, history rewrites, recursive deletes outside `.pio/` and the scratchpad, touching the secrets headers |
 | Deny rules | `.claude/settings.json` | Edit/Write on the secrets headers; the plain forms of the commands above |
 | Git pre-commit | `scripts/hooks/pre-commit` -> `pre_commit.py`; on with `git config core.hooksPath scripts/hooks` (once per clone) | any commit, by anyone, that adds the owner's local-only debug lines (`DEBUG_POPUP`, `DEBUG_HANG`, `DEBUG_FRAMES`) to `platformio.ini`, puts a control byte in a text file (the silent heredoc corruption above), or includes a secrets header |
-| GitHub ruleset | the repo's settings (the owner's) | force pushes to `main`, deleting `main` |
+| GitHub rulesets | the repo's settings (the owner's): "Protect main", "Protect releases" | any push to `main` (it takes changes **only through a pull request**, merge commits only), force pushes, deleting `main`; deleting or moving a `v*` tag |
+| Managed settings | `C:\Program Files\ClaudeCode\` (admin-only; `scripts/hooks/managed/README.md`) | the same guard and deny rules, in a place Claude cannot edit; `disableAllHooks` pinned off |
+
+**The owner merges (W12).** Claude pushes a branch and opens a pull request (`gh pr create`); the
+owner clicks **Merge** in the browser; Claude then pulls `main`, tags the merge commit and flashes.
+The guard refuses `gh pr merge`, pushes to `main` and API writes to merges, rulesets and refs -
+Claude acts with the owner's GitHub login, so GitHub cannot tell the two apart; the guard can.
 
 They stop accidents, not a determined workaround: a command hidden inside a script file passes the
 hook. So the scripts that touch the owner's local state are in the repo and reviewed:

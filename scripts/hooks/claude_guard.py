@@ -30,6 +30,9 @@ SAFE_DELETE = re.compile(r"(\.pio|build_cache|Temp[\\/]+claude|[\\/]tmp[\\/])", 
 # subcommand itself, never a word in a commit message.
 G = r"\bgit(?:\s+(?:-C\s+\S+|-c\s+\S+|--no-pager|-q|--git-dir=\S+))*\s+"
 REST = r"[^;&|\n]*"   # the rest of this statement
+# `gh` where a command starts (the start, or after ; & | ( or a newline) - not
+# the words "gh pr merge" inside a commit message.
+GH = r"(?:^|[;&|(\n])\s*gh\s+"
 
 # (name, pattern, reason). Searched anywhere in the command, so `cd x; git
 # reset --hard` is caught as well as a bare one.
@@ -66,7 +69,51 @@ RULES = [
     ("tag delete",
      G + r"(tag\s+-d\b|push\b" + REST + r"--delete\s+v\d|push\b" + REST + r"\s:refs/tags/)",
      "Release tags are permanent (W3)."),
+    # --- THE OWNER MERGES (2026-10-13, W12): main takes changes only through a
+    # pull request, and only the owner clicks Merge, in the browser. GitHub's
+    # ruleset refuses any push to main; these refuse the doors GitHub cannot
+    # tell from his own (Claude acts with his login).
+    ("push to main",
+     G + r"push\b" + REST + r"(\smain\b|:main\b|:refs/heads/main\b|\s--all\b|\s--mirror\b)",
+     "main takes changes only through a pull request the owner merges (W12). Push the branch and open a PR."),
+    ("merge a PR",
+     GH + r"pr\s+merge\b",
+     "Only the owner merges a pull request, in the browser (W12)."),
+    ("repo settings",
+     GH + r"(repo\s+(edit|delete|rename|archive)|ruleset\s+(create|delete|edit|update))\b",
+     "The repository's settings and rulesets are the owner's."),
 ]
+
+
+def gh_api_write(cmd):
+    """A `gh api` call that would merge, or change rules, refs or settings."""
+    for m in re.finditer(GH + r"api\b" + REST, cmd):
+        call = m.group(0)
+        sensitive = re.search(r"(/merges?\b|/rulesets\b|/protection\b|/git/refs\b|/branches/|repos/[^/\s]+/[^/\s]+\s*($|\s))",
+                              call)
+        writes = re.search(r"(-X\s*|--method[\s=]+)(POST|PUT|PATCH|DELETE)\b|\s-[fF]\s|\s--(raw-)?field\b|\s--input\b",
+                           call, re.I)
+        if sensitive and writes:
+            return True
+    return False
+
+
+def bare_push_on_main(cmd, cwd):
+    """`git push` with no refspec while main is checked out pushes main."""
+    if not cwd:
+        return False
+    for m in re.finditer(G + r"push\b(" + REST + r")", cmd):
+        args = [a for a in m.group(1).split() if not a.startswith("-")]
+        if len(args) <= 1:   # nothing, or only a remote name
+            try:
+                import subprocess
+                head = subprocess.run(["git", "-C", cwd, "rev-parse", "--abbrev-ref", "HEAD"],
+                                      capture_output=True, text=True, timeout=5).stdout.strip()
+            except Exception:
+                return False
+            if head == "main":
+                return True
+    return False
 
 # A recursive delete outside the safe paths. Checked separately: the paths
 # decide it, not just the verb.
@@ -78,11 +125,17 @@ RECURSIVE_DELETE = re.compile(
     r"|shutil\.rmtree)", re.I)
 
 
-def verdict(cmd):
+def verdict(cmd, cwd=None):
     """None if the command may run, else (rule name, reason)."""
     for name, pat, reason in RULES:
         if re.search(pat, cmd, re.I):
             return name, reason
+    if gh_api_write(cmd):
+        return ("GitHub API write",
+                "Merging, and changing rulesets, branch protection or refs through the API, is the owner's (W12).")
+    if bare_push_on_main(cmd, cwd):
+        return ("push to main", "main is checked out, so this pushes main - which takes changes only "
+                                "through a pull request the owner merges (W12).")
     for m in RECURSIVE_DELETE.finditer(cmd):
         # The rest of that statement: its paths decide.
         tail = re.split(r"[;&|\n]", cmd[m.start():], maxsplit=1)[0]
@@ -98,7 +151,7 @@ def main():
     except Exception:
         return 0   # not ours to judge
     cmd = (call.get("tool_input") or {}).get("command") or ""
-    v = verdict(cmd)
+    v = verdict(cmd, call.get("cwd"))
     if not v:
         return 0
     name, reason = v
@@ -123,6 +176,11 @@ BLOCK = [
     "git restore platformio.ini", "git stash drop", "git stash clear",
     "git commit --no-verify -m x", "git config core.hooksPath /dev/null",
     "git -C repo reset --hard", "git -c a=b push --force", "git config --unset core.hooksPath",
+    "git push -q origin main", "git push origin HEAD:main", "git push --all", "git push --mirror x",
+    "gh pr merge 12 --merge", "cd x && gh pr merge --admin",
+    "gh api -X PUT repos/psyfiend/x/pulls/3/merge", "gh api --method DELETE repos/o/r/rulesets/1",
+    "gh api repos/o/r/rulesets/1 -X PATCH --input r.json", "gh api -X DELETE repos/o/r/git/refs/heads/main",
+    "gh repo edit --default-branch x", "gh repo delete o/r",
     "rm components/Fleet_Connectivity/ConnectivityLocalSecrets.h",
     "Remove-Item components/Fleet_MQTT/MqttLocalSecrets.h",
     "echo x > components/Fleet_MQTT/MqttLocalSecrets.h",
@@ -131,7 +189,11 @@ BLOCK = [
     "git push origin --delete v0.2.12",
 ]
 ALLOW = [
-    "git push", "git push -q origin main", "git push origin v0.2.12", "git push -u origin feat/x",
+    "git push", "git push origin v0.2.12", "git push -u origin feat/x", "git push -q -u origin chore/guards",
+    "git push origin feat/maintenance", "gh pr create --fill", "gh pr view 3", "gh pr list",
+    "gh api repos/o/r/rulesets", "gh api repos/o/r/rulesets/24984804 -q .name",
+    "gh api repos/o/r/pulls/3", "gh issue create --title x --body y",
+    "git commit -q -m \"the guard refuses gh pr merge and gh api -X PUT repos/o/r/rulesets/1\"",
     "git status --short", "git commit -q -m \"fix: x\"", "git merge --no-ff feat/x -m m",
     "git stash push -m x -- platformio.ini", "git stash pop", "git stash list",
     "git restore --staged x", "git checkout -q main", "git checkout -b feat/x",

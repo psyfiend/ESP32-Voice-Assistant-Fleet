@@ -42,7 +42,8 @@ anything on/off as its activity - from HA; the owner's choices saved by card id 
 first command: a hook refuses destructive git/delete commands (also in subagents), the pre-commit
 hook refuses the local debug lines and corrupted bytes, release builds go through
 `scripts/release/gate.ps1` and `flash_release.ps1`, and read-only work goes to the `explorer` /
-`auditor` agents.
+`auditor` agents. **`main` takes changes only through a pull request the owner merges (W12)**:
+push the branch, `gh pr create`, wait for the owner's Merge, then `git pull`, tag, flash.
 
 **K17 DONE** (`v0.2.12`, K65-K70): `CardAdded` (`include/Cards/CardAdded.h`) keeps cards made on the
 device in the settings file and merges them into their page after the card they came from; Remove

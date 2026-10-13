@@ -30,6 +30,7 @@ How to use it:
 | W8 | Files are written with Edit/Write, never piped through a shell | 2026-09-18 | CLAUDE.md |
 | W10 | **Guards that run, not rules that are read**: a Claude Code PreToolUse hook (`scripts/hooks/claude_guard.py`) refuses destructive git and delete commands in every session and subagent; deny rules guard the secrets headers; a git pre-commit hook refuses the local debug lines, control bytes and secrets; GitHub protects `main` from force push and deletion. Claude keeps push and merge (owner) | 2026-10-13 | owner; CLAUDE.md "Guards" |
 | W11 | **Subagents**: read-only work to the read-only `explorer` / `auditor` agents; a writing subagent only on files nobody else touches, in a worktree; builds, flashing, git and shared edits stay with the main session | 2026-10-13 | owner; CLAUDE.md "Subagents" |
+| W12 | **Only the owner merges**: `main` takes changes only through a pull request (GitHub ruleset, 0 approvals, merge commits only); Claude opens the PR, the owner clicks Merge in the browser, Claude tags and flashes after. The guard refuses `gh pr merge`, pushes to `main`, and API writes to merges, rulesets and refs; version tags cannot be deleted or moved. The guard is also installed as managed settings, where Claude cannot edit it. Supersedes W10's "Claude keeps push and merge" for `main` | 2026-10-13 | owner; CLAUDE.md "Guards" |
 | W9 | Real lights while testing: any Office light may be commanded and is put back as found; ask before anything in the Kitchen | 2026-10-06 | HANDOFF |
 
 ## Platform and architecture

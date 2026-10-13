@@ -197,9 +197,10 @@ ESP-IDF migration, the S3 boards' esp_lcd move (#67).
 - **Read first**: `CLAUDE.md` (all of it - the file-editing rule above all), `docs/HANDOFF.md`,
   `docs/DECISIONS.md` (W1-W9, K-series for the window), `docs/LESSONS.md` (the LVGL traps),
   `docs/design/card-sheet.md` §14-18 (what the window is), `docs/design/tokens.md`, this file.
-- **Branch**: `refactor/ui-foundation` off `main` at `v0.2.12`. Commit and push at the end of each
-  phase (and mid-phase when a step is done and verified). Never merge to `main` - the owner signs
-  off on glass first (W2).
+- **Branch**: `refactor/ui-foundation` off the latest `main` (`v0.2.12` plus the guard merges).
+  Commit and push the branch at the end of each phase (and mid-phase when a step is done and
+  verified). Do not open the pull request until P6; the owner merges it, in the browser, after
+  signing off on glass (W2, W12) - the guard refuses any other way into `main`.
 - **Boards you may build and flash without asking**: WS_P4_5 (COM15), WS_P4_4B (COM7), CYD_P4_1060
   (COM9) - check the ports by USB serial number first (HANDOFF). Compile WS_S3_4B as the S3 check;
   do not flash it (locked up, #69). All nine compile only at the end of P6.
