@@ -113,6 +113,14 @@ public:
     //   /popup?x=N          History: as a finger on the chart, N px from its left
     //   /popup?extra=0|1    History: activity's Details, Basic or Extra (not kept)
     //   /popup?chips=0|1    History: the span buttons off or on (not kept)
+    //   /popup?tree=1       the open window's LVGL objects, one line each: class,
+    //                       place, size, flags, events, text and style (2.12 P0,
+    //                       scripts/ui_golden.py); tree=page: the whole screen
+    //   /popup?mem=1        LVGL's pool, to the byte
+    //   /popup?sparks=N     the edge sparks from the next window: 0 now and then,
+    //                       1 once, 2 off (not kept)
+    //   /popup?removecard=3 Remove card's dialog over any card's window, to look
+    //                       at; close=1 takes it down (2 is the real one)
     // The handler hands the work to the LVGL thread and waits for it, as
     // /screenshot does - it never touches LVGL itself.
     static void beginDebug(class HttpServer &http);
