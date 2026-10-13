@@ -336,8 +336,23 @@ const UIType &type() {
 static lv_style_t s_paint[(int)UIPaint::PAINT_COUNT];
 static bool       s_paintReady = false;
 
+// Layers above with shared styles of their own (onRepaint()).
+static constexpr uint8_t REPAINT_MAX = 4;
+static void (*s_repaint[REPAINT_MAX])() = {nullptr};
+static uint8_t s_repaintN = 0;
+
+void onRepaint(void (*cb)()) {
+    if (!cb) return;
+    for (uint8_t i = 0; i < s_repaintN; i++) if (s_repaint[i] == cb) return;
+    if (s_repaintN < REPAINT_MAX) s_repaint[s_repaintN++] = cb;
+}
+
 static void refreshPaints() {
-    if (!s_paintReady) return;   // nothing has asked for one yet
+    for (uint8_t i = 0; i < s_repaintN; i++) s_repaint[i]();
+    if (!s_paintReady) {   // nothing has asked for a paint yet
+        if (s_repaintN) lv_obj_report_style_change(NULL);
+        return;
+    }
     auto st = [](UIPaint p) { return &s_paint[(int)p]; };
     const lv_color_t bd = border();
 
@@ -490,6 +505,9 @@ void setAspectPct(uint8_t pct) {
 void onSchemeChanged(void (*cb)()) { s_onChange = cb; }
 
 int32_t sc(int32_t logical) { return (int32_t)(logical * bspUiScale()); }
+
+// The same derivation as minTouch(): real millimetres, whatever the board.
+int32_t mm(float v) { return (int32_t)lroundf(v * (float)bspPixelDensity() / 25.4f); }
 
 lv_color_t c(uint32_t hex) { return lv_color_hex(hex); }
 

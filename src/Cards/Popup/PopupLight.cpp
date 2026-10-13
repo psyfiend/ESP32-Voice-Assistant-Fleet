@@ -393,7 +393,7 @@ void buildLightColumn(lv_obj_t *col, lv_obj_t *deckParent) {
     if (s.lightCtl != LCTL_COLOUR || s.builtPaused) makeLabelRow(col);
     if (s.lightCtl != LCTL_COLOUR) {
         s.lblValue = makeLabel(col, UIToolkit::Font_Hero, p.TEXT);
-        s.lblAgo   = makeLabel(col, t.TAG, p.TEXT_DIM);
+        s.lblAgo   = Kit::label(col, KS::KS_LABEL_TAG_DIM);
         lv_label_set_long_mode(s.lblAgo, LV_LABEL_LONG_DOT);   // "..., 3 paused" stays one line
         lv_obj_set_width(s.lblAgo, lv_pct(100));
     } else {
@@ -410,12 +410,8 @@ void buildLightColumn(lv_obj_t *col, lv_obj_t *deckParent) {
         for (uint8_t i = 0; i < 8; i++) {
             lv_obj_t *w = plain(grid);
             lv_obj_set_size(w, sz, sz);
-            lv_obj_set_style_radius      (w, LV_RADIUS_CIRCLE, 0);
-            lv_obj_set_style_bg_opa      (w, LV_OPA_COVER, 0);
-            lv_obj_set_style_bg_color    (w, UI::c(quiet(lightHsToRgb(SWATCHES[i].hue, SWATCHES[i].sat))), 0);
-            lv_obj_set_style_border_width(w, LV_MAX(1, mm(k.LINE_HAIR)), 0);
-            lv_obj_set_style_border_color(w, UI::border(), 0);
-            lv_obj_set_style_outline_pad (w, LV_MAX(2, mm(k.RING_PAD)), 0);
+            Kit::add(w, KS::KS_SWATCH);   // round, a hairline edge, room for the ring
+            lv_obj_set_style_bg_color(w, UI::c(quiet(lightHsToRgb(SWATCHES[i].hue, SWATCHES[i].sat))), 0);
             lv_obj_add_flag(w, LV_OBJ_FLAG_CLICKABLE);
             lv_obj_add_event_cb(w, swatchCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
             s.swatch[i] = w;

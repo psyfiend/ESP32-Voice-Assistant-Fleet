@@ -396,7 +396,7 @@ void treeDump(bool page) {
                 (long)lv_area_get_width(&s.winRect), (long)lv_area_get_height(&s.winRect), (long)s.winRadius,
                 (long)s.pad, (long)s.titleW, (long)s.titleSlotW, (long)s.titleSlack, (unsigned)s.deckState,
                 s.deckFilled ? 1 : 0, (long)s.deckH, (unsigned)s_chart.state, (unsigned)s_chart.kind,
-                (long)s_chart.h, (unsigned long)s_faceFlat, (unsigned)s_intfMode);
+                (long)s_chart.h, (unsigned long)Kit::facesFlat(), (unsigned)s_intfMode);
     else
         treeOut("# no window\n");
     if (page) {

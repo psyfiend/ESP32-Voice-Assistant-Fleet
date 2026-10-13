@@ -126,21 +126,13 @@ void layoutTitle() {
 // The X closes from every view of the window; inside one member the arrow goes
 // back to Members.
 // Lit as the control deck's selector is (owner, 2026-10-07): the same metal,
-// the icon in the accent. Unlit: a soft dent in the surface (round 6).
+// the icon a face up (round 7) in the accent. Unlit: a soft dent in the
+// surface (round 6). Kit::iconButtonLit().
 void cornerLook(lv_obj_t *b, bool shown, bool lit) {
     if (!b) return;
     if (!shown) { lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN); return; }
     lv_obj_clear_flag(b, LV_OBJ_FLAG_HIDDEN);
-    const UIPalette  &p   = UI::pal();
-    const DeckColours col = deckColours();
-    const int32_t sz = UI::minTouch();
-    setFace(b, sz, sz, sz / 2, lit ? metalKind() : FaceKind::FACE_DENT, p.SURFACE);
-    // Lit, the icon a face up too (owner, round 7), as the selector's is.
-    if (lv_obj_t *l = labelIn(b)) {
-        lv_obj_set_style_text_color(l, UI::c(lit ? col.chosen : p.TEXT), 0);
-        lv_obj_set_style_text_font (l, lit ? UI::type().ICON : UI::type().ICON_MD, 0);
-        lv_obj_center(l);
-    }
+    Kit::iconButtonLit(b, lit);
 }
 
 void showView(PopupView v) {
@@ -318,8 +310,8 @@ void buildContents() {
     lv_obj_set_flex_grow(title, 1);
     lv_obj_set_flex_flow(title, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(title, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    s.lblTitleArea = makeLabel(title, t.NAME, p.TEXT_DIM);
-    s.lblTitleName = makeLabel(title, t.NAME, p.TEXT);
+    s.lblTitleArea = Kit::label(title, KS::KS_LABEL_NAME_DIM);
+    s.lblTitleName = Kit::label(title, KS::KS_LABEL_NAME);
     // ONE LINE EACH, ellipsised, at widths layoutTitle() works out per view.
     // A DOT label with a content height wraps instead of ellipsising, which is
     // how "Members" ended up on two lines and "All Lamps >" overflowed the
@@ -538,7 +530,7 @@ void showWindow() {
     const uint32_t t0 = micros();
 #endif
     s.phase = PopupPhase::PHASE_OPEN;
-    s_faceEpoch++;                                    // faces the last window used may be taken back
+    Kit::facesNextWindow();                           // faces the last window used may be taken back
     lv_obj_t *scr = lv_screen_active();
     lv_obj_update_layout(scr);                        // settle anything pending, aloud
     lv_display_enable_invalidation(nullptr, false);

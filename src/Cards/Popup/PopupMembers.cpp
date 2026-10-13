@@ -11,8 +11,6 @@ void chartFold();                   // open: back to its tab
 void sideFor(PopupView v);          // below: the left panel a view wants (CHART / SCENES)
 
 void buildMembers() {
-    const UIPalette &p = UI::pal();
-    const UIType    &t = UI::type();
     // The stage's height, scrolling if a group has more members than fit. As
     // wide as the controls view's slider and words together, centred, so the
     // rows line up with them (owner, 2.10c G2: full width looked awkward on
@@ -29,22 +27,16 @@ void buildMembers() {
     for (uint8_t i = 0; i < memberCount(); i++) {
         const Entity *e = memberAt(i);
         if (!e) continue;
-        lv_obj_t *r = plain(list);
+        // A tap opens that member's own controls (owner, 2.10b).
+        lv_obj_t *r = Kit::item(list);
         lv_obj_set_size     (r, lv_pct(100), LV_SIZE_CONTENT);
         lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_all(r, mm(UI::shape().S_MEMBERS), 0);
-        lv_obj_set_style_radius (r, UI::sc(UI::met().RADIUS), 0);
-        lv_obj_set_style_bg_color(r, UI::c(p.SURFACE), 0);
-        lv_obj_set_style_bg_opa (r, LV_OPA_COVER, 0);
-        // A tap opens that member's own controls (owner, 2.10b).
-        lv_obj_add_flag(r, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_style_bg_color(r, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)),
-                                  UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
         lv_obj_add_event_cb(r, memberRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
-        lv_obj_t *n = makeLabel(r, t.NAME, p.TEXT);
+        lv_obj_t *n = Kit::label(r, KS::KS_LABEL_NAME);
         lv_label_set_text(n, e->desc.name);
-        lv_obj_t *v = makeLabel(r, t.TAG, p.TEXT_DIM);
+        lv_obj_t *v = Kit::label(r, KS::KS_LABEL_TAG_DIM);
         char buf[48];
         const EntityAttrs &at = e->attrs;
         if (e->paused) {
@@ -71,7 +63,7 @@ void buildMembers() {
             lv_label_set_text(v, buf);
         }
     }
-    lv_obj_t *note = makeLabel(list, t.TAG, p.TEXT_DIM);
+    lv_obj_t *note = Kit::label(list, KS::KS_LABEL_TAG_DIM);
     lv_label_set_text(note, "Tap a member for more details");   // owner's words, 2026-10-07
 }
 

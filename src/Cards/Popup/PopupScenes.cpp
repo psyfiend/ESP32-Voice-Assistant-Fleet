@@ -164,15 +164,13 @@ void buildSceneGrid(lv_obj_t *col, int32_t colW) {
         if (!sc) continue;
         lv_obj_t *b = plain(grid);
         lv_obj_set_size(b, k.bw, ch);
-        lv_obj_set_style_radius   (b, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_opa   (b, LV_OPA_COVER, 0);
-        lv_obj_set_style_bg_color (b, UI::c(quiet(p.SURFACE)), 0);
-        lv_obj_set_style_bg_color (b, UI::c(UI::mix(p.SURFACE, p.TEXT, 20)),
-                                   UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
-        lv_obj_set_style_outline_pad(b, LV_MAX(2, mm(UI::shape().RING_PAD)), 0);
+        Kit::add(b, KS::KS_PILL);
+        Kit::add(b, KS::KS_PILL_PRESSED, UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+        // Greyed in a paused window, as everything else is: its own colours.
+        if (s.builtPaused) lv_obj_set_style_bg_color(b, UI::c(quiet(p.SURFACE)), 0);
         lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(b, sceneCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
-        lv_obj_t *l = makeLabel(b, t.TAG, quiet(p.TEXT));
+        lv_obj_t *l = s.builtPaused ? makeLabel(b, t.TAG, quiet(p.TEXT)) : Kit::label(b, KS::KS_LABEL_TAG);
         lv_label_set_text(l, sc->desc.name);
         lv_obj_center(l);
         s.sceneBtn[i] = b;

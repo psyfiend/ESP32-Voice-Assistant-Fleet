@@ -479,6 +479,24 @@ Rules that are load-bearing rather than stylistic:
 - **Use `UI::tameScroll()`** on every scrollable container: vertical-only, no elastic springback,
   no scrollbar. Rubber-banding looks bad at the refresh rates the S3 boards manage.
 
+### The component kit - build windows from `Kit::`, not from style calls (2.12 P3)
+
+`include/UI/Kit.h`, `src/UI/Kit/`; what each component is and looks like: `docs/design/components.md`.
+Buttons, dialogs, chip rows, list items, panel rows (dropdown, checkbox, row button), folder
+panels, the selector, icon buttons and label roles are the kit's, and a new screen uses them.
+
+- **A component takes a role; a role is shared `lv_style_t`s** (`Kit::KitStyle`), filled in
+  `KitStyles.cpp` from the tokens and refilled on every repaint through `UI::onRepaint()` - so a
+  new look is a new role there, never `lv_obj_set_style_*` at the call. **The caller places it and
+  owns what changes** (a value, a ring, a greyed state that comes and goes): local properties,
+  which beat the shared style.
+- **A new role keeps one style per part and state** (`KS_X`, `KS_X_PRESSED`, ...), and does not
+  repeat a property another style on the same object sets: two shared styles on one object are
+  ordered by when they were added, which is easy to get wrong.
+- **Components build exactly the objects, flags and events their callers expect** - the harness
+  compares trees, and a component's state lives in the caller's struct, found through the
+  object's user data, so events keep their user data.
+
 ### UI scale is derived from pixel density, not declared
 
 `-D HIGH_DPI_DISPLAY` and the `UI_SCALE` macro are **retired**. `DisplayConfig.DIAGONAL_IN`

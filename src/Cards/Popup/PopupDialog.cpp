@@ -15,86 +15,34 @@ void confirmClose() {
     if (s_confirm) { lv_obj_delete(s_confirm); s_confirm = nullptr; }
 }
 
-lv_obj_t *confirmButton(lv_obj_t *parent, const char *txt, uint32_t bg, uint32_t ink, uint32_t edge,
-                        lv_event_cb_t cb) {
-    const UIPalette &p = UI::pal();
-    const UIShape   &k = UI::shape();
-    lv_obj_t *b = plain(parent);
-    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_size(b, mm(k.W_DIALOG_BTN), UI::minTouch());
-    lv_obj_set_style_radius(b, mm(k.R_BUTTON), 0);
-    lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(b, UI::c(bg), 0);
-    lv_obj_set_style_bg_color(b, UI::c(UI::mix(bg, p.TEXT, 20)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
-    lv_obj_set_style_border_width(b, LV_MAX(1, mm(k.LINE_FINE)), 0);
-    lv_obj_set_style_border_color(b, UI::c(edge), 0);
-    lv_obj_t *l = makeLabel(b, UI::type().NAME, ink);
-    lv_label_set_text(l, txt);
-    lv_obj_center(l);
-    lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, nullptr);
-    return b;
+void confirmCancelCb(lv_event_t *) {
+    lv_async_call([](void *) { confirmClose(); }, nullptr);
 }
 
 void confirmRemove() {
     confirmClose();
     if (!CardPopup::isOpen() || !cardOf(h.surface)) return;
-    const UIPalette &p = UI::pal();
-    const UIType    &t = UI::type();
-    const UIShape   &k = UI::shape();
-    // The dim, which also takes every tap that misses the box: Cancel.
-    s_confirm = plain(lv_layer_top());
-    lv_obj_set_size(s_confirm, lv_pct(100), lv_pct(100));
-    lv_obj_set_style_bg_color(s_confirm, UI::c(p.GROUND), 0);
-    lv_obj_set_style_bg_opa(s_confirm, LV_OPA_60, 0);
-    lv_obj_add_flag(s_confirm, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(s_confirm, [](lv_event_t *e) {
-        if (lv_event_get_target(e) == lv_event_get_current_target(e)) lv_async_call([](void *) { confirmClose(); }, nullptr);
-    }, LV_EVENT_CLICKED, nullptr);
-
-    lv_obj_t *box = plain(s_confirm);
-    lv_obj_add_flag(box, LV_OBJ_FLAG_CLICKABLE);   // a tap on it is not a tap outside
-    lv_obj_set_width(box, LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(k.W_DIALOG_MAX)));
-    lv_obj_set_height(box, LV_SIZE_CONTENT);
-    lv_obj_center(box);
-    lv_obj_set_style_radius(box, UI::sc(UI::met().RADIUS), 0);
-    lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(box, UI::c(p.SURFACE_ALT), 0);
-    lv_obj_set_style_border_width(box, LV_MAX(2, mm(k.LINE_HEAVY)), 0);
-    lv_obj_set_style_border_color(box, UI::c(p.ST_BAD), 0);
-    lv_obj_set_style_pad_all(box, mm(k.S9), 0);
-    lv_obj_set_style_pad_row(box, mm(k.S7), 0);
-    lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-    lv_obj_t *title = makeLabel(box, t.NAME, p.TEXT);
-    lv_label_set_text(title, "Remove this card?");
     // The owner's words (K17 round 3).
     char buf[200];
     snprintf(buf, sizeof(buf), "The card \"%s\" will be removed from the dashboard, any other "
                                "instances of this card will be unaffected.", s.name);
-    for (const char *txt : { (const char *)buf, "Removed cards can be restored at any time." }) {
-        lv_obj_t *body = makeLabel(box, t.TAG, p.TEXT_DIM);
-        lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
-        lv_obj_set_width(body, lv_pct(100));
-        lv_obj_set_style_text_align(body, LV_TEXT_ALIGN_CENTER, 0);
-        lv_label_set_text(body, txt);
-    }
-
-    lv_obj_t *row = plain(box);
-    lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_top(row, mm(k.S4), 0);
-    confirmButton(row, "Cancel", p.SURFACE, p.TEXT, UI::mix(p.SURFACE, p.TEXT, 30), [](lv_event_t *) {
-        lv_async_call([](void *) { confirmClose(); }, nullptr);
-    });
-    confirmButton(row, "Remove", p.ST_BAD, p.SURFACE, p.ST_BAD, [](lv_event_t *) {
+    Kit::DialogSpec spec = {};
+    spec.role    = Kit::DialogRole::DLG_DESTRUCTIVE;
+    spec.title   = "Remove this card?";
+    spec.body[0] = buf;
+    spec.body[1] = "Removed cards can be restored at any time.";
+    spec.buttons[0] = { "Cancel", Kit::ButtonRole::BTN_CANCEL, confirmCancelCb };
+    spec.buttons[1] = { "Remove", Kit::ButtonRole::BTN_DESTRUCTIVE, [](lv_event_t *) {
         lv_async_call([](void *) {
             confirmClose();
             Card *held = CardPopup::isOpen() ? cardOf(h.surface) : nullptr;
             if (held && CardAdded::remove(held->id())) CardPopup::close();
         }, nullptr);
-    });
+    } };
+    spec.nButtons = 2;
+    spec.width    = LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(UI::shape().W_DIALOG_MAX));
+    spec.outside  = confirmCancelCb;   // a tap that misses the box: Cancel
+    s_confirm = Kit::dialog(spec);
 }
 
 void removeCardCb(lv_event_t *ev) {

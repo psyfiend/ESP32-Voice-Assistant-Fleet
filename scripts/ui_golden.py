@@ -879,9 +879,15 @@ def compare(args):
             and ea != eb else []
         px, unexplained = "", 0
         if args.pixels and (da / f"{s}.png").exists() and (db / f"{s}.png").exists():
+            # A label showing digits can tick between the tree and the screenshot ("55s ago" in
+            # the tree, "56s ago" in the picture; an uptime): its pixels are the clock's. Its
+            # style and place are still compared, in the tree.
+            def ticking(n):
+                return n.cls == "label" and n.text is not None and re.search(r"\d", n.text) is not None
             rects = []
             for a, b in pairs:
-                if id(a) in scope or (a.text is not None and a.text != b.text) or a.vol or b.vol:
+                if id(a) in scope or (a.text is not None and a.text != b.text) or a.vol or b.vol \
+                        or ticking(a) or ticking(b):
                     rects.append(a.rect())
                     rects.append(b.rect())
             window_state = "window" in tb["roots"]
@@ -1003,6 +1009,40 @@ def measure(args):
 
 
 # ---------------------------------------------------------------------------------------------
+# crop
+# ---------------------------------------------------------------------------------------------
+def crop(args):
+    """A piece of one state's screenshot: an object found by its text (and --up levels above
+    it), or --rect x,y,w,h; with --pad px around it. For docs/design/components.md."""
+    d = pathlib.Path(args.out) / args.board / args.label
+    w, h, rgb = png_read(d / f"{args.state}.png")
+    if args.rect:
+        x, y, cw, ch = (int(v) for v in args.rect.split(","))
+    else:
+        tree = parse_tree((d / f"{args.state}.txt").read_text(encoding="utf-8"))
+        hits = [n for r in tree["roots"].values() for n in walk(r)
+                if n.text is not None and (n.text == args.find if args.exact else args.find in n.text)]
+        if len(hits) <= args.nth:
+            print(f"no object with the text {args.find!r} (found {len(hits)})")
+            return 1
+        n = hits[args.nth]
+        for _ in range(args.up):
+            if n.parent is not None and n.parent.depth >= 0:
+                n = n.parent
+        x, y, cw, ch = n.x, n.y, n.w, n.h
+        print(f"{n.describe()}")
+    x0, y0 = max(0, x - args.pad), max(0, y - args.pad)
+    x1, y1 = min(w, x + cw + args.pad), min(h, y + ch + args.pad)
+    if x1 <= x0 or y1 <= y0:
+        print(f"that is off the screen ({x},{y} {cw}x{ch})")
+        return 1
+    out = b"".join(rgb[(yy * w + x0) * 3:(yy * w + x1) * 3] for yy in range(y0, y1))
+    png_write(args.to, x1 - x0, y1 - y0, out)
+    print(f"{args.to}: {x1 - x0}x{y1 - y0} from {x0},{y0}")
+    return 0
+
+
+# ---------------------------------------------------------------------------------------------
 # bootlog
 # ---------------------------------------------------------------------------------------------
 def bootlog(args):
@@ -1036,6 +1076,13 @@ def bootlog(args):
 
 
 def main():
+    # The trees hold icon glyphs (private-use code points); a Windows console's code page cannot
+    # print them, and a difference must never die in the printing.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0],
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1065,6 +1112,19 @@ def main():
     m.add_argument("--n", type=int, default=7)
     m.add_argument("-v", "--verbose", action="store_true")
     m.set_defaults(func=measure)
+    p = sub.add_parser("crop", help="a piece of a saved screenshot: BOARD LABEL STATE --find TEXT --to PNG")
+    p.add_argument("board")
+    p.add_argument("label")
+    p.add_argument("state")
+    p.add_argument("--find", default="", help="an object whose text contains this")
+    p.add_argument("--exact", action="store_true", help="... whose text is exactly this")
+    p.add_argument("--nth", type=int, default=0, help="the n-th such object (0 first)")
+    p.add_argument("--up", type=int, default=0, help="crop this many levels above it")
+    p.add_argument("--rect", help="x,y,w,h instead of --find")
+    p.add_argument("--pad", type=int, default=12)
+    p.add_argument("--to", required=True, help="the PNG to write")
+    p.add_argument("--out", default=str(OUT_DIR))
+    p.set_defaults(func=crop)
     s = sub.add_parser("bootlog", help="reset a board by its serial port; print its [Heap] lines")
     s.add_argument("port")
     s.add_argument("--seconds", type=float, default=25.0)

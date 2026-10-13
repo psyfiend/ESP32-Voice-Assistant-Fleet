@@ -339,8 +339,15 @@ void setColumnsOverride(uint8_t cols);
 // Registered by GUIManager so a scheme change can restyle what is on screen.
 void onSchemeChanged(void (*cb)());
 
+// Called whenever the shared paints are brought up to date (a scheme or accent
+// change), before LVGL is told every style changed: a layer above the tokens
+// that keeps shared styles of its own - the component kit (2.12) - refreshes
+// them here. Up to four; a second registration of the same function is ignored.
+void onRepaint(void (*cb)());
+
 // --- Helpers ---------------------------------------------------------------
 int32_t    sc(int32_t logical);          // logical px -> this board's pixels
+int32_t    mm(float v);                  // millimetres on glass -> this board's pixels (section 2b)
 lv_color_t c(uint32_t hex);              // the one place that calls lv_color_hex
 lv_color_t border();                     // BORDER, or derived from SURFACE
 

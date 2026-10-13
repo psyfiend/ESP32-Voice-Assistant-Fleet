@@ -35,8 +35,6 @@ void histStateWord(const HistEvent &ev, char *out, size_t n) {
 }
 
 void histDrawActivity(lv_obj_t *body) {
-    const UIPalette &p = UI::pal();
-    const UIType    &t = UI::type();
     const HaHistory &H = *s_hist;
     const uint16_t n = H.events();
     // The span buttons, as on the chart (owner, round 2), centred (round 6);
@@ -83,23 +81,18 @@ void histDrawActivity(lv_obj_t *body) {
             if (d != lastDay) {
                 lastDay = d;
                 tfDay(buf, sizeof(buf), (time_t)ev.t, now);
-                lv_obj_t *hd = makeLabel(list, t.NAME, p.TEXT_DIM);
+                lv_obj_t *hd = Kit::label(list, KS::KS_LABEL_NAME_DIM);
                 lv_label_set_text(hd, buf);
                 lv_obj_set_width(hd, lv_pct(100));
                 lv_obj_set_style_text_align(hd, LV_TEXT_ALIGN_CENTER, 0);
                 lv_obj_set_style_pad_top(hd, r ? mm(k.S4) : 0, 0);
             }
         }
-        lv_obj_t *row = plain(list);
+        lv_obj_t *row = Kit::item(list);
         lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
         lv_obj_set_flex_flow(row, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_style_pad_all(row, mm(k.S4), 0);
         lv_obj_set_style_pad_row(row, mm(k.S1), 0);
-        lv_obj_set_style_radius(row, UI::sc(UI::met().RADIUS), 0);
-        lv_obj_set_style_bg_color(row, UI::c(p.SURFACE), 0);
-        lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
-        lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_style_bg_color(row, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
         lv_obj_add_event_cb(row, histRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
 
         lv_obj_t *line = plain(row);
@@ -111,11 +104,11 @@ void histDrawActivity(lv_obj_t *body) {
         lv_obj_set_flex_grow(col, 1);
         lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
         histStateWord(ev, word, sizeof(word));
-        lv_obj_t *l = makeLabel(col, t.NAME, p.TEXT);
+        lv_obj_t *l = Kit::label(col, KS::KS_LABEL_NAME);
         lv_label_set_text(l, word);
         // The small lines under the state; a long one wraps.
         auto small = [&](const char *txt) {
-            lv_obj_t *s2 = makeLabel(col, t.TAG, p.TEXT_DIM);
+            lv_obj_t *s2 = Kit::label(col, KS::KS_LABEL_TAG_DIM);
             lv_label_set_long_mode(s2, LV_LABEL_LONG_WRAP);
             lv_obj_set_width(s2, lv_pct(100));
             lv_label_set_text(s2, txt);
@@ -149,32 +142,27 @@ void histDrawActivity(lv_obj_t *body) {
         lv_obj_set_flex_flow(right, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(right, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
         tfClock(when, sizeof(when), (time_t)ev.t);
-        l = makeLabel(right, t.NAME, p.TEXT);
+        l = Kit::label(right, KS::KS_LABEL_NAME);
         lv_label_set_text(l, when);
         tfAgo(ago, sizeof(ago), (time_t)ev.t, now, TfAgo::AGO_DATED);
-        l = makeLabel(right, t.TAG, p.TEXT_DIM);
+        l = Kit::label(right, KS::KS_LABEL_TAG_DIM);
         lv_label_set_text(l, ago);
     }
     // More than shows: "Show more", or - shown all there is room for - how many
     // older ones are left out.
     if (!s_hv.more && n > HIST_ROWS_FIRST) {
-        lv_obj_t *b = plain(list);
+        lv_obj_t *b = Kit::item(list);
         lv_obj_set_size(b, lv_pct(100), mm(k.H_MORE));
-        lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_style_radius(b, UI::sc(UI::met().RADIUS), 0);
-        lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
-        lv_obj_set_style_bg_color(b, UI::c(p.SURFACE), 0);
-        lv_obj_set_style_bg_color(b, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
         lv_obj_add_event_cb(b, histMoreCb, LV_EVENT_CLICKED, nullptr);
         snprintf(buf, sizeof(buf), "Show more (%u)", (unsigned)(n - HIST_ROWS_FIRST));
-        lv_obj_t *l = makeLabel(b, t.TAG, p.ACCENT);
+        lv_obj_t *l = Kit::label(b, KS::KS_LABEL_TAG_ACCENT);
         lv_label_set_text(l, buf);
         lv_obj_center(l);
     } else {
         const uint32_t left = (uint32_t)(n - show) + H.eventsDropped();
         if (left) {
             snprintf(buf, sizeof(buf), "%lu older not shown", (unsigned long)left);
-            lv_obj_t *l = makeLabel(list, t.TAG, p.TEXT_DIM);
+            lv_obj_t *l = Kit::label(list, KS::KS_LABEL_TAG_DIM);
             lv_label_set_text(l, buf);
         }
     }

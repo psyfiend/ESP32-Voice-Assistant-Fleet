@@ -38,6 +38,7 @@
 #include "LightColor.h"
 #include "UI/UITokens.h"
 #include "UI/UIToolkit.h"
+#include "UI/Kit.h"             // the component kit (2.12 P3)
 #include "Settings.h"   // 2.10d: SETTINGS' rows are kept by card id
 #include "Cards/CardGroups.h"   // the Card label row (K44)
 #include "Cards/CardAdded.h"    // K17: Add as a card, Remove card
@@ -77,6 +78,8 @@
 #endif
 
 namespace popup {
+
+using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
 
 // Compound names, never a bare ALL-CAPS word - Arduino's pin-mode macros eat
 // those (CLAUDE.md, "Arduino's global macro namespace will eat your enum").
@@ -124,8 +127,6 @@ extern IntfMode s_intfMode;   // PopupSparks.cpp
 constexpr uint8_t POPUP_ENT_MAX = (CARD_PRIMARY_MAX > ENTITY_MEMBERS_MAX) ? CARD_PRIMARY_MAX
                                                                           : ENTITY_MEMBERS_MAX;
 
-// The hand-drawn faces (see "Faces drawn by hand", with the control deck).
-enum class FaceKind : uint8_t { FACE_BLACK, FACE_SILVER, FACE_DENT };   // setFace(): PopupDeck.cpp
 struct Popup {
     PopupPhase phase = PopupPhase::PHASE_CLOSED;
     PopupView  view  = PopupView::VIEW_MAIN;
@@ -207,8 +208,8 @@ struct Popup {
 
     // The settings deck (pathway 1, card-sheet 11.1): see "The settings deck".
     lv_obj_t *deck = nullptr, *deckTab = nullptr, *deckTabLbl = nullptr, *deckPane = nullptr;
-    lv_obj_t *deckBody = nullptr;                  // the pane's rows (buildFolder())
-    lv_obj_t *deckTrack = nullptr;                 // what the panel is dragged in (buildFolder())
+    lv_obj_t *deckBody = nullptr;                  // the pane's rows (Kit::folder())
+    lv_obj_t *deckTrack = nullptr;                 // what the panel is dragged in (Kit::folder())
     lv_obj_t *deckUp = nullptr, *deckDown = nullptr;   // its "more above / below" carets
     lv_obj_t *swPause = nullptr;                   // the Paused checkbox
     int32_t   deckH = 0, deckHead = 0;
@@ -264,18 +265,9 @@ struct LightAgg {
 
 enum LightCtl : uint8_t { LCTL_DIM, LCTL_TEMP, LCTL_COLOUR };
 
-struct DeckColours { uint32_t ribbon, icon, chosen; };
-
-struct Deck {
-    lv_obj_t *obj = nullptr, *sel = nullptr, *selIcon = nullptr;
-    uint8_t   n = 0;                    // mode switches
-    int32_t   x[3] = {0, 0, 0};         // their centres
-    uint8_t   ctl[3] = {0, 0, 0};       // the LightCtl each is
-    const char *glyph[3] = {nullptr, nullptr, nullptr};
-    int32_t   selW = 0;
-    uint8_t   shown = 0;                // the switch whose icon the selector carries
-    bool      dragging = false;
-    int32_t   pressX = 0, selX0 = 0;
+// The control deck (PopupDeck.cpp): the kit's selector, and the LightCtl each choice is.
+struct Deck : Kit::Selector {
+    uint8_t ctl[Kit::SELECTOR_MAX] = {0, 0, 0};
 };
 
 struct SceneStack { int32_t ch, bw, gap, pad, rowsFit, cols, w, h; bool scroll; };
@@ -329,26 +321,16 @@ struct ChartPanel { lv_obj_t *root = nullptr, *tab = nullptr, *pane = nullptr, *
                     lv_obj_t *track = nullptr, *up = nullptr, *down = nullptr;
                     uint8_t state = DECK_HIDDEN; int32_t h = 0; uint8_t kind = SIDE_NONE; };
 
+// A panel's rows are the kit's (2.12 P3): Kit::RowSpec, built by Kit::rows().
 // ROW_BUTTON (2.10e): a button that does something - its words in `opts`.
-enum class DeckRowKind : uint8_t { ROW_CHECK, ROW_DROP, ROW_BUTTON };
-
-struct DeckRowSpec {
-    const char   *label;
-    DeckRowKind   kind;
-    const char   *opts;     // a dropdown's choices, one per line
-    uint16_t      sel;      // its chosen one, or the checkbox's state
-    bool          live;     // false: shown greyed, does nothing yet
-    lv_event_cb_t cb;
-    lv_obj_t    **out;      // where the control is kept, or null
-};
+using DeckRowKind = Kit::RowKind;
+using DeckRowSpec = Kit::RowSpec;
 constexpr uint8_t DECK_ROWS_MAX = 12;   // 7 at most today; room for /popup?rows=
 
 // ---------------------------------------------------------------------------
 // The shared state - each defined once, in the file named
 // ---------------------------------------------------------------------------
 extern Deck d;                         // PopupDeck.cpp: the control deck being shown
-extern uint32_t s_faceEpoch;           // PopupDeck.cpp
-extern uint32_t s_faceFlat;            // PopupDeck.cpp
 extern HaHistory *s_hist;              // PopupHistory.cpp
 extern HistView s_hv;                  // PopupHistory.cpp
 extern lv_obj_t *s_histList;           // PopupHistory.cpp
@@ -413,7 +395,6 @@ void catcherCb(lv_event_t *ev);
 // PopupControls.cpp
 void renderAgo(const Agg &a);
 void makeLabelRow(lv_obj_t *col);
-int32_t deckBreak();
 int32_t selectorW(uint8_t caps);
 int32_t controlDeckH();
 void checkPausedChange(const Agg &a);
@@ -444,12 +425,8 @@ int32_t sceneGridW(int32_t maxW);
 void buildSceneGrid(lv_obj_t *col, int32_t colW);
 
 // PopupDeck.cpp
-int8_t &chosenLook();
+int8_t chosenLook();
 void keepLook(int8_t look);
-DeckColours deckColours();
-FaceKind metalKind();
-lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t flat);
-lv_obj_t *labelIn(lv_obj_t *o);
 void forgetDeck();
 void buildControlDeck(lv_obj_t *parent, uint8_t caps);
 

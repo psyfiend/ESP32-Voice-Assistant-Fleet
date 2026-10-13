@@ -307,6 +307,38 @@ other's numbers then include the sparks (+500 B and ~0.7 ms a window, seen once 
 The candidates to merge (`S_GUTTER` into `S5`, and six more) are in `tokens.md` §7 with each
 one's pixels on the three boards and a recommendation. **The owner decides; nothing is merged.**
 
+**P3 - DONE (2026-10-13).** The component kit: `include/UI/Kit.h`, `src/UI/Kit/` (Basics, Styles,
+Button, Dialog, Chips, Rows, Folder, Faces, Selector), described with pictures in
+`docs/design/components.md`. Label roles, Button (cancel, destructive), Dialog from a spec, Chip
+row, List item, Rows (dropdown, checkbox, row button) from a row table, the Folder panel (not tied
+to the window's state: the window it belongs to and its callbacks are its spec), the Selector (the
+control deck's switch, its four looks and the hand-drawn faces - ready for #92), Icon button, and
+pill / swatch / badge styles. Each role is shared `lv_style_t`s refilled on every repaint
+(`UI::onRepaint()`, new, beside `UI::paint()`), filled at boot by `Kit::begin()`. The window is
+built from it: the window's files lost ~1,000 lines net, and the kit is ~1,500 with its comments.
+
+Checks, by A/B - each board flashed with its P2 image (`test/golden/<board>/fw_p2/`, gitignored)
+and captured, then flashed with P3 and captured, minutes apart, so the house is the same in both:
+**no tree or pixel differences on WS_P4_5, WS_P4_4B and CYD_P4_1060** (labels `p2d`/`p3d`). On the
+1060 the Living room's Overhead and the Office desk light were switched on between its two
+captures; those five states were captured again both ways (`p2e`/`p3e`) and matched. (A page
+state cannot tell the house changed - only a window's entities are snapshotted - so a card that
+changed colour on the page reads as a difference: capture again.) WS_S3_4B builds. LVGL's pool: ~180 B less per window, 1-2.5 KB less with a panel or History open,
+~880 B more at boot for the styles themselves (components.md §4); the window's fastest build within
+0.3 ms of `v0.2.12`.
+
+Harness changes on the way: `crop` (the pictures), `--exact`; output that survives Windows' code
+page; a label showing digits no longer counts as a pixel difference when the clock ticked between
+its tree and its screenshot (the tree still checks it). **One run per board at a time**: a stray
+second chain flashed the P4_5 under a capture once (both discarded, the A/B redone).
+
+For the owner, none changed (zero-change rule):
+- **Buttons have two roles, CANCEL and DESTRUCTIVE**; the brief's PRIMARY and QUIET have no user in
+  the house yet (the row button is a row control, a scene a pill), so they wait for their first.
+- **The kit's styles follow a scheme change live, as `UI::paint()` does.** The window's own
+  local colours still do not, so a window open across a scheme change would show both - a path the
+  device cannot take (the window is modal; the scheme knob and page swipes are behind it).
+
 ## 7. For the owner
 
 Each phase leaves the board looking and behaving exactly as at `v0.2.12`; the proof is the

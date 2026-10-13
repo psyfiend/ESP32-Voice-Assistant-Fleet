@@ -57,21 +57,14 @@ void renderAgo(const Agg &a) {
 // BESIDE it - on the same line, the same height, so nothing below moves when
 // it comes or goes (owner, round 3: it used to sit above and push the rest down).
 void makeLabelRow(lv_obj_t *col) {
-    const UIPalette &p = UI::pal();
-    const UIType    &t = UI::type();
     lv_obj_t *row = plain(col);
-    lv_obj_set_size     (row, LV_SIZE_CONTENT, lv_font_get_line_height(t.TAG));
+    lv_obj_set_size     (row, LV_SIZE_CONTENT, lv_font_get_line_height(UI::type().TAG));
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(row, mm(UI::shape().S5), 0);
-    s.lblWhat = makeLabel(row, t.TAG, p.TEXT_DIM);
-    s.pill = makeLabel(row, t.TAG, UI::contrastOf(p.ST_IDLE, p.GROUND, p.TEXT));
+    s.lblWhat = Kit::label(row, KS::KS_LABEL_TAG_DIM);
+    s.pill = Kit::label(row, KS::KS_BADGE_PAUSED);   // the card's own PAUSED badge
     lv_label_set_text(s.pill, "PAUSED");
-    lv_obj_set_style_bg_color(s.pill, UI::c(p.ST_IDLE), 0);
-    lv_obj_set_style_bg_opa  (s.pill, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius  (s.pill, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_pad_hor (s.pill, mm(UI::shape().S4), 0);
-    lv_obj_set_style_text_letter_space(s.pill, mm(UI::shape().TRACK_PILL), 0);
     if (!s.builtPaused) lv_obj_add_flag(s.pill, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -83,17 +76,14 @@ void makeLabelRow(lv_obj_t *col) {
 // left edge. For any one light nothing moves - not with the control showing,
 // a pause, or changing words, which the allowance covers (a round 3 lesson:
 // a column sized from its text moved the slider every time the text changed).
-// The control deck's width (buildControlDeck()): Power on a ribbon of its own,
-// a break, then the modes' ribbon.
-int32_t deckBreak() { return mm(UI::shape().S6); }
+// The control deck's width (buildControlDeck()): the kit's selector with Power
+// and the light's modes.
 int32_t selectorW(uint8_t caps) {
-    const int32_t g = mm(UI::shape().S1), slot = UI::minTouch();
     uint8_t n = 0;
     if (caps & LIGHT_CAN_DIM)    n++;
     if (caps & LIGHT_CAN_TEMP)   n++;
     if (caps & LIGHT_CAN_COLOUR) n++;
-    const int32_t power = slot + 2 * g;
-    return n ? power + deckBreak() + n * slot + (n + 1) * g : power;
+    return Kit::selectorW(n);
 }
 
 // `deck`: whether the control deck is in the column (beside the hero) or under
@@ -121,7 +111,7 @@ int32_t stageH() {
 }
 
 // The control deck's height: its switches and its own padding.
-int32_t controlDeckH() { return UI::minTouch() + 2 * mm(UI::shape().S1); }
+int32_t controlDeckH() { return Kit::selectorH(); }
 
 void fixColumn(lv_obj_t *col, int32_t width) {
     lv_obj_set_width     (col, width);
@@ -519,7 +509,7 @@ void buildMain() {
     lv_obj_set_style_max_width(s.lblValue, colMax, 0);
     s.lblUnit  = makeLabel(vrow, t.UNIT, p.TEXT_DIM);
 
-    s.lblAgo = makeLabel(col, t.TAG, p.TEXT_DIM);
+    s.lblAgo = Kit::label(col, KS::KS_LABEL_TAG_DIM);
     if (s.toggleHero) {
         lv_label_set_long_mode(s.lblAgo, LV_LABEL_LONG_DOT);
         lv_obj_set_width(s.lblAgo, lv_pct(100));

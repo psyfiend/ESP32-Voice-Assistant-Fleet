@@ -4,11 +4,9 @@
 
 namespace popup {
 
-// Millimetres on glass to this panel's pixels - the same derivation as
-// UI::minTouch(), so the window is the same physical size on every board.
-int32_t mm(float v) {
-    return (int32_t)lroundf(v * (float)UIToolkit::ppi() / 25.4f);
-}
+// Millimetres on glass to this panel's pixels - UI::mm(), the same derivation
+// as UI::minTouch(), so the window is the same physical size on every board.
+int32_t mm(float v) { return UI::mm(v); }
 
 // "P4_5 millimetres": a length that is `v` mm in the P4_5's window, the same
 // SHARE of this one (owner, 2026-10-05: the hero the same proportion of the
@@ -19,22 +17,10 @@ int32_t pm(float v) {
     return (int32_t)lroundf(v * (float)s.propH / REF_WIN_H_MM);
 }
 
-// A bare object: no theme styles, no scrolling, not clickable until asked.
-lv_obj_t *plain(lv_obj_t *parent) {
-    lv_obj_t *o = lv_obj_create(parent);
-    lv_obj_remove_style_all(o);
-    lv_obj_clear_flag(o, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_clear_flag(o, LV_OBJ_FLAG_CLICKABLE);
-    return o;
-}
+// A bare object, and a label in a font and colour: the kit's (2.12 P3).
+lv_obj_t *plain(lv_obj_t *parent) { return Kit::plain(parent); }
 
-lv_obj_t *makeLabel(lv_obj_t *parent, const lv_font_t *f, uint32_t hex) {
-    lv_obj_t *l = lv_label_create(parent);
-    lv_obj_set_style_text_font (l, f, 0);
-    lv_obj_set_style_text_color(l, UI::c(hex), 0);
-    lv_label_set_text(l, "");
-    return l;
-}
+lv_obj_t *makeLabel(lv_obj_t *parent, const lv_font_t *f, uint32_t hex) { return Kit::label(parent, f, hex); }
 
 // Only touch LVGL when the words actually change: a re-render runs every
 // second for the "N ago" line, and setting identical text still invalidates.
@@ -46,45 +32,14 @@ void setText(lv_obj_t *l, const char *t) {
 }
 
 // How wide a line of text draws, in pixels.
-int32_t textW(const char *txt, const lv_font_t *f) {
-    lv_point_t sz = {0, 0};
-    lv_text_get_size(&sz, txt, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-    return sz.x;
-}
-
-// Pressed feedback for a button whose face is an image: the face tinted
-// towards the text colour while a finger is on it.
-void facePressCb(lv_event_t *ev) {
-    lv_obj_t *b = (lv_obj_t *)lv_event_get_current_target(ev);
-    if (lv_obj_get_child_count(b) == 0) return;
-    lv_obj_t *img = lv_obj_get_child(b, 0);
-    if (!lv_obj_check_type(img, &lv_image_class)) return;
-    const bool down = lv_event_get_code(ev) == LV_EVENT_PRESSED;
-    lv_obj_set_style_image_recolor    (img, UI::c(UI::pal().TEXT), 0);
-    lv_obj_set_style_image_recolor_opa(img, down ? LV_OPA_20 : LV_OPA_TRANSP, 0);
-}
+int32_t textW(const char *txt, const lv_font_t *f) { return Kit::textW(txt, f); }
 
 // A round icon button at the minimum touch size: a soft dent in the card
 // surface (owner, round 6), so it reads as a button and not a stray glyph
-// (owner, H1), tinted while pressed.
+// (owner, H1), tinted while pressed - the kit's (Kit::iconButton()).
 lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f,
                      lv_event_cb_t cb, lv_obj_t **outLabel) {
-    const UIPalette &p = UI::pal();
-    const int32_t sz = UI::minTouch();
-    lv_obj_t *b = plain(parent);
-    lv_obj_set_size  (b, sz, sz);
-    lv_obj_add_flag  (b, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
-    lv_obj_t *l = makeLabel(b, f, p.TEXT);
-    lv_label_set_text(l, glyph);
-    lv_obj_center(l);
-    setFace(b, sz, sz, sz / 2, FaceKind::FACE_DENT, p.SURFACE);
-    lv_obj_add_event_cb(b, facePressCb, LV_EVENT_PRESSED,    nullptr);
-    lv_obj_add_event_cb(b, facePressCb, LV_EVENT_RELEASED,   nullptr);
-    lv_obj_add_event_cb(b, facePressCb, LV_EVENT_PRESS_LOST, nullptr);
-    lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, nullptr);
-    if (outLabel) *outLabel = l;
-    return b;
+    return Kit::iconButton(parent, glyph, f, cb, outLabel);
 }
 
 // ---------------------------------------------------------------------------

@@ -11,16 +11,14 @@ namespace popup {
 Card *cardOf(lv_obj_t *sf);
 
 void propRow(lv_obj_t *list, const char *what, const char *value) {
-    const UIPalette &p = UI::pal();
-    const UIType    &t = UI::type();
     lv_obj_t *r = plain(list);
     lv_obj_set_size(r, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(r, mm(UI::shape().S8), 0);
-    lv_obj_t *a = makeLabel(r, t.TAG, p.TEXT_DIM);
+    lv_obj_t *a = Kit::label(r, KS::KS_LABEL_TAG_DIM);
     lv_label_set_text(a, what);
-    lv_obj_t *b = makeLabel(r, t.TAG, p.TEXT);
+    lv_obj_t *b = Kit::label(r, KS::KS_LABEL_TAG);
     lv_label_set_long_mode(b, LV_LABEL_LONG_WRAP);
     lv_obj_set_flex_grow(b, 1);
     lv_obj_set_style_text_align(b, LV_TEXT_ALIGN_RIGHT, 0);

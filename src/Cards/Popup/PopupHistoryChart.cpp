@@ -42,7 +42,7 @@ void histDrawChart(lv_obj_t *body) {
     lv_obj_t *top = histTopRow(body);
     cardFormatValue(e, nowTxt, sizeof(nowTxt), true, s.tempUnit);
     snprintf(buf, sizeof(buf), "Now: %s%s", nowTxt, H.fromStatistics() ? "\n5-minute averages" : "");
-    lv_obj_t *read = makeLabel(top, t.TAG, p.TEXT);
+    lv_obj_t *read = Kit::label(top, KS::KS_LABEL_TAG);
     lv_label_set_text(read, buf);
     lv_obj_set_style_text_align(read, LV_TEXT_ALIGN_RIGHT, 0);
     histCorner(read, LV_ALIGN_RIGHT_MID);
@@ -52,11 +52,11 @@ void histDrawChart(lv_obj_t *body) {
     const int32_t topW = lv_obj_get_width(top);
     int32_t leftEnd = 0;
     if (s_hv.minMax && lo <= hi) {
-        lv_obj_t *words = makeLabel(top, t.TAG, p.TEXT);
+        lv_obj_t *words = Kit::label(top, KS::KS_LABEL_TAG);
         lv_label_set_text(words, "Min:\nMax:");
         histCorner(words, LV_ALIGN_LEFT_MID);
         snprintf(buf, sizeof(buf), "%.1f%s\n%.1f%s", (double)lo, unit, (double)hi, unit);
-        lv_obj_t *nums = makeLabel(top, t.TAG, p.TEXT);
+        lv_obj_t *nums = Kit::label(top, KS::KS_LABEL_TAG);
         lv_label_set_text(nums, buf);
         lv_obj_set_style_text_align(nums, LV_TEXT_ALIGN_RIGHT, 0);
         lv_obj_align_to(nums, words, LV_ALIGN_OUT_RIGHT_MID, mm(UI::shape().S3), 0);
@@ -135,7 +135,7 @@ void histDrawChart(lv_obj_t *body) {
         snprintf(buf, sizeof(buf), "%.*f%s", dec, (double)v, v >= ymax - step * 0.01f ? unit : "");
         const int32_t ly = LV_CLAMP(0, y - lh / 2, ah - lh);
         if (ly < lastLblY + lh) continue;   // never two on top of each other
-        lv_obj_t *yl = makeLabel(area, t.TAG, p.TEXT_DIM);
+        lv_obj_t *yl = Kit::label(area, KS::KS_LABEL_TAG_DIM);
         lv_label_set_text(yl, buf);
         lv_obj_set_pos(yl, gutter - mm(UI::shape().S_GUTTER) - textW(buf, t.TAG), ly);
         lastLblY = ly;
@@ -174,7 +174,7 @@ void histDrawChart(lv_obj_t *body) {
             const int32_t bw = textW(buf, t.TAG);
             const int32_t bx = LV_CLAMP(0, x - bw / 2, w - bw);
             if (bx < lastRight + mm(UI::shape().S_GUTTER)) continue;
-            lv_obj_t *xl = makeLabel(area, t.TAG, p.TEXT_DIM);
+            lv_obj_t *xl = Kit::label(area, KS::KS_LABEL_TAG_DIM);
             lv_label_set_text(xl, buf);
             lv_obj_set_pos(xl, bx, topH + plotH + mm(UI::shape().S1));
             lastRight = bx + bw;
@@ -246,7 +246,7 @@ void histDrawChart(lv_obj_t *body) {
             if (yTop > yBot) { yTop = yBot = topH + plotH / 2; }
         };
         auto place = [&](const char *txt, int32_t x, bool above) {
-            lv_obj_t *l = makeLabel(area, t.TAG, p.TEXT_DIM);
+            lv_obj_t *l = Kit::label(area, KS::KS_LABEL_TAG_DIM);
             lv_label_set_text(l, txt);
             // A backing in the surface's colour: the grid and its dotted line stop at its edge.
             lv_obj_set_style_bg_color(l, UI::c(p.SURFACE_ALT), 0);
@@ -376,7 +376,7 @@ void histScrub(int32_t x) {
     static lv_point_precise_t ptsScrub[2];
     if (!s_hv.scrubLine) {
         s_hv.scrubLine = histVLine(s_hv.area, ptsScrub, xi, UI::mix(p.SURFACE_ALT, p.TEXT, 70), LV_MAX(2, mm(UI::shape().LINE_MID)));
-        s_hv.scrubLbl  = makeLabel(s_hv.area, t.TAG, p.TEXT);
+        s_hv.scrubLbl  = Kit::label(s_hv.area, KS::KS_LABEL_TAG);
         // Opaque, over the min and max labels it may cover.
         lv_obj_set_style_bg_color(s_hv.scrubLbl, UI::c(p.SURFACE_ALT), 0);
         lv_obj_set_style_bg_opa  (s_hv.scrubLbl, LV_OPA_COVER, 0);

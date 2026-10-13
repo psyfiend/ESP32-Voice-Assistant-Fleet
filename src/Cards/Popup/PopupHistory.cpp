@@ -103,7 +103,7 @@ void histSyncPanel();   // below, with the panels: the left panel's rows follow 
 
 // A centred line of words in the view - loading, nothing, a failure.
 void histNote(lv_obj_t *parent, const char *text) {
-    lv_obj_t *l = makeLabel(parent, UI::type().NAME, UI::pal().TEXT_DIM);
+    lv_obj_t *l = Kit::label(parent, KS::KS_LABEL_NAME_DIM);
     lv_label_set_text(l, text);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(l, lv_pct(90));
@@ -151,48 +151,12 @@ void histAsk() {
 
 // --- The chart -------------------------------------------------------------
 
-// The span chips: a row of small buttons, the chosen one lit in the accent -
-// the chart's four spans, or activity's two (owner, round 2).
-// `room`: the most width they may take (0, any) - their padding and the gaps
-// between them shrink to fit it, as far as half.
+// The span chips (Kit::chipRow()): the chart's four spans, or activity's two
+// (owner, round 2), the chosen one lit. `room`: the most width they may take
+// (0, any).
 lv_obj_t *histChips(lv_obj_t *parent, int32_t room) {
-    const UIPalette &p = UI::pal();
-    lv_obj_t *row = plain(parent);
-    lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-    const uint8_t cnt = s_hv.chart ? HIST_SPANS : HIST_PERIODS;
-    const UIShape &k = UI::shape();
-    int32_t padH = mm(k.S_CHIP_SIDE), gap = mm(k.S4);
-    if (room > 0) {
-        int32_t text = 0;
-        for (uint8_t i = 0; i < cnt; i++) text += textW(s_hv.chart ? HIST_SPAN_CHIP[i] : HIST_PERIOD_CHIP[i], UI::type().TAG);
-        const int32_t spare = room - text;   // for 2*cnt paddings and cnt-1 gaps
-        const int32_t full  = 2 * cnt * padH + (cnt - 1) * gap;
-        if (spare < full) {
-            const int32_t s = LV_MAX(spare, full / 2);
-            padH = padH * s / full;
-            gap  = gap * s / full;
-        }
-    }
-    lv_obj_set_style_pad_column(row, gap, 0);
-    for (uint8_t i = 0; i < cnt; i++) {
-        const bool lit = (i == (s_hv.chart ? s_hv.span : s_hv.period));
-        lv_obj_t *b = plain(row);
-        lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_size(b, LV_SIZE_CONTENT, mm(k.H_CHIP));
-        lv_obj_set_style_pad_hor(b, padH, 0);
-        lv_obj_set_style_radius(b, mm(k.R_CHIP), 0);
-        lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
-        lv_obj_set_style_bg_color(b, UI::c(lit ? UI::mix(p.SURFACE, p.ACCENT, 25) : p.SURFACE), 0);
-        lv_obj_set_style_border_width(b, lit ? LV_MAX(1, mm(k.LINE_FINE)) : 0, 0);
-        lv_obj_set_style_border_color(b, UI::c(p.ACCENT), 0);
-        lv_obj_set_style_bg_color(b, UI::c(UI::mix(p.SURFACE, p.TEXT, 15)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
-        lv_obj_add_event_cb(b, spanChipCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
-        lv_obj_t *l = makeLabel(b, UI::type().TAG, lit ? p.ACCENT : p.TEXT);
-        lv_label_set_text(l, s_hv.chart ? HIST_SPAN_CHIP[i] : HIST_PERIOD_CHIP[i]);
-        lv_obj_center(l);
-    }
-    return row;
+    return s_hv.chart ? Kit::chipRow(parent, HIST_SPAN_CHIP, HIST_SPANS, s_hv.span, room, spanChipCb)
+                      : Kit::chipRow(parent, HIST_PERIOD_CHIP, HIST_PERIODS, s_hv.period, room, spanChipCb);
 }
 
 // THE TOP LINE (owner, rounds 5 and 6), one shape for the chart and activity,
@@ -241,7 +205,7 @@ void histShowing(lv_obj_t *row) {
     const UIPalette &p = UI::pal();
     char buf[40];
     snprintf(buf, sizeof(buf), "Showing: %s", s_hv.chart ? CHART_WORDS[s_hv.span] : ACT_WORDS[s_hv.period]);
-    lv_obj_t *l = makeLabel(row, t.NAME, p.TEXT);
+    lv_obj_t *l = Kit::label(row, KS::KS_LABEL_NAME);
     lv_label_set_text(l, buf);
     lv_obj_align(l, LV_ALIGN_TOP_MID, 0, 0);
     // The whole line, and a little round it - not so much that it takes taps

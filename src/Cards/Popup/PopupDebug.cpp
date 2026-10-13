@@ -555,7 +555,7 @@ void CardPopup::debugService(lv_timer_t *t) {
         dbgMem(mem, sizeof(mem));
         dbgOut("%s; window %s; scheme %u, selector %d (-1: the scheme's own); faces flat so far %lu\n", mem,
                isOpen() ? "open" : "closed", (unsigned)UI::schemeIndex(), (int)chosenLook(),
-               (unsigned long)s_faceFlat);
+               (unsigned long)Kit::facesFlat());
         for (int i = 0; i < n; i++) {
             Card *c = cardOf(cards[i]);
             if (c) dbgOut("%2d  %-16s %-12s %u entit%s\n", i, c->label(), c->_area,
