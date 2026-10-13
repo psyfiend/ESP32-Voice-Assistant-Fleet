@@ -4455,8 +4455,9 @@ uint8_t deckSpecs(DeckRowSpec *r) {
         r[n++] = { "Card label", DeckRowKind::ROW_DROP, s_clOpts, clSel,
                    false, cardLabelDropCb, nullptr };
     }
-    r[n++] = { "Visibility", DeckRowKind::ROW_DROP,
-               "Show on dashboard\nShow only in group\nShow only as member\nHidden", 0, false, nullptr, nullptr };
+    // Visibility is NOT SHOWN (owner, 2026-10-12, K68): it belongs to cards in
+    // a group shown as a cluster, a group panel or a group page, and none
+    // exists yet. It comes back with them, offered only there.
     // Tap action (2.10d). Long press always opens the window (K39), whatever
     // this says. Greyed in a member's own view: it is the card's.
     const bool cardRows = held && held->hasId() && !inMember();
@@ -4800,13 +4801,18 @@ void confirmRemove() {
 
     lv_obj_t *title = makeLabel(box, t.NAME, p.TEXT);
     lv_label_set_text(title, "Remove this card?");
-    char buf[160];
-    snprintf(buf, sizeof(buf), "\"%s\" leaves this page. Its settings are kept.", s.name);
-    lv_obj_t *body = makeLabel(box, t.TAG, p.TEXT_DIM);
-    lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(body, lv_pct(100));
-    lv_obj_set_style_text_align(body, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(body, buf);
+    // The owner's words (K17 round 2).
+    char buf[200];
+    snprintf(buf, sizeof(buf), "Are you sure you want to remove \"%s\" from the dashboard? "
+                               "Its settings will be kept so it can be restored.", s.name);
+    for (const char *txt : { (const char *)buf,
+                             "If the card is placed in other locations those will not be affected." }) {
+        lv_obj_t *body = makeLabel(box, t.TAG, p.TEXT_DIM);
+        lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(body, lv_pct(100));
+        lv_obj_set_style_text_align(body, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(body, txt);
+    }
 
     lv_obj_t *row = plain(box);
     lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);

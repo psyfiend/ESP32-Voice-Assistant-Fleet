@@ -58,3 +58,11 @@ card, later ones after it, newest last (4.2 replaces it). Three findings, fixed 
 | B2 | Remove card on one | A dialog over everything, "Remove this card?"; Cancel and a tap outside leave it; Remove removes it and closes the window |
 | B3 | A card whose name is too long for one line (4B: "Office lamp") | The disc keeps its size and place; the name is two lines where there is room under the disc, else one line with "..." |
 | B4 | The other cards, every scheme | Names and discs where they were |
+
+**Round 2 results (owner, 2026-10-12): B1-B4 all PASS.** Asked for: the dialog's words (headline
+"Remove this card?"; body "Are you sure you want to remove "<card>" from the dashboard? Its
+settings will be kept so it can be restored." and a second paragraph "If the card is placed in
+other locations those will not be affected."), and the Visibility row hidden until clusters exist
+(K68) - which also puts "Add as a card" in sight in a member's SETTINGS on the P4_5. Built and
+flashed to all three. Found on the way: removed cards held a slot each (24 for the device, 13
+taken by testing); they now live in the file only - the pool - and a slot is a card on a page.

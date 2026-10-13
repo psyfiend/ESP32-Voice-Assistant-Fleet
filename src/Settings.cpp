@@ -589,7 +589,7 @@ uint8_t countCards(const char *key, const char *value) {
 
 void forEachCardWith(const char *key, void (*fn)(const char *, const char *, void *), void *ctx) {
     if (!s_doc || !key || !fn) return;
-    constexpr uint8_t MAXN = 32;
+    constexpr uint8_t MAXN = 96;   // in PSRAM: the pool of removed cards counts too
     struct C { char id[48]; char v[48]; };
     C *c = (C *)heap_caps_malloc(MAXN * sizeof(C), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!c) return;

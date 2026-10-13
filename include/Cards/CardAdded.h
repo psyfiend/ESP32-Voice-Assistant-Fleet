@@ -37,7 +37,7 @@ struct PageSpec;
 
 namespace CardAdded {
 
-constexpr uint8_t MAX = 24;   // cards added on one device, removed ones included
+constexpr uint8_t MAX = 24;   // cards added on one device and on its pages (removed ones are in the file only)
 
 // Read the added cards from the settings file. `compiledId` says whether an id
 // is a compiled card's (so a new id never repeats one). Once, at boot, before

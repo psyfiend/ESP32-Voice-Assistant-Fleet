@@ -28,6 +28,7 @@ struct Rec {
 Rec      s_rec[CardAdded::MAX];
 CardSpec s_spec[CardAdded::MAX];   // each record as a spec - built once, never moved
 uint8_t  s_n = 0;
+uint16_t s_pooled = 0;             // removed ones, in the file only
 char     s_page[24] = "";
 bool     s_changed = false;
 bool   (*s_compiled)(const char *) = nullptr;
@@ -58,7 +59,10 @@ void readOne(const char *id, const char *page, void *) {
     Settings::card(id, "entity", v, sizeof(v)); copy(r.entity, sizeof(r.entity), v);
     Settings::card(id, "area", v, sizeof(v));   copy(r.area, sizeof(r.area), v);
     r.pri = Settings::card(id, "pri", v, sizeof(v)) ? (uint8_t)atoi(v) : 128;
-    r.removed = Settings::card(id, "removed", v, sizeof(v)) && !strcmp(v, "yes");
+    // REMOVED ONES STAY IN THE FILE ONLY (the page's pool, K66): a slot here is
+    // for a card on a page. known() and idTaken() still find them in the file.
+    if (Settings::card(id, "removed", v, sizeof(v)) && !strcmp(v, "yes")) { s_pooled++; return; }
+    r.removed = false;
     if (!r.entity[0]) return;   // nothing to show: not taken
     specOf(s_n);
     s_n++;
@@ -114,11 +118,10 @@ namespace CardAdded {
 void begin(bool (*compiledId)(const char *id)) {
     s_compiled = compiledId;
     s_n = 0;
+    s_pooled = 0;
     Settings::forEachCardWith("page", readOne, nullptr);
-    uint8_t live = 0;
-    for (uint8_t i = 0; i < s_n; i++) if (!s_rec[i].removed) live++;
-    Serial.printf("[CardAdded] %u card%s added on this device (%u removed)\n",
-                  (unsigned)s_n, s_n == 1 ? "" : "s", (unsigned)(s_n - live));
+    Serial.printf("[CardAdded] %u card%s added on this device on its pages, %u removed (the pool)\n",
+                  (unsigned)s_n, s_n == 1 ? "" : "s", (unsigned)s_pooled);
 }
 
 void setPage(const char *slugName) { copy(s_page, sizeof(s_page), slugName); }
@@ -155,7 +158,8 @@ uint8_t merge(const PageSpec &page, CardSpec *out, uint8_t cap) {
 bool known(const char *cardId) {
     if (!cardId) return false;
     for (uint8_t i = 0; i < s_n; i++) if (!strcmp(s_rec[i].id, cardId)) return true;
-    return false;
+    char v[8];
+    return Settings::card(cardId, "page", v, sizeof(v));   // in the pool
 }
 
 bool isAdded(const char *cardId) {
