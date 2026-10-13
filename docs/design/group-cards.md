@@ -121,6 +121,18 @@ cards on one entity are separate cards with their own settings (K33) - except Pa
 the entity's (#60): pausing the member's card pauses it in the group card too. Remove any card
 (to the page's pool, K35/K66). Move a card to another group or found a new one: 2.11.
 
+**Visibility (owner, 2026-10-12, K68)** - the greyed SETTINGS row is about groups, not every card,
+and shows only where it means something: a card in a group that is shown as a cluster, a group
+panel, or a page of the group's members. A cluster shows every card of its group by default; the
+row then says where this one appears: **in the cluster only**, **available for the dashboard**
+(it still takes a deliberate "make a card" - K17's copy - to put one on the main grid), or
+**hidden**. K17's "Add as a card" is that deliberate step, built before the row exists. Later, the
+device should recognise and manage the cards that are also members of an existing group card.
+
+**Placement of added cards (owner, K65 Q1):** the first card made from a group card stands next to
+it; later ones follow, the newest last. Live layout settings (4.2) and the arranger (#78) replace
+this.
+
 **Open for 2.11 (Claude):**
 - "Every card is in a group" and "a card's colour and type are its own only outside a group" meet
   in K46's solo group: a card that wants its own colour founds a group of one. So SETTINGS' Card

@@ -324,10 +324,40 @@ void StateCard::render() {
     else         lv_obj_clear_flag(_statusRow, LV_OBJ_FLAG_HIDDEN);
 
     if (showName) {
-        lv_label_set_text(_name, lbl == CardLabel::LBL_STATE
-                                 ? cardStateWord(e->desc, isOn) : shownName(lbl));
+        const char *txt = (lbl == CardLabel::LBL_STATE) ? cardStateWord(e->desc, isOn) : shownName(lbl);
+        lv_label_set_text(_name, txt);
         lv_obj_set_style_text_font(_name, t.NAME, 0);
-        lv_obj_set_style_translate_y(_name, nameShift, 0);
+        // A LONG NAME NEVER TAKES THE HERO'S ROOM (owner, K17: "Office lamp" on
+        // two lines pushed the disc up and clipped it). The name always takes
+        // one line's room in the column; a name that wraps gets its second
+        // line only if both fit between the disc and the card's bottom (above
+        // the status row in full), the pair centred there; otherwise one line,
+        // cut with "...". The disc is never made smaller for a name - on a
+        // dense board it is small enough already (owner).
+        const int32_t lh = lv_font_get_line_height(t.NAME);
+        int32_t dy = nameShift;
+        bool two = false;
+        lv_point_t ts;
+        lv_text_get_size(&ts, txt, t.NAME, 0, 0, surfaceWidthPx() - 2 * pad, LV_TEXT_FLAG_NONE);
+        if (ts.y > lh) {
+            // In the body's content coordinates, as compactNameShiftPx().
+            // The status row only ever holds the "1/3" badge: when that is not
+            // showing, its room is the second line's.
+            const int32_t contH   = surfH - bodyTop - pad;
+            const int32_t statusH = compact ? 0 : Card::statusBandHeight();
+            const int32_t badgeH  = (isMixed && !compact) ? statusH : 0;
+            const int32_t midH    = contH - lh - Card::midGap() - statusH;
+            const int32_t top     = midH / 2 + discPx / 2 + UI::sc(2);        // under the disc
+            const int32_t floor   = contH + pad - badgeH - UI::sc(2);         // over the edge or the badge
+            if (floor - top >= 2 * lh) {
+                two = true;
+                dy = ((top + floor) / 2 - lh) - (contH - statusH - lh);       // centred, from where flex put it
+            }
+        }
+        lv_label_set_long_mode(_name, two ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
+        lv_obj_set_height(_name, two ? 2 * lh : lh);
+        lv_obj_set_style_margin_bottom(_name, two ? -lh : 0, 0);   // still one line in the column
+        lv_obj_set_style_translate_y(_name, dy, 0);
         lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(_name, LV_OBJ_FLAG_HIDDEN);

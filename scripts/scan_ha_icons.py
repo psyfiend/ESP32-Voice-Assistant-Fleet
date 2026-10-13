@@ -149,6 +149,16 @@ async def main():
     needed, all_icons, prefixes = set(), collections.Counter(), collections.Counter()
     rows = []
 
+    # THE MEMBERS OF OUR GROUPS TOO (K17, 2026-10-12): a group's members can be
+    # made cards of their own, and HA lists them in the group's `entity_id`
+    # attribute. Desk's lamps (mdi:track-light, mdi:lamp-outline) drew plain
+    # bulbs because this scan only ever looked at the declared entities.
+    for s in states:
+        if s["entity_id"] in ours:
+            members = s.get("attributes", {}).get("entity_id")
+            if isinstance(members, list):
+                ours |= set(members)
+
     for s in states:
         eid = s["entity_id"]
         attrs = s.get("attributes", {})
@@ -171,7 +181,7 @@ async def main():
             needed.add(a)
 
     print("=" * 78)
-    print(f"1. OUR {len(rows)} REGISTERED ENTITIES")
+    print(f"1. OUR {len(rows)} REGISTERED ENTITIES, AND OUR GROUPS' MEMBERS")
     print("=" * 78)
     for eid, icon, dc in sorted(rows):
         name = strip(icon)

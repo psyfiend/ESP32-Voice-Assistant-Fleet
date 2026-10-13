@@ -886,3 +886,13 @@ have said "no known fix".
   (`git log origin/master -- <file>`), as #49 taught for the issue tracker.
 - Re-read the rebuild traps above before rebuilding: this session lost a run to the `-s` trap that
   was already written down here.
+
+## A measured list is only as wide as what was measured (K17, 2026-10-12)
+
+The icon font is a subset, and its list was a measurement - `scan_ha_icons.py` read the icons HA
+serves for the entities the dashboard declares. Then K17 let a card be made from an entity nobody
+declared (a member HA lists for a group), and Desk's lamps drew plain bulbs: `mdi:track-light`
+and `mdi:lamp-outline` had never been measured. Nothing failed loudly - a glyph the subset lacks
+falls through to the kind's icon. **When a feature widens what can reach the screen, widen the
+measurement with it** - the scan now follows the declared groups' members, and the font carries
+every MDI icon the owner's HA serves (~66 glyphs, ~40-120 KB a board, with ~4 MB free).

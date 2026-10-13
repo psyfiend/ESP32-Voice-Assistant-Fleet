@@ -4426,7 +4426,6 @@ void unitsDropCb(lv_event_t *ev);
 void propsCb(lv_event_t *ev);
 void addCardCb(lv_event_t *ev);
 void removeCardCb(lv_event_t *ev);
-bool s_removeArmed = false;   // "Remove card" tapped once: the next tap removes
 
 uint8_t deckSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
@@ -4483,11 +4482,10 @@ uint8_t deckSpecs(DeckRowSpec *r) {
         const bool made = CardAdded::addedFor(held->id(), s.ent[0]->desc.id) != nullptr;
         r[n++] = { "Add as a card", DeckRowKind::ROW_BUTTON, made ? "Added" : "Add", 0, !made, addCardCb, nullptr };
     }
-    // A card added on the device can be removed (K66) - to the page's pool. A
-    // second tap, on "Sure?", does it.
+    // A card added on the device can be removed (K66) - to the page's pool,
+    // after a dialog that asks (confirmRemove()).
     if (!inMember() && held && CardAdded::isAdded(held->id()))
-        r[n++] = { "Remove card", DeckRowKind::ROW_BUTTON, s_removeArmed ? "Sure?" : "Remove", 0, true,
-                   removeCardCb, nullptr };
+        r[n++] = { "Remove card", DeckRowKind::ROW_BUTTON, "Remove", 0, true, removeCardCb, nullptr };
 #ifdef DEBUG_POPUP
     // GET /popup?rows=N: N greyed test rows, so SETTINGS is too tall for the
     // screen and the panel's drag can be tried (P1b round 2).
@@ -4739,16 +4737,97 @@ void addCardCb(lv_event_t *ev) {
     lv_async_call([](void *) { deckSync(); }, nullptr);   // the row now says "Added" - not from its own button's event
 }
 
-// "Remove card" (K66): the first tap asks, the second removes and closes the
-// window; the page is built again without it.
+// "Remove card" (K66) ASKS IN A DIALOG YOU CANNOT MISS (owner, K17 run 2: a
+// button that changed to "Sure?" was easy to overlook). Over everything - the
+// window, its panels - on the top layer, the rest dimmed; Cancel, or a tap
+// outside, leaves it; Remove removes and closes the window, and the page is
+// built again without the card. Rare, so the dim's one full-screen redraw is
+// worth it here (the window itself has none - "Usable first").
+lv_obj_t *s_confirm = nullptr;
+
+void confirmClose() {
+    if (s_confirm) { lv_obj_delete(s_confirm); s_confirm = nullptr; }
+}
+
+lv_obj_t *confirmButton(lv_obj_t *parent, const char *txt, uint32_t bg, uint32_t ink, uint32_t edge,
+                        lv_event_cb_t cb) {
+    const UIPalette &p = UI::pal();
+    lv_obj_t *b = plain(parent);
+    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(b, mm(24.0f), UI::minTouch());
+    lv_obj_set_style_radius(b, mm(1.6f), 0);
+    lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(b, UI::c(bg), 0);
+    lv_obj_set_style_bg_color(b, UI::c(UI::mix(bg, p.TEXT, 20)), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+    lv_obj_set_style_border_width(b, LV_MAX(1, mm(0.25f)), 0);
+    lv_obj_set_style_border_color(b, UI::c(edge), 0);
+    lv_obj_t *l = makeLabel(b, UI::type().NAME, ink);
+    lv_label_set_text(l, txt);
+    lv_obj_center(l);
+    lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, nullptr);
+    return b;
+}
+
+void confirmRemove() {
+    confirmClose();
+    if (!CardPopup::isOpen() || !cardOf(h.surface)) return;
+    const UIPalette &p = UI::pal();
+    const UIType    &t = UI::type();
+    // The dim, which also takes every tap that misses the box: Cancel.
+    s_confirm = plain(lv_layer_top());
+    lv_obj_set_size(s_confirm, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_bg_color(s_confirm, UI::c(p.GROUND), 0);
+    lv_obj_set_style_bg_opa(s_confirm, LV_OPA_60, 0);
+    lv_obj_add_flag(s_confirm, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(s_confirm, [](lv_event_t *e) {
+        if (lv_event_get_target(e) == lv_event_get_current_target(e)) lv_async_call([](void *) { confirmClose(); }, nullptr);
+    }, LV_EVENT_CLICKED, nullptr);
+
+    lv_obj_t *box = plain(s_confirm);
+    lv_obj_add_flag(box, LV_OBJ_FLAG_CLICKABLE);   // a tap on it is not a tap outside
+    lv_obj_set_width(box, LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(90.0f)));
+    lv_obj_set_height(box, LV_SIZE_CONTENT);
+    lv_obj_center(box);
+    lv_obj_set_style_radius(box, UI::sc(UI::met().RADIUS), 0);
+    lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(box, UI::c(p.SURFACE_ALT), 0);
+    lv_obj_set_style_border_width(box, LV_MAX(2, mm(0.4f)), 0);
+    lv_obj_set_style_border_color(box, UI::c(p.ST_BAD), 0);
+    lv_obj_set_style_pad_all(box, mm(4.0f), 0);
+    lv_obj_set_style_pad_row(box, mm(2.4f), 0);
+    lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_t *title = makeLabel(box, t.NAME, p.TEXT);
+    lv_label_set_text(title, "Remove this card?");
+    char buf[160];
+    snprintf(buf, sizeof(buf), "\"%s\" leaves this page. Its settings are kept.", s.name);
+    lv_obj_t *body = makeLabel(box, t.TAG, p.TEXT_DIM);
+    lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(body, lv_pct(100));
+    lv_obj_set_style_text_align(body, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(body, buf);
+
+    lv_obj_t *row = plain(box);
+    lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_top(row, mm(1.2f), 0);
+    confirmButton(row, "Cancel", p.SURFACE, p.TEXT, UI::mix(p.SURFACE, p.TEXT, 30), [](lv_event_t *) {
+        lv_async_call([](void *) { confirmClose(); }, nullptr);
+    });
+    confirmButton(row, "Remove", p.ST_BAD, p.SURFACE, p.ST_BAD, [](lv_event_t *) {
+        lv_async_call([](void *) {
+            confirmClose();
+            Card *held = CardPopup::isOpen() ? cardOf(h.surface) : nullptr;
+            if (held && CardAdded::remove(held->id())) CardPopup::close();
+        }, nullptr);
+    });
+}
+
 void removeCardCb(lv_event_t *ev) {
     (void)ev;
-    Card *held = cardOf(h.surface);
-    if (!held) return;
-    if (!s_removeArmed) { s_removeArmed = true; lv_async_call([](void *) { deckSync(); }, nullptr); return; }
-    s_removeArmed = false;
-    if (!CardAdded::remove(held->id())) return;
-    lv_async_call([](void *) { CardPopup::close(); }, nullptr);
+    lv_async_call([](void *) { confirmRemove(); }, nullptr);
 }
 
 // Paused, a checkbox. Through the card when it is the held one (it repaints at
@@ -5446,7 +5525,7 @@ void closeNow(void *unused) {
     (void)unused;
     s.closeQueued = false;
     if (s.phase != PopupPhase::PHASE_OPEN) return;
-    s_removeArmed = false;
+    confirmClose();   // Remove card's dialog, if it was up
 #ifdef DEBUG_POPUP
     const uint32_t t0 = micros();
 #endif
@@ -5884,6 +5963,10 @@ void CardPopup::debugService(lv_timer_t *t) {
             if (!inMember() || !s.ent[0]) dbgOut("not in a member's own view\n");
             else if (CardAdded::add(*held, *s.ent[0], id, sizeof(id))) { dbgOut("added %s\n", id); deckSync(); }
             else dbgOut("not added\n");
+        } else if (a.removeCard == 2) {
+            // removecard=2: the dialog, as "Remove card" opens it.
+            if (CardAdded::isAdded(held->id())) { confirmRemove(); dbgOut("dialog up\n"); }
+            else dbgOut("%s is not a card added here\n", held->id());
         } else {
             snprintf(id, sizeof(id), "%s", held->id());
             if (CardAdded::remove(id)) { dbgOut("removed %s\n", id); close(); s_dreq.store(DREQ_CLOSING); return; }

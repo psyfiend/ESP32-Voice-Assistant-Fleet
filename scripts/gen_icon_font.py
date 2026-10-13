@@ -151,6 +151,37 @@ GLYPHS = [
     # draws. clock-outline stood in until this regeneration (no Node.js on the
     # laptop).
     "chart-bar",
+
+    # --- EVERY MDI ICON THE OWNER'S HA SERVES, 2026-10-12 (K17) ------------
+    #
+    # A member of a group made a card of its own (Desk's Office Left / Right,
+    # Office lamp) drew a plain bulb: HA sends mdi:track-light and
+    # mdi:lamp-outline, which this subset lacked, and the scan below only
+    # looked at the entities the dashboard declares, never at the members HA
+    # lists for a group. Cards can now be made from entities nobody declared,
+    # so the whole instance is shipped (scan_ha_icons.py section 3), not just
+    # what the dashboard names - ~40-120 KB a board, with ~4 MB free on each.
+    # hue:* icons (a custom pack) cannot come from this font at all, and three
+    # MDI names are newer than the name map (checkbox-marked-circle-multiple-
+    # outline, deck, flower-box) - those fall back to their kind's icon.
+    "account-lock", "alert-box-outline", "battery-60", "battery-arrow-down",
+    "battery-arrow-up", "battery-charging-wireless", "battery-minus",
+    "brightness-auto", "calculator", "calendar-edit", "car-off",
+    "chart-histogram", "chart-line", "chart-timeline", "chart-timeline-variant",
+    "check-network",
+    "checkbox-marked-circle-outline", "clock", "clock-out",
+    "cloud-alert-outline", "cloud-question-outline", "current-ac", "current-dc",
+    "eye", "eye-off", "flash-triangle", "grass", "home",
+    "home-assistant", "home-lightning-bolt", "human-greeting-proximity",
+    "lamp-outline", "led-on", "lightbulb-fluorescent-tube-outline",
+    "outdoor-lamp", "pause-circle-outline", "pipe-valve", "play-circle-outline",
+    "play-network-outline", "power-settings", "puzzle", "shield-edit",
+    "shield-off", "signal", "sprinkler", "sprinkler-variant", "sprout",
+    "stop-circle-outline", "temperature-celsius", "timer", "timer-edit-outline",
+    "timer-outline", "timer-sand", "tooltip-question-outline", "track-light",
+    "tune", "valve", "water-off-outline", "water-percent-alert",
+    "weather-cloudy-alert", "weather-cloudy-clock", "weather-sunny-alert",
+    "weather-sunset-down", "weather-sunset-up", "wrench-clock", "zigbee",
 ]
 
 

@@ -35,3 +35,26 @@ Lamps 1-3 have compiled cards of their own on the Fleet page (Lamp 4's was remov
 opened from those cards, they are not in a member's own view, so no "Add as a card"; and a
 compiled card cannot be removed until page editing (2.11, K66). From All Lamps > Members > Lamp 1
 it is offered - a second card for Lamp 1 (allowed, K33). Retest A1-A10.
+
+**Run 2 (owner, 2026-10-12): A1-A10 all PASS.** Q1: as built - the first card next to its group
+card, later ones after it, newest last (4.2 replaces it). Three findings, fixed (K69):
+- **Icons**: Office Left / Right and Office lamp drew a plain bulb. HA sends `mdi:track-light`
+  and `mdi:lamp-outline`, which the generated icon font lacked - its list was measured from the
+  entities the dashboard declares, never from the members HA lists for a group. Every MDI icon the
+  owner's HA serves is now in it (66 more; 3 newer than the name map, and 2 `hue:` icons, cannot
+  be). P4_5 flash 38.6% -> 41.0%.
+- **Remove** now asks in a dialog over everything: "Remove this card?", Cancel / Remove; a tap
+  outside cancels.
+- **A two-line name clipped the disc**: the name now takes one line's room; a second line only
+  where both fit under the disc (and the "1/3" badge, when shown), else "...". The disc never
+  shrinks. On the 4B "Office lamp" is "Office l..." (53 px under the disc, two lines need ~60).
+- Visibility, as the owner sees it: K68, `group-cards.md` §5.
+
+## Round 2 (P4_5, 4B, 1060 flashed 2026-10-12 ~19:30)
+
+| # | Do this | PASS if |
+|---|---|---|
+| B1 | Add Desk's three lamps as cards | Office Left and Right show HA's track light, Office lamp HA's lamp |
+| B2 | Remove card on one | A dialog over everything, "Remove this card?"; Cancel and a tap outside leave it; Remove removes it and closes the window |
+| B3 | A card whose name is too long for one line (4B: "Office lamp") | The disc keeps its size and place; the name is two lines where there is room under the disc, else one line with "..." |
+| B4 | The other cards, every scheme | Names and discs where they were |
