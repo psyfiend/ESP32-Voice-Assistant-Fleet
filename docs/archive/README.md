@@ -15,6 +15,7 @@ live one wins. Moved here 2026-09-29, unchanged, so section numbers quoted elsew
 | `TEST_58.md` | Screenshots (#58) sign-off | done |
 | `TEST_2.10a.md`, `TEST_2.10b.md` | The card popup's frame (12 rounds) and light controls (7 rounds), with every measurement | `docs/design/card-sheet.md` §14-15 |
 | `TEST_2.10c.md` | HA's lights, members, scenes, and the window redesigned (9 rounds) | `docs/design/card-sheet.md` §16 |
+| `TEST_K17.md` | A member made a card of its own (3 rounds), signed off 2026-10-13, `v0.2.12` | `docs/design/group-cards.md` §5, DECISIONS K65-K70 |
 | `TEST_2.10d.md`, `TEST_2.10e.md` | Saving by card id and panels dragged whole (2 runs and round D); History - charts and activity (run 1 and rounds 2-6), signed off 2026-10-12, `v0.2.11` | `docs/design/card-sheet.md` §17-18 |
 | `ROADMAP_to_2026-10-06.md` | The roadmap as it grew: the 2026-09-03 blueprint (§2-6: working contract, git, architecture, technology choices, UI risks), each milestone's history, and the Q1-Q11 decisions with their reasoning | `docs/ROADMAP.md` (the plan, rewritten lean), `docs/DECISIONS.md` (the decisions) |
 | `TEST_CYD_P4_4880.md` | The JC4880P443's first flash | `docs/HARDWARE_STATUS.md`, `docs/display/README.md` |

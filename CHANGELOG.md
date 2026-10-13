@@ -6,6 +6,28 @@ signed-off merges to `main` in the order they happen - it does not follow milest
 began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
+## v0.2.12 - 2026-10-13
+
+K17 - a group's member made a card of its own, and what its testing found (DECISIONS K65-K70).
+
+- **Add card to dashboard**: in a member's own view (Desk > Members > a lamp), SETTINGS makes a
+  copy of the member as a card - right after its group card, with its priority and its group, HA's
+  name. Kept in the settings file (`CardAdded`); a member learnt after boot appears once HA lists
+  it. **Remove card** on such a card asks in a dialog over everything; removed cards stay in the
+  file, the page's pool.
+- **The owner's group model** recorded for 2.11 (K67, K68, `docs/design/group-cards.md` §5).
+- **Every MDI icon the owner's HA serves** is in the icon font (66 more), so a card made from any
+  entity draws HA's icon; `scan_ha_icons.py` follows groups' members.
+- **A long name never shrinks the hero**: one line's room; a second line only where it fits under
+  the disc, else "...".
+- **SETTINGS follows its rows**: it is made again when they change (another view, Added) - the
+  rows of whichever view it first opened in had stuck.
+- **Scenes on a tap**: Tap action "Scenes..."; SCENES' Default scene and Scene action (Load
+  default / Cycle scenes). Entity properties in the owner's order. Visibility hidden until
+  clusters exist (K68).
+- Signed off by the owner on WS_P4_5, WS_P4_4B and CYD_P4_1060 (`docs/archive/TEST_K17.md`); all
+  nine environments build.
+
 ## v0.2.11 - 2026-10-12
 
 2.10d and 2.10e, merged together (K51) - the card popup is done (#65).

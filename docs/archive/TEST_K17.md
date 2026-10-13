@@ -86,3 +86,5 @@ template is asked once per session for the declared entities, before the members
 | C6 | Tap action Scenes..., Scene action Load default, Default scene Relax; tap Desk | Relax loads |
 | C7 | Scene action Cycle scenes; tap Desk a few times | Each tap loads the next scene |
 | C8 | Close, reopen, reboot | All of it kept |
+
+**Round 3 results (owner, 2026-10-13): C1-C8 all PASS.** K17 signed off; merged as `v0.2.12`.
