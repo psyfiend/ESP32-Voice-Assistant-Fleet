@@ -28,6 +28,8 @@ How to use it:
 | W6 | Snappy and responsive first, eye candy second | 2026-10-04 | `card-sheet.md` §14, LESSONS |
 | W7 | Recommend one option, ask before building on an assumption, discuss a structural choice a turn before building it; plain language | standing | HANDOFF |
 | W8 | Files are written with Edit/Write, never piped through a shell | 2026-09-18 | CLAUDE.md |
+| W10 | **Guards that run, not rules that are read**: a Claude Code PreToolUse hook (`scripts/hooks/claude_guard.py`) refuses destructive git and delete commands in every session and subagent; deny rules guard the secrets headers; a git pre-commit hook refuses the local debug lines, control bytes and secrets; GitHub protects `main` from force push and deletion. Claude keeps push and merge (owner) | 2026-10-13 | owner; CLAUDE.md "Guards" |
+| W11 | **Subagents**: read-only work to the read-only `explorer` / `auditor` agents; a writing subagent only on files nobody else touches, in a worktree; builds, flashing, git and shared edits stay with the main session | 2026-10-13 | owner; CLAUDE.md "Subagents" |
 | W9 | Real lights while testing: any Office light may be commanded and is put back as found; ask before anything in the Kitchen | 2026-10-06 | HANDOFF |
 
 ## Platform and architecture

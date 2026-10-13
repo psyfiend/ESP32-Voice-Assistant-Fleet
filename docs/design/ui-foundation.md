@@ -204,8 +204,12 @@ ESP-IDF migration, the S3 boards' esp_lcd move (#67).
   (COM9) - check the ports by USB serial number first (HANDOFF). Compile WS_S3_4B as the S3 check;
   do not flash it (locked up, #69). All nine compile only at the end of P6.
 - **The local debug lines** in `platformio.ini` (`-D DEBUG_POPUP` on the three P4s, `-D DEBUG_HANG`
-  on the P4_5) are the owner's and uncommitted: keep them, **never commit them**; stash them for a
-  release build and pop them after.
+  on the P4_5) are the owner's and uncommitted: keep them, **never commit them** (the pre-commit
+  hook refuses it). For the all-nine gate use `scripts/release/gate.ps1`, which backs them up and
+  restores them; do not hand-roll a stash.
+- **The guards** (CLAUDE.md, "Guards"): a hook refuses destructive git and delete commands. If one
+  blocks something you believe is needed, stop that line of work, write it in HANDOFF for the owner,
+  and carry on with the next independent piece - never route around it.
 - **Do not**: rebuild libraries, change the settings file's keys or card ids, change what anything
   looks like or does, command any light except Office ones (W9 - none should be needed).
 - **When a decision would change the look or the behaviour**: take the zero-change option, and
@@ -214,10 +218,11 @@ ESP-IDF migration, the S3 boards' esp_lcd move (#67).
   next independent piece rather than forcing it.
 - **Measure, do not assume** (the project's habit): `lv_mem`, build time, frame times
   (`DEBUG_FRAMES`) for panel slides, before and after each phase.
-- **Subagents**: useful for **read-only** work in parallel - the literal/radius/style inventory
-  for P2, a map of every caller of each builder for P3, writing the PC harness script while the
-  main session adds the tree dump. A cheaper model is fine for inventories. **Never two agents
-  editing the same files**; the main session does every edit to the popup and every build/flash.
+- **Subagents** (CLAUDE.md, "Subagents"; W11): the `auditor` agent for the P2 literal / radius /
+  style inventories, `explorer` agents for the map of every caller of each builder (P3), in
+  parallel. Writing the PC harness script may go to a writing subagent in a worktree, since no one
+  else touches `scripts/ui_golden.py`. **Never two agents editing the same files**; the main
+  session does every edit to the firmware and every build/flash.
 - US English on screen; ASCII except the degree sign; comments may stay British.
 
 ## 6. For the owner
