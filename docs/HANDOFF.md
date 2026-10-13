@@ -38,6 +38,12 @@ anything on/off as its activity - from HA; the owner's choices saved by card id 
 2. **The design interview §3 onward** (below), then 2.8 header slots (#19), then 2.11 group cards
    with the page arranger (#66, #78). `ROADMAP.md`'s running order.
 
+**Guards in place (2026-10-13, W10-W11)** - read CLAUDE.md "Guards" and "Subagents" before your
+first command: a hook refuses destructive git/delete commands (also in subagents), the pre-commit
+hook refuses the local debug lines and corrupted bytes, release builds go through
+`scripts/release/gate.ps1` and `flash_release.ps1`, and read-only work goes to the `explorer` /
+`auditor` agents.
+
 **K17 DONE** (`v0.2.12`, K65-K70): `CardAdded` (`include/Cards/CardAdded.h`) keeps cards made on the
 device in the settings file and merges them into their page after the card they came from; Remove
 asks in a dialog; removed cards are the file's pool. `/popup?addcard=1|removecard=1|2`. Open from

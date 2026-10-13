@@ -1,0 +1,4 @@
+#!/bin/sh
+# Git's pre-commit hook for this repo: see pre_commit.py beside it.
+# Turned on once per clone with: git config core.hooksPath scripts/hooks
+exec python "$(git rev-parse --show-toplevel)/scripts/hooks/pre_commit.py"
