@@ -66,3 +66,23 @@ other locations those will not be affected."), and the Visibility row hidden unt
 (K68) - which also puts "Add as a card" in sight in a member's SETTINGS on the P4_5. Built and
 flashed to all three. Found on the way: removed cards held a slot each (24 for the device, 13
 taken by testing); they now live in the file only - the pool - and a slot is a card on a page.
+
+**Round 3 (owner, 2026-10-13), the last before the merge** - flashed to the P4_5, checked by
+screenshot (K70): the dialog's new words ("The card "<card>" will be removed from the dashboard,
+any other instances of this card will be unaffected." / "Removed cards can be restored at any
+time."); "Add card to dashboard"; Entity properties in the owner's order; and the scene settings
+the owner remembered as built - they were an idea recorded for later (interview §12, 2.10d run 2),
+never built until now: Tap action "Scenes...", SCENES' Default scene and Scene action (Load default
+/ Cycle scenes). Noticed: a group's member shows Area in HA "None" and Device "None" - HA's area
+template is asked once per session for the declared entities, before the members are learnt.
+
+| # | Do this | PASS if |
+|---|---|---|
+| C1 | Remove card on an added card | The new words |
+| C2 | Desk > Members > a lamp > SETTINGS | "Add card to dashboard" |
+| C3 | Entity properties on any card | Source, Name in HA, Entity ID, Area in HA, Card group, Device, Device class, State class, Unit, Card ID |
+| C4 | Desk: SETTINGS > Tap action | "Scenes..." once, no "Cycle scenes" / "Load scene" |
+| C5 | Desk: Scenes view > SCENES | Show hidden scenes, Default scene (the scenes), Scene action (Load default / Cycle scenes) |
+| C6 | Tap action Scenes..., Scene action Load default, Default scene Relax; tap Desk | Relax loads |
+| C7 | Scene action Cycle scenes; tap Desk a few times | Each tap loads the next scene |
+| C8 | Close, reopen, reboot | All of it kept |

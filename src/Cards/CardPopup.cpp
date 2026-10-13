@@ -230,7 +230,7 @@ struct Popup {
     GroupOn   groupOn = GroupOn::GROUP_ON_ANY;   // copied from the card at open
     SceneShow sceneShow = SceneShow::SCENES_VISIBLE;   // likewise (2.10c)
     lv_obj_t *ddGroup = nullptr;      // SETTINGS' live dropdown
-    lv_obj_t *ddTapScene = nullptr;   // SCENES' Tap scene: greyed unless Tap action is Load scene
+    lv_obj_t *ddTapScene = nullptr;   // SCENES' Default scene
     bool      builtPaused = false, rebuildQueued = false;   // "A paused window"
     uint8_t   builtCaps = 0;                     // what the selector was built for
     lv_obj_t *pill = nullptr;                    // PAUSED
@@ -3284,24 +3284,30 @@ void buildProps() {
             if (s.ent[i]) propRow(list, s.ent[i]->desc.name,
                                   s.ent[i]->desc.externalRef[0] ? s.ent[i]->desc.externalRef : s.ent[i]->desc.id);
     } else {
+        // The owner's order (2026-10-13): where it comes from, what it is
+        // called and where it lives, then what kind of thing, then the card's.
+        Card *c = inMember() ? nullptr : cardOf(h.surface);
         const bool ha = e->desc.source == EntitySource::HA;
+        static const char *const SRC[] = { "This board (a sensor)", "This board", "MQTT", "Home Assistant", "Virtual" };
+        propRow(list, "Source", SRC[(uint8_t)e->desc.source < 5 ? (uint8_t)e->desc.source : 0]);
         propRow(list, "Name in HA", ha ? (e->sourceName[0] ? e->sourceName : e->desc.name) : "");
         propRow(list, "Entity ID", e->desc.externalRef[0] ? e->desc.externalRef : e->desc.id);
         propRow(list, "Area in HA", ha ? (e->sourceArea[0] ? e->sourceArea : "None") : "");
+        CardGroups::Group g;   // its group on this dashboard (K46)
+        if (c) propRow(list, "Card group", CardGroups::ofCard(*c, g) ? g.name : "None");
         const bool mine = e->desc.source == EntitySource::SYSTEM || e->desc.source == EntitySource::LOCAL;
         propRow(list, "Device", ha ? (e->sourceDevice[0] ? e->sourceDevice : "None") : mine ? "This board" : "");
-        static const char *const SRC[] = { "This board (a sensor)", "This board", "MQTT", "Home Assistant", "Virtual" };
-        propRow(list, "Source", SRC[(uint8_t)e->desc.source < 5 ? (uint8_t)e->desc.source : 0]);
         propRow(list, "Device class", e->desc.deviceClass);
-        propRow(list, "Unit", e->desc.unit);
         propRow(list, "State class", e->desc.stateClass);
+        propRow(list, "Unit", e->desc.unit);
         if (e->nMembers) { snprintf(buf, sizeof(buf), "%u", (unsigned)e->nMembers); propRow(list, "Members", buf); }
+        if (c) propRow(list, "Card ID", c->hasId() ? c->id() : "");   // K33
     }
-    // The card's own: its group on this dashboard (K46) and its id (K33).
-    if (Card *c = inMember() ? nullptr : cardOf(h.surface)) {
+    // A card standing for several entities made here: its group and id after them.
+    if (Card *c = (!e && !inMember()) ? cardOf(h.surface) : nullptr) {
         CardGroups::Group g;
         propRow(list, "Card group", CardGroups::ofCard(*c, g) ? g.name : "None");
-        propRow(list, "Card id", c->hasId() ? c->id() : "");
+        propRow(list, "Card ID", c->hasId() ? c->id() : "");
     }
     // ALL OF IT IN SIGHT where it can be (owner, round 6: the P4_5 cut "Card
     // id" in half): the gaps between the rows close up, as far as a third of
@@ -4352,6 +4358,18 @@ TapAction tapShown(const Card &c) {
     return c.tapToggles() ? TapAction::TAP_TOGGLE : TapAction::TAP_HISTORY;
 }
 
+// WHAT "Scenes..." DOES (owner, 2026-10-13; interview §12): SCENES' Scene
+// action row - Load default or Cycle scenes. The card's own when its Tap
+// action is a scene's, else the choice kept for when it becomes one.
+TapAction sceneActionOf(const Card &c) {
+    const TapAction t = c.tapAction();
+    if (t == TapAction::TAP_CYCLE_SCENES || t == TapAction::TAP_LOAD_SCENE) return t;
+    char v[12];
+    if (c.hasId() && Settings::card(c.id(), "scene_action", v, sizeof(v)) && !strcmp(v, "cycle"))
+        return TapAction::TAP_CYCLE_SCENES;
+    return TapAction::TAP_LOAD_SCENE;
+}
+
 uint16_t tapRowBuild(const Card &c) {
     s_tapN = 0;
     size_t used = 0;
@@ -4366,10 +4384,8 @@ uint16_t tapRowBuild(const Card &c) {
     add(TapAction::TAP_DETAILS, "Details view");
     if (hasMembers())   add(TapAction::TAP_MEMBERS, "Members view");
     add(TapAction::TAP_HISTORY, "History view");
-    if (c.offeredScenes(sc, ENTITY_SCENES_MAX)) {
-        add(TapAction::TAP_CYCLE_SCENES, "Cycle scenes");
-        add(TapAction::TAP_LOAD_SCENE,   "Load scene");
-    }
+    // One line for both (owner, 2026-10-13): which one is SCENES' Scene action.
+    if (c.offeredScenes(sc, ENTITY_SCENES_MAX)) add(sceneActionOf(c), "Scenes...");
     add(TapAction::TAP_NOTHING, "Nothing");
     const TapAction cur = tapShown(c);
     for (uint8_t i = 0; i < s_tapN; i++) if (s_tapMap[i] == cur) return i;
@@ -4481,7 +4497,7 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     // right after the group card, in its group. Once made, the row says so.
     if (inMember() && held && held->hasId() && s.ent[0]) {
         const bool made = CardAdded::addedFor(held->id(), s.ent[0]->desc.id) != nullptr;
-        r[n++] = { "Add as a card", DeckRowKind::ROW_BUTTON, made ? "Added" : "Add", 0, !made, addCardCb, nullptr };
+        r[n++] = { "Add card to dashboard", DeckRowKind::ROW_BUTTON, made ? "Added" : "Add", 0, !made, addCardCb, nullptr };
     }
     // A card added on the device can be removed (K66) - to the page's pool,
     // after a dialog that asks (confirmRemove()).
@@ -4658,9 +4674,19 @@ void groupDropCb(lv_event_t *ev) {
     renderMain();
 }
 
+// The default scene: the one chosen, else the first offered - kept, so Load
+// default always has one.
+void ensureDefaultScene(Card &c) {
+    if (c.tapScene()[0]) return;
+    const Entity *sc[ENTITY_SCENES_MAX];
+    if (!c.offeredScenes(sc, ENTITY_SCENES_MAX)) return;
+    c.setTapScene(sc[0]->desc.externalRef);
+    keepCardSetting("tap_scene", sc[0]->desc.externalRef);
+    if (s.ddTapScene) lv_dropdown_set_selected(s.ddTapScene, 0);
+}
+
 // Tap action: on the held card at once (the next tap does it), kept under its
-// id. Load scene with no scene chosen yet takes the first offered, and the
-// scene row comes alive.
+// id. "Scenes..." is SCENES' Scene action, with a default scene ready.
 void tapDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     Card *c = cardOf(h.surface);
@@ -4668,15 +4694,23 @@ void tapDropCb(lv_event_t *ev) {
     const TapAction t = s_tapMap[k];
     c->setTapAction(t);
     keepCardSetting("tap", tapActionName(t));
-    if (t == TapAction::TAP_LOAD_SCENE && !c->tapScene()[0]) {
-        const Entity *sc[ENTITY_SCENES_MAX];
-        if (c->offeredScenes(sc, ENTITY_SCENES_MAX)) {
-            c->setTapScene(sc[0]->desc.externalRef);
-            keepCardSetting("tap_scene", sc[0]->desc.externalRef);
-            if (s.ddTapScene) lv_dropdown_set_selected(s.ddTapScene, 0);
-        }
+    if (t == TapAction::TAP_LOAD_SCENE) ensureDefaultScene(*c);
+}
+
+// SCENES' Scene action (owner, 2026-10-13): Load default / Cycle scenes. Kept
+// for the card; and when its Tap action is "Scenes...", the tap does it now.
+void sceneActionDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    Card *c = cardOf(h.surface);
+    if (!c) return;
+    const TapAction want = k ? TapAction::TAP_CYCLE_SCENES : TapAction::TAP_LOAD_SCENE;
+    keepCardSetting("scene_action", k ? "cycle" : "load");
+    const TapAction t = c->tapAction();
+    if (t == TapAction::TAP_CYCLE_SCENES || t == TapAction::TAP_LOAD_SCENE) {
+        c->setTapAction(want);
+        keepCardSetting("tap", tapActionName(want));
     }
-    rowLive(s.ddTapScene, t == TapAction::TAP_LOAD_SCENE);
+    if (want == TapAction::TAP_LOAD_SCENE) ensureDefaultScene(*c);
 }
 
 void tapSceneDropCb(lv_event_t *ev) {
@@ -4801,12 +4835,11 @@ void confirmRemove() {
 
     lv_obj_t *title = makeLabel(box, t.NAME, p.TEXT);
     lv_label_set_text(title, "Remove this card?");
-    // The owner's words (K17 round 2).
+    // The owner's words (K17 round 3).
     char buf[200];
-    snprintf(buf, sizeof(buf), "Are you sure you want to remove \"%s\" from the dashboard? "
-                               "Its settings will be kept so it can be restored.", s.name);
-    for (const char *txt : { (const char *)buf,
-                             "If the card is placed in other locations those will not be affected." }) {
+    snprintf(buf, sizeof(buf), "The card \"%s\" will be removed from the dashboard, any other "
+                               "instances of this card will be unaffected.", s.name);
+    for (const char *txt : { (const char *)buf, "Removed cards can be restored at any time." }) {
         lv_obj_t *body = makeLabel(box, t.TAG, p.TEXT_DIM);
         lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
         lv_obj_set_width(body, lv_pct(100));
@@ -5328,12 +5361,14 @@ uint8_t activitySpecs(DeckRowSpec *r) {
     return n;
 }
 
-// --- SCENES: the Scenes view's own options (K43) ----------------------------
+// --- SCENES: the Scenes view's own options (K43; owner, 2026-10-13) ---------
 // Show hidden scenes, a checkbox (the card's Scenes setting: Visible / All -
-// "Off" was dropped), and the scene a tap loads (Tap action: Load scene; greyed
-// otherwise). The scene row's choices are kept by their HA id when the row is
-// made, so a later change to the list cannot make a pick land on another scene.
+// "Off" was dropped); the Default scene; and the Scene action - what SETTINGS'
+// Tap action "Scenes..." does: Load default or Cycle scenes. The default
+// scene's choices are kept by their HA id when the row is made, so a later
+// change to the list cannot make a pick land on another scene.
 void hiddenScenesCb(lv_event_t *ev);
+void sceneActionDropCb(lv_event_t *ev);
 lv_obj_t *s_cbHidden = nullptr;
 
 uint8_t scenesSpecs(DeckRowSpec *r) {
@@ -5344,10 +5379,13 @@ uint8_t scenesSpecs(DeckRowSpec *r) {
     if (held) {
         uint8_t nSc = 0;
         const uint16_t sel = tapSceneRowBuild(*held, nSc);
-        if (nSc)
-            r[n++] = { "Tap scene", DeckRowKind::ROW_DROP, s_tapSceneOpts, sel,
-                       held->hasId() && held->tapAction() == TapAction::TAP_LOAD_SCENE, tapSceneDropCb,
-                       &s.ddTapScene };
+        if (nSc) {
+            r[n++] = { "Default scene", DeckRowKind::ROW_DROP, s_tapSceneOpts, sel, held->hasId(),
+                       tapSceneDropCb, &s.ddTapScene };
+            r[n++] = { "Scene action", DeckRowKind::ROW_DROP, "Load default\nCycle scenes",
+                       (uint16_t)(sceneActionOf(*held) == TapAction::TAP_CYCLE_SCENES), held->hasId(),
+                       sceneActionDropCb, nullptr };
+        }
     }
     return n;
 }
