@@ -28,6 +28,9 @@ anything on/off as its activity - from HA; the owner's choices saved by card id 
 
 ## What is next
 
+0. **2.12 IN PROGRESS (2026-10-13, branch `refactor/ui-foundation`)** - the live notes are in
+   `docs/design/ui-foundation.md` section 6 ("Progress"); P0 and P1 are done and verified there.
+
 1. **2.12 UI foundation - the refactor** (proposed by Claude, asked for by the owner 2026-10-13).
    **The brief, the roadmap and the working rules: `docs/design/ui-foundation.md` - read all of
    it first.** In short: `src/Cards/CardPopup.cpp` is 6,325 lines in one file with half its shapes

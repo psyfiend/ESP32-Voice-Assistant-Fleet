@@ -226,7 +226,55 @@ ESP-IDF migration, the S3 boards' esp_lcd move (#67).
   session does every edit to the firmware and every build/flash.
 - US English on screen; ASCII except the degree sign; comments may stay British.
 
-## 6. For the owner
+## 6. Progress (the session's own record, phase by phase)
+
+**P0 - DONE (2026-10-13, `6475370`, `34fd56a`).** `GET /popup?tree=1|page` prints every object -
+class, place, size, flags, state, the events it listens for, text, and its style as LVGL resolves it
+(theme, shared and local styles together, plus what each pressed / checked / disabled state
+changes); also `mem=1`, `sparks=N` (off for a capture) and `removecard=3` (the Remove dialog over
+any card, nothing removed - the settings file is never written by the harness). `scripts/ui_golden.py`
+walks 46 states (43 on the 4B, whose grid drops the Panel cards) and saves each tree and screenshot
+under `test/golden/<board>/<label>/`; `compare --pixels` reports what changed, telling the house
+apart: digits and times masked, a text that changed size excuses only what sits with it, the
+chart's insides follow the clock, a card on a page whose words changed is data, and a light that
+changed between captures marks its window "capture again". A window closes itself after 60 s
+without a touch and /popup is no touch, so the walks are short groups (the 1060 takes ~6 s a state).
+
+Exit: two baseline captures per board, **no differences in trees or pixels** - WS_P4_5 `p0a`/`p0b`,
+WS_P4_4B `p0a`/`p0b`, CYD_P4_1060 `p0c`/`p0d`. `p0c` (the walk as it now is) is the baseline on all
+three. Window build times, median of 7 opens (minimum), sparks off - `measure`, label `p0c`:
+
+| Window | WS_P4_5 | WS_P4_4B | CYD_P4_1060 |
+|---|---|---|---|
+| Desk (HA light group) | 36.5 ms (36.4) | 37.6 (37.5) | 36.8 (36.4) |
+| Deck (temperature) | 31.1 (31.0) | 32.0 (32.0) | 31.3 (31.2) |
+| North (garage door) | 30.1 (30.0) | 31.0 (30.7) | 30.4 (30.4) |
+| Overhead (switch) | 32.2 (32.1) | 34.7 (32.9) | 32.1 (32.0) |
+| All Lamps (group here) | 37.4 (37.1) | 37.1 (36.9) | 36.8 (36.7) |
+| Lamp 1 (virtual light) | 33.9 (33.9) | 34.9 (34.8) | 33.7 (33.4) |
+
+LVGL's pool per open window: Desk ~10.2 KB, a sensor ~7.2 KB, All Lamps ~11.0 KB (the 4B ~0.8 KB
+more); closing gives it all back. The P0 firmware is kept per board in `test/golden/<board>/fw_p0/`
+(app at 0x10000) for A/B re-flashing.
+
+**P1 - DONE (2026-10-13).** `CardPopup.cpp` is now the frame and the public interface (721 lines);
+the rest is 18 files in `src/Cards/Popup/` (86-838 lines) sharing `PopupState.h` (572 lines: the
+window's types and state, and 141 declarations by file) in `namespace popup`. Made by a script that
+copies every line of the old file once, verbatim (`test/golden/split_popup_p1.py`, gitignored); the
+only edits were the namespace lines, `extern`s for the shared state and default arguments moving
+to the declarations. `CardPopup.h` is unchanged. Checks: WS_P4_5 and WS_S3_4B build (P4_5 RAM
+identical, flash 1.9 KB smaller); every one of the old object's 260 symbols is in the new ones (127
+more: functions P0 had inlined away); **no tree or pixel differences against `p0c` on all three
+boards**; build times within 0.1 ms on every minimum (medians within noise), pool cost per window
+within +-60 B.
+
+Findings for the owner, none changed (zero-change rule):
+- `rowLive()` (SETTINGS rows) has been unused since K70.
+- **WS_P4_4B: All Lamps' Members view titles "All Lamp..." when opened straight from a fresh
+  window**, and "All Lamps >" when reached through Properties first - present at `v0.2.12` (seen in
+  the baselines). The DOT-label trap of 2.10c round 7 (LESSONS), on another path.
+
+## 7. For the owner
 
 Each phase leaves the board looking and behaving exactly as at `v0.2.12`; the proof is the
 harness's tree comparison and the screenshots. After P6 there is one short test sheet: look at
