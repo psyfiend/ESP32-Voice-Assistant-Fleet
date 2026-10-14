@@ -715,6 +715,10 @@ the terminal codepage to utf-8"* - which reads like a cosmetic note and is not.
 export PYTHONIOENCODING=utf-8 && pio run -e <env> -t upload --upload-port COMn
 ```
 
+**And give an unattended upload a `timeout`.** It happened again on 2026-10-13 (2.12): an upload
+chained after a harness run, piped through `grep` without the variable, sat in esptool for two hours
+before anyone looked. `timeout 900 pio run ...` turns that into a failure fifteen minutes in.
+
 ### The second-order damage is worse than the first
 
 A killed `pio` leaves **orphaned `esptool` and `python` children**. Those keep holding the serial

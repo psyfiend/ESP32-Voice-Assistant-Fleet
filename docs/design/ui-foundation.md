@@ -368,6 +368,48 @@ For the owner (P4):
 - **Where should "About this board" live?** It is behind `DEBUG_POPUP` until you say - the system
   panel, or a long press on the header's board name, would both be one line.
 
+**P5 - DONE (2026-10-13).** The layout engine interface: `include/Layout/Layout.h` and
+`src/Layout/Layout.cpp` - `Item`, `Place`, `Container`, `Events`, the `Engine` interface, and
+`FlowEngine`, the dashboard's placement moved out of `CardPage.cpp` unchanged (pins first, the
+widest span that fits at the first free spot, the lowest priority dropped until the rest fit; the
+occupancy bitmap with it), and `rowsWanted()`. `CardPage` turns its cards into items each time it
+plans, hands them to its `FlowEngine` and keeps the places it gets back as its slots
+(`using Slot = Layout::Place`); its `DBG_CARDS` lines come back through `Events`, word for word.
+Memory: the items are on the stack while a page plans (~400 B; the loop task has 16 KB), and a page
+object is 4 B bigger (the engine's vtable pointer; the bitmap moved, not copied). The design for
+2.11's engines is §8.
+
+**Host tests** (`host-tests/`, its own PlatformIO project: `pio test -d host-tests`): 9 tests of the
+flow engine's rules and 8 of `TimeFormat`'s wording. This PC has no Windows compiler, so
+`pio test` fetches Unity and stops at "'g++' is not recognized"; `wsl bash host-tests/run_in_wsl.sh`
+compiles the same suites with WSL's g++ 13.3 and the same flags: **17 of 17 pass, no warnings**.
+Three deliberate breakages of a copy of the engine - ties dropping the earlier item, pins not placed
+first, the narrowest span tried first - each failed exactly the test written for that rule.
+
+Checks, by A/B - the P4 firmware captured, then this build flashed and captured, minutes apart:
+**no tree or pixel differences on WS_P4_5** (46 states, `p4b`/`p5a`) **and WS_P4_4B** (43 states;
+`house_page` and `desk_temp` showed the house changing between the captures - Office's light on,
+Kitchen's off, two temperatures - and were captured again both ways, the P2 image against this
+build, `p2h`/`p5b`: no differences). Every card on both pages sits where it did, which is what this
+phase could have moved. Window build times on WS_P4_5, fastest of 9, within 0.3 ms of P4 on every
+window (Desk 32.7, Deck 27.2, North 26.2, Overhead 28.1, All Lamps 33.0, Lamp 1 29.8 ms); LVGL's
+pool per window unchanged. WS_S3_4B builds - with `DEBUG_CARDS` on, so the `Events` callbacks
+compile there; RAM identical, flash +424 B.
+
+**CYD_P4_1060 is not checked, and is down.** Its walks failed twice part-way ("the window closed
+before its screenshot": its screenshots, ~6 s a state earlier in the day, took ~40 s), then two
+flashes lost its USB link - the second after erasing the app region, so it holds 3.5% of an app and
+does not boot, and Windows has dropped its port (COM9). It needs hands: replug it, check its second
+power cable (it browns out on one - HANDOFF), then flash it. Nothing in P5 is specific to the 1060;
+its A/B is still owed.
+
+For the owner (P5):
+- **A compiler on the PC** for `pio test` is an install, so it is yours (MSYS2 or WinLibs, README in
+  `host-tests/`); the WSL route works without one.
+- Found on the way, unchanged: a card span of 0 counts as a whole cell when the page counts the rows
+  it wants, but as one unit when it places (`rowsWanted()` and `placeOne()`, both as they were). No
+  card sets 0 (`CardPlacement` defaults to 2), so it shows nowhere today.
+
 ## 7. For the owner
 
 Each phase leaves the board looking and behaving exactly as at `v0.2.12`; the proof is the

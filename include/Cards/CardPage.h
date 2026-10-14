@@ -7,6 +7,7 @@
 #include "Cards/CardBinder.h"
 #include "Cards/PageSpec.h"
 #include "EntityRegistry.h"
+#include "Layout/Layout.h"
 
 // ---------------------------------------------------------------------------
 // CardPage - a grid of cards, rendered from a PageSpec.
@@ -49,6 +50,11 @@ static constexpr uint8_t CARD_PAGE_MAX = 48;
 // past the fleet's densest board; the rows bound is what _rowDsc is sized for.
 static constexpr uint8_t PAGE_MAX_UNIT_COLS = 32;
 static constexpr uint8_t PAGE_MAX_UNIT_ROWS = 48;
+
+// Placement is Layout's flow engine (2.12 P5), so its limits are the page's.
+static_assert(CARD_PAGE_MAX == Layout::ITEMS_MAX && PAGE_MAX_UNIT_COLS == Layout::COLS_MAX &&
+              PAGE_MAX_UNIT_ROWS == Layout::ROWS_MAX,
+              "CardPage's limits and Layout's must agree");
 
 class CardPage {
 public:
@@ -108,22 +114,15 @@ public:
     void report() const;
 
 private:
-    // Where one card ended up. Held beside the card rather than on it because
-    // it is the PAGE's decision and a card that moves to another page must not
-    // carry a stale one.
-    struct Slot {
-        uint8_t col = 0, row = 0, spanX = 0, spanY = 0;
-        bool    placed  = false;
-        bool    pinFail = false;   // asked for an explicit spot it could not have
-    };
+    // Where one card ended up: the engine's Place (col, row, spans, placed,
+    // pinFail). Held beside the card rather than on it because it is the PAGE's
+    // decision and a card that moves to another page must not carry a stale one.
+    using Slot = Layout::Place;
 
-    // The whole layout decision. Runs on plain arithmetic with no LVGL, so it
-    // can be reasoned about (and later tested) without a display.
+    // The whole layout decision: the cards as Layout items, placed by the flow
+    // engine - plain arithmetic with no LVGL, tested off the board (host-tests/).
     void plan();
-    bool placeOne(uint8_t i);
-    bool blockFree(uint8_t col, uint8_t row, uint8_t spanX, uint8_t spanY) const;
-    void occupy(uint8_t col, uint8_t row, uint8_t spanX, uint8_t spanY);
-    void clearOcc();
+    void toItems(Layout::Item *out) const;
 
     // The real pixel height of a card spanning `spanY` units, gaps included.
     int32_t heightOf(uint8_t spanY) const;
@@ -172,10 +171,8 @@ private:
     uint8_t  _maxRows  = 1;
     uint8_t  _rowsOverride = 0;   // 0 = let the cards decide
 
-    // Occupancy of the unit grid, one bit per unit, row-major. 192 bytes.
-    // Flow placement alone cannot overlap, but flow MIXED with pinned cards
-    // can, and a bitmap is the honest way to let the two coexist.
-    uint8_t _occ[PAGE_MAX_UNIT_ROWS][(PAGE_MAX_UNIT_COLS + 7) / 8];
+    // The placement engine; it holds the unit grid's occupancy (192 bytes).
+    Layout::FlowEngine _engine;
 };
 
 #endif // CARD_PAGE_H

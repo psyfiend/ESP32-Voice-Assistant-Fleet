@@ -1,3 +1,6 @@
 # Patches are applied in WSL with git apply, which needs them byte for byte:
 # never CRLF, whatever core.autocrlf says on the Windows checkout.
 *.diff eol=lf
+
+# Shell scripts run in WSL's bash (host-tests/run_in_wsl.sh), which stops at a CR.
+*.sh eol=lf

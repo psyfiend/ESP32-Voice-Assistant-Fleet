@@ -280,7 +280,7 @@ so a target or a line is the same physical size on every board (its `mm()`, the 
 millimetres" - the same share of every window as on the P4_5 (`card-sheet.md` §15). Never through
 `UI::sc()`: these are not logical pixels. No number goes into a popup file: a new size is a new
 token with its comment. An effect's own dice may stay named constants beside the effect (the
-sparks' `SPARK_*_MM` in `PopupSparks.cpp`), since nothing else draws one.
+sparks' `SPARK_*_MM` in `src/UI/Kit/KitSparks.cpp`), since nothing else draws one.
 
 **Its own struct, not `UIMetrics`** (the 2.12 brief said `UIMetrics`; this is the zero-risk
 reading of it). `UIMetrics` is per scheme and in logical pixels; these are fleet-wide and physical.

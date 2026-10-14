@@ -29,7 +29,9 @@ anything on/off as its activity - from HA; the owner's choices saved by card id 
 ## What is next
 
 0. **2.12 IN PROGRESS (2026-10-13, branch `refactor/ui-foundation`)** - the live notes are in
-   `docs/design/ui-foundation.md` section 6 ("Progress"); P0 and P1 are done and verified there.
+   `docs/design/ui-foundation.md` section 6 ("Progress"); P0-P5 are done and verified there, each
+   pushed as its own commit (P5 on the P4_5 and the 4B only: the 1060 is down - "Boards on the
+   desk"). P6, the hand-off, is next.
 
 1. **2.12 UI foundation - the refactor** (proposed by Claude, asked for by the owner 2026-10-13).
    **The brief, the roadmap and the working rules: `docs/design/ui-foundation.md` - read all of
@@ -217,7 +219,7 @@ without asking.
 | `WS_P4_5` | COM15 (CH343 `5B90154141`) | dev board; **screwed into its enclosure** - no battery test |
 | `WS_P4_4B` | COM7 (CH343 `5AAF289419`) | P4 rev v1.0 (`esptool read-mac`), the only one on a CH343 |
 | `WS_P4_7B` | COM6 (native USB) | **needs two USB cables** or it browns out on boot |
-| `CYD_P4_1060` | COM9 (native USB, serial `30:ED:A0:E3:2C:7B`) | also needs two cables; its log names it |
+| `CYD_P4_1060` | COM9 (native USB, serial `30:ED:A0:E3:2C:7B`) | also needs two cables; its log names it. **Down since 2026-10-13 ~17:43**: a flash lost USB after erasing the app (3.5% written), and COM9 dropped out of Windows - replug it, check the second cable, then flash it (`ui-foundation.md` §6, P5) |
 | `CYD_P4_4880` | COM19 (native USB) | LiPo fitted; browned out on the PC's USB alone |
 | `WS_S3_4B` | COM8 (CH343 `5A67166678`, not probed) | the slow dev target; `Serial` is native USB, not the CH343. **Locked up 2026-10-05** - #69 |
 | `CYD_S3_3248` | - | **USB broken** (2026-09-28); out of commission |
@@ -334,8 +336,8 @@ as data.** A little colour-blind: never distinguish two states by colour alone.
 **Versioning (changed 2026-10-05, owner):** `A.B.C.D` - B is the roadmap PHASE, C counts RELEASES:
 one more each time a signed-off merge to `main` is tagged, whatever milestones it holds. Add a
 `CHANGELOG.md` entry with the tag, naming the milestones and issues in it. Never tag during
-development. D is commits since the tag; a dirty tree appends `+dirty`. **`v0.2.11` was tagged at
-the 2.10d + 2.10e merge (2026-10-12); the next signed-off merge in Phase 2 is `v0.2.12`**, whatever
+development. D is commits since the tag; a dirty tree appends `+dirty`. **`v0.2.12` was tagged at
+the K17 merge (2026-10-13); the next signed-off merge in Phase 2 is `v0.2.13`**, whatever
 milestones it holds. `docs/DECISIONS.md` W3.
 
 **The issue tracker is yours to manage**, and keeping it, HANDOFF and ROADMAP current is part of the

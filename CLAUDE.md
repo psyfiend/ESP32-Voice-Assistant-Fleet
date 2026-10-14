@@ -409,10 +409,17 @@ architecture enforces it rather than everyone remembering. The no-ops exist so t
 the whole tree. **Use them from any caller that is not the LVGL thread**, even though they
 currently do nothing.
 
-Planned but not yet done: `src/UI/` and `src/Cards/` subfolders, introduced at milestone 2.4 when
-the card library starts adding files. See `docs/design/startup.md` §3.5 — it notes the two things
-that break (`WS_S3_TOUCH_LCD_5B`'s `build_src_filter` exclusion, and `include/` subfolders not
-being on the include path automatically).
+Subfolders: `src/Cards/` (the card library; `Popup/` is the card window), `src/UI/` (tokens,
+panels; `Kit/` is the component kit), `src/Layout/` (placement). `include/` mirrors them, and a
+header is included by its path from `include/` (`"UI/Kit.h"`, `"Layout/Layout.h"`) - its subfolders
+are not on the include path themselves. `WS_S3_TOUCH_LCD_5B` excludes `UI/Panel_Audio.cpp` by path
+in its `build_src_filter`.
+
+**Placement is `Layout::`** (`include/Layout/Layout.h`, 2.12 P5): pure arithmetic - no LVGL, Arduino
+or ESP-IDF header - so it is tested off the board in `host-tests/`, with `TimeFormat`
+(`pio test -d host-tests`; `wsl bash host-tests/run_in_wsl.sh` until Windows has a compiler).
+`CardPage` turns its cards into items and lays out what the engine returns; a new arrangement is a
+new `Layout::Engine`, not placement code in a page. Keep a module there pure, or it cannot be tested.
 
 ## Saved settings (`include/Settings.h`, since 2.10d)
 
