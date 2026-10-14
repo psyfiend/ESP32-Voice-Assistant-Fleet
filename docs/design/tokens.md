@@ -297,7 +297,7 @@ on three boards.
 | Spacing | `S1` 0.6, `S2` 0.8, `S3` 1.0, `S4` 1.2, `S5` 1.6, `S6` 2.0, `S7` 2.4, `S8` 3.0, `S9` 4.0, `S10` 5.0 |
 | Spacing off the scale | `S_MEMBERS` 1.4, `S_GUTTER` 1.5, `S_CHIP_SIDE` 2.2, `S_ROW_MIN` 0.55 |
 | Lines | `LINE_HAIR` 0.2, `LINE_FINE` 0.25, `LINE_MID` 0.3, `LINE_HEAVY` 0.4, `LINE_PLOT` 0.45, `DASH` 0.6, `RING_W` 0.4, `RING_PAD` 0.3; letter spacing `TRACK_PILL` 0.2, `TRACK_TAB` 0.4 |
-| Heights, widths | `H_CONTROL` 6.0, `H_CHIP` 6.0, `H_ROW` 7.2, `H_MORE` 7.0, `H_BAR` 0.5, `H_TABS` 6.0, `W_SIDE_MIN` 6.0, `W_WINDOW_MAX` 100, `W_ROWS_MAX` 70, `W_DIALOG_MAX` 90, `W_DIALOG_BTN` 24, `SWATCH` 6.5, `CARET_W` 2.4, `CARET_H` 1.0 |
+| Heights, widths | `H_CONTROL` 6.0, `H_CHIP` 6.0, `H_ROW` 7.2, `H_MORE` 7.0, `H_BAR` 0.17 (0.5 until #97: 2 px at 294 and 255 PPI, 1 px at 170), `H_TABS` 6.0, `W_SIDE_MIN` 6.0, `W_WINDOW_MAX` 100, `W_ROWS_MAX` 70, `W_DIALOG_MAX` 90, `W_DIALOG_BTN` 24, `SWATCH` 6.5, `CARET_W` 2.4, `CARET_H` 1.0 |
 | Finger travel | `SLOP_SELECTOR` 1.0, `SLOP_KNOB` 1.2, `SLOP_HOLD` 4.0 |
 | The hero (`pm()`) | `P_GAP` 4.0, `P_STACK_GAP` 3.0, `P_GRIP_INSET` 1.4, `P_GRIP_H` 0.5, `P_GRIP_MIN` 5.0, `P_MARK_H` 2.6, `P_MARK_LINE` 0.35, `P_SCENE_H` 9.0, `P_SCENE_GAP` 1.4, `P_SCENE_PAD` 2.4 |
 

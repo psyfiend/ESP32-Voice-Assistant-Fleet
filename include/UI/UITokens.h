@@ -150,7 +150,7 @@ struct UIShape {
     float H_CHIP;       // 6.0  a span chip, and the top line's middle that holds them
     float H_ROW;        // 7.2  a panel's row
     float H_MORE;       // 7.0  activity's "Show more"
-    float H_BAR;        // 0.5  the auto-close bar
+    float H_BAR;        // 0.17 the auto-close bar: 2 px at 294 and 255 PPI, 1 px at 170 (#97; was 0.5)
     float H_TABS;       // 6.0  kept under the window for the panels' tabs
     float W_SIDE_MIN;   // 6.0  the least gap between the window and the screen's side
     float W_WINDOW_MAX; // 100  the widest a window gets (a hand's span)

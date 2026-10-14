@@ -292,10 +292,14 @@ void treeObj(lv_obj_t *o, int depth) {
     treeOut("%*s%s @%ld,%ld %ldx%ld fl=%lx st=%x", depth * 2, "", treeClass(o), (long)a.x1, (long)a.y1,
             (long)lv_area_get_width(&a), (long)lv_area_get_height(&a), (unsigned long)o->flags,
             (unsigned)lv_obj_get_state(o));
-    // The auto-close bar shrinks with every tick: its size is the clock's. And
+    // A countdown bar shrinks with every tick: its size is the clock's - the
+    // card window's, About's, a dialog's (any object with the bar's role). And
     // what is inside the chart's area stands where the time and the values put
     // it - the 24 hours slide with the clock - so only its look compares.
-    if (o == s.autoBar) treeOut(" vol");
+    bool bar = o == s.autoBar;
+    for (uint32_t i = 0; i < o->style_cnt && !bar; i++)
+        bar = o->styles[i].style == Kit::style(Kit::KitStyle::KS_SHEET_BAR);
+    if (bar) treeOut(" vol");
     if (o == s_hv.area) treeOut(" volkids");
     // The events it listens for, in a fixed order; a small user value with each
     // (a row's or a chip's index).

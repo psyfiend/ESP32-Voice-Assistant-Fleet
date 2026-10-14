@@ -99,6 +99,15 @@ void   sheetClose(Sheet &S);                 // from the next timer pass, never 
 Sheet *sheetShowing();                       // the open sheet, or null
 void   sheetLayoutTitle(Sheet &S);           // after the title's words change
 void   sheetTabLook(lv_obj_t *tab, bool shown, bool lit);   // lit: the tab of the view showing
+uint32_t sheetLeftMs(const Sheet &S);        // until it closes itself (0: closing)
+
+// --- The countdown bar (#97, #23) ----------------------------------------------------
+// How long until the open sheet closes itself: a thin bar (H_BAR) on the bottom
+// edge of `box` - inside its border, between its rounded corners - shrinking
+// toward its middle. The sheet's window has one; a dialog over the sheet shows
+// the same. `boxW`: the box's width as set, before LVGL has laid it out.
+lv_obj_t *countdownBar(lv_obj_t *box, int32_t boxW);
+void      countdownSet(lv_obj_t *bar, uint32_t leftMs);   // leftMs of SHEET_AUTOCLOSE_MS
 
 // --- The panels (KitSheetPanels.cpp) -------------------------------------------------
 bool   sheetPanelOpen(const Sheet &S);       // either open: the window is out of reach
