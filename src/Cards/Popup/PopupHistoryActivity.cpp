@@ -152,7 +152,7 @@ void histDrawActivity(lv_obj_t *body) {
     // older ones are left out.
     if (!s_hv.more && n > HIST_ROWS_FIRST) {
         lv_obj_t *b = Kit::item(list);
-        lv_obj_set_size(b, lv_pct(100), mm(k.H_MORE));
+        lv_obj_set_size(b, lv_pct(100), mm(k.H_ROW));
         lv_obj_add_event_cb(b, histMoreCb, LV_EVENT_CLICKED, nullptr);
         snprintf(buf, sizeof(buf), "Show more (%u)", (unsigned)(n - HIST_ROWS_FIRST));
         lv_obj_t *l = Kit::label(b, KS::KS_LABEL_TAG_ACCENT);

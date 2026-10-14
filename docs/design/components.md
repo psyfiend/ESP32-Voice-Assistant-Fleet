@@ -63,7 +63,7 @@ colour worked out at the call; `Kit::label(parent, role)` takes a shared look in
 ![The Remove dialog's two buttons](components/dialog.png)
 
 A plain object with words, its look by role: **CANCEL** (the surface, a faint edge) and
-**DESTRUCTIVE** (`ST_BAD`, the words in the surface colour). Radius `R_BUTTON`, edge `LINE_FINE`,
+**DESTRUCTIVE** (`ST_BAD`, the words in the surface colour). Radius `R_CONTROL`, edge `LINE_MID`,
 pressed: 20% of `TEXT` mixed in. The words are the role's ink (`NAME`).
 
 The brief listed PRIMARY and QUIET too. No button in the house is either today - the row button is
@@ -76,15 +76,18 @@ A question over everything, on the top layer, the rest dimmed (`GROUND` at 60%):
 two centred paragraphs, and up to two buttons side by side; a tap outside the box calls the spec's
 `outside`. Returns the dim; deleting it closes the dialog. One role so far, **DESTRUCTIVE** (the
 box's edge in `ST_BAD`, `LINE_HEAVY`). The box: the scheme's card radius, `SURFACE_ALT`, padding
-`S9`, rows `S7`. "Remove card" (K66, K69) is its first client.
+`S9`, rows `S7`. The buttons are `W_DIALOG_BTN` wide where that fits; in a narrower row they share
+it, `S7` between and beside them (#96). `countdown` in the spec shows the countdown of the sheet
+under it, on the box's bottom edge, for a dialog that closes with that sheet (#23). "Remove card"
+(K66, K69) is its first client.
 
 ### Chip row - `Kit::chipRow(parent, words, n, lit, room, cb)`
 
 ![History's span chips](components/chips.png)
 
 Small round-ended buttons side by side, the chosen one lit: `SURFACE` unlit; lit, 25% of the
-accent mixed in with a `LINE_FINE` accent edge and the words in the accent. Height `H_CHIP`, radius
-`R_CHIP`, sides `S_CHIP_SIDE`, gaps `S4` - both shrinking to fit `room`, as far as half. Each
+accent mixed in with a `LINE_MID` accent edge and the words in the accent. Height `H_CHIP`, radius
+`R_CHIP`, sides `S7`, gaps `S4` - both shrinking to fit `room`, as far as half. Each
 chip's tap carries its index. History's spans are its client; #92's chart options can be.
 
 ### List item - `Kit::item(parent)`

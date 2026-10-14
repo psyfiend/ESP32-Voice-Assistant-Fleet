@@ -61,7 +61,7 @@ void buildProps() {
         int32_t used = 0;
         for (uint32_t i = 0; i < cnt; i++) used += lv_obj_get_height(lv_obj_get_child(list, (int32_t)i));
         const int32_t fit = (lv_obj_get_content_height(list) - used) / (int32_t)(cnt - 1);
-        if (fit < mm(k.S5)) lv_obj_set_style_pad_row(list, LV_MAX(fit, mm(k.S_ROW_MIN)), 0);
+        if (fit < mm(k.S5)) lv_obj_set_style_pad_row(list, LV_MAX(fit, mm(k.S1)), 0);
     }
 }
 

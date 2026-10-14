@@ -105,38 +105,39 @@ struct UIMetrics {
 // docs/design/tokens.md section 7, for the owner to merge or not.
 struct UIShape {
     // --- Corner radii ---
-    float R_CONTROL;    // 1.2  a dropdown and its list, a checkbox's box, a row's button
-    float R_BUTTON;     // 1.6  a dialog's buttons; the control deck and its selector, squared
+    float R_CONTROL;    // 1.6  a dropdown and its list, a checkbox's box, a row's button; a
+                        //      dialog's buttons; the control deck and its selector, squared
+                        //      (#97: R_CONTROL 1.2 and R_BUTTON 1.6 merged - tokens.md 7)
     float R_PANEL;      // 1.6  a folder panel: its pane, its tab, the curve where they meet
     float R_WINDOW;     // 2.4  the window
     float R_CHIP;       // 3.0  a span chip - half its height, so a pill
 
     // --- Spacing, smallest first: padding, gaps, offsets ---
     float S1;           // 0.6  inside the control deck; a swatch grid's room for its ring; the
-                        //      chart's strips; between an activity row's lines
+                        //      chart's strips; between an activity row's lines; the least gap
+                        //      Properties closes its rows to
     float S2;           // 0.8  between the hero column's lines; a value and its unit
     float S3;           // 1.0  clear of a corner chip; between activity rows; a tab a millimetre short
     float S4;           // 1.2  the window's padding; a pill's sides; History's rows; carets from the edge
-    float S5;           // 1.6  under the header row; a label and its pill; swatches; a dropdown's
-                        //      sides; a panel's first and last row; a fact list's rows, and the
-                        //      gap between its two columns (#97: half of S8's)
+    float S5;           // 1.6  under the header row; the header row's gaps; the chart's gutters; a
+                        //      label and its pill; swatches; a dropdown's sides; a panel's first
+                        //      and last row; Members' rows, their padding and gaps; a fact list's
+                        //      rows, and the gap between its two columns (#97: half of S8's)
     float S6;           // 2.0  the window clear of the system header and the tabs; the break before
                         //      the deck's modes; activity's two columns
-    float S7;           // 2.4  a panel's sides; a row button's sides; a dialog's rows, and its
-                        //      buttons' spacing where they share a narrow row
+    float S7;           // 2.4  a panel's sides; a row button's sides; a span chip's sides; a
+                        //      dialog's rows, and its buttons' spacing where they share a narrow row
     float S8;           // 3.0  a time label's elbow room
     float S9;           // 4.0  a panel row's words and its control; a dialog's padding
     float S10;          // 5.0  activity's and a fact list's sides
-    // Off the scale - each a step's near neighbour (tokens.md 7):
-    float S_MEMBERS;    // 1.4  Members' rows: their padding and gaps (between S4 and S5)
-    float S_GUTTER;     // 1.5  the header row's gaps; the chart's gutters (almost S5)
-    float S_CHIP_SIDE;  // 2.2  a span chip's sides (almost S7)
-    float S_ROW_MIN;    // 0.55 the least gap Properties closes its rows to
+    // The four that sat off the scale - S_MEMBERS 1.4, S_GUTTER 1.5, S_CHIP_SIDE 2.2,
+    // S_ROW_MIN 0.55 - were merged into their nearest steps (#97, tokens.md 7).
 
     // --- Lines ---
     float LINE_HAIR;    // 0.2  borders: a dropdown, its list, a swatch, a row button
-    float LINE_FINE;    // 0.25 a lit span chip's border, a dialog button's; the chart's min/max lines
-    float LINE_MID;     // 0.3  a checkbox's box; the finger's line on the chart
+    float LINE_MID;     // 0.3  a checkbox's box; the finger's line on the chart; a lit span chip's
+                        //      border, a dialog button's; the chart's min/max lines (LINE_FINE
+                        //      0.25 merged in, #97)
     float LINE_HEAVY;   // 0.4  the dialog's border
     float LINE_PLOT;    // 0.45 the chart's line; a panel's carets
     float DASH;         // 0.6  a dotted line's dash, and its gap
@@ -148,8 +149,7 @@ struct UIShape {
     // --- Heights and widths ---
     float H_CONTROL;    // 6.0  a dropdown, a checkbox's box, a row's button
     float H_CHIP;       // 6.0  a span chip, and the top line's middle that holds them
-    float H_ROW;        // 7.2  a panel's row
-    float H_MORE;       // 7.0  activity's "Show more"
+    float H_ROW;        // 7.2  a panel's row; activity's "Show more" (H_MORE 7.0 merged in, #97)
     float H_BAR;        // 0.17 the auto-close bar: 2 px at 294 and 255 PPI, 1 px at 170 (#97; was 0.5)
     float H_TABS;       // 6.0  kept under the window for the panels' tabs
     float W_SIDE_MIN;   // 6.0  the least gap between the window and the screen's side

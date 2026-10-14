@@ -171,7 +171,7 @@ static void buildFrame(Sheet &S) {
     const UIType  &t = UI::type();
     const UIShape &k = UI::shape();
     const int32_t btn = UI::minTouch();
-    const int32_t gap = UI::mm(k.S_GUTTER);
+    const int32_t gap = UI::mm(k.S5);
 
     lv_obj_set_flex_flow(S.win, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_all(S.win, S.pad, 0);

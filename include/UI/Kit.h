@@ -108,7 +108,7 @@ int8_t   selectorLook();
 void     keepSelectorLook(int8_t look);
 uint8_t  selectorLookNow();       // the look in force
 FaceKind metalKind();             // its metal
-int32_t  selectorRadius();        // its corners: round, or R_BUTTON
+int32_t  selectorRadius();        // its corners: round, or R_CONTROL
 
 struct SelectorColours { uint32_t ribbon, icon, chosen; };
 SelectorColours selectorColours();

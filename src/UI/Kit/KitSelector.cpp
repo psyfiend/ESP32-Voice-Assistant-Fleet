@@ -229,7 +229,7 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     lv_obj_set_style_radius(S.sel, selectorRadius(), 0);
     // Its face is metal, curved and brushed (KitFaces.cpp). Greyed when quiet,
     // as everything else is.
-    const int32_t selR = (selectorLookNow() & 1) ? LV_MIN(S.selW, H) / 2 : UI::mm(UI::shape().R_BUTTON);
+    const int32_t selR = (selectorLookNow() & 1) ? LV_MIN(S.selW, H) / 2 : UI::mm(UI::shape().R_CONTROL);
     if (lv_obj_t *img = setFace(S.sel, S.selW, H, selR, metalKind(), quietHex(q, UI::pal().GROUND))) {
         if (q) {
             lv_obj_set_style_image_recolor    (img, UI::c(UI::pal().SURFACE_ALT), 0);
