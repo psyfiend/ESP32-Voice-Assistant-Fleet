@@ -91,6 +91,93 @@ struct UIMetrics {
 };
 
 // ---------------------------------------------------------------------------
+// 2b. Shape and spacing in MILLIMETRES on glass - the card window's (2.12 P2)
+// ---------------------------------------------------------------------------
+// The card window sizes what a finger touches and what an eye reads in real
+// millimetres (its mm(), the same derivation as UI::minTouch()), so these are
+// millimetres, never logical pixels: pass them to mm(), not UI::sc(). The P_
+// group is in "P4_5 millimetres" (the window's pm()): the same SHARE of every
+// window as on the P4_5 (docs/design/card-sheet.md section 15).
+//
+// One set, fleet-wide, read through UI::shape(). Every value is the one the
+// window had before it had a name - 2.12 changed no pixel - so a few values
+// sit close to each other: they are kept apart and listed in
+// docs/design/tokens.md section 7, for the owner to merge or not.
+struct UIShape {
+    // --- Corner radii ---
+    float R_CONTROL;    // 1.2  a dropdown and its list, a checkbox's box, a row's button
+    float R_BUTTON;     // 1.6  a dialog's buttons; the control deck and its selector, squared
+    float R_PANEL;      // 1.6  a folder panel: its pane, its tab, the curve where they meet
+    float R_WINDOW;     // 2.4  the window
+    float R_CHIP;       // 3.0  a span chip - half its height, so a pill
+
+    // --- Spacing, smallest first: padding, gaps, offsets ---
+    float S1;           // 0.6  inside the control deck; a swatch grid's room for its ring; the
+                        //      chart's strips; between an activity row's lines
+    float S2;           // 0.8  between the hero column's lines; a value and its unit
+    float S3;           // 1.0  clear of a corner chip; between activity rows; a tab a millimetre short
+    float S4;           // 1.2  the window's padding; a pill's sides; History's rows; carets from the edge
+    float S5;           // 1.6  under the header row; a label and its pill; swatches; a dropdown's
+                        //      sides; a panel's first and last row; Properties' rows
+    float S6;           // 2.0  the window clear of the system header and the tabs; the break before
+                        //      the deck's modes; activity's two columns
+    float S7;           // 2.4  a panel's sides; a row button's sides; a dialog's rows
+    float S8;           // 3.0  Properties' two columns; a time label's elbow room
+    float S9;           // 4.0  a panel row's words and its control; a dialog's padding
+    float S10;          // 5.0  activity's and Properties' sides
+    // Off the scale - each a step's near neighbour (tokens.md 7):
+    float S_MEMBERS;    // 1.4  Members' rows: their padding and gaps (between S4 and S5)
+    float S_GUTTER;     // 1.5  the header row's gaps; the chart's gutters (almost S5)
+    float S_CHIP_SIDE;  // 2.2  a span chip's sides (almost S7)
+    float S_ROW_MIN;    // 0.55 the least gap Properties closes its rows to
+
+    // --- Lines ---
+    float LINE_HAIR;    // 0.2  borders: a dropdown, its list, a swatch, a row button
+    float LINE_FINE;    // 0.25 a lit span chip's border, a dialog button's; the chart's min/max lines
+    float LINE_MID;     // 0.3  a checkbox's box; the finger's line on the chart
+    float LINE_HEAVY;   // 0.4  the dialog's border
+    float LINE_PLOT;    // 0.45 the chart's line; a panel's carets
+    float DASH;         // 0.6  a dotted line's dash, and its gap
+    float RING_W;       // 0.4  the ring round a chosen swatch or a loaded scene
+    float RING_PAD;     // 0.3  its distance from what it rings
+    float TRACK_PILL;   // 0.2  letter spacing: the PAUSED pill
+    float TRACK_TAB;    // 0.4  letter spacing: a panel's tab
+
+    // --- Heights and widths ---
+    float H_CONTROL;    // 6.0  a dropdown, a checkbox's box, a row's button
+    float H_CHIP;       // 6.0  a span chip, and the top line's middle that holds them
+    float H_ROW;        // 7.2  a panel's row
+    float H_MORE;       // 7.0  activity's "Show more"
+    float H_BAR;        // 0.5  the auto-close bar
+    float H_TABS;       // 6.0  kept under the window for the panels' tabs
+    float W_SIDE_MIN;   // 6.0  the least gap between the window and the screen's side
+    float W_WINDOW_MAX; // 100  the widest a window gets (a hand's span)
+    float W_ROWS_MAX;   // 70   activity's rows at most
+    float W_DIALOG_MAX; // 90   a dialog at most
+    float W_DIALOG_BTN; // 24   a dialog's buttons
+    float SWATCH;       // 6.5  a colour swatch; the least height of a scene button
+    float CARET_W;      // 2.4  a panel's caret
+    float CARET_H;      // 1.0
+
+    // --- How far a finger may move ---
+    float SLOP_SELECTOR;// 1.0  before the control deck's selector is dragged
+    float SLOP_KNOB;    // 1.2  before the toggle's knob is dragged
+    float SLOP_HOLD;    // 4.0  before a long press is a drag instead
+
+    // --- The hero and around it, in P4_5 millimetres (pm()) ---
+    float P_GAP;        // 4.0  between the hero and its column
+    float P_STACK_GAP;  // 3.0  between the hero and the control deck under it
+    float P_GRIP_INSET; // 1.4  the slider's grip below the top of its fill
+    float P_GRIP_H;     // 0.5  the grip's height
+    float P_GRIP_MIN;   // 5.0  the least fill that shows a grip
+    float P_MARK_H;     // 2.6  the ring marking a temperature or a colour
+    float P_MARK_LINE;  // 0.35 its line
+    float P_SCENE_H;    // 9.0  a scene button, at most
+    float P_SCENE_GAP;  // 1.4  between scene buttons
+    float P_SCENE_PAD;  // 2.4  a scene button's sides
+};
+
+// ---------------------------------------------------------------------------
 // 3. Grid — derived from the viewport, not declared
 // ---------------------------------------------------------------------------
 // Columns and rows are always DERIVED. You pick a target card width and the
@@ -180,6 +267,8 @@ extern const UIPalette UI_PAL_LINEN;    // light
 extern const UIMetrics UI_MET_DARK;   // 1px lighten @40% border, no shadow needed
 extern const UIMetrics UI_MET_LIGHT;  // no border, leans on the shadow
 
+extern const UIShape UI_SHAPE;        // the card window's shape and spacing (2.12)
+
 // Colour roles for UI::paint() - shared styles that repaint themselves on a
 // scheme change. #64; the full story is at UI::paint() below.
 enum class UIPaint : uint8_t {
@@ -211,6 +300,7 @@ const UIPalette &pal();
 const UIMetrics &met();
 const UIGrid    &grid();
 const UIType    &type();
+const UIShape   &shape();   // millimetres - see section 2b
 
 // --- Runtime customisation -------------------------------------------------
 // The active palette and metrics are COPIES of a scheme, not pointers to one,
@@ -249,8 +339,15 @@ void setColumnsOverride(uint8_t cols);
 // Registered by GUIManager so a scheme change can restyle what is on screen.
 void onSchemeChanged(void (*cb)());
 
+// Called whenever the shared paints are brought up to date (a scheme or accent
+// change), before LVGL is told every style changed: a layer above the tokens
+// that keeps shared styles of its own - the component kit (2.12) - refreshes
+// them here. Up to four; a second registration of the same function is ignored.
+void onRepaint(void (*cb)());
+
 // --- Helpers ---------------------------------------------------------------
 int32_t    sc(int32_t logical);          // logical px -> this board's pixels
+int32_t    mm(float v);                  // millimetres on glass -> this board's pixels (section 2b)
 lv_color_t c(uint32_t hex);              // the one place that calls lv_color_hex
 lv_color_t border();                     // BORDER, or derived from SURFACE
 

@@ -22,3 +22,5 @@ live one wins. Moved here 2026-09-29, unchanged, so section numbers quoted elsew
 | `REVIEW_2026-09-20.md` | A review written while the owner was away | closed 2026-09-21 |
 | `GUI_FRAMEWORK.md` | The first UI vision sketch | `docs/ROADMAP.md` |
 | `HANDOFF_to_2026-09-29.md` | The handoff with every session log from 2026-09-24 to 29 | `docs/HANDOFF.md`, rewritten |
+| `TEST_2.12.md` | The UI foundation (2.12): T1-T12 on glass, Q1-Q7, signed off 2026-10-14, `v0.2.13` | `docs/design/ui-architecture.md`, DECISIONS K71-K74, D-10, W13 |
+| `HANDOFF_to_2026-10-14.md` | The handoff through 2.10, K17 and 2.12, with each 2.10 sub-milestone's carried-forward notes | `docs/HANDOFF.md`, rewritten; the notes filed in `card-sheet.md`, `FUTURE_IMPROVEMENTS.md`, `display/README.md` and issues |

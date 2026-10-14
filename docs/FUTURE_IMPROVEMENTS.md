@@ -498,6 +498,27 @@ from the left edge to look natural. Explicitly low priority, and a case for expe
   stuck valves. A card - probably a group card with its own detail page - is the target.
 - **A thermostat card.** `EntityKind::CLIMATE` already exists with no card behind it.
 
+### Carried out of HANDOFF, 2026-10-14 (from 2.10 and K17)
+
+Open ends of the card window's milestones that are not issues and not decisions. None blocks
+anything; each says where it lands.
+
+- **The sensor hero on a large window**: its disc grows with the window while its icon is a fixed
+  face, so on a 7" the glyph looks small in it. A bigger icon face costs flash (CLAUDE.md, "Two
+  costs"). With the card-library work.
+- **Switching a light's control live while the selector is dragged**, rather than on release.
+  Measure frames with `DEBUG_FRAMES` first (W6).
+- **Linen's panel slides** are a little choppier than the dark schemes' on the P4_5 ("totally
+  passable"; frames 8-40 ms). Linen may also get chrome of its own one day (owner).
+- **The 4880 shows the window in portrait**; nothing was tuned for it.
+- **The Card label row is greyed** until its redesign (K48): Current group / None / Custom, with a
+  name window. With it, the owner's notes from 2.10d: moving a card to another group gets its own
+  row and window (a list of groups, each openable to its members - "change the label" or "move
+  into a group panel"); and the three things now called "group" need names of their own - the
+  shared label, a group card like Desk, a group panel on the dashboard (`group-cards.md`, 2.11).
+  Also from those notes: NINA-style toasts, scene secondary info (#89), names and groups from the
+  web UI (#87), and the Selector look as a device-wide choice on the settings page (4.1).
+
 ## bb_captouch_fork
 
 - **Detach from the original author's repo.** `components/bb_captouch_fork` is currently a

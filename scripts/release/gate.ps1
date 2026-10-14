@@ -31,8 +31,13 @@ try {
     $start = Get-Date
     foreach ($e in $envs) {
         $t0 = Get-Date
+        # Windows PowerShell 5.1 makes every line a native program writes to stderr an error
+        # record, and under "Stop" the first one - the S3 linker's .note.GNU-stack warning - ended
+        # the script (2026-10-13). A build's result is its exit code, so stderr is only logged.
+        $ErrorActionPreference = "Continue"
         & $pio run -e $e *> (Join-Path $Out "build_$e.log")
         $ok = $LASTEXITCODE -eq 0
+        $ErrorActionPreference = "Stop"
         $flash = (Select-String -Path (Join-Path $Out "build_$e.log") -Pattern "Flash: .*" | Select-Object -Last 1).Matches.Value
         "{0,-20} {1,-8} {2:mm\:ss}  {3}" -f $e, $(if ($ok) { "SUCCESS" } else { "FAILED" }), ((Get-Date) - $t0), $flash |
             Out-File $log -Append

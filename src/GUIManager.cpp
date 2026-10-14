@@ -1,6 +1,7 @@
 #include "GUIManager.h"
 #include "UI/UIToolkit.h"
 #include "UI/UITokens.h"
+#include "UI/Kit.h"                      // the component kit's styles, filled at begin()
 #include "SystemReport.h"
 #include "LVGL_Startup.h"                // drawBufInfo(), for [UI STATE]
 #include "Cards/CardDemo.h"
@@ -567,6 +568,9 @@ void GUIManager::begin() {
     // Midnight with a violet accent). Applied here rather than in the token
     // file so "which scheme ships" is a GUIManager decision beside the others.
     UI::setScheme(UI_PAL_MIDNIGHT, UI_MET_DARK);
+    // The component kit's shared styles, in that scheme (2.12): filled once
+    // here, refilled with every scheme change after.
+    Kit::begin();
 
     // --= ROOT SCREEN =--
     lv_obj_t *screen = lv_screen_active();

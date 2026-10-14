@@ -30,6 +30,7 @@ test"; tuning and features were split into their own issues.
 | #70 | S3 LVGL performance: LVGL's pool back in SRAM, S3 framework settings |
 | #71 | Rotation as a setting; auto-rotate from the S3_4B's IMU |
 | #73 | Type ladder - chrome text sizes (seen first on the 4880) |
+| (no issue yet) | The S3 RGB boards (S3_4B, S3_5B, 8048) probably flash on flash writes as the P4s did before A14: `CONFIG_LCD_RGB_ISR_IRAM_SAFE` is off in the stock S3 libraries. Untested - none of them was working on the desk when the P4 fix landed (2.10d) |
 | (no issue yet) | `WS_P4_4B` washed out twice (2.10a, 2.10c): whole picture near-white and lurid while `/screenshot` was right - the panel, not the frame buffer. `GET /panel?resend=1` waits for the next time (below) |
 
 ## Which file answers what

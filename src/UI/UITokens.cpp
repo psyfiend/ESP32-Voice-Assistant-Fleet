@@ -153,6 +153,26 @@ const UIMetrics UI_MET_LIGHT = {
     .SHADOW_Y = 3, .SHADOW_OPA = 140
 };
 
+// The card window's shape and spacing, in millimetres (2.12 P2, the header's
+// section 2b says what each is for). Every value is the one its literal had
+// at v0.2.12, so naming them changed nothing on glass; the near neighbours
+// (1.4 / 1.5 beside 1.6, 2.2 beside 2.4, the two 1.6 radii) are the owner's
+// to merge - docs/design/tokens.md section 7.
+const UIShape UI_SHAPE = {
+    .R_CONTROL = 1.2f, .R_BUTTON = 1.6f, .R_PANEL = 1.6f, .R_WINDOW = 2.4f, .R_CHIP = 3.0f,
+    .S1 = 0.6f, .S2 = 0.8f, .S3 = 1.0f, .S4 = 1.2f, .S5 = 1.6f,
+    .S6 = 2.0f, .S7 = 2.4f, .S8 = 3.0f, .S9 = 4.0f, .S10 = 5.0f,
+    .S_MEMBERS = 1.4f, .S_GUTTER = 1.5f, .S_CHIP_SIDE = 2.2f, .S_ROW_MIN = 0.55f,
+    .LINE_HAIR = 0.2f, .LINE_FINE = 0.25f, .LINE_MID = 0.3f, .LINE_HEAVY = 0.4f, .LINE_PLOT = 0.45f,
+    .DASH = 0.6f, .RING_W = 0.4f, .RING_PAD = 0.3f, .TRACK_PILL = 0.2f, .TRACK_TAB = 0.4f,
+    .H_CONTROL = 6.0f, .H_CHIP = 6.0f, .H_ROW = 7.2f, .H_MORE = 7.0f, .H_BAR = 0.5f, .H_TABS = 6.0f,
+    .W_SIDE_MIN = 6.0f, .W_WINDOW_MAX = 100.0f, .W_ROWS_MAX = 70.0f, .W_DIALOG_MAX = 90.0f,
+    .W_DIALOG_BTN = 24.0f, .SWATCH = 6.5f, .CARET_W = 2.4f, .CARET_H = 1.0f,
+    .SLOP_SELECTOR = 1.0f, .SLOP_KNOB = 1.2f, .SLOP_HOLD = 4.0f,
+    .P_GAP = 4.0f, .P_STACK_GAP = 3.0f, .P_GRIP_INSET = 1.4f, .P_GRIP_H = 0.5f, .P_GRIP_MIN = 5.0f,
+    .P_MARK_H = 2.6f, .P_MARK_LINE = 0.35f, .P_SCENE_H = 9.0f, .P_SCENE_GAP = 1.4f, .P_SCENE_PAD = 2.4f,
+};
+
 // ---------------------------------------------------------------------------
 // Active state
 // ---------------------------------------------------------------------------
@@ -279,6 +299,7 @@ void setViewport(int32_t w, int32_t h) {
 const UIPalette &pal()  { return s_pal; }
 const UIMetrics &met()  { return s_met; }
 const UIGrid    &grid() { return s_grid; }
+const UIShape   &shape() { return UI_SHAPE; }
 
 const UIType &type() {
     // Built on first use rather than at static-init time: the font objects are
@@ -315,8 +336,23 @@ const UIType &type() {
 static lv_style_t s_paint[(int)UIPaint::PAINT_COUNT];
 static bool       s_paintReady = false;
 
+// Layers above with shared styles of their own (onRepaint()).
+static constexpr uint8_t REPAINT_MAX = 4;
+static void (*s_repaint[REPAINT_MAX])() = {nullptr};
+static uint8_t s_repaintN = 0;
+
+void onRepaint(void (*cb)()) {
+    if (!cb) return;
+    for (uint8_t i = 0; i < s_repaintN; i++) if (s_repaint[i] == cb) return;
+    if (s_repaintN < REPAINT_MAX) s_repaint[s_repaintN++] = cb;
+}
+
 static void refreshPaints() {
-    if (!s_paintReady) return;   // nothing has asked for one yet
+    for (uint8_t i = 0; i < s_repaintN; i++) s_repaint[i]();
+    if (!s_paintReady) {   // nothing has asked for a paint yet
+        if (s_repaintN) lv_obj_report_style_change(NULL);
+        return;
+    }
     auto st = [](UIPaint p) { return &s_paint[(int)p]; };
     const lv_color_t bd = border();
 
@@ -469,6 +505,9 @@ void setAspectPct(uint8_t pct) {
 void onSchemeChanged(void (*cb)()) { s_onChange = cb; }
 
 int32_t sc(int32_t logical) { return (int32_t)(logical * bspUiScale()); }
+
+// The same derivation as minTouch(): real millimetres, whatever the board.
+int32_t mm(float v) { return (int32_t)lroundf(v * (float)bspPixelDensity() / 25.4f); }
 
 lv_color_t c(uint32_t hex) { return lv_color_hex(hex); }
 

@@ -125,7 +125,6 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, uint8_t subdivision) 
     _n = 0;
     _placed = 0;
     _committed = false;
-    clearOcc();
 
     Serial.printf("[Cards] Page %u cols (%u units), %ld px of height, max %u rows, gap %ld\n",
                   (unsigned)g.cols, (unsigned)_uCols,
@@ -141,21 +140,9 @@ uint8_t CardPage::rowsWanted() const {
     if (!_n) return 1;
     const uint8_t cellCols = _uCols / _sub ? _uCols / _sub : 1;
 
-    uint16_t cells = 0;
-    for (uint8_t i = 0; i < _n; i++) {
-        if (!_cards[i]) continue;
-        const CardPlacement &p = _cards[i]->placement();
-        uint8_t sx = p.prefSpanX ? p.prefSpanX : _sub;
-        uint8_t sy = p.prefSpanY ? p.prefSpanY : _sub;
-        // Round each card up to whole cells; a half-cell card still occupies a
-        // row, and this is a floor, not a packing.
-        const uint8_t cx = (uint8_t)((sx + _sub - 1) / _sub);
-        const uint8_t cy = (uint8_t)((sy + _sub - 1) / _sub);
-        cells = (uint16_t)(cells + cx * cy);
-    }
-    uint16_t rows = (uint16_t)((cells + cellCols - 1) / cellCols);
-    if (rows < 1) rows = 1;
-    return (uint8_t)(rows > 255 ? 255 : rows);
+    Layout::Item items[CARD_PAGE_MAX];
+    toItems(items);
+    return Layout::rowsWanted(items, _n, cellCols, _sub);
 }
 
 // Spend the height on exactly this many cell rows.
@@ -211,155 +198,46 @@ int32_t CardPage::widthOf(uint8_t spanX) const {
 }
 
 // ---------------------------------------------------------------------------
-// Occupancy
+// Placement - Layout's flow engine (2.12 P5). The rules, and why each is what
+// it is - pins first, the widest span at the first free spot, the lowest
+// priority dropped - moved to src/Layout/Layout.cpp unchanged.
 // ---------------------------------------------------------------------------
 
-void CardPage::clearOcc() {
-    for (uint8_t r = 0; r < PAGE_MAX_UNIT_ROWS; r++)
-        for (uint8_t b = 0; b < sizeof(_occ[0]); b++) _occ[r][b] = 0;
-}
-
-bool CardPage::blockFree(uint8_t col, uint8_t row, uint8_t spanX, uint8_t spanY) const {
-    for (uint8_t r = row; r < row + spanY; r++) {
-        if (r >= PAGE_MAX_UNIT_ROWS) return false;
-        for (uint8_t c = col; c < col + spanX; c++) {
-            if (c >= PAGE_MAX_UNIT_COLS) return false;
-            if (_occ[r][c >> 3] & (uint8_t)(1u << (c & 7))) return false;
+// The cards as the engine sees them. A card commit() freed is an empty slot.
+void CardPage::toItems(Layout::Item *out) const {
+    for (uint8_t i = 0; i < _n; i++) {
+        Layout::Item it;
+        if (_cards[i]) {
+            const CardPlacement &p = _cards[i]->placement();
+            it.prefSpanX = p.prefSpanX; it.prefSpanY = p.prefSpanY;
+            it.minSpanX  = p.minSpanX;  it.minSpanY  = p.minSpanY;
+            it.col       = p.col;       it.row       = p.row;
+            it.priority  = p.priority;
+        } else {
+            it.present = false;
         }
+        out[i] = it;
     }
-    return true;
-}
-
-void CardPage::occupy(uint8_t col, uint8_t row, uint8_t spanX, uint8_t spanY) {
-    for (uint8_t r = row; r < row + spanY && r < PAGE_MAX_UNIT_ROWS; r++)
-        for (uint8_t c = col; c < col + spanX && c < PAGE_MAX_UNIT_COLS; c++)
-            _occ[r][c >> 3] |= (uint8_t)(1u << (c & 7));
-}
-
-// ---------------------------------------------------------------------------
-// Placement
-// ---------------------------------------------------------------------------
-
-bool CardPage::placeOne(uint8_t i) {
-    Card *c = _cards[i];
-    if (!c) return true;
-
-    const CardPlacement &p = c->placement();
-
-    // Clamp to the page before anything else. On CYD_S3_3248 portrait the page
-    // is two cells wide, so a card asking for three is not a misconfiguration
-    // to reject - it is a card designed for a bigger board, and the correct
-    // answer is the widest thing that fits.
-    uint8_t pX = p.prefSpanX ? p.prefSpanX : 1;
-    uint8_t mX = p.minSpanX  ? p.minSpanX  : 1;
-    uint8_t pY = p.prefSpanY ? p.prefSpanY : 1;
-    uint8_t mY = p.minSpanY  ? p.minSpanY  : 1;
-    if (pX > _uCols) pX = _uCols;
-    if (pY > _uRows) pY = _uRows;
-    if (mX > pX)     mX = pX;
-    if (mY > pY)     mY = pY;
-
-    // --- Explicit placement, and the validator ROADMAP Q3b asked for -------
-    //
-    // An invalid pin is REPORTED and then flowed, rather than dropped. The
-    // card is still the one the author asked for; only its coordinate was
-    // wrong, and silently losing it would be a worse answer than putting it
-    // somewhere visible and saying so.
-    if (p.col >= 0 && p.row >= 0) {
-        const uint8_t cc = (uint8_t)p.col, rr = (uint8_t)p.row;
-        if (cc + pX <= _uCols && rr + pY <= _uRows && blockFree(cc, rr, pX, pY)) {
-            occupy(cc, rr, pX, pY);
-            _slot[i].col = cc; _slot[i].row = rr;
-            _slot[i].spanX = pX; _slot[i].spanY = pY;
-            _slot[i].placed = true;
-            return true;
-        }
-        _slot[i].pinFail = true;
-        DBG_CARDS("%s: pin %d,%d rejected (out of bounds or occupied) - flowing\n",
-                  c->typeName(), (int)p.col, (int)p.row);
-    }
-
-    // --- Flow -------------------------------------------------------------
-    //
-    // First free position wins, and at that position the WIDEST span that fits
-    // wins. That ordering is deliberate: a card that fits at its minimum
-    // beside its neighbour beats a card sitting alone on a new row at full
-    // width, which is the rule 2.4's cursor arithmetic encoded and this keeps.
-    for (uint8_t r = 0; r + mY <= _uRows; r++) {
-        for (uint8_t cc = 0; cc + mX <= _uCols; cc++) {
-            for (uint8_t sx = pX; sx >= mX; sx--) {
-                if (cc + sx > _uCols) continue;
-                for (uint8_t sy = pY; sy >= mY; sy--) {
-                    if (r + sy > _uRows) continue;
-                    if (!blockFree(cc, r, sx, sy)) continue;
-                    occupy(cc, r, sx, sy);
-                    _slot[i].col = cc; _slot[i].row = r;
-                    _slot[i].spanX = sx; _slot[i].spanY = sy;
-                    _slot[i].placed = true;
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
 }
 
 void CardPage::plan() {
-    bool alive[CARD_PAGE_MAX];
-    for (uint8_t i = 0; i < _n; i++) alive[i] = (_cards[i] != nullptr);
+    Layout::Item items[CARD_PAGE_MAX];
+    toItems(items);
 
-    for (;;) {
-        clearOcc();
-        for (uint8_t i = 0; i < _n; i++) {
-            const bool pf = _slot[i].pinFail;
-            _slot[i] = Slot();
-            _slot[i].pinFail = pf;      // a bad pin stays reportable across replans
-        }
-
-        // PINNED CARDS ARE PLACED FIRST, in two passes.
-        //
-        // The serial from WS_P4_5 showed "pin 2,2 rejected (out of bounds or
-        // occupied) - flowing": the coordinate was perfectly valid and had
-        // already been taken by a card that flowed into it first. A pin is a
-        // STRONGER statement than flow - the author named that spot - so flow
-        // must not be allowed to consume it. One pass for the pinned, then one
-        // for everything else.
-        bool ok = true;
-        for (uint8_t pass = 0; pass < 2 && ok; pass++) {
-            for (uint8_t i = 0; i < _n; i++) {
-                if (!alive[i] || !_cards[i]) continue;
-                const CardPlacement &pl = _cards[i]->placement();
-                const bool pinned = (pl.col >= 0 && pl.row >= 0);
-                if (pinned != (pass == 0)) continue;
-                if (!placeOne(i)) { ok = false; break; }
-            }
-        }
-        if (ok) break;
-
-        // PRIORITY DEGRADATION. Drop the lowest-priority card still alive and
-        // try the whole layout again - not the card that happened to fail.
-        // Those are different cards whenever a low-priority one was declared
-        // early, and picking the failure would make the outcome depend on
-        // declaration order, which is precisely what priority exists to stop.
-        //
-        // Ties go to the LATER declaration, so an author listing equals keeps
-        // the reading order they wrote.
-        int16_t drop = -1;
-        uint8_t lowest = 255;
-        for (uint8_t i = 0; i < _n; i++) {
-            if (!alive[i] || !_cards[i]) continue;
-            const uint8_t pr = _cards[i]->placement().priority;
-            if (drop < 0 || pr <= lowest) { lowest = pr; drop = (int16_t)i; }
-        }
-        if (drop < 0) break;
-
-        alive[(uint8_t)drop] = false;
+    // The engine says what it decided; the page says it with the card's name.
+    Layout::Events ev;
+#ifdef DEBUG_CARDS
+    ev.ctx = this;
+    ev.pinRejected = [](void *ctx, uint8_t i, int8_t col, int8_t row) {
+        DBG_CARDS("%s: pin %d,%d rejected (out of bounds or occupied) - flowing\n",
+                  ((CardPage *)ctx)->_cards[i]->typeName(), (int)col, (int)row);
+    };
+    ev.dropped = [](void *ctx, uint8_t i, uint8_t priority) {
         DBG_CARDS("dropped %s (priority %u) - page is full\n",
-                  _cards[drop]->typeName(), (unsigned)lowest);
-    }
-
-    _placed = 0;
-    for (uint8_t i = 0; i < _n; i++) if (_slot[i].placed) _placed++;
+                  ((CardPage *)ctx)->_cards[i]->typeName(), (unsigned)priority);
+    };
+#endif
+    _placed = _engine.place(Layout::Container{_uCols, _uRows}, items, _n, _slot, &ev);
 }
 
 // ---------------------------------------------------------------------------

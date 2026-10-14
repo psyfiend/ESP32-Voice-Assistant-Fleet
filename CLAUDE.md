@@ -11,6 +11,7 @@ elsewhere, and it is worth checking those first for "is X already known or plann
 | Doc | Answers |
 |---|---|
 | `docs/HANDOFF.md` | Where we left off, what to know that the other docs do not say. **Start here.** |
+| `docs/design/ui-architecture.md` | **How the UI is built**: the layers, where things live, the rules, how to change it and prove nothing broke. Read before any UI work |
 | `docs/ROADMAP.md` | What we are building, in what order, what is done - and **where each kind of note belongs** |
 | `docs/DECISIONS.md` | Every decision that shapes later work, one line each, pointing at its reasoning |
 | `CHANGELOG.md` | What each tagged version contains |
@@ -19,6 +20,7 @@ elsewhere, and it is worth checking those first for "is X already known or plann
 | `docs/LESSONS.md` | Mistakes that cost real time, written down so they cost it once |
 | `docs/FUTURE_IMPROVEMENTS.md` | Deliberately deferred fleet-wide work |
 | `docs/REFERENCE_PROJECTS.md` | What is in `reference/`, what to mine from it, and its licensing |
+| `docs/HTTP_REFERENCE.md` | Every HTTP address the boards answer: when it exists, what it reads, what it changes |
 | `docs/display/README.md` | The display stack: status per board, open issues, and which file answers what |
 | `docs/BRINGUP_*.md` | Per-board bring-up history for the two boards that fought back |
 | GitHub issues | What is in flight right now, and what is blocked |
@@ -409,10 +411,17 @@ architecture enforces it rather than everyone remembering. The no-ops exist so t
 the whole tree. **Use them from any caller that is not the LVGL thread**, even though they
 currently do nothing.
 
-Planned but not yet done: `src/UI/` and `src/Cards/` subfolders, introduced at milestone 2.4 when
-the card library starts adding files. See `docs/design/startup.md` §3.5 — it notes the two things
-that break (`WS_S3_TOUCH_LCD_5B`'s `build_src_filter` exclusion, and `include/` subfolders not
-being on the include path automatically).
+Subfolders: `src/Cards/` (the card library; `Popup/` is the card window), `src/UI/` (tokens,
+panels; `Kit/` is the component kit), `src/Layout/` (placement). `include/` mirrors them, and a
+header is included by its path from `include/` (`"UI/Kit.h"`, `"Layout/Layout.h"`) - its subfolders
+are not on the include path themselves. `WS_S3_TOUCH_LCD_5B` excludes `UI/Panel_Audio.cpp` by path
+in its `build_src_filter`.
+
+**Placement is `Layout::`** (`include/Layout/Layout.h`, 2.12 P5): pure arithmetic - no LVGL, Arduino
+or ESP-IDF header - so it is tested off the board in `host-tests/`, with `TimeFormat`
+(`pio test -d host-tests`; `wsl bash host-tests/run_in_wsl.sh` until Windows has a compiler).
+`CardPage` turns its cards into items and lays out what the engine returns; a new arrangement is a
+new `Layout::Engine`, not placement code in a page. Keep a module there pure, or it cannot be tested.
 
 ## Saved settings (`include/Settings.h`, since 2.10d)
 
@@ -443,13 +452,14 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
 
 ## Design tokens — no colour or size literals in UI code
 
-Since Phase 2.2 (2026-09-10). `include/UITokens.h` is the single source for how anything looks.
+Since Phase 2.2 (2026-09-10). `include/UI/UITokens.h` is the single source for how anything looks.
 Design and the measurements behind it: `docs/design/tokens.md`; what a card *contains* is
 `docs/design/cards.md`.
 
-Four flat struct groups in the `Fleet_BSP` idiom — `UIPalette` (surfaces, accent, the **semantic
-state palette**, sensor tints), `UIMetrics` (radius, padding, border, shadow), `UIGrid`, `UIType` —
-reached through one namespace: `UI::pal()`, `UI::met()`, `UI::grid()`, `UI::type()`.
+Five flat struct groups in the `Fleet_BSP` idiom — `UIPalette` (surfaces, accent, the **semantic
+state palette**, sensor tints), `UIMetrics` (radius, padding, border, shadow), `UIShape` (the card
+window's radii, spacing, lines and sizes, in millimetres - 2.12), `UIGrid`, `UIType` — reached
+through one namespace: `UI::pal()`, `UI::met()`, `UI::shape()`, `UI::grid()`, `UI::type()`.
 
 Rules that are load-bearing rather than stylistic:
 
@@ -463,8 +473,13 @@ Rules that are load-bearing rather than stylistic:
   and system drawer kept the old scheme. A shared paint is updated in place by `setScheme()`, and
   everything using it repaints. A local colour property beats a shared style in LVGL, so never set
   both on one widget.
-- **All token values are logical pixels.** Run them through `UI::sc()` at the point of use. Never
-  store a scaled value — the scale is per board.
+- **All token values are logical pixels** - except `UIShape`'s. Run them through `UI::sc()` at the
+  point of use. Never store a scaled value — the scale is per board.
+- **The card window's sizes are `UIShape` millimetres, never a number** (since 2.12 P2). The
+  window draws in real millimetres - `mm(UI::shape().S5)`, or `pm()` for the `P_` group (P4_5
+  millimetres, a share of the window). A new radius, gap, line or size is a new token in
+  `UITokens.h` §2b with a comment saying what uses it, and a row in `tokens.md` §7. Tokens close in
+  value are kept apart on purpose until the owner merges them (`tokens.md` §7).
 - **Columns and rows are derived, never declared.** Pick `TARGET_CARD_W`; the page fits as many
   whole cards as the screen allows and stretches row height to fill. One token set gives 5x3 on
   `WS_P4_5` and 2x3 on `CYD_S3_3248` portrait.
@@ -472,6 +487,33 @@ Rules that are load-bearing rather than stylistic:
   deprecated and warns.
 - **Use `UI::tameScroll()`** on every scrollable container: vertical-only, no elastic springback,
   no scrollbar. Rubber-banding looks bad at the refresh rates the S3 boards manage.
+
+### The component kit - build windows from `Kit::`, not from style calls (2.12 P3)
+
+`include/UI/Kit.h`, `src/UI/Kit/`; what each component is and looks like: `docs/design/components.md`.
+Buttons, dialogs, chip rows, list items, panel rows (dropdown, checkbox, row button), folder
+panels, the selector, icon buttons and label roles are the kit's, and a new screen uses them.
+
+- **A component takes a role; a role is shared `lv_style_t`s** (`Kit::KitStyle`), filled in
+  `KitStyles.cpp` from the tokens and refilled on every repaint through `UI::onRepaint()` - so a
+  new look is a new role there, never `lv_obj_set_style_*` at the call. **The caller places it and
+  owns what changes** (a value, a ring, a greyed state that comes and goes): local properties,
+  which beat the shared style.
+- **A new role keeps one style per part and state** (`KS_X`, `KS_X_PRESSED`, ...), and does not
+  repeat a property another style on the same object sets: two shared styles on one object are
+  ordered by when they were added, which is easy to get wrong.
+- **Components build exactly the objects, flags and events their callers expect** - the harness
+  compares trees, and a component's state lives in the caller's struct, found through the
+  object's user data, so events keep their user data.
+- **A window is a Sheet** (`include/UI/Sheet.h`, 2.12 P4): the frame - placement, header row,
+  auto-close, the quiet build, the modal tap catcher, both folder panels, the sparks - is the
+  kit's, and a new window is a client: a `Kit::SheetSpec` and its views. The card window
+  (`struct Popup : Kit::Sheet`) and "About this board" (`UI/AboutSheet`, debug builds) are the two
+  clients. One sheet shows at a time.
+- **`python scripts/structure_check.py` says where the code is drifting** - files over 1,000 lines,
+  style calls outside the kit, colour literals, shape numbers, LVGL in the core layers. It reports
+  and never fails; run it with the all-nine gate and quote it in the merge report (W13).
+  The card window grew to 6,325 lines in one file because nothing counted.
 
 ### UI scale is derived from pixel density, not declared
 
