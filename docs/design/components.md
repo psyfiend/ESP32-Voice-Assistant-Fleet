@@ -88,7 +88,8 @@ under it, on the box's bottom edge, for a dialog that closes with that sheet (#2
 Small round-ended buttons side by side, the chosen one lit: `SURFACE` unlit; lit, 25% of the
 accent mixed in with a `LINE_MID` accent edge and the words in the accent. Height `H_CHIP`, radius
 `R_CHIP`, sides `S7`, gaps `S4` - both shrinking to fit `room`, as far as half. Each
-chip's tap carries its index. History's spans are its client; #92's chart options can be.
+chip's tap carries its index. History's spans were its client until #92 gave them the compact
+selector; it stays in the kit for a choice that wants plain chips (#92's chart options can be).
 
 ### List item - `Kit::item(parent)`
 
@@ -136,6 +137,14 @@ the accent. An ACTION (the window's Power) sits on a ribbon of its own before th
 selector never lands on it. The spec gives the choices' icons, the chosen one, the action, whether
 it is quiet (a paused window), what to ask before anything moves (`blocked`) and what to call when
 the selector arrives (`onChosen`). `Kit::Selector` is its state, kept by the caller while it shows.
+Up to four choices (`SELECTOR_MAX`).
+
+**Compact** (`spec.compact`, #92): the same selector a span chip's height (`H_CHIP`), its choices
+**words** in the label face (`TAG`; the chosen one on the selector in `NAME`, a size up) and no
+action - one option chosen from a short list on a line of text. Each choice is as wide as the
+widest word and its sides (`S7`); `spec.room` makes the sides shrink to fit, as far as `S1`.
+History's span buttons are its first user (the chart's 24 / 12 / 6 / 1 h, activity's 24 h / 7 d),
+in place of the chip row; "Show span buttons" still turns them off.
 
 Its **four looks** (Black or Silver, Square or Round) are per scheme and saved (K36, K45):
 `Kit::selectorLook()`, `Kit::keepSelectorLook()`. Its face, and a lit icon button's, is a **face

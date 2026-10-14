@@ -260,6 +260,7 @@ struct HistView {
     uint8_t  legend = LEGEND_BOTH;
     bool     chips = true;       // the span buttons on the chart
     bool     actChips = true;    // and on activity
+    Kit::Selector spanSel;       // the span buttons: a compact selector (#92), while it shows
     bool     causes = true;      // activity's "by ..." lines (Show triggers)
     bool     duration = false;   // activity's "for: 2 hrs 38 min" lines (Show duration)
     bool     more = false;       // "Show more" was tapped
@@ -408,7 +409,7 @@ void histCorner(lv_obj_t *o, lv_align_t where);
 void histTopMiddle(lv_obj_t *row, int32_t room = 0);
 void histDraw();
 void histPoll();
-void spanChipCb(lv_event_t *ev);
+void histSpanChosen(uint8_t i);
 void histShowingCb(lv_event_t *ev);
 void histMoreCb(lv_event_t *ev);
 void histRowCb(lv_event_t *ev);

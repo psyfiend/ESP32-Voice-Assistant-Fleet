@@ -96,7 +96,7 @@ void histFillCb(lv_event_t *ev);
 int32_t histX(uint32_t t);
 float histNice(float raw);
 lv_obj_t *histVLine(lv_obj_t *parent, lv_point_precise_t *pts, int32_t x, uint32_t col, int32_t width);
-void spanChipCb(lv_event_t *ev);
+void histSpanChosen(uint8_t i);
 void histMoreCb(lv_event_t *ev);
 void histRowCb(lv_event_t *ev);
 void histSyncPanel();   // below, with the panels: the left panel's rows follow the view
@@ -151,12 +151,21 @@ void histAsk() {
 
 // --- The chart -------------------------------------------------------------
 
-// The span chips (Kit::chipRow()): the chart's four spans, or activity's two
-// (owner, round 2), the chosen one lit. `room`: the most width they may take
-// (0, any).
+// The span buttons: the chart's four spans, or activity's two (owner, round
+// 2). THE CONTROL DECK'S SELECTOR, COMPACT (owner, 2026-10-14; #92): the same
+// eye candy as the light's controls, a span chip's height, so the chart and
+// the log keep their room. `room`: the most width it may take (0, any).
 lv_obj_t *histChips(lv_obj_t *parent, int32_t room) {
-    return s_hv.chart ? Kit::chipRow(parent, HIST_SPAN_CHIP, HIST_SPANS, s_hv.span, room, spanChipCb)
-                      : Kit::chipRow(parent, HIST_PERIOD_CHIP, HIST_PERIODS, s_hv.period, room, spanChipCb);
+    Kit::SelectorSpec sp = {};
+    const char *const *words = s_hv.chart ? HIST_SPAN_CHIP : HIST_PERIOD_CHIP;
+    sp.n = s_hv.chart ? HIST_SPANS : HIST_PERIODS;
+    for (uint8_t i = 0; i < sp.n && i < Kit::SELECTOR_MAX; i++) sp.glyph[i] = words[i];
+    sp.chosen   = s_hv.chart ? s_hv.span : s_hv.period;
+    sp.compact  = true;
+    sp.room     = room;
+    sp.onChosen = histSpanChosen;
+    Kit::selector(s_hv.spanSel, parent, sp);
+    return s_hv.spanSel.obj;
 }
 
 // THE TOP LINE (owner, rounds 5 and 6), one shape for the chart and activity,
@@ -257,8 +266,9 @@ void histPoll() {
     if (s_hist->doneSeq() != s_hv.drawnSeq) histDraw();
 }
 
-void spanChipCb(lv_event_t *ev) {
-    const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+// The selector has arrived on span i (it glides there on a tap, or snaps
+// there when let go).
+void histSpanChosen(uint8_t i) {
     if (s_hv.chart) {
         if (i == s_hv.span || i >= HIST_SPANS) return;
         s_hv.span = i;
@@ -271,7 +281,7 @@ void spanChipCb(lv_event_t *ev) {
     }
     histSyncPanel();
     histAsk();
-    lv_async_call([](void *) { histDraw(); }, nullptr);   // the chip's own row is redrawn
+    lv_async_call([](void *) { histDraw(); }, nullptr);   // the selector's own row is redrawn
 }
 
 // "Showing: ..." tapped: the next span, round again after the last.
