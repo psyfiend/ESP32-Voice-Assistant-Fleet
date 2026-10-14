@@ -6,6 +6,28 @@ signed-off merges to `main` in the order they happen - it does not follow milest
 began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
+## v0.2.13 - 2026-10-14
+
+2.12 - the UI foundation: the card window's code rebuilt into a foundation for 2.8 and 2.11, with
+nothing changed on screen (DECISIONS K71-K74, D-10, W13; `docs/design/ui-architecture.md`).
+
+- **A safety net**: `GET /popup?tree=` prints every LVGL object with its style as LVGL resolves it;
+  `scripts/ui_golden.py` walks 46 states per board and compares object trees and screenshots, telling
+  the house's own changes apart.
+- **The card window split by concern**: `CardPopup.cpp`'s 6,325 lines into `src/Cards/Popup/`.
+- **Shape tokens in millimetres** (`UIShape`): no number left in the window's code.
+- **The component kit** (`Kit::`): each look a role - shared styles that follow the colour scheme;
+  buttons, dialogs, chip rows, list items, panel rows, folder panels, the selector.
+- **The Sheet**: every window's frame is one component; "About this board" is its second client
+  (`/popup?about=1`, debug builds).
+- **A layout engine**: the dashboard's placement as `Layout::FlowEngine`, pure C++, with 17 tests
+  that run on the PC (`host-tests/`).
+- **Tools**: `scripts/structure_check.py` (with every gate, W13); `scripts/release/gate.ps1` fixed for
+  Windows PowerShell 5.1; `docs/HTTP_REFERENCE.md`, every route on the boards and what it changes.
+- Each phase proved by A/B on WS_P4_5, WS_P4_4B and CYD_P4_1060: no tree or pixel differences. The
+  window builds ~3.5 ms faster. All nine environments build through the gate. Signed off by the
+  owner (`docs/archive/TEST_2.12.md`); the 4B dialog's overlapping buttons, present before, are #96.
+
 ## v0.2.12 - 2026-10-13
 
 K17 - a group's member made a card of its own, and what its testing found (DECISIONS K65-K70).

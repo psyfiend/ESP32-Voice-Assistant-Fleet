@@ -86,7 +86,8 @@ Also from run 1, after the merge: Entity properties and About this board with bo
 aligned, the gap between them halved.
 
 Answers:
-- Q1: what it asks, explained again in plain terms - open.
+- Q1: yes, merge them ("I doubt I'd even notice the difference") - after the merge, with
+  before/after pictures (#97).
 - Q2: the system panel, as a button on the row with Log | Tokens | Cards (after the merge).
 - Q3: WSL, as recommended; Claude makes the case for any install first.
 - Q4: yes - W13 accepted.
@@ -96,3 +97,8 @@ Answers:
   text inside that hidden label, never seen.
 - Q7: yes - `gate.ps1` fixed: stderr is logged and the exit code decides. Re-run 2026-10-14: all
   nine SUCCESS in 10 min 35 s, `platformio.ini` restored with its local lines.
+
+**Signed off by the owner, 2026-10-14**: U1-U5 accepted (DECISIONS K71-K74, D-10), merge as
+`v0.2.13`. Filed for after the merge: #96 (T9's dialog buttons), #97 (the run-1 asks and the token
+merges), #98 (`/panel?flash`), #99 (a quieter glass finish), #100 (NINA's clock as a hero card);
+notes added to #92 (the selector as History's span buttons) and #23 (the countdown on the dialog).

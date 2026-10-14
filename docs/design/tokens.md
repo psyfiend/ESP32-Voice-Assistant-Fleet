@@ -305,8 +305,11 @@ The spacing literals clustered into ten steps from 0.6 to 5.0 mm; four sat betwe
 names of their own. Several tokens share a value (`R_BUTTON` and `R_PANEL`; `H_CONTROL`, `H_CHIP`,
 `H_TABS` and `W_SIDE_MIN`): they are different roles, and stay separate so one can change alone.
 
-**Merge candidates - the owner's to decide.** Each merge is a look change, small but real. Pixels
-before line minimums, on WS_P4_5 / WS_P4_4B / CYD_P4_1060 (294 / 255 / 170 PPI):
+**Merge candidates - the owner said merge them** (2026-10-14, TEST_2.12 Q1: "I doubt I'd even notice
+the difference"). Each merge is a look change, small but real, so they go on their own branch after
+2.12, with before/after pictures from the harness; `S_MEMBERS` and the two radii are looked at on
+glass before they are chosen. Pixels before line minimums, on WS_P4_5 / WS_P4_4B / CYD_P4_1060
+(294 / 255 / 170 PPI):
 
 | Candidate | Now | Merged | Recommendation |
 |---|---|---|---|

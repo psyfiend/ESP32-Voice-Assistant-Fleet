@@ -1,8 +1,11 @@
-# UI foundation - the refactor before 2.8 (milestone 2.12, proposed 2026-10-13)
+# UI foundation - the refactor before 2.8 (milestone 2.12)
 
-**Status: PROPOSED, the owner's to approve phase by phase.** Written by Claude at the end of K17,
-from the owner's questions about how portable and data-driven the UI code is. This file is the
-brief for the session that does the work: read all of it before touching code.
+**Status: DONE - merged as `v0.2.13` on 2026-10-14, signed off by the owner
+(`docs/archive/TEST_2.12.md`).** This file is now the milestone's record: why it was done, the brief,
+and §6, how each phase was proved to change nothing. **For how the UI is built today, read
+`docs/design/ui-architecture.md`**; the layout engines' design (§8 here until 2.12 closed) is
+`docs/design/layout-engines.md`. Written by Claude at the end of K17, from the owner's questions
+about how portable and data-driven the UI code is.
 
 ---
 
@@ -286,7 +289,7 @@ fourteen sizes, three finger-travel distances, and ten hero values in P4_5 milli
 literals replaced; no `mm(<number>)` or `pm(<number>)` is left in the window's code - the sparks'
 dice are named constants beside the effect, and the one remaining number (a 1 px outline) says why.
 Its own struct rather than `UIMetrics` as the brief said: `tokens.md` §7 gives the reasons, and
-DECISIONS U2 proposes it. "Any repeated durations": the window's are already named constants, each
+DECISIONS U2 proposed it (accepted 2026-10-14 as K72). "Any repeated durations": the window's are already named constants, each
 used in one place, so none moved.
 
 Checks: WS_P4_5 and WS_S3_4B build; **no tree or pixel differences against `p1` or `p0c` on all
@@ -424,8 +427,9 @@ outside the kit, colour literals outside the tokens, numbers where a shape token
 outside the kit in 26 files (the cards, the panels, the header - the window's own files have 1-36
 each, its hero and chart); 44 colour literals in 4 files (the two status widgets, the card icons,
 and the window's colour-picker mark, white and black on every scheme); **no shape numbers; no LVGL
-in the core layers.** The docs: HANDOFF, ROADMAP, DECISIONS (U1-U5, W13 proposed), CLAUDE.md, this
-section, and the owner's sheet `docs/TEST_2.12.md`.
+in the core layers.** The docs: HANDOFF, ROADMAP, DECISIONS (U1-U5 and W13 proposed; accepted 2026-10-14 as K71-K74,
+D-10 and W13), CLAUDE.md, this
+section, and the owner's sheet (`docs/archive/TEST_2.12.md` since the merge).
 
 **All nine environments compile** from the committed configuration. `scripts/release/gate.ps1`
 built the five P4s (7B 37.1% of flash, P4_5 40.8%, 4B 39.1%, 1060 36.9%, 4880 37.5%) and then
@@ -441,53 +445,12 @@ nine SUCCESS through the gate, in 10 min 35 s**.
 
 Each phase leaves the board looking and behaving exactly as at `v0.2.12`; the proof is the
 harness's tree comparison and the screenshots. After P6 there is one short test sheet,
-`docs/TEST_2.12.md`: look at everything, it should be unchanged; its questions Q1-Q7 gather what
+`docs/archive/TEST_2.12.md`: look at everything, it should be unchanged; its questions Q1-Q7 gather what
 each phase left for you. What you get: a dialog is one call, a config window is a list
 of views, a radius is one token, and 2.11's clusters and bento packing have a place to live.
 
 ## 8. The layout engines - design for 2.11 (P5)
 
-P5 built the interface and the one engine the dashboard has always had; what follows is the design
-2.11 builds on it. Nothing here is decided: each is a proposal for the interview.
-
-**The interface** (`include/Layout/Layout.h`, pure C++, tested off the board in `host-tests/`): a
-`Container` is a grid of units; an `Item` has the span it would like and the least it will accept, an
-optional pinned spot and a priority; an `Engine` takes the container and the items and writes a
-`Place` for each - where it went, or that it did not fit. `FlowEngine` is today's: pins first, then
-reading order, the widest span that fits at the first free spot, the lowest priority dropped until
-the rest fit. CardPage turns its cards into items, asks the engine, and lays out what comes back.
-New engines are new classes; a page chooses one.
-
-**A cluster is a container inside an item.** On the page, a cluster (a group panel, `group-cards.md`
-§5.3) is one item, its span from its member count (or declared). Inside it, an engine runs again on
-the cluster's own sub-grid - its span in units less its frame - with the members as items, each a
-unit or two (a member drawn without its own border, compact). The page places the cluster as it
-places a card; the cluster places its members as the page places cards. Same interface, a smaller
-container; the flow engine works there unchanged.
-
-**The packing ("bento") engine.** What it must be: DENSE (no holes a smaller card could fill),
-DETERMINISTIC (the same items give the same layout, every boot) and STABLE (one card more or less
-moves as few others as possible - a layout that reshuffles itself is worse than one with a hole).
-How: items sorted by area, largest first, ties by declaration order; each placed where it leaves the
-least unusable space (a maximal-rectangles packer on the unit grid), trying spans from preferred
-down to least; and stability from the LAST layout - each item first tries its previous place
-(`Place` kept per card id, K33, in the settings file), and only those that no longer fit are packed
-afresh. Priority still decides who leaves when nothing fits. Testable off the board: the same input
-twice gives the same output; one item added moves at most the items after it.
-
-**The domain weight map.** Which cards earn space: a weight per card - its domain's (climate and
-media heavier than a lone sensor), times how much it is used (taps counted in the settings file) -
-turned into a target area, spans chosen within each card's least and preferred. The weights are
-data (a table beside the tokens, a page able to override them), never code.
-
-**The primary-region page.** One hero region - a room's main light, its climate - takes a fixed share
-(a 2x2 at the top left, or a column), and the rest of the page is flowed or packed around it: the
-container split into regions, each region its own engine run. A card is put in the region by a
-`primary` flag in its spec.
-
-**Orbital.** A page arranged around a centre - the room as one large card, its devices around it,
-heaviest nearest: positions by distance from the centre cell, ring by ring, clockwise from the top.
-For the large panels; on a grid too small for a ring it falls back to flow.
-
-Each is a class implementing `Layout::Engine`, pure, with host tests for its properties before it
-draws anything.
+Moved on 2026-10-14 to **`docs/design/layout-engines.md`**, a live design document for 2.11 (the
+interface, clusters, the packing engine, the weight map, the hero region the owner's NINA clock and
+music player need, orbital pages).

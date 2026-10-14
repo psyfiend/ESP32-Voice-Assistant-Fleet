@@ -194,7 +194,7 @@ flag of its own). `src/PanelDebug.cpp`, `PanelDebug.h` (2.10c round 9, 2.10d).
 > test sheet ran `flash=20` and `flash=8&kb=256` on the P4_5 (`archive/TEST_2.10d.md`, F2-F3): if
 > that board lost its settings afterwards, this is why. Not changed in 2.12 (it changes no
 > behaviour); a fix is the owner's to choose - the NVS mode alone, or a test region LittleFS does
-> not use.
+> not use (#98).
 
 ```
 curl "http://fleet-ws-p4-4b/panel"

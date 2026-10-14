@@ -11,6 +11,7 @@ elsewhere, and it is worth checking those first for "is X already known or plann
 | Doc | Answers |
 |---|---|
 | `docs/HANDOFF.md` | Where we left off, what to know that the other docs do not say. **Start here.** |
+| `docs/design/ui-architecture.md` | **How the UI is built**: the layers, where things live, the rules, how to change it and prove nothing broke. Read before any UI work |
 | `docs/ROADMAP.md` | What we are building, in what order, what is done - and **where each kind of note belongs** |
 | `docs/DECISIONS.md` | Every decision that shapes later work, one line each, pointing at its reasoning |
 | `CHANGELOG.md` | What each tagged version contains |

@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 // LAYOUT (2.12 P5) - where things go on a grid, as plain arithmetic: no LVGL,
 // no Arduino, no ESP-IDF, so it runs - and is tested - anywhere (host-tests/).
-// docs/design/ui-foundation.md section 8.
+// docs/design/layout-engines.md.
 //
 // An ENGINE takes a CONTAINER (a grid of units: columns and rows) and the
 // ITEMS to place in it - each with the span it would like and the least it

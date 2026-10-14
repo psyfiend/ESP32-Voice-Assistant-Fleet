@@ -191,7 +191,7 @@ One sheet shows at a time (`Kit::sheetShowing()`).
 | Client | What it adds to the frame |
 |---|---|
 | The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity |
-| "About this board" (`UI/AboutSheet`, debug builds: `GET /popup?about=1`) | one view of fact rows - the board, its screen and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second; no tabs, no panels |
+| "About this board" (`UI/AboutSheet`; debug builds today, `GET /popup?about=1`; to become a button on the system panel's Log / Tokens / Cards row in every build, K74, #97) | one view of fact rows - the board, its screen and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second; no tabs, no panels |
 
 The second client is ~130 lines and owns no frame code: that is the point of it. Where it belongs
 in the product (the system panel?) is the owner's call; until then it is behind `DEBUG_POPUP`.
