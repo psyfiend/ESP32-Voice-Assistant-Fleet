@@ -147,6 +147,7 @@ uint8_t rowsWanted(const Item *items, uint8_t n, uint8_t cellCols, uint8_t sub) 
     if (!sub) sub = 1;
     if (!cellCols) cellCols = 1;
     uint16_t cells = 0;
+    uint8_t  tallest = 1;
     for (uint8_t i = 0; i < n; i++) {
         if (!items[i].present) continue;
         const uint8_t sx = items[i].prefSpanX ? items[i].prefSpanX : sub;
@@ -156,8 +157,15 @@ uint8_t rowsWanted(const Item *items, uint8_t n, uint8_t cellCols, uint8_t sub) 
         const uint8_t cx = (uint8_t)((sx + sub - 1) / sub);
         const uint8_t cy = (uint8_t)((sy + sub - 1) / sub);
         cells = (uint16_t)(cells + cx * cy);
+        if (cy > tallest) tallest = cy;
     }
     uint16_t rows = (uint16_t)((cells + cellCols - 1) / cellCols);
+    // AND AT LEAST AS MANY AS THE TALLEST ITEM ASKS FOR (#100): a lone card two
+    // cells tall on a wide page has the area of one row there, and was laid
+    // out on one row - placement clamps a span to the rows it is given, so it
+    // came out half its height. No card before the clock asked for more than
+    // one cell of height, so no page before it changes.
+    if (rows < tallest) rows = tallest;
     if (rows < 1) rows = 1;
     return (uint8_t)(rows > 255 ? 255 : rows);
 }
