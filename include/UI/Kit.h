@@ -166,10 +166,17 @@ lv_obj_t *chipRow(lv_obj_t *parent, const char *const *words, uint8_t n, uint8_t
                   lv_event_cb_t cb);
 
 // --- Facts --------------------------------------------------------------------------
-// A FACT ROW: what something is, dim, on the left, and its value on the right,
-// wrapping if long ("-" when there is none) - a read-only list such as an
-// entity's Properties or "About this board". Returns the value's label.
+// A FACT LIST: a read-only list such as an entity's Properties or "About this
+// board" - the whole of `parent`, scrolling if it must, a row per fact.
+// A FACT ROW: what something is, dim, and its value beside it, wrapping if
+// long ("-" when there is none). Both left aligned (#97). Returns the value's
+// label. A fact list holds fact rows only.
+// FACT COLUMNS, once the rows are in: the words' column as wide as the longest
+// words in the list (at most half of it; longer words wrap), so every value
+// starts at the same place.
+lv_obj_t *factList(lv_obj_t *parent);
 lv_obj_t *factRow(lv_obj_t *list, const char *what, const char *value);
+void      factColumns(lv_obj_t *list);
 
 // --- List items -----------------------------------------------------------------
 // A tappable surface in a list (a member, an activity row, "Show more"): the

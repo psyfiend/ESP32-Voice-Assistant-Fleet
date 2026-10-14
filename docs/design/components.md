@@ -157,10 +157,15 @@ loaded one. `KS_SWATCH`: a round colour swatch with a hairline edge (the colour 
 The pictures are WS_P4_5 in Midnight, cut from the harness's screenshots
 (`scripts/ui_golden.py crop`).
 
-### Fact row - `Kit::factRow(list, what, value)`
+### Facts - `Kit::factList(parent)`, `Kit::factRow(list, what, value)`, `Kit::factColumns(list)`
 
-What something is, dim, on the left, and its value on the right, wrapping if long ("-" when there
-is none): an entity's Properties, "About this board".
+A read-only list: an entity's Properties, "About this board". `factList()` makes the list (the
+whole of its parent, scrolling if it must, `S10` sides, `S5` between rows); `factRow()` adds what
+something is, dim, and its value beside it, wrapping if long ("-" when there is none); once the
+rows are in, `factColumns()` makes the words' column as wide as the longest words in that list (at
+most half of it), so **both columns are left aligned** and every value starts at one place. The
+gap between the columns is `S5` (1.6 mm), half of the `S8` it was (owner, TEST_2.12; #97). A value
+that wraps keeps to its column, its words at its first line. A fact list holds fact rows only.
 
 ---
 

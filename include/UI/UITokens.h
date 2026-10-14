@@ -118,14 +118,15 @@ struct UIShape {
     float S3;           // 1.0  clear of a corner chip; between activity rows; a tab a millimetre short
     float S4;           // 1.2  the window's padding; a pill's sides; History's rows; carets from the edge
     float S5;           // 1.6  under the header row; a label and its pill; swatches; a dropdown's
-                        //      sides; a panel's first and last row; Properties' rows
+                        //      sides; a panel's first and last row; a fact list's rows, and the
+                        //      gap between its two columns (#97: half of S8's)
     float S6;           // 2.0  the window clear of the system header and the tabs; the break before
                         //      the deck's modes; activity's two columns
     float S7;           // 2.4  a panel's sides; a row button's sides; a dialog's rows, and its
                         //      buttons' spacing where they share a narrow row
-    float S8;           // 3.0  Properties' two columns; a time label's elbow room
+    float S8;           // 3.0  a time label's elbow room
     float S9;           // 4.0  a panel row's words and its control; a dialog's padding
-    float S10;          // 5.0  activity's and Properties' sides
+    float S10;          // 5.0  activity's and a fact list's sides
     // Off the scale - each a step's near neighbour (tokens.md 7):
     float S_MEMBERS;    // 1.4  Members' rows: their padding and gaps (between S4 and S5)
     float S_GUTTER;     // 1.5  the header row's gaps; the chart's gutters (almost S5)
