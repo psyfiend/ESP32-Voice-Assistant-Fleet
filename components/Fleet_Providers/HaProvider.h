@@ -127,6 +127,9 @@ private:
     uint32_t              _scenesForSession = 0;
     std::atomic<uint32_t> _tplId{0};
     std::atomic<bool>     _tplDone{false};
+    // Members were learnt after this session's query went (#93): their areas
+    // and devices were never asked, so the query goes once more when it is done.
+    bool                  _askAgain = false;
 
     uint16_t _handled    = 0;
     uint16_t _unmatched  = 0;
