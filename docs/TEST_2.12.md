@@ -75,4 +75,23 @@ a scheme change, the auto-close, the sparks, a reboot.
 
 ## Your results
 
-(none yet)
+**Run 1 (owner, 2026-10-14): T1-T8 and T10-T12 PASS. T9 FAIL** - on the 4B the dialog's two
+buttons overlap. **Present at `v0.2.12`**: the baseline captured before the refactor
+(`test/golden/WS_P4_4B/p0c/desk_dialog.png`) shows the same overlap, and every phase kept it exactly,
+as the zero-change rule says. Cause: each button is a fixed 24 mm (`W_DIALOG_BTN`) - 241 px at the
+4B's 255 PPI - and two of them (482 px) do not fit the 4B dialog's 362 px button row, so the row
+lays them over each other. To fix after the merge: the buttons share the row's width, 24 mm at most.
+
+Also from run 1, after the merge: Entity properties and About this board with both columns left
+aligned, the gap between them halved.
+
+Answers:
+- Q1: what it asks, explained again in plain terms - open.
+- Q2: the system panel, as a button on the row with Log | Tokens | Cards (after the merge).
+- Q3: WSL, as recommended; Claude makes the case for any install first.
+- Q4: yes - W13 accepted.
+- Q5: yes - each role arrives with its first user.
+- Q6: **withdrawn** - Claude's misreading. On the 4B the window hides the "All Lamps >" part of the
+  title in Members for lack of room, so it shows "Members", which is right; "All Lamp..." is the
+  text inside that hidden label, never seen.
+- Q7: yes - `gate.ps1` fixed: stderr is logged and the exit code decides.

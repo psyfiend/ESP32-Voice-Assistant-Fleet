@@ -31,6 +31,7 @@ How to use it:
 | W10 | **Guards that run, not rules that are read**: a Claude Code PreToolUse hook (`scripts/hooks/claude_guard.py`) refuses destructive git and delete commands in every session and subagent; deny rules guard the secrets headers; a git pre-commit hook refuses the local debug lines, control bytes and secrets; GitHub protects `main` from force push and deletion. Claude keeps push and merge (owner) | 2026-10-13 | owner; CLAUDE.md "Guards" |
 | W11 | **Subagents**: read-only work to the read-only `explorer` / `auditor` agents; a writing subagent only on files nobody else touches, in a worktree; builds, flashing, git and shared edits stay with the main session | 2026-10-13 | owner; CLAUDE.md "Subagents" |
 | W12 | **Only the owner merges**: `main` takes changes only through a pull request (GitHub ruleset, 0 approvals, merge commits only); Claude opens the PR, the owner clicks Merge in the browser, Claude tags and flashes after. The guard refuses `gh pr merge`, pushes to `main`, and API writes to merges, rulesets and refs; version tags cannot be deleted or moved. The guard is also installed as managed settings, where Claude cannot edit it. Supersedes W10's "Claude keeps push and merge" for `main` | 2026-10-13 | owner; CLAUDE.md "Guards" |
+| W13 | **A structure check runs with every all-nine gate** (`scripts/structure_check.py`): it reports files over 1,000 lines, `lv_obj_set_style_*` outside the kit, colour literals outside the tokens, numbers where a shape token belongs, and LVGL in `SystemCore` / `SystemReport`; it never fails a build, and the merge report quotes it - so drift is seen at 1,000 lines rather than at 6,000 | 2026-10-14 | owner (TEST_2.12 Q4); `ui-foundation.md` §6 (P6) |
 | W9 | Real lights while testing: any Office light may be commanded and is put back as found; ask before anything in the Kitchen | 2026-10-06 | HANDOFF |
 
 ## Platform and architecture
@@ -156,8 +157,8 @@ How to use it:
 
 The UI foundation refactor (`docs/design/ui-foundation.md`) makes structural choices the brief left
 open. Each is built and verified (no tree or pixel differences on three boards), and each is a
-**proposal** until the owner accepts it; accepted, it moves to its area with a K or A number (W13
-to the W rows).
+**proposal** until the owner accepts it; accepted, it moves to its area with a K or A number. (W13,
+proposed here too, was accepted on 2026-10-14 and is with the W rows.)
 
 | # | Proposal | Date | Where |
 |---|---|---|---|
@@ -166,4 +167,3 @@ to the W rows).
 | U3 | **The component kit** (`Kit::`, `include/UI/Kit.h`): a component takes a role, and a role is shared `lv_style_t`s refilled on every repaint (`UI::onRepaint()`), so components follow the scheme as the chrome does; the caller places it and owns what changes (local properties). Button roles only as they get users (CANCEL, DESTRUCTIVE today). The selector's looks and faces are the kit's | 2026-10-13 | `components.md` |
 | U4 | **Every window is a Sheet** (`include/UI/Sheet.h`): the frame - placement, header row, auto-close, the quiet build, the modal tap catcher, both folder panels, the sparks - is the kit's, and a window is a client giving a `SheetSpec` and its views; one shows at a time. The card window is the first client; "About this board" (debug builds) the second, its place in the product the owner's to choose | 2026-10-13 | `components.md` §3 |
 | U5 | **Placement is a `Layout::Engine`** (`include/Layout/Layout.h`, pure C++): `CardPage` hands its cards over as items and lays out the places it gets back; the dashboard's flow rules are `FlowEngine`, moved unchanged; 2.11's clusters, packing, weight map and orbital pages are further engines. **Pure modules are tested on the PC** in `host-tests/`, a PlatformIO project of its own, so the firmware's environments and the gate never need a host compiler | 2026-10-13 | `ui-foundation.md` §6 (P5), §8 |
-| W13 | **A structure check runs with every all-nine gate** (`scripts/structure_check.py`): it reports source files over 1,000 lines, `lv_obj_set_style_*` outside the kit, colour literals outside the tokens, numbers where a shape token belongs, and LVGL in `SystemCore` / `SystemReport`; it never fails a build, and the merge report quotes it - so drift is seen at 1,000 lines rather than at 6,000 | 2026-10-13 | `ui-foundation.md` §6 (P6) |

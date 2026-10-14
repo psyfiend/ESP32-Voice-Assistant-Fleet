@@ -511,7 +511,7 @@ panels, the selector, icon buttons and label roles are the kit's, and a new scre
   clients. One sheet shows at a time.
 - **`python scripts/structure_check.py` says where the code is drifting** - files over 1,000 lines,
   style calls outside the kit, colour literals, shape numbers, LVGL in the core layers. It reports
-  and never fails; run it with the all-nine gate and quote it in the merge report (W13, proposed).
+  and never fails; run it with the all-nine gate and quote it in the merge report (W13).
   The card window grew to 6,325 lines in one file because nothing counted.
 
 ### UI scale is derived from pixel density, not declared

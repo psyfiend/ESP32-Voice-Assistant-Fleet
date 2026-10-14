@@ -272,7 +272,9 @@ Findings for the owner, none changed (zero-change rule):
 - `rowLive()` (SETTINGS rows) has been unused since K70.
 - **WS_P4_4B: All Lamps' Members view titles "All Lamp..." when opened straight from a fresh
   window**, and "All Lamps >" when reached through Properties first - present at `v0.2.12` (seen in
-  the baselines). The DOT-label trap of 2.10c round 7 (LESSONS), on another path.
+  the baselines). The DOT-label trap of 2.10c round 7 (LESSONS), on another path. **Withdrawn
+  2026-10-14** (owner, TEST_2.12 Q6): on the 4B that label is hidden in Members for lack of room,
+  and the window shows "Members", which is right - the truncated text is never seen.
 - The auditor's inventory also found two stale comments (the sparks' run time, SETTINGS' most rows)
   and `setFace()` declared twice; fixed in P2. The round selector is drawn two ways (the control
   deck's and SETTINGS'); that is P3's Selector.
@@ -413,7 +415,7 @@ For the owner (P5):
   it wants, but as one unit when it places (`rowsWanted()` and `placeOne()`, both as they were). No
   card sets 0 (`CardPlacement` defaults to 2), so it shows nowhere today.
 
-**P6 - DONE (2026-10-13).** The hand-off. `scripts/structure_check.py` (proposed as W13, to run
+**P6 - DONE (2026-10-13).** The hand-off. `scripts/structure_check.py` (W13, accepted 2026-10-14, to run
 with every all-nine gate; it reports and never fails): files over 1,000 lines, `lv_obj_set_style_*`
 outside the kit, colour literals outside the tokens, numbers where a shape token belongs, LVGL in
 `SystemCore` / `SystemReport` - skipping the generated font faces and headers, `third_party/` and

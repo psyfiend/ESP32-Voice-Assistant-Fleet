@@ -31,10 +31,16 @@ anything on/off as its activity - from HA; the owner's choices saved by card id 
 0. **2.12 UI foundation: BUILT 2026-10-13, all seven phases, on `refactor/ui-foundation`; the pull
    request is open and waits for the owner.** Nothing should look or behave differently - the
    harness compared every window, view, panel and dialog at every phase (`docs/design/ui-foundation.md`
-   §6, phase by phase). **The owner tests by `docs/TEST_2.12.md`** (T1-T12, and questions Q1-Q7
-   with recommendations) on the P4_5, the 4B and the 1060, which run the branch; the proposals to
-   accept are U1-U5 and W13 in `DECISIONS.md`. On sign-off: the CHANGELOG entry (`v0.2.13`) and the
-   sheet to `archive/`, on the branch; the owner merges; then `git pull`, tag `v0.2.13`, flash.
+   §6, phase by phase). **Owner's run 1 (2026-10-14, `docs/TEST_2.12.md`): all PASS but T9**, the
+   4B dialog's overlapping buttons, which `v0.2.12` already had; Q2-Q7 answered (W13 accepted, the
+   gate fixed); Q1 re-asked; U1-U5 still the owner's to accept. On sign-off: the CHANGELOG entry
+   (`v0.2.13`) and the sheet to `archive/`, on the branch; the owner merges; then `git pull`, tag
+   `v0.2.13`, flash. **After the merge, in this order:** T9's dialog buttons (they share the row,
+   24 mm at most); the owner's run-1 asks - About this board as a button on the system panel's
+   Log | Tokens | Cards row, Entity properties / About with both columns left aligned and the gap
+   halved, the countdown bar thinner (1-2 px) and on the window's bottom edge; then the ideas in
+   the owner's 2026-10-14 notes (the selector for the span buttons, #92; a quieter "glass" for
+   things that can be tapped; the dialog's own countdown, with #23) - discussed before building.
 1. **What 2.12 leaves for the next work:** a window is a `Kit::Sheet` built from the component kit
    (`include/UI/Kit.h`, `Sheet.h`; `docs/design/components.md`, with pictures); the window's sizes
    are `UIShape` millimetres (`tokens.md` §7); the dashboard's placement is `Layout::FlowEngine`
@@ -299,12 +305,11 @@ path prefix) has `DEBUG_POPUP` and `DEBUG_FRAMES` on `WS_P4_TOUCH_LCD_5`.
   which has held LittleFS and the settings file since 2.10d - very likely every saved setting
   lost at the next boot. Found 2026-10-13 writing `docs/HTTP_REFERENCE.md` (every route, what it
   reads and changes); the fix is the owner's to choose.
-- **`scripts/release/gate.ps1` stops at the first S3 environment under Windows PowerShell 5.1**
-  (the only PowerShell here; 2026-10-13): with `$ErrorActionPreference = "Stop"`, the S3 linker's
-  warning on stderr (`missing .note.GNU-stack section`) becomes a terminating `NativeCommandError`.
-  Its `finally` still restores `platformio.ini`. Until the owner approves a fix - `"Continue"`
-  around the `& $pio run` line, the result still read from `$LASTEXITCODE` (TEST_2.12 Q7) - compile
-  the S3 four directly: the local debug lines touch only P4 environments, so it is the same config.
+- **Windows PowerShell 5.1 (the only one here) makes a native program's stderr fatal under
+  `$ErrorActionPreference = "Stop"`.** It stopped `scripts/release/gate.ps1` at the first S3 (its
+  linker warns on stderr) on 2026-10-13; fixed 2026-10-14 with the owner's OK (TEST_2.12 Q7) -
+  `"Continue"` around the build, its exit code the result. Any new script that runs `pio` needs the
+  same.
 - **Native-USB boards and a PC:** `Serial.setTxTimeoutMs(0)` in `main.cpp` is what stops them
   freezing when the port is held open unread. Do not remove it.
 - **A serial monitor resets the board when it opens.** Attach with `--rts 0 --dtr 0`, or read the
