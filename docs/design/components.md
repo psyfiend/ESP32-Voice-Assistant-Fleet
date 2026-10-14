@@ -176,7 +176,7 @@ that wraps keeps to its column, its words at its first line. A fact list holds f
 **A window over the page, from a spec.** It is the card window's frame, made a component: placed
 in the middle of the screen (under the system header, over the panels' tabs, up to twice as wide
 as tall, at most `W_WINDOW_MAX`, clear of the sides - `Kit::sheetPlace()`), with a header row (a
-close or back button, a title in two parts, tabs on the right), a stage, the auto-close bar, sparks
+close or back button, a title in two parts, tabs on the right), a stage, the countdown bar, sparks
 now and then along its edge, and two folder panels under it - SETTINGS on the right and the view's
 own options on the left. It is modal: a tap outside closes it (the tap catcher, made once at
 `Kit::sheetBegin()`), and while a panel is open a tap in the window only folds the panel. It is
@@ -193,10 +193,17 @@ rows go. The left panel is shown per view with `Kit::sheetSide(S, kind, title, r
 (`struct Popup : Kit::Sheet`), so the window's code reads `s.win`, `s.stage`, `s.right` as before.
 One sheet shows at a time (`Kit::sheetShowing()`).
 
+**The countdown bar** (`Kit::countdownBar(box, boxW)`, `Kit::countdownSet(bar, leftMs)`; #97,
+#23): how long until the sheet closes itself (60 s untouched, `Kit::sheetLeftMs()`). A line
+`H_BAR` thin - 2 px at 294 and 255 PPI, 1 px at 170 - in the accent (`KS_SHEET_BAR`), on the box's
+bottom edge inside its border and between its rounded corners, shrinking toward its middle. The
+window has one; the Remove dialog, which closes with the window, shows the same over it. Its on/off
+and the timeout's length are device settings for 4.1 (#23).
+
 | Client | What it adds to the frame |
 |---|---|
 | The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity |
-| "About this board" (`UI/AboutSheet`; debug builds today, `GET /popup?about=1`; to become a button on the system panel's Log / Tokens / Cards row in every build, K74, #97) | one view of fact rows - the board, its screen and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second; no tabs, no panels |
+| "About this board" (`UI/AboutSheet`; every build, from the About button on the system panel's Log / Tokens / Cards / About row, K74, #97; debug builds also `GET /popup?about=1`) | one view of fact rows - the board, its screen and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second; no tabs, no panels |
 
 The second client is ~130 lines and owns no frame code: that is the point of it. Where it belongs
 in the product (the system panel?) is the owner's call; until then it is behind `DEBUG_POPUP`.

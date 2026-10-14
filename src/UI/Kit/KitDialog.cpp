@@ -3,8 +3,21 @@
 // into "Sure?" was easy to overlook. Rare, so the dim's one full-screen redraw
 // is worth it here.
 #include "UI/Kit.h"
+#include "UI/Sheet.h"
 
 namespace Kit {
+
+// ANYTHING THAT CLOSES ITSELF SAYS SO THE SAME WAY (owner, 2026-10-14; #23): a
+// dialog that goes with the sheet under it shows that sheet's countdown bar,
+// kept in step by a timer of its own that goes with the bar.
+static void barTick(lv_timer_t *t) {
+    const Sheet *S = sheetShowing();
+    countdownSet((lv_obj_t *)lv_timer_get_user_data(t), S ? sheetLeftMs(*S) : 0);
+}
+
+static void barGone(lv_event_t *e) {
+    if (lv_timer_t *t = (lv_timer_t *)lv_event_get_user_data(e)) lv_timer_delete(t);
+}
 
 // A tap on the dim itself - not on the box, which takes its own taps - is the
 // spec's `outside`, kept in the dim's user data.
@@ -53,6 +66,13 @@ lv_obj_t *dialog(const DialogSpec &spec) {
     const int32_t btnW = n ? LV_MIN(UI::mm(UI::shape().W_DIALOG_BTN), (rowW - (n + 1) * gap) / n) : 0;
     for (uint8_t i = 0; i < n; i++)
         button(row, spec.buttons[i].role, spec.buttons[i].text, btnW, UI::minTouch(), spec.buttons[i].cb);
+
+    if (const Sheet *S = spec.countdown ? sheetShowing() : nullptr) {
+        lv_obj_t *bar = countdownBar(box, spec.width);
+        countdownSet(bar, sheetLeftMs(*S));
+        lv_timer_t *t = lv_timer_create(barTick, SHEET_TICK_MS, bar);
+        lv_obj_add_event_cb(bar, barGone, LV_EVENT_DELETE, t);
+    }
     return dim;
 }
 

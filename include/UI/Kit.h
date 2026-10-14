@@ -260,6 +260,7 @@ struct DialogSpec {
     uint8_t       nButtons;
     int32_t       width;        // px; the height follows the words
     lv_event_cb_t outside;
+    bool          countdown;    // it closes with the sheet under it: show that sheet's countdown (#23)
 };
 
 // Returns the dim, which holds everything: deleting it closes the dialog.
