@@ -1,4 +1,4 @@
-# Handoff — 2026-10-13 (K17 DONE as `v0.2.12`; next: 2.12 UI foundation, the refactor - `design/ui-foundation.md`)
+# Handoff — 2026-10-13 (2.12 UI foundation BUILT on `refactor/ui-foundation`, PR open for the owner's test and merge)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works. This file is only: where we are, what to do
 next, what will bite you, and how to work with the owner. It was rewritten from scratch on
@@ -28,18 +28,19 @@ anything on/off as its activity - from HA; the owner's choices saved by card id 
 
 ## What is next
 
-0. **2.12 IN PROGRESS (2026-10-13, branch `refactor/ui-foundation`)** - the live notes are in
-   `docs/design/ui-foundation.md` section 6 ("Progress"); P0-P5 are done and verified there, each
-   pushed as its own commit (P5 on the P4_5 and the 4B only: the 1060 is down - "Boards on the
-   desk"). P6, the hand-off, is next.
-
-1. **2.12 UI foundation - the refactor** (proposed by Claude, asked for by the owner 2026-10-13).
-   **The brief, the roadmap and the working rules: `docs/design/ui-foundation.md` - read all of
-   it first.** In short: `src/Cards/CardPopup.cpp` is 6,325 lines in one file with half its shapes
-   as literals; P0 a safety net (`/popup?tree=1` + a golden-screenshot harness, baseline at
-   `v0.2.12`), P1 split it by concern, P2 shape and spacing tokens, P3 a component kit, P4 the
-   window as a reusable Sheet, P5 the layout engine interface, P6 the hand-off - **no look or
-   behaviour change**, on `refactor/ui-foundation`, never merged without the owner.
+0. **2.12 UI foundation: BUILT 2026-10-13, all seven phases, on `refactor/ui-foundation`; the pull
+   request is open and waits for the owner.** Nothing should look or behave differently - the
+   harness compared every window, view, panel and dialog at every phase (`docs/design/ui-foundation.md`
+   §6, phase by phase). **The owner tests by `docs/TEST_2.12.md`** (T1-T12, and questions Q1-Q7
+   with recommendations) on the P4_5, the 4B and the 1060, which run the branch; the proposals to
+   accept are U1-U5 and W13 in `DECISIONS.md`. On sign-off: the CHANGELOG entry (`v0.2.13`) and the
+   sheet to `archive/`, on the branch; the owner merges; then `git pull`, tag `v0.2.13`, flash.
+1. **What 2.12 leaves for the next work:** a window is a `Kit::Sheet` built from the component kit
+   (`include/UI/Kit.h`, `Sheet.h`; `docs/design/components.md`, with pictures); the window's sizes
+   are `UIShape` millimetres (`tokens.md` §7); the dashboard's placement is `Layout::FlowEngine`
+   (`ui-foundation.md` §8 designs 2.11's engines on it); pure modules have tests on the PC
+   (`host-tests/`); `scripts/structure_check.py` reports drift. #92 (the span chips as the
+   control deck's selector) can now reuse `Kit::selector()`.
 2. **The design interview §3 onward** (below), then 2.8 header slots (#19), then 2.11 group cards
    with the page arranger (#66, #78). `ROADMAP.md`'s running order.
 
@@ -219,7 +220,7 @@ without asking.
 | `WS_P4_5` | COM15 (CH343 `5B90154141`) | dev board; **screwed into its enclosure** - no battery test |
 | `WS_P4_4B` | COM7 (CH343 `5AAF289419`) | P4 rev v1.0 (`esptool read-mac`), the only one on a CH343 |
 | `WS_P4_7B` | COM6 (native USB) | **needs two USB cables** or it browns out on boot |
-| `CYD_P4_1060` | COM9 (native USB, serial `30:ED:A0:E3:2C:7B`) | also needs two cables; its log names it. **Down since 2026-10-13 ~17:43**: a flash lost USB after erasing the app (3.5% written), and COM9 dropped out of Windows - replug it, check the second cable, then flash it (`ui-foundation.md` §6, P5) |
+| `CYD_P4_1060` | COM9 (native USB, serial `30:ED:A0:E3:2C:7B`) | also needs two cables; its log names it. **Flash it at 460800 and end with `--after watchdog-reset`**: on 2026-10-13 two 1.5 Mbaud uploads lost its USB, the second leaving it dark; BOOT held while plugging in, then a watchdog reset, brought it back (LESSONS) |
 | `CYD_P4_4880` | COM19 (native USB) | LiPo fitted; browned out on the PC's USB alone |
 | `WS_S3_4B` | COM8 (CH343 `5A67166678`, not probed) | the slow dev target; `Serial` is native USB, not the CH343. **Locked up 2026-10-05** - #69 |
 | `CYD_S3_3248` | - | **USB broken** (2026-09-28); out of commission |
@@ -240,7 +241,8 @@ size - not a CR1220). S3_5B's 927 holder is unconfirmed. Nothing reads an RTC ye
    decision in one line) - both short.
 3. `docs/LESSONS.md` — before debugging anything.
 4. For UI work: `docs/design/interview-phase2-3.md`, `card-sheet.md`, `cards.md` §13, `pages.md`,
-   `card-layout.md` (before moving anything inside a card), `tokens.md`, `dashboard.md`,
+   `card-layout.md` (before moving anything inside a card), `tokens.md`, `components.md` (the
+   kit and the Sheet), `ui-foundation.md` (§8: the layout engines), `dashboard.md`,
    `ha-websocket.md`, `startup.md`.
 5. For the display: `docs/display/README.md` only - it indexes the rest.
 
@@ -284,7 +286,21 @@ path prefix) has `DEBUG_POPUP` and `DEBUG_FRAMES` on `WS_P4_TOUCH_LCD_5`.
 - **Do not edit source while a build runs** - it compiles the half-finished edit. Docs are safe.
 - **Never set build flags through `PLATFORMIO_BUILD_FLAGS`** - it wiped `.pio/build` mid-build. Put
   them in `platformio.ini`.
-- **`PYTHONIOENCODING=utf-8` before any `pio` whose output you pipe**, or it dies silently.
+- **`PYTHONIOENCODING=utf-8` before any `pio` whose output you pipe**, or it dies silently - and
+  an unattended upload gets a `timeout` (one sat for two hours, LESSONS).
+- **The UI harness** (`scripts/ui_golden.py`, `ui-foundation.md` §6): never two runs at one board
+  (each turns the sparks off and on); compare A and B captured minutes apart, and capture a state
+  again both ways when the house changed under it. A window closes itself after a minute, so a
+  board whose screenshots are slow fails its walk - the 1060 took ~40 s a screenshot on the
+  afternoon it went down.
+- **Host tests: `wsl bash host-tests/run_in_wsl.sh`** - Windows has no compiler for
+  `pio test -d host-tests` (`host-tests/README.md`).
+- **`scripts/release/gate.ps1` stops at the first S3 environment under Windows PowerShell 5.1**
+  (the only PowerShell here; 2026-10-13): with `$ErrorActionPreference = "Stop"`, the S3 linker's
+  warning on stderr (`missing .note.GNU-stack section`) becomes a terminating `NativeCommandError`.
+  Its `finally` still restores `platformio.ini`. Until the owner approves a fix - `"Continue"`
+  around the `& $pio run` line, the result still read from `$LASTEXITCODE` (TEST_2.12 Q7) - compile
+  the S3 four directly: the local debug lines touch only P4 environments, so it is the same config.
 - **Native-USB boards and a PC:** `Serial.setTxTimeoutMs(0)` in `main.cpp` is what stops them
   freezing when the port is held open unread. Do not remove it.
 - **A serial monitor resets the board when it opens.** Attach with `--rts 0 --dtr 0`, or read the

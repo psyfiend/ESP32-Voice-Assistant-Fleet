@@ -900,3 +900,14 @@ and `mdi:lamp-outline` had never been measured. Nothing failed loudly - a glyph 
 falls through to the kind's icon. **When a feature widens what can reach the screen, widen the
 measurement with it** - the scan now follows the declared groups' members, and the font carries
 every MDI icon the owner's HA serves (~66 glyphs, ~40-120 KB a board, with ~4 MB free).
+
+## A dark screen after a good flash: the chip may still be in download mode (2.12, 2026-10-13)
+
+The CYD_P4_1060 lost its USB link twice during 1.5 Mbaud uploads, the second time after erasing
+its app: no backlight, no HTTP, COM9 gone. The owner held BOOT while plugging it in, COM9 came
+back, and the app flashed and verified at 460800 baud - and the screen stayed black. **It was
+still in the ROM bootloader**: `esptool --before no-reset --after no-reset chip-id` connected
+without a reset, which only the bootloader answers. esptool's RTS hard reset does not take this
+native-USB P4 out of a download mode its BOOT pin forced; **`--after watchdog-reset` does** - the
+app was up 20 s later. So, for a native-USB board that will not flash: the BOOT button, a slower
+baud, and a watchdog reset at the end.

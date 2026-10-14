@@ -388,20 +388,23 @@ first, the narrowest span tried first - each failed exactly the test written for
 
 Checks, by A/B - the P4 firmware captured, then this build flashed and captured, minutes apart:
 **no tree or pixel differences on WS_P4_5** (46 states, `p4b`/`p5a`) **and WS_P4_4B** (43 states;
-`house_page` and `desk_temp` showed the house changing between the captures - Office's light on,
-Kitchen's off, two temperatures - and were captured again both ways, the P2 image against this
-build, `p2h`/`p5b`: no differences). Every card on both pages sits where it did, which is what this
+`house_page` and `desk_temp` showed the house changing between the captures - Office's lights on,
+Kitchen's off, a temperature reading, and Desk's color temperature, which moved the marker on its
+strip - and were captured again both ways, the P2 image against this build, `p2h`/`p5b`: no
+differences). Every card on both pages sits where it did, which is what this
 phase could have moved. Window build times on WS_P4_5, fastest of 9, within 0.3 ms of P4 on every
 window (Desk 32.7, Deck 27.2, North 26.2, Overhead 28.1, All Lamps 33.0, Lamp 1 29.8 ms); LVGL's
 pool per window unchanged. WS_S3_4B builds - with `DEBUG_CARDS` on, so the `Events` callbacks
 compile there; RAM identical, flash +424 B.
 
-**CYD_P4_1060 is not checked, and is down.** Its walks failed twice part-way ("the window closed
-before its screenshot": its screenshots, ~6 s a state earlier in the day, took ~40 s), then two
-flashes lost its USB link - the second after erasing the app region, so it holds 3.5% of an app and
-does not boot, and Windows has dropped its port (COM9). It needs hands: replug it, check its second
-power cable (it browns out on one - HANDOFF), then flash it. Nothing in P5 is specific to the 1060;
-its A/B is still owed.
+**CYD_P4_1060: no differences either** (46 states, the restored P2 image against this build,
+`p2i`/`p5c`; each window opened ~4 ms faster, P4's gain). Getting there cost an hour: its walks
+failed twice part-way ("the window closed before its screenshot" - its screenshots, ~6 s a state
+earlier, took ~40 s), then two 1.5 Mbaud flashes lost its USB link, the second after erasing the
+app, which left it dark and its port gone. The owner held BOOT while plugging it in; the P2 image
+then flashed at 460800 but the screen stayed dark - the chip was still in the ROM bootloader, and
+only `--after watchdog-reset` started the app (LESSONS). After that power cycle its walks ran at
+their usual pace, and P5 went on the same way: the app at 460800, a watchdog reset.
 
 For the owner (P5):
 - **A compiler on the PC** for `pio test` is an install, so it is yours (MSYS2 or WinLibs, README in
@@ -410,11 +413,33 @@ For the owner (P5):
   it wants, but as one unit when it places (`rowsWanted()` and `placeOne()`, both as they were). No
   card sets 0 (`CardPlacement` defaults to 2), so it shows nowhere today.
 
+**P6 - DONE (2026-10-13).** The hand-off. `scripts/structure_check.py` (proposed as W13, to run
+with every all-nine gate; it reports and never fails): files over 1,000 lines, `lv_obj_set_style_*`
+outside the kit, colour literals outside the tokens, numbers where a shape token belongs, LVGL in
+`SystemCore` / `SystemReport` - skipping the generated font faces and headers, `third_party/` and
+`lv_conf.h`, and saying how many it skipped. Its first report, at the end of 2.12: **two files over
+1,000 lines** (`GUIManager.cpp` 1,538, `Card.cpp` 1,462 - neither the window's); 531 style calls
+outside the kit in 26 files (the cards, the panels, the header - the window's own files have 1-36
+each, its hero and chart); 44 colour literals in 4 files (the two status widgets, the card icons,
+and the window's colour-picker mark, white and black on every scheme); **no shape numbers; no LVGL
+in the core layers.** The docs: HANDOFF, ROADMAP, DECISIONS (U1-U5, W13 proposed), CLAUDE.md, this
+section, and the owner's sheet `docs/TEST_2.12.md`.
+
+**All nine environments compile** from the committed configuration. `scripts/release/gate.ps1`
+built the five P4s (7B 37.1% of flash, P4_5 40.8%, 4B 39.1%, 1060 36.9%, 4880 37.5%) and then
+stopped at the first S3: under Windows PowerShell 5.1, with `$ErrorActionPreference = "Stop"`, the
+S3 linker's warning on stderr (`missing .note.GNU-stack section`) is a terminating error. Its
+`finally` restored `platformio.ini` as designed. The four S3s were compiled directly - the local
+debug lines touch only the three P4 environments, so their config is the committed one: WS_S3_4B
+34.3%, CYD_S3_3248 35.1%, WS_S3_5B 36.4%, CYD_S3_8048 35.3%. The script is unchanged; its one-line
+fix is the owner's to approve (TEST_2.12 Q7, HANDOFF).
+
 ## 7. For the owner
 
 Each phase leaves the board looking and behaving exactly as at `v0.2.12`; the proof is the
-harness's tree comparison and the screenshots. After P6 there is one short test sheet: look at
-everything, it should be unchanged. What you get: a dialog is one call, a config window is a list
+harness's tree comparison and the screenshots. After P6 there is one short test sheet,
+`docs/TEST_2.12.md`: look at everything, it should be unchanged; its questions Q1-Q7 gather what
+each phase left for you. What you get: a dialog is one call, a config window is a list
 of views, a radius is one token, and 2.11's clusters and bento packing have a place to live.
 
 ## 8. The layout engines - design for 2.11 (P5)
