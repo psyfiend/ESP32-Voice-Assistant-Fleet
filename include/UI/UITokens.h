@@ -121,7 +121,8 @@ struct UIShape {
                         //      sides; a panel's first and last row; Properties' rows
     float S6;           // 2.0  the window clear of the system header and the tabs; the break before
                         //      the deck's modes; activity's two columns
-    float S7;           // 2.4  a panel's sides; a row button's sides; a dialog's rows
+    float S7;           // 2.4  a panel's sides; a row button's sides; a dialog's rows, and its
+                        //      buttons' spacing where they share a narrow row
     float S8;           // 3.0  Properties' two columns; a time label's elbow room
     float S9;           // 4.0  a panel row's words and its control; a dialog's padding
     float S10;          // 5.0  activity's and Properties' sides
@@ -154,7 +155,7 @@ struct UIShape {
     float W_WINDOW_MAX; // 100  the widest a window gets (a hand's span)
     float W_ROWS_MAX;   // 70   activity's rows at most
     float W_DIALOG_MAX; // 90   a dialog at most
-    float W_DIALOG_BTN; // 24   a dialog's buttons
+    float W_DIALOG_BTN; // 24   a dialog's buttons, at most: narrower, they share the row (#96)
     float SWATCH;       // 6.5  a colour swatch; the least height of a scene button
     float CARET_W;      // 2.4  a panel's caret
     float CARET_H;      // 1.0

@@ -42,9 +42,17 @@ lv_obj_t *dialog(const DialogSpec &spec) {
     lv_obj_t *row = plain(box);
     lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
     add(row, KitStyle::KS_DIALOG_ROW);
-    for (uint8_t i = 0; i < spec.nButtons && i < 2; i++)
-        button(row, spec.buttons[i].role, spec.buttons[i].text, UI::mm(UI::shape().W_DIALOG_BTN),
-               UI::minTouch(), spec.buttons[i].cb);
+    // THE BUTTONS SHARE THE ROW (#96): W_DIALOG_BTN each where it fits, else an
+    // equal share of the row. The row spaces them evenly, so what is left over
+    // goes into n + 1 spaces: a share leaves S7 between and beside them. The
+    // row is the box less its padding and border, read from the box's role.
+    const uint8_t n    = LV_MIN(spec.nButtons, (uint8_t)2);
+    const int32_t rowW = spec.width - lv_obj_get_style_space_left(box, LV_PART_MAIN)
+                                    - lv_obj_get_style_space_right(box, LV_PART_MAIN);
+    const int32_t gap  = UI::mm(UI::shape().S7);
+    const int32_t btnW = n ? LV_MIN(UI::mm(UI::shape().W_DIALOG_BTN), (rowW - (n + 1) * gap) / n) : 0;
+    for (uint8_t i = 0; i < n; i++)
+        button(row, spec.buttons[i].role, spec.buttons[i].text, btnW, UI::minTouch(), spec.buttons[i].cb);
     return dim;
 }
 
