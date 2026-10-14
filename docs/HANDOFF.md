@@ -1,4 +1,4 @@
-# Handoff — 2026-10-14 (2.12 UI foundation merged as `v0.2.13`; next: the owner's UI follow-ups)
+# Handoff — 2026-10-14 (`v0.2.13`; the UI follow-ups built on `feat/ui-followups`, waiting for the owner)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -40,26 +40,27 @@ on the kit yet - bring each over when it is next changed (`ui-architecture.md` �
 
 ## What is next
 
-The owner's order (2026-10-14): small UI follow-ups first, each its own branch off `main`, each
-checked on glass by itself; then the interview and the next milestones.
+**Built unattended on 2026-10-14 (the owner's overnight brief), waiting for the owner:**
 
-1. **#96** - the Remove dialog's buttons overlap on the 4B (fixed 24 mm each, the row is narrower):
-   share the row's width, 24 mm at most.
-2. **#97** - the owner's asks from the 2.12 test: "About this board" as a button on the system
-   panel's Log | Tokens | Cards row (every build, K74); Entity properties and About with both
-   columns left aligned and the gap halved; the countdown bar 1-2 px on the window's bottom edge;
-   the seven near-equal shape tokens merged, with before/after pictures (K72).
-3. **#92** - the control deck's selector, in a compact size, as History's span buttons (chart and
-   activity) - `Kit::selector()` is ready for it.
-4. **#99** - a quieter "glass" finish for things that can be tapped but are not selected; **a mock
-   first** for the owner to react to; measure frames on an S3 before using it widely.
-5. **#23** - the countdown on the Remove dialog too; its settings (on/off, length) wait for 4.1.
-6. **#98** - `/panel?flash=N` erases the settings partition: the owner picks the fix (a task chip
-   for it was offered in the 2.12 session). **Until then, never run it without `&nvs=1`.**
-7. Then **the design interview §3 onward**, **2.8** header slots (#19), **2.11** group cards with
-   the page arranger (#66, #78) - whose hero region (`layout-engines.md`) is what **#100, NINA's
-   multi-face clock**, and a music player wait for (a side project; NINA's code is
-   non-commercial-use only, `REFERENCE_PROJECTS.md`). `ROADMAP.md`'s running order.
+1. **`feat/ui-followups`** (PR_UI) - #96 the dialog's buttons share a narrow row; #97 About in every
+   build (a button on the system panel), fact lists in two left-aligned columns, the countdown bar
+   2 px on the window's edge, the near-equal tokens merged; #23 the Remove dialog shows the bar;
+   #92 History's span buttons are the selector, compact (K75); #98 the flash test NVS-only (A16).
+   One commit each. The sheet: **`docs/TEST_UI_FOLLOWUPS.md`** - tests, before/after pictures, and
+   **Q1-Q7**. Two need the owner first: **Q1, the P4_5 lost its settings file** during the run (a
+   copy from 00:26 exists; not restored), and Q3/Q4, which candidate for Members' spacing and the
+   controls' radius (1.6 mm built for both).
+2. **#99** - a quieter "glass" finish: the mock **"Glass, Satin, Flat"**
+   (https://claude.ai/artifact/G5XANwGMdgWKR19HS1ZQvj, linked on #99): glass, satin and flat on the
+   real elements - Members, scenes, the Remove dialog, Power on and off - each pressed, Midnight at
+   the P4_5's window. **The owner likes satin and agreed its uses** (K77); glass only where
+   something asks for attention. Nothing built; a kit role each, frames measured on an S3 first.
+3. **#100** - NINA's clock: PR_CLOCK.
+
+Then **the design interview §3 onward**, **2.8** header slots (#19), **2.11** group cards with the
+page arranger (#66, #78) - whose hero region (`layout-engines.md`) is where #100's clock and a music
+player belong (NINA's code is non-commercial-use only, `REFERENCE_PROJECTS.md`). `ROADMAP.md`'s
+running order.
 
 **After any merge**: `git pull`, tag the merge commit (annotated, `vX.Y.Z - <milestones>`), push the
 tag, flash the boards on the desk. The CHANGELOG entry and the archived test sheet go on the branch
@@ -120,7 +121,9 @@ Fill and Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
 | `CYD_S3_3248` | - | USB broken (2026-09-28) |
 | `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in |
 
-The P4_5, 4B and 1060 run the 2.12 build (with the local lines). Ports move when boards are
+The P4_5, 4B and 1060 run `feat/ui-followups` (with the local lines). **The P4_5's settings file
+was lost on 2026-10-14** (TEST_UI_FOLLOWUPS Q1): it runs on the dashboard's defaults until restored.
+Ports move when boards are
 re-plugged: `Get-CimInstance Win32_PnPEntity | ? Name -match 'COM\d+' | select Name, DeviceID`.
 **Is a board alive?** Ask Home Assistant (`sensor.<device>_uptime`), not the cable. While developing,
 build and flash the P4_5 (plus the S3_4B compile); while the owner tests, the P4_5 alone unless the
@@ -179,6 +182,9 @@ no compiler (the owner's choice to install one, `host-tests/README.md`).
 - **Do not edit source while a build runs** - it compiles the half-finished edit. Docs are safe.
 - **`/panel?flash=N` keeps only its NVS mode** (#98, `feat/ui-followups`): without `&nvs=1` it is
   refused. A build older than that branch still erases the settings partition - never run it there.
+- **Save a board's `/settings` before flashing it** (`curl -o`): on 2026-10-14 the P4_5 booted with
+  its LittleFS formatted after an app-only flash, cause unknown (TEST_UI_FOLLOWUPS Q1). The file is
+  plain JSON; nothing else on the board holds those choices.
 - **The harness**: never two runs at one board; the 1060 alone (it is slow). A window closes itself
   after a minute.
 - **A serial monitor resets the board when it opens** - attach with `--rts 0 --dtr 0`, or read it

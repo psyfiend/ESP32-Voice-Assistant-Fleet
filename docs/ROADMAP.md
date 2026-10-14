@@ -56,7 +56,7 @@ levels arrive with 2.10c), **#47** discovery payload size, **#48** reason 36.
 | 2.9 | Display stack: esp_lcd (**#67**) | six of nine boards, merged 2026-09-29; left: CYD_S3_8048, WS_S3_5B - `display/README.md` |
 | 2.10 | Card popup (**#65**) | **DONE 2026-10-12.** 2.10a `v0.2.8`; 2.10b `v0.2.9`; 2.10c `v0.2.10` (HA light levels, members of HA groups, scenes, the window redesigned - `design/card-sheet.md` §14-16). **2.10d + 2.10e `v0.2.11`** (merged together, K51): stable ids and saving (§17), History from HA - charts and activity (§18). Sheets in `archive/`. Left over, filed: #90, #91, #92 (K17 done, `v0.2.12`) |
 | 2.11 | Group cards (**#66**) | not started - with the page arranger (#78; its engines: `design/layout-engines.md`); must land before 3.1 |
-| 2.12 | UI foundation - the refactor | **DONE 2026-10-14, `v0.2.13`** - the card window rebuilt on a foundation (safety net, the split, `UIShape`, the component kit, the Sheet, `Layout::FlowEngine` with host tests, the structure check), nothing changed on screen. How it is built: `design/ui-architecture.md`; the record: `design/ui-foundation.md`. Follow-ups #96, #97 |
+| 2.12 | UI foundation - the refactor | **DONE 2026-10-14, `v0.2.13`** - the card window rebuilt on a foundation (safety net, the split, `UIShape`, the component kit, the Sheet, `Layout::FlowEngine` with host tests, the structure check), nothing changed on screen. How it is built: `design/ui-architecture.md`; the record: `design/ui-foundation.md`. Follow-ups #96, #97: **built on `feat/ui-followups`, waiting for the owner's look** (`TEST_UI_FOLLOWUPS.md`) |
 
 ## Phase 3 — Build sheet
 
@@ -99,10 +99,12 @@ The numbers above are identity, not sequence. Agreed with the owner:
 1. ~~**2.10d + 2.10e, one merge**~~ - DONE, `v0.2.11`; ~~**K17**~~ (a group's member as a card of
    its own) - DONE, `v0.2.12`.
 2. ~~**2.12 UI foundation - the refactor**~~ - DONE, `v0.2.13`.
-3. **The UI follow-ups from 2.12's test** (owner, 2026-10-14), each its own branch and look on
-   glass: #96 the dialog's buttons, #97 the owner's asks and the token merges, #92 the selector as
-   History's span buttons, #99 a quieter glass (a mock first), #23 the dialog's countdown; #98 when
-   the owner picks its fix.
+3. **The UI follow-ups from 2.12's test** (owner, 2026-10-14): #96 the dialog's buttons, #97 the
+   owner's asks and the token merges, #92 the selector as History's span buttons, #23 the dialog's
+   countdown, #98 the NVS-only flash test - **built together on `feat/ui-followups`** (one commit
+   each, the owner's overnight brief), its sheet `TEST_UI_FOLLOWUPS.md`, waiting for the owner's look
+   and two choices (Members' spacing, the controls' radius). #99 a quieter glass: a mock artifact
+   first. #100 NINA's clock: a prototype card on `feat/100-nina-clock`, its own PR.
 4. **The design interview §3 onward** (`design/interview-phase2-3.md`), then **2.8** header slots (#19).
 5. **2.11 group cards with the page arranger** (#66, #78; prototype: artifact "Layout Playground";
    engines: `design/layout-engines.md`). Its hero region is what #100 (NINA's clock) waits for.
