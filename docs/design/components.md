@@ -175,9 +175,11 @@ A read-only list: an entity's Properties, "About this board". `factList()` makes
 whole of its parent, scrolling if it must, `S10` sides, `S5` between rows); `factRow()` adds what
 something is, dim, and its value beside it, wrapping if long ("-" when there is none); once the
 rows are in, `factColumns()` makes the words' column as wide as the longest words in that list (at
-most half of it), so **both columns are left aligned** and every value starts at one place. The
-gap between the columns is `S5` (1.6 mm), half of the `S8` it was (owner, TEST_2.12; #97). A value
-that wraps keeps to its column, its words at its first line. A fact list holds fact rows only.
+most half of it) and **centres the two columns**: both left aligned, and the room the longest words
+and the longest value leave is shared equally - the same space from each wall and between the
+columns (owner, TEST_2.12 and this branch's first build; #97). Values too long for that get `S5`
+each way, and wrap in their column, their words at the first line. A fact list holds fact rows
+only.
 
 ---
 

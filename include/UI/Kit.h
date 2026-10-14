@@ -179,8 +179,9 @@ lv_obj_t *chipRow(lv_obj_t *parent, const char *const *words, uint8_t n, uint8_t
 // long ("-" when there is none). Both left aligned (#97). Returns the value's
 // label. A fact list holds fact rows only.
 // FACT COLUMNS, once the rows are in: the words' column as wide as the longest
-// words in the list (at most half of it; longer words wrap), so every value
-// starts at the same place.
+// words in the list (at most half of it), the values' as wide as the longest
+// value, the two CENTRED - the space left over shared equally between the
+// walls and the gap (S5 at least; a long value wraps in its column).
 lv_obj_t *factList(lv_obj_t *parent);
 lv_obj_t *factRow(lv_obj_t *list, const char *what, const char *value);
 void      factColumns(lv_obj_t *list);

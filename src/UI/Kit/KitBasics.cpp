@@ -40,8 +40,7 @@ lv_obj_t *factList(lv_obj_t *parent) {
 
 // TWO LEFT-ALIGNED COLUMNS (owner, TEST_2.12): the words, then the value
 // beside them - a value that wraps keeps to its column, the words at its first
-// line. The gap between them is half what it was (S8 3.0 mm, now S5 1.6, the
-// nearest step). factColumns() then gives every row's words one width.
+// line. S5 between them until factColumns() centres the two and spaces them.
 lv_obj_t *factRow(lv_obj_t *list, const char *what, const char *value) {
     lv_obj_t *r = plain(list);
     lv_obj_set_size(r, lv_pct(100), LV_SIZE_CONTENT);
@@ -57,19 +56,34 @@ lv_obj_t *factRow(lv_obj_t *list, const char *what, const char *value) {
     return b;
 }
 
+// THE TWO COLUMNS, CENTRED (owner, 2026-10-14, on this branch's first build):
+// both left-justified, the words as wide as the longest words, the values as
+// wide as the longest value, and the room left over shared equally - the same
+// space from each wall and between the two. Values too long to leave room for
+// that: the space is S5 each way, and a value wraps in its column.
+static int32_t labelW(lv_obj_t *l) {
+    return l ? textW(lv_label_get_text(l), lv_obj_get_style_text_font(l, LV_PART_MAIN)) + 1 : 0;
+}
+
 void factColumns(lv_obj_t *list) {
     if (!list) return;
     lv_obj_update_layout(list);
-    const int32_t most = lv_obj_get_content_width(list) / 2;
+    const int32_t full = lv_obj_get_width(list);
     const uint32_t n = lv_obj_get_child_count(list);
-    int32_t w = 0;
+    int32_t words = 0, values = 0;
     for (uint32_t i = 0; i < n; i++) {
-        lv_obj_t *a = lv_obj_get_child(lv_obj_get_child(list, (int32_t)i), 0);
-        if (a) w = LV_MAX(w, textW(lv_label_get_text(a), lv_obj_get_style_text_font(a, LV_PART_MAIN)) + 1);
+        lv_obj_t *r = lv_obj_get_child(list, (int32_t)i);
+        words  = LV_MAX(words,  labelW(lv_obj_get_child(r, 0)));
+        values = LV_MAX(values, labelW(lv_obj_get_child(r, 1)));
     }
-    w = LV_MIN(w, most);
-    for (uint32_t i = 0; i < n; i++)
-        if (lv_obj_t *a = lv_obj_get_child(lv_obj_get_child(list, (int32_t)i), 0)) lv_obj_set_width(a, w);
+    words = LV_MIN(words, full / 2);
+    const int32_t space = LV_MAX(UI::mm(UI::shape().S5), (full - words - values) / 3);
+    lv_obj_set_style_pad_hor(list, space, 0);
+    for (uint32_t i = 0; i < n; i++) {
+        lv_obj_t *r = lv_obj_get_child(list, (int32_t)i);
+        lv_obj_set_style_pad_column(r, space, 0);
+        if (lv_obj_t *a = lv_obj_get_child(r, 0)) lv_obj_set_width(a, words);
+    }
 }
 
 lv_obj_t *item(lv_obj_t *parent) {
