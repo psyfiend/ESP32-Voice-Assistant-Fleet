@@ -178,11 +178,33 @@ LWT only fires on an ungraceful drop; disable the library's auto-reconnect and o
 Also the claim behind #41: *NVS writes run with the CPU cache disabled, which can starve the
 esp-hosted SDIO transport* — unverified for us, and it affects four of our eight boards.
 
-### `clock_dial.h` and the clock pages — see #35
+### `clock_dial.h` and the clock pages — see #35, #100
 
 Seven named editorial layouts, each with a fixed palette deliberately independent of the global
 theme. Geometry factored into a pure, header-only, host-tested file with no LVGL or ESP-IDF
 dependency — a practice worth adopting generally.
+
+**Taken, 2026-10-14 (#100's prototype, `feat/100-nina-clock`), with credit and the
+non-commercial condition in every file:** `clock_dial.h`'s two functions ported as they are to
+`include/Clock/ClockMath.h` / `src/Clock/ClockMath.cpp` (pure; NINA's host-test cases kept in
+`host-tests/test/test_clock`), with the Classic face's words; the Classic face's layout and
+palette in `src/Cards/ClockCard.cpp` and `src/Clock/ClockPalettes.cpp` - time and date only, no
+weather yet. NINA's converted `lv_font_*.c` faces were **not** taken. Its faces read
+`localtime_r()` like ours; there is no NINA time service to port.
+
+**Fonts for it, from the foundry** (Google Fonts, SIL OFL 1.1), downloaded 2026-10-14 from Google's
+font service as single-weight WOFF files, kept with their licences in `assets/fonts/` and converted
+by `scripts/gen_clock_fonts.py` (lv_font_conv, only the glyphs drawn):
+
+| File | Face | Licence | Converted to |
+|---|---|---|---|
+| `PlayfairDisplay-Bold.woff` | Playfair Display 700 | OFL, Reserved Font Name "Playfair Display" (`PlayfairDisplay-OFL.txt`) | `fleet_clock_digits_80/104/132` - '-', '0'-'9', ':' |
+| `OverpassMono-Light.woff` | Overpass Mono 300 | OFL (`OverpassMono-OFL.txt`) | `fleet_clock_label_16/22` - space, '0'-'9', 'A'-'Z' |
+
+Playfair Display's figures are **old-style** by default; NINA's Classic face uses lining figures
+from a modified copy (`PlayfairDisplay-Bold-Lining.ttf`, not taken - a modified font may not keep
+the reserved name). Lining figures mean applying the font's `lnum` feature before converting
+(fontTools - an install, the owner's call).
 
 ### Scope worth noticing
 
