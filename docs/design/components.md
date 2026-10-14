@@ -1,12 +1,13 @@
-# The component kit (2.12 P3)
+# The component kit and the Sheet (2.12 P3, P4)
 
 **Status: built and verified 2026-10-13** - the card window is built from it, and the harness found
 no tree or pixel difference against 2.12 P2 (`ui-foundation.md` §6). Companion to `tokens.md` (the
 values the kit reads) and `card-sheet.md` (what the window is).
 
-The kit is `include/UI/Kit.h` and `src/UI/Kit/`. It is the layer between the tokens and a screen:
-a screen asks for a dialog, a row of chips or a panel of rows, and the kit builds it in the house
-style. The card window is its first client; the Sheet (P4) and #92's chart options are the next.
+The kit is `include/UI/Kit.h`, `include/UI/Sheet.h` and `src/UI/Kit/`. It is the layer between the
+tokens and a screen: a screen asks for a dialog, a row of chips, a panel of rows or a whole window
+(the Sheet, §3), and the kit builds it in the house style. The card window is its first client,
+"About this board" its second; #92's chart options can be the next.
 
 ---
 
@@ -33,11 +34,11 @@ object's user data, so the events carry what they always carried.
 
 **What it costs.** An object using a shared style holds one 8-byte entry in its style list
 instead of a copy of every property: a window costs ~180 B less of LVGL's pool, and an open panel
-or History view 1-2.5 KB less (§4). The styles themselves take ~880 B of the pool once, at boot.
+or History view 1-2.5 KB less (§5). The styles themselves take ~880 B of the pool once, at boot.
 
 **Where styles may be set.** In the kit, and in the builders of what no component draws yet -
-the window's hero (toggle, slider, disc), the chart, the sparks, the window frame (the Sheet,
-P4). `scripts/structure_check.py` (P6) reports any other `lv_obj_set_style_*` call.
+the card window's hero (toggle, slider, disc), its chart and its activity list.
+`scripts/structure_check.py` (P6) reports any other `lv_obj_set_style_*` call.
 
 ---
 
@@ -156,16 +157,53 @@ loaded one. `KS_SWATCH`: a round colour swatch with a hairline edge (the colour 
 The pictures are WS_P4_5 in Midnight, cut from the harness's screenshots
 (`scripts/ui_golden.py crop`).
 
+### Fact row - `Kit::factRow(list, what, value)`
+
+What something is, dim, on the left, and its value on the right, wrapping if long ("-" when there
+is none): an entity's Properties, "About this board".
+
 ---
 
-## 3. Not in the kit
+## 3. The Sheet - `include/UI/Sheet.h` (2.12 P4)
+
+![The Sheet's second client, About this board](components/about.png)
+
+**A window over the page, from a spec.** It is the card window's frame, made a component: placed
+in the middle of the screen (under the system header, over the panels' tabs, up to twice as wide
+as tall, at most `W_WINDOW_MAX`, clear of the sides - `Kit::sheetPlace()`), with a header row (a
+close or back button, a title in two parts, tabs on the right), a stage, the auto-close bar, sparks
+now and then along its edge, and two folder panels under it - SETTINGS on the right and the view's
+own options on the left. It is modal: a tap outside closes it (the tap catcher, made once at
+`Kit::sheetBegin()`), and while a panel is open a tap in the window only folds the panel. It is
+built in one quiet pass (invalidation off, then exactly the window and its shadow's bands asked
+for), so its first frame draws only itself - card-sheet 14, "Usable first".
+
+**The spec says what is the client's** (`Kit::SheetSpec`): the left button's and the title link's
+callbacks, the tabs (glyphs and callbacks; the last one made sits in the corner) and a floating tab
+under them, the first view's builder, a tick every 250 ms, what to do as it closes and once it has
+gone, whether it sparks, SETTINGS' title and row specs, and what to forget when either panel's
+rows go. The left panel is shown per view with `Kit::sheetSide(S, kind, title, rows)`.
+
+**Its state is a `Kit::Sheet`**, kept by the client: the card window's own state extends it
+(`struct Popup : Kit::Sheet`), so the window's code reads `s.win`, `s.stage`, `s.right` as before.
+One sheet shows at a time (`Kit::sheetShowing()`).
+
+| Client | What it adds to the frame |
+|---|---|
+| The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity |
+| "About this board" (`UI/AboutSheet`, debug builds: `GET /popup?about=1`) | one view of fact rows - the board, its screen and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second; no tabs, no panels |
+
+The second client is ~130 lines and owns no frame code: that is the point of it. Where it belongs
+in the product (the system panel?) is the owner's call; until then it is behind `DEBUG_POPUP`.
+
+---
+
+## 4. Not in the kit
 
 What only the card window draws stays in `src/Cards/Popup/`: the hero (the toggle and its knob,
-the light's slider, a sensor's disc), the history chart and the activity list's layout, the
-sparks. The window's frame - its shape, header row, views and panels together - becomes the
-**Sheet** in P4.
+the light's slider, a sensor's disc), the history chart and the activity list's layout.
 
-## 4. Measured
+## 5. Measured
 
 LVGL's pool per window opened, WS_P4_5, median of 7 (`scripts/ui_golden.py measure`):
 

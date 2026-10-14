@@ -332,12 +332,41 @@ page; a label showing digits no longer counts as a pixel difference when the clo
 its tree and its screenshot (the tree still checks it). **One run per board at a time**: a stray
 second chain flashed the P4_5 under a capture once (both discarded, the A/B redone).
 
-For the owner, none changed (zero-change rule):
+For the owner (P3), none changed (zero-change rule):
 - **Buttons have two roles, CANCEL and DESTRUCTIVE**; the brief's PRIMARY and QUIET have no user in
   the house yet (the row button is a row control, a scene a pill), so they wait for their first.
 - **The kit's styles follow a scheme change live, as `UI::paint()` does.** The window's own
   local colours still do not, so a window open across a scheme change would show both - a path the
   device cannot take (the window is modal; the scheme knob and page swipes are behind it).
+
+**P4 - DONE (2026-10-13).** The Sheet: `include/UI/Sheet.h`, with `src/UI/Kit/KitSheet.cpp` (the
+frame: placement, the window, header row, stage, auto-close, the quiet build, the modal tap
+catcher, closing), `KitSheetPanels.cpp` (both folder panels: built, slid, dragged, synced, gone)
+and `KitSparks.cpp` - moved from the card window (`CardPopup.cpp`, `PopupPanels.cpp`, the catcher
+from `PopupHold.cpp`; `PopupSparks.cpp` is gone). A `Kit::SheetSpec` says what is the client's -
+its tabs, its first view, a tick, what to do on closing, SETTINGS' rows, the left panel per view -
+and the card window's state extends the sheet's (`struct Popup : Kit::Sheet`), so its code reads
+`s.win`, `s.stage`, `s.right` as before. `components.md` §3.
+
+The second client, **"About this board"** (`src/UI/AboutSheet.cpp`, ~130 lines with no frame code;
+debug builds only: `GET /popup?about=1`, `about=0`): one view of fact rows - the board, its screen
+and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second - on
+the same frame (picture in `components.md` §3). Properties' row became the kit's `Kit::factRow()`
+for it. Closing it leaves the page and LVGL's pool as they were.
+
+Checks: A/B against each board's P2 image, minutes apart (`p2f`/`p4a` on WS_P4_5, `p2g`/`p4a` on
+WS_P4_4B and CYD_P4_1060): **no tree or pixel differences on all three boards** (46 states; 43 on
+the 4B). WS_S3_4B builds. **The window builds ~3.5 ms faster on every window** (WS_P4_5, fastest of 9,
+P2 image and this build back to back: Desk 36.3 -> 32.4 ms, Deck 31.0 -> 27.2, North 29.9 -> 26.2,
+Overhead 32.0 -> 28.1, All Lamps 36.9 -> 32.7, Lamp 1 33.7 -> 29.8). Explained before it was
+believed: SETTINGS' row list was computed twice per window - once for its signature, once for its
+width, and its Card label row walks the dashboard's groups - and the sheet reads it once; the same
+rows. The board's own `DEBUG_POPUP` timings agree (the quiet build 28.8 -> 25.5 ms) and show the
+first frame unchanged: 58-62 ms, the window's rectangle only, both ways.
+
+For the owner (P4):
+- **Where should "About this board" live?** It is behind `DEBUG_POPUP` until you say - the system
+  panel, or a long press on the header's board name, would both be one line.
 
 ## 7. For the owner
 
@@ -345,3 +374,50 @@ Each phase leaves the board looking and behaving exactly as at `v0.2.12`; the pr
 harness's tree comparison and the screenshots. After P6 there is one short test sheet: look at
 everything, it should be unchanged. What you get: a dialog is one call, a config window is a list
 of views, a radius is one token, and 2.11's clusters and bento packing have a place to live.
+
+## 8. The layout engines - design for 2.11 (P5)
+
+P5 built the interface and the one engine the dashboard has always had; what follows is the design
+2.11 builds on it. Nothing here is decided: each is a proposal for the interview.
+
+**The interface** (`include/Layout/Layout.h`, pure C++, tested off the board in `host-tests/`): a
+`Container` is a grid of units; an `Item` has the span it would like and the least it will accept, an
+optional pinned spot and a priority; an `Engine` takes the container and the items and writes a
+`Place` for each - where it went, or that it did not fit. `FlowEngine` is today's: pins first, then
+reading order, the widest span that fits at the first free spot, the lowest priority dropped until
+the rest fit. CardPage turns its cards into items, asks the engine, and lays out what comes back.
+New engines are new classes; a page chooses one.
+
+**A cluster is a container inside an item.** On the page, a cluster (a group panel, `group-cards.md`
+§5.3) is one item, its span from its member count (or declared). Inside it, an engine runs again on
+the cluster's own sub-grid - its span in units less its frame - with the members as items, each a
+unit or two (a member drawn without its own border, compact). The page places the cluster as it
+places a card; the cluster places its members as the page places cards. Same interface, a smaller
+container; the flow engine works there unchanged.
+
+**The packing ("bento") engine.** What it must be: DENSE (no holes a smaller card could fill),
+DETERMINISTIC (the same items give the same layout, every boot) and STABLE (one card more or less
+moves as few others as possible - a layout that reshuffles itself is worse than one with a hole).
+How: items sorted by area, largest first, ties by declaration order; each placed where it leaves the
+least unusable space (a maximal-rectangles packer on the unit grid), trying spans from preferred
+down to least; and stability from the LAST layout - each item first tries its previous place
+(`Place` kept per card id, K33, in the settings file), and only those that no longer fit are packed
+afresh. Priority still decides who leaves when nothing fits. Testable off the board: the same input
+twice gives the same output; one item added moves at most the items after it.
+
+**The domain weight map.** Which cards earn space: a weight per card - its domain's (climate and
+media heavier than a lone sensor), times how much it is used (taps counted in the settings file) -
+turned into a target area, spans chosen within each card's least and preferred. The weights are
+data (a table beside the tokens, a page able to override them), never code.
+
+**The primary-region page.** One hero region - a room's main light, its climate - takes a fixed share
+(a 2x2 at the top left, or a column), and the rest of the page is flowed or packed around it: the
+container split into regions, each region its own engine run. A card is put in the region by a
+`primary` flag in its spec.
+
+**Orbital.** A page arranged around a centre - the room as one large card, its devices around it,
+heaviest nearest: positions by distance from the centre cell, ring by ring, clockwise from the top.
+For the large panels; on a grid too small for a ring it falls back to flow.
+
+Each is a class implementing `Layout::Engine`, pure, with host tests for its properties before it
+draws anything.

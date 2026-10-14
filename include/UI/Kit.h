@@ -51,6 +51,8 @@ enum class KitStyle : uint8_t {
     // Folder panels: the pane's and tab's face, the pieces that paint the join
     // out, the tab's title, the body the rows stand in, the carets.
     KS_PANEL_FACE, KS_PANEL_FILL, KS_PANEL_TITLE, KS_PANEL_BODY, KS_PANEL_CARET,
+    // The sheet (UI/Sheet.h): the window's face, its auto-close bar.
+    KS_SHEET_FACE, KS_SHEET_BAR,
     KS_COUNT
 };
 
@@ -163,6 +165,12 @@ void    selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec);
 lv_obj_t *chipRow(lv_obj_t *parent, const char *const *words, uint8_t n, uint8_t lit, int32_t room,
                   lv_event_cb_t cb);
 
+// --- Facts --------------------------------------------------------------------------
+// A FACT ROW: what something is, dim, on the left, and its value on the right,
+// wrapping if long ("-" when there is none) - a read-only list such as an
+// entity's Properties or "About this board". Returns the value's label.
+lv_obj_t *factRow(lv_obj_t *list, const char *what, const char *value);
+
 // --- List items -----------------------------------------------------------------
 // A tappable surface in a list (a member, an activity row, "Show more"): the
 // card's radius and surface, tinted while pressed. The caller sizes it, lays
@@ -174,6 +182,8 @@ lv_obj_t *item(lv_obj_t *parent);
 // checkbox, a dropdown of choices, or a button that does something. One list
 // of specs is a panel's rows, so its size and its contents cannot disagree.
 enum class RowKind : uint8_t { ROW_CHECK, ROW_DROP, ROW_BUTTON };
+
+constexpr uint8_t ROWS_MAX = 12;   // a panel's rows at most: 7 today, room for /popup?rows=
 
 struct RowSpec {
     const char   *label;

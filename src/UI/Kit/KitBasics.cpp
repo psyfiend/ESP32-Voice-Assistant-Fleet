@@ -26,6 +26,22 @@ lv_obj_t *label(lv_obj_t *parent, KitStyle look) {
     return l;
 }
 
+lv_obj_t *factRow(lv_obj_t *list, const char *what, const char *value) {
+    lv_obj_t *r = plain(list);
+    lv_obj_set_size(r, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(r, UI::mm(UI::shape().S8), 0);
+    lv_obj_t *a = label(r, KitStyle::KS_LABEL_TAG_DIM);
+    lv_label_set_text(a, what);
+    lv_obj_t *b = label(r, KitStyle::KS_LABEL_TAG);
+    lv_label_set_long_mode(b, LV_LABEL_LONG_WRAP);
+    lv_obj_set_flex_grow(b, 1);
+    lv_obj_set_style_text_align(b, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_label_set_text(b, (value && value[0]) ? value : "-");
+    return b;
+}
+
 lv_obj_t *item(lv_obj_t *parent) {
     lv_obj_t *o = plain(parent);
     add(o, KitStyle::KS_ITEM);

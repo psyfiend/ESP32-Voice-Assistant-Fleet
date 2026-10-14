@@ -9,28 +9,31 @@
 // Until 2.12 the window was one 6,325-line file whose parts shared one file-static state. The
 // parts now have a file each and share that state through this header, in namespace popup:
 //
-//   CardPopup.cpp            the frame: open and close, the header row, the views, the clock
+//   CardPopup.cpp            open and close, the corner icons, the views, the clock
 //   PopupCommon.cpp          sizes (mm, pm), bare objects and labels, what the entities say
-//   PopupHold.cpp            the hold on a card, and the tap catcher
+//   PopupHold.cpp            the hold on a card
 //   PopupControls.cpp        the controls view: the toggle, the sensor's disc, the column
 //   PopupLight.cpp           a light's slider and its column
-//   PopupDeck.cpp            the control deck and the hand-drawn faces
+//   PopupDeck.cpp            the control deck (the kit's selector)
 //   PopupScenes.cpp          the Scenes view
 //   PopupMembers.cpp         Members, and a member's own controls
 //   PopupProps.cpp           Properties
 //   PopupHistory.cpp         History: what is asked, the top line, drawing, its taps
 //   PopupHistoryChart.cpp    History: the chart
 //   PopupHistoryActivity.cpp History: activity
-//   PopupPanels.cpp          the folder panels: building, sliding, dragging, the row controls
+//   PopupPanels.cpp          the panels as the window uses them: which left panel a view has
 //   PopupSettingsRows.cpp    SETTINGS' rows and what they do
 //   PopupSideRows.cpp        CHART's, ACTIVITY's and SCENES' rows
 //   PopupDialog.cpp          the Remove dialog
-//   PopupSparks.cpp          the sparks along the edge
 //   PopupDebug.cpp           GET /popup (DEBUG_POPUP)
 //   PopupTree.cpp            GET /popup?tree= (DEBUG_POPUP)
 //
-// The code moved verbatim (P1 changed no logic); its comments still say "below" and "above"
-// about what is now in another file - the declarations at the end of this header say where.
+// The window is a client of the kit (UI/Kit.h, 2.12 P3) and its frame is the kit's Sheet
+// (UI/Sheet.h, P4): the window, its header row, the auto-close, the tap catcher, the folder
+// panels and the sparks. Its state extends the sheet's (struct Popup : Kit::Sheet).
+//
+// The code moved verbatim at P1; its comments still say "below" and "above" about what is now in
+// another file - the declarations at the end of this header say where.
 
 #include "Cards/CardPopup.h"
 #include "Cards/Card.h"
@@ -39,17 +42,14 @@
 #include "UI/UITokens.h"
 #include "UI/UIToolkit.h"
 #include "UI/Kit.h"             // the component kit (2.12 P3)
+#include "UI/Sheet.h"           // the window's frame (2.12 P4)
 #include "Settings.h"   // 2.10d: SETTINGS' rows are kept by card id
 #include "Cards/CardGroups.h"   // the Card label row (K44)
 #include "Cards/CardAdded.h"    // K17: Add as a card, Remove card
 #include "Cards/PageSpec.h"     // CARD_ID_MAX
 #include "HaHistory.h"          // the History view's source (2.10e); no LVGL in it
 #include "TimeFormat.h"         // every time and duration it says (2.10e round 4)
-#include "src/core/lv_obj_event_private.h"   // lv_hit_test_info_t: the tap catcher's hit test
-#include "src/core/lv_obj_draw_private.h"    // lv_obj_get_ext_draw_size: the window's shadow
 #include <Arduino.h>
-#include "esp_heap_caps.h"   // the hand-drawn faces live in PSRAM
-#include "src/misc/cache/instance/lv_image_cache.h"   // lv_image_cache_drop(): not in lvgl.h
 #include <ctype.h>
 #include <math.h>
 #include <stdarg.h>
@@ -93,21 +93,13 @@ enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
 enum class HoldPhase  : uint8_t { HOLD_NONE, HOLD_PRESSING, HOLD_LETTING_GO, HOLD_OWNED };
-// How often a spark runs along the window's edge (see "Interference"): now
-// and then while it is open; once per window; never.
-enum class IntfMode   : uint8_t { INTF_NOW_AND_THEN, INTF_ONCE, INTF_OFF };
-
-// D6: auto-close after 60 s untouched. The owner chose all four close routes.
-constexpr uint32_t POPUP_AUTOCLOSE_MS = 60000;
-constexpr uint32_t POPUP_TICK_MS      = 250;
 
 // THE P4_5 IS THE REFERENCE (owner, 2026-10-05: its toggle "is the perfect
 // size"). Its window is 787 x 545 px (68.1 x 47.1 mm) with the system header
 // showing, and its hero 349 px of that height (30.2 mm, measured with calipers
 // at 30). What is inside a window is sized as the same share of the biggest
-// window of THIS shape that fits in it - see open(), propH and pm(). (The
-// window itself has been up to 2:1 since 2026-10-06.)
-constexpr float POPUP_ASPECT  = 787.0f / 545.0f;
+// window of THIS shape that fits in it - see the sheet's propH, and pm().
+// (The window itself has been up to 2:1 since 2026-10-06.)
 constexpr float REF_WIN_H_MM  = 47.1f;   // the P4_5 window's height, header showing
 constexpr float HERO_H_MM     = 30.2f;   // its hero's
 
@@ -120,17 +112,16 @@ constexpr float    HOLD_SINK_MM    = 0.4f;   // how far the card is pressed in a
 constexpr uint32_t HOLD_LETGO_MS   = 120;    // a tap lets go this fast, from full
 constexpr uint32_t KNOB_SLIDE_MS   = 160;
 
-extern IntfMode s_intfMode;   // PopupSparks.cpp
-
 // A window's entities: a card's primaries, or the members of a group defined
 // at the source (2.10c), whichever list is longer.
 constexpr uint8_t POPUP_ENT_MAX = (CARD_PRIMARY_MAX > ENTITY_MEMBERS_MAX) ? CARD_PRIMARY_MAX
                                                                           : ENTITY_MEMBERS_MAX;
 
-struct Popup {
+// The window's state: the sheet's frame (UI/Sheet.h - the window, its header
+// row, stage, clock and panels), and what the card window adds.
+struct Popup : Kit::Sheet {
     PopupPhase phase = PopupPhase::PHASE_CLOSED;
     PopupView  view  = PopupView::VIEW_MAIN;
-    bool       closeQueued = false;
 
     // Copied from the card at open - see "the window holds the entities".
     const Entity   *ent[POPUP_ENT_MAX] = {nullptr};
@@ -148,20 +139,9 @@ struct Popup {
     char area[ENTITY_SHORT_MAX] = {0};
     char name[ENTITY_NAME_MAX]  = {0};
 
-    lv_area_t winRect = {};
-    int32_t   winRadius = 0;
-    int32_t   pad = 0;
-    int32_t   propH = 0;   // the height the contents are sized from - see open()
-
-    lv_obj_t *win = nullptr;
-    lv_obj_t *btnLeft = nullptr, *lblLeft = nullptr;
+    // The sheet's tabs, by what they are (buildFirst()).
     lv_obj_t *btnHistory = nullptr, *btnMembers = nullptr;
     lv_obj_t *btnScenes = nullptr;   // under the chart, on the light's own views (2.10c)
-    lv_obj_t *lblTitleArea = nullptr, *lblTitleName = nullptr;
-    int32_t   titleW = 0;      // what the two title labels may use together, centred
-    lv_obj_t *titleLeft = nullptr;   // the X's slot: as wide as the right one, so the title centres
-    int32_t   titleSlotW = 0, titleSlack = 0;   // its width, and the room in it beside the X
-    lv_obj_t *stage = nullptr, *autoBar = nullptr;
 
     // The main view's widgets; null while another view is showing.
     lv_obj_t *hero = nullptr, *knob = nullptr, *heroIcon = nullptr;
@@ -206,25 +186,15 @@ struct Popup {
     int32_t   slideVal = 0, sentVal = -1;        // what it shows; what was last sent
     uint32_t  sentMs = 0;
 
-    // The settings deck (pathway 1, card-sheet 11.1): see "The settings deck".
-    lv_obj_t *deck = nullptr, *deckTab = nullptr, *deckTabLbl = nullptr, *deckPane = nullptr;
-    lv_obj_t *deckBody = nullptr;                  // the pane's rows (Kit::folder())
-    lv_obj_t *deckTrack = nullptr;                 // what the panel is dragged in (Kit::folder())
-    lv_obj_t *deckUp = nullptr, *deckDown = nullptr;   // its "more above / below" carets
-    lv_obj_t *swPause = nullptr;                   // the Paused checkbox
-    int32_t   deckH = 0, deckHead = 0;
-    int32_t   deckHide = 0;   // how much of the pane stays below the screen when open
-    uint8_t   deckState = 0;                       // DeckState
-    bool      deckFilled = false;                  // its rows exist (built at first open)
+    // SETTINGS (the sheet's right panel, s.right): its Paused checkbox.
+    lv_obj_t *swPause = nullptr;
 
-    lv_timer_t *timer = nullptr;
-    uint32_t    lastTouchMs = 0;
     uint32_t    lastSig = 0;
     uint32_t    lastAgeMs = 0;
-    lv_point_t  pressStart = {0, 0};
 };
-extern Popup s;   // CardPopup.cpp, as are h, s_indev, s_catcher, s_openFromTap
-enum DeckState : uint8_t { DECK_HIDDEN, DECK_PEEK, DECK_OPEN };
+extern Popup s;   // CardPopup.cpp, as are h, s_indev, s_openFromTap
+// The panels' states, by the window's old names (the sheet's PanelState).
+enum DeckState : uint8_t { DECK_HIDDEN = Kit::PANEL_HIDDEN, DECK_PEEK = Kit::PANEL_PEEK, DECK_OPEN = Kit::PANEL_OPEN };
 
 // The card under the finger. `surface` is a card's own LVGL object, which a
 // page rebuild can delete at any moment: a delete hook clears it the moment
@@ -237,16 +207,6 @@ struct Hold {
 };
 extern Hold h;
 extern lv_indev_t *s_indev;
-
-// THE TAP CATCHER: "tap outside" and the modal rule, with nothing drawn. A
-// transparent full-screen object on lv_layer_top(), made once at begin() and
-// never deleted, hidden or moved - each of those would invalidate the whole
-// screen (LESSONS, "Never toggle HIDDEN on a screen-sized object"). It is
-// switched by CLICKABLE alone, which costs no redraw. Its hit test says "not
-// here" inside the window, so LVGL goes on to search the screen, where the
-// window is (pointer_search_obj() in lv_indev.c: system layer, top layer,
-// then the screen).
-extern lv_obj_t *s_catcher;
 extern bool s_openFromTap;   // open() called by openOn(): the finger is already up
 
 struct Agg {
@@ -316,16 +276,14 @@ struct HistView {
     int32_t   plotL = 0, plotW = 1;   // the plot's left (past the value labels) and width
 };
 
+// The left panel's kinds - the sheet's s.left.kind (sideFor(), PopupPanels.cpp).
 enum : uint8_t { SIDE_NONE, SIDE_CHART, SIDE_SCENES, SIDE_ACTIVITY };
-struct ChartPanel { lv_obj_t *root = nullptr, *tab = nullptr, *pane = nullptr, *body = nullptr;
-                    lv_obj_t *track = nullptr, *up = nullptr, *down = nullptr;
-                    uint8_t state = DECK_HIDDEN; int32_t h = 0; uint8_t kind = SIDE_NONE; };
 
 // A panel's rows are the kit's (2.12 P3): Kit::RowSpec, built by Kit::rows().
 // ROW_BUTTON (2.10e): a button that does something - its words in `opts`.
 using DeckRowKind = Kit::RowKind;
 using DeckRowSpec = Kit::RowSpec;
-constexpr uint8_t DECK_ROWS_MAX = 12;   // 7 at most today; room for /popup?rows=
+constexpr uint8_t DECK_ROWS_MAX = Kit::ROWS_MAX;
 
 // ---------------------------------------------------------------------------
 // The shared state - each defined once, in the file named
@@ -335,7 +293,6 @@ extern HaHistory *s_hist;              // PopupHistory.cpp
 extern HistView s_hv;                  // PopupHistory.cpp
 extern lv_obj_t *s_histList;           // PopupHistory.cpp
 extern uint8_t s_memberPick;           // PopupMembers.cpp
-extern ChartPanel s_chart;             // PopupPanels.cpp: the left panel
 extern CardGroups::Choice s_clMap[24]; // PopupSettingsRows.cpp: the Card label row
 extern uint8_t s_clN;
 extern char s_clOpts[24 * 44];
@@ -390,7 +347,6 @@ void holdDetach();
 void letGo();
 void pressCb(lv_event_t *ev);
 void releaseCb(lv_event_t *ev);
-void catcherCb(lv_event_t *ev);
 
 // PopupControls.cpp
 void renderAgo(const Agg &a);
@@ -469,23 +425,13 @@ void histChartCb(lv_event_t *ev);
 // PopupHistoryActivity.cpp
 void histDrawActivity(lv_obj_t *body);
 
-// PopupSparks.cpp
-void intfCreate();
-void intfStart();
-void intfEnd();
-
-// PopupPanels.cpp
+// PopupPanels.cpp - the sheet's panels, by the window's names
 void deckSet(uint8_t state);
 bool panelOpen();
-bool inDeck(const lv_point_t &pt);
-void deckCreate();
-void deckFill();
 void deckSync();
 void deckOpen();
-void deckEnd();
 void chartSet(uint8_t state);
 void chartFold();
-void panelTrackCb(lv_event_t *ev);
 void chartEnd();
 void sideFor(PopupView v);
 

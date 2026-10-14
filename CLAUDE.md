@@ -496,6 +496,11 @@ panels, the selector, icon buttons and label roles are the kit's, and a new scre
 - **Components build exactly the objects, flags and events their callers expect** - the harness
   compares trees, and a component's state lives in the caller's struct, found through the
   object's user data, so events keep their user data.
+- **A window is a Sheet** (`include/UI/Sheet.h`, 2.12 P4): the frame - placement, header row,
+  auto-close, the quiet build, the modal tap catcher, both folder panels, the sparks - is the
+  kit's, and a new window is a client: a `Kit::SheetSpec` and its views. The card window
+  (`struct Popup : Kit::Sheet`) and "About this board" (`UI/AboutSheet`, debug builds) are the two
+  clients. One sheet shows at a time.
 
 ### UI scale is derived from pixel density, not declared
 

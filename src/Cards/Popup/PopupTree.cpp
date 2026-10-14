@@ -394,9 +394,9 @@ void treeDump(bool page) {
                 s.builtPaused ? "paused" : "live", (long)s.heroW, (long)s.heroH, (long)s.heroR,
                 s.stacked ? 1 : 0, (long)s.mainRowW, (long)s.propH, (long)s.winRect.x1, (long)s.winRect.y1,
                 (long)lv_area_get_width(&s.winRect), (long)lv_area_get_height(&s.winRect), (long)s.winRadius,
-                (long)s.pad, (long)s.titleW, (long)s.titleSlotW, (long)s.titleSlack, (unsigned)s.deckState,
-                s.deckFilled ? 1 : 0, (long)s.deckH, (unsigned)s_chart.state, (unsigned)s_chart.kind,
-                (long)s_chart.h, (unsigned long)Kit::facesFlat(), (unsigned)s_intfMode);
+                (long)s.pad, (long)s.titleW, (long)s.titleSlotW, (long)s.titleSlack, (unsigned)s.right.state,
+                s.right.filled ? 1 : 0, (long)s.right.h, (unsigned)s.left.state, (unsigned)s.left.kind,
+                (long)s.left.h, (unsigned long)Kit::facesFlat(), (unsigned)Kit::sparksMode());
     else
         treeOut("# no window\n");
     if (page) {
@@ -407,8 +407,8 @@ void treeDump(bool page) {
     } else if (CardPopup::isOpen()) {
         s_treeLists = true;
         treeRoot("window", s.win);
-        treeRoot("settings", s.deckTrack);
-        treeRoot("side", s_chart.track);
+        treeRoot("settings", s.right.track);
+        treeRoot("side", s.left.track);
         treeRoot("dialog", s_confirm);
         s_treeLists = false;
     }

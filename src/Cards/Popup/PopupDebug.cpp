@@ -1,6 +1,7 @@
 // GET /popup and what the window's frames cost (2.12 P1, split from CardPopup.cpp). Debug builds
 // only (-D DEBUG_POPUP).
 #include "PopupState.h"
+#include "UI/AboutSheet.h"   // the Sheet's second client (2.12 P4)
 
 namespace popup {
 
@@ -115,6 +116,7 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int dur = -1; int chips = -1; int addCard = -1; int removeCard = -1;
                 int tree = 0;     // 1: the open window's objects; 2 (tree=page): the whole screen
                 int sparks = -1;  // the interference from the next window: 0 now and then, 1 once, 2 off
+                int about = -1;   // 2.12 P4: the About sheet, 1 open, 0 close
                 bool close = false, power = false, more = false, hist = false, mem = false; };
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
@@ -172,6 +174,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "tree", v, sizeof(v)) == ESP_OK) a.tree = strcmp(v, "page") ? 1 : 2;
         if (httpd_query_key_value(q, "mem", v, sizeof(v)) == ESP_OK) a.mem = true;
         if (httpd_query_key_value(q, "sparks", v, sizeof(v)) == ESP_OK) a.sparks = atoi(v);
+        if (httpd_query_key_value(q, "about", v, sizeof(v)) == ESP_OK) a.about = atoi(v);
         // rows=N: test rows for SETTINGS, from the next window built (a byte
         // the LVGL thread reads; nothing else to hand over).
         if (httpd_query_key_value(q, "rows", v, sizeof(v)) == ESP_OK) {
@@ -217,7 +220,7 @@ void CardPopup::debugService(lv_timer_t *t) {
     char mem[96];
     const int st = s_dreq.load();
     if (st == DREQ_CLOSING) {
-        if (isOpen()) return;   // closeNow() runs from lv_async_call
+        if (isOpen()) return;   // the sheet closes from lv_async_call (Kit::sheetClose())
         dbgMem(mem, sizeof(mem));
         dbgOut("closed; %s\n", mem);
         s_dreq.store(DREQ_DONE);
@@ -234,6 +237,14 @@ void CardPopup::debugService(lv_timer_t *t) {
         s_dreq.store(DREQ_CLOSING);
         return;
     }
+    // 2.12 P4: the Sheet's second client, "About this board" (UI/AboutSheet.h).
+    if (a.about >= 0) {
+        if (a.about == 0)          { AboutSheet::close(); dbgOut("about: closing\n"); }
+        else if (AboutSheet::open()) dbgOut("about: open\n");
+        else                         dbgOut("a sheet is already showing; close it first\n");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
     // 2.12 P0, for scripts/ui_golden.py: the object tree (above); LVGL's pool
     // to the byte; and the sparks, which are random, off for a capture.
     if (a.tree) {
@@ -243,9 +254,9 @@ void CardPopup::debugService(lv_timer_t *t) {
     }
     if (a.mem || a.sparks >= 0) {
         if (a.sparks >= 0) {
-            s_intfMode = a.sparks == 1 ? IntfMode::INTF_ONCE : a.sparks == 2 ? IntfMode::INTF_OFF
-                                                                             : IntfMode::INTF_NOW_AND_THEN;
-            dbgOut("sparks %d from the next window\n", (int)s_intfMode);
+            using M = Kit::SparksMode;
+            Kit::setSparksMode(a.sparks == 1 ? M::SPARKS_ONCE : a.sparks == 2 ? M::SPARKS_OFF : M::SPARKS_NOW_AND_THEN);
+            dbgOut("sparks %d from the next window\n", (int)Kit::sparksMode());
         }
         lv_mem_monitor_t m;
         lv_mem_monitor(&m);
@@ -453,7 +464,7 @@ void CardPopup::debugService(lv_timer_t *t) {
         if (!isOpen()) dbgOut("no window open\n");
         else {
             // 2: the CHART panel open (History only).
-            if (a.deck == 2)  { if (s_chart.root) chartSet(DECK_OPEN); }   // CHART or SCENES (K43)
+            if (a.deck == 2)  { if (s.left.root) chartSet(DECK_OPEN); }   // CHART or SCENES (K43)
             else if (a.deck)  deckOpen();
             else            { deckSet(DECK_PEEK); chartFold(); }
             dbgMem(mem, sizeof(mem));

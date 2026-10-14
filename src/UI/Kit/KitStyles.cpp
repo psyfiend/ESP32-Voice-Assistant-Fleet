@@ -205,6 +205,20 @@ static void fill() {
     lv_style_set_line_width  (caret, LV_MAX(2, UI::mm(k.LINE_PLOT)));
     lv_style_set_line_rounded(caret, true);
     lv_style_set_line_color  (caret, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 60)));
+
+    // --- The sheet ---
+    // The scheme's raised surface (the mock's window is Midnight's SURFACE_ALT
+    // exactly) and the border token.
+    lv_style_t *win = st(S::KS_SHEET_FACE);
+    lv_style_set_radius      (win, UI::mm(k.R_WINDOW));
+    lv_style_set_bg_color    (win, UI::c(p.SURFACE_ALT));
+    lv_style_set_bg_opa      (win, LV_OPA_COVER);
+    lv_style_set_border_color(win, UI::border());
+    lv_style_set_border_width(win, UI::met().BORDER_W ? UI::met().BORDER_W : 1);
+    lv_style_t *bar = st(S::KS_SHEET_BAR);
+    lv_style_set_radius  (bar, LV_RADIUS_CIRCLE);
+    lv_style_set_bg_color(bar, UI::c(p.ACCENT));
+    lv_style_set_bg_opa  (bar, LV_OPA_COVER);
 }
 
 void begin() {

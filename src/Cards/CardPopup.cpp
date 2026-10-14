@@ -20,9 +20,10 @@
 // then a spark runs along the window's edge (see "Interference"), and the
 // switch's knob slides - and can be dragged.
 //
-// 2.12 P1: this file is the frame - open and close, the header row and its corner icons, the
-// views, the clock - and the public interface. The rest of the window is in src/Cards/Popup/,
-// listed in PopupState.h.
+// 2.12 P1: this file is open and close, the corner icons, the views and the clock, and the
+// public interface. The rest of the window is in src/Cards/Popup/, listed in PopupState.h.
+// 2.12 P4: the frame itself - the window, its header row, the auto-close, the quiet build, the
+// tap catcher, the panels, the sparks - is the kit's Sheet (UI/Sheet.h); this is its client.
 
 namespace popup {
 
@@ -30,7 +31,6 @@ namespace popup {
 Popup s;
 Hold h;
 lv_indev_t *s_indev = nullptr;
-lv_obj_t *s_catcher = nullptr;
 bool      s_openFromTap = false;
 
 // Changes whenever anything the window shows could have changed. An FNV-1a
@@ -78,62 +78,21 @@ void forgetMainWidgets() {
     s.sliding = false;
 }
 
+// The window's own widgets, when it goes (the sheet forgets its frame's).
 void forgetWidgets() {
-    s.btnLeft = s.lblLeft = s.btnHistory = s.btnMembers = s.btnScenes = nullptr;
-    s.lblTitleArea = s.lblTitleName = nullptr;
-    s.titleLeft = nullptr;
-    s.stage = s.autoBar = nullptr;
+    s.btnHistory = s.btnMembers = s.btnScenes = nullptr;
     forgetMainWidgets();
-}
-
-// Share the title row between "Area > " and the name.
-//  - Both fit in the middle, between ends of equal width: centred, as always.
-//  - They fit if the title takes the room beside the X (a window with two
-//    chips on the right has a chip's width spare on the left): the X's slot
-//    shrinks to the X, and the title sits left of centre (owner, round 7).
-//  - Neither: THE NAME ALONE (owner, round 7, the 4B: "Offi...Desk" was hard to
-//    read). The link back goes with it; the back arrow still does that job.
-void layoutTitle() {
-    if (!s.lblTitleArea || !s.lblTitleName) return;
-    const lv_font_t *f = UI::type().NAME;
-    const char *area = lv_label_get_text(s.lblTitleArea);
-    const int32_t aw = (area && area[0]) ? textW(area, f) + 1 : 0;
-    int32_t nw = textW(lv_label_get_text(s.lblTitleName), f) + 1;
-    bool crumb = true, wide = false;
-    if (aw + nw > s.titleW) {
-        if (aw + nw <= s.titleW + s.titleSlack) wide = true;
-        else { crumb = false; wide = nw > s.titleW; }
-    }
-    const int32_t room = s.titleW + (wide ? s.titleSlack : 0);
-    if (s.titleLeft) lv_obj_set_width(s.titleLeft, s.titleSlotW - (wide ? s.titleSlack : 0));
-    if (nw > room) nw = room;
-    if (crumb && aw) {
-        lv_obj_clear_flag(s.lblTitleArea, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_width(s.lblTitleArea, aw);
-    } else {
-        lv_obj_add_flag(s.lblTitleArea, LV_OBJ_FLAG_HIDDEN);
-    }
-    lv_obj_set_width(s.lblTitleName, nw);
 }
 
 // --- THE CORNER ICONS (owner, 2026-10-06) ------------------------------------
 // History (the chart), Members and Scenes are views of their own, and the icons
-// in the corner work as tabs: shown on every view they belong to, the one
-// showing is lit (as a chosen selector button is), and a tap on a lit one goes
-// back to the controls. Members on the window's own views, not inside one
-// member; Scenes only on a light's controls and its scenes; the chart
-// everywhere - the group's from the group's views, a member's from its own.
-// The X closes from every view of the window; inside one member the arrow goes
-// back to Members.
-// Lit as the control deck's selector is (owner, 2026-10-07): the same metal,
-// the icon a face up (round 7) in the accent. Unlit: a soft dent in the
-// surface (round 6). Kit::iconButtonLit().
-void cornerLook(lv_obj_t *b, bool shown, bool lit) {
-    if (!b) return;
-    if (!shown) { lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN); return; }
-    lv_obj_clear_flag(b, LV_OBJ_FLAG_HIDDEN);
-    Kit::iconButtonLit(b, lit);
-}
+// in the corner are the sheet's tabs (Kit::sheetTabLook()): shown on every view
+// they belong to, the one showing lit, and a tap on a lit one goes back to the
+// controls. Members on the window's own views, not inside one member; Scenes
+// only on a light's controls and its scenes; the chart everywhere - the
+// group's from the group's views, a member's from its own. The X closes from
+// every view of the window; inside one member the arrow goes back to Members.
+void cornerLook(lv_obj_t *b, bool shown, bool lit) { Kit::sheetTabLook(b, shown, lit); }
 
 void showView(PopupView v) {
     const PopupView was = s.view;
@@ -183,9 +142,9 @@ void showView(PopupView v) {
                               : v == PopupView::VIEW_PROPS   ? "Properties" : "Members");
     }
     // SIZED BEFORE THE VIEW IS BUILT: placeWide() lays the window out, and a
-    // DOT label laid out at the last view's width rewrites its own text -
-    // layoutTitle() then measured "Sce..." and kept it (round 7, the 4B).
-    layoutTitle();
+    // DOT label laid out at the last view's width rewrites its own text - the
+    // layout then measured "Sce..." and kept it (round 7, the 4B).
+    Kit::sheetLayoutTitle(s);
     if (v == PopupView::VIEW_HISTORY)      buildHistory();
     else if (v == PopupView::VIEW_MEMBERS) buildMembers();
     else if (v == PopupView::VIEW_PROPS)   buildProps();
@@ -231,166 +190,43 @@ void historyCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_HISTORY); }
 void membersCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_MEMBERS); }
 void scenesCb (lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_SCENES); }
 
-// D6's drag down, on the HEADER ROW only (card-sheet 13): the light's tall
-// slider in 2.10b would fight a drag that could start anywhere. How the
-// gesture gets here is in buildContents() - it is not the obvious way.
-void headerGestureCb(lv_event_t *ev) {
-    (void)ev;
-    lv_indev_t *in = lv_indev_active();
-    if (!in || lv_indev_get_gesture_dir(in) != LV_DIR_BOTTOM) return;
-    lv_indev_wait_release(in);   // before the action - LESSONS
-    CardPopup::close();
-}
-
 #ifdef DEBUG_POPUP
 // The interference trial: a long press on the title cycles how often a spark
 // runs along the edge - now and then, once per window, never - from the next
 // window. Debug builds only, until the owner chooses (a setting, later).
 void intfCycleCb(lv_event_t *ev) {
     (void)ev;
-    s_intfMode = (s_intfMode == IntfMode::INTF_NOW_AND_THEN) ? IntfMode::INTF_ONCE
-               : (s_intfMode == IntfMode::INTF_ONCE)         ? IntfMode::INTF_OFF
-                                                             : IntfMode::INTF_NOW_AND_THEN;
-    UIToolkit::show_toast(s_intfMode == IntfMode::INTF_NOW_AND_THEN ? "Sparks: now and then"
-                        : s_intfMode == IntfMode::INTF_ONCE         ? "Sparks: once per window"
-                                                                    : "Sparks: off");
+    using M = Kit::SparksMode;
+    const M m = Kit::sparksMode();
+    Kit::setSparksMode(m == M::SPARKS_NOW_AND_THEN ? M::SPARKS_ONCE
+                     : m == M::SPARKS_ONCE         ? M::SPARKS_OFF : M::SPARKS_NOW_AND_THEN);
+    UIToolkit::show_toast(Kit::sparksMode() == M::SPARKS_NOW_AND_THEN ? "Sparks: now and then"
+                        : Kit::sparksMode() == M::SPARKS_ONCE         ? "Sparks: once per window"
+                                                                      : "Sparks: off");
 }
 #endif
 
 // ---------------------------------------------------------------------------
-// The window's contents
+// The window's contents - the sheet's frame (Kit::sheetOpen()) with the
+// window's tabs: History - the mock's chart icon, axes and bars (mdi:chart-bar)
+// - always in the corner; a card standing for several things gets the members
+// icon INSIDE it (owner, 2026-10-06: nearly every window has a chart, few have
+// members); Scenes under them, floating, shown when the light has scenes
+// (mdi:movie-open, a clapperboard - HA's own scene icon, the palette, is
+// Colour's here).
 // ---------------------------------------------------------------------------
-void buildContents() {
-    const UIPalette &p = UI::pal();
-    const UIType    &t = UI::type();
-    const UIShape   &k = UI::shape();
-    const int32_t btn  = UI::minTouch();
-    const int32_t gap  = mm(k.S_GUTTER);
-
-    lv_obj_set_flex_flow(s.win, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_all(s.win, s.pad, 0);
-    lv_obj_set_style_pad_row(s.win, mm(k.S5), 0);
-
-    // --- Header row --------------------------------------------------------
-    lv_obj_t *hdr = plain(s.win);
-    lv_obj_set_size     (hdr, lv_pct(100), btn);
-    lv_obj_set_flex_flow(hdr, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(hdr, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(hdr, gap, 0);
-    // Clickable so a press on the title lands HERE and can become a drag.
-    lv_obj_add_flag(hdr, LV_OBJ_FLAG_CLICKABLE);
-    // AND IT MUST NOT BUBBLE GESTURES. LVGL does not deliver a gesture to the
-    // pressed object and bubble it up; it walks UP from the pressed object
-    // PAST every one that has GESTURE_BUBBLE - on by default - and sends it to
-    // the first that does not (lv_indev.c, indev_gesture()). With the flag
-    // left on, the drag went past this row, the window and the top layer, and
-    // reached nobody. The owner's C3, 2026-10-03. The buttons in the row keep
-    // the flag, so a drag that starts on the X still arrives here.
-    lv_obj_clear_flag(hdr, LV_OBJ_FLAG_GESTURE_BUBBLE);
-    lv_obj_add_event_cb(hdr, headerGestureCb, LV_EVENT_GESTURE, nullptr);
-#ifdef DEBUG_POPUP
-    lv_obj_add_event_cb(hdr, intfCycleCb, LV_EVENT_LONG_PRESSED, nullptr);
-#endif
-
-    // Both ends the same width, so the title sits in the true middle.
-    const uint8_t nRight = hasMembers() ? 2 : 1;
-    const int32_t slotW  = btn * nRight + gap * (nRight - 1);
-
-    lv_obj_t *left = plain(hdr);
-    lv_obj_set_size(left, slotW, btn);
-    s.titleLeft  = left;
-    s.titleSlotW = slotW;
-    s.titleSlack = slotW - btn;
-    // The X and the back arrow are LVGL's own symbols, which every built-in
-    // Montserrat carries; the hero face is the largest one already linked.
-    s.btnLeft = iconButton(left, LV_SYMBOL_CLOSE, UIToolkit::Font_Hero, leftCb, &s.lblLeft);
-
-    lv_obj_t *title = plain(hdr);
-    lv_obj_set_height   (title, btn);
-    lv_obj_set_flex_grow(title, 1);
-    lv_obj_set_flex_flow(title, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(title, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    s.lblTitleArea = Kit::label(title, KS::KS_LABEL_NAME_DIM);
-    s.lblTitleName = Kit::label(title, KS::KS_LABEL_NAME);
-    // ONE LINE EACH, ellipsised, at widths layoutTitle() works out per view.
-    // A DOT label with a content height wraps instead of ellipsising, which is
-    // how "Members" ended up on two lines and "All Lamps >" overflowed the
-    // centred row and lost its left half (owner's V3).
-    const int32_t lh = lv_font_get_line_height(t.NAME);
-    lv_label_set_long_mode(s.lblTitleArea, LV_LABEL_LONG_DOT);
-    lv_label_set_long_mode(s.lblTitleName, LV_LABEL_LONG_DOT);
-    lv_obj_set_height(s.lblTitleArea, lh);
-    lv_obj_set_height(s.lblTitleName, lh);
-    s.titleW = lv_area_get_width(&s.winRect) - 2 * s.pad - 2 * slotW - 2 * gap;
-    // The first part is a link (crumbCb()): the whole header row's height
-    // takes the tap, and it brightens while pressed. Gestures still bubble to
-    // the row, so a drag down that starts on it still closes the window.
-    lv_obj_add_flag(s.lblTitleArea, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_ext_click_area(s.lblTitleArea, (btn - lh) / 2);
-    lv_obj_set_style_text_color(s.lblTitleArea, UI::c(p.TEXT), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
-    lv_obj_add_event_cb(s.lblTitleArea, crumbCb, LV_EVENT_CLICKED, nullptr);
-
-    lv_obj_t *right = plain(hdr);
-    lv_obj_set_size     (right, slotW, btn);
-    lv_obj_set_flex_flow(right, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(right, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(right, gap, 0);
-    // The mock's chart icon - axes and bars (mdi:chart-bar, generated
-    // 2026-10-05; clock-outline stood in until then).
-    // D4: a card standing for several things gets the members icon - INSIDE
-    // the chart, which is always in the corner (owner, 2026-10-06: nearly
-    // every window has a chart, few have members). Made first: the row is
-    // end-aligned, so the last made is the one in the corner.
-    if (hasMembers()) s.btnMembers = iconButton(right, MDI_LIGHTBULB_GROUP, t.ICON_MD, membersCb);
-    s.btnHistory = iconButton(right, MDI_CHART_BAR, t.ICON_MD, historyCb);
-
-    // --- The stage: whichever view is showing -------------------------------
-    s.stage = plain(s.win);
-    lv_obj_set_width    (s.stage, lv_pct(100));
-    lv_obj_set_flex_grow(s.stage, 1);
-    lv_obj_set_flex_flow(s.stage, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(s.stage, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-    // --- Scenes: under the chart (owner, 2026-10-06) ------------------------
-    // Out of the flow, in the corner of the window's contents, a header row
-    // and its gap down - so it never pushes the stage. Shown by showView()
-    // when the light has scenes; mdi:movie-open, a clapperboard, already in
-    // the icon faces (HA's own scene icon, the palette, is Colour's here).
-    s.btnScenes = iconButton(s.win, MDI_MOVIE_OPEN, t.ICON_MD, scenesCb);
-    lv_obj_add_flag(s.btnScenes, LV_OBJ_FLAG_FLOATING);
-    lv_obj_align(s.btnScenes, LV_ALIGN_TOP_RIGHT, 0, btn + mm(k.S5));
-    lv_obj_add_flag(s.btnScenes, LV_OBJ_FLAG_HIDDEN);
-
-    // --- The auto-close bar: how long until the window gives up -------------
-    s.autoBar = plain(s.win);
-    lv_obj_add_flag(s.autoBar, LV_OBJ_FLAG_FLOATING);
-    lv_obj_set_size(s.autoBar, lv_area_get_width(&s.winRect) - 2 * s.pad, mm(k.H_BAR) < 3 ? 3 : mm(k.H_BAR));
-    lv_obj_set_style_radius(s.autoBar, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(s.autoBar, UI::c(p.ACCENT), 0);
-    lv_obj_set_style_bg_opa  (s.autoBar, LV_OPA_COVER, 0);
-    lv_obj_align(s.autoBar, LV_ALIGN_BOTTOM_MID, 0, s.pad / 2);
-
+void buildFirst() {
+    if (hasMembers()) { s.btnMembers = s.tab[0]; s.btnHistory = s.tab[1]; }
+    else              { s.btnHistory = s.tab[0]; }
+    s.btnScenes = s.floatTab;
     showView(PopupView::VIEW_MAIN);
 }
 
 // ---------------------------------------------------------------------------
-// The clock: auto-close, the bar, and following the entity
+// The clock: following the entity (the sheet runs the auto-close and its bar)
 // ---------------------------------------------------------------------------
-void tickCb(lv_timer_t *t) {
-    (void)t;
+void tick(uint32_t now) {
     if (s.phase != PopupPhase::PHASE_OPEN) return;
-    const uint32_t now  = millis();
-    const uint32_t idle = now - s.lastTouchMs;
-    if (idle >= POPUP_AUTOCLOSE_MS) { CardPopup::close(); return; }
-
-    if (s.autoBar) {
-        const int32_t full = lv_area_get_width(&s.winRect) - 2 * s.pad;
-        const int32_t w = (int32_t)((int64_t)full * (POPUP_AUTOCLOSE_MS - idle) / POPUP_AUTOCLOSE_MS);
-        if (w != lv_obj_get_width(s.autoBar)) {
-            lv_obj_set_width(s.autoBar, w < 1 ? 1 : w);
-            lv_obj_align(s.autoBar, LV_ALIGN_BOTTOM_MID, 0, s.pad / 2);
-        }
-    }
 
     // A MEMBER OF A GROUP DEFINED IN HA PAUSED OR RESUMED (2.10c): the window
     // now stands for the members, or for the group again. Checked every tick,
@@ -429,52 +265,26 @@ void tickCb(lv_timer_t *t) {
     }
 }
 
-// The window, ON THE SCREEN AS ITS TOPMOST OBJECT - not lv_layer_top(). LVGL
-// draws the top layer OVER the page, never instead of it (lv_refr.c:1049/1081),
-// so with the window up there every redraw inside it - opening, a toggle, the
-// countdown bar - drew the cards beneath it first. On the screen, an opaque
-// window is what lv_refr_get_top_obj() finds covering those areas, and LVGL
-// draws only the window. Created last, so it is above the header, the deck and
-// the drawer; a page rebuild moves only the cards to the back.
-//
-// The scheme's raised surface (the mock's window is Midnight's SURFACE_ALT
-// exactly) and the border token. No clip_corner: it would cost a window-sized
-// layer (card-sheet 8). Clickable, so a tap inside never reaches the catcher.
-void makeWindow() {
-    const UIPalette &p = UI::pal();
-    s.win = plain(lv_screen_active());
-    lv_obj_add_flag(s.win, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_pos (s.win, s.winRect.x1, s.winRect.y1);
-    lv_obj_set_size(s.win, lv_area_get_width(&s.winRect), lv_area_get_height(&s.winRect));
-    lv_obj_set_style_radius      (s.win, s.winRadius, 0);
-    lv_obj_set_style_bg_color    (s.win, UI::c(p.SURFACE_ALT), 0);
-    lv_obj_set_style_bg_opa      (s.win, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(s.win, UI::border(), 0);
-    lv_obj_set_style_border_width(s.win, UI::met().BORDER_W ? UI::met().BORDER_W : 1, 0);
-    // The scheme's lift - a real shadow on Linen, nothing on the dark schemes
-    // (owner, L2).
-    lv_obj_add_style(s.win, UI::paint(UIPaint::PAINT_LIFT), 0);
-}
+// ---------------------------------------------------------------------------
+// The window as a sheet (UI/Sheet.h): its spec, filled each time it opens -
+// the tabs follow the card - and what it does as it goes.
+// ---------------------------------------------------------------------------
+Kit::SheetSpec s_spec;
+#ifdef DEBUG_POPUP
+uint32_t s_closeT0 = 0;
+#endif
 
-// The deferred half of close(). Runs from LVGL's own timer handler, outside any
-// event callback, so deleting the window's children here is safe. Everything
-// goes in one frame, the card's border with it.
-void closeNow(void *unused) {
-    (void)unused;
-    s.closeQueued = false;
-    if (s.phase != PopupPhase::PHASE_OPEN) return;
+void closing() {
     confirmClose();   // Remove card's dialog, if it was up
 #ifdef DEBUG_POPUP
-    const uint32_t t0 = micros();
+    s_closeT0 = micros();
 #endif
-    if (s.timer) { lv_timer_delete(s.timer); s.timer = nullptr; }
-    intfEnd();
-    chartEnd();
-    deckEnd();
-    if (s.win)   { lv_obj_delete(s.win);     s.win = nullptr; }
+}
+
+// Gone: everything in one frame, the card's border with it.
+void closed() {
     forgetWidgets();
     holdDetach();
-    if (s_catcher) lv_obj_clear_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
     s.phase = PopupPhase::PHASE_CLOSED;
     s.nEnt = 0;
     s.groupN = 0;
@@ -489,72 +299,54 @@ void closeNow(void *unused) {
 #ifdef DEBUG_POPUP
     char mem[96];
     dbgMem(mem, sizeof(mem));
-    dbgLater("close: torn down in %lu us; %s", (unsigned long)(micros() - t0), mem);
+    dbgLater("close: torn down in %lu us; %s", (unsigned long)(micros() - s_closeT0), mem);
 #endif
 }
 
-// What the window's first frame must draw: the window's own rectangle, and -
-// only where the scheme gives it a shadow - four thin bands around it. NOT one
-// area of the window plus its shadow: LVGL draws an area in strips as wide as
-// the area, and a strip that sticks out past the window is not covered by it,
-// so the cards under the whole window would be drawn first (LESSONS, "Effects
-// that cover the screen").
-void invalidateWindow() {
-    lv_obj_t *scr = lv_screen_active();
-    const lv_area_t &W = s.winRect;
-    lv_obj_invalidate_area(scr, &W);
-    const int32_t e = lv_obj_get_ext_draw_size(s.win);
-    if (e <= 0) return;
-    const lv_area_t bands[4] = {
-        { W.x1 - e, W.y1 - e, W.x2 + e, W.y1 - 1 },   // above
-        { W.x1 - e, W.y2 + 1, W.x2 + e, W.y2 + e },   // below
-        { W.x1 - e, W.y1,     W.x1 - 1, W.y2     },   // left
-        { W.x2 + 1, W.y1,     W.x2 + e, W.y2     },   // right
-    };
-    for (const lv_area_t &b : bands) lv_obj_invalidate_area(scr, &b);
-}
+// SETTINGS' rows went (made again for other rows, or with the window): the
+// controls the window kept went with them. Likewise the left panel's.
+void panelGone() { s.swPause = nullptr; s.ddGroup = nullptr; }
+void sideGone()  { s.ddTapScene = nullptr; s_cbHidden = nullptr; s_ddSpan = nullptr; }
 
-// The window itself: built, made modal, the clock started, the deck sliding
-// up and the sparks waiting their turn.
-//
-// BUILT QUIET (2026-10-05). The window's frame took ~77 ms where ~25 was
-// expected, and DEBUG_POPUP showed why: it redrew 0,0..1032,627, not the
-// window. LVGL lays out a new object's SIZE before its POSITION
-// (lv_obj_refr_size, then lv_obj_refr_pos), so for one step the full-size
-// window sat at (0,0) and that area was invalidated too; joined with the real
-// one, it covered the cards under the window and the header, and every strip
-// of it was wider than the window. So: everything is made and laid out with
-// invalidation off, and then exactly what must be drawn is asked for.
+// The window itself: the sheet built, made modal, its clock started,
+// SETTINGS' tab sliding up and the sparks waiting their turn.
 void showWindow() {
 #ifdef DEBUG_POPUP
     const uint32_t t0 = micros();
 #endif
     s.phase = PopupPhase::PHASE_OPEN;
-    Kit::facesNextWindow();                           // faces the last window used may be taken back
-    lv_obj_t *scr = lv_screen_active();
-    lv_obj_update_layout(scr);                        // settle anything pending, aloud
-    lv_display_enable_invalidation(nullptr, false);
     s_hv = HistView{};   // History starts on 24 hours in every window (2.10e)
-    makeWindow();
-    buildContents();
-    intfCreate();
-    deckCreate();
-    lv_obj_update_layout(scr);
-    lv_display_enable_invalidation(nullptr, true);
-    invalidateWindow();
-
-    if (s_catcher) lv_obj_add_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
-    s.lastTouchMs = millis();
-    s.lastAgeMs   = s.lastTouchMs;
-    s.timer = lv_timer_create(tickCb, POPUP_TICK_MS, nullptr);
-    intfStart();
-    deckSet(DECK_PEEK);
+    Kit::SheetSpec &k = s_spec;
+    k = Kit::SheetSpec{};
+    k.leftCb  = leftCb;
+    k.crumbCb = crumbCb;
+    k.nTabs   = hasMembers() ? 2 : 1;
+    if (k.nTabs == 2) { k.tabGlyph[0] = MDI_LIGHTBULB_GROUP; k.tabCb[0] = membersCb; }
+    k.tabGlyph[k.nTabs - 1] = MDI_CHART_BAR;
+    k.tabCb[k.nTabs - 1]    = historyCb;
+    k.floatGlyph = MDI_MOVIE_OPEN;
+    k.floatCb    = scenesCb;
+#ifdef DEBUG_POPUP
+    k.headerLongCb = intfCycleCb;
+#endif
+    k.buildFirst = buildFirst;
+    k.tick       = tick;
+    k.closing    = closing;
+    k.closed     = closed;
+    k.sparks     = true;
+    k.panelTitle = "SETTINGS";
+    k.panelRows  = deckSpecs;
+    k.panelGone  = panelGone;
+    k.sideGone   = sideGone;
+    Kit::sheetOpen(s, k);
+    s.lastAgeMs = s.lastTouchMs;
 #ifdef DEBUG_POPUP
     char mem[96];
     dbgMem(mem, sizeof(mem));
     dbgLater("open: window and deck built in %lu us; %s", (unsigned long)(micros() - t0), mem);
 #endif
 }
+
 } // namespace popup
 
 using namespace popup;
@@ -581,22 +373,15 @@ void CardPopup::begin() {
         lv_display_add_event_cb(d, dbgRenderReady, LV_EVENT_RENDER_READY, nullptr);
     }
 #endif
-    // The tap catcher, once, for the life of the device. See s_catcher.
-    s_catcher = plain(lv_layer_top());
-    lv_obj_set_size(s_catcher, lv_pct(100), lv_pct(100));
-    lv_obj_add_flag(s_catcher, LV_OBJ_FLAG_ADV_HITTEST);
-    lv_obj_add_event_cb(s_catcher, catcherCb, LV_EVENT_HIT_TEST, nullptr);
-    lv_obj_add_event_cb(s_catcher, catcherCb, LV_EVENT_PRESSED,  nullptr);
-    lv_obj_add_event_cb(s_catcher, catcherCb, LV_EVENT_CLICKED,  nullptr);
+    // The sheets' tap catcher, once, for the life of the device (UI/Sheet.h).
+    Kit::sheetBegin();
 }
 
 bool CardPopup::isOpen() { return s.phase != PopupPhase::PHASE_CLOSED; }
 
 void CardPopup::close() {
-    if (s.closeQueued) return;
     if (s.phase != PopupPhase::PHASE_OPEN) return;
-    s.closeQueued = true;
-    lv_async_call(closeNow, nullptr);
+    Kit::sheetClose(s);
 }
 
 void CardPopup::open(Card &card) {
@@ -635,45 +420,11 @@ void CardPopup::open(Card &card) {
     snprintf(s.area, sizeof(s.area), "%s", card._area);
     snprintf(s.name, sizeof(s.name), "%s", card.label());
 
-    // --- Where the window goes ---------------------------------------------
-    // Tall: from just under the system header to just above the deck's tab.
-    //
-    // WIDE: UP TO TWICE AS WIDE AS TALL, AND NEVER NEAR THE SCREEN'S SIDES
-    // (owner, 2026-10-06). Round 1 of 2.10b gave every board the P4_5
-    // window's 787:545 shape - itself inherited from the mock, which was drawn
-    // for the 4B - and that held the P4_5 to 68 mm on a 110 mm screen, its
-    // title ellipsised, with room to spare. Now 2:1, capped so a gap of at
-    // least 6 mm or 8% of the screen's width stays on each side: P4_5 ~93 mm,
-    // the 7" panels ~129 mm, the 4B ~60 mm. The height used is the one WITH
-    // the system header showing, so hiding the header makes the window taller
-    // but never wider. The hero stays tied to the height (propH, below).
-    lv_obj_t *scr = lv_screen_active();
-    const int32_t sw = lv_obj_get_width(scr), sh = lv_obj_get_height(scr);
-    const UIShape &k = UI::shape();
-    const int32_t top    = UIToolkit::systemHeaderPx() + mm(k.S6);
-    const int32_t bottom = sh - mm(k.H_TABS) - mm(k.S6);
-    const int32_t refH   = bottom - (UIToolkit::systemHeaderFullPx() + mm(k.S6));
-    // AND NEVER WIDER THAN 100 mm (owner, round 5): on a 7" panel the 2:1
-    // window was ~129 mm, and every reach to the X or across the window got
-    // longer while the space to tap outside it shrank. 100 mm is the P4_5's
-    // window and a little - a hand's span.
-    const int32_t side   = LV_MAX(mm(k.W_SIDE_MIN), sw * 8 / 100);
-    int32_t w = LV_MIN(2 * refH, mm(k.W_WINDOW_MAX));
-    if (w > sw - 2 * side) w = sw - 2 * side;
-    s.winRect.x1 = (sw - w) / 2;
-    s.winRect.x2 = s.winRect.x1 + w - 1;
-    s.winRect.y1 = top;
-    s.winRect.y2 = bottom - 1;
-    // What the contents are sized from: the height of the biggest window of
-    // the P4_5's shape that fits inside this one. The P4_5 itself gives its own
-    // height (with the header shown); the 7" panels theirs; the 4B, whose width
-    // is capped, less than its height. So the hero is the same share of the
-    // window everywhere (owner), and the 4B's shrinks.
-    s.propH = LV_MIN(refH, (int32_t)lroundf((float)w / POPUP_ASPECT));
-    s.winRadius  = mm(k.R_WINDOW);
-    // 1.2 mm, down from the mock's 2.2: the owner wanted the X "closer to the
-    // corner" (H1). Still clear of the 2.4 mm corner radius.
-    s.pad        = mm(k.S4);
+    // --- Where the window goes: the sheet's place (Kit::sheetPlace()) -------
+    // Under the system header, over the panels' tabs, up to twice as wide as
+    // tall and never near the screen's sides; the hero is tied to its height
+    // (propH).
+    Kit::sheetPlace(s);
 
     s.view        = PopupView::VIEW_MAIN;
     s.closeQueued = false;

@@ -1,4 +1,4 @@
-// The hold on a card and the tap catcher (2.12 P1, split from CardPopup.cpp).
+// The hold on a card (2.12 P1, split from CardPopup.cpp).
 #include "PopupState.h"
 
 namespace popup {
@@ -142,37 +142,6 @@ void releaseCb(lv_event_t *ev) {
     if (h.phase == HoldPhase::HOLD_PRESSING) letGo();
 }
 
-bool inWindow(const lv_point_t &pt) {
-    const lv_area_t &W = s.winRect;
-    return pt.x >= W.x1 && pt.x <= W.x2 && pt.y >= W.y1 && pt.y <= W.y2;
-}
-
-// Did this touch, on the catcher, fold the deck? Then its click is spent.
-bool s_catcherFolded = false;
-
-// The catcher's jobs: let presses on the window and its deck through, and
-// close on a tap anywhere else. AND WHILE THE DECK IS OPEN, THE WINDOW IS OUT
-// OF REACH (owner, round 10): the topmost thing on the screen is the deck, so
-// a press anywhere in the window only folds it - it used to fold the deck and
-// also press whatever lay under the finger, the X closing the window before
-// the deck had finished folding, the back arrow leaving the view.
-void catcherCb(lv_event_t *ev) {
-    const lv_event_code_t code = lv_event_get_code(ev);
-    if (code == LV_EVENT_HIT_TEST) {
-        lv_hit_test_info_t *info = lv_event_get_hit_test_info(ev);
-        if (!info || !s.win) return;
-        const lv_point_t &pt = *info->point;
-        if (inDeck(pt) || (!panelOpen() && inWindow(pt))) info->res = false;
-    } else if (code == LV_EVENT_PRESSED) {
-        s_catcherFolded = false;
-        if (panelOpen() && inWindow(s.pressStart)) {
-            s_catcherFolded = true;
-            if (s.deckState == DECK_OPEN) deckSet(DECK_PEEK);
-            chartFold();
-        }
-    } else if (code == LV_EVENT_CLICKED) {
-        if (s_catcherFolded) { s_catcherFolded = false; return; }
-        CardPopup::close();
-    }
-}
+// The tap catcher - "tap outside" and the modal rule - is the sheet's
+// (KitSheet.cpp) since 2.12 P4.
 } // namespace popup
