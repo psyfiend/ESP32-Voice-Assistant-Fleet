@@ -114,6 +114,17 @@ PLAN = [
     {"page": 0, "card": ("Porch", "Outside", 0), "steps": [("porch_main", [], 0.6)]},
     {"page": 0, "card": ("Thermo", "Front", 0), "steps": [("thermo_main", [], 0.6)]},
     {"page": 0, "card": ("Kitchen", "Kitchen", 0), "steps": [("kitchen_occ_main", [], 0.6)]},
+    # The system panel (#97: its About button) and "About this board", as the whole screen. The
+    # drawer slides open, so it is given a second; a build before #97 has no drawer= and shows
+    # the page.
+    {"page": 0, "card": None, "tree": "page", "steps": [
+        ("system_panel", ["drawer=1"], 1.2),
+        (None, ["drawer=0"], 1.0),
+    ]},
+    {"page": 0, "card": None, "tree": "page", "steps": [
+        ("about", ["about=1"], 0.8),
+        (None, ["about=0"], 0.6),
+    ]},
     {"page": 1, "card": None, "tree": "page", "steps": [("fleet_page", [], 0.5)]},
     {"page": 1, "card": ("All Lamps", "Kitchen", 0), "steps": [
         ("lamps_main", [], 0.6),

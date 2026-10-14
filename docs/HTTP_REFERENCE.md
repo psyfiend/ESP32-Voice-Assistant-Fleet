@@ -209,7 +209,7 @@ curl "http://fleet-ws-p4-5/panel?flash=20&nvs=1"     # scratch NVS only
 **`-D DEBUG_POPUP` only** - the owner's local lines on WS_P4_5, WS_P4_4B and CYD_P4_1060, never
 committed. `src/Cards/Popup/PopupDebug.cpp`. What `scripts/ui_golden.py` drives. **One action per
 request**: when a query has several keys, the first in this order acts and the rest are ignored -
-`rows`, `close`, `about`, `tree`, `mem`/`sparks`, `addcard`/`removecard`, `pause`/`member`,
+`rows`, `close`, `about`, `drawer`, `tree`, `mem`/`sparks`, `addcard`/`removecard`, `pause`/`member`,
 `scheme`, `show`, `look`, `scene`, `power`, `view`, `set`, `ctl`, `deck`, the History keys
 (`span`, `more`, `row`, `dur`, `chips`, then `x`, `hist`), `clabel`, `groups`, `tap`, then `card`.
 The reply is text. `503 "Busy"` while another `/popup` runs; `503 "did not pick it up within 3 s"`
@@ -245,7 +245,8 @@ order.
 | `/popup?x=N` | a finger on the chart, N px from its left edge (the scrub line) |
 | `/popup?dur=0\|1` | activity's Show duration off/on (not kept) |
 | `/popup?chips=0\|1` | the span buttons off/on (not kept) |
-| `/popup?about=1` / `about=0` | opens / closes "About this board" (2.12 P4) - the board, screen, chip, firmware, uptime, memory, LVGL's pool, each second |
+| `/popup?about=1` / `about=0` | opens / closes "About this board" (2.12 P4) - the board, screen, chip, firmware, uptime, memory, LVGL's pool, each second. Every build also opens it from the system panel's About button (#97) |
+| `/popup?drawer=1` / `drawer=0` | a tap on the header's icon: the system panel opens / closes (#97, so the harness can see it); "already open/closed" when it was |
 | `/popup?removecard=3` | the Remove card dialog over any card's window, to look at; its Remove does nothing to a compiled card; `close=1` takes it down |
 
 ### Settings for the next windows (each **RAM**)

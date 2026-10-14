@@ -2,6 +2,7 @@
 #include "UI/UIToolkit.h"
 #include "UI/UITokens.h"
 #include "UI/Kit.h"                      // the component kit's styles, filled at begin()
+#include "UI/Sheet.h"                    // sheetShowing(): gestures stand down under any sheet
 #include "SystemReport.h"
 #include "LVGL_Startup.h"                // drawBufInfo(), for [UI STATE]
 #include "Cards/CardDemo.h"
@@ -330,10 +331,12 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
     lv_indev_t *indev = lv_indev_active();
     if (!indev) return;
 
-    // THE CARD POPUP IS MODAL (2.10a). Its scrim on the top layer already
-    // takes every touch, so a gesture should never get here while it is open;
-    // this makes sure no page swipe or edge pull can happen underneath it.
-    if (CardPopup::isOpen()) return;
+    // A SHEET IS MODAL (2.10a, 2.12). Its tap catcher on the top layer takes
+    // every touch outside it, so a gesture should never get here while one is
+    // open; this makes sure no page swipe or edge pull can happen underneath -
+    // under the card window, or "About this board", reachable in every build
+    // since #97.
+    if (CardPopup::isOpen() || Kit::sheetShowing()) return;
 
     const lv_dir_t dir = lv_indev_get_gesture_dir(indev);
 
@@ -923,6 +926,13 @@ void GUIManager::begin() {
 #ifdef DEBUG_POPUP
     // GET /popup: drive the card popup from a PC (CardPopup.h).
     CardPopup::beginDebug(_core.http());
+    // ...and the system panel, so the harness can see it (#97). True when it
+    // was already as asked.
+    CardPopup::setDrawerHook([](bool open) {
+        if (!s_self || s_self->_pnlSystem.isExpanded() == open) return true;
+        s_self->toggleSystemPanel();
+        return false;
+    });
 #endif
 
     // --= Z-INDEX SANDWICH =--

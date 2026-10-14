@@ -1,9 +1,8 @@
 // "About this board" (2.12 P4) - see include/UI/AboutSheet.h. The Sheet's second client, made to
 // prove the frame is a component: one view, no tabs, no panels; the X closes it, and it closes
-// itself after a minute untouched, as the card window does.
+// itself after a minute untouched, as the card window does. In every build since #97 (K74): the
+// system panel's About button opens it.
 #include "UI/AboutSheet.h"
-
-#ifdef DEBUG_POPUP
 #include "UI/Sheet.h"
 #include "bsp_loader.h"
 #include "fleet_fw_version.h"
@@ -108,13 +107,3 @@ void close()  { Kit::sheetClose(S); }
 bool isOpen() { return S.win != nullptr; }
 
 } // namespace AboutSheet
-
-#else   // not a debug build: nothing to open
-
-namespace AboutSheet {
-bool open()   { return false; }
-void close()  {}
-bool isOpen() { return false; }
-}
-
-#endif

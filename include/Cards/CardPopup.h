@@ -121,9 +121,16 @@ public:
     //                       1 once, 2 off (not kept)
     //   /popup?removecard=3 Remove card's dialog over any card's window, to look
     //                       at; close=1 takes it down (2 is the real one)
+    //   /popup?about=1|0    "About this board" open or closed (2.12 P4)
+    //   /popup?drawer=1|0   the system panel open or closed, as a tap on the
+    //                       header's icon (#97: the harness's look at it)
     // The handler hands the work to the LVGL thread and waits for it, as
     // /screenshot does - it never touches LVGL itself.
     static void beginDebug(class HttpServer &http);
+    // drawer=: the screen's to do, so GUIManager hands it over (UI registers
+    // with the layers below it, never the reverse). `open` is what is wanted;
+    // the hook says whether it was already so.
+    static void setDrawerHook(bool (*hook)(bool open));
 private:
     static void debugService(lv_timer_t *t);   // the LVGL-thread half
 #endif
