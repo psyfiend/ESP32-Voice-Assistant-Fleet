@@ -433,8 +433,9 @@ stopped at the first S3: under Windows PowerShell 5.1, with `$ErrorActionPrefere
 S3 linker's warning on stderr (`missing .note.GNU-stack section`) is a terminating error. Its
 `finally` restored `platformio.ini` as designed. The four S3s were compiled directly - the local
 debug lines touch only the three P4 environments, so their config is the committed one: WS_S3_4B
-34.3%, CYD_S3_3248 35.1%, WS_S3_5B 36.4%, CYD_S3_8048 35.3%. The script is unchanged; its one-line
-fix is the owner's to approve (TEST_2.12 Q7, HANDOFF).
+34.3%, CYD_S3_3248 35.1%, WS_S3_5B 36.4%, CYD_S3_8048 35.3%. The owner approved the fix (TEST_2.12
+Q7): `"Continue"` around the build, its exit code the result. Re-run on 2026-10-14 with it: **all
+nine SUCCESS through the gate, in 10 min 35 s**.
 
 ## 7. For the owner
 

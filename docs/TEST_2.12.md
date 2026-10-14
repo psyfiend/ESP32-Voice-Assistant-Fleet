@@ -94,4 +94,5 @@ Answers:
 - Q6: **withdrawn** - Claude's misreading. On the 4B the window hides the "All Lamps >" part of the
   title in Members for lack of room, so it shows "Members", which is right; "All Lamp..." is the
   text inside that hidden label, never seen.
-- Q7: yes - `gate.ps1` fixed: stderr is logged and the exit code decides.
+- Q7: yes - `gate.ps1` fixed: stderr is logged and the exit code decides. Re-run 2026-10-14: all
+  nine SUCCESS in 10 min 35 s, `platformio.ini` restored with its local lines.
