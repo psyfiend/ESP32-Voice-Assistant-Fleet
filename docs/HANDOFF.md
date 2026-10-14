@@ -62,6 +62,11 @@ on the kit yet - bring each over when it is next changed (`ui-architecture.md` ย
    1060 by screenshot, then both put back on #101. Its sheet `docs/TEST_100_CLOCK.md` (on that
    branch) has Q1-Q4 - the spec override or a clock entity, and Playfair's old-style figures (lining
    needs fontTools, an install). Left: the weather half, the other six faces, the hero region.
+4. **#93** - a group's members now get their HA area and device: **`fix/93-member-areas` (PR
+   #103)**, off `main` - the area query is sent once more after members are learnt. Checked on
+   the 4B (Office lamp: "Office" / "Office lamp", were "None").
+5. **#84** - "no data yet": **a proposal on the issue** (a `NO DATA` state of its own, recommended;
+   the link-down half as its own issue). Nothing built - the owner's choice.
 
 Then **the design interview ยง3 onward**, **2.8** header slots (#19), **2.11** group cards with the
 page arranger (#66, #78) - whose hero region (`layout-engines.md`) is where #100's clock and a music
