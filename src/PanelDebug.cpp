@@ -6,7 +6,6 @@
 #include <Arduino.h>   // Serial
 #include <stdio.h>
 #include "esp_timer.h"
-#include "esp_partition.h"
 #include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -62,34 +61,27 @@ uint32_t underrunCount() {
 }
 
 // --- Flash-write test ------------------------------------------------------
+//
+// NVS WRITES ONLY (#98, the owner's choice of fix, 2026-10-14). There was an
+// erase mode too: erase-and-write cycles at the start of the "spiffs" data
+// partition, written when that partition was unused. Since 2.10d it is the
+// LittleFS partition that holds /cfg/settings.json, and erasing its first
+// blocks destroys the file system's superblock - the next boot formats it and
+// every saved setting is gone. The erase test had already answered its
+// question (DECISIONS A14), so it was removed rather than fenced; a request
+// for it is refused with the reason.
 
-constexpr uint32_t SECTOR = 4096;
 constexpr int      FLASH_TEST_MAX = 50;
 constexpr uint32_t FLASH_TEST_GAP_MS = 150;
 
-// The data partition the 16 MB layout calls "spiffs": unused until 2.10d's
-// settings file, so erasing its first sectors costs nothing. LittleFS formats
-// it on first mount anyway.
-const esp_partition_t *testPartition() {
-    return esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, nullptr);
-}
-
-// One cycle: erase `bytes` (a multiple of 4 KB; 64 KB aligned goes as one block
-// erase) and write 256 bytes at its start - or one NVS write of 512 bytes,
-// committed. Returns microseconds, or -1 on failure.
-int64_t flashCycle(int i, bool nvs, nvs_handle_t h, const esp_partition_t *p, uint32_t bytes) {
+// One NVS write of 512 bytes, committed, in the scratch namespace. Returns
+// microseconds, or -1 on failure.
+int64_t flashCycle(int i, nvs_handle_t h) {
     static uint8_t buf[512];
     memset(buf, (uint8_t)(0x30 + (i & 0x3F)), sizeof(buf));
     const int64_t t0 = esp_timer_get_time();
-    esp_err_t err;
-    if (nvs) {
-        err = nvs_set_blob(h, "t", buf, sizeof(buf));
-        if (err == ESP_OK) err = nvs_commit(h);
-    } else {
-        const uint32_t off = (uint32_t)(i % 8) * bytes;
-        err = esp_partition_erase_range(p, off, bytes);
-        if (err == ESP_OK) err = esp_partition_write(p, off, buf, 256);
-    }
+    esp_err_t err = nvs_set_blob(h, "t", buf, sizeof(buf));
+    if (err == ESP_OK) err = nvs_commit(h);
     const int64_t us = esp_timer_get_time() - t0;
     return err == ESP_OK ? us : -1;
 }
@@ -113,8 +105,6 @@ int64_t flashCycle(int i, bool nvs, nvs_handle_t h, const esp_partition_t *p, ui
 // cache error, which no real flash write did.
 struct FlashJob {
     int  n = 0;
-    bool nvs = false;
-    uint32_t bytes = SECTOR;
     bool ok = false;
     int64_t  us[FLASH_TEST_MAX] = {};
     uint32_t got[FLASH_TEST_MAX] = {};
@@ -125,23 +115,22 @@ FlashJob s_job;
 
 void flashTask(void *) {
     FlashJob &j = s_job;
-    const esp_partition_t *p = testPartition();
     nvs_handle_t h = 0;
-    j.ok = j.nvs ? nvs_open("fleet_test", NVS_READWRITE, &h) == ESP_OK : p != nullptr;
+    j.ok = nvs_open("fleet_test", NVS_READWRITE, &h) == ESP_OK;
     j.hits = 0;
     for (int i = 0; j.ok && i < j.n; i++) {
         // Counts, not sample()'s return: loop() samples the same latch
         // concurrently and may be the one to find it.
         sample();                                   // anything before is not ours
         const uint32_t before = underrunCount();
-        j.us[i] = flashCycle(i, j.nvs, h, p, j.bytes);
+        j.us[i] = flashCycle(i, h);
         vTaskDelay(pdMS_TO_TICKS(40));              // let a starved frame finish and latch
         sample();
         j.got[i] = underrunCount() - before;
         j.hits += j.got[i];
         vTaskDelay(pdMS_TO_TICKS(FLASH_TEST_GAP_MS));
     }
-    if (j.ok && j.nvs) { nvs_erase_all(h); nvs_commit(h); nvs_close(h); }
+    if (j.ok) { nvs_erase_all(h); nvs_commit(h); nvs_close(h); }
     xSemaphoreGive(j.done);
     vTaskDelete(nullptr);
 }
@@ -153,15 +142,13 @@ void flashTask(void *) {
 esp_err_t handlePanel(httpd_req_t *req) {
     char q[48], v[8];
     bool resend = false, nvs = false;
-    int flash = 0, kb = 4;
+    int flash = 0;
     if (httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK) {
         if (httpd_query_key_value(q, "resend", v, sizeof(v)) == ESP_OK) resend = atoi(v) != 0;
         if (httpd_query_key_value(q, "flash", v, sizeof(v)) == ESP_OK)  flash = atoi(v);
         if (httpd_query_key_value(q, "nvs", v, sizeof(v)) == ESP_OK)    nvs = atoi(v) != 0;
-        if (httpd_query_key_value(q, "kb", v, sizeof(v)) == ESP_OK)     kb = atoi(v);
     }
     if (flash > FLASH_TEST_MAX) flash = FLASH_TEST_MAX;
-    kb = kb < 4 ? 4 : kb > 256 ? 256 : kb & ~3;   // whole sectors; 8 x 256 KB stays in the partition
 
     static char out[2600];
     int n = snprintf(out, sizeof(out), "%s, driver %s\n", bsp_display.PANEL_MODEL, s_disp->driverName());
@@ -180,21 +167,23 @@ esp_err_t handlePanel(httpd_req_t *req) {
             n += snprintf(out + n, sizeof(out) - n, "  at %lu ms\n", (unsigned long)recent[k]);
     }
 
-    if (flash > 0) {
+    if (flash > 0 && !nvs) {
+        // The erase mode is gone (#98): it erased the settings file system.
+        n += snprintf(out + n, sizeof(out) - n,
+                      "flash test refused: only the NVS mode is kept - /panel?flash=N&nvs=1. The erase mode\n"
+                      "erased the start of the partition that holds the settings file (#98), so it was removed.\n");
+    } else if (flash > 0) {
         if (!s_job.done) s_job.done = xSemaphoreCreateBinary();
         s_job.n = flash;
-        s_job.nvs = nvs;
-        s_job.bytes = (uint32_t)kb * 1024;
-        Serial.printf("[Panel] flash test: %d %s cycles\n", flash, nvs ? "NVS" : "erase");
+        Serial.printf("[Panel] flash test: %d NVS cycles\n", flash);
         const bool started = xTaskCreate(flashTask, "flashtest", 4096, nullptr, 5, nullptr) == pdPASS;
         const TickType_t wait = pdMS_TO_TICKS((uint32_t)flash * (FLASH_TEST_GAP_MS + 500) + 2000);
         if (!started || xSemaphoreTake(s_job.done, wait) != pdTRUE) {
             n += snprintf(out + n, sizeof(out) - n, "flash test: %s\n", started ? "timed out" : "task not started");
         } else if (!s_job.ok) {
-            n += snprintf(out + n, sizeof(out) - n, "flash test: no %s\n", nvs ? "NVS namespace" : "data partition");
+            n += snprintf(out + n, sizeof(out) - n, "flash test: no NVS namespace\n");
         } else {
-            n += snprintf(out + n, sizeof(out) - n, "flash test: %d %s (%d KB erase), %lu ms apart\n", flash,
-                          nvs ? "NVS writes of 512 B" : "erase + 256 B write cycles", nvs ? 0 : kb,
+            n += snprintf(out + n, sizeof(out) - n, "flash test: %d NVS writes of 512 B, %lu ms apart\n", flash,
                           (unsigned long)FLASH_TEST_GAP_MS);
             for (int i = 0; i < flash && n < (int)sizeof(out) - 64; i++)
                 n += snprintf(out + n, sizeof(out) - n, "  %2d: %6.1f ms%s\n", i,
@@ -216,7 +205,7 @@ esp_err_t handlePanel(httpd_req_t *req) {
     } else if (!flash) {
         n += snprintf(out + n, sizeof(out) - n,
                       "/panel?resend=1 sends the panel its init sequence again\n"
-                      "/panel?flash=N tests N flash erase cycles (&nvs=1: NVS writes)\n");
+                      "/panel?flash=N&nvs=1 tests N NVS writes (a scratch namespace, erased after)\n");
     }
     httpd_resp_set_type(req, "text/plain");
     return httpd_resp_send(req, out, n);

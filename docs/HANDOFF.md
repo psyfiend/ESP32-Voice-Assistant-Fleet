@@ -177,7 +177,8 @@ no compiler (the owner's choice to install one, `host-tests/README.md`).
   `firmware.bin` - copy an image you want to keep. Clear `.pio/build_cache` after a BSP,
   struct-layout or `lv_conf.h` edit.
 - **Do not edit source while a build runs** - it compiles the half-finished edit. Docs are safe.
-- **Never run `/panel?flash=N` without `&nvs=1`** (#98).
+- **`/panel?flash=N` keeps only its NVS mode** (#98, `feat/ui-followups`): without `&nvs=1` it is
+  refused. A build older than that branch still erases the settings partition - never run it there.
 - **The harness**: never two runs at one board; the 1060 alone (it is slow). A window closes itself
   after a minute.
 - **A serial monitor resets the board when it opens** - attach with `--rts 0 --dtr 0`, or read it

@@ -182,19 +182,17 @@ flag of its own). `src/PanelDebug.cpp`, `PanelDebug.h` (2.10c round 9, 2.10d).
 | `/panel` | the panel chip and driver; **DSI underruns since boot** (the bridge's feed from PSRAM running dry - a flash on the glass) and the last few times they happened; help lines | Reads. It never reads the panel's registers: a DSI read while the panel streams stops the picture (2.10c) |
 | `/panel?resend=1` | sends the BSP's panel init sequence again, without a reset, and says how many commands went | **Changes the panel controller's registers** back to the BSP's values; the picture may blink. For a washed-out picture (the 4B, twice) |
 | `/panel?flash=N&nvs=1` | N (up to 50) NVS writes of 512 B into a scratch namespace `fleet_test`, 150 ms apart, timing each and counting underruns around it; the namespace is erased afterwards | Writes and erases its own scratch NVS only |
-| `/panel?flash=N` (`&kb=K`, 4-256) | N erase-and-write cycles on the **`spiffs` data partition** | **DESTRUCTIVE - do not use** (below) |
+| `/panel?flash=N` (no `nvs=1`) | **refused**, with the reason: only the NVS mode is kept (#98) | Nothing |
 
-> **WARNING - `/panel?flash=N` without `nvs=1` erases the start of the partition that holds the
-> settings file.** The test erases and writes sectors at the beginning of the `spiffs` partition
-> (offsets 0 to 8 x K KB). Its comment says the partition is "unused until 2.10d's settings
-> file" - and since 2.10d it is exactly where LittleFS keeps `/cfg/settings.json`. LittleFS keeps
-> its superblock at the start of the partition, and the board mounts with "format if the mount
-> fails", so after this test **the next boot is very likely to format the partition and lose
-> every saved setting**: names, groups, added cards, paused entities, selector looks. 2.10d's
-> test sheet ran `flash=20` and `flash=8&kb=256` on the P4_5 (`archive/TEST_2.10d.md`, F2-F3): if
-> that board lost its settings afterwards, this is why. Not changed in 2.12 (it changes no
-> behaviour); a fix is the owner's to choose - the NVS mode alone, or a test region LittleFS does
-> not use (#98).
+> **The erase mode is gone (#98, the owner's choice of fix, 2026-10-14).** `/panel?flash=N` without
+> `nvs=1` used to erase and write sectors at the start of the `spiffs` partition - since 2.10d the
+> LittleFS partition that holds `/cfg/settings.json`. Erasing its first blocks destroys the file
+> system's superblock, and the board mounts with "format if the mount fails", so the next boot
+> formatted the partition and lost every saved setting. The test had already answered its question
+> (DECISIONS A14), so it was removed; a request for it now answers with a refusal and changes
+> nothing. 2.10d's test sheet ran `flash=20` and `flash=8&kb=256` on the P4_5
+> (`archive/TEST_2.10d.md`, F2-F3): if that board lost its settings afterwards, this was why. Builds
+> before `feat/ui-followups` still have it: on them, never run it without `&nvs=1`.
 
 ```
 curl "http://fleet-ws-p4-4b/panel"

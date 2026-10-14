@@ -350,7 +350,9 @@ differ** - `LCD_DSI_ISR_CACHE_SAFE`, `LCD_DSI_ISR_IRAM_SAFE`, `DW_GDMA_ISR_IRAM_
 and the 256 KB L2 are unchanged. Our frame callback (`Fleet_Display.cpp`, `onFrameComplete`) is
 `IRAM_ATTR` and touches only the display object in internal RAM, which a cache-safe interrupt
 requires. Install as in step 6, keeping the #49 folder as `esp32p4_es.hosted_fix` (and the stock one
-where it is); then clear `.pio/build_cache`. Test: `/panel?flash=8&kb=256` while watching the panel.
+where it is); then clear `.pio/build_cache`. Test: `/panel?flash=20&nvs=1` while watching the panel
+(it was `/panel?flash=8&kb=256`, the erase mode - removed in #98, because it erased the settings
+file system).
 
 ## The third rebuild: the PPA rotation hang (2.10d, 2026-10-09, DECISIONS A15)
 

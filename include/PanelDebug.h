@@ -37,18 +37,18 @@
 // write shows on the glass takes eyes (PanelDebug.cpp, "What the recorder
 // cannot see").
 //
-//   http://<board>/panel?flash=N          N 4 KB erase+write cycles on the
-//                                         unused data partition, 150 ms apart,
-//                                         each timed, underruns counted around it
-//   http://<board>/panel?flash=N&kb=K     the same with K KB erased per cycle
-//                                         (4..256; 64 KB aligned is one block)
-//   http://<board>/panel?flash=N&nvs=1    N small NVS writes instead (the kind
-//                                         a Pause makes), in a scratch namespace
-//                                         erased afterwards
+//   http://<board>/panel?flash=N&nvs=1    N small NVS writes (the kind a Pause
+//                                         makes), 150 ms apart, each timed,
+//                                         underruns counted around it, in a
+//                                         scratch namespace erased afterwards
 //
-// Both test whether a flash write starves the panel: while the flash is busy
-// the CPU cache is off, and the interrupt that starts each frame's transfer is
-// not built cache-safe in our framework (CONFIG_LCD_DSI_ISR_CACHE_SAFE off).
+// It tests whether a flash write starves the panel: while the flash is busy the
+// CPU cache is off, and the interrupt that starts each frame's transfer was not
+// built cache-safe until A14 (CONFIG_LCD_DSI_ISR_CACHE_SAFE, the rebuilt libs).
+//
+// /panel?flash=N without nvs=1 is REFUSED (#98). It used to erase and write the
+// start of the "spiffs" data partition - since 2.10d the LittleFS partition
+// that holds the settings file, whose next mount then formatted it.
 //
 class HttpServer;
 class Fleet_Display;
