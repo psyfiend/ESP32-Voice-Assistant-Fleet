@@ -295,6 +295,10 @@ path prefix) has `DEBUG_POPUP` and `DEBUG_FRAMES` on `WS_P4_TOUCH_LCD_5`.
   afternoon it went down.
 - **Host tests: `wsl bash host-tests/run_in_wsl.sh`** - Windows has no compiler for
   `pio test -d host-tests` (`host-tests/README.md`).
+- **Never run `/panel?flash=N` without `&nvs=1`**: it erases the start of the `spiffs` partition,
+  which has held LittleFS and the settings file since 2.10d - very likely every saved setting
+  lost at the next boot. Found 2026-10-13 writing `docs/HTTP_REFERENCE.md` (every route, what it
+  reads and changes); the fix is the owner's to choose.
 - **`scripts/release/gate.ps1` stops at the first S3 environment under Windows PowerShell 5.1**
   (the only PowerShell here; 2026-10-13): with `$ErrorActionPreference = "Stop"`, the S3 linker's
   warning on stderr (`missing .note.GNU-stack section`) becomes a terminating `NativeCommandError`.

@@ -19,6 +19,7 @@ elsewhere, and it is worth checking those first for "is X already known or plann
 | `docs/LESSONS.md` | Mistakes that cost real time, written down so they cost it once |
 | `docs/FUTURE_IMPROVEMENTS.md` | Deliberately deferred fleet-wide work |
 | `docs/REFERENCE_PROJECTS.md` | What is in `reference/`, what to mine from it, and its licensing |
+| `docs/HTTP_REFERENCE.md` | Every HTTP address the boards answer: when it exists, what it reads, what it changes |
 | `docs/display/README.md` | The display stack: status per board, open issues, and which file answers what |
 | `docs/BRINGUP_*.md` | Per-board bring-up history for the two boards that fought back |
 | GitHub issues | What is in flight right now, and what is blocked |
