@@ -42,7 +42,7 @@ on the kit yet - bring each over when it is next changed (`ui-architecture.md` ย
 
 **Built unattended on 2026-10-14 (the owner's overnight brief), waiting for the owner:**
 
-1. **`feat/ui-followups`** (PR_UI) - #96 the dialog's buttons share a narrow row; #97 About in every
+1. **`feat/ui-followups`** (PR #101) - #96 the dialog's buttons share a narrow row; #97 About in every
    build (a button on the system panel), fact lists in two left-aligned columns, the countdown bar
    2 px on the window's edge, the near-equal tokens merged; #23 the Remove dialog shows the bar;
    #92 History's span buttons are the selector, compact (K75); #98 the flash test NVS-only (A16).
@@ -55,7 +55,13 @@ on the kit yet - bring each over when it is next changed (`ui-architecture.md` ย
    real elements - Members, scenes, the Remove dialog, Power on and off - each pressed, Midnight at
    the P4_5's window. **The owner likes satin and agreed its uses** (K77); glass only where
    something asks for attention. Nothing built; a kit role each, frames measured on an S3 first.
-3. **#100** - NINA's clock: PR_CLOCK.
+3. **#100** - NINA's clock, **a prototype: `feat/100-nina-clock` (PR #102)**, off `main`, independent
+   of #101: the Classic face, time and date only, a 2 x 2-cell card pinned top left on a new third
+   page "Clock"; a `CardSpec::type` override asks for a card with no entity; `rowsWanted()` counts
+   the tallest item; the faces converted from the foundry's OFL files (+62 KB). Seen on the 4B and
+   1060 by screenshot, then both put back on #101. Its sheet `docs/TEST_100_CLOCK.md` (on that
+   branch) has Q1-Q4 - the spec override or a clock entity, and Playfair's old-style figures (lining
+   needs fontTools, an install). Left: the weather half, the other six faces, the hero region.
 
 Then **the design interview ยง3 onward**, **2.8** header slots (#19), **2.11** group cards with the
 page arranger (#66, #78) - whose hero region (`layout-engines.md`) is where #100's clock and a music
