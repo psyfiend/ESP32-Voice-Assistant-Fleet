@@ -486,7 +486,8 @@ Rules that are load-bearing rather than stylistic:
 - **Use `UI::part(LV_PART_MAIN)`** instead of `LV_PART_MAIN | LV_STATE_DEFAULT`, which is
   deprecated and warns.
 - **Use `UI::tameScroll()`** on every scrollable container: vertical-only, no elastic springback,
-  no scrollbar. Rubber-banding looks bad at the refresh rates the S3 boards manage.
+  no scrollbar, and clickable so a swipe that starts on a heading or a gap scrolls it (K87).
+  Rubber-banding looks bad at the refresh rates the S3 boards manage.
 
 ### The component kit - build windows from `Kit::`, not from style calls (2.12 P3)
 

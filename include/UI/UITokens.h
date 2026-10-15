@@ -409,13 +409,14 @@ inline lv_style_selector_t part(lv_part_t p, lv_state_t s = LV_STATE_DEFAULT) {
 
 // Scroll behaviour, applied to any container that may overflow.
 //
-// Three things, all of which matter more on these panels than on a phone:
+// Four things, all of which matter more on these panels than on a phone:
 //   - vertical only, so a slightly-too-wide row can never start a sideways drag
 //   - no elastic rubber-banding at the ends, which looks terrible at the refresh
 //     rates the S3 boards manage
 //   - no scrollbar, since it is one more thing to redraw
+//   - clickable, so a swipe that starts on a heading or a gap scrolls it too
 //
-// Call it on every scrollable container rather than remembering three flags.
+// Call it on every scrollable container rather than remembering four flags.
 void tameScroll(lv_obj_t *o);
 
 // Minimum comfortable touch target: ~9 mm, the width of a fingertip. Derived

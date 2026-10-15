@@ -540,6 +540,11 @@ void tameScroll(lv_obj_t *o) {
     lv_obj_set_scrollbar_mode(o, LV_SCROLLBAR_MODE_OFF);
     lv_obj_clear_flag      (o, LV_OBJ_FLAG_SCROLL_ELASTIC);
     lv_obj_clear_flag      (o, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
+    // CAUGHT ANYWHERE (owner, #99 test): LVGL hands a touch to the topmost
+    // CLICKABLE object, so on a bare list a swipe from a day's heading or a
+    // gap fell through to the window and nothing scrolled - only one starting
+    // on a row did.
+    lv_obj_add_flag        (o, LV_OBJ_FLAG_CLICKABLE);
 }
 
 int32_t minTouch() {
