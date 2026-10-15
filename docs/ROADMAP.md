@@ -52,7 +52,7 @@ levels arrive with 2.10c), **#47** discovery payload size, **#48** reason 36.
 | 2.5 | Page + grid engine | DONE 2026-09-18, `v0.2.5` - `design/dashboard.md` |
 | 2.6 | Pages and swipes | DONE 2026-09-24 - `design/pages.md` |
 | 2.7 | First card types | DONE 2026-09-24, `v0.2.7` - `design/cards.md` §13 |
-| 2.8 | Header bar v2 (**#19**) | **interview §3 answered 2026-10-15** (`design/header-slots.md`, D-11-D-15): four evenly spaced slots, each with its own drop-down panel; header shown / hidden per page; slots for the page header and clusters, never a solo card. **Round 1 built unattended 2026-10-15** on `feat/2.8-header-slots` (no PR): the mock's round 2 on the canvas, then the slots as data, their panels, the glyph style as a setting, a page's header shown / hidden, dashes (`TEST_2.8.md` on that branch). **The owner, on seeing it: three places, not four slots** - the clock, alarm and temperature left, the page middle, status right (D-16); the panels are for settings (D-17; `header-slots.md` §9). **Next: round 2** - a mock of the three places, then the build |
+| 2.8 | Header bar v2 (**#19**) | **interview §3 answered 2026-10-15** (`design/header-slots.md`, D-11-D-15): four evenly spaced slots, each with its own drop-down panel; header shown / hidden per page; slots for the page header and clusters, never a solo card. **Round 1 built unattended 2026-10-15** on `feat/2.8-header-slots` (no PR): the mock's round 2 on the canvas, then the slots as data, their panels, the glyph style as a setting, a page's header shown / hidden, dashes (`TEST_2.8.md` on that branch). **The owner, on seeing it: three places, not four slots** - the clock, alarm and temperature left, the page middle, status right (D-16); the panels are for settings (D-17; `header-slots.md` §9). On round 2's mock: the alarm joins the status icons, the weather stays with the clock, the open slot stays joined to its panel (D-18). **Next: round 2's build** |
 | 2.9 | Display stack: esp_lcd (**#67**) | six of nine boards, merged 2026-09-29; left: CYD_S3_8048, WS_S3_5B - `display/README.md` |
 | 2.10 | Card popup (**#65**) | **DONE 2026-10-12.** 2.10a `v0.2.8`; 2.10b `v0.2.9`; 2.10c `v0.2.10` (HA light levels, members of HA groups, scenes, the window redesigned - `design/card-sheet.md` §14-16). **2.10d + 2.10e `v0.2.11`** (merged together, K51): stable ids and saving (§17), History from HA - charts and activity (§18). Sheets in `archive/`. Left over, filed: #90, #91, #92 (K17 done, `v0.2.12`) |
 | 2.11 | Group cards (**#66**) | not started - with the page arranger (#78; its engines: `design/layout-engines.md`); must land before 3.1 |
@@ -105,9 +105,9 @@ The numbers above are identity, not sequence. Agreed with the owner:
    prototype on `feat/100-nina-clock`. #104 (a light's temperature mark) waits.
 4. **2.8 header slots** (#19) - the interview's §3 answered 2026-10-15 (`design/header-slots.md`).
    **Round 1 built 2026-10-15, unattended**, on `feat/2.8-header-slots` (`TEST_2.8.md` there); the
-   owner's verdict: three places, not four slots (D-16, D-17). **Round 2 next**: a mock of the three
-   places, then the build on the same branch. **A17 signed off 2026-10-15** (`v0.2.17`,
-   `archive/TEST_A17.md`), its PR waiting for the owner's merge. Then the interview §4 onward
+   owner's verdict: three places, not four slots (D-16, D-17); round 2's mock refined it (D-18: the
+   alarm with the status icons, the weather with the clock). **Round 2's build next**, on the same
+   branch. ~~**A17**~~ DONE, `v0.2.17` (`archive/TEST_A17.md`). Then the interview §4 onward
    (`design/interview-phase2-3.md`).
 5. **2.11 group cards with the page arranger** (#66, #78; prototype: artifact "Layout Playground";
    engines: `design/layout-engines.md`). Its hero region is what #100 (NINA's clock) waits for.
