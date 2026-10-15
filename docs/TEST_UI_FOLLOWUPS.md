@@ -153,4 +153,25 @@ and activity (P4_5, then 4B):
 
 ## Your results
 
-(empty)
+**Round 1 (owner, 2026-10-14):** T1-T8, T10, T11 **PASS**; T5: the gap between the bar and the
+chart's legend was the point of it, "looks great now"; T6 PASS, with a request (round 2's T12);
+**T9 PARTIAL** - on the 4B the selector widened while the next span loaded, into the room Min / Max
+and Now take, and narrowed again when the chart came (fixed in round 2).
+
+Answers: **Q1** the old settings do not matter - not restored; a way to restore settings after a
+loss is open for discussion. **Q2** an issue: #104. **Q3** 1.6, as built. **Q4-Q7** the
+recommendations, as built (Q7: a "low / no eye candy" setting may come, for a plainer look).
+
+## Round 2 (2026-10-14, after your results)
+
+Two commits on the branch; the P4_5 and the 4B run them (the 1060 still runs round 1).
+
+| # | What | Checked |
+|---|---|---|
+| T9 | **The span selector keeps its size** (K80): the chart's corners set its room, and they are not drawn while a span loads - so the room now only narrows while the window shows one subject (a wider Min / Max narrows it once); Show min/max or another entity starts it afresh. Before the first answer it starts from Now's width | the 4B, Deck's History, every span: 298 px wide while loading ("Loading..." showing) and when drawn (round 1: ~384 while loading, 298-306 drawn) |
+| T12 | **The windows' timeout and countdown bar, from a PC** (K79): `/settings?window_close=60\|30\|10\|off` and `window_bar=on\|off` - system settings in the settings file, from the next window | the 4B: 45 refused; 10 s closed the window after ~11 s; `off` kept it open past 70 s with no bar; 30 with the bar; the bar off hides the window's and the Remove dialog's; 60 and on again leave nothing in the file |
+
+| # | Do this | PASS if |
+|---|---|---|
+| T9 | On the 4B, History on Deck with span buttons on: tap each span, and Show min/max off and on | The selector keeps its width while the chart reloads; it never touches Min / Max or Now |
+| T12 | `curl "http://fleet-ws-p4-5/settings?window_close=10&window_bar=off"`, open a card, wait | No bar; the window closes after 10 s untouched; `window_close=off`: it stays; `window_close=60&window_bar=on`: as before |
