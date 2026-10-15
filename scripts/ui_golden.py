@@ -125,6 +125,20 @@ PLAN = [
         ("about", ["about=1"], 0.8),
         (None, ["about=0"], 0.6),
     ]},
+    # 2.8: the header's glyph styles (shown, never saved; glyphs=3 puts the saved one back) and
+    # each slot's panel - the clock, the page, the sensor (the status slot's is system_panel).
+    # A build before 2.8 ignores slot= and glyphs= and shows the page.
+    {"page": 0, "card": None, "tree": "page", "steps": [
+        ("header_square", ["glyphs=1"], 0.8),
+        ("header_circle", ["glyphs=2"], 0.8),
+        (None, ["glyphs=3"], 0.6),
+        ("slot_clock", ["slot=0"], 1.2),
+        (None, ["slot=-1"], 0.8),
+        ("slot_page", ["slot=1"], 1.2),
+        (None, ["slot=-1"], 0.8),
+        ("slot_sensor", ["slot=3"], 1.2),
+        (None, ["slot=-1"], 0.8),
+    ]},
     {"page": 1, "card": None, "tree": "page", "steps": [("fleet_page", [], 0.5)]},
     {"page": 1, "card": ("All Lamps", "Kitchen", 0), "steps": [
         ("lamps_main", [], 0.6),
