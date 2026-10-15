@@ -16,7 +16,7 @@ Each layer uses the ones below it and never reaches up. Lower layers include no 
 | Hardware and services | display, touch, Wi-Fi, MQTT, Home Assistant, the HTTP server, the saved settings; started in one documented order | `SystemCore`, `components/Fleet_*`, `Settings` - **no LVGL** |
 | Entities | every light, sensor and switch the board knows, from HA, MQTT and virtual sources, behind one mutex; commands go out through it | `components/Fleet_Entities` (`EntityRegistry`), `components/Fleet_Providers`, `components/Fleet_HA` (`HaClient`, `HaHistory`) - **no LVGL** |
 | The LVGL engine | buffers, `lv_init()`, the flush to the panel, touch input | `LVGL_Startup`, `LVGL_Flush_*` |
-| The screen | the root screen, the header, the pages, the system panel and its pages | `GUIManager`, `src/UI/Panel_*`, `LogPage`, `ReferencePage` |
+| The screen | the root screen, the header and its slots' panels (2.8), the pages, the system panel and its pages | `GUIManager`, `src/UI/Panel_*`, `UI/HeaderSlots` + `UI/SlotPanels`, `LogPage`, `ReferencePage` |
 | Pages | a grid of cards built from data (`PageSpec`, the dashboards in `include/Dashboards/`); where each card goes is a **layout engine's** decision | `CardPage` + `Layout::` (`include/Layout/`) |
 | Cards | a card per entity or group, its type from the entity's kind; bound to its entities so it redraws when they change | `src/Cards/` (`Card`, `CardCatalog`, `CardBinder`, `StateCard`, `ValueCard`) |
 | Windows | everything that opens over the page is a **Sheet**: the card window, "About this board" | `Kit::Sheet` (`include/UI/Sheet.h`); clients `CardPopup` + `src/Cards/Popup/`, `UI/AboutSheet` |
@@ -121,7 +121,8 @@ kit). Bring each onto the kit and tokens when it is next changed, not in a sweep
 - **Cards** (`Card.cpp` 1,462 lines and 87 style calls, `StateCard.cpp`, `ValueCard.cpp`) - first,
   because 2.11's group cards and any new card type build on them.
 - **`GUIManager.cpp`** (1,538 lines) - the second file over the 1,000-line mark.
-- The header (`Panel_Header`), the system panel and its pages (`Panel_System`, `Panel_Display`,
+- **The header is on the kit since 2.8** (`Kit::headerBar()`, `headerSlot()`, `glyphFrame()`,
+  `Kit::Drawer` for its slots' panels; `UI::hdr()` sizes). Still to come: the system panel and its pages (`Panel_System`, `Panel_Display`,
   `Panel_Audio`, `LogPage`, `ReferencePage`), `UIToolkit`, the status widgets (whose 34 colour
   literals are most of what the check reports).
 

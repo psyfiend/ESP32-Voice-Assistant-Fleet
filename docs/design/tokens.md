@@ -318,3 +318,29 @@ difference"; built on `feat/ui-followups`, #97, with the harness's before/after 
 | `H_MORE` 7.0 into `H_ROW` 7.2 | 81 / 70 / 47 | 83 / 72 / 48 | "Show more" as tall as a panel row |
 | `S_MEMBERS` 1.4 into `S5` 1.6 (or `S4` 1.2) | 16 / 14 / 9 | 19 / 16 / 11 (or 14 / 12 / 8) | **the owner's choice** - both pictured; built: `S5` |
 | `R_CONTROL` 1.2 and `R_BUTTON` 1.6 as one `R_CONTROL`, 1.6 (or 1.2) | 14 / 12 / 8 and 19 / 16 / 11 | 19 / 16 / 11 (or 14 / 12 / 8) | **the owner's choice** - both pictured; built: 1.6, the corners the owner set on glass for the dialog's buttons and the squared selector (K27) |
+
+## 8. The page header's slots, in logical pixels (2.8)
+
+The header is `sc(SYSTEM_HEADER_FULL_H)` - 35 logical px - tall on every board, so what sits in it
+is sized in the same logical pixels: **`UIHeader`**, read through **`UI::hdr()`**
+(`include/UI/UITokens.h` §2c), passed to `UI::sc()`. One `const` set, fleet-wide. `GLYPH`, the
+dots, `SLOT_GAP` and `LINE` are the values the bar had before it had slots; the frames are the
+"2+" chip of #19's mock; the drawer's are the system panel's shape, named.
+
+| Token | Value | What uses it |
+|---|---|---|
+| `GLYPH` | 28 | a status glyph's drawing box, bare - today's size |
+| `GLYPH_FRAMED` | 19 | the same glyph inside a frame |
+| `FRAME` | 26 | a glyph's frame: the rounded square, the circle |
+| `FRAME_R` | 7 | the rounded square's corners |
+| `FRAME_MIX` | 14 | the rounded square's shade: % of `TEXT` over the bar |
+| `SLOT_GAP` | 8 | between the things in one slot |
+| `SLOT_PAD` | 4 | a slot's sides |
+| `DOT_ON`, `DOT_OFF`, `DOT_RING`, `DOT_GAP` | 11, 8, 2, 5 | the page's dots: this page's, another's ring and its line, between them |
+| `MARK` | 12 | the error mark beside a slot's dashes |
+| `LINE` | 2 | the bar's accent line |
+| `DRAWER_W` | 260 | a slot's panel at most |
+| `DRAWER_R`, `DRAWER_PAD`, `DRAWER_GAP`, `DRAWER_LINE` | 15, 10, 8, 2 | a slot's panel: its bottom corners, inside, between rows, its edge |
+
+Logical rather than millimetres (`UIShape`) because the bar they sit in is logical; the two agree
+to within the scale's clamps (1 logical px is ~0.15 mm wherever `sc()` is not clamped).

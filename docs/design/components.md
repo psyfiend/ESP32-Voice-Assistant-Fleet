@@ -215,6 +215,42 @@ columns (owner, TEST_2.12 and this branch's first build; #97). Values too long f
 each way, and wrap in their column, their words at the first line. A fact list holds fact rows
 only.
 
+### The page header - `Kit::headerBar()`, `Kit::headerSlot()`, `Kit::glyphFrame()` (2.8)
+
+![The header before, then bare, square and circle](../followups/28_hdr_before_p45.png)
+
+**The bar** (`KS_HDR_BAR`): full width, the header's height, `SURFACE_ALT` with the accent line
+along its bottom (`LINE`) and the scheme's drop shadow - the look `Panel_Header` set locally before
+it had slots. **A slot** (`KS_HDR_SLOT`): an equal share of the bar (flex-grown, its own width
+ignored), its contents centred in a row `SLOT_GAP` apart, `SLOT_PAD` at its sides; tinted while
+pressed (`KS_HDR_SLOT_PRESSED`), and in the drawer's face while `LV_STATE_CHECKED` - its panel open
+- so the slot opens into its panel like a folder's tab (`KS_HDR_SLOT_OPEN`). Its words are
+`KS_HDR_TEXT` (the header's face) and `KS_HDR_TEXT_DIM` (am / pm, "3 / 15"); a sensor's icon
+`KS_HDR_ICON`; the clock's row `KS_HDR_CLOCK` (bottoms together), the dots' row `KS_HDR_DOTS`, the
+dots `KS_HDR_DOT_ON` (this page: larger, filled) and `KS_HDR_DOT_OFF` (a ring); the error mark
+beside a slot's dashes `KS_HDR_MARK` ("!" on a disc in `ST_WARN`).
+
+**A glyph's frame** (#19's open question, built as a setting): `GLYPH_BARE` an empty holder the
+glyph's own size; `GLYPH_SQUARE` the rounded square (`KS_GLYPH_SQUARE`, `FRAME` square, `FRAME_R`
+corners, `FRAME_MIX`% of `TEXT` over the bar); `GLYPH_CIRCLE` the circle (`KS_GLYPH_CIRCLE`), its
+colour the glyph's state - set by the glyph - and the glyph drawn in the bar's colour. Framed, a
+status glyph is drawn at `GLYPH_FRAMED` instead of `GLYPH`, and the link glyph leaves out its own
+square. What a slot holds is `Panel_Header`'s, by its kind (`UI/HeaderSlots.h`).
+
+### A drawer - `Kit::drawer(D, parent, w)`, `drawerPlace()`, `drawerOpen()`, `drawerClose()` (2.8)
+
+![The clock slot's panel](../followups/28_slot_clock_p45.png)
+
+**A panel that slides down from a header slot**: the system panel's shape and motion, which it was
+built to match - square where it meets the bar, `DRAWER_R` below, `DRAWER_LINE` edge, 350 ms
+ease-out, its face riding the growing edge (#81). `drawerPlace()` centres it under its slot and
+keeps it on the screen; `drawerOpen()` measures the face and grows to it (at most the screen below);
+`drawerClose()` takes it back to nothing and hides it. `drawerWidth()` is the system panel's width
+rule capped at `DRAWER_W`. Its lines: `drawerItem()` (full width, a finger tall, a dot - filled or
+a ring - and words; `KS_DRAWER_ITEM`), `drawerNote()` (dim, wrapping) and `drawerBig()` (a time, a
+reading; `KS_DRAWER_BIG`). The status slot's drawer is still the older `Panel_System`, which keeps
+its own code until it is next changed.
+
 ---
 
 ## 3. The Sheet - `include/UI/Sheet.h` (2.12 P4)

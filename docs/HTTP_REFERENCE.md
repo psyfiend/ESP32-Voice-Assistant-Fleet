@@ -248,7 +248,10 @@ order.
 | `/popup?dur=0\|1` | activity's Show duration off/on (not kept) |
 | `/popup?chips=0\|1` | the span buttons off/on (not kept) |
 | `/popup?about=1` / `about=0` | opens / closes "About this board" (2.12 P4) - the board, screen, chip, firmware, uptime, memory, LVGL's pool, each second. Every build also opens it from the system panel's About button (#97) |
-| `/popup?drawer=1` / `drawer=0` | a tap on the header's icon: the system panel opens / closes (#97, so the harness can see it); "already open/closed" when it was |
+| `/popup?drawer=1` / `drawer=0` | a tap on the header's status slot: the system panel opens / closes (#97, so the harness can see it); "already open/closed" when it was |
+| `/popup?slot=N` / `slot=-1` | 2.8: a tap on header slot N (0 the clock, 1 the page, 2 status, 3 the sensor, on the default header): its panel opens - the status slot's is the system panel; `-1` closes any. UI |
+| `/popup?glyphs=0\|1\|2\|3` | 2.8: the header's glyphs bare, in a rounded square, in a circle - **not saved** (a capture leaves the owner's choice); `3` the saved style again. UI |
+| `/popup?pagehdr=0\|1` | 2.8: this page's header hidden / shown - **Saved**, as the page slot's panel and Hide Bar save it (`pages.<slug>.header`; shown is the default and is stored as nothing) |
 | `/popup?removecard=3` | the Remove card dialog over any card's window, to look at; its Remove does nothing to a compiled card; `close=1` takes it down |
 
 ### Settings for the next windows (each **RAM**)
