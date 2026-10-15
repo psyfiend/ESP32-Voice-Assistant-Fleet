@@ -162,9 +162,43 @@ size up in the accent: the window's corner icons work as tabs that way.
 
 ![Scene pills](components/scenes.png) ![Colour swatches](components/swatches.png)
 
-`KS_PILL` / `KS_PILL_PRESSED`: a round button with words (a scene); room for the ring round the
-loaded one. `KS_SWATCH`: a round colour swatch with a hairline edge (the colour is the caller's).
-`KS_BADGE_PAUSED`: the card's own PAUSED badge.
+`KS_PILL` / `KS_PILL_PRESSED`: a round button with words (a scene) - satin, glass while it is the
+scene loaded (below; it had a ring until #99). `KS_SWATCH`: a round colour swatch with a hairline
+edge (the colour is the caller's). `KS_BADGE_PAUSED`: the card's own PAUSED badge.
+
+### Finishes - `Kit::finish(o, w, h, r, finish, tint)` (#99, K77, K85)
+
+![Members, before and after](../followups/99_members_p45.png)
+
+What a surface says about a thing you can tap, decided once for every component:
+
+| Finish | Means | Where |
+|---|---|---|
+| **Satin** | can be tapped, not chosen | Members' rows, scenes not loaded, the dialog's buttons (a role keeps its colour: Remove's red), Power while off, the header's buttons (close, back, the tabs) |
+| **Glass** | chosen or active | the selector, the tab showing, a scene loaded, Power while on |
+| **Flat** | information | fact rows, labels - no finish at all |
+
+`Kit::finish()` paints the face into the object (its first child, an image): **satin** - a light
+at the top fading by the middle, a faint step, a shade growing below, a soft edge (a shade on a
+light scheme); **glass** - the selector's metal (`metalKind()`). Called again, it changes the
+finish (a scene loaded and no longer; Power on and off - `Kit::selectorActionLit()`). Pressed:
+satin darkens 30 %, glass lightens 20 %, and the object sinks 1 px (`KS_SINK`) - the tint a
+**veil**, a rounded object in the face's shape over it, because LVGL drops the corner clip of an
+image it recolours (LESSONS). Colour still carries
+state: a member's "On, 100%, 2710 K" is in `KS_LABEL_TAG_ACTIVE`, "Off" white, Paused dimmed. A
+colour drawn on glass goes through `Kit::glassInk()`, which moves it away from the metal's tone
+(Linen's olive was lost on its silver). **The selector's glass shows the rail through it** (owner,
+#99): a band a fifth taller than the rail outside, the rail's colour a quarter darker, half faded
+into the metal, edge to edge behind the icon (`setFace(..., band)`).
+
+**Painted by hand and dithered to the 16-bit grid**, as the metal is: LVGL's own gradients band
+pink and green on these panels (LESSONS). **Satin is painted in 16 bits** - no alpha, its corners cut
+by LVGL from the image's radius - and **floats** (`LV_OBJ_FLAG_FLOATING`), so an object sized to its
+content does not grow by the face. Faces are kept in 16 slots in PSRAM (12 before #99), per size,
+kind and colour. What it costs, WS_P4_5, a full redraw with the window open (`/bench what=full`,
+20 frames): Members 113.1 -> 124.1 ms, Scenes 115.8 -> 121.1, the dialog 165.9 -> 170.3, the
+controls 127.3 -> 128.0; the first window after a boot opens ~35 ms slower, painting Power's two
+faces once. Not yet measured on an S3 (W6).
 
 The pictures are WS_P4_5 in Midnight, cut from the harness's screenshots
 (`scripts/ui_golden.py crop`).

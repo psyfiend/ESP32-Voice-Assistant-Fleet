@@ -44,10 +44,9 @@ on the kit yet - bring each over when it is next changed (`ui-architecture.md` ย
 **A PR is opened only after the owner has run the tests and answered the questions** (owner,
 2026-10-14): push the branch, discuss, then `gh pr create`. The owner's order, 2026-10-14 evening:
 
-1. **#99, satin** - the mock **"Glass, Satin, Flat"** (https://claude.ai/artifact/G5XANwGMdgWKR19HS1ZQvj,
-   linked on #99). **The owner likes satin and agreed its uses** (K77): Members' rows, scenes not
-   loaded, the dialog's buttons, Power while off; glass only where something asks for attention.
-   Nothing built: a kit role each, frames measured on an S3 first (W6) - an S3 must be on the desk.
+1. ~~**#99, satin**~~ - **DONE, `v0.2.16`** (`archive/TEST_99.md`; K77, K85-K87): satin and glass
+   from `Kit::finish()`, the rail through the selector's glass, lists that scroll from anywhere. The
+   S3 frame measurement is still owed (the owner: merge, measure later).
 2. **2.8** header slots (#19), as far as the evening goes (after the design interview ยง3 in
    `ROADMAP.md`'s order).
 3. **Overnight candidates**: **A17** - a failed mount never costs the settings (format only a blank

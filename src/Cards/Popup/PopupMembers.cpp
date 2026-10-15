@@ -24,6 +24,8 @@ void buildMembers() {
     UI::tameScroll(list);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(list, mm(UI::shape().S5), 0);
+    lv_obj_t *rows[POPUP_ENT_MAX] = {};
+    uint8_t nRows = 0;
     for (uint8_t i = 0; i < memberCount(); i++) {
         const Entity *e = memberAt(i);
         if (!e) continue;
@@ -34,16 +36,21 @@ void buildMembers() {
         lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_all(r, mm(UI::shape().S5), 0);
         lv_obj_add_event_cb(r, memberRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
+        if (nRows < POPUP_ENT_MAX) rows[nRows++] = r;
         lv_obj_t *n = Kit::label(r, KS::KS_LABEL_NAME);
         lv_label_set_text(n, e->desc.name);
-        lv_obj_t *v = Kit::label(r, KS::KS_LABEL_TAG_DIM);
+        // ITS STATE IN COLOUR (owner, the #99 mock): on in the active colour,
+        // off and any other value in white, paused or unavailable dimmed.
         char buf[48];
+        KS role = KS::KS_LABEL_TAG;
         const EntityAttrs &at = e->attrs;
         if (e->paused) {
             // Out of the group, but still listed and saying why (owner, 2.10b).
-            lv_label_set_text(v, "Paused");
+            snprintf(buf, sizeof(buf), "Paused");
+            role = KS::KS_LABEL_TAG_DIM;
         } else if (!e->available) {
-            lv_label_set_text(v, "Unavailable");
+            snprintf(buf, sizeof(buf), "Unavailable");
+            role = KS::KS_LABEL_TAG_DIM;
         } else if (e->desc.kind == EntityKind::LIGHT && e->value.type == ValueType::BOOL && e->value.b &&
                    at.brightness >= 0) {
             // A light's levels, so a group's commands can be checked member by
@@ -55,16 +62,24 @@ void buildMembers() {
                 snprintf(buf, sizeof(buf), "On, %d%%, color %d", pct, at.hue);
             else
                 snprintf(buf, sizeof(buf), "On, %d%%", pct);
-            lv_label_set_text(v, buf);
+            role = KS::KS_LABEL_TAG_ACTIVE;
         } else if (e->value.type == ValueType::BOOL) {
-            lv_label_set_text(v, cardStateWord(e->desc, e->value.b));
+            snprintf(buf, sizeof(buf), "%s", cardStateWord(e->desc, e->value.b));
+            if (e->value.b) role = KS::KS_LABEL_TAG_ACTIVE;
         } else {
             cardFormatValue(*e, buf, sizeof(buf), true, s.tempUnit);
-            lv_label_set_text(v, buf);
         }
+        lv_obj_t *v = Kit::label(r, role);
+        lv_label_set_text(v, buf);
     }
     lv_obj_t *note = Kit::label(list, KS::KS_LABEL_TAG_DIM);
     lv_label_set_text(note, "Tap a member for more details");   // owner's words, 2026-10-07
+    // SATIN (#99, K77): a row can be tapped and is not chosen. Painted at the
+    // rows' laid-out size, which only the layout knows.
+    lv_obj_update_layout(list);
+    for (uint8_t i = 0; i < nRows; i++)
+        Kit::finish(rows[i], lv_obj_get_width(rows[i]), lv_obj_get_height(rows[i]),
+                    lv_obj_get_style_radius(rows[i], LV_PART_MAIN), Kit::Finish::FINISH_SATIN);
 }
 
 // --- A MEMBER'S OWN CONTROLS (2.10b; owner: tap a row in Members) -----------

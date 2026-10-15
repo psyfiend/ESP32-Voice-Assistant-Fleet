@@ -100,9 +100,10 @@ The numbers above are identity, not sequence. Agreed with the owner:
    its own) - DONE, `v0.2.12`.
 2. ~~**2.12 UI foundation - the refactor**~~ - DONE, `v0.2.13`.
 3. ~~**The UI follow-ups from 2.12's test**~~ - DONE, `v0.2.15` (#96, #97, #23 and #92 in part, #98;
-   `archive/TEST_UI_FOLLOWUPS.md`); #93 `v0.2.14`. **Next (owner, 2026-10-14): #99** satin (K77),
-   then **2.8**; A17 (settings safe from a failed mount) on its own branch. #100 NINA's clock is
-   **tabled** - three clocks agreed (K81-K84, #100), prototype on `feat/100-nina-clock`.
+   `archive/TEST_UI_FOLLOWUPS.md`); #93 `v0.2.14`; ~~#99 satin~~ DONE, `v0.2.16` (K77, K85-K87;
+   `archive/TEST_99.md`). **Next: 2.8** (the interview §3 first); A17 (settings safe from a failed
+   mount) on its own branch. #100 NINA's clock is **tabled** - three clocks agreed (K81-K84, #100),
+   prototype on `feat/100-nina-clock`.
 4. **The design interview §3 onward** (`design/interview-phase2-3.md`), then **2.8** header slots (#19).
 5. **2.11 group cards with the page arranger** (#66, #78; prototype: artifact "Layout Playground";
    engines: `design/layout-engines.md`). Its hero region is what #100 (NINA's clock) waits for.
@@ -115,7 +116,8 @@ ordered); #69 4B panel timing (WS_S3_4B locked up, waiting to be troubleshot); #
 ## Other open work, by theme
 
 - **Looks**: #73 type ladder, #80 tag styles, #82 per-panel colour, #83 custom icon packs, #85 colour
-  borders and a custom scheme page, #79 page transitions, #99 a quieter glass finish.
+  borders and a custom scheme page, #79 page transitions; History's activity rows in satin once an S3
+  is measured (K86).
 - **Side projects**: #100 clocks - small, NINA medium and NINA full (K81), the full one in 2.11's hero
   region; tabled 2026-10-14.
 - **Behaviour**: #74 clock (RTC fallback), #75 night mode, #76 HA alerts, #84 "no data yet", #71

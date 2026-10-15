@@ -537,6 +537,24 @@ next piece of eye candy:
   as red and blue, so a truncated ramp is not grey at every step. An ARGB8888 face painted by hand
   needs dithering to the 565 grid (an ordered 4x4, the same threshold on every channel) - LVGL's own
   gradients do not help here.
+- **An image with alpha is blended a pixel at a time; an opaque 16-bit one is copied (#99,
+  2026-10-14).** Three ARGB8888 satin rows made a full redraw of Members 22 ms slower on the P4_5;
+  painted as RGB565 with no alpha, LVGL cutting the corners from the image's `radius` style
+  (`clip_radius`), the same rows cost 11. A face that is opaque but for its corners should be 16-bit.
+- **`LV_SIZE_CONTENT` counts a child that only ignores the layout.** A face image as big as its
+  parent, with `LV_OBJ_FLAG_IGNORE_LAYOUT`, reached into the parent's padding - and the Members rows,
+  sized to their content, grew by that padding (68 px to 106). `LV_OBJ_FLAG_FLOATING` takes a child
+  out of the content size as well.
+- **An image both recoloured and corner-clipped loses its clip (#99, 2026-10-15).** LVGL's
+  software image draw has a path for a radius (`radius_only()`, no recolor) and one for a recolor
+  (`recolor_only()`, no radius); with both it falls to the general path, which here drew the square
+  image whole - a pressed satin button showed square. Tint a clipped face with a rounded veil
+  object over it, never with `image_recolor`.
+- **A touch goes to the topmost CLICKABLE object, so a bare scrolling list cannot be swiped from
+  its gaps (#99, 2026-10-15).** The activity log scrolled when the finger landed on a row (a
+  clickable item whose drag chains to the list) and not on a day's heading - a label, so the touch
+  fell through the list, which was not clickable either, to the window. `UI::tameScroll()` now makes
+  every scrolling list clickable.
 - **A flex column centres its children twice.** With `LV_FLEX_ALIGN_CENTER` on the cross axis, LVGL
   centres a "track" as wide as the widest child in the parent, then each child in the track. Two
   integer roundings: the 1060's control deck moved a pixel whenever a sibling (the slider's row)

@@ -7,8 +7,8 @@
 // icon at the next size up, in the accent; its icon changes to a neighbour's
 // once the selector is more than halfway over it, and on release it snaps to
 // the nearest choice, which is then chosen. A tap on a choice glides the
-// selector there. An ACTION (the window's Power) is a plain button at the
-// start, on a ribbon of its own, and the selector never lands on it.
+// selector there. An ACTION (the window's Power) is a button at the start -
+// satin, glass while lit (#99) - and the selector never lands on it.
 #include "UI/Kit.h"
 
 namespace Kit {
@@ -23,18 +23,9 @@ static uint32_t quietHex(bool quiet, uint32_t hex) {
 // Round icon buttons
 // ---------------------------------------------------------------------------
 
-// Pressed feedback for a button whose face is an image: the face tinted
-// towards the text colour while a finger is on it.
-static void facePressCb(lv_event_t *ev) {
-    lv_obj_t *b = (lv_obj_t *)lv_event_get_current_target(ev);
-    if (lv_obj_get_child_count(b) == 0) return;
-    lv_obj_t *img = lv_obj_get_child(b, 0);
-    if (!lv_obj_check_type(img, &lv_image_class)) return;
-    const bool down = lv_event_get_code(ev) == LV_EVENT_PRESSED;
-    lv_obj_set_style_image_recolor    (img, UI::c(UI::pal().TEXT), 0);
-    lv_obj_set_style_image_recolor_opa(img, down ? LV_OPA_20 : LV_OPA_TRANSP, 0);
-}
-
+// SATIN (owner, #99 test: "make the navigation buttons appear as satin" -
+// they were soft dents, round 6): close, back and the tabs can be tapped and
+// are not chosen. Pressed, satin's own feedback (Kit::finish()).
 lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f, lv_event_cb_t cb,
                      lv_obj_t **outLabel) {
     const UIPalette &p = UI::pal();
@@ -46,22 +37,19 @@ lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f, lv
     lv_obj_t *l = label(b, f, p.TEXT);
     lv_label_set_text(l, glyph);
     lv_obj_center(l);
-    setFace(b, sz, sz, sz / 2, FaceKind::FACE_DENT, p.SURFACE);
-    lv_obj_add_event_cb(b, facePressCb, LV_EVENT_PRESSED,    nullptr);
-    lv_obj_add_event_cb(b, facePressCb, LV_EVENT_RELEASED,   nullptr);
-    lv_obj_add_event_cb(b, facePressCb, LV_EVENT_PRESS_LOST, nullptr);
+    finish(b, sz, sz, sz / 2, Finish::FINISH_SATIN);
     lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, nullptr);
     if (outLabel) *outLabel = l;
     return b;
 }
 
-// Lit as the selector is (owner, 2026-10-07): the same metal, the icon a face
-// up and in the accent. Unlit: a soft dent in the surface (round 6).
+// Lit as the selector is (owner, 2026-10-07): glass, the icon a face up and in
+// the accent. Unlit: satin (#99).
 void iconButtonLit(lv_obj_t *b, bool lit) {
     if (!b) return;
     const UIPalette &p = UI::pal();
     const int32_t sz = UI::minTouch();
-    setFace(b, sz, sz, sz / 2, lit ? metalKind() : FaceKind::FACE_DENT, p.SURFACE);
+    finish(b, sz, sz, sz / 2, lit ? Finish::FINISH_GLASS : Finish::FINISH_SATIN);
     if (lv_obj_t *l = labelIn(b)) {
         lv_obj_set_style_text_color(l, UI::c(lit ? selectorColours().chosen : p.TEXT), 0);
         lv_obj_set_style_text_font (l, lit ? UI::type().ICON : UI::type().ICON_MD, 0);
@@ -216,7 +204,9 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
         lv_obj_set_style_bg_color(rib, UI::c(quietHex(q, col.ribbon)), 0);
         lv_obj_set_style_bg_opa  (rib, LV_OPA_COVER, 0);
     };
-    if (hasAction) ribbon(0, actionW);
+    // The action stands on a ribbon of its own only in a quiet selector; else
+    // it has a finish (#99).
+    if (hasAction && q) ribbon(0, actionW);
     if (S.n) ribbon(actionW + brk, W - actionW - brk);
 
     // A choice: an icon, or a word in the label face.
@@ -233,7 +223,20 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
         return b;
     };
 
-    if (hasAction) S.action = iconAt(g, spec.actionGlyph, spec.actionCb, nullptr);
+    // THE ACTION'S FINISH (#99, K77): satin, and glass while what it switches is
+    // on (selectorActionLit()) - a choice's size, its corners the selector's.
+    // A quiet one keeps it plain (actW 0: never finished).
+    S.actLit = -1;
+    S.actW = S.actH = S.actR = 0;
+    if (hasAction) {
+        S.action = iconAt(g, spec.actionGlyph, spec.actionCb, nullptr);
+        if (!q) {
+            S.actW = slotW;
+            S.actH = slotH;
+            S.actR = (selectorLookNow() & 1) ? LV_MIN(slotW, slotH) / 2 : UI::mm(UI::shape().R_CONTROL);
+            selectorActionLit(S, false);
+        }
+    }
     int32_t x = actionW + brk + g;
     const uint8_t chosen = spec.chosen < S.n ? spec.chosen : 0;
     for (uint8_t i = 0; i < S.n; i++) {
@@ -250,10 +253,12 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     lv_obj_set_user_data(S.sel, &S);
     lv_obj_set_size(S.sel, S.selW, H);
     lv_obj_set_style_radius(S.sel, selectorRadius(), 0);
-    // Its face is metal, curved and brushed (KitFaces.cpp). Greyed when quiet,
-    // as everything else is.
+    // Its face is metal, curved and brushed (KitFaces.cpp), the rail showing
+    // through it as through a lens - a fifth taller than the rail outside
+    // (owner, #99). Greyed when quiet, as everything else is.
     const int32_t selR = (selectorLookNow() & 1) ? LV_MIN(S.selW, H) / 2 : UI::mm(UI::shape().R_CONTROL);
-    if (lv_obj_t *img = setFace(S.sel, S.selW, H, selR, metalKind(), quietHex(q, UI::pal().GROUND))) {
+    const int32_t lens = LV_MIN(rh * 12 / 10, H * 85 / 100);
+    if (lv_obj_t *img = setFace(S.sel, S.selW, H, selR, metalKind(), quietHex(q, UI::pal().GROUND), 0, lens)) {
         if (q) {
             lv_obj_set_style_image_recolor    (img, UI::c(UI::pal().SURFACE_ALT), 0);
             lv_obj_set_style_image_recolor_opa(img, (lv_opa_t)166, 0);
@@ -282,6 +287,13 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     S.shown = chosen;
     lv_label_set_text(S.selIcon, S.glyph[chosen]);
     lv_obj_set_pos(S.sel, selX(S, chosen), 0);
+}
+
+// Only on a change: the window refreshes its state often.
+void selectorActionLit(Selector &S, bool lit) {
+    if (!S.action || S.actW <= 0 || S.actLit == (int8_t)lit) return;
+    S.actLit = (int8_t)lit;
+    finish(S.action, S.actW, S.actH, S.actR, lit ? Finish::FINISH_GLASS : Finish::FINISH_SATIN);
 }
 
 } // namespace Kit

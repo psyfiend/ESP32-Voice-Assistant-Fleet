@@ -1,5 +1,5 @@
-// The Scenes view (2.12 P1, split from CardPopup.cpp): which scenes are offered, the ring round
-// one loaded from the window, and the stack of buttons.
+// The Scenes view (2.12 P1, split from CardPopup.cpp): which scenes are offered, the mark on the
+// one loaded from the window (a ring until #99, glass since), and the stack of buttons.
 #include "PopupState.h"
 
 namespace popup {
@@ -43,7 +43,8 @@ const Entity *shownScene(uint8_t i) {
 
 bool hasScenes() { return shownScenes() > 0; }
 
-// THE RING ROUND A LOADED SCENE (owner, 2.10c S5) says "the light is as that
+// THE MARK ON A LOADED SCENE (owner, 2.10c S5; a ring until #99, glass since -
+// K77, "the ring" in the names below) says "the light is as that
 // scene left it", so it lasts only while that is true: until the window
 // closes, any command from the window, or a change from elsewhere. A scene
 // fades in over a second or two and the bridge reports as it goes, so a
@@ -78,7 +79,7 @@ bool sceneRingCheck(uint32_t now) {
     return false;
 }
 
-// A scene button: load it (scene.turn_on), and ring it - see above.
+// A scene button: load it (scene.turn_on), and mark it - see above.
 void sceneCb(lv_event_t *ev) {
     const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
     if (pausedBlocks()) return;
@@ -110,8 +111,10 @@ SceneStack sceneStack(int32_t maxW) {
     const UIShape &u = UI::shape();
     SceneStack k;
     k.gap = pm(u.P_SCENE_GAP);
-    // The stack's own padding holds the ring (outline pad + width), which its
-    // edge would otherwise clip.
+    // The stack's own padding held the ring round a loaded scene (outline pad
+    // + width), which its edge would otherwise have clipped. The ring went
+    // with #99 - a loaded scene is glass - and the padding stays, so the
+    // buttons keep their size and place.
     k.pad = LV_MAX(2, mm(u.RING_PAD)) + LV_MAX(2, mm(u.RING_W)) + 1;
     k.ch  = LV_MAX(mm(u.SWATCH), LV_MIN(pm(u.P_SCENE_H), (s.heroH - 2 * k.gap - 2 * k.pad) / 3));
     k.bw  = k.ch * 16 / 10;
@@ -157,7 +160,7 @@ void buildSceneGrid(lv_obj_t *col, int32_t colW) {
     }
     lv_obj_set_style_pad_column(grid, gap, 0);
     lv_obj_set_style_pad_row   (grid, gap, 0);
-    lv_obj_set_style_pad_all   (grid, pad, 0);   // room for the ring
+    lv_obj_set_style_pad_all   (grid, pad, 0);   // the ring's old room (sceneStack())
 
     for (uint8_t i = 0; i < shownScenes() && i < ENTITY_SCENES_MAX; i++) {
         const Entity *sc = shownScene(i);
@@ -167,10 +170,15 @@ void buildSceneGrid(lv_obj_t *col, int32_t colW) {
         Kit::add(b, KS::KS_PILL);
         Kit::add(b, KS::KS_PILL_PRESSED, UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
         // Greyed in a paused window, as everything else is: its own colours.
+        // Else satin, glass while it is the scene loaded (#99, K77) - from the
+        // first frame, and renderLight() keeps it so.
+        const bool loaded = i == s.lastScene;
         if (s.builtPaused) lv_obj_set_style_bg_color(b, UI::c(quiet(p.SURFACE)), 0);
+        else Kit::finish(b, k.bw, ch, ch / 2, loaded ? Kit::Finish::FINISH_GLASS : Kit::Finish::FINISH_SATIN);
         lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(b, sceneCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
-        lv_obj_t *l = s.builtPaused ? makeLabel(b, t.TAG, quiet(p.TEXT)) : Kit::label(b, KS::KS_LABEL_TAG);
+        lv_obj_t *l = s.builtPaused ? makeLabel(b, t.TAG, quiet(p.TEXT))
+                                    : Kit::label(b, loaded ? KS::KS_LABEL_TAG_ACCENT : KS::KS_LABEL_TAG);
         lv_label_set_text(l, sc->desc.name);
         lv_obj_center(l);
         s.sceneBtn[i] = b;

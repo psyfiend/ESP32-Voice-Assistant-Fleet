@@ -52,6 +52,7 @@ static void fill() {
     text(S::KS_LABEL_TAG,        t.TAG,  p.TEXT);
     text(S::KS_LABEL_TAG_DIM,    t.TAG,  p.TEXT_DIM);
     text(S::KS_LABEL_TAG_ACCENT, t.TAG,  p.ACCENT);
+    text(S::KS_LABEL_TAG_ACTIVE, t.TAG,  p.ST_ACTIVE);
 
     // --- Buttons ---
     fillButton(S::KS_BTN_CANCEL, S::KS_BTN_CANCEL_PRESSED, S::KS_BTN_CANCEL_INK,
@@ -219,6 +220,10 @@ static void fill() {
     lv_style_set_radius  (bar, LV_RADIUS_CIRCLE);
     lv_style_set_bg_color(bar, UI::c(p.ACCENT));
     lv_style_set_bg_opa  (bar, LV_OPA_COVER);
+
+    // --- The finishes (#99) ---
+    // Pressed, a finished surface goes down a pixel, its face with it.
+    lv_style_set_translate_y(st(S::KS_SINK), 1);
 }
 
 void begin() {
