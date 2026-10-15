@@ -14,6 +14,7 @@
 #include "UI/Bench.h"
 #include "Dashboards/Dashboard_Fleet.h"
 #include "Dashboards/Dashboard_HA.h"   // both pages on every board since 2.6
+#include "Dashboards/Dashboard_Clock.h"   // #100's prototype: NINA's clock, a page of its own
 #include "bsp_loader.h"
 #include "Settings.h"   // 2.10d: the claims on saved settings, and [SETTINGS]
 #include "Cards/CardGroups.h"
@@ -32,7 +33,7 @@ static GUIManager *s_self = nullptr;
 
 // THE DASHBOARD'S PAGES, in swipe order - initPages() builds from it, and the
 // settings file's claims (K35) ask it which card ids exist.
-static const PageSpec *const DASH_PAGES[] = { &HA_PAGE, &FLEET_PAGE };
+static const PageSpec *const DASH_PAGES[] = { &HA_PAGE, &FLEET_PAGE, &CLOCK_PAGE };
 static constexpr uint8_t DASH_PAGE_N = sizeof(DASH_PAGES) / sizeof(DASH_PAGES[0]);
 
 // Saved settings nobody claims (2.10d, K35). A card's entry is claimed when

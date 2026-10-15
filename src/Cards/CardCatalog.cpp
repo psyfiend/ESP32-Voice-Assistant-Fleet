@@ -1,4 +1,5 @@
 #include "Cards/CardCatalog.h"
+#include "Cards/ClockCard.h"
 
 // A switch and a light do the same thing, and since 2.10b it is what an HA
 // group does (owner, 2026-10-05): a card that is ON - by its GroupOn rule,
@@ -47,4 +48,12 @@ Card *cardForEntity(const Entity *e) {
     Card *c = cardForKind(e->desc.kind);
     if (c) c->bindPrimary(e);
     return c;
+}
+
+Card *cardForSpecType(CardSpecType type) {
+    switch (type) {
+        case CardSpecType::SPEC_CLOCK:       return new ClockCard();
+        case CardSpecType::SPEC_FROM_ENTITY: return nullptr;   // cardForEntity()'s
+    }
+    return nullptr;
 }

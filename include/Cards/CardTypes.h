@@ -407,6 +407,18 @@ struct CardPlacement {
 };
 
 // ---------------------------------------------------------------------------
+// A card that is not an entity's (#100, a prototype). Every other card's type
+// comes from its first entity's kind (CardCatalog's cardForKind()); a card with
+// nothing to show from the registry - a clock - is asked for by name instead.
+// SPEC_FROM_ENTITY, the default, is every card there was before: a spec that
+// says nothing here changes nothing.
+// ---------------------------------------------------------------------------
+enum class CardSpecType : uint8_t {
+    SPEC_FROM_ENTITY = 0,
+    SPEC_CLOCK,               // NINA's Classic clock face, time and date (ClockCard)
+};
+
+// ---------------------------------------------------------------------------
 // How much of itself a card draws.
 //
 // DERIVED from the cell it was given, not declared - the same rule the grid and

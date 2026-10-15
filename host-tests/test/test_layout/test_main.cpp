@@ -156,6 +156,26 @@ void test_rows_wanted_is_a_floor_in_whole_cells() {
     TEST_ASSERT_EQUAL_UINT8(1, rowsWanted(h, 0, 2, 2));
 }
 
+// ...and never fewer than the tallest item's cells (#100): a lone 2 x 2-cell card on six
+// columns has the area of one row, but needs two.
+void test_rows_wanted_fits_the_tallest_item() {
+    Item big = cell();
+    big.prefSpanX = 4; big.prefSpanY = 4; big.minSpanX = 4; big.minSpanY = 4;
+    Item one[1] = {big};
+    TEST_ASSERT_EQUAL_UINT8(2, rowsWanted(one, 1, 6, 2));
+    Item mix[3] = {big, cell(), cell()};
+    TEST_ASSERT_EQUAL_UINT8(2, rowsWanted(mix, 3, 6, 2));   // 6 cells on 6 columns, but 2 tall
+    // ...and placed whole at the top left on that many rows.
+    FlowEngine e;
+    Container c{12, 4};
+    Place p[1];
+    TEST_ASSERT_EQUAL_UINT8(1, e.place(c, one, 1, p));
+    TEST_ASSERT_TRUE(p[0].placed);
+    TEST_ASSERT_EQUAL_UINT8(0, p[0].col);
+    TEST_ASSERT_EQUAL_UINT8(0, p[0].row);
+    TEST_ASSERT_EQUAL_UINT8(4, p[0].spanY);
+}
+
 int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(test_flow_fills_rows_left_to_right);
@@ -167,5 +187,6 @@ int main(int, char **) {
     RUN_TEST(test_spans_are_clamped_to_the_container);
     RUN_TEST(test_absent_items_are_skipped);
     RUN_TEST(test_rows_wanted_is_a_floor_in_whole_cells);
+    RUN_TEST(test_rows_wanted_fits_the_tallest_item);
     return UNITY_END();
 }

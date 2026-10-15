@@ -106,6 +106,11 @@ struct CardSpec {
     uint32_t longStaleMs = 0;
 
     bool paused = false;
+
+    // A card that is no entity's, by name (#100 prototype: the clock). The
+    // default takes the type from the first primary, as every card always has;
+    // a named type needs no primaries. Last, so no existing spec moves.
+    CardSpecType type = CardSpecType::SPEC_FROM_ENTITY;
 };
 
 // ---------------------------------------------------------------------------

@@ -400,9 +400,14 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
             Serial.printf("[Cards] spec %u: entity \"%s\" not in registry\n",
                           (unsigned)i, cs.primaries[k]);
         }
-        if (!first) continue;
-
-        Card *c = cardForEntity(first);
+        // A CARD ASKED FOR BY NAME (#100): no entity behind it, so its type is
+        // the spec's. Everything after the factory - id, label, area, header,
+        // placement, saved settings - is applied to it as to any card.
+        Card *c = cardForSpecType(cs.type);
+        if (!c) {
+            if (!first) continue;
+            c = cardForEntity(first);
+        }
         if (!c) {
             // A real EntityKind with no card type yet - NUMBER, TEXT, CLIMATE,
             // WEATHER. Saying so beats rendering it as something it is not.

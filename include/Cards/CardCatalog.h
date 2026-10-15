@@ -110,4 +110,8 @@ Card *cardForKind(EntityKind kind);
 // The overwhelmingly common case, and it keeps the kind lookup out of page code.
 Card *cardForEntity(const Entity *e);
 
+// A card a spec asks for by name, with no entity behind it (#100: the clock).
+// nullptr for SPEC_FROM_ENTITY - that card comes from cardForEntity().
+Card *cardForSpecType(CardSpecType type);
+
 #endif // CARD_CATALOG_H
