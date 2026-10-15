@@ -119,14 +119,15 @@ the compile-time defaults in `ConnectivityLocalSecrets.h` and the `_proven` flag
 **Whether this fixes the overnight dropouts (#49) is unproven** - that needs a soak, with
 `WS_P4_5` and `WS_P4_7B` left alone as controls.
 
-## Memory and flash, per the owner (2026-09-24)
+## Memory and flash, per the owner (2026-09-24; corrected 2026-10-14)
 
 | | PSRAM | Flash chip | Partition table in use |
 |---|---|---|---|
-| Every P4 board | **32 MB** | 32 MB | 16 MB layout, left over from the first environment |
+| `WS_P4_4B`, `WS_P4_5`, `WS_P4_7B` | **32 MB** | 32 MB | 16 MB layout, left over from the first environment |
+| `CYD_P4_1060`, `CYD_P4_4880` | **32 MB** | 16 MB | the same 16 MB layout |
 | Every S3 board | **8 MB** | 16 MB | `default_16MB.csv` |
 
-The P4's extra 16 MB of flash is unused because nothing has needed it. Worth remembering at
+The three Waveshare P4s' extra 16 MB of flash is unused because nothing has needed it. Worth remembering at
 **5.1**, when the partition layout is fixed for OTA. The 32 MB PSRAM is why a full-screen
 screenshot on `WS_P4_5` (about 2.8 MB at peak, #58) costs nothing that matters. Measured there:
 28.7 MB free at runtime, with full DSI framebuffers already allocated.

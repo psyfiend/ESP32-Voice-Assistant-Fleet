@@ -6,6 +6,27 @@ signed-off merges to `main` in the order they happen - it does not follow milest
 began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
+## v0.2.15 - 2026-10-14
+
+The UI follow-ups from 2.12's test - #96, #97, #23 and #92 in part, #98 (DECISIONS K75-K80, A16).
+
+- **The Remove dialog's buttons share a narrow row** (#96): on the 4B they no longer overlap.
+- **About this board in every build** (#97): a fourth button, About, on the system panel's first row;
+  fact lists (About, Entity properties) in two left-aligned columns, centred (K78).
+- **The countdown bar** is a 1-2 px line on the window's bottom edge (#97), and the Remove dialog
+  shows it too (#23, K76). **Its timeout and the bar are system settings** (K79), set from a PC
+  until the settings pages: `/settings?window_close=60|30|10|off&window_bar=on|off`.
+- **Near-equal shape tokens merged** (#97): one radius for the panel's controls and the dialog's
+  buttons, Members' spacing on `S5`, and four more.
+- **History's span buttons are the control deck's selector, compact** (#92, K75), and it keeps its
+  size while a span loads (K80).
+- **`/panel?flash=N` keeps only its NVS mode** (#98, A16): the erase mode erased the start of the
+  settings partition.
+- The harness walks two more states (the system panel, About). Proved by A/B against `v0.2.13` on
+  WS_P4_5, WS_P4_4B and CYD_P4_1060; signed off by the owner (`docs/archive/TEST_UI_FOLLOWUPS.md`).
+  Found on the way: #104 (a light's temperature mark moves between builds), and A17 (a failed
+  mount must not cost the settings), to be built next.
+
 ## v0.2.14 - 2026-10-14
 
 #93 - a group's members know their HA area and device.

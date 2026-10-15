@@ -306,7 +306,7 @@ roles, and stay separate so one can change alone.
 
 **The near-equal tokens, merged** (owner, 2026-10-14, TEST_2.12 Q1: "I doubt I'd even notice the
 difference"; built on `feat/ui-followups`, #97, with the harness's before/after pictures in
-`docs/TEST_UI_FOLLOWUPS.md`). Pixels before line minimums, on WS_P4_5 / WS_P4_4B / CYD_P4_1060
+`docs/archive/TEST_UI_FOLLOWUPS.md`; `v0.2.15`). Pixels before line minimums, on WS_P4_5 / WS_P4_4B / CYD_P4_1060
 (294 / 255 / 170 PPI):
 
 | Merge | Was | Now | |

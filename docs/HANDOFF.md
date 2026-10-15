@@ -1,4 +1,4 @@
-# Handoff — 2026-10-14 (`v0.2.13`; the UI follow-ups built on `feat/ui-followups`, waiting for the owner)
+# Handoff — 2026-10-14 (`v0.2.15`, the UI follow-ups; next #99 satin, then 2.8)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -15,10 +15,11 @@ there.
 
 ## Where the project is
 
-**`v0.2.13`, 2026-10-14: milestone 2.12, the UI foundation** - the card window's code rebuilt into
-a foundation, with nothing changed on screen, proved phase by phase on three boards
-(`docs/design/ui-foundation.md` is the record). Before it: `v0.2.12` K17 (a group's member as a
-card of its own), `v0.2.8`-`v0.2.11` milestone 2.10, the card popup. `CHANGELOG.md` matches
+**`v0.2.15`, 2026-10-14: the UI follow-ups from 2.12's test** (#96, #97, #23, #92, #98 -
+`archive/TEST_UI_FOLLOWUPS.md`), after `v0.2.14` (#93, members' HA areas) and **`v0.2.13`, milestone
+2.12, the UI foundation** - the card window's code rebuilt into a foundation, with nothing changed on
+screen (`docs/design/ui-foundation.md` is the record). Before them: `v0.2.12` K17 (a group's member
+as a card of its own), `v0.2.8`-`v0.2.11` milestone 2.10, the card popup. `CHANGELOG.md` matches
 versions to milestones.
 
 What a board does: boots into two pages (House = the owner's 18 HA entities over the websocket,
@@ -40,45 +41,30 @@ on the kit yet - bring each over when it is next changed (`ui-architecture.md` �
 
 ## What is next
 
-**Built unattended on 2026-10-14 (the owner's overnight brief); the owner's first answers came the
-same day. From now on a PR is opened only after the owner has run the tests and answered the
-questions** (owner, 2026-10-14) - push the branch, discuss, then `gh pr create`.
+**A PR is opened only after the owner has run the tests and answered the questions** (owner,
+2026-10-14): push the branch, discuss, then `gh pr create`. The owner's order, 2026-10-14 evening:
 
-1. **`feat/ui-followups`** (PR #101) - #96 the dialog's buttons share a narrow row; #97 About in every
-   build (a button on the system panel), fact lists in two left-aligned columns, the countdown bar
-   2 px on the window's edge, the near-equal tokens merged; #23 the Remove dialog shows the bar;
-   #92 History's span buttons are the selector, compact (K75); #98 the flash test NVS-only (A16).
-   The sheet: **`docs/TEST_UI_FOLLOWUPS.md`**. **Round 1 passed except T9**; Q1-Q7 answered (as
-   built; the old P4_5 settings do not matter; Q2 is #104). **Round 2**, for the owner to retest: T9 (the span
-   selector keeps its size while a span loads, K80) and T12 (the windows' timeout and countdown bar
-   from a PC, K79). Not ready to merge until the owner says.
-2. **#99** - a quieter "glass" finish: the mock **"Glass, Satin, Flat"**
-   (https://claude.ai/artifact/G5XANwGMdgWKR19HS1ZQvj, linked on #99): glass, satin and flat on the
-   real elements - Members, scenes, the Remove dialog, Power on and off - each pressed, Midnight at
-   the P4_5's window. **The owner likes satin and agreed its uses** (K77); glass only where
-   something asks for attention. Nothing built; a kit role each, frames measured on an S3 first.
-3. **#100** - NINA's clock, **a prototype: `feat/100-nina-clock` (PR #102)**, off `main`, independent
-   of #101: the Classic face, time and date only, a 2 x 2-cell card pinned top left on a new third
-   page "Clock"; a `CardSpec::type` override asks for a card with no entity; `rowsWanted()` counts
-   the tallest item; the faces converted from the foundry's OFL files (+62 KB). Seen on the 4B and
-   1060 by screenshot, then both put back on #101. Its sheet `docs/TEST_100_CLOCK.md` (on that
-   branch) has Q1-Q4 - the spec override or a clock entity, and Playfair's old-style figures (lining
-   needs fontTools, an install). **The owner wants much more (2026-10-14)**: a "full" clock - every
-   NINA face and feature, 3 x 3 cells on a 6 x 3 grid, the whole screen on the 4B - a "small" one for
-   1 x 1 to 3 x 2 (time, date, weather, alarm, looks taken from the NINA faces), and a "medium" one
-   with the faces' flourish in less than half the screen (not on the 4880). A plan with decisions is
-   with the owner; nothing built for it yet. Not ready to merge.
-4. **#93** - a group's members now get their HA area and device: **`fix/93-member-areas` (PR
-   #103)**, off `main` - the area query is sent once more after members are learnt. Checked on
-   the 4B (Office lamp: "Office" / "Office lamp", were "None"); all nine environments build; its
-   CHANGELOG entry (`v0.2.14`) is on the branch. **The owner may merge it now**: then tag `v0.2.14`.
+1. **#99, satin** - the mock **"Glass, Satin, Flat"** (https://claude.ai/artifact/G5XANwGMdgWKR19HS1ZQvj,
+   linked on #99). **The owner likes satin and agreed its uses** (K77): Members' rows, scenes not
+   loaded, the dialog's buttons, Power while off; glass only where something asks for attention.
+   Nothing built: a kit role each, frames measured on an S3 first (W6) - an S3 must be on the desk.
+2. **2.8** header slots (#19), as far as the evening goes (after the design interview §3 in
+   `ROADMAP.md`'s order).
+3. **Overnight candidates**: **A17** - a failed mount never costs the settings (format only a blank
+   partition; the flash scripts keep a copy of `/settings`, an address restores it), on its own
+   branch.
+4. **#100, the clocks - tabled.** Three agreed (K81-K84; the full record is
+   [#100's comment](https://github.com/psyfiend/ESP32-Voice-Assistant-Fleet/issues/100#issuecomment-6184362343)):
+   small, NINA medium (square), NINA full (3 x 3; the whole 4B with the bar hidden). Weather from
+   `weather.openweathermap`; the board's own alarm. The prototype is on `feat/100-nina-clock` (PR
+   #102, open, not for merging; its `docs/TEST_100_CLOCK.md`).
 5. **#84** - "no data yet": **a proposal on the issue** (a `NO DATA` state of its own, recommended;
-   the link-down half as its own issue). Nothing built - the owner's choice.
+   the link-down half as its own issue). Nothing built - the owner's choice. **#104**: a light's
+   temperature mark moves between builds.
 
-Then **the design interview §3 onward**, **2.8** header slots (#19), **2.11** group cards with the
-page arranger (#66, #78) - whose hero region (`layout-engines.md`) is where #100's clock and a music
-player belong (NINA's code is non-commercial-use only, `REFERENCE_PROJECTS.md`). `ROADMAP.md`'s
-running order.
+Then **2.11** group cards with the page arranger (#66, #78) - whose hero region (`layout-engines.md`)
+is where #100's full clock and a music player belong (NINA's code is non-commercial-use only,
+`REFERENCE_PROJECTS.md`). `ROADMAP.md`'s running order.
 
 **After any merge**: `git pull`, tag the merge commit (annotated, `vX.Y.Z - <milestones>`), push the
 tag, flash the boards on the desk. The CHANGELOG entry and the archived test sheet go on the branch
@@ -199,11 +185,12 @@ no compiler (the owner's choice to install one, `host-tests/README.md`).
   `firmware.bin` - copy an image you want to keep. Clear `.pio/build_cache` after a BSP,
   struct-layout or `lv_conf.h` edit.
 - **Do not edit source while a build runs** - it compiles the half-finished edit. Docs are safe.
-- **`/panel?flash=N` keeps only its NVS mode** (#98, `feat/ui-followups`): without `&nvs=1` it is
-  refused. A build older than that branch still erases the settings partition - never run it there.
+- **`/panel?flash=N` keeps only its NVS mode** (#98, since `v0.2.15`): without `&nvs=1` it is
+  refused. A build older than that still erases the settings partition - never run it there.
 - **Save a board's `/settings` before flashing it** (`curl -o`): on 2026-10-14 the P4_5 booted with
-  its LittleFS formatted after an app-only flash, cause unknown (TEST_UI_FOLLOWUPS Q1). The file is
-  plain JSON; nothing else on the board holds those choices.
+  its LittleFS formatted after an app-only flash, cause unknown (`archive/TEST_UI_FOLLOWUPS.md` Q1).
+  The file is plain JSON; nothing else on the board holds those choices. A17, when built, makes the
+  flash scripts do this and stops a failed mount from formatting.
 - **The harness**: never two runs at one board; the 1060 alone (it is slow). A window closes itself
   after a minute.
 - **A serial monitor resets the board when it opens** - attach with `--rts 0 --dtr 0`, or read it

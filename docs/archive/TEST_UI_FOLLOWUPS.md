@@ -46,56 +46,56 @@ layers; `GUIManager.cpp` 1,548 lines (+10, the drawer hook), `Card.cpp` 1,462.
 
 **#96 - the 4B's Remove dialog**, before / after:
 
-![The 4B's dialog before and after](followups/96_dialog_4b.png)
+![The 4B's dialog before and after](../followups/96_dialog_4b.png)
 
 **#97 - the system panel** (P4_5), the new About button:
 
-![The system panel with About](followups/97a_system_panel_p45.png)
+![The system panel with About](../followups/97a_system_panel_p45.png)
 
 **#97 - Entity properties and About this board** (P4_5), before above, after below:
 
-![Properties before and after](followups/97b_desk_props_p45.png)
-![About before and after](followups/97b_about_p45.png)
+![Properties before and after](../followups/97b_desk_props_p45.png)
+![About before and after](../followups/97b_about_p45.png)
 
 **#97 - the countdown bar** (P4_5, the window's bottom edge), before above, after below:
 
-![The bar before and after](followups/97c_bar_p45.png)
+![The bar before and after](../followups/97c_bar_p45.png)
 
 **#23 - the Remove dialog's bar** (P4_5), before / after:
 
-![The dialog's bar](followups/23_dialog_bar_p45.png)
+![The dialog's bar](../followups/23_dialog_bar_p45.png)
 
 **#97 - the merged tokens.** The header row's gaps (`S_GUTTER` 1.5 -> `S5` 1.6), before above,
 after below:
 
-![The header row](followups/97d_header_p45.png)
+![The header row](../followups/97d_header_p45.png)
 
 **Members' spacing** - `v0.2.13`'s 1.4 mm / **1.6 (`S5`, built)** / 1.2 (`S4`). P4_5 top to
 bottom, 4B left to right (the 1.2 capture happened with the lights off - the words differ, the
 spacing is what to look at):
 
-![Members, P4_5](followups/97d_members_p45.png)
-![Members, 4B](followups/97d_members_4b.png)
+![Members, P4_5](../followups/97d_members_p45.png)
+![Members, 4B](../followups/97d_members_4b.png)
 
 **One radius for the controls** - `v0.2.13` (dropdowns 1.2, buttons 1.6) / **both 1.6 (built)** /
 both 1.2. SETTINGS' dropdowns, checkbox and row button, P4_5 then 4B:
 
-![SETTINGS, P4_5](followups/97d_radius_settings_p45.png)
-![SETTINGS, 4B](followups/97d_radius_settings_4b.png)
+![SETTINGS, P4_5](../followups/97d_radius_settings_p45.png)
+![SETTINGS, 4B](../followups/97d_radius_settings_4b.png)
 
 The dialog's buttons, top to bottom in the same order, P4_5 then 4B:
 
-![Dialog buttons, P4_5](followups/97d_radius_dialog_p45.png)
-![Dialog buttons, 4B](followups/97d_radius_dialog_4b.png)
+![Dialog buttons, P4_5](../followups/97d_radius_dialog_p45.png)
+![Dialog buttons, 4B](../followups/97d_radius_dialog_4b.png)
 
 **#92 - History's span buttons**, before above / left, after below / right: the chart (P4_5, then
 the 4B, whose Deck card has its span buttons turned off - "Showing:" - so nothing changes there),
 and activity (P4_5, then 4B):
 
-![Chart, P4_5](followups/92_chart_p45.png)
-![Chart, 4B](followups/92_chart_4b.png)
-![Activity, P4_5](followups/92_activity_p45.png)
-![Activity, 4B](followups/92_activity_4b.png)
+![Chart, P4_5](../followups/92_chart_p45.png)
+![Chart, 4B](../followups/92_chart_4b.png)
+![Activity, P4_5](../followups/92_activity_p45.png)
+![Activity, 4B](../followups/92_activity_4b.png)
 
 ## Tests for you
 
@@ -161,6 +161,16 @@ and Now take, and narrowed again when the chart came (fixed in round 2).
 Answers: **Q1** the old settings do not matter - not restored; a way to restore settings after a
 loss is open for discussion. **Q2** an issue: #104. **Q3** 1.6, as built. **Q4-Q7** the
 recommendations, as built (Q7: a "low / no eye candy" setting may come, for a plainer look).
+
+**Round 2 (owner, 2026-10-14): T9 PASS, T12 PASS.** Q1's way back after a loss: the
+recommendations (A17) - the settings partition formatted only when it is blank, a mount failure on
+one holding data leaving that boot read-only and saying so, and the flash scripts keeping a copy of
+`/settings` on the PC with an address that puts one back - built on a branch of their own after this
+merge. (Q1 above guessed at the P4_5's flash chip as the odd one out: the 4B and 7B carry the same
+32 MB chip - owner, 2026-10-14 - so that lead is gone.)
+
+**Signed off by the owner, 2026-10-14** - `v0.2.15`, with `v0.2.14` (#93) merged in from `main`.
+The all-nine gate on the merged branch: below.
 
 ## Round 2 (2026-10-14, after your results)
 
