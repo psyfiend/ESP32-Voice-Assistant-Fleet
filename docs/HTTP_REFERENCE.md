@@ -7,9 +7,11 @@ against its handler. When a route changes, change this file in the same commit.
 
 - **One server per board**: ESP-IDF's `esp_http_server` on **port 80**, owned by `SystemCore`
   (`src/HttpServer.cpp`). It starts the first time Wi-Fi is up, and only if at least one route was
-  registered. Room for 8 routes; the most any board has today is 6 (WS_P4_5).
-- **GET only, no authentication, plain HTTP.** Anyone on the LAN who can reach a board can use
-  every route it has. That is why the riskier ones are build flags.
+  registered. Room for 8 routes; the most any board has today is 7 (WS_P4_5: six GET and the
+  settings restore's POST).
+- **GET only, except the settings restore (`POST /settings`, A17); no authentication, plain
+  HTTP.** Anyone on the LAN who can reach a board can use every route it has. That is why the
+  riskier ones are build flags.
 - **Address**: `http://<hostname>/<route>?<key>=<value>&...`, by the DHCP hostname (it resolves
   through the router's DNS) or the board's IP.
 - **At most 3 connections at once**, and the least recently used is dropped, so a browser's idle
@@ -73,7 +75,7 @@ not mount (the store then lives in RAM and says so in `?stats=1`). The design: `
 | Address | Reply | Effect |
 |---|---|---|
 | `/settings` | the whole settings document as JSON (`application/json`) - schemes, entities, cards, groups, added cards, imports, system | Reads |
-| `/settings?stats=1` | text: the file and whether it is mounted or read-only, saves / failures / a change pending, the last save's time, duration and size, the boot note, the files in `/cfg`, **the last ten changes with their time and task** (`loopTask` = the card window, `httpd` = a browser), and any saved entries nobody claims | Reads |
+| `/settings?stats=1` | text: the file and whether it is mounted or read-only, saves / failures / a change pending, the last save's time, duration and size, the boot note (what the mount and the file were at boot - a failed mount that left the partition untouched says so here, A17), the files in `/cfg`, **the last ten changes with their time and task** (`loopTask` = the card window, `httpd` = a browser), and any saved entries nobody claims | Reads |
 
 ### Setting (each is **Saved**)
 
@@ -109,6 +111,27 @@ curl "http://fleet-ws-p4-5/settings?card=office_overhead_261008_0310&name="     
 curl "http://fleet-ws-p4-5/settings?group=new&name=Climate"                             # Saved
 curl "http://fleet-ws-p4-5/settings?window_close=30&window_bar=off"                     # Saved: next window
 curl "http://fleet-ws-p4-5/settings?window_close=60&window_bar=on"                      # Saved: the defaults again
+```
+
+### Restoring a saved copy (`POST /settings`, A17)
+
+| Address | Body | Reply | Effect |
+|---|---|---|---|
+| `POST /settings` | a whole settings file, as `GET /settings` gave it (at most 64 KB) | one line: `restored: <bytes>, <n> card(s), written in <ms> ms - ...`, or `refused: <why> - nothing changed` (400: not JSON, not an object, a schema this firmware does not know; 409: this boot is read-only) | **Saved** - replaces the whole file. Pages show it when next built; everything at the next boot |
+| `POST /settings?reboot=1` | the same | the same, ending `- restarting` | **Saved**, then the board restarts half a second after answering |
+
+The body is checked on the HTTP task; the settings task writes it (a flash write from the HTTP
+task, whose stack is in PSRAM, reboots the board - LESSONS), and the handler waits for that write
+before it answers. A board whose mount failed refuses: its boot is read-only, and the file on its
+flash is never written over.
+
+The scripts do it for you - copies live in `bench/settings/<board>/<yyyymmdd-hhmm>.json`
+(gitignored), and `flash_release.ps1` makes one for each board before it writes it:
+
+```
+powershell -ExecutionPolicy Bypass -File scripts/release/save_settings.ps1 fleet-ws-p4-5 WS_P4_TOUCH_LCD_5
+powershell -ExecutionPolicy Bypass -File scripts/release/restore_settings.ps1 fleet-ws-p4-5 bench\settings\WS_P4_TOUCH_LCD_5\20261015-0542.json
+curl --data-binary @settings.json -H "Content-Type: application/json" "http://fleet-ws-p4-5/settings?reboot=1"
 ```
 
 ---

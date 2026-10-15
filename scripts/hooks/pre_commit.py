@@ -6,7 +6,8 @@ scripts/hooks` turns it on - once per clone).
 
 Refuses the commit, saying why, when the staged changes:
   1. add a LOCAL-ONLY debug line to platformio.ini (the owner keeps
-     -D DEBUG_POPUP / DEBUG_HANG / DEBUG_FRAMES uncommitted - HANDOFF);
+     -D DEBUG_POPUP / DEBUG_HANG / DEBUG_FRAMES uncommitted - HANDOFF;
+     DEBUG_SETTINGS_NOMOUNT is A17's test, a boot that cannot save);
   2. put a control byte into a text file - the silent half of the heredoc
      corruption CLAUDE.md's STOP section is about (0x08, 0x00...);
   3. include a secrets header.
@@ -17,7 +18,7 @@ Added 2026-10-13 (owner): rules in markdown are interpreted; this runs.
 import subprocess
 import sys
 
-LOCAL_ONLY_FLAGS = ("DEBUG_POPUP", "DEBUG_HANG", "DEBUG_FRAMES")
+LOCAL_ONLY_FLAGS = ("DEBUG_POPUP", "DEBUG_HANG", "DEBUG_FRAMES", "DEBUG_SETTINGS_NOMOUNT")
 SECRETS = ("ConnectivityLocalSecrets.h", "MqttLocalSecrets.h")
 BINARY_EXT = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".bin", ".elf", ".ttf", ".otf",
               ".woff", ".woff2", ".zip", ".gz", ".pdf", ".webp", ".a", ".o")

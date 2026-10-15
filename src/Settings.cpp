@@ -15,6 +15,8 @@
 #include <ArduinoJson.h>   // header-only, plain C++ - nothing Arduino-specific is used
 #include "esp_heap_caps.h"
 #include "esp_littlefs.h"
+#include "esp_partition.h"
+#include "esp_system.h"    // esp_restart(), after a restore with ?reboot=1
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -48,12 +50,17 @@ SemaphoreHandle_t s_mutex   = nullptr;
 TaskHandle_t      s_task    = nullptr;
 volatile uint32_t s_delayMs = 0;
 
-char     s_bootNote[96] = "not started";   // what readFile() found, for ?stats=1
+char     s_bootNote[160] = "not started";  // what the mount and readFile() found, for ?stats=1
 char     s_listing[256] = "";              // the files in BASE, as of boot or the last save
 bool     s_mounted  = false;
-bool     s_readOnly = false;   // a newer schema, or a file that would not read: never overwritten
+// A newer schema, a file that would not read, or a partition that would not
+// mount but holds data (A17): never overwritten.
+bool     s_readOnly = false;
 bool     s_dirty    = false;
 uint32_t s_saves = 0, s_failures = 0, s_lastMs = 0, s_lastUs = 0, s_bytes = 0;
+// Which version of the document the last good write held, so a restore can wait
+// for ITS write rather than one that was already under way (A17).
+uint32_t s_docGen = 0, s_savedGen = 0;
 
 struct Lock {
     Lock()  { xSemaphoreTake(s_mutex, portMAX_DELAY); }
@@ -81,7 +88,8 @@ constexpr uint8_t CHANGES_KEPT = 10;
 char    s_changes[CHANGES_KEPT][112];
 uint8_t s_changeHead = 0, s_changeN = 0;
 
-void noteChange(const char *section, const char *id, const char *key, const char *value, bool remove) {
+// Caller holds the lock.
+void noteLine(const char *what) {
     char when[24] = "";
     time_t now = time(nullptr);
     struct tm tmv;
@@ -89,11 +97,17 @@ void noteChange(const char *section, const char *id, const char *key, const char
     else snprintf(when, sizeof(when), "%lus", (unsigned long)(millis() / 1000));
     const char *task = pcTaskGetName(nullptr);
     char *line = s_changes[s_changeHead];
-    snprintf(line, sizeof(s_changes[0]), "%s %s: %s.%s.%s %s%s", when, task ? task : "?", section, id, key,
-             remove ? "removed" : "= ", remove ? "" : (value ? value : "?"));
+    snprintf(line, sizeof(s_changes[0]), "%s %s: %s", when, task ? task : "?", what);
     s_changeHead = (uint8_t)((s_changeHead + 1) % CHANGES_KEPT);
     if (s_changeN < CHANGES_KEPT) s_changeN++;
     Serial.printf("[Settings] %s\n", line);
+}
+
+void noteChange(const char *section, const char *id, const char *key, const char *value, bool remove) {
+    char what[112];
+    snprintf(what, sizeof(what), "%s.%s.%s %s%s", section, id, key, remove ? "removed" : "= ",
+             remove ? "" : (value ? value : "?"));
+    noteLine(what);
 }
 
 // Set or remove doc[section][id][key]; drops [id], then [section], once empty.
@@ -161,12 +175,14 @@ void listFiles() {
 void writeIfDirty() {
     size_t len = 0;
     char *buf = nullptr;
+    uint32_t gen = 0;
     {
         Lock l;
         if (!s_dirty || s_readOnly || !s_mounted) return;
         buf = serialise(len);
         if (!buf) { s_failures++; return; }
         s_dirty = false;   // a change made while writing marks it again
+        gen = s_docGen;
     }
     const int64_t t0 = esp_timer_get_time();
     bool ok = false;
@@ -184,7 +200,7 @@ void writeIfDirty() {
     heap_caps_free(buf);
     {
         Lock l;
-        if (ok) { s_saves++; s_lastMs = millis(); s_lastUs = us; s_bytes = (uint32_t)len; }
+        if (ok) { s_saves++; s_lastMs = millis(); s_lastUs = us; s_bytes = (uint32_t)len; s_savedGen = gen; }
         else    { s_failures++; s_dirty = true; }
     }
     listFiles();
@@ -266,6 +282,89 @@ void readFile() {
                  ents = (*s_doc)["entities"].size();
     note("%s: %ld bytes - %u card(s), %u scheme(s), %u entit%s", PATH, size,
          (unsigned)cards, (unsigned)schemes, (unsigned)ents, ents == 1 ? "y" : "ies");
+}
+
+// A FAILED MOUNT NEVER COSTS THE SETTINGS (A17). Until 2026-10-15 the mount
+// formatted the partition whenever LittleFS would not mount it, and the P4_5
+// lost its file on 2026-10-14, most likely that way. Now the partition is
+// formatted only when it is blank - every byte 0xFF, a first boot - and
+// anything else is left exactly as it is: the boot runs read-only from RAM
+// and says so. The WHOLE partition is checked, not only its start: an erased
+// start with the file's blocks still behind it is what A16's erase mode left.
+// Reads the flash, so begin()'s caller only (a task whose stack is internal).
+//   0: blank; 1: holds data, `at` is the first byte that is not 0xFF;
+//   -1: could not be read.
+int partitionState(const esp_partition_t *p, uint32_t &at) {
+    constexpr size_t CHUNK = 4096;
+    uint32_t *buf = (uint32_t *)heap_caps_malloc(CHUNK, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!buf) return -1;
+    int state = 0;
+    at = 0;
+    while (state == 0 && at < p->size) {
+        const size_t n = (p->size - at) < CHUNK ? (size_t)(p->size - at) : CHUNK;
+        if (esp_partition_read(p, at, buf, n) != ESP_OK) { state = -1; break; }
+        size_t i = 0;
+        while (i < n / 4 && buf[i] == 0xFFFFFFFFu) i++;
+        if (i < n / 4) { state = 1; at += (uint32_t)(i * 4); }
+        else at += (uint32_t)n;
+    }
+    heap_caps_free(buf);
+    return state;
+}
+
+esp_err_t mountFs() {
+#ifdef DEBUG_SETTINGS_NOMOUNT
+    // A17's test, a local line only (never committed): the mount reports a
+    // failure, so the failed-mount path runs against a partition that holds a
+    // real file - which must come through the next normal boot untouched.
+    Serial.println("[Settings] DEBUG_SETTINGS_NOMOUNT: the mount reports a failure");
+    return ESP_FAIL;
+#else
+    esp_vfs_littlefs_conf_t conf = {};
+    conf.base_path = BASE;
+    conf.partition_label = PARTITION;
+    conf.format_if_mount_failed = 0;   // never: see partitionState()
+    return esp_vfs_littlefs_register(&conf);
+#endif
+}
+
+// Mount, or format a blank partition and mount it, or leave it alone and run
+// read-only. Sets s_mounted / s_readOnly and the boot note.
+void mountOrKeep() {
+    const int64_t t0 = esp_timer_get_time();
+    esp_err_t err = mountFs();
+    if (err != ESP_OK) {
+        const esp_partition_t *part =
+            esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, PARTITION);
+        uint32_t at = 0;
+        const int state = part ? partitionState(part, at) : -2;
+        const double ms = (esp_timer_get_time() - t0) / 1000.0;
+        if (state == 0) {
+            Serial.printf("[Settings] the \"%s\" partition is blank (%u KB, checked in %.1f ms) - a first boot: "
+                          "formatting it\n", PARTITION, (unsigned)(part->size / 1024), ms);
+            err = esp_littlefs_format(PARTITION);
+            if (err == ESP_OK) err = mountFs();
+            if (err != ESP_OK) note("formatted a blank partition, but it did not mount (%s) - settings in RAM this "
+                                    "boot", esp_err_to_name(err));
+        } else if (state == 1) {
+            s_readOnly = true;
+            note("LittleFS did not mount (%s); the partition holds data (from 0x%lx) - left untouched, read-only "
+                 "this boot, settings in RAM", esp_err_to_name(err), (unsigned long)at);
+        } else if (state == -1) {
+            s_readOnly = true;
+            note("LittleFS did not mount (%s) and the partition would not read - left untouched, read-only this "
+                 "boot", esp_err_to_name(err));
+        } else {
+            note("no \"%s\" partition - settings live in RAM this boot and are lost at a reset", PARTITION);
+        }
+    }
+    s_mounted = err == ESP_OK;
+    if (s_mounted) {
+        size_t total = 0, used = 0;
+        esp_littlefs_info(PARTITION, &total, &used);
+        Serial.printf("[Settings] LittleFS on \"%s\" mounted at %s in %.1f ms: %u KB, %u KB used\n", PARTITION,
+                      BASE, (esp_timer_get_time() - t0) / 1000.0, (unsigned)(total / 1024), (unsigned)(used / 1024));
+    }
 }
 
 // %XX and '+' in a query value, in place. No escapes are written anywhere.
@@ -480,6 +579,102 @@ esp_err_t handleSettings(httpd_req_t *req) {
     return r;
 }
 
+esp_err_t replyText(httpd_req_t *req, const char *status, const char *fmt, ...) {
+    char out[240];
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(out, sizeof(out), fmt, ap);
+    va_end(ap);
+    if (n < 0) n = 0;
+    if (n >= (int)sizeof(out)) n = (int)sizeof(out) - 1;
+    httpd_resp_set_status(req, status);
+    httpd_resp_set_type(req, "text/plain");
+    return httpd_resp_send(req, out, n);
+}
+
+void restartNow(void *) { esp_restart(); }
+
+// PUT A SAVED FILE BACK (A17): POST /settings with a settings file as the body
+// (scripts/release/restore_settings.ps1). Checked here - JSON, an object, a
+// schema this firmware knows - then it replaces the document and the settings
+// task writes it: never this handler, whose stack is in PSRAM (a flash write
+// from it reboots the board, LESSONS). The handler waits for that write and
+// answers with the result. ?reboot=1 restarts the board after a good write, so
+// every page and setting is read from the file again.
+esp_err_t handleRestore(httpd_req_t *req) {
+    const size_t len = req->content_len;
+    if (len == 0 || len > FILE_MAX)
+        return replyText(req, "400 Bad Request", "refused: the body is %u bytes; a settings file is 1 to %u\n",
+                         (unsigned)len, (unsigned)FILE_MAX);
+    {
+        Lock l;
+        if (!s_mounted || s_readOnly)
+            return replyText(req, "409 Conflict", "refused: this boot does not write the settings file (%s) - "
+                             "nothing changed\n", s_bootNote);
+    }
+    char *buf = (char *)heap_caps_malloc(len + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!buf) return replyText(req, "500 Internal Server Error", "refused: no memory for %u bytes\n", (unsigned)len);
+    size_t got = 0;
+    uint8_t timeouts = 0;
+    while (got < len) {
+        const int r = httpd_req_recv(req, buf + got, len - got);
+        if (r == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < 3) continue;
+        if (r <= 0) break;
+        got += (size_t)r;
+    }
+    if (got != len) {
+        heap_caps_free(buf);
+        return replyText(req, "400 Bad Request", "refused: the body stopped at %u of %u bytes - nothing changed\n",
+                         (unsigned)got, (unsigned)len);
+    }
+    JsonDocument incoming(&s_alloc);
+    const DeserializationError err = deserializeJson(incoming, buf, len);
+    heap_caps_free(buf);
+    if (err || !incoming.is<JsonObject>())
+        return replyText(req, "400 Bad Request", "refused: not a settings file (%s) - nothing changed\n",
+                         err ? err.c_str() : "not a JSON object");
+    const int schema = incoming["schema"] | 0;
+    if (schema < 1 || schema > SCHEMA)
+        return replyText(req, "400 Bad Request", "refused: the file is schema %d, this firmware knows 1 to %d - "
+                         "nothing changed\n", schema, SCHEMA);
+    const unsigned cards = (unsigned)incoming["cards"].size();
+    uint32_t gen = 0;
+    {
+        Lock l;
+        s_doc->set(incoming);
+        s_dirty = true;
+        gen = ++s_docGen;
+        char what[80];
+        snprintf(what, sizeof(what), "the whole file restored (%u bytes, %u card(s))", (unsigned)len, cards);
+        noteLine(what);
+    }
+    const int64_t t0 = esp_timer_get_time();
+    Settings::save();
+    bool written = false;
+    for (int i = 0; i < 250 && !written; i++) {   // 5 s; a write takes ~10-100 ms
+        vTaskDelay(pdMS_TO_TICKS(20));
+        Lock l;
+        written = s_savedGen >= gen;
+    }
+    if (!written)
+        return replyText(req, "500 Internal Server Error", "the file is in RAM but was not written (failures %lu) - "
+                         "it is written with the next change\n", (unsigned long)Settings::stats().failures);
+    char q[48], v[4];
+    const bool reboot = httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK &&
+                        httpd_query_key_value(q, "reboot", v, sizeof(v)) == ESP_OK && atoi(v) != 0;
+    const esp_err_t r = replyText(req, "200 OK", "restored: %u bytes, %u card(s), written in %.0f ms - %s\n",
+                                  (unsigned)len, cards, (esp_timer_get_time() - t0) / 1000.0,
+                                  reboot ? "restarting" : "pages show it when next built, everything at the next boot");
+    if (reboot) {
+        esp_timer_create_args_t a = {};
+        a.callback = restartNow;
+        a.name = "settings_restart";
+        esp_timer_handle_t t = nullptr;
+        if (esp_timer_create(&a, &t) == ESP_OK) esp_timer_start_once(t, 500 * 1000);
+    }
+    return r;
+}
+
 }  // namespace
 
 namespace Settings {
@@ -491,22 +686,10 @@ bool begin(HttpServer &http) {
     if (!s_mutex || !s_doc) { Serial.println("[Settings] out of memory - no settings this boot"); return false; }
     s_doc->to<JsonObject>();
 
-    esp_vfs_littlefs_conf_t conf = {};
-    conf.base_path = BASE;
-    conf.partition_label = PARTITION;
-    conf.format_if_mount_failed = 1;
-    const int64_t t0 = esp_timer_get_time();
-    const esp_err_t err = esp_vfs_littlefs_register(&conf);
-    s_mounted = err == ESP_OK;
+    mountOrKeep();   // A17: formats only a blank partition
     if (s_mounted) {
-        size_t total = 0, used = 0;
-        esp_littlefs_info(PARTITION, &total, &used);
-        Serial.printf("[Settings] LittleFS on \"%s\" mounted at %s in %.1f ms: %u KB, %u KB used\n", PARTITION,
-                      BASE, (esp_timer_get_time() - t0) / 1000.0, (unsigned)(total / 1024), (unsigned)(used / 1024));
         readFile();
         listFiles();
-    } else {
-        note("no LittleFS (%s) - settings live in RAM this boot and are lost at a reset", esp_err_to_name(err));
     }
     if (!s_readOnly) (*s_doc)["schema"] = SCHEMA;
 
@@ -514,10 +697,18 @@ bool begin(HttpServer &http) {
     // write requires - see Settings.h.
     xTaskCreate(saveTask, "settings", 4096, nullptr, 2, &s_task);
     http.addRoute("/settings", HTTP_GET, handleSettings);
+    http.addRoute("/settings", HTTP_POST, handleRestore);
     return s_mounted;
 }
 
 bool persistent() { return s_mounted && !s_readOnly; }
+
+void bootNote(char *out, size_t cap) {
+    if (!cap) return;
+    if (!s_mutex) { snprintf(out, cap, "%s", s_bootNote); return; }
+    Lock l;
+    snprintf(out, cap, "%s", s_bootNote);
+}
 
 bool card(const char *cardId, const char *key, char *out, size_t cap) {
     bool found = false;

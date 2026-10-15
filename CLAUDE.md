@@ -439,6 +439,12 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
 - **Anything that reads or writes flash runs on a task whose stack is in internal RAM** - the
   settings task, never an HTTP handler (their stacks are in PSRAM) - or the board reboots (LESSONS).
 - **A file that exists but will not read makes the boot read-only**; it is never overwritten.
+- **A failed mount never costs the settings** (A17): the partition is formatted only when every
+  byte is 0xFF (a first boot); one that will not mount but holds anything is left untouched and
+  that boot is read-only, in RAM, and says so (boot note, `?stats=1`, [SETTINGS]). Never set
+  `format_if_mount_failed`. `POST /settings` puts a saved copy back; `scripts/release/
+  save_settings.ps1` / `restore_settings.ps1` make and restore copies (`bench/settings/`), and
+  `flash_release.ps1` saves each board's before writing it.
 - **Groups for card labels** are `CardGroups` (K46): one kind of group, device-wide, HA areas linked
   in as groups; a card's card label shows its group's name (or its own words) in the group's colour.
   **Colour is the key to a group and never follows a rename.**
