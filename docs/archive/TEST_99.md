@@ -28,22 +28,22 @@ panel's own 16 bits, LVGL cutting its corners, the cost halved.
 
 Members (P4_5, then the 4B):
 
-![Members, P4_5](followups/99_members_p45.png)
-![Members, 4B](followups/99_members_4b.png)
+![Members, P4_5](../followups/99_members_p45.png)
+![Members, 4B](../followups/99_members_4b.png)
 
 Scenes - before; after; after with Bright loaded:
 
-![Scenes](followups/99_scenes_p45.png)
+![Scenes](../followups/99_scenes_p45.png)
 
 The Remove dialog:
 
-![The dialog](followups/99_dialog_p45.png)
+![The dialog](../followups/99_dialog_p45.png)
 
 Power - before (light on); after, light on (glass); after, a light that is off (satin, Lamp 1);
 then the 4B before / after:
 
-![Power, P4_5](followups/99_power_p45.png)
-![Power, 4B](followups/99_power_4b.png)
+![Power, P4_5](../followups/99_power_p45.png)
+![Power, 4B](../followups/99_power_4b.png)
 
 ## How it was checked
 
@@ -113,9 +113,9 @@ the first.
 The header (before above, after below), the rail and Power (`v0.2.15`; Midnight now; Linen now,
 twice the size), and History's span selector (before / after):
 
-![The header](followups/99_header_p45.png)
-![The rail through the lens](followups/99_rail_p45.png)
-![History's spans](followups/99_spans_p45.png)
+![The header](../followups/99_header_p45.png)
+![The rail through the lens](../followups/99_rail_p45.png)
+![History's spans](../followups/99_spans_p45.png)
 
 | # | Do this | PASS if |
 |---|---|---|
@@ -126,3 +126,20 @@ twice the size), and History's span selector (before / after):
 
 - **Q7. The rail's size and strength**: a fifth taller than the rail, half faded. Too strong on
   Midnight, too faint on History's small selector? Two numbers, easy to change.
+
+**Round 2 (owner, 2026-10-15): T6, T10, T11 PASS** (T10: "this was really annoying, it's so nice to
+be able to easily scroll these now"). **T9**: pressing a header button showed a box over the top
+of its circle (on Linen, a square round it), and a pressed Remove a square outline. **Q7**: good for
+now - to be lived with.
+
+## Round 3 (2026-10-15): the pressed corners
+
+The press tint was the face's recolor, and LVGL draws an image that is both recoloured and
+corner-clipped through a path that drops the clip, so the square 16-bit satin face showed whole
+while pressed. The tint is now a **veil**: a rounded object in the face's own shape, over the face
+and under the words, clear until pressed (LESSONS). Flashed to the P4_5 for the owner's last look.
+
+**Signed off by the owner, 2026-10-15** - `v0.2.16`. The all-nine gate on the final code
+(`2944846`, `gate.ps1`): **all nine SUCCESS** in 10 min, flash 34-41 %, the owner's local lines
+restored. Structure check: 523 style calls outside the kit in 25 files (524 at `v0.2.15`), 44
+colour literals in 4 files, no shape numbers, no LVGL in the core layers.

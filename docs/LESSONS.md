@@ -545,6 +545,11 @@ next piece of eye candy:
   parent, with `LV_OBJ_FLAG_IGNORE_LAYOUT`, reached into the parent's padding - and the Members rows,
   sized to their content, grew by that padding (68 px to 106). `LV_OBJ_FLAG_FLOATING` takes a child
   out of the content size as well.
+- **An image both recoloured and corner-clipped loses its clip (#99, 2026-10-15).** LVGL's
+  software image draw has a path for a radius (`radius_only()`, no recolor) and one for a recolor
+  (`recolor_only()`, no radius); with both it falls to the general path, which here drew the square
+  image whole - a pressed satin button showed square. Tint a clipped face with a rounded veil
+  object over it, never with `image_recolor`.
 - **A touch goes to the topmost CLICKABLE object, so a bare scrolling list cannot be swiped from
   its gaps (#99, 2026-10-15).** The activity log scrolled when the finger landed on a row (a
   clickable item whose drag chains to the list) and not on a day's heading - a label, so the touch

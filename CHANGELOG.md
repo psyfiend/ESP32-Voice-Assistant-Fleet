@@ -6,6 +6,25 @@ signed-off merges to `main` in the order they happen - it does not follow milest
 began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
+## v0.2.16 - 2026-10-15
+
+#99 - satin and glass: what a surface says about a thing you can tap (DECISIONS K77, K85-K87).
+
+- **Satin** for what can be tapped and is not chosen - Members' rows, scenes not loaded, the Remove
+  dialog's buttons (Remove keeping its red), Power while off, the window's header buttons; **glass**
+  for what is chosen or active - a scene loaded (in place of its ring), Power while on, the tab
+  showing. Pressed, satin darkens and glass lightens under a rounded veil, and the button sinks 1 px.
+- **The selector shows the rail through its glass** (the owner's idea): a band taller than the rail,
+  darker and faded, behind the chosen icon - on the control deck and History's span selector.
+- **A member's state in colour** in Members (on in the active colour, off white); a colour drawn on
+  glass is made to read on it (Linen's olive Power icon).
+- **Every scrolling list scrolls from anywhere on it** - a day's heading in the activity log, a gap,
+  the note under Members (K87).
+- Painted by hand and dithered like the selector's metal (LVGL's gradients band on 16-bit panels),
+  satin in 16 bits: a full redraw of Members +11 ms on WS_P4_5, Scenes +5, the dialog +4. Not yet
+  measured on an S3 (the owner: merge, measure later). Signed off by the owner
+  (`docs/archive/TEST_99.md`); all nine environments build.
+
 ## v0.2.15 - 2026-10-14
 
 The UI follow-ups from 2.12's test - #96, #97, #23 and #92 in part, #98 (DECISIONS K75-K80, A16).

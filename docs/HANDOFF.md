@@ -44,10 +44,9 @@ on the kit yet - bring each over when it is next changed (`ui-architecture.md` ย
 **A PR is opened only after the owner has run the tests and answered the questions** (owner,
 2026-10-14): push the branch, discuss, then `gh pr create`. The owner's order, 2026-10-14 evening:
 
-1. **#99, satin - built on `feat/99-satin`, waiting for the owner's look** (`docs/TEST_99.md`, no PR
-   yet). `Kit::finish()`: satin on Members' rows, scenes not loaded, the dialog's buttons and Power
-   while off; glass on a loaded scene and Power while on (K77, K85). Painted and dithered, satin in
-   16 bits. Measured on the P4_5 only - an S3 must be on the desk for W6 (Q5).
+1. ~~**#99, satin**~~ - **DONE, `v0.2.16`** (`archive/TEST_99.md`; K77, K85-K87): satin and glass
+   from `Kit::finish()`, the rail through the selector's glass, lists that scroll from anywhere. The
+   S3 frame measurement is still owed (the owner: merge, measure later).
 2. **2.8** header slots (#19), as far as the evening goes (after the design interview ยง3 in
    `ROADMAP.md`'s order).
 3. **Overnight candidates**: **A17** - a failed mount never costs the settings (format only a blank

@@ -182,7 +182,9 @@ What a surface says about a thing you can tap, decided once for every component:
 at the top fading by the middle, a faint step, a shade growing below, a soft edge (a shade on a
 light scheme); **glass** - the selector's metal (`metalKind()`). Called again, it changes the
 finish (a scene loaded and no longer; Power on and off - `Kit::selectorActionLit()`). Pressed:
-satin darkens 30 %, glass lightens 20 %, and the object sinks 1 px (`KS_SINK`). Colour still carries
+satin darkens 30 %, glass lightens 20 %, and the object sinks 1 px (`KS_SINK`) - the tint a
+**veil**, a rounded object in the face's shape over it, because LVGL drops the corner clip of an
+image it recolours (LESSONS). Colour still carries
 state: a member's "On, 100%, 2710 K" is in `KS_LABEL_TAG_ACTIVE`, "Off" white, Paused dimmed. A
 colour drawn on glass goes through `Kit::glassInk()`, which moves it away from the metal's tone
 (Linen's olive was lost on its silver). **The selector's glass shows the rail through it** (owner,
