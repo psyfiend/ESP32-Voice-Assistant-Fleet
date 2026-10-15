@@ -180,6 +180,34 @@ struct UIShape {
 };
 
 // ---------------------------------------------------------------------------
+// 2c. The page header's slots, in LOGICAL pixels (2.8, #19)
+// ---------------------------------------------------------------------------
+// The header is sc(UIToolkit::SYSTEM_HEADER_FULL_H) tall on every board, so what
+// sits in it is sized in the same logical pixels: pass these to UI::sc(). One
+// set, fleet-wide, read through UI::hdr(); docs/design/tokens.md section 8.
+struct UIHeader {
+    uint8_t GLYPH;         // 28  a status glyph's drawing box, bare (today's size)
+    uint8_t GLYPH_FRAMED;  // 19  the same glyph inside a frame
+    uint8_t FRAME;         // 26  a glyph's frame, the rounded square or the circle
+    uint8_t FRAME_R;       //  7  the rounded square's corners
+    uint8_t FRAME_MIX;     // 14  the rounded square's shade: % of TEXT over the bar
+    uint8_t SLOT_GAP;      //  8  between the things in one slot
+    uint8_t SLOT_PAD;      //  4  a slot's sides
+    uint8_t DOT_ON;        // 11  this page's dot
+    uint8_t DOT_OFF;       //  8  another page's ring
+    uint8_t DOT_RING;      //  2  the ring's line
+    uint8_t DOT_GAP;       //  5  between dots
+    uint8_t MARK;          // 12  the error mark beside a slot's dashes
+    uint8_t LINE;          //  2  the bar's accent line
+    // A slot's drawer - the system panel's shape, which it was before it had a name
+    uint16_t DRAWER_W;     // 260 a slot's panel at most (the status slot's is the system panel)
+    uint8_t DRAWER_R;      // 15  its bottom corners
+    uint8_t DRAWER_PAD;    // 10  inside it
+    uint8_t DRAWER_GAP;    //  8  between its rows
+    uint8_t DRAWER_LINE;   //  2  its edge
+};
+
+// ---------------------------------------------------------------------------
 // 3. Grid — derived from the viewport, not declared
 // ---------------------------------------------------------------------------
 // Columns and rows are always DERIVED. You pick a target card width and the
@@ -270,6 +298,7 @@ extern const UIMetrics UI_MET_DARK;   // 1px lighten @40% border, no shadow need
 extern const UIMetrics UI_MET_LIGHT;  // no border, leans on the shadow
 
 extern const UIShape UI_SHAPE;        // the card window's shape and spacing (2.12)
+extern const UIHeader UI_HEADER;      // the page header's slots (2.8)
 
 // Colour roles for UI::paint() - shared styles that repaint themselves on a
 // scheme change. #64; the full story is at UI::paint() below.
@@ -303,6 +332,7 @@ const UIMetrics &met();
 const UIGrid    &grid();
 const UIType    &type();
 const UIShape   &shape();   // millimetres - see section 2b
+const UIHeader  &hdr();     // logical px - see section 2c
 
 // --- Runtime customisation -------------------------------------------------
 // The active palette and metrics are COPIES of a scheme, not pointers to one,

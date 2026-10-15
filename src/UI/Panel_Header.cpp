@@ -1,197 +1,285 @@
+// The page header: a bar of slots (2.8). See include/UI/Panel_Header.h; the
+// slots' data is UI/HeaderSlots.h, their panels SlotPanels.cpp.
 #include "UI/Panel_Header.h"
-#include "UI/UITokens.h"
-#include "UI/UIToolkit.h"  // Semantic fonts
-#include "ConnectivityManager.h"
 
-Panel_Header::Panel_Header() {
-    lbl_title  = NULL;
-    btn_status = NULL;
-    slots      = NULL;
+#include <math.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+#include "UI/Kit.h"
+#include "UI/UIIcons.h"           // MDI_THERMOMETER
+#include "UI/UIToolkit.h"
+#include "Cards/CardIcons.h"      // a sensor's icon, tint and value, as its card draws them
+#include "EntityRegistry.h"
+#include "TimeService.h"
+
+namespace {
+constexpr uint32_t TICK_MS   = 250;    // how often the slots are asked; each redraws only on a change
+constexpr uint32_t SENSOR_MS = 1000;   // a sensor is read at most once a second
+
+// UTF-8 for the degree sign, as bytes (as CardIcons.cpp writes it).
+const char *DEG = "\xC2\xB0";
+
+int32_t hashText(const char *s) {
+    uint32_t h = 2166136261u;
+    for (; *s; s++) h = (h ^ (uint8_t)*s) * 16777619u;
+    return (int32_t)(h & 0x3FFFFFFF);
+}
+}  // namespace
+
+// THE KINDS. A new kind of slot is a row here and its two functions; nothing
+// else in the header changes (header-slots.md section 8).
+struct Panel_Header::KindOps {
+    SlotKind kind;
+    void (Panel_Header::*build)(Slot &);
+    void (Panel_Header::*update)(Slot &, bool force);
+};
+
+const Panel_Header::KindOps &Panel_Header::ops(SlotKind k) {
+    static const KindOps TABLE[] = {
+        { SlotKind::SLOT_CLOCK,  &Panel_Header::buildClock,  &Panel_Header::updateClock  },
+        { SlotKind::SLOT_PAGE,   &Panel_Header::buildPage,   &Panel_Header::updatePage   },
+        { SlotKind::SLOT_STATUS, &Panel_Header::buildStatus, &Panel_Header::updateStatus },
+        { SlotKind::SLOT_SENSOR, &Panel_Header::buildSensor, &Panel_Header::updateSensor },
+    };
+    for (const KindOps &o : TABLE) if (o.kind == k) return o;
+    return TABLE[0];
 }
 
-void Panel_Header::init(lv_obj_t* parent, const char* title, ConnectivityManager* conn,
-                        MqttManager* mqtt) {
-    // Top Bar Container
-    container = lv_obj_create(parent);
-    lv_obj_set_size             (container, lv_pct(100), UIToolkit::systemHeaderPx());
-    lv_obj_set_style_bg_color   (container, UI::c(UI::pal().SURFACE_ALT), 0);
+void Panel_Header::init(lv_obj_t *parent, ConnectivityManager *conn, MqttManager *mqtt, EntityRegistry *reg) {
+    _conn = conn;
+    _mqtt = mqtt;
+    _reg  = reg;
+    _bar  = Kit::headerBar(parent);
+    _spec  = HEADER_DEFAULT;
+    _specN = HEADER_DEFAULT_COUNT;
+    buildSlots();
+}
 
-    // Bottom Border Only (Blue Line)
-    lv_obj_set_style_border_width(container, 0, 0);
-    lv_obj_set_style_border_width(container, UIToolkit::sc(2), UI::part(LV_PART_MAIN));
-    lv_obj_set_style_border_side (container, LV_BORDER_SIDE_BOTTOM, 0);
-    lv_obj_set_style_border_color(container, UI::c(UI::pal().ACCENT), 0); // Cyan Blue
-
-    lv_obj_set_style_radius     (container, 0, 0);
-    // The scheme's drop shadow, onto the page below - nothing on a scheme
-    // without one. The owner's Linen request, 2026-09-23.
-    lv_obj_add_style            (container, UI::paint(UIPaint::PAINT_LIFT), 0);
-    lv_obj_set_style_pad_all    (container, 0, 0); // Remove padding so button hits edge
-    lv_obj_set_style_pad_left   (container, UIToolkit::sc(15), 0); // Restore left pad for title
-    lv_obj_set_style_pad_right  (container, UIToolkit::sc(5), 0); // Small pad for button
-
-    lv_obj_set_flex_flow        (container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align       (container, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_clear_flag           (container, LV_OBJ_FLAG_SCROLLABLE);
-
-    // Title Label
-    lbl_title = lv_label_create(container);
-    lv_label_set_text           (lbl_title, title);
-    lv_obj_set_style_text_font  (lbl_title, UIToolkit::Font_PanelHeader, 0); // Semantic Font
-    lv_obj_set_style_text_color (lbl_title, UI::c(UI::pal().ACCENT), 0);
-    
-    // Status Button Wrapper (Touch Hotspot) --
-    btn_status = lv_obj_create(container);
-    // Was sc(80) for one glyph; two need the room. Still one hotspot, because
-    // the tap means "show me connectivity" whichever half you hit - splitting
-    // it into two targets would make the smaller boards' glyphs harder to hit
-    // than UI::minTouch() allows for no gain.
-    lv_obj_set_size             (btn_status, UIToolkit::sc(116), lv_pct(100)); // Wide touch target
-    lv_obj_set_style_bg_opa     (btn_status, LV_OPA_TRANSP, 0); // Invisible
-    lv_obj_set_style_border_width(btn_status, 0, 0);
-    lv_obj_set_style_pad_all    (btn_status, 0, 0);
-
-    // Enable Clicking on the wrapper
-    lv_obj_add_flag             (btn_status, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_clear_flag           (btn_status, LV_OBJ_FLAG_SCROLLABLE);
-
-    // The status cluster. A flex row inside the hotspot rather than each glyph
-    // centred on top of the other - which is what a second lv_obj_center()
-    // call would have produced.
-    //
-    // Order is MQTT then WiFi, left to right, matching the Fleet Status Glyphs
-    // artifact's own header mock. It also reads correctly as a dependency
-    // chain: the link is nearest the edge and everything else rides on it.
-    slots = lv_obj_create(btn_status);
-    lv_obj_remove_style_all(slots);
-    lv_obj_set_size(slots, LV_SIZE_CONTENT, lv_pct(100));
-    lv_obj_center(slots);
-    lv_obj_set_flex_flow(slots, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(slots, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(slots, UIToolkit::sc(8), 0);
-    // The hotspot above owns the touch; these must not eat it.
-    lv_obj_remove_flag(slots, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(slots, LV_OBJ_FLAG_SCROLLABLE);
-
-    // Both glyphs are omitted rather than faked when their subsystem is absent
-    // - a GUI-less or broker-less build should show nothing, not a grey lie.
-    if (mqtt) mqttStatus.init(slots, mqtt);
-
-    // Live connectivity glyph, inside the existing touch hotspot. Replaces the
-    // old always-green LV_SYMBOL_WIFI label, which reported nothing.
-    if (conn) connStatus.init(slots, conn);
+void Panel_Header::buildSlots() {
+    if (!_bar) return;
+    lv_obj_clean(_bar);
+    _n = _specN < HEADER_SLOTS_MAX ? _specN : HEADER_SLOTS_MAX;
+    for (uint8_t i = 0; i < _n; i++) {
+        Slot &s = _slots[i];
+        s = Slot();
+        s.kind   = _spec[i].kind;
+        s.entity = _spec[i].entity;
+        s.box    = Kit::headerSlot(_bar, slotClickCb, this);
+        (this->*ops(s.kind).build)(s);
+    }
+    // Laid out once, so a page slot can measure its room and a panel can find
+    // its slot's centre; then each slot draws what it has.
+    lv_obj_update_layout(_bar);
+    for (uint8_t i = 0; i < _n; i++) (this->*ops(_slots[i].kind).update)(_slots[i], true);
+    if (_open >= 0 && _open < _n) lv_obj_add_state(_slots[_open].box, LV_STATE_CHECKED);
+    else _open = -1;
 }
 
 void Panel_Header::tick() {
-    // Self-throttling and change-guarded internally, so calling this every
-    // loop costs a millis() compare in the common case. Both glyphs no-op
-    // when their subsystem was never handed to init().
-    connStatus.tick();
-    mqttStatus.tick();
+    const uint32_t now = millis();
+    if (now - _lastTickMs < TICK_MS) return;
+    _lastTickMs = now;
+    const bool sensorDue = now - _lastSensorMs >= SENSOR_MS;
+    if (sensorDue) _lastSensorMs = now;
+    for (uint8_t i = 0; i < _n; i++) {
+        Slot &s = _slots[i];
+        if (s.kind == SlotKind::SLOT_SENSOR && !sensorDue) continue;
+        (this->*ops(s.kind).update)(s, false);
+    }
 }
+
 void Panel_Header::restyle() {
-    if (!container) return;
-    lv_obj_set_style_bg_color    (container, UI::c(UI::pal().SURFACE_ALT), 0);
-    lv_obj_set_style_border_color(container, UI::c(UI::pal().ACCENT), 0);
-    if (lbl_title) lv_obj_set_style_text_color(lbl_title, UI::c(UI::pal().ACCENT), 0);
-    paintPage();
+    for (uint8_t i = 0; i < _n; i++) (this->*ops(_slots[i].kind).update)(_slots[i], true);
 }
 
-void Panel_Header::setPage(const char *title, uint8_t index, uint8_t count) {
-    if (!container) return;
-
-    if (!pageBox) {
-        // OUT OF THE BAR'S FLEX ROW and centred on the bar itself, so it sits
-        // in the true middle of the screen whatever the device name on the
-        // left and the status glyphs on the right happen to measure.
-        pageBox = lv_obj_create(container);
-        lv_obj_remove_style_all(pageBox);
-        lv_obj_add_flag       (pageBox, LV_OBJ_FLAG_IGNORE_LAYOUT);
-        lv_obj_set_size       (pageBox, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-        lv_obj_set_flex_flow  (pageBox, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align (pageBox, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
-                               LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_column(pageBox, UIToolkit::sc(8), 0);
-        lv_obj_remove_flag    (pageBox, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_remove_flag    (pageBox, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_align          (pageBox, LV_ALIGN_CENTER, 0, 0);
-
-        pageTitle = lv_label_create(pageBox);
-        lv_obj_set_style_text_font(pageTitle, UIToolkit::Font_PanelHeader, 0);
-
-        pageDots = lv_obj_create(pageBox);
-        lv_obj_remove_style_all(pageDots);
-        lv_obj_set_size       (pageDots, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-        lv_obj_set_flex_flow  (pageDots, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align (pageDots, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
-                               LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_column(pageDots, UIToolkit::sc(5), 0);
-        lv_obj_remove_flag    (pageDots, LV_OBJ_FLAG_CLICKABLE);
+void Panel_Header::setPage(const char *title, uint8_t index, uint8_t count,
+                           const SlotSpec *slots, uint8_t nSlots) {
+    snprintf(_title, sizeof(_title), "%s", title ? title : "");
+    _pageIndex = index;
+    _pageCount = count;
+    const SlotSpec *want  = slots ? slots : HEADER_DEFAULT;
+    const uint8_t   wantN = slots ? nSlots : HEADER_DEFAULT_COUNT;
+    if (want != _spec || wantN != _specN) {
+        _spec  = want;
+        _specN = wantN;
+        buildSlots();
+        return;
     }
+    for (uint8_t i = 0; i < _n; i++)
+        if (_slots[i].kind == SlotKind::SLOT_PAGE) updatePage(_slots[i], true);
+}
 
-    lv_label_set_text(pageTitle, title ? title : "");
+void Panel_Header::setGlyphStyle(GlyphStyle s) {
+    if (s == _style) return;
+    _style = s;
+    buildSlots();
+}
 
-    // Rebuild the dots - there are at most a dozen, and it happens once per
-    // page change. The ">12 pages" case is a label instead of dots.
-    lv_obj_clean(pageDots);
-    if (count > 1 && count <= PAGE_DOTS_MAX) {
-        // CURRENT AND OTHER DIFFER BY SHAPE AND SIZE, NOT ONLY BY COLOUR. The
-        // owner is a little colour-blind and found two same-sized dots in two
-        // colours hard to tell apart. The current page is a larger filled dot;
-        // the others are smaller hollow rings. Readable in greyscale.
-        for (uint8_t i = 0; i < count; i++) {
-            const bool cur = (i == index);
-            const int32_t d = UIToolkit::sc(cur ? 11 : 8);
-            lv_obj_t *dot = lv_obj_create(pageDots);
-            lv_obj_remove_style_all(dot);
-            lv_obj_set_size        (dot, d, d);
-            lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-            lv_obj_set_style_bg_opa(dot, cur ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-            lv_obj_set_style_border_width(dot, cur ? 0 : UIToolkit::sc(2), 0);
-        }
-    } else if (count > PAGE_DOTS_MAX) {
-        lv_obj_t *l = lv_label_create(pageDots);
-        lv_label_set_text_fmt(l, "%u / %u", (unsigned)index + 1, (unsigned)count);
-        lv_obj_set_style_text_font(l, UIToolkit::Font_Label, 0);
+SlotKind Panel_Header::slotKind(uint8_t i) const {
+    return i < _n ? _slots[i].kind : SlotKind::SLOT_KIND_COUNT;
+}
+
+const char *Panel_Header::slotEntity(uint8_t i) const {
+    return i < _n ? _slots[i].entity : nullptr;
+}
+
+int Panel_Header::slotOf(SlotKind k) const {
+    for (uint8_t i = 0; i < _n; i++) if (_slots[i].kind == k) return i;
+    return -1;
+}
+
+int32_t Panel_Header::slotCentreX(uint8_t i) const {
+    if (i >= _n || !_slots[i].box) return 0;
+    lv_area_t a;
+    lv_obj_get_coords(_slots[i].box, &a);
+    return (a.x1 + a.x2) / 2;
+}
+
+void Panel_Header::setOpenSlot(int i) {
+    if (_open >= 0 && _open < _n) lv_obj_remove_state(_slots[_open].box, LV_STATE_CHECKED);
+    _open = (i >= 0 && i < _n) ? i : -1;
+    if (_open >= 0) lv_obj_add_state(_slots[_open].box, LV_STATE_CHECKED);
+}
+
+void Panel_Header::slotClickCb(lv_event_t *e) {
+    Panel_Header *h = (Panel_Header *)lv_event_get_user_data(e);
+    lv_obj_t *box = (lv_obj_t *)lv_event_get_current_target(e);
+    if (!h || !h->_onTap) return;
+    for (uint8_t i = 0; i < h->_n; i++)
+        if (h->_slots[i].box == box) { h->_onTap(i); return; }
+}
+
+// --- The clock ------------------------------------------------------------------
+// "1:55am", as the owner wrote it: 12-hour, am / pm small beside it, no seconds
+// (header-slots.md section 7 - Claude's view, open). Dashes until the clock
+// holds a real time (D-15). Redrawn when the minute changes, and only then.
+void Panel_Header::buildClock(Slot &s) {
+    s.c = Kit::plain(s.box);
+    Kit::add(s.c, Kit::KitStyle::KS_HDR_CLOCK);
+    s.a = Kit::label(s.c, Kit::KitStyle::KS_HDR_TEXT);
+    s.b = Kit::label(s.c, Kit::KitStyle::KS_HDR_TEXT_DIM);
+}
+
+void Panel_Header::updateClock(Slot &s, bool force) {
+    const time_t now = time(nullptr);
+    const int32_t key = TimeService::isSet() ? (int32_t)(now / 60) : -1;
+    if (!force && key == s.key) return;
+    s.key = key;
+    s.redraws++;
+    if (key < 0) {
+        lv_label_set_text(s.a, "--:--");
+        lv_label_set_text(s.b, "");
+        return;
     }
-    paintPage();
+    struct tm t;
+    localtime_r(&now, &t);
+    const int h12 = t.tm_hour % 12 ? t.tm_hour % 12 : 12;
+    lv_label_set_text_fmt(s.a, "%d:%02d", h12, t.tm_min);
+    lv_label_set_text(s.b, t.tm_hour < 12 ? "am" : "pm");
+}
 
-    // ROOM FOR THE DEVICE NAME, measured. On CYD_S3_3248 (320 px) the centred
-    // page title landed on top of the device name. Where the name cannot have
-    // a useful width left of the centred group, it gives way entirely and the
-    // page group takes its place at the left - which is where the owner first
-    // asked for the page title to go. Elsewhere it is shortened with "..."
-    // only if it has to be.
-    lv_obj_update_layout(container);
-    const int32_t barW   = lv_obj_get_content_width(container);
-    const int32_t boxW   = lv_obj_get_width(pageBox);
-    const int32_t roomL  = barW / 2 - boxW / 2 - UIToolkit::sc(10);
-    if (roomL >= UIToolkit::sc(60)) {
-        lv_obj_clear_flag     (lbl_title, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_long_mode(lbl_title, LV_LABEL_LONG_DOT);
-        lv_obj_set_width      (lbl_title, LV_SIZE_CONTENT);
-        lv_obj_update_layout  (container);
-        if (lv_obj_get_width(lbl_title) > roomL) lv_obj_set_width(lbl_title, roomL);
-        lv_obj_align(pageBox, LV_ALIGN_CENTER, 0, 0);
+// --- The page -------------------------------------------------------------------
+// Its name and a dot per page: this page's larger and filled, the others rings.
+// Where the slot is too narrow for both, the name goes and the dots stay (the
+// page's panel names it) - measured, never by board.
+void Panel_Header::buildPage(Slot &s) {
+    s.a = Kit::label(s.box, Kit::KitStyle::KS_HDR_TEXT);
+    s.c = Kit::plain(s.box);
+    Kit::add(s.c, Kit::KitStyle::KS_HDR_DOTS);
+}
+
+void Panel_Header::updatePage(Slot &s, bool force) {
+    if (!force) return;   // it changes with the page, never on its own
+    s.redraws++;
+    lv_label_set_text(s.a, _title);
+    lv_obj_clean(s.c);
+    if (_pageCount > 1 && _pageCount <= PAGE_DOTS_MAX) {
+        for (uint8_t i = 0; i < _pageCount; i++)
+            Kit::add(Kit::plain(s.c), i == _pageIndex ? Kit::KitStyle::KS_HDR_DOT_ON : Kit::KitStyle::KS_HDR_DOT_OFF);
+    } else if (_pageCount > PAGE_DOTS_MAX) {
+        lv_obj_t *l = Kit::label(s.c, Kit::KitStyle::KS_HDR_TEXT_DIM);
+        lv_label_set_text_fmt(l, "%u / %u", (unsigned)_pageIndex + 1, (unsigned)_pageCount);
+    }
+    lv_obj_remove_flag(s.a, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_update_layout(s.box);
+    const int32_t room = lv_obj_get_content_width(s.box);
+    const int32_t need = lv_obj_get_width(s.a) + lv_obj_get_width(s.c) + UI::sc(UI::hdr().SLOT_GAP);
+    if (need > room) lv_obj_add_flag(s.a, LV_OBJ_FLAG_HIDDEN);
+}
+
+// --- Status -----------------------------------------------------------------------
+// The HA / MQTT link, then Wi-Fi - the order of the Fleet Status Glyphs mock, and
+// a dependency chain read from the edge in. Each is its own widget and throttles
+// itself; framed by the glyph style.
+void Panel_Header::buildStatus(Slot &s) {
+    if (_mqtt) _link.init(s.box, _mqtt, _style);
+    if (_conn) _wifi.init(s.box, _conn, _style);
+}
+
+void Panel_Header::updateStatus(Slot &s, bool force) {
+    (void)s;
+    if (force) {
+        if (_mqtt) _link.repaint();
+        if (_conn) _wifi.repaint();
+        return;
+    }
+    if (_conn) _wifi.tick();
+    if (_mqtt) _link.tick();
+}
+
+// --- A sensor ------------------------------------------------------------------------
+// Its icon and its value, as its card would draw them (the corner icon and its
+// tint; a temperature to the whole degree). DASHES UNTIL A LIVE VALUE (D-15):
+// "--" while it has never reported this boot; "--" and the error mark when the
+// source says it is unavailable or it has gone stale - never an old value.
+void Panel_Header::buildSensor(Slot &s) {
+    s.frame = Kit::glyphFrame(s.box, _style);
+    s.a = Kit::label(s.frame, Kit::KitStyle::KS_HDR_ICON);
+    s.b = Kit::label(s.box, Kit::KitStyle::KS_HDR_TEXT);
+    s.c = Kit::label(s.box, Kit::KitStyle::KS_HDR_MARK);
+    lv_label_set_text(s.c, "!");
+    lv_obj_add_flag(s.c, LV_OBJ_FLAG_HIDDEN);
+}
+
+void Panel_Header::updateSensor(Slot &s, bool force) {
+    const Entity *e = (_reg && s.entity) ? _reg->find(s.entity) : nullptr;
+    // An entity this board does not know is taken for a temperature - the
+    // default slot's - so its dashes carry the degree sign they will keep.
+    bool temp = true;
+    if (e) {
+        const char *u = cardDisplayUnit(*e);
+        temp = (uint8_t)u[0] == 0xC2 && (uint8_t)u[1] == 0xB0;
+    }
+    char text[24];
+    uint8_t state = 0;   // 0 live, 1 nothing yet, 2 an error
+    if (!e || !e->everSet) state = 1;
+    else if (!e->available || _reg->isStale(*e, millis())) state = 2;
+    const bool number = e && (e->value.type == ValueType::FLOAT || e->value.type == ValueType::INT);
+    if (state) {
+        snprintf(text, sizeof(text), "--%s", temp ? DEG : "");
+    } else if (temp && number) {
+        const float v = cardDisplayNumber(*e, e->value.type == ValueType::FLOAT ? e->value.f : (float)e->value.i);
+        snprintf(text, sizeof(text), "%ld%s", lroundf(v), DEG);
     } else {
-        lv_obj_add_flag(lbl_title, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_align   (pageBox, LV_ALIGN_LEFT_MID, 0, 0);
+        cardFormatValue(*e, text, sizeof(text), true);
     }
-}
+    const int32_t key = hashText(text) * 4 + state;
+    if (!force && key == s.key) return;
+    s.key = key;
+    s.redraws++;
 
-void Panel_Header::paintPage() {
-    if (!pageBox) return;
-    const UIPalette &p = UI::pal();
-    lv_obj_set_style_text_color(pageTitle, UI::c(p.TEXT), 0);
-    const uint32_t n = lv_obj_get_child_count(pageDots);
-    for (uint32_t i = 0; i < n; i++) {
-        lv_obj_t *c = lv_obj_get_child(pageDots, i);
-        // Which dot is current is decided by its SHAPE, in setPage(); this
-        // only colours them. The filled dot takes the accent, the hollow rings
-        // take TEXT rather than TEXT_DIM so a ring is still plainly visible.
-        // The "3 / 15" label reads its colour from text_color.
-        lv_obj_set_style_bg_color    (c, UI::c(p.ACCENT), 0);
-        lv_obj_set_style_border_color(c, UI::c(p.TEXT), 0);
-        lv_obj_set_style_text_color  (c, UI::c(p.TEXT_DIM), 0);
+    lv_label_set_text(s.b, text);
+    if (state == 2) lv_obj_remove_flag(s.c, LV_OBJ_FLAG_HIDDEN);
+    else            lv_obj_add_flag   (s.c, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text(s.a, e ? cardCornerIcon(*e, false) : MDI_THERMOMETER);
+    // The icon in its tint while live, dimmed otherwise; in a circle, the circle
+    // takes that colour and the icon the bar's.
+    const uint32_t tint = (!state && e) ? cardTintFor(e->desc) : UI::pal().TEXT_DIM;
+    if (_style == GlyphStyle::GLYPH_CIRCLE) {
+        lv_obj_set_style_bg_color(s.frame, UI::c(tint), 0);
+        lv_obj_set_style_text_color(s.a, UI::c(UI::pal().SURFACE_ALT), 0);
+    } else {
+        lv_obj_set_style_text_color(s.a, UI::c(tint), 0);
     }
 }

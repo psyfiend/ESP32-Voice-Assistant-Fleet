@@ -1,6 +1,7 @@
 #pragma once
 #include <lvgl.h>
 #include "ConnectivityManager.h"
+#include "UI/HeaderSlots.h"   // GlyphStyle
 
 // ---------------------------------------------------------------------------
 // Connectivity status glyph - a WiFi fan (base dot + up to three arcs) whose
@@ -36,12 +37,20 @@ public:
     //   OFF   - no motion at all.
     enum class Motion : uint8_t { OFF, BLINK, PULSE };
 
-    void init(lv_obj_t *parent, ConnectivityManager *mgr);
+    // `style` frames the fan (2.8, #19): bare as it always was, in the header's
+    // rounded square, or in a circle of the state's colour with the fan drawn in
+    // the bar's. Called again on new objects (the header rebuilds its slots), it
+    // starts over.
+    void init(lv_obj_t *parent, ConnectivityManager *mgr, GlyphStyle style = GlyphStyle::GLYPH_BARE);
     void tick();                       // call from loop(); self-throttling
+    void repaint();                    // a scheme change: draw the current state again
     void setMotion(Motion m);
     lv_obj_t *getRoot() { return _root; }
 
 private:
+    // Every colour the glyph is given passes through here: for the circle it
+    // fills the frame and hands back the bar's colour for the strokes.
+    lv_color_t glyphCol(lv_color_t state);
     void applyVisual(ConnState st, SignalBand band, bool apUp,
                      LinkHealth health, bool retrying);
     void setArcs(int litCount, lv_color_t col, bool glow);
@@ -54,7 +63,9 @@ private:
     void stopMotion();
 
     ConnectivityManager *_mgr  = nullptr;
+    GlyphStyle _style          = GlyphStyle::GLYPH_BARE;
     lv_obj_t *_root            = nullptr;
+    lv_obj_t *_frame           = nullptr;   // the glyph's frame (Kit::glyphFrame())
     lv_obj_t *_fan             = nullptr;   // fixed-size box holding the arcs
     lv_obj_t *_arc[3]          = {nullptr, nullptr, nullptr};
     lv_obj_t *_dot             = nullptr;

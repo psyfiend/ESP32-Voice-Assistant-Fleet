@@ -18,6 +18,7 @@
 #include "Settings.h"   // 2.10d: the claims on saved settings, and [SETTINGS]
 #include "Cards/CardGroups.h"
 #include "Cards/CardAdded.h"   // K17: cards added on the device
+#include "UI/SlotPanels.h"     // 2.8: the header slots' panels
 #include <string.h>
 #ifdef DEBUG_PAGE_TIMING
 #include <esp_timer.h>   // rebuildDashboard()'s two halves
@@ -182,16 +183,107 @@ void GUIManager::syncPanelOffset() {
     else if (_headerPeeking) top = UIToolkit::sc(UI_HEADER_PEEK_H);   // temporary one
     // else: no bar at all, so the drawer starts at the top of the screen.
     _pnlSystem.setTopOffset(top);
+    // ...and a slot's drawer, which hangs from the same bar (2.8).
+    if (_slotDrawer.root) lv_obj_set_y(_slotDrawer.root, top);
+    _slotDrawer.top = top;
 }
 
+// THE SYSTEM PANEL IS THE STATUS SLOT'S (2.8, D-13): it hangs under that slot,
+// however it was asked for - the slot, a swipe down, the harness.
 void GUIManager::toggleSystemPanel() {
     syncPanelOffset();
+    if (!_pnlSystem.isExpanded()) {
+        closeSlotPanel(false);
+        const int s = _header.slotOf(SlotKind::SLOT_STATUS);
+        if (s >= 0) _pnlSystem.setAnchorX(_header.slotCentreX((uint8_t)s));
+        else        _pnlSystem.setAnchorX(lv_obj_get_width(lv_screen_active()));   // no slot: the right edge, as before
+    }
     _pnlSystem.toggle();
 }
 
-void GUIManager::headerIconClickCb(lv_event_t *e) {
-    (void)e;
-    if (s_self) s_self->toggleSystemPanel();
+void GUIManager::onSlotTap(uint8_t slot) {
+    if (_header.slotKind(slot) == SlotKind::SLOT_STATUS) { toggleSystemPanel(); return; }
+    if (_slotPanel == (int8_t)slot) { closeSlotPanel(true); return; }
+    if (_pnlSystem.isExpanded()) _pnlSystem.close();
+    UIToolkit::closeActiveAccordion();
+    openSlotPanel(slot);
+}
+
+void GUIManager::openSlotPanel(uint8_t slot) {
+    if (!_slotDrawer.root) return;
+    closeSlotPanel(false);
+    lv_obj_clean(_slotDrawer.face);   // what the last panel held
+    SlotPanels::Context c;
+    for (uint8_t i = 0; i < _nPages && i < SlotPanels::PAGES_MAX; i++)
+        c.pageTitles[i] = _pages[i].spec && _pages[i].spec->title ? _pages[i].spec->title : "Page";
+    c.pageCount   = _nPages;
+    c.pageIndex   = _curPage;
+    c.headerShown = !_headerHidden;
+    c.entity      = _header.slotEntity(slot);
+    c.reg         = &_core.entities();
+    c.goToPage    = [](uint8_t p) {
+        if (!s_self) return;
+        s_self->closeSlotPanel(false);
+        s_self->goToPage(p);
+    };
+    c.setHeaderShown = [](bool shown) {
+        if (!s_self) return;
+        s_self->closeSlotPanel(false);
+        s_self->setPageHeaderShown(shown);
+    };
+    if (!SlotPanels::build(_header.slotKind(slot), _slotDrawer.face, c)) return;
+    syncPanelOffset();
+    Kit::drawerPlace(_slotDrawer, _header.slotCentreX(slot), _slotDrawer.top);
+    Kit::drawerOpen(_slotDrawer);
+    _slotPanel = (int8_t)slot;
+    _header.setOpenSlot(slot);
+    syncScrim();
+}
+
+void GUIManager::closeSlotPanel(bool animate) {
+    if (_slotPanel < 0) return;
+    Kit::drawerClose(_slotDrawer, animate);
+    if (_header.openSlot() == _slotPanel) _header.setOpenSlot(-1);
+    _slotPanel = -1;
+    syncScrim();
+}
+
+void GUIManager::syncScrim() {
+    if (!_dismissScrim) return;
+    if (_pnlSystem.isExpanded() || _slotPanel >= 0) lv_obj_add_flag  (_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
+    else                                            lv_obj_clear_flag(_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
+}
+
+void GUIManager::cycleGlyphs() {
+    const uint8_t n = (uint8_t)GlyphStyle::GLYPH_STYLE_COUNT;
+    const GlyphStyle next = (GlyphStyle)(((uint8_t)_header.glyphStyle() + 1) % n);
+    _header.setGlyphStyle(next);
+    // Saved by name; the default (bare) as nothing.
+    Settings::setSystem("header", "glyphs", next == GlyphStyle::GLYPH_BARE ? nullptr : glyphStyleName(next));
+    Settings::save();
+    Serial.printf("[UI] header glyphs: %s\n", glyphStyleName(next));
+}
+
+bool GUIManager::pageHeaderShown() const {
+    if (_curPage >= _nPages || !_pages[_curPage].spec) return true;
+    const PageSpec &p = *_pages[_curPage].spec;
+    char v[12];
+    if (Settings::page(p.slug, "header", v, sizeof(v))) {
+        if (!strcmp(v, "hidden")) return false;
+        if (!strcmp(v, "shown"))  return true;
+    }
+    return p.headerShown;
+}
+
+void GUIManager::setPageHeaderShown(bool shown) {
+    if (_curPage >= _nPages || !_pages[_curPage].spec) return;
+    const PageSpec &p = *_pages[_curPage].spec;
+    // Only a choice that differs from the page's own default is stored.
+    Settings::setPage(p.slug, "header", shown == p.headerShown ? nullptr : (shown ? "shown" : "hidden"));
+    Settings::save();
+    applyHeaderHidden(!shown);
+    rebuildDashboard();
+    Serial.printf("[UI] page %s: header %s\n", p.slug, shown ? "shown" : "hidden");
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +347,7 @@ void GUIManager::peekHeader() {
         // saw exactly that and called the gap "even worse". The peek timeout
         // is about an unattended glance, and a drawer standing open is not
         // one, so the timer simply re-arms instead of firing.
-        if (s_self->_pnlSystem.isExpanded()) return;
+        if (s_self->_pnlSystem.isExpanded() || s_self->_slotPanel >= 0) return;
         s_self->unpeekHeader();
     }, UI_HEADER_PEEK_MS, nullptr);
 
@@ -431,7 +523,8 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
         // peeked header is a "put that away" gesture and is allowed from
         // anywhere - a peek in particular lives at the TOP of the screen, so
         // requiring a swipe from the bottom to dismiss it would be perverse.
-        if (!s_self->_pnlSystem.isExpanded() && !s_self->_headerPeeking && !fromBottom) {
+        if (!s_self->_pnlSystem.isExpanded() && s_self->_slotPanel < 0 && !s_self->_headerPeeking &&
+            !fromBottom) {
             DBG_GESTURE("up from y=%d, not the bottom band\n", (int)p.y);
             break;
         }
@@ -439,9 +532,11 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
         // A swipe up closes the drawer before it touches the deck. With the
         // panel open it is the obvious "put that away" gesture, and toggling
         // the deck underneath an open panel would change something the user
-        // cannot see.
+        // cannot see. A slot's panel the same (2.8).
         if (s_self->_pnlSystem.isExpanded()) {
             s_self->_pnlSystem.close();
+        } else if (s_self->_slotPanel >= 0) {
+            s_self->closeSlotPanel(true);
         } else if (s_self->_headerPeeking) {
             // Put a peeked header away immediately rather than waiting out the
             // three seconds. The owner asked for it and it is the right
@@ -468,10 +563,11 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
         // or a peeking header. A sideways swipe then PUTS IT AWAY instead of
         // turning the page: the owner's rule that panels are closed before a
         // page swipe can happen, and one rule for the drawer and the deck.
-        if (s_self->_pnlSystem.isExpanded() || s_self->_headerPeeking ||
+        if (s_self->_pnlSystem.isExpanded() || s_self->_slotPanel >= 0 || s_self->_headerPeeking ||
             UIToolkit::getActiveAccordionPanel()) {
             release();
             if (s_self->_pnlSystem.isExpanded()) s_self->_pnlSystem.close();
+            if (s_self->_slotPanel >= 0)         s_self->closeSlotPanel(true);
             if (s_self->_headerPeeking)          s_self->unpeekHeader();
             UIToolkit::closeActiveAccordion();
             DBG_GESTURE("horizontal swipe closed what was open; page unchanged\n");
@@ -551,6 +647,14 @@ void GUIManager::reportUiSection() {
                                        : "shown",
                        g._showDeck ? "shown" : "hidden",
                        g._pnlSystem.isExpanded() ? "open" : "closed");
+    // The header's slots (2.8): left to right, the glyph style, a slot's panel.
+    char kinds[64] = "";
+    int  k = 0;
+    for (uint8_t i = 0; i < g._header.slotCount() && k < (int)sizeof(kinds) - 16; i++)
+        k += snprintf(kinds + k, sizeof(kinds) - k, "%s%s %lu", i ? " | " : "", slotKindName(g._header.slotKind(i)),
+                      (unsigned long)g._header.slotRedraws(i));
+    SystemReport::line("  Header:      %s   glyphs %s   slot panel %d", kinds,
+                       glyphStyleName(g._header.glyphStyle()), (int)g._slotPanel);
 }
 
 void GUIManager::begin() {
@@ -597,9 +701,16 @@ void GUIManager::begin() {
     lv_obj_clear_flag        (screen, LV_OBJ_FLAG_SCROLLABLE);               // Disable global scrolling
 
     // --= LAYER 3: HEADER BAR =--
-    // Header click -> toggle system panel
-    _header.init(screen, bsp_hw.device_name, &_core.conn(), &_core.mqtt());
-    lv_obj_add_event_cb(_header.getStatusIcon(), headerIconClickCb, LV_EVENT_CLICKED, NULL);
+    // Four slots (2.8); a tap on one opens its panel - onSlotTap(). The
+    // device's name has left the bar (D-12): About this board shows it.
+    _header.init(screen, &_core.conn(), &_core.mqtt(), &_core.entities());
+    {
+        char g[12];
+        GlyphStyle gs = GlyphStyle::GLYPH_BARE;
+        if (Settings::system("header", "glyphs", g, sizeof(g))) glyphStyleFromName(g, gs);
+        _header.setGlyphStyle(gs);
+    }
+    _header.setOnSlotTap([](uint8_t slot) { if (s_self) s_self->onSlotTap(slot); });
 
     // Swipe navigation, milestone 2.6 first cut. On the screen, not an
     // overlay - see screenGestureCb() for why that distinction matters.
@@ -626,6 +737,7 @@ void GUIManager::begin() {
         if (!s_self) return;
         if (s_self->_headerPeeking)          s_self->unpeekHeader();
         else if (s_self->_pnlSystem.isExpanded()) s_self->_pnlSystem.close();
+        else if (s_self->_slotPanel >= 0)    s_self->closeSlotPanel(true);
     }, LV_EVENT_CLICKED, NULL);
 
     // HOW FAR A SWIPE HAS TO TRAVEL, in real millimetres rather than pixels.
@@ -743,7 +855,9 @@ void GUIManager::begin() {
     lv_obj_clear_flag             (_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(_dismissScrim, [](lv_event_t *ev) {
         (void)ev;
-        if (s_self) s_self->_pnlSystem.close();
+        if (!s_self) return;
+        s_self->_pnlSystem.close();
+        s_self->closeSlotPanel(true);   // a slot's panel too (2.8)
     }, LV_EVENT_CLICKED, NULL);
 
     // Bottom panel open -> close system panel
@@ -795,9 +909,15 @@ void GUIManager::begin() {
 
     // System open -> hide touch window
     _pnlSystem.setOnToggleCallback([](bool isOpen) {
-        if (s_self && s_self->_dismissScrim) {
-            if (isOpen) lv_obj_add_flag  (s_self->_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
-            else        lv_obj_clear_flag(s_self->_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
+        if (!s_self) return;
+        // The status slot is drawn open while its panel shows (2.8). The
+        // scrim is synced after toggle() has set the drawer's state, so read
+        // isOpen rather than isExpanded() here.
+        if (isOpen) s_self->_header.setOpenSlot(s_self->_header.slotOf(SlotKind::SLOT_STATUS));
+        else if (s_self->_slotPanel < 0) s_self->_header.setOpenSlot(-1);
+        if (s_self->_dismissScrim) {
+            if (isOpen || s_self->_slotPanel >= 0) lv_obj_add_flag  (s_self->_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
+            else                                    lv_obj_clear_flag(s_self->_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
         }
         // If System Panel is OPEN (true), Hide Touch Window (false)
         // pnlDisplay.setTouchWindowVisibility(!isOpen);
@@ -808,6 +928,8 @@ void GUIManager::begin() {
 #endif
     _pnlDisplay.init(deck);
     _pnlSystem.init(upper_deck, &_header);
+    // The other slots' drawer (2.8), beside the system panel and over the scrim.
+    Kit::drawer(_slotDrawer, upper_deck, Kit::drawerWidth());
     // The scheme button was built reading "Fleet" whatever the board booted
     // into - visible in the owner's photos with Slate on screen. Say the truth.
     _pnlSystem.setSchemeLabel(UI::pal().name);
@@ -895,6 +1017,7 @@ void GUIManager::begin() {
             case Panel_System::GridAction::FILL_CYCLE:    cycleFill();     break;
             case Panel_System::GridAction::AREA_TOGGLE:   toggleArea();    break;
             case Panel_System::GridAction::LABEL_CYCLE:   cycleLabel();    break;
+            case Panel_System::GridAction::GLYPH_CYCLE:   cycleGlyphs();   break;
         }
     });
 
@@ -932,6 +1055,45 @@ void GUIManager::begin() {
         if (!s_self || s_self->_pnlSystem.isExpanded() == open) return true;
         s_self->toggleSystemPanel();
         return false;
+    });
+    // ...and the header's slots (2.8): slot=N opens slot N's panel as a tap
+    // does, slot=-1 closes any; glyphs=0|1|2 shows a glyph style without saving
+    // it, glyphs=3 the saved one again.
+    CardPopup::setHeaderHook([](int slot, int glyphs, int pageHdr) -> const char * {
+        static char out[96];
+        if (!s_self) return "no GUI";
+        GUIManager &g = *s_self;
+        if (pageHdr >= 0) {
+            g.closeSlotPanel(false);
+            g.setPageHeaderShown(pageHdr != 0);
+            snprintf(out, sizeof(out), "page %s: header %s (saved)", g.currentPageSlug(),
+                     pageHdr ? "shown" : "hidden");
+            return out;
+        }
+        if (glyphs >= 0) {
+            GlyphStyle gs = GlyphStyle::GLYPH_BARE;
+            if (glyphs < (int)GlyphStyle::GLYPH_STYLE_COUNT) {
+                gs = (GlyphStyle)glyphs;
+            } else {
+                char v[12];
+                if (Settings::system("header", "glyphs", v, sizeof(v))) glyphStyleFromName(v, gs);
+            }
+            g._header.setGlyphStyle(gs);
+            snprintf(out, sizeof(out), "glyphs: %s (not saved)", glyphStyleName(gs));
+            return out;
+        }
+        if (slot < 0) {
+            g.closeSlotPanel(false);
+            if (g._pnlSystem.isExpanded()) g._pnlSystem.close();
+            return "slot: closed";
+        }
+        if (slot >= g._header.slotCount()) return "slot: no such slot";
+        const SlotKind k = g._header.slotKind((uint8_t)slot);
+        if (g._slotPanel == slot || (k == SlotKind::SLOT_STATUS && g._pnlSystem.isExpanded()))
+            return "slot: already open";
+        g.onSlotTap((uint8_t)slot);
+        snprintf(out, sizeof(out), "slot %d (%s): opening", slot, slotKindName(k));
+        return out;
     });
 #endif
 
@@ -971,6 +1133,8 @@ void GUIManager::begin() {
 void GUIManager::buildDashboard() {
     lv_obj_t *screen = lv_screen_active();
 
+    // THE PAGE'S HEADER, before anything measures the room it leaves (D-14).
+    applyHeaderHidden(!pageHeaderShown());
     const int32_t headerH = UIToolkit::systemHeaderPx();
 
     // WHAT THE DECK ACTUALLY COSTS, MEASURED RATHER THAN ASSUMED.
@@ -1107,7 +1271,7 @@ void GUIManager::buildDashboard() {
     const int64_t tL4 = esp_timer_get_time();
     Serial.printf("[PageTiming] layout of the new page %lld us\n", (long long)(tL4 - tLx));
 #endif
-    _header.setPage(page.title, _curPage, _nPages);
+    _header.setPage(page.title, _curPage, _nPages, page.headerSlots, page.headerSlotCount);
 #ifdef DEBUG_PAGE_TIMING
     const int64_t tL5 = esp_timer_get_time();
 #endif
@@ -1241,8 +1405,18 @@ void GUIManager::openTokens() {
 // bar moved it off-screen and nothing could bring it back, because every path
 // that restored it went through the same cycle that had six positions and one
 // of them was "gone". Two states cannot get lost in the same way.
+//
+// A PAGE SETTING SINCE 2.8 (D-14): Hide Bar hides THIS page's header, saved
+// with the page (Settings pages.<slug>.header), as the page slot's panel does.
 void GUIManager::toggleHeaderBar() {
-    _headerHidden = !_headerHidden;
+    setPageHeaderShown(_headerHidden);
+}
+
+// The bar shown or hidden, and everything that hangs from it - without a
+// rebuild, so buildDashboard() can call it for the page it is building.
+void GUIManager::applyHeaderHidden(bool hidden) {
+    if (hidden == _headerHidden && UIToolkit::systemHeaderH == (hidden ? 0 : UI_HEADER_H)) return;
+    _headerHidden = hidden;
     UIToolkit::systemHeaderH = _headerHidden ? 0 : UI_HEADER_H;
 
     // Any peek in flight belongs to the state we are leaving.
@@ -1265,7 +1439,6 @@ void GUIManager::toggleHeaderBar() {
     syncPanelOffset();
 
     _pnlSystem.setBarLabel(_headerHidden ? "Show Bar" : "Hide Bar");
-    rebuildDashboard();
     Serial.printf("[UI] system header %s\n", _headerHidden ? "hidden" : "shown");
 }
 
@@ -1481,6 +1654,7 @@ void GUIManager::goToPage(int16_t index) {
     const uint8_t next = (uint8_t)(((index % n) + n) % n);
     if (next == _curPage) return;
 
+    closeSlotPanel(false);   // it described the page being left (2.8)
     savePageState();
     _curPage = next;
     loadPageState();

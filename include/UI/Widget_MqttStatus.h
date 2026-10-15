@@ -1,6 +1,7 @@
 #pragma once
 #include <lvgl.h>
 #include "MqttManager.h"
+#include "UI/HeaderSlots.h"   // GlyphStyle
 
 // ---------------------------------------------------------------------------
 // MQTT status glyph - "glyph A" from the Fleet Status Glyphs artifact: a
@@ -39,12 +40,17 @@ public:
     // No registry, deliberately. Everything this widget reports comes from the
     // broker session itself - see FEED_SILENT_MS in the .cpp for why asking
     // the entity layer was the wrong answer twice.
-    void init(lv_obj_t *parent, MqttManager *mqtt);
+    //
+    // `style` frames the glyph as the Wi-Fi glyph's is (2.8, #19). Framed, the
+    // glyph's own rounded square is left out - the frame is the square.
+    void init(lv_obj_t *parent, MqttManager *mqtt, GlyphStyle style = GlyphStyle::GLYPH_BARE);
     void tick();
+    void repaint();                    // a scheme change: draw the current state again
     void setMotion(Motion m);
     lv_obj_t *getRoot() { return _root; }
 
 private:
+    lv_color_t glyphCol(lv_color_t state);   // as Widget_ConnStatus's
     // Mirrors the artifact's state table rather than MqttState 1:1, because
     // several transport states share one appearance: CONNECTING and BACKOFF
     // are both "working on it" to a person walking past.
@@ -57,7 +63,9 @@ private:
     void stopMotion();
 
     MqttManager *_mqtt = nullptr;
+    GlyphStyle   _style = GlyphStyle::GLYPH_BARE;
 
+    lv_obj_t *_frame  = nullptr;   // the glyph's frame (Kit::glyphFrame())
     lv_obj_t *_root   = nullptr;
     lv_obj_t *_box    = nullptr;   // the rounded square outline
     lv_obj_t *_out    = nullptr;   // upper arrow, pointing right (publish)

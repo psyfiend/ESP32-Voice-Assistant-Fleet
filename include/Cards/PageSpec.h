@@ -4,6 +4,8 @@
 
 #include "Cards/CardTypes.h"
 
+struct SlotSpec;   // UI/HeaderSlots.h - a page's header slots (2.8)
+
 // ---------------------------------------------------------------------------
 // What a page IS, as data.
 //
@@ -158,6 +160,15 @@ struct PageSpec {
     uint8_t  subdivision = PAGE_SUBDIVISION_DEFAULT;
     TempUnit tempUnit    = TempUnit::TEMP_INHERIT;
     CardLabel labelMode  = CardLabel::LBL_INHERIT;
+
+    // THE PAGE'S HEADER (2.8, UI/HeaderSlots.h): its slots, left to right
+    // (nullptr: the four every page has, HEADER_DEFAULT), and whether it shows.
+    // `headerShown` is the compiled default; the owner's choice for the page is
+    // saved by its slug and wins (Settings: pages.<slug>.header). A full-screen
+    // page - the Clock page to come (K82) - is a page with headerShown false.
+    const SlotSpec *headerSlots = nullptr;
+    uint8_t  headerSlotCount = 0;
+    bool     headerShown     = true;
 };
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 #include "UI/Widget_MqttStatus.h"
 #include "UI/UIToolkit.h"
+#include "UI/Kit.h"   // the glyph's frame (2.8)
 
 // Palette - semantic, not themeable: these colours ARE the information, so
 // they do not move when the scheme does. Matched to Widget_ConnStatus so the
@@ -43,8 +44,13 @@ static const uint32_t POLL_MS = 400;   // matched to the WiFi glyph
 // would say why.
 static const uint32_t FEED_SILENT_MS = 30UL * 60UL * 1000UL;
 
-void Widget_MqttStatus::init(lv_obj_t *parent, MqttManager *mqtt) {
-    _mqtt = mqtt;
+void Widget_MqttStatus::init(lv_obj_t *parent, MqttManager *mqtt, GlyphStyle style) {
+    _mqtt  = mqtt;
+    _style = style;
+    // A fresh start, as the Wi-Fi glyph's (the header rebuilds its slots).
+    _motionRunning = false;
+    _lastLook      = -1;
+    _lastPollMs    = 0;
 
     // Same reasoning as the WiFi glyph: the QSPI board pays a per-pixel
     // software rotation cost on every draw, so it gets the cheap motion.
@@ -54,12 +60,15 @@ void Widget_MqttStatus::init(lv_obj_t *parent, MqttManager *mqtt) {
 
     // The artifact draws on a 24x24 viewBox. Everything below is that geometry
     // scaled to S, so the proportions survive a change of size and the numbers
-    // can still be checked against the source drawing.
-    const int32_t S  = UIToolkit::sc(28);
+    // can still be checked against the source drawing. Today's size bare,
+    // smaller inside a frame (2.8).
+    const UIHeader &h = UI::hdr();
+    const int32_t S  = UIToolkit::sc(style == GlyphStyle::GLYPH_BARE ? h.GLYPH : h.GLYPH_FRAMED);
     const int32_t lw = UIToolkit::sc(2) < 2 ? 2 : UIToolkit::sc(2);
     auto u = [S](float v) -> int32_t { return (int32_t)((v / 24.0f) * (float)S + 0.5f); };
 
-    _root = lv_obj_create(parent);
+    _frame = Kit::glyphFrame(parent, style);
+    _root = lv_obj_create(_frame);
     lv_obj_remove_style_all(_root);
     lv_obj_set_size(_root, S, S);
     lv_obj_remove_flag(_root, LV_OBJ_FLAG_CLICKABLE);
@@ -82,6 +91,8 @@ void Widget_MqttStatus::init(lv_obj_t *parent, MqttManager *mqtt) {
     lv_obj_set_style_border_width(_box, lw, 0);
     lv_obj_set_style_bg_opa(_box, LV_OPA_TRANSP, 0);
     lv_obj_remove_flag(_box, LV_OBJ_FLAG_SCROLLABLE);
+    // Framed, the frame is the square: two squares would be one too many.
+    if (style != GlyphStyle::GLYPH_BARE) lv_obj_add_flag(_box, LV_OBJ_FLAG_HIDDEN);
 
     // Two opposing arrows: publish out, subscribe back. Each is one three-point
     // polyline - shaft and half-head in a single object - which is both the
@@ -116,10 +127,24 @@ void Widget_MqttStatus::init(lv_obj_t *parent, MqttManager *mqtt) {
     tick();   // paint the real state immediately, not a default frame
 }
 
+lv_color_t Widget_MqttStatus::glyphCol(lv_color_t state) {
+    if (_style != GlyphStyle::GLYPH_CIRCLE) return state;
+    lv_obj_set_style_bg_color(_frame, state, 0);
+    return UI::c(UI::pal().SURFACE_ALT);
+}
+
 void Widget_MqttStatus::tint(lv_color_t col) {
-    lv_obj_set_style_border_color(_box, col, 0);
-    lv_obj_set_style_line_color(_out, col, 0);
-    lv_obj_set_style_line_color(_in, col, 0);
+    const lv_color_t c = glyphCol(col);
+    lv_obj_set_style_border_color(_box, c, 0);
+    lv_obj_set_style_line_color(_out, c, 0);
+    lv_obj_set_style_line_color(_in, c, 0);
+    lv_obj_set_style_line_color(_strike, _style == GlyphStyle::GLYPH_CIRCLE ? c : lv_color_hex(COL_OFF), 0);
+}
+
+void Widget_MqttStatus::repaint() {
+    _lastLook = -1;
+    _lastPollMs = 0;
+    tick();
 }
 
 static void mqtt_opa_anim_cb(void *obj, int32_t v) {

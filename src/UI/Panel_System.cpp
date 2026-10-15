@@ -103,6 +103,15 @@ void Panel_System::setTopOffset(int32_t y) {
     if (_ui_root) lv_obj_set_y(_ui_root, y);
 }
 
+void Panel_System::setAnchorX(int32_t centreX) {
+    if (!_ui_root) return;
+    const int32_t screenW = lv_obj_get_width(lv_screen_active());
+    int32_t x = centreX - _panelW / 2;
+    if (x + _panelW > screenW - _margin) x = screenW - _margin - _panelW;
+    if (x < _margin) x = _margin;
+    lv_obj_set_x(_ui_root, x);
+}
+
 void Panel_System::setVariantLabel(const char *text) {
     if (_lbl_variant && text) lv_label_set_text(_lbl_variant, text);
 }
@@ -205,6 +214,8 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // lines up with the Audio/Display panels below. GUIManager pads the deck
     // by sc(10); matching that is what makes the two look like one system.
     const int32_t margin = (panelW == screenW) ? 0 : UIToolkit::sc(10);
+    _panelW = panelW;
+    _margin = margin;
 
     // Y COMES FROM THE LIVE HEADER HEIGHT, not from a constant.
     //
@@ -370,6 +381,14 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     knobButton(_ui_actions, this, "About", [](lv_event_t *e) {
         (void)e;
         AboutSheet::open();
+    });
+
+    // Glyphs - the header's glyph style, bare / square / circle (2.8, #19's
+    // open question): a button so the three can be compared on glass. The bar
+    // itself shows which is on.
+    knobButton(_ui_actions, this, "Glyphs", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestGrid(Panel_System::GridAction::GLYPH_CYCLE);
     });
 
     // -- ROWS 2-4: the knobs ----------------------------------------------

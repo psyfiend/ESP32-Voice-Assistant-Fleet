@@ -131,6 +131,11 @@ public:
     // with the layers below it, never the reverse). `open` is what is wanted;
     // the hook says whether it was already so.
     static void setDrawerHook(bool (*hook)(bool open));
+    // 2.8: /popup?slot=N (a header slot's panel; -1 closes), glyphs=0|1|2 (the
+    // glyph style, not saved; 3 the saved one) and pagehdr=0|1 (this page's
+    // header hidden or shown - SAVED, as the page panel saves it). Answers one
+    // line saying what it did.
+    static void setHeaderHook(const char *(*hook)(int slot, int glyphs, int pageHdr));
 private:
     static void debugService(lv_timer_t *t);   // the LVGL-thread half
 #endif

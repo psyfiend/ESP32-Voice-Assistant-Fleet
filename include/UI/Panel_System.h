@@ -93,6 +93,10 @@ public:
     void setColsLabel(const char *text);
     void setRowsLabel(const char *text);
     void setTopOffset(int32_t y);
+    // THE STATUS SLOT'S PANEL (2.8, D-13): it hangs under its slot, centred on
+    // `centreX` and kept on the screen, where it used to sit against the right
+    // edge under the status glyphs.
+    void setAnchorX(int32_t centreX);
     void setVariantLabel(const char *text);
     void setFillLabel(const char *text);
     void setAreaLabel(const char *text);
@@ -129,6 +133,8 @@ public:
         // 2.7: what the line under a state card's hero says - name, the state
         // word ("Open"), or nothing. cards.md section 13.
         LABEL_CYCLE,
+        // 2.8: how the header's glyphs are framed - bare, square, circle (#19).
+        GLYPH_CYCLE,
     };
     using GridCallback = std::function<void(GridAction)>;
     void setOnGridAction(GridCallback cb) { _onGridAction = cb; }
@@ -198,6 +204,7 @@ private:
     // -- Logic --
     bool _expanded;
     int32_t _openH = 0;    // the drawer's open height: anim_height_cb() keeps the contents' bottom on the edge
+    int32_t _panelW = 0, _margin = 0;   // its width and its distance from the screen's edges (init())
     ToggleCallback _onToggle;
 
     // -- Animation --

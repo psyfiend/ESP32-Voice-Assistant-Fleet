@@ -17,6 +17,7 @@
 #include <lvgl.h>
 #include <stdint.h>
 #include "UI/UITokens.h"
+#include "UI/HeaderSlots.h"   // GlyphStyle
 
 namespace Kit {
 
@@ -56,6 +57,21 @@ enum class KitStyle : uint8_t {
     KS_SHEET_FACE, KS_SHEET_BAR,
     // A finished surface sinks 1 px while pressed (Kit::finish()).
     KS_SINK,
+    // The page header (2.8, UI/HeaderSlots.h): the bar and its accent line; a
+    // slot (the tappable share of the bar), pressed, and open - its panel
+    // showing, in the drawer's face, so the slot opens into its panel like a
+    // folder's tab; its words (the bar's face; a smaller, dim one) and a
+    // sensor's icon; a glyph's frame (the rounded square, the circle); the
+    // page's dots; the error mark beside a slot's dashes.
+    KS_HDR_BAR, KS_HDR_SLOT, KS_HDR_SLOT_PRESSED, KS_HDR_SLOT_OPEN,
+    KS_HDR_TEXT, KS_HDR_TEXT_DIM, KS_HDR_ICON,
+    KS_HDR_CLOCK, KS_HDR_DOTS,   // the rows the time and am / pm, and the dots, stand in
+    KS_GLYPH_SQUARE, KS_GLYPH_CIRCLE,
+    KS_HDR_DOT_ON, KS_HDR_DOT_OFF, KS_HDR_MARK,
+    // A slot's drawer (Kit::drawer()): the clipping wrapper that grows to
+    // reveal it and casts the scheme's shadow, and its face; its lines - an
+    // item to tap (a page to go to), a big value.
+    KS_DRAWER, KS_DRAWER_FACE, KS_DRAWER_ITEM, KS_DRAWER_BIG,
     KS_COUNT
 };
 
@@ -301,5 +317,43 @@ struct DialogSpec {
 
 // Returns the dim, which holds everything: deleting it closes the dialog.
 lv_obj_t *dialog(const DialogSpec &spec);
+
+// --- The page header (KitHeader.cpp, 2.8) ----------------------------------------
+// The BAR: full width, the header's height, the scheme's raised surface with its
+// accent line along the bottom. Its slots go in it, left to right.
+lv_obj_t *headerBar(lv_obj_t *parent);
+// A SLOT: an equal share of the bar, tappable, tinted while pressed, in the
+// drawer's face while LV_STATE_CHECKED (its panel open). `cb` on CLICKED, with
+// `user` as its user data. What it shows goes inside, centred in a row.
+lv_obj_t *headerSlot(lv_obj_t *bar, lv_event_cb_t cb, void *user);
+// A GLYPH'S FRAME (#19): BARE an empty holder the glyph's own size, SQUARE the
+// rounded square, CIRCLE the circle - whose colour is the caller's to set: it is
+// the glyph's state. The glyph goes inside, centred.
+lv_obj_t *glyphFrame(lv_obj_t *parent, GlyphStyle style);
+
+// --- A drawer (KitDrawer.cpp, 2.8) -------------------------------------------------
+// A PANEL THAT SLIDES DOWN from a header slot: square where it meets the bar,
+// its bottom corners rounded, the scheme's shadow. The caller builds its rows in
+// `face` (a column), then places and opens it; it grows from nothing to the
+// height its rows need (at most the screen below `top`). The system panel is the
+// status slot's own drawer, and older than this one (Panel_System).
+struct Drawer {
+    lv_obj_t *root = nullptr;   // the clip that grows; holds everything
+    lv_obj_t *face = nullptr;   // the rows go here
+    bool      open = false;
+    int32_t   w = 0, openH = 0, top = 0;
+};
+int32_t drawerWidth();                                // a slot's drawer on this screen
+void    drawer(Drawer &d, lv_obj_t *parent, int32_t w);
+void    drawerPlace(Drawer &d, int32_t centreX, int32_t top);   // under its slot, kept on screen
+void    drawerOpen(Drawer &d);
+void    drawerClose(Drawer &d, bool animate = true);
+// A drawer's lines. An ITEM to tap, full width and a finger tall: a mark (filled
+// when `marked`, a ring otherwise - this page and the others) and its words;
+// `cb` on CLICKED with `user`. A NOTE, dim, wrapping. A BIG value - a time, a
+// reading.
+lv_obj_t *drawerItem(lv_obj_t *face, const char *words, bool marked, lv_event_cb_t cb, void *user);
+lv_obj_t *drawerNote(lv_obj_t *face, const char *words);
+lv_obj_t *drawerBig(lv_obj_t *face, const char *words);
 
 } // namespace Kit

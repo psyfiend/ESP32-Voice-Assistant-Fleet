@@ -118,8 +118,12 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int sparks = -1;  // the interference from the next window: 0 now and then, 1 once, 2 off
                 int about = -1;   // 2.12 P4: the About sheet, 1 open, 0 close
                 int drawer = -1;  // #97: the system panel, 1 open, 0 close (GUIManager's hook)
+                int slot = -2;    // 2.8: a header slot's panel, N open, -1 close (GUIManager's hook)
+                int glyphs = -1;  // 2.8: the header's glyph style, 0 bare, 1 square, 2 circle
+                int pageHdr = -1; // 2.8: this page's header, 0 hidden, 1 shown (saved)
                 bool close = false, power = false, more = false, hist = false, mem = false; };
 bool (*s_drawerHook)(bool open) = nullptr;
+const char *(*s_headerHook)(int slot, int glyphs, int pageHdr) = nullptr;
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
 size_t s_dreqLen = 0;
@@ -178,6 +182,9 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "sparks", v, sizeof(v)) == ESP_OK) a.sparks = atoi(v);
         if (httpd_query_key_value(q, "about", v, sizeof(v)) == ESP_OK) a.about = atoi(v);
         if (httpd_query_key_value(q, "drawer", v, sizeof(v)) == ESP_OK) a.drawer = atoi(v);
+        if (httpd_query_key_value(q, "slot", v, sizeof(v)) == ESP_OK) a.slot = atoi(v);
+        if (httpd_query_key_value(q, "glyphs", v, sizeof(v)) == ESP_OK) a.glyphs = atoi(v);
+        if (httpd_query_key_value(q, "pagehdr", v, sizeof(v)) == ESP_OK) a.pageHdr = atoi(v);
         // rows=N: test rows for SETTINGS, from the next window built (a byte
         // the LVGL thread reads; nothing else to hand over).
         if (httpd_query_key_value(q, "rows", v, sizeof(v)) == ESP_OK) {
@@ -253,6 +260,14 @@ void CardPopup::debugService(lv_timer_t *t) {
         if (!s_drawerHook) dbgOut("no drawer hook (GUIManager gives it)\n");
         else if (s_drawerHook(a.drawer != 0)) dbgOut("drawer: already %s\n", a.drawer ? "open" : "closed");
         else dbgOut("drawer: %s\n", a.drawer ? "opening" : "closing");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    // 2.8: the header - a slot's panel open or closed, the glyph style (not
+    // saved: a capture leaves the owner's choice), the page's header (saved).
+    if (a.slot > -2 || a.glyphs >= 0 || a.pageHdr >= 0) {
+        dbgOut("%s\n", s_headerHook ? s_headerHook(a.slot, a.glyphs, a.pageHdr)
+                                    : "no header hook (GUIManager gives it)");
         s_dreq.store(DREQ_DONE);
         return;
     }
@@ -611,4 +626,5 @@ void CardPopup::beginDebug(HttpServer &http) {
 }
 
 void CardPopup::setDrawerHook(bool (*hook)(bool open)) { s_drawerHook = hook; }
+void CardPopup::setHeaderHook(const char *(*hook)(int slot, int glyphs, int pageHdr)) { s_headerHook = hook; }
 #endif

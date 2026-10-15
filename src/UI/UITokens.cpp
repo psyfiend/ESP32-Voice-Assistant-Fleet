@@ -172,6 +172,17 @@ const UIShape UI_SHAPE = {
     .P_MARK_H = 2.6f, .P_MARK_LINE = 0.35f, .P_SCENE_H = 9.0f, .P_SCENE_GAP = 1.4f, .P_SCENE_PAD = 2.4f,
 };
 
+// The page header's slots (2.8). GLYPH, DOT_*, SLOT_GAP and LINE are the
+// values the bar had before it had slots; the frames are the "2+" chip of the
+// header-glyph mock (#19), the shade stronger than the first try because the
+// owner expected it to fade on glass.
+const UIHeader UI_HEADER = {
+    .GLYPH = 28, .GLYPH_FRAMED = 19, .FRAME = 26, .FRAME_R = 7, .FRAME_MIX = 14,
+    .SLOT_GAP = 8, .SLOT_PAD = 4, .DOT_ON = 11, .DOT_OFF = 8, .DOT_RING = 2, .DOT_GAP = 5,
+    .MARK = 12, .LINE = 2,
+    .DRAWER_W = 260, .DRAWER_R = 15, .DRAWER_PAD = 10, .DRAWER_GAP = 8, .DRAWER_LINE = 2,
+};
+
 // ---------------------------------------------------------------------------
 // Active state
 // ---------------------------------------------------------------------------
@@ -299,6 +310,7 @@ const UIPalette &pal()  { return s_pal; }
 const UIMetrics &met()  { return s_met; }
 const UIGrid    &grid() { return s_grid; }
 const UIShape   &shape() { return UI_SHAPE; }
+const UIHeader  &hdr()   { return UI_HEADER; }
 
 const UIType &type() {
     // Built on first use rather than at static-init time: the font objects are

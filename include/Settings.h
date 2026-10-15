@@ -90,6 +90,14 @@ void forEachCardWith(const char *key, void (*fn)(const char *cardId, const char 
 // ("off" hides the countdown bar). Set from a PC until the system settings
 // page; read as each window opens.
 bool system(const char *area, const char *key, char *out, size_t cap);
+// "header": "glyphs" is the header's glyph style by name (2.8, UI/HeaderSlots.h):
+// "bare" (the default, stored as nothing), "square" or "circle".
+
+// PAGE SETTINGS, by the page's slug (2.8): "pages": {"<slug>": {"header":
+// "hidden"}}. The first is the page header's shown / hidden (D-14), read when
+// the page is built; nothing stored means the page's compiled default.
+bool page(const char *slug, const char *key, char *out, size_t cap);
+bool setPage(const char *slug, const char *key, const char *value);
 
 // Writing, in RAM. nullptr = Reset (removes the key, and the card's or
 // scheme's object once empty). True when the document changed.

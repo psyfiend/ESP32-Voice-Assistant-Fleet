@@ -26,6 +26,7 @@
 #include "Cards/PageSpec.h"    // the pages, 2.6
 #include "UI/UIToolkit.h"       // SYSTEM_HEADER_FULL_H
 #include "UI/Panel_Header.h"
+#include "UI/Kit.h"               // Kit::Drawer, a slot's panel (2.8)
 #include "UI/Panel_Display.h"
 #include "UI/Panel_System.h"
 #ifdef HAS_AUDIO_HW
@@ -140,8 +141,24 @@ private:
     void buildDashboard();           // creates _dashHost and _page
     void destroyDashboard();
 
-    static void headerIconClickCb(lv_event_t *e);
     static void closeSystemPanelCb();
+
+    // THE HEADER'S SLOTS (2.8). A tap on a slot opens its panel - the status
+    // slot's is the system panel, the others' a Kit::Drawer built from
+    // SlotPanels - and a second tap, a tap outside, a swipe up or a page change
+    // puts it away. One panel at a time.
+    void onSlotTap(uint8_t slot);
+    void openSlotPanel(uint8_t slot);
+    void closeSlotPanel(bool animate);
+    void syncScrim();                // the dismiss scrim catches taps while any panel is open
+    // The page's header, shown or hidden (D-14): the owner's choice for the
+    // page (Settings pages.<slug>.header), else the page's compiled default.
+    bool pageHeaderShown() const;
+    void setPageHeaderShown(bool shown);   // saves it, applies it, rebuilds
+    void applyHeaderHidden(bool hidden);   // the bar, the drawers' top, the knob's label
+    void cycleGlyphs();              // bare -> square -> circle, saved (#19)
+    Kit::Drawer _slotDrawer;
+    int8_t      _slotPanel = -1;     // the slot whose drawer is open, or -1
     static void reportUiSection();   // [UI STATE] in the System Doctor
     // Milestone 2.6, first cut. Registered on the SCREEN so a scrollable child
     // still wins its own drag - see the definition.

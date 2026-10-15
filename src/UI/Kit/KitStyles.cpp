@@ -224,6 +224,114 @@ static void fill() {
     // --- The finishes (#99) ---
     // Pressed, a finished surface goes down a pixel, its face with it.
     lv_style_set_translate_y(st(S::KS_SINK), 1);
+
+    // --- The page header (2.8) ---
+    // The bar's look is the one Panel_Header set locally before it had slots.
+    const UIHeader &h = UI::hdr();
+    lv_style_t *hb = st(S::KS_HDR_BAR);
+    lv_style_set_bg_color    (hb, UI::c(p.SURFACE_ALT));
+    lv_style_set_bg_opa      (hb, LV_OPA_COVER);
+    lv_style_set_border_side (hb, LV_BORDER_SIDE_BOTTOM);
+    lv_style_set_border_width(hb, UI::sc(h.LINE));
+    lv_style_set_border_color(hb, UI::c(p.ACCENT));
+    lv_style_set_radius      (hb, 0);
+    lv_style_set_pad_all     (hb, 0);
+    lv_style_set_pad_column  (hb, 0);
+    flex(hb, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_style_t *hs = st(S::KS_HDR_SLOT);
+    lv_style_set_pad_hor   (hs, UI::sc(h.SLOT_PAD));
+    lv_style_set_pad_ver   (hs, 0);
+    lv_style_set_pad_column(hs, UI::sc(h.SLOT_GAP));
+    flex(hs, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_style_set_bg_color(st(S::KS_HDR_SLOT_PRESSED), UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 12)));
+    lv_style_set_bg_opa  (st(S::KS_HDR_SLOT_PRESSED), LV_OPA_COVER);
+    lv_style_set_bg_color(st(S::KS_HDR_SLOT_OPEN),    UI::c(p.SURFACE));   // the drawer's face
+    lv_style_set_bg_opa  (st(S::KS_HDR_SLOT_OPEN),    LV_OPA_COVER);
+    text(S::KS_HDR_TEXT,     UIToolkit::Font_PanelHeader, p.TEXT);
+    text(S::KS_HDR_TEXT_DIM, UIToolkit::Font_Caption,     p.TEXT_DIM);
+    text(S::KS_HDR_ICON,     t.ICON_SM,                   p.TEXT);
+    // The time and its am / pm stand on one line, their bottoms together - near
+    // enough a shared baseline (flex has no baseline alignment).
+    lv_style_t *ck = st(S::KS_HDR_CLOCK);
+    lv_style_set_width (ck, LV_SIZE_CONTENT);
+    lv_style_set_height(ck, LV_SIZE_CONTENT);
+    flex(ck, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
+    lv_style_t *ds = st(S::KS_HDR_DOTS);
+    lv_style_set_width     (ds, LV_SIZE_CONTENT);
+    lv_style_set_height    (ds, LV_SIZE_CONTENT);
+    lv_style_set_pad_column(ds, UI::sc(h.DOT_GAP));
+    flex(ds, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // A glyph's frames: the same size, the square a shade of the bar, the
+    // circle's colour the glyph's own (set by the glyph, it is its state).
+    for (S f : { S::KS_GLYPH_SQUARE, S::KS_GLYPH_CIRCLE }) {
+        lv_style_t *g = st(f);
+        lv_style_set_width (g, UI::sc(h.FRAME));
+        lv_style_set_height(g, UI::sc(h.FRAME));
+        lv_style_set_bg_opa(g, LV_OPA_COVER);
+        flex(g, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    }
+    lv_style_set_radius  (st(S::KS_GLYPH_SQUARE), UI::sc(h.FRAME_R));
+    lv_style_set_bg_color(st(S::KS_GLYPH_SQUARE), UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, h.FRAME_MIX)));
+    lv_style_set_radius  (st(S::KS_GLYPH_CIRCLE), LV_RADIUS_CIRCLE);
+
+    // The page's dots. This page's is larger and filled, the others smaller
+    // rings: told apart by shape and size, never by colour alone (the owner).
+    lv_style_t *don = st(S::KS_HDR_DOT_ON);
+    lv_style_set_width   (don, UI::sc(h.DOT_ON));
+    lv_style_set_height  (don, UI::sc(h.DOT_ON));
+    lv_style_set_radius  (don, LV_RADIUS_CIRCLE);
+    lv_style_set_bg_color(don, UI::c(p.ACCENT));
+    lv_style_set_bg_opa  (don, LV_OPA_COVER);
+    lv_style_t *doff = st(S::KS_HDR_DOT_OFF);
+    lv_style_set_width       (doff, UI::sc(h.DOT_OFF));
+    lv_style_set_height      (doff, UI::sc(h.DOT_OFF));
+    lv_style_set_radius      (doff, LV_RADIUS_CIRCLE);
+    lv_style_set_bg_opa      (doff, LV_OPA_TRANSP);
+    lv_style_set_border_width(doff, UI::sc(h.DOT_RING));
+    lv_style_set_border_color(doff, UI::c(p.TEXT));
+
+    // The error mark: "!" on a disc in the stale colour - a shape as well as a
+    // colour, beside the dashes it explains.
+    lv_style_t *mk = st(S::KS_HDR_MARK);
+    text(S::KS_HDR_MARK, UIToolkit::Font_Caption, UI::contrastOf(p.ST_WARN, p.GROUND, p.TEXT));
+    lv_style_set_width     (mk, UI::sc(h.MARK));
+    lv_style_set_height    (mk, UI::sc(h.MARK));
+    lv_style_set_radius    (mk, LV_RADIUS_CIRCLE);
+    lv_style_set_bg_color  (mk, UI::c(p.ST_WARN));
+    lv_style_set_bg_opa    (mk, LV_OPA_COVER);
+    lv_style_set_text_align(mk, LV_TEXT_ALIGN_CENTER);
+    lv_style_set_pad_top   (mk, LV_MAX(0, (UI::sc(h.MARK) - lv_font_get_line_height(UIToolkit::Font_Caption)) / 2));
+
+    // --- A slot's drawer (2.8) ---
+    // The wrapper clips - it reveals the face as it grows - so the shadow is its
+    // own; the radius only shapes that shadow (no clip_corner: a layer the
+    // wrapper's size, the trap that froze the P4_5 - LESSONS).
+    lv_style_t *dr = st(S::KS_DRAWER);
+    lv_style_set_bg_opa      (dr, LV_OPA_TRANSP);
+    lv_style_set_border_width(dr, 0);
+    lv_style_set_pad_all     (dr, 0);
+    lv_style_set_radius      (dr, UI::sc(h.DRAWER_R));
+    // The face: its top corners pushed above the wrapper's clip (Kit::drawer()),
+    // so it is square where it meets the bar; the padding pays for the push.
+    lv_style_t *df = st(S::KS_DRAWER_FACE);
+    lv_style_set_bg_color    (df, UI::c(p.SURFACE));
+    lv_style_set_bg_opa      (df, LV_OPA_COVER);
+    lv_style_set_border_width(df, UI::sc(h.DRAWER_LINE));
+    lv_style_set_border_color(df, UI::border());
+    lv_style_set_radius      (df, UI::sc(h.DRAWER_R));
+    lv_style_set_pad_hor     (df, UI::sc(h.DRAWER_PAD));
+    lv_style_set_pad_bottom  (df, UI::sc(h.DRAWER_PAD));
+    lv_style_set_pad_top     (df, UI::sc(h.DRAWER_R) + UI::sc(h.DRAWER_PAD));
+    lv_style_set_pad_row     (df, UI::sc(h.DRAWER_GAP));
+    flex(df, LV_FLEX_FLOW_COLUMN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_style_t *di = st(S::KS_DRAWER_ITEM);
+    lv_style_set_width     (di, lv_pct(100));
+    lv_style_set_height    (di, UI::minTouch());
+    lv_style_set_pad_hor   (di, UI::sc(h.DRAWER_PAD));
+    lv_style_set_pad_column(di, UI::sc(h.SLOT_GAP));
+    flex(di, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    text(S::KS_DRAWER_BIG, UIToolkit::Font_Hero, p.TEXT);
 }
 
 void begin() {

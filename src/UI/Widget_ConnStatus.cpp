@@ -1,5 +1,6 @@
 #include "UI/Widget_ConnStatus.h"
 #include "UI/UIToolkit.h"
+#include "UI/Kit.h"   // the glyph's frame (2.8)
 
 // Palette - semantic, not themeable: these colours ARE the information.
 //
@@ -22,8 +23,14 @@ static const int32_t ARC_END   = 330;
 
 static const uint32_t POLL_MS = 400;   // 2.5 Hz is plenty for a status icon
 
-void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr) {
-    _mgr = mgr;
+void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr, GlyphStyle style) {
+    _mgr   = mgr;
+    _style = style;
+    // A fresh start: the header rebuilds its slots, and the old objects (and
+    // any pulse running on them) went with the old slot.
+    _motionRunning = false;
+    _lastKey       = -1;
+    _lastPollMs    = 0;
 
     // The QSPI board pays a per-pixel software rotation cost on every draw, so
     // it gets the cheap motion by default. See Motion in the header.
@@ -31,7 +38,9 @@ void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr) {
         _motion = Motion::BLINK;
     #endif
 
-    const int32_t S   = UIToolkit::sc(28);          // fan bounding box
+    // Fan bounding box: today's size bare, smaller inside a frame.
+    const UIHeader &h = UI::hdr();
+    const int32_t S   = UIToolkit::sc(style == GlyphStyle::GLYPH_BARE ? h.GLYPH : h.GLYPH_FRAMED);
     const int32_t cx  = S / 2;
     const int32_t cy  = (S * 4) / 5;                 // fan origin sits low
     const int32_t aw  = UIToolkit::sc(2) < 2 ? 2 : UIToolkit::sc(2);
@@ -46,7 +55,8 @@ void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr) {
     lv_obj_remove_flag(_root, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(_root, LV_OBJ_FLAG_SCROLLABLE);
 
-    _fan = lv_obj_create(_root);
+    _frame = Kit::glyphFrame(_root, style);
+    _fan = lv_obj_create(_frame);
     lv_obj_remove_style_all(_fan);
     lv_obj_set_size(_fan, S, S);
     lv_obj_remove_flag(_fan, LV_OBJ_FLAG_SCROLLABLE);
@@ -115,14 +125,25 @@ void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr) {
     tick();   // paint the real state immediately, not a default frame
 }
 
+lv_color_t Widget_ConnStatus::glyphCol(lv_color_t state) {
+    if (_style != GlyphStyle::GLYPH_CIRCLE) return state;
+    lv_obj_set_style_bg_color(_frame, state, 0);
+    return UI::c(UI::pal().SURFACE_ALT);
+}
+
 void Widget_ConnStatus::setArcs(int litCount, lv_color_t col, bool glow) {
+    // In a circle the unlit arcs are the lit ones' colour, faded: grey on a
+    // coloured disc would read as a second state.
+    const bool       circle = _style == GlyphStyle::GLYPH_CIRCLE;
+    const lv_color_t c      = glyphCol(col);
     for (int i = 0; i < 3; i++) {
         bool lit = (i < litCount);
-        lv_obj_set_style_arc_color(_arc[i], lit ? col : lv_color_hex(COL_OFF), LV_PART_MAIN);
-        lv_obj_set_style_arc_opa(_arc[i], lit ? LV_OPA_COVER : LV_OPA_20, LV_PART_MAIN);
+        lv_obj_set_style_arc_color(_arc[i], lit || circle ? c : lv_color_hex(COL_OFF), LV_PART_MAIN);
+        lv_obj_set_style_arc_opa(_arc[i], lit ? LV_OPA_COVER : circle ? LV_OPA_40 : LV_OPA_20, LV_PART_MAIN);
     }
-    lv_obj_set_style_bg_color(_dot, col, 0);
-    lv_obj_set_style_bg_color(_stalk, col, 0);
+    lv_obj_set_style_bg_color(_dot, c, 0);
+    lv_obj_set_style_bg_color(_stalk, c, 0);
+    lv_obj_set_style_line_color(_strike, circle ? c : lv_color_hex(COL_OFF), 0);
     if (litCount == 0) lv_obj_remove_flag(_stalk, LV_OBJ_FLAG_HIDDEN);
     else               lv_obj_add_flag(_stalk, LV_OBJ_FLAG_HIDDEN);
     (void)glow;   // reserved: LVGL has no cheap outer-glow; revisit with the
@@ -174,11 +195,12 @@ void Widget_ConnStatus::setMotion(Motion m) {
 void Widget_ConnStatus::setArcsUnknown(lv_color_t col) {
     // Connected, strength unknown. Every arc ghosted, dot solid: the dot says
     // "there is a link", the ghosted arcs say "how strong is not known".
+    const lv_color_t c = glyphCol(col);
     for (int i = 0; i < 3; i++) {
-        lv_obj_set_style_arc_color(_arc[i], col, LV_PART_MAIN);
+        lv_obj_set_style_arc_color(_arc[i], c, LV_PART_MAIN);
         lv_obj_set_style_arc_opa(_arc[i], LV_OPA_30, LV_PART_MAIN);
     }
-    lv_obj_set_style_bg_color(_dot, col, 0);
+    lv_obj_set_style_bg_color(_dot, c, 0);
     lv_obj_add_flag(_stalk, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -290,6 +312,12 @@ void Widget_ConnStatus::applyVisual(ConnState st, SignalBand band, bool apUp,
     (void)apUp;
 }
 
+void Widget_ConnStatus::repaint() {
+    _lastKey = -1;
+    _lastPollMs = 0;
+    tick();
+}
+
 void Widget_ConnStatus::tick() {
     if (!_mgr || !_root) return;
 
@@ -317,4 +345,8 @@ void Widget_ConnStatus::tick() {
     _lastKey = key;
 
     applyVisual(st, band, apUp, health, retrying);
+    // An empty badge takes no room (2.8): its empty line stood the fan above
+    // the glyph beside it, plainly so once each glyph had a frame.
+    if (lv_label_get_text(_badge)[0]) lv_obj_remove_flag(_badge, LV_OBJ_FLAG_HIDDEN);
+    else                              lv_obj_add_flag   (_badge, LV_OBJ_FLAG_HIDDEN);
 }
