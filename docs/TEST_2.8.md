@@ -158,4 +158,23 @@ The clock's, the page's (P4_5, then the 4B) and the sensor's panels:
 
 ## Your results
 
-*(yours)*
+**Round 1 (owner, 2026-10-15)** - seen on glass, not tested against the table above:
+
+> "I caught some of the screens when there were 4 header slots, it was an idea I kinda wanted to see
+> but I'm not really crazy about it. For the main system header I'd probably leave the status icons
+> on the right, page info in the middle, and put the clock/alarm/temp on the left side."
+
+> "The 'knobs'/buttons in the 'SYSTEM - DIAGNOSTICS' panel are there basically so we can test
+> various UI looks/functions while developing and is not intended to be there in the final product.
+> Or at least not in its current incarnation. That panel will ultimately provide settings and/or
+> shortcuts to settings or popups to manage the various statuses. Same for all of the header slots."
+
+Recorded as DECISIONS D-16 (three places: clock, alarm and temperature left; the page middle; the
+status icons right - D-12 superseded) and D-17 (the panels are for settings; the knobs are
+development tools); `header-slots.md` §9. Q1-Q7 stay open for round 2.
+
+## Round 2 (next session)
+
+Three places in place of four slots: a mock on the canvas first, then the build on this branch
+after merging `main` (A17's `SettingsHttp.cpp` split meets this branch's `Settings::page()`). The
+slots stay data; a place holds one or more of them. See HANDOFF "What is next with the owner".
