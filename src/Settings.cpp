@@ -1,5 +1,6 @@
-// Settings - see Settings.h.
+// Settings - see Settings.h. The PC's addresses are SettingsHttp.cpp.
 #include "Settings.h"
+#include "SettingsInternal.h"
 
 #include <Arduino.h>   // Serial, millis()
 #include <ctype.h>
@@ -16,12 +17,10 @@
 #include "esp_heap_caps.h"
 #include "esp_littlefs.h"
 #include "esp_partition.h"
-#include "esp_system.h"    // esp_restart(), after a restore with ?reboot=1
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-#include "HttpServer.h"
 
 namespace {
 
@@ -31,8 +30,7 @@ constexpr const char *PARTITION     = "spiffs";   // the 16 MB layout's data par
 constexpr const char *PATH          = "/cfg/settings.json";
 constexpr const char *TMP_PATH      = "/cfg/settings.tmp";
 constexpr const char *BAD_PATH      = "/cfg/settings.bad";
-constexpr size_t      FILE_MAX      = 64 * 1024;  // refuse anything larger at read
-constexpr size_t      CARD_ID_ARG   = 48;         // CARD_ID_MAX (PageSpec.h) + 1
+constexpr size_t      FILE_MAX      = Settings::detail::FILE_MAX;   // refuse anything larger at read
 
 // The document lives in PSRAM: it is small, but internal RAM is the scarce
 // thing on this fleet (LESSONS) and nothing here is on a hot path.
@@ -367,314 +365,6 @@ void mountOrKeep() {
     }
 }
 
-// %XX and '+' in a query value, in place. No escapes are written anywhere.
-void urlDecode(char *s) {
-    char *o = s;
-    for (const char *p = s; *p; p++) {
-        if (*p == '+') { *o++ = ' '; continue; }
-        if (*p == '%' && isxdigit((unsigned char)p[1]) && isxdigit((unsigned char)p[2])) {
-            const char hex[3] = { p[1], p[2], 0 };
-            *o++ = (char)strtol(hex, nullptr, 16);
-            p += 2;
-            continue;
-        }
-        *o++ = *p;
-    }
-    *o = '\0';
-}
-
-// The panels draw ASCII and the degree sign only (CLAUDE.md): anything else
-// would show as boxes, so a name is refused rather than stored broken.
-bool printableAscii(const char *s) {
-    for (; *s; s++) if ((unsigned char)*s < 0x20 || (unsigned char)*s > 0x7E) return false;
-    return true;
-}
-
-esp_err_t handleSettings(httpd_req_t *req) {
-    char q[160], v[4];
-    bool stats = false;
-    const bool haveQ = httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK;
-    if (haveQ && httpd_query_key_value(q, "stats", v, sizeof(v)) == ESP_OK)
-        stats = atoi(v) != 0;
-
-    // A card's custom name, from a PC (K37, until the web UI): name= sets it,
-    // an empty name= removes it (the Reset). Kept and written like any other
-    // change; the card shows it the next time its page is built.
-    // Groups (K44), from a PC until the web UI: group=new&name=Temperature
-    // makes a custom group and answers its id; group=<id>&color=RRGGBB sets a
-    // group's colour (empty: back to its colour-by-name). Cards already built
-    // show it when their page is next built.
-    {
-        char gid[48], val[48];
-        if (haveQ && httpd_query_key_value(q, "card", gid, sizeof(gid)) != ESP_OK &&
-            httpd_query_key_value(q, "group", gid, sizeof(gid)) == ESP_OK) {
-            char out[160];
-            int len;
-            if (!strcmp(gid, "new") && httpd_query_key_value(q, "name", val, sizeof(val)) == ESP_OK) {
-                urlDecode(val);
-                char id[48];
-                if (strlen(val) >= 40 || !printableAscii(val) || !Settings::newGroup(val, id, sizeof(id)))
-                    len = snprintf(out, sizeof(out), "refused: a group name is 1-39 characters of plain ASCII\n");
-                else {
-                    Settings::save();
-                    len = snprintf(out, sizeof(out), "new group \"%s\": %s\n", val, id);
-                }
-            } else if (httpd_query_key_value(q, "color", val, sizeof(val)) == ESP_OK) {
-                bool hex = strlen(val) == 6;
-                for (const char *p = val; *p && hex; p++) hex = isxdigit((unsigned char)*p);
-                if (val[0] && !hex) len = snprintf(out, sizeof(out), "refused: color is RRGGBB, or empty\n");
-                else {
-                    Settings::setGroup(gid, "color", val[0] ? val : nullptr);
-                    Settings::save();
-                    len = snprintf(out, sizeof(out), "group %s: color %s\n", gid, val[0] ? val : "by name");
-                }
-            } else if (httpd_query_key_value(q, "name", val, sizeof(val)) == ESP_OK) {
-                // Rename a group - every card in it (K46, rename c); for an HA
-                // area, a local rename that keeps the link. Empty: its own name.
-                urlDecode(val);
-                if (strlen(val) >= 40 || !printableAscii(val))
-                    len = snprintf(out, sizeof(out), "refused: a group name is up to 39 characters of plain ASCII\n");
-                else {
-                    Settings::setGroup(gid, "name", val[0] ? val : nullptr);
-                    Settings::save();
-                    len = snprintf(out, sizeof(out), "group %s: name %s\n", gid, val[0] ? val : "its own again");
-                }
-            } else if (httpd_query_key_value(q, "delete", val, sizeof(val)) == ESP_OK && atoi(val)) {
-                // A card still pointing at it shows its dashboard area again
-                // (CardGroups::apply()) until the owner chooses.
-                const bool gone = Settings::setGroup(gid, "name", nullptr) | Settings::setGroup(gid, "color", nullptr) |
-                                  Settings::setGroup(gid, "kind", nullptr);
-                Settings::save();
-                len = snprintf(out, sizeof(out), "group %s: %s\n", gid, gone ? "deleted" : "not found");
-            } else {
-                len = snprintf(out, sizeof(out), "group=new&name=..., group=<id>&color=RRGGBB, group=<id>&delete=1\n");
-            }
-            httpd_resp_set_type(req, "text/plain");
-            return httpd_resp_send(req, out, len);
-        }
-    }
-
-    // Clear what nobody claims (K35): prune=cards or prune=entities.
-    char what[12];
-    if (haveQ && httpd_query_key_value(q, "prune", what, sizeof(what)) == ESP_OK) {
-        const uint8_t n = Settings::prune(what);
-        char out[96];
-        const int len = snprintf(out, sizeof(out), "pruned %u unclaimed %s\n", (unsigned)n,
-                                 strcmp(what, "entities") ? "card(s)" : "entit(ies)");
-        httpd_resp_set_type(req, "text/plain");
-        return httpd_resp_send(req, out, len);
-    }
-
-    // THE WINDOWS' COUNTDOWN (owner, T6, 2026-10-14), from a PC until the system
-    // settings page: window_close=60|30|10|off (60, D6's, is the default and
-    // is stored as nothing) and window_bar=on|off, alone or together. In
-    // effect from the next window.
-    {
-        static const char *const CLOSE[] = { "60", "30", "10", "off" };
-        char cl[8] = "", bar[8] = "";
-        const bool hasClose = haveQ && httpd_query_key_value(q, "window_close", cl, sizeof(cl)) == ESP_OK;
-        const bool hasBar   = haveQ && httpd_query_key_value(q, "window_bar", bar, sizeof(bar)) == ESP_OK;
-        if (hasClose || hasBar) {
-            bool okClose = !hasClose;
-            for (const char *c : CLOSE) okClose = okClose || !strcmp(cl, c);
-            const bool okBar = !hasBar || !strcmp(bar, "on") || !strcmp(bar, "off");
-            char out[160];
-            int len;
-            if (!okClose || !okBar) {
-                len = snprintf(out, sizeof(out), "refused: window_close=60|30|10|off, window_bar=on|off\n");
-            } else {
-                if (hasClose) Settings::setSystem("window", "close", strcmp(cl, "60") ? cl : nullptr);
-                if (hasBar)   Settings::setSystem("window", "bar", strcmp(bar, "on") ? bar : nullptr);
-                Settings::save();
-                char c[8], b[8];
-                if (!Settings::system("window", "close", c, sizeof(c))) snprintf(c, sizeof(c), "60");
-                const bool barOff = Settings::system("window", "bar", b, sizeof(b)) && !strcmp(b, "off");
-                if (!strcmp(c, "off"))
-                    len = snprintf(out, sizeof(out), "windows: never close by themselves (no countdown bar) - from the next window\n");
-                else
-                    len = snprintf(out, sizeof(out), "windows: close after %s s untouched, countdown bar %s - from the next window\n",
-                                   c, barOff ? "off" : "on");
-            }
-            httpd_resp_set_type(req, "text/plain");
-            return httpd_resp_send(req, out, len);
-        }
-    }
-
-    char id[CARD_ID_ARG], name[64];
-    // The other card settings too, as SETTINGS' rows would set them - for
-    // tests from a PC: label=, tap=, tap_scene= (the scene's HA id). The
-    // value is not checked against the choices here; a name the firmware
-    // does not know reads as "not set". An empty value removes the key.
-    // group= (ha_area / own / none / a group id) and label_text= (the card
-    // label's own text, with group=own) are the card label's (K44).
-    static const char *const KEYS[] = { "label", "tap", "tap_scene", "group", "label_text" };
-    for (const char *key : KEYS) {
-        if (!haveQ || httpd_query_key_value(q, "card", id, sizeof(id)) != ESP_OK ||
-            httpd_query_key_value(q, key, name, sizeof(name)) != ESP_OK) continue;
-        urlDecode(name);
-        // label=inherit is kept since K49 (a named card's default is Custom).
-        const bool reset = !name[0] || !strcmp(name, "default") ||
-                           (strcmp(key, "label") && !strcmp(name, "inherit"));
-        Settings::setCard(id, key, reset ? nullptr : name);
-        Settings::save();
-        char out[160];
-        const int n = snprintf(out, sizeof(out), "%s: %s %s - in effect when its page is next built\n",
-                               id, key, reset ? "removed" : name);
-        httpd_resp_set_type(req, "text/plain");
-        return httpd_resp_send(req, out, n);
-    }
-    if (haveQ && httpd_query_key_value(q, "card", id, sizeof(id)) == ESP_OK &&
-        httpd_query_key_value(q, "name", name, sizeof(name)) == ESP_OK) {
-        urlDecode(name);
-        char out[200];
-        int n;
-        if (strlen(name) >= 40 || !printableAscii(name)) {
-            n = snprintf(out, sizeof(out), "refused: a name is at most 39 characters of plain ASCII\n");
-        } else {
-            const bool changed = Settings::setCard(id, "name", name[0] ? name : nullptr);
-            Settings::save();
-            n = snprintf(out, sizeof(out), "%s: name %s%s%s%s - shown when its page is next built\n", id,
-                         name[0] ? "\"" : "removed", name, name[0] ? "\"" : "", changed ? "" : " (no change)");
-        }
-        httpd_resp_set_type(req, "text/plain");
-        return httpd_resp_send(req, out, n);
-    }
-    if (stats) {
-        const Settings::Stats s = Settings::stats();
-        static char out[2048];   // the server has one task: one request at a time
-        int n = snprintf(out, sizeof(out),
-                               "file %s (%s)%s\nsaves %lu, failures %lu, pending %s\nlast save at %lu ms, "
-                               "took %.1f ms, %lu bytes\n",
-                               PATH, s_mounted ? "mounted" : "NOT MOUNTED - RAM only",
-                               s_readOnly ? ", READ-ONLY this boot (see boot:)" : "",
-                               (unsigned long)s.saves, (unsigned long)s.failures, s.pending ? "yes" : "no",
-                               (unsigned long)s.lastMs, s.lastUs / 1000.0, (unsigned long)s.bytes);
-        // The listing was taken by the settings task (listFiles()): reading the
-        // flash from this task, whose stack is in PSRAM, reboots the board.
-        { Lock l; n += snprintf(out + n, sizeof(out) - n, "boot: %s\nfiles in %s:\n%s", s_bootNote, BASE, s_listing); }
-        {
-            Lock l;
-            if (s_changeN) n += snprintf(out + n, sizeof(out) - n, "last changes (newest last):\n");
-            for (uint8_t i = 0; i < s_changeN && n < (int)sizeof(out) - 120; i++) {
-                const uint8_t k = (uint8_t)((s_changeHead + CHANGES_KEPT - s_changeN + i) % CHANGES_KEPT);
-                n += snprintf(out + n, sizeof(out) - n, "  %s\n", s_changes[k]);
-            }
-        }
-        struct Acc { char *out; int n; int cap; } acc{ out, n, (int)sizeof(out) };
-        Settings::forEachUnclaimed([](const char *sec, const char *id, void *c) {
-            Acc &a = *(Acc *)c;
-            if (a.n < a.cap - 64) a.n += snprintf(a.out + a.n, a.cap - a.n, "unclaimed %s: %s\n", sec, id);
-        }, &acc);
-        n = acc.n;
-        httpd_resp_set_type(req, "text/plain");
-        return httpd_resp_send(req, out, n);
-    }
-    size_t len = 0;
-    char *buf = nullptr;
-    { Lock l; buf = serialise(len); }
-    if (!buf) return httpd_resp_send_500(req);
-    httpd_resp_set_type(req, "application/json");
-    const esp_err_t r = httpd_resp_send(req, buf, len);
-    heap_caps_free(buf);
-    return r;
-}
-
-esp_err_t replyText(httpd_req_t *req, const char *status, const char *fmt, ...) {
-    char out[240];
-    va_list ap;
-    va_start(ap, fmt);
-    int n = vsnprintf(out, sizeof(out), fmt, ap);
-    va_end(ap);
-    if (n < 0) n = 0;
-    if (n >= (int)sizeof(out)) n = (int)sizeof(out) - 1;
-    httpd_resp_set_status(req, status);
-    httpd_resp_set_type(req, "text/plain");
-    return httpd_resp_send(req, out, n);
-}
-
-void restartNow(void *) { esp_restart(); }
-
-// PUT A SAVED FILE BACK (A17): POST /settings with a settings file as the body
-// (scripts/release/restore_settings.ps1). Checked here - JSON, an object, a
-// schema this firmware knows - then it replaces the document and the settings
-// task writes it: never this handler, whose stack is in PSRAM (a flash write
-// from it reboots the board, LESSONS). The handler waits for that write and
-// answers with the result. ?reboot=1 restarts the board after a good write, so
-// every page and setting is read from the file again.
-esp_err_t handleRestore(httpd_req_t *req) {
-    const size_t len = req->content_len;
-    if (len == 0 || len > FILE_MAX)
-        return replyText(req, "400 Bad Request", "refused: the body is %u bytes; a settings file is 1 to %u\n",
-                         (unsigned)len, (unsigned)FILE_MAX);
-    {
-        Lock l;
-        if (!s_mounted || s_readOnly)
-            return replyText(req, "409 Conflict", "refused: this boot does not write the settings file (%s) - "
-                             "nothing changed\n", s_bootNote);
-    }
-    char *buf = (char *)heap_caps_malloc(len + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!buf) return replyText(req, "500 Internal Server Error", "refused: no memory for %u bytes\n", (unsigned)len);
-    size_t got = 0;
-    uint8_t timeouts = 0;
-    while (got < len) {
-        const int r = httpd_req_recv(req, buf + got, len - got);
-        if (r == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < 3) continue;
-        if (r <= 0) break;
-        got += (size_t)r;
-    }
-    if (got != len) {
-        heap_caps_free(buf);
-        return replyText(req, "400 Bad Request", "refused: the body stopped at %u of %u bytes - nothing changed\n",
-                         (unsigned)got, (unsigned)len);
-    }
-    JsonDocument incoming(&s_alloc);
-    const DeserializationError err = deserializeJson(incoming, buf, len);
-    heap_caps_free(buf);
-    if (err || !incoming.is<JsonObject>())
-        return replyText(req, "400 Bad Request", "refused: not a settings file (%s) - nothing changed\n",
-                         err ? err.c_str() : "not a JSON object");
-    const int schema = incoming["schema"] | 0;
-    if (schema < 1 || schema > SCHEMA)
-        return replyText(req, "400 Bad Request", "refused: the file is schema %d, this firmware knows 1 to %d - "
-                         "nothing changed\n", schema, SCHEMA);
-    const unsigned cards = (unsigned)incoming["cards"].size();
-    uint32_t gen = 0;
-    {
-        Lock l;
-        s_doc->set(incoming);
-        s_dirty = true;
-        gen = ++s_docGen;
-        char what[80];
-        snprintf(what, sizeof(what), "the whole file restored (%u bytes, %u card(s))", (unsigned)len, cards);
-        noteLine(what);
-    }
-    const int64_t t0 = esp_timer_get_time();
-    Settings::save();
-    bool written = false;
-    for (int i = 0; i < 250 && !written; i++) {   // 5 s; a write takes ~10-100 ms
-        vTaskDelay(pdMS_TO_TICKS(20));
-        Lock l;
-        written = s_savedGen >= gen;
-    }
-    if (!written)
-        return replyText(req, "500 Internal Server Error", "the file is in RAM but was not written (failures %lu) - "
-                         "it is written with the next change\n", (unsigned long)Settings::stats().failures);
-    char q[48], v[4];
-    const bool reboot = httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK &&
-                        httpd_query_key_value(q, "reboot", v, sizeof(v)) == ESP_OK && atoi(v) != 0;
-    const esp_err_t r = replyText(req, "200 OK", "restored: %u bytes, %u card(s), written in %.0f ms - %s\n",
-                                  (unsigned)len, cards, (esp_timer_get_time() - t0) / 1000.0,
-                                  reboot ? "restarting" : "pages show it when next built, everything at the next boot");
-    if (reboot) {
-        esp_timer_create_args_t a = {};
-        a.callback = restartNow;
-        a.name = "settings_restart";
-        esp_timer_handle_t t = nullptr;
-        if (esp_timer_create(&a, &t) == ESP_OK) esp_timer_start_once(t, 500 * 1000);
-    }
-    return r;
-}
-
 }  // namespace
 
 namespace Settings {
@@ -696,8 +386,7 @@ bool begin(HttpServer &http) {
     // The save task: its stack in internal RAM (xTaskCreate), which a flash
     // write requires - see Settings.h.
     xTaskCreate(saveTask, "settings", 4096, nullptr, 2, &s_task);
-    http.addRoute("/settings", HTTP_GET, handleSettings);
-    http.addRoute("/settings", HTTP_POST, handleRestore);
+    detail::registerRoutes(http);   // SettingsHttp.cpp
     return s_mounted;
 }
 
@@ -708,6 +397,91 @@ void bootNote(char *out, size_t cap) {
     if (!s_mutex) { snprintf(out, cap, "%s", s_bootNote); return; }
     Lock l;
     snprintf(out, cap, "%s", s_bootNote);
+}
+
+// --- For SettingsHttp.cpp (SettingsInternal.h) --------------------------------
+
+int detail::statusText(char *out, size_t cap) {
+    const Stats s = stats();
+    int n = snprintf(out, cap,
+                     "file %s (%s)%s\nsaves %lu, failures %lu, pending %s\nlast save at %lu ms, "
+                     "took %.1f ms, %lu bytes\n",
+                     PATH, s_mounted ? "mounted" : "NOT MOUNTED - RAM only",
+                     s_readOnly ? ", READ-ONLY this boot (see boot:)" : "",
+                     (unsigned long)s.saves, (unsigned long)s.failures, s.pending ? "yes" : "no",
+                     (unsigned long)s.lastMs, s.lastUs / 1000.0, (unsigned long)s.bytes);
+    // The listing was taken by the settings task (listFiles()): reading the
+    // flash from the HTTP task, whose stack is in PSRAM, reboots the board.
+    Lock l;
+    n += snprintf(out + n, cap - n, "boot: %s\nfiles in %s:\n%s", s_bootNote, BASE, s_listing);
+    if (s_changeN) n += snprintf(out + n, cap - n, "last changes (newest last):\n");
+    for (uint8_t i = 0; i < s_changeN && n < (int)cap - 120; i++) {
+        const uint8_t k = (uint8_t)((s_changeHead + CHANGES_KEPT - s_changeN + i) % CHANGES_KEPT);
+        n += snprintf(out + n, cap - n, "  %s\n", s_changes[k]);
+    }
+    return n;
+}
+
+char *detail::serialiseCopy(size_t &len) {
+    len = 0;
+    if (!s_doc) return nullptr;
+    Lock l;
+    return serialise(len);
+}
+
+bool detail::writable(char *why, size_t cap) {
+    Lock l;
+    if (s_mounted && !s_readOnly) return true;
+    if (cap) snprintf(why, cap, "%s", s_bootNote);
+    return false;
+}
+
+int detail::restore(const char *json, size_t len, char *msg, size_t cap) {
+    char why[160];
+    if (!writable(why, sizeof(why))) {
+        snprintf(msg, cap, "refused: this boot does not write the settings file (%s) - nothing changed", why);
+        return 409;
+    }
+    JsonDocument incoming(&s_alloc);
+    const DeserializationError err = deserializeJson(incoming, json, len);
+    if (err || !incoming.is<JsonObject>()) {
+        snprintf(msg, cap, "refused: not a settings file (%s) - nothing changed",
+                 err ? err.c_str() : "not a JSON object");
+        return 400;
+    }
+    const int schema = incoming["schema"] | 0;
+    if (schema < 1 || schema > SCHEMA) {
+        snprintf(msg, cap, "refused: the file is schema %d, this firmware knows 1 to %d - nothing changed",
+                 schema, SCHEMA);
+        return 400;
+    }
+    const unsigned cards = (unsigned)incoming["cards"].size();
+    uint32_t gen = 0;
+    {
+        Lock l;
+        s_doc->set(incoming);
+        s_dirty = true;
+        gen = ++s_docGen;
+        char what[80];
+        snprintf(what, sizeof(what), "the whole file restored (%u bytes, %u card(s))", (unsigned)len, cards);
+        noteLine(what);
+    }
+    const int64_t t0 = esp_timer_get_time();
+    save();
+    bool written = false;
+    for (int i = 0; i < 250 && !written; i++) {   // 5 s; a write takes ~10-100 ms
+        vTaskDelay(pdMS_TO_TICKS(20));
+        Lock l;
+        written = s_savedGen >= gen;
+    }
+    if (!written) {
+        snprintf(msg, cap, "the file is in RAM but was not written (failures %lu) - it is written with the "
+                 "next change", (unsigned long)stats().failures);
+        return 500;
+    }
+    snprintf(msg, cap, "restored: %u bytes, %u card(s), written in %.0f ms", (unsigned)len, cards,
+             (esp_timer_get_time() - t0) / 1000.0);
+    return 200;
 }
 
 bool card(const char *cardId, const char *key, char *out, size_t cap) {
