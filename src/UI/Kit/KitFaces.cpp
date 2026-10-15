@@ -101,12 +101,13 @@ struct FaceSlot {
     int16_t  w = 0, h = 0, r = 0;
     FaceKind kind = FaceKind::FACE_BLACK;
     uint32_t key = 0;               // the colours it was painted with
+    uint32_t tint = 0;              // a satin face's own colour
     uint32_t used = 0;              // the window (s_epoch) that last asked for it
     size_t   cap = 0;               // bytes held
     uint8_t *buf = nullptr;
     lv_image_dsc_t dsc = {};
 };
-constexpr uint8_t FACE_SLOTS = 12;
+constexpr uint8_t FACE_SLOTS = 16;   // 12 until #99's satin and glass faces
 static FaceSlot s_faces[FACE_SLOTS];
 static uint32_t s_epoch = 1;        // one per window opened (facesNextWindow())
 static uint32_t s_flat  = 0;        // faces that could not be had and came out flat (debug readout)
@@ -152,8 +153,10 @@ static void paintFace(FaceSlot &f) {
     uint8_t *px = f.buf;
     for (int y = 0; y < h; y++) {
         // Brushed: each row a touch lighter or darker, the same every time.
+        // Metal only - a dent is soft, and satin smooth.
         uint32_t hs = (uint32_t)y * 2654435761u;
-        const int streak = (f.kind == FaceKind::FACE_DENT) ? 0 : (int)((hs >> 28) & 7) - 3;
+        const bool brushed = f.kind == FaceKind::FACE_BLACK || f.kind == FaceKind::FACE_SILVER;
+        const int streak = brushed ? (int)((hs >> 28) & 7) - 3 : 0;
         const float cy = y + 0.5f;
         for (int x = 0; x < w; x++) {
             const float cx = x + 0.5f;
@@ -174,6 +177,19 @@ static void paintFace(FaceSlot &f) {
                 const float t = cy / h;
                 col = (t < 0.5f) ? lerpHex(UI::mix(base, dk, 45), base, t / 0.5f)
                                  : lerpHex(base, UI::mix(base, lt, 7), (t - 0.5f) / 0.5f);
+            } else if (f.kind == FaceKind::FACE_SATIN) {
+                // SATIN (#99, the mock's numbers): light at the top fading by
+                // the middle, a shade growing below it - a faint step between
+                // the two - and a soft edge. A bright colour (the Remove
+                // button's red) carries a stronger light; on a light scheme the
+                // edge is a shade, or it would vanish into the window.
+                const bool bright = lum(f.tint) >= 128;
+                const uint8_t hiTop = bright ? 22 : 10, hiMid = bright ? 7 : 3, shade = bright ? 10 : 12;
+                const float t = cy / h;
+                col = (t < 0.5f) ? lerpHex(UI::mix(f.tint, lt, hiTop), UI::mix(f.tint, lt, hiMid), t / 0.5f)
+                                 : lerpHex(f.tint, UI::mix(f.tint, dk, shade), (t - 0.5f) / 0.5f);
+                const uint32_t rim = darkScheme ? UI::mix(f.tint, lt, bright ? 22 : 11) : UI::mix(f.tint, dk, 15);
+                if (inside < 1.3f) col = lerpHex(col, rim, 0.75f);
             } else {
                 // The line: two fifths down at the sides, rising in the middle.
                 const float u = (cx - w * 0.5f) / (w * 0.5f);
@@ -190,11 +206,25 @@ static void paintFace(FaceSlot &f) {
                 const int q = (int)floorf(v / (float)step + th) * step;
                 return (uint8_t)(q < 0 ? 0 : q > 256 - step ? 256 - step : q);
             };
+            if (f.kind == FaceKind::FACE_SATIN) {
+                // 16 bits, the panel's own (see face()): already on its grid.
+                const uint16_t c565 = (uint16_t)((chan(16, 8) >> 3) << 11 | (chan(8, 4) >> 2) << 5 | chan(0, 8) >> 3);
+                px[0] = (uint8_t)(c565 & 0xFF); px[1] = (uint8_t)(c565 >> 8);
+                px += 2;
+                continue;
+            }
             px[0] = chan(0, 8); px[1] = chan(8, 4); px[2] = chan(16, 8); px[3] = a;   // B, G, R, A
             px += 4;
         }
     }
 }
+
+// SATIN IS PAINTED IN 16 BITS (#99): no alpha, its corners cut by LVGL
+// (the image's radius). Measured on the P4_5, a full redraw of Members with
+// three ARGB8888 rows took 22 ms more than flat rows - an image with alpha is
+// blended pixel by pixel - where an opaque 16-bit one is copied a line at a
+// time, half the bytes from PSRAM. The metal and the dents keep their alpha.
+static bool opaqueFace(FaceKind kind) { return kind == FaceKind::FACE_SATIN; }
 
 // A face of this size and kind in the scheme's colours: found, or painted.
 // TWELVE SLOTS, REUSED (round 8, the 1060 on Linen): each scheme, look and
@@ -205,12 +235,12 @@ static void paintFace(FaceSlot &f) {
 // closed - a scheme changes from the dashboard), else the one asked for
 // longest ago by a window that is not this one. Full of this window's own:
 // null, and the caller paints flat.
-static const lv_image_dsc_t *face(int32_t w, int32_t h, int32_t r, FaceKind kind) {
+static const lv_image_dsc_t *face(int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t tint) {
     const UIPalette &p = UI::pal();
     const uint32_t key = p.GROUND ^ (p.SURFACE << 1) ^ (p.TEXT << 2) ^ (p.SURFACE_ALT << 3);
     FaceSlot *spare = nullptr;
     for (FaceSlot &f : s_faces) {
-        if (f.buf && f.w == w && f.h == h && f.r == r && f.kind == kind && f.key == key) {
+        if (f.buf && f.w == w && f.h == h && f.r == r && f.kind == kind && f.key == key && f.tint == tint) {
             f.used = s_epoch;
             return &f.dsc;
         }
@@ -223,7 +253,8 @@ static const lv_image_dsc_t *face(int32_t w, int32_t h, int32_t r, FaceKind kind
         for (FaceSlot &f : s_faces)
             if (f.used < s_epoch && (!spare || f.used < spare->used)) spare = &f;
     if (!spare) { s_flat++; return nullptr; }
-    const size_t bytes = (size_t)w * h * 4;
+    const uint32_t bpp = opaqueFace(kind) ? 2 : 4;
+    const size_t bytes = (size_t)w * h * bpp;
     if (spare->buf) {
         // LVGL keeps what it decoded from a source, by its address: forget
         // it before the same descriptor shows something else.
@@ -237,27 +268,31 @@ static const lv_image_dsc_t *face(int32_t w, int32_t h, int32_t r, FaceKind kind
     }
     spare->used = s_epoch;
     spare->w = (int16_t)w; spare->h = (int16_t)h; spare->r = (int16_t)r;
-    spare->kind = kind; spare->key = key;
+    spare->kind = kind; spare->key = key; spare->tint = tint;
     paintFace(*spare);
     lv_image_dsc_t &d = spare->dsc;
     d = lv_image_dsc_t{};
     d.header.magic  = LV_IMAGE_HEADER_MAGIC;
-    d.header.cf     = LV_COLOR_FORMAT_ARGB8888;
+    d.header.cf     = opaqueFace(kind) ? LV_COLOR_FORMAT_RGB565 : LV_COLOR_FORMAT_ARGB8888;
     d.header.w      = (uint32_t)w;
     d.header.h      = (uint32_t)h;
-    d.header.stride = (uint32_t)w * 4;
+    d.header.stride = (uint32_t)w * bpp;
     d.data_size     = (uint32_t)bytes;
     d.data          = spare->buf;
     return &d;
 }
 
-lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t flat) {
-    lv_obj_t *img = nullptr;
+static lv_obj_t *faceIn(lv_obj_t *o) {
     for (uint32_t i = 0; i < lv_obj_get_child_count(o); i++) {
         lv_obj_t *c = lv_obj_get_child(o, (int32_t)i);
-        if (lv_obj_check_type(c, &lv_image_class)) { img = c; break; }
+        if (lv_obj_check_type(c, &lv_image_class)) return c;
     }
-    const lv_image_dsc_t *src = face(w, h, r, kind);
+    return nullptr;
+}
+
+lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t flat, uint32_t tint) {
+    lv_obj_t *img = faceIn(o);
+    const lv_image_dsc_t *src = face(w, h, r, kind, kind == FaceKind::FACE_SATIN ? tint : 0);
     if (!src) {
         if (img) lv_obj_add_flag(img, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(o, UI::c(flat), 0);
@@ -272,9 +307,64 @@ lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, u
         lv_obj_center(img);
     }
     lv_obj_clear_flag(img, LV_OBJ_FLAG_HIDDEN);
-    lv_image_set_src(img, src);
+    // The same face again is no change - and setting it would redraw it, every
+    // time a window refreshes its state (a scene's finish, Power's).
+    if (lv_image_get_src(img) != src) lv_image_set_src(img, src);
+    // An opaque face's corners are cut by LVGL; one with alpha has its own.
+    const int32_t clip = opaqueFace(kind) ? LV_MIN(r, LV_MIN(w, h) / 2) : 0;
+    if (lv_obj_get_style_radius(img, LV_PART_MAIN) != clip) lv_obj_set_style_radius(img, clip, 0);
     lv_obj_set_style_bg_opa(o, LV_OPA_TRANSP, 0);
     return img;
+}
+
+// ---------------------------------------------------------------------------
+// THE FINISHES (#99, DECISIONS K77): satin for what can be tapped and is not
+// chosen, glass - the selector's metal - for what is chosen or active.
+// ---------------------------------------------------------------------------
+
+// Between the scheme's two surfaces: the mock's satin on Midnight exactly.
+uint32_t satinBase() { return UI::mix(UI::pal().SURFACE, UI::pal().SURFACE_ALT, 50); }
+
+// The finish a face shows, kept in its image's user data for a press.
+enum : uintptr_t { FIN_NONE = 0, FIN_SATIN = 1, FIN_GLASS = 2 };
+
+// Pressed: satin darkens - its light turned under - and glass lightens, as the
+// round icon buttons do; the object itself sinks 1 px (KS_SINK).
+static void finishPressCb(lv_event_t *ev) {
+    lv_obj_t *img = faceIn((lv_obj_t *)lv_event_get_current_target(ev));
+    if (!img) return;
+    const uintptr_t fin = (uintptr_t)lv_obj_get_user_data(img);
+    const bool down = lv_event_get_code(ev) == LV_EVENT_PRESSED && fin != FIN_NONE;
+    const UIPalette &p = UI::pal();
+    const bool darkScheme = lum(p.SURFACE_ALT) < 128;
+    lv_obj_set_style_image_recolor(img, UI::c(fin == FIN_SATIN ? (darkScheme ? p.GROUND : p.TEXT) : p.TEXT), 0);
+    lv_obj_set_style_image_recolor_opa(img, down ? (fin == FIN_SATIN ? LV_OPA_30 : LV_OPA_20) : LV_OPA_TRANSP, 0);
+}
+
+static bool hasCb(lv_obj_t *o, lv_event_cb_t cb) {
+    for (uint32_t i = 0; i < lv_obj_get_event_count(o); i++)
+        if (lv_event_dsc_get_cb(lv_obj_get_event_dsc(o, i)) == cb) return true;
+    return false;
+}
+
+void finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tint) {
+    if (!o || w <= 0 || h <= 0) return;
+    const bool glass = f == Finish::FINISH_GLASS;
+    const uint32_t base = tint ? tint : satinBase();
+    lv_obj_t *img = setFace(o, w, h, r, glass ? metalKind() : FaceKind::FACE_SATIN, base, base);
+    if (img) {
+        lv_obj_set_user_data(img, (void *)(glass ? FIN_GLASS : FIN_SATIN));
+        // FLOATING, not only out of the layout: an object sized to its content
+        // (a Members row) otherwise counts the face, which reaches into its
+        // padding, and grows by that padding - 68 px rows became 106.
+        lv_obj_add_flag(img, LV_OBJ_FLAG_FLOATING);
+    }
+    if (!hasCb(o, finishPressCb)) {
+        add(o, KitStyle::KS_SINK, UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+        lv_obj_add_event_cb(o, finishPressCb, LV_EVENT_PRESSED,    nullptr);
+        lv_obj_add_event_cb(o, finishPressCb, LV_EVENT_RELEASED,   nullptr);
+        lv_obj_add_event_cb(o, finishPressCb, LV_EVENT_PRESS_LOST, nullptr);
+    }
 }
 
 lv_obj_t *labelIn(lv_obj_t *o) {

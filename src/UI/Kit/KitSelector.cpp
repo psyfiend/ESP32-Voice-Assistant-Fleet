@@ -7,8 +7,8 @@
 // icon at the next size up, in the accent; its icon changes to a neighbour's
 // once the selector is more than halfway over it, and on release it snaps to
 // the nearest choice, which is then chosen. A tap on a choice glides the
-// selector there. An ACTION (the window's Power) is a plain button at the
-// start, on a ribbon of its own, and the selector never lands on it.
+// selector there. An ACTION (the window's Power) is a button at the start -
+// satin, glass while lit (#99) - and the selector never lands on it.
 #include "UI/Kit.h"
 
 namespace Kit {
@@ -216,7 +216,9 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
         lv_obj_set_style_bg_color(rib, UI::c(quietHex(q, col.ribbon)), 0);
         lv_obj_set_style_bg_opa  (rib, LV_OPA_COVER, 0);
     };
-    if (hasAction) ribbon(0, actionW);
+    // The action stands on a ribbon of its own only in a quiet selector; else
+    // it has a finish (#99).
+    if (hasAction && q) ribbon(0, actionW);
     if (S.n) ribbon(actionW + brk, W - actionW - brk);
 
     // A choice: an icon, or a word in the label face.
@@ -233,7 +235,20 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
         return b;
     };
 
-    if (hasAction) S.action = iconAt(g, spec.actionGlyph, spec.actionCb, nullptr);
+    // THE ACTION'S FINISH (#99, K77): satin, and glass while what it switches is
+    // on (selectorActionLit()) - a choice's size, its corners the selector's.
+    // A quiet one keeps it plain (actW 0: never finished).
+    S.actLit = -1;
+    S.actW = S.actH = S.actR = 0;
+    if (hasAction) {
+        S.action = iconAt(g, spec.actionGlyph, spec.actionCb, nullptr);
+        if (!q) {
+            S.actW = slotW;
+            S.actH = slotH;
+            S.actR = (selectorLookNow() & 1) ? LV_MIN(slotW, slotH) / 2 : UI::mm(UI::shape().R_CONTROL);
+            selectorActionLit(S, false);
+        }
+    }
     int32_t x = actionW + brk + g;
     const uint8_t chosen = spec.chosen < S.n ? spec.chosen : 0;
     for (uint8_t i = 0; i < S.n; i++) {
@@ -282,6 +297,13 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     S.shown = chosen;
     lv_label_set_text(S.selIcon, S.glyph[chosen]);
     lv_obj_set_pos(S.sel, selX(S, chosen), 0);
+}
+
+// Only on a change: the window refreshes its state often.
+void selectorActionLit(Selector &S, bool lit) {
+    if (!S.action || S.actW <= 0 || S.actLit == (int8_t)lit) return;
+    S.actLit = (int8_t)lit;
+    finish(S.action, S.actW, S.actH, S.actR, lit ? Finish::FINISH_GLASS : Finish::FINISH_SATIN);
 }
 
 } // namespace Kit

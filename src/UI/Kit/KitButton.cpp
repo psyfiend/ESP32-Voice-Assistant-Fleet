@@ -26,6 +26,10 @@ lv_obj_t *button(lv_obj_t *parent, ButtonRole role, const char *text, int32_t w,
     lv_obj_t *l = label(b, look.ink);
     lv_label_set_text(l, text);
     lv_obj_center(l);
+    // SATIN (#99, K77): a button is pressed, never chosen. Its role keeps its
+    // colour - the Remove button's red.
+    finish(b, w, h, UI::mm(UI::shape().R_CONTROL), Finish::FINISH_SATIN,
+           role == ButtonRole::BTN_DESTRUCTIVE ? UI::pal().ST_BAD : 0);
     if (cb) lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, nullptr);
     return b;
 }

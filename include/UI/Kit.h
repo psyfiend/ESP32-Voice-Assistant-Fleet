@@ -24,8 +24,9 @@ namespace Kit {
 // One lv_style_t each; the selector is given where it is added (Kit::add()).
 // Grouped by the component that uses them; components.md says what each sets.
 enum class KitStyle : uint8_t {
-    // Label roles: a face and a colour.
+    // Label roles: a face and a colour (ACTIVE: a state that is on, ST_ACTIVE).
     KS_LABEL_NAME, KS_LABEL_NAME_DIM, KS_LABEL_TAG, KS_LABEL_TAG_DIM, KS_LABEL_TAG_ACCENT,
+    KS_LABEL_TAG_ACTIVE,
     // Buttons: a face (MAIN), its pressed tint (MAIN | PRESSED), its ink (the label).
     KS_BTN_CANCEL, KS_BTN_CANCEL_PRESSED, KS_BTN_CANCEL_INK,
     KS_BTN_DESTRUCTIVE, KS_BTN_DESTRUCTIVE_PRESSED, KS_BTN_DESTRUCTIVE_INK,
@@ -53,6 +54,8 @@ enum class KitStyle : uint8_t {
     KS_PANEL_FACE, KS_PANEL_FILL, KS_PANEL_TITLE, KS_PANEL_BODY, KS_PANEL_CARET,
     // The sheet (UI/Sheet.h): the window's face, its auto-close bar.
     KS_SHEET_FACE, KS_SHEET_BAR,
+    // A finished surface sinks 1 px while pressed (Kit::finish()).
+    KS_SINK,
     KS_COUNT
 };
 
@@ -90,17 +93,33 @@ lv_obj_t *button(lv_obj_t *parent, ButtonRole role, const char *text, int32_t w,
                  lv_event_cb_t cb);
 
 // --- Faces drawn by hand (KitFaces.cpp) -------------------------------------------
-// A raised metal face (black or silver: the selector, a lit icon button) or a
-// soft dent in the surface (an unlit icon button), painted once into PSRAM and
-// kept; the object's own background is turned off while it shows.
-enum class FaceKind : uint8_t { FACE_BLACK, FACE_SILVER, FACE_DENT };
+// A raised metal face (black or silver: the selector, a lit icon button), a
+// soft dent in the surface (an unlit icon button), or satin (below), painted
+// once into PSRAM and kept; the object's own background is turned off while it
+// shows. Painted, and dithered to the panels' 16 bits, because LVGL's own
+// gradients band pink and green there (LESSONS).
+enum class FaceKind : uint8_t { FACE_BLACK, FACE_SILVER, FACE_DENT, FACE_SATIN };
 
 // The face as the object's first child (an image); `flat` is its colour when
-// no face can be had. Returns the image, or null.
-lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t flat);
+// no face can be had. `tint`: a satin face's own colour. Returns the image, or null.
+lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t flat,
+                  uint32_t tint = 0);
 lv_obj_t *labelIn(lv_obj_t *o);   // the label inside a faced button
 void      facesNextWindow();      // a new window: faces the last one used may be taken back
 uint32_t  facesFlat();            // how many came out flat (a debug readout)
+
+// THE FINISHES (#99, DECISIONS K77): what a surface says about a thing you can
+// tap. SATIN - it can be tapped and is not chosen: a faint light at the top
+// fading by the middle, a faint shade below, a soft edge (Members' rows, a
+// scene not loaded, the dialog's buttons, Power while off). GLASS - it is
+// chosen or active: the selector's metal (a scene loaded, Power while on).
+// FLAT - information - is no finish at all. Pressed, satin darkens and glass
+// lightens, and the object sinks 1 px. `w` x `h` and the corner radius `r` are
+// the object's own; `tint` is satin's colour, 0 for the scheme's (a role keeps
+// its colour: the Remove button's red). Called again, it changes the finish.
+enum class Finish : uint8_t { FINISH_SATIN, FINISH_GLASS };
+void     finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tint = 0);
+uint32_t satinBase();             // the scheme's satin, between its two surfaces
 
 // THE SELECTOR'S LOOK, per scheme (K36, K45): -1 the scheme's own, else bit 0
 // round, bit 1 silver. Kept in the settings file under the scheme.
@@ -124,7 +143,8 @@ void iconButtonLit(lv_obj_t *b, bool lit);
 // --- The selector (KitSelector.cpp) ------------------------------------------------
 // Choices on a ribbon and a metal selector that slides between them - dragged
 // or glided to a tapped choice, snapping to the nearest - with an ACTION button
-// (the window's Power) on a ribbon of its own before them.
+// (the window's Power) before them: satin, glass while lit (#99); in a quiet
+// (greyed) selector, plain on a ribbon of its own.
 //
 // COMPACT (#92): the same selector at a span chip's height (H_CHIP), its
 // choices WORDS in the label face, no action - one option chosen from a short
@@ -158,11 +178,15 @@ struct Selector {
     int32_t   pressX = 0, selX0 = 0;
     bool    (*blocked)() = nullptr;
     void    (*onChosen)(uint8_t i) = nullptr;
+    int32_t   actW = 0, actH = 0, actR = 0;   // the action's face
+    int8_t    actLit = -1;                    // its finish: -1 none (quiet), 0 satin, 1 glass
 };
 
 int32_t selectorW(uint8_t n);   // with n choices and the action
 int32_t selectorH();            // a touch target and its padding (a compact one: H_CHIP)
 void    selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec);
+// The action lit - glass - while what it switches is on (the window's Power), satin while off.
+void    selectorActionLit(Selector &S, bool lit);
 
 // --- Chips --------------------------------------------------------------------
 // A CHIP ROW: small round-ended buttons side by side, the chosen one lit in

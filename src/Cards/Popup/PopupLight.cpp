@@ -219,11 +219,14 @@ void renderLight() {
     }
 
     // --- The selector ------------------------------------------------------
-    // Power says whether the light is on; the chosen switch is the selector's
-    // (buildControlDeck()).
-    if (s.btnCtl[0])
-        if (lv_obj_t *l = lv_obj_get_child(s.btnCtl[0], 0))
+    // Power says whether the light is on - glass and its icon in the active
+    // colour while it is, satin while not (#99, K77); the chosen switch is the
+    // selector's (buildControlDeck()).
+    if (s.btnCtl[0]) {
+        Kit::selectorActionLit(d, on);
+        if (lv_obj_t *l = Kit::labelIn(s.btnCtl[0]))
             lv_obj_set_style_text_color(l, UI::c(quiet(on ? p.ST_ACTIVE : p.TEXT)), 0);
+    }
 
     // --- The swatches: a ring round the one the light is showing -----------
     for (uint8_t i = 0; i < 8; i++) {
@@ -236,13 +239,19 @@ void renderLight() {
         lv_obj_set_style_outline_color(s.swatch[i], UI::c(p.TEXT), 0);
     }
 
-    // --- Scenes: a ring round the one loaded from this window --------------
+    // --- Scenes: the one loaded from this window is glass ------------------
     // Only that: HA does not say which scene is showing, and the lights may
-    // have been changed since (K15).
+    // have been changed since (K15). Glass, its words in the accent, in place
+    // of the ring it had (#99, K77); the others satin. A paused window's are
+    // plain and greyed.
     for (uint8_t i = 0; i < ENTITY_SCENES_MAX; i++) {
-        if (!s.sceneBtn[i]) continue;
-        lv_obj_set_style_outline_width(s.sceneBtn[i], (i == s.lastScene) ? LV_MAX(2, mm(UI::shape().RING_W)) : 0, 0);
-        lv_obj_set_style_outline_color(s.sceneBtn[i], UI::c(p.ACCENT), 0);
+        lv_obj_t *b = s.sceneBtn[i];
+        if (!b || s.builtPaused) continue;
+        const bool loaded = i == s.lastScene;
+        const int32_t h = lv_obj_get_style_height(b, LV_PART_MAIN);   // as set: known before any layout
+        Kit::finish(b, lv_obj_get_style_width(b, LV_PART_MAIN), h, h / 2,
+                    loaded ? Kit::Finish::FINISH_GLASS : Kit::Finish::FINISH_SATIN);
+        if (lv_obj_t *l = Kit::labelIn(b)) lv_obj_set_style_text_color(l, UI::c(loaded ? p.ACCENT : p.TEXT), 0);
     }
 }
 
