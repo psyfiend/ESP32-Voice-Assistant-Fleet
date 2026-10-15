@@ -142,7 +142,19 @@ The clock's, the page's (P4_5, then the 4B) and the sensor's panels:
 
 ## Results
 
-*(filled in below when the gate finishes and the boards are back on `main`)*
+- **The gate**: all nine SUCCESS on `3260eb0` (15:49) and again on the final commit `a04711b`
+  (10:28; P4_5 41.0% flash, the S3 boards 34.5-36.6%).
+- **Drawing cost**, P4_5, a full redraw of the House page, 20 frames: `main` **101.8 ms** (render
+  87.0) -> the branch **102.9 ms** (render 88.3), about 1%. LVGL's pool on the House page: 4.4 KB
+  more in use (the four slots, the frames and the slot drawer, built once).
+- **The structure check** (W13): files over 1,000 lines - `GUIManager.cpp` 1,551 -> 1,605 (2.8's
+  slot code is its own file, `GUIManagerHeader.cpp`, 141), `Card.cpp` 1,462; style calls outside
+  the kit 523 -> 501 (the header moved onto the kit; `Panel_Header.cpp` keeps 3, the sensor's tint);
+  colour literals 44 -> 46 (the two status glyphs' "off" colour, now also used for their strike in
+  the bare and square styles); no shape numbers; no LVGL in the core layers.
+- **The boards are back on `main`** (`v0.2.16` with your local lines): the P4_5 and the 4B, each with
+  its settings file byte-identical to its copy from this morning (05:42); the 1060 was never
+  flashed.
 
 ## Your results
 
