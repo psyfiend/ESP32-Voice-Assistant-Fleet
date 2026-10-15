@@ -168,7 +168,7 @@ Two commits on the branch; the P4_5 and the 4B run them (the 1060 still runs rou
 
 | # | What | Checked |
 |---|---|---|
-| T9 | **The span selector keeps its size** (K80): the chart's corners set its room, and they are not drawn while a span loads - so the room now only narrows while the window shows one subject (a wider Min / Max narrows it once); Show min/max or another entity starts it afresh. Before the first answer it starts from Now's width | the 4B, Deck's History, every span: 298 px wide while loading ("Loading..." showing) and when drawn (round 1: ~384 while loading, 298-306 drawn) |
+| T9 | **The span selector keeps its size** (K80): the chart's corners set its room, and they are not drawn while a span loads - so the room now only narrows while the window shows one subject (a wider Min / Max narrows it once); Show min/max or another entity starts it afresh. Before the first answer it starts from Now's width | the 4B, Deck's History, every span: 298 px wide while loading ("Loading..." showing) and when drawn (round 1, worked out from the tokens rather than captured: about 394 while loading, 298-306 drawn) |
 | T12 | **The windows' timeout and countdown bar, from a PC** (K79): `/settings?window_close=60\|30\|10\|off` and `window_bar=on\|off` - system settings in the settings file, from the next window | the 4B: 45 refused; 10 s closed the window after ~11 s; `off` kept it open past 70 s with no bar; 30 with the bar; the bar off hides the window's and the Remove dialog's; 60 and on again leave nothing in the file |
 
 | # | Do this | PASS if |
