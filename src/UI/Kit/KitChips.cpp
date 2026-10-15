@@ -10,7 +10,7 @@ lv_obj_t *chipRow(lv_obj_t *parent, const char *const *words, uint8_t n, uint8_t
     lv_obj_t *row = plain(parent);
     lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-    int32_t padH = UI::mm(k.S_CHIP_SIDE), gap = UI::mm(k.S4);
+    int32_t padH = UI::mm(k.S7), gap = UI::mm(k.S4);
     if (room > 0) {
         int32_t text = 0;
         for (uint8_t i = 0; i < n; i++) text += textW(words[i], UI::type().TAG);

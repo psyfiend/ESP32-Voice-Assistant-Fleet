@@ -101,7 +101,7 @@ whose stack is in internal RAM - the settings task.
 
 | Tool | What it proves | How |
 |---|---|---|
-| **The harness**, `scripts/ui_golden.py` | a window, view, panel or page is the same object tree and the same pixels as before | `capture <host> --board <B> --label <L>` walks 46 states (43 on the 4B) through `GET /popup` and saves each tree and screenshot; `compare <B> <A> <B>` reports every difference, telling the house apart (times, values, a light switched); `measure` times each window's build; `crop` cuts a picture for the docs. Needs `-D DEBUG_POPUP` |
+| **The harness**, `scripts/ui_golden.py` | a window, view, panel or page is the same object tree and the same pixels as before | `capture <host> --board <B> --label <L>` walks 48 states (45 on the 4B; the system panel and About since #97) through `GET /popup` and saves each tree and screenshot; `compare <B> <A> <B>` reports every difference, telling the house apart (times, values, a light switched); `measure` times each window's build; `crop` cuts a picture for the docs. Needs `-D DEBUG_POPUP` |
 | **A/B on one board** | a refactor changed nothing | capture on the old firmware, flash the new, capture again minutes apart; a state the house changed under is captured again both ways. Keep each phase's image (`test/golden/<board>/fw_*`, gitignored) to flash back |
 | **Host tests**, `host-tests/` | the pure modules' rules (`Layout`, `TimeFormat`) | `wsl bash host-tests/run_in_wsl.sh` (or `pio test -d host-tests` with a Windows compiler) |
 | **The structure check**, `scripts/structure_check.py` | the code is not drifting: big files, style calls outside the kit, colour literals, shape numbers, LVGL in the core layers | run it with the gate; quote it in the merge report (W13) |
@@ -114,8 +114,9 @@ is slow (6-8 s a state) and fails its walk if its screenshots slow further - cap
 ## 6. Not on the foundation yet
 
 2.12 rebuilt the card window. The rest of the UI still sets its looks at the call site; the
-structure check counts it (531 `lv_obj_set_style_*` calls outside the kit, 26 files, on
-2026-10-14). Bring each onto the kit and tokens when it is next changed, not in a sweep:
+structure check counts it (531 `lv_obj_set_style_*` calls outside the kit in 26 files at `v0.2.13`;
+524 in 25 on `feat/ui-followups`, where About's list and the system panel's first row moved onto the
+kit). Bring each onto the kit and tokens when it is next changed, not in a sweep:
 
 - **Cards** (`Card.cpp` 1,462 lines and 87 style calls, `StateCard.cpp`, `ValueCard.cpp`) - first,
   because 2.11's group cards and any new card type build on them.
@@ -126,7 +127,7 @@ structure check counts it (531 `lv_obj_set_style_*` calls outside the kit, 26 fi
 
 ## 7. Open questions this structure leaves for the owner
 
-The finishes (a quieter "glass" for things that can be tapped but are not selected, #99), the
-selector as History's span buttons (#92), and the countdown everywhere a window closes itself (#23)
-are the next look decisions - each a role or a component above, so each is decided once and used
-everywhere.
+The finishes (a quieter "glass" for things that can be tapped but are not selected, #99) are the
+next look decision - a role in the kit, so decided once and used everywhere; a mock comes first.
+The selector as History's span buttons (#92, K75) and the countdown on a dialog that closes with
+its window (#23, K76) are built on `feat/ui-followups`, waiting for the owner's look.

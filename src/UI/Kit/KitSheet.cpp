@@ -9,6 +9,7 @@
 // learned is in docs/LESSONS.md, "Effects that cover the screen". Nothing is drawn behind it.
 #include "KitSheetInternal.h"
 #include "UI/UIToolkit.h"
+#include "Settings.h"
 #include "src/core/lv_obj_event_private.h"   // lv_hit_test_info_t: the tap catcher's hit test
 #include "src/core/lv_obj_draw_private.h"    // lv_obj_get_ext_draw_size: the window's shadow
 #include <Arduino.h>
@@ -133,6 +134,23 @@ void sheetPlace(Sheet &S) {
     S.pad       = UI::mm(k.S4);
 }
 
+// HOW LONG A WINDOW WAITS, AND WHETHER IT SAYS SO (owner, T6, 2026-10-14):
+// system settings, read as each window opens - "close" in seconds or "off",
+// "bar" "off" to hide the countdown. Set from a PC until the system settings
+// page (Settings.h).
+static uint32_t closeSetting() {
+    char v[8];
+    if (!Settings::system("window", "close", v, sizeof(v))) return SHEET_AUTOCLOSE_MS;
+    if (!strcmp(v, "off")) return 0;
+    const int sec = atoi(v);
+    return sec > 0 ? (uint32_t)sec * 1000 : SHEET_AUTOCLOSE_MS;
+}
+
+static bool barSetting() {
+    char v[8];
+    return !Settings::system("window", "bar", v, sizeof(v)) || strcmp(v, "off") != 0;
+}
+
 // --- The window ---------------------------------------------------------------
 // ON THE SCREEN AS ITS TOPMOST OBJECT - not lv_layer_top(). LVGL draws the top
 // layer OVER the page, never instead of it (lv_refr.c), so with the window up
@@ -171,7 +189,7 @@ static void buildFrame(Sheet &S) {
     const UIType  &t = UI::type();
     const UIShape &k = UI::shape();
     const int32_t btn = UI::minTouch();
-    const int32_t gap = UI::mm(k.S_GUTTER);
+    const int32_t gap = UI::mm(k.S5);
 
     lv_obj_set_flex_flow(S.win, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_all(S.win, S.pad, 0);
@@ -264,14 +282,38 @@ static void buildFrame(Sheet &S) {
     }
 
     // --- The auto-close bar: how long until the window gives up -------------
-    S.autoBar = plain(S.win);
-    lv_obj_add_flag(S.autoBar, LV_OBJ_FLAG_FLOATING);
-    lv_obj_set_size(S.autoBar, lv_area_get_width(&S.winRect) - 2 * S.pad,
-                    UI::mm(k.H_BAR) < 3 ? 3 : UI::mm(k.H_BAR));
-    add(S.autoBar, KitStyle::KS_SHEET_BAR);
-    lv_obj_align(S.autoBar, LV_ALIGN_BOTTOM_MID, 0, S.pad / 2);
+    S.autoBar = (S.closeMs && barSetting()) ? countdownBar(S.win, lv_area_get_width(&S.winRect)) : nullptr;
 
     if (spec.buildFirst) spec.buildFirst();
+}
+
+// THE COUNTDOWN BAR ON THE BOTTOM EDGE (owner, TEST_2.12; #97): H_BAR thin - 2 px
+// at 294 and 255 PPI, 1 px at 170, where it was 6 and 3 - and down on the box's
+// edge inside its border, so the gap to what the box holds is its whole bottom
+// padding. Between the rounded corners, so it never crosses their curve. Its
+// full width is kept in its user data.
+lv_obj_t *countdownBar(lv_obj_t *box, int32_t boxW) {
+    const int32_t full = LV_MAX(1, boxW - 2 * lv_obj_get_style_radius(box, LV_PART_MAIN));
+    lv_obj_t *bar = plain(box);
+    lv_obj_add_flag(bar, LV_OBJ_FLAG_FLOATING);
+    lv_obj_set_user_data(bar, (void *)(intptr_t)full);
+    lv_obj_set_size(bar, full, LV_MAX(1, UI::mm(UI::shape().H_BAR)));
+    add(bar, KitStyle::KS_SHEET_BAR);
+    lv_obj_align(bar, LV_ALIGN_BOTTOM_MID, 0, lv_obj_get_style_pad_bottom(box, LV_PART_MAIN));
+    return bar;
+}
+
+void countdownSet(lv_obj_t *bar, const Sheet &S) {
+    if (!bar || !S.closeMs) return;
+    const int32_t full = (int32_t)(intptr_t)lv_obj_get_user_data(bar);
+    const int32_t w = LV_MAX(1, (int32_t)((int64_t)full * LV_MIN(sheetLeftMs(S), S.closeMs) / S.closeMs));
+    if (w != lv_obj_get_width(bar)) lv_obj_set_width(bar, w);   // its align keeps it in the middle
+}
+
+uint32_t sheetLeftMs(const Sheet &S) {
+    if (!S.closeMs) return UINT32_MAX;
+    const uint32_t idle = millis() - S.lastTouchMs;
+    return idle >= S.closeMs ? 0 : S.closeMs - idle;
 }
 
 // Share the title row between its first part ("Area > ") and the name.
@@ -319,17 +361,9 @@ static void tickCb(lv_timer_t *t) {
     Sheet *S = (Sheet *)lv_timer_get_user_data(t);
     if (!S || !S->win) return;
     const uint32_t now  = millis();
-    const uint32_t idle = now - S->lastTouchMs;
-    if (idle >= SHEET_AUTOCLOSE_MS) { sheetClose(*S); return; }
+    if (!sheetLeftMs(*S)) { sheetClose(*S); return; }
 
-    if (S->autoBar) {
-        const int32_t full = lv_area_get_width(&S->winRect) - 2 * S->pad;
-        const int32_t w = (int32_t)((int64_t)full * (SHEET_AUTOCLOSE_MS - idle) / SHEET_AUTOCLOSE_MS);
-        if (w != lv_obj_get_width(S->autoBar)) {
-            lv_obj_set_width(S->autoBar, w < 1 ? 1 : w);
-            lv_obj_align(S->autoBar, LV_ALIGN_BOTTOM_MID, 0, S->pad / 2);
-        }
-    }
+    countdownSet(S->autoBar, *S);
     if (S->spec && S->spec->tick) S->spec->tick(now);
 }
 
@@ -368,6 +402,7 @@ static void invalidateWindow(Sheet &S) {
 void sheetOpen(Sheet &S, const SheetSpec &spec) {
     S.spec = &spec;
     S.closeQueued = false;
+    S.closeMs = closeSetting();
     s_open = &S;
     facesNextWindow();                                // faces the last sheet used may be taken back
     lv_obj_t *scr = lv_screen_active();

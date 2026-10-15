@@ -166,8 +166,8 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     const UIType &t = UI::type();
     const SelectorColours col = selectorColours();
     const bool q = spec.quiet;
-    const int32_t slot = UI::minTouch(), g = UI::mm(UI::shape().S1);
-    const int32_t H = selectorH();
+    const bool compact = spec.compact;
+    const int32_t g = UI::mm(UI::shape().S1);
 
     S.obj = S.sel = S.selIcon = S.action = nullptr;
     S.n = 0;
@@ -175,7 +175,31 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     S.shown = 0; S.dragging = false;
     S.blocked  = spec.blocked;
     S.onChosen = spec.onChosen;
-    const int32_t W = selectorW(S.n);
+
+    // Its size. Full: a touch target per choice, the action before them.
+    // COMPACT (#92): a span chip's height; each choice as wide as the widest
+    // word and its sides (S7, as a chip's), the sides shrinking to fit `room`,
+    // as far as S1; no action.
+    const bool hasAction = !compact && spec.actionGlyph;
+    int32_t H, slotW;
+    if (compact) {
+        H = UI::mm(UI::shape().H_CHIP);
+        int32_t widest = 0;
+        for (uint8_t i = 0; i < S.n; i++) widest = LV_MAX(widest, textW(S.glyph[i], t.TAG));
+        int32_t side = UI::mm(UI::shape().S7);
+        if (spec.room > 0 && S.n) {
+            const int32_t fit = ((spec.room - (S.n + 1) * g) / S.n - widest) / 2;
+            side = LV_CLAMP(g, fit, side);
+        }
+        slotW = widest + 2 * side;
+    } else {
+        H = selectorH();
+        slotW = UI::minTouch();
+    }
+    const int32_t slotH   = H - 2 * g;
+    const int32_t actionW = hasAction ? slotW + 2 * g : 0;
+    const int32_t brk     = hasAction ? selectorBreak() : 0;
+    const int32_t W = actionW + brk + (S.n ? S.n * slotW + (S.n + 1) * g : 0);
 
     S.obj = plain(parent);
     lv_obj_set_size(S.obj, W, H);
@@ -183,8 +207,7 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     // The ribbon: three quarters of a choice tall, centred - IN TWO PIECES
     // (owner: no divider line - the selector never goes to the action anyway).
     // The action has a short ribbon of its own; a break; then the choices'.
-    const int32_t rh = slot * 72 / 100;
-    const int32_t actionW = slot + 2 * g;
+    const int32_t rh = slotH * 72 / 100;
     auto ribbon = [&](int32_t x0, int32_t w) {
         lv_obj_t *rib = plain(S.obj);
         lv_obj_set_pos (rib, x0, (H - rh) / 2);
@@ -193,43 +216,43 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
         lv_obj_set_style_bg_color(rib, UI::c(quietHex(q, col.ribbon)), 0);
         lv_obj_set_style_bg_opa  (rib, LV_OPA_COVER, 0);
     };
-    ribbon(0, actionW);
-    if (S.n) ribbon(actionW + selectorBreak(), W - actionW - selectorBreak());
+    if (hasAction) ribbon(0, actionW);
+    if (S.n) ribbon(actionW + brk, W - actionW - brk);
 
+    // A choice: an icon, or a word in the label face.
     auto iconAt = [&](int32_t x, const char *glyph, lv_event_cb_t cb, void *user) {
         lv_obj_t *b = plain(S.obj);
         lv_obj_set_pos (b, x, 0);
-        lv_obj_set_size(b, slot, H);
+        lv_obj_set_size(b, slotW, H);
         lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_user_data(b, &S);
         lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, user);
-        lv_obj_t *l = label(b, t.ICON_MD, quietHex(q, col.icon));
+        lv_obj_t *l = label(b, compact ? t.TAG : t.ICON_MD, quietHex(q, col.icon));
         lv_label_set_text(l, glyph);
         lv_obj_center(l);
         return b;
     };
 
-    int32_t x = g;
-    S.action = iconAt(x, spec.actionGlyph, spec.actionCb, nullptr);
-    x = actionW + selectorBreak() + g;
+    if (hasAction) S.action = iconAt(g, spec.actionGlyph, spec.actionCb, nullptr);
+    int32_t x = actionW + brk + g;
     const uint8_t chosen = spec.chosen < S.n ? spec.chosen : 0;
     for (uint8_t i = 0; i < S.n; i++) {
         S.item[i] = iconAt(x, S.glyph[i], tapCb, (void *)(uintptr_t)i);
-        S.x[i] = x + slot / 2;
-        x += slot + g;
+        S.x[i] = x + slotW / 2;
+        x += slotW + g;
     }
     if (!S.n) return;
 
     // The selector: the whole height, a little wider than a choice, over the
     // ribbon - with the chosen choice's icon, a size up, in the accent.
-    S.selW = slot + 2 * g;
+    S.selW = slotW + 2 * g;
     S.sel = plain(S.obj);
     lv_obj_set_user_data(S.sel, &S);
     lv_obj_set_size(S.sel, S.selW, H);
     lv_obj_set_style_radius(S.sel, selectorRadius(), 0);
     // Its face is metal, curved and brushed (KitFaces.cpp). Greyed when quiet,
     // as everything else is.
-    const int32_t selR = (selectorLookNow() & 1) ? LV_MIN(S.selW, H) / 2 : UI::mm(UI::shape().R_BUTTON);
+    const int32_t selR = (selectorLookNow() & 1) ? LV_MIN(S.selW, H) / 2 : UI::mm(UI::shape().R_CONTROL);
     if (lv_obj_t *img = setFace(S.sel, S.selW, H, selR, metalKind(), quietHex(q, UI::pal().GROUND))) {
         if (q) {
             lv_obj_set_style_image_recolor    (img, UI::c(UI::pal().SURFACE_ALT), 0);
@@ -243,16 +266,19 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     lv_obj_add_event_cb(S.sel, dragCb, LV_EVENT_PRESSING,   nullptr);
     lv_obj_add_event_cb(S.sel, dragCb, LV_EVENT_RELEASED,   nullptr);
     lv_obj_add_event_cb(S.sel, dragCb, LV_EVENT_PRESS_LOST, nullptr);
-    S.selIcon = label(S.sel, t.ICON, quietHex(q, col.chosen));
+    // Compact: the chosen word in the name face, a size up from the ribbon's.
+    S.selIcon = label(S.sel, compact ? t.NAME : t.ICON, quietHex(q, col.chosen));
     lv_obj_center(S.selIcon);
     // LARGER, TO FILL MORE OF THE SELECTOR (owner, round 7). ICON is the
     // largest icon face there is, so it is scaled up 1.4x about its centre -
     // drawn through a layer, the size of the icon. If that is visibly soft on
     // glass, the answer is a face of just these few glyphs at this size (a few
     // KB), from scripts/gen_icon_font.py.
-    lv_obj_set_style_transform_scale  (S.selIcon, 358, 0);
-    lv_obj_set_style_transform_pivot_x(S.selIcon, lv_pct(50), 0);
-    lv_obj_set_style_transform_pivot_y(S.selIcon, lv_pct(50), 0);
+    if (!compact) {
+        lv_obj_set_style_transform_scale  (S.selIcon, 358, 0);
+        lv_obj_set_style_transform_pivot_x(S.selIcon, lv_pct(50), 0);
+        lv_obj_set_style_transform_pivot_y(S.selIcon, lv_pct(50), 0);
+    }
     S.shown = chosen;
     lv_label_set_text(S.selIcon, S.glyph[chosen]);
     lv_obj_set_pos(S.sel, selX(S, chosen), 0);

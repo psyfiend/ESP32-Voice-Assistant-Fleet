@@ -1,9 +1,8 @@
 // "About this board" (2.12 P4) - see include/UI/AboutSheet.h. The Sheet's second client, made to
 // prove the frame is a component: one view, no tabs, no panels; the X closes it, and it closes
-// itself after a minute untouched, as the card window does.
+// itself after a minute untouched, as the card window does. In every build since #97 (K74): the
+// system panel's About button opens it.
 #include "UI/AboutSheet.h"
-
-#ifdef DEBUG_POPUP
 #include "UI/Sheet.h"
 #include "bsp_loader.h"
 #include "fleet_fw_version.h"
@@ -43,15 +42,7 @@ static void build() {
     lv_label_set_text(S.lblTitleName, "About this board");
     Kit::sheetLayoutTitle(S);
 
-    const UIShape &k = UI::shape();
-    lv_obj_t *list = Kit::plain(S.stage);
-    lv_obj_set_size(list, lv_pct(100), lv_pct(100));
-    lv_obj_set_style_pad_hor(list, UI::mm(k.S10), 0);
-    lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
-    UI::tameScroll(list);
-    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(list, UI::mm(k.S5), 0);
-
+    lv_obj_t *list = Kit::factList(S.stage);
     char buf[64];
     Kit::factRow(list, "Board", bsp_hw.MODEL);
     Kit::factRow(list, "Made by", bsp_hw.MANUFACTURER);
@@ -73,6 +64,7 @@ static void build() {
     s_heap = Kit::factRow(list, "Free memory", buf);
     poolWords(buf, sizeof(buf));
     s_pool = Kit::factRow(list, "LVGL's pool", buf);
+    Kit::factColumns(list);
 }
 
 // Once a second is plenty; only what changed is set (setting identical text still redraws).
@@ -108,13 +100,3 @@ void close()  { Kit::sheetClose(S); }
 bool isOpen() { return S.win != nullptr; }
 
 } // namespace AboutSheet
-
-#else   // not a debug build: nothing to open
-
-namespace AboutSheet {
-bool open()   { return false; }
-void close()  {}
-bool isOpen() { return false; }
-}
-
-#endif

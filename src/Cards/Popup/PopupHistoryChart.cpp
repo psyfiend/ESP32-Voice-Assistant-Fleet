@@ -63,8 +63,7 @@ void histDrawChart(lv_obj_t *body) {
         lv_obj_update_layout(top);
         leftEnd = lv_obj_get_width(words) + mm(UI::shape().S3) + lv_obj_get_width(nums);
     }
-    const int32_t half = LV_MIN(topW / 2 - leftEnd, topW / 2 - lv_obj_get_width(read)) - mm(UI::shape().S_GUTTER);
-    histTopMiddle(top, 2 * LV_MAX(half, 1));
+    histTopMiddle(top, histChipRoom(topW, leftEnd, lv_obj_get_width(read)));
 
     if (lo > hi) { histNote(body, "Nothing recorded in this span"); return; }
 
@@ -111,7 +110,7 @@ void histDrawChart(lv_obj_t *body) {
             snprintf(buf, sizeof(buf), "%.*f%s", dec, (double)v, v + step > ymax + step * 0.01f ? unit : "");
             gutter = LV_MAX(gutter, textW(buf, t.TAG));
         }
-        gutter += mm(UI::shape().S_GUTTER);
+        gutter += mm(UI::shape().S5);
     }
     const int32_t plotW = LV_MAX(10, w - gutter);
     s_hv.plotL = gutter; s_hv.plotW = plotW;
@@ -137,7 +136,7 @@ void histDrawChart(lv_obj_t *body) {
         if (ly < lastLblY + lh) continue;   // never two on top of each other
         lv_obj_t *yl = Kit::label(area, KS::KS_LABEL_TAG_DIM);
         lv_label_set_text(yl, buf);
-        lv_obj_set_pos(yl, gutter - mm(UI::shape().S_GUTTER) - textW(buf, t.TAG), ly);
+        lv_obj_set_pos(yl, gutter - mm(UI::shape().S5) - textW(buf, t.TAG), ly);
         lastLblY = ly;
     }
 
@@ -173,7 +172,7 @@ void histDrawChart(lv_obj_t *body) {
             else            snprintf(buf, sizeof(buf), "%d:%02d", hr, a.tm_min);
             const int32_t bw = textW(buf, t.TAG);
             const int32_t bx = LV_CLAMP(0, x - bw / 2, w - bw);
-            if (bx < lastRight + mm(UI::shape().S_GUTTER)) continue;
+            if (bx < lastRight + mm(UI::shape().S5)) continue;
             lv_obj_t *xl = Kit::label(area, KS::KS_LABEL_TAG_DIM);
             lv_label_set_text(xl, buf);
             lv_obj_set_pos(xl, bx, topH + plotH + mm(UI::shape().S1));
@@ -227,8 +226,8 @@ void histDrawChart(lv_obj_t *body) {
         static lv_point_precise_t ptsLo[2], ptsHi[2];
         const uint32_t faint = UI::mix(p.SURFACE_ALT, p.TEXT, 35);
         const int32_t xLo = histX(tLo), xHi = histX(tHi);
-        histVLine(area, ptsLo, xLo, faint, LV_MAX(1, mm(UI::shape().LINE_FINE)));
-        histVLine(area, ptsHi, xHi, faint, LV_MAX(1, mm(UI::shape().LINE_FINE)));
+        histVLine(area, ptsLo, xLo, faint, LV_MAX(1, mm(UI::shape().LINE_MID)));
+        histVLine(area, ptsHi, xHi, faint, LV_MAX(1, mm(UI::shape().LINE_MID)));
         const int32_t pad = mm(UI::shape().S1), gap = mm(UI::shape().S2);
         // Where the line runs under columns x0..x1: its highest and lowest y.
         auto lineSpan = [&](int32_t x0, int32_t x1, int32_t &yTop, int32_t &yBot) {

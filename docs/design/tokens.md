@@ -288,35 +288,33 @@ Fifty-six floats in `UIMetrics` would give every scheme a copy to keep in step, 
 struct's layout is the build-cache trap (CLAUDE.md). One `const` instance, in flash, no RAM. If a
 scheme ever wants its own corners, `UI::shape()` can return a per-scheme copy and no caller changes.
 
-**The scales.** Every value is the one the window already had - the harness found no pixel changed
-on three boards.
+**The scales** (as merged on `feat/ui-followups`, #97 - below). Until then every value was the one
+the window already had - the harness found no pixel changed on three boards.
 
 | Group | Tokens, in millimetres |
 |---|---|
-| Radius | `R_CONTROL` 1.2, `R_BUTTON` 1.6, `R_PANEL` 1.6, `R_WINDOW` 2.4, `R_CHIP` 3.0 |
+| Radius | `R_CONTROL` 1.6, `R_PANEL` 1.6, `R_WINDOW` 2.4, `R_CHIP` 3.0 |
 | Spacing | `S1` 0.6, `S2` 0.8, `S3` 1.0, `S4` 1.2, `S5` 1.6, `S6` 2.0, `S7` 2.4, `S8` 3.0, `S9` 4.0, `S10` 5.0 |
-| Spacing off the scale | `S_MEMBERS` 1.4, `S_GUTTER` 1.5, `S_CHIP_SIDE` 2.2, `S_ROW_MIN` 0.55 |
-| Lines | `LINE_HAIR` 0.2, `LINE_FINE` 0.25, `LINE_MID` 0.3, `LINE_HEAVY` 0.4, `LINE_PLOT` 0.45, `DASH` 0.6, `RING_W` 0.4, `RING_PAD` 0.3; letter spacing `TRACK_PILL` 0.2, `TRACK_TAB` 0.4 |
-| Heights, widths | `H_CONTROL` 6.0, `H_CHIP` 6.0, `H_ROW` 7.2, `H_MORE` 7.0, `H_BAR` 0.5, `H_TABS` 6.0, `W_SIDE_MIN` 6.0, `W_WINDOW_MAX` 100, `W_ROWS_MAX` 70, `W_DIALOG_MAX` 90, `W_DIALOG_BTN` 24, `SWATCH` 6.5, `CARET_W` 2.4, `CARET_H` 1.0 |
+| Lines | `LINE_HAIR` 0.2, `LINE_MID` 0.3, `LINE_HEAVY` 0.4, `LINE_PLOT` 0.45, `DASH` 0.6, `RING_W` 0.4, `RING_PAD` 0.3; letter spacing `TRACK_PILL` 0.2, `TRACK_TAB` 0.4 |
+| Heights, widths | `H_CONTROL` 6.0, `H_CHIP` 6.0, `H_ROW` 7.2, `H_BAR` 0.17 (0.5 until #97: 2 px at 294 and 255 PPI, 1 px at 170), `H_TABS` 6.0, `W_SIDE_MIN` 6.0, `W_WINDOW_MAX` 100, `W_ROWS_MAX` 70, `W_DIALOG_MAX` 90, `W_DIALOG_BTN` 24, `SWATCH` 6.5, `CARET_W` 2.4, `CARET_H` 1.0 |
 | Finger travel | `SLOP_SELECTOR` 1.0, `SLOP_KNOB` 1.2, `SLOP_HOLD` 4.0 |
 | The hero (`pm()`) | `P_GAP` 4.0, `P_STACK_GAP` 3.0, `P_GRIP_INSET` 1.4, `P_GRIP_H` 0.5, `P_GRIP_MIN` 5.0, `P_MARK_H` 2.6, `P_MARK_LINE` 0.35, `P_SCENE_H` 9.0, `P_SCENE_GAP` 1.4, `P_SCENE_PAD` 2.4 |
 
-The spacing literals clustered into ten steps from 0.6 to 5.0 mm; four sat between steps and keep
-names of their own. Several tokens share a value (`R_BUTTON` and `R_PANEL`; `H_CONTROL`, `H_CHIP`,
-`H_TABS` and `W_SIDE_MIN`): they are different roles, and stay separate so one can change alone.
+The spacing literals clustered into ten steps from 0.6 to 5.0 mm. Several tokens share a value
+(`R_CONTROL` and `R_PANEL`; `H_CONTROL`, `H_CHIP`, `H_TABS` and `W_SIDE_MIN`): they are different
+roles, and stay separate so one can change alone.
 
-**Merge candidates - the owner said merge them** (2026-10-14, TEST_2.12 Q1: "I doubt I'd even notice
-the difference"). Each merge is a look change, small but real, so they go on their own branch after
-2.12, with before/after pictures from the harness; `S_MEMBERS` and the two radii are looked at on
-glass before they are chosen. Pixels before line minimums, on WS_P4_5 / WS_P4_4B / CYD_P4_1060
+**The near-equal tokens, merged** (owner, 2026-10-14, TEST_2.12 Q1: "I doubt I'd even notice the
+difference"; built on `feat/ui-followups`, #97, with the harness's before/after pictures in
+`docs/archive/TEST_UI_FOLLOWUPS.md`; `v0.2.15`). Pixels before line minimums, on WS_P4_5 / WS_P4_4B / CYD_P4_1060
 (294 / 255 / 170 PPI):
 
-| Candidate | Now | Merged | Recommendation |
+| Merge | Was | Now | |
 |---|---|---|---|
-| `S_GUTTER` 1.5 into `S5` 1.6 | 17 / 15 / 10 | 19 / 16 / 11 | merge: the header row and the chart's gutters |
-| `S_ROW_MIN` 0.55 into `S1` 0.6 | 6 / 6 / 4 | 7 / 6 / 4 | merge: only the P4_5 moves, by 1 px |
-| `S_CHIP_SIDE` 2.2 into `S7` 2.4 | 25 / 22 / 15 | 28 / 24 / 16 | merge, after a look at the span chips on the 4B |
-| `S_MEMBERS` 1.4 into `S4` 1.2 or `S5` 1.6 | 16 / 14 / 9 | 14 / 12 / 8, or 19 / 16 / 11 | keep: Members' rows were set on glass (2.10c G2) |
-| `LINE_FINE` 0.25 into `LINE_MID` 0.3 | 3 / 3 / 2 | 3 / 3 / 2 | merge: no change on these three; +1 px on WS_S3_5B and CYD_P4_4880 |
-| `H_MORE` 7.0 into `H_ROW` 7.2 | 81 / 70 / 47 | 83 / 72 / 48 | merge: "Show more" as tall as a panel row |
-| `R_CONTROL` 1.2 and `R_BUTTON` 1.6 | 14 / 12 / 8 | one radius for both | ask on glass: the dropdowns and the dialog's buttons side by side |
+| `S_GUTTER` 1.5 into `S5` 1.6 | 17 / 15 / 10 | 19 / 16 / 11 | the header row and the chart's gutters |
+| `S_ROW_MIN` 0.55 into `S1` 0.6 | 6 / 6 / 4 | 7 / 6 / 4 | only the P4_5 moves, by 1 px |
+| `S_CHIP_SIDE` 2.2 into `S7` 2.4 | 25 / 22 / 15 | 28 / 24 / 16 | the span chips' sides |
+| `LINE_FINE` 0.25 into `LINE_MID` 0.3 | 3 / 3 / 2 | 3 / 3 / 2 | no change on these three; +1 px on WS_S3_5B and CYD_P4_4880 |
+| `H_MORE` 7.0 into `H_ROW` 7.2 | 81 / 70 / 47 | 83 / 72 / 48 | "Show more" as tall as a panel row |
+| `S_MEMBERS` 1.4 into `S5` 1.6 (or `S4` 1.2) | 16 / 14 / 9 | 19 / 16 / 11 (or 14 / 12 / 8) | **the owner's choice** - both pictured; built: `S5` |
+| `R_CONTROL` 1.2 and `R_BUTTON` 1.6 as one `R_CONTROL`, 1.6 (or 1.2) | 14 / 12 / 8 and 19 / 16 / 11 | 19 / 16 / 11 (or 14 / 12 / 8) | **the owner's choice** - both pictured; built: 1.6, the corners the owner set on glass for the dialog's buttons and the squared selector (K27) |

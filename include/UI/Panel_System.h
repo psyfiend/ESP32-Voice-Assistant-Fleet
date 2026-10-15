@@ -176,7 +176,7 @@ private:
     // Four button rows (issue #50). Splitting them is not decoration: eight
     // flex-grown buttons on one row are each a finger-width too narrow on
     // CYD_S3_3248, and the panel is now narrower on every board but that one.
-    lv_obj_t* _ui_actions; // row 1 - Log / Tokens / Cards
+    lv_obj_t* _ui_actions; // row 1 - Log / Tokens / Cards / About
     lv_obj_t* _ui_grid;    // row 2 - Col -/+, Row -/+
     lv_obj_t* _ui_row3;    // row 3 - Deck / Compact / Theme
     lv_obj_t* _ui_row4;    // row 4 - header mode / Fill / Area / Label

@@ -15,13 +15,7 @@ void propRow(lv_obj_t *list, const char *what, const char *value) { Kit::factRow
 void buildProps() {
     const Entity *e = inMember() ? s.ent[0] : s.native ? s.native : (s.nEnt == 1 ? s.ent[0] : nullptr);
     const UIShape &k = UI::shape();
-    lv_obj_t *list = plain(s.stage);
-    lv_obj_set_size(list, lv_pct(100), lv_pct(100));
-    lv_obj_set_style_pad_hor(list, mm(k.S10), 0);
-    lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
-    UI::tameScroll(list);
-    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(list, mm(k.S5), 0);
+    lv_obj_t *list = Kit::factList(s.stage);
     char buf[96];
     if (!e) {
         // A card standing for several entities made here: each one's id.
@@ -56,6 +50,8 @@ void buildProps() {
         propRow(list, "Card group", CardGroups::ofCard(*c, g) ? g.name : "None");
         propRow(list, "Card ID", c->hasId() ? c->id() : "");
     }
+    // The values in one column, after the longest words (#97).
+    Kit::factColumns(list);
     // ALL OF IT IN SIGHT where it can be (owner, round 6: the P4_5 cut "Card
     // id" in half): the gaps between the rows close up, as far as a third of
     // their size; past that the list scrolls, as before.
@@ -65,7 +61,7 @@ void buildProps() {
         int32_t used = 0;
         for (uint32_t i = 0; i < cnt; i++) used += lv_obj_get_height(lv_obj_get_child(list, (int32_t)i));
         const int32_t fit = (lv_obj_get_content_height(list) - used) / (int32_t)(cnt - 1);
-        if (fit < mm(k.S5)) lv_obj_set_style_pad_row(list, LV_MAX(fit, mm(k.S_ROW_MIN)), 0);
+        if (fit < mm(k.S5)) lv_obj_set_style_pad_row(list, LV_MAX(fit, mm(k.S1)), 0);
     }
 }
 

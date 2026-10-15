@@ -31,10 +31,10 @@ static void text(KitStyle s, const lv_font_t *f, uint32_t col) {
 static void fillButton(KitStyle face, KitStyle pressed, KitStyle ink, uint32_t bg, uint32_t edge, uint32_t ink_) {
     const UIShape &k = UI::shape();
     lv_style_t *f = st(face);
-    lv_style_set_radius      (f, UI::mm(k.R_BUTTON));
+    lv_style_set_radius      (f, UI::mm(k.R_CONTROL));
     lv_style_set_bg_opa      (f, LV_OPA_COVER);
     lv_style_set_bg_color    (f, UI::c(bg));
-    lv_style_set_border_width(f, LV_MAX(1, UI::mm(k.LINE_FINE)));
+    lv_style_set_border_width(f, LV_MAX(1, UI::mm(k.LINE_MID)));
     lv_style_set_border_color(f, UI::c(edge));
     lv_style_set_bg_color    (st(pressed), UI::c(UI::mix(bg, UI::pal().TEXT, 20)));
     text(ink, UI::type().NAME, ink_);
@@ -152,7 +152,7 @@ static void fill() {
     lv_style_set_bg_color    (st(S::KS_CHIP_UNLIT),   UI::c(p.SURFACE));
     lv_style_set_border_width(st(S::KS_CHIP_UNLIT),   0);
     lv_style_set_bg_color    (st(S::KS_CHIP_LIT),     UI::c(UI::mix(p.SURFACE, p.ACCENT, 25)));
-    lv_style_set_border_width(st(S::KS_CHIP_LIT),     LV_MAX(1, UI::mm(k.LINE_FINE)));
+    lv_style_set_border_width(st(S::KS_CHIP_LIT),     LV_MAX(1, UI::mm(k.LINE_MID)));
     lv_style_set_bg_color    (st(S::KS_CHIP_PRESSED), UI::c(UI::mix(p.SURFACE, p.TEXT, 15)));
 
     // --- List items ---

@@ -117,7 +117,9 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int tree = 0;     // 1: the open window's objects; 2 (tree=page): the whole screen
                 int sparks = -1;  // the interference from the next window: 0 now and then, 1 once, 2 off
                 int about = -1;   // 2.12 P4: the About sheet, 1 open, 0 close
+                int drawer = -1;  // #97: the system panel, 1 open, 0 close (GUIManager's hook)
                 bool close = false, power = false, more = false, hist = false, mem = false; };
+bool (*s_drawerHook)(bool open) = nullptr;
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
 size_t s_dreqLen = 0;
@@ -175,6 +177,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "mem", v, sizeof(v)) == ESP_OK) a.mem = true;
         if (httpd_query_key_value(q, "sparks", v, sizeof(v)) == ESP_OK) a.sparks = atoi(v);
         if (httpd_query_key_value(q, "about", v, sizeof(v)) == ESP_OK) a.about = atoi(v);
+        if (httpd_query_key_value(q, "drawer", v, sizeof(v)) == ESP_OK) a.drawer = atoi(v);
         // rows=N: test rows for SETTINGS, from the next window built (a byte
         // the LVGL thread reads; nothing else to hand over).
         if (httpd_query_key_value(q, "rows", v, sizeof(v)) == ESP_OK) {
@@ -242,6 +245,14 @@ void CardPopup::debugService(lv_timer_t *t) {
         if (a.about == 0)          { AboutSheet::close(); dbgOut("about: closing\n"); }
         else if (AboutSheet::open()) dbgOut("about: open\n");
         else                         dbgOut("a sheet is already showing; close it first\n");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    // #97: the system panel, for the harness to see its About button.
+    if (a.drawer >= 0) {
+        if (!s_drawerHook) dbgOut("no drawer hook (GUIManager gives it)\n");
+        else if (s_drawerHook(a.drawer != 0)) dbgOut("drawer: already %s\n", a.drawer ? "open" : "closed");
+        else dbgOut("drawer: %s\n", a.drawer ? "opening" : "closing");
         s_dreq.store(DREQ_DONE);
         return;
     }
@@ -598,4 +609,6 @@ void CardPopup::beginDebug(HttpServer &http) {
     http.addRoute("/popup", HTTP_GET, handlePopup);
     lv_timer_create(debugService, 20, nullptr);
 }
+
+void CardPopup::setDrawerHook(bool (*hook)(bool open)) { s_drawerHook = hook; }
 #endif

@@ -42,6 +42,7 @@ void confirmRemove() {
     spec.nButtons = 2;
     spec.width    = LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(UI::shape().W_DIALOG_MAX));
     spec.outside  = confirmCancelCb;   // a tap that misses the box: Cancel
+    spec.countdown = true;             // it closes with the window (closing hook): it says so (#23)
     s_confirm = Kit::dialog(spec);
 }
 

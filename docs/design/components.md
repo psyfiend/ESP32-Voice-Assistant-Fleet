@@ -63,7 +63,7 @@ colour worked out at the call; `Kit::label(parent, role)` takes a shared look in
 ![The Remove dialog's two buttons](components/dialog.png)
 
 A plain object with words, its look by role: **CANCEL** (the surface, a faint edge) and
-**DESTRUCTIVE** (`ST_BAD`, the words in the surface colour). Radius `R_BUTTON`, edge `LINE_FINE`,
+**DESTRUCTIVE** (`ST_BAD`, the words in the surface colour). Radius `R_CONTROL`, edge `LINE_MID`,
 pressed: 20% of `TEXT` mixed in. The words are the role's ink (`NAME`).
 
 The brief listed PRIMARY and QUIET too. No button in the house is either today - the row button is
@@ -76,16 +76,20 @@ A question over everything, on the top layer, the rest dimmed (`GROUND` at 60%):
 two centred paragraphs, and up to two buttons side by side; a tap outside the box calls the spec's
 `outside`. Returns the dim; deleting it closes the dialog. One role so far, **DESTRUCTIVE** (the
 box's edge in `ST_BAD`, `LINE_HEAVY`). The box: the scheme's card radius, `SURFACE_ALT`, padding
-`S9`, rows `S7`. "Remove card" (K66, K69) is its first client.
+`S9`, rows `S7`. The buttons are `W_DIALOG_BTN` wide where that fits; in a narrower row they share
+it, `S7` between and beside them (#96). `countdown` in the spec shows the countdown of the sheet
+under it, on the box's bottom edge, for a dialog that closes with that sheet (#23). "Remove card"
+(K66, K69) is its first client.
 
 ### Chip row - `Kit::chipRow(parent, words, n, lit, room, cb)`
 
 ![History's span chips](components/chips.png)
 
 Small round-ended buttons side by side, the chosen one lit: `SURFACE` unlit; lit, 25% of the
-accent mixed in with a `LINE_FINE` accent edge and the words in the accent. Height `H_CHIP`, radius
-`R_CHIP`, sides `S_CHIP_SIDE`, gaps `S4` - both shrinking to fit `room`, as far as half. Each
-chip's tap carries its index. History's spans are its client; #92's chart options can be.
+accent mixed in with a `LINE_MID` accent edge and the words in the accent. Height `H_CHIP`, radius
+`R_CHIP`, sides `S7`, gaps `S4` - both shrinking to fit `room`, as far as half. Each
+chip's tap carries its index. History's spans were its client until #92 gave them the compact
+selector; it stays in the kit for a choice that wants plain chips (#92's chart options can be).
 
 ### List item - `Kit::item(parent)`
 
@@ -133,6 +137,14 @@ the accent. An ACTION (the window's Power) sits on a ribbon of its own before th
 selector never lands on it. The spec gives the choices' icons, the chosen one, the action, whether
 it is quiet (a paused window), what to ask before anything moves (`blocked`) and what to call when
 the selector arrives (`onChosen`). `Kit::Selector` is its state, kept by the caller while it shows.
+Up to four choices (`SELECTOR_MAX`).
+
+**Compact** (`spec.compact`, #92): the same selector a span chip's height (`H_CHIP`), its choices
+**words** in the label face (`TAG`; the chosen one on the selector in `NAME`, a size up) and no
+action - one option chosen from a short list on a line of text. Each choice is as wide as the
+widest word and its sides (`S7`); `spec.room` makes the sides shrink to fit, as far as `S1`.
+History's span buttons are its first user (the chart's 24 / 12 / 6 / 1 h, activity's 24 h / 7 d),
+in place of the chip row; "Show span buttons" still turns them off.
 
 Its **four looks** (Black or Silver, Square or Round) are per scheme and saved (K36, K45):
 `Kit::selectorLook()`, `Kit::keepSelectorLook()`. Its face, and a lit icon button's, is a **face
@@ -157,10 +169,17 @@ loaded one. `KS_SWATCH`: a round colour swatch with a hairline edge (the colour 
 The pictures are WS_P4_5 in Midnight, cut from the harness's screenshots
 (`scripts/ui_golden.py crop`).
 
-### Fact row - `Kit::factRow(list, what, value)`
+### Facts - `Kit::factList(parent)`, `Kit::factRow(list, what, value)`, `Kit::factColumns(list)`
 
-What something is, dim, on the left, and its value on the right, wrapping if long ("-" when there
-is none): an entity's Properties, "About this board".
+A read-only list: an entity's Properties, "About this board". `factList()` makes the list (the
+whole of its parent, scrolling if it must, `S10` sides, `S5` between rows); `factRow()` adds what
+something is, dim, and its value beside it, wrapping if long ("-" when there is none); once the
+rows are in, `factColumns()` makes the words' column as wide as the longest words in that list (at
+most half of it) and **centres the two columns**: both left aligned, and the room the longest words
+and the longest value leave is shared equally - the same space from each wall and between the
+columns (owner, TEST_2.12 and this branch's first build; #97). Values too long for that get `S5`
+each way, and wrap in their column, their words at the first line. A fact list holds fact rows
+only.
 
 ---
 
@@ -171,7 +190,7 @@ is none): an entity's Properties, "About this board".
 **A window over the page, from a spec.** It is the card window's frame, made a component: placed
 in the middle of the screen (under the system header, over the panels' tabs, up to twice as wide
 as tall, at most `W_WINDOW_MAX`, clear of the sides - `Kit::sheetPlace()`), with a header row (a
-close or back button, a title in two parts, tabs on the right), a stage, the auto-close bar, sparks
+close or back button, a title in two parts, tabs on the right), a stage, the countdown bar, sparks
 now and then along its edge, and two folder panels under it - SETTINGS on the right and the view's
 own options on the left. It is modal: a tap outside closes it (the tap catcher, made once at
 `Kit::sheetBegin()`), and while a panel is open a tap in the window only folds the panel. It is
@@ -188,10 +207,20 @@ rows go. The left panel is shown per view with `Kit::sheetSide(S, kind, title, r
 (`struct Popup : Kit::Sheet`), so the window's code reads `s.win`, `s.stage`, `s.right` as before.
 One sheet shows at a time (`Kit::sheetShowing()`).
 
+**The countdown bar** (`Kit::countdownBar(box, boxW)`, `Kit::countdownSet(bar, sheet)`; #97,
+#23): how long until the sheet closes itself (`Kit::sheetLeftMs()`). A line
+`H_BAR` thin - 2 px at 294 and 255 PPI, 1 px at 170 - in the accent (`KS_SHEET_BAR`), on the box's
+bottom edge inside its border and between its rounded corners, shrinking toward its middle. The
+window has one; the Remove dialog, which closes with the window, shows the same over it.
+**The timeout and the bar are system settings** (K79), read as each sheet opens into
+`Sheet::closeMs`: 60 s untouched (D6) unless set to 30, 10 or never; with never, or the bar off,
+there is no bar (`Sheet::autoBar` is null) and the dialog shows none either. Set from a PC
+(`/settings?window_close=`, `window_bar=`) until the settings pages (4.1, #23).
+
 | Client | What it adds to the frame |
 |---|---|
 | The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity |
-| "About this board" (`UI/AboutSheet`; debug builds today, `GET /popup?about=1`; to become a button on the system panel's Log / Tokens / Cards row in every build, K74, #97) | one view of fact rows - the board, its screen and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second; no tabs, no panels |
+| "About this board" (`UI/AboutSheet`; every build, from the About button on the system panel's Log / Tokens / Cards / About row, K74, #97; debug builds also `GET /popup?about=1`) | one view of fact rows - the board, its screen and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second; no tabs, no panels |
 
 The second client is ~130 lines and owns no frame code: that is the point of it. Where it belongs
 in the product (the system panel?) is the owner's call; until then it is behind `DEBUG_POPUP`.

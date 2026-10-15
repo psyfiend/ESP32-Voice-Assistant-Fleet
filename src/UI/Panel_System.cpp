@@ -1,4 +1,5 @@
 #include "UI/Panel_System.h"
+#include "UI/AboutSheet.h"
 #include "UI/ReferencePage.h"
 #include "UI/UITokens.h"
 
@@ -332,77 +333,44 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     lv_obj_clear_flag               (_ui_actions, LV_OBJ_FLAG_SCROLLABLE);
     UI::tameScroll                  (_ui_actions);
 
-    // ROW 1 is Log / Tokens / Cards, per #50. "Dump Config" has LEFT this
-    // panel - the Log page carries its own Dump button, which re-runs the
-    // report and redraws it in place, so the copy here only ever ran the
-    // report at a screen nobody was looking at.
+    // ROW 1 is Log / Tokens / Cards / About, per #50 and #97. "Dump Config"
+    // has LEFT this panel - the Log page carries its own Dump button, which
+    // re-runs the report and redraws it in place, so the copy here only ever
+    // ran the report at a screen nobody was looking at. The same knob buttons
+    // as the rows below (they were three copies of knobButton() written out).
     //
-    // Button: Design Tokens - opens the 2.2 reference page as its own screen.
-    // Lives here rather than behind a build flag so the schemes can be flipped
-    // and compared without reflashing, and so the page survives into the Phase
-    // 4 settings surface instead of being throwaway scaffolding.
-    lv_obj_t* btnRef = lv_button_create(_ui_actions);
-    lv_obj_set_height               (btnRef, UIToolkit::sc(32));
-    lv_obj_set_width                (btnRef, LV_SIZE_CONTENT);
-    lv_obj_set_flex_grow            (btnRef, 1);
-    lv_obj_add_event_cb             (btnRef, [](lv_event_t *e) {
-                                        Panel_System *self = (Panel_System *)lv_event_get_user_data(e);
-                                        if (self) self->requestTokens();
-                                     }, LV_EVENT_CLICKED, this);
-    lv_obj_add_style                (btnRef, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
-    lv_obj_add_style                (btnRef, UI::paint(UIPaint::PAINT_LIFT_SM), 0);
+    // Log - the System Doctor's output, on its own page now.
+    knobButton(_ui_actions, this, "Log", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestLog();
+    });
 
-    lv_obj_t* lblRef = lv_label_create(btnRef);
-    lv_label_set_text               (lblRef, "Tokens");
-    lv_obj_center                   (lblRef);
-    lv_obj_set_style_text_font      (lblRef, UIToolkit::Font_Button, 0);
-    lv_obj_add_style                (lblRef, UI::paint(UIPaint::PAINT_TEXT), 0);
+    // Tokens - opens the 2.2 reference page as its own screen. Lives here
+    // rather than behind a build flag so the schemes can be flipped and
+    // compared without reflashing, and so the page survives into the Phase 4
+    // settings surface instead of being throwaway scaffolding.
+    knobButton(_ui_actions, this, "Tokens", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestTokens();
+    });
 
-    // Button: Log - the System Doctor's output, on its own page now.
-    lv_obj_t* btnLog = lv_button_create(_ui_actions);
-    lv_obj_set_height               (btnLog, UIToolkit::sc(32));
-    lv_obj_set_width                (btnLog, LV_SIZE_CONTENT);
-    lv_obj_set_flex_grow            (btnLog, 1);
-    lv_obj_add_event_cb             (btnLog, [](lv_event_t *e) {
-                                        Panel_System *self = (Panel_System *)lv_event_get_user_data(e);
-                                        if (self) self->requestLog();
-                                     }, LV_EVENT_CLICKED, this);
-    lv_obj_add_style                (btnLog, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
-    lv_obj_add_style                (btnLog, UI::paint(UIPaint::PAINT_LIFT_SM), 0);
-    lv_obj_t* lblLog = lv_label_create(btnLog);
-    lv_label_set_text               (lblLog, "Log");
-    lv_obj_center                   (lblLog);
-    lv_obj_set_style_text_font      (lblLog, UIToolkit::Font_Button, 0);
-    lv_obj_add_style                (lblLog, UI::paint(UIPaint::PAINT_TEXT), 0);
-
-    // Button: Cards - opens the 2.4 card demo as its own screen.
-    //
-    // Same shape as Tokens above and for the same reason: the dashboard
+    // Cards - opens the 2.4 card demo as its own screen. The dashboard
     // underneath stays untouched, so a card layout can be judged without
-    // disturbing anything that already works. Unlike Tokens it goes through a
-    // registered callback, because the page it opens needs the entity registry
-    // and the card binder and this panel must not know about either.
-    lv_obj_t* btnCards = lv_button_create(_ui_actions);
-    lv_obj_set_height               (btnCards, UIToolkit::sc(32));
-    lv_obj_set_width                (btnCards, LV_SIZE_CONTENT);
-    lv_obj_set_flex_grow            (btnCards, 1);
-    lv_obj_add_event_cb             (btnCards, [](lv_event_t *e) {
-                                        Panel_System *self = (Panel_System *)lv_event_get_user_data(e);
-                                        if (self) self->requestCards();
-                                     }, LV_EVENT_CLICKED, this);
-    lv_obj_add_style                (btnCards, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
-    lv_obj_add_style                (btnCards, UI::paint(UIPaint::PAINT_LIFT_SM), 0);
+    // disturbing anything that already works. Through a registered callback,
+    // because the page it opens needs the entity registry and the card binder
+    // and this panel must not know about either.
+    knobButton(_ui_actions, this, "Cards", [](lv_event_t *e) {
+        Panel_System *p = (Panel_System *)lv_event_get_user_data(e);
+        if (p) p->requestCards();
+    });
 
-    lv_obj_t* lblCards = lv_label_create(btnCards);
-    lv_label_set_text               (lblCards, "Cards");
-    lv_obj_center                   (lblCards);
-    lv_obj_set_style_text_font      (lblCards, UIToolkit::Font_Button, 0);
-    lv_obj_add_style                (lblCards, UI::paint(UIPaint::PAINT_TEXT), 0);
-
-    // Source order is Tokens, Log, Cards; #50 asks for Log first. Reordered by
-    // index rather than by moving ninety lines of button construction around,
-    // which is the same call GUIManager uses for the screen's z-order.
-    lv_obj_move_to_index            (btnLog, 0);
+    // About - "About this board", a sheet over everything (K74, #97). It
+    // needs nothing this panel does not have, so it is opened directly; the
+    // drawer stays as it was underneath and is there again when it closes.
+    knobButton(_ui_actions, this, "About", [](lv_event_t *e) {
+        (void)e;
+        AboutSheet::open();
+    });
 
     // -- ROWS 2-4: the knobs ----------------------------------------------
     //

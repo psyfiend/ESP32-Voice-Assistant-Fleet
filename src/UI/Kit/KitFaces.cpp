@@ -79,7 +79,7 @@ uint8_t selectorLookNow() {
 
 FaceKind metalKind() { return (selectorLookNow() & 2) ? FaceKind::FACE_SILVER : FaceKind::FACE_BLACK; }
 
-int32_t selectorRadius() { return (selectorLookNow() & 1) ? LV_RADIUS_CIRCLE : UI::mm(UI::shape().R_BUTTON); }
+int32_t selectorRadius() { return (selectorLookNow() & 1) ? LV_RADIUS_CIRCLE : UI::mm(UI::shape().R_CONTROL); }
 
 // From the scheme, never written down (tokens.md). The ribbon: lighter than
 // the window on the dark schemes, darker on Linen. Icons in the text colour;

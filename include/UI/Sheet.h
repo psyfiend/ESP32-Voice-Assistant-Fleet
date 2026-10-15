@@ -21,7 +21,8 @@
 namespace Kit {
 
 constexpr uint8_t  SHEET_TABS_MAX     = 2;
-constexpr uint32_t SHEET_AUTOCLOSE_MS = 60000;   // D6: it closes after 60 s untouched
+constexpr uint32_t SHEET_AUTOCLOSE_MS = 60000;   // D6: it closes after 60 s untouched - unless the
+                                                 // system setting window.close says otherwise (T6)
 constexpr uint32_t SHEET_TICK_MS      = 250;
 
 // A panel: below the screen, its tab peeking up, or open.
@@ -83,6 +84,7 @@ struct Sheet {
     lv_obj_t  *stage = nullptr, *autoBar = nullptr;
     lv_timer_t *timer = nullptr;
     uint32_t   lastTouchMs = 0;
+    uint32_t   closeMs = SHEET_AUTOCLOSE_MS;   // untouched this long, it closes (0: never) - read at open
     lv_point_t pressStart = {0, 0};
     bool       closeQueued = false;
     // The panels: SETTINGS on the right, the view's own on the left; the strip
@@ -99,6 +101,16 @@ void   sheetClose(Sheet &S);                 // from the next timer pass, never 
 Sheet *sheetShowing();                       // the open sheet, or null
 void   sheetLayoutTitle(Sheet &S);           // after the title's words change
 void   sheetTabLook(lv_obj_t *tab, bool shown, bool lit);   // lit: the tab of the view showing
+uint32_t sheetLeftMs(const Sheet &S);        // until it closes itself (0: closing; UINT32_MAX: never)
+
+// --- The countdown bar (#97, #23) ----------------------------------------------------
+// How long until the open sheet closes itself: a thin bar (H_BAR) on the bottom
+// edge of `box` - inside its border, between its rounded corners - shrinking
+// toward its middle. The sheet's window has one (S.autoBar; null when the system
+// settings hide it, or the window never closes itself - T6); a dialog over the
+// sheet shows the same. `boxW`: the box's width as set, before LVGL has laid it out.
+lv_obj_t *countdownBar(lv_obj_t *box, int32_t boxW);
+void      countdownSet(lv_obj_t *bar, const Sheet &S);   // as long as S has left to wait
 
 // --- The panels (KitSheetPanels.cpp) -------------------------------------------------
 bool   sheetPanelOpen(const Sheet &S);       // either open: the window is out of reach

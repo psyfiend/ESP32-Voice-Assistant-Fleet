@@ -72,7 +72,7 @@ not mount (the store then lives in RAM and says so in `?stats=1`). The design: `
 
 | Address | Reply | Effect |
 |---|---|---|
-| `/settings` | the whole settings document as JSON (`application/json`) - schemes, entities, cards, groups, added cards, imports | Reads |
+| `/settings` | the whole settings document as JSON (`application/json`) - schemes, entities, cards, groups, added cards, imports, system | Reads |
 | `/settings?stats=1` | text: the file and whether it is mounted or read-only, saves / failures / a change pending, the last save's time, duration and size, the boot note, the files in `/cfg`, **the last ten changes with their time and task** (`loopTask` = the card window, `httpd` = a browser), and any saved entries nobody claims | Reads |
 
 ### Setting (each is **Saved**)
@@ -94,6 +94,8 @@ away and back. A card's id is shown in its window: SETTINGS > Entity properties 
 | `?group=<id>&name=<Name>` | rename a group (every card in it; an HA area keeps its link) | empty: its own name again |
 | `?group=<id>&delete=1` | delete a group | its cards show their dashboard area again |
 | `?prune=cards` / `?prune=entities` | remove saved entries no card or entity claims (K35) | right after boot a group's members are not known yet, so a paused member can look unclaimed - prune later |
+| `?window_close=60\|30\|10\|off` | how long a window (the card window, About) waits untouched before it closes itself (K79); `off`: never, and no countdown bar | anything else is refused; `60` is the default and is stored as nothing. **From the next window** |
+| `?window_bar=on\|off` | the countdown bar on a window's bottom edge, and on the Remove dialog over it | `on` is the default, stored as nothing. May go with `window_close` in one address |
 
 The values a choice takes (`label`, `tap`) are the names in `CardTypes.h`'s name tables; the
 handler does not check them, and a name the firmware does not know reads as "not set". The whole
@@ -105,6 +107,8 @@ curl "http://fleet-ws-p4-5/settings?stats=1"
 curl "http://fleet-ws-p4-5/settings?card=office_overhead_261008_0310&name=Ceiling"      # Saved
 curl "http://fleet-ws-p4-5/settings?card=office_overhead_261008_0310&name="             # Saved: removes it
 curl "http://fleet-ws-p4-5/settings?group=new&name=Climate"                             # Saved
+curl "http://fleet-ws-p4-5/settings?window_close=30&window_bar=off"                     # Saved: next window
+curl "http://fleet-ws-p4-5/settings?window_close=60&window_bar=on"                      # Saved: the defaults again
 ```
 
 ---
@@ -182,19 +186,17 @@ flag of its own). `src/PanelDebug.cpp`, `PanelDebug.h` (2.10c round 9, 2.10d).
 | `/panel` | the panel chip and driver; **DSI underruns since boot** (the bridge's feed from PSRAM running dry - a flash on the glass) and the last few times they happened; help lines | Reads. It never reads the panel's registers: a DSI read while the panel streams stops the picture (2.10c) |
 | `/panel?resend=1` | sends the BSP's panel init sequence again, without a reset, and says how many commands went | **Changes the panel controller's registers** back to the BSP's values; the picture may blink. For a washed-out picture (the 4B, twice) |
 | `/panel?flash=N&nvs=1` | N (up to 50) NVS writes of 512 B into a scratch namespace `fleet_test`, 150 ms apart, timing each and counting underruns around it; the namespace is erased afterwards | Writes and erases its own scratch NVS only |
-| `/panel?flash=N` (`&kb=K`, 4-256) | N erase-and-write cycles on the **`spiffs` data partition** | **DESTRUCTIVE - do not use** (below) |
+| `/panel?flash=N` (no `nvs=1`) | **refused**, with the reason: only the NVS mode is kept (#98) | Nothing |
 
-> **WARNING - `/panel?flash=N` without `nvs=1` erases the start of the partition that holds the
-> settings file.** The test erases and writes sectors at the beginning of the `spiffs` partition
-> (offsets 0 to 8 x K KB). Its comment says the partition is "unused until 2.10d's settings
-> file" - and since 2.10d it is exactly where LittleFS keeps `/cfg/settings.json`. LittleFS keeps
-> its superblock at the start of the partition, and the board mounts with "format if the mount
-> fails", so after this test **the next boot is very likely to format the partition and lose
-> every saved setting**: names, groups, added cards, paused entities, selector looks. 2.10d's
-> test sheet ran `flash=20` and `flash=8&kb=256` on the P4_5 (`archive/TEST_2.10d.md`, F2-F3): if
-> that board lost its settings afterwards, this is why. Not changed in 2.12 (it changes no
-> behaviour); a fix is the owner's to choose - the NVS mode alone, or a test region LittleFS does
-> not use (#98).
+> **The erase mode is gone (#98, the owner's choice of fix, 2026-10-14).** `/panel?flash=N` without
+> `nvs=1` used to erase and write sectors at the start of the `spiffs` partition - since 2.10d the
+> LittleFS partition that holds `/cfg/settings.json`. Erasing its first blocks destroys the file
+> system's superblock, and the board mounts with "format if the mount fails", so the next boot
+> formatted the partition and lost every saved setting. The test had already answered its question
+> (DECISIONS A14), so it was removed; a request for it now answers with a refusal and changes
+> nothing. 2.10d's test sheet ran `flash=20` and `flash=8&kb=256` on the P4_5
+> (`archive/TEST_2.10d.md`, F2-F3): if that board lost its settings afterwards, this was why. Builds
+> before `feat/ui-followups` still have it: on them, never run it without `&nvs=1`.
 
 ```
 curl "http://fleet-ws-p4-4b/panel"
@@ -209,7 +211,7 @@ curl "http://fleet-ws-p4-5/panel?flash=20&nvs=1"     # scratch NVS only
 **`-D DEBUG_POPUP` only** - the owner's local lines on WS_P4_5, WS_P4_4B and CYD_P4_1060, never
 committed. `src/Cards/Popup/PopupDebug.cpp`. What `scripts/ui_golden.py` drives. **One action per
 request**: when a query has several keys, the first in this order acts and the rest are ignored -
-`rows`, `close`, `about`, `tree`, `mem`/`sparks`, `addcard`/`removecard`, `pause`/`member`,
+`rows`, `close`, `about`, `drawer`, `tree`, `mem`/`sparks`, `addcard`/`removecard`, `pause`/`member`,
 `scheme`, `show`, `look`, `scene`, `power`, `view`, `set`, `ctl`, `deck`, the History keys
 (`span`, `more`, `row`, `dur`, `chips`, then `x`, `hist`), `clabel`, `groups`, `tap`, then `card`.
 The reply is text. `503 "Busy"` while another `/popup` runs; `503 "did not pick it up within 3 s"`
@@ -245,7 +247,8 @@ order.
 | `/popup?x=N` | a finger on the chart, N px from its left edge (the scrub line) |
 | `/popup?dur=0\|1` | activity's Show duration off/on (not kept) |
 | `/popup?chips=0\|1` | the span buttons off/on (not kept) |
-| `/popup?about=1` / `about=0` | opens / closes "About this board" (2.12 P4) - the board, screen, chip, firmware, uptime, memory, LVGL's pool, each second |
+| `/popup?about=1` / `about=0` | opens / closes "About this board" (2.12 P4) - the board, screen, chip, firmware, uptime, memory, LVGL's pool, each second. Every build also opens it from the system panel's About button (#97) |
+| `/popup?drawer=1` / `drawer=0` | a tap on the header's icon: the system panel opens / closes (#97, so the harness can see it); "already open/closed" when it was |
 | `/popup?removecard=3` | the Remove card dialog over any card's window, to look at; its Remove does nothing to a compiled card; `close=1` takes it down |
 
 ### Settings for the next windows (each **RAM**)

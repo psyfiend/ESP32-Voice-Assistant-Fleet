@@ -108,7 +108,7 @@ int8_t   selectorLook();
 void     keepSelectorLook(int8_t look);
 uint8_t  selectorLookNow();       // the look in force
 FaceKind metalKind();             // its metal
-int32_t  selectorRadius();        // its corners: round, or R_BUTTON
+int32_t  selectorRadius();        // its corners: round, or R_CONTROL
 
 struct SelectorColours { uint32_t ribbon, icon, chosen; };
 SelectorColours selectorColours();
@@ -125,25 +125,32 @@ void iconButtonLit(lv_obj_t *b, bool lit);
 // Choices on a ribbon and a metal selector that slides between them - dragged
 // or glided to a tapped choice, snapping to the nearest - with an ACTION button
 // (the window's Power) on a ribbon of its own before them.
-constexpr uint8_t SELECTOR_MAX = 3;
+//
+// COMPACT (#92): the same selector at a span chip's height (H_CHIP), its
+// choices WORDS in the label face, no action - one option chosen from a short
+// list on a line of text (History's spans). `room` (0: any) is the most width
+// it may take: the words' sides shrink to fit it, as far as S1.
+constexpr uint8_t SELECTOR_MAX = 4;   // the control deck's three, History's four spans
 
 struct SelectorSpec {
-    const char   *glyph[SELECTOR_MAX];   // the choices' icons
+    const char   *glyph[SELECTOR_MAX];   // the choices: icons, or words when compact
     uint8_t       n;
     uint8_t       chosen;
-    const char   *actionGlyph;
+    const char   *actionGlyph;           // null: no action (a compact one has none)
     lv_event_cb_t actionCb;              // CLICKED on the action, no user data
     bool          quiet;                 // greyed: every colour mixed toward the window
     bool        (*blocked)();            // asked before anything moves; true refuses
     void        (*onChosen)(uint8_t i);  // the selector has arrived on choice i
+    bool          compact;               // words, H_CHIP tall, no action (#92)
+    int32_t       room;                  // compact: the most width it may take (0: any)
 };
 
 // Its state, kept by the caller for as long as it shows (its objects point here).
 struct Selector {
     lv_obj_t *obj = nullptr, *sel = nullptr, *selIcon = nullptr, *action = nullptr;
-    lv_obj_t *item[SELECTOR_MAX] = {nullptr, nullptr, nullptr};
-    const char *glyph[SELECTOR_MAX] = {nullptr, nullptr, nullptr};
-    int32_t   x[SELECTOR_MAX] = {0, 0, 0};   // the choices' centres
+    lv_obj_t *item[SELECTOR_MAX] = {};
+    const char *glyph[SELECTOR_MAX] = {};
+    int32_t   x[SELECTOR_MAX] = {};      // the choices' centres
     uint8_t   n = 0;
     int32_t   selW = 0;
     uint8_t   shown = 0;                     // the choice whose icon the selector carries
@@ -154,7 +161,7 @@ struct Selector {
 };
 
 int32_t selectorW(uint8_t n);   // with n choices and the action
-int32_t selectorH();            // a touch target and its padding
+int32_t selectorH();            // a touch target and its padding (a compact one: H_CHIP)
 void    selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec);
 
 // --- Chips --------------------------------------------------------------------
@@ -166,10 +173,18 @@ lv_obj_t *chipRow(lv_obj_t *parent, const char *const *words, uint8_t n, uint8_t
                   lv_event_cb_t cb);
 
 // --- Facts --------------------------------------------------------------------------
-// A FACT ROW: what something is, dim, on the left, and its value on the right,
-// wrapping if long ("-" when there is none) - a read-only list such as an
-// entity's Properties or "About this board". Returns the value's label.
+// A FACT LIST: a read-only list such as an entity's Properties or "About this
+// board" - the whole of `parent`, scrolling if it must, a row per fact.
+// A FACT ROW: what something is, dim, and its value beside it, wrapping if
+// long ("-" when there is none). Both left aligned (#97). Returns the value's
+// label. A fact list holds fact rows only.
+// FACT COLUMNS, once the rows are in: the words' column as wide as the longest
+// words in the list (at most half of it), the values' as wide as the longest
+// value, the two CENTRED - the space left over shared equally between the
+// walls and the gap (S5 at least; a long value wraps in its column).
+lv_obj_t *factList(lv_obj_t *parent);
 lv_obj_t *factRow(lv_obj_t *list, const char *what, const char *value);
+void      factColumns(lv_obj_t *list);
 
 // --- List items -----------------------------------------------------------------
 // A tappable surface in a list (a member, an activity row, "Show more"): the
@@ -253,6 +268,7 @@ struct DialogSpec {
     uint8_t       nButtons;
     int32_t       width;        // px; the height follows the words
     lv_event_cb_t outside;
+    bool          countdown;    // it closes with the sheet under it: show that sheet's countdown (#23)
 };
 
 // Returns the dim, which holds everything: deleting it closes the dialog.

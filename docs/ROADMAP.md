@@ -56,7 +56,7 @@ levels arrive with 2.10c), **#47** discovery payload size, **#48** reason 36.
 | 2.9 | Display stack: esp_lcd (**#67**) | six of nine boards, merged 2026-09-29; left: CYD_S3_8048, WS_S3_5B - `display/README.md` |
 | 2.10 | Card popup (**#65**) | **DONE 2026-10-12.** 2.10a `v0.2.8`; 2.10b `v0.2.9`; 2.10c `v0.2.10` (HA light levels, members of HA groups, scenes, the window redesigned - `design/card-sheet.md` §14-16). **2.10d + 2.10e `v0.2.11`** (merged together, K51): stable ids and saving (§17), History from HA - charts and activity (§18). Sheets in `archive/`. Left over, filed: #90, #91, #92 (K17 done, `v0.2.12`) |
 | 2.11 | Group cards (**#66**) | not started - with the page arranger (#78; its engines: `design/layout-engines.md`); must land before 3.1 |
-| 2.12 | UI foundation - the refactor | **DONE 2026-10-14, `v0.2.13`** - the card window rebuilt on a foundation (safety net, the split, `UIShape`, the component kit, the Sheet, `Layout::FlowEngine` with host tests, the structure check), nothing changed on screen. How it is built: `design/ui-architecture.md`; the record: `design/ui-foundation.md`. Follow-ups #96, #97 |
+| 2.12 | UI foundation - the refactor | **DONE 2026-10-14, `v0.2.13`** - the card window rebuilt on a foundation (safety net, the split, `UIShape`, the component kit, the Sheet, `Layout::FlowEngine` with host tests, the structure check), nothing changed on screen. How it is built: `design/ui-architecture.md`; the record: `design/ui-foundation.md`. Follow-ups #96, #97 and more: **DONE, `v0.2.15`** (`archive/TEST_UI_FOLLOWUPS.md`) |
 
 ## Phase 3 — Build sheet
 
@@ -73,7 +73,7 @@ device reads, and the backup format - not something a user edits.
 
 | # | Milestone | Status |
 |---|---|---|
-| 4.1 | Standard settings pages (**#23**) | not started; screen dimming pulled forward when it is needed daily; the settings that matter also as HA entities (FUTURE_IMPROVEMENTS, owner 2026-10-07); the card window's timeout (60 / 15 / 5 s / none) and its countdown bar, device-wide (owner 2026-10-12, K63) |
+| 4.1 | Standard settings pages (**#23**) | not started; screen dimming pulled forward when it is needed daily; the settings that matter also as HA entities (FUTURE_IMPROVEMENTS, owner 2026-10-07); the windows' timeout (60 / 30 / 10 s / off) and countdown bar, device-wide - already system settings, set from a PC until this page (K79); perhaps a "low / no eye candy" setting for a plainer look (owner, 2026-10-14) |
 | 4.2 | Live layout settings (**#24**) | not started |
 | 4.3 | Navbar (**#25**) | not started |
 | 4.4 | Context panels (**#26**) | not started - `design/context-panels.md` |
@@ -99,10 +99,10 @@ The numbers above are identity, not sequence. Agreed with the owner:
 1. ~~**2.10d + 2.10e, one merge**~~ - DONE, `v0.2.11`; ~~**K17**~~ (a group's member as a card of
    its own) - DONE, `v0.2.12`.
 2. ~~**2.12 UI foundation - the refactor**~~ - DONE, `v0.2.13`.
-3. **The UI follow-ups from 2.12's test** (owner, 2026-10-14), each its own branch and look on
-   glass: #96 the dialog's buttons, #97 the owner's asks and the token merges, #92 the selector as
-   History's span buttons, #99 a quieter glass (a mock first), #23 the dialog's countdown; #98 when
-   the owner picks its fix.
+3. ~~**The UI follow-ups from 2.12's test**~~ - DONE, `v0.2.15` (#96, #97, #23 and #92 in part, #98;
+   `archive/TEST_UI_FOLLOWUPS.md`); #93 `v0.2.14`. **Next (owner, 2026-10-14): #99** satin (K77),
+   then **2.8**; A17 (settings safe from a failed mount) on its own branch. #100 NINA's clock is
+   **tabled** - three clocks agreed (K81-K84, #100), prototype on `feat/100-nina-clock`.
 4. **The design interview §3 onward** (`design/interview-phase2-3.md`), then **2.8** header slots (#19).
 5. **2.11 group cards with the page arranger** (#66, #78; prototype: artifact "Layout Playground";
    engines: `design/layout-engines.md`). Its hero region is what #100 (NINA's clock) waits for.
@@ -116,7 +116,8 @@ ordered); #69 4B panel timing (WS_S3_4B locked up, waiting to be troubleshot); #
 
 - **Looks**: #73 type ladder, #80 tag styles, #82 per-panel colour, #83 custom icon packs, #85 colour
   borders and a custom scheme page, #79 page transitions, #99 a quieter glass finish.
-- **Side projects**: #100 NINA's multi-face clock as a hero card (after 2.11's hero region).
+- **Side projects**: #100 clocks - small, NINA medium and NINA full (K81), the full one in 2.11's hero
+  region; tabled 2026-10-14.
 - **Behaviour**: #74 clock (RTC fallback), #75 night mode, #76 HA alerts, #84 "no data yet", #71
   rotation.
 - **Layout**: #52 auto-sort, #53 auto-fill, #54 auto-adjust (all weighed against #78's arranger).
