@@ -170,7 +170,10 @@ merge. (Q1 above guessed at the P4_5's flash chip as the odd one out: the 4B and
 32 MB chip - owner, 2026-10-14 - so that lead is gone.)
 
 **Signed off by the owner, 2026-10-14** - `v0.2.15`, with `v0.2.14` (#93) merged in from `main`.
-The all-nine gate on the merged branch: below.
+The all-nine gate on the merged branch (`4af85d1`, `gate.ps1`, the committed `platformio.ini`):
+**all nine SUCCESS** in 13 min, flash 34-41 %, the owner's local lines restored. Structure check
+unchanged: 524 style calls outside the kit in 25 files, 44 colour literals in 4 files, no shape
+numbers, no LVGL in the core layers; `GUIManager.cpp` 1,548 lines, `Card.cpp` 1,462.
 
 ## Round 2 (2026-10-14, after your results)
 
