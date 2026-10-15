@@ -301,6 +301,10 @@ The owner's three signed-off token sets from the bench are the starting points f
 
 ## 8. One slot system, used in three places
 
+> **Superseded in part, 2026-10-15 (owner, 2.8's interview; D-14):** two places, not three - the
+> page header and cluster headers. A solo card's header keeps its formula (its tag on the left,
+> STALE on the right), no slots. `header-slots.md` §5.
+
 Noticed while answering the group-card question, and worth building once rather than three times.
 
 The page header (2.8) is specified as a **configurable slot list** — clock, WiFi and MQTT glyphs,

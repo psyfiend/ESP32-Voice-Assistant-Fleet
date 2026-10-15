@@ -80,6 +80,11 @@ How to use it:
 | D-8 | **A companion web app with a true preview sends the config to the device**; the build sheet becomes its output and backup format, not the user's interface. Presentation (group/room cards) is how the project stands apart | 2026-10-06 | #87 |
 | D-9 | Pages are rebuilt on arrival (one page's cards in memory at a time); swipes wrap around | 2026-09-24 | `docs/design/pages.md` |
 | D-10 | **Placement is a `Layout::Engine`** (2.12, `include/Layout/Layout.h`, pure C++): `CardPage` hands its cards over as items and lays out the places it gets back; today's flow rules are `FlowEngine`; 2.11's clusters, packing, weight map, hero region and orbital pages are further engines. **Pure modules are tested on the PC** in `host-tests/`, a PlatformIO project of its own, so the firmware's environments and the gate never need a host compiler | 2026-10-14 | owner (was U5); `layout-engines.md` |
+| D-11 | **The header is optional, so nothing critical lives only there**: a page or the user may hide it; the clock is a card first (a 2 x 1 top left on the grid, centred on a specialised page) (owner, 2.8 Q1) | 2026-10-15 | `design/header-slots.md` §1 |
+| D-12 | **The page header is four evenly spaced slots**: clock, the page (name and dots), status, climate / secondary; the device's name leaves the bar (owner, 2.8 Q2) | 2026-10-15 | `header-slots.md` §2 |
+| D-13 | **A tap on a slot slides down that slot's own panel from its place** - time and alarm; the page's settings and navigation; connectivity (today's system panel); climate, forecast, other sensors - with buttons that deep-link to settings (owner, 2.8 Q4) | 2026-10-15 | `header-slots.md` §3 |
+| D-14 | **Header shown / hidden is a page setting**, full-screen pages hidden by default (owner, 2.8 Q5). **A solo card's header keeps its formula; slots are for the page header and cluster headers** (area or group name; occupancy, temperature, light counts, open doors and windows from HA helpers) - `cards.md` §8's three consumers become two (owner, 2.8 Q6) | 2026-10-15 | `header-slots.md` §4-5 |
+| D-15 | **A slot with no live value shows dashes, never an old value**, with a way to show a retrieval error (owner, 2.8 Q7) | 2026-10-15 | `header-slots.md` §6 |
 
 ## Cards and the popup
 
