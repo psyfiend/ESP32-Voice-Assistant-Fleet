@@ -174,8 +174,8 @@ What a surface says about a thing you can tap, decided once for every component:
 
 | Finish | Means | Where |
 |---|---|---|
-| **Satin** | can be tapped, not chosen | Members' rows, scenes not loaded, the dialog's buttons (a role keeps its colour: Remove's red), Power while off |
-| **Glass** | chosen or active | the selector, a lit tab, a scene loaded, Power while on |
+| **Satin** | can be tapped, not chosen | Members' rows, scenes not loaded, the dialog's buttons (a role keeps its colour: Remove's red), Power while off, the header's buttons (close, back, the tabs) |
+| **Glass** | chosen or active | the selector, the tab showing, a scene loaded, Power while on |
 | **Flat** | information | fact rows, labels - no finish at all |
 
 `Kit::finish()` paints the face into the object (its first child, an image): **satin** - a light
@@ -183,7 +183,11 @@ at the top fading by the middle, a faint step, a shade growing below, a soft edg
 light scheme); **glass** - the selector's metal (`metalKind()`). Called again, it changes the
 finish (a scene loaded and no longer; Power on and off - `Kit::selectorActionLit()`). Pressed:
 satin darkens 30 %, glass lightens 20 %, and the object sinks 1 px (`KS_SINK`). Colour still carries
-state: a member's "On, 100%, 2710 K" is in `KS_LABEL_TAG_ACTIVE`, "Off" white, Paused dimmed.
+state: a member's "On, 100%, 2710 K" is in `KS_LABEL_TAG_ACTIVE`, "Off" white, Paused dimmed. A
+colour drawn on glass goes through `Kit::glassInk()`, which moves it away from the metal's tone
+(Linen's olive was lost on its silver). **The selector's glass shows the rail through it** (owner,
+#99): a band a fifth taller than the rail outside, the rail's colour a quarter darker, half faded
+into the metal, edge to edge behind the icon (`setFace(..., band)`).
 
 **Painted by hand and dithered to the 16-bit grid**, as the metal is: LVGL's own gradients band
 pink and green on these panels (LESSONS). **Satin is painted in 16 bits** - no alpha, its corners cut

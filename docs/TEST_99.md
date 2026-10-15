@@ -90,4 +90,39 @@ then the 4B before / after:
 
 ## Your results
 
-(empty)
+**Round 1 (owner, 2026-10-14):** T1-T5, T7 and T8 **PASS**. **T6**: on Linen, Power's icon was very
+hard to see - its olive "on" on the silver glass. Answers: Q1 the recommendation (activity rows
+satin after the S3 measurement), Q2 yes, Q3 keep, Q4 accept, **Q5 merge, measure the S3 later**, Q6
+refresh the pictures as they change. Two ideas - the header's buttons in satin, and the selector
+showing a magnified rail through its glass - and a bug: the activity log scrolled only from a row,
+never from a day's heading.
+
+## Round 2 (2026-10-15)
+
+| | What | Checked |
+|---|---|---|
+| T6 | **An ink that reads on glass** (`Kit::glassInk()`): Power's "on" colour pushed toward the scheme's far end until it stands apart from the metal - Linen's olive becomes a dark olive; Midnight's orange is left as it was | Linen and Midnight screenshots, below |
+| Idea 1 | **The header's buttons are satin** - close, back, Members, History, Scenes (they were soft dents); the tab showing stays glass | every window's header; History's below |
+| Idea 2 | **The rail through the lens**: the selector's glass shows the rail behind its icon - a fifth taller than the rail outside, in the rail's own colour taken a quarter darker and half faded into the metal, edge to edge. On the control deck and History's span selector | Midnight and Linen, below |
+| Bug | **A list scrolls from anywhere on it** - a day's heading, a gap, the note under Members: every scrolling list is now touchable itself (`UI::tameScroll()`), where only its rows were | needs your finger (T10) |
+
+The harness, all 48 states against `v0.2.15`: every window's header and the light windows changed as
+above; nothing moved, except Desk's own slider - the light was at 56% for this capture, 100% for
+the first.
+
+The header (before above, after below), the rail and Power (`v0.2.15`; Midnight now; Linen now,
+twice the size), and History's span selector (before / after):
+
+![The header](followups/99_header_p45.png)
+![The rail through the lens](followups/99_rail_p45.png)
+![History's spans](followups/99_spans_p45.png)
+
+| # | Do this | PASS if |
+|---|---|---|
+| T6 | Linen: a light's window, light on | Power's icon easy to see on its glass |
+| T9 | Any window: the buttons at the top | Satin discs; the tab of the view showing is glass; a press darkens and sinks |
+| T10 | History > a door's activity (North): swipe from a day's heading | The list scrolls; a tap on a row still opens it |
+| T11 | Slide the control deck's selector, and History's | The rail shows through the glass, quieter than the icon, and the selector still looks like glass |
+
+- **Q7. The rail's size and strength**: a fifth taller than the rail, half faded. Too strong on
+  Midnight, too faint on History's small selector? Two numbers, easy to change.

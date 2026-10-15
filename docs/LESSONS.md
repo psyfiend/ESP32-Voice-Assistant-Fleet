@@ -545,6 +545,11 @@ next piece of eye candy:
   parent, with `LV_OBJ_FLAG_IGNORE_LAYOUT`, reached into the parent's padding - and the Members rows,
   sized to their content, grew by that padding (68 px to 106). `LV_OBJ_FLAG_FLOATING` takes a child
   out of the content size as well.
+- **A touch goes to the topmost CLICKABLE object, so a bare scrolling list cannot be swiped from
+  its gaps (#99, 2026-10-15).** The activity log scrolled when the finger landed on a row (a
+  clickable item whose drag chains to the list) and not on a day's heading - a label, so the touch
+  fell through the list, which was not clickable either, to the window. `UI::tameScroll()` now makes
+  every scrolling list clickable.
 - **A flex column centres its children twice.** With `LV_FLEX_ALIGN_CENTER` on the cross axis, LVGL
   centres a "track" as wide as the widest child in the parent, then each child in the track. Two
   integer roundings: the 1060's control deck moved a pixel whenever a sibling (the slider's row)
