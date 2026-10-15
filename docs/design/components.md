@@ -207,12 +207,15 @@ rows go. The left panel is shown per view with `Kit::sheetSide(S, kind, title, r
 (`struct Popup : Kit::Sheet`), so the window's code reads `s.win`, `s.stage`, `s.right` as before.
 One sheet shows at a time (`Kit::sheetShowing()`).
 
-**The countdown bar** (`Kit::countdownBar(box, boxW)`, `Kit::countdownSet(bar, leftMs)`; #97,
-#23): how long until the sheet closes itself (60 s untouched, `Kit::sheetLeftMs()`). A line
+**The countdown bar** (`Kit::countdownBar(box, boxW)`, `Kit::countdownSet(bar, sheet)`; #97,
+#23): how long until the sheet closes itself (`Kit::sheetLeftMs()`). A line
 `H_BAR` thin - 2 px at 294 and 255 PPI, 1 px at 170 - in the accent (`KS_SHEET_BAR`), on the box's
 bottom edge inside its border and between its rounded corners, shrinking toward its middle. The
-window has one; the Remove dialog, which closes with the window, shows the same over it. Its on/off
-and the timeout's length are device settings for 4.1 (#23).
+window has one; the Remove dialog, which closes with the window, shows the same over it.
+**The timeout and the bar are system settings** (K79), read as each sheet opens into
+`Sheet::closeMs`: 60 s untouched (D6) unless set to 30, 10 or never; with never, or the bar off,
+there is no bar (`Sheet::autoBar` is null) and the dialog shows none either. Set from a PC
+(`/settings?window_close=`, `window_bar=`) until the settings pages (4.1, #23).
 
 | Client | What it adds to the frame |
 |---|---|

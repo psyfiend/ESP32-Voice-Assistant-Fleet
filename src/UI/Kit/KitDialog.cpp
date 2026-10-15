@@ -11,8 +11,7 @@ namespace Kit {
 // dialog that goes with the sheet under it shows that sheet's countdown bar,
 // kept in step by a timer of its own that goes with the bar.
 static void barTick(lv_timer_t *t) {
-    const Sheet *S = sheetShowing();
-    countdownSet((lv_obj_t *)lv_timer_get_user_data(t), S ? sheetLeftMs(*S) : 0);
+    if (const Sheet *S = sheetShowing()) countdownSet((lv_obj_t *)lv_timer_get_user_data(t), *S);
 }
 
 static void barGone(lv_event_t *e) {
@@ -67,9 +66,11 @@ lv_obj_t *dialog(const DialogSpec &spec) {
     for (uint8_t i = 0; i < n; i++)
         button(row, spec.buttons[i].role, spec.buttons[i].text, btnW, UI::minTouch(), spec.buttons[i].cb);
 
-    if (const Sheet *S = spec.countdown ? sheetShowing() : nullptr) {
+    // Only while the sheet shows its own (the system settings can hide it, T6).
+    const Sheet *S = spec.countdown ? sheetShowing() : nullptr;
+    if (S && S->autoBar) {
         lv_obj_t *bar = countdownBar(box, spec.width);
-        countdownSet(bar, sheetLeftMs(*S));
+        countdownSet(bar, *S);
         lv_timer_t *t = lv_timer_create(barTick, SHEET_TICK_MS, bar);
         lv_obj_add_event_cb(bar, barGone, LV_EVENT_DELETE, t);
     }

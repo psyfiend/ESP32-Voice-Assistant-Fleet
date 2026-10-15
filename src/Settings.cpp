@@ -366,6 +366,41 @@ esp_err_t handleSettings(httpd_req_t *req) {
         return httpd_resp_send(req, out, len);
     }
 
+    // THE WINDOWS' COUNTDOWN (owner, T6, 2026-10-14), from a PC until the system
+    // settings page: window_close=60|30|10|off (60, D6's, is the default and
+    // is stored as nothing) and window_bar=on|off, alone or together. In
+    // effect from the next window.
+    {
+        static const char *const CLOSE[] = { "60", "30", "10", "off" };
+        char cl[8] = "", bar[8] = "";
+        const bool hasClose = haveQ && httpd_query_key_value(q, "window_close", cl, sizeof(cl)) == ESP_OK;
+        const bool hasBar   = haveQ && httpd_query_key_value(q, "window_bar", bar, sizeof(bar)) == ESP_OK;
+        if (hasClose || hasBar) {
+            bool okClose = !hasClose;
+            for (const char *c : CLOSE) okClose = okClose || !strcmp(cl, c);
+            const bool okBar = !hasBar || !strcmp(bar, "on") || !strcmp(bar, "off");
+            char out[160];
+            int len;
+            if (!okClose || !okBar) {
+                len = snprintf(out, sizeof(out), "refused: window_close=60|30|10|off, window_bar=on|off\n");
+            } else {
+                if (hasClose) Settings::setSystem("window", "close", strcmp(cl, "60") ? cl : nullptr);
+                if (hasBar)   Settings::setSystem("window", "bar", strcmp(bar, "on") ? bar : nullptr);
+                Settings::save();
+                char c[8], b[8];
+                if (!Settings::system("window", "close", c, sizeof(c))) snprintf(c, sizeof(c), "60");
+                const bool barOff = Settings::system("window", "bar", b, sizeof(b)) && !strcmp(b, "off");
+                if (!strcmp(c, "off"))
+                    len = snprintf(out, sizeof(out), "windows: never close by themselves (no countdown bar) - from the next window\n");
+                else
+                    len = snprintf(out, sizeof(out), "windows: close after %s s untouched, countdown bar %s - from the next window\n",
+                                   c, barOff ? "off" : "on");
+            }
+            httpd_resp_set_type(req, "text/plain");
+            return httpd_resp_send(req, out, len);
+        }
+    }
+
     char id[CARD_ID_ARG], name[64];
     // The other card settings too, as SETTINGS' rows would set them - for
     // tests from a PC: label=, tap=, tap_scene= (the scene's HA id). The
@@ -499,6 +534,15 @@ bool scheme(const char *schemeName, const char *key, char *out, size_t cap) {
     if (!s_doc || !schemeName) return false;
     Lock l;
     copyOut((*s_doc)["schemes"][schemeName][key], out, cap, found);
+    return found;
+}
+
+bool system(const char *area, const char *key, char *out, size_t cap) {
+    bool found = false;
+    if (cap) out[0] = '\0';
+    if (!s_doc || !area || !*area) return false;
+    Lock l;
+    copyOut((*s_doc)["system"][area][key], out, cap, found);
     return found;
 }
 
@@ -647,6 +691,14 @@ bool setScheme(const char *schemeName, const char *key, const char *value) {
     if (!s_doc) return false;
     Lock l;
     const bool changed = setValue("schemes", schemeName, key, value, false, false, value == nullptr);
+    if (changed) s_dirty = true;
+    return changed;
+}
+
+bool setSystem(const char *area, const char *key, const char *value) {
+    if (!s_doc) return false;
+    Lock l;
+    const bool changed = setValue("system", area, key, value, false, false, value == nullptr);
     if (changed) s_dirty = true;
     return changed;
 }

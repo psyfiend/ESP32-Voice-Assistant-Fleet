@@ -13,7 +13,8 @@
 //   { "schema": 1,
 //     "schemes":  { "<scheme>": { "selector": "silver_round" } },
 //     "entities": { "<entity id>": { "paused": true } },
-//     "cards":    { "<card id>": { "scenes": "all", "active": "all" } } }
+//     "cards":    { "<card id>": { "scenes": "all", "active": "all" } },
+//     "system":   { "window": { "close": "30", "bar": "off" } } }
 //   A card added on the device (K17) is a card entry with "page", "after" and
 //   "entity" as well - see Cards/CardAdded.h.
 //
@@ -30,7 +31,8 @@
 //   - No credentials here, ever - they stay in NVS. The file is served as-is
 //     at GET /settings (?stats=1: its counters). Until the web UI, a card's
 //     custom name is set from a PC: /settings?card=<id>&name=<text> (an empty
-//     name removes it).
+//     name removes it); the windows' auto-close and countdown bar with
+//     /settings?window_close=60|30|10|off&window_bar=on|off.
 //
 // Writing: set*() changes RAM only. save() wakes the save task, which writes
 // the whole file to settings.tmp and renames it over settings.json (a power
@@ -83,10 +85,17 @@ uint8_t countCards(const char *key, const char *value);
 // back into the store. CardAdded's way to find the cards added on the device.
 void forEachCardWith(const char *key, void (*fn)(const char *cardId, const char *value, void *ctx), void *ctx);
 
+// SYSTEM SETTINGS, the device's own, by area (owner, T6, 2026-10-14): the first
+// is "window" - "close" (seconds, or "off"; 60 when unset, D6) and "bar"
+// ("off" hides the countdown bar). Set from a PC until the system settings
+// page; read as each window opens.
+bool system(const char *area, const char *key, char *out, size_t cap);
+
 // Writing, in RAM. nullptr = Reset (removes the key, and the card's or
 // scheme's object once empty). True when the document changed.
 bool setCard(const char *cardId, const char *key, const char *value);
 bool setScheme(const char *schemeName, const char *key, const char *value);
+bool setSystem(const char *area, const char *key, const char *value);
 bool setEntityFlag(const char *entityId, const char *key, bool value, bool dflt);
 
 // SAVED SETTINGS NOBODY CLAIMS (K35). A card's entry whose id is on no page,

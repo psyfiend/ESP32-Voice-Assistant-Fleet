@@ -72,7 +72,7 @@ not mount (the store then lives in RAM and says so in `?stats=1`). The design: `
 
 | Address | Reply | Effect |
 |---|---|---|
-| `/settings` | the whole settings document as JSON (`application/json`) - schemes, entities, cards, groups, added cards, imports | Reads |
+| `/settings` | the whole settings document as JSON (`application/json`) - schemes, entities, cards, groups, added cards, imports, system | Reads |
 | `/settings?stats=1` | text: the file and whether it is mounted or read-only, saves / failures / a change pending, the last save's time, duration and size, the boot note, the files in `/cfg`, **the last ten changes with their time and task** (`loopTask` = the card window, `httpd` = a browser), and any saved entries nobody claims | Reads |
 
 ### Setting (each is **Saved**)
@@ -94,6 +94,8 @@ away and back. A card's id is shown in its window: SETTINGS > Entity properties 
 | `?group=<id>&name=<Name>` | rename a group (every card in it; an HA area keeps its link) | empty: its own name again |
 | `?group=<id>&delete=1` | delete a group | its cards show their dashboard area again |
 | `?prune=cards` / `?prune=entities` | remove saved entries no card or entity claims (K35) | right after boot a group's members are not known yet, so a paused member can look unclaimed - prune later |
+| `?window_close=60\|30\|10\|off` | how long a window (the card window, About) waits untouched before it closes itself (K79); `off`: never, and no countdown bar | anything else is refused; `60` is the default and is stored as nothing. **From the next window** |
+| `?window_bar=on\|off` | the countdown bar on a window's bottom edge, and on the Remove dialog over it | `on` is the default, stored as nothing. May go with `window_close` in one address |
 
 The values a choice takes (`label`, `tap`) are the names in `CardTypes.h`'s name tables; the
 handler does not check them, and a name the firmware does not know reads as "not set". The whole
@@ -105,6 +107,8 @@ curl "http://fleet-ws-p4-5/settings?stats=1"
 curl "http://fleet-ws-p4-5/settings?card=office_overhead_261008_0310&name=Ceiling"      # Saved
 curl "http://fleet-ws-p4-5/settings?card=office_overhead_261008_0310&name="             # Saved: removes it
 curl "http://fleet-ws-p4-5/settings?group=new&name=Climate"                             # Saved
+curl "http://fleet-ws-p4-5/settings?window_close=30&window_bar=off"                     # Saved: next window
+curl "http://fleet-ws-p4-5/settings?window_close=60&window_bar=on"                      # Saved: the defaults again
 ```
 
 ---

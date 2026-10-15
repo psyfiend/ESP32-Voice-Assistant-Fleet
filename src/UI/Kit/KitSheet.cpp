@@ -9,6 +9,7 @@
 // learned is in docs/LESSONS.md, "Effects that cover the screen". Nothing is drawn behind it.
 #include "KitSheetInternal.h"
 #include "UI/UIToolkit.h"
+#include "Settings.h"
 #include "src/core/lv_obj_event_private.h"   // lv_hit_test_info_t: the tap catcher's hit test
 #include "src/core/lv_obj_draw_private.h"    // lv_obj_get_ext_draw_size: the window's shadow
 #include <Arduino.h>
@@ -131,6 +132,23 @@ void sheetPlace(Sheet &S) {
     // 1.2 mm, down from the mock's 2.2: the owner wanted the X "closer to the
     // corner" (H1). Still clear of the 2.4 mm corner radius.
     S.pad       = UI::mm(k.S4);
+}
+
+// HOW LONG A WINDOW WAITS, AND WHETHER IT SAYS SO (owner, T6, 2026-10-14):
+// system settings, read as each window opens - "close" in seconds or "off",
+// "bar" "off" to hide the countdown. Set from a PC until the system settings
+// page (Settings.h).
+static uint32_t closeSetting() {
+    char v[8];
+    if (!Settings::system("window", "close", v, sizeof(v))) return SHEET_AUTOCLOSE_MS;
+    if (!strcmp(v, "off")) return 0;
+    const int sec = atoi(v);
+    return sec > 0 ? (uint32_t)sec * 1000 : SHEET_AUTOCLOSE_MS;
+}
+
+static bool barSetting() {
+    char v[8];
+    return !Settings::system("window", "bar", v, sizeof(v)) || strcmp(v, "off") != 0;
 }
 
 // --- The window ---------------------------------------------------------------
@@ -264,7 +282,7 @@ static void buildFrame(Sheet &S) {
     }
 
     // --- The auto-close bar: how long until the window gives up -------------
-    S.autoBar = countdownBar(S.win, lv_area_get_width(&S.winRect));
+    S.autoBar = (S.closeMs && barSetting()) ? countdownBar(S.win, lv_area_get_width(&S.winRect)) : nullptr;
 
     if (spec.buildFirst) spec.buildFirst();
 }
@@ -285,16 +303,17 @@ lv_obj_t *countdownBar(lv_obj_t *box, int32_t boxW) {
     return bar;
 }
 
-void countdownSet(lv_obj_t *bar, uint32_t leftMs) {
-    if (!bar) return;
+void countdownSet(lv_obj_t *bar, const Sheet &S) {
+    if (!bar || !S.closeMs) return;
     const int32_t full = (int32_t)(intptr_t)lv_obj_get_user_data(bar);
-    const int32_t w = LV_MAX(1, (int32_t)((int64_t)full * LV_MIN(leftMs, SHEET_AUTOCLOSE_MS) / SHEET_AUTOCLOSE_MS));
+    const int32_t w = LV_MAX(1, (int32_t)((int64_t)full * LV_MIN(sheetLeftMs(S), S.closeMs) / S.closeMs));
     if (w != lv_obj_get_width(bar)) lv_obj_set_width(bar, w);   // its align keeps it in the middle
 }
 
 uint32_t sheetLeftMs(const Sheet &S) {
+    if (!S.closeMs) return UINT32_MAX;
     const uint32_t idle = millis() - S.lastTouchMs;
-    return idle >= SHEET_AUTOCLOSE_MS ? 0 : SHEET_AUTOCLOSE_MS - idle;
+    return idle >= S.closeMs ? 0 : S.closeMs - idle;
 }
 
 // Share the title row between its first part ("Area > ") and the name.
@@ -342,10 +361,9 @@ static void tickCb(lv_timer_t *t) {
     Sheet *S = (Sheet *)lv_timer_get_user_data(t);
     if (!S || !S->win) return;
     const uint32_t now  = millis();
-    const uint32_t left = sheetLeftMs(*S);
-    if (!left) { sheetClose(*S); return; }
+    if (!sheetLeftMs(*S)) { sheetClose(*S); return; }
 
-    countdownSet(S->autoBar, left);
+    countdownSet(S->autoBar, *S);
     if (S->spec && S->spec->tick) S->spec->tick(now);
 }
 
@@ -384,6 +402,7 @@ static void invalidateWindow(Sheet &S) {
 void sheetOpen(Sheet &S, const SheetSpec &spec) {
     S.spec = &spec;
     S.closeQueued = false;
+    S.closeMs = closeSetting();
     s_open = &S;
     facesNextWindow();                                // faces the last sheet used may be taken back
     lv_obj_t *scr = lv_screen_active();
