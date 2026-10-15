@@ -6,6 +6,16 @@ signed-off merges to `main` in the order they happen - it does not follow milest
 began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
+## v0.2.14 - 2026-10-14
+
+#93 - a group's members know their HA area and device.
+
+- **Entity properties on a member of an HA group** (Desk > Members > Office lamp) said Area in HA
+  "None" and Device "None": the one question a session asks HA, for the lights' scenes and every
+  entity's area and device, went before the group had reported its members. When members are
+  learnt after it, the question now goes once more (`HaProvider`). Checked on WS_P4_4B ("Office",
+  "Office lamp"); all nine environments build.
+
 ## v0.2.13 - 2026-10-14
 
 2.12 - the UI foundation: the card window's code rebuilt into a foundation for 2.8 and 2.11, with
