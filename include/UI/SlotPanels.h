@@ -29,8 +29,9 @@ struct Context {
     bool        headerShown = true;
     const char *entity      = nullptr;   // the sensor slot's
     EntityRegistry *reg     = nullptr;
-    void (*goToPage)(uint8_t page)    = nullptr;
-    void (*setHeaderShown)(bool shown) = nullptr;
+    void *user = nullptr;                // handed back to the two below
+    void (*goToPage)(void *user, uint8_t page)    = nullptr;
+    void (*setHeaderShown)(void *user, bool shown) = nullptr;
 };
 
 // Build the panel for a slot of `kind` into `face`. False when that kind has no

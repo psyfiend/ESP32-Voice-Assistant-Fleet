@@ -157,6 +157,8 @@ private:
     void setPageHeaderShown(bool shown);   // saves it, applies it, rebuilds
     void applyHeaderHidden(bool hidden);   // the bar, the drawers' top, the knob's label
     void cycleGlyphs();              // bare -> square -> circle, saved (#19)
+    // /popup's slot=, glyphs= and pagehdr= (DEBUG_POPUP): one line saying what it did.
+    const char *headerDebug(int slot, int glyphs, int pageHdr);
     Kit::Drawer _slotDrawer;
     int8_t      _slotPanel = -1;     // the slot whose drawer is open, or -1
     static void reportUiSection();   // [UI STATE] in the System Doctor

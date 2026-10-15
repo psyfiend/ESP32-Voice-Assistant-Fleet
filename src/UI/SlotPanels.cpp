@@ -19,13 +19,13 @@ Context s_ctx;   // the open panel's - one opens at a time
 
 void pageCb(lv_event_t *e) {
     const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
-    if (s_ctx.goToPage) s_ctx.goToPage(i);
+    if (s_ctx.goToPage) s_ctx.goToPage(s_ctx.user, i);
 }
 
 void headerCb(lv_event_t *e) {
     // The chips' order: 0 Shown, 1 Hidden.
     const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
-    if (s_ctx.setHeaderShown) s_ctx.setHeaderShown(i == 0);
+    if (s_ctx.setHeaderShown) s_ctx.setHeaderShown(s_ctx.user, i == 0);
 }
 
 void title(lv_obj_t *face, const char *words) {

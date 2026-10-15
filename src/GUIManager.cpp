@@ -201,90 +201,7 @@ void GUIManager::toggleSystemPanel() {
     _pnlSystem.toggle();
 }
 
-void GUIManager::onSlotTap(uint8_t slot) {
-    if (_header.slotKind(slot) == SlotKind::SLOT_STATUS) { toggleSystemPanel(); return; }
-    if (_slotPanel == (int8_t)slot) { closeSlotPanel(true); return; }
-    if (_pnlSystem.isExpanded()) _pnlSystem.close();
-    UIToolkit::closeActiveAccordion();
-    openSlotPanel(slot);
-}
-
-void GUIManager::openSlotPanel(uint8_t slot) {
-    if (!_slotDrawer.root) return;
-    closeSlotPanel(false);
-    lv_obj_clean(_slotDrawer.face);   // what the last panel held
-    SlotPanels::Context c;
-    for (uint8_t i = 0; i < _nPages && i < SlotPanels::PAGES_MAX; i++)
-        c.pageTitles[i] = _pages[i].spec && _pages[i].spec->title ? _pages[i].spec->title : "Page";
-    c.pageCount   = _nPages;
-    c.pageIndex   = _curPage;
-    c.headerShown = !_headerHidden;
-    c.entity      = _header.slotEntity(slot);
-    c.reg         = &_core.entities();
-    c.goToPage    = [](uint8_t p) {
-        if (!s_self) return;
-        s_self->closeSlotPanel(false);
-        s_self->goToPage(p);
-    };
-    c.setHeaderShown = [](bool shown) {
-        if (!s_self) return;
-        s_self->closeSlotPanel(false);
-        s_self->setPageHeaderShown(shown);
-    };
-    if (!SlotPanels::build(_header.slotKind(slot), _slotDrawer.face, c)) return;
-    syncPanelOffset();
-    Kit::drawerPlace(_slotDrawer, _header.slotCentreX(slot), _slotDrawer.top);
-    Kit::drawerOpen(_slotDrawer);
-    _slotPanel = (int8_t)slot;
-    _header.setOpenSlot(slot);
-    syncScrim();
-}
-
-void GUIManager::closeSlotPanel(bool animate) {
-    if (_slotPanel < 0) return;
-    Kit::drawerClose(_slotDrawer, animate);
-    if (_header.openSlot() == _slotPanel) _header.setOpenSlot(-1);
-    _slotPanel = -1;
-    syncScrim();
-}
-
-void GUIManager::syncScrim() {
-    if (!_dismissScrim) return;
-    if (_pnlSystem.isExpanded() || _slotPanel >= 0) lv_obj_add_flag  (_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
-    else                                            lv_obj_clear_flag(_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
-}
-
-void GUIManager::cycleGlyphs() {
-    const uint8_t n = (uint8_t)GlyphStyle::GLYPH_STYLE_COUNT;
-    const GlyphStyle next = (GlyphStyle)(((uint8_t)_header.glyphStyle() + 1) % n);
-    _header.setGlyphStyle(next);
-    // Saved by name; the default (bare) as nothing.
-    Settings::setSystem("header", "glyphs", next == GlyphStyle::GLYPH_BARE ? nullptr : glyphStyleName(next));
-    Settings::save();
-    Serial.printf("[UI] header glyphs: %s\n", glyphStyleName(next));
-}
-
-bool GUIManager::pageHeaderShown() const {
-    if (_curPage >= _nPages || !_pages[_curPage].spec) return true;
-    const PageSpec &p = *_pages[_curPage].spec;
-    char v[12];
-    if (Settings::page(p.slug, "header", v, sizeof(v))) {
-        if (!strcmp(v, "hidden")) return false;
-        if (!strcmp(v, "shown"))  return true;
-    }
-    return p.headerShown;
-}
-
-void GUIManager::setPageHeaderShown(bool shown) {
-    if (_curPage >= _nPages || !_pages[_curPage].spec) return;
-    const PageSpec &p = *_pages[_curPage].spec;
-    // Only a choice that differs from the page's own default is stored.
-    Settings::setPage(p.slug, "header", shown == p.headerShown ? nullptr : (shown ? "shown" : "hidden"));
-    Settings::save();
-    applyHeaderHidden(!shown);
-    rebuildDashboard();
-    Serial.printf("[UI] page %s: header %s\n", p.slug, shown ? "shown" : "hidden");
-}
+// The header's slots and their panels (2.8): GUIManagerHeader.cpp.
 
 // ---------------------------------------------------------------------------
 // Swipe navigation - a FIRST CUT for milestone 2.6, and deliberately small.
@@ -1060,40 +977,7 @@ void GUIManager::begin() {
     // does, slot=-1 closes any; glyphs=0|1|2 shows a glyph style without saving
     // it, glyphs=3 the saved one again.
     CardPopup::setHeaderHook([](int slot, int glyphs, int pageHdr) -> const char * {
-        static char out[96];
-        if (!s_self) return "no GUI";
-        GUIManager &g = *s_self;
-        if (pageHdr >= 0) {
-            g.closeSlotPanel(false);
-            g.setPageHeaderShown(pageHdr != 0);
-            snprintf(out, sizeof(out), "page %s: header %s (saved)", g.currentPageSlug(),
-                     pageHdr ? "shown" : "hidden");
-            return out;
-        }
-        if (glyphs >= 0) {
-            GlyphStyle gs = GlyphStyle::GLYPH_BARE;
-            if (glyphs < (int)GlyphStyle::GLYPH_STYLE_COUNT) {
-                gs = (GlyphStyle)glyphs;
-            } else {
-                char v[12];
-                if (Settings::system("header", "glyphs", v, sizeof(v))) glyphStyleFromName(v, gs);
-            }
-            g._header.setGlyphStyle(gs);
-            snprintf(out, sizeof(out), "glyphs: %s (not saved)", glyphStyleName(gs));
-            return out;
-        }
-        if (slot < 0) {
-            g.closeSlotPanel(false);
-            if (g._pnlSystem.isExpanded()) g._pnlSystem.close();
-            return "slot: closed";
-        }
-        if (slot >= g._header.slotCount()) return "slot: no such slot";
-        const SlotKind k = g._header.slotKind((uint8_t)slot);
-        if (g._slotPanel == slot || (k == SlotKind::SLOT_STATUS && g._pnlSystem.isExpanded()))
-            return "slot: already open";
-        g.onSlotTap((uint8_t)slot);
-        snprintf(out, sizeof(out), "slot %d (%s): opening", slot, slotKindName(k));
-        return out;
+        return s_self ? s_self->headerDebug(slot, glyphs, pageHdr) : "no GUI";
     });
 #endif
 
