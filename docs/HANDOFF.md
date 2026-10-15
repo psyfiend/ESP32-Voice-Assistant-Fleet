@@ -40,16 +40,18 @@ on the kit yet - bring each over when it is next changed (`ui-architecture.md` Â
 
 ## What is next
 
-**Built unattended on 2026-10-14 (the owner's overnight brief), waiting for the owner:**
+**Built unattended on 2026-10-14 (the owner's overnight brief); the owner's first answers came the
+same day. From now on a PR is opened only after the owner has run the tests and answered the
+questions** (owner, 2026-10-14) - push the branch, discuss, then `gh pr create`.
 
 1. **`feat/ui-followups`** (PR #101) - #96 the dialog's buttons share a narrow row; #97 About in every
    build (a button on the system panel), fact lists in two left-aligned columns, the countdown bar
    2 px on the window's edge, the near-equal tokens merged; #23 the Remove dialog shows the bar;
    #92 History's span buttons are the selector, compact (K75); #98 the flash test NVS-only (A16).
-   One commit each. The sheet: **`docs/TEST_UI_FOLLOWUPS.md`** - tests, before/after pictures, and
-   **Q1-Q7**. Two need the owner first: **Q1, the P4_5 lost its settings file** during the run (a
-   copy from 00:26 exists; not restored), and Q3/Q4, which candidate for Members' spacing and the
-   controls' radius (1.6 mm built for both).
+   The sheet: **`docs/TEST_UI_FOLLOWUPS.md`**. **Round 1 passed except T9**; Q1-Q7 answered (as
+   built; the old P4_5 settings do not matter; Q2 is #104). **Round 2**, for the owner to retest: T9 (the span
+   selector keeps its size while a span loads, K80) and T12 (the windows' timeout and countdown bar
+   from a PC, K79). Not ready to merge until the owner says.
 2. **#99** - a quieter "glass" finish: the mock **"Glass, Satin, Flat"**
    (https://claude.ai/artifact/G5XANwGMdgWKR19HS1ZQvj, linked on #99): glass, satin and flat on the
    real elements - Members, scenes, the Remove dialog, Power on and off - each pressed, Midnight at
@@ -61,10 +63,15 @@ on the kit yet - bring each over when it is next changed (`ui-architecture.md` Â
    the tallest item; the faces converted from the foundry's OFL files (+62 KB). Seen on the 4B and
    1060 by screenshot, then both put back on #101. Its sheet `docs/TEST_100_CLOCK.md` (on that
    branch) has Q1-Q4 - the spec override or a clock entity, and Playfair's old-style figures (lining
-   needs fontTools, an install). Left: the weather half, the other six faces, the hero region.
+   needs fontTools, an install). **The owner wants much more (2026-10-14)**: a "full" clock - every
+   NINA face and feature, 3 x 3 cells on a 6 x 3 grid, the whole screen on the 4B - a "small" one for
+   1 x 1 to 3 x 2 (time, date, weather, alarm, looks taken from the NINA faces), and a "medium" one
+   with the faces' flourish in less than half the screen (not on the 4880). A plan with decisions is
+   with the owner; nothing built for it yet. Not ready to merge.
 4. **#93** - a group's members now get their HA area and device: **`fix/93-member-areas` (PR
    #103)**, off `main` - the area query is sent once more after members are learnt. Checked on
-   the 4B (Office lamp: "Office" / "Office lamp", were "None").
+   the 4B (Office lamp: "Office" / "Office lamp", were "None"); all nine environments build; its
+   CHANGELOG entry (`v0.2.14`) is on the branch. **The owner may merge it now**: then tag `v0.2.14`.
 5. **#84** - "no data yet": **a proposal on the issue** (a `NO DATA` state of its own, recommended;
    the link-down half as its own issue). Nothing built - the owner's choice.
 
@@ -132,8 +139,9 @@ Fill and Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
 | `CYD_S3_3248` | - | USB broken (2026-09-28) |
 | `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in |
 
-The P4_5, 4B and 1060 run `feat/ui-followups` (with the local lines). **The P4_5's settings file
-was lost on 2026-10-14** (TEST_UI_FOLLOWUPS Q1): it runs on the dashboard's defaults until restored.
+The P4_5 and 4B run `feat/ui-followups` round 2, the 1060 round 1 (all with the local lines). **The
+P4_5's settings file was lost on 2026-10-14** (TEST_UI_FOLLOWUPS Q1) and started afresh; the owner
+does not want the old one back. A way to restore settings after a loss is under discussion.
 Ports move when boards are
 re-plugged: `Get-CimInstance Win32_PnPEntity | ? Name -match 'COM\d+' | select Name, DeviceID`.
 **Is a board alive?** Ask Home Assistant (`sensor.<device>_uptime`), not the cable. While developing,
