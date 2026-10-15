@@ -1,4 +1,4 @@
-# Handoff — 2026-10-15 (A17 signed off for `v0.2.17`, its PR open; next: 2.8 round 2, three places)
+# Handoff — 2026-10-15 (`v0.2.17`, A17; next: 2.8 round 2's build - three places)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -40,42 +40,44 @@ trees and screenshots, A/B), host tests (`host-tests/`), the structure check and
 The cards, `GUIManager`, the header (`Panel_Header`) and the system panel's pages are not on the kit
 yet - bring each over when it is next changed (`ui-architecture.md` §6).
 
-## Where things stand (2026-10-15, end of the unattended session)
+## Where things stand (2026-10-15, evening)
 
-- **A17 is signed off** (`docs/archive/TEST_A17.md`; DECISIONS A17): the settings partition is
-  formatted only when blank, a read-only boot says why, `POST /settings` restores, the save / restore
-  scripts, `flash_release.ps1` saving first and writing the 1060 safely. Every path proved on glass,
-  the blank-partition one on the 4B (erased, formatted, its file restored byte-identical). **Its PR is
-  open** (`fix/a17-settings-safety`, `main` merged in, CHANGELOG `v0.2.17`); after the owner merges:
-  pull, tag `v0.2.17`, flash the boards (`flash_release.ps1`, which now saves each board first).
-- **2.8 round 1 is on `feat/2.8-header-slots`** (no PR; `TEST_2.8.md` there): four evenly spaced
-  slots, each with its panel, the glyph style a setting, a page's header shown / hidden, dashes.
-  **The owner saw it and is "not really crazy about" four slots** - `header-slots.md` §9, DECISIONS
-  D-16, D-17:
-  - **Three places**: the clock, the alarm and the temperature on the **left**; the page's name and
-    dots in the **middle**; the status icons on the **right**.
-  - **The system panel's knobs are development tools.** That panel and every slot's panel will hold
-    settings, shortcuts to settings, or popups that manage what the slot shows.
-- **The mock** is the "2.8 Header Slots" canvas (round 2's four artboards show the four-slot
-  version). Round 2's three places want a mock first: show, don't spec.
-- **Boards**: the P4_5 and the 4B run A17's final build (with the owner's local lines), their files
-  as found; the 1060 runs `v0.2.16`. Copies of every board's file are in `bench/settings/<board>/`.
-- **Routes**: the P4_5 serves 7 of `HttpServer::MAX_ROUTES` (8) with A17 (`POST /settings`); the
-  next route needs it raised.
+- **`v0.2.17` - A17** (#108, merged and tagged; `docs/archive/TEST_A17.md`): the settings partition
+  is formatted only when blank, a read-only boot says why, `POST /settings` restores, and the
+  save / restore scripts; `flash_release.ps1` saves each board's file first and writes the 1060
+  app-only at 460800 with a watchdog reset. **Not yet flashed as the release**: the P4_5 and the 4B
+  run A17's last branch build (the same code), the 1060 `v0.2.16`. Copies of every board's file are
+  in `bench/settings/<board>/`.
+- **2.8 is in round 2, on `feat/2.8-header-slots`** (no PR; `TEST_2.8.md` there). Round 1 built
+  four evenly spaced slots - the slots as data (`include/UI/HeaderSlots.h`), each with its panel
+  (`SlotPanels.cpp`, `Kit::Drawer`; the status slot's is the system panel), the glyph style a setting
+  (bare / square / circle), a page's header shown / hidden, dashes for no live value - and passed
+  the all-nine gate. The owner's verdicts since (`header-slots.md` §9; DECISIONS D-16, D-17, D-18):
+  - **Three places**: **left** - the clock and the weather; **middle** - the page's name and dots;
+    **right** - the status icons, **the alarm among them** ("even though it is a clock function").
+  - **Keep the open slot joined to its panel**: the owner likes how a panel opens "connected" to
+    the header, "as if it pours downward out into the panel".
+  - **The panels are for settings** (D-17): the system panel's buttons are development tools; every
+    slot's panel will hold settings, shortcuts to settings, or popups that manage what it shows.
+- **The mock**: the "2.8 Header Slots" canvas
+  (https://claude.ai/artifact/9dLvFUbWZePzgjLnnXZ5Sw); its newest artboards show three places (with
+  the alarm still on the left - D-18 moves it).
+- **Routes**: the P4_5 serves 7 of `HttpServer::MAX_ROUTES` (8); the next route needs it raised.
 
 ## What is next with the owner
 
-1. **Merge A17's PR**, then tag `v0.2.17` and flash.
-2. **2.8 round 2 - three places** (D-16), on `feat/2.8-header-slots` after merging `main` into it
-   (A17 moved `Settings.cpp`'s HTTP code to `SettingsHttp.cpp`; 2.8 added `Settings::page()` /
-   `setPage()` beside `system()` - expect a small merge). First a mock on the canvas: the left place
-   holding the clock, the alarm and the temperature, the page in the middle, the status icons on the
-   right, at the P4_5 and the narrowest board, in the glyph style the owner prefers. Then the build:
-   a *place* (left, middle, right) holds one or more slots; the slots stay data (`HeaderSlots.h`), each
-   kind a build and an update; each slot's panel stays. Still open from round 1 (`TEST_2.8.md`
-   Q1-Q7): the glyph style (recommended: square), the clock's form, how a hidden header comes back,
-   the error mark, the open slot's look, what each panel holds next (settings, D-17), the system
-   panel onto `Kit::Drawer`. Cluster headers come with 2.11; the notification queue with #76.
+1. **Flash the release**: `scripts/release/flash_release.ps1` from `main` at `v0.2.17` (it saves each
+   board's settings first).
+2. **2.8 round 2 - the build**, on `feat/2.8-header-slots` after merging `main` into it (A17 moved
+   `Settings.cpp`'s HTTP code into `SettingsHttp.cpp`; the branch added `Settings::page()` /
+   `setPage()` beside `system()` - expect a small merge). A *place* (left, middle, right) holds one
+   or more slots; the slots stay data, each kind a build and an update in `Panel_Header.cpp`, each with
+   its panel. Left: the clock and the weather; middle: the page; right: the status icons and the
+   alarm (a new slot kind: its glyph, and dashes or nothing until K84's alarms exist - ask). Keep the
+   joined look. Update the canvas if the owner wants to see D-18 first. Still open from
+   `TEST_2.8.md` Q1-Q7: the glyph style (recommended: square), the clock's form, how a hidden header
+   comes back, the error mark, what each panel holds next, the system panel onto `Kit::Drawer`.
+   Cluster headers come with 2.11; the notification queue with #76.
 3. Waiting: **#104** (a light's temperature mark moves between builds); **#100** the clocks (three
    agreed, K81-K84, the record on #100; the prototype on `feat/100-nina-clock`, PR #102 open, not for
    merging); **#106** an active card's glowing border (the owner's idea, mock first); **#84** "no data

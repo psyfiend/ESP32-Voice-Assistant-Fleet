@@ -149,6 +149,16 @@ shown / hidden, dashes for no live value. The owner, having seen it:
   panel - the status slot's included - will hold settings, shortcuts to settings, or popups that
   manage what its slot shows. Round 1's small panels (the clock's time and date, the page's pages
   and Header Shown / Hidden, the sensor's reading) are a start in that direction.
+- **The round-2 mock** (the "2.8 Header Slots" canvas, three places at the P4_5 in the three glyph
+  styles, the narrowest board, the 4B, a slot's panel open). The owner, on it:
+
+  > "I like how the header panel opens looking like it is 'connected' to the header, as if it pours
+  > downward out into the panel. I'd say move the alarm icon to the status icons (even though it is
+  > a clock function) and leave the weather with the clock."
+
+  So (D-18): **left - the clock and the weather**; **middle - the page**; **right - the status
+  icons, the alarm among them**. **Keep the open slot joined to its panel** - the slot drawn in the
+  panel's face, the panel square where it meets the bar - so a panel pours down out of its slot.
 - **Still open** from round 1's sheet: the glyph style (Q1 - Claude's recommendation: square), the
   clock's form (Q2), how a hidden header comes back (Q3), the error mark (Q4), the open slot's look
   (Q5), what each panel holds next (Q6), the system panel onto `Kit::Drawer` (Q7).
