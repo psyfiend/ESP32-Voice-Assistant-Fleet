@@ -102,6 +102,7 @@ struct FaceSlot {
     FaceKind kind = FaceKind::FACE_BLACK;
     uint32_t key = 0;               // the colours it was painted with
     uint32_t tint = 0;              // a satin face's own colour
+    int16_t  band = 0;              // a metal face's rail seen through it (0: none)
     uint32_t used = 0;              // the window (s_epoch) that last asked for it
     size_t   cap = 0;               // bytes held
     uint8_t *buf = nullptr;
@@ -141,6 +142,7 @@ static void paintFace(FaceSlot &f) {
         edge = UI::mix(dk, lt, 52);
     }
     const uint32_t base = p.SURFACE_ALT;   // a dent is pressed into the window
+    const uint32_t rail = UI::mix(selectorColours().ribbon, dk, 25);   // the rail through the lens
 
     // The panels are 16-bit: red and blue in steps of 8, green in steps of 4.
     // A smooth grey ramp truncated to that grid bands, and the bands go pink
@@ -198,6 +200,18 @@ static void paintFace(FaceSlot &f) {
                 const uint32_t below = lerpHex(botA, botB, (cy - line) / (h - line));
                 const float d = cy - line;   // anti-aliased across one pixel
                 col = d <= -0.5f ? above : d >= 0.5f ? below : lerpHex(above, below, d + 0.5f);
+                // THE RAIL THROUGH THE LENS (owner, #99): the selector magnifies
+                // what it slides over, so the rail shows through it - taller
+                // than the rail outside, darker and faded (the rail's own
+                // colour, a quarter of the way to the scheme's darkest, half
+                // into the metal), behind the chosen icon, edge to edge (the
+                // face's own outline cuts it). Lighter than black glass and
+                // darker than silver, so it shows on both.
+                if (f.band > 0) {
+                    const float in = f.band * 0.5f - fabsf(cy - h * 0.5f);   // > 0: inside the band
+                    const float k = in <= -0.75f ? 0.f : in >= 0.75f ? 1.f : (in + 0.75f) / 1.5f;
+                    if (k > 0.f) col = lerpHex(col, rail, 0.5f * k);
+                }
                 if (inside < 1.3f) col = lerpHex(col, edge, 0.75f);   // the fine edge
             }
             const float th = (BAYER[(y & 3) * 4 + (x & 3)] + 0.5f) / 16.f;
@@ -235,12 +249,13 @@ static bool opaqueFace(FaceKind kind) { return kind == FaceKind::FACE_SATIN; }
 // closed - a scheme changes from the dashboard), else the one asked for
 // longest ago by a window that is not this one. Full of this window's own:
 // null, and the caller paints flat.
-static const lv_image_dsc_t *face(int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t tint) {
+static const lv_image_dsc_t *face(int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t tint, int32_t band) {
     const UIPalette &p = UI::pal();
     const uint32_t key = p.GROUND ^ (p.SURFACE << 1) ^ (p.TEXT << 2) ^ (p.SURFACE_ALT << 3);
     FaceSlot *spare = nullptr;
     for (FaceSlot &f : s_faces) {
-        if (f.buf && f.w == w && f.h == h && f.r == r && f.kind == kind && f.key == key && f.tint == tint) {
+        if (f.buf && f.w == w && f.h == h && f.r == r && f.kind == kind && f.key == key && f.tint == tint &&
+            f.band == band) {
             f.used = s_epoch;
             return &f.dsc;
         }
@@ -268,7 +283,7 @@ static const lv_image_dsc_t *face(int32_t w, int32_t h, int32_t r, FaceKind kind
     }
     spare->used = s_epoch;
     spare->w = (int16_t)w; spare->h = (int16_t)h; spare->r = (int16_t)r;
-    spare->kind = kind; spare->key = key; spare->tint = tint;
+    spare->kind = kind; spare->key = key; spare->tint = tint; spare->band = (int16_t)band;
     paintFace(*spare);
     lv_image_dsc_t &d = spare->dsc;
     d = lv_image_dsc_t{};
@@ -290,9 +305,11 @@ static lv_obj_t *faceIn(lv_obj_t *o) {
     return nullptr;
 }
 
-lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t flat, uint32_t tint) {
+lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t flat, uint32_t tint,
+                  int32_t band) {
     lv_obj_t *img = faceIn(o);
-    const lv_image_dsc_t *src = face(w, h, r, kind, kind == FaceKind::FACE_SATIN ? tint : 0);
+    const bool metal = kind == FaceKind::FACE_BLACK || kind == FaceKind::FACE_SILVER;
+    const lv_image_dsc_t *src = face(w, h, r, kind, kind == FaceKind::FACE_SATIN ? tint : 0, metal ? band : 0);
     if (!src) {
         if (img) lv_obj_add_flag(img, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(o, UI::c(flat), 0);
@@ -324,6 +341,24 @@ lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, u
 
 // Between the scheme's two surfaces: the mock's satin on Midnight exactly.
 uint32_t satinBase() { return UI::mix(UI::pal().SURFACE, UI::pal().SURFACE_ALT, 50); }
+
+// INK ON GLASS (owner, #99 T6): Linen's olive "on" vanished into its silver.
+// The metal's middle tone is about a fifth of the way from its own end of the
+// scheme; a colour within 90 of it in lightness is pushed, a tenth at a time,
+// toward the scheme's other end. Midnight's orange on black glass already
+// stands 100 apart and is left as it is.
+uint32_t glassInk(uint32_t hex) {
+    const UIPalette &p = UI::pal();
+    const bool darkScheme = lum(p.SURFACE_ALT) < 128;
+    const uint32_t dk = darkScheme ? p.GROUND : p.TEXT;
+    const uint32_t lt = darkScheme ? p.TEXT : p.SURFACE;
+    const bool silver = metalKind() == FaceKind::FACE_SILVER;
+    const int32_t face = silver ? lum(UI::mix(lt, dk, 23)) : lum(UI::mix(dk, lt, 20));
+    uint32_t c = hex;
+    for (uint8_t pct = 10; pct <= 90 && LV_ABS(lum(c) - face) < 90; pct += 10)
+        c = UI::mix(hex, silver ? dk : lt, pct);
+    return c;
+}
 
 // The finish a face shows, kept in its image's user data for a press.
 enum : uintptr_t { FIN_NONE = 0, FIN_SATIN = 1, FIN_GLASS = 2 };

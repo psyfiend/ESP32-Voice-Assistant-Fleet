@@ -102,8 +102,9 @@ enum class FaceKind : uint8_t { FACE_BLACK, FACE_SILVER, FACE_DENT, FACE_SATIN }
 
 // The face as the object's first child (an image); `flat` is its colour when
 // no face can be had. `tint`: a satin face's own colour. Returns the image, or null.
+// `band`: on a metal face, the height of the rail seen through it (the selector).
 lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t flat,
-                  uint32_t tint = 0);
+                  uint32_t tint = 0, int32_t band = 0);
 lv_obj_t *labelIn(lv_obj_t *o);   // the label inside a faced button
 void      facesNextWindow();      // a new window: faces the last one used may be taken back
 uint32_t  facesFlat();            // how many came out flat (a debug readout)
@@ -120,6 +121,9 @@ uint32_t  facesFlat();            // how many came out flat (a debug readout)
 enum class Finish : uint8_t { FINISH_SATIN, FINISH_GLASS };
 void     finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tint = 0);
 uint32_t satinBase();             // the scheme's satin, between its two surfaces
+// A colour that reads on glass: pushed toward the scheme's far end until it
+// stands apart from the metal (Linen's olive "on" vanished into its silver, T6).
+uint32_t glassInk(uint32_t hex);
 
 // THE SELECTOR'S LOOK, per scheme (K36, K45): -1 the scheme's own, else bit 0
 // round, bit 1 silver. Kept in the settings file under the scheme.
@@ -133,11 +137,11 @@ struct SelectorColours { uint32_t ribbon, icon, chosen; };
 SelectorColours selectorColours();
 
 // --- Icon buttons ----------------------------------------------------------------
-// A round button at the minimum touch size with an icon: a soft dent in the
-// surface, tinted while pressed. `cb` on LV_EVENT_CLICKED.
+// A round button at the minimum touch size with an icon: satin (#99, the owner;
+// a soft dent until then), darkening while pressed. `cb` on LV_EVENT_CLICKED.
 lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f, lv_event_cb_t cb,
                      lv_obj_t **outLabel = nullptr);
-// Lit (a tab that is showing): the selector's metal, the icon a size up in the accent.
+// Lit (a tab that is showing): glass, the icon a size up in the accent.
 void iconButtonLit(lv_obj_t *b, bool lit);
 
 // --- The selector (KitSelector.cpp) ------------------------------------------------
