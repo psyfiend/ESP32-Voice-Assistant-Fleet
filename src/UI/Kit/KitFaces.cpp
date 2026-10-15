@@ -364,16 +364,35 @@ uint32_t glassInk(uint32_t hex) {
 enum : uintptr_t { FIN_NONE = 0, FIN_SATIN = 1, FIN_GLASS = 2 };
 
 // Pressed: satin darkens - its light turned under - and glass lightens, as the
-// round icon buttons do; the object itself sinks 1 px (KS_SINK).
+// round icon buttons did; the object itself sinks 1 px (KS_SINK).
+//
+// THE TINT IS A VEIL, A ROUNDED OBJECT OVER THE FACE IN THE FACE'S SHAPE - not
+// the image's recolor. LVGL draws an image that is both recoloured and
+// corner-clipped through a path that drops the clip (lv_draw_sw_img.c:
+// radius_only() wants no recolor, recolor_only() no radius), so a pressed satin
+// face showed square - a box over a header button, a square outline round
+// Remove (owner, #99 T9).
+static const char VEIL_TAG = 0;
+
+static lv_obj_t *veilIn(lv_obj_t *o) {
+    for (uint32_t i = 0; i < lv_obj_get_child_count(o); i++) {
+        lv_obj_t *c = lv_obj_get_child(o, (int32_t)i);
+        if (lv_obj_get_user_data(c) == (void *)&VEIL_TAG) return c;
+    }
+    return nullptr;
+}
+
 static void finishPressCb(lv_event_t *ev) {
-    lv_obj_t *img = faceIn((lv_obj_t *)lv_event_get_current_target(ev));
-    if (!img) return;
-    const uintptr_t fin = (uintptr_t)lv_obj_get_user_data(img);
-    const bool down = lv_event_get_code(ev) == LV_EVENT_PRESSED && fin != FIN_NONE;
+    lv_obj_t *o = (lv_obj_t *)lv_event_get_current_target(ev);
+    lv_obj_t *veil = veilIn(o);
+    if (!veil) return;
+    lv_obj_t *img = faceIn(o);
+    const bool glass = img && (uintptr_t)lv_obj_get_user_data(img) == FIN_GLASS;
+    const bool down = lv_event_get_code(ev) == LV_EVENT_PRESSED;
     const UIPalette &p = UI::pal();
     const bool darkScheme = lum(p.SURFACE_ALT) < 128;
-    lv_obj_set_style_image_recolor(img, UI::c(fin == FIN_SATIN ? (darkScheme ? p.GROUND : p.TEXT) : p.TEXT), 0);
-    lv_obj_set_style_image_recolor_opa(img, down ? (fin == FIN_SATIN ? LV_OPA_30 : LV_OPA_20) : LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_color(veil, UI::c(glass ? p.TEXT : (darkScheme ? p.GROUND : p.TEXT)), 0);
+    lv_obj_set_style_bg_opa(veil, down ? (glass ? LV_OPA_20 : LV_OPA_30) : LV_OPA_TRANSP, 0);
 }
 
 static bool hasCb(lv_obj_t *o, lv_event_cb_t cb) {
@@ -399,6 +418,15 @@ void finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tin
         lv_obj_add_event_cb(o, finishPressCb, LV_EVENT_PRESSED,    nullptr);
         lv_obj_add_event_cb(o, finishPressCb, LV_EVENT_RELEASED,   nullptr);
         lv_obj_add_event_cb(o, finishPressCb, LV_EVENT_PRESS_LOST, nullptr);
+        // The veil (above): over the face, under the words, clear until pressed.
+        lv_obj_t *veil = plain(o);
+        lv_obj_set_user_data(veil, (void *)&VEIL_TAG);
+        lv_obj_add_flag(veil, LV_OBJ_FLAG_FLOATING);
+        lv_obj_set_size(veil, w, h);
+        lv_obj_set_style_radius(veil, r, 0);
+        lv_obj_set_style_bg_opa(veil, LV_OPA_TRANSP, 0);
+        lv_obj_move_to_index(veil, faceIn(o) ? 1 : 0);
+        lv_obj_center(veil);
     }
 }
 
