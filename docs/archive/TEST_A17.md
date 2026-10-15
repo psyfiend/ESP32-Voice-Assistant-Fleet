@@ -97,4 +97,19 @@ request yet** - for your tests and answers first. Nothing on the screen changes.
 
 ## Your results
 
-*(yours)*
+**Signed off by the owner, 2026-10-15**, who saved the P4_5's file with T3's script and handed the
+rest to Claude: "if you can test A17 then go ahead, I'm placing my trust in you to ensure the safety
+of the settings file." Q1-Q3 not answered; the recommendations stand as built (no format address,
+the toast with #76 later, choices 1-4 kept).
+
+Claude's run, on the final build (`4d4241f`, with `main` merged in):
+
+| # | Result |
+|---|---|
+| T1 | **PASS** - P4_5 and 4B `mounted`, the boot line lists their cards (9 and 12) |
+| T2 | not seen on glass this round (the Log page); the line is in the report's code path |
+| T3 | **PASS** - the owner's copy (15:15) and Claude's before every flash |
+| T4 | **PASS** - P4_5: Desk renamed from the PC, the 15:21 copy restored with a restart; the file byte-identical to the copy |
+| T5 | **PASS** (earlier in the day, `DEBUG_SETTINGS_NOMOUNT`) - read-only with its reason, the file untouched by the next boot |
+| T6 | **PASS** - 4B: its copy checked identical to the morning's original, the partition erased (`erase-region 0xc90000 0x360000`); the boot said `the "spiffs" partition is blank (3456 KB, checked in 387.8 ms) - a first boot: formatting it`, then `no settings file yet`; the copy restored with a restart - byte-identical |
+| T7 | at the release flash (`v0.2.17`) |

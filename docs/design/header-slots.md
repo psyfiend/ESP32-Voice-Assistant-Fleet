@@ -123,3 +123,32 @@ DECISIONS D-11 to D-15.
    does - one slot's area, never the bar or the screen (#19).
 
 Cluster headers come with 2.11; the notification queue with #76.
+
+## 9. Round 1 on glass, and the owner's reaction (2026-10-15)
+
+Round 1 was built unattended on `feat/2.8-header-slots` (`TEST_2.8.md` there; the mock's round 2 on
+the "2.8 Header Slots" canvas): four evenly spaced slots - clock, page, status, the outdoor
+temperature - each tap sliding down that slot's panel, the glyph style a setting, a page's header
+shown / hidden, dashes for no live value. The owner, having seen it:
+
+> "I caught some of the screens when there were 4 header slots, it was an idea I kinda wanted to see
+> but I'm not really crazy about it. For the main system header I'd probably leave the status icons
+> on the right, page info in the middle, and put the clock/alarm/temp on the left side."
+
+> "The 'knobs'/buttons in the 'SYSTEM - DIAGNOSTICS' panel are there basically so we can test
+> various UI looks/functions while developing and is not intended to be there in the final product.
+> Or at least not in its current incarnation. That panel will ultimately provide settings and/or
+> shortcuts to settings or popups to manage the various statuses. Same for all of the header slots."
+
+- **Three places** (D-16): **left** - the clock, the alarm, the temperature; **middle** - the page's
+  name and dots, in the true middle again; **right** - the status icons. §2's four even slots are
+  superseded. What round 1 built underneath stays: a slot is data (`HeaderSlots.h`), a kind is a
+  build and an update, each slot has its panel, the glyph style and a page's header are settings.
+  Round 2 changes where the slots stand - a place holds one or more slots - not what a slot is.
+- **The panels are for settings** (D-17): the system panel's knobs are development tools. Each
+  panel - the status slot's included - will hold settings, shortcuts to settings, or popups that
+  manage what its slot shows. Round 1's small panels (the clock's time and date, the page's pages
+  and Header Shown / Hidden, the sensor's reading) are a start in that direction.
+- **Still open** from round 1's sheet: the glyph style (Q1 - Claude's recommendation: square), the
+  clock's form (Q2), how a hidden header comes back (Q3), the error mark (Q4), the open slot's look
+  (Q5), what each panel holds next (Q6), the system panel onto `Kit::Drawer` (Q7).
