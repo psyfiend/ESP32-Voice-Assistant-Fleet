@@ -1,4 +1,4 @@
-# Handoff — 2026-10-15 (`v0.2.16`, #99 satin; next: A17 and 2.8's header slots, unattended)
+# Handoff — 2026-10-15 (`v0.2.16`, #99 satin; A17 and 2.8 round 1 built unattended, waiting for the owner's tests)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -40,88 +40,41 @@ trees and screenshots, A/B), host tests (`host-tests/`), the structure check and
 The cards, `GUIManager`, the header (`Panel_Header`) and the system panel's pages are not on the kit
 yet - bring each over when it is next changed (`ui-architecture.md` §6).
 
-## For the next session: unattended work (owner, 2026-10-15)
+## Where the unattended session left things (2026-10-15)
 
-The owner reset the usage after #99's merge and handed the next session two things to do
-unattended, effort "high": **A17**, then **as much of 2.8 as can be done well**. The owner: "I'm
-more interested in getting back to working on the bones of the dashboard!" #104 and the NINA clocks
-wait.
+The owner handed a session A17 and 2.8 to do unattended. Both are built, on their own branches off
+`main`, pushed, **no pull requests** - each waits for the owner's test sheet:
 
-**The rules:**
-- Read `CLAUDE.md`, this file, `ui-architecture.md`, `DECISIONS.md` and the task's documents first.
-- **Set the usage-limit watchdog before anything else** (auto-memory "Auto-resume after limits": a
-  recurring `CronCreate` at an off-minute about every 20 minutes that resumes from a progress record
-  in your scratchpad); keep the record current after each step; delete the watchdog when done.
-- **One branch per task, off `main`**; commit and push at the end of each step. **No pull request**
-  (owner, 2026-10-14): push the branch, write `docs/TEST_<topic>.md` - tests with PASS criteria,
-  before/after pictures, questions each with a recommendation - and leave it for the owner.
-- **Decisions the owner has not made** (auto-memory "Decide before building"): the owner is away,
-  so take the conservative option, build it so it is easy to change, and **say in the sheet which
-  choices were yours** and what the alternatives were. Never make a choice the documents leave to
-  the owner without saying so.
-- **Boards**: confirm the ports first. Build and flash the P4_5 (COM15) and the 4B (COM7) freely;
-  the 1060 (COM9) app-only at 460800 ending `--after watchdog-reset`, and alone in the harness;
-  **never flash WS_S3_4B** (#69, compile it as the S3 check); **never rebuild libraries**. Save a
-  board's `/settings` (`curl -o`) before flashing it. Leave the boards on `main`'s build when done,
-  unless a sheet says otherwise.
-- **Prove each change with the harness**: capture a fresh `v0.2.16` baseline first, then A/B.
-  Before calling a branch ready: the all-nine gate (`scripts/release/gate.ps1`, background) and
-  `scripts/structure_check.py`, both quoted in the sheet.
-- **Real lights**: Office only, put back as found; nothing else is commanded.
-- A board that stops answering: note it and leave it.
+| Branch | What | The sheet | Gate |
+|---|---|---|---|
+| `fix/a17-settings-safety` | **A17**: the mount never formats a partition that holds data (blank = every byte 0xFF, the whole partition - Claude's choice, the brief said "its start"); a read-only boot says why; `POST /settings` restores a file; `scripts/release/save_settings.ps1` / `restore_settings.ps1`; `flash_release.ps1` saves each board first and writes the 1060 app-only at 460800 with a watchdog reset; `Settings.cpp` split (`SettingsHttp.cpp`) | `docs/TEST_A17.md` on the branch | all nine, `b233677` |
+| `feat/2.8-header-slots` | **2.8 round 1**: the header as four slots (data: `include/UI/HeaderSlots.h`), each with its panel (the status slot's is the system panel, now under its slot); the glyph style a setting (bare / square / circle, a Glyphs button); a page's header shown / hidden saved per page (Hide Bar too); dashes and a "!" mark for no live value; the header on the kit (`UIHeader` tokens, `Kit::headerBar()`/`headerSlot()`/`glyphFrame()`/`Kit::Drawer`); `GUIManagerHeader.cpp` | `docs/TEST_2.8.md` on the branch | all nine, `3260eb0`; re-run on the final commit - see the sheet |
 
-**1. A17 - a failed mount never costs the settings** (`fix/a17-settings-safety`; DECISIONS A17,
-`archive/TEST_UI_FOLLOWUPS.md` Q1). The P4_5 lost its settings file on 2026-10-14, most likely
-LittleFS failing to mount and `format_if_mount_failed` formatting it.
-- `Settings::begin()`: mount without formatting. If the mount fails, look at the partition's start:
-  erased (all `0xFF`) is a first boot - format and mount; anything else stays untouched, the store
-  runs in RAM, read-only, and says so (the boot note, `/settings?stats=1`, the System Doctor's
-  [SETTINGS]). Flash is read only from a task with an internal-RAM stack (CLAUDE.md).
-- **A restore address**: `POST /settings` with a settings file as its body - parsed and checked
-  (`schema`) on the httpd task, written by the settings task, never by the handler (its stack is in
-  PSRAM: a flash write there reboots the board, LESSONS).
-- **The flash scripts keep a copy**: `scripts/release/flash_release.ps1` saves each board's
-  `/settings` to `bench/settings/<board>/<yyyymmdd-hhmm>.json` (gitignored) before writing, and a
-  `scripts/release/restore_settings.ps1 <host> <file>` posts one back.
-- Test: a local-only `-D DEBUG_SETTINGS_NOMOUNT` (never committed) that makes the mount report a
-  failure - the boot is read-only and the file survives the next boot; a restore round trip on the 4B
-  with its own file (save, rename a card from the PC, restore, check).
-- Docs: `Settings.h`, CLAUDE.md "Saved settings", `HTTP_REFERENCE.md`, DECISIONS A17 (built),
-  `TEST_A17.md`.
+- **The mock's round 2** is on the "2.8 Header Slots" canvas (four artboards: the four slots in the
+  three glyph styles, every board's width, the status slot's panel open, the other three panels and
+  dashes).
+- **PR #107 (this handoff and `header-slots.md`) was still open** when the session started - the
+  owner believed it merged. The work branched off `main` as the brief said, so `header-slots.md` and
+  D-11-D-15 are not on either branch; merging #107 first keeps them all in step. These updates to
+  HANDOFF and ROADMAP are on #107's branch for the same reason.
+- **The two branches touch `Settings.cpp`, `Settings.h` and `HTTP_REFERENCE.md` in different places**
+  (A17 moved the PC's addresses to `SettingsHttp.cpp`; 2.8 added `page()` / `setPage()` beside
+  `system()`). Merge A17 first; 2.8 should then merge cleanly or with a small conflict in the docs.
+- **The boards are back on `main`'s build** (`v0.2.16` with the owner's local lines), their settings
+  files as found: every flash was preceded by a saved copy in `bench/settings/<board>/`. The 4B's
+  `window_close=10` was turned off for a harness capture and put back by restoring its own file.
+- **The session stalled ~7 hours at the usage limit** (06:50-14:05); the watchdog resumed it.
+- **Routes**: the P4_5 serves 7 of `HttpServer::MAX_ROUTES` (8) once A17 merges (`POST /settings`).
+  The next route needs `MAX_ROUTES` raised (a one-line change).
 
-**2. 2.8 - the header's slots** (`feat/2.8-header-slots`; #19). **Read `docs/design/header-slots.md`
-first** - the owner's answers to the interview's §3, in the owner's words, and the build order (§8);
-DECISIONS D-11 to D-15. In short: the header is optional, so nothing critical lives only there; four
-evenly spaced slots - clock, the page, status, climate / secondary; a tap on a slot slides down that
-slot's own panel; shown / hidden is a page setting; slots for the page header and clusters, never a
-solo card; dashes for no live value.
-- **(a) The mock first** (show, don't spec): add artboards to the owner's canvas
-  [2.8 Header Slots](https://claude.ai/artifact/9dLvFUbWZePzgjLnnXZ5Sw) - the four-slot header in the
-  three glyph styles the owner asked to see (no background, rounded square, circle), on the P4_5 and
-  at every board's width, and one slot's panel open.
-- **(b) The slot mechanism**, data-driven (`header-slots.md` §8): a slot is a spec (its kind, its
-  entity where it has one, its panel); a page's header is a list of them plus shown / hidden; one
-  kit component draws it (roles in `KitStyles.cpp`, sizes as tokens); a new kind is a new entry. The
-  four default slots on every page; the glyph style a setting with all three, so the owner can
-  compare on glass. Today's header is `src/UI/Panel_Header.cpp`; today's drawer is
-  `src/UI/Panel_System.cpp` (from the header's status icon).
-- **(c) The slots' panels**: the system panel's drawer generalised - it slides from the slot's place;
-  today's system panel becomes the status slot's. The other three start small (the clock: time,
-  date, the next alarm's place; the page: its pages to jump to and its header shown / hidden; the
-  climate slot: its sensor's value) - say in the sheet what each could hold later.
-- **(d) The page setting** (header shown / hidden) and **(e) dashes** for no live value.
-- **Open, for the owner** (`header-slots.md`): the glyph style; the clock's form (the owner's example
-  writes "1:55am"); narrow boards; how a hidden header comes back; how a slot shows an error. Build
-  each the conservative way and ask in the sheet.
-- Measure: the clock redraws only on a new minute, a slot only when its value changes - one slot's
-  area, never the bar (#19); `/bench` before and after.
-- Stop at a clean point: a mock and a working four-slot header with one panel is a good night.
 
 ## What is next with the owner
 
-1. **The unattended session's sheets**: `TEST_A17.md`, `TEST_2.8.md` (or how far it got).
-2. **2.8**: the mock's three glyph styles, then the build's rounds. Cluster headers come with 2.11;
-   the notification queue (the owner's, 2026-10-15) with #76.
+1. **The unattended session's sheets**: `TEST_A17.md` (on `fix/a17-settings-safety`) and
+   `TEST_2.8.md` (on `feat/2.8-header-slots`) - flash a branch to test it; merge PR #107 first.
+2. **2.8 round 2** from the owner's answers: the glyph style chosen (Q1), the system panel onto
+   `Kit::Drawer` (Q7), what the slots' panels hold next (Q6). Cluster headers come with 2.11; the
+   notification queue (the owner's, 2026-10-15) with #76.
 3. Waiting: **#104** (a light's temperature mark moves between builds); **#100** the clocks (three
    agreed, K81-K84, the record on #100; the prototype on `feat/100-nina-clock`, PR #102 open, not for
    merging); **#106** an active card's glowing border (the owner's idea, mock first); **#84** "no data
@@ -249,7 +202,8 @@ no compiler (the owner's choice to install one, `host-tests/README.md`).
   `firmware.bin` - copy an image you want to keep. Clear `.pio/build_cache` after a BSP,
   struct-layout or `lv_conf.h` edit.
 - **Do not edit source while a build runs** - it compiles the half-finished edit. Docs are safe.
-- **Save a board's `/settings` before flashing it** (`curl -o`) until A17 makes the scripts do it.
+- **Save a board's `/settings` before flashing it**: `scripts/release/save_settings.ps1 <host>
+  <board>` once A17 merges (until then `curl -o`, or the script from that branch).
 - **The harness**: never two runs at one board; the 1060 alone (it is slow). A window closes itself
   after a minute (or what `/settings?window_close=` says, K79). A change to the header will show in
   every state - read the differences, do not wave them through.
