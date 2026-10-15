@@ -63,8 +63,7 @@ void histDrawChart(lv_obj_t *body) {
         lv_obj_update_layout(top);
         leftEnd = lv_obj_get_width(words) + mm(UI::shape().S3) + lv_obj_get_width(nums);
     }
-    const int32_t half = LV_MIN(topW / 2 - leftEnd, topW / 2 - lv_obj_get_width(read)) - mm(UI::shape().S5);
-    histTopMiddle(top, 2 * LV_MAX(half, 1));
+    histTopMiddle(top, histChipRoom(topW, leftEnd, lv_obj_get_width(read)));
 
     if (lo > hi) { histNote(body, "Nothing recorded in this span"); return; }
 

@@ -71,6 +71,7 @@ void spanDropCb(lv_event_t *ev) {
 
 void minMaxCb(lv_event_t *ev) {
     s_hv.minMax = checked(ev);
+    s_hv.chipRoom = 0;   // the left corner comes or goes: the selector's room afresh
     histKeep("hist_minmax", onOff(s_hv.minMax));
     histDraw();
 }

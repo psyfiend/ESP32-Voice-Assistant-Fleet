@@ -168,6 +168,31 @@ lv_obj_t *histChips(lv_obj_t *parent, int32_t room) {
     return s_hv.spanSel.obj;
 }
 
+// THE SELECTOR KEEPS ITS SIZE (owner, T9, 2026-10-14). The chart's corners
+// set its room, and they are not drawn while the next span loads - it widened
+// there and narrowed again when the answer came. So the room only ever
+// narrows while the view shows one subject (a wider Min / Max narrows it once),
+// and a new subject or Show min/max starts it afresh.
+int32_t histChipRoom(int32_t topW, int32_t leftW, int32_t rightW) {
+    const int32_t half = LV_MIN(topW / 2 - leftW, topW / 2 - rightW) - mm(UI::shape().S5);
+    const int32_t room = 2 * LV_MAX(half, 1);
+    s_hv.chipRoom = s_hv.chipRoom ? LV_MIN(s_hv.chipRoom, room) : room;
+    return s_hv.chipRoom;
+}
+
+// Before the chart's first answer: its corners as they will be, the numbers
+// taken as wide as Now's.
+int32_t histChipRoomBefore(lv_obj_t *row) {
+    if (s_hv.chipRoom) return s_hv.chipRoom;
+    const lv_font_t *f = UI::type().TAG;
+    char now[32], buf[48];
+    cardFormatValue(*s_hv.e, now, sizeof(now), true, s.tempUnit);
+    snprintf(buf, sizeof(buf), "Now: %s", now);
+    const int32_t leftW = s_hv.minMax ? LV_MAX(textW("Min:", f), textW("Max:", f)) + mm(UI::shape().S3) + textW(now, f) : 0;
+    lv_obj_update_layout(row);
+    return histChipRoom(lv_obj_get_width(row), leftW, textW(buf, f));
+}
+
 // THE TOP LINE (owner, rounds 5 and 6), one shape for the chart and activity,
 // loading or drawn, so nothing moves when the answer arrives: the span chips
 // or "Showing: ..." in the middle; on the chart, Min / Max in the left corner
@@ -249,7 +274,8 @@ void histDraw() {
     }
     // Still asking, or no answer: the chips stay, so another span can be tried
     // - in the same top line as the answer's, so nothing moves when it comes.
-    histTopMiddle(histTopRow(s_hv.body));
+    lv_obj_t *top = histTopRow(s_hv.body);
+    histTopMiddle(top, (s_hv.chart && histChipsOn()) ? histChipRoomBefore(top) : 0);
     lv_obj_t *mid = plain(s_hv.body);
     lv_obj_set_width(mid, lv_pct(100));
     lv_obj_set_flex_grow(mid, 1);
