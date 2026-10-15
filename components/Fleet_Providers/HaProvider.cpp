@@ -257,11 +257,23 @@ void HaProvider::loop(uint32_t nowMs) {
         }
         // A pause saved for a member could not be applied at boot: it did not
         // exist yet.
-        if (_reg->takeLearnt()) _reg->restorePaused();
+        if (_reg->takeLearnt()) {
+            _reg->restorePaused();
+            // NOR WERE ITS AREA AND DEVICE ASKED (#93): the session's query
+            // goes as soon as the subscription does, and a group reports its
+            // members after that - so a member's Properties said "None". Asked
+            // once more, everything again, when the first query is done.
+            if (_scenesForSession == session) _askAgain = true;
+        }
 
-        // The lights' scenes, once per session; then cancel the template,
+        // The lights' scenes and every entity's area, once per session - and
+        // once more after members were learnt; then cancel the template,
         // which would otherwise go on re-rendering.
-        if (_scenesForSession != session && sendSceneQuery()) _scenesForSession = session;
+        if (_scenesForSession != session) {
+            if (sendSceneQuery()) { _scenesForSession = session; _askAgain = false; }
+        } else if (_askAgain && !_tplId.load()) {
+            if (sendSceneQuery()) _askAgain = false;
+        }
         const uint32_t tpl = _tplId.load();
         if (tpl && _tplDone.exchange(false)) {
             char frame[96];
@@ -280,6 +292,7 @@ void HaProvider::loop(uint32_t nowMs) {
     _subscribedCount      = count;
     _tplId.store(0);   // a template from the last session died with it
     _tplDone.store(false);
+    _askAgain = false;
 
     // Subscribing and re-fetching are ONE event, so they happen in one place.
     //
