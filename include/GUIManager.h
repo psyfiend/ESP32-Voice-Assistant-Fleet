@@ -159,7 +159,7 @@ private:
     void cycleGlyphs();              // bare -> square -> circle, saved (#19)
     static GlyphStyle savedGlyphStyle();   // the owner's, else GLYPH_DEFAULT
     // /popup's slot=, glyphs=, pagehdr= and alarm= (DEBUG_POPUP): one line saying what it did.
-    const char *headerDebug(const char *slot, int glyphs, int pageHdr, int alarm);
+    const char *headerDebug(const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn);
     Kit::Drawer _slotDrawer;
     int8_t      _slotPanel = -1;     // the slot whose drawer is open, or -1
     static void reportUiSection();   // [UI STATE] in the System Doctor

@@ -87,19 +87,23 @@ public:
 
 private:
     // One slot and what it shows. Which object is which depends on the kind:
-    //   clock   a: the time, b: am / pm, c: the row they stand in
+    //   clock   a: the time, b: am / pm, c: the row they stand in, frame + glyph: the bell
     //   page    a: the page's name, c: its dots
     //   status  the two glyphs (their own widgets), nothing here
     //   sensor  frame: the icon's frame, a: the icon, b: the value, c: the error mark
-    //   alarm   frame: the bell's frame, a: the bell, c: the time's row, b: the time, d: am / pm
-    // `extra` is what its forms shed, in order (HeaderSlots.h): the page's name,
-    // the sensor's icon, the alarm's time.
+    //   alarm   frame + glyph: the ringing bell (the 12-hour notice)
+    //   ap      frame + glyph: the mast
+    // `extra` is what its forms shed, in order (HeaderSlots.h): the clock's bell,
+    // the page's name, the sensor's icon. An extra that is OFF (the bell with no
+    // alarm this week) takes no room and stays hidden whatever the form.
     struct Slot {
         SlotKind    kind   = SlotKind::SLOT_CLOCK;
         HeaderPlace place  = HeaderPlace::PLACE_LEFT;
         const char *entity = nullptr;
-        lv_obj_t   *box = nullptr, *frame = nullptr, *a = nullptr, *b = nullptr, *c = nullptr, *d = nullptr;
+        lv_obj_t   *box = nullptr, *frame = nullptr, *a = nullptr, *b = nullptr, *c = nullptr;
+        Kit::StrokeGlyph glyph;            // the bell, the ringing bell, the mast
         lv_obj_t   *extra[Layout::HEADER_FORMS_MAX - 1] = {};
+        bool        extraOn[Layout::HEADER_FORMS_MAX - 1] = { true, true };
         uint8_t     nExtra = 0;
         bool        wanted = true;     // its claim's condition (the alarm: one is set)
         bool        shown  = false;    // the plan put it on the bar
@@ -121,6 +125,10 @@ private:
     void buildStatus(Slot &s);  void updateStatus(Slot &s, bool force);
     void buildSensor(Slot &s);  void updateSensor(Slot &s, bool force);
     void buildAlarm(Slot &s);   void updateAlarm(Slot &s, bool force);
+    void buildAp(Slot &s);      void updateAp(Slot &s, bool force);
+    // A glyph slot's frame and stroke glyph, in the bar's style.
+    void glyphIn(Slot &s, lv_obj_t *parent, Glyphs::Shape shape);
+    void paintGlyph(Slot &s, uint32_t col);
     static void slotClickCb(lv_event_t *e);
 
     lv_obj_t       *_bar = nullptr;

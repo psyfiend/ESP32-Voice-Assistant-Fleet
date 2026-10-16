@@ -41,6 +41,16 @@
 // The popup's dim, the same near-black on every scheme (Card Popup Mock v3).
 #define SCRIM_DARK 0x05080C
 
+// The header's status glyphs (2.8 round 3, D-27): the dark schemes take the
+// "Fleet Status Glyphs" mock's softer set (34D399 in place of 00FF00); Linen
+// its own darker set, every one at least ~3:1 on its sand bar.
+#define SIG_DARK                                                       \
+    .SIG_STRONG = 0x34D399, .SIG_GOOD = 0x4ADE80, .SIG_WEAK = 0xFBBF24, \
+    .SIG_BAD = 0xF87171, .SIG_BUSY = 0x60A5FA, .SIG_OFF = 0x64748B, .SIG_LINK = 0xA78BFA
+#define SIG_LINEN                                                      \
+    .SIG_STRONG = 0x1B7A3A, .SIG_GOOD = 0x2F8F4E, .SIG_WEAK = 0x9A6412, \
+    .SIG_BAD = 0xB4321F, .SIG_BUSY = 0x1D5FD6, .SIG_OFF = 0x8A8076, .SIG_LINK = 0x6B4FC8
+
 // THREE SCHEMES, pruned on glass 2026-09-23: Fleet, Midnight, Linen.
 //
 // Slate went because it differed from Midnight only in its accent ("slate is
@@ -81,6 +91,7 @@ const UIPalette UI_PAL_LINEN = {
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
     .SCRIM       = SCRIM_DARK,
+    SIG_LINEN,
 };
 
 // Today's shipped UI, read out of UIToolkit.cpp and Panel_Header.cpp rather
@@ -99,6 +110,7 @@ const UIPalette UI_PAL_FLEET = {
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_DARK,
     .SCRIM       = SCRIM_DARK,
+    SIG_DARK,
 };
 
 // The owner's verdict after seeing the dark schemes on glass: the former
@@ -116,8 +128,11 @@ const UIPalette UI_PAL_MIDNIGHT = {
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_DARK,
     .SCRIM       = SCRIM_DARK,
+    SIG_DARK,
 };
 
+#undef SIG_DARK
+#undef SIG_LINEN
 #undef FLEET_STATE_AND_TINTS
 #undef ST_ACTIVE_ORANGE
 #undef TINT_LIGHTING_DARK
@@ -179,7 +194,7 @@ const UIShape UI_SHAPE = {
 // each side where round 2's mock drew it (24 px from the P4_5's edge); two
 // slots' pads and SPACE part neighbours as the status glyphs are parted.
 const UIHeader UI_HEADER = {
-    .GLYPH = 28, .GLYPH_FRAMED = 19, .FRAME = 26, .FRAME_R = 7, .FRAME_MIX = 14,
+    .GLYPH = 26, .FRAME = 28, .FRAME_R = 7, .FRAME_MIX = 14,
     .SLOT_GAP = 8, .SLOT_PAD = 6, .EDGE = 8, .SPACE = 2, .CLEAR = 12,
     .DOT_ON = 11, .DOT_OFF = 8, .DOT_RING = 2, .DOT_GAP = 5,
     .MARK = 12, .LINE = 2,

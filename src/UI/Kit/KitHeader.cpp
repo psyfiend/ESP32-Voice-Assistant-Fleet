@@ -35,9 +35,11 @@ lv_obj_t *glyphFrame(lv_obj_t *parent, GlyphStyle style) {
         case GlyphStyle::GLYPH_SQUARE: add(f, KitStyle::KS_GLYPH_SQUARE); break;
         case GlyphStyle::GLYPH_CIRCLE: add(f, KitStyle::KS_GLYPH_CIRCLE); break;
         default:
-            // Bare: a holder exactly the glyph's size, so the glyph sits where
-            // it always did and a tap still falls through to the slot.
-            lv_obj_set_size(f, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            // Bare: a holder the glyph's size (UIHeader GLYPH), so a tap falls
+            // through to the slot.
+            lv_obj_set_size(f, UI::sc(UI::hdr().GLYPH), UI::sc(UI::hdr().GLYPH));
+            lv_obj_set_flex_flow(f, LV_FLEX_FLOW_ROW);
+            lv_obj_set_flex_align(f, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
             break;
     }
     return f;

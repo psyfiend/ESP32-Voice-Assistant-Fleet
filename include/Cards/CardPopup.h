@@ -134,10 +134,10 @@ public:
     // 2.8: /popup?slot=<kind> (a header slot's panel, by its kind's name -
     // clock, sensor, page, alarm, status; -1 closes), glyphs=0|1|2 (the glyph
     // style, not saved; 3 the saved one), pagehdr=0|1 (this page's header
-    // hidden or shown - SAVED, as the page panel saves it) and alarm=HHMM (a
-    // pretend next alarm, RAM only; -1 clears - Alarms.h). Answers one line
-    // saying what it did.
-    static void setHeaderHook(const char *(*hook)(const char *slot, int glyphs, int pageHdr, int alarm));
+    // hidden or shown - SAVED, as the page panel saves it), alarm=HHMM (a
+    // pretend next alarm, RAM only; -1 clears - Alarms.h) and alarmin=N (one N
+    // minutes from now). Answers one line saying what it did.
+    static void setHeaderHook(const char *(*hook)(const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn));
 private:
     static void debugService(lv_timer_t *t);   // the LVGL-thread half
 #endif

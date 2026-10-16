@@ -1,29 +1,19 @@
 #include "UI/Widget_ConnStatus.h"
 #include "UI/UIToolkit.h"
-#include "UI/Kit.h"   // the glyph's frame (2.8)
 
-// Palette - semantic, not themeable: these colours ARE the information.
-//
-// The greens are brighter than the original spec's #34d399/#4ade80. Those read
-// as washed out on the WS_P4_7B panel in person - these displays have poor
-// gamma and mid-saturation colours lose a lot of punch, which a mockup on a
-// desktop monitor cannot show you. Matched to the pure green the old dummy
-// icon used, which was legible. Tune per-board if another panel disagrees.
-static const uint32_t COL_STRONG  = 0x00ff00;  // excellent
-static const uint32_t COL_GOOD    = 0x2ee65a;  // good
-static const uint32_t COL_WEAK    = 0xfbbf24;  // marginal / AP mode
-static const uint32_t COL_BAD     = 0xf87171;  // no link / degraded
-static const uint32_t COL_OFF     = 0x64748b;  // deliberately disabled
-static const uint32_t COL_BUSY    = 0x60a5fa;  // connecting
-
-// Arc sweep. LVGL angles run clockwise from 3 o'clock, so 210->330 passes
-// through 270 (12 o'clock) and gives an upward-opening fan.
-static const int32_t ARC_START = 210;
-static const int32_t ARC_END   = 330;
+// Colours - semantic: these ARE the information, and since 2.8 round 3 they
+// are the scheme's own (UIPalette SIG_*, D-27). History: the greens were once
+// brighter than the "Fleet Status Glyphs" spec (00FF00 - the spec's looked
+// washed out on the 7B); the owner chose the spec's softer pair again on the
+// round-3 canvas, and Linen has a darker set of its own.
 
 static const uint32_t POLL_MS = 400;   // 2.5 Hz is plenty for a status icon
 
-void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr, GlyphStyle style) {
+using Glyphs::WIFI_ARC1;
+using Glyphs::WIFI_DOT;
+using Glyphs::WIFI_STALK;
+
+void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr, GlyphStyle style, int32_t px) {
     _mgr   = mgr;
     _style = style;
     // A fresh start: the header rebuilds its slots, and the old objects (and
@@ -38,88 +28,13 @@ void Widget_ConnStatus::init(lv_obj_t *parent, ConnectivityManager *mgr, GlyphSt
         _motion = Motion::BLINK;
     #endif
 
-    // Fan bounding box: today's size bare, smaller inside a frame.
-    const UIHeader &h = UI::hdr();
-    const int32_t S   = UIToolkit::sc(style == GlyphStyle::GLYPH_BARE ? h.GLYPH : h.GLYPH_FRAMED);
-    const int32_t cx  = S / 2;
-    const int32_t cy  = (S * 4) / 5;                 // fan origin sits low
-    const int32_t aw  = UIToolkit::sc(2) < 2 ? 2 : UIToolkit::sc(2);
-
-    _root = lv_obj_create(parent);
-    lv_obj_remove_style_all(_root);
-    lv_obj_set_size(_root, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(_root, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(_root, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(_root, 0, 0);
-    // Touches belong to the header's hotspot wrapper, not to the glyph.
-    lv_obj_remove_flag(_root, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(_root, LV_OBJ_FLAG_SCROLLABLE);
-
-    _frame = Kit::glyphFrame(_root, style);
-    _fan = lv_obj_create(_frame);
-    lv_obj_remove_style_all(_fan);
-    lv_obj_set_size(_fan, S, S);
-    lv_obj_remove_flag(_fan, LV_OBJ_FLAG_SCROLLABLE);
-
-    // Three concentric arcs, all centred on (cx, cy). Each lv_arc is centred in
-    // its own box, so aligning by top-left with a half-size offset puts every
-    // arc's centre on the same point. Only the upper sweep is drawn, so the
-    // parts that fall below the container are never rendered.
-    const int32_t size[3] = { (S * 2) / 5, (S * 7) / 10, S };   // inner -> outer
-    for (int i = 0; i < 3; i++) {
-        lv_obj_t *a = lv_arc_create(_fan);
-        lv_obj_set_size(a, size[i], size[i]);
-        lv_obj_set_pos(a, cx - size[i] / 2, cy - size[i] / 2);
-        lv_arc_set_bg_angles(a, ARC_START, ARC_END);
-        lv_obj_set_style_arc_width(a, aw, LV_PART_MAIN);
-        lv_obj_set_style_arc_rounded(a, true, LV_PART_MAIN);
-        // An lv_arc is a control by default; strip the knob and the value
-        // indicator so only the background sweep paints.
-        lv_obj_set_style_arc_opa(a, LV_OPA_TRANSP, LV_PART_INDICATOR);
-        lv_obj_set_style_bg_opa(a, LV_OPA_TRANSP, LV_PART_KNOB);
-        lv_obj_remove_flag(a, LV_OBJ_FLAG_CLICKABLE);
-        _arc[i] = a;
-    }
-
-    // Optical centring nudge. lv_arc centres its stroke on the arc radius, so
-    // the visual centre of the fan sits slightly above and right of the
-    // geometric origin; the dot needs to come back down and left to look
-    // centred. Confirmed by eye on both the 7B and the 3248.
-    const int32_t nx = -UIToolkit::sc(1);
-    const int32_t ny =  UIToolkit::sc(2);
-
-    const int32_t dotD = UIToolkit::sc(5) < 4 ? 4 : UIToolkit::sc(5);
-    _dot = lv_obj_create(_fan);
-    lv_obj_remove_style_all(_dot);
-    lv_obj_set_size(_dot, dotD, dotD);
-    lv_obj_set_pos(_dot, cx - dotD / 2 + nx, cy - dotD / 2 + ny);
-    lv_obj_set_style_radius(_dot, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_opa(_dot, LV_OPA_COVER, 0);
-
-    // Bare antenna stalk: shown only when zero arcs are lit, so "radio on, no
-    // link" is a distinct silhouette rather than just a recoloured full fan.
-    _stalk = lv_obj_create(_fan);
-    lv_obj_remove_style_all(_stalk);
-    lv_obj_set_size(_stalk, aw, UIToolkit::sc(7));
-    lv_obj_set_pos(_stalk, cx - aw / 2 + nx, cy - UIToolkit::sc(7) + ny);
-    lv_obj_set_style_bg_opa(_stalk, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(_stalk, aw, 0);
-    lv_obj_add_flag(_stalk, LV_OBJ_FLAG_HIDDEN);
-
-    _strikePts[0] = { (lv_value_precise_t)(S / 6),       (lv_value_precise_t)(S - S / 6) };
-    _strikePts[1] = { (lv_value_precise_t)(S - S / 6),   (lv_value_precise_t)(S / 6) };
-    _strike = lv_line_create(_fan);
-    lv_line_set_points(_strike, _strikePts, 2);
-    lv_obj_set_style_line_width(_strike, aw, 0);
-    lv_obj_set_style_line_rounded(_strike, true, 0);
-    lv_obj_set_style_line_color(_strike, lv_color_hex(COL_OFF), 0);
-    lv_obj_add_flag(_strike, LV_OBJ_FLAG_HIDDEN);
-
-    // Badge is its own label rather than text appended to the glyph: it needs
-    // an independent colour, and mixing sizes inside one label renders badly.
-    _badge = lv_label_create(_root);
-    lv_label_set_text(_badge, "");
-    lv_obj_set_style_text_font(_badge, UIToolkit::Font_Caption, 0);
+    // THE SAME SIZE IN EVERY STYLE (D-24): the frame is a little larger than
+    // the glyph; it never makes the glyph smaller.
+    const int32_t S = px > 0 ? px : UIToolkit::sc(UI::hdr().GLYPH);
+    _frame = Kit::glyphFrame(parent, style);
+    lv_obj_remove_flag(_frame, LV_OBJ_FLAG_CLICKABLE);   // touches are the slot's
+    Kit::strokeGlyph(_g, _frame, Glyphs::Shape::WIFI, S);
+    lv_obj_center(_g.box);
 
     _lastKey = -1;
     tick();   // paint the real state immediately, not a default frame
@@ -131,23 +46,30 @@ lv_color_t Widget_ConnStatus::glyphCol(lv_color_t state) {
     return UI::c(UI::pal().SURFACE_ALT);
 }
 
-void Widget_ConnStatus::setArcs(int litCount, lv_color_t col, bool glow) {
+// A strike's halo is the ground the glyph stands on: the bar, the square's
+// shade, or the circle's colour.
+lv_color_t Widget_ConnStatus::groundCol(lv_color_t state) const {
+    const UIPalette &p = UI::pal();
+    switch (_style) {
+        case GlyphStyle::GLYPH_CIRCLE: return state;
+        case GlyphStyle::GLYPH_SQUARE: return UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, UI::hdr().FRAME_MIX));
+        default:                       return UI::c(p.SURFACE_ALT);
+    }
+}
+
+void Widget_ConnStatus::setArcs(int litCount, uint32_t col) {
     // In a circle the unlit arcs are the lit ones' colour, faded: grey on a
     // coloured disc would read as a second state.
     const bool       circle = _style == GlyphStyle::GLYPH_CIRCLE;
-    const lv_color_t c      = glyphCol(col);
+    const lv_color_t c      = glyphCol(UI::c(col));
     for (int i = 0; i < 3; i++) {
-        bool lit = (i < litCount);
-        lv_obj_set_style_arc_color(_arc[i], lit || circle ? c : lv_color_hex(COL_OFF), LV_PART_MAIN);
-        lv_obj_set_style_arc_opa(_arc[i], lit ? LV_OPA_COVER : circle ? LV_OPA_40 : LV_OPA_20, LV_PART_MAIN);
+        const bool lit = i < litCount;
+        Kit::strokeGlyphPaint(_g, (uint8_t)(WIFI_ARC1 + i), lit || circle ? c : UI::c(UI::pal().SIG_OFF),
+                              lit ? LV_OPA_COVER : circle ? LV_OPA_40 : LV_OPA_50);
     }
-    lv_obj_set_style_bg_color(_dot, c, 0);
-    lv_obj_set_style_bg_color(_stalk, c, 0);
-    lv_obj_set_style_line_color(_strike, circle ? c : lv_color_hex(COL_OFF), 0);
-    if (litCount == 0) lv_obj_remove_flag(_stalk, LV_OBJ_FLAG_HIDDEN);
-    else               lv_obj_add_flag(_stalk, LV_OBJ_FLAG_HIDDEN);
-    (void)glow;   // reserved: LVGL has no cheap outer-glow; revisit with the
-                  // MDI icon font in Phase 2.2 rather than faking it now.
+    Kit::strokeGlyphPaint(_g, WIFI_DOT, c);
+    Kit::strokeGlyphPaint(_g, WIFI_STALK, c);
+    Kit::strokeGlyphShow(_g, WIFI_STALK, litCount == 0);
 }
 
 static void opa_anim_cb(void *obj, int32_t v) {
@@ -158,7 +80,7 @@ void Widget_ConnStatus::startMotion() {
     if (_motionRunning || _motion == Motion::OFF) return;
     lv_anim_t a;
     lv_anim_init(&a);
-    lv_anim_set_var(&a, _fan);
+    lv_anim_set_var(&a, _g.box);
     lv_anim_set_exec_cb(&a, opa_anim_cb);
     lv_anim_set_values(&a, LV_OPA_30, LV_OPA_COVER);
     lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
@@ -179,8 +101,8 @@ void Widget_ConnStatus::startMotion() {
 
 void Widget_ConnStatus::stopMotion() {
     if (!_motionRunning) return;
-    lv_anim_delete(_fan, opa_anim_cb);
-    lv_obj_set_style_opa(_fan, LV_OPA_COVER, LV_PART_MAIN);
+    lv_anim_delete(_g.box, opa_anim_cb);
+    lv_obj_set_style_opa(_g.box, LV_OPA_COVER, LV_PART_MAIN);
     _motionRunning = false;
 }
 
@@ -192,25 +114,21 @@ void Widget_ConnStatus::setMotion(Motion m) {
     if (wasRunning) startMotion();
 }
 
-void Widget_ConnStatus::setArcsUnknown(lv_color_t col) {
+void Widget_ConnStatus::setArcsUnknown(uint32_t col) {
     // Connected, strength unknown. Every arc ghosted, dot solid: the dot says
     // "there is a link", the ghosted arcs say "how strong is not known".
-    const lv_color_t c = glyphCol(col);
-    for (int i = 0; i < 3; i++) {
-        lv_obj_set_style_arc_color(_arc[i], c, LV_PART_MAIN);
-        lv_obj_set_style_arc_opa(_arc[i], LV_OPA_30, LV_PART_MAIN);
-    }
-    lv_obj_set_style_bg_color(_dot, c, 0);
-    lv_obj_add_flag(_stalk, LV_OBJ_FLAG_HIDDEN);
+    const lv_color_t c = glyphCol(UI::c(col));
+    for (int i = 0; i < 3; i++) Kit::strokeGlyphPaint(_g, (uint8_t)(WIFI_ARC1 + i), c, LV_OPA_30);
+    Kit::strokeGlyphPaint(_g, WIFI_DOT, c);
+    Kit::strokeGlyphShow(_g, WIFI_STALK, false);
 }
 
-void Widget_ConnStatus::applyVisual(ConnState st, SignalBand band, bool apUp,
-                                    LinkHealth health, bool retrying) {
+void Widget_ConnStatus::applyVisual(ConnState st, SignalBand band, LinkHealth health, bool retrying) {
+    const UIPalette &p = UI::pal();
     // Always reset the transient bits first, so no previous state can leak
     // through into the next one.
     stopMotion();
-    lv_obj_add_flag(_strike, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_text(_badge, "");
+    Kit::strokeGlyphStrike(_g, false, UI::c(p.SIG_OFF), UI::c(p.SIG_OFF));
 
     // Issue #49 - THE OVERRIDE, and it comes before the switch on purpose.
     //
@@ -218,43 +136,33 @@ void Widget_ConnStatus::applyVisual(ConnState st, SignalBand band, bool apUp,
     // STA_CONNECTED as far as the driver is concerned, so the switch below
     // would paint it green with full arcs. That is the precise lie this whole
     // change exists to stop: full bars for six hours while nothing on the LAN
-    // could reach the panel.
-    //
-    // The evidence outranks the driver's own story, so it is applied first and
-    // the switch never sees the case.
+    // could reach the panel. The evidence outranks the driver's own story.
     if (health == LinkHealth::LINK_DEAD &&
         (st == ConnState::STA_CONNECTED || st == ConnState::APSTA)) {
         // Bare stalk, red - identical to a frank disconnect, because that is
         // what it is. The device just has not been told yet.
-        setArcs(0, lv_color_hex(COL_BAD), false);
-        lv_label_set_text(_badge, "!");
-        lv_obj_set_style_text_color(_badge, lv_color_hex(COL_BAD), 0);
+        setArcs(0, p.SIG_BAD);
         return;
     }
 
     switch (st) {
-    case ConnState::RADIO_OFF:
-        setArcs(3, lv_color_hex(COL_OFF), false);
-        lv_obj_remove_flag(_strike, LV_OBJ_FLAG_HIDDEN);
+    case ConnState::RADIO_OFF: {
+        setArcs(3, p.SIG_OFF);
+        const lv_color_t c = glyphCol(UI::c(p.SIG_OFF));
+        Kit::strokeGlyphStrike(_g, true, c, groundCol(UI::c(p.SIG_OFF)));
         break;
+    }
 
     case ConnState::BOOT:
-        setArcs(0, lv_color_hex(COL_OFF), false);
+        setArcs(0, p.SIG_OFF);
         break;
 
     case ConnState::STA_CONNECTING:
-        // Two readings of the same state, because they mean different things
-        // to somebody looking at the panel. A first join is blue and unworried;
+        // Two readings of the same state: a first join is blue and unworried;
         // a board on its second or third try has been failing, and the amber
-        // says so without needing a number. Both pulse - motion still means
-        // "working", per the status-glyph spec.
-        if (retrying) {
-            setArcs(2, lv_color_hex(COL_WEAK), false);
-            lv_label_set_text(_badge, "RETRY");
-            lv_obj_set_style_text_color(_badge, lv_color_hex(COL_WEAK), 0);
-        } else {
-            setArcs(2, lv_color_hex(COL_BUSY), false);
-        }
+        // says so (the panel's CONNECTIVITY row says how often). Both pulse -
+        // motion still means "working".
+        setArcs(2, retrying ? p.SIG_WEAK : p.SIG_BUSY);
         startMotion();
         break;
 
@@ -264,52 +172,39 @@ void Widget_ConnStatus::applyVisual(ConnState st, SignalBand band, bool apUp,
         // the periodic re-read has been failing, which is itself informative,
         // so it gets its own silhouette rather than being folded into "weak".
         if (band == SignalBand::NONE) {
-            bool suspect = (health == LinkHealth::LINK_SUSPECT);
-            setArcsUnknown(lv_color_hex(suspect ? COL_WEAK : COL_GOOD));
-            if (st == ConnState::APSTA) {
-                lv_label_set_text(_badge, "AP");
-                lv_obj_set_style_text_color(_badge, lv_color_hex(COL_WEAK), 0);
-            }
+            setArcsUnknown(health == LinkHealth::LINK_SUSPECT ? p.SIG_WEAK : p.SIG_GOOD);
             break;
         }
-
         int      lit = 1;
-        uint32_t c   = COL_WEAK;
+        uint32_t c   = p.SIG_WEAK;
         switch (band) {
-            case SignalBand::EXCELLENT: lit = 3; c = COL_STRONG; break;
-            case SignalBand::GOOD:      lit = 2; c = COL_GOOD;   break;
-            case SignalBand::FAIR:      lit = 1; c = COL_WEAK;   break;
-            default:                    lit = 1; c = COL_BAD;    break;
+            case SignalBand::EXCELLENT: lit = 3; c = p.SIG_STRONG; break;
+            case SignalBand::GOOD:      lit = 2; c = p.SIG_GOOD;   break;
+            case SignalBand::FAIR:      lit = 1; c = p.SIG_WEAK;   break;
+            default:                    lit = 1; c = p.SIG_BAD;    break;
         }
         // A link under suspicion keeps its arc COUNT - the radio really is
-        // hearing the AP that well - but loses its colour and its glow. The
-        // count is a measurement and still true; the green is a reassurance
-        // and no longer earned.
-        if (health == LinkHealth::LINK_SUSPECT) c = COL_WEAK;
-        setArcs(lit, lv_color_hex(c),
-                band == SignalBand::EXCELLENT && health != LinkHealth::LINK_SUSPECT);
-        if (st == ConnState::APSTA) {
-            // Green arcs, amber badge: each half of the link reports itself.
-            lv_label_set_text(_badge, "AP");
-            lv_obj_set_style_text_color(_badge, lv_color_hex(COL_WEAK), 0);
-        }
+        // hearing the AP that well - but loses its colour. The count is a
+        // measurement and still true; the green is a reassurance and no longer
+        // earned.
+        if (health == LinkHealth::LINK_SUSPECT) c = p.SIG_WEAK;
+        setArcs(lit, c);
         break;
     }
 
     case ConnState::AP_ACTIVE:
-        // Amber, not red: provisioning is a working state, not a fault.
-        setArcs(3, lv_color_hex(COL_WEAK), false);
-        lv_label_set_text(_badge, "AP");
-        lv_obj_set_style_text_color(_badge, lv_color_hex(COL_WEAK), 0);
+        // Hosting the setup AP with no network joined: no link (the stalk), in
+        // amber, not red - provisioning is a working state, not a fault. The
+        // AP mast beside it says why.
+        setArcs(0, p.SIG_WEAK);
         break;
 
     case ConnState::DEGRADED:
     default:
         // Bare stalk, no arcs - the absence of arcs is the message.
-        setArcs(0, lv_color_hex(COL_BAD), false);
+        setArcs(0, p.SIG_BAD);
         break;
     }
-    (void)apUp;
 }
 
 void Widget_ConnStatus::repaint() {
@@ -319,7 +214,7 @@ void Widget_ConnStatus::repaint() {
 }
 
 void Widget_ConnStatus::tick() {
-    if (!_mgr || !_root) return;
+    if (!_mgr || !_frame) return;
 
     uint32_t now = millis();
     if (now - _lastPollMs < POLL_MS) return;
@@ -327,26 +222,17 @@ void Widget_ConnStatus::tick() {
 
     ConnState  st       = _mgr->getState();
     SignalBand band     = _mgr->getSignalBand();
-    bool       apUp     = _mgr->isApActive();
     LinkHealth health   = _mgr->getLinkHealth();
     bool       retrying = _mgr->isRetrying();
 
     // Change guard. Without it every poll would reissue style calls and
     // invalidate the icon region 2.5x/second forever - the redraw-scoping trap
-    // from the roadmap's gotcha list.
-    //
-    // Health and retrying are IN the key because they are in the visual. A
-    // state the glyph can draw but the guard cannot see is a glyph that
-    // silently stops updating, and this indicator exists to stop exactly that
-    // class of quiet wrongness.
+    // from the roadmap's gotcha list. Health and retrying are IN the key
+    // because they are in the visual.
     int32_t key = ((int32_t)st << 12) | ((int32_t)band << 8) |
-                  ((int32_t)health << 4) | (apUp ? 2 : 0) | (retrying ? 1 : 0);
+                  ((int32_t)health << 4) | (retrying ? 1 : 0);
     if (key == _lastKey) return;
     _lastKey = key;
 
-    applyVisual(st, band, apUp, health, retrying);
-    // An empty badge takes no room (2.8): its empty line stood the fan above
-    // the glyph beside it, plainly so once each glyph had a frame.
-    if (lv_label_get_text(_badge)[0]) lv_obj_remove_flag(_badge, LV_OBJ_FLAG_HIDDEN);
-    else                              lv_obj_add_flag   (_badge, LV_OBJ_FLAG_HIDDEN);
+    applyVisual(st, band, health, retrying);
 }

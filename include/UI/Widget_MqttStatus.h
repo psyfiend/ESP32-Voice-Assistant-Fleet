@@ -2,6 +2,7 @@
 #include <lvgl.h>
 #include "MqttManager.h"
 #include "UI/HeaderSlots.h"   // GlyphStyle
+#include "UI/Kit.h"           // Kit::StrokeGlyph
 
 // ---------------------------------------------------------------------------
 // MQTT status glyph - "glyph A" from the Fleet Status Glyphs artifact: a
@@ -41,13 +42,15 @@ public:
     // broker session itself - see FEED_SILENT_MS in the .cpp for why asking
     // the entity layer was the wrong answer twice.
     //
-    // `style` frames the glyph as the Wi-Fi glyph's is (2.8, #19). Framed, the
-    // glyph's own rounded square is left out - the frame is the square.
-    void init(lv_obj_t *parent, MqttManager *mqtt, GlyphStyle style = GlyphStyle::GLYPH_BARE);
+    // `style` frames the glyph as the Wi-Fi glyph's is (2.8, #19); the arrows
+    // are the same size in every style and have no square of their own (2.8
+    // round 3, D-24: UI/GlyphShapes.h). `px` (0: the header's glyph) is the
+    // drawing box.
+    void init(lv_obj_t *parent, MqttManager *mqtt, GlyphStyle style = GLYPH_DEFAULT, int32_t px = 0);
     void tick();
     void repaint();                    // a scheme change: draw the current state again
     void setMotion(Motion m);
-    lv_obj_t *getRoot() { return _root; }
+    lv_obj_t *getRoot() { return _frame; }
 
 private:
     lv_color_t glyphCol(lv_color_t state);   // as Widget_ConnStatus's
@@ -58,23 +61,15 @@ private:
 
     Look resolveLook() const;
     void applyVisual(Look look);
-    void tint(lv_color_t col);
+    void tint(uint32_t col, bool struck = false);
     void startMotion();
     void stopMotion();
 
     MqttManager *_mqtt = nullptr;
-    GlyphStyle   _style = GlyphStyle::GLYPH_BARE;
+    GlyphStyle   _style = GLYPH_DEFAULT;
 
     lv_obj_t *_frame  = nullptr;   // the glyph's frame (Kit::glyphFrame())
-    lv_obj_t *_root   = nullptr;
-    lv_obj_t *_box    = nullptr;   // the rounded square outline
-    lv_obj_t *_out    = nullptr;   // upper arrow, pointing right (publish)
-    lv_obj_t *_in     = nullptr;   // lower arrow, pointing left (subscribe)
-    lv_obj_t *_strike = nullptr;
-
-    lv_point_precise_t _outPts[3];
-    lv_point_precise_t _inPts[3];
-    lv_point_precise_t _strikePts[2];
+    Kit::StrokeGlyph _g;           // the two arrows (UI/GlyphShapes.h)
 
     Motion   _motion        = Motion::PULSE;
     bool     _motionRunning = false;

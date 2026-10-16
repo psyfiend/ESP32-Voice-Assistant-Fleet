@@ -69,6 +69,13 @@ struct UIPalette {
     // scheme, Linen included - a light dim reads as fog, not as "behind".
     // Drawn as a translucent BACKGROUND, never an object opa (LESSONS: layers).
     uint32_t SCRIM;
+    // --- The header's status glyphs (2.8 round 3, D-24, D-27) ---
+    // Their own colours per scheme: the dark schemes' the "Fleet Status Glyphs"
+    // mock's softer set, Linen's darker so they read on sand (the Wi-Fi green
+    // all but vanished there). Strong / good / weak / bad: Wi-Fi's strength;
+    // busy: joining; off: switched off, and an unlit arc; link: the HA / MQTT
+    // link while it is well.
+    uint32_t SIG_STRONG, SIG_GOOD, SIG_WEAK, SIG_BAD, SIG_BUSY, SIG_OFF, SIG_LINK;
 };
 
 // ---------------------------------------------------------------------------
@@ -186,9 +193,8 @@ struct UIShape {
 // sits in it is sized in the same logical pixels: pass these to UI::sc(). One
 // set, fleet-wide, read through UI::hdr(); docs/design/tokens.md section 8.
 struct UIHeader {
-    uint8_t GLYPH;         // 28  a status glyph's drawing box, bare (today's size)
-    uint8_t GLYPH_FRAMED;  // 19  the same glyph inside a frame
-    uint8_t FRAME;         // 26  a glyph's frame, the rounded square or the circle
+    uint8_t GLYPH;         // 26  a glyph's drawing box - THE SAME bare or framed (D-24: a frame never shrinks it)
+    uint8_t FRAME;         // 28  a glyph's frame, the rounded square or the circle
     uint8_t FRAME_R;       //  7  the rounded square's corners
     uint8_t FRAME_MIX;     // 14  the rounded square's shade: % of TEXT over the bar
     uint8_t SLOT_GAP;      //  8  between the things in one slot

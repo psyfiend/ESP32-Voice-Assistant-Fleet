@@ -982,8 +982,8 @@ void GUIManager::begin() {
     // ...and the header's slots (2.8): slot=<kind> opens that slot's panel as
     // a tap does, slot=-1 closes any; glyphs=0|1|2 shows a glyph style without
     // saving it, glyphs=3 the saved one again; alarm=HHMM a pretend alarm.
-    CardPopup::setHeaderHook([](const char *slot, int glyphs, int pageHdr, int alarm) -> const char * {
-        return s_self ? s_self->headerDebug(slot, glyphs, pageHdr, alarm) : "no GUI";
+    CardPopup::setHeaderHook([](const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn) -> const char * {
+        return s_self ? s_self->headerDebug(slot, glyphs, pageHdr, alarm, alarmIn) : "no GUI";
     });
 #endif
 

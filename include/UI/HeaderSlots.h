@@ -28,7 +28,10 @@
 
 // Prefixed, never a bare word: Arduino's macros eat single ALL-CAPS words
 // (CLAUDE.md, "Arduino's global macro namespace will eat your enum").
-enum class SlotKind : uint8_t { SLOT_CLOCK, SLOT_PAGE, SLOT_STATUS, SLOT_SENSOR, SLOT_ALARM, SLOT_KIND_COUNT };
+// SLOT_CLOCK holds the bell while an alarm is within a week (D-21); SLOT_ALARM
+// is the alarm's NOTICE among the status icons, within the owner's warning time
+// (12 hours unless set); SLOT_AP the access point's mast while one is up (D-24).
+enum class SlotKind : uint8_t { SLOT_CLOCK, SLOT_PAGE, SLOT_STATUS, SLOT_SENSOR, SLOT_ALARM, SLOT_AP, SLOT_KIND_COUNT };
 
 using Layout::HeaderPlace;
 
@@ -53,9 +56,10 @@ const char *slotKindName(SlotKind k);
 bool        slotKindFromName(const char *name, SlotKind &out);
 
 // The header every page has unless its PageSpec names its own
-// (PageSpec::headerSlots): the clock and the deck's outdoor temperature (from
-// HA - on the House page's cards as "Deck") on the left, the page in the
-// middle, the alarm and the status glyphs on the right.
+// (PageSpec::headerSlots): the clock (and its bell) and the deck's outdoor
+// temperature (from HA - on the House page's cards as "Deck") on the left, the
+// page in the middle, the alarm's notice, the AP mast and the status glyphs on
+// the right.
 extern const SlotSpec HEADER_DEFAULT[];
 extern const uint8_t  HEADER_DEFAULT_COUNT;
 static constexpr uint8_t HEADER_SLOTS_MAX = Layout::HEADER_CLAIMS_MAX;

@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include "UI/UITokens.h"
 #include "UI/HeaderSlots.h"   // GlyphStyle
+#include "UI/GlyphShapes.h"   // Kit::strokeGlyph()
 
 namespace Kit {
 
@@ -338,6 +339,28 @@ lv_obj_t *headerSlot(lv_obj_t *bar, lv_event_cb_t cb, void *user);
 // rounded square, CIRCLE the circle - whose colour is the caller's to set: it is
 // the glyph's state. The glyph goes inside, centred.
 lv_obj_t *glyphFrame(lv_obj_t *parent, GlyphStyle style);
+
+// --- A stroke glyph (KitGlyph.cpp, 2.8 round 3) ------------------------------------
+// One of the status glyphs drawn from its strokes (UI/GlyphShapes.h) at `px`
+// square: LVGL's own round-capped arcs and lines, each stroke its own object so
+// each PART takes its own colour. A STRIKE (switched off on purpose) lies over
+// it on a halo of the ground it stands on. Its state lives here, kept by the
+// caller while it shows (a line keeps a pointer to its points).
+struct StrokeGlyph {
+    lv_obj_t *box = nullptr;
+    lv_obj_t *obj[Glyphs::STROKES_MAX] = {};
+    uint8_t   part[Glyphs::STROKES_MAX] = {};
+    uint8_t   n = 0;
+    lv_obj_t *halo = nullptr, *strike = nullptr;
+    lv_point_precise_t pts[Glyphs::STROKES_MAX][2];
+    lv_point_precise_t strikePts[2];
+};
+void strokeGlyph(StrokeGlyph &g, lv_obj_t *parent, Glyphs::Shape shape, int32_t px);
+// Colour every stroke of `part` (ALL_PARTS: every stroke), at `opa`.
+constexpr uint8_t ALL_PARTS = 0xFF;
+void strokeGlyphPaint(StrokeGlyph &g, uint8_t part, lv_color_t c, lv_opa_t opa = LV_OPA_COVER);
+void strokeGlyphShow(StrokeGlyph &g, uint8_t part, bool shown);
+void strokeGlyphStrike(StrokeGlyph &g, bool on, lv_color_t c, lv_color_t halo);
 
 // --- A drawer (KitDrawer.cpp, 2.8) -------------------------------------------------
 // A PANEL THAT SLIDES DOWN from a header slot: square where it meets the bar,

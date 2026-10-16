@@ -8,7 +8,7 @@
 #include <string.h>
 #include <time.h>
 #include "UI/Kit.h"
-#include "UI/UIIcons.h"           // MDI_THERMOMETER, MDI_BELL_OUTLINE
+#include "UI/UIIcons.h"           // MDI_THERMOMETER
 #include "UI/UIToolkit.h"
 #include "Cards/CardIcons.h"      // a sensor's icon, tint and value, as its card draws them
 #include "Alarms.h"
@@ -54,6 +54,7 @@ const Panel_Header::KindOps &Panel_Header::ops(SlotKind k) {
         { SlotKind::SLOT_STATUS, &Panel_Header::buildStatus, &Panel_Header::updateStatus },
         { SlotKind::SLOT_SENSOR, &Panel_Header::buildSensor, &Panel_Header::updateSensor },
         { SlotKind::SLOT_ALARM,  &Panel_Header::buildAlarm,  &Panel_Header::updateAlarm  },
+        { SlotKind::SLOT_AP,     &Panel_Header::buildAp,     &Panel_Header::updateAp     },
     };
     for (const KindOps &o : TABLE) if (o.kind == k) return o;
     return TABLE[0];
@@ -146,6 +147,7 @@ void Panel_Header::claimOf(const Slot &s, Layout::HeaderClaim &c) const {
         int32_t w = base;
         uint8_t n = nBase;
         for (uint8_t e = f; e < s.nExtra; e++) {
+            if (!s.extraOn[e]) continue;   // off (the bell with no alarm): no room
             const int32_t ew = lv_obj_get_width(s.extra[e]);
             if (ew > 0) { w += ew; n++; }
         }
@@ -179,8 +181,8 @@ void Panel_Header::plan() {
         if (!s.shown) { lv_obj_add_flag(s.box, LV_OBJ_FLAG_HIDDEN); continue; }
         lv_obj_remove_flag(s.box, LV_OBJ_FLAG_HIDDEN);
         for (uint8_t e = 0; e < s.nExtra; e++) {
-            if (e < s.form) lv_obj_add_flag   (s.extra[e], LV_OBJ_FLAG_HIDDEN);
-            else            lv_obj_remove_flag(s.extra[e], LV_OBJ_FLAG_HIDDEN);
+            if (e < s.form || !s.extraOn[e]) lv_obj_add_flag   (s.extra[e], LV_OBJ_FLAG_HIDDEN);
+            else                             lv_obj_remove_flag(s.extra[e], LV_OBJ_FLAG_HIDDEN);
         }
         lv_obj_set_pos(s.box, spot[i].x, 0);
         lv_obj_set_width(s.box, spot[i].w);
@@ -253,23 +255,50 @@ void Panel_Header::slotClickCb(lv_event_t *e) {
         if (h->_slots[i].box == box) { h->_onTap(i); return; }
 }
 
+// --- A glyph in a slot ------------------------------------------------------------
+// Its frame in the bar's style and a stroke glyph inside it (UI/GlyphShapes.h),
+// the same size in every style (D-24).
+void Panel_Header::glyphIn(Slot &s, lv_obj_t *parent, Glyphs::Shape shape) {
+    s.frame = Kit::glyphFrame(parent, _style);
+    Kit::strokeGlyph(s.glyph, s.frame, shape, UI::sc(UI::hdr().GLYPH));
+}
+
+// The glyph in `col`; in a circle, the circle takes it and the strokes the bar's.
+void Panel_Header::paintGlyph(Slot &s, uint32_t col) {
+    if (_style == GlyphStyle::GLYPH_CIRCLE) {
+        lv_obj_set_style_bg_color(s.frame, UI::c(col), 0);
+        Kit::strokeGlyphPaint(s.glyph, Kit::ALL_PARTS, UI::c(UI::pal().SURFACE_ALT));
+    } else {
+        Kit::strokeGlyphPaint(s.glyph, Kit::ALL_PARTS, UI::c(col));
+    }
+}
+
 // --- The clock ------------------------------------------------------------------
 // "1:55am", as the owner wrote it: 12-hour, am / pm small beside it, no seconds
-// (header-slots.md section 7 - Claude's view, open). Dashes until the clock
-// holds a real time (D-15). Redrawn when the minute changes, and only then.
+// (Q2: as built). Dashes until the clock holds a real time (D-15). Redrawn when
+// the minute changes, and only then. THE BELL (D-21) stands inside the clock's
+// slot while an alarm is within a week - the slot's extra, the first thing the
+// bar sheds; a tap on either opens the clock's panel, which says when.
 void Panel_Header::buildClock(Slot &s) {
     s.c = Kit::plain(s.box);
     Kit::add(s.c, Kit::KitStyle::KS_HDR_CLOCK);
     s.a = Kit::label(s.c, Kit::KitStyle::KS_HDR_TEXT);
     s.b = Kit::label(s.c, Kit::KitStyle::KS_HDR_TEXT_DIM);
+    glyphIn(s, s.box, Glyphs::Shape::BELL);
+    s.extra[0] = s.frame;
+    s.extraOn[0] = false;
+    s.nExtra = 1;
 }
 
 void Panel_Header::updateClock(Slot &s, bool force) {
     const time_t now = time(nullptr);
-    const int32_t key = TimeService::isSet() ? (int32_t)(now / 60) : -1;
+    const bool bell = TimeService::isSet() && Alarms::bell(now);
+    const int32_t key = TimeService::isSet() ? (int32_t)(now / 60) * 2 + (bell ? 1 : 0) : -1;
     if (!force && key == s.key) return;
     s.key = key;
     redrawn(s);
+    s.extraOn[0] = bell;
+    if (bell) paintGlyph(s, UI::pal().TEXT);
     if (key < 0) {
         lv_label_set_text(s.a, "--:--");
         lv_label_set_text(s.b, "");
@@ -388,42 +417,41 @@ void Panel_Header::updateSensor(Slot &s, bool force) {
     }
 }
 
-// --- The alarm --------------------------------------------------------------------
-// A bell and the next alarm's time, among the status glyphs (D-18). A CLAIM
-// WITH A CONDITION (D-19, D-20): with no alarm set it takes no room - an unset
-// alarm is not missing data. Until K84 builds alarms only a PC sets one
-// (Alarms.h). The time is the slot's extra: on a narrow bar the bell stands
-// alone, and its panel says when.
+// --- The alarm's notice -------------------------------------------------------------
+// A ringing bell among the status icons (D-21): A CLAIM WITH A CONDITION (D-19)
+// - the next alarm is within the owner's warning time (12 hours unless set on
+// the clock's panel) and its notice has not been dismissed. Amber: a notice,
+// not a fault. Its panel says when, dismisses it, and leads to the clock's.
 void Panel_Header::buildAlarm(Slot &s) {
-    s.frame = Kit::glyphFrame(s.box, _style);
-    s.a = Kit::label(s.frame, Kit::KitStyle::KS_HDR_ICON);
-    lv_label_set_text(s.a, MDI_BELL_OUTLINE);
-    s.c = Kit::plain(s.box);
-    Kit::add(s.c, Kit::KitStyle::KS_HDR_CLOCK);
-    s.b = Kit::label(s.c, Kit::KitStyle::KS_HDR_TEXT);
-    s.d = Kit::label(s.c, Kit::KitStyle::KS_HDR_TEXT_DIM);
-    s.extra[0] = s.c;
-    s.nExtra = 1;
+    glyphIn(s, s.box, Glyphs::Shape::BELL_RING);
 }
 
 void Panel_Header::updateAlarm(Slot &s, bool force) {
     time_t when = 0;
-    const bool set = Alarms::next(when);
-    const int32_t key = set ? (int32_t)(when / 60) : -1;
+    const bool on = TimeService::isSet() && Alarms::warning(time(nullptr), when);
+    const int32_t key = on ? (int32_t)(when / 60) : -1;
     if (!force && key == s.key) return;
     s.key = key;
-    s.wanted = set;
+    s.wanted = on;
     redrawn(s);
-    if (!set) return;
-    char hm[8];
-    const char *ampm;
-    clockText(when, hm, sizeof(hm), &ampm);
-    lv_label_set_text(s.b, hm);
-    lv_label_set_text(s.d, ampm);
-    // A bell has no state of its own: the bar's text colour, or in a circle
-    // the circle in it and the bell in the bar's.
-    if (_style == GlyphStyle::GLYPH_CIRCLE) {
-        lv_obj_set_style_bg_color(s.frame, UI::c(UI::pal().TEXT), 0);
-        lv_obj_set_style_text_color(s.a, UI::c(UI::pal().SURFACE_ALT), 0);
-    }
+    if (on) paintGlyph(s, UI::pal().SIG_WEAK);
+}
+
+// --- The access point ---------------------------------------------------------------
+// The mast (D-24, D-27 "B") while the board hosts its setup AP - amber,
+// provisioning being a working state, not a fault. Its own claim beside the
+// Wi-Fi fan, where it used to be a badge under it. A tap opens the system
+// panel, as the status glyphs' does.
+void Panel_Header::buildAp(Slot &s) {
+    glyphIn(s, s.box, Glyphs::Shape::AP_MAST);
+}
+
+void Panel_Header::updateAp(Slot &s, bool force) {
+    const bool on = _conn && _conn->isApActive();
+    const int32_t key = on ? 1 : 0;
+    if (!force && key == s.key) return;
+    s.key = key;
+    s.wanted = on;
+    redrawn(s);
+    if (on) paintGlyph(s, UI::pal().SIG_WEAK);
 }

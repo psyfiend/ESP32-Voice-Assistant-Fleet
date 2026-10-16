@@ -17,7 +17,9 @@
 // system panel; any other slot's is the slot drawer, built for it now. A second
 // tap on the open slot puts its panel away.
 void GUIManager::onSlotTap(uint8_t slot) {
-    if (_header.slotKind(slot) == SlotKind::SLOT_STATUS) { toggleSystemPanel(); return; }
+    // The status glyphs and the AP mast share the system panel (its CONNECTIVITY).
+    const SlotKind k = _header.slotKind(slot);
+    if (k == SlotKind::SLOT_STATUS || k == SlotKind::SLOT_AP) { toggleSystemPanel(); return; }
     if (_slotPanel == (int8_t)slot) { closeSlotPanel(true); return; }
     if (_pnlSystem.isExpanded()) _pnlSystem.close();
     UIToolkit::closeActiveAccordion();
@@ -49,6 +51,20 @@ void GUIManager::openSlotPanel(uint8_t slot) {
         g->closeSlotPanel(false);
         g->setPageHeaderShown(shown);
     };
+    // The alarm's notice (D-21): dismissed, it leaves the bar with its panel;
+    // its Settings opens the clock's panel, where the warning time is set.
+    c.dismissWarning = [](void *user) {
+        GUIManager *g = (GUIManager *)user;
+        Alarms::dismissWarning();
+        g->closeSlotPanel(true);
+        g->_header.refresh();
+    };
+    c.openClock = [](void *user) {
+        GUIManager *g = (GUIManager *)user;
+        const int s = g->_header.slotOf(SlotKind::SLOT_CLOCK);
+        if (s >= 0) g->openSlotPanel((uint8_t)s);
+    };
+    c.refreshHeader = [](void *user) { ((GUIManager *)user)->_header.refresh(); };
     if (!SlotPanels::build(_header.slotKind(slot), _slotDrawer.face, c)) return;
     syncPanelOffset();
     Kit::drawerPlace(_slotDrawer, _header.slotCentreX(slot), _slotDrawer.top);
@@ -112,8 +128,15 @@ void GUIManager::setPageHeaderShown(bool shown) {
 // saved one again; pagehdr=0|1 hides or shows this page's header, saved as the
 // page panel saves it; alarm=HHMM sets a pretend next alarm (RAM only, until
 // K84), alarm=-1 clears it.
-const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHdr, int alarm) {
+const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHdr, int alarm, int alarmIn) {
     static char out[96];
+    if (alarmIn >= 0) {
+        // N minutes from now, as HHMM: the notice (within 12 hours) whatever the hour.
+        time_t at = time(nullptr) + (time_t)alarmIn * 60 + 59;
+        struct tm t;
+        localtime_r(&at, &t);
+        alarm = t.tm_hour * 100 + t.tm_min;
+    }
     if (alarm > -2) {
         const bool ok = Alarms::setPretend(alarm < 0 ? -1 : alarm / 100, alarm < 0 ? 0 : alarm % 100, time(nullptr));
         // Its panel goes with its slot; then the alarm's claim, now.

@@ -141,9 +141,13 @@ PLAN = [
         ("slot_sensor", ["slot=sensor"], 1.2),
         (None, ["slot=-1"], 0.8),
     ]},
+    # Round 3 (D-21): an alarm in two hours - the bell beside the clock and the notice among the
+    # status icons; the notice's panel, then the clock's with the alarm and "Warn me before".
     {"page": 0, "card": None, "tree": "page", "steps": [
-        ("header_alarm", ["alarm=0630"], 0.8),
+        ("header_alarm", ["alarmin=120"], 0.8),
         ("slot_alarm", ["slot=alarm"], 1.2),
+        (None, ["slot=-1"], 0.8),
+        ("slot_clock_alarm", ["slot=clock"], 1.2),
         (None, ["slot=-1"], 0.8),
         (None, ["alarm=-1"], 0.6),
     ]},
