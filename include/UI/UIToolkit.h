@@ -96,4 +96,9 @@ public:
     static const lv_font_t* Font_Button;      // Action buttons
     static const lv_font_t* Font_PanelHeader; // Accordion titles
     static const lv_font_t* Font_Hero;        // Big status numbers
+    // THE HEADER BAR'S WORDS (2.8 round 3, D-26): the larger of the cards' label
+    // face (UIType TAG, millimetres per board) and Font_PanelHeader - so a dense
+    // panel whose TAG outgrows the panel titles (the P4_5, 24) gets it, and no
+    // board's bar ever shrinks.
+    static const lv_font_t* Font_Header;
 };

@@ -72,7 +72,7 @@ LV_FONT_DECLARE(fleet_font_num_60);
     #define FLEET_FONT_VALUE_SM (&fleet_font_num_46)
     #define FLEET_FONT_NAME     (&lv_font_montserrat_28)
     #define FLEET_FONT_UNIT     (&lv_font_montserrat_26)
-    #define FLEET_FONT_TAG      (&lv_font_montserrat_22)
+    #define FLEET_FONT_TAG      (&lv_font_montserrat_24)
     #define FLEET_FONT_ICON     (&lv_font_montserrat_46)
 #elif defined(WS_P4_7B)
     // WS_P4_7B - 170 PPI, 7.0"

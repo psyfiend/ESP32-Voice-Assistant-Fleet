@@ -169,8 +169,10 @@ void iconButtonLit(lv_obj_t *b, bool lit);
 // COMPACT (#92): the same selector at a span chip's height (H_CHIP), its
 // choices WORDS in the label face, no action - one option chosen from a short
 // list on a line of text (History's spans). `room` (0: any) is the most width
-// it may take: the words' sides shrink to fit it, as far as S1.
-constexpr uint8_t SELECTOR_MAX = 4;   // the control deck's three, History's four spans
+// it may take: the words' sides shrink to fit it, as far as S1. `slotW` (0: the
+// widest word's) makes every choice that wide, so selectors stacked in rows -
+// UI Tweaks, Card UI (2.8 round 3, D-27) - line up choice for choice.
+constexpr uint8_t SELECTOR_MAX = 5;   // the control deck's three, History's four spans, Card UI's five
 
 struct SelectorSpec {
     const char   *glyph[SELECTOR_MAX];   // the choices: icons, or words when compact
@@ -183,7 +185,11 @@ struct SelectorSpec {
     void        (*onChosen)(uint8_t i);  // the selector has arrived on choice i
     bool          compact;               // words, H_CHIP tall, no action (#92)
     int32_t       room;                  // compact: the most width it may take (0: any)
+    int32_t       slotW;                 // compact: every choice this wide (0: the widest word's)
 };
+// Compact choices for these words, each as wide as the widest of them and its
+// sides: give it to every row's slotW so rows line up.
+int32_t selectorSlotW(const char *const *words, uint8_t n);
 
 // Its state, kept by the caller for as long as it shows (its objects point here).
 struct Selector {

@@ -18,6 +18,7 @@ const lv_font_t* UIToolkit::Font_Label = NULL;
 const lv_font_t* UIToolkit::Font_Button = NULL;
 const lv_font_t* UIToolkit::Font_PanelHeader = NULL;
 const lv_font_t* UIToolkit::Font_Hero = NULL;
+const lv_font_t* UIToolkit::Font_Header = NULL;
 
 int32_t UIToolkit::sc(int32_t val) {
     return (int32_t)(val * bspUiScale());
@@ -51,6 +52,12 @@ void UIToolkit::init() {
         Font_Button      = &lv_font_montserrat_14;
         Font_PanelHeader = &lv_font_montserrat_14;
         Font_Hero        = &lv_font_montserrat_24;
+    }
+    // The header bar's words: the larger face of the two (UIToolkit.h).
+    {
+        const lv_font_t *tag = UI::type().TAG;
+        Font_Header = (tag && lv_font_get_line_height(tag) > lv_font_get_line_height(Font_PanelHeader))
+                    ? tag : Font_PanelHeader;
     }
 
     // Toast Setup - Top Z Index

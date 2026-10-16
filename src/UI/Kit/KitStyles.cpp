@@ -247,7 +247,7 @@ static void fill() {
     lv_style_set_bg_opa  (st(S::KS_HDR_SLOT_PRESSED), LV_OPA_COVER);
     lv_style_set_bg_color(st(S::KS_HDR_SLOT_OPEN),    UI::c(p.SURFACE));   // the drawer's face
     lv_style_set_bg_opa  (st(S::KS_HDR_SLOT_OPEN),    LV_OPA_COVER);
-    text(S::KS_HDR_TEXT,     UIToolkit::Font_PanelHeader, p.TEXT);
+    text(S::KS_HDR_TEXT,     UIToolkit::Font_Header, p.TEXT);   // the bar's words (D-26)
     text(S::KS_HDR_TEXT_DIM, UIToolkit::Font_Caption,     p.TEXT_DIM);
     text(S::KS_HDR_ICON,     t.ICON_SM,                   p.TEXT);
     // The time and its am / pm stand on one line, their bottoms together - near

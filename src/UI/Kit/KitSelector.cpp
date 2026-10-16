@@ -65,6 +65,14 @@ int32_t selectorH() { return UI::minTouch() + 2 * UI::mm(UI::shape().S1); }
 // The action on a ribbon of its own, a break, then the choices' ribbon.
 static int32_t selectorBreak() { return UI::mm(UI::shape().S6); }
 
+int32_t selectorSlotW(const char *const *words, uint8_t n) {
+    int32_t widest = 0;
+    for (uint8_t i = 0; i < n; i++) if (words[i]) widest = LV_MAX(widest, textW(words[i], UI::type().TAG));
+    // The chosen word rides the selector a face up (NAME): room for it too.
+    for (uint8_t i = 0; i < n; i++) if (words[i]) widest = LV_MAX(widest, textW(words[i], UI::type().NAME));
+    return widest + 2 * UI::mm(UI::shape().S3);
+}
+
 int32_t selectorW(uint8_t n) {
     const int32_t g = UI::mm(UI::shape().S1), slot = UI::minTouch();
     const int32_t action = slot + 2 * g;
@@ -170,7 +178,10 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     // as far as S1; no action.
     const bool hasAction = !compact && spec.actionGlyph;
     int32_t H, slotW;
-    if (compact) {
+    if (compact && spec.slotW > 0) {
+        H = UI::mm(UI::shape().H_CHIP);
+        slotW = spec.slotW;
+    } else if (compact) {
         H = UI::mm(UI::shape().H_CHIP);
         int32_t widest = 0;
         for (uint8_t i = 0; i < S.n; i++) widest = LV_MAX(widest, textW(S.glyph[i], t.TAG));

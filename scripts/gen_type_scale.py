@@ -119,7 +119,12 @@ SCALE = {
     #
     # Hence per-role. "*" shrinks what actually costs height; TAG keeps the mm
     # target, which was right about it all along.
-    "WS_P4_5": {"*": 0.88, "TAG": 1.00},
+    #
+    # TAG 1.09 ON THE P4_5 (owner, 2026-10-16, D-26): with the P4_5 beside the
+    # 4B, its tags and header words were "noticeably smaller" - 22 px is 1.90
+    # mm at 294 PPI, the 4B's 20 px is 1.99 mm at 255, and the 4B sits further
+    # off on the desk. 1.09 lands the P4_5 on 24 (2.07 mm); no other board moves.
+    "WS_P4_5": {"*": 0.88, "TAG": 1.09},
 
     # The 4B pair, 2026-09-19. Same value for both, and that is the point.
     #
