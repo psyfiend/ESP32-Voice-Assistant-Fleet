@@ -341,7 +341,7 @@ dots, `SLOT_GAP` and `LINE` are the values the bar had before it had slots; the 
 | `DOT_ON`, `DOT_OFF`, `DOT_RING`, `DOT_GAP` | 11, 8, 2, 5 | the page's dots: this page's, another's ring and its line, between them |
 | `MARK` | 12 | the error mark beside a slot's dashes |
 | `LINE` | 2 | the bar's accent line - and the outline of an open slot and its panel, in the accent (round 3, D-23) |
-| `JOIN_R` | 6 | a cove (beside an open tab, in the bar) or a flare (beside its panel, below the line): the rounded corner where that outline meets the bar's line (round 3, D-23; its size is Q10 in `TEST_2.8.md`) |
+| `JOIN_R` | 6 | a cove beside an open tab, in the bar: the rounded corner where the tab's side meets the bar's line (round 3, D-23; the panel's own flares went in round 4, D-30) |
 | `DRAWER_W` | 260 | a slot's panel at most |
 | `DRAWER_R`, `DRAWER_PAD`, `DRAWER_GAP`, `DRAWER_LINE` | 15, 10, 8, 2 | a slot's panel: its bottom corners, inside, between rows, its edge |
 
@@ -364,3 +364,14 @@ one set per scheme family - a glyph's colour is its link's state, so it lives wi
 The dark greens are the mocks' softer ones; Linen's are darker so they read on its light bar (T9's
 "Wi-Fi's green all but vanishes on Linen"). The glyphs themselves are numbers, not tokens:
 `UI/GlyphShapes.cpp` holds each stroke on a 24-unit grid, as the mocks drew them.
+
+**The header's words have their own type role, `HEADER`** (round 4, D-30): TAG's millimetre
+target and TAG's scale on every board, except the P4_5 (`gen_type_scale.py`, `HEADER` 1.18): 26 px,
+2.25 mm, matching the 4B's 22 px within 2%. `UIToolkit::Font_Header` is the larger of `HEADER` and
+`Font_PanelHeader`.
+
+**The active frames** (round 4, D-30) are `UIMetrics` tokens, the same on every scheme, in logical
+px: `ACTIVE_RING` 3 (the glow frame's and the corner cut's ring, in `ST_ACTIVE`), `ACTIVE_EDGE` 1
+(the line outside it, in `UI::darkest()` - the scheme's darkest, 60% of the way to black - and the
+bracket's sides), `BRACKET_W` 4 (the bracket's top and bottom). The corner cut's corners are
+`RADIUS` x 2.

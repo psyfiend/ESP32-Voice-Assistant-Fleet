@@ -277,6 +277,7 @@ order.
 | `/popup?alarmin=N` | 2.8 round 3: a pretend next alarm **N minutes from now** (`alarmin=120`: the bell by the clock and, within the 12 hours, the notice among the status icons). As `alarm=`, RAM only. UI |
 | `/popup?tweaks=1` / `tweaks=0` | 2.8 round 3: UI Tweaks opened / closed, as the system panel's button; the deck rises under it. UI |
 | `/popup?sensorerr=1\|0` | 2.8 round 3 (T10): the header's sensor shown failed - `--°` and the "!" - whatever its entity says; `0` as it is again. **RAM only**. UI |
+| `/popup?cardstate=N` | 2.8 round 4: the cards' active state, as UI Tweaks' Card state - `0` Fill, `1` Icon glow, `2` Glow frame, `3` Bracket, `4` Corner cut - **not saved**; `-1` the owner's again. UI |
 | `/popup?glyphs=0\|1\|2\|3` | 2.8: the header's glyphs bare, in a rounded square, in a circle - **not saved** (a capture leaves the owner's choice); `3` the saved style again. UI |
 | `/popup?pagehdr=0\|1` | 2.8: this page's header hidden / shown - **Saved**, as the page slot's panel and Hide Bar save it (`pages.<slug>.header`; shown is the default and is stored as nothing) |
 | `/popup?removecard=3` | the Remove card dialog over any card's window, to look at; its Remove does nothing to a compiled card; `close=1` takes it down |

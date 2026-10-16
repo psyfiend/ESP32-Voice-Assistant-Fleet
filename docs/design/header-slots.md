@@ -265,3 +265,13 @@ pictures, the tests and the choices made along the way (D-29).
   client; its choices device-wide and saved; the deck rises under it (`Kit::sheetBeside()`).
 - **Every header panel closes on the window timeout** (`Kit::windowCloseMs()`), counted from the
   last touch anywhere.
+
+## 13. Round 4, from round 3's test (2026-10-16 afternoon)
+
+Every round-3 test passed but the deck's colour under UI Tweaks; the owner's list is in
+`TEST_2.8.md` (D-30). For the header: **a panel's side walls rise straight to the blue line** (the
+flares are gone; the coves at the slot stay), and **the slot stays open until its panel has
+finished closing** (`Kit::Drawer::onClosed`). **The header is always visible while a header panel
+is open**: the page panel's Show / Hide waits for the panels to close (`GUIManager::
+headerPanelsClosed()`); a peek re-arms while one is open. The system panel lost its Status bar
+(one way to hide the header). The P4_5's words are 26 (a `HEADER` type role).

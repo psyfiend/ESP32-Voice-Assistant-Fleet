@@ -1,4 +1,4 @@
-# Handoff — 2026-10-16 (2.8 round 3 built overnight - the look, UI Tweaks, Card UI - for the owner's test)
+# Handoff — 2026-10-16 (2.8 round 4 built - round 3's list and the active states - for the owner's test)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -44,9 +44,16 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
 
 - **`v0.2.17` - A17** is the release on `main` (flashed on the 1060). Copies of every board's
   settings file are in `bench/settings/<board>/` - one is saved before every flash.
-- **2.8 round 3 is built, on `feat/2.8-header-slots`** (no PR; **`TEST_2.8.md` round 3 is the
-  owner's sheet**, U1-U17, Q10-Q13; rounds 1 and 2 above it, every round-2 test PASS but the
-  glyphs). What it is (`header-slots.md` §11-12; DECISIONS D-21 to D-29):
+- **2.8 round 4 is built, on `feat/2.8-header-slots`** (no PR; **`TEST_2.8.md` round 4 is the
+  owner's sheet**, V1-V15, Q14-Q15). Round 3 was tested the same day - every test PASS but the
+  deck's colour - and its list became round 4 (D-30, `header-slots.md` §13): the system panel's
+  rows built at every open (finished faces live in a cache any window may take back), no Status
+  bar, "Scheme:"; a panel's walls straight to the blue line and its slot open until it has gone;
+  the header always visible while a header panel is open; the P4_5's header words 26 (a `HEADER`
+  type role); window timeout and bar at once; Card UI's Inherit toggles; and the owner's **active
+  states on the edge** - Card state Glow frame / Bracket / Corner cut (`Card::activeFrame()`), a
+  toggle glass off and glowing on (`Kit::glowFrame()`).
+- **2.8 round 3, as built** (`header-slots.md` §11-12; DECISIONS D-21 to D-29):
   - **The header** (round 2's three places on claims, `Layout/HeaderPlan.h`): the mocks' glyphs
     drawn from numbers (`UI/GlyphShapes`, `Kit::strokeGlyph`), the scheme's `SIG_*` colours, an AP
     mast; an open slot and its panel one accent shape (coves, flares, `JOIN_R`); the bell inside
@@ -58,9 +65,7 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
     under it. **Card UI**: the same per card, a view of the card window (`PopupCardUi.cpp`).
   - **Choices made unattended** are D-29 (the scheme one for every page; Col / Row saved per page;
     Card label "Custom" keeps the words showing) - the owner confirms or reverses them.
-  - Proved: see the sheet's Results (harness A/B `r2c` vs `r3` on the P4_5, the 4B's states, the
-    gate, the structure check, 34 host tests).
-- **Boards**: the P4_5 and the 4B run round 3 (local lines), the 1060 `v0.2.17`. The 4B's own file
+- **Boards**: the P4_5 and the 4B run round 4 (local lines), the 1060 `v0.2.17`. The 4B's own file
   closes a window after 10 s (`system.window.close`), which stops the harness's full walk there -
   use `--only`, or ask the owner.
 - **The mock**: the "2.8 Header Slots" canvas
@@ -68,27 +73,9 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
   the alarm still on the left (D-18 moved it; the build is the reference now).
 - **Routes**: the P4_5 serves 7 of `HttpServer::MAX_ROUTES` (8); the next route needs it raised.
 
-## Round 3 - the unattended build's progress (2026-10-16 night; the watchdog resumes from here)
-
-Decided: D-21 to D-28 (DECISIONS); the look: canvas "2.8 Header Slots", the four "Round 3" artboards.
-Each step committed and pushed on `feat/2.8-header-slots`; tick it here when it is.
-
-- [x] 1. Kit selector: up to 5 choices, even widths (`SELECTOR_MAX`, `SelectorSpec::slotW`)
-- [x] 2. Type: the P4_5's TAG and header words 24 (D-26; `UIToolkit::Font_Header`)
-- [x] 3. Glyphs as data (`UI/GlyphShapes`, `Kit::strokeGlyph`), per-scheme status colours (`SIG_*`), one size bare or framed, the AP mast as its own claim (D-24, D-27)
-- [x] 4. The bell in the clock's slot (7 days), the 12-hour notice claim and its panel, the clock panel's NEXT ALARM and "Warn me before" (D-21); `/popup?alarmin=N`
-- [x] 5. One shape in the accent: the open tab, coves, flares, panels aligned at a screen edge (D-23)
-- [x] 6. The system panel: CONNECTIVITY, SYSTEM - DIAGNOSTICS (Log / UI Tweaks / About, Scheme + Status bar, Col / Row) (D-22, D-25)
-- [x] 7. UI Tweaks (a Sheet): selector rows, saved, Reset all, Tokens; the deck rises under it; the left-half swipe; header panels follow the timeout
-- [x] 8. Card UI: a SETTINGS row opening a view of selector rows (D-28); Entity / Card label leave SETTINGS
-- [x] 9. The page panel's Shown / Hidden as a selector; a PC key to show the sensor's "!" (T10)
-- [x] 10. Harness states, A/B against round 2, the gate, the structure check, `TEST_2.8.md` round 3, flash the P4_5 and the 4B (settings saved first)
-
-**Done 2026-10-16 morning; the owner's report given.** This checklist can go once round 3 is tested.
-
 ## What is next with the owner
 
-1. **2.8 round 3, the owner's test** (`TEST_2.8.md` round 3). Then sign-off -> CHANGELOG
+1. **2.8 round 4, the owner's test** (`TEST_2.8.md` round 4). Then sign-off -> CHANGELOG
    `v0.2.18`, archive the sheet, `gh pr create`; the owner merges.
 2. **#76 next, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a
    queue any task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to

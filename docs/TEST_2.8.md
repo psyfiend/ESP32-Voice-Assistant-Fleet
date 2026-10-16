@@ -658,4 +658,28 @@ The 4B: the system panel, Card UI:
 
 ## Results
 
-*(below)*
+- **Your two screenshots' fault, found**: the finished faces (satin, glass) live in a cache of 16
+  slots that each new window may take back; the system panel was built once at boot, so its
+  buttons went on pointing at slots UI Tweaks' selectors had since repainted. It now builds its
+  rows at every open. V1 checks it.
+- **The harness**, P4_5, round 3 (`r3`) against round 4 (`r4`), 63 states (three new:
+  `frame_glow`, `frame_bracket`, `frame_corner`). Differences are what round 4 changed: Power
+  glass where it was satin (every light window), the clock and page name at 26 (the header above
+  every window), the system panel without its Status bar, Card UI's new rows, UI Tweaks' fifth Card
+  state. LVGL's pool **1.7 KB lighter** in every state (the Status bar and its finish gone); the
+  corner cut costs 7 KB with its caps on every state card (built only when it is chosen). Windows
+  open as before (~21-28 ms).
+- **On glass**: the page panel's walls meet the line square, the coves kept (picture above);
+  Power on - glass and the glow frame - seen with the Office desk lamp switched on from the PC and
+  back off, as found; the 4B's Card UI fits once each selector narrows to its window (fixed during
+  the round).
+- **Host tests**: 34, all PASS.
+- **The structure check**: `GUIManager.cpp` 1,490 lines (round 3 1,509), `Card.cpp` 1,473 - the
+  frames went to `CardFrame.cpp` rather than grow it past 1,550; style calls outside the kit 457
+  (round 3 438: the frames' 19); colour literals 10; no shape numbers; no LVGL in the core.
+- **The gate**: all nine SUCCESS on `9bff273` (P4_5 42.0% flash, the S3s 34.9-37.0%); the move of
+  the frames to their own file after it built on the two development boards (P4_5, S3 4B).
+
+## Your results
+
+*(yours)*
