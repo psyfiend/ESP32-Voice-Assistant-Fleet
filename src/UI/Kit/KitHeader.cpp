@@ -21,10 +21,9 @@ lv_obj_t *headerSlot(lv_obj_t *bar, lv_event_cb_t cb, void *user) {
     add(s, KitStyle::KS_HDR_SLOT);
     add(s, KitStyle::KS_HDR_SLOT_PRESSED, LV_PART_MAIN | LV_STATE_PRESSED);
     add(s, KitStyle::KS_HDR_SLOT_OPEN,    LV_PART_MAIN | LV_STATE_CHECKED);
-    // AN EQUAL SHARE, whatever it holds: flex-grown, its own width ignored -
-    // "four evenly spaced slots without a bona fide middle" (D-12).
+    // The bar's full height; its width and x are the header plan's (round 2,
+    // Layout/HeaderPlan.h) - what it holds and its pads, measured.
     lv_obj_set_height(s, lv_pct(100));
-    lv_obj_set_flex_grow(s, 1);
     lv_obj_add_flag(s, LV_OBJ_FLAG_CLICKABLE);
     if (cb) lv_obj_add_event_cb(s, cb, LV_EVENT_CLICKED, user);
     return s;

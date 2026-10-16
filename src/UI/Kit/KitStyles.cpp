@@ -236,8 +236,8 @@ static void fill() {
     lv_style_set_border_color(hb, UI::c(p.ACCENT));
     lv_style_set_radius      (hb, 0);
     lv_style_set_pad_all     (hb, 0);
-    lv_style_set_pad_column  (hb, 0);
-    flex(hb, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // No flex: where each slot stands is the header plan's (round 2) - the
+    // sides at the ends, the middle on the centre.
     lv_style_t *hs = st(S::KS_HDR_SLOT);
     lv_style_set_pad_hor   (hs, UI::sc(h.SLOT_PAD));
     lv_style_set_pad_ver   (hs, 0);

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <functional> // Required for std::function
+#include "UI/Kit.h"           // Kit::Drawer - the panel's frame (2.8 round 2, Q7)
 #include "UI/Panel_Header.h"
 #include "UI/UIToolkit.h"
 #include "SystemReport.h"
@@ -94,8 +95,9 @@ public:
     void setRowsLabel(const char *text);
     void setTopOffset(int32_t y);
     // THE STATUS SLOT'S PANEL (2.8, D-13): it hangs under its slot, centred on
-    // `centreX` and kept on the screen, where it used to sit against the right
-    // edge under the status glyphs.
+    // `centreX` and kept on the screen. Since round 2 (D-20) it is a
+    // Kit::Drawer like every other slot's panel - the same frame, slide and
+    // joined look; its buttons are development tools (D-17).
     void setAnchorX(int32_t centreX);
     void setVariantLabel(const char *text);
     void setFillLabel(const char *text);
@@ -156,16 +158,12 @@ public:
     void setOnToggleCallback(ToggleCallback cb);
     
     // Returns the main wrapper (for parenting checks if needed)
-    lv_obj_t* getContainer() { return _ui_root; }
+    lv_obj_t* getContainer() { return _drawer.root; }
     // For the 2.6 swipe handler: a swipe up should put an open drawer away
     // rather than toggle the deck behind it.
     bool isExpanded() const { return _expanded; }
 
 private:
-    // Measured, not guessed - see the definition. Const because opening the
-    // drawer must not be able to change what is in it.
-    int32_t contentHeight() const;
-
     // Width thresholds, in LOGICAL pixels. Named rather than inline because
     // they are a judgement about readable panel width and the only way to know
     // they are right is to look at one. The fleet's logical widths cluster at
@@ -177,8 +175,10 @@ public:
 
 private:
     // -- UI Objects --
-    lv_obj_t* _ui_root;    // The Outer Wrapper (Animates Height, No Padding)
-    lv_obj_t* _ui_content; // The Inner Container (Has Padding & Style, Auto Height)
+    // The frame: the kit's drawer (KitDrawer.cpp) - a clip that grows to reveal
+    // its face, square where it meets the bar, the face riding the edge (#81).
+    Kit::Drawer _drawer;
+    lv_obj_t* _ui_content; // the drawer's face: the rows go here
     // Four button rows (issue #50). Splitting them is not decoration: eight
     // flex-grown buttons on one row are each a finger-width too narrow on
     // CYD_S3_3248, and the panel is now narrower on every board but that one.
@@ -203,12 +203,7 @@ private:
     
     // -- Logic --
     bool _expanded;
-    int32_t _openH = 0;    // the drawer's open height: anim_height_cb() keeps the contents' bottom on the edge
-    int32_t _panelW = 0, _margin = 0;   // its width and its distance from the screen's edges (init())
     ToggleCallback _onToggle;
-
-    // -- Animation --
-    static void anim_height_cb(void * var, int32_t v);
 
     // -- Callbacks --
     static void btn_action_cb(lv_event_t* e);

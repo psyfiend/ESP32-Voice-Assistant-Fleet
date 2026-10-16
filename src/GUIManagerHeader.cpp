@@ -5,7 +5,10 @@
 #include "GUIManager.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include "Alarms.h"
 #include "Settings.h"
 #include "UI/SlotPanels.h"
 #include "UI/UIToolkit.h"
@@ -75,8 +78,8 @@ void GUIManager::cycleGlyphs() {
     const uint8_t n = (uint8_t)GlyphStyle::GLYPH_STYLE_COUNT;
     const GlyphStyle next = (GlyphStyle)(((uint8_t)_header.glyphStyle() + 1) % n);
     _header.setGlyphStyle(next);
-    // Saved by name; the default (bare) as nothing.
-    Settings::setSystem("header", "glyphs", next == GlyphStyle::GLYPH_BARE ? nullptr : glyphStyleName(next));
+    // Saved by name; the default (square, D-20) as nothing.
+    Settings::setSystem("header", "glyphs", next == GLYPH_DEFAULT ? nullptr : glyphStyleName(next));
     Settings::save();
     Serial.printf("[UI] header glyphs: %s\n", glyphStyleName(next));
 }
@@ -103,12 +106,24 @@ void GUIManager::setPageHeaderShown(bool shown) {
     Serial.printf("[UI] page %s: header %s\n", p.slug, shown ? "shown" : "hidden");
 }
 
-// /popup's header keys (DEBUG_POPUP, for the harness): slot=N opens slot N's
-// panel as a tap does, slot=-1 closes any; glyphs=0|1|2 shows a glyph style
-// without saving it, glyphs=3 the saved one again; pagehdr=0|1 hides or shows
-// this page's header, saved as the page panel saves it.
-const char *GUIManager::headerDebug(int slot, int glyphs, int pageHdr) {
+// /popup's header keys (DEBUG_POPUP, for the harness): slot=<kind> opens that
+// slot's panel as a tap does (clock, sensor, page, alarm, status), slot=-1
+// closes any; glyphs=0|1|2 shows a glyph style without saving it, glyphs=3 the
+// saved one again; pagehdr=0|1 hides or shows this page's header, saved as the
+// page panel saves it; alarm=HHMM sets a pretend next alarm (RAM only, until
+// K84), alarm=-1 clears it.
+const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHdr, int alarm) {
     static char out[96];
+    if (alarm > -2) {
+        const bool ok = Alarms::setPretend(alarm < 0 ? -1 : alarm / 100, alarm < 0 ? 0 : alarm % 100, time(nullptr));
+        // Its panel goes with its slot; then the alarm's claim, now.
+        if (_slotPanel >= 0 && _header.slotKind((uint8_t)_slotPanel) == SlotKind::SLOT_ALARM) closeSlotPanel(false);
+        _header.refresh();
+        if (!ok)            snprintf(out, sizeof(out), "alarm: not set (HHMM, 24 h; or the time is not known yet)");
+        else if (alarm < 0) snprintf(out, sizeof(out), "alarm: cleared");
+        else                snprintf(out, sizeof(out), "alarm: next at %02d:%02d (pretend, not saved)", alarm / 100, alarm % 100);
+        return out;
+    }
     if (pageHdr >= 0) {
         closeSlotPanel(false);
         setPageHeaderShown(pageHdr != 0);
@@ -116,26 +131,32 @@ const char *GUIManager::headerDebug(int slot, int glyphs, int pageHdr) {
         return out;
     }
     if (glyphs >= 0) {
-        GlyphStyle gs = GlyphStyle::GLYPH_BARE;
-        if (glyphs < (int)GlyphStyle::GLYPH_STYLE_COUNT) {
-            gs = (GlyphStyle)glyphs;
-        } else {
-            char v[12];
-            if (Settings::system("header", "glyphs", v, sizeof(v))) glyphStyleFromName(v, gs);
-        }
+        GlyphStyle gs = savedGlyphStyle();
+        if (glyphs < (int)GlyphStyle::GLYPH_STYLE_COUNT) gs = (GlyphStyle)glyphs;
         _header.setGlyphStyle(gs);
         snprintf(out, sizeof(out), "glyphs: %s (not saved)", glyphStyleName(gs));
         return out;
     }
-    if (slot < 0) {
+    if (!strcmp(slotName, "-1")) {
         closeSlotPanel(false);
         if (_pnlSystem.isExpanded()) _pnlSystem.close();
         return "slot: closed";
     }
-    if (slot >= _header.slotCount()) return "slot: no such slot";
-    const SlotKind k = _header.slotKind((uint8_t)slot);
+    SlotKind k;
+    if (!slotKindFromName(slotName, k)) return "slot: no such kind (clock, sensor, page, alarm, status)";
+    const int slot = _header.slotOf(k);
+    if (slot < 0) return "slot: not in this page's header";
+    if (!_header.slotShown((uint8_t)slot)) return "slot: not on the bar now (an alarm: alarm=HHMM first)";
     if (_slotPanel == slot || (k == SlotKind::SLOT_STATUS && _pnlSystem.isExpanded())) return "slot: already open";
     onSlotTap((uint8_t)slot);
     snprintf(out, sizeof(out), "slot %d (%s): opening", slot, slotKindName(k));
     return out;
+}
+
+// The owner's glyph style, else the default (square, D-20).
+GlyphStyle GUIManager::savedGlyphStyle() {
+    char v[12];
+    GlyphStyle gs = GLYPH_DEFAULT;
+    if (Settings::system("header", "glyphs", v, sizeof(v))) glyphStyleFromName(v, gs);
+    return gs;
 }

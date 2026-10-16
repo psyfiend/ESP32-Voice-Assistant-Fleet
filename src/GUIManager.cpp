@@ -567,13 +567,20 @@ void GUIManager::reportUiSection() {
                                        : "shown",
                        g._showDeck ? "shown" : "hidden",
                        g._pnlSystem.isExpanded() ? "open" : "closed");
-    // The header's slots (2.8): left to right, the glyph style, a slot's panel.
-    char kinds[64] = "";
+    // The header's slots (2.8): in list order, each one's redraws and its form
+    // ("-" off the bar, "*N" shedding to form N), the plans, the glyph style, a panel.
+    char kinds[112] = "";
     int  k = 0;
-    for (uint8_t i = 0; i < g._header.slotCount() && k < (int)sizeof(kinds) - 16; i++)
-        k += snprintf(kinds + k, sizeof(kinds) - k, "%s%s %lu", i ? " | " : "", slotKindName(g._header.slotKind(i)),
-                      (unsigned long)g._header.slotRedraws(i));
-    SystemReport::line("  Header:      %s   glyphs %s   slot panel %d", kinds,
+    for (uint8_t i = 0; i < g._header.slotCount() && k < (int)sizeof(kinds) - 20; i++) {
+        char tail[8] = "";
+        if (!g._header.slotShown(i))  snprintf(tail, sizeof(tail), " -");
+        else if (g._header.slotForm(i)) snprintf(tail, sizeof(tail), " *%u", (unsigned)g._header.slotForm(i));
+        k += snprintf(kinds + k, sizeof(kinds) - k, "%s%s %lu%s", i ? " | " : "", slotKindName(g._header.slotKind(i)),
+                      (unsigned long)g._header.slotRedraws(i), tail);
+    }
+    SystemReport::line("  Header:      %s", kinds);
+    SystemReport::line("               planned %lu times%s   glyphs %s   slot panel %d",
+                       (unsigned long)g._header.plans(), g._header.planFits() ? "" : " (DOES NOT FIT)",
                        glyphStyleName(g._header.glyphStyle()), (int)g._slotPanel);
 }
 
@@ -621,15 +628,11 @@ void GUIManager::begin() {
     lv_obj_clear_flag        (screen, LV_OBJ_FLAG_SCROLLABLE);               // Disable global scrolling
 
     // --= LAYER 3: HEADER BAR =--
-    // Four slots (2.8); a tap on one opens its panel - onSlotTap(). The
-    // device's name has left the bar (D-12): About this board shows it.
+    // Three places of slots (2.8, D-16 / D-18); a tap on a slot opens its
+    // panel - onSlotTap(). The device's name has left the bar: About this
+    // board shows it.
     _header.init(screen, &_core.conn(), &_core.mqtt(), &_core.entities());
-    {
-        char g[12];
-        GlyphStyle gs = GlyphStyle::GLYPH_BARE;
-        if (Settings::system("header", "glyphs", g, sizeof(g))) glyphStyleFromName(g, gs);
-        _header.setGlyphStyle(gs);
-    }
+    _header.setGlyphStyle(savedGlyphStyle());
     _header.setOnSlotTap([](uint8_t slot) { if (s_self) s_self->onSlotTap(slot); });
 
     // Swipe navigation, milestone 2.6 first cut. On the screen, not an
@@ -976,11 +979,11 @@ void GUIManager::begin() {
         s_self->toggleSystemPanel();
         return false;
     });
-    // ...and the header's slots (2.8): slot=N opens slot N's panel as a tap
-    // does, slot=-1 closes any; glyphs=0|1|2 shows a glyph style without saving
-    // it, glyphs=3 the saved one again.
-    CardPopup::setHeaderHook([](int slot, int glyphs, int pageHdr) -> const char * {
-        return s_self ? s_self->headerDebug(slot, glyphs, pageHdr) : "no GUI";
+    // ...and the header's slots (2.8): slot=<kind> opens that slot's panel as
+    // a tap does, slot=-1 closes any; glyphs=0|1|2 shows a glyph style without
+    // saving it, glyphs=3 the saved one again; alarm=HHMM a pretend alarm.
+    CardPopup::setHeaderHook([](const char *slot, int glyphs, int pageHdr, int alarm) -> const char * {
+        return s_self ? s_self->headerDebug(slot, glyphs, pageHdr, alarm) : "no GUI";
     });
 #endif
 

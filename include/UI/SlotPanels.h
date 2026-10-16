@@ -6,9 +6,10 @@
 // emptied when it closes). Each starts small - header-slots.md section 3 says
 // what each may hold later, and each panel's last line says so on glass.
 //
-//   clock   the time and the date; the next alarm's place (K84, none yet)
+//   clock   the time and the date
 //   page    the pages, to go to one; this page's header, shown or hidden (D-14)
 //   sensor  its reading, when it last reported, or what went wrong
+//   alarm   the next alarm and how long until it (on the bar only while set, D-20)
 //
 // GUIManager owns the drawer and what a choice does (`goToPage`,
 // `setHeaderShown`); nothing here keeps state beyond the open panel.

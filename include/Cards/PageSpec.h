@@ -161,8 +161,8 @@ struct PageSpec {
     TempUnit tempUnit    = TempUnit::TEMP_INHERIT;
     CardLabel labelMode  = CardLabel::LBL_INHERIT;
 
-    // THE PAGE'S HEADER (2.8, UI/HeaderSlots.h): its slots, left to right
-    // (nullptr: the four every page has, HEADER_DEFAULT), and whether it shows.
+    // THE PAGE'S HEADER (2.8, UI/HeaderSlots.h): its slots, each with its place
+    // (nullptr: the ones every page has, HEADER_DEFAULT), and whether it shows.
     // `headerShown` is the compiled default; the owner's choice for the page is
     // saved by its slug and wins (Settings: pages.<slug>.header). A full-screen
     // page - the Clock page to come (K82) - is a page with headerShown false.

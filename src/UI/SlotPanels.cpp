@@ -8,7 +8,9 @@
 #include <time.h>
 #include "UI/Kit.h"
 #include "Cards/CardIcons.h"   // a reading and its age, as its card says them
+#include "Alarms.h"
 #include "EntityRegistry.h"
+#include "TimeFormat.h"
 #include "TimeService.h"
 
 namespace SlotPanels {
@@ -38,8 +40,8 @@ lv_obj_t *dim(lv_obj_t *parent, const char *words) {
     return l;
 }
 
-// The clock: the time large, the date under it, and the place the next alarm
-// will have (K84 - nothing sets one yet).
+// The clock: the time large and the date under it. The next alarm is the
+// alarm slot's (D-18), among the status glyphs.
 void buildClock(lv_obj_t *face) {
     char t[24] = "--:--", d[48] = "The time is not known yet";
     if (TimeService::isSet()) {
@@ -55,9 +57,29 @@ void buildClock(lv_obj_t *face) {
     }
     Kit::drawerBig(face, t);
     dim(face, d);
-    dim(Kit::row(face, "Next alarm", true), "none set");
-    Kit::drawerNote(face, "Later: alarms and timers (K84, with the Clock page); 24 hours or seconds, "
-                          "as settings.");
+    Kit::drawerNote(face, "Later: timers (K84, with the Clock page); 24 hours or seconds, as settings.");
+}
+
+// The alarm: when the next one goes off, and how long until then. It is on
+// the bar only while one is set (D-20), so its panel always has one to show.
+void buildAlarm(lv_obj_t *face) {
+    time_t when = 0;
+    char t[24] = "--:--", d[48] = "No alarm set";
+    if (Alarms::next(when)) {
+        struct tm tm;
+        localtime_r(&when, &tm);
+        const int h12 = tm.tm_hour % 12 ? tm.tm_hour % 12 : 12;
+        snprintf(t, sizeof(t), "%d:%02d %s", h12, tm.tm_min, tm.tm_hour < 12 ? "am" : "pm");
+        // Whole minutes, rounded up: "in 1 min" until it goes off.
+        const int32_t secs = (int32_t)(((when - time(nullptr) + 59) / 60) * 60);
+        char dur[32];
+        tfDuration(dur, sizeof(dur), secs, TfDur::DUR_WORDS);
+        snprintf(d, sizeof(d), "in %s", dur);
+    }
+    title(face, "NEXT ALARM");
+    Kit::drawerBig(face, t);
+    dim(face, d);
+    Kit::drawerNote(face, "Set from a PC for now. Later: setting, snoozing and your phone's alarms (K84).");
 }
 
 // The page: every page, to go to one (this one marked), and whether this page
@@ -115,6 +137,7 @@ bool build(SlotKind kind, lv_obj_t *face, const Context &c) {
         case SlotKind::SLOT_CLOCK:  buildClock(face);     return true;
         case SlotKind::SLOT_PAGE:   buildPage(face, c);   return true;
         case SlotKind::SLOT_SENSOR: buildSensor(face, c); return true;
+        case SlotKind::SLOT_ALARM:  buildAlarm(face);     return true;
         default:                    return false;   // status: the system panel
     }
 }

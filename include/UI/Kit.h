@@ -320,11 +320,13 @@ lv_obj_t *dialog(const DialogSpec &spec);
 
 // --- The page header (KitHeader.cpp, 2.8) ----------------------------------------
 // The BAR: full width, the header's height, the scheme's raised surface with its
-// accent line along the bottom. Its slots go in it, left to right.
+// accent line along the bottom. Its slots go in it, each where the header plan
+// puts it (Layout/HeaderPlan.h) - the bar lays nothing out itself.
 lv_obj_t *headerBar(lv_obj_t *parent);
-// A SLOT: an equal share of the bar, tappable, tinted while pressed, in the
-// drawer's face while LV_STATE_CHECKED (its panel open). `cb` on CLICKED, with
-// `user` as its user data. What it shows goes inside, centred in a row.
+// A SLOT: the bar's height, tappable, tinted while pressed, in the drawer's
+// face while LV_STATE_CHECKED (its panel open). `cb` on CLICKED, with `user` as
+// its user data. What it shows goes inside, centred in a row; its x and width
+// are the caller's, from the plan.
 lv_obj_t *headerSlot(lv_obj_t *bar, lv_event_cb_t cb, void *user);
 // A GLYPH'S FRAME (#19): BARE an empty holder the glyph's own size, SQUARE the
 // rounded square, CIRCLE the circle - whose colour is the caller's to set: it is

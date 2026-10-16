@@ -175,10 +175,13 @@ const UIShape UI_SHAPE = {
 // The page header's slots (2.8). GLYPH, DOT_*, SLOT_GAP and LINE are the
 // values the bar had before it had slots; the frames are the "2+" chip of the
 // header-glyph mock (#19), the shade stronger than the first try because the
-// owner expected it to fade on glass.
+// owner expected it to fade on glass. EDGE + SLOT_PAD put the first thing in
+// each side where round 2's mock drew it (24 px from the P4_5's edge); two
+// slots' pads and SPACE part neighbours as the status glyphs are parted.
 const UIHeader UI_HEADER = {
     .GLYPH = 28, .GLYPH_FRAMED = 19, .FRAME = 26, .FRAME_R = 7, .FRAME_MIX = 14,
-    .SLOT_GAP = 8, .SLOT_PAD = 4, .DOT_ON = 11, .DOT_OFF = 8, .DOT_RING = 2, .DOT_GAP = 5,
+    .SLOT_GAP = 8, .SLOT_PAD = 6, .EDGE = 8, .SPACE = 2, .CLEAR = 12,
+    .DOT_ON = 11, .DOT_OFF = 8, .DOT_RING = 2, .DOT_GAP = 5,
     .MARK = 12, .LINE = 2,
     .DRAWER_W = 260, .DRAWER_R = 15, .DRAWER_PAD = 10, .DRAWER_GAP = 8, .DRAWER_LINE = 2,
 };

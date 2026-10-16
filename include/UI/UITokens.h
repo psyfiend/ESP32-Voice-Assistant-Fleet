@@ -192,7 +192,11 @@ struct UIHeader {
     uint8_t FRAME_R;       //  7  the rounded square's corners
     uint8_t FRAME_MIX;     // 14  the rounded square's shade: % of TEXT over the bar
     uint8_t SLOT_GAP;      //  8  between the things in one slot
-    uint8_t SLOT_PAD;      //  4  a slot's sides
+    uint8_t SLOT_PAD;      //  6  a slot's sides (its tap area and its open tab reach this far)
+    // The three places (2.8 round 2, Layout/HeaderPlan.h)
+    uint8_t EDGE;          //  8  from each end of the bar to its side's first slot
+    uint8_t SPACE;         //  2  between two slots in one place (their pads make the rest)
+    uint8_t CLEAR;         // 12  at least this between a side and the middle; closer, the lowest keep gives way
     uint8_t DOT_ON;        // 11  this page's dot
     uint8_t DOT_OFF;       //  8  another page's ring
     uint8_t DOT_RING;      //  2  the ring's line

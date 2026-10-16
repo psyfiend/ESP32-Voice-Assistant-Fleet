@@ -1,5 +1,6 @@
-// The page header: a bar of slots (2.8). See include/UI/Panel_Header.h; the
-// slots' data is UI/HeaderSlots.h, their panels SlotPanels.cpp.
+// The page header: three places of slots (2.8). See include/UI/Panel_Header.h;
+// the slots' data is UI/HeaderSlots.h, where they stand Layout/HeaderPlan.h,
+// their panels SlotPanels.cpp.
 #include "UI/Panel_Header.h"
 
 #include <math.h>
@@ -7,9 +8,10 @@
 #include <string.h>
 #include <time.h>
 #include "UI/Kit.h"
-#include "UI/UIIcons.h"           // MDI_THERMOMETER
+#include "UI/UIIcons.h"           // MDI_THERMOMETER, MDI_BELL_OUTLINE
 #include "UI/UIToolkit.h"
 #include "Cards/CardIcons.h"      // a sensor's icon, tint and value, as its card draws them
+#include "Alarms.h"
 #include "EntityRegistry.h"
 #include "TimeService.h"
 
@@ -25,10 +27,20 @@ int32_t hashText(const char *s) {
     for (; *s; s++) h = (h ^ (uint8_t)*s) * 16777619u;
     return (int32_t)(h & 0x3FFFFFFF);
 }
+
+// "6:56" and "am", as the owner wrote the time: 12-hour, no seconds.
+void clockText(time_t when, char *hm, size_t cap, const char **ampm) {
+    struct tm t;
+    localtime_r(&when, &t);
+    const int h12 = t.tm_hour % 12 ? t.tm_hour % 12 : 12;
+    snprintf(hm, cap, "%d:%02d", h12, t.tm_min);
+    *ampm = t.tm_hour < 12 ? "am" : "pm";
+}
 }  // namespace
 
-// THE KINDS. A new kind of slot is a row here and its two functions; nothing
-// else in the header changes (header-slots.md section 8).
+// THE KINDS. A new kind of slot is a row here and its two functions, and a row
+// in HeaderSlots.cpp; nothing else in the header changes (header-slots.md
+// section 8).
 struct Panel_Header::KindOps {
     SlotKind kind;
     void (Panel_Header::*build)(Slot &);
@@ -41,6 +53,7 @@ const Panel_Header::KindOps &Panel_Header::ops(SlotKind k) {
         { SlotKind::SLOT_PAGE,   &Panel_Header::buildPage,   &Panel_Header::updatePage   },
         { SlotKind::SLOT_STATUS, &Panel_Header::buildStatus, &Panel_Header::updateStatus },
         { SlotKind::SLOT_SENSOR, &Panel_Header::buildSensor, &Panel_Header::updateSensor },
+        { SlotKind::SLOT_ALARM,  &Panel_Header::buildAlarm,  &Panel_Header::updateAlarm  },
     };
     for (const KindOps &o : TABLE) if (o.kind == k) return o;
     return TABLE[0];
@@ -64,14 +77,13 @@ void Panel_Header::buildSlots() {
         Slot &s = _slots[i];
         s = Slot();
         s.kind   = _spec[i].kind;
+        s.place  = _spec[i].place;
         s.entity = _spec[i].entity;
         s.box    = Kit::headerSlot(_bar, slotClickCb, this);
         (this->*ops(s.kind).build)(s);
     }
-    // Laid out once, so a page slot can measure its room and a panel can find
-    // its slot's centre; then each slot draws what it has.
-    lv_obj_update_layout(_bar);
     for (uint8_t i = 0; i < _n; i++) (this->*ops(_slots[i].kind).update)(_slots[i], true);
+    plan();
     if (_open >= 0 && _open < _n) lv_obj_add_state(_slots[_open].box, LV_STATE_CHECKED);
     else _open = -1;
 }
@@ -87,10 +99,92 @@ void Panel_Header::tick() {
         if (s.kind == SlotKind::SLOT_SENSOR && !sensorDue) continue;
         (this->*ops(s.kind).update)(s, false);
     }
+    if (_dirty) plan();
+}
+
+void Panel_Header::refresh() {
+    for (uint8_t i = 0; i < _n; i++) (this->*ops(_slots[i].kind).update)(_slots[i], false);
+    if (_dirty) plan();
 }
 
 void Panel_Header::restyle() {
     for (uint8_t i = 0; i < _n; i++) (this->*ops(_slots[i].kind).update)(_slots[i], true);
+    plan();
+}
+
+// --- The plan ---------------------------------------------------------------------
+// Each slot's forms are measured from what it holds now: its pads, the things
+// it always shows, and the extras each form keeps, parted by its gap. An
+// object hidden for a reason of its own (the error mark while nothing is
+// wrong) takes no room; an extra the last plan shed is still measured, since
+// LVGL keeps a hidden object's size up to date.
+void Panel_Header::claimOf(const Slot &s, Layout::HeaderClaim &c) const {
+    const SlotKindInfo &k = slotKindInfo(s.kind);
+    c = Layout::HeaderClaim();
+    c.place  = s.place;
+    c.wanted = s.wanted;
+    c.forms  = k.forms <= s.nExtra + 1 ? k.forms : s.nExtra + 1;
+    for (uint8_t f = 0; f < c.forms; f++) c.keep[f] = k.keep[f];
+
+    const int32_t gap  = lv_obj_get_style_pad_column(s.box, LV_PART_MAIN);
+    const int32_t pads = lv_obj_get_style_pad_left(s.box, LV_PART_MAIN) +
+                         lv_obj_get_style_pad_right(s.box, LV_PART_MAIN);
+    int32_t base = 0;
+    uint8_t nBase = 0;
+    const uint32_t cnt = lv_obj_get_child_count(s.box);
+    for (uint32_t i = 0; i < cnt; i++) {
+        lv_obj_t *ch = lv_obj_get_child(s.box, (int32_t)i);
+        bool isExtra = false;
+        for (uint8_t e = 0; e < s.nExtra; e++) if (s.extra[e] == ch) isExtra = true;
+        if (isExtra || lv_obj_has_flag(ch, LV_OBJ_FLAG_HIDDEN)) continue;
+        const int32_t w = lv_obj_get_width(ch);
+        if (w <= 0) continue;
+        base += w;
+        nBase++;
+    }
+    for (uint8_t f = 0; f < c.forms; f++) {
+        int32_t w = base;
+        uint8_t n = nBase;
+        for (uint8_t e = f; e < s.nExtra; e++) {
+            const int32_t ew = lv_obj_get_width(s.extra[e]);
+            if (ew > 0) { w += ew; n++; }
+        }
+        c.width[f] = pads + w + (n ? gap * (n - 1) : 0);
+    }
+}
+
+void Panel_Header::plan() {
+    _dirty = false;
+    if (!_bar || !_n) return;
+    // The labels' sizes for what they say now.
+    lv_obj_update_layout(_bar);
+    Layout::HeaderClaim claims[HEADER_SLOTS_MAX];
+    for (uint8_t i = 0; i < _n; i++) claimOf(_slots[i], claims[i]);
+    const UIHeader &h = UI::hdr();
+    Layout::HeaderBar bar;
+    bar.width = lv_obj_get_content_width(_bar);
+    bar.edge  = UI::sc(h.EDGE);
+    bar.space = UI::sc(h.SPACE);
+    bar.clear = UI::sc(h.CLEAR);
+    Layout::HeaderSpot spot[HEADER_SLOTS_MAX];
+    const bool fits = Layout::planHeader(bar, claims, _n, spot);
+    if (!fits && _fits) Serial.printf("[UI] header: a side meets the middle with nothing left to give way (%ld px)\n",
+                                      (long)bar.width);
+    _fits = fits;
+    _plans++;
+    for (uint8_t i = 0; i < _n; i++) {
+        Slot &s = _slots[i];
+        s.shown = spot[i].shown;
+        s.form  = spot[i].form;
+        if (!s.shown) { lv_obj_add_flag(s.box, LV_OBJ_FLAG_HIDDEN); continue; }
+        lv_obj_remove_flag(s.box, LV_OBJ_FLAG_HIDDEN);
+        for (uint8_t e = 0; e < s.nExtra; e++) {
+            if (e < s.form) lv_obj_add_flag   (s.extra[e], LV_OBJ_FLAG_HIDDEN);
+            else            lv_obj_remove_flag(s.extra[e], LV_OBJ_FLAG_HIDDEN);
+        }
+        lv_obj_set_pos(s.box, spot[i].x, 0);
+        lv_obj_set_width(s.box, spot[i].w);
+    }
 }
 
 void Panel_Header::setPage(const char *title, uint8_t index, uint8_t count,
@@ -108,6 +202,7 @@ void Panel_Header::setPage(const char *title, uint8_t index, uint8_t count,
     }
     for (uint8_t i = 0; i < _n; i++)
         if (_slots[i].kind == SlotKind::SLOT_PAGE) updatePage(_slots[i], true);
+    if (_dirty) plan();
 }
 
 void Panel_Header::setGlyphStyle(GlyphStyle s) {
@@ -127,6 +222,14 @@ const char *Panel_Header::slotEntity(uint8_t i) const {
 int Panel_Header::slotOf(SlotKind k) const {
     for (uint8_t i = 0; i < _n; i++) if (_slots[i].kind == k) return i;
     return -1;
+}
+
+bool Panel_Header::slotShown(uint8_t i) const {
+    return i < _n && _slots[i].shown;
+}
+
+uint8_t Panel_Header::slotForm(uint8_t i) const {
+    return i < _n ? _slots[i].form : 0;
 }
 
 int32_t Panel_Header::slotCentreX(uint8_t i) const {
@@ -166,32 +269,34 @@ void Panel_Header::updateClock(Slot &s, bool force) {
     const int32_t key = TimeService::isSet() ? (int32_t)(now / 60) : -1;
     if (!force && key == s.key) return;
     s.key = key;
-    s.redraws++;
+    redrawn(s);
     if (key < 0) {
         lv_label_set_text(s.a, "--:--");
         lv_label_set_text(s.b, "");
         return;
     }
-    struct tm t;
-    localtime_r(&now, &t);
-    const int h12 = t.tm_hour % 12 ? t.tm_hour % 12 : 12;
-    lv_label_set_text_fmt(s.a, "%d:%02d", h12, t.tm_min);
-    lv_label_set_text(s.b, t.tm_hour < 12 ? "am" : "pm");
+    char hm[8];
+    const char *ampm;
+    clockText(now, hm, sizeof(hm), &ampm);
+    lv_label_set_text(s.a, hm);
+    lv_label_set_text(s.b, ampm);
 }
 
 // --- The page -------------------------------------------------------------------
 // Its name and a dot per page: this page's larger and filled, the others rings.
-// Where the slot is too narrow for both, the name goes and the dots stay (the
-// page's panel names it) - measured, never by board.
+// The name is the slot's extra: where the bar is too narrow, the plan sheds it
+// and the dots stay (the page's panel names it) - measured, never by board.
 void Panel_Header::buildPage(Slot &s) {
     s.a = Kit::label(s.box, Kit::KitStyle::KS_HDR_TEXT);
     s.c = Kit::plain(s.box);
     Kit::add(s.c, Kit::KitStyle::KS_HDR_DOTS);
+    s.extra[0] = s.a;
+    s.nExtra = 1;
 }
 
 void Panel_Header::updatePage(Slot &s, bool force) {
     if (!force) return;   // it changes with the page, never on its own
-    s.redraws++;
+    redrawn(s);
     lv_label_set_text(s.a, _title);
     lv_obj_clean(s.c);
     if (_pageCount > 1 && _pageCount <= PAGE_DOTS_MAX) {
@@ -201,17 +306,13 @@ void Panel_Header::updatePage(Slot &s, bool force) {
         lv_obj_t *l = Kit::label(s.c, Kit::KitStyle::KS_HDR_TEXT_DIM);
         lv_label_set_text_fmt(l, "%u / %u", (unsigned)_pageIndex + 1, (unsigned)_pageCount);
     }
-    lv_obj_remove_flag(s.a, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_update_layout(s.box);
-    const int32_t room = lv_obj_get_content_width(s.box);
-    const int32_t need = lv_obj_get_width(s.a) + lv_obj_get_width(s.c) + UI::sc(UI::hdr().SLOT_GAP);
-    if (need > room) lv_obj_add_flag(s.a, LV_OBJ_FLAG_HIDDEN);
 }
 
 // --- Status -----------------------------------------------------------------------
 // The HA / MQTT link, then Wi-Fi - the order of the Fleet Status Glyphs mock, and
 // a dependency chain read from the edge in. Each is its own widget and throttles
-// itself; framed by the glyph style.
+// itself; framed by the glyph style. Their size never changes, so they never
+// ask for a plan.
 void Panel_Header::buildStatus(Slot &s) {
     if (_mqtt) _link.init(s.box, _mqtt, _style);
     if (_conn) _wifi.init(s.box, _conn, _style);
@@ -232,7 +333,8 @@ void Panel_Header::updateStatus(Slot &s, bool force) {
 // Its icon and its value, as its card would draw them (the corner icon and its
 // tint; a temperature to the whole degree). DASHES UNTIL A LIVE VALUE (D-15):
 // "--" while it has never reported this boot; "--" and the error mark when the
-// source says it is unavailable or it has gone stale - never an old value.
+// source says it is unavailable or it has gone stale - never an old value. The
+// icon is the slot's extra: on a narrow bar the value stands alone.
 void Panel_Header::buildSensor(Slot &s) {
     s.frame = Kit::glyphFrame(s.box, _style);
     s.a = Kit::label(s.frame, Kit::KitStyle::KS_HDR_ICON);
@@ -240,6 +342,8 @@ void Panel_Header::buildSensor(Slot &s) {
     s.c = Kit::label(s.box, Kit::KitStyle::KS_HDR_MARK);
     lv_label_set_text(s.c, "!");
     lv_obj_add_flag(s.c, LV_OBJ_FLAG_HIDDEN);
+    s.extra[0] = s.frame;
+    s.nExtra = 1;
 }
 
 void Panel_Header::updateSensor(Slot &s, bool force) {
@@ -267,7 +371,7 @@ void Panel_Header::updateSensor(Slot &s, bool force) {
     const int32_t key = hashText(text) * 4 + state;
     if (!force && key == s.key) return;
     s.key = key;
-    s.redraws++;
+    redrawn(s);
 
     lv_label_set_text(s.b, text);
     if (state == 2) lv_obj_remove_flag(s.c, LV_OBJ_FLAG_HIDDEN);
@@ -281,5 +385,45 @@ void Panel_Header::updateSensor(Slot &s, bool force) {
         lv_obj_set_style_text_color(s.a, UI::c(UI::pal().SURFACE_ALT), 0);
     } else {
         lv_obj_set_style_text_color(s.a, UI::c(tint), 0);
+    }
+}
+
+// --- The alarm --------------------------------------------------------------------
+// A bell and the next alarm's time, among the status glyphs (D-18). A CLAIM
+// WITH A CONDITION (D-19, D-20): with no alarm set it takes no room - an unset
+// alarm is not missing data. Until K84 builds alarms only a PC sets one
+// (Alarms.h). The time is the slot's extra: on a narrow bar the bell stands
+// alone, and its panel says when.
+void Panel_Header::buildAlarm(Slot &s) {
+    s.frame = Kit::glyphFrame(s.box, _style);
+    s.a = Kit::label(s.frame, Kit::KitStyle::KS_HDR_ICON);
+    lv_label_set_text(s.a, MDI_BELL_OUTLINE);
+    s.c = Kit::plain(s.box);
+    Kit::add(s.c, Kit::KitStyle::KS_HDR_CLOCK);
+    s.b = Kit::label(s.c, Kit::KitStyle::KS_HDR_TEXT);
+    s.d = Kit::label(s.c, Kit::KitStyle::KS_HDR_TEXT_DIM);
+    s.extra[0] = s.c;
+    s.nExtra = 1;
+}
+
+void Panel_Header::updateAlarm(Slot &s, bool force) {
+    time_t when = 0;
+    const bool set = Alarms::next(when);
+    const int32_t key = set ? (int32_t)(when / 60) : -1;
+    if (!force && key == s.key) return;
+    s.key = key;
+    s.wanted = set;
+    redrawn(s);
+    if (!set) return;
+    char hm[8];
+    const char *ampm;
+    clockText(when, hm, sizeof(hm), &ampm);
+    lv_label_set_text(s.b, hm);
+    lv_label_set_text(s.d, ampm);
+    // A bell has no state of its own: the bar's text colour, or in a circle
+    // the circle in it and the bell in the bar's.
+    if (_style == GlyphStyle::GLYPH_CIRCLE) {
+        lv_obj_set_style_bg_color(s.frame, UI::c(UI::pal().TEXT), 0);
+        lv_obj_set_style_text_color(s.a, UI::c(UI::pal().SURFACE_ALT), 0);
     }
 }

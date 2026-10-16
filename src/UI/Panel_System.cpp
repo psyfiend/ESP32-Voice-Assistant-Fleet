@@ -8,7 +8,6 @@
 static Panel_System *s_self = nullptr;
 
 Panel_System::Panel_System() {
-    _ui_root    = NULL;
     _ui_content = NULL;
     _ui_actions = NULL;
     _ui_grid    = NULL;
@@ -38,23 +37,6 @@ Panel_System::~Panel_System() {
 
 void Panel_System::setOnToggleCallback  (ToggleCallback cb) {
     _onToggle = cb;
-}
-
-void Panel_System::anim_height_cb(void * var, int32_t v) {
-    Panel_System* p = (Panel_System*)var;
-    if (!p || !p->_ui_root) return;
-    lv_obj_set_height(p->_ui_root, v);
-    // THE CONTENTS RIDE ON THE EDGE (owner, #81, 2026-10-06): the wrapper
-    // grows and clips as before, and the contents move with its bottom edge -
-    // their bottom stays on it - so the drawer slides down like the deck's
-    // panels instead of uncovering contents that stand still ("like window
-    // blinds, backwards"). Open, y is -radius: the corner hack below.
-    if (p->_ui_content) lv_obj_set_y(p->_ui_content, v - p->_openH - UIToolkit::sc(15));
-    // HIDDEN AT ZERO, not merely zero-high. Since the drawer casts the
-    // scheme's shadow (Linen), a closed drawer would otherwise leave a thin
-    // shadow line under the header - the shadow of a zero-height box.
-    if (v <= 0) lv_obj_add_flag  (p->_ui_root, LV_OBJ_FLAG_HIDDEN);
-    else        lv_obj_clear_flag(p->_ui_root, LV_OBJ_FLAG_HIDDEN);
 }
 
 void Panel_System::btn_action_cb(lv_event_t* e) {
@@ -100,16 +82,12 @@ void Panel_System::setRowsLabel(const char *text) {
 // supposed to be attached to - otherwise hiding the bar leaves it floating a
 // header's height down an empty screen.
 void Panel_System::setTopOffset(int32_t y) {
-    if (_ui_root) lv_obj_set_y(_ui_root, y);
+    _drawer.top = y;
+    if (_drawer.root) lv_obj_set_y(_drawer.root, y);
 }
 
 void Panel_System::setAnchorX(int32_t centreX) {
-    if (!_ui_root) return;
-    const int32_t screenW = lv_obj_get_width(lv_screen_active());
-    int32_t x = centreX - _panelW / 2;
-    if (x + _panelW > screenW - _margin) x = screenW - _margin - _panelW;
-    if (x < _margin) x = _margin;
-    lv_obj_set_x(_ui_root, x);
+    Kit::drawerPlace(_drawer, centreX, _drawer.top);
 }
 
 void Panel_System::setVariantLabel(const char *text) {
@@ -179,9 +157,6 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     s_self = this;
     SystemReport::addSink(reportSink);
 
-    // 1. Create the WRAPPER (_ui_root)
-    // Acts as the "Viewmask". Positioned explicitly below the header.
-    //
     // WIDTH IS DERIVED FROM THE SCREEN, NOT FROM THE BOARD (issue #50).
     //
     // It was lv_pct(100) - full bleed on every panel, which on a 1280 px board
@@ -209,93 +184,20 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     else if (logicalW >= PANEL_MID_LOGICAL)  panelW = (screenW * 3) / 4;
     else                                     panelW = screenW;   // no room to spare
 
-    // ANCHORED RIGHT, with the deck's own margin rather than hard against the
-    // edge - so it reads as coming from the status icon that opened it, and
-    // lines up with the Audio/Display panels below. GUIManager pads the deck
-    // by sc(10); matching that is what makes the two look like one system.
-    const int32_t margin = (panelW == screenW) ? 0 : UIToolkit::sc(10);
-    _panelW = panelW;
-    _margin = margin;
-
-    // Y COMES FROM THE LIVE HEADER HEIGHT, not from a constant.
+    // THE FRAME IS THE KIT'S DRAWER (2.8 round 2, D-20): the same clip that
+    // grows to reveal its face, the face square where it meets the bar and
+    // riding the growing edge (#81), the scheme's shadow on the clip, no
+    // clip_corner (the layer that froze the P4_5 - LESSONS) - which is what
+    // this panel built by hand before the kit existed, and what every other
+    // slot's panel is. The face is the rows' column.
     //
-    // This was sc(30) hard-coded while the header is a knob that cycles
-    // 50/45/40/35/30/none. At any height but 30 the drawer detached from the
-    // bar and appeared out of nothing, which is the "fix the slide origin"
-    // item in #50 - it was never a slide bug, it was a stale number.
-    _ui_root = lv_obj_create    (parent);
-    lv_obj_set_width            (_ui_root, panelW);
-    lv_obj_set_height           (_ui_root, 0);
-    lv_obj_set_pos              (_ui_root, screenW - panelW - margin,
-                                           UIToolkit::systemHeaderPx());
-
-    // Wrapper Style (Invisible, Clipping)
-    lv_obj_set_style_bg_opa         (_ui_root, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width   (_ui_root, 0, 0);
-    lv_obj_set_style_pad_all        (_ui_root, 0, 0);
-    // THE DRAWER'S SHADOW IS THE WRAPPER'S, not the content's. The wrapper
-    // must clip - it is what reveals the content as it grows - so a shadow on
-    // the content would be cut off at the wrapper's edge. A shadow on the
-    // wrapper itself is drawn by the wrapper, outside its own box, and grows
-    // with the reveal. The radius exists only to shape that shadow: the
-    // wrapper draws no background and radius without clip_corner clips
-    // nothing, so this costs no layer. Zero on schemes without shadows.
-    lv_obj_set_style_radius         (_ui_root, UIToolkit::sc(15), 0);
-    lv_obj_add_style                (_ui_root, UI::paint(UIPaint::PAINT_LIFT), 0);
-    lv_obj_add_flag                 (_ui_root, LV_OBJ_FLAG_HIDDEN);   // closed
-    lv_obj_set_scrollbar_mode       (_ui_root, LV_SCROLLBAR_MODE_OFF);
-    // clip_corner was set here and has been REMOVED. It did nothing - this
-    // object's radius is 0, and clip_corner only masks a radius - but it is
-    // one of the three styles that force LVGL to render an object to an
-    // intermediate layer sized by its WIDTH, and this was the widest object on
-    // the screen. That is the exact shape that froze WS_P4_5 on boot at the
-    // end of 2.5 (docs/LESSONS.md). Harmless today, a trap for whoever gives
-    // this panel a radius later.
-
-    // 2. Create the CONTENT CONTAINER (_ui_content)
-    _ui_content = lv_obj_create     (_ui_root);
-    // SIZED BY ITS CONTENT, not by the wrapper (issue #50, dynamic height).
-    //
-    // It was lv_pct(100) of a wrapper whose height was animated, which meant
-    // the content could never say how tall it wanted to be - so the wrapper
-    // had to guess, and it guessed "most of the screen". Reversing the
-    // dependency is the whole fix: the content measures itself, and the
-    // wrapper animates to that. See contentHeight().
-    lv_obj_set_width                (_ui_content, lv_pct(100));
-    lv_obj_set_height               (_ui_content, LV_SIZE_CONTENT);
-
-    // Content Style
-    // A SHARED paint rather than a local colour: #64, the drawer kept the old
-    // scheme because nothing ever revisited a colour set here once.
-    lv_obj_add_style                (_ui_content, UI::paint(UIPaint::PAINT_SURFACE), 0);
-    
-    // -- CORNER HACK --
-    // We want square top corners (to connect to header) and rounded bottom corners.
-    // LVGL radius applies to all corners.
-    // Trick: Move content UP by the radius amount to clip the top rounded corners off.
-    int32_t radius = UIToolkit::sc(15);
-    lv_obj_set_style_radius     (_ui_content, UIToolkit::sc(15), 0);
-    lv_obj_set_y                (_ui_content, -(UIToolkit::sc(15))); // Shift up to hide top curves
-    
-    // The shift has to be PAID FOR in top padding, or it eats the first row.
-    //
-    // Shifting up by `radius` hides the top corners; it also moves the first
-    // child up by the same amount, straight under the wrapper's clip. Adding
-    // the radius back as padding puts the content where it was and makes the
-    // measured height honest - which now matters, because that height is what
-    // the drawer animates to.
-    lv_obj_set_style_pad_top        (_ui_content, radius + UIToolkit::sc(10), 0);
-
-    lv_obj_set_style_border_width   (_ui_content, UIToolkit::sc(2), 0);
-    // lv_obj_set_style_pad_all        (_ui_content, UIToolkit::sc(10), 0);
-    lv_obj_set_style_pad_left       (_ui_content, UIToolkit::sc(10), 0);
-    lv_obj_set_style_pad_right      (_ui_content, UIToolkit::sc(10), 0);
-    lv_obj_set_style_pad_bottom     (_ui_content, UIToolkit::sc(10), 0);
-    lv_obj_clear_flag               (_ui_content, LV_OBJ_FLAG_SCROLLABLE); // Static background
-
-    lv_obj_set_flex_flow            (_ui_content, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align           (_ui_content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_pad_row        (_ui_content, UIToolkit::sc(8), 0);
+    // It hangs under the status slot (GUIManager: setAnchorX()), kept on the
+    // screen with the deck's own margin; Y COMES FROM THE LIVE HEADER HEIGHT
+    // (setTopOffset()), not from a constant - a stale number once detached it
+    // from the bar (#50).
+    Kit::drawer(_drawer, parent, panelW);
+    _ui_content = _drawer.face;
+    Kit::drawerPlace(_drawer, screenW, UIToolkit::systemHeaderPx());
 
     // -- TITLE: centred, with a rule running out to each edge ---------------
     //
@@ -535,71 +437,24 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // is not half or three-quarters of the screen, an x that does not put the
     // right edge one margin in, or a height of 0 or "most of the screen" are
     // all obvious here and all invisible until tapped.
-    Serial.printf("[SysPanel] %ld px wide at x=%ld (screen %ld, %ld logical), "
-                  "top %ld, content %ld px\n",
-                  (long)panelW, (long)(screenW - panelW - margin), (long)screenW,
-                  (long)logicalW, (long)UIToolkit::systemHeaderPx(),
-                  (long)contentHeight());
-}
-
-// How tall the drawer needs to be to show everything in it, and no taller.
-//
-// It used to open to `screen_h - sc(50) - sc(100)` - most of the display,
-// whatever was actually inside. Two magic numbers standing in for a header
-// this panel no longer has to guess at and a gap nobody could name.
-//
-// The measurement works because _ui_content is LV_SIZE_CONTENT and is NOT
-// sized from its parent, so it has a real height even while the wrapper around
-// it is collapsed to zero. lv_obj_update_layout() is normally something to
-// avoid - docs/design/card-layout.md 1.1 calls it out for walking the whole
-// screen - but that warning is about calling it in a RENDER path, once per
-// card per repaint. This is one call on one subtree when a finger hits a
-// button, which is the case the function is for.
-//
-// The radius comes back off because _ui_content is shifted up by exactly that
-// much to square off its top corners against the header bar (see the corner
-// hack in init). Its visible height is therefore its own height minus the part
-// hidden above the wrapper.
-int32_t Panel_System::contentHeight() const {
-    if (!_ui_content) return 0;
     lv_obj_update_layout(_ui_content);
-    const int32_t h = lv_obj_get_height(_ui_content) - UIToolkit::sc(15);
-
-    // Never taller than the screen below the header. A board small enough for
-    // the content not to fit still has to stop somewhere, and stopping at the
-    // bottom edge is better than drawing past it.
-    const int32_t avail = lv_obj_get_height(lv_screen_active())
-                        - UIToolkit::systemHeaderPx() - UIToolkit::sc(10);
-    return (h > avail) ? avail : h;
+    Serial.printf("[SysPanel] %ld px wide (screen %ld, %ld logical), top %ld, face %ld px\n",
+                  (long)panelW, (long)screenW, (long)logicalW,
+                  (long)UIToolkit::systemHeaderPx(), (long)lv_obj_get_height(_ui_content));
 }
 
+// Open or close. How tall it opens is MEASURED from its face, never guessed
+// (#50: it once opened to most of the screen whatever it held) - the drawer's
+// own rule, Kit::drawerOpen(), as every slot's panel.
 void Panel_System::toggle() {
     _expanded = !_expanded;
     if (_onToggle) _onToggle(_expanded);
-    if (_expanded) UIToolkit::closeActiveAccordion();
-
-    // Unhidden BEFORE measuring: contentHeight() reads the laid-out content,
-    // and a hidden subtree is not something to trust a measurement from.
-    // anim_height_cb() hides it again when a close reaches zero.
     if (_expanded) {
-        lv_obj_clear_flag(_ui_root, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_update_layout(_ui_root);
+        UIToolkit::closeActiveAccordion();
+        Kit::drawerOpen(_drawer);
+    } else {
+        Kit::drawerClose(_drawer, true);
     }
-
-    int32_t start_h = lv_obj_get_height(_ui_root);
-    if (_expanded) _openH = contentHeight();   // what anim_height_cb() rides the contents on
-    int32_t end_h   = _expanded ? _openH : 0;
-
-    lv_anim_del(this, anim_height_cb); 
-
-    lv_anim_t a;
-    lv_anim_init        (&a);
-    lv_anim_set_var     (&a, this); 
-    lv_anim_set_values  (&a, start_h, end_h);
-    lv_anim_set_time    (&a, 350); 
-    lv_anim_set_exec_cb (&a, anim_height_cb);
-    lv_anim_set_path_cb (&a, lv_anim_path_ease_out); 
-    lv_anim_start       (&a);
 }
 
 void Panel_System::close() {
