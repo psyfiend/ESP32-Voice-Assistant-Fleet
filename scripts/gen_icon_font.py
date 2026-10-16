@@ -152,6 +152,11 @@ GLYPHS = [
     # laptop).
     "chart-bar",
 
+    # --- the header's alarm (2.8 round 2, D-18 / D-20) ----------------------
+    # The bell among the status glyphs while an alarm is set - the round-2
+    # mock's outline bell.
+    "bell-outline",
+
     # --- EVERY MDI ICON THE OWNER'S HA SERVES, 2026-10-12 (K17) ------------
     #
     # A member of a group made a card of its own (Desk's Office Left / Right,
