@@ -224,3 +224,23 @@ alarm is not missing data - and is shown from the PC until K84 builds alarms; **
 moves onto `Kit::Drawer`** (Q7). Still open, carried on the sheet with their recommendations: the
 clock's form (Q2), how a hidden header comes back (Q3), the error mark (Q4), what each panel holds
 next (Q6).
+
+## 11. Round 2 on glass (2026-10-16)
+
+Every round-2 test passed; the owner's results and words are in `TEST_2.8.md`. What changes next
+(DECISIONS D-21 to D-24):
+
+- **The alarm by the clock** (D-21): the bell beside the clock while an alarm is set (within about
+  7 days); the clock's panel is where alarms are set and seen; **within 12 hours a notice glyph
+  joins the status icons**, dismissable each time or turned off, its 12 hours the owner's setting.
+  Two claims from one alarm - the claim model at work.
+- **The system panel and UI Tweaks** (D-22): the panel becomes CONNECTIVITY then SYSTEM -
+  DIAGNOSTICS; the knobs move to a UI Tweaks window; every header panel follows the window timeout;
+  the left-half swipe opens UI Tweaks. The page panel's Shown / Hidden becomes a selector bar.
+- **One shape** (D-23): an open slot and its panel inside one border and one colour, the panel
+  breaking through the bar's accent line, every corner rounded.
+- **The glyph overhaul** (D-24): the mocks' glyphs exactly, never shrunk to fit a frame, centred,
+  readable on Linen; an AP mode its own glyph. The frame style (Q1) waits for it.
+- **The header's type** one step up - between today's face and the cards' entity label.
+- **Kept**: Q2 the clock as built, Q3 the edge swipe, Q4 the error mark, Q9 slots as wide as what
+  they show; T4's swipe up to close ("exactly what I would have wanted").

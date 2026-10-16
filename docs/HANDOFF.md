@@ -71,10 +71,13 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
 
 ## What is next with the owner
 
-1. **The owner tests 2.8 round 2** (`TEST_2.8.md`, R1-R11 on the P4_5 and the 4B) and answers Q2-Q4,
-   Q6, Q8 (when the alarm shows), Q9 (tap targets). Then: sign-off -> CHANGELOG `v0.2.18`, archive
-   the sheet, push, `gh pr create`; the owner merges. **One report when the owner says the testing
-   is done.**
+1. **2.8 round 3** - round 2 tested 2026-10-16, every test PASS; the owner's results and new
+   decisions (D-21 the alarm by the clock and its 12-hour notice, D-22 the system panel as
+   CONNECTIVITY + SYSTEM - DIAGNOSTICS and the knobs in a UI Tweaks window, D-23 the slot and panel
+   as one shape through the accent line, D-24 the glyph overhaul) are in `TEST_2.8.md` and
+   `header-slots.md` §11. Being scoped with the owner: how the mocks' glyphs reach the device, the
+   border colour, the bell beside the clock, one round or two. Then sign-off -> CHANGELOG
+   `v0.2.18`, archive the sheet, `gh pr create`; the owner merges.
 2. **#76 next, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a
    queue any task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to
    dismiss), a notice's detailed form in the middle for a while then its minimal "!" in status, a

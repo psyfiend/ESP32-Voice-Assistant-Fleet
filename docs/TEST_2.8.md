@@ -1,126 +1,8 @@
 # TEST - 2.8: the header's slots
 
-# Round 2 - three places, on claims (2026-10-15, evening)
+Rounds in order, each with your results under it.
 
-Branch `feat/2.8-header-slots`, `main` (`v0.2.17`) merged in, built with you at the desk from your
-verdicts on round 1 and the round-2 mock (DECISIONS D-16 to D-20, `docs/design/header-slots.md`
-§9-10). **No pull request** - for your test first.
-
-**On the desk now**: the P4_5 and the 4B run round 2 (with your local lines), their settings files
-as found; the 1060 runs the `v0.2.17` release.
-
-## What changed since round 1
-
-| Where | Round 1 | Round 2 |
-|---|---|---|
-| **The header** | four evenly spaced slots | **three places** (D-16, D-18): **left** the clock and the deck's temperature; **middle** the page's name and dots, on the bar's centre; **right** the alarm (while one is set) and the link and Wi-Fi |
-| **Where things stand** | each slot a quarter of the bar | **claims** (D-19, your idea): each slot claims the room it needs, measured on the board; when a side would run into the middle, the claim of the lowest priority gives way first - the alarm's time, then the temperature's icon, then the page's name; the clock, the dots and the status glyphs never leave. The middle never moves |
-| **The alarm** | "Next alarm: none set" in the clock's panel | **its own slot among the status glyphs** (D-18): a bell and "6:30am"; **on the bar only while an alarm is set** (D-20). Its panel: NEXT ALARM, the time, "in 12 hrs 53 min". Nothing sets an alarm until K84, so for now **a PC sets a pretend one** (RAM only, nothing rings) |
-| **The glyph style** | bare by default, a setting | **square by default** (Q1, D-20); the Glyphs button still cycles square, circle, bare (a development tool, D-17) |
-| **The system panel** | the old panel, centred under its slot | **the kit's drawer**, the same component as every other slot's panel (Q7, D-20): the same frame, slide and joined look; its buttons and width as before |
-| **Under the hood** | slots laid out by flex | a pure planner, `Layout/HeaderPlan` (ten tests on the PC), and the slots as data with a place each (`HeaderSlots.h`) - a notice (#76) will be one more claim, no new layout code |
-
-## The pictures
-
-The P4_5: `v0.2.17`, then round 2 (square), bare, circle, and with an alarm set:
-
-![v0.2.17](followups/28r2_hdr_before_p45.png)
-![Round 2, square](followups/28r2_hdr_square_p45.png)
-![Bare](followups/28r2_hdr_bare_p45.png)
-![Circle](followups/28r2_hdr_circle_p45.png)
-![An alarm set](followups/28r2_hdr_alarm_p45.png)
-
-The 4B (720 px), and with an alarm set - everything still in full:
-
-![4B](followups/28r2_hdr_square_4b.png)
-![4B, an alarm set](followups/28r2_hdr_alarm_4b.png)
-
-The panels, each joined to its slot - the alarm's (P4_5, then the 4B), the system panel, the
-clock's, the temperature's, the page's:
-
-![Alarm](followups/28r2_slot_alarm_p45.png)
-![Alarm, 4B](followups/28r2_slot_alarm_4b.png)
-![System panel](followups/28r2_status_p45.png)
-![Clock](followups/28r2_slot_clock_p45.png)
-![Temperature](followups/28r2_slot_sensor_p45.png)
-![Page](followups/28r2_slot_page_p45.png)
-
-## Tests for you
-
-To set a pretend alarm from the PC (and clear it):
-
-    curl "http://fleet-ws-p4-5/popup?alarm=0630"
-    curl "http://fleet-ws-p4-5/popup?alarm=-1"
-
-| # | Do this | PASS if |
-|---|---|---|
-| R1 | Look at the House page | the clock and the deck's temperature on the left; "House" and its dots in the middle of the bar; the link and Wi-Fi on the right, each glyph in a rounded square; no bell |
-| R2 | Watch the clock across a minute | it turns over on the minute; nothing else in the bar flickers (when the time gains a digit, 9:59 to 10:00, the temperature moves over by that digit - expected) |
-| R3 | Tap each slot: clock, temperature, House, the status glyphs | each panel slides down from under its slot, the slot drawn in the panel's colour so the panel pours out of it; the status glyphs' is the system panel |
-| R4 | With a panel open: tap its slot again; tap a card; swipe up; swipe sideways | each puts it away (the tap on a card does nothing else) |
-| R5 | Set the pretend alarm (above) | a bell and "6:30am" appear left of the status glyphs; the middle does not move |
-| R6 | Tap the bell; then clear the alarm from the PC | NEXT ALARM, its time and how long until it; cleared, the slot and its panel leave together |
-| R7 | The page panel: Fleet; Header Hidden then Shown | as round 1: the Fleet page; this page's cards grow into the bar's room and come back |
-| R8 | The system panel (status glyphs) | the same buttons in the same place; its slide and look match the other panels |
-| R9 | Glyphs (system panel), three times | circle, bare, square; the choice survives a reboot (square is stored as nothing) |
-| R10 | The schemes (Midnight, Fleet, Linen) | the squares read on each; an open slot still reads as part of its panel |
-| R11 | The 4B | as R1-R8 at 720 px |
-
-## Choices that were mine
-
-1. **The keeps** (who gives way first): the alarm's time 10, the temperature's icon 20, the page's
-   name 30, the temperature itself 60, a set alarm's bell 200; the clock, the dots and the status
-   glyphs never. The order is your mock's; the numbers leave room for #76's notices between them.
-   On the P4_5 and the 4B everything fits in full; the planner's tests cover the 320 px board.
-2. **Slots are as wide as what they show**, plus a pad each side - no 9 mm minimum (Q9 below). The
-   status glyphs stay one slot, one tap target, as in round 1.
-3. **The alarm's look**: the outline bell (`bell-outline`, added to the icon font) and its time in
-   the clock's form; its panel says how long until it, in TimeFormat's words.
-4. **"Next alarm" left the clock's panel** - it is the alarm slot's now.
-5. **A pretend alarm** is the only way to see the slot until K84: RAM only, not saved, nothing
-   rings; at its time it leaves the bar and its panel goes with it.
-6. **The system panel kept its width** (half the P4_5) **and its buttons**; only its frame is new.
-
-## Questions for you
-
-Carried from round 1, with their recommendations: **Q2** the clock's form (keep 12-hour; 24 h and
-seconds as settings with 4.1), **Q3** how a hidden header comes back (keep the edge swipe; try a
-drag from a card later), **Q4** the error mark (keep it), **Q6** what each panel holds next (the
-temperature's "This slot shows" first). New:
-
-- **Q8. When the alarm shows.** Today: whenever one is set. Your message also said "an alarm about
-  to go off within a few hours". **Recommended: whenever set for now; "only within N hours" as a
-  setting with K84**, when there are real alarms to judge it by.
-- **Q9. Tap targets.** Slots are as wide as what they show: on the P4_5 the clock is 94 px (~8 mm),
-  the temperature ~10 mm, the status pair ~10.5 mm, and the bar is ~5 mm tall. A 9 mm minimum
-  width (`UI::minTouch()`) would space the sides out unevenly. **Recommended: keep, and see how
-  they feel to tap.**
-
-## Results
-
-- **The harness**, P4_5, `v0.2.17` against round 2, 55 states each, minutes apart (`r2b`, `r2c`):
-  **every window's contents unchanged** - its tree identical but for `desk_temp`'s temperature
-  mark, 15 px lower, which is #104 (open, seen before); the only unexplained pixels in a window
-  state are the new header above it. The header differs in every page state, as it should. **The
-  system panel**: the same place and width (623,35, 640 px); its first row has five buttons where
-  `v0.2.17` had four (round 1's Glyphs). LVGL's pool: **+3.4 to +4.8 KB** in every state (the
-  header's slots, the alarm's built and hidden, the frames, the slot drawer). The first window
-  after the flash took 111 ms, the face painting every boot pays (HANDOFF); the rest within 1 ms.
-- **The 4B**: its header states captured (`r2h`) and looked at (pictures above). Its full walk
-  stops at the Desk window: the 4B's own setting closes a window after 10 s (`system.window.close`),
-  shorter than the walk - left as you set it.
-- **Drawing cost**, P4_5, a full redraw of the House page, 20 frames, three runs each:
-  `v0.2.17` **103.9 ms** (render 89.4) -> round 2 **104.8 ms** (render 90.5), under 1%.
-- **Host tests**: 27, all PASS (the planner's ten new).
-- **The structure check** (W13): files over 1,000 lines - `GUIManager.cpp` 1,615 (round 1 1,605:
-  the [UI STATE] line and the panel guard), `Card.cpp` 1,462; style calls outside the kit **492**
-  (round 1 501: the system panel's frame is the kit's now; `Panel_Header.cpp` 5, the sensor's tint
-  and the alarm's circle); colour literals 46 (unchanged); no shape numbers; no LVGL in the core.
-- **The gate**: all nine SUCCESS on `418ed0f` (17 min; P4_5 41.3% flash, the S3 boards 34.7-36.8%).
-
----
-
-# Round 1 (2026-10-15, morning) - superseded by round 2
+# Round 1 (2026-10-15, morning)
 
 Branch `feat/2.8-header-slots` (off `main` at `v0.2.16`), built unattended on 2026-10-15 from your
 interview answers (`docs/design/header-slots.md`, DECISIONS D-11 to D-15 - both on PR #107, still
@@ -280,7 +162,7 @@ The clock's, the page's (P4_5, then the 4B) and the sensor's panels:
 
 ## Your results
 
-**Round 1 (owner, 2026-10-15)** - seen on glass, not tested against the table above:
+**First look (owner, 2026-10-15)** - seen on glass before the table was run:
 
 > "I caught some of the screens when there were 4 header slots, it was an idea I kinda wanted to see
 > but I'm not really crazy about it. For the main system header I'd probably leave the status icons
@@ -291,10 +173,204 @@ The clock's, the page's (P4_5, then the 4B) and the sensor's panels:
 > Or at least not in its current incarnation. That panel will ultimately provide settings and/or
 > shortcuts to settings or popups to manage the various statuses. Same for all of the header slots."
 
-Recorded as DECISIONS D-16 (three places: clock, alarm and temperature left; the page middle; the
-status icons right - D-12 superseded) and D-17 (the panels are for settings; the knobs are
-development tools); `header-slots.md` §9. Q1-Q7 stay open for round 2.
+Recorded as DECISIONS D-16 (three places; D-12 superseded) and D-17 (the panels are for settings;
+the knobs are development tools); `header-slots.md` §9.
 
-## Round 2
+**The table (owner, 2026-10-16, on round 2's build)**:
 
-Built 2026-10-15 evening - at the top of this sheet.
+| # | Result |
+|---|---|
+| T1 | N/A (four slots are gone) |
+| T2 | PASS |
+| T3 | PASS |
+| T4 | PASS - "Nice job on the swipe upwards to close! Exactly what I would have wanted." |
+| T5 | PASS |
+| T6 | PASS |
+| T7 | PASS |
+| T8 | PASS - glyph switching works |
+| T9 | **FAIL** - "We need a major glyph overhaul" (below) |
+| T10 | the dashes seen; the "!" not seen (the deck's sensor has not been unavailable or stale since) |
+| T11 | PASS - the 4B works |
+
+- **The page panel**: a selector bar in place of the Shown / Hidden buttons.
+- **Q1**: "I want to say square but the icons become far too small to be useful, and in linen the
+  visibility becomes even worse" - waits for the glyph overhaul.
+- **Q2**: as built. **Q3**: the edge swipe, as built. **Q4**: keep.
+- **Q5**: the open slot in a darker colour (lighter on Linen) "doesn't look great as-is" - the
+  owner's idea in its place: **the panel breaks through the bar's accent line**, so the slot's
+  contents and the panel's sit inside one border and one colour, no line between them, as the
+  canvas's status-panel artboard drew it; all corners rounded, no 90-degree cut-offs; the border
+  one colour (the accent?) - "the panel contents pouring out of the header bar itself, not from
+  underneath it".
+- **Q6**: the status icons' panel will hold connectivity, with deep links to the Wi-Fi settings and
+  connectivity stats; the other "later" suggestions agreed.
+- **Q7**: the system panel onto `Kit::Drawer` with the knobs moved out to a **"UI Tweaks" window**;
+  the panel itself as the canvas demo drew it (CONNECTIVITY, then SYSTEM - DIAGNOSTICS); every
+  header panel follows the window timeout; the swipe down on the left half opens UI Tweaks in place
+  of the log page. The owner's layout is in DECISIONS D-22.
+- **The header's type**: the clock and the page's name are too small - one step up, between today's
+  face and the cards' entity label, if there is one; the panels' type stays.
+
+**The glyph overhaul (T9)**, in the owner's words where they matter:
+
+- The Wi-Fi glyph sits lower than the link glyph, and its dot is off centre, to the left.
+- Framed (square or circle) the link's arrows are "far too small" and the Wi-Fi fan shrinks: "the
+  graphical portion of the icon should not have to change size to be placed within a border".
+- Whether the bare link glyph keeps its own coloured border is to be decided; if it does, square.
+  Without it the arrows could be larger.
+- **Wi-Fi is "practically invisible" on Linen**: bright green on a light ground, hard to read even
+  framed.
+- **The glyphs should be the mocks' exactly** - the "Fleet Status Glyphs" and "Linen Fill and Header
+  Glyphs" artifacts: a narrower fan, so the waves fit a square without shrinking. "How can we
+  better transfer those illustrations to the device?"
+- **An AP mode gets its own "AP" glyph** in the status place, not a mark on the Wi-Fi fan.
+
+# Round 2 - three places, on claims (2026-10-15, evening)
+
+Branch `feat/2.8-header-slots`, `main` (`v0.2.17`) merged in, built with you at the desk from your
+verdicts on round 1 and the round-2 mock (DECISIONS D-16 to D-20, `docs/design/header-slots.md`
+§9-10). **No pull request** - for your test first.
+
+**On the desk now**: the P4_5 and the 4B run round 2 (with your local lines), their settings files
+as found; the 1060 runs the `v0.2.17` release.
+
+## What changed since round 1
+
+| Where | Round 1 | Round 2 |
+|---|---|---|
+| **The header** | four evenly spaced slots | **three places** (D-16, D-18): **left** the clock and the deck's temperature; **middle** the page's name and dots, on the bar's centre; **right** the alarm (while one is set) and the link and Wi-Fi |
+| **Where things stand** | each slot a quarter of the bar | **claims** (D-19, your idea): each slot claims the room it needs, measured on the board; when a side would run into the middle, the claim of the lowest priority gives way first - the alarm's time, then the temperature's icon, then the page's name; the clock, the dots and the status glyphs never leave. The middle never moves |
+| **The alarm** | "Next alarm: none set" in the clock's panel | **its own slot among the status glyphs** (D-18): a bell and "6:30am"; **on the bar only while an alarm is set** (D-20). Its panel: NEXT ALARM, the time, "in 12 hrs 53 min". Nothing sets an alarm until K84, so for now **a PC sets a pretend one** (RAM only, nothing rings) |
+| **The glyph style** | bare by default, a setting | **square by default** (Q1, D-20); the Glyphs button still cycles square, circle, bare (a development tool, D-17) |
+| **The system panel** | the old panel, centred under its slot | **the kit's drawer**, the same component as every other slot's panel (Q7, D-20): the same frame, slide and joined look; its buttons and width as before |
+| **Under the hood** | slots laid out by flex | a pure planner, `Layout/HeaderPlan` (ten tests on the PC), and the slots as data with a place each (`HeaderSlots.h`) - a notice (#76) will be one more claim, no new layout code |
+
+## The pictures
+
+The P4_5: `v0.2.17`, then round 2 (square), bare, circle, and with an alarm set:
+
+![v0.2.17](followups/28r2_hdr_before_p45.png)
+![Round 2, square](followups/28r2_hdr_square_p45.png)
+![Bare](followups/28r2_hdr_bare_p45.png)
+![Circle](followups/28r2_hdr_circle_p45.png)
+![An alarm set](followups/28r2_hdr_alarm_p45.png)
+
+The 4B (720 px), and with an alarm set - everything still in full:
+
+![4B](followups/28r2_hdr_square_4b.png)
+![4B, an alarm set](followups/28r2_hdr_alarm_4b.png)
+
+The panels, each joined to its slot - the alarm's (P4_5, then the 4B), the system panel, the
+clock's, the temperature's, the page's:
+
+![Alarm](followups/28r2_slot_alarm_p45.png)
+![Alarm, 4B](followups/28r2_slot_alarm_4b.png)
+![System panel](followups/28r2_status_p45.png)
+![Clock](followups/28r2_slot_clock_p45.png)
+![Temperature](followups/28r2_slot_sensor_p45.png)
+![Page](followups/28r2_slot_page_p45.png)
+
+## Tests for you
+
+To set a pretend alarm from the PC (and clear it):
+
+    curl "http://fleet-ws-p4-5/popup?alarm=0630"
+    curl "http://fleet-ws-p4-5/popup?alarm=-1"
+
+| # | Do this | PASS if |
+|---|---|---|
+| R1 | Look at the House page | the clock and the deck's temperature on the left; "House" and its dots in the middle of the bar; the link and Wi-Fi on the right, each glyph in a rounded square; no bell |
+| R2 | Watch the clock across a minute | it turns over on the minute; nothing else in the bar flickers (when the time gains a digit, 9:59 to 10:00, the temperature moves over by that digit - expected) |
+| R3 | Tap each slot: clock, temperature, House, the status glyphs | each panel slides down from under its slot, the slot drawn in the panel's colour so the panel pours out of it; the status glyphs' is the system panel |
+| R4 | With a panel open: tap its slot again; tap a card; swipe up; swipe sideways | each puts it away (the tap on a card does nothing else) |
+| R5 | Set the pretend alarm (above) | a bell and "6:30am" appear left of the status glyphs; the middle does not move |
+| R6 | Tap the bell; then clear the alarm from the PC | NEXT ALARM, its time and how long until it; cleared, the slot and its panel leave together |
+| R7 | The page panel: Fleet; Header Hidden then Shown | as round 1: the Fleet page; this page's cards grow into the bar's room and come back |
+| R8 | The system panel (status glyphs) | the same buttons in the same place; its slide and look match the other panels |
+| R9 | Glyphs (system panel), three times | circle, bare, square; the choice survives a reboot (square is stored as nothing) |
+| R10 | The schemes (Midnight, Fleet, Linen) | the squares read on each; an open slot still reads as part of its panel |
+| R11 | The 4B | as R1-R8 at 720 px |
+
+## Choices that were mine
+
+1. **The keeps** (who gives way first): the alarm's time 10, the temperature's icon 20, the page's
+   name 30, the temperature itself 60, a set alarm's bell 200; the clock, the dots and the status
+   glyphs never. The order is your mock's; the numbers leave room for #76's notices between them.
+   On the P4_5 and the 4B everything fits in full; the planner's tests cover the 320 px board.
+2. **Slots are as wide as what they show**, plus a pad each side - no 9 mm minimum (Q9 below). The
+   status glyphs stay one slot, one tap target, as in round 1.
+3. **The alarm's look**: the outline bell (`bell-outline`, added to the icon font) and its time in
+   the clock's form; its panel says how long until it, in TimeFormat's words.
+4. **"Next alarm" left the clock's panel** - it is the alarm slot's now.
+5. **A pretend alarm** is the only way to see the slot until K84: RAM only, not saved, nothing
+   rings; at its time it leaves the bar and its panel goes with it.
+6. **The system panel kept its width** (half the P4_5) **and its buttons**; only its frame is new.
+
+## Questions for you
+
+Carried from round 1, with their recommendations: **Q2** the clock's form (keep 12-hour; 24 h and
+seconds as settings with 4.1), **Q3** how a hidden header comes back (keep the edge swipe; try a
+drag from a card later), **Q4** the error mark (keep it), **Q6** what each panel holds next (the
+temperature's "This slot shows" first). New:
+
+- **Q8. When the alarm shows.** Today: whenever one is set. Your message also said "an alarm about
+  to go off within a few hours". **Recommended: whenever set for now; "only within N hours" as a
+  setting with K84**, when there are real alarms to judge it by.
+- **Q9. Tap targets.** Slots are as wide as what they show: on the P4_5 the clock is 94 px (~8 mm),
+  the temperature ~10 mm, the status pair ~10.5 mm, and the bar is ~5 mm tall. A 9 mm minimum
+  width (`UI::minTouch()`) would space the sides out unevenly. **Recommended: keep, and see how
+  they feel to tap.**
+
+## Results
+
+- **The harness**, P4_5, `v0.2.17` against round 2, 55 states each, minutes apart (`r2b`, `r2c`):
+  **every window's contents unchanged** - its tree identical but for `desk_temp`'s temperature
+  mark, 15 px lower, which is #104 (open, seen before); the only unexplained pixels in a window
+  state are the new header above it. The header differs in every page state, as it should. **The
+  system panel**: the same place and width (623,35, 640 px); its first row has five buttons where
+  `v0.2.17` had four (round 1's Glyphs). LVGL's pool: **+3.4 to +4.8 KB** in every state (the
+  header's slots, the alarm's built and hidden, the frames, the slot drawer). The first window
+  after the flash took 111 ms, the face painting every boot pays (HANDOFF); the rest within 1 ms.
+- **The 4B**: its header states captured (`r2h`) and looked at (pictures above). Its full walk
+  stops at the Desk window: the 4B's own setting closes a window after 10 s (`system.window.close`),
+  shorter than the walk - left as you set it.
+- **Drawing cost**, P4_5, a full redraw of the House page, 20 frames, three runs each:
+  `v0.2.17` **103.9 ms** (render 89.4) -> round 2 **104.8 ms** (render 90.5), under 1%.
+- **Host tests**: 27, all PASS (the planner's ten new).
+- **The structure check** (W13): files over 1,000 lines - `GUIManager.cpp` 1,615 (round 1 1,605:
+  the [UI STATE] line and the panel guard), `Card.cpp` 1,462; style calls outside the kit **492**
+  (round 1 501: the system panel's frame is the kit's now; `Panel_Header.cpp` 5, the sensor's tint
+  and the alarm's circle); colour literals 46 (unchanged); no shape numbers; no LVGL in the core.
+- **The gate**: all nine SUCCESS on `418ed0f` (17 min; P4_5 41.3% flash, the S3 boards 34.7-36.8%).
+
+## Your results
+
+**Owner, 2026-10-16**:
+
+| # | Result |
+|---|---|
+| R1 | PASS |
+| R2 | PASS |
+| R3 | PASS - "The color of the panel matches that background of the slot" (but see Q5 under round 1: the joined look is to change) |
+| R4 | PASS |
+| R5 | PASS |
+| R6 | PASS |
+| R7 | PASS |
+| R8 | PASS |
+| R9 | PASS |
+| R10 | see round 1's Q5 and the glyph overhaul |
+| R11 | PASS |
+
+- **Q8 - the alarm, the owner's model** (DECISIONS D-21): **the bell sits next to the clock** while
+  an alarm is set (or goes off within about 7 days); **tapping the clock** is where alarms are set
+  and their details seen. **Within 12 hours of an alarm, a separate notice glyph joins the status
+  icons** - dismissable each time, or turned off altogether; the 12 hours is the owner's to set,
+  from the clock's panel.
+- **Q9**: keep.
+
+# Round 3 (next)
+
+From the results above: the joined look (Q5), the glyph overhaul (T9, Q1), the header's type, the
+alarm by the clock and its 12-hour notice (Q8), the system panel as CONNECTIVITY + SYSTEM -
+DIAGNOSTICS and the knobs in a UI Tweaks window (Q7), the page panel's selector bar. Scope and
+order: HANDOFF.
