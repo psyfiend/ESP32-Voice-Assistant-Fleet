@@ -272,6 +272,9 @@ static void fill() {
     }
     lv_style_set_bg_color(st(S::KS_JOIN_RING_BAR),    UI::c(p.SURFACE_ALT));
     lv_style_set_bg_color(st(S::KS_JOIN_RING_GROUND), UI::c(p.GROUND));
+    lv_style_set_bg_color(st(S::KS_RULE), UI::c(UI::mix(p.SURFACE, p.TEXT, 30)));
+    lv_style_set_bg_opa  (st(S::KS_RULE), LV_OPA_COVER);
+    lv_style_set_radius  (st(S::KS_RULE), UI::sc(UI::hdr().LINE));
     text(S::KS_HDR_TEXT,     UIToolkit::Font_Header, p.TEXT);   // the bar's words (D-26)
     text(S::KS_HDR_TEXT_DIM, UIToolkit::Font_Caption,     p.TEXT_DIM);
     text(S::KS_HDR_ICON,     t.ICON_SM,                   p.TEXT);

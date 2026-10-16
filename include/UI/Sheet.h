@@ -102,6 +102,24 @@ Sheet *sheetShowing();                       // the open sheet, or null
 void   sheetLayoutTitle(Sheet &S);           // after the title's words change
 void   sheetTabLook(lv_obj_t *tab, bool shown, bool lit);   // lit: the tab of the view showing
 uint32_t sheetLeftMs(const Sheet &S);        // until it closes itself (0: closing; UINT32_MAX: never)
+// The system settings every window follows (T6): how long one waits untouched
+// before it closes (0: never), and whether it shows the countdown. The header's
+// panels close on the same timeout (2.8 round 3, D-22).
+uint32_t windowCloseMs();
+bool     windowBarShown();
+
+// --- Beside the window (2.8 round 3, D-25) ----------------------------------------
+// Objects the open sheet lets presses through to, outside its window: the
+// CHILDREN of `holder` (the deck's panels, risen under UI Tweaks). While
+// `isOpen()` says one of them is open, the window is out of reach as it is
+// while the sheet's own panel is open - a press there only calls `fold()`.
+// Forgotten when the sheet closes.
+struct SheetBeside {
+    lv_obj_t *holder;
+    bool    (*isOpen)();
+    void    (*fold)();
+};
+void sheetBeside(const SheetBeside *b);   // null: none
 
 // --- The countdown bar (#97, #23) ----------------------------------------------------
 // How long until the open sheet closes itself: a thin bar (H_BAR) on the bottom

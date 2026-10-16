@@ -163,7 +163,7 @@ static void anim_height_cb(void * var, int32_t v) {
 
 static void execute_panel_toggle(lv_obj_t* panel, bool expand) {
     int32_t h_start = lv_obj_get_height(panel);
-    int32_t h_end   = expand ? UIToolkit::sc(280) : UIToolkit::sc(UIToolkit::PANEL_COLLAPSED_H);
+    int32_t h_end   = UIToolkit::sc(expand ? UIToolkit::PANEL_EXPANDED_H : UIToolkit::PANEL_COLLAPSED_H);
 
     lv_obj_t * header   = lv_obj_get_child(panel, 0);
     lv_obj_t * icon     = lv_obj_get_child(header, 1);

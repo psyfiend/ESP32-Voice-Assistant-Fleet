@@ -11,6 +11,7 @@
 #include "Alarms.h"
 #include "Settings.h"
 #include "UI/SlotPanels.h"
+#include "UI/TweaksSheet.h"
 #include "UI/UIToolkit.h"
 
 // A tap on a slot (Panel_Header's callback): the status slot's panel is the
@@ -74,6 +75,7 @@ void GUIManager::openSlotPanel(uint8_t slot) {
     _header.slotSpan(slot, tl, tr);
     Kit::drawerOpen(_slotDrawer, tl, tr);
     _slotPanel = (int8_t)slot;
+    _panelTouchMs = millis();   // it waits the window timeout from now (D-22)
     _header.setOpenSlot(slot, _slotDrawer.x, _slotDrawer.x + _slotDrawer.w);
     syncScrim();
 }
@@ -92,16 +94,6 @@ void GUIManager::syncScrim() {
     if (!_dismissScrim) return;
     if (_pnlSystem.isExpanded() || _slotPanel >= 0) lv_obj_add_flag  (_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
     else                                            lv_obj_clear_flag(_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
-}
-
-void GUIManager::cycleGlyphs() {
-    const uint8_t n = (uint8_t)GlyphStyle::GLYPH_STYLE_COUNT;
-    const GlyphStyle next = (GlyphStyle)(((uint8_t)_header.glyphStyle() + 1) % n);
-    _header.setGlyphStyle(next);
-    // Saved by name; the default (square, D-20) as nothing.
-    Settings::setSystem("header", "glyphs", next == GLYPH_DEFAULT ? nullptr : glyphStyleName(next));
-    Settings::save();
-    Serial.printf("[UI] header glyphs: %s\n", glyphStyleName(next));
 }
 
 bool GUIManager::pageHeaderShown() const {
@@ -168,6 +160,20 @@ const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHd
         closeSlotPanel(false);
         if (_pnlSystem.isExpanded()) _pnlSystem.close();
         return "slot: closed";
+    }
+    // Round 3: UI Tweaks (tweaks=1 comes here as "tweaks"), and a deck panel's
+    // header tapped - deck0, deck1 - as /bench?what=anim does (the deck is up
+    // under UI Tweaks, D-25).
+    if (!strcmp(slotName, "tweaks")) {
+        openUiTweaks();
+        return TweaksSheet::isOpen() ? "tweaks: open" : "tweaks: not opened (a sheet is showing)";
+    }
+    if (!strncmp(slotName, "deck", 4)) {
+        lv_obj_t *p = deckPanel((uint8_t)atoi(slotName + 4));
+        lv_obj_t *h = p ? lv_obj_get_child(p, 0) : nullptr;
+        if (!h) return "deck: no such panel";
+        lv_obj_send_event(h, LV_EVENT_CLICKED, nullptr);
+        return "deck: its header tapped";
     }
     SlotKind k;
     if (!slotKindFromName(slotName, k)) return "slot: no such kind (clock, sensor, page, alarm, status)";

@@ -300,6 +300,12 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     lv_obj_set_pos(S.sel, selX(S, chosen), 0);
 }
 
+void selectorSet(Selector &S, uint8_t i) {
+    if (!S.sel || i >= S.n) return;
+    lv_anim_delete(S.sel, glideExec);
+    place(S, selX(S, i));
+}
+
 // Only on a change: the window refreshes its state often.
 void selectorActionLit(Selector &S, bool lit) {
     if (!S.action || S.actW <= 0 || S.actLit == (int8_t)lit) return;

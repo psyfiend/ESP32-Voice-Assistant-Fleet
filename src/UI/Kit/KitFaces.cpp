@@ -72,6 +72,13 @@ void keepSelectorLook(int8_t look) {
     Settings::setScheme(key, "selector", look < 0 ? nullptr : LOOK_NAMES[look & 3]);
 }
 
+// Every scheme's look read again from the settings file when next asked for
+// (UI Tweaks' Reset all has just cleared them there).
+void forgetSelectorLooks() {
+    for (int8_t &l : s_look) l = -1;
+    s_lookLoaded = 0;
+}
+
 uint8_t selectorLookNow() {
     if (lookSlot() >= 0) return (uint8_t)lookSlot();
     return lum(UI::pal().SURFACE_ALT) < 128 ? 0 : 3;

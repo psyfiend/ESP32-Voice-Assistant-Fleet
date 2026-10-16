@@ -151,6 +151,14 @@ PLAN = [
         (None, ["slot=-1"], 0.8),
         (None, ["alarm=-1"], 0.6),
     ]},
+    # Round 3 (D-22, D-25): UI Tweaks, and the deck risen under it with its second panel open.
+    # A build before round 3 ignores tweaks= and deckN.
+    {"page": 0, "card": None, "tree": "page", "steps": [
+        ("tweaks", ["tweaks=1"], 1.2),
+        ("tweaks_deck", ["slot=deck1"], 1.0),
+        (None, ["slot=deck1"], 0.8),
+        (None, ["tweaks=0"], 1.0),
+    ]},
     {"page": 1, "card": None, "tree": "page", "steps": [("fleet_page", [], 0.5)]},
     {"page": 1, "card": ("All Lamps", "Kitchen", 0), "steps": [
         ("lamps_main", [], 0.6),

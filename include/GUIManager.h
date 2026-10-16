@@ -67,20 +67,23 @@ public:
     // figure is LVGL's own load, not the chip's - see lv_conf.h.
     void togglePerf();
 
-    // Cycle the header treatment on the live dashboard: tag -> bar -> none.
-    //
-    // All three modes ship permanently - cards.md is explicit that picking one
-    // is "what a card looks like when nobody chose", not an elimination - so
-    // this is how a default gets chosen by looking at it. It is deliberately
-    // RUNTIME state rather than a rebuild-time constant, because the device
-    // settings page (4.1) will own exactly this control later.
-    void cycleHeader();
-
-    // Cycle the colour scheme, from the System panel rather than the reference
-    // page. Also re-applies the SCREEN's own background, which nothing did
-    // before: the ground colour behind the deck was set once at start-up and
-    // then never followed the scheme.
-    void cycleScheme();
+    // --- UI TWEAKS (2.8 round 3, D-22, D-25; GUIManagerTweaks.cpp) -----------
+    // The development window of the card looks, every row a choice made
+    // outright - not a cycle - and SAVED (Settings system.ui.*, the glyphs
+    // system.header.glyphs, the timeout system.window.*), for EVERY page: a
+    // choice is device-wide (the per-page working set below takes it).
+    // Reset all puts them back. The deck rises under it while it is open.
+    void openUiTweaks();
+    void chooseScheme(uint8_t i);                 // 0 Fleet, 1 Midnight, 2 Linen; saved
+    void setCardLabelStyle(CardHeaderStyle s);    // Float / Band / Tag / None
+    void setEntityLabel(CardLabel l);             // Name (HA) / State / Custom / None
+    void setCardState(StateCardFill f);           // Fill / Icon glow
+    void setDensity(CardVariant v);               // Compact / Full / Auto
+    void setGlyphs(GlyphStyle g);
+    void resetUiTweaks();
+    // The saved choices onto the working set and every page's: at boot (before
+    // the pages are made), after a reset.
+    void applyUiSettings();
 
     // Open the design-token reference page, standing the dashboard down first.
     void openTokens();
@@ -95,12 +98,6 @@ public:
     // guard rather than a feature.
     void toggleHeaderBar();
 
-    // The three controls #50 added. Each drives a card-layer static that has
-    // existed since 2.4 with nothing on the device able to reach it.
-    void cycleVariant();   // auto / full / compact - argue with the measurement
-    void cycleFill();      // how an active StateCard reads
-    void cycleLabel();     // name / state word / none under a state card's hero
-    void toggleArea();     // area on every card, or not
     bool deckShown() const { return _showDeck; }
 
     // --- Pages, milestone 2.6. docs/design/pages.md. -----------------------
@@ -156,10 +153,23 @@ private:
     bool pageHeaderShown() const;
     void setPageHeaderShown(bool shown);   // saves it, applies it, rebuilds
     void applyHeaderHidden(bool hidden);   // the bar, the drawers' top, the knob's label
-    void cycleGlyphs();              // bare -> square -> circle, saved (#19)
     static GlyphStyle savedGlyphStyle();   // the owner's, else GLYPH_DEFAULT
     // /popup's slot=, glyphs=, pagehdr= and alarm= (DEBUG_POPUP): one line saying what it did.
     const char *headerDebug(const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn);
+    // The system panel's CONNECTIVITY lines: Wi-Fi, Home Assistant, MQTT.
+    void connectivityWords(char *wifi, char *ha, char *mqtt, size_t n);
+    // UI Tweaks' halves (GUIManagerTweaks.cpp): the owner's scheme, before
+    // anything is built; this page's grid counts, saved with the page; a choice
+    // put on every page's working set. GUITweaks is its rows and the deck that
+    // rises under its window.
+    void applySavedScheme();
+    void saveGrid();
+    template <typename F> void everyPage(F f) { for (uint8_t i = 0; i < _nPages; i++) f(_pages[i]); }
+    friend struct GUITweaks;
+    bool        _deckRaised   = false;   // the deck is up under UI Tweaks
+    // When a header panel was last touched or opened: it closes on the window
+    // timeout as a window does (D-22).
+    uint32_t    _panelTouchMs = 0;
     Kit::Drawer _slotDrawer;
     int8_t      _slotPanel = -1;     // the slot whose drawer is open, or -1
     static void reportUiSection();   // [UI STATE] in the System Doctor

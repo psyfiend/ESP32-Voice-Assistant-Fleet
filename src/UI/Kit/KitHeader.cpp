@@ -19,8 +19,8 @@ lv_obj_t *headerBar(lv_obj_t *parent) {
 lv_obj_t *headerSlot(lv_obj_t *bar, lv_event_cb_t cb, void *user) {
     lv_obj_t *s = plain(bar);
     add(s, KitStyle::KS_HDR_SLOT);
-    add(s, KitStyle::KS_HDR_SLOT_PRESSED, LV_PART_MAIN | LV_STATE_PRESSED);
-    add(s, KitStyle::KS_HDR_SLOT_OPEN,    LV_PART_MAIN | LV_STATE_CHECKED);
+    add(s, KitStyle::KS_HDR_SLOT_PRESSED, UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+    add(s, KitStyle::KS_HDR_SLOT_OPEN,    UI::part(LV_PART_MAIN, LV_STATE_CHECKED));
     // The bar's full height and FRAME_R more, clipped by the bar - so an open
     // slot's rounded corners show at its top only, and its face covers the
     // bar's accent line (D-23); KS_HDR_SLOT's padding below keeps what it holds

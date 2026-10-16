@@ -78,6 +78,8 @@ enum class KitStyle : uint8_t {
     // tab, a flare beside the panel: the shape's fill, and a ring of the accent
     // around what lies outside (the bar, or the ground below it).
     KS_JOIN_FILL, KS_JOIN_RING_BAR, KS_JOIN_RING_GROUND,
+    // A short upright rule setting one choice apart from another (Kit::vrule()).
+    KS_RULE,
     KS_COUNT
 };
 
@@ -151,6 +153,7 @@ uint32_t glassInk(uint32_t hex);
 // round, bit 1 silver. Kept in the settings file under the scheme.
 int8_t   selectorLook();
 void     keepSelectorLook(int8_t look);
+void     forgetSelectorLooks();   // read every scheme's again (the file was changed under them)
 uint8_t  selectorLookNow();       // the look in force
 FaceKind metalKind();             // its metal
 int32_t  selectorRadius();        // its corners: round, or R_CONTROL
@@ -404,5 +407,21 @@ void      flareAt(lv_obj_t *j, int32_t edgeX, bool right, int32_t top);
 lv_obj_t *drawerItem(lv_obj_t *face, const char *words, bool marked, lv_event_cb_t cb, void *user);
 lv_obj_t *drawerNote(lv_obj_t *face, const char *words);
 lv_obj_t *drawerBig(lv_obj_t *face, const char *words);
+// A ROW of things side by side, the panel's width, DRAWER_GAP apart (buttons,
+// a selector and a toggle). A STATUS ROW (2.8 round 3, the system panel's
+// CONNECTIVITY): room for a glyph (`glyphRoom`), what it is, and its live value
+// dim beside it - returns the value's label.
+lv_obj_t *drawerRow(lv_obj_t *face);
+lv_obj_t *statusRow(lv_obj_t *face, const char *what, lv_obj_t **glyphRoom);
+// A drawer's section title, in the panel-title role.
+lv_obj_t *drawerTitle(lv_obj_t *face, const char *words);
+// A short upright rule between things in a row - one choice set apart from
+// another (the scheme and the Status bar, D-25).
+lv_obj_t *vrule(lv_obj_t *row, int32_t h);
+// A TOGGLE button: lit (glass) while on, satin while off (#99's finishes).
+lv_obj_t *toggleButton(lv_obj_t *parent, const char *words, int32_t w, int32_t h, bool on, lv_event_cb_t cb);
+void      toggleButtonSet(lv_obj_t *b, bool on);
+// A selector's chosen, set from outside (no onChosen): the scheme changed elsewhere.
+void      selectorSet(Selector &S, uint8_t i);
 
 } // namespace Kit

@@ -42,6 +42,26 @@ static bool inWindow(const Sheet &S, const lv_point_t &pt) {
     return pt.x >= W.x1 && pt.x <= W.x2 && pt.y >= W.y1 && pt.y <= W.y2;
 }
 
+// What the open sheet lets presses through to beside it (sheetBeside()).
+static const SheetBeside *s_beside = nullptr;
+
+void sheetBeside(const SheetBeside *b) { s_beside = b; }
+
+static bool onBeside(const lv_point_t &pt) {
+    if (!s_beside || !s_beside->holder || lv_obj_has_flag(s_beside->holder, LV_OBJ_FLAG_HIDDEN)) return false;
+    const uint32_t n = lv_obj_get_child_count(s_beside->holder);
+    for (uint32_t i = 0; i < n; i++) {
+        lv_obj_t *k = lv_obj_get_child(s_beside->holder, i);
+        if (lv_obj_has_flag(k, LV_OBJ_FLAG_HIDDEN)) continue;
+        lv_area_t a;
+        lv_obj_get_coords(k, &a);
+        if (pt.x >= a.x1 && pt.x <= a.x2 && pt.y >= a.y1 && pt.y <= a.y2) return true;
+    }
+    return false;
+}
+
+static bool besideOpen() { return s_beside && s_beside->isOpen && s_beside->isOpen(); }
+
 // The catcher's jobs: let presses on the window and its panels through, and
 // close on a tap anywhere else. AND WHILE A PANEL IS OPEN, THE WINDOW IS OUT OF
 // REACH (owner, round 10): the topmost thing on the screen is the panel, so a
@@ -55,13 +75,15 @@ static void catcherCb(lv_event_t *ev) {
         lv_hit_test_info_t *info = lv_event_get_hit_test_info(ev);
         if (!info || !S || !S->win) return;
         const lv_point_t &pt = *info->point;
-        if (sheetInPanel(*S, pt) || (!sheetPanelOpen(*S) && inWindow(*S, pt))) info->res = false;
+        const bool panelOpen = sheetPanelOpen(*S) || besideOpen();
+        if (sheetInPanel(*S, pt) || onBeside(pt) || (!panelOpen && inWindow(*S, pt))) info->res = false;
     } else if (code == LV_EVENT_PRESSED) {
         s_catcherFolded = false;
-        if (S && sheetPanelOpen(*S) && inWindow(*S, S->pressStart)) {
+        if (S && (sheetPanelOpen(*S) || besideOpen()) && inWindow(*S, S->pressStart)) {
             s_catcherFolded = true;
             if (S->right.state == PANEL_OPEN) sheetRightSet(*S, PANEL_PEEK);
             sheetSideFold(*S);
+            if (besideOpen() && s_beside->fold) s_beside->fold();
         }
     } else if (code == LV_EVENT_CLICKED) {
         if (s_catcherFolded) { s_catcherFolded = false; return; }
@@ -150,6 +172,9 @@ static bool barSetting() {
     char v[8];
     return !Settings::system("window", "bar", v, sizeof(v)) || strcmp(v, "off") != 0;
 }
+
+uint32_t windowCloseMs()  { return closeSetting(); }
+bool     windowBarShown() { return barSetting(); }
 
 // --- The window ---------------------------------------------------------------
 // ON THE SCREEN AS ITS TOPMOST OBJECT - not lv_layer_top(). LVGL draws the top
@@ -443,6 +468,7 @@ static void closeAsync(void *p) {
     S->lblTitleArea = S->lblTitleName = S->titleLeft = nullptr;
     S->stage = S->autoBar = nullptr;
     if (s_catcher) lv_obj_clear_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
+    s_beside = nullptr;
     if (s_open == S) s_open = nullptr;
     if (spec && spec->closed) spec->closed();
 }

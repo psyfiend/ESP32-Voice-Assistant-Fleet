@@ -178,4 +178,68 @@ lv_obj_t *drawerBig(lv_obj_t *face, const char *words) {
     return l;
 }
 
+lv_obj_t *drawerRow(lv_obj_t *face) {
+    lv_obj_t *r = plain(face);
+    lv_obj_set_size(r, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(r, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(r, UI::sc(UI::hdr().DRAWER_GAP), 0);
+    UI::unclipShadows(r);
+    return r;
+}
+
+lv_obj_t *statusRow(lv_obj_t *face, const char *what, lv_obj_t **glyphRoom) {
+    lv_obj_t *r = drawerRow(face);
+    lv_obj_set_style_min_height(r, UI::sc(UI::hdr().FRAME), 0);
+    lv_obj_t *g = plain(r);
+    lv_obj_set_size(g, UI::sc(UI::hdr().FRAME), UI::sc(UI::hdr().FRAME));
+    lv_obj_set_flex_flow(g, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(g, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    if (glyphRoom) *glyphRoom = g;
+    lv_obj_t *w = label(r, KitStyle::KS_LABEL_NAME);
+    lv_label_set_text(w, what ? what : "");
+    // The value a face down (SSID, dBm and IP fit the P4_5's panel), on ONE
+    // line: a DOT label with a content height wraps instead of ellipsising.
+    lv_obj_t *v = label(r, KitStyle::KS_LABEL_TAG_DIM);
+    lv_obj_set_flex_grow(v, 1);
+    lv_obj_set_height(v, lv_font_get_line_height(UI::type().TAG));
+    lv_label_set_long_mode(v, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_align(v, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_label_set_text(v, "-");
+    return v;
+}
+
+lv_obj_t *vrule(lv_obj_t *row, int32_t h) {
+    lv_obj_t *v = plain(row);
+    lv_obj_set_size(v, UI::sc(UI::hdr().LINE), h);
+    add(v, KitStyle::KS_RULE);
+    return v;
+}
+
+lv_obj_t *drawerTitle(lv_obj_t *face, const char *words) {
+    lv_obj_t *l = label(face, KitStyle::KS_PANEL_TITLE);
+    lv_label_set_text(l, words ? words : "");
+    return l;
+}
+
+lv_obj_t *toggleButton(lv_obj_t *parent, const char *words, int32_t w, int32_t h, bool on, lv_event_cb_t cb) {
+    lv_obj_t *b = plain(parent);
+    lv_obj_set_size(b, w, h);
+    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_t *l = label(b, KitStyle::KS_LABEL_NAME);
+    lv_label_set_text(l, words ? words : "");
+    lv_obj_center(l);
+    if (cb) lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, nullptr);
+    toggleButtonSet(b, on);
+    return b;
+}
+
+void toggleButtonSet(lv_obj_t *b, bool on) {
+    if (!b) return;
+    // Its size as set (its coordinates are not laid out yet when it is built).
+    finish(b, lv_obj_get_style_width(b, LV_PART_MAIN), lv_obj_get_style_height(b, LV_PART_MAIN),
+           UI::mm(UI::shape().R_CONTROL), on ? Finish::FINISH_GLASS : Finish::FINISH_SATIN);
+    if (lv_obj_t *l = labelIn(b)) lv_obj_center(l);
+}
+
 } // namespace Kit

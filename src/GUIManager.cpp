@@ -207,6 +207,7 @@ void GUIManager::toggleSystemPanel() {
             _pnlSystem.setAnchorX(lv_obj_get_width(lv_screen_active()));   // no slot: the right edge, as before
             _pnlSystem.setTab(-1, -1);
         }
+        _panelTouchMs = millis();
     }
     _pnlSystem.toggle();
 }
@@ -341,6 +342,7 @@ void GUIManager::screenPressCb(lv_event_t *e) {
     if (!s_self) return;
     lv_indev_t *indev = lv_indev_active();
     if (indev) lv_indev_get_point(indev, &s_self->_pressStart);
+    s_self->_panelTouchMs = millis();   // a header panel waits from here (D-22)
 }
 
 void GUIManager::screenGestureCb(lv_event_t *e) {
@@ -432,12 +434,10 @@ void GUIManager::screenGestureCb(lv_event_t *e) {
                 s_self->toggleSystemPanel();
             }
         } else {
-            // LEFT half: straight to the log. The owner's pick, and it is a
-            // good one - the log was two taps deep behind a drawer whose only
-            // other use is changing settings, so reading it always meant
-            // opening something you did not want to touch.
-            DBG_GESTURE("swipe down, left half -> log\n");
-            s_self->openLog();
+            // LEFT half: UI Tweaks (D-22, 2.8 round 3), in place of the log -
+            // which is a tap away on the system panel.
+            DBG_GESTURE("swipe down, left half -> UI Tweaks\n");
+            s_self->openUiTweaks();
         }
         break;
 
@@ -609,6 +609,8 @@ void GUIManager::begin() {
     // Midnight with a violet accent). Applied here rather than in the token
     // file so "which scheme ships" is a GUIManager decision beside the others.
     UI::setScheme(UI_PAL_MIDNIGHT, UI_MET_DARK);
+    // ...unless the owner chose another, from the system panel (2.8 round 3).
+    applySavedScheme();
     // The component kit's shared styles, in that scheme (2.12): filled once
     // here, refilled with every scheme change after.
     Kit::begin();
@@ -861,13 +863,15 @@ void GUIManager::begin() {
     _pnlAudio.init(deck);
 #endif
     _pnlDisplay.init(deck);
+    // The system panel's CONNECTIVITY reads the links it shows (2.8 round 3).
+    _pnlSystem.setLinks(&_core.conn(), &_core.mqtt());
+    _pnlSystem.setConnectivityText([this](char *w, char *h, char *m, size_t n) { connectivityWords(w, h, m, n); });
     _pnlSystem.init(upper_deck, &_header);
     // The other slots' drawer (2.8), beside the system panel and over the scrim.
     Kit::drawer(_slotDrawer, upper_deck, Kit::drawerWidth());
-    // The scheme button was built reading "Fleet" whatever the board booted
-    // into - visible in the owner's photos with Slate on screen. Say the truth.
-    _pnlSystem.setSchemeLabel(UI::pal().name);
-    _pnlSystem.setSelectorLabel(CardPopup::selectorLookShort());   // per scheme (K45)
+    // The scheme it shows chosen is the one the board booted into.
+    _pnlSystem.setScheme(UI::schemeIndex());
+    _pnlSystem.setBarShown(!_headerHidden);
 
     // Every Dump button runs this: the log is emptied first, so the page shows
     // exactly ONE report, whole, top to bottom (owner, 2026-09-30 - there is no
@@ -893,25 +897,11 @@ void GUIManager::begin() {
     // that bargain: somebody has to tell them the scheme moved.
     UI::onSchemeChanged([]() { if (s_self) s_self->_binder.restyleAll(); });
 
-    // The System panel's "Cards" button. Registered rather than reached for,
-    // for the same reason Dump Config is: Panel_System has no business knowing
-    // the entity registry exists.
-    _pnlSystem.setOnCardsRequested([this]() {
-        // THE DASHBOARD COMES DOWN FIRST.
-        //
-        // The bench builds its own page of thirteen more cards. With the
-        // dashboard still alive that is twenty-six cards and two full widget
-        // trees, which is precisely the condition 2.4 documented as fatal:
-        // "Allocating layer buffer failed", then a reboot. The owner hit it
-        // immediately - tapping Cards reset the board.
-        //
-        // The close handler below rebuilds it on the way back.
-        destroyDashboard();
-        CardDemo::show(_core.entities(), _binder);
-    });
-
-    _pnlSystem.setOnTokensRequested([this]() { openTokens();  });
-    _pnlSystem.setOnLogRequested   ([this]() { openLog();     });
+    // The system panel's buttons (2.8 round 3, D-22): Log, UI Tweaks (the knobs'
+    // window - Tokens is there now; the card bench's "Cards" button is gone,
+    // CardDemo still reachable from a PC), About.
+    _pnlSystem.setOnLogRequested     ([this]() { openLog();      });
+    _pnlSystem.setOnUiTweaksRequested([this]() { openUiTweaks(); });
 
     // The log page's own Dump button re-runs the report and redraws it in
     // place. The panel keeps buffering while the page is open, so this is just
@@ -928,30 +918,17 @@ void GUIManager::begin() {
     // incarnation, before the log moved to its own screen.
     _pnlSystem.setLogOnChange([](const char *text) { LogPage::refresh(text); });
     LogPage::setCloseHandler([this]() { rebuildDashboard(); });
-    _pnlSystem.setOnSchemeRequested([this]() { cycleScheme(); });
-    // The card window's Selector look, per scheme (2.10d, K45).
-    _pnlSystem.setOnSelectorRequested([this]() {
-        CardPopup::cycleSelectorLook();
-        _pnlSystem.setSelectorLabel(CardPopup::selectorLookShort());
-    });
-    _pnlSystem.setSelectorLabel(CardPopup::selectorLookShort());
+    _pnlSystem.setOnSchemeChosen([this](uint8_t i) { chooseScheme(i); });
 
-    // The grid knobs. The panel knows a button was pressed; what a column is
-    // remains entirely this class's business.
+    // The grid knobs and the Status bar. The panel knows a button was pressed;
+    // what a column is remains entirely this class's business.
     _pnlSystem.setOnGridAction([this](Panel_System::GridAction a) {
         switch (a) {
             case Panel_System::GridAction::CARD_W_DOWN: nudgeColumns(-1);  break;
             case Panel_System::GridAction::CARD_W_UP:   nudgeColumns(+1);  break;
             case Panel_System::GridAction::ASPECT_DOWN: nudgeRows(-1);     break;
             case Panel_System::GridAction::ASPECT_UP:   nudgeRows(+1);     break;
-            case Panel_System::GridAction::DECK_TOGGLE: toggleDeck();       break;
-            case Panel_System::GridAction::HDR_CYCLE:   cycleHeader();     break;
             case Panel_System::GridAction::BAR_CYCLE:   toggleHeaderBar(); break;
-            case Panel_System::GridAction::VARIANT_CYCLE: cycleVariant();  break;
-            case Panel_System::GridAction::FILL_CYCLE:    cycleFill();     break;
-            case Panel_System::GridAction::AREA_TOGGLE:   toggleArea();    break;
-            case Panel_System::GridAction::LABEL_CYCLE:   cycleLabel();    break;
-            case Panel_System::GridAction::GLYPH_CYCLE:   cycleGlyphs();   break;
         }
     });
 
@@ -1020,7 +997,10 @@ void GUIManager::begin() {
     // pushing them - which is what the owner asked to see.
     //
     // The pages first (2.6): which page, and that page's own settings, decide
-    // what buildDashboard() builds. Boot always lands on the first page.
+    // what buildDashboard() builds. Boot always lands on the first page. UI
+    // Tweaks' saved choices go on the working set first, so every page starts
+    // from them (2.8 round 3).
+    applyUiSettings();
     initPages();
     loadPageState();
     buildDashboard();
@@ -1156,11 +1136,6 @@ void GUIManager::buildDashboard() {
     const int64_t tL3 = esp_timer_get_time();
 #endif
 
-    _pnlSystem.setHeaderLabel(_hdr == CardHeaderStyle::HDR_TAG_FLOAT ? "Float"
-                            : _hdr == CardHeaderStyle::HDR_TAG       ? "Tag"
-                            : _hdr == CardHeaderStyle::HDR_BAND      ? "Band"
-                                                                     : "No hdr");
-
     // The page indicator: this page's title, centred in the bar, and a dot
     // per page. Set on every build so a knob that rebuilds cannot lose it.
 #ifdef DEBUG_PAGE_TIMING
@@ -1201,8 +1176,9 @@ void GUIManager::buildDashboard() {
 #endif
 
     if (_deck) {
-        if (_showDeck) lv_obj_clear_flag(_deck, LV_OBJ_FLAG_HIDDEN);
-        else           lv_obj_add_flag  (_deck, LV_OBJ_FLAG_HIDDEN);
+        // Up under UI Tweaks, it stays up whatever the page says (D-25).
+        if (_showDeck || _deckRaised) lv_obj_clear_flag(_deck, LV_OBJ_FLAG_HIDDEN);
+        else                          lv_obj_add_flag  (_deck, LV_OBJ_FLAG_HIDDEN);
     }
 #ifdef DEBUG_PAGE_TIMING
     const int64_t tL7 = esp_timer_get_time();
@@ -1270,19 +1246,6 @@ void GUIManager::applyGround() {
     if (screen) lv_obj_set_style_bg_color(screen, UI::c(UI::pal().GROUND), LV_PART_MAIN);
 }
 
-void GUIManager::cycleScheme() {
-    UI::cycleScheme();   // Fleet -> Midnight -> Linen; the order lives in UITokens.cpp
-    applyGround();
-    _header.restyle();
-    _pnlSystem.setSchemeLabel(UI::pal().name);
-    _pnlSystem.setSelectorLabel(CardPopup::selectorLookShort());   // per scheme (K45)
-
-    // A rebuild rather than a restyle. Cards would survive restyleAll() - that
-    // is what "never cache a colour" buys - but a METRICS change moves radii
-    // and padding, which a card reads when it is built.
-    rebuildDashboard();
-}
-
 void GUIManager::openTokens() {
     // THE DASHBOARD STANDS DOWN FIRST, exactly as it does for the card bench.
     //
@@ -1339,7 +1302,7 @@ void GUIManager::applyHeaderHidden(bool hidden) {
     // RIGHT NOW while this runs.
     syncPanelOffset();
 
-    _pnlSystem.setBarLabel(_headerHidden ? "Show Bar" : "Hide Bar");
+    _pnlSystem.setBarShown(!_headerHidden);
     Serial.printf("[UI] system header %s\n", _headerHidden ? "hidden" : "shown");
 }
 
@@ -1350,102 +1313,21 @@ void GUIManager::openLog() {
     LogPage::show(_pnlSystem.logText());
 }
 
-// --- The three controls #50 added --------------------------------------
-//
-// All three drive statics that the card layer has had since 2.4 and that
-// nothing on the device could reach. They are new CONTROLS, not new behaviour,
-// which is why each is a handful of lines rather than a feature.
-
-void GUIManager::cycleVariant() {
-    // A rebuild, not a restyle, for the same reason cycleHeader() is: a card
-    // decides compact-vs-full in build() by measuring its cell, so overriding
-    // the decision means making it again.
-    _variant = (_variant == CardVariant::VAR_AUTO)   ? CardVariant::VAR_FULL
-             : (_variant == CardVariant::VAR_FULL)   ? CardVariant::VAR_COMPACT
-                                                     : CardVariant::VAR_AUTO;
-    rebuildDashboard();
-    const char *n = (_variant == CardVariant::VAR_AUTO) ? "Auto"
-                  : (_variant == CardVariant::VAR_FULL) ? "Full" : "Cmpct";
-    _pnlSystem.setVariantLabel(n);
-    Serial.printf("[Cards] variant override -> %s\n", n);
-}
-
-void GUIManager::cycleFill() {
-    _fill = (_fill == StateCardFill::FILL_SURFACE) ? StateCardFill::LIGHT_ICON
-                                                   : StateCardFill::FILL_SURFACE;
-    StateCard::setFill(_fill);
-    // Fill IS a live style - StateCard reads it in render() - so the binder's
-    // restyle is enough and a rebuild would be a waste of a page.
-    _binder.restyleAll();
-    const char *n = (_fill == StateCardFill::FILL_SURFACE) ? "Fill" : "Icon";
-    _pnlSystem.setFillLabel(n);
-    Serial.printf("[Cards] active state -> %s\n", n);
-}
-
-void GUIManager::cycleLabel() {
-    // The FLEET default, which every page and card inherits unless it says
-    // otherwise - the same place TempUnit's fleet default lives. Live, like
-    // Fill: StateCard resolves it in render(), so a restyle is enough.
-    const CardLabel cur  = cardLabelMode();
-    const CardLabel next = (cur == CardLabel::LBL_NAME)  ? CardLabel::LBL_STATE
-                         : (cur == CardLabel::LBL_STATE) ? CardLabel::LBL_NONE
-                                                         : CardLabel::LBL_NAME;
-    cardSetLabelMode(next);
-    _binder.restyleAll();
-    const char *n = (next == CardLabel::LBL_NAME)  ? "Name"
-                  : (next == CardLabel::LBL_STATE) ? "State" : "No lbl";
-    _pnlSystem.setLabelModeLabel(n);
-    Serial.printf("[Cards] state-card label -> %s\n", n);
-}
-
-void GUIManager::toggleArea() {
-    _showArea = !_showArea;
-    // Through the PAGE SPEC rather than the card-layer static.
-    //
-    // PageSpec::showArea already existed and buildDashboard() now sets it from
-    // this flag, so the page stays the single description of itself. Calling
-    // Card::setShowAreaDefault() as well would give the same answer twice from
-    // two places, and they would disagree the first time a second page exists.
-    rebuildDashboard();
-    _pnlSystem.setAreaLabel(_showArea ? "Area" : "No Area");
-    Serial.printf("[Cards] show area -> %s\n", _showArea ? "on" : "off");
-}
-
-void GUIManager::cycleHeader() {
-    // A rebuild, not a restyle. A header bar is CREATED in Card::build() rather
-    // than styled in restyle(), and that is correct - it is a structural choice
-    // a card makes once, not a live style. CardDemo's own header button has
-    // always worked this way for the same reason.
-    // Float -> Tag -> Bar -> None, starting from the default.
-    _hdr = (_hdr == CardHeaderStyle::HDR_TAG_FLOAT) ? CardHeaderStyle::HDR_TAG
-         : (_hdr == CardHeaderStyle::HDR_TAG)       ? CardHeaderStyle::HDR_BAND
-         : (_hdr == CardHeaderStyle::HDR_BAND)      ? CardHeaderStyle::HDR_NONE
-                                                    : CardHeaderStyle::HDR_TAG_FLOAT;
-    rebuildDashboard();
-    Serial.printf("[Cards] header mode -> %s\n", cardHeaderName(_hdr));
-}
+// --- The knobs (#50, 2.5) --------------------------------------------------
+// The card looks - label type, entity label, active state, density - are UI
+// Tweaks' since 2.8 round 3 (GUIManagerTweaks.cpp), chosen outright and saved,
+// for every page. The grid's counts stay on the system panel, saved too.
 
 void GUIManager::nudgeColumns(int8_t steps) {
     _colsOverride = cycleCount(_colsOverride, (uint8_t)UI::grid().cols, steps, UI_MAX_COLS);
-    UI::setColumnsOverride(_colsOverride);
-    rebuildDashboard();
-
-    char lbl[12];
-    if (_colsOverride) snprintf(lbl, sizeof(lbl), "Col %u", (unsigned)_colsOverride);
-    else               snprintf(lbl, sizeof(lbl), "Col A");
-    _pnlSystem.setColsLabel(lbl);
+    saveGrid();
 }
 
 void GUIManager::nudgeRows(int8_t steps) {
     // The page is rebuilt from scratch on every change, so the override is
     // held HERE and handed to each new page - a CardPage cannot remember it.
     _rowsOverride = cycleCount(_rowsOverride, _page ? _page->cellRows() : 1, steps, UI_MAX_ROWS);
-    rebuildDashboard();
-
-    char lbl[12];
-    if (_rowsOverride) snprintf(lbl, sizeof(lbl), "Row %u", (unsigned)_rowsOverride);
-    else               snprintf(lbl, sizeof(lbl), "Row A");
-    _pnlSystem.setRowsLabel(lbl);
+    saveGrid();
 }
 
 // ---------------------------------------------------------------------------
@@ -1473,12 +1355,18 @@ void GUIManager::initPages() {
         // the board's grid, compact, bar headers - so the first swipe changes
         // what is on the page and nothing about how it looks. The working set
         // at this moment holds exactly those defaults.
-        _pages[_nPages++] = PageLive{
+        _pages[_nPages] = PageLive{
             .spec = s, .hdr = _hdr, .variant = _variant, .fill = _fill,
             .label = cardLabelMode(), .showArea = _showArea,
             .cols = _colsOverride, .rows = _rowsOverride,
             .scheme = UI::schemeIndex(),
         };
+        // The page's own grid, if the owner set one (the system panel's Col /
+        // Row, saved with the page since 2.8 round 3): a count, or "auto".
+        char v[8];
+        if (Settings::page(s->slug, "cols", v, sizeof(v))) _pages[_nPages].cols = strcmp(v, "auto") ? (uint8_t)atoi(v) : 0;
+        if (Settings::page(s->slug, "rows", v, sizeof(v))) _pages[_nPages].rows = strcmp(v, "auto") ? (uint8_t)atoi(v) : 0;
+        _nPages++;
     }
     _curPage = 0;
 }
@@ -1521,28 +1409,10 @@ void GUIManager::loadPageState() {
     refreshKnobLabels();
 }
 
-// Every drawer label from the working set, so the drawer describes the page
-// you are on rather than the last one a knob was pressed on.
+// The system panel shows the page you are on: its scheme, its bar.
 void GUIManager::refreshKnobLabels() {
-    char lbl[12];
-    if (_colsOverride) snprintf(lbl, sizeof(lbl), "Col %u", (unsigned)_colsOverride);
-    else               snprintf(lbl, sizeof(lbl), "Col A");
-    _pnlSystem.setColsLabel(lbl);
-    if (_rowsOverride) snprintf(lbl, sizeof(lbl), "Row %u", (unsigned)_rowsOverride);
-    else               snprintf(lbl, sizeof(lbl), "Row A");
-    _pnlSystem.setRowsLabel(lbl);
-
-    _pnlSystem.setVariantLabel(_variant == CardVariant::VAR_AUTO ? "Auto"
-                             : _variant == CardVariant::VAR_FULL ? "Full" : "Cmpct");
-    _pnlSystem.setFillLabel(_fill == StateCardFill::FILL_SURFACE ? "Fill" : "Icon");
-    _pnlSystem.setAreaLabel(_showArea ? "Area" : "No Area");
-    const CardLabel l = cardLabelMode();
-    _pnlSystem.setLabelModeLabel(l == CardLabel::LBL_NAME  ? "Name"
-                               : l == CardLabel::LBL_STATE ? "State" : "No lbl");
-    _pnlSystem.setSchemeLabel(UI::pal().name);
-    _pnlSystem.setSelectorLabel(CardPopup::selectorLookShort());   // per scheme (K45)
-    // The header-mode label is set by buildDashboard(), which every page change
-    // goes through.
+    _pnlSystem.setScheme(UI::schemeIndex());
+    _pnlSystem.setBarShown(!_headerHidden);
 }
 
 void GUIManager::goToPage(int16_t index) {
@@ -1607,6 +1477,18 @@ void GUIManager::tick() {
     // A panel goes with its slot: a claim that has left the bar (an alarm
     // that has gone off) takes its panel with it.
     if (_slotPanel >= 0 && !_header.slotShown((uint8_t)_slotPanel)) closeSlotPanel(true);
+    // EVERY HEADER PANEL FOLLOWS THE WINDOW TIMEOUT (D-22): untouched that
+    // long, it goes, as a window does. Asked twice a second, not every pass.
+    static uint32_t lastAsk = 0;
+    const uint32_t now = millis();
+    if ((_pnlSystem.isExpanded() || _slotPanel >= 0) && now - lastAsk >= 500) {
+        lastAsk = now;
+        const uint32_t wait = Kit::windowCloseMs();
+        if (wait && now - _panelTouchMs >= wait) {
+            if (_pnlSystem.isExpanded()) _pnlSystem.close();
+            closeSlotPanel(true);
+        }
+    }
     _pnlDisplay.tick();
 #ifdef HAS_AUDIO_HW
     _pnlAudio.tick();
