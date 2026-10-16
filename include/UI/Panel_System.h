@@ -33,6 +33,9 @@ public:
     ~Panel_System();
 
     void init(lv_obj_t* parent, Panel_Header* headerRef);
+    // A scheme change: the rows built again (their finished faces are painted
+    // in the scheme they were made in), from the next timer pass.
+    void restyle();
 
     // Public logging - SAFE to call from anywhere (buffers data)
     void log(const char* fmt, ...);
@@ -116,6 +119,7 @@ private:
     static constexpr int32_t PANEL_MID_LOGICAL  = 400;   // and up -> three quarters
 
     void refreshConnectivity();
+    void buildContent();          // CONNECTIVITY and SYSTEM - DIAGNOSTICS, into the drawer's face
     static void reportSink(const char *line);
 
     Kit::Drawer _drawer;

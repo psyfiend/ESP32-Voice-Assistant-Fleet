@@ -1405,6 +1405,7 @@ void GUIManager::loadPageState() {
         UI::setSchemeIndex(p.scheme);
         applyGround();
         _header.restyle();
+        _pnlSystem.restyle();
     }
     refreshKnobLabels();
 }

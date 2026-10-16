@@ -71,6 +71,7 @@ void GUIManager::chooseScheme(uint8_t i, bool save) {
     if (!changed) return;
     applyGround();
     _header.restyle();
+    _pnlSystem.restyle();
     rebuildDashboard();
     Serial.printf("[UI] scheme -> %s\n", UI::pal().name);
 }

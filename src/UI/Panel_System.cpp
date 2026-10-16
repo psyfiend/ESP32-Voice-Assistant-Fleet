@@ -81,7 +81,35 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     Kit::drawer(_drawer, parent, panelW);
     _ui_content = _drawer.face;
     Kit::drawerPlace(_drawer, screenW, UIToolkit::systemHeaderPx());
+    buildContent();
 
+    _ui_timer = lv_timer_create(_ui_timer_cb, 50, this);   // 50 ms for faster log flushing
+
+    lv_obj_update_layout(_ui_content);
+    Serial.printf("[SysPanel] %ld px wide (screen %ld, %ld logical), top %ld, face %ld px\n",
+                  (long)panelW, (long)screenW, (long)logicalW,
+                  (long)UIToolkit::systemHeaderPx(), (long)lv_obj_get_height(_ui_content));
+}
+
+// A SCHEME CHANGE BUILDS THE ROWS AGAIN: their buttons and the selector are
+// finished faces, painted once in the scheme they were made in (#99) - left
+// alone, Linen showed Midnight's dark buttons with Linen's dark words on them.
+// From the next timer pass: the scheme may have been chosen on this panel's own
+// selector, mid-glide.
+void Panel_System::restyle() {
+    lv_async_call([](void *p) {
+        Panel_System *self = (Panel_System *)p;
+        if (!self->_ui_content) return;
+        lv_obj_clean(self->_ui_content);
+        for (lv_obj_t *&v : self->_connVal) v = nullptr;
+        self->_barBtn = nullptr;
+        self->_schemeSel = Kit::Selector{};
+        self->buildContent();
+    }, this);
+}
+
+void Panel_System::buildContent() {
+    const int32_t panelW = _drawer.w;
     const int32_t gap   = UI::sc(UI::hdr().DRAWER_GAP);
     const int32_t inner = panelW - 2 * UI::sc(UI::hdr().DRAWER_PAD);
     const int32_t btnH  = Kit::controlH();
@@ -120,7 +148,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     Kit::SelectorSpec sp = {};
     for (uint8_t i = 0; i < 3; i++) sp.glyph[i] = SCHEMES[i];
     sp.n = 3;
-    sp.chosen = 1;
+    sp.chosen = UI::schemeIndex() < 3 ? UI::schemeIndex() : 1;
     sp.compact = true;
     sp.room = inner - barW - 2 * gap - UI::sc(UI::hdr().LINE);
     sp.slotW = rest <= inner ? slotW : 0;   // too narrow: the words' sides shrink to fit `room`
@@ -139,13 +167,6 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Col +", w4, btnH, colUpCb);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Row -", w4, btnH, rowDownCb);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Row +", w4, btnH, rowUpCb);
-
-    _ui_timer = lv_timer_create(_ui_timer_cb, 50, this);   // 50 ms for faster log flushing
-
-    lv_obj_update_layout(_ui_content);
-    Serial.printf("[SysPanel] %ld px wide (screen %ld, %ld logical), top %ld, face %ld px\n",
-                  (long)panelW, (long)screenW, (long)logicalW,
-                  (long)UIToolkit::systemHeaderPx(), (long)lv_obj_get_height(_ui_content));
 }
 
 void Panel_System::chooseScheme(uint8_t i) {
