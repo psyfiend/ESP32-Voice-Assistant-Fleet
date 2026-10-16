@@ -516,7 +516,8 @@ From the PC (debug builds; RAM only, nothing saved):
   1,615: the knobs left for `GUIManagerTweaks.cpp`), `Card.cpp` 1,462; style calls outside the kit
   **438** (round 2 492); colour literals **10** (round 2 46: the status glyphs' colours are tokens
   now, `SIG_*`); no shape numbers; no LVGL in the core.
-- **The gate**: all nine SUCCESS (P4_5 41.9% flash, the 7B 37.8%, the S3s 34.9-37.0%).
+- **The gate**: all nine SUCCESS on `f344af3`, the build on the boards (P4_5 41.9% flash, the 7B
+  37.8%, the S3s 34.9-37.0%; 12 min).
 
 ## Your results
 
