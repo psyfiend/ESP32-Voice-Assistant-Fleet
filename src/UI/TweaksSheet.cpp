@@ -107,12 +107,7 @@ static void buildList() {
     s_list = Kit::choiceRows(S.stage, stageW, rows, n, s_sel);
 
     // Tokens (the token page; the window goes first) and Reset all.
-    lv_obj_t *btns = Kit::plain(s_list);
-    lv_obj_set_size(btns, lv_pct(100), LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(btns, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(btns, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(btns, gapX, 0);
-    lv_obj_set_style_pad_top(btns, UI::mm(k.S3), 0);
+    lv_obj_t *btns = Kit::buttonRow(s_list);
     const int32_t bw = LV_MIN((stageW - gapX) / 2, Kit::textW("Reset all", UI::type().NAME) + 2 * UI::mm(k.S9));
     Kit::button(btns, Kit::ButtonRole::BTN_CANCEL, "Tokens", bw, Kit::controlH(), tokensCb);
     Kit::button(btns, Kit::ButtonRole::BTN_DESTRUCTIVE, "Reset all", bw, Kit::controlH(), resetCb);

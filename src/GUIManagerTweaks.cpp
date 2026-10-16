@@ -61,12 +61,12 @@ void GUIManager::applySavedScheme() {
 // DEVICE-WIDE since 2.8 round 3: every page takes it, and it is saved. A
 // rebuild rather than a restyle - a METRICS change moves radii and padding,
 // which a card reads when it is built.
-void GUIManager::chooseScheme(uint8_t i) {
+void GUIManager::chooseScheme(uint8_t i, bool save) {
     if (i >= SCHEME_N) return;
     const bool changed = UI::schemeIndex() != i;
     UI::setSchemeIndex(i);
     everyPage([i](PageLive &p) { p.scheme = i; });
-    saveName("scheme", SCHEME_NAMES, i, s_ship.scheme);
+    if (save) saveName("scheme", SCHEME_NAMES, i, s_ship.scheme);
     _pnlSystem.setScheme(i);
     if (!changed) return;
     applyGround();

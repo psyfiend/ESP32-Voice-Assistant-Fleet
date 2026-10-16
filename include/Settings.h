@@ -17,6 +17,11 @@
 //     "system":   { "window": { "close": "30", "bar": "off" } } }
 //   A card added on the device (K17) is a card entry with "page", "after" and
 //   "entity" as well - see Cards/CardAdded.h.
+//   2.8 round 3: UI Tweaks' choices under "system": "ui" ("scheme", "label",
+//   "entity", "state", "density"), "header" ("glyphs"), "window", "alarm"
+//   ("warn"); a page's "cols" / "rows" (a count or "auto") and "header"; Card
+//   UI's per card: "label", "group" / "label_text", "selector", "density",
+//   "close", "bar" (GUIManagerTweaks.cpp, Cards/Popup/PopupCardUi.cpp).
 //
 // Rules that are load-bearing:
 //   - Only what was changed is stored; a missing key means "inherit". Setting a

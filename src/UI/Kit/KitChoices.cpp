@@ -58,4 +58,16 @@ lv_obj_t *choiceRows(lv_obj_t *parent, int32_t w, const ChoiceRow *rows, uint8_t
     return list;
 }
 
+lv_obj_t *buttonRow(lv_obj_t *list) {
+    const UIShape &k = UI::shape();
+    lv_obj_t *r = plain(list);
+    lv_obj_set_size(r, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(r, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(r, UI::mm(k.S5), 0);
+    lv_obj_set_style_pad_top(r, UI::mm(k.S3), 0);
+    UI::unclipShadows(r);
+    return r;
+}
+
 } // namespace Kit

@@ -116,9 +116,7 @@ void buildAlarm(lv_obj_t *face) {
     title(face, "ALARM SOON");
     Kit::drawerBig(face, t);
     dim(face, d);
-    lv_obj_t *r = Kit::plain(face);
-    Kit::add(r, Kit::KitStyle::KS_HDR_CLOCK);   // a row, its items side by side
-    lv_obj_set_style_pad_column(r, UI::sc(UI::hdr().DRAWER_GAP), 0);
+    lv_obj_t *r = Kit::drawerRow(face);
     const int32_t bw = (faceRoom() - UI::sc(UI::hdr().DRAWER_GAP)) / 2;
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Dismiss", bw, UI::minTouch(), dismissCb);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Settings", bw, UI::minTouch(), settingsCb);

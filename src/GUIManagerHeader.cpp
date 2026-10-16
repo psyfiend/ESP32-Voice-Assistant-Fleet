@@ -161,13 +161,22 @@ const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHd
         if (_pnlSystem.isExpanded()) _pnlSystem.close();
         return "slot: closed";
     }
-    // Round 3: UI Tweaks (tweaks=1 comes here as "tweaks"), and a deck panel's
-    // header tapped - deck0, deck1 - as /bench?what=anim does (the deck is up
-    // under UI Tweaks, D-25).
+    // /popup?scheme=N: the scheme on every page, as the system panel shows it,
+    // NOT saved - a capture leaves the owner's choice in the file.
+    if (!strncmp(slotName, "scheme", 6)) {
+        closeSlotPanel(false);
+        chooseScheme((uint8_t)atoi(slotName + 6), false);
+        snprintf(out, sizeof(out), "scheme %s (not saved)", UI::pal().name);
+        return out;
+    }
+    // /popup?sensorerr=1|0 (T10): the header's sensor shown failed, RAM only.
     if (!strcmp(slotName, "sensorerr") || !strcmp(slotName, "sensorok")) {
         _header.pretendSensorError(slotName[6] == 'e');
         return slotName[6] == 'e' ? "sensor: shown as failed (not saved)" : "sensor: as its entity says";
     }
+    // Round 3: UI Tweaks (tweaks=1 comes here as "tweaks"), and a deck panel's
+    // header tapped - deck0, deck1 - as /bench?what=anim does (the deck is up
+    // under UI Tweaks, D-25).
     if (!strcmp(slotName, "tweaks")) {
         openUiTweaks();
         return TweaksSheet::isOpen() ? "tweaks: open" : "tweaks: not opened (a sheet is showing)";

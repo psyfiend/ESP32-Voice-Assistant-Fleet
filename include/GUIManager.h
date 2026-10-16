@@ -74,7 +74,7 @@ public:
     // choice is device-wide (the per-page working set below takes it).
     // Reset all puts them back. The deck rises under it while it is open.
     void openUiTweaks();
-    void chooseScheme(uint8_t i);                 // 0 Fleet, 1 Midnight, 2 Linen; saved
+    void chooseScheme(uint8_t i, bool save = true);   // 0 Fleet, 1 Midnight, 2 Linen (save: a PC's look is not)
     void setCardLabelStyle(CardHeaderStyle s);    // Float / Band / Tag / None
     void setEntityLabel(CardLabel l);             // Name (HA) / State / Custom / None
     void setCardState(StateCardFill f);           // Fill / Icon glow

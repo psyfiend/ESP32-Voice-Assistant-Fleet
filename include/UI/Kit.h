@@ -240,6 +240,8 @@ struct ChoiceRow {
     void             (*onChosen)(uint8_t i);
 };
 lv_obj_t *choiceRows(lv_obj_t *parent, int32_t w, const ChoiceRow *rows, uint8_t n, Selector *S);
+// A row of buttons after choice rows, in their list: centred, S5 apart.
+lv_obj_t *buttonRow(lv_obj_t *list);
 // The action lit - glass - while what it switches is on (the window's Power), satin while off.
 void    selectorActionLit(Selector &S, bool lit);
 

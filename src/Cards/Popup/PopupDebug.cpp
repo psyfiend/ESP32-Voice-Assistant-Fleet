@@ -368,7 +368,12 @@ void CardPopup::debugService(lv_timer_t *t) {
     if (a.scheme >= 0) {
         // The colour scheme, as the drawer's button sets it (0 Fleet, 1
         // Midnight, 2 Linen) - with no window open, as from the dashboard.
+        // Through GUIManager when it is there (2.8 round 3): the ground, the
+        // header and the page follow, and nothing is saved.
+        char name[12];
+        snprintf(name, sizeof(name), "scheme%d", a.scheme);
         if (isOpen()) dbgOut("close the window first\n");
+        else if (s_headerHook) dbgOut("%s\n", s_headerHook(name, -1, -1, -2, -1));
         else { UI::setSchemeIndex((uint8_t)a.scheme); dbgOut("scheme %d\n", a.scheme); }
         s_dreq.store(DREQ_DONE);
         return;
