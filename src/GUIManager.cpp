@@ -1593,6 +1593,9 @@ void GUIManager::toggleDeck() {
 
 void GUIManager::tick() {
     _header.tick();
+    // A panel goes with its slot: a claim that has left the bar (an alarm
+    // that has gone off) takes its panel with it.
+    if (_slotPanel >= 0 && !_header.slotShown((uint8_t)_slotPanel)) closeSlotPanel(true);
     _pnlDisplay.tick();
 #ifdef HAS_AUDIO_HW
     _pnlAudio.tick();
