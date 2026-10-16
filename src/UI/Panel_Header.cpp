@@ -85,8 +85,8 @@ void Panel_Header::buildSlots() {
     }
     for (uint8_t i = 0; i < _n; i++) (this->*ops(_slots[i].kind).update)(_slots[i], true);
     // The open tab's coves, over the slots (D-23).
-    _cove[0] = Kit::joinCorner(_bar, false);
-    _cove[1] = Kit::joinCorner(_bar, false);
+    _cove[0] = Kit::joinCorner(_bar);
+    _cove[1] = Kit::joinCorner(_bar);
     plan();
     if (_open >= 0 && _open < _n) lv_obj_add_state(_slots[_open].box, LV_STATE_CHECKED);
     else _open = -1;

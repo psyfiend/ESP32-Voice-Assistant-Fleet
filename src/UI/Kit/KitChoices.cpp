@@ -1,9 +1,25 @@
-// Choice rows (2.8 round 3) - see include/UI/Kit.h, "CHOICE ROWS". The rows of
-// UI Tweaks and of a card window's Card UI: words and a compact selector each.
+// Choice rows (2.8 round 3) and inherit rows (round 4) - see include/UI/Kit.h,
+// "CHOICE ROWS". UI Tweaks' rows, and a card window's Card UI: words, and the
+// kit's compact selector.
 #include "UI/Kit.h"
 #include "UI/UITokens.h"
 
 namespace Kit {
+
+lv_obj_t *choiceList(lv_obj_t *parent, int32_t w, bool stacked) {
+    const UIShape &k = UI::shape();
+    lv_obj_t *list = plain(parent);
+    lv_obj_set_width    (list, w);
+    lv_obj_set_flex_grow(list, 1);
+    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(list, LV_FLEX_ALIGN_START, stacked ? LV_FLEX_ALIGN_CENTER : LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(list, UI::mm(stacked ? k.S3 : k.S4), 0);
+    UI::tameScroll(list);
+    lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
+    UI::unclipShadows(list);
+    return list;
+}
 
 lv_obj_t *choiceRows(lv_obj_t *parent, int32_t w, const ChoiceRow *rows, uint8_t n, Selector *S) {
     const UIShape &k = UI::shape();
@@ -21,17 +37,7 @@ lv_obj_t *choiceRows(lv_obj_t *parent, int32_t w, const ChoiceRow *rows, uint8_t
     const bool    stacked = wordsW + gapX + selMaxW > w;
     if (stacked && selMaxW > w) slotW = (w - (most + 1) * g) / most;
 
-    lv_obj_t *list = plain(parent);
-    lv_obj_set_width    (list, w);
-    lv_obj_set_flex_grow(list, 1);
-    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(list, LV_FLEX_ALIGN_START, stacked ? LV_FLEX_ALIGN_CENTER : LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(list, UI::mm(stacked ? k.S3 : k.S4), 0);
-    UI::tameScroll(list);
-    lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
-    UI::unclipShadows(list);
-
+    lv_obj_t *list = choiceList(parent, w, stacked);
     for (uint8_t r = 0; r < n; r++) {
         const ChoiceRow &row = rows[r];
         lv_obj_t *line = plain(list);
@@ -56,6 +62,49 @@ lv_obj_t *choiceRows(lv_obj_t *parent, int32_t w, const ChoiceRow *rows, uint8_t
         selector(S[r], line, sp);
     }
     return list;
+}
+
+lv_obj_t *inheritRow(lv_obj_t *list, const char *what, bool inherited, lv_event_cb_t cb, void *user) {
+    const UIShape &k = UI::shape();
+    lv_obj_t *row = plain(list);
+    lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(row, UI::mm(k.S1), 0);
+    UI::unclipShadows(row);
+
+    // Its words, and at the end of the line the Inherit toggle: glass while on.
+    lv_obj_t *head = plain(row);
+    lv_obj_set_size(head, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(head, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(head, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    UI::unclipShadows(head);
+    lv_label_set_text(label(head, KitStyle::KS_LABEL_NAME_DIM), what);
+    const int32_t tw = textW("Inherit", UI::type().NAME) + 2 * UI::mm(k.S5);
+    lv_obj_t *t = toggleButton(head, "Inherit", tw, UI::mm(k.H_CHIP), inherited, nullptr);
+    if (cb) lv_obj_add_event_cb(t, cb, LV_EVENT_CLICKED, user);
+    if (inherited) return nullptr;
+
+    // Off: the row's own choices, under its words.
+    lv_obj_t *line = plain(row);
+    lv_obj_set_size(line, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(line, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(line, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(line, UI::mm(k.S5), 0);
+    UI::unclipShadows(line);
+    return line;
+}
+
+void choiceSelector(Selector &S, lv_obj_t *line, const char *const *words, uint8_t n, uint8_t chosen,
+                    void (*onChosen)(uint8_t i), int32_t room) {
+    SelectorSpec sp = {};
+    for (uint8_t i = 0; i < n && i < SELECTOR_MAX; i++) sp.glyph[i] = words[i];
+    sp.n        = n;
+    sp.chosen   = chosen;
+    sp.compact  = true;
+    sp.slotW    = selectorSlotW(words, n);   // this choice's own longest word
+    sp.room     = room;
+    sp.onChosen = onChosen;
+    selector(S, line, sp);
 }
 
 lv_obj_t *buttonRow(lv_obj_t *list) {

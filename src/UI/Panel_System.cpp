@@ -38,16 +38,11 @@ void Panel_System::setScheme(uint8_t i) {
     Kit::selectorSet(_schemeSel, i);
 }
 
-void Panel_System::setBarShown(bool shown) {
-    _barShown = shown;
-    Kit::toggleButtonSet(_barBtn, shown);
-}
 
 // The buttons: capture-less callbacks, the panel through s_self.
 static void logCb(lv_event_t *)    { if (s_self && s_self->isExpanded()) s_self->close(); if (s_self) s_self->requestLog(); }
 static void tweaksCb(lv_event_t *) { if (s_self) s_self->requestTweaks(); }
 static void aboutCb(lv_event_t *)  { AboutSheet::open(); }
-static void barCb(lv_event_t *)    { if (s_self) s_self->requestGrid(Panel_System::GridAction::BAR_CYCLE); }
 static void colDownCb(lv_event_t *) { if (s_self) s_self->requestGrid(Panel_System::GridAction::CARD_W_DOWN); }
 static void colUpCb(lv_event_t *)   { if (s_self) s_self->requestGrid(Panel_System::GridAction::CARD_W_UP); }
 static void rowDownCb(lv_event_t *) { if (s_self) s_self->requestGrid(Panel_System::GridAction::ASPECT_DOWN); }
@@ -79,6 +74,8 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     // hangs under the status slot (setAnchorX()); its top is the live header's
     // (setTopOffset() - a stale number once detached it from the bar, #50).
     Kit::drawer(_drawer, parent, panelW);
+    _drawer.onClosed   = [](void *u) { Panel_System *p = (Panel_System *)u; if (p->_onClosed) p->_onClosed(); };
+    _drawer.closedUser = this;
     _ui_content = _drawer.face;
     Kit::drawerPlace(_drawer, screenW, UIToolkit::systemHeaderPx());
     buildContent();
@@ -91,21 +88,26 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
                   (long)UIToolkit::systemHeaderPx(), (long)lv_obj_get_height(_ui_content));
 }
 
-// A SCHEME CHANGE BUILDS THE ROWS AGAIN: their buttons and the selector are
-// finished faces, painted once in the scheme they were made in (#99) - left
-// alone, Linen showed Midnight's dark buttons with Linen's dark words on them.
+// THE ROWS ARE BUILT AGAIN whenever the panel opens and whenever the scheme
+// changes. Their buttons and the selector are finished faces (#99), and a face
+// lives in a cache of 16 slots that each new window may take back: built once,
+// at boot, the panel's buttons went on pointing at slots UI Tweaks' selectors
+// had repainted (round 3: doubled faces, Col / Row turned silver). And a face
+// is painted in the scheme it was made in (Linen once showed Midnight's dark
+// buttons). The panel is closed whenever a window opens, so building at open
+// is enough.
+void Panel_System::rebuild() {
+    if (!_ui_content) return;
+    lv_obj_clean(_ui_content);
+    for (lv_obj_t *&v : _connVal) v = nullptr;
+    _schemeSel = Kit::Selector{};
+    buildContent();
+}
+
 // From the next timer pass: the scheme may have been chosen on this panel's own
 // selector, mid-glide.
 void Panel_System::restyle() {
-    lv_async_call([](void *p) {
-        Panel_System *self = (Panel_System *)p;
-        if (!self->_ui_content) return;
-        lv_obj_clean(self->_ui_content);
-        for (lv_obj_t *&v : self->_connVal) v = nullptr;
-        self->_barBtn = nullptr;
-        self->_schemeSel = Kit::Selector{};
-        self->buildContent();
-    }, this);
+    lv_async_call([](void *p) { ((Panel_System *)p)->rebuild(); }, this);
 }
 
 void Panel_System::buildContent() {
@@ -132,33 +134,19 @@ void Panel_System::buildContent() {
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "UI Tweaks", w3, btnH, tweaksCb);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "About", w3, btnH, aboutCb);
 
-    // The scheme - one of three - and, set apart, the Status bar: on or off
-    // (D-25). This page's header, as the page panel's Shown / Hidden (D-14).
-    // Its word "Scheme" only where the row holds it beside the three names
-    // (not on the P4_5's half-screen panel): the names say what they are.
+    // "Scheme:" and one of three (round 4: the Status bar toggle went - the page
+    // panel's Show / Hide is the one way to hide the header).
     r = Kit::drawerRow(_ui_content);
-    int32_t barW = Kit::textW("Status bar", UI::type().NAME) + 2 * UI::mm(UI::shape().S5);
+    lv_label_set_text(Kit::label(r, Kit::KitStyle::KS_LABEL_NAME_DIM), "Scheme:");
     static const char *const SCHEMES[] = { "Fleet", "Midnight", "Linen" };
-    const int32_t slotW = Kit::selectorSlotW(SCHEMES, 3);
-    const int32_t selW  = 3 * slotW + 4 * UI::mm(UI::shape().S1);
-    const int32_t rest  = selW + barW + 2 * gap + UI::sc(UI::hdr().LINE);
-    const int32_t wordW = Kit::textW("Scheme", UI::type().NAME) + gap;
-    const bool    word  = rest + wordW <= inner;
-    if (word) lv_label_set_text(Kit::label(r, Kit::KitStyle::KS_LABEL_NAME_DIM), "Scheme");
     Kit::SelectorSpec sp = {};
     for (uint8_t i = 0; i < 3; i++) sp.glyph[i] = SCHEMES[i];
     sp.n = 3;
     sp.chosen = UI::schemeIndex() < 3 ? UI::schemeIndex() : 1;
     sp.compact = true;
-    sp.room = inner - barW - 2 * gap - UI::sc(UI::hdr().LINE);
-    sp.slotW = rest <= inner ? slotW : 0;   // too narrow: the words' sides shrink to fit `room`
+    sp.room = inner - Kit::textW("Scheme:", UI::type().NAME) - gap;
     sp.onChosen = schemeChosen;
     Kit::selector(_schemeSel, r, sp);
-    Kit::vrule(r, btnH * 6 / 10);
-    // The toggle takes what the row has left, measured from the selector as built.
-    barW = inner - lv_obj_get_style_width(_schemeSel.obj, LV_PART_MAIN) - 2 * gap - UI::sc(UI::hdr().LINE)
-         - (word ? wordW : 0);
-    _barBtn = Kit::toggleButton(r, "Status bar", barW, btnH, _barShown, barCb);
 
     // The grid's counts: columns and rows, "A" past the ends.
     r = Kit::drawerRow(_ui_content);
@@ -195,9 +183,10 @@ void Panel_System::toggle() {
     if (_onToggle) _onToggle(_expanded);
     if (_expanded) {
         UIToolkit::closeActiveAccordion();
+        rebuild();   // fresh faces (above)
         refreshConnectivity();
         _connMs = millis();
-        Kit::drawerOpen(_drawer, _tabL, _tabR);
+        Kit::drawerOpen(_drawer);
     } else {
         Kit::drawerClose(_drawer, true);
     }

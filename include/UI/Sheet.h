@@ -135,6 +135,9 @@ void sheetBeside(const SheetBeside *b);   // null: none
 // sheet shows the same. `boxW`: the box's width as set, before LVGL has laid it out.
 lv_obj_t *countdownBar(lv_obj_t *box, int32_t boxW);
 void      countdownSet(lv_obj_t *bar, const Sheet &S);   // as long as S has left to wait
+// An open sheet's timeout (0: never) and bar changed now: the wait starts again,
+// the bar comes or goes (round 4: a choice in UI Tweaks or Card UI shows at once).
+void      sheetRetime(Sheet &S, uint32_t closeMs, bool bar);
 
 // --- The panels (KitSheetPanels.cpp) -------------------------------------------------
 bool   sheetPanelOpen(const Sheet &S);       // either open: the window is out of reach

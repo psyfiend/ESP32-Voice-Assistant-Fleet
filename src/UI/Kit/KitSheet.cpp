@@ -329,6 +329,18 @@ lv_obj_t *countdownBar(lv_obj_t *box, int32_t boxW) {
     return bar;
 }
 
+// A NEW TIMEOUT OR BAR, AT ONCE (owner, round 4): the wait starts again from
+// now, and the bar comes or goes with it.
+void sheetRetime(Sheet &S, uint32_t closeMs, bool bar) {
+    if (!S.win) return;
+    S.closeMs     = closeMs;
+    S.lastTouchMs = millis();
+    const bool want = closeMs && bar;
+    if (want && !S.autoBar) S.autoBar = countdownBar(S.win, lv_area_get_width(&S.winRect));
+    else if (!want && S.autoBar) { lv_obj_delete(S.autoBar); S.autoBar = nullptr; }
+    countdownSet(S.autoBar, S);
+}
+
 void countdownSet(lv_obj_t *bar, const Sheet &S) {
     if (!bar || !S.closeMs) return;
     const int32_t full = (int32_t)(intptr_t)lv_obj_get_user_data(bar);

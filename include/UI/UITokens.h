@@ -286,6 +286,8 @@ struct UIType {
     const lv_font_t *UNIT;    // the unit beside a value, deliberately smaller
     const lv_font_t *NAME;    // card name
     const lv_font_t *TAG;     // header bar, status row
+    const lv_font_t *HEADER;  // the page header's words: TAG's face, but on the
+                              // P4_5 (26, matching the 4B's in mm; 2.8 round 4)
     // The two icon faces. Material Design Icons, generated as an 84-glyph
     // subset per board - NOT Montserrat, and not interchangeable with it:
     // MDI codepoints sit in the private use area, so these faces can draw

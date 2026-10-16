@@ -259,19 +259,16 @@ static void fill() {
     lv_style_set_border_color(ho, UI::c(p.ACCENT));
     lv_style_set_border_width(ho, UI::sc(h.LINE));
     lv_style_set_border_side (ho, (lv_border_side_t)(LV_BORDER_SIDE_LEFT | LV_BORDER_SIDE_TOP | LV_BORDER_SIDE_RIGHT));
-    // The joins: the fill, and a ring of the accent around what is outside.
+    // The coves: the fill, and a ring of the accent around the bar outside.
     lv_style_t *jf = st(S::KS_JOIN_FILL);
     lv_style_set_bg_color(jf, UI::c(p.SURFACE));
     lv_style_set_bg_opa  (jf, LV_OPA_COVER);
-    for (S r : { S::KS_JOIN_RING_BAR, S::KS_JOIN_RING_GROUND }) {
-        lv_style_t *js = st(r);
-        lv_style_set_bg_opa      (js, LV_OPA_COVER);
-        lv_style_set_radius      (js, LV_RADIUS_CIRCLE);
-        lv_style_set_border_color(js, UI::c(p.ACCENT));
-        lv_style_set_border_width(js, UI::sc(h.LINE));
-    }
-    lv_style_set_bg_color(st(S::KS_JOIN_RING_BAR),    UI::c(p.SURFACE_ALT));
-    lv_style_set_bg_color(st(S::KS_JOIN_RING_GROUND), UI::c(p.GROUND));
+    lv_style_t *js = st(S::KS_JOIN_RING_BAR);
+    lv_style_set_bg_opa      (js, LV_OPA_COVER);
+    lv_style_set_radius      (js, LV_RADIUS_CIRCLE);
+    lv_style_set_border_color(js, UI::c(p.ACCENT));
+    lv_style_set_border_width(js, UI::sc(h.LINE));
+    lv_style_set_bg_color    (js, UI::c(p.SURFACE_ALT));
     lv_style_set_bg_color(st(S::KS_RULE), UI::c(UI::mix(p.SURFACE, p.TEXT, 30)));
     lv_style_set_bg_opa  (st(S::KS_RULE), LV_OPA_COVER);
     lv_style_set_radius  (st(S::KS_RULE), UI::sc(UI::hdr().LINE));

@@ -177,6 +177,8 @@ void GUIManager::resetUiTweaks() {
     applyUiSettings();
     _header.setGlyphStyle(savedGlyphStyle());
     rebuildDashboard();
+    // The open window waits as shipped from now (round 4: at once).
+    if (Kit::Sheet *s = Kit::sheetShowing()) Kit::sheetRetime(*s, Kit::windowCloseMs(), Kit::windowBarShown());
     Serial.println("[UI] UI Tweaks reset");
 }
 
@@ -300,13 +302,23 @@ struct GUITweaks {
         for (uint8_t i = 1; i < 4; i++) if (!strcmp(v, TIMEOUT_IS[i])) return i;
         return 0;
     }
+    // AT ONCE (owner, round 4): this window waits as chosen from now, its bar
+    // coming or going with it.
+    static void retime() {
+        if (Kit::Sheet *s = Kit::sheetShowing()) Kit::sheetRetime(*s, Kit::windowCloseMs(), Kit::windowBarShown());
+    }
     static void timeoutSet(uint8_t i) {
         if (i >= 4) return;
         Settings::setSystem("window", "close", TIMEOUT_IS[i]);
         Settings::save();
+        retime();
     }
     static uint8_t barNow()          { return Kit::windowBarShown() ? 0 : 1; }
-    static void    barSet(uint8_t i) { Settings::setSystem("window", "bar", i ? "off" : nullptr); Settings::save(); }
+    static void    barSet(uint8_t i) {
+        Settings::setSystem("window", "bar", i ? "off" : nullptr);
+        Settings::save();
+        retime();
+    }
 
     static constexpr TweaksSheet::Row ROWS[] = {
         { "Glyphs",         GLYPHS,  3, glyphsNow,  glyphsSet,  false },
@@ -331,6 +343,16 @@ struct GUITweaks {
     static bool besideOpen() { return UIToolkit::getActiveAccordionPanel() != nullptr; }
     static void besideFold() { UIToolkit::closeActiveAccordion(); }
     static Kit::SheetBeside beside;   // the deck's panels, let through the window's catcher
+
+    // The deck's panels in the face of a window's folder panels (added later,
+    // so it wins over their own surface paint), or back to their own.
+    static void panelsFace(lv_obj_t *d, bool on) {
+        for (uint32_t i = 0; i < lv_obj_get_child_count(d); i++) {
+            lv_obj_t *p = lv_obj_get_child(d, (int32_t)i);
+            if (on) Kit::add(p, Kit::KitStyle::KS_PANEL_FACE);
+            else    lv_obj_remove_style(p, Kit::style(Kit::KitStyle::KS_PANEL_FACE), 0);
+        }
+    }
 
     static void slideY(void *o, int32_t v) { lv_obj_set_y((lv_obj_t *)o, v); }
     static void slide(lv_obj_t *d, int32_t from, int32_t to, lv_anim_completed_cb_t done) {
@@ -360,6 +382,8 @@ struct GUITweaks {
         lv_obj_set_pos (d, win.x1 - pad, foot - h + strip);
         lv_obj_clear_flag(d, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(d);
+        // In the window's colour, as the card window's panels are (U10).
+        panelsFace(d, true);
         g->_deckRaised = true;
         beside.holder = d;
         Kit::sheetBeside(&beside);
@@ -372,6 +396,7 @@ struct GUITweaks {
         lv_obj_set_size(d, lv_pct(100), was.h);
         lv_obj_set_pos (d, was.x, was.y);
         lv_obj_move_to_index(d, was.index);
+        panelsFace(d, false);
         if (!g->_showDeck) lv_obj_add_flag(d, LV_OBJ_FLAG_HIDDEN);
     }
 

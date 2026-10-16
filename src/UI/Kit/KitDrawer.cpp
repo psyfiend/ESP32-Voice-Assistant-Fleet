@@ -24,8 +24,14 @@ void slide(void *var, int32_t v) {
     else        lv_obj_clear_flag(d->root, LV_OBJ_FLAG_HIDDEN);
 }
 
+// Closed all the way: tell the caller (its tab may close now).
+void closedCb(lv_anim_t *a) {
+    Drawer *d = (Drawer *)a->var;
+    if (d && !d->open && d->onClosed) d->onClosed(d->closedUser);
+}
+
 void animate(Drawer &d, int32_t to) {
-    lv_anim_delete(&d, slide);
+    lv_anim_delete(&d, slide);   // a close cut short says nothing (no completed_cb on delete)
     lv_anim_t a;
     lv_anim_init        (&a);
     lv_anim_set_var     (&a, &d);
@@ -33,6 +39,7 @@ void animate(Drawer &d, int32_t to) {
     lv_anim_set_duration(&a, SLIDE_MS);
     lv_anim_set_exec_cb (&a, slide);
     lv_anim_set_path_cb (&a, lv_anim_path_ease_out);
+    if (to == 0) lv_anim_set_completed_cb(&a, closedCb);
     lv_anim_start       (&a);
 }
 }  // namespace
@@ -48,19 +55,19 @@ int32_t drawerWidth() {
     return w > cap ? cap : w;
 }
 
-// ONE SHAPE (D-23). A join is a square of the shape's fill holding a ring of the
-// accent - a circle whose inside is what lies outside the shape - clipped to the
-// square, so a quarter of it shows: the outline turning from the line into a
-// side, rounded. Its radius is JOIN_R and the line's width; R0 is both.
+// ONE SHAPE (D-23). A cove is a square of the shape's fill holding a ring of the
+// accent - a circle whose inside is the bar outside the shape - clipped to the
+// square, so a quarter of it shows: the tab's side turning out into the line,
+// rounded. Its radius is JOIN_R and the line's width; R0 is both.
 static int32_t joinR0() { return UI::sc(UI::hdr().JOIN_R) + UI::sc(UI::hdr().LINE); }
 
-lv_obj_t *joinCorner(lv_obj_t *parent, bool flare) {
+lv_obj_t *joinCorner(lv_obj_t *parent) {
     const int32_t r0 = joinR0();
     lv_obj_t *sq = plain(parent);
     add(sq, KitStyle::KS_JOIN_FILL);
     lv_obj_set_size(sq, r0, r0);
     lv_obj_t *ring = plain(sq);
-    add(ring, flare ? KitStyle::KS_JOIN_RING_GROUND : KitStyle::KS_JOIN_RING_BAR);
+    add(ring, KitStyle::KS_JOIN_RING_BAR);
     lv_obj_set_size(ring, 2 * r0, 2 * r0);
     lv_obj_add_flag(sq, LV_OBJ_FLAG_HIDDEN);
     return sq;
@@ -74,18 +81,8 @@ void coveAt(lv_obj_t *j, int32_t edgeX, bool right, int32_t barH) {
     lv_obj_set_pos(lv_obj_get_child(j, 0), right ? 0 : -r0, -r0);
 }
 
-// Beside a panel, below the bar: the line curving down into the panel's side.
-void flareAt(lv_obj_t *j, int32_t edgeX, bool right, int32_t top) {
-    if (!j) return;
-    const int32_t r0 = joinR0(), b = UI::sc(UI::hdr().LINE);
-    lv_obj_set_pos(j, right ? edgeX - b : edgeX + b - r0, top - b);
-    lv_obj_set_pos(lv_obj_get_child(j, 0), right ? 0 : -r0, 0);
-}
-
 void drawer(Drawer &d, lv_obj_t *parent, int32_t w) {
     d.w = w;
-    d.flare[0] = joinCorner(parent, true);
-    d.flare[1] = joinCorner(parent, true);
     d.root = plain(parent);
     add(d.root, KitStyle::KS_DRAWER);
     lv_obj_add_style(d.root, UI::paint(UIPaint::PAINT_LIFT), 0);
@@ -120,19 +117,10 @@ void drawerPlace(Drawer &d, int32_t centreX, int32_t top) {
     d.top = top;
 }
 
-void drawerOpen(Drawer &d, int32_t tabL, int32_t tabR) {
+void drawerOpen(Drawer &d) {
     if (!d.root) return;
-    // The flares: where the panel reaches past its tab, the bar's line curves
-    // down into the panel's side; where they share a side, a straight line.
-    const bool fl = tabL >= 0 && d.x < tabL;
-    const bool fr = tabR >= 0 && d.x + d.w > tabR;
-    flareAt(d.flare[0], d.x, false, d.top);
-    flareAt(d.flare[1], d.x + d.w, true, d.top);
-    for (uint8_t i = 0; i < 2; i++) {
-        if (!d.flare[i]) continue;
-        if (i ? fr : fl) { lv_obj_remove_flag(d.flare[i], LV_OBJ_FLAG_HIDDEN); lv_obj_move_foreground(d.flare[i]); }
-        else             lv_obj_add_flag(d.flare[i], LV_OBJ_FLAG_HIDDEN);
-    }
+    // Its side walls rise straight to the bar's line and stop there (owner,
+    // round 4: the flares that curved the line down into them are gone).
     // Measured, never guessed (the system panel's #50 lesson): the face is
     // content-sized, so it has a true height while the wrapper is closed.
     lv_obj_clear_flag(d.root, LV_OBJ_FLAG_HIDDEN);
@@ -149,10 +137,10 @@ void drawerOpen(Drawer &d, int32_t tabL, int32_t tabR) {
 void drawerClose(Drawer &d, bool anim) {
     if (!d.root) return;
     d.open = false;
-    for (lv_obj_t *f : d.flare) if (f) lv_obj_add_flag(f, LV_OBJ_FLAG_HIDDEN);
     if (anim) { animate(d, 0); return; }
     lv_anim_delete(&d, slide);
     slide(&d, 0);
+    if (d.onClosed) d.onClosed(d.closedUser);
 }
 
 lv_obj_t *drawerItem(lv_obj_t *face, const char *words, bool marked, lv_event_cb_t cb, void *user) {

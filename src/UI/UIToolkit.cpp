@@ -55,9 +55,9 @@ void UIToolkit::init() {
     }
     // The header bar's words: the larger face of the two (UIToolkit.h).
     {
-        const lv_font_t *tag = UI::type().TAG;
-        Font_Header = (tag && lv_font_get_line_height(tag) > lv_font_get_line_height(Font_PanelHeader))
-                    ? tag : Font_PanelHeader;
+        const lv_font_t *hdr = UI::type().HEADER;   // TAG's face but on the P4_5 (2.8 round 4)
+        Font_Header = (hdr && lv_font_get_line_height(hdr) > lv_font_get_line_height(Font_PanelHeader))
+                    ? hdr : Font_PanelHeader;
     }
 
     // Toast Setup - Top Z Index

@@ -343,6 +343,7 @@ int32_t lumOf(uint32_t hex);
 // PopupHold.cpp
 Card *cardOf(lv_obj_t *sf);
 void holdLook(lv_obj_t *sf, int32_t v);
+void restyleHeld(Card &c);   // c->restyle(), the held card kept pressed in
 bool movedTooFar();
 void holdExec(void *var, int32_t v);
 void letGoExec(void *var, int32_t v);

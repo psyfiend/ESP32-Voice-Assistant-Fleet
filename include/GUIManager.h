@@ -89,14 +89,6 @@ public:
     void openTokens();
     void openLog();      // the System Doctor report, on its own screen
 
-    // Cycle the SYSTEM header bar height: 50 -> 45 -> 40 -> 35 -> 30 -> none.
-    //
-    // "none" hides the bar entirely, which would otherwise strand the user:
-    // the header's status icon is the only way to open this drawer. So a
-    // transparent strip is left on the top layer to take the tap - the
-    // simplest form of the owner's swipe-down-to-reveal idea, and a footgun
-    // guard rather than a feature.
-    void toggleHeaderBar();
 
     bool deckShown() const { return _showDeck; }
 
@@ -172,6 +164,13 @@ private:
     uint32_t    _panelTouchMs = 0;
     Kit::Drawer _slotDrawer;
     int8_t      _slotPanel = -1;     // the slot whose drawer is open, or -1
+    // ROUND 4: a slot's tab stays open until its drawer has finished closing,
+    // and the header stays visible while any header panel is open - a Show /
+    // Hide chosen meanwhile waits for them to close.
+    int8_t      _closingSlot   = -1; // the slot whose drawer is closing, or -1
+    bool        _headerPending = false;
+    void slotDrawerClosed();
+    void headerPanelsClosed();
     static void reportUiSection();   // [UI STATE] in the System Doctor
     // Milestone 2.6, first cut. Registered on the SCREEN so a scrollable child
     // still wins its own drag - see the definition.

@@ -4,8 +4,8 @@
 //
 //   CONNECTIVITY          Wi-Fi (its network, signal and address), Home
 //                         Assistant, MQTT - each its live state, its glyph
-//   SYSTEM - DIAGNOSTICS  Log, UI Tweaks, About; the scheme (Fleet / Midnight /
-//                         Linen) and the Status bar toggle; Col - / + Row - / +
+//   SYSTEM - DIAGNOSTICS  Log, UI Tweaks, About; "Scheme:" Fleet / Midnight /
+//                         Linen; Col - / + Row - / +
 //
 // Its frame is the kit's drawer (D-20), one shape with the status slot's tab
 // (D-23). The knobs that used to fill it are UI Tweaks' (a window of its own,
@@ -36,6 +36,7 @@ public:
     // A scheme change: the rows built again (their finished faces are painted
     // in the scheme they were made in), from the next timer pass.
     void restyle();
+    void rebuild();               // the rows built again now (fresh faces; at every open)
 
     // Public logging - SAFE to call from anywhere (buffers data)
     void log(const char* fmt, ...);
@@ -70,16 +71,15 @@ public:
     // The scheme chosen: 0 Fleet, 1 Midnight, 2 Linen (UITokens' order).
     void setOnSchemeChosen(std::function<void(uint8_t)> cb) { _onScheme = cb; }
     void setScheme(uint8_t i);                   // shown as chosen (changed elsewhere)
-    void setBarShown(bool shown);                // the Status bar toggle's state
     // Fire the above (public: the buttons' callbacks are plain functions).
     void requestLog();
     void requestTweaks();                        // puts the panel away first
     void chooseScheme(uint8_t i);
 
-    // The 2.5 GRID KNOBS - counts, not nudges; "A" (auto) past the ends - and
-    // the Status bar (this page's header, D-14). One callback carrying a code:
-    // this panel is a remote control and knows nothing of what a column is.
-    enum class GridAction : uint8_t { CARD_W_DOWN, CARD_W_UP, ASPECT_DOWN, ASPECT_UP, BAR_CYCLE };
+    // The 2.5 GRID KNOBS - counts, not nudges; "A" (auto) past the ends. One
+    // callback carrying a code: this panel is a remote control and knows
+    // nothing of what a column is.
+    enum class GridAction : uint8_t { CARD_W_DOWN, CARD_W_UP, ASPECT_DOWN, ASPECT_UP };
     using GridCallback = std::function<void(GridAction)>;
     void setOnGridAction(GridCallback cb) { _onGridAction = cb; }
     void requestGrid(GridAction a) { if (_onGridAction) _onGridAction(a); }
@@ -95,9 +95,9 @@ public:
     // `centreX` and kept on the screen; a Kit::Drawer like every other slot's
     // panel (D-20), one shape with its tab (D-23).
     void setAnchorX(int32_t centreX);
-    // The status slot's tab [l, r), for the panel's flares (D-23); and where the
-    // panel stands [l, r), for the tab's coves.
-    void setTab(int32_t l, int32_t r) { _tabL = l; _tabR = r; }
+    // Where the panel stands [l, r), for the tab's coves (D-23).
+    // Called once the panel has finished closing (its tab closes then, round 4).
+    void setOnClosed(std::function<void()> cb) { _onClosed = cb; }
     void panelSpan(int32_t &l, int32_t &r) const { l = _drawer.x; r = _drawer.x + _drawer.w; }
 
     void close();
@@ -125,7 +125,6 @@ private:
     Kit::Drawer _drawer;
     lv_obj_t *_ui_content = nullptr;                 // the drawer's face
     lv_obj_t *_connVal[3] = {};                      // Wi-Fi, HA, MQTT: their words
-    lv_obj_t *_barBtn = nullptr;                     // Status bar
     Kit::Selector _schemeSel;
     Widget_ConnStatus _wifiGlyph;
     Widget_MqttStatus _linkGlyph;
@@ -133,11 +132,10 @@ private:
     MqttManager         *_mqtt = nullptr;
     ConnText _connText;
     uint32_t _connMs = 0;
-    bool     _barShown = true;
 
     Panel_Header* _headerRef = nullptr;
     bool _expanded = false;
-    int32_t _tabL = -1, _tabR = -1;
+    std::function<void()> _onClosed;
     ToggleCallback _onToggle;
     Action _onLog, _onTweaks;
     std::function<void(uint8_t)> _onScheme;

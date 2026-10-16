@@ -125,8 +125,9 @@ void buildAlarm(lv_obj_t *face) {
 }
 
 // The page: every page, to go to one (this one marked), and whether this page
-// shows its header (D-14) - a selector (D-22). Hidden, a swipe down from the
-// top edge brings the bar back for a moment, as Hide Bar's does.
+// shows its header (D-14) - a selector (D-22), Show / Hide (round 4). The bar
+// stays while the panel is open; hidden, a swipe down from the top edge brings
+// it back for a moment.
 Kit::Selector s_hdrSel;
 void hdrChosen(uint8_t i) {
     if (s_ctx.setHeaderShown) s_ctx.setHeaderShown(s_ctx.user, i == 0);
@@ -138,16 +139,16 @@ void buildPage(lv_obj_t *face, const Context &c) {
         Kit::drawerItem(face, c.pageTitles[i], i == c.pageIndex, pageCb, (void *)(uintptr_t)i);
     dim(face, "Header");
     Kit::SelectorSpec sp = {};
-    sp.glyph[0] = "Shown";
-    sp.glyph[1] = "Hidden";
+    sp.glyph[0] = "Show";
+    sp.glyph[1] = "Hide";
     sp.n = 2;
     sp.chosen = c.headerShown ? 0 : 1;
     sp.compact  = true;
     sp.room     = faceRoom();
     sp.onChosen = hdrChosen;
     Kit::selector(s_hdrSel, face, sp);
-    Kit::drawerNote(face, "Hidden: swipe down from the top edge to see it for a moment. Later: this "
-                          "page's cards, arrangement and name (2.11).");
+    Kit::drawerNote(face, "Hide: the header goes when this panel closes; swipe down from the top edge "
+                          "to see it for a moment. Later: this page's cards, arrangement and name (2.11).");
 }
 
 // The sensor: its name, its reading - or dashes and what went wrong - and when

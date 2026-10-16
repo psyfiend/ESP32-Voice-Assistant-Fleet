@@ -198,15 +198,8 @@ void GUIManager::toggleSystemPanel() {
     if (!_pnlSystem.isExpanded()) {
         closeSlotPanel(false);
         const int s = _header.slotOf(SlotKind::SLOT_STATUS);
-        if (s >= 0) {
-            _pnlSystem.setAnchorX(_header.slotCentreX((uint8_t)s));
-            int32_t tl, tr;
-            _header.slotSpan((uint8_t)s, tl, tr);
-            _pnlSystem.setTab(tl, tr);   // its flares (D-23)
-        } else {
-            _pnlSystem.setAnchorX(lv_obj_get_width(lv_screen_active()));   // no slot: the right edge, as before
-            _pnlSystem.setTab(-1, -1);
-        }
+        if (s >= 0) _pnlSystem.setAnchorX(_header.slotCentreX((uint8_t)s));
+        else        _pnlSystem.setAnchorX(lv_obj_get_width(lv_screen_active()));   // no slot: the right edge, as before
         _panelTouchMs = millis();
     }
     _pnlSystem.toggle();
@@ -275,7 +268,7 @@ void GUIManager::peekHeader() {
         // saw exactly that and called the gap "even worse". The peek timeout
         // is about an unattended glance, and a drawer standing open is not
         // one, so the timer simply re-arms instead of firing.
-        if (s_self->_pnlSystem.isExpanded() || s_self->_slotPanel >= 0) return;
+        if (s_self->_pnlSystem.isExpanded() || s_self->_slotPanel >= 0 || s_self->_closingSlot >= 0) return;
         s_self->unpeekHeader();
     }, UI_HEADER_PEEK_MS, nullptr);
 
@@ -845,18 +838,27 @@ void GUIManager::begin() {
         // The status slot is drawn open while its panel shows (2.8). The
         // scrim is synced after toggle() has set the drawer's state, so read
         // isOpen rather than isExpanded() here.
+        // Its tab closes once the panel has finished closing (setOnClosed below).
         if (isOpen) {
             int32_t pl, pr;
             s_self->_pnlSystem.panelSpan(pl, pr);
             s_self->_header.setOpenSlot(s_self->_header.slotOf(SlotKind::SLOT_STATUS), pl, pr);
         }
-        else if (s_self->_slotPanel < 0) s_self->_header.setOpenSlot(-1);
         if (s_self->_dismissScrim) {
             if (isOpen || s_self->_slotPanel >= 0) lv_obj_add_flag  (s_self->_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
             else                                    lv_obj_clear_flag(s_self->_dismissScrim, LV_OBJ_FLAG_CLICKABLE);
         }
         // If System Panel is OPEN (true), Hide Touch Window (false)
         // pnlDisplay.setTouchWindowVisibility(!isOpen);
+    });
+    // THE SLOT STAYS OPEN UNTIL ITS PANEL HAS GONE (owner, round 4): joined
+    // for as long as any of the panel shows. Then what waited for no panel to
+    // be open (headerPanelsClosed()).
+    _pnlSystem.setOnClosed([]() {
+        if (!s_self) return;
+        const int s = s_self->_header.slotOf(SlotKind::SLOT_STATUS);
+        if (s >= 0 && s_self->_header.openSlot() == s) s_self->_header.setOpenSlot(-1);
+        s_self->headerPanelsClosed();
     });
 
 #ifdef HAS_AUDIO_HW
@@ -869,9 +871,9 @@ void GUIManager::begin() {
     _pnlSystem.init(upper_deck, &_header);
     // The other slots' drawer (2.8), beside the system panel and over the scrim.
     Kit::drawer(_slotDrawer, upper_deck, Kit::drawerWidth());
+    _slotDrawer.onClosed = [](void *) { if (s_self) s_self->slotDrawerClosed(); };
     // The scheme it shows chosen is the one the board booted into.
     _pnlSystem.setScheme(UI::schemeIndex());
-    _pnlSystem.setBarShown(!_headerHidden);
 
     // Every Dump button runs this: the log is emptied first, so the page shows
     // exactly ONE report, whole, top to bottom (owner, 2026-09-30 - there is no
@@ -928,7 +930,6 @@ void GUIManager::begin() {
             case Panel_System::GridAction::CARD_W_UP:   nudgeColumns(+1);  break;
             case Panel_System::GridAction::ASPECT_DOWN: nudgeRows(-1);     break;
             case Panel_System::GridAction::ASPECT_UP:   nudgeRows(+1);     break;
-            case Panel_System::GridAction::BAR_CYCLE:   toggleHeaderBar(); break;
         }
     });
 
@@ -1258,24 +1259,6 @@ void GUIManager::openTokens() {
     ReferencePage::show();
 }
 
-// Hide or show the system header. NOT a size cycle any more.
-//
-// The owner, 2026-09-19: "35 is now the permanent header bar size. No more
-// adjusting the header size. However we do still need to be able to hide/show
-// the header as without header and deck we have the most screen real estate
-// available."
-//
-// The size cycle (50/45/40/35/30/none) had also produced a trap: hiding the
-// bar moved it off-screen and nothing could bring it back, because every path
-// that restored it went through the same cycle that had six positions and one
-// of them was "gone". Two states cannot get lost in the same way.
-//
-// A PAGE SETTING SINCE 2.8 (D-14): Hide Bar hides THIS page's header, saved
-// with the page (Settings pages.<slug>.header), as the page slot's panel does.
-void GUIManager::toggleHeaderBar() {
-    setPageHeaderShown(_headerHidden);
-}
-
 // The bar shown or hidden, and everything that hangs from it - without a
 // rebuild, so buildDashboard() can call it for the page it is building.
 void GUIManager::applyHeaderHidden(bool hidden) {
@@ -1301,8 +1284,6 @@ void GUIManager::applyHeaderHidden(bool hidden) {
     // screen. Needed here as well as on open, because the drawer may be open
     // RIGHT NOW while this runs.
     syncPanelOffset();
-
-    _pnlSystem.setBarShown(!_headerHidden);
     Serial.printf("[UI] system header %s\n", _headerHidden ? "hidden" : "shown");
 }
 
@@ -1410,10 +1391,9 @@ void GUIManager::loadPageState() {
     refreshKnobLabels();
 }
 
-// The system panel shows the page you are on: its scheme, its bar.
+// The system panel shows the scheme in force.
 void GUIManager::refreshKnobLabels() {
     _pnlSystem.setScheme(UI::schemeIndex());
-    _pnlSystem.setBarShown(!_headerHidden);
 }
 
 void GUIManager::goToPage(int16_t index) {
@@ -1427,6 +1407,7 @@ void GUIManager::goToPage(int16_t index) {
     if (next == _curPage) return;
 
     closeSlotPanel(false);   // it described the page being left (2.8)
+    _headerPending = false;  // the next page's own header is applied as it is built
     savePageState();
     _curPage = next;
     loadPageState();

@@ -36,7 +36,7 @@ void GUIManager::openSlotPanel(uint8_t slot) {
         c.pageTitles[i] = _pages[i].spec && _pages[i].spec->title ? _pages[i].spec->title : "Page";
     c.pageCount   = _nPages;
     c.pageIndex   = _curPage;
-    c.headerShown = !_headerHidden;
+    c.headerShown = pageHeaderShown();   // the page's choice, whatever the bar shows meanwhile
     c.entity      = _header.slotEntity(slot);
     c.reg         = &_core.entities();
     c.user        = this;
@@ -47,10 +47,11 @@ void GUIManager::openSlotPanel(uint8_t slot) {
         g->closeSlotPanel(false);
         g->goToPage(p);
     };
+    // Show / Hide leaves the panel open (owner, round 4): the header is always
+    // visible while a header panel is open, and the choice shows once the
+    // panel has closed (headerPanelsClosed()).
     c.setHeaderShown = [](void *user, bool shown) {
-        GUIManager *g = (GUIManager *)user;
-        g->closeSlotPanel(false);
-        g->setPageHeaderShown(shown);
+        ((GUIManager *)user)->setPageHeaderShown(shown);
     };
     // The alarm's notice (D-21): dismissed, it leaves the bar with its panel;
     // its Settings opens the clock's panel, where the warning time is set.
@@ -69,23 +70,44 @@ void GUIManager::openSlotPanel(uint8_t slot) {
     if (!SlotPanels::build(_header.slotKind(slot), _slotDrawer.face, c)) return;
     syncPanelOffset();
     Kit::drawerPlace(_slotDrawer, _header.slotCentreX(slot), _slotDrawer.top);
-    // One shape (D-23): the panel's flares and the tab's coves, where the panel
-    // reaches past the tab.
-    int32_t tl, tr;
-    _header.slotSpan(slot, tl, tr);
-    Kit::drawerOpen(_slotDrawer, tl, tr);
+    // One shape (D-23): the tab's coves where the panel reaches past the tab
+    // (setOpenSlot() below); the panel's walls meet the line square.
+    Kit::drawerOpen(_slotDrawer);
     _slotPanel = (int8_t)slot;
     _panelTouchMs = millis();   // it waits the window timeout from now (D-22)
     _header.setOpenSlot(slot, _slotDrawer.x, _slotDrawer.x + _slotDrawer.w);
     syncScrim();
 }
 
+// Its tab closes once the drawer has finished closing (slotDrawerClosed()).
 void GUIManager::closeSlotPanel(bool animate) {
     if (_slotPanel < 0) return;
-    Kit::drawerClose(_slotDrawer, animate);
-    if (_header.openSlot() == _slotPanel) _header.setOpenSlot(-1);
+    _closingSlot = _slotPanel;
     _slotPanel = -1;
     syncScrim();
+    Kit::drawerClose(_slotDrawer, animate);
+}
+
+// The slot drawer has gone: its tab closes, unless another slot's panel has
+// opened meanwhile (that one's tab is the open one now).
+void GUIManager::slotDrawerClosed() {
+    if (_closingSlot >= 0 && _header.openSlot() == _closingSlot) _header.setOpenSlot(-1);
+    _closingSlot = -1;
+    headerPanelsClosed();
+}
+
+// WHAT WAITS FOR NO HEADER PANEL TO BE OPEN (owner, round 4): the header is
+// always visible while one is open. A Show / Hide chosen meanwhile takes effect
+// now; a peeked header goes on its own timer (peekHeader()). From the next
+// timer pass, so a panel opening straight after another's close is seen first.
+void GUIManager::headerPanelsClosed() {
+    lv_async_call([](void *p) {
+        GUIManager *g = (GUIManager *)p;
+        if (g->_pnlSystem.isExpanded() || g->_slotPanel >= 0 || !g->_headerPending) return;
+        g->_headerPending = false;
+        g->applyHeaderHidden(!g->pageHeaderShown());
+        g->rebuildDashboard();
+    }, this);
 }
 
 // The dismiss scrim (GUIManager::begin()) takes a tap anywhere outside while any
@@ -113,9 +135,15 @@ void GUIManager::setPageHeaderShown(bool shown) {
     // Only a choice that differs from the page's own default is stored.
     Settings::setPage(p.slug, "header", shown == p.headerShown ? nullptr : (shown ? "shown" : "hidden"));
     Settings::save();
-    applyHeaderHidden(!shown);
-    rebuildDashboard();
-    Serial.printf("[UI] page %s: header %s\n", p.slug, shown ? "shown" : "hidden");
+    // A header panel open (the page panel's own Show / Hide): it waits.
+    if (_pnlSystem.isExpanded() || _slotPanel >= 0) {
+        _headerPending = true;
+    } else {
+        applyHeaderHidden(!shown);
+        rebuildDashboard();
+    }
+    Serial.printf("[UI] page %s: header %s%s\n", p.slug, shown ? "shown" : "hidden",
+                  _headerPending ? " (when the panel has closed)" : "");
 }
 
 // /popup's header keys (DEBUG_POPUP, for the harness): slot=<kind> opens that

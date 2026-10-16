@@ -219,7 +219,7 @@ void unitsDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     const TempUnit u = k ? TempUnit::TEMP_F : TempUnit::TEMP_C;
     s.tempUnit = u;
-    if (Card *c = cardOf(h.surface)) { c->setTempUnit(u); c->restyle(); }
+    if (Card *c = cardOf(h.surface)) { c->setTempUnit(u); restyleHeld(*c); }
     keepCardSetting("units", tempUnitName(u));
     renderMain();
     if (s.view == PopupView::VIEW_HISTORY) histDraw();

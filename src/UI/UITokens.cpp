@@ -349,6 +349,7 @@ const UIType &type() {
         .UNIT    = FLEET_FONT_UNIT,
         .NAME    = FLEET_FONT_NAME,
         .TAG     = FLEET_FONT_TAG,
+        .HEADER  = FLEET_FONT_HEADER,
         .ICON    = FLEET_ICONS_LG,
         .ICON_MD = FLEET_ICONS_MD,
         .ICON_SM = FLEET_ICONS_SM,

@@ -521,4 +521,51 @@ From the PC (debug builds; RAM only, nothing saved):
 
 ## Your results
 
-*(yours)*
+**Owner, 2026-10-16**: "I cannot overstate how much better the header bar looks and feels! The
+status icons alone are OUTSTANDING!" UI Tweaks and Card UI: "amazing QOL upgrades ... making a
+clean separation of duties feels much more correct".
+
+| # | Result |
+|---|---|
+| U1 | PASS |
+| U2 | PASS |
+| U3 | PASS - see the panels' corners below |
+| U4 | PASS |
+| U5 | PASS |
+| U6 | PASS |
+| U7 | PASS |
+| U8 | PASS |
+| U9 | PASS |
+| U10 | **PARTIAL** - AUDIO and DISPLAY should be the window's colour, as the card window's panels are |
+| U11 | PASS |
+| U12 | PASS |
+| U13 | PASS - "Is the glyph default Square then?" (yes: D-20; the P4_5's own file says bare) |
+| U14 | PASS |
+| U15 | PASS - but the held card's pressed look (its border behind the window) is lost when its card label changes |
+| U16 | PASS |
+| U17 | PASS |
+
+**Bugs and requests** (round 4):
+
+- **Choosing the Selector look in UI Tweaks corrupts the system panel's buttons** (two
+  screenshots: doubled faces, Col / Row turned silver). Cause: the finished faces live in a cache
+  of 16 slots that each new window may take back; the system panel is built once, so its buttons
+  went on pointing at slots repainted for UI Tweaks' selectors.
+- **The P4_5's header words** "look the same size as before". They did change, 22 -> 24 (House 71
+  -> 78 px wide); the 4B's 22 px is still ~5% larger in millimetres; 26 would match it.
+- **The panels' corners**: keep the rounded corners where the slot meets the panel (the coves);
+  **remove the flares** - the panel's side walls go straight up and stop at the blue line. **Keep
+  the slot open while its panel closes**, until it has fully gone.
+- **Remove the system panel's Status bar** (two ways to hide the header that look different); the
+  page panel's Shown / Hidden becomes **Show / Hide**. **The header is always visible while a
+  header panel is open**: Hide in the page panel does not close the panel, and the header hides
+  when the panel closes.
+- **"Scheme:" back** in front of the system panel's selector.
+- **Card UI looks unlike UI Tweaks** (its long selectors): each option gets an **Inherit**
+  button; while it is on, no selector; off, the option's own selector appears under it, only as
+  wide as that option's longest choice.
+- **Window timeout and Timer bar take effect at once**, in UI Tweaks and Card UI alike.
+- **A proposal: new active states, on the border** - for the cards and for toggles such as the
+  glass Power button (not the corner tabs): (1) a dual-border "glow" frame - an outer 1 px dark
+  line, an inner 3 px bright ring; (2) an asymmetric "bracket" - top and bottom 4 px, sides 1 px;
+  (3) a corner cut - 3 px border, the top-left and bottom-right corners' radius doubled.

@@ -73,11 +73,10 @@ enum class KitStyle : uint8_t {
     // reveal it and casts the scheme's shadow, and its face; its lines - an
     // item to tap (a page to go to), a big value.
     KS_DRAWER, KS_DRAWER_FACE, KS_DRAWER_ITEM, KS_DRAWER_BIG,
-    // ONE SHAPE (2.8 round 3, D-23): where an open slot and its panel meet the
-    // bar's accent line, a rounded corner of the outline - a cove beside the
-    // tab, a flare beside the panel: the shape's fill, and a ring of the accent
-    // around what lies outside (the bar, or the ground below it).
-    KS_JOIN_FILL, KS_JOIN_RING_BAR, KS_JOIN_RING_GROUND,
+    // ONE SHAPE (2.8 round 3, D-23): where an open slot meets the bar's accent
+    // line, a rounded corner of the outline - a cove beside the tab: the
+    // shape's fill, and a ring of the accent around the bar outside it.
+    KS_JOIN_FILL, KS_JOIN_RING_BAR,
     // A short upright rule setting one choice apart from another (Kit::vrule()).
     KS_RULE,
     KS_COUNT
@@ -242,6 +241,16 @@ struct ChoiceRow {
 lv_obj_t *choiceRows(lv_obj_t *parent, int32_t w, const ChoiceRow *rows, uint8_t n, Selector *S);
 // A row of buttons after choice rows, in their list: centred, S5 apart.
 lv_obj_t *buttonRow(lv_obj_t *list);
+// INHERIT ROWS (Card UI, 2.8 round 4): in a choice list (`stacked`: its rows
+// centred), each row its words with an Inherit toggle at the end of the line
+// (glass while on; `cb` on CLICKED with `user`). While it is on, nothing more;
+// off, inheritRow() returns the line under the words for the row's own
+// choiceSelector()s - each only as wide as its own longest choice (owner: most
+// rows inherit, and a short choice such as "10 s" stays short).
+lv_obj_t *choiceList(lv_obj_t *parent, int32_t w, bool stacked = false);
+lv_obj_t *inheritRow(lv_obj_t *list, const char *what, bool inherited, lv_event_cb_t cb, void *user);
+void      choiceSelector(Selector &S, lv_obj_t *line, const char *const *words, uint8_t n, uint8_t chosen,
+                         void (*onChosen)(uint8_t i), int32_t room = 0);
 // The action lit - glass - while what it switches is on (the window's Power), satin while off.
 void    selectorActionLit(Selector &S, bool lit);
 
@@ -401,27 +410,30 @@ void strokeGlyphStrike(StrokeGlyph &g, bool on, lv_color_t c, lv_color_t halo);
 struct Drawer {
     lv_obj_t *root = nullptr;   // the clip that grows; holds everything
     lv_obj_t *face = nullptr;   // the rows go here
-    lv_obj_t *flare[2] = {};    // its joins to the bar's line, left and right (D-23)
     bool      open = false;
     int32_t   x = 0, w = 0, openH = 0, top = 0;
+    // Called once it has finished closing - its slot's tab stays open until
+    // then (round 4: the slot and its panel joined for as long as any of the
+    // panel shows). Not called for a close cut short by opening again.
+    void    (*onClosed)(void *user) = nullptr;
+    void     *closedUser = nullptr;
 };
 int32_t drawerWidth();                                // a slot's drawer on this screen
 void    drawer(Drawer &d, lv_obj_t *parent, int32_t w);
 // Under its slot, kept on screen EDGE from its sides - where a slot's tab
 // stands, so a panel at a screen edge shares that side with its tab (D-23).
 void    drawerPlace(Drawer &d, int32_t centreX, int32_t top);
-// Open under the tab spanning [tabL, tabR) (-1: none): a FLARE joins each side
-// of the panel to the bar's line where the panel reaches past the tab.
-void    drawerOpen(Drawer &d, int32_t tabL = -1, int32_t tabR = -1);
+// Open: its side walls rise straight to the bar's line (round 4: no flares).
+void    drawerOpen(Drawer &d);
 void    drawerClose(Drawer &d, bool animate = true);
 
 // ONE SHAPE (D-23): a join is a corner of the outline where it meets the bar's
-// accent line - a COVE beside an open slot's tab (in the bar), a FLARE beside
-// its panel (below it). Built hidden; placed at the outer edge of the side it
-// rounds (exclusive for a right side).
-lv_obj_t *joinCorner(lv_obj_t *parent, bool flare);
+// accent line - a COVE beside an open slot's tab, in the bar (round 4: the
+// panel's own corners, the flares, are gone - its walls meet the line square).
+// Built hidden; placed at the outer edge of the side it rounds (exclusive for a
+// right side).
+lv_obj_t *joinCorner(lv_obj_t *parent);
 void      coveAt (lv_obj_t *j, int32_t edgeX, bool right, int32_t barH);
-void      flareAt(lv_obj_t *j, int32_t edgeX, bool right, int32_t top);
 // A drawer's lines. An ITEM to tap, full width and a finger tall: a mark (filled
 // when `marked`, a ring otherwise - this page and the others) and its words;
 // `cb` on CLICKED with `user`. A NOTE, dim, wrapping. A BIG value - a time, a
