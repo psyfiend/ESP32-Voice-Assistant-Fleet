@@ -1498,7 +1498,7 @@ void GUIManager::tick() {
     // after the page was built shows once the table has grown.
     if (!CardPopup::isOpen()) {
         const bool learnt = s_addedWaiting && _core.entities().count() != s_regCountAtBuild;
-        if (CardAdded::takeChanged() || learnt) rebuildDashboard();
+        if (CardAdded::takeChanged() || learnt || CardPopup::takeRebuildWanted()) rebuildDashboard();
     }
     // Renders a waiting screenshot request, on this - the LVGL - thread.
     Screenshot::service();

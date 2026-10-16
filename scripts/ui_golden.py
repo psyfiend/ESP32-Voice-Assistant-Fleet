@@ -166,6 +166,7 @@ PLAN = [
         (None, ["deck=0"], 0.6),
         ("lamps_history", ["view=1"], HIST),
         ("lamps_props", ["view=5"], 0.6),
+        ("lamps_cardui", ["view=6"], 0.6),   # 2.8 round 3: Card UI (D-28)
     ]},
     {"page": 1, "card": ("All Lamps", "Kitchen", 0), "steps": [
         ("lamps_members", ["view=2"], 0.6),

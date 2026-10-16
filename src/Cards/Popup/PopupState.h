@@ -88,7 +88,9 @@ using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
 // History, Members and Scenes are reached by the corner icons, which work as
 // tabs (owner, 2026-10-06): see "The corner icons".
 // VIEW_PROPS: the entity's properties, read-only, from SETTINGS' button (2.10e).
-enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER, VIEW_SCENES, VIEW_PROPS };
+// VIEW_CARD_UI: the card's own looks, from SETTINGS' last row (2.8 round 3, D-28).
+enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER, VIEW_SCENES, VIEW_PROPS,
+                                  VIEW_CARD_UI };
 enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
@@ -397,6 +399,12 @@ void leaveMember(PopupView to = PopupView::VIEW_MEMBERS);
 // PopupProps.cpp
 void buildProps();
 
+// PopupCardUi.cpp
+void buildCardUi();
+void cardWindowLook(const Card &c, Kit::SheetSpec &k);   // its timeout, bar and selector, before it is built
+void cardUiCb(lv_event_t *ev);                           // SETTINGS' Card UI row
+bool cardUiTakeRebuild();                                // a choice wants the page built again
+
 // PopupHistory.cpp
 void histKeep(const char *key, const char *value);
 bool histFromHa(const Entity *e);
@@ -446,8 +454,6 @@ void keepCardSetting(const char *key, const char *value);
 void groupDropCb(lv_event_t *ev);
 void ensureDefaultScene(Card &c);
 void tapDropCb(lv_event_t *ev);
-void cardLabelDropCb(lv_event_t *ev);
-void labelDropCb(lv_event_t *ev);
 void unitsDropCb(lv_event_t *ev);
 void propsCb(lv_event_t *ev);
 void addCardCb(lv_event_t *ev);

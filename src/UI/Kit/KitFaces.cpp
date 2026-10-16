@@ -79,7 +79,21 @@ void forgetSelectorLooks() {
     s_lookLoaded = 0;
 }
 
+const char *selectorLookName(int8_t look) { return look < 0 ? nullptr : LOOK_NAMES[look & 3]; }
+
+bool selectorLookFromName(const char *name, int8_t &look) {
+    if (!name) return false;
+    for (int8_t k = 0; k < 4; k++)
+        if (!strcmp(name, LOOK_NAMES[k])) { look = k; return true; }
+    return false;
+}
+
+// One window's own look (a card's Card UI, D-28), over the scheme's.
+static int8_t s_lookOver = -1;
+void selectorLookOverride(int8_t look) { s_lookOver = look < 0 ? (int8_t)-1 : (int8_t)(look & 3); }
+
 uint8_t selectorLookNow() {
+    if (s_lookOver >= 0) return (uint8_t)s_lookOver;
     if (lookSlot() >= 0) return (uint8_t)lookSlot();
     return lum(UI::pal().SURFACE_ALT) < 128 ? 0 : 3;
 }

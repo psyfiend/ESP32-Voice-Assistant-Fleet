@@ -444,6 +444,12 @@ enum class CardVariant : uint8_t {
 #endif
 
 const char *cardStateName(CardState s);
-const char *cardVariantName(CardVariant v);
+const char *cardVariantName(CardVariant v);   // "auto", "full", "compact": also how it is saved
+inline bool cardVariantFromName(const char *n, CardVariant &out) {
+    if (!n) return false;
+    for (uint8_t i = 0; i < 3; i++)
+        if (!strcmp(n, cardVariantName((CardVariant)i))) { out = (CardVariant)i; return true; }
+    return false;
+}
 
 #endif // CARD_TYPES_H

@@ -468,6 +468,8 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
             if (Settings::card(c->id(), "units", v, sizeof(v)) && tempUnitFromName(v, tu)) c->setTempUnit(tu);
             char ref[ENTITY_TOPIC_MAX];
             if (Settings::card(c->id(), "tap_scene", ref, sizeof(ref))) c->setTapScene(ref);
+            CardVariant cv;   // Card UI's Card density (2.8 round 3, D-28)
+            if (Settings::card(c->id(), "density", v, sizeof(v)) && cardVariantFromName(v, cv)) c->setVariant(cv);
         }
         if (cs.longStaleMs) c->setLongStaleMs(cs.longStaleMs);
         if (cs.paused)      c->setPaused(true);

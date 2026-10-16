@@ -435,6 +435,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             else if (a.view == 1) showView(PopupView::VIEW_HISTORY);
             else if (a.view == 4 && hasScenes()) showView(PopupView::VIEW_SCENES);
             else if (a.view == 5) showView(PopupView::VIEW_PROPS);   // as SETTINGS' Entity properties
+            else if (a.view == 6) showView(PopupView::VIEW_CARD_UI); // as SETTINGS' Card UI (2.8 round 3)
             dbgMem(mem, sizeof(mem));
             dbgOut("view %d; %s\n", a.view, mem);
             // Why the last commands failed, newest first (G8).

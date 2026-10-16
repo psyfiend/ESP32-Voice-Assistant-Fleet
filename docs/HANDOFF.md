@@ -79,8 +79,8 @@ Each step committed and pushed on `feat/2.8-header-slots`; tick it here when it 
 - [x] 3. Glyphs as data (`UI/GlyphShapes`, `Kit::strokeGlyph`), per-scheme status colours (`SIG_*`), one size bare or framed, the AP mast as its own claim (D-24, D-27)
 - [x] 4. The bell in the clock's slot (7 days), the 12-hour notice claim and its panel, the clock panel's NEXT ALARM and "Warn me before" (D-21); `/popup?alarmin=N`
 - [x] 5. One shape in the accent: the open tab, coves, flares, panels aligned at a screen edge (D-23)
-- [ ] 6. The system panel: CONNECTIVITY, SYSTEM - DIAGNOSTICS (Log / UI Tweaks / About, Scheme + Status bar, Col / Row) (D-22, D-25)
-- [ ] 7. UI Tweaks (a Sheet): selector rows, saved, Reset all, Tokens; the deck rises under it; the left-half swipe; header panels follow the timeout
+- [x] 6. The system panel: CONNECTIVITY, SYSTEM - DIAGNOSTICS (Log / UI Tweaks / About, Scheme + Status bar, Col / Row) (D-22, D-25)
+- [x] 7. UI Tweaks (a Sheet): selector rows, saved, Reset all, Tokens; the deck rises under it; the left-half swipe; header panels follow the timeout
 - [ ] 8. Card UI: a SETTINGS row opening a view of selector rows (D-28); Entity / Card label leave SETTINGS
 - [ ] 9. The page panel's Shown / Hidden as a selector; a PC key to show the sensor's "!" (T10)
 - [ ] 10. Harness states, A/B against round 2, the gate, the structure check, `TEST_2.8.md` round 3, flash the P4_5 and the 4B (settings saved first)

@@ -307,7 +307,8 @@ static void buildFrame(Sheet &S) {
     }
 
     // --- The auto-close bar: how long until the window gives up -------------
-    S.autoBar = (S.closeMs && barSetting()) ? countdownBar(S.win, lv_area_get_width(&S.winRect)) : nullptr;
+    const bool bar = spec.bar ? spec.bar == 1 : barSetting();
+    S.autoBar = (S.closeMs && bar) ? countdownBar(S.win, lv_area_get_width(&S.winRect)) : nullptr;
 
     if (spec.buildFirst) spec.buildFirst();
 }
@@ -427,7 +428,7 @@ static void invalidateWindow(Sheet &S) {
 void sheetOpen(Sheet &S, const SheetSpec &spec) {
     S.spec = &spec;
     S.closeQueued = false;
-    S.closeMs = closeSetting();
+    S.closeMs = spec.closeMs == SHEET_NEVER ? 0 : spec.closeMs ? spec.closeMs : closeSetting();
     s_open = &S;
     facesNextWindow();                                // faces the last sheet used may be taken back
     lv_obj_t *scr = lv_screen_active();

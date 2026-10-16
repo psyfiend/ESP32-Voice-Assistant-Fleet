@@ -154,6 +154,10 @@ uint32_t glassInk(uint32_t hex);
 int8_t   selectorLook();
 void     keepSelectorLook(int8_t look);
 void     forgetSelectorLooks();   // read every scheme's again (the file was changed under them)
+void     selectorLookOverride(int8_t look);   // one window's own look (-1: none), until cleared
+// Saved by name (schemes.<name>.selector, a card's "selector"): 0-3 as above.
+const char *selectorLookName(int8_t look);
+bool        selectorLookFromName(const char *name, int8_t &look);
 uint8_t  selectorLookNow();       // the look in force
 FaceKind metalKind();             // its metal
 int32_t  selectorRadius();        // its corners: round, or R_CONTROL
@@ -220,6 +224,22 @@ struct Selector {
 int32_t selectorW(uint8_t n);   // with n choices and the action
 int32_t selectorH();            // a touch target and its padding (a compact one: H_CHIP)
 void    selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec);
+
+// CHOICE ROWS (KitChoices.cpp, 2.8 round 3: UI Tweaks, Card UI): a list of
+// rows `w` wide filling `parent`'s height, each its words and a compact
+// selector, every choice the width of the widest word in ANY row so the rows
+// line up (D-27); where the words and the widest selector will not fit side by
+// side (the 4B), each row's words stand above its selector. Scrolls when it
+// must. `S[i]` is row i's selector, kept by the caller. Returns the list, for
+// anything that follows the rows (buttons).
+struct ChoiceRow {
+    const char        *what;
+    const char *const *words;
+    uint8_t            n;
+    uint8_t            chosen;
+    void             (*onChosen)(uint8_t i);
+};
+lv_obj_t *choiceRows(lv_obj_t *parent, int32_t w, const ChoiceRow *rows, uint8_t n, Selector *S);
 // The action lit - glass - while what it switches is on (the window's Power), satin while off.
 void    selectorActionLit(Selector &S, bool lit);
 

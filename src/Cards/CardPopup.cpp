@@ -139,7 +139,8 @@ void showView(PopupView v) {
         setText(s.lblTitleArea, title);
         setText(s.lblTitleName, v == PopupView::VIEW_HISTORY ? "History"
                               : v == PopupView::VIEW_SCENES  ? "Scenes"
-                              : v == PopupView::VIEW_PROPS   ? "Properties" : "Members");
+                              : v == PopupView::VIEW_PROPS   ? "Properties"
+                              : v == PopupView::VIEW_CARD_UI ? "Card UI" : "Members");
     }
     // SIZED BEFORE THE VIEW IS BUILT: placeWide() lays the window out, and a
     // DOT label laid out at the last view's width rewrites its own text - the
@@ -148,6 +149,7 @@ void showView(PopupView v) {
     if (v == PopupView::VIEW_HISTORY)      buildHistory();
     else if (v == PopupView::VIEW_MEMBERS) buildMembers();
     else if (v == PopupView::VIEW_PROPS)   buildProps();
+    else if (v == PopupView::VIEW_CARD_UI) buildCardUi();
     else                                   buildMain();
     deckSync();     // SETTINGS' rows are the view's (a member's own has more)
     deckRender();   // Paused follows whatever the window is showing now
@@ -292,6 +294,7 @@ void closed() {
     s.expanded = false;
     s.lastScene = -1;
     s.rebuildQueued = false;
+    Kit::selectorLookOverride(-1);   // the card's own look went with its window (Card UI)
     // K8: settings are written when the window closes - once, if anything
     // changed, on the settings task, 400 ms on so the write never lands in
     // the frames of the close or of SETTINGS' slide.
@@ -338,6 +341,8 @@ void showWindow() {
     k.panelRows  = deckSpecs;
     k.panelGone  = panelGone;
     k.sideGone   = sideGone;
+    // The card's own window looks (Card UI, D-28): its timeout, bar, selector.
+    if (Card *c = cardOf(h.surface)) cardWindowLook(*c, k);
     Kit::sheetOpen(s, k);
     s.lastAgeMs = s.lastTouchMs;
 #ifdef DEBUG_POPUP
@@ -444,17 +449,7 @@ void CardPopup::open(Card &card) {
     showWindow();
 }
 
-void CardPopup::cycleSelectorLook() {
-    const int8_t cur = chosenLook();
-    keepLook(cur < 0 ? 0 : cur >= 3 ? (int8_t)-1 : (int8_t)(cur + 1));
-    Settings::save();   // no window closes to ask for it
-}
-
-const char *CardPopup::selectorLookShort() {
-    static const char *const SHORT[5] = { "Sel Own", "Blk Sq", "Blk Rd", "Slv Sq", "Slv Rd" };
-    const int8_t l = chosenLook();
-    return SHORT[(l < 0 || l > 3) ? 0 : l + 1];
-}
+bool CardPopup::takeRebuildWanted() { return !isOpen() && cardUiTakeRebuild(); }
 
 void CardPopup::openOn(Card &card, uint8_t view) {
     s_openFromTap = true;
