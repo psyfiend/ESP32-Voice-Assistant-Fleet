@@ -162,3 +162,65 @@ shown / hidden, dashes for no live value. The owner, having seen it:
 - **Still open** from round 1's sheet: the glyph style (Q1 - Claude's recommendation: square), the
   clock's form (Q2), how a hidden header comes back (Q3), the error mark (Q4), the open slot's look
   (Q5), what each panel holds next (Q6), the system panel onto `Kit::Drawer` (Q7).
+
+## 10. Claims: what shows is decided by priority (2026-10-15, before round 2's build)
+
+Asked how a page's header should name where its slots go, the owner answered with a model of the
+whole header (DECISIONS D-19):
+
+> "Some kind of priority system where multiple entities or events can make simultaneous claims to a
+> given slot and whether they are displayed or not is decided by their priority. For example the
+> 'alarm' icon could have a static presence in the 'status icons' slot but could be elevated to a
+> priority where it would appear if certain conditions are met. Or a popup window could temporarily
+> bump the middle slot to show relevant info while the popup is on screen. For alerts there could be
+> a 'detailed' and 'minimal' way to represent information, so that a 'detailed' version such as
+> 'ALERT - Front door open for 2 hours' could temporarily occupy the middle slot for 30 seconds and
+> draw the users attention, then the 'minimal' version could be reduced to an exclamation mark icon
+> and reside in the status bar slot with a higher priority until dismissed or resolved. Perhaps the
+> status icons slot could be designed to have a certain number of low-pri icons always present
+> (wifi/mqtt for example) but enable a 3rd slot if it is a high-pri status like an exclamation mark,
+> or an alarm about to go off within a few hours."
+
+> "Each slot would have default or baseline residents, and other entities would be more or less
+> 'permanently' attached to certain slots but only show under certain circumstances. And of course
+> additional entities or events down the road could make a claim to any slot as needed."
+
+> "The NINA project has an advanced 'toast' system with a buffer and priority levels ... I'd like to
+> import/port over the framework of how that toast system works, perhaps it could function in
+> parallel with a dynamic header system like I've described to temporarily put text or data into
+> the header. Such alerts or dynamic events could be actionable such that if an event added an
+> alert/notification icon to a header slot it could also add some kind of interactive
+> button/text/info into the panel that opens when the slot is tapped."
+
+**Words.** The owner's "slot" in these quotes is what this document calls a **place** - left, middle,
+right. A **slot** is one thing standing in a place (the clock, the alarm, the status glyphs); each
+slot makes a **claim** on its place.
+
+- **Residents and claims.** A place has residents that are always there (the clock; the page; the
+  link and Wi-Fi) and claims that show only while their condition holds (the alarm, while one is
+  set). Both are data - `HeaderSlots.h`, one list of `{kind, place, entity}`.
+- **Priority decides, and room.** Each claim holds its room with a priority. When a side would run
+  into the middle, the lowest priority gives way first - first a slot's extras (the alarm's time, the
+  temperature's icon, the page's name: round 2's mock's order), then a whole claim. Residents never
+  leave. **This is also how a narrow board sheds**: one rule, measured on the board.
+- **The middle never moves**: it stands on the bar's centre; the sides are pinned to the edges.
+- **A pure planner** (`include/Layout/HeaderPlan.h`, like `Layout::`): given the claims, each form's
+  measured width and its priority, it returns which show, in which form, and where. No LVGL - tested
+  on the PC (`host-tests/test_header_plan`).
+- **Each kind keeps its build, its update and its panel**; a tap on a slot opens that slot's panel
+  joined to it (D-18).
+
+**With #76, later**: the notice queue (NINA's `nina_toast`: a queue any task can post to, drained on
+the UI thread, a few visible and a backlog, severity setting look and lifetime, repeats counted,
+tap to dismiss - its mechanism ported, our tokens for its looks, non-commercial with credit);
+**detailed and minimal forms** (a notice's sentence in the middle for a while, then its "!" in
+status); **a place that grows** for a high-priority claim; **a window taking the middle** while it
+is open; **claims bringing rows to their panel** (acknowledge, snooze). Each is a new claim source;
+none is new layout code. NINA's `nina_nav_arbiter` (sources submit claims, one resolve per cycle) is
+the same shape for page changes (`REFERENCE_PROJECTS.md`).
+
+**Round 2's answers** (D-20): **square glyphs** (Q1); **the alarm leaves until one is set** - an unset
+alarm is not missing data - and is shown from the PC until K84 builds alarms; **the system panel
+moves onto `Kit::Drawer`** (Q7). Still open, carried on the sheet with their recommendations: the
+clock's form (Q2), how a hidden header comes back (Q3), the error mark (Q4), what each panel holds
+next (Q6).
