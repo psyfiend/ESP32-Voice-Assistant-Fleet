@@ -1,4 +1,4 @@
-# Handoff — 2026-10-15 (`v0.2.17`, A17; next: 2.8 round 2's build - three places)
+# Handoff — 2026-10-15 (`v0.2.17` flashed; 2.8 round 2 built - three places on claims - for the owner's test)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -42,42 +42,44 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
 
 ## Where things stand (2026-10-15, evening)
 
-- **`v0.2.17` - A17** (#108, merged and tagged; `docs/archive/TEST_A17.md`): the settings partition
-  is formatted only when blank, a read-only boot says why, `POST /settings` restores, and the
-  save / restore scripts; `flash_release.ps1` saves each board's file first and writes the 1060
-  app-only at 460800 with a watchdog reset. **Not yet flashed as the release**: the P4_5 and the 4B
-  run A17's last branch build (the same code), the 1060 `v0.2.16`. Copies of every board's file are
-  in `bench/settings/<board>/`.
-- **2.8 is in round 2, on `feat/2.8-header-slots`** (no PR; `TEST_2.8.md` there). Round 1 built
-  four evenly spaced slots - the slots as data (`include/UI/HeaderSlots.h`), each with its panel
-  (`SlotPanels.cpp`, `Kit::Drawer`; the status slot's is the system panel), the glyph style a setting
-  (bare / square / circle), a page's header shown / hidden, dashes for no live value - and passed
-  the all-nine gate. The owner's verdicts since (`header-slots.md` §9; DECISIONS D-16, D-17, D-18):
-  - **Three places**: **left** - the clock and the weather; **middle** - the page's name and dots;
-    **right** - the status icons, **the alarm among them** ("even though it is a clock function").
-  - **Keep the open slot joined to its panel**: the owner likes how a panel opens "connected" to
-    the header, "as if it pours downward out into the panel".
-  - **The panels are for settings** (D-17): the system panel's buttons are development tools; every
-    slot's panel will hold settings, shortcuts to settings, or popups that manage what it shows.
+- **`v0.2.17` - A17** (#108, merged, tagged, **flashed as the release** on the P4_5, the 4B and the
+  1060 on 2026-10-15 by `flash_release.ps1` from the tag - each board's file saved first and intact
+  after). Copies of every board's file are in `bench/settings/<board>/`.
+- **2.8 round 2 is built, on `feat/2.8-header-slots`** (no PR; **`TEST_2.8.md` round 2 is the
+  owner's sheet**, R1-R11, Q2-Q4, Q6, Q8, Q9). `main` merged in (no conflict). What it is
+  (`header-slots.md` §9-10; DECISIONS D-16 to D-20):
+  - **Three places**: left the clock and the deck's temperature; the page in the middle, on the
+    bar's centre; right the alarm (while set) and the link and Wi-Fi. **Square glyphs** by default.
+  - **Claims** - the owner's idea, asked how a page names its places: each slot claims its room in
+    its forms, each held with a keep (a priority); when a side would run into the middle the lowest
+    keep gives way. A pure planner, `include/Layout/HeaderPlan.h`, ten host tests. **The notice
+    queue (NINA's toasts), detailed / minimal forms, a window taking the middle and claims' panel
+    rows are #76** - new claim sources, no new layout code.
+  - **The alarm**: a slot kind with its panel, on the bar only while set (D-20). `Alarms.h` holds
+    the next one; only a PC sets one until K84 (`/popup?alarm=HHMM`, RAM only).
+  - **The system panel's frame is `Kit::Drawer`** (Q7): every panel one component, all joined.
+  - Proved: harness A/B on the P4_5 (`v0.2.17` `r2b` vs round 2 `r2c`: every window unchanged;
+    `desk_temp`'s mark is #104), the 4B's header states (`r2h`), frame cost +0.9 ms (<1%), the
+    structure check, the gate (see the sheet).
+- **Boards**: the P4_5 and the 4B run round 2 (local lines), the 1060 `v0.2.17`. The 4B's own file
+  closes a window after 10 s (`system.window.close`), which stops the harness's full walk there -
+  use `--only` for header states, or ask the owner.
 - **The mock**: the "2.8 Header Slots" canvas
-  (https://claude.ai/artifact/9dLvFUbWZePzgjLnnXZ5Sw); its newest artboards show three places (with
-  the alarm still on the left - D-18 moves it).
+  (https://claude.ai/artifact/9dLvFUbWZePzgjLnnXZ5Sw); its last artboards show three places with
+  the alarm still on the left (D-18 moved it; the build is the reference now).
 - **Routes**: the P4_5 serves 7 of `HttpServer::MAX_ROUTES` (8); the next route needs it raised.
 
 ## What is next with the owner
 
-1. **Flash the release**: `scripts/release/flash_release.ps1` from `main` at `v0.2.17` (it saves each
-   board's settings first).
-2. **2.8 round 2 - the build**, on `feat/2.8-header-slots` after merging `main` into it (A17 moved
-   `Settings.cpp`'s HTTP code into `SettingsHttp.cpp`; the branch added `Settings::page()` /
-   `setPage()` beside `system()` - expect a small merge). A *place* (left, middle, right) holds one
-   or more slots; the slots stay data, each kind a build and an update in `Panel_Header.cpp`, each with
-   its panel. Left: the clock and the weather; middle: the page; right: the status icons and the
-   alarm (a new slot kind: its glyph, and dashes or nothing until K84's alarms exist - ask). Keep the
-   joined look. Update the canvas if the owner wants to see D-18 first. Still open from
-   `TEST_2.8.md` Q1-Q7: the glyph style (recommended: square), the clock's form, how a hidden header
-   comes back, the error mark, what each panel holds next, the system panel onto `Kit::Drawer`.
-   Cluster headers come with 2.11; the notification queue with #76.
+1. **The owner tests 2.8 round 2** (`TEST_2.8.md`, R1-R11 on the P4_5 and the 4B) and answers Q2-Q4,
+   Q6, Q8 (when the alarm shows), Q9 (tap targets). Then: sign-off -> CHANGELOG `v0.2.18`, archive
+   the sheet, push, `gh pr create`; the owner merges. **One report when the owner says the testing
+   is done.**
+2. **#76 next, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a
+   queue any task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to
+   dismiss), a notice's detailed form in the middle for a while then its minimal "!" in status, a
+   place that grows for a high-priority claim, a window taking the middle, claims' rows in their
+   panel. Mock first. Cluster headers come with 2.11.
 3. Waiting: **#104** (a light's temperature mark moves between builds); **#100** the clocks (three
    agreed, K81-K84, the record on #100; the prototype on `feat/100-nina-clock`, PR #102 open, not for
    merging); **#106** an active card's glowing border (the owner's idea, mock first); **#84** "no data
