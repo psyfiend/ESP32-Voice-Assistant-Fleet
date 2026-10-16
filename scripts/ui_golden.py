@@ -151,6 +151,11 @@ PLAN = [
         (None, ["slot=-1"], 0.8),
         (None, ["alarm=-1"], 0.6),
     ]},
+    # Round 3 (T10): the header's sensor shown failed - its dashes and "!" (RAM only).
+    {"page": 0, "card": None, "tree": "page", "steps": [
+        ("header_sensor_err", ["sensorerr=1"], 0.8),
+        (None, ["sensorerr=0"], 0.6),
+    ]},
     # Round 3 (D-22, D-25): UI Tweaks, and the deck risen under it with its second panel open.
     # A build before round 3 ignores tweaks= and deckN.
     {"page": 0, "card": None, "tree": "page", "steps": [

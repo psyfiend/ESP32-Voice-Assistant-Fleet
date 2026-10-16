@@ -125,6 +125,7 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int alarm = -2;   // 2.8 round 2: a pretend next alarm, HHMM (24 h); -1 clears (Alarms.h)
                 int alarmIn = -1; // 2.8 round 3: a pretend next alarm N minutes from now
                 int tweaks = -1;  // 2.8 round 3: UI Tweaks, 1 open (GUIManager's hook), 0 close
+                int sensorErr = -1; // 2.8 round 3 (T10): the header's sensor shown failed, 1; as it is, 0
                 bool close = false, power = false, more = false, hist = false, mem = false; };
 bool (*s_drawerHook)(bool open) = nullptr;
 const char *(*s_headerHook)(const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn) = nullptr;
@@ -192,6 +193,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "alarm", v, sizeof(v)) == ESP_OK) a.alarm = atoi(v);
         if (httpd_query_key_value(q, "alarmin", v, sizeof(v)) == ESP_OK) a.alarmIn = atoi(v);
         if (httpd_query_key_value(q, "tweaks", v, sizeof(v)) == ESP_OK) a.tweaks = atoi(v);
+        if (httpd_query_key_value(q, "sensorerr", v, sizeof(v)) == ESP_OK) a.sensorErr = atoi(v);
         // rows=N: test rows for SETTINGS, from the next window built (a byte
         // the LVGL thread reads; nothing else to hand over).
         if (httpd_query_key_value(q, "rows", v, sizeof(v)) == ESP_OK) {
@@ -262,10 +264,14 @@ void CardPopup::debugService(lv_timer_t *t) {
         s_dreq.store(DREQ_DONE);
         return;
     }
-    // 2.8 round 3: UI Tweaks, a Sheet client of GUIManager's (UI/TweaksSheet.h).
-    if (a.tweaks >= 0) {
+    // 2.8 round 3: UI Tweaks, a Sheet client of GUIManager's (UI/TweaksSheet.h);
+    // the header's sensor shown failed (T10). Both through the header hook.
+    if (a.tweaks >= 0 || a.sensorErr >= 0) {
         if (a.tweaks == 0) { TweaksSheet::close(); dbgOut("tweaks: closing\n"); }
-        else dbgOut("%s\n", s_headerHook ? s_headerHook("tweaks", -1, -1, -2, -1) : "no header hook (GUIManager gives it)");
+        else {
+            const char *what = a.tweaks > 0 ? "tweaks" : a.sensorErr ? "sensorerr" : "sensorok";
+            dbgOut("%s\n", s_headerHook ? s_headerHook(what, -1, -1, -2, -1) : "no header hook (GUIManager gives it)");
+        }
         s_dreq.store(DREQ_DONE);
         return;
     }

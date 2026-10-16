@@ -48,6 +48,9 @@ public:
     // A scheme change. The roles follow by themselves; the glyphs' state
     // colours (and a circle's bar-coloured strokes) are drawn again here.
     void restyle();
+    // A sensor slot shown as failed - its dashes and "!" - whatever its entity
+    // says (T10: from a PC, /popup?sensorerr=1; RAM only, until 0 or a reboot).
+    void pretendSensorError(bool on) { _sensorErr = on; restyle(); }
 
     // THE PAGE: its title, its index among `count` pages, and its own slots
     // (nullptr: HEADER_DEFAULT). The slots are rebuilt only when the list is a
@@ -142,6 +145,7 @@ private:
     const SlotSpec *_spec = nullptr;
     uint8_t         _specN = 0;
     GlyphStyle      _style = GLYPH_DEFAULT;
+    bool            _sensorErr = false;   // pretendSensorError()
     int             _open = -1;
     SlotTapFn       _onTap = nullptr;
     uint32_t        _lastTickMs = 0, _lastSensorMs = 0;

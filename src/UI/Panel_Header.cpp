@@ -413,6 +413,7 @@ void Panel_Header::updateSensor(Slot &s, bool force) {
     uint8_t state = 0;   // 0 live, 1 nothing yet, 2 an error
     if (!e || !e->everSet) state = 1;
     else if (!e->available || _reg->isStale(*e, millis())) state = 2;
+    if (_sensorErr) state = 2;   // a PC asked to see it (T10)
     const bool number = e && (e->value.type == ValueType::FLOAT || e->value.type == ValueType::INT);
     if (state) {
         snprintf(text, sizeof(text), "--%s", temp ? DEG : "");

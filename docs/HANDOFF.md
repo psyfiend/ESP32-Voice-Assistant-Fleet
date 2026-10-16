@@ -81,8 +81,8 @@ Each step committed and pushed on `feat/2.8-header-slots`; tick it here when it 
 - [x] 5. One shape in the accent: the open tab, coves, flares, panels aligned at a screen edge (D-23)
 - [x] 6. The system panel: CONNECTIVITY, SYSTEM - DIAGNOSTICS (Log / UI Tweaks / About, Scheme + Status bar, Col / Row) (D-22, D-25)
 - [x] 7. UI Tweaks (a Sheet): selector rows, saved, Reset all, Tokens; the deck rises under it; the left-half swipe; header panels follow the timeout
-- [ ] 8. Card UI: a SETTINGS row opening a view of selector rows (D-28); Entity / Card label leave SETTINGS
-- [ ] 9. The page panel's Shown / Hidden as a selector; a PC key to show the sensor's "!" (T10)
+- [x] 8. Card UI: a SETTINGS row opening a view of selector rows (D-28); Entity / Card label leave SETTINGS
+- [x] 9. The page panel's Shown / Hidden as a selector; a PC key to show the sensor's "!" (T10)
 - [ ] 10. Harness states, A/B against round 2, the gate, the structure check, `TEST_2.8.md` round 3, flash the P4_5 and the 4B (settings saved first)
 
 ## What is next with the owner

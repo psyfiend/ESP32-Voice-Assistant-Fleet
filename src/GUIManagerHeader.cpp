@@ -164,6 +164,10 @@ const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHd
     // Round 3: UI Tweaks (tweaks=1 comes here as "tweaks"), and a deck panel's
     // header tapped - deck0, deck1 - as /bench?what=anim does (the deck is up
     // under UI Tweaks, D-25).
+    if (!strcmp(slotName, "sensorerr") || !strcmp(slotName, "sensorok")) {
+        _header.pretendSensorError(slotName[6] == 'e');
+        return slotName[6] == 'e' ? "sensor: shown as failed (not saved)" : "sensor: as its entity says";
+    }
     if (!strcmp(slotName, "tweaks")) {
         openUiTweaks();
         return TweaksSheet::isOpen() ? "tweaks: open" : "tweaks: not opened (a sheet is showing)";
