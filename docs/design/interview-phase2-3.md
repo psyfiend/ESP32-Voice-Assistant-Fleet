@@ -153,20 +153,24 @@ The blueprint exists (draft 2). Open decisions D1-D7 are there; these are the re
 
 ## 3. Header bar v2 - the slot mechanism (2.8)  → `docs/design/header-slots.md`
 
-2.8 builds ONE slot mechanism used three times: the page header, a group card's header, a normal
-card's header (`cards.md` §8).
+**ANSWERED 2026-10-15** (the owner, from the mock
+[2.8 Header Slots](https://claude.ai/artifact/9dLvFUbWZePzgjLnnXZ5Sw)) -> **`header-slots.md`**,
+DECISIONS D-11 to D-15. The slot mechanism serves two places, not three: the page header and
+cluster headers; a solo card's header keeps its formula (Q6).
 
-1. **Page header content, per screen size.** Today: device name, page title + dots, status glyphs.
-   What should the left / centre / right hold on the 7" vs the 3.5"? **[BLOCKING 2.8]**
-2. **Slot types wanted**: clock, date, weather now, outdoor temp, WiFi, MQTT/HA link, a chosen
-   sensor, alarm state, "next calendar event", notifications count? Rank them.
-3. **Clock**: 12/24 h, seconds, date format. *Needs SNTP + time zone - see §8 G6.*
-4. **Tapping a slot**: does nothing, opens that entity's popup, or goes to a page?
-   **Rec:** opens the popup, same as a card's long press - one rule.
-5. **Header hidden / peek** (exists): keep as a per-page setting?
-6. **Card header slots** (area left, STALE right today): should a card's header also be able to show
-   a promoted value (e.g. battery %)?
-7. **When a slot's entity is stale/unavailable**: hide the slot, grey it, or show a dash?
+- [x] 1. **Page header content, per screen size** - the header is optional, so nothing critical
+  lives only there; the clock is a card first -> §1. Narrow boards: OPEN -> §2.
+- [x] 2. **Slot types** - four evenly spaced slots: clock | the page | status | climate / secondary
+  -> §2. The glyph style (none, rounded square, circle): OPEN, the owner wants to see all three ->
+  §2.
+- [ ] 3. **Clock**: 12/24 h, seconds, date format - not answered; the owner's example writes
+  "1:55am" -> §7.
+- [x] 4. **Tapping a slot** - each slot slides down its own panel from its place, which can
+  deep-link to settings -> §3.
+- [x] 5. **Header hidden / peek** - a page setting; full-screen pages hidden by default -> §4. How it
+  comes back (a drag down on a card?): OPEN -> §4.
+- [x] 6. **Card header slots** - none on a solo card; slots for clusters -> §5.
+- [x] 7. **A stale slot** - dashes until live data, and a way to show an error -> §6.
 
 ## 4. Group and area cards (2.11)  → `docs/design/group-cards.md`
 
@@ -353,3 +357,6 @@ proposes the running order for the rest of Phase 2 and Phase 3 in one table for 
 | §1, 2026-10-01 | **A changed build sheet over a board with user edits**: keep, replace, or ask on the glass? | §9 item 4 (asked early, batch 3) |
 | 2.10d, 2026-10-10 | **The card window's panels, reorganised** (owner, for 2.11): Details view gets a **VISUAL** panel left of SETTINGS. SETTINGS: Paused, Active state, Tap action (Toggle / Nothing / Details view / Members view / History view / Scene...), **Popup timeout** (60 s / 10 s / never). VISUAL: Entity label, Card label, Visibility - for the card's own entity. SCENES gains **Default scene** (the visible scenes); its Tap scene (Load default / Cycle scenes) works when Tap action is Scene... | §4; `card-sheet.md` |
 | 2.10d, 2026-10-10 | **A group's own window or page** (owner): a group card's Tap action opens a large bordered window - in effect a cluster card - holding the group's members, over the page or as a page of its own with the same border, centred. Its **GROUP** panel edits members, the cluster's size on the grid, the members' arrangement and their visibility; VISUAL reused there, applying to every member. Claude's view, for the owner to weigh: what is changed standing at the wall (pause, tap, scene, labels) belongs on the glass; membership, size and arrangement may belong to the web app (#87) | §4 items 6-8, §9 |
+| §3, 2026-10-15 | **A notification queue** (owner): notices from HA (automations, templates) shown in order, opened at any time, some interactive, some kept until dismissed or never dismissable (an alarm coming up, a door open too long); NINA's toast buffer as the reference | #76; `header-slots.md` §7 |
+| §3, 2026-10-15 | **An active card's border** (owner): a thicker border in a contrasting, complementary colour glowing inward toward the icon, in place of the card filling with its state colour | #106 |
+| §3, 2026-10-15 | **How a hidden header comes back**: the top edge as today, or a drag down on a card? | `header-slots.md` §4 |

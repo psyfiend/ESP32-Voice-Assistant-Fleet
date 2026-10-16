@@ -6,6 +6,25 @@ signed-off merges to `main` in the order they happen - it does not follow milest
 began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
+## v0.2.17 - 2026-10-15
+
+A17 - a failed mount never costs the settings (DECISIONS A17).
+
+- **The settings partition is formatted only when it is blank** - every byte 0xFF, the whole
+  partition checked (~390 ms, and only after a failed mount). One that will not mount but holds
+  anything is left untouched; that boot runs read-only from RAM and says why (the boot note,
+  `/settings?stats=1`, a new "Boot:" line in the System Doctor's [SETTINGS]).
+- **`POST /settings` restores a saved file** - checked on the HTTP task, written by the settings
+  task, answered once written; `?reboot=1` restarts after. A read-only boot refuses, with its reason.
+- **Copies on the PC**: `scripts/release/save_settings.ps1` keeps a board's file in
+  `bench/settings/<board>/` (never overwriting one), `restore_settings.ps1` puts it back, and
+  `flash_release.ps1` saves each board before writing it - and writes the 1060 app-only at 460800
+  with a watchdog reset.
+- `Settings.cpp`'s HTTP addresses moved to `SettingsHttp.cpp` (the structure check's 1,000 lines).
+- Proved on WS_P4_5 and WS_P4_4B: a forced mount failure left the file untouched; restore round
+  trips came back byte-identical; a 4B with its partition erased formatted it and took its file back.
+  Signed off by the owner (`docs/archive/TEST_A17.md`); all nine environments build.
+
 ## v0.2.16 - 2026-10-15
 
 #99 - satin and glass: what a surface says about a thing you can tap (DECISIONS K77, K85-K87).

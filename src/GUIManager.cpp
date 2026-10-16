@@ -74,6 +74,9 @@ static void reportSettingsSection() {
                        Settings::persistent() ? "/cfg/settings.json" : "NOT SAVING (RAM only or read-only)",
                        (unsigned long)st.bytes, (unsigned long)st.saves, (unsigned long)st.failures,
                        st.pending ? ", a change pending" : "");
+    char boot[160];
+    Settings::bootNote(boot, sizeof(boot));
+    SystemReport::line("  Boot: %s", boot);
     uint8_t n = 0;
     Settings::forEachUnclaimed([](const char *sec, const char *id, void *c) {
         (*(uint8_t *)c)++;

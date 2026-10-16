@@ -52,11 +52,24 @@ class HttpServer;
 
 namespace Settings {
 
-// Mount, read, start the save task, register GET /settings. Before anything
-// reads a setting - SystemCore::begin(). Without a usable partition the store
-// still works, in RAM only, and says so.
+// Mount, read, start the save task, register GET and POST /settings. Before
+// anything reads a setting - SystemCore::begin(). Without a usable partition
+// the store still works, in RAM only, and says so.
+//
+// A FAILED MOUNT NEVER COSTS THE SETTINGS (A17): the partition is formatted
+// only when every byte of it is 0xFF (a first boot). One that will not mount
+// but holds anything is left untouched, and that boot is read-only, in RAM -
+// said in the boot note, /settings?stats=1 and the System Doctor's [SETTINGS].
+// To start such a board afresh, erase the partition with esptool.
+//
+// RESTORE: POST /settings with a settings file as the body (?reboot=1 to
+// restart after) - checked on the HTTP task, written by the settings task.
+// scripts/release/save_settings.ps1 and restore_settings.ps1 use it; the
+// flash script keeps a copy of each board's file before it writes.
 bool begin(HttpServer &http);
-bool persistent();   // false: no partition, or it would not mount
+bool persistent();   // false: no partition, it would not mount, or read-only this boot
+// Why the store is as it is this boot: the mount and the file, one line.
+void bootNote(char *out, size_t cap);
 
 // Reading. True and the value copied into `out` when the file sets it; false
 // (out = "") when it does not - inherit.

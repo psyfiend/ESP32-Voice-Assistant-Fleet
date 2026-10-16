@@ -1,5 +1,6 @@
-// Settings - see Settings.h.
+// Settings - see Settings.h. The PC's addresses are SettingsHttp.cpp.
 #include "Settings.h"
+#include "SettingsInternal.h"
 
 #include <Arduino.h>   // Serial, millis()
 #include <ctype.h>
@@ -15,11 +16,11 @@
 #include <ArduinoJson.h>   // header-only, plain C++ - nothing Arduino-specific is used
 #include "esp_heap_caps.h"
 #include "esp_littlefs.h"
+#include "esp_partition.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-#include "HttpServer.h"
 
 namespace {
 
@@ -29,8 +30,7 @@ constexpr const char *PARTITION     = "spiffs";   // the 16 MB layout's data par
 constexpr const char *PATH          = "/cfg/settings.json";
 constexpr const char *TMP_PATH      = "/cfg/settings.tmp";
 constexpr const char *BAD_PATH      = "/cfg/settings.bad";
-constexpr size_t      FILE_MAX      = 64 * 1024;  // refuse anything larger at read
-constexpr size_t      CARD_ID_ARG   = 48;         // CARD_ID_MAX (PageSpec.h) + 1
+constexpr size_t      FILE_MAX      = Settings::detail::FILE_MAX;   // refuse anything larger at read
 
 // The document lives in PSRAM: it is small, but internal RAM is the scarce
 // thing on this fleet (LESSONS) and nothing here is on a hot path.
@@ -48,12 +48,17 @@ SemaphoreHandle_t s_mutex   = nullptr;
 TaskHandle_t      s_task    = nullptr;
 volatile uint32_t s_delayMs = 0;
 
-char     s_bootNote[96] = "not started";   // what readFile() found, for ?stats=1
+char     s_bootNote[160] = "not started";  // what the mount and readFile() found, for ?stats=1
 char     s_listing[256] = "";              // the files in BASE, as of boot or the last save
 bool     s_mounted  = false;
-bool     s_readOnly = false;   // a newer schema, or a file that would not read: never overwritten
+// A newer schema, a file that would not read, or a partition that would not
+// mount but holds data (A17): never overwritten.
+bool     s_readOnly = false;
 bool     s_dirty    = false;
 uint32_t s_saves = 0, s_failures = 0, s_lastMs = 0, s_lastUs = 0, s_bytes = 0;
+// Which version of the document the last good write held, so a restore can wait
+// for ITS write rather than one that was already under way (A17).
+uint32_t s_docGen = 0, s_savedGen = 0;
 
 struct Lock {
     Lock()  { xSemaphoreTake(s_mutex, portMAX_DELAY); }
@@ -81,7 +86,8 @@ constexpr uint8_t CHANGES_KEPT = 10;
 char    s_changes[CHANGES_KEPT][112];
 uint8_t s_changeHead = 0, s_changeN = 0;
 
-void noteChange(const char *section, const char *id, const char *key, const char *value, bool remove) {
+// Caller holds the lock.
+void noteLine(const char *what) {
     char when[24] = "";
     time_t now = time(nullptr);
     struct tm tmv;
@@ -89,11 +95,17 @@ void noteChange(const char *section, const char *id, const char *key, const char
     else snprintf(when, sizeof(when), "%lus", (unsigned long)(millis() / 1000));
     const char *task = pcTaskGetName(nullptr);
     char *line = s_changes[s_changeHead];
-    snprintf(line, sizeof(s_changes[0]), "%s %s: %s.%s.%s %s%s", when, task ? task : "?", section, id, key,
-             remove ? "removed" : "= ", remove ? "" : (value ? value : "?"));
+    snprintf(line, sizeof(s_changes[0]), "%s %s: %s", when, task ? task : "?", what);
     s_changeHead = (uint8_t)((s_changeHead + 1) % CHANGES_KEPT);
     if (s_changeN < CHANGES_KEPT) s_changeN++;
     Serial.printf("[Settings] %s\n", line);
+}
+
+void noteChange(const char *section, const char *id, const char *key, const char *value, bool remove) {
+    char what[112];
+    snprintf(what, sizeof(what), "%s.%s.%s %s%s", section, id, key, remove ? "removed" : "= ",
+             remove ? "" : (value ? value : "?"));
+    noteLine(what);
 }
 
 // Set or remove doc[section][id][key]; drops [id], then [section], once empty.
@@ -161,12 +173,14 @@ void listFiles() {
 void writeIfDirty() {
     size_t len = 0;
     char *buf = nullptr;
+    uint32_t gen = 0;
     {
         Lock l;
         if (!s_dirty || s_readOnly || !s_mounted) return;
         buf = serialise(len);
         if (!buf) { s_failures++; return; }
         s_dirty = false;   // a change made while writing marks it again
+        gen = s_docGen;
     }
     const int64_t t0 = esp_timer_get_time();
     bool ok = false;
@@ -184,7 +198,7 @@ void writeIfDirty() {
     heap_caps_free(buf);
     {
         Lock l;
-        if (ok) { s_saves++; s_lastMs = millis(); s_lastUs = us; s_bytes = (uint32_t)len; }
+        if (ok) { s_saves++; s_lastMs = millis(); s_lastUs = us; s_bytes = (uint32_t)len; s_savedGen = gen; }
         else    { s_failures++; s_dirty = true; }
     }
     listFiles();
@@ -268,216 +282,87 @@ void readFile() {
          (unsigned)cards, (unsigned)schemes, (unsigned)ents, ents == 1 ? "y" : "ies");
 }
 
-// %XX and '+' in a query value, in place. No escapes are written anywhere.
-void urlDecode(char *s) {
-    char *o = s;
-    for (const char *p = s; *p; p++) {
-        if (*p == '+') { *o++ = ' '; continue; }
-        if (*p == '%' && isxdigit((unsigned char)p[1]) && isxdigit((unsigned char)p[2])) {
-            const char hex[3] = { p[1], p[2], 0 };
-            *o++ = (char)strtol(hex, nullptr, 16);
-            p += 2;
-            continue;
-        }
-        *o++ = *p;
+// A FAILED MOUNT NEVER COSTS THE SETTINGS (A17). Until 2026-10-15 the mount
+// formatted the partition whenever LittleFS would not mount it, and the P4_5
+// lost its file on 2026-10-14, most likely that way. Now the partition is
+// formatted only when it is blank - every byte 0xFF, a first boot - and
+// anything else is left exactly as it is: the boot runs read-only from RAM
+// and says so. The WHOLE partition is checked, not only its start: an erased
+// start with the file's blocks still behind it is what A16's erase mode left.
+// Reads the flash, so begin()'s caller only (a task whose stack is internal).
+//   0: blank; 1: holds data, `at` is the first byte that is not 0xFF;
+//   -1: could not be read.
+int partitionState(const esp_partition_t *p, uint32_t &at) {
+    constexpr size_t CHUNK = 4096;
+    uint32_t *buf = (uint32_t *)heap_caps_malloc(CHUNK, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!buf) return -1;
+    int state = 0;
+    at = 0;
+    while (state == 0 && at < p->size) {
+        const size_t n = (p->size - at) < CHUNK ? (size_t)(p->size - at) : CHUNK;
+        if (esp_partition_read(p, at, buf, n) != ESP_OK) { state = -1; break; }
+        size_t i = 0;
+        while (i < n / 4 && buf[i] == 0xFFFFFFFFu) i++;
+        if (i < n / 4) { state = 1; at += (uint32_t)(i * 4); }
+        else at += (uint32_t)n;
     }
-    *o = '\0';
-}
-
-// The panels draw ASCII and the degree sign only (CLAUDE.md): anything else
-// would show as boxes, so a name is refused rather than stored broken.
-bool printableAscii(const char *s) {
-    for (; *s; s++) if ((unsigned char)*s < 0x20 || (unsigned char)*s > 0x7E) return false;
-    return true;
-}
-
-esp_err_t handleSettings(httpd_req_t *req) {
-    char q[160], v[4];
-    bool stats = false;
-    const bool haveQ = httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK;
-    if (haveQ && httpd_query_key_value(q, "stats", v, sizeof(v)) == ESP_OK)
-        stats = atoi(v) != 0;
-
-    // A card's custom name, from a PC (K37, until the web UI): name= sets it,
-    // an empty name= removes it (the Reset). Kept and written like any other
-    // change; the card shows it the next time its page is built.
-    // Groups (K44), from a PC until the web UI: group=new&name=Temperature
-    // makes a custom group and answers its id; group=<id>&color=RRGGBB sets a
-    // group's colour (empty: back to its colour-by-name). Cards already built
-    // show it when their page is next built.
-    {
-        char gid[48], val[48];
-        if (haveQ && httpd_query_key_value(q, "card", gid, sizeof(gid)) != ESP_OK &&
-            httpd_query_key_value(q, "group", gid, sizeof(gid)) == ESP_OK) {
-            char out[160];
-            int len;
-            if (!strcmp(gid, "new") && httpd_query_key_value(q, "name", val, sizeof(val)) == ESP_OK) {
-                urlDecode(val);
-                char id[48];
-                if (strlen(val) >= 40 || !printableAscii(val) || !Settings::newGroup(val, id, sizeof(id)))
-                    len = snprintf(out, sizeof(out), "refused: a group name is 1-39 characters of plain ASCII\n");
-                else {
-                    Settings::save();
-                    len = snprintf(out, sizeof(out), "new group \"%s\": %s\n", val, id);
-                }
-            } else if (httpd_query_key_value(q, "color", val, sizeof(val)) == ESP_OK) {
-                bool hex = strlen(val) == 6;
-                for (const char *p = val; *p && hex; p++) hex = isxdigit((unsigned char)*p);
-                if (val[0] && !hex) len = snprintf(out, sizeof(out), "refused: color is RRGGBB, or empty\n");
-                else {
-                    Settings::setGroup(gid, "color", val[0] ? val : nullptr);
-                    Settings::save();
-                    len = snprintf(out, sizeof(out), "group %s: color %s\n", gid, val[0] ? val : "by name");
-                }
-            } else if (httpd_query_key_value(q, "name", val, sizeof(val)) == ESP_OK) {
-                // Rename a group - every card in it (K46, rename c); for an HA
-                // area, a local rename that keeps the link. Empty: its own name.
-                urlDecode(val);
-                if (strlen(val) >= 40 || !printableAscii(val))
-                    len = snprintf(out, sizeof(out), "refused: a group name is up to 39 characters of plain ASCII\n");
-                else {
-                    Settings::setGroup(gid, "name", val[0] ? val : nullptr);
-                    Settings::save();
-                    len = snprintf(out, sizeof(out), "group %s: name %s\n", gid, val[0] ? val : "its own again");
-                }
-            } else if (httpd_query_key_value(q, "delete", val, sizeof(val)) == ESP_OK && atoi(val)) {
-                // A card still pointing at it shows its dashboard area again
-                // (CardGroups::apply()) until the owner chooses.
-                const bool gone = Settings::setGroup(gid, "name", nullptr) | Settings::setGroup(gid, "color", nullptr) |
-                                  Settings::setGroup(gid, "kind", nullptr);
-                Settings::save();
-                len = snprintf(out, sizeof(out), "group %s: %s\n", gid, gone ? "deleted" : "not found");
-            } else {
-                len = snprintf(out, sizeof(out), "group=new&name=..., group=<id>&color=RRGGBB, group=<id>&delete=1\n");
-            }
-            httpd_resp_set_type(req, "text/plain");
-            return httpd_resp_send(req, out, len);
-        }
-    }
-
-    // Clear what nobody claims (K35): prune=cards or prune=entities.
-    char what[12];
-    if (haveQ && httpd_query_key_value(q, "prune", what, sizeof(what)) == ESP_OK) {
-        const uint8_t n = Settings::prune(what);
-        char out[96];
-        const int len = snprintf(out, sizeof(out), "pruned %u unclaimed %s\n", (unsigned)n,
-                                 strcmp(what, "entities") ? "card(s)" : "entit(ies)");
-        httpd_resp_set_type(req, "text/plain");
-        return httpd_resp_send(req, out, len);
-    }
-
-    // THE WINDOWS' COUNTDOWN (owner, T6, 2026-10-14), from a PC until the system
-    // settings page: window_close=60|30|10|off (60, D6's, is the default and
-    // is stored as nothing) and window_bar=on|off, alone or together. In
-    // effect from the next window.
-    {
-        static const char *const CLOSE[] = { "60", "30", "10", "off" };
-        char cl[8] = "", bar[8] = "";
-        const bool hasClose = haveQ && httpd_query_key_value(q, "window_close", cl, sizeof(cl)) == ESP_OK;
-        const bool hasBar   = haveQ && httpd_query_key_value(q, "window_bar", bar, sizeof(bar)) == ESP_OK;
-        if (hasClose || hasBar) {
-            bool okClose = !hasClose;
-            for (const char *c : CLOSE) okClose = okClose || !strcmp(cl, c);
-            const bool okBar = !hasBar || !strcmp(bar, "on") || !strcmp(bar, "off");
-            char out[160];
-            int len;
-            if (!okClose || !okBar) {
-                len = snprintf(out, sizeof(out), "refused: window_close=60|30|10|off, window_bar=on|off\n");
-            } else {
-                if (hasClose) Settings::setSystem("window", "close", strcmp(cl, "60") ? cl : nullptr);
-                if (hasBar)   Settings::setSystem("window", "bar", strcmp(bar, "on") ? bar : nullptr);
-                Settings::save();
-                char c[8], b[8];
-                if (!Settings::system("window", "close", c, sizeof(c))) snprintf(c, sizeof(c), "60");
-                const bool barOff = Settings::system("window", "bar", b, sizeof(b)) && !strcmp(b, "off");
-                if (!strcmp(c, "off"))
-                    len = snprintf(out, sizeof(out), "windows: never close by themselves (no countdown bar) - from the next window\n");
-                else
-                    len = snprintf(out, sizeof(out), "windows: close after %s s untouched, countdown bar %s - from the next window\n",
-                                   c, barOff ? "off" : "on");
-            }
-            httpd_resp_set_type(req, "text/plain");
-            return httpd_resp_send(req, out, len);
-        }
-    }
-
-    char id[CARD_ID_ARG], name[64];
-    // The other card settings too, as SETTINGS' rows would set them - for
-    // tests from a PC: label=, tap=, tap_scene= (the scene's HA id). The
-    // value is not checked against the choices here; a name the firmware
-    // does not know reads as "not set". An empty value removes the key.
-    // group= (ha_area / own / none / a group id) and label_text= (the card
-    // label's own text, with group=own) are the card label's (K44).
-    static const char *const KEYS[] = { "label", "tap", "tap_scene", "group", "label_text" };
-    for (const char *key : KEYS) {
-        if (!haveQ || httpd_query_key_value(q, "card", id, sizeof(id)) != ESP_OK ||
-            httpd_query_key_value(q, key, name, sizeof(name)) != ESP_OK) continue;
-        urlDecode(name);
-        // label=inherit is kept since K49 (a named card's default is Custom).
-        const bool reset = !name[0] || !strcmp(name, "default") ||
-                           (strcmp(key, "label") && !strcmp(name, "inherit"));
-        Settings::setCard(id, key, reset ? nullptr : name);
-        Settings::save();
-        char out[160];
-        const int n = snprintf(out, sizeof(out), "%s: %s %s - in effect when its page is next built\n",
-                               id, key, reset ? "removed" : name);
-        httpd_resp_set_type(req, "text/plain");
-        return httpd_resp_send(req, out, n);
-    }
-    if (haveQ && httpd_query_key_value(q, "card", id, sizeof(id)) == ESP_OK &&
-        httpd_query_key_value(q, "name", name, sizeof(name)) == ESP_OK) {
-        urlDecode(name);
-        char out[200];
-        int n;
-        if (strlen(name) >= 40 || !printableAscii(name)) {
-            n = snprintf(out, sizeof(out), "refused: a name is at most 39 characters of plain ASCII\n");
-        } else {
-            const bool changed = Settings::setCard(id, "name", name[0] ? name : nullptr);
-            Settings::save();
-            n = snprintf(out, sizeof(out), "%s: name %s%s%s%s - shown when its page is next built\n", id,
-                         name[0] ? "\"" : "removed", name, name[0] ? "\"" : "", changed ? "" : " (no change)");
-        }
-        httpd_resp_set_type(req, "text/plain");
-        return httpd_resp_send(req, out, n);
-    }
-    if (stats) {
-        const Settings::Stats s = Settings::stats();
-        static char out[2048];   // the server has one task: one request at a time
-        int n = snprintf(out, sizeof(out),
-                               "file %s (%s)%s\nsaves %lu, failures %lu, pending %s\nlast save at %lu ms, "
-                               "took %.1f ms, %lu bytes\n",
-                               PATH, s_mounted ? "mounted" : "NOT MOUNTED - RAM only",
-                               s_readOnly ? ", READ-ONLY this boot (see boot:)" : "",
-                               (unsigned long)s.saves, (unsigned long)s.failures, s.pending ? "yes" : "no",
-                               (unsigned long)s.lastMs, s.lastUs / 1000.0, (unsigned long)s.bytes);
-        // The listing was taken by the settings task (listFiles()): reading the
-        // flash from this task, whose stack is in PSRAM, reboots the board.
-        { Lock l; n += snprintf(out + n, sizeof(out) - n, "boot: %s\nfiles in %s:\n%s", s_bootNote, BASE, s_listing); }
-        {
-            Lock l;
-            if (s_changeN) n += snprintf(out + n, sizeof(out) - n, "last changes (newest last):\n");
-            for (uint8_t i = 0; i < s_changeN && n < (int)sizeof(out) - 120; i++) {
-                const uint8_t k = (uint8_t)((s_changeHead + CHANGES_KEPT - s_changeN + i) % CHANGES_KEPT);
-                n += snprintf(out + n, sizeof(out) - n, "  %s\n", s_changes[k]);
-            }
-        }
-        struct Acc { char *out; int n; int cap; } acc{ out, n, (int)sizeof(out) };
-        Settings::forEachUnclaimed([](const char *sec, const char *id, void *c) {
-            Acc &a = *(Acc *)c;
-            if (a.n < a.cap - 64) a.n += snprintf(a.out + a.n, a.cap - a.n, "unclaimed %s: %s\n", sec, id);
-        }, &acc);
-        n = acc.n;
-        httpd_resp_set_type(req, "text/plain");
-        return httpd_resp_send(req, out, n);
-    }
-    size_t len = 0;
-    char *buf = nullptr;
-    { Lock l; buf = serialise(len); }
-    if (!buf) return httpd_resp_send_500(req);
-    httpd_resp_set_type(req, "application/json");
-    const esp_err_t r = httpd_resp_send(req, buf, len);
     heap_caps_free(buf);
-    return r;
+    return state;
+}
+
+esp_err_t mountFs() {
+#ifdef DEBUG_SETTINGS_NOMOUNT
+    // A17's test, a local line only (never committed): the mount reports a
+    // failure, so the failed-mount path runs against a partition that holds a
+    // real file - which must come through the next normal boot untouched.
+    Serial.println("[Settings] DEBUG_SETTINGS_NOMOUNT: the mount reports a failure");
+    return ESP_FAIL;
+#else
+    esp_vfs_littlefs_conf_t conf = {};
+    conf.base_path = BASE;
+    conf.partition_label = PARTITION;
+    conf.format_if_mount_failed = 0;   // never: see partitionState()
+    return esp_vfs_littlefs_register(&conf);
+#endif
+}
+
+// Mount, or format a blank partition and mount it, or leave it alone and run
+// read-only. Sets s_mounted / s_readOnly and the boot note.
+void mountOrKeep() {
+    const int64_t t0 = esp_timer_get_time();
+    esp_err_t err = mountFs();
+    if (err != ESP_OK) {
+        const esp_partition_t *part =
+            esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, PARTITION);
+        uint32_t at = 0;
+        const int state = part ? partitionState(part, at) : -2;
+        const double ms = (esp_timer_get_time() - t0) / 1000.0;
+        if (state == 0) {
+            Serial.printf("[Settings] the \"%s\" partition is blank (%u KB, checked in %.1f ms) - a first boot: "
+                          "formatting it\n", PARTITION, (unsigned)(part->size / 1024), ms);
+            err = esp_littlefs_format(PARTITION);
+            if (err == ESP_OK) err = mountFs();
+            if (err != ESP_OK) note("formatted a blank partition, but it did not mount (%s) - settings in RAM this "
+                                    "boot", esp_err_to_name(err));
+        } else if (state == 1) {
+            s_readOnly = true;
+            note("LittleFS did not mount (%s); the partition holds data (from 0x%lx) - left untouched, read-only "
+                 "this boot, settings in RAM", esp_err_to_name(err), (unsigned long)at);
+        } else if (state == -1) {
+            s_readOnly = true;
+            note("LittleFS did not mount (%s) and the partition would not read - left untouched, read-only this "
+                 "boot", esp_err_to_name(err));
+        } else {
+            note("no \"%s\" partition - settings live in RAM this boot and are lost at a reset", PARTITION);
+        }
+    }
+    s_mounted = err == ESP_OK;
+    if (s_mounted) {
+        size_t total = 0, used = 0;
+        esp_littlefs_info(PARTITION, &total, &used);
+        Serial.printf("[Settings] LittleFS on \"%s\" mounted at %s in %.1f ms: %u KB, %u KB used\n", PARTITION,
+                      BASE, (esp_timer_get_time() - t0) / 1000.0, (unsigned)(total / 1024), (unsigned)(used / 1024));
+    }
 }
 
 }  // namespace
@@ -491,33 +376,113 @@ bool begin(HttpServer &http) {
     if (!s_mutex || !s_doc) { Serial.println("[Settings] out of memory - no settings this boot"); return false; }
     s_doc->to<JsonObject>();
 
-    esp_vfs_littlefs_conf_t conf = {};
-    conf.base_path = BASE;
-    conf.partition_label = PARTITION;
-    conf.format_if_mount_failed = 1;
-    const int64_t t0 = esp_timer_get_time();
-    const esp_err_t err = esp_vfs_littlefs_register(&conf);
-    s_mounted = err == ESP_OK;
+    mountOrKeep();   // A17: formats only a blank partition
     if (s_mounted) {
-        size_t total = 0, used = 0;
-        esp_littlefs_info(PARTITION, &total, &used);
-        Serial.printf("[Settings] LittleFS on \"%s\" mounted at %s in %.1f ms: %u KB, %u KB used\n", PARTITION,
-                      BASE, (esp_timer_get_time() - t0) / 1000.0, (unsigned)(total / 1024), (unsigned)(used / 1024));
         readFile();
         listFiles();
-    } else {
-        note("no LittleFS (%s) - settings live in RAM this boot and are lost at a reset", esp_err_to_name(err));
     }
     if (!s_readOnly) (*s_doc)["schema"] = SCHEMA;
 
     // The save task: its stack in internal RAM (xTaskCreate), which a flash
     // write requires - see Settings.h.
     xTaskCreate(saveTask, "settings", 4096, nullptr, 2, &s_task);
-    http.addRoute("/settings", HTTP_GET, handleSettings);
+    detail::registerRoutes(http);   // SettingsHttp.cpp
     return s_mounted;
 }
 
 bool persistent() { return s_mounted && !s_readOnly; }
+
+void bootNote(char *out, size_t cap) {
+    if (!cap) return;
+    if (!s_mutex) { snprintf(out, cap, "%s", s_bootNote); return; }
+    Lock l;
+    snprintf(out, cap, "%s", s_bootNote);
+}
+
+// --- For SettingsHttp.cpp (SettingsInternal.h) --------------------------------
+
+int detail::statusText(char *out, size_t cap) {
+    const Stats s = stats();
+    int n = snprintf(out, cap,
+                     "file %s (%s)%s\nsaves %lu, failures %lu, pending %s\nlast save at %lu ms, "
+                     "took %.1f ms, %lu bytes\n",
+                     PATH, s_mounted ? "mounted" : "NOT MOUNTED - RAM only",
+                     s_readOnly ? ", READ-ONLY this boot (see boot:)" : "",
+                     (unsigned long)s.saves, (unsigned long)s.failures, s.pending ? "yes" : "no",
+                     (unsigned long)s.lastMs, s.lastUs / 1000.0, (unsigned long)s.bytes);
+    // The listing was taken by the settings task (listFiles()): reading the
+    // flash from the HTTP task, whose stack is in PSRAM, reboots the board.
+    Lock l;
+    n += snprintf(out + n, cap - n, "boot: %s\nfiles in %s:\n%s", s_bootNote, BASE, s_listing);
+    if (s_changeN) n += snprintf(out + n, cap - n, "last changes (newest last):\n");
+    for (uint8_t i = 0; i < s_changeN && n < (int)cap - 120; i++) {
+        const uint8_t k = (uint8_t)((s_changeHead + CHANGES_KEPT - s_changeN + i) % CHANGES_KEPT);
+        n += snprintf(out + n, cap - n, "  %s\n", s_changes[k]);
+    }
+    return n;
+}
+
+char *detail::serialiseCopy(size_t &len) {
+    len = 0;
+    if (!s_doc) return nullptr;
+    Lock l;
+    return serialise(len);
+}
+
+bool detail::writable(char *why, size_t cap) {
+    Lock l;
+    if (s_mounted && !s_readOnly) return true;
+    if (cap) snprintf(why, cap, "%s", s_bootNote);
+    return false;
+}
+
+int detail::restore(const char *json, size_t len, char *msg, size_t cap) {
+    char why[160];
+    if (!writable(why, sizeof(why))) {
+        snprintf(msg, cap, "refused: this boot does not write the settings file (%s) - nothing changed", why);
+        return 409;
+    }
+    JsonDocument incoming(&s_alloc);
+    const DeserializationError err = deserializeJson(incoming, json, len);
+    if (err || !incoming.is<JsonObject>()) {
+        snprintf(msg, cap, "refused: not a settings file (%s) - nothing changed",
+                 err ? err.c_str() : "not a JSON object");
+        return 400;
+    }
+    const int schema = incoming["schema"] | 0;
+    if (schema < 1 || schema > SCHEMA) {
+        snprintf(msg, cap, "refused: the file is schema %d, this firmware knows 1 to %d - nothing changed",
+                 schema, SCHEMA);
+        return 400;
+    }
+    const unsigned cards = (unsigned)incoming["cards"].size();
+    uint32_t gen = 0;
+    {
+        Lock l;
+        s_doc->set(incoming);
+        s_dirty = true;
+        gen = ++s_docGen;
+        char what[80];
+        snprintf(what, sizeof(what), "the whole file restored (%u bytes, %u card(s))", (unsigned)len, cards);
+        noteLine(what);
+    }
+    const int64_t t0 = esp_timer_get_time();
+    save();
+    bool written = false;
+    for (int i = 0; i < 250 && !written; i++) {   // 5 s; a write takes ~10-100 ms
+        vTaskDelay(pdMS_TO_TICKS(20));
+        Lock l;
+        written = s_savedGen >= gen;
+    }
+    if (!written) {
+        snprintf(msg, cap, "the file is in RAM but was not written (failures %lu) - it is written with the "
+                 "next change", (unsigned long)stats().failures);
+        return 500;
+    }
+    snprintf(msg, cap, "restored: %u bytes, %u card(s), written in %.0f ms", (unsigned)len, cards,
+             (esp_timer_get_time() - t0) / 1000.0);
+    return 200;
+}
 
 bool card(const char *cardId, const char *key, char *out, size_t cap) {
     bool found = false;
