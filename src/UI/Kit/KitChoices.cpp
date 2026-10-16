@@ -101,7 +101,10 @@ void choiceSelector(Selector &S, lv_obj_t *line, const char *const *words, uint8
     sp.n        = n;
     sp.chosen   = chosen;
     sp.compact  = true;
-    sp.slotW    = selectorSlotW(words, n);   // this choice's own longest word
+    // This choice's own longest word - narrowed to fit `room` (the 4B's window).
+    const int32_t g = UI::mm(UI::shape().S1);
+    sp.slotW    = selectorSlotW(words, n);
+    if (room > 0 && n && n * sp.slotW + (n + 1) * g > room) sp.slotW = (room - (n + 1) * g) / n;
     sp.room     = room;
     sp.onChosen = onChosen;
     selector(S, line, sp);

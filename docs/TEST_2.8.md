@@ -569,3 +569,93 @@ clean separation of duties feels much more correct".
   glass Power button (not the corner tabs): (1) a dual-border "glow" frame - an outer 1 px dark
   line, an inner 3 px bright ring; (2) an asymmetric "bracket" - top and bottom 4 px, sides 1 px;
   (3) a corner cut - 3 px border, the top-left and bottom-right corners' radius doubled.
+- **Settled with the owner the same afternoon**: a toggle that is not a card (Power, any on / off
+  button) is **glass when off and wears the glow frame when on**; the other two are cards only;
+  **all three are built, the corner cut not on Linen** (its shadow); the P4_5's header words
+  **26**. The active state is UI Tweaks' "Card state", device-wide (not in Card UI).
+
+# Round 4 - your round-3 list, and the active states (2026-10-16, afternoon)
+
+Branch `feat/2.8-header-slots`, built with you at the desk from the list above. **No pull
+request** - for your test first. **On the desk now**: the P4_5 and the 4B run round 4 (with your
+local lines), their settings files as found (saved before every flash).
+
+## What changed since round 3
+
+| Where | Round 3 | Round 4 |
+|---|---|---|
+| **The system panel's buttons** | corrupted after choosing a selector look | built again whenever the panel opens (and on a scheme change), so their faces are always their own |
+| **The system panel's scheme row** | the selector beside a Status bar toggle | **"Scheme:"** and the selector; **no Status bar** - the page panel's Show / Hide is the one way |
+| **A panel's corners** | flares curving the line into its walls | **the walls rise straight to the blue line**; the coves beside the slot stay |
+| **Closing a panel** | the slot closed at once | **the slot stays open until the panel has gone** |
+| **The header while a panel is open** | Hide hid it at once, the panel left open | **always visible while a header panel is open**: Show / Hide (the page panel's words now) leaves the panel open and shows once it closes |
+| **The P4_5's header words** | 24 | **26** (a HEADER role in the type scale; every other board unchanged) |
+| **Window timeout, Timer bar** | from the next window (Timer bar in Card UI too) | **at once**, in UI Tweaks and Card UI |
+| **Card UI** | long selectors with "Inherit" as a choice | **an Inherit toggle per row**; off, the row's own selector under it, as wide as its own longest choice |
+| **The deck under UI Tweaks** | the cards' colour | **the window's colour**, as the card window's panels are |
+| **A held card** | lost its pressed look when Card UI changed its label | **stays pressed in** until its window closes |
+| **Card state** (UI Tweaks) | Fill, Icon glow | also **Glow frame, Bracket, Corner cut** - "on" on the card's edge, the icon lit as Icon glow |
+| **Toggles** (Power, Inherit) | satin off, glass on | **glass off; glass and the glow frame on** |
+
+## The pictures
+
+The P4_5: the system panel; the page panel (Show / Hide, the walls meeting the line); Card UI;
+the three active states on the Desk card; Power on:
+
+![System panel](followups/28r4_status_p45.png)
+![Page panel](followups/28r4_slot_page_p45.png)
+![The corners](followups/28r4_corners_p45.png)
+![Card UI](followups/28r4_cardui_p45.png)
+![Glow frame](followups/28r4_frame_glow_p45.png)
+![Bracket](followups/28r4_frame_bracket_p45.png)
+![Corner cut](followups/28r4_frame_corner_p45.png)
+![Power on](followups/28r4_power_on_p45.png)
+
+The 4B: the system panel, Card UI:
+
+![4B system panel](followups/28r4_status_4b.png)
+![4B Card UI](followups/28r4_cardui_4b.png)
+
+## Tests for you
+
+    curl "http://fleet-ws-p4-5/popup?cardstate=2"     the cards' Glow frame, not saved (3 Bracket, 4 Corner cut; -1 yours again)
+
+| # | Do this | PASS if |
+|---|---|---|
+| V1 | UI Tweaks: change Selector and its shape a few times; then open the system panel | its buttons are whole: one face each, Col / Row unchanged |
+| V2 | The system panel | "Scheme:" before the selector; no Status bar |
+| V3 | Open each slot's panel | its walls rise straight to the blue line; the rounded corners only where the slot meets the panel |
+| V4 | Close a panel (its slot, a tap outside, a swipe up) | the slot stays open until the panel has gone, then closes |
+| V5 | Page panel: Hide | the panel stays open and the header with it; close the panel - the header goes, the cards take its room |
+| V6 | With the header hidden: swipe down, open the page panel, Show; close it | the header stays, the cards make room |
+| V7 | The P4_5's clock and page name beside the 4B's | about the same size on the glass |
+| V8 | UI Tweaks: Window timeout 10 s, then Off; Timer bar Off, then On | each at once: the bar restarts, speeds up, stops, goes, comes back |
+| V9 | A card's Card UI: Window timeout and Timer bar | as V8, for that card's window |
+| V10 | Card UI: turn Inherit off and on for each row | off: the row's own selector, its choices short ("10 s"); on: nothing under it; nothing changes until a choice is made |
+| V11 | Card UI's Entity label or Card label, with the card pressed in behind the window | it stays pressed in |
+| V12 | UI Tweaks with the deck up | AUDIO and DISPLAY in the window's colour |
+| V13 | UI Tweaks > Card state: Glow frame, Bracket, Corner cut, with a light on; and on Linen | each on the "on" cards' edges; on Linen the corner cut is the glow frame |
+| V14 | A light's window: Power off and on | glass when off; glass and the glow frame when on |
+| V15 | The 4B | as V1-V14 at 720 px |
+
+## Choices that were mine
+
+1. **The frames light the icon and name as Icon glow does** - a frame alone, on a card with a dim
+   icon, read as "selected" more than "on".
+2. **The glow frame's outer line is the scheme's darkest, pulled 60% of the way to black**; its
+   ring and the bracket are the scheme's active colour (`ST_ACTIVE`); the sizes are tokens
+   (`ACTIVE_RING` 3, `ACTIVE_EDGE` 1, `BRACKET_W` 4 logical px).
+3. **The corner cut's top-left corner sits under a floating card label** (Float), so with Float
+   only the bottom-right shows the cut; Tag, Band or None show both.
+4. **Every Inherit toggle that is on wears the glow frame** (your rule for toggles) - on a fresh
+   card that is all six; say if the frame belongs only on Power.
+5. **Show / Hide shows when the panel closes, both ways** - Show while peeking keeps the bar.
+
+## Questions for you
+
+- **Q14. Which active state** becomes the default (or stays a choice)?
+- **Q15. The Inherit toggles' glow frame** (choice 4): keep, or a quieter "on" for them?
+
+## Results
+
+*(below)*

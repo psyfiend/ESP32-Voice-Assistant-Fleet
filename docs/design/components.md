@@ -166,6 +166,12 @@ words stand above its selector, centred. The list fills its parent's height and 
 must. `Kit::ChoiceRow` is a row's words, choices, chosen one and `onChosen`; the caller keeps one
 `Kit::Selector` per row. `buttonRow()` adds a centred row of buttons after them (Tokens, Reset all).
 
+**Inherit rows** (round 4, D-30 - Card UI): `choiceList(parent, w)` the scrolling list;
+`inheritRow(list, what, inherited, cb, user)` a row's words with an **Inherit** toggle at the end
+of the line - on, nothing more; off, it returns the line under the words for the row's own
+`choiceSelector()`s, each only as wide as its own longest choice (narrowed to the room it has), so
+"10 s" stays short and a card that inherits everything is six quiet lines.
+
 ### Icon button - `Kit::iconButton(parent, glyph, font, cb)`
 
 ![The window's corner icons](components/icons.png)
@@ -190,14 +196,16 @@ What a surface says about a thing you can tap, decided once for every component:
 
 | Finish | Means | Where |
 |---|---|---|
-| **Satin** | can be tapped, not chosen | Members' rows, scenes not loaded, the dialog's buttons (a role keeps its colour: Remove's red), Power while off, the header's buttons (close, back, the tabs) |
-| **Glass** | chosen or active | the selector, the tab showing, a scene loaded, Power while on |
+| **Satin** | can be tapped, not chosen | Members' rows, scenes not loaded, the dialog's buttons (a role keeps its colour: Remove's red), the header's buttons (close, back, the tabs) |
+| **Glass** | chosen or active | the selector, the tab showing, a scene loaded; **a toggle, on and off** (Power, Inherit: round 4) |
+| **Glass + glow frame** | a toggle that is ON (round 4, D-30) | Power while on, an Inherit toggle while on (`Kit::glowFrame()`: a ring in `ST_ACTIVE`, a line in `UI::darkest()` outside it - the cards' "Glow frame") |
 | **Flat** | information | fact rows, labels - no finish at all |
 
 `Kit::finish()` paints the face into the object (its first child, an image): **satin** - a light
 at the top fading by the middle, a faint step, a shade growing below, a soft edge (a shade on a
 light scheme); **glass** - the selector's metal (`metalKind()`). Called again, it changes the
-finish (a scene loaded and no longer; Power on and off - `Kit::selectorActionLit()`). Pressed:
+finish (a scene loaded and no longer); Power on and off is `Kit::selectorActionLit()` - glass, and
+the glow frame while on (round 4). Pressed:
 satin darkens 30 %, glass lightens 20 %, and the object sinks 1 px (`KS_SINK`) - the tint a
 **veil**, a rounded object in the face's shape over it, because LVGL drops the corner clip of an
 image it recolours (LESSONS). Colour still carries
@@ -265,11 +273,11 @@ ground (`strokeGlyphStrike()`, switched off on purpose). `Kit::StrokeGlyph` is i
 
 **One shape** (round 3, D-23): an open slot (`KS_HDR_SLOT_OPEN`, an accent border on its left, top
 and right, its box `FRAME_R` taller than the bar and clipped by it) and its panel share one accent
-outline that breaks through the bar's line. **Joins** round every corner where that outline meets
-the line: `Kit::joinCorner(parent, flare)` - a **cove** beside the tab, in the bar
-(`coveAt()`), a **flare** beside the panel, below the line (`flareAt()`) - `JOIN_R` round, filled
-with the shape's face and ringed in the accent over the bar or the ground (`KS_JOIN_FILL`,
-`KS_JOIN_RING_BAR`, `KS_JOIN_RING_GROUND`).
+outline that breaks through the bar's line. **Coves** round the corners where the slot's sides
+meet the line, in the bar: `Kit::joinCorner(parent)` placed by `coveAt()` - `JOIN_R` round, filled
+with the shape's face and ringed in the accent over the bar (`KS_JOIN_FILL`, `KS_JOIN_RING_BAR`).
+**The panel's own side walls rise straight to the line** (round 4, D-30: its flares are gone), and
+**the slot stays open until its panel has finished closing** (`Kit::Drawer::onClosed`).
 
 ### A drawer - `Kit::drawer(D, parent, w)`, `drawerPlace()`, `drawerOpen()`, `drawerClose()` (2.8)
 
@@ -284,17 +292,18 @@ rule capped at `DRAWER_W`. Its lines: `drawerItem()` (full width, a finger tall,
 a ring - and words; `KS_DRAWER_ITEM`), `drawerNote()` (dim, wrapping) and `drawerBig()` (a time, a
 reading; `KS_DRAWER_BIG`). **The system panel is a drawer too** since 2.8 round 2 (D-20): its frame
 is `Kit::drawer()` at its own width rule (half a wide screen, three quarters of a middling one, all
-of a narrow one), hung under the status slot. `drawerOpen(d, tabL, tabR)` takes its tab's span, and
-places a **flare** each side where the panel reaches past it (one shape, above); `drawerPlace()`
-keeps a panel `EDGE` from the screen's sides, where a tab stands, so a panel at an edge shares that
-side with its tab. The face's edge is the accent at `LINE`.
+of a narrow one), hung under the status slot, its rows built again at every open (round 4: a
+finished face lives in a cache any new window may take back). `drawerPlace()` keeps a panel `EDGE`
+from the screen's sides, where a tab stands, so a panel at an edge shares that side with its tab.
+The face's edge is the accent at `LINE`. `Drawer::onClosed` (with `closedUser`) is called once a
+close has finished - not for one cut short by opening again.
 
 **Its rows, round 3** (the system panel's new layout, D-22 / D-25): `drawerTitle()` a section's
 title (CONNECTIVITY); `drawerRow()` things side by side, the panel's width, `DRAWER_GAP` apart;
 `statusRow(face, what, &glyphRoom)` room for a glyph, what it is, and its live value dim, a face
 smaller, on one line and ellipsised - returns the value's label; `vrule(row, h)` a short upright rule
 setting one choice apart from another (`KS_RULE`); `toggleButton(parent, words, w, h, on, cb)` and
-`toggleButtonSet()` - glass while on, satin while off (#99's finishes); `selectorSet(S, i)` a
+`toggleButtonSet()` - glass, and the glow frame while on (round 4); `selectorSet(S, i)` a
 selector's choice set from outside, with no `onChosen` (the scheme changed elsewhere).
 
 ---
@@ -334,6 +343,8 @@ there is no bar (`Sheet::autoBar` is null) and the dialog shows none either. Set
 2.8 round 3 (and from a PC, `/settings?window_close=`, `window_bar=`); `Kit::windowCloseMs()` and
 `Kit::windowBarShown()` read them - **the header's panels close on the same timeout** (D-22). A
 client may override both for its window (`SheetSpec::closeMs`, `SheetSpec::bar`): a card's Card UI.
+**A change shows at once** (round 4): `Kit::sheetRetime(S, closeMs, bar)` starts the open sheet's
+wait again and adds or removes its bar.
 
 **Beside the window** (`Kit::sheetBeside()`, round 3, D-25): the catcher lets presses through to the
 children of one holder outside the window - the deck's panels, risen under UI Tweaks - and while
