@@ -335,7 +335,10 @@ dots, `SLOT_GAP` and `LINE` are the values the bar had before it had slots; the 
 | `FRAME_R` | 7 | the rounded square's corners |
 | `FRAME_MIX` | 14 | the rounded square's shade: % of `TEXT` over the bar |
 | `SLOT_GAP` | 8 | between the things in one slot |
-| `SLOT_PAD` | 4 | a slot's sides |
+| `SLOT_PAD` | 6 | a slot's sides - how far its tap area and its open tab reach past what it shows (4 in round 1, when slots were quarters) |
+| `EDGE` | 8 | from each end of the bar to its side's first slot (round 2); with `SLOT_PAD`, the first thing sits where round 2's mock drew it (24 px from the P4_5's edge) |
+| `SPACE` | 2 | between two slots in one place; their pads make the rest |
+| `CLEAR` | 12 | at least this between a side and the middle - closer, the lowest keep gives way (`Layout/HeaderPlan.h`) |
 | `DOT_ON`, `DOT_OFF`, `DOT_RING`, `DOT_GAP` | 11, 8, 2, 5 | the page's dots: this page's, another's ring and its line, between them |
 | `MARK` | 12 | the error mark beside a slot's dashes |
 | `LINE` | 2 | the bar's accent line |

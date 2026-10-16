@@ -221,8 +221,11 @@ only.
 
 **The bar** (`KS_HDR_BAR`): full width, the header's height, `SURFACE_ALT` with the accent line
 along its bottom (`LINE`) and the scheme's drop shadow - the look `Panel_Header` set locally before
-it had slots. **A slot** (`KS_HDR_SLOT`): an equal share of the bar (flex-grown, its own width
-ignored), its contents centred in a row `SLOT_GAP` apart, `SLOT_PAD` at its sides; tinted while
+it had slots; it lays nothing out itself - **where each slot stands is the header plan's**
+(`Layout/HeaderPlan.h`, round 2: the sides at the bar's ends `EDGE` in, `SPACE` between slots, the
+middle on the centre, `CLEAR` kept between a side and the middle). **A slot** (`KS_HDR_SLOT`): the
+bar's height, its x and width the plan's - what it holds, measured - its contents centred in a row
+`SLOT_GAP` apart, `SLOT_PAD` at its sides; tinted while
 pressed (`KS_HDR_SLOT_PRESSED`), and in the drawer's face while `LV_STATE_CHECKED` - its panel open
 - so the slot opens into its panel like a folder's tab (`KS_HDR_SLOT_OPEN`). Its words are
 `KS_HDR_TEXT` (the header's face) and `KS_HDR_TEXT_DIM` (am / pm, "3 / 15"); a sensor's icon
@@ -248,8 +251,10 @@ keeps it on the screen; `drawerOpen()` measures the face and grows to it (at mos
 `drawerClose()` takes it back to nothing and hides it. `drawerWidth()` is the system panel's width
 rule capped at `DRAWER_W`. Its lines: `drawerItem()` (full width, a finger tall, a dot - filled or
 a ring - and words; `KS_DRAWER_ITEM`), `drawerNote()` (dim, wrapping) and `drawerBig()` (a time, a
-reading; `KS_DRAWER_BIG`). The status slot's drawer is still the older `Panel_System`, which keeps
-its own code until it is next changed.
+reading; `KS_DRAWER_BIG`). **The system panel is a drawer too** since 2.8 round 2 (D-20): its frame
+is `Kit::drawer()` at its own width rule (half a wide screen, three quarters of a middling one, all
+of a narrow one), hung under the status slot; its rows of buttons are still its own (development
+tools, D-17).
 
 ---
 

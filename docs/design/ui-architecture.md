@@ -37,6 +37,7 @@ whose stack is in internal RAM - the settings task.
 | the window frame | `include/UI/Sheet.h`, `src/UI/Kit/KitSheet.cpp` (frame, auto-close, the tap catcher), `KitSheetPanels.cpp` (the two folder panels), `KitSparks.cpp` |
 | the card window's contents | `src/Cards/CardPopup.cpp` (the client: tabs, views, open/close) and `src/Cards/Popup/` - one file per concern, sharing `PopupState.h`: controls and the light hero (`PopupControls`, `PopupLight`, `PopupDeck`), `PopupScenes`, `PopupMembers`, History (`PopupHistory`, `...Chart`, `...Activity`), `PopupProps`, the panels' rows (`PopupSettingsRows`, `PopupSideRows`, `PopupPanels`), `PopupDialog`, the hold (`PopupHold`), helpers (`PopupCommon`), and the PC's handles (`PopupDebug`, `PopupTree`) |
 | where cards go on a page | `include/Layout/Layout.h` (`FlowEngine`), `src/Cards/CardPage.cpp`; the engines to come: `layout-engines.md` |
+| what the header shows and where | `include/UI/HeaderSlots.h` (the slots as data, each kind's keeps), `include/Layout/HeaderPlan.h` (the planner: three places, claims, keep), `src/UI/Panel_Header.cpp` (each kind's build and update), `src/UI/SlotPanels.cpp` (their panels); `header-slots.md` §10 |
 | which card a kind of entity gets | `src/Cards/CardCatalog.cpp` (`cardForKind()`) |
 | what a dashboard contains | `include/Dashboards/Dashboard_HA.h`, `Dashboard_Fleet.h` (`PageSpec`, `CardSpec`; ids per K33) |
 | the owner's saved choices | `include/Settings.h` (one JSON file), `CardGroups`, `CardAdded`; CLAUDE.md "Saved settings" |
@@ -103,7 +104,7 @@ whose stack is in internal RAM - the settings task.
 |---|---|---|
 | **The harness**, `scripts/ui_golden.py` | a window, view, panel or page is the same object tree and the same pixels as before | `capture <host> --board <B> --label <L>` walks 48 states (45 on the 4B; the system panel and About since #97) through `GET /popup` and saves each tree and screenshot; `compare <B> <A> <B>` reports every difference, telling the house apart (times, values, a light switched); `measure` times each window's build; `crop` cuts a picture for the docs. Needs `-D DEBUG_POPUP` |
 | **A/B on one board** | a refactor changed nothing | capture on the old firmware, flash the new, capture again minutes apart; a state the house changed under is captured again both ways. Keep each phase's image (`test/golden/<board>/fw_*`, gitignored) to flash back |
-| **Host tests**, `host-tests/` | the pure modules' rules (`Layout`, `TimeFormat`) | `wsl bash host-tests/run_in_wsl.sh` (or `pio test -d host-tests` with a Windows compiler) |
+| **Host tests**, `host-tests/` | the pure modules' rules (`Layout`, the header's planner `HeaderPlan`, `TimeFormat`) | `wsl bash host-tests/run_in_wsl.sh` (or `pio test -d host-tests` with a Windows compiler) |
 | **The structure check**, `scripts/structure_check.py` | the code is not drifting: big files, style calls outside the kit, colour literals, shape numbers, LVGL in the core layers | run it with the gate; quote it in the merge report (W13) |
 | **The gate**, `scripts/release/gate.ps1` | all nine boards compile from the committed `platformio.ini` | ~11 minutes; it stashes and restores the owner's local debug lines |
 | **The owner's sheet**, `docs/TEST_<milestone>.md` | touch, feel, schemes, the auto-close, a reboot - what no script sees | numbered tests with PASS criteria, the owner's results under them |
@@ -122,9 +123,11 @@ kit). Bring each onto the kit and tokens when it is next changed, not in a sweep
   because 2.11's group cards and any new card type build on them.
 - **`GUIManager.cpp`** (1,538 lines) - the second file over the 1,000-line mark.
 - **The header is on the kit since 2.8** (`Kit::headerBar()`, `headerSlot()`, `glyphFrame()`,
-  `Kit::Drawer` for its slots' panels; `UI::hdr()` sizes). Still to come: the system panel and its pages (`Panel_System`, `Panel_Display`,
-  `Panel_Audio`, `LogPage`, `ReferencePage`), `UIToolkit`, the status widgets (whose 34 colour
-  literals are most of what the check reports).
+  `Kit::Drawer` for every slot's panel - the system panel's frame too since round 2; `UI::hdr()`
+  sizes); **where its slots stand is a pure planner**, `Layout/HeaderPlan.h` (claims and keeps,
+  D-19; host-tested). Still to come: the system panel's rows of buttons and its pages
+  (`Panel_System`, `Panel_Display`, `Panel_Audio`, `LogPage`, `ReferencePage`), `UIToolkit`, the
+  status widgets (whose 34 colour literals are most of what the check reports).
 
 ## 7. Open questions this structure leaves for the owner
 
