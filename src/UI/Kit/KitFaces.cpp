@@ -422,6 +422,22 @@ static bool hasCb(lv_obj_t *o, lv_event_cb_t cb) {
     return false;
 }
 
+// THE GLOW FRAME ON A TOGGLE (owner, 2.8 round 4): a toggle is glass on and
+// off; on, it wears the cards' glow frame - a ring in the active colour, a line
+// in the scheme's darkest outside it. Drawn over the face (border_post).
+void glowFrame(lv_obj_t *o, int32_t r, bool on) {
+    if (!o) return;
+    const UIMetrics &m = UI::met();
+    lv_obj_set_style_radius       (o, r, 0);
+    lv_obj_set_style_border_post  (o, true, 0);
+    lv_obj_set_style_border_color (o, UI::c(UI::pal().ST_ACTIVE), 0);
+    lv_obj_set_style_border_opa   (o, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width (o, on ? UI::sc(m.ACTIVE_RING) : 0, 0);
+    lv_obj_set_style_outline_color(o, UI::c(UI::darkest()), 0);
+    lv_obj_set_style_outline_pad  (o, 0, 0);
+    lv_obj_set_style_outline_width(o, on ? UI::sc(m.ACTIVE_EDGE) : 0, 0);
+}
+
 void finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tint) {
     if (!o || w <= 0 || h <= 0) return;
     const bool glass = f == Finish::FINISH_GLASS;

@@ -427,6 +427,15 @@ struct CardPlacement {
 // VAR_AUTO is the default and resolves at build time by measuring. A build
 // sheet can pin either variant when it disagrees.
 // ---------------------------------------------------------------------------
+// An "on" state drawn on a card's edge (2.8 round 4; Card::activeFrame()).
+// Compound names per CLAUDE.md's macro hazard.
+enum class CardFrame : uint8_t {
+    FRAME_NONE = 0,   // the edge restyle() gives
+    FRAME_GLOW,       // a ring in the state colour, a dark line outside it
+    FRAME_BRACKET,    // top and bottom thick, the sides thin
+    FRAME_CORNER,     // a ring, the top-left and bottom-right corners twice as round
+};
+
 enum class CardVariant : uint8_t {
     VAR_AUTO = 0,
     VAR_FULL,

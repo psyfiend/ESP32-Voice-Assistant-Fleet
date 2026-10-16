@@ -144,6 +144,10 @@ uint32_t  facesFlat();            // how many came out flat (a debug readout)
 enum class Finish : uint8_t { FINISH_SATIN, FINISH_GLASS };
 void     finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tint = 0);
 uint32_t satinBase();             // the scheme's satin, between its two surfaces
+// A TOGGLE THAT IS ON (2.8 round 4): glass on and off, and on, the glow frame -
+// a ring in the active colour, a line in the scheme's darkest outside it (the
+// cards' "Glow frame"). `r` the object's corners.
+void     glowFrame(lv_obj_t *o, int32_t r, bool on);
 // A colour that reads on glass: pushed toward the scheme's far end until it
 // stands apart from the metal (Linen's olive "on" vanished into its silver, T6).
 uint32_t glassInk(uint32_t hex);

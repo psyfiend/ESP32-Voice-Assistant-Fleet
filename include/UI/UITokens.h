@@ -95,6 +95,13 @@ struct UIMetrics {
     // the owner's "it looks too flat" on Linen, 2026-09-23.
     uint8_t SHADOW_Y;
     uint8_t SHADOW_OPA;     // 0-255
+    // THE ACTIVE FRAMES (2.8 round 4, the owner's proposal): what an "on" card
+    // or toggle draws on its edge in place of a fill. The glow frame's ring in
+    // the active colour and the line outside it in the scheme's darkest; the
+    // bracket's top and bottom (its sides are ACTIVE_EDGE).
+    uint8_t ACTIVE_RING;    // 3
+    uint8_t ACTIVE_EDGE;    // 1
+    uint8_t BRACKET_W;      // 4
 };
 
 // ---------------------------------------------------------------------------
@@ -412,6 +419,8 @@ uint32_t mix(uint32_t a, uint32_t b, uint8_t pct);
 // scheme tokens (GROUND and TEXT) keeps the answer inside the palette, so the
 // "no colour literals in UI code" rule holds.
 uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b);
+// The scheme's darkest colour, near black (the glow frame's outer line).
+uint32_t darkest();
 
 // --- Shared paints: chrome that repaints itself on a scheme change. #64 -----
 //

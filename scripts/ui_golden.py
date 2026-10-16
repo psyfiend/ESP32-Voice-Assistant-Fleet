@@ -151,6 +151,14 @@ PLAN = [
         (None, ["slot=-1"], 0.8),
         (None, ["alarm=-1"], 0.6),
     ]},
+    # Round 4: the cards' active states on their edge - glow frame, bracket, corner cut - shown,
+    # never saved (cardstate=-1 puts the owner's back). What is on is whatever the house has on.
+    {"page": 0, "card": None, "tree": "page", "steps": [
+        ("frame_glow", ["cardstate=2"], 1.5),
+        ("frame_bracket", ["cardstate=3"], 1.5),
+        ("frame_corner", ["cardstate=4"], 2.0),
+        (None, ["cardstate=-1"], 2.0),
+    ]},
     # Round 3 (T10): the header's sensor shown failed - its dashes and "!" (RAM only).
     {"page": 0, "card": None, "tree": "page", "steps": [
         ("header_sensor_err", ["sensorerr=1"], 0.8),

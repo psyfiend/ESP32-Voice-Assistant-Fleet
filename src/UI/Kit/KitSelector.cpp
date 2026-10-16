@@ -307,10 +307,13 @@ void selectorSet(Selector &S, uint8_t i) {
 }
 
 // Only on a change: the window refreshes its state often.
+// Glass, and while what it switches is on, the glow frame (owner, round 4: a
+// toggle's "on" is its frame; satin-off / glass-on was #99's).
 void selectorActionLit(Selector &S, bool lit) {
     if (!S.action || S.actW <= 0 || S.actLit == (int8_t)lit) return;
+    if (S.actLit < 0) finish(S.action, S.actW, S.actH, S.actR, Finish::FINISH_GLASS);
     S.actLit = (int8_t)lit;
-    finish(S.action, S.actW, S.actH, S.actR, lit ? Finish::FINISH_GLASS : Finish::FINISH_SATIN);
+    glowFrame(S.action, S.actR, lit);
 }
 
 } // namespace Kit

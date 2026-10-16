@@ -152,7 +152,8 @@ const UIPalette UI_PAL_MIDNIGHT = {
 // scheme, where a shadow is what separates a card from the page, gets one.
 const UIMetrics UI_MET_DARK  = {
     .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 0, .HEADER_H = 14,
-    .SHADOW_Y = 0, .SHADOW_OPA = 0
+    .SHADOW_Y = 0, .SHADOW_OPA = 0,
+    .ACTIVE_RING = 3, .ACTIVE_EDGE = 1, .BRACKET_W = 4
 };
 // Linen's. A 2 px border, darker than the old hairline (the owner: "make it a
 // bit darker and increase by 1 or 2px", knobs included - the drawer's buttons
@@ -165,7 +166,8 @@ const UIMetrics UI_MET_DARK  = {
 // ("a bit darker than it is or expand it 1 more pixel" - darker was chosen).
 const UIMetrics UI_MET_LIGHT = {
     .RADIUS = 12, .PAD = 5, .BORDER_W = 2, .BORDER_OPA_PCT = 34, .SHADOW = 6, .HEADER_H = 14,
-    .SHADOW_Y = 3, .SHADOW_OPA = 140
+    .SHADOW_Y = 3, .SHADOW_OPA = 140,
+    .ACTIVE_RING = 3, .ACTIVE_EDGE = 1, .BRACKET_W = 4
 };
 
 // The card window's shape and spacing, in millimetres (2.12 P2, the header's
@@ -554,6 +556,14 @@ uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b) {
     const int32_t l = luma(bg);
     const int32_t da = luma(a) - l, db = luma(b) - l;
     return (da * da >= db * db) ? a : b;
+}
+
+// The scheme's darkest colour, its ground or its text whichever way round the
+// scheme is - pulled the rest of the way to black (the glow frame's outer line,
+// 2.8 round 4: "absolute black in dark modes").
+uint32_t darkest() {
+    const uint32_t d = luma(s_pal.GROUND) <= luma(s_pal.TEXT) ? s_pal.GROUND : s_pal.TEXT;
+    return blend(d, 0x000000, 60);
 }
 
 lv_color_t border() {

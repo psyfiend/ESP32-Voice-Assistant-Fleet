@@ -355,6 +355,13 @@ protected:
 
     // --- Helpers for subclasses -------------------------------------------
 
+    // THE ACTIVE FRAMES (owner, 2.8 round 4): an "on" state drawn on the
+    // card's edge in `color` - or FRAME_NONE, the edge restyle() gives. Left
+    // alone while the card is held (its window open: the pressed look owns the
+    // edge). FRAME_CORNER needs the caps, made at build (makeCornerCaps()).
+    void activeFrame(CardFrame f, uint32_t color);
+    void makeCornerCaps();
+
     uint8_t primaryCount() const { return _nPrimary; }
     const Entity *primary(uint8_t i = 0) const {
         return (i < _nPrimary) ? _primary[i] : nullptr;
@@ -498,6 +505,8 @@ private:
     static void eventCb(lv_event_t *e);
 
     lv_obj_t *_corner = nullptr;       // makeCornerIcon()'s, for pressLook()
+    lv_obj_t *_cap[2] = {};            // the corner cut's caps, top-left and bottom-right (activeFrame())
+    bool      _pressed = false;        // held: pressLook() owns the edge
 
     // --- Widget tree ------------------------------------------------------
     //

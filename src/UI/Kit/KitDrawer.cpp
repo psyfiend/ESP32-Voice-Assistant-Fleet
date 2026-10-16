@@ -222,11 +222,14 @@ lv_obj_t *toggleButton(lv_obj_t *parent, const char *words, int32_t w, int32_t h
     return b;
 }
 
+// Glass on and off; on, the glow frame (owner, round 4).
 void toggleButtonSet(lv_obj_t *b, bool on) {
     if (!b) return;
     // Its size as set (its coordinates are not laid out yet when it is built).
-    finish(b, lv_obj_get_style_width(b, LV_PART_MAIN), lv_obj_get_style_height(b, LV_PART_MAIN),
-           UI::mm(UI::shape().R_CONTROL), on ? Finish::FINISH_GLASS : Finish::FINISH_SATIN);
+    const int32_t r = UI::mm(UI::shape().R_CONTROL);
+    finish(b, lv_obj_get_style_width(b, LV_PART_MAIN), lv_obj_get_style_height(b, LV_PART_MAIN), r,
+           Finish::FINISH_GLASS);
+    glowFrame(b, r, on);
     if (lv_obj_t *l = labelIn(b)) lv_obj_center(l);
 }
 
