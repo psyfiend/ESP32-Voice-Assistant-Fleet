@@ -69,6 +69,22 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
   the alarm still on the left (D-18 moved it; the build is the reference now).
 - **Routes**: the P4_5 serves 7 of `HttpServer::MAX_ROUTES` (8); the next route needs it raised.
 
+## Round 3 - the unattended build's progress (2026-10-16 night; the watchdog resumes from here)
+
+Decided: D-21 to D-28 (DECISIONS); the look: canvas "2.8 Header Slots", the four "Round 3" artboards.
+Each step committed and pushed on `feat/2.8-header-slots`; tick it here when it is.
+
+- [ ] 1. Kit selector: up to 5 choices, even widths (`SELECTOR_MAX`, `SelectorSpec`)
+- [ ] 2. Type: the P4_5's TAG and header words 24 (D-26)
+- [ ] 3. Glyphs as data (`StatusGlyphs`), per-scheme status colours, one size bare or framed, the AP mast as its own claim (D-24, D-27)
+- [ ] 4. The bell in the clock's slot (7 days), the 12-hour notice claim and its panel, the clock panel's NEXT ALARM and "Warn me before" (D-21)
+- [ ] 5. One shape in the accent: the open tab, coves, flares, panels aligned at a screen edge (D-23)
+- [ ] 6. The system panel: CONNECTIVITY, SYSTEM - DIAGNOSTICS (Log / UI Tweaks / About, Scheme + Status bar, Col / Row) (D-22, D-25)
+- [ ] 7. UI Tweaks (a Sheet): selector rows, saved, Reset all, Tokens; the deck rises under it; the left-half swipe; header panels follow the timeout
+- [ ] 8. Card UI: a SETTINGS row opening a view of selector rows (D-28); Entity / Card label leave SETTINGS
+- [ ] 9. The page panel's Shown / Hidden as a selector; a PC key to show the sensor's "!" (T10)
+- [ ] 10. Harness states, A/B against round 2, the gate, the structure check, `TEST_2.8.md` round 3, flash the P4_5 and the 4B (settings saved first)
+
 ## What is next with the owner
 
 1. **2.8 round 3** - round 2 tested 2026-10-16, every test PASS; the owner's results and new
