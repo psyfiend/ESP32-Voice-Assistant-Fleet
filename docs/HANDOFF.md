@@ -1,4 +1,4 @@
-# Handoff — 2026-10-15 (`v0.2.17` flashed; 2.8 round 2 built - three places on claims - for the owner's test)
+# Handoff — 2026-10-16 (2.8 round 3 built overnight - the look, UI Tweaks, Card UI - for the owner's test)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -40,30 +40,29 @@ trees and screenshots, A/B), host tests (`host-tests/`), the structure check and
 The cards, `GUIManager`, the header (`Panel_Header`) and the system panel's pages are not on the kit
 yet - bring each over when it is next changed (`ui-architecture.md` §6).
 
-## Where things stand (2026-10-15, evening)
+## Where things stand (2026-10-16, morning)
 
-- **`v0.2.17` - A17** (#108, merged, tagged, **flashed as the release** on the P4_5, the 4B and the
-  1060 on 2026-10-15 by `flash_release.ps1` from the tag - each board's file saved first and intact
-  after). Copies of every board's file are in `bench/settings/<board>/`.
-- **2.8 round 2 is built, on `feat/2.8-header-slots`** (no PR; **`TEST_2.8.md` round 2 is the
-  owner's sheet**, R1-R11, Q2-Q4, Q6, Q8, Q9). `main` merged in (no conflict). What it is
-  (`header-slots.md` §9-10; DECISIONS D-16 to D-20):
-  - **Three places**: left the clock and the deck's temperature; the page in the middle, on the
-    bar's centre; right the alarm (while set) and the link and Wi-Fi. **Square glyphs** by default.
-  - **Claims** - the owner's idea, asked how a page names its places: each slot claims its room in
-    its forms, each held with a keep (a priority); when a side would run into the middle the lowest
-    keep gives way. A pure planner, `include/Layout/HeaderPlan.h`, ten host tests. **The notice
-    queue (NINA's toasts), detailed / minimal forms, a window taking the middle and claims' panel
-    rows are #76** - new claim sources, no new layout code.
-  - **The alarm**: a slot kind with its panel, on the bar only while set (D-20). `Alarms.h` holds
-    the next one; only a PC sets one until K84 (`/popup?alarm=HHMM`, RAM only).
-  - **The system panel's frame is `Kit::Drawer`** (Q7): every panel one component, all joined.
-  - Proved: harness A/B on the P4_5 (`v0.2.17` `r2b` vs round 2 `r2c`: every window unchanged;
-    `desk_temp`'s mark is #104), the 4B's header states (`r2h`), frame cost +0.9 ms (<1%), the
-    structure check, the gate (see the sheet).
-- **Boards**: the P4_5 and the 4B run round 2 (local lines), the 1060 `v0.2.17`. The 4B's own file
+- **`v0.2.17` - A17** is the release on `main` (flashed on the 1060). Copies of every board's
+  settings file are in `bench/settings/<board>/` - one is saved before every flash.
+- **2.8 round 3 is built, on `feat/2.8-header-slots`** (no PR; **`TEST_2.8.md` round 3 is the
+  owner's sheet**, U1-U17, Q10-Q13; rounds 1 and 2 above it, every round-2 test PASS but the
+  glyphs). What it is (`header-slots.md` §11-12; DECISIONS D-21 to D-29):
+  - **The header** (round 2's three places on claims, `Layout/HeaderPlan.h`): the mocks' glyphs
+    drawn from numbers (`UI/GlyphShapes`, `Kit::strokeGlyph`), the scheme's `SIG_*` colours, an AP
+    mast; an open slot and its panel one accent shape (coves, flares, `JOIN_R`); the bell inside
+    the clock's slot and the 12-hour notice among the status icons (`Alarms.h`; a PC sets a
+    pretend alarm until K84). The P4_5's header words and tags at 24 (D-26).
+  - **The system panel**: CONNECTIVITY, then SYSTEM - DIAGNOSTICS (Log / UI Tweaks / About, the
+    scheme beside Status bar, Col / Row). **UI Tweaks** (`UI/TweaksSheet`, `GUIManagerTweaks.cpp`):
+    the card looks, glyphs, selector and window timeout, saved, for every page; the deck rises
+    under it. **Card UI**: the same per card, a view of the card window (`PopupCardUi.cpp`).
+  - **Choices made unattended** are D-29 (the scheme one for every page; Col / Row saved per page;
+    Card label "Custom" keeps the words showing) - the owner confirms or reverses them.
+  - Proved: see the sheet's Results (harness A/B `r2c` vs `r3` on the P4_5, the 4B's states, the
+    gate, the structure check, 34 host tests).
+- **Boards**: the P4_5 and the 4B run round 3 (local lines), the 1060 `v0.2.17`. The 4B's own file
   closes a window after 10 s (`system.window.close`), which stops the harness's full walk there -
-  use `--only` for header states, or ask the owner.
+  use `--only`, or ask the owner.
 - **The mock**: the "2.8 Header Slots" canvas
   (https://claude.ai/artifact/9dLvFUbWZePzgjLnnXZ5Sw); its last artboards show three places with
   the alarm still on the left (D-18 moved it; the build is the reference now).
@@ -87,12 +86,7 @@ Each step committed and pushed on `feat/2.8-header-slots`; tick it here when it 
 
 ## What is next with the owner
 
-1. **2.8 round 3** - round 2 tested 2026-10-16, every test PASS; the owner's results and new
-   decisions (D-21 the alarm by the clock and its 12-hour notice, D-22 the system panel as
-   CONNECTIVITY + SYSTEM - DIAGNOSTICS and the knobs in a UI Tweaks window, D-23 the slot and panel
-   as one shape through the accent line, D-24 the glyph overhaul) are in `TEST_2.8.md` and
-   `header-slots.md` §11. Being scoped with the owner: how the mocks' glyphs reach the device, the
-   border colour, the bell beside the clock, one round or two. Then sign-off -> CHANGELOG
+1. **2.8 round 3, the owner's test** (`TEST_2.8.md` round 3). Then sign-off -> CHANGELOG
    `v0.2.18`, archive the sheet, `gh pr create`; the owner merges.
 2. **#76 next, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a
    queue any task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to

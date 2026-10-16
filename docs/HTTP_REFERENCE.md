@@ -260,7 +260,7 @@ order.
 |---|---|
 | `/popup?card=N` | a long press on card N: opens its window; replies with the build time, window size and LVGL's pool |
 | `/popup?close=1` | closing it; replies with the pool afterwards. **Anything changed in the window is saved now**, as on the glass |
-| `/popup?view=N` | the corner icons: `0` the controls (a member's, inside one), `1` History, `2` Members, `4` Scenes, `5` Properties, `3` only lists. Also lists the entities' levels, an HA group's members and why recent commands failed |
+| `/popup?view=N` | the corner icons: `0` the controls (a member's, inside one), `1` History, `2` Members, `4` Scenes, `5` Properties, `6` Card UI (2.8 round 3, as SETTINGS' last row), `3` only lists. Also lists the entities' levels, an HA group's members and why recent commands failed |
 | `/popup?deck=1` / `deck=0` / `deck=2` | SETTINGS opened / folded; `2` the left panel (CHART or SCENES) opened |
 | `/popup?ctl=N` | a light's control: `0` brightness, `1` color temperature, `2` color; lists where the stage's children landed |
 | `/popup?member=N` | a tap on row N of Members (opens Members first) |
@@ -272,8 +272,11 @@ order.
 | `/popup?chips=0\|1` | the span buttons off/on (not kept) |
 | `/popup?about=1` / `about=0` | opens / closes "About this board" (2.12 P4) - the board, screen, chip, firmware, uptime, memory, LVGL's pool, each second. Every build also opens it from the system panel's About button (#97) |
 | `/popup?drawer=1` / `drawer=0` | a tap on the header's status slot: the system panel opens / closes (#97, so the harness can see it); "already open/closed" when it was |
-| `/popup?slot=<kind>` / `slot=-1` | 2.8: a tap on the header's slot of that kind - `clock`, `sensor`, `page`, `alarm`, `status` (round 2; round 1 took a number): its panel opens - the status slot's is the system panel; `-1` closes any. A slot not on the bar (the alarm with none set) says so. UI |
-| `/popup?alarm=HHMM` / `alarm=-1` | 2.8 round 2: a **pretend** next alarm at that time (24 h; today's if still to come, else tomorrow's), so the alarm slot and its panel can be seen before K84 builds alarms - **RAM only, never saved, nothing rings** (`Alarms.h`); `-1` clears it. UI |
+| `/popup?slot=<kind>` / `slot=-1` | 2.8: a tap on the header's slot of that kind - `clock`, `sensor`, `page`, `alarm` (round 3: the 12-hour notice), `status` (round 2; round 1 took a number): its panel opens - the status slot's is the system panel; `-1` closes any. A slot not on the bar (the notice with no alarm within its hours) says so. Round 3: `slot=deck0` / `deck1` taps a deck panel's header (AUDIO / DISPLAY), as `/bench?what=anim` does - under UI Tweaks, where the deck rises. UI |
+| `/popup?alarm=HHMM` / `alarm=-1` | 2.8 round 2: a **pretend** next alarm at that time (24 h; today's if still to come, else tomorrow's), so the bell, the notice and their panels can be seen before K84 builds alarms - **RAM only, never saved, nothing rings** (`Alarms.h`); `-1` clears it. UI |
+| `/popup?alarmin=N` | 2.8 round 3: a pretend next alarm **N minutes from now** (`alarmin=120`: the bell by the clock and, within the 12 hours, the notice among the status icons). As `alarm=`, RAM only. UI |
+| `/popup?tweaks=1` / `tweaks=0` | 2.8 round 3: UI Tweaks opened / closed, as the system panel's button; the deck rises under it. UI |
+| `/popup?sensorerr=1\|0` | 2.8 round 3 (T10): the header's sensor shown failed - `--°` and the "!" - whatever its entity says; `0` as it is again. **RAM only**. UI |
 | `/popup?glyphs=0\|1\|2\|3` | 2.8: the header's glyphs bare, in a rounded square, in a circle - **not saved** (a capture leaves the owner's choice); `3` the saved style again. UI |
 | `/popup?pagehdr=0\|1` | 2.8: this page's header hidden / shown - **Saved**, as the page slot's panel and Hide Bar save it (`pages.<slug>.header`; shown is the default and is stored as nothing) |
 | `/popup?removecard=3` | the Remove card dialog over any card's window, to look at; its Remove does nothing to a compiled card; `close=1` takes it down |
@@ -284,7 +287,7 @@ order.
 |---|---|
 | `/popup?sparks=0\|1\|2` | the edge sparks from the next window: now and then / once / off |
 | `/popup?rows=N` | N greyed test rows in SETTINGS from the next window (to try dragging a tall panel); `rows=0` undoes it |
-| `/popup?scheme=0\|1\|2` | the colour scheme: Fleet, Midnight, Linen (no window may be open). Not saved: a reboot comes back in Midnight |
+| `/popup?scheme=0\|1\|2` | the colour scheme: Fleet, Midnight, Linen (no window may be open). Since 2.8 round 3 through the dashboard - every page, the header and the ground follow, as the system panel's selector does. **Not saved**: a reboot comes back in the owner's scheme (`system.ui.scheme`, else Midnight) |
 
 ### Changes that are **Saved**
 

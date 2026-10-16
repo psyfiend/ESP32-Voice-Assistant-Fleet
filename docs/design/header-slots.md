@@ -244,3 +244,24 @@ Every round-2 test passed; the owner's results and words are in `TEST_2.8.md`. W
 - **The header's type** one step up - between today's face and the cards' entity label.
 - **Kept**: Q2 the clock as built, Q3 the edge swipe, Q4 the error mark, Q9 slots as wide as what
   they show; T4's swipe up to close ("exactly what I would have wanted").
+
+## 12. Round 3, as built (2026-10-16 night)
+
+Settled on the canvas first (D-25 to D-28), then built unattended; `TEST_2.8.md` round 3 has the
+pictures, the tests and the choices made along the way (D-29).
+
+- **The glyphs are numbers** (`UI/GlyphShapes`): each stroke of the mocks' glyphs on a 24-unit
+  grid, drawn with LVGL's arcs and lines (`Kit::strokeGlyph`), one size bare or framed, coloured
+  from the scheme's `SIG_*`. The AP mast is its own claim (`SLOT_AP`, keep 220) beside the status
+  glyphs and opens the system panel as they do.
+- **One shape**: the open tab (`KS_HDR_SLOT_OPEN`, an accent border left, top and right), the
+  panel's flares and the tab's coves, `JOIN_R` round (`components.md`, "One shape").
+- **The alarm is two claims from one alarm**: the clock's slot carries a bell as an extra
+  (`extraOn`: switched off, it takes no room) within about 7 days; the notice (`SLOT_ALARM`, keep
+  210) within `Alarms::warnHours()` - 12 by default, saved (`system.alarm.warn`), set from the
+  clock's panel, dismissable (`Alarms::dismissWarning()`).
+- **The system panel**: CONNECTIVITY (status rows: a glyph, a name, the state in words, refreshed
+  once a second while open) and SYSTEM - DIAGNOSTICS. **The knobs are UI Tweaks** - a Sheet
+  client; its choices device-wide and saved; the deck rises under it (`Kit::sheetBeside()`).
+- **Every header panel closes on the window timeout** (`Kit::windowCloseMs()`), counted from the
+  last touch anywhere.

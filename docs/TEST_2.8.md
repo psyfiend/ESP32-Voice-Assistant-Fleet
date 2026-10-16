@@ -368,9 +368,156 @@ temperature's "This slot shows" first). New:
   from the clock's panel.
 - **Q9**: keep.
 
-# Round 3 (next)
+# Round 3 - the look, UI Tweaks and Card UI (2026-10-16, built overnight)
 
-From the results above: the joined look (Q5), the glyph overhaul (T9, Q1), the header's type, the
-alarm by the clock and its 12-hour notice (Q8), the system panel as CONNECTIVITY + SYSTEM -
-DIAGNOSTICS and the knobs in a UI Tweaks window (Q7), the page panel's selector bar. Scope and
-order: HANDOFF.
+Branch `feat/2.8-header-slots`, built unattended from your verdicts on rounds 1 and 2 and the
+canvas "2.8 Header Slots" (its four Round 3 artboards; DECISIONS D-21 to D-28). **No pull
+request** - for your test first.
+
+**On the desk now**: the P4_5 and the 4B run round 3 (with your local lines), their settings files
+as found (each saved before every flash, `bench/settings/`); the 1060 runs the `v0.2.17` release.
+
+## What changed since round 2
+
+| Where | Round 2 | Round 3 |
+|---|---|---|
+| **The status glyphs** | icon-font glyphs, shrunk to sit in a frame | **the mocks' glyphs, drawn from numbers** (D-24, D-27): the narrower Wi-Fi fan and the link's two arrows as LVGL arcs and lines, centred, **one size bare or framed** (the frame grows round it); **the dark schemes' softer greens** (34D399 / 4ADE80), Linen its own darker set; **AP a mast of its own** in the status place |
+| **An open slot and its panel** | the slot in the panel's colour | **one shape in the accent** (D-23): the panel breaks through the bar's accent line, the tab and the panel inside one outline, every corner rounded - a cove beside the tab, a flare beside the panel; a panel at a screen edge shares that side with its tab |
+| **The alarm** | its own slot among the status glyphs | **a bell inside the clock's slot** while an alarm is within about 7 days; **within 12 hours a notice joins the status icons** (the bell ringing, amber): tap it for its panel, Dismiss or Settings. The clock's panel: NEXT ALARM, and **"Warn me before"** 1 h / 3 h / 6 h / 12 h / Off (D-21) |
+| **Type, the P4_5** | header words and card tags 22 | **24** (D-26) - everything in the tag face follows: SETTINGS' title, the member rows |
+| **The system panel** | the knobs | **CONNECTIVITY** (Wi-Fi: SSID, dBm, IP; Home Assistant; MQTT - each its glyph and its state in words) and **SYSTEM - DIAGNOSTICS**: Log / UI Tweaks / About; Fleet / Midnight / Linen on the selector, set apart from a **Status bar** toggle; Col / Row (D-22, D-25) |
+| **The knobs** | system panel buttons, cycling | **UI Tweaks**, a window: Glyphs, Card label, Entity label, Card state, Selector and its shape, Card density, Window timeout, Timer bar - each a selector, the rows lined up - then Tokens and Reset all. **While it is open, AUDIO and DISPLAY rise at the foot, splitting the window's width** (D-25) |
+| **A card's window** | SETTINGS: Entity label, Card label | **Card UI**, a view from the last row of SETTINGS (D-28): Entity label, Card label (Inherit / Custom / None), Selector and its shape, Card density, Window timeout, Timer bar - "Inherit" follows UI Tweaks. SETTINGS keeps Paused, Active state, Tap action, Entity properties |
+| **Swipe down, left half** | the log | **UI Tweaks** (the log is a tap away on the system panel) |
+| **The header's panels** | open until put away | **close on the window timeout**, as a window does (D-22) |
+| **Saved** | the glyph style | also **the scheme** (now one for every page), **each page's Col / Row**, and **every UI Tweaks and Card UI choice** |
+
+## The pictures
+
+The header on the P4_5: Midnight, Linen, bare, circle; an alarm in two hours (the bell, the
+notice); the sensor failed (from a PC, below):
+
+![Midnight](followups/28r3_hdr_p45.png)
+![Linen](followups/28r3_hdr_linen_p45.png)
+![Bare](followups/28r3_hdr_bare_p45.png)
+![Circle](followups/28r3_hdr_circle_p45.png)
+![An alarm in two hours](followups/28r3_hdr_alarm_p45.png)
+![The sensor failed](followups/28r3_hdr_sensor_err_p45.png)
+
+The panels, one shape with their slots - the clock's, the notice's, the temperature's, the system
+panel (and on Linen):
+
+![Clock](followups/28r3_slot_clock_p45.png)
+![Notice](followups/28r3_slot_alarm_p45.png)
+![Temperature](followups/28r3_slot_sensor_p45.png)
+![System panel](followups/28r3_status_p45.png)
+![System panel, Linen](followups/28r3_status_linen_p45.png)
+
+UI Tweaks, then DISPLAY open under it; a card's SETTINGS, then its Card UI:
+
+![UI Tweaks](followups/28r3_tweaks_p45.png)
+![The deck under it](followups/28r3_tweaks_deck_p45.png)
+![SETTINGS](followups/28r3_settings_p45.png)
+![Card UI](followups/28r3_cardui_p45.png)
+
+The 4B (720 px): the header with an alarm, the system panel, UI Tweaks (each row's words above its
+selector), Card UI:
+
+![4B header](followups/28r3_hdr_alarm_4b.png)
+![4B system panel](followups/28r3_status_4b.png)
+![4B UI Tweaks](followups/28r3_tweaks_4b.png)
+![4B Card UI](followups/28r3_cardui_4b.png)
+
+## Tests for you
+
+From the PC (debug builds; RAM only, nothing saved):
+
+    curl "http://fleet-ws-p4-5/popup?alarmin=120"     an alarm in two hours: the bell and the notice
+    curl "http://fleet-ws-p4-5/popup?alarm=-1"        cleared
+    curl "http://fleet-ws-p4-5/popup?sensorerr=1"     the header's sensor shown failed; 0 puts it back
+
+| # | Do this | PASS if |
+|---|---|---|
+| U1 | Look at the House page | the Wi-Fi fan and the link are the mock's: centred, the same size whatever the frame; the greens softer |
+| U2 | UI Tweaks > Glyphs: Bare, Square, Circle; then each scheme | a glyph never shrinks; every glyph reads on Linen |
+| U3 | Tap each slot | the tab and its panel inside one accent outline, the bar's line broken where the panel comes out, every corner rounded |
+| U4 | Set an alarm in two hours (above) | a bell inside the clock's slot; the ringing bell, amber, among the status icons; the middle does not move |
+| U5 | Tap the notice; Dismiss | its panel (the time, how long); dismissed, the notice leaves and the clock's bell stays |
+| U6 | Tap the clock; Warn me before: Off, then 12 h | NEXT ALARM and the selector; Off keeps the notice away; it survives a reboot |
+| U7 | The system panel | CONNECTIVITY: Wi-Fi's network, dBm and address, Home Assistant "Connected, N entities", MQTT; then Log / UI Tweaks / About, the schemes beside Status bar, Col / Row |
+| U8 | Scheme: Linen, Fleet, Midnight; Status bar off and on | every page takes the scheme, and it survives a reboot; the toggle hides this page's bar |
+| U9 | Col + and Row + on one page; swipe to the other | only that page changes; both survive a reboot |
+| U10 | UI Tweaks (its button, or a swipe down on the left half) | the rows; AUDIO and DISPLAY rise at the foot, splitting the window's width |
+| U11 | Under UI Tweaks: open DISPLAY, move the brightness; tap in the window; tap outside it all | the slider works; the tap in the window only folds the panel; the tap outside closes the window, and the deck goes with it |
+| U12 | Each UI Tweaks row in turn | Card label, Entity label, Card state and Card density change every page; Selector and its shape redraw the rows in the new look; Window timeout and Timer bar from the next window; all survive a reboot |
+| U13 | Reset all | it asks first; then every row back as shipped (Square, Float, Custom, Fill, the scheme's selector, Compact, 60 s, On) |
+| U14 | Leave a header panel open, untouched | it closes after the window timeout (U12's choice) |
+| U15 | A card's window: SETTINGS > Card UI > Open; try each row | Entity label and Card label at once on the card; Selector in this window; Card density once the window closes; Window timeout at once; Timer bar from the next opening; each kept for this card only |
+| U16 | `sensorerr=1`, then `0` (above) | `--°` and the "!" beside it; then the reading again (T10) |
+| U17 | The 4B | as U1-U15 at 720 px |
+
+## Choices that were mine
+
+1. **The scheme is one for every page** now, saved (`system.ui.scheme`): UI Tweaks' choices are
+   device-wide, and a scheme per page beside them read as a fault. **Col / Row stay per page**
+   (your 2026-09-23 rule) and are saved with the page (`pages.<slug>.cols` / `rows`).
+2. **The word "Scheme" is left off the P4_5's system panel**: on its half-screen panel the three
+   names, the rule and the toggle fill the row. It shows on a panel with room; the names say what
+   they are.
+3. **CONNECTIVITY's words a face smaller** than the names, so SSID, dBm and address fit one line;
+   MQTT says how long since a message once one has come.
+4. **Reset all asks first** (a dialog) and leaves the scheme and the grid alone - those are the
+   system panel's.
+5. **The Selector rows set the look for the scheme showing** (K45: each scheme keeps its own).
+6. **Card UI's Card label "Custom"**: there is no way to type words on the device yet, so choosing
+   it keeps the words showing then (the group's name) as the card's own - they stop following a
+   rename. A PC still sets them (`/settings?card=..&label_text=..`).
+7. **When a Card UI choice shows**: Window timeout at once; Timer bar from the next opening (the
+   bar is made with the window); Card density once the window closes (the page is built again).
+8. **The deck under UI Tweaks** is only as tall as an open panel while it is up, so bringing it
+   forward redraws that strip and not the screen; it slides up and away in 220 ms.
+9. **The harness's new keys**: `tweaks=1|0`, `slot=deck0|deck1`, `sensorerr=1|0`, `view=6` (Card
+   UI); `scheme=N` now goes through the dashboard (header and page follow) and is never saved.
+
+## Questions for you
+
+- **Q10. The joins' size.** The corner where the outline meets the bar's line is `JOIN_R`, 6
+  logical px (~10 px on the P4_5). **Recommended: look at U3; say bigger or smaller.**
+- **Q11. The bottom-left swipe up** still shows the deck on the dashboard. D-25 made UI Tweaks the
+  only way to the deck. **Recommended: remove the gesture** when the deck's options are rehomed;
+  until then it does no harm.
+- **Q12. UI Tweaks scrolls on the P4_5** (nine rows, five in sight). **Recommended: keep while it is
+  a development window**; whittling it (D-25) fixes it.
+- **Q13. Card UI's rows stack on the P4_5** (a row's words above its five choices): the window is
+  not wide enough for both side by side. **Recommended: keep.**
+
+## Results
+
+- **The harness**, P4_5, round 2 (`r2c`) against round 3 (`r3`), 60 states (five new:
+  `slot_clock_alarm`, `header_sensor_err`, `tweaks`, `tweaks_deck`, `lamps_cardui`). What differs is
+  what round 3 changed: the header in every page state (the open tab's accent border, the stroke
+  glyphs, the bell and notice); the tag face at 24 (SETTINGS' title, the member rows, "Tap a member
+  for more details"); SETTINGS two rows shorter and one longer (Entity label and Card label out,
+  Card UI in), its panel 577 -> 600 px wide. 22 card-window states also show the house changed
+  between the captures (the Office desk lamps were on for `r2c`, off for `r3`). Windows opened
+  ~25% faster (`desk_main` 111 -> 87 ms, the rest ~29 -> ~21 ms; fewer SETTINGS rows to build).
+- **LVGL's pool**: **+12.9 KB** in every House state, +16.8 KB on Fleet (of the P4's 512 KB) - 78
+  more objects: the stroke glyphs' arcs and lines (4 -> 39 lines, 3 -> 12 arcs), the joins, the
+  system panel's new rows and finished buttons. **On an S3's 128 KB pool that is a tenth** -
+  worth a look when an S3 is next on the desk (W6).
+- **A fault found and fixed while taking the pictures**: on Linen the system panel kept Midnight's
+  dark buttons, their words invisible - a finished face is painted once, in the scheme it was made
+  in, and the panel is built once. It now builds its rows again on a scheme change
+  (`Panel_System::restyle()`); the Linen pictures above are after the fix.
+- **The 4B**: `header_alarm`, `system_panel`, `tweaks` captured (`r3`), Card UI by hand (the 4B's
+  own 10 s window timeout ends the harness's walk before it); pictures above.
+- **Host tests**: 34, all PASS (seven new for the glyph shapes).
+- **The structure check** (W13): files over 1,000 lines - `GUIManager.cpp` **1,509** (round 2
+  1,615: the knobs left for `GUIManagerTweaks.cpp`), `Card.cpp` 1,462; style calls outside the kit
+  **438** (round 2 492); colour literals **10** (round 2 46: the status glyphs' colours are tokens
+  now, `SIG_*`); no shape numbers; no LVGL in the core.
+- **The gate**: all nine SUCCESS (P4_5 41.9% flash, the 7B 37.8%, the S3s 34.9-37.0%).
+
+## Your results
+
+*(yours)*

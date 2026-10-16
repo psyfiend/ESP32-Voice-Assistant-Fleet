@@ -329,9 +329,8 @@ dots, `SLOT_GAP` and `LINE` are the values the bar had before it had slots; the 
 
 | Token | Value | What uses it |
 |---|---|---|
-| `GLYPH` | 28 | a status glyph's drawing box, bare - today's size |
-| `GLYPH_FRAMED` | 19 | the same glyph inside a frame |
-| `FRAME` | 26 | a glyph's frame: the rounded square, the circle |
+| `GLYPH` | 26 | a status glyph's drawing box - **the same bare or framed** (round 3, D-24: a frame never shrinks it; round 2's 28 bare / 19 framed are gone with `GLYPH_FRAMED`) |
+| `FRAME` | 28 | a glyph's frame: the rounded square, the circle - round the glyph, not inside its box |
 | `FRAME_R` | 7 | the rounded square's corners |
 | `FRAME_MIX` | 14 | the rounded square's shade: % of `TEXT` over the bar |
 | `SLOT_GAP` | 8 | between the things in one slot |
@@ -341,9 +340,27 @@ dots, `SLOT_GAP` and `LINE` are the values the bar had before it had slots; the 
 | `CLEAR` | 12 | at least this between a side and the middle - closer, the lowest keep gives way (`Layout/HeaderPlan.h`) |
 | `DOT_ON`, `DOT_OFF`, `DOT_RING`, `DOT_GAP` | 11, 8, 2, 5 | the page's dots: this page's, another's ring and its line, between them |
 | `MARK` | 12 | the error mark beside a slot's dashes |
-| `LINE` | 2 | the bar's accent line |
+| `LINE` | 2 | the bar's accent line - and the outline of an open slot and its panel, in the accent (round 3, D-23) |
+| `JOIN_R` | 6 | a cove (beside an open tab, in the bar) or a flare (beside its panel, below the line): the rounded corner where that outline meets the bar's line (round 3, D-23; its size is Q10 in `TEST_2.8.md`) |
 | `DRAWER_W` | 260 | a slot's panel at most |
 | `DRAWER_R`, `DRAWER_PAD`, `DRAWER_GAP`, `DRAWER_LINE` | 15, 10, 8, 2 | a slot's panel: its bottom corners, inside, between rows, its edge |
 
 Logical rather than millimetres (`UIShape`) because the bar they sit in is logical; the two agree
 to within the scale's clamps (1 logical px is ~0.15 mm wherever `sc()` is not clamped).
+
+**The status glyphs' colours (round 3, D-24 / D-27)** are palette tokens, `UIPalette`'s `SIG_*`,
+one set per scheme family - a glyph's colour is its link's state, so it lives with the scheme:
+
+| Token | Dark schemes (Fleet, Midnight) | Linen | What it means |
+|---|---|---|---|
+| `SIG_STRONG` | `34D399` | `1B7A3A` | Wi-Fi strong |
+| `SIG_GOOD` | `4ADE80` | `2F8F4E` | Wi-Fi good; a link that is up |
+| `SIG_WEAK` | `FBBF24` | `9A6412` | weak, or a link that is quiet |
+| `SIG_BAD` | `F87171` | `B4321F` | down |
+| `SIG_BUSY` | `60A5FA` | `1D5FD6` | joining, connecting |
+| `SIG_OFF` | `64748B` | `8A8076` | switched off |
+| `SIG_LINK` | `A78BFA` | `6B4FC8` | the MQTT link's arrows |
+
+The dark greens are the mocks' softer ones; Linen's are darker so they read on its light bar (T9's
+"Wi-Fi's green all but vanishes on Linen"). The glyphs themselves are numbers, not tokens:
+`UI/GlyphShapes.cpp` holds each stroke on a 24-unit grid, as the mocks drew them.

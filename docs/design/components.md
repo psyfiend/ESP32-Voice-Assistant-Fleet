@@ -147,8 +147,24 @@ History's span buttons are its first user (the chart's 24 / 12 / 6 / 1 h, activi
 in place of the chip row; "Show span buttons" still turns them off.
 
 Its **four looks** (Black or Silver, Square or Round) are per scheme and saved (K36, K45):
-`Kit::selectorLook()`, `Kit::keepSelectorLook()`. Its face, and a lit icon button's, is a **face
-drawn by hand** - a raised metal face or a soft dent, painted into PSRAM once (`KitFaces.cpp`).
+`Kit::selectorLook()`, `Kit::keepSelectorLook()`; since 2.8 round 3 a card's own look overrides the
+scheme's while its window is open (`Kit::selectorLookOverride()`, Card UI, D-28), and UI Tweaks'
+Reset all clears every scheme's (`Kit::forgetSelectorLooks()`). Its face, and a lit icon button's,
+is a **face drawn by hand** - a raised metal face or a soft dent, painted into PSRAM once
+(`KitFaces.cpp`). Up to five choices since round 3 (`SELECTOR_MAX`), and `spec.slotW` makes every
+compact choice one width (`Kit::selectorSlotW(words, n)`), so stacked selectors line up.
+
+### Choice rows - `Kit::choiceRows(parent, w, rows, n, S)`, `Kit::buttonRow(list)` (2.8 round 3)
+
+![UI Tweaks](../followups/28r3_tweaks_p45.png)
+
+**A list of choices, each its words and a compact selector** - UI Tweaks' and Card UI's rows (D-27:
+"a choice is the kit's selector, not a row of chips, wherever it fits"). Every choice is the width
+of the widest word in ANY row, so the rows line up choice for choice; where the words and the widest
+selector will not fit side by side (the 4B's window, Card UI's five choices on the P4_5), each row's
+words stand above its selector, centred. The list fills its parent's height and scrolls when it
+must. `Kit::ChoiceRow` is a row's words, choices, chosen one and `onChosen`; the caller keeps one
+`Kit::Selector` per row. `buttonRow()` adds a centred row of buttons after them (Tokens, Reset all).
 
 ### Icon button - `Kit::iconButton(parent, glyph, font, cb)`
 
@@ -236,9 +252,24 @@ beside a slot's dashes `KS_HDR_MARK` ("!" on a disc in `ST_WARN`).
 **A glyph's frame** (#19's open question, built as a setting): `GLYPH_BARE` an empty holder the
 glyph's own size; `GLYPH_SQUARE` the rounded square (`KS_GLYPH_SQUARE`, `FRAME` square, `FRAME_R`
 corners, `FRAME_MIX`% of `TEXT` over the bar); `GLYPH_CIRCLE` the circle (`KS_GLYPH_CIRCLE`), its
-colour the glyph's state - set by the glyph - and the glyph drawn in the bar's colour. Framed, a
-status glyph is drawn at `GLYPH_FRAMED` instead of `GLYPH`, and the link glyph leaves out its own
-square. What a slot holds is `Panel_Header`'s, by its kind (`UI/HeaderSlots.h`).
+colour the glyph's state - set by the glyph - and the glyph drawn in the bar's colour. **A frame
+never shrinks a glyph** (round 3, D-24): the glyph is `GLYPH` bare or framed, the frame `FRAME`
+round it. What a slot holds is `Panel_Header`'s, by its kind (`UI/HeaderSlots.h`).
+
+**A stroke glyph** (`Kit::strokeGlyph(g, parent, shape, px)`, round 3, D-27): the status glyphs are
+**numbers**, not a font - each stroke of the mocks' glyphs (an arc, a line or a dot on a 24-unit
+grid, `UI/GlyphShapes.h`, seven tests on the PC) drawn with LVGL's own round-capped arcs and lines,
+one object a stroke so each PART takes its own colour (`strokeGlyphPaint()`; the Wi-Fi fan lights
+arc by arc), shown or hidden by part (`strokeGlyphShow()`), and struck through on a halo of the
+ground (`strokeGlyphStrike()`, switched off on purpose). `Kit::StrokeGlyph` is its state.
+
+**One shape** (round 3, D-23): an open slot (`KS_HDR_SLOT_OPEN`, an accent border on its left, top
+and right, its box `FRAME_R` taller than the bar and clipped by it) and its panel share one accent
+outline that breaks through the bar's line. **Joins** round every corner where that outline meets
+the line: `Kit::joinCorner(parent, flare)` - a **cove** beside the tab, in the bar
+(`coveAt()`), a **flare** beside the panel, below the line (`flareAt()`) - `JOIN_R` round, filled
+with the shape's face and ringed in the accent over the bar or the ground (`KS_JOIN_FILL`,
+`KS_JOIN_RING_BAR`, `KS_JOIN_RING_GROUND`).
 
 ### A drawer - `Kit::drawer(D, parent, w)`, `drawerPlace()`, `drawerOpen()`, `drawerClose()` (2.8)
 
@@ -253,8 +284,18 @@ rule capped at `DRAWER_W`. Its lines: `drawerItem()` (full width, a finger tall,
 a ring - and words; `KS_DRAWER_ITEM`), `drawerNote()` (dim, wrapping) and `drawerBig()` (a time, a
 reading; `KS_DRAWER_BIG`). **The system panel is a drawer too** since 2.8 round 2 (D-20): its frame
 is `Kit::drawer()` at its own width rule (half a wide screen, three quarters of a middling one, all
-of a narrow one), hung under the status slot; its rows of buttons are still its own (development
-tools, D-17).
+of a narrow one), hung under the status slot. `drawerOpen(d, tabL, tabR)` takes its tab's span, and
+places a **flare** each side where the panel reaches past it (one shape, above); `drawerPlace()`
+keeps a panel `EDGE` from the screen's sides, where a tab stands, so a panel at an edge shares that
+side with its tab. The face's edge is the accent at `LINE`.
+
+**Its rows, round 3** (the system panel's new layout, D-22 / D-25): `drawerTitle()` a section's
+title (CONNECTIVITY); `drawerRow()` things side by side, the panel's width, `DRAWER_GAP` apart;
+`statusRow(face, what, &glyphRoom)` room for a glyph, what it is, and its live value dim, a face
+smaller, on one line and ellipsised - returns the value's label; `vrule(row, h)` a short upright rule
+setting one choice apart from another (`KS_RULE`); `toggleButton(parent, words, w, h, on, cb)` and
+`toggleButtonSet()` - glass while on, satin while off (#99's finishes); `selectorSet(S, i)` a
+selector's choice set from outside, with no `onChosen` (the scheme changed elsewhere).
 
 ---
 
@@ -289,16 +330,23 @@ bottom edge inside its border and between its rounded corners, shrinking toward 
 window has one; the Remove dialog, which closes with the window, shows the same over it.
 **The timeout and the bar are system settings** (K79), read as each sheet opens into
 `Sheet::closeMs`: 60 s untouched (D6) unless set to 30, 10 or never; with never, or the bar off,
-there is no bar (`Sheet::autoBar` is null) and the dialog shows none either. Set from a PC
-(`/settings?window_close=`, `window_bar=`) until the settings pages (4.1, #23).
+there is no bar (`Sheet::autoBar` is null) and the dialog shows none either. Set in UI Tweaks since
+2.8 round 3 (and from a PC, `/settings?window_close=`, `window_bar=`); `Kit::windowCloseMs()` and
+`Kit::windowBarShown()` read them - **the header's panels close on the same timeout** (D-22). A
+client may override both for its window (`SheetSpec::closeMs`, `SheetSpec::bar`): a card's Card UI.
+
+**Beside the window** (`Kit::sheetBeside()`, round 3, D-25): the catcher lets presses through to the
+children of one holder outside the window - the deck's panels, risen under UI Tweaks - and while
+one of them is open the window is out of reach as it is under the sheet's own panel: a press there
+only folds it. Forgotten when the sheet closes.
 
 | Client | What it adds to the frame |
 |---|---|
-| The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity |
-| "About this board" (`UI/AboutSheet`; every build, from the About button on the system panel's Log / Tokens / Cards / About row, K74, #97; debug builds also `GET /popup?about=1`) | one view of fact rows - the board, its screen and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second; no tabs, no panels |
+| The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties, Card UI), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity; its own timeout, bar and selector look (Card UI, D-28) |
+| "About this board" (`UI/AboutSheet`; every build, from the About button on the system panel, K74, #97; debug builds also `GET /popup?about=1`) | one view of fact rows - the board, its screen and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second; no tabs, no panels |
+| "UI Tweaks" (`UI/TweaksSheet`, 2.8 round 3; the system panel's UI Tweaks button, a swipe down on the left half, debug builds `GET /popup?tweaks=1`) | one view of choice rows, then Tokens and Reset all (asked in a dialog); what each row sets is `GUIManagerTweaks.cpp`'s; the deck rises beside it (`sheetBeside()`) |
 
-The second client is ~130 lines and owns no frame code: that is the point of it. Where it belongs
-in the product (the system panel?) is the owner's call; until then it is behind `DEBUG_POPUP`.
+The second client is ~130 lines and owns no frame code: that is the point of it.
 
 ---
 
