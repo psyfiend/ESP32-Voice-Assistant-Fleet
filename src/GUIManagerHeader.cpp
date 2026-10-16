@@ -68,9 +68,13 @@ void GUIManager::openSlotPanel(uint8_t slot) {
     if (!SlotPanels::build(_header.slotKind(slot), _slotDrawer.face, c)) return;
     syncPanelOffset();
     Kit::drawerPlace(_slotDrawer, _header.slotCentreX(slot), _slotDrawer.top);
-    Kit::drawerOpen(_slotDrawer);
+    // One shape (D-23): the panel's flares and the tab's coves, where the panel
+    // reaches past the tab.
+    int32_t tl, tr;
+    _header.slotSpan(slot, tl, tr);
+    Kit::drawerOpen(_slotDrawer, tl, tr);
     _slotPanel = (int8_t)slot;
-    _header.setOpenSlot(slot);
+    _header.setOpenSlot(slot, _slotDrawer.x, _slotDrawer.x + _slotDrawer.w);
     syncScrim();
 }
 

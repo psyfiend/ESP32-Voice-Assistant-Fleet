@@ -78,7 +78,7 @@ Each step committed and pushed on `feat/2.8-header-slots`; tick it here when it 
 - [x] 2. Type: the P4_5's TAG and header words 24 (D-26; `UIToolkit::Font_Header`)
 - [x] 3. Glyphs as data (`UI/GlyphShapes`, `Kit::strokeGlyph`), per-scheme status colours (`SIG_*`), one size bare or framed, the AP mast as its own claim (D-24, D-27)
 - [x] 4. The bell in the clock's slot (7 days), the 12-hour notice claim and its panel, the clock panel's NEXT ALARM and "Warn me before" (D-21); `/popup?alarmin=N`
-- [ ] 5. One shape in the accent: the open tab, coves, flares, panels aligned at a screen edge (D-23)
+- [x] 5. One shape in the accent: the open tab, coves, flares, panels aligned at a screen edge (D-23)
 - [ ] 6. The system panel: CONNECTIVITY, SYSTEM - DIAGNOSTICS (Log / UI Tweaks / About, Scheme + Status bar, Col / Row) (D-22, D-25)
 - [ ] 7. UI Tweaks (a Sheet): selector rows, saved, Reset all, Tokens; the deck rises under it; the left-half swipe; header panels follow the timeout
 - [ ] 8. Card UI: a SETTINGS row opening a view of selector rows (D-28); Entity / Card label leave SETTINGS

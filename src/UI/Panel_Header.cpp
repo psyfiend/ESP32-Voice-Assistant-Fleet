@@ -84,6 +84,9 @@ void Panel_Header::buildSlots() {
         (this->*ops(s.kind).build)(s);
     }
     for (uint8_t i = 0; i < _n; i++) (this->*ops(_slots[i].kind).update)(_slots[i], true);
+    // The open tab's coves, over the slots (D-23).
+    _cove[0] = Kit::joinCorner(_bar, false);
+    _cove[1] = Kit::joinCorner(_bar, false);
     plan();
     if (_open >= 0 && _open < _n) lv_obj_add_state(_slots[_open].box, LV_STATE_CHECKED);
     else _open = -1;
@@ -241,10 +244,32 @@ int32_t Panel_Header::slotCentreX(uint8_t i) const {
     return (a.x1 + a.x2) / 2;
 }
 
-void Panel_Header::setOpenSlot(int i) {
+void Panel_Header::slotSpan(uint8_t i, int32_t &l, int32_t &r) const {
+    l = r = -1;
+    if (i >= _n || !_slots[i].box) return;
+    lv_area_t a;
+    lv_obj_get_coords(_slots[i].box, &a);
+    l = a.x1;
+    r = a.x2 + 1;
+}
+
+void Panel_Header::setOpenSlot(int i, int32_t panelL, int32_t panelR) {
     if (_open >= 0 && _open < _n) lv_obj_remove_state(_slots[_open].box, LV_STATE_CHECKED);
     _open = (i >= 0 && i < _n) ? i : -1;
-    if (_open >= 0) lv_obj_add_state(_slots[_open].box, LV_STATE_CHECKED);
+    for (lv_obj_t *c : _cove) if (c) lv_obj_add_flag(c, LV_OBJ_FLAG_HIDDEN);
+    if (_open < 0) return;
+    lv_obj_add_state(_slots[_open].box, LV_STATE_CHECKED);
+    // THE COVES (D-23): where the panel reaches past the tab, the tab's side
+    // curves out into the line; where they share a side, a straight line.
+    int32_t l, r;
+    slotSpan((uint8_t)_open, l, r);
+    const int32_t barH = lv_obj_get_height(_bar);
+    const bool cl = panelL >= 0 && panelL < l;
+    const bool cr = panelR >= 0 && panelR > r;
+    Kit::coveAt(_cove[0], l, false, barH);
+    Kit::coveAt(_cove[1], r, true, barH);
+    if (cl) { lv_obj_remove_flag(_cove[0], LV_OBJ_FLAG_HIDDEN); lv_obj_move_foreground(_cove[0]); }
+    if (cr) { lv_obj_remove_flag(_cove[1], LV_OBJ_FLAG_HIDDEN); lv_obj_move_foreground(_cove[1]); }
 }
 
 void Panel_Header::slotClickCb(lv_event_t *e) {

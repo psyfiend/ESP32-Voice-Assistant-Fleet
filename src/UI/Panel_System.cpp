@@ -451,7 +451,7 @@ void Panel_System::toggle() {
     if (_onToggle) _onToggle(_expanded);
     if (_expanded) {
         UIToolkit::closeActiveAccordion();
-        Kit::drawerOpen(_drawer);
+        Kit::drawerOpen(_drawer, _tabL, _tabR);
     } else {
         Kit::drawerClose(_drawer, true);
     }

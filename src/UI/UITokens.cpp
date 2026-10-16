@@ -197,7 +197,7 @@ const UIHeader UI_HEADER = {
     .GLYPH = 26, .FRAME = 28, .FRAME_R = 7, .FRAME_MIX = 14,
     .SLOT_GAP = 8, .SLOT_PAD = 6, .EDGE = 8, .SPACE = 2, .CLEAR = 12,
     .DOT_ON = 11, .DOT_OFF = 8, .DOT_RING = 2, .DOT_GAP = 5,
-    .MARK = 12, .LINE = 2,
+    .MARK = 12, .LINE = 2, .JOIN_R = 6,
     .DRAWER_W = 260, .DRAWER_R = 15, .DRAWER_PAD = 10, .DRAWER_GAP = 8, .DRAWER_LINE = 2,
 };
 

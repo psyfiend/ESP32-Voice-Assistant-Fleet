@@ -21,9 +21,11 @@ lv_obj_t *headerSlot(lv_obj_t *bar, lv_event_cb_t cb, void *user) {
     add(s, KitStyle::KS_HDR_SLOT);
     add(s, KitStyle::KS_HDR_SLOT_PRESSED, LV_PART_MAIN | LV_STATE_PRESSED);
     add(s, KitStyle::KS_HDR_SLOT_OPEN,    LV_PART_MAIN | LV_STATE_CHECKED);
-    // The bar's full height; its width and x are the header plan's (round 2,
-    // Layout/HeaderPlan.h) - what it holds and its pads, measured.
-    lv_obj_set_height(s, lv_pct(100));
+    // The bar's full height and FRAME_R more, clipped by the bar - so an open
+    // slot's rounded corners show at its top only, and its face covers the
+    // bar's accent line (D-23); KS_HDR_SLOT's padding below keeps what it holds
+    // in the bar. Its width and x are the header plan's (Layout/HeaderPlan.h).
+    lv_obj_set_height(s, UIToolkit::systemHeaderFullPx() + UI::sc(UI::hdr().FRAME_R));
     lv_obj_add_flag(s, LV_OBJ_FLAG_CLICKABLE);
     if (cb) lv_obj_add_event_cb(s, cb, LV_EVENT_CLICKED, user);
     return s;

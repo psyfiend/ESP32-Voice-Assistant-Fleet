@@ -99,6 +99,10 @@ public:
     // Kit::Drawer like every other slot's panel - the same frame, slide and
     // joined look; its buttons are development tools (D-17).
     void setAnchorX(int32_t centreX);
+    // The status slot's tab [l, r), for the panel's flares (D-23); and where the
+    // panel stands [l, r), for the tab's coves.
+    void setTab(int32_t l, int32_t r) { _tabL = l; _tabR = r; }
+    void panelSpan(int32_t &l, int32_t &r) const { l = _drawer.x; r = _drawer.x + _drawer.w; }
     void setVariantLabel(const char *text);
     void setFillLabel(const char *text);
     void setAreaLabel(const char *text);
@@ -203,6 +207,7 @@ private:
     
     // -- Logic --
     bool _expanded;
+    int32_t _tabL = -1, _tabR = -1;
     ToggleCallback _onToggle;
 
     // -- Callbacks --

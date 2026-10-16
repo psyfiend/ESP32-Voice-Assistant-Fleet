@@ -238,15 +238,40 @@ static void fill() {
     lv_style_set_pad_all     (hb, 0);
     // No flex: where each slot stands is the header plan's (round 2) - the
     // sides at the ends, the middle on the centre.
+    // A slot reaches FRAME_R past the bar's foot (Kit::headerSlot()): the bar
+    // clips it there, so an open slot's rounded corners show only at its top.
+    // Its padding below pays that back, so what it holds sits in the bar.
     lv_style_t *hs = st(S::KS_HDR_SLOT);
     lv_style_set_pad_hor   (hs, UI::sc(h.SLOT_PAD));
-    lv_style_set_pad_ver   (hs, 0);
+    lv_style_set_pad_top   (hs, 0);
+    lv_style_set_pad_bottom(hs, UI::sc(h.FRAME_R) + UI::sc(h.LINE));
     lv_style_set_pad_column(hs, UI::sc(h.SLOT_GAP));
+    lv_style_set_radius    (hs, UI::sc(h.FRAME_R));
     flex(hs, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_style_set_bg_color(st(S::KS_HDR_SLOT_PRESSED), UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, 12)));
     lv_style_set_bg_opa  (st(S::KS_HDR_SLOT_PRESSED), LV_OPA_COVER);
-    lv_style_set_bg_color(st(S::KS_HDR_SLOT_OPEN),    UI::c(p.SURFACE));   // the drawer's face
-    lv_style_set_bg_opa  (st(S::KS_HDR_SLOT_OPEN),    LV_OPA_COVER);
+    // OPEN: the tab of one shape with its panel (D-23) - the panel's face and an
+    // accent edge on three sides, the bar's accent line covered beneath it, so
+    // the panel pours out of the bar itself.
+    lv_style_t *ho = st(S::KS_HDR_SLOT_OPEN);
+    lv_style_set_bg_color    (ho, UI::c(p.SURFACE));
+    lv_style_set_bg_opa      (ho, LV_OPA_COVER);
+    lv_style_set_border_color(ho, UI::c(p.ACCENT));
+    lv_style_set_border_width(ho, UI::sc(h.LINE));
+    lv_style_set_border_side (ho, (lv_border_side_t)(LV_BORDER_SIDE_LEFT | LV_BORDER_SIDE_TOP | LV_BORDER_SIDE_RIGHT));
+    // The joins: the fill, and a ring of the accent around what is outside.
+    lv_style_t *jf = st(S::KS_JOIN_FILL);
+    lv_style_set_bg_color(jf, UI::c(p.SURFACE));
+    lv_style_set_bg_opa  (jf, LV_OPA_COVER);
+    for (S r : { S::KS_JOIN_RING_BAR, S::KS_JOIN_RING_GROUND }) {
+        lv_style_t *js = st(r);
+        lv_style_set_bg_opa      (js, LV_OPA_COVER);
+        lv_style_set_radius      (js, LV_RADIUS_CIRCLE);
+        lv_style_set_border_color(js, UI::c(p.ACCENT));
+        lv_style_set_border_width(js, UI::sc(h.LINE));
+    }
+    lv_style_set_bg_color(st(S::KS_JOIN_RING_BAR),    UI::c(p.SURFACE_ALT));
+    lv_style_set_bg_color(st(S::KS_JOIN_RING_GROUND), UI::c(p.GROUND));
     text(S::KS_HDR_TEXT,     UIToolkit::Font_Header, p.TEXT);   // the bar's words (D-26)
     text(S::KS_HDR_TEXT_DIM, UIToolkit::Font_Caption,     p.TEXT_DIM);
     text(S::KS_HDR_ICON,     t.ICON_SM,                   p.TEXT);
@@ -317,8 +342,10 @@ static void fill() {
     lv_style_t *df = st(S::KS_DRAWER_FACE);
     lv_style_set_bg_color    (df, UI::c(p.SURFACE));
     lv_style_set_bg_opa      (df, LV_OPA_COVER);
-    lv_style_set_border_width(df, UI::sc(h.DRAWER_LINE));
-    lv_style_set_border_color(df, UI::border());
+    // Its edge is the accent, the bar's line's width (D-23): with the open
+    // slot's, one outline from the tab's top to the panel's foot.
+    lv_style_set_border_width(df, UI::sc(h.LINE));
+    lv_style_set_border_color(df, UI::c(p.ACCENT));
     lv_style_set_radius      (df, UI::sc(h.DRAWER_R));
     lv_style_set_pad_hor     (df, UI::sc(h.DRAWER_PAD));
     lv_style_set_pad_bottom  (df, UI::sc(h.DRAWER_PAD));

@@ -208,7 +208,8 @@ struct UIHeader {
     uint8_t DOT_RING;      //  2  the ring's line
     uint8_t DOT_GAP;       //  5  between dots
     uint8_t MARK;          // 12  the error mark beside a slot's dashes
-    uint8_t LINE;          //  2  the bar's accent line
+    uint8_t LINE;          //  2  the bar's accent line - and the outline of an open slot and its panel (D-23)
+    uint8_t JOIN_R;        //  6  a cove or flare: the rounded corner where that outline meets the line
     // A slot's drawer - the system panel's shape, which it was before it had a name
     uint16_t DRAWER_W;     // 260 a slot's panel at most (the status slot's is the system panel)
     uint8_t DRAWER_R;      // 15  its bottom corners

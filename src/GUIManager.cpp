@@ -198,8 +198,15 @@ void GUIManager::toggleSystemPanel() {
     if (!_pnlSystem.isExpanded()) {
         closeSlotPanel(false);
         const int s = _header.slotOf(SlotKind::SLOT_STATUS);
-        if (s >= 0) _pnlSystem.setAnchorX(_header.slotCentreX((uint8_t)s));
-        else        _pnlSystem.setAnchorX(lv_obj_get_width(lv_screen_active()));   // no slot: the right edge, as before
+        if (s >= 0) {
+            _pnlSystem.setAnchorX(_header.slotCentreX((uint8_t)s));
+            int32_t tl, tr;
+            _header.slotSpan((uint8_t)s, tl, tr);
+            _pnlSystem.setTab(tl, tr);   // its flares (D-23)
+        } else {
+            _pnlSystem.setAnchorX(lv_obj_get_width(lv_screen_active()));   // no slot: the right edge, as before
+            _pnlSystem.setTab(-1, -1);
+        }
     }
     _pnlSystem.toggle();
 }
@@ -836,7 +843,11 @@ void GUIManager::begin() {
         // The status slot is drawn open while its panel shows (2.8). The
         // scrim is synced after toggle() has set the drawer's state, so read
         // isOpen rather than isExpanded() here.
-        if (isOpen) s_self->_header.setOpenSlot(s_self->_header.slotOf(SlotKind::SLOT_STATUS));
+        if (isOpen) {
+            int32_t pl, pr;
+            s_self->_pnlSystem.panelSpan(pl, pr);
+            s_self->_header.setOpenSlot(s_self->_header.slotOf(SlotKind::SLOT_STATUS), pl, pr);
+        }
         else if (s_self->_slotPanel < 0) s_self->_header.setOpenSlot(-1);
         if (s_self->_dismissScrim) {
             if (isOpen || s_self->_slotPanel >= 0) lv_obj_add_flag  (s_self->_dismissScrim, LV_OBJ_FLAG_CLICKABLE);

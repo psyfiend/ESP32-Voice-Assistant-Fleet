@@ -48,8 +48,44 @@ int32_t drawerWidth() {
     return w > cap ? cap : w;
 }
 
+// ONE SHAPE (D-23). A join is a square of the shape's fill holding a ring of the
+// accent - a circle whose inside is what lies outside the shape - clipped to the
+// square, so a quarter of it shows: the outline turning from the line into a
+// side, rounded. Its radius is JOIN_R and the line's width; R0 is both.
+static int32_t joinR0() { return UI::sc(UI::hdr().JOIN_R) + UI::sc(UI::hdr().LINE); }
+
+lv_obj_t *joinCorner(lv_obj_t *parent, bool flare) {
+    const int32_t r0 = joinR0();
+    lv_obj_t *sq = plain(parent);
+    add(sq, KitStyle::KS_JOIN_FILL);
+    lv_obj_set_size(sq, r0, r0);
+    lv_obj_t *ring = plain(sq);
+    add(ring, flare ? KitStyle::KS_JOIN_RING_GROUND : KitStyle::KS_JOIN_RING_BAR);
+    lv_obj_set_size(ring, 2 * r0, 2 * r0);
+    lv_obj_add_flag(sq, LV_OBJ_FLAG_HIDDEN);
+    return sq;
+}
+
+// Beside a tab, in the bar: the tab's side curving out into the line.
+void coveAt(lv_obj_t *j, int32_t edgeX, bool right, int32_t barH) {
+    if (!j) return;
+    const int32_t r0 = joinR0(), b = UI::sc(UI::hdr().LINE);
+    lv_obj_set_pos(j, right ? edgeX - b : edgeX + b - r0, barH - r0);
+    lv_obj_set_pos(lv_obj_get_child(j, 0), right ? 0 : -r0, -r0);
+}
+
+// Beside a panel, below the bar: the line curving down into the panel's side.
+void flareAt(lv_obj_t *j, int32_t edgeX, bool right, int32_t top) {
+    if (!j) return;
+    const int32_t r0 = joinR0(), b = UI::sc(UI::hdr().LINE);
+    lv_obj_set_pos(j, right ? edgeX - b : edgeX + b - r0, top - b);
+    lv_obj_set_pos(lv_obj_get_child(j, 0), right ? 0 : -r0, 0);
+}
+
 void drawer(Drawer &d, lv_obj_t *parent, int32_t w) {
     d.w = w;
+    d.flare[0] = joinCorner(parent, true);
+    d.flare[1] = joinCorner(parent, true);
     d.root = plain(parent);
     add(d.root, KitStyle::KS_DRAWER);
     lv_obj_add_style(d.root, UI::paint(UIPaint::PAINT_LIFT), 0);
@@ -73,16 +109,30 @@ void drawer(Drawer &d, lv_obj_t *parent, int32_t w) {
 void drawerPlace(Drawer &d, int32_t centreX, int32_t top) {
     if (!d.root) return;
     const int32_t screenW = lv_obj_get_width(lv_screen_active());
-    const int32_t margin  = d.w >= screenW ? 0 : UI::sc(UI::hdr().DRAWER_PAD);
+    // EDGE from the screen's sides: where the outermost slot's tab stands, so a
+    // panel pushed to an edge shares that side with its tab - one straight line.
+    const int32_t margin  = d.w >= screenW ? 0 : UI::sc(UI::hdr().EDGE);
     int32_t x = centreX - d.w / 2;
     if (x + d.w > screenW - margin) x = screenW - margin - d.w;
     if (x < margin) x = margin;
     lv_obj_set_pos(d.root, x, top);
+    d.x = x;
     d.top = top;
 }
 
-void drawerOpen(Drawer &d) {
+void drawerOpen(Drawer &d, int32_t tabL, int32_t tabR) {
     if (!d.root) return;
+    // The flares: where the panel reaches past its tab, the bar's line curves
+    // down into the panel's side; where they share a side, a straight line.
+    const bool fl = tabL >= 0 && d.x < tabL;
+    const bool fr = tabR >= 0 && d.x + d.w > tabR;
+    flareAt(d.flare[0], d.x, false, d.top);
+    flareAt(d.flare[1], d.x + d.w, true, d.top);
+    for (uint8_t i = 0; i < 2; i++) {
+        if (!d.flare[i]) continue;
+        if (i ? fr : fl) { lv_obj_remove_flag(d.flare[i], LV_OBJ_FLAG_HIDDEN); lv_obj_move_foreground(d.flare[i]); }
+        else             lv_obj_add_flag(d.flare[i], LV_OBJ_FLAG_HIDDEN);
+    }
     // Measured, never guessed (the system panel's #50 lesson): the face is
     // content-sized, so it has a true height while the wrapper is closed.
     lv_obj_clear_flag(d.root, LV_OBJ_FLAG_HIDDEN);
@@ -99,6 +149,7 @@ void drawerOpen(Drawer &d) {
 void drawerClose(Drawer &d, bool anim) {
     if (!d.root) return;
     d.open = false;
+    for (lv_obj_t *f : d.flare) if (f) lv_obj_add_flag(f, LV_OBJ_FLAG_HIDDEN);
     if (anim) { animate(d, 0); return; }
     lv_anim_delete(&d, slide);
     slide(&d, 0);

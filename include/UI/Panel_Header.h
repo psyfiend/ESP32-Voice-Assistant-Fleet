@@ -71,7 +71,11 @@ public:
     bool        slotShown(uint8_t i) const;      // on the bar now (a claim may not be)
     uint8_t     slotForm(uint8_t i) const;       // 0 the fullest; HeaderSlots.h
     int32_t     slotCentreX(uint8_t i) const;    // its centre on the screen
-    void        setOpenSlot(int i);              // drawn open while its panel shows; -1 none
+    void        slotSpan(uint8_t i, int32_t &l, int32_t &r) const;   // its tab's outer edges [l, r)
+    // Drawn open while its panel shows (-1: none) - the tab of one shape with
+    // a panel spanning [panelL, panelR) (D-23): a COVE rounds each side of the
+    // tab the panel reaches past.
+    void        setOpenSlot(int i, int32_t panelL = -1, int32_t panelR = -1);
     int         openSlot() const { return _open; }
     // How often a slot has redrawn since it was built: the proof that the
     // clock redraws once a minute and a sensor only when its value moves.
@@ -132,6 +136,7 @@ private:
     static void slotClickCb(lv_event_t *e);
 
     lv_obj_t       *_bar = nullptr;
+    lv_obj_t       *_cove[2] = {};      // the open tab's joins to the line, left and right
     Slot            _slots[HEADER_SLOTS_MAX];
     uint8_t         _n = 0;
     const SlotSpec *_spec = nullptr;
