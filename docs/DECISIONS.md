@@ -24,7 +24,7 @@ How to use it:
 | W2 | Nothing reaches `main` without the all-nine compile gate and a look on glass; no quick-fix branches during the interview (mocks instead); demos on one board | 2026-10-01 | HANDOFF |
 | W3 | Versions `v0.<phase>.<release>`: the release number counts signed-off, tagged merges to `main`, not milestones | 2026-10-05 | CHANGELOG, HANDOFF |
 | W4 | Prefer ESP-IDF facilities to Arduino-only ones; an IDF migration is expected | 2026-09-24 | CLAUDE.md |
-| W5 | Dev boards while building: WS_P4_5 and WS_S3_4B; WS_P4_5 alone while the owner tests; all nine before a merge | 2026-09-28 / 10-04 | HANDOFF |
+| W5 | Dev boards while building and testing: WS_P4_5 and WS_P4_4B (the narrow screen; WS_S3_4B is locked up, #69, and compiled only); **the all-nine build runs once, right before a merge - never per test round** (the owner, 2026-10-17) | 2026-09-28 / 10-04 / 10-17 | HANDOFF |
 | W6 | Snappy and responsive first, eye candy second | 2026-10-04 | `card-sheet.md` §14, LESSONS |
 | W7 | Recommend one option, ask before building on an assumption, discuss a structural choice a turn before building it; plain language | standing | HANDOFF |
 | W8 | Files are written with Edit/Write, never piped through a shell | 2026-09-18 | CLAUDE.md |

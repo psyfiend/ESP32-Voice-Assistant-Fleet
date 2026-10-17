@@ -438,6 +438,9 @@ The owner liked that the mocks' area tag partly overlaps its card. Decisions:
   **Direction for later:** an earth / neutral tone, "something in between olive and terracotta",
   not a jewel tone like the deep teal. Colours come out notably different on the device (#82), so
   the next try is chosen on glass from two or three candidates, not from a mock.
+- **Settled on glass, 2026-10-17 (2.8 round 6, D-32/D-33): `D47F45`**, between burnt amber and
+  terracotta, picked from four candidates tried live (`/popup?active=RRGGBB`) with the cards'
+  active frames, which go darker on Linen to stand out.
 - **Header icons: 2+ (stronger chip), 4 (filled circle) and 2+ with the clock** are all good -
   for 2.8 (#19).
 - **Cluster header bars are CLEAR unless the page is in Bar mode** - "users (I) might not want
@@ -491,6 +494,7 @@ build sheet as a configuration template (§3.10), the floating tag (§3.11, merg
 distance, text targets and uniformity (§3.13, #73), cluster headers clear unless Bar mode.
 
 **Open, with what settles them:** the arranger's scoring weights (play with the Layout Playground);
-cluster-header icon encapsulation (2.8, #19); a better Linen "on" between olive and terracotta
-(two or three candidates on glass); folder-tab style on the device (#80); panel colour per board
+cluster-header icon encapsulation (the page header's glyph frames settled in 2.8; cluster headers
+come with 2.11); ~~a better Linen "on"~~ settled, `D47F45` (2026-10-17); folder-tab style on the
+device (#80); panel colour per board
 (#82); custom HA icon packs (#83).

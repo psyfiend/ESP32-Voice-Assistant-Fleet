@@ -102,7 +102,8 @@ DECISIONS D-11 to D-15.
   up, a door open too long. -> #76.
 - **An active card's border** (owner): in place of a card turning all yellow or green, a thicker
   border in a contrasting but complementary colour glowing inward toward the icon - "a slate card
-  turning yellow is boring. Obvious, but boring." -> #106.
+  turning yellow is boring. Obvious, but boring." -> #106, **built in 2.8 rounds 4-7** as the
+  cards' active frames (Corner cut the default; D-30 to D-33) and closed.
 - **The clock's form** (Q3) was not answered. The owner's own example writes "1:55am". Claude's
   view: 12-hour with am / pm, no seconds in the bar; 24 h and seconds as settings.
 
