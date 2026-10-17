@@ -781,4 +781,123 @@ settings files as found (saved before every flash).
 
 ## Your results
 
+**W1-W8 all PASS** (2026-10-17). "You nailed it ... this looks a million times better ...
+Completely transforms the look." Both Bracket and Corner cut "fucking amazing"; the press
+animation and the active frame together - the border lighting and sinking in, then blinking into
+its new shape on the long press - "I could not have designed it that way on purpose". "I love the
+new power button!!"
+
+**Notes for round 6:**
+
+1. **Linen's active frames are not loud enough.** On Fleet and Midnight the frames glow against
+   the dark; on Linen the olive is not standout obvious, and every card already has a shadow and
+   contrasts with the floor. Go the other way on Linen - darker encroaching frames. Why is the
+   corner cut off on Linen (the shadow? the cost?), and how long does a new border take to draw?
+2. **The unlit chips in UI Tweaks and Card UI get satin** - flat black reads as voids in the
+   window; on Linen a solid white pill blends into the window, so at least a faint border.
+3. **Linen's active colour**: olive was a stop-gap. Try **copper** for Fill and for the frames,
+   or something between burnt amber and terracotta - judged on glass, since the artifact's colours
+   do not match the panel.
+
+**Measured for note 1** (P4_5, House, Midnight, two active cards, `/bench?n=30&what=full` - a
+whole-screen redraw, as on a page change): Fill 88.3 ms, Bracket 93.3 ms, Corner cut 103.2 ms -
+about 2.5 ms per active card for Bracket and 7.5 ms for Corner cut. A value change redraws only
+its own card.
+
+**And one more** (the same evening): on Linen, when a slot's panel opens, the bar's accent line
+opens for it but **the bar's drop shadow stays in view across the top of the panel**.
+
+---
+
+# Round 6 - Linen's active states, satin chips, the header's shadow (2026-10-17, early morning)
+
+Branch `feat/2.8-header-slots`, with you at the desk. **No pull request**; the all-nine build waits
+for the merge. On the desk: the P4_5 and the 4B run round 6, their settings files as found (saved
+before every flash). Office Desk was switched on for the pictures and the timings, and off again.
+
+## What changed since round 5
+
+| Where | Round 5 | Round 6 |
+|---|---|---|
+| **Linen's active colour** | olive `9AA35A` | **copper `B8662E`** for you to judge on glass, with a key to try the others without a build: `/popup?active=RRGGBB` (not saved; `active=0` the scheme's own) |
+| **The frames on Linen** | the active colour, as on the dark schemes | **darker**: the edge 35% of the way from the active colour to Linen's text, the light inward half that, and stronger (150 of 255, was 115). The dark schemes are unchanged |
+| **Corner cut on Linen** | shown as the bracket | **the corner cut**, with a shadow drawn along each cut where the card's square shadow used to be left behind |
+| **UI Tweaks, Card UI chips** | unlit flat | **unlit satin** (on Linen satin's edge is a shade - the faint border); lit as before |
+| **The header on Linen** | its shadow across an open panel's top | **the panel's face over the shadow**: the panel pours out of the bar clean |
+
+## Answers to round 5's notes
+
+- **Why the corner cut was off on Linen**: your call in round 4, "under the presumption we may need
+  to re-work it" - and it did: LVGL draws a card's drop shadow only as a rounded rectangle, so a cut
+  corner left the square corner's shadow behind it. Now the cut covers that shadow and draws its
+  own along the cut.
+- **What a frame costs to draw**, a whole-screen redraw (a page change) on the P4_5, House page:
+
+  | Scheme, lit cards | Fill | Bracket | Corner cut |
+  |---|---|---|---|
+  | Midnight, two | 88.3 ms | 93.3 ms (+2.5 a card) | 103.2 ms (+7.5 a card) |
+  | Linen, one | 139.0 ms | 143.6 ms (+4.6) | 152.4 ms (+13.4) |
+
+  Linen's corner cut is the dear one - its triangles and diagonal lines are drawn by the CPU over
+  their whole bounding box, in every 50-line strip of the screen they cross, and twice (outside the
+  card, then inside it, over the contents). A value change redraws only its own card. If the corner
+  cut stays, it can be made cheaper; the bracket is cheap as it is.
+
+## The pictures
+
+![Linen's candidates](followups/28r6_linen_colours_p45.png)
+
+*Across: copper `B8662E`, between burnt amber and terracotta `D47F45`, terracotta `CF7350`, burnt
+amber `D98A3A`. Down: Corner cut, Bracket, Fill. Judge them on glass - `/popup?active=` below.*
+
+![Corner cut on Linen](followups/28r6_corner_linen_zoom_p45.png)
+![Bracket on Linen](followups/28r6_bracket_linen_zoom_p45.png)
+![Power on Linen](followups/28r6_power_linen_p45.png)
+![UI Tweaks, Linen](followups/28r6_tweaks_linen_p45.png)
+![UI Tweaks, Midnight](followups/28r6_tweaks_midnight_p45.png)
+![Card UI, Linen](followups/28r6_cardui_linen_p45.png)
+![The clock's panel on Linen](followups/28r6_header_panel_p45.png)
+![...close](followups/28r6_header_panel_zoom_p45.png)
+![4B UI Tweaks](followups/28r6_tweaks_4b.png)
+![4B, the clock's panel on Linen](followups/28r6_header_panel_4b.png)
+
+## Tests for you
+
+    curl "http://fleet-ws-p4-5/popup?active=D47F45"   the active colour, not saved (0: the scheme's own)
+    curl "http://fleet-ws-p4-5/popup?cardstate=3"     Corner cut, not saved (2 Bracket, 0 Fill; -1 yours)
+
+| # | Do this | PASS if |
+|---|---|---|
+| X1 | Linen, a light on, Card state Bracket | the bars dark copper and loud on the cream, the light falling inward |
+| X2 | Linen, Corner cut | top-right and bottom-left cut, the card's shadow following the cut, no square shadow left at the corners |
+| X3 | Try the colours with `active=` in each state | one of them is Linen's "on" (or none, and say what to try) |
+| X4 | Fleet and Midnight, both frames | as round 5 |
+| X5 | UI Tweaks and Card UI, every scheme | unlit chips satin - no voids on the dark schemes, a faint edge on Linen; a tapped chip lights at once |
+| X6 | Linen, open each header panel | no shadow line across the panel under its slot; the shadow still under the rest of the bar |
+| X7 | A light's window on Linen: Power on | lit glass in the new colour, its icon dark and clear |
+
+## Choices that were mine
+
+1. **Darker by a token, not a second colour**: Linen's frame edge is derived (`ACTIVE_INK` 35% toward
+   the text), so whichever colour wins, the edge follows it.
+2. **Copper shares the accent's hue** (`A8561C`, a little darker), so on Linen "on" and "chosen"
+   are one colour - the frames' shapes say "on" as well now. Terracotta is the one furthest from it.
+3. **Lit chips stay their role's tint and accent ring** - you asked for satin on the unlit ones.
+
+## Questions for you
+
+- **Q17. Linen's "on"**: which colour (X3)?
+- **Q18. Bracket or Corner cut** for your own (Q15)? If the corner cut, I make it cheaper first.
+
+## Results
+
+- **On glass**: P4_5 every picture above; the 4B's UI Tweaks (stacked, satin) and its clock panel
+  on Linen. No face came out flat (`/popup` "faces flat so far 0").
+- **Two traps found on the way**, now in LESSONS: LVGL 9.5 clips an object's `DRAW_POST` to its own
+  area, so anything drawn outside an object goes in `DRAW_MAIN_END`; and anti-aliased triangles that
+  share an edge leave a pale seam.
+- **Not run this round**: the harness's full walk, the all-nine gate (pre-merge only).
+
+## Your results
+
 *(yours)*

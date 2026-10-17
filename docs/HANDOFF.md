@@ -1,4 +1,4 @@
-# Handoff — 2026-10-17 (2.8 round 5 built - chip rows, lit frames, lit glass - for the owner's test)
+# Handoff — 2026-10-17 (2.8 round 6 built - Linen's active states, satin chips, the header's shadow - for the owner's test)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -44,9 +44,13 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
 
 - **`v0.2.17` - A17** is the release on `main` (flashed on the 1060). Copies of every board's
   settings file are in `bench/settings/<board>/` - one is saved before every flash.
-- **2.8 round 5 is built, on `feat/2.8-header-slots`** (no PR; **`TEST_2.8.md` round 5 is the
-  owner's sheet**, W1-W8, Q16). Round 4 was tested 2026-10-17 - every test PASS - and the owner's
-  notes became round 5 (D-31): **UI Tweaks and Card UI on chip rows** (`Kit::chipTable`: two
+- **2.8 round 6 is built, on `feat/2.8-header-slots`** (no PR; **`TEST_2.8.md` round 6 is the
+  owner's sheet**, X1-X7, Q17-Q18). Round 5 was tested 2026-10-17 - every test PASS - and the
+  owner's notes became round 6 (D-32): Linen's frames darker and stronger (`ACTIVE_INK`), the
+  corner cut on Linen with its own shadow, Linen's "on" copper for now (`/popup?active=` tries
+  others), unlit chips satin, the header's shadow kept off an open panel. Open: which colour, and
+  Bracket or Corner cut (Linen's corner cut costs ~13 ms a lit card on a page change - trim it if
+  it stays). Round 5 (D-31): **UI Tweaks and Card UI on chip rows** (`Kit::chipTable`: two
   columns, the longest row centred; the 4B stacks each name above its chips), Card UI's Inherit as
   each row's first chip; **Card state Fill / Icon glow / Bracket / Corner cut**, the two frames
   drawn and lit inward in draw events (`Cards/CardFrame.cpp`, no layout change), the corner cut
@@ -69,7 +73,8 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
     under it. **Card UI**: the same per card, a view of the card window (`PopupCardUi.cpp`).
   - **Choices made unattended** are D-29 (the scheme one for every page; Col / Row saved per page;
     Card label "Custom" keeps the words showing) - the owner confirms or reverses them.
-- **Boards**: the P4_5 and the 4B run round 5 (local lines), the 1060 `v0.2.17`. The 4B's own file
+- **Boards**: the P4_5 and the 4B run round 6 (local lines), the 1060 `v0.2.17`. Flash them with
+  `PYTHONIOENCODING=utf-8` set (LESSONS) - esptool at 921600 to `0x10000` is what round 6 used. The 4B's own file
   closes a window after 10 s (`system.window.close`), which stops the harness's full walk there -
   use `--only`, or ask the owner.
 - **The mock**: the "2.8 Header Slots" canvas
@@ -79,7 +84,7 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
 
 ## What is next with the owner
 
-1. **2.8 round 5, the owner's test** (`TEST_2.8.md` round 5). Then sign-off -> CHANGELOG
+1. **2.8 round 6, the owner's test** (`TEST_2.8.md` round 6). Then sign-off -> CHANGELOG
    `v0.2.18`, archive the sheet, the all-nine gate, `gh pr create`; the owner merges.
 2. **#76 next, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a
    queue any task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to

@@ -929,3 +929,24 @@ without a reset, which only the bootloader answers. esptool's RTS hard reset doe
 native-USB P4 out of a download mode its BOOT pin forced; **`--after watchdog-reset` does** - the
 app was up 20 s later. So, for a native-USB board that will not flash: the BOOT button, a slower
 baud, and a watchdog reset at the end.
+
+## Drawing outside an object: DRAW_MAIN_END, never DRAW_POST (2.8 round 6, 2026-10-17)
+
+The header bar was to paint an open panel's face back over its own drop shadow, from its
+`DRAW_POST`. It built, flashed, and changed nothing. **LVGL 9.5 clips an object's `DRAW_POST` to
+the object's own area** whenever it has children (`lv_refr.c`, `lv_obj_redraw()`: the post events
+get `clip_coords_for_children`), and skips them entirely when the area being redrawn misses the
+object - so nothing below the bar could ever be drawn there. `DRAW_MAIN_BEGIN` / `MAIN` /
+`MAIN_END` get the object's area *plus its ext draw size* (its shadow's reach). **Anything drawn
+outside an object goes in `DRAW_MAIN_END`**; anything that must be over its children, inside it,
+in `DRAW_POST` - the corner cut does both (`Cards/CardFrame.cpp`). An object made
+`OVERFLOW_VISIBLE` would get the wider clip in POST too, at the cost of letting its children out.
+
+The same pass found the other trap: **two anti-aliased triangles sharing an edge leave a pale
+seam** along it - each fades out over the same pixel, so what is under shows through both. Cover a
+shared edge with a 2 px line in the same colour, or use one triangle whose other edges lie outside
+the clip.
+
+And one not new: piping `pio run -t upload` through `grep` left esptool hung for twelve minutes -
+its progress bar's characters crash a cp1252 pipe. The `PYTHONIOENCODING=utf-8` lesson above is
+the fix; it was not followed.

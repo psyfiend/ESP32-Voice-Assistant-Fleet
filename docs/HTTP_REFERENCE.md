@@ -278,6 +278,7 @@ order.
 | `/popup?tweaks=1` / `tweaks=0` | 2.8 round 3: UI Tweaks opened / closed, as the system panel's button; the deck rises under it. UI |
 | `/popup?sensorerr=1\|0` | 2.8 round 3 (T10): the header's sensor shown failed - `--°` and the "!" - whatever its entity says; `0` as it is again. **RAM only**. UI |
 | `/popup?cardstate=N` | 2.8 round 4: the cards' active state, as UI Tweaks' Card state - `0` Fill, `1` Icon glow, `2` Bracket, `3` Corner cut (round 5) - **not saved**; `-1` the owner's again. UI |
+| `/popup?active=RRGGBB` | 2.8 round 6: the active colour ("on" - a fill, the frames, lit glass) in place of the scheme's, for judging colours on glass (the screenshots' colours are not the panel's) - **not saved**, until the scheme changes; `active=0` the scheme's own again. A leading `#` is fine if URL-encoded (`%23`). UI |
 | `/popup?glyphs=0\|1\|2\|3` | 2.8: the header's glyphs bare, in a rounded square, in a circle - **not saved** (a capture leaves the owner's choice); `3` the saved style again. UI |
 | `/popup?pagehdr=0\|1` | 2.8: this page's header hidden / shown - **Saved**, as the page slot's panel and Hide Bar save it (`pages.<slug>.header`; shown is the default and is stored as nothing) |
 | `/popup?removecard=3` | the Remove card dialog over any card's window, to look at; its Remove does nothing to a compiled card; `close=1` takes it down |

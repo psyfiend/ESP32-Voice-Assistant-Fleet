@@ -370,9 +370,14 @@ target and TAG's scale on every board, except the P4_5 (`gen_type_scale.py`, `HE
 2.25 mm, matching the 4B's 22 px within 2%. `UIToolkit::Font_Header` is the larger of `HEADER` and
 `Font_PanelHeader`.
 
-**The active frames** (rounds 4-5, D-30 / D-31) are `UIMetrics` tokens, the same on every scheme,
-in logical px, drawn in `ST_ACTIVE` (`Cards/CardFrame.cpp`): `BRACKET_W` 6 (the bracket's top and
-bottom bars), `ACTIVE_EDGE` 2 (its sides), `ACTIVE_RING` 3 (the corner cut's frame and the edge
-of each cut), `GLOW_DEPTH` 18 and `GLOW_OPA` 115 of 255 (how far the light reaches in from a lit
-edge, and how strong it is there), `CUT_PCT` 24 (the corner cut's chamfer, % of the card's
-height). `UI::darkest()` (the scheme's darkest, 60% of the way to black) inks lit glass, warmed.
+**The active frames** (rounds 4-6, D-30 to D-32) are `UIMetrics` tokens in logical px, drawn in
+`ST_ACTIVE` (`Cards/CardFrame.cpp`): `BRACKET_W` 6 (the bracket's top and bottom bars),
+`ACTIVE_EDGE` 2 (its sides), `ACTIVE_RING` 3 (the corner cut's frame and the edge of each cut),
+`GLOW_DEPTH` 18 and `GLOW_OPA` (how far the light reaches in from a lit edge, and how strong it is
+there: 115 of 255 on the dark schemes, 150 on Linen), `CUT_PCT` 24 (the corner cut's chamfer, % of
+the card's height), and `ACTIVE_INK` (round 6: how far the frame's edge goes from the active
+colour toward the scheme's text - 0 on the dark schemes, where the frames glow, 35 on Linen, where
+they go darker to stand out; the light goes half as far). The corner cut's shadow along the cuts
+is the card's own (`SHADOW`, `SHADOW_Y`, `SHADOW_OPA`). `UI::darkest()` (the scheme's darkest, 60%
+of the way to black) inks lit glass, warmed. **Linen's `ST_ACTIVE` is copper `B8662E`** for the
+owner to judge (round 6; olive `9AA35A` before) - `/popup?active=RRGGBB` tries another on glass.

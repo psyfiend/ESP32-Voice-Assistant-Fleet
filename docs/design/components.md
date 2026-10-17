@@ -163,7 +163,10 @@ rows of rounds 3-4 took too much room for too little). Two columns: **the longes
 every name right-justified against the chips' column, the chips left-justified from it; **a row's
 chips one width** (its longest word and sides, at least two chips' heights - rows may differ).
 Where that will not fit it tries tighter chips, then names in the chips' own face (Card UI on the
-P4_5); past that (the 4B) every row's name sits above its chips, centred. The list fills its
+P4_5); past that (the 4B) every row's name sits above its chips, centred. **Unlit chips are
+satin** (round 6, D-32 - flat they were voids in the window, and on Linen white pills lost in it;
+satin's edge is a shade there), a lit one its role's tint and accent ring (`Kit::unfinish()` puts
+the face away). One face per row's chip width, in the face cache. The list fills its
 parent's height and scrolls when it must. `Kit::ChipRowSpec` is a row's name, choices and lit
 one; a chip's CLICKED carries `(row << 8) | chip`; `chipTableLit()` re-lights a row after a
 choice. `buttonRow()` adds a centred row of buttons after them (Tokens, Reset all).
@@ -240,7 +243,8 @@ only.
 ![The header before, then bare, square and circle](../followups/28_hdr_before_p45.png)
 
 **The bar** (`KS_HDR_BAR`): full width, the header's height, `SURFACE_ALT` with the accent line
-along its bottom (`LINE`) and the scheme's drop shadow - the look `Panel_Header` set locally before
+along its bottom (`LINE`) and the scheme's drop shadow - kept off an open panel, whose face the bar
+paints back over its shadow (round 6, `Kit::drawerCoverBarShadow()`) - the look `Panel_Header` set locally before
 it had slots; it lays nothing out itself - **where each slot stands is the header plan's**
 (`Layout/HeaderPlan.h`, round 2: the sides at the bar's ends `EDGE` in, `SPACE` between slots, the
 middle on the centre, `CLEAR` kept between a side and the middle). **A slot** (`KS_HDR_SLOT`): the
