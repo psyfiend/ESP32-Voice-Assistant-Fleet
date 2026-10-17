@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <stdio.h>
 
-StateCardFill StateCard::s_fill = StateCardFill::FILL_SURFACE;
+StateCardFill StateCard::s_fill = StateCardFill::FRAME_CORNER;   // GUIManager's default (2.8 round 6)
 
 static lv_obj_t *plainCol(lv_obj_t *parent) {
     lv_obj_t *o = lv_obj_create(parent);

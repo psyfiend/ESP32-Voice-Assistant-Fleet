@@ -233,7 +233,9 @@ private:
     // and without it the icons, disc and text all breathe. Auto and Full stay
     // one knob press away.
     CardVariant     _variant = CardVariant::VAR_COMPACT;
-    StateCardFill   _fill    = StateCardFill::FILL_SURFACE;
+    // The corner cut by default (owner, 2.8 round 6: "Corner cut is what I'd
+    // use for the default"); Fill was the default until then.
+    StateCardFill   _fill    = StateCardFill::FRAME_CORNER;
     bool            _showArea = true;
 
     // PER-BOARD DEFAULT GRID, chosen on the glass by the owner.

@@ -86,6 +86,9 @@
 // copper 3.7. Copper is the accent's hue (A8561C, lighter), so "on" and
 // "chosen" share it on Linen; the frames' shapes now say "on" as well.
 // /popup?active=RRGGBB tries the others without a build.
+//
+// THE OWNER'S PICK, on glass the same day: D47F45, between burnt amber and
+// terracotta (2.6:1 on the card - the frame's edge, darkened, carries it).
 const UIPalette UI_PAL_LINEN = {
     .name        = "Linen",
     .GROUND      = 0xCFC4B2,
@@ -95,7 +98,7 @@ const UIPalette UI_PAL_LINEN = {
     .TEXT_DIM    = 0x6E6459,
     .ACCENT      = 0xA8561C,   // copper
     .BORDER      = 0,
-    .ST_ACTIVE   = 0xB8662E,   // copper (round 6; olive 9AA35A before)
+    .ST_ACTIVE   = 0xD47F45,   // the owner's pick, round 6 (olive 9AA35A before)
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
     .SCRIM       = SCRIM_DARK,
