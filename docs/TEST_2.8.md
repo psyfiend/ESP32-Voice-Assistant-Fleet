@@ -682,4 +682,103 @@ The 4B: the system panel, Card UI:
 
 ## Your results
 
+**Owner, 2026-10-17**: every test PASS. "I love how the header slot closes only after the panel
+has fully retracted"; V7 (the P4_5's header at 26) "So much better!". **Owner: the all-nine build
+is only for right before the merge** - not each round (it ran three times in rounds 3-4).
+
+| # | Result |
+|---|---|
+| V1-V12 | PASS (V4 "love it", V7 "so much better") |
+| V13 | PASS - accurate to the descriptions "but rather boring"; Bracket cuts the hero a little at the top |
+| V14 | PASS - but the yellow border is "loosely tacked onto" Power and does not follow its corners (gaps) |
+| V15 | PASS |
+
+**What changes next** (round 5):
+
+- **UI Tweaks and Card UI go back to chip rows**: the selectors take too much room for too
+  little gain, and the Inherit button's "on" look does not work. One row per option, in two
+  columns - the option's name right-justified against the choices' column, the chips
+  left-justified, a gap between; the longest row centred in the window; a row's chips all one
+  width (rows may differ; the timeouts' a little wider than they need). Window timeout and Timer
+  bar may share a row.
+- **The active states need to pop**: Bracket and Corner cut are the keepers (Bracket "looks quite
+  good on Linen"; the owner's pick if he had to choose today), much stronger, and **lit inside
+  the border** - light from the edge fading quickly toward the centre (an overlay is fine), the
+  futuristic HMI frames and Cyberpunk 2077's cursor brackets as the reference, not full cyber-UI.
+  The corner cut moves to the top-right and bottom-left (clear of the corner icon), much larger,
+  perhaps angular. The glow frame's dark outer line is invisible from 2-3 feet. Neither works with
+  the Band card label; Float does.
+- **A toggle's "on" is lit glass**, not a border: the glass itself tinted a warm white, "a light
+  shining from within refracting through a semi-frosted glass surface" - the glossy-button
+  references, less garish. Every glass toggle the same.
+- **Settled before building**: Inherit is each Card UI row's first chip; on a window too narrow for
+  two columns every row's name goes above its chips; Card state drops Glow frame; the corner cut
+  is angular.
+
+# Round 5 - chip tables, lit frames, lit glass (2026-10-17, night)
+
+Branch `feat/2.8-header-slots`, with you at the desk. **No pull request**; **the all-nine build
+waits for the merge** (owner, this round). On the desk: the P4_5 and the 4B run round 5, their
+settings files as found (saved before every flash).
+
+## What changed since round 4
+
+| Where | Round 4 | Round 5 |
+|---|---|---|
+| **UI Tweaks, Card UI** | selector rows; Card UI's Inherit buttons | **chip rows** (`Kit::chipTable`): one row per option, the longest row centred, names right-justified against the chips' column, a row's chips one width; Card UI's rows start with an **Inherit chip**. Too narrow for two columns (the 4B), each name above its chips |
+| **Card state** | Fill, Icon glow, Glow frame, Bracket, Corner cut | **Fill, Icon glow, Bracket, Corner cut** |
+| **Bracket** | a 4 px border (it pushed the hero down) | **drawn, not a border** - the layout never moves; heavy 6 px bars top and bottom, 2 px sides, and **light falling inward from the bars** |
+| **Corner cut** | rounded, top-left and bottom-right, 3 px ring | **angular**: the **top-right and bottom-left** corners cut away at 45 degrees (24% of the card's height), a 3 px frame, light inward from every edge and along each cut. On Linen it is the bracket |
+| **Power, on** | glass and a yellow border | **lit glass**: smoked glass with a warm light behind it, frosted, its icon dark; glass while off |
+
+## The pictures
+
+![UI Tweaks](followups/28r5_tweaks_p45.png)
+![Card UI](followups/28r5_cardui_p45.png)
+![Bracket](followups/28r5_frame_bracket_p45.png)
+![Corner cut](followups/28r5_frame_corner_p45.png)
+![Corner cut, close](followups/28r5_corner_zoom_p45.png)
+![Power on](followups/28r5_power_on_p45.png)
+![4B UI Tweaks](followups/28r5_tweaks_4b.png)
+
+## Tests for you
+
+    curl "http://fleet-ws-p4-5/popup?cardstate=2"     Bracket, not saved (3 Corner cut; -1 yours again)
+
+| # | Do this | PASS if |
+|---|---|---|
+| W1 | UI Tweaks | one row per option, the longest centred, names right-justified, chips left-justified, a row's chips one width |
+| W2 | Tap chips in each row | the chip lights at once; what it sets changes, as in round 4 |
+| W3 | A card's Card UI | the same layout, Inherit first in each row; Inherit and the others change the card as before |
+| W4 | The 4B: UI Tweaks, Card UI | each row's name above its chips, centred, nothing cut off |
+| W5 | Card state: Bracket, with a light on | heavy bars top and bottom, light falling inward, the hero where it always was |
+| W6 | Card state: Corner cut | the top-right and bottom-left corners cut at 45 degrees, lit inward; the corner icon untouched |
+| W7 | Both on Linen | Bracket as W5; Corner cut shows the bracket |
+| W8 | A light's window: Power off and on | glass when off; lit, warm glass when on, its icon dark and clear |
+
+## Choices that were mine
+
+1. **The light sits behind the card's contents** (text over it is never tinted); the bars, frame
+   and cuts are drawn over them.
+2. **Sizes are tokens**, all logical px: `BRACKET_W` 6, `ACTIVE_EDGE` 2 (the bracket's sides),
+   `ACTIVE_RING` 3 (the corner cut's frame), `GLOW_DEPTH` 18 and `GLOW_OPA` 115/255 (how far and
+   how strong the light), `CUT_PCT` 24.
+3. **Card UI's names drop to the chips' face on the P4_5**: its five-chip rows and "Window
+   timeout" did not fit two columns at the names' usual size. UI Tweaks keeps the larger names.
+4. **Lit glass's light is the active colour 40% of the way to white**; its icon the scheme's
+   darkest, warmed.
+
+## Questions for you
+
+- **Q16. How strong**: the light's depth and strength, the bars' weight, the cut's size - each is
+  one token; say "more" or "less" per frame.
+
+## Results
+
+- **On glass** (P4_5): every picture above; the 4B's UI Tweaks stacked. Card UI fitted two columns
+  after two passes (tighter chips, then smaller names).
+- **Not run this round**: the harness's full walk, the all-nine gate (pre-merge only).
+
+## Your results
+
 *(yours)*

@@ -421,7 +421,7 @@ uint32_t mix(uint32_t a, uint32_t b, uint8_t pct);
 // scheme tokens (GROUND and TEXT) keeps the answer inside the palette, so the
 // "no colour literals in UI code" rule holds.
 uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b);
-// The scheme's darkest colour, near black (the glow frame's outer line).
+// The scheme's darkest colour, near black (the ink on lit glass, warmed).
 uint32_t darkest();
 
 // --- Shared paints: chrome that repaints itself on a scheme change. #64 -----

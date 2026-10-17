@@ -559,8 +559,8 @@ uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b) {
 }
 
 // The scheme's darkest colour, its ground or its text whichever way round the
-// scheme is - pulled the rest of the way to black (the glow frame's outer line,
-// 2.8 round 4: "absolute black in dark modes").
+// scheme is - pulled the rest of the way to black (2.8 round 4: "absolute black
+// in dark modes"; round 5 warms it into the ink on lit glass, Kit::litInk()).
 uint32_t darkest() {
     const uint32_t d = luma(s_pal.GROUND) <= luma(s_pal.TEXT) ? s_pal.GROUND : s_pal.TEXT;
     return blend(d, 0x000000, 60);

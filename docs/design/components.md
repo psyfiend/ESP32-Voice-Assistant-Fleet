@@ -154,23 +154,19 @@ is a **face drawn by hand** - a raised metal face or a soft dent, painted into P
 (`KitFaces.cpp`). Up to five choices since round 3 (`SELECTOR_MAX`), and `spec.slotW` makes every
 compact choice one width (`Kit::selectorSlotW(words, n)`), so stacked selectors line up.
 
-### Choice rows - `Kit::choiceRows(parent, w, rows, n, S)`, `Kit::buttonRow(list)` (2.8 round 3)
+### Chip tables - `Kit::chipTable(parent, w, rows, n, cb)`, `chipTableLit()`, `buttonRow()` (2.8 round 5)
 
-![UI Tweaks](../followups/28r3_tweaks_p45.png)
+![UI Tweaks](../followups/28r5_tweaks_p45.png)
 
-**A list of choices, each its words and a compact selector** - UI Tweaks' and Card UI's rows (D-27:
-"a choice is the kit's selector, not a row of chips, wherever it fits"). Every choice is the width
-of the widest word in ANY row, so the rows line up choice for choice; where the words and the widest
-selector will not fit side by side (the 4B's window, Card UI's five choices on the P4_5), each row's
-words stand above its selector, centred. The list fills its parent's height and scrolls when it
-must. `Kit::ChoiceRow` is a row's words, choices, chosen one and `onChosen`; the caller keeps one
-`Kit::Selector` per row. `buttonRow()` adds a centred row of buttons after them (Tokens, Reset all).
-
-**Inherit rows** (round 4, D-30 - Card UI): `choiceList(parent, w)` the scrolling list;
-`inheritRow(list, what, inherited, cb, user)` a row's words with an **Inherit** toggle at the end
-of the line - on, nothing more; off, it returns the line under the words for the row's own
-`choiceSelector()`s, each only as wide as its own longest choice (narrowed to the room it has), so
-"10 s" stays short and a card that inherits everything is six quiet lines.
+**Options and their choices, one row each** - UI Tweaks and Card UI (round 5, D-31: the selector
+rows of rounds 3-4 took too much room for too little). Two columns: **the longest row centred**,
+every name right-justified against the chips' column, the chips left-justified from it; **a row's
+chips one width** (its longest word and sides, at least two chips' heights - rows may differ).
+Where that will not fit it tries tighter chips, then names in the chips' own face (Card UI on the
+P4_5); past that (the 4B) every row's name sits above its chips, centred. The list fills its
+parent's height and scrolls when it must. `Kit::ChipRowSpec` is a row's name, choices and lit
+one; a chip's CLICKED carries `(row << 8) | chip`; `chipTableLit()` re-lights a row after a
+choice. `buttonRow()` adds a centred row of buttons after them (Tokens, Reset all).
 
 ### Icon button - `Kit::iconButton(parent, glyph, font, cb)`
 
@@ -198,14 +194,14 @@ What a surface says about a thing you can tap, decided once for every component:
 |---|---|---|
 | **Satin** | can be tapped, not chosen | Members' rows, scenes not loaded, the dialog's buttons (a role keeps its colour: Remove's red), the header's buttons (close, back, the tabs) |
 | **Glass** | chosen or active | the selector, the tab showing, a scene loaded; **a toggle, on and off** (Power, Inherit: round 4) |
-| **Glass + glow frame** | a toggle that is ON (round 4, D-30) | Power while on, an Inherit toggle while on (`Kit::glowFrame()`: a ring in `ST_ACTIVE`, a line in `UI::darkest()` outside it - the cards' "Glow frame") |
+| **Lit glass** | a toggle that is ON (round 5, D-31) | Power while on (`Finish::FINISH_LIT`, `FaceKind::FACE_LIT`: smoked glass with a warm light behind it - the active colour 40% toward white - brightest a little below the middle, frosted, its rim catching the light; words and icons on it in `Kit::litInk()`) |
 | **Flat** | information | fact rows, labels - no finish at all |
 
 `Kit::finish()` paints the face into the object (its first child, an image): **satin** - a light
 at the top fading by the middle, a faint step, a shade growing below, a soft edge (a shade on a
 light scheme); **glass** - the selector's metal (`metalKind()`). Called again, it changes the
 finish (a scene loaded and no longer); Power on and off is `Kit::selectorActionLit()` - glass, and
-the glow frame while on (round 4). Pressed:
+lit glass while on (round 5). Pressed:
 satin darkens 30 %, glass lightens 20 %, and the object sinks 1 px (`KS_SINK`) - the tint a
 **veil**, a rounded object in the face's shape over it, because LVGL drops the corner clip of an
 image it recolours (LESSONS). Colour still carries
@@ -303,7 +299,7 @@ title (CONNECTIVITY); `drawerRow()` things side by side, the panel's width, `DRA
 `statusRow(face, what, &glyphRoom)` room for a glyph, what it is, and its live value dim, a face
 smaller, on one line and ellipsised - returns the value's label; `vrule(row, h)` a short upright rule
 setting one choice apart from another (`KS_RULE`); `toggleButton(parent, words, w, h, on, cb)` and
-`toggleButtonSet()` - glass, and the glow frame while on (round 4); `selectorSet(S, i)` a
+`toggleButtonSet()` - glass, lit glass while on (round 5); `selectorSet(S, i)` a
 selector's choice set from outside, with no `onChosen` (the scheme changed elsewhere).
 
 ---

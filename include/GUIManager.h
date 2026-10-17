@@ -77,7 +77,7 @@ public:
     void chooseScheme(uint8_t i, bool save = true);   // 0 Fleet, 1 Midnight, 2 Linen (save: a PC's look is not)
     void setCardLabelStyle(CardHeaderStyle s);    // Float / Band / Tag / None
     void setEntityLabel(CardLabel l);             // Name (HA) / State / Custom / None
-    // Fill / Icon glow / Glow frame / Bracket / Corner cut (round 4); `save`
+    // Fill / Icon glow / Bracket / Corner cut (round 5); `save`
     // false: the harness's look, not the owner's choice.
     void setCardState(StateCardFill f, bool save = true);
     static StateCardFill savedCardState();

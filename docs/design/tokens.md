@@ -370,8 +370,9 @@ target and TAG's scale on every board, except the P4_5 (`gen_type_scale.py`, `HE
 2.25 mm, matching the 4B's 22 px within 2%. `UIToolkit::Font_Header` is the larger of `HEADER` and
 `Font_PanelHeader`.
 
-**The active frames** (round 4, D-30) are `UIMetrics` tokens, the same on every scheme, in logical
-px: `ACTIVE_RING` 3 (the glow frame's and the corner cut's ring, in `ST_ACTIVE`), `ACTIVE_EDGE` 1
-(the line outside it, in `UI::darkest()` - the scheme's darkest, 60% of the way to black - and the
-bracket's sides), `BRACKET_W` 4 (the bracket's top and bottom). The corner cut's corners are
-`RADIUS` x 2.
+**The active frames** (rounds 4-5, D-30 / D-31) are `UIMetrics` tokens, the same on every scheme,
+in logical px, drawn in `ST_ACTIVE` (`Cards/CardFrame.cpp`): `BRACKET_W` 6 (the bracket's top and
+bottom bars), `ACTIVE_EDGE` 2 (its sides), `ACTIVE_RING` 3 (the corner cut's frame and the edge
+of each cut), `GLOW_DEPTH` 18 and `GLOW_OPA` 115 of 255 (how far the light reaches in from a lit
+edge, and how strong it is there), `CUT_PCT` 24 (the corner cut's chamfer, % of the card's
+height). `UI::darkest()` (the scheme's darkest, 60% of the way to black) inks lit glass, warmed.

@@ -1,4 +1,4 @@
-# Handoff — 2026-10-16 (2.8 round 4 built - round 3's list and the active states - for the owner's test)
+# Handoff — 2026-10-17 (2.8 round 5 built - chip rows, lit frames, lit glass - for the owner's test)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -40,19 +40,23 @@ trees and screenshots, A/B), host tests (`host-tests/`), the structure check and
 The cards, `GUIManager`, the header (`Panel_Header`) and the system panel's pages are not on the kit
 yet - bring each over when it is next changed (`ui-architecture.md` §6).
 
-## Where things stand (2026-10-16, morning)
+## Where things stand (2026-10-17)
 
 - **`v0.2.17` - A17** is the release on `main` (flashed on the 1060). Copies of every board's
   settings file are in `bench/settings/<board>/` - one is saved before every flash.
-- **2.8 round 4 is built, on `feat/2.8-header-slots`** (no PR; **`TEST_2.8.md` round 4 is the
-  owner's sheet**, V1-V15, Q14-Q15). Round 3 was tested the same day - every test PASS but the
-  deck's colour - and its list became round 4 (D-30, `header-slots.md` §13): the system panel's
-  rows built at every open (finished faces live in a cache any window may take back), no Status
-  bar, "Scheme:"; a panel's walls straight to the blue line and its slot open until it has gone;
-  the header always visible while a header panel is open; the P4_5's header words 26 (a `HEADER`
-  type role); window timeout and bar at once; Card UI's Inherit toggles; and the owner's **active
-  states on the edge** - Card state Glow frame / Bracket / Corner cut (`Card::activeFrame()`), a
-  toggle glass off and glowing on (`Kit::glowFrame()`).
+- **2.8 round 5 is built, on `feat/2.8-header-slots`** (no PR; **`TEST_2.8.md` round 5 is the
+  owner's sheet**, W1-W8, Q16). Round 4 was tested 2026-10-17 - every test PASS - and the owner's
+  notes became round 5 (D-31): **UI Tweaks and Card UI on chip rows** (`Kit::chipTable`: two
+  columns, the longest row centred; the 4B stacks each name above its chips), Card UI's Inherit as
+  each row's first chip; **Card state Fill / Icon glow / Bracket / Corner cut**, the two frames
+  drawn and lit inward in draw events (`Cards/CardFrame.cpp`, no layout change), the corner cut
+  angular at top-right and bottom-left and never on Linen; **a toggle that is on is lit glass**
+  (`Finish::FINISH_LIT`). Round 4 before it (D-30, `header-slots.md` §13): the system panel's rows
+  built at every open (finished faces live in a cache any window may take back), no Status bar,
+  "Scheme:"; a panel's slot open until it has gone; the header always visible while a header panel
+  is open; the P4_5's header words 26 (a `HEADER` type role); window timeout and bar at once.
+- **The all-nine build runs once, right before the merge** (the owner, 2026-10-17) - not per round.
+  Rounds build the P4_5 and the 4B.
 - **2.8 round 3, as built** (`header-slots.md` §11-12; DECISIONS D-21 to D-29):
   - **The header** (round 2's three places on claims, `Layout/HeaderPlan.h`): the mocks' glyphs
     drawn from numbers (`UI/GlyphShapes`, `Kit::strokeGlyph`), the scheme's `SIG_*` colours, an AP
@@ -65,7 +69,7 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
     under it. **Card UI**: the same per card, a view of the card window (`PopupCardUi.cpp`).
   - **Choices made unattended** are D-29 (the scheme one for every page; Col / Row saved per page;
     Card label "Custom" keeps the words showing) - the owner confirms or reverses them.
-- **Boards**: the P4_5 and the 4B run round 4 (local lines), the 1060 `v0.2.17`. The 4B's own file
+- **Boards**: the P4_5 and the 4B run round 5 (local lines), the 1060 `v0.2.17`. The 4B's own file
   closes a window after 10 s (`system.window.close`), which stops the harness's full walk there -
   use `--only`, or ask the owner.
 - **The mock**: the "2.8 Header Slots" canvas
@@ -75,8 +79,8 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
 
 ## What is next with the owner
 
-1. **2.8 round 4, the owner's test** (`TEST_2.8.md` round 4). Then sign-off -> CHANGELOG
-   `v0.2.18`, archive the sheet, `gh pr create`; the owner merges.
+1. **2.8 round 5, the owner's test** (`TEST_2.8.md` round 5). Then sign-off -> CHANGELOG
+   `v0.2.18`, archive the sheet, the all-nine gate, `gh pr create`; the owner merges.
 2. **#76 next, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a
    queue any task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to
    dismiss), a notice's detailed form in the middle for a while then its minimal "!" in status, a
@@ -84,7 +88,8 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
    panel. Mock first. Cluster headers come with 2.11.
 3. Waiting: **#104** (a light's temperature mark moves between builds); **#100** the clocks (three
    agreed, K81-K84, the record on #100; the prototype on `feat/100-nina-clock`, PR #102 open, not for
-   merging); **#106** an active card's glowing border (the owner's idea, mock first); **#84** "no data
+   merging); **#106** an active card's glowing border (the owner's idea; 2.8's Bracket and Corner cut may
+   answer it - ask at sign-off); **#84** "no data
    yet" (a proposal on the issue); **#99's S3 frame check** (W6) and History's activity rows in satin
    (K86), once an S3 is on the desk.
 
