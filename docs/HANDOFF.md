@@ -1,4 +1,4 @@
-# Handoff — 2026-10-17 (2.8 signed off, `v0.2.18`, in a pull request for the owner to merge)
+# Handoff — 2026-10-17 (2.8 merged as `v0.2.18`; next, 2.11 group cards)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -38,17 +38,18 @@ client; buttons, dialogs, rows, panels and the selector are the component kit (`
 a *role* - shared styles that follow the scheme - and **a tappable surface has a finish**
 (`Kit::finish()`: satin = can be tapped, glass = chosen, painted and dithered; K77, K85-K86); every
 colour and size is a token, the window's sizes millimetres (`UIShape`); where cards go on a page is
-a `Layout::Engine`'s decision. Changes are proved with the harness (`scripts/ui_golden.py`: object
-trees and screenshots, A/B), host tests (`host-tests/`), the structure check and the all-nine gate.
-The cards, `GUIManager`, the header (`Panel_Header`) and the system panel's pages are not on the kit
-yet - bring each over when it is next changed (`ui-architecture.md` §6).
+a `Layout::Engine`'s decision, and where the header's slots go is `Layout::HeaderPlan`'s (claims,
+2.8). Changes are proved with the harness (`scripts/ui_golden.py`: object trees and screenshots,
+A/B), host tests (`host-tests/`), the structure check and the all-nine gate. The header and every
+slot's panel are on the kit since 2.8; **the cards**, `GUIManager` and the system panel's pages are
+not yet - bring each over when it is next changed (`ui-architecture.md` §6). 2.11 changes the cards.
 
 ## Where things stand (2026-10-17)
 
-- **2.8 is signed off and in a pull request** from `feat/2.8-header-slots` (the owner merges). After
-  the merge: `git pull`, tag the merge commit `v0.2.18`, flash the boards on the desk (the 1060
-  still runs `v0.2.17`). Copies of every board's settings file are in `bench/settings/<board>/` -
-  one is saved before every flash.
+- **`v0.2.18` - 2.8 is merged** (#110, 2026-10-17), tagged and flashed to the P4_5, the 4B and the
+  1060 (`scripts/release/flash_release.ps1`). Nothing is in flight: no open branch, no open PR of
+  Claude's. Copies of every board's settings file are in `bench/settings/<board>/` - one is saved
+  before every flash.
 - **Where 2.8's pieces live**: the header's places and claims `Layout/HeaderPlan.h` (host-tested),
   slots as data `UI/HeaderSlots.h`, kinds in `Panel_Header.cpp`, panels in `SlotPanels.cpp`, the
   glyphs `UI/GlyphShapes`; UI Tweaks `UI/TweaksSheet` + `GUIManagerTweaks.cpp`, Card UI
@@ -65,22 +66,24 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
 
 ## What is next with the owner
 
-1. **2.8's merge** (the pull request), then the tag and the flash above. Round 7's two checks (Y1-Y2:
-   the corner cut's shadow at both ends of the cut, on glass) are in `archive/TEST_2.8.md`.
-2. **#76 next, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a
-   queue any task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to
-   dismiss), a notice's detailed form in the middle for a while then its minimal "!" in status, a
-   place that grows for a high-priority claim, a window taking the middle, claims' rows in their
-   panel. Mock first. Cluster headers come with 2.11.
+1. **2.11 group cards** (#66, with the page arranger #78) - **next, the owner's choice
+   (2026-10-17)**. It starts with **the design interview's §4** (`interview-phase2-3.md` §4, its
+   questions marked [BLOCKING 2.11]; the draft and the owner's model in `group-cards.md` §4-5, K65-K68)
+   and the arranger's scoring in the "Layout Playground" artifact (#78), mocks before code. What it
+   builds on: `layout-engines.md` (a cluster is a container inside an item; the bento, weight-map,
+   hero-region and orbital proposals), `cards.md` §4 (the group / room card) and §8 (one slot system
+   - a cluster's header is the page header's slots and planner again), K17 / K46 (members as cards,
+   groups and their colours). The hero region is where #100's full clock and a music player belong.
+2. **#76, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a queue any
+   task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to dismiss), a
+   notice's detailed form in the middle for a while then its minimal "!" in status, a place that
+   grows for a high-priority claim, a window taking the middle, claims' rows in their panel. Mock
+   first.
 3. Waiting: **#104** (a light's temperature mark moves between builds); **#100** the clocks (three
    agreed, K81-K84, the record on #100; the prototype on `feat/100-nina-clock`, PR #102 open, not for
-   merging); **#106** an active card's glowing border (the owner's idea; 2.8's active frames look like its
-   answer - ask the owner whether to close it); **#84** "no data
-   yet" (a proposal on the issue); **#99's S3 frame check** (W6) and History's activity rows in satin
-   (K86), once an S3 is on the desk.
-
-Then **2.11** group cards with the page arranger (#66, #78) - whose hero region (`layout-engines.md`)
-is where the full clock and a music player belong. `ROADMAP.md`'s running order.
+   merging); **#84** "no data yet" (a proposal on the issue); **#99's S3 frame check** (W6) and
+   History's activity rows in satin (K86), once an S3 is on the desk; the header's clock format
+   (12/24 h, seconds - interview §3 Q3, still open).
 
 **After any merge**: `git pull`, tag the merge commit (annotated, `vX.Y.Z - <milestones>`), push the
 tag, flash the boards on the desk. The CHANGELOG entry and the archived test sheet go on the branch
@@ -112,8 +115,8 @@ have names ("Words", K22). Every round and measurement of 2.10 is in `docs/archi
 
 `docs/design/interview-phase2-3.md` is the blueprint for 2.8, 2.11 and Phase 3; Claude facilitates
 with the owner. §1 look and feel closed 2026-10-01 (`look-and-feel.md`); §2 card popups closed
-2026-10-02 (built as 2.10); **§3 the header's slots answered 2026-10-15** (`header-slots.md`; its
-open points are the build's questions). **§4 (2.11 group cards) is next**; #87 (the companion web
+2026-10-02 (built as 2.10); **§3 the header's slots answered 2026-10-15** and built as 2.8
+(`header-slots.md`; only Q3, the clock's format, is still open). **§4 (2.11 group cards) is next**; #87 (the companion web
 app with a true preview, D-8) should be scoped before 3.1. The group taxonomy draft is
 `group-cards.md` (K67, K68). Artifacts on claude.ai: "2.8 Header Slots", "Glass, Satin, Flat"
 (#99), "Card Popup Mock", "Layout Playground" v4 (the arranger, #78), "Beyond the Grid", "Linen Fill
@@ -142,11 +145,12 @@ and Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
 | `CYD_S3_3248` | - | USB broken (2026-09-28) |
 | `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in - #99's S3 frame check waits for one |
 
-The P4_5 and 4B run A17's final build, the 1060 `v0.2.16` (all with the local lines). Ports move when boards are re-plugged:
+The P4_5, the 4B and the 1060 run `v0.2.18` from a clean tree (no local lines in that build).
+Ports move when boards are re-plugged:
 `Get-CimInstance Win32_PnPEntity | ? Name -match 'COM\d+' | select Name, DeviceID`. **Is a board
 alive?** Ask Home Assistant (`sensor.<device>_uptime`), not the cable. While developing, build and
-flash the P4_5 (plus the S3_4B compile); while the owner tests, the P4_5 alone unless the owner says
-otherwise; all nine compile before a merge. **Away from the desk** the owner reflashes the P4_5 from
+flash the P4_5 and the 4B (2.8's rounds did both: the 4B is the narrow screen); all nine compile
+once, right before a merge. **Away from the desk** the owner reflashes the P4_5 from
 the laptop (COM6) for that Wi-Fi; it is then at `http://10.0.0.2` (that router resolves no names).
 RTC cells: the Waveshare P4s need rechargeable ones (the 7B's holder is ML1220); nothing reads an RTC
 yet (#32). Flash and PSRAM per board: `HARDWARE_STATUS.md` (the 1060 and 4880 have 16 MB of flash).
@@ -201,7 +205,13 @@ no compiler (the owner's choice to install one, `host-tests/README.md`).
   struct-layout or `lv_conf.h` edit.
 - **Do not edit source while a build runs** - it compiles the half-finished edit. Docs are safe.
 - **Save a board's `/settings` before flashing it**: `scripts/release/save_settings.ps1 <host>
-  <board>` once A17 merges (until then `curl -o`, or the script from that branch).
+  <board>`. Flash a dev build app-only: `esptool.exe --chip esp32p4 -p COMn -b 921600 write-flash
+  0x10000 .pio/build/<env>/firmware.bin` (PlatformIO's `penv/Scripts`), the 1060 at 460800 with
+  `--after watchdog-reset`. Chain a flash after a build only on the build's success - a failed
+  build flashes the last good `firmware.bin` silently.
+- **LVGL 9.5 clips an object's `DRAW_POST` to its own area** - anything drawn outside an object
+  (a shadow, a cut corner) goes in `DRAW_MAIN_END` (LESSONS, 2.8). An image meant to continue
+  LVGL's own drawing must blend as LVGL does, in 16 bits.
 - **The harness**: never two runs at one board; the 1060 alone (it is slow). A window closes itself
   after a minute (or what `/settings?window_close=` says, K79). A change to the header will show in
   every state - read the differences, do not wave them through.
@@ -230,7 +240,9 @@ colour-blind: never distinguish two states by colour alone.
 **What works:**
 - **Show, don't spec.** Build something to react to (a mock artifact for a look); the owner flashes
   fast and tests thoroughly against a sheet - `docs/TEST_<topic>.md`, numbered tests with PASS
-  criteria, the owner's results under them (`docs/archive/TEST_99.md` is the latest).
+  criteria, the owner's results under them (`docs/archive/TEST_2.8.md` is the latest: seven
+  rounds, each built from the last one's notes). Rounds go on one branch; the all-nine gate and
+  the PR come once, at sign-off.
 - **A PR only after the owner's sign-off** (2026-10-14): push the branch, the owner tests and answers,
   then `gh pr create`; the owner merges.
 - **Snappy and responsive first, eye candy second** (W6). Measure a frame before and after anything
@@ -254,5 +266,5 @@ before the Kitchen. **The issue tracker, HANDOFF and ROADMAP are Claude's to kee
 of the work, not a follow-up.
 
 **Versioning (W3):** `v0.<phase>.<release>`; the release counts signed-off merges to `main` that
-change the firmware (a docs-only merge is not tagged). **`v0.2.16` was tagged at #99's merge
-(2026-10-15); the next is `v0.2.17`.**
+change the firmware (a docs-only merge is not tagged). **`v0.2.18` was tagged at 2.8's merge
+(2026-10-17); the next is `v0.2.19`.**

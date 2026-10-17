@@ -453,6 +453,11 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
   after the card they came from when it is built. Their ids are made as K33's.
 - **Every change is logged** with its time and task (`loopTask` = the card window, `httpd` = a
   browser); the last ten are in `/settings?stats=1`.
+- **UI Tweaks' choices are `system.ui.*`** (scheme, card label, entity label, card state,
+  density), the glyphs `system.header.glyphs`, the window's `system.window.close` / `bar`, the
+  selector's look per scheme (`schemes.<name>.selector`); **a
+  card's own Card UI choices sit on its card entry** (`selector`, `density`, `close`, `bar`,
+  `label_text`), absent while it inherits (2.8).
 - `GET /settings` serves the file; `?stats=1` its counters, files and anything unclaimed. The PC
   addresses that set things until the web UI exists are listed in `Settings.h` and §17.
 
@@ -468,12 +473,20 @@ window's radii, spacing, lines and sizes, in millimetres - 2.12), `UIHeader` (th
 slots, glyph frames and slot drawers, in logical px - 2.8), `UIGrid`, `UIType` — reached through
 one namespace: `UI::pal()`, `UI::met()`, `UI::shape()`, `UI::hdr()`, `UI::grid()`, `UI::type()`.
 
-**The page header is a bar of slots** (2.8, `include/UI/HeaderSlots.h`): data - a kind and an
-entity - per slot, `PageSpec::headerSlots` (else the default four) and `headerShown`; each kind a
-build and an update in `Panel_Header.cpp`'s table, its panel in `SlotPanels.cpp` (the status slot's
-is the system panel). A new kind is a new entry, never layout code. The glyph style
-(`system.header.glyphs`) and a page's header shown / hidden (`pages.<slug>.header`) are saved
-settings.
+**The page header is three places of slots** (2.8, `include/UI/HeaderSlots.h`): data - a kind, a
+place (left, middle, right) and an entity - per slot, `PageSpec::headerSlots` (else
+`HEADER_DEFAULT`'s six) and `headerShown`; **where they stand is a pure planner**,
+`Layout/HeaderPlan.h` (each slot claims room with a priority, the lowest gives way; host-tested).
+Each kind is a build and an update in `Panel_Header.cpp`'s table, its panel in `SlotPanels.cpp` on
+`Kit::Drawer` (the status slot's is the system panel). A new kind is a new entry, never layout code.
+The glyph style (`system.header.glyphs`) and a page's header shown / hidden (`pages.<slug>.header`)
+are saved settings. Cluster headers (2.11) are meant to reuse the same slots (`cards.md` §8).
+
+**A card that is on says so by its card state** (2.8, D-30 to D-33): Fill, Icon glow, Bracket or
+**Corner cut, the default** - a UI Tweaks choice, saved. The frames are **drawn in the surface's
+draw events** (`Card::activeFrame()`, `Cards/CardFrame.cpp`), never set as a border, which moves
+the layout. Anything drawn outside an object goes in `DRAW_MAIN_END`: LVGL 9.5 clips `DRAW_POST`
+to the object's own area (LESSONS).
 
 Rules that are load-bearing rather than stylistic:
 
@@ -506,8 +519,10 @@ Rules that are load-bearing rather than stylistic:
 ### The component kit - build windows from `Kit::`, not from style calls (2.12 P3)
 
 `include/UI/Kit.h`, `src/UI/Kit/`; what each component is and looks like: `docs/design/components.md`.
-Buttons, dialogs, chip rows, list items, panel rows (dropdown, checkbox, row button), folder
-panels, the selector, icon buttons and label roles are the kit's, and a new screen uses them.
+Buttons, dialogs, chip rows and chip tables, list items, panel rows (dropdown, checkbox, row
+button), folder panels, drawers, the selector, icon buttons, the header's bar and slots, and label
+roles are the kit's, and a new screen uses them. A tappable surface has a finish (`Kit::finish()`:
+satin, glass, or lit glass for a toggle that is on).
 
 - **A component takes a role; a role is shared `lv_style_t`s** (`Kit::KitStyle`), filled in
   `KitStyles.cpp` from the tokens and refilled on every repaint through `UI::onRepaint()` - so a
@@ -523,8 +538,8 @@ panels, the selector, icon buttons and label roles are the kit's, and a new scre
 - **A window is a Sheet** (`include/UI/Sheet.h`, 2.12 P4): the frame - placement, header row,
   auto-close, the quiet build, the modal tap catcher, both folder panels, the sparks - is the
   kit's, and a new window is a client: a `Kit::SheetSpec` and its views. The card window
-  (`struct Popup : Kit::Sheet`) and "About this board" (`UI/AboutSheet`, debug builds) are the two
-  clients. One sheet shows at a time.
+  (`struct Popup : Kit::Sheet`), "About this board" (`UI/AboutSheet`) and "UI Tweaks"
+  (`UI/TweaksSheet`, 2.8) are the clients. One sheet shows at a time.
 - **`python scripts/structure_check.py` says where the code is drifting** - files over 1,000 lines,
   style calls outside the kit, colour literals, shape numbers, LVGL in the core layers. It reports
   and never fails; run it with the all-nine gate and quote it in the merge report (W13).

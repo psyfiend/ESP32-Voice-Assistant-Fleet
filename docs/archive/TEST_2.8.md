@@ -943,3 +943,7 @@ The last round before the merge: your two answers, and the two points.
 - **The all-nine gate** ran on the merge commit's code (below, in the pull request).
 - One trap: LVGL blends into the panel in 16 bits with a 32-step mix and rounds down; an image meant
   to match its shadow has to do the same (in LESSONS).
+
+## Your results
+
+**Y1-Y2 PASS** (2026-10-17): "Both pass!!!" - and merged (#110), tagged `v0.2.18`.
