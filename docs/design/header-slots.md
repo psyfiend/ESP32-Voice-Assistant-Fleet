@@ -126,7 +126,7 @@ Cluster headers come with 2.11; the notification queue with #76.
 
 ## 9. Round 1 on glass, and the owner's reaction (2026-10-15)
 
-Round 1 was built unattended on `feat/2.8-header-slots` (`TEST_2.8.md` there; the mock's round 2 on
+Round 1 was built unattended on `feat/2.8-header-slots` (`archive/TEST_2.8.md` there; the mock's round 2 on
 the "2.8 Header Slots" canvas): four evenly spaced slots - clock, page, status, the outdoor
 temperature - each tap sliding down that slot's panel, the glyph style a setting, a page's header
 shown / hidden, dashes for no live value. The owner, having seen it:
@@ -227,7 +227,7 @@ next (Q6).
 
 ## 11. Round 2 on glass (2026-10-16)
 
-Every round-2 test passed; the owner's results and words are in `TEST_2.8.md`. What changes next
+Every round-2 test passed; the owner's results and words are in `archive/TEST_2.8.md`. What changes next
 (DECISIONS D-21 to D-24):
 
 - **The alarm by the clock** (D-21): the bell beside the clock while an alarm is set (within about
@@ -247,7 +247,7 @@ Every round-2 test passed; the owner's results and words are in `TEST_2.8.md`. W
 
 ## 12. Round 3, as built (2026-10-16 night)
 
-Settled on the canvas first (D-25 to D-28), then built unattended; `TEST_2.8.md` round 3 has the
+Settled on the canvas first (D-25 to D-28), then built unattended; `archive/TEST_2.8.md` round 3 has the
 pictures, the tests and the choices made along the way (D-29).
 
 - **The glyphs are numbers** (`UI/GlyphShapes`): each stroke of the mocks' glyphs on a 24-unit
@@ -269,9 +269,18 @@ pictures, the tests and the choices made along the way (D-29).
 ## 13. Round 4, from round 3's test (2026-10-16 afternoon)
 
 Every round-3 test passed but the deck's colour under UI Tweaks; the owner's list is in
-`TEST_2.8.md` (D-30). For the header: **a panel's side walls rise straight to the blue line** (the
+`archive/TEST_2.8.md` (D-30). For the header: **a panel's side walls rise straight to the blue line** (the
 flares are gone; the coves at the slot stay), and **the slot stays open until its panel has
 finished closing** (`Kit::Drawer::onClosed`). **The header is always visible while a header panel
 is open**: the page panel's Show / Hide waits for the panels to close (`GUIManager::
 headerPanelsClosed()`); a peek re-arms while one is open. The system panel lost its Status bar
 (one way to hide the header). The P4_5's words are 26 (a `HEADER` type role).
+
+## 14. Rounds 5-7, and the merge (2026-10-17)
+
+Round 6 kept **the bar's drop shadow off an open panel**: the bar is drawn over the panels (it
+covers their top edge), so on Linen its shadow lay across the top of an open one, under its slot;
+the bar now paints each open panel's face back over it (`Kit::drawerCoverBarShadow()`, in the bar's
+`DRAW_MAIN_END` - LVGL 9.5 clips `DRAW_POST` to the object). The rest of rounds 5-7 was the cards
+(D-31 to D-33: chip tables, the active frames, Linen's terracotta). Signed off 2026-10-17 and merged
+as `v0.2.18`; the sheet is `archive/TEST_2.8.md`.

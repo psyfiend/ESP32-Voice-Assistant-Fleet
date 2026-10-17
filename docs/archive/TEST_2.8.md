@@ -1,6 +1,7 @@
 # TEST - 2.8: the header's slots
 
-Rounds in order, each with your results under it.
+Rounds in order, each with your results under it. **Signed off 2026-10-17** after round 6 ("Apart
+from that we are good!"); round 7 is the two picks and the shadow's joins. Merged as `v0.2.18`.
 
 # Round 1 (2026-10-15, morning)
 
@@ -40,29 +41,29 @@ own roles, their sizes a new token group (`UIHeader`, `UI::hdr()`): `components.
 
 The header on the P4_5: `v0.2.16`, then bare, square, circle:
 
-![Before](followups/28_hdr_before_p45.png)
-![Bare](followups/28_hdr_bare_p45.png)
-![Square](followups/28_hdr_square_p45.png)
-![Circle](followups/28_hdr_circle_p45.png)
+![Before](../followups/28_hdr_before_p45.png)
+![Bare](../followups/28_hdr_bare_p45.png)
+![Square](../followups/28_hdr_square_p45.png)
+![Circle](../followups/28_hdr_circle_p45.png)
 
 The 4B (720 px): before, bare, square, circle:
 
-![Before, 4B](followups/28_hdr_before_4b.png)
-![Bare, 4B](followups/28_hdr_bare_4b.png)
-![Square, 4B](followups/28_hdr_square_4b.png)
-![Circle, 4B](followups/28_hdr_circle_4b.png)
+![Before, 4B](../followups/28_hdr_before_4b.png)
+![Bare, 4B](../followups/28_hdr_bare_4b.png)
+![Square, 4B](../followups/28_hdr_square_4b.png)
+![Circle, 4B](../followups/28_hdr_circle_4b.png)
 
 The status slot's panel - the system panel - before (right edge) and now (under its slot):
 
-![Before](followups/28_status_before_p45.png)
-![Now](followups/28_status_after_p45.png)
+![Before](../followups/28_status_before_p45.png)
+![Now](../followups/28_status_after_p45.png)
 
 The clock's, the page's (P4_5, then the 4B) and the sensor's panels:
 
-![Clock](followups/28_slot_clock_p45.png)
-![Page](followups/28_slot_page_p45.png)
-![Page, 4B](followups/28_slot_page_4b.png)
-![Sensor](followups/28_slot_sensor_p45.png)
+![Clock](../followups/28_slot_clock_p45.png)
+![Page](../followups/28_slot_page_p45.png)
+![Page, 4B](../followups/28_slot_page_4b.png)
+![Sensor](../followups/28_slot_sensor_p45.png)
 
 ## How it was checked
 
@@ -249,26 +250,26 @@ as found; the 1060 runs the `v0.2.17` release.
 
 The P4_5: `v0.2.17`, then round 2 (square), bare, circle, and with an alarm set:
 
-![v0.2.17](followups/28r2_hdr_before_p45.png)
-![Round 2, square](followups/28r2_hdr_square_p45.png)
-![Bare](followups/28r2_hdr_bare_p45.png)
-![Circle](followups/28r2_hdr_circle_p45.png)
-![An alarm set](followups/28r2_hdr_alarm_p45.png)
+![v0.2.17](../followups/28r2_hdr_before_p45.png)
+![Round 2, square](../followups/28r2_hdr_square_p45.png)
+![Bare](../followups/28r2_hdr_bare_p45.png)
+![Circle](../followups/28r2_hdr_circle_p45.png)
+![An alarm set](../followups/28r2_hdr_alarm_p45.png)
 
 The 4B (720 px), and with an alarm set - everything still in full:
 
-![4B](followups/28r2_hdr_square_4b.png)
-![4B, an alarm set](followups/28r2_hdr_alarm_4b.png)
+![4B](../followups/28r2_hdr_square_4b.png)
+![4B, an alarm set](../followups/28r2_hdr_alarm_4b.png)
 
 The panels, each joined to its slot - the alarm's (P4_5, then the 4B), the system panel, the
 clock's, the temperature's, the page's:
 
-![Alarm](followups/28r2_slot_alarm_p45.png)
-![Alarm, 4B](followups/28r2_slot_alarm_4b.png)
-![System panel](followups/28r2_status_p45.png)
-![Clock](followups/28r2_slot_clock_p45.png)
-![Temperature](followups/28r2_slot_sensor_p45.png)
-![Page](followups/28r2_slot_page_p45.png)
+![Alarm](../followups/28r2_slot_alarm_p45.png)
+![Alarm, 4B](../followups/28r2_slot_alarm_4b.png)
+![System panel](../followups/28r2_status_p45.png)
+![Clock](../followups/28r2_slot_clock_p45.png)
+![Temperature](../followups/28r2_slot_sensor_p45.png)
+![Page](../followups/28r2_slot_page_p45.png)
 
 ## Tests for you
 
@@ -397,36 +398,36 @@ as found (each saved before every flash, `bench/settings/`); the 1060 runs the `
 The header on the P4_5: Midnight, Linen, bare, circle; an alarm in two hours (the bell, the
 notice); the sensor failed (from a PC, below):
 
-![Midnight](followups/28r3_hdr_p45.png)
-![Linen](followups/28r3_hdr_linen_p45.png)
-![Bare](followups/28r3_hdr_bare_p45.png)
-![Circle](followups/28r3_hdr_circle_p45.png)
-![An alarm in two hours](followups/28r3_hdr_alarm_p45.png)
-![The sensor failed](followups/28r3_hdr_sensor_err_p45.png)
+![Midnight](../followups/28r3_hdr_p45.png)
+![Linen](../followups/28r3_hdr_linen_p45.png)
+![Bare](../followups/28r3_hdr_bare_p45.png)
+![Circle](../followups/28r3_hdr_circle_p45.png)
+![An alarm in two hours](../followups/28r3_hdr_alarm_p45.png)
+![The sensor failed](../followups/28r3_hdr_sensor_err_p45.png)
 
 The panels, one shape with their slots - the clock's, the notice's, the temperature's, the system
 panel (and on Linen):
 
-![Clock](followups/28r3_slot_clock_p45.png)
-![Notice](followups/28r3_slot_alarm_p45.png)
-![Temperature](followups/28r3_slot_sensor_p45.png)
-![System panel](followups/28r3_status_p45.png)
-![System panel, Linen](followups/28r3_status_linen_p45.png)
+![Clock](../followups/28r3_slot_clock_p45.png)
+![Notice](../followups/28r3_slot_alarm_p45.png)
+![Temperature](../followups/28r3_slot_sensor_p45.png)
+![System panel](../followups/28r3_status_p45.png)
+![System panel, Linen](../followups/28r3_status_linen_p45.png)
 
 UI Tweaks, then DISPLAY open under it; a card's SETTINGS, then its Card UI:
 
-![UI Tweaks](followups/28r3_tweaks_p45.png)
-![The deck under it](followups/28r3_tweaks_deck_p45.png)
-![SETTINGS](followups/28r3_settings_p45.png)
-![Card UI](followups/28r3_cardui_p45.png)
+![UI Tweaks](../followups/28r3_tweaks_p45.png)
+![The deck under it](../followups/28r3_tweaks_deck_p45.png)
+![SETTINGS](../followups/28r3_settings_p45.png)
+![Card UI](../followups/28r3_cardui_p45.png)
 
 The 4B (720 px): the header with an alarm, the system panel, UI Tweaks (each row's words above its
 selector), Card UI:
 
-![4B header](followups/28r3_hdr_alarm_4b.png)
-![4B system panel](followups/28r3_status_4b.png)
-![4B UI Tweaks](followups/28r3_tweaks_4b.png)
-![4B Card UI](followups/28r3_cardui_4b.png)
+![4B header](../followups/28r3_hdr_alarm_4b.png)
+![4B system panel](../followups/28r3_status_4b.png)
+![4B UI Tweaks](../followups/28r3_tweaks_4b.png)
+![4B Card UI](../followups/28r3_cardui_4b.png)
 
 ## Tests for you
 
@@ -602,19 +603,19 @@ local lines), their settings files as found (saved before every flash).
 The P4_5: the system panel; the page panel (Show / Hide, the walls meeting the line); Card UI;
 the three active states on the Desk card; Power on:
 
-![System panel](followups/28r4_status_p45.png)
-![Page panel](followups/28r4_slot_page_p45.png)
-![The corners](followups/28r4_corners_p45.png)
-![Card UI](followups/28r4_cardui_p45.png)
-![Glow frame](followups/28r4_frame_glow_p45.png)
-![Bracket](followups/28r4_frame_bracket_p45.png)
-![Corner cut](followups/28r4_frame_corner_p45.png)
-![Power on](followups/28r4_power_on_p45.png)
+![System panel](../followups/28r4_status_p45.png)
+![Page panel](../followups/28r4_slot_page_p45.png)
+![The corners](../followups/28r4_corners_p45.png)
+![Card UI](../followups/28r4_cardui_p45.png)
+![Glow frame](../followups/28r4_frame_glow_p45.png)
+![Bracket](../followups/28r4_frame_bracket_p45.png)
+![Corner cut](../followups/28r4_frame_corner_p45.png)
+![Power on](../followups/28r4_power_on_p45.png)
 
 The 4B: the system panel, Card UI:
 
-![4B system panel](followups/28r4_status_4b.png)
-![4B Card UI](followups/28r4_cardui_4b.png)
+![4B system panel](../followups/28r4_status_4b.png)
+![4B Card UI](../followups/28r4_cardui_4b.png)
 
 ## Tests for you
 
@@ -733,13 +734,13 @@ settings files as found (saved before every flash).
 
 ## The pictures
 
-![UI Tweaks](followups/28r5_tweaks_p45.png)
-![Card UI](followups/28r5_cardui_p45.png)
-![Bracket](followups/28r5_frame_bracket_p45.png)
-![Corner cut](followups/28r5_frame_corner_p45.png)
-![Corner cut, close](followups/28r5_corner_zoom_p45.png)
-![Power on](followups/28r5_power_on_p45.png)
-![4B UI Tweaks](followups/28r5_tweaks_4b.png)
+![UI Tweaks](../followups/28r5_tweaks_p45.png)
+![Card UI](../followups/28r5_cardui_p45.png)
+![Bracket](../followups/28r5_frame_bracket_p45.png)
+![Corner cut](../followups/28r5_frame_corner_p45.png)
+![Corner cut, close](../followups/28r5_corner_zoom_p45.png)
+![Power on](../followups/28r5_power_on_p45.png)
+![4B UI Tweaks](../followups/28r5_tweaks_4b.png)
 
 ## Tests for you
 
@@ -845,21 +846,21 @@ before every flash). Office Desk was switched on for the pictures and the timing
 
 ## The pictures
 
-![Linen's candidates](followups/28r6_linen_colours_p45.png)
+![Linen's candidates](../followups/28r6_linen_colours_p45.png)
 
 *Across: copper `B8662E`, between burnt amber and terracotta `D47F45`, terracotta `CF7350`, burnt
 amber `D98A3A`. Down: Corner cut, Bracket, Fill. Judge them on glass - `/popup?active=` below.*
 
-![Corner cut on Linen](followups/28r6_corner_linen_zoom_p45.png)
-![Bracket on Linen](followups/28r6_bracket_linen_zoom_p45.png)
-![Power on Linen](followups/28r6_power_linen_p45.png)
-![UI Tweaks, Linen](followups/28r6_tweaks_linen_p45.png)
-![UI Tweaks, Midnight](followups/28r6_tweaks_midnight_p45.png)
-![Card UI, Linen](followups/28r6_cardui_linen_p45.png)
-![The clock's panel on Linen](followups/28r6_header_panel_p45.png)
-![...close](followups/28r6_header_panel_zoom_p45.png)
-![4B UI Tweaks](followups/28r6_tweaks_4b.png)
-![4B, the clock's panel on Linen](followups/28r6_header_panel_4b.png)
+![Corner cut on Linen](../followups/28r6_corner_linen_zoom_p45.png)
+![Bracket on Linen](../followups/28r6_bracket_linen_zoom_p45.png)
+![Power on Linen](../followups/28r6_power_linen_p45.png)
+![UI Tweaks, Linen](../followups/28r6_tweaks_linen_p45.png)
+![UI Tweaks, Midnight](../followups/28r6_tweaks_midnight_p45.png)
+![Card UI, Linen](../followups/28r6_cardui_linen_p45.png)
+![The clock's panel on Linen](../followups/28r6_header_panel_p45.png)
+![...close](../followups/28r6_header_panel_zoom_p45.png)
+![4B UI Tweaks](../followups/28r6_tweaks_4b.png)
+![4B, the clock's panel on Linen](../followups/28r6_header_panel_4b.png)
 
 ## Tests for you
 
@@ -900,4 +901,45 @@ amber `D98A3A`. Down: Corner cut, Bracket, Fill. Judge them on glass - `/popup?a
 
 ## Your results
 
-*(yours)*
+**X1-X7 all PASS** (2026-10-17). "Corner cut looks smashing on linen!" Bracket is "a little harder to
+quick discern on/off from across the room but it's pretty good".
+
+- **Q17**: terracotta - **`D47F45`**, the one between burnt amber and terracotta (the sheet's second
+  column; `CF7350` was the third).
+- **Q18**: **Corner cut** as the default.
+- **Note**: the corner cut's drop shadow on Linen "isn't perfect ... two points that stand out when
+  looking on glass as they don't blend well with the change in angle" - the two ends of the
+  bottom-left cut, where the cut's shadow met the card's. "Apart from that we are good!"
+
+---
+
+# Round 7 - the picks, and the cut's shadow joined (2026-10-17, afternoon)
+
+The last round before the merge: your two answers, and the two points.
+
+| Where | Round 6 | Round 7 |
+|---|---|---|
+| **Linen's "on"** | copper `B8662E` | **`D47F45`**, your pick |
+| **Card state's default** | Fill | **Corner cut** (your own setting was already the corner cut) |
+| **The cut's shadow** | triangles of the floor and strips of shadow, meeting the card's own shadow at the cut's ends | **one painted image per cut corner**: the floor and the shadow the cut card casts, from LVGL's own shadow measured offscreen - so it rounds both ends of the cut as a blur would, and meets the card's shadow at exactly LVGL's value (checked pixel by pixel: no step anywhere along its edges) |
+| **Its cost** (P4_5, Linen, a page change) | +13.4 ms a lit card | **~+8 ms** - the light bands 4, the cuts 2, their lines about 2 |
+
+![The cut's two ends](../followups/28r7_corner_joins_p45.png)
+![Corner cut, Linen, D47F45](../followups/28r7_corner_linen_zoom_p45.png)
+![The 4B](../followups/28r7_corner_linen_4b.png)
+
+## Tests for you
+
+| # | Do this | PASS if |
+|---|---|---|
+| Y1 | Linen, a light on: the bottom-left cut's two ends, on glass | the shadow turns the corner at both ends with no step or notch |
+| Y2 | Midnight and Fleet | the corner cut as round 6 |
+
+## Results
+
+- **On glass**: the P4_5 (Linen and Midnight) and the 4B (Linen). The image's edges against the
+  card's own shadow read the same values pixel for pixel (left 173, below 115, right 189 in red),
+  where the first try - in 8-bit rounding - was one 16-bit step lighter.
+- **The all-nine gate** ran on the merge commit's code (below, in the pull request).
+- One trap: LVGL blends into the panel in 16 bits with a 32-step mix and rounds down; an image meant
+  to match its shadow has to do the same (in LESSONS).

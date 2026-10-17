@@ -52,7 +52,7 @@ levels arrive with 2.10c), **#47** discovery payload size, **#48** reason 36.
 | 2.5 | Page + grid engine | DONE 2026-09-18, `v0.2.5` - `design/dashboard.md` |
 | 2.6 | Pages and swipes | DONE 2026-09-24 - `design/pages.md` |
 | 2.7 | First card types | DONE 2026-09-24, `v0.2.7` - `design/cards.md` §13 |
-| 2.8 | Header bar v2 (**#19**) | **interview §3 answered 2026-10-15** (`design/header-slots.md`, D-11-D-15): four evenly spaced slots, each with its own drop-down panel; header shown / hidden per page; slots for the page header and clusters, never a solo card. **Round 1 built unattended 2026-10-15** on `feat/2.8-header-slots` (no PR): the mock's round 2 on the canvas, then the slots as data, their panels, the glyph style as a setting, a page's header shown / hidden, dashes (`TEST_2.8.md` on that branch). **The owner, on seeing it: three places, not four slots** - the clock, alarm and temperature left, the page middle, status right (D-16); the panels are for settings (D-17; `header-slots.md` §9). On round 2's mock: the alarm joins the status icons, the weather stays with the clock, the open slot stays joined to its panel (D-18). **Round 2 built 2026-10-15**: three places on claims (D-19, the owner's model - priority decides what shows), the alarm while set, square glyphs, the system panel on `Kit::Drawer` (D-20). Round 2 tested 2026-10-16 (D-21-D-28). **Round 3 built 2026-10-16**: the glyphs as numbers, one shape, the bell and its notice, the system panel's new layout, UI Tweaks, Card UI. Round 3 tested; **round 4 built** (D-30: panels, header rule, Card UI's Inherit, active states on the edge), tested 2026-10-17; **round 5 built** (D-31: chip rows, lit frames, lit glass), tested 2026-10-17; **round 6 built** (D-32: Linen's active states, satin chips, the header's shadow). **Next: the owner's test** (`TEST_2.8.md` round 6) |
+| 2.8 | Header bar v2 (**#19**) | **DONE 2026-10-17, `v0.2.18`** - `design/header-slots.md`, D-11 to D-33, `archive/TEST_2.8.md` (seven rounds). Three places on claims (the clock and alarm left, the page middle, status right), each slot with its own panel, one shape with its tab; glyphs drawn from numbers; a page's header shown / hidden; the system panel's new layout; **UI Tweaks** and a card's **Card UI** as chip tables; the cards' **active frames** - Corner cut the default - and lit glass; Linen's "on" terracotta `D47F45` |
 | 2.9 | Display stack: esp_lcd (**#67**) | six of nine boards, merged 2026-09-29; left: CYD_S3_8048, WS_S3_5B - `display/README.md` |
 | 2.10 | Card popup (**#65**) | **DONE 2026-10-12.** 2.10a `v0.2.8`; 2.10b `v0.2.9`; 2.10c `v0.2.10` (HA light levels, members of HA groups, scenes, the window redesigned - `design/card-sheet.md` §14-16). **2.10d + 2.10e `v0.2.11`** (merged together, K51): stable ids and saving (§17), History from HA - charts and activity (§18). Sheets in `archive/`. Left over, filed: #90, #91, #92 (K17 done, `v0.2.12`) |
 | 2.11 | Group cards (**#66**) | not started - with the page arranger (#78; its engines: `design/layout-engines.md`); must land before 3.1 |
@@ -103,24 +103,10 @@ The numbers above are identity, not sequence. Agreed with the owner:
    `archive/TEST_UI_FOLLOWUPS.md`); #93 `v0.2.14`; ~~#99 satin~~ DONE, `v0.2.16` (K77, K85-K87;
    `archive/TEST_99.md`). #100 NINA's clock is **tabled** - three clocks agreed (K81-K84, #100),
    prototype on `feat/100-nina-clock`. #104 (a light's temperature mark) waits.
-4. **2.8 header slots** (#19) - the interview's §3 answered 2026-10-15 (`design/header-slots.md`).
-   **Round 1 built 2026-10-15, unattended**, on `feat/2.8-header-slots` (`TEST_2.8.md` there); the
-   owner's verdict: three places, not four slots (D-16, D-17); round 2's mock refined it (D-18: the
-   alarm with the status icons, the weather with the clock). **Round 2 built 2026-10-15** on the
-   same branch: three places on **claims** - the owner's model, each slot claiming its room with a
-   priority, the lowest giving way (D-19, `header-slots.md` §10; a pure planner, host-tested) - the
-   alarm a claim on the bar only while set, square glyphs, the system panel on `Kit::Drawer` (D-20).
-   Round 2 tested 2026-10-16, every test PASS but the glyphs (D-21-D-28). **Round 3 built
-   2026-10-16 overnight**: the mocks' glyphs drawn from numbers, one accent shape for a slot and
-   its panel, the bell by the clock and its 12-hour notice, the system panel as CONNECTIVITY +
-   SYSTEM - DIAGNOSTICS, the knobs in a **UI Tweaks** window (the deck rising under it), a card's
-   **Card UI**. Round 3 tested the same day; **round 4 built** from its list (D-30) with the
-   owner's **active states on the edge**; tested 2026-10-17. **Round 5 built** (D-31): chip rows
-   for UI Tweaks and Card UI, the Bracket and Corner cut lit inward, lit glass for a toggle that
-   is on; tested 2026-10-17. **Round 6 built** (D-32): Linen's frames darker, its corner cut with
-   its own shadow, Linen's "on" copper for now, satin chips, the header's shadow off an open panel.
-   **The owner's test next** (`TEST_2.8.md` round 6).
-   ~~**A17**~~ DONE, `v0.2.17`
+4. ~~**2.8 header slots** (#19)~~ - DONE, `v0.2.18` (`archive/TEST_2.8.md`, seven rounds; D-11 to
+   D-33): three places on **claims** (D-19, a pure planner, host-tested), a panel per slot, the
+   system panel's new layout, UI Tweaks and Card UI, the cards' active frames (Corner cut the
+   default), lit glass, Linen's terracotta. ~~**A17**~~ DONE, `v0.2.17`
    (`archive/TEST_A17.md`). Then **#76** on the claim model (the notice queue from NINA's toasts),
    and the interview §4 onward (`design/interview-phase2-3.md`).
 5. **2.11 group cards with the page arranger** (#66, #78; prototype: artifact "Layout Playground";

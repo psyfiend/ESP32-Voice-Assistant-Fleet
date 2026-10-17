@@ -947,6 +947,15 @@ seam** along it - each fades out over the same pixel, so what is under shows thr
 shared edge with a 2 px line in the same colour, or use one triangle whose other edges lie outside
 the clip.
 
+**To match LVGL's own drawing, copy its arithmetic, not its intent** (round 7). The corner cut's
+shadow is an image painted to continue the card's LVGL shadow; its edges came out one 16-bit step
+lighter than the shadow beside them - a faint line on glass. LVGL blends into an RGB565 panel with
+`lv_color_16_16_mix()`: the mix cut to 32 steps, each channel rounded *down*; an 8-bit blend rounded
+to nearest and then truncated to 565 lands a step lighter about half the time. Doing the blend in 5
+and 6 bits LVGL's way made the values identical. And the shadow itself was **measured, not
+modelled** - a rectangle with the card's shadow drawn on an offscreen canvas, its alpha read from
+the middle of each side - because LVGL's blur is two box passes over a rounded corner, not a ramp.
+
 And one not new: piping `pio run -t upload` through `grep` left esptool hung for twelve minutes -
 its progress bar's characters crash a cp1252 pipe. The `PYTHONIOENCODING=utf-8` lesson above is
 the fix; it was not followed.

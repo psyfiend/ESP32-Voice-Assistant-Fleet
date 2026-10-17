@@ -1,4 +1,4 @@
-# Handoff — 2026-10-17 (2.8 round 6 built - Linen's active states, satin chips, the header's shadow - for the owner's test)
+# Handoff — 2026-10-17 (2.8 signed off, `v0.2.18`, in a pull request for the owner to merge)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -15,8 +15,11 @@ there.
 
 ## Where the project is
 
-**`v0.2.16`, 2026-10-15: #99, satin and glass** (`archive/TEST_99.md`; K77, K85-K87). Before it, on
-2026-10-14: `v0.2.15` the UI follow-ups from 2.12's test (`archive/TEST_UI_FOLLOWUPS.md`), `v0.2.14`
+**`v0.2.18`, 2026-10-17: milestone 2.8, the header bar v2** (`archive/TEST_2.8.md`; D-11 to D-33) -
+three places on claims, a panel per slot, the system panel's new layout, UI Tweaks and Card UI, the
+cards' active frames (Corner cut the default) and lit glass, Linen's terracotta. Before it:
+`v0.2.17` A17 (settings never lost to a failed mount), **`v0.2.16` #99, satin and glass**
+(`archive/TEST_99.md`; K77, K85-K87). On 2026-10-14: `v0.2.15` the UI follow-ups from 2.12's test (`archive/TEST_UI_FOLLOWUPS.md`), `v0.2.14`
 #93 (members' HA areas), **`v0.2.13` milestone 2.12, the UI foundation** - the card window's code
 rebuilt on a component kit, with nothing changed on screen (`docs/design/ui-foundation.md`). Before
 them: `v0.2.12` K17, `v0.2.8`-`v0.2.11` milestone 2.10, the card popup. `CHANGELOG.md` matches
@@ -42,50 +45,28 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
 
 ## Where things stand (2026-10-17)
 
-- **`v0.2.17` - A17** is the release on `main` (flashed on the 1060). Copies of every board's
-  settings file are in `bench/settings/<board>/` - one is saved before every flash.
-- **2.8 round 6 is built, on `feat/2.8-header-slots`** (no PR; **`TEST_2.8.md` round 6 is the
-  owner's sheet**, X1-X7, Q17-Q18). Round 5 was tested 2026-10-17 - every test PASS - and the
-  owner's notes became round 6 (D-32): Linen's frames darker and stronger (`ACTIVE_INK`), the
-  corner cut on Linen with its own shadow, Linen's "on" copper for now (`/popup?active=` tries
-  others), unlit chips satin, the header's shadow kept off an open panel. Open: which colour, and
-  Bracket or Corner cut (Linen's corner cut costs ~13 ms a lit card on a page change - trim it if
-  it stays). Round 5 (D-31): **UI Tweaks and Card UI on chip rows** (`Kit::chipTable`: two
-  columns, the longest row centred; the 4B stacks each name above its chips), Card UI's Inherit as
-  each row's first chip; **Card state Fill / Icon glow / Bracket / Corner cut**, the two frames
-  drawn and lit inward in draw events (`Cards/CardFrame.cpp`, no layout change), the corner cut
-  angular at top-right and bottom-left and never on Linen; **a toggle that is on is lit glass**
-  (`Finish::FINISH_LIT`). Round 4 before it (D-30, `header-slots.md` §13): the system panel's rows
-  built at every open (finished faces live in a cache any window may take back), no Status bar,
-  "Scheme:"; a panel's slot open until it has gone; the header always visible while a header panel
-  is open; the P4_5's header words 26 (a `HEADER` type role); window timeout and bar at once.
-- **The all-nine build runs once, right before the merge** (the owner, 2026-10-17) - not per round.
-  Rounds build the P4_5 and the 4B.
-- **2.8 round 3, as built** (`header-slots.md` §11-12; DECISIONS D-21 to D-29):
-  - **The header** (round 2's three places on claims, `Layout/HeaderPlan.h`): the mocks' glyphs
-    drawn from numbers (`UI/GlyphShapes`, `Kit::strokeGlyph`), the scheme's `SIG_*` colours, an AP
-    mast; an open slot and its panel one accent shape (coves, flares, `JOIN_R`); the bell inside
-    the clock's slot and the 12-hour notice among the status icons (`Alarms.h`; a PC sets a
-    pretend alarm until K84). The P4_5's header words and tags at 24 (D-26).
-  - **The system panel**: CONNECTIVITY, then SYSTEM - DIAGNOSTICS (Log / UI Tweaks / About, the
-    scheme beside Status bar, Col / Row). **UI Tweaks** (`UI/TweaksSheet`, `GUIManagerTweaks.cpp`):
-    the card looks, glyphs, selector and window timeout, saved, for every page; the deck rises
-    under it. **Card UI**: the same per card, a view of the card window (`PopupCardUi.cpp`).
-  - **Choices made unattended** are D-29 (the scheme one for every page; Col / Row saved per page;
-    Card label "Custom" keeps the words showing) - the owner confirms or reverses them.
-- **Boards**: the P4_5 and the 4B run round 6 (local lines), the 1060 `v0.2.17`. Flash them with
-  `PYTHONIOENCODING=utf-8` set (LESSONS) - esptool at 921600 to `0x10000` is what round 6 used. The 4B's own file
-  closes a window after 10 s (`system.window.close`), which stops the harness's full walk there -
-  use `--only`, or ask the owner.
-- **The mock**: the "2.8 Header Slots" canvas
-  (https://claude.ai/artifact/9dLvFUbWZePzgjLnnXZ5Sw); its last artboards show three places with
-  the alarm still on the left (D-18 moved it; the build is the reference now).
+- **2.8 is signed off and in a pull request** from `feat/2.8-header-slots` (the owner merges). After
+  the merge: `git pull`, tag the merge commit `v0.2.18`, flash the boards on the desk (the 1060
+  still runs `v0.2.17`). Copies of every board's settings file are in `bench/settings/<board>/` -
+  one is saved before every flash.
+- **Where 2.8's pieces live**: the header's places and claims `Layout/HeaderPlan.h` (host-tested),
+  slots as data `UI/HeaderSlots.h`, kinds in `Panel_Header.cpp`, panels in `SlotPanels.cpp`, the
+  glyphs `UI/GlyphShapes`; UI Tweaks `UI/TweaksSheet` + `GUIManagerTweaks.cpp`, Card UI
+  `PopupCardUi.cpp`, both on `Kit::chipTable`; the active frames `Cards/CardFrame.cpp` (the corner
+  cut's corners are cached images, their shadow measured from LVGL's own - D-33); lit glass
+  `Finish::FINISH_LIT`. `header-slots.md` §9-14 is the design's story.
+- **Choices made unattended in round 3** are D-29 (the scheme one for every page; Col / Row saved
+  per page; Card label "Custom" keeps the words showing) - never contradicted in four rounds of tests.
+- **The all-nine build runs once, right before a merge** (the owner, 2026-10-17) - not per round.
+  Rounds build the P4_5 and the 4B. Flash with `PYTHONIOENCODING=utf-8` set (LESSONS); esptool at
+  921600 to `0x10000`, app only. The 4B's own file closes a window after 10 s
+  (`system.window.close`), which stops the harness's full walk there - use `--only`.
 - **Routes**: the P4_5 serves 7 of `HttpServer::MAX_ROUTES` (8); the next route needs it raised.
 
 ## What is next with the owner
 
-1. **2.8 round 6, the owner's test** (`TEST_2.8.md` round 6). Then sign-off -> CHANGELOG
-   `v0.2.18`, archive the sheet, the all-nine gate, `gh pr create`; the owner merges.
+1. **2.8's merge** (the pull request), then the tag and the flash above. Round 7's two checks (Y1-Y2:
+   the corner cut's shadow at both ends of the cut, on glass) are in `archive/TEST_2.8.md`.
 2. **#76 next, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a
    queue any task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to
    dismiss), a notice's detailed form in the middle for a while then its minimal "!" in status, a
@@ -93,8 +74,8 @@ yet - bring each over when it is next changed (`ui-architecture.md` §6).
    panel. Mock first. Cluster headers come with 2.11.
 3. Waiting: **#104** (a light's temperature mark moves between builds); **#100** the clocks (three
    agreed, K81-K84, the record on #100; the prototype on `feat/100-nina-clock`, PR #102 open, not for
-   merging); **#106** an active card's glowing border (the owner's idea; 2.8's Bracket and Corner cut may
-   answer it - ask at sign-off); **#84** "no data
+   merging); **#106** an active card's glowing border (the owner's idea; 2.8's active frames look like its
+   answer - ask the owner whether to close it); **#84** "no data
    yet" (a proposal on the issue); **#99's S3 frame check** (W6) and History's activity rows in satin
    (K86), once an S3 is on the desk.
 

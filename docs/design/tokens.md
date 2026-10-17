@@ -377,7 +377,8 @@ target and TAG's scale on every board, except the P4_5 (`gen_type_scale.py`, `HE
 there: 115 of 255 on the dark schemes, 150 on Linen), `CUT_PCT` 24 (the corner cut's chamfer, % of
 the card's height), and `ACTIVE_INK` (round 6: how far the frame's edge goes from the active
 colour toward the scheme's text - 0 on the dark schemes, where the frames glow, 35 on Linen, where
-they go darker to stand out; the light goes half as far). The corner cut's shadow along the cuts
-is the card's own (`SHADOW`, `SHADOW_Y`, `SHADOW_OPA`). `UI::darkest()` (the scheme's darkest, 60%
-of the way to black) inks lit glass, warmed. **Linen's `ST_ACTIVE` is copper `B8662E`** for the
-owner to judge (round 6; olive `9AA35A` before) - `/popup?active=RRGGBB` tries another on glass.
+they go darker to stand out; the light goes half as far). The corner cut's shadow is the card's
+own (`SHADOW`, `SHADOW_Y`, `SHADOW_OPA`), measured from LVGL and painted around the cut (round 7,
+D-33). `UI::darkest()` (the scheme's darkest, 60% of the way to black) inks lit glass, warmed.
+**Linen's `ST_ACTIVE` is terracotta `D47F45`**, the owner's pick on glass (round 6; olive
+`9AA35A` before) - `/popup?active=RRGGBB` tries another without a build.

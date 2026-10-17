@@ -6,6 +6,32 @@ signed-off merges to `main` in the order they happen - it does not follow milest
 began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
+## v0.2.18 - 2026-10-17
+
+Milestone 2.8 - the header bar, v2 (#19; DECISIONS D-11 to D-33).
+
+- **The header is three places on claims** (D-16, D-19): the clock - with the weather, and the
+  alarm's bell while one is set - on the left, the page in the middle, the status icons on the
+  right; priority decides what shows. A slot is data, a kind and an entity (`HeaderSlots.h`), and a
+  page's header can be shown or hidden (saved). The status glyphs are drawn from numbers in the
+  scheme's own signal colours, bare or in a square or circle frame (a saved setting).
+- **Every slot opens its own panel**, one accent shape with its tab: the tab stays open until the
+  panel has closed, the bar's shadow never crosses it, and the header stays visible while a panel
+  is open (D-23, D-30). The status slot's panel is the system panel: CONNECTIVITY, then SYSTEM -
+  DIAGNOSTICS (Log, UI Tweaks, About), the scheme, Col / Row.
+- **UI Tweaks** (every page) and a card's **Card UI** (that card; Inherit first): chip tables, the
+  unlit chips satin, for the card label, entity label, card state, the selector's look and shape,
+  density, the window's timeout and its bar - each saved by name, each at once.
+- **A card that is on can say so on its edge**: Card state Fill, Icon glow, Bracket or **Corner cut,
+  now the default** - drawn and lit inward, never moving the layout; on Linen darker, and the corner
+  cut with a shadow of its own that joins the card's. A toggle that is on is **lit glass** (Power).
+- **Linen's "on" is terracotta `D47F45`** (olive before); `/popup?active=RRGGBB` tries a colour on
+  glass without a build.
+- The P4_5's header words at 26 px (a `HEADER` type role). The kit gained chip tables, lit glass,
+  `unfinish()` and a drawer's `onClosed`.
+- Measured on WS_P4_5, a page change: the corner cut adds ~8 ms a lit card on Linen. Signed off by
+  the owner (`docs/archive/TEST_2.8.md`, seven rounds); all nine environments build.
+
 ## v0.2.17 - 2026-10-15
 
 A17 - a failed mount never costs the settings (DECISIONS A17).
