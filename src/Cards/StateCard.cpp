@@ -17,8 +17,6 @@ static lv_obj_t *plainCol(lv_obj_t *parent) {
 }
 
 void StateCard::buildBody(lv_obj_t *body) {
-    // The corner cut's caps, only where it is in use (render() makes nothing).
-    if (s_fill == StateCardFill::FRAME_CORNER) makeCornerCaps();
     // Same vertical stack as ValueCard, and for the same reason: the disc used
     // to be centred with a hand-tuned offset and the name aligned to the
     // bottom, which left a gap the owner described as the icon being too high
@@ -282,15 +280,14 @@ void StateCard::render() {
         lv_obj_set_style_text_color(_name, UI::c(tone(p.TEXT)), 0);
     }
 
-    // --- The active frame (owner, 2.8 round 4): "on" on the card's edge --
+    // --- The active frame (owner, 2.8 rounds 4-5): "on" on the card's edge --
     // The frame modes light the icon and name as LIGHT_ICON does (above); the
-    // corner cut is the glow frame on a scheme with a shadow (Linen), where its
-    // caps would cut the shadow.
+    // corner cut is the bracket on a scheme with a shadow (Linen), where its
+    // cut corners would leave the shadow behind.
     CardFrame frame = CardFrame::FRAME_NONE;
     if (isOn && !chrome) {
-        if (s_fill == StateCardFill::FRAME_GLOW)    frame = CardFrame::FRAME_GLOW;
         if (s_fill == StateCardFill::FRAME_BRACKET) frame = CardFrame::FRAME_BRACKET;
-        if (s_fill == StateCardFill::FRAME_CORNER)  frame = UI::met().SHADOW ? CardFrame::FRAME_GLOW
+        if (s_fill == StateCardFill::FRAME_CORNER)  frame = UI::met().SHADOW ? CardFrame::FRAME_BRACKET
                                                                              : CardFrame::FRAME_CORNER;
     }
     activeFrame(frame, p.ST_ACTIVE);

@@ -431,9 +431,8 @@ struct CardPlacement {
 // Compound names per CLAUDE.md's macro hazard.
 enum class CardFrame : uint8_t {
     FRAME_NONE = 0,   // the edge restyle() gives
-    FRAME_GLOW,       // a ring in the state colour, a dark line outside it
-    FRAME_BRACKET,    // top and bottom thick, the sides thin
-    FRAME_CORNER,     // a ring, the top-left and bottom-right corners twice as round
+    FRAME_BRACKET,    // heavy top and bottom bars, light falling inward from them
+    FRAME_CORNER,     // a frame, the top-right and bottom-left corners cut at 45 degrees
 };
 
 enum class CardVariant : uint8_t {

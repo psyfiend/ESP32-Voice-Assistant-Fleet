@@ -12,7 +12,6 @@ namespace TweaksSheet {
 static Kit::Sheet     S;
 static Kit::SheetSpec spec;
 static Spec           s_spec = {};
-static Kit::Selector  s_sel[ROWS_MAX];
 static lv_obj_t      *s_list    = nullptr;   // the rows and the buttons, scrolling
 static lv_obj_t      *s_confirm = nullptr;   // Reset all's question
 static bool           s_tokensAfter = false; // the token page, once the window has gone
@@ -22,8 +21,7 @@ static void closeCb(lv_event_t *) { Kit::sheetClose(S); }
 // --- A choice made ------------------------------------------------------------
 static void buildList();
 
-// Built again in place - the selector's own look changed. Never inside the
-// selector's glide, whose objects these are.
+// Built again in place, where it was scrolled to (Reset all: every row read again).
 static void rebuildAsync(void *) {
     if (!S.win || !s_list) return;
     const int32_t y = lv_obj_get_scroll_y(s_list);
@@ -34,26 +32,21 @@ static void rebuildAsync(void *) {
     lv_obj_scroll_to_y(s_list, y, LV_ANIM_OFF);
 }
 
-// From the next timer pass, outside the selector's glide: a choice may rebuild
+// From the next timer pass, outside the chip's own click: a choice may rebuild
 // the whole dashboard under the window.
 static void chooseAsync(void *p) {
     const uintptr_t v = (uintptr_t)p;
     const uint8_t r = (uint8_t)(v >> 8), i = (uint8_t)(v & 0xFF);
     if (!s_spec.rows || r >= s_spec.nRows || !s_spec.rows[r].choose) return;
     s_spec.rows[r].choose(i);
-    if (s_spec.rows[r].rebuild) rebuildAsync(nullptr);
 }
 
-static void chooseRow(uint8_t r, uint8_t i) {
-    lv_async_call(chooseAsync, (void *)(uintptr_t)(((uintptr_t)r << 8) | i));
+// A chip: lit now, the choice made from the next timer pass.
+static void chipCb(lv_event_t *ev) {
+    const uintptr_t v = (uintptr_t)lv_event_get_user_data(ev);
+    Kit::chipTableLit(s_list, (uint8_t)(v >> 8), (uint8_t)(v & 0xFF));
+    lv_async_call(chooseAsync, (void *)v);
 }
-
-// The selector's onChosen carries no user data: one function per row.
-template <uint8_t R> static void chosenCb(uint8_t i) { chooseRow(R, i); }
-static void (*const ROW_CB[ROWS_MAX])(uint8_t) = {
-    chosenCb<0>, chosenCb<1>, chosenCb<2>, chosenCb<3>, chosenCb<4>,
-    chosenCb<5>, chosenCb<6>, chosenCb<7>, chosenCb<8>, chosenCb<9>,
-};
 
 // --- Tokens and Reset all -----------------------------------------------------
 static void tokensCb(lv_event_t *) {
@@ -92,19 +85,19 @@ static void resetCb(lv_event_t *) {
 }
 
 // --- The view -----------------------------------------------------------------
-// The kit's choice rows (every choice one width, D-27), then the buttons.
+// The kit's chip table (round 5: chips, not selectors), then the buttons.
 static void buildList() {
     const UIShape &k = UI::shape();
     const int32_t stageW = lv_area_get_width(&S.winRect) - 2 * S.pad;
     const int32_t gapX   = UI::mm(k.S5);
 
-    Kit::ChoiceRow rows[ROWS_MAX];
+    Kit::ChipRowSpec rows[ROWS_MAX];
     const uint8_t n = s_spec.nRows < ROWS_MAX ? s_spec.nRows : ROWS_MAX;
     for (uint8_t r = 0; r < n; r++) {
         const Row &row = s_spec.rows[r];
-        rows[r] = { row.what, row.words, row.n, (uint8_t)(row.chosen ? row.chosen() : 0), ROW_CB[r] };
+        rows[r] = { row.what, row.words, row.n, (uint8_t)(row.chosen ? row.chosen() : 0) };
     }
-    s_list = Kit::choiceRows(S.stage, stageW, rows, n, s_sel);
+    s_list = Kit::chipTable(S.stage, stageW, rows, n, chipCb);
 
     // Tokens (the token page; the window goes first) and Reset all.
     lv_obj_t *btns = Kit::buttonRow(s_list);
@@ -127,7 +120,6 @@ static void closing() {
 
 static void closed() {
     s_list = nullptr;
-    for (Kit::Selector &x : s_sel) x = Kit::Selector{};
     if (s_tokensAfter) {
         s_tokensAfter = false;
         if (s_spec.tokens) s_spec.tokens();
@@ -157,7 +149,7 @@ bool isOpen() { return S.win != nullptr; }
 void refresh() {
     if (!S.win) return;
     for (uint8_t r = 0; r < s_spec.nRows && r < ROWS_MAX; r++)
-        if (s_sel[r].obj && s_spec.rows[r].chosen) Kit::selectorSet(s_sel[r], s_spec.rows[r].chosen());
+        if (s_spec.rows[r].chosen) Kit::chipTableLit(s_list, r, s_spec.rows[r].chosen());
 }
 
 } // namespace TweaksSheet

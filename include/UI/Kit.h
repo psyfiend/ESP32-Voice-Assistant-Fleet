@@ -121,7 +121,7 @@ lv_obj_t *button(lv_obj_t *parent, ButtonRole role, const char *text, int32_t w,
 // once into PSRAM and kept; the object's own background is turned off while it
 // shows. Painted, and dithered to the panels' 16 bits, because LVGL's own
 // gradients band pink and green there (LESSONS).
-enum class FaceKind : uint8_t { FACE_BLACK, FACE_SILVER, FACE_DENT, FACE_SATIN };
+enum class FaceKind : uint8_t { FACE_BLACK, FACE_SILVER, FACE_DENT, FACE_SATIN, FACE_LIT };
 
 // The face as the object's first child (an image); `flat` is its colour when
 // no face can be had. `tint`: a satin face's own colour. Returns the image, or null.
@@ -141,13 +141,13 @@ uint32_t  facesFlat();            // how many came out flat (a debug readout)
 // lightens, and the object sinks 1 px. `w` x `h` and the corner radius `r` are
 // the object's own; `tint` is satin's colour, 0 for the scheme's (a role keeps
 // its colour: the Remove button's red). Called again, it changes the finish.
-enum class Finish : uint8_t { FINISH_SATIN, FINISH_GLASS };
+// LIT (2.8 round 5) - a toggle that is ON: glass with a warm light behind it,
+// "a light shining from within refracting through a semi-frosted glass surface"
+// (Power while on; a toggle is glass while off).
+enum class Finish : uint8_t { FINISH_SATIN, FINISH_GLASS, FINISH_LIT };
 void     finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tint = 0);
 uint32_t satinBase();             // the scheme's satin, between its two surfaces
-// A TOGGLE THAT IS ON (2.8 round 4): glass on and off, and on, the glow frame -
-// a ring in the active colour, a line in the scheme's darkest outside it (the
-// cards' "Glow frame"). `r` the object's corners.
-void     glowFrame(lv_obj_t *o, int32_t r, bool on);
+uint32_t litInk();                // words and icons on lit glass: the scheme's darkest, warmed
 // A colour that reads on glass: pushed toward the scheme's far end until it
 // stands apart from the metal (Linen's olive "on" vanished into its silver, T6).
 uint32_t glassInk(uint32_t hex);
@@ -228,35 +228,29 @@ int32_t selectorW(uint8_t n);   // with n choices and the action
 int32_t selectorH();            // a touch target and its padding (a compact one: H_CHIP)
 void    selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec);
 
-// CHOICE ROWS (KitChoices.cpp, 2.8 round 3: UI Tweaks, Card UI): a list of
-// rows `w` wide filling `parent`'s height, each its words and a compact
-// selector, every choice the width of the widest word in ANY row so the rows
-// line up (D-27); where the words and the widest selector will not fit side by
-// side (the 4B), each row's words stand above its selector. Scrolls when it
-// must. `S[i]` is row i's selector, kept by the caller. Returns the list, for
-// anything that follows the rows (buttons).
-struct ChoiceRow {
+// The action's face: glass, LIT glass while what it switches is on (the window's
+// Power; round 5: the glass itself lit from within, not a border on it).
+void    selectorActionLit(Selector &S, bool lit);
+
+// --- Chip tables (KitChoices.cpp, 2.8 round 5: UI Tweaks, Card UI) --------------
+// A list of option rows `w` wide filling `parent`'s height, scrolling when it
+// must: each row its name and its chips, the lit one in the accent. THE LONGEST
+// ROW CENTRED; every name right-justified against the chips' column, the chips
+// left-justified from it; a row's chips one width (rows may differ). On a window
+// too narrow for that (the 4B), every row's name above its chips, centred. `cb`
+// on a chip's CLICKED, with ((row << 8) | chip) as its user data. (Round 3's
+// selector rows took too much room for too little - the owner.)
+constexpr uint8_t CHIP_ROWS_MAX = 12;
+struct ChipRowSpec {
     const char        *what;
     const char *const *words;
     uint8_t            n;
-    uint8_t            chosen;
-    void             (*onChosen)(uint8_t i);
+    uint8_t            lit;
 };
-lv_obj_t *choiceRows(lv_obj_t *parent, int32_t w, const ChoiceRow *rows, uint8_t n, Selector *S);
-// A row of buttons after choice rows, in their list: centred, S5 apart.
+lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_t n, lv_event_cb_t cb);
+void      chipTableLit(lv_obj_t *table, uint8_t row, uint8_t lit);   // after a choice
+// A row of buttons after a chip table, in its list: centred, S5 apart.
 lv_obj_t *buttonRow(lv_obj_t *list);
-// INHERIT ROWS (Card UI, 2.8 round 4): in a choice list (`stacked`: its rows
-// centred), each row its words with an Inherit toggle at the end of the line
-// (glass while on; `cb` on CLICKED with `user`). While it is on, nothing more;
-// off, inheritRow() returns the line under the words for the row's own
-// choiceSelector()s - each only as wide as its own longest choice (owner: most
-// rows inherit, and a short choice such as "10 s" stays short).
-lv_obj_t *choiceList(lv_obj_t *parent, int32_t w, bool stacked = false);
-lv_obj_t *inheritRow(lv_obj_t *list, const char *what, bool inherited, lv_event_cb_t cb, void *user);
-void      choiceSelector(Selector &S, lv_obj_t *line, const char *const *words, uint8_t n, uint8_t chosen,
-                         void (*onChosen)(uint8_t i), int32_t room = 0);
-// The action lit - glass - while what it switches is on (the window's Power), satin while off.
-void    selectorActionLit(Selector &S, bool lit);
 
 // --- Chips --------------------------------------------------------------------
 // A CHIP ROW: small round-ended buttons side by side, the chosen one lit in

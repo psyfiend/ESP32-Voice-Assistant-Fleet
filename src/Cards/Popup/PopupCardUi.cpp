@@ -1,47 +1,40 @@
-// Card UI (2.8 round 3, D-25 / D-28; round 4): the card's own looks, a view of
-// the card window reached from the foot of SETTINGS. Each row is its words and
-// an INHERIT toggle (owner, round 4): on, the row follows UI Tweaks and shows
-// nothing more; off, the row's own choices appear under it, each selector only
-// as wide as its own longest choice. Kept under the card's id; written when the
-// window closes, as SETTINGS' rows are.
+// Card UI (2.8 round 3, D-25 / D-28; round 5): the card's own looks, a view of
+// the card window reached from the foot of SETTINGS. The kit's chip table, as UI
+// Tweaks' - one row per option, Inherit its first chip (owner, round 5: round
+// 4's Inherit buttons and selectors gone). "Inherit" follows UI Tweaks. Kept
+// under the card's id; written when the window closes, as SETTINGS' rows are.
 #include "PopupState.h"
 
 namespace popup {
 
-static Kit::Selector s_cuiSel[8];
-static uint8_t       s_cuiN = 0;
-static int32_t       s_scrollY = 0;           // kept across a rebuild of the view
-static lv_obj_t     *s_list = nullptr;
-static bool          s_rebuildPage = false;   // the page is built again once the window has gone
+static lv_obj_t *s_table = nullptr;
+static bool      s_rebuildPage = false;   // the page is built again once the window has gone
 
-// --- What the rows are -----------------------------------------------------------
-// Entity label, in the owner's order (K40; "Name (HA)" D-28).
-static const char *const ENTITY_W[]  = { "Name (HA)", "State", "Custom", "None" };
-static const CardLabel   ENTITY_IS[] = { CardLabel::LBL_HA, CardLabel::LBL_STATE, CardLabel::LBL_NAME,
-                                         CardLabel::LBL_NONE };
-static const char *const CLABEL_W[]  = { "Custom", "None" };     // CardGroups::LS_CUSTOM, LS_NONE
-static const char *const METAL_W[]   = { "Black", "Silver" };
+// --- What the rows are (each row's first chip is Inherit) -------------------------
+static const char *const ENTITY_W[]  = { "Inherit", "Name (HA)", "State", "Custom", "None" };
+static const CardLabel   ENTITY_IS[] = { CardLabel::LBL_INHERIT, CardLabel::LBL_HA, CardLabel::LBL_STATE,
+                                         CardLabel::LBL_NAME, CardLabel::LBL_NONE };
+static const char *const CLABEL_W[]  = { "Inherit", "Custom", "None" };   // CardGroups::LabelSource's order
+static const char *const METAL_W[]   = { "Inherit", "Black", "Silver" };
 static const char *const SHAPE_W[]   = { "Square", "Round" };
-static const char *const DENSITY_W[] = { "Compact", "Full", "Auto" };
-static const char *const DENSITY_IS[] = { "compact", "full", "auto" };   // cardVariantName()'s words
-static const char *const TIMEOUT_W[] = { "60 s", "30 s", "10 s", "Off" };
-static const char *const TIMEOUT_IS[] = { "60", "30", "10", "off" };
-static const char *const BAR_W[]     = { "On", "Off" };
-static const char *const BAR_IS[]    = { "on", "off" };
+static const char *const DENSITY_W[] = { "Inherit", "Compact", "Full", "Auto" };
+static const char *const DENSITY_IS[] = { nullptr, "compact", "full", "auto" };   // cardVariantName()'s words
+static const char *const TIMEOUT_W[] = { "Inherit", "60 s", "30 s", "10 s", "Off" };
+static const char *const TIMEOUT_IS[] = { nullptr, "60", "30", "10", "off" };
+static const char *const BAR_W[]     = { "Inherit", "On", "Off" };
+static const char *const BAR_IS[]    = { nullptr, "on", "off" };
 
-enum CuiRow : uint8_t { CUI_ENTITY, CUI_CLABEL, CUI_SELECTOR, CUI_DENSITY, CUI_TIMEOUT, CUI_BAR, CUI_ROWS };
-static const char *const ROW_WHAT[CUI_ROWS] = { "Entity label", "Card label", "Selector", "Card density",
-                                                "Window timeout", "Timer bar" };
+enum CuiRow : uint8_t { CUI_ENTITY, CUI_CLABEL, CUI_METAL, CUI_SHAPE, CUI_DENSITY, CUI_TIMEOUT, CUI_BAR, CUI_ROWS };
 
 static Card *held() { return cardOf(h.surface); }
 
-// The held card's saved word for `key`, as a position in `is`; -1: none saved.
-static int8_t savedPos(const char *key, const char *const *is, uint8_t n) {
+// The held card's saved word for `key`, as a position in `is` (0: none saved - Inherit).
+static uint8_t savedPos(const char *key, const char *const *is, uint8_t n) {
     Card *c = held();
     char v[20];
-    if (!c || !c->hasId() || !Settings::card(c->id(), key, v, sizeof(v))) return -1;
-    for (uint8_t i = 0; i < n; i++) if (!strcmp(v, is[i])) return (int8_t)i;
-    return -1;
+    if (!c || !c->hasId() || !Settings::card(c->id(), key, v, sizeof(v))) return 0;
+    for (uint8_t i = 1; i < n; i++) if (!strcmp(v, is[i])) return i;
+    return 0;
 }
 
 static int8_t savedLook() {
@@ -52,147 +45,91 @@ static int8_t savedLook() {
     return look;
 }
 
-static uint8_t posOf(const CardLabel *is, uint8_t n, CardLabel l) {
-    for (uint8_t k = 0; k < n; k++) if (is[k] == l) return k;
+// Which chip each row has lit, as the card has it now.
+static uint8_t litOf(uint8_t row) {
+    Card *c = held();
+    if (!c) return 0;
+    switch (row) {
+        case CUI_ENTITY:
+            for (uint8_t k = 0; k < 5; k++) if (ENTITY_IS[k] == c->labelMode()) return k;
+            return 0;
+        case CUI_CLABEL:  return (uint8_t)CardGroups::labelSource(*c);
+        case CUI_METAL: { const int8_t l = savedLook(); return l < 0 ? 0 : (l & 2) ? 2 : 1; }
+        case CUI_SHAPE:   return Kit::selectorLookNow() & 1;
+        case CUI_DENSITY: return savedPos("density", DENSITY_IS, 4);
+        case CUI_TIMEOUT: return savedPos("close", TIMEOUT_IS, 5);
+        case CUI_BAR:     return savedPos("bar", BAR_IS, 3);
+    }
     return 0;
 }
 
-// The view again (a row opened or closed; the selector's look changed),
-// outside the selector's glide or the toggle's click, where it was scrolled to.
-static void againAsync(void *) {
-    if (s.phase != PopupPhase::PHASE_OPEN || s.view != PopupView::VIEW_CARD_UI) return;
-    if (s_list) s_scrollY = lv_obj_get_scroll_y(s_list);
-    showView(PopupView::VIEW_CARD_UI);
-}
-static void again() { lv_async_call(againAsync, nullptr); }
-
 // This window's wait and bar, as the card now has them - at once (round 4).
 static void retime() {
-    int8_t i = savedPos("close", TIMEOUT_IS, 4);
-    const uint32_t ms = i < 0 ? Kit::windowCloseMs() : i == 3 ? 0 : (uint32_t)atoi(TIMEOUT_IS[i]) * 1000;
-    i = savedPos("bar", BAR_IS, 2);
-    const bool bar = i < 0 ? Kit::windowBarShown() : i == 0;
-    Kit::sheetRetime(s, ms, bar);
+    uint8_t i = savedPos("close", TIMEOUT_IS, 5);
+    const uint32_t ms = i == 0 ? Kit::windowCloseMs() : i == 4 ? 0 : (uint32_t)atoi(TIMEOUT_IS[i]) * 1000;
+    i = savedPos("bar", BAR_IS, 3);
+    Kit::sheetRetime(s, ms, i == 0 ? Kit::windowBarShown() : i == 1);
 }
-
-// --- What choosing does ----------------------------------------------------------
-// On the held card at once, kept under its id - Inherit too, since K49 (a card
-// the dashboard names is Custom unless told otherwise).
-static void entityKeep(CardLabel l) {
-    keepCardSetting("label", cardLabelName(l));
-    if (Card *c = held()) { c->setLabelMode(l); restyleHeld(*c); }
-}
-static void entityChosen(uint8_t i) { if (i < 4) entityKeep(ENTITY_IS[i]); }
-
-static void clabelKeep(CardGroups::LabelSource ls) {
-    Card *c = held();
-    if (!c) return;
-    CardGroups::setLabelSource(*c, ls, c->pageAreaColor());
-    restyleHeld(*c);
-}
-static void clabelChosen(uint8_t i) { clabelKeep(i ? CardGroups::LS_NONE : CardGroups::LS_CUSTOM); }
 
 static void lookKeep(int8_t look) {
     keepCardSetting("selector", Kit::selectorLookName(look));
     Kit::selectorLookOverride(look);
-    again();   // the rows show the look
 }
-static void metalChosen(uint8_t i) { lookKeep((int8_t)((Kit::selectorLookNow() & 1) | (i ? 2 : 0))); }
-static void shapeChosen(uint8_t i) { lookKeep((int8_t)((Kit::selectorLookNow() & 2) | (i & 1))); }
 
-// A card decides compact or full when it is built: the page is built again
-// once the window has gone (it holds the page's cards).
-static void densityKeep(const char *v) { keepCardSetting("density", v); s_rebuildPage = true; }
-static void densityChosen(uint8_t i) { if (i < 3) densityKeep(DENSITY_IS[i]); }
-
-static void timeoutChosen(uint8_t i) { if (i < 4) { keepCardSetting("close", TIMEOUT_IS[i]); retime(); } }
-static void barChosen(uint8_t i)     { if (i < 2) { keepCardSetting("bar", BAR_IS[i]); retime(); } }
-
-// THE INHERIT TOGGLE. On: the card's own choice goes. Off: what it inherits is
-// made its own, so nothing changes until a choice is made.
-static void inheritCb(lv_event_t *ev) {
+// --- What a chip does: on the held card at once, kept under its id ----------------
+static void chooseAsync(void *p) {
+    const uintptr_t v = (uintptr_t)p;
+    const uint8_t row = (uint8_t)(v >> 8), i = (uint8_t)(v & 0xFF);
     Card *c = held();
-    if (!c) return;
-    const uint8_t row = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+    if (!c || s.phase != PopupPhase::PHASE_OPEN) return;
     switch (row) {
-        case CUI_ENTITY:
-            if (c->labelMode() != CardLabel::LBL_INHERIT) entityKeep(CardLabel::LBL_INHERIT);
-            else entityKeep(cardLabelMode());
+        case CUI_ENTITY: {
+            // Inherit too, since K49 (a card the dashboard names is Custom unless told otherwise).
+            const CardLabel l = ENTITY_IS[i < 5 ? i : 0];
+            keepCardSetting("label", cardLabelName(l));
+            c->setLabelMode(l);
+            restyleHeld(*c);
             break;
+        }
         case CUI_CLABEL:
-            clabelKeep(CardGroups::labelSource(*c) == CardGroups::LS_INHERIT ? CardGroups::LS_CUSTOM
-                                                                             : CardGroups::LS_INHERIT);
+            CardGroups::setLabelSource(*c, (CardGroups::LabelSource)(i < 3 ? i : 0), c->pageAreaColor());
+            restyleHeld(*c);
             break;
-        case CUI_SELECTOR: {
-            const int8_t look = savedLook();
-            keepCardSetting("selector", look < 0 ? Kit::selectorLookName((int8_t)Kit::selectorLookNow()) : nullptr);
-            Kit::selectorLookOverride(look < 0 ? (int8_t)Kit::selectorLookNow() : (int8_t)-1);
+        case CUI_METAL:   // the scheme's own, or chosen; choosing one keeps the shape in force
+            lookKeep(i == 0 ? (int8_t)-1 : (int8_t)((Kit::selectorLookNow() & 1) | (i == 2 ? 2 : 0)));
             break;
-        }
-        case CUI_DENSITY:
-            densityKeep(savedPos("density", DENSITY_IS, 3) < 0
-                        ? (c->variant() == CardVariant::VAR_FULL ? "full" : "compact") : nullptr);
+        case CUI_SHAPE:   // choosing a shape chooses the look
+            lookKeep((int8_t)((Kit::selectorLookNow() & 2) | (i & 1)));
             break;
-        case CUI_TIMEOUT: {
-            const uint32_t ms = Kit::windowCloseMs();
-            keepCardSetting("close", savedPos("close", TIMEOUT_IS, 4) >= 0 ? nullptr
-                                   : !ms ? "off" : ms <= 10000 ? "10" : ms <= 30000 ? "30" : "60");
-            retime();
+        case CUI_DENSITY: // a card decides compact or full when it is built: the page, once the window has gone
+            keepCardSetting("density", DENSITY_IS[i < 4 ? i : 0]);
+            s_rebuildPage = true;
             break;
-        }
-        case CUI_BAR:
-            keepCardSetting("bar", savedPos("bar", BAR_IS, 2) >= 0 ? nullptr : Kit::windowBarShown() ? "on" : "off");
-            retime();
-            break;
+        case CUI_TIMEOUT: keepCardSetting("close", TIMEOUT_IS[i < 5 ? i : 0]); retime(); break;
+        case CUI_BAR:     keepCardSetting("bar", BAR_IS[i < 3 ? i : 0]);       retime(); break;
     }
-    again();
+    // Every row lit as the card now has it (a look chosen moves the shape's chip too).
+    if (s.view == PopupView::VIEW_CARD_UI)
+        for (uint8_t r = 0; r < CUI_ROWS; r++) Kit::chipTableLit(s_table, r, litOf(r));
+}
+
+static void chipCb(lv_event_t *ev) {
+    lv_async_call(chooseAsync, lv_event_get_user_data(ev));
 }
 
 // --- The view ----------------------------------------------------------------------
-static void sel(lv_obj_t *line, const char *const *w, uint8_t n, uint8_t chosen, void (*cb)(uint8_t), int32_t room) {
-    if (!line || s_cuiN >= sizeof(s_cuiSel) / sizeof(s_cuiSel[0])) return;
-    Kit::choiceSelector(s_cuiSel[s_cuiN++], line, w, n, chosen, cb, room);
-}
-
 void buildCardUi() {
-    Card *c = held();
-    if (!c) return;
-    const int32_t w = lv_area_get_width(&s.winRect) - 2 * s.pad;
-    s_cuiN = 0;
-    s_list = Kit::choiceList(s.stage, w);
-    auto row = [&](uint8_t r, bool inherited) {
-        return Kit::inheritRow(s_list, ROW_WHAT[r], inherited, inheritCb, (void *)(uintptr_t)r);
+    if (!held()) return;
+    const Kit::ChipRowSpec rows[CUI_ROWS] = {
+        { "Entity label",   ENTITY_W,  5, litOf(CUI_ENTITY)  },
+        { "Card label",     CLABEL_W,  3, litOf(CUI_CLABEL)  },
+        { "Selector",       METAL_W,   3, litOf(CUI_METAL)   },
+        { "Selector shape", SHAPE_W,   2, litOf(CUI_SHAPE)   },
+        { "Card density",   DENSITY_W, 4, litOf(CUI_DENSITY) },
+        { "Window timeout", TIMEOUT_W, 5, litOf(CUI_TIMEOUT) },
+        { "Timer bar",      BAR_W,     3, litOf(CUI_BAR)     },
     };
-
-    lv_obj_t *l = row(CUI_ENTITY, c->labelMode() == CardLabel::LBL_INHERIT);
-    sel(l, ENTITY_W, 4, posOf(ENTITY_IS, 4, c->labelMode()), entityChosen, w);
-
-    const CardGroups::LabelSource ls = CardGroups::labelSource(*c);
-    l = row(CUI_CLABEL, ls == CardGroups::LS_INHERIT);
-    sel(l, CLABEL_W, 2, ls == CardGroups::LS_NONE ? 1 : 0, clabelChosen, w);
-
-    const int8_t look = savedLook();
-    l = row(CUI_SELECTOR, look < 0);
-    sel(l, METAL_W, 2, (look & 2) ? 1 : 0, metalChosen, w / 2);
-    sel(l, SHAPE_W, 2, look & 1, shapeChosen, w / 2);
-
-    int8_t i = savedPos("density", DENSITY_IS, 3);
-    l = row(CUI_DENSITY, i < 0);
-    sel(l, DENSITY_W, 3, i < 0 ? 0 : (uint8_t)i, densityChosen, w);
-
-    i = savedPos("close", TIMEOUT_IS, 4);
-    l = row(CUI_TIMEOUT, i < 0);
-    sel(l, TIMEOUT_W, 4, i < 0 ? 0 : (uint8_t)i, timeoutChosen, w);
-
-    i = savedPos("bar", BAR_IS, 2);
-    l = row(CUI_BAR, i < 0);
-    sel(l, BAR_W, 2, i < 0 ? 0 : (uint8_t)i, barChosen, w);
-
-    if (s_scrollY) {
-        lv_obj_update_layout(s_list);
-        lv_obj_scroll_to_y(s_list, s_scrollY, LV_ANIM_OFF);
-        s_scrollY = 0;
-    }
+    s_table = Kit::chipTable(s.stage, lv_area_get_width(&s.winRect) - 2 * s.pad, rows, CUI_ROWS, chipCb);
 }
 
 // The card's own window look, before its window is built: its timeout and bar
@@ -214,7 +151,6 @@ void cardWindowLook(const Card &c, Kit::SheetSpec &k) {
 void cardUiCb(lv_event_t *ev) {
     (void)ev;
     deckSet(DECK_PEEK);
-    s_scrollY = 0;
     lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_CARD_UI); }, nullptr);
 }
 

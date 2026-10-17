@@ -61,11 +61,11 @@
 enum class StateCardFill : uint8_t {
     FILL_SURFACE = 0,   // cards.md section 4 as written
     LIGHT_ICON,         // icon and name take the state colour; surface does not
-    // THE ACTIVE FRAMES (owner, 2.8 round 4): LIGHT_ICON's icon and name, and
-    // the state shown on the card's EDGE in place of a fill (Card::activeFrame).
-    FRAME_GLOW,         // a ring in the state colour, a dark line outside it
-    FRAME_BRACKET,      // top and bottom thick, the sides thin
-    FRAME_CORNER,       // a ring, the top-left and bottom-right corners twice as round (not on Linen)
+    // THE ACTIVE FRAMES (owner, 2.8 rounds 4-5): LIGHT_ICON's icon and name,
+    // and the state on the card's EDGE, lit inward, in place of a fill
+    // (Card::activeFrame). Round 4's glow frame was dropped in round 5.
+    FRAME_BRACKET,      // heavy top and bottom bars, light falling from them
+    FRAME_CORNER,       // the top-right and bottom-left corners cut away at 45 degrees (not on Linen)
 };
 
 class StateCard : public Card {

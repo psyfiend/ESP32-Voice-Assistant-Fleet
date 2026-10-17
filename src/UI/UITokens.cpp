@@ -153,7 +153,7 @@ const UIPalette UI_PAL_MIDNIGHT = {
 const UIMetrics UI_MET_DARK  = {
     .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 0, .HEADER_H = 14,
     .SHADOW_Y = 0, .SHADOW_OPA = 0,
-    .ACTIVE_RING = 3, .ACTIVE_EDGE = 1, .BRACKET_W = 4
+    .ACTIVE_RING = 3, .ACTIVE_EDGE = 2, .BRACKET_W = 6, .GLOW_DEPTH = 18, .GLOW_OPA = 115, .CUT_PCT = 24
 };
 // Linen's. A 2 px border, darker than the old hairline (the owner: "make it a
 // bit darker and increase by 1 or 2px", knobs included - the drawer's buttons
@@ -167,7 +167,7 @@ const UIMetrics UI_MET_DARK  = {
 const UIMetrics UI_MET_LIGHT = {
     .RADIUS = 12, .PAD = 5, .BORDER_W = 2, .BORDER_OPA_PCT = 34, .SHADOW = 6, .HEADER_H = 14,
     .SHADOW_Y = 3, .SHADOW_OPA = 140,
-    .ACTIVE_RING = 3, .ACTIVE_EDGE = 1, .BRACKET_W = 4
+    .ACTIVE_RING = 3, .ACTIVE_EDGE = 2, .BRACKET_W = 6, .GLOW_DEPTH = 18, .GLOW_OPA = 115, .CUT_PCT = 24
 };
 
 // The card window's shape and spacing, in millimetres (2.12 P2, the header's

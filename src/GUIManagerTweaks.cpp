@@ -20,7 +20,7 @@
 static const char *const SCHEME_NAMES[] = { "fleet", "midnight", "linen" };   // UITokens' order
 static const char *const HDR_NAMES[]    = { "none", "band", "tag", "float" };  // CardHeaderStyle
 static const char *const VAR_NAMES[]    = { "auto", "full", "compact" };       // CardVariant
-static const char *const FILL_NAMES[]   = { "fill", "glow", "frame", "bracket", "corner" };   // StateCardFill
+static const char *const FILL_NAMES[]   = { "fill", "glow", "bracket", "corner" };   // StateCardFill
 constexpr uint8_t FILL_N = sizeof(FILL_NAMES) / sizeof(FILL_NAMES[0]);
 constexpr uint8_t SCHEME_N = sizeof(SCHEME_NAMES) / sizeof(SCHEME_NAMES[0]);
 
@@ -145,15 +145,11 @@ void GUIManager::setEntityLabel(CardLabel l) {
 }
 
 void GUIManager::setCardState(StateCardFill f, bool save) {
-    const bool caps = (f == StateCardFill::FRAME_CORNER) != (_fill == StateCardFill::FRAME_CORNER);
     _fill = f;
     StateCard::setFill(f);
     everyPage([f](PageLive &p) { p.fill = f; });
     if (save) saveName("state", FILL_NAMES, (uint8_t)f, (uint8_t)s_ship.fill);
-    // A live style: render() reads it - but the corner cut's caps are made
-    // when a card is built (render() makes nothing), so to or from it, a rebuild.
-    if (caps) rebuildDashboard();
-    else      _binder.restyleAll();
+    _binder.restyleAll();  // a live style: render() reads it (the frames are drawn, nothing made)
     Serial.printf("[UI] card state -> %s\n", FILL_NAMES[(uint8_t)f]);
 }
 
@@ -257,7 +253,7 @@ struct GUITweaks {
     static constexpr const char *GLYPHS[]  = { "Bare", "Square", "Circle" };
     static constexpr const char *LABEL[]   = { "Float", "Band", "Tag", "None" };
     static constexpr const char *ENTITY[]  = { "Name (HA)", "State", "Custom", "None" };
-    static constexpr const char *STATE[]   = { "Fill", "Icon glow", "Glow frame", "Bracket", "Corner cut" };
+    static constexpr const char *STATE[]   = { "Fill", "Icon glow", "Bracket", "Corner cut" };
     static constexpr const char *METAL[]   = { "Scheme's", "Black", "Silver" };
     static constexpr const char *SHAPE[]   = { "Square", "Round" };
     static constexpr const char *DENSITY[] = { "Compact", "Full", "Auto" };
@@ -270,8 +266,7 @@ struct GUITweaks {
     static constexpr CardLabel       ENTITY_IS[]  = { CardLabel::LBL_HA, CardLabel::LBL_STATE,
                                                       CardLabel::LBL_NAME, CardLabel::LBL_NONE };
     static constexpr StateCardFill   STATE_IS[]   = { StateCardFill::FILL_SURFACE, StateCardFill::LIGHT_ICON,
-                                                      StateCardFill::FRAME_GLOW, StateCardFill::FRAME_BRACKET,
-                                                      StateCardFill::FRAME_CORNER };
+                                                      StateCardFill::FRAME_BRACKET, StateCardFill::FRAME_CORNER };
     static constexpr CardVariant     DENSITY_IS[] = { CardVariant::VAR_COMPACT, CardVariant::VAR_FULL,
                                                       CardVariant::VAR_AUTO };
     static constexpr const char     *TIMEOUT_IS[] = { nullptr, "30", "10", "off" };   // nothing: 60 s (D6)
@@ -288,7 +283,7 @@ struct GUITweaks {
     static uint8_t entityNow()          { return posOf(ENTITY_IS, cardLabelMode()); }
     static void    entitySet(uint8_t i) { if (g && i < 4) g->setEntityLabel(ENTITY_IS[i]); }
     static uint8_t stateNow()           { return g ? posOf(STATE_IS, g->_fill) : 0; }
-    static void    stateSet(uint8_t i)  { if (g && i < 5) g->setCardState(STATE_IS[i]); }
+    static void    stateSet(uint8_t i)  { if (g && i < 4) g->setCardState(STATE_IS[i]); }
     static uint8_t densityNow()         { return g ? posOf(DENSITY_IS, g->_variant) : 0; }
     static void    densitySet(uint8_t i){ if (g && i < 3) g->setDensity(DENSITY_IS[i]); }
 
@@ -334,15 +329,15 @@ struct GUITweaks {
     }
 
     static constexpr TweaksSheet::Row ROWS[] = {
-        { "Glyphs",         GLYPHS,  3, glyphsNow,  glyphsSet,  false },
-        { "Card label",     LABEL,   4, labelNow,   labelSet,   false },
-        { "Entity label",   ENTITY,  4, entityNow,  entitySet,  false },
-        { "Card state",     STATE,   5, stateNow,   stateSet,   false },
-        { "Selector",       METAL,   3, metalNow,   metalSet,   true  },
-        { "Selector shape", SHAPE,   2, shapeNow,   shapeSet,   true  },
-        { "Card density",   DENSITY, 3, densityNow, densitySet, false },
-        { "Window timeout", TIMEOUT, 4, timeoutNow, timeoutSet, false },
-        { "Timer bar",      ONOFF,   2, barNow,     barSet,     false },
+        { "Glyphs",         GLYPHS,  3, glyphsNow,  glyphsSet  },
+        { "Card label",     LABEL,   4, labelNow,   labelSet   },
+        { "Entity label",   ENTITY,  4, entityNow,  entitySet  },
+        { "Card state",     STATE,   4, stateNow,   stateSet   },
+        { "Selector",       METAL,   3, metalNow,   metalSet   },
+        { "Selector shape", SHAPE,   2, shapeNow,   shapeSet   },
+        { "Card density",   DENSITY, 3, densityNow, densitySet },
+        { "Window timeout", TIMEOUT, 4, timeoutNow, timeoutSet },
+        { "Timer bar",      ONOFF,   2, barNow,     barSet     },
     };
 
     // THE DECK RISES UNDER THE WINDOW (D-25): its panels' headers along the

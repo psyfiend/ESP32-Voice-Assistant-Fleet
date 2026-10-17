@@ -941,13 +941,8 @@ lv_obj_t *Card::makeCornerIcon(lv_obj_t *body) {
 // sink) does not depend on the steps before it.
 void Card::pressLook(uint8_t toAccent, int32_t sink) {
     if (!_surface) return;
-    // The held look owns the edge; an active frame waits for pressClear().
+    // The held look owns the edge; an active frame is not drawn until pressClear().
     _pressed = toAccent > 0 || sink > 0;
-    if (_pressed) {
-        lv_obj_set_style_border_side  (_surface, LV_BORDER_SIDE_FULL, 0);
-        lv_obj_set_style_outline_width(_surface, 0, 0);
-        for (lv_obj_t *c : _cap) if (c) lv_obj_add_flag(c, LV_OBJ_FLAG_HIDDEN);
-    }
     const int32_t base = UI::met().BORDER_W;
     const int32_t wide = LV_MAX(base, UI::sc(2));
     const int32_t bw   = base + (wide - base) * toAccent / 255;

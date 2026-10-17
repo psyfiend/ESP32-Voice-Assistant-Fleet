@@ -95,13 +95,15 @@ struct UIMetrics {
     // the owner's "it looks too flat" on Linen, 2026-09-23.
     uint8_t SHADOW_Y;
     uint8_t SHADOW_OPA;     // 0-255
-    // THE ACTIVE FRAMES (2.8 round 4, the owner's proposal): what an "on" card
-    // or toggle draws on its edge in place of a fill. The glow frame's ring in
-    // the active colour and the line outside it in the scheme's darkest; the
-    // bracket's top and bottom (its sides are ACTIVE_EDGE).
-    uint8_t ACTIVE_RING;    // 3
-    uint8_t ACTIVE_EDGE;    // 1
-    uint8_t BRACKET_W;      // 4
+    // THE ACTIVE FRAMES (2.8 rounds 4-5, the owner's): what an "on" card draws
+    // on its edge in place of a fill, LIT inward - drawn, never as its border,
+    // so the card's layout never moves (round 4's bracket pushed the hero down).
+    uint8_t ACTIVE_RING;    // 3   the corner cut's frame and its diagonal
+    uint8_t ACTIVE_EDGE;    // 2   the bracket's sides
+    uint8_t BRACKET_W;      // 6   the bracket's top and bottom bars
+    uint8_t GLOW_DEPTH;     // 18  how far the light reaches in from a lit edge
+    uint8_t GLOW_OPA;       // 115 its strength at the edge (0-255), fading to nothing
+    uint8_t CUT_PCT;        // 24  the corner cut's chamfer, % of the card's height
 };
 
 // ---------------------------------------------------------------------------

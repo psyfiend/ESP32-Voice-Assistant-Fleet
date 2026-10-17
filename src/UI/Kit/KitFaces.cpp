@@ -164,6 +164,7 @@ static void paintFace(FaceSlot &f) {
     }
     const uint32_t base = p.SURFACE_ALT;   // a dent is pressed into the window
     const uint32_t rail = UI::mix(selectorColours().ribbon, dk, 25);   // the rail through the lens
+    const uint32_t warm = UI::mix(p.ST_ACTIVE, lt, 40);                // lit glass's light (round 5)
 
     // The panels are 16-bit: red and blue in steps of 8, green in steps of 4.
     // A smooth grey ramp truncated to that grid bands, and the bands go pink
@@ -178,7 +179,8 @@ static void paintFace(FaceSlot &f) {
         // Brushed: each row a touch lighter or darker, the same every time.
         // Metal only - a dent is soft, and satin smooth.
         uint32_t hs = (uint32_t)y * 2654435761u;
-        const bool brushed = f.kind == FaceKind::FACE_BLACK || f.kind == FaceKind::FACE_SILVER;
+        const bool brushed = f.kind == FaceKind::FACE_BLACK || f.kind == FaceKind::FACE_SILVER ||
+                             f.kind == FaceKind::FACE_LIT;   // lit glass: frosted
         const int streak = brushed ? (int)((hs >> 28) & 7) - 3 : 0;
         const float cy = y + 0.5f;
         for (int x = 0; x < w; x++) {
@@ -213,6 +215,17 @@ static void paintFace(FaceSlot &f) {
                                  : lerpHex(f.tint, UI::mix(f.tint, dk, shade), (t - 0.5f) / 0.5f);
                 const uint32_t rim = darkScheme ? UI::mix(f.tint, lt, bright ? 22 : 11) : UI::mix(f.tint, dk, 15);
                 if (inside < 1.3f) col = lerpHex(col, rim, 0.75f);
+            } else if (f.kind == FaceKind::FACE_LIT) {
+                // LIT GLASS (owner, round 5): "a light shining from within
+                // refracting through a semi-frosted glass surface". Dark smoked
+                // glass with a warm light behind it, brightest a little below
+                // the middle and fading toward the edges; a faint sheen across
+                // the top; the rim catching the light.
+                const float u = (cx - w * 0.5f) / (w * 0.62f), v = (cy - h * 0.58f) / (h * 0.70f);
+                const float k = LV_CLAMP(0.f, 1.f - (u * u + v * v), 1.f);
+                col = lerpHex(lerpHex(UI::mix(dk, lt, 28), UI::mix(dk, lt, 8), cy / h), warm, 0.30f + 0.62f * k);
+                if (cy < h * 0.4f) col = lerpHex(col, lt, 0.14f * (1.f - cy / (h * 0.4f)));
+                if (inside < 1.3f) col = lerpHex(col, UI::mix(warm, lt, 45), 0.8f);
             } else {
                 // The line: two fifths down at the sides, rising in the middle.
                 const float u = (cx - w * 0.5f) / (w * 0.5f);
@@ -363,6 +376,13 @@ lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, u
 // Between the scheme's two surfaces: the mock's satin on Midnight exactly.
 uint32_t satinBase() { return UI::mix(UI::pal().SURFACE, UI::pal().SURFACE_ALT, 50); }
 
+// On lit glass (its light is the active colour toward white): the scheme's
+// darkest, warmed a little by the light - an amber icon vanished into it.
+uint32_t litInk() {
+    const UIPalette &p = UI::pal();
+    return UI::mix(UI::darkest(), p.ST_ACTIVE, 20);
+}
+
 // INK ON GLASS (owner, #99 T6): Linen's olive "on" vanished into its silver.
 // The metal's middle tone is about a fifth of the way from its own end of the
 // scheme; a colour within 90 of it in lightness is pushed, a tenth at a time,
@@ -422,27 +442,13 @@ static bool hasCb(lv_obj_t *o, lv_event_cb_t cb) {
     return false;
 }
 
-// THE GLOW FRAME ON A TOGGLE (owner, 2.8 round 4): a toggle is glass on and
-// off; on, it wears the cards' glow frame - a ring in the active colour, a line
-// in the scheme's darkest outside it. Drawn over the face (border_post).
-void glowFrame(lv_obj_t *o, int32_t r, bool on) {
-    if (!o) return;
-    const UIMetrics &m = UI::met();
-    lv_obj_set_style_radius       (o, r, 0);
-    lv_obj_set_style_border_post  (o, true, 0);
-    lv_obj_set_style_border_color (o, UI::c(UI::pal().ST_ACTIVE), 0);
-    lv_obj_set_style_border_opa   (o, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width (o, on ? UI::sc(m.ACTIVE_RING) : 0, 0);
-    lv_obj_set_style_outline_color(o, UI::c(UI::darkest()), 0);
-    lv_obj_set_style_outline_pad  (o, 0, 0);
-    lv_obj_set_style_outline_width(o, on ? UI::sc(m.ACTIVE_EDGE) : 0, 0);
-}
-
 void finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tint) {
     if (!o || w <= 0 || h <= 0) return;
-    const bool glass = f == Finish::FINISH_GLASS;
+    // LIT GLASS (owner, round 5): glass the light comes on behind - press like glass.
+    const bool glass = f == Finish::FINISH_GLASS || f == Finish::FINISH_LIT;
     const uint32_t base = tint ? tint : satinBase();
-    lv_obj_t *img = setFace(o, w, h, r, glass ? metalKind() : FaceKind::FACE_SATIN, base, base);
+    const FaceKind kind = f == Finish::FINISH_LIT ? FaceKind::FACE_LIT : glass ? metalKind() : FaceKind::FACE_SATIN;
+    lv_obj_t *img = setFace(o, w, h, r, kind, base, base);
     if (img) {
         lv_obj_set_user_data(img, (void *)(glass ? FIN_GLASS : FIN_SATIN));
         // FLOATING, not only out of the layout: an object sized to its content

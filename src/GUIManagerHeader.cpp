@@ -197,11 +197,11 @@ const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHd
         snprintf(out, sizeof(out), "scheme %s (not saved)", UI::pal().name);
         return out;
     }
-    // /popup?cardstate=N (round 4): the cards' active state, 0 Fill .. 4 Corner
+    // /popup?cardstate=N (round 4): the cards' active state, 0 Fill .. 3 Corner
     // cut, NOT saved; -1 the owner's again.
     if (!strncmp(slotName, "cs", 2)) {
         const int n = atoi(slotName + 2);
-        setCardState(n < 0 || n > 4 ? savedCardState() : (StateCardFill)n, false);
+        setCardState(n < 0 || n > 3 ? savedCardState() : (StateCardFill)n, false);
         snprintf(out, sizeof(out), "card state %d (not saved)", n);
         return out;
     }
