@@ -26,6 +26,7 @@
 #include "Cards/PageSpec.h"    // the pages, 2.6
 #include "UI/UIToolkit.h"       // SYSTEM_HEADER_FULL_H
 #include "UI/Panel_Header.h"
+#include "UI/Kit.h"               // Kit::Drawer, a slot's panel (2.8)
 #include "UI/Panel_Display.h"
 #include "UI/Panel_System.h"
 #ifdef HAS_AUDIO_HW
@@ -66,40 +67,32 @@ public:
     // figure is LVGL's own load, not the chip's - see lv_conf.h.
     void togglePerf();
 
-    // Cycle the header treatment on the live dashboard: tag -> bar -> none.
-    //
-    // All three modes ship permanently - cards.md is explicit that picking one
-    // is "what a card looks like when nobody chose", not an elimination - so
-    // this is how a default gets chosen by looking at it. It is deliberately
-    // RUNTIME state rather than a rebuild-time constant, because the device
-    // settings page (4.1) will own exactly this control later.
-    void cycleHeader();
-
-    // Cycle the colour scheme, from the System panel rather than the reference
-    // page. Also re-applies the SCREEN's own background, which nothing did
-    // before: the ground colour behind the deck was set once at start-up and
-    // then never followed the scheme.
-    void cycleScheme();
+    // --- UI TWEAKS (2.8 round 3, D-22, D-25; GUIManagerTweaks.cpp) -----------
+    // The development window of the card looks, every row a choice made
+    // outright - not a cycle - and SAVED (Settings system.ui.*, the glyphs
+    // system.header.glyphs, the timeout system.window.*), for EVERY page: a
+    // choice is device-wide (the per-page working set below takes it).
+    // Reset all puts them back. The deck rises under it while it is open.
+    void openUiTweaks();
+    void chooseScheme(uint8_t i, bool save = true);   // 0 Fleet, 1 Midnight, 2 Linen (save: a PC's look is not)
+    void setCardLabelStyle(CardHeaderStyle s);    // Float / Band / Tag / None
+    void setEntityLabel(CardLabel l);             // Name (HA) / State / Custom / None
+    // Fill / Icon glow / Bracket / Corner cut (round 5); `save`
+    // false: the harness's look, not the owner's choice.
+    void setCardState(StateCardFill f, bool save = true);
+    static StateCardFill savedCardState();
+    void setDensity(CardVariant v);               // Compact / Full / Auto
+    void setGlyphs(GlyphStyle g);
+    void resetUiTweaks();
+    // The saved choices onto the working set and every page's: at boot (before
+    // the pages are made), after a reset.
+    void applyUiSettings();
 
     // Open the design-token reference page, standing the dashboard down first.
     void openTokens();
     void openLog();      // the System Doctor report, on its own screen
 
-    // Cycle the SYSTEM header bar height: 50 -> 45 -> 40 -> 35 -> 30 -> none.
-    //
-    // "none" hides the bar entirely, which would otherwise strand the user:
-    // the header's status icon is the only way to open this drawer. So a
-    // transparent strip is left on the top layer to take the tap - the
-    // simplest form of the owner's swipe-down-to-reveal idea, and a footgun
-    // guard rather than a feature.
-    void toggleHeaderBar();
 
-    // The three controls #50 added. Each drives a card-layer static that has
-    // existed since 2.4 with nothing on the device able to reach it.
-    void cycleVariant();   // auto / full / compact - argue with the measurement
-    void cycleFill();      // how an active StateCard reads
-    void cycleLabel();     // name / state word / none under a state card's hero
-    void toggleArea();     // area on every card, or not
     bool deckShown() const { return _showDeck; }
 
     // --- Pages, milestone 2.6. docs/design/pages.md. -----------------------
@@ -140,8 +133,47 @@ private:
     void buildDashboard();           // creates _dashHost and _page
     void destroyDashboard();
 
-    static void headerIconClickCb(lv_event_t *e);
     static void closeSystemPanelCb();
+
+    // THE HEADER'S SLOTS (2.8). A tap on a slot opens its panel - the status
+    // slot's is the system panel, the others' a Kit::Drawer built from
+    // SlotPanels - and a second tap, a tap outside, a swipe up or a page change
+    // puts it away. One panel at a time.
+    void onSlotTap(uint8_t slot);
+    void openSlotPanel(uint8_t slot);
+    void closeSlotPanel(bool animate);
+    void syncScrim();                // the dismiss scrim catches taps while any panel is open
+    // The page's header, shown or hidden (D-14): the owner's choice for the
+    // page (Settings pages.<slug>.header), else the page's compiled default.
+    bool pageHeaderShown() const;
+    void setPageHeaderShown(bool shown);   // saves it, applies it, rebuilds
+    void applyHeaderHidden(bool hidden);   // the bar, the drawers' top, the knob's label
+    static GlyphStyle savedGlyphStyle();   // the owner's, else GLYPH_DEFAULT
+    // /popup's slot=, glyphs=, pagehdr= and alarm= (DEBUG_POPUP): one line saying what it did.
+    const char *headerDebug(const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn);
+    // The system panel's CONNECTIVITY lines: Wi-Fi, Home Assistant, MQTT.
+    void connectivityWords(char *wifi, char *ha, char *mqtt, size_t n);
+    // UI Tweaks' halves (GUIManagerTweaks.cpp): the owner's scheme, before
+    // anything is built; this page's grid counts, saved with the page; a choice
+    // put on every page's working set. GUITweaks is its rows and the deck that
+    // rises under its window.
+    void applySavedScheme();
+    void saveGrid();
+    template <typename F> void everyPage(F f) { for (uint8_t i = 0; i < _nPages; i++) f(_pages[i]); }
+    friend struct GUITweaks;
+    bool        _deckRaised   = false;   // the deck is up under UI Tweaks
+    // When a header panel was last touched or opened: it closes on the window
+    // timeout as a window does (D-22).
+    uint32_t    _panelTouchMs = 0;
+    Kit::Drawer _slotDrawer;
+    int8_t      _slotPanel = -1;     // the slot whose drawer is open, or -1
+    // ROUND 4: a slot's tab stays open until its drawer has finished closing,
+    // and the header stays visible while any header panel is open - a Show /
+    // Hide chosen meanwhile waits for them to close.
+    int8_t      _closingSlot   = -1; // the slot whose drawer is closing, or -1
+    bool        _headerPending = false;
+    void slotDrawerClosed();
+    void headerPanelsClosed();
     static void reportUiSection();   // [UI STATE] in the System Doctor
     // Milestone 2.6, first cut. Registered on the SCREEN so a scrollable child
     // still wins its own drag - see the definition.
@@ -201,7 +233,9 @@ private:
     // and without it the icons, disc and text all breathe. Auto and Full stay
     // one knob press away.
     CardVariant     _variant = CardVariant::VAR_COMPACT;
-    StateCardFill   _fill    = StateCardFill::FILL_SURFACE;
+    // The corner cut by default (owner, 2.8 round 6: "Corner cut is what I'd
+    // use for the default"); Fill was the default until then.
+    StateCardFill   _fill    = StateCardFill::FRAME_CORNER;
     bool            _showArea = true;
 
     // PER-BOARD DEFAULT GRID, chosen on the glass by the owner.

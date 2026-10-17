@@ -24,6 +24,7 @@ constexpr uint8_t  SHEET_TABS_MAX     = 2;
 constexpr uint32_t SHEET_AUTOCLOSE_MS = 60000;   // D6: it closes after 60 s untouched - unless the
                                                  // system setting window.close says otherwise (T6)
 constexpr uint32_t SHEET_TICK_MS      = 250;
+constexpr uint32_t SHEET_NEVER        = UINT32_MAX;   // SheetSpec::closeMs: never closes itself
 
 // A panel: below the screen, its tab peeking up, or open.
 enum PanelState : uint8_t { PANEL_HIDDEN, PANEL_PEEK, PANEL_OPEN };
@@ -44,6 +45,11 @@ struct SheetSpec {
     void        (*closing)();                // the moment it starts to go
     void        (*closed)();                 // once it has gone
     bool          sparks;                    // now and then a spark runs along its edge
+    // Its own timeout and bar, over the system settings (a card's Card UI, D-28):
+    // closeMs 0 the setting's, SHEET_NEVER never, else ms; bar 0 the setting's,
+    // 1 shown, 2 hidden.
+    uint32_t      closeMs;
+    uint8_t       bar;
     // --- SETTINGS, the panel on the right (null rows: no panel) ---
     const char   *panelTitle;
     uint8_t     (*panelRows)(RowSpec *r);    // read for its size when made, for its rows when first opened
@@ -102,6 +108,24 @@ Sheet *sheetShowing();                       // the open sheet, or null
 void   sheetLayoutTitle(Sheet &S);           // after the title's words change
 void   sheetTabLook(lv_obj_t *tab, bool shown, bool lit);   // lit: the tab of the view showing
 uint32_t sheetLeftMs(const Sheet &S);        // until it closes itself (0: closing; UINT32_MAX: never)
+// The system settings every window follows (T6): how long one waits untouched
+// before it closes (0: never), and whether it shows the countdown. The header's
+// panels close on the same timeout (2.8 round 3, D-22).
+uint32_t windowCloseMs();
+bool     windowBarShown();
+
+// --- Beside the window (2.8 round 3, D-25) ----------------------------------------
+// Objects the open sheet lets presses through to, outside its window: the
+// CHILDREN of `holder` (the deck's panels, risen under UI Tweaks). While
+// `isOpen()` says one of them is open, the window is out of reach as it is
+// while the sheet's own panel is open - a press there only calls `fold()`.
+// Forgotten when the sheet closes.
+struct SheetBeside {
+    lv_obj_t *holder;
+    bool    (*isOpen)();
+    void    (*fold)();
+};
+void sheetBeside(const SheetBeside *b);   // null: none
 
 // --- The countdown bar (#97, #23) ----------------------------------------------------
 // How long until the open sheet closes itself: a thin bar (H_BAR) on the bottom
@@ -111,6 +135,9 @@ uint32_t sheetLeftMs(const Sheet &S);        // until it closes itself (0: closi
 // sheet shows the same. `boxW`: the box's width as set, before LVGL has laid it out.
 lv_obj_t *countdownBar(lv_obj_t *box, int32_t boxW);
 void      countdownSet(lv_obj_t *bar, const Sheet &S);   // as long as S has left to wait
+// An open sheet's timeout (0: never) and bar changed now: the wait starts again,
+// the bar comes or goes (round 4: a choice in UI Tweaks or Card UI shows at once).
+void      sheetRetime(Sheet &S, uint32_t closeMs, bool bar);
 
 // --- The panels (KitSheetPanels.cpp) -------------------------------------------------
 bool   sheetPanelOpen(const Sheet &S);       // either open: the window is out of reach

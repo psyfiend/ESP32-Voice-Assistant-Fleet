@@ -77,11 +77,9 @@ public:
     // the one thing an event callback must not do.
     static void close();
 
-    // The Selector look for the scheme showing (K31; moved to the system
-    // panel, K45): the next one - the scheme's own, then the four looks - kept
-    // in the settings file at once; and a short name for a button.
-    static void cycleSelectorLook();
-    static const char *selectorLookShort();
+    // A choice in Card UI wants the page built again (Card density): true once,
+    // after the window has gone - it holds the page's cards (2.8 round 3).
+    static bool takeRebuildWanted();
 
     // True from the long press until the window has gone. GUIManager asks
     // this before acting on a gesture: the popup is modal.
@@ -97,7 +95,7 @@ public:
     //   /popup?scene=N      as a tap on scene N; lists the light's scenes (2.10c)
     //   /popup?set=V        as a tap on that control's slider at V (%, K, hue)
     //   /popup?view=N       as the corner icons: 0 the controls (a member's, inside
-    //                       one), 1 history, 2 members, 4 scenes, 5 properties; 3 only lists. Each
+    //                       one), 1 history, 2 members, 4 scenes, 5 properties, 6 Card UI; 3 only lists. Each
     //                       lists the entities' levels (and an HA group's members)
     //   /popup?power=1      as a tap on Power
     //   /popup?pause=1|0    pause / resume what the window shows
@@ -131,6 +129,13 @@ public:
     // with the layers below it, never the reverse). `open` is what is wanted;
     // the hook says whether it was already so.
     static void setDrawerHook(bool (*hook)(bool open));
+    // 2.8: /popup?slot=<kind> (a header slot's panel, by its kind's name -
+    // clock, sensor, page, alarm, status; -1 closes), glyphs=0|1|2 (the glyph
+    // style, not saved; 3 the saved one), pagehdr=0|1 (this page's header
+    // hidden or shown - SAVED, as the page panel saves it), alarm=HHMM (a
+    // pretend next alarm, RAM only; -1 clears - Alarms.h) and alarmin=N (one N
+    // minutes from now). Answers one line saying what it did.
+    static void setHeaderHook(const char *(*hook)(const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn));
 private:
     static void debugService(lv_timer_t *t);   // the LVGL-thread half
 #endif

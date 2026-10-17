@@ -352,6 +352,37 @@ void choose(Card &c, const Choice &ch, bool areaColor) {
     apply(c, areaColor);
 }
 
+LabelSource labelSource(const Card &c) {
+    char v[48];
+    if (!c.hasId()) return LS_INHERIT;
+    if (Settings::card(c.id(), "group", v, sizeof(v)) && !strcmp(v, "none")) return LS_NONE;
+    if (Settings::card(c.id(), "label_text", v, sizeof(v))) return LS_CUSTOM;
+    return LS_INHERIT;
+}
+
+void setLabelSource(Card &c, LabelSource ls, bool areaColor) {
+    if (!c.hasId()) return;
+    char v[48];
+    const bool none = Settings::card(c.id(), "group", v, sizeof(v)) && !strcmp(v, "none");
+    switch (ls) {
+        case LS_INHERIT:
+            Settings::setCard(c.id(), "label_text", nullptr);
+            if (none) Settings::setCard(c.id(), "group", nullptr);   // back to its dashboard area's
+            break;
+        case LS_CUSTOM:
+            if (none) Settings::setCard(c.id(), "group", nullptr);
+            apply(c, areaColor);
+            // Its own words: the ones it shows now, kept (a rename follows later).
+            if (!Settings::card(c.id(), "label_text", v, sizeof(v)))
+                Settings::setCard(c.id(), "label_text", c.area());
+            break;
+        case LS_NONE:
+            Settings::setCard(c.id(), "group", "none");
+            break;
+    }
+    apply(c, areaColor);
+}
+
 void forEach(void (*fn)(const Group &g, void *ctx), void *ctx) {
     if (!fn) return;
     collect();

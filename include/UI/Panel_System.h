@@ -1,11 +1,30 @@
 #pragma once
+// ---------------------------------------------------------------------------
+// THE SYSTEM PANEL - the status icons' panel (2.8, D-13, D-22, D-25).
+//
+//   CONNECTIVITY          Wi-Fi (its network, signal and address), Home
+//                         Assistant, MQTT - each its live state, its glyph
+//   SYSTEM - DIAGNOSTICS  Log, UI Tweaks, About; "Scheme:" Fleet / Midnight /
+//                         Linen; Col - / + Row - / +
+//
+// Its frame is the kit's drawer (D-20), one shape with the status slot's tab
+// (D-23). The knobs that used to fill it are UI Tweaks' (a window of its own,
+// D-22); the deck is reached from there. Deep links to the Wi-Fi settings and
+// the connectivity stats come with the settings pages (Q6, 4.1).
+//
+// It also BUFFERS THE SYSTEM DOCTOR'S LOG (a SystemReport sink) for LogPage,
+// whether or not it is open.
+// ---------------------------------------------------------------------------
 #include <lvgl.h>
 #include <Arduino.h>
 #include <string>
 #include <vector>
-#include <functional> // Required for std::function
+#include <functional>
+#include "UI/Kit.h"           // Kit::Drawer, Kit::Selector
 #include "UI/Panel_Header.h"
 #include "UI/UIToolkit.h"
+#include "UI/Widget_ConnStatus.h"
+#include "UI/Widget_MqttStatus.h"
 #include "SystemReport.h"
 
 class Panel_System {
@@ -13,60 +32,26 @@ public:
     Panel_System();
     ~Panel_System();
 
-    // Init needs the header to link the animation
     void init(lv_obj_t* parent, Panel_Header* headerRef);
-    
+    // A scheme change: the rows built again (their finished faces are painted
+    // in the scheme they were made in), from the next timer pass.
+    void restyle();
+    void rebuild();               // the rows built again now (fresh faces; at every open)
+
     // Public logging - SAFE to call from anywhere (buffers data)
     void log(const char* fmt, ...);
 
-    // What to run when the "Dump Config" button is pressed. Registered by
-    // GUIManager. This replaces an `extern void debug_dump_config(bool)` that
-    // reached from this UI file straight into main.
+    // What the Log page's Dump runs (GUIManager): the report, run afresh.
     using DumpCallback = std::function<void()>;
     void setOnDumpRequested(DumpCallback cb) { _onDumpRequested = cb; }
-
-    // What to run when the "Cards" button is pressed. Registered by GUIManager
-    // for the same reason the dump callback is: the card demo needs the entity
-    // registry and the card binder, and this panel has no business knowing
-    // either exists. Lower layers never reach up into UI, and UI files do not
-    // reach sideways into each other's dependencies.
-    using CardsCallback = std::function<void()>;
-    void setOnCardsRequested(CardsCallback cb) { _onCardsRequested = cb; }
-
-    // Same again for the design-token reference page. It used to call
-    // ReferencePage::show() straight from the button, which meant a second
-    // full screen was built while the dashboard was still alive - the exact
-    // condition that exhausts LVGL's layer buffers and hangs the board. The
-    // dashboard's owner has to be given the chance to stand down first.
-    using TokensCallback = std::function<void()>;
-    void setOnTokensRequested(TokensCallback cb) { _onTokensRequested = cb; }
-    void requestTokens() { if (_onTokensRequested) _onTokensRequested(); }
-
-    // Cycle the colour scheme without going near the reference page. The owner
-    // asked for this directly, and it also removes the only reason to open
-    // that page during normal use.
-    using SchemeCallback = std::function<void()>;
-    void setOnSchemeRequested(SchemeCallback cb) { _onSchemeRequested = cb; }
-    void requestScheme() { if (_onSchemeRequested) _onSchemeRequested(); }
-    void setSchemeLabel(const char *text);
-    void setBarLabel(const char *text);
-
-    // The card window's Selector look, for the scheme showing (2.10d, K45:
-    // moved here from the card's SETTINGS - it is device-wide, per scheme).
-    using SelectorCallback = std::function<void()>;
-    void setOnSelectorRequested(SelectorCallback cb) { _onSelectorRequested = cb; }
-    void requestSelector() { if (_onSelectorRequested) _onSelectorRequested(); }
-    void setSelectorLabel(const char *text);
 
     // The accumulated report, as plain text. The panel BUFFERS the log; it no
     // longer displays it - LogPage does. Keeping the buffer here means the
     // boot-time dump is already waiting when the page is first opened.
     const char *logText() const { return _log_text.c_str(); }
-
     // Called whenever the drained log text changes, so an open LogPage can
     // redraw as output arrives rather than only when it is reopened.
     void setLogOnChange(std::function<void(const char *)> cb) { _log_on_change = cb; }
-
     // Empty the log and tell any listener. Every Dump runs this first, so the
     // log page holds exactly one report (GUIManager's dumpFresh).
     void clearLog() {
@@ -78,172 +63,100 @@ public:
         if (_log_on_change) _log_on_change(_log_text.c_str());
     }
 
-    // What the "Log" button runs. Registered by GUIManager, which stands the
-    // dashboard down before the page opens.
-    using LogCallback = std::function<void()>;
-    void setOnLogRequested(LogCallback cb) { _onLogRequested = cb; }
-    void requestLog() { if (_onLogRequested) _onLogRequested(); }
+    // --- What its buttons do: GUIManager's (the panel only knows a button was
+    //     pressed) ---
+    using Action = std::function<void()>;
+    void setOnLogRequested(Action cb)      { _onLog = cb; }
+    void setOnUiTweaksRequested(Action cb) { _onTweaks = cb; }
+    // The scheme chosen: 0 Fleet, 1 Midnight, 2 Linen (UITokens' order).
+    void setOnSchemeChosen(std::function<void(uint8_t)> cb) { _onScheme = cb; }
+    void setScheme(uint8_t i);                   // shown as chosen (changed elsewhere)
+    // Fire the above (public: the buttons' callbacks are plain functions).
+    void requestLog();
+    void requestTweaks();                        // puts the panel away first
+    void chooseScheme(uint8_t i);
 
-    // The accumulated report, as plain text. The panel BUFFERS the log; it no
-    // longer displays it - LogPage does. Keeping the buffer here means the
-    // boot-time dump is already waiting when the page is first opened.
-
-    // What the "Log" button runs. Registered by GUIManager, which stands the
-    // dashboard down before the page opens.
-    void setColsLabel(const char *text);
-    void setRowsLabel(const char *text);
-    void setTopOffset(int32_t y);
-    void setVariantLabel(const char *text);
-    void setFillLabel(const char *text);
-    void setAreaLabel(const char *text);
-    void setLabelModeLabel(const char *text);
-
-    // Fires the above. Public because a capture-less lv_event_cb lambda is a
-    // free function, not a member, so it cannot reach a private field.
-    void requestCards() { if (_onCardsRequested) _onCardsRequested(); }
-
-    // The 2.5 GRID KNOBS.
-    //
-    // They live here rather than on the card bench deliberately: this drawer
-    // opens OVER the real dashboard, so what is being tuned is the page the
-    // device actually boots into. The bench derives its grid from a different
-    // host - a screen minus a button bar - and a number tuned there would be
-    // right for the bench and wrong for the dashboard.
-    //
-    // One callback carrying a code rather than five callbacks, because this
-    // panel is a remote control: it knows a button was pressed and nothing at
-    // all about what a column is.
-    enum class GridAction : uint8_t {
-        CARD_W_DOWN, CARD_W_UP,    // TARGET_CARD_W - decides COLUMNS
-        ASPECT_DOWN, ASPECT_UP,    // ASPECT_PCT    - decides ROWS
-        DECK_TOGGLE,               // the deck costs a row on every board
-        HDR_CYCLE,                 // bar / tag / none, on the live dashboard
-        BAR_CYCLE,                 // the SYSTEM header bar height
-        // Added with the #50 rework. All three drive statics that already
-        // existed on the card layer - Card::setShowAreaDefault(),
-        // StateCard::setFill() and the per-card variant - so these are new
-        // CONTROLS over settled behaviour rather than new behaviour.
-        VARIANT_CYCLE,             // auto / full / compact, overriding the measurement
-        FILL_CYCLE,                // how an active StateCard reads: fill or icon
-        AREA_TOGGLE,               // show the area on every card, or not
-        // 2.7: what the line under a state card's hero says - name, the state
-        // word ("Open"), or nothing. cards.md section 13.
-        LABEL_CYCLE,
-    };
+    // The 2.5 GRID KNOBS - counts, not nudges; "A" (auto) past the ends. One
+    // callback carrying a code: this panel is a remote control and knows
+    // nothing of what a column is.
+    enum class GridAction : uint8_t { CARD_W_DOWN, CARD_W_UP, ASPECT_DOWN, ASPECT_UP };
     using GridCallback = std::function<void(GridAction)>;
     void setOnGridAction(GridCallback cb) { _onGridAction = cb; }
     void requestGrid(GridAction a) { if (_onGridAction) _onGridAction(a); }
 
-    // The header-mode button says which mode is live. Set by GUIManager, which
-    // owns the choice - this panel only knows a button was pressed.
-    void setHeaderLabel(const char *text);
+    // CONNECTIVITY's sources: the two glyphs' managers, and its three lines'
+    // words - Wi-Fi, Home Assistant, MQTT - asked once a second while it shows.
+    void setLinks(ConnectivityManager *conn, MqttManager *mqtt) { _conn = conn; _mqtt = mqtt; }
+    using ConnText = std::function<void(char *wifi, char *ha, char *mqtt, size_t n)>;
+    void setConnectivityText(ConnText cb) { _connText = cb; }
 
-    // Update system stats - SAFE to call from anywhere
-    void updateSystemStats(float voltage, float current, int wifi_rssi);
+    void setTopOffset(int32_t y);
+    // THE STATUS SLOT'S PANEL (2.8, D-13): it hangs under its slot, centred on
+    // `centreX` and kept on the screen; a Kit::Drawer like every other slot's
+    // panel (D-20), one shape with its tab (D-23).
+    void setAnchorX(int32_t centreX);
+    // Where the panel stands [l, r), for the tab's coves (D-23).
+    // Called once the panel has finished closing (its tab closes then, round 4).
+    void setOnClosed(std::function<void()> cb) { _onClosed = cb; }
+    void panelSpan(int32_t &l, int32_t &r) const { l = _drawer.x; r = _drawer.x + _drawer.w; }
 
-    // Toggle the drawer
-    void close(); 
+    void close();
     void toggle();
 
-    // Callback registration
     using ToggleCallback = std::function<void(bool isOpen)>;
-    void setOnToggleCallback(ToggleCallback cb);
-    
-    // Returns the main wrapper (for parenting checks if needed)
-    lv_obj_t* getContainer() { return _ui_root; }
-    // For the 2.6 swipe handler: a swipe up should put an open drawer away
-    // rather than toggle the deck behind it.
+    void setOnToggleCallback(ToggleCallback cb) { _onToggle = cb; }
+
+    lv_obj_t* getContainer() { return _drawer.root; }
+    // For the swipe handler: a swipe up should put an open drawer away rather
+    // than toggle anything behind it.
     bool isExpanded() const { return _expanded; }
 
 private:
-    // Measured, not guessed - see the definition. Const because opening the
-    // drawer must not be able to change what is in it.
-    int32_t contentHeight() const;
-
-    // Width thresholds, in LOGICAL pixels. Named rather than inline because
-    // they are a judgement about readable panel width and the only way to know
-    // they are right is to look at one. The fleet's logical widths cluster at
-    // 330 / 480 / 727-740 / 1024, so both sit in a wide gap.
+    // Width thresholds, in LOGICAL pixels: a judgement about readable panel
+    // width (#50). The fleet's logical widths cluster at 330 / 480 / 727-740 /
+    // 1024, so both sit in a wide gap.
     static constexpr int32_t PANEL_WIDE_LOGICAL = 700;   // and up -> half width
     static constexpr int32_t PANEL_MID_LOGICAL  = 400;   // and up -> three quarters
 
-public:
+    void refreshConnectivity();
+    void buildContent();          // CONNECTIVITY and SYSTEM - DIAGNOSTICS, into the drawer's face
+    static void reportSink(const char *line);
 
-private:
-    // -- UI Objects --
-    lv_obj_t* _ui_root;    // The Outer Wrapper (Animates Height, No Padding)
-    lv_obj_t* _ui_content; // The Inner Container (Has Padding & Style, Auto Height)
-    // Four button rows (issue #50). Splitting them is not decoration: eight
-    // flex-grown buttons on one row are each a finger-width too narrow on
-    // CYD_S3_3248, and the panel is now narrower on every board but that one.
-    lv_obj_t* _ui_actions; // row 1 - Log / Tokens / Cards / About
-    lv_obj_t* _ui_grid;    // row 2 - Col -/+, Row -/+
-    lv_obj_t* _ui_row3;    // row 3 - Deck / Compact / Theme
-    lv_obj_t* _ui_row4;    // row 4 - header mode / Fill / Area / Label
-    lv_obj_t* _lbl_variant;
-    lv_obj_t* _lbl_fill;
-    lv_obj_t* _lbl_area;
-    lv_obj_t* _lbl_label = nullptr;   // name / state / none
-    lv_obj_t* _lbl_hdr;    // label inside the header-mode button
-    lv_obj_t* _lbl_scheme; // label inside the scheme button
-    lv_obj_t* _lbl_selector = nullptr;   // label inside the Selector button
-    lv_obj_t* _lbl_bar;    // label inside the header-size button
-    lv_obj_t* _lbl_cols;
-    lv_obj_t* _lbl_rows;
-    
-    lv_obj_t* lbl_stats;   // The stats header label
+    Kit::Drawer _drawer;
+    lv_obj_t *_ui_content = nullptr;                 // the drawer's face
+    lv_obj_t *_connVal[3] = {};                      // Wi-Fi, HA, MQTT: their words
+    Kit::Selector _schemeSel;
+    Widget_ConnStatus _wifiGlyph;
+    Widget_MqttStatus _linkGlyph;
+    ConnectivityManager *_conn = nullptr;
+    MqttManager         *_mqtt = nullptr;
+    ConnText _connText;
+    uint32_t _connMs = 0;
 
-    Panel_Header* _headerRef;
-    
-    // -- Logic --
-    bool _expanded;
-    int32_t _openH = 0;    // the drawer's open height: anim_height_cb() keeps the contents' bottom on the edge
+    Panel_Header* _headerRef = nullptr;
+    bool _expanded = false;
+    std::function<void()> _onClosed;
     ToggleCallback _onToggle;
+    Action _onLog, _onTweaks;
+    std::function<void(uint8_t)> _onScheme;
+    GridCallback _onGridAction;
+    DumpCallback _onDumpRequested;
 
-    // -- Animation --
-    static void anim_height_cb(void * var, int32_t v);
-
-    // -- Callbacks --
-    static void btn_action_cb(lv_event_t* e);
-    
     // -- Safe Data Buffering --
     std::vector<std::string> _log_queue;
     std::string              _log_text;   // what LogPage renders
-
-    // How much log to keep, trimmed from the FRONT. Raised from the original
-    // 4,000 because the System Doctor's report has grown a lot since that
-    // number was picked - at 4 KB a third dump was being cut off mid-report.
-    // This is a diagnostic tail, not a history, so it is still bounded.
+    // How much log to keep, trimmed from the FRONT: a diagnostic tail, not a
+    // history (at 4 KB a third dump was cut off mid-report).
     static constexpr size_t  LOG_TAIL_MAX = 12000;
-
     // The queue between log() and the tick that drains it is capped by BYTES,
-    // at the same budget as the text it feeds. It was capped at 100 LINES, and
-    // a report arrives all at once, so once the System Doctor passed 100 lines
-    // (2026-09-30, with [POWER]) the tail of every dump was dropped silently.
+    // at the same budget as the text it feeds (a cap of 100 LINES silently
+    // dropped the tail of every dump once the report passed 100 lines).
     size_t   _log_queue_bytes = 0;
     uint16_t _log_dropped     = 0;   // lines refused since the last drain, reported once
-
     std::function<void(const char *)> _log_on_change;
-    bool _log_dirty;
-    DumpCallback  _onDumpRequested  = nullptr;
-    CardsCallback _onCardsRequested = nullptr;
-    GridCallback  _onGridAction     = nullptr;
-    TokensCallback _onTokensRequested = nullptr;
-    LogCallback    _onLogRequested    = nullptr;
-    SchemeCallback _onSchemeRequested = nullptr;
-    SelectorCallback _onSelectorRequested = nullptr;
+    bool _log_dirty = false;
 
-    // Sink registered with SystemReport in init(), so report lines land in this
-    // panel. Serial mirroring is SystemReport's job now, not log()'s.
-    static void reportSink(const char *line);
-    
-    float _batt_volts = 0;
-    float _batt_amps = 0;
-    int _rssi = 0;
-    bool _stats_dirty;
-
-    // -- Timer for UI Updates --
-    lv_timer_t* _ui_timer;
+    lv_timer_t* _ui_timer = nullptr;
     static void _ui_timer_cb(lv_timer_t* timer);
-    void _tick(); // Instance method called by timer
+    void _tick();
 };

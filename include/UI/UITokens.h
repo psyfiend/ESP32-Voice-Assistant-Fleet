@@ -69,6 +69,13 @@ struct UIPalette {
     // scheme, Linen included - a light dim reads as fog, not as "behind".
     // Drawn as a translucent BACKGROUND, never an object opa (LESSONS: layers).
     uint32_t SCRIM;
+    // --- The header's status glyphs (2.8 round 3, D-24, D-27) ---
+    // Their own colours per scheme: the dark schemes' the "Fleet Status Glyphs"
+    // mock's softer set, Linen's darker so they read on sand (the Wi-Fi green
+    // all but vanished there). Strong / good / weak / bad: Wi-Fi's strength;
+    // busy: joining; off: switched off, and an unlit arc; link: the HA / MQTT
+    // link while it is well.
+    uint32_t SIG_STRONG, SIG_GOOD, SIG_WEAK, SIG_BAD, SIG_BUSY, SIG_OFF, SIG_LINK;
 };
 
 // ---------------------------------------------------------------------------
@@ -88,6 +95,19 @@ struct UIMetrics {
     // the owner's "it looks too flat" on Linen, 2026-09-23.
     uint8_t SHADOW_Y;
     uint8_t SHADOW_OPA;     // 0-255
+    // THE ACTIVE FRAMES (2.8 rounds 4-5, the owner's): what an "on" card draws
+    // on its edge in place of a fill, LIT inward - drawn, never as its border,
+    // so the card's layout never moves (round 4's bracket pushed the hero down).
+    uint8_t ACTIVE_RING;    // 3   the corner cut's frame and its diagonal
+    uint8_t ACTIVE_EDGE;    // 2   the bracket's sides
+    uint8_t BRACKET_W;      // 6   the bracket's top and bottom bars
+    uint8_t GLOW_DEPTH;     // 18  how far the light reaches in from a lit edge
+    uint8_t GLOW_OPA;       // 115 its strength at the edge (0-255), fading to nothing (Linen 150)
+    uint8_t CUT_PCT;        // 24  the corner cut's chamfer, % of the card's height
+    // ...and the way a light scheme makes them loud (round 6): DARKER, where a
+    // dark one makes them brighter - the frame's edge this % of the way from
+    // the active colour to the scheme's text, the light inward half that.
+    uint8_t ACTIVE_INK;     // 0 (dark schemes), 35 (Linen)
 };
 
 // ---------------------------------------------------------------------------
@@ -180,6 +200,38 @@ struct UIShape {
 };
 
 // ---------------------------------------------------------------------------
+// 2c. The page header's slots, in LOGICAL pixels (2.8, #19)
+// ---------------------------------------------------------------------------
+// The header is sc(UIToolkit::SYSTEM_HEADER_FULL_H) tall on every board, so what
+// sits in it is sized in the same logical pixels: pass these to UI::sc(). One
+// set, fleet-wide, read through UI::hdr(); docs/design/tokens.md section 8.
+struct UIHeader {
+    uint8_t GLYPH;         // 26  a glyph's drawing box - THE SAME bare or framed (D-24: a frame never shrinks it)
+    uint8_t FRAME;         // 28  a glyph's frame, the rounded square or the circle
+    uint8_t FRAME_R;       //  7  the rounded square's corners
+    uint8_t FRAME_MIX;     // 14  the rounded square's shade: % of TEXT over the bar
+    uint8_t SLOT_GAP;      //  8  between the things in one slot
+    uint8_t SLOT_PAD;      //  6  a slot's sides (its tap area and its open tab reach this far)
+    // The three places (2.8 round 2, Layout/HeaderPlan.h)
+    uint8_t EDGE;          //  8  from each end of the bar to its side's first slot
+    uint8_t SPACE;         //  2  between two slots in one place (their pads make the rest)
+    uint8_t CLEAR;         // 12  at least this between a side and the middle; closer, the lowest keep gives way
+    uint8_t DOT_ON;        // 11  this page's dot
+    uint8_t DOT_OFF;       //  8  another page's ring
+    uint8_t DOT_RING;      //  2  the ring's line
+    uint8_t DOT_GAP;       //  5  between dots
+    uint8_t MARK;          // 12  the error mark beside a slot's dashes
+    uint8_t LINE;          //  2  the bar's accent line - and the outline of an open slot and its panel (D-23)
+    uint8_t JOIN_R;        //  6  a cove or flare: the rounded corner where that outline meets the line
+    // A slot's drawer - the system panel's shape, which it was before it had a name
+    uint16_t DRAWER_W;     // 260 a slot's panel at most (the status slot's is the system panel)
+    uint8_t DRAWER_R;      // 15  its bottom corners
+    uint8_t DRAWER_PAD;    // 10  inside it
+    uint8_t DRAWER_GAP;    //  8  between its rows
+    uint8_t DRAWER_LINE;   //  2  its edge
+};
+
+// ---------------------------------------------------------------------------
 // 3. Grid — derived from the viewport, not declared
 // ---------------------------------------------------------------------------
 // Columns and rows are always DERIVED. You pick a target card width and the
@@ -247,6 +299,8 @@ struct UIType {
     const lv_font_t *UNIT;    // the unit beside a value, deliberately smaller
     const lv_font_t *NAME;    // card name
     const lv_font_t *TAG;     // header bar, status row
+    const lv_font_t *HEADER;  // the page header's words: TAG's face, but on the
+                              // P4_5 (26, matching the 4B's in mm; 2.8 round 4)
     // The two icon faces. Material Design Icons, generated as an 84-glyph
     // subset per board - NOT Montserrat, and not interchangeable with it:
     // MDI codepoints sit in the private use area, so these faces can draw
@@ -270,6 +324,7 @@ extern const UIMetrics UI_MET_DARK;   // 1px lighten @40% border, no shadow need
 extern const UIMetrics UI_MET_LIGHT;  // no border, leans on the shadow
 
 extern const UIShape UI_SHAPE;        // the card window's shape and spacing (2.12)
+extern const UIHeader UI_HEADER;      // the page header's slots (2.8)
 
 // Colour roles for UI::paint() - shared styles that repaint themselves on a
 // scheme change. #64; the full story is at UI::paint() below.
@@ -303,6 +358,7 @@ const UIMetrics &met();
 const UIGrid    &grid();
 const UIType    &type();
 const UIShape   &shape();   // millimetres - see section 2b
+const UIHeader  &hdr();     // logical px - see section 2c
 
 // --- Runtime customisation -------------------------------------------------
 // The active palette and metrics are COPIES of a scheme, not pointers to one,
@@ -321,6 +377,10 @@ void cycleScheme();
 uint8_t schemeIndex();
 void    setSchemeIndex(uint8_t i);
 void setAccent(uint32_t hex);
+// The active colour ("on") in place of the scheme's, until the scheme changes;
+// 0 puts the scheme's own back. For trying colours on glass (round 6,
+// /popup?active=) - the caller restyles the cards.
+void setActiveColour(uint32_t hex);
 void setTargetCardWidth(uint16_t logicalPx);
 
 // The OTHER grid knob, and the one that was missing.
@@ -369,6 +429,8 @@ uint32_t mix(uint32_t a, uint32_t b, uint8_t pct);
 // scheme tokens (GROUND and TEXT) keeps the answer inside the palette, so the
 // "no colour literals in UI code" rule holds.
 uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b);
+// The scheme's darkest colour, near black (the ink on lit glass, warmed).
+uint32_t darkest();
 
 // --- Shared paints: chrome that repaints itself on a scheme change. #64 -----
 //

@@ -13,7 +13,7 @@ if [ ! -f "$U/unity.c" ]; then
     echo "Unity is not fetched yet: run 'pio test -d host-tests' once on Windows, then this again."
     exit 2
 fi
-SRC=(src/Layout/Layout.cpp src/TimeFormat.cpp)   # the same files as build_src_filter
+SRC=(src/Layout/Layout.cpp src/Layout/HeaderPlan.cpp src/TimeFormat.cpp src/UI/GlyphShapes.cpp)   # the same files as build_src_filter
 O=/tmp/fleet_host_tests
 mkdir -p "$O"
 gcc -c "$U/unity.c" -I "$U" -o "$O/unity.o" || exit 1

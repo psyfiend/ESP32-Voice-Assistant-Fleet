@@ -355,6 +355,12 @@ protected:
 
     // --- Helpers for subclasses -------------------------------------------
 
+    // THE ACTIVE FRAMES (owner, 2.8 rounds 4-5): an "on" state drawn on the
+    // card's edge in `color`, lit inward - or FRAME_NONE. Drawn in the card's
+    // own draw (CardFrame.cpp), never as its border: the layout never moves.
+    // Not drawn while the card is held (its window open: the pressed look).
+    void activeFrame(CardFrame f, uint32_t color);
+
     uint8_t primaryCount() const { return _nPrimary; }
     const Entity *primary(uint8_t i = 0) const {
         return (i < _nPrimary) ? _primary[i] : nullptr;
@@ -498,6 +504,11 @@ private:
     static void eventCb(lv_event_t *e);
 
     lv_obj_t *_corner = nullptr;       // makeCornerIcon()'s, for pressLook()
+    bool      _pressed = false;        // held: pressLook() owns the edge
+    CardFrame _frame = CardFrame::FRAME_NONE;   // activeFrame()'s, drawn by frameDrawCb()
+    uint32_t  _frameColor = 0;
+    bool      _frameHooked = false;
+    static void frameDrawCb(lv_event_t *e);
 
     // --- Widget tree ------------------------------------------------------
     //

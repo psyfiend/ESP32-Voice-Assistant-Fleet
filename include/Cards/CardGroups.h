@@ -72,6 +72,14 @@ uint8_t rowChoices(const Card &c, Choice *out, uint8_t cap, char *opts, size_t o
 // nothing else is in deletes it.
 void choose(Card &c, const Choice &ch, bool areaColor);
 
+// Card UI's Card label row (2.8 round 3, D-28): where the card label's words
+// come from - its group's name (Inherit), its own words (Custom; until a way to
+// type them exists, the words it shows when chosen, kept), or no card label
+// (None). The group itself is chosen another way, later.
+enum LabelSource : uint8_t { LS_INHERIT, LS_CUSTOM, LS_NONE };
+LabelSource labelSource(const Card &c);
+void        setLabelSource(Card &c, LabelSource ls, bool areaColor);
+
 // Every known group, for the System Doctor and /settings?stats=1.
 void forEach(void (*fn)(const Group &g, void *ctx), void *ctx);
 

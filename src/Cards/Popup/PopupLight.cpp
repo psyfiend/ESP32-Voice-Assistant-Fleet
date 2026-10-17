@@ -219,15 +219,13 @@ void renderLight() {
     }
 
     // --- The selector ------------------------------------------------------
-    // Power says whether the light is on - glass and its icon in the active
-    // colour while it is, satin while not (#99, K77); the chosen switch is the
-    // selector's (buildControlDeck()).
-    // On glass the active colour is the glass's ink (T6: Linen's olive was
-    // lost in its silver).
+    // Power says whether the light is on - LIT glass while it is, glass while
+    // not (round 5; #99 had satin and glass), its icon in lit glass's dark ink;
+    // the chosen switch is the selector's (buildControlDeck()).
     if (s.btnCtl[0]) {
         Kit::selectorActionLit(d, on);
         if (lv_obj_t *l = Kit::labelIn(s.btnCtl[0]))
-            lv_obj_set_style_text_color(l, UI::c(quiet(on ? Kit::glassInk(p.ST_ACTIVE) : p.TEXT)), 0);
+            lv_obj_set_style_text_color(l, UI::c(quiet(on ? Kit::litInk() : p.TEXT)), 0);
     }
 
     // --- The swatches: a ring round the one the light is showing -----------

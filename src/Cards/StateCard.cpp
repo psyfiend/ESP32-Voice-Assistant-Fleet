@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <stdio.h>
 
-StateCardFill StateCard::s_fill = StateCardFill::FILL_SURFACE;
+StateCardFill StateCard::s_fill = StateCardFill::FRAME_CORNER;   // GUIManager's default (2.8 round 6)
 
 static lv_obj_t *plainCol(lv_obj_t *parent) {
     lv_obj_t *o = lv_obj_create(parent);
@@ -279,6 +279,17 @@ void StateCard::render() {
         lv_obj_set_style_text_color(_icon, UI::c(tone(chrome ? chrome : p.ST_IDLE)), 0);
         lv_obj_set_style_text_color(_name, UI::c(tone(p.TEXT)), 0);
     }
+
+    // --- The active frame (owner, 2.8 rounds 4-5): "on" on the card's edge --
+    // The frame modes light the icon and name as LIGHT_ICON does (above). The
+    // corner cut on Linen too since round 6: it draws its own shadow along the
+    // cuts (CardFrame.cpp), where the card's square one used to be left behind.
+    CardFrame frame = CardFrame::FRAME_NONE;
+    if (isOn && !chrome) {
+        if (s_fill == StateCardFill::FRAME_BRACKET) frame = CardFrame::FRAME_BRACKET;
+        if (s_fill == StateCardFill::FRAME_CORNER)  frame = CardFrame::FRAME_CORNER;
+    }
+    activeFrame(frame, p.ST_ACTIVE);
 
     // --- The light's own colour, in the disc. cards.md section 13 ---------
     //

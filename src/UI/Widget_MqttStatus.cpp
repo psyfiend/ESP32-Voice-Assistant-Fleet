@@ -1,20 +1,10 @@
 #include "UI/Widget_MqttStatus.h"
 #include "UI/UIToolkit.h"
 
-// Palette - semantic, not themeable: these colours ARE the information, so
-// they do not move when the scheme does. Matched to Widget_ConnStatus so the
-// two glyphs in the header speak one language; amber means the same thing on
-// both, and so does red.
-//
-// The one value taken straight from the artifact is the violet. The greens
-// next door were brightened because mid-saturation colours wash out on these
-// panels, but violet against a dark surface survives - to be re-checked on
-// glass like everything else here.
-static const uint32_t COL_OK    = 0xa78bfa;  // session up
-static const uint32_t COL_BUSY  = 0x60a5fa;  // connecting / backing off
-static const uint32_t COL_STALE = 0xfbbf24;  // connected, nothing arriving
-static const uint32_t COL_BAD   = 0xf87171;  // unreachable
-static const uint32_t COL_OFF   = 0x64748b;  // deliberately disabled
+// Colours - semantic: these ARE the information. Since 2.8 round 3 they are
+// the scheme's own (UIPalette SIG_*, D-27), shared with the Wi-Fi glyph so the
+// two speak one language: amber means the same thing on both, and so does red.
+// The violet is the "Fleet Status Glyphs" mock's.
 
 static const uint32_t POLL_MS = 400;   // matched to the WiFi glyph
 
@@ -43,8 +33,13 @@ static const uint32_t POLL_MS = 400;   // matched to the WiFi glyph
 // would say why.
 static const uint32_t FEED_SILENT_MS = 30UL * 60UL * 1000UL;
 
-void Widget_MqttStatus::init(lv_obj_t *parent, MqttManager *mqtt) {
-    _mqtt = mqtt;
+void Widget_MqttStatus::init(lv_obj_t *parent, MqttManager *mqtt, GlyphStyle style, int32_t px) {
+    _mqtt  = mqtt;
+    _style = style;
+    // A fresh start, as the Wi-Fi glyph's (the header rebuilds its slots).
+    _motionRunning = false;
+    _lastLook      = -1;
+    _lastPollMs    = 0;
 
     // Same reasoning as the WiFi glyph: the QSPI board pays a per-pixel
     // software rotation cost on every draw, so it gets the cheap motion.
@@ -52,74 +47,42 @@ void Widget_MqttStatus::init(lv_obj_t *parent, MqttManager *mqtt) {
         _motion = Motion::BLINK;
     #endif
 
-    // The artifact draws on a 24x24 viewBox. Everything below is that geometry
-    // scaled to S, so the proportions survive a change of size and the numbers
-    // can still be checked against the source drawing.
-    const int32_t S  = UIToolkit::sc(28);
-    const int32_t lw = UIToolkit::sc(2) < 2 ? 2 : UIToolkit::sc(2);
-    auto u = [S](float v) -> int32_t { return (int32_t)((v / 24.0f) * (float)S + 0.5f); };
-
-    _root = lv_obj_create(parent);
-    lv_obj_remove_style_all(_root);
-    lv_obj_set_size(_root, S, S);
-    lv_obj_remove_flag(_root, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(_root, LV_OBJ_FLAG_SCROLLABLE);
-
-    // The rounded square. An outlined lv_obj rather than a drawn rectangle:
-    // border + radius is one object where four lines would be four, and the
-    // draw walk recurses per level of nesting (docs/design/card-layout.md
-    // 1.3 - every crash in milestone 2.4 was loopTask stack depth).
-    //
-    // NOTE the radius is set from the artifact's rx=4.2 and NOT rounded up to
-    // LV_RADIUS_CIRCLE, and clip_corner is never set. A clipped corner costs a
-    // whole render layer sized by object WIDTH, which is what froze WS_P4_5 on
-    // boot at the end of 2.5. This object is small, but the rule is the rule.
-    _box = lv_obj_create(_root);
-    lv_obj_remove_style_all(_box);
-    lv_obj_set_size(_box, u(17.2f), u(17.2f));
-    lv_obj_set_pos(_box, u(3.4f), u(3.4f));
-    lv_obj_set_style_radius(_box, u(4.2f), 0);
-    lv_obj_set_style_border_width(_box, lw, 0);
-    lv_obj_set_style_bg_opa(_box, LV_OPA_TRANSP, 0);
-    lv_obj_remove_flag(_box, LV_OBJ_FLAG_SCROLLABLE);
-
-    // Two opposing arrows: publish out, subscribe back. Each is one three-point
-    // polyline - shaft and half-head in a single object - which is both the
-    // artifact's own path shape ("M 7.6 9.6 h 7.2 l -2.4 -2.4") and the
-    // cheapest thing to draw.
-    _outPts[0] = { (lv_value_precise_t)u(7.6f),  (lv_value_precise_t)u(9.6f)  };
-    _outPts[1] = { (lv_value_precise_t)u(14.8f), (lv_value_precise_t)u(9.6f)  };
-    _outPts[2] = { (lv_value_precise_t)u(12.4f), (lv_value_precise_t)u(7.2f)  };
-    _out = lv_line_create(_root);
-    lv_line_set_points(_out, _outPts, 3);
-    lv_obj_set_style_line_width(_out, lw, 0);
-    lv_obj_set_style_line_rounded(_out, true, 0);
-
-    _inPts[0] = { (lv_value_precise_t)u(16.4f), (lv_value_precise_t)u(14.4f) };
-    _inPts[1] = { (lv_value_precise_t)u(9.2f),  (lv_value_precise_t)u(14.4f) };
-    _inPts[2] = { (lv_value_precise_t)u(11.6f), (lv_value_precise_t)u(16.8f) };
-    _in = lv_line_create(_root);
-    lv_line_set_points(_in, _inPts, 3);
-    lv_obj_set_style_line_width(_in, lw, 0);
-    lv_obj_set_style_line_rounded(_in, true, 0);
-
-    _strikePts[0] = { (lv_value_precise_t)u(4.0f),  (lv_value_precise_t)u(20.0f) };
-    _strikePts[1] = { (lv_value_precise_t)u(20.0f), (lv_value_precise_t)u(4.0f)  };
-    _strike = lv_line_create(_root);
-    lv_line_set_points(_strike, _strikePts, 2);
-    lv_obj_set_style_line_width(_strike, lw, 0);
-    lv_obj_set_style_line_rounded(_strike, true, 0);
-    lv_obj_set_style_line_color(_strike, lv_color_hex(COL_OFF), 0);
-    lv_obj_add_flag(_strike, LV_OBJ_FLAG_HIDDEN);
+    // The two arrows (UI/GlyphShapes.h), THE SAME SIZE in every style (D-24).
+    // No square of their own any more: a frame is the square, and bare they
+    // are larger for it.
+    const int32_t S = px > 0 ? px : UIToolkit::sc(UI::hdr().GLYPH);
+    _frame = Kit::glyphFrame(parent, style);
+    lv_obj_remove_flag(_frame, LV_OBJ_FLAG_CLICKABLE);   // touches are the slot's
+    Kit::strokeGlyph(_g, _frame, Glyphs::Shape::LINK, S);
+    lv_obj_center(_g.box);
 
     _lastLook = -1;
     tick();   // paint the real state immediately, not a default frame
 }
 
-void Widget_MqttStatus::tint(lv_color_t col) {
-    lv_obj_set_style_border_color(_box, col, 0);
-    lv_obj_set_style_line_color(_out, col, 0);
-    lv_obj_set_style_line_color(_in, col, 0);
+lv_color_t Widget_MqttStatus::glyphCol(lv_color_t state) {
+    if (_style != GlyphStyle::GLYPH_CIRCLE) return state;
+    lv_obj_set_style_bg_color(_frame, state, 0);
+    return UI::c(UI::pal().SURFACE_ALT);
+}
+
+void Widget_MqttStatus::tint(uint32_t col, bool struck) {
+    const UIPalette &p = UI::pal();
+    const lv_color_t state = UI::c(col);
+    const lv_color_t c = glyphCol(state);
+    Kit::strokeGlyphPaint(_g, Kit::ALL_PARTS, c);
+    // The strike's halo is the ground it stands on (the bar, the square's
+    // shade, the circle's colour).
+    const lv_color_t halo = _style == GlyphStyle::GLYPH_CIRCLE ? state
+                          : _style == GlyphStyle::GLYPH_SQUARE ? UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, UI::hdr().FRAME_MIX))
+                          : UI::c(p.SURFACE_ALT);
+    Kit::strokeGlyphStrike(_g, struck, c, halo);
+}
+
+void Widget_MqttStatus::repaint() {
+    _lastLook = -1;
+    _lastPollMs = 0;
+    tick();
 }
 
 static void mqtt_opa_anim_cb(void *obj, int32_t v) {
@@ -130,7 +93,7 @@ void Widget_MqttStatus::startMotion() {
     if (_motionRunning || _motion == Motion::OFF) return;
     lv_anim_t a;
     lv_anim_init(&a);
-    lv_anim_set_var(&a, _root);
+    lv_anim_set_var(&a, _g.box);
     lv_anim_set_exec_cb(&a, mqtt_opa_anim_cb);
     lv_anim_set_values(&a, LV_OPA_30, LV_OPA_COVER);
     lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
@@ -149,8 +112,8 @@ void Widget_MqttStatus::startMotion() {
 
 void Widget_MqttStatus::stopMotion() {
     if (!_motionRunning) return;
-    lv_anim_delete(_root, mqtt_opa_anim_cb);
-    lv_obj_set_style_opa(_root, LV_OPA_COVER, LV_PART_MAIN);
+    lv_anim_delete(_g.box, mqtt_opa_anim_cb);
+    lv_obj_set_style_opa(_g.box, LV_OPA_COVER, LV_PART_MAIN);
     _motionRunning = false;
 }
 
@@ -215,53 +178,49 @@ Widget_MqttStatus::Look Widget_MqttStatus::resolveLook() const {
 }
 
 void Widget_MqttStatus::applyVisual(Look look) {
+    const UIPalette &p = UI::pal();
     stopMotion();
-    lv_obj_add_flag(_strike, LV_OBJ_FLAG_HIDDEN);
 
     switch (look) {
     case Look::OK:
-        tint(lv_color_hex(COL_OK));
+        tint(p.SIG_LINK);
         break;
 
     case Look::CONNECTING:
-        tint(lv_color_hex(COL_BUSY));
+        tint(p.SIG_BUSY);
         startMotion();
         break;
 
     case Look::STALE:
-        tint(lv_color_hex(COL_STALE));
+        tint(p.SIG_WEAK);
         break;
 
     case Look::UNREACHABLE:
-        tint(lv_color_hex(COL_BAD));
+        tint(p.SIG_BAD);
         break;
 
     case Look::NO_LINK:
         // Dimmed, static, and NO strike - the strike means a human turned this
         // off, and nobody did.
-        tint(lv_color_hex(COL_OFF));
+        tint(p.SIG_OFF);
         break;
 
     case Look::SESSION_OFF:
     default:
-        tint(lv_color_hex(COL_OFF));
-        lv_obj_remove_flag(_strike, LV_OBJ_FLAG_HIDDEN);
+        tint(p.SIG_OFF, true);
         break;
     }
 }
 
 void Widget_MqttStatus::tick() {
-    if (!_mqtt || !_root) return;
+    if (!_mqtt || !_frame) return;
 
     uint32_t now = millis();
     if (now - _lastPollMs < POLL_MS) return;
     _lastPollMs = now;
 
-    // resolveLook() walks the registry, so the change guard sits AFTER it
-    // rather than before - unlike the WiFi glyph, where the inputs are three
-    // atomic loads. At 2.5 Hz over at most ENTITY_MAX entries that walk is
-    // cheap; reissuing the style calls and invalidating the region is what is
-    // not, and that is what the guard prevents.
+    // resolveLook() is cheap; reissuing the style calls and invalidating the
+    // region is not, and that is what the guard prevents.
     Look look = resolveLook();
     if ((int32_t)look == _lastLook) return;
     _lastLook = (int32_t)look;

@@ -17,6 +17,8 @@
 #include <lvgl.h>
 #include <stdint.h>
 #include "UI/UITokens.h"
+#include "UI/HeaderSlots.h"   // GlyphStyle
+#include "UI/GlyphShapes.h"   // Kit::strokeGlyph()
 
 namespace Kit {
 
@@ -56,6 +58,27 @@ enum class KitStyle : uint8_t {
     KS_SHEET_FACE, KS_SHEET_BAR,
     // A finished surface sinks 1 px while pressed (Kit::finish()).
     KS_SINK,
+    // The page header (2.8, UI/HeaderSlots.h): the bar and its accent line; a
+    // slot (the tappable share of the bar), pressed, and open - its panel
+    // showing, in the drawer's face, so the slot opens into its panel like a
+    // folder's tab; its words (the bar's face; a smaller, dim one) and a
+    // sensor's icon; a glyph's frame (the rounded square, the circle); the
+    // page's dots; the error mark beside a slot's dashes.
+    KS_HDR_BAR, KS_HDR_SLOT, KS_HDR_SLOT_PRESSED, KS_HDR_SLOT_OPEN,
+    KS_HDR_TEXT, KS_HDR_TEXT_DIM, KS_HDR_ICON,
+    KS_HDR_CLOCK, KS_HDR_DOTS,   // the rows the time and am / pm, and the dots, stand in
+    KS_GLYPH_SQUARE, KS_GLYPH_CIRCLE,
+    KS_HDR_DOT_ON, KS_HDR_DOT_OFF, KS_HDR_MARK,
+    // A slot's drawer (Kit::drawer()): the clipping wrapper that grows to
+    // reveal it and casts the scheme's shadow, and its face; its lines - an
+    // item to tap (a page to go to), a big value.
+    KS_DRAWER, KS_DRAWER_FACE, KS_DRAWER_ITEM, KS_DRAWER_BIG,
+    // ONE SHAPE (2.8 round 3, D-23): where an open slot meets the bar's accent
+    // line, a rounded corner of the outline - a cove beside the tab: the
+    // shape's fill, and a ring of the accent around the bar outside it.
+    KS_JOIN_FILL, KS_JOIN_RING_BAR,
+    // A short upright rule setting one choice apart from another (Kit::vrule()).
+    KS_RULE,
     KS_COUNT
 };
 
@@ -98,7 +121,7 @@ lv_obj_t *button(lv_obj_t *parent, ButtonRole role, const char *text, int32_t w,
 // once into PSRAM and kept; the object's own background is turned off while it
 // shows. Painted, and dithered to the panels' 16 bits, because LVGL's own
 // gradients band pink and green there (LESSONS).
-enum class FaceKind : uint8_t { FACE_BLACK, FACE_SILVER, FACE_DENT, FACE_SATIN };
+enum class FaceKind : uint8_t { FACE_BLACK, FACE_SILVER, FACE_DENT, FACE_SATIN, FACE_LIT };
 
 // The face as the object's first child (an image); `flat` is its colour when
 // no face can be had. `tint`: a satin face's own colour. Returns the image, or null.
@@ -118,9 +141,14 @@ uint32_t  facesFlat();            // how many came out flat (a debug readout)
 // lightens, and the object sinks 1 px. `w` x `h` and the corner radius `r` are
 // the object's own; `tint` is satin's colour, 0 for the scheme's (a role keeps
 // its colour: the Remove button's red). Called again, it changes the finish.
-enum class Finish : uint8_t { FINISH_SATIN, FINISH_GLASS };
+// LIT (2.8 round 5) - a toggle that is ON: glass with a warm light behind it,
+// "a light shining from within refracting through a semi-frosted glass surface"
+// (Power while on; a toggle is glass while off).
+enum class Finish : uint8_t { FINISH_SATIN, FINISH_GLASS, FINISH_LIT };
 void     finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tint = 0);
+void     unfinish(lv_obj_t *o);   // the face put away, the object's own background back (a chip lit)
 uint32_t satinBase();             // the scheme's satin, between its two surfaces
+uint32_t litInk();                // words and icons on lit glass: the scheme's darkest, warmed
 // A colour that reads on glass: pushed toward the scheme's far end until it
 // stands apart from the metal (Linen's olive "on" vanished into its silver, T6).
 uint32_t glassInk(uint32_t hex);
@@ -129,6 +157,11 @@ uint32_t glassInk(uint32_t hex);
 // round, bit 1 silver. Kept in the settings file under the scheme.
 int8_t   selectorLook();
 void     keepSelectorLook(int8_t look);
+void     forgetSelectorLooks();   // read every scheme's again (the file was changed under them)
+void     selectorLookOverride(int8_t look);   // one window's own look (-1: none), until cleared
+// Saved by name (schemes.<name>.selector, a card's "selector"): 0-3 as above.
+const char *selectorLookName(int8_t look);
+bool        selectorLookFromName(const char *name, int8_t &look);
 uint8_t  selectorLookNow();       // the look in force
 FaceKind metalKind();             // its metal
 int32_t  selectorRadius();        // its corners: round, or R_CONTROL
@@ -153,8 +186,10 @@ void iconButtonLit(lv_obj_t *b, bool lit);
 // COMPACT (#92): the same selector at a span chip's height (H_CHIP), its
 // choices WORDS in the label face, no action - one option chosen from a short
 // list on a line of text (History's spans). `room` (0: any) is the most width
-// it may take: the words' sides shrink to fit it, as far as S1.
-constexpr uint8_t SELECTOR_MAX = 4;   // the control deck's three, History's four spans
+// it may take: the words' sides shrink to fit it, as far as S1. `slotW` (0: the
+// widest word's) makes every choice that wide, so selectors stacked in rows -
+// UI Tweaks, Card UI (2.8 round 3, D-27) - line up choice for choice.
+constexpr uint8_t SELECTOR_MAX = 5;   // the control deck's three, History's four spans, Card UI's five
 
 struct SelectorSpec {
     const char   *glyph[SELECTOR_MAX];   // the choices: icons, or words when compact
@@ -167,7 +202,11 @@ struct SelectorSpec {
     void        (*onChosen)(uint8_t i);  // the selector has arrived on choice i
     bool          compact;               // words, H_CHIP tall, no action (#92)
     int32_t       room;                  // compact: the most width it may take (0: any)
+    int32_t       slotW;                 // compact: every choice this wide (0: the widest word's)
 };
+// Compact choices for these words, each as wide as the widest of them and its
+// sides: give it to every row's slotW so rows line up.
+int32_t selectorSlotW(const char *const *words, uint8_t n);
 
 // Its state, kept by the caller for as long as it shows (its objects point here).
 struct Selector {
@@ -189,8 +228,30 @@ struct Selector {
 int32_t selectorW(uint8_t n);   // with n choices and the action
 int32_t selectorH();            // a touch target and its padding (a compact one: H_CHIP)
 void    selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec);
-// The action lit - glass - while what it switches is on (the window's Power), satin while off.
+
+// The action's face: glass, LIT glass while what it switches is on (the window's
+// Power; round 5: the glass itself lit from within, not a border on it).
 void    selectorActionLit(Selector &S, bool lit);
+
+// --- Chip tables (KitChoices.cpp, 2.8 round 5: UI Tweaks, Card UI) --------------
+// A list of option rows `w` wide filling `parent`'s height, scrolling when it
+// must: each row its name and its chips, the lit one in the accent. THE LONGEST
+// ROW CENTRED; every name right-justified against the chips' column, the chips
+// left-justified from it; a row's chips one width (rows may differ). On a window
+// too narrow for that (the 4B), every row's name above its chips, centred. `cb`
+// on a chip's CLICKED, with ((row << 8) | chip) as its user data. (Round 3's
+// selector rows took too much room for too little - the owner.)
+constexpr uint8_t CHIP_ROWS_MAX = 12;
+struct ChipRowSpec {
+    const char        *what;
+    const char *const *words;
+    uint8_t            n;
+    uint8_t            lit;
+};
+lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_t n, lv_event_cb_t cb);
+void      chipTableLit(lv_obj_t *table, uint8_t row, uint8_t lit);   // after a choice
+// A row of buttons after a chip table, in its list: centred, S5 apart.
+lv_obj_t *buttonRow(lv_obj_t *list);
 
 // --- Chips --------------------------------------------------------------------
 // A CHIP ROW: small round-ended buttons side by side, the chosen one lit in
@@ -301,5 +362,103 @@ struct DialogSpec {
 
 // Returns the dim, which holds everything: deleting it closes the dialog.
 lv_obj_t *dialog(const DialogSpec &spec);
+
+// --- The page header (KitHeader.cpp, 2.8) ----------------------------------------
+// The BAR: full width, the header's height, the scheme's raised surface with its
+// accent line along the bottom. Its slots go in it, each where the header plan
+// puts it (Layout/HeaderPlan.h) - the bar lays nothing out itself.
+lv_obj_t *headerBar(lv_obj_t *parent);
+// A SLOT: the bar's height, tappable, tinted while pressed, in the drawer's
+// face while LV_STATE_CHECKED (its panel open). `cb` on CLICKED, with `user` as
+// its user data. What it shows goes inside, centred in a row; its x and width
+// are the caller's, from the plan.
+lv_obj_t *headerSlot(lv_obj_t *bar, lv_event_cb_t cb, void *user);
+// A GLYPH'S FRAME (#19): BARE an empty holder the glyph's own size, SQUARE the
+// rounded square, CIRCLE the circle - whose colour is the caller's to set: it is
+// the glyph's state. The glyph goes inside, centred.
+lv_obj_t *glyphFrame(lv_obj_t *parent, GlyphStyle style);
+
+// --- A stroke glyph (KitGlyph.cpp, 2.8 round 3) ------------------------------------
+// One of the status glyphs drawn from its strokes (UI/GlyphShapes.h) at `px`
+// square: LVGL's own round-capped arcs and lines, each stroke its own object so
+// each PART takes its own colour. A STRIKE (switched off on purpose) lies over
+// it on a halo of the ground it stands on. Its state lives here, kept by the
+// caller while it shows (a line keeps a pointer to its points).
+struct StrokeGlyph {
+    lv_obj_t *box = nullptr;
+    lv_obj_t *obj[Glyphs::STROKES_MAX] = {};
+    uint8_t   part[Glyphs::STROKES_MAX] = {};
+    uint8_t   n = 0;
+    lv_obj_t *halo = nullptr, *strike = nullptr;
+    lv_point_precise_t pts[Glyphs::STROKES_MAX][2];
+    lv_point_precise_t strikePts[2];
+};
+void strokeGlyph(StrokeGlyph &g, lv_obj_t *parent, Glyphs::Shape shape, int32_t px);
+// Colour every stroke of `part` (ALL_PARTS: every stroke), at `opa`.
+constexpr uint8_t ALL_PARTS = 0xFF;
+void strokeGlyphPaint(StrokeGlyph &g, uint8_t part, lv_color_t c, lv_opa_t opa = LV_OPA_COVER);
+void strokeGlyphShow(StrokeGlyph &g, uint8_t part, bool shown);
+void strokeGlyphStrike(StrokeGlyph &g, bool on, lv_color_t c, lv_color_t halo);
+
+// --- A drawer (KitDrawer.cpp, 2.8) -------------------------------------------------
+// A PANEL THAT SLIDES DOWN from a header slot: square where it meets the bar,
+// its bottom corners rounded, the scheme's shadow. The caller builds its rows in
+// `face` (a column), then places and opens it; it grows from nothing to the
+// height its rows need (at most the screen below `top`). The system panel is the
+// status slot's own drawer, and older than this one (Panel_System).
+struct Drawer {
+    lv_obj_t *root = nullptr;   // the clip that grows; holds everything
+    lv_obj_t *face = nullptr;   // the rows go here
+    bool      open = false;
+    int32_t   x = 0, w = 0, openH = 0, top = 0;
+    // Called once it has finished closing - its slot's tab stays open until
+    // then (round 4: the slot and its panel joined for as long as any of the
+    // panel shows). Not called for a close cut short by opening again.
+    void    (*onClosed)(void *user) = nullptr;
+    void     *closedUser = nullptr;
+};
+int32_t drawerWidth();                                // a slot's drawer on this screen
+void    drawer(Drawer &d, lv_obj_t *parent, int32_t w);
+// Under its slot, kept on screen EDGE from its sides - where a slot's tab
+// stands, so a panel at a screen edge shares that side with its tab (D-23).
+void    drawerPlace(Drawer &d, int32_t centreX, int32_t top);
+// Open: its side walls rise straight to the bar's line (round 4: no flares).
+void    drawerOpen(Drawer &d);
+void    drawerClose(Drawer &d, bool animate = true);
+// The bar's DRAW_MAIN_END (Kit::headerBar() hooks it): the bar is drawn over the
+// panels, so its drop shadow fell across an open panel's top, under the open
+// slot (owner, round 6, Linen). It paints each open panel's face back over it.
+void    drawerCoverBarShadow(lv_event_t *e);
+
+// ONE SHAPE (D-23): a join is a corner of the outline where it meets the bar's
+// accent line - a COVE beside an open slot's tab, in the bar (round 4: the
+// panel's own corners, the flares, are gone - its walls meet the line square).
+// Built hidden; placed at the outer edge of the side it rounds (exclusive for a
+// right side).
+lv_obj_t *joinCorner(lv_obj_t *parent);
+void      coveAt (lv_obj_t *j, int32_t edgeX, bool right, int32_t barH);
+// A drawer's lines. An ITEM to tap, full width and a finger tall: a mark (filled
+// when `marked`, a ring otherwise - this page and the others) and its words;
+// `cb` on CLICKED with `user`. A NOTE, dim, wrapping. A BIG value - a time, a
+// reading.
+lv_obj_t *drawerItem(lv_obj_t *face, const char *words, bool marked, lv_event_cb_t cb, void *user);
+lv_obj_t *drawerNote(lv_obj_t *face, const char *words);
+lv_obj_t *drawerBig(lv_obj_t *face, const char *words);
+// A ROW of things side by side, the panel's width, DRAWER_GAP apart (buttons,
+// a selector and a toggle). A STATUS ROW (2.8 round 3, the system panel's
+// CONNECTIVITY): room for a glyph (`glyphRoom`), what it is, and its live value
+// dim beside it - returns the value's label.
+lv_obj_t *drawerRow(lv_obj_t *face);
+lv_obj_t *statusRow(lv_obj_t *face, const char *what, lv_obj_t **glyphRoom);
+// A drawer's section title, in the panel-title role.
+lv_obj_t *drawerTitle(lv_obj_t *face, const char *words);
+// A short upright rule between things in a row - one choice set apart from
+// another (the scheme and the Status bar, D-25).
+lv_obj_t *vrule(lv_obj_t *row, int32_t h);
+// A TOGGLE button: lit (glass) while on, satin while off (#99's finishes).
+lv_obj_t *toggleButton(lv_obj_t *parent, const char *words, int32_t w, int32_t h, bool on, lv_event_cb_t cb);
+void      toggleButtonSet(lv_obj_t *b, bool on);
+// A selector's chosen, set from outside (no onChosen): the scheme changed elsewhere.
+void      selectorSet(Selector &S, uint8_t i);
 
 } // namespace Kit

@@ -2,6 +2,7 @@
 // only (-D DEBUG_POPUP).
 #include "PopupState.h"
 #include "UI/AboutSheet.h"   // the Sheet's second client (2.12 P4)
+#include "UI/TweaksSheet.h"  // and UI Tweaks (2.8 round 3)
 
 namespace popup {
 
@@ -118,8 +119,18 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int sparks = -1;  // the interference from the next window: 0 now and then, 1 once, 2 off
                 int about = -1;   // 2.12 P4: the About sheet, 1 open, 0 close
                 int drawer = -1;  // #97: the system panel, 1 open, 0 close (GUIManager's hook)
+                char slot[8] = {};// 2.8: a header slot's panel by its kind's name ("clock"), "-1" closes (GUIManager's hook)
+                int glyphs = -1;  // 2.8: the header's glyph style, 0 bare, 1 square, 2 circle
+                int pageHdr = -1; // 2.8: this page's header, 0 hidden, 1 shown (saved)
+                int alarm = -2;   // 2.8 round 2: a pretend next alarm, HHMM (24 h); -1 clears (Alarms.h)
+                int alarmIn = -1; // 2.8 round 3: a pretend next alarm N minutes from now
+                int tweaks = -1;  // 2.8 round 3: UI Tweaks, 1 open (GUIManager's hook), 0 close
+                int sensorErr = -1; // 2.8 round 3 (T10): the header's sensor shown failed, 1; as it is, 0
+                int cardState = -2; // 2.8 round 4: the cards' active state 0-3, not saved; -1 the owner's
+                int32_t active = -1;// 2.8 round 6: the active colour, RRGGBB, not saved; 0 the scheme's own
                 bool close = false, power = false, more = false, hist = false, mem = false; };
 bool (*s_drawerHook)(bool open) = nullptr;
+const char *(*s_headerHook)(const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn) = nullptr;
 DbgReq s_dreqArgs;
 char   s_dreqOut[2048];
 size_t s_dreqLen = 0;
@@ -178,6 +189,16 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "sparks", v, sizeof(v)) == ESP_OK) a.sparks = atoi(v);
         if (httpd_query_key_value(q, "about", v, sizeof(v)) == ESP_OK) a.about = atoi(v);
         if (httpd_query_key_value(q, "drawer", v, sizeof(v)) == ESP_OK) a.drawer = atoi(v);
+        if (httpd_query_key_value(q, "slot", v, sizeof(v)) == ESP_OK) snprintf(a.slot, sizeof(a.slot), "%s", v);
+        if (httpd_query_key_value(q, "glyphs", v, sizeof(v)) == ESP_OK) a.glyphs = atoi(v);
+        if (httpd_query_key_value(q, "pagehdr", v, sizeof(v)) == ESP_OK) a.pageHdr = atoi(v);
+        if (httpd_query_key_value(q, "alarm", v, sizeof(v)) == ESP_OK) a.alarm = atoi(v);
+        if (httpd_query_key_value(q, "alarmin", v, sizeof(v)) == ESP_OK) a.alarmIn = atoi(v);
+        if (httpd_query_key_value(q, "tweaks", v, sizeof(v)) == ESP_OK) a.tweaks = atoi(v);
+        if (httpd_query_key_value(q, "sensorerr", v, sizeof(v)) == ESP_OK) a.sensorErr = atoi(v);
+        if (httpd_query_key_value(q, "cardstate", v, sizeof(v)) == ESP_OK) a.cardState = atoi(v);
+        if (httpd_query_key_value(q, "active", v, sizeof(v)) == ESP_OK)
+            a.active = (int32_t)(strtoul(v[0] == '#' ? v + 1 : v, nullptr, 16) & 0xFFFFFF);
         // rows=N: test rows for SETTINGS, from the next window built (a byte
         // the LVGL thread reads; nothing else to hand over).
         if (httpd_query_key_value(q, "rows", v, sizeof(v)) == ESP_OK) {
@@ -248,11 +269,35 @@ void CardPopup::debugService(lv_timer_t *t) {
         s_dreq.store(DREQ_DONE);
         return;
     }
+    // 2.8 round 3: UI Tweaks, a Sheet client of GUIManager's (UI/TweaksSheet.h);
+    // the header's sensor shown failed (T10). Both through the header hook.
+    if (a.tweaks >= 0 || a.sensorErr >= 0 || a.cardState > -2 || a.active >= 0) {
+        char cs[12];
+        if (a.active >= 0) snprintf(cs, sizeof(cs), "act%06lX", (unsigned long)a.active);
+        else               snprintf(cs, sizeof(cs), "cs%d", a.cardState);
+        if (a.tweaks == 0) { TweaksSheet::close(); dbgOut("tweaks: closing\n"); }
+        else {
+            const char *what = a.tweaks > 0 ? "tweaks" : (a.cardState > -2 || a.active >= 0) ? cs
+                             : a.sensorErr ? "sensorerr" : "sensorok";
+            dbgOut("%s\n", s_headerHook ? s_headerHook(what, -1, -1, -2, -1) : "no header hook (GUIManager gives it)");
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
     // #97: the system panel, for the harness to see its About button.
     if (a.drawer >= 0) {
         if (!s_drawerHook) dbgOut("no drawer hook (GUIManager gives it)\n");
         else if (s_drawerHook(a.drawer != 0)) dbgOut("drawer: already %s\n", a.drawer ? "open" : "closed");
         else dbgOut("drawer: %s\n", a.drawer ? "opening" : "closing");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    // 2.8: the header - a slot's panel open or closed, the glyph style (not
+    // saved: a capture leaves the owner's choice), the page's header (saved),
+    // a pretend alarm (RAM only).
+    if (a.slot[0] || a.glyphs >= 0 || a.pageHdr >= 0 || a.alarm > -2 || a.alarmIn >= 0) {
+        dbgOut("%s\n", s_headerHook ? s_headerHook(a.slot, a.glyphs, a.pageHdr, a.alarm, a.alarmIn)
+                                    : "no header hook (GUIManager gives it)");
         s_dreq.store(DREQ_DONE);
         return;
     }
@@ -332,7 +377,12 @@ void CardPopup::debugService(lv_timer_t *t) {
     if (a.scheme >= 0) {
         // The colour scheme, as the drawer's button sets it (0 Fleet, 1
         // Midnight, 2 Linen) - with no window open, as from the dashboard.
+        // Through GUIManager when it is there (2.8 round 3): the ground, the
+        // header and the page follow, and nothing is saved.
+        char name[12];
+        snprintf(name, sizeof(name), "scheme%d", a.scheme);
         if (isOpen()) dbgOut("close the window first\n");
+        else if (s_headerHook) dbgOut("%s\n", s_headerHook(name, -1, -1, -2, -1));
         else { UI::setSchemeIndex((uint8_t)a.scheme); dbgOut("scheme %d\n", a.scheme); }
         s_dreq.store(DREQ_DONE);
         return;
@@ -405,6 +455,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             else if (a.view == 1) showView(PopupView::VIEW_HISTORY);
             else if (a.view == 4 && hasScenes()) showView(PopupView::VIEW_SCENES);
             else if (a.view == 5) showView(PopupView::VIEW_PROPS);   // as SETTINGS' Entity properties
+            else if (a.view == 6) showView(PopupView::VIEW_CARD_UI); // as SETTINGS' Card UI (2.8 round 3)
             dbgMem(mem, sizeof(mem));
             dbgOut("view %d; %s\n", a.view, mem);
             // Why the last commands failed, newest first (G8).
@@ -611,4 +662,5 @@ void CardPopup::beginDebug(HttpServer &http) {
 }
 
 void CardPopup::setDrawerHook(bool (*hook)(bool open)) { s_drawerHook = hook; }
+void CardPopup::setHeaderHook(const char *(*hook)(const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn)) { s_headerHook = hook; }
 #endif

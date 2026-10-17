@@ -6,7 +6,7 @@
 //
 // Each board's four faces, sized from ITS OWN pixel density so that text
 // is the same physical size on every panel in the fleet. Targets, in mm
-// on glass: TAG 1.90, UNIT 2.47, NAME 2.66, VALUE 5.89, VALUE_SM 4.40, ICON 4.50.
+// on glass: TAG 1.90, HEADER 1.90, UNIT 2.47, NAME 2.66, VALUE 5.89, VALUE_SM 4.40, ICON 4.50.
 //
 // Resolved with #if rather than at runtime on purpose: LVGL links every
 // font a translation unit REFERENCES, at roughly 96 KB for a full ASCII
@@ -33,6 +33,7 @@ LV_FONT_DECLARE(fleet_font_num_60);
     #define FLEET_FONT_NAME     (&lv_font_montserrat_18)
     #define FLEET_FONT_UNIT     (&lv_font_montserrat_18)
     #define FLEET_FONT_TAG      (&lv_font_montserrat_14)
+    #define FLEET_FONT_HEADER   (&lv_font_montserrat_14)
     #define FLEET_FONT_ICON     (&lv_font_montserrat_30)
 #elif defined(CYD_P4_4880)
     // CYD_P4_4880 - 217 PPI, 4.3"
@@ -41,6 +42,7 @@ LV_FONT_DECLARE(fleet_font_num_60);
     #define FLEET_FONT_NAME     (&lv_font_montserrat_24)
     #define FLEET_FONT_UNIT     (&lv_font_montserrat_22)
     #define FLEET_FONT_TAG      (&lv_font_montserrat_16)
+    #define FLEET_FONT_HEADER   (&lv_font_montserrat_16)
     #define FLEET_FONT_ICON     (&lv_font_montserrat_38)
 #elif defined(CYD_S3_3248)
     // CYD_S3_3248 - 165 PPI, 3.5"
@@ -49,6 +51,7 @@ LV_FONT_DECLARE(fleet_font_num_60);
     #define FLEET_FONT_NAME     (&lv_font_montserrat_18)
     #define FLEET_FONT_UNIT     (&lv_font_montserrat_16)
     #define FLEET_FONT_TAG      (&lv_font_montserrat_12)
+    #define FLEET_FONT_HEADER   (&lv_font_montserrat_12)
     #define FLEET_FONT_ICON     (&lv_font_montserrat_30)
 #elif defined(CYD_S3_8048)
     // CYD_S3_8048 - 187 PPI, 5.0"
@@ -57,6 +60,7 @@ LV_FONT_DECLARE(fleet_font_num_60);
     #define FLEET_FONT_NAME     (&lv_font_montserrat_20)
     #define FLEET_FONT_UNIT     (&lv_font_montserrat_18)
     #define FLEET_FONT_TAG      (&lv_font_montserrat_14)
+    #define FLEET_FONT_HEADER   (&lv_font_montserrat_14)
     #define FLEET_FONT_ICON     (&lv_font_montserrat_34)
 #elif defined(WS_P4_4B)
     // WS_P4_4B - 255 PPI, 4.0"
@@ -65,6 +69,7 @@ LV_FONT_DECLARE(fleet_font_num_60);
     #define FLEET_FONT_NAME     (&lv_font_montserrat_24)
     #define FLEET_FONT_UNIT     (&lv_font_montserrat_22)
     #define FLEET_FONT_TAG      (&lv_font_montserrat_20)
+    #define FLEET_FONT_HEADER   (&lv_font_montserrat_20)
     #define FLEET_FONT_ICON     (&lv_font_montserrat_38)
 #elif defined(WS_P4_5)
     // WS_P4_5 - 294 PPI, 5.0"
@@ -72,7 +77,8 @@ LV_FONT_DECLARE(fleet_font_num_60);
     #define FLEET_FONT_VALUE_SM (&fleet_font_num_46)
     #define FLEET_FONT_NAME     (&lv_font_montserrat_28)
     #define FLEET_FONT_UNIT     (&lv_font_montserrat_26)
-    #define FLEET_FONT_TAG      (&lv_font_montserrat_22)
+    #define FLEET_FONT_TAG      (&lv_font_montserrat_24)
+    #define FLEET_FONT_HEADER   (&lv_font_montserrat_26)
     #define FLEET_FONT_ICON     (&lv_font_montserrat_46)
 #elif defined(WS_P4_7B)
     // WS_P4_7B - 170 PPI, 7.0"
@@ -81,6 +87,7 @@ LV_FONT_DECLARE(fleet_font_num_60);
     #define FLEET_FONT_NAME     (&lv_font_montserrat_18)
     #define FLEET_FONT_UNIT     (&lv_font_montserrat_18)
     #define FLEET_FONT_TAG      (&lv_font_montserrat_14)
+    #define FLEET_FONT_HEADER   (&lv_font_montserrat_14)
     #define FLEET_FONT_ICON     (&lv_font_montserrat_30)
 #elif defined(WS_S3_4B)
     // WS_S3_4B - 170 PPI, 4.0"
@@ -89,6 +96,7 @@ LV_FONT_DECLARE(fleet_font_num_60);
     #define FLEET_FONT_NAME     (&lv_font_montserrat_16)
     #define FLEET_FONT_UNIT     (&lv_font_montserrat_14)
     #define FLEET_FONT_TAG      (&lv_font_montserrat_14)
+    #define FLEET_FONT_HEADER   (&lv_font_montserrat_14)
     #define FLEET_FONT_ICON     (&lv_font_montserrat_26)
 #elif defined(WS_S3_5B)
     // WS_S3_5B - 237 PPI, 5.0"
@@ -97,6 +105,7 @@ LV_FONT_DECLARE(fleet_font_num_60);
     #define FLEET_FONT_NAME     (&lv_font_montserrat_26)
     #define FLEET_FONT_UNIT     (&lv_font_montserrat_24)
     #define FLEET_FONT_TAG      (&lv_font_montserrat_18)
+    #define FLEET_FONT_HEADER   (&lv_font_montserrat_18)
     #define FLEET_FONT_ICON     (&lv_font_montserrat_42)
 #else
     #error "No type scale for this board - rerun scripts/gen_type_scale.py"

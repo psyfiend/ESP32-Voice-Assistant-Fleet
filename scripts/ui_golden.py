@@ -125,6 +125,52 @@ PLAN = [
         ("about", ["about=1"], 0.8),
         (None, ["about=0"], 0.6),
     ]},
+    # 2.8: the header's glyph styles (shown, never saved; glyphs=3 puts the saved one back - square,
+    # the default since round 2) and each slot's panel by its kind's name (the status slot's is
+    # system_panel). Then the alarm: a pretend one (RAM only, Alarms.h) puts its slot on the bar,
+    # its panel opens, and it is cleared again. A build before 2.8 ignores slot=, glyphs= and
+    # alarm= and shows the page; round 1 knew slot= only as a number.
+    {"page": 0, "card": None, "tree": "page", "steps": [
+        ("header_bare", ["glyphs=0"], 0.8),
+        ("header_circle", ["glyphs=2"], 0.8),
+        (None, ["glyphs=3"], 0.6),
+        ("slot_clock", ["slot=clock"], 1.2),
+        (None, ["slot=-1"], 0.8),
+        ("slot_page", ["slot=page"], 1.2),
+        (None, ["slot=-1"], 0.8),
+        ("slot_sensor", ["slot=sensor"], 1.2),
+        (None, ["slot=-1"], 0.8),
+    ]},
+    # Round 3 (D-21): an alarm in two hours - the bell beside the clock and the notice among the
+    # status icons; the notice's panel, then the clock's with the alarm and "Warn me before".
+    {"page": 0, "card": None, "tree": "page", "steps": [
+        ("header_alarm", ["alarmin=120"], 0.8),
+        ("slot_alarm", ["slot=alarm"], 1.2),
+        (None, ["slot=-1"], 0.8),
+        ("slot_clock_alarm", ["slot=clock"], 1.2),
+        (None, ["slot=-1"], 0.8),
+        (None, ["alarm=-1"], 0.6),
+    ]},
+    # Round 4: the cards' active states on their edge - glow frame, bracket, corner cut - shown,
+    # never saved (cardstate=-1 puts the owner's back). What is on is whatever the house has on.
+    {"page": 0, "card": None, "tree": "page", "steps": [
+        ("frame_bracket", ["cardstate=2"], 1.5),
+        ("frame_corner", ["cardstate=3"], 2.0),
+        (None, ["cardstate=-1"], 2.0),
+    ]},
+    # Round 3 (T10): the header's sensor shown failed - its dashes and "!" (RAM only).
+    {"page": 0, "card": None, "tree": "page", "steps": [
+        ("header_sensor_err", ["sensorerr=1"], 0.8),
+        (None, ["sensorerr=0"], 0.6),
+    ]},
+    # Round 3 (D-22, D-25): UI Tweaks, and the deck risen under it with its second panel open.
+    # A build before round 3 ignores tweaks= and deckN.
+    {"page": 0, "card": None, "tree": "page", "steps": [
+        ("tweaks", ["tweaks=1"], 1.2),
+        ("tweaks_deck", ["slot=deck1"], 1.0),
+        (None, ["slot=deck1"], 0.8),
+        (None, ["tweaks=0"], 1.0),
+    ]},
     {"page": 1, "card": None, "tree": "page", "steps": [("fleet_page", [], 0.5)]},
     {"page": 1, "card": ("All Lamps", "Kitchen", 0), "steps": [
         ("lamps_main", [], 0.6),
@@ -132,6 +178,7 @@ PLAN = [
         (None, ["deck=0"], 0.6),
         ("lamps_history", ["view=1"], HIST),
         ("lamps_props", ["view=5"], 0.6),
+        ("lamps_cardui", ["view=6"], 0.6),   # 2.8 round 3: Card UI (D-28)
     ]},
     {"page": 1, "card": ("All Lamps", "Kitchen", 0), "steps": [
         ("lamps_members", ["view=2"], 0.6),

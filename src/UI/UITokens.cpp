@@ -41,6 +41,16 @@
 // The popup's dim, the same near-black on every scheme (Card Popup Mock v3).
 #define SCRIM_DARK 0x05080C
 
+// The header's status glyphs (2.8 round 3, D-27): the dark schemes take the
+// "Fleet Status Glyphs" mock's softer set (34D399 in place of 00FF00); Linen
+// its own darker set, every one at least ~3:1 on its sand bar.
+#define SIG_DARK                                                       \
+    .SIG_STRONG = 0x34D399, .SIG_GOOD = 0x4ADE80, .SIG_WEAK = 0xFBBF24, \
+    .SIG_BAD = 0xF87171, .SIG_BUSY = 0x60A5FA, .SIG_OFF = 0x64748B, .SIG_LINK = 0xA78BFA
+#define SIG_LINEN                                                      \
+    .SIG_STRONG = 0x1B7A3A, .SIG_GOOD = 0x2F8F4E, .SIG_WEAK = 0x9A6412, \
+    .SIG_BAD = 0xB4321F, .SIG_BUSY = 0x1D5FD6, .SIG_OFF = 0x8A8076, .SIG_LINK = 0x6B4FC8
+
 // THREE SCHEMES, pruned on glass 2026-09-23: Fleet, Midnight, Linen.
 //
 // Slate went because it differed from Midnight only in its accent ("slate is
@@ -68,6 +78,17 @@
 // The panels disagree with the screenshots: on WS_P4_5 the glass looked much
 // lighter and warmer than /screenshot of the same frame. Judge these on glass
 // (#82 is the 7B's cool cast; the P4_5 may need the same look).
+//
+// 2.8 round 6, 2026-10-17: COPPER, for the owner to judge on glass with the
+// active frames - "olive ... looks ok at best", and the frames need something
+// "more striking and contrasting, but that also fits with the rest of the
+// scheme". Against the card: olive 2.4:1, burnt amber 2.4, terracotta 2.9,
+// copper 3.7. Copper is the accent's hue (A8561C, lighter), so "on" and
+// "chosen" share it on Linen; the frames' shapes now say "on" as well.
+// /popup?active=RRGGBB tries the others without a build.
+//
+// THE OWNER'S PICK, on glass the same day: D47F45, between burnt amber and
+// terracotta (2.6:1 on the card - the frame's edge, darkened, carries it).
 const UIPalette UI_PAL_LINEN = {
     .name        = "Linen",
     .GROUND      = 0xCFC4B2,
@@ -77,10 +98,11 @@ const UIPalette UI_PAL_LINEN = {
     .TEXT_DIM    = 0x6E6459,
     .ACCENT      = 0xA8561C,   // copper
     .BORDER      = 0,
-    .ST_ACTIVE   = 0x9AA35A,   // olive
+    .ST_ACTIVE   = 0xD47F45,   // the owner's pick, round 6 (olive 9AA35A before)
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
     .SCRIM       = SCRIM_DARK,
+    SIG_LINEN,
 };
 
 // Today's shipped UI, read out of UIToolkit.cpp and Panel_Header.cpp rather
@@ -99,6 +121,7 @@ const UIPalette UI_PAL_FLEET = {
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_DARK,
     .SCRIM       = SCRIM_DARK,
+    SIG_DARK,
 };
 
 // The owner's verdict after seeing the dark schemes on glass: the former
@@ -116,8 +139,11 @@ const UIPalette UI_PAL_MIDNIGHT = {
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_DARK,
     .SCRIM       = SCRIM_DARK,
+    SIG_DARK,
 };
 
+#undef SIG_DARK
+#undef SIG_LINEN
 #undef FLEET_STATE_AND_TINTS
 #undef ST_ACTIVE_ORANGE
 #undef TINT_LIGHTING_DARK
@@ -137,7 +163,9 @@ const UIPalette UI_PAL_MIDNIGHT = {
 // scheme, where a shadow is what separates a card from the page, gets one.
 const UIMetrics UI_MET_DARK  = {
     .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 0, .HEADER_H = 14,
-    .SHADOW_Y = 0, .SHADOW_OPA = 0
+    .SHADOW_Y = 0, .SHADOW_OPA = 0,
+    .ACTIVE_RING = 3, .ACTIVE_EDGE = 2, .BRACKET_W = 6, .GLOW_DEPTH = 18, .GLOW_OPA = 115, .CUT_PCT = 24,
+    .ACTIVE_INK = 0
 };
 // Linen's. A 2 px border, darker than the old hairline (the owner: "make it a
 // bit darker and increase by 1 or 2px", knobs included - the drawer's buttons
@@ -148,9 +176,17 @@ const UIMetrics UI_MET_DARK  = {
 // DARKER, not wider. A short blur, a small drop, a firm edge - the first try
 // (12 px blur at 30%) read as fuzz rather than depth. Border darker again
 // ("a bit darker than it is or expand it 1 more pixel" - darker was chosen).
+//
+// 2.8 round 6, the active frames: on the dark schemes they glow; on Linen they
+// were "not nearly as standout obvious", every card already having a shadow
+// against the floor. So here they go DARKER and stronger: the edge a third of
+// the way to the text, the light inward stronger (the owner: "go in the
+// opposite direction and have the encroaching brackets be darker").
 const UIMetrics UI_MET_LIGHT = {
     .RADIUS = 12, .PAD = 5, .BORDER_W = 2, .BORDER_OPA_PCT = 34, .SHADOW = 6, .HEADER_H = 14,
-    .SHADOW_Y = 3, .SHADOW_OPA = 140
+    .SHADOW_Y = 3, .SHADOW_OPA = 140,
+    .ACTIVE_RING = 3, .ACTIVE_EDGE = 2, .BRACKET_W = 6, .GLOW_DEPTH = 18, .GLOW_OPA = 150, .CUT_PCT = 24,
+    .ACTIVE_INK = 35
 };
 
 // The card window's shape and spacing, in millimetres (2.12 P2, the header's
@@ -170,6 +206,20 @@ const UIShape UI_SHAPE = {
     .SLOP_SELECTOR = 1.0f, .SLOP_KNOB = 1.2f, .SLOP_HOLD = 4.0f,
     .P_GAP = 4.0f, .P_STACK_GAP = 3.0f, .P_GRIP_INSET = 1.4f, .P_GRIP_H = 0.5f, .P_GRIP_MIN = 5.0f,
     .P_MARK_H = 2.6f, .P_MARK_LINE = 0.35f, .P_SCENE_H = 9.0f, .P_SCENE_GAP = 1.4f, .P_SCENE_PAD = 2.4f,
+};
+
+// The page header's slots (2.8). GLYPH, DOT_*, SLOT_GAP and LINE are the
+// values the bar had before it had slots; the frames are the "2+" chip of the
+// header-glyph mock (#19), the shade stronger than the first try because the
+// owner expected it to fade on glass. EDGE + SLOT_PAD put the first thing in
+// each side where round 2's mock drew it (24 px from the P4_5's edge); two
+// slots' pads and SPACE part neighbours as the status glyphs are parted.
+const UIHeader UI_HEADER = {
+    .GLYPH = 26, .FRAME = 28, .FRAME_R = 7, .FRAME_MIX = 14,
+    .SLOT_GAP = 8, .SLOT_PAD = 6, .EDGE = 8, .SPACE = 2, .CLEAR = 12,
+    .DOT_ON = 11, .DOT_OFF = 8, .DOT_RING = 2, .DOT_GAP = 5,
+    .MARK = 12, .LINE = 2, .JOIN_R = 6,
+    .DRAWER_W = 260, .DRAWER_R = 15, .DRAWER_PAD = 10, .DRAWER_GAP = 8, .DRAWER_LINE = 2,
 };
 
 // ---------------------------------------------------------------------------
@@ -299,6 +349,7 @@ const UIPalette &pal()  { return s_pal; }
 const UIMetrics &met()  { return s_met; }
 const UIGrid    &grid() { return s_grid; }
 const UIShape   &shape() { return UI_SHAPE; }
+const UIHeader  &hdr()   { return UI_HEADER; }
 
 const UIType &type() {
     // Built on first use rather than at static-init time: the font objects are
@@ -319,6 +370,7 @@ const UIType &type() {
         .UNIT    = FLEET_FONT_UNIT,
         .NAME    = FLEET_FONT_NAME,
         .TAG     = FLEET_FONT_TAG,
+        .HEADER  = FLEET_FONT_HEADER,
         .ICON    = FLEET_ICONS_LG,
         .ICON_MD = FLEET_ICONS_MD,
         .ICON_SM = FLEET_ICONS_SM,
@@ -477,6 +529,11 @@ void setAccent(uint32_t hex) {
     if (s_onChange) s_onChange();
 }
 
+void setActiveColour(uint32_t hex) {
+    s_pal.ST_ACTIVE = hex ? hex : SCHEMES[schemeIndex()].pal->ST_ACTIVE;
+    refreshPaints();
+}
+
 void setTargetCardWidth(uint16_t logicalPx) {
     s_grid.TARGET_CARD_W = logicalPx;
     recomputeGrid();
@@ -523,6 +580,14 @@ uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b) {
     const int32_t l = luma(bg);
     const int32_t da = luma(a) - l, db = luma(b) - l;
     return (da * da >= db * db) ? a : b;
+}
+
+// The scheme's darkest colour, its ground or its text whichever way round the
+// scheme is - pulled the rest of the way to black (2.8 round 4: "absolute black
+// in dark modes"; round 5 warms it into the ink on lit glass, Kit::litInk()).
+uint32_t darkest() {
+    const uint32_t d = luma(s_pal.GROUND) <= luma(s_pal.TEXT) ? s_pal.GROUND : s_pal.TEXT;
+    return blend(d, 0x000000, 60);
 }
 
 lv_color_t border() {

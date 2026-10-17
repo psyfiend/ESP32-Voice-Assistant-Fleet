@@ -16,10 +16,10 @@ Each layer uses the ones below it and never reaches up. Lower layers include no 
 | Hardware and services | display, touch, Wi-Fi, MQTT, Home Assistant, the HTTP server, the saved settings; started in one documented order | `SystemCore`, `components/Fleet_*`, `Settings` - **no LVGL** |
 | Entities | every light, sensor and switch the board knows, from HA, MQTT and virtual sources, behind one mutex; commands go out through it | `components/Fleet_Entities` (`EntityRegistry`), `components/Fleet_Providers`, `components/Fleet_HA` (`HaClient`, `HaHistory`) - **no LVGL** |
 | The LVGL engine | buffers, `lv_init()`, the flush to the panel, touch input | `LVGL_Startup`, `LVGL_Flush_*` |
-| The screen | the root screen, the header, the pages, the system panel and its pages | `GUIManager`, `src/UI/Panel_*`, `LogPage`, `ReferencePage` |
+| The screen | the root screen, the header and its slots' panels (2.8), the pages, the system panel and its pages, UI Tweaks' choices (2.8 round 3) | `GUIManager` (+ `GUIManagerHeader.cpp`, `GUIManagerTweaks.cpp`), `src/UI/Panel_*`, `UI/HeaderSlots` + `UI/SlotPanels` + `UI/GlyphShapes`, `LogPage`, `ReferencePage` |
 | Pages | a grid of cards built from data (`PageSpec`, the dashboards in `include/Dashboards/`); where each card goes is a **layout engine's** decision | `CardPage` + `Layout::` (`include/Layout/`) |
 | Cards | a card per entity or group, its type from the entity's kind; bound to its entities so it redraws when they change | `src/Cards/` (`Card`, `CardCatalog`, `CardBinder`, `StateCard`, `ValueCard`) |
-| Windows | everything that opens over the page is a **Sheet**: the card window, "About this board" | `Kit::Sheet` (`include/UI/Sheet.h`); clients `CardPopup` + `src/Cards/Popup/`, `UI/AboutSheet` |
+| Windows | everything that opens over the page is a **Sheet**: the card window, "About this board", "UI Tweaks" | `Kit::Sheet` (`include/UI/Sheet.h`); clients `CardPopup` + `src/Cards/Popup/`, `UI/AboutSheet`, `UI/TweaksSheet` |
 | Components | buttons, dialogs, chip rows, list items, panel rows, folder panels, the selector, icon buttons, label roles | `Kit::` (`include/UI/Kit.h`, `src/UI/Kit/`) |
 | Tokens | every colour, size, font and shape | `UI::` (`include/UI/UITokens.h`, `src/UI/UITokens.cpp`) |
 
@@ -35,8 +35,10 @@ whose stack is in internal RAM - the settings task.
 | a colour, a size, a font, a radius | `include/UI/UITokens.h` (`UIPalette`, `UIMetrics`, `UIShape`, `UIGrid`, `UIType`); values in `src/UI/UITokens.cpp`; why: `tokens.md` |
 | a component and its looks | `include/UI/Kit.h`; `src/UI/Kit/Kit<Name>.cpp`; the roles' styles in `KitStyles.cpp`; pictures in `components.md` |
 | the window frame | `include/UI/Sheet.h`, `src/UI/Kit/KitSheet.cpp` (frame, auto-close, the tap catcher), `KitSheetPanels.cpp` (the two folder panels), `KitSparks.cpp` |
-| the card window's contents | `src/Cards/CardPopup.cpp` (the client: tabs, views, open/close) and `src/Cards/Popup/` - one file per concern, sharing `PopupState.h`: controls and the light hero (`PopupControls`, `PopupLight`, `PopupDeck`), `PopupScenes`, `PopupMembers`, History (`PopupHistory`, `...Chart`, `...Activity`), `PopupProps`, the panels' rows (`PopupSettingsRows`, `PopupSideRows`, `PopupPanels`), `PopupDialog`, the hold (`PopupHold`), helpers (`PopupCommon`), and the PC's handles (`PopupDebug`, `PopupTree`) |
+| the card window's contents | `src/Cards/CardPopup.cpp` (the client: tabs, views, open/close) and `src/Cards/Popup/` - one file per concern, sharing `PopupState.h`: controls and the light hero (`PopupControls`, `PopupLight`, `PopupDeck`), `PopupScenes`, `PopupMembers`, History (`PopupHistory`, `...Chart`, `...Activity`), `PopupProps`, `PopupCardUi` (Card UI, 2.8 round 3), the panels' rows (`PopupSettingsRows`, `PopupSideRows`, `PopupPanels`), `PopupDialog`, the hold (`PopupHold`), helpers (`PopupCommon`), and the PC's handles (`PopupDebug`, `PopupTree`) |
 | where cards go on a page | `include/Layout/Layout.h` (`FlowEngine`), `src/Cards/CardPage.cpp`; the engines to come: `layout-engines.md` |
+| what the header shows and where | `include/UI/HeaderSlots.h` (the slots as data, each kind's keeps), `include/Layout/HeaderPlan.h` (the planner: three places, claims, keep), `src/UI/Panel_Header.cpp` (each kind's build and update), `src/UI/SlotPanels.cpp` (their panels), `include/UI/GlyphShapes.h` (the status glyphs as strokes, round 3); `header-slots.md` §10-12 |
+| UI Tweaks and the system panel's choices | `src/GUIManagerTweaks.cpp` (each row: what it sets, where it is saved; the scheme; the grid's counts; the deck under the window), `src/UI/TweaksSheet.cpp` (the window), `src/UI/Panel_System.cpp` (CONNECTIVITY, SYSTEM - DIAGNOSTICS) |
 | which card a kind of entity gets | `src/Cards/CardCatalog.cpp` (`cardForKind()`) |
 | what a dashboard contains | `include/Dashboards/Dashboard_HA.h`, `Dashboard_Fleet.h` (`PageSpec`, `CardSpec`; ids per K33) |
 | the owner's saved choices | `include/Settings.h` (one JSON file), `CardGroups`, `CardAdded`; CLAUDE.md "Saved settings" |
@@ -103,7 +105,7 @@ whose stack is in internal RAM - the settings task.
 |---|---|---|
 | **The harness**, `scripts/ui_golden.py` | a window, view, panel or page is the same object tree and the same pixels as before | `capture <host> --board <B> --label <L>` walks 48 states (45 on the 4B; the system panel and About since #97) through `GET /popup` and saves each tree and screenshot; `compare <B> <A> <B>` reports every difference, telling the house apart (times, values, a light switched); `measure` times each window's build; `crop` cuts a picture for the docs. Needs `-D DEBUG_POPUP` |
 | **A/B on one board** | a refactor changed nothing | capture on the old firmware, flash the new, capture again minutes apart; a state the house changed under is captured again both ways. Keep each phase's image (`test/golden/<board>/fw_*`, gitignored) to flash back |
-| **Host tests**, `host-tests/` | the pure modules' rules (`Layout`, `TimeFormat`) | `wsl bash host-tests/run_in_wsl.sh` (or `pio test -d host-tests` with a Windows compiler) |
+| **Host tests**, `host-tests/` | the pure modules' rules (`Layout`, the header's planner `HeaderPlan`, `TimeFormat`) | `wsl bash host-tests/run_in_wsl.sh` (or `pio test -d host-tests` with a Windows compiler) |
 | **The structure check**, `scripts/structure_check.py` | the code is not drifting: big files, style calls outside the kit, colour literals, shape numbers, LVGL in the core layers | run it with the gate; quote it in the merge report (W13) |
 | **The gate**, `scripts/release/gate.ps1` | all nine boards compile from the committed `platformio.ini` | ~11 minutes; it stashes and restores the owner's local debug lines |
 | **The owner's sheet**, `docs/TEST_<milestone>.md` | touch, feel, schemes, the auto-close, a reboot - what no script sees | numbered tests with PASS criteria, the owner's results under them |
@@ -121,9 +123,12 @@ kit). Bring each onto the kit and tokens when it is next changed, not in a sweep
 - **Cards** (`Card.cpp` 1,462 lines and 87 style calls, `StateCard.cpp`, `ValueCard.cpp`) - first,
   because 2.11's group cards and any new card type build on them.
 - **`GUIManager.cpp`** (1,538 lines) - the second file over the 1,000-line mark.
-- The header (`Panel_Header`), the system panel and its pages (`Panel_System`, `Panel_Display`,
-  `Panel_Audio`, `LogPage`, `ReferencePage`), `UIToolkit`, the status widgets (whose 34 colour
-  literals are most of what the check reports).
+- **The header is on the kit since 2.8** (`Kit::headerBar()`, `headerSlot()`, `glyphFrame()`,
+  `Kit::Drawer` for every slot's panel - the system panel's frame too since round 2; `UI::hdr()`
+  sizes); **where its slots stand is a pure planner**, `Layout/HeaderPlan.h` (claims and keeps,
+  D-19; host-tested). Still to come: the system panel's rows of buttons and its pages
+  (`Panel_System`, `Panel_Display`, `Panel_Audio`, `LogPage`, `ReferencePage`), `UIToolkit`, the
+  status widgets (whose 34 colour literals are most of what the check reports).
 
 ## 7. Open questions this structure leaves for the owner
 

@@ -318,3 +318,67 @@ difference"; built on `feat/ui-followups`, #97, with the harness's before/after 
 | `H_MORE` 7.0 into `H_ROW` 7.2 | 81 / 70 / 47 | 83 / 72 / 48 | "Show more" as tall as a panel row |
 | `S_MEMBERS` 1.4 into `S5` 1.6 (or `S4` 1.2) | 16 / 14 / 9 | 19 / 16 / 11 (or 14 / 12 / 8) | **the owner's choice** - both pictured; built: `S5` |
 | `R_CONTROL` 1.2 and `R_BUTTON` 1.6 as one `R_CONTROL`, 1.6 (or 1.2) | 14 / 12 / 8 and 19 / 16 / 11 | 19 / 16 / 11 (or 14 / 12 / 8) | **the owner's choice** - both pictured; built: 1.6, the corners the owner set on glass for the dialog's buttons and the squared selector (K27) |
+
+## 8. The page header's slots, in logical pixels (2.8)
+
+The header is `sc(SYSTEM_HEADER_FULL_H)` - 35 logical px - tall on every board, so what sits in it
+is sized in the same logical pixels: **`UIHeader`**, read through **`UI::hdr()`**
+(`include/UI/UITokens.h` §2c), passed to `UI::sc()`. One `const` set, fleet-wide. `GLYPH`, the
+dots, `SLOT_GAP` and `LINE` are the values the bar had before it had slots; the frames are the
+"2+" chip of #19's mock; the drawer's are the system panel's shape, named.
+
+| Token | Value | What uses it |
+|---|---|---|
+| `GLYPH` | 26 | a status glyph's drawing box - **the same bare or framed** (round 3, D-24: a frame never shrinks it; round 2's 28 bare / 19 framed are gone with `GLYPH_FRAMED`) |
+| `FRAME` | 28 | a glyph's frame: the rounded square, the circle - round the glyph, not inside its box |
+| `FRAME_R` | 7 | the rounded square's corners |
+| `FRAME_MIX` | 14 | the rounded square's shade: % of `TEXT` over the bar |
+| `SLOT_GAP` | 8 | between the things in one slot |
+| `SLOT_PAD` | 6 | a slot's sides - how far its tap area and its open tab reach past what it shows (4 in round 1, when slots were quarters) |
+| `EDGE` | 8 | from each end of the bar to its side's first slot (round 2); with `SLOT_PAD`, the first thing sits where round 2's mock drew it (24 px from the P4_5's edge) |
+| `SPACE` | 2 | between two slots in one place; their pads make the rest |
+| `CLEAR` | 12 | at least this between a side and the middle - closer, the lowest keep gives way (`Layout/HeaderPlan.h`) |
+| `DOT_ON`, `DOT_OFF`, `DOT_RING`, `DOT_GAP` | 11, 8, 2, 5 | the page's dots: this page's, another's ring and its line, between them |
+| `MARK` | 12 | the error mark beside a slot's dashes |
+| `LINE` | 2 | the bar's accent line - and the outline of an open slot and its panel, in the accent (round 3, D-23) |
+| `JOIN_R` | 6 | a cove beside an open tab, in the bar: the rounded corner where the tab's side meets the bar's line (round 3, D-23; the panel's own flares went in round 4, D-30) |
+| `DRAWER_W` | 260 | a slot's panel at most |
+| `DRAWER_R`, `DRAWER_PAD`, `DRAWER_GAP`, `DRAWER_LINE` | 15, 10, 8, 2 | a slot's panel: its bottom corners, inside, between rows, its edge |
+
+Logical rather than millimetres (`UIShape`) because the bar they sit in is logical; the two agree
+to within the scale's clamps (1 logical px is ~0.15 mm wherever `sc()` is not clamped).
+
+**The status glyphs' colours (round 3, D-24 / D-27)** are palette tokens, `UIPalette`'s `SIG_*`,
+one set per scheme family - a glyph's colour is its link's state, so it lives with the scheme:
+
+| Token | Dark schemes (Fleet, Midnight) | Linen | What it means |
+|---|---|---|---|
+| `SIG_STRONG` | `34D399` | `1B7A3A` | Wi-Fi strong |
+| `SIG_GOOD` | `4ADE80` | `2F8F4E` | Wi-Fi good; a link that is up |
+| `SIG_WEAK` | `FBBF24` | `9A6412` | weak, or a link that is quiet |
+| `SIG_BAD` | `F87171` | `B4321F` | down |
+| `SIG_BUSY` | `60A5FA` | `1D5FD6` | joining, connecting |
+| `SIG_OFF` | `64748B` | `8A8076` | switched off |
+| `SIG_LINK` | `A78BFA` | `6B4FC8` | the MQTT link's arrows |
+
+The dark greens are the mocks' softer ones; Linen's are darker so they read on its light bar (T9's
+"Wi-Fi's green all but vanishes on Linen"). The glyphs themselves are numbers, not tokens:
+`UI/GlyphShapes.cpp` holds each stroke on a 24-unit grid, as the mocks drew them.
+
+**The header's words have their own type role, `HEADER`** (round 4, D-30): TAG's millimetre
+target and TAG's scale on every board, except the P4_5 (`gen_type_scale.py`, `HEADER` 1.18): 26 px,
+2.25 mm, matching the 4B's 22 px within 2%. `UIToolkit::Font_Header` is the larger of `HEADER` and
+`Font_PanelHeader`.
+
+**The active frames** (rounds 4-6, D-30 to D-32) are `UIMetrics` tokens in logical px, drawn in
+`ST_ACTIVE` (`Cards/CardFrame.cpp`): `BRACKET_W` 6 (the bracket's top and bottom bars),
+`ACTIVE_EDGE` 2 (its sides), `ACTIVE_RING` 3 (the corner cut's frame and the edge of each cut),
+`GLOW_DEPTH` 18 and `GLOW_OPA` (how far the light reaches in from a lit edge, and how strong it is
+there: 115 of 255 on the dark schemes, 150 on Linen), `CUT_PCT` 24 (the corner cut's chamfer, % of
+the card's height), and `ACTIVE_INK` (round 6: how far the frame's edge goes from the active
+colour toward the scheme's text - 0 on the dark schemes, where the frames glow, 35 on Linen, where
+they go darker to stand out; the light goes half as far). The corner cut's shadow is the card's
+own (`SHADOW`, `SHADOW_Y`, `SHADOW_OPA`), measured from LVGL and painted around the cut (round 7,
+D-33). `UI::darkest()` (the scheme's darkest, 60% of the way to black) inks lit glass, warmed.
+**Linen's `ST_ACTIVE` is terracotta `D47F45`**, the owner's pick on glass (round 6; olive
+`9AA35A` before) - `/popup?active=RRGGBB` tries another without a build.

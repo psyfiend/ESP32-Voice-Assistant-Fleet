@@ -462,10 +462,18 @@ Since Phase 2.2 (2026-09-10). `include/UI/UITokens.h` is the single source for h
 Design and the measurements behind it: `docs/design/tokens.md`; what a card *contains* is
 `docs/design/cards.md`.
 
-Five flat struct groups in the `Fleet_BSP` idiom — `UIPalette` (surfaces, accent, the **semantic
+Six flat struct groups in the `Fleet_BSP` idiom — `UIPalette` (surfaces, accent, the **semantic
 state palette**, sensor tints), `UIMetrics` (radius, padding, border, shadow), `UIShape` (the card
-window's radii, spacing, lines and sizes, in millimetres - 2.12), `UIGrid`, `UIType` — reached
-through one namespace: `UI::pal()`, `UI::met()`, `UI::shape()`, `UI::grid()`, `UI::type()`.
+window's radii, spacing, lines and sizes, in millimetres - 2.12), `UIHeader` (the page header's
+slots, glyph frames and slot drawers, in logical px - 2.8), `UIGrid`, `UIType` — reached through
+one namespace: `UI::pal()`, `UI::met()`, `UI::shape()`, `UI::hdr()`, `UI::grid()`, `UI::type()`.
+
+**The page header is a bar of slots** (2.8, `include/UI/HeaderSlots.h`): data - a kind and an
+entity - per slot, `PageSpec::headerSlots` (else the default four) and `headerShown`; each kind a
+build and an update in `Panel_Header.cpp`'s table, its panel in `SlotPanels.cpp` (the status slot's
+is the system panel). A new kind is a new entry, never layout code. The glyph style
+(`system.header.glyphs`) and a page's header shown / hidden (`pages.<slug>.header`) are saved
+settings.
 
 Rules that are load-bearing rather than stylistic:
 

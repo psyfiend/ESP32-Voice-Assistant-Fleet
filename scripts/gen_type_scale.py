@@ -60,6 +60,10 @@ FONT_DIR = os.path.join(ROOT, "src", "UI", "fonts")
 # ---------------------------------------------------------------------------
 TARGETS_MM = {
     "TAG":   1.90,   # header band, status row, units of measure
+    # The page header's words - the clock, the page's name (2.8 round 4). The
+    # TAG target and TAG's scale on every board, unless a board gives HEADER
+    # its own (the P4_5: below).
+    "HEADER": 1.90,
     "UNIT":  2.47,   # the unit beside a value, deliberately smaller than it
     "NAME":  2.66,   # the card's name - which is the LOCATION, per cards.md
     "VALUE": 5.89,   # the number, dominant
@@ -119,7 +123,16 @@ SCALE = {
     #
     # Hence per-role. "*" shrinks what actually costs height; TAG keeps the mm
     # target, which was right about it all along.
-    "WS_P4_5": {"*": 0.88, "TAG": 1.00},
+    #
+    # TAG 1.09 ON THE P4_5 (owner, 2026-10-16, D-26): with the P4_5 beside the
+    # 4B, its tags and header words were "noticeably smaller" - 22 px is 1.90
+    # mm at 294 PPI, the 4B's 20 px is 1.99 mm at 255, and the 4B sits further
+    # off on the desk. 1.09 lands the P4_5 on 24 (2.07 mm); no other board moves.
+    # HEADER 1.18 (owner, 2.8 round 3's test): the clock and the page's name at
+    # 24 still "look the same size as before" - the 4B's 22 px is 2.19 mm at
+    # 255 PPI, the P4_5's 24 px 2.07 mm. 26 px (2.25 mm) matches it within 2%;
+    # the tags stay 24.
+    "WS_P4_5": {"*": 0.88, "TAG": 1.09, "HEADER": 1.18},
 
     # The 4B pair, 2026-09-19. Same value for both, and that is the point.
     #
@@ -151,6 +164,8 @@ def scale_for(macro, role):
     """Per-board, per-role multiplier. Default 1.0 - i.e. trust the mm target."""
     s = SCALE.get(macro, 1.0)
     if isinstance(s, dict):
+        if role == "HEADER" and role not in s:
+            role = "TAG"   # the header's words follow the tags unless told otherwise
         return s.get(role, s.get("*", 1.0))
     return s
 
@@ -329,7 +344,7 @@ def main():
         L.append("%s defined(%s)" % ("#if" if first else "#elif", b["macro"]))
         first = False
         L.append("    // %s - %d PPI, %.1f\"" % (b["macro"], b["ppi"], b["diag"]))
-        for role in ("VALUE", "VALUE_SM", "NAME", "UNIT", "TAG", "ICON"):
+        for role in ("VALUE", "VALUE_SM", "NAME", "UNIT", "TAG", "HEADER", "ICON"):
             px = b["px"][role]
             if role == "ICON":
                 # Always a built-in, clamped to the largest one. Icons are

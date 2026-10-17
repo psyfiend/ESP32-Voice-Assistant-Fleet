@@ -941,6 +941,8 @@ lv_obj_t *Card::makeCornerIcon(lv_obj_t *body) {
 // sink) does not depend on the steps before it.
 void Card::pressLook(uint8_t toAccent, int32_t sink) {
     if (!_surface) return;
+    // The held look owns the edge; an active frame is not drawn until pressClear().
+    _pressed = toAccent > 0 || sink > 0;
     const int32_t base = UI::met().BORDER_W;
     const int32_t wide = LV_MAX(base, UI::sc(2));
     const int32_t bw   = base + (wide - base) * toAccent / 255;
@@ -976,14 +978,18 @@ void Card::pressLook(uint8_t toAccent, int32_t sink) {
     }
 }
 
-// Back to exactly what restyle() gives every card.
+// Back to exactly what restyle() gives every card - and its state drawn again,
+// an active frame with it (round 4).
 void Card::pressClear() {
     pressLook(0, 0);
     if (_surface) {
         lv_obj_set_style_border_color(_surface, UI::border(), 0);
         lv_obj_set_style_border_width(_surface, UI::met().BORDER_W, 0);
+        if (_root) render();
     }
 }
+
+// The active frames (Card::activeFrame(), 2.8 round 4): CardFrame.cpp.
 
 // THE CORNER ICON SCALES WITH THE PAGE, by ROW COUNT. 2.7 round four.
 //

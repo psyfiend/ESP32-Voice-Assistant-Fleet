@@ -511,6 +511,23 @@ bool system(const char *area, const char *key, char *out, size_t cap) {
     return found;
 }
 
+bool page(const char *slug, const char *key, char *out, size_t cap) {
+    bool found = false;
+    if (cap) out[0] = '\0';
+    if (!s_doc || !slug || !*slug) return false;
+    Lock l;
+    copyOut((*s_doc)["pages"][slug][key], out, cap, found);
+    return found;
+}
+
+bool setPage(const char *slug, const char *key, const char *value) {
+    if (!s_doc) return false;
+    Lock l;
+    const bool changed = setValue("pages", slug, key, value, false, false, value == nullptr);
+    if (changed) s_dirty = true;
+    return changed;
+}
+
 bool group(const char *groupId, const char *key, char *out, size_t cap) {
     bool found = false;
     if (cap) out[0] = '\0';

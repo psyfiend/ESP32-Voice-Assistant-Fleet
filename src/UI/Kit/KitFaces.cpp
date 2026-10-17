@@ -72,7 +72,28 @@ void keepSelectorLook(int8_t look) {
     Settings::setScheme(key, "selector", look < 0 ? nullptr : LOOK_NAMES[look & 3]);
 }
 
+// Every scheme's look read again from the settings file when next asked for
+// (UI Tweaks' Reset all has just cleared them there).
+void forgetSelectorLooks() {
+    for (int8_t &l : s_look) l = -1;
+    s_lookLoaded = 0;
+}
+
+const char *selectorLookName(int8_t look) { return look < 0 ? nullptr : LOOK_NAMES[look & 3]; }
+
+bool selectorLookFromName(const char *name, int8_t &look) {
+    if (!name) return false;
+    for (int8_t k = 0; k < 4; k++)
+        if (!strcmp(name, LOOK_NAMES[k])) { look = k; return true; }
+    return false;
+}
+
+// One window's own look (a card's Card UI, D-28), over the scheme's.
+static int8_t s_lookOver = -1;
+void selectorLookOverride(int8_t look) { s_lookOver = look < 0 ? (int8_t)-1 : (int8_t)(look & 3); }
+
 uint8_t selectorLookNow() {
+    if (s_lookOver >= 0) return (uint8_t)s_lookOver;
     if (lookSlot() >= 0) return (uint8_t)lookSlot();
     return lum(UI::pal().SURFACE_ALT) < 128 ? 0 : 3;
 }
@@ -143,6 +164,7 @@ static void paintFace(FaceSlot &f) {
     }
     const uint32_t base = p.SURFACE_ALT;   // a dent is pressed into the window
     const uint32_t rail = UI::mix(selectorColours().ribbon, dk, 25);   // the rail through the lens
+    const uint32_t warm = UI::mix(p.ST_ACTIVE, lt, 40);                // lit glass's light (round 5)
 
     // The panels are 16-bit: red and blue in steps of 8, green in steps of 4.
     // A smooth grey ramp truncated to that grid bands, and the bands go pink
@@ -157,7 +179,8 @@ static void paintFace(FaceSlot &f) {
         // Brushed: each row a touch lighter or darker, the same every time.
         // Metal only - a dent is soft, and satin smooth.
         uint32_t hs = (uint32_t)y * 2654435761u;
-        const bool brushed = f.kind == FaceKind::FACE_BLACK || f.kind == FaceKind::FACE_SILVER;
+        const bool brushed = f.kind == FaceKind::FACE_BLACK || f.kind == FaceKind::FACE_SILVER ||
+                             f.kind == FaceKind::FACE_LIT;   // lit glass: frosted
         const int streak = brushed ? (int)((hs >> 28) & 7) - 3 : 0;
         const float cy = y + 0.5f;
         for (int x = 0; x < w; x++) {
@@ -192,6 +215,17 @@ static void paintFace(FaceSlot &f) {
                                  : lerpHex(f.tint, UI::mix(f.tint, dk, shade), (t - 0.5f) / 0.5f);
                 const uint32_t rim = darkScheme ? UI::mix(f.tint, lt, bright ? 22 : 11) : UI::mix(f.tint, dk, 15);
                 if (inside < 1.3f) col = lerpHex(col, rim, 0.75f);
+            } else if (f.kind == FaceKind::FACE_LIT) {
+                // LIT GLASS (owner, round 5): "a light shining from within
+                // refracting through a semi-frosted glass surface". Dark smoked
+                // glass with a warm light behind it, brightest a little below
+                // the middle and fading toward the edges; a faint sheen across
+                // the top; the rim catching the light.
+                const float u = (cx - w * 0.5f) / (w * 0.62f), v = (cy - h * 0.58f) / (h * 0.70f);
+                const float k = LV_CLAMP(0.f, 1.f - (u * u + v * v), 1.f);
+                col = lerpHex(lerpHex(UI::mix(dk, lt, 28), UI::mix(dk, lt, 8), cy / h), warm, 0.30f + 0.62f * k);
+                if (cy < h * 0.4f) col = lerpHex(col, lt, 0.14f * (1.f - cy / (h * 0.4f)));
+                if (inside < 1.3f) col = lerpHex(col, UI::mix(warm, lt, 45), 0.8f);
             } else {
                 // The line: two fifths down at the sides, rising in the middle.
                 const float u = (cx - w * 0.5f) / (w * 0.5f);
@@ -251,7 +285,10 @@ static bool opaqueFace(FaceKind kind) { return kind == FaceKind::FACE_SATIN; }
 // null, and the caller paints flat.
 static const lv_image_dsc_t *face(int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t tint, int32_t band) {
     const UIPalette &p = UI::pal();
-    const uint32_t key = p.GROUND ^ (p.SURFACE << 1) ^ (p.TEXT << 2) ^ (p.SURFACE_ALT << 3);
+    // Lit glass's light is painted from ST_ACTIVE, which can change without the
+    // scheme (round 6's /popup?active=) - so its faces are keyed by it too.
+    const uint32_t key = p.GROUND ^ (p.SURFACE << 1) ^ (p.TEXT << 2) ^ (p.SURFACE_ALT << 3) ^
+                         (kind == FaceKind::FACE_LIT ? p.ST_ACTIVE << 4 : 0);
     FaceSlot *spare = nullptr;
     for (FaceSlot &f : s_faces) {
         if (f.buf && f.w == w && f.h == h && f.r == r && f.kind == kind && f.key == key && f.tint == tint &&
@@ -342,6 +379,13 @@ lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, u
 // Between the scheme's two surfaces: the mock's satin on Midnight exactly.
 uint32_t satinBase() { return UI::mix(UI::pal().SURFACE, UI::pal().SURFACE_ALT, 50); }
 
+// On lit glass (its light is the active colour toward white): the scheme's
+// darkest, warmed a little by the light - an amber icon vanished into it.
+uint32_t litInk() {
+    const UIPalette &p = UI::pal();
+    return UI::mix(UI::darkest(), p.ST_ACTIVE, 20);
+}
+
 // INK ON GLASS (owner, #99 T6): Linen's olive "on" vanished into its silver.
 // The metal's middle tone is about a fifth of the way from its own end of the
 // scheme; a colour within 90 of it in lightness is pushed, a tenth at a time,
@@ -403,9 +447,11 @@ static bool hasCb(lv_obj_t *o, lv_event_cb_t cb) {
 
 void finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tint) {
     if (!o || w <= 0 || h <= 0) return;
-    const bool glass = f == Finish::FINISH_GLASS;
+    // LIT GLASS (owner, round 5): glass the light comes on behind - press like glass.
+    const bool glass = f == Finish::FINISH_GLASS || f == Finish::FINISH_LIT;
     const uint32_t base = tint ? tint : satinBase();
-    lv_obj_t *img = setFace(o, w, h, r, glass ? metalKind() : FaceKind::FACE_SATIN, base, base);
+    const FaceKind kind = f == Finish::FINISH_LIT ? FaceKind::FACE_LIT : glass ? metalKind() : FaceKind::FACE_SATIN;
+    lv_obj_t *img = setFace(o, w, h, r, kind, base, base);
     if (img) {
         lv_obj_set_user_data(img, (void *)(glass ? FIN_GLASS : FIN_SATIN));
         // FLOATING, not only out of the layout: an object sized to its content
@@ -428,6 +474,15 @@ void finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tin
         lv_obj_move_to_index(veil, faceIn(o) ? 1 : 0);
         lv_obj_center(veil);
     }
+}
+
+// A chip lit (round 6: satin while unlit): its face hidden and the background
+// setFace() turned off given back, so its role's own colour shows again.
+void unfinish(lv_obj_t *o) {
+    if (!o) return;
+    if (lv_obj_t *img = faceIn(o)) lv_obj_add_flag(img, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_local_style_prop(o, LV_STYLE_BG_OPA,   0);
+    lv_obj_remove_local_style_prop(o, LV_STYLE_BG_COLOR, 0);
 }
 
 lv_obj_t *labelIn(lv_obj_t *o) {

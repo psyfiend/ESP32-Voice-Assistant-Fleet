@@ -18,22 +18,11 @@ uint8_t s_dbgRows = 0;                  // GET /popup?rows=N: test rows added to
 
 void pauseCheckCb(lv_event_t *ev);
 void groupDropCb(lv_event_t *ev);
-void labelDropCb(lv_event_t *ev);
 
-// SETTINGS' Entity label row (the words under the hero), in the owner's order
-// (K40; named K45, "HA name" K44). Index 0 is Inherit.
-const char *const LABEL_ROW_OPTS = "Inherit\nHA name\nState\nCustom\nNone";
-const CardLabel LABEL_ROW[5] = { CardLabel::LBL_INHERIT, CardLabel::LBL_HA, CardLabel::LBL_STATE,
-                                 CardLabel::LBL_NAME, CardLabel::LBL_NONE };
-uint16_t labelRowIndex(CardLabel l) {
-    for (uint16_t k = 0; k < 5; k++) if (LABEL_ROW[k] == l) return k;
-    return 0;
-}
-
-// SETTINGS' Card label row (2.10d, K44, K45): HA area / the dashboard's areas
-// and the owner's groups / Custom / None (CardGroups.h). Built with the rows;
-// the map says what each line is.
-void cardLabelDropCb(lv_event_t *ev);
+// The card's group, from a PC (/popup?clabel=N): HA area / the dashboard's
+// areas and the owner's groups / Own group / None (CardGroups.h). SETTINGS'
+// Card label row went to Card UI as Inherit / Custom / None (2.8 round 3,
+// D-28): the group is chosen another way, later.
 CardGroups::Choice s_clMap[24];
 uint8_t s_clN = 0;
 char    s_clOpts[24 * 44];
@@ -121,10 +110,7 @@ void removeCardCb(lv_event_t *ev);
 
 uint8_t deckSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
-    // Label (2.10d, K40, K49): what the CARD chose - saved, else its default
-    // (Custom when the dashboard names it) - never what the knob makes of it.
     Card *held = cardOf(h.surface);
-    const uint16_t lblSel = held ? labelRowIndex(held->labelMode()) : 0;
     r[n++] = { "Paused", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)aggregate().paused, true,
                pauseCheckCb, &s.swPause };
     // When a group defined here counts as on - HA's group helper option.
@@ -132,21 +118,7 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     if (s.nEnt > 1 && !s.native && !inMember())
         r[n++] = { "Active state", DeckRowKind::ROW_DROP, "Any members are on\nAll members are on",
                    (uint16_t)(s.groupOn == GroupOn::GROUP_ON_ALL), true, groupDropCb, &s.ddGroup };
-    // Live since 2.10d; a card without a usable id cannot keep it, so stays grey.
-    r[n++] = { "Entity label", DeckRowKind::ROW_DROP, LABEL_ROW_OPTS,
-               lblSel, held && held->hasId() && !inMember(), labelDropCb, nullptr };
-    // The custom name itself is set from a PC for now (GET /settings?card=..
-    // &name=..); the web UI does it properly later (K37).
-    // Card label: the card's group, or its own words, or none (K44). GREYED
-    // (owner, 2026-10-09, K48): its choices become Current group / None /
-    // Custom with a name-entry window, after 2.10d. It shows the card's group;
-    // groups are still set from a PC (/settings?card=..&group=..).
-    if (held) {
-        uint16_t clSel = 0;
-        s_clN = CardGroups::rowChoices(*held, s_clMap, 24, s_clOpts, sizeof(s_clOpts), clSel);
-        r[n++] = { "Card label", DeckRowKind::ROW_DROP, s_clOpts, clSel,
-                   false, cardLabelDropCb, nullptr };
-    }
+    // Entity label and Card label are Card UI's since 2.8 round 3 (D-25, D-28).
     // Visibility is NOT SHOWN (owner, 2026-10-12, K68): it belongs to cards in
     // a group shown as a cluster, a group panel or a group page, and none
     // exists yet. It comes back with them, offered only there.
@@ -179,6 +151,11 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     // after a dialog that asks (confirmRemove()).
     if (!inMember() && held && CardAdded::isAdded(held->id()))
         r[n++] = { "Remove card", DeckRowKind::ROW_BUTTON, "Remove", 0, true, removeCardCb, nullptr };
+    // CARD UI (2.8 round 3, D-27): the card's own looks, a view of their own -
+    // at the foot. The card's, so greyed in a member's view; a card without a
+    // usable id cannot keep them.
+    if (held)
+        r[n++] = { "Card UI", DeckRowKind::ROW_BUTTON, "Open", 0, cardRows, cardUiCb, nullptr };
 #ifdef DEBUG_POPUP
     // GET /popup?rows=N: N greyed test rows, so SETTINGS is too tall for the
     // screen and the panel's drag can be tried (P1b round 2).
@@ -236,32 +213,13 @@ void tapDropCb(lv_event_t *ev) {
     if (t == TapAction::TAP_LOAD_SCENE) ensureDefaultScene(*c);
 }
 
-// Card label: kept and applied to the held card at once (CardGroups::choose()).
-// The window's title keeps the words it opened with until it is reopened.
-void cardLabelDropCb(lv_event_t *ev) {
-    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
-    Card *c = cardOf(h.surface);
-    if (!c || k >= s_clN) return;
-    CardGroups::choose(*c, s_clMap[k], c->pageAreaColor());
-    c->restyle();
-}
-
-// Label: on the held card at once, kept under its id - Inherit too, since K49
-// (a card the dashboard names is Custom unless told otherwise).
-void labelDropCb(lv_event_t *ev) {
-    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
-    const CardLabel l = LABEL_ROW[k < 5 ? k : 0];
-    keepCardSetting("label", cardLabelName(l));
-    if (Card *c = cardOf(h.surface)) { c->setLabelMode(l); c->restyle(); }
-}
-
 // Units: on the card at once and kept under its id; the window and a showing
 // chart follow.
 void unitsDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     const TempUnit u = k ? TempUnit::TEMP_F : TempUnit::TEMP_C;
     s.tempUnit = u;
-    if (Card *c = cardOf(h.surface)) { c->setTempUnit(u); c->restyle(); }
+    if (Card *c = cardOf(h.surface)) { c->setTempUnit(u); restyleHeld(*c); }
     keepCardSetting("units", tempUnitName(u));
     renderMain();
     if (s.view == PopupView::VIEW_HISTORY) histDraw();

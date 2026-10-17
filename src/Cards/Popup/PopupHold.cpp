@@ -30,6 +30,14 @@ void holdRestore(lv_obj_t *sf) {
     if (Card *c = cardOf(sf)) c->pressClear();
 }
 
+// THE HELD CARD STAYS PRESSED IN while its window is open (owner, round 3's
+// U15): a restyle - its label changed in Card UI, its units in SETTINGS - would
+// otherwise drop the pressed look and its border.
+void restyleHeld(Card &c) {
+    c.restyle();
+    if (h.phase == HoldPhase::HOLD_OWNED && cardOf(h.surface) == &c) holdLook(h.surface, 255);
+}
+
 bool movedTooFar() {
     if (!s_indev) return false;
     lv_point_t now;

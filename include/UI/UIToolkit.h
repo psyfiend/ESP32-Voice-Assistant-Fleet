@@ -43,6 +43,7 @@ public:
     // so the relationship is stated rather than re-derived.
     static constexpr int32_t PANEL_COLLAPSED_H = 85;   // logical px
     static constexpr int32_t PANEL_HEADER_H    = 45;   // the visible strip
+    static constexpr int32_t PANEL_EXPANDED_H  = 280;  // an open panel, overhang included
     static constexpr int32_t DECK_PAD          = 10;
 
     // How far past the bottom of the screen the deck must extend for exactly
@@ -96,4 +97,8 @@ public:
     static const lv_font_t* Font_Button;      // Action buttons
     static const lv_font_t* Font_PanelHeader; // Accordion titles
     static const lv_font_t* Font_Hero;        // Big status numbers
+    // THE HEADER BAR'S WORDS (2.8 round 3, D-26; round 4): the larger of the
+    // type scale's HEADER face (TAG's, millimetres per board; the P4_5 its own,
+    // 26) and Font_PanelHeader - so no board's bar ever shrinks.
+    static const lv_font_t* Font_Header;
 };

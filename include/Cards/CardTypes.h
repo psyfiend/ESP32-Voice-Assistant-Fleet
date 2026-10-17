@@ -427,6 +427,14 @@ struct CardPlacement {
 // VAR_AUTO is the default and resolves at build time by measuring. A build
 // sheet can pin either variant when it disagrees.
 // ---------------------------------------------------------------------------
+// An "on" state drawn on a card's edge (2.8 round 4; Card::activeFrame()).
+// Compound names per CLAUDE.md's macro hazard.
+enum class CardFrame : uint8_t {
+    FRAME_NONE = 0,   // the edge restyle() gives
+    FRAME_BRACKET,    // heavy top and bottom bars, light falling inward from them
+    FRAME_CORNER,     // a frame, the top-right and bottom-left corners cut at 45 degrees
+};
+
 enum class CardVariant : uint8_t {
     VAR_AUTO = 0,
     VAR_FULL,
@@ -444,6 +452,12 @@ enum class CardVariant : uint8_t {
 #endif
 
 const char *cardStateName(CardState s);
-const char *cardVariantName(CardVariant v);
+const char *cardVariantName(CardVariant v);   // "auto", "full", "compact": also how it is saved
+inline bool cardVariantFromName(const char *n, CardVariant &out) {
+    if (!n) return false;
+    for (uint8_t i = 0; i < 3; i++)
+        if (!strcmp(n, cardVariantName((CardVariant)i))) { out = (CardVariant)i; return true; }
+    return false;
+}
 
 #endif // CARD_TYPES_H
