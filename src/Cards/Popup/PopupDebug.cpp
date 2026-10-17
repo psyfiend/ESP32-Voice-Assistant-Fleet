@@ -126,7 +126,8 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int alarmIn = -1; // 2.8 round 3: a pretend next alarm N minutes from now
                 int tweaks = -1;  // 2.8 round 3: UI Tweaks, 1 open (GUIManager's hook), 0 close
                 int sensorErr = -1; // 2.8 round 3 (T10): the header's sensor shown failed, 1; as it is, 0
-                int cardState = -2; // 2.8 round 4: the cards' active state 0-4, not saved; -1 the owner's
+                int cardState = -2; // 2.8 round 4: the cards' active state 0-3, not saved; -1 the owner's
+                int32_t active = -1;// 2.8 round 6: the active colour, RRGGBB, not saved; 0 the scheme's own
                 bool close = false, power = false, more = false, hist = false, mem = false; };
 bool (*s_drawerHook)(bool open) = nullptr;
 const char *(*s_headerHook)(const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn) = nullptr;
@@ -196,6 +197,8 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "tweaks", v, sizeof(v)) == ESP_OK) a.tweaks = atoi(v);
         if (httpd_query_key_value(q, "sensorerr", v, sizeof(v)) == ESP_OK) a.sensorErr = atoi(v);
         if (httpd_query_key_value(q, "cardstate", v, sizeof(v)) == ESP_OK) a.cardState = atoi(v);
+        if (httpd_query_key_value(q, "active", v, sizeof(v)) == ESP_OK)
+            a.active = (int32_t)(strtoul(v[0] == '#' ? v + 1 : v, nullptr, 16) & 0xFFFFFF);
         // rows=N: test rows for SETTINGS, from the next window built (a byte
         // the LVGL thread reads; nothing else to hand over).
         if (httpd_query_key_value(q, "rows", v, sizeof(v)) == ESP_OK) {
@@ -268,12 +271,14 @@ void CardPopup::debugService(lv_timer_t *t) {
     }
     // 2.8 round 3: UI Tweaks, a Sheet client of GUIManager's (UI/TweaksSheet.h);
     // the header's sensor shown failed (T10). Both through the header hook.
-    if (a.tweaks >= 0 || a.sensorErr >= 0 || a.cardState > -2) {
-        char cs[8];
-        snprintf(cs, sizeof(cs), "cs%d", a.cardState);
+    if (a.tweaks >= 0 || a.sensorErr >= 0 || a.cardState > -2 || a.active >= 0) {
+        char cs[12];
+        if (a.active >= 0) snprintf(cs, sizeof(cs), "act%06lX", (unsigned long)a.active);
+        else               snprintf(cs, sizeof(cs), "cs%d", a.cardState);
         if (a.tweaks == 0) { TweaksSheet::close(); dbgOut("tweaks: closing\n"); }
         else {
-            const char *what = a.tweaks > 0 ? "tweaks" : a.cardState > -2 ? cs : a.sensorErr ? "sensorerr" : "sensorok";
+            const char *what = a.tweaks > 0 ? "tweaks" : (a.cardState > -2 || a.active >= 0) ? cs
+                             : a.sensorErr ? "sensorerr" : "sensorok";
             dbgOut("%s\n", s_headerHook ? s_headerHook(what, -1, -1, -2, -1) : "no header hook (GUIManager gives it)");
         }
         s_dreq.store(DREQ_DONE);

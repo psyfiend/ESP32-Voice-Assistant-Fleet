@@ -6,6 +6,15 @@
 namespace Kit {
 
 namespace {
+// UNLIT IS SATIN (owner, round 6): flat, a chip "just looks like a void on the
+// window" on the dark schemes and a white pill lost in it on Linen, where
+// satin's edge is a shade. Lit keeps its role's tint and accent ring.
+void chipFinish(lv_obj_t *b, bool on) {
+    if (on) { unfinish(b); return; }
+    const UIShape &k = UI::shape();
+    finish(b, lv_obj_get_style_width(b, LV_PART_MAIN), UI::mm(k.H_CHIP), UI::mm(k.R_CHIP), Finish::FINISH_SATIN);
+}
+
 lv_obj_t *chipAt(lv_obj_t *line, const char *word, int32_t cw, bool on, lv_event_cb_t cb, uintptr_t ud) {
     lv_obj_t *b = plain(line);
     lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
@@ -17,6 +26,7 @@ lv_obj_t *chipAt(lv_obj_t *line, const char *word, int32_t cw, bool on, lv_event
     lv_obj_t *l = label(b, on ? KitStyle::KS_LABEL_TAG_ACCENT : KitStyle::KS_LABEL_TAG);
     lv_label_set_text(l, word ? word : "");
     lv_obj_center(l);
+    chipFinish(b, on);
     return b;
 }
 }  // namespace
@@ -110,10 +120,11 @@ void chipTableLit(lv_obj_t *table, uint8_t row, uint8_t lit) {
     if (!line) return;
     for (uint32_t i = 1; i < lv_obj_get_child_count(line); i++) {   // child 0: the row's name
         lv_obj_t *b = lv_obj_get_child(line, (int32_t)i);
-        lv_obj_t *l = lv_obj_get_child(b, 0);
+        lv_obj_t *l = labelIn(b);   // after the face and its veil, on a satin chip
         const bool on = (i - 1) == lit;
         lv_obj_remove_style(b, style(on ? KitStyle::KS_CHIP_UNLIT : KitStyle::KS_CHIP_LIT), 0);
         add(b, on ? KitStyle::KS_CHIP_LIT : KitStyle::KS_CHIP_UNLIT);
+        chipFinish(b, on);
         if (l) {
             lv_obj_remove_style(l, style(on ? KitStyle::KS_LABEL_TAG : KitStyle::KS_LABEL_TAG_ACCENT), 0);
             add(l, on ? KitStyle::KS_LABEL_TAG_ACCENT : KitStyle::KS_LABEL_TAG);

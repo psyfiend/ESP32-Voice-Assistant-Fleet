@@ -102,8 +102,12 @@ struct UIMetrics {
     uint8_t ACTIVE_EDGE;    // 2   the bracket's sides
     uint8_t BRACKET_W;      // 6   the bracket's top and bottom bars
     uint8_t GLOW_DEPTH;     // 18  how far the light reaches in from a lit edge
-    uint8_t GLOW_OPA;       // 115 its strength at the edge (0-255), fading to nothing
+    uint8_t GLOW_OPA;       // 115 its strength at the edge (0-255), fading to nothing (Linen 150)
     uint8_t CUT_PCT;        // 24  the corner cut's chamfer, % of the card's height
+    // ...and the way a light scheme makes them loud (round 6): DARKER, where a
+    // dark one makes them brighter - the frame's edge this % of the way from
+    // the active colour to the scheme's text, the light inward half that.
+    uint8_t ACTIVE_INK;     // 0 (dark schemes), 35 (Linen)
 };
 
 // ---------------------------------------------------------------------------
@@ -373,6 +377,10 @@ void cycleScheme();
 uint8_t schemeIndex();
 void    setSchemeIndex(uint8_t i);
 void setAccent(uint32_t hex);
+// The active colour ("on") in place of the scheme's, until the scheme changes;
+// 0 puts the scheme's own back. For trying colours on glass (round 6,
+// /popup?active=) - the caller restyles the cards.
+void setActiveColour(uint32_t hex);
 void setTargetCardWidth(uint16_t logicalPx);
 
 // The OTHER grid knob, and the one that was missing.

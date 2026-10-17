@@ -42,7 +42,49 @@ void animate(Drawer &d, int32_t to) {
     if (to == 0) lv_anim_set_completed_cb(&a, closedCb);
     lv_anim_start       (&a);
 }
+
+// Every drawer made (the system panel's and the slots'), for the bar's shadow.
+constexpr uint8_t DRAWERS_MAX = 4;
+Drawer *s_drawers[DRAWERS_MAX] = {};
+uint8_t s_drawerN = 0;
 }  // namespace
+
+// THE BAR'S SHADOW, NOT ON AN OPEN PANEL (owner, round 6: on Linen "the drop
+// shadow line under the header stays in view where the slot opens up"). The
+// bar is drawn over the panels - it covers their top edge - so its shadow lay
+// across the top of an open one, under the open slot, where the panel pours
+// out of the bar. Its DRAW_MAIN_END - right after the shadow, and the last
+// event whose clip reaches past the bar (LVGL 9.5 clips DRAW_POST to an
+// object's own area) - paints each open panel's face back over it,
+// inside the panel's walls: the face's top padding (DRAWER_PAD) is deeper than
+// the shadow reaches, so only plain face is ever covered. Short of its bottom
+// corners, so a panel still opening keeps its edge. Nothing on a scheme
+// without a shadow.
+void drawerCoverBarShadow(lv_event_t *e) {
+    lv_obj_t *bar = lv_event_get_current_target_obj(e);
+    const int32_t sw = lv_obj_get_style_shadow_width(bar, LV_PART_MAIN);
+    if (sw <= 0 || lv_obj_get_style_shadow_opa(bar, LV_PART_MAIN) == LV_OPA_TRANSP) return;
+    const int32_t reach = sw / 2 + lv_obj_get_style_shadow_offset_y(bar, LV_PART_MAIN) +
+                          lv_obj_get_style_shadow_spread(bar, LV_PART_MAIN) + 1;
+    lv_area_t b;
+    lv_obj_get_coords(bar, &b);
+    lv_layer_t *layer = lv_event_get_layer(e);
+    for (uint8_t i = 0; i < s_drawerN; i++) {
+        const Drawer &d = *s_drawers[i];
+        if (!d.root || !d.face || lv_obj_has_flag(d.root, LV_OBJ_FLAG_HIDDEN)) continue;
+        lv_area_t r;
+        lv_obj_get_coords(d.root, &r);
+        const int32_t wall = lv_obj_get_style_border_width(d.face, LV_PART_MAIN);
+        const lv_area_t a = { r.x1 + wall, b.y2 + 1, r.x2 - wall,
+                              LV_MIN(b.y2 + reach, r.y2 - UI::sc(UI::hdr().DRAWER_R)) };
+        if (a.x1 > a.x2 || a.y1 > a.y2) continue;
+        lv_draw_rect_dsc_t dsc;
+        lv_draw_rect_dsc_init(&dsc);
+        dsc.bg_color = lv_obj_get_style_bg_color(d.face, LV_PART_MAIN);
+        dsc.bg_opa   = LV_OPA_COVER;
+        lv_draw_rect(layer, &dsc, &a);
+    }
+}
 
 // The system panel's width rule (Panel_System::init: half a wide screen, three
 // quarters of a middling one, all of a narrow one), capped at DRAWER_W: a
@@ -82,6 +124,9 @@ void coveAt(lv_obj_t *j, int32_t edgeX, bool right, int32_t barH) {
 }
 
 void drawer(Drawer &d, lv_obj_t *parent, int32_t w) {
+    bool known = false;
+    for (uint8_t i = 0; i < s_drawerN; i++) known |= s_drawers[i] == &d;
+    if (!known && s_drawerN < DRAWERS_MAX) s_drawers[s_drawerN++] = &d;
     d.w = w;
     d.root = plain(parent);
     add(d.root, KitStyle::KS_DRAWER);

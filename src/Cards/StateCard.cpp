@@ -281,14 +281,13 @@ void StateCard::render() {
     }
 
     // --- The active frame (owner, 2.8 rounds 4-5): "on" on the card's edge --
-    // The frame modes light the icon and name as LIGHT_ICON does (above); the
-    // corner cut is the bracket on a scheme with a shadow (Linen), where its
-    // cut corners would leave the shadow behind.
+    // The frame modes light the icon and name as LIGHT_ICON does (above). The
+    // corner cut on Linen too since round 6: it draws its own shadow along the
+    // cuts (CardFrame.cpp), where the card's square one used to be left behind.
     CardFrame frame = CardFrame::FRAME_NONE;
     if (isOn && !chrome) {
         if (s_fill == StateCardFill::FRAME_BRACKET) frame = CardFrame::FRAME_BRACKET;
-        if (s_fill == StateCardFill::FRAME_CORNER)  frame = UI::met().SHADOW ? CardFrame::FRAME_BRACKET
-                                                                             : CardFrame::FRAME_CORNER;
+        if (s_fill == StateCardFill::FRAME_CORNER)  frame = CardFrame::FRAME_CORNER;
     }
     activeFrame(frame, p.ST_ACTIVE);
 

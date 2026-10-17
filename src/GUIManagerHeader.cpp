@@ -205,6 +205,15 @@ const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHd
         snprintf(out, sizeof(out), "card state %d (not saved)", n);
         return out;
     }
+    // /popup?active=RRGGBB (round 6): the active colour on glass, NOT saved -
+    // the screenshots' colours are not the panel's (Linen's olive, D-31);
+    // active=0 the scheme's own again, as a scheme change also brings back.
+    if (!strncmp(slotName, "act", 3)) {
+        UI::setActiveColour(strtoul(slotName + 3, nullptr, 16));
+        _binder.restyleAll();   // render() reads it; the frames are drawn
+        snprintf(out, sizeof(out), "active colour %06lX (not saved)", (unsigned long)UI::pal().ST_ACTIVE);
+        return out;
+    }
     // /popup?sensorerr=1|0 (T10): the header's sensor shown failed, RAM only.
     if (!strcmp(slotName, "sensorerr") || !strcmp(slotName, "sensorok")) {
         _header.pretendSensorError(slotName[6] == 'e');

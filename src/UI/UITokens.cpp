@@ -78,6 +78,14 @@
 // The panels disagree with the screenshots: on WS_P4_5 the glass looked much
 // lighter and warmer than /screenshot of the same frame. Judge these on glass
 // (#82 is the 7B's cool cast; the P4_5 may need the same look).
+//
+// 2.8 round 6, 2026-10-17: COPPER, for the owner to judge on glass with the
+// active frames - "olive ... looks ok at best", and the frames need something
+// "more striking and contrasting, but that also fits with the rest of the
+// scheme". Against the card: olive 2.4:1, burnt amber 2.4, terracotta 2.9,
+// copper 3.7. Copper is the accent's hue (A8561C, lighter), so "on" and
+// "chosen" share it on Linen; the frames' shapes now say "on" as well.
+// /popup?active=RRGGBB tries the others without a build.
 const UIPalette UI_PAL_LINEN = {
     .name        = "Linen",
     .GROUND      = 0xCFC4B2,
@@ -87,7 +95,7 @@ const UIPalette UI_PAL_LINEN = {
     .TEXT_DIM    = 0x6E6459,
     .ACCENT      = 0xA8561C,   // copper
     .BORDER      = 0,
-    .ST_ACTIVE   = 0x9AA35A,   // olive
+    .ST_ACTIVE   = 0xB8662E,   // copper (round 6; olive 9AA35A before)
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
     .SCRIM       = SCRIM_DARK,
@@ -153,7 +161,8 @@ const UIPalette UI_PAL_MIDNIGHT = {
 const UIMetrics UI_MET_DARK  = {
     .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 0, .HEADER_H = 14,
     .SHADOW_Y = 0, .SHADOW_OPA = 0,
-    .ACTIVE_RING = 3, .ACTIVE_EDGE = 2, .BRACKET_W = 6, .GLOW_DEPTH = 18, .GLOW_OPA = 115, .CUT_PCT = 24
+    .ACTIVE_RING = 3, .ACTIVE_EDGE = 2, .BRACKET_W = 6, .GLOW_DEPTH = 18, .GLOW_OPA = 115, .CUT_PCT = 24,
+    .ACTIVE_INK = 0
 };
 // Linen's. A 2 px border, darker than the old hairline (the owner: "make it a
 // bit darker and increase by 1 or 2px", knobs included - the drawer's buttons
@@ -164,10 +173,17 @@ const UIMetrics UI_MET_DARK  = {
 // DARKER, not wider. A short blur, a small drop, a firm edge - the first try
 // (12 px blur at 30%) read as fuzz rather than depth. Border darker again
 // ("a bit darker than it is or expand it 1 more pixel" - darker was chosen).
+//
+// 2.8 round 6, the active frames: on the dark schemes they glow; on Linen they
+// were "not nearly as standout obvious", every card already having a shadow
+// against the floor. So here they go DARKER and stronger: the edge a third of
+// the way to the text, the light inward stronger (the owner: "go in the
+// opposite direction and have the encroaching brackets be darker").
 const UIMetrics UI_MET_LIGHT = {
     .RADIUS = 12, .PAD = 5, .BORDER_W = 2, .BORDER_OPA_PCT = 34, .SHADOW = 6, .HEADER_H = 14,
     .SHADOW_Y = 3, .SHADOW_OPA = 140,
-    .ACTIVE_RING = 3, .ACTIVE_EDGE = 2, .BRACKET_W = 6, .GLOW_DEPTH = 18, .GLOW_OPA = 115, .CUT_PCT = 24
+    .ACTIVE_RING = 3, .ACTIVE_EDGE = 2, .BRACKET_W = 6, .GLOW_DEPTH = 18, .GLOW_OPA = 150, .CUT_PCT = 24,
+    .ACTIVE_INK = 35
 };
 
 // The card window's shape and spacing, in millimetres (2.12 P2, the header's
@@ -508,6 +524,11 @@ void setAccent(uint32_t hex) {
     s_pal.ACCENT = hex;
     refreshPaints();
     if (s_onChange) s_onChange();
+}
+
+void setActiveColour(uint32_t hex) {
+    s_pal.ST_ACTIVE = hex ? hex : SCHEMES[schemeIndex()].pal->ST_ACTIVE;
+    refreshPaints();
 }
 
 void setTargetCardWidth(uint16_t logicalPx) {

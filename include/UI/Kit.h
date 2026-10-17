@@ -146,6 +146,7 @@ uint32_t  facesFlat();            // how many came out flat (a debug readout)
 // (Power while on; a toggle is glass while off).
 enum class Finish : uint8_t { FINISH_SATIN, FINISH_GLASS, FINISH_LIT };
 void     finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tint = 0);
+void     unfinish(lv_obj_t *o);   // the face put away, the object's own background back (a chip lit)
 uint32_t satinBase();             // the scheme's satin, between its two surfaces
 uint32_t litInk();                // words and icons on lit glass: the scheme's darkest, warmed
 // A colour that reads on glass: pushed toward the scheme's far end until it
@@ -424,6 +425,10 @@ void    drawerPlace(Drawer &d, int32_t centreX, int32_t top);
 // Open: its side walls rise straight to the bar's line (round 4: no flares).
 void    drawerOpen(Drawer &d);
 void    drawerClose(Drawer &d, bool animate = true);
+// The bar's DRAW_MAIN_END (Kit::headerBar() hooks it): the bar is drawn over the
+// panels, so its drop shadow fell across an open panel's top, under the open
+// slot (owner, round 6, Linen). It paints each open panel's face back over it.
+void    drawerCoverBarShadow(lv_event_t *e);
 
 // ONE SHAPE (D-23): a join is a corner of the outline where it meets the bar's
 // accent line - a COVE beside an open slot's tab, in the bar (round 4: the

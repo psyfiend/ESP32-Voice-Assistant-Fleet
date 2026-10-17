@@ -285,7 +285,10 @@ static bool opaqueFace(FaceKind kind) { return kind == FaceKind::FACE_SATIN; }
 // null, and the caller paints flat.
 static const lv_image_dsc_t *face(int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t tint, int32_t band) {
     const UIPalette &p = UI::pal();
-    const uint32_t key = p.GROUND ^ (p.SURFACE << 1) ^ (p.TEXT << 2) ^ (p.SURFACE_ALT << 3);
+    // Lit glass's light is painted from ST_ACTIVE, which can change without the
+    // scheme (round 6's /popup?active=) - so its faces are keyed by it too.
+    const uint32_t key = p.GROUND ^ (p.SURFACE << 1) ^ (p.TEXT << 2) ^ (p.SURFACE_ALT << 3) ^
+                         (kind == FaceKind::FACE_LIT ? p.ST_ACTIVE << 4 : 0);
     FaceSlot *spare = nullptr;
     for (FaceSlot &f : s_faces) {
         if (f.buf && f.w == w && f.h == h && f.r == r && f.kind == kind && f.key == key && f.tint == tint &&
@@ -471,6 +474,15 @@ void finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tin
         lv_obj_move_to_index(veil, faceIn(o) ? 1 : 0);
         lv_obj_center(veil);
     }
+}
+
+// A chip lit (round 6: satin while unlit): its face hidden and the background
+// setFace() turned off given back, so its role's own colour shows again.
+void unfinish(lv_obj_t *o) {
+    if (!o) return;
+    if (lv_obj_t *img = faceIn(o)) lv_obj_add_flag(img, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_local_style_prop(o, LV_STYLE_BG_OPA,   0);
+    lv_obj_remove_local_style_prop(o, LV_STYLE_BG_COLOR, 0);
 }
 
 lv_obj_t *labelIn(lv_obj_t *o) {
