@@ -129,6 +129,8 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int sensorErr = -1; // 2.8 round 3 (T10): the header's sensor shown failed, 1; as it is, 0
                 int cardState = -2; // 2.8 round 4: the cards' active state 0-3, not saved; -1 the owner's
                 int32_t active = -1;// 2.8 round 6: the active colour, RRGGBB, not saved; 0 the scheme's own
+                int kbd = -1, kbMode = -1, kbPress = -1;   // 2.11 (K95): the keyboard
+                char kbType[24] = {};                      // ... words typed on it ('+' a space)
                 bool close = false, power = false, more = false, hist = false, mem = false; };
 bool (*s_drawerHook)(bool open) = nullptr;
 const char *(*s_headerHook)(const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn) = nullptr;
@@ -199,6 +201,11 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "tweaks", v, sizeof(v)) == ESP_OK) a.tweaks = atoi(v);
         if (httpd_query_key_value(q, "sensorerr", v, sizeof(v)) == ESP_OK) a.sensorErr = atoi(v);
         if (httpd_query_key_value(q, "cardstate", v, sizeof(v)) == ESP_OK) a.cardState = atoi(v);
+        if (httpd_query_key_value(q, "kbd", v, sizeof(v)) == ESP_OK) a.kbd = atoi(v);
+        if (httpd_query_key_value(q, "kbmode", v, sizeof(v)) == ESP_OK) a.kbMode = atoi(v);
+        if (httpd_query_key_value(q, "kbpress", v, sizeof(v)) == ESP_OK) a.kbPress = atoi(v);
+        if (httpd_query_key_value(q, "kbtype", a.kbType, sizeof(a.kbType)) == ESP_OK)
+            for (char *p = a.kbType; *p; p++) if (*p == '+') *p = ' ';
         if (httpd_query_key_value(q, "active", v, sizeof(v)) == ESP_OK)
             a.active = (int32_t)(strtoul(v[0] == '#' ? v + 1 : v, nullptr, 16) & 0xFFFFFF);
         // rows=N: test rows for SETTINGS, from the next window built (a byte
@@ -321,6 +328,25 @@ void CardPopup::debugService(lv_timer_t *t) {
         dbgOut("lv_mem used %lu free %lu biggest %lu frag %u; window %s\n",
                (unsigned long)(m.total_size - m.free_size), (unsigned long)m.free_size,
                (unsigned long)m.free_biggest_size, (unsigned)m.frag_pct, isOpen() ? "open" : "closed");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    // 2.11 (K95): the keyboard. kbd=1 opens it as the window's Rename does (a
+    // cluster) or Entity label's Custom (a card); kbd=2 as Card label's Custom.
+    // kbtype= words as the keys type them, kbmode= 0 lower, 1 upper, 2 symbols,
+    // kbpress= 1 Save, 2 Cancel, 3 the field emptied (before kbtype=).
+    if (a.kbd > 0 || a.kbType[0] || a.kbMode >= 0 || a.kbPress > 0) {
+        if (a.kbd > 0) {
+            if (!isOpen())                     dbgOut("no window open\n");
+            else if (s.cluster && a.kbd == 1)  clusterRename();
+            else                               cardUiTypeWords(a.kbd == 1);
+        }
+        if ((a.kbType[0] || a.kbMode >= 0 || a.kbPress > 0) && !Kit::keyboardDebug(a.kbType, a.kbMode, a.kbPress))
+            dbgOut("no keyboard showing\n");
+        lv_mem_monitor_t m;
+        lv_mem_monitor(&m);
+        dbgOut("keyboard %s; lv_mem used %lu\n", Kit::keyboardShowing() ? "showing" : "gone",
+               (unsigned long)(m.total_size - m.free_size));
         s_dreq.store(DREQ_DONE);
         return;
     }

@@ -60,6 +60,8 @@ static void fill() {
                p.SURFACE, UI::mix(p.SURFACE, p.TEXT, 30), p.TEXT);
     fillButton(S::KS_BTN_DESTRUCTIVE, S::KS_BTN_DESTRUCTIVE_PRESSED, S::KS_BTN_DESTRUCTIVE_INK,
                p.ST_BAD, p.ST_BAD, p.SURFACE);
+    fillButton(S::KS_BTN_CONFIRM, S::KS_BTN_CONFIRM_PRESSED, S::KS_BTN_CONFIRM_INK,
+               p.ACCENT, p.ACCENT, UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT));
 
     // --- The dialog ---
     lv_style_t *dim = st(S::KS_DIALOG_DIM);
@@ -82,6 +84,49 @@ static void fill() {
     lv_style_t *drow = st(S::KS_DIALOG_ROW);
     flex(drow, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_style_set_pad_top(drow, UI::mm(k.S4));
+
+    // --- The keyboard (2.11, K95): a dialog's box with the accent for its edge,
+    // a field like a dropdown's, keys like the window's satin surfaces ---
+    lv_style_t *kbox = st(S::KS_KBD_BOX);
+    lv_style_set_radius      (kbox, UI::sc(UI::met().RADIUS));
+    lv_style_set_bg_opa      (kbox, LV_OPA_COVER);
+    lv_style_set_bg_color    (kbox, UI::c(p.SURFACE_ALT));
+    lv_style_set_border_width(kbox, LV_MAX(2, UI::mm(k.LINE_HEAVY)));
+    lv_style_set_border_color(kbox, UI::c(p.ACCENT));
+    lv_style_set_pad_all     (kbox, UI::mm(k.S7));
+    lv_style_set_pad_row     (kbox, UI::mm(k.S5));
+    flex(kbox, LV_FLEX_FLOW_COLUMN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    lv_style_t *field = st(S::KS_FIELD);
+    text(S::KS_FIELD, t.NAME, p.TEXT);
+    lv_style_set_bg_opa      (field, LV_OPA_COVER);
+    lv_style_set_bg_color    (field, UI::c(p.SURFACE));
+    lv_style_set_radius      (field, UI::mm(k.R_CONTROL));
+    lv_style_set_border_width(field, LV_MAX(1, UI::mm(k.LINE_MID)));
+    lv_style_set_border_color(field, UI::c(p.ACCENT));
+    lv_style_set_pad_hor     (field, UI::mm(k.S5));
+    lv_style_set_pad_ver     (field, UI::mm(k.S3));
+    // A cursor that stays lit: a blink redraws the field twice a second for nothing.
+    lv_style_t *cur = st(S::KS_FIELD_CURSOR);
+    lv_style_set_border_side (cur, LV_BORDER_SIDE_LEFT);
+    lv_style_set_border_width(cur, LV_MAX(2, UI::mm(k.LINE_HEAVY)));
+    lv_style_set_border_color(cur, UI::c(p.ACCENT));
+    lv_style_set_pad_left    (cur, -1);
+    lv_style_set_anim_duration(cur, 0);
+
+    lv_style_t *kb = st(S::KS_KBD);
+    lv_style_set_bg_opa    (kb, LV_OPA_COVER);
+    lv_style_set_bg_color  (kb, UI::c(p.SURFACE_ALT));
+    lv_style_set_pad_all   (kb, UI::mm(k.KEY_GAP));
+    lv_style_set_pad_row   (kb, UI::mm(k.KEY_GAP));
+    lv_style_set_pad_column(kb, UI::mm(k.KEY_GAP));
+    lv_style_t *key = st(S::KS_KEY);
+    text(S::KS_KEY, t.NAME, p.TEXT);
+    lv_style_set_bg_opa (key, LV_OPA_COVER);
+    lv_style_set_bg_color(key, UI::c(p.SURFACE));
+    lv_style_set_radius (key, UI::mm(k.R_CONTROL));
+    lv_style_set_bg_color(st(S::KS_KEY_CTRL),    UI::c(UI::mix(p.SURFACE, p.TEXT, 12)));
+    lv_style_set_bg_color(st(S::KS_KEY_PRESSED), UI::c(UI::mix(p.SURFACE, p.ACCENT, 45)));
 
     // --- Rows ---
     const int32_t ctlH = controlH();

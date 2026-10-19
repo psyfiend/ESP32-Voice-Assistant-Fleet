@@ -32,6 +32,7 @@ enum class KitStyle : uint8_t {
     // Buttons: a face (MAIN), its pressed tint (MAIN | PRESSED), its ink (the label).
     KS_BTN_CANCEL, KS_BTN_CANCEL_PRESSED, KS_BTN_CANCEL_INK,
     KS_BTN_DESTRUCTIVE, KS_BTN_DESTRUCTIVE_PRESSED, KS_BTN_DESTRUCTIVE_INK,
+    KS_BTN_CONFIRM, KS_BTN_CONFIRM_PRESSED, KS_BTN_CONFIRM_INK,
     // The dialog: the dim behind it, a destructive question's box (its edge in
     // ST_BAD), its words, and the row its buttons stand in.
     KS_DIALOG_DIM, KS_DIALOG_BOX_DESTRUCTIVE, KS_DIALOG_BODY, KS_DIALOG_ROW,
@@ -96,6 +97,11 @@ enum class KitStyle : uint8_t {
     // entity label.
     KS_CLUSTER_HDR, KS_CLUSTER_TITLE, KS_CLUSTER_SWATCH, KS_CLUSTER_VALUE,
     KS_TILE, KS_TILE_PRESSED, KS_TILE_NAME,
+    // THE KEYBOARD (2.11, K95): the box over it (what the words are for, the
+    // field, the buttons), the field and its cursor, the keys' ground, a key,
+    // a key that does something other than type (shift, the modes, the arrows,
+    // backspace: LVGL marks them CHECKED), any key pressed.
+    KS_KBD_BOX, KS_FIELD, KS_FIELD_CURSOR, KS_KBD, KS_KEY, KS_KEY_CTRL, KS_KEY_PRESSED,
     KS_COUNT
 };
 
@@ -136,8 +142,9 @@ void    haloDraw(lv_layer_t *layer, const lv_area_t &a, int32_t radius, const lv
 
 // --- Buttons ------------------------------------------------------------------
 // A button with words: CANCEL is the quiet way out, DESTRUCTIVE the one that
-// removes something (the scheme's ST_BAD).
-enum class ButtonRole : uint8_t { BTN_CANCEL, BTN_DESTRUCTIVE };
+// removes something (the scheme's ST_BAD), CONFIRM the one that keeps what was
+// done (the accent: the keyboard's Save).
+enum class ButtonRole : uint8_t { BTN_CANCEL, BTN_DESTRUCTIVE, BTN_CONFIRM };
 
 // `w` x `h` px, the words centred; `cb` on LV_EVENT_CLICKED, with no user data.
 lv_obj_t *button(lv_obj_t *parent, ButtonRole role, const char *text, int32_t w, int32_t h,
@@ -390,6 +397,36 @@ struct DialogSpec {
 
 // Returns the dim, which holds everything: deleting it closes the dialog.
 lv_obj_t *dialog(const DialogSpec &spec);
+
+// --- The on-screen keyboard (KitKeyboard.cpp, 2.11, K95) ----------------------------
+// Words typed on the glass - a name. Over everything on the top layer, the rest
+// dimmed: a box holding what the words are for, the field and Cancel / Save,
+// above a keyboard along the bottom of the screen. PLAIN ASCII ONLY - the
+// panels' fonts carry nothing else (CLAUDE.md): the keys offer nothing more and
+// the field takes nothing more. One line, at most `maxLen` characters. Save, or
+// the keyboard's tick or return, calls `save` with the words, trimmed of spaces
+// at the ends ("" when none are left: the caller's "back to the default"), and
+// closes it; Cancel, the keyboard's hide key or a tap on the dim closes it
+// without. One shows at a time; it goes with the sheet under it.
+struct KeyboardSpec {
+    const char *title;                          // what the words are for
+    const char *text;                           // what the field starts with (null: empty)
+    const char *hint;                           // a line under the field (null: none)
+    uint8_t     maxLen;                         // 1-63
+    void      (*save)(const char *text, void *user);
+    void       *user;
+};
+constexpr uint8_t KEYBOARD_TEXT_MAX = 63;
+
+lv_obj_t *keyboard(const KeyboardSpec &spec);   // the dim, which holds everything
+void      keyboardClose();                      // gone without saving (its sheet closed)
+bool      keyboardShowing();
+#ifdef DEBUG_POPUP
+// /popup's hands on it: type words as the keys would, change the keys' mode
+// (0 lower, 1 upper, 2 symbols), press Save (1) or Cancel (2), or empty the
+// field first (3). False: none showing.
+bool      keyboardDebug(const char *type, int mode, int press);
+#endif
 
 // --- The page header (KitHeader.cpp, 2.8) ----------------------------------------
 // The BAR: full width, the header's height, the scheme's raised surface with its

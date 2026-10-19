@@ -62,13 +62,13 @@ colour worked out at the call; `Kit::label(parent, role)` takes a shared look in
 
 ![The Remove dialog's two buttons](components/dialog.png)
 
-A plain object with words, its look by role: **CANCEL** (the surface, a faint edge) and
-**DESTRUCTIVE** (`ST_BAD`, the words in the surface colour). Radius `R_CONTROL`, edge `LINE_MID`,
-pressed: 20% of `TEXT` mixed in. The words are the role's ink (`NAME`).
+A plain object with words, its look by role: **CANCEL** (the surface, a faint edge),
+**DESTRUCTIVE** (`ST_BAD`, the words in the surface colour) and **CONFIRM** (2.11: the accent, the
+words in its contrast - the keyboard's Save, its first user). Radius `R_CONTROL`, edge `LINE_MID`,
+pressed: 20% of `TEXT` mixed in. The words are the role's ink (`NAME`). Satin, tinted by its role.
 
-The brief listed PRIMARY and QUIET too. No button in the house is either today - the row button is
-a row control (below), a scene is a pill - so they wait for their first user rather than ship
-untested.
+The brief listed QUIET too. No button in the house is one today - the row button is a row control
+(below), a scene is a pill - so it waits for its first user rather than ship untested.
 
 ### Dialog - `Kit::dialog(spec)`
 
@@ -80,6 +80,25 @@ box's edge in `ST_BAD`, `LINE_HEAVY`). The box: the scheme's card radius, `SURFA
 it, `S7` between and beside them (#96). `countdown` in the spec shows the countdown of the sheet
 under it, on the box's bottom edge, for a dialog that closes with that sheet (#23). "Remove card"
 (K66, K69) is its first client.
+
+### Keyboard - `Kit::keyboard(spec)` (2.11, K95)
+
+![The keyboard over a cluster's window, on the P4_5](../followups/211_r3_keyboard_p45.png)
+
+Words typed on the glass - a name. On the top layer over everything, the rest dimmed as a dialog's:
+a box (`KS_KBD_BOX`: a dialog's box, its edge the accent) holding what the words are for, the field
+(`KS_FIELD`, one line, `NAME`, an accent edge; its cursor `KS_FIELD_CURSOR` stays lit - a blink
+redraws the field twice a second for nothing) and Cancel / Save, centred in what the keys leave;
+LVGL's keyboard along the bottom (`KS_KBD`, keys `KS_KEY` - the surface, `R_CONTROL`; the keys that
+do something other than type, which LVGL marks CHECKED, `KS_KEY_CTRL`; any key pressed
+`KS_KEY_PRESSED`, the accent). Four rows `KEY_H` 7 mm tall, `KEY_GAP` 1 mm between and round them:
+a phone's keys, under the touch minimum - four rows of 9 mm took 62% of the P4_5's height.
+**Plain ASCII only**: LVGL's keys are all in it and the field refuses anything else, newlines
+included. Save, the tick or return hands the words over trimmed (`""` - the caller's default
+again); Cancel, the hide key or a tap on the dim leaves. `hint` is the field's placeholder: what the
+words are when there are none. It shows the countdown of the sheet under it and goes with that sheet
+(`Kit::sheetClose()`), unsaved. ~7 KB of `lv_mem` while it shows. First clients: a cluster's Rename,
+and Card UI's Custom chips (Entity label: the card's name; Card label: its words).
 
 ### Chip row - `Kit::chipRow(parent, words, n, lit, room, cb)`
 

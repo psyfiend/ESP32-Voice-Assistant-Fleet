@@ -2,14 +2,15 @@
 // layout): the main view of a cluster's window (a long press on its header,
 // K107). Two parts:
 //
-//   HEADER   Style - the page's, Swatch or Bar (K102); Sensor icons - the
+//   HEADER   Name - its own words, typed on the keyboard (K95); Style - the
+//            page's, Swatch or Bar (K102); Sensor icons - the
 //            header's values with their icons or without; Header slots - a view
 //            of the members, each ticked into the header or not (K104's Slots).
 //   MEMBERS  each member's name and Visible: a tile in the cluster or not
 //            (hidden is not removed, K92 rule 8). Add cards at the foot comes
 //            with the card list (greyed until then).
 //
-// Kept under the cluster's id (cl_style, cl_icons, slots) and each member's
+// Kept under the cluster's id (label_text, cl_style, cl_icons, slots) and each member's
 // (hidden) - the settings file's entries agreed in K106 - written when the
 // window closes, as SETTINGS' rows are; the page is built again once it has
 // gone, so what the cluster shows follows. Every state shown is read from the
@@ -145,6 +146,38 @@ void iconsCb(lv_event_t *ev) {
     changed();
 }
 
+// RENAME (K95): its own words on the keyboard - the header's name, in the
+// group's colour (K46 rename a); none, and it is its group's name again.
+void renamed(const char *words, void *) {
+    ClusterCard *cl = held();
+    if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN) return;
+    CardGroups::Group g;
+    const bool groups = CardGroups::ofCard(*cl, g) && !strcmp(words, g.name);   // its group's: none of its own
+    Settings::setCard(cl->id(), "label_text", (words[0] && !groups) ? words : nullptr);
+    CardGroups::apply(*cl, cl->pageAreaColor());
+    snprintf(s.area, sizeof(s.area), "%s", cl->area());
+    snprintf(s.name, sizeof(s.name), "%s", cl->area()[0] ? cl->area() : cl->shownName(CardLabel::LBL_NAME));
+    changed();
+    rebuildView();   // the title says it at once; the cluster when the window closes
+}
+
+void renameCb(lv_event_t *ev) {
+    (void)ev;
+    ClusterCard *cl = held();
+    if (!cl || !cl->hasId()) return;
+    static char own[40], dflt[48];
+    if (!Settings::card(cl->id(), "label_text", own, sizeof(own))) own[0] = '\0';
+    CardGroups::Group g;
+    snprintf(dflt, sizeof(dflt), "%s", CardGroups::ofCard(*cl, g) ? g.name : cl->shownName(CardLabel::LBL_NAME));
+    Kit::KeyboardSpec k = {};
+    k.title  = "Name this cluster";
+    k.text   = own[0] ? own : dflt;
+    k.hint   = dflt;           // shown when the field is empty: what it is called then
+    k.maxLen = sizeof(own) - 1;
+    k.save   = renamed;
+    Kit::keyboard(k);
+}
+
 void slotsViewCb(lv_event_t *ev) {
     (void)ev;
     lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_CLUSTER_SLOTS); },
@@ -225,11 +258,12 @@ void buildCluster() {
     lv_obj_t *r = Kit::row(list, "Style", true);
     Kit::chipRow(r, STYLE_W, 3, style, listW() / 2, styleCb);
     s_cbIcons = nullptr;
-    const DeckRowSpec hdr[2] = {
+    const DeckRowSpec hdr[3] = {
+        { "Name",         Kit::RowKind::ROW_BUTTON, "Rename", 0,               true, renameCb,    nullptr },
         { "Sensor icons", Kit::RowKind::ROW_CHECK,  nullptr,  (uint16_t)icons, true, iconsCb,     &s_cbIcons },
         { "Header slots", Kit::RowKind::ROW_BUTTON, "Choose", 0,               true, slotsViewCb, nullptr },
     };
-    Kit::rows(list, hdr, 2);
+    Kit::rows(list, hdr, 3);
 
     title(list, "MEMBERS");
     DeckRowSpec rows[GROUP_MEMBERS_MAX + 1];
@@ -265,6 +299,8 @@ void buildClusterSlots() {
                     (uint16_t)inList(idOf(cl->memberAt(i)), ids, nIds), true, slotCb, &s_cbSlot[i] };
     Kit::rows(list, rows, n);
 }
+
+void clusterRename() { renameCb(nullptr); }
 
 bool clusterTakeRebuild() {
     const bool r = s_rebuildPage;

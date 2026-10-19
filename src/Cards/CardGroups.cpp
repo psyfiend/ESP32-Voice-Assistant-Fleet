@@ -375,7 +375,7 @@ void setLabelSource(Card &c, LabelSource ls, bool areaColor) {
         case LS_CUSTOM:
             if (none) Settings::setCard(c.id(), "group", nullptr);
             apply(c, areaColor);
-            // Its own words: the ones it shows now, kept (a rename follows later).
+            // Its own words: the ones it shows now, kept (Card UI then opens the keyboard on them, K95).
             if (!Settings::card(c.id(), "label_text", v, sizeof(v)))
                 Settings::setCard(c.id(), "label_text", c.area());
             break;

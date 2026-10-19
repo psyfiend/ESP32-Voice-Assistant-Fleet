@@ -301,6 +301,7 @@ the window already had - the harness found no pixel changed on three boards.
 | The hero (`pm()`) | `P_GAP` 4.0, `P_STACK_GAP` 3.0, `P_GRIP_INSET` 1.4, `P_GRIP_H` 0.5, `P_GRIP_MIN` 5.0, `P_MARK_H` 2.6, `P_MARK_LINE` 0.35, `P_SCENE_H` 9.0, `P_SCENE_GAP` 1.4, `P_SCENE_PAD` 2.4 |
 | A cluster (2.11, K89-K103; the "2.11 Clusters" mock's) | `C_HDR_H` 5.2 its header row, `C_PAD` 1.1 inside its frame, `C_TILE_GAP` 0.8 between mini tiles, `C_SWATCH_W` 1.1 / `C_SWATCH_H` 2.4 the group's swatch, `C_VALUE_GAP` 1.3 between header values, `C_TILE_MIN` 7.5 the least a tile is each way ("tight", K103) |
 | Floating (D-35, "Panel Edges") | `HALO` 5.0 the halo round a header slot's panel and every window, `LINE_FADE` 2.5 the bar's line fading out before an open panel's walls |
+| The keyboard (2.11, K95) | `KEY_H` 7.0 a key's height (a phone's, under the touch minimum), `KEY_GAP` 1.0 between keys and round them |
 
 The spacing literals clustered into ten steps from 0.6 to 5.0 mm. Several tokens share a value
 (`R_CONTROL` and `R_PANEL`; `H_CONTROL`, `H_CHIP`, `H_TABS` and `W_SIDE_MIN`): they are different

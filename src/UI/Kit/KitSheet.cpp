@@ -472,6 +472,7 @@ static void closeAsync(void *p) {
     if (!S->win) return;
     const SheetSpec *spec = S->spec;
     if (spec && spec->closing) spec->closing();
+    keyboardClose();   // words being typed for the window go with it, unsaved
     if (S->timer) { lv_timer_delete(S->timer); S->timer = nullptr; }
     sparksEnd();
     sheetSideEnd(*S);

@@ -289,6 +289,7 @@ order.
 | `/popup?glyphs=0\|1\|2\|3` | 2.8: the header's glyphs bare, in a rounded square, in a circle - **not saved** (a capture leaves the owner's choice); `3` the saved style again. UI |
 | `/popup?pagehdr=0\|1` | 2.8: this page's header hidden / shown - **Saved**, as the page slot's panel and Hide Bar save it (`pages.<slug>.header`; shown is the default and is stored as nothing) |
 | `/popup?removecard=3` | the Remove card dialog over any card's window, to look at; its Remove does nothing to a compiled card; `close=1` takes it down |
+| `/popup?kbd=1\|2` | 2.11 (K95): the keyboard over the open window - `1` as a cluster's Rename, or a card's Entity label Custom (its name); `2` as Card label's Custom (the card label's words). Then `kbtype=<words>` types them (`+` a space), `kbmode=0\|1\|2` shows the lower / upper / symbol keys, `kbpress=3` empties the field, `kbpress=2` Cancel. Replies with LVGL's pool. UI (`kbpress=1` saves: below) |
 
 ### Settings for the next windows (each **RAM**)
 
@@ -309,6 +310,7 @@ order.
 | `/popup?addcard=1` | "Add card to dashboard" in a member's own view (K17) | a new card entry after its group card |
 | `/popup?removecard=2` | Remove card's dialog on a card added on the device | removed only if Remove is tapped |
 | `/popup?removecard=1` | Remove card, confirmed, on a card added on the device - no dialog | the card, removed (kept in the file's pool) |
+| `/popup?kbpress=1` | the keyboard's Save (2.11, K95) | what it was opened for: a cluster's `label_text` (none: its group's name), a card's `name`, or its card label's `label_text` - when the window closes |
 
 ### **Device** - these command real lights and scenes
 

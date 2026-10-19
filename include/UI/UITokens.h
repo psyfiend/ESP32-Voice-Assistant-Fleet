@@ -213,6 +213,11 @@ struct UIShape {
     float HALO;         // 5.0  the halo round a header slot's panel and every window: black at
                         //      their edge, clear this far out
     float LINE_FADE;    // 2.5  the bar's accent line fading out before an open panel's walls
+
+    // --- The on-screen keyboard (2.11, K95): Kit::keyboard() ---
+    float KEY_H;        // 7.0  a key's height - a phone's, under the touch minimum: four rows
+                        //      of 9 mm took 62 % of the P4_5's height, leaving the field no room
+    float KEY_GAP;      // 1.0  between keys, and round them
 };
 
 // ---------------------------------------------------------------------------

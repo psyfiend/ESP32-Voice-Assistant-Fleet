@@ -408,11 +408,13 @@ void buildCardUi();
 void cardWindowLook(const Card &c, Kit::SheetSpec &k);   // its timeout, bar and selector, before it is built
 void cardUiCb(lv_event_t *ev);                           // SETTINGS' Card UI row
 bool cardUiTakeRebuild();                                // a choice wants the page built again
+void cardUiTypeWords(bool name);                         // the keyboard: the card's name, or its card label's words (K95)
 
 // PopupCluster.cpp (2.11, K104)
 void buildCluster();
 void buildClusterSlots();
 bool clusterTakeRebuild();   // a choice wants the page built again, once the window has gone
+void clusterRename();        // the keyboard on the cluster's name, as Rename opens it (K95)
 
 // PopupHistory.cpp
 void histKeep(const char *key, const char *value);

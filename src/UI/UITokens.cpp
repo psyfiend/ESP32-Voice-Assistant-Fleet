@@ -209,6 +209,7 @@ const UIShape UI_SHAPE = {
     .C_HDR_H = 5.2f, .C_PAD = 1.1f, .C_TILE_GAP = 0.8f, .C_SWATCH_W = 1.1f, .C_SWATCH_H = 2.4f,
     .C_VALUE_GAP = 1.3f, .C_TILE_MIN = 7.5f,
     .HALO = 5.0f, .LINE_FADE = 2.5f,
+    .KEY_H = 7.0f, .KEY_GAP = 1.0f,
 };
 
 // The page header's slots (2.8). GLYPH, DOT_*, SLOT_GAP and LINE are the

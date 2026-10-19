@@ -123,6 +123,11 @@ public:
     //   /popup?about=1|0    "About this board" open or closed (2.12 P4)
     //   /popup?drawer=1|0   the system panel open or closed, as a tap on the
     //                       header's icon (#97: the harness's look at it)
+    //   /popup?kbd=1|2      the keyboard (2.11, K95) over the open window: 1 as a
+    //                       cluster's Rename or Entity label's Custom, 2 as Card
+    //                       label's Custom; kbtype=<words> types them ('+' a
+    //                       space), kbmode=0|1|2 lower / upper / symbols,
+    //                       kbpress=1 Save, 2 Cancel, 3 empty the field first
     // The handler hands the work to the LVGL thread and waits for it, as
     // /screenshot does - it never touches LVGL itself.
     static void beginDebug(class HttpServer &http);

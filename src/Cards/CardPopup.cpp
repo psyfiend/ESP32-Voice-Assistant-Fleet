@@ -433,6 +433,8 @@ void CardPopup::open(Card &card) {
     s.lightCtl = firstCtl(lightAggregate().caps);   // D3: open on the control
     snprintf(s.area, sizeof(s.area), "%s", card._area);
     snprintf(s.name, sizeof(s.name), "%s", card.label());
+    // A cluster is called what its header says: its own words, else its group's.
+    if (s.cluster && s.area[0]) snprintf(s.name, sizeof(s.name), "%s", s.area);
 
     // --- Where the window goes: the sheet's place (Kit::sheetPlace()) -------
     // Under the system header, over the panels' tabs, up to twice as wide as
