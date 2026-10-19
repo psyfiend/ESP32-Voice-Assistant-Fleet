@@ -136,3 +136,75 @@ the page is next built - swipe away and back):
 ## Your results
 
 (to come)
+
+# Round 2 (2026-10-19, morning, built unattended) - the arranger
+
+The same branch, on round 1. Flashed to the P4_5 and the 4B (settings saved first); the 1060 keeps
+round 1 (flashed once, for D-34). Design: `layout-engines.md` "As prototyped" and "As built"; K105.
+
+## What changed
+
+| Where | Before | Now |
+|---|---|---|
+| **Where blocks go** | the flow engine: each card or cluster at the first free place, reading order | **the arranger - Layout Playground v5, as prototyped** (K105): every tiling of the board's grid and its neighbours (a row or column either way), the cheapest page by the playground's weights - **an empty cell costs 60**, a cluster with too much room, a long thin cluster, a block out of reading order, leaving the board's grid, single cards drifting from today's size |
+| **The P4_5's House page** | 5 x 3 with three cells empty at the bottom right (round 1) | **5 x 3 with none empty**: the three clusters three cells wide, the doors and the four cards around them |
+| **The 4B's** | 4 x 3, full | the same 4 x 3 - it was already the cheapest |
+| **When it runs** | - | **when a page's blocks change, and the answer kept** (K105) - in the settings file, `pages.<slug>.layout`, with a fingerprint of what it was arranged for (the blocks, the page's room, the weights). A build that matches uses it at once; one that does not is built as before while the arranger runs **on a task of its own**, and the page is built again when its answer is kept - so the screen never waits. Your next boot uses the kept answer straight away |
+| **How long** | - | **P4_5: 150,031 steps, 414 ms** (one neighbouring grid hits the playground's 150,000-step cap); **4B: 57 steps, 1 ms**. No S3 to time (the S3_4B is locked, #69); it compiles |
+| **The Fleet page** | flowed | still flowed: the arranger finds no page for its 16 cards on the board's grid or its neighbours at the playground's cell sizes (`/popup` says so). A smaller `mincell` would let it try |
+| **Your Col / Row** (UI Tweaks) | obeyed | still obeyed: the arranger uses that grid (the other count the board's) |
+
+![The P4_5, arranged](../followups/211_r2_house_p45.png)
+
+## Tuning from the PC
+
+Each is kept in the settings file (`system.arranger`); the page is arranged again when next built -
+swipe away and back. Empty `v` puts the playground's default back.
+
+    curl "http://fleet-ws-p4-5/settings?arranger=hole&v=40"
+    curl "http://fleet-ws-p4-5/settings?arranger=hole&v="
+    curl "http://fleet-ws-p4-5/settings?arranger=off&v=1"
+    curl "http://fleet-ws-p4-5/settings?arranger=off&v="
+    curl "http://fleet-ws-p4-5/popup"
+
+The weights, in plain words: **hole** (60) what an empty cell costs - lower lets the arranger leave
+cells empty rather than stretch a cluster; **comfy** (1.6) how roomy a cluster's tiles may be before
+it pays for spare room; **loose** (25) what that spare room costs, by its square - so two clusters a
+cell bigger each cost less than one two cells bigger; **long** (40) what a long thin cluster (beyond
+1.8 : 1) costs; **order** (4) what moving a block ahead of an earlier one costs; **away** (6) what
+each row or column away from the board's own grid costs. The sizes (mm): **maxcell** 34 and
+**mincell** 14 a grid cell's size; **tilew** 12 x **tileh** 9 the smallest tile the arranger plans
+for; **hdr** 5 a cluster's header. `/popup`'s second line says what the last run did and how this
+page was placed. **off** = 1 lets every page flow as in round 1, to compare.
+
+## Tests for you
+
+| # | Do this | PASS if |
+|---|---|---|
+| A1 | Look at the House page on the P4_5 | no empty cell; the three clusters three cells wide; nothing overlaps |
+| A2 | Reboot the P4_5 (the reset button) | the House page comes up arranged at once - no flowed page first |
+| A3 | `arranger=off&v=1`, swipe away and back; then `off&v=` | round 1's flowed page; then the arranged page again, at once (its answer is kept) |
+| A4 | `arranger=hole&v=40`, swipe away and back; then `hole&v=` | the page may change once the new answer is ready (a moment after the swipe back); then back |
+| A5 | Office as a card (round 1's T10), swipe away and back | the page is arranged again for the new blocks, a moment after it is built |
+| A6 | The 4B | its House page as before, full |
+
+## Choices that were mine
+
+- **A cluster always counts one member in its header** for the arranger, so it never gets a single
+  headerless cell - one-cell clusters (K103, sensors only) are round 4's, and not drawn yet.
+- **The page is built first and arranged after** when there is no kept answer, rather than waiting
+  for the arranger: a first boot, or a change, shows the flowed page for under half a second.
+- **Every page of up to 24 blocks** is arranged; a page the arranger finds no page for flows, and
+  it is not tried again until its blocks or the weights change.
+- **The arranger's own weights stay the playground's** - nothing tuned yet; that is yours on glass.
+
+## Results (mine, before you)
+
+- **Host tests**: 52, all PASS - `test_arranger`'s nine: the playground's answers for its House
+  blocks on its seven boards (P4_5 5 x 2, 7B 5 x 3, both 4Bs 4 x 3, the 4880 5 x 2 and 2 x 5, none
+  for the 3248), every grid, place and score to 1e-5; the same answer twice; a fixed grid obeyed.
+- On the boards: as above - the kept answer is used after a reboot on both.
+
+## Your results
+
+(to come)

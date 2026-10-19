@@ -158,6 +158,29 @@ esp_err_t handleSettings(httpd_req_t *req) {
     }
 
     char id[CARD_ID_ARG], name[200];   // a cluster's slots: up to four card ids
+    // THE ARRANGER'S WEIGHTS AND SIZES (2.11 round 2, K105), tuned from a PC:
+    // arranger=<hole|comfy|loose|long|order|away|maxcell|mincell|tilew|tileh|hdr>
+    // &v=<number> (empty: the playground's default). A page is arranged again
+    // when it is next built.
+    if (haveQ && httpd_query_key_value(q, "arranger", id, sizeof(id)) == ESP_OK &&
+        httpd_query_key_value(q, "v", name, sizeof(name)) == ESP_OK) {
+        static const char *const W[] = { "hole", "comfy", "loose", "long", "order", "away",
+                                         "maxcell", "mincell", "tilew", "tileh", "hdr", "off" };
+        bool known = false;
+        for (const char *w : W) known = known || !strcmp(w, id);
+        char out[160];
+        int n;
+        if (!known) {
+            n = snprintf(out, sizeof(out), "refused: arranger=hole|comfy|loose|long|order|away|maxcell|mincell|tilew|tileh|hdr|off\n");
+        } else {
+            Settings::setSystem("arranger", id, name[0] ? name : nullptr);
+            Settings::save();
+            n = snprintf(out, sizeof(out), "arranger %s: %s - pages are arranged again when next built\n",
+                         id, name[0] ? name : "the default");
+        }
+        httpd_resp_set_type(req, "text/plain");
+        return httpd_resp_send(req, out, n);
+    }
     // A PAGE'S CLUSTERS' HEADER STYLE (2.11, K102), until the glass sets it:
     // page=<slug>&cl_style=swatch|bar (empty: the dashboard's).
     if (haveQ && httpd_query_key_value(q, "page", id, sizeof(id)) == ESP_OK &&

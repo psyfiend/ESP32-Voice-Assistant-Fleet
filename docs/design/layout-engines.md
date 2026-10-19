@@ -83,6 +83,32 @@ packing, each cluster in turn grabbing what is beside it. Version 5, in the arti
   glass"): the weights are adjustable from the PC, and the playground stays the place to see what
   each one does.
 
+### As built (2.11 round 2, 2026-10-19)
+
+- **`Layout::arrange()`** (`include/Layout/Arranger.h`, `src/Layout/Arranger.cpp`): a line-for-line
+  port of the playground's `arrangeV5()` - doubles, the same loops and tie-breaks. **Its host tests
+  are the playground's own answers** (`host-tests/test_arranger`: the playground's House blocks on
+  its seven boards, run with node on its code): every grid, place and score matches.
+- **Run when a page's blocks change, and kept** (`Cards/PageArranger`): a page's blocks are its
+  cards and clusters (a cluster's tiles, header members and members). Its answer is kept in the
+  settings file - `pages.<slug>.layout`: `v1 <fingerprint> <cols>x<rows>` and each block's
+  `c,r,w,h,one` - the fingerprint covering the blocks and their card ids, the page's room, the
+  weights and sizes. A build whose fingerprint matches places every block from it (pinned, on its
+  grid); one that does not flows as before and starts the arranger **on a task of its own**
+  (priority 1, core 0), and the page is built again once the answer is kept. The screen never waits.
+- **Timed** (K105): the P4_5's House page (9 blocks: two door cards, three clusters, four cards) -
+  **150,031 steps in 414 ms** (one neighbouring grid hits the 150,000-step cap; 5 x 3, no empty
+  cell); the 4B's - **57 steps, 1 ms** (4 x 3). No S3 is on the desk to time (the S3_4B is locked,
+  #69); it compiles. A page the arranger finds no page for flows (the Fleet page's 16 cards, at the
+  playground's cell sizes), and is not tried again until its blocks or the weights change; so do
+  pages of more than 24 blocks.
+- **The page's grid**: the board's own (`UI::grid()`) and its neighbours; the page's own columns or
+  rows when set in UI Tweaks (obeyed, the other the board's). A cluster always counts one header
+  member, so it is never given a single headerless cell (K103's one-cell clusters are round 4's).
+- **Tuning from the PC**: `/settings?arranger=<hole|comfy|loose|long|order|away|maxcell|mincell|
+  tilew|tileh|hdr>&v=<number>` (empty: the playground's default) - the next build arranges again.
+  What the last run did: the System Doctor's page report, and `/popup`'s first lines.
+
 ## The domain weight map
 
 Which cards earn space: a weight per card - its domain's (climate and media heavier than a lone

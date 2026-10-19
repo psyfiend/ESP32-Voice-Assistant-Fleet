@@ -97,6 +97,7 @@ away and back. A card's id is shown in its window: SETTINGS > Entity properties 
 | `?card=<group card>&cl_icons=off` | the header's values without their icons (K104's "Show sensor icons") | empty: icons shown |
 | `?card=<member>&hidden=yes\|no` | a member's tile hidden or shown in its cluster (K104's Visible) | empty: the default - a tile unless it is in the header |
 | `?page=<slug>&cl_style=swatch\|bar` | the clusters' header style on that page (K102) | empty: the dashboard's (Swatch) |
+| `?arranger=<weight>&v=<number>` | one of the arranger's weights or sizes (2.11 round 2, K105): `hole`, `comfy`, `loose`, `long`, `order`, `away` (the playground's weights), `maxcell`, `mincell`, `tilew`, `tileh`, `hdr` (its sizes, mm); `off` = 1 lets every page flow as before 2.11, to compare. Saved under `system.arranger`; each page is arranged again when next built, and its answer kept in `pages.<slug>.layout` | an unknown name is refused; empty `v`: the playground's default |
 | `?group=new&name=<Name>` | a new custom group; answers its id | 1-39 characters of ASCII |
 | `?group=<id>&color=RRGGBB` | a group's colour | six hex digits; empty: back to its colour by name |
 | `?group=<id>&name=<Name>` | rename a group (every card in it; an HA area keeps its link) | empty: its own name again |

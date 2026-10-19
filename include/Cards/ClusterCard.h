@@ -49,6 +49,7 @@ public:
 
     uint8_t memberCount() const { return _n; }
     uint8_t tileCount() const;
+    uint8_t headerCount() const;   // the members in its header
     Card   *memberAt(uint8_t i) const { return i < _n ? _m[i] : nullptr; }
 
     bool owns(const char *entityId) const override;

@@ -8,6 +8,7 @@
 #include "Cards/PageSpec.h"
 #include "EntityRegistry.h"
 #include "Layout/Layout.h"
+#include "Cards/PageArranger.h"   // the arranger's kept answers (2.11 round 2)
 
 // ---------------------------------------------------------------------------
 // CardPage - a grid of cards, rendered from a PageSpec.
@@ -124,6 +125,16 @@ private:
     // of its members, or - when it cannot fit, or the owner chose it - its card.
     Card *makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, uint8_t i);
     Card *makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg);
+
+    // THE ARRANGER (2.11 round 2, K105): the page's blocks - its cards and
+    // clusters - placed by the arranger's kept answer for exactly these blocks:
+    // its grid and each block's cells, pinned. With no such answer the page
+    // flows as before and the arranger is started in the background
+    // (PageArranger.h); GUIManager builds the page again once its answer is kept.
+    void arrangePage(const PageSpec &spec);
+    void useCols(uint8_t cellCols);
+    bool    _arranged = false;
+    uint8_t _arrCols = 0, _arrRows = 0;
 
     // The whole layout decision: the cards as Layout items, placed by the flow
     // engine - plain arithmetic with no LVGL, tested off the board (host-tests/).

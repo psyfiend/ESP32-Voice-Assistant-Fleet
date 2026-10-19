@@ -166,7 +166,7 @@ void CardPage::useRows(uint8_t cellRows) {
     // as tall as the screen. It does NOT apply when a row count was demanded -
     // there the tall card is what was asked for, and quietly refusing to give
     // it would make the button feel broken in exactly the way the old one did.
-    if (!_rowsOverride) {
+    if (!_rowsOverride && !_arranged) {   // the arranger chose its rows for the whole height
         const int32_t capH = ((int32_t)UI::grid().cellW * UI::grid().ASPECT_PCT) / 100;
         if (capH > 0 && cellH > capH) cellH = capH;
     }
@@ -275,7 +275,12 @@ void CardPage::commit() {
     // Spend as few rows as the cards need, and only add more when placement
     // genuinely cannot fit them. Dropping cards is the LAST resort, after the
     // page has already grown to every row it could carry.
-    if (_rowsOverride) {
+    if (_arranged) {
+        // THE ARRANGER'S PAGE (2.11 round 2): its grid, every block pinned.
+        useCols(_arrCols);
+        useRows(_arrRows);
+        plan();
+    } else if (_rowsOverride) {
         // OBEYED, not negotiated. The caller asked for this many rows; cards
         // that do not fit are dropped by priority, which is the whole point of
         // asking. The only clamp is the descriptor's own size.
@@ -395,7 +400,79 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
         if (c) add(c);
     }
 
+    arrangePage(spec);
     commit();
+}
+
+void CardPage::arrangePage(const PageSpec &spec) {
+    _arranged = false;
+    if (!spec.slug || !_n) return;
+    if (_n > Layout::ARR_BLOCKS_MAX) { PageArranger::flowed(spec.slug, "more blocks than the arranger takes"); return; }
+    char off[4];   // system.arranger.off = 1: every page flows, as before 2.11 (to compare)
+    if (Settings::system("arranger", "off", off, sizeof(off)) && off[0] == '1') {
+        PageArranger::flowed(spec.slug, "the arranger is off");
+        return;
+    }
+    PageArranger::Input in;
+    in.slug = spec.slug;
+    Layout::ArrScreen &s = in.scr;
+    s.pmm  = (double)bspPixelDensity() / 25.4;
+    s.aw   = _availW;
+    s.ah   = _availH;
+    s.gap  = _gap;
+    s.tagH = Card::headerHeight();
+    const UIGrid &g = UI::grid();
+    s.recCols = g.cols;
+    s.recRows = g.rows;
+    // The page's own columns or rows (UI Tweaks): obeyed, the other the board's.
+    if (g.COLS_OVERRIDE || _rowsOverride) {
+        s.fixCols = g.COLS_OVERRIDE ? g.COLS_OVERRIDE : g.cols;
+        s.fixRows = _rowsOverride ? _rowsOverride : g.rows;
+    }
+    for (uint8_t i = 0; i < _n; i++) {
+        Card *c = _cards[i];
+        if (!c) return;
+        Layout::ArrBlock &b = in.blocks[in.n];
+        b = Layout::ArrBlock();
+        if (!strcmp(c->typeName(), "cluster")) {
+            const ClusterCard *cl = static_cast<const ClusterCard *>(c);
+            b.cluster = true;
+            b.tiles   = cl->tileCount();
+            // A cluster with a header always (one in a single cell, headerless,
+            // is K103's - sensors only - and not drawn yet).
+            b.hdr     = (uint8_t)LV_MAX(1, cl->headerCount());
+            b.members = cl->memberCount();
+        } else {
+            b.members = 1;
+        }
+        in.ids[in.n] = c->id();
+        in.n++;
+    }
+    Layout::ArrResult r;
+    if (!PageArranger::kept(in, r)) { PageArranger::start(in); return; }
+    for (uint8_t i = 0; i < _n; i++) {
+        CardPlacement p = _cards[i]->placement();
+        p.col = (int8_t)(r.pos[i].c * _sub);
+        p.row = (int8_t)(r.pos[i].r * _sub);
+        p.prefSpanX = p.minSpanX = (uint8_t)(r.pos[i].w * _sub);
+        p.prefSpanY = p.minSpanY = (uint8_t)(r.pos[i].h * _sub);
+        _cards[i]->setPlacement(p);
+    }
+    _arranged = true;
+    _arrCols = r.cols;
+    _arrRows = r.rows;
+    Serial.printf("[Arranger] %s: the kept answer, %ux%u\n", spec.slug, (unsigned)r.cols, (unsigned)r.rows);
+}
+
+// The page's columns, from the arranger's grid (begin() took the board's).
+void CardPage::useCols(uint8_t cellCols) {
+    uint16_t uc = (uint16_t)cellCols * _sub;
+    if (uc < 1) uc = 1;
+    if (uc > PAGE_MAX_UNIT_COLS) uc = PAGE_MAX_UNIT_COLS;
+    _uCols = (uint8_t)uc;
+    for (uint8_t i = 0; i < _uCols; i++) _colDsc[i] = LV_GRID_FR(1);
+    _colDsc[_uCols] = LV_GRID_TEMPLATE_LAST;
+    lv_obj_set_grid_dsc_array(_root, _colDsc, _rowDsc);
 }
 
 // One card from its spec, configured and with the owner's saved choices laid
@@ -618,9 +695,10 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
 // ---------------------------------------------------------------------------
 
 void CardPage::report() const {
-    SystemReport::line("  Page: %ux%u units (subdivision %u), %u of %u cards placed",
+    SystemReport::line("  Page: %ux%u units (subdivision %u), %u of %u cards placed%s",
                        (unsigned)_uCols, (unsigned)_uRows, (unsigned)_sub,
-                       (unsigned)_placed, (unsigned)_n);
+                       (unsigned)_placed, (unsigned)_n, _arranged ? ", by the arranger" : "");
+    SystemReport::line("  Arranger: %s", PageArranger::lastText());
     for (uint8_t i = 0; i < _n; i++) {
         const Card *c = _cards[i];
         if (!c) continue;

@@ -1475,12 +1475,11 @@ void GUIManager::tick() {
 #ifdef HAS_AUDIO_HW
     _pnlAudio.tick();
 #endif
-    // K17: a card added or removed shows once no card window is open (the
-    // window holds the page's cards); an added card whose entity was learnt
-    // after the page was built shows once the table has grown.
+    // K17: a card added or removed shows once no card window is open (the window holds the
+    // page's cards); one whose entity was learnt late, once the table has grown; the arranger's answer once kept.
     if (!CardPopup::isOpen()) {
         const bool learnt = s_addedWaiting && _core.entities().count() != s_regCountAtBuild;
-        if (CardAdded::takeChanged() || learnt || CardPopup::takeRebuildWanted()) rebuildDashboard();
+        if (CardAdded::takeChanged() || learnt || CardPopup::takeRebuildWanted() || PageArranger::takeDone()) rebuildDashboard();
     }
     // Renders a waiting screenshot request, on this - the LVGL - thread.
     Screenshot::service();

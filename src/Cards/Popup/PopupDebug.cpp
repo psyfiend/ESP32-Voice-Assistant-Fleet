@@ -3,6 +3,7 @@
 #include "PopupState.h"
 #include "UI/AboutSheet.h"   // the Sheet's second client (2.12 P4)
 #include "UI/TweaksSheet.h"  // and UI Tweaks (2.8 round 3)
+#include "Cards/PageArranger.h"   // the arranger's last run, in the card list (2.11 round 2)
 
 namespace popup {
 
@@ -630,6 +631,7 @@ void CardPopup::debugService(lv_timer_t *t) {
         dbgOut("%s; window %s; scheme %u, selector %d (-1: the scheme's own); faces flat so far %lu\n", mem,
                isOpen() ? "open" : "closed", (unsigned)UI::schemeIndex(), (int)chosenLook(),
                (unsigned long)Kit::facesFlat());
+        dbgOut("arranger: %s\n", PageArranger::lastText());   // 2.11 round 2
         for (int i = 0; i < n; i++) {
             Card *c = cardOf(cards[i]);
             if (c) dbgOut("%2d  %-16s %-12s %u entit%s\n", i, c->label(), c->_area,

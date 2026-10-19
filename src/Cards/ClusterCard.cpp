@@ -60,6 +60,12 @@ uint8_t ClusterCard::tileCount() const {
     return n;
 }
 
+uint8_t ClusterCard::headerCount() const {
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < _n; i++) if (_slotOf[i] >= 0) n++;
+    return n;
+}
+
 int32_t ClusterCard::chromeW() { return 2 * UI::met().BORDER_W + 2 * pad(); }
 int32_t ClusterCard::chromeH() { return 2 * UI::met().BORDER_W + tilesTop() + pad(); }
 
