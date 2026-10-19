@@ -285,3 +285,25 @@ the bar now paints each open panel's face back over it (`Kit::drawerCoverBarShad
 `DRAW_MAIN_END` - LVGL 9.5 clips `DRAW_POST` to the object). The rest of rounds 5-7 was the cards
 (D-31 to D-33: chip tables, the active frames, Linen's terracotta). Signed off 2026-10-17 and merged
 as `v0.2.18`; the sheet is `archive/TEST_2.8.md`.
+
+## 15. After 2.8: the panel lies on the bar (2026-10-19, D-35; built in 2.11 round 1)
+
+The owner, on the joined look: the rounded corners where the panel rejoined the bar's line did not
+please him, and his answer was the other way round -
+
+> "Place the rounded corners on the inner corners of the panel at the top ... and then ... insert a
+> very small horizontal 'fade-to-black' section so that the header bar accent lines outside the
+> panel don't actually contact the panel ... This will drive home the illusion that the panel has
+> opened up on top of the header bar. Actually ... can we extend this border all the way around the
+> opened panel? So that it appears to be floating disconnected above whatever is underneath it?"
+
+Mocked on the "Panel Edges" artifact (`https://claude.ai/artifact/U8wGGgPEWHpgKNvZ2miYMu`), and
+chosen there ("loved it"): **Edges + halo** - the slot and its panel stay one outline (D-23), the
+panel's top corners rounded toward its middle; the bar's accent line **fades to clear over 2.5 mm**
+and stops short of the walls; a **halo 5 mm wide at full strength** all round the slot and panel,
+black against them fading out. **Every window gets the same halo** (the card window, About, UI
+Tweaks); the dim stays out - its cost was measured in 2.10a (one full-screen redraw to open and one
+to close: P4_5 ~85 ms, 4B ~52 ms). To build: LVGL's own shadow (spread 0) on the panel and on the
+Sheet, measured with `/bench` against today; if a window-sized shadow costs too much (Linen's
+shadows cost +35%, `display-stack.md` §8.2), the ring becomes painted images, as the corner cut's
+shadow did (D-33).

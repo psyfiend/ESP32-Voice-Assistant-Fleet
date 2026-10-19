@@ -66,16 +66,22 @@ packing, each cluster in turn grabbing what is beside it. Version 5, in the arti
   in each of its shapes, or leave it empty - every tiling, blocks kept near their list order. Branch
   and bound: a branch stops once it costs more than the best page so far, counting each block left
   at its cheapest shape and the cells that must stay empty.
-- **Cost** (each a knob): an empty cell 40; a cluster's room beyond comfortable (1.6x the smallest
+- **Cost** (each a knob): an empty cell 60 (the owner's, K105 - 40 when first published); a cluster's room beyond comfortable (1.6x the smallest
   tiles' area) charged by its square, 25 x excess^2 - so spare room spreads over clusters; a long
   cluster (beyond 1.8 : 1) 40 x the log excess squared; a block placed ahead of earlier ones 4 each;
   each row or column away from the board's grid 6; single cards 10 x how far the cell drifts from
   today's ~20 mm card.
 - **Deterministic**; no stability term yet (each page is arranged afresh).
 - **Cost to compute: the open problem for the port.** In the browser the P4_5's House page takes
-  ~300,000 steps (~45 ms); a page with much spare room hits the 150,000-step cap per grid. #78's PASS
-  is under 5 ms on an S3. Candidates: arrange only when the page changes and keep the result by card
-  id (as above), a time budget, a stronger bound.
+  ~300,000 steps (~45 ms) - **on the owner's PC, in JavaScript**; C++ on the P4 is expected to be
+  several times slower, an S3 slower again, so hundreds of milliseconds are possible until it is
+  measured. A page with much spare room hits the 150,000-step cap per grid. #78's PASS is under 5 ms
+  on an S3. **Decided (K105)**: build it as prototyped; arrange when a page's blocks change and keep
+  the result (by card id, as above), never on every page build (D-9 rebuilds pages on arrival); time
+  it on the P4_5 and an S3 first. Then, if needed: a time budget, a stronger bound, fewer shapes.
+- **Tuning happens on glass** (the owner: "this is going to require a lot of experimental tuning on
+  glass"): the weights are adjustable from the PC, and the playground stays the place to see what
+  each one does.
 
 ## The domain weight map
 

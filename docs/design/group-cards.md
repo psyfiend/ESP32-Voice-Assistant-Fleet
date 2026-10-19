@@ -451,15 +451,18 @@ owner** - a structural choice a turn before it is built (W7) - then branches off
   header the page header's slots and planner (K101, K102, one line). Placed by today's
   `FlowEngine`, the cluster's span derived from its member count - the arranger comes later. Built
   from a dashboard spec first (the House page's Office, Kitchen, Outside), saved settings after.
-  D-34 (the 7" header words) rides along.
+  Riding along: D-34 (the 7" header words) and **D-35 - the header panel lying on the bar and the
+  halo round every panel and window** (`header-slots.md` §15), each measured with `/bench` before
+  and after.
 - **Round 2 - what the glass edits.** The options view by location (K96), the cluster management
   screen (K104), Copy / Move (K100), the "which group?" dialog (K92 rule 9), the hidden-cards list.
 - **Round 3 - the rest of the group card.** The summary card (K98), count slots (K103), extending a
   source group (K93), group pages (K90, K99), the on-screen keyboard (K95).
-- **The arranger (#78)** after the owner has tuned Playground v5 - and only once its speed is
-  solved for the S3 (`layout-engines.md` "As prototyped"); host-tested before it draws.
-- **Panel edges and the window halo** when the owner has reacted to the "Panel Edges" mock;
-  measured with `/bench`.
+- **The arranger (#78), K105**: Playground v5's engine as prototyped, an empty cell at 60, as a
+  `Layout::Engine` with host tests (the playground's results for the same input are the expected
+  values); arranged when a page's blocks change and kept, never per page build; timed on the P4_5
+  and an S3 before the page relies on it; its weights adjustable from the PC so the owner can tune
+  on glass. Its own round once clusters exist - round 2 or 3, the building session's call.
 - **Still open, each to ask with a recommendation when its round comes:** §4 Q8 (how "back" works
   from a group opened as a page); the other half of Q6 (a long press on a cluster's header - Claude:
   the cluster's own window, its management screen inside); spreading spare room as margins on a page

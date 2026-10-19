@@ -73,11 +73,12 @@ not yet - bring each over when it is next changed (`ui-architecture.md` §6). 2.
    card (`group-cards.md` §6, K88-K104). **A fresh session builds 2.11** (the owner's suggestion, to
    start with a small context): **its first step is to put `group-cards.md` §7's round plan and the
    settings file's new entries to the owner**, then branch off `main` - round 1 is the cards onto the
-   kit and clusters on the page, with D-34 (the 7" header words). Still waiting on the owner, none
-   blocking round 1: the **"Panel Edges"** mock (his header-panel edges and a window halo, requests
-   from 2026-10-19 - not yet reacted to), tuning **Layout Playground v5** (the new arranger, #78;
-   the owner found the sliders hard to read - explain them in plain words when asking; its speed is
-   the port's open problem, `layout-engines.md` "As prototyped"), §4 Q8 and half of Q6 (§7). What 2.11 builds on: `layout-engines.md` (a cluster is a container inside an item),
+   kit and clusters on the page, with D-34 (the 7" header words) and D-35 (the header panel lying
+   on the bar, a halo round every panel and window - chosen on the "Panel Edges" mock). **The
+   arranger is built as prototyped** (K105: Playground v5, an empty cell at 60; arranged when a
+   page changes and kept, timed on the boards first - the playground's milliseconds are the owner's
+   PC; tuned on glass later, so explain each weight in plain words when asking). Still open, asked
+   in their rounds: §4 Q8 and half of Q6 (§7). What 2.11 builds on: `layout-engines.md` (a cluster is a container inside an item),
    `cards.md` §4 and §8, `header-slots.md` §10 (the planner of claims), K17 / K46.
 2. **#76, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a queue any
    task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to dismiss), a
