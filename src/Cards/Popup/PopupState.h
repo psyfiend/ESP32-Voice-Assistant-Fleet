@@ -419,8 +419,8 @@ void buildCluster();
 void buildClusterSlots();
 bool clusterTakeRebuild();   // a choice wants the page built again, once the window has gone
 void clusterRename();        // the keyboard on the cluster's name, as Rename opens it (K95)
-void buildClusterAdd();      // VIEW_CLUSTER_ADD: the page's cards to tick in, Copy or Move (K91)
-uint8_t clusterAddCards(uint32_t mask, bool move);   // ...the ticked ones in; the window closes
+void buildClusterAdd();      // VIEW_CLUSTER_ADD: the page's cards, each No / Copy / Move (K91)
+uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask);   // ...the picked ones in; the window closes
 
 // PopupHistory.cpp
 void histKeep(const char *key, const char *value);

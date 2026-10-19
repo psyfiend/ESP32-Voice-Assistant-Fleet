@@ -378,7 +378,7 @@ void CardPopup::debugService(lv_timer_t *t) {
     // Move, and Add. The window closes.
     if (a.addCards > 0) {
         if (!isOpen() || !s.cluster) dbgOut("no cluster's window open\n");
-        else if (const uint8_t n = clusterAddCards((uint32_t)a.addCards, a.mv != 0)) {
+        else if (const uint8_t n = clusterAddCards(a.mv ? 0u : (uint32_t)a.addCards, a.mv ? (uint32_t)a.addCards : 0u)) {
             dbgOut("%s %u\n", a.mv ? "moved" : "copied", (unsigned)n);
             s_dreq.store(DREQ_CLOSING);
             return;

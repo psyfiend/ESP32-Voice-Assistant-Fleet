@@ -37,23 +37,32 @@ ClusterCard *clusterOfTile() {
     return nullptr;
 }
 
-// The stage's whole height, so a short list starts at the top as the others do.
-lv_obj_t *column(const char *heading) {
-    lv_obj_t *list = plain(s.stage);
-    lv_obj_set_size(list, lv_area_get_width(&s.winRect) - 2 * s.pad, lv_pct(100));
-    lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
-    UI::tameScroll(list);
-    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(list, mm(UI::shape().S3), 0);
-    lv_label_set_text(Kit::label(list, KS::KS_PANEL_TITLE), heading);
-    return list;
+// THE VIEWS ARE CHIP TABLES (round 4, the owner: "look more like the Card UI or
+// UI Tweaks sheet"): choices as chip rows, actions as buttons below them.
+int32_t listW() { return lv_area_get_width(&s.winRect) - 2 * s.pad; }
+lv_obj_t *s_table = nullptr;
+
+lv_obj_t *table(const Kit::ChipRowSpec *rows, uint8_t n, lv_event_cb_t cb) {
+    s_table = Kit::chipTable(s.stage, listW(), rows, n, cb);
+    return s_table;
 }
 
 void note(lv_obj_t *list, const char *words) {
     lv_obj_t *l = Kit::label(list, KS::KS_LABEL_TAG_DIM);
     lv_obj_set_width(l, lv_pct(100));
+    lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     lv_label_set_text(l, words);
+}
+
+// Buttons, one to a row, one width - the longest words' - centred.
+struct Action { const char *words; Kit::ButtonRole role; lv_event_cb_t cb; };
+void actions(lv_obj_t *list, const Action *a, uint8_t n) {
+    const UIShape &k = UI::shape();
+    int32_t widest = 0;
+    for (uint8_t i = 0; i < n; i++) widest = LV_MAX(widest, Kit::textW(a[i].words, UI::type().NAME));
+    const int32_t bw = LV_MIN(listW(), widest + 2 * mm(k.S9));
+    for (uint8_t i = 0; i < n; i++) Kit::button(Kit::buttonRow(list), a[i].role, a[i].words, bw, Kit::controlH(), a[i].cb);
 }
 
 void hideTileCb(lv_event_t *) { lv_async_call([](void *) { visibilityHideTile(); }, nullptr); }
@@ -104,17 +113,20 @@ void addToCb(lv_event_t *) {
     lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_ADD_TO); }, nullptr);
 }
 
-void pickCb(lv_event_t *ev) {
-    s_pick = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
-    addToCb(ev);
+// Add to's chips: row 0 the cluster, row 1 Copy or Move.
+void addToChipCb(lv_event_t *ev) {
+    const uintptr_t v = (uintptr_t)lv_event_get_user_data(ev);
+    const uint8_t row = (uint8_t)(v >> 8), i = (uint8_t)(v & 0xFF);
+    Kit::chipTableLit(s_table, row, i);
+    if (row == 0) s_pick = i;
+    else          s_move = i == 1;
 }
 
-void moveCb(lv_event_t *ev) {
-    s_move = (uintptr_t)lv_event_get_user_data(ev) == 1;
-    addToCb(ev);
+void addCb(lv_event_t *) {
+    lv_async_call([](void *) {
+        if (!visibilityAddTo(s_pick, s_move)) UIToolkit::show_toast("It is in that cluster already");
+    }, nullptr);
 }
-
-void addCb(lv_event_t *) { lv_async_call([](void *) { visibilityAddTo(s_pick, s_move); }, nullptr); }
 
 // --- WHICH GROUP? (K92 rule 9; the mock's "Table's card joins which group?") ----------
 // A member made a card of its own joins a group: its group card's - chosen
@@ -124,10 +136,8 @@ const Entity *s_joinEntity = nullptr;
 constexpr uint8_t JOIN_MAX = 24;
 char          s_joinGid[JOIN_MAX][48];  // every group: the suggestions first
 char          s_joinName[JOIN_MAX][56];
-const char   *s_joinWords[3];
 uint8_t       s_nJoin = 0, s_nSuggest = 0, s_joinPick = 0;
-char          s_otherOpts[JOIN_MAX * 44];
-lv_obj_t     *s_otherDd = nullptr;
+const char *const JOIN_W[] = { "Join" };
 
 void joinAdd(const char *gid, const char *name) {
     if (s_nJoin >= JOIN_MAX || !gid[0]) return;
@@ -151,18 +161,14 @@ void joinCollect() {
     CardGroups::forEach([](const CardGroups::Group &gr, void *) { joinAdd(gr.id, gr.name); }, nullptr);
 }
 
+// A group's row: its one chip lit, the one before unlit (a row with one chip has
+// no second to light).
 void joinChipCb(lv_event_t *ev) {
-    const uint8_t k = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
-    if (k >= s_nSuggest) return;   // the other group chosen: it is that one already
-    s_joinPick = k;
-    lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_JOIN); }, nullptr);
-}
-
-void joinOtherCb(lv_event_t *ev) {
-    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
-    if (k == 0) return;                          // "-": a suggestion stays chosen
-    s_joinPick = (uint8_t)(s_nSuggest + k - 1);
-    lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_JOIN); }, nullptr);
+    const uint8_t row = (uint8_t)((uintptr_t)lv_event_get_user_data(ev) >> 8);
+    if (row >= s_nJoin) return;
+    Kit::chipTableLit(s_table, s_joinPick, 1);
+    Kit::chipTableLit(s_table, row, 0);
+    s_joinPick = row;
 }
 
 void joinGoCb(lv_event_t *) { lv_async_call([](void *) { visibilityJoin(s_joinPick); }, nullptr); }
@@ -193,26 +199,26 @@ void buildVisibility() {
     Card *c = held();
     if (!c) return;
     ClusterCard *cl = clusterOfTile();
-    lv_obj_t *list = column(cl ? "IN THE CLUSTER" : "ON THIS PAGE");
-    DeckRowSpec rows[3];
+    lv_obj_t *list = table(nullptr, 0, nullptr);
+    Action a[3];
+    uint8_t n = 0;
     if (cl) {
         const Entity *e = c->firstEntity();
         const bool made = e && cl->hasId() && CardAdded::addedFor(cl->id(), e->desc.id);
-        uint8_t n = 0;
-        rows[n++] = { "Hide from the cluster", Kit::RowKind::ROW_BUTTON, "Hide", 0, c->hasId(), hideTileCb, nullptr };
-        rows[n++] = { "Add card to dashboard", Kit::RowKind::ROW_BUTTON, made ? "Added" : "Add", 0,
-                      !made && e && cl->hasId(), addTileCb, nullptr };
+        if (c->hasId()) a[n++] = { "Hide from the cluster", Kit::ButtonRole::BTN_CANCEL, hideTileCb };
+        if (!made && e && cl->hasId()) a[n++] = { "Add card to dashboard", Kit::ButtonRole::BTN_CANCEL, addTileCb };
         // A copy made here can go again, for good (K91; the dashboard's members only hide).
-        if (CardAdded::isMember(c->id()))
-            rows[n++] = { "Remove from the cluster", Kit::RowKind::ROW_BUTTON, "Remove", 0, true, removeCopyCb, nullptr };
-        Kit::rows(list, rows, n);
-        note(list, "A hidden member stays in the cluster's list and comes back from the cluster's window "
-                   "(a long press on its header).");
+        if (CardAdded::isMember(c->id())) a[n++] = { "Remove from the cluster", Kit::ButtonRole::BTN_DESTRUCTIVE, removeCopyCb };
+        actions(list, a, n);
+        note(list, made ? "Its card is on the dashboard already. A hidden member stays in the cluster and "
+                          "comes back from the cluster's window (a long press on its header)."
+                        : "A hidden member stays in the cluster and comes back from the cluster's window (a "
+                          "long press on its header).");
         return;
     }
-    rows[0] = { "Hide from this page",  Kit::RowKind::ROW_BUTTON, "Hide", 0, c->hasId(), hideCardCb, nullptr };
-    rows[1] = { "Add to a cluster", Kit::RowKind::ROW_BUTTON, "Add", 0, addable(c) != nullptr, addToCb, nullptr };
-    Kit::rows(list, rows, 2);
+    if (c->hasId())  a[n++] = { "Hide from this page", Kit::ButtonRole::BTN_CANCEL, hideCardCb };
+    if (addable(c))  a[n++] = { "Add to a cluster",    Kit::ButtonRole::BTN_CANCEL, addToCb };
+    actions(list, a, n);
     note(list, "Hidden cards go to this page's list of hidden cards, with their settings, and come back "
                "from there: tap the page's name in the header.");
     s_pick = 0;
@@ -223,24 +229,22 @@ void buildVisibility() {
 void buildAddTo() {
     Card *c = held();
     const Entity *e = addable(c);
-    lv_obj_t *list = column("ADD TO A CLUSTER");
     s_nCl = 0;
     findClusters(lv_screen_active());
     if (!e || !s_nCl) {
-        note(list, e ? "There is no cluster on this page." : "This card cannot join a cluster: it stands for "
-                                                            "more than one thing, or is a cluster itself.");
+        note(table(nullptr, 0, nullptr), e ? "There is no cluster on this page."
+                                           : "This card cannot join a cluster: it stands for more than one "
+                                             "thing, or is a cluster itself.");
         return;
     }
     if (s_pick >= s_nCl) s_pick = 0;
-    const int32_t room = (lv_area_get_width(&s.winRect) - 2 * s.pad) * 2 / 3;
-    lv_obj_t *r = Kit::row(list, "Cluster", true);
-    Kit::chipRow(r, s_clName, s_nCl, s_pick, room, pickCb);
-    r = Kit::row(list, "This card", true);
-    Kit::chipRow(r, COPY_W, 2, s_move ? 1 : 0, room, moveCb);
-    const bool in = alreadyIn(*s_cl[s_pick], *e);
-    DeckRowSpec go = { in ? "It is in that cluster already" : "Add this card", Kit::RowKind::ROW_BUTTON, "Add", 0,
-                       !in, addCb, nullptr };
-    Kit::rows(list, &go, 1);
+    const Kit::ChipRowSpec rows[2] = {
+        { "Cluster",   s_clName, s_nCl, s_pick },
+        { "This card", COPY_W,   2,     (uint8_t)(s_move ? 1 : 0) },
+    };
+    lv_obj_t *list = table(rows, 2, addToChipCb);
+    const Action go = { "Add", Kit::ButtonRole::BTN_CONFIRM, addCb };
+    actions(list, &go, 1);
     note(list, "Copy: the card stays on the page and a copy joins the cluster. Move: the card joins it and "
                "leaves this page for its list of hidden cards. The cluster shows it when this window closes.");
 }
@@ -281,31 +285,18 @@ void visibilityJoinOpen(Card *parent, const Entity *member) {
     if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_JOIN);
 }
 
+// Joins which group: every group a row, its suggestions first, the chosen one's
+// chip lit; Add at the foot.
 void buildJoin() {
-    lv_obj_t *list = column("JOINS WHICH GROUP?");
     if (!s_joinParent || !s_joinEntity) return;
     joinCollect();
-    if (!s_nJoin) { note(list, "No group is known yet."); return; }
+    if (!s_nJoin) { note(table(nullptr, 0, nullptr), "No group is known yet."); return; }
     if (s_joinPick >= s_nJoin) s_joinPick = 0;
-    // The suggestions as chips; the one chosen among the others, as a chip after them.
-    uint8_t nChips = 0;
-    for (uint8_t k = 0; k < s_nSuggest && nChips < 2; k++) s_joinWords[nChips++] = s_joinName[k];
-    const bool other = s_joinPick >= s_nSuggest;
-    if (other) s_joinWords[nChips++] = s_joinName[s_joinPick];
-    lv_obj_t *r = Kit::row(list, "Group", true);
-    Kit::chipRow(r, s_joinWords, nChips, other ? nChips - 1 : s_joinPick,
-                 (lv_area_get_width(&s.winRect) - 2 * s.pad) * 2 / 3, joinChipCb);
-    // Every other group, in a list.
-    size_t used = snprintf(s_otherOpts, sizeof(s_otherOpts), "-");
-    for (uint8_t k = s_nSuggest; k < s_nJoin; k++)
-        used += snprintf(s_otherOpts + used, used < sizeof(s_otherOpts) ? sizeof(s_otherOpts) - used : 0,
-                         "\n%s", s_joinName[k]);
-    DeckRowSpec rows[2] = {
-        { "Another group", Kit::RowKind::ROW_DROP, s_otherOpts, (uint16_t)(other ? s_joinPick - s_nSuggest + 1 : 0),
-          s_nJoin > s_nSuggest, joinOtherCb, &s_otherDd },
-        { "Add card to dashboard", Kit::RowKind::ROW_BUTTON, "Add", 0, true, joinGoCb, nullptr },
-    };
-    Kit::rows(list, rows, 2);
+    Kit::ChipRowSpec rows[JOIN_MAX];
+    for (uint8_t k = 0; k < s_nJoin; k++) rows[k] = { s_joinName[k], JOIN_W, 1, (uint8_t)(k == s_joinPick ? 0 : 1) };
+    lv_obj_t *list = table(rows, s_nJoin, joinChipCb);
+    const Action go = { "Add card to dashboard", Kit::ButtonRole::BTN_CONFIRM, joinGoCb };
+    actions(list, &go, 1);
     // Where the suggestions come from, in words.
     char words[200];
     int w = snprintf(words, sizeof(words), "%s's card goes right after %s on this page.",
