@@ -267,7 +267,7 @@ order.
 |---|---|
 | `/popup?card=N` | a long press on card N: opens its window; replies with the build time, window size and LVGL's pool |
 | `/popup?close=1` | closing it; replies with the pool afterwards. **Anything changed in the window is saved now**, as on the glass |
-| `/popup?view=N` | the corner icons: `0` the controls (a member's, inside one), `1` History, `2` Members, `4` Scenes, `5` Properties, `6` Card UI (2.8 round 3, as SETTINGS' last row), `7` a cluster's Header slots (2.11), `8` Visibility (2.11, K96: the card's options by where it is), `9` its Add to a cluster (K91, K100), `3` only lists. Also lists the entities' levels, an HA group's members and why recent commands failed |
+| `/popup?view=N` | the corner icons: `0` the controls (a member's, inside one), `1` History, `2` Members, `4` Scenes, `5` Properties, `6` Card UI (2.8 round 3, as SETTINGS' last row), `7` a cluster's Header slots (2.11), `8` Visibility (2.11, K96: the card's options by where it is), `9` its Add to a cluster (K91, K100), `10` a cluster's Add cards (K104), `3` only lists. Also lists the entities' levels, an HA group's members and why recent commands failed |
 | `/popup?deck=1` / `deck=0` / `deck=2` | SETTINGS opened / folded; `2` the left panel (CHART or SCENES) opened |
 | `/popup?ctl=N` | a light's control: `0` brightness, `1` color temperature, `2` color; lists where the stage's children landed |
 | `/popup?member=N` | a tap on row N of Members (opens Members first) |
@@ -312,6 +312,7 @@ order.
 | `/popup?removecard=1` | Hide from this page, confirmed - no dialog; on a mini tile, Hide from the cluster | the card's `removed` (the page's pool, its settings kept); a tile's `hidden` = `yes` |
 | `/popup?restore=N` | Restore beside the Nth of this page's hidden cards, in the page slot's panel (`slot=page` first) | the card's `removed`, removed - back on its page |
 | `/popup?removecard=4` / `removecard=5` | on a copy made in a cluster (K91): `4` its "Remove this copy?" dialog; `5` its Remove, no dialog | `5`: the copy's whole entry, deleted (`Settings::dropCard()`) |
+| `/popup?addcards=MASK&mv=0\|1` | a cluster's Add cards (K104, K91) on its open window: the cards whose bits are set ticked (bit 0 the list's first - `view=10` shows the list), Copy or Move, and Add - the window closes | an entry with `in` for each, as `addto=`; Move also each card's `removed` |
 | `/popup?addto=N&mv=0\|1` | Add to a cluster (K91, K100) on the open card: the Nth cluster on the page (screen order), Copy (`mv=0`) or Move (`mv=1`), and Add - the window closes | a new card entry with `in` (the cluster's id), `entity`, `area`, `group`, `name`; Move also the card's `removed` |
 | `/popup?kbpress=1` | the keyboard's Save (2.11, K95) | what it was opened for: a cluster's `label_text` (none: its group's name), a card's `name`, or its card label's `label_text` - when the window closes |
 

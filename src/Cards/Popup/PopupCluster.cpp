@@ -7,8 +7,9 @@
 //            header's values with their icons or without; Header slots - a view
 //            of the members, each ticked into the header or not (K104's Slots).
 //   MEMBERS  each member's name and Visible: a tile in the cluster or not
-//            (hidden is not removed, K92 rule 8). Add cards at the foot comes
-//            with the card list (greyed until then).
+//            (hidden is not removed, K92 rule 8). Add cards at the foot: the
+//            page's cards that can join, ticked, then Copy or Move (K91, K100);
+//            HA entities not on the page come with the card list.
 //
 // Kept under the cluster's id (label_text, cl_style, cl_icons, slots) and each member's
 // (hidden) - the settings file's entries agreed in K106 - written when the
@@ -24,6 +25,16 @@ namespace popup {
 namespace {
 
 bool s_rebuildPage = false;
+
+// ADD CARDS (K104's foot, K91): the page's cards that can join - one entity
+// each, not a cluster, not in this one already - ticked, then Copy or Move.
+constexpr uint8_t ADD_MAX = 16;
+Card       *s_cand[ADD_MAX] = {};
+lv_obj_t   *s_cbAdd[ADD_MAX] = {};
+bool        s_tick[ADD_MAX] = {};
+uint8_t     s_nCand = 0;
+bool        s_addMove = false;
+const char *const ADD_COPY_W[] = { "Copy - stay here", "Move" };
 
 const char *const STYLE_W[]  = { "Page's", "Swatch", "Bar" };
 const char *const STYLE_IS[] = { nullptr, "swatch", "bar" };
@@ -238,7 +249,114 @@ void slotCb(lv_event_t *ev) {
     changed();
 }
 
+// --- Add cards -------------------------------------------------------------------------
+bool memberHas(const ClusterCard &cl, const Entity &e) {
+    for (uint8_t i = 0; i < cl.memberCount(); i++) {
+        const Card *m = cl.memberAt(i);
+        const Entity *me = m ? m->firstEntity() : nullptr;
+        if (me && !strcmp(me->desc.id, e.desc.id)) return true;
+    }
+    return false;
+}
+
+// The page's cards, in screen order; a card's own objects hold no more cards.
+void findCandidates(lv_obj_t *o, const ClusterCard &cl) {
+    const uint32_t n = lv_obj_get_child_count(o);
+    for (uint32_t i = 0; i < n && s_nCand < ADD_MAX; i++) {
+        lv_obj_t *c = lv_obj_get_child(o, (int32_t)i);
+        if (!lv_obj_has_flag(c, CardPopup::CARD_SURFACE_FLAG)) { findCandidates(c, cl); continue; }
+        Card *k = cardOf(c);
+        const Entity *e = k ? k->firstEntity() : nullptr;
+        if (k && e && k->hasId() && !k->mini() && k->entityCount() == 1 && strcmp(k->typeName(), "cluster") &&
+            !memberHas(cl, *e))
+            s_cand[s_nCand++] = k;
+    }
+}
+
+char s_candName[ADD_MAX][ENTITY_NAME_MAX + 24];
+
+void addViewCb(lv_event_t *) {
+    for (bool &t : s_tick) t = false;
+    s_addMove = false;
+    lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_CLUSTER_ADD); }, nullptr);
+}
+
+void addTickCb(lv_event_t *ev) {
+    lv_obj_t *box = lv_event_get_target_obj(ev);
+    for (uint8_t i = 0; i < ADD_MAX; i++)
+        if (s_cbAdd[i] == box) s_tick[i] = lv_obj_has_state(box, LV_STATE_CHECKED);
+}
+
+void addMoveCb(lv_event_t *ev) {
+    s_addMove = (uintptr_t)lv_event_get_user_data(ev) == 1;
+    lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_CLUSTER_ADD); }, nullptr);
+}
+
+void addGoCb(lv_event_t *) {
+    lv_async_call([](void *) {
+        uint32_t mask = 0;
+        for (uint8_t i = 0; i < ADD_MAX; i++) if (s_tick[i]) mask |= 1u << i;
+        clusterAddCards(mask, s_addMove);
+    }, nullptr);
+}
+
 }  // namespace
+
+// The ticked cards (`mask`, by their place in the list) into the cluster - copies
+// with the names they show; Move hides each from the page too. The window closes
+// and the page is built again. How many went in.
+uint8_t clusterAddCards(uint32_t mask, bool move) {
+    ClusterCard *cl = held();
+    if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN) return 0;
+    s_nCand = 0;
+    findCandidates(lv_screen_active(), *cl);
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < s_nCand; i++) {
+        if (!(mask & (1u << i))) continue;
+        Card *k = s_cand[i];
+        char id[CARD_ID_MAX + 1];
+        if (!CardAdded::addTo(*cl, *k->firstEntity(), id, sizeof(id))) break;   // full
+        const char *name = k->shownName(CardLabel::LBL_NAME);
+        if (name && name[0]) Settings::setCard(id, "name", name);
+        if (move) CardAdded::hide(k->id());
+        n++;
+    }
+    if (!n) return 0;
+    char msg[64];
+    snprintf(msg, sizeof(msg), "%s %u to %s", move ? "Moved" : "Copied", (unsigned)n, s.name);
+    UIToolkit::show_toast(msg);
+    CardPopup::close();
+    return n;
+}
+
+void buildClusterAdd() {
+    ClusterCard *cl = held();
+    if (!cl) return;
+    s_nCand = 0;
+    findCandidates(lv_screen_active(), *cl);
+    lv_obj_t *list = column();
+    title(list, "ADD CARDS");
+    if (!s_nCand) {
+        note(list, "No card on this page can join: a card joins with one entity, and not one this cluster "
+                   "has already.");
+        return;
+    }
+    DeckRowSpec rows[ADD_MAX];
+    for (uint8_t i = 0; i < ADD_MAX; i++) s_cbAdd[i] = nullptr;
+    for (uint8_t i = 0; i < s_nCand; i++) {
+        Card *k = s_cand[i];
+        if (k->area()[0]) snprintf(s_candName[i], sizeof(s_candName[i]), "%s (%s)", k->shownName(CardLabel::LBL_NAME), k->area());
+        else              snprintf(s_candName[i], sizeof(s_candName[i]), "%s", k->shownName(CardLabel::LBL_NAME));
+        rows[i] = { s_candName[i], Kit::RowKind::ROW_CHECK, nullptr, (uint16_t)s_tick[i], true, addTickCb, &s_cbAdd[i] };
+    }
+    Kit::rows(list, rows, s_nCand);
+    lv_obj_t *r = Kit::row(list, "These cards", true);
+    Kit::chipRow(r, ADD_COPY_W, 2, s_addMove ? 1 : 0, listW() * 2 / 3, addMoveCb);
+    const DeckRowSpec go = { "Add the ticked cards", Kit::RowKind::ROW_BUTTON, "Add", 0, true, addGoCb, nullptr };
+    Kit::rows(list, &go, 1);
+    note(list, "Copy: each card stays on the page and a copy joins the cluster. Move: each joins it and "
+               "leaves this page for its list of hidden cards.");
+}
 
 // --- The views ------------------------------------------------------------------------
 void buildCluster() {
@@ -273,8 +391,8 @@ void buildCluster() {
     for (uint8_t i = 0; i < cl->memberCount() && n < GROUP_MEMBERS_MAX; i++, n++)
         rows[n] = { s_names[i], Kit::RowKind::ROW_CHECK, nullptr,
                     (uint16_t)visible(*cl, i, ids, nIds), true, visibleCb, &s_cbVis[i] };
-    // The card list (K91, K92 rule 11) comes later: greyed until then.
-    rows[n++] = { "Add cards", Kit::RowKind::ROW_BUTTON, "Add", 0, false, nullptr, nullptr };
+    // The page's cards (K91); HA entities not on the page (K92 rule 11) come with the card list.
+    rows[n++] = { "Add cards", Kit::RowKind::ROW_BUTTON, "Add", 0, cl->hasId(), addViewCb, nullptr };
     Kit::rows(list, rows, n);
     note(list, "Visible: shown as a tile. Changes show when this window closes.");
 }

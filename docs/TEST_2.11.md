@@ -208,3 +208,138 @@ page was placed. **off** = 1 lets every page flow as in round 1, to compare.
 ## Your results
 
 (to come)
+
+# Round 3 (2026-10-19, morning, built unattended) - what the glass edits
+
+The same branch, on round 2: `bd88809` (the cluster's window), `751d1f5` (the keyboard), `29a93a2`
+(Visibility and hidden cards), `3816fe6` (Copy / Move), `6a5bde9` (removing a copy), and the
+cluster's Add cards. Flashed to the P4_5 and the 4B, each board's settings saved first. **Every change
+the tests made was put back** from those saved copies (`restore_settings.ps1`): the P4_5's file is
+the same as at 09:39, the 4B's as at 09:28. Words on screen are the "2.11 Clusters" mock's (section
+D) where it had them - proposals, K96 left the names open.
+
+## What changed
+
+| Where | Before | Now |
+|---|---|---|
+| **A cluster's window** (a long press on its header, K107) | its Members | **its management screen** (K104): HEADER - **Name** (Rename: the keyboard), **Style** (Page's / Swatch / Bar), **Sensor icons**, **Header slots** (Choose: the members, each ticked into the header or not, in the order ticked, four at most); MEMBERS - each member with **Visible** (a tile or not); **Add cards** at the foot. Changes show when the window closes |
+| **The on-screen keyboard** (K95) | - | **a kit component** (`Kit::keyboard()`): over everything, the rest dimmed - a box with what the words are for, a one-line field and Cancel / **Save** (the accent), above LVGL's keys along the bottom (lower case, ABC, 1# symbols, the arrows, backspace, the hide key, the tick). **Plain ASCII only** - the keys offer nothing else and the field refuses anything else. Keys 7 mm tall: four rows take about half the P4_5's height. It goes with the window under it, unsaved |
+| **Naming a cluster** | from the PC | **Rename** types its own words (`label_text` on the cluster - in its group's colour, K46); an empty field is its group's name again (shown faintly in the field). The window's title follows at once, the cluster when the window closes |
+| **Card UI's Custom chips** | Entity label's Custom kept the words the card showed; Card label's Custom likewise | **a tap on Custom opens the keyboard** on the words the card shows now: Entity label - the card's name (`name`, K37, K40); Card label - its card label's words (`label_text`; none: the colour alone) |
+| **SETTINGS** | Remove card, on cards added on the device | **Visibility**, on every card: a view whose choices depend on **where the card is** (K96) |
+| **Visibility, a card on the page** | - | **Hide from this page** - K66's remove, now **for every card**: after the dialog ("Hide this card?"), to the page's pool with its settings (`removed`: `yes`), and the page is arranged again. **Add to a cluster** - below |
+| **This page's hidden cards** | - | **listed in the page slot's panel** (tap the page's name in the header), each with **Restore**, which puts it back where it was |
+| **Visibility, a mini tile** | - | **Hide from the cluster** - the window closes and the tile goes (its Visible, K104, brings it back); **Add card to dashboard** - a copy right after the cluster, in its group (K65); **Remove from the cluster** on a copy made on the glass, after a dialog - deleted, entry and all (the card it came from is untouched; the dashboard's own members only hide) |
+| **Add to a cluster** (Visibility, on the page) | - | **the page's clusters as chips, "Copy - stays here" / Move** (K100: one screen, Copy first), and Add. A copy is a card of its own (`in`: the cluster's id - K106's key) **with the name the card shows** ("Thermo", not HA's "THERMOSTAT Temperature"), wearing the cluster's group (K92 rule 2). **Move** is a copy, and the card itself to the page's hidden cards. Only a card standing for one thing - not a cluster or a group card (one level, K92 rule 3) |
+| **A cluster's Add cards** | greyed | **the page's cards that can join, each with a box**, then Copy / Move and Add - the same as above, several at once |
+
+## The pictures
+
+The cluster's window, its header slots (4B), and the keyboard over it (P4_5, then the 4B on Linen):
+
+![The cluster's window](../followups/211_r3_cluster_window_p45.png)
+![Header slots](../followups/211_r3_header_slots_4b.png)
+![The keyboard](../followups/211_r3_keyboard_p45.png)
+![The keyboard on Linen](../followups/211_r3_keyboard_4b.png)
+
+Visibility on the page (4B), its dialog, and the page's hidden cards (the P4_5 with Thermo hidden;
+the 4B's list - cards removed in October's K17 tests, already in its pool):
+
+![Visibility](../followups/211_r3_visibility_4b.png)
+![Hide this card?](../followups/211_r3_hide_dialog_p45.png)
+![Hidden cards](../followups/211_r3_hidden_cards_p45.png)
+![The 4B's](../followups/211_r3_hidden_cards_4b.png)
+
+A tile's Visibility, and a copy's (with Remove):
+
+![A tile](../followups/211_r3_visibility_tile_p45.png)
+![A copy](../followups/211_r3_copy_visibility_p45.png)
+
+Add to a cluster; Thermo moved into Kitchen (and copied into Office before it); copied into Office
+on the 4B; the cluster's Add cards, and Office with two cards added:
+
+![Add to](../followups/211_r3_add_to_cluster_p45.png)
+![Moved](../followups/211_r3_moved_p45.png)
+![Copied on the 4B](../followups/211_r3_copied_4b.png)
+![Add cards](../followups/211_r3_add_cards_p45.png)
+![Added](../followups/211_r3_added_p45.png)
+
+## Tests for you
+
+Office's lights are safe to use (W9). Each test puts back what it changed.
+
+| # | Do this | PASS if |
+|---|---|---|
+| E1 | Long-press Office's header | its window: HEADER (Name, Style, Sensor icons, Header slots) and MEMBERS (each with Visible, Add cards) |
+| E2 | Style: Bar, close; then Page's | Office's header is a bar in its colour; then a swatch again |
+| E3 | Header slots: untick occupancy, back, close; then tick it again | the header shows the temperature only and occupancy comes back as a tile; then as before |
+| E4 | Members: untick Overhead's Visible, close; then tick it | Overhead's tile goes; then comes back |
+| E5 | Name: Rename, type "Work" on the keys, Save | the title says Work; after closing, so does the header. Rename again, empty the field (backspace), Save: Office again |
+| E6 | The keyboard: ABC for capitals, 1# for symbols, the arrows, backspace held down; then the hide key, and a tap outside the box | it types what the keys say and nothing else; held backspace repeats; the hide key and a tap outside leave without saving |
+| E7 | Desk's window - SETTINGS - Card UI: tap Entity label's Custom | the keyboard on "Desk"; change it, Save: the card's name changes. Tap Inherit: back |
+| E8 | The same for Card label's Custom | the keyboard on the card label's words; Save changes them, in the group's colour. Inherit: back |
+| E9 | Thermo's window - SETTINGS - Visibility - Hide from this page - Hide | the dialog asks; Thermo goes and the page is arranged again (a moment later) |
+| E10 | Tap "House" in the header | HIDDEN CARDS lists Thermo with Restore; Restore puts it back |
+| E11 | Long-press Porch's tile - SETTINGS - Visibility - Hide from the cluster | the window closes and Porch leaves Outside. Outside's window - Porch's Visible - close: back |
+| E12 | Thermo - Visibility - Add to a cluster: Office, Copy, Add | a Thermo tile joins Office (named Thermo) and Thermo stays on the page |
+| E13 | Long-press that new tile - SETTINGS - Visibility - Remove from the cluster - Remove | the copy goes; Office as before |
+| E14 | Thermo - Add to a cluster: Kitchen, Move, Add | Thermo leaves the page (listed under HIDDEN CARDS) and joins Kitchen. Remove the copy (E13), Restore Thermo (E10) |
+| E15 | Office's window - Add cards: tick two, Copy, Add | both join Office. Remove each copy (E13) |
+| E16 | The 4B: E1, E5, E9-E10, E12-E13 | the same at 720 px on Linen; the keyboard's keys about 5.6 mm wide |
+
+## Choices that were mine
+
+- **Visibility replaced SETTINGS' Remove card.** Hide from this page is K66's remove for every card,
+  with the same dialog in K96's words; for a card added on the device it is what Remove was.
+- **This page's hidden cards live in the page slot's panel** - the mock's "this page's list of hidden
+  cards"; the page's name in the header is the page's own place. Each has Restore; **Delete** (K66:
+  "deleted only by the owner") is not built.
+- **Tapping Custom opens the keyboard**, every time, on the words the card shows - one choice, no
+  separate Rename button. Cancel leaves the card Custom with the words it had.
+- **A cluster's name is its card label's words** (`label_text`), as a card's own words (K46 rename
+  a): in its group's colour, and empty is the group's name. A name the same as the group's is not
+  kept, so a group renamed later still names it.
+- **The keyboard** is LVGL's keys in the kit's roles; 7 mm keys (a phone's - four rows of the 9 mm
+  touch minimum left the P4_5's field no room); a cursor that does not blink (a blink redraws the
+  field twice a second); Save is a new button role, **CONFIRM**, in the accent.
+- **"Add to a group card or cluster" became "Add to a cluster"**: group cards and a new group card
+  as targets, and K92 rule 9's "which group?" for Add card to dashboard, wait for the card list.
+- **A copy takes the name its card shows** (kept as its custom name), so Thermo's copy is "Thermo".
+- **Move is Copy and Hide from this page**: the card goes to the page's hidden cards, restorable -
+  K92 rule 10's "Take them off the page" read as the pool, not a deletion.
+- **A copy made on the glass can be removed for good**; a dashboard member only hides.
+- **The tests' changes were undone by restoring each board's saved settings file**, so your file is
+  exactly as you left it.
+
+## Questions for you
+
+1. **The hidden-cards list in the page panel** - right home, or a window of its own? *Mine: the
+   panel; a page with many hidden cards scrolls it.*
+2. **Custom opening the keyboard** - or a Rename button beside the chips? *Mine: Custom.*
+3. **The pools hold cards from the K17 tests** (October 14-18): the 4B's House page Office lamp and
+   Office Right, twice each; the P4_5's Office Right four times (and a Kitchen lamp on its Home page).
+   **Delete beside Restore**, with a dialog, in round 4? *Mine: yes.*
+4. **Two members of one name** in a cluster (Office's own Overhead and a copy of Living's) read the
+   same on their tiles. Show the card label's words under a copy from another group, or leave it to
+   a rename? *Mine: leave it; the copy can be renamed (E7).*
+
+## Not built (round 3's rest)
+
+K92 rule 9's "which group?" dialog; group cards and a new group card as Add targets (K96); the card
+list (K91: HA entities not on the page, making a cluster from a group); Delete from the pool; the
+keyboard for groups' names (nothing names a group on the glass yet).
+
+## Results (mine, before you)
+
+- **Every piece verified on both boards** with `/popup` and screenshots (the pictures above), and
+  undone: Thermo hidden and restored; Porch hidden from Outside and back; Thermo copied into Office
+  (the arranger re-arranged the page in 76 ms on the P4_5, 1 ms on the 4B), moved into Kitchen (39
+  ms), the copy removed; two cards added to Office at once (26 ms).
+- **The keyboard costs ~7 KB of LVGL's pool** while it shows (P4_5: 105 to 112 KB with Office's
+  window under it).
+- **Host tests**: 52, all PASS (no layout code changed this round).
+- **`WS_S3_4B` compiles** with the keyboard (built once, not flashed - #69).
+
+## Your results
+
+(to come)

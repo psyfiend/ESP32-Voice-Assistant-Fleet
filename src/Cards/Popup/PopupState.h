@@ -95,7 +95,8 @@ using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
 // row (2.11 round 3, K96; PopupVisibility.cpp); VIEW_ADD_TO its Add to a
 // cluster (K91, K100).
 enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER, VIEW_SCENES, VIEW_PROPS,
-                                  VIEW_CARD_UI, VIEW_CLUSTER_SLOTS, VIEW_VISIBILITY, VIEW_ADD_TO };
+                                  VIEW_CARD_UI, VIEW_CLUSTER_SLOTS, VIEW_VISIBILITY, VIEW_ADD_TO,
+                                  VIEW_CLUSTER_ADD };
 enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
@@ -418,6 +419,8 @@ void buildCluster();
 void buildClusterSlots();
 bool clusterTakeRebuild();   // a choice wants the page built again, once the window has gone
 void clusterRename();        // the keyboard on the cluster's name, as Rename opens it (K95)
+void buildClusterAdd();      // VIEW_CLUSTER_ADD: the page's cards to tick in, Copy or Move (K91)
+uint8_t clusterAddCards(uint32_t mask, bool move);   // ...the ticked ones in; the window closes
 
 // PopupHistory.cpp
 void histKeep(const char *key, const char *value);

@@ -96,7 +96,8 @@ public:
     //   /popup?set=V        as a tap on that control's slider at V (%, K, hue)
     //   /popup?view=N       as the corner icons: 0 the controls (a member's, inside
     //                       one), 1 history, 2 members, 4 scenes, 5 properties, 6 Card UI,
-    //                       7 a cluster's Header slots (2.11), 8 Visibility (K96);
+    //                       7 a cluster's Header slots (2.11), 8 Visibility (K96),
+    //                       9 its Add to a cluster, 10 a cluster's Add cards;
     //                       3 only lists. Each
     //                       lists the entities' levels (and an HA group's members)
     //   /popup?power=1      as a tap on Power
@@ -123,6 +124,7 @@ public:
     //                       at; close=1 takes it down (2 is the real one; 1 hides
     //                       at once; 4 / 5 a copy in a cluster: its dialog / removed)
     //   /popup?addto=N&mv=1 Add to a cluster: the page's Nth, Copy (mv=0) or Move
+    //   /popup?addcards=M   a cluster's Add cards, the list's cards in bit mask M (mv= too)
     //   /popup?restore=N    the page panel's Restore beside hidden card N
     //   /popup?about=1|0    "About this board" open or closed (2.12 P4)
     //   /popup?drawer=1|0   the system panel open or closed, as a tap on the
