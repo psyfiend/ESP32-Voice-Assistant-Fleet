@@ -71,10 +71,6 @@ public:
     static constexpr uint8_t OPEN_CONTROLS = 0, OPEN_HISTORY = 1, OPEN_MEMBERS = 2;
     static void openOn(Card &card, uint8_t view);
 
-    // A long press that opens on Members (2.11: a cluster's header - the
-    // cluster's own window lists its members). Held as open() holds.
-    static void openMembers(Card &card);
-
     // Close it, by whichever of the four routes. Safe to call from an event
     // callback of an object inside the window: the work is deferred to
     // lv_async_call, because deleting the object whose event is running is
@@ -99,7 +95,8 @@ public:
     //   /popup?scene=N      as a tap on scene N; lists the light's scenes (2.10c)
     //   /popup?set=V        as a tap on that control's slider at V (%, K, hue)
     //   /popup?view=N       as the corner icons: 0 the controls (a member's, inside
-    //                       one), 1 history, 2 members, 4 scenes, 5 properties, 6 Card UI; 3 only lists. Each
+    //                       one), 1 history, 2 members, 4 scenes, 5 properties, 6 Card UI,
+    //                       7 a cluster's Header slots (2.11); 3 only lists. Each
     //                       lists the entities' levels (and an HA group's members)
     //   /popup?power=1      as a tap on Power
     //   /popup?pause=1|0    pause / resume what the window shows

@@ -126,8 +126,13 @@ void showView(PopupView v) {
     const char *who = (member && s.ent[0]) ? s.ent[0]->desc.name : s.name;
     char title[ENTITY_NAME_MAX + 16];
     if (v == PopupView::VIEW_MAIN) {
-        if (s.area[0]) { snprintf(title, sizeof(title), "%s > ", s.area); setText(s.lblTitleArea, title); }
-        else           setText(s.lblTitleArea, "");
+        // A cluster's name is its group's: "Office", never "Office > Office".
+        if (s.area[0] && !(s.cluster && !strcmp(s.area, s.name))) {
+            snprintf(title, sizeof(title), "%s > ", s.area);
+            setText(s.lblTitleArea, title);
+        } else {
+            setText(s.lblTitleArea, "");
+        }
         setText(s.lblTitleName, s.name);
     } else if (v == PopupView::VIEW_MEMBER) {
         // "Group > member" (card-sheet 11.1).
@@ -140,7 +145,8 @@ void showView(PopupView v) {
         setText(s.lblTitleName, v == PopupView::VIEW_HISTORY ? "History"
                               : v == PopupView::VIEW_SCENES  ? "Scenes"
                               : v == PopupView::VIEW_PROPS   ? "Properties"
-                              : v == PopupView::VIEW_CARD_UI ? "Card UI" : "Members");
+                              : v == PopupView::VIEW_CARD_UI ? "Card UI"
+                              : v == PopupView::VIEW_CLUSTER_SLOTS ? "Header" : "Members");
     }
     // SIZED BEFORE THE VIEW IS BUILT: placeWide() lays the window out, and a
     // DOT label laid out at the last view's width rewrites its own text - the
@@ -150,6 +156,8 @@ void showView(PopupView v) {
     else if (v == PopupView::VIEW_MEMBERS) buildMembers();
     else if (v == PopupView::VIEW_PROPS)   buildProps();
     else if (v == PopupView::VIEW_CARD_UI) buildCardUi();
+    else if (v == PopupView::VIEW_CLUSTER_SLOTS) buildClusterSlots();
+    else if (v == PopupView::VIEW_MAIN && s.cluster) buildCluster();   // K104
     else                                   buildMain();
     deckSync();     // SETTINGS' rows are the view's (a member's own has more)
     deckRender();   // Paused follows whatever the window is showing now
@@ -419,6 +427,7 @@ void CardPopup::open(Card &card) {
     s.native   = (s.nEnt == 1 && s.ent[0]->nMembers) ? s.ent[0] : nullptr;
     applyNative();
     s.tempUnit = card.tempUnit();
+    s.cluster  = !strcmp(card.typeName(), "cluster");
     s.groupOn  = card.groupOn();
     s.sceneShow = card.sceneShow();
     s.lightCtl = firstCtl(lightAggregate().caps);   // D3: open on the control
@@ -449,7 +458,11 @@ void CardPopup::open(Card &card) {
     showWindow();
 }
 
-bool CardPopup::takeRebuildWanted() { return !isOpen() && cardUiTakeRebuild(); }
+bool CardPopup::takeRebuildWanted() {
+    if (isOpen()) return false;
+    const bool ui = cardUiTakeRebuild(), cl = clusterTakeRebuild();   // both, so neither waits
+    return ui || cl;
+}
 
 void CardPopup::openOn(Card &card, uint8_t view) {
     s_openFromTap = true;
@@ -458,9 +471,4 @@ void CardPopup::openOn(Card &card, uint8_t view) {
     if (!isOpen()) return;
     if (view == OPEN_HISTORY)                      showView(PopupView::VIEW_HISTORY);
     else if (view == OPEN_MEMBERS && hasMembers()) showView(PopupView::VIEW_MEMBERS);
-}
-
-void CardPopup::openMembers(Card &card) {
-    open(card);
-    if (isOpen() && hasMembers()) showView(PopupView::VIEW_MEMBERS);
 }

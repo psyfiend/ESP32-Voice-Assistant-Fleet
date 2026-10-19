@@ -89,8 +89,10 @@ using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
 // tabs (owner, 2026-10-06): see "The corner icons".
 // VIEW_PROPS: the entity's properties, read-only, from SETTINGS' button (2.10e).
 // VIEW_CARD_UI: the card's own looks, from SETTINGS' last row (2.8 round 3, D-28).
+// A CLUSTER'S WINDOW (2.11, K104): its main view is the cluster's management
+// screen (PopupCluster.cpp), VIEW_CLUSTER_SLOTS the members in its header.
 enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER, VIEW_SCENES, VIEW_PROPS,
-                                  VIEW_CARD_UI };
+                                  VIEW_CARD_UI, VIEW_CLUSTER_SLOTS };
 enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
@@ -138,6 +140,7 @@ struct Popup : Kit::Sheet {
     bool            expanded = false;
     EntityRegistry *reg  = nullptr;
     TempUnit        tempUnit = TempUnit::TEMP_INHERIT;
+    bool            cluster = false;   // a cluster's window (2.11): its main view manages it
     char area[ENTITY_SHORT_MAX] = {0};
     char name[ENTITY_NAME_MAX]  = {0};
 
@@ -405,6 +408,11 @@ void buildCardUi();
 void cardWindowLook(const Card &c, Kit::SheetSpec &k);   // its timeout, bar and selector, before it is built
 void cardUiCb(lv_event_t *ev);                           // SETTINGS' Card UI row
 bool cardUiTakeRebuild();                                // a choice wants the page built again
+
+// PopupCluster.cpp (2.11, K104)
+void buildCluster();
+void buildClusterSlots();
+bool clusterTakeRebuild();   // a choice wants the page built again, once the window has gone
 
 // PopupHistory.cpp
 void histKeep(const char *key, const char *value);

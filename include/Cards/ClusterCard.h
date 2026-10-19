@@ -51,6 +51,8 @@ public:
     uint8_t tileCount() const;
     uint8_t headerCount() const;   // the members in its header
     Card   *memberAt(uint8_t i) const { return i < _n ? _m[i] : nullptr; }
+    bool    tileAt(uint8_t i) const { return i < _n && _tile[i]; }     // shown as a tile, as built
+    int8_t  slotAt(uint8_t i) const { return i < _n ? _slotOf[i] : -1; }   // its place in the header, or -1
 
     bool owns(const char *entityId) const override;
     void onSnapshot(const Entity &snap) override;
