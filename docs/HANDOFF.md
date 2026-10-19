@@ -1,4 +1,4 @@
-# Handoff — 2026-10-17 (2.8 merged as `v0.2.18`; next, 2.11 group cards)
+# Handoff — 2026-10-19 (2.11 group cards: rounds 1-3 built on `feat/2.11-group-cards`; the owner's tests next)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -41,15 +41,33 @@ colour and size is a token, the window's sizes millimetres (`UIShape`); where ca
 a `Layout::Engine`'s decision, and where the header's slots go is `Layout::HeaderPlan`'s (claims,
 2.8). Changes are proved with the harness (`scripts/ui_golden.py`: object trees and screenshots,
 A/B), host tests (`host-tests/`), the structure check and the all-nine gate. The header and every
-slot's panel are on the kit since 2.8; **the cards**, `GUIManager` and the system panel's pages are
-not yet - bring each over when it is next changed (`ui-architecture.md` §6). 2.11 changes the cards.
+slot's panel are on the kit since 2.8, **the cards since 2.11 round 1** (`KS_CARD_*`, on the
+branch); `GUIManager` and the system panel's pages are not yet - bring each over when it is next
+changed (`ui-architecture.md` §6).
 
-## Where things stand (2026-10-17)
+## Where things stand (2026-10-19)
 
-- **`v0.2.18` - 2.8 is merged** (#110, 2026-10-17), tagged and flashed to the P4_5, the 4B and the
-  1060 (`scripts/release/flash_release.ps1`). Nothing is in flight: no open branch, no open PR of
-  Claude's. Copies of every board's settings file are in `bench/settings/<board>/` - one is saved
-  before every flash.
+- **2.11 is on `feat/2.11-group-cards`** (off `main` at `6bd834f`), pushed, **no PR** (it comes at
+  sign-off, after the all-nine gate). Built unattended on 2026-10-19 in three rounds, the owner's
+  order (K106): **round 1** clusters on the page, the cards onto the kit, D-34, D-35 (`16066b7`);
+  **round 2** the arranger, Playground v5 as prototyped (`476c57f`); **round 3** what the glass edits
+  - the cluster's window (K104), the keyboard (K95), Visibility by where a card is and the page's
+  hidden cards (K96, K66), Copy / Move into a cluster and its Add cards (K91, K100), "which group?"
+  (K92 rule 9) (`bd88809` to `2275545`). **The owner's sheet is `docs/TEST_2.11.md`**: three rounds of
+  tests, the choices made unattended, questions, and what round 3 left. Nothing tested by the owner yet.
+- **Boards**: the P4_5 and the 4B run round 3's last build (the branch with their local
+  `DEBUG_POPUP` lines); the 1060 runs round 1 (flashed once, for D-34 - leave it). **Their settings
+  files are exactly the owner's**: every test change was put back from the copy saved before it
+  (`restore_settings.ps1`; P4_5 as at 09:39, 4B as at 09:28). `WS_S3_4B` compiles (not flashed, #69).
+- **Where 2.11's pieces live**: a cluster `Cards/ClusterCard` + `Cards/MiniTile.cpp`, its span and
+  tile grid `Layout/Cluster.h`; the arranger `Layout/Arranger.h` (both host-tested, 52 tests) and
+  `Cards/PageArranger` (its task, kept answers in `pages.<slug>.layout`); the halo
+  `UI/Kit/KitHalo.cpp`; the keyboard `UI/Kit/KitKeyboard.cpp`; the cluster's window
+  `Popup/PopupCluster.cpp`; Visibility, Add to, which group `Popup/PopupVisibility.cpp`; the pool
+  (any card hidden) and copies in clusters (`in`) `Cards/CardAdded`. Each round's "As built" is in
+  its design doc (`group-cards.md` §7, `layout-engines.md`, `header-slots.md` §15).
+- **`v0.2.18` - 2.8** (#110, 2026-10-17) is the last merge. Copies of every board's settings file
+  are in `bench/settings/<board>/` - one is saved before every flash.
 - **Where 2.8's pieces live**: the header's places and claims `Layout/HeaderPlan.h` (host-tested),
   slots as data `UI/HeaderSlots.h`, kinds in `Panel_Header.cpp`, panels in `SlotPanels.cpp`, the
   glyphs `UI/GlyphShapes`; UI Tweaks `UI/TweaksSheet` + `GUIManagerTweaks.cpp`, Card UI
@@ -66,20 +84,14 @@ not yet - bring each over when it is next changed (`ui-architecture.md` §6). 2.
 
 ## What is next with the owner
 
-1. **2.11 group cards** (#66, with the page arranger #78) - **next, the owner's choice
-   (2026-10-17); the design interview's §4 is under way** on branch `docs/2.11-interview` (docs
-   only, pushed). **Where it stands (2026-10-19, night)**: the design is agreed enough to build -
-   the words, mini tiles, the group model, the mocks' C1-C8 and a fourth presentation, the summary
-   card (`group-cards.md` §6, K88-K104). **A fresh session builds 2.11** (the owner's suggestion, to
-   start with a small context): **its first step is to put `group-cards.md` §7's round plan and the
-   settings file's new entries to the owner**, then branch off `main` - round 1 is the cards onto the
-   kit and clusters on the page, with D-34 (the 7" header words) and D-35 (the header panel lying
-   on the bar, a halo round every panel and window - chosen on the "Panel Edges" mock). **The
-   arranger is built as prototyped** (K105: Playground v5, an empty cell at 60; arranged when a
-   page changes and kept, timed on the boards first - the playground's milliseconds are the owner's
-   PC; tuned on glass later, so explain each weight in plain words when asking). Still open, asked
-   in their rounds: §4 Q8 and half of Q6 (§7). What 2.11 builds on: `layout-engines.md` (a cluster is a container inside an item),
-   `cards.md` §4 and §8, `header-slots.md` §10 (the planner of claims), K17 / K46.
+1. **2.11 group cards** (#66, with the arranger #78) - **the owner tests rounds 1-3** against
+   `docs/TEST_2.11.md` and answers its questions (the halo on Linen, the hidden-cards list's home,
+   Custom opening the keyboard, Delete from the pool...). Then **round 4** (K106): the summary card
+   (K98), count slots (K103), extending a source group (K93), group pages (K90, K99 - §4 Q8, how
+   "back" works, still to ask); and round 3's rest (group cards and a new group card as Add targets,
+   the card list K91, Delete from the pool). The arranger's weights are the owner's to tune on glass
+   (`/settings?arranger=`, explained in the sheet). At sign-off: the all-nine gate, the CHANGELOG
+   entry, the sheet archived, the PR; the owner merges; tag `v0.2.19`.
 2. **#76, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a queue any
    task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to dismiss), a
    notice's detailed form in the middle for a while then its minimal "!" in status, a place that
@@ -122,9 +134,9 @@ have names ("Words", K22). Every round and measurement of 2.10 is in `docs/archi
 `docs/design/interview-phase2-3.md` is the blueprint for 2.8, 2.11 and Phase 3; Claude facilitates
 with the owner. §1 look and feel closed 2026-10-01 (`look-and-feel.md`); §2 card popups closed
 2026-10-02 (built as 2.10); **§3 the header's slots answered 2026-10-15** and built as 2.8
-(`header-slots.md`; only Q3, the clock's format, is still open). **§4 (2.11 group cards) is under
-way** (sittings 2026-10-18 and 10-19, `group-cards.md` §6, K88-K97; the model accepted, three mocks
-waiting - "What is next" item 1); #87 (the companion web
+(`header-slots.md`; only Q3, the clock's format, is still open). **§4 (2.11 group cards) is answered
+and being built** (`group-cards.md` §6-7, K88-K107; Q8 - "back" from a group page - asked in round
+4); #87 (the companion web
 app with a true preview, D-8) should be scoped before 3.1. The group taxonomy draft is
 `group-cards.md` (K67, K68). Artifacts on claude.ai: "2.11 Clusters", "Panel Edges" (2026-10-19),
 "2.8 Header Slots", "Glass, Satin, Flat"
@@ -154,7 +166,8 @@ and Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
 | `CYD_S3_3248` | - | USB broken (2026-09-28) |
 | `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in - #99's S3 frame check waits for one |
 
-The P4_5, the 4B and the 1060 run `v0.2.18` from a clean tree (no local lines in that build).
+The P4_5 and the 4B run 2.11 round 3 from the branch (with their local lines); the 1060 runs 2.11
+round 1 (flashed once for D-34); the rest `v0.2.18` or older.
 Ports move when boards are re-plugged:
 `Get-CimInstance Win32_PnPEntity | ? Name -match 'COM\d+' | select Name, DeviceID`. **Is a board
 alive?** Ask Home Assistant (`sensor.<device>_uptime`), not the cable. While developing, build and

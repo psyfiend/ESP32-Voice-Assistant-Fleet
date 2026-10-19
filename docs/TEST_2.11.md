@@ -212,8 +212,8 @@ page was placed. **off** = 1 lets every page flow as in round 1, to compare.
 # Round 3 (2026-10-19, morning, built unattended) - what the glass edits
 
 The same branch, on round 2: `bd88809` (the cluster's window), `751d1f5` (the keyboard), `29a93a2`
-(Visibility and hidden cards), `3816fe6` (Copy / Move), `6a5bde9` (removing a copy), and the
-cluster's Add cards. Flashed to the P4_5 and the 4B, each board's settings saved first. **Every change
+(Visibility and hidden cards), `3816fe6` (Copy / Move), `6a5bde9` (removing a copy), `96b54ba` (the
+cluster's Add cards), `2275545` ("which group?"). Flashed to the P4_5 and the 4B, each board's settings saved first. **Every change
 the tests made was put back** from those saved copies (`restore_settings.ps1`): the P4_5's file is
 the same as at 09:39, the 4B's as at 09:28. Words on screen are the "2.11 Clusters" mock's (section
 D) where it had them - proposals, K96 left the names open.
@@ -232,6 +232,7 @@ D) where it had them - proposals, K96 left the names open.
 | **Visibility, a mini tile** | - | **Hide from the cluster** - the window closes and the tile goes (its Visible, K104, brings it back); **Add card to dashboard** - a copy right after the cluster, in its group (K65); **Remove from the cluster** on a copy made on the glass, after a dialog - deleted, entry and all (the card it came from is untouched; the dashboard's own members only hide) |
 | **Add to a cluster** (Visibility, on the page) | - | **the page's clusters as chips, "Copy - stays here" / Move** (K100: one screen, Copy first), and Add. A copy is a card of its own (`in`: the cluster's id - K106's key) **with the name the card shows** ("Thermo", not HA's "THERMOSTAT Temperature"), wearing the cluster's group (K92 rule 2). **Move** is a copy, and the card itself to the page's hidden cards. Only a card standing for one thing - not a cluster or a group card (one level, K92 rule 3) |
 | **A cluster's Add cards** | greyed | **the page's cards that can join, each with a box**, then Copy / Move and Add - the same as above, several at once |
+| **Add card to dashboard** (a member's own view; a tile's Visibility) | the card made at once, in its group card's group (K65) | **"Joins which group?" first** (K92 rule 9): its group card's group as the first chip, **chosen already** - Add is still one tap - its entity's HA-area group beside it when that differs, and every other group in a list. The card goes right after its group card, in the group chosen |
 
 ## The pictures
 
@@ -264,6 +265,12 @@ on the 4B; the cluster's Add cards, and Office with two cards added:
 ![Add cards](../followups/211_r3_add_cards_p45.png)
 ![Added](../followups/211_r3_added_p45.png)
 
+"Which group?" for Kitchen's Sink (its area's group is its cluster's, so one chip), and its card
+made, right after the Kitchen cluster:
+
+![Which group](../followups/211_r3_which_group_p45.png)
+![Made](../followups/211_r3_joined_p45.png)
+
 ## Tests for you
 
 Office's lights are safe to use (W9). Each test puts back what it changed.
@@ -285,7 +292,8 @@ Office's lights are safe to use (W9). Each test puts back what it changed.
 | E13 | Long-press that new tile - SETTINGS - Visibility - Remove from the cluster - Remove | the copy goes; Office as before |
 | E14 | Thermo - Add to a cluster: Kitchen, Move, Add | Thermo leaves the page (listed under HIDDEN CARDS) and joins Kitchen. Remove the copy (E13), Restore Thermo (E10) |
 | E15 | Office's window - Add cards: tick two, Copy, Add | both join Office. Remove each copy (E13) |
-| E16 | The 4B: E1, E5, E9-E10, E12-E13 | the same at 720 px on Linen; the keyboard's keys about 5.6 mm wide |
+| E16 | Long-press Sink's tile - SETTINGS - Visibility - Add card to dashboard | "Joins which group?" with Kitchen chosen; pick another from the list, then Kitchen again; Add: a Sink card right after the Kitchen cluster (the page arranged again). Hide it from the page (E9) |
+| E17 | The 4B: E1, E5, E9-E10, E12-E13, E16 | the same at 720 px on Linen; the keyboard's keys about 5.6 mm wide |
 
 ## Choices that were mine
 
@@ -303,7 +311,10 @@ Office's lights are safe to use (W9). Each test puts back what it changed.
   touch minimum left the P4_5's field no room); a cursor that does not blink (a blink redraws the
   field twice a second); Save is a new button role, **CONFIRM**, in the accent.
 - **"Add to a group card or cluster" became "Add to a cluster"**: group cards and a new group card
-  as targets, and K92 rule 9's "which group?" for Add card to dashboard, wait for the card list.
+  as targets wait for the card list.
+- **"Which group?" is a view of the window**, not a dialog: chips for the two suggestions and a list
+  of the rest did not fit a dialog's box. The suggestion chosen already keeps Add one tap (the mock's
+  "one tap: the first is chosen already").
 - **A copy takes the name its card shows** (kept as its custom name), so Thermo's copy is "Thermo".
 - **Move is Copy and Hide from this page**: the card goes to the page's hidden cards, restorable -
   K92 rule 10's "Take them off the page" read as the pool, not a deletion.
@@ -325,20 +336,25 @@ Office's lights are safe to use (W9). Each test puts back what it changed.
 
 ## Not built (round 3's rest)
 
-K92 rule 9's "which group?" dialog; group cards and a new group card as Add targets (K96); the card
-list (K91: HA entities not on the page, making a cluster from a group); Delete from the pool; the
-keyboard for groups' names (nothing names a group on the glass yet).
+Group cards and a new group card as Add targets (K96); the card list (K91: HA entities not on the
+page, making a cluster from a group); Delete from the pool; the keyboard for groups' names (nothing
+names a group on the glass yet). A card made from a member keeps HA's name (K65), as before.
 
 ## Results (mine, before you)
 
 - **Every piece verified on both boards** with `/popup` and screenshots (the pictures above), and
   undone: Thermo hidden and restored; Porch hidden from Outside and back; Thermo copied into Office
   (the arranger re-arranged the page in 76 ms on the P4_5, 1 ms on the 4B), moved into Kitchen (39
-  ms), the copy removed; two cards added to Office at once (26 ms).
+  ms), the copy removed; two cards added to Office at once (26 ms); Sink's card made in Kitchen
+  through "which group?" (10 blocks, 221 ms).
 - **The keyboard costs ~7 KB of LVGL's pool** while it shows (P4_5: 105 to 112 KB with Office's
   window under it).
 - **Host tests**: 52, all PASS (no layout code changed this round).
 - **`WS_S3_4B` compiles** with the keyboard (built once, not flashed - #69).
+- **Structure check**: two files over 1,000 lines (`GUIManager.cpp` 1,489, `Card.cpp` 1,448 -
+  neither grew); `lv_obj_set_style_*` outside the kit 402 in 28 files (399 in 26 after round 1: the
+  two new views' list columns, as the cluster's window has); colour literals 10 in 2 files and shape
+  numbers none, unchanged; no LVGL in the core layers.
 
 ## Your results
 

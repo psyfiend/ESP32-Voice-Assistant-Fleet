@@ -478,3 +478,25 @@ Built on `feat/2.11-group-cards`; the owner's sheet is `docs/TEST_2.11.md`.
   from a group opened as a page); the other half of Q6 (a long press on a cluster's header - Claude:
   the cluster's own window, its management screen inside); spreading spare room as margins on a page
   with too little on it (the 7B's House page).
+
+**As built, round 3 (2026-10-19, unattended; `docs/TEST_2.11.md` round 3).** What the glass edits,
+on the kit, in the card window's views:
+
+- **The cluster's window** (`Popup/PopupCluster.cpp`, K104): HEADER - Name (the keyboard; the
+  cluster's `label_text`, empty = its group's name), Style, Sensor icons, Header slots (a view of the
+  members, ticked in priority order, four at most); MEMBERS - Visible per member, **Add cards** (the
+  page's one-entity cards, ticked, Copy / Move).
+- **The keyboard** (`Kit::keyboard()`, K95): a kit component, ASCII only, 7 mm keys. Used by the
+  cluster's Name and by Card UI's Custom chips (a card's name; its card label's words).
+- **Visibility** (`Popup/PopupVisibility.cpp`, K96) replaces SETTINGS' Remove card: **on the page**
+  Hide from this page (K66 for every card: `removed` on its entry, the page's pool) and Add to a
+  cluster (Copy / Move, K100); **a mini tile** Hide from the cluster, Add card to dashboard, and
+  Remove from the cluster for a copy made on the glass (deleted). **The page's hidden cards** are
+  listed in the page slot's panel with Restore.
+- **Copies in a cluster** (K91) are card entries with `in` (the cluster's id), built after its
+  compiled members (`CardAdded::membersIn()`, `CardPage::makeGroupCard()`); a copy takes the name its
+  card shows and wears the cluster's group (rule 2). **Move** = a copy and the card to the pool.
+- **"Which group?"** (rule 9) before Add card to dashboard: the group card's group chosen already,
+  the entity's HA-area group beside it, every other in a list.
+- **Not built**: group cards and a new group card as Add targets; the card list (HA entities not on
+  the page, making a cluster from a group); Delete from the pool; groups named on the glass.
