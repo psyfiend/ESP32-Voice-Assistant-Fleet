@@ -259,6 +259,25 @@ uint8_t membersIn(const char *clusterId, const CardSpec **out, uint8_t cap) {
     return n;
 }
 
+bool isMember(const char *cardId) {
+    for (uint8_t i = 0; cardId && i < s_n; i++)
+        if (!s_rec[i].removed && s_rec[i].in[0] && !strcmp(s_rec[i].id, cardId)) return true;
+    return false;
+}
+
+bool removeMember(const char *cardId) {
+    for (uint8_t i = 0; cardId && i < s_n; i++) {
+        Rec &r = s_rec[i];
+        if (r.removed || !r.in[0] || strcmp(r.id, cardId)) continue;
+        r.removed = true;   // the record stays (a Card points at its id) until the next boot
+        Settings::dropCard(r.id);
+        s_changed = true;
+        Serial.printf("[CardAdded] %s removed from %s (its entry deleted)\n", r.id, r.in);
+        return true;
+    }
+    return false;
+}
+
 bool inCluster(const char *clusterId, const char *entityId) {
     for (uint8_t i = 0; clusterId && entityId && i < s_n; i++)
         if (!s_rec[i].removed && !strcmp(s_rec[i].in, clusterId) && !strcmp(s_rec[i].entity, entityId)) return true;

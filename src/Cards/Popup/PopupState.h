@@ -486,6 +486,8 @@ void hiddenScenesCb(lv_event_t *ev);
 void confirmClose();
 void confirmHide();              // "Hide this card?" (K96, K66) over the held card's window
 void hideCardCb(lv_event_t *ev);
+void confirmRemoveCopy();        // "Remove this copy?" - a member copied into a cluster here (K91)
+void removeCopyCb(lv_event_t *ev);
 
 // PopupVisibility.cpp (2.11 round 3, K96)
 void buildVisibility();

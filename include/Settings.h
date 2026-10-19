@@ -120,6 +120,9 @@ bool setPage(const char *slug, const char *key, const char *value);
 // Writing, in RAM. nullptr = Reset (removes the key, and the card's or
 // scheme's object once empty). True when the document changed.
 bool setCard(const char *cardId, const char *key, const char *value);
+// The card's whole entry gone - a copy the owner removed from its cluster on
+// the glass (2.11, K91). Every other entry is kept until the owner prunes it.
+bool dropCard(const char *cardId);
 bool setScheme(const char *schemeName, const char *key, const char *value);
 bool setSystem(const char *area, const char *key, const char *value);
 bool setEntityFlag(const char *entityId, const char *key, bool value, bool dflt);

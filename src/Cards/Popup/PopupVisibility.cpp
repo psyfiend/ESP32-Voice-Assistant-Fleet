@@ -144,14 +144,18 @@ void buildVisibility() {
     if (!c) return;
     ClusterCard *cl = clusterOfTile();
     lv_obj_t *list = column(cl ? "IN THE CLUSTER" : "ON THIS PAGE");
-    DeckRowSpec rows[2];
+    DeckRowSpec rows[3];
     if (cl) {
         const Entity *e = c->firstEntity();
         const bool made = e && cl->hasId() && CardAdded::addedFor(cl->id(), e->desc.id);
-        rows[0] = { "Hide from the cluster", Kit::RowKind::ROW_BUTTON, "Hide", 0, c->hasId(), hideTileCb, nullptr };
-        rows[1] = { "Add card to dashboard", Kit::RowKind::ROW_BUTTON, made ? "Added" : "Add", 0,
-                    !made && e && cl->hasId(), addTileCb, nullptr };
-        Kit::rows(list, rows, 2);
+        uint8_t n = 0;
+        rows[n++] = { "Hide from the cluster", Kit::RowKind::ROW_BUTTON, "Hide", 0, c->hasId(), hideTileCb, nullptr };
+        rows[n++] = { "Add card to dashboard", Kit::RowKind::ROW_BUTTON, made ? "Added" : "Add", 0,
+                      !made && e && cl->hasId(), addTileCb, nullptr };
+        // A copy made here can go again, for good (K91; the dashboard's members only hide).
+        if (CardAdded::isMember(c->id()))
+            rows[n++] = { "Remove from the cluster", Kit::RowKind::ROW_BUTTON, "Remove", 0, true, removeCopyCb, nullptr };
+        Kit::rows(list, rows, n);
         note(list, "A hidden member stays in the cluster's list and comes back from the cluster's window "
                    "(a long press on its header).");
         return;

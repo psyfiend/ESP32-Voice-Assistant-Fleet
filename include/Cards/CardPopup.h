@@ -120,7 +120,10 @@ public:
     //   /popup?sparks=N     the edge sparks from the next window: 0 now and then,
     //                       1 once, 2 off (not kept)
     //   /popup?removecard=3 Hide's dialog (K96) over any card's window, to look
-    //                       at; close=1 takes it down (2 is the real one)
+    //                       at; close=1 takes it down (2 is the real one; 1 hides
+    //                       at once; 4 / 5 a copy in a cluster: its dialog / removed)
+    //   /popup?addto=N&mv=1 Add to a cluster: the page's Nth, Copy (mv=0) or Move
+    //   /popup?restore=N    the page panel's Restore beside hidden card N
     //   /popup?about=1|0    "About this board" open or closed (2.12 P4)
     //   /popup?drawer=1|0   the system panel open or closed, as a tap on the
     //                       header's icon (#97: the harness's look at it)

@@ -391,6 +391,15 @@ void CardPopup::debugService(lv_timer_t *t) {
             // its Hide, and close=1 takes it down with the window.
             confirmHide();
             dbgOut("dialog up\n");
+        } else if (a.removeCard == 4) {
+            // removecard=4 (2.11, K91): a copy in a cluster - its "Remove this copy?" dialog.
+            confirmRemoveCopy();
+            dbgOut(CardAdded::isMember(held->id()) ? "dialog up\n" : "not a copy made here\n");
+        } else if (a.removeCard == 5) {
+            // removecard=5: the copy removed, as the dialog's Remove - its entry deleted.
+            snprintf(id, sizeof(id), "%s", held->id());
+            if (CardAdded::removeMember(id)) { dbgOut("removed %s\n", id); close(); s_dreq.store(DREQ_CLOSING); return; }
+            dbgOut("%s is not a copy made here\n", id);
         } else if (held->mini()) {
             // A mini tile's: Visibility's Hide from the cluster.
             dbgOut("%s hidden from its cluster\n", held->id());

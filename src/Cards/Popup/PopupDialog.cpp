@@ -48,6 +48,40 @@ void confirmHide() {
     s_confirm = Kit::dialog(spec);
 }
 
+// A COPY IN A CLUSTER, REMOVED (2.11, K91): it was made on the glass, so
+// removing it deletes it - after the same dialog. The card it was copied from
+// is untouched.
+void confirmRemoveCopy() {
+    confirmClose();
+    Card *held = CardPopup::isOpen() ? cardOf(h.surface) : nullptr;
+    if (!held || !CardAdded::isMember(held->id())) return;
+    char buf[200];
+    snprintf(buf, sizeof(buf), "This copy of \"%s\" will be removed from the cluster and deleted; the card "
+                               "it was copied from is unaffected.", s.name);
+    Kit::DialogSpec spec = {};
+    spec.role    = Kit::DialogRole::DLG_DESTRUCTIVE;
+    spec.title   = "Remove this copy?";
+    spec.body[0] = buf;
+    spec.buttons[0] = { "Cancel", Kit::ButtonRole::BTN_CANCEL, confirmCancelCb };
+    spec.buttons[1] = { "Remove", Kit::ButtonRole::BTN_DESTRUCTIVE, [](lv_event_t *) {
+        lv_async_call([](void *) {
+            confirmClose();
+            Card *held = CardPopup::isOpen() ? cardOf(h.surface) : nullptr;
+            if (held && CardAdded::removeMember(held->id())) CardPopup::close();
+        }, nullptr);
+    } };
+    spec.nButtons = 2;
+    spec.width    = LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(UI::shape().W_DIALOG_MAX));
+    spec.outside  = confirmCancelCb;
+    spec.countdown = true;
+    s_confirm = Kit::dialog(spec);
+}
+
+void removeCopyCb(lv_event_t *ev) {
+    (void)ev;
+    lv_async_call([](void *) { confirmRemoveCopy(); }, nullptr);
+}
+
 void hideCardCb(lv_event_t *ev) {
     (void)ev;
     lv_async_call([](void *) { confirmHide(); }, nullptr);

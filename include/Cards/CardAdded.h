@@ -75,6 +75,10 @@ bool remove(const char *cardId);
 bool    addTo(const Card &cluster, const Entity &e, char *idOut, size_t cap);
 uint8_t membersIn(const char *clusterId, const CardSpec **out, uint8_t cap);
 bool    inCluster(const char *clusterId, const char *entityId);   // a copy of it is in there already
+bool    isMember(const char *cardId);       // a copy added to a cluster here
+// Removed from its cluster: a copy made on the glass is deleted, entry and all -
+// the card it was copied from is untouched.
+bool    removeMember(const char *cardId);
 
 // --- THE PAGE'S POOL, FOR EVERY CARD (2.11 round 3, K66, K96) -----------------
 // "Hide from this page" sends any card on a page there - a compiled one too:
