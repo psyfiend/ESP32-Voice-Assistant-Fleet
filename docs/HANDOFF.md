@@ -116,7 +116,9 @@ have names ("Words", K22). Every round and measurement of 2.10 is in `docs/archi
 `docs/design/interview-phase2-3.md` is the blueprint for 2.8, 2.11 and Phase 3; Claude facilitates
 with the owner. §1 look and feel closed 2026-10-01 (`look-and-feel.md`); §2 card popups closed
 2026-10-02 (built as 2.10); **§3 the header's slots answered 2026-10-15** and built as 2.8
-(`header-slots.md`; only Q3, the clock's format, is still open). **§4 (2.11 group cards) is next**; #87 (the companion web
+(`header-slots.md`; only Q3, the clock's format, is still open). **§4 (2.11 group cards) is under
+way** (first sitting 2026-10-18, `group-cards.md` §6, K88-K91; Claude's model of how the pieces fit,
+§6.3, waits for the owner; then the cluster mock); #87 (the companion web
 app with a true preview, D-8) should be scoped before 3.1. The group taxonomy draft is
 `group-cards.md` (K67, K68). Artifacts on claude.ai: "2.8 Header Slots", "Glass, Satin, Flat"
 (#99), "Card Popup Mock", "Layout Playground" v4 (the arranger, #78), "Beyond the Grid", "Linen Fill

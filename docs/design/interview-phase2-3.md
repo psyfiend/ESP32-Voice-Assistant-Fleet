@@ -174,23 +174,34 @@ cluster headers; a solo card's header keeps its formula (Q6).
 
 ## 4. Group and area cards (2.11)  → `docs/design/group-cards.md`
 
+**UNDER WAY - first sitting 2026-10-18** (`group-cards.md` §6; K88-K91). Claude's model of how
+groups, group cards, clusters and copies fit, with what can go wrong, waits for the owner (§6.3).
+
 1. **Confirm the two kinds** (`card-sheet.md` §6): *aggregate* (one card, several same-kind
    entities acting as one, e.g. the 3 office bulbs) and *area* (a multi-cell card holding several
    different entities with a header). Any third kind? **[BLOCKING 2.11]**
+   **ANSWERED 2026-10-18 -> `group-cards.md` §6.1** (group, group card, cluster, group page; source
+   and presentation; K88)
 2. **Aggregate tap** when members disagree (some on): all off, or all on? *`cards.md` §4 row 4
    chose "tap toggles all; mixed state has its own indicator".* Still right?
+   **DROPPED - answered in 2.10b** (#66's comment: as HA's light group, "On when: any / all")
 3. **Area card sizes**: smallest useful size (2x1? 2x2?), and the most entities it may hold per size.
 4. **Area header**: which promoted values (temperature, humidity, occupancy, light level)? One line
-   or two? What if the area has none?
+   or two? What if the area has none? **IN PART** (D-14, #66: a bar header whenever there is
+   content; status as icons by shape and fill) - number or icon, one line or two: on the mock
 5. **Inside an area card**: entities as mini tiles (icon + state), as rows (icon, name, state), or
    chosen per entity? **Show-don't-spec: Claude mocks both.**
+   **ANSWERED 2026-10-18 -> `group-cards.md` §6.1**: mini tiles, no border, the icon over its entity
+   label (K89)
 6. **Long press inside an area card**: on a member -> that member's popup; on the header -> the
    area's popup. Agreed?
 7. **An area on a small screen** that cannot fit its members: collapse to an aggregate-style summary
-   card, or drop members by priority?
+   card, or drop members by priority? **PROPOSED** (`group-cards.md` §6.3 rule 6): shown as its 1x1
+   group card, and the arranger says so
 8. **Rooms as linked pages** (`pages.md`): should an area card's header tap open the room's full
    page? How does "back" work - a header back button, a swipe, or both?
 9. **Area colour**: per area, set once, used by every card in it (`card-sheet.md` §5.4) - agreed?
+   **DROPPED - answered by K46 / K47** (the colour is the group's, device-wide)
 
 ## 5. Edge gestures, the system panel, and what becomes of the deck  → `docs/design/context-panels.md`
 
