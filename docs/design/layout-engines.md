@@ -109,6 +109,34 @@ packing, each cluster in turn grabbing what is beside it. Version 5, in the arti
   tilew|tileh|hdr>&v=<number>` (empty: the playground's default) - the next build arranges again.
   What the last run did: the System Doctor's page report, and `/popup`'s first lines.
 
+### Prototyped next: Layout Playground version 6 (2026-10-19, round 4) - for the owner to try
+
+The owner's round-4 notes: a tile's icon must be a solo card's size and look; clusters keep their
+whole cell (labels are for solo cards); clusters need more of the page than a 1x1 cell, "a cluster
+deserves 1x the proportional cell space, whereas a solo card should occupy .75x"; tiles and cards of
+the same shape. Version 6, in the same artifact (v5 and v4 still selectable beside it):
+
+- **Sub-units**: the page is a finer grid. A solo card covers CARD x CARD sub-units and a tile
+  TILE x TILE, two knobs. A cluster of tc x tr tiles is a (TILE*tc) x (TILE*tr) block, or one
+  sub-unit wider or taller to close a gap; a card never changes size. Clusters wear no label and no
+  header (a Cluster header switch puts one back), so a card pays for its label inside its own square.
+- **Tiles drawn as cards are** - disc, glyph and name at a card's proportions - clear until on, then
+  filled (the Fill card state); or bare (no ring), the glyph taking the disc's room.
+- **Cost**: a tile icon a different size from a card's, `40 x 100 x log(ratio)^2`; a tile shaped
+  unlike a card, `20 x 100 x log(ratio)^2`; empty sub-units at the empty-cell price per card's worth;
+  long clusters, order and leaving the board's grid as v5; an empty tile slot 8.
+- **Grids**: every sub-unit grid with a solo card between the smallest and biggest size and within
+  two cards across or down of the board's own; the cheapest first, and a grid that cannot beat the
+  sixth-best page is skipped. Rows are bit masks; 25,000 steps per grid. ~100 ms for the P4_5 in the
+  browser.
+
+What it showed on the House page (16 entities, by area, no header): **tiles a third bigger than
+cards (4:3) fit nowhere but the 7-inch board** - a tile bigger than a card needs more page than the
+same entity as a card would. **Equal squares (3:3)** fit five of the seven boards with no empty
+sub-unit, tile icons within 7% of card icons - a card's label costs about what a cluster's padding
+does. **Bare tile icons at 2:3** fit all seven, and every icon on the page grows (P4_5: a 3.9 mm
+glyph against 3.4 mm). The owner decides from the playground before the C++ arranger changes.
+
 ## The domain weight map
 
 Which cards earn space: a weight per card - its domain's (climate and media heavier than a lone

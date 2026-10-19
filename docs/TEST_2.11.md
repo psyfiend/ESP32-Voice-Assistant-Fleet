@@ -465,9 +465,34 @@ The views as Card UI (P4_5, and the cluster's window on the 4B):
 
 1. **Halo on Linen at 30%** - right, or lower still? (The slider is there to find out.)
 2. **The summary's words** past two members: "All" and "2 open" - right?
-3. **v6** comes next: the solo-card scale and finer sub-units in the Layout Playground, for you to
-   try before the arranger changes. Anything you want it to show besides the House page on the
-   P4_5 and the 4B?
+3. **Layout Playground v6** - which way for the arranger? (See "The grid: Layout Playground v6"
+   below.) Equal squares, 4:3 on pages with fewer entities, bare tile icons, or something else.
+
+## The grid: Layout Playground v6
+
+Published to the same artifact (`https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp`), v6 the
+default and v5 / v4 beside it. **The page is a grid of sub-units**: a solo card covers one square of
+them, a cluster's tile another, set separately (your 1x against 0.75x); a cluster may grow one
+sub-unit to close a gap, a card never changes size. Clusters wear no label and no header. Tiles are
+drawn as cards are, and the arranger is paid to keep each tile's icon a card's size and each tile a
+card's shape. Three buttons under Arranger try the three settings below; design notes in
+`layout-engines.md` ("Prototyped next").
+
+What it shows on the House page (16 entities, by area):
+
+| Setting | Fits | Icons | On the P4_5 |
+|---|---|---|---|
+| **4:3** (tile 4 sub-units, card 3) | the 7-inch board only | tiles' icons about a third bigger than cards' | does not fit: a tile bigger than a card needs more page than the same entity as a card |
+| **Equal** (3:3) | five of seven boards, no gaps | tiles within 7% of cards | 6 x 3 cards' worth; card 16 mm, glyph 3.4 mm |
+| **Bare tile icons** (2:3, no ring) | all seven | tiles within 7% of cards | card 30 x 18 mm, glyph 3.9 mm - every icon bigger |
+
+The surprise was Equal: a card's label takes about what a cluster's padding does, so equal squares
+already match. 4:3 suits a page with fewer entities.
+
+| # | Do this | PASS if |
+|---|---|---|
+| G1 | Open the playground; P4_5 and 4B, Midnight and Linen; each of the three buttons | the tiles' icons look the solo cards' size, and you can say which you prefer |
+| G2 | Drag the sub-unit knobs; tick Cluster header; switch Tiles and Tile icon | the page follows, and the Clusters box says each cluster's icon and shape against a card |
 
 ## Results (mine, before you)
 
