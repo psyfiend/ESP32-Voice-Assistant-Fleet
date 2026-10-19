@@ -1,8 +1,8 @@
 # Groups, areas and clusters - what is a "group card"? (milestone 2.11, #66)
 
-**Status: interview §4 under way, 2026-10-18** - the names, mini tiles and what the glass edits are
-answered (§6.1); Claude's model of how the pieces fit, with what can go wrong, waits for the owner
-(§6.3). §1-5 are the draft taxonomy of 2026-10-01 and the owner's model of 2026-10-12; where they
+**Status: interview §4 under way, 2026-10-19** - the names, mini tiles and what the glass edits are
+answered (§6.1); Claude's model of how the pieces fit is accepted (§6.3), with the owner's notes
+(§6.4); the mocks are next ("2.11 Clusters", Layout Playground v5). §1-5 are the draft taxonomy of 2026-10-01 and the owner's model of 2026-10-12; where they
 disagree with §6, §6 wins. Nothing here is built. Related:
 `card-sheet.md` §6 (aggregate vs area, draft 2), `look-and-feel.md` §3.8 (clusters, the arranger),
 `ha-websocket.md` (area resolution, measured).
@@ -200,7 +200,7 @@ this.
   status as icons, told apart by shape and fill. Left: temperature and lux as a number or an icon;
   one line or two.
 
-### 6.3 Claude's model of how the pieces fit - OPEN, for the owner
+### 6.3 Claude's model of how the pieces fit - ACCEPTED 2026-10-19 (K92), with §6.4's notes
 
 The owner asked: must groups be exclusive? Are Desk's lamps in Desk or in Office? Which group does a
 member copied to the page join? Can a cluster of two lights and a TV, turned into one card, toggle
@@ -300,3 +300,64 @@ put the keyboard later; until it exists, a new cluster takes its base group's na
 PC. §4 Q3 (sizes) goes to the Layout Playground; Q6 (long press inside a cluster) and Q8 (group
 pages and "back") come next; §5's "Open for 2.11" (Card label "None", the label type per group)
 after.
+
+### 6.4 The owner's notes on the model (2026-10-19)
+
+"The proposed model in §6.3 looks legit to me" - with these:
+
+- **Extending a group defined at the source (K93).** The owner's idea: a member added to Desk keeps
+  the card called "Desk", and behind the scenes the board makes it a group card holding
+  [Desk's Hue group + the new member]. Claude: manageable - it is rule 3's nesting, done for the
+  user. The card keeps its id, words, group, settings and place; its source changes from "the Hue
+  group" to "a list holding the Hue group and the extras". The tap is one HA call with both ids (HA
+  expands the Hue group). The Members view lists Desk's lamps (from Hue: they can be hidden, not
+  removed) and then the extras (removable). Desk's Hue scenes stay, acting on the Hue lamps only,
+  and the view says so. Removing the last extra makes it the plain Hue card again.
+- **History for a group made on the device (K94):** scenes do not matter much; history does, and a
+  **local history recorder is already in scope** - for MQTT cards, sensors wired to the board, and
+  the board's own counters (boots, firmware updates, others to come). A device-made group card's
+  History is then its members', from HA or from that recorder.
+- **"A cluster based on a group is a snapshot"** - the owner asked what this means. Making a
+  cluster from the Kitchen group copies the cards ticked at that moment into it. A Kitchen entity
+  brought onto the board later (a new Kitchen light from HA) becomes a solo card in the Kitchen
+  group, on the page; it does not appear in the Kitchen cluster by itself. **OPEN:** keep the
+  snapshot and add it by hand (Claude's recommendation: a cluster that changes by itself moves the
+  page), or offer "Also add to the Kitchen cluster?" when a card joins a group that has a cluster.
+- **The on-screen keyboard comes in 2.11 (K95)** - "Should we just take the plunge?" Claude: yes.
+  It has been put off three times (K37), and 2.11 is the first place it is needed: group and
+  cluster names. A kit component, ASCII only (the fonts carry nothing else), used by the custom card
+  name (K37) as well.
+- **A card's options by where it is (K96)** - the SETTINGS "Visibility" row, in flux until now,
+  becomes a button opening a view whose choices depend on where the card is (names not settled):
+  - **A card on the page:** *Hide from dashboard* - with a way to see the hidden cards and restore
+    them (K66's pool); *Add to group* - a screen to add the card to an existing group card, to make
+    a new group card (choosing its sibling members), or to add it to an existing cluster, as a copy
+    or as a move.
+  - **A member of a group card:** *Add card to dashboard*; when that member is already on the
+    dashboard, *Remove from dashboard*.
+  - **A member in a cluster:** *Hide from cluster view* - with a way to see the hidden ones and
+    restore them; *Add card to dashboard*.
+  - **The cluster itself:** a "card / tile management" screen - members shown or hidden, cards
+    added, which members fill the header's slots. ("This may be delving too deeply into 'do that
+    from webapp' territory", the owner says; Claude: it is K91's minimum, a list of rows on the kit,
+    and belongs on the glass.)
+
+  Claude's notes: *Add to group* in these words means a group card or a cluster; choosing the
+  card's **group** (its label's name and colour, K88) is a separate choice on the same screen, and
+  the two need different words. *Hide* is K66's remove: the card goes to the page's pool with its
+  settings, and the pool's list restores it (or deletes it, on the owner's word).
+- **A cluster can be 1x1 (K97)** - the owner, from the House page's two garage doors: as a group card
+  they would go "on" if either door is open, but better still if one cell showed which door. "Maybe
+  a cluster with few enough mini tiles could actually fit a 1x1 cell?" On the 7" boards at 6x3 a
+  cell is about 24 x 25 mm - room for 2 x 2 mini tiles with labels a size down; on the P4_5 at 5x3
+  (about 22 x 19 mm), two side by side. The arranger may give a cluster one cell when its tiles fit;
+  a 1x1 cluster has no header, and wears its group's card label as a solo card does. To confirm on
+  the mock.
+- **The arranger, the owner's verdict on the playground (v4):** the first look "blew me away"; over
+  time, "rather unhappy with the way the auto-layout feature works": it could not find layouts the
+  owner was sure existed, made "very unbalanced clusters where a cluster becomes enormous with just
+  2 mini tiles", or stretched them into long rows and columns. Claude, from v4's code: its packing
+  is greedy (first fit in reading order, so a tiling that needs another order is never found), it
+  tries only five shapes per cluster and stops after 4,000, and the spare cells are handed out
+  AFTER packing - each cluster in turn grabbing the empty cells beside it, so the first one grabs
+  most. Playground v5 replaces it (#78).
