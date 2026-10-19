@@ -380,3 +380,102 @@ names a group on the glass yet). A card made from a member keeps HA's name (K65)
 **2026-10-19, afternoon** (with round 1's notes): "lots of thoughts and notes about the sheets" to
 come; **at a minimum, the new views should look like Card UI and UI Tweaks** - the same face, chip
 styles, buttons, and the same columns and justification.
+
+# Round 4 (2026-10-19, afternoon) - your notes, and the summary card
+
+The same branch: `a61718a` (the summary card), `d15b0e6` (the halo, its corners, clusters filling
+their cells, tiles' discs), `ea68c95` (the views as Card UI). Flashed to the P4_5 and the 4B, their
+settings saved first; nothing in them was changed this round. Your answers before it (2026-10-19):
+tiles keep the disc and match the solo cards in size and look, the grid giving clusters the room;
+**clusters fill their cells**; **the grid goes to Layout Playground v6 first**; the halo's strength
+**a slider in UI Tweaks**, 50% on Midnight and Fleet and 30% on Linen until moved.
+
+## What changed
+
+| Where | Before | Now |
+|---|---|---|
+| **The halo's strength** | full black at the edge, every scheme | **50% on Midnight and Fleet, 30% on Linen**, and **a Halo slider at the foot of UI Tweaks** (0-100%), kept per scheme - each scheme remembers its own. Reset all puts each scheme's own back. Painted at that strength, so it stays smooth (drawn faded, the steps came back) |
+| **Where a panel meets the bar** | square marks beside the coves, dark specks in them, a light strip at the panel's top corners; on Linen a grey patch at the system panel's corner | **the tab, its coves and the panel's top are one shape with one halo**, painted for the shape: no marks, nothing darkened twice. The panel's top corners are whole arcs; **a panel flush with its tab has a square corner on that side** (the system panel's right); the bar's own drop shadow (Linen) is off while a panel is open - the halo is the panel's shadow |
+| **Clusters** | kept a tag's room above them, so their tops lined up with the cards' | **fill their whole cells**; only solo cards wear Float's and Tag's room. A cluster's top stands a little above its neighbours' |
+| **Tile icons** | sized from the tile alone - bigger or smaller than the solo cards' | **a solo card's disc and icon** wherever the tile has the room (measured from a 1x1 card on the page); smaller only where it does not. **On the 4B they now match; on the P4_5 at 5 x 3 the tiles are still smaller** - that is the room v6 is for. A tile's disc no longer overflows its room (it did once clusters grew taller) |
+| **The garage doors** | two cards, North and South | **one summary card, "Doors"** (K98): open while either door is, its words naming the open one - **"North", "South", "Both"** (more than two: "All", or "2 open"); a **tap opens its Members** (never a door's own action); same ids, so North's and South's settings are theirs |
+| **The views** (the cluster's window, Header slots, Add cards, Visibility, Add to, which group) | rows of words and checkboxes, buttons beside them | **as Card UI and UI Tweaks**: the kit's chip table - each option's name right-justified against its chips (stacked on a narrow window) - and the actions as buttons below. **Members: Shown / Hidden**; Header slots: **Yes / No**; **Add cards: each card No / Copy / Move** (one choice per card); which group: **every group a row with Join**, its group card's first and chosen |
+
+## The pictures
+
+The page panel and the system panel on Linen (the 4B, close up) - smooth halo, whole arcs, the
+system panel's square corner - and the Halo slider:
+
+![The page panel](../followups/211_r4_pagepanel_corners_4b.png)
+![The system panel](../followups/211_r4_syspanel_corner_4b.png)
+![Halo slider](../followups/211_r4_halo_slider_p45.png)
+
+The House pages - clusters to their cells' edges; the 4B's tiles the solo cards' size, the P4_5's
+smaller:
+
+![The 4B](../followups/211_r4_house_4b.png)
+![The P4_5](../followups/211_r4_house_p45.png)
+
+The summary card's words on a test build with the doors pointed at two virtual lamps ("Both"; one
+read "North"), not kept; its Members on the real doors:
+
+![Both](../followups/211_r4_summary_both.png)
+![Doors' members](../followups/211_r4_doors_members_p45.png)
+
+The views as Card UI (P4_5, and the cluster's window on the 4B):
+
+![The cluster's window](../followups/211_r4_cluster_window_p45.png)
+![On the 4B](../followups/211_r4_cluster_window_4b.png)
+![Add cards](../followups/211_r4_add_cards_p45.png)
+![Visibility](../followups/211_r4_visibility_p45.png)
+![Which group](../followups/211_r4_which_group_p45.png)
+
+## Tests for you
+
+| # | Do this | PASS if |
+|---|---|---|
+| F1 | Open each header panel on Midnight, then on Linen | the halo reads as a shadow, about half as strong (lighter on Linen); smooth, no steps; no marks beside the coves or at the panel's top corners |
+| F2 | The system panel (the status icons) on Linen | its right side runs straight from the tab into the panel - no notch; no grey patch at the corner |
+| F3 | UI Tweaks - scroll to the foot - move Halo | the number follows the knob; on release the window's halo changes; switch scheme: that scheme keeps its own; Reset all: 50 / 30 again |
+| F4 | Look at the House page on each board | clusters reach their cells' edges; on the 4B the tiles' discs are the solo cards' size |
+| F5 | Open a garage door (or wait for one) | Doors lights up and reads "North" or "South"; both open, "Both" |
+| F6 | Tap Doors | its Members: North and South with their states |
+| F7 | Long-press Office's header | the window as Card UI: Header style, Sensor icons, each member Shown / Hidden; Rename, Header slots, Add cards below |
+| F8 | Add cards: one card Copy, another Move, Add | both join Office; the moved one leaves the page for its hidden cards. Remove the copies (a tile's Visibility) and Restore the moved one (House panel) |
+| F9 | Thermo's Visibility; Add to a cluster; Sink's Add card to dashboard | buttons and chip rows as Card UI's; each still does what round 3's did |
+
+## Choices that were mine
+
+- **The halo's strength is a per-scheme setting** (`schemes.<name>.halo`), as the selector's look is:
+  a slider on Linen does not move Midnight's.
+- **The bar's drop shadow is off while any panel is open** - the simplest way to keep it off the
+  halo's corners; it returns when the last panel has gone.
+- **A tile matches the page's solo card measured from the first 1x1 card on the page** - every 1x1
+  card's hero is the same size on a page, so any one will do.
+- **"Doors"** for the summary's own name (in Garage); "All" past two members and "2 open" for some -
+  your "North" / "South" / "Both" are the two-member case.
+- **The summary's tap is Members** - K98 offered History, Members or a small window; Members says
+  which door, and a tap never moves a door.
+- **One choice per card in Add cards** (No / Copy / Move) in place of a box per card and one Copy /
+  Move for all - it fits the chip table and lets one card copy while another moves.
+- **"Which group?" lists every group as a row**, its suggestions first, in place of two chips and a
+  list - one control, as the chip table has.
+
+## Questions for you
+
+1. **Halo on Linen at 30%** - right, or lower still? (The slider is there to find out.)
+2. **The summary's words** past two members: "All" and "2 open" - right?
+3. **v6** comes next: the solo-card scale and finer sub-units in the Layout Playground, for you to
+   try before the arranger changes. Anything you want it to show besides the House page on the
+   P4_5 and the 4B?
+
+## Results (mine, before you)
+
+- Each change seen on glass by screenshot on both boards (the pictures above). The summary card's
+  words checked on a throwaway build with the doors pointed at virtual lamps; the doors themselves
+  only read closed today.
+- The slider row joins the kit's chip table: Card UI, UI Tweaks and anything else can use it.
+
+## Your results
+
+(to come)
