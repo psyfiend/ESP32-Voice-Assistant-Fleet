@@ -67,13 +67,20 @@ not yet - bring each over when it is next changed (`ui-architecture.md` §6). 2.
 ## What is next with the owner
 
 1. **2.11 group cards** (#66, with the page arranger #78) - **next, the owner's choice
-   (2026-10-17)**. It starts with **the design interview's §4** (`interview-phase2-3.md` §4, its
-   questions marked [BLOCKING 2.11]; the draft and the owner's model in `group-cards.md` §4-5, K65-K68)
-   and the arranger's scoring in the "Layout Playground" artifact (#78), mocks before code. What it
-   builds on: `layout-engines.md` (a cluster is a container inside an item; the bento, weight-map,
-   hero-region and orbital proposals), `cards.md` §4 (the group / room card) and §8 (one slot system
-   - a cluster's header is the page header's slots and planner again), K17 / K46 (members as cards,
-   groups and their colours). The hero region is where #100's full clock and a music player belong.
+   (2026-10-17); the design interview's §4 is under way** on branch `docs/2.11-interview` (docs
+   only, pushed, no PR yet). **Where it stands (2026-10-19)**: the words, mini tiles, what the glass
+   edits and the whole group model are decided (`group-cards.md` §6, K88-K97); three mocks wait for
+   the owner (§6.5): **"2.11 Clusters"** (its questions C1-C8), **"Panel Edges"** (the owner's
+   header-panel edges and a halo round every window - requests from 2026-10-19), and **Layout
+   Playground v5** (a new arranger: every tiling, spare room shared out; its weights to tune, its
+   speed the open problem for the port - `layout-engines.md` "As prototyped"). **Next**: the owner's
+   answers to C1-C8 and on the two other mocks, recorded; Q6 (long press in a cluster) and Q8 (group
+   pages and back) asked; then **a fresh session builds 2.11** from these docs (the owner's
+   suggestion, to start with a small context) - its first round also carries D-34 (the 7" boards'
+   header words) and, if the owner approves the mock, the panel edges and halo (measured with
+   `/bench`). Merge the docs branch first, or build on it: the owner's call. The keyboard (K95) is
+   2.11's too. What 2.11 builds on: `layout-engines.md` (a cluster is a container inside an item),
+   `cards.md` §4 and §8, `header-slots.md` §10 (the planner of claims), K17 / K46.
 2. **#76, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a queue any
    task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to dismiss), a
    notice's detailed form in the middle for a while then its minimal "!" in status, a place that
@@ -117,11 +124,12 @@ have names ("Words", K22). Every round and measurement of 2.10 is in `docs/archi
 with the owner. §1 look and feel closed 2026-10-01 (`look-and-feel.md`); §2 card popups closed
 2026-10-02 (built as 2.10); **§3 the header's slots answered 2026-10-15** and built as 2.8
 (`header-slots.md`; only Q3, the clock's format, is still open). **§4 (2.11 group cards) is under
-way** (first sitting 2026-10-18, `group-cards.md` §6, K88-K91; Claude's model of how the pieces fit,
-§6.3, waits for the owner; then the cluster mock); #87 (the companion web
+way** (sittings 2026-10-18 and 10-19, `group-cards.md` §6, K88-K97; the model accepted, three mocks
+waiting - "What is next" item 1); #87 (the companion web
 app with a true preview, D-8) should be scoped before 3.1. The group taxonomy draft is
-`group-cards.md` (K67, K68). Artifacts on claude.ai: "2.8 Header Slots", "Glass, Satin, Flat"
-(#99), "Card Popup Mock", "Layout Playground" v4 (the arranger, #78), "Beyond the Grid", "Linen Fill
+`group-cards.md` (K67, K68). Artifacts on claude.ai: "2.11 Clusters", "Panel Edges" (2026-10-19),
+"2.8 Header Slots", "Glass, Satin, Flat"
+(#99), "Card Popup Mock", "Layout Playground" v5 (the arranger, #78), "Beyond the Grid", "Linen Fill
 and Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
 
 ## Fires still burning - each has an owner doc or issue, none needs the next session

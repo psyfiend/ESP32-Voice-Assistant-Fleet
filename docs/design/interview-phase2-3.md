@@ -174,8 +174,9 @@ cluster headers; a solo card's header keeps its formula (Q6).
 
 ## 4. Group and area cards (2.11)  → `docs/design/group-cards.md`
 
-**UNDER WAY - first sitting 2026-10-18** (`group-cards.md` §6; K88-K91). Claude's model of how
-groups, group cards, clusters and copies fit, with what can go wrong, waits for the owner (§6.3).
+**UNDER WAY - sittings 2026-10-18 and 10-19** (`group-cards.md` §6; K88-K97). The group model is
+accepted (§6.3-6.4); three mocks and their questions (C1-C8) wait for the owner (§6.5). Still to
+ask: Q6, Q8.
 
 1. **Confirm the two kinds** (`card-sheet.md` §6): *aggregate* (one card, several same-kind
    entities acting as one, e.g. the 3 office bulbs) and *area* (a multi-cell card holding several

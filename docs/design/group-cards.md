@@ -361,3 +361,33 @@ after.
   tries only five shapes per cluster and stops after 4,000, and the spare cells are handed out
   AFTER packing - each cluster in turn grabbing the empty cells beside it, so the first one grabs
   most. Playground v5 replaces it (#78).
+
+### 6.5 The mocks (2026-10-19, built unattended) - for the owner to react to
+
+- **[2.11 Clusters](https://claude.ai/artifact/9mRzE8nb7U8nYSfxAxQhrV)** - the House page with
+  clusters on the P4_5 and the 4B (switches for the open looks), a cluster in one cell on every
+  board at true size, Desk as a card / a cluster / a group page, and a card's options by where it is
+  (K96). Its section E asks **C1-C8**, each with Claude's recommendation: the mini tile's "on" (lit
+  disc), header values (number), one header line, the group's colour on a cluster (a swatch), where
+  one-cell clusters are allowed, one Tile / Header / Hidden choice per member, Copy / Move when adding
+  to a cluster, and the snapshot (§6.4).
+- **What the mock measured** (estimates from the BSP diagonals until 2.11 runs on glass):
+  - **One-cell clusters with every tile at 9 mm** fit only on the 7" boards (7B, 1060: a 23 x 25 mm
+    cell holds the two doors at 20 x 10 mm, Desk's three lamps at 10 x 10 mm) and the CYD_S3_8048.
+    On the P4_5, the S3_5B, the 4880 and the 3248, two tiles are tight (8-9 mm) and three too
+    small; the 4B's narrow cells (15.5 mm) hold neither. So K97 is a 7"-and-up feature unless the
+    owner accepts tight tiles.
+  - **The P4_5's cells are short** (16.4 mm): a one-row cluster's tiles are about 8.8 mm tall under
+    a 5 mm header - at the touch minimum. Two-line headers would push them under it.
+- **[Panel Edges](https://claude.ai/artifact/U8wGGgPEWHpgKNvZ2miYMu)** - the owner's requests 2 and 3
+  from 2026-10-19 (`interview-phase2-3.md` §12): the header panel lying on the bar (top corners
+  rounded toward its middle, the bar's line fading out before the walls) with a halo, and a window
+  over the page with no backdrop / a halo / the dim / both; sliders for the halo's width and
+  strength and the line's fade; the cost of each, from 2.10's measurements.
+- **[Layout Playground](https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp) version 5** - the new
+  arranger, v4 kept beside it for comparison (`layout-engines.md`, "As prototyped"). On the House
+  page it gives the P4_5 a 5 x 2 page with no empty cell and four even 2 x 1 clusters (v4: 4 x 3,
+  clusters 1 x 2 and 1 x 3); with a five-member cluster added, a full 6 x 4. **On the 7B the House
+  page has 6 blocks for 18 cells**: v5 leaves 9 cells empty rather than make one cluster huge (v4
+  made two 3 x 2 clusters). Spreading that spare room as even margins (`look-and-feel.md` §3.8 item
+  3) is the question it raises. Its weights are starting guesses for the owner to tune.
