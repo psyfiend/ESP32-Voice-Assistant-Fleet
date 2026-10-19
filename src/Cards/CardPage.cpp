@@ -347,6 +347,28 @@ void CardPage::commit() {
                   (long long)tPlan, (unsigned)_placed, (long long)tBuild, worst,
                   (long long)tWorst, (long long)tBind);
 #endif
+    // THE PAGE'S HERO (round 4): a solo 1x1 card's disc and icon, measured now
+    // it is built, and every cluster's tiles drawn again to match it where they
+    // have the room - a tile's icon and a card's are the same size.
+    {
+        int32_t disc = 0;
+        const lv_font_t *face = nullptr;
+        for (uint8_t i = 0; i < _n && !face; i++) {
+            Card *c = _cards[i];
+            if (!c || !_slot[i].placed || _slot[i].spanX != _sub || _slot[i].spanY != _sub) continue;
+            if (!strcmp(c->typeName(), "cluster")) continue;
+            c->heroSizes(disc, face);
+        }
+        Card::setPageHero(disc, face);
+        for (uint8_t i = 0; i < _n; i++) {
+            Card *c = _cards[i];
+            if (!c || !_slot[i].placed || strcmp(c->typeName(), "cluster")) continue;
+            ClusterCard *cl = static_cast<ClusterCard *>(c);
+            for (uint8_t k = 0; k < cl->memberCount(); k++)
+                if (Card *m = cl->memberAt(k)) if (m->root()) m->restyle();
+        }
+    }
+
     // CARDS THAT DID NOT MAKE THE PAGE ARE FREED, not kept around.
     //
     // The owner asked directly: "is the device holding the cards not on the
@@ -630,11 +652,7 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
         g.cellH   = (int32_t)UI::grid().cellH;
         g.gap     = _gap;
         g.chromeW = ClusterCard::chromeW();
-        g.chromeH = ClusterCard::chromeH();
-        // The room a tag takes above and beside a card is the cluster's too (below).
-        if (spec.headerDefault == CardHeaderStyle::HDR_TAG)       g.chromeH += Card::headerHeight();
-        if (spec.headerDefault == CardHeaderStyle::HDR_TAG_FLOAT) { g.chromeH += Card::headerHeight() / 2;
-                                                                    g.chromeW += Card::headerHeight() / 4; }
+        g.chromeH = ClusterCard::chromeH();   // whole cells: no tag's room (round 4, below)
         g.tileGap = UI::mm(UI::shape().C_TILE_GAP);
         g.minTile = UI::mm(UI::shape().C_TILE_MIN);
         const uint8_t cellCols = _uCols / _sub ? _uCols / _sub : 1;
@@ -652,11 +670,11 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
             if (cs.label) cl->setLabel(cs.label);
             cl->setSheetArea(cs.area);
             CardGroups::apply(*cl, spec.areaColor);
-            // ITS TOP LINES UP WITH ITS NEIGHBOURS': the room a tag takes above a
-            // card is kept above the cluster too, with no tag in it - the
-            // cluster's header names it (a band style has nothing above).
-            cl->setHeaderStyle(cardHeaderIsTag(spec.headerDefault) ? spec.headerDefault
-                                                                   : CardHeaderStyle::HDR_NONE);
+            // A CLUSTER FILLS ITS CELLS (owner, round 4): Float and Tag take room
+            // from a solo card for its label, and a cluster has none - its header
+            // names it. Round 1 kept the tag's room above it to line its top up
+            // with its neighbours', and the owner saw its tiles shrink for it.
+            cl->setHeaderStyle(CardHeaderStyle::HDR_NONE);
             cl->setShowArea(false);
             CardPlacement pl = cs.place;
             pl.prefSpanX = pl.minSpanX = (uint8_t)(sp.cols * _sub);

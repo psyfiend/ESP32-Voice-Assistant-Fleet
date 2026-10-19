@@ -38,7 +38,24 @@ void column(lv_obj_t *o) {
 
 // Between the hero and the label.
 int32_t heroGap() { return UI::mm(UI::shape().C_TILE_GAP); }
+
+// The gap the tile's column keeps between its hero and its label: the theme's
+// row padding, which its plain holders keep (round 4: a tile limited by its
+// height, now clusters fill their cells, got a disc too big for its middle).
+int32_t rowGap(lv_obj_t *mid) {
+    lv_obj_t *col = mid ? lv_obj_get_parent(mid) : nullptr;
+    return col ? lv_obj_get_style_pad_row(col, LV_PART_MAIN) : 0;
+}
+
+int32_t          s_pageDisc = 0;
+const lv_font_t *s_pageFace = nullptr;
 }  // namespace
+
+// The page's hero (Card.h): kept here, beside the tiles that use it - Card.cpp
+// is over the structure check's 1,000 lines.
+void Card::setPageHero(int32_t discPx, const lv_font_t *face) { s_pageDisc = discPx; s_pageFace = face; }
+int32_t          Card::pageDisc() { return s_pageDisc; }
+const lv_font_t *Card::pageFace() { return s_pageFace; }
 
 // The tile's frame: Card::build()'s, less everything a tile does not have.
 void Card::buildMini(lv_obj_t *parent) {
@@ -107,15 +124,22 @@ void StateCard::renderMini() {
     const int32_t w = cellWidthPx();
     const int32_t h = cellPx();
     const int32_t nameH = showName ? lv_font_get_line_height(t.TAG) : 0;
-    const int32_t room  = h - nameH - (showName ? heroGap() : 0);
+    const int32_t room  = h - nameH - (showName ? heroGap() + rowGap(_mid) : 0);
 
-    // The disc: most of the room left over, never wider than most of the tile.
+    // The disc: most of the room left over, never wider than most of the tile -
+    // and THE SOLO CARDS' OWN wherever that much room is there (round 4: "it
+    // is really not a good look when dashboard icons are different sizes").
     int32_t d = LV_MIN(room * 92 / 100, w * 72 / 100);
     if (d < 0) d = 0;
-    // The largest icon face whose glyph sits comfortably on that disc.
     const lv_font_t *face = t.ICON_SM;
-    if (lv_font_get_line_height(t.ICON) * 100 <= d * 62)         face = t.ICON;
-    else if (lv_font_get_line_height(t.ICON_MD) * 100 <= d * 62) face = t.ICON_MD;
+    if (pageDisc() > 0 && pageFace() && pageDisc() <= d) {
+        d    = pageDisc();
+        face = pageFace();
+    } else {
+        // Less room than a solo card's: the largest face that sits comfortably on it.
+        if (lv_font_get_line_height(t.ICON) * 100 <= d * 62)         face = t.ICON;
+        else if (lv_font_get_line_height(t.ICON_MD) * 100 <= d * 62) face = t.ICON_MD;
+    }
     const bool discFits = d >= lv_font_get_line_height(face) + UI::sc(4);
     lv_obj_set_size(_disc, d, d);
     lv_obj_set_style_pad_bottom(_mid, showName ? heroGap() : 0, 0);
@@ -187,7 +211,7 @@ void ValueCard::renderMini() {
     const bool showName = (lbl != CardLabel::LBL_NONE);
     const int32_t w = cellWidthPx();
     const int32_t h = cellPx();
-    const int32_t room = h - (showName ? lv_font_get_line_height(t.TAG) + heroGap() : 0);
+    const int32_t room = h - (showName ? lv_font_get_line_height(t.TAG) + heroGap() + rowGap(_mid) : 0);
 
     char buf[40];
     cardFormatValue(*e, buf, sizeof(buf), false, tempUnit());

@@ -37,8 +37,10 @@ static void rebuildAsync(void *) {
 static void chooseAsync(void *p) {
     const uintptr_t v = (uintptr_t)p;
     const uint8_t r = (uint8_t)(v >> 8), i = (uint8_t)(v & 0xFF);
-    if (!s_spec.rows || r >= s_spec.nRows || !s_spec.rows[r].choose) return;
-    s_spec.rows[r].choose(i);
+    if (!s_spec.rows || r >= s_spec.nRows) return;
+    const Row &row = s_spec.rows[r];
+    if (i == Kit::CHIP_SLIDER) { if (row.setValue && s_list) row.setValue(Kit::chipTableValue(s_list, r)); return; }
+    if (row.choose) row.choose(i);
 }
 
 // A chip: lit now, the choice made from the next timer pass.
@@ -96,6 +98,12 @@ static void buildList() {
     for (uint8_t r = 0; r < n; r++) {
         const Row &row = s_spec.rows[r];
         rows[r] = { row.what, row.words, row.n, (uint8_t)(row.chosen ? row.chosen() : 0) };
+        if (row.hi > row.lo) {   // a slider row
+            rows[r].lo    = row.lo;
+            rows[r].hi    = row.hi;
+            rows[r].value = row.value ? row.value() : row.lo;
+            rows[r].unit  = row.unit;
+        }
     }
     s_list = Kit::chipTable(S.stage, stageW, rows, n, chipCb);
 
@@ -143,13 +151,24 @@ bool open(const Spec &sp) {
     return true;
 }
 
+#ifdef DEBUG_POPUP
+void debugScrollEnd() {
+    if (!s_list) return;
+    lv_obj_update_layout(s_list);
+    lv_obj_scroll_to_y(s_list, LV_COORD_MAX, LV_ANIM_OFF);
+}
+#endif
+
 void close()  { Kit::sheetClose(S); }
 bool isOpen() { return S.win != nullptr; }
 
 void refresh() {
     if (!S.win) return;
-    for (uint8_t r = 0; r < s_spec.nRows && r < ROWS_MAX; r++)
-        if (s_spec.rows[r].chosen) Kit::chipTableLit(s_list, r, s_spec.rows[r].chosen());
+    for (uint8_t r = 0; r < s_spec.nRows && r < ROWS_MAX; r++) {
+        const Row &row = s_spec.rows[r];
+        if (row.hi > row.lo) { if (row.value) Kit::chipTableSet(s_list, r, row.value()); continue; }
+        if (row.chosen) Kit::chipTableLit(s_list, r, row.chosen());
+    }
 }
 
 } // namespace TweaksSheet

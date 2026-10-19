@@ -236,6 +236,17 @@ public:
     Card &setMini(bool on) { _mini = on; return *this; }
     bool  mini() const { return _mini; }
 
+    // THE PAGE'S HERO (2.11 round 4, the owner: a tile's icon and a solo card's
+    // "MUST remain the same size"): the disc and icon face a solo 1x1 card has
+    // on the page now, measured by CardPage once the page is built. A mini tile
+    // takes exactly these wherever it has the room (Cards/MiniTile.cpp); 0 /
+    // null: no solo card to measure, a tile sizes its own.
+    static void setPageHero(int32_t discPx, const lv_font_t *face);
+    static int32_t          pageDisc();
+    static const lv_font_t *pageFace();
+    // This card's own hero, as a solo card draws it - what the page measures.
+    void heroSizes(int32_t &discPx, const lv_font_t *&face) const { discPx = heroDiscPx(); face = heroIconFace(); }
+
     // Overrides cardLongStaleMs(). This is the build sheet's hook.
     Card &setLongStaleMs(uint32_t ms) { _longStaleMs = ms; return *this; }
 

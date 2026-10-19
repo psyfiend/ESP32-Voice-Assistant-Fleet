@@ -14,12 +14,18 @@ namespace TweaksSheet {
 constexpr uint8_t ROWS_MAX = 10;
 
 // A row: what it sets, its choices, which is chosen now, and what choosing one does.
+// A SLIDER ROW (2.11 round 4) has no choices: `hi` above `lo`, its value now
+// and what setting one does (on release), `unit` after the number.
 struct Row {
     const char        *what;
     const char *const *words;
     uint8_t            n;
     uint8_t          (*chosen)();
     void             (*choose)(uint8_t i);
+    int16_t            lo = 0, hi = 0;
+    int16_t          (*value)() = nullptr;
+    void             (*setValue)(int16_t v) = nullptr;
+    const char        *unit = nullptr;
 };
 
 struct Spec {
@@ -35,5 +41,8 @@ bool open(const Spec &spec);   // false when a sheet is already showing
 void close();
 bool isOpen();
 void refresh();                // every row's selector from its chosen()
+#ifdef DEBUG_POPUP
+void debugScrollEnd();         // /popup?tweaks=2: the rows scrolled to the last
+#endif
 
 } // namespace TweaksSheet

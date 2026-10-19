@@ -46,6 +46,8 @@ enum class KitStyle : uint8_t {
     KS_ROWBTN, KS_ROWBTN_PRESSED, KS_ROWBTN_LIVE, KS_ROWBTN_GREYED,
     // Chips: every chip, unlit, lit, pressed.
     KS_CHIP, KS_CHIP_UNLIT, KS_CHIP_LIT, KS_CHIP_PRESSED,
+    // A chip table's slider row (2.11 round 4): its track, the filled part, its knob.
+    KS_SLIDER, KS_SLIDER_IND, KS_SLIDER_KNOB,
     // A list item (Kit::item()): a tappable surface in a list - a member, an
     // activity row, "Show more" - and its pressed tint.
     KS_ITEM, KS_ITEM_PRESSED,
@@ -139,6 +141,24 @@ int32_t textW(const char *txt, const lv_font_t *f);
 int32_t haloWidth();
 void    haloAttach(lv_obj_t *o);
 void    haloDraw(lv_layer_t *layer, const lv_area_t &a, int32_t radius, const lv_area_t *clip);
+// Its strength, 0-100 %, for the scheme showing (2.11 round 4): the owner's from
+// UI Tweaks' slider (schemes.<name>.halo), else UIMetrics::HALO_PCT. Kept in RAM;
+// the caller saves the file. forget...: read again (UI Tweaks' Reset all).
+uint8_t haloStrength();
+void    keepHaloStrength(uint8_t pct);
+void    forgetHaloStrengths();
+// WHERE A PANEL MEETS THE BAR the panel, its slot's tab and the coves between
+// them are one shape, and its halo in the bar is painted for that shape whole
+// (drawerOverBar(), in the bar's DRAW_POST): screen coordinates; a cove is its
+// square and the centre and inner radius of the bar-coloured disc in it.
+struct HaloShape {
+    lv_area_t  pane;    int32_t paneR;
+    lv_area_t  tab;     int32_t tabR;   bool hasTab;
+    lv_area_t  coveSq[2];
+    lv_point_t coveC[2];
+    int32_t    coveR;   uint8_t nCove;
+};
+void    haloOverBar(lv_layer_t *layer, const HaloShape &s, const lv_area_t &bar);
 
 // --- Buttons ------------------------------------------------------------------
 // A button with words: CANCEL is the quiet way out, DESTRUCTIVE the one that
@@ -277,14 +297,23 @@ void    selectorActionLit(Selector &S, bool lit);
 // on a chip's CLICKED, with ((row << 8) | chip) as its user data. (Round 3's
 // selector rows took too much room for too little - the owner.)
 constexpr uint8_t CHIP_ROWS_MAX = 12;
+// A SLIDER ROW (2.11 round 4): `hi` above `lo` makes the row a slider from lo to
+// hi at `value`, in place of chips, as wide as the widest row of chips, its
+// value in words beside it (`unit` after the number). `cb` hears it on release,
+// its user data (row << 8) | CHIP_SLIDER; chipTableValue() reads it.
+constexpr uint8_t CHIP_SLIDER = 0xFF;
 struct ChipRowSpec {
     const char        *what;
     const char *const *words;
     uint8_t            n;
     uint8_t            lit;
+    int16_t            lo = 0, hi = 0, value = 0;
+    const char        *unit = nullptr;
 };
 lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_t n, lv_event_cb_t cb);
 void      chipTableLit(lv_obj_t *table, uint8_t row, uint8_t lit);   // after a choice
+int16_t   chipTableValue(lv_obj_t *table, uint8_t row);              // a slider row's value
+void      chipTableSet(lv_obj_t *table, uint8_t row, int16_t value); // ...set from outside
 // A row of buttons after a chip table, in its list: centred, S5 apart.
 lv_obj_t *buttonRow(lv_obj_t *list);
 

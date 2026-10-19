@@ -178,8 +178,9 @@ void GUIManager::resetUiTweaks() {
     Settings::setSystem("header", "glyphs", nullptr);
     Settings::setSystem("window", "close", nullptr);
     Settings::setSystem("window", "bar", nullptr);
-    for (const char *s : SCHEME_NAMES) Settings::setScheme(s, "selector", nullptr);
+    for (const char *s : SCHEME_NAMES) { Settings::setScheme(s, "selector", nullptr); Settings::setScheme(s, "halo", nullptr); }
     Kit::forgetSelectorLooks();
+    Kit::forgetHaloStrengths();
     Settings::save();
     applyUiSettings();
     _header.setGlyphStyle(savedGlyphStyle());
@@ -321,6 +322,11 @@ struct GUITweaks {
         Settings::save();
         retime();
     }
+    // THE HALO'S STRENGTH (2.11 round 4), for the scheme showing: a slider, kept
+    // per scheme (schemes.<name>.halo); its own value is the scheme's (50 / 30).
+    static int16_t haloNow()          { return (int16_t)Kit::haloStrength(); }
+    static void    haloSet(int16_t v) { Kit::keepHaloStrength((uint8_t)LV_CLAMP(0, v, 100)); Settings::save(); }
+
     static uint8_t barNow()          { return Kit::windowBarShown() ? 0 : 1; }
     static void    barSet(uint8_t i) {
         Settings::setSystem("window", "bar", i ? "off" : nullptr);
@@ -338,6 +344,7 @@ struct GUITweaks {
         { "Card density",   DENSITY, 3, densityNow, densitySet },
         { "Window timeout", TIMEOUT, 4, timeoutNow, timeoutSet },
         { "Timer bar",      ONOFF,   2, barNow,     barSet     },
+        { "Halo",           nullptr, 0, nullptr,    nullptr,   0, 100, haloNow, haloSet, "%" },
     };
 
     // THE DECK RISES UNDER THE WINDOW (D-25): its panels' headers along the

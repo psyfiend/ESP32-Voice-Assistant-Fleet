@@ -17,6 +17,8 @@ lv_obj_t *headerBar(lv_obj_t *parent) {
     // halo falls on it (D-35). MAIN_END: the last a bar draws outside itself -
     // LVGL 9.5 clips its DRAW_POST to its own area (lv_refr.c, lv_obj_redraw()).
     lv_obj_add_event_cb(b, drawerOverBar, LV_EVENT_DRAW_MAIN_END, nullptr);
+    // ...and the halo of a panel's shape over the bar, after its slots (round 4).
+    lv_obj_add_event_cb(b, drawerOverBar, LV_EVENT_DRAW_POST, nullptr);
     lv_obj_set_size(b, lv_pct(100), UIToolkit::systemHeaderFullPx());
     return b;
 }

@@ -13,10 +13,26 @@
 // along the edges - the dither's period divides it, so the tiles join unseen.
 // Drawn under the object, in its DRAW_MAIN_BEGIN; nothing inside the object's
 // edge is drawn twice (alpha 0 there).
+//
+// ITS STRENGTH (2.11 round 4, the owner: "the effect itself is outstanding",
+// but at full strength it stops reading as a shadow - "around 50%", Linen
+// lighter still): painted into the images (strengthOf()), each scheme's own
+// (UIMetrics::HALO_PCT: 50 dark, 30 Linen) or the owner's from UI Tweaks'
+// slider, kept as schemes.<name>.halo.
+//
+// WHERE A PANEL MEETS THE BAR it is one shape - the open slot's tab, the two
+// coves and the pane's top - and its halo there is painted for that shape as a
+// whole (haloOverBar()): two halos, the pane's and the tab's, darkened twice
+// where they overlapped, and the coves' insides were painted in the bar's
+// colour over them (round 4, the owner's close-ups of Linen).
 #include "UI/Kit.h"
+#include "Settings.h"
 #include "src/misc/cache/instance/lv_image_cache.h"   // lv_image_cache_drop(): not in lvgl.h
+#include <ctype.h>
 #include <esp_heap_caps.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 namespace Kit {
@@ -36,12 +52,42 @@ struct Img {
 struct HaloSet {
     int32_t  h = 0, r = 0;
     uint8_t  amp = 0;
+    uint8_t  str = 0;   // the strength painted in (%)
     bool     ok = false;
     Img      corner[4];   // TL, TR, BL, BR
     Img      edge[4];     // top, bottom, left, right
 };
 HaloSet s_sets[3];
 uint8_t s_next = 0;
+
+// --- Its strength, per scheme ---------------------------------------------------
+constexpr uint8_t STRENGTH_SCHEMES = 4;   // UITokens' schemes, with room for one more
+int16_t s_strength[STRENGTH_SCHEMES] = { -1, -1, -1, -1 };   // -1: the scheme's own
+uint8_t s_strengthLoaded = 0;                                 // bit per scheme: read from the file
+
+void schemeKey(char *out, size_t cap) {
+    const char *n = UI::pal().name ? UI::pal().name : "scheme";
+    size_t k = 0;
+    for (; n[k] && k + 1 < cap; k++) out[k] = (char)tolower((unsigned char)n[k]);
+    out[k] = '\0';
+}
+
+int16_t &strengthSlot() {
+    uint8_t i = UI::schemeIndex();
+    if (i >= STRENGTH_SCHEMES) i = 0;
+    if (!(s_strengthLoaded & (1u << i))) {
+        s_strengthLoaded |= (uint8_t)(1u << i);
+        char key[16], v[8];
+        schemeKey(key, sizeof(key));
+        if (Settings::scheme(key, "halo", v, sizeof(v))) s_strength[i] = (int16_t)LV_CLAMP(0, atoi(v), 100);
+    }
+    return s_strength[i];
+}
+
+// PAINTED IN, not drawn at an opacity: the dither must straddle a 16-bit step
+// of the alpha as drawn, and an opacity scaled the dither down with it - at 30%
+// the steps came back (round 4, Linen). A change of strength repaints the sets.
+float strengthOf(float a, uint8_t str) { return a * (float)str / 100.f; }
 
 // Black at the edge (d = 0), clear at h: eased, so it ends softly.
 float profile(float d, float h) {
@@ -87,7 +133,7 @@ void paint(Img &im, int32_t w, int32_t h, float (*dist)(int32_t x, int32_t y, co
     uint8_t *p = im.buf;
     for (int32_t y = 0; y < h; y++)
         for (int32_t x = 0; x < w; x++, p++)
-            *p = dithered(profile(dist(x, y, s), (float)s.h), x, y, s.amp);
+            *p = dithered(strengthOf(profile(dist(x, y, s), (float)s.h), s.str), x, y, s.amp);
 }
 
 // The corners: the arc's centre is the image's corner nearest the object.
@@ -122,13 +168,13 @@ uint8_t ditherAmp() {
 }
 
 const HaloSet *haloSet(int32_t h, int32_t r) {
-    const uint8_t amp = ditherAmp();
+    const uint8_t amp = ditherAmp(), str = haloStrength();
     for (const HaloSet &s : s_sets)
-        if (s.ok && s.h == h && s.r == r && s.amp == amp) return &s;
+        if (s.ok && s.h == h && s.r == r && s.amp == amp && s.str == str) return &s;
     HaloSet &s = s_sets[s_next];
     s_next = (uint8_t)((s_next + 1) % (sizeof(s_sets) / sizeof(s_sets[0])));
     s.ok = false;
-    s.h = h; s.r = r; s.amp = amp;
+    s.h = h; s.r = r; s.amp = amp; s.str = str;
     const int32_t c = h + r;
     float (*const cd[4])(int32_t, int32_t, const HaloSet &) = { dTL, dTR, dBL, dBR };
     for (int i = 0; i < 4; i++) {
@@ -149,6 +195,7 @@ const HaloSet *haloSet(int32_t h, int32_t r) {
 // given (a darker band where an edge strip ran on over a corner), so the layer's
 // clip is narrowed to it for the one call.
 void put(lv_layer_t *layer, const Img &im, const lv_area_t &fill, int32_t ox, int32_t oy, bool tile) {
+    if (!haloStrength()) return;
     const lv_area_t keep = layer->_clip_area;
     const lv_area_t c = { LV_MAX(keep.x1, fill.x1), LV_MAX(keep.y1, fill.y1),
                           LV_MIN(keep.x2, fill.x2), LV_MIN(keep.y2, fill.y2) };
@@ -218,6 +265,102 @@ void haloAttach(lv_obj_t *o) {
     lv_obj_add_event_cb(o, drawMainBegin, LV_EVENT_DRAW_MAIN_BEGIN, nullptr);
     lv_obj_add_event_cb(o, extDrawSize, LV_EVENT_REFR_EXT_DRAW_SIZE, nullptr);
     lv_obj_refresh_ext_draw_size(o);
+}
+
+// --- Its strength ---------------------------------------------------------------
+uint8_t haloStrength() {
+    const int16_t s = strengthSlot();
+    return s >= 0 ? (uint8_t)s : UI::met().HALO_PCT;
+}
+
+void keepHaloStrength(uint8_t pct) {
+    if (pct > 100) pct = 100;
+    int16_t &s = strengthSlot();
+    s = pct == UI::met().HALO_PCT ? -1 : (int16_t)pct;   // the scheme's own is stored as nothing
+    char key[16], v[8];
+    schemeKey(key, sizeof(key));
+    snprintf(v, sizeof(v), "%u", (unsigned)pct);
+    Settings::setScheme(key, "halo", s < 0 ? nullptr : v);
+    // Everything floating shows it at once: the screen and the top layer.
+    lv_obj_invalidate(lv_screen_active());
+    lv_obj_invalidate(lv_layer_top());
+}
+
+void forgetHaloStrengths() {
+    for (int16_t &s : s_strength) s = -1;
+    s_strengthLoaded = 0;
+}
+
+// --- One shape's halo, over the bar ------------------------------------------------
+namespace {
+// The shape's mask for the bar's share, painted when the shape changes (a panel
+// opening, another slot) and kept; drawn as one image. Two: the system panel's
+// and a slot's may both be on screen while one closes.
+struct BarMask {
+    HaloShape key = {};
+    lv_area_t at  = {};
+    int32_t   h   = 0;
+    uint8_t   amp = 0, str = 0;
+    bool      ok  = false;
+    Img       im;
+};
+BarMask s_barMask[2];
+uint8_t s_barNext = 0;
+
+// How far (px centre) is outside a rounded rectangle: <= 0 inside.
+float rrDist(float px, float py, const lv_area_t &a, float r) {
+    const float cx = LV_CLAMP((float)a.x1 + r, px, (float)a.x2 + 1.f - r);
+    const float cy = LV_CLAMP((float)a.y1 + r, py, (float)a.y2 + 1.f - r);
+    const float dx = px - cx, dy = py - cy;
+    const float d  = hypotf(dx, dy);
+    if (d > 0.f) return d - r;
+    // In the straight part: how far in, as a negative.
+    return -LV_MIN(LV_MIN(px - (float)a.x1, (float)a.x2 + 1.f - px), LV_MIN(py - (float)a.y1, (float)a.y2 + 1.f - py));
+}
+
+// The distance from the shape - the pane, the tab, the coves' fill - or <= 0 in it.
+float shapeDist(float px, float py, const HaloShape &s) {
+    float d = rrDist(px, py, s.pane, (float)s.paneR);
+    if (s.hasTab) d = LV_MIN(d, rrDist(px, py, s.tab, (float)s.tabR));
+    for (uint8_t k = 0; k < s.nCove; k++) {
+        const lv_area_t &q = s.coveSq[k];
+        if (px < q.x1 || px > q.x2 + 1 || py < q.y1 || py > q.y2 + 1) continue;
+        const float c = hypotf(px - (float)s.coveC[k].x, py - (float)s.coveC[k].y);
+        if (c >= (float)s.coveR) return 0.f;               // the cove's fill: in the shape
+        d = LV_MIN(d, (float)s.coveR - c);                 // its inside: the bar, beside the shape
+    }
+    return d;
+}
+}  // namespace
+
+void haloOverBar(lv_layer_t *layer, const HaloShape &s, const lv_area_t &bar) {
+    const int32_t h = haloWidth();
+    if (h <= 0 || lv_area_get_width(&s.pane) < 2 * s.paneR) return;
+    const uint8_t amp = ditherAmp(), str = haloStrength();
+    if (!str) return;
+    const int32_t scrW = lv_display_get_horizontal_resolution(nullptr);
+    lv_area_t at = { LV_MAX(0, LV_MIN(s.pane.x1, s.hasTab ? s.tab.x1 : s.pane.x1) - h), bar.y1,
+                     LV_MIN(scrW - 1, LV_MAX(s.pane.x2, s.hasTab ? s.tab.x2 : s.pane.x2) + h), bar.y2 };
+    if (at.x1 > at.x2 || at.y1 > at.y2) return;
+    BarMask *m = nullptr;
+    for (BarMask &b : s_barMask)
+        if (b.ok && b.h == h && b.amp == amp && b.str == str && !memcmp(&b.key, &s, sizeof(s)) &&
+            !memcmp(&b.at, &at, sizeof(at))) m = &b;
+    if (!m) {
+        m = &s_barMask[s_barNext];
+        s_barNext = (uint8_t)((s_barNext + 1) % 2);
+        m->ok = false;
+        const int32_t w = lv_area_get_width(&at), ht = lv_area_get_height(&at);
+        if (!alloc(m->im, w, ht)) return;
+        uint8_t *p = m->im.buf;
+        for (int32_t y = at.y1; y <= at.y2; y++)
+            for (int32_t x = at.x1; x <= at.x2; x++, p++) {
+                const float d = shapeDist(x + .5f, y + .5f, s);
+                *p = d <= 0.f ? 0 : dithered(strengthOf(profile(d, (float)h), str), x, y, amp);
+            }
+        m->key = s; m->at = at; m->h = h; m->amp = amp; m->str = str; m->ok = true;
+    }
+    put(layer, m->im, at, at.x1, at.y1, false);
 }
 
 }  // namespace Kit

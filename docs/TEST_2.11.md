@@ -135,7 +135,26 @@ the page is next built - swipe away and back):
 
 ## Your results
 
-(to come)
+**2026-10-19, afternoon** (rounds 1-3 tried together, not test by test; HA had crashed overnight, so
+the morning's readings were dashes). "I like it!" The notes, in short:
+
+- **The halo (D-35)**: "the effect itself is outstanding", but not calibrated - **too strong
+  everywhere** (about 50% or lower), and on **Linen** it stops reading as a shadow and looks like a
+  black border. **Its corners need work**: where a panel's top corners meet the bar (the page panel
+  and the system panel on Linen, pictured in the session) the halo leaves square marks, and the
+  tab's coves show dark specks.
+- **Icon sizes must match**: a cluster's tile icons and a solo card's must be the same size (or very
+  close), on every grid. If that is too hard, drop the disc in a tile so its icon can be a solo
+  card's size, and show a tile that is on with the page's card state round the tile (Bracket, Corner
+  cut or Fill) - borderless until active.
+- **Cluster headers** take a cell's height and leave neighbours' icons out of proportion - bigger
+  or smaller depending on the grid. **Clusters should fill their whole cells**: Float and Tag take
+  room from a solo card for its label, and a cluster has no such label - let only solo cards wear
+  that room. (An idea set aside by the owner: the sensors in tags of their own on the right.)
+- **The grid**: clusters need more room than a solo card's cells give - more height above all.
+  Use cells and sub-units to even it out (a solo card ~0.75 of the room a cluster's cell gets;
+  double the grid so a card is 2x2 sub-units); aim for **tiles and cards of the same shape**, so
+  clusters may need to be bigger. A thought for the arranger's logic.
 
 # Round 2 (2026-10-19, morning, built unattended) - the arranger
 
@@ -358,4 +377,6 @@ names a group on the glass yet). A card made from a member keeps HA's name (K65)
 
 ## Your results
 
-(to come)
+**2026-10-19, afternoon** (with round 1's notes): "lots of thoughts and notes about the sheets" to
+come; **at a minimum, the new views should look like Card UI and UI Tweaks** - the same face, chip
+styles, buttons, and the same columns and justification.

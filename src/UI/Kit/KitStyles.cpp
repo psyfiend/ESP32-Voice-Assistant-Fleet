@@ -202,6 +202,25 @@ static void fill() {
     lv_style_set_border_width(st(S::KS_CHIP_LIT),     LV_MAX(1, UI::mm(k.LINE_MID)));
     lv_style_set_bg_color    (st(S::KS_CHIP_PRESSED), UI::c(UI::mix(p.SURFACE, p.TEXT, 15)));
 
+    // A slider row: a track a third of a chip's height, the accent filling it, a
+    // knob a chip's height in the surface ringed in the accent.
+    lv_style_t *sl = st(S::KS_SLIDER);
+    lv_style_set_height  (sl, LV_MAX(4, UI::mm(k.H_CHIP) / 3));
+    lv_style_set_radius  (sl, LV_RADIUS_CIRCLE);
+    lv_style_set_bg_opa  (sl, LV_OPA_COVER);
+    lv_style_set_bg_color(sl, UI::c(UI::mix(p.SURFACE, p.TEXT, 18)));
+    lv_style_t *si = st(S::KS_SLIDER_IND);
+    lv_style_set_radius  (si, LV_RADIUS_CIRCLE);
+    lv_style_set_bg_opa  (si, LV_OPA_COVER);
+    lv_style_set_bg_color(si, UI::c(p.ACCENT));
+    lv_style_t *sk = st(S::KS_SLIDER_KNOB);
+    lv_style_set_radius      (sk, LV_RADIUS_CIRCLE);
+    lv_style_set_bg_opa      (sk, LV_OPA_COVER);
+    lv_style_set_bg_color    (sk, UI::c(p.SURFACE));
+    lv_style_set_border_width(sk, LV_MAX(1, UI::mm(k.LINE_MID)));
+    lv_style_set_border_color(sk, UI::c(p.ACCENT));
+    lv_style_set_pad_all     (sk, (UI::mm(k.H_CHIP) - LV_MAX(4, UI::mm(k.H_CHIP) / 3)) / 2);
+
     // --- List items ---
     lv_style_t *item = st(S::KS_ITEM);
     lv_style_set_radius  (item, UI::sc(UI::met().RADIUS));

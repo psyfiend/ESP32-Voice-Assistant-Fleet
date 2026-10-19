@@ -299,6 +299,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             const char *what = a.tweaks > 0 ? "tweaks" : (a.cardState > -2 || a.active >= 0) ? cs
                              : a.sensorErr ? "sensorerr" : "sensorok";
             dbgOut("%s\n", s_headerHook ? s_headerHook(what, -1, -1, -2, -1) : "no header hook (GUIManager gives it)");
+            if (a.tweaks == 2) TweaksSheet::debugScrollEnd();   // 2.11 round 4: to its last rows (the Halo slider)
         }
         s_dreq.store(DREQ_DONE);
         return;

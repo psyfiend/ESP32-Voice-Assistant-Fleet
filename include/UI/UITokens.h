@@ -108,6 +108,11 @@ struct UIMetrics {
     // dark one makes them brighter - the frame's edge this % of the way from
     // the active colour to the scheme's text, the light inward half that.
     uint8_t ACTIVE_INK;     // 0 (dark schemes), 35 (Linen)
+    // THE HALO'S STRENGTH (D-35, 2.11 round 4): % of black at a floating
+    // panel's edge - the owner: full strength "stops looking like a shadow",
+    // about half on the dark schemes and lighter on Linen. UI Tweaks' slider
+    // overrides it per scheme (Kit::haloStrength()).
+    uint8_t HALO_PCT;       // 50 (dark schemes), 30 (Linen)
 };
 
 // ---------------------------------------------------------------------------
