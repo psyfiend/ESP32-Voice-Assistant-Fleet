@@ -449,8 +449,11 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
   in as groups; a card's card label shows its group's name (or its own words) in the group's colour.
   **Colour is the key to a group and never follows a rename.**
 - **Cards added on the device** (K17, `CardAdded`) are card entries with `page`, `after` and `entity`
-  keys (and `removed` once removed - the page's pool, never built), merged into their page right
-  after the card they came from when it is built. Their ids are made as K33's.
+  keys, merged into their page right after the card they came from when it is built; **members
+  copied into a cluster** (2.11, K91) have `in` (the cluster's id) where a page card has `page`, and
+  are built after its compiled members. Their ids are made as K33's. **Any card hidden from its page**
+  (K96, K66's remove - compiled or added) has `removed`: `yes`: the page's pool, never built, listed
+  in the page slot's panel with Restore.
 - **Every change is logged** with its time and task (`loopTask` = the card window, `httpd` = a
   browser); the last ten are in `/settings?stats=1`.
 - **UI Tweaks' choices are `system.ui.*`** (scheme, card label, entity label, card state,

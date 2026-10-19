@@ -64,6 +64,18 @@ bool add(const Card &parent, const Entity &member, char *idOut, size_t cap);
 // To the page's pool. False if it is not a card added here.
 bool remove(const char *cardId);
 
+// --- MEMBERS ADDED TO A CLUSTER (2.11 round 3, K91, K100) -----------------------
+// A card copied into a cluster from the glass: a card entry with "in" (the
+// cluster's id), "entity" and "area" - a copy with an id of its own (K92: a
+// grouping is of copies), wearing the cluster's group (K92 rule 2). Built after
+// the cluster's compiled members (CardPage::makeGroupCard()).
+//
+//   "cards": { "<id>": { "in": "office_261019_0500", "entity": "...", "area": "Office",
+//                        "group": "ha_office" } }
+bool    addTo(const Card &cluster, const Entity &e, char *idOut, size_t cap);
+uint8_t membersIn(const char *clusterId, const CardSpec **out, uint8_t cap);
+bool    inCluster(const char *clusterId, const char *entityId);   // a copy of it is in there already
+
 // --- THE PAGE'S POOL, FOR EVERY CARD (2.11 round 3, K66, K96) -----------------
 // "Hide from this page" sends any card on a page there - a compiled one too:
 // "removed": "yes" on its entry, as on an added card's, its settings kept.

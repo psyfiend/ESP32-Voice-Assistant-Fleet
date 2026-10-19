@@ -6,6 +6,7 @@
 #include "SystemReport.h"
 #include "Settings.h"
 #include "Cards/CardGroups.h"
+#include "Cards/CardAdded.h"     // a cluster's members added on the device (2.11, K91)
 #include "Cards/ClusterCard.h"
 #include "Layout/Cluster.h"
 #include <Arduino.h>
@@ -581,6 +582,12 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
     GroupPresent pres = cs.present;
     if (hasId && Settings::card(cs.id, "present", v, sizeof(v))) groupPresentFromName(v, pres);
 
+    // ITS MEMBERS: the dashboard's, then those added on the device (K91; CardAdded).
+    const CardSpec *mem[GROUP_MEMBERS_MAX];
+    uint8_t nMem = 0;
+    for (uint8_t k = 0; k < cs.memberCount && nMem < GROUP_MEMBERS_MAX; k++) mem[nMem++] = &cs.members[k];
+    if (hasId) nMem += CardAdded::membersIn(cs.id, mem + nMem, (uint8_t)(GROUP_MEMBERS_MAX - nMem));
+
     // The header's members, by id, highest priority first: the saved list, else the dashboard's.
     const char *slotIds[CLUSTER_SLOTS_MAX] = {nullptr};
     char saved[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1] = "";
@@ -615,8 +622,8 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
 
     if (pres == GroupPresent::PRESENT_CLUSTER) {
         uint8_t nTiles = 0;
-        for (uint8_t k = 0; k < cs.memberCount; k++)
-            if (cs.members[k].primaries[0] && reg.find(cs.members[k].primaries[0]) && tileOf(cs.members[k])) nTiles++;
+        for (uint8_t k = 0; k < nMem; k++)
+            if (mem[k]->primaries[0] && reg.find(mem[k]->primaries[0]) && tileOf(*mem[k])) nTiles++;
         Layout::ClusterGeom g;
         g.cellW   = widthOf(_sub) > 0 ? widthOf(_sub) : (int32_t)UI::grid().cellW;
         g.cellH   = (int32_t)UI::grid().cellH;
@@ -633,12 +640,12 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
         const Layout::ClusterSpan sp = Layout::clusterSpan(nTiles, g, cellCols, _maxRows);
         if (sp.fits) {
             ClusterCard *cl = new ClusterCard();
-            for (uint8_t k = 0; k < cs.memberCount; k++) {
-                Card *m = makeCard(cs.members[k], spec, reg, k);
+            for (uint8_t k = 0; k < nMem; k++) {
+                Card *m = makeCard(*mem[k], spec, reg, k);
                 if (!m) continue;
                 m->setMini(true);
                 m->setHeaderStyle(CardHeaderStyle::HDR_NONE);
-                cl->addMember(m, tileOf(cs.members[k]), slotOf(cs.members[k].id));
+                cl->addMember(m, tileOf(*mem[k]), slotOf(mem[k]->id));
             }
             if (hasId) cl->setId(cs.id);
             if (cs.label) cl->setLabel(cs.label);
@@ -680,8 +687,8 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
     one.groupOn = cs.groupOn;
     uint8_t n = 0;
     for (int pass = 0; pass < 2 && !n; pass++)
-        for (uint8_t k = 0; k < cs.memberCount && n < CARD_PRIMARY_MAX; k++) {
-            const char *pid = cs.members[k].primaries[0];
+        for (uint8_t k = 0; k < nMem && n < CARD_PRIMARY_MAX; k++) {
+            const char *pid = mem[k]->primaries[0];
             const Entity *e = pid ? reg.find(pid) : nullptr;
             if (!e) continue;
             const bool switches = e->desc.writable &&

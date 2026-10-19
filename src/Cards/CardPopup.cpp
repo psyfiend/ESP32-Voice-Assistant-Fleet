@@ -147,7 +147,8 @@ void showView(PopupView v) {
                               : v == PopupView::VIEW_PROPS   ? "Properties"
                               : v == PopupView::VIEW_CARD_UI ? "Card UI"
                               : v == PopupView::VIEW_CLUSTER_SLOTS ? "Header"
-                              : v == PopupView::VIEW_VISIBILITY ? "Visibility" : "Members");
+                              : v == PopupView::VIEW_VISIBILITY ? "Visibility"
+                              : v == PopupView::VIEW_ADD_TO ? "Add to" : "Members");
     }
     // SIZED BEFORE THE VIEW IS BUILT: placeWide() lays the window out, and a
     // DOT label laid out at the last view's width rewrites its own text - the
@@ -159,6 +160,7 @@ void showView(PopupView v) {
     else if (v == PopupView::VIEW_CARD_UI) buildCardUi();
     else if (v == PopupView::VIEW_CLUSTER_SLOTS) buildClusterSlots();
     else if (v == PopupView::VIEW_VISIBILITY) buildVisibility();      // K96
+    else if (v == PopupView::VIEW_ADD_TO)     buildAddTo();           // K91, K100
     else if (v == PopupView::VIEW_MAIN && s.cluster) buildCluster();   // K104
     else                                   buildMain();
     deckSync();     // SETTINGS' rows are the view's (a member's own has more)
@@ -183,6 +185,7 @@ void goBack() {
     switch (s.view) {
         case PopupView::VIEW_MAIN:   CardPopup::close();     break;
         case PopupView::VIEW_MEMBER: leaveMember();          break;
+        case PopupView::VIEW_ADD_TO: showView(PopupView::VIEW_VISIBILITY); break;   // its view's own
         default:                     showView(controlsView()); break;
     }
 }

@@ -132,6 +132,7 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int32_t active = -1;// 2.8 round 6: the active colour, RRGGBB, not saved; 0 the scheme's own
                 int kbd = -1, kbMode = -1, kbPress = -1;   // 2.11 (K95): the keyboard
                 int restore = -1;                          // 2.11 (K96): the page panel's Restore N
+                int addTo = -1, mv = 0;                    // 2.11 (K91): Add to cluster N, copy or move
                 char kbType[24] = {};                      // ... words typed on it ('+' a space)
                 bool close = false, power = false, more = false, hist = false, mem = false; };
 bool (*s_drawerHook)(bool open) = nullptr;
@@ -205,6 +206,8 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "cardstate", v, sizeof(v)) == ESP_OK) a.cardState = atoi(v);
         if (httpd_query_key_value(q, "kbd", v, sizeof(v)) == ESP_OK) a.kbd = atoi(v);
         if (httpd_query_key_value(q, "restore", v, sizeof(v)) == ESP_OK) a.restore = atoi(v);
+        if (httpd_query_key_value(q, "addto", v, sizeof(v)) == ESP_OK) a.addTo = atoi(v);
+        if (httpd_query_key_value(q, "mv", v, sizeof(v)) == ESP_OK) a.mv = atoi(v);
         if (httpd_query_key_value(q, "kbmode", v, sizeof(v)) == ESP_OK) a.kbMode = atoi(v);
         if (httpd_query_key_value(q, "kbpress", v, sizeof(v)) == ESP_OK) a.kbPress = atoi(v);
         if (httpd_query_key_value(q, "kbtype", a.kbType, sizeof(a.kbType)) == ESP_OK)
@@ -331,6 +334,16 @@ void CardPopup::debugService(lv_timer_t *t) {
         dbgOut("lv_mem used %lu free %lu biggest %lu frag %u; window %s\n",
                (unsigned long)(m.total_size - m.free_size), (unsigned long)m.free_size,
                (unsigned long)m.free_biggest_size, (unsigned)m.frag_pct, isOpen() ? "open" : "closed");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    // 2.11 (K91, K100): addto=N as Add to a cluster with the Nth cluster on
+    // the page chosen, mv=1 Move (else Copy) - the window closes.
+    if (a.addTo >= 0) {
+        if (!isOpen()) dbgOut("no window open\n");
+        else if (visibilityAddTo((uint8_t)a.addTo, a.mv != 0)) { dbgOut("%s\n", a.mv ? "moved" : "copied");
+                                                                  s_dreq.store(DREQ_CLOSING); return; }
+        else dbgOut("cannot: not one entity, no such cluster, or in it already\n");
         s_dreq.store(DREQ_DONE);
         return;
     }
@@ -499,6 +512,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             else if (a.view == 6) showView(PopupView::VIEW_CARD_UI); // as SETTINGS' Card UI (2.8 round 3)
             else if (a.view == 7 && s.cluster) showView(PopupView::VIEW_CLUSTER_SLOTS);   // 2.11: Header slots
             else if (a.view == 8) showView(PopupView::VIEW_VISIBILITY);   // 2.11 (K96): as SETTINGS' Visibility
+            else if (a.view == 9) showView(PopupView::VIEW_ADD_TO);       // ... and its Add to a cluster
             dbgMem(mem, sizeof(mem));
             dbgOut("view %d; %s\n", a.view, mem);
             // Why the last commands failed, newest first (G8).

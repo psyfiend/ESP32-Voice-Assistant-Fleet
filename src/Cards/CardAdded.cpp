@@ -18,6 +18,7 @@ namespace {
 struct Rec {
     char    id[CARD_ID_MAX + 1];
     char    page[24];
+    char    in[CARD_ID_MAX + 1];      // a member added to this cluster (2.11, K91), else ""
     char    after[CARD_ID_MAX + 1];
     char    entity[ENTITY_ID_MAX];
     char    area[ENTITY_SHORT_MAX];
@@ -64,6 +65,24 @@ void readOne(const char *id, const char *page, void *) {
     if (Settings::card(id, "removed", v, sizeof(v)) && !strcmp(v, "yes")) { s_pooled++; return; }
     r.removed = false;
     if (!r.entity[0]) return;   // nothing to show: not taken
+    specOf(s_n);
+    s_n++;
+}
+
+// A MEMBER ADDED TO A CLUSTER ON THE DEVICE (2.11, K91, K100): a card entry with
+// "in" (the cluster's id) where a page card has "page" - a copy with an id of
+// its own (K92: a grouping is of copies), wearing its cluster's group.
+void readMember(const char *id, const char *in, void *) {
+    if (s_n >= CardAdded::MAX || !cardIdWellFormed(id) || !cardIdWellFormed(in)) return;
+    Rec &r = s_rec[s_n];
+    r = Rec{};
+    copy(r.id, sizeof(r.id), id);
+    copy(r.in, sizeof(r.in), in);
+    char v[48];
+    Settings::card(id, "entity", v, sizeof(v)); copy(r.entity, sizeof(r.entity), v);
+    Settings::card(id, "area", v, sizeof(v));   copy(r.area, sizeof(r.area), v);
+    r.pri = 128;
+    if (!r.entity[0]) return;
     specOf(s_n);
     s_n++;
 }
@@ -120,8 +139,10 @@ void begin(bool (*compiledId)(const char *id)) {
     s_n = 0;
     s_pooled = 0;
     Settings::forEachCardWith("page", readOne, nullptr);
-    Serial.printf("[CardAdded] %u card%s added on this device on its pages, %u removed (the pool)\n",
-                  (unsigned)s_n, s_n == 1 ? "" : "s", (unsigned)s_pooled);
+    const uint8_t onPages = s_n;
+    Settings::forEachCardWith("in", readMember, nullptr);
+    Serial.printf("[CardAdded] %u card%s added on this device on its pages, %u removed (the pool), %u in clusters\n",
+                  (unsigned)onPages, onPages == 1 ? "" : "s", (unsigned)s_pooled, (unsigned)(s_n - onPages));
 }
 
 void setPage(const char *slugName) { copy(s_page, sizeof(s_page), slugName); }
@@ -206,6 +227,42 @@ bool add(const Card &parent, const Entity &member, char *idOut, size_t cap) {
     if (idOut && cap) copy(idOut, cap, r.id);
     Serial.printf("[CardAdded] %s: %s after %s on %s\n", r.id, r.entity, r.after, r.page);
     return true;
+}
+
+bool addTo(const Card &cluster, const Entity &e, char *idOut, size_t cap) {
+    if (s_n >= MAX || !cluster.hasId()) return false;
+    Rec &r = s_rec[s_n];
+    r = Rec{};
+    if (!makeId(cluster.sheetArea(), e.desc.name, r.id, sizeof(r.id))) return false;
+    copy(r.in, sizeof(r.in), cluster.id());
+    copy(r.entity, sizeof(r.entity), e.desc.id);
+    copy(r.area, sizeof(r.area), cluster.sheetArea());
+    r.pri = 128;
+    Settings::setCard(r.id, "in", r.in);
+    Settings::setCard(r.id, "entity", r.entity);
+    if (r.area[0]) Settings::setCard(r.id, "area", r.area);
+    // A MEMBER WEARS ITS CLUSTER'S GROUP (K92 rule 2).
+    CardGroups::Group g;
+    if (CardGroups::ofCard(cluster, g)) Settings::setCard(r.id, "group", g.id);
+    specOf(s_n);
+    s_n++;
+    s_changed = true;
+    if (idOut && cap) copy(idOut, cap, r.id);
+    Serial.printf("[CardAdded] %s: %s into %s\n", r.id, r.entity, r.in);
+    return true;
+}
+
+uint8_t membersIn(const char *clusterId, const CardSpec **out, uint8_t cap) {
+    uint8_t n = 0;
+    for (uint8_t i = 0; clusterId && i < s_n && n < cap; i++)
+        if (!s_rec[i].removed && !strcmp(s_rec[i].in, clusterId)) out[n++] = &s_spec[i];
+    return n;
+}
+
+bool inCluster(const char *clusterId, const char *entityId) {
+    for (uint8_t i = 0; clusterId && entityId && i < s_n; i++)
+        if (!s_rec[i].removed && !strcmp(s_rec[i].in, clusterId) && !strcmp(s_rec[i].entity, entityId)) return true;
+    return false;
 }
 
 bool remove(const char *cardId) {
