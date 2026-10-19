@@ -444,6 +444,17 @@ The design is agreed enough to build (the owner, 2026-10-19: "are we at a handof
 build?"). **The building session first puts this plan, and the settings file's new entries, to the
 owner** - a structural choice a turn before it is built (W7) - then branches off `main`.
 
+**Agreed 2026-10-19 (K106, K107)**, the building session's proposal: **round 1** as below; **round 2
+the arranger** (its speed is the one unknown that could change the design - better known before
+round 3 makes pages change often); **round 3** what the glass edits, **with the on-screen keyboard**
+(making a cluster names it); **round 4** the summary card, count slots, extending a source group,
+group pages. The settings file's new entries are additive (same file, `schema` 1, names, existing
+sections): a group card's `present` (card / cluster / summary), `slots` (member ids, highest
+priority first), `cl_style` (swatch / bar), `cl_icons` (off); a member's `in`, `hidden` (yes / no),
+`tap_set`; `removed` on every card; a page's `cl_style`, `layout` (the arranger's kept answer),
+`of` (a group page); `system.arranger.*`. A cluster's header: long press its window, tap nothing.
+Built on `feat/2.11-group-cards`; the owner's sheet is `docs/TEST_2.11.md`.
+
 - **Round 1 - clusters on the page.** The cards come onto the kit first (`ui-architecture.md` §6:
   roles for a card's surface, hero, labels; the harness proves nothing moved), in new files - `Card.cpp`
   and `GUIManager.cpp` are over 1,000 lines and must not grow. Then the cluster: a group card whose

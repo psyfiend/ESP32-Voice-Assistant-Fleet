@@ -39,6 +39,100 @@ static constexpr uint8_t HA_PRI_LIGHT    = 140;
 static constexpr uint8_t HA_PRI_INDOOR   = 100;
 static constexpr uint8_t HA_PRI_EXTRA    = 60;    // first to go
 
+// --- 2.11: CLUSTERS (DECISIONS K88-K92, K100-K104) ---------------------------
+//
+// Office, Kitchen and Outside are group cards made on the device, shown as
+// clusters: one border, the members inside as mini tiles, a header filled from
+// the members (the "2.11 Clusters" mock's House page). The members are the cards
+// these areas had before - SAME IDS, so every setting the owner saved on them
+// (Desk's tap, the history spans) is still theirs. They wear their cluster's
+// group (K92 rule 2), so their own area below only says where they came from.
+//
+// The header's members (`slots`) are not tiles unless made visible (K104).
+// A cluster's priority is its most important member's, so it stands where that
+// card stood in the page's order.
+inline const CardSpec HA_OUTSIDE[] = {
+    { .id        = "outside_porch_261008_0310",
+      .primaries = { "outside_front_light" },
+      .label     = "Porch",
+      .area      = "Outside",
+      .place     = { .priority = HA_PRI_LIGHT } },
+    // outside_deck_temp is the SAME PHYSICAL SENSOR as the fleet page's
+    // deck_temp, reached over the websocket instead of the broker. It arrives
+    // already in Fahrenheit because HA converts to the user's display unit,
+    // while the broker carries the raw Celsius - and the page's TEMP_F setting
+    // converts only when the source says 'C', so both land on the same number.
+    // See ExternalEntities_HA.h note 3.
+    { .id        = "outside_front_261008_0310",
+      .primaries = { "outside_front_temp" },
+      .label     = "Front",
+      .area      = "Outside",
+      .place     = { .priority = HA_PRI_OUTDOOR } },
+    { .id        = "outside_deck_261008_0310",
+      .primaries = { "outside_deck_temp" },
+      .label     = "Deck",
+      .area      = "Outside",
+      .place     = { .priority = HA_PRI_OUTDOOR } },
+    { .id        = "outside_deck_261008_0310b",
+      .primaries = { "outside_deck_lux" },
+      .label     = "Deck",
+      .area      = "Outside",
+      .place     = { .priority = HA_PRI_EXTRA } },
+};
+
+// HA ships the state-dependent glyph in attributes.icon - measured: the
+// occupancy sensors report mdi:motion-sensor-off while clear. Each state has its
+// own icon in the header (K101), from our device_class table.
+inline const CardSpec HA_KITCHEN[] = {
+    { .id        = "kitchen_sink_261008_0310",
+      .primaries = { "kitchen_sink" },
+      .label     = "Sink",
+      .area      = "Kitchen",
+      .place     = { .priority = HA_PRI_LIGHT } },
+    // kitchen_table is dimmable (['brightness']).
+    { .id        = "kitchen_table_261008_0310",
+      .primaries = { "kitchen_table" },
+      .label     = "Table",
+      .area      = "Kitchen",
+      .place     = { .priority = HA_PRI_LIGHT } },
+    { .id        = "kitchen_261008_0310",
+      .primaries = { "kitchen_occupancy" },
+      .label     = "Kitchen",
+      .area      = "Kitchen",
+      .place     = { .priority = HA_PRI_PRESENCE } },
+    { .id        = "kitchen_261008_0310b",
+      .primaries = { "kitchen_temp" },
+      .label     = "Kitchen",
+      .area      = "Kitchen",
+      .place     = { .priority = HA_PRI_INDOOR } },
+};
+
+inline const CardSpec HA_OFFICE[] = {
+    // office_desk is light.office: a GROUP defined in Hue, ['color_temp','xy'] -
+    // the most demanding card here. As a mini tile its tap toggles all three
+    // lamps and its long press opens Desk's own window (K92 rule 3).
+    { .id        = "office_desk_261008_0310",
+      .primaries = { "office_desk" },
+      .label     = "Desk",
+      .area      = "Office",
+      .place     = { .priority = HA_PRI_LIGHT } },
+    { .id        = "office_overhead_261008_0310",
+      .primaries = { "office_overhead" },
+      .label     = "Overhead",
+      .area      = "Office",
+      .place     = { .priority = HA_PRI_LIGHT } },
+    { .id        = "office_261008_0310",
+      .primaries = { "office_occupancy" },
+      .label     = "Office",
+      .area      = "Office",
+      .place     = { .priority = HA_PRI_PRESENCE } },
+    { .id        = "office_261008_0310b",
+      .primaries = { "office_temp" },
+      .label     = "Office",
+      .area      = "Office",
+      .place     = { .priority = HA_PRI_INDOOR } },
+};
+
 inline const CardSpec HA_CARDS[] = {
     // --- Garage: the doors ------------------------------------------------
     //
@@ -57,82 +151,38 @@ inline const CardSpec HA_CARDS[] = {
       .area      = "Garage",
       .place     = { .priority = HA_PRI_DOORS } },
 
-    // --- Outside ----------------------------------------------------------
-    //
-    // outside_deck_temp is the SAME PHYSICAL SENSOR as the fleet page's
-    // deck_temp, reached over the websocket instead of the broker. It arrives
-    // already in Fahrenheit because HA converts to the user's display unit,
-    // while the broker carries the raw Celsius - and the page's TEMP_F setting
-    // converts only when the source says 'C', so both land on the same number.
-    // See ExternalEntities_HA.h note 3.
-    { .id        = "outside_deck_261008_0310",
-      .primaries = { "outside_deck_temp" },
-      .label     = "Deck",
-      .area      = "Outside",
-      .place     = { .priority = HA_PRI_OUTDOOR } },
-    { .id        = "outside_front_261008_0310",
-      .primaries = { "outside_front_temp" },
-      .label     = "Front",
-      .area      = "Outside",
-      .place     = { .priority = HA_PRI_OUTDOOR } },
-    { .id        = "outside_porch_261008_0310",
-      .primaries = { "outside_front_light" },
-      .label     = "Porch",
-      .area      = "Outside",
-      .place     = { .priority = HA_PRI_LIGHT } },
-    { .id        = "outside_deck_261008_0310b",
-      .primaries = { "outside_deck_lux" },
-      .label     = "Deck",
-      .area      = "Outside",
-      .place     = { .priority = HA_PRI_EXTRA } },
-
-    // --- Presence ---------------------------------------------------------
-    //
-    // HA ships the state-dependent glyph in attributes.icon - measured: these
-    // report mdi:motion-sensor-off while clear. Nothing reads it yet, and the
-    // glyph is not in the generated icon subset, so wiring it up without
-    // regenerating the fonts would render tofu. Both are 2.7.
-    { .id        = "kitchen_261008_0310",
-      .primaries = { "kitchen_occupancy" },
-      .label     = "Kitchen",
-      .area      = "Kitchen",
-      .place     = { .priority = HA_PRI_PRESENCE } },
-    { .id        = "office_261008_0310",
-      .primaries = { "office_occupancy" },
-      .label     = "Office",
-      .area      = "Office",
-      .place     = { .priority = HA_PRI_PRESENCE } },
+    // --- The clusters (2.11) - Outside, then the two rooms with presence ----
+    // Ids made 2026-10-19 (K33); the members are above, with the ids they had.
+    { .id          = "outside_261019_0500",
+      .label       = "Outside",
+      .area        = "Outside",
+      .place       = { .priority = HA_PRI_OUTDOOR },
+      .members     = HA_OUTSIDE,
+      .memberCount = (uint8_t)(sizeof(HA_OUTSIDE) / sizeof(HA_OUTSIDE[0])),
+      .present     = GroupPresent::PRESENT_CLUSTER,
+      .slots       = { "outside_deck_261008_0310", "outside_deck_261008_0310b" } },
+    { .id          = "kitchen_261019_0500",
+      .label       = "Kitchen",
+      .area        = "Kitchen",
+      .place       = { .priority = HA_PRI_PRESENCE },
+      .members     = HA_KITCHEN,
+      .memberCount = (uint8_t)(sizeof(HA_KITCHEN) / sizeof(HA_KITCHEN[0])),
+      .present     = GroupPresent::PRESENT_CLUSTER,
+      .slots       = { "kitchen_261008_0310b", "kitchen_261008_0310" } },
+    { .id          = "office_261019_0500",
+      .label       = "Office",
+      .area        = "Office",
+      .place       = { .priority = HA_PRI_PRESENCE },
+      .members     = HA_OFFICE,
+      .memberCount = (uint8_t)(sizeof(HA_OFFICE) / sizeof(HA_OFFICE[0])),
+      .present     = GroupPresent::PRESENT_CLUSTER,
+      .slots       = { "office_261008_0310b", "office_261008_0310" } },
 
     // --- Lights -----------------------------------------------------------
-    //
-    // office_desk is light.office: a GROUP, ['color_temp','xy']. It is the most
-    // demanding card here and the one that will force LightCard to stop being
-    // a SwitchCard. kitchen_table is dimmable too (['brightness']). Both render
-    // as plain on/off today.
     //
     // living_overhead is a switch.* entity the owner uses as a light - the card
     // calls it a light, and #44 must call switch.turn_on for it. The domain
     // comes from the entity id, not from this file.
-    { .id        = "office_desk_261008_0310",
-      .primaries = { "office_desk" },
-      .label     = "Desk",
-      .area      = "Office",
-      .place     = { .priority = HA_PRI_LIGHT } },
-    { .id        = "office_overhead_261008_0310",
-      .primaries = { "office_overhead" },
-      .label     = "Overhead",
-      .area      = "Office",
-      .place     = { .priority = HA_PRI_LIGHT } },
-    { .id        = "kitchen_sink_261008_0310",
-      .primaries = { "kitchen_sink" },
-      .label     = "Sink",
-      .area      = "Kitchen",
-      .place     = { .priority = HA_PRI_LIGHT } },
-    { .id        = "kitchen_table_261008_0310",
-      .primaries = { "kitchen_table" },
-      .label     = "Table",
-      .area      = "Kitchen",
-      .place     = { .priority = HA_PRI_LIGHT } },
     { .id        = "living_overhead_261008_0310",
       .primaries = { "living_overhead" },
       .label     = "Overhead",
@@ -144,16 +194,6 @@ inline const CardSpec HA_CARDS[] = {
       .primaries = { "front_thermo" },
       .label     = "Thermo",
       .area      = "Front",
-      .place     = { .priority = HA_PRI_INDOOR } },
-    { .id        = "kitchen_261008_0310b",
-      .primaries = { "kitchen_temp" },
-      .label     = "Kitchen",
-      .area      = "Kitchen",
-      .place     = { .priority = HA_PRI_INDOOR } },
-    { .id        = "office_261008_0310b",
-      .primaries = { "office_temp" },
-      .label     = "Office",
-      .area      = "Office",
       .place     = { .priority = HA_PRI_INDOOR } },
     { .id        = "bedroom_eric_261008_0310",
       .primaries = { "bedroom_temp" },

@@ -197,6 +197,22 @@ struct UIShape {
     float P_SCENE_H;    // 9.0  a scene button, at most
     float P_SCENE_GAP;  // 1.4  between scene buttons
     float P_SCENE_PAD;  // 2.4  a scene button's sides
+
+    // --- A cluster (2.11, K89, K100-K103): a group card shown as a block of its
+    // members, in real millimetres on every board (the "2.11 Clusters" mock's) ---
+    float C_HDR_H;      // 5.2  its header row - one line (K100)
+    float C_PAD;        // 1.1  inside its frame, round the tiles; the header's sides
+    float C_TILE_GAP;   // 0.8  between mini tiles
+    float C_SWATCH_W;   // 1.1  the group's swatch beside the cluster's name
+    float C_SWATCH_H;   // 2.4
+    float C_VALUE_GAP;  // 1.3  between the header's values, and a value's icon and words
+    float C_TILE_MIN;   // 7.5  the least a mini tile is each way - "tight" (K103); a cluster
+                        //      whose tiles would be smaller takes more cells
+
+    // --- Panels and windows float over the page (D-35, the "Panel Edges" mock) ---
+    float HALO;         // 5.0  the halo round a header slot's panel and every window: black at
+                        //      their edge, clear this far out
+    float LINE_FADE;    // 2.5  the bar's accent line fading out before an open panel's walls
 };
 
 // ---------------------------------------------------------------------------

@@ -6,6 +6,8 @@
 #include "SystemReport.h"
 #include "Settings.h"
 #include "Cards/CardGroups.h"
+#include "Cards/ClusterCard.h"
+#include "Layout/Cluster.h"
 #include <Arduino.h>
 #ifdef DEBUG_PAGE_TIMING
 #include <esp_timer.h>   // where a page rebuild's time goes - see commit()
@@ -387,7 +389,19 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
 
     for (uint8_t i = 0; i < spec.count; i++) {
         const CardSpec &cs = spec.cards[i];
+        // A group card made on the device (2.11): a cluster, or its one card.
+        Card *c = (cs.memberCount && cs.members) ? makeGroupCard(cs, spec, reg)
+                                                 : makeCard(cs, spec, reg, i);
+        if (c) add(c);
+    }
 
+    commit();
+}
+
+// One card from its spec, configured and with the owner's saved choices laid
+// over it - or null when its entity is not here or has no card type.
+Card *CardPage::makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, uint8_t i) {
+    {
         // The FIRST primary that resolves decides the card's type. A spec may
         // name several - the aggregate light case - and a room where one bulb
         // has been unpaired should still render the rest.
@@ -400,7 +414,7 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
             Serial.printf("[Cards] spec %u: entity \"%s\" not in registry\n",
                           (unsigned)i, cs.primaries[k]);
         }
-        if (!first) continue;
+        if (!first) return nullptr;
 
         Card *c = cardForEntity(first);
         if (!c) {
@@ -408,7 +422,7 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
             // WEATHER. Saying so beats rendering it as something it is not.
             Serial.printf("[Cards] spec %u: no card type for \"%s\"\n",
                           (unsigned)i, cs.primaries[firstIdx]);
-            continue;
+            return nullptr;
         }
 
         for (uint8_t k = (uint8_t)(firstIdx + 1); k < CARD_PRIMARY_MAX; k++) {
@@ -473,11 +487,132 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
         }
         if (cs.longStaleMs) c->setLongStaleMs(cs.longStaleMs);
         if (cs.paused)      c->setPaused(true);
+        return c;
+    }
+}
 
-        add(c);
+// A GROUP CARD MADE ON THE DEVICE (2.11, K88-K92): its presentation is the
+// saved "present", else the dashboard's. As a CLUSTER its members become mini
+// tiles (the visible ones) and header values (the `slots`); it asks for as many
+// cells as its tiles need (Layout::clusterSpan(), until the arranger). A cluster
+// that cannot fit on this board is shown as its ONE CARD (K92 rule 6): the
+// members that switch together - lights and switches (rule 5) - behind one tile
+// whose tap acts on them all.
+Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg) {
+    char v[64];
+    const bool hasId = cardIdUsable(cs.id);
+    GroupPresent pres = cs.present;
+    if (hasId && Settings::card(cs.id, "present", v, sizeof(v))) groupPresentFromName(v, pres);
+
+    // The header's members, by id, highest priority first: the saved list, else the dashboard's.
+    const char *slotIds[CLUSTER_SLOTS_MAX] = {nullptr};
+    char saved[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1] = "";
+    if (hasId && Settings::card(cs.id, "slots", saved, sizeof(saved))) {
+        uint8_t k = 0;
+        for (char *p = saved; *p && k < CLUSTER_SLOTS_MAX;) {
+            slotIds[k++] = p;
+            char *comma = strchr(p, ',');
+            if (!comma) break;
+            *comma = '\0';
+            p = comma + 1;
+        }
+    } else {
+        for (uint8_t k = 0; k < CLUSTER_SLOTS_MAX; k++) slotIds[k] = cs.slots[k];
+    }
+    auto slotOf = [&](const char *id) -> int8_t {
+        for (uint8_t k = 0; k < CLUSTER_SLOTS_MAX; k++)
+            if (id && slotIds[k] && !strcmp(slotIds[k], id)) return (int8_t)k;
+        return -1;
+    };
+    // A member's tile: shown unless it is in the header (K92 rule 7); "hidden"
+    // saved on it says otherwise either way (K104's Visible).
+    auto tileOf = [&](const CardSpec &m) -> bool {
+        bool tile = slotOf(m.id) < 0;
+        char h[8];
+        if (cardIdUsable(m.id) && Settings::card(m.id, "hidden", h, sizeof(h))) {
+            if (!strcmp(h, "yes")) tile = false;
+            if (!strcmp(h, "no"))  tile = true;
+        }
+        return tile;
+    };
+
+    if (pres == GroupPresent::PRESENT_CLUSTER) {
+        uint8_t nTiles = 0;
+        for (uint8_t k = 0; k < cs.memberCount; k++)
+            if (cs.members[k].primaries[0] && reg.find(cs.members[k].primaries[0]) && tileOf(cs.members[k])) nTiles++;
+        Layout::ClusterGeom g;
+        g.cellW   = widthOf(_sub) > 0 ? widthOf(_sub) : (int32_t)UI::grid().cellW;
+        g.cellH   = (int32_t)UI::grid().cellH;
+        g.gap     = _gap;
+        g.chromeW = ClusterCard::chromeW();
+        g.chromeH = ClusterCard::chromeH();
+        // The room a tag takes above and beside a card is the cluster's too (below).
+        if (spec.headerDefault == CardHeaderStyle::HDR_TAG)       g.chromeH += Card::headerHeight();
+        if (spec.headerDefault == CardHeaderStyle::HDR_TAG_FLOAT) { g.chromeH += Card::headerHeight() / 2;
+                                                                    g.chromeW += Card::headerHeight() / 4; }
+        g.tileGap = UI::mm(UI::shape().C_TILE_GAP);
+        g.minTile = UI::mm(UI::shape().C_TILE_MIN);
+        const uint8_t cellCols = _uCols / _sub ? _uCols / _sub : 1;
+        const Layout::ClusterSpan sp = Layout::clusterSpan(nTiles, g, cellCols, _maxRows);
+        if (sp.fits) {
+            ClusterCard *cl = new ClusterCard();
+            for (uint8_t k = 0; k < cs.memberCount; k++) {
+                Card *m = makeCard(cs.members[k], spec, reg, k);
+                if (!m) continue;
+                m->setMini(true);
+                m->setHeaderStyle(CardHeaderStyle::HDR_NONE);
+                cl->addMember(m, tileOf(cs.members[k]), slotOf(cs.members[k].id));
+            }
+            if (hasId) cl->setId(cs.id);
+            if (cs.label) cl->setLabel(cs.label);
+            cl->setSheetArea(cs.area);
+            CardGroups::apply(*cl, spec.areaColor);
+            // ITS TOP LINES UP WITH ITS NEIGHBOURS': the room a tag takes above a
+            // card is kept above the cluster too, with no tag in it - the
+            // cluster's header names it (a band style has nothing above).
+            cl->setHeaderStyle(cardHeaderIsTag(spec.headerDefault) ? spec.headerDefault
+                                                                   : CardHeaderStyle::HDR_NONE);
+            cl->setShowArea(false);
+            CardPlacement pl = cs.place;
+            pl.prefSpanX = pl.minSpanX = (uint8_t)(sp.cols * _sub);
+            pl.prefSpanY = pl.minSpanY = (uint8_t)(sp.rows * _sub);
+            cl->setPlacement(pl);
+            // The header's style (K102): the cluster's own, else the page's, else the spec's.
+            ClusterStyle st = spec.clusterStyle;
+            if (spec.slug && Settings::page(spec.slug, "cl_style", v, sizeof(v))) clusterStyleFromName(v, st);
+            if (hasId && Settings::card(cs.id, "cl_style", v, sizeof(v))) clusterStyleFromName(v, st);
+            cl->setStyle(st);
+            cl->setIcons(!(hasId && Settings::card(cs.id, "cl_icons", v, sizeof(v)) && !strcmp(v, "off")));
+            cl->setBinder(_binder);
+            Serial.printf("[Cards] cluster %s: %u members, %u tiles, %ux%u cells\n",
+                          cs.label ? cs.label : "?", (unsigned)cl->memberCount(), (unsigned)nTiles,
+                          (unsigned)sp.cols, (unsigned)sp.rows);
+            return cl;
+        }
+        Serial.printf("[Cards] cluster %s: %u tiles do not fit this page - shown as its card\n",
+                      cs.label ? cs.label : "?", (unsigned)nTiles);
     }
 
-    commit();
+    // AS ONE CARD: the members that switch together (lights and switches),
+    // else every member, behind one tile.
+    CardSpec one = {};
+    one.id    = cs.id;
+    one.label = cs.label;
+    one.area  = cs.area;
+    one.place = cs.place;
+    one.groupOn = cs.groupOn;
+    uint8_t n = 0;
+    for (int pass = 0; pass < 2 && !n; pass++)
+        for (uint8_t k = 0; k < cs.memberCount && n < CARD_PRIMARY_MAX; k++) {
+            const char *pid = cs.members[k].primaries[0];
+            const Entity *e = pid ? reg.find(pid) : nullptr;
+            if (!e) continue;
+            const bool switches = e->desc.writable &&
+                                  (e->desc.kind == EntityKind::LIGHT || e->desc.kind == EntityKind::SWITCH);
+            if (pass == 0 && !switches) continue;
+            one.primaries[n++] = pid;
+        }
+    return n ? makeCard(one, spec, reg, 0) : nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -533,42 +668,42 @@ bool cardIdWellFormed(const char *id) {
 uint8_t checkCardIds(const PageSpec *const *pages, uint8_t n) {
     s_idDupeCount = 0;
     uint8_t problems = 0, total = 0;
+    // Every card id seen so far, a group card's members among them (2.11).
+    constexpr uint8_t SEEN_MAX = 128;
+    const char *seen[SEEN_MAX];
+    uint8_t nSeen = 0;
     for (uint8_t pi = 0; pi < n; pi++) {
         const PageSpec *pg = pages[pi];
         if (!pg) continue;
-        for (uint8_t ci = 0; ci < pg->count; ci++) {
-            const CardSpec &cs = pg->cards[ci];
+        uint8_t ci = 0;
+        forEachCardSpec(*pg, [&](const CardSpec &cs) {
+            const uint8_t here = ci++;
             total++;
             const char *what = cs.label ? cs.label : (cs.primaries[0] ? cs.primaries[0] : "?");
             if (!cs.id || !*cs.id) {
                 Serial.printf("[CardIds] %s card %u (%s) has no id - its settings cannot be saved\n",
-                              pg->slug, (unsigned)ci, what);
+                              pg->slug, (unsigned)here, what);
                 problems++;
-                continue;
+                return;
             }
             if (!cardIdWellFormed(cs.id)) {
                 Serial.printf("[CardIds] %s card %u (%s): id \"%s\" is not lowercase letters, digits and _ "
                               "(at most %u) - its settings cannot be saved\n",
-                              pg->slug, (unsigned)ci, what, cs.id, (unsigned)CARD_ID_MAX);
+                              pg->slug, (unsigned)here, what, cs.id, (unsigned)CARD_ID_MAX);
                 problems++;
-                continue;
+                return;
             }
-            // Seen earlier, on this page or one before it?
             bool dupe = false;
-            for (uint8_t pj = 0; pj <= pi && !dupe; pj++) {
-                const PageSpec *q = pages[pj];
-                if (!q) continue;
-                const uint8_t end = (pj == pi) ? ci : q->count;
-                for (uint8_t cj = 0; cj < end; cj++)
-                    if (q->cards[cj].id && strcmp(q->cards[cj].id, cs.id) == 0) { dupe = true; break; }
-            }
+            for (uint8_t k = 0; k < nSeen && !dupe; k++) dupe = !strcmp(seen[k], cs.id);
             if (dupe) {
                 Serial.printf("[CardIds] id \"%s\" is used twice (again on %s, card %u, %s) - "
-                              "neither card's settings can be saved\n", cs.id, pg->slug, (unsigned)ci, what);
+                              "neither card's settings can be saved\n", cs.id, pg->slug, (unsigned)here, what);
                 problems++;
                 if (s_idDupeCount < ID_DUPES_MAX) s_idDupes[s_idDupeCount++] = cs.id;
+            } else if (nSeen < SEEN_MAX) {
+                seen[nSeen++] = cs.id;
             }
-        }
+        });
     }
     Serial.printf("[CardIds] %u cards on %u pages, %u id problem%s\n",
                   (unsigned)total, (unsigned)n, (unsigned)problems, problems == 1 ? "" : "s");

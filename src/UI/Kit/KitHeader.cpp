@@ -12,10 +12,11 @@ lv_obj_t *headerBar(lv_obj_t *parent) {
     // The scheme's drop shadow onto the page below; nothing on a scheme
     // without one (the owner's Linen request, 2026-09-23).
     lv_obj_add_style(b, UI::paint(UIPaint::PAINT_LIFT), 0);
-    // ...but never across an open panel, which pours out of the bar (round 6).
-    // MAIN_END: the last a bar draws outside itself - LVGL 9.5 clips its
-    // DRAW_POST to its own area (lv_refr.c, lv_obj_redraw()).
-    lv_obj_add_event_cb(b, drawerCoverBarShadow, LV_EVENT_DRAW_MAIN_END, nullptr);
+    // ...but never across an open panel, which pours out of the bar (round 6);
+    // and for an open panel its line fades short of the panel's walls and the
+    // halo falls on it (D-35). MAIN_END: the last a bar draws outside itself -
+    // LVGL 9.5 clips its DRAW_POST to its own area (lv_refr.c, lv_obj_redraw()).
+    lv_obj_add_event_cb(b, drawerOverBar, LV_EVENT_DRAW_MAIN_END, nullptr);
     lv_obj_set_size(b, lv_pct(100), UIToolkit::systemHeaderFullPx());
     return b;
 }

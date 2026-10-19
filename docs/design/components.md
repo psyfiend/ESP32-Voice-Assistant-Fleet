@@ -306,6 +306,51 @@ setting one choice apart from another (`KS_RULE`); `toggleButton(parent, words, 
 `toggleButtonSet()` - glass, lit glass while on (round 5); `selectorSet(S, i)` a
 selector's choice set from outside, with no `onChosen` (the scheme changed elsewhere).
 
+**It lies on the bar (D-35, 2.11 round 1)**: every corner of the face is rounded and its top edge
+is the bar's line - the wrapper stands `LINE` higher, under the bar, which is drawn over it. The bar
+draws for each open panel (`Kit::drawerOverBar()`, its `DRAW_MAIN_END`): its line faded out over
+`LINE_FADE` and stopped a quarter of `DRAWER_R` short of the panel's walls, then the halo where it
+falls on the bar - round the panel's top, and round its slot's tab above the line only, so the
+panel's top edge beside the tab stays lit.
+
+### The halo - `Kit::haloAttach(o)`, `Kit::haloDraw(layer, area, radius, clip)` (D-35, 2.11)
+
+**What floats over the page** - a header slot's panel (the wrapper) and every window (the Sheet) -
+stands on a black rim at its edge fading to clear `HALO` millimetres out ("Panel Edges", the owner's
+choice; it takes the place of the scheme's lift). **Painted, not LVGL's shadow**: as a shadow it cost
+a full redraw with a window open 45 ms more on the P4_5 and banded into visible steps; as four A8
+corner images and four 16 px edge strips (tiled), black, ordered-dithered (4 x 4 Bayer, its strength
+from the scheme's ground) and painted once per size and scheme into PSRAM, it costs ~28 ms on the
+same frame and does not band. `haloAttach()` draws it in the object's `DRAW_MAIN_BEGIN`, under it,
+and widens the object's redraw area by `haloWidth()`; nothing is drawn while the object is smaller
+than its own corners (a panel's first frames).
+
+### Cards - the `KS_CARD_*` roles (2.11 round 1)
+
+The cards came onto the kit when 2.11 changed them (`ui-architecture.md` §6): the wrapper in its
+cell (`KS_CARD_ROOT`, a flex column), a plain holder (`KS_CARD_PLAIN`), the surface (`KS_CARD_SURFACE`:
+radius, border, the scheme's shadow) and its padded body (`KS_CARD_BODY`), a tag's strip and pill
+(`KS_CARD_STRIP`, `KS_CARD_PILL`), the badge of a card with no header (`KS_CARD_BADGE`), the hero's
+disc (`KS_CARD_DISC`), the name (`KS_CARD_NAME`), small words (`KS_CARD_SMALL`) and those in the
+surface's colour on a tag or band (`KS_CARD_TAGTEXT`), the unit, the status row's icon, the
+long-stale diagonal. **What follows the card's state stays the card's own** - a colour, a paused
+card's mixed surface, the press look, a size worked out from its cell. Proved by the harness on the
+P4_5 and the 4B: no pixel moved on the pages (only fonts on status-row labels that are never drawn).
+
+### A cluster and its mini tiles (2.11, K89, K100-K104; `Cards/ClusterCard`, `Cards/MiniTile.cpp`)
+
+**A group card shown as a block of its members**: the card's surface, a header row
+(`KS_CLUSTER_HDR`: one line, a rule under it) holding the group's swatch (`KS_CLUSTER_SWATCH`) and
+the cluster's name (`KS_CLUSTER_TITLE`) on the left and the header's members' values on the right
+(`KS_CLUSTER_VALUE`, an icon in its tint beside each) - placed by the page header's planner of
+claims (`Layout/HeaderPlan.h`): the name a resident, each value a claim whose icon gives way first,
+the last slot first. In **Bar** style the row is the group's colour (a skirt squares its foot) and
+the words the surface's. **A mini tile** (`KS_TILE`, `KS_TILE_PRESSED`, `KS_TILE_NAME`) is a whole
+card drawn without a border: a state's lit disc (on: a solid disc in the active colour, or the
+light's own; off: the faint disc) or a value and its unit, its entity label under it; its badge and
+diagonal as a card's. The tiles stand where `Layout::tileGrid()` puts them; a cluster asks the page
+for `Layout::clusterSpan()` cells (`include/Layout/Cluster.h`, host-tested).
+
 ---
 
 ## 3. The Sheet - `include/UI/Sheet.h` (2.12 P4)

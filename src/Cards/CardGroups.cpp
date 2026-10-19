@@ -35,14 +35,15 @@ bool startsWith(const char *s, const char *p) { return !strncmp(s, p, strlen(p))
 // The dashboard's areas, each once, in page order.
 uint8_t sheetAreas(const char **out, uint8_t cap) {
     uint8_t n = 0;
+    // A group card's members too (2.11): a cluster's area is its members'.
     for (uint8_t p = 0; p < s_nPages; p++)
-        for (uint8_t i = 0; i < s_pages[p]->count; i++) {
-            const char *a = s_pages[p]->cards[i].area;
-            if (!a || !a[0]) continue;
+        forEachCardSpec(*s_pages[p], [&](const CardSpec &cs) {
+            const char *a = cs.area;
+            if (!a || !a[0]) return;
             bool seen = false;
             for (uint8_t k = 0; k < n && !seen; k++) seen = !strcmp(out[k], a);
             if (!seen && n < cap) out[n++] = a;
-        }
+        });
     return n;
 }
 
@@ -55,15 +56,17 @@ const char *linkOf(const char *area) {
     static char id[40];
     id[0] = '\0';
     if (!s_reg || !area || !area[0]) return id;
-    for (uint8_t p = 0; p < s_nPages; p++)
-        for (uint8_t i = 0; i < s_pages[p]->count; i++) {
-            const CardSpec &cs = s_pages[p]->cards[i];
-            if (!cs.area || strcmp(cs.area, area) != 0 || !cs.primaries[0]) continue;
+    // A group card's members count (2.11): a cluster has no entity of its own.
+    bool split = false;
+    for (uint8_t p = 0; p < s_nPages && !split; p++)
+        forEachCardSpec(*s_pages[p], [&](const CardSpec &cs) {
+            if (split || !cs.area || strcmp(cs.area, area) != 0 || !cs.primaries[0]) return;
             const Entity *e = s_reg->find(cs.primaries[0]);
-            if (!e || e->desc.source != EntitySource::HA || !e->sourceAreaId[0]) continue;
+            if (!e || e->desc.source != EntitySource::HA || !e->sourceAreaId[0]) return;
             if (!id[0]) snprintf(id, sizeof(id), "%s", e->sourceAreaId);
-            else if (strcmp(id, e->sourceAreaId) != 0) { id[0] = '\0'; return id; }
-        }
+            else if (strcmp(id, e->sourceAreaId) != 0) split = true;
+        });
+    if (split) id[0] = '\0';
     return id;
 }
 

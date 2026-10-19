@@ -459,3 +459,8 @@ void CardPopup::openOn(Card &card, uint8_t view) {
     if (view == OPEN_HISTORY)                      showView(PopupView::VIEW_HISTORY);
     else if (view == OPEN_MEMBERS && hasMembers()) showView(PopupView::VIEW_MEMBERS);
 }
+
+void CardPopup::openMembers(Card &card) {
+    open(card);
+    if (isOpen() && hasMembers()) showView(PopupView::VIEW_MEMBERS);
+}

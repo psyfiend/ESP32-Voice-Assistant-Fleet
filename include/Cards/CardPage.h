@@ -119,6 +119,12 @@ private:
     // decision and a card that moves to another page must not carry a stale one.
     using Slot = Layout::Place;
 
+    // One card from its spec, configured, the saved settings over it; null when
+    // its entity is not here. A group card made on the device (2.11): a cluster
+    // of its members, or - when it cannot fit, or the owner chose it - its card.
+    Card *makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, uint8_t i);
+    Card *makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg);
+
     // The whole layout decision: the cards as Layout items, placed by the flow
     // engine - plain arithmetic with no LVGL, tested off the board (host-tests/).
     void plan();

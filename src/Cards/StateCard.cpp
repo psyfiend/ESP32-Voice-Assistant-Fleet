@@ -1,22 +1,24 @@
 #include "Cards/StateCard.h"
 #include "Cards/CardIcons.h"
 #include "UI/UITokens.h"
+#include "UI/Kit.h"
 #include <Arduino.h>
 #include <stdio.h>
 
 StateCardFill StateCard::s_fill = StateCardFill::FRAME_CORNER;   // GUIManager's default (2.8 round 6)
 
+using KS = Kit::KitStyle;
+
 static lv_obj_t *plainCol(lv_obj_t *parent) {
     lv_obj_t *o = lv_obj_create(parent);
-    lv_obj_set_style_bg_opa       (o, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width (o, 0, 0);
-    lv_obj_set_style_pad_all      (o, 0, 0);
+    Kit::add(o, KS::KS_CARD_PLAIN);
     lv_obj_clear_flag             (o, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (o, LV_OBJ_FLAG_CLICKABLE);
     return o;
 }
 
 void StateCard::buildBody(lv_obj_t *body) {
+    if (mini()) { buildMiniBody(body); return; }   // a cluster's tile (MiniTile.cpp)
     // Same vertical stack as ValueCard, and for the same reason: the disc used
     // to be centred with a hand-tuned offset and the name aligned to the
     // bottom, which left a gap the owner described as the icon being too high
@@ -45,15 +47,14 @@ void StateCard::buildBody(lv_obj_t *body) {
     _disc = lv_obj_create(_mid);
     lv_obj_clear_flag             (_disc, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_disc, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_border_width (_disc, 0, 0);
-    lv_obj_set_style_pad_all      (_disc, 0, 0);
+    Kit::add(_disc, KS::KS_CARD_DISC);   // round, no border, no padding
 
     _icon = lv_label_create(_disc);
     lv_obj_center(_icon);
 
     _name = lv_label_create(body);
+    Kit::add(_name, KS::KS_CARD_NAME);   // the name's face, centred
     lv_label_set_long_mode     (_name, LV_LABEL_LONG_DOT);
-    lv_obj_set_style_text_align(_name, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width           (_name, lv_pct(100));
 
     _statusRow = plainCol(body);
@@ -65,6 +66,7 @@ void StateCard::buildBody(lv_obj_t *body) {
     // icon there. The top-right is the floating STALE badge's in HDR_NONE, and
     // a mixed count is status - so it moved down to where status lives.
     _mixed = lv_label_create(_statusRow);
+    Kit::add(_mixed, KS::KS_CARD_SMALL);
     lv_obj_align   (_mixed, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_flag(_mixed, LV_OBJ_FLAG_HIDDEN);
 
@@ -84,6 +86,7 @@ bool StateCard::onFill(int32_t fromBottom, int pct) const {
 }
 
 void StateCard::render() {
+    if (mini()) { renderMini(); return; }
     const Entity *e = primary();
     if (!e) return;
 
@@ -140,9 +143,7 @@ void StateCard::render() {
     // the circle is not drawn at all and the icon stands on its own. Draw
     // LESS, never the same thing smaller - the rule the variants already obey.
     const bool discFits = (discPx >= iconPx + UI::sc(4));
-    lv_obj_set_size        (_disc, discPx, discPx);
-    lv_obj_set_style_radius(_disc, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_pad_bottom(_disc, 0, 0);
+    lv_obj_set_size        (_disc, discPx, discPx);   // round by its role
 
     // --- State: the whole surface, not a corner ---------------------------
     //
@@ -337,7 +338,6 @@ void StateCard::render() {
     if (showName) {
         const char *txt = (lbl == CardLabel::LBL_STATE) ? cardStateWord(e->desc, isOn) : shownName(lbl);
         lv_label_set_text(_name, txt);
-        lv_obj_set_style_text_font(_name, t.NAME, 0);
         // A LONG NAME NEVER TAKES THE HERO'S ROOM (owner, K17: "Office lamp" on
         // two lines pushed the disc up and clipped it). The name always takes
         // one line's room in the column; a name that wraps gets its second
@@ -379,7 +379,6 @@ void StateCard::render() {
         char buf[12];
         snprintf(buf, sizeof(buf), "%u/%u", (unsigned)active, (unsigned)total);
         lv_label_set_text          (_mixed, buf);
-        lv_obj_set_style_text_font (_mixed, t.TAG, 0);
         lv_obj_set_style_text_color(_mixed, UI::c(tone(ink(yMixed, p.TEXT_DIM))), 0);
         lv_obj_clear_flag          (_mixed, LV_OBJ_FLAG_HIDDEN);
     } else {

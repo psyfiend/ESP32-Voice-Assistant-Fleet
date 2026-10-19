@@ -307,3 +307,12 @@ to close: P4_5 ~85 ms, 4B ~52 ms). To build: LVGL's own shadow (spread 0) on the
 Sheet, measured with `/bench` against today; if a window-sized shadow costs too much (Linen's
 shadows cost +35%, `display-stack.md` §8.2), the ring becomes painted images, as the corner cut's
 shadow did (D-33).
+
+**As built (2.11 round 1, 2026-10-19).** The panel's wrapper stands `LINE` higher, its face rounded
+at every corner, so its top edge is the bar's line; the bar (`Kit::drawerOverBar()`, its
+`DRAW_MAIN_END`) fades its line out over `LINE_FADE` 2.5 mm and stops it a quarter of `DRAWER_R`
+short of the walls, then draws the halo where it falls on the bar - round the panel's top, and round
+the open slot's tab above the line only. **The halo is painted**: LVGL's shadow (5 mm, spread half)
+cost +45 ms on a full redraw with a window open on the P4_5 and banded; dithered A8 images cost ~28 ms
+and do not (`Kit::haloAttach()`, `UI/Kit/KitHalo.cpp`; `components.md`; LESSONS). It takes the place of
+Linen's lift on panels and windows. The owner's sheet: `docs/TEST_2.11.md` round 1.

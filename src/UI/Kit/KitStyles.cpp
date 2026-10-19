@@ -12,6 +12,7 @@ static lv_style_t s_style[(int)KitStyle::KS_COUNT];
 static bool       s_ready = false;
 
 static lv_style_t *st(KitStyle s) { return &s_style[(int)s]; }
+static void fillCards();   // below fill(): the cards' and clusters' roles
 
 static void flex(lv_style_t *x, lv_flex_flow_t flow, lv_flex_align_t main, lv_flex_align_t cross,
                  lv_flex_align_t track) {
@@ -337,8 +338,8 @@ static void fill() {
     lv_style_set_border_width(dr, 0);
     lv_style_set_pad_all     (dr, 0);
     lv_style_set_radius      (dr, UI::sc(h.DRAWER_R));
-    // The face: its top corners pushed above the wrapper's clip (Kit::drawer()),
-    // so it is square where it meets the bar; the padding pays for the push.
+    // The face: every corner rounded - the panel lies ON the bar (D-35), its top
+    // edge the bar's line, its top corners turning down from it.
     lv_style_t *df = st(S::KS_DRAWER_FACE);
     lv_style_set_bg_color    (df, UI::c(p.SURFACE));
     lv_style_set_bg_opa      (df, LV_OPA_COVER);
@@ -349,7 +350,7 @@ static void fill() {
     lv_style_set_radius      (df, UI::sc(h.DRAWER_R));
     lv_style_set_pad_hor     (df, UI::sc(h.DRAWER_PAD));
     lv_style_set_pad_bottom  (df, UI::sc(h.DRAWER_PAD));
-    lv_style_set_pad_top     (df, UI::sc(h.DRAWER_R) + UI::sc(h.DRAWER_PAD));
+    lv_style_set_pad_top     (df, UI::sc(h.DRAWER_PAD));
     lv_style_set_pad_row     (df, UI::sc(h.DRAWER_GAP));
     flex(df, LV_FLEX_FLOW_COLUMN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_style_t *di = st(S::KS_DRAWER_ITEM);
@@ -359,6 +360,109 @@ static void fill() {
     lv_style_set_pad_column(di, UI::sc(h.SLOT_GAP));
     flex(di, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     text(S::KS_DRAWER_BIG, UIToolkit::Font_Hero, p.TEXT);
+
+    fillCards();
+}
+
+// CARDS (2.11 round 1): each value the one Card, StateCard and ValueCard set
+// locally before they had roles, so moving them changed no pixel. The surface's
+// colour stays the card's (a paused card mixes it toward the ground).
+static void fillCards() {
+    const UIPalette &p = UI::pal();
+    const UIMetrics &m = UI::met();
+    const UIType    &t = UI::type();
+    const UIShape   &k = UI::shape();
+    using S = KitStyle;
+
+    lv_style_t *root = st(S::KS_CARD_ROOT);
+    lv_style_set_bg_opa      (root, LV_OPA_TRANSP);
+    lv_style_set_border_width(root, 0);
+    lv_style_set_pad_all     (root, 0);
+    lv_style_set_pad_gap     (root, 0);
+    lv_style_set_layout      (root, LV_LAYOUT_FLEX);
+    lv_style_set_flex_flow   (root, LV_FLEX_FLOW_COLUMN);
+
+    lv_style_t *pl = st(S::KS_CARD_PLAIN);
+    lv_style_set_bg_opa      (pl, LV_OPA_TRANSP);
+    lv_style_set_border_width(pl, 0);
+    lv_style_set_pad_all     (pl, 0);
+
+    lv_style_t *sf = st(S::KS_CARD_SURFACE);
+    lv_style_set_bg_color        (sf, UI::c(p.SURFACE));
+    lv_style_set_bg_opa          (sf, LV_OPA_COVER);
+    lv_style_set_radius          (sf, UI::sc(m.RADIUS));
+    lv_style_set_border_width    (sf, m.BORDER_W);
+    lv_style_set_border_color    (sf, UI::border());
+    lv_style_set_shadow_width    (sf, UI::sc(m.SHADOW));
+    lv_style_set_shadow_offset_y (sf, UI::sc(m.SHADOW_Y));
+    lv_style_set_shadow_opa      (sf, m.SHADOW ? (lv_opa_t)m.SHADOW_OPA : LV_OPA_TRANSP);
+    lv_style_set_pad_all         (sf, 0);   // the body owns padding
+
+    lv_style_t *bd = st(S::KS_CARD_BODY);
+    lv_style_set_bg_opa      (bd, LV_OPA_TRANSP);
+    lv_style_set_border_width(bd, 0);
+    lv_style_set_pad_all     (bd, UI::sc(m.PAD));
+
+    lv_style_t *sp = st(S::KS_CARD_STRIP);
+    lv_style_set_pad_all     (sp, 0);
+    lv_style_set_pad_left    (sp, UI::sc(7));
+    lv_style_set_pad_right   (sp, UI::sc(7));
+    lv_style_set_border_width(sp, 0);
+
+    lv_style_t *pi = st(S::KS_CARD_PILL);
+    lv_style_set_bg_opa(pi, LV_OPA_COVER);
+    lv_style_set_radius(pi, UI::sc(m.RADIUS / 2));
+
+    lv_style_t *bg = st(S::KS_CARD_BADGE);
+    lv_style_set_bg_opa (bg, LV_OPA_COVER);
+    lv_style_set_radius (bg, UI::sc(m.RADIUS / 2));
+    lv_style_set_pad_hor(bg, UI::sc(6));
+    lv_style_set_pad_ver(bg, UI::sc(3));
+
+    lv_style_t *dc = st(S::KS_CARD_DISC);
+    lv_style_set_border_width(dc, 0);
+    lv_style_set_pad_all     (dc, 0);
+    lv_style_set_radius      (dc, LV_RADIUS_CIRCLE);
+
+    lv_style_set_text_font (st(S::KS_CARD_NAME), t.NAME);
+    lv_style_set_text_align(st(S::KS_CARD_NAME), LV_TEXT_ALIGN_CENTER);
+    lv_style_set_text_font (st(S::KS_CARD_SMALL), t.TAG);
+    text(S::KS_CARD_TAGTEXT, t.TAG, p.SURFACE);
+    lv_style_set_text_font (st(S::KS_CARD_UNIT), t.UNIT);
+    lv_style_set_text_font (st(S::KS_CARD_ICON_SM), t.ICON_SM);
+
+    lv_style_t *dg = st(S::KS_CARD_DIAG);
+    lv_style_set_line_width  (dg, UI::sc(6));
+    lv_style_set_line_opa    (dg, LV_OPA_60);
+    lv_style_set_line_rounded(dg, true);
+
+    // --- A cluster (2.11): its frame is a card's surface (KS_CARD_SURFACE) ---
+    // One line, the name on the left and the values on the right (the header's
+    // planner places them); a rule under it in the border's colour - a light
+    // scheme draws no card border, so the rule has a hairline of its own.
+    lv_style_t *ch = st(S::KS_CLUSTER_HDR);
+    lv_style_set_bg_opa      (ch, LV_OPA_TRANSP);
+    lv_style_set_border_side (ch, LV_BORDER_SIDE_BOTTOM);
+    lv_style_set_border_width(ch, LV_MAX(1, UI::mm(k.LINE_HAIR)));
+    lv_style_set_border_color(ch, UI::border());
+    lv_style_set_pad_all     (ch, 0);
+    lv_style_set_radius      (ch, 0);
+    text(S::KS_CLUSTER_TITLE, t.NAME, p.TEXT);
+    lv_style_t *sw = st(S::KS_CLUSTER_SWATCH);
+    lv_style_set_width (sw, LV_MAX(2, UI::mm(k.C_SWATCH_W)));
+    lv_style_set_height(sw, LV_MAX(4, UI::mm(k.C_SWATCH_H)));
+    lv_style_set_radius(sw, LV_MAX(1, UI::mm(k.C_SWATCH_W) / 3));
+    lv_style_set_bg_opa(sw, LV_OPA_COVER);
+    text(S::KS_CLUSTER_VALUE, t.NAME, p.TEXT);
+    lv_style_t *tl = st(S::KS_TILE);
+    lv_style_set_bg_opa      (tl, LV_OPA_TRANSP);
+    lv_style_set_border_width(tl, 0);
+    lv_style_set_pad_all     (tl, 0);
+    lv_style_set_radius      (tl, UI::sc(m.RADIUS));
+    lv_style_set_bg_color(st(S::KS_TILE_PRESSED), UI::c(UI::mix(p.SURFACE, p.TEXT, 12)));
+    lv_style_set_bg_opa  (st(S::KS_TILE_PRESSED), LV_OPA_COVER);
+    text(S::KS_TILE_NAME, t.TAG, p.TEXT);
+    lv_style_set_text_align(st(S::KS_TILE_NAME), LV_TEXT_ALIGN_CENTER);
 }
 
 void begin() {

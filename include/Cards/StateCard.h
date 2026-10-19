@@ -93,6 +93,11 @@ protected:
     void commandAll(bool on);
 
 private:
+    // As a cluster's MINI TILE (2.11, K89, K100): the icon on its disc - lit, a
+    // solid disc in the active colour, while on - its entity label under it.
+    // Cards/MiniTile.cpp.
+    void buildMiniBody(lv_obj_t *body);
+    void renderMini();
 
     static StateCardFill s_fill;
 

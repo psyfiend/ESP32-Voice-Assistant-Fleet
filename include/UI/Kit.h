@@ -79,6 +79,23 @@ enum class KitStyle : uint8_t {
     KS_JOIN_FILL, KS_JOIN_RING_BAR,
     // A short upright rule setting one choice apart from another (Kit::vrule()).
     KS_RULE,
+    // CARDS (2.11 round 1): the parts every card has - the wrapper in its cell
+    // (a flex column), a plain holder, the surface and its padded body, a tag's
+    // strip and pill, the badge of a card with no header, the hero's disc, the
+    // name under it, the small words (a tag, a count, the status row) and those
+    // in the surface's colour (on a tag or a band), the unit, the status row's
+    // icon, the long-stale diagonal. What follows the card's state - its
+    // colours, a press, a size worked out from its cell - stays the card's own.
+    KS_CARD_ROOT, KS_CARD_PLAIN, KS_CARD_SURFACE, KS_CARD_BODY, KS_CARD_STRIP, KS_CARD_PILL,
+    KS_CARD_BADGE, KS_CARD_DISC, KS_CARD_NAME, KS_CARD_SMALL, KS_CARD_TAGTEXT, KS_CARD_UNIT,
+    KS_CARD_ICON_SM, KS_CARD_DIAG,
+    // A CLUSTER (2.11, K89, K101): a group card shown as a block of its members.
+    // Its frame (a card's surface), its header row (one line, a rule under it),
+    // the header's name, the group's swatch beside it, a value's words; a MINI
+    // TILE - a member with no border of its own, tinted while pressed - and its
+    // entity label.
+    KS_CLUSTER_HDR, KS_CLUSTER_TITLE, KS_CLUSTER_SWATCH, KS_CLUSTER_VALUE,
+    KS_TILE, KS_TILE_PRESSED, KS_TILE_NAME,
     KS_COUNT
 };
 
@@ -105,6 +122,17 @@ lv_obj_t *label(lv_obj_t *parent, KitStyle look);
 
 // How wide a line of text draws, in pixels.
 int32_t textW(const char *txt, const lv_font_t *f);
+
+// --- The halo (KitHalo.cpp, D-35) ---------------------------------------------------
+// What floats over the page - a header slot's panel, every window - stands on a
+// black rim at its edge fading to clear, haloWidth() out (UIShape HALO): painted
+// and dithered images (LVGL's own shadow cost 45 ms a full frame on the P4_5 and
+// banded on these 16-bit panels). haloAttach() draws it under the object, round
+// its rounded edge, and widens its redraw area; haloDraw() draws one round `a`,
+// within `clip` (null: the layer's) - the bar's share of a panel's (drawerOverBar).
+int32_t haloWidth();
+void    haloAttach(lv_obj_t *o);
+void    haloDraw(lv_layer_t *layer, const lv_area_t &a, int32_t radius, const lv_area_t *clip);
 
 // --- Buttons ------------------------------------------------------------------
 // A button with words: CANCEL is the quiet way out, DESTRUCTIVE the one that
@@ -426,9 +454,11 @@ void    drawerPlace(Drawer &d, int32_t centreX, int32_t top);
 void    drawerOpen(Drawer &d);
 void    drawerClose(Drawer &d, bool animate = true);
 // The bar's DRAW_MAIN_END (Kit::headerBar() hooks it): the bar is drawn over the
-// panels, so its drop shadow fell across an open panel's top, under the open
-// slot (owner, round 6, Linen). It paints each open panel's face back over it.
-void    drawerCoverBarShadow(lv_event_t *e);
+// panels. For each open panel it fades its accent line out short of the panel's
+// walls - the panel lies on the bar (D-35) - and draws the halo where it falls
+// on the bar (round the panel's top and its slot's tab); and on a scheme with a
+// shadow it paints the panel's face back over the bar's shadow (round 6, Linen).
+void    drawerOverBar(lv_event_t *e);
 
 // ONE SHAPE (D-23): a join is a corner of the outline where it meets the bar's
 // accent line - a COVE beside an open slot's tab, in the bar (round 4: the

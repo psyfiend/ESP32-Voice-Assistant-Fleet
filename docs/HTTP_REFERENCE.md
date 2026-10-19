@@ -91,6 +91,12 @@ away and back. A card's id is shown in its window: SETTINGS > Entity properties 
 | `?card=<id>&tap_scene=<scene id>` | the scene a tap loads | the scene's HA id |
 | `?card=<id>&group=<g>` | the card label's group (K44): `ha_area`, `own`, `none` or a group id | |
 | `?card=<id>&label_text=<text>` | the card label's own words, with `group=own` | |
+| `?card=<group card>&present=card\|cluster` | how a group card made on the device is shown (2.11, K90): its members as a cluster, or one card for them | `default`/empty: the dashboard's |
+| `?card=<group card>&slots=<id>,<id>` | the members in a cluster's header, highest priority first (K104); a member there is not also a tile unless made visible | member card ids, comma-separated, up to 4; empty: the dashboard's |
+| `?card=<group card>&cl_style=swatch\|bar` | that cluster's header style (K102) | empty: the page's |
+| `?card=<group card>&cl_icons=off` | the header's values without their icons (K104's "Show sensor icons") | empty: icons shown |
+| `?card=<member>&hidden=yes\|no` | a member's tile hidden or shown in its cluster (K104's Visible) | empty: the default - a tile unless it is in the header |
+| `?page=<slug>&cl_style=swatch\|bar` | the clusters' header style on that page (K102) | empty: the dashboard's (Swatch) |
 | `?group=new&name=<Name>` | a new custom group; answers its id | 1-39 characters of ASCII |
 | `?group=<id>&color=RRGGBB` | a group's colour | six hex digits; empty: back to its colour by name |
 | `?group=<id>&name=<Name>` | rename a group (every card in it; an HA area keeps its link) | empty: its own name again |

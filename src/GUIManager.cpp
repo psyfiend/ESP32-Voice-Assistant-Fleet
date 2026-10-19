@@ -43,12 +43,12 @@ static constexpr uint8_t DASH_PAGE_N = sizeof(DASH_PAGES) / sizeof(DASH_PAGES[0]
 static EntityRegistry *s_claimReg = nullptr;
 
 static bool compiledCard(const char *id) {
-    for (uint8_t p = 0; p < DASH_PAGE_N; p++)
-        for (uint8_t i = 0; i < DASH_PAGES[p]->count; i++) {
-            const char *cid = DASH_PAGES[p]->cards[i].id;
-            if (cid && !strcmp(cid, id)) return true;
-        }
-    return false;
+    bool found = false;   // a group card's members are cards too (2.11)
+    for (uint8_t p = 0; p < DASH_PAGE_N && !found; p++)
+        forEachCardSpec(*DASH_PAGES[p], [&](const CardSpec &cs) {
+            if (cs.id && !strcmp(cs.id, id)) found = true;
+        });
+    return found;
 }
 
 // A card on a page, or one added on the device (K17) - removed ones too: they

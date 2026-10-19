@@ -157,14 +157,31 @@ esp_err_t handleSettings(httpd_req_t *req) {
         }
     }
 
-    char id[CARD_ID_ARG], name[64];
+    char id[CARD_ID_ARG], name[200];   // a cluster's slots: up to four card ids
+    // A PAGE'S CLUSTERS' HEADER STYLE (2.11, K102), until the glass sets it:
+    // page=<slug>&cl_style=swatch|bar (empty: the dashboard's).
+    if (haveQ && httpd_query_key_value(q, "page", id, sizeof(id)) == ESP_OK &&
+        httpd_query_key_value(q, "cl_style", name, sizeof(name)) == ESP_OK) {
+        const bool reset = !name[0] || !strcmp(name, "default");
+        Settings::setPage(id, "cl_style", reset ? nullptr : name);
+        Settings::save();
+        char out[160];
+        const int n = snprintf(out, sizeof(out), "page %s: cl_style %s - in effect when it is next built\n",
+                               id, reset ? "removed" : name);
+        httpd_resp_set_type(req, "text/plain");
+        return httpd_resp_send(req, out, n);
+    }
     // The other card settings too, as SETTINGS' rows would set them - for
     // tests from a PC: label=, tap=, tap_scene= (the scene's HA id). The
     // value is not checked against the choices here; a name the firmware
     // does not know reads as "not set". An empty value removes the key.
     // group= (ha_area / own / none / a group id) and label_text= (the card
     // label's own text, with group=own) are the card label's (K44).
-    static const char *const KEYS[] = { "label", "tap", "tap_scene", "group", "label_text" };
+    // A group card's (2.11, until round 3 edits them on the glass): present=
+    // card|cluster, slots= (member card ids, comma-separated, highest priority
+    // first), cl_style=swatch|bar, cl_icons=off; a member's hidden=yes|no.
+    static const char *const KEYS[] = { "label", "tap", "tap_scene", "group", "label_text",
+                                        "present", "slots", "cl_style", "cl_icons", "hidden" };
     for (const char *key : KEYS) {
         if (!haveQ || httpd_query_key_value(q, "card", id, sizeof(id)) != ESP_OK ||
             httpd_query_key_value(q, key, name, sizeof(name)) != ESP_OK) continue;

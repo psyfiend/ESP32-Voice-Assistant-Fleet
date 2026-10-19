@@ -71,6 +71,10 @@ public:
     static constexpr uint8_t OPEN_CONTROLS = 0, OPEN_HISTORY = 1, OPEN_MEMBERS = 2;
     static void openOn(Card &card, uint8_t view);
 
+    // A long press that opens on Members (2.11: a cluster's header - the
+    // cluster's own window lists its members). Held as open() holds.
+    static void openMembers(Card &card);
+
     // Close it, by whichever of the four routes. Safe to call from an event
     // callback of an object inside the window: the work is deferred to
     // lv_async_call, because deleting the object whose event is running is

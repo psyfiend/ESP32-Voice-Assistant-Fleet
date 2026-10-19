@@ -130,6 +130,9 @@ public:
     const char *id() const { return _id ? _id : ""; }
     bool hasId() const { return _id && *_id; }
 
+    // Its first entity, or null: what a cluster's header shows of a member (2.11).
+    const Entity *firstEntity() const { return _nPrimary ? _primary[0] : nullptr; }
+
     // What a tap does (2.10d, TapAction). The scene for Load scene is named
     // by its source's id ("scene.office_relax"), which outlives a session.
     Card &setTapAction(TapAction t) { _tap = t; return *this; }
@@ -225,6 +228,13 @@ public:
     // every card. Same pattern as StateCard::setFill().
     static void setShowAreaDefault(bool v) { s_showArea = v; }
 
+    // A MINI TILE (2.11, K89): a member of a cluster, drawn inside it with no
+    // border, header or card label of its own - its hero and its entity label.
+    // Still a whole card: its id and settings, its tap, its window on a long
+    // press (K104). Set before build(); the cluster sizes and places it.
+    Card &setMini(bool on) { _mini = on; return *this; }
+    bool  mini() const { return _mini; }
+
     // Overrides cardLongStaleMs(). This is the build sheet's hook.
     Card &setLongStaleMs(uint32_t ms) { _longStaleMs = ms; return *this; }
 
@@ -253,20 +263,22 @@ public:
 
     // --- CardBinder hooks. LVGL thread only. ------------------------------
 
-    // Does this card render entityId? Used to route a dirty snapshot.
-    bool owns(const char *entityId) const;
+    // Does this card render entityId? Used to route a dirty snapshot. Virtual
+    // for a cluster (2.11), whose header shows members it does not bind.
+    virtual bool owns(const char *entityId) const;
 
     // One of our bound entities changed. See the threading note above for why
     // the snapshot is passed even though render() re-reads.
-    void onSnapshot(const Entity &snap);
+    virtual void onSnapshot(const Entity &snap);
 
     // Staleness is a POLL, not an event, and that is deliberate: an entity
     // going stale sets no dirty flag (EntityRegistry::tick() only reverts
     // optimistic writes), and making it do so would wake every card on the
     // page every tick just to discover that nothing had changed. Re-deriving
     // one subtraction per binding at 10 Hz is cheaper than that, and it only
-    // touches LVGL when the state actually transitions.
-    void pollState(uint32_t nowMs);
+    // touches LVGL when the state actually transitions. A cluster has no state
+    // of its own - its members show theirs (2.11).
+    virtual void pollState(uint32_t nowMs);
 
     virtual const char *typeName() const = 0;
 
@@ -492,13 +504,15 @@ protected:
     // fit (the value face, the diagonal, the short side) must measure.
     int32_t surfaceWidthPx() const;
 
+    uint32_t headerColor() const;      // the group's colour, or the accent (a cluster's header too)
+
 private:
     void buildHeader();
+    void buildMini(lv_obj_t *parent);  // a mini tile's frame (Cards/MiniTile.cpp)
     void applyState();                 // repaint chrome for _state
     void applyDiagonal();              // the loud treatment, every mode
     void resolveVariant();             // measure the cell, pick FULL or COMPACT
     CardState deriveState(uint32_t nowMs) const;
-    uint32_t headerColor() const;      // the area's colour, or the accent
     uint32_t tagColor() const;         // the badge's colour, which is NOT
                                        // stateColor() - see ST_PARTIAL
     static void eventCb(lv_event_t *e);
@@ -579,6 +593,7 @@ private:
     // cmdFailed on the entity. Two cards on one switch used to be able to
     // disagree; now they cannot.
     bool            _showArea    = s_showArea;
+    bool            _mini        = false;   // a cluster's mini tile (2.11)
     bool            _forced      = false;   // debugForceState()
     bool            _dimmed      = false;   // paused, mixed not opa'd
 

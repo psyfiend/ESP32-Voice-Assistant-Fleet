@@ -144,13 +144,14 @@ void dbgOut(const char *fmt, ...) {
     if (n > 0) s_dreqLen = LV_MIN(sizeof(s_dreqOut) - 1, s_dreqLen + (size_t)n);
 }
 
-// The cards on the screen, in tree order - the surfaces CARD_SURFACE_FLAG marks.
+// The cards on the screen, in tree order - the surfaces CARD_SURFACE_FLAG marks;
+// a cluster's mini tiles right after the cluster (2.11): they are inside it.
 int dbgCards(lv_obj_t *o, lv_obj_t **out, int n, int cap) {
     const uint32_t cnt = lv_obj_get_child_count(o);
     for (uint32_t i = 0; i < cnt && n < cap; i++) {
         lv_obj_t *c = lv_obj_get_child(o, (int32_t)i);
         if (lv_obj_has_flag(c, CardPopup::CARD_SURFACE_FLAG)) out[n++] = c;
-        else n = dbgCards(c, out, n, cap);
+        n = dbgCards(c, out, n, cap);
     }
     return n;
 }

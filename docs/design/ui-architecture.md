@@ -37,6 +37,8 @@ whose stack is in internal RAM - the settings task.
 | the window frame | `include/UI/Sheet.h`, `src/UI/Kit/KitSheet.cpp` (frame, auto-close, the tap catcher), `KitSheetPanels.cpp` (the two folder panels), `KitSparks.cpp` |
 | the card window's contents | `src/Cards/CardPopup.cpp` (the client: tabs, views, open/close) and `src/Cards/Popup/` - one file per concern, sharing `PopupState.h`: controls and the light hero (`PopupControls`, `PopupLight`, `PopupDeck`), `PopupScenes`, `PopupMembers`, History (`PopupHistory`, `...Chart`, `...Activity`), `PopupProps`, `PopupCardUi` (Card UI, 2.8 round 3), the panels' rows (`PopupSettingsRows`, `PopupSideRows`, `PopupPanels`), `PopupDialog`, the hold (`PopupHold`), helpers (`PopupCommon`), and the PC's handles (`PopupDebug`, `PopupTree`) |
 | where cards go on a page | `include/Layout/Layout.h` (`FlowEngine`), `src/Cards/CardPage.cpp`; the engines to come: `layout-engines.md` |
+| a group card, a cluster and its mini tiles (2.11) | the spec: `CardSpec::members` / `present` / `slots` (`PageSpec.h`), the House page's in `Dashboard_HA.h`; built by `CardPage::makeGroupCard()`; drawn by `Cards/ClusterCard` and `Cards/MiniTile.cpp`; the arithmetic `include/Layout/Cluster.h` (host-tested); `group-cards.md` §6-7 |
+| the halo round panels and windows (D-35) | `Kit::haloAttach()`, `src/UI/Kit/KitHalo.cpp`; the panel on the bar `Kit::drawerOverBar()` in `KitDrawer.cpp` |
 | what the header shows and where | `include/UI/HeaderSlots.h` (the slots as data, each kind's keeps), `include/Layout/HeaderPlan.h` (the planner: three places, claims, keep), `src/UI/Panel_Header.cpp` (each kind's build and update), `src/UI/SlotPanels.cpp` (their panels), `include/UI/GlyphShapes.h` (the status glyphs as strokes, round 3); `header-slots.md` §10-12 |
 | UI Tweaks and the system panel's choices | `src/GUIManagerTweaks.cpp` (each row: what it sets, where it is saved; the scheme; the grid's counts; the deck under the window), `src/UI/TweaksSheet.cpp` (the window), `src/UI/Panel_System.cpp` (CONNECTIVITY, SYSTEM - DIAGNOSTICS) |
 | a card's "on" look | `src/Cards/StateCard.cpp` (`render()` picks the state: Fill, Icon glow, Bracket, Corner cut), `src/Cards/CardFrame.cpp` (`Card::activeFrame()`: the frames drawn in draw events; the corner cut's corners as cached images with LVGL's own shadow, measured - D-33) |
@@ -123,8 +125,11 @@ structure check counts it (531 `lv_obj_set_style_*` calls outside the kit in 26 
 **438 in 24 at `v0.2.18`**). Bring each onto the kit and tokens when it is next changed, not in a
 sweep:
 
-- **Cards** (`Card.cpp` 1,468 lines and 87 style calls, `StateCard.cpp` 40, `ValueCard.cpp` 22) -
-  first, because 2.11's group cards and any new card type build on them. The active frames left
+- **Cards** - **on the kit since 2.11 round 1** for their parts' looks (`KS_CARD_*`: the wrapper,
+  surface, body, tag, badge, disc, name; `components.md`), proved by the harness with no pixel moved;
+  what follows a card's state stays local. `Card.cpp` is 1,448 lines and 43 style calls (was 1,468
+  and 87), `StateCard.cpp` 30, `ValueCard.cpp` 13. **Clusters** (`Cards/ClusterCard`) and **mini
+  tiles** (`Cards/MiniTile.cpp`) were built on the roles from the start. The active frames left
   `Card.cpp` for `CardFrame.cpp` in 2.8.
 - **`GUIManager.cpp`** (1,490 lines) - the second file over the 1,000-line mark; 2.8 put its header
   and UI Tweaks work in `GUIManagerHeader.cpp` and `GUIManagerTweaks.cpp`.

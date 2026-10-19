@@ -959,3 +959,23 @@ the middle of each side - because LVGL's blur is two box passes over a rounded c
 And one not new: piping `pio run -t upload` through `grep` left esptool hung for twelve minutes -
 its progress bar's characters crash a cp1252 pipe. The `PYTHONIOENCODING=utf-8` lesson above is
 the fix; it was not followed.
+
+## A wide soft shadow: paint it, do not ask LVGL for it (2.11 round 1, 2026-10-19)
+
+D-35's halo - black at a window's edge, clear 5 mm out (58 px on the P4_5) - was built first as
+LVGL's own shadow (width 5 mm, spread half of it). Two things went wrong, both measured:
+
+- **It cost a frame.** A full redraw with a card window open went from 129 to 175 ms on the P4_5
+  (/bench `what=full`); the clock's panel 106 to 143. LVGL computes the blur for every draw unless
+  its single shadow cache holds that exact size, and three shadows of three sizes were on screen.
+- **It banded.** Black to Midnight's ground is a handful of RGB565 levels; the blur came out as
+  visible concentric steps.
+
+Painted as A8 images (four corners, four 16 px edge strips tiled), black by recolour, alpha falling
+off with distance and ordered-dithered (4 x 4 Bayer), it costs ~28 ms on the same frame and does not
+band (`UI/Kit/KitHalo.cpp`). ARGB8888 images cost ~7 ms more than A8: LVGL blends an A8 image as a
+masked fill. The same answer the corner cut's shadow reached (D-33): **anything soft and wide on
+these panels is an image painted once.**
+
+Also learnt: `lv_area_intersect()` and `lv_image_cache_drop()` are not in `lvgl.h` in 9.5 - include
+`src/misc/lv_area_private.h` / `src/misc/cache/instance/lv_image_cache.h`, or clip by hand.
