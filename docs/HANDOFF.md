@@ -68,18 +68,16 @@ not yet - bring each over when it is next changed (`ui-architecture.md` §6). 2.
 
 1. **2.11 group cards** (#66, with the page arranger #78) - **next, the owner's choice
    (2026-10-17); the design interview's §4 is under way** on branch `docs/2.11-interview` (docs
-   only, pushed, no PR yet). **Where it stands (2026-10-19)**: the words, mini tiles, what the glass
-   edits and the whole group model are decided (`group-cards.md` §6, K88-K97); three mocks wait for
-   the owner (§6.5): **"2.11 Clusters"** (its questions C1-C8), **"Panel Edges"** (the owner's
-   header-panel edges and a halo round every window - requests from 2026-10-19), and **Layout
-   Playground v5** (a new arranger: every tiling, spare room shared out; its weights to tune, its
-   speed the open problem for the port - `layout-engines.md` "As prototyped"). **Next**: the owner's
-   answers to C1-C8 and on the two other mocks, recorded; Q6 (long press in a cluster) and Q8 (group
-   pages and back) asked; then **a fresh session builds 2.11** from these docs (the owner's
-   suggestion, to start with a small context) - its first round also carries D-34 (the 7" boards'
-   header words) and, if the owner approves the mock, the panel edges and halo (measured with
-   `/bench`). Merge the docs branch first, or build on it: the owner's call. The keyboard (K95) is
-   2.11's too. What 2.11 builds on: `layout-engines.md` (a cluster is a container inside an item),
+   only, pushed). **Where it stands (2026-10-19, night)**: the design is agreed enough to build -
+   the words, mini tiles, the group model, the mocks' C1-C8 and a fourth presentation, the summary
+   card (`group-cards.md` §6, K88-K104). **A fresh session builds 2.11** (the owner's suggestion, to
+   start with a small context): **its first step is to put `group-cards.md` §7's round plan and the
+   settings file's new entries to the owner**, then branch off `main` - round 1 is the cards onto the
+   kit and clusters on the page, with D-34 (the 7" header words). Still waiting on the owner, none
+   blocking round 1: the **"Panel Edges"** mock (his header-panel edges and a window halo, requests
+   from 2026-10-19 - not yet reacted to), tuning **Layout Playground v5** (the new arranger, #78;
+   the owner found the sliders hard to read - explain them in plain words when asking; its speed is
+   the port's open problem, `layout-engines.md` "As prototyped"), §4 Q8 and half of Q6 (§7). What 2.11 builds on: `layout-engines.md` (a cluster is a container inside an item),
    `cards.md` §4 and §8, `header-slots.md` §10 (the planner of claims), K17 / K46.
 2. **#76, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a queue any
    task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to dismiss), a

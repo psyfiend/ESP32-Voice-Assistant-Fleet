@@ -391,3 +391,76 @@ after.
   page has 6 blocks for 18 cells**: v5 leaves 9 cells empty rather than make one cluster huge (v4
   made two 3 x 2 clusters). Spreading that spare room as even margins (`look-and-feel.md` §3.8 item
   3) is the question it raises. Its weights are starting guesses for the owner to tune.
+
+### 6.6 The owner's answers to the mocks (2026-10-19, night; DECISIONS K98-K104)
+
+- **A summary card - a fourth presentation (K98).** What the owner meant by the garage doors: "a
+  single icon that will switch to its ACTIVE state if either door is open but label to say
+  North/South/Both depending on which door was open". Only for members of one kind (doors, windows,
+  lights); "Open Doors" and "Open Windows" are the same idea. A tap opens History, Members, or a
+  small window holding only the members. Claude's proposals for the words: none active - the card's
+  own name; some - the active members' names while they fit, else "2 of 4"; all - "Both" for two,
+  "All" for more.
+- **Group pages are also whole pages (K99):** full screen, so many more cards; swiped to like any
+  page, or targeted from the navbar. They sit beside a group card's own way of opening its members
+  (K90).
+- **C1, lit disc** - "the disc itself can sometimes shrink beyond its useful limit if too crowded, so
+  we'll need to watch for that". It cannot show a light's brightness; only Fill could, and Fill is
+  not the owner's choice for a card. **C3, one line. C7, Copy / Move on one screen. C8, snapshot.**
+  (K100)
+- **C2, header values (K101):** "I like icons, they're pretty!" - icons with text where there is
+  room, text with units where not. The user picks which sensors go in the header, and whether icons
+  show. **Occupancy has its own icon for each state** (separate MDI glyphs, from the device_class
+  table), never one icon filled or outlined.
+- **C4, the header's style, customizable all the way down (K102):** the page's card label type
+  applies to solo cards only; clusters have their own page-wide Swatch / Bar; each cluster can opt
+  out of inheriting it; and a card label type per group, discussed before (§5), later.
+- **C5, one-cell clusters (K103, refines K97):** a summary card and a one-cell cluster of mini
+  tiles are different things. "Even on 7" screens putting 2 or 3 tap targets on a single card is a
+  bit too close for comfort." So a one-cell cluster is **for sensors only**, the whole cell one tap
+  target; "tight" tiles are acceptable, nothing smaller. And: **count sensors** - one entity
+  counting the lights on or the doors open, from an HA template or group - belong in cluster header
+  slots and in the page header too, an icon beside the count, a tap showing which.
+  Claude: at zero, the slot shows its idle icon with no number - dashes mean "no data" (D-15).
+- **C6, the cluster's management screen - the owner's layout (K104)**, replacing the mock's Tile /
+  Header / Hidden row:
+  - **HEADER**: *Style* - Swatch / Bar; a *Slots* button opening a view with *Show sensor icons*
+    (a checkbox) and the cluster's sensors, each with a checkbox.
+  - **MEMBERS**: two columns, *Name* (the entity labels) and *Visible* (a checkbox each); *Add cards*
+    at the foot.
+  - **A long press on a mini tile** (or a tap, when its tap action is Details) opens the member's
+    own window, as a card's - so its SETTINGS keeps the Visibility button (K96). This answers half
+    of §4 Q6.
+
+  The owner asked: three slots at most? **Claude's recommendation: no fixed number** - the slots are
+  a priority list and the header's planner of claims (D-19, `HeaderPlan.h`) shows what fits,
+  dropping the lowest first: two or three on most clusters, more on a wide one. And where K92 rule 7
+  meets this screen: ticking a sensor into the header unticks its Visible, so it moves rather than
+  doubles; ticking Visible again shows it in both places.
+
+## 7. The build - a proposal for the session that builds 2.11
+
+The design is agreed enough to build (the owner, 2026-10-19: "are we at a handoff point ready for
+build?"). **The building session first puts this plan, and the settings file's new entries, to the
+owner** - a structural choice a turn before it is built (W7) - then branches off `main`.
+
+- **Round 1 - clusters on the page.** The cards come onto the kit first (`ui-architecture.md` §6:
+  roles for a card's surface, hero, labels; the harness proves nothing moved), in new files - `Card.cpp`
+  and `GUIManager.cpp` are over 1,000 lines and must not grow. Then the cluster: a group card whose
+  presentation is Cluster, its members cards with ids (K33) drawn as mini tiles (K89, lit disc), its
+  header the page header's slots and planner (K101, K102, one line). Placed by today's
+  `FlowEngine`, the cluster's span derived from its member count - the arranger comes later. Built
+  from a dashboard spec first (the House page's Office, Kitchen, Outside), saved settings after.
+  D-34 (the 7" header words) rides along.
+- **Round 2 - what the glass edits.** The options view by location (K96), the cluster management
+  screen (K104), Copy / Move (K100), the "which group?" dialog (K92 rule 9), the hidden-cards list.
+- **Round 3 - the rest of the group card.** The summary card (K98), count slots (K103), extending a
+  source group (K93), group pages (K90, K99), the on-screen keyboard (K95).
+- **The arranger (#78)** after the owner has tuned Playground v5 - and only once its speed is
+  solved for the S3 (`layout-engines.md` "As prototyped"); host-tested before it draws.
+- **Panel edges and the window halo** when the owner has reacted to the "Panel Edges" mock;
+  measured with `/bench`.
+- **Still open, each to ask with a recommendation when its round comes:** §4 Q8 (how "back" works
+  from a group opened as a page); the other half of Q6 (a long press on a cluster's header - Claude:
+  the cluster's own window, its management screen inside); spreading spare room as margins on a page
+  with too little on it (the 7B's House page).
