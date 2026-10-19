@@ -133,13 +133,13 @@ inline const CardSpec HA_OFFICE[] = {
       .place     = { .priority = HA_PRI_INDOOR } },
 };
 
-inline const CardSpec HA_CARDS[] = {
-    // --- Garage: the doors ------------------------------------------------
-    //
-    // These two report device_class garage_door and there is NO door card type
-    // yet, so today they render as generic binary sensors reading on/off.
-    // dashboard-target-7b.md point 3; 2.7 owes the type. Listed first anyway
-    // because the priority is about what matters, not about what renders well.
+// --- Garage: the doors ------------------------------------------------------
+//
+// These two report device_class garage_door. Since 2.11 round 4 they are the
+// members of a SUMMARY (K98): one card, open while either door is, its words
+// naming the open one ("North", "South", "Both"). Same ids as the two cards
+// they were, so what was saved on them is still theirs.
+inline const CardSpec HA_GARAGE_DOORS[] = {
     { .id        = "garage_north_261008_0310",
       .primaries = { "garage_door_north" },
       .label     = "North",
@@ -150,6 +150,18 @@ inline const CardSpec HA_CARDS[] = {
       .label     = "South",
       .area      = "Garage",
       .place     = { .priority = HA_PRI_DOORS } },
+};
+
+inline const CardSpec HA_CARDS[] = {
+    // --- Garage: the doors, first - the priority is about what matters -------
+    // Id made 2026-10-19 (K33).
+    { .id          = "garage_doors_261019_1050",
+      .label       = "Doors",
+      .area        = "Garage",
+      .place       = { .priority = HA_PRI_DOORS },
+      .members     = HA_GARAGE_DOORS,
+      .memberCount = (uint8_t)(sizeof(HA_GARAGE_DOORS) / sizeof(HA_GARAGE_DOORS[0])),
+      .present     = GroupPresent::PRESENT_SUMMARY },
 
     // --- The clusters (2.11) - Outside, then the two rooms with presence ----
     // Ids made 2026-10-19 (K33); the members are above, with the ids they had.

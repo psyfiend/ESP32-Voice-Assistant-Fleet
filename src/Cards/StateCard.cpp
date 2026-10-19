@@ -336,7 +336,7 @@ void StateCard::render() {
     else         lv_obj_clear_flag(_statusRow, LV_OBJ_FLAG_HIDDEN);
 
     if (showName) {
-        const char *txt = (lbl == CardLabel::LBL_STATE) ? cardStateWord(e->desc, isOn) : shownName(lbl);
+        const char *txt = nameText(lbl, *e, isOn);
         lv_label_set_text(_name, txt);
         // A LONG NAME NEVER TAKES THE HERO'S ROOM (owner, K17: "Office lamp" on
         // two lines pushed the disc up and clipped it). The name always takes
@@ -388,6 +388,10 @@ void StateCard::render() {
     // Last word, after the state block has set the real opacity: a disc too
     // small to enclose its own glyph is not drawn.
     if (!discFits) lv_obj_set_style_bg_opa(_disc, LV_OPA_TRANSP, 0);
+}
+
+const char *StateCard::nameText(CardLabel lbl, const Entity &e, bool isOn) {
+    return (lbl == CardLabel::LBL_STATE) ? cardStateWord(e.desc, isOn) : shownName(lbl);
 }
 
 void StateCard::commandAll(bool on) {

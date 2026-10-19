@@ -368,17 +368,20 @@ inline bool cardLabelFromName(const char *n, CardLabel &out) {
 // entities; its members are cards of their own (an id, their own settings). How
 // it is SHOWN is its presentation (K90, K92 rule 6): one card, or a CLUSTER - a
 // block of its members on the page, each a mini tile (K89). A cluster that
-// cannot fit is shown as its card. The summary card (K98) and the group page
-// (K99) come later. Saved by name: "present": "card" / "cluster".
+// cannot fit is shown as its card. A SUMMARY (2.11 round 4, K98): one card of
+// members of one kind - one icon, active while any member is, its words naming
+// the active ones ("North", "Both"); a tap opens its Members. The group page
+// (K99) comes later. Saved by name: "present": "card" / "cluster" / "summary".
 // ---------------------------------------------------------------------------
-enum class GroupPresent : uint8_t { PRESENT_CARD = 0, PRESENT_CLUSTER };
+enum class GroupPresent : uint8_t { PRESENT_CARD = 0, PRESENT_CLUSTER, PRESENT_SUMMARY };
 inline const char *groupPresentName(GroupPresent p) {
-    return p == GroupPresent::PRESENT_CLUSTER ? "cluster" : "card";
+    return p == GroupPresent::PRESENT_CLUSTER ? "cluster" : p == GroupPresent::PRESENT_SUMMARY ? "summary" : "card";
 }
 inline bool groupPresentFromName(const char *n, GroupPresent &out) {
     if (!n) return false;
     if (!strcmp(n, "card"))    { out = GroupPresent::PRESENT_CARD;    return true; }
     if (!strcmp(n, "cluster")) { out = GroupPresent::PRESENT_CLUSTER; return true; }
+    if (!strcmp(n, "summary")) { out = GroupPresent::PRESENT_SUMMARY; return true; }
     return false;
 }
 

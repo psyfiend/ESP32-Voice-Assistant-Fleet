@@ -478,7 +478,7 @@ void CardPage::useCols(uint8_t cellCols) {
 
 // One card from its spec, configured and with the owner's saved choices laid
 // over it - or null when its entity is not here or has no card type.
-Card *CardPage::makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, uint8_t i) {
+Card *CardPage::makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, uint8_t i, Card *made) {
     {
         // The FIRST primary that resolves decides the card's type. A spec may
         // name several - the aggregate light case - and a room where one bulb
@@ -492,9 +492,10 @@ Card *CardPage::makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistr
             Serial.printf("[Cards] spec %u: entity \"%s\" not in registry\n",
                           (unsigned)i, cs.primaries[k]);
         }
-        if (!first) return nullptr;
+        if (!first) { delete made; return nullptr; }
 
-        Card *c = cardForEntity(first);
+        Card *c = made ? made : cardForEntity(first);
+        if (made) made->bindPrimary(first);
         if (!c) {
             // A real EntityKind with no card type yet - NUMBER, TEXT, CLIMATE,
             // WEATHER. Saying so beats rendering it as something it is not.
@@ -678,7 +679,8 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
     }
 
     // AS ONE CARD: the members that switch together (lights and switches),
-    // else every member, behind one tile.
+    // else every member, behind one tile. AS A SUMMARY (K98): every member -
+    // one of a kind - with each one's name for the words under the icon.
     CardSpec one = {};
     one.id    = cs.id;
     one.label = cs.label;
@@ -686,6 +688,19 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
     one.place = cs.place;
     one.groupOn = cs.groupOn;
     uint8_t n = 0;
+    if (pres == GroupPresent::PRESENT_SUMMARY) {
+        for (uint8_t k = 0; k < nMem && n < CARD_PRIMARY_MAX; k++)
+            if (mem[k]->primaries[0] && reg.find(mem[k]->primaries[0])) one.primaries[n++] = mem[k]->primaries[0];
+        if (!n) return nullptr;
+        SummaryCard *sc = new SummaryCard();
+        for (uint8_t k = 0; k < nMem; k++)
+            if (mem[k]->primaries[0] && mem[k]->label) sc->setMemberName(mem[k]->primaries[0], mem[k]->label);
+        Card *c = makeCard(one, spec, reg, 0, sc);
+        // ITS TAP OPENS ITS MEMBERS (K98) - never a door's - unless the owner chose.
+        char t[16];
+        if (c && !(hasId && Settings::card(cs.id, "tap", t, sizeof(t)))) c->setTapAction(TapAction::TAP_MEMBERS);
+        return c;
+    }
     for (int pass = 0; pass < 2 && !n; pass++)
         for (uint8_t k = 0; k < nMem && n < CARD_PRIMARY_MAX; k++) {
             const char *pid = mem[k]->primaries[0];

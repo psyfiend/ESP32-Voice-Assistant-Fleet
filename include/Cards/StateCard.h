@@ -92,6 +92,10 @@ protected:
     // switch look identical and behave completely differently.
     void commandAll(bool on);
 
+    // The words under the hero for a resolved label: the state's word, or the
+    // name. A summary (K98) names its active members instead (CardCatalog).
+    virtual const char *nameText(CardLabel lbl, const Entity &e, bool isOn);
+
 private:
     // As a cluster's MINI TILE (2.11, K89, K100): the icon on its disc - lit, a
     // solid disc in the active colour, while on - its entity label under it.

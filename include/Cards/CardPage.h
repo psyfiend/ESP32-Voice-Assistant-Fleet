@@ -122,8 +122,11 @@ private:
 
     // One card from its spec, configured, the saved settings over it; null when
     // its entity is not here. A group card made on the device (2.11): a cluster
-    // of its members, or - when it cannot fit, or the owner chose it - its card.
-    Card *makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, uint8_t i);
+    // of its members, or - when it cannot fit, or the owner chose it - its card,
+    // or its summary (K98). `made`: the card to configure, in place of the one
+    // its entity's kind gives (a summary); deleted when the entity is not here.
+    Card *makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, uint8_t i,
+                   Card *made = nullptr);
     Card *makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg);
 
     // THE ARRANGER (2.11 round 2, K105): the page's blocks - its cards and
