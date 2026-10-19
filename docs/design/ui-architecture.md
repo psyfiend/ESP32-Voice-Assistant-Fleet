@@ -1,8 +1,8 @@
 # UI architecture - how the screen is built, and how to change it safely
 
-**Read this before any UI work.** It is the map as of `v0.2.13` (2026-10-14), when milestone 2.12
-rebuilt the UI's foundation without changing a pixel (`ui-foundation.md` is that milestone's
-record). The rules here are load-bearing; CLAUDE.md states each one briefly, this file says where
+**Read this before any UI work.** It is the map as of `v0.2.18` (2026-10-17, milestone 2.8, the
+header bar v2), built on the foundation milestone 2.12 laid at `v0.2.13` without changing a pixel
+(`ui-foundation.md` is that milestone's record). The rules here are load-bearing; CLAUDE.md states each one briefly, this file says where
 each lives and how to work with it. What things look like: `components.md` (the kit, with pictures)
 and `tokens.md` (colours, sizes, type). What the card window is, view by view: `card-sheet.md`
 §14-18.
@@ -18,9 +18,9 @@ Each layer uses the ones below it and never reaches up. Lower layers include no 
 | The LVGL engine | buffers, `lv_init()`, the flush to the panel, touch input | `LVGL_Startup`, `LVGL_Flush_*` |
 | The screen | the root screen, the header and its slots' panels (2.8), the pages, the system panel and its pages, UI Tweaks' choices (2.8 round 3) | `GUIManager` (+ `GUIManagerHeader.cpp`, `GUIManagerTweaks.cpp`), `src/UI/Panel_*`, `UI/HeaderSlots` + `UI/SlotPanels` + `UI/GlyphShapes`, `LogPage`, `ReferencePage` |
 | Pages | a grid of cards built from data (`PageSpec`, the dashboards in `include/Dashboards/`); where each card goes is a **layout engine's** decision | `CardPage` + `Layout::` (`include/Layout/`) |
-| Cards | a card per entity or group, its type from the entity's kind; bound to its entities so it redraws when they change | `src/Cards/` (`Card`, `CardCatalog`, `CardBinder`, `StateCard`, `ValueCard`) |
+| Cards | a card per entity or group, its type from the entity's kind; bound to its entities so it redraws when they change; "on" shown by its card state (2.8) | `src/Cards/` (`Card`, `CardFrame` - the active frames, `CardCatalog`, `CardBinder`, `StateCard`, `ValueCard`) |
 | Windows | everything that opens over the page is a **Sheet**: the card window, "About this board", "UI Tweaks" | `Kit::Sheet` (`include/UI/Sheet.h`); clients `CardPopup` + `src/Cards/Popup/`, `UI/AboutSheet`, `UI/TweaksSheet` |
-| Components | buttons, dialogs, chip rows, list items, panel rows, folder panels, the selector, icon buttons, label roles | `Kit::` (`include/UI/Kit.h`, `src/UI/Kit/`) |
+| Components | buttons, dialogs, chip rows and chip tables, list items, panel rows, folder panels, drawers, the header's bar and slots, the selector, icon buttons, label roles; the finishes (satin, glass, lit glass) | `Kit::` (`include/UI/Kit.h`, `src/UI/Kit/`) |
 | Tokens | every colour, size, font and shape | `UI::` (`include/UI/UITokens.h`, `src/UI/UITokens.cpp`) |
 
 **Threads.** LVGL runs only on `loop()` (`LV_OS_NONE`). Providers, the HA websocket task and HTTP
@@ -39,6 +39,7 @@ whose stack is in internal RAM - the settings task.
 | where cards go on a page | `include/Layout/Layout.h` (`FlowEngine`), `src/Cards/CardPage.cpp`; the engines to come: `layout-engines.md` |
 | what the header shows and where | `include/UI/HeaderSlots.h` (the slots as data, each kind's keeps), `include/Layout/HeaderPlan.h` (the planner: three places, claims, keep), `src/UI/Panel_Header.cpp` (each kind's build and update), `src/UI/SlotPanels.cpp` (their panels), `include/UI/GlyphShapes.h` (the status glyphs as strokes, round 3); `header-slots.md` §10-12 |
 | UI Tweaks and the system panel's choices | `src/GUIManagerTweaks.cpp` (each row: what it sets, where it is saved; the scheme; the grid's counts; the deck under the window), `src/UI/TweaksSheet.cpp` (the window), `src/UI/Panel_System.cpp` (CONNECTIVITY, SYSTEM - DIAGNOSTICS) |
+| a card's "on" look | `src/Cards/StateCard.cpp` (`render()` picks the state: Fill, Icon glow, Bracket, Corner cut), `src/Cards/CardFrame.cpp` (`Card::activeFrame()`: the frames drawn in draw events; the corner cut's corners as cached images with LVGL's own shadow, measured - D-33) |
 | which card a kind of entity gets | `src/Cards/CardCatalog.cpp` (`cardForKind()`) |
 | what a dashboard contains | `include/Dashboards/Dashboard_HA.h`, `Dashboard_Fleet.h` (`PageSpec`, `CardSpec`; ids per K33) |
 | the owner's saved choices | `include/Settings.h` (one JSON file), `CardGroups`, `CardAdded`; CLAUDE.md "Saved settings" |
@@ -76,7 +77,9 @@ whose stack is in internal RAM - the settings task.
   the P4_5); an opacity below cover on a container makes one; LVGL draws in strips and skips a child
   whose parent is outside the strip; never read from a DSI panel that shows a picture (it blanks
   it); keep moving objects tight (a wide transparent holder redraws everything under a slide); the
-  hand-drawn faces' cache must give its slots back.
+  hand-drawn faces' cache must give its slots back. From 2.8: **an object's `DRAW_POST` is clipped
+  to its own area** - draw outside it in `DRAW_MAIN_END`; anti-aliased triangles that share an
+  edge leave a seam; an image meant to match LVGL's own drawing must blend as LVGL does, in 16 bits.
 
 ## 4. How to...
 
@@ -103,11 +106,11 @@ whose stack is in internal RAM - the settings task.
 
 | Tool | What it proves | How |
 |---|---|---|
-| **The harness**, `scripts/ui_golden.py` | a window, view, panel or page is the same object tree and the same pixels as before | `capture <host> --board <B> --label <L>` walks 48 states (45 on the 4B; the system panel and About since #97) through `GET /popup` and saves each tree and screenshot; `compare <B> <A> <B>` reports every difference, telling the house apart (times, values, a light switched); `measure` times each window's build; `crop` cuts a picture for the docs. Needs `-D DEBUG_POPUP` |
+| **The harness**, `scripts/ui_golden.py` | a window, view, panel or page is the same object tree and the same pixels as before | `capture <host> --board <B> --label <L>` walks 62 states (the system panel and About since #97; the header's slots, UI Tweaks, Card UI and the active frames since 2.8; fewer on the 4B, whose own 10 s window timeout cuts the walk - `--only`) through `GET /popup` and saves each tree and screenshot; `compare <B> <A> <B>` reports every difference, telling the house apart (times, values, a light switched); `measure` times each window's build; `crop` cuts a picture for the docs. Needs `-D DEBUG_POPUP` |
 | **A/B on one board** | a refactor changed nothing | capture on the old firmware, flash the new, capture again minutes apart; a state the house changed under is captured again both ways. Keep each phase's image (`test/golden/<board>/fw_*`, gitignored) to flash back |
 | **Host tests**, `host-tests/` | the pure modules' rules (`Layout`, the header's planner `HeaderPlan`, `TimeFormat`) | `wsl bash host-tests/run_in_wsl.sh` (or `pio test -d host-tests` with a Windows compiler) |
 | **The structure check**, `scripts/structure_check.py` | the code is not drifting: big files, style calls outside the kit, colour literals, shape numbers, LVGL in the core layers | run it with the gate; quote it in the merge report (W13) |
-| **The gate**, `scripts/release/gate.ps1` | all nine boards compile from the committed `platformio.ini` | ~11 minutes; it stashes and restores the owner's local debug lines |
+| **The gate**, `scripts/release/gate.ps1` | all nine boards compile from the committed `platformio.ini` | ~15 minutes; it stashes and restores the owner's local debug lines. **Once, right before a merge** - never per test round (the owner) |
 | **The owner's sheet**, `docs/TEST_<milestone>.md` | touch, feel, schemes, the auto-close, a reboot - what no script sees | numbered tests with PASS criteria, the owner's results under them |
 
 The harness's rules: never two runs at one board (each turns the sparks off and back on); the 1060
@@ -117,12 +120,14 @@ is slow (6-8 s a state) and fails its walk if its screenshots slow further - cap
 
 2.12 rebuilt the card window. The rest of the UI still sets its looks at the call site; the
 structure check counts it (531 `lv_obj_set_style_*` calls outside the kit in 26 files at `v0.2.13`;
-524 in 25 on `feat/ui-followups`, where About's list and the system panel's first row moved onto the
-kit). Bring each onto the kit and tokens when it is next changed, not in a sweep:
+**438 in 24 at `v0.2.18`**). Bring each onto the kit and tokens when it is next changed, not in a
+sweep:
 
-- **Cards** (`Card.cpp` 1,462 lines and 87 style calls, `StateCard.cpp`, `ValueCard.cpp`) - first,
-  because 2.11's group cards and any new card type build on them.
-- **`GUIManager.cpp`** (1,538 lines) - the second file over the 1,000-line mark.
+- **Cards** (`Card.cpp` 1,468 lines and 87 style calls, `StateCard.cpp` 40, `ValueCard.cpp` 22) -
+  first, because 2.11's group cards and any new card type build on them. The active frames left
+  `Card.cpp` for `CardFrame.cpp` in 2.8.
+- **`GUIManager.cpp`** (1,490 lines) - the second file over the 1,000-line mark; 2.8 put its header
+  and UI Tweaks work in `GUIManagerHeader.cpp` and `GUIManagerTweaks.cpp`.
 - **The header is on the kit since 2.8** (`Kit::headerBar()`, `headerSlot()`, `glyphFrame()`,
   `Kit::Drawer` for every slot's panel - the system panel's frame too since round 2; `UI::hdr()`
   sizes); **where its slots stand is a pure planner**, `Layout/HeaderPlan.h` (claims and keeps,
@@ -130,9 +135,10 @@ kit). Bring each onto the kit and tokens when it is next changed, not in a sweep
   (`Panel_System`, `Panel_Display`, `Panel_Audio`, `LogPage`, `ReferencePage`), `UIToolkit`, the
   status widgets (whose 34 colour literals are most of what the check reports).
 
-## 7. Open questions this structure leaves for the owner
+## 7. What 2.11 will ask of this structure
 
-The finishes (a quieter "glass" for things that can be tapped but are not selected, #99) are the
-next look decision - a role in the kit, so decided once and used everywhere; a mock comes first.
-The selector as History's span buttons (#92, K75) and the countdown on a dialog that closes with
-its window (#23, K76) are built on `feat/ui-followups`, waiting for the owner's look.
+The finishes (#99, `v0.2.16`) and the follow-ups (`v0.2.15`) are done, and 2.8 left no look
+question open. **Group cards (2.11)** are the next pressure on it: a cluster is a container inside
+an item, placed by an engine run on its own sub-grid (`layout-engines.md`); its header is meant to
+be the page header's slots and planner again (`cards.md` §8, `Layout/HeaderPlan.h`); and its
+members are cards without their own borders - which is where the cards should come onto the kit.

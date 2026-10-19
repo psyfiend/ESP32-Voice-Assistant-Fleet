@@ -20,6 +20,9 @@ param([string]$Out = "", [switch]$NoBackup)
 # brings this native-USB P4 out of a download mode). pio builds it; esptool
 # writes it.
 $ErrorActionPreference = "Stop"
+# esptool's progress bar is not cp1252: written to a log, it crashed and once
+# hung an upload for twelve minutes (LESSONS, PYTHONIOENCODING).
+$env:PYTHONIOENCODING = "utf-8"
 $repo = (git rev-parse --show-toplevel).Trim()
 Set-Location $repo
 if (-not $Out) { $Out = Join-Path $repo ".pio\release" }

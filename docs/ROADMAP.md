@@ -55,7 +55,7 @@ levels arrive with 2.10c), **#47** discovery payload size, **#48** reason 36.
 | 2.8 | Header bar v2 (**#19**) | **DONE 2026-10-17, `v0.2.18`** - `design/header-slots.md`, D-11 to D-33, `archive/TEST_2.8.md` (seven rounds). Three places on claims (the clock and alarm left, the page middle, status right), each slot with its own panel, one shape with its tab; glyphs drawn from numbers; a page's header shown / hidden; the system panel's new layout; **UI Tweaks** and a card's **Card UI** as chip tables; the cards' **active frames** - Corner cut the default - and lit glass; Linen's "on" terracotta `D47F45` |
 | 2.9 | Display stack: esp_lcd (**#67**) | six of nine boards, merged 2026-09-29; left: CYD_S3_8048, WS_S3_5B - `display/README.md` |
 | 2.10 | Card popup (**#65**) | **DONE 2026-10-12.** 2.10a `v0.2.8`; 2.10b `v0.2.9`; 2.10c `v0.2.10` (HA light levels, members of HA groups, scenes, the window redesigned - `design/card-sheet.md` §14-16). **2.10d + 2.10e `v0.2.11`** (merged together, K51): stable ids and saving (§17), History from HA - charts and activity (§18). Sheets in `archive/`. Left over, filed: #90, #91, #92 (K17 done, `v0.2.12`) |
-| 2.11 | Group cards (**#66**) | not started - with the page arranger (#78; its engines: `design/layout-engines.md`); must land before 3.1 |
+| 2.11 | Group cards (**#66**) | **next** (2026-10-17) - opens with the design interview §4 (`design/group-cards.md`); with the page arranger (#78; its engines: `design/layout-engines.md`); must land before 3.1 |
 | 2.12 | UI foundation - the refactor | **DONE 2026-10-14, `v0.2.13`** - the card window rebuilt on a foundation (safety net, the split, `UIShape`, the component kit, the Sheet, `Layout::FlowEngine` with host tests, the structure check), nothing changed on screen. How it is built: `design/ui-architecture.md`; the record: `design/ui-foundation.md`. Follow-ups #96, #97 and more: **DONE, `v0.2.15`** (`archive/TEST_UI_FOLLOWUPS.md`) |
 
 ## Phase 3 — Build sheet
@@ -92,7 +92,7 @@ device reads, and the backup format - not something a user edits.
 **#31** card library (with #86 control styles, #77 media), **#32** WS_S3_4B onboard hardware, **#33**
 RS485/Modbus, **#34** weather station, **#35** alarm clock.
 
-## Running order — 2026-10-06 (items 1-2 done; the UI follow-ups inserted 2026-10-14)
+## Running order — 2026-10-06 (items 1-4 done; the UI follow-ups inserted 2026-10-14; 2.11 before #76, 2026-10-17)
 
 The numbers above are identity, not sequence. Agreed with the owner:
 
@@ -107,11 +107,13 @@ The numbers above are identity, not sequence. Agreed with the owner:
    D-33): three places on **claims** (D-19, a pure planner, host-tested), a panel per slot, the
    system panel's new layout, UI Tweaks and Card UI, the cards' active frames (Corner cut the
    default), lit glass, Linen's terracotta. ~~**A17**~~ DONE, `v0.2.17`
-   (`archive/TEST_A17.md`). Then **#76** on the claim model (the notice queue from NINA's toasts),
-   and the interview §4 onward (`design/interview-phase2-3.md`).
-5. **2.11 group cards with the page arranger** (#66, #78; prototype: artifact "Layout Playground";
-   engines: `design/layout-engines.md`). Its hero region is what #100 (NINA's clock) waits for.
-6. **3.1 schema** (#20), scoped together with **the companion web app** (#87).
+   (`archive/TEST_A17.md`).
+5. **2.11 group cards with the page arranger** - **NEXT** (the owner, 2026-10-17) (#66, #78;
+   prototype: artifact "Layout Playground"; engines: `design/layout-engines.md`). It opens with the
+   design interview's §4 (`design/interview-phase2-3.md`, `design/group-cards.md` §4-5). Its hero
+   region is what #100 (NINA's clock) waits for.
+6. **#76** HA alerts on the claim model (the notice queue from NINA's toasts; mock first).
+7. **3.1 schema** (#20), scoped together with **the companion web app** (#87).
 
 Alongside, when the hardware is on the desk: #67's last two boards; #72 battery (fuel gauges
 ordered); #69 4B panel timing (WS_S3_4B locked up, waiting to be troubleshot); #70 S3 LVGL speed;

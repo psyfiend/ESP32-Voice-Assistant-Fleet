@@ -151,7 +151,7 @@ PLAN = [
         (None, ["slot=-1"], 0.8),
         (None, ["alarm=-1"], 0.6),
     ]},
-    # Round 4: the cards' active states on their edge - glow frame, bracket, corner cut - shown,
+    # Round 4: the cards' active states on their edge - bracket, corner cut (round 5) - shown,
     # never saved (cardstate=-1 puts the owner's back). What is on is whatever the house has on.
     {"page": 0, "card": None, "tree": "page", "steps": [
         ("frame_bracket", ["cardstate=2"], 1.5),
