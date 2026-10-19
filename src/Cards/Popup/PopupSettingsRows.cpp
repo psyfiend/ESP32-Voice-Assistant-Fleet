@@ -231,16 +231,18 @@ void propsCb(lv_event_t *ev) {
     lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_PROPS); }, nullptr);
 }
 
-// "Add as a card" (K17): made now, kept in the file, shown when the window
-// closes - the page is built again then (GUIManager::tick()), not under the
-// window, which holds the page's cards.
+// "Add card to dashboard" (K17): which group first (K92 rule 9, VIEW_JOIN);
+// made there, kept in the file, shown when the window closes - the page is
+// built again then (GUIManager::tick()), not under the window, which holds
+// the page's cards.
 void addCardCb(lv_event_t *ev) {
     (void)ev;
-    Card *held = cardOf(h.surface);
-    if (!held || !inMember() || !s.ent[0]) return;
-    char id[CARD_ID_MAX + 1];
-    if (!CardAdded::add(*held, *s.ent[0], id, sizeof(id))) return;
-    lv_async_call([](void *) { deckSync(); }, nullptr);   // the row now says "Added" - not from its own button's event
+    lv_async_call([](void *) {
+        Card *held = cardOf(h.surface);
+        if (!held || !inMember() || !s.ent[0]) return;
+        deckSet(DECK_PEEK);
+        visibilityJoinOpen(held, s.ent[0]);
+    }, nullptr);
 }
 
 // Paused, a checkbox. Through the card when it is the held one (it repaints at

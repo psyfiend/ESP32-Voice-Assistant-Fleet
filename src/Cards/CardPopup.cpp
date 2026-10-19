@@ -149,7 +149,8 @@ void showView(PopupView v) {
                               : v == PopupView::VIEW_CLUSTER_SLOTS ? "Header"
                               : v == PopupView::VIEW_VISIBILITY ? "Visibility"
                               : v == PopupView::VIEW_ADD_TO ? "Add to"
-                              : v == PopupView::VIEW_CLUSTER_ADD ? "Add cards" : "Members");
+                              : v == PopupView::VIEW_CLUSTER_ADD ? "Add cards"
+                              : v == PopupView::VIEW_JOIN ? "Add to dashboard" : "Members");
     }
     // SIZED BEFORE THE VIEW IS BUILT: placeWide() lays the window out, and a
     // DOT label laid out at the last view's width rewrites its own text - the
@@ -163,6 +164,7 @@ void showView(PopupView v) {
     else if (v == PopupView::VIEW_VISIBILITY) buildVisibility();      // K96
     else if (v == PopupView::VIEW_ADD_TO)     buildAddTo();           // K91, K100
     else if (v == PopupView::VIEW_CLUSTER_ADD) buildClusterAdd();     // K104's Add cards
+    else if (v == PopupView::VIEW_JOIN)       buildJoin();            // K92 rule 9
     else if (v == PopupView::VIEW_MAIN && s.cluster) buildCluster();   // K104
     else                                   buildMain();
     deckSync();     // SETTINGS' rows are the view's (a member's own has more)
@@ -188,6 +190,9 @@ void goBack() {
         case PopupView::VIEW_MAIN:   CardPopup::close();     break;
         case PopupView::VIEW_MEMBER: leaveMember();          break;
         case PopupView::VIEW_ADD_TO: showView(PopupView::VIEW_VISIBILITY); break;   // its view's own
+        case PopupView::VIEW_JOIN:   // a tile's Visibility, or the member's own view
+            showView(cardOf(h.surface) && cardOf(h.surface)->mini() ? PopupView::VIEW_VISIBILITY : controlsView());
+            break;
         default:                     showView(controlsView()); break;
     }
 }

@@ -116,15 +116,65 @@ void moveCb(lv_event_t *ev) {
 
 void addCb(lv_event_t *) { lv_async_call([](void *) { visibilityAddTo(s_pick, s_move); }, nullptr); }
 
-// Add card to dashboard, from a mini tile: a copy right after its cluster.
+// --- WHICH GROUP? (K92 rule 9; the mock's "Table's card joins which group?") ----------
+// A member made a card of its own joins a group: its group card's - chosen
+// already, so Add is one tap - the group of its entity's HA area, or any other.
+Card         *s_joinParent = nullptr;   // the group card or cluster it comes out of
+const Entity *s_joinEntity = nullptr;
+constexpr uint8_t JOIN_MAX = 24;
+char          s_joinGid[JOIN_MAX][48];  // every group: the suggestions first
+char          s_joinName[JOIN_MAX][56];
+const char   *s_joinWords[3];
+uint8_t       s_nJoin = 0, s_nSuggest = 0, s_joinPick = 0;
+char          s_otherOpts[JOIN_MAX * 44];
+lv_obj_t     *s_otherDd = nullptr;
+
+void joinAdd(const char *gid, const char *name) {
+    if (s_nJoin >= JOIN_MAX || !gid[0]) return;
+    for (uint8_t k = 0; k < s_nJoin; k++) if (!strcmp(s_joinGid[k], gid)) return;
+    snprintf(s_joinGid[s_nJoin], sizeof(s_joinGid[0]), "%s", gid);
+    snprintf(s_joinName[s_nJoin], sizeof(s_joinName[0]), "%s", name);
+    s_nJoin++;
+}
+
+// The suggestions, then every other group (CardGroups::forEach()).
+void joinCollect() {
+    s_nJoin = 0;
+    CardGroups::Group g;
+    if (s_joinParent && CardGroups::ofCard(*s_joinParent, g)) joinAdd(g.id, g.name);
+    if (s_joinEntity && s_joinEntity->sourceAreaId[0]) {
+        char gid[48];
+        snprintf(gid, sizeof(gid), "%s%s", CardGroups::HA_PREFIX, s_joinEntity->sourceAreaId);
+        if (CardGroups::byId(gid, g)) joinAdd(g.id, g.name);
+    }
+    s_nSuggest = s_nJoin;
+    CardGroups::forEach([](const CardGroups::Group &gr, void *) { joinAdd(gr.id, gr.name); }, nullptr);
+}
+
+void joinChipCb(lv_event_t *ev) {
+    const uint8_t k = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+    if (k >= s_nSuggest) return;   // the other group chosen: it is that one already
+    s_joinPick = k;
+    lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_JOIN); }, nullptr);
+}
+
+void joinOtherCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    if (k == 0) return;                          // "-": a suggestion stays chosen
+    s_joinPick = (uint8_t)(s_nSuggest + k - 1);
+    lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_JOIN); }, nullptr);
+}
+
+void joinGoCb(lv_event_t *) { lv_async_call([](void *) { visibilityJoin(s_joinPick); }, nullptr); }
+
+// Add card to dashboard, from a mini tile: which group first.
 void addTileCb(lv_event_t *) {
     lv_async_call([](void *) {
         Card *c = held();
         ClusterCard *cl = clusterOfTile();
         const Entity *e = c ? c->firstEntity() : nullptr;
         if (!cl || !e || s.phase != PopupPhase::PHASE_OPEN) return;
-        char id[CARD_ID_MAX + 1];
-        if (CardAdded::add(*cl, *e, id, sizeof(id))) showView(PopupView::VIEW_VISIBILITY);   // the row says Added
+        visibilityJoinOpen(cl, e);
     }, nullptr);
 }
 
@@ -220,6 +270,68 @@ void visibilityCb(lv_event_t *ev) {
     (void)ev;
     deckSet(DECK_PEEK);
     lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_VISIBILITY); }, nullptr);
+}
+
+// Which group: opened for `member` coming out of `parent` (a group card, its
+// member's view; or a cluster, its tile's Visibility).
+void visibilityJoinOpen(Card *parent, const Entity *member) {
+    s_joinParent = parent;
+    s_joinEntity = member;
+    s_joinPick   = 0;
+    if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_JOIN);
+}
+
+void buildJoin() {
+    lv_obj_t *list = column("JOINS WHICH GROUP?");
+    if (!s_joinParent || !s_joinEntity) return;
+    joinCollect();
+    if (!s_nJoin) { note(list, "No group is known yet."); return; }
+    if (s_joinPick >= s_nJoin) s_joinPick = 0;
+    // The suggestions as chips; the one chosen among the others, as a chip after them.
+    uint8_t nChips = 0;
+    for (uint8_t k = 0; k < s_nSuggest && nChips < 2; k++) s_joinWords[nChips++] = s_joinName[k];
+    const bool other = s_joinPick >= s_nSuggest;
+    if (other) s_joinWords[nChips++] = s_joinName[s_joinPick];
+    lv_obj_t *r = Kit::row(list, "Group", true);
+    Kit::chipRow(r, s_joinWords, nChips, other ? nChips - 1 : s_joinPick,
+                 (lv_area_get_width(&s.winRect) - 2 * s.pad) * 2 / 3, joinChipCb);
+    // Every other group, in a list.
+    size_t used = snprintf(s_otherOpts, sizeof(s_otherOpts), "-");
+    for (uint8_t k = s_nSuggest; k < s_nJoin; k++)
+        used += snprintf(s_otherOpts + used, used < sizeof(s_otherOpts) ? sizeof(s_otherOpts) - used : 0,
+                         "\n%s", s_joinName[k]);
+    DeckRowSpec rows[2] = {
+        { "Another group", Kit::RowKind::ROW_DROP, s_otherOpts, (uint16_t)(other ? s_joinPick - s_nSuggest + 1 : 0),
+          s_nJoin > s_nSuggest, joinOtherCb, &s_otherDd },
+        { "Add card to dashboard", Kit::RowKind::ROW_BUTTON, "Add", 0, true, joinGoCb, nullptr },
+    };
+    Kit::rows(list, rows, 2);
+    // Where the suggestions come from, in words.
+    char words[200];
+    int w = snprintf(words, sizeof(words), "%s's card goes right after %s on this page.",
+                     s_joinEntity->desc.name, s_joinParent->shownName(CardLabel::LBL_NAME));
+    if (!s_nSuggest) { note(list, words); return; }
+    w += snprintf(words + w, sizeof(words) - w, " %s is its group card's group", s_joinName[0]);
+    if (s_nSuggest > 1)
+        snprintf(words + w, sizeof(words) - w, "; %s its area's in HA.", s_joinName[1]);
+    else
+        snprintf(words + w, sizeof(words) - w, "%s.", s_joinEntity->sourceAreaId[0] ? ", and its area's in HA" : "");
+    note(list, words);
+}
+
+// Made, in group `pick`; the view it came from again (its row says Added).
+bool visibilityJoin(uint8_t pick) {
+    if (!s_joinParent || !s_joinEntity || s.phase != PopupPhase::PHASE_OPEN) return false;
+    joinCollect();
+    char id[CARD_ID_MAX + 1];
+    if (!CardAdded::add(*s_joinParent, *s_joinEntity, id, sizeof(id))) return false;
+    if (pick < s_nJoin) Settings::setCard(id, "group", s_joinGid[pick]);   // add() gave it the parent's
+    char msg[80];
+    snprintf(msg, sizeof(msg), "Added to the dashboard, in %s", pick < s_nJoin ? s_joinName[pick] : "its group");
+    UIToolkit::show_toast(msg);
+    const bool tile = held() && held()->mini();
+    showView(tile ? PopupView::VIEW_VISIBILITY : controlsView());
+    return true;
 }
 
 bool visibilityTakeRebuild() {

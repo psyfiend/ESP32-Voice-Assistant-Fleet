@@ -134,6 +134,7 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int restore = -1;                          // 2.11 (K96): the page panel's Restore N
                 int addTo = -1, mv = 0;                    // 2.11 (K91): Add to cluster N, copy or move
                 int addCards = -1;                         // ... a cluster's Add cards: the ticked, as a bit mask
+                int join = -1;                             // K92 rule 9: 1 opens "which group?", 2+N adds in group N
                 char kbType[24] = {};                      // ... words typed on it ('+' a space)
                 bool close = false, power = false, more = false, hist = false, mem = false; };
 bool (*s_drawerHook)(bool open) = nullptr;
@@ -210,6 +211,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "addto", v, sizeof(v)) == ESP_OK) a.addTo = atoi(v);
         if (httpd_query_key_value(q, "mv", v, sizeof(v)) == ESP_OK) a.mv = atoi(v);
         if (httpd_query_key_value(q, "addcards", v, sizeof(v)) == ESP_OK) a.addCards = atoi(v);
+        if (httpd_query_key_value(q, "join", v, sizeof(v)) == ESP_OK) a.join = atoi(v);
         if (httpd_query_key_value(q, "kbmode", v, sizeof(v)) == ESP_OK) a.kbMode = atoi(v);
         if (httpd_query_key_value(q, "kbpress", v, sizeof(v)) == ESP_OK) a.kbPress = atoi(v);
         if (httpd_query_key_value(q, "kbtype", a.kbType, sizeof(a.kbType)) == ESP_OK)
@@ -346,6 +348,27 @@ void CardPopup::debugService(lv_timer_t *t) {
         else if (visibilityAddTo((uint8_t)a.addTo, a.mv != 0)) { dbgOut("%s\n", a.mv ? "moved" : "copied");
                                                                   s_dreq.store(DREQ_CLOSING); return; }
         else dbgOut("cannot: not one entity, no such cluster, or in it already\n");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    // 2.11 (K92 rule 9): join=1 as Add card to dashboard - in a member's own
+    // view, or a tile's window - opening "which group?"; join=2+N its Add with
+    // group N chosen (0 the group card's, 1 the area's, then the others).
+    if (a.join >= 1) {
+        Card *held = isOpen() ? cardOf(h.surface) : nullptr;
+        if (!held) dbgOut("no window open\n");
+        else if (a.join == 1) {
+            Card *parent = nullptr;
+            const Entity *e = nullptr;
+            if (inMember() && s.ent[0]) { parent = held; e = s.ent[0]; }
+            else if (held->mini())
+                for (lv_obj_t *o = lv_obj_get_parent(h.surface); o && !parent; o = lv_obj_get_parent(o))
+                    if (lv_obj_has_flag(o, CardPopup::CARD_SURFACE_FLAG)) { parent = cardOf(o); e = held->firstEntity(); }
+            if (parent && e) { visibilityJoinOpen(parent, e); dbgOut("which group? for %s\n", e->desc.id); }
+            else dbgOut("not a member's view or a tile\n");
+        } else {
+            dbgOut(visibilityJoin((uint8_t)(a.join - 2)) ? "added\n" : "not added\n");
+        }
         s_dreq.store(DREQ_DONE);
         return;
     }

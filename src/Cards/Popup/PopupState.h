@@ -96,7 +96,7 @@ using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
 // cluster (K91, K100).
 enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER, VIEW_SCENES, VIEW_PROPS,
                                   VIEW_CARD_UI, VIEW_CLUSTER_SLOTS, VIEW_VISIBILITY, VIEW_ADD_TO,
-                                  VIEW_CLUSTER_ADD };
+                                  VIEW_CLUSTER_ADD, VIEW_JOIN };
 enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
@@ -498,6 +498,10 @@ void visibilityCb(lv_event_t *ev);   // SETTINGS' Visibility row
 void visibilityHideTile();           // Hide from the cluster: the held mini tile, and the window closes
 void buildAddTo();                   // VIEW_ADD_TO: Add to a cluster - which, Copy or Move (K91, K100)
 bool visibilityAddTo(uint8_t pick, bool move);   // ...done: the window closes; false when it cannot
+// WHICH GROUP? (K92 rule 9): Add card to dashboard asks it first - VIEW_JOIN.
+void visibilityJoinOpen(Card *parent, const Entity *member);
+void buildJoin();
+bool visibilityJoin(uint8_t pick);   // made, in group `pick` (0: its group card's)
 bool visibilityTakeRebuild();        // a choice wants the page built again, once the window has gone
 
 // PopupDebug.cpp
