@@ -174,23 +174,35 @@ cluster headers; a solo card's header keeps its formula (Q6).
 
 ## 4. Group and area cards (2.11)  → `docs/design/group-cards.md`
 
+**UNDER WAY - sittings 2026-10-18 and 10-19** (`group-cards.md` §6; K88-K97). The group model is
+accepted (§6.3-6.4); three mocks and their questions (C1-C8) wait for the owner (§6.5). Still to
+ask: Q6, Q8.
+
 1. **Confirm the two kinds** (`card-sheet.md` §6): *aggregate* (one card, several same-kind
    entities acting as one, e.g. the 3 office bulbs) and *area* (a multi-cell card holding several
    different entities with a header). Any third kind? **[BLOCKING 2.11]**
+   **ANSWERED 2026-10-18 -> `group-cards.md` §6.1** (group, group card, cluster, group page; source
+   and presentation; K88)
 2. **Aggregate tap** when members disagree (some on): all off, or all on? *`cards.md` §4 row 4
    chose "tap toggles all; mixed state has its own indicator".* Still right?
+   **DROPPED - answered in 2.10b** (#66's comment: as HA's light group, "On when: any / all")
 3. **Area card sizes**: smallest useful size (2x1? 2x2?), and the most entities it may hold per size.
 4. **Area header**: which promoted values (temperature, humidity, occupancy, light level)? One line
-   or two? What if the area has none?
+   or two? What if the area has none? **IN PART** (D-14, #66: a bar header whenever there is
+   content; status as icons by shape and fill) - number or icon, one line or two: on the mock
 5. **Inside an area card**: entities as mini tiles (icon + state), as rows (icon, name, state), or
    chosen per entity? **Show-don't-spec: Claude mocks both.**
+   **ANSWERED 2026-10-18 -> `group-cards.md` §6.1**: mini tiles, no border, the icon over its entity
+   label (K89)
 6. **Long press inside an area card**: on a member -> that member's popup; on the header -> the
    area's popup. Agreed?
 7. **An area on a small screen** that cannot fit its members: collapse to an aggregate-style summary
-   card, or drop members by priority?
+   card, or drop members by priority? **PROPOSED** (`group-cards.md` §6.3 rule 6): shown as its 1x1
+   group card, and the arranger says so
 8. **Rooms as linked pages** (`pages.md`): should an area card's header tap open the room's full
    page? How does "back" work - a header back button, a swipe, or both?
 9. **Area colour**: per area, set once, used by every card in it (`card-sheet.md` §5.4) - agreed?
+   **DROPPED - answered by K46 / K47** (the colour is the group's, device-wide)
 
 ## 5. Edge gestures, the system panel, and what becomes of the deck  → `docs/design/context-panels.md`
 
@@ -360,3 +372,6 @@ proposes the running order for the rest of Phase 2 and Phase 3 in one table for 
 | §3, 2026-10-15 | **A notification queue** (owner): notices from HA (automations, templates) shown in order, opened at any time, some interactive, some kept until dismissed or never dismissable (an alarm coming up, a door open too long); NINA's toast buffer as the reference | #76; `header-slots.md` §7 |
 | §3, 2026-10-15 | **An active card's border** (owner): a thicker border in a contrasting, complementary colour glowing inward toward the icon, in place of the card filling with its state colour | #106 - **built in 2.8** (the active frames, D-30 to D-33), closed |
 | §3, 2026-10-15 | **How a hidden header comes back**: the top edge as today, or a drag down on a card? | `header-slots.md` §4 |
+| §4, 2026-10-19 | **A header slot's panel lies on top of the bar** (owner): its top corners rounded toward its middle; the bar's accent line fades to black just before it would meet the panel's walls, so the two never touch; and a narrow halo all round the panel - black against it, fading to clear - so it floats over whatever is under it | **ANSWERED 2026-10-19 on the mock: Edges + halo, 5 mm, full strength, a 2.5 mm fade** (D-35, `header-slots.md` §15); 2.11 round 1 |
+| §4, 2026-10-19 | **Windows need more separation from the page** (owner): a dim or a blur behind them, if affordable - the dim was measured in 2.10 at one full-screen redraw to open and one to close (P4_5 ~85 ms, 4B ~52 ms), and dropped for speed (`card-sheet.md` §1, §14); otherwise the same halo as the header panels, round every window | **ANSWERED 2026-10-19: the halo, no dim** (D-35); measured with `/bench` in 2.11 round 1 |
+| §4, 2026-10-19 | **A cluster made from a group: a snapshot, or following its group?** A card that joins the group later does not join the cluster by itself (Claude's recommendation: keep it so, add by hand) | `group-cards.md` §6.4 |

@@ -49,6 +49,40 @@ down to least; and stability from the LAST layout - each item first tries its pr
 afresh. Priority still decides who leaves when nothing fits. Testable off the board: the same input
 twice gives the same output; one item added moves at most the items after it.
 
+### As prototyped: Layout Playground version 5 (2026-10-19, #78) - a proposal, not yet tuned
+
+The playground's arranger v4 was rejected by the owner on use: it missed layouts that existed, made
+one cluster huge, and stretched others into long rows. Its code says why - first-fit packing in
+reading order, five shapes per cluster, a stop after 4,000 tries, and spare cells handed out after
+packing, each cluster in turn grabbing what is beside it. Version 5, in the artifact
+(`https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp`), is the candidate for the C++ port:
+
+- **Grids**: the board's own (the owner's pick on glass) and its neighbours, one row or column
+  either way, each with cells between the smallest and biggest allowed size.
+- **Shapes**: every rectangle that holds a cluster's tiles at the smallest tile size; one cell only
+  for a cluster with nothing in its header (K97). A shape is dropped when a smaller shape inside it
+  plus empty cells for the difference costs no more.
+- **Search**: fill the FIRST EMPTY CELL in reading order, with one of the next three unplaced blocks
+  in each of its shapes, or leave it empty - every tiling, blocks kept near their list order. Branch
+  and bound: a branch stops once it costs more than the best page so far, counting each block left
+  at its cheapest shape and the cells that must stay empty.
+- **Cost** (each a knob): an empty cell 60 (the owner's, K105 - 40 when first published); a cluster's room beyond comfortable (1.6x the smallest
+  tiles' area) charged by its square, 25 x excess^2 - so spare room spreads over clusters; a long
+  cluster (beyond 1.8 : 1) 40 x the log excess squared; a block placed ahead of earlier ones 4 each;
+  each row or column away from the board's grid 6; single cards 10 x how far the cell drifts from
+  today's ~20 mm card.
+- **Deterministic**; no stability term yet (each page is arranged afresh).
+- **Cost to compute: the open problem for the port.** In the browser the P4_5's House page takes
+  ~300,000 steps (~45 ms) - **on the owner's PC, in JavaScript**; C++ on the P4 is expected to be
+  several times slower, an S3 slower again, so hundreds of milliseconds are possible until it is
+  measured. A page with much spare room hits the 150,000-step cap per grid. #78's PASS is under 5 ms
+  on an S3. **Decided (K105)**: build it as prototyped; arrange when a page's blocks change and keep
+  the result (by card id, as above), never on every page build (D-9 rebuilds pages on arrival); time
+  it on the P4_5 and an S3 first. Then, if needed: a time budget, a stronger bound, fewer shapes.
+- **Tuning happens on glass** (the owner: "this is going to require a lot of experimental tuning on
+  glass"): the weights are adjustable from the PC, and the playground stays the place to see what
+  each one does.
+
 ## The domain weight map
 
 Which cards earn space: a weight per card - its domain's (climate and media heavier than a lone

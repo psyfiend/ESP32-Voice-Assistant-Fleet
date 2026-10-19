@@ -1,7 +1,9 @@
 # Groups, areas and clusters - what is a "group card"? (milestone 2.11, #66)
 
-**Status: draft taxonomy, 2026-10-01**, from the owner's notes during interview §2 (D4) and Claude's
-reply. Interview §4 asks its questions against this file. Nothing here is built. Related:
+**Status: interview §4 under way, 2026-10-19** - the names, mini tiles and what the glass edits are
+answered (§6.1); Claude's model of how the pieces fit is accepted (§6.3), with the owner's notes
+(§6.4); the mocks are next ("2.11 Clusters", Layout Playground v5). §1-5 are the draft taxonomy of 2026-10-01 and the owner's model of 2026-10-12; where they
+disagree with §6, §6 wins. Nothing here is built. Related:
 `card-sheet.md` §6 (aggregate vs area, draft 2), `look-and-feel.md` §3.8 (clusters, the arranger),
 `ha-websocket.md` (area resolution, measured).
 
@@ -77,14 +79,16 @@ and stays mixed). `cards.md` §4 already chose "tap toggles all; mixed state has
 
 ## 4. OPEN - for interview §4 (2.11)
 
-- Confirm the source x presentation split, and the names: *group entity*, *area*, *board group*;
-  *card*, *cluster*, *page*.
-- Area tap default: the area's lights only (domain-scoped)? With per-area exclusions?
-- Does a board group live in the build sheet only (3.1), or also on the glass?
+- ~~Confirm the source x presentation split, and the names~~ **ANSWERED 2026-10-18** -> §6.1.
+- ~~Area tap default~~ **ANSWERED by K67** (2026-10-12): HA areas are never commanded.
+- ~~Does a board group live in the build sheet only (3.1), or also on the glass?~~ **ANSWERED
+  2026-10-18** -> §6.1: made and edited on the glass too, at a minimum; the intricate rest in the web
+  app.
 - ~~Verify: Hue group member attributes on `light.office`~~ **VERIFIED 2026-10-02 (owner):**
   `entity_id: [light.office_right, light.office_lamp, light.office_left]`, plus `is_hue_group`,
   `hue_type: room` and `hue_scenes` - see `card-sheet.md` §11.1.
-- Verify: `render_template` for `area_entities()`.
+- ~~Verify: `render_template` for `area_entities()`~~ - not needed: areas are never commanded (K67),
+  and members' areas are learnt since #93.
 
 ## 5. The owner's model, 2026-10-12 (before K17; DECISIONS K65-K67)
 
@@ -143,3 +147,323 @@ this.
   drops first. K17 places a new card after its parent, with the parent's priority.
 - In HA a group entity's members may sit in other areas than the group (areas are per entity);
   irrelevant to K17 - a member made a card takes the group card's group.
+
+## 6. Interview §4, first sitting (2026-10-18)
+
+### 6.1 Answered (DECISIONS K88-K91)
+
+- **The names (§4 Q1)** - the owner accepted Claude's recommendation:
+  - **group**: the relationship behind the card label - a name and a colour (K46);
+  - **group card**: one card standing for a set of entities;
+  - **cluster**: a group card shown as a block of its members, on the page;
+  - **group page**: a group card's members as a page of their own.
+
+  A group card has a **source** - a group defined in Hue or HA (Desk = `light.office`), or a list
+  made on the device (All Lamps; the owner's "Laundry") - and a **presentation**. Its members are
+  cards of their own: an id, their own settings. "Area card" is dropped as a term.
+- **"Area" is HA's word, never the dashboard's** (owner):
+
+  > "As far as how our dashboard engine handles card relationships the word 'area' is not part of
+  > the conversation, our entire card management and grouping systems use the term 'group'. The
+  > word 'area' has meaning only when an entity is brought onto the dashboard upon which the 'area'
+  > becomes 'group'. We maintain a table of area names in HA and the group that each area is mapped
+  > to so that if we rename a group but then bring an entity in that belongs to the original area
+  > name, it will be assigned to the correct renamed group."
+
+  That table exists: a linked group's id is `ha_<area_id>` (`CardGroups.h`), and HA keeps an area's
+  id when the area is renamed in HA, so the link survives a rename at either end.
+- **Mini tiles (§4 Q5)** (owner): a cluster's members have no border of their own - the icon, with
+  its entity label underneath. The cluster's border is the only one.
+- **Any presentation can become another** (owner): a group card can be shown as a cluster, and back;
+  and its tap can open a **group page** holding only its members - Desk's page holds its three
+  lamps, not every card in Office.
+- **What 2.11 edits on the glass** (owner's minimum; everything more intricate is the web app's,
+  #87 - Claude's earlier advice, which the owner found grounding):
+  - a card's group - which includes moving a card into a cluster, or a mini tile out to the page;
+  - which members fill the cluster header's slots (temperature, occupancy);
+  - members shown or hidden in a cluster (hidden is not removed);
+  - **making a cluster**: choose a group to base it on, then a list of cards with that group's
+    preselected - leave any out, add any others - and a name of its own if wanted, which its members
+    then wear;
+  - adding cards to a cluster, moving them out, swapping the cards in the header's slots.
+
+  "Just because a cluster is made of the 'Office' group doesn't mean there can't be solo cards on
+  the dashboard that are still members of 'Office'." The same cards can be in a cluster and on the
+  page "without conflict".
+
+### 6.2 Questions dropped - already answered
+
+- §4 Q2 (a tap on a group whose members disagree): 2.10b, #66's comment - as HA's light group, "On
+  when: any / all", on turns all off, otherwise all on.
+- §4 Q9 (area colour): K46, K47 - the colour is the group's, device-wide.
+- §4 Q4 in part: D-14 and #66's first comment - a cluster has a bar header whenever it has content;
+  status as icons, told apart by shape and fill. Left: temperature and lux as a number or an icon;
+  one line or two.
+
+### 6.3 Claude's model of how the pieces fit - ACCEPTED 2026-10-19 (K92), with §6.4's notes
+
+The owner asked: must groups be exclusive? Are Desk's lamps in Desk or in Office? Which group does a
+member copied to the page join? Can a cluster of two lights and a TV, turned into one card, toggle
+only the lights? And for every combination of entities, cards, groups, group cards and clusters,
+with how each can go wrong. The owner's own reasoning got most of the way: "once an entity becomes a
+card, the card becomes its own unique thing detached from the entity itself".
+
+**The objects:**
+
+| Thing | What it is | Its group | Where it sits |
+|---|---|---|---|
+| Entity | a light, sensor or switch in HA, MQTT or virtual; in HA at most one area | none - an HA area at most | the registry |
+| Card | the dashboard's object for one entity (a solo card) or a set (a group card); an id (K33) and its own settings | exactly one | on one page's grid, or inside one group card |
+| Group | a name and a colour, device-wide; remembers the HA areas linked to it | - | nowhere: groups place nothing (K46) |
+| Group card | a card for a set: a source and a presentation | exactly one | a page |
+| Member | a card inside a group card | its group card's | inside that group card, on no page |
+
+**The rules (proposal):**
+
+1. **Groups stay exclusive: a card is in exactly one.** A grouping by function ("Temp Sensors",
+   "Indoors") is a group card in a group of its own, whose members are copies of cards that live
+   elsewhere; copies are independent (K33). The price: the same sensor can wear two colours on one
+   dashboard - colour then says "the set you put it in", not "where it is". The alternative, a card
+   in several groups, needs a rule for which colour it wears, and whichever it wore would mislead.
+2. **A member has no group of its own: it wears its group card's** (refines K67). Desk's lamps are
+   Desk's members and wear Office; "Desk" is the card's own words (K46: own words keep the group).
+   Desk as a cluster: a header saying "Desk" in Office's colour. Desk moved to another group: its
+   lamps follow. Mini tiles show no card label - the cluster's header shows the name and the colour
+   once.
+3. **One level of nesting.** A group card made on the device may hold solo cards and group cards
+   defined at the source - Desk as one mini tile in an Office cluster, its tap toggling all three
+   lamps, its long press opening Desk's own window. It never holds another group card made on the
+   device: no loops, no cluster inside a cluster.
+4. **A source group's members are the source's** (K65): the board may hide one, never add or remove
+   one. To put Desk beside a sensor, put Desk in a group card made on the device (rule 3).
+5. **The tap set.** A group card's tap acts on the members that switch together - lights and
+   switches by default; anything else (a TV, a fan, a cover, a lock) only when ticked; sensors never.
+   "On when: any / all" counts the same members. The Kitchen's TV is safe unless someone ticks it.
+   Paused cannot do this job: it belongs to the entity, everywhere (#60).
+6. **Presentation is the group card's setting**: Card (1x1) or Cluster; its tap may open the group
+   page, a window, or the Members view. Switching keeps the members and their settings. **A cluster
+   that cannot fit** (a small screen) is shown as its 1x1 card, and the arranger says so - which
+   answers §4 Q7.
+7. **The header's slots are filled from members**; a member in a slot is not also a tile.
+8. **Visibility inside a group card is Shown / Hidden.** K68's third choice, "available for the
+   dashboard", goes: any member can be copied to a page at any time ("Add card to dashboard"), so it
+   says nothing. *K68 was the owner's, so this is his to confirm.*
+9. **A member copied to a page asks which group, in one tap**: the group card's group (chosen
+   already) / the entity's own HA-area group / Other group. The owner's Laundry: a group card in
+   Living holding Table (Kitchen in HA) and Overhead (Living in HA); Table's "Add card to dashboard"
+   offers "Living (Laundry's group)", "Kitchen (Table's area in HA)", "Other...". Replaces K65's
+   fixed rule.
+10. **Making a cluster from cards on the page copies them; one checkbox, "Take them off the page",
+    moves them** - ticked to begin with, as a cluster is usually made to tidy a page.
+11. **The card list** (making a cluster, adding a member): the cards on the device, by group, and
+    **the HA entities the owner has labelled** in HA - labels exist since HA 2024.4, on entities,
+    devices and areas - say "Fleet", read in one template call (`label_entities('fleet')`, and
+    `label_devices()` with `device_entities()` for a labelled device). To verify on the owner's HA.
+    Searching all of HA is the web app's job.
+
+**How it can go wrong, and what stops it:**
+
+| Case | What goes wrong | What stops it |
+|---|---|---|
+| One entity on three cards | renamed on one, the others keep the old name: "I changed it and it didn't change" | by design (K33); Entity properties lists the entity's other cards ("Also on: ...") - K68's "recognise and manage the cards that are also members" |
+| Pausing a member | pauses it in every card | Paused is the entity's (#60); its row says so |
+| A mixed group card's tap | the TV turns on | rule 5 |
+| The Hue app adds a lamp to Desk | the board's list is out of date | members follow the source at every load (A13); a vanished member's settings are kept and listed (K35) |
+| Adding a sensor to Desk | Hue owns that list | rules 3 and 4 |
+| A group card inside itself | a loop | rule 3 |
+| A function group's colour | one sensor in two colours | rule 1's price, accepted |
+| Two groups with one name | a new "Outside" beside HA's Outside area | warn and offer the existing one, as K46 does for a colour |
+| A group renamed on the board, or the area renamed in HA | the next entity from that area lands in a new group | the `ha_<area_id>` id (exists) |
+| HA renames an entity id | the card loses its entity | G4: an "unknown entity" card, a System Doctor line |
+| A group with cards deleted | cards with no group | a group is deleted only once empty; a solo group goes with its last card (K46) |
+| Members hidden or shown | the cluster changes size, the page re-arranges | the arranger is deterministic (#78): the same blocks always give the same page |
+| More members than a screen holds | the cluster does not fit | rule 6 |
+| A device-made group card's History | no HA entity, so no history | the members' History through Members (K54's rule, extended) |
+| A device-made group card's scenes | none - scenes are the source's | Laundry has none; Desk keeps its own |
+| A cluster based on a group, later | a card added to that group afterwards does not join | a cluster's members are a list made once; the web app may offer "new in this group" later |
+| A cluster on an S3 | 9 tiles and a header on a 128 KB pool | mini tiles are lighter than cards; measured with `lv_mem_monitor()` before committing |
+
+**What this buys, and what it costs:**
+
+- **Buys:** one colour rule that never lies about what it claims; any entity in any arrangement,
+  through copies; one object - the group card - for the 1x1 card, the cluster and the group page,
+  so a small screen's fallback, the owner's "transform" and the group page are one setting; commands
+  right by construction (a source group: one call; a list: one call with the entity ids; an area:
+  never); groups never move cards.
+- **Costs:** copies multiply and drift - more entries in the settings file, and "which card is
+  which?"; a sensor can wear two colours; a source group is extended only through one more level;
+  members become cards with ids - more to save, and a source group's members get ids the board
+  makes (A13's, with the group card's id).
+
+**Still open beside the model:** naming on the glass - a new cluster or group needs words, and K37
+put the keyboard later; until it exists, a new cluster takes its base group's name, renamed from the
+PC. §4 Q3 (sizes) goes to the Layout Playground; Q6 (long press inside a cluster) and Q8 (group
+pages and "back") come next; §5's "Open for 2.11" (Card label "None", the label type per group)
+after.
+
+### 6.4 The owner's notes on the model (2026-10-19)
+
+"The proposed model in §6.3 looks legit to me" - with these:
+
+- **Extending a group defined at the source (K93).** The owner's idea: a member added to Desk keeps
+  the card called "Desk", and behind the scenes the board makes it a group card holding
+  [Desk's Hue group + the new member]. Claude: manageable - it is rule 3's nesting, done for the
+  user. The card keeps its id, words, group, settings and place; its source changes from "the Hue
+  group" to "a list holding the Hue group and the extras". The tap is one HA call with both ids (HA
+  expands the Hue group). The Members view lists Desk's lamps (from Hue: they can be hidden, not
+  removed) and then the extras (removable). Desk's Hue scenes stay, acting on the Hue lamps only,
+  and the view says so. Removing the last extra makes it the plain Hue card again.
+- **History for a group made on the device (K94):** scenes do not matter much; history does, and a
+  **local history recorder is already in scope** - for MQTT cards, sensors wired to the board, and
+  the board's own counters (boots, firmware updates, others to come). A device-made group card's
+  History is then its members', from HA or from that recorder.
+- **"A cluster based on a group is a snapshot"** - the owner asked what this means. Making a
+  cluster from the Kitchen group copies the cards ticked at that moment into it. A Kitchen entity
+  brought onto the board later (a new Kitchen light from HA) becomes a solo card in the Kitchen
+  group, on the page; it does not appear in the Kitchen cluster by itself. **OPEN:** keep the
+  snapshot and add it by hand (Claude's recommendation: a cluster that changes by itself moves the
+  page), or offer "Also add to the Kitchen cluster?" when a card joins a group that has a cluster.
+- **The on-screen keyboard comes in 2.11 (K95)** - "Should we just take the plunge?" Claude: yes.
+  It has been put off three times (K37), and 2.11 is the first place it is needed: group and
+  cluster names. A kit component, ASCII only (the fonts carry nothing else), used by the custom card
+  name (K37) as well.
+- **A card's options by where it is (K96)** - the SETTINGS "Visibility" row, in flux until now,
+  becomes a button opening a view whose choices depend on where the card is (names not settled):
+  - **A card on the page:** *Hide from dashboard* - with a way to see the hidden cards and restore
+    them (K66's pool); *Add to group* - a screen to add the card to an existing group card, to make
+    a new group card (choosing its sibling members), or to add it to an existing cluster, as a copy
+    or as a move.
+  - **A member of a group card:** *Add card to dashboard*; when that member is already on the
+    dashboard, *Remove from dashboard*.
+  - **A member in a cluster:** *Hide from cluster view* - with a way to see the hidden ones and
+    restore them; *Add card to dashboard*.
+  - **The cluster itself:** a "card / tile management" screen - members shown or hidden, cards
+    added, which members fill the header's slots. ("This may be delving too deeply into 'do that
+    from webapp' territory", the owner says; Claude: it is K91's minimum, a list of rows on the kit,
+    and belongs on the glass.)
+
+  Claude's notes: *Add to group* in these words means a group card or a cluster; choosing the
+  card's **group** (its label's name and colour, K88) is a separate choice on the same screen, and
+  the two need different words. *Hide* is K66's remove: the card goes to the page's pool with its
+  settings, and the pool's list restores it (or deletes it, on the owner's word).
+- **A cluster can be 1x1 (K97)** - the owner, from the House page's two garage doors: as a group card
+  they would go "on" if either door is open, but better still if one cell showed which door. "Maybe
+  a cluster with few enough mini tiles could actually fit a 1x1 cell?" On the 7" boards at 6x3 a
+  cell is about 24 x 25 mm - room for 2 x 2 mini tiles with labels a size down; on the P4_5 at 5x3
+  (about 22 x 19 mm), two side by side. The arranger may give a cluster one cell when its tiles fit;
+  a 1x1 cluster has no header, and wears its group's card label as a solo card does. To confirm on
+  the mock.
+- **The arranger, the owner's verdict on the playground (v4):** the first look "blew me away"; over
+  time, "rather unhappy with the way the auto-layout feature works": it could not find layouts the
+  owner was sure existed, made "very unbalanced clusters where a cluster becomes enormous with just
+  2 mini tiles", or stretched them into long rows and columns. Claude, from v4's code: its packing
+  is greedy (first fit in reading order, so a tiling that needs another order is never found), it
+  tries only five shapes per cluster and stops after 4,000, and the spare cells are handed out
+  AFTER packing - each cluster in turn grabbing the empty cells beside it, so the first one grabs
+  most. Playground v5 replaces it (#78).
+
+### 6.5 The mocks (2026-10-19, built unattended) - for the owner to react to
+
+- **[2.11 Clusters](https://claude.ai/artifact/9mRzE8nb7U8nYSfxAxQhrV)** - the House page with
+  clusters on the P4_5 and the 4B (switches for the open looks), a cluster in one cell on every
+  board at true size, Desk as a card / a cluster / a group page, and a card's options by where it is
+  (K96). Its section E asks **C1-C8**, each with Claude's recommendation: the mini tile's "on" (lit
+  disc), header values (number), one header line, the group's colour on a cluster (a swatch), where
+  one-cell clusters are allowed, one Tile / Header / Hidden choice per member, Copy / Move when adding
+  to a cluster, and the snapshot (§6.4).
+- **What the mock measured** (estimates from the BSP diagonals until 2.11 runs on glass):
+  - **One-cell clusters with every tile at 9 mm** fit only on the 7" boards (7B, 1060: a 23 x 25 mm
+    cell holds the two doors at 20 x 10 mm, Desk's three lamps at 10 x 10 mm) and the CYD_S3_8048.
+    On the P4_5, the S3_5B, the 4880 and the 3248, two tiles are tight (8-9 mm) and three too
+    small; the 4B's narrow cells (15.5 mm) hold neither. So K97 is a 7"-and-up feature unless the
+    owner accepts tight tiles.
+  - **The P4_5's cells are short** (16.4 mm): a one-row cluster's tiles are about 8.8 mm tall under
+    a 5 mm header - at the touch minimum. Two-line headers would push them under it.
+- **[Panel Edges](https://claude.ai/artifact/U8wGGgPEWHpgKNvZ2miYMu)** - the owner's requests 2 and 3
+  from 2026-10-19 (`interview-phase2-3.md` §12): the header panel lying on the bar (top corners
+  rounded toward its middle, the bar's line fading out before the walls) with a halo, and a window
+  over the page with no backdrop / a halo / the dim / both; sliders for the halo's width and
+  strength and the line's fade; the cost of each, from 2.10's measurements.
+- **[Layout Playground](https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp) version 5** - the new
+  arranger, v4 kept beside it for comparison (`layout-engines.md`, "As prototyped"). On the House
+  page it gives the P4_5 a 5 x 2 page with no empty cell and four even 2 x 1 clusters (v4: 4 x 3,
+  clusters 1 x 2 and 1 x 3); with a five-member cluster added, a full 6 x 4. **On the 7B the House
+  page has 6 blocks for 18 cells**: v5 leaves 9 cells empty rather than make one cluster huge (v4
+  made two 3 x 2 clusters). Spreading that spare room as even margins (`look-and-feel.md` §3.8 item
+  3) is the question it raises. Its weights are starting guesses for the owner to tune.
+
+### 6.6 The owner's answers to the mocks (2026-10-19, night; DECISIONS K98-K104)
+
+- **A summary card - a fourth presentation (K98).** What the owner meant by the garage doors: "a
+  single icon that will switch to its ACTIVE state if either door is open but label to say
+  North/South/Both depending on which door was open". Only for members of one kind (doors, windows,
+  lights); "Open Doors" and "Open Windows" are the same idea. A tap opens History, Members, or a
+  small window holding only the members. Claude's proposals for the words: none active - the card's
+  own name; some - the active members' names while they fit, else "2 of 4"; all - "Both" for two,
+  "All" for more.
+- **Group pages are also whole pages (K99):** full screen, so many more cards; swiped to like any
+  page, or targeted from the navbar. They sit beside a group card's own way of opening its members
+  (K90).
+- **C1, lit disc** - "the disc itself can sometimes shrink beyond its useful limit if too crowded, so
+  we'll need to watch for that". It cannot show a light's brightness; only Fill could, and Fill is
+  not the owner's choice for a card. **C3, one line. C7, Copy / Move on one screen. C8, snapshot.**
+  (K100)
+- **C2, header values (K101):** "I like icons, they're pretty!" - icons with text where there is
+  room, text with units where not. The user picks which sensors go in the header, and whether icons
+  show. **Occupancy has its own icon for each state** (separate MDI glyphs, from the device_class
+  table), never one icon filled or outlined.
+- **C4, the header's style, customizable all the way down (K102):** the page's card label type
+  applies to solo cards only; clusters have their own page-wide Swatch / Bar; each cluster can opt
+  out of inheriting it; and a card label type per group, discussed before (§5), later.
+- **C5, one-cell clusters (K103, refines K97):** a summary card and a one-cell cluster of mini
+  tiles are different things. "Even on 7" screens putting 2 or 3 tap targets on a single card is a
+  bit too close for comfort." So a one-cell cluster is **for sensors only**, the whole cell one tap
+  target; "tight" tiles are acceptable, nothing smaller. And: **count sensors** - one entity
+  counting the lights on or the doors open, from an HA template or group - belong in cluster header
+  slots and in the page header too, an icon beside the count, a tap showing which.
+  Claude: at zero, the slot shows its idle icon with no number - dashes mean "no data" (D-15).
+- **C6, the cluster's management screen - the owner's layout (K104)**, replacing the mock's Tile /
+  Header / Hidden row:
+  - **HEADER**: *Style* - Swatch / Bar; a *Slots* button opening a view with *Show sensor icons*
+    (a checkbox) and the cluster's sensors, each with a checkbox.
+  - **MEMBERS**: two columns, *Name* (the entity labels) and *Visible* (a checkbox each); *Add cards*
+    at the foot.
+  - **A long press on a mini tile** (or a tap, when its tap action is Details) opens the member's
+    own window, as a card's - so its SETTINGS keeps the Visibility button (K96). This answers half
+    of §4 Q6.
+
+  The owner asked: three slots at most? **Claude's recommendation: no fixed number** - the slots are
+  a priority list and the header's planner of claims (D-19, `HeaderPlan.h`) shows what fits,
+  dropping the lowest first: two or three on most clusters, more on a wide one. And where K92 rule 7
+  meets this screen: ticking a sensor into the header unticks its Visible, so it moves rather than
+  doubles; ticking Visible again shows it in both places.
+
+## 7. The build - a proposal for the session that builds 2.11
+
+The design is agreed enough to build (the owner, 2026-10-19: "are we at a handoff point ready for
+build?"). **The building session first puts this plan, and the settings file's new entries, to the
+owner** - a structural choice a turn before it is built (W7) - then branches off `main`.
+
+- **Round 1 - clusters on the page.** The cards come onto the kit first (`ui-architecture.md` §6:
+  roles for a card's surface, hero, labels; the harness proves nothing moved), in new files - `Card.cpp`
+  and `GUIManager.cpp` are over 1,000 lines and must not grow. Then the cluster: a group card whose
+  presentation is Cluster, its members cards with ids (K33) drawn as mini tiles (K89, lit disc), its
+  header the page header's slots and planner (K101, K102, one line). Placed by today's
+  `FlowEngine`, the cluster's span derived from its member count - the arranger comes later. Built
+  from a dashboard spec first (the House page's Office, Kitchen, Outside), saved settings after.
+  Riding along: D-34 (the 7" header words) and **D-35 - the header panel lying on the bar and the
+  halo round every panel and window** (`header-slots.md` §15), each measured with `/bench` before
+  and after.
+- **Round 2 - what the glass edits.** The options view by location (K96), the cluster management
+  screen (K104), Copy / Move (K100), the "which group?" dialog (K92 rule 9), the hidden-cards list.
+- **Round 3 - the rest of the group card.** The summary card (K98), count slots (K103), extending a
+  source group (K93), group pages (K90, K99), the on-screen keyboard (K95).
+- **The arranger (#78), K105**: Playground v5's engine as prototyped, an empty cell at 60, as a
+  `Layout::Engine` with host tests (the playground's results for the same input are the expected
+  values); arranged when a page's blocks change and kept, never per page build; timed on the P4_5
+  and an S3 before the page relies on it; its weights adjustable from the PC so the owner can tune
+  on glass. Its own round once clusters exist - round 2 or 3, the building session's call.
+- **Still open, each to ask with a recommendation when its round comes:** §4 Q8 (how "back" works
+  from a group opened as a page); the other half of Q6 (a long press on a cluster's header - Claude:
+  the cluster's own window, its management screen inside); spreading spare room as margins on a page
+  with too little on it (the 7B's House page).

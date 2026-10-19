@@ -109,9 +109,12 @@ The numbers above are identity, not sequence. Agreed with the owner:
    default), lit glass, Linen's terracotta. ~~**A17**~~ DONE, `v0.2.17`
    (`archive/TEST_A17.md`).
 5. **2.11 group cards with the page arranger** - **NEXT** (the owner, 2026-10-17) (#66, #78;
-   prototype: artifact "Layout Playground"; engines: `design/layout-engines.md`). It opens with the
-   design interview's §4 (`design/interview-phase2-3.md`, `design/group-cards.md` §4-5). Its hero
-   region is what #100 (NINA's clock) waits for.
+   prototype: artifact "Layout Playground" v5; engines: `design/layout-engines.md`). **Design agreed
+   2026-10-19** in the interview's §4 (`design/group-cards.md` §6, K88-K105; mocks "2.11 Clusters",
+   "Panel Edges"); **the build's round plan is `group-cards.md` §7**: the cards onto the kit and
+   clusters on the page (with D-34, D-35), then what the glass edits, then the summary card, count
+   slots, group pages and the keyboard, and the arranger in its own round. Its hero region is what
+   #100 (NINA's clock) waits for.
 6. **#76** HA alerts on the claim model (the notice queue from NINA's toasts; mock first).
 7. **3.1 schema** (#20), scoped together with **the companion web app** (#87).
 
