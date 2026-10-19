@@ -9,6 +9,7 @@
 #include <string.h>
 #include <time.h>
 #include "Alarms.h"
+#include "Cards/CardAdded.h"   // this page's hidden cards (K66, K96)
 #include "Settings.h"
 #include "UI/SlotPanels.h"
 #include "UI/TweaksSheet.h"
@@ -67,6 +68,24 @@ void GUIManager::openSlotPanel(uint8_t slot) {
         if (s >= 0) g->openSlotPanel((uint8_t)s);
     };
     c.refreshHeader = [](void *user) { ((GUIManager *)user)->_header.refresh(); };
+    // THIS PAGE'S HIDDEN CARDS (2.11, K66, K96): by the name the dashboard gives,
+    // else its entity's. Restore puts one back; the page is built again once the
+    // panel has gone (tick(), CardAdded::takeChanged()).
+    static CardAdded::PoolItem s_pool[SlotPanels::HIDDEN_MAX];
+    if (_header.slotKind(slot) == SlotKind::SLOT_PAGE && _pages[_curPage].spec) {
+        c.hiddenCount = CardAdded::pool(*_pages[_curPage].spec, s_pool, SlotPanels::HIDDEN_MAX);
+        for (uint8_t i = 0; i < c.hiddenCount; i++) {
+            const Entity *e = s_pool[i].entity[0] ? _core.entities().find(s_pool[i].entity) : nullptr;
+            c.hiddenNames[i] = s_pool[i].label && s_pool[i].label[0] ? s_pool[i].label
+                             : e && e->desc.name[0]                  ? e->desc.name
+                             : e && e->sourceName[0]                 ? e->sourceName : s_pool[i].id;
+        }
+        c.restoreCard = [](void *user, uint8_t i) {
+            GUIManager *g = (GUIManager *)user;
+            g->closeSlotPanel(true);
+            if (i < SlotPanels::HIDDEN_MAX && CardAdded::restore(s_pool[i].id)) Settings::save();
+        };
+    }
     if (!SlotPanels::build(_header.slotKind(slot), _slotDrawer.face, c)) return;
     syncPanelOffset();
     Kit::drawerPlace(_slotDrawer, _header.slotCentreX(slot), _slotDrawer.top);

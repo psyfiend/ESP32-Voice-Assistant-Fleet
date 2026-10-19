@@ -106,7 +106,6 @@ bool unitsShownF() {
 void unitsDropCb(lv_event_t *ev);
 void propsCb(lv_event_t *ev);
 void addCardCb(lv_event_t *ev);
-void removeCardCb(lv_event_t *ev);
 
 uint8_t deckSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
@@ -119,9 +118,8 @@ uint8_t deckSpecs(DeckRowSpec *r) {
         r[n++] = { "Active state", DeckRowKind::ROW_DROP, "Any members are on\nAll members are on",
                    (uint16_t)(s.groupOn == GroupOn::GROUP_ON_ALL), true, groupDropCb, &s.ddGroup };
     // Entity label and Card label are Card UI's since 2.8 round 3 (D-25, D-28).
-    // Visibility is NOT SHOWN (owner, 2026-10-12, K68): it belongs to cards in
-    // a group shown as a cluster, a group panel or a group page, and none
-    // exists yet. It comes back with them, offered only there.
+    // Visibility is a button to a view since 2.11 (K96): the card's options by
+    // where it is - below, before Card UI.
     // Tap action (2.10d). Long press always opens the window (K39), whatever
     // this says. Greyed in a member's own view: it is the card's.
     const bool cardRows = held && held->hasId() && !inMember();
@@ -147,10 +145,10 @@ uint8_t deckSpecs(DeckRowSpec *r) {
         const bool made = CardAdded::addedFor(held->id(), s.ent[0]->desc.id) != nullptr;
         r[n++] = { "Add card to dashboard", DeckRowKind::ROW_BUTTON, made ? "Added" : "Add", 0, !made, addCardCb, nullptr };
     }
-    // A card added on the device can be removed (K66) - to the page's pool,
-    // after a dialog that asks (confirmRemove()).
-    if (!inMember() && held && CardAdded::isAdded(held->id()))
-        r[n++] = { "Remove card", DeckRowKind::ROW_BUTTON, "Remove", 0, true, removeCardCb, nullptr };
+    // VISIBILITY (K96): what the card can do where it is - hidden from the page
+    // (K66's remove, every card since 2.11) or from its cluster, and more later.
+    if (held)
+        r[n++] = { "Visibility", DeckRowKind::ROW_BUTTON, "Open", 0, cardRows, visibilityCb, nullptr };
     // CARD UI (2.8 round 3, D-27): the card's own looks, a view of their own -
     // at the foot. The card's, so greyed in a member's view; a card without a
     // usable id cannot keep them.

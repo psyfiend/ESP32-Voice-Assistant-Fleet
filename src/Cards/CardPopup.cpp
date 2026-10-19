@@ -146,7 +146,8 @@ void showView(PopupView v) {
                               : v == PopupView::VIEW_SCENES  ? "Scenes"
                               : v == PopupView::VIEW_PROPS   ? "Properties"
                               : v == PopupView::VIEW_CARD_UI ? "Card UI"
-                              : v == PopupView::VIEW_CLUSTER_SLOTS ? "Header" : "Members");
+                              : v == PopupView::VIEW_CLUSTER_SLOTS ? "Header"
+                              : v == PopupView::VIEW_VISIBILITY ? "Visibility" : "Members");
     }
     // SIZED BEFORE THE VIEW IS BUILT: placeWide() lays the window out, and a
     // DOT label laid out at the last view's width rewrites its own text - the
@@ -157,6 +158,7 @@ void showView(PopupView v) {
     else if (v == PopupView::VIEW_PROPS)   buildProps();
     else if (v == PopupView::VIEW_CARD_UI) buildCardUi();
     else if (v == PopupView::VIEW_CLUSTER_SLOTS) buildClusterSlots();
+    else if (v == PopupView::VIEW_VISIBILITY) buildVisibility();      // K96
     else if (v == PopupView::VIEW_MAIN && s.cluster) buildCluster();   // K104
     else                                   buildMain();
     deckSync();     // SETTINGS' rows are the view's (a member's own has more)
@@ -462,8 +464,9 @@ void CardPopup::open(Card &card) {
 
 bool CardPopup::takeRebuildWanted() {
     if (isOpen()) return false;
-    const bool ui = cardUiTakeRebuild(), cl = clusterTakeRebuild();   // both, so neither waits
-    return ui || cl;
+    // Every one, so none waits for the next window.
+    const bool ui = cardUiTakeRebuild(), cl = clusterTakeRebuild(), vis = visibilityTakeRebuild();
+    return ui || cl || vis;
 }
 
 void CardPopup::openOn(Card &card, uint8_t view) {

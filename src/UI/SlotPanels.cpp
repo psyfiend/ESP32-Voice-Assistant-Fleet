@@ -133,10 +133,30 @@ void hdrChosen(uint8_t i) {
     if (s_ctx.setHeaderShown) s_ctx.setHeaderShown(s_ctx.user, i == 0);
 }
 
+// THIS PAGE'S HIDDEN CARDS (2.11, K66, K96 - the mock's "this page's list of
+// hidden cards"): each with Restore, which puts it back where it was.
+void restoreCb(lv_event_t *e) {
+    const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
+    if (s_ctx.restoreCard) s_ctx.restoreCard(s_ctx.user, i);
+}
+
+void hiddenCards(lv_obj_t *face, const Context &c) {
+    if (!c.hiddenCount) return;
+    title(face, "HIDDEN CARDS");
+    const UIShape &k = UI::shape();
+    const int32_t bw = Kit::textW("Restore", UI::type().NAME) + 2 * UI::mm(k.S7);
+    for (uint8_t i = 0; i < c.hiddenCount && i < HIDDEN_MAX; i++) {
+        lv_obj_t *r = Kit::row(face, c.hiddenNames[i], true);
+        lv_obj_t *b = Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Restore", bw, Kit::controlH(), nullptr);
+        lv_obj_add_event_cb(b, restoreCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
+    }
+}
+
 void buildPage(lv_obj_t *face, const Context &c) {
     title(face, "PAGES");
     for (uint8_t i = 0; i < c.pageCount && i < PAGES_MAX; i++)
         Kit::drawerItem(face, c.pageTitles[i], i == c.pageIndex, pageCb, (void *)(uintptr_t)i);
+    hiddenCards(face, c);
     dim(face, "Header");
     Kit::SelectorSpec sp = {};
     sp.glyph[0] = "Show";
@@ -148,7 +168,8 @@ void buildPage(lv_obj_t *face, const Context &c) {
     sp.onChosen = hdrChosen;
     Kit::selector(s_hdrSel, face, sp);
     Kit::drawerNote(face, "Hide: the header goes when this panel closes; swipe down from the top edge "
-                          "to see it for a moment. Later: this page's cards, arrangement and name (2.11).");
+                          "to see it for a moment. A card hidden from this page (its window's Visibility) "
+                          "is listed here until restored.");
 }
 
 // The sensor: its name, its reading - or dashes and what went wrong - and when
@@ -197,5 +218,14 @@ bool build(SlotKind kind, lv_obj_t *face, const Context &c) {
         default:                    return false;   // status: the system panel
     }
 }
+
+#ifdef DEBUG_POPUP
+bool restoreDebug(uint8_t i) {
+    if (!s_ctx.restoreCard || i >= s_ctx.hiddenCount) return false;
+    s_ctx.restoreCard(s_ctx.user, i);
+    s_ctx.restoreCard = nullptr;   // once: the list it was built from is gone
+    return true;
+}
+#endif
 
 }  // namespace SlotPanels

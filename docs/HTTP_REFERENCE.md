@@ -267,7 +267,7 @@ order.
 |---|---|
 | `/popup?card=N` | a long press on card N: opens its window; replies with the build time, window size and LVGL's pool |
 | `/popup?close=1` | closing it; replies with the pool afterwards. **Anything changed in the window is saved now**, as on the glass |
-| `/popup?view=N` | the corner icons: `0` the controls (a member's, inside one), `1` History, `2` Members, `4` Scenes, `5` Properties, `6` Card UI (2.8 round 3, as SETTINGS' last row), `3` only lists. Also lists the entities' levels, an HA group's members and why recent commands failed |
+| `/popup?view=N` | the corner icons: `0` the controls (a member's, inside one), `1` History, `2` Members, `4` Scenes, `5` Properties, `6` Card UI (2.8 round 3, as SETTINGS' last row), `7` a cluster's Header slots (2.11), `8` Visibility (2.11, K96: the card's options by where it is), `3` only lists. Also lists the entities' levels, an HA group's members and why recent commands failed |
 | `/popup?deck=1` / `deck=0` / `deck=2` | SETTINGS opened / folded; `2` the left panel (CHART or SCENES) opened |
 | `/popup?ctl=N` | a light's control: `0` brightness, `1` color temperature, `2` color; lists where the stage's children landed |
 | `/popup?member=N` | a tap on row N of Members (opens Members first) |
@@ -288,7 +288,7 @@ order.
 | `/popup?active=RRGGBB` | 2.8 round 6: the active colour ("on" - a fill, the frames, lit glass) in place of the scheme's, for judging colours on glass (the screenshots' colours are not the panel's) - **not saved**, until the scheme changes; `active=0` the scheme's own again. A leading `#` is fine if URL-encoded (`%23`). UI |
 | `/popup?glyphs=0\|1\|2\|3` | 2.8: the header's glyphs bare, in a rounded square, in a circle - **not saved** (a capture leaves the owner's choice); `3` the saved style again. UI |
 | `/popup?pagehdr=0\|1` | 2.8: this page's header hidden / shown - **Saved**, as the page slot's panel and Hide Bar save it (`pages.<slug>.header`; shown is the default and is stored as nothing) |
-| `/popup?removecard=3` | the Remove card dialog over any card's window, to look at; its Remove does nothing to a compiled card; `close=1` takes it down |
+| `/popup?removecard=3` | the Hide dialog (K96; Remove card's until 2.11) over any card's window, to look at - never tap its Hide, which now hides any card; `close=1` takes it down |
 | `/popup?kbd=1\|2` | 2.11 (K95): the keyboard over the open window - `1` as a cluster's Rename, or a card's Entity label Custom (its name); `2` as Card label's Custom (the card label's words). Then `kbtype=<words>` types them (`+` a space), `kbmode=0\|1\|2` shows the lower / upper / symbol keys, `kbpress=3` empties the field, `kbpress=2` Cancel. Replies with LVGL's pool. UI (`kbpress=1` saves: below) |
 
 ### Settings for the next windows (each **RAM**)
@@ -308,8 +308,9 @@ order.
 | `/popup?look=0..4` | the system panel's Selector look, for the scheme showing: `0` Black - Square, `1` Black - Round, `2` Silver - Square, `3` Silver - Round, `4` the scheme's own | the scheme's `selector` (at once with no window open; else when it closes) |
 | `/popup?clabel=N` | choosing line N of the open card's Card label row (K46); replies with the row | the card's `group` (and a solo group, for its own words) |
 | `/popup?addcard=1` | "Add card to dashboard" in a member's own view (K17) | a new card entry after its group card |
-| `/popup?removecard=2` | Remove card's dialog on a card added on the device | removed only if Remove is tapped |
-| `/popup?removecard=1` | Remove card, confirmed, on a card added on the device - no dialog | the card, removed (kept in the file's pool) |
+| `/popup?removecard=2` | Visibility's Hide from this page: its dialog, on any card (K96; K66's remove, every card since 2.11) | hidden only if Hide is tapped |
+| `/popup?removecard=1` | Hide from this page, confirmed - no dialog; on a mini tile, Hide from the cluster | the card's `removed` (the page's pool, its settings kept); a tile's `hidden` = `yes` |
+| `/popup?restore=N` | Restore beside the Nth of this page's hidden cards, in the page slot's panel (`slot=page` first) | the card's `removed`, removed - back on its page |
 | `/popup?kbpress=1` | the keyboard's Save (2.11, K95) | what it was opened for: a cluster's `label_text` (none: its group's name), a card's `name`, or its card label's `label_text` - when the window closes |
 
 ### **Device** - these command real lights and scenes

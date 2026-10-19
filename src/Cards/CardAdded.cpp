@@ -142,7 +142,7 @@ uint8_t merge(const PageSpec &page, CardSpec *out, uint8_t cap) {
         }
     };
     for (uint8_t c = 0; c < page.count && n < cap; c++) {
-        out[n++] = page.cards[c];
+        if (!isHidden(page.cards[c].id)) out[n++] = page.cards[c];   // K96: hidden, in the pool
         followers(page.cards[c].id, followers);
     }
     // Their card is gone: at the end.
@@ -219,6 +219,74 @@ bool remove(const char *cardId) {
         return true;
     }
     return false;
+}
+
+bool isHidden(const char *cardId) {
+    char v[8];
+    return cardId && Settings::card(cardId, "removed", v, sizeof(v)) && !strcmp(v, "yes");
+}
+
+bool hide(const char *cardId) {
+    if (!cardId || !cardIdWellFormed(cardId) || isHidden(cardId)) return false;
+    if (isAdded(cardId)) return remove(cardId);
+    Settings::setCard(cardId, "removed", "yes");
+    s_changed = true;
+    Serial.printf("[CardAdded] %s hidden (kept in the page's pool)\n", cardId);
+    return true;
+}
+
+bool restore(const char *cardId) {
+    if (!isHidden(cardId)) return false;
+    Settings::setCard(cardId, "removed", nullptr);
+    s_changed = true;
+    // An added card comes back to its record: the one removed this boot, else
+    // read from the file as begin() would (a Card points at its id: never moved).
+    char page[24];
+    if (Settings::card(cardId, "page", page, sizeof(page))) {
+        bool found = false;
+        for (uint8_t i = 0; i < s_n && !found; i++)
+            if (!strcmp(s_rec[i].id, cardId)) { s_rec[i].removed = false; found = true; }
+        if (!found) readOne(cardId, page, nullptr);
+        if (s_pooled) s_pooled--;
+    }
+    Serial.printf("[CardAdded] %s restored to its page\n", cardId);
+    return true;
+}
+
+namespace {
+struct PoolCtx { const char *slug; CardAdded::PoolItem *out; uint8_t cap, n; };
+
+// An added card hidden from this page (a compiled one has no "page" key: its
+// page's spec lists it, below).
+void poolAdded(const char *id, const char *value, void *p) {
+    PoolCtx &x = *(PoolCtx *)p;
+    char page[24];
+    if (x.n >= x.cap || strcmp(value, "yes") || !Settings::card(id, "page", page, sizeof(page)) ||
+        strcmp(page, x.slug)) return;
+    CardAdded::PoolItem &it = x.out[x.n++];
+    copy(it.id, sizeof(it.id), id);
+    char v[ENTITY_ID_MAX];
+    Settings::card(id, "entity", v, sizeof(v)); copy(it.entity, sizeof(it.entity), v);
+    Settings::card(id, "area", v, sizeof(v));   copy(it.area, sizeof(it.area), v);
+    it.label = nullptr;
+}
+}  // namespace
+
+uint8_t pool(const PageSpec &page, PoolItem *out, uint8_t cap) {
+    PoolCtx x = { page.slug ? page.slug : "", out, cap, 0 };
+    for (uint8_t c = 0; c < page.count && x.n < cap; c++) {
+        const CardSpec &cs = page.cards[c];
+        if (!isHidden(cs.id)) continue;
+        PoolItem &it = out[x.n++];
+        copy(it.id, sizeof(it.id), cs.id);
+        const char *e = cs.primaries[0];
+        if (!e && cs.memberCount && cs.members) e = cs.members[0].primaries[0];
+        copy(it.entity, sizeof(it.entity), e);
+        copy(it.area, sizeof(it.area), cs.area);
+        it.label = cs.label;
+    }
+    Settings::forEachCardWith("removed", poolAdded, &x);
+    return x.n;
 }
 
 bool takeChanged() {

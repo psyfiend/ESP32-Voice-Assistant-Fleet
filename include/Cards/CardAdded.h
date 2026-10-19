@@ -29,11 +29,10 @@
 //
 #include <stddef.h>
 #include <stdint.h>
+#include "Entity.h"            // ENTITY_ID_MAX, ENTITY_SHORT_MAX: a pool item's strings
+#include "Cards/PageSpec.h"    // CARD_ID_MAX
 
 class Card;
-struct Entity;
-struct CardSpec;
-struct PageSpec;
 
 namespace CardAdded {
 
@@ -53,7 +52,7 @@ uint8_t merge(const PageSpec &page, CardSpec *out, uint8_t cap);
 
 // Was `cardId` added here (removed or not)? For the settings file's claims.
 bool known(const char *cardId);
-// Added here and still on its page: SETTINGS offers "Remove card".
+// Added here and still on its page.
 bool isAdded(const char *cardId);
 // The card already made from `entityId` out of `parentId`, still on its page,
 // or null.
@@ -65,8 +64,27 @@ bool add(const Card &parent, const Entity &member, char *idOut, size_t cap);
 // To the page's pool. False if it is not a card added here.
 bool remove(const char *cardId);
 
-// True once after add() or remove(): the page must be rebuilt to show it
-// (GUIManager, once no card window is open).
+// --- THE PAGE'S POOL, FOR EVERY CARD (2.11 round 3, K66, K96) -----------------
+// "Hide from this page" sends any card on a page there - a compiled one too:
+// "removed": "yes" on its entry, as on an added card's, its settings kept.
+// merge() leaves a hidden card out; the cards added after it still follow its
+// place. The page's list of hidden cards brings it back (restore()).
+bool isHidden(const char *cardId);
+bool hide(const char *cardId);      // false: no id, or hidden already
+bool restore(const char *cardId);   // false: not hidden
+
+// A hidden card on a page, for its list: its id, the entity it shows (a group
+// card's first member's), its dashboard name (null: none - HA's), its area.
+struct PoolItem {
+    char        id[CARD_ID_MAX + 1];
+    char        entity[ENTITY_ID_MAX];
+    const char *label;
+    char        area[ENTITY_SHORT_MAX];
+};
+uint8_t pool(const PageSpec &page, PoolItem *out, uint8_t cap);
+
+// True once after add(), remove(), hide() or restore(): the page must be rebuilt
+// to show it (GUIManager, once no card window is open).
 bool takeChanged();
 
 }  // namespace CardAdded

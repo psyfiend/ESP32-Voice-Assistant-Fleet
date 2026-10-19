@@ -682,8 +682,8 @@ malformed one or a duplicate draws but is never given its id, so it saves nothin
 |---|---|
 | Shown | - |
 | Dropped because the grid is too small | still on its page; nothing changes |
-| Hidden (Visibility - greyed until 2.11) | on its page, in the page's pool, can be brought back |
-| Removed from the page (page editing, later) | in the pool, kept |
+| Hidden from its page (2.11, K96: Visibility's "Hide from this page" - K66's remove, every card) | in the page's pool, kept (`removed`: `yes`); listed in the page slot's panel, where Restore brings it back |
+| Hidden from its cluster (2.11, K96, K104) | still in the cluster's list (`hidden`: `yes`); its Visible box in the cluster's window brings it back |
 | Deleted | only by the owner, from the pool; gone |
 | No longer in the dashboard definition | kept, listed as "unclaimed", cleared only by the owner |
 | Its entity gone from HA | kept, listed as "entity missing" - the board cannot tell "gone" from "HA restarting" or "renamed" |

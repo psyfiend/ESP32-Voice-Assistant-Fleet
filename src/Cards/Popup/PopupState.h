@@ -91,8 +91,10 @@ using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
 // VIEW_CARD_UI: the card's own looks, from SETTINGS' last row (2.8 round 3, D-28).
 // A CLUSTER'S WINDOW (2.11, K104): its main view is the cluster's management
 // screen (PopupCluster.cpp), VIEW_CLUSTER_SLOTS the members in its header.
+// VIEW_VISIBILITY: a card's options by where it is, from SETTINGS' Visibility
+// row (2.11 round 3, K96; PopupVisibility.cpp).
 enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER, VIEW_SCENES, VIEW_PROPS,
-                                  VIEW_CARD_UI, VIEW_CLUSTER_SLOTS };
+                                  VIEW_CARD_UI, VIEW_CLUSTER_SLOTS, VIEW_VISIBILITY };
 enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
@@ -481,8 +483,14 @@ void hiddenScenesCb(lv_event_t *ev);
 
 // PopupDialog.cpp
 void confirmClose();
-void confirmRemove();
-void removeCardCb(lv_event_t *ev);
+void confirmHide();              // "Hide this card?" (K96, K66) over the held card's window
+void hideCardCb(lv_event_t *ev);
+
+// PopupVisibility.cpp (2.11 round 3, K96)
+void buildVisibility();
+void visibilityCb(lv_event_t *ev);   // SETTINGS' Visibility row
+void visibilityHideTile();           // Hide from the cluster: the held mini tile, and the window closes
+bool visibilityTakeRebuild();        // a choice wants the page built again, once the window has gone
 
 // PopupDebug.cpp
 #ifdef DEBUG_POPUP
