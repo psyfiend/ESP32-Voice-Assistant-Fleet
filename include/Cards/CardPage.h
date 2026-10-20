@@ -114,6 +114,20 @@ public:
     // landed, and why it is not on screen if it is not.
     void report() const;
 
+    // CARDS CROWDED OFF THE PAGE (the sprint after round 7, the owner: "or they
+    // are easy to forget"): not hidden, not shown - plan() dropped them for room,
+    // lowest priority first. Noted at commit(), which frees the cards themselves,
+    // so the page's hidden cards can list them.
+    struct Crowded {
+        char id[CARD_ID_MAX + 1];         // "" when it has none
+        char name[ENTITY_NAME_MAX];       // the name it shows
+        char area[ENTITY_SHORT_MAX];      // for two of one name
+        bool cluster;
+    };
+    static constexpr uint8_t CROWDED_MAX = 12;
+    uint8_t        crowdedCount() const { return _nCrowded; }
+    const Crowded &crowded(uint8_t i) const { return _crowded[i < CROWDED_MAX ? i : 0]; }
+
 private:
     // Where one card ended up: the engine's Place (col, row, spans, placed,
     // pinFail). Held beside the card rather than on it because it is the PAGE's
@@ -165,6 +179,8 @@ private:
     uint8_t     _n      = 0;
     uint8_t     _placed = 0;
     bool        _committed = false;
+    Crowded     _crowded[CROWDED_MAX];
+    uint8_t     _nCrowded = 0;
 
     // LVGL holds these BY POINTER for the lifetime of the container, not by
     // copy, so they are members rather than locals.

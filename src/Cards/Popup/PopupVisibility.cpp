@@ -16,6 +16,11 @@
 // to dashboard (K17). Inside a CLUSTER's window it has this view instead, the
 // same as its tile's (round 6: one member, one answer), and a hidden member's
 // says Show in the cluster - Members lists them all.
+//
+// Copy or Move, both ways, tracked (K111 into a cluster; K112 out of one, the
+// sprint after round 7): a tile's Add card to dashboard asks which, and the
+// card it makes on the page remembers the tile - moved, it goes back (Move back
+// to the cluster); copied, or made here any other way, it can be removed.
 #include "PopupState.h"
 #include "Cards/ClusterCard.h"
 
@@ -135,11 +140,17 @@ void addCb(lv_event_t *) {
 // already, so Add is one tap - the group of its entity's HA area, or any other.
 Card         *s_joinParent = nullptr;   // the group card or cluster it comes out of
 const Entity *s_joinEntity = nullptr;
+// COPY OR MOVE, OUT OF A CLUSTER (the sprint after round 7): the tile's own card,
+// so the page card can say where it came from; null for a group card's member
+// (Desk's lamp: the source's, so a copy only - K92 rule 4).
+Card         *s_joinMember = nullptr;
+bool          s_joinMove = false;
 constexpr uint8_t JOIN_MAX = 24;
 char          s_joinGid[JOIN_MAX][48];  // every group: the suggestions first
 char          s_joinName[JOIN_MAX][56];
 uint8_t       s_nJoin = 0, s_nSuggest = 0, s_joinPick = 0;
 const char *const JOIN_W[] = { "Join" };
+uint8_t joinFirst() { return s_joinMember ? 1 : 0; }   // the groups' rows start after This card's
 
 void joinAdd(const char *gid, const char *name) {
     if (s_nJoin >= JOIN_MAX || !gid[0]) return;
@@ -163,17 +174,24 @@ void joinCollect() {
     CardGroups::forEach([](const CardGroups::Group &gr, void *) { joinAdd(gr.id, gr.name); }, nullptr);
 }
 
-// A group's row: its one chip lit, the one before unlit (a row with one chip has
-// no second to light).
+// This card's row: Copy or Move. A group's row: its one chip lit, the one before
+// unlit (a row with one chip has no second to light).
 void joinChipCb(lv_event_t *ev) {
-    const uint8_t row = (uint8_t)((uintptr_t)lv_event_get_user_data(ev) >> 8);
-    if (row >= s_nJoin) return;
-    Kit::chipTableLit(s_table, s_joinPick, 1);
+    const uintptr_t v = (uintptr_t)lv_event_get_user_data(ev);
+    const uint8_t row = (uint8_t)(v >> 8);
+    if (s_joinMember && row == 0) {
+        Kit::chipTableLit(s_table, 0, (uint8_t)(v & 0xFF));
+        s_joinMove = (v & 0xFF) == 1;
+        return;
+    }
+    const uint8_t g = (uint8_t)(row - joinFirst());
+    if (row < joinFirst() || g >= s_nJoin) return;
+    Kit::chipTableLit(s_table, (uint8_t)(s_joinPick + joinFirst()), 1);
     Kit::chipTableLit(s_table, row, 0);
-    s_joinPick = row;
+    s_joinPick = g;
 }
 
-void joinGoCb(lv_event_t *) { lv_async_call([](void *) { visibilityJoin(s_joinPick); }, nullptr); }
+void joinGoCb(lv_event_t *) { lv_async_call([](void *) { visibilityJoin(s_joinPick, s_joinMove); }, nullptr); }
 
 // The cluster the subject is in: the held tile's, or the window's own.
 ClusterCard *clusterOfSubject() {
@@ -188,7 +206,21 @@ void addTileCb(lv_event_t *) {
         ClusterCard *cl = clusterOfSubject();
         const Entity *e = c ? c->firstEntity() : nullptr;
         if (!cl || !e || s.phase != PopupPhase::PHASE_OPEN) return;
-        visibilityJoinOpen(cl, e);
+        visibilityJoinOpen(cl, e, c->hasId() ? c : nullptr);
+    }, nullptr);
+}
+
+// Move back to the cluster: a card moved out of one (the sprint after round 7)
+// is its tile again, and the page card goes. The page is built again when the
+// window has gone.
+void backToClusterCb(lv_event_t *) {
+    lv_async_call([](void *) {
+        Card *c = visibilitySubject();
+        if (!c || !c->hasId() || s.phase != PopupPhase::PHASE_OPEN) return;
+        if (CardAdded::moveBack(c->id())) {
+            UIToolkit::show_toast("Back in the cluster");
+            CardPopup::close();
+        }
     }, nullptr);
 }
 
@@ -306,8 +338,15 @@ void buildVisibility() {
     const bool clusterSelf = s.cluster && !inMember();
     const Kit::ChipRowSpec paused = { "Paused", PAUSED_W, 2, (uint8_t)(aggregate().paused ? 1 : 0) };
     lv_obj_t *list = clusterSelf ? table(nullptr, 0, nullptr) : table(&paused, 1, pausedChipCb);
-    Action a[3];
+    Action a[4];
     uint8_t n = 0;
+    if (cl && c->hasId() && CardAdded::isMovedToPage(c->id())) {
+        // MOVED OUT TO THE PAGE (the sprint after round 7): its card is there now,
+        // and that card's Visibility is where it comes back - nothing to do here.
+        note(list, "Moved out of the cluster to the page: its card there moves it back (Visibility - Move back "
+                   "to the cluster).");
+        return;
+    }
     if (cl) {
         // COPY OR MOVE, TRACKED (round 7): where the member came from says what it
         // may do - no second card of one entity on the page.
@@ -340,11 +379,20 @@ void buildVisibility() {
                               : "A hidden member stays in the cluster, listed in its Members.");
         return;
     }
+    // A CARD TAKEN OUT OF A CLUSTER (the sprint after round 7): moved, it is that
+    // member, and goes back; copied - or any card made here - it can go for good,
+    // as the owner asked ("the dashboard copy can go without being hidden").
+    const bool movedHere = c->hasId() && CardAdded::movedHere(c->id());
+    const bool made = c->hasId() && !movedHere && CardAdded::isAdded(c->id());
+    if (movedHere)   a[n++] = { "Move back to the cluster", Kit::ButtonRole::BTN_CANCEL, backToClusterCb };
     if (c->hasId())  a[n++] = { "Hide from this page", Kit::ButtonRole::BTN_CANCEL, hideCardCb };
     if (addable(c))  a[n++] = { "Add to a cluster",    Kit::ButtonRole::BTN_CANCEL, addToCb };
+    if (made)        a[n++] = { "Remove from the page", Kit::ButtonRole::BTN_DESTRUCTIVE, removeFromPageCb };
     actions(list, a, n);
     note(list, clusterSelf ? "A hidden cluster goes to this page's hidden cards, and comes back from there: tap the "
                              "page's name in the header."
+             : movedHere   ? "Moved out of its cluster: Move back to the cluster makes it a tile again."
+             : made        ? "Made on this board: Remove from the page deletes it, settings and all."
                            : "Paused: out of every group it is in, its card greyed. Hidden cards go to this "
                              "page's hidden cards, with their settings, and come back from there: tap the page's name.");
     s_pick = 0;
@@ -404,28 +452,36 @@ void visibilityCb(lv_event_t *ev) {
 
 // Which group: opened for `member` coming out of `parent` (a group card, its
 // member's view; or a cluster, its tile's Visibility).
-void visibilityJoinOpen(Card *parent, const Entity *member) {
+void visibilityJoinOpen(Card *parent, const Entity *member, Card *memberCard) {
     s_joinParent = parent;
     s_joinEntity = member;
+    // Copy or Move only out of a cluster, for a member that is a card of its own.
+    s_joinMember = (memberCard && parent && !strcmp(parent->typeName(), "cluster")) ? memberCard : nullptr;
+    s_joinMove   = false;
     s_joinPick   = 0;
     if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_JOIN);
 }
 
-// Joins which group: every group a row, its suggestions first, the chosen one's
-// chip lit; Add at the foot.
+// Joins which group: This card's Copy / Move first (out of a cluster), then
+// every group a row, its suggestions first, the chosen one's chip lit; Add at
+// the foot.
 void buildJoin() {
     if (!s_joinParent || !s_joinEntity) return;
     joinCollect();
     if (!s_nJoin) { note(table(nullptr, 0, nullptr), "No group is known yet."); return; }
     if (s_joinPick >= s_nJoin) s_joinPick = 0;
-    Kit::ChipRowSpec rows[JOIN_MAX];
-    for (uint8_t k = 0; k < s_nJoin; k++) rows[k] = { s_joinName[k], JOIN_W, 1, (uint8_t)(k == s_joinPick ? 0 : 1) };
-    lv_obj_t *list = table(rows, s_nJoin, joinChipCb);
+    Kit::ChipRowSpec rows[JOIN_MAX + 1];
+    const uint8_t f = joinFirst();
+    if (f) rows[0] = { "This card", COPY_W, 2, (uint8_t)(s_joinMove ? 1 : 0) };
+    for (uint8_t k = 0; k < s_nJoin; k++) rows[f + k] = { s_joinName[k], JOIN_W, 1, (uint8_t)(k == s_joinPick ? 0 : 1) };
+    lv_obj_t *list = table(rows, (uint8_t)(f + s_nJoin), joinChipCb);
     const Action go = { "Add card to dashboard", Kit::ButtonRole::BTN_CONFIRM, joinGoCb };
     actions(list, &go, 1);
     // Where the suggestions come from, in words.
-    char words[200];
-    int w = snprintf(words, sizeof(words), "%s's card goes right after %s on this page.",
+    char words[320];
+    int w = snprintf(words, sizeof(words), "%s%s's card goes right after %s on this page.",
+                     f ? "Copy: it stays in the cluster too, and the card on the page can be removed again. Move: it "
+                         "leaves the cluster, and its card's Visibility moves it back. " : "",
                      s_joinEntity->desc.name, s_joinParent->shownName(CardLabel::LBL_NAME));
     if (!s_nSuggest) { note(list, words); return; }
     w += snprintf(words + w, sizeof(words) - w, " %s is its group card's group", s_joinName[0]);
@@ -436,16 +492,32 @@ void buildJoin() {
     note(list, words);
 }
 
-// Made, in group `pick`; the view it came from again (its row says Added).
-bool visibilityJoin(uint8_t pick) {
+// Made, in group `pick`; the view it came from again (its row says Added). A
+// Move takes the member out of its cluster, and the window closes.
+bool visibilityJoin(uint8_t pick, bool move) {
     if (!s_joinParent || !s_joinEntity || s.phase != PopupPhase::PHASE_OPEN) return false;
+    if (move && !s_joinMember) return false;   // a group card's member is the source's: a copy only
     joinCollect();
     char id[CARD_ID_MAX + 1];
-    if (!CardAdded::add(*s_joinParent, *s_joinEntity, id, sizeof(id))) return false;
+    const char *from = s_joinMember ? s_joinMember->id() : nullptr;
+    if (!CardAdded::add(*s_joinParent, *s_joinEntity, id, sizeof(id), from)) return false;
     if (pick < s_nJoin) Settings::setCard(id, "group", s_joinGid[pick]);   // add() gave it the parent's
+    // ITS NAME IS THE TILE'S when the tile has one of its own (the dashboard's,
+    // or one typed): a moved card is the same card, and a copy looks like it, as
+    // Add to a cluster's copies do. A member with HA's name keeps following HA (K65).
+    if (s_joinMember) {
+        const char *nm = s_joinMember->shownName(CardLabel::LBL_NAME);
+        if (nm && nm[0] && strcmp(nm, s_joinEntity->desc.name)) Settings::setCard(id, "name", nm);
+    }
     char msg[80];
-    snprintf(msg, sizeof(msg), "Added to the dashboard, in %s", pick < s_nJoin ? s_joinName[pick] : "its group");
+    snprintf(msg, sizeof(msg), "%s the dashboard, in %s", move ? "Moved to" : "Added to",
+             pick < s_nJoin ? s_joinName[pick] : "its group");
     UIToolkit::show_toast(msg);
+    if (move) {
+        CardAdded::moveToPage(from);   // no tile, not in the hidden cards; Members says On the page
+        CardPopup::close();            // the page is built again once the window has gone
+        return true;
+    }
     // Back to the Visibility it came from: a tile's, or a member's own view's (round 7: a
     // group card's member asks from there too).
     const bool tile = (held() && held()->mini()) || inMember();

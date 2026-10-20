@@ -427,8 +427,9 @@ uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask);   // ...the picke
 // Member `i` of `cl` shown as a tile or not, kept when the window closes (K104's
 // Visible - from its Visibility since round 6, no longer the cluster's Details).
 void clusterMemberShow(const ClusterCard &cl, uint8_t i, bool want);
-// Member `i` as the next build will show it: a tile, in the header, or hidden.
-enum class MemberShown : uint8_t { SHOWN_TILE, SHOWN_HEADER, SHOWN_HIDDEN };
+// Member `i` as the next build will show it: a tile, in the header, hidden - or
+// moved out to the page, its card there (the sprint after round 7).
+enum class MemberShown : uint8_t { SHOWN_TILE, SHOWN_HEADER, SHOWN_HIDDEN, SHOWN_MOVED };
 MemberShown clusterMemberShown(const ClusterCard &cl, uint8_t i);
 // The member of `cl` whose entity is `e`, or -1.
 int8_t clusterMemberOf(const ClusterCard &cl, const Entity *e);
@@ -501,6 +502,7 @@ void confirmHide();              // "Hide this card?" (K96, K66) over the held c
 void hideCardCb(lv_event_t *ev);
 void confirmRemoveCopy();        // "Remove this copy?" - a member copied into a cluster here (K91)
 void removeCopyCb(lv_event_t *ev);
+void confirmRemoveFromPage();    // "Remove this card?" - a page card made on the glass, deleted
 
 // PopupVisibility.cpp (2.11 round 3, K96)
 void buildVisibility();
@@ -512,9 +514,12 @@ Card *visibilitySubject();
 void buildAddTo();                   // VIEW_ADD_TO: Add to a cluster - which, Copy or Move (K91, K100)
 bool visibilityAddTo(uint8_t pick, bool move);   // ...done: the window closes; false when it cannot
 // WHICH GROUP? (K92 rule 9): Add card to dashboard asks it first - VIEW_JOIN.
-void visibilityJoinOpen(Card *parent, const Entity *member);
+// `memberCard`: the cluster's tile it is, so it asks Copy or Move too (the
+// sprint after round 7); null for a group card's member - a copy only.
+void visibilityJoinOpen(Card *parent, const Entity *member, Card *memberCard = nullptr);
 void buildJoin();
-bool visibilityJoin(uint8_t pick);   // made, in group `pick` (0: its group card's)
+bool visibilityJoin(uint8_t pick, bool move = false);   // made, in group `pick` (0: its group card's)
+void removeFromPageCb(lv_event_t *ev);   // PopupDialog.cpp: "Remove this card?" - one made on the glass
 bool visibilityTakeRebuild();        // a choice wants the page built again, once the window has gone
 
 // PopupDebug.cpp

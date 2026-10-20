@@ -836,3 +836,78 @@ the 1060's Front; **of hidden cards made on the glass with one entity**, the new
 Rights went on the P4_5, an Office Lamp and an Office Right on the 4B, two Office Lamps and an Office
 Right on the 1060. The P4_5's hidden cards are now Office Right, Office Left and Office (the Office
 cluster's).
+
+# Round 8 (2026-10-20, evening) - out of a cluster as Copy or Move; cards crowded off the page
+
+The last sprint's first two items (HANDOFF), from your round-7 notes; K112, K113. Flashed to the
+P4_5, the 4B and the 1060, each board's settings saved first (`bench/settings/<board>/20261020-16*.json`).
+Every change my tests made on the P4_5 was undone and checked against its saved file (no
+difference); nothing was added or moved on the 4B or the 1060.
+
+| Where | Before | Now |
+|---|---|---|
+| **Add card to dashboard, from a tile** | made a copy at once (after "which group?"); the tile stayed, and the new card could only be hidden - a copy in the hidden cards that should not exist | **"This card: Copy - stays here / Move"** above the groups, as Add to a cluster's row. The page card remembers the tile it came from (`from`) |
+| **Moved out** | - | the tile goes: **no tile, no header value, not in the hidden cards**; the cluster's Members says **"On the page"**. The card on the page is the tile itself: its Visibility has **Move back to the cluster** (it is a tile again, the page card deleted) and Hide; **never Remove** |
+| **Copied out** | - | the tile stays; the card on the page, **like any card made on this board**, has **Remove from the page** (after a dialog: deleted, settings and all, not kept in the hidden cards) beside Hide |
+| **A group card's member** (Desk's lamp) | Add card to dashboard | the same, **a copy only** - Desk's lamps are Hue's (K92 rule 4) |
+| **The page's hidden cards** | hidden from the page, hidden from a cluster | also **every card crowded off the page** - not hidden, not shown: the page had no room and gave way lowest priority first. A row each with **"No room"** (a tap says so), and a line under the list saying they come back when there is room |
+
+The P4_5 - Copy or Move, then Front moved out (Outside's tile gone, the page arranged again), its
+Visibility, and Outside's Members:
+
+![Copy or Move](followups/211_r8_copy_move_p45.png)
+![Moved](followups/211_r8_moved_page_p45.png)
+![The moved card's Visibility](followups/211_r8_moved_visibility_p45.png)
+![Members: On the page](followups/211_r8_members_on_page_p45.png)
+
+A copy's Visibility and its dialog; the 4B's Copy or Move on Linen:
+
+![A copy's Visibility](followups/211_r8_copy_visibility_p45.png)
+![Remove this card?](followups/211_r8_remove_dialog_p45.png)
+![The 4B](followups/211_r8_copy_move_4b.png)
+
+The hidden cards with the House page squeezed to one row (a test copy of your settings, yours put
+back after): Kitchen and Office crowded off.
+
+![No room](followups/211_r8_crowded_p45.png)
+
+**On the 1060, your Front card from 14:55 is still on the page** (Outside's Front, added to the
+dashboard before this round: the bug itself). It was made before cards remembered where they came
+from, so it counts as a copy: its Visibility now has Remove from the page - L5 below.
+
+## Tests for you
+
+| # | Do this | PASS if |
+|---|---|---|
+| L1 | Long-press a tile (Outside's Porch) - SETTINGS - Visibility - Add card to dashboard | "This card: Copy - stays here / Move" above the groups, Copy lit |
+| L2 | Move, Add card to dashboard | the window closes; Porch is a card on the page and gone from Outside; Outside's Members says "On the page" for it; it is not in the hidden cards |
+| L3 | That card - Visibility | Move back to the cluster, Hide from this page, Add to a cluster - no Remove. Move back: Porch is a tile again and the card is gone |
+| L4 | L1 again with Copy | Porch stays a tile, a Porch card joins the page; the tile no longer offers Add card to dashboard |
+| L5 | That card (or the 1060's Front Door Temperature) - Visibility - Remove from the page - Remove | the dialog asks; the card goes, and is not in the hidden cards |
+| L6 | Desk - Members - a lamp - Visibility - Add card to dashboard | no Copy / Move row - a copy |
+| L7 | UI Tweaks or the system panel: Row - until something leaves the page; tap the page name - View hidden cards | each card that left is listed with "No room"; a tap on it says there is no room; Row + brings it back and it leaves the list |
+
+## Choices that were mine
+
+- **A moved member keeps its entry**, `hidden`: `moved` - for a copy made on the glass too. HANDOFF's
+  draft had a moved copy deleted; kept, Move back brings back the copy's own name and settings and
+  its place among the members, and the rule is one rule for every member, as K111's is for every
+  card (a card moved into a cluster keeps its entry, `removed`: `moved`).
+- **The card on the page takes the tile's name** when the tile has one of its own (the dashboard's
+  "Front", or one typed), for Copy and Move both - a moved card is the same card, and a copy looks
+  like it, as Add to a cluster's copies do. A tile with HA's name keeps following HA (K65).
+- **Remove from the page is offered on every card made on this board** that is not a moved one -
+  the copies out of a cluster, the older ones without a record (the 1060's Front), and K17's cards
+  from a group card's member. Each is a copy of something still elsewhere.
+- **A moved header member leaves the header too**, and comes back to it with Move back.
+- **"No room" rows have no Restore**: nothing was hidden, so nothing is put back - more room is.
+  They are listed after the hidden ones, a cluster as "Kitchen cluster".
+
+## Results (mine, before you)
+
+- On the P4_5, from the PC (`/popup`): Front moved out of Outside (the page arranged again, 5 blocks
+  on 4 x 2, 1 ms), its Visibility, Outside's Members, Move back (4 blocks again); Front copied out,
+  its Visibility, the dialog, Remove; then the settings file compared with the saved copy: no
+  difference. The crowded list from a one-row test copy of the settings, then the saved copy put
+  back (no difference). The 4B's Copy / Move view looked at and closed.
+- Not tapped on the glass: any of it - each was driven from the PC.

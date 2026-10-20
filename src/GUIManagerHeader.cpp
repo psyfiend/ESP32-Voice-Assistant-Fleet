@@ -105,6 +105,7 @@ struct Hidden {
     char where[ENTITY_SHORT_MAX];   // a card's area, for two of one name
     bool member;                    // hidden from a cluster, not the page
     bool inHeader;                  // ...one of its header's members
+    bool crowded;                   // not hidden: the page had no room for it
 };
 
 void nameOf(const EntityRegistry &reg, const char *label, const char *entity, const char *id, char *out, size_t cap) {
@@ -113,7 +114,7 @@ void nameOf(const EntityRegistry &reg, const char *label, const char *entity, co
                              : e && e->sourceName[0] ? e->sourceName : id);
 }
 
-uint8_t collectHidden(const PageSpec &page, const EntityRegistry &reg, Hidden *out, uint8_t cap) {
+uint8_t collectHidden(const PageSpec &page, const EntityRegistry &reg, const CardPage *built, Hidden *out, uint8_t cap) {
     static CardAdded::PoolItem pool[HiddenSheet::MAX];
     uint8_t n = CardAdded::pool(page, pool, LV_MIN(cap, HiddenSheet::MAX));
     for (uint8_t i = 0; i < n; i++) {
@@ -166,6 +167,18 @@ uint8_t collectHidden(const PageSpec &page, const EntityRegistry &reg, Hidden *o
             h.inHeader = inHeader(m.id);
         }
     }
+    // CROWDED OFF THE PAGE (the sprint after round 7): not hidden, not shown -
+    // the page had no room, and dropped the lowest priority first. Listed so they
+    // are not forgotten; they come back when there is room.
+    for (uint8_t i = 0; built && i < built->crowdedCount() && n < cap; i++) {
+        const CardPage::Crowded &k = built->crowded(i);
+        Hidden &h = out[n++];
+        h = Hidden{};
+        snprintf(h.id, sizeof(h.id), "%s", k.id);
+        snprintf(h.where, sizeof(h.where), "%s", k.area);
+        snprintf(h.name, sizeof(h.name), k.cluster ? "%s cluster" : "%s", k.name);
+        h.crowded = true;
+    }
     // Two cards called the same say where each is from ("Office Right (Office)").
     bool twin[HiddenSheet::MAX] = {};
     for (uint8_t i = 0; i < n && i < HiddenSheet::MAX; i++)
@@ -182,7 +195,7 @@ uint8_t collectHidden(const PageSpec &page, const EntityRegistry &reg, Hidden *o
 uint8_t GUIManager::hiddenCount() {
     if (_curPage >= _nPages || !_pages[_curPage].spec) return 0;
     static Hidden s_count[HiddenSheet::MAX];
-    return collectHidden(*_pages[_curPage].spec, _core.entities(), s_count, HiddenSheet::MAX);
+    return collectHidden(*_pages[_curPage].spec, _core.entities(), _page, s_count, HiddenSheet::MAX);
 }
 
 // THE PAGE'S HIDDEN CARDS, IN THEIR OWN SHEET (2.11 round 6; round 7: members
@@ -193,14 +206,23 @@ void GUIManager::openHiddenSheet() {
     static Hidden s_items[HiddenSheet::MAX];
     HiddenSheet::Spec sp;
     sp.page = _pages[_curPage].spec->title;
-    sp.n    = collectHidden(*_pages[_curPage].spec, _core.entities(), s_items, HiddenSheet::MAX);
+    sp.n    = collectHidden(*_pages[_curPage].spec, _core.entities(), _page, s_items, HiddenSheet::MAX);
+    bool crowded = false;
     for (uint8_t i = 0; i < sp.n; i++) {
         sp.names[i] = s_items[i].name;
-        sp.chip[i]  = s_items[i].member ? "Restore to cluster" : "Restore to page";
+        sp.chip[i]  = s_items[i].crowded ? "No room" : s_items[i].member ? "Restore to cluster" : "Restore to page";
+        crowded |= s_items[i].crowded;
     }
+    if (crowded)
+        sp.note = "No room: not hidden - this page had no room for it, and gave way lowest priority first. It "
+                  "comes back by itself when there is room: hide another card, or change the page's rows.";
     sp.restore = [](void *user, uint8_t i) {
         if (i >= HiddenSheet::MAX) return false;
         const Hidden &h = s_items[i];
+        if (h.crowded) {   // nothing to restore: it was never hidden
+            UIToolkit::show_toast("No room on this page for it");
+            return false;
+        }
         if (h.member) {
             // A tile again: a header member shown as one too (its default is the header alone).
             Settings::setCard(h.id, "hidden", h.inHeader ? "no" : nullptr);

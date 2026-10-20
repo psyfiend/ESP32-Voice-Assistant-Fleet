@@ -315,6 +315,9 @@ order.
 | `/popup?removecard=4` / `removecard=5` | on a copy made in a cluster (K91): `4` its "Remove this copy?" dialog; `5` its Remove, no dialog | `5`: the copy's whole entry, deleted (`Settings::dropCard()`) |
 | `/popup?addcards=MASK&mv=0\|1` | a cluster's Add cards (K104, K91) on its open window: the cards whose bits are set ticked (bit 0 the list's first - `view=10` shows the list), Copy or Move, and Add - the window closes | an entry with `in` for each, as `addto=`; Move also each card's `removed` |
 | `/popup?addto=N&mv=0\|1` | Add to a cluster (K91, K100) on the open card: the Nth cluster on the page (screen order), Copy (`mv=0`) or Move (`mv=1`), and Add - the window closes | a new card entry with `in` (the cluster's id), `entity`, `area`, `group`, `name`; Move also the card's `removed` |
+| `/popup?join=1` | Add card to dashboard (K92 rule 9) in a member's own view or a tile's window: "which group?" opens - with This card's Copy / Move row for a cluster's tile (K112) | nothing yet |
+| `/popup?join=2+N` (`&mv=1`) | its Add card to dashboard with group N chosen (0 the group card's, 1 the area's, then the others); `mv=1` Move, a tile's only - the window closes | a new card entry with `page`, `after`, `entity`, `from` (the tile); Move also the tile's `hidden` = `moved` |
+| `/popup?removecard=6` / `7` / `8` | (K112) on a card made on the glass: `6` its Remove from the page, no dialog; `7` that dialog; on a card moved out of a cluster, `8` its Move back to the cluster - each closes the window | `6`: the card's entry deleted; `8`: the entry deleted and the tile's `hidden` cleared |
 | `/popup?kbpress=1` | the keyboard's Save (2.11, K95) | what it was opened for: a cluster's `label_text` (none: its group's name), a card's `name`, or its card label's `label_text` - when the window closes |
 
 ### **Device** - these command real lights and scenes

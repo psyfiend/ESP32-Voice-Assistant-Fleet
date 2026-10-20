@@ -387,8 +387,18 @@ void CardPage::commit() {
     // back: placement has already been decided, and a card that was not placed
     // will not be placed by anything short of a rebuild - which constructs
     // fresh ones from the spec anyway.
+    // What they were is noted first, for the page's hidden cards (crowded()).
+    _nCrowded = 0;
     for (uint8_t i = 0; i < _n; i++) {
         if (!_cards[i] || _slot[i].placed) continue;
+        if (_nCrowded < CROWDED_MAX) {
+            const Card *c = _cards[i];
+            Crowded &k = _crowded[_nCrowded++];
+            k.cluster = !strcmp(c->typeName(), "cluster");
+            snprintf(k.id,   sizeof(k.id),   "%s", c->hasId() ? c->id() : "");
+            snprintf(k.name, sizeof(k.name), "%s", k.cluster && c->area()[0] ? c->area() : c->shownName(CardLabel::LBL_NAME));
+            snprintf(k.area, sizeof(k.area), "%s", c->area());
+        }
         delete _cards[i];
         _cards[i] = nullptr;
     }
@@ -632,7 +642,12 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
     } else {
         for (uint8_t k = 0; k < CLUSTER_SLOTS_MAX; k++) slotIds[k] = cs.slots[k];
     }
+    // A MEMBER MOVED OUT TO THE PAGE ("hidden": "moved", the sprint after round
+    // 7): its card is on the page now, so it is no tile, no header value, and
+    // not behind the one card - still a member, so Members lists it.
+    auto movedOut = [&](const CardSpec &m) { return cardIdUsable(m.id) && CardAdded::isMovedToPage(m.id); };
     auto slotOf = [&](const char *id) -> int8_t {
+        if (id && cardIdUsable(id) && CardAdded::isMovedToPage(id)) return -1;
         for (uint8_t k = 0; k < CLUSTER_SLOTS_MAX; k++)
             if (id && slotIds[k] && !strcmp(slotIds[k], id)) return (int8_t)k;
         return -1;
@@ -643,8 +658,8 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
         bool tile = slotOf(m.id) < 0;
         char h[8];
         if (cardIdUsable(m.id) && Settings::card(m.id, "hidden", h, sizeof(h))) {
-            if (!strcmp(h, "yes")) tile = false;
-            if (!strcmp(h, "no"))  tile = true;
+            if (strcmp(h, "no")) tile = false;   // "yes", or "moved"
+            else                 tile = true;
         }
         return tile;
     };
@@ -721,7 +736,8 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
     uint8_t n = 0;
     if (pres == GroupPresent::PRESENT_SUMMARY) {
         for (uint8_t k = 0; k < nMem && n < CARD_PRIMARY_MAX; k++)
-            if (mem[k]->primaries[0] && reg.find(mem[k]->primaries[0])) one.primaries[n++] = mem[k]->primaries[0];
+            if (mem[k]->primaries[0] && reg.find(mem[k]->primaries[0]) && !movedOut(*mem[k]))
+                one.primaries[n++] = mem[k]->primaries[0];
         if (!n) return nullptr;
         SummaryCard *sc = new SummaryCard();
         for (uint8_t k = 0; k < nMem; k++)
@@ -736,7 +752,7 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
         for (uint8_t k = 0; k < nMem && n < CARD_PRIMARY_MAX; k++) {
             const char *pid = mem[k]->primaries[0];
             const Entity *e = pid ? reg.find(pid) : nullptr;
-            if (!e) continue;
+            if (!e || movedOut(*mem[k])) continue;
             const bool switches = e->desc.writable &&
                                   (e->desc.kind == EntityKind::LIGHT || e->desc.kind == EntityKind::SWITCH);
             if (pass == 0 && !switches) continue;

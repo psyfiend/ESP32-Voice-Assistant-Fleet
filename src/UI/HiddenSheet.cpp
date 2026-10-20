@@ -58,6 +58,13 @@ static void fill() {
     lv_label_set_text(l, s_n ? "Restore puts a card back where it was, with its settings: on the page, or a "
                                "tile in its cluster. Cards are hidden from their window: SETTINGS, Visibility."
                              : "No hidden cards on this page.");
+    if (s_n && s_spec.note) {
+        lv_obj_t *m = Kit::label(t, Kit::KitStyle::KS_LABEL_TAG_DIM);
+        lv_obj_set_width(m, lv_pct(100));
+        lv_obj_set_style_text_align(m, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_long_mode(m, LV_LABEL_LONG_WRAP);
+        lv_label_set_text(m, s_spec.note);
+    }
 }
 
 static void build() {

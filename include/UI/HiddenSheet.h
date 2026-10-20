@@ -19,6 +19,7 @@ struct Spec {
     const char *names[MAX] = {};             // each hidden card, by the name it shows
     const char *chip[MAX] = {};              // ...and its row's button
     uint8_t     n = 0;
+    const char *note = nullptr;              // a sentence more under the rows (cards crowded off the page)
     bool (*restore)(void *user, uint8_t i) = nullptr;   // names[i] back on the page: true when it went
     void *user = nullptr;
 };

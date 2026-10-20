@@ -59,10 +59,27 @@ bool isAdded(const char *cardId);
 const char *addedFor(const char *parentId, const char *entityId);
 
 // Make a card for `member`, right after `parent`, on the page being built. Its
-// id into `idOut`. False when full, or the parent has no id.
-bool add(const Card &parent, const Entity &member, char *idOut, size_t cap);
+// id into `idOut`. False when full, or the parent has no id. `fromId`: the
+// member card it came out of (a cluster's tile, the sprint after round 7), kept
+// as "from" - so its Visibility knows a copy from a move.
+bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, const char *fromId = nullptr);
 // To the page's pool. False if it is not a card added here.
 bool remove(const char *cardId);
+
+// --- A TILE TAKEN OUT TO THE PAGE, TRACKED (the sprint after round 7, the owner:
+// Outside's Front added to the dashboard stayed in the cluster, and its new card
+// could only be hidden - a copy in the hidden cards that should not exist) ------
+// Add card to dashboard from a cluster's tile asks Copy or Move, as Add to a
+// cluster does the other way (K111). The page card records "from", the member.
+//   Copy  the member stays; the page card can go again for good (drop()).
+//   Move  the member is "hidden": "moved" - no tile, not in the hidden cards,
+//         Members says On the page; its page card moves it back (moveBack()),
+//         and is never dropped: it is the card itself.
+bool moveToPage(const char *memberId);       // the member's half of a Move
+bool isMovedToPage(const char *memberId);    // a member whose card is on the page now
+bool movedHere(const char *pageCardId);      // a page card that IS a member moved out
+bool moveBack(const char *pageCardId);       // ...back into its cluster; the page card deleted
+bool drop(const char *pageCardId);           // a card added here deleted, entry and all (not a moved one)
 
 // --- MEMBERS ADDED TO A CLUSTER (2.11 round 3, K91, K100) -----------------------
 // A card copied into a cluster from the glass: a card entry with "in" (the
@@ -83,7 +100,7 @@ bool    addTo(const Card &cluster, const Entity &e, char *idOut, size_t cap, con
 uint8_t membersIn(const char *clusterId, const CardSpec **out, uint8_t cap);
 bool    inCluster(const char *clusterId, const char *entityId);   // a copy of it is in there already
 bool    isMember(const char *cardId);       // a copy added to a cluster here
-const char *fromOf(const char *memberId);   // the card a member came from, or null
+const char *fromOf(const char *cardId);     // the card a member, or a card added to a page, came from; or null
 // Removed from its cluster: a copy made on the glass is deleted, entry and all -
 // the card it was copied from is untouched; one it was MOVED from goes back.
 bool    removeMember(const char *cardId);

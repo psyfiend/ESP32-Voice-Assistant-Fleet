@@ -60,6 +60,7 @@ void readOne(const char *id, const char *page, void *) {
     Settings::card(id, "after", v, sizeof(v));  copy(r.after, sizeof(r.after), v);
     Settings::card(id, "entity", v, sizeof(v)); copy(r.entity, sizeof(r.entity), v);
     Settings::card(id, "area", v, sizeof(v));   copy(r.area, sizeof(r.area), v);
+    if (Settings::card(id, "from", v, sizeof(v))) copy(r.from, sizeof(r.from), v);
     r.pri = Settings::card(id, "pri", v, sizeof(v)) ? (uint8_t)atoi(v) : 128;
     // REMOVED ONES STAY IN THE FILE ONLY (the page's pool, K66): a slot here is
     // for a card on a page. known() and idTaken() still find them in the file.
@@ -202,7 +203,7 @@ const char *addedFor(const char *parentId, const char *entityId) {
     return nullptr;
 }
 
-bool add(const Card &parent, const Entity &member, char *idOut, size_t cap) {
+bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, const char *fromId) {
     if (s_n >= MAX || !parent.hasId() || !s_page[0]) return false;
     Rec &r = s_rec[s_n];
     r = Rec{};
@@ -211,6 +212,7 @@ bool add(const Card &parent, const Entity &member, char *idOut, size_t cap) {
     copy(r.after, sizeof(r.after), parent.id());
     copy(r.entity, sizeof(r.entity), member.desc.id);
     copy(r.area, sizeof(r.area), parent.sheetArea());
+    if (fromId && cardIdWellFormed(fromId)) copy(r.from, sizeof(r.from), fromId);
     r.pri = parent.placement().priority;
     r.removed = false;
 
@@ -220,6 +222,7 @@ bool add(const Card &parent, const Entity &member, char *idOut, size_t cap) {
     Settings::setCard(r.id, "after", r.after);
     Settings::setCard(r.id, "entity", r.entity);
     if (r.area[0]) Settings::setCard(r.id, "area", r.area);
+    if (r.from[0]) Settings::setCard(r.id, "from", r.from);
     Settings::setCard(r.id, "pri", pri);
     // ITS PARENT'S GROUP (owner, K65): the card label's words, colour and type.
     CardGroups::Group g;
@@ -287,10 +290,55 @@ bool removeMember(const char *cardId) {
     return false;
 }
 
-const char *fromOf(const char *memberId) {
-    for (uint8_t i = 0; memberId && i < s_n; i++)
-        if (!s_rec[i].removed && s_rec[i].in[0] && !strcmp(s_rec[i].id, memberId)) return s_rec[i].from[0] ? s_rec[i].from : nullptr;
+const char *fromOf(const char *cardId) {
+    for (uint8_t i = 0; cardId && i < s_n; i++)
+        if (!s_rec[i].removed && !strcmp(s_rec[i].id, cardId)) return s_rec[i].from[0] ? s_rec[i].from : nullptr;
     return nullptr;
+}
+
+bool isMovedToPage(const char *memberId) {
+    char v[8];
+    return memberId && Settings::card(memberId, "hidden", v, sizeof(v)) && !strcmp(v, "moved");
+}
+
+bool moveToPage(const char *memberId) {
+    if (!memberId || !cardIdWellFormed(memberId) || isMovedToPage(memberId)) return false;
+    Settings::setCard(memberId, "hidden", "moved");
+    s_changed = true;
+    Serial.printf("[CardAdded] %s moved out of its cluster to the page (no tile, not in the hidden cards)\n", memberId);
+    return true;
+}
+
+bool movedHere(const char *pageCardId) {
+    const char *from = isAdded(pageCardId) ? fromOf(pageCardId) : nullptr;
+    return from && isMovedToPage(from);
+}
+
+// The page card goes - deleted, as a copy removed from a cluster is - and the
+// member it was is a tile again: the move undone, nothing lost.
+bool moveBack(const char *pageCardId) {
+    if (!movedHere(pageCardId)) return false;
+    Settings::setCard(fromOf(pageCardId), "hidden", nullptr);
+    for (uint8_t i = 0; i < s_n; i++)
+        if (!s_rec[i].removed && !strcmp(s_rec[i].id, pageCardId)) s_rec[i].removed = true;   // the record stays (a Card points at its id)
+    Settings::dropCard(pageCardId);
+    s_changed = true;
+    Serial.printf("[CardAdded] %s moved back into its cluster (its entry deleted)\n", pageCardId);
+    return true;
+}
+
+bool drop(const char *pageCardId) {
+    if (!pageCardId || movedHere(pageCardId)) return false;
+    for (uint8_t i = 0; i < s_n; i++) {
+        Rec &r = s_rec[i];
+        if (r.removed || r.in[0] || strcmp(r.id, pageCardId)) continue;   // a page card, not a cluster's copy
+        r.removed = true;   // the record stays (a Card points at its id) until the next boot
+        Settings::dropCard(pageCardId);
+        s_changed = true;
+        Serial.printf("[CardAdded] %s removed from the page (its entry deleted)\n", pageCardId);
+        return true;
+    }
+    return false;
 }
 
 bool isMoved(const char *cardId) {

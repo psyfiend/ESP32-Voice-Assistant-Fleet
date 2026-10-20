@@ -50,8 +50,10 @@ void buildMembers() {
         KS role = KS::KS_LABEL_TAG;
         const EntityAttrs &at = e->attrs;
         const int8_t k = cl ? clusterMemberOf(*cl, e) : -1;
-        if (k >= 0 && clusterMemberShown(*cl, (uint8_t)k) == MemberShown::SHOWN_HIDDEN) {
-            snprintf(buf, sizeof(buf), "Hidden");
+        const MemberShown shown = k >= 0 ? clusterMemberShown(*cl, (uint8_t)k) : MemberShown::SHOWN_TILE;
+        if (shown == MemberShown::SHOWN_HIDDEN || shown == MemberShown::SHOWN_MOVED) {
+            // Moved out (the sprint after round 7): its card is on the page.
+            snprintf(buf, sizeof(buf), shown == MemberShown::SHOWN_MOVED ? "On the page" : "Hidden");
             role = KS::KS_LABEL_TAG_DIM;
         } else if (e->paused) {
             // Out of the group, but still listed and saying why (owner, 2.10b).

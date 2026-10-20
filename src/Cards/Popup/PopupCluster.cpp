@@ -85,12 +85,11 @@ bool visible(const ClusterCard &cl, uint8_t i, const char *const *ids, uint8_t n
     const Card *m = cl.memberAt(i);
     const char *id = idOf(m);
     char v[8];
-    if (id[0] && Settings::card(id, "hidden", v, sizeof(v))) {
-        if (!strcmp(v, "yes")) return false;
-        if (!strcmp(v, "no"))  return true;
-    }
+    if (id[0] && Settings::card(id, "hidden", v, sizeof(v))) return !strcmp(v, "no");   // "yes", or "moved" to the page
     return !inList(id, ids, n);
 }
+
+bool movedOut(const Card *m) { return m && m->hasId() && CardAdded::isMovedToPage(m->id()); }
 
 const char *nameOf(const Card *m) { return m ? m->shownName(CardLabel::LBL_NAME) : "?"; }
 
@@ -145,7 +144,7 @@ void changed() { s_rebuildPage = true; }
 // (Settings.h: a missing key inherits) - the default a tile unless in the header.
 void setVisible(const ClusterCard &cl, uint8_t i, bool want) {
     const Card *m = cl.memberAt(i);
-    if (!m || !m->hasId()) return;
+    if (!m || !m->hasId() || movedOut(m)) return;   // its card on the page moves it back, nothing here
     const char *ids[CLUSTER_SLOTS_MAX];
     char buf[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1];
     const uint8_t n = headerIds(cl, ids, buf, sizeof(buf));
@@ -210,12 +209,15 @@ void slotsViewCb(lv_event_t *ev) {
 
 // Yes puts a member in the header: appended, last in priority; No takes it out.
 // A member that leaves the header comes back as a tile unless hidden (K104).
+uint8_t s_slotMember[GROUP_MEMBERS_MAX];   // Header slots' rows: each row's member (one moved out has none)
+
 void slotChoose(void *p) {
     const uintptr_t v = (uintptr_t)p;
-    const uint8_t i = (uint8_t)(v >> 8);
+    const uint8_t row = (uint8_t)(v >> 8);
     const bool want = (v & 0xFF) == 0;
     ClusterCard *cl = held();
-    if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN) return;
+    if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN || row >= GROUP_MEMBERS_MAX) return;
+    const uint8_t i = s_slotMember[row];
     const Card *m = cl->memberAt(i);
     if (!m || !m->hasId()) return;
     const char *ids[CLUSTER_SLOTS_MAX + 1];
@@ -230,7 +232,7 @@ void slotChoose(void *p) {
     }
     if (want && !inList(m->id(), ids, n)) {
         if (kept >= CLUSTER_SLOTS_MAX) {   // four at most: the header has no room for more
-            Kit::chipTableLit(s_table, i, 1);
+            Kit::chipTableLit(s_table, row, 1);
             UIToolkit::show_toast("The header holds four at most");
             return;
         }
@@ -362,6 +364,7 @@ MemberShown clusterMemberShown(const ClusterCard &cl, uint8_t i) {
     const char *ids[CLUSTER_SLOTS_MAX];
     char buf[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1];
     const uint8_t n = headerIds(cl, ids, buf, sizeof(buf));
+    if (movedOut(cl.memberAt(i))) return MemberShown::SHOWN_MOVED;
     if (visible(cl, i, ids, n)) return MemberShown::SHOWN_TILE;
     return inList(idOf(cl.memberAt(i)), ids, n) ? MemberShown::SHOWN_HEADER : MemberShown::SHOWN_HIDDEN;
 }
@@ -411,17 +414,19 @@ void buildCluster() {
         if (own) w = snprintf(words, sizeof(words), "Renamed from %s, %s. ", g.name, ha ? "its area in HA" : "its group");
         else     w = snprintf(words, sizeof(words), "%s: %s. ", ha ? "Its area in HA" : "Its group", g.name);
     }
-    uint8_t tiles = 0, inHdr = 0, hidden = 0;
+    uint8_t tiles = 0, inHdr = 0, hidden = 0, out = 0;
     for (uint8_t i = 0; i < cl->memberCount(); i++) {
         const MemberShown m = clusterMemberShown(*cl, i);
         if (m == MemberShown::SHOWN_TILE) tiles++;
         else if (m == MemberShown::SHOWN_HEADER) inHdr++;
+        else if (m == MemberShown::SHOWN_MOVED) out++;
         else hidden++;
     }
     w += snprintf(words + w, sizeof(words) - w, "%u member%s: %u as tiles", (unsigned)cl->memberCount(),
                   cl->memberCount() == 1 ? "" : "s", (unsigned)tiles);
     if (inHdr)  w += snprintf(words + w, sizeof(words) - w, ", %u in the header", (unsigned)inHdr);
     if (hidden) w += snprintf(words + w, sizeof(words) - w, ", %u hidden", (unsigned)hidden);
+    if (out)    w += snprintf(words + w, sizeof(words) - w, ", %u on the page", (unsigned)out);
     snprintf(words + w, sizeof(words) - w, " - each one, hidden ones too, in Members.");
     note(s_table, words);
 }
@@ -436,8 +441,11 @@ void buildClusterSlots() {
     Kit::ChipRowSpec rows[GROUP_MEMBERS_MAX];
     uint8_t n = 0;
     names(*cl);
-    for (uint8_t i = 0; i < cl->memberCount() && n < GROUP_MEMBERS_MAX; i++)
+    for (uint8_t i = 0; i < cl->memberCount() && n < GROUP_MEMBERS_MAX; i++) {
+        if (movedOut(cl->memberAt(i))) continue;   // its card is on the page: not the cluster's to show
+        s_slotMember[n] = i;
         rows[n++] = { s_names[i], YESNO_W, 2, (uint8_t)(inList(idOf(cl->memberAt(i)), ids, nIds) ? 0 : 1) };
+    }
     s_table = Kit::chipTable(s.stage, listW(), rows, n, slotChipCb);
     note(s_table, "Yes: its value in the header, in the order chosen, four at most; one that does not fit "
                   "gives way, the last first. A member in the header is not a tile unless shown.");

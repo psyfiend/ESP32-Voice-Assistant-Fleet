@@ -83,6 +83,41 @@ void removeCopyCb(lv_event_t *ev) {
     lv_async_call([](void *) { confirmRemoveCopy(); }, nullptr);
 }
 
+// A CARD MADE ON THE GLASS, REMOVED FROM THE PAGE (the sprint after round 7, the
+// owner: a card copied out of a cluster "can go without being hidden"): deleted,
+// entry and all - it does not join the hidden cards. A card MOVED out of a
+// cluster is never offered this: it is the card itself, and goes back.
+void confirmRemoveFromPage() {
+    confirmClose();
+    Card *held = CardPopup::isOpen() ? cardOf(h.surface) : nullptr;
+    if (!held || !held->hasId() || !CardAdded::isAdded(held->id()) || CardAdded::movedHere(held->id())) return;
+    char buf[200];
+    snprintf(buf, sizeof(buf), "The card \"%s\" was made on this board: it will be deleted with its settings, "
+                               "not kept in the hidden cards. Any other card of it is unaffected.", s.name);
+    Kit::DialogSpec spec = {};
+    spec.role    = Kit::DialogRole::DLG_DESTRUCTIVE;
+    spec.title   = "Remove this card?";
+    spec.body[0] = buf;
+    spec.buttons[0] = { "Cancel", Kit::ButtonRole::BTN_CANCEL, confirmCancelCb };
+    spec.buttons[1] = { "Remove", Kit::ButtonRole::BTN_DESTRUCTIVE, [](lv_event_t *) {
+        lv_async_call([](void *) {
+            confirmClose();
+            Card *held = CardPopup::isOpen() ? cardOf(h.surface) : nullptr;
+            if (held && CardAdded::drop(held->id())) CardPopup::close();
+        }, nullptr);
+    } };
+    spec.nButtons = 2;
+    spec.width    = LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(UI::shape().W_DIALOG_MAX));
+    spec.outside  = confirmCancelCb;
+    spec.countdown = true;
+    s_confirm = Kit::dialog(spec);
+}
+
+void removeFromPageCb(lv_event_t *ev) {
+    (void)ev;
+    lv_async_call([](void *) { confirmRemoveFromPage(); }, nullptr);
+}
+
 void hideCardCb(lv_event_t *ev) {
     (void)ev;
     lv_async_call([](void *) { confirmHide(); }, nullptr);

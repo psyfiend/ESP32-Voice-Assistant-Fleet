@@ -366,10 +366,16 @@ void CardPopup::debugService(lv_timer_t *t) {
             else if (held->mini())
                 for (lv_obj_t *o = lv_obj_get_parent(h.surface); o && !parent; o = lv_obj_get_parent(o))
                     if (lv_obj_has_flag(o, CardPopup::CARD_SURFACE_FLAG)) { parent = cardOf(o); e = held->firstEntity(); }
-            if (parent && e) { visibilityJoinOpen(parent, e); dbgOut("which group? for %s\n", e->desc.id); }
+            // A tile's own card, as its Visibility passes it: Copy or Move (the sprint after round 7).
+            Card *mc = (held->mini() && held->hasId()) ? held : (inMember() ? visibilitySubject() : nullptr);
+            if (parent && e) { visibilityJoinOpen(parent, e, mc); dbgOut("which group? for %s\n", e->desc.id); }
             else dbgOut("not a member's view or a tile\n");
         } else {
-            dbgOut(visibilityJoin((uint8_t)(a.join - 2)) ? "added\n" : "not added\n");
+            // join=2+N&mv=1: Move (out of a cluster) - the window closes.
+            if (visibilityJoin((uint8_t)(a.join - 2), a.mv != 0)) {
+                dbgOut(a.mv ? "moved\n" : "added\n");
+                if (a.mv) { s_dreq.store(DREQ_CLOSING); return; }
+            } else dbgOut("not added\n");
         }
         s_dreq.store(DREQ_DONE);
         return;
@@ -446,6 +452,18 @@ void CardPopup::debugService(lv_timer_t *t) {
             snprintf(id, sizeof(id), "%s", held->id());
             if (CardAdded::removeMember(id)) { dbgOut("removed %s\n", id); close(); s_dreq.store(DREQ_CLOSING); return; }
             dbgOut("%s is not a copy made here\n", id);
+        } else if (a.removeCard == 6 || a.removeCard == 7 || a.removeCard == 8) {
+            // The sprint after round 7: a card taken out of a cluster. 6 Remove from
+            // the page with no dialog (deleted), 7 its dialog, 8 Move back to the cluster.
+            snprintf(id, sizeof(id), "%s", held->id());
+            if (a.removeCard == 7) { confirmRemoveFromPage(); dbgOut("dialog up\n"); }
+            else if (a.removeCard == 6 ? CardAdded::drop(id) : CardAdded::moveBack(id)) {
+                dbgOut("%s %s\n", a.removeCard == 6 ? "removed" : "moved back", id);
+                close();
+                s_dreq.store(DREQ_CLOSING);
+                return;
+            } else dbgOut("%s: %s\n", id, a.removeCard == 6 ? "not a card made here, or a moved one"
+                                                           : "not moved out of a cluster");
         } else if (held->mini()) {
             // A mini tile's: Visibility's Hide from the cluster.
             dbgOut("%s hidden from its cluster\n", held->id());
