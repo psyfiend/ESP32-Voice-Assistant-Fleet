@@ -592,4 +592,60 @@ in the playground first.
 
 ## Your results
 
-(to come)
+**2026-10-20, night** (three screenshots: the P4_5 House page at 4 x 2 on Midnight and Linen, the
+system panel open on Linen). Recorded as you wrote it; the plan answering it is in the conversation
+and lands here once you have answered its questions.
+
+**The layout.** The device never re-picks rows or columns when a page's blocks change, so it never
+looks for a new best. Rearranging clusters automatically now seems better than the alternative -
+lopsided, unevenly shaped clusters, or solo cards out of all proportion to tiles. Two parts:
+(1) a bento arrangement independent of any grid - a known number of rectangles, each with a known
+range of sizes and proportions, fitted into the screen; (2) a grid laid over it, its divisions chosen
+so the rectangles snapped to it stay within their ranges (3 x 2 or 27 x 15 - only the number of
+grids to try matters). Rules, in your words:
+
+- solo cards as close to **square** as possible;
+- clusters prefer **width** over height (3 x 2 over 2 x 3, on a landscape page);
+- clusters with the **same number of tiles** take the same number of units, or as near as can be;
+- **tiles in every cluster** as close in size as possible;
+- **solo cards** close to the size of a tile - never much larger, smaller, or out of proportion.
+
+Limits: the smallest solo card is one card of a 7 x 3 page on the P4_5, and its proportions are the
+furthest a solo card may go; the smallest tile is one of a 3 x 1 cluster on the P4_4B at 4 x 4.
+Small dead spaces are better than grossly unequal units per tile. Your worked examples on the P4_5,
+counted as units per tile (a cell is 2 x 2 units):
+
+| Grid | Top row | Bottom row | Clusters | Solo against tiles |
+|---|---|---|---|---|
+| 4 x 2 (on glass) | solo 4; A 12/4 = 3 | B 8/3 = 2.7; C 8/3 = 2.7 | 1/3 apart, very good | 4 against 2.7, bad: the card is too big |
+| 4 x 3, rows 3 units (not possible yet) | solo 6; A 18/4 = 4.5 | B 12/3 = 4; C 12/3 = 4 | 1/2 apart, very good | 6, worst - but with the card's top cut off (2 x 2) it is 4, best |
+| 5 x 2 (on glass) | solo 4; A 16/4 = 4 | B 8/3 = 2.7; C 12/3 = 4 | B 1 1/3 apart, worst - same three tiles as C, fewer cells | - |
+| 5 x 2, B and C splitting the row (5 units each) | as above | B 10/3 = 3.3; C 10/3 = 3.3 | 2/3 apart, good | 2/3, good |
+| 5 x 3, rows 3 units (not possible yet) | solo 6; A 24/4 = 6 | B 15/3 = 5; C 15/3 = 5 | 1 apart, bad | 1 (or 1 with the top cut off), bad |
+
+A web app where a user shapes pages, clusters and cards by hand would make the automatic answer
+matter less.
+
+**Bugs.**
+- **Icons shrink with every row added**, whatever room there is round them - even when the
+  arrangement does not change.
+- **The shading at a slot panel's top corners does not show on the device**, though a screenshot
+  shows it; it does appear when a slot panel opens while the system panel is open. **The bar's drop
+  shadow disappears** while any panel is open.
+- **A cluster's Tap action** (its window, SETTINGS) reverts to Nothing when the page is next arranged;
+  it should probably default to Members.
+- **A cluster's Members view** does not follow a group card's (Desk): the members' satin buttons
+  sometimes span the window, sometimes not.
+- **Card UI is generic**: on a cluster or a cluster's member it offers what does not apply (Entity
+  label, Card label, Selector, Selector shape, Card density). It should be built from what the card
+  it was opened from can do.
+- **Rename** (the cluster's window) and Card label's **Custom** do the same thing.
+- **A cluster's SETTINGS** offers what does not apply: Paused, Active state.
+- **The cluster's Details view** is not where members are shown or hidden, and should not list them.
+  Either Details becomes a window of its members as mini tiles (no Members or History buttons), or
+  Members stays and Details holds only Header style (Swatch, Band), Sensor icons (On, Off) and the
+  Rename, Header slots and Add cards buttons.
+- **A member added from the dashboard**: tapped in the cluster's Members, its SETTINGS shows "Add
+  card to dashboard"; long-pressed, the same member's SETTINGS shows Visibility with other choices.
+- **The page title slot** should have a "View hidden cards" button opening a sheet of them, so the
+  slot's panel stays clean.
