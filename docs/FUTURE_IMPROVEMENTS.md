@@ -532,7 +532,8 @@ Pages now arrange themselves (K109); these are what he wants beside that:
   temporary badge on each movable one. What a hand arrangement does to the arranger's answer (kept
   as pins, or the arranger re-run around them) is the design question it raises.
 - **The web app** shaping pages, clusters, cards and their sizes in detail makes the automatic
-  answer matter less (owner) - 3.1's build sheet.
+  answer matter less (owner) - 3.1's build sheet. **Its dashboard arranging could be the first part
+  built** at 3.1, so layouts and configurations can be tried quickly (owner, 2026-10-20).
 
 ## bb_captouch_fork
 

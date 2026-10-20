@@ -1,4 +1,4 @@
-# Handoff — 2026-10-19 (2.11 group cards: rounds 1-3 built on `feat/2.11-group-cards`; the owner's tests next)
+# Handoff — 2026-10-20 (2.11 group cards: rounds 1-7 built on `feat/2.11-group-cards`; the last sprint next)
 
 **Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
 UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
@@ -45,20 +45,27 @@ slot's panel are on the kit since 2.8, **the cards since 2.11 round 1** (`KS_CAR
 branch); `GUIManager` and the system panel's pages are not yet - bring each over when it is next
 changed (`ui-architecture.md` §6).
 
-## Where things stand (2026-10-19)
+## Where things stand (2026-10-20)
 
 - **2.11 is on `feat/2.11-group-cards`** (off `main` at `6bd834f`), pushed, **no PR** (it comes at
-  sign-off, after the all-nine gate). Built unattended on 2026-10-19 in three rounds, the owner's
-  order (K106): **round 1** clusters on the page, the cards onto the kit, D-34, D-35 (`16066b7`);
-  **round 2** the arranger, Playground v5 as prototyped (`476c57f`); **round 3** what the glass edits
-  - the cluster's window (K104), the keyboard (K95), Visibility by where a card is and the page's
-  hidden cards (K96, K66), Copy / Move into a cluster and its Add cards (K91, K100), "which group?"
-  (K92 rule 9) (`bd88809` to `2275545`). **The owner's sheet is `docs/TEST_2.11.md`**: three rounds of
-  tests, the choices made unattended, questions, and what round 3 left. Nothing tested by the owner yet.
-- **Boards**: the P4_5 and the 4B run round 3's last build (the branch with their local
-  `DEBUG_POPUP` lines); the 1060 runs round 1 (flashed once, for D-34 - leave it). **Their settings
-  files are exactly the owner's**: every test change was put back from the copy saved before it
-  (`restore_settings.ps1`; P4_5 as at 09:39, 4B as at 09:28). `WS_S3_4B` compiles (not flashed, #69).
+  sign-off, after the all-nine gate). Seven rounds, all in `docs/TEST_2.11.md` with the owner's
+  results after each: 1 clusters on the page; 2 the arranger (Playground v5, ported); 3 what the glass
+  edits (cluster window, keyboard, Visibility, hidden cards, Copy / Move); 4 the summary card, the
+  halo calibrated, the views as Card UI; 5 header panels without the halo, a close that keeps its top
+  (K108); 6 the owner's bugs and the cluster window as option B (K110), Playground v8 - **the
+  arranger by the owner's rules, in units** (K109); 7 copy and move tracked, Paused in Visibility
+  (K111). Last commit `99dd5f0` and the docs after it.
+- **Boards**: the P4_5, the 4B and the 1060 run round 7 (`r7a`, with their local `DEBUG_POPUP`
+  lines). **Their settings were cleaned of round 6's duplicates on 2026-10-20 at the owner's word**
+  ("remove any of the duplicated cards in the Hidden cards sheet from all of the devices"): old moves
+  turned into `moved`, hidden copies of cluster members deleted, one hidden card kept per entity
+  (the rules are in TEST_2.11 round 7; before = `bench/settings/<board>/20261020-1508.json`, after =
+  `cleaned-20261020-1508.json`). `WS_S3_4B` compiles (not flashed, #69).
+- **Layout Playground v10** (`https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp`): v8 is the arranger
+  to port, **with the owner's knobs as its defaults** (size 75, square 30, wide 20, twin 70, empty
+  unit 11, order 4), "Copy settings for Claude" for the next tuning. Its code is the spec:
+  `arrangeV8()`, `shapesV8()`, `searchV8()`, `scoreV8()`, `refSizes()`, `finishWith()` - read the
+  published page (`Artifact` read) for the source.
 - **Where 2.11's pieces live**: a cluster `Cards/ClusterCard` + `Cards/MiniTile.cpp`, its span and
   tile grid `Layout/Cluster.h`; the arranger `Layout/Arranger.h` (both host-tested, 52 tests) and
   `Cards/PageArranger` (its task, kept answers in `pages.<slug>.layout`); the halo
@@ -84,14 +91,41 @@ changed (`ui-architecture.md` §6).
 
 ## What is next with the owner
 
-1. **2.11 group cards** (#66, with the arranger #78) - **the owner tests rounds 1-3** against
-   `docs/TEST_2.11.md` and answers its questions (the halo on Linen, the hidden-cards list's home,
-   Custom opening the keyboard, Delete from the pool...). Then **round 4** (K106): the summary card
-   (K98), count slots (K103), extending a source group (K93), group pages (K90, K99 - §4 Q8, how
-   "back" works, still to ask); and round 3's rest (group cards and a new group card as Add targets,
-   the card list K91, Delete from the pool). The arranger's weights are the owner's to tune on glass
-   (`/settings?arranger=`, explained in the sheet). At sign-off: the all-nine gate, the CHANGELOG
-   entry, the sheet archived, the PR; the owner merges; tag `v0.2.19`.
+1. **2.11's last sprint** (#66, with the arranger #78), in this order - the owner's notes of
+   2026-10-20 are in `TEST_2.11.md` round 7, "Your results":
+   1. **Bug: a card taken out of a cluster to the dashboard duplicates.** The 1060's Outside "Front":
+      Add card to dashboard leaves the tile, and the new card can only be hidden - into the hidden
+      cards, a copy that should not exist. **Build it as K111 did the other way**: Add card to
+      dashboard from a tile asks **Copy or Move** (a chip row, as Add to's "This card"); the new page
+      card records `from` (the member). **Move**: the member leaves - an added copy deleted, a compiled
+      member `hidden: moved` (no tile, not in the hidden cards, Members says "On the page"); the page
+      card's Visibility offers **Move to cluster** (back, the page card deleted) and Hide. **Copy**:
+      its Visibility offers **Remove from the page** - deleted, no pool entry - besides Hide. Either
+      way no entity gets a second card; the member's own "from" chain (K111's Move back) stays right.
+      `Cards/CardAdded`, `Popup/PopupVisibility.cpp` (`buildJoin`, `visibilityJoin`), the hidden list
+      in `GUIManagerHeader.cpp` (`collectHidden`).
+   2. **The hidden cards list the cards crowded off the page** - not hidden, not shown (the page's
+      plan dropped them, lowest priority first, `CardPage::plan()`); a row each, saying so.
+   3. **Port v8** (K109): `Layout::arrange()` in units with the owner's knobs, host tests from the
+      playground's answers (as v5's were), a step budget, pages arranging themselves - Row / Col +/-
+      a pin with a way back to Auto. Time it on the P4_5 (and compile the S3).
+   4. **Tiles' icons in roomy clusters** - on the 1060, a grid that fills the screen leaves the tiles'
+      icons "relatively tiny"; find why there (the face's size at its PPI, the solo cap from round 6)
+      and try **a border round each tile** (the owner is curious, now the active states changed) -
+      a mock first.
+   5. **Group view** (owner, 2026-10-20, new): a sheet of a group's members **as tiles** - for any
+      group card (Desk, the garage Doors, a cluster) - and "Group view" among the Tap actions. On a
+      group card's and a cluster's Visibility: **show it as one card** (1x1, a tap opens its
+      details) and **choose its icon**. Mock first; ask how it relates to group pages (K90, K99).
+   6. **A Reset button for development**: the dashboard and its clusters back to the compiled ones
+      (the `cards.*` entries made on the glass and the pages' `layout`), the owner's looks kept.
+   7. Round 4's rest, if still wanted - ask: count slots (K103), extending a source group (K93),
+      group pages (K90, K99, §4 Q8), group cards as Add targets, the card list (K91), Delete from the
+      pool.
+   8. **Sign-off**: one **final test sheet** for the owner (he asked for it), the all-nine gate with
+      the structure check, the CHANGELOG entry, the sheet archived, the PR; the owner merges; tag
+      `v0.2.19`. The owner will bring `dashboard-target-7b.md` up to date with clusters as the new
+      baseline (and add entities to fill the screen).
 2. **#76, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a queue any
    task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to dismiss), a
    notice's detailed form in the middle for a while then its minimal "!" in status, a place that
@@ -166,8 +200,8 @@ and Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
 | `CYD_S3_3248` | - | USB broken (2026-09-28) |
 | `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in - #99's S3 frame check waits for one |
 
-The P4_5 and the 4B run 2.11 round 3 from the branch (with their local lines); the 1060 runs 2.11
-round 1 (flashed once for D-34); the rest `v0.2.18` or older.
+The P4_5, the 4B and the 1060 run 2.11 round 7 from the branch (with their local lines) - the 1060
+at the owner's request (2026-10-20); flash it with the others now. The rest `v0.2.18` or older.
 Ports move when boards are re-plugged:
 `Get-CimInstance Win32_PnPEntity | ? Name -match 'COM\d+' | select Name, DeviceID`. **Is a board
 alive?** Ask Home Assistant (`sensor.<device>_uptime`), not the cable. While developing, build and

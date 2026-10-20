@@ -802,4 +802,37 @@ Kitchen and hid (`kitchen_living_overhead_261020_1257`). The question below is a
 
 ## Your results
 
-(to come)
+**2026-10-20, afternoon** - recorded as you wrote it; the plan for each is HANDOFF's last sprint.
+
+- **Clusters freed so many cells** that a grid without empty spaces is hard to find on the 1060 - "a
+  good problem to have". With a grid where clusters and cards fill the screen (the arranged
+  proportions work great), **the icons inside each cluster are relatively tiny**: scale them, or change
+  them. Would **borders round each tile** look right, now the active states changed?
+- **Duplicates may go from every board** - done 2026-10-20 (below).
+- You will bring **`dashboard-target-7b.md`** up to date with clusters as the new baseline, and add
+  entities to fill the screen. **A Reset button** would help during development: the dashboard and its
+  clusters back as they were built. At 3.1 the web app's dashboard arranging could start, to try
+  layouts quickly.
+- **The hidden cards should also list cards crowded off the page** - not hidden, not shown - or they
+  are easy to forget.
+- **Bug**: Outside's "Front", added to the dashboard on the 1060, left its copy in the cluster; the
+  new card could only be hidden, making a copy in the hidden cards that should not exist. Taking a
+  card out of a cluster should offer **Copy or Move** too. Copied: the dashboard copy can go without
+  being hidden. Moved: its choices are **Move to cluster** or **Hide** - the original can't be
+  deleted, and moving it out never makes copies.
+- **Group view**: a sheet of all a group's members as tiles - any group card (Desk, Garage doors) or
+  cluster - and "Group view" among the Tap actions, an alternative to Members as tiles. On a group
+  card's and a cluster's Visibility: show it as one 1x1 card, a tap opening its details, and choose
+  the icon it shows then.
+- Remaining work, and **a final test sheet to sign off on**, when it is finished. A fresh session for
+  the last sprint.
+
+**The cleanup** (2026-10-20, each board's settings saved first - `bench/settings/<board>/20261020-1508.json`,
+the cleaned file beside it): **a compiled card hidden from its page whose entity has a copy in a
+cluster** was a Move made before round 7, and became one (`moved`, the copy's `from` set) - the P4_5's
+Overhead, Thermo, Eric and Garage, the 4B's Overhead and Garage; **a hidden card made on the glass
+whose entity is a cluster's member** was deleted - the P4_5's extra Overhead and Office temperature,
+the 1060's Front; **of hidden cards made on the glass with one entity**, the newest stays - four Office
+Rights went on the P4_5, an Office Lamp and an Office Right on the 4B, two Office Lamps and an Office
+Right on the 1060. The P4_5's hidden cards are now Office Right, Office Left and Office (the Office
+cluster's).
