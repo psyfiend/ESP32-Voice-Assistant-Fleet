@@ -11,22 +11,27 @@ namespace Kit {
 namespace {
 constexpr uint32_t SLIDE_MS = 350;   // the system panel's
 
+lv_obj_t *s_bar = nullptr;   // the header bar the panels lie on (drawerOverBar() learns it)
+
 bool anyDrawerShowing();   // below, with the list of drawers
 void barShadow(bool on);
 
 void slide(void *var, int32_t v) {
     Drawer *d = (Drawer *)var;
     if (!d || !d->root) return;
+    // The wrapper is the panel: its top edge stays, its foot moves (round 5).
     lv_obj_set_height(d->root, v);
-    // The face rides the edge: its bottom stays on the wrapper's bottom, so it
-    // slides down rather than being uncovered (the owner's "window blinds").
+    // The face rides the foot: its bottom stays on the wrapper's bottom, so it
+    // slides down rather than being uncovered (the owner's "window blinds"),
+    // and back up under the panel's top edge as it closes.
     lv_obj_set_y(d->face, v - d->openH);
-    // Hidden at zero, not merely zero-high: a drawer casts the scheme's shadow,
-    // and a zero-high one would leave a line of it under the bar.
+    // Hidden at zero, not merely zero-high: a zero-high panel would leave its
+    // edge as a line under the bar.
     if (v <= 0) {
         lv_obj_add_flag(d->root, LV_OBJ_FLAG_HIDDEN);
         // Closing only: an opening slide's first step is 0 too.
         if (!d->open && !anyDrawerShowing()) barShadow(true);
+        if (!d->open && s_bar) lv_obj_invalidate(s_bar);   // its shading on the bar goes with it
     } else {
         lv_obj_clear_flag(d->root, LV_OBJ_FLAG_HIDDEN);
     }
@@ -56,11 +61,10 @@ constexpr uint8_t DRAWERS_MAX = 4;
 Drawer *s_drawers[DRAWERS_MAX] = {};
 uint8_t s_drawerN = 0;
 
-// The coves made (joinCorner()), for the shape's halo; and the bar they stand in.
+// The coves made (joinCorner()), for the shape's shading on the bar.
 constexpr uint8_t JOINS_MAX = 4;
 lv_obj_t *s_joins[JOINS_MAX] = {};
 uint8_t   s_joinN = 0;
-lv_obj_t *s_bar = nullptr;
 
 bool anyDrawerShowing() {
     for (uint8_t i = 0; i < s_drawerN; i++)
@@ -119,12 +123,14 @@ static void coverLine(lv_layer_t *layer, lv_color_t face, int32_t x1, int32_t x2
 //    outside the panel stops a quarter of a corner short of its walls, fading
 //    out over LINE_FADE before that - "so that the header bar accent lines
 //    outside the panel don't actually contact the panel".
-// 3. THE HALO, where it falls on the bar - in the bar's DRAW_POST, after its
-//    slots (round 4): one shape's, the panel's top, its slot's tab and the two
-//    coves together (Kit::haloOverBar()), so nothing is darkened twice and the
-//    coves' insides are shaded as the bar beside them. It falls on the slots'
-//    words beside the panel too, as a shadow would. Below the bar the panel's
-//    wrapper casts its own.
+// 3. THE SHADING WHERE THE PANEL MEETS THE BAR - in the bar's DRAW_POST, after
+//    its slots (round 4): the halo of one shape, the panel's top, its slot's tab
+//    and the two coves together (Kit::haloOverBar()), so nothing is darkened
+//    twice and the coves' insides are shaded as the bar beside them. It falls on
+//    the slots' words beside the panel too, as a shadow would. The ONLY halo a
+//    header panel has (owner, round 5: below the bar it made the slide
+//    "dreadfully chunky" at any strength, and the panel's accent edge needs no
+//    more than the shadow where it meets the line).
 //
 // The pane's top edge is drawn over the line again in its own colours (round 4):
 // the line's cover used to cut the top of its corners' arcs.
@@ -137,6 +143,10 @@ static void haloOverBarAll(lv_obj_t *bar, lv_layer_t *layer, const lv_area_t &b)
         memset(&s, 0, sizeof(s));   // compared byte for byte to find its painted mask
         lv_obj_get_coords(d.root, &s.pane);
         s.paneR = UI::sc(h.DRAWER_R);
+        // Over the bar only the pane's top matters, so its foot is set where the
+        // shading cannot reach: the mask stays the same while the panel slides,
+        // where a true foot made it repaint on every frame of the slide.
+        s.pane.y2 = b.y2 + haloWidth() + s.paneR + 1;
         // The open slot's tab: the bar's child in LV_STATE_CHECKED, over this panel.
         const uint32_t n = lv_obj_get_child_count(bar);
         for (uint32_t k = 0; k < n && !s.hasTab; k++) {
@@ -169,14 +179,16 @@ static void haloOverBarAll(lv_obj_t *bar, lv_layer_t *layer, const lv_area_t &b)
 // shares that side with its slot's tab - one straight line - so its top corner
 // on that side is square, the tab's side running straight down into the
 // panel's (the owner's close-up of the system panel: a notch there). In the
-// face's own draw: the corner is inside its area.
-static void faceSquareCorner(lv_event_t *e) {
+// wrapper's DRAW_POST, after its edge (round 5: the wrapper is the panel and
+// draws its edge last): the corner is inside its area.
+static void frameSquareCorner(lv_event_t *e) {
     lv_obj_t *face = lv_event_get_current_target_obj(e);
     if (!s_bar) return;
     const UIHeader &h = UI::hdr();
     const int32_t line = UI::sc(h.LINE), R = UI::sc(h.DRAWER_R);
     lv_area_t f;
     lv_obj_get_coords(face, &f);
+    if (lv_area_get_height(&f) < 2 * R) return;   // the slide's last frames: a pill, no corner
     const uint32_t n = lv_obj_get_child_count(s_bar);
     for (uint32_t k = 0; k < n; k++) {
         lv_obj_t *c = lv_obj_get_child(s_bar, (int32_t)k);
@@ -234,10 +246,10 @@ void drawerOverBar(lv_event_t *e) {
             layer->_clip_area = c;
             lv_draw_rect_dsc_t dsc;
             lv_draw_rect_dsc_init(&dsc);
-            dsc.bg_color     = lv_obj_get_style_bg_color(d.face, LV_PART_MAIN);
+            dsc.bg_color     = lv_obj_get_style_bg_color(d.root, LV_PART_MAIN);
             dsc.bg_opa       = LV_OPA_COVER;
             dsc.radius       = R;
-            dsc.border_color = lv_obj_get_style_border_color(d.face, LV_PART_MAIN);
+            dsc.border_color = lv_obj_get_style_border_color(d.root, LV_PART_MAIN);
             dsc.border_width = line;
             dsc.border_opa   = LV_OPA_COVER;
             lv_draw_rect(layer, &dsc, &r);
@@ -254,10 +266,10 @@ void drawerOverBar(lv_event_t *e) {
         if (!d.root || !d.face || lv_obj_has_flag(d.root, LV_OBJ_FLAG_HIDDEN)) continue;
         lv_area_t r;
         lv_obj_get_coords(d.root, &r);
-        // The face's own inside, its top corners turning down from the line
+        // The panel's own inside, its top corners turning down from the line
         // (D-35): a rounded rectangle inside its walls, drawn below the bar only.
-        // Its edge is the line's width (KS_DRAWER_FACE); read back from the face
-        // it came out 0 here, and the cover hid the top of the edge's curve.
+        // Its edge is the line's width (KS_DRAWER); read back from the style it
+        // once came out 0 here, and the cover hid the top of the edge's curve.
         const int32_t R    = UI::sc(UI::hdr().DRAWER_R);
         const int32_t wall = UI::sc(UI::hdr().LINE);
         // Drawn whole (LVGL clamps a radius to half the height) and clipped to the
@@ -272,7 +284,7 @@ void drawerOverBar(lv_event_t *e) {
         layer->_clip_area = c;
         lv_draw_rect_dsc_t dsc;
         lv_draw_rect_dsc_init(&dsc);
-        dsc.bg_color = lv_obj_get_style_bg_color(d.face, LV_PART_MAIN);
+        dsc.bg_color = lv_obj_get_style_bg_color(d.root, LV_PART_MAIN);
         dsc.bg_opa   = LV_OPA_COVER;
         dsc.radius   = LV_MAX(0, R - wall);
         lv_draw_rect(layer, &dsc, &a);
@@ -325,9 +337,9 @@ void drawer(Drawer &d, lv_obj_t *parent, int32_t w) {
     d.w = w;
     d.root = plain(parent);
     add(d.root, KitStyle::KS_DRAWER);
-    // D-35: it floats over the page on the halo, which takes the place of the
-    // scheme's lift (the shadow it cast on Linen).
-    haloAttach(d.root);
+    // No halo below the bar (owner, round 5): the shading where it meets the
+    // bar is the bar's (drawerOverBar()), and the accent edge does the rest.
+    lv_obj_add_event_cb(d.root, frameSquareCorner, LV_EVENT_DRAW_POST, nullptr);
     lv_obj_set_size(d.root, w, 0);
     // A tap on the drawer is the drawer's: without this it would fall through
     // to the card under it.
@@ -338,10 +350,7 @@ void drawer(Drawer &d, lv_obj_t *parent, int32_t w) {
     add(d.face, KitStyle::KS_DRAWER_FACE);
     lv_obj_set_size(d.face, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_add_flag(d.face, LV_OBJ_FLAG_CLICKABLE);
-    // Every corner of it shows: it lies on the bar (D-35), its top corners
-    // turning down from the line - no longer pushed above the wrapper's clip.
     lv_obj_set_y(d.face, 0);
-    lv_obj_add_event_cb(d.face, faceSquareCorner, LV_EVENT_DRAW_MAIN_END, nullptr);
     d.open = false;
     d.openH = 0;
 }
@@ -362,6 +371,14 @@ void drawerPlace(Drawer &d, int32_t centreX, int32_t top) {
     d.top = top;
 }
 
+// One rule for where it hangs (round 5): the system panel's own re-placing put
+// it at the bar's foot instead, a line's width low, every time it closed - its
+// top edge showed under the status icons for the slide.
+void drawerSetTop(Drawer &d, int32_t top) {
+    d.top = top;
+    if (d.root) lv_obj_set_y(d.root, top - UI::sc(UI::hdr().LINE));
+}
+
 void drawerOpen(Drawer &d) {
     if (!d.root) return;
     // Its side walls rise straight to the bar's line and stop there (owner,
@@ -369,7 +386,8 @@ void drawerOpen(Drawer &d) {
     // Measured, never guessed (the system panel's #50 lesson): the face is
     // content-sized, so it has a true height while the wrapper is closed.
     lv_obj_clear_flag(d.root, LV_OBJ_FLAG_HIDDEN);
-    barShadow(false);   // the halo is the panel's shadow (round 4)
+    barShadow(false);   // the shading on the bar takes its place (round 4)
+    if (s_bar) lv_obj_invalidate(s_bar);   // that shading, drawn once for the slide
     lv_obj_update_layout(d.face);
     int32_t h = lv_obj_get_height(d.face);
     const int32_t avail = lv_obj_get_height(lv_screen_active()) - d.top - UI::sc(UI::hdr().DRAWER_PAD);

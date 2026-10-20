@@ -132,8 +132,9 @@ lv_obj_t *label(lv_obj_t *parent, KitStyle look);
 int32_t textW(const char *txt, const lv_font_t *f);
 
 // --- The halo (KitHalo.cpp, D-35) ---------------------------------------------------
-// What floats over the page - a header slot's panel, every window - stands on a
-// black rim at its edge fading to clear, haloWidth() out (UIShape HALO): painted
+// A window floating over the page stands on a black rim at its edge fading to
+// clear, haloWidth() out (UIShape HALO); a header slot's panel only where it
+// meets the bar (round 5, haloOverBar() below): painted
 // and dithered images (LVGL's own shadow cost 45 ms a full frame on the P4_5 and
 // banded on these 16-bit panels). haloAttach() draws it under the object, round
 // its rounded edge, and widens its redraw area; haloDraw() draws one round `a`,
@@ -142,7 +143,7 @@ int32_t haloWidth();
 void    haloAttach(lv_obj_t *o);
 void    haloDraw(lv_layer_t *layer, const lv_area_t &a, int32_t radius, const lv_area_t *clip);
 // Its strength, 0-100 %, for the scheme showing (2.11 round 4): the owner's from
-// UI Tweaks' slider (schemes.<name>.halo), else UIMetrics::HALO_PCT. Kept in RAM;
+// UI Tweaks' slider (schemes.<name>.halo), else UIMetrics::HALO_PCT (25). Kept in RAM;
 // the caller saves the file. forget...: read again (UI Tweaks' Reset all).
 uint8_t haloStrength();
 void    keepHaloStrength(uint8_t pct);
@@ -516,6 +517,9 @@ void    drawer(Drawer &d, lv_obj_t *parent, int32_t w);
 // Under its slot, kept on screen EDGE from its sides - where a slot's tab
 // stands, so a panel at a screen edge shares that side with its tab (D-23).
 void    drawerPlace(Drawer &d, int32_t centreX, int32_t top);
+// The bar it hangs from has moved (shown, peeked, hidden): `top` is the bar's
+// foot, and the panel lies on the bar's line, as drawerPlace() puts it.
+void    drawerSetTop(Drawer &d, int32_t top);
 // Open: its side walls rise straight to the bar's line (round 4: no flares).
 void    drawerOpen(Drawer &d);
 void    drawerClose(Drawer &d, bool animate = true);

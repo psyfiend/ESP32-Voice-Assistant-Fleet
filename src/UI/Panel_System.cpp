@@ -26,8 +26,7 @@ void Panel_System::reportSink(const char *line) {
 // supposed to be attached to - otherwise hiding the bar leaves it floating a
 // header's height down an empty screen.
 void Panel_System::setTopOffset(int32_t y) {
-    _drawer.top = y;
-    if (_drawer.root) lv_obj_set_y(_drawer.root, y);
+    Kit::drawerSetTop(_drawer, y);
 }
 
 void Panel_System::setAnchorX(int32_t centreX) {

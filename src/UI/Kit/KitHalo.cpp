@@ -1,6 +1,7 @@
-// THE HALO (D-35, 2.11 round 1): what floats over the page - a header slot's
-// panel, every window - stands on a black rim at its edge fading to clear,
-// UIShape HALO millimetres out ("Panel Edges", the owner's choice).
+// THE HALO (D-35, 2.11 round 1): a window floating over the page stands on a
+// black rim at its edge fading to clear, UIShape HALO millimetres out ("Panel
+// Edges", the owner's choice). A header slot's panel has it only where it meets
+// the bar (haloOverBar(), round 5: below the bar it made the slide chunky).
 //
 // PAINTED, NOT LVGL'S SHADOW. Built first as a shadow (spread half its width),
 // it cost a full redraw with a window open 45 ms more on the P4_5 (129 -> 175 ms)
@@ -17,7 +18,7 @@
 // ITS STRENGTH (2.11 round 4, the owner: "the effect itself is outstanding",
 // but at full strength it stops reading as a shadow - "around 50%", Linen
 // lighter still): painted into the images (strengthOf()), each scheme's own
-// (UIMetrics::HALO_PCT: 50 dark, 30 Linen) or the owner's from UI Tweaks'
+// (UIMetrics::HALO_PCT: 25 since round 5) or the owner's from UI Tweaks'
 // slider, kept as schemes.<name>.halo.
 //
 // WHERE A PANEL MEETS THE BAR it is one shape - the open slot's tab, the two

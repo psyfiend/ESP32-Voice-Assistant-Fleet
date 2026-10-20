@@ -187,8 +187,7 @@ void GUIManager::syncPanelOffset() {
     // else: no bar at all, so the drawer starts at the top of the screen.
     _pnlSystem.setTopOffset(top);
     // ...and a slot's drawer, which hangs from the same bar (2.8).
-    if (_slotDrawer.root) lv_obj_set_y(_slotDrawer.root, top);
-    _slotDrawer.top = top;
+    Kit::drawerSetTop(_slotDrawer, top);
 }
 
 // THE SYSTEM PANEL IS THE STATUS SLOT'S (2.8, D-13): it hangs under that slot,

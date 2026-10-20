@@ -394,24 +394,30 @@ static void fill() {
     lv_style_set_pad_top   (mk, LV_MAX(0, (UI::sc(h.MARK) - lv_font_get_line_height(UIToolkit::Font_Caption)) / 2));
 
     // --- A slot's drawer (2.8) ---
-    // The wrapper clips - it reveals the face as it grows - so the shadow is its
-    // own; the radius only shapes that shadow (no clip_corner: a layer the
-    // wrapper's size, the trap that froze the P4_5 - LESSONS).
+    // THE WRAPPER IS THE PANEL (2.11 round 5): its surface and its edge, every
+    // corner rounded - it lies ON the bar (D-35), its top edge the bar's line,
+    // its top corners turning down from it. It is what grows and shrinks, so
+    // the top edge and its corners stay whole while the foot moves (the owner:
+    // the walls stay joined to the top's curves until the last frame). It clips
+    // the face riding inside it; no clip_corner (a layer the wrapper's size,
+    // the trap that froze the P4_5 - LESSONS).
     lv_style_t *dr = st(S::KS_DRAWER);
-    lv_style_set_bg_opa      (dr, LV_OPA_TRANSP);
-    lv_style_set_border_width(dr, 0);
+    lv_style_set_bg_color    (dr, UI::c(p.SURFACE));
+    lv_style_set_bg_opa      (dr, LV_OPA_COVER);
+    // Its edge is the accent, the bar's line's width (D-23): with the open
+    // slot's, one outline from the tab's top to the panel's foot. Drawn after
+    // the face, so what rides up passes under it.
+    lv_style_set_border_width(dr, UI::sc(h.LINE));
+    lv_style_set_border_color(dr, UI::c(p.ACCENT));
+    lv_style_set_border_post (dr, true);
     lv_style_set_pad_all     (dr, 0);
     lv_style_set_radius      (dr, UI::sc(h.DRAWER_R));
-    // The face: every corner rounded - the panel lies ON the bar (D-35), its top
-    // edge the bar's line, its top corners turning down from it.
+    // The face: the panel's contents, riding the moving foot. Clear; its edge
+    // is kept at the line's width, unpainted, so the contents sit where they did.
     lv_style_t *df = st(S::KS_DRAWER_FACE);
-    lv_style_set_bg_color    (df, UI::c(p.SURFACE));
-    lv_style_set_bg_opa      (df, LV_OPA_COVER);
-    // Its edge is the accent, the bar's line's width (D-23): with the open
-    // slot's, one outline from the tab's top to the panel's foot.
+    lv_style_set_bg_opa      (df, LV_OPA_TRANSP);
     lv_style_set_border_width(df, UI::sc(h.LINE));
-    lv_style_set_border_color(df, UI::c(p.ACCENT));
-    lv_style_set_radius      (df, UI::sc(h.DRAWER_R));
+    lv_style_set_border_opa  (df, LV_OPA_TRANSP);
     lv_style_set_pad_hor     (df, UI::sc(h.DRAWER_PAD));
     lv_style_set_pad_bottom  (df, UI::sc(h.DRAWER_PAD));
     lv_style_set_pad_top     (df, UI::sc(h.DRAWER_PAD));
