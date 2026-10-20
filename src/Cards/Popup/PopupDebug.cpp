@@ -4,7 +4,8 @@
 #include "UI/AboutSheet.h"   // the Sheet's second client (2.12 P4)
 #include "UI/TweaksSheet.h"  // and UI Tweaks (2.8 round 3)
 #include "Cards/PageArranger.h"   // the arranger's last run, in the card list (2.11 round 2)
-#include "UI/SlotPanels.h"        // restore=: the page panel's hidden cards (2.11, K96)
+#include "UI/SlotPanels.h"        // restore=-2: the page panel's View hidden cards (2.11, K96)
+#include "UI/HiddenSheet.h"       // restore=N: the hidden cards' sheet (round 6)
 
 namespace popup {
 
@@ -131,7 +132,7 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int cardState = -2; // 2.8 round 4: the cards' active state 0-3, not saved; -1 the owner's
                 int32_t active = -1;// 2.8 round 6: the active colour, RRGGBB, not saved; 0 the scheme's own
                 int kbd = -1, kbMode = -1, kbPress = -1;   // 2.11 (K95): the keyboard
-                int restore = -1;                          // 2.11 (K96): the page panel's Restore N
+                int restore = -1;                          // 2.11 (K96): the hidden cards' Restore N; -2 View hidden cards
                 int addTo = -1, mv = 0;                    // 2.11 (K91): Add to cluster N, copy or move
                 int addCards = -1;                         // ... a cluster's Add cards: the ticked, as a bit mask
                 int join = -1;                             // K92 rule 9: 1 opens "which group?", 2+N adds in group N
@@ -386,11 +387,17 @@ void CardPopup::debugService(lv_timer_t *t) {
         s_dreq.store(DREQ_DONE);
         return;
     }
-    // 2.11 (K96): restore=N as a tap on Restore beside the page panel's Nth
-    // hidden card (slot=page opens it first).
+    // 2.11 (K96, round 6): restore=N as a tap on the Nth card's Restore in the
+    // hidden cards' sheet; restore=-2 as a tap on the page panel's "View hidden
+    // cards" (slot=page opens the panel first).
+    if (a.restore == -2) {
+        dbgOut(SlotPanels::viewHiddenDebug() ? "hidden cards: open\n" : "no View hidden cards in an open page panel\n");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
     if (a.restore >= 0) {
-        dbgOut(SlotPanels::restoreDebug((uint8_t)a.restore) ? "restoring hidden card %d\n"
-                                                            : "no hidden card %d in an open page panel\n", a.restore);
+        dbgOut(HiddenSheet::restoreDebug((uint8_t)a.restore) ? "restoring hidden card %d\n"
+                                                             : "no hidden card %d in an open hidden cards sheet\n", a.restore);
         s_dreq.store(DREQ_DONE);
         return;
     }

@@ -110,11 +110,16 @@ void addCardCb(lv_event_t *ev);
 uint8_t deckSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
     Card *held = cardOf(h.surface);
-    r[n++] = { "Paused", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)aggregate().paused, true,
-               pauseCheckCb, &s.swPause };
+    // A CLUSTER'S OWN SETTINGS (round 6, the owner): no Paused and no Active
+    // state - it neither pauses nor counts as on; its members do, each in its
+    // own view.
+    const bool clusterSelf = s.cluster && !inMember();
+    if (!clusterSelf)
+        r[n++] = { "Paused", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)aggregate().paused, true,
+                   pauseCheckCb, &s.swPause };
     // When a group defined here counts as on - HA's group helper option.
     // Not for a group defined in HA or Hue: the source decides (2.10c).
-    if (s.nEnt > 1 && !s.native && !inMember())
+    if (s.nEnt > 1 && !s.native && !inMember() && !s.cluster)
         r[n++] = { "Active state", DeckRowKind::ROW_DROP, "Any members are on\nAll members are on",
                    (uint16_t)(s.groupOn == GroupOn::GROUP_ON_ALL), true, groupDropCb, &s.ddGroup };
     // Entity label and Card label are Card UI's since 2.8 round 3 (D-25, D-28).
@@ -141,14 +146,19 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     r[n++] = { "Entity properties", DeckRowKind::ROW_BUTTON, "View", 0, true, propsCb, nullptr };
     // K17 (K65): a member of a group card made a card of its own - a copy,
     // right after the group card, in its group. Once made, the row says so.
-    if (inMember() && held && held->hasId() && s.ent[0]) {
+    // A CLUSTER'S MEMBER has Visibility instead (round 6, the owner: from
+    // Members its SETTINGS offered Add card to dashboard, from its tile
+    // Visibility - one member, two answers): the same view as its tile's.
+    const bool clusterMember = s.cluster && inMember();
+    if (inMember() && !s.cluster && held && held->hasId() && s.ent[0]) {
         const bool made = CardAdded::addedFor(held->id(), s.ent[0]->desc.id) != nullptr;
         r[n++] = { "Add card to dashboard", DeckRowKind::ROW_BUTTON, made ? "Added" : "Add", 0, !made, addCardCb, nullptr };
     }
     // VISIBILITY (K96): what the card can do where it is - hidden from the page
     // (K66's remove, every card since 2.11) or from its cluster, and more later.
     if (held)
-        r[n++] = { "Visibility", DeckRowKind::ROW_BUTTON, "Open", 0, cardRows, visibilityCb, nullptr };
+        r[n++] = { "Visibility", DeckRowKind::ROW_BUTTON, "Open", 0, cardRows || (clusterMember && visibilitySubject()),
+                   visibilityCb, nullptr };
     // CARD UI (2.8 round 3, D-27): the card's own looks, a view of their own -
     // at the foot. The card's, so greyed in a member's view; a card without a
     // usable id cannot keep them.

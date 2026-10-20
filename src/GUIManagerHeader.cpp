@@ -10,6 +10,7 @@
 #include <time.h>
 #include "Alarms.h"
 #include "Cards/CardAdded.h"   // this page's hidden cards (K66, K96)
+#include "UI/HiddenSheet.h"    // ...in their own sheet (round 6)
 #include "Settings.h"
 #include "UI/SlotPanels.h"
 #include "UI/TweaksSheet.h"
@@ -68,22 +69,15 @@ void GUIManager::openSlotPanel(uint8_t slot) {
         if (s >= 0) g->openSlotPanel((uint8_t)s);
     };
     c.refreshHeader = [](void *user) { ((GUIManager *)user)->_header.refresh(); };
-    // THIS PAGE'S HIDDEN CARDS (2.11, K66, K96): by the name the dashboard gives,
-    // else its entity's. Restore puts one back; the page is built again once the
-    // panel has gone (tick(), CardAdded::takeChanged()).
-    static CardAdded::PoolItem s_pool[SlotPanels::HIDDEN_MAX];
+    // THIS PAGE'S HIDDEN CARDS (2.11, K66, K96): how many, and a button to their
+    // own sheet (round 6) - the panel goes first.
     if (_header.slotKind(slot) == SlotKind::SLOT_PAGE && _pages[_curPage].spec) {
-        c.hiddenCount = CardAdded::pool(*_pages[_curPage].spec, s_pool, SlotPanels::HIDDEN_MAX);
-        for (uint8_t i = 0; i < c.hiddenCount; i++) {
-            const Entity *e = s_pool[i].entity[0] ? _core.entities().find(s_pool[i].entity) : nullptr;
-            c.hiddenNames[i] = s_pool[i].label && s_pool[i].label[0] ? s_pool[i].label
-                             : e && e->desc.name[0]                  ? e->desc.name
-                             : e && e->sourceName[0]                 ? e->sourceName : s_pool[i].id;
-        }
-        c.restoreCard = [](void *user, uint8_t i) {
+        static CardAdded::PoolItem s_count[HiddenSheet::MAX];
+        c.hiddenCount = CardAdded::pool(*_pages[_curPage].spec, s_count, HiddenSheet::MAX);
+        c.viewHidden  = [](void *user) {
             GUIManager *g = (GUIManager *)user;
             g->closeSlotPanel(true);
-            if (i < SlotPanels::HIDDEN_MAX && CardAdded::restore(s_pool[i].id)) Settings::save();
+            g->openHiddenSheet();
         };
     }
     if (!SlotPanels::build(_header.slotKind(slot), _slotDrawer.face, c)) return;
@@ -96,6 +90,45 @@ void GUIManager::openSlotPanel(uint8_t slot) {
     _panelTouchMs = millis();   // it waits the window timeout from now (D-22)
     _header.setOpenSlot(slot, _slotDrawer.x, _slotDrawer.x + _slotDrawer.w);
     syncScrim();
+}
+
+// THE PAGE'S HIDDEN CARDS, IN THEIR OWN SHEET (2.11 round 6): by the name the
+// dashboard gives, else its entity's, copied - the page is built again under the
+// sheet as each one is restored (tick(), CardAdded::takeChanged()).
+void GUIManager::openHiddenSheet() {
+    if (_curPage >= _nPages || !_pages[_curPage].spec) return;
+    static CardAdded::PoolItem s_pool[HiddenSheet::MAX];
+    static char s_names[HiddenSheet::MAX][ENTITY_NAME_MAX];
+    HiddenSheet::Spec sp;
+    sp.page = _pages[_curPage].spec->title;
+    sp.n    = CardAdded::pool(*_pages[_curPage].spec, s_pool, HiddenSheet::MAX);
+    for (uint8_t i = 0; i < sp.n; i++) {
+        const Entity *e = s_pool[i].entity[0] ? _core.entities().find(s_pool[i].entity) : nullptr;
+        snprintf(s_names[i], sizeof(s_names[i]), "%s",
+                 s_pool[i].label && s_pool[i].label[0] ? s_pool[i].label
+                 : e && e->desc.name[0]                  ? e->desc.name
+                 : e && e->sourceName[0]                 ? e->sourceName : s_pool[i].id);
+        sp.names[i] = s_names[i];
+    }
+    // Two called the same say where each is from ("Office Right (Office)"), else
+    // which entity it shows.
+    bool twin[HiddenSheet::MAX] = {};
+    for (uint8_t i = 0; i < sp.n; i++)
+        for (uint8_t j = 0; j < sp.n && !twin[i]; j++) twin[i] = j != i && !strcmp(s_names[j], s_names[i]);
+    for (uint8_t i = 0; i < sp.n; i++) {
+        if (!twin[i]) continue;
+        const char *where = s_pool[i].area[0] ? s_pool[i].area : s_pool[i].entity;
+        const size_t len = strlen(s_names[i]);
+        if (where[0] && len + 4 < sizeof(s_names[i]))
+            snprintf(s_names[i] + len, sizeof(s_names[i]) - len, " (%s)", where);
+    }
+    sp.restore = [](void *, uint8_t i) {
+        if (i >= HiddenSheet::MAX || !CardAdded::restore(s_pool[i].id)) return false;
+        Settings::save();
+        return true;
+    };
+    sp.user = this;
+    HiddenSheet::open(sp);
 }
 
 // Its tab closes once the drawer has finished closing (slotDrawerClosed()).

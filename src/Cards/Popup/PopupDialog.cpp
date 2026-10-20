@@ -53,11 +53,12 @@ void confirmHide() {
 // is untouched.
 void confirmRemoveCopy() {
     confirmClose();
-    Card *held = CardPopup::isOpen() ? cardOf(h.surface) : nullptr;
+    // The held tile, or - in a cluster's window - the member whose view this is (round 6).
+    Card *held = CardPopup::isOpen() ? visibilitySubject() : nullptr;
     if (!held || !CardAdded::isMember(held->id())) return;
     char buf[200];
     snprintf(buf, sizeof(buf), "This copy of \"%s\" will be removed from the cluster and deleted; the card "
-                               "it was copied from is unaffected.", s.name);
+                               "it was copied from is unaffected.", held->shownName(CardLabel::LBL_NAME));
     Kit::DialogSpec spec = {};
     spec.role    = Kit::DialogRole::DLG_DESTRUCTIVE;
     spec.title   = "Remove this copy?";
@@ -66,7 +67,7 @@ void confirmRemoveCopy() {
     spec.buttons[1] = { "Remove", Kit::ButtonRole::BTN_DESTRUCTIVE, [](lv_event_t *) {
         lv_async_call([](void *) {
             confirmClose();
-            Card *held = CardPopup::isOpen() ? cardOf(h.surface) : nullptr;
+            Card *held = CardPopup::isOpen() ? visibilitySubject() : nullptr;
             if (held && CardAdded::removeMember(held->id())) CardPopup::close();
         }, nullptr);
     } };

@@ -134,22 +134,17 @@ void hdrChosen(uint8_t i) {
 }
 
 // THIS PAGE'S HIDDEN CARDS (2.11, K66, K96 - the mock's "this page's list of
-// hidden cards"): each with Restore, which puts it back where it was.
-void restoreCb(lv_event_t *e) {
-    const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
-    if (s_ctx.restoreCard) s_ctx.restoreCard(s_ctx.user, i);
+// hidden cards"): a button to their own sheet (round 6, the owner: the list made
+// the panel long), there only when the page has some.
+void viewHiddenCb(lv_event_t *) {
+    if (s_ctx.viewHidden) s_ctx.viewHidden(s_ctx.user);
 }
 
 void hiddenCards(lv_obj_t *face, const Context &c) {
-    if (!c.hiddenCount) return;
-    title(face, "HIDDEN CARDS");
-    const UIShape &k = UI::shape();
-    const int32_t bw = Kit::textW("Restore", UI::type().NAME) + 2 * UI::mm(k.S7);
-    for (uint8_t i = 0; i < c.hiddenCount && i < HIDDEN_MAX; i++) {
-        lv_obj_t *r = Kit::row(face, c.hiddenNames[i], true);
-        lv_obj_t *b = Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Restore", bw, Kit::controlH(), nullptr);
-        lv_obj_add_event_cb(b, restoreCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
-    }
+    if (!c.hiddenCount || !c.viewHidden) return;
+    char words[32];
+    snprintf(words, sizeof(words), "View hidden cards (%u)", (unsigned)c.hiddenCount);
+    Kit::button(Kit::buttonRow(face), Kit::ButtonRole::BTN_CANCEL, words, faceRoom(), UI::minTouch(), viewHiddenCb);
 }
 
 void buildPage(lv_obj_t *face, const Context &c) {
@@ -169,7 +164,7 @@ void buildPage(lv_obj_t *face, const Context &c) {
     Kit::selector(s_hdrSel, face, sp);
     Kit::drawerNote(face, "Hide: the header goes when this panel closes; swipe down from the top edge "
                           "to see it for a moment. A card hidden from this page (its window's Visibility) "
-                          "is listed here until restored.");
+                          "waits under View hidden cards until restored.");
 }
 
 // The sensor: its name, its reading - or dashes and what went wrong - and when
@@ -220,10 +215,10 @@ bool build(SlotKind kind, lv_obj_t *face, const Context &c) {
 }
 
 #ifdef DEBUG_POPUP
-bool restoreDebug(uint8_t i) {
-    if (!s_ctx.restoreCard || i >= s_ctx.hiddenCount) return false;
-    s_ctx.restoreCard(s_ctx.user, i);
-    s_ctx.restoreCard = nullptr;   // once: the list it was built from is gone
+bool viewHiddenDebug() {
+    if (!s_ctx.viewHidden || !s_ctx.hiddenCount) return false;
+    s_ctx.viewHidden(s_ctx.user);
+    s_ctx.viewHidden = nullptr;   // once: the panel it was built for has gone
     return true;
 }
 #endif

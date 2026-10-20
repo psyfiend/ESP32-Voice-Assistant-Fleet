@@ -24,8 +24,9 @@ int32_t tilesTop() { return hdrH() + pad() * 8 / 10; }
 }  // namespace
 
 ClusterCard::ClusterCard() {
-    // A tap on the cluster itself (its header) does nothing (owner, 2026-10-19);
-    // its own header is drawn here, not a card label.
+    // A tap on the cluster itself (its header) switches nothing (owner, K107):
+    // the page sets it from the file, Members unless chosen (round 6). Its own
+    // header is drawn here, not a card label.
     setTapAction(TapAction::TAP_NOTHING);
     setHeaderStyle(CardHeaderStyle::HDR_NONE);
     for (int8_t &s : _slotOf) s = -1;

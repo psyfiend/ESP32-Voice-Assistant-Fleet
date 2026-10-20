@@ -13,13 +13,11 @@ constexpr uint32_t SLIDE_MS = 350;   // the system panel's
 
 lv_obj_t *s_bar = nullptr;   // the header bar the panels lie on (drawerOverBar() learns it)
 
-bool anyDrawerShowing();   // below, with the list of drawers
-void barShadow(bool on);
-
 void slide(void *var, int32_t v) {
     Drawer *d = (Drawer *)var;
     if (!d || !d->root) return;
     // The wrapper is the panel: its top edge stays, its foot moves (round 5).
+    const int32_t was = lv_obj_get_style_height(d->root, LV_PART_MAIN);   // as last set
     lv_obj_set_height(d->root, v);
     // The face rides the foot: its bottom stays on the wrapper's bottom, so it
     // slides down rather than being uncovered (the owner's "window blinds"),
@@ -29,11 +27,16 @@ void slide(void *var, int32_t v) {
     // edge as a line under the bar.
     if (v <= 0) {
         lv_obj_add_flag(d->root, LV_OBJ_FLAG_HIDDEN);
-        // Closing only: an opening slide's first step is 0 too.
-        if (!d->open && !anyDrawerShowing()) barShadow(true);
-        if (!d->open && s_bar) lv_obj_invalidate(s_bar);   // its shading on the bar goes with it
+        // Closing only (an opening slide's first step is 0 too): its shading
+        // on the bar goes with it.
+        if (!d->open && s_bar) lv_obj_invalidate(s_bar);
     } else {
         lv_obj_clear_flag(d->root, LV_OBJ_FLAG_HIDDEN);
+        // Its first frame with a height: the bar draws its shading now. Drawn
+        // when the panel was asked to open, it had none yet, and nothing else
+        // redraws that part of the bar - the owner saw it only in screenshots,
+        // which draw everything afresh (round 6).
+        if (was <= 0 && s_bar) lv_obj_invalidate(s_bar);
     }
 }
 
@@ -66,21 +69,9 @@ constexpr uint8_t JOINS_MAX = 4;
 lv_obj_t *s_joins[JOINS_MAX] = {};
 uint8_t   s_joinN = 0;
 
-bool anyDrawerShowing() {
-    for (uint8_t i = 0; i < s_drawerN; i++)
-        if (s_drawers[i]->root && !lv_obj_has_flag(s_drawers[i]->root, LV_OBJ_FLAG_HIDDEN)) return true;
-    return false;
-}
-
-// THE BAR'S DROP SHADOW (Linen) IS OFF WHILE A PANEL SHOWS (2.11 round 4): it
-// fell over the halo at the panel's top corners - a grey patch where the halo
-// should be dark (the owner's close-up of the system panel). The halo is the
-// panel's shadow; the bar's comes back when the last panel has gone.
-void barShadow(bool on) {
-    if (!s_bar) return;
-    if (on) lv_obj_remove_local_style_prop(s_bar, LV_STYLE_SHADOW_OPA, 0);
-    else    lv_obj_set_style_shadow_opa(s_bar, LV_OPA_TRANSP, 0);
-}
+// THE BAR'S DROP SHADOW STAYS WHILE A PANEL SHOWS (round 6, the owner: it
+// disappeared). Round 4 took it away because it fell over the panel's halo at
+// its top corners; a header panel has no halo below the bar since round 5.
 }  // namespace
 
 // Over the bar's accent line, from x1 to x2: the bar's own face, at `opa`, or
@@ -386,8 +377,6 @@ void drawerOpen(Drawer &d) {
     // Measured, never guessed (the system panel's #50 lesson): the face is
     // content-sized, so it has a true height while the wrapper is closed.
     lv_obj_clear_flag(d.root, LV_OBJ_FLAG_HIDDEN);
-    barShadow(false);   // the shading on the bar takes its place (round 4)
-    if (s_bar) lv_obj_invalidate(s_bar);   // that shading, drawn once for the slide
     lv_obj_update_layout(d.face);
     int32_t h = lv_obj_get_height(d.face);
     const int32_t avail = lv_obj_get_height(lv_screen_active()) - d.top - UI::sc(UI::hdr().DRAWER_PAD);

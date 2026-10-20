@@ -77,6 +77,8 @@
     #define DBG_POPUP(...) do {} while (0)
 #endif
 
+class ClusterCard;   // Cards/ClusterCard.h: the cluster's window (PopupCluster.cpp)
+
 namespace popup {
 
 using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
@@ -400,6 +402,7 @@ void buildControlDeck(lv_obj_t *parent, uint8_t caps);
 
 // PopupMembers.cpp
 void buildMembers();
+int32_t membersRowW();   // PopupControls.cpp: Members' width - a group light's controls', in a cluster's window too
 void enterMemberAsync(void *unused);
 void memberRowCb(lv_event_t *ev);
 void leaveMember(PopupView to = PopupView::VIEW_MEMBERS);
@@ -421,6 +424,14 @@ bool clusterTakeRebuild();   // a choice wants the page built again, once the wi
 void clusterRename();        // the keyboard on the cluster's name, as Rename opens it (K95)
 void buildClusterAdd();      // VIEW_CLUSTER_ADD: the page's cards, each No / Copy / Move (K91)
 uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask);   // ...the picked ones in; the window closes
+// Member `i` of `cl` shown as a tile or not, kept when the window closes (K104's
+// Visible - from its Visibility since round 6, no longer the cluster's Details).
+void clusterMemberShow(const ClusterCard &cl, uint8_t i, bool want);
+// Member `i` as the next build will show it: a tile, in the header, or hidden.
+enum class MemberShown : uint8_t { SHOWN_TILE, SHOWN_HEADER, SHOWN_HIDDEN };
+MemberShown clusterMemberShown(const ClusterCard &cl, uint8_t i);
+// The member of `cl` whose entity is `e`, or -1.
+int8_t clusterMemberOf(const ClusterCard &cl, const Entity *e);
 
 // PopupHistory.cpp
 void histKeep(const char *key, const char *value);
@@ -496,6 +507,9 @@ void removeCopyCb(lv_event_t *ev);
 void buildVisibility();
 void visibilityCb(lv_event_t *ev);   // SETTINGS' Visibility row
 void visibilityHideTile();           // Hide from the cluster: the held mini tile, and the window closes
+// Whose visibility the view is about: the held card, or - in a cluster's window,
+// one member's own view - that member's card (round 6). Null when there is none.
+Card *visibilitySubject();
 void buildAddTo();                   // VIEW_ADD_TO: Add to a cluster - which, Copy or Move (K91, K100)
 bool visibilityAddTo(uint8_t pick, bool move);   // ...done: the window closes; false when it cannot
 // WHICH GROUP? (K92 rule 9): Add card to dashboard asks it first - VIEW_JOIN.

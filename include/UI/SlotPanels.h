@@ -8,7 +8,8 @@
 //
 //   clock   the time and the date; the next alarm and the warning time (D-21)
 //   page    the pages, to go to one; this page's header, shown or hidden (D-14);
-//           this page's hidden cards, each with Restore (2.11, K66, K96)
+//           "View hidden cards", when it has some - their own sheet (2.11 round 6,
+//           K66, K96; HiddenSheet)
 //   sensor  its reading, when it last reported, or what went wrong
 //   alarm   the alarm's notice: when, Dismiss, Settings (the clock's panel)
 //
@@ -23,16 +24,14 @@ class EntityRegistry;
 namespace SlotPanels {
 
 static constexpr uint8_t PAGES_MAX  = 12;
-static constexpr uint8_t HIDDEN_MAX = 12;   // this page's hidden cards listed, at most
 
 struct Context {
     const char *pageTitles[PAGES_MAX] = {};
     uint8_t     pageCount   = 0;
     uint8_t     pageIndex   = 0;
     bool        headerShown = true;
-    const char *hiddenNames[HIDDEN_MAX] = {};   // this page's pool (K66, K96), by name
-    uint8_t     hiddenCount = 0;
-    void (*restoreCard)(void *user, uint8_t i) = nullptr;   // hiddenNames[i] back on the page
+    uint8_t     hiddenCount = 0;                         // this page's pool (K66, K96)
+    void (*viewHidden)(void *user) = nullptr;            // ...their sheet (round 6)
     const char *entity      = nullptr;   // the sensor slot's
     EntityRegistry *reg     = nullptr;
     void *user = nullptr;                // handed back to those below
@@ -48,9 +47,9 @@ struct Context {
 bool build(SlotKind kind, lv_obj_t *face, const Context &c);
 
 #ifdef DEBUG_POPUP
-// /popup?restore=N: as a tap on Restore beside the page panel's Nth hidden
-// card. False when the page's panel has not been built with one.
-bool restoreDebug(uint8_t i);
+// /popup?hidden=1: as a tap on the page panel's "View hidden cards". False when
+// the page's panel has not been built with it.
+bool viewHiddenDebug();
 #endif
 
 }  // namespace SlotPanels

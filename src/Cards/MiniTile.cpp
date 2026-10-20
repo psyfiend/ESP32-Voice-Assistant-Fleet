@@ -126,10 +126,13 @@ void StateCard::renderMini() {
     const int32_t nameH = showName ? lv_font_get_line_height(t.TAG) : 0;
     const int32_t room  = h - nameH - (showName ? heroGap() + rowGap(_mid) : 0);
 
-    // The disc: most of the room left over, never wider than most of the tile -
-    // and THE SOLO CARDS' OWN wherever that much room is there (round 4: "it
-    // is really not a good look when dashboard icons are different sizes").
+    // The disc: most of the room left over, never wider than most of the tile,
+    // never larger than a solo card's at its largest (Card::heroDiscPx()) - and
+    // THE SOLO CARDS' OWN wherever that much room is there (round 4: "it is
+    // really not a good look when dashboard icons are different sizes"), unless
+    // they are squeezed (round 6: the page sets none then, CardPage::commit()).
     int32_t d = LV_MIN(room * 92 / 100, w * 72 / 100);
+    d = LV_MIN(d, lv_font_get_line_height(t.ICON) * 2);
     if (d < 0) d = 0;
     const lv_font_t *face = t.ICON_SM;
     if (pageDisc() > 0 && pageFace() && pageDisc() <= d) {

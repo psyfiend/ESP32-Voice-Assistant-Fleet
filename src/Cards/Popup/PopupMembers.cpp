@@ -1,5 +1,6 @@
 // Members, and a member's own controls (2.12 P1, split from CardPopup.cpp).
 #include "PopupState.h"
+#include "Cards/ClusterCard.h"
 
 namespace popup {
 
@@ -18,7 +19,11 @@ void buildMembers() {
     // Centred vertically too (owner, round 4): as tall as its rows, never
     // taller than the stage, which centres it.
     lv_obj_t *list = plain(s.stage);
-    lv_obj_set_size     (list, s.mainRowW > 0 ? s.mainRowW : lv_pct(100), LV_SIZE_CONTENT);
+    const int32_t rowW = membersRowW();
+    lv_obj_set_size     (list, rowW > 0 ? rowW : lv_pct(100), LV_SIZE_CONTENT);
+    // A CLUSTER'S MEMBERS ARE ALL HERE, hidden ones too (round 6), each saying so.
+    Card *held = cardOf(h.surface);
+    const ClusterCard *cl = (held && s.cluster) ? static_cast<const ClusterCard *>(held) : nullptr;
     lv_obj_set_style_max_height(list, lv_pct(100), 0);
     lv_obj_add_flag     (list, LV_OBJ_FLAG_SCROLLABLE);
     UI::tameScroll(list);
@@ -44,7 +49,11 @@ void buildMembers() {
         char buf[48];
         KS role = KS::KS_LABEL_TAG;
         const EntityAttrs &at = e->attrs;
-        if (e->paused) {
+        const int8_t k = cl ? clusterMemberOf(*cl, e) : -1;
+        if (k >= 0 && clusterMemberShown(*cl, (uint8_t)k) == MemberShown::SHOWN_HIDDEN) {
+            snprintf(buf, sizeof(buf), "Hidden");
+            role = KS::KS_LABEL_TAG_DIM;
+        } else if (e->paused) {
             // Out of the group, but still listed and saying why (owner, 2.10b).
             snprintf(buf, sizeof(buf), "Paused");
             role = KS::KS_LABEL_TAG_DIM;
@@ -73,7 +82,9 @@ void buildMembers() {
         lv_label_set_text(v, buf);
     }
     lv_obj_t *note = Kit::label(list, KS::KS_LABEL_TAG_DIM);
-    lv_label_set_text(note, "Tap a member for more details");   // owner's words, 2026-10-07
+    // Owner's words, 2026-10-07; a cluster's member is shown or hidden from its own view.
+    lv_label_set_text(note, cl ? "Tap a member for more details; its Visibility shows or hides it"
+                               : "Tap a member for more details");
     // SATIN (#99, K77): a row can be tapped and is not chosen. Painted at the
     // rows' laid-out size, which only the layout knows.
     lv_obj_update_layout(list);

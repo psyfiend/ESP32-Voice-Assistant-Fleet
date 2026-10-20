@@ -13,7 +13,9 @@
 //                  group?" comes with the card list).
 //
 // A member's own view inside a group card's window keeps SETTINGS' Add card
-// to dashboard (K17).
+// to dashboard (K17). Inside a CLUSTER's window it has this view instead, the
+// same as its tile's (round 6: one member, one answer), and a hidden member's
+// says Show in the cluster - Members lists them all.
 #include "PopupState.h"
 #include "Cards/ClusterCard.h"
 
@@ -173,47 +175,83 @@ void joinChipCb(lv_event_t *ev) {
 
 void joinGoCb(lv_event_t *) { lv_async_call([](void *) { visibilityJoin(s_joinPick); }, nullptr); }
 
+// The cluster the subject is in: the held tile's, or the window's own.
+ClusterCard *clusterOfSubject() {
+    if (s.cluster && inMember()) return static_cast<ClusterCard *>(held());
+    return clusterOfTile();
+}
+
 // Add card to dashboard, from a mini tile: which group first.
 void addTileCb(lv_event_t *) {
     lv_async_call([](void *) {
-        Card *c = held();
-        ClusterCard *cl = clusterOfTile();
+        Card *c = visibilitySubject();
+        ClusterCard *cl = clusterOfSubject();
         const Entity *e = c ? c->firstEntity() : nullptr;
         if (!cl || !e || s.phase != PopupPhase::PHASE_OPEN) return;
         visibilityJoinOpen(cl, e);
     }, nullptr);
 }
 
+// Show in the cluster: a hidden member (or one only in the header) a tile again.
+void showTileCb(lv_event_t *) {
+    lv_async_call([](void *) {
+        Card *c = visibilitySubject();
+        ClusterCard *cl = clusterOfSubject();
+        const int8_t i = (cl && c) ? clusterMemberOf(*cl, c->firstEntity()) : -1;
+        if (i < 0 || s.phase != PopupPhase::PHASE_OPEN) return;
+        clusterMemberShow(*cl, (uint8_t)i, true);
+        showView(PopupView::VIEW_VISIBILITY);   // it says so at once; the cluster when the window closes
+    }, nullptr);
+}
+
 }  // namespace
 
-// Hide from the cluster: gone from it when the window closes - which it does now.
-void visibilityHideTile() {
+Card *visibilitySubject() {
     Card *c = held();
+    if (!(c && s.cluster && inMember())) return c;
+    ClusterCard *cl = static_cast<ClusterCard *>(c);
+    const int8_t i = clusterMemberOf(*cl, s.ent[0]);
+    return i >= 0 ? cl->memberAt((uint8_t)i) : nullptr;
+}
+
+// Hide from the cluster: gone from it when the window closes. From its tile the
+// window closes now; from the cluster's own window it stays, saying so.
+void visibilityHideTile() {
+    Card *c = visibilitySubject();
+    ClusterCard *cl = clusterOfSubject();
     if (!c || !c->hasId() || !c->mini() || s.phase != PopupPhase::PHASE_OPEN) return;
+    if (s.cluster && inMember()) {
+        const int8_t i = cl ? clusterMemberOf(*cl, c->firstEntity()) : -1;
+        if (i >= 0) clusterMemberShow(*cl, (uint8_t)i, false);
+        showView(PopupView::VIEW_VISIBILITY);
+        return;
+    }
     Settings::setCard(c->id(), "hidden", "yes");
     s_rebuildPage = true;
     CardPopup::close();
 }
 
 void buildVisibility() {
-    Card *c = held();
+    Card *c = visibilitySubject();
     if (!c) return;
-    ClusterCard *cl = clusterOfTile();
+    ClusterCard *cl = clusterOfSubject();
     lv_obj_t *list = table(nullptr, 0, nullptr);
     Action a[3];
     uint8_t n = 0;
     if (cl) {
         const Entity *e = c->firstEntity();
         const bool made = e && cl->hasId() && CardAdded::addedFor(cl->id(), e->desc.id);
-        if (c->hasId()) a[n++] = { "Hide from the cluster", Kit::ButtonRole::BTN_CANCEL, hideTileCb };
+        const int8_t i = clusterMemberOf(*cl, e);
+        const bool tile = i < 0 || clusterMemberShown(*cl, (uint8_t)i) == MemberShown::SHOWN_TILE;
+        if (c->hasId()) a[n++] = tile ? Action{ "Hide from the cluster", Kit::ButtonRole::BTN_CANCEL, hideTileCb }
+                                      : Action{ "Show in the cluster", Kit::ButtonRole::BTN_CANCEL, showTileCb };
         if (!made && e && cl->hasId()) a[n++] = { "Add card to dashboard", Kit::ButtonRole::BTN_CANCEL, addTileCb };
         // A copy made here can go again, for good (K91; the dashboard's members only hide).
         if (CardAdded::isMember(c->id())) a[n++] = { "Remove from the cluster", Kit::ButtonRole::BTN_DESTRUCTIVE, removeCopyCb };
         actions(list, a, n);
-        note(list, made ? "Its card is on the dashboard already. A hidden member stays in the cluster and "
-                          "comes back from the cluster's window (a long press on its header)."
-                        : "A hidden member stays in the cluster and comes back from the cluster's window (a "
-                          "long press on its header).");
+        note(list, made ? "Its card is on the dashboard already. A hidden member stays in the cluster, listed in "
+                          "its Members."
+                        : "A hidden member stays in the cluster, listed in its Members.");
         return;
     }
     if (c->hasId())  a[n++] = { "Hide from this page", Kit::ButtonRole::BTN_CANCEL, hideCardCb };
@@ -320,7 +358,8 @@ bool visibilityJoin(uint8_t pick) {
     char msg[80];
     snprintf(msg, sizeof(msg), "Added to the dashboard, in %s", pick < s_nJoin ? s_joinName[pick] : "its group");
     UIToolkit::show_toast(msg);
-    const bool tile = held() && held()->mini();
+    // Back to the Visibility it came from: a tile's, or a cluster member's own view's.
+    const bool tile = (held() && held()->mini()) || (s.cluster && inMember());
     showView(tile ? PopupView::VIEW_VISIBILITY : controlsView());
     return true;
 }

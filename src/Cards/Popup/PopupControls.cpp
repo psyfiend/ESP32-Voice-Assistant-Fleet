@@ -110,6 +110,24 @@ int32_t stageH() {
     return lv_area_get_height(&s.winRect) - 2 * s.pad - UI::minTouch() - mm(UI::shape().S5);
 }
 
+int32_t controlDeckH();   // below
+
+// MEMBERS' WIDTH (round 6): the main view's slider and words together. A
+// cluster's window has no slider, and its Members took whatever the last window
+// had left (the owner: "sometimes the satin buttons span the entire window,
+// sometimes not") - so it is a group light's, as Desk's would be in this window.
+int32_t membersRowW() {
+    if (!s.cluster) return s.mainRowW;
+    const int32_t keepW = s.heroW, keepH = s.heroH;   // colWidth() reads the hero's width
+    s.heroH = LV_MAX(pm(HERO_H_MM), UI::minTouch());
+    s.heroW = s.heroH * 42 / 100;
+    const bool stacked = stageH() >= s.heroH + pm(UI::shape().P_STACK_GAP) + controlDeckH();
+    const int32_t w = s.heroW + pm(UI::shape().P_GAP) + colWidth(true, LIGHT_CAN_DIM | LIGHT_CAN_TEMP, !stacked);
+    s.heroW = keepW;
+    s.heroH = keepH;
+    return w;
+}
+
 // The control deck's height: its switches and its own padding.
 int32_t controlDeckH() { return Kit::selectorH(); }
 

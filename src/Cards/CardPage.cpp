@@ -350,6 +350,11 @@ void CardPage::commit() {
     // THE PAGE'S HERO (round 4): a solo 1x1 card's disc and icon, measured now
     // it is built, and every cluster's tiles drawn again to match it where they
     // have the room - a tile's icon and a card's are the same size.
+    // UNLESS THE CARD IS SQUEEZED (round 6, the owner: "the icons get smaller and
+    // smaller the more rows are added", the clusters roomy around them): a card
+    // whose icon had to step down from the full face sets nothing, and the tiles
+    // size themselves - as large as a solo card's at most. Giving solo cards their
+    // room is the arranger's (layout-engines.md, v8).
     {
         int32_t disc = 0;
         const lv_font_t *face = nullptr;
@@ -359,6 +364,7 @@ void CardPage::commit() {
             if (!strcmp(c->typeName(), "cluster")) continue;
             c->heroSizes(disc, face);
         }
+        if (face != UI::type().ICON) { disc = 0; face = nullptr; }
         Card::setPageHero(disc, face);
         for (uint8_t i = 0; i < _n; i++) {
             Card *c = _cards[i];
@@ -686,6 +692,13 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
             if (hasId && Settings::card(cs.id, "cl_style", v, sizeof(v))) clusterStyleFromName(v, st);
             cl->setStyle(st);
             cl->setIcons(!(hasId && Settings::card(cs.id, "cl_icons", v, sizeof(v)) && !strcmp(v, "off")));
+            // ITS TAP (round 6): the one chosen in SETTINGS, read here because a
+            // cluster is not made by makeCard() - it went back to Nothing whenever
+            // the page was built again (the owner). Else Members, which lists every
+            // member, hidden ones too (refines K107: opening a list switches nothing).
+            TapAction ta = TapAction::TAP_MEMBERS;
+            if (hasId && Settings::card(cs.id, "tap", v, sizeof(v))) tapActionFromName(v, ta);
+            cl->setTapAction(ta);
             cl->setBinder(_binder);
             Serial.printf("[Cards] cluster %s: %u members, %u tiles, %ux%u cells\n",
                           cs.label ? cs.label : "?", (unsigned)cl->memberCount(), (unsigned)nTiles,

@@ -1,15 +1,17 @@
-// A CLUSTER'S MANAGEMENT SCREEN (2.11 round 3, DECISIONS K104, the owner's
-// layout): the main view of a cluster's window (a long press on its header,
-// K107). Two parts:
+// A CLUSTER'S MANAGEMENT SCREEN (2.11 round 3, DECISIONS K104; round 6 the
+// owner's option B): the main view of a cluster's window (a long press on its
+// header, K107). It is about the cluster, and says what it is:
 //
-//   HEADER   Name - its own words, typed on the keyboard (K95); Style - the
-//            page's, Swatch or Bar (K102); Sensor icons - the
-//            header's values with their icons or without; Header slots - a view
-//            of the members, each ticked into the header or not (K104's Slots).
-//   MEMBERS  each member's name and Visible: a tile in the cluster or not
-//            (hidden is not removed, K92 rule 8). Add cards at the foot: the
-//            page's cards that can join, ticked, then Copy or Move (K91, K100);
-//            HA entities not on the page come with the card list.
+//   Header style - the page's, Swatch or Bar (K102); Sensor icons - the
+//   header's values with their icons or without. Rename (its own words on the
+//   keyboard, K95), Header slots (a view of the members, each into the header
+//   or not) and Add cards (the page's cards that can join, Copy or Move - K91,
+//   K100) at the foot. Under them, in words: its group - the HA area or group it
+//   came from, and that name when it has been renamed - and its members.
+//
+// The members themselves are Members' (the corner icon): every one, hidden ones
+// too, each opening its own view, whose Visibility shows or hides it (round 6:
+// "Details is not where the Shown/Hidden state of each member should be selected").
 //
 // Kept under the cluster's id (label_text, cl_style, cl_icons, slots) and each member's
 // (hidden) - the settings file's entries agreed in K106 - written when the
@@ -40,9 +42,8 @@ const char *const ADD_W[] = { "No", "Copy", "Move" };
 const char *const STYLE_W[]  = { "Page's", "Swatch", "Bar" };
 const char *const STYLE_IS[] = { nullptr, "swatch", "bar" };
 const char *const ONOFF_W[]  = { "On", "Off" };
-const char *const SHOWN_W[]  = { "Shown", "Hidden" };
 const char *const YESNO_W[]  = { "Yes", "No" };
-constexpr uint8_t ROW_STYLE = 0, ROW_ICONS = 1, ROW_MEMBER0 = 2;   // the main view's rows
+constexpr uint8_t ROW_STYLE = 0, ROW_ICONS = 1;   // the main view's rows
 
 lv_obj_t *s_table = nullptr;   // the view's chip table
 
@@ -160,7 +161,6 @@ void mainChoose(void *p) {
     if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN) return;
     if (row == ROW_STYLE)      Settings::setCard(cl->id(), "cl_style", i < 3 ? STYLE_IS[i] : nullptr);
     else if (row == ROW_ICONS) Settings::setCard(cl->id(), "cl_icons", i == 0 ? nullptr : "off");
-    else                       setVisible(*cl, (uint8_t)(row - ROW_MEMBER0), i == 0);
     changed();
 }
 
@@ -352,37 +352,78 @@ void buildClusterAdd() {
                   "and leaves this page for its list of hidden cards.");
 }
 
+// --- A member shown or not (its own Visibility, round 6) ------------------------------
+void clusterMemberShow(const ClusterCard &cl, uint8_t i, bool want) {
+    setVisible(cl, i, want);
+    changed();
+}
+
+MemberShown clusterMemberShown(const ClusterCard &cl, uint8_t i) {
+    const char *ids[CLUSTER_SLOTS_MAX];
+    char buf[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1];
+    const uint8_t n = headerIds(cl, ids, buf, sizeof(buf));
+    if (visible(cl, i, ids, n)) return MemberShown::SHOWN_TILE;
+    return inList(idOf(cl.memberAt(i)), ids, n) ? MemberShown::SHOWN_HEADER : MemberShown::SHOWN_HIDDEN;
+}
+
+int8_t clusterMemberOf(const ClusterCard &cl, const Entity *e) {
+    if (!e) return -1;
+    for (uint8_t i = 0; i < cl.memberCount(); i++) {
+        const Card *m = cl.memberAt(i);
+        const Entity *me = m ? m->firstEntity() : nullptr;
+        if (me && !strcmp(me->desc.id, e->desc.id)) return (int8_t)i;
+    }
+    return -1;
+}
+
 // --- The views ------------------------------------------------------------------------
-// The cluster's window: its header's style and icons, each member shown as a
-// tile or hidden; Rename, Header slots and Add cards at the foot.
+// The cluster's window (option B, round 6): its header's style and icons; Rename,
+// Header slots and Add cards at the foot; then what it is, in words.
 void buildCluster() {
     ClusterCard *cl = held();
     if (!cl) return;
-    char v[16];
+    char v[40];
     uint8_t style = 0;
     if (cl->hasId() && Settings::card(cl->id(), "cl_style", v, sizeof(v)))
         style = !strcmp(v, "bar") ? 2 : !strcmp(v, "swatch") ? 1 : 0;
     const bool icons = !(cl->hasId() && Settings::card(cl->id(), "cl_icons", v, sizeof(v)) && !strcmp(v, "off"));
-    const char *ids[CLUSTER_SLOTS_MAX];
-    char buf[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1];
-    const uint8_t nIds = headerIds(*cl, ids, buf, sizeof(buf));
 
-    Kit::ChipRowSpec rows[ROW_MEMBER0 + GROUP_MEMBERS_MAX];
-    uint8_t n = 0;
-    rows[n++] = { "Header style", STYLE_W, 3, style };
-    rows[n++] = { "Sensor icons", ONOFF_W, 2, (uint8_t)(icons ? 0 : 1) };
-    names(*cl);
-    for (uint8_t i = 0; i < cl->memberCount() && i < GROUP_MEMBERS_MAX; i++)
-        rows[n++] = { s_names[i], SHOWN_W, 2, (uint8_t)(visible(*cl, i, ids, nIds) ? 0 : 1) };
-    s_table = Kit::chipTable(s.stage, listW(), rows, n, mainChipCb);
+    const Kit::ChipRowSpec rows[2] = {
+        { "Header style", STYLE_W, 3, style },
+        { "Sensor icons", ONOFF_W, 2, (uint8_t)(icons ? 0 : 1) },
+    };
+    s_table = Kit::chipTable(s.stage, listW(), rows, 2, mainChipCb);
     // The page's cards (K91); HA entities not on the page (K92 rule 11) come with the card list.
     static const char *const W[] = { "Rename", "Header slots", "Add cards" };
     static const Kit::ButtonRole R[] = { Kit::ButtonRole::BTN_CANCEL, Kit::ButtonRole::BTN_CANCEL,
                                          Kit::ButtonRole::BTN_CANCEL };
     static const lv_event_cb_t C[] = { renameCb, slotsViewCb, addViewCb };
     footButtons(s_table, W, R, C, cl->hasId() ? 3 : 0);
-    note(s_table, "A hidden member stays in the cluster, not shown as a tile. Changes show when this window "
-                  "closes.");
+
+    // WHAT IT IS (the owner: "informational" - the HA area it came from, or its
+    // group's name when it has been renamed), and its members, counted.
+    static char words[200];
+    int w = 0;
+    CardGroups::Group g;
+    const bool own = cl->hasId() && Settings::card(cl->id(), "label_text", v, sizeof(v)) && v[0];
+    if (CardGroups::ofCard(*cl, g)) {
+        const bool ha = !strncmp(g.id, CardGroups::HA_PREFIX, strlen(CardGroups::HA_PREFIX));
+        if (own) w = snprintf(words, sizeof(words), "Renamed from %s, %s. ", g.name, ha ? "its area in HA" : "its group");
+        else     w = snprintf(words, sizeof(words), "%s: %s. ", ha ? "Its area in HA" : "Its group", g.name);
+    }
+    uint8_t tiles = 0, inHdr = 0, hidden = 0;
+    for (uint8_t i = 0; i < cl->memberCount(); i++) {
+        const MemberShown m = clusterMemberShown(*cl, i);
+        if (m == MemberShown::SHOWN_TILE) tiles++;
+        else if (m == MemberShown::SHOWN_HEADER) inHdr++;
+        else hidden++;
+    }
+    w += snprintf(words + w, sizeof(words) - w, "%u member%s: %u as tiles", (unsigned)cl->memberCount(),
+                  cl->memberCount() == 1 ? "" : "s", (unsigned)tiles);
+    if (inHdr)  w += snprintf(words + w, sizeof(words) - w, ", %u in the header", (unsigned)inHdr);
+    if (hidden) w += snprintf(words + w, sizeof(words) - w, ", %u hidden", (unsigned)hidden);
+    snprintf(words + w, sizeof(words) - w, " - each one, hidden ones too, in Members.");
+    note(s_table, words);
 }
 
 // Header slots: each member in the header or not, in the order chosen.
