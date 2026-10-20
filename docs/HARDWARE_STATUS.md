@@ -147,6 +147,8 @@ screenshot on `WS_P4_5` (about 2.8 MB at peak, #58) costs nothing that matters. 
 - **Onboard buttons** — nothing beyond BOOT is inventoried, and no firmware uses one.
 - **Silicon revision** — only the `WS_P4_5` has been probed (rev v1.3). One `esptool
   flash-id` each would settle what the fleet actually contains.
+- **RTC cells** — the Waveshare P4s need rechargeable ones (the 7B's holder is ML1220); nothing
+  reads an RTC yet (#32).
 
 ---
 

@@ -1,190 +1,157 @@
-# Handoff — 2026-10-20 (2.11 group cards: rounds 1-7 built on `feat/2.11-group-cards`; the last sprint next)
+# Handoff — 2026-10-20 (2.11 group cards: seven rounds built and tested; the last sprint next)
 
-**Start here.** `CLAUDE.md` is the stable how-it-works; **`docs/design/ui-architecture.md` is how the
-UI is built** - read both before touching UI code. This file is only: where we are, what to do next,
-what will bite you, and how to work with the owner. It was rewritten on 2026-10-15 for a fresh
-session; the earlier ones, with each milestone's detail, are `docs/archive/HANDOFF_to_2026-10-14.md`
-and `HANDOFF_to_2026-09-29.md` - read them only when chasing the history of something.
+**Start here.** This file is only: what to read, where we are, what to do next, what will bite you,
+and how to work with the owner. The history of how things got here is in the test sheets
+(`docs/archive/TEST_*.md`, `docs/TEST_2.11.md`), `DECISIONS.md` and `CHANGELOG.md`; earlier
+handoffs are `docs/archive/HANDOFF_to_2026-10-14.md` and `HANDOFF_to_2026-09-29.md`.
 
-**Keep it short.** A finished investigation goes to `docs/LESSONS.md` (general) or
-`docs/display/history.md` (display) as a few lines; a test run goes to its test sheet; a decision to
-`DECISIONS.md`; a number to the doc that owns it. This file says where things are, not how they got
-there.
+## Read in this order - all of it, before starting
+
+1. `CLAUDE.md` - the HAL/BSP, the rules, **and the file-editing rule at the top**.
+2. `docs/ROADMAP.md` (the plan, and where each kind of note belongs) and `docs/DECISIONS.md` (every
+   decision in one line - 2.11's are K88-K111).
+3. **`docs/design/ui-architecture.md`**, then what it points at - `components.md` (the kit, the
+   finishes), `tokens.md`, `header-slots.md`, `card-sheet.md` §14-18, `layout-engines.md` (v8, the
+   arranger to port), `cards.md`, `pages.md`, `card-layout.md` (before moving anything inside a
+   card), `group-cards.md` §6-7 (2.11's design), `interview-phase2-3.md`.
+4. **`docs/TEST_2.11.md`** - the milestone in progress: seven rounds, the owner's results after each,
+   and what round 7's results ask for.
+5. `docs/LESSONS.md` - before debugging anything. `docs/HTTP_REFERENCE.md` - before calling a route.
+6. For the display: `docs/display/README.md` only - it indexes the rest.
+
+**Keep it short.** A finished investigation goes to `LESSONS.md`; a test run to its test sheet; a
+decision to `DECISIONS.md`; a number to the doc that owns it. This file is rewritten at a handoff.
 
 ---
 
 ## Where the project is
 
-**`v0.2.18`, 2026-10-17: milestone 2.8, the header bar v2** (`archive/TEST_2.8.md`; D-11 to D-33) -
-three places on claims, a panel per slot, the system panel's new layout, UI Tweaks and Card UI, the
-cards' active frames (Corner cut the default) and lit glass, Linen's terracotta. Before it:
-`v0.2.17` A17 (settings never lost to a failed mount), **`v0.2.16` #99, satin and glass**
-(`archive/TEST_99.md`; K77, K85-K87). On 2026-10-14: `v0.2.15` the UI follow-ups from 2.12's test (`archive/TEST_UI_FOLLOWUPS.md`), `v0.2.14`
-#93 (members' HA areas), **`v0.2.13` milestone 2.12, the UI foundation** - the card window's code
-rebuilt on a component kit, with nothing changed on screen (`docs/design/ui-foundation.md`). Before
-them: `v0.2.12` K17, `v0.2.8`-`v0.2.11` milestone 2.10, the card popup. `CHANGELOG.md` matches
-versions to milestones.
+**The last release is `v0.2.18`** (2026-10-17, milestone 2.8, the header bar v2); `CHANGELOG.md`
+matches every version to its milestones. **The next is `v0.2.19`, milestone 2.11**, on its branch.
 
-What a board does: boots into two pages (House = the owner's 18 HA entities over the websocket,
-Fleet = MQTT/system/virtual cards), swiped with wrap-around; three colour schemes (Midnight default,
-Fleet, Linen); card types with state icons; **a long press opens a card's window** - a light's
-controls, an HA group's members, the light's HA scenes, **every card's History** (a chart, or an
-on/off thing's activity), SETTINGS and Entity properties; About this board from the system panel;
-the owner's choices saved by card id on LittleFS; HTTP routes for screenshots, benches, settings and
-debugging (`docs/HTTP_REFERENCE.md`).
+**Lines of code** - the project's own C/C++ (`src/`, `include/`, its own `components/`; generated
+fonts, `lvgl`, `GFX_Library_for_Arduino`, `SensorLib`, `XPowersLib`, `bb_captouch_fork`,
+`esp_websocket_client` and `include/third_party` left out; every line counted, comments too):
 
-**The UI now, in one paragraph** (details: `ui-architecture.md`): every window is a `Kit::Sheet`
-client; buttons, dialogs, rows, panels and the selector are the component kit (`Kit::`), each look
-a *role* - shared styles that follow the scheme - and **a tappable surface has a finish**
-(`Kit::finish()`: satin = can be tapped, glass = chosen, painted and dithered; K77, K85-K86); every
-colour and size is a token, the window's sizes millimetres (`UIShape`); where cards go on a page is
-a `Layout::Engine`'s decision, and where the header's slots go is `Layout::HeaderPlan`'s (claims,
-2.8). Changes are proved with the harness (`scripts/ui_golden.py`: object trees and screenshots,
-A/B), host tests (`host-tests/`), the structure check and the all-nine gate. The header and every
-slot's panel are on the kit since 2.8, **the cards since 2.11 round 1** (`KS_CARD_*`, on the
-branch); `GUIManager` and the system panel's pages are not yet - bring each over when it is next
-changed (`ui-architecture.md` §6).
+| Release | Date | Milestone | Lines | Files |
+|---|---|---|---|---|
+| `v0.1.0` | 2026-09-03 | Phase 1 | 9,039 | 44 |
+| `v0.2.4` | 2026-09-15 | 2.4 (the tag's number was the milestone's until 2.7) | 18,745 | 98 |
+| `v0.2.7` | 2026-09-24 | 2.7 | 28,207 | 117 |
+| `v0.2.8`-`v0.2.11` | 10-05 to 10-12 | 2.10, the card popup | 50,115 | 183 |
+| `v0.2.12` | 2026-10-13 | K17 | 50,872 | 185 |
+| `v0.2.13` | 2026-10-14 | 2.12, the UI foundation | 52,957 | 222 |
+| `v0.2.16` | 2026-10-15 | #99, satin and glass | 53,449 | 222 |
+| `v0.2.18` | 2026-10-17 | 2.8, the header bar v2 | 57,224 | 244 |
+| branch | 2026-10-20 | **2.11 so far** (seven rounds) | **62,077** | **259** |
 
-## Where things stand (2026-10-20)
+Counted with `git grep -c '' <tag> -- <those paths>` over `.c .cpp .h .hpp`; recount the same way.
 
-- **2.11 is on `feat/2.11-group-cards`** (off `main` at `6bd834f`), pushed, **no PR** (it comes at
-  sign-off, after the all-nine gate). Seven rounds, all in `docs/TEST_2.11.md` with the owner's
-  results after each: 1 clusters on the page; 2 the arranger (Playground v5, ported); 3 what the glass
-  edits (cluster window, keyboard, Visibility, hidden cards, Copy / Move); 4 the summary card, the
-  halo calibrated, the views as Card UI; 5 header panels without the halo, a close that keeps its top
-  (K108); 6 the owner's bugs and the cluster window as option B (K110), Playground v8 - **the
-  arranger by the owner's rules, in units** (K109); 7 copy and move tracked, Paused in Visibility
-  (K111). Last commit `99dd5f0` and the docs after it.
-- **Boards**: the P4_5, the 4B and the 1060 run round 7 (`r7a`, with their local `DEBUG_POPUP`
-  lines). **Their settings were cleaned of round 6's duplicates on 2026-10-20 at the owner's word**
-  ("remove any of the duplicated cards in the Hidden cards sheet from all of the devices"): old moves
-  turned into `moved`, hidden copies of cluster members deleted, one hidden card kept per entity
-  (the rules are in TEST_2.11 round 7; before = `bench/settings/<board>/20261020-1508.json`, after =
-  `cleaned-20261020-1508.json`). `WS_S3_4B` compiles (not flashed, #69).
-- **Layout Playground v10** (`https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp`): v8 is the arranger
-  to port, **with the owner's knobs as its defaults** (size 75, square 30, wide 20, twin 70, empty
-  unit 11, order 4), "Copy settings for Claude" for the next tuning. Its code is the spec:
-  `arrangeV8()`, `shapesV8()`, `searchV8()`, `scoreV8()`, `refSizes()`, `finishWith()` - read the
-  published page (`Artifact` read) for the source.
+What a board does: boots into two pages (House = the owner's HA entities over the websocket, Fleet =
+MQTT/system/virtual cards), swiped with wrap-around; three colour schemes (Midnight default, Fleet,
+Linen); **clusters** - a group as one block of tiles under a header - and solo cards, **placed by the
+arranger**; a long press opens a card's or a cluster's window (controls, members, scenes, History,
+SETTINGS, Visibility, Card UI); the header's slots open panels (pages, hidden cards, the system
+panel); the owner's choices saved by card id on LittleFS; HTTP routes for screenshots, benches,
+settings and debugging (`HTTP_REFERENCE.md`).
+
+**The UI, in one paragraph** (details: `ui-architecture.md`): every window is a `Kit::Sheet` client;
+buttons, dialogs, rows, panels and the selector are the component kit (`Kit::`), each look a *role*
+- shared styles that follow the scheme - and a tappable surface has a finish (satin, glass, lit
+glass); every colour and size is a token, a window's sizes millimetres (`UIShape`); where cards go
+is the arranger's (`Layout::arrange()`), where the header's slots go `Layout::HeaderPlan`'s. Changes
+are proved with the harness (`scripts/ui_golden.py`), host tests (`host-tests/`), the structure
+check and the all-nine gate. `GUIManager` and the system panel's pages are not on the kit yet -
+bring each over when it is next changed (`ui-architecture.md` §6).
+
+## Where 2.11 stands (2026-10-20)
+
+- **Branch `feat/2.11-group-cards`** (off `main` at `6bd834f`), pushed, **no PR** (it comes at
+  sign-off). Seven rounds, each tested by the owner (`TEST_2.11.md`). Built: clusters and the summary
+  card; the arranger (Playground v5, ported, host-tested); the cluster's window (Details, Members,
+  Header slots, Add cards, Rename on the keyboard); Visibility by where a card is, with Paused; the
+  page's hidden cards in their own sheet; Copy / Move into a cluster, tracked (K111); the halo on
+  windows only, header panels with a close that keeps their top (K108).
+- **Boards**: the P4_5, the 4B and the 1060 run round 7 (`r7a`) with their local `DEBUG_POPUP` lines.
+  Their settings were cleaned of duplicates on 2026-10-20 at the owner's word (`TEST_2.11.md` round
+  7 says what went; before and after copies in `bench/settings/<board>/`).
+- **The arranger to port is Playground v8** - `https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp`
+  (v10 of the page): the owner's rules in units (K109), **his tuned knobs its defaults** (size 75,
+  square 30, wide 20, twin 70, empty unit 11, order 4); "Copy settings for Claude" gives the knobs as
+  text. Its source is the spec - read the page with the `Artifact` tool: `arrangeV8()`,
+  `shapesV8()`, `searchV8()`, `scoreV8()`, `refSizes()`, `finishWith()`.
 - **Where 2.11's pieces live**: a cluster `Cards/ClusterCard` + `Cards/MiniTile.cpp`, its span and
-  tile grid `Layout/Cluster.h`; the arranger `Layout/Arranger.h` (both host-tested, 52 tests) and
-  `Cards/PageArranger` (its task, kept answers in `pages.<slug>.layout`); the halo
+  tile grid `Layout/Cluster.h`; the arranger `Layout/Arranger.h` (host-tested) and
+  `Cards/PageArranger` (its task; kept answers in `pages.<slug>.layout`); the halo
   `UI/Kit/KitHalo.cpp`; the keyboard `UI/Kit/KitKeyboard.cpp`; the cluster's window
-  `Popup/PopupCluster.cpp`; Visibility, Add to, which group `Popup/PopupVisibility.cpp`; the pool
-  (any card hidden) and copies in clusters (`in`) `Cards/CardAdded`. Each round's "As built" is in
-  its design doc (`group-cards.md` §7, `layout-engines.md`, `header-slots.md` §15).
-- **`v0.2.18` - 2.8** (#110, 2026-10-17) is the last merge. Copies of every board's settings file
-  are in `bench/settings/<board>/` - one is saved before every flash.
-- **Where 2.8's pieces live**: the header's places and claims `Layout/HeaderPlan.h` (host-tested),
-  slots as data `UI/HeaderSlots.h`, kinds in `Panel_Header.cpp`, panels in `SlotPanels.cpp`, the
-  glyphs `UI/GlyphShapes`; UI Tweaks `UI/TweaksSheet` + `GUIManagerTweaks.cpp`, Card UI
-  `PopupCardUi.cpp`, both on `Kit::chipTable`; the active frames `Cards/CardFrame.cpp` (the corner
-  cut's corners are cached images, their shadow measured from LVGL's own - D-33); lit glass
-  `Finish::FINISH_LIT`. `header-slots.md` §9-14 is the design's story.
-- **Choices made unattended in round 3** are D-29 (the scheme one for every page; Col / Row saved
-  per page; Card label "Custom" keeps the words showing) - never contradicted in four rounds of tests.
-- **The all-nine build runs once, right before a merge** (the owner, 2026-10-17) - not per round.
-  Rounds build the P4_5 and the 4B. Flash with `PYTHONIOENCODING=utf-8` set (LESSONS); esptool at
-  921600 to `0x10000`, app only. The 4B's own file closes a window after 10 s
-  (`system.window.close`), which stops the harness's full walk there - use `--only`.
-- **Routes**: the P4_5 serves 7 of `HttpServer::MAX_ROUTES` (8); the next route needs it raised.
+  `Popup/PopupCluster.cpp`; Visibility, Add to, which group `Popup/PopupVisibility.cpp`; the hidden
+  cards `UI/HiddenSheet` + `GUIManagerHeader.cpp` (`collectHidden`); copies, moves and the pool
+  `Cards/CardAdded`.
 
-## What is next with the owner
+## What is next
 
-1. **2.11's last sprint** (#66, with the arranger #78), in this order - the owner's notes of
-   2026-10-20 are in `TEST_2.11.md` round 7, "Your results":
+1. **2.11's last sprint**, in this order (the owner's notes: `TEST_2.11.md` round 7, "Your results"):
    1. **Bug: a card taken out of a cluster to the dashboard duplicates.** The 1060's Outside "Front":
       Add card to dashboard leaves the tile, and the new card can only be hidden - into the hidden
       cards, a copy that should not exist. **Build it as K111 did the other way**: Add card to
       dashboard from a tile asks **Copy or Move** (a chip row, as Add to's "This card"); the new page
-      card records `from` (the member). **Move**: the member leaves - an added copy deleted, a compiled
-      member `hidden: moved` (no tile, not in the hidden cards, Members says "On the page"); the page
-      card's Visibility offers **Move to cluster** (back, the page card deleted) and Hide. **Copy**:
-      its Visibility offers **Remove from the page** - deleted, no pool entry - besides Hide. Either
-      way no entity gets a second card; the member's own "from" chain (K111's Move back) stays right.
-      `Cards/CardAdded`, `Popup/PopupVisibility.cpp` (`buildJoin`, `visibilityJoin`), the hidden list
-      in `GUIManagerHeader.cpp` (`collectHidden`).
-   2. **The hidden cards list the cards crowded off the page** - not hidden, not shown (the page's
-      plan dropped them, lowest priority first, `CardPage::plan()`); a row each, saying so.
+      card records `from` (the member). **Move**: the member leaves - an added copy deleted, a
+      compiled member `hidden: moved` (no tile, not in the hidden cards, Members says "On the
+      page"); the page card's Visibility offers **Move to cluster** (back; the page card deleted) and
+      Hide. **Copy**: its Visibility offers **Remove from the page** - deleted, no pool entry -
+      besides Hide. No entity gets a second card; K111's Move back stays right. `Cards/CardAdded`,
+      `Popup/PopupVisibility.cpp` (`buildJoin`, `visibilityJoin`), `collectHidden`.
+   2. **The hidden cards list the cards crowded off the page** - not hidden, not shown
+      (`CardPage::plan()` dropped them, lowest priority first); a row each, saying so.
    3. **Port v8** (K109): `Layout::arrange()` in units with the owner's knobs, host tests from the
-      playground's answers (as v5's were), a step budget, pages arranging themselves - Row / Col +/-
-      a pin with a way back to Auto. Time it on the P4_5 (and compile the S3).
-   4. **Tiles' icons in roomy clusters** - on the 1060, a grid that fills the screen leaves the tiles'
-      icons "relatively tiny"; find why there (the face's size at its PPI, the solo cap from round 6)
-      and try **a border round each tile** (the owner is curious, now the active states changed) -
-      a mock first.
-   5. **Group view** (owner, 2026-10-20, new): a sheet of a group's members **as tiles** - for any
-      group card (Desk, the garage Doors, a cluster) - and "Group view" among the Tap actions. On a
-      group card's and a cluster's Visibility: **show it as one card** (1x1, a tap opens its
-      details) and **choose its icon**. Mock first; ask how it relates to group pages (K90, K99).
-   6. **A Reset button for development**: the dashboard and its clusters back to the compiled ones
-      (the `cards.*` entries made on the glass and the pages' `layout`), the owner's looks kept.
-   7. Round 4's rest, if still wanted - ask: count slots (K103), extending a source group (K93),
-      group pages (K90, K99, §4 Q8), group cards as Add targets, the card list (K91), Delete from the
-      pool.
-   8. **Sign-off**: one **final test sheet** for the owner (he asked for it), the all-nine gate with
+      playground's answers (as v5's were), a step budget; pages arranging themselves, Row / Col +/-
+      a pin with a way back to Auto. Time it on the P4_5; compile the S3.
+   4. **Tiles' icons in roomy clusters** look tiny on the 1060 when the grid fills the screen: find
+      why there (its face sizes at its PPI, round 6's solo cap in `MiniTile.cpp`), and mock **a
+      border round each tile** (the owner is curious, now the active states have changed).
+   5. **Group view** (new, owner 2026-10-20): a sheet of a group's members **as tiles** - any group
+      card (Desk, the garage Doors) or cluster - and "Group view" among the Tap actions. On a group
+      card's and a cluster's Visibility: **show it as one card** (1x1, a tap opens its details) and
+      **choose its icon**. Mock first; ask how it relates to group pages (K90, K99).
+   6. **A Reset for development**: the dashboard and its clusters back to the compiled ones (the
+      `cards.*` entries made on the glass, the pages' `layout`), the owner's looks kept.
+   7. Round 4's rest - **ask which are still wanted**: count slots (K103), extending a source group
+      (K93), group pages (K90, K99, interview §4 Q8), group cards as Add targets, the card list
+      (K91), Delete from the pool.
+   8. **Sign-off**: **one final test sheet** for the owner (he asked for it), the all-nine gate with
       the structure check, the CHANGELOG entry, the sheet archived, the PR; the owner merges; tag
-      `v0.2.19`. The owner will bring `dashboard-target-7b.md` up to date with clusters as the new
-      baseline (and add entities to fill the screen).
-2. **#76, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast` (a queue any
-   task posts to, drained on the UI thread; severity, lifetime, repeats counted, tap to dismiss), a
-   notice's detailed form in the middle for a while then its minimal "!" in status, a place that
-   grows for a high-priority claim, a window taking the middle, claims' rows in their panel. Mock
+      `v0.2.19`. The owner is bringing `dashboard-target-7b.md` up to date with clusters as the new
+      baseline, with entities added to fill the screen.
+2. **#76, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast`, a notice's
+   detailed form then its minimal "!" in status, a place that grows for a high-priority claim. Mock
    first.
-3. Waiting: **#104** (a light's temperature mark moves between builds); **#100** the clocks (three
-   agreed, K81-K84, the record on #100; the prototype on `feat/100-nina-clock`, PR #102 open, not for
-   merging); **#84** "no data yet" (a proposal on the issue); **#99's S3 frame check** (W6) and
-   History's activity rows in satin (K86), once an S3 is on the desk; the header's clock format
-   (12/24 h, seconds - interview §3 Q3, still open).
+3. Waiting: **#104** (a light's temperature mark moves between builds); **#100** the clocks (K81-K84;
+   prototype on `feat/100-nina-clock`, PR #102 not for merging); **#84** "no data yet"; **#99's S3
+   frame check** (W6) once an S3 is on the desk; the header clock's format (interview §3 Q3).
 
 **After any merge**: `git pull`, tag the merge commit (annotated, `vX.Y.Z - <milestones>`), push the
 tag, flash the boards on the desk. The CHANGELOG entry and the archived test sheet go on the branch
 before the owner merges. **The owner merges** (W12); a PR is opened only after the owner's sign-off.
 
-## The card window - what 2.10 taught, in brief
-
-What the window is, view by view: **`card-sheet.md` §14-18** (a later section wins), and its parts
-have names ("Words", K22). Every round and measurement of 2.10 is in `docs/archive/TEST_2.10*.md`.
-
-- **Usable first**: complete in its first frame, closed in one; no grow, no dim. **Nothing moves**
-  within one window. Sizes are shares of the P4_5's window (`pm()`); touch targets and text are real
-  millimetres.
-- **Light state lives in the registry**; a command is confirmed only by a matching report. Groups
-  act as HA's light group does; a paused member is out of its group.
-- **History**: `HaHistory` (`components/Fleet_HA`) asks HA's websocket from the loop task and parses
-  on the websocket task; `TimeFormat` words every time and duration (`card-sheet.md` §18).
-- **Saving**: one JSON file, `Settings` (CLAUDE.md "Saved settings"); cards added on the device are
-  `CardAdded` (K17); the windows' timeout and bar are system settings (K79).
-- **The P4 freezes were IDF's PPA hanging on a rotated strip** (A15), fixed by a patch in the rebuilt
-  libraries (below). None since. If one returns: `GET /hang` on the P4_5 (`-D DEBUG_HANG`) before
-  anyone resets it.
-- **Never read from a DSI panel that is showing a picture** - it blanked all three P4s. The 4B
-  washed out twice ever: next time, `GET /panel?resend=1` before resetting it.
-- Open and not blocking: **#91** the P4_5's white flash under sustained drawing; #90, #89, #85; the
-  rest is in `FUTURE_IMPROVEMENTS.md` ("Carried out of HANDOFF").
-
 ## Where the design interview stands
 
-`docs/design/interview-phase2-3.md` is the blueprint for 2.8, 2.11 and Phase 3; Claude facilitates
-with the owner. §1 look and feel closed 2026-10-01 (`look-and-feel.md`); §2 card popups closed
-2026-10-02 (built as 2.10); **§3 the header's slots answered 2026-10-15** and built as 2.8
-(`header-slots.md`; only Q3, the clock's format, is still open). **§4 (2.11 group cards) is answered
-and being built** (`group-cards.md` §6-7, K88-K107; Q8 - "back" from a group page - asked in round
-4); #87 (the companion web
-app with a true preview, D-8) should be scoped before 3.1. The group taxonomy draft is
-`group-cards.md` (K67, K68). Artifacts on claude.ai: "2.11 Clusters", "Panel Edges" (2026-10-19),
-"2.8 Header Slots", "Glass, Satin, Flat"
-(#99), "Card Popup Mock", "Layout Playground" v8 (the owner's rules in units, round 6, K109; v5 the arranger as built, #78), "Beyond the Grid", "Linen Fill
-and Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
+`docs/design/interview-phase2-3.md` is the blueprint for 2.8, 2.11 and Phase 3. §1 look and feel,
+§2 card popups and §3 the header's slots are closed (§3 Q3, the clock's format, still open); **§4
+(2.11) is answered and being built** (`group-cards.md` §6-7, K88-K111; Q8 - "back" from a group
+page - open). #87 (the companion web app, D-8) should be scoped before 3.1; the owner would start it
+with dashboard arranging (FUTURE_IMPROVEMENTS). Artifacts on claude.ai: "Layout Playground" (v8),
+"2.11 Clusters", "Panel Edges", "2.8 Header Slots", "Glass, Satin, Flat", "Card Popup Mock",
+"Beyond the Grid", "Linen Fill and Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
 
 ## Fires still burning - each has an owner doc or issue, none needs the next session
 
 | What | State | Where |
 |---|---|---|
-| **Battery** | prototype merged; `-D HAS_BATTERY` (7B, 4880); the inferred power state cannot see a missing cell on USB. **Owner: fuel gauges (MAX17043, ordered), not a better inference** | #72, `design/power-battery.md` |
+| **Battery** | prototype merged; `-D HAS_BATTERY` (7B, 4880); **owner: fuel gauges (MAX17043, ordered)** | #72, `design/power-battery.md` |
 | **2.9 last boards** | `CYD_S3_8048`, `WS_S3_5B` to esp_lcd when on the desk | #67, `display/README.md` |
-| **4B panel timing** | **S3_4B locked up 2026-10-05**, left as found - read #69's latest comment before resetting it | #69 |
-| **S3 LVGL speed** | the S3_4B feels heavier since LVGL's pool moved to PSRAM; paused by the owner | #70 |
+| **4B panel timing** | **S3_4B locked up 2026-10-05**, left as found - read #69's latest comment first | #69 |
+| **S3 LVGL speed** | the S3_4B feels heavier since LVGL's pool moved to PSRAM; paused | #70 |
+| The card window | #91 (the P4_5's white flash under sustained drawing), #90, #89, #85 | issues; `FUTURE_IMPROVEMENTS.md` |
 | Rotation / IMU; type ladder | recorded | #71, #73 |
 
 ## Boards on the desk
@@ -193,134 +160,112 @@ and Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
 |---|---|---|
 | `WS_P4_5` | COM15 (CH343 `5B90154141`) | the dev board, in its enclosure; local lines `DEBUG_POPUP` + `DEBUG_HANG` |
 | `WS_P4_4B` | COM7 (CH343 `5AAF289419`) | P4 rev v1.0; local `DEBUG_POPUP` |
-| `CYD_P4_1060` | COM9 (native USB, serial `30:ED:A0:E3:2C:7B`) | needs two cables; local `DEBUG_POPUP`. **Flash it at 460800 and end with `--after watchdog-reset`** - two 1.5 Mbaud uploads lost its USB on 2026-10-13; BOOT held while plugging in, then a watchdog reset, brought it back (LESSONS) |
+| `CYD_P4_1060` | COM9 (native USB, serial `30:ED:A0:E3:2C:7B`) | needs two cables; local `DEBUG_POPUP`. **Flash at 460800 with `--after watchdog-reset`** (LESSONS). The owner asked for it to be flashed with the dev boards (2026-10-20) |
 | `WS_P4_7B` | COM6 (native USB) | needs two USB cables or it browns out on boot |
 | `CYD_P4_4880` | COM19 (native USB) | LiPo fitted; browned out on the PC's USB alone |
 | `WS_S3_4B` | COM8 (CH343 `5A67166678`) | **locked up** (#69); compile it as the S3 check, never flash it until the owner says |
 | `CYD_S3_3248` | - | USB broken (2026-09-28) |
-| `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in - #99's S3 frame check waits for one |
+| `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in |
 
-The P4_5, the 4B and the 1060 run 2.11 round 7 from the branch (with their local lines) - the 1060
-at the owner's request (2026-10-20); flash it with the others now. The rest `v0.2.18` or older.
-Ports move when boards are re-plugged:
-`Get-CimInstance Win32_PnPEntity | ? Name -match 'COM\d+' | select Name, DeviceID`. **Is a board
-alive?** Ask Home Assistant (`sensor.<device>_uptime`), not the cable. While developing, build and
-flash the P4_5 and the 4B (2.8's rounds did both: the 4B is the narrow screen); all nine compile
-once, right before a merge. **Away from the desk** the owner reflashes the P4_5 from
-the laptop (COM6) for that Wi-Fi; it is then at `http://10.0.0.2` (that router resolves no names).
-RTC cells: the Waveshare P4s need rechargeable ones (the 7B's holder is ML1220); nothing reads an RTC
-yet (#32). Flash and PSRAM per board: `HARDWARE_STATUS.md` (the 1060 and 4880 have 16 MB of flash).
-
-## Read in this order
-
-1. `CLAUDE.md` - the HAL/BSP, the rules, **and the file-editing rule at the top**.
-2. `docs/ROADMAP.md` (the plan, and where each kind of note belongs) and `docs/DECISIONS.md` (every
-   decision in one line).
-3. **For UI work: `docs/design/ui-architecture.md`**, then what it points at - `components.md`
-   (the kit, the finishes), `tokens.md`, `header-slots.md` (2.8), `card-sheet.md` §14-18,
-   `layout-engines.md`, `cards.md`, `pages.md`, `card-layout.md` (before moving anything inside a
-   card), `interview-phase2-3.md`.
-4. `docs/LESSONS.md` - before debugging anything. `docs/HTTP_REFERENCE.md` - before calling a route.
-5. For the display: `docs/display/README.md` only - it indexes the rest.
+The P4_5, the 4B and the 1060 run 2.11 round 7; the rest `v0.2.18` or older. Ports move when boards
+are re-plugged: `pio device list` and match the serial. **Is a board alive?** Ask Home Assistant
+(`sensor.<device>_uptime`) or `GET /settings?stats=1`, not the cable. While developing, build and
+flash the P4_5, the 4B and the 1060; all nine compile once, right before a merge. **Away from the
+desk** the owner reflashes the P4_5 from the laptop (COM6); it is then at `http://10.0.0.2`.
+Flash and PSRAM per board: `HARDWARE_STATUS.md`.
 
 ## Environment state git cannot see
 
 **The ESP32-P4 framework libraries are REBUILT, not stock** (`esp32p4_es` in
 `~/.platformio/packages/framework-arduinoespressif32-libs/`): `MEMPOOL_PREFER_SPIRAM` and a 64-byte
-L2 line (esp-hosted-mcu#243, #49), `LCD_DSI_ISR_CACHE_SAFE` (flash writes flashed the panels blue,
-A14) and IDF's **PPA rotation patch** (the freezes, A15, `scripts/idf-patches/`). Beside it:
-`esp32p4_es.cache_safe`, `esp32p4_es.hosted_fix`, `esp32p4_es.stock.55.03.311` - rollback is a
-rename. **A `pio pkg update` or platform reinstall silently puts the bugs back.** How:
-`docs/REBUILD_P4_LIBS.md`; the build tree is in WSL (`~/esp32-arduino-lib-builder`). The folder is a
-GitHub pre-release, `p4-libs-2026-10-09` (97 MB, install steps there); check a build with
+L2 line (#49), `LCD_DSI_ISR_CACHE_SAFE` (A14) and IDF's **PPA rotation patch** (the freezes, A15,
+`scripts/idf-patches/`). Beside it: `esp32p4_es.cache_safe`, `.hosted_fix`, `.stock.55.03.311` -
+rollback is a rename. **A `pio pkg update` or platform reinstall silently puts the bugs back.** How:
+`docs/REBUILD_P4_LIBS.md`; the GitHub pre-release `p4-libs-2026-10-09`; check a build with
 `grep -a -o "v5.5.5-832-g2553c5ad432[-a-z]*" .pio/build/<env>/firmware.bin` (it must end `-dirty`).
-**Per machine**: the laptop has the same folder (2026-10-10). The S3 libraries are stock.
+The laptop has the same folder. The S3 libraries are stock.
 
-**The owner's local debug lines** in `platformio.ini` (above, per board) are uncommitted and never
-committed - the pre-commit hook refuses them; `scripts/release/gate.ps1` stashes and restores them.
-The laptop's copy (skip-worktree, its own path prefix) has `DEBUG_POPUP` and `DEBUG_FRAMES` on the
-P4_5.
+**The owner's local debug lines** in `platformio.ini` are uncommitted and never committed - the
+pre-commit hook refuses them; `scripts/release/gate.ps1` stashes and restores them. The laptop's copy
+(skip-worktree, its own path prefix) has `DEBUG_POPUP` and `DEBUG_FRAMES` on the P4_5.
 
-**WSL's Ubuntu has g++ 13.3** - the host tests run there (`host-tests/run_in_wsl.sh`); Windows has
-no compiler (the owner's choice to install one, `host-tests/README.md`).
+**WSL's Ubuntu has g++ 13.3** - the host tests run there (`host-tests/run_in_wsl.sh`).
 
 **Do not use NINA's C6 updater** - it hung `WS_P4_5`. `reference/` is gitignored.
 
 ## Things that will bite you
 
-- **`PYTHONIOENCODING=utf-8` before any `pio` whose output is piped** - it dies silently otherwise -
-  and an unattended upload gets a `timeout` (one sat two hours). Builds run from Git Bash by calling
+- **`PYTHONIOENCODING=utf-8` before any `pio` whose output is piped** - it dies silently otherwise;
+  give an unattended upload a `timeout`. Builds run from Git Bash calling
   `~/.platformio/penv/Scripts/pio.exe` directly.
 - **Windows PowerShell 5.1 makes a native program's stderr fatal under `$ErrorActionPreference =
   "Stop"`** - `gate.ps1` handles it; a new script that runs `pio` must too.
 - **`pio run` with no `-e` builds the 7B only.** The all-nine gate: `powershell -ExecutionPolicy
-  Bypass -File scripts/release/gate.ps1` (10-30 min; run it in the background). It refuses a dirty
-  tree; do not build anything else while it runs (it stashes `platformio.ini`).
-- **PlatformIO keeps one environment's build at a time**: building another wipes the last one's
-  `firmware.bin` - copy an image you want to keep. Clear `.pio/build_cache` after a BSP,
-  struct-layout or `lv_conf.h` edit.
-- **Do not edit source while a build runs** - it compiles the half-finished edit. Docs are safe.
+  Bypass -File scripts/release/gate.ps1` (10-30 min, in the background); it refuses a dirty tree.
+- **PlatformIO keeps one environment's build at a time** - copy an image you want to keep. Clear
+  `.pio/build_cache` after a BSP, struct-layout or `lv_conf.h` edit.
+- **Do not edit source while a build runs** - it compiles the half-finished edit.
 - **Save a board's `/settings` before flashing it**: `scripts/release/save_settings.ps1 <host>
-  <board>`. Flash a dev build app-only: `esptool.exe --chip esp32p4 -p COMn -b 921600 write-flash
-  0x10000 .pio/build/<env>/firmware.bin` (PlatformIO's `penv/Scripts`), the 1060 at 460800 with
-  `--after watchdog-reset`. Chain a flash after a build only on the build's success - a failed
-  build flashes the last good `firmware.bin` silently.
-- **LVGL 9.5 clips an object's `DRAW_POST` to its own area** - anything drawn outside an object
-  (a shadow, a cut corner) goes in `DRAW_MAIN_END` (LESSONS, 2.8). An image meant to continue
-  LVGL's own drawing must blend as LVGL does, in 16 bits.
-- **The harness**: never two runs at one board; the 1060 alone (it is slow). A window closes itself
-  after a minute (or what `/settings?window_close=` says, K79). A change to the header will show in
-  every state - read the differences, do not wave them through.
-- **A serial monitor resets the board when it opens** - attach with `--rts 0 --dtr 0`, or read it
-  through HA, `/screenshot` or `scripts/ui_golden.py bootlog`. `Serial.setTxTimeoutMs(0)` in
-  `main.cpp` stops native-USB boards freezing when the port is open but unread: keep it.
-- **HTTP handlers and the HA websocket task never touch LVGL.** Prefer ESP-IDF facilities to
-  Arduino-only ones (W4).
-- **Faces** (`KitFaces.cpp`): LVGL's gradients band on these 16-bit panels, so faces are painted and
-  dithered; a recoloured image loses its corner clip, so a press tint is a veil (LESSONS). 16 face
-  slots in PSRAM; the first window after a boot pays ~35 ms painting them.
+  <board>`; put a copy back with `restore_settings.ps1` (it restarts the board; a timeout can still
+  mean it landed - read `/settings` to check). Flash app-only: `esptool.exe --chip esp32p4 -p COMn
+  -b 921600 write-flash 0x10000 <image>`, the 1060 at 460800 with `--after watchdog-reset`. Chain a
+  flash after a build only on the build's success.
+- **LVGL 9.5 clips an object's `DRAW_POST` to its own area** - anything drawn outside an object goes
+  in `DRAW_MAIN_END` (LESSONS). An image meant to continue LVGL's drawing must blend in 16 bits.
+- **A screenshot is not the glass**: `/screenshot` renders the object tree afresh, so it can show
+  what the panel does not (round 6's missing shading). `/screenshot?fb=1` is the panel's own frame
+  buffer (portrait on the P4_5).
+- **Never read from a DSI panel that is showing a picture** - it blanked all three P4s. If a freeze
+  returns, `GET /hang` on the P4_5 before anyone resets it. The 4B washed out twice ever: next time
+  `GET /panel?resend=1` before resetting it.
+- **LVGL clips children to their parent** (`UI::unclipShadows()` where a shadow must show); never
+  toggle HIDDEN on a screen-sized object as an animation starts (LESSONS); anything drawn on a panel
+  stays ASCII except `°`.
+- **The harness**: never two runs at one board; the 1060 alone. A window closes itself after a minute
+  (the 4B's own file: 10 s - use `--only`).
+- **A serial monitor resets the board when it opens** - attach with `--rts 0 --dtr 0`.
+- **HTTP handlers and the HA websocket task never touch LVGL.** Prefer ESP-IDF to Arduino-only (W4).
+- **The P4_5 serves 7 of `HttpServer::MAX_ROUTES` (8)** - the next route needs it raised.
 - **`Edit` on a CRLF file**: deleting a line by matching a leading newline joins two lines.
-- **`gh ... --body $text` and `git commit -m` in PowerShell 5.1 drop double quotes** - write the text
-  to a file and use `--body-file` / `git commit -F`.
-- **LVGL clips children to their parent** (`UI::unclipShadows()`); never toggle HIDDEN on a
-  screen-sized object when an animation starts; anything drawn stays ASCII except `°`.
+- **`git commit -m` and `gh ... --body` in PowerShell 5.1 drop double quotes** - write the text to a
+  file and use `git commit -F` / `--body-file`.
 - **Verify from outside the device** - the router, the broker, HA, `/bench?what=verify`, the harness.
 
 ## How to work with this owner
 
 A hobbyist and ESP32 enthusiast, not a professional developer, and explicit about that - but reads
 code, spots real bugs, and has caught several that were not obvious. **Treat the owner's instincts
-as data** - #99's rail through the lens and 2.8's four slots were the owner's ideas. A little
+as data** - #99's rail, 2.8's four slots and 2.11's arranger rules were the owner's. A little
 colour-blind: never distinguish two states by colour alone.
 
 **What works:**
-- **Show, don't spec.** Build something to react to (a mock artifact for a look); the owner flashes
-  fast and tests thoroughly against a sheet - `docs/TEST_<topic>.md`, numbered tests with PASS
-  criteria, the owner's results under them (`docs/archive/TEST_2.8.md` is the latest: seven
-  rounds, each built from the last one's notes). Rounds go on one branch; the all-nine gate and
+- **Show, don't spec.** Build something to react to (a mock artifact, the Layout Playground); the
+  owner flashes fast and tests thoroughly against a sheet - `docs/TEST_<topic>.md`, numbered tests
+  with PASS criteria, the owner's results under them. Rounds go on one branch; the all-nine gate and
   the PR come once, at sign-off.
-- **A PR only after the owner's sign-off** (2026-10-14): push the branch, the owner tests and answers,
-  then `gh pr create`; the owner merges.
-- **Snappy and responsive first, eye candy second** (W6). Measure a frame before and after anything
-  visual (`/bench what=full` with the window open).
-- **When the owner is testing, give ONE report when the owner says the testing is done.**
+- **A PR only after the owner's sign-off**: push the branch, the owner tests and answers, then
+  `gh pr create`; the owner merges.
+- **Snappy and responsive first, eye candy second** (W6) - he noticed round 5's faster panels.
+- **While the owner is testing, give ONE report when he says the testing is done.**
+- **Read the tool, not the name**; **make the case for any install first** - the owner decides.
 - **Plain language, not metaphor.** State what things are; avoid "X, not Y" framings.
 - **Never assume. Give the top 2-3 options with a recommendation, and ask** before building on an
-  assumption; discuss a structural choice a turn before implementing it. Make the case for any
-  install first; the owner decides.
-- **Read the tool, not the name**; **own mistakes plainly** (a finding that was wrong is withdrawn,
-  in the sheet); **say plainly what is unexplained**; **say what to expect** before anything that
-  changes the screen.
+  assumption; discuss a structural choice a turn before implementing it.
+- **Own mistakes plainly**; **say plainly what is unexplained**; **say what to expect** before
+  anything that changes the screen; say what was not tested on the glass.
 - **Unattended work is welcome** when the brief is clear. Commit and push at the end of each step.
-- **Avoid compacting context**: the owner would rather end a session with a clean handoff.
+- **Docs when there is something to record** (2026-10-20): DECISIONS after a settled discussion,
+  design docs when something is decided, LESSONS as learned, ROADMAP as achievements are checked
+  off, the test sheet each round. **HANDOFF only at a handoff** - rewritten then, with the lines of
+  code above recounted.
+- **Recommend a handoff as context nears half** - before starting something big, or at a good
+  stopping point mid-task - and prepare it (docs, this file, the next session's brief).
 
 **What to avoid:** committing straight to `main` (the guard refuses it anyway); guessing a fourth
 time - instrument it or ask the far end; claiming a script worked because it printed something.
 
 **Real lights (W9):** any Office light may be commanded while testing, put back as found; ask
-before the Kitchen. **The issue tracker, HANDOFF and ROADMAP are Claude's to keep current** - part
-of the work, not a follow-up.
+before the Kitchen.
 
 **Versioning (W3):** `v0.<phase>.<release>`; the release counts signed-off merges to `main` that
-change the firmware (a docs-only merge is not tagged). **`v0.2.18` was tagged at 2.8's merge
-(2026-10-17); the next is `v0.2.19`.**
+change the firmware (a docs-only merge is not tagged). **The next is `v0.2.19`.**
