@@ -503,4 +503,93 @@ already match. 4:3 suits a page with fewer entities.
 
 ## Your results
 
+**2026-10-19, evening** (with four screenshots): the device already has sub-grid units
+(`dashboard.md` §2, a cell is 2 x 2 units - the Fleet page's 1.5-cell cards), and your multiples
+of cells extend the same idea. In v6's own 15 x 8 page, Overhead and Thermo are well proportioned
+but each has an empty row of cells under it: move each down one unit (half a cell) rather than
+making it taller - evener spacing, and its hero nearer the tiles beside it. On the P4_5 the Doors,
+Overhead, Thermo and Eric cards are taller than wide: push each down a unit, and if one unit makes
+them too flat, cut a cell into more units down first. Icons get smaller as rows or columns go up
+though the cards and clusters have room. The halo makes the header panels' slide chunky at any
+strength (0 is snappy); they do not need it beyond the shadow where they meet the bar's line; windows
+benefit, 25% is enough. A closing panel should keep its top edge and corners whole - the system
+panel's top vanished at once and its border showed under the status icons.
+
+# Round 5 (2026-10-19, evening) - the panels, and units in the playground
+
+Same branch: `0ede284` (the panels). Flashed to the P4_5 and the 4B, their settings saved first.
+Layout Playground v7 published to the same artifact.
+
+## What changed
+
+| Where | Before | Now |
+|---|---|---|
+| **Header panels' halo** | all round the panel, 5 mm out - and the shading on the bar repainted on every frame of the slide | **only where the panel meets the bar** (K108), painted once for the whole slide |
+| **Windows' halo** | 50% on Midnight and Fleet, 30% on Linen | **25% on every scheme**; the slider in UI Tweaks still sets each scheme's own |
+| **A panel closing** | its contents and edge slid up together, so the top edge and corners went first; the system panel also dropped a line's width as it closed, its border showing under the status icons | **the top edge and its corners stay**; the foot rises, the walls joined to the top until the last frame, the contents riding up under the top edge. The system panel stays on the bar's line |
+| **Layout Playground** | v6, "sub-units" | **v7, cells and units** - below |
+
+**Your saved halo is 0** on the P4_5 (Midnight and Fleet) and on the 4B (Linen), from your test, so
+windows show no halo there until the slider moves - 25 is the new default, and Reset all in UI Tweaks
+puts it back too.
+
+![Late in the close, P4_5](../followups/211_r5_close_late_p45.png)
+![The 4B closing](../followups/211_r5_close_4b.png)
+![Before the fix: the line under the icons](../followups/211_r5_close_mid_p45_before_fix.png)
+![The shading on the bar at 25%](../followups/211_r5_bar_shading_25_p45.png)
+
+## Layout Playground v7: units
+
+The arranger still places blocks on cells; a **finish** then moves each solo card within its room, in
+units, and never touches a cluster:
+
+- **A card taller than it is wide gives up units at its top** - nearer square, its hero lower - but
+  never flatter than 0.85 of its width. **Units down a cell: Auto** tries 2, 3 and 4 and keeps the
+  fewest that gets every card near square (across stays 2).
+- **Spare rows above or below a card become even margins**: centred, the odd unit below. Up and down
+  only - centred across an empty row, a card wandered away from its neighbours on the 4B.
+- Empty units are hatched; the Clusters box lists what the finish did to each card. Untick Finish to
+  compare.
+
+Checked off the page: your 15 x 8 example (P4_5, cluster headers on) moves Overhead and Thermo down
+one unit each, and the device's 5 x 2 House page trims each tall card one unit at 4 units down (2 would
+make them too flat): 228 x 292 px becomes 228 x 213.
+
+## Why icons shrink as rows or columns go up
+
+A card's icon is sized from its **height** - its shortest side as the cards stand - with the label,
+name and padding taken off: more rows make cards short and wide, so the icon shrinks while the width
+goes unused. A cluster's tiles **copy the page's 1x1 card icon** (round 4, so the two match), so a
+roomy cluster shows the same small icon. Neither looks at the room the other has. The fix that keeps
+them matching is **squarer solo cards**, which is the arranger's job - v7's finish is that, tried
+in the playground first.
+
+## Tests for you
+
+| # | Do this | PASS if |
+|---|---|---|
+| H1 | Open and close each header panel, Midnight then Linen | the slide is smooth; no halo below the bar; a faint shadow where the panel meets the bar's line (once the slider is above 0) |
+| H2 | Watch the system panel close | its top edge and corners stay to the end; no line under the status icons |
+| H3 | UI Tweaks - Halo to 25 (or Reset all); open a card's window | the window's halo is back, lighter than round 4's |
+| H4 | The playground: P4_5, tick Cluster header | Overhead and Thermo half a cell lower, even margins above and below |
+| H5 | The playground: Units down a cell 2 / 3 / 4 / Auto; untick Finish | the cards follow; the Clusters box says what moved |
+
+## Questions for you
+
+1. **The finish, for the device** - squarer solo cards in units (v7), before the arranger changes?
+   Up and down only, or across too?
+2. **Icons** - keep tiles copying the 1x1 card's icon (matching) and let squarer cards give it room,
+   or let a roomy cluster's tiles grow past the cards?
+
+## Results (mine, before you)
+
+- The close seen on both boards from frames caught mid-slide (pictures above); the stray line under
+  the icons was there before `drawerSetTop()` and gone after.
+- The shading on the bar checked at 25% on the P4_5 with a test copy of its settings, then its own
+  settings put back (`bench/settings/WS_P4_TOUCH_LCD_5/20261019-1852.json`).
+- The slide's smoothness is for you to judge: no frame timing exists for header panels (`/bench`
+  times the deck's panels).
+
+## Your results
+
 (to come)

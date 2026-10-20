@@ -137,6 +137,34 @@ sub-unit, tile icons within 7% of card icons - a card's label costs about what a
 does. **Bare tile icons at 2:3** fit all seven, and every icon on the page grows (P4_5: a 3.9 mm
 glyph against 3.4 mm). The owner decides from the playground before the C++ arranger changes.
 
+### Then version 7 (2026-10-19, round 5): units
+
+The owner's reminder: the device already divides a cell into units (`dashboard.md` §2, 2 x 2 - a
+quarter-page card on a 3 x 3 page, the Fleet page's 1.5-cell cards), and multiples of cells are the
+same idea. v6's "sub-units" are now **cells** in the playground, and **units** are a cell's parts.
+The arranger still places blocks on cells; a **finish** then moves each **solo card** within its room,
+in units, and never touches a cluster:
+
+- **Nearer square**: a card taller than it is wide (as seen, its label paid) gives up units at its top
+  while that brings it nearer square and keeps it at least 0.85 as tall as wide; its foot stays, so
+  its hero sits lower, nearer the tiles of a cluster beside it. Cards much wider than tall give up
+  units in pairs, one each side.
+- **Units down a cell**: 2, 3, 4, or **Auto** - the fewest that gets every card on the page near
+  square ("if 1 unit would make them too short and flat, increase the vertical multiplier"). Across
+  stays 2.
+- **Even margins**: whole unit rows free above or below a card, across its width, are shared out -
+  the card centred, the odd unit below. **Up and down only**: centred across a free row, a card
+  wandered away from its neighbours (the 4B).
+- **A unit's step is the cell's pitch over the units**, so spans join exactly as the device's unit
+  tracks do (a gap between every track, dimensionally transparent).
+
+Checked off the page: the owner's 15 x 8 example (P4_5, cluster headers) moves Overhead and Thermo
+down one unit each; the device's 5 x 2 House page trims each 1 x 1 card one unit at 4 units down
+(228 x 292 px to 228 x 213), where 2 down would leave it too flat. **Why the icons shrink** with more
+rows (owner, round 5): a card's hero is sized from its height, and tiles copy the 1 x 1 card's hero
+(round 4), so short wide cards make every icon on the page small; squarer cards are the fix that keeps
+tiles and cards matching. The port waits for the owner's answer.
+
 ## The domain weight map
 
 Which cards earn space: a weight per card - its domain's (climate and media heavier than a lone

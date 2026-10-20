@@ -140,7 +140,7 @@ and being built** (`group-cards.md` §6-7, K88-K107; Q8 - "back" from a group pa
 app with a true preview, D-8) should be scoped before 3.1. The group taxonomy draft is
 `group-cards.md` (K67, K68). Artifacts on claude.ai: "2.11 Clusters", "Panel Edges" (2026-10-19),
 "2.8 Header Slots", "Glass, Satin, Flat"
-(#99), "Card Popup Mock", "Layout Playground" v6 (sub-units, round 4; v5 the arranger as built, #78), "Beyond the Grid", "Linen Fill
+(#99), "Card Popup Mock", "Layout Playground" v7 (cells and units, round 5; v5 the arranger as built, #78), "Beyond the Grid", "Linen Fill
 and Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
 
 ## Fires still burning - each has an owner doc or issue, none needs the next session
