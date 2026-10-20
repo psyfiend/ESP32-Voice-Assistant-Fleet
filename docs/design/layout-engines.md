@@ -165,6 +165,37 @@ rows (owner, round 5): a card's hero is sized from its height, and tiles copy th
 (round 4), so short wide cards make every icon on the page small; squarer cards are the fix that keeps
 tiles and cards matching. The port waits for the owner's answer.
 
+### Then version 8 (2026-10-20, round 6): the owner's rules, in units - K109
+
+The owner's night notes (TEST_2.11 round 5, "Your results") set the rules and the limits, and left
+the logic to Claude. **Every block is placed on a grid of units** - the device's own, a cell's halves
+- in any shape its limits allow, so a cluster can be 2.5 cells wide and a row 1.5 cells tall. A
+block's shapes:
+
+- **A solo card**: any w x h units with at least the area of one card of the P4_5 at 7 x 3
+  (13.5 x 16.2 mm in the playground) and no taller for its width (1.20), at most 1.7 as wide as tall.
+- **A cluster**: any w x h units, its tiles in the arrangement (tc across x tr down, no empty row)
+  that costs least, each tile at least one of a 3 x 1 cluster on the 4B at 4 x 4 (15.3 x 6.7 mm, its
+  header paid). Clusters wear the device's header and padding (UIShape C_HDR_H, C_PAD, C_TILE_GAP).
+
+**Cost**: an entity's size is the side of the square with its area (a solo card after its label, a
+tile after its cluster's header and padding). `size` x log(size / target)^2 per entity - the target
+the page's equal share first, then the average the first pass found (two passes per grid); `square` x
+4 x log(h/w)^2 per solo card and 0.4 x that per tile; `wide` x 2 x log(h/w) when a cluster is taller
+than wide; `twin` x |log(area ratio)| between clusters with as many tiles (as each is placed); an empty
+unit `gap8` per entity-sized area it wastes (6 - deliberately cheap: "I'd prefer small amounts of dead
+space over grossly disproportionate units per tile"); `order` per block ahead of an earlier one. The
+search is v5's (first empty unit, the next three blocks in each shape, or leave it), rows as bit
+masks, 20,000 steps per pass. Grids: units across from 2 x (the board's columns - 1) to
+2 x (its columns + 2), down 2 x (its rows -/+ 1). Solo cards then take spare unit rows above or below
+as even margins (v7's finish, units of 1).
+
+**On the owner's page** (P4_5): Kitchen 8 x 4 units across the top, Outside and Office 5 x 4 each
+below - the owner's "what SHOULD happen" - and Doors 2 x 3 with a unit of margin above it; every
+entity 16.9 to 18.8 mm. The 4B is bound by the tile limit (three tiles need three quarters of its
+width); ten times the step budget found nothing better. ~200 ms and 600,000 steps in the browser on
+the P4_5: the C++ port needs a budget, as v5's did. Waits for the owner's look.
+
 ## The domain weight map
 
 Which cards earn space: a weight per card - its domain's (climate and media heavier than a lone

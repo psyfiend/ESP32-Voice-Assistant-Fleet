@@ -310,7 +310,8 @@ order.
 | `/popup?addcard=1` | "Add card to dashboard" in a member's own view (K17) | a new card entry after its group card |
 | `/popup?removecard=2` | Visibility's Hide from this page: its dialog, on any card (K96; K66's remove, every card since 2.11) | hidden only if Hide is tapped |
 | `/popup?removecard=1` | Hide from this page, confirmed - no dialog; on a mini tile, Hide from the cluster | the card's `removed` (the page's pool, its settings kept); a tile's `hidden` = `yes` |
-| `/popup?restore=N` | Restore beside the Nth of this page's hidden cards, in the page slot's panel (`slot=page` first) | the card's `removed`, removed - back on its page |
+| `/popup?restore=-2` | (round 6) the page slot's panel's "View hidden cards (N)" (`slot=page` first): the hidden cards' sheet opens | nothing |
+| `/popup?restore=N` | Restore beside the Nth card in the hidden cards' sheet (`restore=-2` first) | the card's `removed`, removed - back on its page |
 | `/popup?removecard=4` / `removecard=5` | on a copy made in a cluster (K91): `4` its "Remove this copy?" dialog; `5` its Remove, no dialog | `5`: the copy's whole entry, deleted (`Settings::dropCard()`) |
 | `/popup?addcards=MASK&mv=0\|1` | a cluster's Add cards (K104, K91) on its open window: the cards whose bits are set ticked (bit 0 the list's first - `view=10` shows the list), Copy or Move, and Add - the window closes | an entry with `in` for each, as `addto=`; Move also each card's `removed` |
 | `/popup?addto=N&mv=0\|1` | Add to a cluster (K91, K100) on the open card: the Nth cluster on the page (screen order), Copy (`mv=0`) or Move (`mv=1`), and Add - the window closes | a new card entry with `in` (the cluster's id), `entity`, `area`, `group`, `name`; Move also the card's `removed` |

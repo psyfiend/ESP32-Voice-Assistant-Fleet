@@ -649,3 +649,98 @@ matter less.
   card to dashboard"; long-pressed, the same member's SETTINGS shows Visibility with other choices.
 - **The page title slot** should have a "View hidden cards" button opening a sheet of them, so the
   slot's panel stays clean.
+
+# Round 6 (2026-10-20, night) - your bugs, and the arranger by your rules
+
+Your answers before it: (1) units per entity is rough - your smallest sizes are the guide, the logic
+is mine; (2) pages arrange themselves, for now - a priority order by domain and arranging by hand
+later (FUTURE_IMPROVEMENTS); (3) the cluster's Details as option B, informational, with the HA area
+or the original name when renamed; (4) Rename stays, Custom goes for clusters; (5) Members as the
+default tap only if it shows hidden members too. Recorded as K109 and K110.
+
+`1d01b72` (the firmware). Flashed to the P4_5 and the 4B, their settings saved first. Layout
+Playground v8 published to the same artifact.
+
+## What changed
+
+| Where | Before | Now |
+|---|---|---|
+| **Shading where a panel meets the bar** | in screenshots only: the bar drew it when the panel was asked to open, still hidden, and nothing drew it again | **on the glass**, drawn on the panel's first frame with a height (the panel's own frame buffer, below) |
+| **The bar's drop shadow** | gone while a panel was open (round 4's fix for the halo's corners) | **stays** - header panels have had no halo below the bar since round 5 |
+| **Icons and rows** | tiles copied a 1x1 solo card's icon, and more rows squeeze that card - every icon on the page shrank | a card **squeezed** (its icon stepped down from the full face) sets nothing: the tiles size from their own room, a solo card's largest at most. Where solo cards have their room, tiles still match them. The squeezed card itself stays small - **the arranger's to fix** (v8, below) |
+| **A cluster's Tap action** | back to Nothing whenever the page was built again (the cluster's builder never read it) | **kept**; **Members by default** |
+| **Members** | its width whatever the last window left | **a group light's width**, as Desk's; **every member, hidden ones saying "Hidden"** |
+| **Details** | style, icons, and each member Shown / Hidden | **option B**: Header style, Sensor icons; Rename, Header slots, Add cards; then in words its HA area or group (the original name if renamed) and its members counted |
+| **Card UI** | every row for every card | **what the card can use**: a cluster its Window timeout and Timer bar; a tile no Card label or density; the selector rows only with a light's controls |
+| **A cluster's SETTINGS** | Paused, Active state | neither |
+| **A member's own view** (from Members) | SETTINGS: Add card to dashboard | **Visibility**, as its tile's window: Hide from / **Show in the cluster**, Add card to dashboard, Remove a copy |
+| **The page slot's panel** | every hidden card with Restore | **"View hidden cards (N)"**, opening a sheet of them in Card UI's layout, each with Restore; the page is built again under it as you go. Two with one name say where each is from |
+
+![The shading, from the panel's frame buffer](../followups/211_r6_bar_shading_framebuffer_p45.png)
+![Details](../followups/211_r6_cluster_details_p45.png)
+![Members](../followups/211_r6_cluster_members_p45.png)
+![A cluster's Card UI](../followups/211_r6_cluster_cardui_p45.png)
+![A member's Visibility](../followups/211_r6_member_visibility_p45.png)
+![The page panel](../followups/211_r6_page_panel_p45.png)
+![Hidden cards](../followups/211_r6_hidden_cards_p45.png)
+
+The House page at 4 rows (a test copy of your settings, yours put back after): before, every tile
+copied the two squeezed 1x1 cards' tiny icon; after, the tiles keep theirs.
+
+![4 rows, before](../followups/211_r6_rows4_before_p45.png)
+![4 rows, after](../followups/211_r6_rows4_after_p45.png)
+
+## Layout Playground v8: your rules, in units
+
+Every block on a grid of units (a cell's halves) in any shape its limits allow. Paid for: entities of
+different sizes (each solo card and each tile - the side of the square with its area), solo cards far
+from square, clusters taller than wide, clusters with as many tiles at different sizes, empty units
+(cheap: a little margin beats unequal sizes), and order. Your limits, measured in the playground:
+**a solo card at least 13.5 x 16.2 mm in area and no taller than 1.20 its width** (the P4_5 at
+7 x 3); **a tile at least 15.3 x 6.7 mm** (the 4B at 4 x 4, three tiles in a 3 x 1 cluster under its
+header). "Your House (round 5)" is your page from the screenshots.
+
+| Board | v8's page | Entities |
+|---|---|---|
+| P4_5 | Kitchen across the top (8 units, 4 tiles); **Outside and Office sharing the bottom row, 5 units each** - your "what should happen"; Doors near square (19.7 x 18.5 mm) with a unit of margin above, its hero level with Kitchen's tiles | 16.9 to 18.8 mm, 11% apart |
+| P4_7B | the same shape | 27 to 30 mm |
+| P4_4B, S3_4B | Doors and Outside on top, Kitchen across the middle, Office below with room beside it - your smallest tile is about one 4B cell wide, so three tiles take three quarters of the width | 11.7 to 16.8 mm |
+| 4880, 3248 | fit; the 3248 only with tall clusters of one tile across | - |
+
+Not run on a board: its search is ~200 ms in the browser on the P4_5 (600,000 steps over 35 grids, two
+passes) - the C++ port needs a budget, as v5's did.
+
+## Tests for you
+
+| # | Do this | PASS if |
+|---|---|---|
+| J1 | Open a slot panel from the page (no system panel open) | the shading round the tab shows on the glass; the bar's drop shadow (Linen) stays |
+| J2 | Long-press a cluster's header: Details | Header style, Sensor icons, the three buttons, and the words about its group and members |
+| J3 | Tap a cluster's header | Members opens; hidden members are listed, saying Hidden; the rows are as wide as Desk's |
+| J4 | Members - a member - SETTINGS - Visibility | the same buttons as a long press on its tile; Hide, then Show in the cluster, puts it back |
+| J5 | SETTINGS of a cluster; its Card UI | no Paused or Active state; Card UI has only Window timeout and Timer bar |
+| J6 | Set a cluster's Tap action; Row + then Row - in the system panel | the Tap action stays |
+| J7 | Tap the page name - View hidden cards - Restore one | the card is back on the page behind the sheet, gone from the list |
+| J8 | Row + twice on a page with clusters | the tiles' icons keep their size (squeezed solo cards still shrink) |
+| J9 | The playground: v8, Your House; P4_5, then the 4B | the layouts above; the Clusters box gives units per entity |
+
+## Questions for you
+
+1. **v8 for the device** - port it as it is, or after you have tuned it in the playground?
+2. **The 4B**: your smallest tile is about a cell wide, so a three-tile cluster spans three quarters
+   of the screen. Keep that limit, or allow narrower tiles there?
+3. **Squeezed solo cards** (round 6's icons fix): until v8 is on the device, a page with more rows
+   than its cards need shows small solo cards beside full-size tiles. Acceptable for now?
+
+## Results (mine, before you)
+
+- Each change seen on the P4_5 by screenshot (pictures above); the shading by the panel's own frame
+  buffer (`/screenshot?fb=1`), which a screenshot is not. The 4B flashed and its page seen.
+- The icon fix seen at 3 and 4 rows on the P4_5 from a test copy of its settings
+  (`pages.house.rows`); its own settings put back and checked (4,996 bytes, 2 rows).
+- Not tapped on the glass: Hide / Show in the cluster from a member's view, and Restore in the sheet
+  (driven by `/popup?restore=N`, not run - it would change your page).
+
+## Your results
+
+(to come)

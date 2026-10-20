@@ -519,6 +519,21 @@ anything; each says where it lands.
   Also from those notes: NINA-style toasts, scene secondary info (#89), names and groups from the
   web UI (#87), and the Selector look as a device-wide choice on the settings page (4.1).
 
+### Arranging by hand, and an order by domain (owner, 2026-10-20, 2.11 round 6)
+
+Pages now arrange themselves (K109); these are what he wants beside that:
+
+- **A priority order for tiles by domain** - lights and switches first, then binary sensors, then
+  sensors, or similar - so a cluster's tiles, and the page's blocks, fall in an order that means
+  something before anyone moves them.
+- **Arranging on the device**: a "manual arrange" mode, perhaps from the page slot's panel, where
+  tiles, cards and clusters are dragged and dropped - "at a minimum some form of rudimentary manual
+  arrangement mechanism". He likes iPhone's jiggle (icons wobbling while they can be moved) and a
+  temporary badge on each movable one. What a hand arrangement does to the arranger's answer (kept
+  as pins, or the arranger re-run around them) is the design question it raises.
+- **The web app** shaping pages, clusters, cards and their sizes in detail makes the automatic
+  answer matter less (owner) - 3.1's build sheet.
+
 ## bb_captouch_fork
 
 - **Detach from the original author's repo.** `components/bb_captouch_fork` is currently a
