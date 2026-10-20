@@ -191,7 +191,7 @@ void goBack() {
         case PopupView::VIEW_MEMBER: leaveMember();          break;
         case PopupView::VIEW_ADD_TO: showView(PopupView::VIEW_VISIBILITY); break;   // its view's own
         case PopupView::VIEW_JOIN:   // a tile's Visibility (or a cluster member's, round 6), or the member's own view
-            showView((cardOf(h.surface) && cardOf(h.surface)->mini()) || (s.cluster && inMember())
+            showView((cardOf(h.surface) && cardOf(h.surface)->mini()) || inMember()
                          ? PopupView::VIEW_VISIBILITY : controlsView());
             break;
         default:                     showView(controlsView()); break;

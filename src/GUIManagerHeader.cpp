@@ -10,6 +10,8 @@
 #include <time.h>
 #include "Alarms.h"
 #include "Cards/CardAdded.h"   // this page's hidden cards (K66, K96)
+#include "Cards/CardTypes.h"   // ...and its clusters' (GroupPresent, round 7)
+#include "Cards/PageSpec.h"
 #include "UI/HiddenSheet.h"    // ...in their own sheet (round 6)
 #include "Settings.h"
 #include "UI/SlotPanels.h"
@@ -72,8 +74,7 @@ void GUIManager::openSlotPanel(uint8_t slot) {
     // THIS PAGE'S HIDDEN CARDS (2.11, K66, K96): how many, and a button to their
     // own sheet (round 6) - the panel goes first.
     if (_header.slotKind(slot) == SlotKind::SLOT_PAGE && _pages[_curPage].spec) {
-        static CardAdded::PoolItem s_count[HiddenSheet::MAX];
-        c.hiddenCount = CardAdded::pool(*_pages[_curPage].spec, s_count, HiddenSheet::MAX);
+        c.hiddenCount = hiddenCount();
         c.viewHidden  = [](void *user) {
             GUIManager *g = (GUIManager *)user;
             g->closeSlotPanel(true);
@@ -92,38 +93,122 @@ void GUIManager::openSlotPanel(uint8_t slot) {
     syncScrim();
 }
 
-// THE PAGE'S HIDDEN CARDS, IN THEIR OWN SHEET (2.11 round 6): by the name the
-// dashboard gives, else its entity's, copied - the page is built again under the
-// sheet as each one is restored (tick(), CardAdded::takeChanged()).
+namespace {
+// WHAT A PAGE HAS HIDDEN (round 7, the owner: a card is in the page's hidden
+// cards only because someone hid it - "Hide from this page" on a card, "Hide from
+// the cluster" on a member - never because it was moved into a cluster). The
+// page's pool first, then each of its clusters' members hidden from it (the
+// cluster itself showing: a hidden cluster's members go with it).
+struct Hidden {
+    char id[CARD_ID_MAX + 1];
+    char name[ENTITY_NAME_MAX + 32];
+    char where[ENTITY_SHORT_MAX];   // a card's area, for two of one name
+    bool member;                    // hidden from a cluster, not the page
+    bool inHeader;                  // ...one of its header's members
+};
+
+void nameOf(const EntityRegistry &reg, const char *label, const char *entity, const char *id, char *out, size_t cap) {
+    const Entity *e = entity && entity[0] ? reg.find(entity) : nullptr;
+    snprintf(out, cap, "%s", label && label[0] ? label : e && e->desc.name[0] ? e->desc.name
+                             : e && e->sourceName[0] ? e->sourceName : id);
+}
+
+uint8_t collectHidden(const PageSpec &page, const EntityRegistry &reg, Hidden *out, uint8_t cap) {
+    static CardAdded::PoolItem pool[HiddenSheet::MAX];
+    uint8_t n = CardAdded::pool(page, pool, LV_MIN(cap, HiddenSheet::MAX));
+    for (uint8_t i = 0; i < n; i++) {
+        Hidden &h = out[i];
+        h = Hidden{};
+        snprintf(h.id, sizeof(h.id), "%s", pool[i].id);
+        snprintf(h.where, sizeof(h.where), "%s", pool[i].area);
+        nameOf(reg, pool[i].label, pool[i].entity, pool[i].id, h.name, sizeof(h.name));
+    }
+    char v[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1];
+    for (uint8_t c = 0; c < page.count && n < cap; c++) {
+        const CardSpec &cs = page.cards[c];
+        if (!cs.id || !cardIdWellFormed(cs.id) || CardAdded::isHidden(cs.id) || CardAdded::isMoved(cs.id)) continue;
+        GroupPresent pres = cs.present;
+        if (Settings::card(cs.id, "present", v, sizeof(v))) groupPresentFromName(v, pres);
+        if (pres != GroupPresent::PRESENT_CLUSTER) continue;
+        char cname[48];
+        if (!Settings::card(cs.id, "label_text", cname, sizeof(cname)) || !cname[0])
+            snprintf(cname, sizeof(cname), "%s", cs.label ? cs.label : cs.area ? cs.area : "the");
+        // Its header's members: the saved list, else the dashboard's.
+        const bool savedSlots = Settings::card(cs.id, "slots", v, sizeof(v));
+        auto inHeader = [&](const char *id) {
+            if (!id) return false;
+            if (savedSlots) {
+                const size_t len = strlen(id);
+                for (const char *p = strstr(v, id); p; p = strstr(p + 1, id))
+                    if ((p == v || p[-1] == ',') && (p[len] == ',' || p[len] == '\0')) return true;
+                return false;
+            }
+            for (uint8_t k = 0; k < CLUSTER_SLOTS_MAX; k++) if (cs.slots[k] && !strcmp(cs.slots[k], id)) return true;
+            return false;
+        };
+        const CardSpec *mem[GROUP_MEMBERS_MAX];
+        uint8_t nMem = 0;
+        for (uint8_t k = 0; k < cs.memberCount && nMem < GROUP_MEMBERS_MAX; k++) mem[nMem++] = &cs.members[k];
+        nMem += CardAdded::membersIn(cs.id, mem + nMem, (uint8_t)(GROUP_MEMBERS_MAX - nMem));
+        for (uint8_t k = 0; k < nMem && n < cap; k++) {
+            const CardSpec &m = *mem[k];
+            char hv[8];
+            if (!m.id || !Settings::card(m.id, "hidden", hv, sizeof(hv)) || strcmp(hv, "yes")) continue;
+            Hidden &h = out[n++];
+            h = Hidden{};
+            snprintf(h.id, sizeof(h.id), "%s", m.id);
+            char own[ENTITY_NAME_MAX];
+            if (!Settings::card(m.id, "name", own, sizeof(own))) own[0] = '\0';
+            char nm[ENTITY_NAME_MAX];
+            nameOf(reg, own[0] ? own : m.label, m.primaries[0], m.id, nm, sizeof(nm));
+            snprintf(h.name, sizeof(h.name), "%s (%s cluster)", nm, cname);
+            h.member   = true;
+            h.inHeader = inHeader(m.id);
+        }
+    }
+    // Two cards called the same say where each is from ("Office Right (Office)").
+    bool twin[HiddenSheet::MAX] = {};
+    for (uint8_t i = 0; i < n && i < HiddenSheet::MAX; i++)
+        for (uint8_t j = 0; j < n && !twin[i]; j++) twin[i] = j != i && !out[i].member && !strcmp(out[j].name, out[i].name);
+    for (uint8_t i = 0; i < n && i < HiddenSheet::MAX; i++) {
+        const size_t len = strlen(out[i].name);
+        if (twin[i] && out[i].where[0] && len + 4 < sizeof(out[i].name))
+            snprintf(out[i].name + len, sizeof(out[i].name) - len, " (%s)", out[i].where);
+    }
+    return n;
+}
+}  // namespace
+
+uint8_t GUIManager::hiddenCount() {
+    if (_curPage >= _nPages || !_pages[_curPage].spec) return 0;
+    static Hidden s_count[HiddenSheet::MAX];
+    return collectHidden(*_pages[_curPage].spec, _core.entities(), s_count, HiddenSheet::MAX);
+}
+
+// THE PAGE'S HIDDEN CARDS, IN THEIR OWN SHEET (2.11 round 6; round 7: members
+// hidden from a cluster too): each says where it goes back - the page, or its
+// cluster, named - and the page is built again under the sheet as each one is.
 void GUIManager::openHiddenSheet() {
     if (_curPage >= _nPages || !_pages[_curPage].spec) return;
-    static CardAdded::PoolItem s_pool[HiddenSheet::MAX];
-    static char s_names[HiddenSheet::MAX][ENTITY_NAME_MAX];
+    static Hidden s_items[HiddenSheet::MAX];
     HiddenSheet::Spec sp;
     sp.page = _pages[_curPage].spec->title;
-    sp.n    = CardAdded::pool(*_pages[_curPage].spec, s_pool, HiddenSheet::MAX);
+    sp.n    = collectHidden(*_pages[_curPage].spec, _core.entities(), s_items, HiddenSheet::MAX);
     for (uint8_t i = 0; i < sp.n; i++) {
-        const Entity *e = s_pool[i].entity[0] ? _core.entities().find(s_pool[i].entity) : nullptr;
-        snprintf(s_names[i], sizeof(s_names[i]), "%s",
-                 s_pool[i].label && s_pool[i].label[0] ? s_pool[i].label
-                 : e && e->desc.name[0]                  ? e->desc.name
-                 : e && e->sourceName[0]                 ? e->sourceName : s_pool[i].id);
-        sp.names[i] = s_names[i];
+        sp.names[i] = s_items[i].name;
+        sp.chip[i]  = s_items[i].member ? "Restore to cluster" : "Restore to page";
     }
-    // Two called the same say where each is from ("Office Right (Office)"), else
-    // which entity it shows.
-    bool twin[HiddenSheet::MAX] = {};
-    for (uint8_t i = 0; i < sp.n; i++)
-        for (uint8_t j = 0; j < sp.n && !twin[i]; j++) twin[i] = j != i && !strcmp(s_names[j], s_names[i]);
-    for (uint8_t i = 0; i < sp.n; i++) {
-        if (!twin[i]) continue;
-        const char *where = s_pool[i].area[0] ? s_pool[i].area : s_pool[i].entity;
-        const size_t len = strlen(s_names[i]);
-        if (where[0] && len + 4 < sizeof(s_names[i]))
-            snprintf(s_names[i] + len, sizeof(s_names[i]) - len, " (%s)", where);
-    }
-    sp.restore = [](void *, uint8_t i) {
-        if (i >= HiddenSheet::MAX || !CardAdded::restore(s_pool[i].id)) return false;
+    sp.restore = [](void *user, uint8_t i) {
+        if (i >= HiddenSheet::MAX) return false;
+        const Hidden &h = s_items[i];
+        if (h.member) {
+            // A tile again: a header member shown as one too (its default is the header alone).
+            Settings::setCard(h.id, "hidden", h.inHeader ? "no" : nullptr);
+            Settings::save();
+            ((GUIManager *)user)->rebuildDashboard();
+            return true;
+        }
+        if (!CardAdded::restore(h.id)) return false;
         Settings::save();
         return true;
     };

@@ -71,14 +71,24 @@ bool remove(const char *cardId);
 // the cluster's compiled members (CardPage::makeGroupCard()).
 //
 //   "cards": { "<id>": { "in": "office_261019_0500", "entity": "...", "area": "Office",
-//                        "group": "ha_office" } }
-bool    addTo(const Card &cluster, const Entity &e, char *idOut, size_t cap);
+//                        "group": "ha_office", "from": "<the card it came from>" } }
+//
+// COPY OR MOVE, TRACKED (round 7, the owner: a card moved into a cluster turned
+// up in the page's hidden cards, and could be restored AND added again from the
+// cluster - two of one light). "from" names the card a member came from. Moved,
+// that card is "removed": "moved" - off its page, and NOT in its pool: the
+// hidden cards are only what was hidden (Hide from this page, Hide from the
+// cluster). Removing the member puts the moved card back on its page.
+bool    addTo(const Card &cluster, const Entity &e, char *idOut, size_t cap, const char *fromId = nullptr);
 uint8_t membersIn(const char *clusterId, const CardSpec **out, uint8_t cap);
 bool    inCluster(const char *clusterId, const char *entityId);   // a copy of it is in there already
 bool    isMember(const char *cardId);       // a copy added to a cluster here
+const char *fromOf(const char *memberId);   // the card a member came from, or null
 // Removed from its cluster: a copy made on the glass is deleted, entry and all -
-// the card it was copied from is untouched.
+// the card it was copied from is untouched; one it was MOVED from goes back.
 bool    removeMember(const char *cardId);
+bool    moveOut(const char *cardId);        // a card moved into a cluster: off its page, not in the pool
+bool    isMoved(const char *cardId);
 
 // --- THE PAGE'S POOL, FOR EVERY CARD (2.11 round 3, K66, K96) -----------------
 // "Hide from this page" sends any card on a page there - a compiled one too:
@@ -87,7 +97,7 @@ bool    removeMember(const char *cardId);
 // place. The page's list of hidden cards brings it back (restore()).
 bool isHidden(const char *cardId);
 bool hide(const char *cardId);      // false: no id, or hidden already
-bool restore(const char *cardId);   // false: not hidden
+bool restore(const char *cardId);   // false: not hidden (or moved)
 
 // A hidden card on a page, for its list: its id, the entity it shows (a group
 // card's first member's), its dashboard name (null: none - HA's), its area.

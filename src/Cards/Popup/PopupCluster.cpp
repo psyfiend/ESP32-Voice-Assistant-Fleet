@@ -311,10 +311,10 @@ uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask) {
         if (!move && !(copyMask & (1u << i))) continue;
         Card *k = s_cand[i];
         char id[CARD_ID_MAX + 1];
-        if (!CardAdded::addTo(*cl, *k->firstEntity(), id, sizeof(id))) break;   // full
+        if (!CardAdded::addTo(*cl, *k->firstEntity(), id, sizeof(id), k->id())) break;   // full
         const char *name = k->shownName(CardLabel::LBL_NAME);
         if (name && name[0]) Settings::setCard(id, "name", name);
-        if (move) CardAdded::hide(k->id());
+        if (move) CardAdded::moveOut(k->id());   // off the page, not one of its hidden cards (round 7)
         n++;
     }
     if (!n) return 0;

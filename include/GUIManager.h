@@ -143,6 +143,7 @@ private:
     void openSlotPanel(uint8_t slot);
     void closeSlotPanel(bool animate);
     void openHiddenSheet();   // the page's hidden cards, each with Restore (round 6)
+    uint8_t hiddenCount();    // ...how many: from the page and from its clusters (round 7)
     void syncScrim();                // the dismiss scrim catches taps while any panel is open
     // The page's header, shown or hidden (D-14): the owner's choice for the
     // page (Settings pages.<slug>.header), else the page's compiled default.

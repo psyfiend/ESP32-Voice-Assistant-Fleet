@@ -18,7 +18,7 @@ static uint8_t        s_at[MAX];   // a row's card, as its index in the caller's
 static uint8_t        s_n = 0;     // rows still listed
 static char           s_title[48];
 
-static const char *const RESTORE_W[] = { "Restore" };
+static const char *const RESTORE_W = "Restore";   // a row the caller gave no words
 
 static void closeCb(lv_event_t *ev) { (void)ev; Kit::sheetClose(S); }
 
@@ -28,7 +28,7 @@ static bool restoreRow(uint8_t row) {
     if (row >= s_n || !s_spec.restore) return false;
     if (!s_spec.restore(s_spec.user, s_at[row])) return false;
     char msg[64];
-    snprintf(msg, sizeof(msg), "%s is back on the page", s_spec.names[s_at[row]]);
+    snprintf(msg, sizeof(msg), "%s restored", s_spec.names[s_at[row]]);
     UIToolkit::show_toast(msg);
     for (uint8_t k = row; k + 1 < s_n; k++) s_at[k] = s_at[k + 1];
     s_n--;
@@ -46,14 +46,17 @@ static void fill() {
     lv_obj_clean(S.stage);
     const int32_t w = lv_area_get_width(&S.winRect) - 2 * S.pad;
     Kit::ChipRowSpec rows[MAX];
-    for (uint8_t k = 0; k < s_n; k++) rows[k] = { s_spec.names[s_at[k]], RESTORE_W, 1, 1 };
+    for (uint8_t k = 0; k < s_n; k++) {
+        const char *const *chip = s_spec.chip[s_at[k]] ? &s_spec.chip[s_at[k]] : &RESTORE_W;   // one chip: its button
+        rows[k] = { s_spec.names[s_at[k]], chip, 1, 1 };
+    }
     lv_obj_t *t = Kit::chipTable(S.stage, w, rows, s_n, chipCb);
     lv_obj_t *l = Kit::label(t, Kit::KitStyle::KS_LABEL_TAG_DIM);
     lv_obj_set_width(l, lv_pct(100));
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
-    lv_label_set_text(l, s_n ? "Restore puts a card back where it was, with its settings. A card is hidden from "
-                               "its window: SETTINGS, Visibility."
+    lv_label_set_text(l, s_n ? "Restore puts a card back where it was, with its settings: on the page, or a "
+                               "tile in its cluster. Cards are hidden from their window: SETTINGS, Visibility."
                              : "No hidden cards on this page.");
 }
 

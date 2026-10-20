@@ -178,6 +178,9 @@ block's shapes:
   that costs least, each tile at least one of a 3 x 1 cluster on the 4B at 4 x 4 (15.3 x 6.7 mm, its
   header paid). Clusters wear the device's header and padding (UIShape C_HDR_H, C_PAD, C_TILE_GAP).
 
+**The owner's knobs** (2026-10-20, tuned in the playground, now its defaults): `size` 75, `square`
+30, `wide` 20, `twin` 70, `gap8` 11, `order` 4.
+
 **Cost**: an entity's size is the side of the square with its area (a solo card after its label, a
 tile after its cluster's header and padding). `size` x log(size / target)^2 per entity - the target
 the page's equal share first, then the average the first pass found (two passes per grid); `square` x

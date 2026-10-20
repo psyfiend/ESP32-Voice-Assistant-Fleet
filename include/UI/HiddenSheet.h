@@ -11,9 +11,13 @@ namespace HiddenSheet {
 
 static constexpr uint8_t MAX = 12;   // a page's hidden cards listed, at most
 
+// A card hidden from the page, or a member hidden from its cluster (round 7):
+// each row says which - "Restore to page", "Restore to cluster" - and a member's
+// name says which cluster.
 struct Spec {
     const char *page = nullptr;              // the page's title, for the sheet's
     const char *names[MAX] = {};             // each hidden card, by the name it shows
+    const char *chip[MAX] = {};              // ...and its row's button
     uint8_t     n = 0;
     bool (*restore)(void *user, uint8_t i) = nullptr;   // names[i] back on the page: true when it went
     void *user = nullptr;

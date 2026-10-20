@@ -485,7 +485,6 @@ void tapDropCb(lv_event_t *ev);
 void unitsDropCb(lv_event_t *ev);
 void propsCb(lv_event_t *ev);
 void addCardCb(lv_event_t *ev);
-void pauseCheckCb(lv_event_t *ev);
 
 // PopupSideRows.cpp
 void sceneActionDropCb(lv_event_t *ev);

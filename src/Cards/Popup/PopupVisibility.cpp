@@ -204,6 +204,56 @@ void showTileCb(lv_event_t *) {
     }, nullptr);
 }
 
+// Move back to the page: a member moved in from a card (round 7) leaves, and
+// that card is back where it was. The page is built again when the window goes.
+void moveBackCb(lv_event_t *) {
+    lv_async_call([](void *) {
+        Card *c = visibilitySubject();
+        if (!c || !c->hasId() || s.phase != PopupPhase::PHASE_OPEN) return;
+        if (CardAdded::removeMember(c->id())) {
+            UIToolkit::show_toast("Back on the page");
+            CardPopup::close();
+        }
+    }, nullptr);
+}
+
+// A card on the page shows `eid` already - a solo card, not a tile or a group
+// card's member (round 7: no second card of one light from Add card to dashboard).
+bool onPage(lv_obj_t *o, const char *eid) {
+    const uint32_t n = lv_obj_get_child_count(o);
+    for (uint32_t i = 0; i < n; i++) {
+        lv_obj_t *c = lv_obj_get_child(o, (int32_t)i);
+        if (!lv_obj_has_flag(c, CardPopup::CARD_SURFACE_FLAG)) { if (onPage(c, eid)) return true; continue; }
+        Card *k = cardOf(c);
+        const Entity *e = k ? k->firstEntity() : nullptr;
+        if (k && e && !k->mini() && k->entityCount() == 1 && strcmp(k->typeName(), "cluster") && !strcmp(e->desc.id, eid))
+            return true;
+    }
+    return false;
+}
+
+// PAUSED (round 7, the owner: SETTINGS' Paused belongs with Visibility): the
+// card's own, a tile's, or - in a member's own view - that member's alone.
+const char *const PAUSED_W[] = { "No", "Yes" };
+void pausedChoose(void *p) {
+    const bool on = (uintptr_t)p == 1;
+    if (s.phase != PopupPhase::PHASE_OPEN) return;
+    Card *c = inMember() ? nullptr : held();
+    if (c) {
+        c->setPaused(on);
+    } else if (s.reg) {
+        const uint32_t now = millis();
+        for (uint8_t i = 0; i < s.nEnt; i++) if (s.ent[i]) s.reg->setPaused(s.ent[i]->desc.id, on, now);
+    }
+    deckRender();
+    renderMain();   // the controls' PAUSED pill, when they show next
+}
+void pausedChipCb(lv_event_t *ev) {
+    const uintptr_t v = (uintptr_t)lv_event_get_user_data(ev);
+    Kit::chipTableLit(s_table, (uint8_t)(v >> 8), (uint8_t)(v & 0xFF));
+    lv_async_call(pausedChoose, (void *)(v & 0xFF));
+}
+
 }  // namespace
 
 Card *visibilitySubject() {
@@ -232,33 +282,71 @@ void visibilityHideTile() {
 }
 
 void buildVisibility() {
+    Card *held_ = held();
+    // A GROUP CARD'S MEMBER (Desk's lamp, round 7): its Paused, and Add card to
+    // dashboard - SETTINGS' row until now - unless the page shows it already.
+    if (held_ && inMember() && !s.cluster) {
+        const Entity *e = s.ent[0];
+        const Kit::ChipRowSpec paused = { "Paused", PAUSED_W, 2, (uint8_t)(aggregate().paused ? 1 : 0) };
+        lv_obj_t *list = table(&paused, 1, pausedChipCb);
+        const bool there = e && ((held_->hasId() && CardAdded::addedFor(held_->id(), e->desc.id)) ||
+                                 onPage(lv_screen_active(), e->desc.id));
+        if (e && held_->hasId() && !there) {
+            const Action add = { "Add card to dashboard", Kit::ButtonRole::BTN_CANCEL, addCardCb };
+            actions(list, &add, 1);
+        }
+        note(list, there ? "Its card is on the dashboard already. Paused: out of its group."
+                         : "Paused: out of its group.");
+        return;
+    }
     Card *c = visibilitySubject();
     if (!c) return;
     ClusterCard *cl = clusterOfSubject();
-    lv_obj_t *list = table(nullptr, 0, nullptr);
+    // Paused, for anything that is not a cluster itself (K110).
+    const bool clusterSelf = s.cluster && !inMember();
+    const Kit::ChipRowSpec paused = { "Paused", PAUSED_W, 2, (uint8_t)(aggregate().paused ? 1 : 0) };
+    lv_obj_t *list = clusterSelf ? table(nullptr, 0, nullptr) : table(&paused, 1, pausedChipCb);
     Action a[3];
     uint8_t n = 0;
     if (cl) {
+        // COPY OR MOVE, TRACKED (round 7): where the member came from says what it
+        // may do - no second card of one entity on the page.
         const Entity *e = c->firstEntity();
-        const bool made = e && cl->hasId() && CardAdded::addedFor(cl->id(), e->desc.id);
+        const char *from = CardAdded::fromOf(c->id());
+        const bool moved = from && CardAdded::isMoved(from);         // its card left the page for it
+        const bool fromHidden = from && CardAdded::isHidden(from);   // its card is in the hidden ones
+        const bool there = e && ((cl->hasId() && CardAdded::addedFor(cl->id(), e->desc.id)) ||
+                                 onPage(lv_screen_active(), e->desc.id));
         const int8_t i = clusterMemberOf(*cl, e);
         const bool tile = i < 0 || clusterMemberShown(*cl, (uint8_t)i) == MemberShown::SHOWN_TILE;
         if (c->hasId()) a[n++] = tile ? Action{ "Hide from the cluster", Kit::ButtonRole::BTN_CANCEL, hideTileCb }
                                       : Action{ "Show in the cluster", Kit::ButtonRole::BTN_CANCEL, showTileCb };
-        if (!made && e && cl->hasId()) a[n++] = { "Add card to dashboard", Kit::ButtonRole::BTN_CANCEL, addTileCb };
-        // A copy made here can go again, for good (K91; the dashboard's members only hide).
-        if (CardAdded::isMember(c->id())) a[n++] = { "Remove from the cluster", Kit::ButtonRole::BTN_DESTRUCTIVE, removeCopyCb };
+        if (moved) {
+            a[n++] = { "Move back to the page", Kit::ButtonRole::BTN_CANCEL, moveBackCb };
+        } else {
+            if (e && cl->hasId() && !there && !fromHidden)
+                a[n++] = { "Add card to dashboard", Kit::ButtonRole::BTN_CANCEL, addTileCb };
+            // A copy made here can go again, for good (K91; the dashboard's members only hide).
+            if (CardAdded::isMember(c->id()))
+                a[n++] = { "Remove from the cluster", Kit::ButtonRole::BTN_DESTRUCTIVE, removeCopyCb };
+        }
         actions(list, a, n);
-        note(list, made ? "Its card is on the dashboard already. A hidden member stays in the cluster, listed in "
-                          "its Members."
-                        : "A hidden member stays in the cluster, listed in its Members.");
+        note(list, moved      ? "Moved here from the page: Move back to the page puts its card back where it was. "
+                                "A hidden member stays in the cluster, listed in its Members."
+                 : there      ? "Its card is on the dashboard already. A hidden member stays in the cluster, listed "
+                                "in its Members."
+                 : fromHidden ? "Its card is hidden from the page: it comes back from the page's hidden cards (tap "
+                                "the page's name). A hidden member stays in the cluster, listed in its Members."
+                              : "A hidden member stays in the cluster, listed in its Members.");
         return;
     }
     if (c->hasId())  a[n++] = { "Hide from this page", Kit::ButtonRole::BTN_CANCEL, hideCardCb };
     if (addable(c))  a[n++] = { "Add to a cluster",    Kit::ButtonRole::BTN_CANCEL, addToCb };
     actions(list, a, n);
-    note(list, "Hidden cards go to this page's list of hidden cards, with their settings, and come back "
-               "from there: tap the page's name in the header.");
+    note(list, clusterSelf ? "A hidden cluster goes to this page's hidden cards, and comes back from there: tap the "
+                             "page's name in the header."
+                           : "Paused: out of every group it is in, its card greyed. Hidden cards go to this "
+                             "page's hidden cards, with their settings, and come back from there: tap the page's name.");
     s_pick = 0;
     s_move = false;
 }
@@ -295,12 +383,12 @@ bool visibilityAddTo(uint8_t pick, bool move) {
     findClusters(lv_screen_active());
     if (pick >= s_nCl || alreadyIn(*s_cl[pick], *e)) return false;
     char id[CARD_ID_MAX + 1];
-    if (!CardAdded::addTo(*s_cl[pick], *e, id, sizeof(id))) return false;
+    if (!CardAdded::addTo(*s_cl[pick], *e, id, sizeof(id), c->id())) return false;
     // A COPY LOOKS LIKE ITS CARD: the name it shows ("Thermo", not HA's
     // "THERMOSTAT Temperature") - a custom name, as one typed would be (K40).
     const char *name = c->shownName(CardLabel::LBL_NAME);
     if (name && name[0]) Settings::setCard(id, "name", name);
-    if (move) CardAdded::hide(c->id());
+    if (move) CardAdded::moveOut(c->id());   // off the page, not one of its hidden cards (round 7)
     char msg[64];
     snprintf(msg, sizeof(msg), "%s to %s", move ? "Moved" : "Copied", s_clName[pick]);
     UIToolkit::show_toast(msg);
@@ -358,8 +446,9 @@ bool visibilityJoin(uint8_t pick) {
     char msg[80];
     snprintf(msg, sizeof(msg), "Added to the dashboard, in %s", pick < s_nJoin ? s_joinName[pick] : "its group");
     UIToolkit::show_toast(msg);
-    // Back to the Visibility it came from: a tile's, or a cluster member's own view's.
-    const bool tile = (held() && held()->mini()) || (s.cluster && inMember());
+    // Back to the Visibility it came from: a tile's, or a member's own view's (round 7: a
+    // group card's member asks from there too).
+    const bool tile = (held() && held()->mini()) || inMember();
     showView(tile ? PopupView::VIEW_VISIBILITY : controlsView());
     return true;
 }

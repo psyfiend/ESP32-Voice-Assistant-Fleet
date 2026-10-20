@@ -16,7 +16,6 @@ namespace popup {
 uint8_t s_dbgRows = 0;                  // GET /popup?rows=N: test rows added to SETTINGS
 #endif
 
-void pauseCheckCb(lv_event_t *ev);
 void groupDropCb(lv_event_t *ev);
 
 // The card's group, from a PC (/popup?clabel=N): HA area / the dashboard's
@@ -110,13 +109,8 @@ void addCardCb(lv_event_t *ev);
 uint8_t deckSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
     Card *held = cardOf(h.surface);
-    // A CLUSTER'S OWN SETTINGS (round 6, the owner): no Paused and no Active
-    // state - it neither pauses nor counts as on; its members do, each in its
-    // own view.
-    const bool clusterSelf = s.cluster && !inMember();
-    if (!clusterSelf)
-        r[n++] = { "Paused", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)aggregate().paused, true,
-                   pauseCheckCb, &s.swPause };
+    // PAUSED IS VISIBILITY'S since round 7 (the owner). A cluster has no Active
+    // state (round 6): it never counts as on; its members do.
     // When a group defined here counts as on - HA's group helper option.
     // Not for a group defined in HA or Hue: the source decides (2.10c).
     if (s.nEnt > 1 && !s.native && !inMember() && !s.cluster)
@@ -144,21 +138,13 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     // ENTITY PROPERTIES (owner): a view of its own, from here - no room for
     // another corner icon.
     r[n++] = { "Entity properties", DeckRowKind::ROW_BUTTON, "View", 0, true, propsCb, nullptr };
-    // K17 (K65): a member of a group card made a card of its own - a copy,
-    // right after the group card, in its group. Once made, the row says so.
-    // A CLUSTER'S MEMBER has Visibility instead (round 6, the owner: from
-    // Members its SETTINGS offered Add card to dashboard, from its tile
-    // Visibility - one member, two answers): the same view as its tile's.
-    const bool clusterMember = s.cluster && inMember();
-    if (inMember() && !s.cluster && held && held->hasId() && s.ent[0]) {
-        const bool made = CardAdded::addedFor(held->id(), s.ent[0]->desc.id) != nullptr;
-        r[n++] = { "Add card to dashboard", DeckRowKind::ROW_BUTTON, made ? "Added" : "Add", 0, !made, addCardCb, nullptr };
-    }
     // VISIBILITY (K96): what the card can do where it is - hidden from the page
-    // (K66's remove, every card since 2.11) or from its cluster, and more later.
+    // (K66's remove, every card since 2.11) or from its cluster - and, since
+    // round 7, Paused, and a member's Add card to dashboard (K17: a group card's
+    // member made a card of its own), in a member's own view too: one place.
     if (held)
-        r[n++] = { "Visibility", DeckRowKind::ROW_BUTTON, "Open", 0, cardRows || (clusterMember && visibilitySubject()),
-                   visibilityCb, nullptr };
+        r[n++] = { "Visibility", DeckRowKind::ROW_BUTTON, "Open", 0,
+                   cardRows || (inMember() && (!s.cluster || visibilitySubject())), visibilityCb, nullptr };
     // CARD UI (2.8 round 3, D-27): the card's own looks, a view of their own -
     // at the foot. The card's, so greyed in a member's view; a card without a
     // usable id cannot keep them.
@@ -253,23 +239,6 @@ void addCardCb(lv_event_t *ev) {
         deckSet(DECK_PEEK);
         visibilityJoinOpen(held, s.ent[0]);
     }, nullptr);
-}
-
-// Paused, a checkbox. Through the card when it is the held one (it repaints at
-// once, and every card on the same entities follows through the registry).
-void pauseCheckCb(lv_event_t *ev) {
-    const bool on = lv_obj_has_state((lv_obj_t *)lv_event_get_target(ev), LV_STATE_CHECKED);
-    // In a member's own view, only that member (2.10b) - the registry, and
-    // every card on it follows.
-    Card *c = inMember() ? nullptr : cardOf(h.surface);
-    if (c) {
-        c->setPaused(on);
-    } else if (s.reg) {
-        const uint32_t now = millis();
-        for (uint8_t i = 0; i < s.nEnt; i++) if (s.ent[i]) s.reg->setPaused(s.ent[i]->desc.id, on, now);
-    }
-    deckRender();
-    renderMain();
 }
 
 } // namespace popup

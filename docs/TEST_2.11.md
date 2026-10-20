@@ -743,4 +743,63 @@ passes) - the C++ port needs a budget, as v5's did.
 
 ## Your results
 
+**2026-10-20, afternoon**: the P4_5 feels faster, Linen included. Happy with v8's arranging after
+tuning it in the playground (entity sizes 75, same-sized clusters 70, an empty unit 11; the rest as
+published). Duplicates: Living's Overhead moved into Kitchen turned up in the page's hidden cards,
+could be restored, AND could be added from Kitchen's tile - two Overheads where there was one. A card
+should be in the hidden cards only if someone hid it (Hide from this page, Hide from the cluster);
+moved, it is not; copied, its tile should not offer Add card to dashboard (it is there already). The
+hidden cards should say Restore to page or Restore to cluster, naming the cluster. Add card to
+dashboard from Kitchen choosing the Kitchen group is understandable. Desk's member's Add card to
+dashboard, and Paused, belong in Visibility.
+
+# Round 7 (2026-10-20, afternoon) - copy and move tracked, Paused in Visibility
+
+Your notes above, built (K111). Flashed to the P4_5, the 4B and **the 1060** (as asked; COM9 at
+460800), each board's settings saved first. Layout Playground v10: your knobs as v8's defaults, and
+**Copy settings for Claude** under Arranger - the knobs as text, copied, to paste here.
+
+| Where | Before | Now |
+|---|---|---|
+| **Move into a cluster** | the card was hidden from the page - in its hidden cards, restorable while its copy stayed | the card is **moved**: off the page, **not** in its hidden cards; the copy remembers it. Removing the copy, or its **Move back to the page**, puts the card back where it was |
+| **Copy into a cluster** | the copy offered Add card to dashboard | the copy remembers its card; **no Add card to dashboard while a card on the page shows it** (or its card is hidden - restore that instead) |
+| **Add card to dashboard** (any member) | offered unless that member had made one | offered **only while no card on the page shows that entity** |
+| **The page's hidden cards** | the page's only, "Restore" | the page's and **each cluster's**: **Restore to page**, or **Restore to cluster** with the cluster named ("Overhead (Kitchen cluster)") |
+| **Paused** | SETTINGS | **Visibility**, as its first row: a card's, a tile's, a member's own (a cluster has none) |
+| **A group card's member** (Desk's lamp) | SETTINGS: Add card to dashboard | **Visibility**: Paused, and Add card to dashboard unless the page shows it |
+
+![A tile's Visibility](../followups/211_r7_tile_visibility_p45.png)
+![The hidden cards](../followups/211_r7_hidden_cards_p45.png)
+
+**Your page's old moves are still hidden cards.** Made before this round, they have no record of a
+move, so Overhead, Thermo, Eric and Garage still sit in the hidden cards ("Restore to page") while
+their copies are in Kitchen, Kitchen, Office and Outside, and those copies still offer Add card to
+dashboard (no card on the page shows them). There is also an extra Overhead card you made from
+Kitchen and hid (`kitchen_living_overhead_261020_1257`). The question below is about them.
+
+## Tests for you
+
+| # | Do this | PASS if |
+|---|---|---|
+| K1 | A card's Visibility - Add to a cluster - Move | it joins the cluster and is in neither the page nor its hidden cards |
+| K2 | That tile's Visibility | Move back to the page; no Add card to dashboard; tapping it puts the card back and the tile goes |
+| K3 | Another card - Add to a cluster - Copy; the copy's Visibility | no Add card to dashboard; Remove from the cluster deletes the copy only |
+| K4 | A tile's Visibility - Hide from the cluster; the page's hidden cards | "<name> (<cluster> cluster)", Restore to cluster brings the tile back |
+| K5 | Desk - Members - a lamp - SETTINGS | no Paused, no Add card; Visibility has both |
+| K6 | Any card's Visibility - Paused Yes / No | the card greys with PAUSED and comes back |
+
+## Questions for you
+
+1. **The old moves** - shall I turn Overhead, Thermo, Eric and Garage into moves (out of the hidden
+   cards; each copy's Move back to the page brings its card back) and delete the extra Overhead card?
+2. **v8 for the device** - port it now with your knobs?
+
+## Results (mine, before you)
+
+- Seen on the P4_5: Overhead's tile Visibility (Paused, Hide, Add, Remove - its old move has no record,
+  so Add shows) and the hidden cards with Restore to page. The 4B and the 1060 flashed and answering.
+- Not tapped on the glass: a new Move or Copy, Move back, Restore to cluster - each changes your page.
+
+## Your results
+
 (to come)

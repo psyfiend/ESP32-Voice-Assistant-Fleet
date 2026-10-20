@@ -453,7 +453,10 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
   copied into a cluster** (2.11, K91) have `in` (the cluster's id) where a page card has `page`, and
   are built after its compiled members. Their ids are made as K33's. **Any card hidden from its page**
   (K96, K66's remove - compiled or added) has `removed`: `yes`: the page's pool, never built, listed
-  in the page slot's panel with Restore.
+  in the page's hidden cards with Restore. **A card moved into a cluster** has `removed`: `moved` -
+  off its page and NOT in its pool; its copy in the cluster has `from` (the card it came from), and
+  removing that copy puts the card back (K111). A member hidden from its cluster (`hidden`: `yes`) is
+  listed with the page's hidden cards too, Restore to cluster.
 - **Every change is logged** with its time and task (`loopTask` = the card window, `httpd` = a
   browser); the last ten are in `/settings?stats=1`.
 - **UI Tweaks' choices are `system.ui.*`** (scheme, card label, entity label, card state,
