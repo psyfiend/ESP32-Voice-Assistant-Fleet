@@ -383,6 +383,15 @@ const UIType &type() {
         // cost recorded in docs/design/tokens.md. Point it somewhere larger
         // when a fullscreen card actually needs one.
         .HERO    = FLEET_FONT_VALUE,
+        // The roomy hero (2.11 round 9): on the 7" boards a tile or card with
+        // room for it draws its glyph 1.5 x ICON - fleet_icons_46, the face the
+        // 4B already uses as ICON (6.9 mm here; ~119 KB of flash on these two
+        // boards). Elsewhere ICON itself, which costs nothing.
+#if defined(CYD_P4_1060) || defined(WS_P4_7B)
+        .ICON_XL = &fleet_icons_46,
+#else
+        .ICON_XL = FLEET_ICONS_LG,
+#endif
     };
     return t;
 }

@@ -354,16 +354,21 @@ void CardPage::commit() {
     // whose icon had to step down from the full face sets nothing, and the tiles
     // size themselves - as large as a solo card's at most. Giving solo cards their
     // room is the arranger's (layout-engines.md, v8).
+    // ON AN ARRANGED PAGE (round 9) nothing is copied: the arranger has made every
+    // entity one size, so a tile and a card each fill their own room alike - and a
+    // card a pin squeezed must not shrink every tile (the 1060's Thermo).
     {
         int32_t disc = 0;
         const lv_font_t *face = nullptr;
-        for (uint8_t i = 0; i < _n && !face; i++) {
+        const UIType &t = UI::type();
+        for (uint8_t i = 0; i < _n && !_arranged; i++) {
             Card *c = _cards[i];
             if (!c || !_slot[i].placed || _slot[i].spanX != _sub || _slot[i].spanY != _sub) continue;
             if (!strcmp(c->typeName(), "cluster")) continue;
             c->heroSizes(disc, face);
+            if (face != t.ICON && face != t.ICON_XL) { disc = 0; face = nullptr; }   // squeezed: it sets nothing
+            break;
         }
-        if (face != UI::type().ICON) { disc = 0; face = nullptr; }
         Card::setPageHero(disc, face);
         for (uint8_t i = 0; i < _n; i++) {
             Card *c = _cards[i];

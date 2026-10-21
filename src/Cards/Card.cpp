@@ -879,6 +879,8 @@ const lv_font_t *Card::heroIconFace() const {
     const UIType &t = UI::type();
     const int32_t room = midHeight();
     if (room <= 0) return t.ICON;
+    // The roomy hero (2.11 round 9): where most of its disc fits (the tiles' rule, MiniTile.cpp).
+    if (t.ICON_XL != t.ICON && room * 10 >= lv_font_get_line_height(t.ICON_XL) * 16) return t.ICON_XL;
     if (room >= lv_font_get_line_height(t.ICON)    + UI::sc(4)) return t.ICON;
     if (room >= lv_font_get_line_height(t.ICON_MD) + UI::sc(4)) return t.ICON_MD;
     return t.ICON_SM;

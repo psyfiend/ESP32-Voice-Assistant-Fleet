@@ -337,6 +337,11 @@ struct UIType {
                               // the hero on a CRAMPED one. 2.7
     const lv_font_t *ICON_SM; // the corner icon on an ordinary card
     const lv_font_t *HERO;    // oversized, for a fullscreen card
+    // THE ROOMY HERO (2.11 round 9): a state card's or a tile's glyph where its
+    // room holds the larger disc - ICON's 4.5 mm looked tiny in the 1060's 27 mm
+    // tiles. 1.5 x ICON on the 7" boards (an existing face: no new font), ICON
+    // elsewhere (no cost). UITokens.cpp says which.
+    const lv_font_t *ICON_XL;
 };
 
 // ---------------------------------------------------------------------------

@@ -131,13 +131,21 @@ void StateCard::renderMini() {
     // THE SOLO CARDS' OWN wherever that much room is there (round 4: "it is
     // really not a good look when dashboard icons are different sizes"), unless
     // they are squeezed (round 6: the page sets none then, CardPage::commit()).
+    // THE ROOMY HERO (round 9, the owner on the 1060: "the icons inside each
+    // cluster are relatively tiny"): the cap was twice ICON, which is ~4.5 mm on
+    // every board - a third of a 27 mm tile. Where the room holds most of twice
+    // ICON_XL (the 7" boards' 1.5 x ICON; ICON elsewhere), that is the cap and face.
     int32_t d = LV_MIN(room * 92 / 100, w * 72 / 100);
-    d = LV_MIN(d, lv_font_get_line_height(t.ICON) * 2);
+    const int32_t xl = lv_font_get_line_height(t.ICON_XL);
+    const bool roomy = t.ICON_XL != t.ICON && d * 10 >= xl * 16;
+    d = LV_MIN(d, (roomy ? xl : lv_font_get_line_height(t.ICON)) * 2);
     if (d < 0) d = 0;
     const lv_font_t *face = t.ICON_SM;
     if (pageDisc() > 0 && pageFace() && pageDisc() <= d) {
         d    = pageDisc();
         face = pageFace();
+    } else if (roomy) {
+        face = t.ICON_XL;
     } else {
         // Less room than a solo card's: the largest face that sits comfortably on it.
         if (lv_font_get_line_height(t.ICON) * 100 <= d * 62)         face = t.ICON;

@@ -1063,3 +1063,48 @@ about looks, and two Reset buttons side by side invite the wrong one.
 says how to restore it from now on. Why the co-processor does not come back after a software
 restart is unexplained; this round did not change the restart path (the settings restore's), and
 the P4_5 and the 4B restart cleanly.
+
+## 3. Tiles' icons on the 1060, and borders round tiles
+
+**Why they looked tiny.** A tile's disc was capped at twice its icon face's height, and the icon
+face is sized by the board's pixel density to the same **4.5 mm on every board** (the P4_5's 52 px,
+the 1060's 30 px). The cap is ~9 mm everywhere. On the P4_5 a tile is ~18 mm, so the disc is half of
+it; v8 gives the 1060 ~27 mm tiles, and the same disc is a third. Nothing was wrong on any one
+board: the icon simply does not grow with the room.
+
+**Fixed** on the two 7" boards: a **roomy hero face**, 1.5 x the icon (6.9 mm - the 46 px face the
+4B already uses, so no new font; ~119 KB of flash on the 1060 and the 7B only). A tile, and a solo
+state card, uses it wherever its room holds most of the larger disc, and keeps the old faces
+elsewhere. Other boards are unchanged (their roomy face is the icon itself). **And on an arranged
+page the tiles no longer copy a solo card's disc** (round 4's rule): the arranger has made every
+entity one size, so each fills its own room - a card a pin squeezed (the 1060's Thermo) no longer
+shrinks every tile.
+
+The 1060 before and after (its House page as pinned, 5 x 2; Home Assistant was down, hence the
+dashes and the plain bulbs):
+
+![1060 before](followups/211_r9_house_pinned_1060.png)
+![1060 after: 94 px discs and 46 px glyphs, from 62 and 30](followups/211_r9_icons_after_1060.png)
+
+The 4B after (its tiles size themselves now; the short Office cluster's stay small - the pin to 4
+rows gives it two units of height):
+
+![4B after](followups/211_r9_icons_after_4b.png)
+
+**Borders round tiles: a mock** - [2.11 Tile Borders](https://claude.ai/artifact/SpSG1hhpbJsUmxBLv3cdfY):
+the 1060's Kitchen cluster at its size in pixels, four ways - **A** as built (no tile borders,
+K89); **B** a hairline round each tile; **C** a hairline, and an on tile wearing the Corner cut as a
+solo card does; **D** a faint fill per tile, no line. Linen or Midnight from its Tweaks.
+
+| # | Do this | PASS if |
+|---|---|---|
+| O1 | The 1060's House page | the tiles' icons fill their tiles as the Doors card's does (the second picture) |
+| O2 | The P4_5 and the 4B | nothing smaller than before; the 4B's Outside and Kitchen tiles larger |
+
+**Questions (item 4):**
+
+1. **Keep the roomy face on the 7" boards?** It costs ~119 KB of flash on each. *Recommendation:
+   keep* - it is what "scale them" asked, and those boards have ~4 MB free.
+2. **Borders round tiles** - A, B, C or D? *Recommendation: A, or D if you want the tiles grouped* -
+   B and C put a line round every tile inside a bordered cluster, the "busy" look the mini tiles
+   were made to avoid (K89), and C gives a tile two ways to say on.
