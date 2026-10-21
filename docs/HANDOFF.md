@@ -1,4 +1,4 @@
-# Handoff — 2026-10-20 (2.11 group cards: seven rounds built and tested; the last sprint next)
+# Handoff — 2026-10-20, night (2.11 group cards: nine rounds; sign-off next)
 
 **Start here.** This file is only: what to read, where we are, what to do next, what will bite you,
 and how to work with the owner. The history of how things got here is in the test sheets
@@ -9,13 +9,13 @@ handoffs are `docs/archive/HANDOFF_to_2026-10-14.md` and `HANDOFF_to_2026-09-29.
 
 1. `CLAUDE.md` - the HAL/BSP, the rules, **and the file-editing rule at the top**.
 2. `docs/ROADMAP.md` (the plan, and where each kind of note belongs) and `docs/DECISIONS.md` (every
-   decision in one line - 2.11's are K88-K111).
+   decision in one line - 2.11's are K88-K113).
 3. **`docs/design/ui-architecture.md`**, then what it points at - `components.md` (the kit, the
    finishes), `tokens.md`, `header-slots.md`, `card-sheet.md` §14-18, `layout-engines.md` (v8, the
    arranger to port), `cards.md`, `pages.md`, `card-layout.md` (before moving anything inside a
    card), `group-cards.md` §6-7 (2.11's design), `interview-phase2-3.md`.
-4. **`docs/TEST_2.11.md`** - the milestone in progress: seven rounds, the owner's results after each,
-   and what round 7's results ask for.
+4. **`docs/TEST_2.11.md`** - the milestone in progress: nine rounds, the owner's results after the
+   first seven, and round 9's questions for him.
 5. `docs/LESSONS.md` - before debugging anything. `docs/HTTP_REFERENCE.md` - before calling a route.
 6. For the display: `docs/display/README.md` only - it indexes the rest.
 
@@ -43,7 +43,8 @@ fonts, `lvgl`, `GFX_Library_for_Arduino`, `SensorLib`, `XPowersLib`, `bb_captouc
 | `v0.2.13` | 2026-10-14 | 2.12, the UI foundation | 52,957 | 222 |
 | `v0.2.16` | 2026-10-15 | #99, satin and glass | 53,449 | 222 |
 | `v0.2.18` | 2026-10-17 | 2.8, the header bar v2 | 57,224 | 244 |
-| branch | 2026-10-20 | **2.11 so far** (seven rounds) | **62,077** | **259** |
+| branch | 2026-10-20 | 2.11, seven rounds | 62,077 | 259 |
+| branch | 2026-10-20, night | **2.11 so far** (nine rounds) | **62,907** | **259** |
 
 Counted with `git grep -c '' <tag> -- <those paths>` over `.c .cpp .h .hpp`; recount the same way.
 
@@ -64,25 +65,29 @@ are proved with the harness (`scripts/ui_golden.py`), host tests (`host-tests/`)
 check and the all-nine gate. `GUIManager` and the system panel's pages are not on the kit yet -
 bring each over when it is next changed (`ui-architecture.md` §6).
 
-## Where 2.11 stands (2026-10-20)
+## Where 2.11 stands (2026-10-20, night)
 
-- **Branch `feat/2.11-group-cards`** (off `main` at `6bd834f`), pushed, **no PR** (it comes at
-  sign-off). Seven rounds, each tested by the owner (`TEST_2.11.md`). Built: clusters and the summary
-  card; the arranger (Playground v5, ported, host-tested); the cluster's window (Details, Members,
-  Header slots, Add cards, Rename on the keyboard); Visibility by where a card is, with Paused; the
-  page's hidden cards in their own sheet; Copy / Move into a cluster, tracked (K111); the halo on
-  windows only, header panels with a close that keeps their top (K108).
-- **Boards**: the P4_5, the 4B and the 1060 run round 7 (`r7a`) with their local `DEBUG_POPUP` lines.
-  Their settings were cleaned of duplicates on 2026-10-20 at the owner's word (`TEST_2.11.md` round
-  7 says what went; before and after copies in `bench/settings/<board>/`).
-- **The arranger to port is Playground v8** - `https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp`
-  (v10 of the page): the owner's rules in units (K109), **his tuned knobs its defaults** (size 75,
-  square 30, wide 20, twin 70, empty unit 11, order 4); "Copy settings for Claude" gives the knobs as
-  text. Its source is the spec - read the page with the `Artifact` tool: `arrangeV8()`,
-  `shapesV8()`, `searchV8()`, `scoreV8()`, `refSizes()`, `finishWith()`.
+- **Branch `feat/2.11-group-cards`** (off `main` at `6bd834f`), pushed at `7626049` (+ this
+  handoff), **no PR** (it comes at sign-off). Nine rounds (`TEST_2.11.md`); rounds 8 and 9 were
+  built while the owner was away and **wait for his tests and answers**. Built: clusters and the
+  summary card; **the arranger, Playground v8 in units** (round 9, host-tested against the
+  playground's own answers; pages arrange themselves; Col / Row pin a count, Auto unpins); the
+  cluster's window; Visibility by where a card is; the hidden cards (with "No room"); Copy / Move
+  into and out of a cluster, tracked (K111, K112); **a development Reset** in the system panel;
+  **the roomy hero face** on the 7" boards (tiles' icons grow with their room); the halo on windows.
+- **Boards**: the P4_5, the 4B and the 1060 run `7626049` with their local `DEBUG_POPUP` lines. Each
+  page's earlier Col / Row choice is now a pin (the P4_5's House 4 x 2 - the owner's - the 4B's 4
+  rows, the 1060's 5 x 2; `TEST_2.11.md` round 9 lists them). Settings copies from every flash in
+  `bench/settings/<board>/20261020-*.json`.
+- **Mocks waiting for the owner**: [2.11 Round 9 Mocks](https://claude.ai/artifact/SpSG1hhpbJsUmxBLv3cdfY)
+  - tile borders (four ways) and the group view (a window of a group's members as tiles; a cluster
+  as one card with its icon). The Layout Playground (v8) stays the place to tune the knobs.
 - **Where 2.11's pieces live**: a cluster `Cards/ClusterCard` + `Cards/MiniTile.cpp`, its span and
   tile grid `Layout/Cluster.h`; the arranger `Layout/Arranger.h` (host-tested) and
-  `Cards/PageArranger` (its task; kept answers in `pages.<slug>.layout`); the halo
+  `Cards/PageArranger` (its task, 24 KB stack; kept answers `pages.<slug>.layout` = `v2 fp CxR`
+  and `c,r,w,h,tc` in units), `CardPage::arrangePage()` / `useUnits()`; the pins in `GUIManager`
+  (`_pinCols`, `saveGrid()` in `GUIManagerTweaks.cpp`); the Reset `CardAdded::resetToCompiled()`
+  + `GUIManager::resetDashboard()`; the halo
   `UI/Kit/KitHalo.cpp`; the keyboard `UI/Kit/KitKeyboard.cpp`; the cluster's window
   `Popup/PopupCluster.cpp`; Visibility, Add to, which group `Popup/PopupVisibility.cpp`; the hidden
   cards `UI/HiddenSheet` + `GUIManagerHeader.cpp` (`collectHidden`); copies, moves and the pool
@@ -90,38 +95,17 @@ bring each over when it is next changed (`ui-architecture.md` §6).
 
 ## What is next
 
-1. **2.11's last sprint**, in this order (the owner's notes: `TEST_2.11.md` round 7, "Your results"):
-   1. **Bug: a card taken out of a cluster to the dashboard duplicates.** The 1060's Outside "Front":
-      Add card to dashboard leaves the tile, and the new card can only be hidden - into the hidden
-      cards, a copy that should not exist. **Build it as K111 did the other way**: Add card to
-      dashboard from a tile asks **Copy or Move** (a chip row, as Add to's "This card"); the new page
-      card records `from` (the member). **Move**: the member leaves - an added copy deleted, a
-      compiled member `hidden: moved` (no tile, not in the hidden cards, Members says "On the
-      page"); the page card's Visibility offers **Move to cluster** (back; the page card deleted) and
-      Hide. **Copy**: its Visibility offers **Remove from the page** - deleted, no pool entry -
-      besides Hide. No entity gets a second card; K111's Move back stays right. `Cards/CardAdded`,
-      `Popup/PopupVisibility.cpp` (`buildJoin`, `visibilityJoin`), `collectHidden`.
-   2. **The hidden cards list the cards crowded off the page** - not hidden, not shown
-      (`CardPage::plan()` dropped them, lowest priority first); a row each, saying so.
-   3. **Port v8** (K109): `Layout::arrange()` in units with the owner's knobs, host tests from the
-      playground's answers (as v5's were), a step budget; pages arranging themselves, Row / Col +/-
-      a pin with a way back to Auto. Time it on the P4_5; compile the S3.
-   4. **Tiles' icons in roomy clusters** look tiny on the 1060 when the grid fills the screen: find
-      why there (its face sizes at its PPI, round 6's solo cap in `MiniTile.cpp`), and mock **a
-      border round each tile** (the owner is curious, now the active states have changed).
-   5. **Group view** (new, owner 2026-10-20): a sheet of a group's members **as tiles** - any group
-      card (Desk, the garage Doors) or cluster - and "Group view" among the Tap actions. On a group
-      card's and a cluster's Visibility: **show it as one card** (1x1, a tap opens its details) and
-      **choose its icon**. Mock first; ask how it relates to group pages (K90, K99).
-   6. **A Reset for development**: the dashboard and its clusters back to the compiled ones (the
-      `cards.*` entries made on the glass, the pages' `layout`), the owner's looks kept.
-   7. Round 4's rest - **ask which are still wanted**: count slots (K103), extending a source group
-      (K93), group pages (K90, K99, interview §4 Q8), group cards as Add targets, the card list
-      (K91), Delete from the pool.
-   8. **Sign-off**: **one final test sheet** for the owner (he asked for it), the all-nine gate with
-      the structure check, the CHANGELOG entry, the sheet archived, the PR; the owner merges; tag
-      `v0.2.19`. The owner is bringing `dashboard-target-7b.md` up to date with clusters as the new
-      baseline, with entities added to fill the screen.
+1. **2.11's sign-off** - the last sprint's items 1-7 are done (rounds 8 and 9, `TEST_2.11.md`).
+   **First, the owner's results and answers to rounds 8 and 9**: round 9 asks about the arranger's
+   time (1-3 s unpinned on the P4s), the finish's margins (a card half a row lower than its
+   neighbours), the old pins (Auto on the 1060 and the 4B?), the roomy hero face's flash (~119 KB on
+   the 7" boards), tile borders (A-D), the Reset's home, the group view against group pages (K90,
+   K99 - recommendation (a): the group view is K90's group page, as a window), and round 4's rest
+   (a table of six). Record his decisions as DECISIONS lines (K114 on), build what he chooses that
+   belongs in 2.11, then **item 8**: **one final test sheet** for the owner (he asked for it), the
+   all-nine gate with the structure check, the CHANGELOG entry, the sheet archived, the PR; the
+   owner merges; tag `v0.2.19`. The owner is bringing `dashboard-target-7b.md` up to date with
+   clusters as the new baseline, with entities added to fill the screen.
 2. **#76, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast`, a notice's
    detailed form then its minimal "!" in status, a place that grows for a high-priority claim. Mock
    first.
@@ -137,7 +121,7 @@ before the owner merges. **The owner merges** (W12); a PR is opened only after t
 
 `docs/design/interview-phase2-3.md` is the blueprint for 2.8, 2.11 and Phase 3. §1 look and feel,
 §2 card popups and §3 the header's slots are closed (§3 Q3, the clock's format, still open); **§4
-(2.11) is answered and being built** (`group-cards.md` §6-7, K88-K111; Q8 - "back" from a group
+(2.11) is answered and being built** (`group-cards.md` §6-7, K88-K113; Q8 - "back" from a group
 page - open). #87 (the companion web app, D-8) should be scoped before 3.1; the owner would start it
 with dashboard arranging (FUTURE_IMPROVEMENTS). Artifacts on claude.ai: "Layout Playground" (v8),
 "2.11 Clusters", "Panel Edges", "2.8 Header Slots", "Glass, Satin, Flat", "Card Popup Mock",
@@ -160,14 +144,14 @@ with dashboard arranging (FUTURE_IMPROVEMENTS). Artifacts on claude.ai: "Layout 
 |---|---|---|
 | `WS_P4_5` | COM15 (CH343 `5B90154141`) | the dev board, in its enclosure; local lines `DEBUG_POPUP` + `DEBUG_HANG` |
 | `WS_P4_4B` | COM7 (CH343 `5AAF289419`) | P4 rev v1.0; local `DEBUG_POPUP` |
-| `CYD_P4_1060` | COM9 (native USB, serial `30:ED:A0:E3:2C:7B`) | needs two cables; local `DEBUG_POPUP`. **Flash at 460800 with `--after watchdog-reset`** (LESSONS). The owner asked for it to be flashed with the dev boards (2026-10-20) |
+| `CYD_P4_1060` | COM9 (native USB, serial `30:ED:A0:E3:2C:7B`) | needs two cables; local `DEBUG_POPUP`. **Flash at 460800 with `--after watchdog-reset`** (LESSONS). The owner asked for it to be flashed with the dev boards (2026-10-20). **A software restart can boot-loop it** (its Wi-Fi co-processor): put a settings copy back WITHOUT `?reboot=1`, then `esptool ... --after watchdog-reset read-mac` (LESSONS, round 9) |
 | `WS_P4_7B` | COM6 (native USB) | needs two USB cables or it browns out on boot |
 | `CYD_P4_4880` | COM19 (native USB) | LiPo fitted; browned out on the PC's USB alone |
 | `WS_S3_4B` | COM8 (CH343 `5A67166678`) | **locked up** (#69); compile it as the S3 check, never flash it until the owner says |
 | `CYD_S3_3248` | - | USB broken (2026-09-28) |
 | `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in |
 
-The P4_5, the 4B and the 1060 run 2.11 round 7; the rest `v0.2.18` or older. Ports move when boards
+The P4_5, the 4B and the 1060 run 2.11 round 9; the rest `v0.2.18` or older. Ports move when boards
 are re-plugged: `pio device list` and match the serial. **Is a board alive?** Ask Home Assistant
 (`sensor.<device>_uptime`) or `GET /settings?stats=1`, not the cable. While developing, build and
 flash the P4_5, the 4B and the 1060; all nine compile once, right before a merge. **Away from the

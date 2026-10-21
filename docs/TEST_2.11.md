@@ -1091,7 +1091,7 @@ rows gives it two units of height):
 
 ![4B after](followups/211_r9_icons_after_4b.png)
 
-**Borders round tiles: a mock** - [2.11 Tile Borders](https://claude.ai/artifact/SpSG1hhpbJsUmxBLv3cdfY):
+**Borders round tiles: a mock** - [2.11 Round 9 Mocks](https://claude.ai/artifact/SpSG1hhpbJsUmxBLv3cdfY), page *Tile borders*:
 the 1060's Kitchen cluster at its size in pixels, four ways - **A** as built (no tile borders,
 K89); **B** a hairline round each tile; **C** a hairline, and an on tile wearing the Corner cut as a
 solo card does; **D** a faint fill per tile, no line. Linen or Midnight from its Tweaks.
@@ -1108,3 +1108,72 @@ solo card does; **D** a faint fill per tile, no line. Linen or Midnight from its
 2. **Borders round tiles** - A, B, C or D? *Recommendation: A, or D if you want the tiles grouped* -
    B and C put a line round every tile inside a bordered cluster, the "busy" look the mini tiles
    were made to avoid (K89), and C gives a tile two ways to say on.
+
+## 4. The group view - a mock, not built
+
+[2.11 Round 9 Mocks](https://claude.ai/artifact/SpSG1hhpbJsUmxBLv3cdfY), page *Group view*, on the
+P4_5 in Linen:
+
+- **The group view**: a window of a group's members **as tiles** - Desk's three lamps, large, each
+  saying its state; a tap switches one, a long press opens its own window; the window's X and its
+  timeout as every window's. No corner tabs (no Members or History): it is the members and nothing
+  else. Opened by a group card's or a cluster's tap when its **Tap action is Group view** (a new
+  choice beside Members), so the same window serves Desk, the garage Doors and any cluster.
+- **A cluster shown as one card**: its Visibility gains **Show as - Cluster / One card**; as one
+  card it takes one entity's room (1x1), names what is on ("Sink, Table on"), shows **its icon**
+  (chosen from a row of icons), and its tap opens the group view. Cluster brings the tiles back;
+  the members keep their settings.
+
+**Questions (item 5):**
+
+1. **The group view and group pages (K90, K99).** K90 said a group card's tap may open "a group
+   page holding only its members"; K99 made group pages whole pages too - full screen, swiped to,
+   targeted from the navbar. Three ways to fit the group view in:
+   - **(a) The group view is K90's group page, as a window** - a tap opens the window; K99's whole
+     pages stay a separate, later thing (the navbar, Phase 4). *My recommendation*: it is the
+     smaller build, it answers interview §4 Q8 ("back" from a group page) by being a window - the X
+     is the way back - and it is what you described.
+   - (b) The group view now, and a whole group page later replacing it as the tap's target.
+   - (c) Whole group pages only, no window.
+2. **Where it is chosen**: Group view as a **Tap action** (SETTINGS), as you said, and as the
+   default tap of a cluster shown as one card. Members stays the cluster's default tap otherwise?
+   *Recommendation: yes* - Members lists hidden members too (K110), which the group view does not.
+3. **Hidden members in the group view**: left out (Members lists them), or shown dimmed?
+   *Recommendation: left out* - the view is for using the group.
+4. **The icon choice** for one card: from the members' own icons plus a short list by kind (a room,
+   a pot, a sofa, a bed, a garage, a tree), or any MDI icon the board carries? *Recommendation: the
+   short list plus the members' icons* - any icon means a picker of 157, and the font has only the
+   icons HA serves.
+5. **A summary card** (K98, the Doors' "Both") and **one card** are near neighbours: one card names
+   what is on and opens the group view; a summary card does the same for members of one kind. Fold
+   them into one presentation? *Recommendation: yes, later* - one presentation "One card", the
+   summary's words when the members are of one kind.
+
+## 5. Round 4's rest - which are still wanted?
+
+Not built, each a question (HANDOFF item 7):
+
+| # | What | Decided before | My recommendation |
+|---|---|---|---|
+| 1 | **Count slots** - one entity counting the lights on or the doors open, in a cluster header's slots and the page header, a tap showing which | K103 | **Yes, after 2.11** - it needs an HA template or group per count, set up in HA first; the header's planner takes it as a new slot kind |
+| 2 | **Extending a source group** - a member added to Desk keeps the card "Desk", made a group card of the Hue group and the extra | K93 | **Later (the web app, #87)** - the clusters already hold any card beside Desk's lamps |
+| 3 | **Group pages** - a group's members as a page of their own | K90, K99, interview §4 Q8 | **As the group view (section 4, (a))**; whole pages with the navbar (4.3) |
+| 4 | **Group cards as Add targets** - Add to a group card (Desk) as well as to a cluster | K96 | **No** - a source group's members are the source's (K92 rule 4); a device-made group card is a cluster here |
+| 5 | **The card list** - making a cluster from a group, the HA entities labelled "Fleet" in HA | K91, K92 rule 11 | **Later (the web app)** - Add cards on a cluster covers the page's cards today |
+| 6 | **Delete from the pool** - a hidden card deleted for good from the page's hidden cards | K66 | **Yes, small** - a Delete beside Restore for a card made on the board (the compiled ones can only be hidden); the development Reset covers it meanwhile |
+
+## Results (mine, before you)
+
+- **Built, flashed, seen by screenshot**: the P4_5, the 4B and the 1060 run `7626049` with your
+  local debug lines, each board's settings saved before every flash. Host tests: 63, all passing
+  (the arranger's 19 against the playground). `WS_S3_4B` compiles.
+- **Driven from the PC, then undone**: Auto on each board's House page (test copies) and the
+  P4_5's Fleet page; the Reset (a test copy of the P4_5's); each board's file put back and compared
+  with `setdiff.py`: **no difference** on any of the three.
+- **Not tapped on the glass**: the Grid line's Auto and Col / Row (driven through `/popup?grid=` only
+  as far as reading the line), the Reset's buttons (driven with `/popup?dash=`), anything on the
+  1060 or the 4B beyond screenshots.
+- **Home Assistant was down** for most of the evening (the header's "Lost, retrying", MQTT too, on
+  every board), so the later pictures show dashes and generic icons; the arranger, the Reset and the
+  icons need nothing from it. The values come back when it does.
+- **Lines of code**: HANDOFF's table, recounted.
