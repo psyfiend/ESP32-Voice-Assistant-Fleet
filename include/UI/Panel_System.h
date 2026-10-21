@@ -90,6 +90,14 @@ public:
     void setGridText(GridText cb) { _gridText = cb; }
     void refreshGrid();
 
+    // THE DEVELOPMENT RESET (2.11 round 9): SYSTEM - DIAGNOSTICS' Reset and the
+    // dialog that asks first - `detail` is its count of what goes ("brief", "as
+    // built" / "5 changes", for a line when there is room for one).
+    using DashText = std::function<void(char *brief, size_t nBrief, char *detail, size_t nDetail)>;
+    void setDashboard(DashText text, Action onReset) { _dashText = text; _onDashReset = onReset; }
+    void askDashReset();         // the dialog
+    void confirmDashReset();     // its Reset: the panel closes, GUIManager resets
+
     // CONNECTIVITY's sources: the two glyphs' managers, and its three lines'
     // words - Wi-Fi, Home Assistant, MQTT - asked once a second while it shows.
     void setLinks(ConnectivityManager *conn, MqttManager *mqtt) { _conn = conn; _mqtt = mqtt; }
@@ -133,6 +141,8 @@ private:
     lv_obj_t *_connVal[3] = {};                      // Wi-Fi, HA, MQTT: their words
     lv_obj_t *_gridVal = nullptr;                    // the page's grid, in words
     GridText  _gridText;
+    DashText  _dashText;
+    Action    _onDashReset;
     Kit::Selector _schemeSel;
     Widget_ConnStatus _wifiGlyph;
     Widget_MqttStatus _linkGlyph;

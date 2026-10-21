@@ -449,4 +449,58 @@ bool takeChanged() {
     return c;
 }
 
+namespace {
+// The ids carrying a key, collected first: an entry is never changed while the
+// file is being walked.
+constexpr uint8_t RESET_IDS = 64;
+struct Ids { char id[RESET_IDS][CARD_ID_MAX + 1]; uint8_t n; };
+void collect(const char *id, const char *, void *p) {
+    Ids &x = *(Ids *)p;
+    if (x.n < RESET_IDS) copy(x.id[x.n++], sizeof(x.id[0]), id);
+}
+}  // namespace
+
+ResetCount resetToCompiled(bool apply) {
+    ResetCount c = {};
+    Ids *ids = new Ids();   // ~2.6 KB, for the moment it takes
+    if (!ids) return c;
+    // Cards made here: on a page ("page") or in a cluster ("in"), deleted whole.
+    static const char *const MADE[] = { "page", "in" };
+    for (const char *key : MADE) {
+        ids->n = 0;
+        Settings::forEachCardWith(key, collect, ids);
+        for (uint8_t i = 0; i < ids->n; i++) {
+            c.made++;
+            if (apply) Settings::dropCard(ids->id[i]);
+        }
+    }
+    // Then what was done to the compiled ones: hidden or moved off a page, a
+    // member hidden or moved out, a group card's slots and presentation.
+    struct Undo { const char *key; uint8_t ResetCount::*count; };
+    static const Undo UNDO[] = {
+        { "removed", &ResetCount::hidden }, { "hidden", &ResetCount::members },
+        { "slots", &ResetCount::clusters }, { "present", &ResetCount::clusters },
+    };
+    for (const Undo &u : UNDO) {
+        ids->n = 0;
+        Settings::forEachCardWith(u.key, collect, ids);
+        for (uint8_t i = 0; i < ids->n; i++) {
+            char v[4];
+            const char *id = ids->id[i];
+            if (Settings::card(id, "page", v, sizeof(v)) || Settings::card(id, "in", v, sizeof(v))) continue;   // made here: counted above
+            c.*u.count += 1;
+            if (apply) Settings::setCard(id, u.key, nullptr);
+        }
+    }
+    delete ids;
+    if (apply) {
+        begin(s_compiled);   // the records again: none made here now
+        s_changed = true;
+        Serial.printf("[CardAdded] reset to the compiled dashboard: %u made here deleted, %u hidden or moved back, "
+                      "%u members, %u cluster settings\n", (unsigned)c.made, (unsigned)c.hidden,
+                      (unsigned)c.members, (unsigned)c.clusters);
+    }
+    return c;
+}
+
 }  // namespace CardAdded

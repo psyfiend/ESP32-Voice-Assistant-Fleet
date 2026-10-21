@@ -1014,3 +1014,52 @@ page is built again):
    were chosen before the arranger could choose. Neither 1060 picture is even yet: pinned, Front
    Door Temperature has three times Thermo's area; on Auto Thermo is the large one. The size knob
    (75) is the one that would even them, and the playground is the place to try it.
+
+**A bug of mine, found and fixed this round**: the first build's tile rule (`Layout::tileGrid()`)
+stopped at one column whenever the arranger gave no count - every cluster on a page that flowed
+(the second or two while a page arranges, or the arranger off) stacked its tiles. The host tests
+caught it after the first flash; the boards were flashed again with the fix (`r9b`).
+
+## 2. A development Reset
+
+**Where**: the system panel, SYSTEM - DIAGNOSTICS: **Log, UI Tweaks, About, Reset** (D-17 made that
+row the place for development tools). A line of its own did not fit the P4_5's height with the new
+Grid line, so Reset joined the buttons; its dialog says what would go.
+
+**What it does** - the dashboard and its clusters back to the compiled ones:
+
+| Goes | Stays |
+|---|---|
+| every card made on this board: added to a page, copied into a cluster, moved out of one (their entries and settings) | every look: names, card labels, entity labels, tap actions, units, density, Card UI |
+| every hide and move: hidden cards and cluster members shown again, moved cards back where they were built | groups and their colours, cluster header styles and icons, a cluster's Rename |
+| clusters' header slots and presentation as compiled (`slots`, `present`) | schemes, UI Tweaks, the windows' timeout |
+| every page's kept arrangement: each arranges itself again | **the pages' pins** (Col / Row) - Auto is their reset |
+
+![The Reset's dialog](followups/211_r9_reset_dialog_p45.png)
+![The P4_5 after the Reset (a test copy; Home Assistant was down, hence the dashes)](followups/211_r9_after_reset_p45.png)
+![The system panel](followups/211_r9_grid_row_p45.png)
+
+Run once, on a test copy of the P4_5's settings: 8 cards made here deleted, 7 hides and moves undone,
+3 clusters' header slots and 1 member as built; the House page arranged itself again in 29 ms (8
+blocks on your pinned 4 x 2). Then your file was put back: no difference.
+
+| # | Do this | PASS if |
+|---|---|---|
+| N1 | The system panel - Reset | the dialog, counting what would go; **Cancel** leaves everything as it was |
+| N2 | (On a board whose dashboard you can lose - or after `save_settings.ps1`) Reset - Reset | the panel closes; every page is the compiled dashboard, arranged again; your scheme, names and pins are as they were |
+
+**Choices that were mine (item 6):** the pins stay (they are a choice about the page, and Auto
+already resets them); a cluster's Rename and header style stay (looks); groups made on the board
+stay even if no card wears them now; no restart (the page is taken down, the records read again,
+the page built - the 1060 boot-loops on a software restart, below).
+
+**Question:** is the system panel the right home, or would you rather have it in UI Tweaks beside
+Reset all (one place for both resets)? *My recommendation: the system panel* - UI Tweaks' Reset all is
+about looks, and two Reset buttons side by side invite the wrong one.
+
+**Found while testing**: the 1060 boot-looped after a software restart (a settings copy put back with
+`?reboot=1`): its Wi-Fi co-processor stopped answering at boot, and the board restarted itself every
+~20 s, off the network. A watchdog reset (`esptool --after watchdog-reset`) brought it back; LESSONS
+says how to restore it from now on. Why the co-processor does not come back after a software
+restart is unexplained; this round did not change the restart path (the settings restore's), and
+the P4_5 and the 4B restart cleanly.

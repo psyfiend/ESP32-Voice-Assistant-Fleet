@@ -200,6 +200,11 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "about", v, sizeof(v)) == ESP_OK) a.about = atoi(v);
         if (httpd_query_key_value(q, "drawer", v, sizeof(v)) == ESP_OK) a.drawer = atoi(v);
         if (httpd_query_key_value(q, "slot", v, sizeof(v)) == ESP_OK) snprintf(a.slot, sizeof(a.slot), "%s", v);
+        // 2.11 round 9, through the header hook as slot= is: the development Reset
+        // (dash=1 its dialog, 2 done) and the system panel's grid (grid=a Auto,
+        // cu / cd Col + / -, ru / rd Row + / -).
+        if (httpd_query_key_value(q, "dash", v, sizeof(v)) == ESP_OK) snprintf(a.slot, sizeof(a.slot), "dash%.1s", v);
+        if (httpd_query_key_value(q, "grid", v, sizeof(v)) == ESP_OK) snprintf(a.slot, sizeof(a.slot), "grid%.2s", v);
         if (httpd_query_key_value(q, "glyphs", v, sizeof(v)) == ESP_OK) a.glyphs = atoi(v);
         if (httpd_query_key_value(q, "pagehdr", v, sizeof(v)) == ESP_OK) a.pageHdr = atoi(v);
         if (httpd_query_key_value(q, "alarm", v, sizeof(v)) == ESP_OK) a.alarm = atoi(v);

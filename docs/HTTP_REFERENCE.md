@@ -241,7 +241,7 @@ curl "http://fleet-ws-p4-5/panel?flash=20&nvs=1"     # scratch NVS only
 **`-D DEBUG_POPUP` only** - the owner's local lines on WS_P4_5, WS_P4_4B and CYD_P4_1060, never
 committed. `src/Cards/Popup/PopupDebug.cpp`. What `scripts/ui_golden.py` drives. **One action per
 request**: when a query has several keys, the first in this order acts and the rest are ignored -
-`rows`, `close`, `about`, `drawer`, `tree`, `mem`/`sparks`, `addcard`/`removecard`, `pause`/`member`,
+`rows`, `close`, `about`, `drawer`, `slot` (and round 9's `dash`, `grid`, which go the same way), `tree`, `mem`/`sparks`, `addcard`/`removecard`, `pause`/`member`,
 `scheme`, `show`, `look`, `scene`, `power`, `view`, `set`, `ctl`, `deck`, the History keys
 (`span`, `more`, `row`, `dur`, `chips`, then `x`, `hist`), `clabel`, `groups`, `tap`, then `card`.
 The reply is text. `503 "Busy"` while another `/popup` runs; `503 "did not pick it up within 3 s"`
@@ -319,6 +319,9 @@ order.
 | `/popup?join=2+N` (`&mv=1`) | its Add card to dashboard with group N chosen (0 the group card's, 1 the area's, then the others); `mv=1` Move, a tile's only - the window closes | a new card entry with `page`, `after`, `entity`, `from` (the tile); Move also the tile's `hidden` = `moved` |
 | `/popup?removecard=6` / `7` / `8` | (K112) on a card made on the glass: `6` its Remove from the page, no dialog; `7` that dialog; on a card moved out of a cluster, `8` its Move back to the cluster - each closes the window | `6`: the card's entry deleted; `8`: the entry deleted and the tile's `hidden` cleared |
 | `/popup?kbpress=1` | the keyboard's Save (2.11, K95) | what it was opened for: a cluster's `label_text` (none: its group's name), a card's `name`, or its card label's `label_text` - when the window closes |
+| `/popup?grid=a\|cu\|cd\|ru\|rd` | (2.11 round 9) the system panel's **Auto**, **Col +**, **Col -**, **Row +**, **Row -** on the page showing | the page's `cols` / `rows` pins (Auto removes both); the page arranges again |
+| `/popup?dash=1` | (round 9) the system panel opens with the development **Reset**'s dialog, which counts what would go - nothing changes unless its Reset is tapped (`slot=-1` takes it down) | nothing |
+| `/popup?dash=2` | **the Reset done, no dialog**: every card made on the board deleted (`page` / `in` entries), every hide and move undone (`removed`, `hidden`), group cards' `slots` and `present` removed, every page's `layout` removed. **Never on the owner's real settings** - a test copy, then `restore_settings.ps1` | as described; the looks, schemes, UI Tweaks and pins stay |
 
 ### **Device** - these command real lights and scenes
 

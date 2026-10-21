@@ -130,4 +130,16 @@ uint8_t pool(const PageSpec &page, PoolItem *out, uint8_t cap);
 // to show it (GUIManager, once no card window is open).
 bool takeChanged();
 
+// --- THE DEVELOPMENT RESET (2.11 round 9, the owner: "the dashboard and its
+// clusters back as they were built") --------------------------------------------
+// Every card made on this board deleted, entry and settings (cards added to a
+// page, copies in clusters, members moved out); every hide and move undone
+// ("removed", a member's "hidden"); every group card's header slots and
+// presentation as compiled ("slots", "present"). The looks stay - names, card
+// labels, tap actions, styles, groups and colours. `apply` false only counts.
+// After applying, the records are read again: call with no page built (a Card
+// points at a record's id).
+struct ResetCount { uint8_t made, hidden, members, clusters; };
+ResetCount resetToCompiled(bool apply);
+
 }  // namespace CardAdded

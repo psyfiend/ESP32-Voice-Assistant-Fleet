@@ -164,6 +164,10 @@ private:
     // rises under its window.
     void applySavedScheme();
     void saveGrid();
+    // The system panel's development Reset (2.11 round 9): the dashboard and its
+    // clusters back to the compiled ones, the looks and pins kept; its line's words.
+    void resetDashboard();
+    void dashboardText(char *brief, size_t nb, char *detail, size_t nd);
     template <typename F> void everyPage(F f) { for (uint8_t i = 0; i < _nPages; i++) f(_pages[i]); }
     friend struct GUITweaks;
     bool        _deckRaised   = false;   // the deck is up under UI Tweaks

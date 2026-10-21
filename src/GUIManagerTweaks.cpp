@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "Settings.h"
+#include "Cards/CardAdded.h"     // the development Reset (round 9)
 #include "Cards/CardIcons.h"     // cardLabelMode(), cardSetLabelMode()
 #include "Cards/CardPopup.h"
 #include "UI/Sheet.h"            // windowCloseMs(), sheetBeside()
@@ -108,6 +109,38 @@ void GUIManager::saveGrid() {
     }
     rebuildDashboard();
     Serial.printf("[UI] grid pins -> %u x %u (0: the arranger's)\n", (unsigned)_pinCols, (unsigned)_pinRows);
+}
+
+// --- The development Reset (the system panel's, 2.11 round 9) ----------------------
+// THE DASHBOARD AND ITS CLUSTERS BACK TO THE COMPILED ONES (the owner: "a Reset
+// button would help during development"): CardAdded's reset - every card made
+// here deleted, every hide and move undone, the clusters' members and header
+// slots as built - and every page's kept arrangement forgotten, so each arranges
+// itself again. The looks, the schemes, UI Tweaks and the pins stay. The page is
+// taken down first: a card points at a record CardAdded reads again.
+void GUIManager::resetDashboard() {
+    savePageState();
+    destroyDashboard();
+    CardAdded::resetToCompiled(true);
+    for (uint8_t i = 0; i < _nPages; i++)
+        if (_pages[i].spec && _pages[i].spec->slug) Settings::setPage(_pages[i].spec->slug, "layout", nullptr);
+    Settings::save();
+    CardAdded::takeChanged();   // built now, not again on the next pass
+    rebuildDashboard();
+}
+
+// The system panel's Dashboard line, and the dialog's count of what goes.
+void GUIManager::dashboardText(char *brief, size_t nb, char *detail, size_t nd) {
+    const CardAdded::ResetCount c = CardAdded::resetToCompiled(false);
+    const unsigned all = (unsigned)c.made + c.hidden + c.members + c.clusters;
+    if (!all) snprintf(brief, nb, "as built");
+    else      snprintf(brief, nb, "%u change%s", all, all == 1 ? "" : "s");
+    if (!all) snprintf(detail, nd, "Nothing here differs from the dashboard as built.");
+    else      snprintf(detail, nd, "On this board now: %u card%s made here, %u hidden or moved, %u cluster "
+                                   "member%s hidden or moved out, %u cluster setting%s.",
+                       (unsigned)c.made, c.made == 1 ? "" : "s", (unsigned)c.hidden,
+                       (unsigned)c.members, c.members == 1 ? "" : "s",
+                       (unsigned)c.clusters, c.clusters == 1 ? "" : "s");
 }
 
 // --- The card looks (UI Tweaks) ----------------------------------------------------

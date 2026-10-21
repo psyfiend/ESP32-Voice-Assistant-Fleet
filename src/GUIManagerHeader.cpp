@@ -348,6 +348,26 @@ const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHd
         if (_pnlSystem.isExpanded()) _pnlSystem.close();
         return "slot: closed";
     }
+    // /popup?dash=1|2 (2.11 round 9): the development Reset - 1 its dialog, over
+    // the system panel; 2 done without asking (Saved). /popup?grid=: the panel's
+    // Auto (a) and Col / Row (cu, cd, ru, rd) - each Saved, as on the glass.
+    if (!strncmp(slotName, "dash", 4)) {
+        if (slotName[4] == '2') { resetDashboard(); return "dashboard: reset to the compiled one (saved)"; }
+        closeSlotPanel(false);
+        if (!_pnlSystem.isExpanded()) _pnlSystem.toggle();
+        _pnlSystem.askDashReset();
+        return "dashboard: the Reset's dialog";
+    }
+    if (!strncmp(slotName, "grid", 4)) {
+        const char *g = slotName + 4;
+        if      (!strcmp(g, "a"))  gridAuto();
+        else if (!strcmp(g, "cu")) nudgeColumns(+1);
+        else if (!strcmp(g, "cd")) nudgeColumns(-1);
+        else if (!strcmp(g, "ru")) nudgeRows(+1);
+        else if (!strcmp(g, "rd")) nudgeRows(-1);
+        snprintf(out, sizeof(out), "grid pins: %u x %u (0: the arranger's; saved)", (unsigned)_pinCols, (unsigned)_pinRows);
+        return out;
+    }
     // /popup?scheme=N: the scheme on every page, as the system panel shows it,
     // NOT saved - a capture leaves the owner's choice in the file.
     if (!strncmp(slotName, "scheme", 6)) {

@@ -941,6 +941,9 @@ void GUIManager::begin() {
             snprintf(out, n, "auto, %u x %u units", (unsigned)_page->unitCols(), (unsigned)_page->unitRows());
         else                       snprintf(out, n, "auto");
     });
+    // Its development Reset (round 9): GUIManagerTweaks.cpp.
+    _pnlSystem.setDashboard([this](char *b, size_t nb, char *d, size_t nd) { dashboardText(b, nb, d, nd); },
+                            [this]() { resetDashboard(); });
 
     // The card page's own Dump button runs the same report the System panel's
     // does, Serial echo and all.

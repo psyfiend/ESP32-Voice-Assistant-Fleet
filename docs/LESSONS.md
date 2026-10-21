@@ -930,6 +930,15 @@ native-USB P4 out of a download mode its BOOT pin forced; **`--after watchdog-re
 app was up 20 s later. So, for a native-USB board that will not flash: the BOOT button, a slower
 baud, and a watchdog reset at the end.
 
+**And a software restart can leave it boot-looping (2.11 round 9, 2026-10-20).** `POST
+/settings?reboot=1` restarts the board with `esp_restart()`. The 1060 came back with its Wi-Fi
+co-processor (the C6, over SDIO) not answering - `sdmmc_host_wait_for_event returned 0x107`, `H_SDIO_DRV:
+failed to read registers` - and esp-hosted restarted it again, every ~20 s, off the network. Read
+over its native USB without a reset (pyserial, `dtr = rts = False`). `esptool ... --after
+watchdog-reset read-mac` brought it back. **On the 1060, put a settings copy back without
+`reboot=1`** (`curl --data-binary @copy.json .../settings`, it says "everything at the next boot")
+**and restart it with the watchdog reset.** The P4_5 and the 4B restart cleanly either way.
+
 ## Drawing outside an object: DRAW_MAIN_END, never DRAW_POST (2.8 round 6, 2026-10-17)
 
 The header bar was to paint an open panel's face back over its own drop shadow, from its
