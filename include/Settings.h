@@ -19,7 +19,8 @@
 //   "entity" as well - see Cards/CardAdded.h.
 //   2.8 round 3: UI Tweaks' choices under "system": "ui" ("scheme", "label",
 //   "entity", "state", "density"), "header" ("glyphs"), "window", "alarm"
-//   ("warn"); a page's "cols" / "rows" (a count or "auto") and "header"; Card
+//   ("warn"); a page's "cols" / "rows" (a count, since 2.11 round 9 a pin the
+//   arranger keeps; "auto" in older files reads as not pinned) and "header"; Card
 //   UI's per card: "label", "group" / "label_text", "selector", "density",
 //   "close", "bar" (GUIManagerTweaks.cpp, Cards/Popup/PopupCardUi.cpp).
 //

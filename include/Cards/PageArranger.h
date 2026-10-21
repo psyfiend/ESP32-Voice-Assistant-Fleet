@@ -1,23 +1,24 @@
 #pragma once
 // ---------------------------------------------------------------------------
 // PageArranger - the arranger (Layout/Arranger.h) for the dashboard's pages
-// (2.11 round 2, #78, DECISIONS K105).
+// (2.11, #78, DECISIONS K105, K109).
 //
 // ARRANGED WHEN A PAGE'S BLOCKS CHANGE, AND KEPT (K105): a page is built often
 // (on arrival, D-9), so the arranger is never run on a build. Its answer is kept
-// in the settings file - pages.<slug>.layout: a fingerprint of what it was
-// arranged for (the blocks, the screen, the weights) and where each block went -
-// and a build whose blocks match uses it. When they do not (a first boot, a
+// in the settings file - pages.<slug>.layout: "v2 <fingerprint> <C>x<R>" and
+// each block's box in units, "c,r,w,h,tc" (tc a cluster's tiles across), the
+// fingerprint covering what it was arranged for (the blocks and their ids, the
+// screen, the pins, the knobs) - and a build whose blocks match uses it. Round
+// 2's "v1" answers (cells) are not read. When they do not (a first boot, a
 // cluster made or hidden, a weight changed), the page is built as before (the
 // flow engine) and the arranger runs on a task of its own; once its answer is
 // kept, takeDone() says so and the page is built again with it. So the screen
 // never waits for it, however long it takes - which is what K105 asks to time on
 // the boards before the page relies on it.
 //
-// Its weights and sizes are system.arranger.* in the settings file (hole, comfy,
-// loose, long, order, away; maxcell, mincell, tilew, tileh, hdr - the
-// playground's knobs), the playground's defaults when unset, so the owner can
-// tune on glass from the PC (/settings?arranger=...).
+// Its knobs are system.arranger.* in the settings file (size, square, wide,
+// twin, gap8, order - Layout Playground v8's), the owner's tuned values when
+// unset, so he can tune on glass from the PC (/settings?arranger=...).
 //
 // UI code; called on the LVGL thread. The arranger itself runs on its task and
 // touches nothing but its own copy of the input.

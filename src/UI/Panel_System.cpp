@@ -46,6 +46,7 @@ static void colDownCb(lv_event_t *) { if (s_self) s_self->requestGrid(Panel_Syst
 static void colUpCb(lv_event_t *)   { if (s_self) s_self->requestGrid(Panel_System::GridAction::CARD_W_UP); }
 static void rowDownCb(lv_event_t *) { if (s_self) s_self->requestGrid(Panel_System::GridAction::ASPECT_DOWN); }
 static void rowUpCb(lv_event_t *)   { if (s_self) s_self->requestGrid(Panel_System::GridAction::ASPECT_UP); }
+static void gridAutoCb(lv_event_t *) { if (s_self) s_self->requestGrid(Panel_System::GridAction::GRID_AUTO); }
 static void schemeChosen(uint8_t i) { if (s_self) s_self->chooseScheme(i); }
 
 void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
@@ -99,6 +100,7 @@ void Panel_System::rebuild() {
     if (!_ui_content) return;
     lv_obj_clean(_ui_content);
     for (lv_obj_t *&v : _connVal) v = nullptr;
+    _gridVal = nullptr;
     _schemeSel = Kit::Selector{};
     buildContent();
 }
@@ -147,9 +149,17 @@ void Panel_System::buildContent() {
     sp.onChosen = schemeChosen;
     Kit::selector(_schemeSel, r, sp);
 
-    // The grid's counts: columns and rows, "A" past the ends.
-    r = Kit::drawerRow(_ui_content);
+    // The page's grid (2.11 round 9): pinned counts or the arranger's choice, in
+    // words, and Auto to take the pins away; then the counts, each press a pin.
     const int32_t w4 = (inner - 3 * gap) / 4;
+    r = Kit::drawerRow(_ui_content);
+    lv_label_set_text(Kit::label(r, Kit::KitStyle::KS_LABEL_NAME_DIM), "Grid:");
+    _gridVal = Kit::label(r, Kit::KitStyle::KS_LABEL_NAME);
+    lv_label_set_long_mode(_gridVal, LV_LABEL_LONG_DOT);
+    lv_obj_set_flex_grow(_gridVal, 1);
+    Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Auto", w4, btnH, gridAutoCb);
+    refreshGrid();
+    r = Kit::drawerRow(_ui_content);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Col -", w4, btnH, colDownCb);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Col +", w4, btnH, colUpCb);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Row -", w4, btnH, rowDownCb);
@@ -158,6 +168,13 @@ void Panel_System::buildContent() {
 
 void Panel_System::chooseScheme(uint8_t i) {
     if (_onScheme) _onScheme(i);
+}
+
+void Panel_System::refreshGrid() {
+    if (!_gridVal) return;
+    char t[48] = "";
+    if (_gridText) _gridText(t, sizeof(t));
+    lv_label_set_text(_gridVal, t);
 }
 
 void Panel_System::requestLog()    { if (_onLog) _onLog(); }

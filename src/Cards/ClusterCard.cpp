@@ -126,7 +126,7 @@ void ClusterCard::buildBody(lv_obj_t *body) {
     const uint8_t nTiles = tileCount();
     const int32_t boxW = _innerW - 2 * pad();
     const int32_t boxH = innerH - tilesTop() - pad();
-    const Layout::TileGrid g = Layout::tileGrid(nTiles, boxW, boxH, tgap());
+    const Layout::TileGrid g = Layout::tileGrid(nTiles, boxW, boxH, tgap(), _tileCols);
     uint8_t t = 0;
     for (uint8_t i = 0; i < _n; i++) {
         if (!_tile[i]) continue;

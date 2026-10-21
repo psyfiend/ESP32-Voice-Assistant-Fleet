@@ -21,13 +21,14 @@ namespace Layout {
 // each tile gets. The rule is the "2.11 Clusters" mock's: the biggest touch
 // target first (a tile's shorter side), then the squarest tile, then the fewest
 // empty places. A short last row is not left ragged: its tiles share the row's
-// whole width (lastW).
+// whole width (lastW). `cols`, when given, is the arranger's choice (its tc,
+// 2.11 v8): that many across, as long as each tile gets room.
 struct TileGrid {
     uint8_t cols = 1, rows = 1;
     int32_t tileW = 0, tileH = 0;   // every tile but a short last row's
     int32_t lastW = 0;              // a tile in the last row (== tileW when it is full)
 };
-TileGrid tileGrid(uint8_t n, int32_t w, int32_t h, int32_t gap);
+TileGrid tileGrid(uint8_t n, int32_t w, int32_t h, int32_t gap, uint8_t cols = 0);
 
 // Where tile i (0-based, reading order) stands in a grid laid out by tileGrid,
 // from the box's top-left corner.

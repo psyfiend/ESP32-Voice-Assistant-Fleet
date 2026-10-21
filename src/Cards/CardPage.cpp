@@ -277,9 +277,8 @@ void CardPage::commit() {
     // genuinely cannot fit them. Dropping cards is the LAST resort, after the
     // page has already grown to every row it could carry.
     if (_arranged) {
-        // THE ARRANGER'S PAGE (2.11 round 2): its grid, every block pinned.
-        useCols(_arrCols);
-        useRows(_arrRows);
+        // THE ARRANGER'S PAGE (2.11): its grid of units, every block pinned.
+        useUnits(_arrCols, _arrRows);
         plan();
     } else if (_rowsOverride) {
         // OBEYED, not negotiated. The caller asked for this many rows; cards
@@ -460,14 +459,27 @@ void CardPage::arrangePage(const PageSpec &spec) {
     s.ah   = _availH;
     s.gap  = _gap;
     s.tagH = Card::headerHeight();
+    // What a solo card's label takes from its box: the first solo card's (a
+    // page's cards share the page's label type; a cluster wears none).
+    s.label = Layout::ArrLabel::LABEL_NONE;
+    for (uint8_t i = 0; i < _n; i++) {
+        if (!_cards[i] || !strcmp(_cards[i]->typeName(), "cluster")) continue;
+        switch (_cards[i]->headerStyle()) {
+            case CardHeaderStyle::HDR_TAG_FLOAT: s.label = Layout::ArrLabel::LABEL_FLOAT;  break;
+            case CardHeaderStyle::HDR_TAG:       s.label = Layout::ArrLabel::LABEL_FOLDER; break;
+            case CardHeaderStyle::HDR_BAND:      s.label = Layout::ArrLabel::LABEL_BAR;    break;
+            default:                             s.label = Layout::ArrLabel::LABEL_NONE;   break;
+        }
+        break;
+    }
+    // The board's own grid is where the search starts (its columns, and the rows
+    // the page would flow to); a count the owner PINNED (the system panel's Col /
+    // Row, round 9) is the only one it tries that way.
     const UIGrid &g = UI::grid();
     s.recCols = g.cols;
-    s.recRows = g.rows;
-    // The page's own columns or rows (UI Tweaks): obeyed, the other the board's.
-    if (g.COLS_OVERRIDE || _rowsOverride) {
-        s.fixCols = g.COLS_OVERRIDE ? g.COLS_OVERRIDE : g.cols;
-        s.fixRows = _rowsOverride ? _rowsOverride : g.rows;
-    }
+    s.recRows = _rowsOverride ? _rowsOverride : g.rows;
+    s.fixCols = _pinCols;
+    s.fixRows = _pinRows;
     for (uint8_t i = 0; i < _n; i++) {
         Card *c = _cards[i];
         if (!c) return;
@@ -489,28 +501,39 @@ void CardPage::arrangePage(const PageSpec &spec) {
     }
     Layout::ArrResult r;
     if (!PageArranger::kept(in, r)) { PageArranger::start(in); return; }
+    // IN UNITS (v8): each block's box as the arranger finished it - a solo card
+    // in its even margins, a cluster as placed with its tiles across.
     for (uint8_t i = 0; i < _n; i++) {
         CardPlacement p = _cards[i]->placement();
-        p.col = (int8_t)(r.pos[i].c * _sub);
-        p.row = (int8_t)(r.pos[i].r * _sub);
-        p.prefSpanX = p.minSpanX = (uint8_t)(r.pos[i].w * _sub);
-        p.prefSpanY = p.minSpanY = (uint8_t)(r.pos[i].h * _sub);
+        p.col = (int8_t)r.box[i].c;
+        p.row = (int8_t)r.box[i].r;
+        p.prefSpanX = p.minSpanX = r.box[i].w;
+        p.prefSpanY = p.minSpanY = r.box[i].h;
         _cards[i]->setPlacement(p);
+        if (!strcmp(_cards[i]->typeName(), "cluster"))
+            static_cast<ClusterCard *>(_cards[i])->setTileCols(r.box[i].tc);
     }
     _arranged = true;
     _arrCols = r.cols;
     _arrRows = r.rows;
-    Serial.printf("[Arranger] %s: the kept answer, %ux%u\n", spec.slug, (unsigned)r.cols, (unsigned)r.rows);
+    Serial.printf("[Arranger] %s: the kept answer, %ux%u units\n", spec.slug, (unsigned)r.cols, (unsigned)r.rows);
 }
 
-// The page's columns, from the arranger's grid (begin() took the board's).
-void CardPage::useCols(uint8_t cellCols) {
-    uint16_t uc = (uint16_t)cellCols * _sub;
-    if (uc < 1) uc = 1;
-    if (uc > PAGE_MAX_UNIT_COLS) uc = PAGE_MAX_UNIT_COLS;
-    _uCols = (uint8_t)uc;
+// The arranger's grid, in units (begin() took the board's cells): the columns
+// FR tracks, the rows sharing the whole height - its grid was chosen for it.
+void CardPage::useUnits(uint8_t cols, uint8_t rows) {
+    if (cols < 1) cols = 1;
+    if (cols > PAGE_MAX_UNIT_COLS) cols = PAGE_MAX_UNIT_COLS;
+    if (rows < 1) rows = 1;
+    if (rows > PAGE_MAX_UNIT_ROWS) rows = PAGE_MAX_UNIT_ROWS;
+    _uCols = cols;
     for (uint8_t i = 0; i < _uCols; i++) _colDsc[i] = LV_GRID_FR(1);
     _colDsc[_uCols] = LV_GRID_TEMPLATE_LAST;
+    _uRows = rows;
+    _unitH = (_availH - _gap * (rows - 1)) / rows;
+    if (_unitH < 1) _unitH = 1;
+    for (uint8_t i = 0; i < _uRows; i++) _rowDsc[i] = (lv_coord_t)_unitH;
+    _rowDsc[_uRows] = LV_GRID_TEMPLATE_LAST;
     lv_obj_set_grid_dsc_array(_root, _colDsc, _rowDsc);
 }
 

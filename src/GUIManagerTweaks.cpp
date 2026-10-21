@@ -86,21 +86,28 @@ void GUIManager::chooseScheme(uint8_t i, bool save) {
 // --- The grid's counts (the system panel's Col / Row) -------------------------------
 // PER PAGE, as they always were (owner, 2026-09-23: "a page built for a fixed
 // set of cards needs its own arrangement") - and saved with the page now.
+// SINCE 2.11 ROUND 9 A COUNT IS A PIN: saved only while pinned, kept by the
+// arranger, which chooses the rest; unpinned, the flow (a page the arranger does
+// not place) takes the board's own grid.
 void GUIManager::saveGrid() {
+    _colsOverride = _pinCols ? _pinCols : s_ship.cols;
+    _rowsOverride = _pinRows ? _pinRows : s_ship.rows;
     UI::setColumnsOverride(_colsOverride);
     if (_curPage < _nPages && _pages[_curPage].spec) {
         PageLive &p = _pages[_curPage];
         p.cols = _colsOverride;
         p.rows = _rowsOverride;
+        p.pinCols = _pinCols;
+        p.pinRows = _pinRows;
         char c[6], r[6];
-        snprintf(c, sizeof(c), "%u", (unsigned)_colsOverride);
-        snprintf(r, sizeof(r), "%u", (unsigned)_rowsOverride);
-        Settings::setPage(p.spec->slug, "cols", _colsOverride == s_ship.cols ? nullptr : _colsOverride ? c : "auto");
-        Settings::setPage(p.spec->slug, "rows", _rowsOverride == s_ship.rows ? nullptr : _rowsOverride ? r : "auto");
+        snprintf(c, sizeof(c), "%u", (unsigned)_pinCols);
+        snprintf(r, sizeof(r), "%u", (unsigned)_pinRows);
+        Settings::setPage(p.spec->slug, "cols", _pinCols ? c : nullptr);
+        Settings::setPage(p.spec->slug, "rows", _pinRows ? r : nullptr);
         Settings::save();
     }
     rebuildDashboard();
-    Serial.printf("[UI] grid -> %u x %u (0: auto)\n", (unsigned)_colsOverride, (unsigned)_rowsOverride);
+    Serial.printf("[UI] grid pins -> %u x %u (0: the arranger's)\n", (unsigned)_pinCols, (unsigned)_pinRows);
 }
 
 // --- The card looks (UI Tweaks) ----------------------------------------------------

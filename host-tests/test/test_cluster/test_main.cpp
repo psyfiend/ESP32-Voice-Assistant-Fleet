@@ -32,6 +32,19 @@ void test_four_tiles_in_a_square_box_are_two_by_two() {
     TEST_ASSERT_EQUAL_UINT8(2, g.rows);
 }
 
+// The arranger's column count (v8's tc) is taken as given: four tiles in a row in a box
+// that would otherwise make two rows of two.
+void test_the_arrangers_columns_are_obeyed() {
+    const TileGrid g = tileGrid(4, 300, 300, 10, 4);
+    TEST_ASSERT_EQUAL_UINT8(4, g.cols);
+    TEST_ASSERT_EQUAL_UINT8(1, g.rows);
+    TEST_ASSERT_EQUAL_INT32(67, g.tileW);
+    TEST_ASSERT_EQUAL_INT32(300, g.tileH);
+    // More columns than tiles: the rule chooses, as with none given.
+    const TileGrid h = tileGrid(4, 300, 300, 10, 6);
+    TEST_ASSERT_EQUAL_UINT8(2, h.cols);
+}
+
 // A short last row is not ragged: its tiles share the row.
 void test_short_last_row_shares_the_width() {
     const TileGrid g = tileGrid(3, 300, 300, 10);
@@ -106,6 +119,7 @@ int main(int, char **) {
     RUN_TEST(test_two_tiles_side_by_side_in_a_wide_box);
     RUN_TEST(test_two_tiles_stack_in_a_tall_box);
     RUN_TEST(test_four_tiles_in_a_square_box_are_two_by_two);
+    RUN_TEST(test_the_arrangers_columns_are_obeyed);
     RUN_TEST(test_short_last_row_shares_the_width);
     RUN_TEST(test_nothing_to_lay_out);
     RUN_TEST(test_two_tiles_take_two_cells_across);

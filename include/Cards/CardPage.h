@@ -96,6 +96,11 @@ public:
     // Call before commit().
     void setRowsOverride(uint8_t rows) { _rowsOverride = rows; }
 
+    // THE PAGE'S PINNED GRID (2.11 round 9): the system panel's Col / Row, which
+    // the arranger keeps - columns, rows or both - choosing the rest itself. 0 =
+    // not pinned. Call before applySpec().
+    void setPin(uint8_t cols, uint8_t rows) { _pinCols = cols; _pinRows = rows; }
+
     void commit();
 
     // Re-plan and re-place without rebuilding widgets. Correct for a span or
@@ -108,6 +113,11 @@ public:
     uint8_t   count() const { return _n; }
     uint8_t   placed() const { return _placed; }
     uint8_t   cellRows() const { return _sub ? (uint8_t)(_uRows / _sub) : _uRows; }
+    uint8_t   cellCols() const { return _sub ? (uint8_t)(_uCols / _sub) : _uCols; }
+    // Placed by the arranger's kept answer, and its grid in units.
+    bool      arranged() const { return _arranged; }
+    uint8_t   unitCols() const { return _uCols; }
+    uint8_t   unitRows() const { return _uRows; }
     uint8_t   dropped() const { return (uint8_t)(_n - _placed); }
 
     // One line per card for the System Doctor: type, span, priority, where it
@@ -143,15 +153,16 @@ private:
                    Card *made = nullptr);
     Card *makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg);
 
-    // THE ARRANGER (2.11 round 2, K105): the page's blocks - its cards and
+    // THE ARRANGER (2.11, K105, K109): the page's blocks - its cards and
     // clusters - placed by the arranger's kept answer for exactly these blocks:
-    // its grid and each block's cells, pinned. With no such answer the page
-    // flows as before and the arranger is started in the background
+    // its grid of units and each block's box, pinned. With no such answer the
+    // page flows as before and the arranger is started in the background
     // (PageArranger.h); GUIManager builds the page again once its answer is kept.
     void arrangePage(const PageSpec &spec);
-    void useCols(uint8_t cellCols);
+    void useUnits(uint8_t cols, uint8_t rows);
     bool    _arranged = false;
-    uint8_t _arrCols = 0, _arrRows = 0;
+    uint8_t _arrCols = 0, _arrRows = 0;   // units
+    uint8_t _pinCols = 0, _pinRows = 0;   // cells; 0 = the arranger chooses
 
     // The whole layout decision: the cards as Layout items, placed by the flow
     // engine - plain arithmetic with no LVGL, tested off the board (host-tests/).

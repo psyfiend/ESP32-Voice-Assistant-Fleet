@@ -929,7 +929,17 @@ void GUIManager::begin() {
             case Panel_System::GridAction::CARD_W_UP:   nudgeColumns(+1);  break;
             case Panel_System::GridAction::ASPECT_DOWN: nudgeRows(-1);     break;
             case Panel_System::GridAction::ASPECT_UP:   nudgeRows(+1);     break;
+            case Panel_System::GridAction::GRID_AUTO:   gridAuto();        break;
         }
+    });
+    // Its Grid line: the counts pinned, or what the arranger chose.
+    _pnlSystem.setGridText([this](char *out, size_t n) {
+        if (_pinCols && _pinRows)  snprintf(out, n, "%u x %u, pinned", (unsigned)_pinCols, (unsigned)_pinRows);
+        else if (_pinCols)         snprintf(out, n, "%u columns, pinned", (unsigned)_pinCols);
+        else if (_pinRows)         snprintf(out, n, "%u rows, pinned", (unsigned)_pinRows);
+        else if (_page && _page->arranged())
+            snprintf(out, n, "auto, %u x %u units", (unsigned)_page->unitCols(), (unsigned)_page->unitRows());
+        else                       snprintf(out, n, "auto");
     });
 
     // The card page's own Dump button runs the same report the System panel's
@@ -1107,6 +1117,7 @@ void GUIManager::buildDashboard() {
     _page = new CardPage();
     _page->begin(_dashHost, &_binder);
     _page->setRowsOverride(_rowsOverride);
+    _page->setPin(_pinCols, _pinRows);
 #ifdef DEBUG_PAGE_TIMING
     const int64_t tL2 = esp_timer_get_time();
 #endif
@@ -1216,6 +1227,7 @@ void GUIManager::rebuildDashboard() {
     // A rebuild is the one thing that happens over and over on a running
     // board. If internal heap trends down across these, the leak is here.
     SystemCore::heapMark("after rebuild");
+    _pnlSystem.refreshGrid();   // its Grid line: pinned, or what the arranger chose
 }
 
 // ---------------------------------------------------------------------------
@@ -1298,15 +1310,23 @@ void GUIManager::openLog() {
 // Tweaks' since 2.8 round 3 (GUIManagerTweaks.cpp), chosen outright and saved,
 // for every page. The grid's counts stay on the system panel, saved too.
 
+// A PRESS PINS THE COUNT (2.11 round 9): from what the page shows, one more or
+// less, kept by the arranger; past either end the pin goes (the arranger chooses).
 void GUIManager::nudgeColumns(int8_t steps) {
-    _colsOverride = cycleCount(_colsOverride, (uint8_t)UI::grid().cols, steps, UI_MAX_COLS);
+    _pinCols = cycleCount(_pinCols, _page ? _page->cellCols() : (uint8_t)UI::grid().cols, steps, UI_MAX_COLS);
     saveGrid();
 }
 
 void GUIManager::nudgeRows(int8_t steps) {
-    // The page is rebuilt from scratch on every change, so the override is
-    // held HERE and handed to each new page - a CardPage cannot remember it.
-    _rowsOverride = cycleCount(_rowsOverride, _page ? _page->cellRows() : 1, steps, UI_MAX_ROWS);
+    // The page is rebuilt from scratch on every change, so the pin is held HERE
+    // and handed to each new page - a CardPage cannot remember it.
+    _pinRows = cycleCount(_pinRows, _page ? _page->cellRows() : 1, steps, UI_MAX_ROWS);
+    saveGrid();
+}
+
+void GUIManager::gridAuto() {
+    _pinCols = 0;
+    _pinRows = 0;
     saveGrid();
 }
 
@@ -1340,12 +1360,15 @@ void GUIManager::initPages() {
             .label = cardLabelMode(), .showArea = _showArea,
             .cols = _colsOverride, .rows = _rowsOverride,
             .scheme = UI::schemeIndex(),
+            .pinCols = 0, .pinRows = 0,
         };
         // The page's own grid, if the owner set one (the system panel's Col /
-        // Row, saved with the page since 2.8 round 3): a count, or "auto".
+        // Row, saved with the page since 2.8 round 3): a count is a PIN (round
+        // 9), which the arranger keeps; "auto" (older files) or none, not pinned.
         char v[8];
-        if (Settings::page(s->slug, "cols", v, sizeof(v))) _pages[_nPages].cols = strcmp(v, "auto") ? (uint8_t)atoi(v) : 0;
-        if (Settings::page(s->slug, "rows", v, sizeof(v))) _pages[_nPages].rows = strcmp(v, "auto") ? (uint8_t)atoi(v) : 0;
+        PageLive &pl = _pages[_nPages];
+        if (Settings::page(s->slug, "cols", v, sizeof(v)) && atoi(v) > 0) pl.cols = pl.pinCols = (uint8_t)atoi(v);
+        if (Settings::page(s->slug, "rows", v, sizeof(v)) && atoi(v) > 0) pl.rows = pl.pinRows = (uint8_t)atoi(v);
         _nPages++;
     }
     _curPage = 0;
@@ -1362,6 +1385,8 @@ void GUIManager::savePageState() {
     p.cols     = _colsOverride;
     p.rows     = _rowsOverride;
     p.scheme   = UI::schemeIndex();
+    p.pinCols  = _pinCols;
+    p.pinRows  = _pinRows;
 }
 
 void GUIManager::loadPageState() {
@@ -1373,6 +1398,8 @@ void GUIManager::loadPageState() {
     _showArea     = p.showArea;
     _colsOverride = p.cols;
     _rowsOverride = p.rows;
+    _pinCols      = p.pinCols;
+    _pinRows      = p.pinRows;
 
     // The three that live outside this class, applied where they live.
     StateCard::setFill(_fill);

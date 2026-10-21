@@ -911,3 +911,106 @@ from, so it counts as a copy: its Visibility now has Remove from the page - L5 b
   difference. The crowded list from a one-row test copy of the settings, then the saved copy put
   back (no difference). The 4B's Copy / Move view looked at and closed.
 - Not tapped on the glass: any of it - each was driven from the PC.
+
+# Round 9 (2026-10-20, night, unattended) - v8 on the boards; a development Reset; the mocks
+
+The last sprint's items 3 to 7 (HANDOFF), while you were away. Flashed to the P4_5, the 4B and the
+1060, each board's settings saved first (`bench/settings/<board>/20261020-19*.json`). Every test
+that changed your settings ran on a test copy, and your file was put back and compared afterwards:
+no difference on any board. Nothing for the gate, the CHANGELOG or the PR (item 8 waits for you).
+
+## 1. The arranger by your rules (Playground v8), on the boards
+
+| Where | Before | Now |
+|---|---|---|
+| **The arranger** | Playground v5, in cells: a page's grid, then its clusters' shapes | **v8, in units** (a cell's halves): every entity the same size, solo cards square, clusters wider than tall, clusters with as many tiles the same size, a little empty space rather than unequal sizes - your knobs as its defaults (size 75, square 30, wide 20, twin 70, empty unit 11, order 4). Line for line from the playground; its answers are the host tests (19, every one matching) |
+| **A solo card** | its cells | its **finished box**: units off its top while that brings it nearer square, then any free unit rows above or below shared out as even margins (v7's finish) |
+| **A cluster's tiles** | across and down by the tile rule | **as the arranger counted them** (Kitchen's four in one row) |
+| **Col / Row** (the system panel) | a count for the page, which the arranger obeyed whole - with the board's own default always set, so it never chose a grid at all | **a pin**: each press pins that count for the page; the arranger keeps it and chooses the other. A new line, **Grid:**, says "4 x 2, pinned", "4 columns, pinned" or "auto, 10 x 8 units", and **Auto** beside it takes both pins away |
+| **Tuning from the PC** | `/settings?arranger=hole\|comfy\|...` | `/settings?arranger=size\|square\|wide\|twin\|gap8\|order` (HTTP_REFERENCE) |
+
+**Your pages' earlier choices are pins now, left as they were.** Each was a Col / Row choice saved
+before this round, and each is now a pin the arranger keeps:
+
+| Board | House | Fleet |
+|---|---|---|
+| P4_5 | **4 x 2, pinned** (your choice; not changed) | 7 columns, pinned |
+| 4B | 4 rows, pinned | 4 rows, pinned |
+| 1060 | 5 x 2, pinned | - (auto) |
+
+Auto on a page gives it back to the arranger. The pictures below show each House page pinned, and
+what Auto would give (from a test copy, put back after).
+
+The P4_5's House page as pinned (4 x 2: Doors one cell, Kitchen across three, Outside and Office
+splitting the bottom row) and as Auto would arrange it (10 x 8 units: your "what should happen",
+Doors with a unit of margin above):
+
+![P4_5 pinned 4 x 2](followups/211_r9_house_pinned_p45.png)
+![P4_5 auto](followups/211_r9_house_auto_p45.png)
+
+The 4B (pinned at 4 rows; auto) and the 1060 (pinned at 5 x 2; auto):
+
+![4B pinned](followups/211_r9_house_pinned_4b.png)
+![4B auto](followups/211_r9_house_auto_4b.png)
+![1060 pinned](followups/211_r9_house_pinned_1060.png)
+![1060 auto](followups/211_r9_house_auto_1060.png)
+
+The P4_5's Fleet page unpinned (16 cards on 12 x 6 units; Lamp 3 and Switch take the free unit row
+under them as margin), and the Grid line:
+
+![Fleet page auto](followups/211_r9_fleet_auto_p45.png)
+![Grid](followups/211_r9_grid_row_p45.png)
+
+**Timed** (`/popup`'s second line; the search runs on its own task while the page flows, then the
+page is built again):
+
+| Board, page | Grid | Steps | Time | Stack used |
+|---|---|---|---|---|
+| P4_5 House, pinned 4 x 2 | 8 x 4 units | 627 | **19 ms** | 5 KB |
+| P4_5 House, auto | 10 x 8 | 313,539 | **1.95 s** | 11 KB |
+| P4_5 Fleet, auto | 12 x 6 | 205,360 | 1.2 s | 13 KB |
+| 4B House, pinned 4 rows | 12 x 8 | 169,818 (budget hit) | 0.8 s | 9 KB |
+| 4B House, auto | 8 x 7 | 341,180 (budget hit) | 1.9 s | 9 KB |
+| 1060 House, pinned 5 x 2 | 10 x 4 | 20,032 (budget hit) | 76 ms | 6 KB |
+| 1060 House, auto | 11 x 6 | 735,416 (budget hit) | 3.2 s | 11 KB |
+
+`WS_S3_4B` compiles (RAM 38.6%, flash 36.1%); not timed - no S3 runs. An S3 would be slower again.
+
+| # | Do this | PASS if |
+|---|---|---|
+| M1 | The P4_5's House page | as the first picture: 4 x 2, Outside and Office the same width; Kitchen's four tiles in one row |
+| M2 | The system panel | a **Grid:** line saying "4 x 2, pinned", **Auto** beside it, Col / Row under it |
+| M3 | Auto | within ~2 s the page arranges itself as the second picture; Grid says "auto, 10 x 8 units" |
+| M4 | Col +, then Row - | each press pins (the Grid line says which), the page arranges again; Auto takes the pins away |
+| M5 | Swipe to Fleet and back | each page keeps its own pins |
+| M6 | Restart the board | each page comes up arranged at once (its answer kept), no second build |
+
+**Choices that were mine (item 3):**
+
+- **A count is a pin; the board's own grid is where the search starts.** Before this round the board's
+  default (5 x 3 on the P4_5) was always handed to the arranger as the page's grid, so it never chose
+  one - your round-5 note ("never re-picks rows or columns"). Now a count is pinned only by a press.
+- **One count pinned searches the other** (the playground pins both or neither): Col + alone keeps
+  the columns and lets the arranger choose the rows.
+- **Older files' "auto" reads as not pinned**; unpinning removes the entry. A page the arranger does
+  not place (the arranger off, more than 24 blocks) flows at the board's own grid.
+- **A grid of more than 192 units is skipped** (16 x 12 at most when pinned): the search goes a level
+  deeper for each unit, and its stack is 24 KB.
+- **The playground's step budget, 20,000 a pass**, so the boards' answers are the playground's.
+
+**Questions for you (item 3):**
+
+1. **Time**: unpinned, the search takes 1-3 s on the P4s, in the background (the page flows, then
+   arranges itself once and keeps it). Keep it, or give it a time limit? *My recommendation: keep it
+   for now* - it runs only when a page's blocks change, and a limit would make the boards' answers
+   differ from the playground's, where you tune. An S3 would take longer; measure one before
+   deciding.
+2. **The finish's margins**: a solo card takes free unit rows above or below as even margins, so a
+   card can sit half a card lower than its neighbours (Lamp 3 and Switch on the Fleet page, Bedroom on
+   the 4B). Keep v7's rule, or keep a card level with its neighbours' tops? *My recommendation:
+   level with the top* - the margin rule was made for a lone card beside a cluster.
+3. **Your old Col / Row choices are pins now** (the table above). Leave them, or Auto on every page
+   but the P4_5's House? *My recommendation: try Auto on the 1060 and the 4B* - their pinned pages
+   were chosen before the arranger could choose. Neither 1060 picture is even yet: pinned, Front
+   Door Temperature has three times Thermo's area; on Auto Thermo is the large one. The size knob
+   (75) is the one that would even them, and the playground is the place to try it.

@@ -4,12 +4,26 @@
 
 namespace Layout {
 
-TileGrid tileGrid(uint8_t n, int32_t w, int32_t h, int32_t gap) {
+TileGrid tileGrid(uint8_t n, int32_t w, int32_t h, int32_t gap, uint8_t cols) {
     TileGrid best;
     if (n == 0 || w <= 0 || h <= 0) return best;
     float bestScore = 0.f;
     bool  found = false;
-    for (uint8_t c = 1; c <= n; c++) {
+    // The arranger's column count, when it gives one and it leaves every tile room.
+    bool given = false;
+    if (cols && cols <= n) {
+        const uint8_t r  = (uint8_t)((n + cols - 1) / cols);
+        const int32_t tw = (w - (cols - 1) * gap) / cols;
+        const int32_t th = (h - (r - 1) * gap) / r;
+        if (tw > 0 && th > 0) {
+            best.cols = cols;
+            best.rows = r;
+            best.tileW = tw;
+            best.tileH = th;
+            found = given = true;
+        }
+    }
+    for (uint8_t c = 1; c <= n && !given; c++) {
         const uint8_t r  = (uint8_t)((n + c - 1) / c);
         const int32_t tw = (w - (c - 1) * gap) / c;
         const int32_t th = (h - (r - 1) * gap) / r;

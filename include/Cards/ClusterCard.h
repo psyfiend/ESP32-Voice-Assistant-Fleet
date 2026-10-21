@@ -46,6 +46,8 @@ public:
     void setBinder(CardBinder *b) { _binder = b; }
     void setStyle(ClusterStyle s) { _style = s; }
     void setIcons(bool on) { _icons = on; }
+    // The tiles across, as the arranger chose them (v8's tc); 0: Layout::tileGrid()'s rule.
+    void setTileCols(uint8_t c) { _tileCols = c; }
 
     uint8_t memberCount() const { return _n; }
     uint8_t tileCount() const;
@@ -79,6 +81,7 @@ private:
     CardBinder *_binder = nullptr;
     ClusterStyle _style = ClusterStyle::CLSTYLE_SWATCH;
     bool        _icons = true;
+    uint8_t     _tileCols = 0;
 
     lv_obj_t *_room = nullptr;   // the card's body: the header and the tiles stand in it
     // The header: the row, its bar's skirt, the swatch, the name, and a value per slot.

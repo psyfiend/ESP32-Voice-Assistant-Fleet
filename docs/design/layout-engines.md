@@ -199,6 +199,29 @@ entity 16.9 to 18.8 mm. The 4B is bound by the tile limit (three tiles need thre
 width); ten times the step budget found nothing better. ~200 ms and 600,000 steps in the browser on
 the P4_5: the C++ port needs a budget, as v5's did. Waits for the owner's look.
 
+### v8 as built (2.11 round 9, 2026-10-20)
+
+- **`Layout::arrange()`** is a line-for-line port of `arrangeV8()` with its shapes, search, score,
+  references and the finish (a unit a step) - doubles, the same loops, sums and tie-breaks. **Its
+  host tests are the playground's answers** (`host-tests/test_arranger`, 19 tests): the device's
+  House blocks and the playground's own House page on its seven boards, every grid, place, finished
+  box, score and empty unit; the P4_5 pinned at 4 x 2 and 5 x 3; the 4B pinned at its 4 x 3, where
+  no page holds the device's blocks. The budget is the playground's, 20,000 steps a pass.
+- **Units on the page**: the arranger's grid is the page's unit grid (`CardPage::useUnits()`), the
+  rows sharing the whole height; each block goes where its finished box says - a solo card in its
+  even margins - and a cluster's tiles across (`tc`) are the arranger's (`Layout::tileGrid()`'s
+  `cols`). The label it pays for is the page's first solo card's (Float, Tag as folder, Band, None).
+- **Kept** as `pages.<slug>.layout` = `v2 <fingerprint> <C>x<R>` and `c,r,w,h,tc` a block; round
+  2's `v1` answers are not read, so every page arranges once on the new firmware.
+- **Pins**: the system panel's Col / Row pin that count for the page (saved as `cols` / `rows`);
+  the arranger keeps a pinned count and searches the other, and **Auto** takes both pins away. The
+  board's own grid (5 x 3 on the P4_5, 4 x 3 on the 4B) is where an unpinned search starts.
+- **Timed on the boards** (the task's stack 24 KB, its high-water mark logged): the P4_5's House page
+  pinned at 4 x 2, 627 steps in 19 ms; unpinned, 313,539 steps in 1.95 s (10 x 8 units, as the
+  playground); its Fleet page (16 cards), 205,360 steps in 1.2 s. The 4B pinned at 4 rows, 0.8 s;
+  unpinned 1.9 s. The 1060 pinned at 5 x 2, 76 ms; unpinned 3.2 s. At most 13 KB of stack used. All
+  in the background (the page flows meanwhile, then is built again); `WS_S3_4B` compiles, untimed.
+
 ## The domain weight map
 
 Which cards earn space: a weight per card - its domain's (climate and media heavier than a lone
