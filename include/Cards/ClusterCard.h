@@ -3,6 +3,7 @@
 #define CLUSTER_CARD_H
 
 #include "Cards/Card.h"
+#include "Layout/Cluster.h"   // TileGrid
 #include "UI/HeaderSlots.h"   // GlyphStyle (round 11)
 
 class CardBinder;
@@ -49,6 +50,12 @@ public:
     void setIcons(bool on) { _icons = on; }
     // The tiles across, as the arranger chose them (v8's tc); 0: Layout::tileGrid()'s rule.
     void setTileCols(uint8_t c) { _tileCols = c; }
+    // Once sized (setCellWidthPx / setCellHeightPx): how tall its tiles are drawn
+    // on their own - near square, no taller than C_TILE_TALL their width.
+    int32_t tileHeight() const;
+    // ONE TILE HEIGHT A PAGE (round 12b): the page gives every cluster the
+    // shortest any of them draws, so each room's tiles stand alike. 0: its own.
+    void setTileHeightCap(int32_t px) { _tileHCap = px; }
     // The header values' icons in the page header's glyph style (round 11, K115):
     // framed on a Swatch header, bare on a Band. Every cluster's, from the next build.
     static void setGlyphStyle(GlyphStyle g) { s_glyphs = g; }
@@ -77,6 +84,7 @@ protected:
 
 private:
     void layoutHeader();
+    Layout::TileGrid tileGrid() const;   // its tiles' grid in its block as sized
 
     Card       *_m[GROUP_MEMBERS_MAX] = {nullptr};
     bool        _tile[GROUP_MEMBERS_MAX] = {false};
@@ -86,8 +94,9 @@ private:
     ClusterStyle _style = ClusterStyle::CLSTYLE_SWATCH;
     bool        _icons = true;
     uint8_t     _tileCols = 0;
+    int32_t     _tileHCap = 0;
 
-    lv_obj_t *_room = nullptr;   // the card's body: the header and the tiles stand in it
+    lv_obj_t *_room = nullptr;  // the card's body: the header and the tiles stand in it
     // The header: the row, its bar's skirt, the swatch, the name, and a value per slot.
     lv_obj_t *_hdr = nullptr, *_skirt = nullptr, *_swatch = nullptr, *_title = nullptr;
     // `glyph` is what stands: the icon's frame when it has one, else the icon.

@@ -152,9 +152,12 @@ void start(const Input &in) {
     if (s_fp == s_failFp) return;
     for (uint8_t i = 0; i < Layout::ARR_BLOCKS_MAX; i++) s_in.ids[i] = nullptr;
     s_state.store(1);
-    // Low priority, so the screen and the network go first; its stack in
-    // internal RAM. The search's own room is made once, from the heap.
-    if (xTaskCreatePinnedToCore(task, "arrange", TASK_STACK, nullptr, 1, nullptr, 0) != pdPASS) {
+    // The idle task's own priority, so the screen and the network go first and
+    // core 0's idle task still runs, time-sliced with it: at priority 1 a search
+    // longer than the task watchdog's 5 s starved IDLE0 and rebooted the board,
+    // every boot (the 4B on "auto", round 12: ~1.07 M steps). Its stack in
+    // internal RAM; the search's own room is made once, from the heap.
+    if (xTaskCreatePinnedToCore(task, "arrange", TASK_STACK, nullptr, tskIDLE_PRIORITY, nullptr, 0) != pdPASS) {
         s_state.store(0);
         snprintf(s_last, sizeof(s_last), "%s: could not start the arranger", s_slug);
     }

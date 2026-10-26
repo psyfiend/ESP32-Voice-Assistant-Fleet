@@ -311,6 +311,24 @@ void CardPage::commit() {
                   (unsigned)_maxRows,
                   (long)UI::grid().cellW, (long)heightOf(_sub));
 
+    // ONE TILE HEIGHT A PAGE (round 12b, the owner: the 1060's Kitchen tiles
+    // stood taller than the other rooms', just under the near-square limit):
+    // every cluster's tiles drawn as tall as the shortest any of them draws.
+    {
+        int32_t tileH = 0;
+        for (uint8_t pass = 0; pass < 2; pass++)
+            for (uint8_t i = 0; i < _n; i++) {
+                Card *c = _cards[i];
+                if (!c || !_slot[i].placed || strcmp(c->typeName(), "cluster")) continue;
+                ClusterCard *cl = static_cast<ClusterCard *>(c);
+                if (pass) { cl->setTileHeightCap(tileH); continue; }
+                const Layout::ArrRect &a = _arrRect[i < Layout::ARR_BLOCKS_MAX ? i : 0];
+                cl->setCellHeightPx(_arranged ? a.h : heightOf(_slot[i].spanY));
+                cl->setCellWidthPx (_arranged ? a.w : widthOf (_slot[i].spanX));
+                const int32_t h = cl->tileHeight();
+                if (h > 0 && (!tileH || h < tileH)) tileH = h;
+            }
+    }
 
     for (uint8_t i = 0; i < _n; i++) {
         Card *c = _cards[i];

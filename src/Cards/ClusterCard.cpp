@@ -91,6 +91,19 @@ uint8_t ClusterCard::headerCount() const {
 int32_t ClusterCard::chromeW() { return 2 * UI::met().BORDER_W + 2 * pad(); }
 int32_t ClusterCard::chromeH() { return 2 * UI::met().BORDER_W + tilesTop() + pad(); }
 
+Layout::TileGrid ClusterCard::tileGrid() const {
+    return Layout::tileGrid(tileCount(), surfaceWidthPx() - chromeW(), surfaceHeightPx() - chromeH(), tgap(),
+                            _tileCols);
+}
+
+// NEAR SQUARE (round 12, the owner: tiles "drawn smaller inside clusters when
+// needed"): no taller than C_TILE_TALL a full row's tile is wide - a short last
+// row's wider tiles stand as tall as the rest.
+int32_t ClusterCard::tileHeight() const {
+    const Layout::TileGrid g = tileGrid();
+    return LV_MIN(g.tileH, (int32_t)(g.tileW * UI::shape().C_TILE_TALL));
+}
+
 bool ClusterCard::owns(const char *entityId) const {
     if (!entityId || !entityId[0]) return false;
     for (const Slot &s : _slot) {
@@ -116,7 +129,6 @@ void ClusterCard::buildBody(lv_obj_t *body) {
     Kit::add(body, KS::KS_CARD_PLAIN);   // no padding, no flow: placed by hand
     const int32_t bw = UI::met().BORDER_W;
     _innerW = surfaceWidthPx() - 2 * bw;
-    const int32_t innerH = surfaceHeightPx() - 2 * bw;
 
     _hdr = Kit::plain(body);
     Kit::add(_hdr, KS::KS_CLUSTER_HDR);
@@ -166,18 +178,16 @@ void ClusterCard::buildBody(lv_obj_t *body) {
 
     // The tiles.
     const uint8_t nTiles = tileCount();
-    const int32_t boxW = _innerW - 2 * pad();
-    const int32_t boxH = innerH - tilesTop() - pad();
-    const Layout::TileGrid g = Layout::tileGrid(nTiles, boxW, boxH, tgap(), _tileCols);
+    const Layout::TileGrid g = tileGrid();
+    // Each tile near square (tileHeight()), or the page's height when shorter,
+    // centred in its slot - a little wiggle room left inside the cluster.
+    int32_t th = tileHeight();
+    if (_tileHCap > 0 && _tileHCap < th) th = _tileHCap;
     uint8_t t = 0;
     for (uint8_t i = 0; i < _n; i++) {
         if (!_tile[i]) continue;
         int32_t x = 0, y = 0, w = 0;
         Layout::tileAt(g, nTiles, t++, tgap(), x, y, w);
-        // NEAR SQUARE (round 12, the owner: tiles "drawn smaller inside clusters
-        // when needed"): a tile no taller than C_TILE_TALL its width, centred in
-        // its slot - a little wiggle room left inside the cluster.
-        const int32_t th = LV_MIN(g.tileH, (int32_t)(w * UI::shape().C_TILE_TALL));
         Card *m = _m[i];
         m->setCellWidthPx(w);
         m->setCellHeightPx(th);
