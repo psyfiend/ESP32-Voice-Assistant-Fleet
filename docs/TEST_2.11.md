@@ -1395,3 +1395,106 @@ and the pinned cases, every place, trimmed box, finished rectangle and score mat
 - **Not reproduced**: the accent-line notch.
 - **The structure check**: two files over 1,000 lines (`GUIManager.cpp` 1,520, `Card.cpp` 1,456),
   405 style calls outside the kit in 29 files (438 at `v0.2.18`), 10 colour literals in 2 files.
+
+## Your notes after round 11 (2026-10-26, midday)
+
+The 1060: Doors and Thermo centred in their free space at 5 x 5, "exactly as I suggested"; the tiles
+should be drawn smaller inside a cluster when needed (Desk much taller than wide), their labels are
+too close to the foot - inside the active frame's glow - and could be bigger on the P4_5 and the
+1060. The 4B: Auto (8 x 7) leaves dead space between the rows - the clusters should grow to fill it,
+the solo cards keep their size; horizontal clusters always over vertical; 4 x 6 is about right; 4 x 3,
+4 x 4 and 4 x 5 squash everything into two short rows. Your answers: spare space goes round the
+blocks, **but only when that would not make the blocks too small**; the accent-line notch is gone;
+the group view after 2.11, once you have labelled the cards in HA.
+
+# Round 12 (2026-10-26) - clusters grow, tiles near square
+
+Built, flashed to the P4_5, the 4B and the 1060, and seen by screenshot on all three. The
+[Layout Playground](https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp) is at page v12 - the engine
+button reads **v9: grow, spread** - and the C++ is its line-for-line port again.
+
+## 1. The arranger
+
+| Your note | Round 12 |
+|---|---|
+| "The clusters should expand vertically to fill the space and leave the solo cards the size they currently are" | **Clusters grow into the spare height first**: each row of blocks holding a cluster takes an equal share, each cluster growing to its row's height plus that share - never past square tiles. Solo cards keep their size and centre in their row |
+| "Spare space should go around the blocks, but only when that would not make the blocks too small" | that is the order: the clusters grow first, and only what is left is spread round the blocks |
+| "I would always prefer horizontal to vertical groups" | a cluster whose tiles stack more rows than columns pays the **wide** cost again, by how many more |
+| 4 x 3, 4 x 4, 4 x 5: everything on two short rows | **found**: each block kept only its ten cheapest shapes, and at 4 x 5 the clusters' ten were all four units tall - no page fitted, so the page fell back to the flow. **A block now keeps its tightest shape too.** And a solo card may take a box up to half again taller than it may be, drawn at its tallest allowed shape and centred, the rest paid as a hole - at 4 x 3 that is what lets Doors and Thermo fit |
+
+**A bug on the way, fixed**: a kept answer stores each cluster's tiles across but not down, so a page
+built from one gave the finish no room to grow its clusters (the 4B at 4 x 5 showed them at 173 px
+where the playground grows them to 195). Kept answers are now **v4**, so every page arranges once
+on this firmware; on all three boards the House pages came out where they were.
+
+The 4B, your House page, pinned (on your own settings, put back afterwards):
+
+| 4 x 3 | 4 x 5 |
+|---|---|
+| ![4B 4x3](followups/211_r12_4b_4x3.png) | ![4B 4x5](followups/211_r12_4b_4x5.png) |
+
+| 4 x 6 (your pin) | 4 x 4 |
+|---|---|
+| ![4B 4x6](followups/211_r12_4b_4x6.png) | ![4B 4x4](followups/211_r12_4b_4x4.png) |
+
+4 x 3, 4 x 5 and 4 x 6 now give the same page: three rows of clusters filling the screen, Doors and
+Thermo at either end. **4 x 4 fills the screen but unevenly** - Kitchen two units tall and seven
+wide between two clusters three units tall: at 8 x 8 units three equal rows do not divide, and the
+search counts empty units before the clusters grow, so it prefers filling the units unevenly
+(question 1).
+
+## 2. The tiles
+
+- **Near square** (`C_TILE_TALL`, 1.1): a tile is drawn no taller than 1.1 times its width, centred
+  in its slot - a little room left inside the cluster, as you allowed. The 1060's Desk is near
+  square now.
+- **The hero and its label centred as one** (`C_TILE_FOOT`, 1.5 mm off the tile's top and foot),
+  as on a solo card - the label is out of the active frame's glow.
+- **A bigger label where it costs the hero nothing**: the name's face (the solo cards' card-name
+  size) when a state tile's disc would be no smaller with it - the P4_5 and the 1060 - and the tag's
+  face otherwise (the 4B, whose discs would shrink). Decided by the tile's size alone, so every tile
+  of a cluster has the same.
+
+| P4_5 | 1060 |
+|---|---|
+| ![P4_5 tiles](followups/211_r12_tiles_p45.png) | ![1060 tiles](followups/211_r12_tiles_1060.png) |
+
+## For the final pass (added to round 11's)
+
+| # | Do this | PASS if |
+|---|---|---|
+| P8 | The 1060's House: a cluster with tall slots (Office) | its tiles near square, centred in their slots |
+| P9 | Switch on a light in a cluster | its label sits clear of the frame's glow; the hero and label centred in the tile |
+| P10 | The 4B: Auto, then 4 x 3, 4 x 5, 4 x 6 | each fills the screen; the clusters grow, the solo cards keep their size; no strips of empty space between rows |
+| P11 | The P4_5 and the 1060 | the tiles' labels in the bigger face, the same in every tile of a cluster |
+
+## Choices that were mine (round 12)
+
+- **Growth stops at square tiles**, so a cluster on a tall page does not grow tiles taller than
+  wide; the rest of the height goes round the blocks.
+- **A tile 1.1 times as tall as wide at most**, and 1.5 mm off its top and foot - both tokens, easy
+  to tune on the glass.
+- **The bigger label by the tile's size alone**: my first try decided tile by tile and mixed two
+  sizes in one 4B cluster (the value tiles took the bigger face, the state tiles did not). A long
+  name that does not fit gets dots, as before.
+
+## Questions for you (round 12)
+
+1. **The 4B at 4 x 4** fills the screen unevenly (above). The fix is for the search to score a page
+   after its clusters grow - a deeper change to the search. *My recommendation: leave it for now* -
+   Auto and your 4 x 6 give the even page; say if 4 x 4 matters.
+2. **The 4B's tile discs** are a little smaller than before (the foot takes 1.5 mm at each end of a
+   small tile). Fine, or a smaller foot on small tiles?
+
+## Results (mine, before you)
+
+- **Seen by screenshot**: the P4_5, the 1060 and the 4B on their House pages; the 4B pinned at 4 x 3,
+  4 x 4, 4 x 5 and 4 x 6.
+- **Host tests**: 74, all passing - the arranger's 30 generated from the playground's own code
+  (among them the 4B's House at 4 x 3 and 4 x 5, and a page finished without its tiles down, which
+  fails on the old code).
+- **Settings**: every board's file saved before each flash. The 4B's pin test ran on your settings
+  and the file was put back and compared: no difference. The P4_5 and the 1060: only the kept House
+  layout's version moved (`v3` to `v4`, every place the same).
+- **The structure check**: two files over 1,000 lines (`GUIManager.cpp` 1,520, `Card.cpp` 1,456),
+  409 style calls outside the kit in 29 files, 10 colour literals in 2 files.

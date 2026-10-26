@@ -249,6 +249,30 @@ Host tests: 27, generated from the playground's own answers (scratchpad `gen_tes
 on eight boards, pinned grids - every place, trimmed box, rectangle and score matching. Kept answers
 are `v3`: the search's places only; the finish is worked out again at each build.
 
+### Round 12 (2026-10-26): clusters grow first - K121
+
+The owner's notes on the 4B (`TEST_2.11.md` round 12). Playground page v12, ported:
+
+- **Clusters grow into the spare height before anything is spread**: each band holding a cluster
+  takes an equal share of the page's spare height, each cluster in it growing to its band's height
+  plus that share - never past square tiles (its tiles' width less their height, times its rows).
+  Solo cards keep their size. What is left is spread as v9 spreads it - "around the blocks, but only
+  when that would not make the blocks too small".
+- **Horizontal over vertical**: a cluster whose tiles stack more rows than columns pays `wide` again,
+  `wide x 2 log(rows / columns)`.
+- **The tightest shape stays**: a block keeps its ten cheapest shapes and, after them, its smallest
+  (`ARR_SHAPES_CHEAP` + 1). With only the ten, the 4B pinned at 4 x 3 to 4 x 5 had no page - its
+  clusters kept only shapes four units tall - and fell back to the flow.
+- **A loose box for a solo card**: up to 1.5 times taller than a card may be; the card is drawn at
+  its tallest allowed shape, centred, and the height it leaves pays as a hole (`gap8 x area / L²`).
+- **A page filled to the pixel is still packed** (`spreadAround()` returns only when a page
+  overflows).
+
+Kept answers are **`v4`** (the search changed), and a kept page's clusters have their tiles down
+worked out from across, which the finish needs to grow them. Host tests: 30. Open: the 4B pinned at
+4 x 4 fills the screen unevenly - the search counts empty units before clusters grow, so it does
+not see that three equal rows would grow to fill; scoring a page after its growth is the fix.
+
 ## The domain weight map
 
 Which cards earn space: a weight per card - its domain's (climate and media heavier than a lone

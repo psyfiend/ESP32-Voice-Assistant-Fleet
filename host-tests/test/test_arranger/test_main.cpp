@@ -1,6 +1,7 @@
 // The arranger (2.11, K109, K120): Layout Playground v9's answers are the expected values.
-// GENERATED from the playground's own code (its page v11, 2026-10-26) by scratchpad gen_tests.py
-// with run_v9.js - do not edit the cases by hand; run it again when the playground changes.
+// GENERATED from the playground's own code (host-tests/tools/playground.html, its page v12,
+// 2026-10-26) by host-tests/tools/gen_arranger_tests.py with run_playground.js - do not edit the
+// cases by hand; run it again when the playground changes.
 // Four sets of blocks: DEVICE (the House page as the boards showed it in round 6: Doors, Kitchen
 // 4 tiles, Outside and Office 3), PLAYGROUND (its own House page by area), P1060 (the 1060's page in
 // round 9: Doors, three 3-tile clusters, Thermo) and FLEET (sixteen solo cards, Free Heap and Uptime

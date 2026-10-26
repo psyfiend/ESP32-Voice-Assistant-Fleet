@@ -1,0 +1,1649 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Layout Playground</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: a board preview beside a control panel; the arranger's report and alternatives underneath. */
+:root {
+  --bg: #F3F4F6; --fg: #1C2128; --dim: #5A6370; --rule: #D5D9DF; --accent: #0072B5; --panel: #FFFFFF; --chip: #E4E8EE;
+  --ok: #2E8B57; --warn: #B7791F; --bad: #C0392B;
+  --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-device: "Montserrat", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #12161C; --fg: #E6E9ED; --dim: #98A0AA; --rule: #2B3038; --accent: #4CC3FF; --panel: #1A1F26; --chip: #222830; --ok: #4ADE80; --warn: #FBBF24; --bad: #F87171; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #12161C; --fg: #E6E9ED; --dim: #98A0AA; --rule: #2B3038; --accent: #4CC3FF; --panel: #1A1F26; --chip: #222830; --ok: #4ADE80; --warn: #FBBF24; --bad: #F87171; color-scheme: dark; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1320px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 56px; }
+.v5note { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; margin-top: 14px; display: grid; gap: 6px; }
+.v5note p { margin: 0; max-width: 95ch; font-size: .92rem; }
+.knob { display: grid; grid-template-columns: minmax(0, 1fr) 4.5em; gap: 2px 8px; align-items: center; }
+.knob label { font-size: .88rem; }
+.knob output { font-variant-numeric: tabular-nums; text-align: right; font-size: .85rem; color: var(--dim); }
+.knob input { grid-column: 1 / -1; }
+h1 { font-size: 1.8rem; margin: 0 0 6px; }
+.lede { color: var(--dim); margin: 0; max-width: 80ch; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; margin-top: 18px; align-items: start; }
+@media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.stage { min-width: 0; display: grid; gap: 12px; }
+.boardbox { position: relative; width: 100%; display: grid; place-items: center; }
+.bezel { position: relative; background: #0B0D10; border-radius: 14px; padding: 10px; box-sizing: border-box; overflow: hidden; }
+.screen { position: relative; overflow: hidden; transform-origin: 0 0; font-family: var(--f-device); touch-action: none; }
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 14px; display: grid; gap: 14px; }
+.panel h2 { font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 0; }
+.ctl { display: grid; gap: 6px; }
+.ctl label { font-size: .9rem; }
+.row2 { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+select, input[type=number] { font: inherit; font-size: .9rem; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--rule); background: var(--bg); color: var(--fg); }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+button { font: inherit; font-size: .85rem; padding: 4px 10px; border-radius: 6px; border: 1.5px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button.on { background: var(--accent); color: var(--panel); }
+.seg { display: inline-flex; border-radius: 7px; overflow: hidden; border: 1.5px solid var(--accent); }
+.seg button { border: 0; border-radius: 0; }
+.blocks { display: grid; gap: 6px; max-height: 420px; overflow: auto; }
+.blk { display: grid; grid-template-columns: 12px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; background: var(--chip); font-size: .88rem; }
+.blk .sw { width: 12px; height: 26px; border-radius: 3px; }
+.blk .nm { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.blk .sub { color: var(--dim); font-size: .8rem; }
+.blk .acts { display: flex; gap: 4px; align-items: center; }
+.blk .acts button { padding: 1px 7px; }
+.blk select { padding: 1px 4px; font-size: .8rem; }
+.report { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.card2 { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+.card2 h3 { margin: 0 0 6px; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.big { font-family: var(--f-device); font-size: 1.6rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat { display: flex; gap: 18px; flex-wrap: wrap; }
+.stat div { min-width: 70px; }
+.stat small { display: block; color: var(--dim); font-size: .78rem; }
+.pill { display: inline-block; padding: 1px 9px; border-radius: 99px; font-size: .8rem; font-weight: 700; border: 1.5px solid currentColor; }
+.pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); }
+.alts { display: grid; gap: 6px; }
+.alts button { text-align: left; color: var(--fg); border-color: var(--rule); display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
+.alts button.on { border-color: var(--accent); background: transparent; color: var(--fg); box-shadow: inset 4px 0 0 var(--accent); }
+.why { font-size: .9rem; color: var(--dim); margin: 0; }
+.hint { font-size: .85rem; color: var(--dim); margin: 0; }
+details summary { cursor: pointer; font-weight: 700; }
+code { font-size: .88em; }
+
+/* ---- device rendering (scheme colours live on the screen element as variables) ---- */
+.screen { background: var(--g); color: var(--t); }
+.hdr { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; box-sizing: border-box; border-bottom: 2px solid var(--a); }
+.hdr .dev { flex: 1; color: var(--a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hdr .pg { flex: 1; text-align: center; white-space: nowrap; }
+.hdr .tm { flex: 1; text-align: right; font-variant-numeric: tabular-nums; }
+.cellg { position: absolute; border-radius: 6px; border: 1px dashed var(--cellline); box-sizing: border-box; }
+.dead { position: absolute; border-radius: 10px; box-sizing: border-box; background: repeating-linear-gradient(45deg, transparent 0 8px, var(--deadline) 8px 10px); border: 1.5px dashed var(--deadline); }
+.card, .clu { position: absolute; box-sizing: border-box; background: var(--s); border: var(--bw) solid var(--b); box-shadow: var(--sh); cursor: grab; user-select: none; }
+.card.on { background: #F0A63C; color: #1A1F27; border-color: #F0A63C; }
+.dragging { opacity: .85; z-index: 50; cursor: grabbing; box-shadow: 0 12px 30px #0008 !important; }
+.droptarget { outline: 3px solid var(--a); outline-offset: 2px; }
+.tag { position: absolute; color: #fff; white-space: nowrap; font-weight: 500; z-index: 3; }
+.tag.floating { box-shadow: var(--tagsh); }
+.tag.folder::after { content: ""; position: absolute; bottom: 0; width: var(--fr); height: var(--fr); background: radial-gradient(circle at 100% 0, transparent calc(var(--fr) - 0.5px), var(--tc) var(--fr)); }
+.ci { position: absolute; }
+.disc { position: absolute; left: 50%; transform: translateX(-50%); border-radius: 50%; background: var(--disc); display: grid; place-items: center; }
+.card.on .disc { background: #FFFFFF40; }
+.cnm { position: absolute; left: 4%; right: 4%; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cval { position: absolute; left: 0; right: 0; text-align: center; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cval small { color: var(--d); }
+.chd { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; box-sizing: border-box; border-bottom: 1.5px solid var(--b); white-space: nowrap; overflow: hidden; }
+.chd .sw { flex: none; border-radius: 3px; }
+.chd .ttl { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.chd .slot { display: flex; align-items: center; color: var(--t); font-variant-numeric: tabular-nums; }
+.mt { position: absolute; box-sizing: border-box; background: var(--alt); display: grid; place-items: center; cursor: grab; overflow: hidden; }
+.mt.on { background: #F0A63C; color: #1A1F27; }
+.mt .in { display: grid; justify-items: center; gap: 2px; max-width: 100%; }
+.mt .mn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-weight: 500; }
+.mt .mv { font-weight: 500; font-variant-numeric: tabular-nums; }
+.mt .mv small { color: var(--d); }
+.mt.on .mv small { color: #1A1F2799; }
+.cellg.sub { border-radius: 2px; border-style: dotted; opacity: .55; }
+.dead.sub { border-radius: 3px; border-width: 1px; }
+.dead.unit { border: 0; border-radius: 0; }
+.mt.v6.clear { background: transparent; }
+.mt.v6.clear.on { background: #F0A63C; }
+.mt.on .disc { background: #FFFFFF40; }
+.disc.bare, .mt.on .disc.bare { background: transparent; }
+.over { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); background: #C0392BE6; color: #fff; padding: .4em 1em; border-radius: 99px; font-weight: 600; white-space: nowrap; z-index: 60; }
+@media (prefers-reduced-motion: no-preference) { .card, .clu, .mt { transition: left .25s ease, top .25s ease, width .25s ease, height .25s ease; } .dragging { transition: none; } }
+</style>
+
+<div class="wrap">
+  <h1>Layout Playground</h1>
+  <p class="lede">Pick a board, group entities into clusters, and watch the arranger lay out the page with no dead space where it can manage that. <b>Drag</b> a card or cluster onto another to reorder them. Drag a member tile within its cluster to reorder members; the others shift along and wrap to the next row. Everything here is a throwaway browser sketch: the sizes are millimetre estimates and nothing has been measured on glass.</p>
+  <div class="v5note">
+    <p><b>Version 8 (2026-10-20, round six): your rules, in units.</b> Every block is placed on a grid of units - the device's own, a cell's halves - in any shape its limits allow, so a cluster can be 2.5 cells wide and a row 1.5 cells tall. The search is paid to make <b>every entity the same size</b> (each solo card and each tile: the side of the square with its area, label and header paid), <b>solo cards square</b>, <b>clusters wider than tall</b>, <b>clusters with as many tiles the same size</b>, and to waste little - but an empty unit is cheap: a little margin beats unequal sizes. Your limits are never crossed: a solo card no smaller than one of the P4_5 at 7 x 3, and no taller for its width; a tile no smaller than one of a 3 x 1 cluster on the 4B at 4 x 4. Clusters wear the device's header. Spare unit rows by a solo card become even margins.</p>
+    <p><b>Your House (round 5)</b> is the page from your screenshots. On the P4_5 v8 lands on what you said should happen at 5 x 2: Kitchen across the top, Outside and Office sharing the bottom row 2.5 cells each, and Doors a near-square card with a margin - every entity 17 to 19 mm. The Clusters box gives each block's units per entity, your measure. v7, v5 and v4 are still there to compare.</p>
+  </div>
+  <div class="v5note">
+    <p><b>Version 7 (2026-10-19, round five): units.</b> The page's cells divide into units, as the device's already do (<code>dashboard.md</code> section 2: two across and two down a cell, the Fleet page's 1.5-cell cards). The arranger still places blocks on cells; then a <b>finish</b> moves each solo card within the room around it, in units, and never touches a cluster. A card taller than it is wide gives up units at its top, so it is nearer square and its hero sits lower, nearer the tiles beside it; when one unit would leave it too flat, a cell is cut into more units down (<b>Auto</b> picks the fewest that gets every card near square). Spare rows above or below a card, such as an empty row under it, become even margins: the card is centred in them, the odd unit going below (up and down only; centred across an empty row, a card wandered away from its neighbours). Empty units are hatched after the finish. Untick <b>Finish</b> to see the page as the arranger left it.</p>
+  </div>
+  <div class="v5note">
+    <p><b>Version 6 (2026-10-19, round four): finer cells.</b> The page is a finer grid of cells. A solo card covers a square of cells and a cluster's tile covers another, set separately, so a cluster can be given more of the page than the cards beside it (your "1x against 0.75x"). Clusters wear no label and no header, so a card pays for its label inside its own square and a cluster keeps all of its box. Tiles are drawn as cards are, and the arranger is paid to keep every tile's icon the size of a card's icon and every tile the shape of a card. A cluster may grow by one cell to close a gap; a card never changes size.</p>
+    <p>What it shows on this House page (16 entities): with tiles a third bigger than cards (<b>4:3</b>) nothing fits except on the 7-inch board, because every tile then needs more page than a card does. <b>Equal</b> squares fit five of the seven boards with no gaps, and tile icons land within 7% of card icons: a card's label costs about what a cluster's padding does. (The 4.3-inch landscape and 3.5-inch boards need a smaller smallest card, under Knobs, or a second page.) <b>Bare tile icons</b> (no ring) let a tile two-thirds of a card's size carry the same size icon, which fits all seven boards and frees enough room for every icon on the page to grow, by about 15% on the P4_5. Try the three buttons under Arranger.</p>
+  </div>
+  <div class="v5note">
+    <p><b>Version 5 (2026-10-19): a new arranger.</b> Version 4 placed blocks first-come-first-served and then let each cluster in turn grab the empty cells beside it, so it missed layouts that needed another order and the first cluster grabbed most of the spare room. Version 5 tries every way of tiling the page: it fills the first empty cell with one of the next few blocks, in every shape that holds its tiles, or leaves it empty, and keeps the cheapest page.</p>
+    <p>Spare room is shared out instead of grabbed. A cluster pays for room beyond what its tiles comfortably need, and the charge grows faster than the room, so two clusters one cell bigger each cost less than one cluster two cells bigger. Long thin clusters pay too. A one-cell cluster is allowed when all its members fit as tiles; it has no header and wears its card label (K97). Switch <b>Arranger</b> to v4 to compare. The weights are starting guesses for you to tune.</p>
+  </div>
+
+  <div class="main">
+    <div class="stage">
+      <div class="boardbox" id="boardbox"><div class="bezel" id="bezel"><div class="screen" id="screen"></div></div></div>
+      <div class="report">
+        <div class="card2"><h3>This layout</h3><div class="stat" id="stats"></div><p class="why" id="why"></p></div>
+        <div class="card2"><h3>Best layout per grid size</h3><div class="alts" id="alts"></div><p class="hint">Click one to see it. The top one is what the device would pick.</p></div>
+        <div class="card2"><h3>Clusters</h3><div id="clusterInfo" class="hint"></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ctl"><h2>Board</h2>
+        <select id="board"></select>
+      </div>
+      <div class="ctl"><h2>Arranger</h2>
+        <div class="row2"><span class="seg" id="engine"><button data-v="v9" class="on" type="button">v9: grow, spread</button><button data-v="v8" type="button">v8: your rules</button><button data-v="v6" type="button">v7: cells</button><button data-v="v5" type="button">v5</button><button data-v="v4" type="button">v4</button></span></div>
+        <div class="knob"><label for="wSize">Cost of entities of different sizes (v8)</label><output id="oSize"></output><input type="range" id="wSize" min="0" max="200" step="5"></div>
+        <div class="knob"><label for="wSquare">Cost of a solo card far from square (v8)</label><output id="oSquare"></output><input type="range" id="wSquare" min="0" max="100" step="5"></div>
+        <div class="knob"><label for="wWide">Cost of a cluster taller than wide (v8)</label><output id="oWide"></output><input type="range" id="wWide" min="0" max="100" step="5"></div>
+        <div class="knob"><label for="wTwin">Cost of same-sized clusters not the same size (v8)</label><output id="oTwin"></output><input type="range" id="wTwin" min="0" max="100" step="5"></div>
+        <div class="knob"><label for="wGap8">Cost of an empty unit, per entity's worth (v8)</label><output id="oGap8"></output><input type="range" id="wGap8" min="0" max="60" step="1"></div>
+        <div class="knob"><label for="wBig">Extra cost of a solo card bigger than the rest (v9)</label><output id="oBig"></output><input type="range" id="wBig" min="0" max="300" step="10"></div>
+        <div class="row2"><button type="button" id="copyKnobs">Copy settings for Claude</button></div>
+        <textarea id="knobsOut" readonly hidden rows="3" aria-label="These settings, as text" style="width:100%;box-sizing:border-box;font:12px ui-monospace,monospace;background:var(--bg);color:var(--fg);border:1px solid var(--rule);border-radius:6px"></textarea>
+        <div class="knob"><label for="kTile">Cells per cluster tile, each way</label><output id="oTile"></output><input type="range" id="kTile" min="1" max="6" step="1"></div>
+        <div class="knob"><label for="kCard">Cells per solo card, each way</label><output id="oCard"></output><input type="range" id="kCard" min="1" max="6" step="1"></div>
+        <p class="hint" id="ratio"></p>
+        <div class="row2"><span>Try</span><button type="button" data-preset="3,3,disc">Equal</button><button type="button" data-preset="4,3,disc">4:3</button><button type="button" data-preset="2,3,bare">Bare tile icons</button></div>
+        <div class="row2"><label><input type="checkbox" id="flex" checked> A cluster may grow a cell to close a gap</label></div>
+        <div class="row2"><label><input type="checkbox" id="finish" checked> Finish solo cards in units</label></div>
+        <div class="row2"><span>Units down a cell</span><select id="unitsDown"><option value="auto">Auto</option><option>2</option><option>3</option><option>4</option></select><span class="hint">across: 2</span></div>
+        <div class="knob"><label for="wIcons">Cost of a tile icon a different size from a card's</label><output id="oIcons"></output><input type="range" id="wIcons" min="0" max="80" step="1"></div>
+        <div class="knob"><label for="wShape">Cost of a tile shaped unlike a card</label><output id="oShape"></output><input type="range" id="wShape" min="0" max="80" step="1"></div>
+        <div class="knob"><label for="wHole">Cost of an empty cell</label><output id="oHole"></output><input type="range" id="wHole" min="0" max="80" step="1"></div>
+        <div class="knob"><label for="wComfy">Room a tile needs to feel comfortable</label><output id="oComfy"></output><input type="range" id="wComfy" min="1" max="3" step="0.1"></div>
+        <div class="knob"><label for="wLoose">Cost of a cluster with too much room</label><output id="oLoose"></output><input type="range" id="wLoose" min="0" max="80" step="1"></div>
+        <div class="knob"><label for="wLong">Cost of a long, thin cluster</label><output id="oLong"></output><input type="range" id="wLong" min="0" max="80" step="1"></div>
+        <div class="knob"><label for="wOrder">Cost of a block out of reading order</label><output id="oOrder"></output><input type="range" id="wOrder" min="0" max="30" step="1"></div>
+        <div class="knob"><label for="wAway">Cost of leaving the board's own grid, per row or column</label><output id="oAway"></output><input type="range" id="wAway" min="0" max="40" step="1"></div>
+        <p class="hint">The cell, unit, icon and shape knobs are v7 only; there an empty cell's cost is for an empty solo card's worth of cells. The two "room" knobs are v5 only: "room" is a cluster's tile area divided by what its tiles need at the smallest tile size, 1.0 packed tight. In v7 a cluster's pinned shape is tiles across x down, and a fixed grid is cards across x down.</p>
+      </div>
+      <div class="ctl"><h2>Look</h2>
+        <div class="row2"><span>Scheme</span><span class="seg" id="scheme"><button data-v="midnight" class="on" type="button">Midnight</button><button data-v="linen" type="button">Linen</button></span></div>
+        <div class="row2"><span>Area</span><span class="seg" id="tagstyle"><button data-v="floating" class="on" type="button">Float</button><button data-v="attached" type="button">Tag</button><button data-v="folder" type="button">Folder</button><button data-v="bar" type="button">Bar</button><button data-v="none" type="button">None</button></span></div>
+        <p class="hint">Applies to single cards. In v7 a cluster wears no label and no header unless Cluster header is ticked. In v5 a cluster always has a header bar when it has an area, temperature, lux or occupancy to show, because a floating tag would land on the header's content; the bar is clear, and filled with the area's colour only in Bar mode.</p>
+        <div class="row2"><span>Tiles</span><span class="seg" id="tileFrame"><button data-v="clear" class="on" type="button">Clear until on</button><button data-v="panel" type="button">Panel</button></span></div>
+        <div class="row2"><span>Tile icon</span><span class="seg" id="tileIcon"><button data-v="disc" class="on" type="button">Disc, as a card</button><button data-v="bare" type="button">Bare</button></span></div>
+        <div class="row2"><label><input type="checkbox" id="clHdr"> Cluster header (v7)</label></div>
+        <p class="hint">v7 only. A tile that is on is filled, the Fill card state; Bracket or Corner cut would draw the same way they do on a card.</p>
+        <div class="row2"><label><input type="checkbox" id="showGrid" checked> Show grid cells</label></div>
+      </div>
+      <div class="ctl"><h2>Page</h2>
+        <div class="row2"><span class="seg" id="data"><button data-v="device" class="on" type="button">Your House (round 5)</button><button data-v="1060" type="button">The 1060's House</button><button data-v="fleet" type="button">Fleet page</button><button data-v="playground" type="button">Playground's House</button></span></div>
+        <div class="row2"><label><input type="checkbox" id="byArea" checked> Organize clusters by area</label></div>
+        <div class="row2"><label><input type="checkbox" id="promote" checked> Put temperature, motion and lux in the cluster header</label></div>
+        <div class="row2"><span>Grid</span><select id="gridMode"><option value="auto">Auto (fill the page)</option></select></div>
+      </div>
+      <div class="ctl"><h2>Blocks, in reading order</h2>
+        <div class="blocks" id="blocks"></div>
+        <div class="row2"><button type="button" id="addCluster">Add a cluster</button><button type="button" id="addCard">Add a card</button><button type="button" id="reset">Reset</button></div>
+      </div>
+      <details class="ctl"><summary>Knobs (millimetres)</summary>
+        <div class="ctl"><label for="kMax">Biggest a grid cell may get: <b id="vMax"></b></label><input type="range" id="kMax" min="22" max="50" step="1" value="34"></div>
+        <div class="ctl"><label for="kMin">Smallest a grid cell may get: <b id="vMin"></b></label><input type="range" id="kMin" min="12" max="24" step="1" value="16"></div>
+        <div class="ctl"><label for="kTileW">Smallest member tile, width: <b id="vTileW"></b></label><input type="range" id="kTileW" min="9" max="22" step="0.5" value="13"></div>
+        <div class="ctl"><label for="kTileH">Smallest member tile, height: <b id="vTileH"></b></label><input type="range" id="kTileH" min="9" max="20" step="0.5" value="11"></div>
+        <div class="ctl"><label for="kHdr">Cluster header height: <b id="vHdr"></b></label><input type="range" id="kHdr" min="4" max="10" step="0.5" value="6"></div>
+        <p class="hint">9 mm is the touch minimum (<code>UI::minTouch()</code>). A member tile needs room for its label too, which is why it starts at 13 mm wide.</p>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------- data ---------------- */
+const BOARDS = [
+  // rec = the grid the owner chose on glass for that board (GUIManager.h, ROADMAP §7).
+  { id: "p45", name: "WS_P4_5  5in  1280x720", w: 1280, h: 720, diag: 5.0, dev: "Waveshare P4-Touch-LCD-5", rec: [5, 3] },
+  { id: "p47b", name: "WS_P4_7B  7in  1024x600", w: 1024, h: 600, diag: 7.0, dev: "Waveshare P4-Touch-LCD-7B", rec: [6, 3] },
+  { id: "1060", name: "CYD_P4_1060  7in  1024x600", w: 1024, h: 600, diag: 7.0, dev: "CYD P4 JC1060P470", rec: [6, 3] },
+  { id: "p44b", name: "WS_P4_4B  4in  720x720", w: 720, h: 720, diag: 4.0, dev: "Waveshare P4-Touch-LCD-4B", rec: [4, 3] },
+  { id: "s34b", name: "WS_S3_4B  4in  480x480", w: 480, h: 480, diag: 4.0, dev: "Waveshare S3-Touch-LCD-4B", rec: [4, 3] },
+  { id: "4880l", name: "CYD_P4_4880  4.3in  800x480 landscape", w: 800, h: 480, diag: 4.3, dev: "CYD P4 JC4880P443", rec: [4, 3] },
+  { id: "4880p", name: "CYD_P4_4880  4.3in  480x800 portrait", w: 480, h: 800, diag: 4.3, dev: "CYD P4 JC4880P443", rec: [2, 5] },
+  { id: "3248", name: "CYD_S3_3248  3.5in  320x480 portrait", w: 320, h: 480, diag: 3.5, dev: "CYD S3 JC3248W535", rec: [2, 4] },
+];
+const AREA = { Garage: "#7CB342", Outside: "#5C6BC0", Kitchen: "#689F38", Office: "#9C5BD6", Living: "#D6578F", Front: "#2E9E4A", Hall: "#E07A3C", Den: "#3BA7B8" };
+// The House page's entities, from the 2026-09-30 screenshots.
+const HOUSE = [
+  { area: "Garage", name: "North", kind: "cover" }, { area: "Garage", name: "South", kind: "cover" },
+  { area: "Outside", name: "Deck", kind: "temp", v: "51.5" }, { area: "Outside", name: "Front", kind: "temp", v: "51.3" },
+  { area: "Outside", name: "Porch", kind: "light" }, { area: "Outside", name: "Deck", kind: "lux", v: "1" },
+  { area: "Kitchen", name: "Kitchen", kind: "motion" }, { area: "Kitchen", name: "Sink", kind: "light" },
+  { area: "Kitchen", name: "Table", kind: "light" }, { area: "Kitchen", name: "Kitchen", kind: "temp", v: "66.0" },
+  { area: "Office", name: "Office", kind: "motion", on: 1 }, { area: "Office", name: "Desk", kind: "light", on: 1 },
+  { area: "Office", name: "Overhead", kind: "light", on: 1 }, { area: "Office", name: "Office", kind: "temp", v: "73.4" },
+  { area: "Living", name: "Overhead", kind: "light" }, { area: "Front", name: "Thermo", kind: "temp", v: "73.0" },
+];
+// The P4_5's House page as the owner had it in round 5 (his screenshots, 2026-10-20): the garage
+// doors as one summary card, and three clusters - Kitchen four tiles, Outside and Office three each -
+// with their area's temperature, occupancy and lux in the header. His worked examples are this page.
+const HOUSE_DEVICE = [
+  { area: "Garage", name: "Doors", kind: "cover" },
+  { area: "Kitchen", name: "Kitchen", kind: "temp", v: "67.6" }, { area: "Kitchen", name: "Kitchen", kind: "motion" },
+  { area: "Kitchen", name: "Sink", kind: "light" }, { area: "Kitchen", name: "Table", kind: "light" },
+  { area: "Kitchen", name: "Overhead", kind: "light" }, { area: "Kitchen", name: "Thermo", kind: "temp", v: "74.0" },
+  { area: "Outside", name: "Outside", kind: "temp", v: "49.0" }, { area: "Outside", name: "Outside", kind: "lux", v: "0" },
+  { area: "Outside", name: "Porch", kind: "light" }, { area: "Outside", name: "Front", kind: "temp", v: "50.0" },
+  { area: "Outside", name: "Garage", kind: "temp", v: "60.4" },
+  { area: "Office", name: "Office", kind: "temp", v: "73.2" }, { area: "Office", name: "Office", kind: "motion", on: 1 },
+  { area: "Office", name: "Desk", kind: "light", on: 1 }, { area: "Office", name: "Overhead", kind: "light" },
+  { area: "Office", name: "Eric", kind: "temp", v: "71.0" },
+];
+// The 1060's House page in round 9 (the owner's screenshots, 2026-10-26): the doors' summary, three
+// clusters of three tiles, and Front's Thermo on its own.
+const HOUSE_1060 = [
+  { area: "Garage", name: "Doors", kind: "cover" },
+  { area: "Outside", name: "Outside", kind: "temp", v: "48.4" }, { area: "Outside", name: "Outside", kind: "lux", v: "0" },
+  { area: "Outside", name: "Porch", kind: "light" }, { area: "Outside", name: "Front", kind: "temp", v: "48.4" },
+  { area: "Outside", name: "Garage", kind: "temp", v: "58.1" },
+  { area: "Kitchen", name: "Kitchen", kind: "temp", v: "64.6" }, { area: "Kitchen", name: "Kitchen", kind: "motion" },
+  { area: "Kitchen", name: "Sink", kind: "light" }, { area: "Kitchen", name: "Table", kind: "light" },
+  { area: "Kitchen", name: "Overhead", kind: "light" },
+  { area: "Office", name: "Office", kind: "temp", v: "74.3" }, { area: "Office", name: "Office", kind: "motion", on: 1 },
+  { area: "Office", name: "Desk", kind: "light", on: 1 }, { area: "Office", name: "Overhead", kind: "light" },
+  { area: "Office", name: "Eric", kind: "temp", v: "70.6" },
+  { area: "Front", name: "Thermo", kind: "temp", v: "72.0" },
+];
+// The Fleet page: sixteen solo cards; Free Heap and Uptime ask for 1.5 cells across (their spec's
+// three units), which v9 takes as their shape.
+const FLEET = [
+  { area: "Test", name: "Avail", kind: "switch" }, { area: "Test", name: "Reading", kind: "temp", v: "--" },
+  { area: "Test", name: "Refuse", kind: "switch" }, { area: "Office", name: "Deck", kind: "temp", v: "--" },
+  { area: "Office", name: "Deck", kind: "motion" }, { area: "Office", name: "Deck", kind: "lux", v: "--" },
+  { area: "Kitchen", name: "All Lamps", kind: "light" }, { area: "Kitchen", name: "Lamp 4", kind: "light" },
+  { area: "Kitchen", name: "Lamp 1", kind: "light" }, { area: "Kitchen", name: "Lamp 2", kind: "light" },
+  { area: "Living", name: "Lamp 3", kind: "light" }, { area: "Office", name: "Switch", kind: "switch" },
+  { area: "Office", name: "Stuck", kind: "switch" }, { area: "Den", name: "Signal", kind: "lux", v: "-44" },
+  { area: "Den", name: "Free Heap", kind: "lux", v: "151068", wide: 1.5 }, { area: "Den", name: "Uptime", kind: "lux", v: "00:45", wide: 1.5 },
+];
+const PROMOTABLE = { temp: 1, motion: 1, lux: 1 };
+const ICON = {
+  light: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2v.5h5v-.5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/>',
+  cover: '<path d="M3 21V9.5L12 4l9 5.5V21M6.5 21v-8.5h11V21M6.5 15.5h11M6.5 18.5h11"/>',
+  temp: '<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 9v7"/>',
+  motion: '<circle cx="13.5" cy="4.5" r="2"/><path d="M9 21l2.5-6 3 2.5V21M6.5 12.5 9.5 9l4 .5 2.5 3.5M11.5 15l-1-5"/>',
+  lux: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  switch: '<rect x="2" y="7" width="20" height="10" rx="5"/><circle cx="16" cy="12" r="3"/>'
+};
+const TINT = { light: "#FFE3A3", cover: "#5B8DEF", temp: "#E0705F", motion: "#2EC4B6", lux: "#E0A53C", switch: "#5B8DEF" };
+const UNIT = { temp: "&deg;F", lux: "lx" };
+const ic = (k, col, sz) => `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
+const SCHEMES = {
+  midnight: { g: "#1A1F27", s: "#212429", alt: "#2B2F36", t: "#F0F2F4", d: "#98A0AA", a: "#00A8FF", b: "#3A3F47", bw: "1.5px", sh: "none", disc: "#FFFFFF14", cellline: "#FFFFFF1F", deadline: "#F8717199", tagsh: "0 2px 6px #000A" },
+  linen: { g: "#DDD5C8", s: "#F8F4EC", alt: "#EDE6DA", t: "#2B2520", d: "#6E6459", a: "#A8561C", b: "#2B252057", bw: "2px", sh: "0 3px 6px #2B252066", disc: "#2B252012", cellline: "#2B252026", deadline: "#C0392B99", tagsh: "0 3px 5px #2B25207A" },
+};
+
+/* ---------------- state ---------------- */
+let S;
+function freshState() {
+  return { board: "p45", scheme: "midnight", tag: "floating", showGrid: true, byArea: true, promote: true, grid: "auto", engine: "v9",
+    data: "device", clHdr: false, tileFrame: "clear", tileIcon: "disc",
+    knobs: { maxCell: 34, minCell: 14, tileW: 12, tileH: 9, hdr: 5 },
+    v6: { tile: 3, card: 3, flex: true, finish: true, uy: "auto" },
+    w: { hole: 60, comfy: 1.6, loose: 25, long: 40, order: 4, away: 6, icons: 40, shape: 20,
+         size: 75, square: 30, twin: 70, wide: 20, gap8: 11,     // v8's: the owner's, tuned 2026-10-20
+         big: 60 },                                              // v9's (2026-10-26)
+    blocks: buildBlocks(true, "device"), pick: 0, nextId: 1 };
+}
+function buildBlocks(byArea, data) {
+  const d = data || (S && S.data);
+  const SRC = d === "device" ? HOUSE_DEVICE : d === "1060" ? HOUSE_1060 : d === "fleet" ? FLEET : HOUSE;
+  // The Fleet page is solo cards only, as on the device; a card's preferred shape is its `wide`.
+  if (!byArea || d === "fleet") return SRC.map((e, i) => ({ id: "c" + i, type: "card", area: e.area, members: [Object.assign({}, e)], pin: null, shortTop: false, aspect: e.wide || 1 }));
+  const order = [], groups = {};
+  SRC.forEach(e => { if (!groups[e.area]) { groups[e.area] = []; order.push(e.area); } groups[e.area].push(Object.assign({}, e)); });
+  return order.map((a, i) => groups[a].length > 1
+    ? { id: "k" + i, type: "cluster", area: a, members: groups[a], pin: null, shortTop: false }
+    : { id: "k" + i, type: "card", area: a, members: groups[a], pin: null, shortTop: false });
+}
+function splitHeader(b) {
+  // Promote one of each header kind, keeping at least one member tile.
+  // v7 clusters have no header unless asked for (owner, round four: a cluster keeps its whole cell).
+  // v8's always have one, as the device's do.
+  if (b.type !== "cluster" || !S.promote || (S.engine === "v6" && !S.clHdr)) return { hdr: [], tiles: b.members };
+  const hdr = [], tiles = [], seen = {};
+  b.members.forEach(m => { if (PROMOTABLE[m.kind] && !seen[m.kind]) { seen[m.kind] = 1; hdr.push(m); } else tiles.push(m); });
+  if (!tiles.length && hdr.length) tiles.push(hdr.pop());
+  return { hdr, tiles };
+}
+
+/* ---------------- the arranger ---------------- */
+function geometry(board) {
+  const ppi = Math.hypot(board.w, board.h) / board.diag, pmm = ppi / 25.4;
+  const hdrH = Math.round(5 * pmm), inset = Math.round(2.5 * pmm), gap = Math.round(1.8 * pmm);
+  return { ppi, pmm, hdrH, inset, gap, ax: inset, ay: hdrH + inset, aw: board.w - 2 * inset, ah: board.h - hdrH - 2 * inset };
+}
+function gridCandidates(G) {
+  const out = [], k = S.knobs;
+  for (let c = 1; c <= 12; c++) for (let r = 1; r <= 10; r++) {
+    const cw = (G.aw - (c - 1) * G.gap) / c / G.pmm, ch = (G.ah - (r - 1) * G.gap) / r / G.pmm;
+    if (cw < k.minCell || ch < k.minCell * 0.8 || cw > k.maxCell || ch > k.maxCell) continue;
+    const asp = cw / ch; if (asp < 0.7 || asp > 1.7) continue;
+    out.push({ cols: c, rows: r, cwmm: cw, chmm: ch });
+  }
+  return out;
+}
+function capacity(G, grid, w, h, one) {
+  const k = S.knobs, pad = 1.2 * G.pmm, tg = 1.0 * G.pmm;
+  // A cluster with a header wears no tag, so its whole cell box is its own. A one-cell cluster
+  // (v5, K97) has no header and wears a card label, paid for inside the cell as a card's is.
+  const t = one ? insetForTag({ x: 0, y: 0, w: 0, h: 0 }, G) : { x: 0, y: 0 };
+  const bw = w * (grid.cwmm * G.pmm) + (w - 1) * G.gap - t.x, bh = h * (grid.chmm * G.pmm) + (h - 1) * G.gap - t.y;
+  const across = Math.floor((bw - 2 * pad + tg) / (k.tileW * G.pmm + tg));
+  const down = Math.floor((bh - (one ? 0 : k.hdr * G.pmm) - 2 * pad + tg) / (k.tileH * G.pmm + tg));
+  return { across: Math.max(0, across), down: Math.max(0, down) };
+}
+function shapeOptions(G, grid, b) {
+  if (b.type === "card") return [{ w: 1, h: 1 }];
+  const n = splitHeader(b).tiles.length, opts = [];
+  if (b.pin) { const c = capacity(G, grid, b.pin.w, b.pin.h); return (b.pin.w <= grid.cols && b.pin.h <= grid.rows && c.across * c.down >= n) ? [b.pin] : []; }
+  for (let w = 1; w <= grid.cols; w++) for (let h = 1; h <= grid.rows; h++) {
+    const c = capacity(G, grid, w, h);
+    if (c.across * c.down >= n) { opts.push({ w, h }); break; }   // the smallest height that holds them, per width
+  }
+  // Most square first, then smallest; keep five.
+  const bwmm = s => s.w * grid.cwmm, bhmm = s => s.h * grid.chmm;
+  opts.sort((a, b2) => Math.abs(Math.log(bwmm(a) / bhmm(a))) - Math.abs(Math.log(bwmm(b2) / bhmm(b2))) || a.w * a.h - b2.w * b2.h);
+  return opts.slice(0, 5);
+}
+function pack(grid, shapes) {
+  const occ = Array.from({ length: grid.rows }, () => Array(grid.cols).fill(-1)), pos = [];
+  for (let i = 0; i < shapes.length; i++) {
+    const s = shapes[i]; let placed = null;
+    for (let r = 0; r + s.h <= grid.rows && !placed; r++) for (let c = 0; c + s.w <= grid.cols && !placed; c++) {
+      let free = true;
+      for (let y = r; y < r + s.h && free; y++) for (let x = c; x < c + s.w; x++) if (occ[y][x] !== -1) { free = false; break; }
+      if (free) placed = { c, r };
+    }
+    if (!placed) return null;
+    for (let y = placed.r; y < placed.r + s.h; y++) for (let x = placed.c; x < placed.c + s.w; x++) occ[y][x] = i;
+    pos.push({ c: placed.c, r: placed.r, w: s.w, h: s.h });
+  }
+  return { occ, pos };
+}
+function grow(grid, P, blocks) {
+  // Clusters absorb empty cells next to them (right, then down, then left, then up) while they stay rectangles.
+  // Cards never change span (owner, 2026-10-01).
+  const { occ, pos } = P; let changed = true;
+  const free = (c0, r0, w, h) => { for (let y = r0; y < r0 + h; y++) for (let x = c0; x < c0 + w; x++) if (y < 0 || x < 0 || y >= grid.rows || x >= grid.cols || occ[y][x] !== -1) return false; return true; };
+  const claim = (i, c0, r0, w, h) => { for (let y = r0; y < r0 + h; y++) for (let x = c0; x < c0 + w; x++) occ[y][x] = i; };
+  while (changed) {
+    changed = false;
+    pos.forEach((p, i) => {
+      if (blocks[i].type !== "cluster" || blocks[i].pin) return;
+      if (free(p.c + p.w, p.r, 1, p.h)) { claim(i, p.c + p.w, p.r, 1, p.h); p.w++; changed = true; }
+      else if (free(p.c, p.r + p.h, p.w, 1)) { claim(i, p.c, p.r + p.h, p.w, 1); p.h++; changed = true; }
+      else if (free(p.c - 1, p.r, 1, p.h)) { claim(i, p.c - 1, p.r, 1, p.h); p.c--; p.w++; changed = true; }
+      else if (free(p.c, p.r - 1, p.w, 1)) { claim(i, p.c, p.r - 1, p.w, 1); p.r--; p.h++; changed = true; }
+    });
+  }
+  let dead = 0; occ.forEach(row => row.forEach(v => { if (v === -1) dead++; }));
+  return dead;
+}
+function arrangeV4(board, blocks) {
+  const G = geometry(board), results = [];
+  let grids = gridCandidates(G);
+  if (board.rec && !grids.some(g => g.cols === board.rec[0] && g.rows === board.rec[1])) {
+    const [c, r] = board.rec;
+    grids.push({ cols: c, rows: r, cwmm: (G.aw - (c - 1) * G.gap) / c / G.pmm, chmm: (G.ah - (r - 1) * G.gap) / r / G.pmm });
+  }
+  if (S.grid !== "auto") { const [c, r] = S.grid.split("x").map(Number); grids = [{ cols: c, rows: r, cwmm: (G.aw - (c - 1) * G.gap) / c / G.pmm, chmm: (G.ah - (r - 1) * G.gap) / r / G.pmm }]; }
+  let bestPartial = null;
+  for (const grid of grids) {
+    const opts = blocks.map(b => shapeOptions(G, grid, b));
+    const cellCount = grid.cols * grid.rows;
+    if (opts.some(o => !o.length)) { bestPartial = bestPartial || { grid, reason: "a cluster cannot hold its members at this cell size" }; continue; }
+    let evals = 0; const pick = [];
+    const dfs = (i, area) => {
+      if (evals > 4000) return;
+      if (i === blocks.length) {
+        evals++;
+        const P = pack(grid, pick);
+        if (!P) return;
+        const holes = cellCount - area;
+        const dead = grow(grid, P, blocks);
+        // Owner, 2026-10-01: a cluster growing into spare cells is fine; a CARD
+        // suddenly twice the size is not. So spare cells (holes) cost little,
+        // and every single card is charged for drifting from today's ~20 mm.
+        let sq = 0, cardDev = 0;
+        P.pos.forEach((p, j) => {
+          if (blocks[j].type === "cluster") sq += Math.abs(Math.log((p.w * grid.cwmm) / (p.h * grid.chmm)));
+          else cardDev += Math.abs(Math.log(Math.sqrt(grid.cwmm * grid.chmm) / 20));
+        });
+        const size = Math.abs(Math.log(grid.cwmm / 20));
+        // The board's recommended grid is where the arranger starts; each row or column away
+        // from it has to be paid for by the layout getting better.
+        const away = board.rec ? Math.abs(grid.cols - board.rec[0]) + Math.abs(grid.rows - board.rec[1]) : 0;
+        const score = dead * 100 + holes * 0.5 + sq * 4 + cardDev * 8 + size + away * 2;
+        results.push({ grid, pos: P.pos.map(p => Object.assign({}, p)), dead, holes, sq, score, G });
+        return;
+      }
+      for (const s of opts[i]) { if (area + s.w * s.h > cellCount) continue; pick[i] = s; dfs(i + 1, area + s.w * s.h); }
+      pick.length = i;
+    };
+    dfs(0, 0);
+  }
+  results.sort((a, b) => a.score - b.score);
+  // Keep the best layout per grid size, so the alternatives differ in something you can see.
+  const seen = new Set(), uniq = [];
+  for (const r of results) { const k = r.grid.cols + "x" + r.grid.rows; if (!seen.has(k)) { seen.add(k); uniq.push(r); } if (uniq.length >= 6) break; }
+  return { G, list: uniq, grids, bestPartial };
+}
+
+/* ---------------- the arranger, version 5 (2026-10-19) ----------------
+   Every tiling, not the first one that fits. The search fills the FIRST EMPTY CELL in reading order,
+   each time with one of the next few unplaced blocks (WINDOW) in each shape that holds its tiles, or
+   leaves that cell empty - so any layout that exists is found, and blocks stay close to their list
+   order. Branch and bound: a branch stops as soon as it costs more than the best page so far.
+   A cluster's spare room is part of its shape from the start and is charged by a convex cost, so the
+   cheapest page shares the room out; long thin clusters are charged too. Deterministic: same blocks,
+   same order, same screen, same page. */
+const WINDOW = 3, BUDGET = 150000;
+function gridList(G, board) {
+  const mk = (c, r) => ({ cols: c, rows: r, cwmm: (G.aw - (c - 1) * G.gap) / c / G.pmm, chmm: (G.ah - (r - 1) * G.gap) / r / G.pmm });
+  if (S.grid !== "auto") { const [c, r] = S.grid.split("x").map(Number); return [mk(c, r)]; }
+  // The board's own grid (the owner's pick on glass) and its neighbours, one row or column either way:
+  // leaving it has to buy a better page, and a smaller search is what an S3 can afford.
+  let grids = gridCandidates(G);
+  if (board.rec) grids = grids.filter(g => Math.abs(g.cols - board.rec[0]) <= 1 && Math.abs(g.rows - board.rec[1]) <= 1);
+  if (board.rec && !grids.some(g => g.cols === board.rec[0] && g.rows === board.rec[1])) grids.push(mk(board.rec[0], board.rec[1]));
+  return grids;
+}
+function shapesV5(G, grid, b) {
+  if (b.type === "card") return [{ w: 1, h: 1, cost: 0, room: 1, roomC: 0, longC: 0 }];
+  const W = S.w, k = S.knobs, split = splitHeader(b), out = [];
+  const consider = (w, h) => {
+    if (w > grid.cols || h > grid.rows) return;
+    // One cell: no header, every member a tile (K97) - only for a cluster with nothing in its header,
+    // so the arranger never drops a room's temperature or occupancy to save a cell (or when pinned).
+    const one = w === 1 && h === 1;
+    if (one && split.hdr.length && !b.pin) return;
+    const n = one ? b.members.length : split.tiles.length;
+    const c = capacity(G, grid, w, h, one);
+    if (c.across * c.down < n) return;
+    const wmm = w * grid.cwmm + (w - 1) * G.gap / G.pmm, hmm = h * grid.chmm + (h - 1) * G.gap / G.pmm;
+    const inner = Math.max(1, (wmm - 2.4) * (hmm - (one ? 1.5 : k.hdr) - 2.4));
+    const room = inner / (n * k.tileW * k.tileH);
+    // Room beyond comfortable, charged by its SQUARE: a cluster twice as roomy as comfortable pays W,
+    // three times pays 4W, five times 16W - so spare cells spread over clusters instead of piling up
+    // in one. (A log here, the first try, grew too slowly: one giant cluster stayed cheap.)
+    const excess = Math.max(0, room / W.comfy - 1);
+    const longness = Math.max(0, Math.abs(Math.log(wmm / hmm)) - Math.log(1.8));
+    const roomC = W.loose * excess * excess, longC = W.long * longness * longness;
+    out.push({ w, h, one, room, roomC, longC, cost: roomC + longC });
+  };
+  if (b.pin) consider(b.pin.w, b.pin.h);
+  else for (let w = 1; w <= grid.cols; w++) for (let h = 1; h <= grid.rows; h++) consider(w, h);
+  // Drop a shape that costs more than a smaller shape inside it plus empty cells for the difference:
+  // the smaller one, placed at the same corner, with those cells left empty, is always at least as good.
+  const kept = out.filter(s => !out.some(t => t !== s && t.w <= s.w && t.h <= s.h && t.cost + (s.w * s.h - t.w * t.h) * W.hole <= s.cost));
+  kept.sort((a, c) => a.cost - c.cost || a.w * a.h - c.w * c.h || a.h - c.h);
+  return kept;
+}
+function gridCostV5(board, grid, blocks) {
+  const cards = blocks.filter(b => b.type === "card").length;
+  const away = board.rec ? Math.abs(grid.cols - board.rec[0]) + Math.abs(grid.rows - board.rec[1]) : 0;
+  // Single cards are charged for drifting from today's ~20 mm card (owner, 2026-10-01: cards stay near today's size).
+  const cardC = cards * 10 * Math.abs(Math.log(Math.sqrt(grid.cwmm * grid.chmm) / 20));
+  return { away, awayC: S.w.away * away, cardC, cost: S.w.away * away + cardC };
+}
+function arrangeV5(board, blocks) {
+  const G = geometry(board), results = [], W = S.w, t0 = performance.now();
+  const grids = gridList(G, board);
+  let bestPartial = null, nodesAll = 0;
+  for (const grid of grids) {
+    const cols = grid.cols, cells = cols * grid.rows, n = blocks.length;
+    const opts = blocks.map(b => shapesV5(G, grid, b));
+    if (opts.some(o => !o.length)) { bestPartial = bestPartial || { grid, reason: "a cluster cannot hold its members at this cell size" }; continue; }
+    const minA = opts.map(o => Math.min(...o.map(s => s.w * s.h))), maxA = opts.map(o => Math.max(...o.map(s => s.w * s.h)));
+    const minC = opts.map(o => Math.min(...o.map(s => s.cost)));
+    let remMin = minA.reduce((a, v) => a + v, 0), remMax = maxA.reduce((a, v) => a + v, 0), remC = minC.reduce((a, v) => a + v, 0);
+    if (remMin > cells) continue;
+    const gc = gridCostV5(board, grid, blocks);
+    const occ = new Int16Array(cells).fill(-1), placed = new Uint8Array(n), pos = new Array(n);
+    let free = cells, nodes = 0, best = null, bestCost = Infinity;
+    const fits = (r, c, s) => {
+      if (c + s.w > cols || r + s.h > grid.rows) return false;
+      for (let y = r; y < r + s.h; y++) for (let x = c; x < c + s.w; x++) if (occ[y * cols + x] !== -1) return false;
+      return true;
+    };
+    const mark = (r, c, s, v) => { for (let y = r; y < r + s.h; y++) for (let x = c; x < c + s.w; x++) occ[y * cols + x] = v; };
+    const rec = (cost, done, from) => {
+      if (++nodes > BUDGET) return;
+      // Lower bound: every block left costs at least its cheapest shape, and cells the remaining blocks
+      // cannot cover even at their biggest are empty for sure.
+      const bound = cost + remC + Math.max(0, free - remMax) * W.hole;
+      if (bound >= bestCost) return;
+      if (done === n) {
+        const total = cost + free * W.hole;
+        if (total < bestCost) { bestCost = total; best = pos.map(p => Object.assign({}, p)); }
+        return;
+      }
+      let f = from; while (f < cells && occ[f] !== -1) f++;
+      if (f >= cells || free < remMin) return;
+      const r = (f / cols) | 0, c = f % cols;
+      let seen = 0, skipped = 0;
+      for (let j = 0; j < n && seen < WINDOW; j++) {
+        if (placed[j]) continue;
+        seen++;
+        for (const s of opts[j]) {
+          if (!fits(r, c, s)) continue;
+          const a = s.w * s.h;
+          mark(r, c, s, j); placed[j] = 1; free -= a; remMin -= minA[j]; remMax -= maxA[j]; remC -= minC[j];
+          pos[j] = { c, r, w: s.w, h: s.h, one: s.one, room: s.room, roomC: s.roomC, longC: s.longC };
+          rec(cost + s.cost + skipped * W.order, done + 1, f + 1);
+          mark(r, c, s, -1); placed[j] = 0; free += a; remMin += minA[j]; remMax += maxA[j]; remC += minC[j];
+        }
+        skipped++;
+      }
+      // Or leave this cell empty; a hole late on the page costs a hair less than one early on.
+      if (free - 1 >= remMin) {
+        occ[f] = -2; free--;
+        rec(cost + W.hole + (cells - f) * 0.01, done, f + 1);
+        occ[f] = -1; free++;
+      }
+    };
+    rec(gc.cost, 0, 0);
+    nodesAll += nodes;
+    if (!best) continue;
+    const holes = cells - best.reduce((a, p) => a + p.w * p.h, 0);
+    let roomC = 0, longC = 0, inv = 0;
+    best.forEach((p, i) => { roomC += p.roomC; longC += p.longC; best.forEach((q, j) => { if (i < j && p.r * cols + p.c > q.r * cols + q.c) inv++; }); });
+    results.push({ grid, pos: best, dead: holes, holes, sq: longC, score: bestCost, G, nodes, capped: nodes > BUDGET,
+      parts: { holes: holes * W.hole, room: roomC, long: longC, order: bestCost - gc.cost - holes * W.hole - roomC - longC, grid: gc.cost, away: gc.away } });
+  }
+  results.sort((a, b) => a.score - b.score);
+  const seen = new Set(), uniq = [];
+  for (const r of results) { const k = r.grid.cols + "x" + r.grid.rows; if (!seen.has(k)) { seen.add(k); uniq.push(r); } if (uniq.length >= 6) break; }
+  return { G, list: uniq, grids, bestPartial, v5: { nodes: nodesAll, ms: performance.now() - t0 } };
+}
+/* ---------------- the arranger, version 6 (2026-10-19) ----------------
+   Finer cells (owner, round four). The page is a fine grid. A solo card covers CARD x CARD cells
+   and a cluster's member tile TILE x TILE, so a cluster can be given more of the page than the cards
+   beside it: "a cluster deserves 1x the proportional cell space, whereas a solo card should occupy
+   .75x". A cluster of tc x tr tiles is a (TILE*tc) x (TILE*tr) block, or one cell wider or taller
+   to close a gap; a card never changes size. Clusters wear no label and no header (round four), so a
+   card pays for its label inside its box and a cluster keeps the whole of its own.
+   What the search is paid to keep equal is the ICON: each tile's glyph against a card's, and each
+   tile's shape against a card's. The search is v5's, on the finer grid, rows held as bit masks. */
+const BUDGET6 = 25000;
+function cardGeom(G, grid) {
+  // A solo card at this grid: its box, the body left after its label, and its icon.
+  const K = S.v6, w = K.card * grid.cwmm * G.pmm + (K.card - 1) * G.gap, h = K.card * grid.chmm * G.pmm + (K.card - 1) * G.gap;
+  const B = insetForTag({ x: 0, y: 0, w, h }, G), band = S.tag === "bar" ? Math.round(tagHeight(G) * 1.15) : 0;
+  const bw = B.w, bh = B.h - band, disc = Math.min(bw, bh) * 0.42;
+  return { w, h, bw, bh, disc, glyph: disc * 0.55 };
+}
+// A tile is laid out as a card is. With a disc its glyph is a card's share of the disc; bare (no
+// ring, owner's suggestion) the glyph takes most of the room the disc would have had.
+const tileGlyph = (w, h) => Math.min(w, h) * 0.42 * (S.tileIcon === "bare" ? 0.8 : 0.55);
+function tileBox(G, grid, w, h, tc, tr, hdrOn) {
+  const pad = Math.round(1.2 * G.pmm), tg = Math.round(1.0 * G.pmm);
+  const bw = w * grid.cwmm * G.pmm + (w - 1) * G.gap, bh = h * grid.chmm * G.pmm + (h - 1) * G.gap;
+  const hH = hdrOn ? Math.round(S.knobs.hdr * G.pmm) : 0;
+  return { w: (bw - 2 * pad - (tc - 1) * tg) / tc, h: (bh - hH - 2 * pad - (tr - 1) * tg) / tr };
+}
+function gridListV6(G, board) {
+  const K = S.v6, k = S.knobs, out = [];
+  const mk = (C, R) => ({ cols: C, rows: R, cwmm: (G.aw - (C - 1) * G.gap) / C / G.pmm, chmm: (G.ah - (R - 1) * G.gap) / R / G.pmm });
+  // A fixed grid names cards across x down; the grid of cells follows from it.
+  if (S.grid !== "auto") { const [c, r] = S.grid.split("x").map(Number); return [mk(Math.min(30, c * K.card), r * K.card)]; }
+  for (let C = K.card; C <= 30; C++) for (let R = K.card; R <= 30; R++) {
+    const g = mk(C, R);
+    const cw = K.card * g.cwmm + (K.card - 1) * G.gap / G.pmm, ch = K.card * g.chmm + (K.card - 1) * G.gap / G.pmm;
+    if (cw < k.minCell || ch < k.minCell * 0.8 || cw > k.maxCell || ch > k.maxCell) continue;
+    const asp = cw / ch; if (asp < 0.7 || asp > 1.7) continue;
+    // Within two cards either way of the board's own grid, which is where the search starts.
+    if (board.rec && (Math.abs(C / K.card - board.rec[0]) > 2.01 || Math.abs(R / K.card - board.rec[1]) > 2.01)) continue;
+    out.push(g);
+  }
+  return out;
+}
+function shapesV6(G, grid, b, cg) {
+  const K = S.v6, W = S.w;
+  if (b.type === "card") return [{ w: K.card, h: K.card, cost: 0 }];
+  const sp = splitHeader(b), n = sp.tiles.length, hdrOn = S.clHdr && !!(b.area || sp.hdr.length);
+  const hs = hdrOn ? Math.ceil(S.knobs.hdr * G.pmm / (grid.chmm * G.pmm + G.gap)) : 0;
+  const arr = [], out = [];
+  // A pin names tiles across x down.
+  if (b.pin) arr.push([b.pin.w, b.pin.h]);
+  else for (let tc = 1; tc <= n; tc++) { const tr = Math.ceil(n / tc); if (tc * tr - n < tc) arr.push([tc, tr]); }
+  for (const [tc, tr] of arr) {
+    if (tc * tr < n) continue;
+    for (const dw of K.flex ? [0, 1] : [0]) for (const dh of K.flex ? [0, 1] : [0]) {
+      const w = K.tile * tc + dw, h = K.tile * tr + hs + dh;
+      if (w > grid.cols || h > grid.rows) continue;
+      const t = tileBox(G, grid, w, h, tc, tr, hdrOn);
+      if (t.w < 9 * G.pmm || t.h < 9 * G.pmm) continue;   // under UI::minTouch()
+      const iconX = Math.log(tileGlyph(t.w, t.h) / cg.glyph), shapeX = Math.log((t.w / t.h) / (cg.bw / cg.bh));
+      const wmm = w * grid.cwmm + (w - 1) * G.gap / G.pmm, hmm = h * grid.chmm + (h - 1) * G.gap / G.pmm;
+      const longness = Math.max(0, Math.abs(Math.log(wmm / hmm)) - Math.log(1.8));
+      const iconC = W.icons * 100 * iconX * iconX, shapeC = W.shape * 100 * shapeX * shapeX;
+      const longC = W.long * longness * longness, slotC = (tc * tr - n) * 8;
+      out.push({ w, h, tc, tr, hdrOn, iconX, shapeX, iconC, shapeC, longC, slotC, cost: iconC + shapeC + longC + slotC });
+    }
+  }
+  // As v5: drop a shape that costs more than a smaller one inside it plus the empty cells between.
+  const hole1 = W.hole / (K.card * K.card);
+  const kept = out.filter(s => !out.some(t => t !== s && t.w <= s.w && t.h <= s.h && t.cost + (s.w * s.h - t.w * t.h) * hole1 <= s.cost));
+  kept.sort((a, c) => a.cost - c.cost || a.w * a.h - c.w * c.h);
+  return kept.slice(0, 8);
+}
+function arrangeV6(board, blocks) {
+  const G = geometry(board), W = S.w, K = S.v6, t0 = performance.now(), results = [];
+  const grids = gridListV6(G, board);
+  grids.forEach(g => {
+    g.away = board.rec && S.grid === "auto" ? Math.abs(g.cols / K.card - board.rec[0]) + Math.abs(g.rows / K.card - board.rec[1]) : 0;
+    g.gc = W.away * g.away;
+  });
+  grids.sort((a, b) => a.gc - b.gc || a.cols * a.rows - b.cols * b.rows);
+  const hole1 = W.hole / (K.card * K.card);
+  let nodesAll = 0, sixth = Infinity;
+  for (const grid of grids) {
+    if (grid.gc >= sixth) continue;          // cannot make the list of six
+    const cols = grid.cols, rows = grid.rows, cells = cols * rows, n = blocks.length;
+    const cg = cardGeom(G, grid);
+    const opts = blocks.map(b => shapesV6(G, grid, b, cg));
+    if (opts.some(o => !o.length)) continue;
+    const minA = opts.map(o => Math.min(...o.map(s => s.w * s.h))), maxA = opts.map(o => Math.max(...o.map(s => s.w * s.h)));
+    const minC = opts.map(o => Math.min(...o.map(s => s.cost)));
+    let remMin = minA.reduce((a, v) => a + v, 0), remMax = maxA.reduce((a, v) => a + v, 0), remC = minC.reduce((a, v) => a + v, 0);
+    if (remMin > cells) continue;
+    const occ = new Int32Array(rows), placed = new Uint8Array(n), pos = new Array(n);
+    let free = cells, nodes = 0, best = null, bestCost = sixth;
+    const fits = (r, c, s) => {
+      if (c + s.w > cols || r + s.h > rows) return false;
+      const m = ((1 << s.w) - 1) << c;
+      for (let y = r; y < r + s.h; y++) if (occ[y] & m) return false;
+      return true;
+    };
+    const mark = (r, c, s, on) => { const m = ((1 << s.w) - 1) << c; for (let y = r; y < r + s.h; y++) occ[y] = on ? (occ[y] | m) : (occ[y] & ~m); };
+    const rec = (cost, done, from) => {
+      if (++nodes > BUDGET6) return;
+      const bound = cost + remC + Math.max(0, free - remMax) * hole1;
+      if (bound >= bestCost) return;
+      if (done === n) {
+        const total = cost + free * hole1;
+        if (total < bestCost) { bestCost = total; best = pos.map(p => Object.assign({}, p)); }
+        return;
+      }
+      let f = from; while (f < cells && ((occ[(f / cols) | 0] >> (f % cols)) & 1)) f++;
+      if (f >= cells || free < remMin) return;
+      const r = (f / cols) | 0, c = f % cols;
+      let seen = 0, skipped = 0;
+      for (let j = 0; j < n && seen < WINDOW; j++) {
+        if (placed[j]) continue;
+        seen++;
+        for (const s of opts[j]) {
+          if (!fits(r, c, s)) continue;
+          const a = s.w * s.h;
+          mark(r, c, s, true); placed[j] = 1; free -= a; remMin -= minA[j]; remMax -= maxA[j]; remC -= minC[j];
+          pos[j] = Object.assign({ c, r }, s);
+          rec(cost + s.cost + skipped * W.order, done + 1, f + 1);
+          mark(r, c, s, false); placed[j] = 0; free += a; remMin += minA[j]; remMax += maxA[j]; remC += minC[j];
+        }
+        skipped++;
+      }
+      if (free - 1 >= remMin) {
+        occ[r] |= 1 << c; free--;
+        rec(cost + hole1 + (cells - f) * 0.001, done, f + 1);
+        occ[r] &= ~(1 << c); free++;
+      }
+    };
+    rec(grid.gc, 0, 0);
+    nodesAll += nodes;
+    if (!best) continue;
+    const holes = cells - best.reduce((a, p) => a + p.w * p.h, 0);
+    const sum = k => best.reduce((a, p) => a + (p[k] || 0), 0);
+    const known = holes * hole1 + sum("iconC") + sum("shapeC") + sum("longC") + sum("slotC");
+    results.push({ grid, pos: best, dead: holes, holes, score: bestCost, G, cg, nodes, capped: nodes > BUDGET6,
+      parts: { holes: holes * hole1, icon: sum("iconC"), shape: sum("shapeC"), long: sum("longC"), slot: sum("slotC"),
+               order: bestCost - grid.gc - known, grid: grid.gc, away: grid.away } });
+    results.sort((a, b) => a.score - b.score);
+    if (results.length >= 6) sixth = results[5].score;
+  }
+  return { G, list: results.slice(0, 6), grids, v6: { nodes: nodesAll, ms: performance.now() - t0 } };
+}
+const arrange = (board, blocks) => S.engine === "v4" ? arrangeV4(board, blocks) : S.engine === "v5" ? arrangeV5(board, blocks)
+                                 : S.engine === "v9" ? arrangeV9(board, blocks)
+                                 : S.engine === "v8" ? arrangeV8(board, blocks) : arrangeV6(board, blocks);
+
+/* ---------------- the finish, version 7 (2026-10-19, round five) ----------------
+   Units (dashboard.md section 2: the device already cuts a cell into units, 2 x 2, and a card spans
+   units). The arranger places blocks on cells; the finish then moves each SOLO card within the room
+   around it, in units, and never touches a cluster (owner, round five):
+   - a card taller than it is wide gives up units at its top: nearer square, its hero lower and nearer
+     the tiles beside it, never flatter than SQ_LO. "If 1 unit would make them too short and flat,
+     increase the vertical multiplier": Auto tries 2, 3 and 4 units down a cell and keeps the fewest
+     that bring the cards nearest square;
+   - a card much wider than it is tall gives up units in pairs, one each side;
+   - spare room above or below a card - whole unit rows free across its width - becomes even
+     margins: the card is centred, the odd unit below.
+   A unit's step is the cell's pitch over the units, so spans join exactly as the device's tracks do. */
+const SQ_HI = 1.12, SQ_LO = 0.85, UNITS_ACROSS = 2;
+function finishV7(lay, G) {
+  const K = S.v6, tries = K.uy === "auto" ? [2, 3, 4] : [+K.uy];
+  let best = null;
+  for (const uy of tries) {
+    const f = finishWith(lay, G, UNITS_ACROSS, uy);
+    if (!best || f.err < best.err - 0.01) best = f;
+  }
+  return best;
+}
+function finishWith(lay, G, ux, uy) {
+  const grid = lay.grid, C = grid.cols * ux, R = grid.rows * uy;
+  const sx = (grid.cwmm * G.pmm + G.gap) / ux, sy = (grid.chmm * G.pmm + G.gap) / uy;
+  const boxPx = b => ({ x: G.ax + b.c * sx, y: G.ay + b.r * sy, w: b.w * sx - G.gap, h: b.h * sy - G.gap });
+  const tall = b => { const B = insetForTag(boxPx(b), G); return B.h / B.w; };   // the card as seen, its label paid
+  const away = a => Math.abs(Math.log(a));
+  const occ = Array.from({ length: R }, () => new Uint8Array(C));
+  const mark = (b, v) => { for (let y = b.r; y < b.r + b.h; y++) for (let x = b.c; x < b.c + b.w; x++) occ[y][x] = v; };
+  const boxes = lay.pos.map(p => ({ c: p.c * ux, r: p.r * uy, w: p.w * ux, h: p.h * uy }));
+  boxes.forEach(b => mark(b, 1));
+  const notes = [];
+  let err = 0;
+  S.blocks.forEach((bl, i) => {
+    if (bl.type !== "card") return;
+    const b = boxes[i], c0 = b.c, r0 = b.r, h0 = b.h, before = tall(b);
+    mark(b, 0);
+    let trim = 0, trimW = 0;
+    while (b.h > 1 && tall(b) > SQ_HI) {
+      const t = { c: b.c, r: b.r + 1, w: b.w, h: b.h - 1 };
+      if (tall(t) < SQ_LO || away(tall(t)) >= away(tall(b))) break;
+      Object.assign(b, t); trim++;
+    }
+    while (b.w > 2 && tall(b) < SQ_LO) {
+      const t = { c: b.c + 1, r: b.r, w: b.w - 2, h: b.h };
+      if (tall(t) > SQ_HI || away(tall(t)) >= away(tall(b))) break;
+      Object.assign(b, t); trimW += 2;
+    }
+    // Its own cells are its room, and any whole unit rows free above or below them. Up and down
+    // only: centred across a free row, a card wandered away from its neighbours (the 4B).
+    const rowFree = y => { if (y < 0 || y >= R) return false; for (let x = b.c; x < b.c + b.w; x++) if (occ[y][x]) return false; return true; };
+    let top = r0, bot = r0 + h0 - 1;
+    while (rowFree(top - 1)) top--;
+    while (rowFree(bot + 1)) bot++;
+    b.r = top + Math.ceil((bot - top + 1 - b.h) / 2);
+    mark(b, 1);
+    const after = tall(b);
+    err += Math.max(0, away(after) - Math.log(SQ_HI));
+    // How far its foot moved (a trim alone moves none), and its middle across.
+    notes[i] = { trim, trimW, down: (b.r + b.h) - (r0 + h0), right: b.c - c0 - trimW / 2, before, after };
+  });
+  return { ux, uy, sx, sy, C, R, boxes, occ, notes, err, boxPx };
+}
+
+/* ---------------- the arranger, version 8 (2026-10-20, round six) ----------------
+   UNITS, AND THE OWNER'S RULES (TEST_2.11 round 5, "Your results"). Every block is placed on a grid of
+   units - the device's own (dashboard.md section 2), a cell's halves - in any shape its limits allow,
+   so a cluster can be 2.5 cells wide and a row 1.5 cells tall. What the search is paid for:
+   - every ENTITY THE SAME SIZE: a solo card and each cluster's tiles (rules 4 and 5) - the size being
+     the side of the square with the entity's own area, its label and header paid. Against a target
+     for the page, then again against the page's own average (two passes);
+   - solo cards SQUARE (rule 1); tiles not too far from square either, more lightly;
+   - clusters WIDER THAN TALL on a landscape page (rule 2): a charge for each step taller;
+   - clusters with the SAME NUMBER OF TILES the same size (rule 3): a charge between each such pair;
+   - empty units, by the entity-sized area they waste; and blocks out of reading order.
+   Limits, never crossed (the owner's): a solo card no smaller than one card of the P4_5 at 7 x 3,
+   and no taller for its width; a tile no smaller than one of a 3-wide, one-cell cluster on the 4B at
+   4 x 4. Clusters wear the device's header. Solo cards then take any spare unit rows above or below
+   them as even margins (v7's finish). The search is v5's, rows held as bit masks. */
+const V8 = { hdr: 5.2, pad: 1.1, tg: 0.8 };   // UIShape's C_HDR_H, C_PAD, C_TILE_GAP (mm)
+const BUDGET8 = 20000;
+let s_ref = null;
+function refSizes() {
+  // The owner's two references, in this playground's own geometry.
+  if (s_ref) return s_ref;
+  const g5 = geometry(BOARDS.find(b => b.id === "p45")), g4 = geometry(BOARDS.find(b => b.id === "p44b"));
+  const cw = (g5.aw - 6 * g5.gap) / 7 / g5.pmm, ch = (g5.ah - 2 * g5.gap) / 3 / g5.pmm;
+  const c4w = (g4.aw - 3 * g4.gap) / 4 / g4.pmm, c4h = (g4.ah - 3 * g4.gap) / 4 / g4.pmm;
+  const clw = 3 * c4w + 2 * g4.gap / g4.pmm;
+  s_ref = { soloW: cw, soloH: ch, tall: ch / cw,
+            tileW: (clw - 2 * V8.pad - 2 * V8.tg) / 3, tileH: c4h - V8.hdr - 2 * V8.pad };
+  return s_ref;
+}
+// A block of w x h units on this grid, in mm.
+const spanW = (G, grid, w) => w * grid.cwmm + (w - 1) * G.gap / G.pmm;
+const spanH = (G, grid, h) => h * grid.chmm + (h - 1) * G.gap / G.pmm;
+// A solo card's body, its label paid (mm), as insetForTag() takes it.
+function soloBody(G, wmm, hmm) {
+  const B = insetForTag({ x: 0, y: 0, w: wmm * G.pmm, h: hmm * G.pmm }, G);
+  const band = S.tag === "bar" ? Math.round(tagHeight(G) * 1.15) : 0;
+  return { w: B.w / G.pmm, h: (B.h - band) / G.pmm };
+}
+function tileOf(wmm, hmm, tc, tr) {
+  return { w: (wmm - 2 * V8.pad - (tc - 1) * V8.tg) / tc, h: (hmm - V8.hdr - 2 * V8.pad - (tr - 1) * V8.tg) / tr };
+}
+const lg2 = x => x * x;
+function shapesV8(G, grid, b, L) {
+  const W = S.w, ref = refSizes(), out = [];
+  if (b.type === "card") {
+    for (let w = 1; w <= grid.cols; w++) for (let h = 1; h <= grid.rows; h++) {
+      const wmm = spanW(G, grid, w), hmm = spanH(G, grid, h);
+      if (wmm * hmm < ref.soloW * ref.soloH * 0.98 || hmm / wmm > ref.tall * 1.001 || wmm / hmm > 1.7) continue;
+      const body = soloBody(G, wmm, hmm), size = Math.sqrt(body.w * body.h);
+      const sizeC = W.size * lg2(Math.log(size / L)), sqC = W.square * lg2(Math.log(hmm / wmm)) * 4;
+      out.push({ w, h, size, sizes: [size], cost: sizeC + sqC, sizeC, sqC });
+    }
+  } else {
+    const n = splitHeader(b).tiles.length;
+    for (let w = 1; w <= grid.cols; w++) for (let h = 1; h <= grid.rows; h++) {
+      const wmm = spanW(G, grid, w), hmm = spanH(G, grid, h);
+      let best = null;
+      for (let tc = 1; tc <= n; tc++) {
+        const tr = Math.ceil(n / tc);
+        if (tc * tr - n >= tc) continue;
+        const t = tileOf(wmm, hmm, tc, tr);
+        if (t.w < ref.tileW * 0.98 || t.h < ref.tileH * 0.98) continue;
+        const size = Math.sqrt(t.w * t.h);
+        const sizeC = n * W.size * lg2(Math.log(size / L)), tshC = n * W.square * 0.4 * lg2(Math.log(t.h / t.w));
+        const slotC = (tc * tr - n) * 8;
+        // Rule 2: a step taller than wide is charged, more the taller (landscape pages).
+        const wideC = W.wide * Math.max(0, Math.log(hmm / wmm)) * 2;
+        const cost = sizeC + tshC + slotC + wideC;
+        if (!best || cost < best.cost) best = { w, h, tc, tr, n, size, sizes: Array(n).fill(size), cost, sizeC, tshC, slotC, wideC, hdrOn: true };
+      }
+      if (best) out.push(best);
+    }
+  }
+  // As v5: a shape that costs more than a smaller one inside it plus the empty units between is dropped.
+  const hole1 = W.gap8 * (grid.cwmm * grid.chmm) / (L * L);
+  const kept = out.filter(s => !out.some(t => t !== s && t.w <= s.w && t.h <= s.h && t.cost + (s.w * s.h - t.w * t.h) * hole1 <= s.cost));
+  kept.sort((a, c) => a.cost - c.cost || a.w * a.h - c.w * c.h);
+  return kept.slice(0, 10);
+}
+function gridListV8(G, board) {
+  const mk = (C, R) => ({ cols: C, rows: R, cwmm: (G.aw - (C - 1) * G.gap) / C / G.pmm, chmm: (G.ah - (R - 1) * G.gap) / R / G.pmm });
+  if (S.grid !== "auto") { const [c, r] = S.grid.split("x").map(Number); return [mk(2 * c, 2 * r)]; }
+  const rc = board.rec || [4, 3], out = [];
+  // Units: a cell's halves, around the board's own grid - one cell fewer to two more across, one
+  // either way down - so a row can be 1.5 cells tall and a block 2.5 cells wide.
+  for (let C = 2 * Math.max(1, rc[0] - 1); C <= 2 * (rc[0] + 2); C++)
+    for (let R = 2 * Math.max(1, rc[1] - 1); R <= 2 * (rc[1] + 1); R++) {
+      const g = mk(C, R);
+      if (g.cwmm < 3 || g.chmm < 3) continue;
+      out.push(g);
+    }
+  return out;
+}
+// The page's entities, after a search: each one's size (mm), and the costs a target cannot price.
+function scoreV8(G, grid, pos, blocks) {
+  const W = S.w, sizes = [];
+  pos.forEach(p => sizes.push(...p.sizes));
+  const mean = Math.exp(sizes.reduce((a, s) => a + Math.log(s), 0) / sizes.length);
+  let sizeC = 0, other = 0, twin = 0;
+  sizes.forEach(s => { sizeC += W.size * lg2(Math.log(s / mean)); });
+  pos.forEach((p, i) => { other += (p.sqC || 0) + (p.tshC || 0) + (p.slotC || 0) + (p.wideC || 0); });
+  blocks.forEach((b, i) => blocks.forEach((c, j) => {
+    if (i < j && b.type === "cluster" && c.type === "cluster" && pos[i].n === pos[j].n)
+      twin += W.twin * Math.abs(Math.log((pos[i].w * pos[i].h) / (pos[j].w * pos[j].h)));
+  }));
+  const used = pos.reduce((a, p) => a + p.w * p.h, 0), holes = grid.cols * grid.rows - used;
+  const holeC = W.gap8 * holes * (grid.cwmm * grid.chmm) / (mean * mean);
+  let inv = 0;
+  pos.forEach((p, i) => pos.forEach((q, j) => { if (i < j && p.r * grid.cols + p.c > q.r * grid.cols + q.c) inv++; }));
+  const orderC = W.order * inv;
+  return { mean, sizes, holes, total: sizeC + other + twin + holeC + orderC, parts: { size: sizeC, shape: other, twin, holes: holeC, order: orderC } };
+}
+function searchV8(G, grid, blocks, L, bestAllowed, shapesFn) {
+  const W = S.w, cols = grid.cols, rows = grid.rows, cells = cols * rows, n = blocks.length;
+  const opts = blocks.map(b => (shapesFn || shapesV8)(G, grid, b, L));
+  if (opts.some(o => !o.length)) return null;
+  const minA = opts.map(o => Math.min(...o.map(s => s.w * s.h))), maxA = opts.map(o => Math.max(...o.map(s => s.w * s.h)));
+  const minC = opts.map(o => Math.min(...o.map(s => s.cost)));
+  let remMin = minA.reduce((a, v) => a + v, 0), remMax = maxA.reduce((a, v) => a + v, 0), remC = minC.reduce((a, v) => a + v, 0);
+  if (remMin > cells) return null;
+  const hole1 = W.gap8 * (grid.cwmm * grid.chmm) / (L * L);
+  const occ = new Int32Array(rows), placed = new Uint8Array(n), pos = new Array(n);
+  let free = cells, nodes = 0, best = null, bestCost = bestAllowed;
+  const fits = (r, c, s) => {
+    if (c + s.w > cols || r + s.h > rows) return false;
+    const m = ((1 << s.w) - 1) << c;
+    for (let y = r; y < r + s.h; y++) if (occ[y] & m) return false;
+    return true;
+  };
+  const mark = (r, c, s, on) => { const m = ((1 << s.w) - 1) << c; for (let y = r; y < r + s.h; y++) occ[y] = on ? (occ[y] | m) : (occ[y] & ~m); };
+  // Rule 3, as each cluster goes down: against those placed with as many tiles.
+  const twinC = (j, s) => {
+    if (blocks[j].type !== "cluster") return 0;
+    let c = 0;
+    for (let k = 0; k < n; k++) if (placed[k] && blocks[k].type === "cluster" && pos[k].n === s.n)
+      c += W.twin * Math.abs(Math.log((s.w * s.h) / (pos[k].w * pos[k].h)));
+    return c;
+  };
+  const rec = (cost, done, from) => {
+    if (++nodes > BUDGET8) return;
+    if (cost + remC + Math.max(0, free - remMax) * hole1 >= bestCost) return;
+    if (done === n) {
+      const total = cost + free * hole1;
+      if (total < bestCost) { bestCost = total; best = pos.map(p => Object.assign({}, p)); }
+      return;
+    }
+    let f = from; while (f < cells && ((occ[(f / cols) | 0] >> (f % cols)) & 1)) f++;
+    if (f >= cells || free < remMin) return;
+    const r = (f / cols) | 0, c = f % cols;
+    let seen = 0, skipped = 0;
+    for (let j = 0; j < n && seen < WINDOW; j++) {
+      if (placed[j]) continue;
+      seen++;
+      for (const s of opts[j]) {
+        if (!fits(r, c, s)) continue;
+        const a = s.w * s.h, tw = twinC(j, s);
+        mark(r, c, s, true); placed[j] = 1; free -= a; remMin -= minA[j]; remMax -= maxA[j]; remC -= minC[j];
+        pos[j] = Object.assign({ c, r }, s);
+        rec(cost + s.cost + tw + skipped * W.order, done + 1, f + 1);
+        mark(r, c, s, false); placed[j] = 0; free += a; remMin += minA[j]; remMax += maxA[j]; remC += minC[j];
+      }
+      skipped++;
+    }
+    if (free - 1 >= remMin) {
+      occ[r] |= 1 << c; free--;
+      rec(cost + hole1 + (cells - f) * 0.001, done, f + 1);
+      occ[r] &= ~(1 << c); free++;
+    }
+  };
+  rec(0, 0, 0);
+  return best ? { pos: best, nodes, capped: nodes > BUDGET8 } : { pos: null, nodes };
+}
+function arrangeV8(board, blocks) {
+  const G = geometry(board), t0 = performance.now(), results = [];
+  const grids = gridListV8(G, board);
+  const nEnt = blocks.reduce((a, b) => a + (b.type === "card" ? 1 : splitHeader(b).tiles.length), 0);
+  const L0 = Math.sqrt((G.aw / G.pmm) * (G.ah / G.pmm) / (nEnt * 1.35));   // an equal share, headers paid roughly
+  let nodesAll = 0;
+  for (const grid of grids) {
+    // Two passes: against the page's equal share, then against the average the first one found.
+    let L = L0, found = null;
+    for (let pass = 0; pass < 2; pass++) {
+      const s = searchV8(G, grid, blocks, L, Infinity);
+      if (!s) break;
+      nodesAll += s.nodes;
+      if (!s.pos) break;
+      const sc = scoreV8(G, grid, s.pos, blocks);
+      if (!found || sc.total < found.score) found = { pos: s.pos, score: sc.total, sc, capped: s.capped };
+      if (Math.abs(Math.log(sc.mean / L)) < 0.03) break;
+      L = sc.mean;
+    }
+    if (!found) continue;
+    results.push({ grid, pos: found.pos, dead: found.sc.holes, holes: found.sc.holes, score: found.score, G,
+                   capped: found.capped, mean: found.sc.mean, sizes: found.sc.sizes, parts: found.sc.parts });
+  }
+  results.sort((a, b) => a.score - b.score);
+  return { G, list: results.slice(0, 6), grids, v6: { nodes: nodesAll, ms: performance.now() - t0 }, v8: true };
+}
+
+/* ---------------- the arranger, version 9 (2026-10-26, round eleven) ----------------
+   v8's search and rules, and the owner's notes after round 9 (K120):
+   - SOLO CARDS NO BIGGER THAN THE REST: a card larger than the page's entities pays BIG on top of
+     the size cost, so spare room stays spare instead of swelling a card ("solo cards should
+     generally be smaller than a cluster, not bigger");
+   - A CARD MAY PREFER A SHAPE: its spec's span (the Fleet page's Free Heap and Uptime, 1.5 cells
+     wide) - its squareness measured against that shape, its size against its area at that shape,
+     its limits stretched by it;
+   - SPARE ROOM IS SHARED OUT (the finish, in pixels): blocks whose rows overlap make a BAND, and
+     bands spread down the page; in a band, blocks whose columns overlap make a COLUMN, columns
+     spread across it, and each column is centred in its band's height. Spread "around": the gaps
+     between are whole, the edges half. So a row's blocks centre, solo cards sit symmetric or float
+     with even space round them, and rows added on a pinned page part the bands instead of leaving
+     a strip at the foot. v7's trim (a card no taller than near square) comes first, in units. */
+function shapesV9(G, grid, b, L) {
+  const W = S.w, ref = refSizes(), out = [];
+  if (b.type === "card") {
+    const A = b.aspect || 1;
+    for (let w = 1; w <= grid.cols; w++) for (let h = 1; h <= grid.rows; h++) {
+      const wmm = spanW(G, grid, w), hmm = spanH(G, grid, h);
+      // A LOOSE BOX (round 12): taller than a card may be, up to half as much again - the card is
+      // drawn at its tallest allowed shape, centred, and the height it leaves pays as a hole. A
+      // pinned page with few rows (the 4B at 4 x 3) otherwise had no page at all.
+      const hd = Math.min(hmm, wmm * ref.tall / A);
+      if (wmm * hd < ref.soloW * ref.soloH * A * 0.98 || hmm / wmm > ref.tall / A * 1.5 || wmm / hmm > 1.7 * A) continue;
+      const body = soloBody(G, wmm, hd), size = Math.sqrt(body.w * body.h / A);
+      const lr = Math.log(size / L), waste = hmm - hd > 0.01 ? W.gap8 * wmm * (hmm - hd) / (L * L) : 0;
+      const sizeC = W.size * lg2(lr) + W.big * lg2(Math.max(0, lr)), sqC = W.square * lg2(Math.log(hd / wmm * A)) * 4 + waste;
+      out.push({ w, h, size, sizes: [size], cost: sizeC + sqC, sizeC, sqC });
+    }
+  } else {
+    // v8's, and (round 12, the owner: "I would always prefer horizontal to vertical groups") tiles
+    // stacked more rows than columns pay WIDE again, by how many more.
+    const n = splitHeader(b).tiles.length;
+    for (let w = 1; w <= grid.cols; w++) for (let h = 1; h <= grid.rows; h++) {
+      const wmm = spanW(G, grid, w), hmm = spanH(G, grid, h);
+      let best = null;
+      for (let tc = 1; tc <= n; tc++) {
+        const tr = Math.ceil(n / tc);
+        if (tc * tr - n >= tc) continue;
+        const t = tileOf(wmm, hmm, tc, tr);
+        if (t.w < ref.tileW * 0.98 || t.h < ref.tileH * 0.98) continue;
+        const size = Math.sqrt(t.w * t.h);
+        const sizeC = n * W.size * lg2(Math.log(size / L)), tshC = n * W.square * 0.4 * lg2(Math.log(t.h / t.w));
+        const slotC = (tc * tr - n) * 8;
+        const wideC = W.wide * Math.max(0, Math.log(hmm / wmm)) * 2 + W.wide * Math.max(0, Math.log(tr / tc)) * 2;
+        const cost = sizeC + tshC + slotC + wideC;
+        if (!best || cost < best.cost) best = { w, h, tc, tr, n, size, sizes: Array(n).fill(size), cost, sizeC, tshC, slotC, wideC, hdrOn: true };
+      }
+      if (best) out.push(best);
+    }
+  }
+  const hole1 = W.gap8 * (grid.cwmm * grid.chmm) / (L * L);
+  const kept = out.filter(s => !out.some(t => t !== s && t.w <= s.w && t.h <= s.h && t.cost + (s.w * s.h - t.w * t.h) * hole1 <= s.cost));
+  kept.sort((a, c) => a.cost - c.cost || a.w * a.h - c.w * c.h);
+  const top = kept.slice(0, 10);
+  // THE TIGHTEST SHAPE ALWAYS STAYS (round 12): with only the ten cheapest, a pinned page whose
+  // blocks needed their smallest shapes had no page at all (the 4B at 4 x 3 to 4 x 5 - its clusters
+  // kept only shapes four units tall). Ties: the cheapest.
+  let tight = null;
+  kept.forEach(s => { if (!tight || s.w * s.h < tight.w * tight.h) tight = s; });
+  if (tight && top.indexOf(tight) < 0) top.push(tight);
+  return top;
+}
+function scoreV9(G, grid, pos, blocks) {
+  const sc = scoreV8(G, grid, pos, blocks);
+  let big = 0;
+  pos.forEach((p, i) => { if (blocks[i].type === "card") big += S.w.big * lg2(Math.max(0, Math.log(p.size / sc.mean))); });
+  sc.total += big;
+  sc.parts.big = big;
+  return sc;
+}
+function arrangeV9(board, blocks) {
+  const G = geometry(board), t0 = performance.now(), results = [];
+  const grids = gridListV8(G, board);
+  const nEnt = blocks.reduce((a, b) => a + (b.type === "card" ? 1 : splitHeader(b).tiles.length), 0);
+  const L0 = Math.sqrt((G.aw / G.pmm) * (G.ah / G.pmm) / (nEnt * 1.35));
+  let nodesAll = 0;
+  for (const grid of grids) {
+    let L = L0, found = null;
+    for (let pass = 0; pass < 2; pass++) {
+      const s = searchV8(G, grid, blocks, L, Infinity, shapesV9);
+      if (!s) break;
+      nodesAll += s.nodes;
+      if (!s.pos) break;
+      const sc = scoreV9(G, grid, s.pos, blocks);
+      if (!found || sc.total < found.score) found = { pos: s.pos, score: sc.total, sc, capped: s.capped };
+      if (Math.abs(Math.log(sc.mean / L)) < 0.03) break;
+      L = sc.mean;
+    }
+    if (!found) continue;
+    results.push({ grid, pos: found.pos, dead: found.sc.holes, holes: found.sc.holes, score: found.score, G,
+                   capped: found.capped, mean: found.sc.mean, sizes: found.sc.sizes, parts: found.sc.parts });
+  }
+  results.sort((a, b) => a.score - b.score);
+  return { G, list: results.slice(0, 6), grids, v6: { nodes: nodesAll, ms: performance.now() - t0 }, v8: true, v9: true };
+}
+// Groups of indices whose [lo, hi) overlap, transitively, in order of lo (ties: index).
+function overlapGroups(items, lo, hi) {
+  const ix = items.slice().sort((a, b) => lo(a) - lo(b) || a - b);
+  const out = []; let cur = null, end = -Infinity;
+  for (const i of ix) {
+    if (cur && lo(i) < end) { cur.push(i); end = Math.max(end, hi(i)); }
+    else { cur = [i]; out.push(cur); end = hi(i); }
+  }
+  return out;
+}
+// Spread groups along one axis in `room`: the spare shared "around" - n parts, half of one at
+// each edge, a whole one between - each group moved as one.
+function spreadAround(gs, lo, hi, room, gap, move) {
+  const n = gs.length;
+  if (!n) return;
+  const ext = gs.map(g => [Math.min(...g.map(lo)), Math.max(...g.map(hi))]);
+  let used = (n - 1) * gap;
+  ext.forEach(e => { used += e[1] - e[0]; });
+  // Round 12: a page filled to the pixel (clusters grown into the spare height) is still packed -
+  // only one that overflows is left where the units put it.
+  const spare = room - used;
+  if (spare < -0.5) return;
+  const s = Math.max(0, spare) / n;
+  let at = s / 2;
+  gs.forEach((g, k) => { const d = at - ext[k][0]; g.forEach(i => move(i, d)); at += ext[k][1] - ext[k][0] + gap + s; });
+}
+function finishV9(lay, G, blocks) {
+  const grid = lay.grid, sx = grid.cwmm * G.pmm + G.gap, sy = grid.chmm * G.pmm + G.gap;
+  const boxPx = b => ({ x: b.c * sx, y: b.r * sy, w: b.w * sx - G.gap, h: b.h * sy - G.gap });   // in the page's room
+  const tall = (b, A) => { const B = insetForTag(boxPx(b), G); return B.h / B.w * A; };
+  const away = a => Math.abs(Math.log(a));
+  const boxes = lay.pos.map(p => ({ c: p.c, r: p.r, w: p.w, h: p.h }));
+  // 1. v7's trim, in units: a card no taller than near square, and no flatter.
+  blocks.forEach((bl, i) => {
+    if (bl.type !== "card") return;
+    const A = bl.aspect || 1, b = boxes[i];
+    while (b.h > 1 && tall(b, A) > SQ_HI) {
+      const t = { c: b.c, r: b.r + 1, w: b.w, h: b.h - 1 };
+      if (tall(t, A) < SQ_LO || away(tall(t, A)) >= away(tall(b, A))) break;
+      Object.assign(b, t);
+    }
+    while (b.w > 2 && tall(b, A) < SQ_LO) {
+      const t = { c: b.c + 1, r: b.r, w: b.w - 2, h: b.h };
+      if (tall(t, A) > SQ_HI || away(tall(t, A)) >= away(tall(b, A))) break;
+      Object.assign(b, t);
+    }
+  });
+  // 2. The rest in pixels. A loose card's box is drawn at its tallest allowed shape, centred.
+  const R = boxes.map(boxPx), all = R.map((_, i) => i), ref = refSizes();
+  blocks.forEach((bl, i) => {
+    if (bl.type !== "card") return;
+    const hd = R[i].w * ref.tall / (bl.aspect || 1);
+    if (R[i].h > hd + 0.5) { R[i].y += (R[i].h - hd) / 2; R[i].h = hd; }
+  });
+  const top = i => R[i].y, foot = i => R[i].y + R[i].h, left = i => R[i].x, right = i => R[i].x + R[i].w;
+  const bands = overlapGroups(all, top, foot);
+  // 3. CLUSTERS GROW INTO THE SPARE HEIGHT FIRST (round 12, the owner: "the clusters should expand
+  //    vertically to fill the space and leave the solo cards the size they currently are"): each band
+  //    holding a cluster takes an equal share of the page's spare height, each cluster in it growing
+  //    to its band's height plus that share - but never past square tiles. What is left is spread:
+  //    "around the blocks, but only when that would not make the blocks too small".
+  let usedH = (bands.length - 1) * G.gap;
+  bands.forEach(bd => { usedH += Math.max(...bd.map(foot)) - Math.min(...bd.map(top)); });
+  const spareH = G.ah - usedH;
+  const grows = bands.filter(bd => bd.some(i => blocks[i].type === "cluster"));
+  if (spareH > 0 && grows.length) {
+    const share = spareH / grows.length;
+    const room = i => {   // how much taller cluster i may grow before its tiles are square, px
+      const p = lay.pos[i], t = tileOf(R[i].w / G.pmm, R[i].h / G.pmm, p.tc, p.tr);
+      return Math.max(0, (t.w - t.h) * p.tr * G.pmm);
+    };
+    grows.forEach(bd => {
+      const b0 = Math.min(...bd.map(top)), b1 = Math.max(...bd.map(foot));
+      bd.forEach(i => {
+        if (blocks[i].type !== "cluster") return;
+        R[i].h += Math.max(0, Math.min(b1 - b0 + share - R[i].h, room(i)));
+      });
+    });
+  }
+  spreadAround(bands, top, foot, G.ah, G.gap, (i, d) => { R[i].y += d; });
+  bands.forEach(bd => {
+    const cols = overlapGroups(bd, left, right);
+    spreadAround(cols, left, right, G.aw, G.gap, (i, d) => { R[i].x += d; });
+    const b0 = Math.min(...bd.map(top)), b1 = Math.max(...bd.map(foot));
+    cols.forEach(c => {
+      const c0 = Math.min(...c.map(top)), c1 = Math.max(...c.map(foot)), d = (b0 + b1) / 2 - (c0 + c1) / 2;
+      c.forEach(i => { R[i].y += d; });
+    });
+  });
+  const rects = R.map(r => ({ x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h) }));
+  return { boxes, rects, notes: [], v9: true };
+}
+
+/* ---------------- rendering ---------------- */
+function memberGrid(n, cap, bw, bh) {
+  // Choose columns x rows for n tiles inside cap, closest to the box's own shape, fewest empty slots.
+  let best = null;
+  for (let c = 1; c <= cap.across; c++) {
+    const r = Math.ceil(n / c); if (r > cap.down) continue;
+    const empty = c * r - n, asp = Math.abs(Math.log((bw / c) / (bh / r) / 1.2));
+    const sc = empty * 2 + asp;
+    if (!best || sc < best.sc) best = { c, r, sc };
+  }
+  return best || { c: Math.max(1, cap.across), r: Math.ceil(n / Math.max(1, cap.across)) };
+}
+const tagHeight = G => Math.round(Math.round(2.0 * G.pmm) * 1.45);
+// The tag is paid for INSIDE the cell, as on the device (2026-10-01): the gap between blocks is
+// measured from the tag, so the card or cluster moves in by whatever the tag sticks out.
+function insetForTag(B, G) {
+  const h = tagHeight(G), o = Math.round(h * 0.5), side = Math.round(h * 0.25);
+  // Floating: up by half the tag, out to the side by half of THAT (owner, round three).
+  if (S.tag === "floating") return { x: B.x + side, y: B.y + o, w: B.w - side, h: B.h - o };
+  if (S.tag === "attached") { const a = Math.round(h * 0.72); return { x: B.x, y: B.y + a, w: B.w, h: B.h - a }; }
+  if (S.tag === "folder") return { x: B.x, y: B.y + h, w: B.w, h: B.h - h };
+  return B;
+}
+function tagHtml(area, G, style, sch) {
+  if (style === "bar" || style === "none") return "";
+  const fs = Math.round(2.0 * G.pmm), padx = Math.round(1.1 * G.pmm), h = Math.round(fs * 1.45), col = AREA[area] || "#888";
+  const base = `font-size:${fs}px;line-height:${h}px;height:${h}px;padding:0 ${padx}px;background:${col};--tc:${col};`;
+  if (style === "attached") return `<span class="tag" style="${base}left:0;top:${-Math.round(h * 0.72)}px;border-radius:${Math.round(h * 0.35)}px ${Math.round(h * 0.35)}px ${Math.round(h * 0.35)}px 0">${area}</span>`;
+  if (style === "floating") { const o = Math.round(h * 0.5), side = Math.round(h * 0.25); return `<span class="tag floating" style="${base}left:${-side}px;top:${-o}px;border-radius:${Math.round(h * 0.4)}px">${area}</span>`; }
+  // Folder (owner, round three): the tab sits a hair in from the corner, so it meets the card's
+  // top edge with a rounded inside corner on BOTH sides and the card keeps its rounded corner.
+  const fr = Math.round(h * 0.45), off = Math.round(h * 0.6);
+  const fillet = (side) => `<i style="position:absolute;${side}:${-fr}px;bottom:0;width:${fr}px;height:${fr}px;background:radial-gradient(circle at ${side === "right" ? "100%" : "0"} 0,transparent ${fr - 0.5}px,${col} ${fr}px)"></i>`;
+  return `<span class="tag folder" style="${base}left:${off}px;top:${-h + 1}px;border-radius:${Math.round(h * 0.45)}px ${Math.round(h * 0.45)}px 0 0">${area}${fillet("left")}${fillet("right")}</span>`;
+}
+function render() {
+  const board = BOARDS.find(b => b.id === S.board), sch = SCHEMES[S.scheme];
+  const R = arrange(board, S.blocks), G = R.G;
+  const screen = document.getElementById("screen");
+  Object.entries(sch).forEach(([k, v]) => screen.style.setProperty("--" + k, v));
+  screen.style.width = board.w + "px"; screen.style.height = board.h + "px";
+  const lay = R.list[Math.min(S.pick, R.list.length - 1)];
+  const sc = G.ppi / 170, rad = Math.round((S.scheme === "linen" ? 12 : 10) * sc);
+  let h = `<div class="hdr" style="height:${G.hdrH}px;padding:0 ${G.inset}px;font-size:${Math.round(2.4 * G.pmm)}px"><span class="dev">${board.dev}</span><span class="pg">House</span><span class="tm">7:42</span></div>`;
+  if (!lay) {
+    h += `<div class="over" style="font-size:${Math.round(2.4 * G.pmm)}px">These blocks do not fit on one page</div>`;
+    screen.innerHTML = h; report(R, null, board); fit(board); return;
+  }
+  const grid = lay.grid, cw = grid.cwmm * G.pmm, ch = grid.chmm * G.pmm;
+  const X = c => G.ax + c * (cw + G.gap), Y = r => G.ay + r * (ch + G.gap);
+  const box = p => ({ x: X(p.c), y: Y(p.r), w: p.w * cw + (p.w - 1) * G.gap, h: p.h * ch + (p.h - 1) * G.gap });
+  const sub = R.v6 ? " sub" : "";   // v7's cells are finer
+  if (S.showGrid) for (let r = 0; r < grid.rows; r++) for (let c = 0; c < grid.cols; c++) h += `<div class="cellg${sub}" style="left:${X(c)}px;top:${Y(r)}px;width:${cw}px;height:${ch}px"></div>`;
+  // v7: the solo cards finished in units (finishV7), the empty units hatched in runs along each row
+  // v8 places in units already: the finish only shares spare unit rows out (units of 1 x 1).
+  const F = R.v9 ? finishV9(lay, G, S.blocks) : R.v8 ? finishWith(lay, G, 1, 1) : R.v6 && S.v6.finish ? finishV7(lay, G) : null;
+  lay.finish = F;
+  // v9's blocks leave the unit grid when the spare room is shared out: nothing hatched.
+  const rectOf = i => ({ x: G.ax + F.rects[i].x, y: G.ay + F.rects[i].y, w: F.rects[i].w, h: F.rects[i].h });
+  if (F && F.v9) {}
+  else if (F) F.occ.forEach((row, r) => {
+    for (let x = 0; x < F.C; x++) {
+      if (row[x]) continue;
+      let e = x; while (e + 1 < F.C && !row[e + 1]) e++;
+      const u = F.boxPx({ c: x, r, w: e - x + 1, h: 1 });
+      h += `<div class="dead unit" style="left:${u.x}px;top:${u.y}px;width:${u.w}px;height:${F.sy}px"></div>`;
+      x = e;
+    }
+  });
+  else {
+  // dead cells
+  const occ = Array.from({ length: grid.rows }, () => Array(grid.cols).fill(0));
+  lay.pos.forEach(p => { for (let y = p.r; y < p.r + p.h; y++) for (let x = p.c; x < p.c + p.w; x++) occ[y][x] = 1; });
+  occ.forEach((row, r) => row.forEach((v, c) => { if (!v) h += `<div class="dead${sub}" style="left:${X(c)}px;top:${Y(r)}px;width:${cw}px;height:${ch}px"></div>`; }));
+  }
+
+  S.blocks.forEach((b, i) => {
+    // Clusters with a header never wear a tag (owner, round three), so only cards move in for one -
+    // and a one-cell cluster (v5, K97), which has no header and wears its card label as a card does.
+    const one = b.type === "cluster" && !!lay.pos[i].one;
+    const B = F && F.v9 ? (b.type === "card" ? insetForTag(rectOf(i), G) : rectOf(i))
+            : (b.type === "card" || one) ? insetForTag(F && b.type === "card" ? F.boxPx(F.boxes[i]) : box(lay.pos[i]), G) : box(lay.pos[i]);
+    const tagH = tagHeight(G), bandH = S.tag === "bar" ? Math.round(tagH * 1.15) : 0, acol = AREA[b.area] || "#888";
+    if (b.type === "card") {
+      const m = b.members[0], on = !!m.on, isVal = !!m.v;
+      const bodyH = B.h - bandH;
+      const nameFs = Math.min(Math.round(2.6 * G.pmm), Math.round(bodyH * 0.15)), disc = Math.round(Math.min(B.w, bodyH) * 0.42);
+      const iconTop = Math.round(1.2 * G.pmm) + bandH + (S.tag === "floating" ? Math.round(tagH * 0.5) : S.tag === "attached" ? Math.round(tagH * 0.28) : 0);
+      let inner = bandH ? `<div style="position:absolute;left:0;right:0;top:0;height:${bandH}px;line-height:${bandH}px;padding:0 ${Math.round(1.2 * G.pmm)}px;background:${acol};color:#fff;font-size:${Math.round(2.0 * G.pmm)}px;border-radius:${rad - 2}px ${rad - 2}px 0 0">${b.area}</div>` : "";
+      inner += `<span class="ci" style="left:${Math.round(1.3 * G.pmm)}px;top:${iconTop}px">${ic(m.kind, on ? "#1A1F27" : TINT[m.kind], Math.round(2.6 * G.pmm))}</span>`;
+      if (isVal) { const vf = Math.min(Math.round(bodyH * 0.3), Math.round(B.w / (m.v.length * 0.62 + 1.2))); inner += `<div class="cval" style="top:${bandH + Math.round(bodyH * 0.2)}px;font-size:${vf}px">${m.v}<small style="font-size:${Math.round(vf * 0.38)}px">${UNIT[m.kind] || ""}</small></div>`; }
+      else inner += `<div class="disc" style="top:${bandH + Math.round(bodyH * 0.1)}px;width:${disc}px;height:${disc}px">${ic(m.kind, on ? "#1A1F27" : sch.d, Math.round(disc * 0.55))}</div>`;
+      inner += `<div class="cnm" style="bottom:${Math.round(B.h * 0.07)}px;font-size:${nameFs}px;${isVal ? "color:var(--d)" : ""}">${m.name}</div>`;
+      h += `<div class="card${on ? " on" : ""}" data-bi="${i}" style="left:${B.x}px;top:${B.y}px;width:${B.w}px;height:${B.h}px;border-radius:${rad}px">${tagHtml(b.area, G, S.tag, sch)}${inner}</div>`;
+    } else if (R.v6) {
+      // v6 (owner, round four): no label, no header unless asked for, the whole box its own. Tiles in
+      // the arrangement the arranger chose, each laid out as a card is, so the icons match the cards'.
+      const p = lay.pos[i], sp = splitHeader(b);
+      // v8: the device's own cluster tokens (UIShape C_PAD, C_TILE_GAP, C_HDR_H).
+      const pad = Math.round((R.v8 ? V8.pad : 1.2) * G.pmm), tg = Math.round((R.v8 ? V8.tg : 1.0) * G.pmm);
+      const hH = p.hdrOn ? Math.round((R.v8 ? V8.hdr : S.knobs.hdr) * G.pmm) : 0;
+      let inner = p.hdrOn ? clusterHeader(b, sp.hdr, hH, pad, G, sch, rad, acol) : "";
+      const rows = tileRows(b, sp.tiles, p.tc);
+      const inW = B.w - 2 * pad, inH = B.h - hH - 2 * pad, tH = (inH - (rows.length - 1) * tg) / rows.length;
+      rows.forEach((rw, ri) => {
+        const tW = (inW - (rw.length - 1) * tg) / rw.length;
+        rw.forEach((m, ci) => {
+          inner += `<div class="mt v6 ${S.tileFrame}${m.on ? " on" : ""}" data-bi="${i}" data-mi="${b.members.indexOf(m)}" style="left:${pad + ci * (tW + tg)}px;top:${hH + pad + ri * (tH + tg)}px;width:${tW}px;height:${tH}px;border-radius:${Math.round(rad * 0.7)}px">${bodyHtml(m, tW, tH, G, sch, S.tileIcon === "bare")}</div>`;
+        });
+      });
+      h += `<div class="clu" data-bi="${i}" style="left:${B.x}px;top:${B.y}px;width:${B.w}px;height:${B.h}px;border-radius:${Math.round(rad * 1.2)}px">${inner}</div>`;
+    } else {
+      const sp = splitHeader(b), hdr = one ? [] : sp.hdr, tiles = one ? b.members : sp.tiles;
+      const pad = Math.round(1.2 * G.pmm), tg = Math.round(1.0 * G.pmm);
+      // ALWAYS A BAR, whatever the cards wear (owner, round three: a floating tag lands on the
+      // header's content) - but only when there is something to put in it: the area or a custom
+      // name, temperature, lux, occupancy. With nothing, the cluster is just a container.
+      const hasHeader = !one && !!(b.area || hdr.length);
+      const hH = hasHeader ? Math.round(S.knobs.hdr * G.pmm) : 0;
+      const cap = capacity(G, grid, lay.pos[i].w, lay.pos[i].h, one);
+      const inW = B.w - 2 * pad, inH = B.h - hH - 2 * pad, MG = memberGrid(tiles.length, cap, inW, inH);
+      let inner = hasHeader ? clusterHeader(b, hdr, hH, pad, G, sch, rad, acol) : "";
+      // tiles, rows of MG.c; the short row stretches its tiles to fill (owner's "1.5 slots" idea)
+      const rows = tileRows(b, tiles, MG.c);
+      const tH = (inH - (rows.length - 1) * tg) / rows.length; let idx = 0;
+      rows.forEach((rw, ri) => {
+        const tW = (inW - (rw.length - 1) * tg) / rw.length;
+        rw.forEach((m, ci) => {
+          const mi = b.members.indexOf(m), tf = Math.min(Math.round(2.3 * G.pmm), Math.round(tH * 0.2), Math.round(tW / Math.max(5, m.name.length * 0.62)));
+          const body = m.v ? `<div class="mv" style="font-size:${Math.round(Math.min(tH * 0.36, tW / (m.v.length * 0.62 + 1.4)))}px">${m.v}<small style="font-size:${Math.round(tf * 0.8)}px">${UNIT[m.kind] || ""}</small></div>`
+                           : ic(m.kind, m.on ? "#1A1F27" : TINT[m.kind], Math.round(Math.min(tH * 0.42, tW * 0.4)));
+          inner += `<div class="mt${m.on ? " on" : ""}" data-bi="${i}" data-mi="${mi}" style="left:${pad + ci * (tW + tg)}px;top:${hH + pad + ri * (tH + tg)}px;width:${tW}px;height:${tH}px;border-radius:${Math.round(rad * 0.7)}px"><div class="in">${body}<div class="mn" style="font-size:${tf}px">${m.name}</div></div></div>`;
+          idx++;
+        });
+      });
+      h += `<div class="clu" data-bi="${i}" style="left:${B.x}px;top:${B.y}px;width:${B.w}px;height:${B.h}px;border-radius:${Math.round(rad * 1.2)}px">${one ? tagHtml(b.area, G, S.tag, sch) : ""}${inner}</div>`;
+    }
+  });
+  screen.innerHTML = h;
+  report(R, lay, board);
+  fit(board);
+}
+function tileRows(b, tiles, cols) {
+  const rows = []; for (let k = 0; k < tiles.length; k += cols) rows.push(tiles.slice(k, k + cols));
+  if (b.shortTop && rows.length > 1 && rows[rows.length - 1].length < cols) {
+    // move the short row to the top, keeping member order
+    const n = tiles.length, shortN = n % cols; rows.length = 0; rows.push(tiles.slice(0, shortN));
+    for (let k = shortN; k < n; k += cols) rows.push(tiles.slice(k, k + cols));
+  }
+  return rows;
+}
+// A card's body, and a v6 tile's (owner, round four: a tile keeps a card's icon, in size and in look).
+function bodyHtml(m, w, h, G, sch, bare) {
+  const on = !!m.on, nameFs = Math.min(Math.round(2.6 * G.pmm), Math.round(h * 0.15));
+  let s = "";
+  if (m.v) {
+    const vf = Math.min(Math.round(h * 0.3), Math.round(w / (m.v.length * 0.62 + 1.2)));
+    s += `<div class="cval" style="top:${Math.round(h * 0.2)}px;font-size:${vf}px">${m.v}<small style="font-size:${Math.round(vf * 0.38)}px">${UNIT[m.kind] || ""}</small></div>`;
+  } else {
+    const disc = Math.round(Math.min(w, h) * 0.42);
+    s += `<div class="disc${bare ? " bare" : ""}" style="top:${Math.round(h * 0.1)}px;width:${disc}px;height:${disc}px">${ic(m.kind, on ? "#1A1F27" : sch.d, Math.round(disc * (bare ? 0.8 : 0.55)))}</div>`;
+  }
+  return s + `<div class="cnm" style="bottom:${Math.round(h * 0.07)}px;font-size:${nameFs}px;${m.v ? "color:var(--d)" : ""}">${m.name}</div>`;
+}
+function clusterHeader(b, hdr, hH, pad, G, sch, rad, acol) {
+        const fs = Math.min(Math.round(2.6 * G.pmm), Math.round(hH * 0.5));
+        let inner;
+        // COLOURED ONLY IN BAR MODE (owner, 2026-10-01): "users might not want color in the
+        // header unless intentionally enabled". Otherwise the bar is clear: the scheme's own
+        // text and icon colours and a hairline under it, no area colour at all.
+        const fill = S.tag === "bar";
+        const fg = fill ? "#fff" : sch.t, faint = fill ? "#FFFFFF" : sch.d;
+        inner = `<div class="chd" style="height:${hH}px;padding:0 ${pad + 2}px;gap:${Math.round(1.0 * G.pmm)}px;font-size:${fs}px;color:${fg};${fill ? `background:${acol};border-radius:${Math.round(rad * 1.2) - 2}px ${Math.round(rad * 1.2) - 2}px 0 0;border-bottom:0` : ""}">`;
+        inner += `<span class="ttl">${b.area}</span>`;
+        // Status as ICONS, like a card's hero (owner, round three), clearly distinct when active:
+        // an active binary sensor is a filled disc with a contrasting glyph; an idle one is a faint
+        // outline. Shape and fill carry the state, never colour alone. Numbers keep their value.
+        const d = Math.round(hH * 0.72);
+        hdr.forEach(m => {
+          if (m.kind === "motion") {
+            inner += m.on
+              ? `<span style="width:${d}px;height:${d}px;border-radius:50%;background:${fill ? "#fff" : TINT.motion};display:grid;place-items:center;flex:none" title="Occupied">${ic("motion", fill ? acol : sch.g, Math.round(d * 0.7))}</span>`
+              : `<span style="width:${d}px;height:${d}px;border-radius:50%;border:2px solid ${faint}66;display:grid;place-items:center;flex:none;box-sizing:border-box" title="Clear">${ic("motion", faint + "99", Math.round(d * 0.62))}</span>`;
+          } else {
+            inner += `<span class="slot" style="gap:${Math.round(0.3 * G.pmm)}px;color:${fg}">${ic(m.kind, fill ? "#fff" : TINT[m.kind], Math.round(fs * 1.0))}${m.v}${m.kind === "temp" ? "&deg;" : ""}</span>`;
+          }
+        });
+        inner += `</div>`;
+        return inner;
+}
+function fit(board) {
+  const box = document.getElementById("boardbox"), bezel = document.getElementById("bezel"), screen = document.getElementById("screen");
+  const maxW = box.clientWidth - 20, maxH = Math.max(320, window.innerHeight * 0.68);
+  const s = Math.min(maxW / board.w, maxH / board.h, 1.2);
+  screen.style.transform = `scale(${s})`;
+  bezel.style.width = (board.w * s + 20) + "px"; bezel.style.height = (board.h * s + 20) + "px";
+  S._scale = s;
+}
+function report(R, lay, board) {
+  const G = R.G, nEnt = S.blocks.reduce((a, b) => a + b.members.length, 0);
+  const st = document.getElementById("stats"), why = document.getElementById("why"), alts = document.getElementById("alts"), ci = document.getElementById("clusterInfo");
+  if (!lay && R.v8) {
+    const ref = refSizes();
+    st.innerHTML = `<div><span class="pill bad">does not fit</span></div>`;
+    why.innerHTML = `No grid of units around this board's own holds all ${nEnt} entities within the limits: a solo card at least ${ref.soloW.toFixed(1)} x ${ref.soloH.toFixed(1)} mm in area, a tile at least ${ref.tileW.toFixed(1)} x ${ref.tileH.toFixed(1)} mm. Move some to another page, or merge cards into a cluster.`;
+    alts.innerHTML = ""; ci.innerHTML = ""; return;
+  }
+  if (!lay && R.v6) {
+    const K = S.v6;
+    st.innerHTML = `<div><span class="pill bad">does not fit</span></div>`;
+    why.innerHTML = `No grid of cells with solo cards between ${S.knobs.minCell} and ${S.knobs.maxCell} mm can hold all ${nEnt} entities with tiles ${K.tile} cells and cards ${K.card}. ${K.tile > K.card ? "Tiles bigger than cards need more page than the same entities as cards would, so a full page stops fitting first. " : ""}To fit, make tiles smaller against cards (Bare tile icons keeps their icons the size of a card's), lower the smallest card under Knobs, or move some entities to another page.`;
+    alts.innerHTML = ""; ci.innerHTML = ""; return;
+  }
+  if (!lay) {
+    st.innerHTML = `<div><span class="pill bad">does not fit</span></div>`;
+    let detail = "";
+    if (S.grid !== "auto") {
+      // Say WHY, per block: what each one needs at this grid's cell size.
+      const [c, r] = S.grid.split("x").map(Number);
+      const grid = { cols: c, rows: r, cwmm: (G.aw - (c - 1) * G.gap) / c / G.pmm, chmm: (G.ah - (r - 1) * G.gap) / r / G.pmm };
+      const one = capacity(G, grid, 1, 1);
+      let need = 0;
+      const lines = S.blocks.map(b => {
+        const o = shapeOptions(G, grid, b);
+        if (!o.length) return `<div><b>${b.area}</b>: cannot be placed at all${b.pin ? " (its pinned shape is too small or too big)" : ""}</div>`;
+        const m = Math.min(...o.map(s => s.w * s.h)); need += m;
+        return b.type === "cluster" ? `<div><b>${b.area}</b>: ${splitHeader(b).tiles.length} tiles need ${m} cells (${o.filter(s => s.w * s.h === m).map(s => s.w + " x " + s.h).join(" or ")})</div>` : "";
+      }).join("");
+      detail = `<p class="why">At ${c} x ${r} a cell is ${grid.cwmm.toFixed(0)} x ${grid.chmm.toFixed(0)} mm. After the cluster header, one cell has room for <b>${one.across} x ${one.down}</b> member tiles of at least ${S.knobs.tileW} x ${S.knobs.tileH} mm. The blocks need at least <b>${need} cells</b>, and this page has ${c * r}.</p>${lines}`;
+    }
+    why.innerHTML = `No grid between ${S.knobs.minCell} and ${S.knobs.maxCell} mm cells can hold all ${S.blocks.length} blocks on this board. The device would say so in the web UI before saving and would never push cards onto another page by itself. To fix it, merge some cards into a cluster, move one to another page, or make the smallest member tile smaller.${detail}`;
+    alts.innerHTML = ""; ci.innerHTML = ""; return;
+  }
+  if (R.v8) { reportV8(R, lay, st, why, alts, ci); return; }
+  if (R.v6) { reportV6(R, lay, nEnt, st, why, alts, ci); return; }
+  const used = lay.grid.cols * lay.grid.rows - lay.dead;
+  st.innerHTML = `<div><span class="big">${lay.grid.cols} x ${lay.grid.rows}</span><small>grid</small></div>
+    <div><span class="big">${lay.grid.cwmm.toFixed(0)} x ${lay.grid.chmm.toFixed(0)}</span><small>cell, mm</small></div>
+    <div><span class="big">${nEnt}</span><small>entities</small></div>
+    <div><span class="big">${S.blocks.length}</span><small>blocks</small></div>
+    <div><span class="big">${lay.dead}</span><small>dead cells ${lay.dead ? '<span class="pill warn">gap</span>' : '<span class="pill ok">none</span>'}</small></div>` +
+    (R.v5 ? `<div><span class="big">${R.v5.ms.toFixed(0)}</span><small>ms to search, ${R.v5.nodes.toLocaleString()} steps</small></div>` : "");
+  const clusters = S.blocks.filter(b => b.type === "cluster").length;
+  if (R.v5) {
+    const p = lay.parts, f = v => v.toFixed(0);
+    why.innerHTML = `${S.grid === "auto" ? `Searched ${R.grids.length} grid sizes with cells between ${S.knobs.minCell} and ${S.knobs.maxCell} mm, every tiling of each.` : `Grid fixed at ${S.grid}; every tiling searched.`} This page costs <b>${f(lay.score)}</b>: empty cells ${f(p.holes)}, clusters with too much room ${f(p.room)}, long clusters ${f(p.long)}, out of order ${f(Math.max(0, p.order))}, the grid ${f(p.grid)}${p.away ? ` (${p.away} row${p.away === 1 ? "" : "s"} or column${p.away === 1 ? "" : "s"} from the board's own)` : ""}. Lower is better; the knobs set each price.${lay.capped ? ' <span class="pill warn">search stopped early</span> the best page found is shown.' : ""} Same blocks in the same order always give the same layout.${lay.dead ? ` <b>${lay.dead} cell${lay.dead === 1 ? " is" : "s are"} left empty</b> because growing a cluster into ${lay.dead === 1 ? "it" : "them"} would cost more: the page has more room than its blocks need. Raise the cost of an empty cell to let clusters grow, or the biggest cell size to get fewer, larger cells. Spreading the spare room out as even margins (look-and-feel 3.8, item 3) is the design question this raises.` : ""}`;
+  } else
+  why.innerHTML = `${S.grid === "auto" ? `Tried ${R.grids.length} grid sizes that keep cells between ${S.knobs.minCell} and ${S.knobs.maxCell} mm.` : `Grid fixed at ${S.grid}.`} The score counts dead cells most heavily, then cells left for clusters to grow into, then clusters far from square, then cells far from today's ~20 mm card. ${clusters ? "Clusters grow into empty neighbouring cells. Single cards keep their 1x1 span." : ""} Same blocks in the same order always give the same layout.`;
+  alts.innerHTML = R.list.map((r, k) => `<button type="button" data-alt="${k}" class="${k === S.pick ? "on" : ""}"><span>${k === 0 ? "Best: " : ""}${r.grid.cols} x ${r.grid.rows}, cells ${r.grid.cwmm.toFixed(0)} mm</span><span>${r.dead} dead${r.sq > 0.01 ? ", shape " + r.sq.toFixed(1) : ""}</span></button>`).join("");
+  const one = capacity(G, lay.grid, 1, 1);
+  ci.innerHTML = `<p class="why" style="margin:0 0 6px">How clusters size: a cluster always covers whole page cells. Inside it, member tiles are at least ${S.knobs.tileW} x ${S.knobs.tileH} mm, so at this grid one cell has room for <b>${one.across} x ${one.down}</b> tiles under the header, and a cluster takes as many cells as its tiles need. Changing the grid changes the cell size, and so how many cells each cluster needs. That is why 2 x 3 and 4 x 3 give different layouts.</p>` + S.blocks.map((b, i) => {
+    if (b.type !== "cluster") return "";
+    const p = lay.pos[i], cap = capacity(G, lay.grid, p.w, p.h, !!p.one), t = splitHeader(b), nt = p.one ? b.members.length : t.tiles.length;
+    return `<div><b>${b.area}</b>: ${p.w} x ${p.h} cell${p.w * p.h === 1 ? "" : "s"}, ${nt} tile${nt === 1 ? "" : "s"} (room for ${cap.across} x ${cap.down})${p.one ? ", no header" : t.hdr.length ? ", " + t.hdr.length + " in the header" : ""}${p.room ? `, room ${p.room.toFixed(1)}x` : ""}${b.pin ? " - pinned" : ""}</div>`;
+  }).join("") || "No clusters on this page.";
+}
+
+function reportV6(R, lay, nEnt, st, why, alts, ci) {
+  const G = R.G, K = S.v6, f = v => v.toFixed(0), mm = px => (px / G.pmm).toFixed(1);
+  const cg = lay.cg, p = lay.parts;
+  const tiles = lay.pos.filter(q => q.tc), icons = tiles.map(q => Math.exp(q.iconX) * 100 - 100);
+  const spread = icons.length ? `${f(Math.min(...icons))} to ${f(Math.max(...icons))}%` : "none";
+  const F = lay.finish;
+  st.innerHTML = `<div><span class="big">${lay.grid.cols} x ${lay.grid.rows}</span><small>cells</small></div>
+    <div><span class="big">${(lay.grid.cols / K.card).toFixed(1)} x ${(lay.grid.rows / K.card).toFixed(1)}</span><small>cards across x down</small></div>
+    <div><span class="big">${mm(cg.w)} x ${mm(cg.h)}</span><small>solo card, mm</small></div>
+    <div><span class="big">${mm(cg.glyph)}</span><small>card icon, mm</small></div>
+    <div><span class="big">${spread}</span><small>tile icons against it</small></div>
+    <div><span class="big">${lay.dead}</span><small>empty cells ${lay.dead ? '<span class="pill warn">gap</span>' : '<span class="pill ok">none</span>'}</small></div>` +
+    (F ? `<div><span class="big">${F.ux} x ${F.uy}</span><small>units a cell${K.uy === "auto" ? " (Auto)" : ""}</small></div>` : "") +
+    `<div><span class="big">${R.v6.ms.toFixed(0)}</span><small>ms to search, ${R.v6.nodes.toLocaleString()} steps</small></div>`;
+  why.innerHTML = `${S.grid === "auto" ? `Searched ${R.grids.length} grids of cells that keep a solo card between ${S.knobs.minCell} and ${S.knobs.maxCell} mm.` : `Grid fixed at ${S.grid} cards.`} A solo card is ${K.card} x ${K.card} cells and a tile ${K.tile} x ${K.tile}. This page costs <b>${f(lay.score)}</b>: tile icons a different size from a card's ${f(p.icon)}, tiles shaped unlike a card ${f(p.shape)}, long clusters ${f(p.long)}, empty tile slots ${f(p.slot)}, empty cells ${f(p.holes)}, out of order ${f(Math.max(0, p.order))}, the grid ${f(p.grid)}${p.away ? ` (${p.away.toFixed(1)} cards across and down from the board's own)` : ""}. Lower is better.${lay.capped ? ' <span class="pill warn">search stopped early</span> the best page found is shown.' : ""}` +
+    (F ? ` The finish cut each cell into ${F.ux} x ${F.uy} units and moved the solo cards within them (list under Clusters); the cost is the arranger's, before the finish.` : "");
+  alts.innerHTML = R.list.map((r, k) => `<button type="button" data-alt="${k}" class="${k === S.pick ? "on" : ""}"><span>${k === 0 ? "Best: " : ""}${r.grid.cols} x ${r.grid.rows}, cards ${mm(r.cg.w)} mm</span><span>${r.dead} empty, cost ${f(r.score)}</span></button>`).join("");
+  ci.innerHTML = `<p class="why" style="margin:0 0 6px">A cluster's tiles are laid out as cards are, at ${K.tile} cells each way against a card's ${K.card}. The percentages say how a tile's icon and shape compare with a solo card's on this page: 0% is the same.</p>` + (S.blocks.map((b, i) => {
+    const q = lay.pos[i]; if (b.type !== "cluster" || !q.tc) return "";
+    const n = splitHeader(b).tiles.length, pc = x => (x >= 0 ? "+" : "") + f(Math.exp(x) * 100 - 100) + "%";
+    return `<div><b>${b.area}</b>: ${n} tile${n === 1 ? "" : "s"}, ${q.tc} across x ${q.tr} down, ${q.w} x ${q.h} cells; icon ${pc(q.iconX)}, shape ${pc(q.shapeX)}${q.hdrOn ? ", with a header" : ""}${b.pin ? " - pinned" : ""}</div>`;
+  }).join("") || "No clusters on this page.") + (F ? finishLines(F) : "");
+}
+function reportV8(R, lay, st, why, alts, ci) {
+  const G = R.G, f = v => v.toFixed(0), f1 = v => v.toFixed(1), ref = refSizes(), p = lay.parts;
+  const lo = Math.min(...lay.sizes), hi = Math.max(...lay.sizes);
+  const g = lay.grid;
+  st.innerHTML = `<div><span class="big">${g.cols} x ${g.rows}</span><small>units across x down</small></div>
+    <div><span class="big">${f1(g.cwmm)} x ${f1(g.chmm)}</span><small>a unit, mm</small></div>
+    <div><span class="big">${lay.sizes.length}</span><small>entities</small></div>
+    <div><span class="big">${f1(lay.mean)}</span><small>entity size, mm (average)</small></div>
+    <div><span class="big">${f1(lo)} to ${f1(hi)}</span><small>smallest to largest, mm (${f((hi / lo - 1) * 100)}% apart)</small></div>
+    <div><span class="big">${lay.dead}</span><small>empty units ${lay.dead ? '<span class="pill warn">margin</span>' : '<span class="pill ok">none</span>'}</small></div>
+    <div><span class="big">${R.v6.ms.toFixed(0)}</span><small>ms to search, ${R.v6.nodes.toLocaleString()} steps</small></div>`;
+  why.innerHTML = `${S.grid === "auto" ? `Searched ${R.grids.length} grids of units, around the board's own grid.` : `Grid fixed at ${S.grid} cells.`} An entity's size is the side of the square with its area - a solo card's after its label, a tile's after its cluster's header and padding. This page costs <b>${f(lay.score)}</b>: entities of different sizes ${f(p.size)}, shapes (solo cards from square, tiles from square, clusters taller than wide) ${f(p.shape)}, same-sized clusters of different sizes ${f(p.twin)}, empty units ${f(p.holes)}, out of order ${f(p.order)}${p.big !== undefined ? `, solo cards bigger than the rest ${f(p.big)}` : ""}. Lower is better.${R.v9 ? " v9 then grows the clusters into the spare height, no further than square tiles, and shares out what is left: rows of blocks spread down the page, blocks in a row spread across it, each centred in its row's height." : ""} Limits: a solo card at least ${f1(ref.soloW)} x ${f1(ref.soloH)} mm in area (the P4_5 at 7 x 3) and no taller than ${ref.tall.toFixed(2)} its width; a tile at least ${f1(ref.tileW)} x ${f1(ref.tileH)} mm (the 4B at 4 x 4, a 3 x 1 cluster).${lay.capped ? ' <span class="pill warn">search stopped early</span>' : ""}`;
+  alts.innerHTML = R.list.map((r, k) => `<button type="button" data-alt="${k}" class="${k === S.pick ? "on" : ""}"><span>${k === 0 ? "Best: " : ""}${r.grid.cols} x ${r.grid.rows} units, entities ${f1(r.mean)} mm</span><span>${r.dead} empty, cost ${f(r.score)}</span></button>`).join("");
+  ci.innerHTML = `<p class="why" style="margin:0 0 6px">Each block in units, your measure: its units divided by its entities. Sizes in mm against the page's average.</p>` + S.blocks.map((b, i) => {
+    const q = lay.pos[i];
+    const n = b.type === "card" ? 1 : splitHeader(b).tiles.length;
+    const pc = (q.size / lay.mean - 1) * 100;
+    return `<div><b>${b.type === "card" ? b.members[0].name : b.area}</b>: ${q.w} x ${q.h} units, ${(q.w * q.h / n).toFixed(2)} a${b.type === "card" ? " card" : " tile"}${q.tc ? `, tiles ${q.tc} across x ${q.tr} down` : ""}; ${f1(q.size)} mm (${pc >= 0 ? "+" : ""}${f(pc)}%)</div>`;
+  }).join("") + (lay.finish ? finishLines(lay.finish) : "");
+}
+function finishLines(F) {
+  // What the finish did to each solo card, in units, and how square it came out (height / width).
+  const u = n => n + " unit" + (n === 1 ? "" : "s");
+  const rows = S.blocks.map((b, i) => {
+    const n = F.notes[i]; if (!n) return "";
+    const did = [];
+    if (n.trim) did.push(`${u(n.trim)} off its top`);
+    if (n.trimW) did.push(`${u(n.trimW)} off its sides`);
+    if (n.down) did.push(`${u(Math.abs(n.down))} ${n.down > 0 ? "down" : "up"}`);
+    if (n.right) did.push(`${u(Math.abs(n.right))} ${n.right > 0 ? "right" : "left"}`);
+    return `<div><b>${b.members[0].name}</b> (${b.area}): ${did.length ? did.join(", ") : "as placed"}; ${n.before.toFixed(2)} tall for its width, now ${n.after.toFixed(2)}</div>`;
+  }).join("");
+  return rows ? `<p class="why" style="margin:8px 0 6px">Solo cards after the finish:</p>${rows}` : "";
+}
+
+/* ---------------- controls ---------------- */
+function blocksPanel() {
+  const el = document.getElementById("blocks");
+  el.innerHTML = S.blocks.map((b, i) => {
+    const t = splitHeader(b);
+    const pinOpts = b.type === "cluster" ? `<select data-pin="${i}" aria-label="Shape for ${b.area}"><option value="">Auto</option>${["1x2","2x1","2x2","3x1","1x3","3x2","2x3","4x1","1x4","4x2","2x4","3x3","6x1","1x6"].map(s => `<option ${b.pin && (b.pin.w + "x" + b.pin.h) === s ? "selected" : ""}>${s}</option>`).join("")}</select>` : "";
+    const short = b.type === "cluster" ? `<button type="button" data-short="${i}" title="Where the short row goes">${b.shortTop ? "short row: top" : "short row: bottom"}</button>` : "";
+    const mem = b.type === "cluster" ? `<button type="button" data-minus="${i}" aria-label="Remove a member">-</button><button type="button" data-plus="${i}" aria-label="Add a member">+</button>` : "";
+    return `<div class="blk"><span class="sw" style="background:${AREA[b.area] || "#888"}"></span>
+      <div style="min-width:0"><div class="nm">${b.type === "cluster" ? b.area : b.members[0].name + " (" + b.area + ")"}</div>
+      <div class="sub">${b.type === "cluster" ? `${b.members.length} entities: ${t.tiles.length} tiles${t.hdr.length ? ", " + t.hdr.length + " in header" : ""}` : "card"}</div>
+      <div class="acts" style="margin-top:4px">${pinOpts}${short}</div></div>
+      <div class="acts">${mem}<button type="button" data-up="${i}" aria-label="Move earlier">&uarr;</button><button type="button" data-del="${i}" aria-label="Remove">&times;</button></div></div>`;
+  }).join("");
+}
+function gridOptions() {
+  const board = BOARDS.find(b => b.id === S.board), sel = document.getElementById("gridMode");
+  const opts = [];
+  for (let c = 1; c <= 8; c++) for (let r = 1; r <= 6; r++) opts.push(c + "x" + r);
+  sel.innerHTML = `<option value="auto">Auto (fill the page)</option>` + opts.map(o => `<option ${S.grid === o ? "selected" : ""}>${o}</option>`).join("");
+  sel.value = S.grid;
+}
+function refresh() { S.pick = Math.min(S.pick, 5); blocksPanel(); render(); }
+
+document.getElementById("board").innerHTML = BOARDS.map(b => `<option value="${b.id}">${b.name}</option>`).join("");
+function seg(id, key) {
+  document.getElementById(id).addEventListener("click", e => {
+    const v = e.target.dataset.v; if (!v) return; S[key] = v; S.pick = 0;
+    syncSeg(id, v); refresh();
+  });
+}
+const syncSeg = (id, v) => document.querySelectorAll("#" + id + " button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+seg("scheme", "scheme"); seg("tagstyle", "tag"); seg("engine", "engine"); seg("tileFrame", "tileFrame"); seg("tileIcon", "tileIcon");
+// THE KNOBS, AS TEXT TO PASTE TO CLAUDE (owner, 2026-10-20: "How do I transfer those settings to
+// you?"): every weight and size, copied when the browser allows, shown either way.
+document.getElementById("copyKnobs").addEventListener("click", e => {
+  const text = JSON.stringify({ playground: "v8", engine: S.engine, board: S.board, tag: S.tag, w: S.w, knobs: S.knobs, v6: S.v6 });
+  const out = document.getElementById("knobsOut"), btn = e.currentTarget;
+  out.hidden = false; out.value = text; out.focus(); out.select();
+  const said = ok => { btn.textContent = ok ? "Copied - paste it to Claude" : "Select the text below and copy it"; };
+  try { navigator.clipboard.writeText(text).then(() => said(true), () => said(false)); } catch (err) { said(false); }
+});
+// Which House: the blocks are made again from it.
+document.getElementById("data").addEventListener("click", e => {
+  const v = e.target.dataset.v; if (!v) return;
+  S.data = v; S.blocks = buildBlocks(S.byArea, v); S.pick = 0; syncSeg("data", v); refresh();
+});
+const WK = [["wHole", "hole", "oHole", v => v], ["wComfy", "comfy", "oComfy", v => v.toFixed(1) + "x"], ["wLoose", "loose", "oLoose", v => v], ["wLong", "long", "oLong", v => v], ["wOrder", "order", "oOrder", v => v], ["wAway", "away", "oAway", v => v], ["wIcons", "icons", "oIcons", v => v], ["wShape", "shape", "oShape", v => v],
+            ["wSize", "size", "oSize", v => v], ["wSquare", "square", "oSquare", v => v], ["wWide", "wide", "oWide", v => v],
+            ["wTwin", "twin", "oTwin", v => v], ["wGap8", "gap8", "oGap8", v => v], ["wBig", "big", "oBig", v => v]];
+function syncV6() {
+  const K = S.v6;
+  document.getElementById("kTile").value = K.tile; document.getElementById("oTile").textContent = K.tile;
+  document.getElementById("kCard").value = K.card; document.getElementById("oCard").textContent = K.card;
+  document.getElementById("flex").checked = K.flex; document.getElementById("clHdr").checked = S.clHdr;
+  document.getElementById("finish").checked = K.finish; document.getElementById("unitsDown").value = K.uy;
+  document.getElementById("ratio").textContent = `A solo card is ${K.card}/${K.tile} of a tile each way (${(K.card / K.tile).toFixed(2)}x).`;
+  syncSeg("tileFrame", S.tileFrame); syncSeg("tileIcon", S.tileIcon);
+}
+[["kTile", "tile"], ["kCard", "card"]].forEach(([id, k]) => document.getElementById(id).addEventListener("input", e => { S.v6[k] = +e.target.value; syncV6(); S.pick = 0; render(); }));
+document.getElementById("flex").addEventListener("change", e => { S.v6.flex = e.target.checked; S.pick = 0; render(); });
+document.getElementById("finish").addEventListener("change", e => { S.v6.finish = e.target.checked; render(); });
+document.getElementById("unitsDown").addEventListener("change", e => { S.v6.uy = e.target.value; render(); });
+document.getElementById("clHdr").addEventListener("change", e => { S.clHdr = e.target.checked; S.pick = 0; refresh(); });
+document.querySelector("[data-preset]").parentElement.addEventListener("click", e => {
+  const b = e.target.closest("[data-preset]"); if (!b) return;
+  const [t, c, icon] = b.dataset.preset.split(",");
+  S.v6.tile = +t; S.v6.card = +c; S.tileIcon = icon; S.engine = "v6"; syncSeg("engine", "v6"); syncV6(); S.pick = 0; refresh();
+});
+function syncWeights() { WK.forEach(([id, k, o, fmt]) => { document.getElementById(id).value = S.w[k]; document.getElementById(o).textContent = fmt(S.w[k]); }); }
+WK.forEach(([id, k, o, fmt]) => document.getElementById(id).addEventListener("input", e => { S.w[k] = +e.target.value; document.getElementById(o).textContent = fmt(S.w[k]); S.pick = 0; render(); }));
+document.getElementById("board").addEventListener("change", e => { S.board = e.target.value; S.pick = 0; render(); });
+document.getElementById("showGrid").addEventListener("change", e => { S.showGrid = e.target.checked; render(); });
+document.getElementById("byArea").addEventListener("change", e => { S.byArea = e.target.checked; S.blocks = buildBlocks(S.byArea); S.pick = 0; refresh(); });
+document.getElementById("promote").addEventListener("change", e => { S.promote = e.target.checked; S.pick = 0; refresh(); });
+document.getElementById("gridMode").addEventListener("change", e => { S.grid = e.target.value; S.pick = 0; render(); });
+document.getElementById("alts").addEventListener("click", e => { const b = e.target.closest("[data-alt]"); if (!b) return; S.pick = +b.dataset.alt; render(); });
+document.getElementById("blocks").addEventListener("click", e => {
+  const t = e.target, d = t.dataset;
+  if (d.up !== undefined) { const i = +d.up; if (i > 0) { const [b] = S.blocks.splice(i, 1); S.blocks.splice(i - 1, 0, b); } }
+  else if (d.del !== undefined) S.blocks.splice(+d.del, 1);
+  else if (d.plus !== undefined) { const b = S.blocks[+d.plus]; b.members.push({ area: b.area, name: "Lamp " + (b.members.length + 1), kind: "light" }); }
+  else if (d.minus !== undefined) { const b = S.blocks[+d.minus]; if (b.members.length > 2) b.members.pop(); }
+  else if (d.short !== undefined) { const b = S.blocks[+d.short]; b.shortTop = !b.shortTop; }
+  else return;
+  S.pick = 0; refresh();
+});
+document.getElementById("blocks").addEventListener("change", e => {
+  const d = e.target.dataset; if (d.pin === undefined) return;
+  const v = e.target.value, b = S.blocks[+d.pin];
+  b.pin = v ? { w: +v.split("x")[0], h: +v.split("x")[1] } : null; S.pick = 0; refresh();
+});
+const extraAreas = ["Hall", "Den"];
+document.getElementById("addCluster").addEventListener("click", () => {
+  const a = extraAreas[S.nextId++ % extraAreas.length];
+  S.blocks.push({ id: "n" + S.nextId, type: "cluster", area: a, members: [
+    { area: a, name: "Ceiling", kind: "light" }, { area: a, name: "Lamp", kind: "light", on: 1 }, { area: a, name: "Fan", kind: "switch" },
+    { area: a, name: a, kind: "temp", v: "70.2" }, { area: a, name: "Accent", kind: "light" }], pin: null, shortTop: false });
+  S.pick = 0; refresh();
+});
+document.getElementById("addCard").addEventListener("click", () => {
+  S.blocks.push({ id: "n" + (S.nextId++), type: "card", area: "Hall", members: [{ area: "Hall", name: "Hall", kind: "light" }], pin: null, shortTop: false });
+  S.pick = 0; refresh();
+});
+document.getElementById("reset").addEventListener("click", () => { S = freshState(); syncKnobs(); syncWeights(); syncV6(); syncSeg("scheme", S.scheme); syncSeg("tagstyle", S.tag); syncSeg("engine", S.engine); syncSeg("data", S.data); document.getElementById("byArea").checked = true; document.getElementById("promote").checked = true; document.getElementById("board").value = S.board; gridOptions(); refresh(); });
+
+const KN = [["kMax", "maxCell", "vMax"], ["kMin", "minCell", "vMin"], ["kTileW", "tileW", "vTileW"], ["kTileH", "tileH", "vTileH"], ["kHdr", "hdr", "vHdr"]];
+function syncKnobs() { KN.forEach(([id, k, v]) => { document.getElementById(id).value = S.knobs[k]; document.getElementById(v).textContent = S.knobs[k] + " mm"; }); }
+KN.forEach(([id, k, v]) => document.getElementById(id).addEventListener("input", e => { S.knobs[k] = +e.target.value; document.getElementById(v).textContent = S.knobs[k] + " mm"; S.pick = 0; refresh(); }));
+
+/* ---------------- drag to reorder ---------------- */
+let drag = null;
+const screenEl = document.getElementById("screen");
+screenEl.addEventListener("pointerdown", e => {
+  const tile = e.target.closest(".mt"), blk = e.target.closest(".card, .clu");
+  const el = tile || blk; if (!el) return;
+  e.preventDefault();
+  drag = { el, tile: !!tile, bi: +el.dataset.bi, mi: tile ? +tile.dataset.mi : -1, x: e.clientX, y: e.clientY, moved: false, target: null };
+  el.setPointerCapture(e.pointerId);
+});
+screenEl.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const dx = (e.clientX - drag.x) / S._scale, dy = (e.clientY - drag.y) / S._scale;
+  if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+  drag.moved = true; drag.el.classList.add("dragging"); drag.el.style.transform = `translate(${dx}px,${dy}px)`;
+  drag.el.style.pointerEvents = "none";
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  drag.el.style.pointerEvents = "";
+  let t = null;
+  if (under) t = drag.tile ? under.closest(`.mt[data-bi="${drag.bi}"]`) : under.closest(".card, .clu");
+  if (t === drag.el) t = null;
+  if (drag.target && drag.target !== t) drag.target.classList.remove("droptarget");
+  if (t) t.classList.add("droptarget");
+  drag.target = t;
+});
+function endDrag() {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (d.moved && d.target) {
+    if (d.tile) {
+      const m = S.blocks[d.bi].members, ti = +d.target.dataset.mi, [x] = m.splice(d.mi, 1);
+      m.splice(ti, 0, x);
+    } else {
+      const ti = +d.target.dataset.bi, [b] = S.blocks.splice(d.bi, 1); S.blocks.splice(ti, 0, b);
+    }
+    S.pick = 0; refresh();
+  } else { d.el.classList.remove("dragging"); d.el.style.transform = ""; }
+}
+screenEl.addEventListener("pointerup", endDrag);
+screenEl.addEventListener("pointercancel", endDrag);
+
+window.addEventListener("resize", () => fit(BOARDS.find(b => b.id === S.board)));
+S = freshState(); syncKnobs(); syncWeights(); syncV6(); gridOptions(); refresh();
+</script>
+</body></html>

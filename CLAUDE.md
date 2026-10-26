@@ -443,7 +443,8 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
   byte is 0xFF (a first boot); one that will not mount but holds anything is left untouched and
   that boot is read-only, in RAM, and says so (boot note, `?stats=1`, [SETTINGS]). Never set
   `format_if_mount_failed`. `POST /settings` puts a saved copy back; `scripts/release/
-  save_settings.ps1` / `restore_settings.ps1` make and restore copies (`bench/settings/`), and
+  save_settings.ps1` / `restore_settings.ps1` make and restore copies (`bench/settings/`),
+  `setdiff.py` compares a copy with what a board serves, and
   `flash_release.ps1` saves each board's before writing it.
 - **Groups for card labels** are `CardGroups` (K46): one kind of group, device-wide, HA areas linked
   in as groups; a card's card label shows its group's name (or its own words) in the group's colour.
