@@ -174,12 +174,16 @@ void ClusterCard::buildBody(lv_obj_t *body) {
         if (!_tile[i]) continue;
         int32_t x = 0, y = 0, w = 0;
         Layout::tileAt(g, nTiles, t++, tgap(), x, y, w);
+        // NEAR SQUARE (round 12, the owner: tiles "drawn smaller inside clusters
+        // when needed"): a tile no taller than C_TILE_TALL its width, centred in
+        // its slot - a little wiggle room left inside the cluster.
+        const int32_t th = LV_MIN(g.tileH, (int32_t)(w * UI::shape().C_TILE_TALL));
         Card *m = _m[i];
         m->setCellWidthPx(w);
-        m->setCellHeightPx(g.tileH);
+        m->setCellHeightPx(th);
         m->build(body);
-        lv_obj_set_pos (m->root(), pad() + x, tilesTop() + y);
-        lv_obj_set_size(m->root(), w, g.tileH);
+        lv_obj_set_pos (m->root(), pad() + x, tilesTop() + y + (g.tileH - th) / 2);
+        lv_obj_set_size(m->root(), w, th);
         if (_binder) _binder->add(m);
     }
 }

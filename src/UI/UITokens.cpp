@@ -207,7 +207,7 @@ const UIShape UI_SHAPE = {
     .P_GAP = 4.0f, .P_STACK_GAP = 3.0f, .P_GRIP_INSET = 1.4f, .P_GRIP_H = 0.5f, .P_GRIP_MIN = 5.0f,
     .P_MARK_H = 2.6f, .P_MARK_LINE = 0.35f, .P_SCENE_H = 9.0f, .P_SCENE_GAP = 1.4f, .P_SCENE_PAD = 2.4f,
     .C_HDR_H = 5.2f, .C_PAD = 1.1f, .C_TILE_GAP = 0.8f, .C_SWATCH_W = 1.1f, .C_SWATCH_H = 2.4f,
-    .C_VALUE_GAP = 1.3f, .C_TILE_MIN = 7.5f,
+    .C_VALUE_GAP = 1.3f, .C_TILE_MIN = 7.5f, .C_TILE_FOOT = 1.5f, .C_TILE_TALL = 1.1f,
     .HALO = 5.0f, .LINE_FADE = 2.5f,
     .KEY_H = 7.0f, .KEY_GAP = 1.0f,
 };

@@ -51,7 +51,8 @@
 namespace Layout {
 
 constexpr uint8_t  ARR_BLOCKS_MAX = 24;      // a page's blocks
-constexpr uint8_t  ARR_SHAPES_MAX = 10;      // a block's cheapest shapes kept, per grid (the playground's)
+constexpr uint8_t  ARR_SHAPES_CHEAP = 10;    // a block's cheapest shapes kept, per grid (the playground's)
+constexpr uint8_t  ARR_SHAPES_MAX = ARR_SHAPES_CHEAP + 1;   // ...and its tightest (round 12)
 constexpr uint8_t  ARR_UNITS_MAX  = 24;      // units across or down, at most
 constexpr uint16_t ARR_CELLS_MAX  = 192;     // units on a grid, at most: the search recurses a level a unit
 constexpr uint8_t  ARR_WINDOW     = 3;       // the next unplaced blocks tried at each empty unit
@@ -131,7 +132,9 @@ bool arrange(const ArrScreen &scr, const ArrBlock *blocks, uint8_t n, const ArrW
 
 // THE FINISH (the playground's finishV9()), from the search's places on a grid of
 // cols x rows units: each solo card trimmed toward square in units (`box`), then
-// every block's pixel rectangle with the spare room shared out (`rect`). Cheap
+// every block's pixel rectangle (`rect`) - a loose card drawn at its tallest
+// allowed shape, clusters grown into the spare height (round 12, to square tiles
+// at most), what is left shared out. Cheap
 // and deterministic, so a kept answer keeps only `pos` and is finished again.
 void finishPage(const ArrScreen &scr, const ArrBlock *blocks, uint8_t n, uint8_t cols, uint8_t rows,
                 const ArrPlace *pos, ArrPlace *box, ArrRect *rect);

@@ -39,6 +39,45 @@ void column(lv_obj_t *o) {
 // Between the hero and the label.
 int32_t heroGap() { return UI::mm(UI::shape().C_TILE_GAP); }
 
+// Off the tile's top and foot (round 12): the label sat on the tile's foot, in
+// its active frame's glow.
+int32_t foot() { return UI::mm(UI::shape().C_TILE_FOOT); }
+
+// THE TILE'S COLUMN (round 12, the owner: "no reason why the hero shouldn't be
+// centered within the tile frame like it is for solo cards"): the hero and its
+// label as one, centred in the tile, clear of its top and foot.
+void tileColumn(lv_obj_t *body, lv_obj_t *mid) {
+    lv_obj_set_style_pad_top   (body, foot(), 0);
+    lv_obj_set_style_pad_bottom(body, foot(), 0);
+    lv_obj_set_size(mid, lv_pct(100), LV_SIZE_CONTENT);
+    column(mid);
+}
+
+// The disc a state tile w x h (inside its foot) gets with its label in face `nf`
+// and `gap` between them: most of the room left over, never wider than most of
+// the tile, capped at twice ICON - or twice ICON_XL where the room holds most of
+// that (`roomy`, round 9). StateCard::renderMini() says why.
+int32_t discFor(int32_t w, int32_t h, const lv_font_t *nf, int32_t gap, bool &roomy) {
+    const UIType &t = UI::type();
+    const int32_t xl = lv_font_get_line_height(t.ICON_XL);
+    const int32_t room = h - (nf ? lv_font_get_line_height(nf) + gap : 0);
+    int32_t d = LV_MIN(room * 92 / 100, w * 72 / 100);
+    roomy = t.ICON_XL != t.ICON && d * 10 >= xl * 16;
+    d = LV_MIN(d, (roomy ? xl : lv_font_get_line_height(t.ICON)) * 2);
+    return d < 0 ? 0 : d;
+}
+
+// A BIGGER LABEL (round 12, the owner: tiles on the P4_5 and 1060 "could handle a
+// bump in the entity label font size"): the name's face where it costs a state
+// tile's disc nothing, the tag's otherwise. By the tile's size alone, so every
+// tile of a cluster - state or value - has the same.
+const lv_font_t *labelFace(int32_t w, int32_t h, int32_t gap) {
+    const UIType &t = UI::type();
+    bool roomy = false;
+    if (t.NAME == t.TAG || discFor(w, h, t.NAME, gap, roomy) < discFor(w, h, t.TAG, gap, roomy)) return t.TAG;
+    return t.NAME;
+}
+
 // The gap the tile's column keeps between its hero and its label: the theme's
 // row padding, which its plain holders keep (round 4: a tile limited by its
 // height, now clusters fill their cells, got a disc too big for its middle).
@@ -96,9 +135,7 @@ void Card::buildMini(lv_obj_t *parent) {
 void StateCard::buildMiniBody(lv_obj_t *body) {
     column(body);
     _mid = plainBox(body);
-    lv_obj_set_width    (_mid, lv_pct(100));
-    lv_obj_set_flex_grow(_mid, 1);
-    column(_mid);
+    tileColumn(body, _mid);
 
     _disc = lv_obj_create(_mid);
     lv_obj_clear_flag(_disc, LV_OBJ_FLAG_SCROLLABLE);
@@ -121,10 +158,11 @@ void StateCard::renderMini() {
 
     const CardLabel lbl = cardResolveLabel(labelMode());
     const bool showName = (lbl != CardLabel::LBL_NONE);
+    const bool on = groupIsOn();
+    const char *words = !showName ? "" : lbl == CardLabel::LBL_STATE ? cardStateWord(e->desc, on) : shownName(lbl);
     const int32_t w = cellWidthPx();
-    const int32_t h = cellPx();
-    const int32_t nameH = showName ? lv_font_get_line_height(t.TAG) : 0;
-    const int32_t room  = h - nameH - (showName ? heroGap() + rowGap(_mid) : 0);
+    const int32_t h = cellPx() - 2 * foot();
+    const int32_t gap = heroGap() + rowGap(_mid);
 
     // The disc: most of the room left over, never wider than most of the tile,
     // never larger than a solo card's at its largest (Card::heroDiscPx()) - and
@@ -135,11 +173,9 @@ void StateCard::renderMini() {
     // cluster are relatively tiny"): the cap was twice ICON, which is ~4.5 mm on
     // every board - a third of a 27 mm tile. Where the room holds most of twice
     // ICON_XL (the 7" boards' 1.5 x ICON; ICON elsewhere), that is the cap and face.
-    int32_t d = LV_MIN(room * 92 / 100, w * 72 / 100);
-    const int32_t xl = lv_font_get_line_height(t.ICON_XL);
-    const bool roomy = t.ICON_XL != t.ICON && d * 10 >= xl * 16;
-    d = LV_MIN(d, (roomy ? xl : lv_font_get_line_height(t.ICON)) * 2);
-    if (d < 0) d = 0;
+    const lv_font_t *nameFace = labelFace(w, h, gap);
+    bool roomy = false;
+    int32_t d = discFor(w, h, showName ? nameFace : nullptr, gap, roomy);
     const lv_font_t *face = t.ICON_SM;
     if (pageDisc() > 0 && pageFace() && pageDisc() <= d) {
         d    = pageDisc();
@@ -155,7 +191,6 @@ void StateCard::renderMini() {
     lv_obj_set_size(_disc, d, d);
     lv_obj_set_style_pad_bottom(_mid, showName ? heroGap() : 0, 0);
 
-    const bool     on     = groupIsOn();
     const uint32_t chrome = stateColor();   // stale or failed take over, as on a card
     uint32_t discBg = p.SURFACE_ALT, ink = chrome ? chrome : p.ST_IDLE;
     if (on && !chrome) {
@@ -190,7 +225,8 @@ void StateCard::renderMini() {
     activeFrame(frame, p.ST_ACTIVE);
 
     if (showName) {
-        lv_label_set_text(_name, lbl == CardLabel::LBL_STATE ? cardStateWord(e->desc, on) : shownName(lbl));
+        lv_label_set_text(_name, words);
+        lv_obj_set_style_text_font (_name, nameFace, 0);
         lv_obj_set_style_text_color(_name, UI::c(tone(p.TEXT)), 0);
         lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -203,9 +239,7 @@ void StateCard::renderMini() {
 void ValueCard::buildMiniBody(lv_obj_t *body) {
     column(body);
     _mid = plainBox(body);
-    lv_obj_set_width    (_mid, lv_pct(100));
-    lv_obj_set_flex_grow(_mid, 1);
-    column(_mid);
+    tileColumn(body, _mid);
 
     _valueRow = plainBox(_mid);
     lv_obj_set_size      (_valueRow, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -230,8 +264,8 @@ void ValueCard::renderMini() {
     const CardLabel lbl = cardResolveLabel(labelMode());
     const bool showName = (lbl != CardLabel::LBL_NONE);
     const int32_t w = cellWidthPx();
-    const int32_t h = cellPx();
-    const int32_t room = h - (showName ? lv_font_get_line_height(t.TAG) + heroGap() + rowGap(_mid) : 0);
+    const int32_t h = cellPx() - 2 * foot();
+    const char *words = showName ? shownName(lbl) : "";
 
     char buf[40];
     cardFormatValue(*e, buf, sizeof(buf), false, tempUnit());
@@ -239,6 +273,8 @@ void ValueCard::renderMini() {
     lv_label_set_text(_value, buf);
 
     // The small value face where it fits the tile, else the name's.
+    const lv_font_t *nameFace = labelFace(w, h, heroGap() + rowGap(_mid));
+    const int32_t room = h - (showName ? lv_font_get_line_height(nameFace) + heroGap() + rowGap(_mid) : 0);
     const lv_font_t *vf = t.VALUE_SM;
     const int32_t uw = unit[0] ? Kit::textW(unit, t.UNIT) : 0;
     if (Kit::textW(buf, vf) + uw > w * 9 / 10 || lv_font_get_line_height(vf) > room) vf = t.NAME;
@@ -254,7 +290,8 @@ void ValueCard::renderMini() {
     lv_obj_set_style_pad_bottom(_mid, showName ? heroGap() : 0, 0);
 
     if (showName) {
-        lv_label_set_text(_name, shownName(lbl));
+        lv_label_set_text(_name, words);
+        lv_obj_set_style_text_font (_name, nameFace, 0);
         lv_obj_set_style_text_color(_name, UI::c(tone(p.TEXT)), 0);
         lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
     } else {

@@ -214,6 +214,10 @@ struct UIShape {
     float C_VALUE_GAP;  // 1.3  between the header's values, and a value's icon and words
     float C_TILE_MIN;   // 7.5  the least a mini tile is each way - "tight" (K103); a cluster
                         //      whose tiles would be smaller takes more cells
+    float C_TILE_FOOT;  // 1.5  a mini tile's hero and label kept this far off its top and foot,
+                        //      clear of its active frame (2.11 round 12)
+    float C_TILE_TALL;  // 1.1  A RATIO: a mini tile drawn no taller than this times its width,
+                        //      centred in its slot (round 12: "Desk is much taller than it is wider")
 
     // --- Panels and windows float over the page (D-35, the "Panel Edges" mock) ---
     float HALO;         // 5.0  the halo round a header slot's panel and every window: black at

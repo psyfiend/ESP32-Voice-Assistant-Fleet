@@ -102,18 +102,24 @@ uint8_t shapes(const ArrScreen &s, const ArrWeights &W, const ArrRef &ref, const
         // v9 (shapesV9()): its preferred shape A stretches its limits and is what
         // square means; its size is taken at that shape; bigger than the target
         // pays BIG on top.
+        // A LOOSE BOX (round 12): taller than the card may be, up to half as much
+        // again - the card is drawn at its tallest allowed shape, centred
+        // (finishPage()), and the height it leaves pays as a hole. A pinned page
+        // with few rows (the 4B at 4 x 3) otherwise had no page at all.
         const double A = b.aspect > 0 ? b.aspect : 1.0;
         for (int w = 1; w <= g.cols; w++)
             for (int h = 1; h <= g.rows; h++) {
                 const double wmm = spanW(s, g, w), hmm = spanH(s, g, h);
-                if (wmm * hmm < ref.soloW * ref.soloH * A * 0.98 || hmm / wmm > ref.tall / A * 1.001 || wmm / hmm > 1.7 * A)
+                const double hd = fmin(hmm, wmm * ref.tall / A);
+                if (wmm * hd < ref.soloW * ref.soloH * A * 0.98 || hmm / wmm > ref.tall / A * 1.5 || wmm / hmm > 1.7 * A)
                     continue;
                 double bw, bh;
-                soloBody(s, wmm, hmm, bw, bh);
+                soloBody(s, wmm, hd, bw, bh);
                 const double size = sqrt(bw * bh / A);
                 const double lr = log(size / L);
+                const double waste = hmm - hd > 0.01 ? W.gap8 * wmm * (hmm - hd) / (L * L) : 0.0;
                 const double sizeC = W.size * sq(lr) + W.big * sq(lr > 0 ? lr : 0.0);
-                const double sqC = W.square * sq(log(hmm / wmm * A)) * 4;
+                const double sqC = W.square * sq(log(hd / wmm * A)) * 4 + waste;
                 all[na++] = { (uint8_t)w, (uint8_t)h, 0, 0, 0, sizeC + sqC, size, sqC };
             }
     } else {
@@ -133,9 +139,11 @@ uint8_t shapes(const ArrScreen &s, const ArrWeights &W, const ArrRef &ref, const
                     const double size = sqrt(tw * th);
                     const double sizeC = n * W.size * sq(log(size / L)), tshC = n * W.square * 0.4 * sq(log(th / tw));
                     const double slotC = (tc * tr - n) * 8;
-                    // Rule 2: a step taller than wide is charged, more the taller (landscape pages).
-                    const double lw = log(hmm / wmm);
-                    const double wideC = W.wide * (lw > 0 ? lw : 0.0) * 2;
+                    // Rule 2: a step taller than wide is charged, more the taller (landscape pages);
+                    // and (round 12, the owner: "I would always prefer horizontal to vertical
+                    // groups") tiles stacked more rows than columns pay WIDE again, by how many more.
+                    const double lw = log(hmm / wmm), lt = log((double)tr / tc);
+                    const double wideC = W.wide * (lw > 0 ? lw : 0.0) * 2 + W.wide * (lt > 0 ? lt : 0.0) * 2;
                     const double cost = sizeC + tshC + slotC + wideC;
                     if (!have || cost < best.cost) {
                         have = true;
@@ -149,8 +157,14 @@ uint8_t shapes(const ArrScreen &s, const ArrWeights &W, const ArrRef &ref, const
     // As v5: a shape that costs more than a smaller one inside it plus the empty
     // units between is dropped. Then the cheapest first, ties by area, kept in
     // the order made (the playground's sort is stable).
+    // THE TIGHTEST SHAPE ALWAYS STAYS (round 12), after the ten: with only the
+    // cheapest, a pinned page whose blocks needed their smallest shapes had no page
+    // (the 4B at 4 x 3 to 4 x 5 - its clusters kept only shapes four units tall).
+    // Ties: the cheapest, then the first made.
     const double hole1 = W.gap8 * (g.cwmm * g.chmm) / (L * L);
     uint8_t n = 0;
+    bool haveTight = false;
+    Shape tight = {};
     for (uint16_t i = 0; i < na; i++) {
         const Shape &sh = all[i];
         bool dominated = false;
@@ -160,14 +174,24 @@ uint8_t shapes(const ArrScreen &s, const ArrWeights &W, const ArrRef &ref, const
             if (t.w <= sh.w && t.h <= sh.h && t.cost + (sh.w * sh.h - t.w * t.h) * hole1 <= sh.cost) dominated = true;
         }
         if (dominated) continue;
+        const int area = sh.w * sh.h;
+        if (!haveTight || area < tight.w * tight.h || (area == tight.w * tight.h && sh.cost < tight.cost)) {
+            haveTight = true;
+            tight = sh;
+        }
         // Into the sorted list, after every shape not after it; only the first ten stay.
         uint8_t at = n;
         while (at > 0 && before(sh, out[at - 1])) at--;
-        if (at >= ARR_SHAPES_MAX) continue;
-        const uint8_t last = n < ARR_SHAPES_MAX ? n : (uint8_t)(ARR_SHAPES_MAX - 1);
+        if (at >= ARR_SHAPES_CHEAP) continue;
+        const uint8_t last = n < ARR_SHAPES_CHEAP ? n : (uint8_t)(ARR_SHAPES_CHEAP - 1);
         for (uint8_t k = last; k > at; k--) out[k] = out[k - 1];
         out[at] = sh;
-        if (n < ARR_SHAPES_MAX) n++;
+        if (n < ARR_SHAPES_CHEAP) n++;
+    }
+    if (haveTight) {
+        bool in = false;
+        for (uint8_t k = 0; k < n && !in; k++) in = out[k].w == tight.w && out[k].h == tight.h;
+        if (!in) out[n++] = tight;
     }
     return n;
 }
@@ -383,9 +407,11 @@ void spreadAround(const Groups &g, double *p, const double *len, double room, do
     }
     double used = (n - 1) * gap;
     for (uint8_t k = 0; k < n; k++) used += e1[k] - e0[k];
+    // Round 12: a page filled to the pixel (clusters grown into the spare height)
+    // is still packed - only one that overflows stays where the units put it.
     const double spare = room - used;
-    if (spare <= 0) return;
-    const double s = spare / n;
+    if (spare < -0.5) return;
+    const double s = (spare > 0 ? spare : 0.0) / n;
     double at = s / 2;
     for (uint8_t k = 0; k < n; k++) {
         const double d = at - e0[k];
@@ -402,7 +428,8 @@ void spreadAround(const Groups &g, double *p, const double *len, double room, do
 // while far too flat. 2. In pixels, the spare room shared out: blocks whose rows
 // overlap make a BAND, and bands spread down the page; in each band, blocks whose
 // columns overlap make a COLUMN, columns spread across it, and each column is
-// centred in its band's height. Clusters keep their units.
+// centred in its band's height. Before the spreading (round 12): a loose card is
+// drawn at its tallest allowed shape, and clusters grow into the spare height.
 void finishPage(const ArrScreen &s, const ArrBlock *blocks, uint8_t n, uint8_t cols, uint8_t rows,
                 const ArrPlace *pos, ArrPlace *box, ArrRect *rect) {
     if (!n || n > ARR_BLOCKS_MAX || !cols || !rows) return;
@@ -454,8 +481,56 @@ void finishPage(const ArrScreen &s, const ArrBlock *blocks, uint8_t n, uint8_t c
         h[i] = box[i].h * sy - s.gap;
         all[i] = i;
     }
+    // A loose card's box (shapes()) is drawn at its tallest allowed shape, centred.
+    const ArrRef ref = arrRef();
+    for (uint8_t i = 0; i < n; i++) {
+        if (blocks[i].cluster) continue;
+        const double hd = w[i] * ref.tall / (blocks[i].aspect > 0 ? blocks[i].aspect : 1.0);
+        if (h[i] > hd + 0.5) {
+            y[i] += (h[i] - hd) / 2;
+            h[i] = hd;
+        }
+    }
     for (uint8_t i = 0; i < n; i++) hiY[i] = y[i] + h[i];
     overlapGroups(all, n, y, hiY, bands);
+    // CLUSTERS GROW INTO THE SPARE HEIGHT FIRST (round 12, the owner: "the clusters
+    // should expand vertically to fill the space and leave the solo cards the size
+    // they currently are"): each band holding a cluster takes an equal share of the
+    // page's spare height, each cluster in it growing to its band's height plus that
+    // share - never past square tiles. What is left is spread: "around the blocks,
+    // but only when that would not make the blocks too small".
+    double usedH = (bands.n - 1) * s.gap;
+    uint8_t grows = 0;
+    double bb0[ARR_BLOCKS_MAX], bb1[ARR_BLOCKS_MAX];
+    for (uint8_t k = 0; k < bands.n; k++) {
+        bb0[k] = INFINITY;
+        bb1[k] = -INFINITY;
+        bool cl = false;
+        for (uint8_t j = 0; j < bands.len[k]; j++) {
+            const uint8_t i = bands.m[k][j];
+            if (y[i] < bb0[k]) bb0[k] = y[i];
+            if (y[i] + h[i] > bb1[k]) bb1[k] = y[i] + h[i];
+            cl = cl || blocks[i].cluster;
+        }
+        usedH += bb1[k] - bb0[k];
+        if (cl) grows++;
+    }
+    const double spareH = s.ah - usedH;
+    if (spareH > 0 && grows) {
+        const double share = spareH / grows;
+        for (uint8_t k = 0; k < bands.n; k++)
+            for (uint8_t j = 0; j < bands.len[k]; j++) {
+                const uint8_t i = bands.m[k][j];
+                if (!blocks[i].cluster) continue;
+                // How much taller it may grow before its tiles are square, px.
+                const ArrPlace &p = pos[i];
+                const double wmm = w[i] / s.pmm, hmm = h[i] / s.pmm;
+                const double tw = (wmm - 2 * PAD - (p.tc - 1) * TG) / (p.tc ? p.tc : 1);
+                const double th = (hmm - HDR - 2 * PAD - (p.tr - 1) * TG) / (p.tr ? p.tr : 1);
+                const double room = fmax(0.0, (tw - th) * p.tr * s.pmm);
+                h[i] += fmax(0.0, fmin(bb1[k] - bb0[k] + share - h[i], room));
+            }
+    }
     spreadAround(bands, y, h, s.ah, s.gap);
     for (uint8_t k = 0; k < bands.n; k++) {
         const uint8_t *bd = bands.m[k];
