@@ -1536,12 +1536,30 @@ Midnight; the off disc still stands apart from it.
 |---|---|
 | ![P4_5](followups/211_r12b_p45.png) | ![1060](followups/211_r12b_1060.png) |
 
+## 3. Your notes on the above, and the tweak
+
+Your notes: Kitchen's tiles are now wider than tall, too squat - "split the difference"; the tile
+panel went too far, and stands out more on the 1060 than on the P4_5 and far more on the 4B (P4_5:
+Fleet perfect, Midnight and Linen a little strong; 1060: all a bit strong, Midnight and Linen most;
+4B: every scheme too strong). One value for every board and scheme, no per-board profiles yet.
+
+- **Tile heights**: a cluster whose own near-square height is taller than the page's shortest now
+  draws **halfway down to it** (K124). The 1060's Kitchen tiles: 210 px before, 170 at one height,
+  **188 now**; the bottom row's stay 168. The P4_5 (its House header now hidden, so taller rows):
+  Kitchen ~221 px, the bottom row 204.
+- **The tile panel**: **3% toward the text**, half of 6%. The 4B's panel shows the difference more
+  than the other two boards at any value; calibrating the panels (their init commands) is for later.
+
+| P4_5 (Fleet) | 1060 (Linen) | 4B (Midnight) |
+|---|---|---|
+| ![P4_5](followups/211_r12b2_p45.png) | ![1060](followups/211_r12b2_1060.png) | ![4B](followups/211_r12b2_4b.png) |
+
 ## For the final pass (added)
 
 | # | Do this | PASS if |
 |---|---|---|
 | P12 | The 4B: Auto, then power it off and on | the page arranges itself within ~10 s of HA starting, and the board keeps running; after the power cycle the page is built at once |
-| P13 | The P4_5's and 1060's House on Midnight, Linen and Fleet | every room's tiles the same height, each with a visible panel, the off discs still distinct |
+| P13 | The P4_5's and 1060's House on Midnight, Linen and Fleet | Kitchen's tiles between square and squat, the other rooms' alike; each tile's panel visible without standing out (the 4B too), the off discs still distinct |
 
 ## Questions for you (round 12b)
 
@@ -1553,9 +1571,11 @@ Midnight; the off disc still stands apart from it.
 
 ## Results (mine, before you)
 
-- **Seen by screenshot**: the 4B on Auto (above), the P4_5's and 1060's House pages.
-- **Settings**: every board's file saved before the flash (the 4B's caught between reboots);
+- **Seen by screenshot**: the 4B on Auto (above), the P4_5's and 1060's House pages; after the
+  tweak, all three.
+- **Settings**: every board's file saved before each flash (the 4B's first caught between reboots);
   compared afterwards: the P4_5 and 1060 0 differences, the 4B only its kept House layout (Auto's
-  new answer).
+  new answer). After the tweak: the P4_5 and 4B 0; the 1060 only `system.ui.scheme` cleared, by a
+  tap on the board at 16:12 (`loopTask`) - your scheme change, left as you set it.
 - **Host tests**: not rerun - the search is unchanged; the change is the task's priority and the
   tiles' drawing.

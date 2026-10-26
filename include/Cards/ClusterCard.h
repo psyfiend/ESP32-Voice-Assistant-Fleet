@@ -54,7 +54,7 @@ public:
     // on their own - near square, no taller than C_TILE_TALL their width.
     int32_t tileHeight() const;
     // ONE TILE HEIGHT A PAGE (round 12b): the page gives every cluster the
-    // shortest any of them draws, so each room's tiles stand alike. 0: its own.
+    // shortest any of them draws; a taller one draws halfway down to it. 0: its own.
     void setTileHeightCap(int32_t px) { _tileHCap = px; }
     // The header values' icons in the page header's glyph style (round 11, K115):
     // framed on a Swatch header, bare on a Band. Every cluster's, from the next build.

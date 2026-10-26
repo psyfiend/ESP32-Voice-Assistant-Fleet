@@ -179,10 +179,11 @@ void ClusterCard::buildBody(lv_obj_t *body) {
     // The tiles.
     const uint8_t nTiles = tileCount();
     const Layout::TileGrid g = tileGrid();
-    // Each tile near square (tileHeight()), or the page's height when shorter,
-    // centred in its slot - a little wiggle room left inside the cluster.
+    // Each tile near square (tileHeight()), or halfway down to the page's height
+    // when that is shorter (round 12b, the owner: the page's height alone left
+    // Kitchen's wide tiles squat - "split the difference"), centred in its slot.
     int32_t th = tileHeight();
-    if (_tileHCap > 0 && _tileHCap < th) th = _tileHCap;
+    if (_tileHCap > 0 && _tileHCap < th) th = (th + _tileHCap) / 2;
     uint8_t t = 0;
     for (uint8_t i = 0; i < _n; i++) {
         if (!_tile[i]) continue;

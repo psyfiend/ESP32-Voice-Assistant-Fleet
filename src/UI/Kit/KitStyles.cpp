@@ -540,9 +540,9 @@ static void fillCards() {
     lv_style_t *tl = st(S::KS_TILE);
     // A FAINT PANEL EACH (round 11, the owner's E - K116): between the cluster's
     // surface and SURFACE_ALT, so the off disc (SURFACE_ALT) and the header's
-    // band still stand apart from it - and a step toward the text (round 12b,
-    // the owner: "a bit too faint, barely visible").
-    lv_style_set_bg_color    (tl, UI::c(UI::mix(UI::mix(p.SURFACE, p.SURFACE_ALT, 50), p.TEXT, 6)));
+    // band still stand apart from it - and a small step toward the text (round
+    // 12b, the owner: "barely visible" at none, too bright at 6%; 3% between).
+    lv_style_set_bg_color    (tl, UI::c(UI::mix(UI::mix(p.SURFACE, p.SURFACE_ALT, 50), p.TEXT, 3)));
     lv_style_set_bg_opa      (tl, LV_OPA_COVER);
     lv_style_set_border_width(tl, 0);
     lv_style_set_pad_all     (tl, 0);

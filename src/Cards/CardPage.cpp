@@ -313,7 +313,7 @@ void CardPage::commit() {
 
     // ONE TILE HEIGHT A PAGE (round 12b, the owner: the 1060's Kitchen tiles
     // stood taller than the other rooms', just under the near-square limit):
-    // every cluster's tiles drawn as tall as the shortest any of them draws.
+    // the shortest tiles any cluster draws, handed to each (it draws halfway).
     {
         int32_t tileH = 0;
         for (uint8_t pass = 0; pass < 2; pass++)
