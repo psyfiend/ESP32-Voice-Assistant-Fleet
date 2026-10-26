@@ -511,7 +511,8 @@ static void fillCards() {
     // planner places them); a rule under it in the border's colour - a light
     // scheme draws no card border, so the rule has a hairline of its own.
     lv_style_t *ch = st(S::KS_CLUSTER_HDR);
-    lv_style_set_bg_opa      (ch, LV_OPA_TRANSP);
+    lv_style_set_bg_color    (ch, UI::c(p.SURFACE_ALT));   // a faint band, as the page header's (round 10)
+    lv_style_set_bg_opa      (ch, LV_OPA_COVER);
     lv_style_set_border_side (ch, LV_BORDER_SIDE_BOTTOM);
     lv_style_set_border_width(ch, LV_MAX(1, UI::mm(k.LINE_HAIR)));
     lv_style_set_border_color(ch, UI::border());

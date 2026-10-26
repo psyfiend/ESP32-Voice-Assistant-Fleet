@@ -376,7 +376,7 @@ struct GUITweaks {
 
     static constexpr TweaksSheet::Row ROWS[] = {
         { "Glyphs",         GLYPHS,  3, glyphsNow,  glyphsSet  },
-        { "Card label",     LABEL,   4, labelNow,   labelSet   },
+        { "Label type",     LABEL,   4, labelNow,   labelSet   },   // the card label's TYPE; Card UI's "Card label" is its words (round 10)
         { "Entity label",   ENTITY,  4, entityNow,  entitySet  },
         { "Card state",     STATE,   4, stateNow,   stateSet   },
         { "Selector",       METAL,   3, metalNow,   metalSet   },

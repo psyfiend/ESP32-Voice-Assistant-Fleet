@@ -39,7 +39,7 @@ const char *const ADD_W[] = { "No", "Copy", "Move" };
 // THE VIEWS ARE CHIP TABLES (round 4, the owner: "look more like the Card UI or
 // UI Tweaks sheet"): an option's name right-justified against its chips, the
 // actions as buttons at the foot.
-const char *const STYLE_W[]  = { "Page's", "Swatch", "Bar" };
+const char *const STYLE_W[]  = { "Page's", "Swatch", "Band" };   // "Band", as the label type's (round 10); saved as "bar"
 const char *const STYLE_IS[] = { nullptr, "swatch", "bar" };
 const char *const ONOFF_W[]  = { "On", "Off" };
 const char *const YESNO_W[]  = { "Yes", "No" };
@@ -443,12 +443,19 @@ void buildClusterSlots() {
     names(*cl);
     for (uint8_t i = 0; i < cl->memberCount() && n < GROUP_MEMBERS_MAX; i++) {
         if (movedOut(cl->memberAt(i))) continue;   // its card is on the page: not the cluster's to show
+        // SENSORS ONLY (round 10, the owner): a light or a switch is a tile. One
+        // already in the header is listed, so it can be taken out.
+        const bool in = inList(idOf(cl->memberAt(i)), ids, nIds);
+        const Entity *e = cl->memberAt(i) ? cl->memberAt(i)->firstEntity() : nullptr;
+        const bool sensor = e && (e->desc.kind == EntityKind::SENSOR || e->desc.kind == EntityKind::BINARY_SENSOR);
+        if (!sensor && !in) continue;
         s_slotMember[n] = i;
-        rows[n++] = { s_names[i], YESNO_W, 2, (uint8_t)(inList(idOf(cl->memberAt(i)), ids, nIds) ? 0 : 1) };
+        rows[n++] = { s_names[i], YESNO_W, 2, (uint8_t)(in ? 0 : 1) };
     }
     s_table = Kit::chipTable(s.stage, listW(), rows, n, slotChipCb);
-    note(s_table, "Yes: its value in the header, in the order chosen, four at most; one that does not fit "
-                  "gives way, the last first. A member in the header is not a tile unless shown.");
+    note(s_table, "Yes: its value in the header, four at most - from the right, temperature, occupancy, "
+                  "light level, then the rest, on every cluster; one that does not fit gives way from "
+                  "the left. A member in the header is not a tile unless shown.");
 }
 
 void clusterRename() { renameCb(nullptr); }

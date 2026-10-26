@@ -1,4 +1,4 @@
-# Handoff — 2026-10-20, night (2.11 group cards: nine rounds; sign-off next)
+# Handoff — 2026-10-26 (2.11 group cards: ten rounds; the last features, then sign-off)
 
 **Start here.** This file is only: what to read, where we are, what to do next, what will bite you,
 and how to work with the owner. The history of how things got here is in the test sheets
@@ -95,17 +95,30 @@ bring each over when it is next changed (`ui-architecture.md` §6).
 
 ## What is next
 
-1. **2.11's sign-off** - the last sprint's items 1-7 are done (rounds 8 and 9, `TEST_2.11.md`).
-   **First, the owner's results and answers to rounds 8 and 9**: round 9 asks about the arranger's
-   time (1-3 s unpinned on the P4s), the finish's margins (a card half a row lower than its
-   neighbours), the old pins (Auto on the 1060 and the 4B?), the roomy hero face's flash (~119 KB on
-   the 7" boards), tile borders (A-D), the Reset's home, the group view against group pages (K90,
-   K99 - recommendation (a): the group view is K90's group page, as a window), and round 4's rest
-   (a table of six). Record his decisions as DECISIONS lines (K114 on), build what he chooses that
-   belongs in 2.11, then **item 8**: **one final test sheet** for the owner (he asked for it), the
-   all-nine gate with the structure check, the CHANGELOG entry, the sheet archived, the PR; the
-   owner merges; tag `v0.2.19`. The owner is bringing `dashboard-target-7b.md` up to date with
-   clusters as the new baseline, with entities added to fill the screen.
+1. **2.11's last features, then sign-off.** The owner answered round 9 on 2026-10-26 (DECISIONS
+   K114-K120; `TEST_2.11.md` "Your results" after round 9, and round 10 - the names and the
+   cluster headers, built). **He tests once, at the end** - no more test rounds for him until the
+   features are done. Left, in `TEST_2.11.md` round 10 "Left for the next session":
+   - **Bugs on the glass**: in Fleet and Midnight, where a slot panel's tab meets the bar's accent
+     line, a small square of the panel's face covers the line just outside each of the tab's lower
+     corners (the line breaks in a notch beside the tab, both sides of the page slot's, the left
+     of the status slot's); in Linen a slot panel at the screen's edge shows the bar's drop shadow
+     along its own outer edge; check the Band now reaches the border (round 10's fix, untested in
+     Linen).
+   - **The 4B's arranger bug** (rows added become empty space) - read `/popup`'s second line on a
+     test copy, row by row; likely "no page" and the flow fallback.
+   - **The arranger, next (K120)**: solo cards no bigger than a cluster; centred rows and symmetric
+     solo cards, or even space round them (the owner liked the 1060 at 7 x 5); a card's preferred
+     span (the Fleet page's Free Heap and Uptime, 1.5 cells). **Playground v9 first** - the owner
+     reacts to a page, then the port.
+   - **Active tiles wear the card state** (K116; inactive: C or E in the mock), **sensor icons in
+     the header's glyph styles** (K115).
+   - Two of his answers wait on a question: K117 (copies made on the board - keep Remove?) and
+     K118 (tiles or cards in a group view and a group page).
+   Then **item 8**: **one final test sheet** for the owner (he asked for it), the all-nine gate with
+   the structure check, the CHANGELOG entry, the sheet archived, the PR; the owner merges; tag
+   `v0.2.19`. The owner is bringing `dashboard-target-7b.md` up to date with clusters as the new
+   baseline, with entities added to fill the screen.
 2. **#76, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast`, a notice's
    detailed form then its minimal "!" in status, a place that grows for a high-priority claim. Mock
    first.

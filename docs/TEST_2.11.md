@@ -1177,3 +1177,87 @@ Not built, each a question (HANDOFF item 7):
   every board), so the later pictures show dashes and generic icons; the arranger, the Reset and the
   icons need nothing from it. The values come back when it does.
 - **Lines of code**: HANDOFF's table, recounted.
+
+## Your results
+
+**2026-10-26** - answers to rounds 9's questions and new notes; **the tests wait for one final pass
+once the features are done** (your word). Your answers are DECISIONS K114-K120. In short: keep the
+arranger as it is and keep arranging automatic, with solo cards no bigger than clusters, centred
+rows, symmetric solo cards and a card's preferred span to prototype next (K120); the larger icon
+stays; active tiles wear the card state, with C (hairline) or E (faint fill, new in the mock) for
+the rest (K116); the Reset stays where it is; the group view first, group pages later (K118);
+counts and alerts from HA template sensors (K119); Delete only from the web app (K117).
+
+Bugs you found: in Fleet and Midnight a slot panel's top corners block a small piece of the bar's
+accent line; in Linen a slot panel at the screen's edge shows the bar's drop shadow at its own edge;
+in Linen a cluster's Band stops short of its border on some clusters; non-sensors offered for a
+cluster's header; the header's values in a different order on each cluster. The 4B's arranging: rows
+added become empty space.
+
+# Round 10 (2026-10-26) - names, cluster headers
+
+| Where | Before | Now |
+|---|---|---|
+| **UI Tweaks** | "Card label" (Float, Band, Tag, None) - the same name as Card UI's row for the label's words | **Label type** (K114) |
+| **A cluster's Header style** | Swatch / Bar | **Swatch / Band** (still saved as `bar`) |
+| **Header slots** (the cluster's window) | every member offered | **sensors only** (temperature, occupancy, light level...); a non-sensor already there is listed so it can come out |
+| **The header's values** | in each cluster's own order | **one order everywhere** (K115): from the right, temperature, occupancy, light level, then the rest; they give way from the left |
+| **Swatch headers** | on the cluster's own surface | **on a faint band**, the page header's colour (SURFACE_ALT) |
+| **A Band header** | sized from the width the page computed, a pixel or three short of the border on some clusters | **the room's whole width** - to check in Linen, where you saw it |
+
+![The P4_5 (Midnight): temperature rightmost on every cluster, Swatch headers on a faint band](followups/211_r10_headers_p45.png)
+
+**The tile-borders mock** has **E** now: every tile a faint panel, an on tile framed with the Corner
+cut ([2.11 Round 9 Mocks](https://claude.ai/artifact/SpSG1hhpbJsUmxBLv3cdfY), page *Tile borders*).
+
+## Your questions, answered
+
+**The Doors card.** It is a **summary** (K98, round 4): a group card made on the device - its members
+are the two door cards, defined in the dashboard (`Dashboard_HA.h`, `present: summary`) - drawn as
+one card. On and off follow the group card's **Active state**, which SETTINGS already offers on any
+group card made on the device: **Any members are on** (its default, so either door open lights it)
+or **All members are on**. Its words are the one piece of logic of its own (`SummaryCard::nameText()`
+in `CardCatalog.cpp`): none open - its own name ("Doors"); one - that door's name from the
+dashboard ("North"); all - "Both" (two) or "All"; some of more - "2 open". So yes: "North", "South",
+"Both" is what it does. Nothing lets you change those words on the board; customising them belongs
+with the web app (#87), as you said. It is the only summary on the dashboard so far.
+
+**HA template sensors as the backbone.** Yes, and I think you have it the right way round: the
+counting and the conditions live in HA, where they can be written once, tested in HA's own template
+editor, and shared by every board; the board shows an entity. A "garage doors" template sensor whose
+state is the number open and whose attributes carry the open doors' names can be the Doors card
+(its words from the attribute) and a header slot at once. An **alert** template sensor ("after
+10 pm and the garage open", "front door open over 5 minutes") is a binary sensor: on in a header
+slot it shows, off it shows nothing - which is exactly #76's claim model (a notice queue, a slot that
+appears only while something claims it). What it asks of the board: a header slot kind "alert",
+shown only while on, and a slot that reads its words from an attribute. Recorded as K119; it
+belongs with #76, after 2.11.
+
+**Round 4's question 5, the card list.** When you make a cluster, or Add cards to one, the board
+offers only the cards already on the page. K92 rule 11 proposed a longer list: also the HA entities
+you have **labelled "Fleet" in HA** (HA's labels, since 2024.4) - so you could bring a new entity onto
+the board without editing the dashboard. The question was whether to build that list in 2.11. My
+recommendation stands: later, with the web app, which can search all of HA.
+
+**Group view or group page - tiles or cards?** (K118's open part.) *My recommendation*: **tiles in the
+group view** - it is a window, so it is a cluster's members at a glance, and tiles are what fit -
+and **cards on a group page** - a whole page is a page, built like any page, by the arranger, so a
+member there is a card with its own border. A choice for each later, from the web app.
+
+**Delete** (K117): the board only hides. One thing to settle: K112 gave **copies made on the board**
+a *Remove from the page* (and a copy in a cluster *Remove from the cluster*) - deleted, not hidden,
+because the card it was copied from is still there. Keep that for copies, or make them Hide too?
+*My recommendation: keep Remove for copies made on the board* - nothing original is lost, and a
+hidden copy would sit in the hidden cards beside the card it copies.
+
+## Left for the next session (not built)
+
+- **The bugs that need the glass**: the slot panel's corners on the accent line (Fleet, Midnight);
+  the drop shadow at a panel's edge (Linen); the Band check.
+- **The 4B's arranging** (rows added become empty space): most likely its search finds no page
+  for some row counts and the page falls back to the flow - to confirm from `/popup`'s second line
+  on a test copy, row by row.
+- **The arranger, next** (K120): solo cards no bigger than a cluster; centred rows and symmetric solo
+  cards, or even space round them; a card's preferred span (Free Heap, Uptime) - in the playground
+  first (v9), then the port.
+- **Active tiles in the card state** (K116), and the header's sensor icons in the glyph styles (K115).

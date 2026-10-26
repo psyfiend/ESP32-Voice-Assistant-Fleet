@@ -21,6 +21,19 @@ int32_t tgap()  { return UI::mm(UI::shape().C_TILE_GAP); }
 // The tiles' box starts a little under the header and ends a little above the
 // frame's foot (the mock's: 0.8 and 1.0 of the padding).
 int32_t tilesTop() { return hdrH() + pad() * 8 / 10; }
+
+// WHERE A HEADER VALUE STANDS (round 10, the owner: "the order should be
+// universal across all clusters"): from the right, temperature, occupancy,
+// light level, then the rest. Lower stands further right, and gives way last.
+uint8_t headerRank(const Card *m) {
+    const Entity *e = m ? m->firstEntity() : nullptr;
+    if (!e) return 3;
+    const char *dc = e->desc.deviceClass;
+    if (!strcmp(dc, "temperature")) return 0;
+    if (!strcmp(dc, "occupancy") || !strcmp(dc, "motion") || !strcmp(dc, "presence")) return 1;
+    if (!strcmp(dc, "illuminance")) return 2;
+    return 3;
+}
 }  // namespace
 
 ClusterCard::ClusterCard() {
@@ -99,7 +112,9 @@ void ClusterCard::buildBody(lv_obj_t *body) {
 
     _hdr = Kit::plain(body);
     Kit::add(_hdr, KS::KS_CLUSTER_HDR);
-    lv_obj_set_size(_hdr, _innerW, hdrH());
+    // The room's whole width as laid out (round 10: a band stopped short of the
+    // border by the page's pixel rounding when sized from the computed width).
+    lv_obj_set_size(_hdr, lv_pct(100), hdrH());
     lv_obj_set_pos (_hdr, 0, 0);
     // A bar's lower corners are square (the card band's skirt, without a layer).
     _skirt = Kit::plain(_hdr);
@@ -111,11 +126,20 @@ void ClusterCard::buildBody(lv_obj_t *body) {
     _title = Kit::label(_hdr, KS::KS_CLUSTER_TITLE);
     lv_label_set_long_mode(_title, LV_LABEL_LONG_DOT);
     lv_obj_set_height(_title, lv_font_get_line_height(UI::type().NAME));
-    for (uint8_t i = 0; i < _n; i++) {
-        const int8_t r = _slotOf[i];
-        if (r < 0 || _slot[r].member >= 0) continue;
-        Slot &s = _slot[r];
-        s.member = (int8_t)i;
+    // The header's members, in the saved list's order, then placed by kind
+    // (headerRank()): slot 0 the rightmost, ties in the list's order.
+    uint8_t order[CLUSTER_SLOTS_MAX];
+    uint8_t no = 0;
+    for (int8_t want = 0; want < (int8_t)CLUSTER_SLOTS_MAX; want++)
+        for (uint8_t i = 0; i < _n && no < CLUSTER_SLOTS_MAX; i++)
+            if (_slotOf[i] == want) order[no++] = i;
+    for (uint8_t a = 1; a < no; a++)   // a stable insertion sort by rank
+        for (uint8_t b = a; b > 0 && headerRank(_m[order[b]]) < headerRank(_m[order[b - 1]]); b--) {
+            const uint8_t t = order[b]; order[b] = order[b - 1]; order[b - 1] = t;
+        }
+    for (uint8_t k = 0; k < no; k++) {
+        Slot &s = _slot[k];
+        s.member = (int8_t)order[k];
         s.box  = Kit::plain(_hdr);
         lv_obj_set_height(s.box, hdrH());
         s.icon = Kit::label(s.box, KS::KS_CARD_ICON_SM);
@@ -164,11 +188,16 @@ void ClusterCard::render() {
         lv_obj_clear_flag(_skirt, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag  (_swatch, LV_OBJ_FLAG_HIDDEN);
     } else {
+        // SWATCH, ON A FAINT BAND (round 10, the owner): the header set apart from
+        // the tiles as the page header is from the ground - the role's
+        // SURFACE_ALT, its corners the frame's, its foot square (the skirt).
         lv_obj_remove_local_style_prop(_hdr, LV_STYLE_BG_COLOR, 0);
         lv_obj_remove_local_style_prop(_hdr, LV_STYLE_BG_OPA, 0);
-        lv_obj_remove_local_style_prop(_hdr, LV_STYLE_RADIUS, 0);
+        lv_obj_set_style_radius     (_hdr, UI::sc(UI::met().RADIUS) - UI::met().BORDER_W, 0);
         lv_obj_remove_local_style_prop(_hdr, LV_STYLE_BORDER_WIDTH, 0);
-        lv_obj_add_flag  (_skirt, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_bg_color   (_skirt, UI::c(p.SURFACE_ALT), 0);
+        lv_obj_set_style_bg_opa     (_skirt, LV_OPA_COVER, 0);
+        lv_obj_clear_flag(_skirt, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(_swatch, UI::c(gcol), 0);
         lv_obj_clear_flag(_swatch, LV_OBJ_FLAG_HIDDEN);
     }
@@ -218,8 +247,10 @@ void ClusterCard::layoutHeader() {
     c[n].width[0] = swW + Kit::textW(lv_label_get_text(_title), t.NAME);
     c[n].keep[0]  = Layout::KEEP_ALWAYS;
     n++;
-    for (uint8_t r = 0; r < CLUSTER_SLOTS_MAX; r++) {
-        claimOf[r] = -1;
+    for (uint8_t r = 0; r < CLUSTER_SLOTS_MAX; r++) claimOf[r] = -1;
+    // Claims stand left to right in list order: slot 0 (temperature) goes last,
+    // so it stands rightmost; its keep is the highest, so it gives way last.
+    for (int8_t r = (int8_t)CLUSTER_SLOTS_MAX - 1; r >= 0; r--) {
         const Slot &s = _slot[r];
         if (s.member < 0) continue;
         const char   *txt = lv_label_get_text(s.text);
