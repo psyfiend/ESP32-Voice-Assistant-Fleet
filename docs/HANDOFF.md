@@ -46,7 +46,7 @@ fonts, `lvgl`, `GFX_Library_for_Arduino`, `SensorLib`, `XPowersLib`, `bb_captouc
 | `v0.2.18` | 2026-10-17 | 2.8, the header bar v2 | 57,224 | 244 |
 | branch | 2026-10-20 | 2.11, seven rounds | 62,077 | 259 |
 | branch | 2026-10-26, morning | 2.11, eleven rounds | 63,201 | 259 |
-| branch | 2026-10-26, evening | **2.11 so far** (rounds 1-12b) | **63,372** | **259** |
+| branch | 2026-10-26, evening | **2.11 so far** (rounds 1-12b) | **63,373** | **259** |
 
 Counted with `git grep -c '' <rev> -- <those paths>` over `.c .cpp .h .hpp`; recount the same way.
 
@@ -78,9 +78,9 @@ bring each over when it is next changed (`ui-architecture.md` §6).
   where a card is; the hidden cards (with "No room"); Copy / Move into and out of a cluster, tracked
   (K111, K112); **a development Reset** in the system panel; the roomy hero face on the 7" boards;
   **tiles as E** (K116), drawn **near square** with the hero and label centred and a bigger label
-  where there is room (K122), **one tile height a page** (K124); cluster headers in one order, on a
+  where there is room (K122), **tile heights evened across a page** (K124); cluster headers in one order, on a
   faint band, with the glyph styles (K115).
-- **Boards**: the P4_5, the 4B and the 1060 run round 12b (`76f6e9c`) with their local `DEBUG_POPUP`
+- **Boards**: the P4_5, the 4B and the 1060 run round 12b (`2dcb106`) with their local `DEBUG_POPUP`
   lines. The owner's pins: the P4_5's House 5 x 4 (its header hidden) and Fleet 7 columns + 3 rows
   (a 7-column pin makes the Fleet page flow - `TEST_2.11.md` round 11), the 1060's House 5 x 5; the
   4B's House on **Auto** (he unpinned it 2026-10-26 - that is what found round 12b's boot loop), its
@@ -115,8 +115,9 @@ bring each over when it is next changed (`ui-architecture.md` §6).
    vertical, the 4B's pinned 4 x 3 / 4 x 5 pages found (a block keeps its tightest shape), tiles
    near square with the hero and label centred and clear of the active frame, the bigger label on
    the P4_5 and 1060, and a fix for kept pages whose clusters could not grow. Round 12b fixed the
-   4B's boot loop on Auto (the arranger's task starved the idle task; LESSONS) and gave every
-   cluster on a page one tile height (K124). **He tests once, at the end** - the "For the final
+   4B's boot loop on Auto (the arranger's task starved the idle task; LESSONS), evened the tile
+   heights across a page's clusters (halfway to the shortest) and settled the tile panel at 3%
+   toward the text (K124) - the owner found 6% too bright, most of all on the 4B's panel. **He tests once, at the end** - the "For the final
    pass" tables in rounds 11, 12 and 12b (P1-P13). Open questions for him: round 11's 1-2 ("around"
    or "between" spacing; its arrange time, now round 12b's 1: **the 4B's search takes ~10 s** - a
    time budget, tried in the playground first, is the recommendation) and round 12's 1-2 (the 4B
