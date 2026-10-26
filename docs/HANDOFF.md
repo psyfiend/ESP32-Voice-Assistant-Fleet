@@ -1,4 +1,4 @@
-# Handoff — 2026-10-26, afternoon (2.11 group cards: twelve rounds; the owner's final pass, then sign-off)
+# Handoff — 2026-10-26, evening (2.11 group cards: rounds 1-12b; the owner's final pass, then sign-off)
 
 **Start here.** This file is only: what to read, where we are, what to do next, what will bite you,
 and how to work with the owner. The history of how things got here is in the test sheets
@@ -9,13 +9,13 @@ handoffs are `docs/archive/HANDOFF_to_2026-10-14.md` and `HANDOFF_to_2026-09-29.
 
 1. `CLAUDE.md` - the HAL/BSP, the rules, **and the file-editing rule at the top**.
 2. `docs/ROADMAP.md` (the plan, and where each kind of note belongs) and `docs/DECISIONS.md` (every
-   decision in one line - 2.11's are K88-K123).
+   decision in one line - 2.11's are K88-K124).
 3. **`docs/design/ui-architecture.md`**, then what it points at - `components.md` (the kit, the
    finishes), `tokens.md`, `header-slots.md`, `card-sheet.md` §14-18, `layout-engines.md` (the
    arranger: v8 as built, version 9, round 12), `cards.md`, `pages.md`, `card-layout.md` (before
    moving anything inside a card), `group-cards.md` §6-7 (2.11's design), `interview-phase2-3.md`.
-4. **`docs/TEST_2.11.md`** - the milestone in progress: twelve rounds, the owner's results after the
-   first seven, his notes after rounds 9 and 11, and the open questions of rounds 11 and 12.
+4. **`docs/TEST_2.11.md`** - the milestone in progress: rounds 1-12b, the owner's results after the
+   first seven, his notes after rounds 9, 11 and 12, and the open questions of rounds 11, 12 and 12b.
 5. `docs/LESSONS.md` - before debugging anything. `docs/HTTP_REFERENCE.md` - before calling a route.
    `host-tests/README.md` - before touching `src/Layout/`.
 6. For the display: `docs/display/README.md` only - it indexes the rest.
@@ -46,7 +46,7 @@ fonts, `lvgl`, `GFX_Library_for_Arduino`, `SensorLib`, `XPowersLib`, `bb_captouc
 | `v0.2.18` | 2026-10-17 | 2.8, the header bar v2 | 57,224 | 244 |
 | branch | 2026-10-20 | 2.11, seven rounds | 62,077 | 259 |
 | branch | 2026-10-26, morning | 2.11, eleven rounds | 63,201 | 259 |
-| branch | 2026-10-26, afternoon | **2.11 so far** (twelve rounds) | **63,331** | **259** |
+| branch | 2026-10-26, evening | **2.11 so far** (rounds 1-12b) | **63,372** | **259** |
 
 Counted with `git grep -c '' <rev> -- <those paths>` over `.c .cpp .h .hpp`; recount the same way.
 
@@ -67,10 +67,10 @@ are proved with the harness (`scripts/ui_golden.py`), host tests (`host-tests/`)
 check and the all-nine gate. `GUIManager` and the system panel's pages are not on the kit yet -
 bring each over when it is next changed (`ui-architecture.md` §6).
 
-## Where 2.11 stands (2026-10-26, afternoon)
+## Where 2.11 stands (2026-10-26, evening)
 
 - **Branch `feat/2.11-group-cards`** (off `main` at `6bd834f`), pushed, **no PR** (it comes at
-  sign-off). Twelve rounds (`TEST_2.11.md`); the owner tests once, at the end. Built: clusters and
+  sign-off). Rounds 1-12b (`TEST_2.11.md`); the owner tests once, at the end. Built: clusters and
   the summary card; **the arranger, Layout Playground v9 in units** (host-tested against the
   playground's own answers: `big`, a card's preferred shape, **clusters grown into the spare height
   first** and what is left shared out, horizontal clusters preferred, a block's tightest shape kept;
@@ -78,21 +78,23 @@ bring each over when it is next changed (`ui-architecture.md` §6).
   where a card is; the hidden cards (with "No room"); Copy / Move into and out of a cluster, tracked
   (K111, K112); **a development Reset** in the system panel; the roomy hero face on the 7" boards;
   **tiles as E** (K116), drawn **near square** with the hero and label centred and a bigger label
-  where there is room (K122); cluster headers in one order, on a faint band, with the glyph styles
-  (K115).
-- **Boards**: the P4_5, the 4B and the 1060 run round 12 (`b88ec73`) with their local `DEBUG_POPUP`
-  lines. The owner's pins: the P4_5's House 5 x 4 and Fleet 7 columns + 3 rows (a 7-column pin
-  makes the Fleet page flow - `TEST_2.11.md` round 11), the 1060's House 5 x 5, the 4B's House
-  4 x 6. Kept layouts are `v4` (round 12 moved the version so every page arranged again). Settings
-  copies from every flash: `bench/settings/<board>/2026102*-*.json`.
+  where there is room (K122), **one tile height a page** (K124); cluster headers in one order, on a
+  faint band, with the glyph styles (K115).
+- **Boards**: the P4_5, the 4B and the 1060 run round 12b (`76f6e9c`) with their local `DEBUG_POPUP`
+  lines. The owner's pins: the P4_5's House 5 x 4 (its header hidden) and Fleet 7 columns + 3 rows
+  (a 7-column pin makes the Fleet page flow - `TEST_2.11.md` round 11), the 1060's House 5 x 5; the
+  4B's House on **Auto** (he unpinned it 2026-10-26 - that is what found round 12b's boot loop), its
+  Fleet page 4 rows. Kept layouts are `v4` (round 12 moved the version so every page arranged
+  again). Settings copies from every flash: `bench/settings/<board>/2026102*-*.json`.
 - **Artifacts**: [Layout Playground](https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp) (page v12,
   engine "v9: grow, spread" - the spec for `Layout::arrange()`; its page is also
   `host-tests/tools/playground.html`); [2.11 Round 9 Mocks](https://claude.ai/artifact/SpSG1hhpbJsUmxBLv3cdfY)
   (tile borders A-E - E chosen - and the group view, after 2.11).
-- **Where 2.11's pieces live**: a cluster `Cards/ClusterCard` + `Cards/MiniTile.cpp` (tiles near
-  square in `ClusterCard::buildBody()`, the label face in `MiniTile.cpp`'s `labelFace()`), its span
+- **Where 2.11's pieces live**: a cluster `Cards/ClusterCard` + `Cards/MiniTile.cpp` (a tile's
+  near-square height `ClusterCard::tileHeight()`, the page's shortest handed to every cluster in
+  `CardPage::commit()` before the build; the label face in `MiniTile.cpp`'s `labelFace()`), its span
   and tile grid `Layout/Cluster.h`; the arranger `Layout/Arranger.h` (host-tested; the finish
-  `finishPage()`) and `Cards/PageArranger` (its task, 24 KB stack; kept answers
+  `finishPage()`) and `Cards/PageArranger` (its task at the idle priority, 24 KB stack; kept answers
   `pages.<slug>.layout` = `v4 fp CxR` then `c,r,w,h,tc` in units), `CardPage::arrangePage()` /
   `placeArranged()`; the pins in `GUIManager` (`_pinCols`, `saveGrid()` in `GUIManagerTweaks.cpp`);
   the Reset `CardAdded::resetToCompiled()` + `GUIManager::resetDashboard()`; the halo
@@ -112,10 +114,13 @@ bring each over when it is next changed (`ui-architecture.md` §6).
    clusters grow to fill the spare height (solo cards keep their size), horizontal clusters over
    vertical, the 4B's pinned 4 x 3 / 4 x 5 pages found (a block keeps its tightest shape), tiles
    near square with the hero and label centred and clear of the active frame, the bigger label on
-   the P4_5 and 1060, and a fix for kept pages whose clusters could not grow. **He tests once, at
-   the end** - the "For the final pass" tables in rounds 11 and 12 (P1-P11). Open questions for him:
-   round 11's 1-2 (the 4B's 3.7 s arrange; "around" or "between" spacing) and round 12's 1-2 (the
-   4B at 4 x 4 fills unevenly; the 4B's tile discs a little smaller). Then **item 8**: **one final
+   the P4_5 and 1060, and a fix for kept pages whose clusters could not grow. Round 12b fixed the
+   4B's boot loop on Auto (the arranger's task starved the idle task; LESSONS) and gave every
+   cluster on a page one tile height (K124). **He tests once, at the end** - the "For the final
+   pass" tables in rounds 11, 12 and 12b (P1-P13). Open questions for him: round 11's 1-2 ("around"
+   or "between" spacing; its arrange time, now round 12b's 1: **the 4B's search takes ~10 s** - a
+   time budget, tried in the playground first, is the recommendation) and round 12's 1-2 (the 4B
+   at 4 x 4 fills unevenly; the 4B's tile discs a little smaller). Then **item 8**: **one final
    test sheet** for the owner (he asked for it), the all-nine gate with the structure check, the
    CHANGELOG entry, the sheet archived, the PR; the owner merges; tag `v0.2.19`. The owner is
    bringing `dashboard-target-7b.md` up to date with clusters as the new baseline, with entities
@@ -138,7 +143,7 @@ before the owner merges. **The owner merges** (W12); a PR is opened only after t
 
 `docs/design/interview-phase2-3.md` is the blueprint for 2.8, 2.11 and Phase 3. §1 look and feel,
 §2 card popups and §3 the header's slots are closed (§3 Q3, the clock's format, still open); **§4
-(2.11) is answered and built** (`group-cards.md` §6-7, K88-K123; Q8 - "back" from a group page -
+(2.11) is answered and built** (`group-cards.md` §6-7, K88-K124; Q8 - "back" from a group page -
 open, with the group view after 2.11). #87 (the companion web app, D-8) should be scoped before
 3.1; the owner would start it with dashboard arranging (FUTURE_IMPROVEMENTS). Artifacts on
 claude.ai: "Layout Playground" (page v12), "2.11 Round 9 Mocks", "2.11 Clusters", "Panel Edges",
@@ -169,7 +174,7 @@ Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
 | `CYD_S3_3248` | - | USB broken (2026-09-28) |
 | `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in |
 
-The P4_5, the 4B and the 1060 run 2.11 round 12; the rest `v0.2.18` or older. Hosts:
+The P4_5, the 4B and the 1060 run 2.11 round 12b; the rest `v0.2.18` or older. Hosts:
 `fleet-ws-p4-5`, `fleet-ws-p4-4b`, `fleet-cyd-p4-1060` (all in `HTTP_REFERENCE.md`). Environments:
 `WS_P4_TOUCH_LCD_5`, `WS_P4_TOUCH_LCD_4B`, `CYD_P4_1060P470`. Ports move when boards are re-plugged:
 `pio device list` and match the serial. **Is a board alive?** Ask Home Assistant
@@ -222,7 +227,12 @@ the PC's PATH - the arranger's test generator needs it.
   flash after a build only on the build's success.
 - **A kept arranger answer outlives a search change** unless its version moves (`v4` now, in
   `PageArranger.cpp`): bump it whenever the search's shapes or costs change, or the boards keep
-  showing the old search's pages.
+  showing the old search's pages. **Time a search change on the 4B, unpinned** (its `[Arranger]`
+  serial line gives steps and ms): it is the slowest board, and a page the owner pinned does not
+  run the unpinned search at all - round 12's Auto went unseen until it boot-looped (LESSONS).
+- **A task that never blocks runs at `tskIDLE_PRIORITY`** (or yields every second) - above it, the
+  idle task starves and the task watchdog reboots the chip after 5 s. A boot loop: read the serial
+  first (`task_wdt: ... CPU 0: <task>` names the culprit).
 - **LVGL 9.5 clips an object's `DRAW_POST` to its own area** - anything drawn outside an object goes
   in `DRAW_MAIN_END` (LESSONS). An image meant to continue LVGL's drawing must blend in 16 bits.
 - **A screenshot is not the glass**: `/screenshot` renders the object tree afresh, so it can show

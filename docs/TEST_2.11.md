@@ -1498,3 +1498,64 @@ search counts empty units before the clusters grow, so it prefers filling the un
   layout's version moved (`v3` to `v4`, every place the same).
 - **The structure check**: two files over 1,000 lines (`GUIManager.cpp` 1,520, `Card.cpp` 1,456),
   409 style calls outside the kit in 29 files, 10 colour literals in 2 files.
+
+# Round 12b (2026-10-26, evening) - the 4B's boot loop, one tile height a page
+
+Your notes on round 12: the 1060's and P4_5's Kitchen tiles kept their height while the bottom
+row's were shortened, their faint panel "a bit too faint, barely visible"; **the 4B hung after
+Auto** - cyan, then black, the same ~20 s after every power-up.
+
+## 1. The 4B's boot loop - fixed
+
+The serial log: `task_wdt: - IDLE0 (CPU 0)`, `CPU 0: arrange`, then a reboot, every ~20 s. The
+arranger's task ran at priority 1 and never blocks, so core 0's idle task never ran, and the task
+watchdog aborts after 5 s of that. Round 11's search on your 4B took 3.7 s; round 12's extra shape
+for each cluster took it past 5 s, and since the search never finished, no answer was kept and every
+boot searched again. **The task now runs at the idle task's priority** (time-sliced with it, so the
+watchdog is fed). On your 4B the search finished - **1,238,747 steps in 10.3 s**, in the background
+while HA started - and its answer is kept, so later boots build at once (LESSONS).
+
+**My miss**: round 12 said "Auto and your 4 x 6 give the even page". Your 4B was pinned at 4 x 6, so
+Auto had not run on round 12's firmware on the glass - I had seen it in the playground only.
+
+Auto on your 4B now (12 x 6 units):
+
+![4B Auto](followups/211_r12b_4b_auto.png)
+
+## 2. One tile height a page
+
+Not by design: Kitchen's tiles were just under the near-square limit (195 x 210 px on the 1060,
+1.08 times as tall as wide, the limit 1.1), so they kept their slot's height while the narrower
+bottom-row tiles were cut. **Every cluster on a page now draws its tiles as tall as the shortest any
+of them draws** (K124), centred in their slots: 170 px in all three rooms on the 1060, 204 px on
+the P4_5. The width stays each room's own, so Kitchen's four tiles still fill its row. And **the
+tile panel** is a step further from the cluster's surface (6% toward the text), so it shows on
+Midnight; the off disc still stands apart from it.
+
+| P4_5 | 1060 |
+|---|---|
+| ![P4_5](followups/211_r12b_p45.png) | ![1060](followups/211_r12b_1060.png) |
+
+## For the final pass (added)
+
+| # | Do this | PASS if |
+|---|---|---|
+| P12 | The 4B: Auto, then power it off and on | the page arranges itself within ~10 s of HA starting, and the board keeps running; after the power cycle the page is built at once |
+| P13 | The P4_5's and 1060's House on Midnight, Linen and Fleet | every room's tiles the same height, each with a visible panel, the off discs still distinct |
+
+## Questions for you (round 12b)
+
+1. **The 4B's search now takes ~10 s** (round 11's question 1 said 3.7 s). The page shows its flowed
+   layout meanwhile, then the arranged one; it runs once per change (a pin, a card added or moved),
+   then the answer is kept. A time budget would cut it, with a chance of a
+   slightly worse page on the 4B. *My recommendation: a budget of ~3 s, tried in the playground
+   first* - say if the wait bothers you.
+
+## Results (mine, before you)
+
+- **Seen by screenshot**: the 4B on Auto (above), the P4_5's and 1060's House pages.
+- **Settings**: every board's file saved before the flash (the 4B's caught between reboots);
+  compared afterwards: the P4_5 and 1060 0 differences, the 4B only its kept House layout (Auto's
+  new answer).
+- **Host tests**: not rerun - the search is unchanged; the change is the task's priority and the
+  tiles' drawing.

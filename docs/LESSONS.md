@@ -991,3 +991,23 @@ these panels is an image painted once.**
 
 Also learnt: `lv_area_intersect()` and `lv_image_cache_drop()` are not in `lvgl.h` in 9.5 - include
 `src/misc/lv_area_private.h` / `src/misc/cache/instance/lv_image_cache.h`, or clip by hand.
+
+## A background job that never blocks must run at the idle task's priority (2.11 round 12b, 2026-10-26)
+
+The arranger's search runs on its own task on core 0. It was created at priority 1 - "low", so the
+screen and the network go first - and it never blocks. At priority 1 it never lets **IDLE0**
+(priority 0) run, and the task watchdog watches IDLE0: any search longer than 5 s
+(`CONFIG_ESP_TASK_WDT_TIMEOUT_S`) aborts the chip. Round 11's 4B search took 3.7 s; round 12's extra
+shape per cluster made it ~1.1-1.2 M steps, past 5 s once HA's start-up shared the core, and the 4B
+rebooted ~20 s after every boot - the page never got a kept answer, so every boot searched again.
+The owner saw it as "cyan, then black" after pressing Auto.
+
+The log says it plainly - `task_wdt: - IDLE0 (CPU 0)` / `CPU 0: arrange` - so **read the serial
+before guessing** (`pio device monitor -p COM7 --rts 0 --dtr 0`, or pyserial from PlatformIO's own Python,
+`~/.platformio/penv/Scripts/python.exe` - the system Python has none). Fixed by creating the
+task at `tskIDLE_PRIORITY`: equal-priority tasks are time-sliced, IDLE0 runs between slices and feeds
+the watchdog, and the search still gets what the core has spare (10.3 s for 1.24 M steps on the 4B
+while HA started). **Any CPU-bound task that does not block - a search, an encoder, a checksum -
+goes at priority 0, or yields (`vTaskDelay(1)`) at least every second.** And a check "on glass"
+of a page the owner had pinned does not prove its unpinned search: the 4B's Auto had not run on
+round 12's firmware until he pressed it.
