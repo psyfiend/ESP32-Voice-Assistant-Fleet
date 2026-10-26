@@ -312,7 +312,7 @@ void test_device_p44b_pinned_4x5() {
     check(s, DEVICE, 4, 8, 10, 43.488537944050535, 6, false, want);
 }
 
-// the 4B pinned at its own 4 x 3: no page holds the blocks
+// the 4B pinned at its own 4 x 3: a page, its clusters at their tightest (round 12)
 void test_device_p44b_pinned_4x3() {
     ArrScreen s = screen(10.021985875084926, 670.0, 620.0, 18.0, 29.0, 4, 3);
     s.fixCols = 4; s.fixRows = 3;
@@ -321,6 +321,30 @@ void test_device_p44b_pinned_4x3() {
         {2,0,6,2,3,1, 2,0,6,2, 172,0,498,195}, {0,4,6,2,3,1, 0,4,6,2, 86,425,498,195},
     };
     check(s, DEVICE, 4, 8, 6, 32.20086821057672, 4, false, want);
+}
+
+// the 4B's House at 4 x 5: its clusters grown into the spare height (round 12)
+void test_p1060_p44b_pinned_4x5() {
+    ArrScreen s = screen(10.021985875084926, 670.0, 620.0, 18.0, 29.0, 4, 3);
+    s.fixCols = 4; s.fixRows = 5;
+    const Want want[5] = {
+        {0,0,2,3,0,0, 0,0,2,3, 0,11,154,173}, {2,0,6,3,3,1, 2,0,6,3, 172,0,498,195},
+        {0,3,6,3,3,1, 0,3,6,3, 86,213,498,195}, {0,6,6,3,3,1, 0,6,6,3, 0,425,498,195},
+        {6,6,2,3,0,0, 6,6,2,3, 516,436,154,173},
+    };
+    check(s, P1060, 5, 8, 10, 62.180868253569116, 14, true, want);
+}
+
+// the 4B's House at 4 x 3: a page, where round 11 had none
+void test_p1060_p44b_pinned_4x3() {
+    ArrScreen s = screen(10.021985875084926, 670.0, 620.0, 18.0, 29.0, 4, 3);
+    s.fixCols = 4; s.fixRows = 3;
+    const Want want[5] = {
+        {0,0,2,2,0,0, 0,0,2,2, 0,5,154,184}, {2,0,6,2,3,1, 2,0,6,2, 172,0,498,195},
+        {0,2,6,2,3,1, 0,2,6,2, 86,213,498,195}, {0,4,6,2,3,1, 0,4,6,2, 0,425,498,195},
+        {6,4,2,2,0,0, 6,4,2,2, 516,431,154,184},
+    };
+    check(s, P1060, 5, 8, 6, 33.29531012255164, 4, false, want);
 }
 
 // The owner's two references, in the playground's geometry (its refSizes()).
@@ -358,6 +382,27 @@ void test_finish_again() {
         TEST_ASSERT_EQUAL_INT32(out.rect[i].x, rect[i].x);
         TEST_ASSERT_EQUAL_INT32(out.rect[i].y, rect[i].y);
     }
+}
+
+// A kept answer holds a cluster's tiles across, not down (round 12): finished without them, the
+// page is the same - its clusters still grow into the spare height (the 4B's House at 4 x 5).
+void test_finish_without_tiles_down() {
+    ArrScreen s = screen(10.021985875084926, 670.0, 620.0, 18.0, 29.0, 4, 3);
+    s.fixCols = 4; s.fixRows = 5;
+    ArrResult out;
+    TEST_ASSERT_TRUE(arrange(s, P1060, 5, ArrWeights(), out));
+    ArrPlace pos[ARR_BLOCKS_MAX], box[ARR_BLOCKS_MAX];
+    ArrRect rect[ARR_BLOCKS_MAX];
+    for (int i = 0; i < 5; i++) { pos[i] = out.pos[i]; pos[i].tr = 0; }
+    finishPage(s, P1060, 5, out.cols, out.rows, pos, box, rect);
+    const double sy = (s.ah + s.gap) / out.rows;
+    bool grew = false;
+    for (int i = 0; i < 5; i++) {
+        TEST_ASSERT_EQUAL_INT32(out.rect[i].y, rect[i].y);
+        TEST_ASSERT_EQUAL_INT32(out.rect[i].h, rect[i].h);
+        if (P1060[i].cluster && rect[i].h > out.box[i].h * sy - s.gap + 1) grew = true;
+    }
+    TEST_ASSERT_TRUE(grew);
 }
 
 // No two finished rectangles overlap, and all lie in the page's room.
@@ -400,9 +445,12 @@ int main(int, char **) {
     RUN_TEST(test_playground_p45_pinned_5x3);
     RUN_TEST(test_device_p44b_pinned_4x5);
     RUN_TEST(test_device_p44b_pinned_4x3);
+    RUN_TEST(test_p1060_p44b_pinned_4x5);
+    RUN_TEST(test_p1060_p44b_pinned_4x3);
     RUN_TEST(test_references);
     RUN_TEST(test_pinned_columns_only);
     RUN_TEST(test_finish_again);
+    RUN_TEST(test_finish_without_tiles_down);
     RUN_TEST(test_no_overlap);
     return UNITY_END();
 }

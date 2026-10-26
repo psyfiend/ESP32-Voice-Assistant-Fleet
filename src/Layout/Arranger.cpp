@@ -523,11 +523,13 @@ void finishPage(const ArrScreen &s, const ArrBlock *blocks, uint8_t n, uint8_t c
                 const uint8_t i = bands.m[k][j];
                 if (!blocks[i].cluster) continue;
                 // How much taller it may grow before its tiles are square, px.
-                const ArrPlace &p = pos[i];
+                // A place without its tiles down (an older caller) has them from across.
+                const int tc = pos[i].tc ? pos[i].tc : 1;
+                const int tr = pos[i].tr ? pos[i].tr : (blocks[i].tiles + tc - 1) / tc;
                 const double wmm = w[i] / s.pmm, hmm = h[i] / s.pmm;
-                const double tw = (wmm - 2 * PAD - (p.tc - 1) * TG) / (p.tc ? p.tc : 1);
-                const double th = (hmm - HDR - 2 * PAD - (p.tr - 1) * TG) / (p.tr ? p.tr : 1);
-                const double room = fmax(0.0, (tw - th) * p.tr * s.pmm);
+                const double tw = (wmm - 2 * PAD - (tc - 1) * TG) / tc;
+                const double th = (hmm - HDR - 2 * PAD - (tr - 1) * TG) / (tr ? tr : 1);
+                const double room = fmax(0.0, (tw - th) * tr * s.pmm);
                 h[i] += fmax(0.0, fmin(bb1[k] - bb0[k] + share - h[i], room));
             }
     }

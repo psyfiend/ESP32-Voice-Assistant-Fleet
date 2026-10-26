@@ -15,7 +15,8 @@ namespace PageArranger {
 
 namespace {
 
-// "v3 fp CxR" and "c,r,w,h,tc" a block, in units.
+// "v4 fp CxR" and "c,r,w,h,tc" a block, in units. The version moves when the
+// search does (v4: round 12's shapes), so every page arranges once on new firmware.
 constexpr size_t VALUE_MAX = 24 + 16 * Layout::ARR_BLOCKS_MAX;
 
 // The search recurses a level a unit (Layout::ARR_CELLS_MAX at most), each
@@ -99,12 +100,13 @@ bool kept(const Input &in, Layout::ArrResult &out) {
     tuning(w);
     char v[VALUE_MAX];
     if (!Settings::page(in.slug, "layout", v, sizeof(v))) return false;
-    // "v3 <fingerprint> <cols>x<rows> c,r,w,h,tc ..." - units; each block as the
+    // "v4 <fingerprint> <cols>x<rows> c,r,w,h,tc ..." - units; each block as the
     // search placed it, a cluster's tiles across; one per block, in order. The
     // finish (Layout::finishPage()) is run again here: cheap, and the same every
-    // time. Older answers (v1 cells, v2 round 9's finished boxes) are not read.
+    // time. Older answers (v1 cells, v2 round 9's finished boxes, v3 round 11's
+    // search) are not read.
     char *p = v;
-    if (strncmp(p, "v3 ", 3)) return false;
+    if (strncmp(p, "v4 ", 3)) return false;
     p += 3;
     const uint32_t fp = (uint32_t)strtoul(p, &p, 16);
     if (fp != fingerprint(in, w)) return false;
@@ -125,6 +127,10 @@ bool kept(const Input &in, Layout::ArrResult &out) {
         Layout::ArrPlace &b = out.pos[i];
         b.c = (uint8_t)q[0]; b.r = (uint8_t)q[1]; b.w = (uint8_t)q[2]; b.h = (uint8_t)q[3];
         b.tc = (uint8_t)q[4];
+        // Its tiles down follow from across (round 12: without them the finish
+        // saw no room for a kept page's clusters to grow).
+        const uint8_t nt = in.blocks[i].tiles;
+        b.tr = in.blocks[i].cluster && b.tc ? (uint8_t)((nt + b.tc - 1) / b.tc) : 0;
     }
     out.ok = true;
     out.cols = (uint8_t)cols;
@@ -160,7 +166,7 @@ bool takeDone() {
     bool keptNew = false;
     if (s_res.ok) {
         char v[VALUE_MAX];
-        int len = snprintf(v, sizeof(v), "v3 %08lx %ux%u", (unsigned long)s_fp, (unsigned)s_res.cols,
+        int len = snprintf(v, sizeof(v), "v4 %08lx %ux%u", (unsigned long)s_fp, (unsigned)s_res.cols,
                            (unsigned)s_res.rows);
         for (uint8_t i = 0; i < s_in.n && len < (int)sizeof(v); i++) {
             const Layout::ArrPlace &q = s_res.pos[i];
