@@ -222,6 +222,33 @@ the P4_5: the C++ port needs a budget, as v5's did. Waits for the owner's look.
   unpinned 1.9 s. The 1060 pinned at 5 x 2, 76 ms; unpinned 3.2 s. At most 13 KB of stack used. All
   in the background (the page flows meanwhile, then is built again); `WS_S3_4B` compiles, untimed.
 
+### Then version 9 (2026-10-26, round 11): the spare room shared out - K120
+
+The owner's notes after round 9: solo cards should be no bigger than a cluster ("the Doors and
+Thermo ended up gigantic"); a row's blocks centred and solo cards symmetric, or "floating in free
+space with an equal amount of space all around them"; the Fleet page's Free Heap and Uptime at 1.5
+cells; and on the 4B, rows added became a strip of empty space at the foot. Version 9 is v8's search
+with:
+
+- **`big`** (60): a solo card bigger than the page's entities pays `big` x log(size / target)^2 on
+  top of the size cost (in the shapes and the score), so spare room stays spare instead of swelling
+  a card. It also prunes the search hard: the P4_5's House page went from 313,539 steps (1.95 s) to
+  3,601 (49 ms) on the board.
+- **A card's preferred shape**: its spec's span, wide over tall (`ArrBlock::aspect`; Free Heap and
+  Uptime are 3 x 2 units, 1.5). Square means that shape; its size is taken at that shape; its limits
+  stretch by it (area x A, no taller than tall / A, no wider than 1.7 A).
+- **The finish shares the spare room out, in pixels** (`Layout::finishPage()`): v7's trim first (a
+  card no taller than near square, in units), then blocks whose rows overlap make a **band** and the
+  bands spread down the page; in each band, blocks whose columns overlap make a **column**, the
+  columns spread across the band, and each column is centred in the band's height. "Spread around":
+  the spare in n parts, half of one at each edge, a whole one between. The device draws each block
+  at its rectangle (`CardPage::placeArranged()`), off the unit grid.
+
+Host tests: 27, generated from the playground's own answers (scratchpad `gen_tests.py`,
+`run_v9.js`): four sets of blocks (the device's House, the playground's, the 1060's, the Fleet page)
+on eight boards, pinned grids - every place, trimmed box, rectangle and score matching. Kept answers
+are `v3`: the search's places only; the finish is worked out again at each build.
+
 ## The domain weight map
 
 Which cards earn space: a weight per card - its domain's (climate and media heavier than a lone

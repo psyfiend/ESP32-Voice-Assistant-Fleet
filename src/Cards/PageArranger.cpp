@@ -15,7 +15,7 @@ namespace PageArranger {
 
 namespace {
 
-// "v2 fp CxR" and "c,r,w,h,tc" a block, in units.
+// "v3 fp CxR" and "c,r,w,h,tc" a block, in units.
 constexpr size_t VALUE_MAX = 24 + 16 * Layout::ARR_BLOCKS_MAX;
 
 // The search recurses a level a unit (Layout::ARR_CELLS_MAX at most), each
@@ -52,6 +52,7 @@ void tuning(Layout::ArrWeights &w) {
     w.twin   = num("twin", d.twin);
     w.gap8   = num("gap8", d.gap8);
     w.order  = num("order", d.order);
+    w.big    = num("big", d.big);
 }
 
 // FNV-1a over everything an answer depends on.
@@ -65,18 +66,18 @@ struct Fp {
 
 uint32_t fingerprint(const Input &in, const Layout::ArrWeights &w) {
     Fp f;
-    f.byte(8);   // the arranger's version: v8
+    f.byte(9);   // the arranger's version: v9
     f.str(in.slug);
     f.i32(in.n);
     for (uint8_t i = 0; i < in.n; i++) {
         const Layout::ArrBlock &b = in.blocks[i];
-        f.byte(b.cluster); f.byte(b.tiles); f.byte(b.hdr); f.byte(b.members);
+        f.byte(b.cluster); f.byte(b.tiles); f.byte(b.hdr); f.byte(b.members); f.dbl(b.aspect);
         f.str(in.ids[i]);
     }
     const Layout::ArrScreen &s = in.scr;
     f.dbl(s.pmm); f.dbl(s.aw); f.dbl(s.ah); f.dbl(s.gap); f.dbl(s.tagH); f.byte((uint8_t)s.label);
     f.byte(s.recCols); f.byte(s.recRows); f.byte(s.fixCols); f.byte(s.fixRows);
-    f.dbl(w.size); f.dbl(w.square); f.dbl(w.wide); f.dbl(w.twin); f.dbl(w.gap8); f.dbl(w.order);
+    f.dbl(w.size); f.dbl(w.square); f.dbl(w.wide); f.dbl(w.twin); f.dbl(w.gap8); f.dbl(w.order); f.dbl(w.big);
     return f.h;
 }
 
@@ -98,11 +99,12 @@ bool kept(const Input &in, Layout::ArrResult &out) {
     tuning(w);
     char v[VALUE_MAX];
     if (!Settings::page(in.slug, "layout", v, sizeof(v))) return false;
-    // "v2 <fingerprint> <cols>x<rows> c,r,w,h,tc ..." - units; each block's box
-    // after the finish, a cluster's tiles across. One per block, in order. A v1
-    // answer (cells, round 2's arranger) is never read: arranged again.
+    // "v3 <fingerprint> <cols>x<rows> c,r,w,h,tc ..." - units; each block as the
+    // search placed it, a cluster's tiles across; one per block, in order. The
+    // finish (Layout::finishPage()) is run again here: cheap, and the same every
+    // time. Older answers (v1 cells, v2 round 9's finished boxes) are not read.
     char *p = v;
-    if (strncmp(p, "v2 ", 3)) return false;
+    if (strncmp(p, "v3 ", 3)) return false;
     p += 3;
     const uint32_t fp = (uint32_t)strtoul(p, &p, 16);
     if (fp != fingerprint(in, w)) return false;
@@ -120,14 +122,14 @@ bool kept(const Input &in, Layout::ArrResult &out) {
             p = e;
         }
         if (q[0] < 0 || q[1] < 0 || q[2] < 1 || q[3] < 1 || q[0] + q[2] > cols || q[1] + q[3] > rows) return false;
-        Layout::ArrPlace &b = out.box[i];
+        Layout::ArrPlace &b = out.pos[i];
         b.c = (uint8_t)q[0]; b.r = (uint8_t)q[1]; b.w = (uint8_t)q[2]; b.h = (uint8_t)q[3];
         b.tc = (uint8_t)q[4];
-        out.pos[i] = b;
     }
     out.ok = true;
     out.cols = (uint8_t)cols;
     out.rows = (uint8_t)rows;
+    Layout::finishPage(in.scr, in.blocks, in.n, out.cols, out.rows, out.pos, out.box, out.rect);
     snprintf(s_use, sizeof(s_use), "%s built from its kept answer, %u blocks on %ldx%ld units",
              in.slug, (unsigned)in.n, cols, rows);
     return true;
@@ -158,10 +160,10 @@ bool takeDone() {
     bool keptNew = false;
     if (s_res.ok) {
         char v[VALUE_MAX];
-        int len = snprintf(v, sizeof(v), "v2 %08lx %ux%u", (unsigned long)s_fp, (unsigned)s_res.cols,
+        int len = snprintf(v, sizeof(v), "v3 %08lx %ux%u", (unsigned long)s_fp, (unsigned)s_res.cols,
                            (unsigned)s_res.rows);
         for (uint8_t i = 0; i < s_in.n && len < (int)sizeof(v); i++) {
-            const Layout::ArrPlace &q = s_res.box[i];
+            const Layout::ArrPlace &q = s_res.pos[i];
             len += snprintf(v + len, sizeof(v) - len, " %u,%u,%u,%u,%u", (unsigned)q.c, (unsigned)q.r,
                             (unsigned)q.w, (unsigned)q.h, (unsigned)q.tc);
         }

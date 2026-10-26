@@ -277,9 +277,11 @@ void CardPage::commit() {
     // genuinely cannot fit them. Dropping cards is the LAST resort, after the
     // page has already grown to every row it could carry.
     if (_arranged) {
-        // THE ARRANGER'S PAGE (2.11): its grid of units, every block pinned.
+        // THE ARRANGER'S PAGE (2.11): its grid of units, every block pinned - and
+        // drawn where the finish put it (v9), so the page lays nothing out itself.
         useUnits(_arrCols, _arrRows);
         plan();
+        lv_obj_set_layout(_root, LV_LAYOUT_NONE);
     } else if (_rowsOverride) {
         // OBEYED, not negotiated. The caller asked for this many rows; cards
         // that do not fit are dropped by priority, which is the whole point of
@@ -324,12 +326,16 @@ void CardPage::commit() {
         // is not, now that rows are units - and it was already fragile, since
         // the grid it read is global state that any other page can move. The
         // page knows the answer exactly; handing it over removes the guess.
-        c->setCellHeightPx(heightOf(_slot[i].spanY));
-        c->setCellWidthPx (widthOf (_slot[i].spanX));
-        c->build(_root);
-        lv_obj_set_grid_cell(c->root(),
-                             LV_GRID_ALIGN_STRETCH, _slot[i].col, _slot[i].spanX,
-                             LV_GRID_ALIGN_STRETCH, _slot[i].row, _slot[i].spanY);
+        if (_arranged) {
+            placeArranged(c, i);
+        } else {
+            c->setCellHeightPx(heightOf(_slot[i].spanY));
+            c->setCellWidthPx (widthOf (_slot[i].spanX));
+            c->build(_root);
+            lv_obj_set_grid_cell(c->root(),
+                                 LV_GRID_ALIGN_STRETCH, _slot[i].col, _slot[i].spanX,
+                                 LV_GRID_ALIGN_STRETCH, _slot[i].row, _slot[i].spanY);
+        }
 #ifdef DEBUG_PAGE_TIMING
         const int64_t t1 = esp_timer_get_time();
 #endif
@@ -415,6 +421,17 @@ void CardPage::commit() {
     }
 }
 
+// A block on an arranged page, built at the size the finish gave it and put
+// there (v9): its rectangle in the page's content area.
+void CardPage::placeArranged(Card *c, uint8_t i) {
+    const Layout::ArrRect &a = _arrRect[i < Layout::ARR_BLOCKS_MAX ? i : 0];
+    c->setCellHeightPx(a.h);
+    c->setCellWidthPx (a.w);
+    if (!c->root()) c->build(_root);
+    lv_obj_set_pos (c->root(), a.x, a.y);
+    lv_obj_set_size(c->root(), a.w, a.h);
+}
+
 void CardPage::relayout() {
     plan();
     for (uint8_t i = 0; i < _n; i++) {
@@ -422,6 +439,7 @@ void CardPage::relayout() {
         if (!c || !c->root()) continue;
         if (!_slot[i].placed) { lv_obj_add_flag(c->root(), LV_OBJ_FLAG_HIDDEN); continue; }
         lv_obj_clear_flag(c->root(), LV_OBJ_FLAG_HIDDEN);
+        if (_arranged) { placeArranged(c, i); continue; }
         lv_obj_set_grid_cell(c->root(),
                              LV_GRID_ALIGN_STRETCH, _slot[i].col, _slot[i].spanX,
                              LV_GRID_ALIGN_STRETCH, _slot[i].row, _slot[i].spanY);
@@ -500,14 +518,19 @@ void CardPage::arrangePage(const PageSpec &spec) {
             b.members = cl->memberCount();
         } else {
             b.members = 1;
+            // ITS PREFERRED SHAPE (v9): its spec's span, wide over tall - the Fleet
+            // page's Free Heap and Uptime ask for 3 x 2 units, 1.5 cells across.
+            const CardPlacement &pl = c->placement();
+            if (pl.prefSpanX && pl.prefSpanY) b.aspect = (double)pl.prefSpanX / (double)pl.prefSpanY;
         }
         in.ids[in.n] = c->id();
         in.n++;
     }
     Layout::ArrResult r;
     if (!PageArranger::kept(in, r)) { PageArranger::start(in); return; }
-    // IN UNITS (v8): each block's box as the arranger finished it - a solo card
-    // in its even margins, a cluster as placed with its tiles across.
+    // Each block pinned to its trimmed box in units (the page's bookkeeping - what
+    // is placed), drawn where the finish put it (_arrRect, v9), a cluster with
+    // its tiles across.
     for (uint8_t i = 0; i < _n; i++) {
         CardPlacement p = _cards[i]->placement();
         p.col = (int8_t)r.box[i].c;
@@ -515,8 +538,9 @@ void CardPage::arrangePage(const PageSpec &spec) {
         p.prefSpanX = p.minSpanX = r.box[i].w;
         p.prefSpanY = p.minSpanY = r.box[i].h;
         _cards[i]->setPlacement(p);
+        _arrRect[i] = r.rect[i];
         if (!strcmp(_cards[i]->typeName(), "cluster"))
-            static_cast<ClusterCard *>(_cards[i])->setTileCols(r.box[i].tc);
+            static_cast<ClusterCard *>(_cards[i])->setTileCols(r.pos[i].tc);
     }
     _arranged = true;
     _arrCols = r.cols;

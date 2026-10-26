@@ -163,6 +163,10 @@ private:
     bool    _arranged = false;
     uint8_t _arrCols = 0, _arrRows = 0;   // units
     uint8_t _pinCols = 0, _pinRows = 0;   // cells; 0 = the arranger chooses
+    // Where each block is drawn (v9, round 11): the finish's rectangles, in pixels
+    // in the page's content area - off the unit grid once spare room is shared out.
+    Layout::ArrRect _arrRect[Layout::ARR_BLOCKS_MAX];
+    void placeArranged(Card *c, uint8_t i);
 
     // The whole layout decision: the cards as Layout items, placed by the flow
     // engine - plain arithmetic with no LVGL, tested off the board (host-tests/).

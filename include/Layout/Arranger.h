@@ -1,15 +1,21 @@
 #pragma once
 // ---------------------------------------------------------------------------
-// THE ARRANGER (2.11, #78; DECISIONS K105, K109) - where a page's blocks go: its
-// solo cards and its clusters, each in any shape its limits allow, on a grid of
-// UNITS - the device's own, a cell's halves - so a cluster can be 2.5 cells wide
-// and a row 1.5 cells tall. Layout Playground version 8, ported line for line
-// (the "Layout Playground" artifact, 2026-10-20) with the owner's tuned knobs as
-// its defaults. Plain arithmetic like the rest of Layout - no LVGL, Arduino or
-// ESP-IDF - tested on the PC (host-tests/test_arranger), where the playground's
-// own answers for the same blocks are the expected values.
-// docs/design/layout-engines.md, "Then version 8". Version 5 (round 2) is in
-// git history and still selectable in the playground.
+// THE ARRANGER (2.11, #78; DECISIONS K105, K109, K120) - where a page's blocks
+// go: its solo cards and its clusters, each in any shape its limits allow, on a
+// grid of UNITS - the device's own, a cell's halves - so a cluster can be 2.5
+// cells wide and a row 1.5 cells tall. Layout Playground version 9, ported line
+// for line (the "Layout Playground" artifact, its page v11, 2026-10-26) with the
+// owner's tuned knobs as its defaults. Plain arithmetic like the rest of Layout -
+// no LVGL, Arduino or ESP-IDF - tested on the PC (host-tests/test_arranger),
+// where the playground's own answers for the same blocks are the expected values.
+// docs/design/layout-engines.md, "Then version 9". Versions 5 and 8 are in git
+// history and still selectable in the playground.
+//
+// v9 over v8 (the owner's notes after round 9, K120): a solo card bigger than
+// the page's entities pays BIG; a card may PREFER A SHAPE (its spec's span - the
+// Fleet page's 1.5-cell Free Heap and Uptime); and the finish SHARES THE SPARE
+// ROOM OUT in pixels - bands of blocks spread down the page, columns spread
+// across each band, each column centred in its band's height (finishPage()).
 //
 // The owner's rules (TEST_2.11 round 5), and what the search is paid for:
 //   - every ENTITY THE SAME SIZE - a solo card and each cluster's tiles, the size
@@ -26,8 +32,8 @@
 // Limits never crossed: a solo card no smaller than one card of the P4_5 at
 // 7 x 3, and no taller for its width; a tile no smaller than one of a 3-wide,
 // one-cell cluster on the 4B at 4 x 4. Clusters wear the device's header and
-// padding (UIShape C_HDR_H, C_PAD, C_TILE_GAP). Solo cards then take spare unit
-// rows above or below them as even margins (the finish, v7's).
+// padding (UIShape C_HDR_H, C_PAD, C_TILE_GAP). Then the finish: solo cards
+// trimmed toward square (v7's), and the spare room shared out (v9's).
 //
 // GRIDS: units across from 2 x (the board's columns - 1) to 2 x (its columns +
 // 2), down 2 x (its rows -/+ 1); a count the page pins (the system panel's Col /
@@ -60,6 +66,7 @@ struct ArrWeights {
     double twin   = 70.0;   // clusters with as many tiles, not the same size: x |log(area ratio)|
     double gap8   = 11.0;   // an empty unit, per entity-sized area it wastes
     double order  = 4.0;    // each block placed ahead of an earlier one
+    double big    = 60.0;   // v9: a solo card bigger than the rest, on top: x log(size / target)^2
 };
 
 // How a solo card wears its card label: what it takes from the card's box.
@@ -87,6 +94,7 @@ struct ArrScreen {
 struct ArrBlock {
     bool    cluster = false;
     uint8_t tiles = 0, hdr = 0, members = 0;
+    double  aspect = 1.0;     // v9: a solo card's preferred width over height (its spec's span; 1.5 for 3 x 2 units)
 };
 
 // Where a block went, in units: its box, and a cluster's tiles across and down.
@@ -94,6 +102,10 @@ struct ArrPlace {
     uint8_t c = 0, r = 0, w = 1, h = 1;
     uint8_t tc = 0, tr = 0;   // a cluster's tiles across x down; 0 for a card
 };
+
+// Where a block is drawn after the finish, in pixels from the page's room's
+// top-left corner (v9: off the unit grid once the spare room is shared out).
+struct ArrRect { int32_t x = 0, y = 0, w = 0, h = 0; };
 
 struct ArrResult {
     bool     ok = false;
@@ -105,7 +117,8 @@ struct ArrResult {
     uint32_t nodes = 0;            // search steps, every grid and pass
     bool     capped = false;       // the kept page's search hit ARR_BUDGET
     ArrPlace pos[ARR_BLOCKS_MAX];  // as the search placed them
-    ArrPlace box[ARR_BLOCKS_MAX];  // after the finish: a solo card in its even margins (a cluster as pos)
+    ArrPlace box[ARR_BLOCKS_MAX];  // after the finish's trim, in units (a solo card no taller than near square)
+    ArrRect  rect[ARR_BLOCKS_MAX]; // after the finish, in pixels: the spare room shared out
 };
 
 // The owner's two references (the playground's refSizes()): the smallest solo
@@ -115,5 +128,12 @@ ArrRef arrRef();
 
 // The cheapest page for the blocks, in `out`. False when none fits.
 bool arrange(const ArrScreen &scr, const ArrBlock *blocks, uint8_t n, const ArrWeights &w, ArrResult &out);
+
+// THE FINISH (the playground's finishV9()), from the search's places on a grid of
+// cols x rows units: each solo card trimmed toward square in units (`box`), then
+// every block's pixel rectangle with the spare room shared out (`rect`). Cheap
+// and deterministic, so a kept answer keeps only `pos` and is finished again.
+void finishPage(const ArrScreen &scr, const ArrBlock *blocks, uint8_t n, uint8_t cols, uint8_t rows,
+                const ArrPlace *pos, ArrPlace *box, ArrRect *rect);
 
 }  // namespace Layout

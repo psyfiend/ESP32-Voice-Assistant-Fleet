@@ -937,7 +937,10 @@ failed to read registers` - and esp-hosted restarted it again, every ~20 s, off 
 over its native USB without a reset (pyserial, `dtr = rts = False`). `esptool ... --after
 watchdog-reset read-mac` brought it back. **On the 1060, put a settings copy back without
 `reboot=1`** (`curl --data-binary @copy.json .../settings`, it says "everything at the next boot")
-**and restart it with the watchdog reset.** The P4_5 and the 4B restart cleanly either way.
+**and restart it with the watchdog reset.** *Round 11 (2026-10-26): the 4B did it too*, after
+restarting cleanly a dozen times - so treat it as any P4 with the C6, not a 1060 quirk: restore
+without `reboot=1` and watchdog-reset (`esptool ... -p COM7 --after watchdog-reset read-mac` on the
+4B). The P4_5 has not done it yet.
 
 ## Drawing outside an object: DRAW_MAIN_END, never DRAW_POST (2.8 round 6, 2026-10-17)
 

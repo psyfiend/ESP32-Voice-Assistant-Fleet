@@ -1261,3 +1261,137 @@ hidden copy would sit in the hidden cards beside the card it copies.
   cards, or even space round them; a card's preferred span (Free Heap, Uptime) - in the playground
   first (v9), then the port.
 - **Active tiles in the card state** (K116), and the header's sensor icons in the glyph styles (K115).
+
+## Your answers (2026-10-26, morning)
+
+E for the tiles; both follow-up recommendations (copies keep Remove - K117; tiles in a group view,
+cards on a group page - K118); Add cards to offer the cards on the board or the entities labelled
+"Fleet" in HA (K119, after 2.11). Then: work unattended, and improve the arranger from your notes.
+
+# Round 11 (2026-10-26, unattended) - tiles as E, header glyphs, the arranger v9
+
+All built, flashed and seen by screenshot on the P4_5; the 4B and the 1060 flashed (below). Every
+test that changed your settings ran on a test copy, your file put back and compared afterwards.
+
+## 1. Tiles: E (K116)
+
+Every tile a faint panel inside its cluster, and a tile that is on framed as a solo card is - the
+Corner cut by default (Bracket if you choose it), its lit disc kept. The Office's Desk switched on for
+the picture, and off again as it was:
+
+![Tiles as E, Desk on](followups/211_r11_tiles_e_p45.png)
+
+## 2. Header icons in the glyph styles (K115)
+
+A cluster's header values take UI Tweaks' **Header glyphs**: framed (Square, or Circle) on a Swatch
+header, bare on a Band (the band is the group's colour, and a frame on it looked like a hole). Bare in
+UI Tweaks makes them bare everywhere.
+
+![Square frames on the cluster headers](followups/211_r11_glyphs_p45.png)
+
+## 3. The two bugs on the glass
+
+- **Linen, a slot panel at the screen's edge showing the bar's shadow** - found and fixed: the face
+  painted back over the bar's shadow under an open panel was a rounded rectangle, so where the tab
+  runs straight down into the wall (the status panel) a sliver of the shadow showed in that corner.
+  It is square there now.
+
+  ![Before](followups/211_r11_edge_shadow_before.png)
+  ![After](followups/211_r11_edge_shadow_after.png)
+
+- **Fleet / Midnight, the accent line notched beside a panel's tab** - **not reproduced**: I opened
+  the page slot and the status slot on the P4_5 and the 1060 and read the panels' own frame buffers
+  (`/screenshot?fb=1`, what the glass shows); the coves were whole each time. If you see it again,
+  which board, which slot, and was the system panel open? A photo of the glass would settle it.
+
+## 4. The arranger, version 9 (K120)
+
+**[Layout Playground](https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp)**, page v11: **v9 is its
+default**, with your pages to try - *The 1060's House* and *Fleet page* beside your round-5 House -
+and a new knob, **Extra cost of a solo card bigger than the rest** (60). What v9 does over v8:
+
+| Your note | v9 |
+|---|---|
+| "Solo cards should generally be smaller than a cluster, not bigger" | a card bigger than the page's entities pays **big** on top of the size cost: spare room stays spare |
+| "Outside not horizontally centred", "Doors and Thermo symmetrical", "floating with an equal amount of space all around them" | **the spare room is shared out**: blocks in rows (bands) spread down the page, the blocks of a row spread across it, each centred in its row's height - the gaps between whole, the edges half |
+| "Free Heap and Uptime should prefer 1.5x the horizontal space" | **a card's preferred shape** is its spec's span (they were already 3 units wide in the dashboard; v8 ignored it) |
+| The 4B: "adding rows simply adds loads of empty space at the bottom" | not a crash: at 5 pinned rows the arranger found a page but left the spare units as one strip at the foot. **The rows now part evenly** instead |
+
+The 1060's House page in the playground (auto, 14 x 8 units): Outside centred on the top row, Doors and
+Thermo mirrored either side of it with even space, each centred in the row's height; every entity
+within 5% of the others. The P4_5's House page on the glass, and its Fleet page (a test copy with
+the Fleet page's old 7-column pin taken off - at 14 units across no card can be both your smallest
+size and not too tall, so a 7-column pin makes it flow):
+
+![P4_5 House, v9](followups/211_r11_v9_house_p45.png)
+![P4_5 Fleet, v9: Free Heap and Uptime at 1.5 cells](followups/211_r11_v9_fleet_p45.png)
+
+Before, the 4B at five pinned rows (v8, your earlier dashboard on a test copy) - the strip at the foot:
+
+![4B, 5 rows, v8](followups/211_r11_4b_5rows_v8.png)
+
+The 1060 on v9, at your 7 x 5 pin (14 x 10 units, 110 ms): Outside centred on the top row, Doors and
+Thermo mirrored either side of it, each centred in the row's height - the layout you found by hand,
+now from the arranger:
+
+![1060, v9](followups/211_r11_v9_house_1060.png)
+
+The 4B on v9 (its compiled dashboard, since your Reset; unpinned, 12 x 7 units): Doors centred beside
+Outside. The stagger at the foot is the search's own placement - Office's two tiles stacked make it
+taller than Kitchen, and Bedroom and Garage sit under it - not the finish:
+
+![4B, v9](followups/211_r11_v9_house_4b.png)
+
+**Time**: the P4_5's House page unpinned, **49 ms** (3,601 steps; v8 took 1.95 s - the `big` term
+prunes most oversized card shapes before the search sees them); its Fleet page 140 ms. **The 4B's
+eight blocks: 3.7 s** (808,154 steps, the budget hit on a grid) - in the background, but the slowest
+board; a time limit is the question below.
+
+**Host tests**: 27, generated from the playground's own code - four sets of blocks on eight boards
+and the pinned cases, every place, trimmed box, finished rectangle and score matching.
+
+## For the final pass (your one test, when the features are done)
+
+| # | Do this | PASS if |
+|---|---|---|
+| P1 | A cluster with a light on | the tile is a faint panel, framed with the Corner cut; off tiles faint panels, no frame |
+| P2 | UI Tweaks - Header glyphs: Bare, Square, Circle | the cluster headers' icons follow on Swatch headers; bare on a Band |
+| P3 | Linen: the status slot's panel | no shadow in its top corner by the screen's edge |
+| P4 | Auto on each board's House page | rows of blocks spread down the page, a row's blocks across it; solo cards no bigger than tiles, centred in their row |
+| P5 | Row + twice on the 4B | the rows part evenly - no strip of empty space at the foot |
+| P6 | The Fleet page with Auto (its old 7-column pin taken off) | Free Heap and Uptime 1.5 cells wide on the last row |
+| P7 | The playground: v9, The 1060's House on the 1060 board | Outside centred, Doors and Thermo mirrored with even space |
+
+## Choices that were mine (round 11)
+
+- **Frames only on Swatch headers**: a Band is the group's colour, and a square on it read as a hole.
+- **"Around" spacing** for the spare room: the gaps between blocks whole, the edges half, so a row
+  floats a little off the page's edges rather than touching them.
+- **A lone block centred in its row's height**; a column of stacked blocks moves as one.
+- **`big` at 60**: on your pages it changes little about where blocks go (the solo cards were already
+  near tile size); what it does is keep a card from swelling into spare room, and it cut the search
+  forty-fold on the P4_5.
+- **Kept answers are `v3`** (the search's places only); every page arranges once on the new firmware.
+
+## Questions for you (round 11)
+
+1. **The 4B takes 3.7 s** to arrange its eight blocks (in the background; the page shows meanwhile,
+   then arranges itself and keeps it). Leave it, or a time limit? *My recommendation: leave it* -
+   it runs only when a page's blocks change.
+2. **Spacing "around" or "between"?** v9 leaves half a gap at the page's edges; "between" would put
+   the outer blocks flush to the edges and all the spare between them. *Recommendation: around* -
+   try both in the playground if you have time and say.
+3. **The accent-line notch**: which board and slot, and was the system panel open?
+4. **The group view** (the mock): into 2.11, or after? *Recommendation: after* - 2.11 has enough to
+   sign off, and K119's Add cards from HA's "Fleet" label pairs naturally with it.
+
+## Results (mine, before you)
+
+- **Seen by screenshot**: tiles as E with the Desk on (put back off); glyph frames; the Linen corner
+  before and after; v9 on the P4_5 (House; Fleet on a test copy), the 4B and the 1060.
+- **Settings**: every board's file saved before each flash; tests ran on test copies; each file put
+  back and compared - no difference, except the P4_5's kept House layout, which the new firmware
+  rewrote itself on its first boot (`v2` to `v3`, the same blocks).
+- **Not reproduced**: the accent-line notch.
+- **The structure check**: two files over 1,000 lines (`GUIManager.cpp` 1,520, `Card.cpp` 1,456),
+  405 style calls outside the kit in 29 files (438 at `v0.2.18`), 10 colour literals in 2 files.

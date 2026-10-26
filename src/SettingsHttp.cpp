@@ -159,18 +159,18 @@ esp_err_t handleSettings(httpd_req_t *req) {
 
     char id[CARD_ID_ARG], name[200];   // a cluster's slots: up to four card ids
     // THE ARRANGER'S KNOBS (2.11, K105, K109 - Layout Playground v8's), tuned
-    // from a PC: arranger=<size|square|wide|twin|gap8|order|off>&v=<number>
-    // (empty: the owner's tuned default). A page is arranged again when it is
-    // next built.
+    // from a PC: arranger=<size|square|wide|twin|gap8|order|big|off>&v=<number>
+    // (empty: the owner's tuned default; big is v9's). A page is arranged again
+    // when it is next built.
     if (haveQ && httpd_query_key_value(q, "arranger", id, sizeof(id)) == ESP_OK &&
         httpd_query_key_value(q, "v", name, sizeof(name)) == ESP_OK) {
-        static const char *const W[] = { "size", "square", "wide", "twin", "gap8", "order", "off" };
+        static const char *const W[] = { "size", "square", "wide", "twin", "gap8", "order", "big", "off" };
         bool known = false;
         for (const char *w : W) known = known || !strcmp(w, id);
         char out[160];
         int n;
         if (!known) {
-            n = snprintf(out, sizeof(out), "refused: arranger=size|square|wide|twin|gap8|order|off\n");
+            n = snprintf(out, sizeof(out), "refused: arranger=size|square|wide|twin|gap8|order|big|off\n");
         } else {
             Settings::setSystem("arranger", id, name[0] ? name : nullptr);
             Settings::save();

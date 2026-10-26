@@ -1,8 +1,9 @@
 // The arranger (2.11): include/Layout/Arranger.h says what and why. A
-// line-for-line port of Layout Playground v8's arrangeV8() with its shapesV8(),
-// searchV8(), scoreV8(), refSizes() and the finish, finishWith() at a unit a
-// step (the "Layout Playground" artifact, 2026-10-20) - doubles, the same order
-// of loops, sums and tie-breaks, so its answers are the playground's.
+// line-for-line port of Layout Playground v9's arrangeV9() with its shapesV9()
+// (v8's for clusters), searchV8(), scoreV9(), refSizes() and the finish,
+// finishV9() (the "Layout Playground" artifact, its page v11, 2026-10-26) -
+// doubles, the same order of loops, sums and tie-breaks, so its answers are the
+// playground's.
 #include "Layout/Arranger.h"
 #include <math.h>
 #include <stdlib.h>
@@ -98,14 +99,21 @@ uint8_t shapes(const ArrScreen &s, const ArrWeights &W, const ArrRef &ref, const
                double L, Shape *out, Shape *all) {
     uint16_t na = 0;
     if (!b.cluster) {
+        // v9 (shapesV9()): its preferred shape A stretches its limits and is what
+        // square means; its size is taken at that shape; bigger than the target
+        // pays BIG on top.
+        const double A = b.aspect > 0 ? b.aspect : 1.0;
         for (int w = 1; w <= g.cols; w++)
             for (int h = 1; h <= g.rows; h++) {
                 const double wmm = spanW(s, g, w), hmm = spanH(s, g, h);
-                if (wmm * hmm < ref.soloW * ref.soloH * 0.98 || hmm / wmm > ref.tall * 1.001 || wmm / hmm > 1.7) continue;
+                if (wmm * hmm < ref.soloW * ref.soloH * A * 0.98 || hmm / wmm > ref.tall / A * 1.001 || wmm / hmm > 1.7 * A)
+                    continue;
                 double bw, bh;
                 soloBody(s, wmm, hmm, bw, bh);
-                const double size = sqrt(bw * bh);
-                const double sizeC = W.size * sq(log(size / L)), sqC = W.square * sq(log(hmm / wmm)) * 4;
+                const double size = sqrt(bw * bh / A);
+                const double lr = log(size / L);
+                const double sizeC = W.size * sq(lr) + W.big * sq(lr > 0 ? lr : 0.0);
+                const double sqC = W.square * sq(log(hmm / wmm * A)) * 4;
                 all[na++] = { (uint8_t)w, (uint8_t)h, 0, 0, 0, sizeC + sqC, size, sqC };
             }
     } else {
@@ -309,61 +317,172 @@ Score score(const ArrWeights &W, const Grid &g, const Shape *pos, const uint8_t 
         for (uint8_t j = 0; j < n; j++)
             if (i < j && pr[i] * g.cols + pc[i] > pr[j] * g.cols + pc[j]) inv++;
     const double orderC = W.order * inv;
-    return { mean, sizeC + other + twin + holeC + orderC, (uint16_t)holes };
-}
-
-// THE FINISH (v7's, a unit a step): each solo card, in the blocks' order, gives
-// up units at its top while that brings it nearer square (never flatter than
-// SQ_LO), units in pairs across while far too wide, and then takes whole free
-// unit rows above and below it as even margins - the odd unit below. Clusters
-// stay as placed.
-void finish(const ArrScreen &s, const Grid &g, const ArrBlock *blocks, uint8_t n, ArrPlace *box) {
-    const int R = g.rows;
-    const double sx = g.cwmm * s.pmm + s.gap, sy = g.chmm * s.pmm + s.gap;
-    auto tall = [&](const ArrPlace &b) {
-        double w = b.w * sx - s.gap, h = b.h * sy - s.gap;
-        insetForTag(s, w, h);
-        return h / w;
-    };
-    uint8_t occ[ARR_UNITS_MAX][ARR_UNITS_MAX] = {};
-    auto mark = [&](const ArrPlace &b, uint8_t v) {
-        for (int y = b.r; y < b.r + b.h; y++) for (int x = b.c; x < b.c + b.w; x++) occ[y][x] = v;
-    };
-    for (uint8_t i = 0; i < n; i++) mark(box[i], 1);
+    double total = sizeC + other + twin + holeC + orderC;
+    // v9 (scoreV9()): each solo card bigger than the entities' size, on top.
+    double big = 0;
     for (uint8_t i = 0; i < n; i++) {
         if (blocks[i].cluster) continue;
-        ArrPlace &b = box[i];
-        const int r0 = b.r, h0 = b.h;
-        mark(b, 0);
-        while (b.h > 1 && tall(b) > SQ_HI) {
-            ArrPlace t = b;
-            t.r++; t.h--;
-            if (tall(t) < SQ_LO || fabs(log(tall(t))) >= fabs(log(tall(b)))) break;
-            b = t;
+        const double lr = log(pos[i].size / mean);
+        big += W.big * sq(lr > 0 ? lr : 0.0);
+    }
+    total += big;
+    return { mean, total, (uint16_t)holes };
+}
+
+// Groups of blocks for the finish: each group's blocks, by index.
+struct Groups {
+    uint8_t m[ARR_BLOCKS_MAX][ARR_BLOCKS_MAX];
+    uint8_t len[ARR_BLOCKS_MAX];
+    uint8_t n;
+};
+
+// The blocks in `idx` grouped where their [lo, hi) overlap, transitively, in
+// order of lo, ties by index (the playground's overlapGroups()).
+void overlapGroups(const uint8_t *idx, uint8_t k, const double *lo, const double *hi, Groups &g) {
+    uint8_t ix[ARR_BLOCKS_MAX];
+    for (uint8_t i = 0; i < k; i++) {
+        const uint8_t v = idx[i];
+        uint8_t at = i;
+        while (at > 0 && (lo[v] < lo[ix[at - 1]] || (lo[v] == lo[ix[at - 1]] && v < ix[at - 1]))) {
+            ix[at] = ix[at - 1];
+            at--;
         }
-        while (b.w > 2 && tall(b) < SQ_LO) {
-            ArrPlace t = b;
-            t.c++; t.w -= 2;
-            if (tall(t) > SQ_HI || fabs(log(tall(t))) >= fabs(log(tall(b)))) break;
-            b = t;
+        ix[at] = v;
+    }
+    g.n = 0;
+    double end = -INFINITY;
+    for (uint8_t j = 0; j < k; j++) {
+        const uint8_t i = ix[j];
+        if (g.n && lo[i] < end) {
+            g.m[g.n - 1][g.len[g.n - 1]++] = i;
+            if (hi[i] > end) end = hi[i];
+        } else {
+            g.m[g.n][0] = i;
+            g.len[g.n] = 1;
+            g.n++;
+            end = hi[i];
         }
-        // Its own units are its room, and any whole unit rows free above or below
-        // them. Up and down only: centred across a free row, a card wandered away
-        // from its neighbours (the 4B).
-        auto rowFree = [&](int y) {
-            if (y < 0 || y >= R) return false;
-            for (int x = b.c; x < b.c + b.w; x++) if (occ[y][x]) return false;
-            return true;
-        };
-        int top = r0, bot = r0 + h0 - 1;
-        while (rowFree(top - 1)) top--;
-        while (rowFree(bot + 1)) bot++;
-        b.r = (uint8_t)(top + (bot - top + 1 - b.h + 1) / 2);
-        mark(b, 1);
+    }
+}
+
+// The groups spread along one axis in `room` (the playground's spreadAround()):
+// the spare in n parts, half of one at each edge, a whole one between, each group
+// moved as one. `p` is the blocks' start on that axis, `len` their length.
+void spreadAround(const Groups &g, double *p, const double *len, double room, double gap) {
+    const uint8_t n = g.n;
+    if (!n) return;
+    double e0[ARR_BLOCKS_MAX], e1[ARR_BLOCKS_MAX];
+    for (uint8_t k = 0; k < n; k++) {
+        e0[k] = INFINITY;
+        e1[k] = -INFINITY;
+        for (uint8_t j = 0; j < g.len[k]; j++) {
+            const uint8_t i = g.m[k][j];
+            if (p[i] < e0[k]) e0[k] = p[i];
+            if (p[i] + len[i] > e1[k]) e1[k] = p[i] + len[i];
+        }
+    }
+    double used = (n - 1) * gap;
+    for (uint8_t k = 0; k < n; k++) used += e1[k] - e0[k];
+    const double spare = room - used;
+    if (spare <= 0) return;
+    const double s = spare / n;
+    double at = s / 2;
+    for (uint8_t k = 0; k < n; k++) {
+        const double d = at - e0[k];
+        for (uint8_t j = 0; j < g.len[k]; j++) p[g.m[k][j]] += d;
+        at += e1[k] - e0[k] + gap + s;
     }
 }
 
 }  // namespace
+
+// THE FINISH (the playground's finishV9()). 1. v7's trim, in units: each solo
+// card, in the blocks' order, gives up units at its top while that brings it
+// nearer its own shape's square (never flatter than SQ_LO), units in pairs across
+// while far too flat. 2. In pixels, the spare room shared out: blocks whose rows
+// overlap make a BAND, and bands spread down the page; in each band, blocks whose
+// columns overlap make a COLUMN, columns spread across it, and each column is
+// centred in its band's height. Clusters keep their units.
+void finishPage(const ArrScreen &s, const ArrBlock *blocks, uint8_t n, uint8_t cols, uint8_t rows,
+                const ArrPlace *pos, ArrPlace *box, ArrRect *rect) {
+    if (!n || n > ARR_BLOCKS_MAX || !cols || !rows) return;
+    const Grid g = mk(s, cols, rows);
+    const double sx = g.cwmm * s.pmm + s.gap, sy = g.chmm * s.pmm + s.gap;
+    auto tall = [&](const ArrPlace &b, double A) {
+        double w = b.w * sx - s.gap, h = b.h * sy - s.gap;
+        insetForTag(s, w, h);
+        return h / w * A;
+    };
+    for (uint8_t i = 0; i < n; i++) box[i] = pos[i];
+    for (uint8_t i = 0; i < n; i++) {
+        if (blocks[i].cluster) continue;
+        const double A = blocks[i].aspect > 0 ? blocks[i].aspect : 1.0;
+        ArrPlace &b = box[i];
+        while (b.h > 1 && tall(b, A) > SQ_HI) {
+            ArrPlace t = b;
+            t.r++; t.h--;
+            if (tall(t, A) < SQ_LO || fabs(log(tall(t, A))) >= fabs(log(tall(b, A)))) break;
+            b = t;
+        }
+        while (b.w > 2 && tall(b, A) < SQ_LO) {
+            ArrPlace t = b;
+            t.c++; t.w -= 2;
+            if (tall(t, A) > SQ_HI || fabs(log(tall(t, A))) >= fabs(log(tall(b, A)))) break;
+            b = t;
+        }
+    }
+    // ~2.4 KB of room, from the heap: the arranger's task and the LVGL thread
+    // (a kept answer finished at a build) both come here.
+    struct Work {
+        double  x[ARR_BLOCKS_MAX], y[ARR_BLOCKS_MAX], w[ARR_BLOCKS_MAX], h[ARR_BLOCKS_MAX];
+        double  hiY[ARR_BLOCKS_MAX], hiX[ARR_BLOCKS_MAX];
+        uint8_t all[ARR_BLOCKS_MAX];
+        Groups  bands, colsG;
+    };
+    Work *wk = (Work *)calloc(1, sizeof(Work));
+    if (!wk) {
+        for (uint8_t i = 0; i < n; i++) rect[i] = { 0, 0, 0, 0 };
+        return;
+    }
+    double *x = wk->x, *y = wk->y, *w = wk->w, *h = wk->h, *hiY = wk->hiY, *hiX = wk->hiX;
+    uint8_t *all = wk->all;
+    Groups &bands = wk->bands, &colsG = wk->colsG;
+    for (uint8_t i = 0; i < n; i++) {
+        x[i] = box[i].c * sx;
+        y[i] = box[i].r * sy;
+        w[i] = box[i].w * sx - s.gap;
+        h[i] = box[i].h * sy - s.gap;
+        all[i] = i;
+    }
+    for (uint8_t i = 0; i < n; i++) hiY[i] = y[i] + h[i];
+    overlapGroups(all, n, y, hiY, bands);
+    spreadAround(bands, y, h, s.ah, s.gap);
+    for (uint8_t k = 0; k < bands.n; k++) {
+        const uint8_t *bd = bands.m[k];
+        const uint8_t bn = bands.len[k];
+        for (uint8_t j = 0; j < bn; j++) hiX[bd[j]] = x[bd[j]] + w[bd[j]];
+        overlapGroups(bd, bn, x, hiX, colsG);
+        spreadAround(colsG, x, w, s.aw, s.gap);
+        double b0 = INFINITY, b1 = -INFINITY;
+        for (uint8_t j = 0; j < bn; j++) {
+            if (y[bd[j]] < b0) b0 = y[bd[j]];
+            if (y[bd[j]] + h[bd[j]] > b1) b1 = y[bd[j]] + h[bd[j]];
+        }
+        for (uint8_t c = 0; c < colsG.n; c++) {
+            double c0 = INFINITY, c1 = -INFINITY;
+            for (uint8_t j = 0; j < colsG.len[c]; j++) {
+                const uint8_t i = colsG.m[c][j];
+                if (y[i] < c0) c0 = y[i];
+                if (y[i] + h[i] > c1) c1 = y[i] + h[i];
+            }
+            const double d = (b0 + b1) / 2 - (c0 + c1) / 2;
+            for (uint8_t j = 0; j < colsG.len[c]; j++) y[colsG.m[c][j]] += d;
+        }
+    }
+    for (uint8_t i = 0; i < n; i++)
+        rect[i] = { (int32_t)jsRound(x[i]), (int32_t)jsRound(y[i]), (int32_t)jsRound(w[i]), (int32_t)jsRound(h[i]) };
+    free(wk);
+}
 
 ArrRef arrRef() {
     // The owner's two references, in the playground's own geometry: one card of
@@ -470,9 +589,7 @@ bool arrange(const ArrScreen &scr, const ArrBlock *blocks, uint8_t n, const ArrW
         }
     }
     if (!out.ok) return false;
-    Grid g = { out.cols, out.rows, out.cwmm, out.chmm };
-    memcpy(out.box, out.pos, sizeof(ArrPlace) * n);
-    finish(scr, g, blocks, n, out.box);
+    finishPage(scr, blocks, n, out.cols, out.rows, out.pos, out.box, out.rect);
     return true;
 }
 
