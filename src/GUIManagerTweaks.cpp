@@ -10,6 +10,7 @@
 #include <string.h>
 #include "Settings.h"
 #include "Cards/CardAdded.h"     // the development Reset (round 9)
+#include "Cards/ClusterCard.h"   // the clusters' header glyphs (round 11)
 #include "Cards/CardIcons.h"     // cardLabelMode(), cardSetLabelMode()
 #include "Cards/CardPopup.h"
 #include "UI/Sheet.h"            // windowCloseMs(), sheetBeside()
@@ -206,6 +207,9 @@ void GUIManager::setGlyphs(GlyphStyle g) {
     // Saved by name; the default (square, D-20) as nothing.
     Settings::setSystem("header", "glyphs", g == GLYPH_DEFAULT ? nullptr : glyphStyleName(g));
     Settings::save();
+    // The clusters' header values take it too (round 11, K115).
+    ClusterCard::setGlyphStyle(g);
+    rebuildDashboard();
     Serial.printf("[UI] header glyphs -> %s\n", glyphStyleName(g));
 }
 
@@ -224,6 +228,7 @@ void GUIManager::resetUiTweaks() {
     Settings::save();
     applyUiSettings();
     _header.setGlyphStyle(savedGlyphStyle());
+    ClusterCard::setGlyphStyle(savedGlyphStyle());
     rebuildDashboard();
     // The open window waits as shipped from now (round 4: at once).
     if (Kit::Sheet *s = Kit::sheetShowing()) Kit::sheetRetime(*s, Kit::windowCloseMs(), Kit::windowBarShown());

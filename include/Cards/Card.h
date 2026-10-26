@@ -521,6 +521,7 @@ protected:
 private:
     void buildHeader();
     void buildMini(lv_obj_t *parent);  // a mini tile's frame (Cards/MiniTile.cpp)
+    void paintSurface();               // its colour: paused or not, a tile's or a card's
     void applyState();                 // repaint chrome for _state
     void applyDiagonal();              // the loud treatment, every mode
     void resolveVariant();             // measure the cell, pick FULL or COMPACT

@@ -180,6 +180,15 @@ void StateCard::renderMini() {
     lv_label_set_text         (_icon, cardHeroIcon(*e, on));
     lv_obj_set_style_text_font(_icon, face, 0);
 
+    // THE CARD STATE, ON A TILE TOO (round 11, the owner's E - K116): an active
+    // tile framed as a solo card is (Corner cut, Bracket), its lit disc kept.
+    CardFrame frame = CardFrame::FRAME_NONE;
+    if (on && !chrome) {
+        if (s_fill == StateCardFill::FRAME_BRACKET) frame = CardFrame::FRAME_BRACKET;
+        if (s_fill == StateCardFill::FRAME_CORNER)  frame = CardFrame::FRAME_CORNER;
+    }
+    activeFrame(frame, p.ST_ACTIVE);
+
     if (showName) {
         lv_label_set_text(_name, lbl == CardLabel::LBL_STATE ? cardStateWord(e->desc, on) : shownName(lbl));
         lv_obj_set_style_text_color(_name, UI::c(tone(p.TEXT)), 0);

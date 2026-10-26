@@ -699,6 +699,14 @@ void Card::buildHeader() {
 // live - a card that cached a colour would simply not repaint.
 // ---------------------------------------------------------------------------
 
+// The surface's colour: the card's own, mixed toward the ground while paused. A
+// mini tile keeps its role's faint panel (KS_TILE, 2.11 round 11) unless paused.
+void Card::paintSurface() {
+    const UIPalette &p = UI::pal();
+    if (_mini && !_dimmed) lv_obj_remove_local_style_prop(_surface, LV_STYLE_BG_COLOR, 0);
+    else lv_obj_set_style_bg_color(_surface, UI::c(_dimmed ? UI::mix(p.SURFACE, p.GROUND, 55) : p.SURFACE), 0);
+}
+
 void Card::restyle() {
     if (!_root) return;
 
@@ -708,8 +716,7 @@ void Card::restyle() {
     // The surface's radius, border and shadow, and the body's padding, are the
     // card's roles (KS_CARD_SURFACE, KS_CARD_BODY), refilled with the scheme.
     // The colour is the card's own: a paused card mixes it toward the ground.
-    const uint32_t surf = _dimmed ? UI::mix(p.SURFACE, p.GROUND, 55) : p.SURFACE;
-    lv_obj_set_style_bg_color     (_surface, UI::c(surf), 0);
+    paintSurface();
 
     // BAR ONLY. This said "not TAG", which also reserved a header's height in
     // HDR_NONE - a mode whose whole point is that it reserves nothing, and
@@ -1079,8 +1086,7 @@ void Card::applyState() {
     // runs on every transition, restyle() only on a scheme change. That is the
     // regression the owner spotted - "cards no longer dim when paused".
     _dimmed = cardStateMayDim(_state);
-    lv_obj_set_style_bg_color(_surface,
-        UI::c(_dimmed ? UI::mix(p.SURFACE, p.GROUND, 55) : p.SURFACE), 0);
+    paintSurface();
 
     const char *mark = "";
     switch (_state) {

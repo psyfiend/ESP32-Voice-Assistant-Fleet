@@ -3,6 +3,7 @@
 #define CLUSTER_CARD_H
 
 #include "Cards/Card.h"
+#include "UI/HeaderSlots.h"   // GlyphStyle (round 11)
 
 class CardBinder;
 
@@ -48,6 +49,9 @@ public:
     void setIcons(bool on) { _icons = on; }
     // The tiles across, as the arranger chose them (v8's tc); 0: Layout::tileGrid()'s rule.
     void setTileCols(uint8_t c) { _tileCols = c; }
+    // The header values' icons in the page header's glyph style (round 11, K115):
+    // framed on a Swatch header, bare on a Band. Every cluster's, from the next build.
+    static void setGlyphStyle(GlyphStyle g) { s_glyphs = g; }
 
     uint8_t memberCount() const { return _n; }
     uint8_t tileCount() const;
@@ -86,9 +90,12 @@ private:
     lv_obj_t *_room = nullptr;   // the card's body: the header and the tiles stand in it
     // The header: the row, its bar's skirt, the swatch, the name, and a value per slot.
     lv_obj_t *_hdr = nullptr, *_skirt = nullptr, *_swatch = nullptr, *_title = nullptr;
-    struct Slot { int8_t member = -1; lv_obj_t *box = nullptr, *icon = nullptr, *text = nullptr; };
+    // `glyph` is what stands: the icon's frame when it has one, else the icon.
+    struct Slot { int8_t member = -1; lv_obj_t *box = nullptr, *icon = nullptr, *glyph = nullptr, *text = nullptr; };
     Slot      _slot[CLUSTER_SLOTS_MAX];
     int32_t   _innerW = 0;
+    static GlyphStyle s_glyphs;
+    int32_t   glyphW(const Slot &s) const;
 };
 
 #endif // CLUSTER_CARD_H

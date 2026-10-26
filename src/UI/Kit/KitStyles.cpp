@@ -525,8 +525,24 @@ static void fillCards() {
     lv_style_set_radius(sw, LV_MAX(1, UI::mm(k.C_SWATCH_W) / 3));
     lv_style_set_bg_opa(sw, LV_OPA_COVER);
     text(S::KS_CLUSTER_VALUE, t.NAME, p.TEXT);
+    // The page header's glyph frames at the cluster header's size: four fifths of
+    // its height, the page header's tint (round 11, K115).
+    for (S f : { S::KS_CLUSTER_GLYPH_SQUARE, S::KS_CLUSTER_GLYPH_CIRCLE }) {
+        lv_style_t *g = st(f);
+        lv_style_set_width (g, UI::mm(k.C_HDR_H) * 4 / 5);
+        lv_style_set_height(g, UI::mm(k.C_HDR_H) * 4 / 5);
+        lv_style_set_bg_color(g, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, UI::hdr().FRAME_MIX)));
+        lv_style_set_bg_opa(g, LV_OPA_COVER);
+        flex(g, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    }
+    lv_style_set_radius(st(S::KS_CLUSTER_GLYPH_SQUARE), UI::mm(k.C_HDR_H) / 5);
+    lv_style_set_radius(st(S::KS_CLUSTER_GLYPH_CIRCLE), LV_RADIUS_CIRCLE);
     lv_style_t *tl = st(S::KS_TILE);
-    lv_style_set_bg_opa      (tl, LV_OPA_TRANSP);
+    // A FAINT PANEL EACH (round 11, the owner's E - K116): between the cluster's
+    // surface and SURFACE_ALT, so the off disc (SURFACE_ALT) and the header's
+    // band still stand apart from it.
+    lv_style_set_bg_color    (tl, UI::c(UI::mix(p.SURFACE, p.SURFACE_ALT, 50)));
+    lv_style_set_bg_opa      (tl, LV_OPA_COVER);
     lv_style_set_border_width(tl, 0);
     lv_style_set_pad_all     (tl, 0);
     lv_style_set_radius      (tl, UI::sc(m.RADIUS));

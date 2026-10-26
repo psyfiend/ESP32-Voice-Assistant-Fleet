@@ -36,6 +36,14 @@ uint8_t headerRank(const Card *m) {
 }
 }  // namespace
 
+GlyphStyle ClusterCard::s_glyphs = GLYPH_DEFAULT;
+
+// How wide a header value's icon stands: its frame, or the glyph itself.
+int32_t ClusterCard::glyphW(const Slot &s) const {
+    if (s.glyph != s.icon) return lv_obj_get_style_width(s.glyph, LV_PART_MAIN);
+    return Kit::textW(lv_label_get_text(s.icon), UI::type().ICON_SM);
+}
+
 ClusterCard::ClusterCard() {
     // A tap on the cluster itself (its header) switches nothing (owner, K107):
     // the page sets it from the file, Members unless chosen (round 6). Its own
@@ -137,12 +145,22 @@ void ClusterCard::buildBody(lv_obj_t *body) {
         for (uint8_t b = a; b > 0 && headerRank(_m[order[b]]) < headerRank(_m[order[b - 1]]); b--) {
             const uint8_t t = order[b]; order[b] = order[b - 1]; order[b - 1] = t;
         }
+    // Framed on a Swatch header in the page header's glyph style; bare on a Band,
+    // whose colour is the group's (round 11, K115).
+    const bool framed = _style != ClusterStyle::CLSTYLE_BAR && s_glyphs != GlyphStyle::GLYPH_BARE;
     for (uint8_t k = 0; k < no; k++) {
         Slot &s = _slot[k];
         s.member = (int8_t)order[k];
         s.box  = Kit::plain(_hdr);
         lv_obj_set_height(s.box, hdrH());
-        s.icon = Kit::label(s.box, KS::KS_CARD_ICON_SM);
+        if (framed) {
+            s.glyph = Kit::plain(s.box);
+            Kit::add(s.glyph, s_glyphs == GlyphStyle::GLYPH_CIRCLE ? KS::KS_CLUSTER_GLYPH_CIRCLE
+                                                                    : KS::KS_CLUSTER_GLYPH_SQUARE);
+            s.icon = Kit::label(s.glyph, KS::KS_CARD_ICON_SM);
+        } else {
+            s.icon = s.glyph = Kit::label(s.box, KS::KS_CARD_ICON_SM);
+        }
         s.text = Kit::label(s.box, KS::KS_CLUSTER_VALUE);
     }
 
@@ -254,7 +272,7 @@ void ClusterCard::layoutHeader() {
         const Slot &s = _slot[r];
         if (s.member < 0) continue;
         const char   *txt = lv_label_get_text(s.text);
-        const int32_t iw  = Kit::textW(lv_label_get_text(s.icon), t.ICON_SM);
+        const int32_t iw  = glyphW(s);
         const int32_t tw  = txt[0] ? Kit::textW(txt, t.NAME) : 0;
         Layout::HeaderClaim &v = c[n];
         v.place = Layout::HeaderPlace::PLACE_RIGHT;
@@ -292,12 +310,12 @@ void ClusterCard::layoutHeader() {
         lv_obj_align(s.box, LV_ALIGN_LEFT_MID, sp.x, 0);
         const bool iconShown = !lv_label_get_text(s.text)[0] || (_icons && sp.form == 0);
         if (iconShown) {
-            lv_obj_clear_flag(s.icon, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_align(s.icon, LV_ALIGN_LEFT_MID, 0, 0);
-            const int32_t iw = Kit::textW(lv_label_get_text(s.icon), UI::type().ICON_SM);
+            lv_obj_clear_flag(s.glyph, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_align(s.glyph, LV_ALIGN_LEFT_MID, 0, 0);
+            const int32_t iw = glyphW(s);
             lv_obj_align(s.text, LV_ALIGN_LEFT_MID, iw + vgap(), 0);
         } else {
-            lv_obj_add_flag(s.icon, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(s.glyph, LV_OBJ_FLAG_HIDDEN);
             lv_obj_align(s.text, LV_ALIGN_LEFT_MID, 0, 0);
         }
         if (sp.x < rightmost) rightmost = sp.x;

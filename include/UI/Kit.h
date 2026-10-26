@@ -97,7 +97,10 @@ enum class KitStyle : uint8_t {
     // the header's name, the group's swatch beside it, a value's words; a MINI
     // TILE - a member with no border of its own, tinted while pressed - and its
     // entity label.
+    // A header value's icon in the page header's glyph styles (round 11, K115):
+    // the rounded square and the circle, the cluster header's size.
     KS_CLUSTER_HDR, KS_CLUSTER_TITLE, KS_CLUSTER_SWATCH, KS_CLUSTER_VALUE,
+    KS_CLUSTER_GLYPH_SQUARE, KS_CLUSTER_GLYPH_CIRCLE,
     KS_TILE, KS_TILE_PRESSED, KS_TILE_NAME,
     // THE KEYBOARD (2.11, K95): the box over it (what the words are for, the
     // field, the buttons), the field and its cursor, the keys' ground, a key,

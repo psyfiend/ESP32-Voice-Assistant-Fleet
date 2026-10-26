@@ -279,6 +279,24 @@ void drawerOverBar(lv_event_t *e) {
         dsc.bg_opa   = LV_OPA_COVER;
         dsc.radius   = LV_MAX(0, R - wall);
         lv_draw_rect(layer, &dsc, &a);
+        // A CORNER UNDER THE TAB IS SQUARE (2.11 round 11, the owner on Linen: the
+        // status panel at the screen's edge showed the bar's shadow in its top
+        // corner): where the open slot's tab runs straight down into the wall,
+        // the panel has no rounded corner there, so neither does the cover.
+        const uint32_t nb = lv_obj_get_child_count(bar);
+        for (uint32_t k = 0; k < nb; k++) {
+            lv_obj_t *c2 = lv_obj_get_child(bar, (int32_t)k);
+            if (!lv_obj_has_state(c2, LV_STATE_CHECKED)) continue;
+            lv_area_t t;
+            lv_obj_get_coords(c2, &t);
+            if (t.x2 < r.x1 || t.x1 > r.x2) continue;
+            dsc.radius = 0;
+            const lv_area_t right = { a.x2 - R, a.y1, a.x2, a.y1 + R };
+            const lv_area_t left  = { a.x1, a.y1, a.x1 + R, a.y1 + R };
+            if (t.x2 >= r.x2 - wall - R) lv_draw_rect(layer, &dsc, &right);
+            if (t.x1 <= r.x1 + wall + R) lv_draw_rect(layer, &dsc, &left);
+            break;
+        }
         layer->_clip_area = keep;
     }
 }

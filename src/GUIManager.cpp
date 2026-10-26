@@ -18,6 +18,7 @@
 #include "Settings.h"   // 2.10d: the claims on saved settings, and [SETTINGS]
 #include "Cards/CardGroups.h"
 #include "Cards/CardAdded.h"   // K17: cards added on the device
+#include "Cards/ClusterCard.h" // the clusters' header glyphs (2.11 round 11)
 #include "UI/SlotPanels.h"     // 2.8: the header slots' panels
 #include <string.h>
 #ifdef DEBUG_PAGE_TIMING
@@ -634,6 +635,7 @@ void GUIManager::begin() {
     // board shows it.
     _header.init(screen, &_core.conn(), &_core.mqtt(), &_core.entities());
     _header.setGlyphStyle(savedGlyphStyle());
+    ClusterCard::setGlyphStyle(savedGlyphStyle());   // and the clusters' header values (round 11)
     _header.setOnSlotTap([](uint8_t slot) { if (s_self) s_self->onSlotTap(slot); });
 
     // Swipe navigation, milestone 2.6 first cut. On the screen, not an
