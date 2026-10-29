@@ -1,4 +1,4 @@
-# Handoff — 2026-10-26, evening (2.11 group cards: rounds 1-12b; the owner's final pass, then sign-off)
+# Handoff — 2026-10-29, afternoon (2.11 group cards: rounds 1-14 built; round 14's test, then item 8)
 
 **Start here.** This file is only: what to read, where we are, what to do next, what will bite you,
 and how to work with the owner. The history of how things got here is in the test sheets
@@ -9,16 +9,20 @@ handoffs are `docs/archive/HANDOFF_to_2026-10-14.md` and `HANDOFF_to_2026-09-29.
 
 1. `CLAUDE.md` - the HAL/BSP, the rules, **and the file-editing rule at the top**.
 2. `docs/ROADMAP.md` (the plan, and where each kind of note belongs) and `docs/DECISIONS.md` (every
-   decision in one line - 2.11's are K88-K124).
+   decision in one line - 2.11's are K88-K128).
 3. **`docs/design/ui-architecture.md`**, then what it points at - `components.md` (the kit, the
    finishes), `tokens.md`, `header-slots.md`, `card-sheet.md` §14-18, `layout-engines.md` (the
    arranger: v8 as built, version 9, round 12), `cards.md`, `pages.md`, `card-layout.md` (before
    moving anything inside a card), `group-cards.md` §6-7 (2.11's design), `interview-phase2-3.md`.
-4. **`docs/TEST_2.11.md`** - the milestone in progress: rounds 1-12b, the owner's results after the
-   first seven, his notes after rounds 9, 11 and 12, and the open questions of rounds 11, 12 and 12b.
-5. `docs/LESSONS.md` - before debugging anything. `docs/HTTP_REFERENCE.md` - before calling a route.
+4. **`docs/TEST_2.11.md`** - the milestone in progress: rounds 1-14, the owner's results, **the
+   final pass (A1-F3, all PASS on 2026-10-29)** and round 14's tests R1-R9 (his to run).
+5. **Home Assistant** (sibling folder `../Home Assistant/`, a separate git repo, read-only from
+   here): `FLEET_REFERENCE.md` (the panels' entity map, alerts, header entities) and
+   `HOUSE_RULES.md` (naming, labels, the logical layer). The House page reads its names since
+   round 13 (K127). Changes to HA are asked for there, never made from this project.
+6. `docs/LESSONS.md` - before debugging anything. `docs/HTTP_REFERENCE.md` - before calling a route.
    `host-tests/README.md` - before touching `src/Layout/`.
-6. For the display: `docs/display/README.md` only - it indexes the rest.
+7. For the display: `docs/display/README.md` only - it indexes the rest.
 
 **Keep it short.** A finished investigation goes to `LESSONS.md`; a test run to its test sheet; a
 decision to `DECISIONS.md`; a number to the doc that owns it. This file is rewritten at a handoff.
@@ -46,7 +50,8 @@ fonts, `lvgl`, `GFX_Library_for_Arduino`, `SensorLib`, `XPowersLib`, `bb_captouc
 | `v0.2.18` | 2026-10-17 | 2.8, the header bar v2 | 57,224 | 244 |
 | branch | 2026-10-20 | 2.11, seven rounds | 62,077 | 259 |
 | branch | 2026-10-26, morning | 2.11, eleven rounds | 63,201 | 259 |
-| branch | 2026-10-26, evening | **2.11 so far** (rounds 1-12b) | **63,373** | **259** |
+| branch | 2026-10-26, evening | 2.11, rounds 1-12b | 63,373 | 259 |
+| branch | 2026-10-29 | **2.11 so far** (rounds 1-14) | **63,569** | **259** |
 
 Counted with `git grep -c '' <rev> -- <those paths>` over `.c .cpp .h .hpp`; recount the same way.
 
@@ -67,10 +72,16 @@ are proved with the harness (`scripts/ui_golden.py`), host tests (`host-tests/`)
 check and the all-nine gate. `GUIManager` and the system panel's pages are not on the kit yet -
 bring each over when it is next changed (`ui-architecture.md` §6).
 
-## Where 2.11 stands (2026-10-26, evening)
+## Where 2.11 stands (2026-10-29)
 
+- **The owner's final pass passed - every test** (A1-F3, 2026-10-29). His notes became **round 14**
+  (K128: checkboxes, the 4-slot limit, Hide from the cluster asking, Add card to dashboard
+  redesigned, panel sections, his words), built and flashed; **its tests R1-R9 are his to run**.
+  Round 13 (K125-K127) moved the House page to HA's new entity ids, kept cluster-hidden members off
+  the page's hidden list, sized solo cards to the tiles, and set the arranger's budget to 7,000
+  (the 4B's search 10.2 s -> 4.9 s, the same page).
 - **Branch `feat/2.11-group-cards`** (off `main` at `6bd834f`), pushed, **no PR** (it comes at
-  sign-off). Rounds 1-12b (`TEST_2.11.md`); the owner tests once, at the end. Built: clusters and
+  sign-off). Rounds 1-14 (`TEST_2.11.md`). Built: clusters and
   the summary card; **the arranger, Layout Playground v9 in units** (host-tested against the
   playground's own answers: `big`, a card's preferred shape, **clusters grown into the spare height
   first** and what is left shared out, horizontal clusters preferred, a block's tightest shape kept;
@@ -80,12 +91,12 @@ bring each over when it is next changed (`ui-architecture.md` §6).
   **tiles as E** (K116), drawn **near square** with the hero and label centred and a bigger label
   where there is room (K122), **tile heights evened across a page** (K124); cluster headers in one order, on a
   faint band, with the glyph styles (K115).
-- **Boards**: the P4_5, the 4B and the 1060 run round 12b (`2dcb106`) with their local `DEBUG_POPUP`
-  lines. The owner's pins: the P4_5's House 5 x 4 (its header hidden) and Fleet 7 columns + 3 rows
-  (a 7-column pin makes the Fleet page flow - `TEST_2.11.md` round 11), the 1060's House 5 x 5; the
-  4B's House on **Auto** (he unpinned it 2026-10-26 - that is what found round 12b's boot loop), its
-  Fleet page 4 rows. Kept layouts are `v4` (round 12 moved the version so every page arranged
-  again). Settings copies from every flash: `bench/settings/<board>/2026102*-*.json`.
+- **Boards**: the P4_5, the 4B and the 1060 run round 14 (`0b6c978`) with their local `DEBUG_POPUP`
+  lines. The P4_5's House pinned 5 x 4, its Fleet page 7 columns + 3 rows; the 4B's House pinned
+  4 x 5 with Thermo hidden (left by his final pass - he may say they were tests); the 1060's House
+  5 x 5, on Linen. Window close is off on all three (his). Kept layouts are `v4`. Settings copies
+  from every flash: `bench/settings/<board>/202610*-*.json`; the P4_5's `20261029-1449-restore.json`
+  is its dashboard as he wants it (his F3 Reset undone).
 - **Artifacts**: [Layout Playground](https://claude.ai/artifact/SBSanCnwviNbKzQmkwiJXp) (page v12,
   engine "v9: grow, spread" - the spec for `Layout::arrange()`; its page is also
   `host-tests/tools/playground.html`); [2.11 Round 9 Mocks](https://claude.ai/artifact/SpSG1hhpbJsUmxBLv3cdfY)
@@ -106,7 +117,19 @@ bring each over when it is next changed (`ui-architecture.md` §6).
   `host-tests/tools/playground.html`, regenerate `test_arranger` with
   `host-tests/tools/gen_arranger_tests.py` (~10 min, needs node), port to `src/Layout/Arranger.cpp`
   until `wsl bash host-tests/run_in_wsl.sh` passes. Bump the kept-answer version in
-  `PageArranger.cpp` when the search changes. `host-tests/README.md` has the commands.
+  `PageArranger.cpp` when the search changes. `host-tests/README.md` has the commands. **The
+  boards' search budget is `Layout::ARR_BUDGET_BOARD` (7,000), a knob (`?arranger=budget`); the
+  host tests run the playground's `ARR_BUDGET` (20,000)** through `pg()` in the generated tests.
+- **Round 14's pieces**: the kit's check row, words row and chip grid (`UI/Kit/KitChoices.cpp`),
+  the section title `Kit::drawerTitle()` (`KitDrawer.cpp`, `KS_SECTION_RULE_L/R`); the cluster's
+  window `Popup/PopupCluster.cpp`; the Visibility note and Add card to dashboard
+  `Popup/PopupVisibility.cpp` (`buildJoin()`, its picker `s_joinPicking`); the dialogs
+  `Popup/PopupDialog.cpp`; the page panel `UI/SlotPanels.cpp`.
+- **HA's names (round 13)**: `components/Fleet_Providers/ExternalEntities_HA.h` - the same entity
+  ids (`office_desk`...), new `externalRef`s; `outdoor_temp` (`sensor.outdoor_temperature`) is on
+  no card - the page header's sensor slot reads it (`UI/HeaderSlots.cpp`). The `ha_outside` group
+  no longer exists in HA; a card saved with it falls back to its dashboard area's group
+  (`CardGroups::ofCard()`), so nothing was rewritten.
 
 ## What is next
 
@@ -117,18 +140,21 @@ bring each over when it is next changed (`ui-architecture.md` §6).
    the P4_5 and 1060, and a fix for kept pages whose clusters could not grow. Round 12b fixed the
    4B's boot loop on Auto (the arranger's task starved the idle task; LESSONS), evened the tile
    heights across a page's clusters (halfway to the shortest) and settled the tile panel at 3%
-   toward the text (K124) - the owner found 6% too bright, most of all on the 4B's panel. **He tests once, at the end** - the "For the final
-   pass" tables in rounds 11, 12 and 12b (P1-P13). Open questions for him: round 11's 1-2 ("around"
-   or "between" spacing; its arrange time, now round 12b's 1: **the 4B's search takes ~10 s** - a
-   time budget, tried in the playground first, is the recommendation) and round 12's 1-2 (the 4B
-   at 4 x 4 fills unevenly; the 4B's tile discs a little smaller). Then **item 8**: **one final
-   test sheet** for the owner (he asked for it), the all-nine gate with the structure check, the
-   CHANGELOG entry, the sheet archived, the PR; the owner merges; tag `v0.2.19`. The owner is
-   bringing `dashboard-target-7b.md` up to date with clusters as the new baseline, with entities
-   added to fill the screen.
-2. **After 2.11** (K118, K119, K123): the group view (the mock, tiles in it) and Add cards offering
-   the cards on the board or the entities labelled "Fleet" in HA - once the owner has labelled them.
-   Counts and alerts from HA template sensors (K119).
+   toward the text (K124). The owner's final pass then passed everything (2026-10-29), and round
+   14 built his notes (K128). **Next: he runs round 14's R1-R9** (`TEST_2.11.md`); anything he
+   finds is round 15, on the three dev boards. No questions are open (the 4B at 4 x 4 filling
+   unevenly was left by him). When he signs off, **item 8**: the all-nine gate
+   (`scripts/release/gate.ps1`, with `python scripts/structure_check.py`), the CHANGELOG entry for
+   `v0.2.19`, the test sheet archived to `docs/archive/`, then `gh pr create` (body via
+   `--body-file`). He merges; you pull, tag `v0.2.19` (annotated), push the tag, flash the boards
+   on the desk. The consolidated final sheet he asked for is round 13's list - done.
+2. **After 2.11** (ROADMAP 5a; K118, K119, K123, K127): HA's organisation, offered - the group
+   view; Add cards from the entities labelled `fleet` (the linked area's first); a cluster linked
+   to the HA area closest to its intent, or none, its header able to adopt that area's logical
+   entities as members; an outdoor average (asked of the HA project). From the final pass: a header
+   panel's temperature opening its History; a cluster's own card state; **UI Tweaks' "Show helper
+   text"**. The owner was firm: the dashboard never has to follow HA's organisation, and the
+   project must not depend on a particular HA layout (no manifest template).
 3. **#76, on the claim model** (D-19): the notice queue ported from NINA's `nina_toast`, a notice's
    detailed form then its minimal "!" in status, a place that grows for a high-priority claim. Mock
    first.
@@ -175,7 +201,7 @@ Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
 | `CYD_S3_3248` | - | USB broken (2026-09-28) |
 | `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in |
 
-The P4_5, the 4B and the 1060 run 2.11 round 12b; the rest `v0.2.18` or older. Hosts:
+The P4_5, the 4B and the 1060 run 2.11 round 14; the rest `v0.2.18` or older. Hosts:
 `fleet-ws-p4-5`, `fleet-ws-p4-4b`, `fleet-cyd-p4-1060` (all in `HTTP_REFERENCE.md`). Environments:
 `WS_P4_TOUCH_LCD_5`, `WS_P4_TOUCH_LCD_4B`, `CYD_P4_1060P470`. Ports move when boards are re-plugged:
 `pio device list` and match the serial. **Is a board alive?** Ask Home Assistant
