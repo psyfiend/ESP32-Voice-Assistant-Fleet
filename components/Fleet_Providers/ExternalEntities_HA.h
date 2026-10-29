@@ -94,13 +94,15 @@ inline const EntityDescriptor HA_ENTITIES[] = {
     {
         .id          = "living_overhead",
         .name        = "Living Overhead",
-        .kind        = EntityKind::LIGHT,     // a switch.* entity; see note 2
+        .kind        = EntityKind::LIGHT,
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
-        .externalRef = "switch.tv_room_switch_1",
+        // Was switch.tv_room_switch_1 (note 2); HA wraps the relay as a light
+        // since 2026-10-28 (Switch-as-X), the switch hidden.
+        .externalRef = "light.living_room_light_laundry",
     },
 
     // --- Kitchen ----------------------------------------------------------
@@ -113,7 +115,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
-        .externalRef = "light.kitchen_switch_1",
+        .externalRef = "light.kitchen_light_sink",
     },
     {
         .id          = "kitchen_table",
@@ -126,7 +128,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .staleAfterMs = 0,
         // Dimmable - supported_color_modes is ['brightness']. What a light can
         // do is read from HA with every report (2.10c), never declared here.
-        .externalRef = "light.dining_room_light",
+        .externalRef = "light.kitchen_light_table",
     },
     {
         .id          = "kitchen_temp",
@@ -140,7 +142,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
-        .externalRef = "sensor.kitchen_mmwave_temperature",
+        .externalRef = "sensor.kitchen_temperature",
     },
     {
         .id          = "kitchen_occupancy",
@@ -168,7 +170,8 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
-        .externalRef = "sensor.thermostat_temperature",
+        // The thermostat's room since 2026-10-27 is the Hallway (logical).
+        .externalRef = "sensor.hallway_temperature",
     },
 
     // --- Office -----------------------------------------------------------
@@ -191,7 +194,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         // A GROUP entity (a Hue room), ['color_temp','xy']. HA and the Hue
         // bridge send each command on to its three bulbs. cards.md section 4,
         // ha-websocket.md section 9.
-        .externalRef = "light.office",
+        .externalRef = "light.office_lights_hue",
     },
     {
         .id          = "office_overhead",
@@ -202,7 +205,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
-        .externalRef = "light.office_overhead",
+        .externalRef = "light.office_light_overhead",
     },
     {
         .id          = "office_occupancy",
@@ -228,7 +231,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
-        .externalRef = "sensor.mmwave_temperature",
+        .externalRef = "sensor.office_temperature",
     },
 
     // --- Bedroom ----------------------------------------------------------
@@ -244,7 +247,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
-        .externalRef = "sensor.temp_3_eric_bedroom_temperature",
+        .externalRef = "sensor.eric_bedroom_temperature",
     },
 
     // --- Outside ----------------------------------------------------------
@@ -260,7 +263,9 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
-        .externalRef = "sensor.temp_2_front_door_temperature",
+        // The porch's own sensor (physical): this card is that one reading;
+        // the house-wide outdoor reading is outdoor_temp below.
+        .externalRef = "sensor.porch_climate_temperature",
     },
     {
         .id          = "outside_deck_temp",
@@ -275,7 +280,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .advertise   = false,
         .staleAfterMs = 0,
         // Same physical sensor as deck_temp in ExternalEntities.h. See note 3.
-        .externalRef = "sensor.outdoor_deck_motion_temperature",
+        .externalRef = "sensor.deck_motion_temperature",
     },
     {
         .id          = "outside_front_light",
@@ -286,7 +291,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
-        .externalRef = "light.porch_switch_1",
+        .externalRef = "light.porch_light",
     },
     {
         .id          = "outside_deck_lux",
@@ -301,7 +306,24 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .advertise   = false,
         .staleAfterMs = 0,
         // Same physical sensor as deck_lux in ExternalEntities.h. See note 3.
-        .externalRef = "sensor.outdoor_deck_motion_illuminance",
+        .externalRef = "sensor.deck_motion_illuminance",
+    },
+    {
+        // THE HOUSE-WIDE OUTDOOR READING (HA's logical sensor: the porch, else
+        // the deck, else the weather service). On no card: the page header's
+        // sensor slot reads it (HeaderSlots.cpp, owner 2026-10-29).
+        .id          = "outdoor_temp",
+        .name        = "Outdoor Temperature",
+        .kind        = EntityKind::SENSOR,
+        .source      = EntitySource::HA,
+        .valueType   = ValueType::FLOAT,
+        .unit        = HA_DEG_F,
+        .deviceClass = "temperature",
+        .stateClass  = "measurement",
+        .writable    = false,
+        .advertise   = false,
+        .staleAfterMs = 0,
+        .externalRef = "sensor.outdoor_temperature",
     },
 
     // --- Garage -----------------------------------------------------------
@@ -318,7 +340,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
-        .externalRef = "binary_sensor.door_sensor_2_garage_north",
+        .externalRef = "binary_sensor.garage_north_door",
     },
     {
         .id          = "garage_door_south",
@@ -330,7 +352,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
-        .externalRef = "binary_sensor.door_sensor_3_south_garage_opening_2",
+        .externalRef = "binary_sensor.garage_south_door",
     },
     {
         .id          = "garage_temp",
@@ -344,7 +366,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
-        .externalRef = "sensor.temp_1_garage_temperature",
+        .externalRef = "sensor.garage_temperature",
     },
 
     // --- Test fixtures, 2026-09-23 --------------------------------------------

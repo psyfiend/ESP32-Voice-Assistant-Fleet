@@ -328,6 +328,20 @@ void CardPage::commit() {
                 const int32_t h = cl->tileHeight();
                 if (h > 0 && (!tileH || h < tileH)) tileH = h;
             }
+        // AND A SOLO CARD'S BODY NO TALLER THAN THOSE TILES (round 13, K126, the
+        // owner: the 4B's Doors and Thermo stood taller than the tiles beside
+        // them - "closer in size to the tiles ... makes a huge difference"), centred
+        // where the finish put it, its card label on top; its value in their face.
+        for (uint8_t i = 0; tileH > 0 && _arranged && i < _n && i < Layout::ARR_BLOCKS_MAX; i++) {
+            Card *c = _cards[i];
+            if (!c || !_slot[i].placed || !strcmp(c->typeName(), "cluster")) continue;
+            c->setBesideTiles(true);
+            Layout::ArrRect &a = _arrRect[i];
+            const int32_t cap = LV_MAX(tileH, Card::compactCellNeedPx()) + c->labelTakesPx();
+            if (a.h <= cap) continue;
+            a.y += (a.h - cap) / 2;
+            a.h = cap;
+        }
     }
 
     for (uint8_t i = 0; i < _n; i++) {

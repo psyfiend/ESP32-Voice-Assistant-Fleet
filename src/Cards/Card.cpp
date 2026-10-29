@@ -390,6 +390,9 @@ void Card::resolveVariant() {
             _valueSmall = (h < needC);
         }
     }
+    // Beside tiles, the tiles' face (round 13, K126: the owner found the 4B's
+    // Thermo far larger than the tile next to it, and clipping its corner icon).
+    if (_besideTiles) _valueSmall = true;
 
     // Printed once per card, because this decision was guessed at twice and
     // both times the guess was wrong. The numbers are cheap and they end the

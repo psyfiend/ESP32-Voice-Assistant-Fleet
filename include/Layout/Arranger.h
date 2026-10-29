@@ -56,7 +56,13 @@ constexpr uint8_t  ARR_SHAPES_MAX = ARR_SHAPES_CHEAP + 1;   // ...and its tighte
 constexpr uint8_t  ARR_UNITS_MAX  = 24;      // units across or down, at most
 constexpr uint16_t ARR_CELLS_MAX  = 192;     // units on a grid, at most: the search recurses a level a unit
 constexpr uint8_t  ARR_WINDOW     = 3;       // the next unplaced blocks tried at each empty unit
-constexpr uint32_t ARR_BUDGET     = 20000;   // steps per pass per grid before the search stops
+constexpr uint32_t ARR_BUDGET     = 20000;   // steps per pass per grid before the search stops: the
+                                             // playground's, which the host tests check against
+// THE BOARDS' BUDGET (round 13, the owner: the 4B's ~10 s "is asking a lot"):
+// 7,000 found the 4B's House page in 4.9 s, the same page and score as 20,000's
+// 10.2 s (10,000: 6.2 s). Only a search that hits the budget is touched - the
+// P4_5's and 1060's never do.
+constexpr uint32_t ARR_BUDGET_BOARD = 7000;
 
 // The owner's knobs (2026-10-20, tuned in the playground: its defaults now),
 // adjustable from the PC (system.arranger.*).
@@ -68,6 +74,9 @@ struct ArrWeights {
     double gap8   = 11.0;   // an empty unit, per entity-sized area it wastes
     double order  = 4.0;    // each block placed ahead of an earlier one
     double big    = 60.0;   // v9: a solo card bigger than the rest, on top: x log(size / target)^2
+    // Not a weight: the search's steps per pass per grid (round 13, the owner: the
+    // 4B's ~10 s is "asking a lot"). Fewer is faster, perhaps a worse page.
+    uint32_t budget = ARR_BUDGET_BOARD;
 };
 
 // How a solo card wears its card label: what it takes from the card's box.

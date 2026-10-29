@@ -1579,3 +1579,160 @@ Fleet perfect, Midnight and Linen a little strong; 1060: all a bit strong, Midni
   tap on the board at 16:12 (`loopTask`) - your scheme change, left as you set it.
 - **Host tests**: not rerun - the search is unchanged; the change is the task's priority and the
   tiles' drawing.
+
+## Your answers (2026-10-29)
+
+Round 11's 2: **around**, as built. Round 12's 1: the 4B at 4 x 4 **left for now**. Round 12's 2:
+**larger discs on the 4B**, and the solo cards beside the clusters brought down to the tiles' size,
+as the P4_5's Doors is - your 4B's Auto (12 x 6 units) should look like its 4 x 6 pin, and Thermo's
+number there was far larger than the tile beside it, clipping its icon. Round 12b's 1: ~10 s is too
+long - **try ~5 s on the glass**, and can it be changed without a build. And: Home Assistant's new
+names into the House page, keeping the cards and clusters as they are (K127); the P4_5's two glitched
+Office cards deleted; **a member hidden from its cluster must not be listed with the page's hidden
+cards** (K125).
+
+# Round 13 (2026-10-29) - HA's new names, solo cards a tile's size, the budget a knob
+
+## What changed
+
+1. **HA's new names** (K127, the HA project's `FLEET_REFERENCE.md`): every House card is the same
+   card, with the same id and settings, on its new entity. Logical entities where HA has one;
+   Front and Deck the porch's and the deck's own sensors (`sensor.porch_climate_temperature`,
+   `sensor.deck_motion_temperature`, `sensor.deck_motion_illuminance`); the page header's
+   temperature is now **`sensor.outdoor_temperature`**, HA's house-wide outdoor reading - Outside's
+   cluster header keeps Deck. Sink, Table, Porch, the laundry light (Living Overhead) and the
+   Office overhead are on their new names but unavailable in HA today (the Tuya switches): N/A is
+   expected on those five. The Fleet page's MQTT deck sensor is unchanged.
+2. **A member hidden from its cluster stays the cluster's** (K125): listed and restored in its
+   Members, never in the page's hidden cards. The page's list holds what was hidden from the page
+   and what had no room.
+3. **Solo cards a tile's size** (K126): on a page with clusters, a solo card's body is no taller
+   than the page's tiles, centred where the arranger put it, its card label on top - and its
+   number in the tiles' face. Done when the page is drawn, as K124's one tile height is; the
+   arranger's search is unchanged.
+4. **Larger discs on small tiles** (K126): a tile under 18 mm tall (the 4B's) keeps less space
+   off its top and foot, in step with its height (`C_TILE_FOOT_AT`); the P4_5's and 1060's tiles
+   are taller and unchanged.
+5. **The arranger's budget, 7,000 and a knob** (K126): steps per pass per grid, settable without a
+   build (`?arranger=budget&v=<steps>` on `/settings`; a page is arranged again when next built).
+   Timed on your 4B's House, Auto, on the glass - the same page and score each time:
+
+   | Budget | Steps | Time |
+   |---|---|---|
+   | 20,000 (round 12b, the playground's) | 1,238,790 | 10.2 s |
+   | 10,000 | 644,394 | 6.2 s |
+   | **7,000 (the boards' default now)** | 457,727 | **4.9 s** |
+
+   Only a search that hits its budget is changed by it - the P4_5's and the 1060's never do. The
+   host tests keep the playground's 20,000, so they still check the port line for line.
+
+Your 4B on Auto now - Doors and Thermo the tiles' height, Thermo's number in their face, the discs
+larger; the P4_5 and the 1060 on their own settings:
+
+| 4B | P4_5 | 1060 |
+|---|---|---|
+| ![4B](followups/211_r13_4b.png) | ![P4_5](followups/211_r13_p45.png) | ![1060](followups/211_r13_1060.png) |
+
+## Choices that were mine (round 13)
+
+- **Front and Deck on the physical sensors**, as you asked ("their new actual entity IDs"); Deck's
+  light level too (`sensor.deck_motion_illuminance`), to match its temperature.
+- **The solo cards' size is the drawing's, not the search's** - as K124's tile height was: the
+  arranger still finds the same page, and the page draws a solo card no taller than its tiles. The
+  Playground does not show this step.
+- **The number's face beside tiles is VALUE_SM on every board**, the face the tiles' numbers use -
+  so the 1060's solo Thermo, if you make it one, is smaller than before too.
+- **7,000 as the default**, rather than leaving 20,000 and your 4B on a setting of its own: the same
+  page in half the time, and a new board gets it too.
+- **Kitchen's Overhead (the laundry light) shows a bulb now**, not the ceiling-light glyph: HA
+  serves it as a `light.*` since the overhaul, and the icon is HA's.
+
+## Results (mine, before you)
+
+- **Seen by screenshot** on all three boards: every card on its new entity, live; N/A only on the
+  five Tuya-switched lights; the page header's 45° from `sensor.outdoor_temperature`.
+- **The 4B's budget**, timed on the glass on Auto (the table above), then your settings put back.
+- **Settings**: each board's file saved before the flash. The P4_5's two glitched Office cards
+  (`office_right_261020_1234`, `office_left_261020_1235`) deleted as you asked - the only
+  difference (14 lines, both entries). The 4B's file put back after the timing test; all three
+  boards 0 differences against their saved copies afterwards.
+- **Host tests**: 74, all passing (the arranger's 30 at the playground's budget).
+- **Builds**: the P4_5, the 4B and the 1060 flashed; the S3_4B compiled.
+- **The structure check**: two files over 1,000 lines (`GUIManager.cpp` 1,519, `Card.cpp` 1,458),
+  409 style calls outside the kit in 29 files, 10 colour literals in 2 files - unchanged.
+- **K125 on the P4_5**: Deck's light level is hidden from Outside there (your test), and the page
+  panel no longer offers View hidden cards at all - nothing is hidden from the page. Hiding and
+  showing through a tile's Visibility is C5 below, not tapped through by me.
+
+## For the final pass - everything, in one list
+
+Your one test of 2.11. **Lights**: Office's are safe to switch; Kitchen's and the porch are N/A
+until the Tuyas are back. Every board's settings were saved before this round's flash
+(`bench/settings/<board>/20261029-*.json`), so anything you change here can be put back.
+"Each board" means the P4_5, the 4B and the 1060.
+
+### A. HA's new names (round 13)
+
+| # | Do this | PASS if |
+|---|---|---|
+| A1 | Each board's House page | every card and tile reads: temperatures, occupancy, Desk, the doors. N/A only on Sink, Table, Porch, Overhead (Kitchen) and Office's Overhead |
+| A2 | The page header's temperature | the outdoor reading (HA's `sensor.outdoor_temperature`); its panel opens on it |
+| A3 | Desk: tap it, then long-press for its window and a scene | the Office Hue lights follow; the scenes are listed and work. Put back as found |
+| A4 | Open a garage door, or watch Doors when one is opened | Doors lights up and reads "North", "South" or "Both"; its Members show each door |
+| A5 | A card's History (Thermo, Eric) | history shows from the new entity's start (2026-10-28) at least |
+
+### B. Clusters and tiles
+
+| # | Do this | PASS if |
+|---|---|---|
+| B1 | Each board's House page | clusters fill their space; each header one line - swatch (on a faint band) or band, name, values from the right: temperature, occupancy, light level |
+| B2 | A cluster with a light on (Office) | the tile is a faint panel, framed in the card state (Corner cut by default); off tiles faint panels, no frame; its label clear of the frame's glow |
+| B3 | Tiles on each board | near square, hero and label centred; one height a page (Kitchen's between square and squat); the panel visible without standing out on Midnight, Linen and Fleet; the off discs distinct |
+| B4 | The P4_5 and the 1060 | the tiles' labels in the bigger face, the same in every tile of a cluster |
+| B5 | **The 4B** | the tiles' discs a little larger than round 12b's |
+| B6 | **Solo cards beside clusters** (Doors, Thermo where solo) | no taller than the tiles beside them, centred in their row; a number in the same face as the tiles' numbers, clear of the corner icon. **The 4B on Auto** looks like its 4 x 6 pin |
+| B7 | UI Tweaks - Header glyphs: Bare, Square, Circle | the cluster headers' icons follow on Swatch headers; bare on a Band |
+| B8 | Long-press a tile (Desk) | Desk's own window, as its card's |
+| B9 | Tap a cluster's header | its Members (or its Tap action); a brush switches nothing |
+
+### C. The cluster's window
+
+| # | Do this | PASS if |
+|---|---|---|
+| C1 | Long-press Office's header: Details | Header style, Sensor icons, Rename / Header slots / Add cards; its HA area or group and members counted |
+| C2 | Style Band, close; then back | Office's header a band in its colour; then a swatch |
+| C3 | Header slots: untick occupancy; then tick it | occupancy leaves the header and shows as a tile; then back in the header |
+| C4 | Rename "Work" on the keyboard, Save; then empty it and Save | the header says Work; then Office again. The keyboard types what its keys say; the hide key and a tap outside leave without saving |
+| C5 | Members: a member's Visibility - Hide from the cluster; then Show in the cluster | its tile goes and Members says Hidden; **the page's View hidden cards does not list it** (K125); Show puts it back |
+| C6 | Add cards: one Copy, one Move, Add | both join Office; the moved card leaves the page and is in neither the page nor its hidden cards. Remove the copy (its Visibility); Move back the moved one |
+
+### D. A card's Visibility, the hidden cards
+
+| # | Do this | PASS if |
+|---|---|---|
+| D1 | A solo card - Visibility - Hide from this page | it goes, the page arranges again; View hidden cards (tap the page name) lists it with Restore to page; Restore brings it back |
+| D2 | A tile - Visibility - Add card to dashboard - Move | it becomes a page card; Members says "On the page"; the card offers Move back to the cluster, which makes it a tile again |
+| D3 | The same with Copy | the tile stays, a page card joins; that card's Remove from the page deletes it (no hidden entry) |
+| D4 | Desk - Members - a lamp - Visibility | Add card to dashboard is a copy (no Copy / Move row); no Paused |
+| D5 | Row - in the system panel until a card leaves; View hidden cards | the card is listed with "No room"; Row + brings it back |
+| D6 | Any card - Visibility - Paused Yes, then No | the card greys with PAUSED, then returns |
+
+### E. The arranger and the pins
+
+| # | Do this | PASS if |
+|---|---|---|
+| E1 | Auto on each board's House page | rows of blocks spread down the page, each row's across it, a little space round the outer blocks ("around"); clusters grow before space is shared |
+| E2 | The 4B: Auto, then 4 x 3, 4 x 5, 4 x 6 | each fills the screen, no strips of empty space between rows (4 x 4 still uneven - left, round 12) |
+| E3 | The 4B: Row + twice | the rows part evenly |
+| E4 | The Fleet page on Auto | Free Heap and Uptime 1.5 cells wide on the last row |
+| E5 | The system panel's Grid line, Col + / Row - / Auto | each press pins and says so; Auto unpins; each page keeps its own |
+| E6 | Restart each board (power off and on) | each page comes up arranged at once, from its kept answer; the 4B keeps running |
+| E7 | **The 4B's arrange time**: Auto, then 4 x 6, then Auto again | each new page arranges itself within ~5 s (flowed meanwhile), and Auto is the page above |
+
+### F. Header panels, Reset
+
+| # | Do this | PASS if |
+|---|---|---|
+| F1 | Open and close each header panel, Midnight then Linen | a smooth slide; a faint shadow where the panel meets the bar; Linen's status panel with no shadow in its top corner |
+| F2 | A card's window; About; UI Tweaks | each on its halo (25% by default) |
+| F3 | (After a settings copy, on one board) system panel - Reset - Cancel; then Reset - Reset | Cancel leaves everything; Reset gives the compiled dashboard arranged again, your scheme, names and pins kept. I put the copy back afterwards |

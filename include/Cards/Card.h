@@ -101,6 +101,12 @@ public:
     // Zero means nobody said, and the card falls back to one whole cell.
     Card &setCellHeightPx(int32_t px) { _cellPx = px; return *this; }
 
+    // A SOLO CARD BESIDE TILES (2.11 round 13, K126): on a page with clusters
+    // its value is in the tiles' face (VALUE_SM), and the page sizes its body to
+    // theirs - labelTakesPx() is what its card label takes from its cell.
+    Card &setBesideTiles(bool on) { _besideTiles = on; return *this; }
+    int32_t labelTakesPx() const { return tagRowPx() + tagInsetPx(); }
+
     // And its real WIDTH, for the same reason. Needed since 2.7: the corner
     // icon's size follows the card's SHORT side, not only its height.
     Card &setCellWidthPx(int32_t px) { _cellWPx = px; return *this; }
@@ -597,6 +603,7 @@ private:
     int32_t         _cellPx      = 0;     // set by CardPage::commit()
     int32_t         _cellWPx     = 0;     // likewise; 0 = nobody said
     bool            _valueSmall  = false; // resolveVariant(): hero at VALUE_SM
+    bool            _besideTiles = false; // setBesideTiles(): VALUE_SM always
     TempUnit        _tempUnit    = TempUnit::TEMP_INHERIT;
     CardLabel       _labelMode   = CardLabel::LBL_INHERIT;
     GroupOn         _groupOn     = GroupOn::GROUP_ON_ANY;

@@ -54,6 +54,8 @@ void tuning(Layout::ArrWeights &w) {
     w.gap8   = num("gap8", d.gap8);
     w.order  = num("order", d.order);
     w.big    = num("big", d.big);
+    const double b = num("budget", d.budget);
+    w.budget = b >= 1000 && b <= 1e7 ? (uint32_t)b : d.budget;
 }
 
 // FNV-1a over everything an answer depends on.
@@ -79,6 +81,7 @@ uint32_t fingerprint(const Input &in, const Layout::ArrWeights &w) {
     f.dbl(s.pmm); f.dbl(s.aw); f.dbl(s.ah); f.dbl(s.gap); f.dbl(s.tagH); f.byte((uint8_t)s.label);
     f.byte(s.recCols); f.byte(s.recRows); f.byte(s.fixCols); f.byte(s.fixRows);
     f.dbl(w.size); f.dbl(w.square); f.dbl(w.wide); f.dbl(w.twin); f.dbl(w.gap8); f.dbl(w.order); f.dbl(w.big);
+    if (w.budget != Layout::ARR_BUDGET_BOARD) f.i32((int32_t)w.budget);   // the default leaves kept answers as they are
     return f.h;
 }
 

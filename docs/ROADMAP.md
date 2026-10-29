@@ -111,10 +111,14 @@ The numbers above are identity, not sequence. Agreed with the owner:
 5. **2.11 group cards with the page arranger** - **IN PROGRESS** on `feat/2.11-group-cards` (#66,
    #78; the arranger's spec: artifact "Layout Playground", page v12; engines:
    `design/layout-engines.md`). **Design agreed 2026-10-19** in the interview's §4
-   (`design/group-cards.md` §6, K88-K105; mocks "2.11 Clusters", "Panel Edges"); rounds 1-12b
-   built (`TEST_2.11.md`), the owner's one final pass and sign-off next. The group view and Add
-   cards from HA's "Fleet" label follow 2.11 (K118, K119, K123). Its hero region is what #100
-   (NINA's clock) waits for.
+   (`design/group-cards.md` §6, K88-K105; mocks "2.11 Clusters", "Panel Edges"); rounds 1-13
+   built (`TEST_2.11.md`; round 13 moved the House page to HA's new names, K127), the owner's one
+   final pass and sign-off next. Its hero region is what #100 (NINA's clock) waits for.
+5a. **After 2.11: HA's organisation, offered** (owner, 2026-10-29; HA's `FLEET_REFERENCE.md`):
+   the group view (K118); Add cards from the entities labelled `fleet`, the linked area's first
+   (K119, K123); a cluster linked to the HA area closest to its intent - or none - its header able
+   to adopt that area's logical entities as members; an outdoor average from HA. The dashboard
+   never has to follow HA's organisation, and needs no particular HA layout to work.
 6. **#76** HA alerts on the claim model (the notice queue from NINA's toasts; mock first).
 7. **3.1 schema** (#20), scoped together with **the companion web app** (#87).
 

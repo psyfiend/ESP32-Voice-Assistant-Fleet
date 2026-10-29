@@ -457,7 +457,7 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
   in the page's hidden cards with Restore. **A card moved into a cluster** has `removed`: `moved` -
   off its page and NOT in its pool; its copy in the cluster has `from` (the card it came from), and
   removing that copy puts the card back (K111). A member hidden from its cluster (`hidden`: `yes`) is
-  listed with the page's hidden cards too, Restore to cluster. **A member moved out to the page**
+  listed in its cluster's Members only, never with the page's hidden cards (K125). **A member moved out to the page**
   (K112) has `hidden`: `moved` - no tile, not in the hidden cards - and its page card `from`; Move
   back to the cluster deletes the page card and clears `hidden`.
 - **Every change is logged** with its time and task (`loopTask` = the card window, `httpd` = a

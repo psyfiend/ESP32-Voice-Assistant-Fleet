@@ -218,6 +218,8 @@ struct UIShape {
                         //      clear of its active frame (2.11 round 12)
     float C_TILE_TALL;  // 1.1  A RATIO: a mini tile drawn no taller than this times its width,
                         //      centred in its slot (round 12: "Desk is much taller than it is wider")
+    float C_TILE_FOOT_AT; // 18.0 a tile this tall or taller keeps the whole C_TILE_FOOT; a shorter
+                        //      one keeps it in step with its height, for its disc (round 13: the 4B's)
 
     // --- Panels and windows float over the page (D-35, the "Panel Edges" mock) ---
     float HALO;         // 5.0  the halo round a header slot's panel and every window: black at

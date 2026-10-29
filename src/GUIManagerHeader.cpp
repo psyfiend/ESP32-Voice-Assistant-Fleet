@@ -95,16 +95,14 @@ void GUIManager::openSlotPanel(uint8_t slot) {
 
 namespace {
 // WHAT A PAGE HAS HIDDEN (round 7, the owner: a card is in the page's hidden
-// cards only because someone hid it - "Hide from this page" on a card, "Hide from
-// the cluster" on a member - never because it was moved into a cluster). The
-// page's pool first, then each of its clusters' members hidden from it (the
-// cluster itself showing: a hidden cluster's members go with it).
+// cards only because someone hid it with "Hide from this page" - never because
+// it was moved into a cluster). The page's pool, then the cards crowded off it.
+// A member hidden from its cluster is not here (round 13, K125): the cluster's
+// Members list shows it and restores it.
 struct Hidden {
     char id[CARD_ID_MAX + 1];
     char name[ENTITY_NAME_MAX + 32];
     char where[ENTITY_SHORT_MAX];   // a card's area, for two of one name
-    bool member;                    // hidden from a cluster, not the page
-    bool inHeader;                  // ...one of its header's members
     bool crowded;                   // not hidden: the page had no room for it
 };
 
@@ -124,49 +122,6 @@ uint8_t collectHidden(const PageSpec &page, const EntityRegistry &reg, const Car
         snprintf(h.where, sizeof(h.where), "%s", pool[i].area);
         nameOf(reg, pool[i].label, pool[i].entity, pool[i].id, h.name, sizeof(h.name));
     }
-    char v[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1];
-    for (uint8_t c = 0; c < page.count && n < cap; c++) {
-        const CardSpec &cs = page.cards[c];
-        if (!cs.id || !cardIdWellFormed(cs.id) || CardAdded::isHidden(cs.id) || CardAdded::isMoved(cs.id)) continue;
-        GroupPresent pres = cs.present;
-        if (Settings::card(cs.id, "present", v, sizeof(v))) groupPresentFromName(v, pres);
-        if (pres != GroupPresent::PRESENT_CLUSTER) continue;
-        char cname[48];
-        if (!Settings::card(cs.id, "label_text", cname, sizeof(cname)) || !cname[0])
-            snprintf(cname, sizeof(cname), "%s", cs.label ? cs.label : cs.area ? cs.area : "the");
-        // Its header's members: the saved list, else the dashboard's.
-        const bool savedSlots = Settings::card(cs.id, "slots", v, sizeof(v));
-        auto inHeader = [&](const char *id) {
-            if (!id) return false;
-            if (savedSlots) {
-                const size_t len = strlen(id);
-                for (const char *p = strstr(v, id); p; p = strstr(p + 1, id))
-                    if ((p == v || p[-1] == ',') && (p[len] == ',' || p[len] == '\0')) return true;
-                return false;
-            }
-            for (uint8_t k = 0; k < CLUSTER_SLOTS_MAX; k++) if (cs.slots[k] && !strcmp(cs.slots[k], id)) return true;
-            return false;
-        };
-        const CardSpec *mem[GROUP_MEMBERS_MAX];
-        uint8_t nMem = 0;
-        for (uint8_t k = 0; k < cs.memberCount && nMem < GROUP_MEMBERS_MAX; k++) mem[nMem++] = &cs.members[k];
-        nMem += CardAdded::membersIn(cs.id, mem + nMem, (uint8_t)(GROUP_MEMBERS_MAX - nMem));
-        for (uint8_t k = 0; k < nMem && n < cap; k++) {
-            const CardSpec &m = *mem[k];
-            char hv[8];
-            if (!m.id || !Settings::card(m.id, "hidden", hv, sizeof(hv)) || strcmp(hv, "yes")) continue;
-            Hidden &h = out[n++];
-            h = Hidden{};
-            snprintf(h.id, sizeof(h.id), "%s", m.id);
-            char own[ENTITY_NAME_MAX];
-            if (!Settings::card(m.id, "name", own, sizeof(own))) own[0] = '\0';
-            char nm[ENTITY_NAME_MAX];
-            nameOf(reg, own[0] ? own : m.label, m.primaries[0], m.id, nm, sizeof(nm));
-            snprintf(h.name, sizeof(h.name), "%s (%s cluster)", nm, cname);
-            h.member   = true;
-            h.inHeader = inHeader(m.id);
-        }
-    }
     // CROWDED OFF THE PAGE (the sprint after round 7): not hidden, not shown -
     // the page had no room, and dropped the lowest priority first. Listed so they
     // are not forgotten; they come back when there is room.
@@ -182,7 +137,7 @@ uint8_t collectHidden(const PageSpec &page, const EntityRegistry &reg, const Car
     // Two cards called the same say where each is from ("Office Right (Office)").
     bool twin[HiddenSheet::MAX] = {};
     for (uint8_t i = 0; i < n && i < HiddenSheet::MAX; i++)
-        for (uint8_t j = 0; j < n && !twin[i]; j++) twin[i] = j != i && !out[i].member && !strcmp(out[j].name, out[i].name);
+        for (uint8_t j = 0; j < n && !twin[i]; j++) twin[i] = j != i && !strcmp(out[j].name, out[i].name);
     for (uint8_t i = 0; i < n && i < HiddenSheet::MAX; i++) {
         const size_t len = strlen(out[i].name);
         if (twin[i] && out[i].where[0] && len + 4 < sizeof(out[i].name))
@@ -198,9 +153,8 @@ uint8_t GUIManager::hiddenCount() {
     return collectHidden(*_pages[_curPage].spec, _core.entities(), _page, s_count, HiddenSheet::MAX);
 }
 
-// THE PAGE'S HIDDEN CARDS, IN THEIR OWN SHEET (2.11 round 6; round 7: members
-// hidden from a cluster too): each says where it goes back - the page, or its
-// cluster, named - and the page is built again under the sheet as each one is.
+// THE PAGE'S HIDDEN CARDS, IN THEIR OWN SHEET (2.11 round 6): each goes back to
+// the page, which is built again under the sheet as each one is.
 void GUIManager::openHiddenSheet() {
     if (_curPage >= _nPages || !_pages[_curPage].spec) return;
     static Hidden s_items[HiddenSheet::MAX];
@@ -210,7 +164,7 @@ void GUIManager::openHiddenSheet() {
     bool crowded = false;
     for (uint8_t i = 0; i < sp.n; i++) {
         sp.names[i] = s_items[i].name;
-        sp.chip[i]  = s_items[i].crowded ? "No room" : s_items[i].member ? "Restore to cluster" : "Restore to page";
+        sp.chip[i]  = s_items[i].crowded ? "No room" : "Restore to page";
         crowded |= s_items[i].crowded;
     }
     if (crowded)
@@ -222,13 +176,6 @@ void GUIManager::openHiddenSheet() {
         if (h.crowded) {   // nothing to restore: it was never hidden
             UIToolkit::show_toast("No room on this page for it");
             return false;
-        }
-        if (h.member) {
-            // A tile again: a header member shown as one too (its default is the header alone).
-            Settings::setCard(h.id, "hidden", h.inHeader ? "no" : nullptr);
-            Settings::save();
-            ((GUIManager *)user)->rebuildDashboard();
-            return true;
         }
         if (!CardAdded::restore(h.id)) return false;
         Settings::save();

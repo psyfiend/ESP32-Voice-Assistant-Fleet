@@ -40,17 +40,28 @@ void column(lv_obj_t *o) {
 int32_t heroGap() { return UI::mm(UI::shape().C_TILE_GAP); }
 
 // Off the tile's top and foot (round 12): the label sat on the tile's foot, in
-// its active frame's glow.
-int32_t foot() { return UI::mm(UI::shape().C_TILE_FOOT); }
+// its active frame's glow. A SHORT TILE KEEPS LESS (round 13, the owner: the
+// 4B's discs had shrunk for it): the whole C_TILE_FOOT from C_TILE_FOOT_AT tall,
+// in step with the tile's height below that.
+int32_t foot(int32_t tileH) {
+    const int32_t full = UI::mm(UI::shape().C_TILE_FOOT);
+    const int32_t at   = UI::mm(UI::shape().C_TILE_FOOT_AT);
+    return tileH > 0 && tileH < at ? full * tileH / at : full;
+}
 
 // THE TILE'S COLUMN (round 12, the owner: "no reason why the hero shouldn't be
 // centered within the tile frame like it is for solo cards"): the hero and its
 // label as one, centred in the tile, clear of its top and foot.
 void tileColumn(lv_obj_t *body, lv_obj_t *mid) {
-    lv_obj_set_style_pad_top   (body, foot(), 0);
-    lv_obj_set_style_pad_bottom(body, foot(), 0);
     lv_obj_set_size(mid, lv_pct(100), LV_SIZE_CONTENT);
     column(mid);
+}
+
+// Its foot, from the tile's height now (renderMini()).
+void setFoot(lv_obj_t *mid, int32_t f) {
+    lv_obj_t *body = lv_obj_get_parent(mid);
+    lv_obj_set_style_pad_top   (body, f, 0);
+    lv_obj_set_style_pad_bottom(body, f, 0);
 }
 
 // The disc a state tile w x h (inside its foot) gets with its label in face `nf`
@@ -161,8 +172,10 @@ void StateCard::renderMini() {
     const bool on = groupIsOn();
     const char *words = !showName ? "" : lbl == CardLabel::LBL_STATE ? cardStateWord(e->desc, on) : shownName(lbl);
     const int32_t w = cellWidthPx();
-    const int32_t h = cellPx() - 2 * foot();
+    const int32_t f = foot(cellPx());
+    const int32_t h = cellPx() - 2 * f;
     const int32_t gap = heroGap() + rowGap(_mid);
+    setFoot(_mid, f);
 
     // The disc: most of the room left over, never wider than most of the tile,
     // never larger than a solo card's at its largest (Card::heroDiscPx()) - and
@@ -264,8 +277,10 @@ void ValueCard::renderMini() {
     const CardLabel lbl = cardResolveLabel(labelMode());
     const bool showName = (lbl != CardLabel::LBL_NONE);
     const int32_t w = cellWidthPx();
-    const int32_t h = cellPx() - 2 * foot();
+    const int32_t f = foot(cellPx());
+    const int32_t h = cellPx() - 2 * f;
     const char *words = showName ? shownName(lbl) : "";
+    setFoot(_mid, f);
 
     char buf[40];
     cardFormatValue(*e, buf, sizeof(buf), false, tempUnit());

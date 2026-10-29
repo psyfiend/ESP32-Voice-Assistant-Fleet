@@ -17,6 +17,9 @@ using namespace Layout;
 void setUp() {}
 void tearDown() {}
 
+// The playground's search: its budget, not the boards' (ARR_BUDGET_BOARD).
+static ArrWeights pg() { ArrWeights w; w.budget = ARR_BUDGET; return w; }
+
 static const ArrBlock DEVICE[4] = {
     { false, 0, 0, 1, 1.0 },
     { true, 4, 2, 6, 1.0 },
@@ -70,7 +73,7 @@ static ArrScreen screen(double pmm, double aw, double ah, double gap, double tag
 static void check(const ArrScreen &s, const ArrBlock *blocks, uint8_t n, uint8_t cols, uint8_t rows,
                   double score, uint16_t holes, bool capped, const Want *want) {
     ArrResult out;
-    TEST_ASSERT_TRUE(arrange(s, blocks, n, ArrWeights(), out));
+    TEST_ASSERT_TRUE(arrange(s, blocks, n, pg(), out));
     TEST_ASSERT_EQUAL_UINT8(cols, out.cols);
     TEST_ASSERT_EQUAL_UINT8(rows, out.rows);
     TEST_ASSERT_TRUE(fabs(score - out.score) < 1e-6);   // Unity's doubles are off here
@@ -364,7 +367,7 @@ void test_pinned_columns_only() {
     ArrScreen s = screen(11.563817165786343, 1222.0, 604.0, 21.0, 33.0, 5, 3);
     s.fixCols = 4;
     ArrResult out;
-    TEST_ASSERT_TRUE(arrange(s, DEVICE, 4, ArrWeights(), out));
+    TEST_ASSERT_TRUE(arrange(s, DEVICE, 4, pg(), out));
     TEST_ASSERT_EQUAL_UINT8(8, out.cols);
     TEST_ASSERT_TRUE(out.rows >= 4 && out.rows <= 8);
 }
@@ -373,7 +376,7 @@ void test_pinned_columns_only() {
 void test_finish_again() {
     const ArrScreen s = screen(11.563817165786343, 1222.0, 604.0, 21.0, 33.0, 5, 3);
     ArrResult out;
-    TEST_ASSERT_TRUE(arrange(s, PLAYGROUND, 6, ArrWeights(), out));
+    TEST_ASSERT_TRUE(arrange(s, PLAYGROUND, 6, pg(), out));
     ArrPlace box[ARR_BLOCKS_MAX];
     ArrRect rect[ARR_BLOCKS_MAX];
     finishPage(s, PLAYGROUND, 6, out.cols, out.rows, out.pos, box, rect);
@@ -391,7 +394,7 @@ void test_finish_without_tiles_down() {
     ArrScreen s = screen(10.021985875084926, 670.0, 620.0, 18.0, 29.0, 4, 3);
     s.fixCols = 4; s.fixRows = 5;
     ArrResult out;
-    TEST_ASSERT_TRUE(arrange(s, P1060, 5, ArrWeights(), out));
+    TEST_ASSERT_TRUE(arrange(s, P1060, 5, pg(), out));
     ArrPlace pos[ARR_BLOCKS_MAX], box[ARR_BLOCKS_MAX];
     ArrRect rect[ARR_BLOCKS_MAX];
     for (int i = 0; i < 5; i++) { pos[i] = out.pos[i]; pos[i].tr = 0; }
@@ -410,7 +413,7 @@ void test_finish_without_tiles_down() {
 void test_no_overlap() {
     const ArrScreen s = screen(11.563817165786343, 1222.0, 604.0, 21.0, 33.0, 5, 3);
     ArrResult out;
-    TEST_ASSERT_TRUE(arrange(s, FLEET, 16, ArrWeights(), out));
+    TEST_ASSERT_TRUE(arrange(s, FLEET, 16, pg(), out));
     for (int i = 0; i < 16; i++) {
         const ArrRect &a = out.rect[i];
         TEST_ASSERT_TRUE(a.x >= 0 && a.y >= 0 && a.x + a.w <= 1222 && a.y + a.h <= 604);

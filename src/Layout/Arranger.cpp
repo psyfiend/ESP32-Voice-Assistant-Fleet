@@ -256,7 +256,7 @@ struct Search {
     }
 
     void rec(double cost, uint8_t done, uint16_t from) {
-        if (++nodes > ARR_BUDGET) return;
+        if (++nodes > W->budget) return;
         const int32_t sure = free - remMax;
         if (cost + remC + (sure > 0 ? sure : 0) * hole1 >= bestCost) return;
         if (done == n) {
@@ -644,7 +644,7 @@ bool arrange(const ArrScreen &scr, const ArrBlock *blocks, uint8_t n, const ArrW
                 have = true;
                 haveScore = sc.total;
                 haveSc = sc;
-                haveCapped = S.nodes > ARR_BUDGET;
+                haveCapped = S.nodes > W.budget;
                 memcpy(hp, S.best, sizeof(Shape) * n);
                 memcpy(hc, S.bc, n);
                 memcpy(hr, S.br, n);
