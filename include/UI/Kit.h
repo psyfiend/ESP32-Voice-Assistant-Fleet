@@ -82,6 +82,9 @@ enum class KitStyle : uint8_t {
     KS_JOIN_FILL, KS_JOIN_RING_BAR,
     // A short upright rule setting one choice apart from another (Kit::vrule()).
     KS_RULE,
+    // A SECTION'S RULES (2.11 round 14, Kit::drawerTitle()): the lines either side
+    // of a panel's centred section title, each fading out toward the panel's edge.
+    KS_SECTION_RULE_L, KS_SECTION_RULE_R,
     // CARDS (2.11 round 1): the parts every card has - the wrapper in its cell
     // (a flex column), a plain holder, the surface and its padded body, a tag's
     // strip and pill, the badge of a card with no header, the hero's disc, the
@@ -306,6 +309,11 @@ constexpr uint8_t CHIP_ROWS_MAX = 12;
 // value in words beside it (`unit` after the number). `cb` hears it on release,
 // its user data (row << 8) | CHIP_SLIDER; chipTableValue() reads it.
 constexpr uint8_t CHIP_SLIDER = 0xFF;
+// A CHECK ROW (2.11 round 14, the owner: "a checkbox, not On / Off buttons"): no
+// words and no slider - a checkbox in the chips' column, ticked when `lit` is 1.
+// `cb` hears it change, its user data (row << 8) | CHIP_CHECK; chipTableChecked()
+// reads it, chipTableCheck() sets it (a tick refused).
+constexpr uint8_t CHIP_CHECK = 0xFE;
 struct ChipRowSpec {
     const char        *what;
     const char *const *words;
@@ -313,13 +321,23 @@ struct ChipRowSpec {
     uint8_t            lit;
     int16_t            lo = 0, hi = 0, value = 0;
     const char        *unit = nullptr;
+    // A WORDS ROW (round 14: "Member of group:" and its name): no chips - these
+    // words in the chips' column, in the accent, nothing to tap.
+    const char        *says = nullptr;
 };
 lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_t n, lv_event_cb_t cb);
 void      chipTableLit(lv_obj_t *table, uint8_t row, uint8_t lit);   // after a choice
 int16_t   chipTableValue(lv_obj_t *table, uint8_t row);              // a slider row's value
 void      chipTableSet(lv_obj_t *table, uint8_t row, int16_t value); // ...set from outside
+bool      chipTableChecked(lv_obj_t *table, uint8_t row);            // a check row's tick
+void      chipTableCheck(lv_obj_t *table, uint8_t row, bool on);     // ...set from outside
 // A row of buttons after a chip table, in its list: centred, S5 apart.
 lv_obj_t *buttonRow(lv_obj_t *list);
+// A CHIP GRID (2.11 round 14: a group picker): `n` chips one width, wrapping in
+// rows `w` wide, centred, `lit` lit; `cb` on a chip's CLICKED with its index.
+lv_obj_t *chipGrid(lv_obj_t *parent, int32_t w, const char *const *words, uint8_t n, uint8_t lit,
+                   lv_event_cb_t cb);
+void      chipGridLit(lv_obj_t *grid, uint8_t lit);
 
 // --- Chips --------------------------------------------------------------------
 // A CHIP ROW: small round-ended buttons side by side, the chosen one lit in
@@ -553,8 +571,12 @@ lv_obj_t *drawerBig(lv_obj_t *face, const char *words);
 // dim beside it - returns the value's label.
 lv_obj_t *drawerRow(lv_obj_t *face);
 lv_obj_t *statusRow(lv_obj_t *face, const char *what, lv_obj_t **glyphRoom);
-// A drawer's section title, in the panel-title role.
+// A drawer's SECTION TITLE (2.11 round 14, the owner): the panel-title role,
+// centred, a rule out to either side fading toward the panel's edge. Returns
+// the title's label.
 lv_obj_t *drawerTitle(lv_obj_t *face, const char *words);
+// A drawer's own ROW, its content centred (a selector under a section title).
+lv_obj_t *drawerCentred(lv_obj_t *face);
 // A short upright rule between things in a row - one choice set apart from
 // another (the scheme and the Status bar, D-25).
 lv_obj_t *vrule(lv_obj_t *row, int32_t h);

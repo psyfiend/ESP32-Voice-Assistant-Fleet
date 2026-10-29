@@ -32,7 +32,7 @@ void confirmHide() {
     spec.role    = Kit::DialogRole::DLG_DESTRUCTIVE;
     spec.title   = "Hide this card?";
     spec.body[0] = buf;
-    spec.body[1] = "Hidden cards come back from this page's list: tap the page's name in the header.";
+    spec.body[1] = "This card can be restored from the 'Page' \"View hidden cards\" menu.";
     spec.buttons[0] = { "Cancel", Kit::ButtonRole::BTN_CANCEL, confirmCancelCb };
     spec.buttons[1] = { "Hide", Kit::ButtonRole::BTN_DESTRUCTIVE, [](lv_event_t *) {
         lv_async_call([](void *) {
@@ -46,6 +46,39 @@ void confirmHide() {
     spec.outside  = confirmCancelCb;   // a tap that misses the box: Cancel
     spec.countdown = true;             // it closes with the window (closing hook): it says so (#23)
     s_confirm = Kit::dialog(spec);
+}
+
+// "HIDE FROM THE CLUSTER" ASKS TOO (round 14, the owner's words): the tile goes
+// from its cluster, and comes back from the cluster's Members (K125).
+void confirmHideTile() {
+    confirmClose();
+    Card *held = CardPopup::isOpen() ? visibilitySubject() : nullptr;
+    if (!held || !held->hasId()) return;
+    char buf[200];
+    snprintf(buf, sizeof(buf), "The card \"%s\" will be hidden from this cluster, any other instances of "
+                               "this card will not be affected", held->shownName(CardLabel::LBL_NAME));
+    Kit::DialogSpec spec = {};
+    spec.role    = Kit::DialogRole::DLG_DESTRUCTIVE;
+    spec.title   = "Hide this card?";
+    spec.body[0] = buf;
+    spec.body[1] = "This card can be restored from the cluster 'Members' view";
+    spec.buttons[0] = { "Cancel", Kit::ButtonRole::BTN_CANCEL, confirmCancelCb };
+    spec.buttons[1] = { "Hide", Kit::ButtonRole::BTN_DESTRUCTIVE, [](lv_event_t *) {
+        lv_async_call([](void *) {
+            confirmClose();
+            visibilityHideTile();
+        }, nullptr);
+    } };
+    spec.nButtons = 2;
+    spec.width    = LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(UI::shape().W_DIALOG_MAX));
+    spec.outside  = confirmCancelCb;
+    spec.countdown = true;
+    s_confirm = Kit::dialog(spec);
+}
+
+void hideTileCb(lv_event_t *ev) {
+    (void)ev;
+    lv_async_call([](void *) { confirmHideTile(); }, nullptr);
 }
 
 // A COPY IN A CLUSTER, REMOVED (2.11, K91): it was made on the glass, so

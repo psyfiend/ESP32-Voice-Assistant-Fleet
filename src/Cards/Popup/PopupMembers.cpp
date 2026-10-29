@@ -85,8 +85,7 @@ void buildMembers() {
     }
     lv_obj_t *note = Kit::label(list, KS::KS_LABEL_TAG_DIM);
     // Owner's words, 2026-10-07; a cluster's member is shown or hidden from its own view.
-    lv_label_set_text(note, cl ? "Tap a member for more details; its Visibility shows or hides it"
-                               : "Tap a member for more details");
+    lv_label_set_text(note, "Tap a member for details");   // the owner's words, round 14
     // SATIN (#99, K77): a row can be tapped and is not chosen. Painted at the
     // rows' laid-out size, which only the layout knows.
     lv_obj_update_layout(list);

@@ -337,6 +337,17 @@ static void fill() {
     lv_style_set_bg_color(st(S::KS_RULE), UI::c(UI::mix(p.SURFACE, p.TEXT, 30)));
     lv_style_set_bg_opa  (st(S::KS_RULE), LV_OPA_COVER);
     lv_style_set_radius  (st(S::KS_RULE), UI::sc(UI::hdr().LINE));
+    // A section's rules: the accent, clear at the panel's edge, whole at the title.
+    for (int i = 0; i < 2; i++) {
+        lv_style_t *sr = st(i ? S::KS_SECTION_RULE_R : S::KS_SECTION_RULE_L);
+        lv_style_set_height       (sr, UI::sc(UI::hdr().LINE));
+        lv_style_set_bg_color     (sr, UI::c(p.ACCENT));
+        lv_style_set_bg_grad_color(sr, UI::c(p.ACCENT));
+        lv_style_set_bg_grad_dir  (sr, LV_GRAD_DIR_HOR);
+        lv_style_set_bg_opa       (sr, LV_OPA_COVER);
+        lv_style_set_bg_main_opa  (sr, i ? LV_OPA_COVER : LV_OPA_TRANSP);
+        lv_style_set_bg_grad_opa  (sr, i ? LV_OPA_TRANSP : LV_OPA_COVER);
+    }
     text(S::KS_HDR_TEXT,     UIToolkit::Font_Header, p.TEXT);   // the bar's words (D-26)
     text(S::KS_HDR_TEXT_DIM, UIToolkit::Font_Caption,     p.TEXT_DIM);
     text(S::KS_HDR_ICON,     t.ICON_SM,                   p.TEXT);
@@ -425,7 +436,7 @@ static void fill() {
     flex(df, LV_FLEX_FLOW_COLUMN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_style_t *di = st(S::KS_DRAWER_ITEM);
     lv_style_set_width     (di, lv_pct(100));
-    lv_style_set_height    (di, UI::minTouch());
+    lv_style_set_height    (di, UI::mm(UI::shape().H_ROW));   // a panel's row (round 14: the pages closer)
     lv_style_set_pad_hor   (di, UI::sc(h.DRAWER_PAD));
     lv_style_set_pad_column(di, UI::sc(h.SLOT_GAP));
     flex(di, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);

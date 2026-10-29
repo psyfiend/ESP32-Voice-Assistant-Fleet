@@ -500,6 +500,7 @@ void hiddenScenesCb(lv_event_t *ev);
 void confirmClose();
 void confirmHide();              // "Hide this card?" (K96, K66) over the held card's window
 void hideCardCb(lv_event_t *ev);
+void hideTileCb(lv_event_t *ev);     // Hide from the cluster, after its dialog (round 14)
 void confirmRemoveCopy();        // "Remove this copy?" - a member copied into a cluster here (K91)
 void removeCopyCb(lv_event_t *ev);
 void confirmRemoveFromPage();    // "Remove this card?" - a page card made on the glass, deleted

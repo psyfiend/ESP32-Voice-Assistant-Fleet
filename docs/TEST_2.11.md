@@ -1787,3 +1787,76 @@ until the Tuyas are back. Every board's settings were saved before this round's 
   from the page's.
 - **UI Tweaks: "Show helper text"**, a checkbox that hides or shows every helper note at the foot of
   the windows and panels.
+
+# Round 14 (2026-10-29) - your words and controls
+
+Built from the list above, flashed to the P4_5, the 4B and the 1060.
+
+## What changed
+
+1. **The cluster's window**: Header style **Inherit / Swatch / Band**; **"Show sensor icons"** a
+   checkbox; Header slots a checkbox per sensor, your words under them, and a fifth tick refused
+   with **"Limit reached"** (the box unticks itself); Members' foot **"Tap a member for details"**
+   (every Members view, not only a cluster's); Add cards' and the cluster's Visibility words yours.
+2. **Visibility**: one note for cards and tiles, yours; the solo card's Hide dialog's second line
+   yours; **Hide from the cluster now asks**, in your words, then hides.
+3. **Add card to dashboard**: Member of group (its name in the accent), Change group? **Select**,
+   Copy or move this card? (out of a cluster only), then the button. **Select** turns the view
+   into every group as a grid of chips - the current one lit - with Copy / Move and the button
+   under it, so a tap and Add finish it there. The long explanation that was at its foot is gone.
+4. **The page slot's panel**: three sections - **PAGES**, **HEADER** (the selector centred, your
+   words), **HIDDEN** (the button when there are hidden cards, then your words). House and Fleet a
+   panel row apart (7.2 mm, was 9 mm) and their names in one column.
+5. **Section titles everywhere**: centred, the accent rule out to either side fading toward the
+   panel's edge - the page panel, the system panel (CONNECTIVITY, SYSTEM - DIAGNOSTICS), and the
+   clock's and alarm's panels (NEXT ALARM, ALARM SOON), since they are the same component.
+
+New in the kit for it (`components.md`): a chip table's **check row** and **words row**, a **chip
+grid**, and `drawerTitle()` as a section title.
+
+| Page panel | System panel |
+|---|---|
+| ![page](followups/211_r14_page.png) | ![status](followups/211_r14_status.png) |
+
+| Cluster: Details | Header slots | Add card to dashboard |
+|---|---|---|
+| ![details](followups/211_r14_details.png) | ![slots](followups/211_r14_slots.png) | ![join](followups/211_r14_join.png) |
+
+## Choices that were mine (round 14)
+
+- **"Tap a member for details" on every Members view**: one wording, as you asked for the
+  Visibility note.
+- **The group picker is a view in the same window**, not a separate sheet - the kit shows one
+  sheet at a time. Its back arrow returns to the Visibility it came from.
+- **The section rules fade** (clear at the panel's edge, the accent at the title).
+- **The clock's and alarm's panels got the section titles too** - one component.
+- **House and Fleet a panel row tall (7.2 mm)** - closer, still a comfortable tap.
+
+## For you (round 14)
+
+| # | Do this | PASS if |
+|---|---|---|
+| R1 | Long-press a cluster's header: Details | Header style Inherit / Swatch / Band; Show sensor icons a checkbox that takes the icons off and back |
+| R2 | Header slots: tick sensors until a fifth | four tick; the fifth says "Limit reached" and stays unticked |
+| R3 | A tile's Visibility - Hide from the cluster | the dialog in your words; Hide hides it, Cancel leaves it |
+| R4 | A tile's Visibility - Add card to dashboard | Member of group, Change group? Select, Copy or move, the button |
+| R5 | Select | every group as chips, the current one lit; tap another, Move, Add card to dashboard: the card is on the page in that group |
+| R6 | Desk - Members - a lamp - Visibility - Add card to dashboard | no Copy / Move row |
+| R7 | The page name in the header | PAGES, HEADER, HIDDEN with their rules; House and Fleet close, names aligned; the selector centred |
+| R8 | The status icons | CONNECTIVITY and SYSTEM - DIAGNOSTICS centred with their rules |
+| R9 | A solo card - Hide from this page | the dialog's second line in your words |
+
+## Results (mine, before you)
+
+- **Seen by screenshot on the P4_5**: the page and system panels, the cluster's Details, Header
+  slots and Members, a tile's Visibility and Add card to dashboard (above). **Not seen**: the group
+  grid after Select (`/popup` has no tap for it), the "Limit reached" toast and the Hide from the
+  cluster dialog - R2, R3 and R5 are their first look.
+- **Your F3 Reset on the P4_5 put back**, as F3 promised: its dashboard from before (round 13's
+  copy, the two glitched Office cards still gone) with **Window close: off**, which you set on all
+  three boards since, kept. The 4B and the 1060 keep what your tests left: the 4B's House pinned
+  4 x 5 and its Thermo hidden (D1), the 1060 on Linen - say if any of that was a test to undo.
+- **Settings**: each board's file saved before the flash; 0 differences on all three afterwards.
+- **Builds**: the P4_5, the 4B and the 1060 flashed; the S3_4B compiled.
+- **The structure check**: two files over 1,000 lines (`GUIManager.cpp` 1,520, `Card.cpp` 1,459),
+  409 style calls outside the kit in 29 files, 10 colour literals in 2 files - unchanged.

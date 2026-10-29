@@ -190,6 +190,14 @@ parent's height and scrolls when it must. `Kit::ChipRowSpec` is a row's name, ch
 one; a chip's CLICKED carries `(row << 8) | chip`; `chipTableLit()` re-lights a row after a
 choice. `buttonRow()` adds a centred row of buttons after them (Tokens, Reset all).
 
+**Two more kinds of row, and a grid (2.11 round 14).** A **check row** - no words, no slider
+(`words` null, `n` 0) - is a checkbox (`Kit::checkbox()`'s) in the chips' column, ticked when `lit`
+is 1; its change carries `(row << 8) | CHIP_CHECK`, `chipTableChecked()` reads it and
+`chipTableCheck()` sets it (a tick refused: the cluster's fifth header slot). A **words row**
+(`says`) is words in the chips' column, the accent, nothing to tap ("Member of group:" and its
+name). `chipGrid(parent, w, words, n, lit, cb)` is chips one width wrapping in centred rows, the
+chosen one lit (`chipGridLit()`) - Add card to dashboard's group picker.
+
 ### Icon button - `Kit::iconButton(parent, glyph, font, cb)`
 
 ![The window's corner icons](components/icons.png)
@@ -318,7 +326,10 @@ The face's edge is the accent at `LINE`. `Drawer::onClosed` (with `closedUser`) 
 close has finished - not for one cut short by opening again.
 
 **Its rows, round 3** (the system panel's new layout, D-22 / D-25): `drawerTitle()` a section's
-title (CONNECTIVITY); `drawerRow()` things side by side, the panel's width, `DRAWER_GAP` apart;
+title (CONNECTIVITY) - **since 2.11 round 14 centred between two accent rules that fade out toward
+the panel's edges** (`KS_SECTION_RULE_L` / `_R`), on every slot panel and the system panel;
+`drawerCentred()` a row whose content is centred (the page panel's Show / Hide); a `drawerItem()`'s
+mark stands in a box the larger dot's size, so every item's words start in one column; `drawerRow()` things side by side, the panel's width, `DRAWER_GAP` apart;
 `statusRow(face, what, &glyphRoom)` room for a glyph, what it is, and its live value dim, a face
 smaller, on one line and ellipsised - returns the value's label; `vrule(row, h)` a short upright rule
 setting one choice apart from another (`KS_RULE`); `toggleButton(parent, words, w, h, on, cb)` and

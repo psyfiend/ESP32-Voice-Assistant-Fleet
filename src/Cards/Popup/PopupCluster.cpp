@@ -39,11 +39,9 @@ const char *const ADD_W[] = { "No", "Copy", "Move" };
 // THE VIEWS ARE CHIP TABLES (round 4, the owner: "look more like the Card UI or
 // UI Tweaks sheet"): an option's name right-justified against its chips, the
 // actions as buttons at the foot.
-const char *const STYLE_W[]  = { "Page's", "Swatch", "Band" };   // "Band", as the label type's (round 10); saved as "bar"
+const char *const STYLE_W[]  = { "Inherit", "Swatch", "Band" };   // "Band", as the label type's (round 10); saved as "bar"
 const char *const STYLE_IS[] = { nullptr, "swatch", "bar" };
-const char *const ONOFF_W[]  = { "On", "Off" };
-const char *const YESNO_W[]  = { "Yes", "No" };
-constexpr uint8_t ROW_STYLE = 0, ROW_ICONS = 1;   // the main view's rows
+constexpr uint8_t ROW_STYLE = 0, ROW_ICONS = 1;   // the main view's rows; Show sensor icons a checkbox (round 14)
 
 lv_obj_t *s_table = nullptr;   // the view's chip table
 
@@ -159,7 +157,7 @@ void mainChoose(void *p) {
     ClusterCard *cl = held();
     if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN) return;
     if (row == ROW_STYLE)      Settings::setCard(cl->id(), "cl_style", i < 3 ? STYLE_IS[i] : nullptr);
-    else if (row == ROW_ICONS) Settings::setCard(cl->id(), "cl_icons", i == 0 ? nullptr : "off");
+    else if (row == ROW_ICONS) Settings::setCard(cl->id(), "cl_icons", Kit::chipTableChecked(s_table, ROW_ICONS) ? nullptr : "off");
     changed();
 }
 
@@ -207,14 +205,14 @@ void slotsViewCb(lv_event_t *ev) {
                   nullptr);
 }
 
-// Yes puts a member in the header: appended, last in priority; No takes it out.
-// A member that leaves the header comes back as a tile unless hidden (K104).
+// A tick puts a member in the header: appended, last in priority; untick takes
+// it out. A member that leaves the header comes back as a tile unless hidden (K104).
 uint8_t s_slotMember[GROUP_MEMBERS_MAX];   // Header slots' rows: each row's member (one moved out has none)
 
 void slotChoose(void *p) {
     const uintptr_t v = (uintptr_t)p;
     const uint8_t row = (uint8_t)(v >> 8);
-    const bool want = (v & 0xFF) == 0;
+    const bool want = Kit::chipTableChecked(s_table, row);
     ClusterCard *cl = held();
     if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN || row >= GROUP_MEMBERS_MAX) return;
     const uint8_t i = s_slotMember[row];
@@ -232,8 +230,8 @@ void slotChoose(void *p) {
     }
     if (want && !inList(m->id(), ids, n)) {
         if (kept >= CLUSTER_SLOTS_MAX) {   // four at most: the header has no room for more
-            Kit::chipTableLit(s_table, row, 1);
-            UIToolkit::show_toast("The header holds four at most");
+            Kit::chipTableCheck(s_table, row, false);
+            UIToolkit::show_toast("Limit reached");
             return;
         }
         snprintf(list + strlen(list), sizeof(list) - strlen(list), "%s%s", kept ? "," : "", m->id());
@@ -243,9 +241,7 @@ void slotChoose(void *p) {
 }
 
 void slotChipCb(lv_event_t *ev) {
-    const uintptr_t v = (uintptr_t)lv_event_get_user_data(ev);
-    Kit::chipTableLit(s_table, (uint8_t)(v >> 8), (uint8_t)(v & 0xFF));
-    lv_async_call(slotChoose, (void *)v);
+    lv_async_call(slotChoose, lv_event_get_user_data(ev));
 }
 
 // --- Add cards -------------------------------------------------------------------------
@@ -350,8 +346,8 @@ void buildClusterAdd() {
     static const Kit::ButtonRole R[] = { Kit::ButtonRole::BTN_CONFIRM };
     static const lv_event_cb_t C[] = { addGoCb };
     footButtons(s_table, W, R, C, 1);
-    note(s_table, "Copy: the card stays on the page and a copy joins the cluster. Move: the card joins it "
-                  "and leaves this page for its list of hidden cards.");
+    note(s_table, "Copy: creates a separate card to add to the cluster. Move: card is removed from the "
+                  "dashboard and added to the cluster.");
 }
 
 // --- A member shown or not (its own Visibility, round 6) ------------------------------
@@ -393,7 +389,7 @@ void buildCluster() {
 
     const Kit::ChipRowSpec rows[2] = {
         { "Header style", STYLE_W, 3, style },
-        { "Sensor icons", ONOFF_W, 2, (uint8_t)(icons ? 0 : 1) },
+        { "Show sensor icons", nullptr, 0, (uint8_t)(icons ? 1 : 0) },
     };
     s_table = Kit::chipTable(s.stage, listW(), rows, 2, mainChipCb);
     // The page's cards (K91); HA entities not on the page (K92 rule 11) come with the card list.
@@ -450,12 +446,10 @@ void buildClusterSlots() {
         const bool sensor = e && (e->desc.kind == EntityKind::SENSOR || e->desc.kind == EntityKind::BINARY_SENSOR);
         if (!sensor && !in) continue;
         s_slotMember[n] = i;
-        rows[n++] = { s_names[i], YESNO_W, 2, (uint8_t)(in ? 0 : 1) };
+        rows[n++] = { s_names[i], nullptr, 0, (uint8_t)(in ? 1 : 0) };
     }
     s_table = Kit::chipTable(s.stage, listW(), rows, n, slotChipCb);
-    note(s_table, "Yes: its value in the header, four at most - from the right, temperature, occupancy, "
-                  "light level, then the rest, on every cluster; one that does not fit gives way from "
-                  "the left. A member in the header is not a tile unless shown.");
+    note(s_table, "Check the boxes to select sensors to be displayed in the header.");
 }
 
 void clusterRename() { renameCb(nullptr); }

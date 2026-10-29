@@ -67,6 +67,27 @@ lv_obj_t *sliderAt(lv_obj_t *line, const ChipRowSpec &row, int32_t w, lv_event_c
     sliderWords(words, row.value, row.unit);
     return sl;
 }
+
+bool isCheck(const ChipRowSpec &row) { return !row.n && !row.words && row.hi <= row.lo && !row.says; }
+
+// A chip lit or not, after a choice: its face and words swapped over.
+void lightChip(lv_obj_t *b, bool on) {
+    lv_obj_t *l = labelIn(b);   // after the face and its veil, on a satin chip
+    lv_obj_remove_style(b, style(on ? KitStyle::KS_CHIP_UNLIT : KitStyle::KS_CHIP_LIT), 0);
+    add(b, on ? KitStyle::KS_CHIP_LIT : KitStyle::KS_CHIP_UNLIT);
+    chipFinish(b, on);
+    if (l) {
+        lv_obj_remove_style(l, style(on ? KitStyle::KS_LABEL_TAG : KitStyle::KS_LABEL_TAG_ACCENT), 0);
+        add(l, on ? KitStyle::KS_LABEL_TAG_ACCENT : KitStyle::KS_LABEL_TAG);
+    }
+}
+
+// A check row's box: the row's second child, after its name.
+lv_obj_t *checkOf(lv_obj_t *table, uint8_t row) {
+    lv_obj_t *line = table ? lv_obj_get_child(table, row) : nullptr;
+    lv_obj_t *c = line ? lv_obj_get_child(line, 1) : nullptr;
+    return (c && lv_obj_check_type(c, &lv_checkbox_class)) ? c : nullptr;
+}
 }  // namespace
 
 // THE LAYOUT (owner, round 5): the longest row - name, gap, chips - centred in
@@ -96,6 +117,8 @@ lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_
             for (uint8_t i = 0; i < rows[r].n; i++) widest = LV_MAX(widest, textW(rows[r].words[i], UI::type().TAG));
             cw[r]    = LV_MAX(minChip, widest + 2 * side);
             span[r]  = rows[r].n * cw[r] + (rows[r].n ? rows[r].n - 1 : 0) * gap;
+            if (isCheck(rows[r])) span[r] = controlH();   // the box
+            if (rows[r].says) span[r] = textW(rows[r].says, UI::type().NAME);
             nameW[r] = textW(rows[r].what, nameF);
             maxName  = LV_MAX(maxName, nameW[r]);
             maxSpan  = LV_MAX(maxSpan, span[r]);
@@ -154,6 +177,38 @@ lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_
                            y + (chipH - lv_font_get_line_height(UI::type().TAG)) / 2);
             continue;
         }
+        if (row.says) {
+            lv_obj_t *v = label(line, KitStyle::KS_LABEL_TAG_ACCENT);
+            lv_obj_set_style_text_font(v, UI::type().NAME, 0);
+            lv_label_set_text(v, row.says);
+            const int32_t vh = lv_font_get_line_height(UI::type().NAME);
+            if (stacked) {
+                lv_obj_set_size(line, w, nameH + UI::mm(k.S1) + vh);
+                lv_obj_set_pos(words, (w - nameW[r]) / 2, 0);
+                lv_obj_set_pos(v, (w - span[r]) / 2, nameH + UI::mm(k.S1));
+            } else {
+                lv_obj_set_size(line, w, LV_MAX(chipH, vh));
+                lv_obj_set_pos(words, col - nameW[r], (LV_MAX(chipH, vh) - nameH) / 2);
+                lv_obj_set_pos(v, col + gapX, (LV_MAX(chipH, vh) - vh) / 2);
+            }
+            continue;
+        }
+        if (isCheck(row)) {
+            const int32_t box = controlH();
+            const RowSpec rs = { row.what, RowKind::ROW_CHECK, nullptr, row.lit, true, nullptr, nullptr };
+            lv_obj_t *c = checkbox(line, rs);
+            if (cb) lv_obj_add_event_cb(c, cb, LV_EVENT_VALUE_CHANGED, (void *)(((uintptr_t)r << 8) | CHIP_CHECK));
+            if (stacked) {
+                lv_obj_set_size(line, w, nameH + UI::mm(k.S1) + box);
+                lv_obj_set_pos(words, (w - nameW[r]) / 2, 0);
+                lv_obj_set_pos(c, (w - box) / 2, nameH + UI::mm(k.S1));
+            } else {
+                lv_obj_set_size(line, w, LV_MAX(chipH, box));
+                lv_obj_set_pos(words, col - nameW[r], (LV_MAX(chipH, box) - nameH) / 2);
+                lv_obj_set_pos(c, col + gapX, (LV_MAX(chipH, box) - box) / 2);
+            }
+            continue;
+        }
         int32_t x, y, c = cw[r], s = span[r];
         if (stacked) {
             if (s > w) { c = (w - (row.n - 1) * gap) / LV_MAX(row.n, 1); s = w; }
@@ -178,20 +233,36 @@ lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_
 // A row's lit chip, after a choice: the chips' faces and words swapped over.
 void chipTableLit(lv_obj_t *table, uint8_t row, uint8_t lit) {
     lv_obj_t *line = table ? lv_obj_get_child(table, row) : nullptr;
-    if (!line || lit == CHIP_SLIDER) return;
+    if (!line || lit == CHIP_SLIDER || lit == CHIP_CHECK) return;
     if (lv_obj_check_type(lv_obj_get_child(line, 1), &lv_slider_class)) return;   // a slider row
-    for (uint32_t i = 1; i < lv_obj_get_child_count(line); i++) {   // child 0: the row's name
-        lv_obj_t *b = lv_obj_get_child(line, (int32_t)i);
-        lv_obj_t *l = labelIn(b);   // after the face and its veil, on a satin chip
-        const bool on = (i - 1) == lit;
-        lv_obj_remove_style(b, style(on ? KitStyle::KS_CHIP_UNLIT : KitStyle::KS_CHIP_LIT), 0);
-        add(b, on ? KitStyle::KS_CHIP_LIT : KitStyle::KS_CHIP_UNLIT);
-        chipFinish(b, on);
-        if (l) {
-            lv_obj_remove_style(l, style(on ? KitStyle::KS_LABEL_TAG : KitStyle::KS_LABEL_TAG_ACCENT), 0);
-            add(l, on ? KitStyle::KS_LABEL_TAG_ACCENT : KitStyle::KS_LABEL_TAG);
-        }
-    }
+    if (checkOf(table, row)) return;                                              // a check row
+    if (lv_obj_get_child_count(line) == 2 && lv_obj_check_type(lv_obj_get_child(line, 1), &lv_label_class))
+        return;                                                                   // a words row
+    for (uint32_t i = 1; i < lv_obj_get_child_count(line); i++)   // child 0: the row's name
+        lightChip(lv_obj_get_child(line, (int32_t)i), (i - 1) == lit);
+}
+
+// A CHIP GRID (round 14, the owner's group picker): the chips one width - the
+// longest word's - wrapping in rows, centred, the chosen one lit.
+lv_obj_t *chipGrid(lv_obj_t *parent, int32_t w, const char *const *words, uint8_t n, uint8_t lit,
+                   lv_event_cb_t cb) {
+    const UIShape &k = UI::shape();
+    int32_t widest = 0;
+    for (uint8_t i = 0; i < n; i++) widest = LV_MAX(widest, textW(words[i], UI::type().TAG));
+    const int32_t cw = LV_MIN(w, LV_MAX(2 * UI::mm(k.H_CHIP), widest + 2 * UI::mm(k.S5)));
+    lv_obj_t *grid = plain(parent);
+    lv_obj_set_size(grid, w, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(grid, UI::mm(k.S3), 0);
+    lv_obj_set_style_pad_row(grid, UI::mm(k.S3), 0);
+    for (uint8_t i = 0; i < n; i++) chipAt(grid, words[i], cw, i == lit, cb, i);
+    return grid;
+}
+
+void chipGridLit(lv_obj_t *grid, uint8_t lit) {
+    for (uint32_t i = 0; grid && i < lv_obj_get_child_count(grid); i++)
+        lightChip(lv_obj_get_child(grid, (int32_t)i), i == lit);
 }
 
 // A slider row's slider: the row's second child, after its name.
@@ -211,6 +282,18 @@ void chipTableSet(lv_obj_t *table, uint8_t row, int16_t value) {
     if (!sl) return;
     lv_slider_set_value(sl, value, LV_ANIM_OFF);
     lv_obj_send_event(sl, LV_EVENT_VALUE_CHANGED, nullptr);   // its words follow
+}
+
+bool chipTableChecked(lv_obj_t *table, uint8_t row) {
+    lv_obj_t *c = checkOf(table, row);
+    return c && lv_obj_has_state(c, LV_STATE_CHECKED);
+}
+
+void chipTableCheck(lv_obj_t *table, uint8_t row, bool on) {
+    lv_obj_t *c = checkOf(table, row);
+    if (!c) return;
+    if (on) lv_obj_add_state(c, LV_STATE_CHECKED);
+    else    lv_obj_remove_state(c, LV_STATE_CHECKED);
 }
 
 lv_obj_t *buttonRow(lv_obj_t *list) {

@@ -417,7 +417,14 @@ void drawerClose(Drawer &d, bool anim) {
 lv_obj_t *drawerItem(lv_obj_t *face, const char *words, bool marked, lv_event_cb_t cb, void *user) {
     lv_obj_t *it = item(face);   // the card's surface, tinted while pressed
     add(it, KitStyle::KS_DRAWER_ITEM);
-    add(plain(it), marked ? KitStyle::KS_HDR_DOT_ON : KitStyle::KS_HDR_DOT_OFF);
+    // The mark in a box the larger dot's size, so every item's words start in
+    // one column (round 14, the owner: the ring pushed the other page's words).
+    const int32_t m = UI::sc(LV_MAX(UI::hdr().DOT_ON, UI::hdr().DOT_OFF));
+    lv_obj_t *box = plain(it);
+    lv_obj_set_size(box, m, m);
+    lv_obj_t *dot = plain(box);
+    add(dot, marked ? KitStyle::KS_HDR_DOT_ON : KitStyle::KS_HDR_DOT_OFF);
+    lv_obj_center(dot);
     lv_label_set_text(label(it, KitStyle::KS_LABEL_NAME), words ? words : "");
     if (cb) lv_obj_add_event_cb(it, cb, LV_EVENT_CLICKED, user);
     return it;
@@ -476,9 +483,22 @@ lv_obj_t *vrule(lv_obj_t *row, int32_t h) {
 }
 
 lv_obj_t *drawerTitle(lv_obj_t *face, const char *words) {
-    lv_obj_t *l = label(face, KitStyle::KS_PANEL_TITLE);
+    lv_obj_t *r = drawerCentred(face);
+    lv_obj_t *a = plain(r);
+    add(a, KitStyle::KS_SECTION_RULE_L);
+    lv_obj_set_flex_grow(a, 1);
+    lv_obj_t *l = label(r, KitStyle::KS_PANEL_TITLE);
     lv_label_set_text(l, words ? words : "");
+    lv_obj_t *b = plain(r);
+    add(b, KitStyle::KS_SECTION_RULE_R);
+    lv_obj_set_flex_grow(b, 1);
     return l;
+}
+
+lv_obj_t *drawerCentred(lv_obj_t *face) {
+    lv_obj_t *r = drawerRow(face);
+    lv_obj_set_flex_align(r, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    return r;
 }
 
 lv_obj_t *toggleButton(lv_obj_t *parent, const char *words, int32_t w, int32_t h, bool on, lv_event_cb_t cb) {

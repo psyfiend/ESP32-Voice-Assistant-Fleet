@@ -24,9 +24,9 @@ void pageCb(lv_event_t *e) {
     if (s_ctx.goToPage) s_ctx.goToPage(s_ctx.user, i);
 }
 
-void title(lv_obj_t *face, const char *words) {
-    lv_label_set_text(Kit::label(face, Kit::KitStyle::KS_PANEL_TITLE), words);
-}
+// A section's title: centred between its rules (round 14, the owner), as the
+// system panel's are.
+void title(lv_obj_t *face, const char *words) { Kit::drawerTitle(face, words); }
 
 lv_obj_t *dim(lv_obj_t *parent, const char *words) {
     lv_obj_t *l = Kit::label(parent, Kit::KitStyle::KS_LABEL_NAME_DIM);
@@ -147,12 +147,16 @@ void hiddenCards(lv_obj_t *face, const Context &c) {
     Kit::button(Kit::buttonRow(face), Kit::ButtonRole::BTN_CANCEL, words, faceRoom(), UI::minTouch(), viewHiddenCb);
 }
 
+// THREE SECTIONS (round 14, the owner's): PAGES - every page, close together;
+// HEADER - Show / Hide, centred; HIDDEN - View hidden cards when there are some.
 void buildPage(lv_obj_t *face, const Context &c) {
     title(face, "PAGES");
+    lv_obj_t *pages = Kit::plain(face);
+    lv_obj_set_size(pages, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(pages, LV_FLEX_FLOW_COLUMN);
     for (uint8_t i = 0; i < c.pageCount && i < PAGES_MAX; i++)
-        Kit::drawerItem(face, c.pageTitles[i], i == c.pageIndex, pageCb, (void *)(uintptr_t)i);
-    hiddenCards(face, c);
-    dim(face, "Header");
+        Kit::drawerItem(pages, c.pageTitles[i], i == c.pageIndex, pageCb, (void *)(uintptr_t)i);
+    title(face, "HEADER");
     Kit::SelectorSpec sp = {};
     sp.glyph[0] = "Show";
     sp.glyph[1] = "Hide";
@@ -161,10 +165,11 @@ void buildPage(lv_obj_t *face, const Context &c) {
     sp.compact  = true;
     sp.room     = faceRoom();
     sp.onChosen = hdrChosen;
-    Kit::selector(s_hdrSel, face, sp);
-    Kit::drawerNote(face, "Hide: the header goes when this panel closes; swipe down from the top edge "
-                          "to see it for a moment. A card hidden from this page (its window's Visibility) "
-                          "waits under View hidden cards until restored.");
+    Kit::selector(s_hdrSel, Kit::drawerCentred(face), sp);
+    Kit::drawerNote(face, "When hidden, swipe down from the top edge of the screen to reveal");
+    title(face, "HIDDEN");
+    hiddenCards(face, c);
+    Kit::drawerNote(face, "Cards hidden from the dashboard can be viewed/restored from here");
 }
 
 // The sensor: its name, its reading - or dashes and what went wrong - and when
