@@ -164,7 +164,7 @@ void GUIManager::openHiddenSheet() {
     bool crowded = false;
     for (uint8_t i = 0; i < sp.n; i++) {
         sp.names[i] = s_items[i].name;
-        sp.chip[i]  = s_items[i].crowded ? "No room" : "Restore to page";
+        sp.chip[i]  = s_items[i].crowded ? "No room" : "Restore to dashboard";
         crowded |= s_items[i].crowded;
     }
     if (crowded)

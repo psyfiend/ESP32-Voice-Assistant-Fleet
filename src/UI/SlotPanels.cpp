@@ -149,6 +149,8 @@ void hiddenCards(lv_obj_t *face, const Context &c) {
 
 // THREE SECTIONS (round 14, the owner's): PAGES - every page, close together;
 // HEADER - Show / Hide, centred; HIDDEN - View hidden cards when there are some.
+// A section's words only while they are needed (round 14b: with the button the
+// panel overran the P4_5): HEADER's while it is hidden, HIDDEN's with no button.
 void buildPage(lv_obj_t *face, const Context &c) {
     title(face, "PAGES");
     lv_obj_t *pages = Kit::plain(face);
@@ -166,10 +168,11 @@ void buildPage(lv_obj_t *face, const Context &c) {
     sp.room     = faceRoom();
     sp.onChosen = hdrChosen;
     Kit::selector(s_hdrSel, Kit::drawerCentred(face), sp);
-    Kit::drawerNote(face, "When hidden, swipe down from the top edge of the screen to reveal");
+    if (!c.headerShown) Kit::drawerNote(face, "When hidden, swipe down from the top edge of the screen to reveal");
     title(face, "HIDDEN");
     hiddenCards(face, c);
-    Kit::drawerNote(face, "Cards hidden from the dashboard can be viewed/restored from here");
+    if (!c.hiddenCount || !c.viewHidden)
+        Kit::drawerNote(face, "Cards hidden from the dashboard can be viewed/restored from here");
 }
 
 // The sensor: its name, its reading - or dashes and what went wrong - and when

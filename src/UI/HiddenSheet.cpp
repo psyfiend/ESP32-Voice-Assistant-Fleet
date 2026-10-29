@@ -55,8 +55,9 @@ static void fill() {
     lv_obj_set_width(l, lv_pct(100));
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
-    lv_label_set_text(l, s_n ? "Restore puts a card back where it was, with its settings: on the page, or a "
-                               "tile in its cluster. Cards are hidden from their window: SETTINGS, Visibility."
+    // The owner's words (2.11 round 14b); a member hidden from its cluster is not here (K125).
+    lv_label_set_text(l, s_n ? "Tap to restore a card back to the dashboard with its original settings intact.\n"
+                               "Cards hidden from clusters can be restored from the cluster 'Members' view."
                              : "No hidden cards on this page.");
     if (s_n && s_spec.note) {
         lv_obj_t *m = Kit::label(t, Kit::KitStyle::KS_LABEL_TAG_DIM);

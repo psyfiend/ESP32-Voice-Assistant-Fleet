@@ -1845,6 +1845,18 @@ grid**, and `drawerTitle()` as a section title.
 | R7 | The page name in the header | PAGES, HEADER, HIDDEN with their rules; House and Fleet close, names aligned; the selector centred |
 | R8 | The status icons | CONNECTIVITY and SYSTEM - DIAGNOSTICS centred with their rules |
 | R9 | A solo card - Hide from this page | the dialog's second line in your words |
+| R10 | (14b) The page panel with the header shown, and a card hidden from the page | HEADER has no words under its selector; HIDDEN shows the button and no words; it all fits the P4_5. Hide the header, reopen: HEADER's words are back |
+| R11 | (14b) View hidden cards | each card's button says **Restore to dashboard**; under them: "Tap to restore a card back to the dashboard with its original settings intact." and "Cards hidden from clusters can be restored from the cluster 'Members' view." |
+
+**Round 14b (your note, 2026-10-29)**: the page panel overran the P4_5 with the button showing, so a
+section's words show only while needed - HEADER's while the header is hidden, HIDDEN's while there
+is no button - and the hidden cards' sheet says **Restore to dashboard**, as Add card to dashboard
+does, with your two lines under it. Flashed to the three dev boards; the S3_4B compiled; settings 0
+differences on all three. The P4_5 with Eric hidden (yours) - it fits, the header shown:
+
+| Page panel | Hidden cards |
+|---|---|
+| ![page](followups/211_r14b_page.png) | ![hidden](followups/211_r14b_hidden.png) |
 
 ## Results (mine, before you)
 

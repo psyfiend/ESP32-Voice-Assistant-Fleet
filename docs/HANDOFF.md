@@ -15,7 +15,7 @@ handoffs are `docs/archive/HANDOFF_to_2026-10-14.md` and `HANDOFF_to_2026-09-29.
    arranger: v8 as built, version 9, round 12), `cards.md`, `pages.md`, `card-layout.md` (before
    moving anything inside a card), `group-cards.md` §6-7 (2.11's design), `interview-phase2-3.md`.
 4. **`docs/TEST_2.11.md`** - the milestone in progress: rounds 1-14, the owner's results, **the
-   final pass (A1-F3, all PASS on 2026-10-29)** and round 14's tests R1-R9 (his to run).
+   final pass (A1-F3, all PASS on 2026-10-29)** and round 14's tests R1-R11 (his to run).
 5. **Home Assistant** (sibling folder `../Home Assistant/`, a separate git repo, read-only from
    here): `FLEET_REFERENCE.md` (the panels' entity map, alerts, header entities) and
    `HOUSE_RULES.md` (naming, labels, the logical layer). The House page reads its names since
@@ -76,7 +76,8 @@ bring each over when it is next changed (`ui-architecture.md` §6).
 
 - **The owner's final pass passed - every test** (A1-F3, 2026-10-29). His notes became **round 14**
   (K128: checkboxes, the 4-slot limit, Hide from the cluster asking, Add card to dashboard
-  redesigned, panel sections, his words), built and flashed; **its tests R1-R9 are his to run**.
+  redesigned, panel sections, his words) and 14b (the page panel's words only while needed,
+  "Restore to dashboard"), built and flashed; **its tests R1-R11 are his to run**.
   Round 13 (K125-K127) moved the House page to HA's new entity ids, kept cluster-hidden members off
   the page's hidden list, sized solo cards to the tiles, and set the arranger's budget to 7,000
   (the 4B's search 10.2 s -> 4.9 s, the same page).
@@ -91,7 +92,8 @@ bring each over when it is next changed (`ui-architecture.md` §6).
   **tiles as E** (K116), drawn **near square** with the hero and label centred and a bigger label
   where there is room (K122), **tile heights evened across a page** (K124); cluster headers in one order, on a
   faint band, with the glyph styles (K115).
-- **Boards**: the P4_5, the 4B and the 1060 run round 14 (`0b6c978`) with their local `DEBUG_POPUP`
+- **Boards**: the P4_5, the 4B and the 1060 run round 14b (14 plus the page panel's and hidden
+  cards' words, R10-R11) with their local `DEBUG_POPUP`
   lines. The P4_5's House pinned 5 x 4, its Fleet page 7 columns + 3 rows; the 4B's House pinned
   4 x 5 with Thermo hidden (left by his final pass - he may say they were tests); the 1060's House
   5 x 5, on Linen. Window close is off on all three (his). Kept layouts are `v4`. Settings copies
@@ -141,7 +143,7 @@ bring each over when it is next changed (`ui-architecture.md` §6).
    4B's boot loop on Auto (the arranger's task starved the idle task; LESSONS), evened the tile
    heights across a page's clusters (halfway to the shortest) and settled the tile panel at 3%
    toward the text (K124). The owner's final pass then passed everything (2026-10-29), and round
-   14 built his notes (K128). **Next: he runs round 14's R1-R9** (`TEST_2.11.md`); anything he
+   14 built his notes (K128), 14b his last three words. **Next: he runs round 14's R1-R11** (`TEST_2.11.md`); anything he
    finds is round 15, on the three dev boards. No questions are open (the 4B at 4 x 4 filling
    unevenly was left by him). When he signs off, **item 8**: the all-nine gate
    (`scripts/release/gate.ps1`, with `python scripts/structure_check.py`), the CHANGELOG entry for
@@ -201,7 +203,7 @@ Header Glyphs", "Fleet Status Glyphs" - links in the design docs.
 | `CYD_S3_3248` | - | USB broken (2026-09-28) |
 | `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in |
 
-The P4_5, the 4B and the 1060 run 2.11 round 14; the rest `v0.2.18` or older. Hosts:
+The P4_5, the 4B and the 1060 run 2.11 round 14b; the rest `v0.2.18` or older. Hosts:
 `fleet-ws-p4-5`, `fleet-ws-p4-4b`, `fleet-cyd-p4-1060` (all in `HTTP_REFERENCE.md`). Environments:
 `WS_P4_TOUCH_LCD_5`, `WS_P4_TOUCH_LCD_4B`, `CYD_P4_1060P470`. Ports move when boards are re-plugged:
 `pio device list` and match the serial. **Is a board alive?** Ask Home Assistant
