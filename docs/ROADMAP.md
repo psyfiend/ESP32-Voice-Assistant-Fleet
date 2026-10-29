@@ -118,7 +118,10 @@ The numbers above are identity, not sequence. Agreed with the owner:
    the group view (K118); Add cards from the entities labelled `fleet`, the linked area's first
    (K119, K123); a cluster linked to the HA area closest to its intent - or none - its header able
    to adopt that area's logical entities as members; an outdoor average from HA. The dashboard
-   never has to follow HA's organisation, and needs no particular HA layout to work.
+   never has to follow HA's organisation, and needs no particular HA layout to work. With it,
+   from 2.11's final pass (`TEST_2.11.md`, 2026-10-29): a header panel's temperature opening that
+   sensor's History; a cluster's own card state for its members; **UI Tweaks' "Show helper
+   text"**, hiding every helper note.
 6. **#76** HA alerts on the claim model (the notice queue from NINA's toasts; mock first).
 7. **3.1 schema** (#20), scoped together with **the companion web app** (#87).
 

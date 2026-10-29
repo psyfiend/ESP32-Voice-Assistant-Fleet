@@ -1736,3 +1736,54 @@ until the Tuyas are back. Every board's settings were saved before this round's 
 | F1 | Open and close each header panel, Midnight then Linen | a smooth slide; a faint shadow where the panel meets the bar; Linen's status panel with no shadow in its top corner |
 | F2 | A card's window; About; UI Tweaks | each on its halo (25% by default) |
 | F3 | (After a settings copy, on one board) system panel - Reset - Cancel; then Reset - Reset | Cancel leaves everything; Reset gives the compiled dashboard arranged again, your scheme, names and pins kept. I put the copy back afterwards |
+
+## Your results (2026-10-29)
+
+**Every test passed** - A1-A5, B1-B9, C1-C6, D1-D6, E1-E7, F1-F3. Your notes, as round 14's list:
+
+**For round 14 (2.11), the words and controls you asked for**
+
+1. **The cluster's window**
+   - Details: Header style **Inherit / Swatch / Band** (C1).
+   - Details: the Sensor icons row is a checkbox, **"Show sensor icons"**.
+   - Header slots: checkboxes instead of Yes / No; the words **"Check the boxes to select sensors to
+     be displayed in the header."**; **at most 4** - a fifth tick shows the toast **"Limit
+     reached"**.
+   - Members: at the foot, **"Tap a member for details"**.
+   - Add cards: **"Copy: creates a separate card to add to the cluster. Move: card is removed from
+     the dashboard and added to the cluster."**
+   - Its Visibility, under Hide from this page: **"Hidden clusters can be restored from the 'Page'
+     "View hidden cards" menu."**
+2. **Visibility**
+   - A solo card's Hide confirmation, second line: **"This card can be restored from the 'Page' "View
+     hidden cards" menu."**
+   - **A tile's Hide from the cluster asks first**: "The card "XXX" will be hidden from this
+     cluster, any other instances of this card will not be affected" / "This card can be restored
+     from the cluster 'Members' view".
+   - The same note for cards and tiles: **"Paused cards will not send or receive any updates.
+     Hidden cards can be restored."** (true as built: a paused entity's values are dropped and its
+     commands refused).
+3. **Add card to dashboard, redesigned**
+   - Row 1: **"Member of group:"** and the card's group.
+   - Row 2: **"Change group?"** with a **Select** button, opening a grid of group chips (the current
+     one lit) with the copy / move row and the Add button at its foot.
+   - Row 3: **"Copy or move this card?"**, chips Copy / Move.
+   - Then **Add card to dashboard**.
+   - A group card's member (Desk's lamps): no copy / move row.
+4. **The page slot's panel**
+   - **Section titles**: PAGES centred, with decorative lines out to either side.
+   - House and Fleet closer together, their names aligned (the inactive dot pushes it now).
+   - **HEADER** styled the same way, the Show / Hide selector centred, and under it: **"When
+     hidden, swipe down from the top edge of the screen to reveal"**.
+   - A new **HIDDEN** section: "Cards hidden from the dashboard can be viewed/restored from here",
+     with the View hidden cards button between the title and the words when there is one.
+5. **The status slot's panel (the system panel)**: its section titles centred and styled as the
+   page panel's.
+
+**After 2.11 (noted, not for round 14)**
+
+- A2: tapping the temperature in its header panel opens that sensor's History.
+- B2: a cluster's Card UI sets the card state (Corner cut, Bracket, Fill...) for its members, apart
+  from the page's.
+- **UI Tweaks: "Show helper text"**, a checkbox that hides or shows every helper note at the foot of
+  the windows and panels.
