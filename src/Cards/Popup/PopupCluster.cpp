@@ -1,17 +1,12 @@
-// A CLUSTER'S MANAGEMENT SCREEN (2.11 round 3, DECISIONS K104; round 6 the
-// owner's option B): the main view of a cluster's window (a long press on its
-// header, K107). It is about the cluster, and says what it is:
+// A CLUSTER'S WINDOW IS ITS MEMBERS (2.11 round 16, the owner: the Details view
+// held settings, not details). A long press on its header (K107) opens Members -
+// every member, hidden ones too, each opening its own view, whose Visibility
+// shows or hides it - with the CLUSTER panel beside SETTINGS:
 //
-//   Header style - the page's, Swatch or Bar (K102); Sensor icons - the
-//   header's values with their icons or without. Rename (its own words on the
-//   keyboard, K95), Header slots (a view of the members, each into the header
-//   or not) and Add cards (the page's cards that can join, Copy or Move - K91,
-//   K100) at the foot. Under them, in words: its group - the HA area or group it
-//   came from, and that name when it has been renamed - and its members.
-//
-// The members themselves are Members' (the corner icon): every one, hidden ones
-// too, each opening its own view, whose Visibility shows or hides it (round 6:
-// "Details is not where the Shown/Hidden state of each member should be selected").
+//   Rename cluster - its own words on the keyboard (K95); Header options - which
+//   sensors its header shows (four at most), Sensor icons and Header style (the
+//   page's, Swatch or Band - K102); Add cards - the page's cards that can join,
+//   Copy or Move (K91, K100).
 //
 // Kept under the cluster's id (label_text, cl_style, cl_icons, slots) and each member's
 // (hidden) - the settings file's entries agreed in K106 - written when the
@@ -36,12 +31,12 @@ uint8_t     s_pick[ADD_MAX] = {};   // 0 no, 1 copy, 2 move
 uint8_t     s_nCand = 0;
 const char *const ADD_W[] = { "No", "Copy", "Move" };
 
-// THE VIEWS ARE CHIP TABLES (round 4, the owner: "look more like the Card UI or
-// UI Tweaks sheet"): an option's name right-justified against its chips, the
-// actions as buttons at the foot.
+// THE OPTIONS ARE CHIP TABLES (round 4, the owner: "look more like the Card UI or
+// UI Tweaks sheet"): an option's name right-justified against its chips.
 const char *const STYLE_W[]  = { "Inherit", "Swatch", "Band" };   // "Band", as the label type's (round 10); saved as "bar"
 const char *const STYLE_IS[] = { nullptr, "swatch", "bar" };
-constexpr uint8_t ROW_STYLE = 0, ROW_ICONS = 1;   // the main view's rows; Show sensor icons a checkbox (round 14)
+const char *const ICONS_W[]  = { "Show", "Hide" };
+constexpr uint8_t ROW_ICONS = 0, ROW_STYLE = 1;   // Header options' chip rows, under the sensors (round 16)
 
 lv_obj_t *s_table = nullptr;   // the view's chip table
 
@@ -150,14 +145,14 @@ void setVisible(const ClusterCard &cl, uint8_t i, bool want) {
     Settings::setCard(m->id(), "hidden", want == dflt ? nullptr : (want ? "no" : "yes"));
 }
 
-// The main view's chips: lit at once, kept from the next timer pass.
+// Header options' chips: lit at once, kept from the next timer pass.
 void mainChoose(void *p) {
     const uintptr_t v = (uintptr_t)p;
     const uint8_t row = (uint8_t)(v >> 8), i = (uint8_t)(v & 0xFF);
     ClusterCard *cl = held();
     if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN) return;
     if (row == ROW_STYLE)      Settings::setCard(cl->id(), "cl_style", i < 3 ? STYLE_IS[i] : nullptr);
-    else if (row == ROW_ICONS) Settings::setCard(cl->id(), "cl_icons", Kit::chipTableChecked(s_table, ROW_ICONS) ? nullptr : "off");
+    else if (row == ROW_ICONS) Settings::setCard(cl->id(), "cl_icons", i ? "off" : nullptr);
     changed();
 }
 
@@ -183,9 +178,9 @@ void renamed(const char *words, void *) {
 }
 
 void renameCb(lv_event_t *ev) {
-    (void)ev;
     ClusterCard *cl = held();
     if (!cl || !cl->hasId()) return;
+    if (ev) chartSet(DECK_PEEK);   // from the CLUSTER panel: it folds under the keyboard
     static char own[40], dflt[48];
     if (!Settings::card(cl->id(), "label_text", own, sizeof(own))) own[0] = '\0';
     CardGroups::Group g;
@@ -205,16 +200,35 @@ void slotsViewCb(lv_event_t *ev) {
                   nullptr);
 }
 
-// A tick puts a member in the header: appended, last in priority; untick takes
-// it out. A member that leaves the header comes back as a tile unless hidden (K104).
-uint8_t s_slotMember[GROUP_MEMBERS_MAX];   // Header slots' rows: each row's member (one moved out has none)
+// A SENSOR'S ROW IS A BUTTON (round 16, components.md's surfaces): satin while
+// it can be chosen, glass while it is in the header. A tap puts it in the
+// header - appended, last in priority - or takes it out. A member that leaves
+// the header comes back as a tile unless hidden (K104).
+uint8_t   s_slotMember[GROUP_MEMBERS_MAX];   // Header options' rows: each row's member (one moved out has none)
+lv_obj_t *s_slotRow[GROUP_MEMBERS_MAX];
+bool      s_slotOn[GROUP_MEMBERS_MAX];
+uint8_t   s_nSlotRows = 0;
 
-void slotChoose(void *p) {
-    const uintptr_t v = (uintptr_t)p;
-    const uint8_t row = (uint8_t)(v >> 8);
-    const bool want = Kit::chipTableChecked(s_table, row);
+void slotLook(uint8_t row) {
+    lv_obj_t *r = s_slotRow[row];
+    if (!r) return;
+    const bool on = s_slotOn[row];
+    Kit::finish(r, lv_obj_get_width(r), lv_obj_get_height(r), lv_obj_get_style_radius(r, LV_PART_MAIN),
+                on ? Kit::Finish::FINISH_GLASS : Kit::Finish::FINISH_SATIN);
+    // Its name in the accent while chosen, as a loaded scene's.
+    for (uint32_t k = 0; k < lv_obj_get_child_count(r); k++) {
+        lv_obj_t *l = lv_obj_get_child(r, (int32_t)k);
+        if (!lv_obj_check_type(l, &lv_label_class)) continue;
+        if (on) lv_obj_set_style_text_color(l, UI::c(UI::pal().ACCENT), 0);
+        else    lv_obj_remove_local_style_prop(l, LV_STYLE_TEXT_COLOR, 0);   // its role's again
+        break;
+    }
+}
+
+void slotChoose(uint8_t row) {
     ClusterCard *cl = held();
-    if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN || row >= GROUP_MEMBERS_MAX) return;
+    if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN || row >= s_nSlotRows) return;
+    const bool want = !s_slotOn[row];
     const uint8_t i = s_slotMember[row];
     const Card *m = cl->memberAt(i);
     if (!m || !m->hasId()) return;
@@ -230,18 +244,19 @@ void slotChoose(void *p) {
     }
     if (want && !inList(m->id(), ids, n)) {
         if (kept >= CLUSTER_SLOTS_MAX) {   // four at most: the header has no room for more
-            Kit::chipTableCheck(s_table, row, false);
             UIToolkit::show_toast("Limit reached");
             return;
         }
         snprintf(list + strlen(list), sizeof(list) - strlen(list), "%s%s", kept ? "," : "", m->id());
     }
     Settings::setCard(cl->id(), "slots", list);
+    s_slotOn[row] = want;
+    slotLook(row);
     changed();
 }
 
-void slotChipCb(lv_event_t *ev) {
-    lv_async_call(slotChoose, lv_event_get_user_data(ev));
+void slotRowCb(lv_event_t *ev) {
+    slotChoose((uint8_t)(uintptr_t)lv_event_get_user_data(ev));
 }
 
 // --- Add cards -------------------------------------------------------------------------
@@ -376,80 +391,80 @@ int8_t clusterMemberOf(const ClusterCard &cl, const Entity *e) {
 }
 
 // --- The views ------------------------------------------------------------------------
-// The cluster's window (option B, round 6): its header's style and icons; Rename,
-// Header slots and Add cards at the foot; then what it is, in words.
-void buildCluster() {
+// THE CLUSTER PANEL (round 16): on Members, beside SETTINGS. Greyed for a
+// cluster without a usable id, which could keep none of it.
+uint8_t clusterSpecs(DeckRowSpec *r) {
     ClusterCard *cl = held();
-    if (!cl) return;
-    char v[40];
-    uint8_t style = 0;
-    if (cl->hasId() && Settings::card(cl->id(), "cl_style", v, sizeof(v)))
-        style = !strcmp(v, "bar") ? 2 : !strcmp(v, "swatch") ? 1 : 0;
-    const bool icons = !(cl->hasId() && Settings::card(cl->id(), "cl_icons", v, sizeof(v)) && !strcmp(v, "off"));
-
-    const Kit::ChipRowSpec rows[2] = {
-        { "Header style", STYLE_W, 3, style },
-        { "Show sensor icons", nullptr, 0, (uint8_t)(icons ? 1 : 0) },
-    };
-    s_table = Kit::chipTable(s.stage, listW(), rows, 2, mainChipCb);
-    // The page's cards (K91); HA entities not on the page (K92 rule 11) come with the card list.
-    static const char *const W[] = { "Rename", "Header slots", "Add cards" };
-    static const Kit::ButtonRole R[] = { Kit::ButtonRole::BTN_CANCEL, Kit::ButtonRole::BTN_CANCEL,
-                                         Kit::ButtonRole::BTN_CANCEL };
-    static const lv_event_cb_t C[] = { renameCb, slotsViewCb, addViewCb };
-    footButtons(s_table, W, R, C, cl->hasId() ? 3 : 0);
-
-    // WHAT IT IS (the owner: "informational" - the HA area it came from, or its
-    // group's name when it has been renamed), and its members, counted.
-    static char words[200];
-    int w = 0;
-    CardGroups::Group g;
-    const bool own = cl->hasId() && Settings::card(cl->id(), "label_text", v, sizeof(v)) && v[0];
-    if (CardGroups::ofCard(*cl, g)) {
-        const bool ha = !strncmp(g.id, CardGroups::HA_PREFIX, strlen(CardGroups::HA_PREFIX));
-        if (own) w = snprintf(words, sizeof(words), "Renamed from %s, %s. ", g.name, ha ? "its area in HA" : "its group");
-        else     w = snprintf(words, sizeof(words), "%s: %s. ", ha ? "Its area in HA" : "Its group", g.name);
-    }
-    uint8_t tiles = 0, inHdr = 0, hidden = 0, out = 0;
-    for (uint8_t i = 0; i < cl->memberCount(); i++) {
-        const MemberShown m = clusterMemberShown(*cl, i);
-        if (m == MemberShown::SHOWN_TILE) tiles++;
-        else if (m == MemberShown::SHOWN_HEADER) inHdr++;
-        else if (m == MemberShown::SHOWN_MOVED) out++;
-        else hidden++;
-    }
-    w += snprintf(words + w, sizeof(words) - w, "%u member%s: %u as tiles", (unsigned)cl->memberCount(),
-                  cl->memberCount() == 1 ? "" : "s", (unsigned)tiles);
-    if (inHdr)  w += snprintf(words + w, sizeof(words) - w, ", %u in the header", (unsigned)inHdr);
-    if (hidden) w += snprintf(words + w, sizeof(words) - w, ", %u hidden", (unsigned)hidden);
-    if (out)    w += snprintf(words + w, sizeof(words) - w, ", %u on the page", (unsigned)out);
-    snprintf(words + w, sizeof(words) - w, " - each one, hidden ones too, in Members.");
-    note(s_table, words);
+    const bool live = cl && cl->hasId();
+    uint8_t n = 0;
+    r[n++] = { "Rename cluster", DeckRowKind::ROW_BUTTON, "Edit", 0, live, renameCb, nullptr };
+    r[n++] = { "Header options", DeckRowKind::ROW_BUTTON, "Open", 0, live, slotsViewCb, nullptr };
+    r[n++] = { "Add cards", DeckRowKind::ROW_BUTTON, "Open", 0, live, addViewCb, nullptr };
+    return n;
 }
 
-// Header slots: each member in the header or not, in the order chosen.
+// HEADER OPTIONS (round 16, the owner's layout): which sensors the header
+// shows - each a member's row as Members has it, with its reading - then Sensor
+// icons and Header style. One column holds it all, so it scrolls as one; the
+// chip table's rows are found by their place in it, so it holds only its own.
 void buildClusterSlots() {
     ClusterCard *cl = held();
     if (!cl) return;
     const char *ids[CLUSTER_SLOTS_MAX];
     char buf[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1];
     const uint8_t nIds = headerIds(*cl, ids, buf, sizeof(buf));
-    Kit::ChipRowSpec rows[GROUP_MEMBERS_MAX];
-    uint8_t n = 0;
+    char v[16];
+    uint8_t style = 0;
+    if (cl->hasId() && Settings::card(cl->id(), "cl_style", v, sizeof(v)))
+        style = !strcmp(v, "bar") ? 2 : !strcmp(v, "swatch") ? 1 : 0;
+    const bool icons = !(cl->hasId() && Settings::card(cl->id(), "cl_icons", v, sizeof(v)) && !strcmp(v, "off"));
+    // As tall as it holds, never taller than the stage, which centres it (Members').
+    lv_obj_t *col = plain(s.stage);
+    lv_obj_set_size     (col, listW(), LV_SIZE_CONTENT);
+    lv_obj_set_style_max_height(col, lv_pct(100), 0);
+    lv_obj_add_flag     (col, LV_OBJ_FLAG_SCROLLABLE);
+    UI::tameScroll(col);
+    lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(col, mm(UI::shape().S5), 0);
+    note(col, "Select the entities to display in the header (max: 4)");
+
+    // The sensors, Members' width and spacing.
+    lv_obj_t *box = plain(col);
+    const int32_t rowW = membersRowW();
+    lv_obj_set_size     (box, rowW > 0 ? LV_MIN(rowW, listW()) : lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(box, mm(UI::shape().S5), 0);
+
+    const Kit::ChipRowSpec opts[2] = {
+        { "Sensor icons:", ICONS_W, 2, (uint8_t)(icons ? 0 : 1) },
+        { "Header style:", STYLE_W, 3, style },
+    };
+    s_table = Kit::chipTable(col, listW(), opts, 2, mainChipCb);
+    // In the column, which scrolls: as tall as its rows.
+    lv_obj_set_flex_grow(s_table, 0);
+    lv_obj_set_height   (s_table, LV_SIZE_CONTENT);
+    lv_obj_remove_flag  (s_table, LV_OBJ_FLAG_SCROLLABLE);
+    s_nSlotRows = 0;
     names(*cl);
-    for (uint8_t i = 0; i < cl->memberCount() && n < GROUP_MEMBERS_MAX; i++) {
+    for (uint8_t i = 0; i < cl->memberCount() && s_nSlotRows < GROUP_MEMBERS_MAX; i++) {
         if (movedOut(cl->memberAt(i))) continue;   // its card is on the page: not the cluster's to show
         // SENSORS ONLY (round 10, the owner): a light or a switch is a tile. One
         // already in the header is listed, so it can be taken out.
         const bool in = inList(idOf(cl->memberAt(i)), ids, nIds);
         const Entity *e = cl->memberAt(i) ? cl->memberAt(i)->firstEntity() : nullptr;
         const bool sensor = e && (e->desc.kind == EntityKind::SENSOR || e->desc.kind == EntityKind::BINARY_SENSOR);
-        if (!sensor && !in) continue;
-        s_slotMember[n] = i;
-        rows[n++] = { s_names[i], nullptr, 0, (uint8_t)(in ? 1 : 0) };
+        if (!e || (!sensor && !in)) continue;
+        const uint8_t row = s_nSlotRows++;
+        s_slotMember[row] = i;
+        s_slotOn[row]     = in;
+        s_slotRow[row]    = memberRow(box, s_names[i], *e, MemberShown::SHOWN_TILE);
+        lv_obj_add_event_cb(s_slotRow[row], slotRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)row);
     }
-    s_table = Kit::chipTable(s.stage, listW(), rows, n, slotChipCb);
-    note(s_table, "Check the boxes to select sensors to be displayed in the header.");
+    if (!s_nSlotRows) note(box, "This cluster has no sensors to show in its header.");
+    // Satin or glass, painted at the rows' laid-out size, which only the layout knows.
+    lv_obj_update_layout(col);
+    for (uint8_t r = 0; r < s_nSlotRows; r++) slotLook(r);
 }
 
 void clusterRename() { renameCb(nullptr); }

@@ -95,6 +95,9 @@ void forgetWidgets() {
 void cornerLook(lv_obj_t *b, bool shown, bool lit) { Kit::sheetTabLook(b, shown, lit); }
 
 void showView(PopupView v) {
+    // A CLUSTER HAS NO CONTROLS VIEW (round 16, the owner: its Details held
+    // settings, not details): its window is Members, whatever asked for the main view.
+    if (v == PopupView::VIEW_MAIN && s.cluster) v = PopupView::VIEW_MEMBERS;
     const PopupView was = s.view;
     s.view = v;
     forgetMainWidgets();
@@ -114,7 +117,7 @@ void showView(PopupView v) {
     const bool member   = inMember();
     const bool controls = (v == PopupView::VIEW_MAIN || v == PopupView::VIEW_MEMBER);
     // X on the controls, the back arrow everywhere else (owner, round 4).
-    setText(s.lblLeft, v == PopupView::VIEW_MAIN ? LV_SYMBOL_CLOSE : LV_SYMBOL_LEFT);
+    setText(s.lblLeft, v == controlsView() && !member ? LV_SYMBOL_CLOSE : LV_SYMBOL_LEFT);
     cornerLook(s.btnHistory, true, v == PopupView::VIEW_HISTORY);
     cornerLook(s.btnMembers, !member && hasMembers(), v == PopupView::VIEW_MEMBERS);
     cornerLook(s.btnScenes, (controls || v == PopupView::VIEW_SCENES) && hasScenes(),
@@ -146,7 +149,7 @@ void showView(PopupView v) {
                               : v == PopupView::VIEW_SCENES  ? "Scenes"
                               : v == PopupView::VIEW_PROPS   ? "Properties"
                               : v == PopupView::VIEW_CARD_UI ? "Card UI"
-                              : v == PopupView::VIEW_CLUSTER_SLOTS ? "Header"
+                              : v == PopupView::VIEW_CLUSTER_SLOTS ? "Header options"
                               : v == PopupView::VIEW_VISIBILITY ? "Visibility"
                               : v == PopupView::VIEW_ADD_TO ? "Add to"
                               : v == PopupView::VIEW_CLUSTER_ADD ? "Add cards"
@@ -165,7 +168,6 @@ void showView(PopupView v) {
     else if (v == PopupView::VIEW_ADD_TO)     buildAddTo();           // K91, K100
     else if (v == PopupView::VIEW_CLUSTER_ADD) buildClusterAdd();     // K104's Add cards
     else if (v == PopupView::VIEW_JOIN)       buildJoin();            // K92 rule 9
-    else if (v == PopupView::VIEW_MAIN && s.cluster) buildCluster();   // K104
     else                                   buildMain();
     deckSync();     // SETTINGS' rows are the view's (a member's own has more)
     deckRender();   // Paused follows whatever the window is showing now
@@ -173,8 +175,11 @@ void showView(PopupView v) {
 }
 
 // The controls view of whatever the window is showing: the window's, or one
-// member's.
-PopupView controlsView() { return inMember() ? PopupView::VIEW_MEMBER : PopupView::VIEW_MAIN; }
+// member's. A cluster's is its Members (round 16).
+PopupView controlsView() {
+    if (inMember()) return PopupView::VIEW_MEMBER;
+    return s.cluster ? PopupView::VIEW_MEMBERS : PopupView::VIEW_MAIN;
+}
 
 // A corner icon: its view, or - when lit - back to the controls.
 void cornerTap(PopupView v) { showView(s.view == v ? controlsView() : v); }
@@ -188,6 +193,10 @@ void cornerTap(PopupView v) { showView(s.view == v ? controlsView() : v); }
 void goBack() {
     switch (s.view) {
         case PopupView::VIEW_MAIN:   CardPopup::close();     break;
+        case PopupView::VIEW_MEMBERS:   // a cluster's own view: its X
+            if (s.cluster) CardPopup::close();
+            else           showView(controlsView());
+            break;
         case PopupView::VIEW_MEMBER: leaveMember();          break;
         case PopupView::VIEW_ADD_TO: showView(PopupView::VIEW_VISIBILITY); break;   // its view's own
         case PopupView::VIEW_JOIN:   // a tile's Visibility (or a cluster member's, round 6), or the member's own view

@@ -267,8 +267,8 @@ order.
 |---|---|
 | `/popup?card=N` | a long press on card N: opens its window; replies with the build time, window size and LVGL's pool |
 | `/popup?close=1` | closing it; replies with the pool afterwards. **Anything changed in the window is saved now**, as on the glass |
-| `/popup?view=N` | the corner icons: `0` the controls (a member's, inside one), `1` History, `2` Members, `4` Scenes, `5` Properties, `6` Card UI (2.8 round 3, as SETTINGS' last row), `7` a cluster's Header slots (2.11), `8` Visibility (2.11, K96: the card's options by where it is), `9` its Add to a cluster (K91, K100), `10` a cluster's Add cards (K104), `3` only lists. Also lists the entities' levels, an HA group's members and why recent commands failed |
-| `/popup?deck=1` / `deck=0` / `deck=2` | SETTINGS opened / folded; `2` the left panel (CHART or SCENES) opened |
+| `/popup?view=N` | the corner icons: `0` the controls (a member's, inside one; a cluster's Members, K129), `1` History, `2` Members, `4` Scenes, `5` Properties, `6` Card UI (2.8 round 3, as SETTINGS' last row), `7` a cluster's Header options (2.11, K129), `8` Visibility (2.11, K96: the card's options by where it is), `9` its Add to a cluster (K91, K100), `10` a cluster's Add cards (K104), `3` only lists. Also lists the entities' levels, an HA group's members and why recent commands failed |
+| `/popup?deck=1` / `deck=0` / `deck=2` | SETTINGS opened / folded; `2` the left panel (CHART, ACTIVITY, SCENES, or a cluster's CLUSTER) opened |
 | `/popup?ctl=N` | a light's control: `0` brightness, `1` color temperature, `2` color; lists where the stage's children landed |
 | `/popup?member=N` | a tap on row N of Members (opens Members first) |
 | `/popup?span=N` | History's span buttons: chart `0` 24 h, `1` 12 h, `2` 6 h, `3` 1 h; activity `0` 24 h, `1` 7 days. Asks Home Assistant for that history |

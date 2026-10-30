@@ -91,8 +91,9 @@ using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
 // tabs (owner, 2026-10-06): see "The corner icons".
 // VIEW_PROPS: the entity's properties, read-only, from SETTINGS' button (2.10e).
 // VIEW_CARD_UI: the card's own looks, from SETTINGS' last row (2.8 round 3, D-28).
-// A CLUSTER'S WINDOW (2.11, K104): its main view is the cluster's management
-// screen (PopupCluster.cpp), VIEW_CLUSTER_SLOTS the members in its header.
+// A CLUSTER'S WINDOW (2.11, K104; round 16): it opens on Members - a cluster has
+// no controls view of its own - with the CLUSTER panel beside SETTINGS (Rename
+// cluster, Header options, Add cards); VIEW_CLUSTER_SLOTS is Header options.
 // VIEW_VISIBILITY: a card's options by where it is, from SETTINGS' Visibility
 // row (2.11 round 3, K96; PopupVisibility.cpp); VIEW_ADD_TO its Add to a
 // cluster (K91, K100).
@@ -290,7 +291,7 @@ struct HistView {
 };
 
 // The left panel's kinds - the sheet's s.left.kind (sideFor(), PopupPanels.cpp).
-enum : uint8_t { SIDE_NONE, SIDE_CHART, SIDE_SCENES, SIDE_ACTIVITY };
+enum : uint8_t { SIDE_NONE, SIDE_CHART, SIDE_SCENES, SIDE_ACTIVITY, SIDE_CLUSTER };
 
 // A panel's rows are the kit's (2.12 P3): Kit::RowSpec, built by Kit::rows().
 // ROW_BUTTON (2.10e): a button that does something - its words in `opts`.
@@ -401,7 +402,12 @@ void forgetDeck();
 void buildControlDeck(lv_obj_t *parent, uint8_t caps);
 
 // PopupMembers.cpp
+enum class MemberShown : uint8_t;   // below, with the cluster's
 void buildMembers();
+// A member's state in words and the role that colours them; its row, as Members
+// shows it (the cluster's Header options too).
+KS memberState(const Entity &e, MemberShown shown, char *buf, size_t cap);
+lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberShown shown);
 int32_t membersRowW();   // PopupControls.cpp: Members' width - a group light's controls', in a cluster's window too
 void enterMemberAsync(void *unused);
 void memberRowCb(lv_event_t *ev);
@@ -417,9 +423,9 @@ void cardUiCb(lv_event_t *ev);                           // SETTINGS' Card UI ro
 bool cardUiTakeRebuild();                                // a choice wants the page built again
 void cardUiTypeWords(bool name);                         // the keyboard: the card's name, or its card label's words (K95)
 
-// PopupCluster.cpp (2.11, K104)
-void buildCluster();
-void buildClusterSlots();
+// PopupCluster.cpp (2.11, K104; round 16 - Members is a cluster's window)
+uint8_t clusterSpecs(DeckRowSpec *r);   // the CLUSTER panel's rows, on Members
+void buildClusterSlots();               // VIEW_CLUSTER_SLOTS: Header options
 bool clusterTakeRebuild();   // a choice wants the page built again, once the window has gone
 void clusterRename();        // the keyboard on the cluster's name, as Rename opens it (K95)
 void buildClusterAdd();      // VIEW_CLUSTER_ADD: the page's cards, each No / Copy / Move (K91)

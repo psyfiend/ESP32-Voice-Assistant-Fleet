@@ -482,10 +482,12 @@ Built on `feat/2.11-group-cards`; the owner's sheet is `docs/TEST_2.11.md`.
 **As built, round 3 (2026-10-19, unattended; `docs/TEST_2.11.md` round 3).** What the glass edits,
 on the kit, in the card window's views:
 
-- **The cluster's window** (`Popup/PopupCluster.cpp`, K104): HEADER - Name (the keyboard; the
-  cluster's `label_text`, empty = its group's name), Style, Sensor icons, Header slots (a view of the
-  members, ticked in priority order, four at most); MEMBERS - Visible per member, **Add cards** (the
-  page's one-entity cards, ticked, Copy / Move).
+- **The cluster's window** (`Popup/PopupCluster.cpp`, K104; **K129 since round 16**): it opens on
+  **Members** - a cluster has no Details view - with the **CLUSTER** panel beside SETTINGS: **Rename
+  cluster** (the keyboard; the cluster's `label_text`, empty = its group's name), **Header options**
+  (its sensors as Members' rows with their readings, satin, glass while in the header, four at most;
+  then Sensor icons Show / Hide and Header style Inherit / Swatch / Band) and **Add cards** (the
+  page's one-entity cards, Copy / Move). A member is shown or hidden from its own Visibility.
 - **The keyboard** (`Kit::keyboard()`, K95): a kit component, ASCII only, 7 mm keys. Used by the
   cluster's Name and by Card UI's Custom chips (a card's name; its card label's words).
 - **Visibility** (`Popup/PopupVisibility.cpp`, K96) replaces SETTINGS' Remove card: **on the page**

@@ -11,6 +11,61 @@ void chartSet(uint8_t state);       // below, with the deck: the CHART panel
 void chartFold();                   // open: back to its tab
 void sideFor(PopupView v);          // below: the left panel a view wants (CHART / SCENES)
 
+// ITS STATE IN COLOUR (owner, the #99 mock): on in the active colour, off and
+// any other value in white, paused or unavailable dimmed. Returns the role.
+KS memberState(const Entity &e, MemberShown shown, char *buf, size_t cap) {
+    const EntityAttrs &at = e.attrs;
+    if (shown == MemberShown::SHOWN_HIDDEN || shown == MemberShown::SHOWN_MOVED) {
+        // Moved out (the sprint after round 7): its card is on the page.
+        snprintf(buf, cap, shown == MemberShown::SHOWN_MOVED ? "On the page" : "Hidden");
+        return KS::KS_LABEL_TAG_DIM;
+    }
+    if (e.paused) {
+        // Out of the group, but still listed and saying why (owner, 2.10b).
+        snprintf(buf, cap, "Paused");
+        return KS::KS_LABEL_TAG_DIM;
+    }
+    if (!e.available) {
+        snprintf(buf, cap, "Unavailable");
+        return KS::KS_LABEL_TAG_DIM;
+    }
+    if (e.desc.kind == EntityKind::LIGHT && e.value.type == ValueType::BOOL && e.value.b && at.brightness >= 0) {
+        // A light's levels, so a group's commands can be checked member by
+        // member (2.10b): "On, 40%, 2700 K", "On, 40%, colour 30".
+        const int pct = LV_MAX(1, (at.brightness * 100 + 127) / 255);
+        if (at.lightMode == LightMode::LMODE_TEMP && at.colorTempK > 0)
+            snprintf(buf, cap, "On, %d%%, %d K", pct, at.colorTempK);
+        else if (at.lightMode == LightMode::LMODE_COLOUR && at.hue >= 0)
+            snprintf(buf, cap, "On, %d%%, color %d", pct, at.hue);
+        else
+            snprintf(buf, cap, "On, %d%%", pct);
+        return KS::KS_LABEL_TAG_ACTIVE;
+    }
+    if (e.value.type == ValueType::BOOL) {
+        snprintf(buf, cap, "%s", cardStateWord(e.desc, e.value.b));
+        return e.value.b ? KS::KS_LABEL_TAG_ACTIVE : KS::KS_LABEL_TAG;
+    }
+    cardFormatValue(e, buf, cap, true, s.tempUnit);
+    return KS::KS_LABEL_TAG;
+}
+
+// A member's row: its name, and its state beside it. The caller says what a tap
+// does and gives it its finish once laid out.
+lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberShown shown) {
+    lv_obj_t *r = Kit::item(list);
+    lv_obj_set_size     (r, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_all(r, mm(UI::shape().S5), 0);
+    lv_obj_t *n = Kit::label(r, KS::KS_LABEL_NAME);
+    lv_label_set_text(n, name);
+    char buf[48];
+    const KS role = memberState(e, shown, buf, sizeof(buf));
+    lv_obj_t *v = Kit::label(r, role);
+    lv_label_set_text(v, buf);
+    return r;
+}
+
 void buildMembers() {
     // The stage's height, scrolling if a group has more members than fit. As
     // wide as the controls view's slider and words together, centred, so the
@@ -35,53 +90,11 @@ void buildMembers() {
         const Entity *e = memberAt(i);
         if (!e) continue;
         // A tap opens that member's own controls (owner, 2.10b).
-        lv_obj_t *r = Kit::item(list);
-        lv_obj_set_size     (r, lv_pct(100), LV_SIZE_CONTENT);
-        lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_all(r, mm(UI::shape().S5), 0);
-        lv_obj_add_event_cb(r, memberRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
-        if (nRows < POPUP_ENT_MAX) rows[nRows++] = r;
-        lv_obj_t *n = Kit::label(r, KS::KS_LABEL_NAME);
-        lv_label_set_text(n, e->desc.name);
-        // ITS STATE IN COLOUR (owner, the #99 mock): on in the active colour,
-        // off and any other value in white, paused or unavailable dimmed.
-        char buf[48];
-        KS role = KS::KS_LABEL_TAG;
-        const EntityAttrs &at = e->attrs;
         const int8_t k = cl ? clusterMemberOf(*cl, e) : -1;
         const MemberShown shown = k >= 0 ? clusterMemberShown(*cl, (uint8_t)k) : MemberShown::SHOWN_TILE;
-        if (shown == MemberShown::SHOWN_HIDDEN || shown == MemberShown::SHOWN_MOVED) {
-            // Moved out (the sprint after round 7): its card is on the page.
-            snprintf(buf, sizeof(buf), shown == MemberShown::SHOWN_MOVED ? "On the page" : "Hidden");
-            role = KS::KS_LABEL_TAG_DIM;
-        } else if (e->paused) {
-            // Out of the group, but still listed and saying why (owner, 2.10b).
-            snprintf(buf, sizeof(buf), "Paused");
-            role = KS::KS_LABEL_TAG_DIM;
-        } else if (!e->available) {
-            snprintf(buf, sizeof(buf), "Unavailable");
-            role = KS::KS_LABEL_TAG_DIM;
-        } else if (e->desc.kind == EntityKind::LIGHT && e->value.type == ValueType::BOOL && e->value.b &&
-                   at.brightness >= 0) {
-            // A light's levels, so a group's commands can be checked member by
-            // member (2.10b): "On, 40%, 2700 K", "On, 40%, colour 30".
-            const int pct = LV_MAX(1, (at.brightness * 100 + 127) / 255);
-            if (at.lightMode == LightMode::LMODE_TEMP && at.colorTempK > 0)
-                snprintf(buf, sizeof(buf), "On, %d%%, %d K", pct, at.colorTempK);
-            else if (at.lightMode == LightMode::LMODE_COLOUR && at.hue >= 0)
-                snprintf(buf, sizeof(buf), "On, %d%%, color %d", pct, at.hue);
-            else
-                snprintf(buf, sizeof(buf), "On, %d%%", pct);
-            role = KS::KS_LABEL_TAG_ACTIVE;
-        } else if (e->value.type == ValueType::BOOL) {
-            snprintf(buf, sizeof(buf), "%s", cardStateWord(e->desc, e->value.b));
-            if (e->value.b) role = KS::KS_LABEL_TAG_ACTIVE;
-        } else {
-            cardFormatValue(*e, buf, sizeof(buf), true, s.tempUnit);
-        }
-        lv_obj_t *v = Kit::label(r, role);
-        lv_label_set_text(v, buf);
+        lv_obj_t *r = memberRow(list, e->desc.name, *e, shown);
+        lv_obj_add_event_cb(r, memberRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
+        if (nRows < POPUP_ENT_MAX) rows[nRows++] = r;
     }
     lv_obj_t *note = Kit::label(list, KS::KS_LABEL_TAG_DIM);
     // Owner's words, 2026-10-07; a cluster's member is shown or hidden from its own view.

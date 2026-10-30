@@ -66,13 +66,15 @@ uint16_t tapRowBuild(const Card &c) {
     };
     const Entity *sc[ENTITY_SCENES_MAX];
     if (c.tapToggles()) add(TapAction::TAP_TOGGLE, "Toggle");
-    add(TapAction::TAP_DETAILS, "Details view");
+    // A cluster has no Details view (round 16): its window is Members.
+    if (!s.cluster)     add(TapAction::TAP_DETAILS, "Details view");
     if (hasMembers())   add(TapAction::TAP_MEMBERS, "Members view");
     add(TapAction::TAP_HISTORY, "History view");
     // One line for both (owner, 2026-10-13): which one is SCENES' Scene action.
     if (c.offeredScenes(sc, ENTITY_SCENES_MAX)) add(sceneActionOf(c), "Scenes...");
     add(TapAction::TAP_NOTHING, "Nothing");
-    const TapAction cur = tapShown(c);
+    TapAction cur = tapShown(c);
+    if (s.cluster && cur == TapAction::TAP_DETAILS) cur = TapAction::TAP_MEMBERS;   // what it opens now
     for (uint8_t i = 0; i < s_tapN; i++) if (s_tapMap[i] == cur) return i;
     return 0;
 }

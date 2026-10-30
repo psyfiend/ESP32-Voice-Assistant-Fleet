@@ -1899,3 +1899,52 @@ was re-keyed for the taller page on boot - the same placement.
 | # | Do this | PASS if |
 |---|---|---|
 | R13 | The page panel: tap Hide, then Show, then both quickly | PAGES and HEADER never move; the line unrolls downward and rolls back up, HIDDEN and the panel's bottom edge riding with it |
+
+## Your results (round 15)
+
+R12 and R13 **PASS** (2026-10-30).
+
+## Round 16 - the cluster's window is its Members (your notes, 2026-10-30; K129)
+
+The Details view had become a place for settings, which are not details, so it is gone:
+
+- **A long press on a cluster opens Members**, with the X: Members is the cluster's window, and the
+  back arrow from any view of it comes back there. History stays a tab.
+- **Details view is no longer a cluster's Tap action.** A cluster that had it saved opens Members,
+  and its Tap action row shows Members view.
+- **The CLUSTER panel**, left of SETTINGS, on Members only: **Rename cluster** (Edit: the keyboard;
+  the panel folds under it), **Header options** (Open), **Add cards** (Open). Rows with a button, as
+  SETTINGS' are - my choice of words for the buttons (Edit, Open).
+- **Header options** (the old Header slots): "Select the entities to display in the header (max: 4)";
+  the sensors as Members' rows, each with its reading, **satin**, **glass with its name in the
+  accent while in the header**, a tap putting it in or taking it out, a fifth refused with "Limit
+  reached"; then **Sensor icons:** Show / Hide and **Header style:** Inherit / Swatch / Band. On the
+  P4_5 it scrolls to reach Header style.
+- **Garage - Doors' Members** are a group light's width, as every other Members (its controls have
+  no slider, which left the rows the window's whole width).
+
+Flashed to the three dev boards; the S3_4B compiled; settings 0 differences on all three.
+
+| Office: Members and CLUSTER | Header options | Doors: Members |
+|---|---|---|
+| ![cluster](followups/211_r16_cluster.png) | ![header options](followups/211_r16_header_options.png) | ![garage](followups/211_r16_garage.png) |
+
+## The final pass (for you, round 16)
+
+The cluster window's every path, once, on the P4_5 - then any one row on the 4B and the 1060.
+
+| # | Do this | PASS if |
+|---|---|---|
+| S1 | Long-press Office's header | Office > Members, the X at the left, the Members tab lit; the CLUSTER tab at the bottom left, SETTINGS at the right |
+| S2 | Open CLUSTER | Rename cluster [Edit], Header options [Open], Add cards [Open] |
+| S3 | Rename cluster: type a name, Save; then Rename again and clear it, Save | the title says the new name at once, the header after the window closes; cleared, it is Office again |
+| S4 | Header options | your sentence on top; Office's sensors with their readings, the ones in the header glass and their names in the accent; then Sensor icons: Show / Hide and Header style: Inherit / Swatch / Band |
+| S5 | Tap sensors until five are chosen (or every sensor, if fewer) | each turns glass as it is tapped; a fifth says "Limit reached" and stays satin; tap one again: satin, out |
+| S6 | Sensor icons Hide, Header style Band; back, close | the back arrow returns to Members; closed, the header has no icons and is a band. Put both back |
+| S7 | Add cards | the page's cards with No / Copy / Move, as before; back returns to Members without adding |
+| S8 | Members: tap a member, then its back arrow; then "Office >" in a member's title | the member's own view, then Members; the title link also goes to Members |
+| S9 | History tab, then tap it again (or the Members tab) | History, then Members |
+| S10 | SETTINGS: Tap action | no "Details view"; Members view, History view, Nothing (and Toggle where it applies) |
+| S11 | A member's Visibility: Hide from the cluster, then restore it from Members | it goes from the cluster and shows "Hidden" in Members; restored, it is a tile again |
+| S12 | Long-press Garage - Doors, Members tab | Garage North and Garage South as wide as Office's rows, satin, "Tap a member for details" under them |
+| S13 | Any light card's window | unchanged: its controls, Details view still in its Tap action |

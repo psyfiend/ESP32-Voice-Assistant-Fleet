@@ -117,7 +117,9 @@ int32_t controlDeckH();   // below
 // had left (the owner: "sometimes the satin buttons span the entire window,
 // sometimes not") - so it is a group light's, as Desk's would be in this window.
 int32_t membersRowW() {
-    if (!s.cluster) return s.mainRowW;
+    // A card whose controls have no slider (a disc: Garage Doors, round 16) gets
+    // a group light's width too, as every other Members does.
+    if (!s.cluster && s.mainRowW > 0) return s.mainRowW;
     const int32_t keepW = s.heroW, keepH = s.heroH;   // colWidth() reads the hero's width
     s.heroH = LV_MAX(pm(HERO_H_MM), UI::minTouch());
     s.heroW = s.heroH * 42 / 100;
