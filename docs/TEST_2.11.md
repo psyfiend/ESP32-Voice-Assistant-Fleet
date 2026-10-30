@@ -1872,3 +1872,18 @@ differences on all three. The P4_5 with Eric hidden (yours) - it fits, the heade
 - **Builds**: the P4_5, the 4B and the 1060 flashed; the S3_4B compiled.
 - **The structure check**: two files over 1,000 lines (`GUIManager.cpp` 1,520, `Card.cpp` 1,459),
   409 style calls outside the kit in 29 files, 10 colour literals in 2 files - unchanged.
+
+## Your results (round 14)
+
+R1-R11 **PASS** (2026-10-29). R10 with one note: HEADER's words should appear the moment Hide is
+tapped, to say how to bring the header back - not only after the panel closes and reopens.
+
+## Round 15 (your R10 note)
+
+HEADER's words are built with the panel and shown or hidden by Show / Hide as it is tapped; the open
+panel grows or shrinks to fit them in the same slide (`Kit::drawerRefit()`, new). Flashed to the
+three dev boards; the S3_4B compiled; settings 0 differences on all three.
+
+| # | Do this | PASS if |
+|---|---|---|
+| R12 | The page panel, the header shown: tap Hide, then Show | Hide: "When hidden, swipe down..." appears at once and the panel grows to hold it; Show: it goes and the panel shrinks back |

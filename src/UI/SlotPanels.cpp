@@ -129,8 +129,14 @@ void buildAlarm(lv_obj_t *face) {
 // stays while the panel is open; hidden, a swipe down from the top edge brings
 // it back for a moment.
 Kit::Selector s_hdrSel;
+lv_obj_t *s_hdrNote = nullptr;   // HEADER's words: shown the moment Hide is chosen (round 15)
 void hdrChosen(uint8_t i) {
     if (s_ctx.setHeaderShown) s_ctx.setHeaderShown(s_ctx.user, i == 0);
+    if (s_hdrNote) {
+        if (i == 0) lv_obj_add_flag(s_hdrNote, LV_OBJ_FLAG_HIDDEN);
+        else        lv_obj_remove_flag(s_hdrNote, LV_OBJ_FLAG_HIDDEN);
+        Kit::drawerRefit(lv_obj_get_parent(s_hdrNote));
+    }
 }
 
 // THIS PAGE'S HIDDEN CARDS (2.11, K66, K96 - the mock's "this page's list of
@@ -150,7 +156,8 @@ void hiddenCards(lv_obj_t *face, const Context &c) {
 // THREE SECTIONS (round 14, the owner's): PAGES - every page, close together;
 // HEADER - Show / Hide, centred; HIDDEN - View hidden cards when there are some.
 // A section's words only while they are needed (round 14b: with the button the
-// panel overran the P4_5): HEADER's while it is hidden, HIDDEN's with no button.
+// panel overran the P4_5): HEADER's while it is hidden - from the tap on Hide,
+// round 15 - HIDDEN's with no button.
 void buildPage(lv_obj_t *face, const Context &c) {
     title(face, "PAGES");
     lv_obj_t *pages = Kit::plain(face);
@@ -168,7 +175,8 @@ void buildPage(lv_obj_t *face, const Context &c) {
     sp.room     = faceRoom();
     sp.onChosen = hdrChosen;
     Kit::selector(s_hdrSel, Kit::drawerCentred(face), sp);
-    if (!c.headerShown) Kit::drawerNote(face, "When hidden, swipe down from the top edge of the screen to reveal");
+    s_hdrNote = Kit::drawerNote(face, "When hidden, swipe down from the top edge of the screen to reveal");
+    if (c.headerShown) lv_obj_add_flag(s_hdrNote, LV_OBJ_FLAG_HIDDEN);
     title(face, "HIDDEN");
     hiddenCards(face, c);
     if (!c.hiddenCount || !c.viewHidden)

@@ -405,6 +405,22 @@ void drawerOpen(Drawer &d) {
     animate(d, h);
 }
 
+// Measured as drawerOpen() measures it; the face rides the foot as it slides.
+void drawerRefit(lv_obj_t *face) {
+    for (uint8_t i = 0; i < s_drawerN; i++) {
+        Drawer &d = *s_drawers[i];
+        if (d.face != face || !d.open || !d.root) continue;
+        lv_obj_update_layout(d.face);
+        int32_t h = lv_obj_get_height(d.face);
+        const int32_t avail = lv_obj_get_height(lv_screen_active()) - d.top - UI::sc(UI::hdr().DRAWER_PAD);
+        if (h > avail) h = avail;
+        if (h == d.openH) return;
+        d.openH = h;
+        animate(d, h);
+        return;
+    }
+}
+
 void drawerClose(Drawer &d, bool anim) {
     if (!d.root) return;
     d.open = false;

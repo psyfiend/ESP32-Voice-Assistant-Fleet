@@ -544,6 +544,9 @@ void    drawerSetTop(Drawer &d, int32_t top);
 // Open: its side walls rise straight to the bar's line (round 4: no flares).
 void    drawerOpen(Drawer &d);
 void    drawerClose(Drawer &d, bool animate = true);
+// Its contents changed while open (a line shown or hidden): the open drawer
+// whose face this is takes its new height (2.11 round 15). Closed, nothing.
+void    drawerRefit(lv_obj_t *face);
 // The bar's DRAW_MAIN_END (Kit::headerBar() hooks it): the bar is drawn over the
 // panels. For each open panel it fades its accent line out short of the panel's
 // walls - the panel lies on the bar (D-35) - and draws the halo where it falls
