@@ -1,5 +1,9 @@
 # TEST - 2.11: group cards, clusters and the arranger
 
+**Signed off by the owner 2026-10-30** after round 16's final pass (S1-S13, all PASS): sixteen
+rounds, 54 builds, released as `v0.2.19`. Archived unchanged apart from this note and the images'
+paths.
+
 Rounds in order, each with your results under it. The design is `docs/design/group-cards.md` §6-7
 (DECISIONS K88-K107, D-34, D-35); the build order you agreed on 2026-10-19 (K106): round 1 clusters
 on the page, round 2 the arranger, round 3 what the glass edits (with the keyboard), round 4 the
@@ -855,21 +859,21 @@ difference); nothing was added or moved on the 4B or the 1060.
 The P4_5 - Copy or Move, then Front moved out (Outside's tile gone, the page arranged again), its
 Visibility, and Outside's Members:
 
-![Copy or Move](followups/211_r8_copy_move_p45.png)
-![Moved](followups/211_r8_moved_page_p45.png)
-![The moved card's Visibility](followups/211_r8_moved_visibility_p45.png)
-![Members: On the page](followups/211_r8_members_on_page_p45.png)
+![Copy or Move](../followups/211_r8_copy_move_p45.png)
+![Moved](../followups/211_r8_moved_page_p45.png)
+![The moved card's Visibility](../followups/211_r8_moved_visibility_p45.png)
+![Members: On the page](../followups/211_r8_members_on_page_p45.png)
 
 A copy's Visibility and its dialog; the 4B's Copy or Move on Linen:
 
-![A copy's Visibility](followups/211_r8_copy_visibility_p45.png)
-![Remove this card?](followups/211_r8_remove_dialog_p45.png)
-![The 4B](followups/211_r8_copy_move_4b.png)
+![A copy's Visibility](../followups/211_r8_copy_visibility_p45.png)
+![Remove this card?](../followups/211_r8_remove_dialog_p45.png)
+![The 4B](../followups/211_r8_copy_move_4b.png)
 
 The hidden cards with the House page squeezed to one row (a test copy of your settings, yours put
 back after): Kitchen and Office crowded off.
 
-![No room](followups/211_r8_crowded_p45.png)
+![No room](../followups/211_r8_crowded_p45.png)
 
 **On the 1060, your Front card from 14:55 is still on the page** (Outside's Front, added to the
 dashboard before this round: the bug itself). It was made before cards remembered where they came
@@ -945,21 +949,21 @@ The P4_5's House page as pinned (4 x 2: Doors one cell, Kitchen across three, Ou
 splitting the bottom row) and as Auto would arrange it (10 x 8 units: your "what should happen",
 Doors with a unit of margin above):
 
-![P4_5 pinned 4 x 2](followups/211_r9_house_pinned_p45.png)
-![P4_5 auto](followups/211_r9_house_auto_p45.png)
+![P4_5 pinned 4 x 2](../followups/211_r9_house_pinned_p45.png)
+![P4_5 auto](../followups/211_r9_house_auto_p45.png)
 
 The 4B (pinned at 4 rows; auto) and the 1060 (pinned at 5 x 2; auto):
 
-![4B pinned](followups/211_r9_house_pinned_4b.png)
-![4B auto](followups/211_r9_house_auto_4b.png)
-![1060 pinned](followups/211_r9_house_pinned_1060.png)
-![1060 auto](followups/211_r9_house_auto_1060.png)
+![4B pinned](../followups/211_r9_house_pinned_4b.png)
+![4B auto](../followups/211_r9_house_auto_4b.png)
+![1060 pinned](../followups/211_r9_house_pinned_1060.png)
+![1060 auto](../followups/211_r9_house_auto_1060.png)
 
 The P4_5's Fleet page unpinned (16 cards on 12 x 6 units; Lamp 3 and Switch take the free unit row
 under them as margin), and the Grid line:
 
-![Fleet page auto](followups/211_r9_fleet_auto_p45.png)
-![Grid](followups/211_r9_grid_row_p45.png)
+![Fleet page auto](../followups/211_r9_fleet_auto_p45.png)
+![Grid](../followups/211_r9_grid_row_p45.png)
 
 **Timed** (`/popup`'s second line; the search runs on its own task while the page flows, then the
 page is built again):
@@ -1035,9 +1039,9 @@ Grid line, so Reset joined the buttons; its dialog says what would go.
 | clusters' header slots and presentation as compiled (`slots`, `present`) | schemes, UI Tweaks, the windows' timeout |
 | every page's kept arrangement: each arranges itself again | **the pages' pins** (Col / Row) - Auto is their reset |
 
-![The Reset's dialog](followups/211_r9_reset_dialog_p45.png)
-![The P4_5 after the Reset (a test copy; Home Assistant was down, hence the dashes)](followups/211_r9_after_reset_p45.png)
-![The system panel](followups/211_r9_grid_row_p45.png)
+![The Reset's dialog](../followups/211_r9_reset_dialog_p45.png)
+![The P4_5 after the Reset (a test copy; Home Assistant was down, hence the dashes)](../followups/211_r9_after_reset_p45.png)
+![The system panel](../followups/211_r9_grid_row_p45.png)
 
 Run once, on a test copy of the P4_5's settings: 8 cards made here deleted, 7 hides and moves undone,
 3 clusters' header slots and 1 member as built; the House page arranged itself again in 29 ms (8
@@ -1083,13 +1087,13 @@ shrinks every tile.
 The 1060 before and after (its House page as pinned, 5 x 2; Home Assistant was down, hence the
 dashes and the plain bulbs):
 
-![1060 before](followups/211_r9_house_pinned_1060.png)
-![1060 after: 94 px discs and 46 px glyphs, from 62 and 30](followups/211_r9_icons_after_1060.png)
+![1060 before](../followups/211_r9_house_pinned_1060.png)
+![1060 after: 94 px discs and 46 px glyphs, from 62 and 30](../followups/211_r9_icons_after_1060.png)
 
 The 4B after (its tiles size themselves now; the short Office cluster's stay small - the pin to 4
 rows gives it two units of height):
 
-![4B after](followups/211_r9_icons_after_4b.png)
+![4B after](../followups/211_r9_icons_after_4b.png)
 
 **Borders round tiles: a mock** - [2.11 Round 9 Mocks](https://claude.ai/artifact/SpSG1hhpbJsUmxBLv3cdfY), page *Tile borders*:
 the 1060's Kitchen cluster at its size in pixels, four ways - **A** as built (no tile borders,
@@ -1205,7 +1209,7 @@ added become empty space.
 | **Swatch headers** | on the cluster's own surface | **on a faint band**, the page header's colour (SURFACE_ALT) |
 | **A Band header** | sized from the width the page computed, a pixel or three short of the border on some clusters | **the room's whole width** - to check in Linen, where you saw it |
 
-![The P4_5 (Midnight): temperature rightmost on every cluster, Swatch headers on a faint band](followups/211_r10_headers_p45.png)
+![The P4_5 (Midnight): temperature rightmost on every cluster, Swatch headers on a faint band](../followups/211_r10_headers_p45.png)
 
 **The tile-borders mock** has **E** now: every tile a faint panel, an on tile framed with the Corner
 cut ([2.11 Round 9 Mocks](https://claude.ai/artifact/SpSG1hhpbJsUmxBLv3cdfY), page *Tile borders*).
@@ -1279,7 +1283,7 @@ Every tile a faint panel inside its cluster, and a tile that is on framed as a s
 Corner cut by default (Bracket if you choose it), its lit disc kept. The Office's Desk switched on for
 the picture, and off again as it was:
 
-![Tiles as E, Desk on](followups/211_r11_tiles_e_p45.png)
+![Tiles as E, Desk on](../followups/211_r11_tiles_e_p45.png)
 
 ## 2. Header icons in the glyph styles (K115)
 
@@ -1287,7 +1291,7 @@ A cluster's header values take UI Tweaks' **Header glyphs**: framed (Square, or 
 header, bare on a Band (the band is the group's colour, and a frame on it looked like a hole). Bare in
 UI Tweaks makes them bare everywhere.
 
-![Square frames on the cluster headers](followups/211_r11_glyphs_p45.png)
+![Square frames on the cluster headers](../followups/211_r11_glyphs_p45.png)
 
 ## 3. The two bugs on the glass
 
@@ -1296,8 +1300,8 @@ UI Tweaks makes them bare everywhere.
   runs straight down into the wall (the status panel) a sliver of the shadow showed in that corner.
   It is square there now.
 
-  ![Before](followups/211_r11_edge_shadow_before.png)
-  ![After](followups/211_r11_edge_shadow_after.png)
+  ![Before](../followups/211_r11_edge_shadow_before.png)
+  ![After](../followups/211_r11_edge_shadow_after.png)
 
 - **Fleet / Midnight, the accent line notched beside a panel's tab** - **not reproduced**: I opened
   the page slot and the status slot on the P4_5 and the 1060 and read the panels' own frame buffers
@@ -1323,24 +1327,24 @@ within 5% of the others. The P4_5's House page on the glass, and its Fleet page 
 the Fleet page's old 7-column pin taken off - at 14 units across no card can be both your smallest
 size and not too tall, so a 7-column pin makes it flow):
 
-![P4_5 House, v9](followups/211_r11_v9_house_p45.png)
-![P4_5 Fleet, v9: Free Heap and Uptime at 1.5 cells](followups/211_r11_v9_fleet_p45.png)
+![P4_5 House, v9](../followups/211_r11_v9_house_p45.png)
+![P4_5 Fleet, v9: Free Heap and Uptime at 1.5 cells](../followups/211_r11_v9_fleet_p45.png)
 
 Before, the 4B at five pinned rows (v8, your earlier dashboard on a test copy) - the strip at the foot:
 
-![4B, 5 rows, v8](followups/211_r11_4b_5rows_v8.png)
+![4B, 5 rows, v8](../followups/211_r11_4b_5rows_v8.png)
 
 The 1060 on v9, at your 7 x 5 pin (14 x 10 units, 110 ms): Outside centred on the top row, Doors and
 Thermo mirrored either side of it, each centred in the row's height - the layout you found by hand,
 now from the arranger:
 
-![1060, v9](followups/211_r11_v9_house_1060.png)
+![1060, v9](../followups/211_r11_v9_house_1060.png)
 
 The 4B on v9 (its compiled dashboard, since your Reset; unpinned, 12 x 7 units): Doors centred beside
 Outside. The stagger at the foot is the search's own placement - Office's two tiles stacked make it
 taller than Kitchen, and Bedroom and Garage sit under it - not the finish:
 
-![4B, v9](followups/211_r11_v9_house_4b.png)
+![4B, v9](../followups/211_r11_v9_house_4b.png)
 
 **Time**: the P4_5's House page unpinned, **49 ms** (3,601 steps; v8 took 1.95 s - the `big` term
 prunes most oversized card shapes before the search sees them); its Fleet page 140 ms. **The 4B's
@@ -1431,11 +1435,11 @@ The 4B, your House page, pinned (on your own settings, put back afterwards):
 
 | 4 x 3 | 4 x 5 |
 |---|---|
-| ![4B 4x3](followups/211_r12_4b_4x3.png) | ![4B 4x5](followups/211_r12_4b_4x5.png) |
+| ![4B 4x3](../followups/211_r12_4b_4x3.png) | ![4B 4x5](../followups/211_r12_4b_4x5.png) |
 
 | 4 x 6 (your pin) | 4 x 4 |
 |---|---|
-| ![4B 4x6](followups/211_r12_4b_4x6.png) | ![4B 4x4](followups/211_r12_4b_4x4.png) |
+| ![4B 4x6](../followups/211_r12_4b_4x6.png) | ![4B 4x4](../followups/211_r12_4b_4x4.png) |
 
 4 x 3, 4 x 5 and 4 x 6 now give the same page: three rows of clusters filling the screen, Doors and
 Thermo at either end. **4 x 4 fills the screen but unevenly** - Kitchen two units tall and seven
@@ -1457,7 +1461,7 @@ search counts empty units before the clusters grow, so it prefers filling the un
 
 | P4_5 | 1060 |
 |---|---|
-| ![P4_5 tiles](followups/211_r12_tiles_p45.png) | ![1060 tiles](followups/211_r12_tiles_1060.png) |
+| ![P4_5 tiles](../followups/211_r12_tiles_p45.png) | ![1060 tiles](../followups/211_r12_tiles_1060.png) |
 
 ## For the final pass (added to round 11's)
 
@@ -1520,7 +1524,7 @@ Auto had not run on round 12's firmware on the glass - I had seen it in the play
 
 Auto on your 4B now (12 x 6 units):
 
-![4B Auto](followups/211_r12b_4b_auto.png)
+![4B Auto](../followups/211_r12b_4b_auto.png)
 
 ## 2. One tile height a page
 
@@ -1534,7 +1538,7 @@ Midnight; the off disc still stands apart from it.
 
 | P4_5 | 1060 |
 |---|---|
-| ![P4_5](followups/211_r12b_p45.png) | ![1060](followups/211_r12b_1060.png) |
+| ![P4_5](../followups/211_r12b_p45.png) | ![1060](../followups/211_r12b_1060.png) |
 
 ## 3. Your notes on the above, and the tweak
 
@@ -1552,7 +1556,7 @@ Fleet perfect, Midnight and Linen a little strong; 1060: all a bit strong, Midni
 
 | P4_5 (Fleet) | 1060 (Linen) | 4B (Midnight) |
 |---|---|---|
-| ![P4_5](followups/211_r12b2_p45.png) | ![1060](followups/211_r12b2_1060.png) | ![4B](followups/211_r12b2_4b.png) |
+| ![P4_5](../followups/211_r12b2_p45.png) | ![1060](../followups/211_r12b2_1060.png) | ![4B](../followups/211_r12b2_4b.png) |
 
 ## For the final pass (added)
 
@@ -1631,7 +1635,7 @@ larger; the P4_5 and the 1060 on their own settings:
 
 | 4B | P4_5 | 1060 |
 |---|---|---|
-| ![4B](followups/211_r13_4b.png) | ![P4_5](followups/211_r13_p45.png) | ![1060](followups/211_r13_1060.png) |
+| ![4B](../followups/211_r13_4b.png) | ![P4_5](../followups/211_r13_p45.png) | ![1060](../followups/211_r13_1060.png) |
 
 ## Choices that were mine (round 13)
 
@@ -1816,11 +1820,11 @@ grid**, and `drawerTitle()` as a section title.
 
 | Page panel | System panel |
 |---|---|
-| ![page](followups/211_r14_page.png) | ![status](followups/211_r14_status.png) |
+| ![page](../followups/211_r14_page.png) | ![status](../followups/211_r14_status.png) |
 
 | Cluster: Details | Header slots | Add card to dashboard |
 |---|---|---|
-| ![details](followups/211_r14_details.png) | ![slots](followups/211_r14_slots.png) | ![join](followups/211_r14_join.png) |
+| ![details](../followups/211_r14_details.png) | ![slots](../followups/211_r14_slots.png) | ![join](../followups/211_r14_join.png) |
 
 ## Choices that were mine (round 14)
 
@@ -1856,7 +1860,7 @@ differences on all three. The P4_5 with Eric hidden (yours) - it fits, the heade
 
 | Page panel | Hidden cards |
 |---|---|
-| ![page](followups/211_r14b_page.png) | ![hidden](followups/211_r14b_hidden.png) |
+| ![page](../followups/211_r14b_page.png) | ![hidden](../followups/211_r14b_hidden.png) |
 
 ## Results (mine, before you)
 
@@ -1927,7 +1931,7 @@ Flashed to the three dev boards; the S3_4B compiled; settings 0 differences on a
 
 | Office: Members and CLUSTER | Header options | Doors: Members |
 |---|---|---|
-| ![cluster](followups/211_r16_cluster.png) | ![header options](followups/211_r16_header_options.png) | ![garage](followups/211_r16_garage.png) |
+| ![cluster](../followups/211_r16_cluster.png) | ![header options](../followups/211_r16_header_options.png) | ![garage](../followups/211_r16_garage.png) |
 
 ## The final pass (for you, round 16)
 
@@ -1948,3 +1952,7 @@ The cluster window's every path, once, on the P4_5 - then any one row on the 4B 
 | S11 | A member's Visibility: Hide from the cluster, then restore it from Members | it goes from the cluster and shows "Hidden" in Members; restored, it is a tile again |
 | S12 | Long-press Garage - Doors, Members tab | Garage North and Garage South as wide as Office's rows, satin, "Tap a member for details" under them |
 | S13 | Any light card's window | unchanged: its controls, Details view still in its Tap action |
+
+## Your results (round 16)
+
+S1-S13 **all PASS** (2026-10-30). **2.11 signed off.** Then the all-nine gate, the PR and `v0.2.19`.

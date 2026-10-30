@@ -190,8 +190,9 @@ rebuilds on every commit: all in `LESSONS.md` under Build system.
   since both share the P4 + ESP32-C6 hosted-WiFi architecture, and confirmed cosmetic (see that
   board's notes below for the full trace). This also settles the open question of whether each
   unit's C6 co-processor firmware might differ: two separate physical units now behave identically.
-- **Now the primary development target** — see `docs/ROADMAP.md` Q11. Every milestone builds for
-  this board and `CYD_S3_3248W535` (the fleet's weakest board) as a matched pair.
+- Was the primary development target (ROADMAP Q11). **Since 2026-10-20 the dev boards are
+  `WS_P4_5`, `WS_P4_4B` and `CYD_P4_1060`** (`WS_S3_4B` compile-only, #69); all nine build once
+  before each merge.
 - Nothing else board-specific outstanding — remaining items are fleet-wide, see above.
 
 ### WS_P4_5 — ESP32-P4-WIFI6-Touch-LCD-5
@@ -292,7 +293,8 @@ the 7B to be the better board for its features and its maker. Unexplained; nobod
 
 ### CYD_P4_4880 — Guition P4 4.3" portrait (JC4880P443C_I_W)
 
-**Added 2026-09-28, never flashed.** The owner's intended successor to `CYD_S3_3248` as the
+**Added 2026-09-28; flashed since (esp_lcd, 2 x 5 portrait signed off - `display/README.md`). On
+2026-10-30 it still ran v0.2.9-era firmware (COM19); `v0.2.19` goes on it after the merge.** The owner's intended successor to `CYD_S3_3248` as the
 small portrait board: native 480x800, 217 PPI (UI scale 1.28), ST7701 over 2-lane MIPI-DSI,
 esp_lcd only. Everything in its BSP came from `reference/Guition Examples/Guition-P4-JC4880P433/`
 (folder misnamed P433; the contents are the P443) - the schematic for pins, Guition's modified

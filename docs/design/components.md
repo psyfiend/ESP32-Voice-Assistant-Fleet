@@ -193,7 +193,8 @@ choice. `buttonRow()` adds a centred row of buttons after them (Tokens, Reset al
 **Two more kinds of row, and a grid (2.11 round 14).** A **check row** - no words, no slider
 (`words` null, `n` 0) - is a checkbox (`Kit::checkbox()`'s) in the chips' column, ticked when `lit`
 is 1; its change carries `(row << 8) | CHIP_CHECK`, `chipTableChecked()` reads it and
-`chipTableCheck()` sets it (a tick refused: the cluster's fifth header slot). A **words row**
+`chipTableCheck()` sets it (a tick refused; no client since K129 - a cluster's Header options are
+Members' rows, satin, glass while chosen). A **words row**
 (`says`) is words in the chips' column, the accent, nothing to tap ("Member of group:" and its
 name). `chipGrid(parent, w, words, n, lit, cb)` is chips one width wrapping in centred rows, the
 chosen one lit (`chipGridLit()`) - Add card to dashboard's group picker.
@@ -374,7 +375,7 @@ P4_5 and the 4B: no pixel moved on the pages (only fonts on status-row labels th
 the cluster's name (`KS_CLUSTER_TITLE`) on the left and the header's members' values on the right
 (`KS_CLUSTER_VALUE`, an icon in its tint beside each) - placed by the page header's planner of
 claims (`Layout/HeaderPlan.h`): the name a resident, each value a claim whose icon gives way first,
-the last slot first. In **Bar** style the row is the group's colour (a skirt squares its foot) and
+the last slot first. In **Band** style (saved `bar`) the row is the group's colour (a skirt squares its foot) and
 the words the surface's. **A mini tile** (`KS_TILE`, `KS_TILE_PRESSED`, `KS_TILE_NAME`) is a whole
 card drawn without a border: a state's lit disc (on: a solid disc in the active colour, or the
 light's own; off: the faint disc) or a value and its unit, its entity label under it; its badge and
@@ -428,7 +429,7 @@ only folds it. Forgotten when the sheet closes.
 
 | Client | What it adds to the frame |
 |---|---|
-| The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties, Card UI), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity; its own timeout, bar and selector look (Card UI, D-28) |
+| The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties, Card UI; a cluster's window opens on Members with the CLUSTER panel and Header options, K129), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity; its own timeout, bar and selector look (Card UI, D-28) |
 | "About this board" (`UI/AboutSheet`; every build, from the About button on the system panel, K74, #97; debug builds also `GET /popup?about=1`) | one view of fact rows - the board, its screen and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second; no tabs, no panels |
 | "UI Tweaks" (`UI/TweaksSheet`, 2.8 round 3; the system panel's UI Tweaks button, a swipe down on the left half, debug builds `GET /popup?tweaks=1`) | one view of choice rows, then Tokens and Reset all (asked in a dialog); what each row sets is `GUIManagerTweaks.cpp`'s; the deck rises beside it (`sheetBeside()`) |
 

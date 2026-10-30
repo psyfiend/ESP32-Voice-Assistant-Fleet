@@ -1,7 +1,7 @@
 # UI architecture - how the screen is built, and how to change it safely
 
-**Read this before any UI work.** It is the map as of `v0.2.18` (2026-10-17, milestone 2.8, the
-header bar v2), built on the foundation milestone 2.12 laid at `v0.2.13` without changing a pixel
+**Read this before any UI work.** It is the map as of `v0.2.19` (2026-10-30, milestone 2.11, group
+cards) and 2.8's header bar (`v0.2.18`), built on the foundation milestone 2.12 laid at `v0.2.13` without changing a pixel
 (`ui-foundation.md` is that milestone's record). The rules here are load-bearing; CLAUDE.md states each one briefly, this file says where
 each lives and how to work with it. What things look like: `components.md` (the kit, with pictures)
 and `tokens.md` (colours, sizes, type). What the card window is, view by view: `card-sheet.md`
@@ -35,10 +35,10 @@ whose stack is in internal RAM - the settings task.
 | a colour, a size, a font, a radius | `include/UI/UITokens.h` (`UIPalette`, `UIMetrics`, `UIShape`, `UIGrid`, `UIType`); values in `src/UI/UITokens.cpp`; why: `tokens.md` |
 | a component and its looks | `include/UI/Kit.h`; `src/UI/Kit/Kit<Name>.cpp`; the roles' styles in `KitStyles.cpp`; pictures in `components.md` |
 | the window frame | `include/UI/Sheet.h`, `src/UI/Kit/KitSheet.cpp` (frame, auto-close, the tap catcher), `KitSheetPanels.cpp` (the two folder panels), `KitSparks.cpp` |
-| the card window's contents | `src/Cards/CardPopup.cpp` (the client: tabs, views, open/close) and `src/Cards/Popup/` - one file per concern, sharing `PopupState.h`: controls and the light hero (`PopupControls`, `PopupLight`, `PopupDeck`), `PopupScenes`, `PopupMembers`, History (`PopupHistory`, `...Chart`, `...Activity`), `PopupProps`, `PopupCardUi` (Card UI, 2.8 round 3), a cluster's window `PopupCluster` (2.11, K104), Visibility, Add to a cluster and "which group?" `PopupVisibility` (2.11, K96), the panels' rows (`PopupSettingsRows`, `PopupSideRows`, `PopupPanels`), `PopupDialog` (Hide, Remove this copy), the hold (`PopupHold`), helpers (`PopupCommon`), and the PC's handles (`PopupDebug`, `PopupTree`) |
+| the card window's contents | `src/Cards/CardPopup.cpp` (the client: tabs, views, open/close) and `src/Cards/Popup/` - one file per concern, sharing `PopupState.h`: controls and the light hero (`PopupControls`, `PopupLight`, `PopupDeck`), `PopupScenes`, `PopupMembers`, History (`PopupHistory`, `...Chart`, `...Activity`), `PopupProps`, `PopupCardUi` (Card UI, 2.8 round 3), a cluster's window `PopupCluster` (2.11, K104, K129: it opens on Members, with the CLUSTER panel - Rename cluster, Header options, Add cards), Visibility, Add to a cluster and "which group?" `PopupVisibility` (2.11, K96), the panels' rows (`PopupSettingsRows`, `PopupSideRows`, `PopupPanels`), `PopupDialog` (Hide, Remove this copy), the hold (`PopupHold`), helpers (`PopupCommon`), and the PC's handles (`PopupDebug`, `PopupTree`) |
 | typing words (a name) | `Kit::keyboard()`, `src/UI/Kit/KitKeyboard.cpp` (2.11, K95); `components.md` "Keyboard" |
 | a card hidden from its page, a copy in a cluster | `Cards/CardAdded` (`hide()`, `restore()`, `pool()`; `addTo()`, `membersIn()`); the page's list in `src/UI/SlotPanels.cpp`, filled in `GUIManagerHeader.cpp`; the development Reset (2.11 round 9) `CardAdded::resetToCompiled()`, run by `GUIManager::resetDashboard()` from the system panel |
-| where cards go on a page | `include/Layout/Layout.h` (`FlowEngine`), `src/Cards/CardPage.cpp`; the engines to come: `layout-engines.md` |
+| where cards go on a page | `include/Layout/Layout.h` (`FlowEngine`), `src/Cards/CardPage.cpp`; the arranger (below); the engines: `layout-engines.md` |
 | a group card, a cluster and its mini tiles (2.11) | the spec: `CardSpec::members` / `present` / `slots` (`PageSpec.h`), the House page's in `Dashboard_HA.h`; built by `CardPage::makeGroupCard()`; drawn by `Cards/ClusterCard` and `Cards/MiniTile.cpp`; the arithmetic `include/Layout/Cluster.h` (host-tested); `group-cards.md` §6-7 |
 | the arranger (#78, K105) | `include/Layout/Arranger.h` (pure, host-tested against the playground), `Cards/PageArranger` (kept answers, the background run), `CardPage::arrangePage()`; `layout-engines.md` "As built" |
 | the halo round panels and windows (D-35) | `Kit::haloAttach()`, `src/UI/Kit/KitHalo.cpp`; the panel on the bar `Kit::drawerOverBar()` in `KitDrawer.cpp` |
@@ -143,10 +143,10 @@ sweep:
   (`Panel_System`, `Panel_Display`, `Panel_Audio`, `LogPage`, `ReferencePage`), `UIToolkit`, the
   status widgets (whose 34 colour literals are most of what the check reports).
 
-## 7. What 2.11 will ask of this structure
+## 7. What 2.11 asked of this structure, and what comes next
 
-The finishes (#99, `v0.2.16`) and the follow-ups (`v0.2.15`) are done, and 2.8 left no look
-question open. **Group cards (2.11)** are the next pressure on it: a cluster is a container inside
-an item, placed by an engine run on its own sub-grid (`layout-engines.md`); its header is meant to
-be the page header's slots and planner again (`cards.md` §8, `Layout/HeaderPlan.h`); and its
-members are cards without their own borders - which is where the cards should come onto the kit.
+**Group cards (2.11, `v0.2.19`)** were built on it: a cluster is a container inside an item, placed
+by the arranger on its own sub-grid (`layout-engines.md`); its header is the page header's planner
+and claims again (`cards.md` §8, `Layout/HeaderPlan.h`); its members are borderless mini tiles on
+roles; its window is a Sheet client like the card's (K129). The next pressure is **2.13's group
+view and Add cards from HA, and 2.14's alerts on the header claim model** (K130).

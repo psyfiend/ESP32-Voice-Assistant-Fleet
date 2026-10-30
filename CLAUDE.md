@@ -489,7 +489,8 @@ place (left, middle, right) and an entity - per slot, `PageSpec::headerSlots` (e
 Each kind is a build and an update in `Panel_Header.cpp`'s table, its panel in `SlotPanels.cpp` on
 `Kit::Drawer` (the status slot's is the system panel). A new kind is a new entry, never layout code.
 The glyph style (`system.header.glyphs`) and a page's header shown / hidden (`pages.<slug>.header`)
-are saved settings. Cluster headers (2.11) are meant to reuse the same slots (`cards.md` §8).
+are saved settings. Cluster headers (2.11) reuse the same planner and claims (`Cards/ClusterCard`, `cards.md` §8); a
+cluster's sensors are chosen in its window's Header options (K129).
 
 **A card that is on says so by its card state** (2.8, D-30 to D-33): Fill, Icon glow, Bracket or
 **Corner cut, the default** - a UI Tweaks choice, saved. The frames are **drawn in the surface's

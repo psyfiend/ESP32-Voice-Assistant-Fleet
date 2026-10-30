@@ -1,8 +1,11 @@
-# Layout engines - where cards go (design for 2.11)
+# Layout engines - where cards go (the arranger built in 2.11)
 
-2.12 (P5) built the interface and the one engine the dashboard has always had; this file is the
-design 2.11 builds on it. The interface is decided (DECISIONS D-10); **the engines below are
-proposals for the design interview**, not decisions. Moved here from `ui-foundation.md` §8 on
+2.12 (P5) built the interface and the one engine the dashboard has always had (`FlowEngine`); 2.11
+(`v0.2.19`) built **the arranger**, `Layout::arrange()` (K105-K126, below from "The arranger"). The
+interface is decided (DECISIONS D-10). **The other engines below - packing, hero region, domain
+weight, orbital - are proposals, not built.** The boards search 7,000 steps a pass per grid
+(`Layout::ARR_BUDGET_BOARD`, round 13, K126; `?arranger=budget`), the host tests the playground's
+20,000; kept answers are `v4`. Moved here from `ui-foundation.md` §8 on
 2026-10-14, with the owner's first hero cards added.
 
 ## The interface (built, 2.12)
@@ -251,7 +254,7 @@ are `v3`: the search's places only; the finish is worked out again at each build
 
 ### Round 12 (2026-10-26): clusters grow first - K121
 
-The owner's notes on the 4B (`TEST_2.11.md` round 12). Playground page v12, ported:
+The owner's notes on the 4B (`archive/TEST_2.11.md` round 12). Playground page v12, ported:
 
 - **Clusters grow into the spare height before anything is spread**: each band holding a cluster
   takes an equal share of the page's spare height, each cluster in it growing to its band's height

@@ -514,8 +514,8 @@ anything; each says where it lands.
 - **The Card label row is greyed** until its redesign (K48): Current group / None / Custom, with a
   name window. With it, the owner's notes from 2.10d: moving a card to another group gets its own
   row and window (a list of groups, each openable to its members - "change the label" or "move
-  into a group panel"); and the three things now called "group" need names of their own - the
-  shared label, a group card like Desk, a group panel on the dashboard (`group-cards.md`, 2.11).
+  into a group panel"); and the three things called "group" now have names of their own (K88:
+  group, group card, cluster - `group-cards.md` §6.1, built in 2.11).
   Also from those notes: NINA-style toasts, scene secondary info (#89), names and groups from the
   web UI (#87), and the Selector look as a device-wide choice on the settings page (4.1).
 

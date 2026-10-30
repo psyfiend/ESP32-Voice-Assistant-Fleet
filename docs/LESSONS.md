@@ -1011,3 +1011,18 @@ while HA started). **Any CPU-bound task that does not block - a search, an encod
 goes at priority 0, or yields (`vTaskDelay(1)`) at least every second.** And a check "on glass"
 of a page the owner had pinned does not prove its unpinned search: the 4B's Auto had not run on
 round 12's firmware until he pressed it.
+
+## A panel that changes while open: animate the part that changes (2.11 round 15, 2026-10-29)
+
+The page panel's HEADER words had to appear the moment Hide was tapped. Round 15 showed the line and
+re-measured the open panel with the drawer's own opening slide - which moves the whole face, top
+included, so every tap made the panel jump up and slide down again. The owner saw it at once; it
+cost a round. Round 15b animates **the line's own height** (0 to its full height, a label clips its
+text to its height) and sets the panel's foot to the face's height each frame, the face held at the
+top (`Kit::drawerReveal()`). **When something inside an open container appears or goes, animate
+that thing; the container follows its content.** An animation built to open a container is the
+wrong tool for resizing one.
+
+Its neighbour, found in round 16 before it cost anything: **a kit component may find its own parts
+by child index** - `Kit::chipTable()` finds row N as its Nth child - so never add children to one
+built by the kit. Put the component and the extras in a column of your own.

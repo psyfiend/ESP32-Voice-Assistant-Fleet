@@ -123,7 +123,7 @@ DECISIONS D-11 to D-15.
 6. **Cheap to keep**: the clock redraws only when its minute changes, a slot only when its value
    does - one slot's area, never the bar or the screen (#19).
 
-Cluster headers come with 2.11; the notification queue with #76.
+Cluster headers were built in 2.11 (`v0.2.19`; K115, K129); the notification queue is #76 (2.14).
 
 ## 9. Round 1 on glass, and the owner's reaction (2026-10-15)
 
@@ -315,4 +315,4 @@ short of the walls, then draws the halo where it falls on the bar - round the pa
 the open slot's tab above the line only. **The halo is painted**: LVGL's shadow (5 mm, spread half)
 cost +45 ms on a full redraw with a window open on the P4_5 and banded; dithered A8 images cost ~28 ms
 and do not (`Kit::haloAttach()`, `UI/Kit/KitHalo.cpp`; `components.md`; LESSONS). It takes the place of
-Linen's lift on panels and windows. The owner's sheet: `docs/TEST_2.11.md` round 1.
+Linen's lift on panels and windows. The owner's sheet: `docs/archive/TEST_2.11.md` round 1.
