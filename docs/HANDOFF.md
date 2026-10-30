@@ -1,4 +1,4 @@
-# Handoff — 2026-10-30, night (2.11 signed off, `v0.2.19` at the owner's merge; next: 2.13 and 2.14, designed with Home Assistant)
+# Handoff — 2026-10-30, night (2.11 released as `v0.2.19`; next: 2.13 and 2.14, designed with Home Assistant)
 
 **Start here.** This file is only: what to read, where we are, what to do next, what will bite you,
 and how to work with the owner. The history of how things got here is in the test sheets
@@ -33,7 +33,8 @@ decision to `DECISIONS.md`; a number to the doc that owns it. This file is rewri
 
 **2.11 is finished.** The owner signed it off on 2026-10-30 after sixteen rounds and 54 builds
 (`docs/archive/TEST_2.11.md`). It is **`v0.2.19`**: [PR #113](https://github.com/psyfiend/ESP32-Voice-Assistant-Fleet/pull/113)
-from `feat/2.11-group-cards` (all nine built, 32:36) is open for the owner to merge; the tag goes on the merge commit (below). The release before was `v0.2.18`
+from `feat/2.11-group-cards` (all nine built, 32:36), merged 2026-10-30 and tagged on the merge
+commit `5f174f2`. The release before was `v0.2.18`
 (2.8, the header bar v2). `CHANGELOG.md` matches every version to its milestones.
 
 **Lines of code** - the project's own C/C++ (`src/`, `include/`, its own `components/`; generated
@@ -90,18 +91,22 @@ arranger**: the playground first, then `host-tests/README.md`'s steps; the board
 
 ## What is next
 
-1. **The release, once the owner has merged** (he said he would on 2026-10-31): `git checkout main`,
-   `git pull`, tag the merge commit `git tag -a v0.2.19 -m "v0.2.19 - 2.11 group cards"`, push the
-   tag (`git push origin v0.2.19`). Then **build after the tag** (the version comes from
-   `git describe`, so an image built before it says `0.2.18.N`) and flash, saving each board's
-   settings first (`flash_release.ps1` does both for the three dev boards; it builds from the local
-   `platformio.ini`, their `DEBUG_POPUP` lines included). **And the 4880** (owner, 2026-10-30): it
-   still runs v0.2.9-era firmware, older than the settings file (`v0.2.11`), so there is nothing to
-   save - check `GET /settings` anyway; its first boot formats the blank partition (A17). Read
-   `HARDWARE_STATUS.md` and `docs/archive/TEST_CYD_P4_4880.md` before flashing it (COM19, native
-   USB; it browns out on the PC's USB alone - the LiPo must be in). Confirm each board's version in
-   `/settings?stats=1` or HA's `sensor.<device>_firmware`-style entity, not the cable.
-2. **A short ROADMAP rewrite with the owner.** Settled with him 2026-10-30: **2.13 is "Add cards from
+1. **`v0.2.19` is on the desk** (2026-10-30): the P4_5, the 4B and the 1060 by `flash_release.ps1`
+   (settings saved first, 0 differences after), the 4880 by hand (app-only at 0x10000 after checking its partition table
+   matched; it booted on the PC's USB alone, no LiPo; its old empty SPIFFS was erased so the
+   settings could mount - `HARDWARE_STATUS.md`). **`flash_release.ps1` builds
+   from the committed `platformio.ini`** (it stashes the local lines so the version has no `+dirty`),
+   so the three dev boards run **without `DEBUG_POPUP`**: the `/popup` routes come back with the next
+   test build from the local file. A board the script does not cover is built from a clean
+   worktree at the tag (`git worktree add --detach ../wt<board> v0.2.19`, a short path: the scratchpad's is too long for the deepest files; `components/` and the
+   secrets come from this checkout through the absolute symlinks),
+   which leaves the owner's `platformio.ini` alone.
+2. **The issue tracker, brought back into use** (owner, 2026-10-30: "we stopped looking at it"):
+   on the release #66, #78, #53, #54 and #44 were closed; #90 is unblocked (HA's names are tidied).
+   Partly done and worth retitling to what is left: #74 (the RTC fallback), #80 (the file-folder
+   tag), #88 (the LVGL 9.6 check), #23 and #92. **2.13 has no issue yet** - open one when its
+   design starts, and keep a milestone's issue current as rounds land.
+3. **A short ROADMAP rewrite with the owner.** Settled with him 2026-10-30: **2.13 is "Add cards from
    HA" and 2.14 is alerts (#76)**, designed together (DECISIONS K130). Proposed and leaning yes, to
    settle then: **Phase 3 (the build sheet, 3.1-3.3) after 4.3 (the navbar) and the alerts**, since
    the settings file is already the runtime schema and what a schema most needs to say - the navbar,
@@ -114,9 +119,9 @@ arranger**: the playground first, then `host-tests/README.md`'s steps; the board
    weather entity: forecasts come from the `weather.get_forecasts` service now, not attributes; the
    History the cards already fetch). The proposal made to him: 2.13, then the clock with OTA and
    dimming, then 2.14, then the navbar, then the schema.
-3. **The 2.13 / 2.14 design interview** - like 2.11's §4 (`interview-phase2-3.md`), mocks first,
+4. **The 2.13 / 2.14 design interview** - like 2.11's §4 (`interview-phase2-3.md`), mocks first,
    with the Home Assistant side in the same conversation (next section). Then build 2.13.
-4. Waiting: **#104** (a light's temperature mark moves between builds); **#84** "no data yet";
+5. Waiting: **#104** (a light's temperature mark moves between builds); **#84** "no data yet";
    **#99's S3 frame check** (W6) once an S3 is on the desk; the header clock's format (interview §3
    Q3); from 2.11's final pass, a header panel's temperature opening its History and a cluster's own
    card state (ROADMAP 5a).
@@ -176,9 +181,10 @@ process (`logical/house_logical.py`, regenerate, `tools/config_snapshot.py`, a b
 anything irreversible, `HOUSE_RULES.md` §6) - or writes its asks for an HA session. Until he says,
 read only.
 
-**HA's state** (its `ROADMAP.md`): the Tuya Wi-Fi switches are all unavailable - among them **Office
-Light Overhead**, the garage overhead, the laundry and porch lights; the owner is fixing it. Test
-with the Office's Desk, Left and Lamp meanwhile. Kitchen Leak Left is offline.
+**HA's state** (its `ROADMAP.md`): the Tuya integration's Wi-Fi devices are unavailable - the garage
+overhead, the laundry and porch lights among them; the owner is fixing it. **Office Light Overhead
+is a standalone Zigbee relay, not Tuya** (owner, 2026-10-30), and is available again. Kitchen Leak
+Left is offline.
 
 ## Where the design interview stands
 
@@ -212,12 +218,12 @@ Glyphs", "Fleet Status Glyphs" - links in the design docs.
 | `WS_P4_4B` | COM7 (CH343 `5AAF289419`) | P4 rev v1.0; local `DEBUG_POPUP`. **It boot-looped once on a software restart too** (round 11): restore with `-NoReboot`, then `esptool ... -p COM7 --after watchdog-reset read-mac` |
 | `CYD_P4_1060` | COM9 (native USB, serial `30:ED:A0:E3:2C:7B`) | needs two cables; local `DEBUG_POPUP`. **Flash at 460800 with `--after watchdog-reset`** (LESSONS). **A software restart can boot-loop it** (its Wi-Fi co-processor): put a settings copy back with `-NoReboot`, then `esptool ... --after watchdog-reset read-mac` (LESSONS, round 9) |
 | `WS_P4_7B` | COM6 (native USB) | needs two USB cables or it browns out on boot |
-| `CYD_P4_4880` | COM19 (native USB) | LiPo fitted; browned out on the PC's USB alone. **Still on v0.2.9-era firmware**; the owner wants `v0.2.19` on it |
+| `CYD_P4_4880` | COM19 (native USB) | `v0.2.19` since 2026-10-30, booted without its LiPo that time (it once browned out on the PC's USB alone); host `fleet-cyd-p4-4880` |
 | `WS_S3_4B` | COM8 (CH343 `5A67166678`) | **locked up** (#69); compile it as the S3 check, never flash it until the owner says |
 | `CYD_S3_3248` | - | USB broken (2026-09-28) |
 | `CYD_S3_8048`, `WS_S3_5B` | - | not plugged in |
 
-The P4_5, the 4B and the 1060 run 2.11 round 16 (the `v0.2.19` code, built before the tag); the rest
+The P4_5, the 4B, the 1060 and the 4880 run `v0.2.19` (`0.2.19.0`, no debug lines); the rest
 `v0.2.18` or older. Their dashboards are as the owner left them after his final pass: the P4_5's
 House pinned 5 x 4, the 4B's 4 x 5 with Thermo hidden, the 1060's House 5 x 5 on Linen; window close
 off on all three. Settings copies from every flash: `bench/settings/<board>/2026*.json`. Hosts:
@@ -335,7 +341,7 @@ by colour alone.
 time - instrument it or ask the far end; claiming a script worked because it printed something.
 
 **Real lights (W9):** any Office light may be commanded while testing, put back as found; ask
-before the Kitchen. (The Office Overhead is unavailable in HA until the Tuya fix.)
+before the Kitchen.
 
 **Versioning (W3):** `v0.<phase>.<release>`; the release counts signed-off merges to `main` that
 change the firmware (a docs-only merge is not tagged). **`v0.2.19` is 2.11; the next is `v0.2.20`.**

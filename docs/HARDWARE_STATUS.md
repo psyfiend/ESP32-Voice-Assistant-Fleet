@@ -293,8 +293,12 @@ the 7B to be the better board for its features and its maker. Unexplained; nobod
 
 ### CYD_P4_4880 — Guition P4 4.3" portrait (JC4880P443C_I_W)
 
-**Added 2026-09-28; flashed since (esp_lcd, 2 x 5 portrait signed off - `display/README.md`). On
-2026-10-30 it still ran v0.2.9-era firmware (COM19); `v0.2.19` goes on it after the merge.** The owner's intended successor to `CYD_S3_3248` as the
+**Added 2026-09-28; flashed since (esp_lcd, 2 x 5 portrait signed off - `display/README.md`). Runs
+`v0.2.19` since 2026-10-30 (COM19); it booted on the PC's USB without its LiPo.** Its first boot
+could not mount the settings: the `spiffs` partition held an empty SPIFFS from older firmware (block
+headers only, no files), and A17 leaves a partition with anything in it alone. Erased with the
+owner's yes (`esptool erase-region 0xc90000 0x360000`, a copy kept first); the next boot formatted
+it and saves. Any board coming from firmware older than `v0.2.11` may need the same. The owner's intended successor to `CYD_S3_3248` as the
 small portrait board: native 480x800, 217 PPI (UI scale 1.28), ST7701 over 2-lane MIPI-DSI,
 esp_lcd only. Everything in its BSP came from `reference/Guition Examples/Guition-P4-JC4880P433/`
 (folder misnamed P433; the contents are the P443) - the schematic for pins, Guition's modified
