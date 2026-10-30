@@ -132,11 +132,7 @@ Kit::Selector s_hdrSel;
 lv_obj_t *s_hdrNote = nullptr;   // HEADER's words: shown the moment Hide is chosen (round 15)
 void hdrChosen(uint8_t i) {
     if (s_ctx.setHeaderShown) s_ctx.setHeaderShown(s_ctx.user, i == 0);
-    if (s_hdrNote) {
-        if (i == 0) lv_obj_add_flag(s_hdrNote, LV_OBJ_FLAG_HIDDEN);
-        else        lv_obj_remove_flag(s_hdrNote, LV_OBJ_FLAG_HIDDEN);
-        Kit::drawerRefit(lv_obj_get_parent(s_hdrNote));
-    }
+    Kit::drawerReveal(s_hdrNote, i != 0);
 }
 
 // THIS PAGE'S HIDDEN CARDS (2.11, K66, K96 - the mock's "this page's list of

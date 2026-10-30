@@ -1887,3 +1887,15 @@ three dev boards; the S3_4B compiled; settings 0 differences on all three.
 | # | Do this | PASS if |
 |---|---|---|
 | R12 | The page panel, the header shown: tap Hide, then Show | Hide: "When hidden, swipe down..." appears at once and the panel grows to hold it; Show: it goes and the panel shrinks back |
+
+**Round 15b (your R12 note)**: the whole panel jerked on every tap - the refit slid the face from
+the top again. Now only the line moves: it grows down from nothing (Hide) or closes up (Show) over
+the slide's 350 ms, the panel's foot and the HIDDEN section following it, and everything above it
+stays still (`Kit::drawerReveal()`, replacing `drawerRefit()`). A tap mid-slide turns it round.
+Flashed to the three dev boards; the S3_4B compiled. Settings: 0 differences on the 4B and the
+1060; on the P4_5 House's header is hidden (your R12 test, left as you had it) and its kept layout
+was re-keyed for the taller page on boot - the same placement.
+
+| # | Do this | PASS if |
+|---|---|---|
+| R13 | The page panel: tap Hide, then Show, then both quickly | PAGES and HEADER never move; the line unrolls downward and rolls back up, HIDDEN and the panel's bottom edge riding with it |

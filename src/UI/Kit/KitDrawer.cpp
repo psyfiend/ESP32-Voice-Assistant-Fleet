@@ -405,20 +405,64 @@ void drawerOpen(Drawer &d) {
     animate(d, h);
 }
 
-// Measured as drawerOpen() measures it; the face rides the foot as it slides.
-void drawerRefit(lv_obj_t *face) {
-    for (uint8_t i = 0; i < s_drawerN; i++) {
-        Drawer &d = *s_drawers[i];
-        if (d.face != face || !d.open || !d.root) continue;
-        lv_obj_update_layout(d.face);
-        int32_t h = lv_obj_get_height(d.face);
-        const int32_t avail = lv_obj_get_height(lv_screen_active()) - d.top - UI::sc(UI::hdr().DRAWER_PAD);
-        if (h > avail) h = avail;
-        if (h == d.openH) return;
-        d.openH = h;
-        animate(d, h);
+// The panel's foot follows its face, the face held at the top (round 15b, the
+// owner: re-sliding the whole face made the panel jerk on every Show / Hide).
+static void fitToFace(Drawer &d) {
+    lv_obj_update_layout(d.face);
+    int32_t h = lv_obj_get_height(d.face);
+    const int32_t avail = lv_obj_get_height(lv_screen_active()) - d.top - UI::sc(UI::hdr().DRAWER_PAD);
+    if (h > avail) h = avail;
+    d.openH = h;
+    lv_obj_set_y(d.face, 0);
+    lv_obj_set_height(d.root, h);
+}
+
+static void revealStep(lv_anim_t *a, int32_t v) {
+    lv_obj_set_height((lv_obj_t *)a->var, v);
+    Drawer *d = (Drawer *)lv_anim_get_user_data(a);
+    if (d && d->open && d->root) fitToFace(*d);
+}
+
+static void revealDone(lv_anim_t *a) {
+    lv_obj_t *obj = (lv_obj_t *)a->var;
+    if (a->end_value == 0) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_height(obj, LV_SIZE_CONTENT);
+    Drawer *d = (Drawer *)lv_anim_get_user_data(a);
+    if (d && d->open && d->root) fitToFace(*d);
+}
+
+void drawerReveal(lv_obj_t *obj, bool show) {
+    if (!obj) return;
+    Drawer *d = nullptr;
+    for (uint8_t i = 0; i < s_drawerN && !d; i++)
+        for (lv_obj_t *p = lv_obj_get_parent(obj); p; p = lv_obj_get_parent(p))
+            if (p == s_drawers[i]->face) { d = s_drawers[i]; break; }
+    lv_anim_delete(obj, nullptr);
+    const bool hidden = lv_obj_has_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    if (!d || !d->open) {   // nothing on screen to slide: just the flag
+        if (show) lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN);
+        else      lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_height(obj, LV_SIZE_CONTENT);
         return;
     }
+    // From where it stands (a tap mid-slide turns it round) to its full height or 0.
+    int32_t from = hidden ? 0 : lv_obj_get_height(obj);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_height(obj, LV_SIZE_CONTENT);
+    lv_obj_update_layout(obj);
+    const int32_t full = lv_obj_get_height(obj);
+    if (from > full) from = full;
+    lv_obj_set_height(obj, from);
+    lv_anim_t a;
+    lv_anim_init        (&a);
+    lv_anim_set_var     (&a, obj);
+    lv_anim_set_user_data(&a, d);
+    lv_anim_set_values  (&a, from, show ? full : 0);
+    lv_anim_set_duration(&a, SLIDE_MS);
+    lv_anim_set_custom_exec_cb(&a, revealStep);
+    lv_anim_set_path_cb (&a, lv_anim_path_ease_out);
+    lv_anim_set_completed_cb(&a, revealDone);
+    lv_anim_start       (&a);
 }
 
 void drawerClose(Drawer &d, bool anim) {
