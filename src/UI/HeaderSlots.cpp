@@ -13,7 +13,7 @@ using Layout::KEEP_ALWAYS;
 // left to right.
 const SlotSpec HEADER_DEFAULT[] = {
     { SlotKind::SLOT_CLOCK,  HeaderPlace::PLACE_LEFT,   nullptr },
-    { SlotKind::SLOT_SENSOR, HeaderPlace::PLACE_LEFT,   "outside_deck_temp" },
+    { SlotKind::SLOT_SENSOR, HeaderPlace::PLACE_LEFT,   "outdoor_temp" },
     { SlotKind::SLOT_PAGE,   HeaderPlace::PLACE_MIDDLE, nullptr },
     { SlotKind::SLOT_ALARM,  HeaderPlace::PLACE_RIGHT,  nullptr },
     { SlotKind::SLOT_AP,     HeaderPlace::PLACE_RIGHT,  nullptr },

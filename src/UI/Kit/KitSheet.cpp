@@ -185,17 +185,19 @@ bool     windowBarShown() { return barSetting(); }
 // window. Created last, so it is above the header, the deck and the drawer; a
 // page rebuild moves only the cards to the back.
 //
-// The scheme's raised surface and border (KS_SHEET_FACE), and its lift - a real
-// shadow on Linen, nothing on the dark schemes (owner, L2). No clip_corner: it
-// would cost a window-sized layer (card-sheet 8). Clickable, so a tap inside
-// never reaches the catcher.
+// The scheme's raised surface and border (KS_SHEET_FACE), and THE HALO (D-35,
+// 2.11): every window floats over the page on a black rim fading to clear, in
+// place of the scheme's lift (Linen's shadow). No dim (its cost: a full-screen
+// redraw to open and one to close, 2.10a). No clip_corner: it would cost a
+// window-sized layer (card-sheet 8). Clickable, so a tap inside never reaches
+// the catcher.
 static void makeWindow(Sheet &S) {
     S.win = plain(lv_screen_active());
     lv_obj_add_flag(S.win, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_pos (S.win, S.winRect.x1, S.winRect.y1);
     lv_obj_set_size(S.win, lv_area_get_width(&S.winRect), lv_area_get_height(&S.winRect));
     add(S.win, KitStyle::KS_SHEET_FACE);
-    lv_obj_add_style(S.win, UI::paint(UIPaint::PAINT_LIFT), 0);
+    haloAttach(S.win);
 }
 
 // D6's drag down, on the HEADER ROW only (card-sheet 13): the light's tall
@@ -470,6 +472,7 @@ static void closeAsync(void *p) {
     if (!S->win) return;
     const SheetSpec *spec = S->spec;
     if (spec && spec->closing) spec->closing();
+    keyboardClose();   // words being typed for the window go with it, unsaved
     if (S->timer) { lv_timer_delete(S->timer); S->timer = nullptr; }
     sparksEnd();
     sheetSideEnd(*S);

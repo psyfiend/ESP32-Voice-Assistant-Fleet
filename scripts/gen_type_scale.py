@@ -157,6 +157,14 @@ SCALE = {
     # had on WS_P4_5 before it was looked at. The glass decides.
     "WS_P4_4B": {"*": 0.85, "TAG": 1.00},
     "WS_S3_4B": {"*": 0.85, "TAG": 1.00},
+
+    # HEADER UP ON THE 7" BOARDS (owner, 2026-10-19, D-34): the 7B's header words
+    # are "notably smaller" than the P4_5's and the 4B's, as the P4_5's were
+    # before D-26. At 170 PPI the TAG target lands on 14 px (2.09 mm); one step
+    # up, 16 px (2.39 mm), to judge on glass in 2.11 round 1 (the 1060). The
+    # tags stay 14.
+    "WS_P4_7B":    {"HEADER": 1.26},
+    "CYD_P4_1060": {"HEADER": 1.26},
 }
 
 

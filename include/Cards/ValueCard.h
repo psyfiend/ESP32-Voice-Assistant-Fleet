@@ -47,6 +47,11 @@ protected:
     void render() override;
 
 private:
+    // As a cluster's MINI TILE (2.11, K89): the value and its unit, its entity
+    // label under them. Cards/MiniTile.cpp.
+    void buildMiniBody(lv_obj_t *body);
+    void renderMini();
+
     // A vertical stack. Nothing here is positioned against anything else -
     // every hand-alignment in the previous version resolved against a position
     // layout had not computed yet. See the .cpp.

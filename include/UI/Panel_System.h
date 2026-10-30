@@ -78,11 +78,25 @@ public:
 
     // The 2.5 GRID KNOBS - counts, not nudges; "A" (auto) past the ends. One
     // callback carrying a code: this panel is a remote control and knows
-    // nothing of what a column is.
-    enum class GridAction : uint8_t { CARD_W_DOWN, CARD_W_UP, ASPECT_DOWN, ASPECT_UP };
+    // nothing of what a column is. Since 2.11 round 9 a count is a PIN the
+    // arranger keeps, and GRID_AUTO takes both pins away (the arranger chooses).
+    enum class GridAction : uint8_t { CARD_W_DOWN, CARD_W_UP, ASPECT_DOWN, ASPECT_UP, GRID_AUTO };
     using GridCallback = std::function<void(GridAction)>;
     void setOnGridAction(GridCallback cb) { _onGridAction = cb; }
     void requestGrid(GridAction a) { if (_onGridAction) _onGridAction(a); }
+    // The page's grid in words ("4 x 2, pinned", "auto"), asked when the panel
+    // is built and again by refreshGrid() after a change.
+    using GridText = std::function<void(char *out, size_t n)>;
+    void setGridText(GridText cb) { _gridText = cb; }
+    void refreshGrid();
+
+    // THE DEVELOPMENT RESET (2.11 round 9): SYSTEM - DIAGNOSTICS' Reset and the
+    // dialog that asks first - `detail` is its count of what goes ("brief", "as
+    // built" / "5 changes", for a line when there is room for one).
+    using DashText = std::function<void(char *brief, size_t nBrief, char *detail, size_t nDetail)>;
+    void setDashboard(DashText text, Action onReset) { _dashText = text; _onDashReset = onReset; }
+    void askDashReset();         // the dialog
+    void confirmDashReset();     // its Reset: the panel closes, GUIManager resets
 
     // CONNECTIVITY's sources: the two glyphs' managers, and its three lines'
     // words - Wi-Fi, Home Assistant, MQTT - asked once a second while it shows.
@@ -125,6 +139,10 @@ private:
     Kit::Drawer _drawer;
     lv_obj_t *_ui_content = nullptr;                 // the drawer's face
     lv_obj_t *_connVal[3] = {};                      // Wi-Fi, HA, MQTT: their words
+    lv_obj_t *_gridVal = nullptr;                    // the page's grid, in words
+    GridText  _gridText;
+    DashText  _dashText;
+    Action    _onDashReset;
     Kit::Selector _schemeSel;
     Widget_ConnStatus _wifiGlyph;
     Widget_MqttStatus _linkGlyph;

@@ -16,7 +16,6 @@ namespace popup {
 uint8_t s_dbgRows = 0;                  // GET /popup?rows=N: test rows added to SETTINGS
 #endif
 
-void pauseCheckCb(lv_event_t *ev);
 void groupDropCb(lv_event_t *ev);
 
 // The card's group, from a PC (/popup?clabel=N): HA area / the dashboard's
@@ -67,13 +66,15 @@ uint16_t tapRowBuild(const Card &c) {
     };
     const Entity *sc[ENTITY_SCENES_MAX];
     if (c.tapToggles()) add(TapAction::TAP_TOGGLE, "Toggle");
-    add(TapAction::TAP_DETAILS, "Details view");
+    // A cluster has no Details view (round 16): its window is Members.
+    if (!s.cluster)     add(TapAction::TAP_DETAILS, "Details view");
     if (hasMembers())   add(TapAction::TAP_MEMBERS, "Members view");
     add(TapAction::TAP_HISTORY, "History view");
     // One line for both (owner, 2026-10-13): which one is SCENES' Scene action.
     if (c.offeredScenes(sc, ENTITY_SCENES_MAX)) add(sceneActionOf(c), "Scenes...");
     add(TapAction::TAP_NOTHING, "Nothing");
-    const TapAction cur = tapShown(c);
+    TapAction cur = tapShown(c);
+    if (s.cluster && cur == TapAction::TAP_DETAILS) cur = TapAction::TAP_MEMBERS;   // what it opens now
     for (uint8_t i = 0; i < s_tapN; i++) if (s_tapMap[i] == cur) return i;
     return 0;
 }
@@ -106,22 +107,20 @@ bool unitsShownF() {
 void unitsDropCb(lv_event_t *ev);
 void propsCb(lv_event_t *ev);
 void addCardCb(lv_event_t *ev);
-void removeCardCb(lv_event_t *ev);
 
 uint8_t deckSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
     Card *held = cardOf(h.surface);
-    r[n++] = { "Paused", DeckRowKind::ROW_CHECK, nullptr, (uint16_t)aggregate().paused, true,
-               pauseCheckCb, &s.swPause };
+    // PAUSED IS VISIBILITY'S since round 7 (the owner). A cluster has no Active
+    // state (round 6): it never counts as on; its members do.
     // When a group defined here counts as on - HA's group helper option.
     // Not for a group defined in HA or Hue: the source decides (2.10c).
-    if (s.nEnt > 1 && !s.native && !inMember())
+    if (s.nEnt > 1 && !s.native && !inMember() && !s.cluster)
         r[n++] = { "Active state", DeckRowKind::ROW_DROP, "Any members are on\nAll members are on",
                    (uint16_t)(s.groupOn == GroupOn::GROUP_ON_ALL), true, groupDropCb, &s.ddGroup };
     // Entity label and Card label are Card UI's since 2.8 round 3 (D-25, D-28).
-    // Visibility is NOT SHOWN (owner, 2026-10-12, K68): it belongs to cards in
-    // a group shown as a cluster, a group panel or a group page, and none
-    // exists yet. It comes back with them, offered only there.
+    // Visibility is a button to a view since 2.11 (K96): the card's options by
+    // where it is - below, before Card UI.
     // Tap action (2.10d). Long press always opens the window (K39), whatever
     // this says. Greyed in a member's own view: it is the card's.
     const bool cardRows = held && held->hasId() && !inMember();
@@ -141,16 +140,13 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     // ENTITY PROPERTIES (owner): a view of its own, from here - no room for
     // another corner icon.
     r[n++] = { "Entity properties", DeckRowKind::ROW_BUTTON, "View", 0, true, propsCb, nullptr };
-    // K17 (K65): a member of a group card made a card of its own - a copy,
-    // right after the group card, in its group. Once made, the row says so.
-    if (inMember() && held && held->hasId() && s.ent[0]) {
-        const bool made = CardAdded::addedFor(held->id(), s.ent[0]->desc.id) != nullptr;
-        r[n++] = { "Add card to dashboard", DeckRowKind::ROW_BUTTON, made ? "Added" : "Add", 0, !made, addCardCb, nullptr };
-    }
-    // A card added on the device can be removed (K66) - to the page's pool,
-    // after a dialog that asks (confirmRemove()).
-    if (!inMember() && held && CardAdded::isAdded(held->id()))
-        r[n++] = { "Remove card", DeckRowKind::ROW_BUTTON, "Remove", 0, true, removeCardCb, nullptr };
+    // VISIBILITY (K96): what the card can do where it is - hidden from the page
+    // (K66's remove, every card since 2.11) or from its cluster - and, since
+    // round 7, Paused, and a member's Add card to dashboard (K17: a group card's
+    // member made a card of its own), in a member's own view too: one place.
+    if (held)
+        r[n++] = { "Visibility", DeckRowKind::ROW_BUTTON, "Open", 0,
+                   cardRows || (inMember() && (!s.cluster || visibilitySubject())), visibilityCb, nullptr };
     // CARD UI (2.8 round 3, D-27): the card's own looks, a view of their own -
     // at the foot. The card's, so greyed in a member's view; a card without a
     // usable id cannot keep them.
@@ -233,33 +229,18 @@ void propsCb(lv_event_t *ev) {
     lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_PROPS); }, nullptr);
 }
 
-// "Add as a card" (K17): made now, kept in the file, shown when the window
-// closes - the page is built again then (GUIManager::tick()), not under the
-// window, which holds the page's cards.
+// "Add card to dashboard" (K17): which group first (K92 rule 9, VIEW_JOIN);
+// made there, kept in the file, shown when the window closes - the page is
+// built again then (GUIManager::tick()), not under the window, which holds
+// the page's cards.
 void addCardCb(lv_event_t *ev) {
     (void)ev;
-    Card *held = cardOf(h.surface);
-    if (!held || !inMember() || !s.ent[0]) return;
-    char id[CARD_ID_MAX + 1];
-    if (!CardAdded::add(*held, *s.ent[0], id, sizeof(id))) return;
-    lv_async_call([](void *) { deckSync(); }, nullptr);   // the row now says "Added" - not from its own button's event
-}
-
-// Paused, a checkbox. Through the card when it is the held one (it repaints at
-// once, and every card on the same entities follows through the registry).
-void pauseCheckCb(lv_event_t *ev) {
-    const bool on = lv_obj_has_state((lv_obj_t *)lv_event_get_target(ev), LV_STATE_CHECKED);
-    // In a member's own view, only that member (2.10b) - the registry, and
-    // every card on it follows.
-    Card *c = inMember() ? nullptr : cardOf(h.surface);
-    if (c) {
-        c->setPaused(on);
-    } else if (s.reg) {
-        const uint32_t now = millis();
-        for (uint8_t i = 0; i < s.nEnt; i++) if (s.ent[i]) s.reg->setPaused(s.ent[i]->desc.id, on, now);
-    }
-    deckRender();
-    renderMain();
+    lv_async_call([](void *) {
+        Card *held = cardOf(h.surface);
+        if (!held || !inMember() || !s.ent[0]) return;
+        deckSet(DECK_PEEK);
+        visibilityJoinOpen(held, s.ent[0]);
+    }, nullptr);
 }
 
 } // namespace popup

@@ -654,7 +654,7 @@ reproduced): no matching report in 3 s, with what was asked and what the light l
 refusal and its message. The last four are logged and listed by `/popup?view=3`. A refusal of an
 earlier call while a newer one is in flight (a drag) no longer fails the newer one.
 
-## 17. 2.10d - stable card ids and saved settings (in progress, from 2026-10-08)
+## 17. 2.10d - stable card ids and saved settings (signed off, `v0.2.11`, 2026-10-12)
 
 Decided with the owner on 2026-10-08: `DECISIONS.md` K33-K38. What the problem is, in the owner's
 words: how does a device stay customised instead of reverting to its compiled configuration at every
@@ -682,8 +682,8 @@ malformed one or a duplicate draws but is never given its id, so it saves nothin
 |---|---|
 | Shown | - |
 | Dropped because the grid is too small | still on its page; nothing changes |
-| Hidden (Visibility - greyed until 2.11) | on its page, in the page's pool, can be brought back |
-| Removed from the page (page editing, later) | in the pool, kept |
+| Hidden from its page (2.11, K96: Visibility's "Hide from this page" - K66's remove, every card) | in the page's pool, kept (`removed`: `yes`); listed in the page slot's panel, where Restore brings it back |
+| Hidden from its cluster (2.11, K96, K104) | still in the cluster's list (`hidden`: `yes`); restored from its own Visibility, through the cluster's Members (K125, K129) |
 | Deleted | only by the owner, from the pool; gone |
 | No longer in the dashboard definition | kept, listed as "unclaimed", cleared only by the owner |
 | Its entity gone from HA | kept, listed as "entity missing" - the board cannot tell "gone" from "HA restarting" or "renamed" |

@@ -24,9 +24,9 @@ void pageCb(lv_event_t *e) {
     if (s_ctx.goToPage) s_ctx.goToPage(s_ctx.user, i);
 }
 
-void title(lv_obj_t *face, const char *words) {
-    lv_label_set_text(Kit::label(face, Kit::KitStyle::KS_PANEL_TITLE), words);
-}
+// A section's title: centred between its rules (round 14, the owner), as the
+// system panel's are.
+void title(lv_obj_t *face, const char *words) { Kit::drawerTitle(face, words); }
 
 lv_obj_t *dim(lv_obj_t *parent, const char *words) {
     lv_obj_t *l = Kit::label(parent, Kit::KitStyle::KS_LABEL_NAME_DIM);
@@ -129,15 +129,39 @@ void buildAlarm(lv_obj_t *face) {
 // stays while the panel is open; hidden, a swipe down from the top edge brings
 // it back for a moment.
 Kit::Selector s_hdrSel;
+lv_obj_t *s_hdrNote = nullptr;   // HEADER's words: shown the moment Hide is chosen (round 15)
 void hdrChosen(uint8_t i) {
     if (s_ctx.setHeaderShown) s_ctx.setHeaderShown(s_ctx.user, i == 0);
+    Kit::drawerReveal(s_hdrNote, i != 0);
 }
 
+// THIS PAGE'S HIDDEN CARDS (2.11, K66, K96 - the mock's "this page's list of
+// hidden cards"): a button to their own sheet (round 6, the owner: the list made
+// the panel long), there only when the page has some.
+void viewHiddenCb(lv_event_t *) {
+    if (s_ctx.viewHidden) s_ctx.viewHidden(s_ctx.user);
+}
+
+void hiddenCards(lv_obj_t *face, const Context &c) {
+    if (!c.hiddenCount || !c.viewHidden) return;
+    char words[32];
+    snprintf(words, sizeof(words), "View hidden cards (%u)", (unsigned)c.hiddenCount);
+    Kit::button(Kit::buttonRow(face), Kit::ButtonRole::BTN_CANCEL, words, faceRoom(), UI::minTouch(), viewHiddenCb);
+}
+
+// THREE SECTIONS (round 14, the owner's): PAGES - every page, close together;
+// HEADER - Show / Hide, centred; HIDDEN - View hidden cards when there are some.
+// A section's words only while they are needed (round 14b: with the button the
+// panel overran the P4_5): HEADER's while it is hidden - from the tap on Hide,
+// round 15 - HIDDEN's with no button.
 void buildPage(lv_obj_t *face, const Context &c) {
     title(face, "PAGES");
+    lv_obj_t *pages = Kit::plain(face);
+    lv_obj_set_size(pages, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(pages, LV_FLEX_FLOW_COLUMN);
     for (uint8_t i = 0; i < c.pageCount && i < PAGES_MAX; i++)
-        Kit::drawerItem(face, c.pageTitles[i], i == c.pageIndex, pageCb, (void *)(uintptr_t)i);
-    dim(face, "Header");
+        Kit::drawerItem(pages, c.pageTitles[i], i == c.pageIndex, pageCb, (void *)(uintptr_t)i);
+    title(face, "HEADER");
     Kit::SelectorSpec sp = {};
     sp.glyph[0] = "Show";
     sp.glyph[1] = "Hide";
@@ -146,9 +170,13 @@ void buildPage(lv_obj_t *face, const Context &c) {
     sp.compact  = true;
     sp.room     = faceRoom();
     sp.onChosen = hdrChosen;
-    Kit::selector(s_hdrSel, face, sp);
-    Kit::drawerNote(face, "Hide: the header goes when this panel closes; swipe down from the top edge "
-                          "to see it for a moment. Later: this page's cards, arrangement and name (2.11).");
+    Kit::selector(s_hdrSel, Kit::drawerCentred(face), sp);
+    s_hdrNote = Kit::drawerNote(face, "When hidden, swipe down from the top edge of the screen to reveal");
+    if (c.headerShown) lv_obj_add_flag(s_hdrNote, LV_OBJ_FLAG_HIDDEN);
+    title(face, "HIDDEN");
+    hiddenCards(face, c);
+    if (!c.hiddenCount || !c.viewHidden)
+        Kit::drawerNote(face, "Cards hidden from the dashboard can be viewed/restored from here");
 }
 
 // The sensor: its name, its reading - or dashes and what went wrong - and when
@@ -197,5 +225,14 @@ bool build(SlotKind kind, lv_obj_t *face, const Context &c) {
         default:                    return false;   // status: the system panel
     }
 }
+
+#ifdef DEBUG_POPUP
+bool viewHiddenDebug() {
+    if (!s_ctx.viewHidden || !s_ctx.hiddenCount) return false;
+    s_ctx.viewHidden(s_ctx.user);
+    s_ctx.viewHidden = nullptr;   // once: the panel it was built for has gone
+    return true;
+}
+#endif
 
 }  // namespace SlotPanels

@@ -18,6 +18,17 @@ static void barGone(lv_event_t *e) {
     if (lv_timer_t *t = (lv_timer_t *)lv_event_get_user_data(e)) lv_timer_delete(t);
 }
 
+// Only while the sheet shows its own (the system settings can hide it, T6).
+lv_obj_t *countdownFollow(lv_obj_t *box, int32_t boxW) {
+    const Sheet *S = sheetShowing();
+    if (!S || !S->autoBar) return nullptr;
+    lv_obj_t *bar = countdownBar(box, boxW);
+    countdownSet(bar, *S);
+    lv_timer_t *t = lv_timer_create(barTick, SHEET_TICK_MS, bar);
+    lv_obj_add_event_cb(bar, barGone, LV_EVENT_DELETE, t);
+    return bar;
+}
+
 // A tap on the dim itself - not on the box, which takes its own taps - is the
 // spec's `outside`, kept in the dim's user data.
 static void dimCb(lv_event_t *e) {
@@ -66,14 +77,7 @@ lv_obj_t *dialog(const DialogSpec &spec) {
     for (uint8_t i = 0; i < n; i++)
         button(row, spec.buttons[i].role, spec.buttons[i].text, btnW, UI::minTouch(), spec.buttons[i].cb);
 
-    // Only while the sheet shows its own (the system settings can hide it, T6).
-    const Sheet *S = spec.countdown ? sheetShowing() : nullptr;
-    if (S && S->autoBar) {
-        lv_obj_t *bar = countdownBar(box, spec.width);
-        countdownSet(bar, *S);
-        lv_timer_t *t = lv_timer_create(barTick, SHEET_TICK_MS, bar);
-        lv_obj_add_event_cb(bar, barGone, LV_EVENT_DELETE, t);
-    }
+    if (spec.countdown) countdownFollow(box, spec.width);
     return dim;
 }
 

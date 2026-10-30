@@ -108,6 +108,12 @@ struct UIMetrics {
     // dark one makes them brighter - the frame's edge this % of the way from
     // the active colour to the scheme's text, the light inward half that.
     uint8_t ACTIVE_INK;     // 0 (dark schemes), 35 (Linen)
+    // THE HALO'S STRENGTH (D-35, 2.11 round 4): % of black at a window's edge
+    // (and in the shading where a header panel meets the bar) - the owner:
+    // full strength "stops looking like a shadow"; round 5, "I'd say 25% is
+    // good" for the windows. UI Tweaks' slider overrides it per scheme
+    // (Kit::haloStrength()).
+    uint8_t HALO_PCT;       // 25, every scheme
 };
 
 // ---------------------------------------------------------------------------
@@ -197,6 +203,33 @@ struct UIShape {
     float P_SCENE_H;    // 9.0  a scene button, at most
     float P_SCENE_GAP;  // 1.4  between scene buttons
     float P_SCENE_PAD;  // 2.4  a scene button's sides
+
+    // --- A cluster (2.11, K89, K100-K103): a group card shown as a block of its
+    // members, in real millimetres on every board (the "2.11 Clusters" mock's) ---
+    float C_HDR_H;      // 5.2  its header row - one line (K100)
+    float C_PAD;        // 1.1  inside its frame, round the tiles; the header's sides
+    float C_TILE_GAP;   // 0.8  between mini tiles
+    float C_SWATCH_W;   // 1.1  the group's swatch beside the cluster's name
+    float C_SWATCH_H;   // 2.4
+    float C_VALUE_GAP;  // 1.3  between the header's values, and a value's icon and words
+    float C_TILE_MIN;   // 7.5  the least a mini tile is each way - "tight" (K103); a cluster
+                        //      whose tiles would be smaller takes more cells
+    float C_TILE_FOOT;  // 1.5  a mini tile's hero and label kept this far off its top and foot,
+                        //      clear of its active frame (2.11 round 12)
+    float C_TILE_TALL;  // 1.1  A RATIO: a mini tile drawn no taller than this times its width,
+                        //      centred in its slot (round 12: "Desk is much taller than it is wider")
+    float C_TILE_FOOT_AT; // 18.0 a tile this tall or taller keeps the whole C_TILE_FOOT; a shorter
+                        //      one keeps it in step with its height, for its disc (round 13: the 4B's)
+
+    // --- Panels and windows float over the page (D-35, the "Panel Edges" mock) ---
+    float HALO;         // 5.0  the halo round a header slot's panel and every window: black at
+                        //      their edge, clear this far out
+    float LINE_FADE;    // 2.5  the bar's accent line fading out before an open panel's walls
+
+    // --- The on-screen keyboard (2.11, K95): Kit::keyboard() ---
+    float KEY_H;        // 7.0  a key's height - a phone's, under the touch minimum: four rows
+                        //      of 9 mm took 62 % of the P4_5's height, leaving the field no room
+    float KEY_GAP;      // 1.0  between keys, and round them
 };
 
 // ---------------------------------------------------------------------------
@@ -310,6 +343,11 @@ struct UIType {
                               // the hero on a CRAMPED one. 2.7
     const lv_font_t *ICON_SM; // the corner icon on an ordinary card
     const lv_font_t *HERO;    // oversized, for a fullscreen card
+    // THE ROOMY HERO (2.11 round 9): a state card's or a tile's glyph where its
+    // room holds the larger disc - ICON's 4.5 mm looked tiny in the 1060's 27 mm
+    // tiles. 1.5 x ICON on the 7" boards (an existing face: no new font), ICON
+    // elsewhere (no cost). UITokens.cpp says which.
+    const lv_font_t *ICON_XL;
 };
 
 // ---------------------------------------------------------------------------

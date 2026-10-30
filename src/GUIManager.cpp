@@ -18,6 +18,7 @@
 #include "Settings.h"   // 2.10d: the claims on saved settings, and [SETTINGS]
 #include "Cards/CardGroups.h"
 #include "Cards/CardAdded.h"   // K17: cards added on the device
+#include "Cards/ClusterCard.h" // the clusters' header glyphs (2.11 round 11)
 #include "UI/SlotPanels.h"     // 2.8: the header slots' panels
 #include <string.h>
 #ifdef DEBUG_PAGE_TIMING
@@ -43,12 +44,12 @@ static constexpr uint8_t DASH_PAGE_N = sizeof(DASH_PAGES) / sizeof(DASH_PAGES[0]
 static EntityRegistry *s_claimReg = nullptr;
 
 static bool compiledCard(const char *id) {
-    for (uint8_t p = 0; p < DASH_PAGE_N; p++)
-        for (uint8_t i = 0; i < DASH_PAGES[p]->count; i++) {
-            const char *cid = DASH_PAGES[p]->cards[i].id;
-            if (cid && !strcmp(cid, id)) return true;
-        }
-    return false;
+    bool found = false;   // a group card's members are cards too (2.11)
+    for (uint8_t p = 0; p < DASH_PAGE_N && !found; p++)
+        forEachCardSpec(*DASH_PAGES[p], [&](const CardSpec &cs) {
+            if (cs.id && !strcmp(cs.id, id)) found = true;
+        });
+    return found;
 }
 
 // A card on a page, or one added on the device (K17) - removed ones too: they
@@ -187,8 +188,7 @@ void GUIManager::syncPanelOffset() {
     // else: no bar at all, so the drawer starts at the top of the screen.
     _pnlSystem.setTopOffset(top);
     // ...and a slot's drawer, which hangs from the same bar (2.8).
-    if (_slotDrawer.root) lv_obj_set_y(_slotDrawer.root, top);
-    _slotDrawer.top = top;
+    Kit::drawerSetTop(_slotDrawer, top);
 }
 
 // THE SYSTEM PANEL IS THE STATUS SLOT'S (2.8, D-13): it hangs under that slot,
@@ -635,6 +635,7 @@ void GUIManager::begin() {
     // board shows it.
     _header.init(screen, &_core.conn(), &_core.mqtt(), &_core.entities());
     _header.setGlyphStyle(savedGlyphStyle());
+    ClusterCard::setGlyphStyle(savedGlyphStyle());   // and the clusters' header values (round 11)
     _header.setOnSlotTap([](uint8_t slot) { if (s_self) s_self->onSlotTap(slot); });
 
     // Swipe navigation, milestone 2.6 first cut. On the screen, not an
@@ -930,8 +931,21 @@ void GUIManager::begin() {
             case Panel_System::GridAction::CARD_W_UP:   nudgeColumns(+1);  break;
             case Panel_System::GridAction::ASPECT_DOWN: nudgeRows(-1);     break;
             case Panel_System::GridAction::ASPECT_UP:   nudgeRows(+1);     break;
+            case Panel_System::GridAction::GRID_AUTO:   gridAuto();        break;
         }
     });
+    // Its Grid line: the counts pinned, or what the arranger chose.
+    _pnlSystem.setGridText([this](char *out, size_t n) {
+        if (_pinCols && _pinRows)  snprintf(out, n, "%u x %u, pinned", (unsigned)_pinCols, (unsigned)_pinRows);
+        else if (_pinCols)         snprintf(out, n, "%u columns, pinned", (unsigned)_pinCols);
+        else if (_pinRows)         snprintf(out, n, "%u rows, pinned", (unsigned)_pinRows);
+        else if (_page && _page->arranged())
+            snprintf(out, n, "auto, %u x %u units", (unsigned)_page->unitCols(), (unsigned)_page->unitRows());
+        else                       snprintf(out, n, "auto");
+    });
+    // Its development Reset (round 9): GUIManagerTweaks.cpp.
+    _pnlSystem.setDashboard([this](char *b, size_t nb, char *d, size_t nd) { dashboardText(b, nb, d, nd); },
+                            [this]() { resetDashboard(); });
 
     // The card page's own Dump button runs the same report the System panel's
     // does, Serial echo and all.
@@ -1108,6 +1122,7 @@ void GUIManager::buildDashboard() {
     _page = new CardPage();
     _page->begin(_dashHost, &_binder);
     _page->setRowsOverride(_rowsOverride);
+    _page->setPin(_pinCols, _pinRows);
 #ifdef DEBUG_PAGE_TIMING
     const int64_t tL2 = esp_timer_get_time();
 #endif
@@ -1217,6 +1232,7 @@ void GUIManager::rebuildDashboard() {
     // A rebuild is the one thing that happens over and over on a running
     // board. If internal heap trends down across these, the leak is here.
     SystemCore::heapMark("after rebuild");
+    _pnlSystem.refreshGrid();   // its Grid line: pinned, or what the arranger chose
 }
 
 // ---------------------------------------------------------------------------
@@ -1299,15 +1315,23 @@ void GUIManager::openLog() {
 // Tweaks' since 2.8 round 3 (GUIManagerTweaks.cpp), chosen outright and saved,
 // for every page. The grid's counts stay on the system panel, saved too.
 
+// A PRESS PINS THE COUNT (2.11 round 9): from what the page shows, one more or
+// less, kept by the arranger; past either end the pin goes (the arranger chooses).
 void GUIManager::nudgeColumns(int8_t steps) {
-    _colsOverride = cycleCount(_colsOverride, (uint8_t)UI::grid().cols, steps, UI_MAX_COLS);
+    _pinCols = cycleCount(_pinCols, _page ? _page->cellCols() : (uint8_t)UI::grid().cols, steps, UI_MAX_COLS);
     saveGrid();
 }
 
 void GUIManager::nudgeRows(int8_t steps) {
-    // The page is rebuilt from scratch on every change, so the override is
-    // held HERE and handed to each new page - a CardPage cannot remember it.
-    _rowsOverride = cycleCount(_rowsOverride, _page ? _page->cellRows() : 1, steps, UI_MAX_ROWS);
+    // The page is rebuilt from scratch on every change, so the pin is held HERE
+    // and handed to each new page - a CardPage cannot remember it.
+    _pinRows = cycleCount(_pinRows, _page ? _page->cellRows() : 1, steps, UI_MAX_ROWS);
+    saveGrid();
+}
+
+void GUIManager::gridAuto() {
+    _pinCols = 0;
+    _pinRows = 0;
     saveGrid();
 }
 
@@ -1341,12 +1365,15 @@ void GUIManager::initPages() {
             .label = cardLabelMode(), .showArea = _showArea,
             .cols = _colsOverride, .rows = _rowsOverride,
             .scheme = UI::schemeIndex(),
+            .pinCols = 0, .pinRows = 0,
         };
         // The page's own grid, if the owner set one (the system panel's Col /
-        // Row, saved with the page since 2.8 round 3): a count, or "auto".
+        // Row, saved with the page since 2.8 round 3): a count is a PIN (round
+        // 9), which the arranger keeps; "auto" (older files) or none, not pinned.
         char v[8];
-        if (Settings::page(s->slug, "cols", v, sizeof(v))) _pages[_nPages].cols = strcmp(v, "auto") ? (uint8_t)atoi(v) : 0;
-        if (Settings::page(s->slug, "rows", v, sizeof(v))) _pages[_nPages].rows = strcmp(v, "auto") ? (uint8_t)atoi(v) : 0;
+        PageLive &pl = _pages[_nPages];
+        if (Settings::page(s->slug, "cols", v, sizeof(v)) && atoi(v) > 0) pl.cols = pl.pinCols = (uint8_t)atoi(v);
+        if (Settings::page(s->slug, "rows", v, sizeof(v)) && atoi(v) > 0) pl.rows = pl.pinRows = (uint8_t)atoi(v);
         _nPages++;
     }
     _curPage = 0;
@@ -1363,6 +1390,8 @@ void GUIManager::savePageState() {
     p.cols     = _colsOverride;
     p.rows     = _rowsOverride;
     p.scheme   = UI::schemeIndex();
+    p.pinCols  = _pinCols;
+    p.pinRows  = _pinRows;
 }
 
 void GUIManager::loadPageState() {
@@ -1374,6 +1403,8 @@ void GUIManager::loadPageState() {
     _showArea     = p.showArea;
     _colsOverride = p.cols;
     _rowsOverride = p.rows;
+    _pinCols      = p.pinCols;
+    _pinRows      = p.pinRows;
 
     // The three that live outside this class, applied where they live.
     StateCard::setFill(_fill);
@@ -1475,12 +1506,11 @@ void GUIManager::tick() {
 #ifdef HAS_AUDIO_HW
     _pnlAudio.tick();
 #endif
-    // K17: a card added or removed shows once no card window is open (the
-    // window holds the page's cards); an added card whose entity was learnt
-    // after the page was built shows once the table has grown.
+    // K17: a card added or removed shows once no card window is open (the window holds the
+    // page's cards); one whose entity was learnt late, once the table has grown; the arranger's answer once kept.
     if (!CardPopup::isOpen()) {
         const bool learnt = s_addedWaiting && _core.entities().count() != s_regCountAtBuild;
-        if (CardAdded::takeChanged() || learnt || CardPopup::takeRebuildWanted()) rebuildDashboard();
+        if (CardAdded::takeChanged() || learnt || CardPopup::takeRebuildWanted() || PageArranger::takeDone()) rebuildDashboard();
     }
     // Renders a waiting screenshot request, on this - the LVGL - thread.
     Screenshot::service();

@@ -19,7 +19,8 @@
 //   "entity" as well - see Cards/CardAdded.h.
 //   2.8 round 3: UI Tweaks' choices under "system": "ui" ("scheme", "label",
 //   "entity", "state", "density"), "header" ("glyphs"), "window", "alarm"
-//   ("warn"); a page's "cols" / "rows" (a count or "auto") and "header"; Card
+//   ("warn"); a page's "cols" / "rows" (a count, since 2.11 round 9 a pin the
+//   arranger keeps; "auto" in older files reads as not pinned) and "header"; Card
 //   UI's per card: "label", "group" / "label_text", "selector", "density",
 //   "close", "bar" (GUIManagerTweaks.cpp, Cards/Popup/PopupCardUi.cpp).
 //
@@ -120,6 +121,9 @@ bool setPage(const char *slug, const char *key, const char *value);
 // Writing, in RAM. nullptr = Reset (removes the key, and the card's or
 // scheme's object once empty). True when the document changed.
 bool setCard(const char *cardId, const char *key, const char *value);
+// The card's whole entry gone - a copy the owner removed from its cluster on
+// the glass (2.11, K91). Every other entry is kept until the owner prunes it.
+bool dropCard(const char *cardId);
 bool setScheme(const char *schemeName, const char *key, const char *value);
 bool setSystem(const char *area, const char *key, const char *value);
 bool setEntityFlag(const char *entityId, const char *key, bool value, bool dflt);

@@ -95,6 +95,9 @@ void forgetWidgets() {
 void cornerLook(lv_obj_t *b, bool shown, bool lit) { Kit::sheetTabLook(b, shown, lit); }
 
 void showView(PopupView v) {
+    // A CLUSTER HAS NO CONTROLS VIEW (round 16, the owner: its Details held
+    // settings, not details): its window is Members, whatever asked for the main view.
+    if (v == PopupView::VIEW_MAIN && s.cluster) v = PopupView::VIEW_MEMBERS;
     const PopupView was = s.view;
     s.view = v;
     forgetMainWidgets();
@@ -114,7 +117,7 @@ void showView(PopupView v) {
     const bool member   = inMember();
     const bool controls = (v == PopupView::VIEW_MAIN || v == PopupView::VIEW_MEMBER);
     // X on the controls, the back arrow everywhere else (owner, round 4).
-    setText(s.lblLeft, v == PopupView::VIEW_MAIN ? LV_SYMBOL_CLOSE : LV_SYMBOL_LEFT);
+    setText(s.lblLeft, v == controlsView() && !member ? LV_SYMBOL_CLOSE : LV_SYMBOL_LEFT);
     cornerLook(s.btnHistory, true, v == PopupView::VIEW_HISTORY);
     cornerLook(s.btnMembers, !member && hasMembers(), v == PopupView::VIEW_MEMBERS);
     cornerLook(s.btnScenes, (controls || v == PopupView::VIEW_SCENES) && hasScenes(),
@@ -126,8 +129,13 @@ void showView(PopupView v) {
     const char *who = (member && s.ent[0]) ? s.ent[0]->desc.name : s.name;
     char title[ENTITY_NAME_MAX + 16];
     if (v == PopupView::VIEW_MAIN) {
-        if (s.area[0]) { snprintf(title, sizeof(title), "%s > ", s.area); setText(s.lblTitleArea, title); }
-        else           setText(s.lblTitleArea, "");
+        // A cluster's name is its group's: "Office", never "Office > Office".
+        if (s.area[0] && !(s.cluster && !strcmp(s.area, s.name))) {
+            snprintf(title, sizeof(title), "%s > ", s.area);
+            setText(s.lblTitleArea, title);
+        } else {
+            setText(s.lblTitleArea, "");
+        }
         setText(s.lblTitleName, s.name);
     } else if (v == PopupView::VIEW_MEMBER) {
         // "Group > member" (card-sheet 11.1).
@@ -140,7 +148,12 @@ void showView(PopupView v) {
         setText(s.lblTitleName, v == PopupView::VIEW_HISTORY ? "History"
                               : v == PopupView::VIEW_SCENES  ? "Scenes"
                               : v == PopupView::VIEW_PROPS   ? "Properties"
-                              : v == PopupView::VIEW_CARD_UI ? "Card UI" : "Members");
+                              : v == PopupView::VIEW_CARD_UI ? "Card UI"
+                              : v == PopupView::VIEW_CLUSTER_SLOTS ? "Header options"
+                              : v == PopupView::VIEW_VISIBILITY ? "Visibility"
+                              : v == PopupView::VIEW_ADD_TO ? "Add to"
+                              : v == PopupView::VIEW_CLUSTER_ADD ? "Add cards"
+                              : v == PopupView::VIEW_JOIN ? "Add to dashboard" : "Members");
     }
     // SIZED BEFORE THE VIEW IS BUILT: placeWide() lays the window out, and a
     // DOT label laid out at the last view's width rewrites its own text - the
@@ -150,6 +163,11 @@ void showView(PopupView v) {
     else if (v == PopupView::VIEW_MEMBERS) buildMembers();
     else if (v == PopupView::VIEW_PROPS)   buildProps();
     else if (v == PopupView::VIEW_CARD_UI) buildCardUi();
+    else if (v == PopupView::VIEW_CLUSTER_SLOTS) buildClusterSlots();
+    else if (v == PopupView::VIEW_VISIBILITY) buildVisibility();      // K96
+    else if (v == PopupView::VIEW_ADD_TO)     buildAddTo();           // K91, K100
+    else if (v == PopupView::VIEW_CLUSTER_ADD) buildClusterAdd();     // K104's Add cards
+    else if (v == PopupView::VIEW_JOIN)       buildJoin();            // K92 rule 9
     else                                   buildMain();
     deckSync();     // SETTINGS' rows are the view's (a member's own has more)
     deckRender();   // Paused follows whatever the window is showing now
@@ -157,8 +175,11 @@ void showView(PopupView v) {
 }
 
 // The controls view of whatever the window is showing: the window's, or one
-// member's.
-PopupView controlsView() { return inMember() ? PopupView::VIEW_MEMBER : PopupView::VIEW_MAIN; }
+// member's. A cluster's is its Members (round 16).
+PopupView controlsView() {
+    if (inMember()) return PopupView::VIEW_MEMBER;
+    return s.cluster ? PopupView::VIEW_MEMBERS : PopupView::VIEW_MAIN;
+}
 
 // A corner icon: its view, or - when lit - back to the controls.
 void cornerTap(PopupView v) { showView(s.view == v ? controlsView() : v); }
@@ -172,7 +193,16 @@ void cornerTap(PopupView v) { showView(s.view == v ? controlsView() : v); }
 void goBack() {
     switch (s.view) {
         case PopupView::VIEW_MAIN:   CardPopup::close();     break;
+        case PopupView::VIEW_MEMBERS:   // a cluster's own view: its X
+            if (s.cluster) CardPopup::close();
+            else           showView(controlsView());
+            break;
         case PopupView::VIEW_MEMBER: leaveMember();          break;
+        case PopupView::VIEW_ADD_TO: showView(PopupView::VIEW_VISIBILITY); break;   // its view's own
+        case PopupView::VIEW_JOIN:   // a tile's Visibility (or a cluster member's, round 6), or the member's own view
+            showView((cardOf(h.surface) && cardOf(h.surface)->mini()) || inMember()
+                         ? PopupView::VIEW_VISIBILITY : controlsView());
+            break;
         default:                     showView(controlsView()); break;
     }
 }
@@ -419,11 +449,14 @@ void CardPopup::open(Card &card) {
     s.native   = (s.nEnt == 1 && s.ent[0]->nMembers) ? s.ent[0] : nullptr;
     applyNative();
     s.tempUnit = card.tempUnit();
+    s.cluster  = !strcmp(card.typeName(), "cluster");
     s.groupOn  = card.groupOn();
     s.sceneShow = card.sceneShow();
     s.lightCtl = firstCtl(lightAggregate().caps);   // D3: open on the control
     snprintf(s.area, sizeof(s.area), "%s", card._area);
     snprintf(s.name, sizeof(s.name), "%s", card.label());
+    // A cluster is called what its header says: its own words, else its group's.
+    if (s.cluster && s.area[0]) snprintf(s.name, sizeof(s.name), "%s", s.area);
 
     // --- Where the window goes: the sheet's place (Kit::sheetPlace()) -------
     // Under the system header, over the panels' tabs, up to twice as wide as
@@ -449,7 +482,12 @@ void CardPopup::open(Card &card) {
     showWindow();
 }
 
-bool CardPopup::takeRebuildWanted() { return !isOpen() && cardUiTakeRebuild(); }
+bool CardPopup::takeRebuildWanted() {
+    if (isOpen()) return false;
+    // Every one, so none waits for the next window.
+    const bool ui = cardUiTakeRebuild(), cl = clusterTakeRebuild(), vis = visibilityTakeRebuild();
+    return ui || cl || vis;
+}
 
 void CardPopup::openOn(Card &card, uint8_t view) {
     s_openFromTap = true;

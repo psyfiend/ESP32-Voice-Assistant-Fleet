@@ -95,7 +95,8 @@ from discovery rather than anyone tagging entities by hand.
 **Deferred: visually grouping several cards by area** (a dim border around a cluster, a shared
 colour band). This is a *page engine* feature, not a card feature — it needs group containers in
 the grid, which changes 2.5's layout model. Take the tag at 2.4; revisit grouping at 2.5 or in the
-build sheet.
+build sheet. **Built as clusters in 2.11** (`group-cards.md` §6, K88-K129): the owner's groups as
+blocks of tiles under a header, placed by the arranger.
 
 ---
 

@@ -333,12 +333,12 @@ void drawImage(lv_layer_t *layer, const CutImage &c, int32_t x, int32_t y, const
 
 // Both cut corners of the card at `a`. UNDER the contents (`over` false) only
 // what is off the card - its shadow, past its edges (nothing on a scheme
-// without one); OVER them only the cut's own square, inside the card.
-void drawCuts(lv_layer_t *layer, const lv_area_t &a, int32_t cut, bool shadow, bool over) {
+// without one); OVER them only the cut's own square, inside the card, in
+// `ground` - what lies behind it: the page's ground, a cluster's surface.
+void drawCuts(lv_layer_t *layer, const lv_area_t &a, int32_t cut, bool shadow, bool over, uint32_t ground) {
     if (!over && !shadow) return;
     const int32_t reach = shadow ? s_cal.sw / 2 + LV_ABS(s_cal.oy) + 2 : 2;
     const int32_t n = cut + 2 * reach, far = n;
-    const uint32_t ground = UI::pal().GROUND;
     if (const CutImage *c = cutImage(CUT_TR, cut, reach, ground, shadow)) {
         const int32_t x = a.x2 - (n - 1 - reach), y = a.y1 - reach;
         if (over) drawImage(layer, *c, x, y, { a.x2 - cut, a.y1, a.x2, a.y1 + cut });
@@ -414,6 +414,8 @@ void Card::frameDrawCb(lv_event_t *e) {
     const bool corner = card->_frame == CardFrame::FRAME_CORNER;
     const int32_t cut = lv_area_get_height(&a) * m.CUT_PCT / 100;
     const bool shadow = corner && cardShadow(card->_surface);
+    // A mini tile is cut to its cluster's surface (2.11 round 11, K116).
+    const uint32_t ground = card->mini() ? UI::pal().SURFACE : UI::pal().GROUND;
 
     if (lv_event_get_code(e) == LV_EVENT_DRAW_MAIN_END) {
         // THE LIGHT, behind the contents: from the bars (bracket), from every
@@ -425,7 +427,7 @@ void Card::frameDrawCb(lv_event_t *e) {
         band(layer, { a.x2 - depth, a.y1, a.x2, a.y2 }, false, false, light, m.GLOW_OPA * 3 / 4, r);
         // THE CUTS' SHADOW, past the card - here, because this is the last
         // event whose clip reaches past it (LVGL 9.5 clips DRAW_POST to it).
-        drawCuts(layer, a, cut, shadow, false);
+        drawCuts(layer, a, cut, shadow, false, ground);
         return;
     }
 
@@ -452,7 +454,7 @@ void Card::frameDrawCb(lv_event_t *e) {
     lv_draw_rect(layer, &d, &a);
     // The cuts, over the contents and the frame, then the cut's own edge, and
     // a softer, wider line inside it, the light along the cut.
-    drawCuts(layer, a, cut, shadow, true);
+    drawCuts(layer, a, cut, shadow, true, ground);
     const int32_t in = depth / 3;   // the soft line, set in from the cut
     line(layer, a.x2 - cut - in, a.y1 + w, a.x2 - w, a.y1 + cut + in, depth / 2, light, m.GLOW_OPA / 2, false);
     line(layer, a.x1 + w, a.y2 - cut - in, a.x1 + cut + in, a.y2 - w, depth / 2, light, m.GLOW_OPA / 2, false);

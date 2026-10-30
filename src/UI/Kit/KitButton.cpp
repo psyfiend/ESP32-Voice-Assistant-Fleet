@@ -9,6 +9,8 @@ static ButtonLook lookOf(ButtonRole role) {
     switch (role) {
         case ButtonRole::BTN_DESTRUCTIVE:
             return { KitStyle::KS_BTN_DESTRUCTIVE, KitStyle::KS_BTN_DESTRUCTIVE_PRESSED, KitStyle::KS_BTN_DESTRUCTIVE_INK };
+        case ButtonRole::BTN_CONFIRM:
+            return { KitStyle::KS_BTN_CONFIRM, KitStyle::KS_BTN_CONFIRM_PRESSED, KitStyle::KS_BTN_CONFIRM_INK };
         case ButtonRole::BTN_CANCEL:
         default:
             return { KitStyle::KS_BTN_CANCEL, KitStyle::KS_BTN_CANCEL_PRESSED, KitStyle::KS_BTN_CANCEL_INK };
@@ -27,9 +29,10 @@ lv_obj_t *button(lv_obj_t *parent, ButtonRole role, const char *text, int32_t w,
     lv_label_set_text(l, text);
     lv_obj_center(l);
     // SATIN (#99, K77): a button is pressed, never chosen. Its role keeps its
-    // colour - the Remove button's red.
+    // colour - the Remove button's red, Save's accent.
     finish(b, w, h, UI::mm(UI::shape().R_CONTROL), Finish::FINISH_SATIN,
-           role == ButtonRole::BTN_DESTRUCTIVE ? UI::pal().ST_BAD : 0);
+           role == ButtonRole::BTN_DESTRUCTIVE ? UI::pal().ST_BAD :
+           role == ButtonRole::BTN_CONFIRM     ? UI::pal().ACCENT : 0);
     if (cb) lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, nullptr);
     return b;
 }

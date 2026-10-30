@@ -28,6 +28,29 @@ enum CuiRow : uint8_t { CUI_ENTITY, CUI_CLABEL, CUI_METAL, CUI_SHAPE, CUI_DENSIT
 
 static Card *held() { return cardOf(h.surface); }
 
+// ONLY WHAT THIS CARD CAN USE (round 6, the owner: Card UI "should read the
+// specific features of whichever card it was launched from"). A cluster wears
+// no label of either kind, has no density and no selector: its window's timeout
+// and bar. A mini tile names its entity, and has no card label or density. The
+// selector rows are for a window that has one - a light's controls. The table's
+// rows, in order, as CuiRows.
+static CuiRow  s_rowAt[CUI_ROWS];
+static uint8_t s_nRows = 0;
+
+static bool rowApplies(CuiRow r) {
+    const Card *c = held();
+    if (!c) return false;
+    const bool cluster = s.cluster, mini = c->mini();
+    switch (r) {
+        case CUI_ENTITY:  return !cluster;
+        case CUI_CLABEL:  return !cluster && !mini;
+        case CUI_METAL:
+        case CUI_SHAPE:   return !cluster && s.lightHero;
+        case CUI_DENSITY: return !cluster && !mini;
+        default:          return true;   // the window's own timeout and bar
+    }
+}
+
 // The held card's saved word for `key`, as a position in `is` (0: none saved - Inherit).
 static uint8_t savedPos(const char *key, const char *const *is, uint8_t n) {
     Card *c = held();
@@ -76,12 +99,67 @@ static void lookKeep(int8_t look) {
     Kit::selectorLookOverride(look);
 }
 
+// --- CUSTOM TYPES ITS WORDS (2.11, K95) ----------------------------------------------
+// A tap on Custom - lit already or not - opens the keyboard on the words the card
+// shows now; Save keeps them, Cancel leaves the card Custom with the words it had.
+static void relightAsync(void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_CARD_UI); }
+
+// The entity label's words: the card's custom name (K37, K40). None: the
+// dashboard's name again, which the page knows - built again once the window has gone.
+static void nameSaved(const char *words, void *) {
+    Card *c = held();
+    if (!c || s.phase != PopupPhase::PHASE_OPEN) return;
+    keepCardSetting("name", words[0] ? words : nullptr);
+    if (words[0]) {
+        c->setLabel(words);
+        snprintf(s.name, sizeof(s.name), "%s", words);   // the window's title says it too
+    } else {
+        s_rebuildPage = true;
+    }
+    restyleHeld(*c);
+    lv_async_call(relightAsync, nullptr);
+}
+
+// The card label's words, in its group's colour (K46 rename a). None is a card
+// label in the colour alone, as Custom has always allowed.
+static void labelSaved(const char *words, void *) {
+    Card *c = held();
+    if (!c || s.phase != PopupPhase::PHASE_OPEN) return;
+    keepCardSetting("label_text", words);
+    CardGroups::apply(*c, c->pageAreaColor());
+    restyleHeld(*c);
+}
+
+static void typeWords(bool name) {
+    Card *c = held();
+    if (!c || !c->hasId()) return;
+    static char now[ENTITY_NAME_MAX], hint[48];
+    Kit::KeyboardSpec k = {};
+    if (name) {
+        snprintf(now, sizeof(now), "%s", c->shownName(CardLabel::LBL_NAME));
+        snprintf(hint, sizeof(hint), "None: the dashboard's name");
+        k.title  = "The card's name";
+        k.maxLen = (uint8_t)LV_MIN(sizeof(now) - 1, (size_t)Kit::KEYBOARD_TEXT_MAX);
+        k.save   = nameSaved;
+    } else {
+        if (!Settings::card(c->id(), "label_text", now, sizeof(now))) snprintf(now, sizeof(now), "%s", c->area());
+        snprintf(hint, sizeof(hint), "None: the color alone");
+        k.title  = "The card label's words";
+        k.maxLen = 39;   // a group's name at most (SettingsHttp)
+        k.save   = labelSaved;
+    }
+    k.text = now;
+    k.hint = hint;
+    Kit::keyboard(k);
+}
+
 // --- What a chip does: on the held card at once, kept under its id ----------------
 static void chooseAsync(void *p) {
     const uintptr_t v = (uintptr_t)p;
-    const uint8_t row = (uint8_t)(v >> 8), i = (uint8_t)(v & 0xFF);
+    const uint8_t at = (uint8_t)(v >> 8), i = (uint8_t)(v & 0xFF);
     Card *c = held();
-    if (!c || s.phase != PopupPhase::PHASE_OPEN) return;
+    if (!c || s.phase != PopupPhase::PHASE_OPEN || at >= s_nRows) return;
+    const CuiRow row = s_rowAt[at];   // the table's row, as the option it is
     switch (row) {
         case CUI_ENTITY: {
             // Inherit too, since K49 (a card the dashboard names is Custom unless told otherwise).
@@ -107,10 +185,13 @@ static void chooseAsync(void *p) {
             break;
         case CUI_TIMEOUT: keepCardSetting("close", TIMEOUT_IS[i < 5 ? i : 0]); retime(); break;
         case CUI_BAR:     keepCardSetting("bar", BAR_IS[i < 3 ? i : 0]);       retime(); break;
+        default: break;
     }
     // Every row lit as the card now has it (a look chosen moves the shape's chip too).
     if (s.view == PopupView::VIEW_CARD_UI)
-        for (uint8_t r = 0; r < CUI_ROWS; r++) Kit::chipTableLit(s_table, r, litOf(r));
+        for (uint8_t r = 0; r < s_nRows; r++) Kit::chipTableLit(s_table, r, litOf(s_rowAt[r]));
+    if (row == CUI_ENTITY && ENTITY_IS[i < 5 ? i : 0] == CardLabel::LBL_NAME) typeWords(true);
+    if (row == CUI_CLABEL && i == (uint8_t)CardGroups::LS_CUSTOM)          typeWords(false);
 }
 
 static void chipCb(lv_event_t *ev) {
@@ -120,7 +201,7 @@ static void chipCb(lv_event_t *ev) {
 // --- The view ----------------------------------------------------------------------
 void buildCardUi() {
     if (!held()) return;
-    const Kit::ChipRowSpec rows[CUI_ROWS] = {
+    const Kit::ChipRowSpec all[CUI_ROWS] = {
         { "Entity label",   ENTITY_W,  5, litOf(CUI_ENTITY)  },
         { "Card label",     CLABEL_W,  3, litOf(CUI_CLABEL)  },
         { "Selector",       METAL_W,   3, litOf(CUI_METAL)   },
@@ -129,7 +210,14 @@ void buildCardUi() {
         { "Window timeout", TIMEOUT_W, 5, litOf(CUI_TIMEOUT) },
         { "Timer bar",      BAR_W,     3, litOf(CUI_BAR)     },
     };
-    s_table = Kit::chipTable(s.stage, lv_area_get_width(&s.winRect) - 2 * s.pad, rows, CUI_ROWS, chipCb);
+    Kit::ChipRowSpec rows[CUI_ROWS];
+    s_nRows = 0;
+    for (uint8_t r = 0; r < CUI_ROWS; r++) {
+        if (!rowApplies((CuiRow)r)) continue;
+        s_rowAt[s_nRows] = (CuiRow)r;
+        rows[s_nRows++] = all[r];
+    }
+    s_table = Kit::chipTable(s.stage, lv_area_get_width(&s.winRect) - 2 * s.pad, rows, s_nRows, chipCb);
 }
 
 // The card's own window look, before its window is built: its timeout and bar
@@ -153,6 +241,8 @@ void cardUiCb(lv_event_t *ev) {
     deckSet(DECK_PEEK);
     lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_CARD_UI); }, nullptr);
 }
+
+void cardUiTypeWords(bool name) { typeWords(name); }
 
 bool cardUiTakeRebuild() {
     const bool r = s_rebuildPage;

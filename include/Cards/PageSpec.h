@@ -108,7 +108,24 @@ struct CardSpec {
     uint32_t longStaleMs = 0;
 
     bool paused = false;
+
+    // A GROUP CARD MADE ON THE DEVICE (2.11, K88-K92): no primaries of its own,
+    // its MEMBERS instead - each a card of its own, with its own id (K33) and
+    // settings, wearing the group card's group (K92 rule 2). One level only: a
+    // member is never a group card made here (rule 3). `present` is how it is
+    // shown (the saved "present" wins); `slots` the members that fill a
+    // cluster's header, by id, highest priority first (K101, K104) - a member in
+    // the header is not also a tile unless it is made visible (K92 rule 7).
+    const CardSpec *members     = nullptr;
+    uint8_t         memberCount = 0;
+    GroupPresent    present     = GroupPresent::PRESENT_CARD;
+    const char     *slots[CLUSTER_SLOTS_MAX] = {nullptr};
 };
+
+// Every card a page's spec holds, in order: each card, and right after a group
+// card its members. For whatever must see every card id or every entity a page
+// names (the ids' check, the settings file's claims, the groups' HA areas).
+template <typename F> void forEachCardSpec(const struct PageSpec &page, F fn);
 
 // ---------------------------------------------------------------------------
 // A page of cards.
@@ -169,7 +186,19 @@ struct PageSpec {
     const SlotSpec *headerSlots = nullptr;
     uint8_t  headerSlotCount = 0;
     bool     headerShown     = true;
+
+    // Its clusters' header style (2.11, K102); the saved pages.<slug>.cl_style
+    // wins, and a cluster's own over both.
+    ClusterStyle clusterStyle = ClusterStyle::CLSTYLE_SWATCH;
 };
+
+template <typename F> void forEachCardSpec(const PageSpec &page, F fn) {
+    for (uint8_t i = 0; i < page.count; i++) {
+        const CardSpec &cs = page.cards[i];
+        fn(cs);
+        for (uint8_t k = 0; k < cs.memberCount && cs.members; k++) fn(cs.members[k]);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Card ids (2.10d). checkCardIds() runs once at boot over every page: it logs

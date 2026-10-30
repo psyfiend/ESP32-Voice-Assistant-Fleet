@@ -62,13 +62,13 @@ colour worked out at the call; `Kit::label(parent, role)` takes a shared look in
 
 ![The Remove dialog's two buttons](components/dialog.png)
 
-A plain object with words, its look by role: **CANCEL** (the surface, a faint edge) and
-**DESTRUCTIVE** (`ST_BAD`, the words in the surface colour). Radius `R_CONTROL`, edge `LINE_MID`,
-pressed: 20% of `TEXT` mixed in. The words are the role's ink (`NAME`).
+A plain object with words, its look by role: **CANCEL** (the surface, a faint edge),
+**DESTRUCTIVE** (`ST_BAD`, the words in the surface colour) and **CONFIRM** (2.11: the accent, the
+words in its contrast - the keyboard's Save, its first user). Radius `R_CONTROL`, edge `LINE_MID`,
+pressed: 20% of `TEXT` mixed in. The words are the role's ink (`NAME`). Satin, tinted by its role.
 
-The brief listed PRIMARY and QUIET too. No button in the house is either today - the row button is
-a row control (below), a scene is a pill - so they wait for their first user rather than ship
-untested.
+The brief listed QUIET too. No button in the house is one today - the row button is a row control
+(below), a scene is a pill - so it waits for its first user rather than ship untested.
 
 ### Dialog - `Kit::dialog(spec)`
 
@@ -80,6 +80,25 @@ box's edge in `ST_BAD`, `LINE_HEAVY`). The box: the scheme's card radius, `SURFA
 it, `S7` between and beside them (#96). `countdown` in the spec shows the countdown of the sheet
 under it, on the box's bottom edge, for a dialog that closes with that sheet (#23). "Remove card"
 (K66, K69) is its first client.
+
+### Keyboard - `Kit::keyboard(spec)` (2.11, K95)
+
+![The keyboard over a cluster's window, on the P4_5](../followups/211_r3_keyboard_p45.png)
+
+Words typed on the glass - a name. On the top layer over everything, the rest dimmed as a dialog's:
+a box (`KS_KBD_BOX`: a dialog's box, its edge the accent) holding what the words are for, the field
+(`KS_FIELD`, one line, `NAME`, an accent edge; its cursor `KS_FIELD_CURSOR` stays lit - a blink
+redraws the field twice a second for nothing) and Cancel / Save, centred in what the keys leave;
+LVGL's keyboard along the bottom (`KS_KBD`, keys `KS_KEY` - the surface, `R_CONTROL`; the keys that
+do something other than type, which LVGL marks CHECKED, `KS_KEY_CTRL`; any key pressed
+`KS_KEY_PRESSED`, the accent). Four rows `KEY_H` 7 mm tall, `KEY_GAP` 1 mm between and round them:
+a phone's keys, under the touch minimum - four rows of 9 mm took 62% of the P4_5's height.
+**Plain ASCII only**: LVGL's keys are all in it and the field refuses anything else, newlines
+included. Save, the tick or return hands the words over trimmed (`""` - the caller's default
+again); Cancel, the hide key or a tap on the dim leaves. `hint` is the field's placeholder: what the
+words are when there are none. It shows the countdown of the sheet under it and goes with that sheet
+(`Kit::sheetClose()`), unsaved. ~7 KB of `lv_mem` while it shows. First clients: a cluster's Rename,
+and Card UI's Custom chips (Entity label: the card's name; Card label: its words).
 
 ### Chip row - `Kit::chipRow(parent, words, n, lit, room, cb)`
 
@@ -170,6 +189,15 @@ the face away). One face per row's chip width, in the face cache. The list fills
 parent's height and scrolls when it must. `Kit::ChipRowSpec` is a row's name, choices and lit
 one; a chip's CLICKED carries `(row << 8) | chip`; `chipTableLit()` re-lights a row after a
 choice. `buttonRow()` adds a centred row of buttons after them (Tokens, Reset all).
+
+**Two more kinds of row, and a grid (2.11 round 14).** A **check row** - no words, no slider
+(`words` null, `n` 0) - is a checkbox (`Kit::checkbox()`'s) in the chips' column, ticked when `lit`
+is 1; its change carries `(row << 8) | CHIP_CHECK`, `chipTableChecked()` reads it and
+`chipTableCheck()` sets it (a tick refused; no client since K129 - a cluster's Header options are
+Members' rows, satin, glass while chosen). A **words row**
+(`says`) is words in the chips' column, the accent, nothing to tap ("Member of group:" and its
+name). `chipGrid(parent, w, words, n, lit, cb)` is chips one width wrapping in centred rows, the
+chosen one lit (`chipGridLit()`) - Add card to dashboard's group picker.
 
 ### Icon button - `Kit::iconButton(parent, glyph, font, cb)`
 
@@ -299,12 +327,60 @@ The face's edge is the accent at `LINE`. `Drawer::onClosed` (with `closedUser`) 
 close has finished - not for one cut short by opening again.
 
 **Its rows, round 3** (the system panel's new layout, D-22 / D-25): `drawerTitle()` a section's
-title (CONNECTIVITY); `drawerRow()` things side by side, the panel's width, `DRAWER_GAP` apart;
+title (CONNECTIVITY) - **since 2.11 round 14 centred between two accent rules that fade out toward
+the panel's edges** (`KS_SECTION_RULE_L` / `_R`), on every slot panel and the system panel;
+`drawerCentred()` a row whose content is centred (the page panel's Show / Hide); a `drawerItem()`'s
+mark stands in a box the larger dot's size, so every item's words start in one column; `drawerRow()` things side by side, the panel's width, `DRAWER_GAP` apart;
 `statusRow(face, what, &glyphRoom)` room for a glyph, what it is, and its live value dim, a face
 smaller, on one line and ellipsised - returns the value's label; `vrule(row, h)` a short upright rule
 setting one choice apart from another (`KS_RULE`); `toggleButton(parent, words, w, h, on, cb)` and
 `toggleButtonSet()` - glass, lit glass while on (round 5); `selectorSet(S, i)` a
 selector's choice set from outside, with no `onChosen` (the scheme changed elsewhere).
+
+**It lies on the bar (D-35, 2.11 round 1)**: every corner of the face is rounded and its top edge
+is the bar's line - the wrapper stands `LINE` higher, under the bar, which is drawn over it. The bar
+draws for each open panel (`Kit::drawerOverBar()`, its `DRAW_MAIN_END`): its line faded out over
+`LINE_FADE` and stopped a quarter of `DRAWER_R` short of the panel's walls, then the halo where it
+falls on the bar - round the panel's top, and round its slot's tab above the line only, so the
+panel's top edge beside the tab stays lit.
+
+### The halo - `Kit::haloAttach(o)`, `Kit::haloDraw(layer, area, radius, clip)` (D-35, 2.11)
+
+**What floats over the page** - a header slot's panel (the wrapper) and every window (the Sheet) -
+stands on a black rim at its edge fading to clear `HALO` millimetres out ("Panel Edges", the owner's
+choice; it takes the place of the scheme's lift). **Painted, not LVGL's shadow**: as a shadow it cost
+a full redraw with a window open 45 ms more on the P4_5 and banded into visible steps; as four A8
+corner images and four 16 px edge strips (tiled), black, ordered-dithered (4 x 4 Bayer, its strength
+from the scheme's ground) and painted once per size and scheme into PSRAM, it costs ~28 ms on the
+same frame and does not band. `haloAttach()` draws it in the object's `DRAW_MAIN_BEGIN`, under it,
+and widens the object's redraw area by `haloWidth()`; nothing is drawn while the object is smaller
+than its own corners (a panel's first frames).
+
+### Cards - the `KS_CARD_*` roles (2.11 round 1)
+
+The cards came onto the kit when 2.11 changed them (`ui-architecture.md` §6): the wrapper in its
+cell (`KS_CARD_ROOT`, a flex column), a plain holder (`KS_CARD_PLAIN`), the surface (`KS_CARD_SURFACE`:
+radius, border, the scheme's shadow) and its padded body (`KS_CARD_BODY`), a tag's strip and pill
+(`KS_CARD_STRIP`, `KS_CARD_PILL`), the badge of a card with no header (`KS_CARD_BADGE`), the hero's
+disc (`KS_CARD_DISC`), the name (`KS_CARD_NAME`), small words (`KS_CARD_SMALL`) and those in the
+surface's colour on a tag or band (`KS_CARD_TAGTEXT`), the unit, the status row's icon, the
+long-stale diagonal. **What follows the card's state stays the card's own** - a colour, a paused
+card's mixed surface, the press look, a size worked out from its cell. Proved by the harness on the
+P4_5 and the 4B: no pixel moved on the pages (only fonts on status-row labels that are never drawn).
+
+### A cluster and its mini tiles (2.11, K89, K100-K104; `Cards/ClusterCard`, `Cards/MiniTile.cpp`)
+
+**A group card shown as a block of its members**: the card's surface, a header row
+(`KS_CLUSTER_HDR`: one line, a rule under it) holding the group's swatch (`KS_CLUSTER_SWATCH`) and
+the cluster's name (`KS_CLUSTER_TITLE`) on the left and the header's members' values on the right
+(`KS_CLUSTER_VALUE`, an icon in its tint beside each) - placed by the page header's planner of
+claims (`Layout/HeaderPlan.h`): the name a resident, each value a claim whose icon gives way first,
+the last slot first. In **Band** style (saved `bar`) the row is the group's colour (a skirt squares its foot) and
+the words the surface's. **A mini tile** (`KS_TILE`, `KS_TILE_PRESSED`, `KS_TILE_NAME`) is a whole
+card drawn without a border: a state's lit disc (on: a solid disc in the active colour, or the
+light's own; off: the faint disc) or a value and its unit, its entity label under it; its badge and
+diagonal as a card's. The tiles stand where `Layout::tileGrid()` puts them; a cluster asks the page
+for `Layout::clusterSpan()` cells (`include/Layout/Cluster.h`, host-tested).
 
 ---
 
@@ -353,7 +429,7 @@ only folds it. Forgotten when the sheet closes.
 
 | Client | What it adds to the frame |
 |---|---|
-| The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties, Card UI), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity; its own timeout, bar and selector look (Card UI, D-28) |
+| The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties, Card UI; a cluster's window opens on Members with the CLUSTER panel and Header options, K129), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity; its own timeout, bar and selector look (Card UI, D-28) |
 | "About this board" (`UI/AboutSheet`; every build, from the About button on the system panel, K74, #97; debug builds also `GET /popup?about=1`) | one view of fact rows - the board, its screen and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second; no tabs, no panels |
 | "UI Tweaks" (`UI/TweaksSheet`, 2.8 round 3; the system panel's UI Tweaks button, a swipe down on the left half, debug builds `GET /popup?tweaks=1`) | one view of choice rows, then Tokens and Reset all (asked in a dialog); what each row sets is `GUIManagerTweaks.cpp`'s; the deck rises beside it (`sheetBeside()`) |
 

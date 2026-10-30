@@ -165,7 +165,7 @@ const UIMetrics UI_MET_DARK  = {
     .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 0, .HEADER_H = 14,
     .SHADOW_Y = 0, .SHADOW_OPA = 0,
     .ACTIVE_RING = 3, .ACTIVE_EDGE = 2, .BRACKET_W = 6, .GLOW_DEPTH = 18, .GLOW_OPA = 115, .CUT_PCT = 24,
-    .ACTIVE_INK = 0
+    .ACTIVE_INK = 0, .HALO_PCT = 25
 };
 // Linen's. A 2 px border, darker than the old hairline (the owner: "make it a
 // bit darker and increase by 1 or 2px", knobs included - the drawer's buttons
@@ -186,7 +186,7 @@ const UIMetrics UI_MET_LIGHT = {
     .RADIUS = 12, .PAD = 5, .BORDER_W = 2, .BORDER_OPA_PCT = 34, .SHADOW = 6, .HEADER_H = 14,
     .SHADOW_Y = 3, .SHADOW_OPA = 140,
     .ACTIVE_RING = 3, .ACTIVE_EDGE = 2, .BRACKET_W = 6, .GLOW_DEPTH = 18, .GLOW_OPA = 150, .CUT_PCT = 24,
-    .ACTIVE_INK = 35
+    .ACTIVE_INK = 35, .HALO_PCT = 25
 };
 
 // The card window's shape and spacing, in millimetres (2.12 P2, the header's
@@ -206,6 +206,10 @@ const UIShape UI_SHAPE = {
     .SLOP_SELECTOR = 1.0f, .SLOP_KNOB = 1.2f, .SLOP_HOLD = 4.0f,
     .P_GAP = 4.0f, .P_STACK_GAP = 3.0f, .P_GRIP_INSET = 1.4f, .P_GRIP_H = 0.5f, .P_GRIP_MIN = 5.0f,
     .P_MARK_H = 2.6f, .P_MARK_LINE = 0.35f, .P_SCENE_H = 9.0f, .P_SCENE_GAP = 1.4f, .P_SCENE_PAD = 2.4f,
+    .C_HDR_H = 5.2f, .C_PAD = 1.1f, .C_TILE_GAP = 0.8f, .C_SWATCH_W = 1.1f, .C_SWATCH_H = 2.4f,
+    .C_VALUE_GAP = 1.3f, .C_TILE_MIN = 7.5f, .C_TILE_FOOT = 1.5f, .C_TILE_TALL = 1.1f, .C_TILE_FOOT_AT = 18.0f,
+    .HALO = 5.0f, .LINE_FADE = 2.5f,
+    .KEY_H = 7.0f, .KEY_GAP = 1.0f,
 };
 
 // The page header's slots (2.8). GLYPH, DOT_*, SLOT_GAP and LINE are the
@@ -379,6 +383,15 @@ const UIType &type() {
         // cost recorded in docs/design/tokens.md. Point it somewhere larger
         // when a fullscreen card actually needs one.
         .HERO    = FLEET_FONT_VALUE,
+        // The roomy hero (2.11 round 9): on the 7" boards a tile or card with
+        // room for it draws its glyph 1.5 x ICON - fleet_icons_46, the face the
+        // 4B already uses as ICON (6.9 mm here; ~119 KB of flash on these two
+        // boards). Elsewhere ICON itself, which costs nothing.
+#if defined(CYD_P4_1060) || defined(WS_P4_7B)
+        .ICON_XL = &fleet_icons_46,
+#else
+        .ICON_XL = FLEET_ICONS_LG,
+#endif
     };
     return t;
 }

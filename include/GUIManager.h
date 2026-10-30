@@ -60,6 +60,9 @@ public:
     // currently showing, so the first press moves by one rather than jumping.
     void nudgeColumns(int8_t steps);
     void nudgeRows(int8_t steps);
+    // SINCE 2.11 ROUND 9 each press PINS that count for the page - the arranger
+    // keeps it and chooses the rest - and gridAuto() takes both pins away.
+    void gridAuto();
     void toggleDeck();
 
     // LVGL's FPS / CPU overlay, bottom-right. Swipe up from the bottom-right
@@ -142,6 +145,8 @@ private:
     void onSlotTap(uint8_t slot);
     void openSlotPanel(uint8_t slot);
     void closeSlotPanel(bool animate);
+    void openHiddenSheet();   // the page's hidden cards, each with Restore (round 6)
+    uint8_t hiddenCount();    // ...how many: from the page and from its clusters (round 7)
     void syncScrim();                // the dismiss scrim catches taps while any panel is open
     // The page's header, shown or hidden (D-14): the owner's choice for the
     // page (Settings pages.<slug>.header), else the page's compiled default.
@@ -159,6 +164,10 @@ private:
     // rises under its window.
     void applySavedScheme();
     void saveGrid();
+    // The system panel's development Reset (2.11 round 9): the dashboard and its
+    // clusters back to the compiled ones, the looks and pins kept; its line's words.
+    void resetDashboard();
+    void dashboardText(char *brief, size_t nb, char *detail, size_t nd);
     template <typename F> void everyPage(F f) { for (uint8_t i = 0; i < _nPages; i++) f(_pages[i]); }
     friend struct GUITweaks;
     bool        _deckRaised   = false;   // the deck is up under UI Tweaks
@@ -286,6 +295,10 @@ private:
     uint8_t         _colsOverride = 0;      // 0 = derive from TARGET_CARD_W
     uint8_t         _rowsOverride = 0;      // 0 = let the cards decide
 #endif
+    // THE PAGE'S PINS (2.11 round 9): the counts the owner chose with Col / Row,
+    // which the arranger keeps; 0 = not pinned (it chooses, starting from the
+    // board's grid above). A pinned count is also the flow's override.
+    uint8_t         _pinCols = 0, _pinRows = 0;
     // WHAT EACH PAGE REMEMBERS. Every drawer knob except Deck and Hide Bar is
     // PER PAGE - the owner, 2026-09-23: "the header and the deck are
     // functional components of the dashboard in general so those should
@@ -309,6 +322,8 @@ private:
         uint8_t         cols;
         uint8_t         rows;
         uint8_t         scheme;     // UI::schemeIndex()
+        uint8_t         pinCols;    // the counts the owner pinned (2.11 round 9); 0 = the arranger's
+        uint8_t         pinRows;
     };
     static constexpr uint8_t GUI_MAX_PAGES = 8;
     PageLive  _pages[GUI_MAX_PAGES] = {};

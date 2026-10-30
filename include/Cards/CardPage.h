@@ -8,6 +8,7 @@
 #include "Cards/PageSpec.h"
 #include "EntityRegistry.h"
 #include "Layout/Layout.h"
+#include "Cards/PageArranger.h"   // the arranger's kept answers (2.11 round 2)
 
 // ---------------------------------------------------------------------------
 // CardPage - a grid of cards, rendered from a PageSpec.
@@ -95,6 +96,11 @@ public:
     // Call before commit().
     void setRowsOverride(uint8_t rows) { _rowsOverride = rows; }
 
+    // THE PAGE'S PINNED GRID (2.11 round 9): the system panel's Col / Row, which
+    // the arranger keeps - columns, rows or both - choosing the rest itself. 0 =
+    // not pinned. Call before applySpec().
+    void setPin(uint8_t cols, uint8_t rows) { _pinCols = cols; _pinRows = rows; }
+
     void commit();
 
     // Re-plan and re-place without rebuilding widgets. Correct for a span or
@@ -107,17 +113,60 @@ public:
     uint8_t   count() const { return _n; }
     uint8_t   placed() const { return _placed; }
     uint8_t   cellRows() const { return _sub ? (uint8_t)(_uRows / _sub) : _uRows; }
+    uint8_t   cellCols() const { return _sub ? (uint8_t)(_uCols / _sub) : _uCols; }
+    // Placed by the arranger's kept answer, and its grid in units.
+    bool      arranged() const { return _arranged; }
+    uint8_t   unitCols() const { return _uCols; }
+    uint8_t   unitRows() const { return _uRows; }
     uint8_t   dropped() const { return (uint8_t)(_n - _placed); }
 
     // One line per card for the System Doctor: type, span, priority, where it
     // landed, and why it is not on screen if it is not.
     void report() const;
 
+    // CARDS CROWDED OFF THE PAGE (the sprint after round 7, the owner: "or they
+    // are easy to forget"): not hidden, not shown - plan() dropped them for room,
+    // lowest priority first. Noted at commit(), which frees the cards themselves,
+    // so the page's hidden cards can list them.
+    struct Crowded {
+        char id[CARD_ID_MAX + 1];         // "" when it has none
+        char name[ENTITY_NAME_MAX];       // the name it shows
+        char area[ENTITY_SHORT_MAX];      // for two of one name
+        bool cluster;
+    };
+    static constexpr uint8_t CROWDED_MAX = 12;
+    uint8_t        crowdedCount() const { return _nCrowded; }
+    const Crowded &crowded(uint8_t i) const { return _crowded[i < CROWDED_MAX ? i : 0]; }
+
 private:
     // Where one card ended up: the engine's Place (col, row, spans, placed,
     // pinFail). Held beside the card rather than on it because it is the PAGE's
     // decision and a card that moves to another page must not carry a stale one.
     using Slot = Layout::Place;
+
+    // One card from its spec, configured, the saved settings over it; null when
+    // its entity is not here. A group card made on the device (2.11): a cluster
+    // of its members, or - when it cannot fit, or the owner chose it - its card,
+    // or its summary (K98). `made`: the card to configure, in place of the one
+    // its entity's kind gives (a summary); deleted when the entity is not here.
+    Card *makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, uint8_t i,
+                   Card *made = nullptr);
+    Card *makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg);
+
+    // THE ARRANGER (2.11, K105, K109): the page's blocks - its cards and
+    // clusters - placed by the arranger's kept answer for exactly these blocks:
+    // its grid of units and each block's box, pinned. With no such answer the
+    // page flows as before and the arranger is started in the background
+    // (PageArranger.h); GUIManager builds the page again once its answer is kept.
+    void arrangePage(const PageSpec &spec);
+    void useUnits(uint8_t cols, uint8_t rows);
+    bool    _arranged = false;
+    uint8_t _arrCols = 0, _arrRows = 0;   // units
+    uint8_t _pinCols = 0, _pinRows = 0;   // cells; 0 = the arranger chooses
+    // Where each block is drawn (v9, round 11): the finish's rectangles, in pixels
+    // in the page's content area - off the unit grid once spare room is shared out.
+    Layout::ArrRect _arrRect[Layout::ARR_BLOCKS_MAX];
+    void placeArranged(Card *c, uint8_t i);
 
     // The whole layout decision: the cards as Layout items, placed by the flow
     // engine - plain arithmetic with no LVGL, tested off the board (host-tests/).
@@ -145,6 +194,8 @@ private:
     uint8_t     _n      = 0;
     uint8_t     _placed = 0;
     bool        _committed = false;
+    Crowded     _crowded[CROWDED_MAX];
+    uint8_t     _nCrowded = 0;
 
     // LVGL holds these BY POINTER for the lifetime of the container, not by
     // copy, so they are members rather than locals.

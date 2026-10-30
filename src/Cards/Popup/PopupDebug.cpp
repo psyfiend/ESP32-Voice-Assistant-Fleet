@@ -3,6 +3,9 @@
 #include "PopupState.h"
 #include "UI/AboutSheet.h"   // the Sheet's second client (2.12 P4)
 #include "UI/TweaksSheet.h"  // and UI Tweaks (2.8 round 3)
+#include "Cards/PageArranger.h"   // the arranger's last run, in the card list (2.11 round 2)
+#include "UI/SlotPanels.h"        // restore=-2: the page panel's View hidden cards (2.11, K96)
+#include "UI/HiddenSheet.h"       // restore=N: the hidden cards' sheet (round 6)
 
 namespace popup {
 
@@ -128,6 +131,12 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int sensorErr = -1; // 2.8 round 3 (T10): the header's sensor shown failed, 1; as it is, 0
                 int cardState = -2; // 2.8 round 4: the cards' active state 0-3, not saved; -1 the owner's
                 int32_t active = -1;// 2.8 round 6: the active colour, RRGGBB, not saved; 0 the scheme's own
+                int kbd = -1, kbMode = -1, kbPress = -1;   // 2.11 (K95): the keyboard
+                int restore = -1;                          // 2.11 (K96): the hidden cards' Restore N; -2 View hidden cards
+                int addTo = -1, mv = 0;                    // 2.11 (K91): Add to cluster N, copy or move
+                int addCards = -1;                         // ... a cluster's Add cards: the ticked, as a bit mask
+                int join = -1;                             // K92 rule 9: 1 opens "which group?", 2+N adds in group N
+                char kbType[24] = {};                      // ... words typed on it ('+' a space)
                 bool close = false, power = false, more = false, hist = false, mem = false; };
 bool (*s_drawerHook)(bool open) = nullptr;
 const char *(*s_headerHook)(const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn) = nullptr;
@@ -144,13 +153,14 @@ void dbgOut(const char *fmt, ...) {
     if (n > 0) s_dreqLen = LV_MIN(sizeof(s_dreqOut) - 1, s_dreqLen + (size_t)n);
 }
 
-// The cards on the screen, in tree order - the surfaces CARD_SURFACE_FLAG marks.
+// The cards on the screen, in tree order - the surfaces CARD_SURFACE_FLAG marks;
+// a cluster's mini tiles right after the cluster (2.11): they are inside it.
 int dbgCards(lv_obj_t *o, lv_obj_t **out, int n, int cap) {
     const uint32_t cnt = lv_obj_get_child_count(o);
     for (uint32_t i = 0; i < cnt && n < cap; i++) {
         lv_obj_t *c = lv_obj_get_child(o, (int32_t)i);
         if (lv_obj_has_flag(c, CardPopup::CARD_SURFACE_FLAG)) out[n++] = c;
-        else n = dbgCards(c, out, n, cap);
+        n = dbgCards(c, out, n, cap);
     }
     return n;
 }
@@ -190,6 +200,11 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "about", v, sizeof(v)) == ESP_OK) a.about = atoi(v);
         if (httpd_query_key_value(q, "drawer", v, sizeof(v)) == ESP_OK) a.drawer = atoi(v);
         if (httpd_query_key_value(q, "slot", v, sizeof(v)) == ESP_OK) snprintf(a.slot, sizeof(a.slot), "%s", v);
+        // 2.11 round 9, through the header hook as slot= is: the development Reset
+        // (dash=1 its dialog, 2 done) and the system panel's grid (grid=a Auto,
+        // cu / cd Col + / -, ru / rd Row + / -).
+        if (httpd_query_key_value(q, "dash", v, sizeof(v)) == ESP_OK) snprintf(a.slot, sizeof(a.slot), "dash%.1s", v);
+        if (httpd_query_key_value(q, "grid", v, sizeof(v)) == ESP_OK) snprintf(a.slot, sizeof(a.slot), "grid%.2s", v);
         if (httpd_query_key_value(q, "glyphs", v, sizeof(v)) == ESP_OK) a.glyphs = atoi(v);
         if (httpd_query_key_value(q, "pagehdr", v, sizeof(v)) == ESP_OK) a.pageHdr = atoi(v);
         if (httpd_query_key_value(q, "alarm", v, sizeof(v)) == ESP_OK) a.alarm = atoi(v);
@@ -197,6 +212,16 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "tweaks", v, sizeof(v)) == ESP_OK) a.tweaks = atoi(v);
         if (httpd_query_key_value(q, "sensorerr", v, sizeof(v)) == ESP_OK) a.sensorErr = atoi(v);
         if (httpd_query_key_value(q, "cardstate", v, sizeof(v)) == ESP_OK) a.cardState = atoi(v);
+        if (httpd_query_key_value(q, "kbd", v, sizeof(v)) == ESP_OK) a.kbd = atoi(v);
+        if (httpd_query_key_value(q, "restore", v, sizeof(v)) == ESP_OK) a.restore = atoi(v);
+        if (httpd_query_key_value(q, "addto", v, sizeof(v)) == ESP_OK) a.addTo = atoi(v);
+        if (httpd_query_key_value(q, "mv", v, sizeof(v)) == ESP_OK) a.mv = atoi(v);
+        if (httpd_query_key_value(q, "addcards", v, sizeof(v)) == ESP_OK) a.addCards = atoi(v);
+        if (httpd_query_key_value(q, "join", v, sizeof(v)) == ESP_OK) a.join = atoi(v);
+        if (httpd_query_key_value(q, "kbmode", v, sizeof(v)) == ESP_OK) a.kbMode = atoi(v);
+        if (httpd_query_key_value(q, "kbpress", v, sizeof(v)) == ESP_OK) a.kbPress = atoi(v);
+        if (httpd_query_key_value(q, "kbtype", a.kbType, sizeof(a.kbType)) == ESP_OK)
+            for (char *p = a.kbType; *p; p++) if (*p == '+') *p = ' ';
         if (httpd_query_key_value(q, "active", v, sizeof(v)) == ESP_OK)
             a.active = (int32_t)(strtoul(v[0] == '#' ? v + 1 : v, nullptr, 16) & 0xFFFFFF);
         // rows=N: test rows for SETTINGS, from the next window built (a byte
@@ -280,6 +305,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             const char *what = a.tweaks > 0 ? "tweaks" : (a.cardState > -2 || a.active >= 0) ? cs
                              : a.sensorErr ? "sensorerr" : "sensorok";
             dbgOut("%s\n", s_headerHook ? s_headerHook(what, -1, -1, -2, -1) : "no header hook (GUIManager gives it)");
+            if (a.tweaks == 2) TweaksSheet::debugScrollEnd();   // 2.11 round 4: to its last rows (the Halo slider)
         }
         s_dreq.store(DREQ_DONE);
         return;
@@ -322,8 +348,92 @@ void CardPopup::debugService(lv_timer_t *t) {
         s_dreq.store(DREQ_DONE);
         return;
     }
+    // 2.11 (K91, K100): addto=N as Add to a cluster with the Nth cluster on
+    // the page chosen, mv=1 Move (else Copy) - the window closes.
+    if (a.addTo >= 0) {
+        if (!isOpen()) dbgOut("no window open\n");
+        else if (visibilityAddTo((uint8_t)a.addTo, a.mv != 0)) { dbgOut("%s\n", a.mv ? "moved" : "copied");
+                                                                  s_dreq.store(DREQ_CLOSING); return; }
+        else dbgOut("cannot: not one entity, no such cluster, or in it already\n");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    // 2.11 (K92 rule 9): join=1 as Add card to dashboard - in a member's own
+    // view, or a tile's window - opening "which group?"; join=2+N its Add with
+    // group N chosen (0 the group card's, 1 the area's, then the others).
+    if (a.join >= 1) {
+        Card *held = isOpen() ? cardOf(h.surface) : nullptr;
+        if (!held) dbgOut("no window open\n");
+        else if (a.join == 1) {
+            Card *parent = nullptr;
+            const Entity *e = nullptr;
+            if (inMember() && s.ent[0]) { parent = held; e = s.ent[0]; }
+            else if (held->mini())
+                for (lv_obj_t *o = lv_obj_get_parent(h.surface); o && !parent; o = lv_obj_get_parent(o))
+                    if (lv_obj_has_flag(o, CardPopup::CARD_SURFACE_FLAG)) { parent = cardOf(o); e = held->firstEntity(); }
+            // A tile's own card, as its Visibility passes it: Copy or Move (the sprint after round 7).
+            Card *mc = (held->mini() && held->hasId()) ? held : (inMember() ? visibilitySubject() : nullptr);
+            if (parent && e) { visibilityJoinOpen(parent, e, mc); dbgOut("which group? for %s\n", e->desc.id); }
+            else dbgOut("not a member's view or a tile\n");
+        } else {
+            // join=2+N&mv=1: Move (out of a cluster) - the window closes.
+            if (visibilityJoin((uint8_t)(a.join - 2), a.mv != 0)) {
+                dbgOut(a.mv ? "moved\n" : "added\n");
+                if (a.mv) { s_dreq.store(DREQ_CLOSING); return; }
+            } else dbgOut("not added\n");
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    // 2.11 (K104, K91): addcards=MASK on a cluster's window - its Add cards
+    // with the cards whose bits are set ticked (bit 0 the list's first), mv=1
+    // Move, and Add. The window closes.
+    if (a.addCards > 0) {
+        if (!isOpen() || !s.cluster) dbgOut("no cluster's window open\n");
+        else if (const uint8_t n = clusterAddCards(a.mv ? 0u : (uint32_t)a.addCards, a.mv ? (uint32_t)a.addCards : 0u)) {
+            dbgOut("%s %u\n", a.mv ? "moved" : "copied", (unsigned)n);
+            s_dreq.store(DREQ_CLOSING);
+            return;
+        } else dbgOut("none added\n");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    // 2.11 (K96, round 6): restore=N as a tap on the Nth card's Restore in the
+    // hidden cards' sheet; restore=-2 as a tap on the page panel's "View hidden
+    // cards" (slot=page opens the panel first).
+    if (a.restore == -2) {
+        dbgOut(SlotPanels::viewHiddenDebug() ? "hidden cards: open\n" : "no View hidden cards in an open page panel\n");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.restore >= 0) {
+        dbgOut(HiddenSheet::restoreDebug((uint8_t)a.restore) ? "restoring hidden card %d\n"
+                                                             : "no hidden card %d in an open hidden cards sheet\n", a.restore);
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    // 2.11 (K95): the keyboard. kbd=1 opens it as the window's Rename does (a
+    // cluster) or Entity label's Custom (a card); kbd=2 as Card label's Custom.
+    // kbtype= words as the keys type them, kbmode= 0 lower, 1 upper, 2 symbols,
+    // kbpress= 1 Save, 2 Cancel, 3 the field emptied (before kbtype=).
+    if (a.kbd > 0 || a.kbType[0] || a.kbMode >= 0 || a.kbPress > 0) {
+        if (a.kbd > 0) {
+            if (!isOpen())                     dbgOut("no window open\n");
+            else if (s.cluster && a.kbd == 1)  clusterRename();
+            else                               cardUiTypeWords(a.kbd == 1);
+        }
+        if ((a.kbType[0] || a.kbMode >= 0 || a.kbPress > 0) && !Kit::keyboardDebug(a.kbType, a.kbMode, a.kbPress))
+            dbgOut("no keyboard showing\n");
+        lv_mem_monitor_t m;
+        lv_mem_monitor(&m);
+        dbgOut("keyboard %s; lv_mem used %lu\n", Kit::keyboardShowing() ? "showing" : "gone",
+               (unsigned long)(m.total_size - m.free_size));
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
     // K17: addcard=1 as SETTINGS' "Add as a card" in a member's own view;
-    // removecard=1 as "Remove card" tapped twice, on a card added here.
+    // removecard=1 as Visibility's "Hide from this page" and its dialog's Hide
+    // (K96, every card since 2.11: to the page's pool).
     if (a.addCard > 0 || a.removeCard > 0) {
         Card *held = isOpen() ? cardOf(h.surface) : nullptr;
         char id[CARD_ID_MAX + 1] = "";
@@ -332,21 +442,43 @@ void CardPopup::debugService(lv_timer_t *t) {
             if (!inMember() || !s.ent[0]) dbgOut("not in a member's own view\n");
             else if (CardAdded::add(*held, *s.ent[0], id, sizeof(id))) { dbgOut("added %s\n", id); deckSync(); }
             else dbgOut("not added\n");
-        } else if (a.removeCard == 2) {
-            // removecard=2: the dialog, as "Remove card" opens it.
-            if (CardAdded::isAdded(held->id())) { confirmRemove(); dbgOut("dialog up\n"); }
-            else dbgOut("%s is not a card added here\n", held->id());
-        } else if (a.removeCard == 3) {
-            // removecard=3 (2.12): the same dialog over ANY card's window, to be
-            // looked at - scripts/ui_golden.py, which must not touch the settings
-            // file. Its Remove does nothing for a card not added here
-            // (CardAdded::remove()); close=1 takes it down with the window.
-            confirmRemove();
-            dbgOut("dialog up, to look at\n");
+        } else if (a.removeCard == 2 || a.removeCard == 3) {
+            // removecard=2: the dialog, as "Hide" opens it. 3 (2.12, scripts/
+            // ui_golden.py) the same, to be looked at - the harness never taps
+            // its Hide, and close=1 takes it down with the window.
+            confirmHide();
+            dbgOut("dialog up\n");
+        } else if (a.removeCard == 4) {
+            // removecard=4 (2.11, K91): a copy in a cluster - its "Remove this copy?" dialog.
+            confirmRemoveCopy();
+            dbgOut(CardAdded::isMember(held->id()) ? "dialog up\n" : "not a copy made here\n");
+        } else if (a.removeCard == 5) {
+            // removecard=5: the copy removed, as the dialog's Remove - its entry deleted.
+            snprintf(id, sizeof(id), "%s", held->id());
+            if (CardAdded::removeMember(id)) { dbgOut("removed %s\n", id); close(); s_dreq.store(DREQ_CLOSING); return; }
+            dbgOut("%s is not a copy made here\n", id);
+        } else if (a.removeCard == 6 || a.removeCard == 7 || a.removeCard == 8) {
+            // The sprint after round 7: a card taken out of a cluster. 6 Remove from
+            // the page with no dialog (deleted), 7 its dialog, 8 Move back to the cluster.
+            snprintf(id, sizeof(id), "%s", held->id());
+            if (a.removeCard == 7) { confirmRemoveFromPage(); dbgOut("dialog up\n"); }
+            else if (a.removeCard == 6 ? CardAdded::drop(id) : CardAdded::moveBack(id)) {
+                dbgOut("%s %s\n", a.removeCard == 6 ? "removed" : "moved back", id);
+                close();
+                s_dreq.store(DREQ_CLOSING);
+                return;
+            } else dbgOut("%s: %s\n", id, a.removeCard == 6 ? "not a card made here, or a moved one"
+                                                           : "not moved out of a cluster");
+        } else if (held->mini()) {
+            // A mini tile's: Visibility's Hide from the cluster.
+            dbgOut("%s hidden from its cluster\n", held->id());
+            visibilityHideTile();
+            s_dreq.store(DREQ_CLOSING);
+            return;
         } else {
             snprintf(id, sizeof(id), "%s", held->id());
-            if (CardAdded::remove(id)) { dbgOut("removed %s\n", id); close(); s_dreq.store(DREQ_CLOSING); return; }
-            dbgOut("%s is not a card added here\n", id);
+            if (CardAdded::hide(id)) { dbgOut("hidden %s\n", id); close(); s_dreq.store(DREQ_CLOSING); return; }
+            dbgOut("%s: no id, or hidden already\n", id);
         }
         s_dreq.store(DREQ_DONE);
         return;
@@ -456,6 +588,10 @@ void CardPopup::debugService(lv_timer_t *t) {
             else if (a.view == 4 && hasScenes()) showView(PopupView::VIEW_SCENES);
             else if (a.view == 5) showView(PopupView::VIEW_PROPS);   // as SETTINGS' Entity properties
             else if (a.view == 6) showView(PopupView::VIEW_CARD_UI); // as SETTINGS' Card UI (2.8 round 3)
+            else if (a.view == 7 && s.cluster) showView(PopupView::VIEW_CLUSTER_SLOTS);   // 2.11: Header slots
+            else if (a.view == 8) showView(PopupView::VIEW_VISIBILITY);   // 2.11 (K96): as SETTINGS' Visibility
+            else if (a.view == 9) showView(PopupView::VIEW_ADD_TO);       // ... and its Add to a cluster
+            else if (a.view == 10 && s.cluster) showView(PopupView::VIEW_CLUSTER_ADD);   // a cluster's Add cards
             dbgMem(mem, sizeof(mem));
             dbgOut("view %d; %s\n", a.view, mem);
             // Why the last commands failed, newest first (G8).
@@ -629,6 +765,7 @@ void CardPopup::debugService(lv_timer_t *t) {
         dbgOut("%s; window %s; scheme %u, selector %d (-1: the scheme's own); faces flat so far %lu\n", mem,
                isOpen() ? "open" : "closed", (unsigned)UI::schemeIndex(), (int)chosenLook(),
                (unsigned long)Kit::facesFlat());
+        dbgOut("arranger: %s\n", PageArranger::lastText());   // 2.11 round 2
         for (int i = 0; i < n; i++) {
             Card *c = cardOf(cards[i]);
             if (c) dbgOut("%2d  %-16s %-12s %u entit%s\n", i, c->label(), c->_area,

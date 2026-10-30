@@ -9,6 +9,10 @@
 #include <string.h>
 #include <time.h>
 #include "Alarms.h"
+#include "Cards/CardAdded.h"   // this page's hidden cards (K66, K96)
+#include "Cards/CardTypes.h"   // ...and its clusters' (GroupPresent, round 7)
+#include "Cards/PageSpec.h"
+#include "UI/HiddenSheet.h"    // ...in their own sheet (round 6)
 #include "Settings.h"
 #include "UI/SlotPanels.h"
 #include "UI/TweaksSheet.h"
@@ -67,6 +71,16 @@ void GUIManager::openSlotPanel(uint8_t slot) {
         if (s >= 0) g->openSlotPanel((uint8_t)s);
     };
     c.refreshHeader = [](void *user) { ((GUIManager *)user)->_header.refresh(); };
+    // THIS PAGE'S HIDDEN CARDS (2.11, K66, K96): how many, and a button to their
+    // own sheet (round 6) - the panel goes first.
+    if (_header.slotKind(slot) == SlotKind::SLOT_PAGE && _pages[_curPage].spec) {
+        c.hiddenCount = hiddenCount();
+        c.viewHidden  = [](void *user) {
+            GUIManager *g = (GUIManager *)user;
+            g->closeSlotPanel(true);
+            g->openHiddenSheet();
+        };
+    }
     if (!SlotPanels::build(_header.slotKind(slot), _slotDrawer.face, c)) return;
     syncPanelOffset();
     Kit::drawerPlace(_slotDrawer, _header.slotCentreX(slot), _slotDrawer.top);
@@ -77,6 +91,98 @@ void GUIManager::openSlotPanel(uint8_t slot) {
     _panelTouchMs = millis();   // it waits the window timeout from now (D-22)
     _header.setOpenSlot(slot, _slotDrawer.x, _slotDrawer.x + _slotDrawer.w);
     syncScrim();
+}
+
+namespace {
+// WHAT A PAGE HAS HIDDEN (round 7, the owner: a card is in the page's hidden
+// cards only because someone hid it with "Hide from this page" - never because
+// it was moved into a cluster). The page's pool, then the cards crowded off it.
+// A member hidden from its cluster is not here (round 13, K125): the cluster's
+// Members list shows it and restores it.
+struct Hidden {
+    char id[CARD_ID_MAX + 1];
+    char name[ENTITY_NAME_MAX + 32];
+    char where[ENTITY_SHORT_MAX];   // a card's area, for two of one name
+    bool crowded;                   // not hidden: the page had no room for it
+};
+
+void nameOf(const EntityRegistry &reg, const char *label, const char *entity, const char *id, char *out, size_t cap) {
+    const Entity *e = entity && entity[0] ? reg.find(entity) : nullptr;
+    snprintf(out, cap, "%s", label && label[0] ? label : e && e->desc.name[0] ? e->desc.name
+                             : e && e->sourceName[0] ? e->sourceName : id);
+}
+
+uint8_t collectHidden(const PageSpec &page, const EntityRegistry &reg, const CardPage *built, Hidden *out, uint8_t cap) {
+    static CardAdded::PoolItem pool[HiddenSheet::MAX];
+    uint8_t n = CardAdded::pool(page, pool, LV_MIN(cap, HiddenSheet::MAX));
+    for (uint8_t i = 0; i < n; i++) {
+        Hidden &h = out[i];
+        h = Hidden{};
+        snprintf(h.id, sizeof(h.id), "%s", pool[i].id);
+        snprintf(h.where, sizeof(h.where), "%s", pool[i].area);
+        nameOf(reg, pool[i].label, pool[i].entity, pool[i].id, h.name, sizeof(h.name));
+    }
+    // CROWDED OFF THE PAGE (the sprint after round 7): not hidden, not shown -
+    // the page had no room, and dropped the lowest priority first. Listed so they
+    // are not forgotten; they come back when there is room.
+    for (uint8_t i = 0; built && i < built->crowdedCount() && n < cap; i++) {
+        const CardPage::Crowded &k = built->crowded(i);
+        Hidden &h = out[n++];
+        h = Hidden{};
+        snprintf(h.id, sizeof(h.id), "%s", k.id);
+        snprintf(h.where, sizeof(h.where), "%s", k.area);
+        snprintf(h.name, sizeof(h.name), k.cluster ? "%s cluster" : "%s", k.name);
+        h.crowded = true;
+    }
+    // Two cards called the same say where each is from ("Office Right (Office)").
+    bool twin[HiddenSheet::MAX] = {};
+    for (uint8_t i = 0; i < n && i < HiddenSheet::MAX; i++)
+        for (uint8_t j = 0; j < n && !twin[i]; j++) twin[i] = j != i && !strcmp(out[j].name, out[i].name);
+    for (uint8_t i = 0; i < n && i < HiddenSheet::MAX; i++) {
+        const size_t len = strlen(out[i].name);
+        if (twin[i] && out[i].where[0] && len + 4 < sizeof(out[i].name))
+            snprintf(out[i].name + len, sizeof(out[i].name) - len, " (%s)", out[i].where);
+    }
+    return n;
+}
+}  // namespace
+
+uint8_t GUIManager::hiddenCount() {
+    if (_curPage >= _nPages || !_pages[_curPage].spec) return 0;
+    static Hidden s_count[HiddenSheet::MAX];
+    return collectHidden(*_pages[_curPage].spec, _core.entities(), _page, s_count, HiddenSheet::MAX);
+}
+
+// THE PAGE'S HIDDEN CARDS, IN THEIR OWN SHEET (2.11 round 6): each goes back to
+// the page, which is built again under the sheet as each one is.
+void GUIManager::openHiddenSheet() {
+    if (_curPage >= _nPages || !_pages[_curPage].spec) return;
+    static Hidden s_items[HiddenSheet::MAX];
+    HiddenSheet::Spec sp;
+    sp.page = _pages[_curPage].spec->title;
+    sp.n    = collectHidden(*_pages[_curPage].spec, _core.entities(), _page, s_items, HiddenSheet::MAX);
+    bool crowded = false;
+    for (uint8_t i = 0; i < sp.n; i++) {
+        sp.names[i] = s_items[i].name;
+        sp.chip[i]  = s_items[i].crowded ? "No room" : "Restore to dashboard";
+        crowded |= s_items[i].crowded;
+    }
+    if (crowded)
+        sp.note = "No room: not hidden - this page had no room for it, and gave way lowest priority first. It "
+                  "comes back by itself when there is room: hide another card, or change the page's rows.";
+    sp.restore = [](void *user, uint8_t i) {
+        if (i >= HiddenSheet::MAX) return false;
+        const Hidden &h = s_items[i];
+        if (h.crowded) {   // nothing to restore: it was never hidden
+            UIToolkit::show_toast("No room on this page for it");
+            return false;
+        }
+        if (!CardAdded::restore(h.id)) return false;
+        Settings::save();
+        return true;
+    };
+    sp.user = this;
+    HiddenSheet::open(sp);
 }
 
 // Its tab closes once the drawer has finished closing (slotDrawerClosed()).
@@ -188,6 +294,26 @@ const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHd
         closeSlotPanel(false);
         if (_pnlSystem.isExpanded()) _pnlSystem.close();
         return "slot: closed";
+    }
+    // /popup?dash=1|2 (2.11 round 9): the development Reset - 1 its dialog, over
+    // the system panel; 2 done without asking (Saved). /popup?grid=: the panel's
+    // Auto (a) and Col / Row (cu, cd, ru, rd) - each Saved, as on the glass.
+    if (!strncmp(slotName, "dash", 4)) {
+        if (slotName[4] == '2') { resetDashboard(); return "dashboard: reset to the compiled one (saved)"; }
+        closeSlotPanel(false);
+        if (!_pnlSystem.isExpanded()) _pnlSystem.toggle();
+        _pnlSystem.askDashReset();
+        return "dashboard: the Reset's dialog";
+    }
+    if (!strncmp(slotName, "grid", 4)) {
+        const char *g = slotName + 4;
+        if      (!strcmp(g, "a"))  gridAuto();
+        else if (!strcmp(g, "cu")) nudgeColumns(+1);
+        else if (!strcmp(g, "cd")) nudgeColumns(-1);
+        else if (!strcmp(g, "ru")) nudgeRows(+1);
+        else if (!strcmp(g, "rd")) nudgeRows(-1);
+        snprintf(out, sizeof(out), "grid pins: %u x %u (0: the arranger's; saved)", (unsigned)_pinCols, (unsigned)_pinRows);
+        return out;
     }
     // /popup?scheme=N: the scheme on every page, as the system panel shows it,
     // NOT saved - a capture leaves the owner's choice in the file.

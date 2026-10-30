@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "Settings.h"
+#include "Cards/CardAdded.h"     // the development Reset (round 9)
+#include "Cards/ClusterCard.h"   // the clusters' header glyphs (round 11)
 #include "Cards/CardIcons.h"     // cardLabelMode(), cardSetLabelMode()
 #include "Cards/CardPopup.h"
 #include "UI/Sheet.h"            // windowCloseMs(), sheetBeside()
@@ -86,21 +88,60 @@ void GUIManager::chooseScheme(uint8_t i, bool save) {
 // --- The grid's counts (the system panel's Col / Row) -------------------------------
 // PER PAGE, as they always were (owner, 2026-09-23: "a page built for a fixed
 // set of cards needs its own arrangement") - and saved with the page now.
+// SINCE 2.11 ROUND 9 A COUNT IS A PIN: saved only while pinned, kept by the
+// arranger, which chooses the rest; unpinned, the flow (a page the arranger does
+// not place) takes the board's own grid.
 void GUIManager::saveGrid() {
+    _colsOverride = _pinCols ? _pinCols : s_ship.cols;
+    _rowsOverride = _pinRows ? _pinRows : s_ship.rows;
     UI::setColumnsOverride(_colsOverride);
     if (_curPage < _nPages && _pages[_curPage].spec) {
         PageLive &p = _pages[_curPage];
         p.cols = _colsOverride;
         p.rows = _rowsOverride;
+        p.pinCols = _pinCols;
+        p.pinRows = _pinRows;
         char c[6], r[6];
-        snprintf(c, sizeof(c), "%u", (unsigned)_colsOverride);
-        snprintf(r, sizeof(r), "%u", (unsigned)_rowsOverride);
-        Settings::setPage(p.spec->slug, "cols", _colsOverride == s_ship.cols ? nullptr : _colsOverride ? c : "auto");
-        Settings::setPage(p.spec->slug, "rows", _rowsOverride == s_ship.rows ? nullptr : _rowsOverride ? r : "auto");
+        snprintf(c, sizeof(c), "%u", (unsigned)_pinCols);
+        snprintf(r, sizeof(r), "%u", (unsigned)_pinRows);
+        Settings::setPage(p.spec->slug, "cols", _pinCols ? c : nullptr);
+        Settings::setPage(p.spec->slug, "rows", _pinRows ? r : nullptr);
         Settings::save();
     }
     rebuildDashboard();
-    Serial.printf("[UI] grid -> %u x %u (0: auto)\n", (unsigned)_colsOverride, (unsigned)_rowsOverride);
+    Serial.printf("[UI] grid pins -> %u x %u (0: the arranger's)\n", (unsigned)_pinCols, (unsigned)_pinRows);
+}
+
+// --- The development Reset (the system panel's, 2.11 round 9) ----------------------
+// THE DASHBOARD AND ITS CLUSTERS BACK TO THE COMPILED ONES (the owner: "a Reset
+// button would help during development"): CardAdded's reset - every card made
+// here deleted, every hide and move undone, the clusters' members and header
+// slots as built - and every page's kept arrangement forgotten, so each arranges
+// itself again. The looks, the schemes, UI Tweaks and the pins stay. The page is
+// taken down first: a card points at a record CardAdded reads again.
+void GUIManager::resetDashboard() {
+    savePageState();
+    destroyDashboard();
+    CardAdded::resetToCompiled(true);
+    for (uint8_t i = 0; i < _nPages; i++)
+        if (_pages[i].spec && _pages[i].spec->slug) Settings::setPage(_pages[i].spec->slug, "layout", nullptr);
+    Settings::save();
+    CardAdded::takeChanged();   // built now, not again on the next pass
+    rebuildDashboard();
+}
+
+// The system panel's Dashboard line, and the dialog's count of what goes.
+void GUIManager::dashboardText(char *brief, size_t nb, char *detail, size_t nd) {
+    const CardAdded::ResetCount c = CardAdded::resetToCompiled(false);
+    const unsigned all = (unsigned)c.made + c.hidden + c.members + c.clusters;
+    if (!all) snprintf(brief, nb, "as built");
+    else      snprintf(brief, nb, "%u change%s", all, all == 1 ? "" : "s");
+    if (!all) snprintf(detail, nd, "Nothing here differs from the dashboard as built.");
+    else      snprintf(detail, nd, "On this board now: %u card%s made here, %u hidden or moved, %u cluster "
+                                   "member%s hidden or moved out, %u cluster setting%s.",
+                       (unsigned)c.made, c.made == 1 ? "" : "s", (unsigned)c.hidden,
+                       (unsigned)c.members, c.members == 1 ? "" : "s",
+                       (unsigned)c.clusters, c.clusters == 1 ? "" : "s");
 }
 
 // --- The card looks (UI Tweaks) ----------------------------------------------------
@@ -166,6 +207,9 @@ void GUIManager::setGlyphs(GlyphStyle g) {
     // Saved by name; the default (square, D-20) as nothing.
     Settings::setSystem("header", "glyphs", g == GLYPH_DEFAULT ? nullptr : glyphStyleName(g));
     Settings::save();
+    // The clusters' header values take it too (round 11, K115).
+    ClusterCard::setGlyphStyle(g);
+    rebuildDashboard();
     Serial.printf("[UI] header glyphs -> %s\n", glyphStyleName(g));
 }
 
@@ -178,11 +222,13 @@ void GUIManager::resetUiTweaks() {
     Settings::setSystem("header", "glyphs", nullptr);
     Settings::setSystem("window", "close", nullptr);
     Settings::setSystem("window", "bar", nullptr);
-    for (const char *s : SCHEME_NAMES) Settings::setScheme(s, "selector", nullptr);
+    for (const char *s : SCHEME_NAMES) { Settings::setScheme(s, "selector", nullptr); Settings::setScheme(s, "halo", nullptr); }
     Kit::forgetSelectorLooks();
+    Kit::forgetHaloStrengths();
     Settings::save();
     applyUiSettings();
     _header.setGlyphStyle(savedGlyphStyle());
+    ClusterCard::setGlyphStyle(savedGlyphStyle());
     rebuildDashboard();
     // The open window waits as shipped from now (round 4: at once).
     if (Kit::Sheet *s = Kit::sheetShowing()) Kit::sheetRetime(*s, Kit::windowCloseMs(), Kit::windowBarShown());
@@ -321,6 +367,11 @@ struct GUITweaks {
         Settings::save();
         retime();
     }
+    // THE HALO'S STRENGTH (2.11 round 4), for the scheme showing: a slider, kept
+    // per scheme (schemes.<name>.halo); its own value is the scheme's (50 / 30).
+    static int16_t haloNow()          { return (int16_t)Kit::haloStrength(); }
+    static void    haloSet(int16_t v) { Kit::keepHaloStrength((uint8_t)LV_CLAMP(0, v, 100)); Settings::save(); }
+
     static uint8_t barNow()          { return Kit::windowBarShown() ? 0 : 1; }
     static void    barSet(uint8_t i) {
         Settings::setSystem("window", "bar", i ? "off" : nullptr);
@@ -330,7 +381,7 @@ struct GUITweaks {
 
     static constexpr TweaksSheet::Row ROWS[] = {
         { "Glyphs",         GLYPHS,  3, glyphsNow,  glyphsSet  },
-        { "Card label",     LABEL,   4, labelNow,   labelSet   },
+        { "Label type",     LABEL,   4, labelNow,   labelSet   },   // the card label's TYPE; Card UI's "Card label" is its words (round 10)
         { "Entity label",   ENTITY,  4, entityNow,  entitySet  },
         { "Card state",     STATE,   4, stateNow,   stateSet   },
         { "Selector",       METAL,   3, metalNow,   metalSet   },
@@ -338,6 +389,7 @@ struct GUITweaks {
         { "Card density",   DENSITY, 3, densityNow, densitySet },
         { "Window timeout", TIMEOUT, 4, timeoutNow, timeoutSet },
         { "Timer bar",      ONOFF,   2, barNow,     barSet     },
+        { "Halo",           nullptr, 0, nullptr,    nullptr,   0, 100, haloNow, haloSet, "%" },
     };
 
     // THE DECK RISES UNDER THE WINDOW (D-25): its panels' headers along the

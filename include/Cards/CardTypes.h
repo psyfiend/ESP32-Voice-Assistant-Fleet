@@ -364,6 +364,44 @@ inline bool cardLabelFromName(const char *n, CardLabel &out) {
 }
 
 // ---------------------------------------------------------------------------
+// GROUP CARDS (2.11, DECISIONS K88-K92). A group card stands for a set of
+// entities; its members are cards of their own (an id, their own settings). How
+// it is SHOWN is its presentation (K90, K92 rule 6): one card, or a CLUSTER - a
+// block of its members on the page, each a mini tile (K89). A cluster that
+// cannot fit is shown as its card. A SUMMARY (2.11 round 4, K98): one card of
+// members of one kind - one icon, active while any member is, its words naming
+// the active ones ("North", "Both"); a tap opens its Members. The group page
+// (K99) comes later. Saved by name: "present": "card" / "cluster" / "summary".
+// ---------------------------------------------------------------------------
+enum class GroupPresent : uint8_t { PRESENT_CARD = 0, PRESENT_CLUSTER, PRESENT_SUMMARY };
+inline const char *groupPresentName(GroupPresent p) {
+    return p == GroupPresent::PRESENT_CLUSTER ? "cluster" : p == GroupPresent::PRESENT_SUMMARY ? "summary" : "card";
+}
+inline bool groupPresentFromName(const char *n, GroupPresent &out) {
+    if (!n) return false;
+    if (!strcmp(n, "card"))    { out = GroupPresent::PRESENT_CARD;    return true; }
+    if (!strcmp(n, "cluster")) { out = GroupPresent::PRESENT_CLUSTER; return true; }
+    if (!strcmp(n, "summary")) { out = GroupPresent::PRESENT_SUMMARY; return true; }
+    return false;
+}
+
+// A cluster header's style (K102): the group's colour as a SWATCH beside the
+// cluster's name, or the header a BAR in that colour. Page-wide (the page's
+// "cl_style"), each cluster able to take its own ("cl_style" on its card).
+enum class ClusterStyle : uint8_t { CLSTYLE_SWATCH = 0, CLSTYLE_BAR };
+inline const char *clusterStyleName(ClusterStyle s) { return s == ClusterStyle::CLSTYLE_BAR ? "bar" : "swatch"; }
+inline bool clusterStyleFromName(const char *n, ClusterStyle &out) {
+    if (!n) return false;
+    if (!strcmp(n, "swatch")) { out = ClusterStyle::CLSTYLE_SWATCH; return true; }
+    if (!strcmp(n, "bar"))    { out = ClusterStyle::CLSTYLE_BAR;    return true; }
+    return false;
+}
+
+static constexpr uint8_t GROUP_MEMBERS_MAX = 12;   // a group card's members
+static constexpr uint8_t CLUSTER_SLOTS_MAX = 4;    // the members a cluster header lists (a priority
+                                                   // list - the header shows what fits, K104)
+
+// ---------------------------------------------------------------------------
 // Where a card wants to sit, in grid UNITS.
 //
 // CHANGED AT 2.5, and the change is the unit rather than the fields: these

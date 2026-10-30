@@ -1,9 +1,11 @@
 # Groups, areas and clusters - what is a "group card"? (milestone 2.11, #66)
 
-**Status: interview §4 under way, 2026-10-19** - the names, mini tiles and what the glass edits are
-answered (§6.1); Claude's model of how the pieces fit is accepted (§6.3), with the owner's notes
-(§6.4); the mocks are next ("2.11 Clusters", Layout Playground v5). §1-5 are the draft taxonomy of 2026-10-01 and the owner's model of 2026-10-12; where they
-disagree with §6, §6 wins. Nothing here is built. Related:
+**Status: BUILT as milestone 2.11, `v0.2.19`** (2026-10-30; sixteen rounds, signed off -
+`archive/TEST_2.11.md`). §1-5 are the draft taxonomy of 2026-10-01 and the owner's model of
+2026-10-12; §6 the interview and its answers (K88-K105); §7 the build plan and what was built.
+Where §1-5 disagree with §6, §6 wins; where §6 disagrees with K106-K129 in `DECISIONS.md`, those
+win - **a cluster's window is its Members since K129** (no management screen). Not built: the group
+view and Add cards from HA (2.13, K118, K119, K123, K130). Related:
 `card-sheet.md` §6 (aggregate vs area, draft 2), `look-and-feel.md` §3.8 (clusters, the arranger),
 `ha-websocket.md` (area resolution, measured).
 
@@ -423,7 +425,8 @@ after.
   slots and in the page header too, an icon beside the count, a tap showing which.
   Claude: at zero, the slot shows its idle icon with no number - dashes mean "no data" (D-15).
 - **C6, the cluster's management screen - the owner's layout (K104)**, replacing the mock's Tile /
-  Header / Hidden row:
+  Header / Hidden row (**superseded by K129, round 16**: the window opens on Members; the CLUSTER
+  panel holds Rename cluster, Header options and Add cards - §7):
   - **HEADER**: *Style* - Swatch / Bar; a *Slots* button opening a view with *Show sensor icons*
     (a checkbox) and the cluster's sensors, each with a checkbox.
   - **MEMBERS**: two columns, *Name* (the entity labels) and *Visible* (a checkbox each); *Add cards*
@@ -440,9 +443,19 @@ after.
 
 ## 7. The build - a proposal for the session that builds 2.11
 
-The design is agreed enough to build (the owner, 2026-10-19: "are we at a handoff point ready for
-build?"). **The building session first puts this plan, and the settings file's new entries, to the
-owner** - a structural choice a turn before it is built (W7) - then branches off `main`.
+The plan the building session put to the owner, agreed 2026-10-19 (K106, K107); what the rounds
+built is below and in `archive/TEST_2.11.md`.
+
+**Agreed 2026-10-19 (K106, K107)**, the building session's proposal: **round 1** as below; **round 2
+the arranger** (its speed is the one unknown that could change the design - better known before
+round 3 makes pages change often); **round 3** what the glass edits, **with the on-screen keyboard**
+(making a cluster names it); **round 4** the summary card, count slots, extending a source group,
+group pages. The settings file's new entries are additive (same file, `schema` 1, names, existing
+sections): a group card's `present` (card / cluster / summary), `slots` (member ids, highest
+priority first), `cl_style` (swatch / bar), `cl_icons` (off); a member's `in`, `hidden` (yes / no),
+`tap_set`; `removed` on every card; a page's `cl_style`, `layout` (the arranger's kept answer),
+`of` (a group page); `system.arranger.*`. A cluster's header: long press its window, tap nothing.
+Built on `feat/2.11-group-cards`; the owner's sheet is `docs/archive/TEST_2.11.md`.
 
 - **Round 1 - clusters on the page.** The cards come onto the kit first (`ui-architecture.md` §6:
   roles for a card's surface, hero, labels; the harness proves nothing moved), in new files - `Card.cpp`
@@ -464,6 +477,30 @@ owner** - a structural choice a turn before it is built (W7) - then branches off
   and an S3 before the page relies on it; its weights adjustable from the PC so the owner can tune
   on glass. Its own round once clusters exist - round 2 or 3, the building session's call.
 - **Still open, each to ask with a recommendation when its round comes:** §4 Q8 (how "back" works
-  from a group opened as a page); the other half of Q6 (a long press on a cluster's header - Claude:
-  the cluster's own window, its management screen inside); spreading spare room as margins on a page
+  from a group opened as a page); the other half of Q6 (a long press on a cluster's header - answered
+  by K107 and K129: the cluster's window, on its Members); spreading spare room as margins on a page
   with too little on it (the 7B's House page).
+
+**As built, round 3 (2026-10-19, unattended; `docs/archive/TEST_2.11.md` round 3; rounds 4-16 are recorded there).** What the glass edits,
+on the kit, in the card window's views:
+
+- **The cluster's window** (`Popup/PopupCluster.cpp`, K104; **K129 since round 16**): it opens on
+  **Members** - a cluster has no Details view - with the **CLUSTER** panel beside SETTINGS: **Rename
+  cluster** (the keyboard; the cluster's `label_text`, empty = its group's name), **Header options**
+  (its sensors as Members' rows with their readings, satin, glass while in the header, four at most;
+  then Sensor icons Show / Hide and Header style Inherit / Swatch / Band) and **Add cards** (the
+  page's one-entity cards, Copy / Move). A member is shown or hidden from its own Visibility.
+- **The keyboard** (`Kit::keyboard()`, K95): a kit component, ASCII only, 7 mm keys. Used by the
+  cluster's Name and by Card UI's Custom chips (a card's name; its card label's words).
+- **Visibility** (`Popup/PopupVisibility.cpp`, K96) replaces SETTINGS' Remove card: **on the page**
+  Hide from this page (K66 for every card: `removed` on its entry, the page's pool) and Add to a
+  cluster (Copy / Move, K100); **a mini tile** Hide from the cluster, Add card to dashboard, and
+  Remove from the cluster for a copy made on the glass (deleted). **The page's hidden cards** are
+  listed in the page slot's panel with Restore.
+- **Copies in a cluster** (K91) are card entries with `in` (the cluster's id), built after its
+  compiled members (`CardAdded::membersIn()`, `CardPage::makeGroupCard()`); a copy takes the name its
+  card shows and wears the cluster's group (rule 2). **Move** = a copy and the card to the pool.
+- **"Which group?"** (rule 9) before Add card to dashboard: the group card's group chosen already,
+  the entity's HA-area group beside it, every other in a list.
+- **Not built**: group cards and a new group card as Add targets; the card list (HA entities not on
+  the page, making a cluster from a group); Delete from the pool; groups named on the glass.

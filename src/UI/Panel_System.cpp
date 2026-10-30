@@ -26,8 +26,7 @@ void Panel_System::reportSink(const char *line) {
 // supposed to be attached to - otherwise hiding the bar leaves it floating a
 // header's height down an empty screen.
 void Panel_System::setTopOffset(int32_t y) {
-    _drawer.top = y;
-    if (_drawer.root) lv_obj_set_y(_drawer.root, y);
+    Kit::drawerSetTop(_drawer, y);
 }
 
 void Panel_System::setAnchorX(int32_t centreX) {
@@ -47,6 +46,18 @@ static void colDownCb(lv_event_t *) { if (s_self) s_self->requestGrid(Panel_Syst
 static void colUpCb(lv_event_t *)   { if (s_self) s_self->requestGrid(Panel_System::GridAction::CARD_W_UP); }
 static void rowDownCb(lv_event_t *) { if (s_self) s_self->requestGrid(Panel_System::GridAction::ASPECT_DOWN); }
 static void rowUpCb(lv_event_t *)   { if (s_self) s_self->requestGrid(Panel_System::GridAction::ASPECT_UP); }
+static void gridAutoCb(lv_event_t *) { if (s_self) s_self->requestGrid(Panel_System::GridAction::GRID_AUTO); }
+
+// The development Reset's question (2.11 round 9), on the top layer over the panel.
+static lv_obj_t *s_confirm = nullptr;
+static void confirmClose() {
+    if (s_confirm) { lv_obj_delete(s_confirm); s_confirm = nullptr; }
+}
+static void dashCancelCb(lv_event_t *) { lv_async_call([](void *) { confirmClose(); }, nullptr); }
+static void dashResetCb(lv_event_t *) {
+    lv_async_call([](void *) { confirmClose(); if (s_self) s_self->confirmDashReset(); }, nullptr);
+}
+static void dashAskCb(lv_event_t *) { lv_async_call([](void *) { if (s_self) s_self->askDashReset(); }, nullptr); }
 static void schemeChosen(uint8_t i) { if (s_self) s_self->chooseScheme(i); }
 
 void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
@@ -100,6 +111,7 @@ void Panel_System::rebuild() {
     if (!_ui_content) return;
     lv_obj_clean(_ui_content);
     for (lv_obj_t *&v : _connVal) v = nullptr;
+    _gridVal = nullptr;
     _schemeSel = Kit::Selector{};
     buildContent();
 }
@@ -128,11 +140,16 @@ void Panel_System::buildContent() {
 
     // --- SYSTEM - DIAGNOSTICS: development tools for now (D-17) ------------
     Kit::drawerTitle(_ui_content, "SYSTEM - DIAGNOSTICS");
+    // Reset (2.11 round 9, the development Reset) asks first: its dialog says
+    // what would go.
     lv_obj_t *r = Kit::drawerRow(_ui_content);
-    const int32_t w3 = (inner - 2 * gap) / 3;
+    const int32_t w4 = (inner - 3 * gap) / 4;
+    const int32_t wT = LV_MAX(w4, Kit::textW("UI Tweaks", UI::type().NAME) + 2 * UI::mm(UI::shape().S5));
+    const int32_t w3 = (inner - 3 * gap - wT) / 3;   // the other three share what UI Tweaks leaves
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Log", w3, btnH, logCb);
-    Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "UI Tweaks", w3, btnH, tweaksCb);
+    Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "UI Tweaks", wT, btnH, tweaksCb);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "About", w3, btnH, aboutCb);
+    Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Reset", w3, btnH, dashAskCb);
 
     // "Scheme:" and one of three (round 4: the Status bar toggle went - the page
     // panel's Show / Hide is the one way to hide the header).
@@ -148,17 +165,59 @@ void Panel_System::buildContent() {
     sp.onChosen = schemeChosen;
     Kit::selector(_schemeSel, r, sp);
 
-    // The grid's counts: columns and rows, "A" past the ends.
+    // The page's grid (2.11 round 9): pinned counts or the arranger's choice, in
+    // words, and Auto to take the pins away; then the counts, each press a pin.
     r = Kit::drawerRow(_ui_content);
-    const int32_t w4 = (inner - 3 * gap) / 4;
+    lv_label_set_text(Kit::label(r, Kit::KitStyle::KS_LABEL_NAME_DIM), "Grid:");
+    _gridVal = Kit::label(r, Kit::KitStyle::KS_LABEL_NAME);
+    lv_label_set_long_mode(_gridVal, LV_LABEL_LONG_DOT);
+    lv_obj_set_flex_grow(_gridVal, 1);
+    Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Auto", w4, btnH, gridAutoCb);
+    refreshGrid();
+    r = Kit::drawerRow(_ui_content);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Col -", w4, btnH, colDownCb);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Col +", w4, btnH, colUpCb);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Row -", w4, btnH, rowDownCb);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Row +", w4, btnH, rowUpCb);
 }
 
+void Panel_System::askDashReset() {
+    confirmClose();
+    if (!_expanded) return;
+    static char detail[200];   // the dialog keeps a pointer to its words
+    char brief[48];
+    detail[0] = '\0';
+    if (_dashText) _dashText(brief, sizeof(brief), detail, sizeof(detail));
+    Kit::DialogSpec d = {};
+    d.role    = Kit::DialogRole::DLG_DESTRUCTIVE;
+    d.title   = "Reset the dashboard?";
+    d.body[0] = "The cards and clusters go back to how they were built: cards made on this board are "
+                "deleted, hidden and moved cards come back, clusters lose added members and header "
+                "changes, and every page arranges itself again. Names, labels, tap actions, colors, "
+                "schemes, UI Tweaks and grid pins stay.";
+    d.body[1] = detail[0] ? detail : nullptr;
+    d.buttons[0] = { "Cancel", Kit::ButtonRole::BTN_CANCEL, dashCancelCb };
+    d.buttons[1] = { "Reset", Kit::ButtonRole::BTN_DESTRUCTIVE, dashResetCb };
+    d.nButtons = 2;
+    d.width    = LV_MIN(lv_obj_get_width(lv_screen_active()) * 3 / 4, UI::mm(UI::shape().W_DIALOG_MAX));
+    d.outside  = dashCancelCb;
+    s_confirm = Kit::dialog(d);
+}
+
+void Panel_System::confirmDashReset() {
+    close();
+    if (_onDashReset) _onDashReset();
+}
+
 void Panel_System::chooseScheme(uint8_t i) {
     if (_onScheme) _onScheme(i);
+}
+
+void Panel_System::refreshGrid() {
+    if (!_gridVal) return;
+    char t[48] = "";
+    if (_gridText) _gridText(t, sizeof(t));
+    lv_label_set_text(_gridVal, t);
 }
 
 void Panel_System::requestLog()    { if (_onLog) _onLog(); }
@@ -188,6 +247,7 @@ void Panel_System::toggle() {
         _connMs = millis();
         Kit::drawerOpen(_drawer);
     } else {
+        confirmClose();   // the Reset's question goes with the panel
         Kit::drawerClose(_drawer, true);
     }
 }

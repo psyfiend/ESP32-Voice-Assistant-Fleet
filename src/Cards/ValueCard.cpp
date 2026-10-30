@@ -1,22 +1,24 @@
 #include "Cards/ValueCard.h"
 #include "Cards/CardIcons.h"
 #include "UI/UITokens.h"
+#include "UI/Kit.h"
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
 
+using KS = Kit::KitStyle;
+
 // A transparent, padding-free container. Every row below is one.
 static lv_obj_t *plain(lv_obj_t *parent) {
     lv_obj_t *o = lv_obj_create(parent);
-    lv_obj_set_style_bg_opa       (o, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width (o, 0, 0);
-    lv_obj_set_style_pad_all      (o, 0, 0);
+    Kit::add(o, KS::KS_CARD_PLAIN);
     lv_obj_clear_flag             (o, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (o, LV_OBJ_FLAG_CLICKABLE);
     return o;
 }
 
 void ValueCard::buildBody(lv_obj_t *body) {
+    if (mini()) { buildMiniBody(body); return; }   // a cluster's tile (MiniTile.cpp)
     // A VERTICAL STACK, not a set of aligned pieces.
     //
     // Everything here used to be positioned by hand against something else,
@@ -85,10 +87,11 @@ void ValueCard::buildBody(lv_obj_t *body) {
 
     _value = lv_label_create(_valueRow);
     _unit  = lv_label_create(_valueRow);
+    Kit::add(_unit, KS::KS_CARD_UNIT);
 
     _name = lv_label_create(body);
+    Kit::add(_name, KS::KS_CARD_NAME);   // the name's face, centred
     lv_label_set_long_mode     (_name, LV_LABEL_LONG_DOT);
-    lv_obj_set_style_text_align(_name, LV_TEXT_ALIGN_CENTER, 0);
 
     // Battery on the left, last-seen on the right, on one line at the bottom.
     // RESERVED, always, in a full layout - see Card::statusBandHeight(). A
@@ -114,11 +117,15 @@ void ValueCard::buildBody(lv_obj_t *body) {
 
     _battIcon = lv_label_create(_battGroup);
     _battery  = lv_label_create(_battGroup);
+    Kit::add(_battIcon, KS::KS_CARD_ICON_SM);
+    Kit::add(_battery,  KS::KS_CARD_SMALL);
 
     _seen = lv_label_create(_statusRow);
+    Kit::add(_seen, KS::KS_CARD_SMALL);
 }
 
 void ValueCard::render() {
+    if (mini()) { renderMini(); return; }
     const Entity *e = primary();
     if (!e) return;
 
@@ -163,7 +170,6 @@ void ValueCard::render() {
     const char *dispUnit = cardDisplayUnit(*e, tempUnit());
     if (dispUnit[0]) {
         lv_label_set_text          (_unit, dispUnit);
-        lv_obj_set_style_text_font (_unit, t.UNIT, 0);
         lv_obj_set_style_text_color(_unit, UI::c(tone(p.TEXT_DIM)), 0);
         lv_obj_clear_flag          (_unit, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -181,7 +187,6 @@ void ValueCard::render() {
     if (showName) lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
     else          lv_obj_add_flag  (_name, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_text          (_name, shownName(lbl));
-    lv_obj_set_style_text_font (_name, t.NAME, 0);
     lv_obj_set_style_text_color(_name, UI::c(tone(p.TEXT_DIM)), 0);
     lv_obj_set_width           (_name, lv_pct(100));
 
@@ -226,10 +231,8 @@ void ValueCard::render() {
         snprintf(b, sizeof(b), "%d%%", pct);
 
         lv_label_set_text          (_battIcon, cardBatteryGlyph(pct));
-        lv_obj_set_style_text_font (_battIcon, t.ICON_SM, 0);
         lv_obj_set_style_text_color(_battIcon, UI::c(tone(p.TEXT_DIM)), 0);
         lv_label_set_text          (_battery, b);
-        lv_obj_set_style_text_font (_battery, t.TAG, 0);
         lv_obj_set_style_text_color(_battery, UI::c(tone(p.TEXT_DIM)), 0);
     } else {
         // Emptied rather than hidden. Hiding it removed it from the row, and
@@ -269,7 +272,6 @@ void ValueCard::render() {
         char full[24];
         snprintf(full, sizeof(full), "Seen: %s", age);
         lv_label_set_text          (_seen, full);
-        lv_obj_set_style_text_font (_seen, t.TAG, 0);
         lv_obj_set_style_text_color(_seen, UI::c(tone(p.TEXT_DIM)), 0);
 
         // MEASURED FROM THE TEXT, not from layout. This used to call

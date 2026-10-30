@@ -669,6 +669,20 @@ bool setCard(const char *cardId, const char *key, const char *value) {
     return changed;
 }
 
+bool dropCard(const char *cardId) {
+    if (!s_doc || !cardId || !*cardId) return false;
+    Lock l;
+    JsonObject root = s_doc->as<JsonObject>();
+    JsonVariant secV = root["cards"];
+    if (!secV.is<JsonObject>() || secV[cardId].isNull()) return false;
+    JsonObject sec = secV.as<JsonObject>();
+    sec.remove(cardId);
+    if (sec.size() == 0) root.remove("cards");
+    noteChange("cards", cardId, "(entry)", nullptr, true);
+    s_dirty = true;
+    return true;
+}
+
 bool setScheme(const char *schemeName, const char *key, const char *value) {
     if (!s_doc) return false;
     Lock l;

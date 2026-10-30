@@ -930,6 +930,18 @@ native-USB P4 out of a download mode its BOOT pin forced; **`--after watchdog-re
 app was up 20 s later. So, for a native-USB board that will not flash: the BOOT button, a slower
 baud, and a watchdog reset at the end.
 
+**And a software restart can leave it boot-looping (2.11 round 9, 2026-10-20).** `POST
+/settings?reboot=1` restarts the board with `esp_restart()`. The 1060 came back with its Wi-Fi
+co-processor (the C6, over SDIO) not answering - `sdmmc_host_wait_for_event returned 0x107`, `H_SDIO_DRV:
+failed to read registers` - and esp-hosted restarted it again, every ~20 s, off the network. Read
+over its native USB without a reset (pyserial, `dtr = rts = False`). `esptool ... --after
+watchdog-reset read-mac` brought it back. **On the 1060, put a settings copy back without
+`reboot=1`** (`curl --data-binary @copy.json .../settings`, it says "everything at the next boot")
+**and restart it with the watchdog reset.** *Round 11 (2026-10-26): the 4B did it too*, after
+restarting cleanly a dozen times - so treat it as any P4 with the C6, not a 1060 quirk: restore
+without `reboot=1` and watchdog-reset (`esptool ... -p COM7 --after watchdog-reset read-mac` on the
+4B). The P4_5 has not done it yet.
+
 ## Drawing outside an object: DRAW_MAIN_END, never DRAW_POST (2.8 round 6, 2026-10-17)
 
 The header bar was to paint an open panel's face back over its own drop shadow, from its
@@ -959,3 +971,58 @@ the middle of each side - because LVGL's blur is two box passes over a rounded c
 And one not new: piping `pio run -t upload` through `grep` left esptool hung for twelve minutes -
 its progress bar's characters crash a cp1252 pipe. The `PYTHONIOENCODING=utf-8` lesson above is
 the fix; it was not followed.
+
+## A wide soft shadow: paint it, do not ask LVGL for it (2.11 round 1, 2026-10-19)
+
+D-35's halo - black at a window's edge, clear 5 mm out (58 px on the P4_5) - was built first as
+LVGL's own shadow (width 5 mm, spread half of it). Two things went wrong, both measured:
+
+- **It cost a frame.** A full redraw with a card window open went from 129 to 175 ms on the P4_5
+  (/bench `what=full`); the clock's panel 106 to 143. LVGL computes the blur for every draw unless
+  its single shadow cache holds that exact size, and three shadows of three sizes were on screen.
+- **It banded.** Black to Midnight's ground is a handful of RGB565 levels; the blur came out as
+  visible concentric steps.
+
+Painted as A8 images (four corners, four 16 px edge strips tiled), black by recolour, alpha falling
+off with distance and ordered-dithered (4 x 4 Bayer), it costs ~28 ms on the same frame and does not
+band (`UI/Kit/KitHalo.cpp`). ARGB8888 images cost ~7 ms more than A8: LVGL blends an A8 image as a
+masked fill. The same answer the corner cut's shadow reached (D-33): **anything soft and wide on
+these panels is an image painted once.**
+
+Also learnt: `lv_area_intersect()` and `lv_image_cache_drop()` are not in `lvgl.h` in 9.5 - include
+`src/misc/lv_area_private.h` / `src/misc/cache/instance/lv_image_cache.h`, or clip by hand.
+
+## A background job that never blocks must run at the idle task's priority (2.11 round 12b, 2026-10-26)
+
+The arranger's search runs on its own task on core 0. It was created at priority 1 - "low", so the
+screen and the network go first - and it never blocks. At priority 1 it never lets **IDLE0**
+(priority 0) run, and the task watchdog watches IDLE0: any search longer than 5 s
+(`CONFIG_ESP_TASK_WDT_TIMEOUT_S`) aborts the chip. Round 11's 4B search took 3.7 s; round 12's extra
+shape per cluster made it ~1.1-1.2 M steps, past 5 s once HA's start-up shared the core, and the 4B
+rebooted ~20 s after every boot - the page never got a kept answer, so every boot searched again.
+The owner saw it as "cyan, then black" after pressing Auto.
+
+The log says it plainly - `task_wdt: - IDLE0 (CPU 0)` / `CPU 0: arrange` - so **read the serial
+before guessing** (`pio device monitor -p COM7 --rts 0 --dtr 0`, or pyserial from PlatformIO's own Python,
+`~/.platformio/penv/Scripts/python.exe` - the system Python has none). Fixed by creating the
+task at `tskIDLE_PRIORITY`: equal-priority tasks are time-sliced, IDLE0 runs between slices and feeds
+the watchdog, and the search still gets what the core has spare (10.3 s for 1.24 M steps on the 4B
+while HA started). **Any CPU-bound task that does not block - a search, an encoder, a checksum -
+goes at priority 0, or yields (`vTaskDelay(1)`) at least every second.** And a check "on glass"
+of a page the owner had pinned does not prove its unpinned search: the 4B's Auto had not run on
+round 12's firmware until he pressed it.
+
+## A panel that changes while open: animate the part that changes (2.11 round 15, 2026-10-29)
+
+The page panel's HEADER words had to appear the moment Hide was tapped. Round 15 showed the line and
+re-measured the open panel with the drawer's own opening slide - which moves the whole face, top
+included, so every tap made the panel jump up and slide down again. The owner saw it at once; it
+cost a round. Round 15b animates **the line's own height** (0 to its full height, a label clips its
+text to its height) and sets the panel's foot to the face's height each frame, the face held at the
+top (`Kit::drawerReveal()`). **When something inside an open container appears or goes, animate
+that thing; the container follows its content.** An animation built to open a container is the
+wrong tool for resizing one.
+
+Its neighbour, found in round 16 before it cost anything: **a kit component may find its own parts
+by child index** - `Kit::chipTable()` finds row N as its Nth child - so never add children to one
+built by the kit. Put the component and the extras in a column of your own.

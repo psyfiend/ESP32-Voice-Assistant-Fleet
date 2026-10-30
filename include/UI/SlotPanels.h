@@ -7,7 +7,9 @@
 // what each may hold later, and each panel's last line says so on glass.
 //
 //   clock   the time and the date; the next alarm and the warning time (D-21)
-//   page    the pages, to go to one; this page's header, shown or hidden (D-14)
+//   page    the pages, to go to one; this page's header, shown or hidden (D-14);
+//           "View hidden cards", when it has some - their own sheet (2.11 round 6,
+//           K66, K96; HiddenSheet)
 //   sensor  its reading, when it last reported, or what went wrong
 //   alarm   the alarm's notice: when, Dismiss, Settings (the clock's panel)
 //
@@ -21,13 +23,15 @@ class EntityRegistry;
 
 namespace SlotPanels {
 
-static constexpr uint8_t PAGES_MAX = 12;
+static constexpr uint8_t PAGES_MAX  = 12;
 
 struct Context {
     const char *pageTitles[PAGES_MAX] = {};
     uint8_t     pageCount   = 0;
     uint8_t     pageIndex   = 0;
     bool        headerShown = true;
+    uint8_t     hiddenCount = 0;                         // this page's pool (K66, K96)
+    void (*viewHidden)(void *user) = nullptr;            // ...their sheet (round 6)
     const char *entity      = nullptr;   // the sensor slot's
     EntityRegistry *reg     = nullptr;
     void *user = nullptr;                // handed back to those below
@@ -41,5 +45,11 @@ struct Context {
 // Build the panel for a slot of `kind` into `face`. False when that kind has no
 // panel here (status: the system panel is its own).
 bool build(SlotKind kind, lv_obj_t *face, const Context &c);
+
+#ifdef DEBUG_POPUP
+// /popup?hidden=1: as a tap on the page panel's "View hidden cards". False when
+// the page's panel has not been built with it.
+bool viewHiddenDebug();
+#endif
 
 }  // namespace SlotPanels

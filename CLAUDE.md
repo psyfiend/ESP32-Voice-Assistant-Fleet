@@ -443,14 +443,23 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
   byte is 0xFF (a first boot); one that will not mount but holds anything is left untouched and
   that boot is read-only, in RAM, and says so (boot note, `?stats=1`, [SETTINGS]). Never set
   `format_if_mount_failed`. `POST /settings` puts a saved copy back; `scripts/release/
-  save_settings.ps1` / `restore_settings.ps1` make and restore copies (`bench/settings/`), and
+  save_settings.ps1` / `restore_settings.ps1` make and restore copies (`bench/settings/`),
+  `setdiff.py` compares a copy with what a board serves, and
   `flash_release.ps1` saves each board's before writing it.
 - **Groups for card labels** are `CardGroups` (K46): one kind of group, device-wide, HA areas linked
   in as groups; a card's card label shows its group's name (or its own words) in the group's colour.
   **Colour is the key to a group and never follows a rename.**
 - **Cards added on the device** (K17, `CardAdded`) are card entries with `page`, `after` and `entity`
-  keys (and `removed` once removed - the page's pool, never built), merged into their page right
-  after the card they came from when it is built. Their ids are made as K33's.
+  keys, merged into their page right after the card they came from when it is built; **members
+  copied into a cluster** (2.11, K91) have `in` (the cluster's id) where a page card has `page`, and
+  are built after its compiled members. Their ids are made as K33's. **Any card hidden from its page**
+  (K96, K66's remove - compiled or added) has `removed`: `yes`: the page's pool, never built, listed
+  in the page's hidden cards with Restore. **A card moved into a cluster** has `removed`: `moved` -
+  off its page and NOT in its pool; its copy in the cluster has `from` (the card it came from), and
+  removing that copy puts the card back (K111). A member hidden from its cluster (`hidden`: `yes`) is
+  listed in its cluster's Members only, never with the page's hidden cards (K125). **A member moved out to the page**
+  (K112) has `hidden`: `moved` - no tile, not in the hidden cards - and its page card `from`; Move
+  back to the cluster deletes the page card and clears `hidden`.
 - **Every change is logged** with its time and task (`loopTask` = the card window, `httpd` = a
   browser); the last ten are in `/settings?stats=1`.
 - **UI Tweaks' choices are `system.ui.*`** (scheme, card label, entity label, card state,
@@ -480,7 +489,8 @@ place (left, middle, right) and an entity - per slot, `PageSpec::headerSlots` (e
 Each kind is a build and an update in `Panel_Header.cpp`'s table, its panel in `SlotPanels.cpp` on
 `Kit::Drawer` (the status slot's is the system panel). A new kind is a new entry, never layout code.
 The glyph style (`system.header.glyphs`) and a page's header shown / hidden (`pages.<slug>.header`)
-are saved settings. Cluster headers (2.11) are meant to reuse the same slots (`cards.md` §8).
+are saved settings. Cluster headers (2.11) reuse the same planner and claims (`Cards/ClusterCard`, `cards.md` §8); a
+cluster's sensors are chosen in its window's Header options (K129).
 
 **A card that is on says so by its card state** (2.8, D-30 to D-33): Fill, Icon glow, Bracket or
 **Corner cut, the default** - a UI Tweaks choice, saved. The frames are **drawn in the surface's

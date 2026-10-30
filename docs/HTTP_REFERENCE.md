@@ -91,6 +91,13 @@ away and back. A card's id is shown in its window: SETTINGS > Entity properties 
 | `?card=<id>&tap_scene=<scene id>` | the scene a tap loads | the scene's HA id |
 | `?card=<id>&group=<g>` | the card label's group (K44): `ha_area`, `own`, `none` or a group id | |
 | `?card=<id>&label_text=<text>` | the card label's own words, with `group=own` | |
+| `?card=<group card>&present=card\|cluster` | how a group card made on the device is shown (2.11, K90): its members as a cluster, or one card for them | `default`/empty: the dashboard's |
+| `?card=<group card>&slots=<id>,<id>` | the members in a cluster's header, highest priority first (K104); a member there is not also a tile unless made visible | member card ids, comma-separated, up to 4; empty: the dashboard's |
+| `?card=<group card>&cl_style=swatch\|bar` | that cluster's header style (K102) | empty: the page's |
+| `?card=<group card>&cl_icons=off` | the header's values without their icons (Header options' Sensor icons: Hide, K129) | empty: icons shown |
+| `?card=<member>&hidden=yes\|no` | a member's tile hidden or shown in its cluster (its own Visibility, from the cluster's Members, K96, K129) | empty: the default - a tile unless it is in the header |
+| `?page=<slug>&cl_style=swatch\|bar` | the clusters' header style on that page (K102) | empty: the dashboard's (Swatch) |
+| `?arranger=<knob>&v=<number>` | one of the arranger's knobs (2.11, K105, K109, K120 - Layout Playground v9's since round 11): `size` (75), `square` (30), `wide` (20), `twin` (70), `gap8` (11), `order` (4), `big` (60, v9: a solo card bigger than the rest), `budget` (7000: the search's steps per pass per grid - fewer is faster, perhaps a worse page; the playground's is 20000; round 13) - the owner's tuned values are the defaults; `off` = 1 lets every page flow as before 2.11, to compare. Saved under `system.arranger`; each page is arranged again when next built, and its answer kept in `pages.<slug>.layout` (`v4 <fingerprint> <C>x<R>` in units, then `c,r,w,h,tc` a block as the search placed it - the finish is worked out again at each build; the version moves when the search changes, so every page arranges once on new firmware). Round 2's names (`hole`, `comfy`, ... `hdr`) are refused | an unknown name is refused; empty `v`: the default |
 | `?group=new&name=<Name>` | a new custom group; answers its id | 1-39 characters of ASCII |
 | `?group=<id>&color=RRGGBB` | a group's colour | six hex digits; empty: back to its colour by name |
 | `?group=<id>&name=<Name>` | rename a group (every card in it; an HA area keeps its link) | empty: its own name again |
@@ -234,7 +241,7 @@ curl "http://fleet-ws-p4-5/panel?flash=20&nvs=1"     # scratch NVS only
 **`-D DEBUG_POPUP` only** - the owner's local lines on WS_P4_5, WS_P4_4B and CYD_P4_1060, never
 committed. `src/Cards/Popup/PopupDebug.cpp`. What `scripts/ui_golden.py` drives. **One action per
 request**: when a query has several keys, the first in this order acts and the rest are ignored -
-`rows`, `close`, `about`, `drawer`, `tree`, `mem`/`sparks`, `addcard`/`removecard`, `pause`/`member`,
+`rows`, `close`, `about`, `drawer`, `slot` (and round 9's `dash`, `grid`, which go the same way), `tree`, `mem`/`sparks`, `addcard`/`removecard`, `pause`/`member`,
 `scheme`, `show`, `look`, `scene`, `power`, `view`, `set`, `ctl`, `deck`, the History keys
 (`span`, `more`, `row`, `dur`, `chips`, then `x`, `hist`), `clabel`, `groups`, `tap`, then `card`.
 The reply is text. `503 "Busy"` while another `/popup` runs; `503 "did not pick it up within 3 s"`
@@ -260,8 +267,8 @@ order.
 |---|---|
 | `/popup?card=N` | a long press on card N: opens its window; replies with the build time, window size and LVGL's pool |
 | `/popup?close=1` | closing it; replies with the pool afterwards. **Anything changed in the window is saved now**, as on the glass |
-| `/popup?view=N` | the corner icons: `0` the controls (a member's, inside one), `1` History, `2` Members, `4` Scenes, `5` Properties, `6` Card UI (2.8 round 3, as SETTINGS' last row), `3` only lists. Also lists the entities' levels, an HA group's members and why recent commands failed |
-| `/popup?deck=1` / `deck=0` / `deck=2` | SETTINGS opened / folded; `2` the left panel (CHART or SCENES) opened |
+| `/popup?view=N` | the corner icons: `0` the controls (a member's, inside one; a cluster's Members, K129), `1` History, `2` Members, `4` Scenes, `5` Properties, `6` Card UI (2.8 round 3, as SETTINGS' last row), `7` a cluster's Header options (2.11, K129), `8` Visibility (2.11, K96: the card's options by where it is), `9` its Add to a cluster (K91, K100), `10` a cluster's Add cards (K104), `3` only lists. Also lists the entities' levels, an HA group's members and why recent commands failed |
+| `/popup?deck=1` / `deck=0` / `deck=2` | SETTINGS opened / folded; `2` the left panel (CHART, ACTIVITY, SCENES, or a cluster's CLUSTER) opened |
 | `/popup?ctl=N` | a light's control: `0` brightness, `1` color temperature, `2` color; lists where the stage's children landed |
 | `/popup?member=N` | a tap on row N of Members (opens Members first) |
 | `/popup?span=N` | History's span buttons: chart `0` 24 h, `1` 12 h, `2` 6 h, `3` 1 h; activity `0` 24 h, `1` 7 days. Asks Home Assistant for that history |
@@ -281,7 +288,8 @@ order.
 | `/popup?active=RRGGBB` | 2.8 round 6: the active colour ("on" - a fill, the frames, lit glass) in place of the scheme's, for judging colours on glass (the screenshots' colours are not the panel's) - **not saved**, until the scheme changes; `active=0` the scheme's own again. A leading `#` is fine if URL-encoded (`%23`). UI |
 | `/popup?glyphs=0\|1\|2\|3` | 2.8: the header's glyphs bare, in a rounded square, in a circle - **not saved** (a capture leaves the owner's choice); `3` the saved style again. UI |
 | `/popup?pagehdr=0\|1` | 2.8: this page's header hidden / shown - **Saved**, as the page slot's panel and Hide Bar save it (`pages.<slug>.header`; shown is the default and is stored as nothing) |
-| `/popup?removecard=3` | the Remove card dialog over any card's window, to look at; its Remove does nothing to a compiled card; `close=1` takes it down |
+| `/popup?removecard=3` | the Hide dialog (K96; Remove card's until 2.11) over any card's window, to look at - never tap its Hide, which now hides any card; `close=1` takes it down |
+| `/popup?kbd=1\|2` | 2.11 (K95): the keyboard over the open window - `1` as a cluster's Rename, or a card's Entity label Custom (its name); `2` as Card label's Custom (the card label's words). Then `kbtype=<words>` types them (`+` a space), `kbmode=0\|1\|2` shows the lower / upper / symbol keys, `kbpress=3` empties the field, `kbpress=2` Cancel. Replies with LVGL's pool. UI (`kbpress=1` saves: below) |
 
 ### Settings for the next windows (each **RAM**)
 
@@ -300,8 +308,20 @@ order.
 | `/popup?look=0..4` | the system panel's Selector look, for the scheme showing: `0` Black - Square, `1` Black - Round, `2` Silver - Square, `3` Silver - Round, `4` the scheme's own | the scheme's `selector` (at once with no window open; else when it closes) |
 | `/popup?clabel=N` | choosing line N of the open card's Card label row (K46); replies with the row | the card's `group` (and a solo group, for its own words) |
 | `/popup?addcard=1` | "Add card to dashboard" in a member's own view (K17) | a new card entry after its group card |
-| `/popup?removecard=2` | Remove card's dialog on a card added on the device | removed only if Remove is tapped |
-| `/popup?removecard=1` | Remove card, confirmed, on a card added on the device - no dialog | the card, removed (kept in the file's pool) |
+| `/popup?removecard=2` | Visibility's Hide from this page: its dialog, on any card (K96; K66's remove, every card since 2.11) | hidden only if Hide is tapped |
+| `/popup?removecard=1` | Hide from this page, confirmed - no dialog; on a mini tile, Hide from the cluster | the card's `removed` (the page's pool, its settings kept); a tile's `hidden` = `yes` |
+| `/popup?restore=-2` | (round 6) the page slot's panel's "View hidden cards (N)" (`slot=page` first): the hidden cards' sheet opens | nothing |
+| `/popup?restore=N` | Restore beside the Nth card in the hidden cards' sheet (`restore=-2` first) | the card's `removed`, removed - back on its page |
+| `/popup?removecard=4` / `removecard=5` | on a copy made in a cluster (K91): `4` its "Remove this copy?" dialog; `5` its Remove, no dialog | `5`: the copy's whole entry, deleted (`Settings::dropCard()`) |
+| `/popup?addcards=MASK&mv=0\|1` | a cluster's Add cards (K104, K91) on its open window: the cards whose bits are set ticked (bit 0 the list's first - `view=10` shows the list), Copy or Move, and Add - the window closes | an entry with `in` for each, as `addto=`; Move also each card's `removed` |
+| `/popup?addto=N&mv=0\|1` | Add to a cluster (K91, K100) on the open card: the Nth cluster on the page (screen order), Copy (`mv=0`) or Move (`mv=1`), and Add - the window closes | a new card entry with `in` (the cluster's id), `entity`, `area`, `group`, `name`; Move also the card's `removed` |
+| `/popup?join=1` | Add card to dashboard (K92 rule 9) in a member's own view or a tile's window: "which group?" opens - with This card's Copy / Move row for a cluster's tile (K112) | nothing yet |
+| `/popup?join=2+N` (`&mv=1`) | its Add card to dashboard with group N chosen (0 the group card's, 1 the area's, then the others); `mv=1` Move, a tile's only - the window closes | a new card entry with `page`, `after`, `entity`, `from` (the tile); Move also the tile's `hidden` = `moved` |
+| `/popup?removecard=6` / `7` / `8` | (K112) on a card made on the glass: `6` its Remove from the page, no dialog; `7` that dialog; on a card moved out of a cluster, `8` its Move back to the cluster - each closes the window | `6`: the card's entry deleted; `8`: the entry deleted and the tile's `hidden` cleared |
+| `/popup?kbpress=1` | the keyboard's Save (2.11, K95) | what it was opened for: a cluster's `label_text` (none: its group's name), a card's `name`, or its card label's `label_text` - when the window closes |
+| `/popup?grid=a\|cu\|cd\|ru\|rd` | (2.11 round 9) the system panel's **Auto**, **Col +**, **Col -**, **Row +**, **Row -** on the page showing | the page's `cols` / `rows` pins (Auto removes both); the page arranges again |
+| `/popup?dash=1` | (round 9) the system panel opens with the development **Reset**'s dialog, which counts what would go - nothing changes unless its Reset is tapped (`slot=-1` takes it down) | nothing |
+| `/popup?dash=2` | **the Reset done, no dialog**: every card made on the board deleted (`page` / `in` entries), every hide and move undone (`removed`, `hidden`), group cards' `slots` and `present` removed, every page's `layout` removed. **Never on the owner's real settings** - a test copy, then `restore_settings.ps1` | as described; the looks, schemes, UI Tweaks and pins stay |
 
 ### **Device** - these command real lights and scenes
 

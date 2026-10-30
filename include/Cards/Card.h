@@ -101,6 +101,12 @@ public:
     // Zero means nobody said, and the card falls back to one whole cell.
     Card &setCellHeightPx(int32_t px) { _cellPx = px; return *this; }
 
+    // A SOLO CARD BESIDE TILES (2.11 round 13, K126): on a page with clusters
+    // its value is in the tiles' face (VALUE_SM), and the page sizes its body to
+    // theirs - labelTakesPx() is what its card label takes from its cell.
+    Card &setBesideTiles(bool on) { _besideTiles = on; return *this; }
+    int32_t labelTakesPx() const { return tagRowPx() + tagInsetPx(); }
+
     // And its real WIDTH, for the same reason. Needed since 2.7: the corner
     // icon's size follows the card's SHORT side, not only its height.
     Card &setCellWidthPx(int32_t px) { _cellWPx = px; return *this; }
@@ -129,6 +135,10 @@ public:
     Card &setId(const char *id) { _id = id; return *this; }
     const char *id() const { return _id ? _id : ""; }
     bool hasId() const { return _id && *_id; }
+
+    // Its first entity, or null: what a cluster's header shows of a member (2.11).
+    const Entity *firstEntity() const { return _nPrimary ? _primary[0] : nullptr; }
+    uint8_t entityCount() const { return _nPrimary; }   // one: it can join a cluster (2.11, K91)
 
     // What a tap does (2.10d, TapAction). The scene for Load scene is named
     // by its source's id ("scene.office_relax"), which outlives a session.
@@ -225,6 +235,24 @@ public:
     // every card. Same pattern as StateCard::setFill().
     static void setShowAreaDefault(bool v) { s_showArea = v; }
 
+    // A MINI TILE (2.11, K89): a member of a cluster, drawn inside it with no
+    // border, header or card label of its own - its hero and its entity label.
+    // Still a whole card: its id and settings, its tap, its window on a long
+    // press (K104). Set before build(); the cluster sizes and places it.
+    Card &setMini(bool on) { _mini = on; return *this; }
+    bool  mini() const { return _mini; }
+
+    // THE PAGE'S HERO (2.11 round 4, the owner: a tile's icon and a solo card's
+    // "MUST remain the same size"): the disc and icon face a solo 1x1 card has
+    // on the page now, measured by CardPage once the page is built. A mini tile
+    // takes exactly these wherever it has the room (Cards/MiniTile.cpp); 0 /
+    // null: no solo card to measure, a tile sizes its own.
+    static void setPageHero(int32_t discPx, const lv_font_t *face);
+    static int32_t          pageDisc();
+    static const lv_font_t *pageFace();
+    // This card's own hero, as a solo card draws it - what the page measures.
+    void heroSizes(int32_t &discPx, const lv_font_t *&face) const { discPx = heroDiscPx(); face = heroIconFace(); }
+
     // Overrides cardLongStaleMs(). This is the build sheet's hook.
     Card &setLongStaleMs(uint32_t ms) { _longStaleMs = ms; return *this; }
 
@@ -253,20 +281,22 @@ public:
 
     // --- CardBinder hooks. LVGL thread only. ------------------------------
 
-    // Does this card render entityId? Used to route a dirty snapshot.
-    bool owns(const char *entityId) const;
+    // Does this card render entityId? Used to route a dirty snapshot. Virtual
+    // for a cluster (2.11), whose header shows members it does not bind.
+    virtual bool owns(const char *entityId) const;
 
     // One of our bound entities changed. See the threading note above for why
     // the snapshot is passed even though render() re-reads.
-    void onSnapshot(const Entity &snap);
+    virtual void onSnapshot(const Entity &snap);
 
     // Staleness is a POLL, not an event, and that is deliberate: an entity
     // going stale sets no dirty flag (EntityRegistry::tick() only reverts
     // optimistic writes), and making it do so would wake every card on the
     // page every tick just to discover that nothing had changed. Re-deriving
     // one subtraction per binding at 10 Hz is cheaper than that, and it only
-    // touches LVGL when the state actually transitions.
-    void pollState(uint32_t nowMs);
+    // touches LVGL when the state actually transitions. A cluster has no state
+    // of its own - its members show theirs (2.11).
+    virtual void pollState(uint32_t nowMs);
 
     virtual const char *typeName() const = 0;
 
@@ -492,13 +522,16 @@ protected:
     // fit (the value face, the diagonal, the short side) must measure.
     int32_t surfaceWidthPx() const;
 
+    uint32_t headerColor() const;      // the group's colour, or the accent (a cluster's header too)
+
 private:
     void buildHeader();
+    void buildMini(lv_obj_t *parent);  // a mini tile's frame (Cards/MiniTile.cpp)
+    void paintSurface();               // its colour: paused or not, a tile's or a card's
     void applyState();                 // repaint chrome for _state
     void applyDiagonal();              // the loud treatment, every mode
     void resolveVariant();             // measure the cell, pick FULL or COMPACT
     CardState deriveState(uint32_t nowMs) const;
-    uint32_t headerColor() const;      // the area's colour, or the accent
     uint32_t tagColor() const;         // the badge's colour, which is NOT
                                        // stateColor() - see ST_PARTIAL
     static void eventCb(lv_event_t *e);
@@ -570,6 +603,7 @@ private:
     int32_t         _cellPx      = 0;     // set by CardPage::commit()
     int32_t         _cellWPx     = 0;     // likewise; 0 = nobody said
     bool            _valueSmall  = false; // resolveVariant(): hero at VALUE_SM
+    bool            _besideTiles = false; // setBesideTiles(): VALUE_SM always
     TempUnit        _tempUnit    = TempUnit::TEMP_INHERIT;
     CardLabel       _labelMode   = CardLabel::LBL_INHERIT;
     GroupOn         _groupOn     = GroupOn::GROUP_ON_ANY;
@@ -579,6 +613,7 @@ private:
     // cmdFailed on the entity. Two cards on one switch used to be able to
     // disagree; now they cannot.
     bool            _showArea    = s_showArea;
+    bool            _mini        = false;   // a cluster's mini tile (2.11)
     bool            _forced      = false;   // debugForceState()
     bool            _dimmed      = false;   // paused, mixed not opa'd
 

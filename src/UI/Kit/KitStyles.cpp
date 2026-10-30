@@ -12,6 +12,7 @@ static lv_style_t s_style[(int)KitStyle::KS_COUNT];
 static bool       s_ready = false;
 
 static lv_style_t *st(KitStyle s) { return &s_style[(int)s]; }
+static void fillCards();   // below fill(): the cards' and clusters' roles
 
 static void flex(lv_style_t *x, lv_flex_flow_t flow, lv_flex_align_t main, lv_flex_align_t cross,
                  lv_flex_align_t track) {
@@ -59,6 +60,8 @@ static void fill() {
                p.SURFACE, UI::mix(p.SURFACE, p.TEXT, 30), p.TEXT);
     fillButton(S::KS_BTN_DESTRUCTIVE, S::KS_BTN_DESTRUCTIVE_PRESSED, S::KS_BTN_DESTRUCTIVE_INK,
                p.ST_BAD, p.ST_BAD, p.SURFACE);
+    fillButton(S::KS_BTN_CONFIRM, S::KS_BTN_CONFIRM_PRESSED, S::KS_BTN_CONFIRM_INK,
+               p.ACCENT, p.ACCENT, UI::contrastOf(p.ACCENT, p.SURFACE_ALT, p.TEXT));
 
     // --- The dialog ---
     lv_style_t *dim = st(S::KS_DIALOG_DIM);
@@ -81,6 +84,49 @@ static void fill() {
     lv_style_t *drow = st(S::KS_DIALOG_ROW);
     flex(drow, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_style_set_pad_top(drow, UI::mm(k.S4));
+
+    // --- The keyboard (2.11, K95): a dialog's box with the accent for its edge,
+    // a field like a dropdown's, keys like the window's satin surfaces ---
+    lv_style_t *kbox = st(S::KS_KBD_BOX);
+    lv_style_set_radius      (kbox, UI::sc(UI::met().RADIUS));
+    lv_style_set_bg_opa      (kbox, LV_OPA_COVER);
+    lv_style_set_bg_color    (kbox, UI::c(p.SURFACE_ALT));
+    lv_style_set_border_width(kbox, LV_MAX(2, UI::mm(k.LINE_HEAVY)));
+    lv_style_set_border_color(kbox, UI::c(p.ACCENT));
+    lv_style_set_pad_all     (kbox, UI::mm(k.S7));
+    lv_style_set_pad_row     (kbox, UI::mm(k.S5));
+    flex(kbox, LV_FLEX_FLOW_COLUMN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    lv_style_t *field = st(S::KS_FIELD);
+    text(S::KS_FIELD, t.NAME, p.TEXT);
+    lv_style_set_bg_opa      (field, LV_OPA_COVER);
+    lv_style_set_bg_color    (field, UI::c(p.SURFACE));
+    lv_style_set_radius      (field, UI::mm(k.R_CONTROL));
+    lv_style_set_border_width(field, LV_MAX(1, UI::mm(k.LINE_MID)));
+    lv_style_set_border_color(field, UI::c(p.ACCENT));
+    lv_style_set_pad_hor     (field, UI::mm(k.S5));
+    lv_style_set_pad_ver     (field, UI::mm(k.S3));
+    // A cursor that stays lit: a blink redraws the field twice a second for nothing.
+    lv_style_t *cur = st(S::KS_FIELD_CURSOR);
+    lv_style_set_border_side (cur, LV_BORDER_SIDE_LEFT);
+    lv_style_set_border_width(cur, LV_MAX(2, UI::mm(k.LINE_HEAVY)));
+    lv_style_set_border_color(cur, UI::c(p.ACCENT));
+    lv_style_set_pad_left    (cur, -1);
+    lv_style_set_anim_duration(cur, 0);
+
+    lv_style_t *kb = st(S::KS_KBD);
+    lv_style_set_bg_opa    (kb, LV_OPA_COVER);
+    lv_style_set_bg_color  (kb, UI::c(p.SURFACE_ALT));
+    lv_style_set_pad_all   (kb, UI::mm(k.KEY_GAP));
+    lv_style_set_pad_row   (kb, UI::mm(k.KEY_GAP));
+    lv_style_set_pad_column(kb, UI::mm(k.KEY_GAP));
+    lv_style_t *key = st(S::KS_KEY);
+    text(S::KS_KEY, t.NAME, p.TEXT);
+    lv_style_set_bg_opa (key, LV_OPA_COVER);
+    lv_style_set_bg_color(key, UI::c(p.SURFACE));
+    lv_style_set_radius (key, UI::mm(k.R_CONTROL));
+    lv_style_set_bg_color(st(S::KS_KEY_CTRL),    UI::c(UI::mix(p.SURFACE, p.TEXT, 12)));
+    lv_style_set_bg_color(st(S::KS_KEY_PRESSED), UI::c(UI::mix(p.SURFACE, p.ACCENT, 45)));
 
     // --- Rows ---
     const int32_t ctlH = controlH();
@@ -155,6 +201,25 @@ static void fill() {
     lv_style_set_bg_color    (st(S::KS_CHIP_LIT),     UI::c(UI::mix(p.SURFACE, p.ACCENT, 25)));
     lv_style_set_border_width(st(S::KS_CHIP_LIT),     LV_MAX(1, UI::mm(k.LINE_MID)));
     lv_style_set_bg_color    (st(S::KS_CHIP_PRESSED), UI::c(UI::mix(p.SURFACE, p.TEXT, 15)));
+
+    // A slider row: a track a third of a chip's height, the accent filling it, a
+    // knob a chip's height in the surface ringed in the accent.
+    lv_style_t *sl = st(S::KS_SLIDER);
+    lv_style_set_height  (sl, LV_MAX(4, UI::mm(k.H_CHIP) / 3));
+    lv_style_set_radius  (sl, LV_RADIUS_CIRCLE);
+    lv_style_set_bg_opa  (sl, LV_OPA_COVER);
+    lv_style_set_bg_color(sl, UI::c(UI::mix(p.SURFACE, p.TEXT, 18)));
+    lv_style_t *si = st(S::KS_SLIDER_IND);
+    lv_style_set_radius  (si, LV_RADIUS_CIRCLE);
+    lv_style_set_bg_opa  (si, LV_OPA_COVER);
+    lv_style_set_bg_color(si, UI::c(p.ACCENT));
+    lv_style_t *sk = st(S::KS_SLIDER_KNOB);
+    lv_style_set_radius      (sk, LV_RADIUS_CIRCLE);
+    lv_style_set_bg_opa      (sk, LV_OPA_COVER);
+    lv_style_set_bg_color    (sk, UI::c(p.SURFACE));
+    lv_style_set_border_width(sk, LV_MAX(1, UI::mm(k.LINE_MID)));
+    lv_style_set_border_color(sk, UI::c(p.ACCENT));
+    lv_style_set_pad_all     (sk, (UI::mm(k.H_CHIP) - LV_MAX(4, UI::mm(k.H_CHIP) / 3)) / 2);
 
     // --- List items ---
     lv_style_t *item = st(S::KS_ITEM);
@@ -272,6 +337,17 @@ static void fill() {
     lv_style_set_bg_color(st(S::KS_RULE), UI::c(UI::mix(p.SURFACE, p.TEXT, 30)));
     lv_style_set_bg_opa  (st(S::KS_RULE), LV_OPA_COVER);
     lv_style_set_radius  (st(S::KS_RULE), UI::sc(UI::hdr().LINE));
+    // A section's rules: the accent, clear at the panel's edge, whole at the title.
+    for (int i = 0; i < 2; i++) {
+        lv_style_t *sr = st(i ? S::KS_SECTION_RULE_R : S::KS_SECTION_RULE_L);
+        lv_style_set_height       (sr, UI::sc(UI::hdr().LINE));
+        lv_style_set_bg_color     (sr, UI::c(p.ACCENT));
+        lv_style_set_bg_grad_color(sr, UI::c(p.ACCENT));
+        lv_style_set_bg_grad_dir  (sr, LV_GRAD_DIR_HOR);
+        lv_style_set_bg_opa       (sr, LV_OPA_COVER);
+        lv_style_set_bg_main_opa  (sr, i ? LV_OPA_COVER : LV_OPA_TRANSP);
+        lv_style_set_bg_grad_opa  (sr, i ? LV_OPA_TRANSP : LV_OPA_COVER);
+    }
     text(S::KS_HDR_TEXT,     UIToolkit::Font_Header, p.TEXT);   // the bar's words (D-26)
     text(S::KS_HDR_TEXT_DIM, UIToolkit::Font_Caption,     p.TEXT_DIM);
     text(S::KS_HDR_ICON,     t.ICON_SM,                   p.TEXT);
@@ -329,36 +405,163 @@ static void fill() {
     lv_style_set_pad_top   (mk, LV_MAX(0, (UI::sc(h.MARK) - lv_font_get_line_height(UIToolkit::Font_Caption)) / 2));
 
     // --- A slot's drawer (2.8) ---
-    // The wrapper clips - it reveals the face as it grows - so the shadow is its
-    // own; the radius only shapes that shadow (no clip_corner: a layer the
-    // wrapper's size, the trap that froze the P4_5 - LESSONS).
+    // THE WRAPPER IS THE PANEL (2.11 round 5): its surface and its edge, every
+    // corner rounded - it lies ON the bar (D-35), its top edge the bar's line,
+    // its top corners turning down from it. It is what grows and shrinks, so
+    // the top edge and its corners stay whole while the foot moves (the owner:
+    // the walls stay joined to the top's curves until the last frame). It clips
+    // the face riding inside it; no clip_corner (a layer the wrapper's size,
+    // the trap that froze the P4_5 - LESSONS).
     lv_style_t *dr = st(S::KS_DRAWER);
-    lv_style_set_bg_opa      (dr, LV_OPA_TRANSP);
-    lv_style_set_border_width(dr, 0);
+    lv_style_set_bg_color    (dr, UI::c(p.SURFACE));
+    lv_style_set_bg_opa      (dr, LV_OPA_COVER);
+    // Its edge is the accent, the bar's line's width (D-23): with the open
+    // slot's, one outline from the tab's top to the panel's foot. Drawn after
+    // the face, so what rides up passes under it.
+    lv_style_set_border_width(dr, UI::sc(h.LINE));
+    lv_style_set_border_color(dr, UI::c(p.ACCENT));
+    lv_style_set_border_post (dr, true);
     lv_style_set_pad_all     (dr, 0);
     lv_style_set_radius      (dr, UI::sc(h.DRAWER_R));
-    // The face: its top corners pushed above the wrapper's clip (Kit::drawer()),
-    // so it is square where it meets the bar; the padding pays for the push.
+    // The face: the panel's contents, riding the moving foot. Clear; its edge
+    // is kept at the line's width, unpainted, so the contents sit where they did.
     lv_style_t *df = st(S::KS_DRAWER_FACE);
-    lv_style_set_bg_color    (df, UI::c(p.SURFACE));
-    lv_style_set_bg_opa      (df, LV_OPA_COVER);
-    // Its edge is the accent, the bar's line's width (D-23): with the open
-    // slot's, one outline from the tab's top to the panel's foot.
+    lv_style_set_bg_opa      (df, LV_OPA_TRANSP);
     lv_style_set_border_width(df, UI::sc(h.LINE));
-    lv_style_set_border_color(df, UI::c(p.ACCENT));
-    lv_style_set_radius      (df, UI::sc(h.DRAWER_R));
+    lv_style_set_border_opa  (df, LV_OPA_TRANSP);
     lv_style_set_pad_hor     (df, UI::sc(h.DRAWER_PAD));
     lv_style_set_pad_bottom  (df, UI::sc(h.DRAWER_PAD));
-    lv_style_set_pad_top     (df, UI::sc(h.DRAWER_R) + UI::sc(h.DRAWER_PAD));
+    lv_style_set_pad_top     (df, UI::sc(h.DRAWER_PAD));
     lv_style_set_pad_row     (df, UI::sc(h.DRAWER_GAP));
     flex(df, LV_FLEX_FLOW_COLUMN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_style_t *di = st(S::KS_DRAWER_ITEM);
     lv_style_set_width     (di, lv_pct(100));
-    lv_style_set_height    (di, UI::minTouch());
+    lv_style_set_height    (di, UI::mm(UI::shape().H_ROW));   // a panel's row (round 14: the pages closer)
     lv_style_set_pad_hor   (di, UI::sc(h.DRAWER_PAD));
     lv_style_set_pad_column(di, UI::sc(h.SLOT_GAP));
     flex(di, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     text(S::KS_DRAWER_BIG, UIToolkit::Font_Hero, p.TEXT);
+
+    fillCards();
+}
+
+// CARDS (2.11 round 1): each value the one Card, StateCard and ValueCard set
+// locally before they had roles, so moving them changed no pixel. The surface's
+// colour stays the card's (a paused card mixes it toward the ground).
+static void fillCards() {
+    const UIPalette &p = UI::pal();
+    const UIMetrics &m = UI::met();
+    const UIType    &t = UI::type();
+    const UIShape   &k = UI::shape();
+    using S = KitStyle;
+
+    lv_style_t *root = st(S::KS_CARD_ROOT);
+    lv_style_set_bg_opa      (root, LV_OPA_TRANSP);
+    lv_style_set_border_width(root, 0);
+    lv_style_set_pad_all     (root, 0);
+    lv_style_set_pad_gap     (root, 0);
+    lv_style_set_layout      (root, LV_LAYOUT_FLEX);
+    lv_style_set_flex_flow   (root, LV_FLEX_FLOW_COLUMN);
+
+    lv_style_t *pl = st(S::KS_CARD_PLAIN);
+    lv_style_set_bg_opa      (pl, LV_OPA_TRANSP);
+    lv_style_set_border_width(pl, 0);
+    lv_style_set_pad_all     (pl, 0);
+
+    lv_style_t *sf = st(S::KS_CARD_SURFACE);
+    lv_style_set_bg_color        (sf, UI::c(p.SURFACE));
+    lv_style_set_bg_opa          (sf, LV_OPA_COVER);
+    lv_style_set_radius          (sf, UI::sc(m.RADIUS));
+    lv_style_set_border_width    (sf, m.BORDER_W);
+    lv_style_set_border_color    (sf, UI::border());
+    lv_style_set_shadow_width    (sf, UI::sc(m.SHADOW));
+    lv_style_set_shadow_offset_y (sf, UI::sc(m.SHADOW_Y));
+    lv_style_set_shadow_opa      (sf, m.SHADOW ? (lv_opa_t)m.SHADOW_OPA : LV_OPA_TRANSP);
+    lv_style_set_pad_all         (sf, 0);   // the body owns padding
+
+    lv_style_t *bd = st(S::KS_CARD_BODY);
+    lv_style_set_bg_opa      (bd, LV_OPA_TRANSP);
+    lv_style_set_border_width(bd, 0);
+    lv_style_set_pad_all     (bd, UI::sc(m.PAD));
+
+    lv_style_t *sp = st(S::KS_CARD_STRIP);
+    lv_style_set_pad_all     (sp, 0);
+    lv_style_set_pad_left    (sp, UI::sc(7));
+    lv_style_set_pad_right   (sp, UI::sc(7));
+    lv_style_set_border_width(sp, 0);
+
+    lv_style_t *pi = st(S::KS_CARD_PILL);
+    lv_style_set_bg_opa(pi, LV_OPA_COVER);
+    lv_style_set_radius(pi, UI::sc(m.RADIUS / 2));
+
+    lv_style_t *bg = st(S::KS_CARD_BADGE);
+    lv_style_set_bg_opa (bg, LV_OPA_COVER);
+    lv_style_set_radius (bg, UI::sc(m.RADIUS / 2));
+    lv_style_set_pad_hor(bg, UI::sc(6));
+    lv_style_set_pad_ver(bg, UI::sc(3));
+
+    lv_style_t *dc = st(S::KS_CARD_DISC);
+    lv_style_set_border_width(dc, 0);
+    lv_style_set_pad_all     (dc, 0);
+    lv_style_set_radius      (dc, LV_RADIUS_CIRCLE);
+
+    lv_style_set_text_font (st(S::KS_CARD_NAME), t.NAME);
+    lv_style_set_text_align(st(S::KS_CARD_NAME), LV_TEXT_ALIGN_CENTER);
+    lv_style_set_text_font (st(S::KS_CARD_SMALL), t.TAG);
+    text(S::KS_CARD_TAGTEXT, t.TAG, p.SURFACE);
+    lv_style_set_text_font (st(S::KS_CARD_UNIT), t.UNIT);
+    lv_style_set_text_font (st(S::KS_CARD_ICON_SM), t.ICON_SM);
+
+    lv_style_t *dg = st(S::KS_CARD_DIAG);
+    lv_style_set_line_width  (dg, UI::sc(6));
+    lv_style_set_line_opa    (dg, LV_OPA_60);
+    lv_style_set_line_rounded(dg, true);
+
+    // --- A cluster (2.11): its frame is a card's surface (KS_CARD_SURFACE) ---
+    // One line, the name on the left and the values on the right (the header's
+    // planner places them); a rule under it in the border's colour - a light
+    // scheme draws no card border, so the rule has a hairline of its own.
+    lv_style_t *ch = st(S::KS_CLUSTER_HDR);
+    lv_style_set_bg_color    (ch, UI::c(p.SURFACE_ALT));   // a faint band, as the page header's (round 10)
+    lv_style_set_bg_opa      (ch, LV_OPA_COVER);
+    lv_style_set_border_side (ch, LV_BORDER_SIDE_BOTTOM);
+    lv_style_set_border_width(ch, LV_MAX(1, UI::mm(k.LINE_HAIR)));
+    lv_style_set_border_color(ch, UI::border());
+    lv_style_set_pad_all     (ch, 0);
+    lv_style_set_radius      (ch, 0);
+    text(S::KS_CLUSTER_TITLE, t.NAME, p.TEXT);
+    lv_style_t *sw = st(S::KS_CLUSTER_SWATCH);
+    lv_style_set_width (sw, LV_MAX(2, UI::mm(k.C_SWATCH_W)));
+    lv_style_set_height(sw, LV_MAX(4, UI::mm(k.C_SWATCH_H)));
+    lv_style_set_radius(sw, LV_MAX(1, UI::mm(k.C_SWATCH_W) / 3));
+    lv_style_set_bg_opa(sw, LV_OPA_COVER);
+    text(S::KS_CLUSTER_VALUE, t.NAME, p.TEXT);
+    // The page header's glyph frames at the cluster header's size: four fifths of
+    // its height, the page header's tint (round 11, K115).
+    for (S f : { S::KS_CLUSTER_GLYPH_SQUARE, S::KS_CLUSTER_GLYPH_CIRCLE }) {
+        lv_style_t *g = st(f);
+        lv_style_set_width (g, UI::mm(k.C_HDR_H) * 4 / 5);
+        lv_style_set_height(g, UI::mm(k.C_HDR_H) * 4 / 5);
+        lv_style_set_bg_color(g, UI::c(UI::mix(p.SURFACE_ALT, p.TEXT, UI::hdr().FRAME_MIX)));
+        lv_style_set_bg_opa(g, LV_OPA_COVER);
+        flex(g, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    }
+    lv_style_set_radius(st(S::KS_CLUSTER_GLYPH_SQUARE), UI::mm(k.C_HDR_H) / 5);
+    lv_style_set_radius(st(S::KS_CLUSTER_GLYPH_CIRCLE), LV_RADIUS_CIRCLE);
+    lv_style_t *tl = st(S::KS_TILE);
+    // A FAINT PANEL EACH (round 11, the owner's E - K116): between the cluster's
+    // surface and SURFACE_ALT, so the off disc (SURFACE_ALT) and the header's
+    // band still stand apart from it - and a small step toward the text (round
+    // 12b, the owner: "barely visible" at none, too bright at 6%; 3% between).
+    lv_style_set_bg_color    (tl, UI::c(UI::mix(UI::mix(p.SURFACE, p.SURFACE_ALT, 50), p.TEXT, 3)));
+    lv_style_set_bg_opa      (tl, LV_OPA_COVER);
+    lv_style_set_border_width(tl, 0);
+    lv_style_set_pad_all     (tl, 0);
+    lv_style_set_radius      (tl, UI::sc(m.RADIUS));
+    lv_style_set_bg_color(st(S::KS_TILE_PRESSED), UI::c(UI::mix(p.SURFACE, p.TEXT, 12)));
+    lv_style_set_bg_opa  (st(S::KS_TILE_PRESSED), LV_OPA_COVER);
+    text(S::KS_TILE_NAME, t.TAG, p.TEXT);
+    lv_style_set_text_align(st(S::KS_TILE_NAME), LV_TEXT_ALIGN_CENTER);
 }
 
 void begin() {

@@ -77,6 +77,8 @@
     #define DBG_POPUP(...) do {} while (0)
 #endif
 
+class ClusterCard;   // Cards/ClusterCard.h: the cluster's window (PopupCluster.cpp)
+
 namespace popup {
 
 using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
@@ -89,8 +91,15 @@ using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
 // tabs (owner, 2026-10-06): see "The corner icons".
 // VIEW_PROPS: the entity's properties, read-only, from SETTINGS' button (2.10e).
 // VIEW_CARD_UI: the card's own looks, from SETTINGS' last row (2.8 round 3, D-28).
+// A CLUSTER'S WINDOW (2.11, K104; round 16): it opens on Members - a cluster has
+// no controls view of its own - with the CLUSTER panel beside SETTINGS (Rename
+// cluster, Header options, Add cards); VIEW_CLUSTER_SLOTS is Header options.
+// VIEW_VISIBILITY: a card's options by where it is, from SETTINGS' Visibility
+// row (2.11 round 3, K96; PopupVisibility.cpp); VIEW_ADD_TO its Add to a
+// cluster (K91, K100).
 enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER, VIEW_SCENES, VIEW_PROPS,
-                                  VIEW_CARD_UI };
+                                  VIEW_CARD_UI, VIEW_CLUSTER_SLOTS, VIEW_VISIBILITY, VIEW_ADD_TO,
+                                  VIEW_CLUSTER_ADD, VIEW_JOIN };
 enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
@@ -138,6 +147,7 @@ struct Popup : Kit::Sheet {
     bool            expanded = false;
     EntityRegistry *reg  = nullptr;
     TempUnit        tempUnit = TempUnit::TEMP_INHERIT;
+    bool            cluster = false;   // a cluster's window (2.11): its main view manages it
     char area[ENTITY_SHORT_MAX] = {0};
     char name[ENTITY_NAME_MAX]  = {0};
 
@@ -281,7 +291,7 @@ struct HistView {
 };
 
 // The left panel's kinds - the sheet's s.left.kind (sideFor(), PopupPanels.cpp).
-enum : uint8_t { SIDE_NONE, SIDE_CHART, SIDE_SCENES, SIDE_ACTIVITY };
+enum : uint8_t { SIDE_NONE, SIDE_CHART, SIDE_SCENES, SIDE_ACTIVITY, SIDE_CLUSTER };
 
 // A panel's rows are the kit's (2.12 P3): Kit::RowSpec, built by Kit::rows().
 // ROW_BUTTON (2.10e): a button that does something - its words in `opts`.
@@ -392,7 +402,13 @@ void forgetDeck();
 void buildControlDeck(lv_obj_t *parent, uint8_t caps);
 
 // PopupMembers.cpp
+enum class MemberShown : uint8_t;   // below, with the cluster's
 void buildMembers();
+// A member's state in words and the role that colours them; its row, as Members
+// shows it (the cluster's Header options too).
+KS memberState(const Entity &e, MemberShown shown, char *buf, size_t cap);
+lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberShown shown);
+int32_t membersRowW();   // PopupControls.cpp: Members' width - a group light's controls', in a cluster's window too
 void enterMemberAsync(void *unused);
 void memberRowCb(lv_event_t *ev);
 void leaveMember(PopupView to = PopupView::VIEW_MEMBERS);
@@ -405,6 +421,24 @@ void buildCardUi();
 void cardWindowLook(const Card &c, Kit::SheetSpec &k);   // its timeout, bar and selector, before it is built
 void cardUiCb(lv_event_t *ev);                           // SETTINGS' Card UI row
 bool cardUiTakeRebuild();                                // a choice wants the page built again
+void cardUiTypeWords(bool name);                         // the keyboard: the card's name, or its card label's words (K95)
+
+// PopupCluster.cpp (2.11, K104; round 16 - Members is a cluster's window)
+uint8_t clusterSpecs(DeckRowSpec *r);   // the CLUSTER panel's rows, on Members
+void buildClusterSlots();               // VIEW_CLUSTER_SLOTS: Header options
+bool clusterTakeRebuild();   // a choice wants the page built again, once the window has gone
+void clusterRename();        // the keyboard on the cluster's name, as Rename opens it (K95)
+void buildClusterAdd();      // VIEW_CLUSTER_ADD: the page's cards, each No / Copy / Move (K91)
+uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask);   // ...the picked ones in; the window closes
+// Member `i` of `cl` shown as a tile or not, kept when the window closes (K104's
+// Visible - from its Visibility since round 6, no longer the cluster's Details).
+void clusterMemberShow(const ClusterCard &cl, uint8_t i, bool want);
+// Member `i` as the next build will show it: a tile, in the header, hidden - or
+// moved out to the page, its card there (the sprint after round 7).
+enum class MemberShown : uint8_t { SHOWN_TILE, SHOWN_HEADER, SHOWN_HIDDEN, SHOWN_MOVED };
+MemberShown clusterMemberShown(const ClusterCard &cl, uint8_t i);
+// The member of `cl` whose entity is `e`, or -1.
+int8_t clusterMemberOf(const ClusterCard &cl, const Entity *e);
 
 // PopupHistory.cpp
 void histKeep(const char *key, const char *value);
@@ -458,7 +492,6 @@ void tapDropCb(lv_event_t *ev);
 void unitsDropCb(lv_event_t *ev);
 void propsCb(lv_event_t *ev);
 void addCardCb(lv_event_t *ev);
-void pauseCheckCb(lv_event_t *ev);
 
 // PopupSideRows.cpp
 void sceneActionDropCb(lv_event_t *ev);
@@ -471,8 +504,30 @@ void hiddenScenesCb(lv_event_t *ev);
 
 // PopupDialog.cpp
 void confirmClose();
-void confirmRemove();
-void removeCardCb(lv_event_t *ev);
+void confirmHide();              // "Hide this card?" (K96, K66) over the held card's window
+void hideCardCb(lv_event_t *ev);
+void hideTileCb(lv_event_t *ev);     // Hide from the cluster, after its dialog (round 14)
+void confirmRemoveCopy();        // "Remove this copy?" - a member copied into a cluster here (K91)
+void removeCopyCb(lv_event_t *ev);
+void confirmRemoveFromPage();    // "Remove this card?" - a page card made on the glass, deleted
+
+// PopupVisibility.cpp (2.11 round 3, K96)
+void buildVisibility();
+void visibilityCb(lv_event_t *ev);   // SETTINGS' Visibility row
+void visibilityHideTile();           // Hide from the cluster: the held mini tile, and the window closes
+// Whose visibility the view is about: the held card, or - in a cluster's window,
+// one member's own view - that member's card (round 6). Null when there is none.
+Card *visibilitySubject();
+void buildAddTo();                   // VIEW_ADD_TO: Add to a cluster - which, Copy or Move (K91, K100)
+bool visibilityAddTo(uint8_t pick, bool move);   // ...done: the window closes; false when it cannot
+// WHICH GROUP? (K92 rule 9): Add card to dashboard asks it first - VIEW_JOIN.
+// `memberCard`: the cluster's tile it is, so it asks Copy or Move too (the
+// sprint after round 7); null for a group card's member - a copy only.
+void visibilityJoinOpen(Card *parent, const Entity *member, Card *memberCard = nullptr);
+void buildJoin();
+bool visibilityJoin(uint8_t pick, bool move = false);   // made, in group `pick` (0: its group card's)
+void removeFromPageCb(lv_event_t *ev);   // PopupDialog.cpp: "Remove this card?" - one made on the glass
+bool visibilityTakeRebuild();        // a choice wants the page built again, once the window has gone
 
 // PopupDebug.cpp
 #ifdef DEBUG_POPUP

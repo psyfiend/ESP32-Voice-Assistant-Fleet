@@ -39,6 +39,26 @@ public:
     const char *typeName() const override { return "sensor"; }
 };
 
+// A SUMMARY (2.11 round 4, K98): a group card of members of one kind - the
+// garage doors - as one card: one icon, active while any member is, and under
+// it the active ones by name - "North", "Both", "2 open"; none, its own name.
+// A tap opens its Members (CardPage gives it that, unless the owner chose).
+// Its one piece of logic is those words, which are the type's own business.
+class SummaryCard : public StateCard {
+public:
+    const char *typeName() const override { return "summary"; }
+    // A member's words, by its entity: the dashboard's name for it ("North").
+    void setMemberName(const char *entityId, const char *name);
+protected:
+    const char *nameText(CardLabel lbl, const Entity &e, bool isOn) override;
+private:
+    static constexpr uint8_t NAMES_MAX = 12;
+    const char *_ids[NAMES_MAX]   = {};
+    const char *_names[NAMES_MAX] = {};
+    uint8_t     _nNames = 0;
+    char        _words[40] = {};
+};
+
 // A read-only bit. Motion, occupancy, a door, a window.
 //
 // It uses the state layout rather than the value one because one bit is not a

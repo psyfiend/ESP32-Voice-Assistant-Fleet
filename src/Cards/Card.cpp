@@ -3,6 +3,7 @@
 #include "Cards/CardIcons.h"
 #include "Cards/CardPopup.h"
 #include "UI/UITokens.h"
+#include "UI/Kit.h"         // the card's roles (2.11 round 1)
 #include "UI/UIToolkit.h"   // the scene toast (2.10d; NINA's toasts after 2.10d)
 #include "Cards/CardGroups.h"   // the card label's colour, following the HA area (K44)
 #include <Arduino.h>
@@ -389,6 +390,9 @@ void Card::resolveVariant() {
             _valueSmall = (h < needC);
         }
     }
+    // Beside tiles, the tiles' face (round 13, K126: the owner found the 4B's
+    // Thermo far larger than the tile next to it, and clipping its corner icon).
+    if (_besideTiles) _valueSmall = true;
 
     // Printed once per card, because this decision was guessed at twice and
     // both times the guess was wrong. The numbers are cheap and they end the
@@ -424,6 +428,7 @@ void Card::onLongPress() {
 // ---------------------------------------------------------------------------
 
 void Card::build(lv_obj_t *parent) {
+    if (_mini) { buildMini(parent); return; }   // a cluster's tile: Cards/MiniTile.cpp
     const UIMetrics &m = UI::met();
 
     // THE TAG LIVES INSIDE THE CELL, above the card. It used to hang outside
@@ -448,11 +453,7 @@ void Card::build(lv_obj_t *parent) {
     // now satisfied by construction rather than by arithmetic. CardPage no
     // longer widens anything.
     _root = lv_obj_create(parent);
-    lv_obj_set_style_bg_opa       (_root, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width (_root, 0, 0);
-    lv_obj_set_style_pad_all      (_root, 0, 0);
-    lv_obj_set_style_pad_gap      (_root, 0, 0);
-    lv_obj_set_flex_flow          (_root, LV_FLEX_FLOW_COLUMN);
+    Kit::add(_root, Kit::KitStyle::KS_CARD_ROOT);   // transparent, unpadded, a flex column
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_CLICKABLE);
     // THE SHADOW LIVES OUTSIDE THIS WRAPPER, so the wrapper must not clip it.
@@ -479,9 +480,7 @@ void Card::build(lv_obj_t *parent) {
         _tagRow = lv_obj_create(_root);
         lv_obj_set_width              (_tagRow, lv_pct(100));
         lv_obj_set_height             (_tagRow, tagRowPx());
-        lv_obj_set_style_bg_opa       (_tagRow, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width (_tagRow, 0, 0);
-        lv_obj_set_style_pad_all      (_tagRow, 0, 0);
+        Kit::add(_tagRow, Kit::KitStyle::KS_CARD_PLAIN);
         lv_obj_clear_flag             (_tagRow, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_clear_flag             (_tagRow, LV_OBJ_FLAG_CLICKABLE);
         // The area and STALE pills cast the scheme's shadow (Linen), and the
@@ -492,7 +491,7 @@ void Card::build(lv_obj_t *parent) {
     _surface = lv_obj_create(_root);
     lv_obj_set_width              (_surface, lv_pct(100));
     lv_obj_set_flex_grow          (_surface, 1);
-    lv_obj_set_style_pad_all      (_surface, 0, 0);   // the body owns padding
+    Kit::add(_surface, Kit::KitStyle::KS_CARD_SURFACE);   // its look; the body owns padding
     lv_obj_clear_flag             (_surface, LV_OBJ_FLAG_SCROLLABLE);
 
     // CLIP_CORNER ONLY WHERE SOMETHING ACTUALLY NEEDS CLIPPING.
@@ -551,9 +550,7 @@ void Card::build(lv_obj_t *parent) {
 
     _body = lv_obj_create(_surface);
     lv_obj_set_size               (_body, lv_pct(100), lv_pct(100));
-    lv_obj_set_style_bg_opa       (_body, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width (_body, 0, 0);
-    lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
+    Kit::add(_body, Kit::KitStyle::KS_CARD_BODY);   // transparent, the card's padding
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_body, LV_OBJ_FLAG_CLICKABLE);
     if (_hdrStyle == CardHeaderStyle::HDR_BAND) {
@@ -572,10 +569,7 @@ void Card::build(lv_obj_t *parent) {
 static lv_obj_t *makeStrip(lv_obj_t *parent) {
     lv_obj_t *o = lv_obj_create(parent);
     lv_obj_set_height             (o, Card::headerHeight());
-    lv_obj_set_style_pad_all      (o, 0, 0);
-    lv_obj_set_style_pad_left     (o, UI::sc(7), 0);
-    lv_obj_set_style_pad_right    (o, UI::sc(7), 0);
-    lv_obj_set_style_border_width (o, 0, 0);
+    Kit::add(o, Kit::KitStyle::KS_CARD_STRIP);
     lv_obj_clear_flag             (o, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (o, LV_OBJ_FLAG_CLICKABLE);
     return o;
@@ -590,6 +584,8 @@ void Card::buildHeader() {
     // to go, which is what makes it the mode you pick when you do not want one.
     if (_hdrStyle == CardHeaderStyle::HDR_NONE) {
         _badge = lv_label_create(_surface);
+        Kit::add(_badge, Kit::KitStyle::KS_CARD_BADGE);
+        Kit::add(_badge, Kit::KitStyle::KS_CARD_TAGTEXT);
         lv_obj_align   (_badge, LV_ALIGN_TOP_RIGHT, -UI::sc(6), UI::sc(6));
         lv_obj_add_flag(_badge, LV_OBJ_FLAG_HIDDEN);
         return;
@@ -630,6 +626,8 @@ void Card::buildHeader() {
         // attached pills.
         lv_obj_add_style (_header, UI::paint(UIPaint::PAINT_LIFT), 0);
         lv_obj_add_style (_stale,  UI::paint(UIPaint::PAINT_LIFT), 0);
+        Kit::add(_header, Kit::KitStyle::KS_CARD_PILL);
+        Kit::add(_stale,  Kit::KitStyle::KS_CARD_PILL);
     } else if (tag) {
         _header = makeStrip(_tagRow);
 
@@ -649,6 +647,8 @@ void Card::buildHeader() {
         // Linen request, 2026-09-23.
         lv_obj_add_style (_header, UI::paint(UIPaint::PAINT_LIFT), 0);
         lv_obj_add_style (_stale,  UI::paint(UIPaint::PAINT_LIFT), 0);
+        Kit::add(_header, Kit::KitStyle::KS_CARD_PILL);
+        Kit::add(_stale,  Kit::KitStyle::KS_CARD_PILL);
     } else {
         _header = makeStrip(_surface);
         lv_obj_set_width (_header, lv_pct(100));
@@ -685,10 +685,12 @@ void Card::buildHeader() {
     // labels carry the inset makeStrip() would have given them.
     const int32_t inset = _bandSkirt ? UI::sc(7) : 0;
     _lblArea = lv_label_create(_header);
+    Kit::add(_lblArea, Kit::KitStyle::KS_CARD_TAGTEXT);   // in the surface's colour, on its tag or band
     lv_label_set_long_mode(_lblArea, LV_LABEL_LONG_DOT);
     lv_obj_align (_lblArea, LV_ALIGN_LEFT_MID, inset, 0);
 
     _badge = lv_label_create(_stale ? _stale : _header);
+    Kit::add(_badge, Kit::KitStyle::KS_CARD_TAGTEXT);
     lv_obj_align (_badge, _stale ? LV_ALIGN_CENTER : LV_ALIGN_RIGHT_MID, -inset, 0);
 }
 
@@ -700,23 +702,25 @@ void Card::buildHeader() {
 // live - a card that cached a colour would simply not repaint.
 // ---------------------------------------------------------------------------
 
+// The surface's colour: the card's own, mixed toward the ground while paused. A
+// mini tile keeps its role's faint panel (KS_TILE, 2.11 round 11) unless paused.
+void Card::paintSurface() {
+    const UIPalette &p = UI::pal();
+    if (_mini && !_dimmed) lv_obj_remove_local_style_prop(_surface, LV_STYLE_BG_COLOR, 0);
+    else lv_obj_set_style_bg_color(_surface, UI::c(_dimmed ? UI::mix(p.SURFACE, p.GROUND, 55) : p.SURFACE), 0);
+}
+
 void Card::restyle() {
     if (!_root) return;
 
     const UIPalette &p = UI::pal();
     const UIMetrics &m = UI::met();
 
-    const uint32_t surf = _dimmed ? UI::mix(p.SURFACE, p.GROUND, 55) : p.SURFACE;
-    lv_obj_set_style_bg_color     (_surface, UI::c(surf), 0);
-    lv_obj_set_style_bg_opa       (_surface, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius       (_surface, UI::sc(m.RADIUS), 0);
-    lv_obj_set_style_border_width (_surface, m.BORDER_W, 0);
-    lv_obj_set_style_border_color (_surface, UI::border(), 0);
-    lv_obj_set_style_shadow_width   (_surface, UI::sc(m.SHADOW), 0);
-    lv_obj_set_style_shadow_offset_y(_surface, UI::sc(m.SHADOW_Y), 0);
-    lv_obj_set_style_shadow_opa     (_surface, m.SHADOW ? (lv_opa_t)m.SHADOW_OPA : LV_OPA_TRANSP, 0);
+    // The surface's radius, border and shadow, and the body's padding, are the
+    // card's roles (KS_CARD_SURFACE, KS_CARD_BODY), refilled with the scheme.
+    // The colour is the card's own: a paused card mixes it toward the ground.
+    paintSurface();
 
-    lv_obj_set_style_pad_all      (_body, UI::sc(m.PAD), 0);
     // BAR ONLY. This said "not TAG", which also reserved a header's height in
     // HDR_NONE - a mode whose whole point is that it reserves nothing, and
     // which build() above and fullCellNeedPx() both already treated that way.
@@ -732,14 +736,12 @@ void Card::restyle() {
 
     if (_header) {
         lv_obj_set_height          (_header, Card::headerHeight());
-        lv_obj_set_style_text_font (_lblArea, UI::type().TAG, 0);
         // ONE LINE, fixed. LV_LABEL_LONG_DOT only shortens text that overflows
         // the label's HEIGHT; a content-height label wraps instead, and a
         // narrowed area name ("Outdoor" beside STALE on WS_P4_4B) showed as its
         // middle line, "doo". See the stale holder in applyState().
         lv_obj_set_height(_lblArea, lv_font_get_line_height(UI::type().TAG));
     }
-    lv_obj_set_style_text_font (_badge, UI::type().TAG, 0);
     if (_stale) lv_obj_set_height(_stale, Card::headerHeight());
 
     resolveVariant();
@@ -887,6 +889,8 @@ const lv_font_t *Card::heroIconFace() const {
     const UIType &t = UI::type();
     const int32_t room = midHeight();
     if (room <= 0) return t.ICON;
+    // The roomy hero (2.11 round 9): where most of its disc fits (the tiles' rule, MiniTile.cpp).
+    if (t.ICON_XL != t.ICON && room * 10 >= lv_font_get_line_height(t.ICON_XL) * 16) return t.ICON_XL;
     if (room >= lv_font_get_line_height(t.ICON)    + UI::sc(4)) return t.ICON;
     if (room >= lv_font_get_line_height(t.ICON_MD) + UI::sc(4)) return t.ICON_MD;
     return t.ICON_SM;
@@ -943,7 +947,7 @@ void Card::pressLook(uint8_t toAccent, int32_t sink) {
     if (!_surface) return;
     // The held look owns the edge; an active frame is not drawn until pressClear().
     _pressed = toAccent > 0 || sink > 0;
-    const int32_t base = UI::met().BORDER_W;
+    const int32_t base = _mini ? 0 : UI::met().BORDER_W;   // a mini tile has no border of its own
     const int32_t wide = LV_MAX(base, UI::sc(2));
     const int32_t bw   = base + (wide - base) * toAccent / 255;
     lv_obj_set_style_border_color(_surface,
@@ -983,8 +987,9 @@ void Card::pressLook(uint8_t toAccent, int32_t sink) {
 void Card::pressClear() {
     pressLook(0, 0);
     if (_surface) {
-        lv_obj_set_style_border_color(_surface, UI::border(), 0);
-        lv_obj_set_style_border_width(_surface, UI::met().BORDER_W, 0);
+        // Back to the surface's role (KS_CARD_SURFACE), which follows the scheme.
+        lv_obj_remove_local_style_prop(_surface, LV_STYLE_BORDER_COLOR, 0);
+        lv_obj_remove_local_style_prop(_surface, LV_STYLE_BORDER_WIDTH, 0);
         if (_root) render();
     }
 }
@@ -1084,8 +1089,7 @@ void Card::applyState() {
     // runs on every transition, restyle() only on a scheme change. That is the
     // regression the owner spotted - "cards no longer dim when paused".
     _dimmed = cardStateMayDim(_state);
-    lv_obj_set_style_bg_color(_surface,
-        UI::c(_dimmed ? UI::mix(p.SURFACE, p.GROUND, 55) : p.SURFACE), 0);
+    paintSurface();
 
     const char *mark = "";
     switch (_state) {
@@ -1103,13 +1107,9 @@ void Card::applyState() {
     // HDR_NONE has no area holder, so it is only ever the floating badge.
     if (!_header) {
         if (mark[0]) {
+            // Its shape and words are its roles (KS_CARD_BADGE, KS_CARD_TAGTEXT).
             lv_label_set_text          (_badge, mark);
             lv_obj_set_style_bg_color  (_badge, UI::c(tc ? tc : p.ACCENT), 0);
-            lv_obj_set_style_bg_opa    (_badge, LV_OPA_COVER, 0);
-            lv_obj_set_style_radius    (_badge, UI::sc(m.RADIUS / 2), 0);
-            lv_obj_set_style_pad_hor   (_badge, UI::sc(6), 0);
-            lv_obj_set_style_pad_ver   (_badge, UI::sc(3), 0);
-            lv_obj_set_style_text_color(_badge, UI::c(p.SURFACE), 0);
             lv_obj_clear_flag          (_badge, LV_OBJ_FLAG_HIDDEN);
             lv_obj_move_foreground     (_badge);
         } else {
@@ -1129,10 +1129,8 @@ void Card::applyState() {
         // A pill only exists when it has something in it. Hiding it is safe
         // precisely because the clearance is the PAGE's, not the card's: a
         // card with no tag is exactly as tall as one with a tag.
+        // A pill (KS_CARD_PILL) in its group's colour, the words in the surface's.
         lv_obj_set_style_bg_color  (_header, UI::c(headerColor()), 0);
-        lv_obj_set_style_bg_opa    (_header, LV_OPA_COVER, 0);
-        lv_obj_set_style_radius    (_header, UI::sc(m.RADIUS / 2), 0);
-        lv_obj_set_style_text_color(_lblArea, UI::c(p.SURFACE), 0);
         if (wantArea) lv_obj_clear_flag(_header, LV_OBJ_FLAG_HIDDEN);
         else          lv_obj_add_flag  (_header, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -1156,8 +1154,8 @@ void Card::applyState() {
         lv_obj_set_style_radius    (_header, UI::sc(m.RADIUS) - m.BORDER_W, 0);
         if (_bandSkirt) lv_obj_set_style_bg_color(_bandSkirt, UI::c(headerColor()), 0);
         // Text in the card's BACKGROUND colour - dark on a light accent, light
-        // on a dark one, without anyone picking per scheme. cards.md section 2.
-        lv_obj_set_style_text_color(_lblArea, UI::c(p.SURFACE), 0);
+        // on a dark one, without anyone picking per scheme (cards.md section 2):
+        // the words' role, KS_CARD_TAGTEXT.
         // The badge carries the state, as its own chip inside the band - and
         // now for every state that has a colour, paused included.
         if (tc) {
@@ -1165,10 +1163,8 @@ void Card::applyState() {
             lv_obj_set_style_bg_opa    (_badge, LV_OPA_COVER, 0);
             lv_obj_set_style_radius    (_badge, UI::sc(m.RADIUS / 2), 0);
             lv_obj_set_style_pad_hor   (_badge, UI::sc(5), 0);
-            lv_obj_set_style_text_color(_badge, UI::c(p.SURFACE), 0);
         } else {
             lv_obj_set_style_bg_opa    (_badge, LV_OPA_TRANSP, 0);
-            lv_obj_set_style_text_color(_badge, UI::c(p.SURFACE), 0);
         }
         // The band stays even when empty: it is part of the card's shape in
         // this mode, and appearing only sometimes would be worse than blank.
@@ -1177,10 +1173,7 @@ void Card::applyState() {
 
     // --- the stale holder, which only exists in tag mode --------------------
     if (_stale) {
-        lv_obj_set_style_bg_color  (_stale, UI::c(tc ? tc : headerColor()), 0);
-        lv_obj_set_style_bg_opa    (_stale, LV_OPA_COVER, 0);
-        lv_obj_set_style_radius    (_stale, UI::sc(m.RADIUS / 2), 0);
-        lv_obj_set_style_text_color(_badge, UI::c(p.SURFACE), 0);
+        lv_obj_set_style_bg_color  (_stale, UI::c(tc ? tc : headerColor()), 0);   // a pill, KS_CARD_PILL
         if (mark[0]) lv_obj_clear_flag(_stale, LV_OBJ_FLAG_HIDDEN);
         else         lv_obj_add_flag  (_stale, LV_OBJ_FLAG_HIDDEN);
 
@@ -1226,6 +1219,7 @@ void Card::applyDiagonal() {
 
     if (!_diagonal) {
         _diagonal = lv_line_create(_surface);
+        Kit::add(_diagonal, Kit::KitStyle::KS_CARD_DIAG);   // its width, strength and round ends
         lv_obj_clear_flag(_diagonal, LV_OBJ_FLAG_CLICKABLE);
     }
 
@@ -1264,10 +1258,7 @@ void Card::applyDiagonal() {
     _diagPts[1].y = h - half;
     lv_line_set_points            (_diagonal, _diagPts, 2);
     lv_obj_align                  (_diagonal, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_obj_set_style_line_width   (_diagonal, UI::sc(6), 0);
     lv_obj_set_style_line_color   (_diagonal, UI::c(tagColor()), 0);
-    lv_obj_set_style_line_opa     (_diagonal, LV_OPA_60, 0);
-    lv_obj_set_style_line_rounded (_diagonal, true, 0);
     lv_obj_move_foreground        (_diagonal);
 }
 

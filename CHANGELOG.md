@@ -6,6 +6,37 @@ signed-off merges to `main` in the order they happen - it does not follow milest
 began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
+## v0.2.19 - 2026-10-30
+
+Milestone 2.11 - group cards (#66, #78; DECISIONS K88-K129; design `docs/design/group-cards.md`
+§6-7, the arranger `docs/design/layout-engines.md`).
+
+- **Clusters**: a group as one block of tiles under a header - its name in the group's colour, up
+  to four sensor readings, Swatch or Band - beside solo cards. Tiles are near square, their heights
+  evened across a page (K116, K122, K124); a solo card beside them is a tile's size (K126). A tap on
+  a tile is that member's own tap; a long press opens the member's window.
+- **The page arranger** (`Layout::arrange()`, the Layout Playground's rules in units, v9; host-tested
+  against the playground's own answers): pages arrange themselves, clusters grow into the spare
+  height first, horizontal shapes preferred; Col / Row pin a count and Auto unpins. It runs on its
+  own task at idle priority, 7,000 steps a pass on the boards (the 4B's House in 4.9 s), and each
+  page keeps its answer (`pages.<slug>.layout`, `v4`).
+- **A cluster's window is its Members** (K129): every member, hidden ones too, each opening its own
+  view; the **CLUSTER** panel beside SETTINGS - Rename cluster (the keyboard, K95), **Header
+  options** (which sensors its header shows, four at most; Sensor icons; Header style) and **Add
+  cards** (the page's cards, Copy or Move).
+- **Visibility, by where a card is** (K96): Hide from this page or from the cluster, each asking
+  first; Paused; Add card to dashboard, with the card's group and Change group? Select (K128); Add
+  to a cluster, Copy or Move, both tracked so a move can be undone (K111, K112). Hidden cards are
+  listed in the page panel and restored with **Restore to dashboard**; a member hidden from its
+  cluster is restored from the cluster's Members (K125).
+- **Card groups** (K46) shown on every card's label, HA areas linked in as groups; the House page
+  reads Home Assistant's new entity names (K127).
+- **The kit gained** the keyboard, chip grids, check and words rows in chip tables, section titles
+  in panels, and a drawer line that unrolls in place (`Kit::drawerReveal()`). A development
+  **Reset** in the system panel puts a board's dashboard back to the compiled one.
+- Signed off by the owner (`docs/archive/TEST_2.11.md`, sixteen rounds, 54 builds); all nine
+  environments build.
+
 ## v0.2.18 - 2026-10-17
 
 Milestone 2.8 - the header bar, v2 (#19; DECISIONS D-11 to D-33).

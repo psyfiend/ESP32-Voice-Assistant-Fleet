@@ -95,7 +95,10 @@ public:
     //   /popup?scene=N      as a tap on scene N; lists the light's scenes (2.10c)
     //   /popup?set=V        as a tap on that control's slider at V (%, K, hue)
     //   /popup?view=N       as the corner icons: 0 the controls (a member's, inside
-    //                       one), 1 history, 2 members, 4 scenes, 5 properties, 6 Card UI; 3 only lists. Each
+    //                       one), 1 history, 2 members, 4 scenes, 5 properties, 6 Card UI,
+    //                       7 a cluster's Header slots (2.11), 8 Visibility (K96),
+    //                       9 its Add to a cluster, 10 a cluster's Add cards;
+    //                       3 only lists. Each
     //                       lists the entities' levels (and an HA group's members)
     //   /popup?power=1      as a tap on Power
     //   /popup?pause=1|0    pause / resume what the window shows
@@ -117,11 +120,20 @@ public:
     //   /popup?mem=1        LVGL's pool, to the byte
     //   /popup?sparks=N     the edge sparks from the next window: 0 now and then,
     //                       1 once, 2 off (not kept)
-    //   /popup?removecard=3 Remove card's dialog over any card's window, to look
-    //                       at; close=1 takes it down (2 is the real one)
+    //   /popup?removecard=3 Hide's dialog (K96) over any card's window, to look
+    //                       at; close=1 takes it down (2 is the real one; 1 hides
+    //                       at once; 4 / 5 a copy in a cluster: its dialog / removed)
+    //   /popup?addto=N&mv=1 Add to a cluster: the page's Nth, Copy (mv=0) or Move
+    //   /popup?addcards=M   a cluster's Add cards, the list's cards in bit mask M (mv= too)
+    //   /popup?restore=N    the page panel's Restore beside hidden card N
     //   /popup?about=1|0    "About this board" open or closed (2.12 P4)
     //   /popup?drawer=1|0   the system panel open or closed, as a tap on the
     //                       header's icon (#97: the harness's look at it)
+    //   /popup?kbd=1|2      the keyboard (2.11, K95) over the open window: 1 as a
+    //                       cluster's Rename or Entity label's Custom, 2 as Card
+    //                       label's Custom; kbtype=<words> types them ('+' a
+    //                       space), kbmode=0|1|2 lower / upper / symbols,
+    //                       kbpress=1 Save, 2 Cancel, 3 empty the field first
     // The handler hands the work to the LVGL thread and waits for it, as
     // /screenshot does - it never touches LVGL itself.
     static void beginDebug(class HttpServer &http);
