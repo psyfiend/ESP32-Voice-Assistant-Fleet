@@ -32,8 +32,8 @@ decision to `DECISIONS.md`; a number to the doc that owns it. This file is rewri
 ## Where the project is
 
 **2.11 is finished.** The owner signed it off on 2026-10-30 after sixteen rounds and 54 builds
-(`docs/archive/TEST_2.11.md`). It is **`v0.2.19`**: the PR from `feat/2.11-group-cards` is open for
-the owner to merge; the tag goes on the merge commit (below). The release before was `v0.2.18`
+(`docs/archive/TEST_2.11.md`). It is **`v0.2.19`**: [PR #113](https://github.com/psyfiend/ESP32-Voice-Assistant-Fleet/pull/113)
+from `feat/2.11-group-cards` (all nine built, 32:36) is open for the owner to merge; the tag goes on the merge commit (below). The release before was `v0.2.18`
 (2.8, the header bar v2). `CHANGELOG.md` matches every version to its milestones.
 
 **Lines of code** - the project's own C/C++ (`src/`, `include/`, its own `components/`; generated
