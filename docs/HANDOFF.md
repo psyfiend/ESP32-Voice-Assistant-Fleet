@@ -124,7 +124,7 @@ arranger**: the playground first, then `host-tests/README.md`'s steps; the board
 5. Waiting: **#104** (a light's temperature mark moves between builds); **#84** "no data yet";
    **#99's S3 frame check** (W6) once an S3 is on the desk; the header clock's format (interview §3
    Q3); from 2.11's final pass, a header panel's temperature opening its History and a cluster's own
-   card state (ROADMAP 5a).
+   card state (ROADMAP running order 6).
 
 **After any merge**: `git pull`, tag the merge commit (annotated, `vX.Y.Z - <milestones>`), push the
 tag, flash the boards on the desk. The CHANGELOG entry and the archived test sheet go on the branch
@@ -152,7 +152,7 @@ clusters from areas and labels.
 
 **Questions the interview has to settle** (my reading, 2026-10-30 - check them with the owner):
 
-- **Offered, not imposed.** The owner was firm (ROADMAP 5a, K118-K123): the dashboard never has to
+- **Offered, not imposed.** The owner was firm (ROADMAP running order 6, K118-K123): the dashboard never has to
   follow HA's organisation and needs no particular HA layout - which is why there is no manifest
   dependency. `FLEET_REFERENCE.md` rule 3 ("Discover, don't hardcode", the manifest) reads the other
   way. Proposed: HA's areas, labels and the manifest feed **the Add cards picker and an area link's
