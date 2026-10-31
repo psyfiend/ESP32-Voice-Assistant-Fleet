@@ -117,9 +117,23 @@ The numbers above are identity, not sequence. Agreed with the owner:
    `archive/TEST_2.11.md`, sixteen rounds; design `design/group-cards.md` §6, K88-K129; the
    arranger's spec: artifact "Layout Playground"; engines: `design/layout-engines.md`). A cluster's
    long press opens its Members (K129).
+5b. **The 2.11 follow-ups** (the owner's notes on `v0.2.19`, 2026-10-31; branch
+   `feat/2.11-followups`, `TEST_2.11_FOLLOWUPS.md`), before 2.13 is built. Round 1 is on the dev
+   boards: a swipe in a sheet never taps (signed off), one name for a member in Members and Header
+   options, and the first Move this card. **Round 2 is being designed** (artifact "Card moves on the
+   glass"): card management on the glass, all-in - a tile's Hide from the cluster / Add to dashboard
+   / Change cluster, a solo card's Hide from this page / Change group / Add to cluster, a group
+   picker with Custom for every card, and **Restore**, so every moved, copied or regrouped card has
+   one way back to how it was built. The header glyph beside a member's row in Members. **No new
+   words on a panel until the owner has agreed them.**
 6. **2.13 - Add cards from HA, HA's organisation offered** (owner, 2026-10-29; HA's
    `FLEET_REFERENCE.md` and `HOUSE_RULES.md`), **designed together with 2.14 and with improvements
-   on HA's side** (K130, K132-K134; `HANDOFF.md`, "Home Assistant"):
+   on HA's side** (K130, K132-K136; `HANDOFF.md`, "Home Assistant"). **HA's side so far**: the
+   milestone's log is the HA folder's `projects/2026-10_fleet-2.13/`, tagged `fleet-2.13-start`
+   (K135); its first HA job is turning the generated logical and status YAML into hand-written
+   files organised by function (K136). Open: per-room status entities for cluster headers, and the
+   anatomy of an alert so HA's own Security dashboard works as fully as the boards (artifact "HA
+   Side of 2.13").
    the group view (K118); Add cards from the entities labelled `fleet`, the linked area's first
    (K119, K123); a cluster linked to the HA area closest to its intent - or none - its header able
    to adopt that area's logical entities as members; an outdoor average from HA. The dashboard
