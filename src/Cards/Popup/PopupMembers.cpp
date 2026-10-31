@@ -51,18 +51,31 @@ KS memberState(const Entity &e, MemberShown shown, char *buf, size_t cap) {
 
 // A member's row: its name, and its state beside it. The caller says what a tap
 // does and gives it its finish once laid out.
-lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberShown shown) {
+lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberShown shown,
+                    bool header, const char *says) {
     lv_obj_t *r = Kit::item(list);
     lv_obj_set_size     (r, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_all(r, mm(UI::shape().S5), 0);
-    lv_obj_t *n = Kit::label(r, KS::KS_LABEL_NAME);
+    // IN THE HEADER, IN WORDS (owner, after v0.2.19: which members are in a header
+    // slot): a tag after the name - words, never a colour alone.
+    lv_obj_t *left = r;
+    if (header) {
+        left = plain(r);
+        lv_obj_set_size     (left, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_flex_flow(left, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(left, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(left, mm(UI::shape().S5), 0);
+        lv_obj_remove_flag  (left, LV_OBJ_FLAG_CLICKABLE);   // a tap is the row's
+    }
+    lv_obj_t *n = Kit::label(left, KS::KS_LABEL_NAME);
     lv_label_set_text(n, name);
+    if (header) lv_label_set_text(Kit::label(left, KS::KS_LABEL_TAG_DIM), "HEADER");
     char buf[48];
-    const KS role = memberState(e, shown, buf, sizeof(buf));
+    const KS role = says ? KS::KS_LABEL_TAG_DIM : memberState(e, shown, buf, sizeof(buf));
     lv_obj_t *v = Kit::label(r, role);
-    lv_label_set_text(v, buf);
+    lv_label_set_text(v, says ? says : buf);
     return r;
 }
 
@@ -86,13 +99,20 @@ void buildMembers() {
     lv_obj_set_style_pad_row(list, mm(UI::shape().S5), 0);
     lv_obj_t *rows[POPUP_ENT_MAX] = {};
     uint8_t nRows = 0;
+    if (cl) clusterMemberNames(*cl);
     for (uint8_t i = 0; i < memberCount(); i++) {
         const Entity *e = memberAt(i);
         if (!e) continue;
         // A tap opens that member's own controls (owner, 2.10b).
         const int8_t k = cl ? clusterMemberOf(*cl, e) : -1;
         const MemberShown shown = k >= 0 ? clusterMemberShown(*cl, (uint8_t)k) : MemberShown::SHOWN_TILE;
-        lv_obj_t *r = memberRow(list, e->desc.name, *e, shown);
+        // A cluster's member: its name as Header options gives it, whether its
+        // sensor is in the header, and where it went if it moved out.
+        char where[48];
+        const char *says = (k >= 0 && shown == MemberShown::SHOWN_MOVED)
+                               ? movedWords(cl->memberAt((uint8_t)k), where, sizeof(where)) : nullptr;
+        lv_obj_t *r = memberRow(list, k >= 0 ? clusterMemberName((uint8_t)k) : e->desc.name, *e, shown,
+                                k >= 0 && clusterMemberInHeader(*cl, (uint8_t)k), says);
         lv_obj_add_event_cb(r, memberRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
         if (nRows < POPUP_ENT_MAX) rows[nRows++] = r;
     }

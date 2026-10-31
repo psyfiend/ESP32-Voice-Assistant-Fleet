@@ -34,8 +34,9 @@ enum class KitStyle : uint8_t {
     KS_BTN_DESTRUCTIVE, KS_BTN_DESTRUCTIVE_PRESSED, KS_BTN_DESTRUCTIVE_INK,
     KS_BTN_CONFIRM, KS_BTN_CONFIRM_PRESSED, KS_BTN_CONFIRM_INK,
     // The dialog: the dim behind it, a destructive question's box (its edge in
-    // ST_BAD), its words, and the row its buttons stand in.
-    KS_DIALOG_DIM, KS_DIALOG_BOX_DESTRUCTIVE, KS_DIALOG_BODY, KS_DIALOG_ROW,
+    // ST_BAD), a confirming one's (its edge the accent), its words, and the row
+    // its buttons stand in.
+    KS_DIALOG_DIM, KS_DIALOG_BOX_DESTRUCTIVE, KS_DIALOG_BOX_CONFIRM, KS_DIALOG_BODY, KS_DIALOG_ROW,
     // Rows: the row; a dropdown (MAIN, live or greyed, its arrow) and its list
     // (MAIN, the chosen line, a pressed line); a checkbox (MAIN, its box, the
     // box ticked); a row's button (face, pressed, live or greyed edge).
@@ -427,7 +428,9 @@ void folder(Folder &F, const FolderSpec &spec);
 // A question over everything - on the top layer, the rest dimmed - with its
 // words centred and its buttons side by side. A tap outside the box calls
 // `outside` (with the dim's event).
-enum class DialogRole : uint8_t { DLG_DESTRUCTIVE };
+// Destructive: something goes (Hide, Remove). Confirm: something moves or is
+// made (Move this card).
+enum class DialogRole : uint8_t { DLG_DESTRUCTIVE, DLG_CONFIRM };
 
 struct DialogButton {
     const char   *text;

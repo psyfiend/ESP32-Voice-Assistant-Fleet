@@ -50,7 +50,8 @@ lv_obj_t *dialog(const DialogSpec &spec) {
     lv_obj_set_width(box, spec.width);
     lv_obj_set_height(box, LV_SIZE_CONTENT);
     lv_obj_center(box);
-    add(box, KitStyle::KS_DIALOG_BOX_DESTRUCTIVE);   // the only role so far (DialogRole)
+    add(box, spec.role == DialogRole::DLG_CONFIRM ? KitStyle::KS_DIALOG_BOX_CONFIRM
+                                                  : KitStyle::KS_DIALOG_BOX_DESTRUCTIVE);
 
     lv_obj_t *title = label(box, KitStyle::KS_LABEL_NAME);
     lv_label_set_text(title, spec.title);

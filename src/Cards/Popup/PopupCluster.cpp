@@ -84,24 +84,39 @@ bool visible(const ClusterCard &cl, uint8_t i, const char *const *ids, uint8_t n
 
 bool movedOut(const Card *m) { return m && m->hasId() && CardAdded::isMovedToPage(m->id()); }
 
-const char *nameOf(const Card *m) { return m ? m->shownName(CardLabel::LBL_NAME) : "?"; }
+// THE LISTS NAME A MEMBER IN FULL (owner, after v0.2.19: Header options said
+// "Eric" where Members said "Eric Bedroom Temperature"): a name typed on the
+// glass, else HA's. The tile keeps the dashboard's short label.
+void nameOf(const Card *m, char *out, size_t cap) {
+    const Entity *e = m ? m->firstEntity() : nullptr;
+    if (m && m->hasId() && Settings::card(m->id(), "name", out, cap) && out[0]) return;
+    snprintf(out, cap, "%s", e ? e->desc.name : m ? m->shownName(CardLabel::LBL_NAME) : "?");
+}
 
-// Each member's name in the rows; two called the same ("Office", its temperature
-// and its occupancy) say what each is.
-char s_names[GROUP_MEMBERS_MAX][ENTITY_NAME_MAX + 24];
-void names(const ClusterCard &cl) {
-    for (uint8_t i = 0; i < cl.memberCount() && i < GROUP_MEMBERS_MAX; i++) {
-        const Card *m = cl.memberAt(i);
-        const char *nm = nameOf(m);
-        bool twin = false;
-        for (uint8_t j = 0; j < cl.memberCount() && !twin; j++)
-            twin = j != i && !strcmp(nameOf(cl.memberAt(j)), nm);
-        const Entity *e = m ? m->firstEntity() : nullptr;
+}  // namespace
+
+// Each member's name in the rows - Members' and Header options' alike; two
+// called the same ("Office", its temperature and its occupancy) say what each is.
+static char s_names[GROUP_MEMBERS_MAX][ENTITY_NAME_MAX + 24];
+void clusterMemberNames(const ClusterCard &cl) {
+    const uint8_t n = (uint8_t)LV_MIN(cl.memberCount(), GROUP_MEMBERS_MAX);
+    bool twin[GROUP_MEMBERS_MAX] = {};
+    for (uint8_t i = 0; i < n; i++) nameOf(cl.memberAt(i), s_names[i], ENTITY_NAME_MAX);
+    for (uint8_t i = 0; i < n; i++)
+        for (uint8_t j = 0; j < n && !twin[i]; j++) twin[i] = j != i && !strcmp(s_names[j], s_names[i]);
+    for (uint8_t i = 0; i < n; i++) {
+        const Entity *e = cl.memberAt(i) ? cl.memberAt(i)->firstEntity() : nullptr;
         char w[32];
-        if (twin && e) snprintf(s_names[i], sizeof(s_names[i]), "%s (%s)", nm, whatWord(*e, w, sizeof(w)));
-        else           snprintf(s_names[i], sizeof(s_names[i]), "%s", nm);
+        if (twin[i] && e) {
+            const size_t len = strlen(s_names[i]);
+            snprintf(s_names[i] + len, sizeof(s_names[i]) - len, " (%s)", whatWord(*e, w, sizeof(w)));
+        }
     }
 }
+
+const char *clusterMemberName(uint8_t i) { return i < GROUP_MEMBERS_MAX ? s_names[i] : "?"; }
+
+namespace {
 
 int32_t listW() { return lv_area_get_width(&s.winRect) - 2 * s.pad; }
 
@@ -380,6 +395,13 @@ MemberShown clusterMemberShown(const ClusterCard &cl, uint8_t i) {
     return inList(idOf(cl.memberAt(i)), ids, n) ? MemberShown::SHOWN_HEADER : MemberShown::SHOWN_HIDDEN;
 }
 
+bool clusterMemberInHeader(const ClusterCard &cl, uint8_t i) {
+    const char *ids[CLUSTER_SLOTS_MAX];
+    char buf[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1];
+    const uint8_t n = headerIds(cl, ids, buf, sizeof(buf));
+    return !movedOut(cl.memberAt(i)) && inList(idOf(cl.memberAt(i)), ids, n);
+}
+
 int8_t clusterMemberOf(const ClusterCard &cl, const Entity *e) {
     if (!e) return -1;
     for (uint8_t i = 0; i < cl.memberCount(); i++) {
@@ -446,7 +468,7 @@ void buildClusterSlots() {
     lv_obj_set_height   (s_table, LV_SIZE_CONTENT);
     lv_obj_remove_flag  (s_table, LV_OBJ_FLAG_SCROLLABLE);
     s_nSlotRows = 0;
-    names(*cl);
+    clusterMemberNames(*cl);
     for (uint8_t i = 0; i < cl->memberCount() && s_nSlotRows < GROUP_MEMBERS_MAX; i++) {
         if (movedOut(cl->memberAt(i))) continue;   // its card is on the page: not the cluster's to show
         // SENSORS ONLY (round 10, the owner): a light or a switch is a tile. One

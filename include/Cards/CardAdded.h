@@ -75,7 +75,9 @@ bool remove(const char *cardId);
 //   Move  the member is "hidden": "moved" - no tile, not in the hidden cards,
 //         Members says On the page; its page card moves it back (moveBack()),
 //         and is never dropped: it is the card itself.
-bool moveToPage(const char *memberId);       // the member's half of a Move
+// The member's half of a Move. `toId`: the card it became - the page card, or
+// a copy in another cluster - kept as "moved_to", so only that card moves it back.
+bool moveToPage(const char *memberId, const char *toId = nullptr);
 bool isMovedToPage(const char *memberId);    // a member whose card is on the page now
 bool movedHere(const char *pageCardId);      // a page card that IS a member moved out
 bool moveBack(const char *pageCardId);       // ...back into its cluster; the page card deleted
@@ -106,6 +108,18 @@ const char *fromOf(const char *cardId);     // the card a member, or a card adde
 bool    removeMember(const char *cardId);
 bool    moveOut(const char *cardId);        // a card moved into a cluster: off its page, not in the pool
 bool    isMoved(const char *cardId);
+
+// --- A TILE MOVED STRAIGHT TO ANOTHER CLUSTER (owner, after v0.2.19: a card had
+// to go to the dashboard first, then into the other cluster) ---------------------
+// A copy made here changes cluster: its "in" is the other's, and it wears that
+// cluster's group (K92 rule 2); its "from" stays, so removing it still puts back
+// the card it came from. A dashboard's member cannot change cluster: it is
+// moveToPage()'d in its own, with "moved_to" its copy in the other - removing that
+// copy is the move undone (removeMember()).
+bool rehome(const char *memberId, const Card &cluster);
+// Where a moved member's card is: the id of the cluster holding it, "" when it is
+// on a page; null when the member has not moved.
+const char *movedTo(const char *memberId);
 
 // --- THE PAGE'S POOL, FOR EVERY CARD (2.11 round 3, K66, K96) -----------------
 // "Hide from this page" sends any card on a page there - a compiled one too:

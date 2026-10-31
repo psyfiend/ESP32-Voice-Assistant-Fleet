@@ -407,7 +407,10 @@ void buildMembers();
 // A member's state in words and the role that colours them; its row, as Members
 // shows it (the cluster's Header options too).
 KS memberState(const Entity &e, MemberShown shown, char *buf, size_t cap);
-lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberShown shown);
+// `header`: it is in the cluster's header, and its row says so. `says`: the
+// state's words instead of memberState()'s ("In Kitchen" for one moved there).
+lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberShown shown,
+                    bool header = false, const char *says = nullptr);
 int32_t membersRowW();   // PopupControls.cpp: Members' width - a group light's controls', in a cluster's window too
 void enterMemberAsync(void *unused);
 void memberRowCb(lv_event_t *ev);
@@ -437,8 +440,13 @@ void clusterMemberShow(const ClusterCard &cl, uint8_t i, bool want);
 // moved out to the page, its card there (the sprint after round 7).
 enum class MemberShown : uint8_t { SHOWN_TILE, SHOWN_HEADER, SHOWN_HIDDEN, SHOWN_MOVED };
 MemberShown clusterMemberShown(const ClusterCard &cl, uint8_t i);
+bool clusterMemberInHeader(const ClusterCard &cl, uint8_t i);   // one of its header's sensors
 // The member of `cl` whose entity is `e`, or -1.
 int8_t clusterMemberOf(const ClusterCard &cl, const Entity *e);
+// Its members' names as the lists show them (a name typed on the glass, else HA's
+// in full; twins say what each is): made by clusterMemberNames(), then by index.
+void clusterMemberNames(const ClusterCard &cl);
+const char *clusterMemberName(uint8_t i);
 
 // PopupHistory.cpp
 void histKeep(const char *key, const char *value);
@@ -510,6 +518,9 @@ void hideTileCb(lv_event_t *ev);     // Hide from the cluster, after its dialog 
 void confirmRemoveCopy();        // "Remove this copy?" - a member copied into a cluster here (K91)
 void removeCopyCb(lv_event_t *ev);
 void confirmRemoveFromPage();    // "Remove this card?" - a page card made on the glass, deleted
+// "Move this card?" / "Copy this card?": from where, to where, and the button's
+// word; `go` runs on it (the words must outlive the dialog: static buffers).
+void confirmMove(const char *title, const char *from, const char *to, const char *verb, void (*go)());
 
 // PopupVisibility.cpp (2.11 round 3, K96)
 void buildVisibility();
@@ -528,6 +539,11 @@ void buildJoin();
 bool visibilityJoin(uint8_t pick, bool move = false);   // made, in group `pick` (0: its group card's)
 void removeFromPageCb(lv_event_t *ev);   // PopupDialog.cpp: "Remove this card?" - one made on the glass
 bool visibilityTakeRebuild();        // a choice wants the page built again, once the window has gone
+const char *visibilityJoinTitle();   // VIEW_JOIN's name: "Move this card" for a cluster's tile
+bool visibilityJoinBack();           // its back arrow inside the view (a picker back to its start); false: leave it
+// Where a member moved out has gone, in words for its row: "On the page", or
+// "In <cluster>" for one on this page; null when it has not moved.
+const char *movedWords(const Card *member, char *buf, size_t cap);
 
 // PopupDebug.cpp
 #ifdef DEBUG_POPUP
