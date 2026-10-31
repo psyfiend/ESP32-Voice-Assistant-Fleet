@@ -84,12 +84,11 @@ bool visible(const ClusterCard &cl, uint8_t i, const char *const *ids, uint8_t n
 
 bool movedOut(const Card *m) { return m && m->hasId() && CardAdded::isMovedToPage(m->id()); }
 
-// THE LISTS NAME A MEMBER IN FULL (owner, after v0.2.19: Header options said
-// "Eric" where Members said "Eric Bedroom Temperature"): a name typed on the
-// glass, else HA's. The tile keeps the dashboard's short label.
+// THE LISTS NAME A MEMBER IN FULL (owner, after v0.2.19 and again after round 1:
+// "Eric Bedroom Temperature", never "Eric"): HA's name, always, in both lists.
+// The tile keeps the dashboard's short label.
 void nameOf(const Card *m, char *out, size_t cap) {
     const Entity *e = m ? m->firstEntity() : nullptr;
-    if (m && m->hasId() && Settings::card(m->id(), "name", out, cap) && out[0]) return;
     snprintf(out, cap, "%s", e ? e->desc.name : m ? m->shownName(CardLabel::LBL_NAME) : "?");
 }
 

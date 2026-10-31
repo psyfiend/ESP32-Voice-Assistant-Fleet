@@ -32,13 +32,14 @@ CardSpec s_spec[CardAdded::MAX];   // each record as a spec - built once, never 
 uint8_t  s_n = 0;
 uint16_t s_pooled = 0;             // removed ones, in the file only
 char     s_page[24] = "";
+const PageSpec *s_pageSpec = nullptr;   // the page being built, as compiled
 bool     s_changed = false;
 bool   (*s_compiled)(const char *) = nullptr;
 
 void copy(char *dst, size_t cap, const char *src) { snprintf(dst, cap, "%s", src ? src : ""); }
 
 // The record's spec: what a compiled card would say, from the record.
-void specOf(uint8_t i) {
+void specFor(uint8_t i) {
     const Rec &r = s_rec[i];
     CardSpec cs{};
     cs.id           = r.id;
@@ -68,7 +69,7 @@ void readOne(const char *id, const char *page, void *) {
     if (Settings::card(id, "removed", v, sizeof(v)) && (!strcmp(v, "yes") || !strcmp(v, "moved"))) { s_pooled++; return; }
     r.removed = false;
     if (!r.entity[0]) return;   // nothing to show: not taken
-    specOf(s_n);
+    specFor(s_n);
     s_n++;
 }
 
@@ -87,7 +88,7 @@ void readMember(const char *id, const char *in, void *) {
     if (Settings::card(id, "from", v, sizeof(v))) copy(r.from, sizeof(r.from), v);
     r.pri = 128;
     if (!r.entity[0]) return;
-    specOf(s_n);
+    specFor(s_n);
     s_n++;
 }
 
@@ -149,7 +150,19 @@ void begin(bool (*compiledId)(const char *id)) {
                   (unsigned)onPages, onPages == 1 ? "" : "s", (unsigned)s_pooled, (unsigned)(s_n - onPages));
 }
 
-void setPage(const char *slugName) { copy(s_page, sizeof(s_page), slugName); }
+void setPage(const char *slugName, const PageSpec *compiled) {
+    copy(s_page, sizeof(s_page), slugName);
+    s_pageSpec = compiled;
+}
+
+const PageSpec *pageSpec() { return s_pageSpec; }
+
+const CardSpec *specOf(const char *cardId) {
+    if (!cardId || !s_pageSpec) return nullptr;
+    const CardSpec *found = nullptr;
+    forEachCardSpec(*s_pageSpec, [&](const CardSpec &cs) { if (!found && cs.id && !strcmp(cs.id, cardId)) found = &cs; });
+    return found;
+}
 
 uint8_t merge(const PageSpec &page, CardSpec *out, uint8_t cap) {
     uint8_t n = 0;
@@ -228,7 +241,7 @@ bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, cons
     CardGroups::Group g;
     if (CardGroups::ofCard(parent, g)) Settings::setCard(r.id, "group", g.id);
 
-    specOf(s_n);
+    specFor(s_n);
     s_n++;
     s_changed = true;
     if (idOut && cap) copy(idOut, cap, r.id);
@@ -237,13 +250,21 @@ bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, cons
 }
 
 bool addTo(const Card &cluster, const Entity &e, char *idOut, size_t cap, const char *fromId) {
-    if (s_n >= MAX || !cluster.hasId()) return false;
+    if (!cluster.hasId()) return false;
+    CardGroups::Group g;
+    return addTo(cluster.id(), cluster.sheetArea(), CardGroups::ofCard(cluster, g) ? g.id : nullptr, e, idOut, cap,
+                 fromId);
+}
+
+bool addTo(const char *clusterId, const char *clusterArea, const char *groupId, const Entity &e,
+           char *idOut, size_t cap, const char *fromId) {
+    if (s_n >= MAX || !clusterId || !cardIdWellFormed(clusterId)) return false;
     Rec &r = s_rec[s_n];
     r = Rec{};
-    if (!makeId(cluster.sheetArea(), e.desc.name, r.id, sizeof(r.id))) return false;
-    copy(r.in, sizeof(r.in), cluster.id());
+    if (!makeId(clusterArea, e.desc.name, r.id, sizeof(r.id))) return false;
+    copy(r.in, sizeof(r.in), clusterId);
     copy(r.entity, sizeof(r.entity), e.desc.id);
-    copy(r.area, sizeof(r.area), cluster.sheetArea());
+    copy(r.area, sizeof(r.area), clusterArea);
     if (fromId && cardIdWellFormed(fromId)) copy(r.from, sizeof(r.from), fromId);
     r.pri = 128;
     Settings::setCard(r.id, "in", r.in);
@@ -251,9 +272,8 @@ bool addTo(const Card &cluster, const Entity &e, char *idOut, size_t cap, const 
     if (r.area[0]) Settings::setCard(r.id, "area", r.area);
     if (r.from[0]) Settings::setCard(r.id, "from", r.from);
     // A MEMBER WEARS ITS CLUSTER'S GROUP (K92 rule 2).
-    CardGroups::Group g;
-    if (CardGroups::ofCard(cluster, g)) Settings::setCard(r.id, "group", g.id);
-    specOf(s_n);
+    if (groupId && groupId[0]) Settings::setCard(r.id, "group", groupId);
+    specFor(s_n);
     s_n++;
     s_changed = true;
     if (idOut && cap) copy(idOut, cap, r.id);
@@ -277,33 +297,68 @@ bool isMember(const char *cardId) {
 // A MEMBER MOVED OUT KNOWS WHICH CARD IT BECAME (the follow-ups): "moved_to",
 // that card's id - a page card, or a copy in another cluster. Without it (a move
 // saved before it existed) any card it came from is that card, as before.
-static bool becameThis(const char *memberId, const char *cardId) {
-    if (!isMovedToPage(memberId)) return false;
+// A page card moved into a cluster (round 2 of the follow-ups) knows it too.
+static bool becameThis(const char *origId, const char *cardId) {
+    if (!isMovedToPage(origId) && !isMoved(origId)) return false;
     char v[CARD_ID_MAX + 1];
-    return !Settings::card(memberId, "moved_to", v, sizeof(v)) || !strcmp(v, cardId);
+    return !Settings::card(origId, "moved_to", v, sizeof(v)) || !strcmp(v, cardId);
 }
 
 // The move undone: a tile in its cluster again.
 static void unmove(const char *memberId) {
     Settings::setCard(memberId, "hidden", nullptr);
     Settings::setCard(memberId, "moved_to", nullptr);
+    Settings::setCard(memberId, "home_name", nullptr);
+    Settings::setCard(memberId, "home_group", nullptr);
+}
+
+bool isMoveOf(const char *cardId) {
+    const char *from = fromOf(cardId);
+    return from && becameThis(from, cardId);
+}
+
+const char *becameOf(const char *origId) {
+    for (uint8_t i = 0; origId && i < s_n; i++)
+        if (!s_rec[i].removed && !strcmp(s_rec[i].from, origId) && becameThis(origId, s_rec[i].id)) return s_rec[i].id;
+    return nullptr;
+}
+
+// Deleted, entry and all, wherever it is. A MOVED CARD GOES BACK (round 7): the
+// card it was moved from is home again - on its page, or a tile in its cluster -
+// the move undone, nothing lost. A copy's original is untouched.
+bool unmake(const char *cardId) {
+    for (uint8_t i = 0; cardId && i < s_n; i++) {
+        Rec &r = s_rec[i];
+        if (r.removed || strcmp(r.id, cardId)) continue;
+        const bool move = r.from[0] && becameThis(r.from, r.id);
+        r.removed = true;   // the record stays (a Card points at its id) until the next boot
+        if (move && isMoved(r.from)) restore(r.from);
+        else if (move)               unmove(r.from);
+        Settings::dropCard(r.id);
+        s_changed = true;
+        Serial.printf("[CardAdded] %s deleted%s\n", r.id, move ? ", its original back home" : "");
+        return true;
+    }
+    return false;
+}
+
+void keepHome(const char *memberId, const char *name, const char *groupId) {
+    if (!memberId) return;
+    Settings::setCard(memberId, "home_name", name && name[0] ? name : nullptr);
+    Settings::setCard(memberId, "home_group", groupId && groupId[0] ? groupId : nullptr);
+}
+
+bool home(const char *memberId, char *name, size_t nameCap, char *groupId, size_t gidCap) {
+    if (!memberId) return false;
+    const bool n = Settings::card(memberId, "home_name", name, nameCap);
+    if (!n) name[0] = '\0';
+    if (!Settings::card(memberId, "home_group", groupId, gidCap)) groupId[0] = '\0';
+    return n;
 }
 
 bool removeMember(const char *cardId) {
-    for (uint8_t i = 0; cardId && i < s_n; i++) {
-        Rec &r = s_rec[i];
-        if (r.removed || !r.in[0] || strcmp(r.id, cardId)) continue;
-        r.removed = true;   // the record stays (a Card points at its id) until the next boot
-        // A MOVED CARD GOES BACK (round 7): its copy gone, the card it was moved
-        // from is on its page again - the move undone, nothing lost. A cluster's
-        // member moved straight here (the follow-ups) is a tile in its own again.
-        if (r.from[0] && isMoved(r.from)) restore(r.from);
-        else if (r.from[0] && becameThis(r.from, r.id)) unmove(r.from);
-        Settings::dropCard(r.id);
-        s_changed = true;
-        Serial.printf("[CardAdded] %s removed from %s (its entry deleted)\n", r.id, r.in);
-        return true;
-    }
+    for (uint8_t i = 0; cardId && i < s_n; i++)
+        if (!s_rec[i].removed && s_rec[i].in[0] && !strcmp(s_rec[i].id, cardId)) return unmake(cardId);
     return false;
 }
 
@@ -335,16 +390,7 @@ bool movedHere(const char *pageCardId) {
 
 // The page card goes - deleted, as a copy removed from a cluster is - and the
 // member it was is a tile again: the move undone, nothing lost.
-bool moveBack(const char *pageCardId) {
-    if (!movedHere(pageCardId)) return false;
-    unmove(fromOf(pageCardId));
-    for (uint8_t i = 0; i < s_n; i++)
-        if (!s_rec[i].removed && !strcmp(s_rec[i].id, pageCardId)) s_rec[i].removed = true;   // the record stays (a Card points at its id)
-    Settings::dropCard(pageCardId);
-    s_changed = true;
-    Serial.printf("[CardAdded] %s moved back into its cluster (its entry deleted)\n", pageCardId);
-    return true;
-}
+bool moveBack(const char *pageCardId) { return movedHere(pageCardId) && unmake(pageCardId); }
 
 bool drop(const char *pageCardId) {
     if (!pageCardId || movedHere(pageCardId)) return false;
@@ -365,31 +411,69 @@ bool isMoved(const char *cardId) {
     return cardId && Settings::card(cardId, "removed", v, sizeof(v)) && !strcmp(v, "moved");
 }
 
-bool moveOut(const char *cardId) {
+bool moveOut(const char *cardId, const char *toId) {
     if (!cardId || !cardIdWellFormed(cardId) || isHidden(cardId) || isMoved(cardId)) return false;
     for (uint8_t i = 0; i < s_n; i++)
         if (!s_rec[i].removed && !s_rec[i].in[0] && !strcmp(s_rec[i].id, cardId)) s_rec[i].removed = true;
     Settings::setCard(cardId, "removed", "moved");
+    if (toId && toId[0]) Settings::setCard(cardId, "moved_to", toId);
     s_changed = true;
     Serial.printf("[CardAdded] %s moved into a cluster (off its page, not in its pool)\n", cardId);
     return true;
 }
 
 bool rehome(const char *memberId, const Card &cluster) {
-    if (!memberId || !cluster.hasId()) return false;
+    if (!cluster.hasId()) return false;
+    CardGroups::Group g;
+    return rehome(memberId, cluster.id(), cluster.sheetArea(), CardGroups::ofCard(cluster, g) ? g.id : nullptr);
+}
+
+// A card made here RELOCATES (round 2 of the follow-ups): out of a cluster or off
+// the page, into another cluster - its record changes, its id and settings stay.
+bool rehome(const char *cardId, const char *clusterId, const char *clusterArea, const char *groupId) {
+    if (!cardId || !clusterId || !cardIdWellFormed(clusterId)) return false;
     for (uint8_t i = 0; i < s_n; i++) {
         Rec &r = s_rec[i];
-        if (r.removed || !r.in[0] || strcmp(r.id, memberId)) continue;
-        copy(r.in, sizeof(r.in), cluster.id());
-        copy(r.area, sizeof(r.area), cluster.sheetArea());
-        specOf(i);
+        if (r.removed || strcmp(r.id, cardId)) continue;
+        if (!r.in[0]) {   // a page card: off the page
+            r.page[0] = r.after[0] = '\0';
+            Settings::setCard(r.id, "page", nullptr);
+            Settings::setCard(r.id, "after", nullptr);
+            Settings::setCard(r.id, "pri", nullptr);
+        }
+        copy(r.in, sizeof(r.in), clusterId);
+        copy(r.area, sizeof(r.area), clusterArea);
+        r.pri = 128;
+        specFor(i);
         Settings::setCard(r.id, "in", r.in);
         Settings::setCard(r.id, "area", r.area[0] ? r.area : nullptr);
         // A MEMBER WEARS ITS CLUSTER'S GROUP (K92 rule 2).
-        CardGroups::Group g;
-        if (CardGroups::ofCard(cluster, g)) Settings::setCard(r.id, "group", g.id);
+        Settings::setCard(r.id, "group", groupId && groupId[0] ? groupId : nullptr);
         s_changed = true;
         Serial.printf("[CardAdded] %s moved into %s\n", r.id, r.in);
+        return true;
+    }
+    return false;
+}
+
+bool toPage(const char *cardId, const char *afterId, uint8_t pri) {
+    if (!cardId || !afterId || !s_page[0]) return false;
+    for (uint8_t i = 0; i < s_n; i++) {
+        Rec &r = s_rec[i];
+        if (r.removed || !r.in[0] || strcmp(r.id, cardId)) continue;
+        r.in[0] = '\0';
+        copy(r.page, sizeof(r.page), s_page);
+        copy(r.after, sizeof(r.after), afterId);
+        r.pri = pri;
+        specFor(i);
+        char p[8];
+        snprintf(p, sizeof(p), "%u", (unsigned)pri);
+        Settings::setCard(r.id, "in", nullptr);
+        Settings::setCard(r.id, "page", r.page);
+        Settings::setCard(r.id, "after", r.after);
+        Settings::setCard(r.id, "pri", p);
+        s_changed = true;
+        Serial.printf("[CardAdded] %s out of its cluster onto %s, after %s\n", r.id, r.page, r.after);
         return true;
     }
     return false;
@@ -439,6 +523,7 @@ bool hide(const char *cardId) {
 bool restore(const char *cardId) {
     if (!isHidden(cardId) && !isMoved(cardId)) return false;
     Settings::setCard(cardId, "removed", nullptr);
+    Settings::setCard(cardId, "moved_to", nullptr);
     s_changed = true;
     // An added card comes back to its record: the one removed this boot, else
     // read from the file as begin() would (a Card points at its id: never moved).
@@ -528,6 +613,7 @@ ResetCount resetToCompiled(bool apply) {
         { "removed", &ResetCount::hidden }, { "hidden", &ResetCount::members },
         { "slots", &ResetCount::clusters }, { "present", &ResetCount::clusters },
         { "moved_to", nullptr },   // a moved member's note of its card: goes with its "hidden"
+        { "home_name", nullptr }, { "home_group", nullptr },   // ...and of its cluster as it was
     };
     for (const Undo &u : UNDO) {
         ids->n = 0;

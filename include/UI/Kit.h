@@ -441,7 +441,9 @@ struct DialogButton {
 struct DialogSpec {
     DialogRole    role;
     const char   *title;
-    const char   *body[2];      // up to two paragraphs; a null ends them early
+    // Up to four paragraphs; a null ends them early. Recoloured: "#RRGGBB words#"
+    // puts words in a colour (a name in the accent - 2.11 follow-ups).
+    const char   *body[4];
     DialogButton  buttons[2];
     uint8_t       nButtons;
     int32_t       width;        // px; the height follows the words

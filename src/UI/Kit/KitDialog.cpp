@@ -60,6 +60,7 @@ lv_obj_t *dialog(const DialogSpec &spec) {
         lv_obj_t *body = label(box, KitStyle::KS_DIALOG_BODY);
         lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
         lv_obj_set_width(body, lv_pct(100));
+        lv_label_set_recolor(body, true);
         lv_label_set_text(body, txt);
     }
 

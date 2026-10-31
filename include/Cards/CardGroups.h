@@ -57,6 +57,14 @@ struct Group {
 bool byId(const char *gid, Group &g);
 // The card's group now; false = none.
 bool ofCard(const Card &c, Group &g);
+// The same for a card that is not built (a hidden cluster, a card moved away):
+// its id and its dashboard area.
+bool ofId(const char *cardId, const char *sheetArea, Group &g);
+
+// A GROUP MADE BY THE OWNER, NAMED ON THE KEYBOARD (Visibility's "New group", the
+// 2.11 follow-ups): kept until deleted, in a colour no other group is using
+// while one is left. Its id into `idOut`.
+bool make(const char *name, char *idOut, size_t cap);
 
 // Apply the card's group to its card label: words (its own if it has them,
 // else the group's name), colour (if `areaColor`, the page's setting).

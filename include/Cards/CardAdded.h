@@ -43,8 +43,12 @@ constexpr uint8_t MAX = 24;   // cards added on one device and on its pages (rem
 // the first page is built.
 void begin(bool (*compiledId)(const char *id));
 
-// The page being built, by slug: where "Add as a card" puts its card.
-void setPage(const char *slug);
+// The page being built, by slug: where "Add as a card" puts its card. With its
+// compiled spec (the 2.11 follow-ups): its hidden clusters, and a card's
+// dashboard words when that card is not built.
+void setPage(const char *slug, const PageSpec *compiled = nullptr);
+const PageSpec *pageSpec();
+const CardSpec *specOf(const char *cardId);   // a compiled card of that page (a member too); null
 
 // The page's cards: each compiled one followed by the cards added after it (and
 // after those), then any whose card is gone. Into `out`; how many.
@@ -106,7 +110,7 @@ const char *fromOf(const char *cardId);     // the card a member, or a card adde
 // Removed from its cluster: a copy made on the glass is deleted, entry and all -
 // the card it was copied from is untouched; one it was MOVED from goes back.
 bool    removeMember(const char *cardId);
-bool    moveOut(const char *cardId);        // a card moved into a cluster: off its page, not in the pool
+bool    moveOut(const char *cardId, const char *toId = nullptr);   // a card moved into a cluster: off its page, not in the pool
 bool    isMoved(const char *cardId);
 
 // --- A TILE MOVED STRAIGHT TO ANOTHER CLUSTER (owner, after v0.2.19: a card had
@@ -120,6 +124,28 @@ bool rehome(const char *memberId, const Card &cluster);
 // Where a moved member's card is: the id of the cluster holding it, "" when it is
 // on a page; null when the member has not moved.
 const char *movedTo(const char *memberId);
+
+// --- ONE CARD, ONE WAY BACK (owner, round 2 of the 2.11 follow-ups) ---------------
+// Every card made here names its ORIGINAL ("from", a compiled card), and a card
+// made here that moves again RELOCATES - its record changes, page to cluster,
+// cluster to page or cluster to cluster - so there is never a copy of a copy, and
+// Restore is always one step:
+//   a COPY (its original still home)        deleted
+//   a MOVE (it IS its original, moved)      deleted, and the original back home
+// A move records on the original the card it became ("moved_to"); a member also
+// keeps its cluster's name and group as they were ("home_name", "home_group"), so
+// Restore can tell a renamed cluster. A compiled card given another group keeps
+// the one it had ("orig_group", a group id or "none"), and Restore puts it back.
+// The id-based forms take a cluster that is not built (a hidden one).
+bool addTo(const char *clusterId, const char *clusterArea, const char *groupId, const Entity &e,
+           char *idOut, size_t cap, const char *fromId);
+bool rehome(const char *cardId, const char *clusterId, const char *clusterArea, const char *groupId);
+bool toPage(const char *cardId, const char *afterId, uint8_t pri);   // a cluster's copy onto the page
+bool isMoveOf(const char *cardId);           // made here, and it IS its original moved
+const char *becameOf(const char *origId);    // the card a moved original became; null
+bool unmake(const char *cardId);             // deleted wherever it is; a move's original back home
+void keepHome(const char *memberId, const char *name, const char *groupId);   // with moveToPage()
+bool home(const char *memberId, char *name, size_t nameCap, char *groupId, size_t gidCap);
 
 // --- THE PAGE'S POOL, FOR EVERY CARD (2.11 round 3, K66, K96) -----------------
 // "Hide from this page" sends any card on a page there - a compiled one too:

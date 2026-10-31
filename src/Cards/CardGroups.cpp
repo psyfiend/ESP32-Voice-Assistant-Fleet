@@ -270,17 +270,28 @@ bool byId(const char *gid, Group &g) {
     return true;
 }
 
-bool ofCard(const Card &c, Group &g) {
+bool ofCard(const Card &c, Group &g) { return ofId(c.hasId() ? c.id() : nullptr, c.sheetArea(), g); }
+
+bool ofId(const char *cardId, const char *sheetArea, Group &g) {
     char v[48];
-    if (c.hasId() && Settings::card(c.id(), "group", v, sizeof(v)) && v[0]) {
+    if (cardId && cardId[0] && Settings::card(cardId, "group", v, sizeof(v)) && v[0]) {
         if (!strcmp(v, "none")) return false;
         if (byId(v, g)) return true;
         // A group that has gone: the dashboard's area, until the owner chooses.
     }
-    if (!c.sheetArea()[0]) return false;
+    if (!sheetArea || !sheetArea[0]) return false;
     char gid[48];
-    sheetGroupId(c.sheetArea(), gid, sizeof(gid));
+    sheetGroupId(sheetArea, gid, sizeof(gid));
     return byId(gid, g);
+}
+
+bool make(const char *name, char *idOut, size_t cap) {
+    if (!name || !name[0] || !Settings::newGroup(name, idOut, cap)) return false;
+    char hex[8];
+    snprintf(hex, sizeof(hex), "%06lX", (unsigned long)(freeColour() & 0xFFFFFF));
+    Settings::setGroup(idOut, "color", hex);
+    forgetColours();
+    return true;
 }
 
 void apply(Card &c, bool areaColor) {

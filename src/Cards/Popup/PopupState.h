@@ -407,10 +407,9 @@ void buildMembers();
 // A member's state in words and the role that colours them; its row, as Members
 // shows it (the cluster's Header options too).
 KS memberState(const Entity &e, MemberShown shown, char *buf, size_t cap);
-// `header`: it is in the cluster's header, and its row says so. `says`: the
-// state's words instead of memberState()'s ("In Kitchen" for one moved there).
+// `says`: the state's words instead of memberState()'s ("In Kitchen" for one moved there).
 lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberShown shown,
-                    bool header = false, const char *says = nullptr);
+                    const char *says = nullptr);
 int32_t membersRowW();   // PopupControls.cpp: Members' width - a group light's controls', in a cluster's window too
 void enterMemberAsync(void *unused);
 void memberRowCb(lv_event_t *ev);
@@ -518,9 +517,18 @@ void hideTileCb(lv_event_t *ev);     // Hide from the cluster, after its dialog 
 void confirmRemoveCopy();        // "Remove this copy?" - a member copied into a cluster here (K91)
 void removeCopyCb(lv_event_t *ev);
 void confirmRemoveFromPage();    // "Remove this card?" - a page card made on the glass, deleted
-// "Move this card?" / "Copy this card?": from where, to where, and the button's
-// word; `go` runs on it (the words must outlive the dialog: static buffers).
-void confirmMove(const char *title, const char *from, const char *to, const char *verb, void (*go)());
+// A move, copy, group change or Restore, asked: up to four lines, the button's
+// word and role; `go` runs on it (the words must outlive the dialog: static buffers).
+void confirmAsk(Kit::DialogRole role, const char *title, const char *const *lines, uint8_t n, const char *verb,
+                Kit::ButtonRole verbRole, void (*go)());
+
+// PopupMove.cpp (round 2 of the 2.11 follow-ups): a card moved, copied or
+// regrouped, and its Restore. `from`: the cluster a tile is in (null on the page);
+// `toCluster`: Change cluster / Add to cluster, else Add to dashboard / Change group.
+void moveOpen(Card *subject, ClusterCard *from, bool toCluster);
+bool restoreOffered(const Card *c);   // something to restore: a copy, a move, a group changed
+void restoreAsk(const Card *c);       // its dialog
+void visibilityWantRebuild();         // PopupVisibility.cpp: the page built again once the window goes
 
 // PopupVisibility.cpp (2.11 round 3, K96)
 void buildVisibility();
@@ -540,7 +548,7 @@ bool visibilityJoin(uint8_t pick, bool move = false);   // made, in group `pick`
 void removeFromPageCb(lv_event_t *ev);   // PopupDialog.cpp: "Remove this card?" - one made on the glass
 bool visibilityTakeRebuild();        // a choice wants the page built again, once the window has gone
 const char *visibilityJoinTitle();   // VIEW_JOIN's name: "Move this card" for a cluster's tile
-bool visibilityJoinBack();           // its back arrow inside the view (a picker back to its start); false: leave it
+bool visibilityJoinBack();           // its back arrow inside the view; false: back to Visibility
 // Where a member moved out has gone, in words for its row: "On the page", or
 // "In <cluster>" for one on this page; null when it has not moved.
 const char *movedWords(const Card *member, char *buf, size_t cap);

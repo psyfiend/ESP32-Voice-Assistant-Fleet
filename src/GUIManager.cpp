@@ -1141,7 +1141,7 @@ void GUIManager::buildDashboard() {
     // The cards added on the device among the compiled ones (K17).
     page.count = CardAdded::merge(*_pages[_curPage].spec, s_pageCards, PAGE_CARDS_MAX);
     page.cards = s_pageCards;
-    CardAdded::setPage(page.slug);
+    CardAdded::setPage(page.slug, _pages[_curPage].spec);
     s_regCountAtBuild = _core.entities().count();
     s_addedWaiting = 0;
     for (uint8_t i = 0; i < page.count; i++)

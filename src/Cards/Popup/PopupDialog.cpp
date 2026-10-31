@@ -151,20 +151,21 @@ void removeFromPageCb(lv_event_t *ev) {
     lv_async_call([](void *) { confirmRemoveFromPage(); }, nullptr);
 }
 
-// MOVE OR COPY, CONFIRMED (owner, after v0.2.19): where the card is and where it
-// is going, before anything changes. `go` does it; the window then closes.
+// MOVE, COPY, CHANGE OR RESTORE, ASKED FIRST (owner, after v0.2.19; round 2 of the
+// follow-ups): what will happen, in the owner's words, before anything changes.
+// `go` does it; the window then closes.
 static void (*s_go)() = nullptr;
-void confirmMove(const char *title, const char *from, const char *to, const char *verb, void (*go)()) {
+void confirmAsk(Kit::DialogRole role, const char *title, const char *const *lines, uint8_t n, const char *verb,
+                Kit::ButtonRole verbRole, void (*go)()) {
     confirmClose();
     if (!CardPopup::isOpen() || !go) return;
     s_go = go;
     Kit::DialogSpec spec = {};
-    spec.role    = Kit::DialogRole::DLG_CONFIRM;
+    spec.role    = role;
     spec.title   = title;
-    spec.body[0] = from;
-    spec.body[1] = to;
+    for (uint8_t i = 0; i < n && i < 4; i++) spec.body[i] = lines[i];
     spec.buttons[0] = { "Cancel", Kit::ButtonRole::BTN_CANCEL, confirmCancelCb };
-    spec.buttons[1] = { verb, Kit::ButtonRole::BTN_CONFIRM, [](lv_event_t *) {
+    spec.buttons[1] = { verb, verbRole, [](lv_event_t *) {
         lv_async_call([](void *) {
             confirmClose();
             if (CardPopup::isOpen() && s_go) s_go();
