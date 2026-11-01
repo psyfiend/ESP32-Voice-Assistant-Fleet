@@ -459,7 +459,7 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
   removing that copy puts the card back (K111). A member hidden from its cluster (`hidden`: `yes`) is
   listed in its cluster's Members only, never with the page's hidden cards (K125). **A member moved out to the page**
   (K112) has `hidden`: `moved` - no tile, not in the hidden cards - and its page card `from`.
-  **Restore is the one way back** (K131): it deletes a copy, or sends a moved card home and brings
+  **Restore is the one way back** (K137): it deletes a copy, or sends a moved card home and brings
   its original back. A made card that moves again relocates, never copies a copy; `home_name` /
   `home_group` (a member's cluster as it was), `moved_to` (what a moved page card became) and
   `orig_group` (a regrouped card's group) are what Restore reads.

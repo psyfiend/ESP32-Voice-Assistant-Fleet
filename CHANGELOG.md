@@ -8,7 +8,7 @@ version is matched to its milestones.
 
 ## v0.2.20 - 2026-10-31
 
-The 2.11 follow-ups - the owner's notes on `v0.2.19` (#66; DECISIONS K131; `docs/archive/TEST_2.11_FOLLOWUPS.md`).
+The 2.11 follow-ups - the owner's notes on `v0.2.19` (#66; DECISIONS K137; `docs/archive/TEST_2.11_FOLLOWUPS.md`).
 
 - **Moving a card, redesigned in the owner's words**: Change cluster, Add to dashboard, Change
   group and Add to cluster each pick a target (a grid of this page's groups or clusters, New group,

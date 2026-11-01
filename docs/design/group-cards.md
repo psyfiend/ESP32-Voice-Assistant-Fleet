@@ -504,7 +504,7 @@ on the kit, in the card window's views:
   the entity's HA-area group beside it, every other in a list.
 - **Not built**: group cards and a new group card as Add targets; the card list (HA entities not on
   the page, making a cluster from a group); Delete from the pool; groups named on the glass.
-- **Since `v0.2.20` (K131)** the moves above are the owner's redesign: Change cluster / Add to
+- **Since `v0.2.20` (K137)** the moves above are the owner's redesign: Change cluster / Add to
   dashboard / Change group / Add to cluster, each a target, Copy / Move and a dialog, and **Restore**
   in place of Move back and Remove; New group names a group on the glass. What changed and how it
   is kept: `archive/TEST_2.11_FOLLOWUPS.md`, "Round 2 - what changed" and "How it is kept".

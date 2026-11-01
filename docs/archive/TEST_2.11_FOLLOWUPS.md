@@ -3,7 +3,7 @@
 Branch `feat/2.11-followups`, off `main` at `v0.2.19`. Round 1 (below) built your first notes; round
 2 is your redesign of moving a card, in your words (the demo artifact "Card Moves on the Glass" and
 your answers of 2026-10-31). The 4880's portrait look and the rotation switcher wait
-(`FUTURE_IMPROVEMENTS.md`, #71). **Signed off 2026-10-31: `v0.2.20`, DECISIONS K131.**
+(`FUTURE_IMPROVEMENTS.md`, #71). **Signed off 2026-10-31: `v0.2.20`, DECISIONS K137.**
 
 ## Round 2 - what changed
 
