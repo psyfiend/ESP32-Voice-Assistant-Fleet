@@ -42,6 +42,13 @@ your answers of 2026-10-31). The 4880's portrait look and the rotation switcher 
 
 On the P4_5 (or the 4B, or the 1060):
 
+**2026-10-31, laptop, P4_5 only, no flash, no network** (it runs round 2, `34fdd2e`, flashed from the
+desktop with the home Wi-Fi): no HTTP routes, so these tests change the owner's settings on the board
+with no save or restore here. **Back home, the desktop puts them back** from
+`bench/settings/WS_P4_TOUCH_LCD_5/20261031-1416.json` (taken right before that flash; on the desktop,
+not the laptop) with `restore_settings.ps1`, then `setdiff.py`: 0 differences. The HA and MQTT cards
+show no states here, so 10 and 11 check structure only.
+
 1. A tile > Visibility: three buttons, no Restore. **Change cluster** > a cluster > **Move** > Next:
    the dialog's words; Move. In its new cluster, Visibility shows **Restore** > the Restore version >
    Restore: back home.
@@ -62,7 +69,8 @@ On the P4_5 (or the 4B, or the 1060):
 
 ## Round 2 - to confirm
 
-Each is the nearest thing to your words that the case needed:
+Each is the nearest thing to your words that the case needed. **All five approved by the owner,
+2026-10-31** (the italic line stays in the tag face; no italic face added):
 
 - **A group card's member, Copy line 1**: "This card will be copied from the **group card** Desk and
   placed onto the dashboard as a separate card." Your line says "the cluster"; Desk is a group card.
