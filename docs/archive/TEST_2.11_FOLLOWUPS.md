@@ -2,7 +2,8 @@
 
 Branch `feat/2.11-followups`, off `main` at `v0.2.19`. Round 1 (below) built your first notes; round
 2 is your redesign of moving a card, in your words (the demo artifact "Card Moves on the Glass" and
-your answers of 2026-10-31). The 4880's portrait look and the rotation switcher wait.
+your answers of 2026-10-31). The 4880's portrait look and the rotation switcher wait
+(`FUTURE_IMPROVEMENTS.md`, #71). **Signed off 2026-10-31: `v0.2.20`, DECISIONS K131.**
 
 ## Round 2 - what changed
 
@@ -66,6 +67,16 @@ show no states here, so 10 and 11 check structure only.
 9. Hide a cluster a card came from, then Restore the card: the hidden version; the cluster is back.
 10. Desk's lamp > Add card to dashboard: Copy only, the members line.
 11. Members of a cluster with header sensors: the glyph beside those rows; names in full in both lists.
+
+## Round 2 - results (owner, 2026-10-31, P4_5, laptop, no network) - SIGNED OFF
+
+All eleven run; no failures reported. The owner: "I feel like we finally have full control over
+what cards go where now on the dashboard! This is a level of freedom we haven't yet had, and the
+page arranger works really well! It hasn't left any weird holes or odd shapes or sizes" - every
+arrangement it chose while cards were added, removed and moved was right. Signed off for `v0.2.20`.
+
+Not seen here: the 4B and the 1060 (at home; both compile), HA values on 10 and 11 (no network).
+The P4_5's settings are still the test's: put back at home from `20261031-1416.json` (above).
 
 ## Round 2 - to confirm
 

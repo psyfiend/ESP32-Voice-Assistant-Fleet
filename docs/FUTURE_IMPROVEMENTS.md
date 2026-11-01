@@ -510,7 +510,11 @@ anything; each says where it lands.
   Measure frames with `DEBUG_FRAMES` first (W6).
 - **Linen's panel slides** are a little choppier than the dark schemes' on the P4_5 ("totally
   passable"; frames 8-40 ms). Linen may also get chrome of its own one day (owner).
-- **The 4880 shows the window in portrait**; nothing was tuned for it.
+- **The 4880 shows the window in portrait**; nothing was tuned for it. The owner's 2.11 follow-up
+  notes: its font sizes and fit, far down the list.
+- **A rotation switcher** (owner, 2.11 follow-ups; with #71): rotate-and-restart from UI Tweaks is
+  small - the board already works out its frame path, layout and touch mapping from the rotation at
+  boot; switching live, without a restart, is a larger job.
 - **The Card label row is greyed** until its redesign (K48): Current group / None / Custom, with a
   name window. With it, the owner's notes from 2.10d: moving a card to another group gets its own
   row and window (a list of groups, each openable to its members - "change the label" or "move

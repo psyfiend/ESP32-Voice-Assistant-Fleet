@@ -458,8 +458,11 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
   off its page and NOT in its pool; its copy in the cluster has `from` (the card it came from), and
   removing that copy puts the card back (K111). A member hidden from its cluster (`hidden`: `yes`) is
   listed in its cluster's Members only, never with the page's hidden cards (K125). **A member moved out to the page**
-  (K112) has `hidden`: `moved` - no tile, not in the hidden cards - and its page card `from`; Move
-  back to the cluster deletes the page card and clears `hidden`.
+  (K112) has `hidden`: `moved` - no tile, not in the hidden cards - and its page card `from`.
+  **Restore is the one way back** (K131): it deletes a copy, or sends a moved card home and brings
+  its original back. A made card that moves again relocates, never copies a copy; `home_name` /
+  `home_group` (a member's cluster as it was), `moved_to` (what a moved page card became) and
+  `orig_group` (a regrouped card's group) are what Restore reads.
 - **Every change is logged** with its time and task (`loopTask` = the card window, `httpd` = a
   browser); the last ten are in `/settings?stats=1`.
 - **UI Tweaks' choices are `system.ui.*`** (scheme, card label, entity label, card state,
