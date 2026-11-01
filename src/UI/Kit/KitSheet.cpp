@@ -101,9 +101,29 @@ static void touchCb(lv_event_t *ev) {
     s_open->lastTouchMs = millis();
 }
 
+// A SWIPE NEVER TAPS (owner, after v0.2.19): on a view with nothing to scroll
+// LVGL takes a swipe's release as a tap on whatever the finger started on. The
+// input device hears CLICKED before the object does, so a finger that moved
+// further than a hold's slop stops there, while a sheet is open. Drags that
+// mean something (a slider, the selector, the chart) act on PRESSING and
+// RELEASED, never CLICKED.
+static void swipeCb(lv_event_t *ev) {
+    (void)ev;
+    lv_indev_t *in = lv_indev_active();
+    if (!s_open || !in) return;
+    lv_point_t now;
+    lv_indev_get_point(in, &now);
+    const int32_t dx = now.x - s_open->pressStart.x, dy = now.y - s_open->pressStart.y;
+    const int32_t lim = UI::mm(UI::shape().SLOP_HOLD);
+    if (dx * dx + dy * dy > lim * lim) lv_indev_stop_processing(in);
+}
+
 void sheetBegin() {
     if (s_catcher) return;
-    if (lv_indev_t *in = lv_indev_get_next(nullptr)) lv_indev_add_event_cb(in, touchCb, LV_EVENT_PRESSED, nullptr);
+    if (lv_indev_t *in = lv_indev_get_next(nullptr)) {
+        lv_indev_add_event_cb(in, touchCb, LV_EVENT_PRESSED, nullptr);
+        lv_indev_add_event_cb(in, swipeCb, LV_EVENT_CLICKED, nullptr);
+    }
     s_catcher = plain(lv_layer_top());
     lv_obj_set_size(s_catcher, lv_pct(100), lv_pct(100));
     lv_obj_add_flag(s_catcher, LV_OBJ_FLAG_ADV_HITTEST);

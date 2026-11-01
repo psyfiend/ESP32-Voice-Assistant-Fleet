@@ -151,9 +151,9 @@ void showView(PopupView v) {
                               : v == PopupView::VIEW_CARD_UI ? "Card UI"
                               : v == PopupView::VIEW_CLUSTER_SLOTS ? "Header options"
                               : v == PopupView::VIEW_VISIBILITY ? "Visibility"
-                              : v == PopupView::VIEW_ADD_TO ? "Add to"
+                              : v == PopupView::VIEW_ADD_TO ? "Add to cluster"
                               : v == PopupView::VIEW_CLUSTER_ADD ? "Add cards"
-                              : v == PopupView::VIEW_JOIN ? "Add to dashboard" : "Members");
+                              : v == PopupView::VIEW_JOIN ? visibilityJoinTitle() : "Members");
     }
     // SIZED BEFORE THE VIEW IS BUILT: placeWide() lays the window out, and a
     // DOT label laid out at the last view's width rewrites its own text - the
@@ -199,9 +199,9 @@ void goBack() {
             break;
         case PopupView::VIEW_MEMBER: leaveMember();          break;
         case PopupView::VIEW_ADD_TO: showView(PopupView::VIEW_VISIBILITY); break;   // its view's own
-        case PopupView::VIEW_JOIN:   // a tile's Visibility (or a cluster member's, round 6), or the member's own view
-            showView((cardOf(h.surface) && cardOf(h.surface)->mini()) || inMember()
-                         ? PopupView::VIEW_VISIBILITY : controlsView());
+        case PopupView::VIEW_JOIN:   // every move opens from Visibility (round 2 of the 2.11 follow-ups)
+            if (visibilityJoinBack()) break;
+            showView(PopupView::VIEW_VISIBILITY);
             break;
         default:                     showView(controlsView()); break;
     }

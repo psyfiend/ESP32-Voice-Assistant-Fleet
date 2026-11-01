@@ -68,15 +68,21 @@ static void fill() {
     lv_style_set_bg_color(dim, UI::c(p.GROUND));
     lv_style_set_bg_opa  (dim, LV_OPA_60);
 
-    lv_style_t *box = st(S::KS_DIALOG_BOX_DESTRUCTIVE);
-    lv_style_set_radius      (box, UI::sc(UI::met().RADIUS));
-    lv_style_set_bg_opa      (box, LV_OPA_COVER);
-    lv_style_set_bg_color    (box, UI::c(p.SURFACE_ALT));
-    lv_style_set_border_width(box, LV_MAX(2, UI::mm(k.LINE_HEAVY)));
-    lv_style_set_border_color(box, UI::c(p.ST_BAD));
-    lv_style_set_pad_all     (box, UI::mm(k.S9));
-    lv_style_set_pad_row     (box, UI::mm(k.S7));
-    flex(box, LV_FLEX_FLOW_COLUMN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // The two boxes differ only in their edge: ST_BAD for a destructive question,
+    // the accent for one that moves or makes something.
+    const S boxes[2]   = { S::KS_DIALOG_BOX_DESTRUCTIVE, S::KS_DIALOG_BOX_CONFIRM };
+    const uint32_t edge[2] = { p.ST_BAD, p.ACCENT };
+    for (uint8_t i = 0; i < 2; i++) {
+        lv_style_t *box = st(boxes[i]);
+        lv_style_set_radius      (box, UI::sc(UI::met().RADIUS));
+        lv_style_set_bg_opa      (box, LV_OPA_COVER);
+        lv_style_set_bg_color    (box, UI::c(p.SURFACE_ALT));
+        lv_style_set_border_width(box, LV_MAX(2, UI::mm(k.LINE_HEAVY)));
+        lv_style_set_border_color(box, UI::c(edge[i]));
+        lv_style_set_pad_all     (box, UI::mm(k.S9));
+        lv_style_set_pad_row     (box, UI::mm(k.S7));
+        flex(box, LV_FLEX_FLOW_COLUMN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    }
 
     text(S::KS_DIALOG_BODY, t.TAG, p.TEXT_DIM);
     lv_style_set_text_align(st(S::KS_DIALOG_BODY), LV_TEXT_ALIGN_CENTER);

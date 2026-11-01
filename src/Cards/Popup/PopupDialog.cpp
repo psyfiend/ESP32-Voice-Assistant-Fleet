@@ -151,6 +151,33 @@ void removeFromPageCb(lv_event_t *ev) {
     lv_async_call([](void *) { confirmRemoveFromPage(); }, nullptr);
 }
 
+// MOVE, COPY, CHANGE OR RESTORE, ASKED FIRST (owner, after v0.2.19; round 2 of the
+// follow-ups): what will happen, in the owner's words, before anything changes.
+// `go` does it; the window then closes.
+static void (*s_go)() = nullptr;
+void confirmAsk(Kit::DialogRole role, const char *title, const char *const *lines, uint8_t n, const char *verb,
+                Kit::ButtonRole verbRole, void (*go)()) {
+    confirmClose();
+    if (!CardPopup::isOpen() || !go) return;
+    s_go = go;
+    Kit::DialogSpec spec = {};
+    spec.role    = role;
+    spec.title   = title;
+    for (uint8_t i = 0; i < n && i < 4; i++) spec.body[i] = lines[i];
+    spec.buttons[0] = { "Cancel", Kit::ButtonRole::BTN_CANCEL, confirmCancelCb };
+    spec.buttons[1] = { verb, verbRole, [](lv_event_t *) {
+        lv_async_call([](void *) {
+            confirmClose();
+            if (CardPopup::isOpen() && s_go) s_go();
+        }, nullptr);
+    } };
+    spec.nButtons = 2;
+    spec.width    = LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(UI::shape().W_DIALOG_MAX));
+    spec.outside  = confirmCancelCb;
+    spec.countdown = true;
+    s_confirm = Kit::dialog(spec);
+}
+
 void hideCardCb(lv_event_t *ev) {
     (void)ev;
     lv_async_call([](void *) { confirmHide(); }, nullptr);

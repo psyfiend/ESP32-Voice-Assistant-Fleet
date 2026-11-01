@@ -6,6 +6,22 @@ signed-off merges to `main` in the order they happen - it does not follow milest
 began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
+## v0.2.20 - 2026-10-31
+
+The 2.11 follow-ups - the owner's notes on `v0.2.19` (#66; DECISIONS K137; `docs/archive/TEST_2.11_FOLLOWUPS.md`).
+
+- **Moving a card, redesigned in the owner's words**: Change cluster, Add to dashboard, Change
+  group and Add to cluster each pick a target (a grid of this page's groups or clusters, New group,
+  None), then Copy or Move, then a dialog that says exactly what will happen.
+- **Restore** is the one way back - a copy deleted, a moved card home with its original, a group
+  put back - shown only on a card that has something to restore; moving a card home by hand is its
+  Restore. A card made on the glass that moves again relocates, so there is never a copy of a copy.
+- A cluster emptied by a move hides, and returns when a card is added or restored into it. A group
+  card's member can only be copied out.
+- **Members**: both lists show HA's full name; a member in the cluster's header wears the header
+  glyph. In any open sheet a finger that moves more than 4 mm is never a tap.
+- Signed off by the owner on the P4_5 (two rounds); all nine environments build.
+
 ## v0.2.19 - 2026-10-30
 
 Milestone 2.11 - group cards (#66, #78; DECISIONS K88-K129; design `docs/design/group-cards.md`
