@@ -16,6 +16,9 @@
 // build will draw.
 #include "PopupState.h"
 #include "Cards/ClusterCard.h"
+#include "Cards/CardWhere.h"   // 2.13: what a picker row says it already is
+#include "UI/HaOffer.h"        // 2.13: Add cards from Home Assistant
+#include "UI/HaPicker.h"
 
 namespace popup {
 
@@ -352,10 +355,110 @@ uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask) {
     return n;
 }
 
-// Add cards: each card on the page that can join, No / Copy / Move; Add.
+// --- Add cards FROM HOME ASSISTANT (2.13, K140; mock 1) --------------------------------
+namespace {
+
+// The source: the page's cards, or HA's entities labelled "fleet" - HA's
+// first, once HA has said what it offers (K145's words).
+const char *const SRC_W[] = { "On this board", "From Home Assistant" };
+int8_t    s_addSrc = -1;   // -1: none chosen yet this boot; then the last one used
+lv_obj_t *s_addLbl = nullptr;
+
+void srcCb(lv_event_t *ev) {
+    s_addSrc = (int8_t)(uintptr_t)lv_event_get_user_data(ev);
+    rebuildView();
+}
+
+const char *haHeld(const HaOffer::Row &r, void *ctx) {
+    static char words[56];
+    return (r.have && CardWhere::words(*r.have, (const Card *)ctx, HaOffer::registry(), words, sizeof(words)))
+               ? words : nullptr;
+}
+
+void haChanged(uint8_t n, void *) {
+    if (!s_addLbl) return;
+    char w[16];
+    if (n) snprintf(w, sizeof(w), "Add %u", (unsigned)n);   // the mock's "Add 2"
+    else   snprintf(w, sizeof(w), "Add");
+    lv_label_set_text(s_addLbl, w);
+}
+
+// The chosen entities in, each a member made here ("in"); one the compiled
+// table does not have keeps its HA id on its entry, so the next boot makes it
+// again (design/ha-cards.md 2.3). The window closes and the page is built again.
+void haGoCb(lv_event_t *) {
+    lv_async_call([](void *) {
+        ClusterCard *cl = held();
+        if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN) return;
+        HaOffer::Row rows[24];
+        const uint8_t n = HaPicker::chosen(rows, 24);
+        uint8_t added = 0;
+        for (uint8_t i = 0; i < n; i++) {
+            const Entity *e = HaOffer::entityFor(rows[i]);
+            if (!e) continue;
+            char id[CARD_ID_MAX + 1];
+            if (!CardAdded::addTo(*cl, *e, id, sizeof(id))) break;   // full
+            if (e->learnt) {
+                Settings::setCard(id, "ha", rows[i].ref);
+                if (rows[i].dc[0])   Settings::setCard(id, "ha_dc", rows[i].dc);
+                if (rows[i].unit[0]) Settings::setCard(id, "ha_unit", rows[i].unit);
+            }
+            added++;
+        }
+        if (!added) return;
+        HaPicker::forget();
+        char msg[64];
+        snprintf(msg, sizeof(msg), "Added %u to %s", (unsigned)added, s.name);
+        UIToolkit::show_toast(msg);
+        CardPopup::close();
+    }, nullptr);
+}
+
+}  // namespace
+
+void clusterAddSource(uint8_t src) { s_addSrc = src ? 1 : 0; rebuildView(); }
+void clusterAddHaGo() { haGoCb(nullptr); }
+
+// Add cards: the source chips, then the page's cards that can join (No / Copy /
+// Move) or HA's (ticks, mock 1); Add.
 void buildClusterAdd() {
     ClusterCard *cl = held();
     if (!cl) return;
+    s_addLbl = nullptr;
+    if (s_addSrc < 0) s_addSrc = HaOffer::ready() ? 1 : 0;
+    lv_obj_t *col = plain(s.stage);
+    lv_obj_set_size(col, listW(), lv_pct(100));
+    lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(col, mm(UI::shape().S5), 0);
+    Kit::chipRow(col, SRC_W, 2, (uint8_t)s_addSrc, listW(), srcCb);
+
+    if (s_addSrc == 1) {
+        HaPicker::forget();   // a new list: nothing ticked
+        HaOffer::refresh();   // what HA offers now
+        if (!HaOffer::ready()) { note(col, "Waiting for Home Assistant"); return; }   // to confirm (not in K145)
+        CardGroups::Group g;
+        char area[40] = "";
+        if (CardGroups::ofCard(*cl, g)) HaOffer::groupArea(g.id, area, sizeof(area));
+        HaPicker::Spec sp;
+        sp.area    = area;
+        sp.held    = haHeld;
+        sp.ctx     = cl;
+        sp.changed = haChanged;
+        lv_obj_t *p = HaPicker::build(col, listW(), 1, sp);
+        if (p) lv_obj_set_flex_grow(p, 1);
+        static const char *const W[] = { "Add 00" };   // sized for a count; its words set below
+        static const Kit::ButtonRole R[] = { Kit::ButtonRole::BTN_CONFIRM };
+        static const lv_event_cb_t C[] = { haGoCb };
+        footButtons(col, W, R, C, 1);
+        // The button's own words, counted as rows are ticked.
+        lv_obj_t *row = lv_obj_get_child(col, -1);
+        lv_obj_t *btn = row ? lv_obj_get_child(row, 0) : nullptr;
+        s_addLbl = btn ? Kit::labelIn(btn) : nullptr;
+        haChanged(HaPicker::chosenCount(), nullptr);
+        return;
+    }
+
     s_nCand = 0;
     findCandidates(lv_screen_active(), *cl);
     Kit::ChipRowSpec rows[ADD_MAX];
@@ -365,7 +468,8 @@ void buildClusterAdd() {
         else              snprintf(s_candName[i], sizeof(s_candName[i]), "%s", k->shownName(CardLabel::LBL_NAME));
         rows[i] = { s_candName[i], ADD_W, 3, s_pick[i] };
     }
-    s_table = Kit::chipTable(s.stage, listW(), rows, s_nCand, addChipCb);
+    s_table = Kit::chipTable(col, listW(), rows, s_nCand, addChipCb);
+    lv_obj_set_flex_grow(s_table, 1);
     if (!s_nCand) {
         note(s_table, "No card on this page can join: a card joins with one entity, and not one this cluster "
                       "has already.");

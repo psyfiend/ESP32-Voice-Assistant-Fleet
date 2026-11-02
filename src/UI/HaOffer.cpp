@@ -132,6 +132,7 @@ void tick() {
     onCatalogue();
 }
 
+const EntityRegistry *registry() { return s_reg; }
 void refresh() { if (s_prov) s_prov->requestCatalog(); }
 bool ready() { return s_cat && s_cat->ready(); }
 uint32_t epoch() { return s_cat ? s_cat->epoch() : 0; }

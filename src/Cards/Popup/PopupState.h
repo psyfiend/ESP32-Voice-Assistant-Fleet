@@ -432,6 +432,8 @@ bool clusterTakeRebuild();   // a choice wants the page built again, once the wi
 void clusterRename();        // the keyboard on the cluster's name, as Rename opens it (K95)
 void buildClusterAdd();      // VIEW_CLUSTER_ADD: the page's cards, each No / Copy / Move (K91)
 uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask);   // ...the picked ones in; the window closes
+void clusterAddSource(uint8_t src);   // 2.13: Add cards' source chip - 0 this board, 1 Home Assistant
+void clusterAddHaGo();                // ...HA's ticked rows in (Add); the window closes
 // Member `i` of `cl` shown as a tile or not, kept when the window closes (K104's
 // Visible - from its Visibility since round 6, no longer the cluster's Details).
 void clusterMemberShow(const ClusterCard &cl, uint8_t i, bool want);

@@ -7,6 +7,7 @@
 #include "UI/SlotPanels.h"        // restore=-2: the page panel's View hidden cards (2.11, K96)
 #include "UI/HiddenSheet.h"       // restore=N: the hidden cards' sheet (round 6)
 #include "UI/HaOffer.h"           // catalog=1: what HA offers (2.13)
+#include "UI/HaPicker.h"          // hatick=N, haarea=<id>: its picker
 
 namespace popup {
 
@@ -119,6 +120,8 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int member = -1; int scene = -1; int look = -1; int show = -1; int scheme = -1;
                 int tap = -1; int groups = -1; int clabel = -1; int span = -1; int row = -1; int x = -1;
                 int catalog = -1;                          // 2.13: what HA offers (1 lists, 2 asks HA again)
+                int haSrc = -1, haTick = -1, haGo = -1;    // ...Add cards' source, a picker row, its Add
+                char haArea[32] = {}; bool haAreaSet = false;   // ...another area in the picker
                 int dur = -1; int chips = -1; int addCard = -1; int removeCard = -1;
                 int tree = 0;     // 1: the open window's objects; 2 (tree=page): the whole screen
                 int sparks = -1;  // the interference from the next window: 0 now and then, 1 once, 2 off
@@ -187,6 +190,10 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "tap", v, sizeof(v)) == ESP_OK) a.tap = atoi(v);
         if (httpd_query_key_value(q, "groups", v, sizeof(v)) == ESP_OK) a.groups = atoi(v);
         if (httpd_query_key_value(q, "catalog", v, sizeof(v)) == ESP_OK) a.catalog = atoi(v);
+        if (httpd_query_key_value(q, "hasrc", v, sizeof(v)) == ESP_OK) a.haSrc = atoi(v);
+        if (httpd_query_key_value(q, "hatick", v, sizeof(v)) == ESP_OK) a.haTick = atoi(v);
+        if (httpd_query_key_value(q, "hago", v, sizeof(v)) == ESP_OK) a.haGo = atoi(v);
+        if (httpd_query_key_value(q, "haarea", a.haArea, sizeof(a.haArea)) == ESP_OK) a.haAreaSet = true;
         if (httpd_query_key_value(q, "clabel", v, sizeof(v)) == ESP_OK) a.clabel = atoi(v);
         if (httpd_query_key_value(q, "span", v, sizeof(v)) == ESP_OK) a.span = atoi(v);
         if (httpd_query_key_value(q, "more", v, sizeof(v)) == ESP_OK) a.more = atoi(v) != 0;
@@ -384,6 +391,20 @@ void CardPopup::debugService(lv_timer_t *t) {
                 dbgOut(a.mv ? "moved\n" : "added\n");
                 if (a.mv) { s_dreq.store(DREQ_CLOSING); return; }
             } else dbgOut("not added\n");
+        }
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    // 2.13: the HA picker - hasrc=0|1 Add cards' source (view=10 first),
+    // haarea=<id> another area ("-" No area), hatick=N a tap on row N, hago=1 Add.
+    if (a.haSrc >= 0 || a.haTick >= 0 || a.haGo > 0 || a.haAreaSet) {
+        if (a.haSrc >= 0) { if (isOpen() && s.cluster) { clusterAddSource((uint8_t)a.haSrc); dbgOut("source %d\n", a.haSrc); } else dbgOut("no cluster's window open\n"); }
+        if (a.haAreaSet) dbgOut(HaPicker::tapArea(strcmp(a.haArea, "-") ? a.haArea : "") ? "area %s\n" : "no area %s\n", a.haArea);
+        if (a.haTick >= 0) dbgOut(HaPicker::tapRow((uint8_t)a.haTick) ? "row %d tapped, %u chosen\n" : "no row %d (%u chosen)\n",
+                                  a.haTick, (unsigned)HaPicker::chosenCount());
+        if (a.haGo > 0) {
+            if (isOpen() && s.cluster) { clusterAddHaGo(); dbgOut("add asked, %u chosen\n", (unsigned)HaPicker::chosenCount()); }
+            else dbgOut("no cluster's window open\n");
         }
         s_dreq.store(DREQ_DONE);
         return;

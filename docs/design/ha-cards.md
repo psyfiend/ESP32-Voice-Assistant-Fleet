@@ -74,10 +74,11 @@ Branch `feat/2.13-add-from-ha`, off `main` at `fd3d59e`. Unattended run from 202
 the owner's permission to flash the three dev boards (settings saved and restored), toggle Office
 lights, and reword HA's docs for K133.
 
-- [ ] 2.1 subscription in chunks; the template buffers
-- [ ] 2.2 room: registry 192, HaPublisher to PSRAM, CardAdded 64 in PSRAM
-- [ ] 2.3 runtime entities from card entries
-- [ ] 2.4 the catalogue, registry events, known ids
+- [x] 2.1 subscription in chunks; the template buffers (`94cb6df`)
+- [x] 2.2 room: registry 192, HaPublisher to PSRAM, CardAdded 64 in PSRAM (`94cb6df`)
+- [x] 2.3 runtime entities from card entries (`94cb6df`)
+- [x] 2.4 the catalogue, registry events, known ids, the notice queue (`61a088b`; `/popup?catalog=1`
+  checked on the P4_5 - 70 entities, the Outside group linked to HA's Outside floor)
 - [ ] Screen 1 - a cluster's Add cards from HA
 - [ ] Screen 2 - Add card
 - [ ] Screen 5 - the group view, tap and long press

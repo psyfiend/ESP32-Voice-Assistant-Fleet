@@ -24,6 +24,7 @@ struct Entity;
 namespace HaOffer {
 
 void begin(HaCatalog *cat, HaProvider *prov, EntityRegistry *reg);
+const EntityRegistry *registry();
 void tick();       // from GUIManager's loop: a new catalogue, its notices
 void refresh();    // ask HA again (a picker opening)
 bool ready();      // a catalogue has arrived this boot
