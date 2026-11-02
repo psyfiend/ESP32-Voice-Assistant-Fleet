@@ -226,12 +226,25 @@ struct EntityAttrs {
     int16_t   hue        = -1;             // 0-359
     int8_t    sat        = -1;             // 0-100
 
+    // A thermostat's, 2.13 (K144): HA's climate state is its MODE ("heat"), and
+    // the readings are attributes. Tenths of a degree in the entity's own unit;
+    // ATTR_NONE = not reported. `action` is hvac_action ("idle", "heating").
+    static constexpr int16_t ATTR_NONE = -32768;
+    int16_t   curTemp10    = ATTR_NONE;   // current_temperature
+    int16_t   target10     = ATTR_NONE;   // temperature: the setpoint
+    int8_t    curHumidity  = -1;          // current_humidity, %
+    char      action[16]   = {0};
+    char      fanMode[12]  = {0};
+
     bool equals(const EntityAttrs &o) const {
         return brightness == o.brightness && hasRgb == o.hasRgb &&
                (!hasRgb || rgb == o.rgb) && strcmp(icon, o.icon) == 0 &&
                lightCaps == o.lightCaps && lightMode == o.lightMode &&
                colorTempK == o.colorTempK && minTempK == o.minTempK &&
-               maxTempK == o.maxTempK && hue == o.hue && sat == o.sat;
+               maxTempK == o.maxTempK && hue == o.hue && sat == o.sat &&
+               curTemp10 == o.curTemp10 && target10 == o.target10 &&
+               curHumidity == o.curHumidity && strcmp(action, o.action) == 0 &&
+               strcmp(fanMode, o.fanMode) == 0;
     }
 };
 

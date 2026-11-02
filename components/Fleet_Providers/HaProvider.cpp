@@ -4,6 +4,14 @@
 #include "HaValue.h"
 #include <string.h>
 #include <stdlib.h>
+#include <esp_heap_caps.h>
+
+// A buffer in PSRAM when there is some, else internal RAM: the templates'
+// frames and answers grew with 2.13's entity count past what belongs in .bss.
+static char *bigBuf(size_t n) {
+    char *p = (char *)heap_caps_malloc(n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    return p ? p : (char *)malloc(n);
+}
 
 #ifdef DEBUG_HA
   #define DBG_HAP(...) Serial.printf("[HaProv] " __VA_ARGS__)
@@ -22,7 +30,8 @@ void HaProvider::begin(EntityRegistry *reg, HaClient *ha, HaRest *rest) {
 // Subscription - loop task
 // ---------------------------------------------------------------------------
 
-int HaProvider::sendSubscribe(uint8_t from, uint8_t to) {
+int HaProvider::sendSubscribe(uint8_t from, uint8_t to, uint8_t *reached) {
+    if (reached) *reached = from;
     if (!_reg || !_ha) return -1;
 
     // Built from the REGISTRY, not from a list, so an entity added anywhere
@@ -40,8 +49,14 @@ int HaProvider::sendSubscribe(uint8_t from, uint8_t to) {
                      "\"trigger\":{\"platform\":\"state\",\"entity_id\":[",
                      (unsigned long)id);
 
-    uint8_t named = 0;
-    for (uint8_t i = from; i < to; i++) {
+    // ONE FRAME-FULL AT A TIME (2.13): the frame holds about 45 entity ids and
+    // the owner labels 70 for the boards. A full frame is sent as it is and
+    // `reached` says where the next one starts - HA keeps every subscription
+    // a connection makes. Until 2.13 a full frame refused the whole
+    // subscription: nothing at all was subscribed, and loop() retried it
+    // every pass.
+    uint8_t named = 0, i = from;
+    for (; i < to; i++) {
         const Entity *e = _reg->at(i);
         if (!e) continue;
         if (e->desc.source != EntitySource::HA) continue;
@@ -50,18 +65,13 @@ int HaProvider::sendSubscribe(uint8_t from, uint8_t to) {
         int add = snprintf(frame + n, sizeof(frame) - n, "%s\"%s\"",
                            named ? "," : "", e->desc.externalRef);
         if (add < 0 || n + add >= (int)sizeof(frame) - 8) {
-            // Refuse rather than send a truncated subscription. A half list
-            // would silently drop entities and look like HA not reporting
-            // them - the exact class of lying diagnostic this project keeps
-            // paying for.
-            Serial.printf("[HaProv] subscription frame full at %u entities; "
-                          "raise the buffer or split the request.\n",
-                          (unsigned)named);
-            return -1;
+            if (named == 0) return -1;   // one id larger than a frame: never
+            break;                       // the rest in the next frame
         }
         n += add;
         named++;
     }
+    if (reached) *reached = i;
 
     if (named == 0) {
         DBG_HAP("no HA-sourced entities registered; nothing to subscribe to\n");
@@ -72,14 +82,17 @@ int HaProvider::sendSubscribe(uint8_t from, uint8_t to) {
     if (tail < 0 || n + tail >= (int)sizeof(frame)) return -1;
     n += tail;
 
-    if (!_ha->sendText(frame, n)) return -1;
+    if (!_ha->sendText(frame, n)) { if (reached) *reached = from; return -1; }
 
-    // Remembered so the reply can be matched. Cleared when it arrives.
-    _pendingSubId = id;
-    _subAccepted  = false;
+    // Remembered so the reply can be matched - several may be out at once now.
+    // A ring written only here (loop task) and only read by the websocket task;
+    // the oldest is overwritten, answered long before.
+    if (from == 0) { _subAccepted = false; _subRefused = false; }
+    _subIds[_subHead++ % SUB_IDS].store(id);
 
     Serial.printf("[HaProv] subscribe_trigger id %lu for %u entities (%d B)%s\n",
-                  (unsigned long)id, (unsigned)named, n, from ? ", learnt since" : "");
+                  (unsigned long)id, (unsigned)named, n,
+                  from ? ", the next part" : (i < to ? ", the first part" : ""));
     return named;
 }
 
@@ -88,10 +101,13 @@ bool HaProvider::sendSceneQuery() {
 
     // The lights we were given (not learnt members - a single bulb's device
     // carries no scenes). Single quotes inside, so the JSON needs no escapes.
-    // 3 KB since 2.10d: the same template also asks each entity's area.
-    static char frame[3072];
+    // 3 KB since 2.10d: the same template also asks each entity's area. 8 KB in
+    // PSRAM since 2.13: the areas of 190 entities, not 70.
+    static constexpr size_t FRAME = 8192;
+    static char *frame = bigBuf(FRAME);
+    if (!frame) return false;
     const uint32_t id = _ha->nextId();
-    int n = snprintf(frame, sizeof(frame),
+    int n = snprintf(frame, FRAME,
                      "{\"id\":%lu,\"type\":\"render_template\",\"template\":\"{%% for l in [",
                      (unsigned long)id);
     uint8_t named = 0;
@@ -99,9 +115,9 @@ bool HaProvider::sendSceneQuery() {
         const Entity *e = _reg->at(i);
         if (!e || e->learnt || e->desc.source != EntitySource::HA) continue;
         if (strncmp(e->desc.externalRef, "light.", 6) != 0) continue;
-        const int add = snprintf(frame + n, sizeof(frame) - n, "%s'%s'", named ? "," : "",
+        const int add = snprintf(frame + n, FRAME - n, "%s'%s'", named ? "," : "",
                                  e->desc.externalRef);
-        if (add < 0 || n + add >= (int)sizeof(frame) - 1400) {
+        if (add < 0 || n + add >= (int)FRAME - 1400) {
             Serial.printf("[HaProv] scene query frame full at %u lights\n", (unsigned)named);
             break;
         }
@@ -116,28 +132,28 @@ bool HaProvider::sendSceneQuery() {
     // says whether the owner hid the scene in HA's UI (is_hidden_entity, HA's
     // own test of the entity registry's hidden_by - checked 2026-10-07: four
     // of Office's seven are hidden).
-    const int tail = snprintf(frame + n, sizeof(frame) - n,
+    const int tail = snprintf(frame + n, FRAME - n,
         "] %%}{%% set d = device_id(l) %%}{%% if d %%}"
         "{%% for s in device_entities(d) | sort if s.startswith('scene.') %%}"
         "{{ l }}>{{ s }}>{{ state_attr(s,'name') or state_attr(s,'friendly_name') }}>"
         "{{ 'H' if is_hidden_entity(s) else 'V' }}|"
         "{%% endfor %%}{%% endif %%}{%% endfor %%}");
-    if (tail < 0 || n + tail >= (int)sizeof(frame)) return false;
+    if (tail < 0 || n + tail >= (int)FRAME) return false;
     n += tail;
 
     // EVERY ENTITY'S AREA (2.10d, K44, K46): "@>sensor.x>office>Office|" -
     // HA's area_id() and area_name(), the entity's own area or else its
     // device's; empty when it has none. For a card label set to "HA area". Learnt members are asked
     // too: a member can be a card's primary one day (K17).
-    int add = snprintf(frame + n, sizeof(frame) - n, "{%% for e in [");
-    if (add < 0 || n + add >= (int)sizeof(frame)) return false;
+    int add = snprintf(frame + n, FRAME - n, "{%% for e in [");
+    if (add < 0 || n + add >= (int)FRAME) return false;
     n += add;
     uint8_t asked = 0;
     for (uint8_t i = 0; i < _reg->count(); i++) {
         const Entity *e = _reg->at(i);
         if (!e || e->desc.source != EntitySource::HA || e->desc.kind == EntityKind::BUTTON) continue;
-        add = snprintf(frame + n, sizeof(frame) - n, "%s'%s'", asked ? "," : "", e->desc.externalRef);
-        if (add < 0 || n + add >= (int)sizeof(frame) - 260) {
+        add = snprintf(frame + n, FRAME - n, "%s'%s'", asked ? "," : "", e->desc.externalRef);
+        if (add < 0 || n + add >= (int)FRAME - 260) {
             Serial.printf("[HaProv] area query frame full at %u entities\n", (unsigned)asked);
             break;
         }
@@ -147,11 +163,11 @@ bool HaProvider::sendSceneQuery() {
     // ...and its DEVICE's name (2.10e, the window's Properties): the owner's
     // name for it, else the device's own; empty without a device. Measured
     // 2026-10-11: light.office -> "Office", the thermostat -> "THERMOSTAT".
-    add = snprintf(frame + n, sizeof(frame) - n,
+    add = snprintf(frame + n, FRAME - n,
                    "] %%}@>{{ e }}>{{ area_id(e) or '' }}>{{ area_name(e) or '' }}>"
                    "{%% set d = device_id(e) %%}{{ (device_attr(d,'name_by_user') or device_attr(d,'name')) if d else '' }}"
                    "|{%% endfor %%}\"}");
-    if (add < 0 || n + add >= (int)sizeof(frame)) return false;
+    if (add < 0 || n + add >= (int)FRAME) return false;
     n += add;
     if (!named && !asked) return true;   // nothing to ask this session
 
@@ -251,9 +267,10 @@ void HaProvider::loop(uint32_t nowMs) {
         // both - and HaRest fetches their values on its own, since it walks
         // the table to its end whenever the table has grown.
         const uint8_t count = _reg->count();
-        if (count > _subscribedCount) {
-            if (sendSubscribe(_subscribedCount, count) < 0) return;   // retried next loop
-            _subscribedCount = count;
+        while (count > _subscribedCount) {
+            uint8_t reached = _subscribedCount;
+            if (sendSubscribe(_subscribedCount, count, &reached) < 0) return;   // retried next loop
+            _subscribedCount = reached;
         }
         // A pause saved for a member could not be applied at boot: it did not
         // exist yet.
@@ -287,9 +304,10 @@ void HaProvider::loop(uint32_t nowMs) {
     }
 
     const uint8_t count = _reg->count();
-    if (sendSubscribe(0, count) <= 0) return;
+    uint8_t reached = 0;
+    if (sendSubscribe(0, count, &reached) <= 0) return;
     _subscribedForSession = session;
-    _subscribedCount      = count;
+    _subscribedCount      = reached;   // the rest, a frame at a time, from the next pass
     _tplId.store(0);   // a template from the last session died with it
     _tplDone.store(false);
     _askAgain = false;
@@ -371,10 +389,12 @@ void HaProvider::handle(const char *json, size_t len) {
     // on the id we sent and say so either way.
     if (strcmp(type, "result") == 0) {
         uint32_t rid = doc["id"] | 0UL;
-        if (rid != 0 && rid == _pendingSubId) {
-            _pendingSubId = 0;
+        bool sub = false;
+        for (uint8_t k = 0; rid && k < SUB_IDS; k++) if (_subIds[k].load() == rid) { sub = true; break; }
+        if (sub) {
             bool ok = doc["success"] | false;
-            _subAccepted = ok;
+            if (!ok) _subRefused = true;
+            _subAccepted = !_subRefused;   // every part so far, not just the last
             if (ok) {
                 Serial.printf("[HaProv] HA ACCEPTED the subscription (id %lu)\n",
                               (unsigned long)rid);

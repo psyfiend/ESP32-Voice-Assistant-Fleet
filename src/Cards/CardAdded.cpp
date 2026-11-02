@@ -5,6 +5,7 @@
 #include "Entity.h"
 #include "Settings.h"
 #include <Arduino.h>
+#include <esp_heap_caps.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,8 +28,10 @@ struct Rec {
     bool    removed;
 };
 
-Rec      s_rec[CardAdded::MAX];
-CardSpec s_spec[CardAdded::MAX];   // each record as a spec - built once, never moved
+// MAX of each, allocated once by begin() - in PSRAM since 2.13, when MAX went
+// from 24 to 64: ~40 KB with the specs, too much for an S3's internal RAM.
+Rec      *s_rec  = nullptr;
+CardSpec *s_spec = nullptr;        // each record as a spec - built once, never moved
 uint8_t  s_n = 0;
 uint16_t s_pooled = 0;             // removed ones, in the file only
 char     s_page[24] = "";
@@ -140,6 +143,13 @@ bool makeId(const char *area, const char *label, char *id, size_t cap) {
 namespace CardAdded {
 
 void begin(bool (*compiledId)(const char *id)) {
+    if (!s_rec) {
+        s_rec  = (Rec *)heap_caps_calloc(MAX, sizeof(Rec), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        s_spec = (CardSpec *)heap_caps_calloc(MAX, sizeof(CardSpec), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!s_rec)  s_rec  = (Rec *)calloc(MAX, sizeof(Rec));
+        if (!s_spec) s_spec = (CardSpec *)calloc(MAX, sizeof(CardSpec));
+        if (!s_rec || !s_spec) { Serial.println("[CardAdded] no memory for the added cards"); return; }
+    }
     s_compiled = compiledId;
     s_n = 0;
     s_pooled = 0;
@@ -217,7 +227,7 @@ const char *addedFor(const char *parentId, const char *entityId) {
 }
 
 bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, const char *fromId) {
-    if (s_n >= MAX || !parent.hasId() || !s_page[0]) return false;
+    if (!s_rec || s_n >= MAX || !parent.hasId() || !s_page[0]) return false;
     Rec &r = s_rec[s_n];
     r = Rec{};
     if (!makeId(parent.sheetArea(), member.desc.name, r.id, sizeof(r.id))) return false;
@@ -258,7 +268,7 @@ bool addTo(const Card &cluster, const Entity &e, char *idOut, size_t cap, const 
 
 bool addTo(const char *clusterId, const char *clusterArea, const char *groupId, const Entity &e,
            char *idOut, size_t cap, const char *fromId) {
-    if (s_n >= MAX || !clusterId || !cardIdWellFormed(clusterId)) return false;
+    if (!s_rec || s_n >= MAX || !clusterId || !cardIdWellFormed(clusterId)) return false;
     Rec &r = s_rec[s_n];
     r = Rec{};
     if (!makeId(clusterArea, e.desc.name, r.id, sizeof(r.id))) return false;

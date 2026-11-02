@@ -48,7 +48,13 @@
 // this board's own eight diagnostics lands near 40; 128 is headroom without
 // being a blank cheque. It costs ~450 bytes each IN PSRAM and nothing in
 // internal SRAM. The index type caps it at 255 regardless.
-static constexpr uint8_t ENTITY_MAX = 128;
+//
+// 192 SINCE 2.13: cards are added from HA at runtime now (design/ha-cards.md
+// 2.2) - 38 entities at boot, the 70 the owner labels "fleet", and the
+// members and scenes learnt from them. An Entity is ~1 KB today (the boot log
+// prints it), so 192 KB of PSRAM; HaPublisher's per-slot arrays moved to PSRAM
+// with it.
+static constexpr uint8_t ENTITY_MAX = 192;
 
 class EntityRegistry {
 public:
@@ -109,6 +115,16 @@ public:
     // after a reboot. Then the group's member list is set. Any task; under the
     // lock. Returns how many entities were added.
     uint8_t learnMembers(const char *groupId, const char *const *refs, uint8_t n);
+
+    // AN ENTITY ADDED WHILE RUNNING, 2.13: a card added from HA names one the
+    // compiled table does not have. As learnMembers(): the entity already in
+    // the table with this source and ref is returned as it is; else `d` is
+    // registered now with an id made from its ref ("ha_switch_office_3d_printer"
+    // - the same one every boot) and its ref for a name until the source sends
+    // one. Any task; under the lock. Null when the table is full or `d` has no ref.
+    const Entity *adopt(const EntityDescriptor &d);
+    // The entity with this source and ref, or null. Under the lock.
+    const Entity *findRef(EntitySource src, const char *ref) const;
 
     // Member `i` of a group, or null.
     const Entity *memberOf(const Entity &g, uint8_t i) const {

@@ -67,21 +67,25 @@ private:
     bool _discoveryDone = false;
     bool _wasConnected  = false;
 
-    // Last value published per entity, so an unchanged reading is not
-    // republished every cycle. Indexed the same way the registry is.
-    EntityValue _lastPub[ENTITY_MAX];
-    bool        _everPub[ENTITY_MAX] = {};
-
-    // Has this entity's pause already been announced to HA? Issue #60 - the
-    // "unavailable" goes out once on pause, not on every loop.
-    bool        _pauseAnnounced[ENTITY_MAX] = {};
+    // Per registry slot, indexed the same way the registry is; in PSRAM since
+    // 2.13 (begin()). `last` and `ever`: the last value published, so an
+    // unchanged reading is not republished every cycle; `lastMs` its time, for
+    // the heartbeat. `pauseAnn`: this entity's pause already announced to HA?
+    // Issue #60 - the "unavailable" goes out once on pause, not on every loop.
+    // Plain data: calloc's zero is a valid "never published".
+    struct Slot {
+        EntityValue last;
+        uint32_t    lastMs;
+        bool        ever;
+        bool        pauseAnn;
+    };
+    Slot *_slot = nullptr;
 
     // Publishes "unavailable" to one entity's state topic. Issue #60.
     void publishPaused(const Entity &e);
 
     // <base>/<object_id>/set, for entities we own. Issue #44.
     void commandTopicFor(const Entity &e, char *out, size_t outLen) const;
-    uint32_t    _lastPubMs[ENTITY_MAX] = {};
 
     // Republish an unchanged value this often anyway. Cheap insurance: a
     // broker that restarted without persistence has no retained state, and a

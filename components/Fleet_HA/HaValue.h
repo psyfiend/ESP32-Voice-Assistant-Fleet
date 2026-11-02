@@ -105,9 +105,23 @@ inline void haAttrFilter(JsonObject attrs) {
     attrs["min_color_temp_kelvin"] = true;
     attrs["max_color_temp_kelvin"] = true;
     attrs["hs_color"]              = true;
+    // A thermostat's, 2.13 (K144).
+    attrs["current_temperature"]   = true;
+    attrs["temperature"]           = true;
+    attrs["current_humidity"]      = true;
+    attrs["hvac_action"]           = true;
+    attrs["fan_mode"]              = true;
 }
 
 inline int haClamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
+inline float haClampF(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+// A temperature attribute in tenths, or ATTR_NONE when absent or null.
+inline int16_t haTenths(JsonVariantConst v) {
+    if (!(v.is<float>() || v.is<int>())) return EntityAttrs::ATTR_NONE;
+    const float f = v.as<float>() * 10.0f;
+    return (int16_t)haClampF(f + (f < 0 ? -0.5f : 0.5f), -3000.0f, 3000.0f);   // rounded
+}
 
 // One of HA's colour modes, as what it lets a control do. onoff is the only
 // mode that cannot be dimmed; hs, xy and the rgb family all mean "has a hue".
@@ -184,6 +198,58 @@ inline void haReadAttrs(JsonVariantConst attrs, EntityAttrs &out) {
             out.sat = (int8_t)haClamp((int)(sat + 0.5f), 0, 100);
         }
     }
+
+    // A thermostat's (2.13, K144). Every climate entity sends these; nothing
+    // else on the owner's HA sends a bare "temperature" attribute.
+    out.curTemp10 = haTenths(attrs["current_temperature"]);
+    out.target10  = haTenths(attrs["temperature"]);
+    JsonVariantConst hum = attrs["current_humidity"];
+    if (hum.is<float>() || hum.is<int>()) out.curHumidity = (int8_t)haClamp((int)(hum.as<float>() + 0.5f), 0, 100);
+    snprintf(out.action, sizeof(out.action), "%s", attrs["hvac_action"] | "");
+    snprintf(out.fanMode, sizeof(out.fanMode), "%s", attrs["fan_mode"] | "");
+}
+
+// ---------------------------------------------------------------------------
+// AN ENTITY THE BOARD WAS NEVER TOLD ABOUT, 2.13 (design/ha-cards.md 2.3): a
+// card added from HA's catalogue. Its kind from HA's domain, the way the
+// compiled table declares each by hand; device class and unit as HA reported
+// them when it was added. False for a domain no card can show yet.
+// ---------------------------------------------------------------------------
+inline bool haDescriptor(const char *ref, const char *deviceClass, const char *unit,
+                         EntityDescriptor &d) {
+    if (!ref || !ref[0] || !strchr(ref, '.')) return false;
+    d = EntityDescriptor{};
+    auto is = [&](const char *dom) {
+        const size_t n = strlen(dom);
+        return strncmp(ref, dom, n) == 0 && ref[n] == '.';
+    };
+    if (is("light")) {
+        d.kind = EntityKind::LIGHT;         d.valueType = ValueType::BOOL; d.writable = true;
+    } else if (is("switch") || is("input_boolean") || is("fan")) {
+        d.kind = EntityKind::SWITCH;        d.valueType = ValueType::BOOL; d.writable = true;
+    } else if (is("binary_sensor")) {
+        d.kind = EntityKind::BINARY_SENSOR; d.valueType = ValueType::BOOL;
+    } else if (is("sensor")) {
+        // A unit, or a measuring device class, is a number; anything else (a
+        // phase, a name) is words.
+        const bool num = (unit && unit[0]) || (deviceClass && deviceClass[0] &&
+                         strcmp(deviceClass, "enum") != 0 && strcmp(deviceClass, "timestamp") != 0 &&
+                         strcmp(deviceClass, "date") != 0);
+        d.kind = EntityKind::SENSOR;        d.valueType = num ? ValueType::FLOAT : ValueType::TEXT_VAL;
+        if (num) snprintf(d.stateClass, sizeof(d.stateClass), "measurement");
+    } else if (is("climate")) {
+        d.kind = EntityKind::CLIMATE;       d.valueType = ValueType::TEXT_VAL;   // the mode; readings are attributes
+    } else if (is("scene") || is("script") || is("button")) {
+        d.kind = EntityKind::BUTTON;        d.valueType = ValueType::TEXT_VAL; d.writable = true;
+    } else {
+        return false;
+    }
+    d.source    = EntitySource::HA;
+    d.advertise = false;   // someone else's
+    snprintf(d.externalRef, sizeof(d.externalRef), "%s", ref);
+    snprintf(d.deviceClass, sizeof(d.deviceClass), "%s", deviceClass ? deviceClass : "");
+    snprintf(d.unit, sizeof(d.unit), "%s", unit ? unit : "");
+    return true;
 }
 
 // ---------------------------------------------------------------------------

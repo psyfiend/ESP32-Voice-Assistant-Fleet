@@ -89,9 +89,11 @@ private:
     // shared with HaRest's initial fetch. It is NOT a method here on purpose:
     // two copies would let the boot value and the live value for one entity
     // disagree about what "closed" means, and only after something changed.
-    // One subscribe_trigger for the HA entities at registry indices [from, to).
-    // Returns how many it named, 0 for none, -1 if it could not be sent.
-    int sendSubscribe(uint8_t from, uint8_t to);
+    // One subscribe_trigger for the HA entities at registry indices [from, to),
+    // as many as one frame holds (2.13): `reached` is where the next frame
+    // starts - `to` when they all fit. Returns how many it named, 0 for none,
+    // -1 if it could not be sent.
+    int sendSubscribe(uint8_t from, uint8_t to, uint8_t *reached);
 
     // THE SCENES OF EVERY LIGHT ON THE BOARD (2.10c): one render_template,
     // ha-websocket.md section 7a's pattern - HA's scene entities on each
@@ -112,10 +114,13 @@ private:
     // learnt later (2.10c) sit beyond it and get a subscription of their own.
     uint8_t  _subscribedCount = 0;
 
-    // The id of the subscribe_trigger awaiting a reply, and whether the last
-    // one was accepted.
-    uint32_t _pendingSubId = 0;
-    bool     _subAccepted  = false;
+    // The ids of the latest subscribe_triggers (a ring: a subscription goes in
+    // parts since 2.13), and whether every part so far was accepted.
+    static constexpr uint8_t SUB_IDS = 8;
+    std::atomic<uint32_t> _subIds[SUB_IDS] = {};
+    uint8_t  _subHead     = 0;
+    bool     _subAccepted = false;
+    bool     _subRefused  = false;
 
     ResultFn _resultFn  = nullptr;
     void    *_resultCtx = nullptr;

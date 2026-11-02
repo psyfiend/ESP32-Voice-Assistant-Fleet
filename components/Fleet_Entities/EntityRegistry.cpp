@@ -161,6 +161,48 @@ uint8_t EntityRegistry::learnMembers(const char *groupId, const char *const *ref
                      g.members, g.nMembers, ENTITY_MEMBERS_MAX);
 }
 
+const Entity *EntityRegistry::findRef(EntitySource src, const char *ref) const {
+    if (!ref || !ref[0]) return nullptr;
+    std::lock_guard<std::mutex> lk(_mx);
+    for (uint8_t i = 0; i < _count; i++)
+        if (_items[i].desc.source == src && strcmp(_items[i].desc.externalRef, ref) == 0) return &_items[i];
+    return nullptr;
+}
+
+const Entity *EntityRegistry::adopt(const EntityDescriptor &d) {
+    if (!d.externalRef[0]) return nullptr;
+    std::lock_guard<std::mutex> lk(_mx);
+    if (!_items) return nullptr;
+    for (uint8_t i = 0; i < _count; i++)
+        if (_items[i].desc.source == d.source && strcmp(_items[i].desc.externalRef, d.externalRef) == 0)
+            return &_items[i];
+    if (_count >= _capacity) {
+        ESP_LOGW(ENT_TAG, "table full; %s not added", d.externalRef);
+        return nullptr;
+    }
+    EntityDescriptor n = d;
+    learntId(d.externalRef, n.id, sizeof(n.id));
+    for (uint8_t tries = 0; indexOf(n.id) >= 0 && tries < 9; tries++) {
+        const size_t len = strlen(n.id);
+        if (len >= sizeof(n.id) - 1) n.id[len - 1] = (char)('1' + tries);
+        else { n.id[len] = (char)('1' + tries); n.id[len + 1] = '\0'; }
+    }
+    if (indexOf(n.id) >= 0) return nullptr;
+    if (!n.name[0]) snprintf(n.name, sizeof(n.name), "%s", d.externalRef);
+
+    // The slot is complete before the count admits it - see count().
+    const uint8_t slot = _count;
+    Entity &e = _items[slot];
+    e = Entity{};
+    e.desc       = n;
+    e.value.type = n.valueType;
+    e.learnt     = true;   // its name is the source's (adoptName)
+    _count.store((uint8_t)(slot + 1), std::memory_order_release);
+    _learnt.store(true);   // pauses and areas are asked again
+    ESP_LOGI(ENT_TAG, "added %s (%s)", n.id, d.externalRef);
+    return &e;
+}
+
 uint8_t EntityRegistry::learnScenes(const char *lightId, const char *const *refs,
                                     const char *const *names, const bool *hidden, uint8_t n) {
     std::lock_guard<std::mutex> lk(_mx);

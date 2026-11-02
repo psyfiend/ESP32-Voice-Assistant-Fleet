@@ -10,6 +10,7 @@
 #include "PanelDebug.h"
 #include "HangWatch.h"
 #include "Settings.h"
+#include "HaValue.h"        // haDescriptor(): a card added from HA (2.13)
 
 // Normally injected by scripts/fw_version.py via extra_scripts (derived from
 // `git describe`). Defined defensively here so a build still succeeds if that
@@ -77,6 +78,22 @@ void SystemCore::heapMark(const char *stage) {
 // PauseStore); the file holds entities.<id>.paused = true, an entity that is
 // not paused having no entry.
 namespace {
+// A card added from HA (2.13, design/ha-cards.md 2.3) keeps its entity's HA id
+// as "ha", with the device class and unit HA gave when it was added: the
+// entity is made from those at boot, before any page is built.
+void adoptHaCard(const char *cardId, const char *ref, void *ctx) {
+    char dc[ENTITY_SHORT_MAX] = "", unit[ENTITY_SHORT_MAX] = "";
+    Settings::card(cardId, "ha_dc", dc, sizeof(dc));
+    Settings::card(cardId, "ha_unit", unit, sizeof(unit));
+    EntityDescriptor d;
+    if (!haDescriptor(ref, dc, unit, d)) {
+        Serial.printf("[Core] card %s: %s is no kind of card yet\n", cardId, ref);
+        return;
+    }
+    if (!static_cast<EntityRegistry *>(ctx)->adopt(d))
+        Serial.printf("[Core] card %s: no room for %s\n", cardId, ref);
+}
+
 bool listContains(const char *list, const char *id) {
     const size_t n = strlen(id);
     for (const char *p = list; *p; ) {
@@ -242,6 +259,14 @@ bool SystemCore::begin() {
     // above, deliberately, to compare the two transports. See the header.
     for (uint8_t i = 0; i < HA_ENTITY_COUNT; i++) {
         _entities.add(HA_ENTITIES[i]);
+    }
+    // ...and the entities of the cards added from HA's catalogue (2.13): one
+    // per card entry with "ha", unless the table has it already.
+    {
+        const uint8_t before = _entities.count();
+        Settings::forEachCardWith("ha", adoptHaCard, &_entities);
+        if (_entities.count() > before)
+            Serial.printf("[Core] %u entities for cards added from HA\n", (unsigned)(_entities.count() - before));
     }
 
     // --= 10. Virtual test entities =--

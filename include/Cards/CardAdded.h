@@ -36,7 +36,9 @@ class Card;
 
 namespace CardAdded {
 
-constexpr uint8_t MAX = 24;   // cards added on one device and on its pages (removed ones are in the file only)
+// Cards added on one device and on its pages (removed ones are in the file
+// only). 24 until 2.13; Add card from HA makes them by the handful.
+constexpr uint8_t MAX = 64;
 
 // Read the added cards from the settings file. `compiledId` says whether an id
 // is a compiled card's (so a new id never repeats one). Once, at boot, before

@@ -1,4 +1,5 @@
 #include "HaPublisher.h"
+#include <esp_heap_caps.h>
 #include "DeviceIdentity.h"
 #include "bsp_loader.h"
 
@@ -32,6 +33,12 @@ static void closeObj(String &j) {
 void HaPublisher::begin(EntityRegistry *reg, MqttManager *mqtt) {
     _reg  = reg;
     _mqtt = mqtt;
+    // PSRAM since 2.13: ~62 bytes a registry slot, and the registry grew to 192
+    // slots - 12 KB that CYD_S3_3248's internal RAM cannot spare. Zeroed.
+    if (!_slot) {
+        _slot = (Slot *)heap_caps_calloc(ENTITY_MAX, sizeof(Slot), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!_slot) _slot = (Slot *)calloc(ENTITY_MAX, sizeof(Slot));
+    }
 }
 
 void HaPublisher::stateTopicFor(const Entity &e, char *out, size_t outLen) const {
@@ -230,14 +237,14 @@ void HaPublisher::publishState(const Entity &e, uint8_t idx, uint32_t nowMs) {
     }
 
     if (_mqtt->publish(topic, payload, /*retain=*/true)) {
-        _lastPub[idx]   = e.value;
-        _everPub[idx]   = true;
-        _lastPubMs[idx] = nowMs;
+        _slot[idx].last   = e.value;
+        _slot[idx].ever   = true;
+        _slot[idx].lastMs = nowMs;
     }
 }
 
 void HaPublisher::loop(uint32_t nowMs) {
-    if (!_reg || !_mqtt) return;
+    if (!_reg || !_mqtt || !_slot) return;
 
     const bool connected = _mqtt->isConnected();
 
@@ -245,7 +252,7 @@ void HaPublisher::loop(uint32_t nowMs) {
     // retained data at all, so discovery and every state are republished.
     if (connected && !_wasConnected) {
         _discoveryDone = false;
-        for (uint8_t i = 0; i < ENTITY_MAX; i++) _everPub[i] = false;
+        for (uint8_t i = 0; i < ENTITY_MAX; i++) _slot[i].ever = false;
     }
     _wasConnected = connected;
 
@@ -275,18 +282,18 @@ void HaPublisher::loop(uint32_t nowMs) {
         // other entity are untouched: a paused deck probe must not make the
         // whole panel look offline.
         if (e->paused) {
-            if (!_pauseAnnounced[i]) {
+            if (!_slot[i].pauseAnn) {
                 publishPaused(*e);
-                _pauseAnnounced[i] = true;
+                _slot[i].pauseAnn = true;
                 Serial.printf("[HaPub] %s paused - published unavailable\n",
                               e->desc.id);
             }
             continue;
         }
-        if (_pauseAnnounced[i]) {
+        if (_slot[i].pauseAnn) {
             // Resumed. Clear the flag and fall through; the value publish
             // below is itself the "it is back" signal.
-            _pauseAnnounced[i] = false;
+            _slot[i].pauseAnn = false;
             // No explicit "available" is needed: the value publish that falls
             // through below is itself the proof it is back, exactly as it is on
             // the inbound side (EntityRegistry::setValue).
@@ -294,8 +301,8 @@ void HaPublisher::loop(uint32_t nowMs) {
         }
         if (!e->everSet) continue;              // no reading yet; nothing honest to send
 
-        const bool changed   = !_everPub[i] || !_lastPub[i].equals(e->value);
-        const bool heartbeat = _everPub[i] && (nowMs - _lastPubMs[i]) > HEARTBEAT_MS;
+        const bool changed   = !_slot[i].ever || !_slot[i].last.equals(e->value);
+        const bool heartbeat = _slot[i].ever && (nowMs - _slot[i].lastMs) > HEARTBEAT_MS;
 
         if (changed || heartbeat) publishState(*e, i, nowMs);
     }
