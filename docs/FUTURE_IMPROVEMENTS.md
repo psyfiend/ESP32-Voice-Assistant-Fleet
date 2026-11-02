@@ -272,7 +272,9 @@ not have moved the too-small text of 2.4's first flash by a single pixel.
 - **AEC stays deprioritized indefinitely**, not just paused. If from-scratch
   voice-assistant work (wake word, on-device AEC) resumes, the plan is a full ESP-IDF
   rewrite (separate project) or adopting/extending ESPHome, not continuing to build AEC out
-  here. `ENABLE_AEC` stays off by default.
+  here. `ENABLE_AEC` stays off by default. **Superseded in direction 2026-11-02 (DECISIONS
+  A18)**: voice comes back as ROADMAP Phase 7, the ESPHome native API served by this firmware;
+  `design/voice-esphome.md`.
 - **ES8311/ES7210 mic gain and output volume tuning**, based on Waveshare's recent official
   sample repos/documentation rather than chip defaults. Directly relevant: `CYD_S3_8048W550`
   audio is notably quieter than other boards, unexplained — could be a gain issue.

@@ -97,6 +97,16 @@ importing it, scoped with #87; 3.2 and 3.3 are re-scoped then.
 **#31** card library (with #86 control styles, #77 media), **#32** WS_S3_4B onboard hardware, **#33**
 RS485/Modbus, **#34** weather station (its cards come with 2.15), **#35** alarm clock (now 2.15).
 
+## Phase 7 — Voice and the ESPHome API
+
+Intent recorded 2026-11-02 (DECISIONS A18): near future, placed in the running order after 2.13.
+Design notes: `design/voice-esphome.md`.
+
+| # | Milestone | Status |
+|---|---|---|
+| 7.1 | ESPHome native API on the boards - HA adopts a board as an ESPHome device, its entities and screen with it; optional, beside MQTT | not started |
+| 7.2 | Assist satellite - wake word on the board, audio to HA's Assist pipeline, replies on the speaker | not started; needs 7.1 |
+
 ## Running order — 2026-10-06 (items 1-5 done; the UI follow-ups inserted 2026-10-14; 2.11 before #76, 2026-10-17; 2.13 / 2.14 named 2026-10-30; rewritten after 2.11, 2026-10-30, K131)
 
 The numbers above are identity, not sequence. Agreed with the owner:

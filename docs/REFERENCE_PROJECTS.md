@@ -118,6 +118,11 @@ alignment and capability requirements, and the cache discipline.
 
 Patterns transfer; code mostly does not, being ESP-IDF C against our Arduino C++.
 
+**Check its upstream at the start of each milestone** (owner, 2026-11-02): the author keeps adding
+well-thought-out pieces (the toast queue and its dismissing, the navigation arbiter, the clocks).
+Pull `reference/ESP32-P4-NINA-Display`, skim the commits since the last look, and note here what is
+worth borrowing.
+
 ### The page/view/grid back-end — the most valuable part for our actual purpose
 
 `main/ui/page_registry.h` is the piece to read first.
