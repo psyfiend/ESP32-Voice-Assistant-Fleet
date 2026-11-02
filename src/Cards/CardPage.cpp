@@ -488,8 +488,11 @@ void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
     for (uint8_t i = 0; i < spec.count; i++) {
         const CardSpec &cs = spec.cards[i];
         // A group card made on the device (2.11): a cluster, or its one card.
-        Card *c = (cs.memberCount && cs.members) ? makeGroupCard(cs, spec, reg)
-                                                 : makeCard(cs, spec, reg, i);
+        // ...or one made here with no compiled members (2.13): a cluster spec with
+        // no entity of its own, its members all added on the device.
+        const bool madeCluster = cs.present == GroupPresent::PRESENT_CLUSTER && !cs.primaries[0];
+        Card *c = ((cs.memberCount && cs.members) || madeCluster) ? makeGroupCard(cs, spec, reg)
+                                                                   : makeCard(cs, spec, reg, i);
         if (c) add(c);
     }
 

@@ -26,6 +26,9 @@ struct Spec {
     const char *(*held)(const HaOffer::Row &r, void *ctx) = nullptr;
     void       *ctx = nullptr;
     void      (*changed)(uint8_t chosen, void *ctx) = nullptr;   // a tick came or went
+    // Ticked to start with (New cluster's K92 tap set and header sensors), in
+    // the area shown first. Null: nothing.
+    bool      (*preselect)(const HaOffer::Row &r) = nullptr;
 };
 
 // The picker, `w` x `h` in `parent`. Rebuilt in place when another area is

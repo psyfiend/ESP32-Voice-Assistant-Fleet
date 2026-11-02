@@ -26,6 +26,8 @@ struct Rec {
     char    area[ENTITY_SHORT_MAX];
     uint8_t pri;
     bool    removed;
+    bool    cluster;                  // a cluster made here (2.13, K140): "kind": "cluster", no entity
+    char    name[ENTITY_SHORT_MAX];   // ...its name
 };
 
 // MAX of each, allocated once by begin() - in PSRAM since 2.13, when MAX went
@@ -51,6 +53,13 @@ void specFor(uint8_t i) {
     cs.label        = nullptr;                    // Inherit: HA's name (K65)
     cs.labelMode    = CardLabel::LBL_INHERIT;
     cs.place.priority = r.pri;
+    // A CLUSTER MADE HERE (2.13): no entity of its own; its members are the
+    // records "in" it (membersIn()), its words its name.
+    if (r.cluster) {
+        cs.primaries[0] = nullptr;
+        cs.present      = GroupPresent::PRESENT_CLUSTER;
+        cs.label        = r.name;
+    }
     s_spec[i] = cs;
 }
 
@@ -71,7 +80,11 @@ void readOne(const char *id, const char *page, void *) {
     // So do ones moved into a cluster (round 7): off the page, not in its pool.
     if (Settings::card(id, "removed", v, sizeof(v)) && (!strcmp(v, "yes") || !strcmp(v, "moved"))) { s_pooled++; return; }
     r.removed = false;
-    if (!r.entity[0]) return;   // nothing to show: not taken
+    if (Settings::card(id, "kind", v, sizeof(v)) && !strcmp(v, "cluster")) {
+        r.cluster = true;
+        if (!Settings::card(id, "name", r.name, sizeof(r.name))) copy(r.name, sizeof(r.name), r.area);
+    }
+    if (!r.entity[0] && !r.cluster) return;   // nothing to show: not taken
     specFor(s_n);
     s_n++;
 }
@@ -281,6 +294,32 @@ bool addToPage(const Entity &e, const char *area, const char *groupId, char *idO
     s_changed = true;
     if (idOut && cap) copy(idOut, cap, r.id);
     Serial.printf("[CardAdded] %s: %s on %s, from HA\n", r.id, r.entity, r.page);
+    return true;
+}
+
+bool addCluster(const char *name, const char *area, const char *groupId, char *idOut, size_t cap) {
+    if (!s_rec || s_n >= MAX || !s_page[0] || !name || !name[0]) return false;
+    Rec &r = s_rec[s_n];
+    r = Rec{};
+    if (!makeId(area ? area : "", name, r.id, sizeof(r.id))) return false;
+    copy(r.page, sizeof(r.page), s_page);
+    copy(r.area, sizeof(r.area), area ? area : "");
+    copy(r.name, sizeof(r.name), name);
+    r.cluster = true;
+    r.pri = CardPlacement{}.priority;
+    char pri[8];
+    snprintf(pri, sizeof(pri), "%u", (unsigned)r.pri);
+    Settings::setCard(r.id, "page", r.page);
+    Settings::setCard(r.id, "kind", "cluster");
+    Settings::setCard(r.id, "name", r.name);
+    if (r.area[0]) Settings::setCard(r.id, "area", r.area);
+    Settings::setCard(r.id, "pri", pri);
+    if (groupId && groupId[0]) Settings::setCard(r.id, "group", groupId);
+    specFor(s_n);
+    s_n++;
+    s_changed = true;
+    if (idOut && cap) copy(idOut, cap, r.id);
+    Serial.printf("[CardAdded] %s: a cluster, \"%s\", on %s\n", r.id, r.name, r.page);
     return true;
 }
 

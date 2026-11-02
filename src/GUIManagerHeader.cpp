@@ -14,6 +14,7 @@
 #include "Cards/PageSpec.h"
 #include "UI/HiddenSheet.h"    // ...in their own sheet (round 6)
 #include "UI/AddCardSheet.h"   // CARDS' Add card (2.13)
+#include "UI/NewClusterSheet.h" // ...and New cluster
 #include "Settings.h"
 #include "UI/SlotPanels.h"
 #include "UI/TweaksSheet.h"
@@ -87,6 +88,12 @@ void GUIManager::openSlotPanel(uint8_t slot) {
             g->closeSlotPanel(true);
             const PageSpec *ps = g->_pages[g->_curPage].spec;
             AddCardSheet::open(ps && ps->title ? ps->title : nullptr);
+        };
+        c.newCluster = [](void *user) {
+            GUIManager *g = (GUIManager *)user;
+            g->closeSlotPanel(true);
+            const PageSpec *ps = g->_pages[g->_curPage].spec;
+            NewClusterSheet::open(ps && ps->title ? ps->title : nullptr);
         };
     }
     if (!SlotPanels::build(_header.slotKind(slot), _slotDrawer.face, c)) return;

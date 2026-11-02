@@ -33,6 +33,7 @@ struct Context {
     uint8_t     hiddenCount = 0;                         // this page's pool (K66, K96)
     void (*viewHidden)(void *user) = nullptr;            // ...their sheet (round 6)
     void (*addCard)(void *user) = nullptr;               // CARDS' Add card (2.13, K140)
+    void (*newCluster)(void *user) = nullptr;            // ...and New cluster
     const char *entity      = nullptr;   // the sensor slot's
     EntityRegistry *reg     = nullptr;
     void *user = nullptr;                // handed back to those below

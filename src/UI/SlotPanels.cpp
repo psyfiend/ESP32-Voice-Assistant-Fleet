@@ -146,6 +146,10 @@ void addCardCb(lv_event_t *) {
     if (s_ctx.addCard) s_ctx.addCard(s_ctx.user);
 }
 
+void newClusterCb(lv_event_t *) {
+    if (s_ctx.newCluster) s_ctx.newCluster(s_ctx.user);
+}
+
 void hiddenCards(lv_obj_t *face, const Context &c) {
     if (!c.hiddenCount || !c.viewHidden) return;
     char words[32];
@@ -177,13 +181,16 @@ void buildPage(lv_obj_t *face, const Context &c) {
     Kit::selector(s_hdrSel, Kit::drawerCentred(face), sp);
     s_hdrNote = Kit::drawerNote(face, "When hidden, swipe down from the top edge of the screen to reveal");
     if (c.headerShown) lv_obj_add_flag(s_hdrNote, LV_OBJ_FLAG_HIDDEN);
-    // CARDS (2.13, K140, K145): Add card - HA's entities, by area. New cluster
-    // joins it when it is built.
+    // CARDS (2.13, K140, K145): Add card - HA's entities, by area - and New
+    // cluster, side by side in one row.
     if (c.addCard) {
         title(face, "CARDS");
         // A control's height, not a full touch target's: the panel overran the
         // P4_5 once already (round 14b), and this section is one more.
-        Kit::button(Kit::buttonRow(face), Kit::ButtonRole::BTN_CANCEL, "Add card", faceRoom(), Kit::controlH(), addCardCb);
+        lv_obj_t *row = Kit::buttonRow(face);
+        const int32_t bw = c.newCluster ? (faceRoom() - UI::mm(UI::shape().S5)) / 2 : faceRoom();
+        Kit::button(row, Kit::ButtonRole::BTN_CANCEL, "Add card", bw, Kit::controlH(), addCardCb);
+        if (c.newCluster) Kit::button(row, Kit::ButtonRole::BTN_CANCEL, "New cluster", bw, Kit::controlH(), newClusterCb);
     }
     title(face, "HIDDEN");
     hiddenCards(face, c);

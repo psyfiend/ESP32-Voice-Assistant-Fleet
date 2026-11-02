@@ -73,6 +73,9 @@ bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, cons
 // its own cards (no "after"), at the default priority, in `groupId` (its HA
 // area's group). Its id into `idOut`. False when full.
 bool addToPage(const Entity &e, const char *area, const char *groupId, char *idOut, size_t cap);
+// A CLUSTER MADE HERE (2.13, K140, K91's "making a cluster"): on the page being
+// built, named, in `groupId`; its members are then added with addTo(id, ...).
+bool addCluster(const char *name, const char *area, const char *groupId, char *idOut, size_t cap);
 // To the page's pool. False if it is not a card added here.
 bool remove(const char *cardId);
 

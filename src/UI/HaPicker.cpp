@@ -257,6 +257,11 @@ lv_obj_t *build(lv_obj_t *parent, int32_t w, int32_t h, const Spec &spec) {
         lv_obj_set_size(s_body, lv_pct(100), lv_pct(100));
     }
     lv_obj_update_layout(s_root);   // the rows are sized from the body's width
+    if (spec.preselect) {
+        s_n = HaOffer::rows(s_area, s_rows, ROWS_MAX);
+        for (uint8_t i = 0; i < s_n && s_nChosen < CHOSEN_MAX; i++)
+            if (spec.preselect(s_rows[i]) && chosenAt(s_rows[i].ref) < 0) s_chosen[s_nChosen++] = s_rows[i];
+    }
     lv_obj_add_event_cb(s_root, [](lv_event_t *) { s_root = s_body = s_nav = nullptr; }, LV_EVENT_DELETE, nullptr);
     fillBody();
     return s_root;
