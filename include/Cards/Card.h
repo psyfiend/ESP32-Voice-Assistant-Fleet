@@ -240,6 +240,10 @@ public:
     // border, header or card label of its own - its hero and its entity label.
     // Still a whole card: its id and settings, its tap, its window on a long
     // press (K104). Set before build(); the cluster sizes and places it.
+    // A cluster's own card state for its tiles (2.13): a StateCardFill, -1 the
+    // device's (UI Tweaks').
+    Card &setOwnFill(int8_t f) { _ownFill = f; return *this; }
+    int8_t ownFill() const { return _ownFill; }
     Card &setMini(bool on) { _mini = on; return *this; }
     bool  mini() const { return _mini; }
 
@@ -615,6 +619,7 @@ private:
     // disagree; now they cannot.
     bool            _showArea    = s_showArea;
     bool            _mini        = false;   // a cluster's mini tile (2.11)
+    int8_t          _ownFill     = -1;      // its cluster's card state (2.13); -1 the device's
     bool            _forced      = false;   // debugForceState()
     bool            _dimmed      = false;   // paused, mixed not opa'd
 

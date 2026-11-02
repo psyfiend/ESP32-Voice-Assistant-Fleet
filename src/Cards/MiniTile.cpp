@@ -230,10 +230,12 @@ void StateCard::renderMini() {
 
     // THE CARD STATE, ON A TILE TOO (round 11, the owner's E - K116): an active
     // tile framed as a solo card is (Corner cut, Bracket), its lit disc kept.
+    // Its cluster's own card state, when it has one (2.13), else the device's.
+    const StateCardFill fill = ownFill() >= 0 ? (StateCardFill)ownFill() : s_fill;
     CardFrame frame = CardFrame::FRAME_NONE;
     if (on && !chrome) {
-        if (s_fill == StateCardFill::FRAME_BRACKET) frame = CardFrame::FRAME_BRACKET;
-        if (s_fill == StateCardFill::FRAME_CORNER)  frame = CardFrame::FRAME_CORNER;
+        if (fill == StateCardFill::FRAME_BRACKET) frame = CardFrame::FRAME_BRACKET;
+        if (fill == StateCardFill::FRAME_CORNER)  frame = CardFrame::FRAME_CORNER;
     }
     activeFrame(frame, p.ST_ACTIVE);
 

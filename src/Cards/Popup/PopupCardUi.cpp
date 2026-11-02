@@ -24,7 +24,12 @@ static const char *const TIMEOUT_IS[] = { nullptr, "60", "30", "10", "off" };
 static const char *const BAR_W[]     = { "Inherit", "On", "Off" };
 static const char *const BAR_IS[]    = { nullptr, "on", "off" };
 
-enum CuiRow : uint8_t { CUI_ENTITY, CUI_CLABEL, CUI_METAL, CUI_SHAPE, CUI_DENSITY, CUI_TIMEOUT, CUI_BAR, CUI_ROWS };
+// A CLUSTER'S OWN CARD STATE FOR ITS TILES (2.11's final pass, 2.13): UI Tweaks'
+// words with Inherit first; saved on the cluster as "card_state" (K106's way).
+static const char *const STATE_W[]   = { "Inherit", "Fill", "Icon glow", "Bracket", "Corner cut" };
+static const char *const STATE_IS[]  = { nullptr, "fill", "glow", "bracket", "corner" };
+
+enum CuiRow : uint8_t { CUI_ENTITY, CUI_CLABEL, CUI_METAL, CUI_SHAPE, CUI_DENSITY, CUI_TIMEOUT, CUI_BAR, CUI_STATE, CUI_ROWS };
 
 static Card *held() { return cardOf(h.surface); }
 
@@ -47,6 +52,7 @@ static bool rowApplies(CuiRow r) {
         case CUI_METAL:
         case CUI_SHAPE:   return !cluster && s.lightHero;
         case CUI_DENSITY: return !cluster && !mini;
+        case CUI_STATE:   return cluster;   // its tiles'
         default:          return true;   // the window's own timeout and bar
     }
 }
@@ -82,6 +88,7 @@ static uint8_t litOf(uint8_t row) {
         case CUI_DENSITY: return savedPos("density", DENSITY_IS, 4);
         case CUI_TIMEOUT: return savedPos("close", TIMEOUT_IS, 5);
         case CUI_BAR:     return savedPos("bar", BAR_IS, 3);
+        case CUI_STATE:   return savedPos("card_state", STATE_IS, 5);
     }
     return 0;
 }
@@ -185,6 +192,10 @@ static void chooseAsync(void *p) {
             break;
         case CUI_TIMEOUT: keepCardSetting("close", TIMEOUT_IS[i < 5 ? i : 0]); retime(); break;
         case CUI_BAR:     keepCardSetting("bar", BAR_IS[i < 3 ? i : 0]);       retime(); break;
+        case CUI_STATE:   // its tiles take it when the page is built again, once the window has gone
+            keepCardSetting("card_state", STATE_IS[i < 5 ? i : 0]);
+            s_rebuildPage = true;
+            break;
         default: break;
     }
     // Every row lit as the card now has it (a look chosen moves the shape's chip too).
@@ -209,6 +220,7 @@ void buildCardUi() {
         { "Card density",   DENSITY_W, 4, litOf(CUI_DENSITY) },
         { "Window timeout", TIMEOUT_W, 5, litOf(CUI_TIMEOUT) },
         { "Timer bar",      BAR_W,     3, litOf(CUI_BAR)     },
+        { "Card state",     STATE_W,   5, litOf(CUI_STATE)   },   // a cluster's (its place in the list: to confirm)
     };
     Kit::ChipRowSpec rows[CUI_ROWS];
     s_nRows = 0;

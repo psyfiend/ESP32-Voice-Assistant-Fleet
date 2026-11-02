@@ -767,9 +767,17 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
         const Layout::ClusterSpan sp = Layout::clusterSpan(nTiles, g, cellCols, _maxRows);
         if (sp.fits) {
             ClusterCard *cl = new ClusterCard();
+            // ITS OWN CARD STATE FOR ITS TILES (2.13): "card_state", a StateCardFill
+            // by name in GUIManagerTweaks' order; none, the device's.
+            int8_t ownFill = -1;
+            if (hasId && Settings::card(cs.id, "card_state", v, sizeof(v))) {
+                static const char *const FILLS[] = { "fill", "glow", "bracket", "corner" };
+                for (int8_t f = 0; f < 4; f++) if (!strcmp(v, FILLS[f])) ownFill = f;
+            }
             for (uint8_t k = 0; k < nMem; k++) {
                 Card *m = makeCard(*mem[k], spec, reg, k);
                 if (!m) continue;
+                m->setOwnFill(ownFill);
                 m->setMini(true);
                 m->setHeaderStyle(CardHeaderStyle::HDR_NONE);
                 cl->addMember(m, tileOf(*mem[k]), slotOf(mem[k]->id));
