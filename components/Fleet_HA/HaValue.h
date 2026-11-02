@@ -238,7 +238,12 @@ inline bool haDescriptor(const char *ref, const char *deviceClass, const char *u
         d.kind = EntityKind::SENSOR;        d.valueType = num ? ValueType::FLOAT : ValueType::TEXT_VAL;
         if (num) snprintf(d.stateClass, sizeof(d.stateClass), "measurement");
     } else if (is("climate")) {
-        d.kind = EntityKind::CLIMATE;       d.valueType = ValueType::TEXT_VAL;   // the mode; readings are attributes
+        // The mode is its state; the readings are attributes, in HA's own unit
+        // - Fahrenheit on the owner's HA, assumed until a board asks HA which
+        // (to confirm with the owner before another house uses it).
+        d.kind = EntityKind::CLIMATE;       d.valueType = ValueType::TEXT_VAL;
+        deviceClass = "temperature";
+        unit = "\xC2\xB0" "F";
     } else if (is("scene") || is("script") || is("button")) {
         d.kind = EntityKind::BUTTON;        d.valueType = ValueType::TEXT_VAL; d.writable = true;
     } else {

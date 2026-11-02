@@ -347,6 +347,7 @@ void buildMain() {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const Entity    &e = *s.ent[0];
+    if (e.desc.kind == EntityKind::CLIMATE) { buildClimate(); return; }   // 2.13, read only (K144)
 
     lv_obj_t *row = plain(s.stage);
     lv_obj_set_size     (row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);

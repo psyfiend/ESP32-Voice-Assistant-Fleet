@@ -433,6 +433,7 @@ void clusterRename();        // the keyboard on the cluster's name, as Rename op
 void buildClusterAdd();      // VIEW_CLUSTER_ADD: the page's cards, each No / Copy / Move (K91)
 uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask);   // ...the picked ones in; the window closes
 void buildGroup();                    // 2.13 (K143): VIEW_GROUP, a cluster's members as tiles (PopupGroup.cpp)
+void buildClimate();                  // 2.13 (K144): a thermostat's main view, read only (PopupClimate.cpp)
 void groupWindow(bool big);           // ...the window to the page's size and its panels away, or back
 void groupForget();                   // ...the window went
 void enterMemberAt(uint8_t i);        // a member's own view, as a tap on its row in Members (PopupMembers.cpp)

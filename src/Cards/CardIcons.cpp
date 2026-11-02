@@ -495,6 +495,14 @@ void cardFormatValue(const Entity &e, char *out, size_t cap, bool withUnit, Temp
 
     const char *unit = withUnit ? cardDisplayUnit(e, want) : "";
 
+    // A THERMOSTAT's number is the room's temperature, an attribute (2.13,
+    // K144); its state is its mode.
+    if (e.desc.kind == EntityKind::CLIMATE) {
+        if (e.attrs.curTemp10 == EntityAttrs::ATTR_NONE) { snprintf(out, cap, "--"); return; }
+        snprintf(out, cap, "%.1f%s", (double)cardDisplayNumber(e, e.attrs.curTemp10 / 10.0f, want), unit);
+        return;
+    }
+
     bool converted = false;
     const float dv = displayValue(e, want, converted);
 

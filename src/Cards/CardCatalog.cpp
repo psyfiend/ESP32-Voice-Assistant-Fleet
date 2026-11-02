@@ -70,13 +70,33 @@ Card *cardForKind(EntityKind kind) {
         // so that adding an EntityKind cannot silently inherit someone else's
         // card - the compiler names the one you forgot, which is the same
         // discipline EntityTypes.h uses for HA platform strings.
+        case EntityKind::CLIMATE:       return new ClimateCard();   // 2.13, read only (K144)
+
         case EntityKind::NUMBER:
         case EntityKind::TEXT:
-        case EntityKind::CLIMATE:
         case EntityKind::WEATHER:
             return nullptr;
     }
     return nullptr;
+}
+
+// "Heat to 68°", "Cool to 74°", "Off"; the mode alone where it has no one
+// setpoint (heat_cool, auto). The setpoint in the card's unit, whole degrees.
+bool ClimateCard::statusWords(const Entity &e, char *out, size_t cap) const {
+    if (!e.everSet || e.value.type != ValueType::TEXT_VAL) return false;
+    const char *m = e.value.text;
+    if (!strcmp(m, "off")) { snprintf(out, cap, "Off"); return true; }
+    char mode[16];
+    snprintf(mode, sizeof(mode), "%s", m);
+    if (mode[0] >= 'a' && mode[0] <= 'z') mode[0] = (char)(mode[0] - 'a' + 'A');
+    for (char *p = mode; *p; p++) if (*p == '_') *p = ' ';
+    if (e.attrs.target10 == EntityAttrs::ATTR_NONE || strchr(m, '_') || !strcmp(m, "auto")) {
+        snprintf(out, cap, "%s", mode);
+        return true;
+    }
+    const float t = cardDisplayNumber(e, e.attrs.target10 / 10.0f, tempUnit());
+    snprintf(out, cap, "%s to %d\xC2\xB0", mode, (int)(t + (t < 0 ? -0.5f : 0.5f)));
+    return true;
 }
 
 Card *cardForEntity(const Entity *e) {

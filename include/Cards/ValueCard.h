@@ -45,6 +45,9 @@ class ValueCard : public Card {
 protected:
     void buildBody(lv_obj_t *body) override;
     void render() override;
+    // Words for the status row's right-hand corner in place of "Seen: ...";
+    // false (the default) keeps the age.
+    virtual bool statusWords(const Entity &e, char *out, size_t cap) const { (void)e; (void)out; (void)cap; return false; }
 
 private:
     // As a cluster's MINI TILE (2.11, K89): the value and its unit, its entity

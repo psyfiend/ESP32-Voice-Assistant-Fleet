@@ -39,6 +39,17 @@ public:
     const char *typeName() const override { return "sensor"; }
 };
 
+// A THERMOSTAT, READ ONLY (2.13, K144): the room's temperature as a measure
+// card's number, and what it is set to where a sensor says when it was seen -
+// "Heat to 68°" (K145). Its window lists the rest. Controls come with the card
+// library (#31).
+class ClimateCard : public ValueCard {
+public:
+    const char *typeName() const override { return "climate"; }
+protected:
+    bool statusWords(const Entity &e, char *out, size_t cap) const override;
+};
+
 // A SUMMARY (2.11 round 4, K98): a group card of members of one kind - the
 // garage doors - as one card: one icon, active while any member is, and under
 // it the active ones by name - "North", "Both", "2 open"; none, its own name.

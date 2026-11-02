@@ -79,9 +79,9 @@ lights, and reword HA's docs for K133.
 - [x] 2.3 runtime entities from card entries (`94cb6df`)
 - [x] 2.4 the catalogue, registry events, known ids, the notice queue (`61a088b`; `/popup?catalog=1`
   checked on the P4_5 - 70 entities, the Outside group linked to HA's Outside floor)
-- [ ] Screen 1 - a cluster's Add cards from HA
+- [x] Screen 1 - a cluster's Add cards from HA (`161cf8d`; checked on the P4_5, survives a reboot)
 - [ ] Screen 2 - Add card
-- [ ] Screen 5 - the group view, tap and long press
+- [x] Screen 5 - the group view, tap and long press (`17b4dbe`; checked on the P4_5)
 - [ ] Screen 6 - the thermostat
 - [ ] Screen 4 - Area row, "1 new", the notice queue
 - [ ] Screen 3 - New cluster

@@ -314,7 +314,8 @@ void tick(uint32_t now) {
     const uint32_t sig = signature();
     if (sig != s.lastSig) {
         s.lastSig = sig;
-        if (s.view == PopupView::VIEW_MEMBERS || s.view == PopupView::VIEW_GROUP) showView(s.view);
+        const bool climate = s.view == PopupView::VIEW_MAIN && s.ent[0] && s.ent[0]->desc.kind == EntityKind::CLIMATE;
+        if (s.view == PopupView::VIEW_MEMBERS || s.view == PopupView::VIEW_GROUP || climate) showView(s.view);
         else                                    renderMain();
         s.lastAgeMs = now;
     } else if (now - s.lastAgeMs >= 1000) {

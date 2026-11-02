@@ -261,6 +261,15 @@ void ValueCard::render() {
     // from. For a Zigbee sensor publishing four values on one topic those are
     // the same moment; for anything else they are not, and the device-level
     // question is one only #43's device registry can answer.
+    // A card with words of its own for this corner says them instead (the
+    // thermostat's "Heat to 68°", 2.13 K144).
+    char own[40];
+    if (statusWords(*e, own, sizeof(own))) {
+        lv_label_set_text          (_seen, own);
+        lv_obj_set_style_text_color(_seen, UI::c(tone(p.TEXT_DIM)), 0);
+        lv_obj_clear_flag(_seen, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
     if (e->everSet && !e->desc.advertise) {
         char age[12];
         cardFormatAge(millis() - e->lastUpdateMs, age, sizeof(age));
