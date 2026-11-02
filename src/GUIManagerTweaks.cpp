@@ -372,6 +372,8 @@ struct GUITweaks {
     static int16_t haloNow()          { return (int16_t)Kit::haloStrength(); }
     static void    haloSet(int16_t v) { Kit::keepHaloStrength((uint8_t)LV_CLAMP(0, v, 100)); Settings::save(); }
 
+    static uint8_t helperNow()          { return Kit::helperShown() ? 1 : 0; }
+    static void    helperSet(uint8_t i) { Kit::setHelperShown(i != 0); }
     static uint8_t barNow()          { return Kit::windowBarShown() ? 0 : 1; }
     static void    barSet(uint8_t i) {
         Settings::setSystem("window", "bar", i ? "off" : nullptr);
@@ -390,6 +392,8 @@ struct GUITweaks {
         { "Window timeout", TIMEOUT, 4, timeoutNow, timeoutSet },
         { "Timer bar",      ONOFF,   2, barNow,     barSet     },
         { "Halo",           nullptr, 0, nullptr,    nullptr,   0, 100, haloNow, haloSet, "%" },
+        // A CHECKBOX (K128: one thing on or off), the owner's words (round 14).
+        { "Show helper text", nullptr, 0, helperNow, helperSet },
     };
 
     // THE DECK RISES UNDER THE WINDOW (D-25): its panels' headers along the

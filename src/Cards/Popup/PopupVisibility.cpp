@@ -55,6 +55,7 @@ void note(lv_obj_t *list, const char *words) {
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     lv_label_set_text(l, words);
+    Kit::helperNote(l);   // UI Tweaks' Show helper text (2.13)
 }
 
 void restoreCb(lv_event_t *) {

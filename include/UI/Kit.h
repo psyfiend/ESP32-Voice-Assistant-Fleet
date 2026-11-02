@@ -573,6 +573,11 @@ void      coveAt (lv_obj_t *j, int32_t edgeX, bool right, int32_t barH);
 // reading.
 lv_obj_t *drawerItem(lv_obj_t *face, const char *words, bool marked, lv_event_cb_t cb, void *user);
 lv_obj_t *drawerNote(lv_obj_t *face, const char *words);
+// UI Tweaks' "Show helper text" (K128, 2.13): every helper note follows it -
+// drawerNote()'s by itself, a view's own notes through helperNote().
+bool helperShown();
+void setHelperShown(bool on);
+void helperNote(lv_obj_t *note);
 lv_obj_t *drawerBig(lv_obj_t *face, const char *words);
 // A ROW of things side by side, the panel's width, DRAWER_GAP apart (buttons,
 // a selector and a toggle). A STATUS ROW (2.8 round 3, the system panel's

@@ -59,6 +59,8 @@ static void fill() {
     lv_label_set_text(l, s_n ? "Tap to restore a card back to the dashboard with its original settings intact.\n"
                                "Cards hidden from clusters can be restored from the cluster 'Members' view."
                              : "No hidden cards on this page.");
+    if (s_n) Kit::helperNote(l);   // UI Tweaks' Show helper text (2.13); "none" is not help, it is the list
+    if (s_n && s_spec.note && !Kit::helperShown()) return;
     if (s_n && s_spec.note) {
         lv_obj_t *m = Kit::label(t, Kit::KitStyle::KS_LABEL_TAG_DIM);
         lv_obj_set_width(m, lv_pct(100));

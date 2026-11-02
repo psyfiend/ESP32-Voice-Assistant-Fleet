@@ -11,7 +11,7 @@
 
 namespace TweaksSheet {
 
-constexpr uint8_t ROWS_MAX = 10;
+constexpr uint8_t ROWS_MAX = 12;   // the chip table's own most (Kit::CHIP_ROWS_MAX); 10 until 2.13's helper text
 
 // A row: what it sets, its choices, which is chosen now, and what choosing one does.
 // A SLIDER ROW (2.11 round 4) has no choices: `hi` above `lo`, its value now

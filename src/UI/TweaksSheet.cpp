@@ -40,6 +40,7 @@ static void chooseAsync(void *p) {
     if (!s_spec.rows || r >= s_spec.nRows) return;
     const Row &row = s_spec.rows[r];
     if (i == Kit::CHIP_SLIDER) { if (row.setValue && s_list) row.setValue(Kit::chipTableValue(s_list, r)); return; }
+    if (i == Kit::CHIP_CHECK) { if (row.choose && s_list) row.choose(Kit::chipTableChecked(s_list, r) ? 1 : 0); return; }   // a check row (2.13)
     if (row.choose) row.choose(i);
 }
 

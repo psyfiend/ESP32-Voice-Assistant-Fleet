@@ -5,6 +5,8 @@
 // four slots' panels read as one family.
 #include "UI/Kit.h"
 #include "UI/UIToolkit.h"
+#include "Settings.h"   // system.ui.helper (2.13)
+#include <string.h>
 
 namespace Kit {
 
@@ -490,11 +492,21 @@ lv_obj_t *drawerItem(lv_obj_t *face, const char *words, bool marked, lv_event_cb
     return it;
 }
 
+// UI TWEAKS' "SHOW HELPER TEXT" (K128's "later", 2.13): system.ui.helper "off"
+// hides every helper note; shown is the default and is stored as nothing.
+bool helperShown() {
+    char v[8];
+    return !Settings::system("ui", "helper", v, sizeof(v)) || strcmp(v, "off") != 0;
+}
+void setHelperShown(bool on) { Settings::setSystem("ui", "helper", on ? nullptr : "off"); Settings::save(); }
+void helperNote(lv_obj_t *l) { if (l && !helperShown()) lv_obj_add_flag(l, LV_OBJ_FLAG_HIDDEN); }
+
 lv_obj_t *drawerNote(lv_obj_t *face, const char *words) {
     lv_obj_t *l = label(face, KitStyle::KS_LABEL_TAG_DIM);
     lv_obj_set_width(l, lv_pct(100));
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     lv_label_set_text(l, words ? words : "");
+    helperNote(l);
     return l;
 }
 
