@@ -20,6 +20,7 @@
 #include "Cards/CardAdded.h"   // K17: cards added on the device
 #include "Cards/ClusterCard.h" // the clusters' header glyphs (2.11 round 11)
 #include "UI/SlotPanels.h"     // 2.8: the header slots' panels
+#include "UI/HaOffer.h"        // 2.13: what HA offers
 #include <string.h>
 #ifdef DEBUG_PAGE_TIMING
 #include <esp_timer.h>   // rebuildDashboard()'s two halves
@@ -706,6 +707,7 @@ void GUIManager::begin() {
     // anything was last touched (its auto-close). Cards/CardPopup.h.
     CardPopup::begin();
     CardPopup::setHistory(&_core.history());   // History's source (2.10e)
+    HaOffer::begin(&_core.catalog(), &_core.haProvider(), &_core.entities());   // what HA offers (2.13)
 
     // Bottom deck height = screen height - header height.
     int32_t header_h = UIToolkit::systemHeaderPx();
@@ -1512,6 +1514,8 @@ void GUIManager::tick() {
         const bool learnt = s_addedWaiting && _core.entities().count() != s_regCountAtBuild;
         if (CardAdded::takeChanged() || learnt || CardPopup::takeRebuildWanted() || PageArranger::takeDone()) rebuildDashboard();
     }
+    // What HA offers (2.13): a new catalogue, and its notices.
+    HaOffer::tick();
     // Renders a waiting screenshot request, on this - the LVGL - thread.
     Screenshot::service();
     // Same for GET /bench (2.9), which may also change page first.

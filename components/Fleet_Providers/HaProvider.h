@@ -7,6 +7,7 @@
 #include "EntityRegistry.h"
 #include "HaClient.h"
 #include "HaRest.h"
+#include "HaCatalog.h"
 
 // ---------------------------------------------------------------------------
 // Reads Home Assistant's entities over the websocket and writes them into the
@@ -79,6 +80,13 @@ public:
     typedef bool (*RawFn)(const char *json, size_t len, void *ctx);
     void setRawHook(RawFn fn, void *ctx) { _rawFn = fn; _rawCtx = ctx; }
 
+    // WHAT HA OFFERS, 2.13 (HaCatalog.h). Asked once a session, again when HA
+    // says an entity or an area changed in its registries (a label added, an
+    // entity moved), and whenever requestCatalog() is called (a picker opening).
+    // Any task.
+    void setCatalog(HaCatalog *c) { _cat = c; }
+    void requestCatalog() { _catWanted.store(true); }
+
 private:
     // HaClient hands out a bare function pointer, so the instance is reached
     // through the ctx argument - same shape MqttProvider uses for PubSubClient.
@@ -102,6 +110,20 @@ private:
     // only when the frame could not be sent.
     bool sendSceneQuery();
     void parseScenes(const char *result);   // websocket task
+
+    // The catalogue's template, and the two registry subscriptions (2.13).
+    bool sendCatalogQuery();
+    bool sendRegistrySubs();
+    void catalogLoop(uint32_t session);
+
+    HaCatalog            *_cat = nullptr;
+    std::atomic<bool>     _catWanted{false};
+    std::atomic<uint32_t> _catTpl{0};
+    std::atomic<bool>     _catDone{false};
+    uint32_t              _catSession = 0;
+    uint32_t              _regSession = 0;
+    std::atomic<uint32_t> _regIds[2] = {};
+    std::atomic<uint32_t> _regChangedMs{0};   // when HA last said its registries changed; 0 none
 
     EntityRegistry *_reg  = nullptr;
     HaClient       *_ha   = nullptr;

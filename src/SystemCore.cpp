@@ -299,6 +299,7 @@ bool SystemCore::begin() {
     // setMessageHandler only stores a pointer and the order is not load-bearing.
     _haRest.begin(&_entities);
     _haProv.begin(&_entities, &_ha, &_haRest);
+    if (_haCat.begin()) _haProv.setCatalog(&_haCat);   // 2.13: what HA offers the pickers
 
     // --= 12. Outbound commands =--
     //

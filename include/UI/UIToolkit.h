@@ -74,6 +74,11 @@ public:
     // stays still. Pass the WIDEST value it can show, e.g. "Volume: 100%".
     static void     show_toast(const char* text, uint32_t duration_ms = 2000,
                                const char* widthOf = nullptr);
+    // A NOTICE, 2.13 (K142; NINA's toasts): queued rather than replacing what
+    // shows - each for its time, a bar running down under its words, the next
+    // after it. Info notices only until 2.14's alerts join the queue. A readout
+    // (show_toast) still shows at once; the queue carries on after it.
+    static void     show_notice(const char* text, uint32_t duration_ms = 5000);
 
     // Widget Generators
     static lv_obj_t*    create_collapsible_panel(lv_obj_t* parent, const char* title, lv_obj_t** content_container);

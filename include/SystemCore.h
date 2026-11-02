@@ -57,6 +57,8 @@ public:
     EntityRegistry      &entities() { return _entities; }
     HaClient            &ha()       { return _ha; }
     HaHistory           &history()  { return _haHist; }
+    HaCatalog           &catalog()  { return _haCat; }    // what HA offers (2.13)
+    HaProvider          &haProvider() { return _haProv; }
     HttpServer          &http()     { return _http; }
     BatteryProvider     &battery()  { return _battProvider; }
 #ifdef HAS_AUDIO_HW
@@ -128,6 +130,10 @@ private:
     // entity table rather than a hardcoded list. Also owns the decision that a
     // new session has begun, and tells _haRest to re-fetch when it does.
     HaProvider          _haProv;
+
+    // What HA offers the pickers (2.13): the "fleet" entities by area, asked by
+    // _haProv. See HaCatalog.h.
+    HaCatalog           _haCat;
 
     // An entity's past, for a card window's History view (2.10e): asked on the
     // same session, answered through _haProv's raw hook. See HaHistory.h.

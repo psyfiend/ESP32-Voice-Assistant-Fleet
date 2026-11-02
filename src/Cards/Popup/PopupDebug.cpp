@@ -6,6 +6,7 @@
 #include "Cards/PageArranger.h"   // the arranger's last run, in the card list (2.11 round 2)
 #include "UI/SlotPanels.h"        // restore=-2: the page panel's View hidden cards (2.11, K96)
 #include "UI/HiddenSheet.h"       // restore=N: the hidden cards' sheet (round 6)
+#include "UI/HaOffer.h"           // catalog=1: what HA offers (2.13)
 
 namespace popup {
 
@@ -117,6 +118,7 @@ std::atomic<int> s_dreq{DREQ_IDLE};
 struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int view = -1; int pause = -1;
                 int member = -1; int scene = -1; int look = -1; int show = -1; int scheme = -1;
                 int tap = -1; int groups = -1; int clabel = -1; int span = -1; int row = -1; int x = -1;
+                int catalog = -1;                          // 2.13: what HA offers (1 lists, 2 asks HA again)
                 int dur = -1; int chips = -1; int addCard = -1; int removeCard = -1;
                 int tree = 0;     // 1: the open window's objects; 2 (tree=page): the whole screen
                 int sparks = -1;  // the interference from the next window: 0 now and then, 1 once, 2 off
@@ -141,7 +143,7 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
 bool (*s_drawerHook)(bool open) = nullptr;
 const char *(*s_headerHook)(const char *slot, int glyphs, int pageHdr, int alarm, int alarmIn) = nullptr;
 DbgReq s_dreqArgs;
-char   s_dreqOut[2048];
+char   s_dreqOut[16384];   // 2 KB until 2.13: catalog=1 lists HA's 70 fleet entities
 size_t s_dreqLen = 0;
 
 void dbgOut(const char *fmt, ...) {
@@ -184,6 +186,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "close", v, sizeof(v)) == ESP_OK) a.close = atoi(v) != 0;
         if (httpd_query_key_value(q, "tap", v, sizeof(v)) == ESP_OK) a.tap = atoi(v);
         if (httpd_query_key_value(q, "groups", v, sizeof(v)) == ESP_OK) a.groups = atoi(v);
+        if (httpd_query_key_value(q, "catalog", v, sizeof(v)) == ESP_OK) a.catalog = atoi(v);
         if (httpd_query_key_value(q, "clabel", v, sizeof(v)) == ESP_OK) a.clabel = atoi(v);
         if (httpd_query_key_value(q, "span", v, sizeof(v)) == ESP_OK) a.span = atoi(v);
         if (httpd_query_key_value(q, "more", v, sizeof(v)) == ESP_OK) a.more = atoi(v) != 0;
@@ -723,6 +726,14 @@ void CardPopup::debugService(lv_timer_t *t) {
         s_clN = CardGroups::rowChoices(*c, s_clMap, 24, s_clOpts, sizeof(s_clOpts), now);
         dbgOut("card label: \"%s\" #%06lX; the row, now on line %u:\n%s\n", c->area(),
                (unsigned long)c->headerColor(), (unsigned)now, s_clOpts);
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.catalog >= 0) {
+        // What HA offers (2.13): every area and its fleet entities, with the
+        // board's entity for each and what is new; 2 asks HA again first.
+        if (a.catalog == 2) HaOffer::refresh();
+        HaOffer::dump([](const char *line, void *) { dbgOut("%s", line); }, nullptr);
         s_dreq.store(DREQ_DONE);
         return;
     }

@@ -248,6 +248,62 @@ void HaProvider::parseScenes(const char *result) {
                   (unsigned)scenes, (unsigned)lights, (unsigned)nHidden, (unsigned)withArea, (unsigned)areas);
 }
 
+// ---------------------------------------------------------------------------
+// What HA offers - 2.13 (HaCatalog.h). Loop task.
+// ---------------------------------------------------------------------------
+
+bool HaProvider::sendCatalogQuery() {
+    if (!_cat || !_ha) return false;
+    static char *frame = bigBuf(1536);
+    if (!frame) return false;
+    const uint32_t id = _ha->nextId();
+    const int n = snprintf(frame, 1536, "{\"id\":%lu,\"type\":\"render_template\",\"template\":\"%s\"}",
+                           (unsigned long)id, HaCatalog::templateText());
+    if (n <= 0 || n >= 1536) return false;
+    _catDone.store(false);
+    _catTpl.store(id);
+    if (!_ha->sendText(frame, n)) { _catTpl.store(0); return false; }
+    Serial.printf("[HaProv] render_template id %lu: the fleet catalogue (%d B)\n", (unsigned long)id, n);
+    return true;
+}
+
+// HA's own word that something in its registries moved: an entity labelled,
+// moved to another area or renamed, an area added or renamed. Allowed to any
+// user's token (HA's subscription allowlist). Answered with the catalogue
+// asked again, a few seconds after the last of a burst.
+bool HaProvider::sendRegistrySubs() {
+    static const char *const TYPES[2] = {"entity_registry_updated", "area_registry_updated"};
+    for (uint8_t k = 0; k < 2; k++) {
+        char frame[112];
+        const uint32_t id = _ha->nextId();
+        const int n = snprintf(frame, sizeof(frame), "{\"id\":%lu,\"type\":\"subscribe_events\",\"event_type\":\"%s\"}",
+                               (unsigned long)id, TYPES[k]);
+        _regIds[k].store(id);
+        if (!_ha->sendText(frame, n)) return false;
+    }
+    return true;
+}
+
+void HaProvider::catalogLoop(uint32_t session) {
+    if (!_cat) return;
+    if (_regSession != session && sendRegistrySubs()) _regSession = session;
+    if (_catSession != session) { _catSession = session; _catWanted.store(true); }
+    const uint32_t changed = _regChangedMs.load();
+    if (changed && millis() - changed > 3000) { _regChangedMs.store(0); _catWanted.store(true); }
+
+    const uint32_t tpl = _catTpl.load();
+    if (tpl && _catDone.exchange(false)) {
+        char frame[96];
+        const int n = snprintf(frame, sizeof(frame),
+                               "{\"id\":%lu,\"type\":\"unsubscribe_events\",\"subscription\":%lu}",
+                               (unsigned long)_ha->nextId(), (unsigned long)tpl);
+        _ha->sendText(frame, n);
+        _catTpl.store(0);
+        return;
+    }
+    if (!tpl && _catWanted.load() && sendCatalogQuery()) _catWanted.store(false);
+}
+
 void HaProvider::loop(uint32_t nowMs) {
     (void)nowMs;
     if (!_ha) return;
@@ -300,6 +356,7 @@ void HaProvider::loop(uint32_t nowMs) {
             _ha->sendText(frame, n);
             _tplId.store(0);
         }
+        catalogLoop(session);
         return;
     }
 
@@ -357,6 +414,7 @@ void HaProvider::handle(const char *json, size_t len) {
         haAttrFilter(attrs);
         haEntityFilter(attrs);
         filter["event"]["result"]     = true;   // a template's answer (2.10c)
+        filter["event"]["event_type"] = true;   // HA's registries changed (2.13)
         filter["type"]                = true;
         // Needed to read the subscription's own reply. Without these three the
         // filtered parse drops them and every result looks like success=false.
@@ -404,6 +462,11 @@ void HaProvider::handle(const char *json, size_t len) {
                 Serial.printf("[HaProv] HA REFUSED the subscription (id %lu): %s - %s\n",
                               (unsigned long)rid, code, msg);
             }
+        } else if (rid != 0 && (rid == _regIds[0].load() || rid == _regIds[1].load() || rid == _catTpl.load())) {
+            if (!(doc["success"] | false))
+                Serial.printf("[HaProv] HA REFUSED a catalogue request (id %lu): %s - %s\n", (unsigned long)rid,
+                              doc["error"]["code"] | "?", doc["error"]["message"] | "");
+            if (rid == _catTpl.load() && !(doc["success"] | false)) _catTpl.store(0);
         } else if (rid != 0 && rid == _tplId.load()) {
             if (!(doc["success"] | false)) {
                 Serial.printf("[HaProv] HA REFUSED the scene query: %s - %s\n",
@@ -419,6 +482,19 @@ void HaProvider::handle(const char *json, size_t len) {
     }
 
     if (strcmp(type, "event") != 0) return;
+
+    // The catalogue's answer (2.13), and HA's registries changing.
+    const uint32_t eid = doc["id"] | 0UL;
+    const uint32_t cat = _catTpl.load();
+    if (cat && eid == cat) {
+        if (_cat && !_catDone.load()) _cat->parse(doc["event"]["result"] | "");
+        _catDone.store(true);
+        return;
+    }
+    if (eid && (eid == _regIds[0].load() || eid == _regIds[1].load())) {
+        _regChangedMs.store(millis() | 1);   // never 0, which means none
+        return;
+    }
 
     // The scene query's answer: learnt here, unsubscribed by loop().
     const uint32_t tpl = _tplId.load();

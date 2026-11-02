@@ -25,9 +25,19 @@ int32_t UIToolkit::sc(int32_t val) {
 }
 
 // --- Toast Logic ---
+// THE NOTICE QUEUE (2.13, K142): waiting notices, oldest first; a full queue
+// drops the newest. The bar under a notice's words runs down its time.
+static constexpr uint8_t NOTICE_Q = 6;
+static char     notice_q[NOTICE_Q][96];
+static uint32_t notice_ms[NOTICE_Q];
+static uint8_t  notice_n = 0;
+static lv_obj_t *toast_bar = NULL;
+static void notice_next();
+
 static void toast_timer_cb(lv_timer_t * t) {
     if (toast_panel) lv_obj_add_flag(toast_panel, LV_OBJ_FLAG_HIDDEN);
     toast_timer_handle = NULL;
+    if (notice_n) notice_next();
 }
 
 void UIToolkit::init() {
@@ -135,6 +145,52 @@ void UIToolkit::show_toast(const char* text, uint32_t duration_ms, const char* w
     }
     toast_timer_handle = lv_timer_create(toast_timer_cb, duration_ms, NULL);
     lv_timer_set_repeat_count   (toast_timer_handle, 1);
+    if (toast_bar) lv_obj_add_flag(toast_bar, LV_OBJ_FLAG_HIDDEN);   // a readout has no bar
+}
+
+static void bar_width_cb(void *bar, int32_t w) { lv_obj_set_width((lv_obj_t *)bar, w); }
+
+static void notice_next() {
+    if (!notice_n) return;
+    char text[96];
+    snprintf(text, sizeof(text), "%s", notice_q[0]);
+    const uint32_t ms = notice_ms[0];
+    memmove(notice_q, notice_q + 1, sizeof(notice_q[0]) * (NOTICE_Q - 1));
+    memmove(notice_ms, notice_ms + 1, sizeof(notice_ms[0]) * (NOTICE_Q - 1));
+    notice_n--;
+    UIToolkit::show_toast(text, ms);
+    if (!toast_panel) return;
+    if (!toast_bar) {
+        toast_bar = lv_obj_create(toast_panel);
+        lv_obj_remove_style_all(toast_bar);
+        lv_obj_add_flag(toast_bar, LV_OBJ_FLAG_FLOATING);
+        lv_obj_clear_flag(toast_bar, (lv_obj_flag_t)(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
+        lv_obj_set_style_bg_opa(toast_bar, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(toast_bar, UI::sc(2), 0);
+    }
+    lv_obj_set_style_bg_color(toast_bar, UI::c(UI::pal().ACCENT), 0);   // the scheme's, now
+    lv_obj_update_layout(toast_panel);
+    const int32_t w = lv_obj_get_width(toast_panel) - UI::sc(30);
+    lv_obj_set_size(toast_bar, w, UI::sc(4));
+    lv_obj_align(toast_bar, LV_ALIGN_BOTTOM_LEFT, 0, UI::sc(10));
+    lv_obj_clear_flag(toast_bar, LV_OBJ_FLAG_HIDDEN);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, toast_bar);
+    lv_anim_set_exec_cb(&a, bar_width_cb);
+    lv_anim_set_values(&a, w, 0);
+    lv_anim_set_duration(&a, ms);
+    lv_anim_start(&a);
+}
+
+void UIToolkit::show_notice(const char* text, uint32_t duration_ms) {
+    if (!text || !text[0]) return;
+    if (notice_n < NOTICE_Q) {
+        snprintf(notice_q[notice_n], sizeof(notice_q[0]), "%s", text);
+        notice_ms[notice_n++] = duration_ms;
+    }
+    // Nothing showing: this one now. Else it waits for the timer.
+    if (!toast_timer_handle) notice_next();
 }
 
 // Expanded Accordion Panel Accessor
