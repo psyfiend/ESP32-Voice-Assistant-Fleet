@@ -19,6 +19,7 @@
 #include "Cards/CardWhere.h"   // 2.13: what a picker row says it already is
 #include "UI/HaOffer.h"        // 2.13: Add cards from Home Assistant
 #include "UI/HaPicker.h"
+#include "HaCatalog.h"         // AREAS_MAX: the Area row's choices
 
 namespace popup {
 
@@ -518,13 +519,64 @@ int8_t clusterMemberOf(const ClusterCard &cl, const Entity *e) {
 // --- The views ------------------------------------------------------------------------
 // THE CLUSTER PANEL (round 16): on Members, beside SETTINGS. Greyed for a
 // cluster without a usable id, which could keep none of it.
+// AREA (2.13, K141): the HA area or floor the cluster's GROUP is linked to -
+// None, then each floor and its areas. A choice changes the group's link, so
+// every card in that group follows it.
+static char    s_areaOpts[768];
+static char    s_areaIds[HaCatalog::AREAS_MAX + 8][32];
+static uint8_t s_areaN = 0;
+static char    s_addWords[12];
+
+static void areaDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    ClusterCard *cl = held();
+    CardGroups::Group g;
+    if (!cl || k >= s_areaN || !CardGroups::ofCard(*cl, g)) return;
+    HaOffer::setGroupArea(g.id, k ? s_areaIds[k] : "none");
+    changed();
+}
+
+static uint16_t areaOptions(const char *current) {
+    static HaOffer::AreaRow rows[HaCatalog::AREAS_MAX];   // ~6 KB: not on the loop task's stack
+    const uint8_t na = HaOffer::areas(rows, HaCatalog::AREAS_MAX);
+    size_t used = (size_t)snprintf(s_areaOpts, sizeof(s_areaOpts), "None");
+    s_areaIds[0][0] = '\0';
+    s_areaN = 1;
+    uint16_t sel = 0;
+    auto add = [&](const char *id, const char *words) {
+        if (s_areaN >= sizeof(s_areaIds) / sizeof(s_areaIds[0]) || used + strlen(words) + 2 >= sizeof(s_areaOpts)) return;
+        used += (size_t)snprintf(s_areaOpts + used, sizeof(s_areaOpts) - used, "\n%s", words);
+        snprintf(s_areaIds[s_areaN], sizeof(s_areaIds[0]), "%s", id);
+        if (current && !strcmp(current, id)) sel = s_areaN;
+        s_areaN++;
+    };
+    const char *floor = nullptr;
+    for (uint8_t i = 0; i < na; i++) {
+        if (!rows[i].id[0]) continue;   // No area is no place to link to
+        if (rows[i].floor[0] && (!floor || strcmp(floor, rows[i].floor))) {
+            add(rows[i].floor, rows[i].floorName);   // the floor itself: Outside
+            floor = rows[i].floor;
+        }
+        add(rows[i].id, rows[i].name);
+    }
+    return sel;
+}
+
 uint8_t clusterSpecs(DeckRowSpec *r) {
     ClusterCard *cl = held();
     const bool live = cl && cl->hasId();
     uint8_t n = 0;
+    // ITS AREA'S NEW ENTITIES (K142): "1 new" on Add cards until it has shown them.
+    char area[40] = "";
+    CardGroups::Group g;
+    if (cl && CardGroups::ofCard(*cl, g)) HaOffer::groupArea(g.id, area, sizeof(area));
+    const uint8_t fresh = area[0] ? HaOffer::newIn(area) : 0;
+    snprintf(s_addWords, sizeof(s_addWords), fresh ? "%u new" : "Open", (unsigned)fresh);   // K145
     r[n++] = { "Rename cluster", DeckRowKind::ROW_BUTTON, "Edit", 0, live, renameCb, nullptr };
     r[n++] = { "Header options", DeckRowKind::ROW_BUTTON, "Open", 0, live, slotsViewCb, nullptr };
-    r[n++] = { "Add cards", DeckRowKind::ROW_BUTTON, "Open", 0, live, addViewCb, nullptr };
+    r[n++] = { "Add cards", DeckRowKind::ROW_BUTTON, s_addWords, 0, live, addViewCb, nullptr };
+    const uint16_t sel = areaOptions(area);
+    r[n++] = { "Area", DeckRowKind::ROW_DROP, s_areaOpts, sel, live && HaOffer::ready(), areaDropCb, nullptr };   // K145
     return n;
 }
 

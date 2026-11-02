@@ -80,7 +80,13 @@ lights, and reword HA's docs for K133.
 - [x] 2.4 the catalogue, registry events, known ids, the notice queue (`61a088b`; `/popup?catalog=1`
   checked on the P4_5 - 70 entities, the Outside group linked to HA's Outside floor)
 - [x] Screen 1 - a cluster's Add cards from HA (`161cf8d`; checked on the P4_5, survives a reboot)
-- [ ] Screen 2 - Add card
+- [x] Screen 2 - Add card (`16e497a`; checked on the P4_5)
+- [x] Screen 6 - the thermostat (`4e98c4e`; checked on the P4_5)
+- [~] Screen 4 - the Area row and "1 new" built and compiled, NOT yet flashed or checked; the notice
+  queue built with 2.4. Next: flash, open Office's CLUSTER panel, pick an area, check the link.
+- **The P4_5 holds test cards** (3D Printer hidden, Office Humidity and THERMOSTAT in Office; Garage
+  House Door and Garage Humidity on the page): put its settings back from
+  `bench/settings/WS_P4_TOUCH_LCD_5/20261102-0552.json` before the owner tests.
 - [x] Screen 5 - the group view, tap and long press (`17b4dbe`; checked on the P4_5)
 - [ ] Screen 6 - the thermostat
 - [ ] Screen 4 - Area row, "1 new", the notice queue

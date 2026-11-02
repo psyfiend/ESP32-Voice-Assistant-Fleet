@@ -147,6 +147,7 @@ uint8_t areas(AreaRow *out, uint8_t cap) {
         AreaRow &r = out[n++];
         snprintf(r.id, sizeof(r.id), "%s", a.id);
         snprintf(r.name, sizeof(r.name), "%s", a.name);
+        snprintf(r.floor, sizeof(r.floor), "%s", a.floor);
         snprintf(r.floorName, sizeof(r.floorName), "%s", a.floorName);
         r.items = a.items;
         r.fresh = 0;
@@ -200,13 +201,16 @@ uint8_t rows(const char *areaId, Row *out, uint8_t cap) {
     return n;
 }
 
-uint8_t newIn(const char *areaId) {
+uint8_t newIn(const char *place) {
     if (!s_cat || !s_knownRead) return 0;
     uint8_t n = 0;
     s_cat->lock();
     for (uint8_t i = 0; i < s_cat->itemCount(); i++) {
         const HaCatalog::Item &it = s_cat->item(i);
-        if (strcmp(it.areaId, areaId ? areaId : "") == 0 && !inList(s_known, it.ref)) n++;
+        if (inList(s_known, it.ref)) continue;
+        // The area itself, or an area on that floor.
+        const int a = s_cat->findArea(it.areaId);
+        if (!strcmp(it.areaId, place ? place : "") || (a >= 0 && place && place[0] && !strcmp(s_cat->area(a).floor, place))) n++;
     }
     s_cat->unlock();
     return n;

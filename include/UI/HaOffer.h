@@ -33,6 +33,7 @@ uint32_t epoch();  // counts catalogues; a picker rebuilds when it moves
 struct AreaRow {
     char    id[32];          // "" = No area
     char    name[40];
+    char    floor[32];       // its floor's id; "" on no floor
     char    floorName[32];   // "" on no floor
     uint8_t items;
     uint8_t fresh;           // how many are new
