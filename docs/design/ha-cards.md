@@ -82,14 +82,12 @@ lights, and reword HA's docs for K133.
 - [x] Screen 1 - a cluster's Add cards from HA (`161cf8d`; checked on the P4_5, survives a reboot)
 - [x] Screen 2 - Add card (`16e497a`; checked on the P4_5)
 - [x] Screen 6 - the thermostat (`4e98c4e`; checked on the P4_5)
-- [~] Screen 4 - the Area row and "1 new" built and compiled, NOT yet flashed or checked; the notice
-  queue built with 2.4. Next: flash, open Office's CLUSTER panel, pick an area, check the link.
-- **The P4_5 holds test cards** (3D Printer hidden, Office Humidity and THERMOSTAT in Office; Garage
-  House Door and Garage Humidity on the page): put its settings back from
-  `bench/settings/WS_P4_TOUCH_LCD_5/20261102-0552.json` before the owner tests.
+- [x] Screen 4 - the Area row and "1 new" (`55d114c`; the row checked on the P4_5, "1 new" needs a
+  change in HA - TEST T8)
+- [x] Screen 3 - New cluster (`dcbd271`; checked on the P4_5)
+- [x] Leftovers: Show helper text (`9f7ec11`), a cluster's card state (`a3eef7a`), HA's docs for K133
+  (HA repo `d8293c5`)
+- [x] The P4_5, 4B and 1060 flashed with round 1 and checked; the P4_5's settings put back (one
+  difference: `system.ha.known`)
+- [x] `docs/TEST_2.13.md` written
 - [x] Screen 5 - the group view, tap and long press (`17b4dbe`; checked on the P4_5)
-- [ ] Screen 6 - the thermostat
-- [ ] Screen 4 - Area row, "1 new", the notice queue
-- [ ] Screen 3 - New cluster
-- [ ] Leftovers: Show helper text (K128); a cluster's card state; HA docs (K133)
-- [ ] Flash the dev boards, verify, `docs/TEST_2.13.md`
