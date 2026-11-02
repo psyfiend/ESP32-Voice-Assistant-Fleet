@@ -255,6 +255,7 @@ enum class TapAction : uint8_t {
     TAP_CYCLE_SCENES,   // loads the next scene, with a toast naming it
     TAP_LOAD_SCENE,     // loads one chosen scene ("tap_scene"), with a toast
     TAP_NOTHING,
+    TAP_GROUP,          // a cluster's group view (2.13, K143) - its default; saved by name, so last
 };
 
 inline const char *tapActionName(TapAction t) {
@@ -266,12 +267,13 @@ inline const char *tapActionName(TapAction t) {
         case TapAction::TAP_CYCLE_SCENES: return "cycle_scenes";
         case TapAction::TAP_LOAD_SCENE:   return "load_scene";
         case TapAction::TAP_NOTHING:      return "nothing";
+        case TapAction::TAP_GROUP:        return "group";
         default:                          return "default";
     }
 }
 inline bool tapActionFromName(const char *n, TapAction &out) {
     if (!n) return false;
-    for (uint8_t i = 1; i <= (uint8_t)TapAction::TAP_NOTHING; i++)
+    for (uint8_t i = 1; i <= (uint8_t)TapAction::TAP_GROUP; i++)
         if (!strcmp(n, tapActionName((TapAction)i))) { out = (TapAction)i; return true; }
     return false;
 }

@@ -116,10 +116,24 @@ void showView(PopupView v) {
 
     const bool member   = inMember();
     const bool controls = (v == PopupView::VIEW_MAIN || v == PopupView::VIEW_MEMBER);
-    // X on the controls, the back arrow everywhere else (owner, round 4).
-    setText(s.lblLeft, v == controlsView() && !member ? LV_SYMBOL_CLOSE : LV_SYMBOL_LEFT);
+    // THE GROUP VIEW HAS THE PAGE'S ROOM (2.13, K143); every other view the
+    // window's own. Before the title is laid out: it is sized from the window.
+    groupWindow(v == PopupView::VIEW_GROUP);
+    // X on the controls, the back arrow everywhere else (owner, round 4). A
+    // cluster opens on either of its two views, so both have the X.
+    setText(s.lblLeft, (v == controlsView() || v == PopupView::VIEW_GROUP) && !member ? LV_SYMBOL_CLOSE : LV_SYMBOL_LEFT);
     cornerLook(s.btnHistory, true, v == PopupView::VIEW_HISTORY);
-    cornerLook(s.btnMembers, !member && hasMembers(), v == PopupView::VIEW_MEMBERS);
+    if (s.cluster && s.btnMembers) {
+        // A CLUSTER'S TAB GOES BETWEEN ITS TWO VIEWS (K143): to Members from the
+        // group view, to the group view from Members. To confirm: the owner's
+        // grid and list glyphs need the icon font made again (#83's way);
+        // these are the nearest it has.
+        cornerLook(s.btnMembers, !member, false);
+        if (lv_obj_t *g = Kit::labelIn(s.btnMembers))
+            lv_label_set_text(g, v == PopupView::VIEW_GROUP ? MDI_TUNE : MDI_LIGHTBULB_GROUP);
+    } else {
+        cornerLook(s.btnMembers, !member && hasMembers(), v == PopupView::VIEW_MEMBERS);
+    }
     cornerLook(s.btnScenes, (controls || v == PopupView::VIEW_SCENES) && hasScenes(),
                v == PopupView::VIEW_SCENES);
     // The left panel belongs to its view: CHART to History, SCENES to Scenes.
@@ -128,7 +142,10 @@ void showView(PopupView v) {
     // Whose view it is: the window's, or (inside one) the member's.
     const char *who = (member && s.ent[0]) ? s.ent[0]->desc.name : s.name;
     char title[ENTITY_NAME_MAX + 16];
-    if (v == PopupView::VIEW_MAIN) {
+    if (v == PopupView::VIEW_GROUP) {
+        setText(s.lblTitleArea, "");
+        setText(s.lblTitleName, s.name);
+    } else if (v == PopupView::VIEW_MAIN) {
         // A cluster's name is its group's: "Office", never "Office > Office".
         if (s.area[0] && !(s.cluster && !strcmp(s.area, s.name))) {
             snprintf(title, sizeof(title), "%s > ", s.area);
@@ -168,6 +185,7 @@ void showView(PopupView v) {
     else if (v == PopupView::VIEW_ADD_TO)     buildAddTo();           // K91, K100
     else if (v == PopupView::VIEW_CLUSTER_ADD) buildClusterAdd();     // K104's Add cards
     else if (v == PopupView::VIEW_JOIN)       buildJoin();            // K92 rule 9
+    else if (v == PopupView::VIEW_GROUP)      buildGroup();           // 2.13, K143
     else                                   buildMain();
     deckSync();     // SETTINGS' rows are the view's (a member's own has more)
     deckRender();   // Paused follows whatever the window is showing now
@@ -193,6 +211,7 @@ void cornerTap(PopupView v) { showView(s.view == v ? controlsView() : v); }
 void goBack() {
     switch (s.view) {
         case PopupView::VIEW_MAIN:   CardPopup::close();     break;
+        case PopupView::VIEW_GROUP:  CardPopup::close();     break;   // a cluster's own view: its X
         case PopupView::VIEW_MEMBERS:   // a cluster's own view: its X
             if (s.cluster) CardPopup::close();
             else           showView(controlsView());
@@ -219,7 +238,14 @@ void crumbCb(lv_event_t *ev) {
     showView(controlsView());
 }
 void historyCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_HISTORY); }
-void membersCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_MEMBERS); }
+void membersCb(lv_event_t *ev) {
+    (void)ev;
+    // A cluster's tab goes between its group view and Members (K143).
+    if (s.cluster && !inMember())
+        showView(s.view == PopupView::VIEW_GROUP ? PopupView::VIEW_MEMBERS : PopupView::VIEW_GROUP);
+    else
+        cornerTap(PopupView::VIEW_MEMBERS);
+}
 void scenesCb (lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_SCENES); }
 
 #ifdef DEBUG_POPUP
@@ -288,7 +314,7 @@ void tick(uint32_t now) {
     const uint32_t sig = signature();
     if (sig != s.lastSig) {
         s.lastSig = sig;
-        if (s.view == PopupView::VIEW_MEMBERS) showView(PopupView::VIEW_MEMBERS);
+        if (s.view == PopupView::VIEW_MEMBERS || s.view == PopupView::VIEW_GROUP) showView(s.view);
         else                                    renderMain();
         s.lastAgeMs = now;
     } else if (now - s.lastAgeMs >= 1000) {
@@ -316,6 +342,7 @@ void closing() {
 // Gone: everything in one frame, the card's border with it.
 void closed() {
     forgetWidgets();
+    groupForget();   // the window that had the page's room went with it
     holdDetach();
     s.phase = PopupPhase::PHASE_CLOSED;
     s.nEnt = 0;
@@ -496,4 +523,5 @@ void CardPopup::openOn(Card &card, uint8_t view) {
     if (!isOpen()) return;
     if (view == OPEN_HISTORY)                      showView(PopupView::VIEW_HISTORY);
     else if (view == OPEN_MEMBERS && hasMembers()) showView(PopupView::VIEW_MEMBERS);
+    else if (view == OPEN_GROUP && s.cluster)      showView(PopupView::VIEW_GROUP);   // 2.13, K143
 }

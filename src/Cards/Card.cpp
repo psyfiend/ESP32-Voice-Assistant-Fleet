@@ -232,6 +232,7 @@ void Card::tap() {
         case TapAction::TAP_TOGGLE:  onTap(); return;
         case TapAction::TAP_DETAILS: CardPopup::openOn(*this, CardPopup::OPEN_CONTROLS); return;
         case TapAction::TAP_MEMBERS: CardPopup::openOn(*this, CardPopup::OPEN_MEMBERS);  return;
+        case TapAction::TAP_GROUP:   CardPopup::openOn(*this, CardPopup::OPEN_GROUP);    return;
         case TapAction::TAP_HISTORY: CardPopup::openOn(*this, CardPopup::OPEN_HISTORY);  return;
         case TapAction::TAP_NOTHING: return;
         case TapAction::TAP_CYCLE_SCENES:

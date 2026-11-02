@@ -795,8 +795,12 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
             // cluster is not made by makeCard() - it went back to Nothing whenever
             // the page was built again (the owner). Else Members, which lists every
             // member, hidden ones too (refines K107: opening a list switches nothing).
-            TapAction ta = TapAction::TAP_MEMBERS;
+            // 2.13 (K143): its group view - a long press opens Members.
+            TapAction ta = TapAction::TAP_GROUP;
             if (hasId && Settings::card(cs.id, "tap", v, sizeof(v))) tapActionFromName(v, ta);
+            // A saved Details view meant "its window" (K129: a cluster has none); its
+            // window's first view is the group view now.
+            if (ta == TapAction::TAP_DETAILS) ta = TapAction::TAP_GROUP;
             cl->setTapAction(ta);
             cl->setBinder(_binder);
             Serial.printf("[Cards] cluster %s: %u members, %u tiles, %ux%u cells\n",

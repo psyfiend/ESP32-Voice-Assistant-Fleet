@@ -69,6 +69,7 @@ public:
     // its Members (Members only where the card has some; else the controls).
     // The finger is already up, so the touch is not held as open() holds it.
     static constexpr uint8_t OPEN_CONTROLS = 0, OPEN_HISTORY = 1, OPEN_MEMBERS = 2;
+    static constexpr uint8_t OPEN_GROUP = 3;   // a cluster's group view (2.13, K143)
     static void openOn(Card &card, uint8_t view);
 
     // Close it, by whichever of the four routes. Safe to call from an event

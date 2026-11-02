@@ -172,7 +172,8 @@ uint8_t s_groupCtl   = 0;   // the group's control, restored on the way back
 
 void enterMemberAsync(void *unused) {
     (void)unused;
-    if (s.phase != PopupPhase::PHASE_OPEN || s.view != PopupView::VIEW_MEMBERS || inMember()) return;
+    if (s.phase != PopupPhase::PHASE_OPEN || inMember() ||
+        (s.view != PopupView::VIEW_MEMBERS && s.view != PopupView::VIEW_GROUP)) return;   // a row, or a tile (2.13)
     const Entity *m = (s_memberPick < memberCount()) ? memberAt(s_memberPick) : nullptr;
     if (!m) return;
     for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.groupEnt[i] = s.ent[i];
@@ -189,6 +190,11 @@ void enterMemberAsync(void *unused) {
 // cleaned, and an event callback must not delete its own object.
 void memberRowCb(lv_event_t *ev) {
     s_memberPick = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+    lv_async_call(enterMemberAsync, nullptr);
+}
+
+void enterMemberAt(uint8_t i) {
+    s_memberPick = i;
     lv_async_call(enterMemberAsync, nullptr);
 }
 

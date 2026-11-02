@@ -616,6 +616,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             else if (a.view == 8) showView(PopupView::VIEW_VISIBILITY);   // 2.11 (K96): as SETTINGS' Visibility
             else if (a.view == 9) showView(PopupView::VIEW_ADD_TO);       // ... and its Add to a cluster
             else if (a.view == 10 && s.cluster) showView(PopupView::VIEW_CLUSTER_ADD);   // a cluster's Add cards
+            else if (a.view == 11 && s.cluster) showView(PopupView::VIEW_GROUP);         // its group view (2.13)
             dbgMem(mem, sizeof(mem));
             dbgOut("view %d; %s\n", a.view, mem);
             // Why the last commands failed, newest first (G8).

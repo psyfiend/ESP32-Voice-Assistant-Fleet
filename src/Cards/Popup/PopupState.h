@@ -99,7 +99,7 @@ using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
 // cluster (K91, K100).
 enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER, VIEW_SCENES, VIEW_PROPS,
                                   VIEW_CARD_UI, VIEW_CLUSTER_SLOTS, VIEW_VISIBILITY, VIEW_ADD_TO,
-                                  VIEW_CLUSTER_ADD, VIEW_JOIN };
+                                  VIEW_CLUSTER_ADD, VIEW_JOIN, VIEW_GROUP };
 enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
@@ -432,6 +432,10 @@ bool clusterTakeRebuild();   // a choice wants the page built again, once the wi
 void clusterRename();        // the keyboard on the cluster's name, as Rename opens it (K95)
 void buildClusterAdd();      // VIEW_CLUSTER_ADD: the page's cards, each No / Copy / Move (K91)
 uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask);   // ...the picked ones in; the window closes
+void buildGroup();                    // 2.13 (K143): VIEW_GROUP, a cluster's members as tiles (PopupGroup.cpp)
+void groupWindow(bool big);           // ...the window to the page's size and its panels away, or back
+void groupForget();                   // ...the window went
+void enterMemberAt(uint8_t i);        // a member's own view, as a tap on its row in Members (PopupMembers.cpp)
 void clusterAddSource(uint8_t src);   // 2.13: Add cards' source chip - 0 this board, 1 Home Assistant
 void clusterAddHaGo();                // ...HA's ticked rows in (Add); the window closes
 // Member `i` of `cl` shown as a tile or not, kept when the window closes (K104's
