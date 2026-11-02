@@ -8,6 +8,7 @@
 #include "UI/HiddenSheet.h"       // restore=N: the hidden cards' sheet (round 6)
 #include "UI/HaOffer.h"           // catalog=1: what HA offers (2.13)
 #include "UI/HaPicker.h"          // hatick=N, haarea=<id>: its picker
+#include "UI/AddCardSheet.h"      // pagecard=1, pageadd=1: the page's Add card
 
 namespace popup {
 
@@ -121,6 +122,7 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int tap = -1; int groups = -1; int clabel = -1; int span = -1; int row = -1; int x = -1;
                 int catalog = -1;                          // 2.13: what HA offers (1 lists, 2 asks HA again)
                 int haSrc = -1, haTick = -1, haGo = -1;    // ...Add cards' source, a picker row, its Add
+                int pageCard = -1, pageAdd = -1;           // ...the page's Add card sheet: open it, its Add
                 char haArea[32] = {}; bool haAreaSet = false;   // ...another area in the picker
                 int dur = -1; int chips = -1; int addCard = -1; int removeCard = -1;
                 int tree = 0;     // 1: the open window's objects; 2 (tree=page): the whole screen
@@ -193,6 +195,8 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "hasrc", v, sizeof(v)) == ESP_OK) a.haSrc = atoi(v);
         if (httpd_query_key_value(q, "hatick", v, sizeof(v)) == ESP_OK) a.haTick = atoi(v);
         if (httpd_query_key_value(q, "hago", v, sizeof(v)) == ESP_OK) a.haGo = atoi(v);
+        if (httpd_query_key_value(q, "pagecard", v, sizeof(v)) == ESP_OK) a.pageCard = atoi(v);
+        if (httpd_query_key_value(q, "pageadd", v, sizeof(v)) == ESP_OK) a.pageAdd = atoi(v);
         if (httpd_query_key_value(q, "haarea", a.haArea, sizeof(a.haArea)) == ESP_OK) a.haAreaSet = true;
         if (httpd_query_key_value(q, "clabel", v, sizeof(v)) == ESP_OK) a.clabel = atoi(v);
         if (httpd_query_key_value(q, "span", v, sizeof(v)) == ESP_OK) a.span = atoi(v);
@@ -397,6 +401,18 @@ void CardPopup::debugService(lv_timer_t *t) {
     }
     // 2.13: the HA picker - hasrc=0|1 Add cards' source (view=10 first),
     // haarea=<id> another area ("-" No area), hatick=N a tap on row N, hago=1 Add.
+    // 2.13: pagecard=1 opens the page's Add card (as CARDS' button), pageadd=1 its Add.
+    if (a.pageCard > 0) {
+        const PageSpec *ps = CardAdded::pageSpec();
+        dbgOut(AddCardSheet::open(ps && ps->title ? ps->title : nullptr) ? "add card: open\n" : "a sheet is showing\n");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.pageAdd > 0) {
+        dbgOut(AddCardSheet::addDebug() ? "added\n" : "not added\n");
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
     if (a.haSrc >= 0 || a.haTick >= 0 || a.haGo > 0 || a.haAreaSet) {
         if (a.haSrc >= 0) { if (isOpen() && s.cluster) { clusterAddSource((uint8_t)a.haSrc); dbgOut("source %d\n", a.haSrc); } else dbgOut("no cluster's window open\n"); }
         if (a.haAreaSet) dbgOut(HaPicker::tapArea(strcmp(a.haArea, "-") ? a.haArea : "") ? "area %s\n" : "no area %s\n", a.haArea);

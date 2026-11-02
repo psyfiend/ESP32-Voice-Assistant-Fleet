@@ -259,6 +259,31 @@ bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, cons
     return true;
 }
 
+bool addToPage(const Entity &e, const char *area, const char *groupId, char *idOut, size_t cap) {
+    if (!s_rec || s_n >= MAX || !s_page[0]) return false;
+    Rec &r = s_rec[s_n];
+    r = Rec{};
+    if (!makeId(area ? area : "", e.desc.name, r.id, sizeof(r.id))) return false;
+    copy(r.page, sizeof(r.page), s_page);
+    copy(r.entity, sizeof(r.entity), e.desc.id);
+    copy(r.area, sizeof(r.area), area ? area : "");
+    r.pri = CardPlacement{}.priority;   // the default: a page's own cards' (128)
+    r.removed = false;
+    char pri[8];
+    snprintf(pri, sizeof(pri), "%u", (unsigned)r.pri);
+    Settings::setCard(r.id, "page", r.page);   // no "after": it follows the page's own cards
+    Settings::setCard(r.id, "entity", r.entity);
+    if (r.area[0]) Settings::setCard(r.id, "area", r.area);
+    Settings::setCard(r.id, "pri", pri);
+    if (groupId && groupId[0]) Settings::setCard(r.id, "group", groupId);
+    specFor(s_n);
+    s_n++;
+    s_changed = true;
+    if (idOut && cap) copy(idOut, cap, r.id);
+    Serial.printf("[CardAdded] %s: %s on %s, from HA\n", r.id, r.entity, r.page);
+    return true;
+}
+
 bool addTo(const Card &cluster, const Entity &e, char *idOut, size_t cap, const char *fromId) {
     if (!cluster.hasId()) return false;
     CardGroups::Group g;

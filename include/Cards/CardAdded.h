@@ -69,6 +69,10 @@ const char *addedFor(const char *parentId, const char *entityId);
 // member card it came out of (a cluster's tile, the sprint after round 7), kept
 // as "from" - so its Visibility knows a copy from a move.
 bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, const char *fromId = nullptr);
+// A CARD FROM HOME ASSISTANT (2.13, K140): `e` on the page being built, after
+// its own cards (no "after"), at the default priority, in `groupId` (its HA
+// area's group). Its id into `idOut`. False when full.
+bool addToPage(const Entity &e, const char *area, const char *groupId, char *idOut, size_t cap);
 // To the page's pool. False if it is not a card added here.
 bool remove(const char *cardId);
 

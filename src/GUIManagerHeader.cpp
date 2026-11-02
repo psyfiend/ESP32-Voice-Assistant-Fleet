@@ -13,6 +13,7 @@
 #include "Cards/CardTypes.h"   // ...and its clusters' (GroupPresent, round 7)
 #include "Cards/PageSpec.h"
 #include "UI/HiddenSheet.h"    // ...in their own sheet (round 6)
+#include "UI/AddCardSheet.h"   // CARDS' Add card (2.13)
 #include "Settings.h"
 #include "UI/SlotPanels.h"
 #include "UI/TweaksSheet.h"
@@ -79,6 +80,13 @@ void GUIManager::openSlotPanel(uint8_t slot) {
             GUIManager *g = (GUIManager *)user;
             g->closeSlotPanel(true);
             g->openHiddenSheet();
+        };
+        // CARDS' Add card (2.13, K140): HA's entities, by area - the panel goes first.
+        c.addCard = [](void *user) {
+            GUIManager *g = (GUIManager *)user;
+            g->closeSlotPanel(true);
+            const PageSpec *ps = g->_pages[g->_curPage].spec;
+            AddCardSheet::open(ps && ps->title ? ps->title : nullptr);
         };
     }
     if (!SlotPanels::build(_header.slotKind(slot), _slotDrawer.face, c)) return;

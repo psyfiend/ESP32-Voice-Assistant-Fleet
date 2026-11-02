@@ -139,6 +139,7 @@ public:
     // Its first entity, or null: what a cluster's header shows of a member (2.11).
     const Entity *firstEntity() const { return _nPrimary ? _primary[0] : nullptr; }
     uint8_t entityCount() const { return _nPrimary; }   // one: it can join a cluster (2.11, K91)
+    const Entity *entityAt(uint8_t i) const { return i < _nPrimary ? _primary[i] : nullptr; }   // 2.13: CardWhere
 
     // What a tap does (2.10d, TapAction). The scene for Load scene is named
     // by its source's id ("scene.office_relax"), which outlives a session.

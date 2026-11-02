@@ -38,6 +38,12 @@ void walk(lv_obj_t *o, Find &f) {
             continue;   // its tiles are its members, counted above
         }
         if (k->mini()) continue;
+        // A summary of several (the garage's Doors): each of its entities is in it.
+        if (k->entityCount() > 1) {
+            for (uint8_t p = 0; p < k->entityCount() && !f.group[0]; p++)
+                if (same(k->entityAt(p), f.e)) snprintf(f.group, sizeof(f.group), "%s", k->shownName(CardLabel::LBL_NAME));
+            continue;
+        }
         const Entity *ke = k->firstEntity();
         if (same(ke, f.e)) { f.page = true; continue; }
         // A group card: its entity's members (Desk's lamps).
