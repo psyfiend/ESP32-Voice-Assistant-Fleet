@@ -2,10 +2,11 @@
 
 # Round 2
 
-**Branch** `feat/2.13-add-from-ha` at `3ef7e99`. **Boards** WS_P4_5, WS_P4_4B, CYD_P4_1060 and
-CYD_P4_4880 run it (flashed 2026-11-03 04:30-04:45, app only; each board's settings saved first in
+**Branch** `feat/2.13-add-from-ha` at `d8d3d26`. **Boards** WS_P4_5, WS_P4_4B, CYD_P4_1060 and
+CYD_P4_4880 run it (flashed 2026-11-03 04:50-05:00, app only; each board's settings saved first in
 `bench/settings/<board>/20261103-04*.json` and unchanged after - the 4880 only learnt HA's list, as round
-1 did). WS_P4_7B was not plugged in; WS_S3_4B compiled only (#69). **Decisions** K146-K153; the look:
+1 did). WS_P4_7B was not plugged in; WS_S3_4B compiled only (#69) - it builds (RAM 46.9%, flash
+37.3%). **Decisions** K146-K153; the look:
 artifact "2.13 Round 2 Mocks" (version 17).
 
 Built unattended overnight with your permission. The P4_5 tests below marked *(run)* were driven by
@@ -27,6 +28,8 @@ been tried by hand on the glass.**
   cards).
 - **Show as** (Cluster, Solo card) in GROUP; a group shown as one card has **Show as** and **Face**
   in its SETTINGS. **Long press opens** is in every card's SETTINGS.
+- **Names fitted to their room** (K152) in Edit cards: a name too long for its row steps down to the
+  tag's face before it is cut; rows keep one height.
 
 ## Tests
 
@@ -86,7 +89,12 @@ it. *PASS:* its window opens on History. A cluster's choices are Members view, G
 view. Toggle is never offered.
 
 **R14 - The other boards.** On the 4B, the 1060 and the 4880: R1, R2 and R7. *PASS:* everything
-fits; on the 4B the rows are one column (the column's names are cut short - see below).
+fits; on the 4B the rows are one column.
+
+**R15 - Names fitted.** On the 4B, Edit cards from the page, the Garage area. *PASS:* "On the page",
+"Eric Bedroom" and "Garage Motion Occupancy" are whole, in a smaller face than the names that fit
+already; every row the same height; only a name too long for either face ("Garage Overhead ...") is
+cut. *(run)*
 
 ## To confirm (words and choices Claude made)
 
@@ -111,13 +119,12 @@ fits; on the 4B the rows are one column (the column's names are cut short - see 
   panel row tapping as its member (K150's second half).
 - **Removed** for a built-in card (K148): Remove is offered only for cards made on the board.
 - Units and precision from HA (K153): HA's display precision is not in what the board reads.
-- The text fitter (K152).
+- The text fitter anywhere but Edit cards (Members, the group step, the cards themselves).
 - Two levels of nesting (K147) and "one block per group": nothing new allows or stops them yet.
 - New group from the page's cards (mock 11), and the thermostat's controls (with you there).
 
 ## Known
 
-- On the 4B the column's names are cut ("On the ...", "Eric Bedr..."): the text fitter's.
 - The group view and Edit cards end where the panels' tabs begin; the page shows in the strip beside
   the tabs.
 - Edit cards from a group opens on In this group; its HA area is not brought to the top of the column.
