@@ -135,13 +135,6 @@ void hdrChosen(uint8_t i) {
     Kit::drawerReveal(s_hdrNote, i != 0);
 }
 
-// THIS PAGE'S HIDDEN CARDS (2.11, K66, K96 - the mock's "this page's list of
-// hidden cards"): a button to their own sheet (round 6, the owner: the list made
-// the panel long), there only when the page has some.
-void viewHiddenCb(lv_event_t *) {
-    if (s_ctx.viewHidden) s_ctx.viewHidden(s_ctx.user);
-}
-
 void addCardCb(lv_event_t *) {
     if (s_ctx.addCard) s_ctx.addCard(s_ctx.user);
 }
@@ -150,18 +143,10 @@ void newClusterCb(lv_event_t *) {
     if (s_ctx.newCluster) s_ctx.newCluster(s_ctx.user);
 }
 
-void hiddenCards(lv_obj_t *face, const Context &c) {
-    if (!c.hiddenCount || !c.viewHidden) return;
-    char words[32];
-    snprintf(words, sizeof(words), "View hidden cards (%u)", (unsigned)c.hiddenCount);
-    Kit::button(Kit::buttonRow(face), Kit::ButtonRole::BTN_CANCEL, words, faceRoom(), UI::minTouch(), viewHiddenCb);
-}
-
-// THREE SECTIONS (round 14, the owner's): PAGES - every page, close together;
-// HEADER - Show / Hide, centred; HIDDEN - View hidden cards when there are some.
-// A section's words only while they are needed (round 14b: with the button the
-// panel overran the P4_5): HEADER's while it is hidden - from the tap on Hide,
-// round 15 - HIDDEN's with no button.
+// THREE SECTIONS (round 14, the owner's; 2.13 round 2): PAGES - every page,
+// close together; HEADER - Show / Hide, centred; CARDS - Edit cards and New
+// group. A section's words only while they are needed (round 14b: the panel
+// overran the P4_5): HEADER's while it is hidden - from the tap on Hide, round 15.
 void buildPage(lv_obj_t *face, const Context &c) {
     title(face, "PAGES");
     lv_obj_t *pages = Kit::plain(face);
@@ -181,21 +166,19 @@ void buildPage(lv_obj_t *face, const Context &c) {
     Kit::selector(s_hdrSel, Kit::drawerCentred(face), sp);
     s_hdrNote = Kit::drawerNote(face, "When hidden, swipe down from the top edge of the screen to reveal");
     if (c.headerShown) lv_obj_add_flag(s_hdrNote, LV_OBJ_FLAG_HIDDEN);
-    // CARDS (2.13, K140, K145): Add card - HA's entities, by area - and New
-    // cluster, side by side in one row.
+    // CARDS (2.13 round 2, K148): Edit cards - the page's, its hidden ones and
+    // HA's, by area - and New group, side by side in one row. HIDDEN went into
+    // Edit cards (the round-2 mock 1).
     if (c.addCard) {
         title(face, "CARDS");
         // A control's height, not a full touch target's: the panel overran the
-        // P4_5 once already (round 14b), and this section is one more.
+        // P4_5 once already (round 14b).
         lv_obj_t *row = Kit::buttonRow(face);
         const int32_t bw = c.newCluster ? (faceRoom() - UI::mm(UI::shape().S5)) / 2 : faceRoom();
-        Kit::button(row, Kit::ButtonRole::BTN_CANCEL, "Add card", bw, Kit::controlH(), addCardCb);
-        if (c.newCluster) Kit::button(row, Kit::ButtonRole::BTN_CANCEL, "New cluster", bw, Kit::controlH(), newClusterCb);
+        Kit::button(row, Kit::ButtonRole::BTN_CANCEL, "Edit cards", bw, Kit::controlH(), addCardCb);
+        if (c.newCluster) Kit::button(row, Kit::ButtonRole::BTN_CANCEL, "New group", bw, Kit::controlH(), newClusterCb);   // K146
+        Kit::drawerNote(face, "Hidden cards are viewed and restored in Edit cards");
     }
-    title(face, "HIDDEN");
-    hiddenCards(face, c);
-    if (!c.hiddenCount || !c.viewHidden)
-        Kit::drawerNote(face, "Cards hidden from the dashboard can be viewed/restored from here");
 }
 
 // The sensor: its name, its reading - or dashes and what went wrong - and when
@@ -250,6 +233,13 @@ bool viewHiddenDebug() {
     if (!s_ctx.viewHidden || !s_ctx.hiddenCount) return false;
     s_ctx.viewHidden(s_ctx.user);
     s_ctx.viewHidden = nullptr;   // once: the panel it was built for has gone
+    return true;
+}
+
+bool editCardsDebug() {
+    if (!s_ctx.addCard) return false;
+    s_ctx.addCard(s_ctx.user);
+    s_ctx.addCard = nullptr;      // once, as above
     return true;
 }
 #endif

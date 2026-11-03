@@ -52,6 +52,7 @@ bool build(SlotKind kind, lv_obj_t *face, const Context &c);
 // /popup?hidden=1: as a tap on the page panel's "View hidden cards". False when
 // the page's panel has not been built with it.
 bool viewHiddenDebug();
+bool editCardsDebug();   // CARDS' Edit cards, as a tap (2.13 round 2)
 #endif
 
 }  // namespace SlotPanels

@@ -430,15 +430,13 @@ uint8_t clusterSpecs(DeckRowSpec *r);   // the CLUSTER panel's rows, on Members
 void buildClusterSlots();               // VIEW_CLUSTER_SLOTS: Header options
 bool clusterTakeRebuild();   // a choice wants the page built again, once the window has gone
 void clusterRename();        // the keyboard on the cluster's name, as Rename opens it (K95)
-void buildClusterAdd();      // VIEW_CLUSTER_ADD: the page's cards, each No / Copy / Move (K91)
-uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask);   // ...the picked ones in; the window closes
+void buildClusterAdd();      // VIEW_CLUSTER_ADD: Edit cards (2.13 round 2, K148)
+uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask);   // /popup: the page's picked cards in; the window closes
 void buildGroup();                    // 2.13 (K143): VIEW_GROUP, a cluster's members as tiles (PopupGroup.cpp)
 void buildClimate();                  // 2.13 (K144): a thermostat's main view, read only (PopupClimate.cpp)
 void groupWindow(bool big);           // ...the window to the page's size and its panels away, or back
 void groupForget();                   // ...the window went
 void enterMemberAt(uint8_t i);        // a member's own view, as a tap on its row in Members (PopupMembers.cpp)
-void clusterAddSource(uint8_t src);   // 2.13: Add cards' source chip - 0 this board, 1 Home Assistant
-void clusterAddHaGo();                // ...HA's ticked rows in (Add); the window closes
 // Member `i` of `cl` shown as a tile or not, kept when the window closes (K104's
 // Visible - from its Visibility since round 6, no longer the cluster's Details).
 void clusterMemberShow(const ClusterCard &cl, uint8_t i, bool want);
@@ -528,6 +526,7 @@ void confirmRemoveFromPage();    // "Remove this card?" - a page card made on th
 // word and role; `go` runs on it (the words must outlive the dialog: static buffers).
 void confirmAsk(Kit::DialogRole role, const char *title, const char *const *lines, uint8_t n, const char *verb,
                 Kit::ButtonRole verbRole, void (*go)());
+bool confirmGoDebug();           // /popup: the asked dialog's button, as a tap (false: none up)
 
 // PopupMove.cpp (round 2 of the 2.11 follow-ups): a card moved, copied or
 // regrouped, and its Restore. `from`: the cluster a tile is in (null on the page);

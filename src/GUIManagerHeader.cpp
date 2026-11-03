@@ -13,8 +13,11 @@
 #include "Cards/CardTypes.h"   // ...and its clusters' (GroupPresent, round 7)
 #include "Cards/PageSpec.h"
 #include "UI/HiddenSheet.h"    // ...in their own sheet (round 6)
-#include "UI/AddCardSheet.h"   // CARDS' Add card (2.13)
-#include "UI/NewClusterSheet.h" // ...and New cluster
+#include "UI/EditCardsSheet.h" // CARDS' Edit cards (2.13 round 2)
+#include "UI/NewClusterSheet.h" // ...and New group
+#include "Cards/Card.h"
+#include "Cards/CardIcons.h"   // cardStateWord(), cardFormatValue(): a row's state
+#include "Cards/CardPopup.h"   // CARD_SURFACE_FLAG: the page's cards
 #include "Settings.h"
 #include "UI/SlotPanels.h"
 #include "UI/TweaksSheet.h"
@@ -82,12 +85,11 @@ void GUIManager::openSlotPanel(uint8_t slot) {
             g->closeSlotPanel(true);
             g->openHiddenSheet();
         };
-        // CARDS' Add card (2.13, K140): HA's entities, by area - the panel goes first.
+        // CARDS' Edit cards (2.13 round 2, K148) - the panel goes first.
         c.addCard = [](void *user) {
             GUIManager *g = (GUIManager *)user;
             g->closeSlotPanel(true);
-            const PageSpec *ps = g->_pages[g->_curPage].spec;
-            AddCardSheet::open(ps && ps->title ? ps->title : nullptr);
+            g->openEditCards();
         };
         c.newCluster = [](void *user) {
             GUIManager *g = (GUIManager *)user;
@@ -198,6 +200,86 @@ void GUIManager::openHiddenSheet() {
     };
     sp.user = this;
     HiddenSheet::open(sp);
+}
+
+// --- Edit cards (2.13 round 2, K148) -----------------------------------------------------
+namespace {
+// A card's state as its row says it: "On", "Closed", "74.5°F", "Unavailable".
+void entityWords(const Entity &e, char *out, size_t cap) {
+    out[0] = '\0';
+    if (!e.available)                    snprintf(out, cap, "Unavailable");
+    else if (!e.everSet)                 return;
+    else if (e.value.type == ValueType::BOOL) snprintf(out, cap, "%s", cardStateWord(e.desc, e.value.b));
+    else                                 cardFormatValue(e, out, cap, true);
+}
+
+// The page's cards in screen order; a card's own objects hold no more (a
+// cluster's tiles are its own).
+void pageCards(lv_obj_t *o, Card **out, uint8_t &n, uint8_t cap) {
+    const uint32_t k = lv_obj_get_child_count(o);
+    for (uint32_t i = 0; i < k && n < cap; i++) {
+        lv_obj_t *c = lv_obj_get_child(o, (int32_t)i);
+        if (!lv_obj_has_flag(c, CardPopup::CARD_SURFACE_FLAG)) { pageCards(c, out, n, cap); continue; }
+        Card *card = (Card *)lv_obj_get_user_data(c);
+        if (card && !card->mini()) out[n++] = card;
+    }
+}
+}  // namespace
+
+// ON THE PAGE: every card, a group as one row - each to hide, a card made here
+// to remove too (K117).
+uint8_t GUIManager::editFillPage(EditCards::Item *out, uint8_t cap, void *gui) {
+    GUIManager *g = (GUIManager *)gui;
+    if (!g || !g->_page || !g->_page->root()) return 0;
+    static Card *cards[CARD_PAGE_MAX];
+    uint8_t nc = 0;
+    pageCards(g->_page->root(), cards, nc, CARD_PAGE_MAX);
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < nc && n < cap; i++) {
+        const Card *k = cards[i];
+        EditCards::Item &it = out[n++];
+        it = EditCards::Item{};
+        const bool group = !strcmp(k->typeName(), "cluster");
+        snprintf(it.key, sizeof(it.key), "%s", k->id());
+        snprintf(it.name, sizeof(it.name), "%s", group && k->area()[0] ? k->area() : k->shownName(CardLabel::LBL_NAME));
+        if (group) snprintf(it.mark, sizeof(it.mark), "Group");   // to confirm (K146)
+        else if (const Entity *e = k->firstEntity()) entityWords(*e, it.state, sizeof(it.state));
+        it.from = EditCards::From::FROM_PAGE;
+        if (!k->hasId()) continue;   // nothing can be kept for it
+        it.tick = EditCards::Tick::TICK_HIDE;
+        it.canRemove = CardAdded::isAdded(k->id()) && !CardAdded::movedHere(k->id());
+    }
+    return n;
+}
+
+// HIDDEN: the page's pool, each to restore; the cards it had no room for, said so.
+uint8_t GUIManager::editFillHidden(EditCards::Item *out, uint8_t cap, void *gui) {
+    GUIManager *g = (GUIManager *)gui;
+    if (!g || g->_curPage >= g->_nPages || !g->_pages[g->_curPage].spec) return 0;
+    static Hidden s_h[HiddenSheet::MAX];
+    const uint8_t n = collectHidden(*g->_pages[g->_curPage].spec, g->_core.entities(), g->_page, s_h,
+                                    LV_MIN(cap, HiddenSheet::MAX));
+    for (uint8_t i = 0; i < n; i++) {
+        EditCards::Item &it = out[i];
+        it = EditCards::Item{};
+        snprintf(it.key, sizeof(it.key), "%s", s_h[i].id);
+        snprintf(it.name, sizeof(it.name), "%s", s_h[i].name);
+        it.from = EditCards::From::FROM_PAGE;
+        if (s_h[i].crowded) snprintf(it.mark, sizeof(it.mark), "No room");   // round 7's words
+        else                it.tick = EditCards::Tick::TICK_RESTORE;
+    }
+    return n;
+}
+
+void GUIManager::openEditCards() {
+    if (_curPage >= _nPages || !_pages[_curPage].spec) return;
+    EditCardsSheet::Spec sp;
+    sp.page     = _pages[_curPage].spec->title;
+    sp.lists[0] = { "On the page", editFillPage, true };   // K145
+    sp.lists[1] = { "Hidden", editFillHidden, false };     // K145
+    sp.nLists   = 2;
+    sp.ctx      = this;
+    EditCardsSheet::open(sp);
 }
 
 // Its tab closes once the drawer has finished closing (slotDrawerClosed()).

@@ -52,6 +52,10 @@ enum class KitStyle : uint8_t {
     // A list item (Kit::item()): a tappable surface in a list - a member, an
     // activity row, "Show more" - and its pressed tint.
     KS_ITEM, KS_ITEM_PRESSED,
+    // A list item's marks (Kit::itemMark(), 2.13 round 2): ticked to go - tinted
+    // toward ST_BAD, a red edge inside and a glow; about to come - tinted toward
+    // the accent (its dashed edge is drawn).
+    KS_ITEM_DOOMED, KS_ITEM_COMING,
     // A round button with words (a scene) and its pressed tint; a colour
     // swatch (its colour is its own, set by the caller); the PAUSED badge.
     KS_PILL, KS_PILL_PRESSED, KS_SWATCH, KS_BADGE_PAUSED,
@@ -367,6 +371,13 @@ void      factColumns(lv_obj_t *list);
 // card's radius and surface, tinted while pressed. The caller sizes it, lays
 // out what it holds and says what a tap does.
 lv_obj_t *item(lv_obj_t *parent);
+// AN ITEM'S MARK (2.13 round 2, K148): what a list showing the result of a
+// choice says about one row. DOOMED - ticked to go (hidden, removed): red, with
+// a glow; COMING - about to be added: a dashed edge in the accent. Edges are an
+// outline and drawing, never a border, so nothing inside moves. A marked item
+// shows no finish: call it after Kit::finish(). MARK_NONE takes a mark away.
+enum class ItemMark : uint8_t { MARK_NONE, MARK_DOOMED, MARK_COMING };
+void itemMark(lv_obj_t *o, ItemMark m);
 
 // --- Rows ---------------------------------------------------------------------
 // A ROW in a panel: its words on the left, its control on the right - a

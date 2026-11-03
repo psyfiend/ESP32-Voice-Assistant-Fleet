@@ -275,6 +275,8 @@ uint8_t chosen(HaOffer::Row *out, uint8_t cap) {
 
 uint8_t chosenCount() { return s_nChosen; }
 
+void stateWords(const HaOffer::Row &r, char *out, size_t cap) { ::stateWords(r, out, cap); }
+
 void forget() { s_nChosen = 0; s_area[0] = '\0'; }
 
 bool tapRow(uint8_t i) {

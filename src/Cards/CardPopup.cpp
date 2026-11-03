@@ -118,7 +118,7 @@ void showView(PopupView v) {
     const bool controls = (v == PopupView::VIEW_MAIN || v == PopupView::VIEW_MEMBER);
     // THE GROUP VIEW HAS THE PAGE'S ROOM (2.13, K143); every other view the
     // window's own. Before the title is laid out: it is sized from the window.
-    groupWindow(v == PopupView::VIEW_GROUP);
+    groupWindow(v == PopupView::VIEW_GROUP || v == PopupView::VIEW_CLUSTER_ADD);   // Edit cards too (K148)
     // X on the controls, the back arrow everywhere else (owner, round 4). A
     // cluster opens on either of its two views, so both have the X.
     setText(s.lblLeft, (v == controlsView() || v == PopupView::VIEW_GROUP) && !member ? LV_SYMBOL_CLOSE : LV_SYMBOL_LEFT);
@@ -168,7 +168,7 @@ void showView(PopupView v) {
                               : v == PopupView::VIEW_CLUSTER_SLOTS ? "Header options"
                               : v == PopupView::VIEW_VISIBILITY ? "Visibility"
                               : v == PopupView::VIEW_ADD_TO ? "Add to cluster"
-                              : v == PopupView::VIEW_CLUSTER_ADD ? "Add cards"
+                              : v == PopupView::VIEW_CLUSTER_ADD ? "Edit cards"
                               : v == PopupView::VIEW_JOIN ? visibilityJoinTitle() : "Members");
     }
     // SIZED BEFORE THE VIEW IS BUILT: placeWide() lays the window out, and a

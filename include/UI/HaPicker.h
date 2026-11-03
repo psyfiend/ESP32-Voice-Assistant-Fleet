@@ -37,6 +37,8 @@ lv_obj_t *build(lv_obj_t *parent, int32_t w, int32_t h, const Spec &spec);
 uint8_t   chosen(HaOffer::Row *out, uint8_t cap);   // the ticked rows, every area's
 uint8_t   chosenCount();
 void      forget();   // the window closed
+// What a row's state says, as a card would say it: "Closed", "74.5°F" (Edit cards' too).
+void      stateWords(const HaOffer::Row &r, char *out, size_t cap);
 // For /popup (DEBUG_POPUP): a tap on row `i` of the area showing, or on
 // another area (screen 1's chip, screen 2's column) by its id ("" No area).
 bool      tapRow(uint8_t i);

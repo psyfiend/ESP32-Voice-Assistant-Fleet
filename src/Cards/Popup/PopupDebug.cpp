@@ -7,8 +7,9 @@
 #include "UI/SlotPanels.h"        // restore=-2: the page panel's View hidden cards (2.11, K96)
 #include "UI/HiddenSheet.h"       // restore=N: the hidden cards' sheet (round 6)
 #include "UI/HaOffer.h"           // catalog=1: what HA offers (2.13)
-#include "UI/HaPicker.h"          // hatick=N, haarea=<id>: its picker
-#include "UI/AddCardSheet.h"      // pagecard=1, pageadd=1: the page's Add card
+#include "UI/HaPicker.h"          // ncarea=: New group's picker
+#include "UI/EditCards.h"         // hatick=N, haarea=<id>, hasrc=K, hago=N: Edit cards (round 2)
+#include "UI/EditCardsSheet.h"    // pageadd=N, hayes=1: the page's
 #include "UI/NewClusterSheet.h"   // ncopen=1, ncarea=<id>, nccreate=1: New cluster
 
 namespace popup {
@@ -123,7 +124,8 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int tap = -1; int groups = -1; int clabel = -1; int span = -1; int row = -1; int x = -1;
                 int catalog = -1;                          // 2.13: what HA offers (1 lists, 2 asks HA again)
                 int haSrc = -1, haTick = -1, haGo = -1;    // ...Add cards' source, a picker row, its Add
-                int pageCard = -1, pageAdd = -1;           // ...the page's Add card sheet: open it, its Add
+                int pageCard = -1, pageAdd = -1;           // ...the page's Edit cards: open it, a group step chip
+                int haYes = -1;                            // ...the question's button
                 int ncOpen = -1, ncCreate = -1;            // ...New cluster: open it, its Create
                 char ncArea[32] = {}; bool ncAreaSet = false;   // ...its area
                 char haArea[32] = {}; bool haAreaSet = false;   // ...another area in the picker
@@ -200,6 +202,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "hago", v, sizeof(v)) == ESP_OK) a.haGo = atoi(v);
         if (httpd_query_key_value(q, "pagecard", v, sizeof(v)) == ESP_OK) a.pageCard = atoi(v);
         if (httpd_query_key_value(q, "pageadd", v, sizeof(v)) == ESP_OK) a.pageAdd = atoi(v);
+        if (httpd_query_key_value(q, "hayes", v, sizeof(v)) == ESP_OK) a.haYes = atoi(v);
         if (httpd_query_key_value(q, "ncopen", v, sizeof(v)) == ESP_OK) a.ncOpen = atoi(v);
         if (httpd_query_key_value(q, "nccreate", v, sizeof(v)) == ESP_OK) a.ncCreate = atoi(v);
         if (httpd_query_key_value(q, "ncarea", a.ncArea, sizeof(a.ncArea)) == ESP_OK) a.ncAreaSet = true;
@@ -405,18 +408,24 @@ void CardPopup::debugService(lv_timer_t *t) {
         s_dreq.store(DREQ_DONE);
         return;
     }
-    // 2.13: the HA picker - hasrc=0|1 Add cards' source (view=10 first),
-    // haarea=<id> another area ("-" No area), hatick=N a tap on row N, hago=1 Add.
-    // 2.13: pagecard=1 opens the page's Add card (as CARDS' button), pageadd=1 its Add.
+    // 2.13 round 2, Edit cards (K148) - a group's (view=10 first) or the page's
+    // (pagecard=1, as CARDS' button): hasrc=K a tap on list K, haarea=<id> on an
+    // area ("-" No area), hatick=N on row N, hago=1 Add, 2 Hide, 3 Remove,
+    // 4 Restore; pageadd=N the page's group step's chip N; hayes=1 the question's
+    // button (or the group step's Next).
     if (a.pageCard > 0) {
-        const PageSpec *ps = CardAdded::pageSpec();
-        dbgOut(AddCardSheet::open(ps && ps->title ? ps->title : nullptr) ? "add card: open\n" : "a sheet is showing\n");
+        dbgOut(SlotPanels::editCardsDebug() ? "edit cards: open\n" : "no page panel open (slot=page first)\n");
         s_dreq.store(DREQ_DONE);
         return;
     }
-    if (a.pageAdd > 0) {
-        dbgOut(AddCardSheet::addDebug() ? "added\n" : "not added\n");
+    if (a.pageAdd >= 0) {
+        dbgOut(EditCardsSheet::groupDebug((uint8_t)a.pageAdd) ? "group chip %d\n" : "no group step (%d)\n", a.pageAdd);
         s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.haYes > 0) {
+        dbgOut((confirmGoDebug() || EditCardsSheet::goDebug()) ? "yes\n" : "no question up\n");
+        s_dreq.store(DREQ_CLOSING);
         return;
     }
     // 2.13: ncopen=1 opens New cluster, ncarea=<id> chooses its area, nccreate=1 its Create.
@@ -429,14 +438,13 @@ void CardPopup::debugService(lv_timer_t *t) {
         return;
     }
     if (a.haSrc >= 0 || a.haTick >= 0 || a.haGo > 0 || a.haAreaSet) {
-        if (a.haSrc >= 0) { if (isOpen() && s.cluster) { clusterAddSource((uint8_t)a.haSrc); dbgOut("source %d\n", a.haSrc); } else dbgOut("no cluster's window open\n"); }
-        if (a.haAreaSet) dbgOut(HaPicker::tapArea(strcmp(a.haArea, "-") ? a.haArea : "") ? "area %s\n" : "no area %s\n", a.haArea);
-        if (a.haTick >= 0) dbgOut(HaPicker::tapRow((uint8_t)a.haTick) ? "row %d tapped, %u chosen\n" : "no row %d (%u chosen)\n",
-                                  a.haTick, (unsigned)HaPicker::chosenCount());
-        if (a.haGo > 0) {
-            if (isOpen() && s.cluster) { clusterAddHaGo(); dbgOut("add asked, %u chosen\n", (unsigned)HaPicker::chosenCount()); }
-            else dbgOut("no cluster's window open\n");
-        }
+        EditCards::Item tmp[32];
+        if (a.haSrc >= 0) dbgOut(EditCards::tapList((uint8_t)a.haSrc) ? "list %d\n" : "no list %d\n", a.haSrc);
+        if (a.haAreaSet) dbgOut(EditCards::tapArea(strcmp(a.haArea, "-") ? a.haArea : "") ? "area %s\n" : "no area %s\n", a.haArea);
+        if (a.haTick >= 0) dbgOut(EditCards::tapRow((uint8_t)a.haTick) ? "row %d tapped\n" : "no row %d\n", a.haTick);
+        if (a.haGo > 0 && a.haGo <= 4)
+            dbgOut(EditCards::press((EditCards::Act)(a.haGo - 1)) ? "pressed %d\n" : "nothing ticked (%d)\n", a.haGo);
+        dbgOut("%u ticked\n", (unsigned)EditCards::chosen(tmp, 32));
         s_dreq.store(DREQ_DONE);
         return;
     }

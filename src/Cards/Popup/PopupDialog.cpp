@@ -178,6 +178,13 @@ void confirmAsk(Kit::DialogRole role, const char *title, const char *const *line
     s_confirm = Kit::dialog(spec);
 }
 
+bool confirmGoDebug() {
+    if (!s_confirm || !s_go || !CardPopup::isOpen()) return false;
+    confirmClose();
+    s_go();
+    return true;
+}
+
 void hideCardCb(lv_event_t *ev) {
     (void)ev;
     lv_async_call([](void *) { confirmHide(); }, nullptr);

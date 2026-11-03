@@ -94,6 +94,62 @@ lv_obj_t *item(lv_obj_t *parent) {
     return o;
 }
 
+// COMING's dashed edge, drawn over the item: its four sides dashed (LVGL dashes
+// straight lines only), its corners plain arcs, all inside its own area.
+static void comingDraw(lv_event_t *ev) {
+    lv_obj_t *o = (lv_obj_t *)lv_event_get_current_target(ev);
+    lv_layer_t *layer = lv_event_get_layer(ev);
+    lv_area_t a;
+    lv_obj_get_coords(o, &a);
+    const UIShape &k = UI::shape();
+    const int32_t w  = LV_MAX(2, UI::mm(k.LINE_MID));
+    const int32_t in = w / 2;
+    const int32_t r  = LV_MIN(lv_obj_get_style_radius(o, LV_PART_MAIN),
+                              LV_MIN(lv_area_get_width(&a), lv_area_get_height(&a)) / 2);
+    const lv_color_t c = UI::c(UI::pal().ACCENT);
+    lv_draw_line_dsc_t d;
+    lv_draw_line_dsc_init(&d);
+    d.color = c;
+    d.width = w;
+    d.dash_width = d.dash_gap = LV_MAX(2, UI::mm(k.DASH) * 2);
+    auto side = [&](int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
+        d.p1.x = x1; d.p1.y = y1; d.p2.x = x2; d.p2.y = y2;
+        lv_draw_line(layer, &d);
+    };
+    side(a.x1 + r, a.y1 + in, a.x2 - r, a.y1 + in);
+    side(a.x1 + r, a.y2 - in, a.x2 - r, a.y2 - in);
+    side(a.x1 + in, a.y1 + r, a.x1 + in, a.y2 - r);
+    side(a.x2 - in, a.y1 + r, a.x2 - in, a.y2 - r);
+    if (r <= 0) return;
+    lv_draw_arc_dsc_t arc;
+    lv_draw_arc_dsc_init(&arc);
+    arc.color  = c;
+    arc.width  = w;
+    arc.radius = (uint16_t)r;
+    const struct { int32_t x, y; int16_t from; } corners[4] = {
+        { a.x1 + r, a.y1 + r, 180 }, { a.x2 - r, a.y1 + r, 270 },
+        { a.x2 - r, a.y2 - r, 0 },   { a.x1 + r, a.y2 - r, 90 } };
+    for (const auto &q : corners) {
+        arc.center.x = q.x;
+        arc.center.y = q.y;
+        arc.start_angle = q.from;
+        arc.end_angle   = q.from + 90;
+        lv_draw_arc(layer, &arc);
+    }
+}
+
+void itemMark(lv_obj_t *o, ItemMark m) {
+    if (!o) return;
+    lv_obj_remove_style(o, style(KitStyle::KS_ITEM_DOOMED), 0);
+    lv_obj_remove_style(o, style(KitStyle::KS_ITEM_COMING), 0);
+    lv_obj_remove_event_cb(o, comingDraw);
+    if (m == ItemMark::MARK_NONE) return;
+    unfinish(o);
+    add(o, m == ItemMark::MARK_DOOMED ? KitStyle::KS_ITEM_DOOMED : KitStyle::KS_ITEM_COMING);
+    if (m == ItemMark::MARK_COMING) lv_obj_add_event_cb(o, comingDraw, LV_EVENT_DRAW_MAIN_END, nullptr);
+    lv_obj_invalidate(o);
+}
+
 int32_t textW(const char *txt, const lv_font_t *f) {
     lv_point_t sz = {0, 0};
     lv_text_get_size(&sz, txt, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);

@@ -233,6 +233,17 @@ static void fill() {
     lv_style_set_bg_opa  (item, LV_OPA_COVER);
     lv_style_set_bg_color(item, UI::c(p.SURFACE));
     lv_style_set_bg_color(st(S::KS_ITEM_PRESSED), UI::c(UI::mix(p.SURFACE, p.TEXT, 15)));
+    // Its marks (2.13 round 2): the red one's edge inside it, its glow outside.
+    lv_style_t *doomed = st(S::KS_ITEM_DOOMED);
+    const int32_t markW = LV_MAX(2, UI::mm(k.LINE_MID));
+    lv_style_set_bg_color      (doomed, UI::c(UI::mix(p.SURFACE, p.ST_BAD, 18)));
+    lv_style_set_outline_width (doomed, markW);
+    lv_style_set_outline_pad   (doomed, -markW);
+    lv_style_set_outline_color (doomed, UI::c(p.ST_BAD));
+    lv_style_set_shadow_width  (doomed, UI::mm(k.S5));
+    lv_style_set_shadow_color  (doomed, UI::c(p.ST_BAD));
+    lv_style_set_shadow_opa    (doomed, LV_OPA_40);
+    lv_style_set_bg_color(st(S::KS_ITEM_COMING), UI::c(UI::mix(p.SURFACE, p.ACCENT, 10)));
 
     // --- Pills (scene buttons) and swatches ---
     lv_style_t *pill = st(S::KS_PILL);

@@ -18,8 +18,9 @@
 #include "Cards/ClusterCard.h"
 #include "Cards/CardWhere.h"   // 2.13: what a picker row says it already is
 #include "UI/HaOffer.h"        // 2.13: Add cards from Home Assistant
-#include "UI/HaPicker.h"
+#include "UI/EditCards.h"      // 2.13 round 2: Edit cards (K148)
 #include "HaCatalog.h"         // AREAS_MAX: the Area row's choices
+#include <stdarg.h>
 
 namespace popup {
 
@@ -27,13 +28,11 @@ namespace {
 
 bool s_rebuildPage = false;
 
-// ADD CARDS (K104's foot, K91): the page's cards that can join - one entity
-// each, not a cluster, not in this one already - each No, Copy or Move.
+// THE PAGE'S CARDS THAT CAN JOIN (K91): one entity each, not a cluster, not in
+// this one already - Edit cards' "On the page".
 constexpr uint8_t ADD_MAX = 16;
 Card       *s_cand[ADD_MAX] = {};
-uint8_t     s_pick[ADD_MAX] = {};   // 0 no, 1 copy, 2 move
 uint8_t     s_nCand = 0;
-const char *const ADD_W[] = { "No", "Copy", "Move" };
 
 // THE OPTIONS ARE CHIP TABLES (round 4, the owner: "look more like the Card UI or
 // UI Tweaks sheet"): an option's name right-justified against its chips.
@@ -302,36 +301,16 @@ void findCandidates(lv_obj_t *o, const ClusterCard &cl) {
     }
 }
 
-char s_candName[ADD_MAX][ENTITY_NAME_MAX + 24];
-
 void addViewCb(lv_event_t *) {
-    for (uint8_t &p : s_pick) p = 0;
     lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_CLUSTER_ADD); }, nullptr);
-}
-
-void addChipCb(lv_event_t *ev) {
-    const uintptr_t v = (uintptr_t)lv_event_get_user_data(ev);
-    const uint8_t row = (uint8_t)(v >> 8), i = (uint8_t)(v & 0xFF);
-    Kit::chipTableLit(s_table, row, i);
-    if (row < ADD_MAX) s_pick[row] = i;
-}
-
-void addGoCb(lv_event_t *) {
-    lv_async_call([](void *) {
-        uint32_t copy = 0, move = 0;
-        for (uint8_t i = 0; i < ADD_MAX; i++) {
-            if (s_pick[i] == 1) copy |= 1u << i;
-            if (s_pick[i] == 2) move |= 1u << i;
-        }
-        clusterAddCards(copy, move);
-    }, nullptr);
 }
 
 }  // namespace
 
-// The cards picked (by their place in the list): a copy of each into the cluster,
-// with the name it shows; one to Move also hides from the page. The window closes
-// and the page is built again. How many went in.
+// The cards picked (by their place in the page's list), for /popup's addcards=:
+// a copy of each into the cluster, with the name it shows; one to Move also
+// hides from the page. The window closes and the page is built again. How many
+// went in.
 uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask) {
     ClusterCard *cl = held();
     if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN) return 0;
@@ -357,19 +336,12 @@ uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask) {
     return n;
 }
 
-// --- Add cards FROM HOME ASSISTANT (2.13, K140; mock 1) --------------------------------
+// --- Edit cards (2.13 round 2, K148, K149; mocks 8 and 8b) -------------------------------
+// The group's members, the page's cards that can join and HA's areas in one list
+// (UI/EditCards): ticked to add, to hide or remove, or to restore - one kind at a
+// time - then the go-or-no-go question; the window closes and the page is built
+// again.
 namespace {
-
-// The source: the page's cards, or HA's entities labelled "fleet" - HA's
-// first, once HA has said what it offers (K145's words).
-const char *const SRC_W[] = { "On this board", "From Home Assistant" };
-int8_t    s_addSrc = -1;   // -1: none chosen yet this boot; then the last one used
-lv_obj_t *s_addLbl = nullptr;
-
-void srcCb(lv_event_t *ev) {
-    s_addSrc = (int8_t)(uintptr_t)lv_event_get_user_data(ev);
-    rebuildView();
-}
 
 const char *haHeld(const HaOffer::Row &r, void *ctx) {
     static char words[56];
@@ -377,112 +349,250 @@ const char *haHeld(const HaOffer::Row &r, void *ctx) {
                ? words : nullptr;
 }
 
-void haChanged(uint8_t n, void *) {
-    if (!s_addLbl) return;
-    char w[16];
-    if (n) snprintf(w, sizeof(w), "Add %u", (unsigned)n);   // the mock's "Add 2"
-    else   snprintf(w, sizeof(w), "Add");
-    lv_label_set_text(s_addLbl, w);
+int8_t memberIndexOf(const ClusterCard &cl, const char *id) {
+    for (uint8_t i = 0; i < cl.memberCount(); i++)
+        if (cl.memberAt(i) && cl.memberAt(i)->hasId() && !strcmp(cl.memberAt(i)->id(), id)) return (int8_t)i;
+    return -1;
 }
 
-// The chosen entities in, each a member made here ("in"); one the compiled
-// table does not have keeps its HA id on its entry, so the next boot makes it
-// again (design/ha-cards.md 2.3). The window closes and the page is built again.
-void haGoCb(lv_event_t *) {
-    lv_async_call([](void *) {
-        ClusterCard *cl = held();
-        if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN) return;
-        HaOffer::Row rows[24];
-        const uint8_t n = HaPicker::chosen(rows, 24);
-        uint8_t added = 0;
-        for (uint8_t i = 0; i < n; i++) {
-            const Entity *e = HaOffer::entityFor(rows[i]);
+// IN THIS GROUP: the members as the group view shows them - the tiles and those
+// in the header, then the hidden ones last; one moved out says where it is.
+uint8_t fillMembers(EditCards::Item *out, uint8_t cap, void *) {
+    ClusterCard *cl = held();
+    if (!cl) return 0;
+    clusterMemberNames(*cl);
+    uint8_t n = 0;
+    for (int pass = 0; pass < 2; pass++)
+        for (uint8_t i = 0; i < cl->memberCount() && n < cap; i++) {
+            const Card *m = cl->memberAt(i);
+            const Entity *e = m ? m->firstEntity() : nullptr;
             if (!e) continue;
-            char id[CARD_ID_MAX + 1];
+            const MemberShown sh = clusterMemberShown(*cl, i);
+            if ((sh == MemberShown::SHOWN_HIDDEN) != (pass == 1)) continue;
+            EditCards::Item &it = out[n++];
+            it = EditCards::Item{};
+            snprintf(it.key, sizeof(it.key), "%s", idOf(m));
+            snprintf(it.name, sizeof(it.name), "%s", clusterMemberName(i));
+            char st[48];
+            memberState(*e, MemberShown::SHOWN_TILE, st, sizeof(st));
+            snprintf(it.state, sizeof(it.state), "%s", st);
+            it.from = EditCards::From::FROM_GROUP;
+            if (!m->hasId()) continue;   // nothing can be kept for it
+            if (sh == MemberShown::SHOWN_TILE) {
+                it.tick = EditCards::Tick::TICK_HIDE;
+                // A copy made here may go for good; a card moved in goes home by Restore (K137).
+                it.canRemove = CardAdded::isMember(m->id()) && !CardAdded::isMoveOf(m->id());
+            } else if (sh == MemberShown::SHOWN_HEADER) {
+                snprintf(it.mark, sizeof(it.mark), "In the header");   // K145
+            } else if (sh == MemberShown::SHOWN_HIDDEN) {
+                snprintf(it.mark, sizeof(it.mark), "Hidden");
+                it.tick = EditCards::Tick::TICK_RESTORE;
+            } else {
+                snprintf(it.mark, sizeof(it.mark), "On the page");    // K145
+            }
+        }
+    return n;
+}
+
+// ON THE PAGE: the page's cards that can join - one entity, not a group, not in
+// this one already (findCandidates()).
+uint8_t fillPage(EditCards::Item *out, uint8_t cap, void *) {
+    ClusterCard *cl = held();
+    if (!cl) return 0;
+    s_nCand = 0;
+    findCandidates(lv_screen_active(), *cl);
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < s_nCand && n < cap; i++) {
+        const Card *k = s_cand[i];
+        EditCards::Item &it = out[n++];
+        it = EditCards::Item{};
+        snprintf(it.key, sizeof(it.key), "%s", k->id());
+        snprintf(it.name, sizeof(it.name), "%s", k->shownName(CardLabel::LBL_NAME));
+        char st[48];
+        memberState(*k->firstEntity(), MemberShown::SHOWN_TILE, st, sizeof(st));
+        snprintf(it.state, sizeof(it.state), "%s", st);
+        it.from = EditCards::From::FROM_PAGE;
+        it.tick = EditCards::Tick::TICK_ADD;
+    }
+    return n;
+}
+
+// The dialog's words: four lines at most, names in the accent (as PopupMove's).
+char        s_eLine[4][420];
+const char *s_eLines[4];
+uint8_t     s_eN = 0;
+
+void eLine(const char *fmt, ...) {
+    if (s_eN >= 4) return;
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(s_eLine[s_eN], sizeof(s_eLine[0]), fmt, ap);
+    va_end(ap);
+    s_eLines[s_eN] = s_eLine[s_eN];
+    s_eN++;
+}
+
+const char *eAcc(char *buf, size_t cap, const char *name) {
+    snprintf(buf, cap, "#%06lX %s#", (unsigned long)(UI::pal().ACCENT & 0xFFFFFF), name ? name : "");
+    return buf;
+}
+
+// What was ticked when the question was asked.
+EditCards::Item s_eItems[24];
+uint8_t         s_eNItems = 0;
+bool            s_eMove = false;
+
+void editDone(uint8_t n, const char *fmt) {
+    if (!n) return;
+    char msg[64];
+    snprintf(msg, sizeof(msg), fmt, (unsigned)n, s.name);
+    UIToolkit::show_toast(msg);
+    EditCards::forget();
+    changed();
+    CardPopup::close();
+}
+
+// ADD: HA's entities as members made here ("in"), each one the compiled table
+// lacks keeping its HA id (design/ha-cards.md 2.3); the page's cards copied in,
+// or moved - off the page, not one of its hidden cards (round 7).
+void doEditAdd() {
+    ClusterCard *cl = held();
+    if (!cl || !cl->hasId()) return;
+    s_nCand = 0;
+    findCandidates(lv_screen_active(), *cl);
+    uint8_t added = 0;
+    for (uint8_t i = 0; i < s_eNItems; i++) {
+        const EditCards::Item &it = s_eItems[i];
+        char id[CARD_ID_MAX + 1];
+        if (it.from == EditCards::From::FROM_HA) {
+            HaOffer::Row r;
+            const Entity *e = EditCards::haRowOf(it.key, r) ? HaOffer::entityFor(r) : nullptr;
+            if (!e) continue;
             if (!CardAdded::addTo(*cl, *e, id, sizeof(id))) break;   // full
             if (e->learnt) {
-                Settings::setCard(id, "ha", rows[i].ref);
-                if (rows[i].dc[0])   Settings::setCard(id, "ha_dc", rows[i].dc);
-                if (rows[i].unit[0]) Settings::setCard(id, "ha_unit", rows[i].unit);
+                Settings::setCard(id, "ha", r.ref);
+                if (r.dc[0])   Settings::setCard(id, "ha_dc", r.dc);
+                if (r.unit[0]) Settings::setCard(id, "ha_unit", r.unit);
             }
             added++;
+        } else if (it.from == EditCards::From::FROM_PAGE) {
+            Card *k = nullptr;
+            for (uint8_t c = 0; c < s_nCand && !k; c++) if (!strcmp(s_cand[c]->id(), it.key)) k = s_cand[c];
+            if (!k) continue;
+            if (!CardAdded::addTo(*cl, *k->firstEntity(), id, sizeof(id), k->id())) break;
+            const char *name = k->shownName(CardLabel::LBL_NAME);
+            if (name && name[0]) Settings::setCard(id, "name", name);
+            if (s_eMove) CardAdded::moveOut(k->id(), id);
+            added++;
         }
-        if (!added) return;
-        HaPicker::forget();
-        char msg[64];
-        snprintf(msg, sizeof(msg), "Added %u to %s", (unsigned)added, s.name);
-        UIToolkit::show_toast(msg);
-        CardPopup::close();
-    }, nullptr);
+    }
+    editDone(added, "Added %u to %s");
+}
+
+void doEditHide() {
+    ClusterCard *cl = held();
+    if (!cl) return;
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < s_eNItems; i++) {
+        const int8_t k = memberIndexOf(*cl, s_eItems[i].key);
+        if (k >= 0) { setVisible(*cl, (uint8_t)k, false); n++; }
+    }
+    editDone(n, "Hid %u in %s");   // to confirm
+}
+
+void doEditRemove() {
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < s_eNItems; i++) n += CardAdded::removeMember(s_eItems[i].key) ? 1 : 0;
+    editDone(n, "Removed %u from %s");   // to confirm
+}
+
+void doEditRestore() {
+    ClusterCard *cl = held();
+    if (!cl) return;
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < s_eNItems; i++) {
+        const int8_t k = memberIndexOf(*cl, s_eItems[i].key);
+        if (k >= 0) { setVisible(*cl, (uint8_t)k, true); n++; }
+    }
+    editDone(n, "Restored %u to %s");   // to confirm
+}
+
+// EVERY CHOICE BEFORE THE QUESTION (K149): the dialog is go or no-go, in the
+// existing dialogs' sentences made plural (round-2 mocks 12 and 13).
+void editAct(EditCards::Act a, void *) {
+    ClusterCard *cl = held();
+    if (!cl || !cl->hasId()) return;
+    s_eNItems = EditCards::chosen(s_eItems, 24);
+    s_eMove = EditCards::moving();
+    if (!s_eNItems) return;
+    static char g[96], names[400], more[400];
+    eAcc(g, sizeof(g), s.name);
+    s_eN = 0;
+    const bool many = s_eNItems > 1;
+    using F = EditCards::From;
+    if (a == EditCards::Act::ACT_ADD) {
+        const uint8_t nHa = EditCards::countOf(F::FROM_HA), nPg = EditCards::countOf(F::FROM_PAGE);
+        if (nHa) {
+            EditCards::namesOf(names, sizeof(names), true, F::FROM_HA);
+            eLine(nHa > 1 ? "The cards %s will be added from Home Assistant to the group %s."
+                          : "The card %s will be added from Home Assistant to the group %s.", names, g);
+        }
+        if (nPg) {
+            EditCards::namesOf(more, sizeof(more), true, F::FROM_PAGE);
+            if (s_eMove) {
+                eLine(nPg > 1 ? "The cards %s will be removed from this page and moved to the group %s."
+                              : "The card %s will be removed from this page and moved to the group %s.", more, g);
+                eLine(nPg > 1 ? "The moved cards will become members of the %s group, and settings applied to that "
+                                "group may be propagated to the new cards."
+                              : "The moved card will become a member of the %s group, and settings applied to that "
+                                "group may be propagated to the new card.", g);
+            } else {
+                eLine(nPg > 1 ? "The cards %s will be copied to the group %s and a copy of each will remain on this page."
+                              : "The card %s will be copied to the group %s and a copy will remain on this page.", more, g);
+            }
+        }
+        eLine("A card can always be restored to its original configuration.");
+        confirmAsk(Kit::DialogRole::DLG_CONFIRM, many ? "Add cards to group?" : "Add card to group?", s_eLines, s_eN,
+                   "Confirm", Kit::ButtonRole::BTN_CONFIRM, doEditAdd);
+        return;
+    }
+    EditCards::namesOf(names, sizeof(names));
+    if (a == EditCards::Act::ACT_HIDE) {
+        eLine(many ? "The cards %s will be hidden from the group %s." : "The card %s will be hidden from the group %s.",
+              names, g);
+        eLine("Hidden cards still show in the group view, and can always be restored.");
+        confirmAsk(Kit::DialogRole::DLG_DESTRUCTIVE, many ? "Hide these cards?" : "Hide this card?", s_eLines, s_eN,
+                   "Hide", Kit::ButtonRole::BTN_DESTRUCTIVE, doEditHide);
+    } else if (a == EditCards::Act::ACT_REMOVE) {
+        eLine(many ? "The cards %s will be removed from this device." : "The card %s will be removed from this device.",
+              names);
+        eLine("Nothing will be removed from Home Assistant. You can always add these entities back to your device.");
+        eLine(many ? "Tap Remove to confirm you wish to remove these cards from the device."
+                   : "Tap Remove to confirm you wish to remove this card from the device.");
+        confirmAsk(Kit::DialogRole::DLG_DESTRUCTIVE, many ? "Remove these cards?" : "Remove this card?", s_eLines, s_eN,
+                   "Remove", Kit::ButtonRole::BTN_DESTRUCTIVE, doEditRemove);
+    } else {
+        doEditRestore();   // nothing goes: no question
+    }
 }
 
 }  // namespace
 
-void clusterAddSource(uint8_t src) { s_addSrc = src ? 1 : 0; rebuildView(); }
-void clusterAddHaGo() { haGoCb(nullptr); }
-
-// Add cards: the source chips, then the page's cards that can join (No / Copy /
-// Move) or HA's (ticks, mock 1); Add.
+// EDIT CARDS (K148): the window has the page's room (groupWindow()), the list all of it.
 void buildClusterAdd() {
     ClusterCard *cl = held();
     if (!cl) return;
-    s_addLbl = nullptr;
-    if (s_addSrc < 0) s_addSrc = HaOffer::ready() ? 1 : 0;
-    lv_obj_t *col = plain(s.stage);
-    lv_obj_set_size(col, listW(), lv_pct(100));
-    lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(col, mm(UI::shape().S5), 0);
-    Kit::chipRow(col, SRC_W, 2, (uint8_t)s_addSrc, listW(), srcCb);
-
-    if (s_addSrc == 1) {
-        HaPicker::forget();   // a new list: nothing ticked
-        HaOffer::refresh();   // what HA offers now
-        if (!HaOffer::ready()) { note(col, "Waiting for Home Assistant"); return; }   // to confirm (not in K145)
-        CardGroups::Group g;
-        char area[40] = "";
-        if (CardGroups::ofCard(*cl, g)) HaOffer::groupArea(g.id, area, sizeof(area));
-        HaPicker::Spec sp;
-        sp.area    = area;
-        sp.held    = haHeld;
-        sp.ctx     = cl;
-        sp.changed = haChanged;
-        lv_obj_t *p = HaPicker::build(col, listW(), 1, sp);
-        if (p) lv_obj_set_flex_grow(p, 1);
-        static const char *const W[] = { "Add 00" };   // sized for a count; its words set below
-        static const Kit::ButtonRole R[] = { Kit::ButtonRole::BTN_CONFIRM };
-        static const lv_event_cb_t C[] = { haGoCb };
-        footButtons(col, W, R, C, 1);
-        // The button's own words, counted as rows are ticked.
-        lv_obj_t *row = lv_obj_get_child(col, -1);
-        lv_obj_t *btn = row ? lv_obj_get_child(row, 0) : nullptr;
-        s_addLbl = btn ? Kit::labelIn(btn) : nullptr;
-        haChanged(HaPicker::chosenCount(), nullptr);
-        return;
-    }
-
-    s_nCand = 0;
-    findCandidates(lv_screen_active(), *cl);
-    Kit::ChipRowSpec rows[ADD_MAX];
-    for (uint8_t i = 0; i < s_nCand; i++) {
-        Card *k = s_cand[i];
-        if (k->area()[0]) snprintf(s_candName[i], sizeof(s_candName[i]), "%s (%s)", k->shownName(CardLabel::LBL_NAME), k->area());
-        else              snprintf(s_candName[i], sizeof(s_candName[i]), "%s", k->shownName(CardLabel::LBL_NAME));
-        rows[i] = { s_candName[i], ADD_W, 3, s_pick[i] };
-    }
-    s_table = Kit::chipTable(col, listW(), rows, s_nCand, addChipCb);
-    lv_obj_set_flex_grow(s_table, 1);
-    if (!s_nCand) {
-        note(s_table, "No card on this page can join: a card joins with one entity, and not one this cluster "
-                      "has already.");
-        return;
-    }
-    static const char *const W[] = { "Add" };
-    static const Kit::ButtonRole R[] = { Kit::ButtonRole::BTN_CONFIRM };
-    static const lv_event_cb_t C[] = { addGoCb };
-    footButtons(s_table, W, R, C, 1);
-    note(s_table, "Copy: creates a separate card to add to the cluster. Move: card is removed from the "
-                  "dashboard and added to the cluster.");
+    HaOffer::refresh();   // what HA offers now
+    lv_obj_update_layout(s.win);
+    EditCards::Spec sp;
+    sp.lists[0] = { "In this group", fillMembers, true };   // K146
+    sp.lists[1] = { "On the page", fillPage, false };       // K145
+    sp.nLists   = 2;
+    sp.held     = haHeld;
+    sp.ctx      = cl;
+    sp.copyMove = true;
+    sp.act      = editAct;
+    EditCards::build(s.stage, lv_obj_get_content_width(s.stage), lv_obj_get_content_height(s.stage), sp);
 }
 
 // --- A member shown or not (its own Visibility, round 6) ------------------------------
@@ -575,7 +685,7 @@ uint8_t clusterSpecs(DeckRowSpec *r) {
     snprintf(s_addWords, sizeof(s_addWords), fresh ? "%u new" : "Open", (unsigned)fresh);   // K145
     r[n++] = { "Rename cluster", DeckRowKind::ROW_BUTTON, "Edit", 0, live, renameCb, nullptr };
     r[n++] = { "Header options", DeckRowKind::ROW_BUTTON, "Open", 0, live, slotsViewCb, nullptr };
-    r[n++] = { "Add cards", DeckRowKind::ROW_BUTTON, s_addWords, 0, live, addViewCb, nullptr };
+    r[n++] = { "Edit cards", DeckRowKind::ROW_BUTTON, s_addWords, 0, live, addViewCb, nullptr };   // K148
     const uint16_t sel = areaOptions(area);
     r[n++] = { "Area", DeckRowKind::ROW_DROP, s_areaOpts, sel, live && HaOffer::ready(), areaDropCb, nullptr };   // K145
     return n;
