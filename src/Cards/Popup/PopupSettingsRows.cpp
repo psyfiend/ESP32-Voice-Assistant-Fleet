@@ -1,5 +1,7 @@
 // SETTINGS' rows and what they do (2.12 P1, split from CardPopup.cpp).
 #include "PopupState.h"
+#include "UI/HaOffer.h"         // registry(): a group's members' names (Face, K151)
+#include "EntityRegistry.h"
 
 namespace popup {
 
@@ -80,6 +82,95 @@ uint16_t tapRowBuild(const Card &c) {
     return 0;
 }
 
+// LONG PRESS OPENS (K151): the view a long press opens the window on - a
+// cluster's Members first, any other card's Details view first - never a
+// toggle: a long press always opens the window (K3, K39). The first is the
+// default, kept as nothing. Rebuilt with the rows.
+uint8_t s_longMap[4];
+uint8_t s_longN = 0;
+char    s_longOpts[64];
+
+uint16_t longRowBuild(const Card &c) {
+    s_longN = 0;
+    size_t used = 0;
+    s_longOpts[0] = '\0';
+    auto add = [&used](uint8_t v, const char *word) {
+        if (s_longN >= 4) return;
+        used += snprintf(s_longOpts + used, sizeof(s_longOpts) - used, "%s%s", s_longN ? "\n" : "", word);
+        s_longMap[s_longN++] = v;
+    };
+    if (s.cluster) {
+        add(CardPopup::OPEN_MEMBERS, "Members view");
+        add(CardPopup::OPEN_GROUP, "Group view");
+    } else {
+        add(CardPopup::OPEN_CONTROLS, "Details view");
+        if (hasMembers()) add(CardPopup::OPEN_MEMBERS, "Members view");
+    }
+    add(CardPopup::OPEN_HISTORY, "History view");
+    for (uint8_t i = 0; i < s_longN; i++) if (s_longMap[i] == c.longOpen()) return i;
+    return 0;
+}
+
+void longDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    Card *c = cardOf(h.surface);
+    if (!c || k >= s_longN) return;
+    c->setLongOpen(k ? s_longMap[k] : 0xFF);
+    keepCardSetting("long", k ? CardPopup::openViewName(s_longMap[k]) : nullptr);
+}
+
+// SHOW AS and FACE (K151): a group card shown as one card - a cluster again,
+// or which member is its face (the members that switch together, or one). A
+// cluster's own Show as is its GROUP panel's. The page is built again once the
+// window has gone.
+char    s_faceOpts[400];
+char    s_faceIds[GROUP_MEMBERS_MAX][CARD_ID_MAX + 1];
+uint8_t s_faceN = 0;
+
+uint16_t faceRowBuild(const Card &c) {
+    const CardSpec *mem[GROUP_MEMBERS_MAX];
+    uint8_t nm = 0;
+    if (const CardSpec *cs = CardAdded::specOf(c.id()))
+        for (uint8_t k = 0; k < cs->memberCount && nm < GROUP_MEMBERS_MAX; k++) mem[nm++] = &cs->members[k];
+    nm += CardAdded::membersIn(c.id(), mem + nm, (uint8_t)(GROUP_MEMBERS_MAX - nm));
+    const EntityRegistry *reg = HaOffer::registry();
+    bool lights = false;
+    for (uint8_t k = 0; k < nm; k++) {
+        const Entity *e = (reg && mem[k]->primaries[0]) ? reg->find(mem[k]->primaries[0]) : nullptr;
+        lights |= e && (e->desc.kind == EntityKind::LIGHT || e->desc.kind == EntityKind::SWITCH);
+    }
+    size_t used = (size_t)snprintf(s_faceOpts, sizeof(s_faceOpts), "%s", lights ? "All lights" : "All members");
+    s_faceN = 0;
+    char cur[CARD_ID_MAX + 1] = "";
+    Settings::card(c.id(), "face", cur, sizeof(cur));
+    uint16_t sel = 0;
+    for (uint8_t k = 0; k < nm && s_faceN < GROUP_MEMBERS_MAX; k++) {
+        const CardSpec &m = *mem[k];
+        const Entity *e = (reg && m.primaries[0]) ? reg->find(m.primaries[0]) : nullptr;
+        if (!m.id || !e) continue;
+        const char *name = m.label && m.label[0] ? m.label : e->desc.name;
+        if (used + strlen(name) + 2 >= sizeof(s_faceOpts)) break;
+        used += (size_t)snprintf(s_faceOpts + used, sizeof(s_faceOpts) - used, "\n%s", name);
+        snprintf(s_faceIds[s_faceN], sizeof(s_faceIds[0]), "%s", m.id);
+        if (!strcmp(cur, m.id)) sel = (uint16_t)(s_faceN + 1);
+        s_faceN++;
+    }
+    return sel;
+}
+
+void showAsDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    keepCardSetting("present", k ? "card" : "cluster");
+    visibilityWantRebuild();
+}
+
+void faceDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    if (k > s_faceN) return;
+    keepCardSetting("face", k ? s_faceIds[k - 1] : nullptr);
+    visibilityWantRebuild();
+}
+
 // A row's control made live or greyed after it was built (the scene row, as
 // Tap action changes): the dropdown's state and colours, and the row's words.
 void rowLive(lv_obj_t *dd, bool live) {
@@ -128,6 +219,13 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     if (held) {
         const uint16_t sel = tapRowBuild(*held);
         r[n++] = { "Tap action", DeckRowKind::ROW_DROP, s_tapOpts, sel, cardRows, tapDropCb, nullptr };
+        r[n++] = { "Long press opens", DeckRowKind::ROW_DROP, s_longOpts, longRowBuild(*held), cardRows,
+                   longDropCb, nullptr };   // K151; to confirm
+    }
+    // A group shown as one card (K151): back to a cluster, and its face.
+    if (held && held->groupCard() && cardRows) {
+        r[n++] = { "Show as", DeckRowKind::ROW_DROP, "Cluster\nSolo card", 1, true, showAsDropCb, nullptr };   // to confirm
+        r[n++] = { "Face", DeckRowKind::ROW_DROP, s_faceOpts, faceRowBuild(*held), true, faceDropCb, nullptr };  // to confirm
     }
     // Show hidden scenes and Tap scene are in the SCENES panel, in the Scenes
     // view (K43); Scenes "Off" was dropped. The Selector look moved to the

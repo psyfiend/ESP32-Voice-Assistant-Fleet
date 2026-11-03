@@ -8,6 +8,7 @@
 #include "Cards/CardGroups.h"
 #include "Cards/CardAdded.h"     // a cluster's members added on the device (2.11, K91)
 #include "Cards/ClusterCard.h"
+#include "Cards/CardPopup.h"     // a card's Long press opens, by name (K151)
 #include "Layout/Cluster.h"
 #include <Arduino.h>
 #ifdef DEBUG_PAGE_TIMING
@@ -682,6 +683,8 @@ Card *CardPage::makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistr
             }
             TapAction ta;
             if (Settings::card(c->id(), "tap", v, sizeof(v)) && tapActionFromName(v, ta)) c->setTapAction(ta);
+            uint8_t lo;    // SETTINGS' Long press opens (K151)
+            if (Settings::card(c->id(), "long", v, sizeof(v)) && CardPopup::openViewFromName(v, lo)) c->setLongOpen(lo);
             TempUnit tu;   // SETTINGS' Units row (2.10e round 2)
             if (Settings::card(c->id(), "units", v, sizeof(v)) && tempUnitFromName(v, tu)) c->setTempUnit(tu);
             char ref[ENTITY_TOPIC_MAX];
@@ -813,6 +816,8 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
             // window's first view is the group view now.
             if (ta == TapAction::TAP_DETAILS) ta = TapAction::TAP_GROUP;
             cl->setTapAction(ta);
+            uint8_t lo;   // Long press opens (K151)
+            if (hasId && Settings::card(cs.id, "long", v, sizeof(v)) && CardPopup::openViewFromName(v, lo)) cl->setLongOpen(lo);
             cl->setBinder(_binder);
             Serial.printf("[Cards] cluster %s: %u members, %u tiles, %ux%u cells\n",
                           cs.label ? cs.label : "?", (unsigned)cl->memberCount(), (unsigned)nTiles,
@@ -828,7 +833,7 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
     // one of a kind - with each one's name for the words under the icon.
     CardSpec one = {};
     one.id    = cs.id;
-    one.label = cs.label;
+    one.label = cs.label ? cs.label : cs.area;   // a cluster is named by its group: the one card is too
     one.area  = cs.area;
     one.place = cs.place;
     one.groupOn = cs.groupOn;
@@ -847,6 +852,13 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
         if (c && !(hasId && Settings::card(cs.id, "tap", t, sizeof(t)))) c->setTapAction(TapAction::TAP_MEMBERS);
         return c;
     }
+    // ITS FACE (K151): one member chosen in SETTINGS ("face", that member's id);
+    // else the members that switch together, else every member.
+    if (hasId && Settings::card(cs.id, "face", v, sizeof(v)))
+        for (uint8_t k = 0; k < nMem && !n; k++)
+            if (mem[k]->id && !strcmp(mem[k]->id, v) && mem[k]->primaries[0] && reg.find(mem[k]->primaries[0]) &&
+                !movedOut(*mem[k]))
+                one.primaries[n++] = mem[k]->primaries[0];
     for (int pass = 0; pass < 2 && !n; pass++)
         for (uint8_t k = 0; k < nMem && n < CARD_PRIMARY_MAX; k++) {
             const char *pid = mem[k]->primaries[0];
@@ -857,7 +869,9 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
             if (pass == 0 && !switches) continue;
             one.primaries[n++] = pid;
         }
-    return n ? makeCard(one, spec, reg, 0) : nullptr;
+    Card *c = n ? makeCard(one, spec, reg, 0) : nullptr;
+    if (c) c->setGroupCard(true);   // SETTINGS' Show as and Face (K151)
+    return c;
 }
 
 // ---------------------------------------------------------------------------

@@ -524,12 +524,33 @@ bool CardPopup::takeRebuildWanted() {
     return ui || cl || vis;
 }
 
+static void openView(uint8_t view) {
+    if (view == CardPopup::OPEN_HISTORY)                      showView(PopupView::VIEW_HISTORY);
+    else if (view == CardPopup::OPEN_MEMBERS && hasMembers()) showView(PopupView::VIEW_MEMBERS);
+    else if (view == CardPopup::OPEN_GROUP && s.cluster)      showView(PopupView::VIEW_GROUP);   // 2.13, K143
+}
+
 void CardPopup::openOn(Card &card, uint8_t view) {
     s_openFromTap = true;
     open(card);
     s_openFromTap = false;
-    if (!isOpen()) return;
-    if (view == OPEN_HISTORY)                      showView(PopupView::VIEW_HISTORY);
-    else if (view == OPEN_MEMBERS && hasMembers()) showView(PopupView::VIEW_MEMBERS);
-    else if (view == OPEN_GROUP && s.cluster)      showView(PopupView::VIEW_GROUP);   // 2.13, K143
+    if (isOpen()) openView(view);
+}
+
+void CardPopup::openHeldOn(Card &card, uint8_t view) {
+    open(card);
+    if (isOpen()) openView(view);
+}
+
+const char *CardPopup::openViewName(uint8_t view) {
+    return view == OPEN_HISTORY ? "history" : view == OPEN_MEMBERS ? "members" : view == OPEN_GROUP ? "group" : "details";
+}
+
+bool CardPopup::openViewFromName(const char *name, uint8_t &view) {
+    if (!name) return false;
+    if (!strcmp(name, "details")) { view = OPEN_CONTROLS; return true; }
+    if (!strcmp(name, "history")) { view = OPEN_HISTORY;  return true; }
+    if (!strcmp(name, "members")) { view = OPEN_MEMBERS;  return true; }
+    if (!strcmp(name, "group"))   { view = OPEN_GROUP;    return true; }
+    return false;
 }

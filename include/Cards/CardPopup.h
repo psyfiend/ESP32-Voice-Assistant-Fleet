@@ -71,6 +71,11 @@ public:
     static constexpr uint8_t OPEN_CONTROLS = 0, OPEN_HISTORY = 1, OPEN_MEMBERS = 2;
     static constexpr uint8_t OPEN_GROUP = 3;   // a cluster's group view (2.13, K143)
     static void openOn(Card &card, uint8_t view);
+    // A LONG PRESS'S VIEW (2.13 round 2, K151): open() - the finger still down -
+    // on one of the views above. Saved by name as the card's "long".
+    static void openHeldOn(Card &card, uint8_t view);
+    static const char *openViewName(uint8_t view);
+    static bool openViewFromName(const char *name, uint8_t &view);
 
     // Close it, by whichever of the four routes. Safe to call from an event
     // callback of an object inside the window: the work is deferred to

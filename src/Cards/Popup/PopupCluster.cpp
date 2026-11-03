@@ -644,6 +644,17 @@ static char    s_areaIds[HaCatalog::AREAS_MAX + 8][32];
 static uint8_t s_areaN = 0;
 static char    s_addWords[12];
 
+// SHOW AS (K151): the group as one card - the members that switch together
+// behind it, or the one SETTINGS' Face picks there. The page is built again
+// once the window has gone; the card's SETTINGS brings the cluster back.
+static void showAsCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    ClusterCard *cl = held();
+    if (!cl || !cl->hasId()) return;
+    Settings::setCard(cl->id(), "present", k ? "card" : "cluster");
+    changed();
+}
+
 static void areaDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     ClusterCard *cl = held();
@@ -692,6 +703,7 @@ uint8_t clusterSpecs(DeckRowSpec *r) {
     r[n++] = { "Rename group", DeckRowKind::ROW_BUTTON, "Edit", 0, live, renameCb, nullptr };
     r[n++] = { "Header options", DeckRowKind::ROW_BUTTON, "Open", 0, live, slotsViewCb, nullptr };
     r[n++] = { "Edit cards", DeckRowKind::ROW_BUTTON, s_addWords, 0, live, addViewCb, nullptr };   // K148
+    r[n++] = { "Show as", DeckRowKind::ROW_DROP, "Cluster\nSolo card", 0, live, showAsCb, nullptr };   // K151; to confirm
     const uint16_t sel = areaOptions(area);
     r[n++] = { "Area", DeckRowKind::ROW_DROP, s_areaOpts, sel, live && HaOffer::ready(), areaDropCb, nullptr };   // K145
     return n;

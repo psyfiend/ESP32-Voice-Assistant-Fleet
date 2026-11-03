@@ -145,6 +145,13 @@ public:
     // by its source's id ("scene.office_relax"), which outlives a session.
     Card &setTapAction(TapAction t) { _tap = t; return *this; }
     TapAction tapAction() const { return _tap; }
+    // What a long press opens (K151): a CardPopup::OPEN_* view, 0xFF its window's
+    // first. A long press always opens the window, never toggles (K3, K39).
+    Card &setLongOpen(uint8_t v) { _longOpen = v; return *this; }
+    uint8_t longOpen() const { return _longOpen; }
+    // A group card shown as one card (K151): SETTINGS offers Show as and Face.
+    Card &setGroupCard(bool g) { _groupCard = g; return *this; }
+    bool groupCard() const { return _groupCard; }
     Card &setTapScene(const char *ref);
     const char *tapScene() const { return _tapScene; }
     // Does this card's own tap toggle (switch, light, button)? Decides what
@@ -626,6 +633,8 @@ private:
     char _label[ENTITY_NAME_MAX] = {0};
     const char *_id = nullptr;   // CardSpec::id, when usable
     TapAction   _tap = TapAction::TAP_DEFAULT;
+    uint8_t     _longOpen = 0xFF;    // K151
+    bool        _groupCard = false;  // K151
     char        _tapScene[ENTITY_TOPIC_MAX] = {0};   // as EntityDescriptor::externalRef
     char _area[ENTITY_SHORT_MAX] = {0};
     uint32_t _areaColor = 0;   // 0 = use the accent

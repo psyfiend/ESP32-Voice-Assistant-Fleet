@@ -421,7 +421,8 @@ int32_t Card::shortSidePx() const {
 // than a failure". Pause is still reachable on every card, one tap further in:
 // the popup's SETTINGS deck (card-sheet.md section 13).
 void Card::onLongPress() {
-    CardPopup::open(*this);
+    if (_longOpen != 0xFF) CardPopup::openHeldOn(*this, _longOpen);   // K151
+    else                   CardPopup::open(*this);
 }
 
 // ---------------------------------------------------------------------------

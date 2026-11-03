@@ -120,7 +120,11 @@ void ClusterCard::onSnapshot(const Entity &snap) {
 }
 
 // Its window opens on its management screen (K104, Popup/PopupCluster.cpp).
-void ClusterCard::onLongPress() { CardPopup::open(*this); }
+// A chosen Long press opens (K151) as any card's.
+void ClusterCard::onLongPress() {
+    if (longOpen() != 0xFF) CardPopup::openHeldOn(*this, longOpen());
+    else                    CardPopup::open(*this);
+}
 
 // The cluster lays out its own room: the header row along the top, the tiles
 // under it where Layout::tileGrid() puts them.
