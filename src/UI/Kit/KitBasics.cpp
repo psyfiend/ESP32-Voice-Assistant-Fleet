@@ -150,6 +150,18 @@ void itemMark(lv_obj_t *o, ItemMark m) {
     lv_obj_invalidate(o);
 }
 
+const lv_font_t *fitLabel(lv_obj_t *l, const char *text, int32_t w, const lv_font_t *const *faces, uint8_t n) {
+    if (!l || !text || !faces || !n) return nullptr;
+    const lv_font_t *f = faces[n - 1];
+    for (uint8_t i = 0; i < n; i++)
+        if (faces[i] && textW(text, faces[i]) <= w) { f = faces[i]; break; }
+    lv_obj_set_style_text_font(l, f, 0);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
+    lv_obj_set_height(l, lv_font_get_line_height(f));
+    lv_label_set_text(l, text);
+    return f;
+}
+
 int32_t textW(const char *txt, const lv_font_t *f) {
     lv_point_t sz = {0, 0};
     lv_text_get_size(&sz, txt, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);

@@ -43,6 +43,27 @@ template <typename T> T *psram(size_t n) {
 
 int32_t gap() { return UI::mm(UI::shape().S5); }
 
+// A NAME FITTED TO ITS ROOM (K152): the name's face, else the tag's; cut only
+// when neither fits (the 4B's narrow column).
+void fitName(lv_obj_t *l, const char *text, int32_t room) {
+    const lv_font_t *ladder[] = { UI::type().NAME, UI::type().TAG };
+    Kit::fitLabel(l, text, room, ladder, 2);
+    // Every row as tall as one in the name's face, so a smaller name keeps the list even.
+    if (lv_obj_t *row = lv_obj_get_parent(l))
+        lv_obj_set_style_min_height(row, lv_font_get_line_height(UI::type().NAME) +
+                                         lv_obj_get_style_pad_top(row, LV_PART_MAIN) +
+                                         lv_obj_get_style_pad_bottom(row, LV_PART_MAIN), 0);
+}
+
+// What a row's words beside its name take: each tag and a gap before it.
+int32_t besideW(const char *a, const char *b, int32_t tickW) {
+    const lv_font_t *t = UI::type().TAG;
+    int32_t w = tickW ? tickW + gap() : 0;
+    if (a && a[0]) w += Kit::textW(a, t) + gap();
+    if (b && b[0]) w += Kit::textW(b, t) + gap();
+    return w;
+}
+
 int chosenAt(const char *key) {
     for (uint8_t i = 0; i < s_nChosen; i++) if (!strcmp(s_chosen[i].key, key)) return i;
     return -1;
@@ -225,11 +246,11 @@ void fillBody(bool keepScroll) {
         lv_obj_set_style_pad_ver(r, UI::mm(UI::shape().S4), 0);
         lv_obj_set_style_pad_column(r, gap(), 0);
         lv_obj_t *n = Kit::label(r, tappable ? KS::KS_LABEL_NAME : KS::KS_LABEL_NAME_DIM);
-        lv_label_set_long_mode(n, LV_LABEL_LONG_DOT);
         lv_obj_set_flex_grow(n, 1);
-        lv_obj_set_height(n, lv_font_get_line_height(lv_obj_get_style_text_font(n, LV_PART_MAIN)));   // one line, "..."
-        lv_label_set_text(n, it.name);
-        if (it.fresh && !it.coming) lv_label_set_text(Kit::label(r, KS::KS_LABEL_TAG_ACTIVE), "New");   // K145
+        const bool fresh = it.fresh && !it.coming;
+        fitName(n, it.name, rowW - 2 * gap() - besideW(it.state, it.mark, tappable ? tickW : 0) -
+                            (fresh ? Kit::textW("New", tagF) + gap() : 0));
+        if (fresh) lv_label_set_text(Kit::label(r, KS::KS_LABEL_TAG_ACTIVE), "New");   // K145
         if (it.state[0]) lv_label_set_text(Kit::label(r, KS::KS_LABEL_TAG), it.state);
         if (it.mark[0]) lv_label_set_text(Kit::label(r, it.coming ? KS::KS_LABEL_TAG_ACCENT : KS::KS_LABEL_TAG_DIM), it.mark);
         if (tappable) {
@@ -255,10 +276,8 @@ lv_obj_t *navItem(const char *words, const char *count, bool countLit, uintptr_t
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_all(r, gap(), 0);
     lv_obj_t *n = Kit::label(r, KS::KS_LABEL_NAME);
-    lv_label_set_long_mode(n, LV_LABEL_LONG_DOT);
     lv_obj_set_flex_grow(n, 1);
-    lv_obj_set_height(n, lv_font_get_line_height(lv_obj_get_style_text_font(n, LV_PART_MAIN)));
-    lv_label_set_text(n, words);
+    fitName(n, words, lv_obj_get_content_width(s_nav) - 2 * gap() - besideW(count, nullptr, 0));
     if (count && count[0]) lv_label_set_text(Kit::label(r, countLit ? KS::KS_LABEL_TAG_ACCENT : KS::KS_LABEL_TAG_DIM), count);
     lv_obj_add_event_cb(r, navCb, LV_EVENT_CLICKED, (void *)user);
     return r;
@@ -421,7 +440,8 @@ lv_obj_t *build(lv_obj_t *parent, int32_t w, int32_t h, const Spec &spec) {
     lv_obj_set_flex_flow(top, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(top, gap() * 2, 0);
     s_nav = column(top);
-    lv_obj_set_size(s_nav, w * 27 / 100, lv_pct(100));
+    // The column a little wider on a narrow window (the 4B), where its names are cut first.
+    lv_obj_set_size(s_nav, w * (w < UI::mm(100) ? 31 : 27) / 100, lv_pct(100));
     s_body = column(top, true);
     lv_obj_set_height(s_body, lv_pct(100));
     lv_obj_set_flex_grow(s_body, 1);

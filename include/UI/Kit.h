@@ -379,6 +379,14 @@ lv_obj_t *item(lv_obj_t *parent);
 enum class ItemMark : uint8_t { MARK_NONE, MARK_DOOMED, MARK_COMING };
 void itemMark(lv_obj_t *o, ItemMark m);
 
+// TEXT FITTED TO ITS ROOM (2.13 round 2, K152, after NINA's ui_text_fit): the
+// first of `faces` - largest first, faces already linked, so it costs no flash -
+// whose measured `text` fits `w` on one line; else the last, cut with "...".
+// One line high. Only the face is set: the label's role keeps its colour. The
+// text is measured as given, never as the label holds it (LVGL rewrites a cut
+// label's text in place - NINA's shadow-string lesson). Returns the face.
+const lv_font_t *fitLabel(lv_obj_t *label, const char *text, int32_t w, const lv_font_t *const *faces, uint8_t n);
+
 // --- Rows ---------------------------------------------------------------------
 // A ROW in a panel: its words on the left, its control on the right - a
 // checkbox, a dropdown of choices, or a button that does something. One list
