@@ -422,13 +422,13 @@ void askDash() {
     const char *from = m.from ? clName(m.from) : m.parent ? m.parent->shownName(CardLabel::LBL_NAME) : "";
     lines();
     if (!m.move && m.from)
-        line("This card will be copied from the cluster %s and placed onto the dashboard as a separate card.",
+        line("This card will be copied from the group %s and placed onto the dashboard as a separate card.",
              acc(a, sizeof(a), from));
     else if (!m.move)
         line("This card will be copied from the group card %s and placed onto the dashboard as a separate card.",
              acc(a, sizeof(a), from));
     else
-        line("This card will be removed from the cluster %s and placed onto the dashboard.", acc(a, sizeof(a), from));
+        line("This card will be removed from the group %s and placed onto the dashboard.", acc(a, sizeof(a), from));
     if (m.pick == groupNone())
         line("The card will not be a member of any group.");
     else if (m.pick == s_cur)
@@ -439,7 +439,7 @@ void askDash() {
         line("The card will become a member of the group %s.", acc(a, sizeof(a), pickName()));
     line(RESTORABLE);
     if (m.move && lastTile())
-        line("The cluster %s will be empty after moving this card. An empty cluster will be hidden automatically "
+        line("The group %s will be empty after moving this card. An empty group will be hidden automatically "
              "but can be used again by adding cards to it.", acc(b, sizeof(b), from));
     confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Add card to dashboard?", s_lines, s_nLines, m.move ? "Move" : "Copy",
                Kit::ButtonRole::BTN_CONFIRM, doDash);
@@ -452,26 +452,26 @@ void askCluster() {
     char a[96], b[96];
     lines();
     if (!m.move && m.from)
-        line("This card will be copied to the cluster %s and a copy will remain in the %s cluster.",
+        line("This card will be copied to the group %s and a copy will remain in the %s group.",
              acc(a, sizeof(a), T.name), acc(b, sizeof(b), clName(m.from)));
     else if (!m.move)
-        line("This card will be copied to the cluster %s and a copy will remain on this page.", acc(a, sizeof(a), T.name));
+        line("This card will be copied to the group %s and a copy will remain on this page.", acc(a, sizeof(a), T.name));
     else if (m.from)
-        line("This card will be removed from the cluster %s and moved to the cluster %s.",
+        line("This card will be removed from the group %s and moved to the group %s.",
              acc(a, sizeof(a), clName(m.from)), acc(b, sizeof(b), T.name));
     else
-        line("This card will be removed from this page and moved to the cluster %s.", acc(a, sizeof(a), T.name));
+        line("This card will be removed from this page and moved to the group %s.", acc(a, sizeof(a), T.name));
     if (!m.move)
         line("The new copy will change its group membership to be a member of %s. Changes made to one copy will "
              "not apply to the other.", acc(a, sizeof(a), T.gname));
     else
-        line("The moved card will become a member of the %s group, and settings applied to that cluster may be "
+        line("The moved card will become a member of the %s group, and settings applied to that group may be "
              "propagated to the new card.", acc(a, sizeof(a), T.gname));
     line(RESTORABLE);
     if (m.move && lastTile())
-        line("The cluster %s will be empty after moving this card. An empty cluster will be hidden automatically "
+        line("The group %s will be empty after moving this card. An empty group will be hidden automatically "
              "but can be used again by adding cards to it.", acc(b, sizeof(b), clName(m.from)));
-    confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Add card to cluster?", s_lines, s_nLines, m.move ? "Move" : "Copy",
+    confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Add card to group?", s_lines, s_nLines, m.move ? "Move" : "Copy",
                Kit::ButtonRole::BTN_CONFIRM, doCluster);
 }
 
@@ -488,7 +488,7 @@ void askGroup() {
         line("This will remove the card from group %s and add it to the group %s.",
              acc(a, sizeof(a), s_grp[s_cur].name), acc(b, sizeof(b), pickName()));
     line(RESTORABLE);
-    confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Change group for this card?", s_lines, s_nLines, "Confirm",
+    confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Change label for this card?", s_lines, s_nLines, "Confirm",
                Kit::ButtonRole::BTN_CONFIRM, doGroup);
 }
 
@@ -609,8 +609,8 @@ void visibilityJoinOpen(Card *parent, const Entity *member, Card *memberCard) {
 }
 
 const char *visibilityJoinTitle() {
-    if (m.mode == MoveMode::MOVE_CLUSTER) return m.from ? "Change cluster" : "Add to cluster";
-    return m.mode == MoveMode::MOVE_GROUP ? "Change group" : "Add to dashboard";
+    if (m.mode == MoveMode::MOVE_CLUSTER) return m.from ? "Change group" : "Add to group";
+    return m.mode == MoveMode::MOVE_GROUP ? "Change label" : "Add to dashboard";   // K146
 }
 
 bool visibilityJoinBack() { return false; }
@@ -622,10 +622,10 @@ void buildJoin() {
     if (m.mode == MoveMode::MOVE_CLUSTER) {
         collectTargets();
         if (m.pick >= s_nTgt) m.pick = 0;
-        words(list, KS::KS_LABEL_NAME, "Select target cluster:");
+        words(list, KS::KS_LABEL_NAME, "Select target group:");
         if (s_nTgt) s_grid = Kit::chipGrid(list, listW(), s_tgtWords, s_nTgt, m.pick, gridCb);
-        words(list, KS::KS_LABEL_TAG_DIM, "A card cannot be added to a cluster if that cluster already contains a copy.");
-        if (!s_nTgt) { words(list, KS::KS_LABEL_TAG_DIM, "This card cannot be added to any clusters on this page."); return; }
+        words(list, KS::KS_LABEL_TAG_DIM, "A card cannot be added to a group if that group already contains a copy.");
+        if (!s_nTgt) { words(list, KS::KS_LABEL_TAG_DIM, "This card cannot be added to any groups on this page."); return; }
         nextRow(list, true, false);
         return;
     }
@@ -805,7 +805,7 @@ void restoreAsk(const Card *c) {
         if (hc) {
             char now[48];
             clusterNameNow(hc->id, now, sizeof(now));
-            line("This card was originally a member of the %s cluster.", acc(a, sizeof(a), now));
+            line("This card was originally a member of the %s group.", acc(a, sizeof(a), now));
         } else if (o && pageGroup(o, g)) {
             line("This card was originally a member of the %s group.", acc(a, sizeof(a), g.name));
         }
@@ -831,20 +831,20 @@ void restoreAsk(const Card *c) {
         clusterNameNow(hc->id, now, sizeof(now));
         if (!hn[0]) snprintf(hn, sizeof(hn), "%s", now);
         const bool renamed = strcmp(hn, now) != 0;
-        snprintf(l1, sizeof(l1), "This card was originally a member of the %s cluster.%s", acc(a, sizeof(a), hn), nameLine);
+        snprintf(l1, sizeof(l1), "This card was originally a member of the %s group.%s", acc(a, sizeof(a), hn), nameLine);
         line("%s", l1);
         if (renamed) {
             const bool has = hg[0] && CardGroups::byId(hg, g);
             snprintf(l2, sizeof(l2), "Tap 'Restore' to confirm you wish to restore it to the %s group%s.",
                      acc(b, sizeof(b), has ? g.name : hn), nameTail);
             line("%s", l2);
-            line("The original cluster has been renamed or repurposed and the card cannot be restored there.");
+            line("The original group has been renamed or repurposed and the card cannot be restored there.");
         } else {
-            snprintf(l2, sizeof(l2), "Tap 'Restore' to confirm you wish to restore it to the %s cluster%s.",
+            snprintf(l2, sizeof(l2), "Tap 'Restore' to confirm you wish to restore it to the %s group%s.",
                      acc(b, sizeof(b), hn), nameTail);
             line("%s", l2);
             if (CardAdded::isHidden(hc->id))
-                line("The original cluster had become hidden, restoring this card will reactivate the cluster.");
+                line("The original group had become hidden, restoring this card will reactivate the group.");
         }
     } else {
         const bool has = o && pageGroup(o, g);

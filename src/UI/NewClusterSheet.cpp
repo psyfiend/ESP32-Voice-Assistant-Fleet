@@ -117,7 +117,7 @@ static void fill() {
     lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_row(col, UI::mm(UI::shape().S5), 0);
     lv_label_set_text(S.lblTitleArea, s_area[0] ? s_title : "");
-    lv_label_set_text(S.lblTitleName, s_area[0] ? HaOffer::areaName(s_area) : "New cluster");   // K145
+    lv_label_set_text(S.lblTitleName, s_area[0] ? HaOffer::areaName(s_area) : "New group");   // K146
     Kit::sheetLayoutTitle(S);
     if (!HaOffer::ready()) {
         lv_label_set_text(Kit::label(col, Kit::KitStyle::KS_LABEL_TAG_DIM), "Waiting for Home Assistant");   // to confirm
@@ -158,7 +158,7 @@ bool open(const char *pageTitle) {
     HaPicker::forget();
     HaOffer::refresh();
     s_area[0] = '\0';
-    snprintf(s_title, sizeof(s_title), "New cluster > ");   // K145
+    snprintf(s_title, sizeof(s_title), "New group > ");   // K146
     (void)pageTitle;
     sheet = Kit::SheetSpec{};
     sheet.leftCb     = closeCb;

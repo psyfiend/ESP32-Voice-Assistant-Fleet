@@ -67,7 +67,7 @@ bool words(const Entity &e, const Card *self, const EntityRegistry *reg, char *o
     f.reg = reg;
     walk(lv_screen_active(), f);
     // K145's words, the most telling first.
-    if (f.self_)          snprintf(out, cap, "%s", f.header ? "In the header" : "In this cluster");
+    if (f.self_)          snprintf(out, cap, "%s", f.header ? "In the header" : "In this group");
     else if (f.page)      snprintf(out, cap, "On the page");
     else if (f.group[0])  snprintf(out, cap, "In %s", f.group);
     else if (f.cluster[0]) snprintf(out, cap, "In %s", f.cluster);

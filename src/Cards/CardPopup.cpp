@@ -167,7 +167,7 @@ void showView(PopupView v) {
                               : v == PopupView::VIEW_CARD_UI ? "Card UI"
                               : v == PopupView::VIEW_CLUSTER_SLOTS ? "Header options"
                               : v == PopupView::VIEW_VISIBILITY ? "Visibility"
-                              : v == PopupView::VIEW_ADD_TO ? "Add to cluster"
+                              : v == PopupView::VIEW_ADD_TO ? "Add to group"
                               : v == PopupView::VIEW_CLUSTER_ADD ? "Edit cards"
                               : v == PopupView::VIEW_JOIN ? visibilityJoinTitle() : "Members");
     }

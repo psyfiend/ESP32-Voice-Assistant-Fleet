@@ -22,7 +22,7 @@ void chartEnd()              { Kit::sheetSideEnd(s); }
 // what its header shows, and the cards that join it.
 const char *sideTitle(uint8_t side) {
     return side == SIDE_SCENES ? "SCENES" : side == SIDE_ACTIVITY ? "ACTIVITY"
-         : side == SIDE_CLUSTER ? "CLUSTER" : "CHART";
+         : side == SIDE_CLUSTER ? "GROUP" : "CHART";
 }
 
 uint8_t (*sideRows(uint8_t side))(DeckRowSpec *) {

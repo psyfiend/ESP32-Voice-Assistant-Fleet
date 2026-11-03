@@ -211,10 +211,10 @@ void buildVisibility() {
         const int8_t i = clusterMemberOf(*cl, c->firstEntity());
         const bool tile = i < 0 || clusterMemberShown(*cl, (uint8_t)i) == MemberShown::SHOWN_TILE;
         if (c->hasId()) {
-            a[n++] = tile ? Action{ "Hide from the cluster", Kit::ButtonRole::BTN_CANCEL, hideTileCb }
-                          : Action{ "Show in the cluster", Kit::ButtonRole::BTN_CANCEL, showTileCb };
+            a[n++] = tile ? Action{ "Hide from the group", Kit::ButtonRole::BTN_CANCEL, hideTileCb }
+                          : Action{ "Show in the group", Kit::ButtonRole::BTN_CANCEL, showTileCb };
             a[n++] = { "Add to dashboard", Kit::ButtonRole::BTN_CANCEL, toDashCb };
-            a[n++] = { "Change cluster", Kit::ButtonRole::BTN_CANCEL, toClusterCb };
+            a[n++] = { "Change group", Kit::ButtonRole::BTN_CANCEL, toClusterCb };
         }
         actions(list, a, n, restore);
         note(list, VIS_NOTE);
@@ -222,11 +222,11 @@ void buildVisibility() {
     }
     if (c->hasId()) a[n++] = { "Hide from this page", Kit::ButtonRole::BTN_CANCEL, hideCardCb };
     if (c->hasId() && !clusterSelf) {
-        a[n++] = { "Change group", Kit::ButtonRole::BTN_CANCEL, toDashCb };
-        a[n++] = { "Add to cluster", Kit::ButtonRole::BTN_CANCEL, toClusterCb };
+        a[n++] = { "Change label", Kit::ButtonRole::BTN_CANCEL, toDashCb };   // K146
+        a[n++] = { "Add to group", Kit::ButtonRole::BTN_CANCEL, toClusterCb };
     }
     actions(list, a, n, restore && !clusterSelf);
-    note(list, clusterSelf ? "Hidden clusters can be restored from the 'Page' \"View hidden cards\" menu."
+    note(list, clusterSelf ? "Hidden groups can be restored from the page's Edit cards."   // K148; to confirm
                            : VIS_NOTE);
 }
 
@@ -253,7 +253,7 @@ const char *movedWords(const Card *member, char *buf, size_t cap) {
         snprintf(buf, cap, "In %s", k->area()[0] ? k->area() : k->shownName(CardLabel::LBL_NAME));
         return buf;
     }
-    snprintf(buf, cap, "In another cluster");
+    snprintf(buf, cap, "In another group");
     return buf;
 }
 

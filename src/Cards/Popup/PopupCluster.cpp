@@ -3,7 +3,7 @@
 // every member, hidden ones too, each opening its own view, whose Visibility
 // shows or hides it - with the CLUSTER panel beside SETTINGS:
 //
-//   Rename cluster - its own words on the keyboard (K95); Header options - which
+//   Rename group - the group's name on the keyboard (K95, K146); Header options - which
 //   sensors its header shows (four at most), Sensor icons and Header style (the
 //   page's, Swatch or Band - K102); Add cards - the page's cards that can join,
 //   Copy or Move (K91, K100).
@@ -180,14 +180,20 @@ void mainChipCb(lv_event_t *ev) {
     lv_async_call(mainChoose, (void *)v);
 }
 
-// RENAME (K95): its own words on the keyboard - the header's name, in the
-// group's colour (K46 rename a); none, and it is its group's name again.
+// RENAME (K95; K146: a group keeps one name): the GROUP is renamed, so every
+// card wearing it says the new name too - its colour never follows a rename
+// (K46). None, and a group from an HA area or the dashboard has its own name
+// again; a group made here keeps the one it has. A cluster's own words from
+// before K146 (label_text) go with the first rename.
 void renamed(const char *words, void *) {
     ClusterCard *cl = held();
     if (!cl || !cl->hasId() || s.phase != PopupPhase::PHASE_OPEN) return;
     CardGroups::Group g;
-    const bool groups = CardGroups::ofCard(*cl, g) && !strcmp(words, g.name);   // its group's: none of its own
-    Settings::setCard(cl->id(), "label_text", (words[0] && !groups) ? words : nullptr);
+    if (!CardGroups::ofCard(*cl, g)) return;
+    const bool hasBase = g.haName[0] || !strncmp(g.id, "sheet_", 6);
+    if (words[0])     Settings::setGroup(g.id, "name", words);
+    else if (hasBase) Settings::setGroup(g.id, "name", nullptr);
+    Settings::setCard(cl->id(), "label_text", nullptr);
     CardGroups::apply(*cl, cl->pageAreaColor());
     snprintf(s.area, sizeof(s.area), "%s", cl->area());
     snprintf(s.name, sizeof(s.name), "%s", cl->area()[0] ? cl->area() : cl->shownName(CardLabel::LBL_NAME));
@@ -199,15 +205,15 @@ void renameCb(lv_event_t *ev) {
     ClusterCard *cl = held();
     if (!cl || !cl->hasId()) return;
     if (ev) chartSet(DECK_PEEK);   // from the CLUSTER panel: it folds under the keyboard
-    static char own[40], dflt[48];
-    if (!Settings::card(cl->id(), "label_text", own, sizeof(own))) own[0] = '\0';
+    static char now[40], dflt[48];
+    snprintf(now, sizeof(now), "%s", s.name);   // as it is shown: its group's, or its own words from before K146
     CardGroups::Group g;
-    snprintf(dflt, sizeof(dflt), "%s", CardGroups::ofCard(*cl, g) ? g.name : cl->shownName(CardLabel::LBL_NAME));
+    snprintf(dflt, sizeof(dflt), "%s", CardGroups::ofCard(*cl, g) && g.haName[0] ? g.haName : now);
     Kit::KeyboardSpec k = {};
-    k.title  = "Name this cluster";
-    k.text   = own[0] ? own : dflt;
+    k.title  = "Name this group";   // K146
+    k.text   = now;
     k.hint   = dflt;           // shown when the field is empty: what it is called then
-    k.maxLen = sizeof(own) - 1;
+    k.maxLen = sizeof(now) - 1;
     k.save   = renamed;
     Kit::keyboard(k);
 }
@@ -683,7 +689,7 @@ uint8_t clusterSpecs(DeckRowSpec *r) {
     if (cl && CardGroups::ofCard(*cl, g)) HaOffer::groupArea(g.id, area, sizeof(area));
     const uint8_t fresh = area[0] ? HaOffer::newIn(area) : 0;
     snprintf(s_addWords, sizeof(s_addWords), fresh ? "%u new" : "Open", (unsigned)fresh);   // K145
-    r[n++] = { "Rename cluster", DeckRowKind::ROW_BUTTON, "Edit", 0, live, renameCb, nullptr };
+    r[n++] = { "Rename group", DeckRowKind::ROW_BUTTON, "Edit", 0, live, renameCb, nullptr };
     r[n++] = { "Header options", DeckRowKind::ROW_BUTTON, "Open", 0, live, slotsViewCb, nullptr };
     r[n++] = { "Edit cards", DeckRowKind::ROW_BUTTON, s_addWords, 0, live, addViewCb, nullptr };   // K148
     const uint16_t sel = areaOptions(area);
@@ -749,7 +755,7 @@ void buildClusterSlots() {
         s_slotRow[row]    = memberRow(box, s_names[i], *e, MemberShown::SHOWN_TILE);
         lv_obj_add_event_cb(s_slotRow[row], slotRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)row);
     }
-    if (!s_nSlotRows) note(box, "This cluster has no sensors to show in its header.");
+    if (!s_nSlotRows) note(box, "This group has no sensors to show in its header.");
     // Satin or glass, painted at the rows' laid-out size, which only the layout knows.
     lv_obj_update_layout(col);
     for (uint8_t r = 0; r < s_nSlotRows; r++) slotLook(r);

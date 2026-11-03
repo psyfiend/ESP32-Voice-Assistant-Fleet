@@ -55,13 +55,13 @@ void confirmHideTile() {
     Card *held = CardPopup::isOpen() ? visibilitySubject() : nullptr;
     if (!held || !held->hasId()) return;
     char buf[200];
-    snprintf(buf, sizeof(buf), "The card \"%s\" will be hidden from this cluster, any other instances of "
+    snprintf(buf, sizeof(buf), "The card \"%s\" will be hidden from this group, any other instances of "
                                "this card will not be affected", held->shownName(CardLabel::LBL_NAME));
     Kit::DialogSpec spec = {};
     spec.role    = Kit::DialogRole::DLG_DESTRUCTIVE;
     spec.title   = "Hide this card?";
     spec.body[0] = buf;
-    spec.body[1] = "This card can be restored from the cluster 'Members' view";
+    spec.body[1] = "This card can be restored from the group's Edit cards";   // K146, K148; to confirm
     spec.buttons[0] = { "Cancel", Kit::ButtonRole::BTN_CANCEL, confirmCancelCb };
     spec.buttons[1] = { "Hide", Kit::ButtonRole::BTN_DESTRUCTIVE, [](lv_event_t *) {
         lv_async_call([](void *) {
@@ -90,7 +90,7 @@ void confirmRemoveCopy() {
     Card *held = CardPopup::isOpen() ? visibilitySubject() : nullptr;
     if (!held || !CardAdded::isMember(held->id())) return;
     char buf[200];
-    snprintf(buf, sizeof(buf), "This copy of \"%s\" will be removed from the cluster and deleted; the card "
+    snprintf(buf, sizeof(buf), "This copy of \"%s\" will be removed from the group and deleted; the card "
                                "it was copied from is unaffected.", held->shownName(CardLabel::LBL_NAME));
     Kit::DialogSpec spec = {};
     spec.role    = Kit::DialogRole::DLG_DESTRUCTIVE;
