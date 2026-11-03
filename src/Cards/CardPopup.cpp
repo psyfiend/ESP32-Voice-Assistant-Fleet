@@ -124,13 +124,11 @@ void showView(PopupView v) {
     setText(s.lblLeft, (v == controlsView() || v == PopupView::VIEW_GROUP) && !member ? LV_SYMBOL_CLOSE : LV_SYMBOL_LEFT);
     cornerLook(s.btnHistory, true, v == PopupView::VIEW_HISTORY);
     if (s.cluster && s.btnMembers) {
-        // A CLUSTER'S TAB GOES BETWEEN ITS TWO VIEWS (K143): to Members from the
-        // group view, to the group view from Members. To confirm: the owner's
-        // grid and list glyphs need the icon font made again (#83's way);
-        // these are the nearest it has.
-        cornerLook(s.btnMembers, !member, false);
-        if (lv_obj_t *g = Kit::labelIn(s.btnMembers))
-            lv_label_set_text(g, v == PopupView::VIEW_GROUP ? MDI_TUNE : MDI_LIGHTBULB_GROUP);
+        // A GROUP'S TWO VIEWS (K150): its name in the title goes between them;
+        // the group view has no tabs, Members shows its own lit.
+        const bool groupView = v == PopupView::VIEW_GROUP;
+        cornerLook(s.btnMembers, !member && !groupView, v == PopupView::VIEW_MEMBERS);
+        if (groupView) cornerLook(s.btnHistory, false, false);
     } else {
         cornerLook(s.btnMembers, !member && hasMembers(), v == PopupView::VIEW_MEMBERS);
     }
@@ -142,7 +140,8 @@ void showView(PopupView v) {
     // Whose view it is: the window's, or (inside one) the member's.
     const char *who = (member && s.ent[0]) ? s.ent[0]->desc.name : s.name;
     char title[ENTITY_NAME_MAX + 16];
-    if (v == PopupView::VIEW_GROUP) {
+    if (v == PopupView::VIEW_GROUP || (v == PopupView::VIEW_MEMBERS && s.cluster && !member)) {
+        // A group's name alone, on either of its views (K150): a tap on it is the other view.
         setText(s.lblTitleArea, "");
         setText(s.lblTitleName, s.name);
     } else if (v == PopupView::VIEW_MAIN) {
@@ -236,6 +235,13 @@ void crumbCb(lv_event_t *ev) {
     if (s.view == PopupView::VIEW_MAIN) return;
     if (s.view == PopupView::VIEW_MEMBER) { leaveMember(PopupView::VIEW_MAIN); return; }
     showView(controlsView());
+}
+// A GROUP'S NAME GOES BETWEEN ITS TWO VIEWS (K150); elsewhere it is no link.
+void nameCb(lv_event_t *ev) {
+    (void)ev;
+    if (!s.cluster || inMember()) return;
+    if (s.view == PopupView::VIEW_GROUP)        showView(PopupView::VIEW_MEMBERS);
+    else if (s.view == PopupView::VIEW_MEMBERS) showView(PopupView::VIEW_GROUP);
 }
 void historyCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_HISTORY); }
 void membersCb(lv_event_t *ev) {
@@ -381,6 +387,7 @@ void showWindow() {
     k = Kit::SheetSpec{};
     k.leftCb  = leftCb;
     k.crumbCb = crumbCb;
+    if (s.cluster) k.nameCb = nameCb;
     k.nTabs   = hasMembers() ? 2 : 1;
     if (k.nTabs == 2) { k.tabGlyph[0] = MDI_LIGHTBULB_GROUP; k.tabCb[0] = membersCb; }
     k.tabGlyph[k.nTabs - 1] = MDI_CHART_BAR;

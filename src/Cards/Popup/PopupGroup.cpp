@@ -1,11 +1,11 @@
-// THE GROUP VIEW (2.13, DECISIONS K143; artifact "2.13 Add Cards Mocks", screen 5).
+// THE GROUP VIEW (2.13, DECISIONS K143, K150; artifact "2.13 Round 2 Mocks", 2-4).
 //
 // A tap on a cluster opens it; a long press opens Members - one window, two
-// views, the corner tab going between them. Every member as a tile, the ones
-// hidden from the cluster last, each saying Hidden: a cluster on the page keeps
-// the few tiles that earn their space, the group view has them all. It fills
-// the page area under the header - a bigger screen shows bigger tiles - and has
-// no panels: CLUSTER and SETTINGS are Members'.
+// views, the group's name in the title going between them. Every member as a
+// tile, the ones hidden from the cluster last, each saying Hidden: a cluster on
+// the page keeps the few tiles that earn their space, the group view has them
+// all. It fills the page area under the header - a bigger screen shows bigger
+// tiles - with the GROUP and SETTINGS panels under it, as Members has.
 //
 // A tile that switches (a light, a switch) switches on a tap; any other opens
 // that member's own view, as its row in Members does; a long press on any tile
@@ -101,7 +101,8 @@ void tile(lv_obj_t *grid, Card *m, const char *name, bool hidden, int32_t w, int
 
 }  // namespace
 
-// The window to the page's size, its panels away - or back as it was.
+// The window to the page's size - or back as it was. Its panels stay (K150):
+// it ends where their folded tabs begin, so no tile sits under one.
 void groupWindow(bool big) {
     if (big == s_big || !s.win) return;
     if (big) {
@@ -111,15 +112,13 @@ void groupWindow(bool big) {
         s.winRect.x1 = gap;
         s.winRect.x2 = sw - gap - 1;
         s.winRect.y1 = UIToolkit::systemHeaderPx() + gap;
-        s.winRect.y2 = sh - gap - 1;
+        s.winRect.y2 = sh - LV_MAX(s.panelHead, gap) - 1;
     } else {
         s.winRect = s_smallRect;
     }
     s_big = big;
     lv_obj_set_pos(s.win, s.winRect.x1, s.winRect.y1);
     lv_obj_set_size(s.win, lv_area_get_width(&s.winRect), lv_area_get_height(&s.winRect));
-    for (lv_obj_t *p : { s.right.root, s.left.root })
-        if (p) { if (big) lv_obj_add_flag(p, LV_OBJ_FLAG_HIDDEN); else lv_obj_remove_flag(p, LV_OBJ_FLAG_HIDDEN); }
     Kit::sheetLayoutTitle(s);
 }
 

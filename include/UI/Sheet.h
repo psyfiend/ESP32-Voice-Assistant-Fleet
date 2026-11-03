@@ -33,6 +33,7 @@ struct SheetSpec {
     // --- The header row ---
     lv_event_cb_t leftCb;                    // the left button: close, or back
     lv_event_cb_t crumbCb;                   // a tap on the title's first part (null: not a link)
+    lv_event_cb_t nameCb;                    // a tap on its second part (null: not a link)
     uint8_t       nTabs;                     // icon buttons on the right, made in order: the last
     const char   *tabGlyph[SHEET_TABS_MAX];  //   made is the one in the corner
     lv_event_cb_t tabCb[SHEET_TABS_MAX];

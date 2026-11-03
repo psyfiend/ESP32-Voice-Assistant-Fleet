@@ -44,7 +44,7 @@ void sideFor(PopupView v) {
         if (histFromHa(s_hv.e)) side = s_hv.chart ? SIDE_CHART : SIDE_ACTIVITY;
     } else if (v == PopupView::VIEW_SCENES) {
         side = SIDE_SCENES;
-    } else if (v == PopupView::VIEW_MEMBERS && s.cluster && !inMember()) {
+    } else if ((v == PopupView::VIEW_MEMBERS || v == PopupView::VIEW_GROUP) && s.cluster && !inMember()) {   // K150
         side = SIDE_CLUSTER;
     }
     if (s.left.root && s.left.kind != side) chartEnd();

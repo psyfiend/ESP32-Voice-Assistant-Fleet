@@ -300,6 +300,14 @@ static void buildFrame(Sheet &S) {
         lv_obj_set_style_text_color(S.lblTitleArea, UI::c(UI::pal().TEXT), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
         lv_obj_add_event_cb(S.lblTitleArea, spec.crumbCb, LV_EVENT_CLICKED, nullptr);
     }
+    // The second part a link too, where the client says (a group's name goes
+    // between its two views, K150): it dims while pressed, being lit already.
+    if (spec.nameCb) {
+        lv_obj_add_flag(S.lblTitleName, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_ext_click_area(S.lblTitleName, (btn - lh) / 2);
+        lv_obj_set_style_text_color(S.lblTitleName, UI::c(UI::pal().TEXT_DIM), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+        lv_obj_add_event_cb(S.lblTitleName, spec.nameCb, LV_EVENT_CLICKED, nullptr);
+    }
 
     lv_obj_t *right = plain(hdr);
     lv_obj_set_size     (right, slotW, btn);
