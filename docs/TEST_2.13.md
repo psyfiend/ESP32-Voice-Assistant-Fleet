@@ -1,4 +1,133 @@
-# Test sheet - 2.13, cards from Home Assistant (round 1)
+# Test sheet - 2.13, cards from Home Assistant (rounds 1 and 2)
+
+# Round 2
+
+**Branch** `feat/2.13-add-from-ha` at `3ef7e99`. **Boards** WS_P4_5, WS_P4_4B, CYD_P4_1060 and
+CYD_P4_4880 run it (flashed 2026-11-03 04:30-04:45, app only; each board's settings saved first in
+`bench/settings/<board>/20261103-04*.json` and unchanged after - the 4880 only learnt HA's list, as round
+1 did). WS_P4_7B was not plugged in; WS_S3_4B compiled only (#69). **Decisions** K146-K153; the look:
+artifact "2.13 Round 2 Mocks" (version 17).
+
+Built unattended overnight with your permission. The P4_5 tests below marked *(run)* were driven by
+Claude over `/popup` with screenshots, then the P4_5's settings put back (0 differences). **Nothing has
+been tried by hand on the glass.**
+
+## What changed on screen
+
+- **The group view keeps its panels** (GROUP, SETTINGS); its title row has no buttons; the group's
+  name in the title goes between the group view and Members (Members' own tab lit).
+- **CLUSTER is GROUP** (K146): Rename group, Edit cards, Show as, Header options, Area. A tile's
+  Visibility says Hide from the group, Change group; a page card's says Change label, Add to group.
+  The move dialogs say group.
+- **Rename group renames the group**: every card wearing it follows; its color stays.
+- **Edit cards** (K148) from a group's GROUP panel or the page panel's CARDS: one window over the
+  page, the lists in a column (In this group / On the page / Hidden, then HA's areas), the result
+  shown as you tick - dashed rows being added, red rows going.
+- **The page panel**: CARDS is Edit cards and New group; HIDDEN is gone (hidden cards are in Edit
+  cards).
+- **Show as** (Cluster, Solo card) in GROUP; a group shown as one card has **Show as** and **Face**
+  in its SETTINGS. **Long press opens** is in every card's SETTINGS.
+
+## Tests
+
+**R1 - The group view.** Tap Office. *PASS:* the window fills the page under the header, GROUP and
+SETTINGS tabs under it, no buttons beside the title, which says Office. Tap Office in the title:
+Members, its bulbs tab lit. Tap Office again: the group view. Open GROUP from the group view. *(run)*
+
+**R2 - Edit cards from a group.** Office > GROUP > Edit cards. *PASS:* the window fills the page;
+the column has In this group (4), On the page, then House's and Outside's areas; In this group lists
+Desk, Overhead, then Occupancy and Temperature flat, "In the header". Tick Desk: red, a tick, the foot
+says Hide 1 (no Remove: Desk is built in). *(run)*
+
+**R3 - One kind of tick at a time.** With Desk ticked, open On the page and tap Table. *PASS:* "Cards
+cannot be selected to add while cards are selected to hide." and the rows there are flat and dim.
+Untick Desk: they come back. *(run)*
+
+**R4 - The result as you tick.** Open Office (the area), tick Office Motion PIR Occupancy; On the
+page, tick Table; back to In this group. *PASS:* In this group says "4 +2", On the page "1", Office
+"1 / 11"; two dashed rows at the foot of the members, "From Office" and "From the page"; the foot
+has Copy / Move and Add 2. Add 2: "Add cards to group?" in the dialogs' sentences, Cancel and
+Confirm. Confirm: both are tiles in Office. *(run)*
+
+**R5 - Remove.** Office > Edit cards, tick the two cards R4 added. *PASS:* both red; the foot has
+Remove 2 and Hide 2. Remove 2: "Remove these cards?"; Remove: both gone. *(run)*
+
+**R6 - Hide and restore a member.** Edit cards, tick Overhead, Hide 1, Hide. *PASS:* Overhead is no
+tile on the page, still in the group view (dimmed, Hidden). Edit cards again: Overhead last, "Hidden";
+tick it: Restore 1 - back as a tile.
+
+**R7 - Edit cards from the page.** Tap House. *PASS:* PAGES, HEADER, CARDS (Edit cards, New group,
+"Hidden cards are viewed and restored in Edit cards"), no HIDDEN. Edit cards: On the page lists
+every card, groups marked Group; Hidden; the areas. *(run)*
+
+**R8 - Add to the page, the group step.** Garage area, tick Garage Light Attic and Garage Overhead
+Lights, Add 2. *PASS:* "House > Add to dashboard", "Select group for these cards:", Garage * lit, the
+page's groups, New group, None, the note, Next. Next: "Add cards to dashboard?", "...placed onto the
+House page." "The cards will become members of the group Garage." Add: two cards on the page. Then
+tick both under On the page: Remove 2 (made here) - gone. *(run)*
+
+**R9 - Cards from two areas.** Tick one from Garage and one from Kitchen, Add 2. *PASS:* the step
+starts with Area, lit; Next says "Each card will become a member of its Home Assistant area's group."
+
+**R10 - Hide and restore from the page.** Tick Eric under On the page, Hide 1, Hide. *PASS:* gone
+from the page; Edit cards > Hidden lists it, tick it, Restore 1: back. *(run)*
+
+**R11 - Rename group.** Office > GROUP > Rename group, type Study, Save. *PASS:* the window, the
+cluster's header and every card wearing Office say Study, in Office's purple. Rename again with the
+field empty: Office. *(run)*
+
+**R12 - Show as and Face.** Kitchen > GROUP > Show as: Solo card, close. *PASS:* Kitchen is one card
+named Kitchen. Its SETTINGS has Long press opens, Show as (Solo card), Face (All lights, then each
+member). Face: one member - the card shows that one. Show as: Cluster, close: the cluster is back.
+*(run, without Face)*
+
+**R13 - Long press opens.** Any card's SETTINGS > Long press opens: History view; close; long press
+it. *PASS:* its window opens on History. A cluster's choices are Members view, Group view, History
+view. Toggle is never offered.
+
+**R14 - The other boards.** On the 4B, the 1060 and the 4880: R1, R2 and R7. *PASS:* everything
+fits; on the 4B the rows are one column (the column's names are cut short - see below).
+
+## To confirm (words and choices Claude made)
+
+- Show as's **Cluster / Solo card**, **Face** with **All lights** (All members when none switch),
+  **Long press opens** and its **Details view / Members view / Group view / History view**.
+- The step's **Area** (cards from several areas); its dialog line "Each card will become a member of
+  its Home Assistant area's group."
+- Toasts after an action: "Added N to Office", "Hid N in Office", "Removed N from Office", "Restored
+  N to Office", and on the page "Added N", "Hid N", "Removed N", "Restored N". Restore asks nothing.
+- The page's Hide dialog: "Hidden cards can always be restored from Edit cards." A hidden group's
+  Visibility note: "Hidden groups can be restored from the page's Edit cards." A member's Hide
+  dialog: "This card can be restored from the group's Edit cards".
+- Groups in the page's On the page marked **Group**; "In another group"; "From Home Assistant" for an
+  entity with no area.
+- Restore N is blue (Confirm); Remove N is a plain button beside a red Hide N.
+- Show as is in GROUP for a cluster, but in SETTINGS for a group shown as one card (it has no GROUP
+  panel).
+
+## Not built this round
+
+- The group view's header sensors in its title row, and their drop-down (mocks 2 and 3); a header
+  panel row tapping as its member (K150's second half).
+- **Removed** for a built-in card (K148): Remove is offered only for cards made on the board.
+- Units and precision from HA (K153): HA's display precision is not in what the board reads.
+- The text fitter (K152).
+- Two levels of nesting (K147) and "one block per group": nothing new allows or stops them yet.
+- New group from the page's cards (mock 11), and the thermostat's controls (with you there).
+
+## Known
+
+- On the 4B the column's names are cut ("On the ...", "Eric Bedr..."): the text fitter's.
+- The group view and Edit cards end where the panels' tabs begin; the page shows in the strip beside
+  the tabs.
+- Edit cards from a group opens on In this group; its HA area is not brought to the top of the column.
+- A cluster renamed before tonight keeps its own words until its next rename.
+- The P4_5 once failed to join WiFi after a flash (handshake timeout, then a 45-minute wait); a reset
+  fixed it. Not from this round's code.
+
+---
+
+# Round 1
 
 **Branch** `feat/2.13-add-from-ha`. **Boards** WS_P4_5, WS_P4_4B and CYD_P4_1060 run the round-1 build
 (flashed 2026-11-02 08:40; the P4_5's settings put back as they were at 05:52 - the one difference is
