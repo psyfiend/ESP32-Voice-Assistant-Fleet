@@ -130,7 +130,7 @@ void readRows() {
     s_n = n;
 }
 
-// A ROW'S LOOK: ticked to add or restore, lit glass; ticked to hide or remove,
+// A ROW'S LOOK: ticked to add or restore, a lit chip's (round 3); ticked to hide or remove,
 // red; one being added, dashed; one that can be ticked, satin; information, or
 // a row of another kind while one kind is ticked, flat - the latter dimmed. The
 // tick says it too, never colour alone.
@@ -146,7 +146,7 @@ void paint(uint8_t i) {
     if (it.coming)                     { Kit::itemMark(r, Kit::ItemMark::MARK_COMING); return; }
     if (it.tick == Tick::TICK_NONE)    { Kit::unfinish(r); return; }
     if (on && it.tick == Tick::TICK_HIDE) { Kit::itemMark(r, Kit::ItemMark::MARK_DOOMED); return; }
-    if (on)                            { Kit::finish(r, w, h, rad, Kit::Finish::FINISH_LIT); return; }
+    if (on)                            { Kit::itemMark(r, Kit::ItemMark::MARK_CHOSEN); return; }
     const Tick now = kindNow();
     if (now != Tick::TICK_NONE && now != it.tick) {   // another kind is ticked: flat, dimmed
         Kit::unfinish(r);
@@ -331,7 +331,7 @@ void fillNav() {
         const bool on = i < s_spec.nLists ? s_list == (int8_t)i
                                           : (s_list < 0 && !strcmp(s_areas[i - s_spec.nLists].id, s_area));
         Kit::finish(items[i], lv_obj_get_width(items[i]), lv_obj_get_height(items[i]),
-                    lv_obj_get_style_radius(items[i], LV_PART_MAIN), on ? Kit::Finish::FINISH_LIT : Kit::Finish::FINISH_SATIN);
+                    lv_obj_get_style_radius(items[i], LV_PART_MAIN), on ? Kit::Finish::FINISH_GLASS : Kit::Finish::FINISH_SATIN);   // round 3: the list showing is glass
     }
 }
 

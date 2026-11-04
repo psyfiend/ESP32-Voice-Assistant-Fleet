@@ -46,6 +46,11 @@ public:
     // -1. A member that is neither is still a member - in its window's Members.
     bool addMember(Card *m, bool tile, int8_t slot);
     void setBinder(CardBinder *b) { _binder = b; }
+    CardBinder *binder() const { return _binder; }
+    // A MEMBER HIDDEN FROM THE PAGE'S CLUSTER, as the group view shows it (K154):
+    // a tile, dimmed and marked "Hidden". Before build().
+    void markHidden(uint8_t i) { if (i < _n) _hidden[i] = true; }
+    bool hiddenAt(uint8_t i) const { return i < _n && _hidden[i]; }
     void setStyle(ClusterStyle s) { _style = s; }
     void setIcons(bool on) { _icons = on; }
     // The tiles across, as the arranger chose them (v8's tc); 0: Layout::tileGrid()'s rule.
@@ -89,6 +94,7 @@ private:
     Card       *_m[GROUP_MEMBERS_MAX] = {nullptr};
     bool        _tile[GROUP_MEMBERS_MAX] = {false};
     int8_t      _slotOf[GROUP_MEMBERS_MAX] = {0};
+    bool        _hidden[GROUP_MEMBERS_MAX] = {false};
     uint8_t     _n = 0;
     CardBinder *_binder = nullptr;
     ClusterStyle _style = ClusterStyle::CLSTYLE_SWATCH;

@@ -551,7 +551,7 @@ void CardPopup::debugService(lv_timer_t *t) {
         else if (a.member >= 0) {
             // As a tap on row N of Members (opens Members first if needed).
             if (s.view != PopupView::VIEW_MEMBERS) showView(PopupView::VIEW_MEMBERS);
-            s_memberPick = (uint8_t)a.member;
+            pickMemberRow((uint8_t)a.member);
             enterMemberAsync(nullptr);
             dbgOut("member %d: %s\n", a.member, s.view == PopupView::VIEW_MEMBER ? "open" : "not open");
         } else {
@@ -644,8 +644,11 @@ void CardPopup::debugService(lv_timer_t *t) {
         else {
             // As the corner icons do: 0 the controls of whatever is showing (a
             // member's, inside one), 1 its history, 4 its scenes, 2 Members
-            // (back out of a member first, as the arrow does). 3 only lists.
-            if (a.view == 2) { if (inMember()) leaveMember(); showView(PopupView::VIEW_MEMBERS); }
+            // (back out of a member first, as the arrow does - unless it has
+            // members of its own, K157: Desk's). 3 only lists. 12 a member's back
+            // arrow: where it was opened from.
+            if (a.view == 2) { if (inMember() && !hasMembers()) leaveMember(); showView(PopupView::VIEW_MEMBERS); }
+            else if (a.view == 12 && inMember()) leaveMember();
             else if (a.view == 0) showView(controlsView());
             else if (a.view == 1) showView(PopupView::VIEW_HISTORY);
             else if (a.view == 4 && hasScenes()) showView(PopupView::VIEW_SCENES);
@@ -654,7 +657,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             else if (a.view == 7 && s.cluster) showView(PopupView::VIEW_CLUSTER_SLOTS);   // 2.11: Header slots
             else if (a.view == 8) showView(PopupView::VIEW_VISIBILITY);   // 2.11 (K96): as SETTINGS' Visibility
             else if (a.view == 9) showView(PopupView::VIEW_ADD_TO);       // ... and its Add to a cluster
-            else if (a.view == 10 && s.cluster) showView(PopupView::VIEW_CLUSTER_ADD);   // a cluster's Add cards
+            else if (a.view == 10 && heldGroup()) showView(PopupView::VIEW_CLUSTER_ADD);   // a group's Edit cards (K155)
             else if (a.view == 11 && s.cluster) showView(PopupView::VIEW_GROUP);         // its group view (2.13)
             dbgMem(mem, sizeof(mem));
             dbgOut("view %d; %s\n", a.view, mem);

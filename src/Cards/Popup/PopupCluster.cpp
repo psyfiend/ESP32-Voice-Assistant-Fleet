@@ -43,10 +43,9 @@ constexpr uint8_t ROW_ICONS = 0, ROW_STYLE = 1;   // Header options' chip rows, 
 
 lv_obj_t *s_table = nullptr;   // the view's chip table
 
-ClusterCard *held() {
-    Card *c = cardOf(h.surface);
-    return (c && s.cluster) ? static_cast<ClusterCard *>(c) : nullptr;
-}
+// The group the panel is about: the held cluster, or a group shown as one card's
+// cluster made again (K155) - its GROUP panel is the same panel.
+ClusterCard *held() { return heldGroup(); }
 
 const char *idOf(const Card *m) { return (m && m->hasId()) ? m->id() : ""; }
 
@@ -196,7 +195,8 @@ void renamed(const char *words, void *) {
     Settings::setCard(cl->id(), "label_text", nullptr);
     CardGroups::apply(*cl, cl->pageAreaColor());
     snprintf(s.area, sizeof(s.area), "%s", cl->area());
-    snprintf(s.name, sizeof(s.name), "%s", cl->area()[0] ? cl->area() : cl->shownName(CardLabel::LBL_NAME));
+    // A cluster is called its group's name; a solo card keeps its own (K146).
+    if (s.cluster) snprintf(s.name, sizeof(s.name), "%s", cl->area()[0] ? cl->area() : cl->shownName(CardLabel::LBL_NAME));
     changed();
     rebuildView();   // the title says it at once; the cluster when the window closes
 }
@@ -584,7 +584,7 @@ void editAct(EditCards::Act a, void *) {
 
 }  // namespace
 
-// EDIT CARDS (K148): the window has the page's room (groupWindow()), the list all of it.
+// EDIT CARDS (K148): the window has the page's room (groupWindowFor()), the list all of it.
 void buildClusterAdd() {
     ClusterCard *cl = held();
     if (!cl) return;
@@ -644,14 +644,52 @@ static char    s_areaIds[HaCatalog::AREAS_MAX + 8][32];
 static uint8_t s_areaN = 0;
 static char    s_addWords[12];
 
-// SHOW AS (K151): the group as one card - the members that switch together
-// behind it, or the one SETTINGS' Face picks there. The page is built again
-// once the window has gone; the card's SETTINGS brings the cluster back.
+// SHOW AS (K151): the group as a cluster or as one card - the members that switch
+// together behind it, or the one Face picks. The page is built again once the
+// window has gone. Here in every presentation (K155).
 static void showAsCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     ClusterCard *cl = held();
     if (!cl || !cl->hasId()) return;
     Settings::setCard(cl->id(), "present", k ? "card" : "cluster");
+    changed();
+}
+
+// FACE (K151): which member a group shown as one card shows - the members that
+// switch together ("All lights"), or one. Greyed while it is a cluster (K155).
+static char    s_faceOpts[400];
+static char    s_faceIds[GROUP_MEMBERS_MAX][CARD_ID_MAX + 1];
+static uint8_t s_faceN = 0;
+
+static uint16_t faceRowBuild(const ClusterCard &cl) {
+    bool lights = false;
+    for (uint8_t k = 0; k < cl.memberCount(); k++) {
+        const Entity *e = cl.memberAt(k) ? cl.memberAt(k)->firstEntity() : nullptr;
+        lights |= e && (e->desc.kind == EntityKind::LIGHT || e->desc.kind == EntityKind::SWITCH);
+    }
+    size_t used = (size_t)snprintf(s_faceOpts, sizeof(s_faceOpts), "%s", lights ? "All lights" : "All members");
+    s_faceN = 0;
+    char cur[CARD_ID_MAX + 1] = "";
+    if (cl.hasId()) Settings::card(cl.id(), "face", cur, sizeof(cur));
+    uint16_t sel = 0;
+    for (uint8_t k = 0; k < cl.memberCount() && s_faceN < GROUP_MEMBERS_MAX; k++) {
+        const Card *m = cl.memberAt(k);
+        if (!m || !m->hasId() || !m->firstEntity() || movedOut(m)) continue;
+        const char *name = m->shownName(CardLabel::LBL_NAME);
+        if (used + strlen(name) + 2 >= sizeof(s_faceOpts)) break;
+        used += (size_t)snprintf(s_faceOpts + used, sizeof(s_faceOpts) - used, "\n%s", name);
+        snprintf(s_faceIds[s_faceN], sizeof(s_faceIds[0]), "%s", m->id());
+        if (!strcmp(cur, m->id())) sel = (uint16_t)(s_faceN + 1);
+        s_faceN++;
+    }
+    return sel;
+}
+
+static void faceDropCb(lv_event_t *ev) {
+    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+    ClusterCard *cl = held();
+    if (!cl || !cl->hasId() || k > s_faceN) return;
+    Settings::setCard(cl->id(), "face", k ? s_faceIds[k - 1] : nullptr);
     changed();
 }
 
@@ -700,10 +738,16 @@ uint8_t clusterSpecs(DeckRowSpec *r) {
     if (cl && CardGroups::ofCard(*cl, g)) HaOffer::groupArea(g.id, area, sizeof(area));
     const uint8_t fresh = area[0] ? HaOffer::newIn(area) : 0;
     snprintf(s_addWords, sizeof(s_addWords), fresh ? "%u new" : "Open", (unsigned)fresh);   // K145
+    // THE SAME ROWS IN EVERY PRESENTATION (K155): what does not apply greyed -
+    // Header options while the group is one card, Face while it is a cluster.
     r[n++] = { "Rename group", DeckRowKind::ROW_BUTTON, "Edit", 0, live, renameCb, nullptr };
-    r[n++] = { "Header options", DeckRowKind::ROW_BUTTON, "Open", 0, live, slotsViewCb, nullptr };
+    r[n++] = { "Header options", DeckRowKind::ROW_BUTTON, "Open", 0, live && s.cluster, slotsViewCb, nullptr };
     r[n++] = { "Edit cards", DeckRowKind::ROW_BUTTON, s_addWords, 0, live, addViewCb, nullptr };   // K148
-    r[n++] = { "Show as", DeckRowKind::ROW_DROP, "Cluster\nSolo card", 0, live, showAsCb, nullptr };   // K151; to confirm
+    r[n++] = { "Show as", DeckRowKind::ROW_DROP, "Cluster\nSolo card", (uint16_t)(s.cluster ? 0 : 1), live, showAsCb,
+               nullptr };   // K151
+    const uint16_t face = cl ? faceRowBuild(*cl) : 0;
+    if (!cl) snprintf(s_faceOpts, sizeof(s_faceOpts), "All members");
+    r[n++] = { "Face", DeckRowKind::ROW_DROP, s_faceOpts, face, live && !s.cluster, faceDropCb, nullptr };   // K151
     const uint16_t sel = areaOptions(area);
     r[n++] = { "Area", DeckRowKind::ROW_DROP, s_areaOpts, sel, live && HaOffer::ready(), areaDropCb, nullptr };   // K145
     return n;

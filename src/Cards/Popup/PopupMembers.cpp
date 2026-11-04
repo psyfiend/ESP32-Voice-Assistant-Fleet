@@ -85,6 +85,11 @@ static void headerGlyph(lv_obj_t *col, const Entity &e, int32_t gap) {
     lv_obj_center(ic);
 }
 
+// MEMBERS' ROWS: a group's member cards - every member, hidden ones too (round
+// 6), and a group shown as one card's too, its header's sensors with them (K157)
+// - else the entities the window stands for (a member's own, inside one).
+static ClusterCard *rowGroup() { return inMember() ? nullptr : heldGroup(); }
+
 void buildMembers() {
     // The stage's height, scrolling if a group has more members than fit. As
     // wide as the controls view's slider and words together, centred, so the
@@ -94,9 +99,7 @@ void buildMembers() {
     // taller than the stage, which centres it.
     lv_obj_t *list = plain(s.stage);
     const int32_t rowW = membersRowW();
-    // A CLUSTER'S MEMBERS ARE ALL HERE, hidden ones too (round 6), each saying so.
-    Card *held = cardOf(h.surface);
-    const ClusterCard *cl = (held && s.cluster) ? static_cast<const ClusterCard *>(held) : nullptr;
+    const ClusterCard *cl = rowGroup();
     // IN THE HEADER, ITS GLYPH OUTSIDE THE ROW ON THE RIGHT (owner, round 2 of the
     // follow-ups): the rows as they were, centred, with a column each side as wide
     // as the glyph and its gap - only when one is in the header.
@@ -118,14 +121,16 @@ void buildMembers() {
     UI::tameScroll(list);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(list, mm(UI::shape().S5), 0);
-    lv_obj_t *rows[POPUP_ENT_MAX] = {};
+    constexpr uint8_t ROWS = GROUP_MEMBERS_MAX > POPUP_ENT_MAX ? GROUP_MEMBERS_MAX : POPUP_ENT_MAX;
+    lv_obj_t *rows[ROWS] = {};
     uint8_t nRows = 0;
     if (cl) clusterMemberNames(*cl);
-    for (uint8_t i = 0; i < memberCount(); i++) {
-        const Entity *e = memberAt(i);
+    const uint8_t total = cl ? cl->memberCount() : memberCount();
+    for (uint8_t i = 0; i < total; i++) {
+        const Entity *e = cl ? (cl->memberAt(i) ? cl->memberAt(i)->firstEntity() : nullptr) : memberAt(i);
         if (!e) continue;
-        // A tap opens that member's own controls (owner, 2.10b).
-        const int8_t k = cl ? clusterMemberOf(*cl, e) : -1;
+        // A tap opens that member's own views (owner, 2.10b; K157).
+        const int8_t k = cl ? (int8_t)i : -1;
         const MemberShown shown = k >= 0 ? clusterMemberShown(*cl, (uint8_t)k) : MemberShown::SHOWN_TILE;
         // A cluster's member: its name as Header options gives it, whether its
         // sensor is in the header, and where it went if it moved out.
@@ -150,7 +155,7 @@ void buildMembers() {
             if (k >= 0 && clusterMemberInHeader(*cl, (uint8_t)k)) headerGlyph(right, *e, gap);
         }
         lv_obj_add_event_cb(r, memberRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
-        if (nRows < POPUP_ENT_MAX) rows[nRows++] = r;
+        if (nRows < ROWS) rows[nRows++] = r;
     }
     lv_obj_t *note = Kit::label(list, KS::KS_LABEL_TAG_DIM);
     // Owner's words, 2026-10-07; a cluster's member is shown or hidden from its own view.
@@ -164,52 +169,117 @@ void buildMembers() {
                     lv_obj_get_style_radius(rows[i], LV_PART_MAIN), Kit::Finish::FINISH_SATIN);
 }
 
-// --- A MEMBER'S OWN CONTROLS (2.10b; owner: tap a row in Members) -----------
-// The same window and the same views, pointed at one member: the group's
-// entities are set aside, and the back arrow puts them back and returns to
-// Members. It needs no card of its own, so Lamp 4 works too.
-uint8_t s_memberPick = 0;
-uint8_t s_groupCtl   = 0;   // the group's control, restored on the way back
+// --- A MEMBER'S OWN VIEWS (2.10b; owner: tap a row in Members) --------------
+// The same window and the same views, pointed at one member: the window's
+// entities are set aside, and the back arrow puts them back and returns where
+// the member was opened from - Members, or the group view. It needs no card of
+// its own, so Lamp 4 works too. A MEMBER THAT IS A CARD OF ITS OWN opens as a
+// long press on its tile does (K157): its entities, its name, its own Members -
+// Desk in Office, and one of Desk's lamps from there. Two levels at most (K147).
+namespace {
+constexpr uint8_t DEPTH_MAX = 2;
+struct Level {
+    const Entity *ent[POPUP_ENT_MAX];
+    uint8_t       nEnt;
+    const Entity *native;
+    bool          expanded;
+    uint8_t       lightCtl;   // the control it showed, restored on the way back
+    PopupView     back;       // where the member was opened from
+};
+Level s_lv[DEPTH_MAX];
+Card *s_mCard[DEPTH_MAX] = {};                // each level's member: its card, or null
+char  s_mName[DEPTH_MAX][ENTITY_NAME_MAX];    // ... and its name
+
+// What is to be entered (deferred: a row or a tile is in the stage about to be cleaned).
+Card         *s_pickCard = nullptr;
+const Entity *s_pickEnt  = nullptr;
+PopupView     s_pickView = PopupView::VIEW_MEMBER;
+}  // namespace
 
 void enterMemberAsync(void *unused) {
     (void)unused;
-    if (s.phase != PopupPhase::PHASE_OPEN || inMember() ||
+    if (s.phase != PopupPhase::PHASE_OPEN || s.depth >= DEPTH_MAX ||
         (s.view != PopupView::VIEW_MEMBERS && s.view != PopupView::VIEW_GROUP)) return;   // a row, or a tile (2.13)
-    const Entity *m = (s_memberPick < memberCount()) ? memberAt(s_memberPick) : nullptr;
+    Card *mc = s_pickCard;
+    const Entity *m = mc ? mc->firstEntity() : s_pickEnt;
     if (!m) return;
-    for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.groupEnt[i] = s.ent[i];
-    s.groupN = s.nEnt;
-    s_groupCtl = s.lightCtl;
+    Level &L = s_lv[s.depth];
+    for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) L.ent[i] = s.ent[i];
+    L.nEnt     = s.nEnt;
+    L.native   = s.native;
+    L.expanded = s.expanded;
+    L.lightCtl = s.lightCtl;
+    L.back     = s.view;
+    s_mCard[s.depth] = mc;
+    // ITS CARD'S NAME ("Desk"), the window's title says (K157); HA's for an entity with none.
+    snprintf(s_mName[s.depth], sizeof(s_mName[0]), "%s", mc ? mc->shownName(CardLabel::LBL_NAME) : m->desc.name);
+    s.depth++;
     for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.ent[i] = nullptr;
-    s.ent[0] = m;
-    s.nEnt   = 1;
+    s.nEnt = 0;
+    if (mc) {
+        for (uint8_t i = 0; i < mc->entityCount() && s.nEnt < POPUP_ENT_MAX; i++)
+            if (const Entity *e = mc->entityAt(i)) s.ent[s.nEnt++] = e;
+    } else {
+        s.ent[s.nEnt++] = m;
+    }
+    // One entity HA defines as a group (Desk is light.office): its members are its Members.
+    s.native   = (s.nEnt == 1 && s.ent[0]->nMembers) ? s.ent[0] : nullptr;
+    s.expanded = false;
+    applyNative();
     s.lightCtl = firstCtl(lightAggregate().caps);
-    showView(PopupView::VIEW_MEMBER);
+    const PopupView v = s_pickView == PopupView::VIEW_HISTORY ? PopupView::VIEW_HISTORY
+                      : s_pickView == PopupView::VIEW_MEMBERS && hasMembers() ? PopupView::VIEW_MEMBERS
+                      : PopupView::VIEW_MEMBER;
+    showView(v);
+}
+
+void pickMemberRow(uint8_t i) {
+    const ClusterCard *cl = rowGroup();
+    s_pickCard = cl ? cl->memberAt(i) : nullptr;
+    s_pickEnt  = cl ? nullptr : memberAt(i);
+    s_pickView = PopupView::VIEW_MEMBER;
 }
 
 // A row in Members. Deferred: the row is in the stage that is about to be
 // cleaned, and an event callback must not delete its own object.
 void memberRowCb(lv_event_t *ev) {
-    s_memberPick = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
+    pickMemberRow((uint8_t)(uintptr_t)lv_event_get_user_data(ev));
     lv_async_call(enterMemberAsync, nullptr);
 }
 
-void enterMemberAt(uint8_t i) {
-    s_memberPick = i;
+void enterMember(Card *card, const Entity *e, PopupView v) {
+    s_pickCard = card;
+    s_pickEnt  = card ? nullptr : e;
+    s_pickView = v;
     lv_async_call(enterMemberAsync, nullptr);
 }
 
-// Out of a member, to the group's Members (the back arrow) or its controls
-// (the "Desk" in the title).
+Card *memberCard() { return s.depth ? s_mCard[s.depth - 1] : nullptr; }
+const char *memberName() { return s.depth ? s_mName[s.depth - 1] : s.name; }
+const char *memberParentName() { return s.depth >= 2 ? s_mName[s.depth - 2] : s.name; }
+
+void memberForget() {
+    s.depth = 0;
+    for (Card *&c : s_mCard) c = nullptr;
+    s_pickCard = nullptr;
+    s_pickEnt  = nullptr;
+}
+
+// Out of a member, one level: back where it was opened from, or to the
+// controls there (the "Desk" in the title).
 void leaveMember(PopupView to) {
     if (!inMember()) return;
-    for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.ent[i] = s.groupEnt[i];
-    s.nEnt     = s.groupN;
-    s.groupN   = 0;
+    s.depth--;
+    const Level &L = s_lv[s.depth];
+    for (uint8_t i = 0; i < POPUP_ENT_MAX; i++) s.ent[i] = L.ent[i];
+    s.nEnt     = L.nEnt;
+    s.native   = L.native;
+    s.expanded = L.expanded;
+    s_mCard[s.depth] = nullptr;
     applyNative();   // the member may have been paused or resumed meanwhile
     s.view     = PopupView::VIEW_MEMBERS;   // not Scenes: its slider swap is the member's
-    s.lightCtl = s_groupCtl;
-    showView(to);
+    s.lightCtl = L.lightCtl;
+    showView(to == PopupView::VIEW_MEMBERS ? L.back : to == PopupView::VIEW_MAIN ? controlsView() : to);
 }
 
 } // namespace popup

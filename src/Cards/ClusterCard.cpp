@@ -200,6 +200,15 @@ void ClusterCard::buildBody(lv_obj_t *body) {
         lv_obj_set_pos (m->root(), pad() + x, tilesTop() + y + (g.tileH - th) / 2);
         lv_obj_set_size(m->root(), w, th);
         if (_binder) _binder->add(m);
+        // HIDDEN, SAID IN WORDS AND BY THE EYE (K143: "clearly noted"; K154), never
+        // by colour alone: dimmed, its word in the corner.
+        if (_hidden[i]) {
+            lv_obj_set_style_opa(m->root(), LV_OPA_70, 0);
+            lv_obj_t *tag = Kit::label(m->root(), KS::KS_LABEL_TAG_DIM);
+            lv_obj_add_flag(tag, LV_OBJ_FLAG_FLOATING);
+            lv_obj_align(tag, LV_ALIGN_TOP_LEFT, vgap(), vgap());
+            lv_label_set_text(tag, "Hidden");   // K143's word
+        }
     }
 }
 

@@ -10,6 +10,8 @@
 #include "Layout/Layout.h"
 #include "Cards/PageArranger.h"   // the arranger's kept answers (2.11 round 2)
 
+class ClusterCard;
+
 // ---------------------------------------------------------------------------
 // CardPage - a grid of cards, rendered from a PageSpec.
 //
@@ -138,6 +140,15 @@ public:
     uint8_t        crowdedCount() const { return _nCrowded; }
     const Crowded &crowded(uint8_t i) const { return _crowded[i < CROWDED_MAX ? i : 0]; }
 
+    // A GROUP CARD'S CLUSTER, made again from its spec for the card window (2.13
+    // round 3, K154, K155): every member, configured as the page configures it,
+    // NOT BUILT - the caller builds it, or only reads it, and deletes it. `allTiles`:
+    // the group view's - every member a tile but the header's and the moved, the
+    // hidden ones last and marked; else as the page shows it (a solo group card's
+    // GROUP panel reads its members from it). Live (the binder) only with
+    // `allTiles`. Null when this page has no group card of that id.
+    ClusterCard *makeGroup(const char *id, bool allTiles);
+
 private:
     // Where one card ended up: the engine's Place (col, row, spans, placed,
     // pinFail). Held beside the card rather than on it because it is the PAGE's
@@ -152,6 +163,12 @@ private:
     Card *makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, uint8_t i,
                    Card *made = nullptr);
     Card *makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg);
+    // The cluster itself, its members in it (makeGroupCard() places it; makeGroup() hands it out).
+    ClusterCard *newCluster(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, bool allTiles);
+    // The page as applySpec() was given it, for makeGroup(): its cards are GUIManager's
+    // merged list, which lives as long as this page.
+    PageSpec        _spec = {};
+    EntityRegistry *_reg  = nullptr;
 
     // THE ARRANGER (2.11, K105, K109): the page's blocks - its cards and
     // clusters - placed by the arranger's kept answer for exactly these blocks:

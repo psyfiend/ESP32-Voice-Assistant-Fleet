@@ -142,10 +142,12 @@ void itemMark(lv_obj_t *o, ItemMark m) {
     if (!o) return;
     lv_obj_remove_style(o, style(KitStyle::KS_ITEM_DOOMED), 0);
     lv_obj_remove_style(o, style(KitStyle::KS_ITEM_COMING), 0);
+    lv_obj_remove_style(o, style(KitStyle::KS_ITEM_CHOSEN), 0);
     lv_obj_remove_event_cb(o, comingDraw);
     if (m == ItemMark::MARK_NONE) return;
     unfinish(o);
-    add(o, m == ItemMark::MARK_DOOMED ? KitStyle::KS_ITEM_DOOMED : KitStyle::KS_ITEM_COMING);
+    add(o, m == ItemMark::MARK_DOOMED ? KitStyle::KS_ITEM_DOOMED
+         : m == ItemMark::MARK_CHOSEN ? KitStyle::KS_ITEM_CHOSEN : KitStyle::KS_ITEM_COMING);
     if (m == ItemMark::MARK_COMING) lv_obj_add_event_cb(o, comingDraw, LV_EVENT_DRAW_MAIN_END, nullptr);
     lv_obj_invalidate(o);
 }

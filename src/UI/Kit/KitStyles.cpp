@@ -244,6 +244,14 @@ static void fill() {
     lv_style_set_shadow_color  (doomed, UI::c(p.ST_BAD));
     lv_style_set_shadow_opa    (doomed, LV_OPA_40);
     lv_style_set_bg_color(st(S::KS_ITEM_COMING), UI::c(UI::mix(p.SURFACE, p.ACCENT, 10)));
+    // CHOSEN is a lit chip's look (round 3, the owner): KS_CHIP_LIT's tint, its
+    // accent edge as an outline inside the item.
+    lv_style_t *chosen = st(S::KS_ITEM_CHOSEN);
+    const int32_t chipW = LV_MAX(1, UI::mm(k.LINE_MID));
+    lv_style_set_bg_color     (chosen, UI::c(UI::mix(p.SURFACE, p.ACCENT, 25)));
+    lv_style_set_outline_width(chosen, chipW);
+    lv_style_set_outline_pad  (chosen, -chipW);
+    lv_style_set_outline_color(chosen, UI::c(p.ACCENT));
 
     // --- Pills (scene buttons) and swatches ---
     lv_style_t *pill = st(S::KS_PILL);

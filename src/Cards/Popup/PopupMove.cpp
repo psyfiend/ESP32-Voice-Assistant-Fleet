@@ -230,7 +230,7 @@ void collectGroups() {
         snprintf(s_grpWord[i], sizeof(s_grpWord[0]), own ? "%s *" : "%s", s_grp[i].name);
         s_grpWords[i] = s_grpWord[i];
     }
-    s_grpWords[groupNew()]  = "New group";
+    s_grpWords[groupNew()]  = "New label";   // K158: a page card's colored name
     s_grpWords[groupNone()] = "None";
 }
 
@@ -429,14 +429,13 @@ void askDash() {
              acc(a, sizeof(a), from));
     else
         line("This card will be removed from the group %s and placed onto the dashboard.", acc(a, sizeof(a), from));
+    // K158: the page card's label.
     if (m.pick == groupNone())
-        line("The card will not be a member of any group.");
+        line("The card will have no label.");
     else if (m.pick == s_cur)
-        line(m.move ? "The card will still be a member of the %s group, certain group settings may affect this card."
-                    : "The card will still be a member of the %s group but certain settings can be applied "
-                      "separately to each card.", acc(a, sizeof(a), pickName()));
+        line("The card will keep the label %s.", acc(a, sizeof(a), pickName()));
     else
-        line("The card will become a member of the group %s.", acc(a, sizeof(a), pickName()));
+        line("The card will be labeled %s.", acc(a, sizeof(a), pickName()));
     line(RESTORABLE);
     if (m.move && lastTile())
         line("The group %s will be empty after moving this card. An empty group will be hidden automatically "
@@ -480,13 +479,9 @@ void askGroup() {
     char a[96], b[96];
     lines();
     const bool toNone = m.pick == groupNone();
-    if (s_cur == 0xFF)
-        line("This will add the card to the group %s.", acc(a, sizeof(a), pickName()));
-    else if (toNone)
-        line("This will remove the card from group %s, leaving it with no group.", acc(a, sizeof(a), s_grp[s_cur].name));
-    else
-        line("This will remove the card from group %s and add it to the group %s.",
-             acc(a, sizeof(a), s_grp[s_cur].name), acc(b, sizeof(b), pickName()));
+    // K158: "This card's label will change from A to B."
+    line("This card's label will change from %s to %s.", acc(a, sizeof(a), s_cur == 0xFF ? "None" : s_grp[s_cur].name),
+         acc(b, sizeof(b), toNone ? "None" : pickName()));
     line(RESTORABLE);
     confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Change label for this card?", s_lines, s_nLines, "Confirm",
                Kit::ButtonRole::BTN_CONFIRM, doGroup);
@@ -512,7 +507,7 @@ void next() {
     collectGroups();
     if (m.pick == groupNew()) {
         Kit::KeyboardSpec k = {};
-        k.title  = "New group name";
+        k.title  = "New label name";   // K158
         k.maxLen = sizeof(s_newName) - 1;
         k.save   = named;
         Kit::keyboard(k);
@@ -640,10 +635,10 @@ void buildJoin() {
     }
     collectGroups();
     if (m.pick > groupNone()) m.pick = groupNone();
-    words(list, KS::KS_LABEL_NAME, "Select group for this card:");
+    words(list, KS::KS_LABEL_NAME, "Select label for this card:");   // K158
     s_grid = Kit::chipGrid(list, listW(), s_grpWords, (uint8_t)(s_nGrp + 2), m.pick, gridCb);
-    words(list, KS::KS_LABEL_TAG_DIM, "Select 'New group' to create a new group for this card. Select 'None' to add "
-                                      "the card with no group assigned.");
+    words(list, KS::KS_LABEL_TAG_DIM, "Select 'New label' to create a new label for this card. Select 'None' to add "
+                                      "the card with no label.");
     if (m.mode == MoveMode::MOVE_DASH && member)
         words(list, KS::KS_LABEL_TAG_DIM, "Members of a group card cannot be moved, only copied.");
     nextRow(list, m.mode == MoveMode::MOVE_DASH, member);
@@ -791,9 +786,10 @@ void restoreAsk(const Card *c) {
         const CardSpec *cs = CardAdded::specOf(s_rid);
         const bool has = !strcmp(was, "inherit") ? CardGroups::ofId(nullptr, cs ? cs->area : c->sheetArea(), g)
                        : strcmp(was, "none") ? CardGroups::byId(was, g) : false;
-        if (has) line("This card was originally a member of the %s group.", acc(a, sizeof(a), g.name));
-        else     line("This card was originally not a member of any group.");
-        line("Tap 'Restore' to assign this card back to its original group %s.", acc(a, sizeof(a), has ? g.name : "None"));
+        // K158: a page card's label.
+        if (has) line("This card was originally labeled %s.", acc(a, sizeof(a), g.name));
+        else     line("This card originally had no label.");
+        line("Tap 'Restore' to give this card its original label %s.", acc(a, sizeof(a), has ? g.name : "None"));
         confirmAsk(Kit::DialogRole::DLG_DESTRUCTIVE, RESTORE_TITLE, s_lines, s_nLines, "Restore",
                    Kit::ButtonRole::BTN_DESTRUCTIVE, goGroup);
         return;
@@ -807,7 +803,7 @@ void restoreAsk(const Card *c) {
             clusterNameNow(hc->id, now, sizeof(now));
             line("This card was originally a member of the %s group.", acc(a, sizeof(a), now));
         } else if (o && pageGroup(o, g)) {
-            line("This card was originally a member of the %s group.", acc(a, sizeof(a), g.name));
+            line("This card was originally labeled %s.", acc(a, sizeof(a), g.name));   // a page card's (K158)
         }
         line("The original copy of this card still exists in its original state, tap 'Delete' to confirm you "
              "wish to delete this copy.");
@@ -848,10 +844,11 @@ void restoreAsk(const Card *c) {
         }
     } else {
         const bool has = o && pageGroup(o, g);
-        if (has) snprintf(l1, sizeof(l1), "This card was originally a member of the %s group.%s", acc(a, sizeof(a), g.name), nameLine);
-        else     snprintf(l1, sizeof(l1), "This card was originally not a member of any group.%s", nameLine);
+        // A page card's (K158): its label.
+        if (has) snprintf(l1, sizeof(l1), "This card was originally labeled %s.%s", acc(a, sizeof(a), g.name), nameLine);
+        else     snprintf(l1, sizeof(l1), "This card originally had no label.%s", nameLine);
         line("%s", l1);
-        snprintf(l2, sizeof(l2), "Tap 'Restore' to confirm you wish to restore it to the %s group%s.",
+        snprintf(l2, sizeof(l2), "Tap 'Restore' to confirm you wish to restore it to the page with the label %s%s.",
                  acc(b, sizeof(b), has ? g.name : "None"), nameTail);
         line("%s", l2);
     }

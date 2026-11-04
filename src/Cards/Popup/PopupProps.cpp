@@ -34,8 +34,8 @@ void buildProps() {
         propRow(list, "Name in HA", ha ? (e->sourceName[0] ? e->sourceName : e->desc.name) : "");
         propRow(list, "Entity ID", e->desc.externalRef[0] ? e->desc.externalRef : e->desc.id);
         propRow(list, "Area in HA", ha ? (e->sourceArea[0] ? e->sourceArea : "None") : "");
-        CardGroups::Group g;   // its group on this dashboard (K46)
-        if (c) propRow(list, "Card group", CardGroups::ofCard(*c, g) ? g.name : "None");
+        CardGroups::Group g;   // its label on this dashboard (K46, K158); a cluster's group
+        if (c) propRow(list, s.cluster ? "Group" : "Card label", CardGroups::ofCard(*c, g) ? g.name : "None");
         const bool mine = e->desc.source == EntitySource::SYSTEM || e->desc.source == EntitySource::LOCAL;
         propRow(list, "Device", ha ? (e->sourceDevice[0] ? e->sourceDevice : "None") : mine ? "This board" : "");
         propRow(list, "Device class", e->desc.deviceClass);
@@ -47,7 +47,7 @@ void buildProps() {
     // A card standing for several entities made here: its group and id after them.
     if (Card *c = (!e && !inMember()) ? cardOf(h.surface) : nullptr) {
         CardGroups::Group g;
-        propRow(list, "Card group", CardGroups::ofCard(*c, g) ? g.name : "None");
+        propRow(list, s.cluster ? "Group" : "Card label", CardGroups::ofCard(*c, g) ? g.name : "None");
         propRow(list, "Card ID", c->hasId() ? c->id() : "");
     }
     // The values in one column, after the longest words (#97).

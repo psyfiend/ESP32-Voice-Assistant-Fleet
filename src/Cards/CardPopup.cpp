@@ -1,4 +1,5 @@
 #include "Popup/PopupState.h"
+#include "Cards/ClusterCard.h"   // a group's members (K157)
 
 // See CardPopup.h for what this is and docs/design/card-sheet.md sections 11-13
 // for why it looks the way it does. Step 1 of 2.10a: the window, its header,
@@ -41,11 +42,16 @@ uint32_t signature() {
     // The entities shown, and - for a group defined at the source - its
     // members, whose rows the Members view shows and whose pauses change what
     // the window stands for (2.10c).
-    const Entity *all[2 * POPUP_ENT_MAX];
+    // A group's members, all of them (K157: Members lists past the window's six).
+    constexpr uint8_t ALL_MAX = 2 * POPUP_ENT_MAX + GROUP_MEMBERS_MAX;
+    const Entity *all[ALL_MAX];
     uint8_t nAll = 0;
     for (uint8_t i = 0; i < s.nEnt; i++) all[nAll++] = s.ent[i];
     if (s.native) for (uint8_t i = 0; i < s.native->nMembers && nAll < 2 * POPUP_ENT_MAX; i++)
         all[nAll++] = memberAt(i);
+    if (const ClusterCard *g = inMember() ? nullptr : heldGroup())
+        for (uint8_t i = 0; i < g->memberCount() && nAll < ALL_MAX; i++)
+            if (g->memberAt(i)) all[nAll++] = g->memberAt(i)->firstEntity();
     for (uint8_t i = 0; i < nAll; i++) {
         const Entity *e = all[i];
         if (!e) continue;
@@ -101,6 +107,7 @@ void showView(PopupView v) {
     const PopupView was = s.view;
     s.view = v;
     forgetMainWidgets();
+    groupViewForget();   // the group view's cluster: its cards before their widgets (K154)
     lv_obj_clean(s.stage);
     // HISTORY REACHES UP INTO THE HEADER ROW (owner, round 6): see histTopRow().
     lv_obj_set_style_pad_row(s.win, v == PopupView::VIEW_HISTORY ? -histLift() : mm(UI::shape().S5), 0);
@@ -116,14 +123,18 @@ void showView(PopupView v) {
 
     const bool member   = inMember();
     const bool controls = (v == PopupView::VIEW_MAIN || v == PopupView::VIEW_MEMBER);
-    // THE GROUP VIEW HAS THE PAGE'S ROOM (2.13, K143); every other view the
-    // window's own. Before the title is laid out: it is sized from the window.
-    groupWindow(v == PopupView::VIEW_GROUP || v == PopupView::VIEW_CLUSTER_ADD);   // Edit cards too (K148)
+    // THE GROUP VIEW IS ITS CLUSTER, FITTED AND BARE (K154); Edit cards has the
+    // page's room (K148); every other view the window's own. Before the title is
+    // laid out: it is sized from the window.
+    groupWindowFor(v);
     // X on the controls, the back arrow everywhere else (owner, round 4). A
     // cluster opens on either of its two views, so both have the X.
     setText(s.lblLeft, (v == controlsView() || v == PopupView::VIEW_GROUP) && !member ? LV_SYMBOL_CLOSE : LV_SYMBOL_LEFT);
     cornerLook(s.btnHistory, true, v == PopupView::VIEW_HISTORY);
-    if (s.cluster && s.btnMembers) {
+    if (member) {
+        // A MEMBER WITH MEMBERS OF ITS OWN HAS THEM (K157): Desk's lamps.
+        cornerLook(s.btnMembers, hasMembers(), v == PopupView::VIEW_MEMBERS);
+    } else if (s.cluster && s.btnMembers) {
         // A GROUP'S TWO VIEWS (K150): its name in the title goes between them;
         // the group view has no tabs, Members shows its own lit.
         const bool groupView = v == PopupView::VIEW_GROUP;
@@ -137,8 +148,9 @@ void showView(PopupView v) {
     // The left panel belongs to its view: CHART to History, SCENES to Scenes.
     sideFor(v);
 
-    // Whose view it is: the window's, or (inside one) the member's.
-    const char *who = (member && s.ent[0]) ? s.ent[0]->desc.name : s.name;
+    // Whose view it is: the window's, or (inside one) the member's - its card's
+    // name, "Desk", where it has one (K157).
+    const char *who = member ? memberName() : s.name;
     char title[ENTITY_NAME_MAX + 16];
     if (v == PopupView::VIEW_GROUP || (v == PopupView::VIEW_MEMBERS && s.cluster && !member)) {
         // A group's name alone, on either of its views (K150): a tap on it is the other view.
@@ -154,8 +166,8 @@ void showView(PopupView v) {
         }
         setText(s.lblTitleName, s.name);
     } else if (v == PopupView::VIEW_MEMBER) {
-        // "Group > member" (card-sheet 11.1).
-        snprintf(title, sizeof(title), "%s > ", s.name);
+        // "Group > member" (card-sheet 11.1): "Office > Desk", "Desk > Lamp 1".
+        snprintf(title, sizeof(title), "%s > ", memberParentName());
         setText(s.lblTitleArea, title);
         setText(s.lblTitleName, who);
     } else {
@@ -211,9 +223,9 @@ void goBack() {
     switch (s.view) {
         case PopupView::VIEW_MAIN:   CardPopup::close();     break;
         case PopupView::VIEW_GROUP:  CardPopup::close();     break;   // a cluster's own view: its X
-        case PopupView::VIEW_MEMBERS:   // a cluster's own view: its X
-            if (s.cluster) CardPopup::close();
-            else           showView(controlsView());
+        case PopupView::VIEW_MEMBERS:   // a cluster's own view: its X; a member's Members: its controls
+            if (s.cluster && !inMember()) CardPopup::close();
+            else                          showView(controlsView());
             break;
         case PopupView::VIEW_MEMBER: leaveMember();          break;
         case PopupView::VIEW_ADD_TO: showView(PopupView::VIEW_VISIBILITY); break;   // its view's own
@@ -279,8 +291,12 @@ void intfCycleCb(lv_event_t *ev) {
 // (mdi:movie-open, a clapperboard - HA's own scene icon, the palette, is
 // Colour's here).
 // ---------------------------------------------------------------------------
+// A Members tab wherever one could show: a cluster's members may have members of
+// their own (Desk, K157).
+static bool membersTab() { return hasMembers() || s.cluster; }
+
 void buildFirst() {
-    if (hasMembers()) { s.btnMembers = s.tab[0]; s.btnHistory = s.tab[1]; }
+    if (membersTab()) { s.btnMembers = s.tab[0]; s.btnHistory = s.tab[1]; }
     else              { s.btnHistory = s.tab[0]; }
     s.btnScenes = s.floatTab;
     showView(PopupView::VIEW_MAIN);
@@ -297,7 +313,8 @@ void tick(uint32_t now) {
     // not only on a change, because leaving a member's own view settles the
     // signature before this could see it. Not in a member's own view, whose
     // ent[] is that member.
-    if (s.native && !inMember() && nativeWantsMembers() != s.expanded) {
+    // A member's own (K157: Desk is light.office) is followed the same way.
+    if (s.native && nativeWantsMembers() != s.expanded) {
         applyNative();
         // Scenes go while a member is paused: from their view, back to the controls.
         showView((s.view == PopupView::VIEW_SCENES && !hasScenes()) ? controlsView() : s.view);
@@ -321,7 +338,8 @@ void tick(uint32_t now) {
     if (sig != s.lastSig) {
         s.lastSig = sig;
         const bool climate = s.view == PopupView::VIEW_MAIN && s.ent[0] && s.ent[0]->desc.kind == EntityKind::CLIMATE;
-        if (s.view == PopupView::VIEW_MEMBERS || s.view == PopupView::VIEW_GROUP || climate) showView(s.view);
+        // The group view's tiles and header follow by themselves (the binder, K154).
+        if (s.view == PopupView::VIEW_MEMBERS || climate) showView(s.view);
         else                                    renderMain();
         s.lastAgeMs = now;
     } else if (now - s.lastAgeMs >= 1000) {
@@ -341,6 +359,7 @@ uint32_t s_closeT0 = 0;
 
 void closing() {
     confirmClose();   // Remove card's dialog, if it was up
+    groupViewForget();   // the group view's cards, before the window's widgets go
 #ifdef DEBUG_POPUP
     s_closeT0 = micros();
 #endif
@@ -350,10 +369,12 @@ void closing() {
 void closed() {
     forgetWidgets();
     groupForget();   // the window that had the page's room went with it
+    groupModelForget();
+    memberForget();
     holdDetach();
     s.phase = PopupPhase::PHASE_CLOSED;
     s.nEnt = 0;
-    s.groupN = 0;
+    s.groupCard = false;
     s.native = nullptr;
     s.expanded = false;
     s.lastScene = -1;
@@ -388,7 +409,7 @@ void showWindow() {
     k.leftCb  = leftCb;
     k.crumbCb = crumbCb;
     if (s.cluster) k.nameCb = nameCb;
-    k.nTabs   = hasMembers() ? 2 : 1;
+    k.nTabs   = membersTab() ? 2 : 1;
     if (k.nTabs == 2) { k.tabGlyph[0] = MDI_LIGHTBULB_GROUP; k.tabCb[0] = membersCb; }
     k.tabGlyph[k.nTabs - 1] = MDI_CHART_BAR;
     k.tabCb[k.nTabs - 1]    = historyCb;
@@ -454,8 +475,16 @@ void CardPopup::close() {
     Kit::sheetClose(s);
 }
 
+void CardPopup::setGroupMaker(ClusterCard *(*maker)(const char *id, bool allTiles)) { s_groupMaker = maker; }
+
 void CardPopup::open(Card &card) {
-    if (s.phase != PopupPhase::PHASE_CLOSED) return;
+    // A CARD IN THE OPEN WINDOW (the group view's, K154): its member opens there.
+    // The finger is still down: its release must land nowhere.
+    if (s.phase != PopupPhase::PHASE_CLOSED) {
+        if (groupViewRoute(card, OPEN_CONTROLS))
+            if (lv_indev_t *in = lv_indev_active()) lv_indev_wait_release(in);
+        return;
+    }
     if (!card._surface || !card._nPrimary) return;
 
     // A FINGER THAT MOVED IS A DRAG, NOT A LONG PRESS (card-sheet 7). LVGL
@@ -485,6 +514,8 @@ void CardPopup::open(Card &card) {
     applyNative();
     s.tempUnit = card.tempUnit();
     s.cluster  = !strcmp(card.typeName(), "cluster");
+    s.groupCard = !s.cluster && card.groupCard();   // K155: its GROUP panel; K157: all its Members
+    groupModelOpen(card);
     s.groupOn  = card.groupOn();
     s.sceneShow = card.sceneShow();
     s.lightCtl = firstCtl(lightAggregate().caps);   // D3: open on the control
@@ -531,6 +562,7 @@ static void openView(uint8_t view) {
 }
 
 void CardPopup::openOn(Card &card, uint8_t view) {
+    if (isOpen()) { groupViewRoute(card, view); return; }   // a tap in the group view (K154)
     s_openFromTap = true;
     open(card);
     s_openFromTap = false;
@@ -538,6 +570,11 @@ void CardPopup::openOn(Card &card, uint8_t view) {
 }
 
 void CardPopup::openHeldOn(Card &card, uint8_t view) {
+    if (isOpen()) {   // a long press in the group view (K154)
+        if (groupViewRoute(card, view))
+            if (lv_indev_t *in = lv_indev_active()) lv_indev_wait_release(in);
+        return;
+    }
     open(card);
     if (isOpen()) openView(view);
 }

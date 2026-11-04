@@ -83,6 +83,12 @@ public:
     // the one thing an event callback must not do.
     static void close();
 
+    // A GROUP CARD'S CLUSTER, from the page (2.13 round 3, K154, K155): the group
+    // view draws it, a solo group card's GROUP panel reads it. GUIManager hands the
+    // page's maker down (UI registers with the layers below it). See
+    // CardPage::makeGroup(); the window deletes what it is given.
+    static void setGroupMaker(class ClusterCard *(*maker)(const char *id, bool allTiles));
+
     // A choice in Card UI wants the page built again (Card density): true once,
     // after the window has gone - it holds the page's cards (2.8 round 3).
     static bool takeRebuildWanted();

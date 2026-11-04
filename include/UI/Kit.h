@@ -55,7 +55,7 @@ enum class KitStyle : uint8_t {
     // A list item's marks (Kit::itemMark(), 2.13 round 2): ticked to go - tinted
     // toward ST_BAD, a red edge inside and a glow; about to come - tinted toward
     // the accent (its dashed edge is drawn).
-    KS_ITEM_DOOMED, KS_ITEM_COMING,
+    KS_ITEM_DOOMED, KS_ITEM_COMING, KS_ITEM_CHOSEN,
     // A round button with words (a scene) and its pressed tint; a colour
     // swatch (its colour is its own, set by the caller); the PAUSED badge.
     KS_PILL, KS_PILL_PRESSED, KS_SWATCH, KS_BADGE_PAUSED,
@@ -373,10 +373,12 @@ void      factColumns(lv_obj_t *list);
 lv_obj_t *item(lv_obj_t *parent);
 // AN ITEM'S MARK (2.13 round 2, K148): what a list showing the result of a
 // choice says about one row. DOOMED - ticked to go (hidden, removed): red, with
-// a glow; COMING - about to be added: a dashed edge in the accent. Edges are an
-// outline and drawing, never a border, so nothing inside moves. A marked item
-// shows no finish: call it after Kit::finish(). MARK_NONE takes a mark away.
-enum class ItemMark : uint8_t { MARK_NONE, MARK_DOOMED, MARK_COMING };
+// a glow; COMING - about to be added: a dashed edge in the accent; CHOSEN - ticked
+// to add or restore: a lit chip's look (round 3, the owner), its tint and its
+// accent edge. Edges are an outline and drawing, never a border, so nothing
+// inside moves. A marked item shows no finish: call it after Kit::finish().
+// MARK_NONE takes a mark away.
+enum class ItemMark : uint8_t { MARK_NONE, MARK_DOOMED, MARK_COMING, MARK_CHOSEN };
 void itemMark(lv_obj_t *o, ItemMark m);
 
 // TEXT FITTED TO ITS ROOM (2.13 round 2, K152, after NINA's ui_text_fit): the

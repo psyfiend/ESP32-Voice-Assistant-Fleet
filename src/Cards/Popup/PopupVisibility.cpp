@@ -90,9 +90,11 @@ void actions(lv_obj_t *list, const Action *a, uint8_t n, bool restore) {
 // THE SAME WORDS FOR CARDS AND TILES (round 14, the owner's).
 const char *const VIS_NOTE = "Paused cards will not send or receive any updates. Hidden cards can be restored.";
 
-// The cluster the subject is in: the held tile's, or the window's own.
+// The cluster the subject is in: the held tile's, or the window's own group's -
+// a cluster's, or a group shown as one card's (K155).
 ClusterCard *clusterOfSubject() {
-    if (s.cluster && inMember()) return static_cast<ClusterCard *>(held());
+    if (inMember())
+        if (ClusterCard *g = heldGroup()) return g;
     return clusterOfTile();
 }
 
@@ -151,12 +153,16 @@ void pausedChipCb(lv_event_t *ev) {
 
 }  // namespace
 
+// In a group's member: that member's own card (K157) - none for one of Desk's
+// lamps, which has no card of its own here.
 Card *visibilitySubject() {
     Card *c = held();
-    if (!(c && s.cluster && inMember())) return c;
-    ClusterCard *cl = static_cast<ClusterCard *>(c);
-    const int8_t i = clusterMemberOf(*cl, s.ent[0]);
-    return i >= 0 ? cl->memberAt((uint8_t)i) : nullptr;
+    ClusterCard *g = heldGroup();
+    if (!(c && g && inMember())) return c;
+    Card *m = memberCard();
+    for (uint8_t i = 0; m && i < g->memberCount(); i++)
+        if (g->memberAt(i) == m) return m;
+    return nullptr;
 }
 
 // Hide from the cluster: gone from it when the window closes. From its tile the
@@ -165,7 +171,7 @@ void visibilityHideTile() {
     Card *c = visibilitySubject();
     ClusterCard *cl = clusterOfSubject();
     if (!c || !c->hasId() || !c->mini() || s.phase != PopupPhase::PHASE_OPEN) return;
-    if (s.cluster && inMember()) {
+    if (heldGroup() && inMember()) {
         const int8_t i = cl ? clusterMemberOf(*cl, c->firstEntity()) : -1;
         if (i >= 0) clusterMemberShow(*cl, (uint8_t)i, false);
         showView(PopupView::VIEW_VISIBILITY);
@@ -180,7 +186,7 @@ void buildVisibility() {
     Card *held_ = held();
     // A GROUP CARD'S MEMBER (Desk's lamp, round 7): its Paused, and Add card to
     // dashboard - a copy (PopupMove.cpp says when it cannot be).
-    if (held_ && inMember() && !s.cluster) {
+    if (held_ && inMember() && !heldGroup()) {
         const Kit::ChipRowSpec paused = { "Paused", PAUSED_W, 2, (uint8_t)(aggregate().paused ? 1 : 0) };
         lv_obj_t *list = table(&paused, 1, pausedChipCb);
         if (s.ent[0] && held_->hasId()) {

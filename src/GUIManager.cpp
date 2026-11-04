@@ -707,6 +707,10 @@ void GUIManager::begin() {
     // anything was last touched (its auto-close). Cards/CardPopup.h.
     CardPopup::begin();
     CardPopup::setHistory(&_core.history());   // History's source (2.10e)
+    // A group card's cluster, made again from the page for the window (K154, K155).
+    CardPopup::setGroupMaker([](const char *id, bool allTiles) -> ClusterCard * {
+        return (s_self && s_self->_page) ? s_self->_page->makeGroup(id, allTiles) : nullptr;
+    });
     HaOffer::begin(&_core.catalog(), &_core.haProvider(), &_core.entities());   // what HA offers (2.13)
 
     // Bottom deck height = screen height - header height.

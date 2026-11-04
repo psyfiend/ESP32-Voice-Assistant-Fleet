@@ -175,10 +175,13 @@ struct Popup : Kit::Sheet {
     bool      builtPaused = false, rebuildQueued = false;   // "A paused window"
     uint8_t   builtCaps = 0;                     // what the selector was built for
     lv_obj_t *pill = nullptr;                    // PAUSED
-    // A member's own controls, reached from Members (2.10b): the group's
-    // entities are kept here while ent[] holds the one member.
-    const Entity *groupEnt[POPUP_ENT_MAX] = {nullptr};
-    uint8_t   groupN = 0;
+    // A member's own views, reached from Members or the group view (2.10b; two
+    // deep since 2.13 round 3, K157): how deep. Each level's entities are set
+    // aside in PopupMembers.cpp while ent[] holds the member's.
+    uint8_t   depth = 0;
+    // A GROUP SHOWN AS ONE CARD (K151, K155): its GROUP panel, and its Members
+    // listing every member, read from the group's cluster made again (heldGroup()).
+    bool      groupCard = false;
     bool      lightHero = false;
     uint8_t   lightCtl = 0;                      // LightCtl: which control the hero is
     lv_obj_t *fill = nullptr, *grip = nullptr, *mark = nullptr;
@@ -306,7 +309,6 @@ extern Deck d;                         // PopupDeck.cpp: the control deck being 
 extern HaHistory *s_hist;              // PopupHistory.cpp
 extern HistView s_hv;                  // PopupHistory.cpp
 extern lv_obj_t *s_histList;           // PopupHistory.cpp
-extern uint8_t s_memberPick;           // PopupMembers.cpp
 extern CardGroups::Choice s_clMap[24]; // PopupSettingsRows.cpp: the Card label row
 extern uint8_t s_clN;
 extern char s_clOpts[24 * 44];
@@ -413,7 +415,18 @@ lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberSho
 int32_t membersRowW();   // PopupControls.cpp: Members' width - a group light's controls', in a cluster's window too
 void enterMemberAsync(void *unused);
 void memberRowCb(lv_event_t *ev);
+// Out of a member, one level: VIEW_MEMBERS goes back where it was opened from
+// (Members or the group view), VIEW_MAIN to the controls there.
 void leaveMember(PopupView to = PopupView::VIEW_MEMBERS);
+// A member's own views, from its row or its tile (K157): its card - a card of its
+// own opens as its tile's long press does - or, with none, its entity. Deferred.
+// `v`: VIEW_MEMBER (its controls), VIEW_HISTORY or VIEW_MEMBERS.
+void enterMember(Card *card, const Entity *e, PopupView v = PopupView::VIEW_MEMBER);
+void pickMemberRow(uint8_t i);    // Members' row i picked, for enterMemberAsync() (/popup?member=N)
+Card *memberCard();               // the member being shown: its card, or null (none, or not in one)
+const char *memberName();         // ... its name: the card's, else HA's; the window's at the top
+const char *memberParentName();   // ... and the name of what it is a member of
+void memberForget();              // the window went
 
 // PopupProps.cpp
 void buildProps();
@@ -432,11 +445,21 @@ bool clusterTakeRebuild();   // a choice wants the page built again, once the wi
 void clusterRename();        // the keyboard on the cluster's name, as Rename opens it (K95)
 void buildClusterAdd();      // VIEW_CLUSTER_ADD: Edit cards (2.13 round 2, K148)
 uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask);   // /popup: the page's picked cards in; the window closes
-void buildGroup();                    // 2.13 (K143): VIEW_GROUP, a cluster's members as tiles (PopupGroup.cpp)
+void buildGroup();                    // 2.13 (K143, K154): VIEW_GROUP, the group's cluster (PopupGroup.cpp)
 void buildClimate();                  // 2.13 (K144): a thermostat's main view, read only (PopupClimate.cpp)
-void groupWindow(bool big);           // ...the window to the page's size and its panels away, or back
+void groupWindowFor(PopupView v);     // ...the window for view v: fitted to the group view, the page's for Edit cards
+void groupViewForget();               // ...the group view's cluster deleted, before the stage is cleaned
 void groupForget();                   // ...the window went
-void enterMemberAt(uint8_t i);        // a member's own view, as a tap on its row in Members (PopupMembers.cpp)
+// A card inside the window asked to open (a group view's tile, or its header -
+// K154): true when it was the group view's, now routed into the window.
+bool groupViewRoute(Card &card, uint8_t view);
+// THE GROUP THE WINDOW STANDS FOR (K155): the held cluster, or - for a group shown
+// as one card - its cluster made again from the page and kept while the window is
+// open (never built). Null for any other card.
+ClusterCard *heldGroup();
+void groupModelOpen(Card &card);      // at open: the model, for a group shown as one card
+void groupModelForget();              // the window went
+extern ClusterCard *(*s_groupMaker)(const char *id, bool allTiles);   // CardPage::makeGroup(), from GUIManager
 // Member `i` of `cl` shown as a tile or not, kept when the window closes (K104's
 // Visible - from its Visibility since round 6, no longer the cluster's Details).
 void clusterMemberShow(const ClusterCard &cl, uint8_t i, bool want);

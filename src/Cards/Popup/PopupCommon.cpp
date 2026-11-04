@@ -54,7 +54,11 @@ const Entity *memberAt(uint8_t i) {
     return (i < s.nEnt) ? s.ent[i] : nullptr;
 }
 
-bool hasMembers() { return s.native ? s.native->nMembers > 0 : s.nEnt > 1; }
+// A group shown as one card has its Members whatever its face is (K157).
+bool hasMembers() {
+    if (s.groupCard && !inMember()) return true;
+    return s.native ? s.native->nMembers > 0 : s.nEnt > 1;
+}
 
 // Should ent[] hold the members? While any is paused - and the group itself is
 // not, which is a group paused as a whole (Card::setPaused pauses both).
@@ -187,8 +191,8 @@ uint32_t quiet(uint32_t hex) {
 }
 
 // Inside one member's own views (its controls, its history): the group's
-// entities are set aside in groupEnt while ent[] holds the member.
-bool inMember() { return s.groupN > 0; }
+// entities are set aside (PopupMembers.cpp) while ent[] holds the member's.
+bool inMember() { return s.depth > 0; }
 
 // Rough luminance, to keep the fill visible against its track.
 int32_t lumOf(uint32_t hex) {

@@ -89,6 +89,8 @@ struct Sheet {
     lv_obj_t  *titleLeft = nullptr;          // the left button's slot: as wide as the right one
     int32_t    titleSlotW = 0, titleSlack = 0;   // its width, and the room in it beside the button
     lv_obj_t  *stage = nullptr, *autoBar = nullptr;
+    lv_obj_t  *header = nullptr;             // the header row
+    bool       bare = false;                 // sheetBare()
     lv_timer_t *timer = nullptr;
     uint32_t   lastTouchMs = 0;
     uint32_t   closeMs = SHEET_AUTOCLOSE_MS;   // untouched this long, it closes (0: never) - read at open
@@ -107,6 +109,14 @@ void   sheetOpen(Sheet &S, const SheetSpec &spec);   // spec: kept until it clos
 void   sheetClose(Sheet &S);                 // from the next timer pass, never inside an event
 Sheet *sheetShowing();                       // the open sheet, or null
 void   sheetLayoutTitle(Sheet &S);           // after the title's words change
+// A BARE SHEET (2.13 round 3, K154): no header row and no padding, the window
+// itself clear - what its stage holds is the window (the card window's group view:
+// a cluster, with its own surface and border). Its corners `radius`, for the halo
+// and the countdown bar. False: as it was.
+void   sheetBare(Sheet &S, bool bare, int32_t radius);
+// The window was moved or resized (S.winRect, a view with a room of its own): the
+// countdown bar follows its bottom edge.
+void   sheetResized(Sheet &S);
 void   sheetTabLook(lv_obj_t *tab, bool shown, bool lit);   // lit: the tab of the view showing
 uint32_t sheetLeftMs(const Sheet &S);        // until it closes itself (0: closing; UINT32_MAX: never)
 // The system settings every window follows (T6): how long one waits untouched

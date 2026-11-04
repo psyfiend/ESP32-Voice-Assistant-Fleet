@@ -159,9 +159,9 @@ static void collectGroups() {
     }
     findGroups(lv_screen_active());
     uint8_t w = 0;
-    if (s_hasArea) s_words[w++] = "Area";   // to confirm (the owner's "Use area as group name")
+    if (s_hasArea) s_words[w++] = "Area";   // K158
     for (uint8_t i = 0; i < s_nGrp; i++) s_words[w++] = s_grp[i].name;
-    s_words[w++] = "New group";
+    s_words[w++] = "New label";             // K158
     s_words[w++] = "None";
     s_pick = 0;   // Area, or the cards' own area's group
 }
@@ -176,7 +176,7 @@ static void gridCb(lv_event_t *ev) {
     if (s_grid) Kit::chipGridLit(s_grid, s_pick);
     if (s_pick == pickNew()) {
         Kit::KeyboardSpec k = {};
-        k.title  = "New group name";   // the existing step's
+        k.title  = "New label name";   // K158
         k.text   = s_newName;
         k.maxLen = sizeof(s_newName) - 1;
         k.save   = keepName;
@@ -237,7 +237,7 @@ static void doAdd() {
 }
 
 static void askAdd() {
-    if (s_pick == pickNew() && !s_newName[0]) { UIToolkit::show_toast("Name the new group first"); return; }   // to confirm
+    if (s_pick == pickNew() && !s_newName[0]) { UIToolkit::show_toast("Name the new label first"); return; }   // K158
     static char names[400], page[96], grp[96];
     EditCards::namesOf(names, sizeof(names));
     const bool many = s_nItems > 1;
@@ -245,13 +245,13 @@ static void askAdd() {
     line(many ? "The cards %s will be added from Home Assistant and placed onto the %s page."
               : "The card %s will be added from Home Assistant and placed onto the %s page.",
          names, acc(page, sizeof(page), s_spec.page ? s_spec.page : ""));
+    // K158: a page card's colored name is its label.
     if (s_pick == pickNone())
-        line(many ? "The cards will not be members of any group." : "The card will not be a member of any group.");
+        line(many ? "The cards will have no label." : "The card will have no label.");
     else if (s_hasArea && s_pick == 0)
-        line("Each card will become a member of its Home Assistant area's group.");   // to confirm
+        line(many ? "Each card will be labeled with its Home Assistant area." : "The card will be labeled with its Home Assistant area.");
     else
-        line(many ? "The cards will become members of the group %s." : "The card will become a member of the group %s.",
-             acc(grp, sizeof(grp), pickWords()));
+        line(many ? "The cards will be labeled %s." : "The card will be labeled %s.", acc(grp, sizeof(grp), pickWords()));
     line("A card can always be restored to its original configuration.");
     ask(Kit::DialogRole::DLG_CONFIRM, many ? "Add cards to dashboard?" : "Add card to dashboard?", "Add",
         Kit::ButtonRole::BTN_CONFIRM, doAdd);
@@ -273,16 +273,16 @@ static void buildStep() {
     lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_row(col, UI::mm(UI::shape().S6), 0);
     lv_label_set_text(Kit::label(col, KS::KS_LABEL_NAME),
-                      s_nItems > 1 ? "Select group for these cards:" : "Select group for this card:");
+                      s_nItems > 1 ? "Select label for these cards:" : "Select label for this card:");   // K158
     s_grid = Kit::chipGrid(col, w, s_words, (uint8_t)(pickNone() + 1), s_pick, gridCb);
     lv_obj_t *n = Kit::label(col, KS::KS_LABEL_TAG_DIM);
     lv_obj_set_width(n, w);
     lv_obj_set_style_text_align(n, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(n, LV_LABEL_LONG_WRAP);
-    lv_label_set_text(n, s_nItems > 1 ? "Select 'New group' to create a new group for these cards. Select 'None' to "
-                                        "add the cards with no group assigned."
-                                      : "Select 'New group' to create a new group for this card. Select 'None' to "
-                                        "add the card with no group assigned.");
+    lv_label_set_text(n, s_nItems > 1 ? "Select 'New label' to create a new label for these cards. Select 'None' to "
+                                        "add the cards with no label."
+                                      : "Select 'New label' to create a new label for this card. Select 'None' to "
+                                        "add the card with no label.");   // K158
     lv_obj_t *row = Kit::buttonRow(col);
     const int32_t bw = Kit::textW("Next", UI::type().NAME) + 2 * UI::mm(UI::shape().S7);
     Kit::button(row, Kit::ButtonRole::BTN_CONFIRM, "Next", bw, Kit::controlH(), nextCb);

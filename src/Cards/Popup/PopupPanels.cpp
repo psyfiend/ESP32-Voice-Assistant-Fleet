@@ -44,8 +44,9 @@ void sideFor(PopupView v) {
         if (histFromHa(s_hv.e)) side = s_hv.chart ? SIDE_CHART : SIDE_ACTIVITY;
     } else if (v == PopupView::VIEW_SCENES) {
         side = SIDE_SCENES;
-    } else if ((v == PopupView::VIEW_MEMBERS || v == PopupView::VIEW_GROUP) && s.cluster && !inMember()) {   // K150
-        side = SIDE_CLUSTER;
+    } else if (!inMember() && (s.cluster ? (v == PopupView::VIEW_MEMBERS || v == PopupView::VIEW_GROUP)    // K150
+                                         : s.groupCard && (v == PopupView::VIEW_MAIN || v == PopupView::VIEW_MEMBERS))) {
+        side = SIDE_CLUSTER;   // A GROUP'S PANEL IN EVERY PRESENTATION (K155)
     }
     if (s.left.root && s.left.kind != side) chartEnd();
     if (side != SIDE_NONE && !s.left.root) Kit::sheetSide(s, side, sideTitle(side), sideRows(side));

@@ -244,6 +244,7 @@ static void buildFrame(Sheet &S) {
 
     // --- Header row --------------------------------------------------------
     lv_obj_t *hdr = plain(S.win);
+    S.header = hdr;
     lv_obj_set_size     (hdr, lv_pct(100), btn);
     lv_obj_set_flex_flow(hdr, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(hdr, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -415,6 +416,50 @@ void sheetLayoutTitle(Sheet &S) {
     lv_obj_set_width(S.lblTitleName, nw);
 }
 
+// A BARE SHEET (K154): the header row hidden and the padding gone, so the stage is
+// the window; the window clear, without its border, its corners the client's - what
+// the stage holds draws the surface. Local properties over KS_SHEET_FACE, taken away
+// again. The row padding is the client's per view (the card window sets it), so it
+// is set here only going bare.
+void sheetBare(Sheet &S, bool bare, int32_t radius) {
+    if (!S.win || !S.header) return;
+    if (bare != S.bare) {
+        S.bare = bare;
+        if (bare) {
+            lv_obj_add_flag(S.header, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_pad_all     (S.win, 0, 0);
+            lv_obj_set_style_pad_row     (S.win, 0, 0);
+            lv_obj_set_style_bg_opa      (S.win, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(S.win, 0, 0);
+            lv_obj_set_style_radius      (S.win, radius, 0);
+            S.winRadius = radius;   // the sparks run round these corners
+        } else {
+            S.winRadius = UI::mm(UI::shape().R_WINDOW);   // sheetPlace()'s
+            lv_obj_clear_flag(S.header, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_pad_all(S.win, S.pad, 0);
+            lv_obj_remove_local_style_prop(S.win, LV_STYLE_BG_OPA, 0);
+            lv_obj_remove_local_style_prop(S.win, LV_STYLE_BORDER_WIDTH, 0);
+            lv_obj_remove_local_style_prop(S.win, LV_STYLE_RADIUS, 0);
+        }
+    }
+    sheetResized(S);
+}
+
+// THE TITLE AND THE BAR FOLLOW THE WINDOW (2.13 round 3): the title's room as
+// buildFrame() works it out; the bar as wide as the bottom edge allows between
+// the corners, on that edge - inside a bare window's client's border.
+void sheetResized(Sheet &S) {
+    if (!S.win) return;
+    S.titleW = lv_area_get_width(&S.winRect) - 2 * S.pad - 2 * S.titleSlotW - 2 * UI::mm(UI::shape().S5);
+    if (!S.autoBar) return;
+    const int32_t full = LV_MAX(1, lv_area_get_width(&S.winRect) - 2 * lv_obj_get_style_radius(S.win, LV_PART_MAIN));
+    lv_obj_set_user_data(S.autoBar, (void *)(intptr_t)full);
+    const int32_t inset = S.bare ? UI::met().BORDER_W : 0;
+    lv_obj_align(S.autoBar, LV_ALIGN_BOTTOM_MID, 0, lv_obj_get_style_pad_bottom(S.win, LV_PART_MAIN) - inset);
+    lv_obj_set_width(S.autoBar, 1);   // countdownSet() sets it from the new full width
+    countdownSet(S.autoBar, S);
+}
+
 // THE TABS WORK AS TABS (owner, 2026-10-06): shown on every view they belong
 // to, the one showing lit (as a chosen selector button is).
 void sheetTabLook(lv_obj_t *tab, bool shown, bool lit) {
@@ -510,7 +555,8 @@ static void closeAsync(void *p) {
     S->btnLeft = S->lblLeft = S->floatTab = nullptr;
     for (lv_obj_t *&b : S->tab) b = nullptr;
     S->lblTitleArea = S->lblTitleName = S->titleLeft = nullptr;
-    S->stage = S->autoBar = nullptr;
+    S->stage = S->autoBar = S->header = nullptr;
+    S->bare = false;
     if (s_catcher) lv_obj_clear_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
     s_beside = nullptr;
     if (s_open == S) s_open = nullptr;
