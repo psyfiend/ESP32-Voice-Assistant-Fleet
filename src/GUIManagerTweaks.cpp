@@ -217,7 +217,7 @@ void GUIManager::setGlyphs(GlyphStyle g) {
 // every scheme's selector, the window timeout and its bar. Not the scheme or
 // the grid - those are the system panel's.
 void GUIManager::resetUiTweaks() {
-    static const char *const KEYS[] = { "label", "entity", "state", "density" };
+    static const char *const KEYS[] = { "label", "entity", "state", "density", "group_view" };
     for (const char *k : KEYS) Settings::setSystem("ui", k, nullptr);
     Settings::setSystem("header", "glyphs", nullptr);
     Settings::setSystem("window", "close", nullptr);
@@ -305,6 +305,7 @@ struct GUITweaks {
     static constexpr const char *DENSITY[] = { "Compact", "Full", "Auto" };
     static constexpr const char *TIMEOUT[] = { "60 s", "30 s", "10 s", "Off" };
     static constexpr const char *ONOFF[]   = { "On", "Off" };
+    static constexpr const char *GVIEW[]   = { "Tiles", "Cards" };   // K162
 
     // ...and what each position is.
     static constexpr CardHeaderStyle LABEL_IS[]   = { CardHeaderStyle::HDR_TAG_FLOAT, CardHeaderStyle::HDR_BAND,
@@ -372,6 +373,17 @@ struct GUITweaks {
     static int16_t haloNow()          { return (int16_t)Kit::haloStrength(); }
     static void    haloSet(int16_t v) { Kit::keepHaloStrength((uint8_t)LV_CLAMP(0, v, 100)); Settings::save(); }
 
+    // GROUP VIEW (K162): its members as tiles or as cards, device-wide - a group's
+    // own in its Card UI. system.ui.group_view, "cards" or nothing (Tiles).
+    static uint8_t groupViewNow() {
+        char v[8];
+        return Settings::system("ui", "group_view", v, sizeof(v)) && !strcmp(v, "cards") ? 1 : 0;
+    }
+    static void groupViewSet(uint8_t i) {
+        Settings::setSystem("ui", "group_view", i == 1 ? "cards" : nullptr);
+        Settings::save();
+    }
+
     static uint8_t helperNow()          { return Kit::helperShown() ? 1 : 0; }
     static void    helperSet(uint8_t i) { Kit::setHelperShown(i != 0); }
     static uint8_t barNow()          { return Kit::windowBarShown() ? 0 : 1; }
@@ -389,6 +401,7 @@ struct GUITweaks {
         { "Selector",       METAL,   3, metalNow,   metalSet   },
         { "Selector shape", SHAPE,   2, shapeNow,   shapeSet   },
         { "Card density",   DENSITY, 3, densityNow, densitySet },
+        { "Group view",     GVIEW,   2, groupViewNow, groupViewSet },   // K162
         { "Window timeout", TIMEOUT, 4, timeoutNow, timeoutSet },
         { "Timer bar",      ONOFF,   2, barNow,     barSet     },
         { "Halo",           nullptr, 0, nullptr,    nullptr,   0, 100, haloNow, haloSet, "%" },

@@ -541,6 +541,16 @@ Pages now arrange themselves (K109); these are what he wants beside that:
   answer matter less (owner) - 3.1's build sheet. **Its dashboard arranging could be the first part
   built** at 3.1, so layouts and configurations can be tried quickly (owner, 2026-10-20).
 
+### The old card pinning, shelved (owner, 2026-11-04, DECISIONS K164)
+
+**"Pin" on the glass now means "shown on the page"** (a group's pinned members, K160). The first
+grid engine's pinning - a card placed at a fixed cell (`PageSpec`'s place, `CardPage`'s "pin
+rejected ... flowing", `Layout.cpp`'s invalid pin) - predates the arranger, which seldom lets a page
+overflow, and the layout web app makes a hand-placed cell even less useful. **Its code is still
+there**, along with the arranger's own "pinned" vocabulary (`_pinCols` / `_pinRows`, Arranger.cpp's
+pinned counts; on the glass the Grid line now says "fixed"). Either remove it, or refit it to the
+arranger with a new name once the hand-arranging above is designed - never under the word "pin".
+
 ## bb_captouch_fork
 
 - **Detach from the original author's repo.** `components/bb_captouch_fork` is currently a

@@ -133,6 +133,7 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int tree = 0;     // 1: the open window's objects; 2 (tree=page): the whole screen
                 int sparks = -1;  // the interference from the next window: 0 now and then, 1 once, 2 off
                 int about = -1;   // 2.12 P4: the About sheet, 1 open, 0 close
+                int drop = -1;    // K163: the group view's header sensors, as a tap on them
                 int drawer = -1;  // #97: the system panel, 1 open, 0 close (GUIManager's hook)
                 char slot[8] = {};// 2.8: a header slot's panel by its kind's name ("clock"), "-1" closes (GUIManager's hook)
                 int glyphs = -1;  // 2.8: the header's glyph style, 0 bare, 1 square, 2 circle
@@ -221,6 +222,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "mem", v, sizeof(v)) == ESP_OK) a.mem = true;
         if (httpd_query_key_value(q, "sparks", v, sizeof(v)) == ESP_OK) a.sparks = atoi(v);
         if (httpd_query_key_value(q, "about", v, sizeof(v)) == ESP_OK) a.about = atoi(v);
+        if (httpd_query_key_value(q, "drop", v, sizeof(v)) == ESP_OK) a.drop = atoi(v);
         if (httpd_query_key_value(q, "drawer", v, sizeof(v)) == ESP_OK) a.drawer = atoi(v);
         if (httpd_query_key_value(q, "slot", v, sizeof(v)) == ESP_OK) snprintf(a.slot, sizeof(a.slot), "%s", v);
         // 2.11 round 9, through the header hook as slot= is: the development Reset
@@ -307,6 +309,12 @@ void CardPopup::debugService(lv_timer_t *t) {
         if (!isOpen()) { dbgOut("no window open\n"); s_dreq.store(DREQ_DONE); return; }
         close();
         s_dreq.store(DREQ_CLOSING);
+        return;
+    }
+    // K163: the group view's header sensors' panel, as a tap on them.
+    if (a.drop >= 0) {
+        dbgOut(groupDropDebug() ? "drop: tapped\n" : "no group view showing\n");
+        s_dreq.store(DREQ_DONE);
         return;
     }
     // 2.12 P4: the Sheet's second client, "About this board" (UI/AboutSheet.h).

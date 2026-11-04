@@ -4,8 +4,8 @@
 //
 //   On the page    Hide from this page - to the page's pool, after its dialog
 //                  (PopupDialog.cpp); Change group; Add to cluster
-//   In a cluster   Hide from the cluster (or Show in the cluster) - back from the
-//                  cluster's Members; Add to dashboard; Change cluster
+//   In a cluster   Unpin this card (or Pin this card, K160) - on the page or only
+//                  in the group; Add to dashboard; Change group
 //   A group card's Paused, and Add card to dashboard (K17) - a copy
 //   member
 //
@@ -87,8 +87,10 @@ void actions(lv_obj_t *list, const Action *a, uint8_t n, bool restore) {
     lv_obj_align(r, LV_ALIGN_RIGHT_MID, 0, 0);
 }
 
-// THE SAME WORDS FOR CARDS AND TILES (round 14, the owner's).
+// THE SAME WORDS FOR CARDS AND TILES (round 14, the owner's) - a member's without
+// the hidden cards' half (K160: a member is unpinned, never hidden).
 const char *const VIS_NOTE = "Paused cards will not send or receive any updates. Hidden cards can be restored.";
+const char *const VIS_NOTE_MEMBER = "Paused cards will not send or receive any updates.";
 
 // The cluster the subject is in: the held tile's, or the window's own group's -
 // a cluster's, or a group shown as one card's (K155).
@@ -117,7 +119,13 @@ Card *cardWithId(lv_obj_t *o, const char *id) {
     return nullptr;
 }
 
-// Show in the cluster: a hidden member (or one only in the header) a tile again.
+// UNPIN THIS CARD (K160): off the page, still in the group - nothing lost, so no
+// dialog (Hide from the group had one).
+void unpinTileCb(lv_event_t *) {
+    lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) visibilityHideTile(); }, nullptr);
+}
+
+// PIN THIS CARD (K160): on the page as a tile.
 void showTileCb(lv_event_t *) {
     lv_async_call([](void *) {
         Card *c = visibilitySubject();
@@ -165,19 +173,20 @@ Card *visibilitySubject() {
     return nullptr;
 }
 
-// Hide from the cluster: gone from it when the window closes. From its tile the
-// window closes now; from the cluster's own window it stays, saying so.
+// Unpin this card (K160): off the page when the window closes. From its tile the
+// window closes now; from the group's own window it stays, saying so.
 void visibilityHideTile() {
     Card *c = visibilitySubject();
     ClusterCard *cl = clusterOfSubject();
     if (!c || !c->hasId() || !c->mini() || s.phase != PopupPhase::PHASE_OPEN) return;
+    const int8_t i = cl ? clusterMemberOf(*cl, c->firstEntity()) : -1;
     if (heldGroup() && inMember()) {
-        const int8_t i = cl ? clusterMemberOf(*cl, c->firstEntity()) : -1;
         if (i >= 0) clusterMemberShow(*cl, (uint8_t)i, false);
         showView(PopupView::VIEW_VISIBILITY);
         return;
     }
-    Settings::setCard(c->id(), "hidden", "yes");
+    if (i >= 0) clusterMemberShow(*cl, (uint8_t)i, false);   // out of the header too
+    else        Settings::setCard(c->id(), "hidden", "yes");
     s_rebuildPage = true;
     CardPopup::close();
 }
@@ -211,19 +220,19 @@ void buildVisibility() {
         // Restore brings it back.
         if (c->hasId() && CardAdded::isMovedToPage(c->id())) {
             actions(list, a, 0, restore);
-            note(list, VIS_NOTE);
+            note(list, VIS_NOTE_MEMBER);
             return;
         }
         const int8_t i = clusterMemberOf(*cl, c->firstEntity());
-        const bool tile = i < 0 || clusterMemberShown(*cl, (uint8_t)i) == MemberShown::SHOWN_TILE;
+        const bool pinned = i < 0 || clusterMemberPinned(*cl, (uint8_t)i);
         if (c->hasId()) {
-            a[n++] = tile ? Action{ "Hide from the group", Kit::ButtonRole::BTN_CANCEL, hideTileCb }
-                          : Action{ "Show in the group", Kit::ButtonRole::BTN_CANCEL, showTileCb };
+            a[n++] = pinned ? Action{ "Unpin this card", Kit::ButtonRole::BTN_CANCEL, unpinTileCb }   // K160
+                            : Action{ "Pin this card", Kit::ButtonRole::BTN_CANCEL, showTileCb };
             a[n++] = { "Add to dashboard", Kit::ButtonRole::BTN_CANCEL, toDashCb };
             a[n++] = { "Change group", Kit::ButtonRole::BTN_CANCEL, toClusterCb };
         }
         actions(list, a, n, restore);
-        note(list, VIS_NOTE);
+        note(list, VIS_NOTE_MEMBER);
         return;
     }
     if (c->hasId()) a[n++] = { "Hide from this page", Kit::ButtonRole::BTN_CANCEL, hideCardCb };

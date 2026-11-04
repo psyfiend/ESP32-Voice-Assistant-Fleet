@@ -157,6 +157,10 @@ GLYPHS = [
     # mock's outline bell.
     "bell-outline",
 
+    # --- a group's member on the page (2.13 round 4, K160) -----------------
+    # The pin in a square beside a pinned member, in Members and Edit cards.
+    "pin",
+
     # --- EVERY MDI ICON THE OWNER'S HA SERVES, 2026-10-12 (K17) ------------
     #
     # A member of a group made a card of its own (Desk's Office Left / Right,

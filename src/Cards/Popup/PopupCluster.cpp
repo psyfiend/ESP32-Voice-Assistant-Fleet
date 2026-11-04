@@ -284,9 +284,12 @@ void slotRowCb(lv_event_t *ev) {
 }
 
 // --- Add cards -------------------------------------------------------------------------
+// One moved out to the page is not in the group (K161: Table, moved out of
+// Kitchen, was counted in and could not be added back).
 bool memberHas(const ClusterCard &cl, const Entity &e) {
     for (uint8_t i = 0; i < cl.memberCount(); i++) {
         const Card *m = cl.memberAt(i);
+        if (movedOut(m)) continue;
         const Entity *me = m ? m->firstEntity() : nullptr;
         if (me && !strcmp(me->desc.id, e.desc.id)) return true;
     }
@@ -361,8 +364,9 @@ int8_t memberIndexOf(const ClusterCard &cl, const char *id) {
     return -1;
 }
 
-// IN THIS GROUP: the members as the group view shows them - the tiles and those
-// in the header, then the hidden ones last; one moved out says where it is.
+// IN THIS GROUP (K160, K161): every member, the pinned first - each ending in its
+// square (its header glyph, a pin, or nothing) and each a tap cycle. One moved out
+// to the page is not here: it is the page's card, under On the page.
 uint8_t fillMembers(EditCards::Item *out, uint8_t cap, void *) {
     ClusterCard *cl = held();
     if (!cl) return 0;
@@ -372,9 +376,9 @@ uint8_t fillMembers(EditCards::Item *out, uint8_t cap, void *) {
         for (uint8_t i = 0; i < cl->memberCount() && n < cap; i++) {
             const Card *m = cl->memberAt(i);
             const Entity *e = m ? m->firstEntity() : nullptr;
-            if (!e) continue;
-            const MemberShown sh = clusterMemberShown(*cl, i);
-            if ((sh == MemberShown::SHOWN_HIDDEN) != (pass == 1)) continue;
+            if (!e || movedOut(m)) continue;
+            const bool pinned = clusterMemberPinned(*cl, i);
+            if (pinned != (pass == 0)) continue;
             EditCards::Item &it = out[n++];
             it = EditCards::Item{};
             snprintf(it.key, sizeof(it.key), "%s", idOf(m));
@@ -382,20 +386,14 @@ uint8_t fillMembers(EditCards::Item *out, uint8_t cap, void *) {
             char st[48];
             memberState(*e, MemberShown::SHOWN_TILE, st, sizeof(st));
             snprintf(it.state, sizeof(it.state), "%s", st);
-            it.from = EditCards::From::FROM_GROUP;
+            it.from   = EditCards::From::FROM_GROUP;
+            it.pinned = pinned;
+            if (clusterMemberInHeader(*cl, i)) it.signIcon = headerGlyphOf(*e, it.signTint);
+            else if (pinned)                   it.signIcon = MDI_PIN;
             if (!m->hasId()) continue;   // nothing can be kept for it
-            if (sh == MemberShown::SHOWN_TILE) {
-                it.tick = EditCards::Tick::TICK_HIDE;
-                // A copy made here may go for good; a card moved in goes home by Restore (K137).
-                it.canRemove = CardAdded::isMember(m->id()) && !CardAdded::isMoveOf(m->id());
-            } else if (sh == MemberShown::SHOWN_HEADER) {
-                snprintf(it.mark, sizeof(it.mark), "In the header");   // K145
-            } else if (sh == MemberShown::SHOWN_HIDDEN) {
-                snprintf(it.mark, sizeof(it.mark), "Hidden");
-                it.tick = EditCards::Tick::TICK_RESTORE;
-            } else {
-                snprintf(it.mark, sizeof(it.mark), "On the page");    // K145
-            }
+            it.tick = EditCards::Tick::TICK_HIDE;   // a member: its tap cycle
+            // A copy made here may go for good; a card moved in goes home by Restore (K137).
+            it.canRemove = CardAdded::isMember(m->id()) && !CardAdded::isMoveOf(m->id());
         }
     return n;
 }
@@ -523,6 +521,64 @@ void doEditRestore() {
     editDone(n, "Restored %u to %s");   // to confirm
 }
 
+// SAVE N (K161): every change the taps made, at once. A card added on its first
+// tap joins unpinned (K160), on its second pinned; a page card that came from
+// this group goes home, as its Restore would (K137). A member flips its pin, or
+// - marked red - is removed. Then the toast, and the page built again.
+void doEditSave() {
+    ClusterCard *cl = held();
+    if (!cl || !cl->hasId()) return;
+    s_nCand = 0;
+    findCandidates(lv_screen_active(), *cl);
+    uint8_t done = 0;
+    for (uint8_t i = 0; i < s_eNItems; i++) {
+        const EditCards::Item &it = s_eItems[i];
+        char id[CARD_ID_MAX + 1] = "";
+        if (it.from == EditCards::From::FROM_GROUP) {
+            const int8_t k = memberIndexOf(*cl, it.key);
+            if (it.step == 2)  done += CardAdded::removeMember(it.key) ? 1 : 0;
+            else if (k >= 0) { clusterMemberShow(*cl, (uint8_t)k, !it.pinned); done++; }
+            continue;
+        }
+        if (it.from == EditCards::From::FROM_HA) {
+            HaOffer::Row r;
+            const Entity *e = EditCards::haRowOf(it.key, r) ? HaOffer::entityFor(r) : nullptr;
+            if (!e) continue;
+            if (!CardAdded::addTo(*cl, *e, id, sizeof(id))) break;   // full
+            if (e->learnt) {
+                Settings::setCard(id, "ha", r.ref);
+                if (r.dc[0])   Settings::setCard(id, "ha_dc", r.dc);
+                if (r.unit[0]) Settings::setCard(id, "ha_unit", r.unit);
+            }
+        } else {
+            Card *k = nullptr;
+            for (uint8_t c = 0; c < s_nCand && !k; c++) if (!strcmp(s_cand[c]->id(), it.key)) k = s_cand[c];
+            if (!k) continue;
+            const char *from = CardAdded::fromOf(k->id());
+            if (CardAdded::movedHere(k->id()) && from && memberIndexOf(*cl, from) >= 0) {
+                // Home again: the page card goes, the member it was comes back.
+                snprintf(id, sizeof(id), "%s", from);
+                if (!CardAdded::moveBack(k->id())) continue;
+            } else {
+                if (!CardAdded::addTo(*cl, *k->firstEntity(), id, sizeof(id), k->id())) break;
+                const char *name = k->shownName(CardLabel::LBL_NAME);
+                if (name && name[0]) Settings::setCard(id, "name", name);
+                if (s_eMove) CardAdded::moveOut(k->id(), id);
+            }
+        }
+        // Unpinned unless tapped twice (K160): new members never move the page.
+        Settings::setCard(id, "hidden", it.step == 2 ? nullptr : "yes");
+        done++;
+    }
+    if (!done) return;
+    char msg[64];
+    snprintf(msg, sizeof(msg), "Saved %u change%s to %s", (unsigned)done, done == 1 ? "" : "s", s.name);   // the owner's (K161)
+    UIToolkit::show_toast(msg);
+    EditCards::forget();
+    changed();
+    CardPopup::close();
+}
+
 // EVERY CHOICE BEFORE THE QUESTION (K149): the dialog is go or no-go, in the
 // existing dialogs' sentences made plural (round-2 mocks 12 and 13).
 void editAct(EditCards::Act a, void *) {
@@ -536,6 +592,34 @@ void editAct(EditCards::Act a, void *) {
     s_eN = 0;
     const bool many = s_eNItems > 1;
     using F = EditCards::From;
+    // SAVE (K161): a question only when something is to be removed - K149's words.
+    if (a == EditCards::Act::ACT_SAVE) {
+        uint8_t gone = 0;
+        names[0] = '\0';
+        const unsigned long acc = (unsigned long)(UI::pal().ACCENT & 0xFFFFFF);
+        for (uint8_t i = 0; i < s_eNItems; i++) {
+            if (s_eItems[i].from != F::FROM_GROUP || s_eItems[i].step != 2) continue;
+            gone++;
+        }
+        if (!gone) { doEditSave(); return; }
+        uint8_t k = 0;
+        for (uint8_t i = 0; i < s_eNItems; i++) {
+            if (s_eItems[i].from != F::FROM_GROUP || s_eItems[i].step != 2) continue;
+            const size_t used = strlen(names);
+            snprintf(names + used, sizeof(names) - used, "%s#%06lX %s#",
+                     k == 0 ? "" : (k + 1 == gone ? " and " : ", "), acc, s_eItems[i].name);
+            k++;
+        }
+        const bool plural = gone > 1;
+        eLine(plural ? "The cards %s will be removed from this device." : "The card %s will be removed from this device.",
+              names);
+        eLine("Nothing will be removed from Home Assistant. You can always add these entities back to your device.");
+        eLine(plural ? "Tap Remove to confirm you wish to remove these cards from the device."
+                     : "Tap Remove to confirm you wish to remove this card from the device.");
+        confirmAsk(Kit::DialogRole::DLG_DESTRUCTIVE, plural ? "Remove these cards?" : "Remove this card?", s_eLines,
+                   s_eN, "Remove", Kit::ButtonRole::BTN_DESTRUCTIVE, doEditSave);
+        return;
+    }
     if (a == EditCards::Act::ACT_ADD) {
         const uint8_t nHa = EditCards::countOf(F::FROM_HA), nPg = EditCards::countOf(F::FROM_PAGE);
         if (nHa) {
@@ -597,14 +681,38 @@ void buildClusterAdd() {
     sp.held     = haHeld;
     sp.ctx      = cl;
     sp.copyMove = true;
+    sp.cycle    = true;   // K161
     sp.act      = editAct;
     EditCards::build(s.stage, lv_obj_get_content_width(s.stage), lv_obj_get_content_height(s.stage), sp);
 }
 
-// --- A member shown or not (its own Visibility, round 6) ------------------------------
+// --- A member pinned or not (K160; its own Visibility, Edit cards) ---------------------
+// Unpinned, it leaves the header too: the page shows no part of it.
+static void headerDrop(const ClusterCard &cl, uint8_t i) {
+    const Card *m = cl.memberAt(i);
+    if (!m || !m->hasId() || !cl.hasId()) return;
+    const char *ids[CLUSTER_SLOTS_MAX];
+    char buf[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1];
+    const uint8_t n = headerIds(cl, ids, buf, sizeof(buf));
+    if (!inList(m->id(), ids, n)) return;
+    char list[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1] = "";
+    uint8_t kept = 0;
+    for (uint8_t k = 0; k < n; k++) {
+        if (!strcmp(ids[k], m->id())) continue;
+        snprintf(list + strlen(list), sizeof(list) - strlen(list), "%s%s", kept++ ? "," : "", ids[k]);
+    }
+    Settings::setCard(cl.id(), "slots", list);
+}
+
 void clusterMemberShow(const ClusterCard &cl, uint8_t i, bool want) {
+    if (!want) headerDrop(cl, i);
     setVisible(cl, i, want);
     changed();
+}
+
+bool clusterMemberPinned(const ClusterCard &cl, uint8_t i) {
+    const MemberShown sh = clusterMemberShown(cl, i);
+    return sh == MemberShown::SHOWN_TILE || sh == MemberShown::SHOWN_HEADER;
 }
 
 MemberShown clusterMemberShown(const ClusterCard &cl, uint8_t i) {

@@ -329,6 +329,9 @@ struct ChipRowSpec {
     // A WORDS ROW (round 14: "Member of group:" and its name): no chips - these
     // words in the chips' column, in the accent, nothing to tap.
     const char        *says = nullptr;
+    // GREYED (K155, K162: options never move): the row shown, its chips dim and
+    // not to be tapped, where the option does not apply.
+    bool               greyed = false;
 };
 lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_t n, lv_event_cb_t cb);
 void      chipTableLit(lv_obj_t *table, uint8_t row, uint8_t lit);   // after a choice

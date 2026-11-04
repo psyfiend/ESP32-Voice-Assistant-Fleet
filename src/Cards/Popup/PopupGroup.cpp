@@ -124,6 +124,98 @@ void place(const lv_area_t *r, bool bare) {
     Kit::sheetLayoutTitle(s);
 }
 
+// TILES OR CARDS (K162): the group's own choice (Card UI), else UI Tweaks'.
+bool groupViewCards() {
+    char v[8];
+    const ClusterCard *pg = heldCluster();
+    if (pg && pg->hasId() && Settings::card(pg->id(), "group_view", v, sizeof(v))) return !strcmp(v, "cards");
+    return Settings::system("ui", "group_view", v, sizeof(v)) && !strcmp(v, "cards");
+}
+
+// --- THE HEADER'S SENSORS (K163; round 2's mocks 2-3) -------------------------------
+// A tap on them drops a panel from under the header, on the right: a row for each
+// - its glyph, HA's full name, its state - and a row opens that sensor's History,
+// as a tap on it would. A second tap on the sensors folds it.
+lv_obj_t *s_drop = nullptr;
+
+void dropClose() {
+    if (s_drop) lv_obj_delete(s_drop);
+    s_drop = nullptr;
+}
+
+void dropRowCb(lv_event_t *ev) {
+    if (!s_view || s.phase != PopupPhase::PHASE_OPEN) return;
+    Card *m = s_view->memberAt((uint8_t)(uintptr_t)lv_event_get_user_data(ev));
+    if (!m) return;
+    ClusterCard *g = heldGroup();
+    Card *twin = nullptr;
+    for (uint8_t i = 0; g && i < g->memberCount() && !twin; i++) {
+        Card *t = g->memberAt(i);
+        if (t && t->hasId() && m->hasId() && !strcmp(t->id(), m->id())) twin = t;
+    }
+    enterMember(twin, twin ? nullptr : m->firstEntity(), PopupView::VIEW_HISTORY);   // deferred
+}
+
+void dropOpen() {
+    lv_obj_t *hdr = s_view ? s_view->headerRow() : nullptr;
+    if (!hdr || !s.win || s.phase != PopupPhase::PHASE_OPEN) return;
+    const UIShape &k = UI::shape();
+    const int32_t gap = mm(k.S5);
+    lv_area_t ha, wa;
+    lv_obj_get_coords(hdr, &ha);
+    lv_obj_get_coords(s.win, &wa);
+    const int32_t winW = lv_area_get_width(&wa);
+    const int32_t w = LV_MIN(winW - 2 * gap, winW * (winW < mm(100) ? 72 : 48) / 100);
+    s_drop = plain(s.win);
+    lv_obj_add_flag(s_drop, LV_OBJ_FLAG_FLOATING);
+    lv_obj_add_flag(s_drop, LV_OBJ_FLAG_CLICKABLE);   // a tap between its rows stays in it
+    Kit::add(s_drop, KS::KS_SHEET_FACE);
+    lv_obj_set_size(s_drop, w, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(s_drop, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_all(s_drop, gap, 0);
+    lv_obj_set_style_pad_row(s_drop, mm(k.S3), 0);
+    lv_obj_set_pos(s_drop, winW - w - gap, ha.y2 + 1 - wa.y1);
+    lv_obj_t *rows[CLUSTER_SLOTS_MAX] = {};
+    uint8_t nr = 0;
+    const int32_t nameH = lv_font_get_line_height(UI::type().NAME);
+    for (int8_t slot = 0; slot < (int8_t)CLUSTER_SLOTS_MAX; slot++)
+        for (uint8_t i = 0; i < s_view->memberCount(); i++) {
+            if (s_view->slotAt(i) != slot) continue;
+            const Card *m = s_view->memberAt(i);
+            const Entity *e = m ? m->firstEntity() : nullptr;
+            if (!e) continue;
+            lv_obj_t *r = Kit::item(s_drop);
+            lv_obj_set_size(r, lv_pct(100), LV_SIZE_CONTENT);
+            lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
+            lv_obj_set_flex_align(r, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+            lv_obj_set_style_pad_all(r, gap, 0);
+            lv_obj_set_style_pad_column(r, gap, 0);
+            uint32_t tint = 0;
+            lv_obj_t *ic = Kit::label(r, KS::KS_CARD_ICON_SM);
+            lv_label_set_text(ic, headerGlyphOf(*e, tint));
+            lv_obj_set_style_text_color(ic, UI::c(tint), 0);
+            lv_obj_t *n = Kit::label(r, KS::KS_LABEL_NAME);
+            lv_obj_set_size(n, 1, nameH);
+            lv_obj_set_flex_grow(n, 1);
+            lv_label_set_long_mode(n, LV_LABEL_LONG_DOT);
+            lv_label_set_text(n, e->desc.name);   // HA's in full (K157)
+            char st[48];
+            const KS role = memberState(*e, MemberShown::SHOWN_TILE, st, sizeof(st));
+            lv_label_set_text(Kit::label(r, role), st);
+            lv_obj_add_event_cb(r, dropRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
+            if (nr < CLUSTER_SLOTS_MAX) rows[nr++] = r;
+        }
+    lv_obj_update_layout(s_drop);
+    for (uint8_t i = 0; i < nr; i++)
+        Kit::finish(rows[i], lv_obj_get_width(rows[i]), lv_obj_get_height(rows[i]),
+                    lv_obj_get_style_radius(rows[i], LV_PART_MAIN), Kit::Finish::FINISH_SATIN);
+}
+
+void slotsTapCb(lv_event_t *) {
+    if (s_drop) { lv_async_call([](void *) { dropClose(); }, nullptr); return; }
+    lv_async_call([](void *) { dropOpen(); }, nullptr);
+}
+
 // A DRAG DOWN FROM ITS HEADER CLOSES IT (K159), as from any window's title row.
 // Every drag in the view arrives here (its root stops the gesture's walk up);
 // only one that began on the header closes.
@@ -156,7 +248,15 @@ void groupWindowFor(PopupView v) {
     }
 }
 
+// /popup?drop=1: as a tap on the header's sensors.
+bool groupDropDebug() {
+    if (!s_view) return false;
+    slotsTapCb(nullptr);
+    return true;
+}
+
 void groupViewForget() {
+    dropClose();   // on the window, not the stage: it goes first
     if (!s_view) return;
     if (CardBinder *b = s_view->binder()) b->remove(s_view);
     delete s_view;   // its members' widgets and its own; the stage is still alive
@@ -181,6 +281,12 @@ void buildGroup() {
     s_view->setTileCols(0);
     s_view->setTileCap(groupCap());
     s_view->setFrameRadius(mm(UI::shape().R_WINDOW));
+    s_view->setSlotsTap(slotsTapCb);   // K163
+    // AS CARDS (K162): each member a solo card - border, corners, shadow - with no
+    // card label (made HDR_NONE), on the same grid.
+    if (groupViewCards())
+        for (uint8_t i = 0; i < s_view->memberCount(); i++)
+            if (Card *m = s_view->memberAt(i)) m->setMini(false);
     s_view->build(s.stage);
     lv_obj_set_size(s_view->root(), W, H);
     lv_obj_clear_flag(s_view->root(), LV_OBJ_FLAG_GESTURE_BUBBLE);

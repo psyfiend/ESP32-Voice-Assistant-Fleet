@@ -95,15 +95,23 @@ TileGrid cappedGrid(uint8_t n, int32_t w, int32_t h, int32_t gap, const TileCap 
     return best;
 }
 
+// THE SPARE ROOM SPREAD EVENLY (K162): the same space between the tiles and at
+// the edges, never less than their own gap.
+static int32_t evenGap(int32_t room, int32_t count, int32_t size, int32_t gap) {
+    const int32_t e = (room - count * size) / (count + 1);
+    return e > gap ? e : gap;
+}
+
 void cappedTileAt(const TileGrid &g, uint8_t n, uint8_t i, int32_t gap, int32_t w, int32_t h, int32_t &x, int32_t &y) {
     const uint8_t cols = g.cols ? g.cols : 1;
     const uint8_t row  = (uint8_t)(i / cols);
     const uint8_t col  = (uint8_t)(i % cols);
     const int32_t inRow = (row + 1 == g.rows) ? (int32_t)n - (int32_t)row * cols : cols;
-    const int32_t rowW  = inRow * g.tileW + (inRow - 1) * gap;
-    const int32_t gridH = g.rows * g.tileH + (g.rows - 1) * gap;
-    x = (w - rowW) / 2 + col * (g.tileW + gap);
-    y = (h - gridH) / 2 + row * (g.tileH + gap);
+    const int32_t gx = evenGap(w, cols, g.tileW, gap), gy = evenGap(h, g.rows, g.tileH, gap);
+    const int32_t rowW  = inRow * g.tileW + (inRow - 1) * gx;   // a short last row centred on the same spacing
+    const int32_t gridH = g.rows * g.tileH + (g.rows - 1) * gy;
+    x = (w - rowW) / 2 + col * (g.tileW + gx);
+    y = (h - gridH) / 2 + row * (g.tileH + gy);
 }
 
 ClusterSpan clusterSpan(uint8_t n, const ClusterGeom &g, uint8_t maxCols, uint8_t maxRows) {

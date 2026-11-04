@@ -940,11 +940,12 @@ void GUIManager::begin() {
             case Panel_System::GridAction::GRID_AUTO:   gridAuto();        break;
         }
     });
-    // Its Grid line: the counts pinned, or what the arranger chose.
+    // Its Grid line: the counts held, or what the arranger chose. "Fixed" on the
+    // glass (K164: "pin" there means a member shown on the page).
     _pnlSystem.setGridText([this](char *out, size_t n) {
-        if (_pinCols && _pinRows)  snprintf(out, n, "%u x %u, pinned", (unsigned)_pinCols, (unsigned)_pinRows);
-        else if (_pinCols)         snprintf(out, n, "%u columns, pinned", (unsigned)_pinCols);
-        else if (_pinRows)         snprintf(out, n, "%u rows, pinned", (unsigned)_pinRows);
+        if (_pinCols && _pinRows)  snprintf(out, n, "%u x %u, fixed", (unsigned)_pinCols, (unsigned)_pinRows);
+        else if (_pinCols)         snprintf(out, n, "%u columns, fixed", (unsigned)_pinCols);
+        else if (_pinRows)         snprintf(out, n, "%u rows, fixed", (unsigned)_pinRows);
         else if (_page && _page->arranged())
             snprintf(out, n, "auto, %u x %u units", (unsigned)_page->unitCols(), (unsigned)_page->unitRows());
         else                       snprintf(out, n, "auto");

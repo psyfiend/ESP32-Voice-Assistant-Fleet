@@ -128,7 +128,7 @@ void test_capped_four_tiles_two_by_two_at_the_cap() {
 }
 
 // A short last row's tile is the size of the rest, centred under them; the
-// grid centred in the box.
+// spare room spread evenly between the tiles and at the edges (K162).
 void test_capped_last_row_centred_not_stretched() {
     TileCap cap;
     cap.maxW = 100; cap.maxH = 100;
@@ -137,11 +137,23 @@ void test_capped_last_row_centred_not_stretched() {
     TEST_ASSERT_EQUAL_UINT8(2, g.rows);
     int32_t x, y;
     cappedTileAt(g, 3, 0, 10, 300, 300, x, y);
-    TEST_ASSERT_EQUAL_INT32(45, x);
-    TEST_ASSERT_EQUAL_INT32(45, y);
+    TEST_ASSERT_EQUAL_INT32(33, x);
+    TEST_ASSERT_EQUAL_INT32(33, y);
+    cappedTileAt(g, 3, 1, 10, 300, 300, x, y);
+    TEST_ASSERT_EQUAL_INT32(166, x);
     cappedTileAt(g, 3, 2, 10, 300, 300, x, y);
     TEST_ASSERT_EQUAL_INT32(100, x);
-    TEST_ASSERT_EQUAL_INT32(155, y);
+    TEST_ASSERT_EQUAL_INT32(166, y);
+}
+
+// No spare room: the tiles' own gap, nothing at the edges.
+void test_capped_full_box_keeps_the_gap() {
+    TileCap cap;
+    const TileGrid g = cappedGrid(2, 210, 100, 10, cap);
+    int32_t x, y;
+    cappedTileAt(g, 2, 1, 10, 210, 100, x, y);
+    TEST_ASSERT_EQUAL_INT32(110, x);
+    TEST_ASSERT_EQUAL_INT32(0, y);
 }
 
 // No wider than twice its height.
@@ -168,5 +180,6 @@ int main(int, char **) {
     RUN_TEST(test_capped_four_tiles_two_by_two_at_the_cap);
     RUN_TEST(test_capped_last_row_centred_not_stretched);
     RUN_TEST(test_capped_never_twice_as_wide_as_tall);
+    RUN_TEST(test_capped_full_box_keeps_the_gap);
     return UNITY_END();
 }

@@ -413,6 +413,11 @@ KS memberState(const Entity &e, MemberShown shown, char *buf, size_t cap);
 lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberShown shown,
                     const char *says = nullptr);
 int32_t membersRowW();   // PopupControls.cpp: Members' width - a group light's controls', in a cluster's window too
+// ON THE PAGE, SAID BY A SQUARE (K160): member i's header glyph, or a pin for a
+// pinned tile, `gap` into `col`; nothing when it is not on the page.
+void pageSign(lv_obj_t *col, const ClusterCard &cl, uint8_t i, const Entity &e, int32_t gap);
+int32_t pageSignW(int32_t gap);   // the square and its gap
+const char *headerGlyphOf(const Entity &e, uint32_t &tint);   // the glyph a group's header shows for it
 void enterMemberAsync(void *unused);
 void memberRowCb(lv_event_t *ev);
 // Out of a member, one level: VIEW_MEMBERS goes back where it was opened from
@@ -454,6 +459,7 @@ void groupForget();                   // ...the window went
 // K154): true when it was the group view's, now routed into the window.
 bool groupViewRoute(Card &card, uint8_t view);
 bool groupViewHas(const Card &card);  // the group view's cluster, or one of its tiles
+bool groupDropDebug();                // /popup?drop=1: as a tap on the group view's header sensors (K163)
 // THE GROUP THE WINDOW STANDS FOR (K155): the held cluster, or - for a group shown
 // as one card - its cluster made again from the page and kept while the window is
 // open (never built). Null for any other card.
@@ -461,9 +467,10 @@ ClusterCard *heldGroup();
 void groupModelOpen(Card &card);      // at open: the model, for a group shown as one card
 void groupModelForget();              // the window went
 extern ClusterCard *(*s_groupMaker)(const char *id, bool allTiles);   // CardPage::makeGroup(), from GUIManager
-// Member `i` of `cl` shown as a tile or not, kept when the window closes (K104's
-// Visible - from its Visibility since round 6, no longer the cluster's Details).
+// Member `i` of `cl` PINNED or not (K160): on the page as a tile, or off it -
+// unpinned, out of the header too. Kept when the window closes.
 void clusterMemberShow(const ClusterCard &cl, uint8_t i, bool want);
+bool clusterMemberPinned(const ClusterCard &cl, uint8_t i);   // a tile or in the header, as the next build
 // Member `i` as the next build will show it: a tile, in the header, hidden - or
 // moved out to the page, its card there (the sprint after round 7).
 enum class MemberShown : uint8_t { SHOWN_TILE, SHOWN_HEADER, SHOWN_HIDDEN, SHOWN_MOVED };
@@ -542,7 +549,6 @@ void hiddenScenesCb(lv_event_t *ev);
 void confirmClose();
 void confirmHide();              // "Hide this card?" (K96, K66) over the held card's window
 void hideCardCb(lv_event_t *ev);
-void hideTileCb(lv_event_t *ev);     // Hide from the cluster, after its dialog (round 14)
 void confirmRemoveCopy();        // "Remove this copy?" - a member copied into a cluster here (K91)
 void removeCopyCb(lv_event_t *ev);
 void confirmRemoveFromPage();    // "Remove this card?" - a page card made on the glass, deleted

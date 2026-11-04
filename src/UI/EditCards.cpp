@@ -4,6 +4,7 @@
 #include "UI/Kit.h"
 #include "UI/UITokens.h"
 #include "UI/UIToolkit.h"     // show_toast()
+#include "UI/UIIcons.h"       // MDI_PIN (K160)
 #include "HaCatalog.h"        // AREAS_MAX
 #include <esp_heap_caps.h>
 #include <stdio.h>
@@ -71,6 +72,30 @@ int chosenAt(const char *key) {
 
 Tick kindNow() { return s_nChosen ? s_chosen[0].tick : Tick::TICK_NONE; }
 
+// --- A group's tap cycle (K161) ---------------------------------------------------
+uint8_t stepOf(const Item &it) {
+    const int k = chosenAt(it.key);
+    return k >= 0 ? s_chosen[k].step : 0;
+}
+
+uint8_t addsChosen() {
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < s_nChosen; i++) n += s_chosen[i].tick == Tick::TICK_ADD;
+    return n;
+}
+
+// THE SQUARE A ROW ENDS IN: what will be on the page (K160) - a member's header
+// glyph or pin, its first tap flipping it; a card being added pinned on its second.
+const char *signOf(const Item &it, uint8_t step, uint32_t &tint) {
+    tint = 0;
+    if (it.from == From::FROM_GROUP && !it.coming) {
+        if (step == 1) return it.pinned ? nullptr : MDI_PIN;
+        tint = it.signTint;
+        return it.signIcon;
+    }
+    return step == 2 ? MDI_PIN : nullptr;
+}
+
 const char *verb(Tick t) {
     return t == Tick::TICK_ADD ? "add" : t == Tick::TICK_HIDE ? "hide" : "restore";
 }
@@ -95,13 +120,17 @@ void readRows() {
         const EditCards::List &L = s_spec.lists[s_list];
         uint8_t n = L.fill ? L.fill(s_rows, ROWS_MAX, s_spec.ctx) : 0;
         for (uint8_t i = 0; i < n; i++) { s_rows[i].coming = false; s_rows[i].list = s_list; }
-        if (L.target && kindNow() == Tick::TICK_ADD) {
+        // A group's (cycle): its additions last, among its other changes.
+        if (L.target && (s_spec.cycle ? addsChosen() > 0 : kindNow() == Tick::TICK_ADD)) {
             uint8_t at = n;
-            for (uint8_t i = 0; i < n; i++) if (s_rows[i].tick == Tick::TICK_RESTORE) { at = i; break; }
-            const uint8_t add = (uint8_t)LV_MIN(s_nChosen, ROWS_MAX - n);
+            if (!s_spec.cycle)
+                for (uint8_t i = 0; i < n; i++) if (s_rows[i].tick == Tick::TICK_RESTORE) { at = i; break; }
+            const uint8_t add = (uint8_t)LV_MIN(addsChosen(), ROWS_MAX - n);
             memmove(s_rows + at + add, s_rows + at, sizeof(Item) * (n - at));
-            for (uint8_t k = 0; k < add; k++) {
-                Item &c = s_rows[at + k];
+            uint8_t j = 0;
+            for (uint8_t k = 0; k < s_nChosen && j < add; k++) {
+                if (s_chosen[k].tick != Tick::TICK_ADD) continue;
+                Item &c = s_rows[at + j++];
                 c = s_chosen[k];
                 c.coming = true;
                 comingMark(c, c.mark, sizeof(c.mark));
@@ -140,6 +169,17 @@ void paint(uint8_t i) {
     const Item &it = s_rows[i];
     Kit::itemMark(r, Kit::ItemMark::MARK_NONE);
     lv_obj_set_style_opa(r, LV_OPA_COVER, 0);
+    const int32_t rw = lv_obj_get_width(r), rh = lv_obj_get_height(r), rr = lv_obj_get_style_radius(r, LV_PART_MAIN);
+    if (s_spec.cycle) {   // K161: changed, lit; to be removed, red; else satin
+        const uint8_t st = stepOf(it);
+        if (s_tick[i]) lv_label_set_text(s_tick[i], st ? LV_SYMBOL_OK : "");
+        if (it.coming)                  { Kit::itemMark(r, Kit::ItemMark::MARK_COMING); return; }
+        if (it.tick == Tick::TICK_NONE) { Kit::unfinish(r); return; }
+        if (st == 2 && it.from == From::FROM_GROUP) { Kit::itemMark(r, Kit::ItemMark::MARK_DOOMED); return; }
+        if (st)                         { Kit::itemMark(r, Kit::ItemMark::MARK_CHOSEN); return; }
+        Kit::finish(r, rw, rh, rr, Kit::Finish::FINISH_SATIN);
+        return;
+    }
     const bool on = it.coming || (it.tick != Tick::TICK_NONE && chosenAt(it.key) >= 0);
     if (s_tick[i]) lv_label_set_text(s_tick[i], on ? LV_SYMBOL_OK : "");
     const int32_t w = lv_obj_get_width(r), h = lv_obj_get_height(r), rad = lv_obj_get_style_radius(r, LV_PART_MAIN);
@@ -174,9 +214,40 @@ void ticksChanged(bool rebuild) {
     }, rebuild ? (void *)1 : nullptr);
 }
 
+// THE TAP CYCLE (K161): a member flips its pin, then (one made here) is to be
+// removed, then is as it was; a card not in the group is added, then added and
+// pinned, then not. The rows made again: their squares say the result.
+void cycleTap(uint8_t i) {
+    const Item &it = s_rows[i];
+    const int k = chosenAt(it.key);
+    if (k < 0) {
+        if (it.tick == Tick::TICK_NONE || s_nChosen >= CHOSEN_MAX) return;
+        Item &c = s_chosen[s_nChosen];
+        c = it;
+        c.list = s_list;
+        c.step = 1;
+        c.coming = false;
+        if (it.from == From::FROM_HA && s_list < 0) s_chosenRow[s_nChosen] = s_haRows[i];
+        s_nChosen++;
+    } else {
+        Item &c = s_chosen[k];
+        const uint8_t last = (c.from == From::FROM_GROUP && !c.canRemove) ? 1 : 2;
+        if (c.step < last) {
+            c.step++;
+        } else {
+            memmove(s_chosen + k, s_chosen + k + 1, sizeof(Item) * (s_nChosen - k - 1));
+            memmove(s_chosenRow + k, s_chosenRow + k + 1, sizeof(HaOffer::Row) * (s_nChosen - k - 1));
+            s_nChosen--;
+        }
+    }
+    if (!EditCards::countOf(From::FROM_PAGE)) s_move = false;
+    ticksChanged(true);
+}
+
 void rowCb(lv_event_t *ev) {
     const uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(ev);
     if (i >= s_n) return;
+    if (s_spec.cycle) { cycleTap(i); return; }
     const Item &it = s_rows[i];
     const Tick before = kindNow();
     const int k = chosenAt(it.key);
@@ -234,12 +305,46 @@ void fillBody(bool keepScroll) {
     // (the mock's), one on a narrow one (the 4B, mock 9).
     const int32_t bodyW = lv_obj_get_content_width(s_body);
     const bool two = bodyW >= UI::mm(80);
-    const int32_t rowW = two ? (bodyW - gap()) / 2 : bodyW;
+    const int32_t cellW = two ? (bodyW - gap()) / 2 : bodyW;
+    // A GROUP'S ROWS END IN A SQUARE (K160, K161): shorter, the square beside them
+    // as Members has it - a header glyph, a pin, or an empty place.
+    int32_t side = 0, sq = 0;
+    if (s_spec.cycle) {
+        lv_obj_t *probe = Kit::plain(s_body);
+        Kit::add(probe, KS::KS_CLUSTER_GLYPH_SQUARE);
+        sq = lv_obj_get_style_width(probe, LV_PART_MAIN);
+        lv_obj_delete(probe);
+        side = sq + gap();
+    }
+    const int32_t rowW = cellW - side;
     for (uint8_t i = 0; i < s_n; i++) {
         const Item &it = s_rows[i];
         const bool tappable = it.coming || it.tick != Tick::TICK_NONE;
-        lv_obj_t *r = Kit::item(s_body);
+        lv_obj_t *holder = s_body;
+        if (s_spec.cycle) {
+            holder = Kit::plain(s_body);
+            lv_obj_set_size(holder, cellW, LV_SIZE_CONTENT);
+            lv_obj_set_flex_flow(holder, LV_FLEX_FLOW_ROW);
+            lv_obj_set_flex_align(holder, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+            lv_obj_set_style_pad_column(holder, gap(), 0);
+        }
+        lv_obj_t *r = Kit::item(holder);
         lv_obj_set_size(r, rowW, LV_SIZE_CONTENT);
+        if (s_spec.cycle) {
+            uint32_t tint = 0;
+            const char *icon = signOf(it, stepOf(it), tint);
+            lv_obj_t *g = Kit::plain(holder);
+            Kit::add(g, KS::KS_CLUSTER_GLYPH_SQUARE);
+            lv_obj_t *ic = Kit::label(g, KS::KS_CARD_ICON_SM);
+            lv_label_set_text(ic, icon ? icon : "");
+            if (tint) lv_obj_set_style_text_color(ic, UI::c(tint), 0);
+            lv_obj_center(ic);
+            if (!icon) lv_obj_add_flag(g, LV_OBJ_FLAG_HIDDEN);
+            if (!icon) {   // its place kept, so the rows stay one width
+                lv_obj_t *gap_ = Kit::plain(holder);
+                lv_obj_set_size(gap_, sq, 1);
+            }
+        }
         lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(r, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_hor(r, gap(), 0);
@@ -305,8 +410,9 @@ void fillNav() {
         c[0] = '\0';
         if (L.target) {
             const uint8_t n = L.fill ? L.fill(s_count, ROWS_MAX, s_spec.ctx) : 0;
-            if (kindNow() == Tick::TICK_ADD) { snprintf(c, sizeof(c), "%u +%u", (unsigned)n, (unsigned)s_nChosen); lit = true; }
-            else                               snprintf(c, sizeof(c), "%u", (unsigned)n);
+            const uint8_t adds = s_spec.cycle ? addsChosen() : (kindNow() == Tick::TICK_ADD ? s_nChosen : 0);
+            if (adds) { snprintf(c, sizeof(c), "%u +%u", (unsigned)n, (unsigned)adds); lit = true; }
+            else        snprintf(c, sizeof(c), "%u", (unsigned)n);
         } else if (ticked) {
             snprintf(c, sizeof(c), "%u", (unsigned)ticked);
             lit = true;
@@ -344,6 +450,7 @@ void addCb(lv_event_t *)     { act(Act::ACT_ADD); }
 void hideCb(lv_event_t *)    { act(Act::ACT_HIDE); }
 void removeCb(lv_event_t *)  { act(Act::ACT_REMOVE); }
 void restoreCb(lv_event_t *) { act(Act::ACT_RESTORE); }
+void saveCb(lv_event_t *)    { act(Act::ACT_SAVE); }
 
 void moveCb(lv_event_t *ev) {
     s_move = (uintptr_t)lv_event_get_user_data(ev) == 1;
@@ -360,6 +467,15 @@ void fillFoot() {
     const int32_t bw = Kit::textW("Restore 00", UI::type().NAME) + 2 * UI::mm(UI::shape().S7);
     const int32_t bh = Kit::controlH();
     char w[24];
+    if (s_spec.cycle) {   // K161: every change at once
+        if (s_spec.copyMove && EditCards::countOf(From::FROM_PAGE)) {
+            static const char *const CM[] = { "Copy", "Move" };
+            Kit::chipRow(s_foot, CM, 2, s_move ? 1 : 0, 0, moveCb);
+        }
+        snprintf(w, sizeof(w), "Save %u", (unsigned)s_nChosen);   // the owner's (2026-11-04)
+        Kit::button(s_foot, Kit::ButtonRole::BTN_CONFIRM, w, bw, bh, saveCb);
+        return;
+    }
     if (t == Tick::TICK_ADD) {
         if (s_spec.copyMove && EditCards::countOf(From::FROM_PAGE)) {
             static const char *const CM[] = { "Copy", "Move" };

@@ -16,9 +16,10 @@ void sideFor(PopupView v);          // below: the left panel a view wants (CHART
 // any other value in white, paused or unavailable dimmed. Returns the role.
 KS memberState(const Entity &e, MemberShown shown, char *buf, size_t cap) {
     const EntityAttrs &at = e.attrs;
-    if (shown == MemberShown::SHOWN_HIDDEN || shown == MemberShown::SHOWN_MOVED) {
-        // Moved out (the sprint after round 7): its card is on the page.
-        snprintf(buf, cap, shown == MemberShown::SHOWN_MOVED ? "On the page" : "Hidden");
+    if (shown == MemberShown::SHOWN_MOVED) {
+        // Moved out (the sprint after round 7): its card is on the page. An
+        // unpinned member says its state like any other (K160).
+        snprintf(buf, cap, "On the page");
         return KS::KS_LABEL_TAG_DIM;
     }
     if (e.paused) {
@@ -70,19 +71,51 @@ lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberSho
 
 // THE HEADER'S GLYPH, SQUARE (owner, round 2 of the follow-ups): the one the
 // cluster's header shows for this member, in its colour, `gap` from the row.
-static void headerGlyph(lv_obj_t *col, const Entity &e, int32_t gap) {
+const char *headerGlyphOf(const Entity &e, uint32_t &tint) {
     const UIPalette &p = UI::pal();
+    const bool binary = e.value.type == ValueType::BOOL;
+    const bool on = binary && e.value.b;
+    tint = binary ? (on ? p.ST_ACTIVE : p.TEXT_DIM) : cardTintFor(e.desc);
+    if (!e.everSet || !e.available) tint = p.TEXT_DIM;
+    return binary ? cardHeroIcon(e, on) : cardCornerIcon(e, false);
+}
+
+static void headerGlyph(lv_obj_t *col, const Entity &e, int32_t gap) {
     lv_obj_t *g = plain(col);
     Kit::add(g, KS::KS_CLUSTER_GLYPH_SQUARE);
     lv_obj_align(g, LV_ALIGN_LEFT_MID, gap, 0);
     lv_obj_t *ic = Kit::label(g, KS::KS_CARD_ICON_SM);
-    const bool binary = e.value.type == ValueType::BOOL;
-    const bool on = binary && e.value.b;
-    lv_label_set_text(ic, binary ? cardHeroIcon(e, on) : cardCornerIcon(e, false));
-    uint32_t tint = binary ? (on ? p.ST_ACTIVE : p.TEXT_DIM) : cardTintFor(e.desc);
-    if (!e.everSet || !e.available) tint = p.TEXT_DIM;
+    uint32_t tint = 0;
+    lv_label_set_text(ic, headerGlyphOf(e, tint));
     lv_obj_set_style_text_color(ic, UI::c(tint), 0);
     lv_obj_center(ic);
+}
+
+// PINNED, A PIN IN THE SAME SQUARE (K160): a tile on the page. A header member
+// shows its own glyph instead; one not on the page, nothing.
+void pinGlyph(lv_obj_t *col, int32_t gap) {
+    lv_obj_t *g = plain(col);
+    Kit::add(g, KS::KS_CLUSTER_GLYPH_SQUARE);
+    lv_obj_align(g, LV_ALIGN_LEFT_MID, gap, 0);
+    lv_obj_t *ic = Kit::label(g, KS::KS_CARD_ICON_SM);
+    lv_label_set_text(ic, MDI_PIN);
+    lv_obj_center(ic);
+}
+
+// Whatever says a member is on the page (K160), `gap` from its row: its header
+// glyph, a pin, or nothing.
+void pageSign(lv_obj_t *col, const ClusterCard &cl, uint8_t i, const Entity &e, int32_t gap) {
+    if (clusterMemberInHeader(cl, i))                          headerGlyph(col, e, gap);
+    else if (clusterMemberShown(cl, i) == MemberShown::SHOWN_TILE) pinGlyph(col, gap);
+}
+
+// The width a sign's column takes beside a row: the square and its gap.
+int32_t pageSignW(int32_t gap) {
+    lv_obj_t *probe = plain(lv_layer_top());
+    Kit::add(probe, KS::KS_CLUSTER_GLYPH_SQUARE);
+    const int32_t w = lv_obj_get_style_width(probe, LV_PART_MAIN) + gap;
+    lv_obj_delete(probe);
+    return w;
 }
 
 // MEMBERS' ROWS: a group's member cards - every member, hidden ones too (round
@@ -100,19 +133,14 @@ void buildMembers() {
     lv_obj_t *list = plain(s.stage);
     const int32_t rowW = membersRowW();
     const ClusterCard *cl = rowGroup();
-    // IN THE HEADER, ITS GLYPH OUTSIDE THE ROW ON THE RIGHT (owner, round 2 of the
-    // follow-ups): the rows as they were, centred, with a column each side as wide
-    // as the glyph and its gap - only when one is in the header.
+    // ON THE PAGE, ITS SIGN OUTSIDE THE ROW ON THE RIGHT (owner, round 2 of the
+    // follow-ups; K160): the rows as they were, centred, with a column each side
+    // as wide as the sign and its gap - a header member's glyph, a pinned tile's
+    // pin - only when one of them is on the page.
     bool anyHeader = false;
-    for (uint8_t i = 0; cl && i < cl->memberCount(); i++) anyHeader |= clusterMemberInHeader(*cl, i);
+    for (uint8_t i = 0; cl && i < cl->memberCount(); i++) anyHeader |= clusterMemberPinned(*cl, i);
     const int32_t gap = mm(UI::shape().S5);
-    int32_t side = 0;
-    if (anyHeader) {
-        lv_obj_t *probe = plain(s.stage);
-        Kit::add(probe, KS::KS_CLUSTER_GLYPH_SQUARE);
-        side = lv_obj_get_style_width(probe, LV_PART_MAIN) + gap;
-        lv_obj_delete(probe);
-    }
+    const int32_t side = anyHeader ? pageSignW(gap) : 0;
     const int32_t avail = lv_area_get_width(&s.winRect) - 2 * s.pad;
     const int32_t rowsW = anyHeader ? LV_MIN(rowW > 0 ? rowW : avail, avail - 2 * side) : rowW;
     lv_obj_set_size     (list, anyHeader ? rowsW + 2 * side : rowW > 0 ? rowW : lv_pct(100), LV_SIZE_CONTENT);
@@ -152,7 +180,7 @@ void buildMembers() {
             lv_obj_set_width(r, rowsW);
             right = plain(holder);
             lv_obj_set_size(right, side, LV_SIZE_CONTENT);
-            if (k >= 0 && clusterMemberInHeader(*cl, (uint8_t)k)) headerGlyph(right, *e, gap);
+            if (k >= 0) pageSign(right, *cl, (uint8_t)k, *e, gap);
         }
         lv_obj_add_event_cb(r, memberRowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
         if (nRows < ROWS) rows[nRows++] = r;

@@ -47,8 +47,8 @@ public:
     bool addMember(Card *m, bool tile, int8_t slot);
     void setBinder(CardBinder *b) { _binder = b; }
     CardBinder *binder() const { return _binder; }
-    // A MEMBER HIDDEN FROM THE PAGE'S CLUSTER, as the group view shows it (K154):
-    // a tile, dimmed and marked "Hidden". Before build().
+    // A MEMBER NOT PINNED TO THE PAGE, as the group view shows it (K154, K160): a
+    // tile like the rest, after them. Before build().
     void markHidden(uint8_t i) { if (i < _n) _hidden[i] = true; }
     bool hiddenAt(uint8_t i) const { return i < _n && _hidden[i]; }
     void setStyle(ClusterStyle s) { _style = s; }
@@ -68,6 +68,10 @@ public:
     void setFrameRadius(int32_t px) { _frameR = px; }
     // Is this point (screen coordinates) on its header row?
     bool headerHas(const lv_point_t &p) const;
+    // THE GROUP VIEW'S HEADER SENSORS (K163), before build(): a tap on any of
+    // them is `cb`'s (its user data this cluster) - the name's stays the card's.
+    void setSlotsTap(lv_event_cb_t cb) { _slotsCb = cb; }
+    lv_obj_t *headerRow() const { return _hdr; }
     // The header values' icons in the page header's glyph style (round 11, K115):
     // framed on a Swatch header, bare on a Band. Every cluster's, from the next build.
     static void setGlyphStyle(GlyphStyle g) { s_glyphs = g; }
@@ -111,6 +115,7 @@ private:
     Layout::TileCap _cap;
     bool        _capped = false;
     int32_t     _frameR = 0;   // 0: a card's corners
+    lv_event_cb_t _slotsCb = nullptr;
 
     lv_obj_t *_room = nullptr;  // the card's body: the header and the tiles stand in it
     // The header: the row, its bar's skirt, the swatch, the name, and a value per slot.

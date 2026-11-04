@@ -176,6 +176,10 @@ void ClusterCard::buildBody(lv_obj_t *body) {
         s.member = (int8_t)order[k];
         s.box  = Kit::plain(_hdr);
         lv_obj_set_height(s.box, hdrH());
+        if (_slotsCb) {   // the group view's (K163): the sensors' own tap
+            lv_obj_add_flag(s.box, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_add_event_cb(s.box, _slotsCb, LV_EVENT_CLICKED, this);
+        }
         if (framed) {
             s.glyph = Kit::plain(s.box);
             Kit::add(s.glyph, s_glyphs == GlyphStyle::GLYPH_CIRCLE ? KS::KS_CLUSTER_GLYPH_CIRCLE
@@ -210,15 +214,7 @@ void ClusterCard::buildBody(lv_obj_t *body) {
         lv_obj_set_pos (m->root(), pad() + x, tilesTop() + y + (g.tileH - th) / 2);
         lv_obj_set_size(m->root(), w, th);
         if (_binder) _binder->add(m);
-        // HIDDEN, SAID IN WORDS AND BY THE EYE (K143: "clearly noted"; K154), never
-        // by colour alone: dimmed, its word in the corner.
-        if (_hidden[i]) {
-            lv_obj_set_style_opa(m->root(), LV_OPA_70, 0);
-            lv_obj_t *tag = Kit::label(m->root(), KS::KS_LABEL_TAG_DIM);
-            lv_obj_add_flag(tag, LV_OBJ_FLAG_FLOATING);
-            lv_obj_align(tag, LV_ALIGN_TOP_LEFT, vgap(), vgap());
-            lv_label_set_text(tag, "Hidden");   // K143's word
-        }
+        // An unpinned member (`_hidden`) is drawn like the rest, after them (K160).
     }
 }
 

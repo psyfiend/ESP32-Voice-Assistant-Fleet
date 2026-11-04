@@ -48,38 +48,8 @@ void confirmHide() {
     s_confirm = Kit::dialog(spec);
 }
 
-// "HIDE FROM THE CLUSTER" ASKS TOO (round 14, the owner's words): the tile goes
-// from its cluster, and comes back from the cluster's Members (K125).
-void confirmHideTile() {
-    confirmClose();
-    Card *held = CardPopup::isOpen() ? visibilitySubject() : nullptr;
-    if (!held || !held->hasId()) return;
-    char buf[200];
-    snprintf(buf, sizeof(buf), "The card \"%s\" will be hidden from this group, any other instances of "
-                               "this card will not be affected", held->shownName(CardLabel::LBL_NAME));
-    Kit::DialogSpec spec = {};
-    spec.role    = Kit::DialogRole::DLG_DESTRUCTIVE;
-    spec.title   = "Hide this card?";
-    spec.body[0] = buf;
-    spec.body[1] = "This card can be restored from the group's Edit cards";   // K146, K148; to confirm
-    spec.buttons[0] = { "Cancel", Kit::ButtonRole::BTN_CANCEL, confirmCancelCb };
-    spec.buttons[1] = { "Hide", Kit::ButtonRole::BTN_DESTRUCTIVE, [](lv_event_t *) {
-        lv_async_call([](void *) {
-            confirmClose();
-            visibilityHideTile();
-        }, nullptr);
-    } };
-    spec.nButtons = 2;
-    spec.width    = LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(UI::shape().W_DIALOG_MAX));
-    spec.outside  = confirmCancelCb;
-    spec.countdown = true;
-    s_confirm = Kit::dialog(spec);
-}
-
-void hideTileCb(lv_event_t *ev) {
-    (void)ev;
-    lv_async_call([](void *) { confirmHideTile(); }, nullptr);
-}
+// A member's Hide from the group and its dialog went with K160: Unpin this card
+// loses nothing, so it asks nothing (PopupVisibility.cpp).
 
 // A COPY IN A CLUSTER, REMOVED (2.11, K91): it was made on the glass, so
 // removing it deletes it - after the same dialog. The card it was copied from

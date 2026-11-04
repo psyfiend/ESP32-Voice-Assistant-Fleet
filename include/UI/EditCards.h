@@ -19,6 +19,12 @@
 // calls the caller's act(), which asks its go-or-no-go question (K149) and does
 // it. One list at a time (one sheet shows at a time). LVGL thread.
 //
+// A GROUP'S LIST IS A TAP CYCLE (Spec::cycle; K160, K161): a member's first tap
+// flips its pin, its second marks it for removal (red; only one made on the
+// board), its third puts it back; a card not in the group is added, then added
+// and pinned, then not. Kinds mix. Each row ends in a square saying what will be
+// on the page - a header glyph, or a pin - and one button, Save N, calls act(ACT_SAVE).
+//
 #include <lvgl.h>
 #include "UI/HaOffer.h"
 
@@ -41,10 +47,16 @@ struct Item {
     Tick tick;
     bool canRemove;      // a row to hide that may be removed instead
     bool fresh;          // an HA row new to the board (HaOffer): "New"
+    // A GROUP'S MEMBER (cycle): pinned now, and the square saying so - its header
+    // glyph in `signTint`, or the pin (null: not on the page).
+    bool        pinned;
+    const char *signIcon;
+    uint32_t    signTint;   // 0: the role's
     // EditCards' own: a card being added, shown in the target list; the list a
-    // ticked row was ticked in (-1: an HA area).
-    bool   coming;
-    int8_t list;
+    // ticked row was ticked in (-1: an HA area); where the cycle is (1, 2).
+    bool    coming;
+    int8_t  list;
+    uint8_t step;
 };
 
 struct List {
@@ -53,7 +65,7 @@ struct List {
     bool        target;  // where the cards being added go: they show here, dotted
 };
 
-enum class Act : uint8_t { ACT_ADD, ACT_HIDE, ACT_REMOVE, ACT_RESTORE };
+enum class Act : uint8_t { ACT_ADD, ACT_HIDE, ACT_REMOVE, ACT_RESTORE, ACT_SAVE };
 
 struct Spec {
     List        lists[LISTS_MAX] = {};
@@ -65,6 +77,7 @@ struct Spec {
     bool        copyMove = false;    // a page card being added asks Copy or Move (into a group)
     void      (*act)(Act a, void *ctx) = nullptr;
     bool        keepTicks = false;   // made again (back from a step): the ticks and list kept
+    bool        cycle = false;       // a group's: the tap cycle and Save N (K161)
 };
 
 // The list, `w` x `h` in `parent`. Nothing ticked to start with, unless keepTicks.

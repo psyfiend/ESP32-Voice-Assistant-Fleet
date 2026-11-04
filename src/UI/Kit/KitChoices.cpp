@@ -225,6 +225,10 @@ lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_
         for (uint8_t i = 0; i < row.n; i++) {
             lv_obj_t *b = chipAt(line, row.words[i], c, i == row.lit, cb, ((uintptr_t)r << 8) | i);
             lv_obj_set_pos(b, x + i * (c + gap), y);
+            if (row.greyed) {   // shown, dim, nothing to tap
+                lv_obj_clear_flag(b, LV_OBJ_FLAG_CLICKABLE);
+                lv_obj_set_style_opa(b, LV_OPA_40, 0);
+            }
         }
     }
     return list;

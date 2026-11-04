@@ -29,7 +29,13 @@ static const char *const BAR_IS[]    = { nullptr, "on", "off" };
 static const char *const STATE_W[]   = { "Inherit", "Fill", "Icon glow", "Bracket", "Corner cut" };
 static const char *const STATE_IS[]  = { nullptr, "fill", "glow", "bracket", "corner" };
 
-enum CuiRow : uint8_t { CUI_ENTITY, CUI_CLABEL, CUI_METAL, CUI_SHAPE, CUI_DENSITY, CUI_TIMEOUT, CUI_BAR, CUI_STATE, CUI_ROWS };
+// A GROUP'S GROUP VIEW (K162): its members as tiles or cards, else UI Tweaks'. A
+// group's row in both presentations, greyed while it is shown as a solo card.
+static const char *const GVIEW_W[]   = { "Inherit", "Tiles", "Cards" };
+static const char *const GVIEW_IS[]  = { nullptr, "tiles", "cards" };
+
+enum CuiRow : uint8_t { CUI_ENTITY, CUI_CLABEL, CUI_METAL, CUI_SHAPE, CUI_DENSITY, CUI_TIMEOUT, CUI_BAR, CUI_STATE,
+                        CUI_GVIEW, CUI_ROWS };
 
 static Card *held() { return cardOf(h.surface); }
 
@@ -53,6 +59,7 @@ static bool rowApplies(CuiRow r) {
         case CUI_SHAPE:   return !cluster && s.lightHero;
         case CUI_DENSITY: return !cluster && !mini;
         case CUI_STATE:   return cluster;   // its tiles'
+        case CUI_GVIEW:   return (cluster || s.groupCard) && !inMember();   // a group's, either way it is shown
         default:          return true;   // the window's own timeout and bar
     }
 }
@@ -89,6 +96,7 @@ static uint8_t litOf(uint8_t row) {
         case CUI_TIMEOUT: return savedPos("close", TIMEOUT_IS, 5);
         case CUI_BAR:     return savedPos("bar", BAR_IS, 3);
         case CUI_STATE:   return savedPos("card_state", STATE_IS, 5);
+        case CUI_GVIEW:   return savedPos("group_view", GVIEW_IS, 3);
     }
     return 0;
 }
@@ -196,6 +204,9 @@ static void chooseAsync(void *p) {
             keepCardSetting("card_state", STATE_IS[i < 5 ? i : 0]);
             s_rebuildPage = true;
             break;
+        case CUI_GVIEW:   // read as the group view opens (PopupGroup.cpp)
+            if (!s.groupCard) keepCardSetting("group_view", GVIEW_IS[i < 3 ? i : 0]);
+            break;
         default: break;
     }
     // Every row lit as the card now has it (a look chosen moves the shape's chip too).
@@ -221,13 +232,16 @@ void buildCardUi() {
         { "Window timeout", TIMEOUT_W, 5, litOf(CUI_TIMEOUT) },
         { "Timer bar",      BAR_W,     3, litOf(CUI_BAR)     },
         { "Card state",     STATE_W,   5, litOf(CUI_STATE)   },   // a cluster's (its place in the list: to confirm)
+        { "Group view",     GVIEW_W,   3, litOf(CUI_GVIEW)   },   // K162
     };
     Kit::ChipRowSpec rows[CUI_ROWS];
     s_nRows = 0;
     for (uint8_t r = 0; r < CUI_ROWS; r++) {
         if (!rowApplies((CuiRow)r)) continue;
         s_rowAt[s_nRows] = (CuiRow)r;
-        rows[s_nRows++] = all[r];
+        rows[s_nRows] = all[r];
+        if (r == CUI_GVIEW && s.groupCard) rows[s_nRows].greyed = true;   // shown as a solo card (K162)
+        s_nRows++;
     }
     s_table = Kit::chipTable(s.stage, lv_area_get_width(&s.winRect) - 2 * s.pad, rows, s_nRows, chipCb);
 }

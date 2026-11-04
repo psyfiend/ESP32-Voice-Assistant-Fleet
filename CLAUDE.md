@@ -456,8 +456,9 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
   (K96, K66's remove - compiled or added) has `removed`: `yes`: the page's pool, never built, listed
   in the page's hidden cards with Restore. **A card moved into a cluster** has `removed`: `moved` -
   off its page and NOT in its pool; its copy in the cluster has `from` (the card it came from), and
-  removing that copy puts the card back (K111). A member hidden from its cluster (`hidden`: `yes`) is
-  listed in its cluster's Members only, never with the page's hidden cards (K125). **A member moved out to the page**
+  removing that copy puts the card back (K111). A member **not pinned** to the page (`hidden`: `yes`;
+  "Pin" on the glass means on the page, K160) is in its group's Members and group view only, never
+  with the page's hidden cards (K125); new members join unpinned. **A member moved out to the page**
   (K112) has `hidden`: `moved` - no tile, not in the hidden cards - and its page card `from`.
   **Restore is the one way back** (K137): it deletes a copy, or sends a moved card home and brings
   its original back. A made card that moves again relocates, never copies a copy; `home_name` /

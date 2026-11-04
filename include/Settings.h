@@ -18,11 +18,13 @@
 //   A card added on the device (K17) is a card entry with "page", "after" and
 //   "entity" as well - see Cards/CardAdded.h.
 //   2.8 round 3: UI Tweaks' choices under "system": "ui" ("scheme", "label",
-//   "entity", "state", "density"), "header" ("glyphs"), "window", "alarm"
-//   ("warn"); a page's "cols" / "rows" (a count, since 2.11 round 9 a pin the
-//   arranger keeps; "auto" in older files reads as not pinned) and "header"; Card
-//   UI's per card: "label", "group" / "label_text", "selector", "density",
-//   "close", "bar" (GUIManagerTweaks.cpp, Cards/Popup/PopupCardUi.cpp).
+//   "entity", "state", "density", "group_view"), "header" ("glyphs"), "window",
+//   "alarm" ("warn"); a page's "cols" / "rows" (a count held, since 2.11 round 9
+//   - "fixed" on the glass, K164; "auto" in older files reads as not held) and
+//   "header"; Card UI's per card: "label", "group" / "label_text", "selector",
+//   "density", "close", "bar", a group's "card_state" and "group_view" (K162)
+//   (GUIManagerTweaks.cpp, Cards/Popup/PopupCardUi.cpp). A group member's
+//   "hidden": "yes" is UNPINNED - off the page, in the group view (K160).
 //
 // Rules that are load-bearing:
 //   - Only what was changed is stored; a missing key means "inherit". Setting a
