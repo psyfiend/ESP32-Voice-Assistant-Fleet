@@ -500,6 +500,9 @@ lv_style_t *paint(UIPaint p);
 // largest shadow any scheme draws - a fixed number, so a scheme change never
 // leaves a container with a margin computed for the previous one.
 void unclipShadows(lv_obj_t *container);
+// That margin: the largest reach any scheme's shadow has past its object's edge
+// (a bare sheet lets its client's shadow out only while bare - KitSheet).
+int32_t shadowReachPx();
 
 // Silences the `lv_part_t | lv_state_t` deprecation warning that would
 // otherwise be reproduced in every card type. Issue #13 asked for this.

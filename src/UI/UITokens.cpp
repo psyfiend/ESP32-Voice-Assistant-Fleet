@@ -480,7 +480,7 @@ lv_style_t *paint(UIPaint p) {
 // The largest reach any scheme's shadow has past its object's edge. Linen is
 // the only scheme with one; computing it from the metrics keeps this honest if
 // that changes.
-static int32_t shadowReachPx() {
+int32_t shadowReachPx() {
     const UIMetrics *all[] = { &UI_MET_DARK, &UI_MET_LIGHT };
     int32_t r = 0;
     for (const UIMetrics *m : all) {

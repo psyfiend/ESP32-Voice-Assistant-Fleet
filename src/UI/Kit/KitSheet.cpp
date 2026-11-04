@@ -211,6 +211,19 @@ bool     windowBarShown() { return barSetting(); }
 // redraw to open and one to close, 2.10a). No clip_corner: it would cost a
 // window-sized layer (card-sheet 8). Clickable, so a tap inside never reaches
 // the catcher.
+//
+// A BARE SHEET LETS ITS CLIENT'S SHADOW OUT (K154, the owner's round 3 look at
+// the 4B): the group view's cluster casts Linen's shadow as it does on the page,
+// and the stage and the window, each exactly its size, clipped it to the
+// rectangle - the shadow gone below it and "mud" left in the rounded corners,
+// the card shadow's first bug again (Card.cpp, UI::unclipShadows()). So while
+// bare, both are overflow-visible with the shadow's margin. Only while bare: a
+// view that scrolls must clip.
+static void bareExtDrawCb(lv_event_t *e) {
+    const Sheet *S = (const Sheet *)lv_event_get_user_data(e);
+    if (S && S->bare) lv_event_set_ext_draw_size(e, UI::shadowReachPx());
+}
+
 static void makeWindow(Sheet &S) {
     S.win = plain(lv_screen_active());
     lv_obj_add_flag(S.win, LV_OBJ_FLAG_CLICKABLE);
@@ -218,6 +231,7 @@ static void makeWindow(Sheet &S) {
     lv_obj_set_size(S.win, lv_area_get_width(&S.winRect), lv_area_get_height(&S.winRect));
     add(S.win, KitStyle::KS_SHEET_FACE);
     haloAttach(S.win);
+    lv_obj_add_event_cb(S.win, bareExtDrawCb, LV_EVENT_REFR_EXT_DRAW_SIZE, &S);
 }
 
 // D6's drag down, on the HEADER ROW only (card-sheet 13): the light's tall
@@ -325,6 +339,7 @@ static void buildFrame(Sheet &S) {
     lv_obj_set_flex_grow(S.stage, 1);
     lv_obj_set_flex_flow(S.stage, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(S.stage, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_add_event_cb(S.stage, bareExtDrawCb, LV_EVENT_REFR_EXT_DRAW_SIZE, &S);   // makeWindow()
 
     // --- A floating tab under the right slot (the card window's Scenes) ------
     // Out of the flow, in the corner of the window's contents, a header row
@@ -440,6 +455,14 @@ void sheetBare(Sheet &S, bool bare, int32_t radius) {
             lv_obj_remove_local_style_prop(S.win, LV_STYLE_BG_OPA, 0);
             lv_obj_remove_local_style_prop(S.win, LV_STYLE_BORDER_WIDTH, 0);
             lv_obj_remove_local_style_prop(S.win, LV_STYLE_RADIUS, 0);
+        }
+        // Its client's shadow let out while bare, clipped again after (makeWindow()).
+        lv_obj_t *const both[] = { S.win, S.stage };
+        for (lv_obj_t *o : both) {
+            if (!o) continue;
+            if (bare) lv_obj_add_flag(o, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+            else      lv_obj_clear_flag(o, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+            lv_obj_refresh_ext_draw_size(o);
         }
     }
     sheetResized(S);
