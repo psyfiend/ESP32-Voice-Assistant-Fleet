@@ -1,4 +1,58 @@
-# Test sheet - 2.13, cards from Home Assistant (rounds 1 to 3)
+# Test sheet - 2.13, cards from Home Assistant (rounds 1 to 4)
+
+# Round 4
+
+**Branch** `feat/2.13-add-from-ha` at `5fbc9ee`. **Boards** WS_P4_5, WS_P4_4B and CYD_P4_1060 run it
+(app only, settings saved first in `bench/settings/<board>/20261104-01*.json`, 0 differences after).
+**Decisions** K159-K164. Driven by Claude over `/popup` with screenshots: the group view's spacing,
+the header drop-down, Members' squares, Edit cards' cycle (taps only, never saved), Cards mode on
+the 4B (its settings put back after). **Swipes and taps on the glass are untried.**
+
+## What changed on screen
+
+- **Group view tiles have a maximum size**, 25 x 20 mm, never more than twice as wide as tall, all
+  one size; the window keeps its own size and place unless its tiles would be smaller there than on
+  the page; **the spare room is spread evenly** between and around them (K159, K162).
+- **Its frame has the window's corners**: switching to Members does not jump. **A drag down from
+  its header closes it.**
+- **A tap on its header sensors** drops a panel of them - glyph, full name, state; a row opens that
+  sensor's History; a second tap folds it. A tap on the name opens Members (K163).
+- **Pin** (K160): the page shows a group's pinned members. Members and Edit cards end each member's
+  row in a square - its header glyph, or a pin for a tile - and nothing for one not on the page. A
+  tile's Visibility says **Pin this card** / **Unpin this card**, with no dialog. The group view draws
+  every member alike, the pinned first. New members join unpinned.
+- **Edit cards for a group** (K161): a tap on a member flips its pin (lit); a second marks a card
+  made on the board for removal (red); a third puts it back. A card not in the group: added, then
+  added and pinned. **Save N** does it all; "Saved N changes to Kitchen"; a dialog only for removals.
+- **Table** (moved out of Kitchen on 10/31) is under On the page again, not In this group; adding it
+  sends it home - the page card goes, Kitchen's member comes back.
+- **Group view: Tiles or Cards** (K162) in UI Tweaks; a group's own in Card UI (Inherit, Tiles,
+  Cards), greyed while it is shown as a solo card.
+- The system panel's Grid line says **fixed** for a held column or row count (K164).
+
+## Tests
+
+| # | Do this | PASS if |
+|---|---|---|
+| T1 | Tap Office (4B or 1060) | the window the normal size; three tiles one size, the third centred under two, even space round them |
+| T2 | Tap Office's header sensors, then a row | the panel drops under the header on the right; the row opens that sensor's History; the back arrow returns |
+| T3 | Tap the sensors again; tap the name | the panel folds; the name opens Members |
+| T4 | Drag down from the group view's header | it closes |
+| T5 | In the group view, tap a light tile; long-press a tile | the light switches; the tile opens its member here |
+| T6 | Office's Members | a pin beside each tile on the page, the header's glyphs beside its sensors |
+| T7 | Long-press a tile, Visibility, **Unpin this card** | no dialog; the window closes and the tile leaves the page; it is still in the group view |
+| T8 | That member's Visibility from Members: **Pin this card** | it is back on the page when the window closes |
+| T9 | Kitchen's Edit cards, On the page: tap Table twice, **Save 2**... | Table back in Kitchen as a tile; its page card gone; "Saved 1 change to Kitchen" |
+| T10 | Edit cards: tap a member once, twice, three times | lit with its square gone (or a pin come); a made card red at two, a built-in one back at two; as it was at three |
+| T11 | Edit cards: add a card from Home Assistant once, Save | it joins Kitchen but not the page; the group view shows it |
+| T12 | UI Tweaks, Group view: Cards; tap Office | members drawn as cards, bordered, even spacing |
+| T13 | A cluster's Card UI: Group view; a solo group card's | Inherit / Tiles / Cards; greyed on the solo card |
+
+## Not built yet
+
+- Moving a page card into a group from its Visibility (Add to group) still pins it; only Edit cards
+  adds unpinned.
+- A tap outside the header panel but on a tile acts on the tile instead of folding the panel.
 
 # Round 3
 
