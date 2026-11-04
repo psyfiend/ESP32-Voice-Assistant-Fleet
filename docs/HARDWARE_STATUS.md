@@ -43,7 +43,8 @@ display path, present mode, soak and glass sign-off, `docs/display/README.md` is
 **2026-09-28: `CYD_S3_3248`'s USB connector broke off the PCB** (owner). Unavailable until
 repaired; it can still be powered by battery/headers and flashed over UART.
 
-**WiFi and the MQTT/HA pipeline: 8 of 8.** The fleet-wide flash pass on 2026-09-08 put the
+**WiFi and the MQTT/HA pipeline: 8 of 8** (the ninth board, `CYD_P4_4880`, joined 2026-09-28 and
+runs the same pipeline). The fleet-wide flash pass on 2026-09-08 put the
 full stack on every board — each one joined the network, connected to the broker, published
 discovery and appeared in Home Assistant. Reaching HA exercises the whole chain, so a board
 that shows up there has demonstrated WiFi, MQTT, discovery and the registry together.
@@ -63,7 +64,7 @@ already gone wrong.
 
 ### The internal-RAM constraint, and which board has it
 
-`GuiManager` places LVGL buffers by bus type: MIPI/RGB boards get full framebuffers in
+`LVGL_Startup` (`GUIManager` before 2.1) places LVGL buffers by bus type: MIPI/RGB boards get full framebuffers in
 **PSRAM**; SPI/QSPI boards get partial buffers in **internal SRAM**, because a QSPI panel
 cannot stream from PSRAM fast enough.
 
@@ -79,7 +80,7 @@ took static internal RAM from 209,895 back to 187,960 bytes.
 
 **Updated on `WS_P4_4B`, 2026-09-19, and it was out of date.** See GitHub issue #59.
 
-The four P4 boards have no radio of their own; WiFi runs on an onboard ESP32-C6 over SDIO
+The P4 boards (five since the 4880) have no radio of their own; WiFi runs on an onboard ESP32-C6 over SDIO
 (`esp_hosted`). **Host and slave firmware must be interoperable**, and Waveshare publish the matrix
 in `docs/P4_C6_HOSTED_WIFI.md` in two of the vendor trees under `reference/Waveshare Official
 Repos/`: esp_hosted 1.4.x pairs with ESP-IDF before 6.0, 2.12-3.0 with 6.0 and later. Our host runs
@@ -294,7 +295,8 @@ the 7B to be the better board for its features and its maker. Unexplained; nobod
 ### CYD_P4_4880 — Guition P4 4.3" portrait (JC4880P443C_I_W)
 
 **Added 2026-09-28; flashed since (esp_lcd, 2 x 5 portrait signed off - `display/README.md`). Runs
-`v0.2.19` since 2026-10-30 (COM19); it booted on the PC's USB without its LiPo.** Its first boot
+2.13's round-2 test build (`d8d3d26`) since 2026-11-03 (COM19); it booted on the PC's USB without
+its LiPo.** Its first boot
 could not mount the settings: the `spiffs` partition held an empty SPIFFS from older firmware (block
 headers only, no files), and A17 leaves a partition with anything in it alone. Erased with the
 owner's yes (`esptool erase-region 0xc90000 0x360000`, a copy kept first); the next boot formatted
@@ -404,6 +406,6 @@ is the same effective UI space as 480×480 at 1.0×. If the scaling approach is 
 visually indistinguishable apart from sharpness, which makes them a free correctness check. **Not
 yet flashed as a pair.**
 
-Only `WS_P4_5` and `CYD_S3_3248` have been flashed since the change. The other six build clean but
+*(At the time - every P4 has run on glass since.)* Only `WS_P4_5` and `CYD_S3_3248` have been flashed since the change. The other six build clean but
 their appearance at the new scales is unverified — `CYD_S3_8048` is the one to look at first, since
 it moved.

@@ -1026,3 +1026,15 @@ wrong tool for resizing one.
 Its neighbour, found in round 16 before it cost anything: **a kit component may find its own parts
 by child index** - `Kit::chipTable()` finds row N as its Nth child - so never add children to one
 built by the kit. Put the component and the extras in a column of your own.
+
+## A shadow cut off at its parent's edge: OVERFLOW_VISIBLE goes only as far as the ext draw size (2.13 round 3, 2026-11-03)
+
+The group view's cluster showed dark, square-cut corners on the 4B: its drop shadow was being
+clipped. The cluster sat in a sheet's window and stage, both clipping their children. Setting
+`LV_OBJ_FLAG_OVERFLOW_VISIBLE` on them was not enough on its own: **LVGL lets a child draw outside
+an overflow-visible parent only as far as the parent's own extra draw size** (`LV_EVENT_REFR_EXT_DRAW_SIZE`),
+which is 0 for a plain object. The fix is both - the flag, and an ext-draw callback returning the
+shadow's reach (`UI::shadowReachPx()`), then `lv_obj_refresh_ext_draw_size()` on each ancestor
+(`bareExtDrawCb` in `KitSheet.cpp`). Check every ancestor between the shadow and the screen; one
+clipping parent is enough to cut it. Same family as the `OVERFLOW_VISIBLE` note above and
+`UI::unclipShadows()`.

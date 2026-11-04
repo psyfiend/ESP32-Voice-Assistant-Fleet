@@ -267,8 +267,8 @@ order.
 |---|---|
 | `/popup?card=N` | a long press on card N: opens its window; replies with the build time, window size and LVGL's pool |
 | `/popup?close=1` | closing it; replies with the pool afterwards. **Anything changed in the window is saved now**, as on the glass |
-| `/popup?view=N` | the corner icons: `0` the controls (a member's, inside one; a cluster's Members, K129), `1` History, `2` Members, `4` Scenes, `5` Properties, `6` Card UI (2.8 round 3, as SETTINGS' last row), `7` a cluster's Header options (2.11, K129), `8` Visibility (2.11, K96: the card's options by where it is), `9` its Add to a cluster (K91, K100), `10` a cluster's Add cards (K104), `3` only lists. Also lists the entities' levels, an HA group's members and why recent commands failed |
-| `/popup?deck=1` / `deck=0` / `deck=2` | SETTINGS opened / folded; `2` the left panel (CHART, ACTIVITY, SCENES, or a cluster's CLUSTER) opened |
+| `/popup?view=N` | the corner icons: `0` the controls (a member's, inside one; a cluster's Members, K129), `1` History, `2` Members, `4` Scenes, `5` Properties, `6` Card UI (2.8 round 3, as SETTINGS' last row), `7` a cluster's Header options (2.11, K129), `8` Visibility (2.11, K96: the card's options by where it is), `9` its Add to a cluster (K91, K100), `10` a group's Edit cards (K155; a group's window only), `11` a cluster's group view (2.13), `12` a member's back arrow (where it was opened from), `3` only lists. Also lists the entities' levels, an HA group's members and why recent commands failed |
+| `/popup?deck=1` / `deck=0` / `deck=2` | SETTINGS opened / folded; `2` the left panel (CHART, ACTIVITY, SCENES, or a group's GROUP) opened |
 | `/popup?ctl=N` | a light's control: `0` brightness, `1` color temperature, `2` color; lists where the stage's children landed |
 | `/popup?member=N` | a tap on row N of Members (opens Members first) |
 | `/popup?span=N` | History's span buttons: chart `0` 24 h, `1` 12 h, `2` 6 h, `3` 1 h; activity `0` 24 h, `1` 7 days. Asks Home Assistant for that history |
@@ -322,6 +322,25 @@ order.
 | `/popup?grid=a\|cu\|cd\|ru\|rd` | (2.11 round 9) the system panel's **Auto**, **Col +**, **Col -**, **Row +**, **Row -** on the page showing | the page's `cols` / `rows` pins (Auto removes both); the page arranges again |
 | `/popup?dash=1` | (round 9) the system panel opens with the development **Reset**'s dialog, which counts what would go - nothing changes unless its Reset is tapped (`slot=-1` takes it down) | nothing |
 | `/popup?dash=2` | **the Reset done, no dialog**: every card made on the board deleted (`page` / `in` entries), every hide and move undone (`removed`, `hidden`), group cards' `slots` and `present` removed, every page's `layout` removed. **Never on the owner's real settings** - a test copy, then `restore_settings.ps1` | as described; the looks, schemes, UI Tweaks and pins stay |
+
+### 2.13: Edit cards, New group, the group view (debug builds)
+
+The rows above that name 2.11's flows (`addcards=`, `removecard=4`-`8`, `restore=-2`, `join=`) were
+written for 2.11's windows; several of those buttons are gone or renamed since 2.13
+(`ha-cards.md` §4). **The code is the truth** - `PopupDebug.cpp`, the argument list near its top.
+
+| Address | As if... | Kept |
+|---|---|---|
+| `/popup?catalog=1` / `2` | lists what HA offers: every area, its `fleet` entities, the board's entity for each, what is new; `2` asks HA again first | Reads |
+| `/popup?pagecard=1` | the page panel's Edit cards (`slot=page` first) | UI |
+| `/popup?hasrc=K` | a tap on list K of Edit cards' column (In this group, On the page, Hidden, then HA's areas) | UI |
+| `/popup?haarea=<id>` | a tap on HA area `<id>` (`-` No area) | UI |
+| `/popup?hatick=N` | a tap on row N of the list showing (from a group: the tap cycle, one step) | UI |
+| `/popup?hago=1`..`4` | Edit cards' Add, Hide, Remove, Restore (a group's Save N has no handle yet) | **Saved** once its dialog's button is tapped (`hayes=1`) |
+| `/popup?pageadd=N` | chip N of the label step ("Select label for these cards:") | UI |
+| `/popup?hayes=1` | the question's go button, or the label step's Next | **Saved**: what the dialog said |
+| `/popup?ncopen=1`, `ncarea=<id>`, `nccreate=1` | New group: open it, choose its HA area, Create | `nccreate`: **Saved**, a new group and its cards |
+| `/popup?drop=1` | a tap on the group view's header sensors: their panel drops or folds (K163) | UI |
 
 ### **Device** - these command real lights and scenes
 

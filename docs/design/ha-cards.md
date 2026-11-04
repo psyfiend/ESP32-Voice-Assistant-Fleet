@@ -1,8 +1,11 @@
 # 2.13 - Cards from Home Assistant
 
-**What 2.13 builds, and how.** Decisions: DECISIONS K130-K145 (the owner's, 2026-10-30 to 11-02).
-The look: artifact "2.13 Add Cards Mocks" (six screens); the alerts it was designed with (2.14):
-artifact "2.13 Alert Flow Mocks", K138-K139. Issue #116.
+**What 2.13 builds, and how.** Decisions: DECISIONS K130-K164 (the owner's, 2026-10-30 to 11-04).
+The look: artifact "2.13 Add Cards Mocks" (six screens, round 1), then "2.13 Round 2 Mocks"; the
+alerts it was designed with (2.14): artifact "2.13 Alert Flow Mocks", K138-K139. Issue #116.
+
+**§1-3 are round 1 as designed and built (2026-11-02). Rounds 2-4 revised screens 1-5 heavily -
+read §4 for what the glass does now**, and `docs/PLAN_2.13.md` for what is left.
 
 ## 1. What the owner sees
 
@@ -13,7 +16,7 @@ artifact "2.13 Alert Flow Mocks", K138-K139. Issue #116.
 | 3 | The page panel's **New cluster**: K91's flow from an area - Tiles and Header preselected, a name, Create | K140, K91 |
 | 4 | The CLUSTER panel's **Area** row (the group's link); "1 new" on Add cards; the notice "New in Office: 3D Printer" | K141, K142 |
 | 5 | **The group view**: a tap on a cluster; every member, hidden ones last and marked; fills the page area; list and grid buttons between it and Members | K143 |
-| 6 | **The thermostat**, read-only: card and window | K144 |
+| 6 | **The thermostat**, read-only: card and window. **Still read-only** - no setpoint is sent (`Popup/PopupClimate.cpp`); its controls are `PLAN_2.13.md` §3.1 | K144, K153 |
 
 Words: K145. Nothing from HA is added by itself (K133).
 
@@ -91,3 +94,89 @@ lights, and reword HA's docs for K133.
   difference: `system.ha.known`)
 - [x] `docs/TEST_2.13.md` written
 - [x] Screen 5 - the group view, tap and long press (`17b4dbe`; checked on the P4_5)
+- [x] Round 2 (`c453a92` to `d8d3d26`, K146-K153), round 3 (`1edb552` to `ab4f396`, K154-K159),
+  round 4 (`5fbc9ee`, K160-K164) - §4. What is left: `docs/PLAN_2.13.md`.
+
+## 4. As built after round 4 (2026-11-04, `5fbc9ee`)
+
+What the glass does now; the decisions hold the reasons, `TEST_2.13.md` the rounds.
+
+### 4.1 Group and label (K146, K158)
+
+A **group** is the bordered block - a cluster, or a group shown as one card - and its members share
+its name and color; renaming a group renames it. A **label** is a page card's colored name (Card
+label, Change label, "Select label for these cards:"). The window's group panel is **GROUP** (it was
+CLUSTER).
+
+### 4.2 The group view (K154, K159, K162, K163)
+
+- A **tap on a cluster** runs its Tap action, by default Group view (`TAP_GROUP`); a **long press**
+  runs Long press opens, by default Members (K151). A group card keeps both separately as a cluster
+  (`tap`, `long`) and as a solo card (`card_tap`, `card_long`) (K156).
+- It is **the group's own cluster** - `CardPage::makeGroup(id, true)`, a real `ClusterCard` - in a
+  **bare sheet** (`Kit::sheetBare()`: no title row, no X, the window's corners, its shadow let out by
+  `UI::shadowReachPx()`). It closes on a tap outside or a drag down from its header. The header's
+  name opens Members; its sensors drop a panel listing each (glyph, full name, state), a row opening
+  that member as its tile would (`ClusterCard::setSlotsTap`).
+- **Every member alike, the pinned first.** Tiles have a maximum size, `C_TILE_MAX_W` x
+  `C_TILE_MAX_H` (25 x 20 mm), never wider than `C_TILE_WIDE` (2) times their height, every tile one
+  size, the spare room spread evenly between and around them (`Layout::cappedGrid` /
+  `cappedTileAt`, host-tested). The window keeps the normal card window's size and place unless its
+  tiles would be smaller there than the page's, and then grows, up to the page area.
+- **Tiles or Cards**: UI Tweaks' Group view (`system.ui.group_view`), a group's own in Card UI
+  (Inherit / Tiles / Cards, `group_view`, greyed while it is a solo card). Cards are members drawn
+  as solo cards without card labels, on the same grid.
+- The GROUP and SETTINGS panels stay under it (K150, K155).
+- Code: `Cards/Popup/PopupGroup.cpp` (`groupCap()`, `fitted()`, `place()`, the swipe, the drop-down).
+
+### 4.3 Pinned members (K160, K164)
+
+The page shows a group's **pinned** members - its tiles and its header sensors. Saved: a member's
+`hidden`: `yes` means unpinned; header members are the group's `slots`. **New members join
+unpinned**, so adding never rearranges the page. Members and Edit cards end a member's row in a
+square: its header glyph, or a pin (`MDI_PIN`) for a tile, nothing when unpinned. A tile's
+Visibility says **Pin this card** / **Unpin this card**, no dialog. "Pin" means on the page; the old
+pinning to a grid cell is shelved (K164, `FUTURE_IMPROVEMENTS.md`).
+
+### 4.4 Edit cards (K148, K149, K152, K161)
+
+One window over the page, from the page panel's **CARDS** (Edit cards, New group) or a group's
+**GROUP > Edit cards**; it replaced round 1's Add card, a cluster's Add cards and the page panel's
+HIDDEN section. Its column: In this group, On the page, Hidden, then HA's areas by floor. **The
+lists show the result as you tick** - dashed rows coming, red rows going.
+
+- **From the page**: one kind of tick at a time; Add N, Hide N, Remove N (cards made on the board),
+  Restore N; every choice made before a go / no-go dialog in the dialogs' sentences (K149); adding
+  from HA goes through the label step.
+- **From a group**: the tap cycle - a member's pin flips, a second tap marks a made card for removal
+  (red), a third puts it back (built-in members only flip); a card not in the group is added, then
+  added pinned, then not. Copy / Move for page cards. One **Save N**, the toast "Saved N changes to
+  Kitchen", a dialog only when something is removed (`doEditSave()` in `Popup/PopupCluster.cpp`).
+  A page card that came out of this group goes home (`CardAdded::moveBack`).
+- Names fitted to their row (K152, `Kit::fitLabel`): the largest linked face that fits, else cut.
+- Code: `UI/EditCards.cpp` (the list, `Spec::cycle`), `UI/EditCardsSheet.cpp` (from the page),
+  `UI/HaOffer` (what HA offers, "N new"), `UI/HaPicker`, `UI/NewClusterSheet.cpp` (New group).
+
+### 4.5 A group's options (K151, K155, K157)
+
+The GROUP panel is there in every presentation: Rename group, Header options, Edit cards, Show as
+(Cluster, Solo card), Face, Area - a row that does not apply is greyed (`ChipRowSpec::greyed`),
+never moved. Long press opens: Group view, Members, Details or History - never Toggle. A solo group
+card's Members lists every member, its header sensors too; a member that is itself a group card
+(Desk) opens as its tile does, "Office > Desk" with its own Members.
+
+### 4.6 Limits and saved keys
+
+| What | Number | Where |
+|---|---|---|
+| Entities in the registry | 192 | `EntityRegistry.h:57` (`ENTITY_MAX`) |
+| Cards made on the board | 64 | `CardAdded.h:41` (`CardAdded::MAX`); hidden page cards do not count |
+| HA catalogue | 48 areas, 160 entities | `HaCatalog.h:40-41` |
+| Ids per subscribe frame | ~45 (1,536-byte frame), sent in parts | `HaProvider.cpp:44` |
+| Websocket receive buffer | 48 KB in PSRAM (8 KB internal fallback) | `HaDefaults.h:119-121` |
+
+A card made from HA carries `ha` (the entity id), `ha_dc` (its device class) and `ha_unit`; at boot
+`SystemCore` creates its entity from those (`adoptHaCard`, `Settings::forEachCardWith("ha", ...)`).
+The ids HA has offered are `system.ha.known`; a group's HA area link is `groups.<id>.ha_area`. A
+group card's own keys: `present`, `slots`, `face`, `tap` / `long`, `card_tap` / `card_long`,
+`card_state`, `group_view`.

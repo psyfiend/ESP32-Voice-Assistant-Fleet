@@ -5,7 +5,12 @@
 instruction was not to guess what HA exposes; this is the answer to that, and the design for
 issue #43 should be built against it.
 
-Nothing on the device implements any of this yet.
+**Built since** (#43, then 2.13): `HaProvider` subscribes with `subscribe_trigger` in frame-sized
+parts (~45 ids a 1,536-byte frame; any number of entities), asks scene and area names in one
+`render_template`, fetches the `fleet` catalogue (areas, floors, each entity's area - `HaCatalog`,
+48 areas / 160 entities), and listens for `entity_registry_updated` and `area_registry_updated`.
+`ha-cards.md` §2 is how; the numbers below are the measurements it was built on. Where this file
+says "not implemented", read it as the reasoning at the time.
 
 ---
 
@@ -225,9 +230,10 @@ the websocket cannot replace. Websocket inbound for HA's entities, MQTT outbound
 | `config/device_registry/list` | **115,742** | 6 ms |
 | **one `render_template` for all 18 entities** | **818** | 17 ms |
 
-A **141x** reduction, and the decisive part is not the ratio: `HaClient`'s reassembly buffer is
-**8 KB**, so the device registry does not fit and never could without an incremental parser that
-does not exist. The template reply does fit, comfortably.
+A **141x** reduction, and the decisive part is not the ratio: `HaClient`'s reassembly buffer was
+**8 KB** (48 KB in PSRAM since 2.13, 8 KB the internal fallback - `HaDefaults.h`), so the ~120 KB
+device registry does not fit and never could without an incremental parser that does not exist. The
+template reply does fit, comfortably.
 
 HA's `area_name()` template function **follows the device hop itself**, which is the whole reason
 §4 wanted the device registry:
@@ -248,7 +254,7 @@ own `area_id` is null and which §4 specifically warns about.
 its dependencies change, so it must be cancelled with `unsubscribe_events` once the answer is in,
 or it becomes a permanent feed. That is one extra message, not a reason to avoid it.
 
-### Why this is not implemented yet
+### Why this is not implemented yet *(it is now: `HaProvider::sendSceneQuery` resolves areas at runtime, and the 2.13 catalogue gives each entity's area and floor)*
 
 Areas are currently hardcoded in `Dashboard_HA.h` and they are correct, so resolving them at
 runtime changes nothing visible today. It earns its keep when pages are grouped by area - the

@@ -1,5 +1,10 @@
 # Pages — model, navigation, and what 2.6 builds
 
+*(2.6's design record, built and signed off 2026-09-24. What a page holds and edits since:
+clusters and the arranger, `group-cards.md` §6-7 and `layout-engines.md`; the page panel's CARDS
+section - Edit cards, New group - and cards from HA, `ha-cards.md` §4; "Pin" means on the page and a
+held column or row count says "fixed", K164.)*
+
 **Status: 2.6 BUILT, 2026-09-23, on `feat/17-page-swipes`; awaiting glass (`docs/archive/TEST_2.6.md`).**
 Written from the owner's brain-dump of 2026-09-22. His answers of 2026-09-23 settled the proposals:
 **wrap-around on** (test it now, decide the default later); **every knob is per page except Deck

@@ -8,7 +8,10 @@ seconds, off the board:
 | `test/test_layout` | `Layout::FlowEngine`, the dashboard's placement: reading order, the widest span that fits at the first free spot, pins first, a bad pin flowed and reported, the lowest priority dropped (not the item that failed), clamping, absent items, `rowsWanted()` |
 | `test/test_timeformat` | `TimeFormat`: the clock, durations, "2+ hours ago", day headings - the owner's wording |
 | `test/test_arranger` | `Layout::arrange()` / `finishPage()` (2.11): **generated** - every case's expected places, boxes, rectangles and scores are the Layout Playground's own answers (below) |
-| `test/test_cluster`, `test_header_plan`, `test_glyph_shapes` | a cluster's span and tile grid; the header's slot planner; the status glyphs' shapes |
+| `test/test_cluster`, `test_header_plan`, `test_glyph_shapes` | a cluster's span and tile grid, and the group view's capped grid (`cappedGrid` / `cappedTileAt`, 2.13); the header's slot planner; the status glyphs' shapes |
+
+**78 tests in 6 suites** (2026-11-04): arranger 30, cluster 14, header_plan 10, layout 9,
+timeformat 8, glyph_shapes 7.
 
 Run them before a board build whenever `src/Layout/` or `src/TimeFormat.cpp` changes.
 

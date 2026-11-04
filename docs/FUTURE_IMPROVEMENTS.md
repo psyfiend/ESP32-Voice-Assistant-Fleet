@@ -13,8 +13,8 @@ one sketched here: `main` / `SystemCore` / `SystemReport` / `LVGL_Startup` / `GU
 subsystem globals needed an owner, and the System Doctor turned out to be the thing standing
 between us and an LVGL-free `main`.
 
-Design, reasoning and acceptance criteria: `docs/design/startup.md`. **Code complete, not yet
-flashed** — identical on-device behaviour is still unverified.
+Design, reasoning and acceptance criteria: `docs/design/startup.md`. **Built and flashed
+(2026-09-09); every board has run it since.**
 
 ## LVGL / Display
 
@@ -94,7 +94,8 @@ are where the real sluggishness is and PPA cannot help them at all.
   hardware measurement on the 7B) rather than being a per-device, per-hardware-measured value.
 - **Per-device LVGL buffering optimization, backed by actual testing.** The
   `DOUBLE_BUFFERING`/`BUFFER_SIZE_PX` BSP fields exist on every board but are currently
-  unused/dead in `GuiManager.cpp` — every board gets the same buffering strategy regardless
+  unused/dead in `GuiManager.cpp` (now `LVGL_Startup.cpp`; the esp_lcd boards derive their
+  framebuffers from `bspPresentMode()`) — every board gets the same buffering strategy regardless
   of what these fields say. Measure which boards actually benefit and build real per-device
   logic around it.
 - **PPA rotation** — folded into 2.9 above. Kept as a pointer because the buffer discipline is
@@ -625,7 +626,7 @@ Full detail: `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
 
 ## New hardware
 
-### WaveShare ESP32-P4-WIFI6-Touch-LCD-5 (`WS_P4_5`) — BSP built, not yet flashed
+### WaveShare ESP32-P4-WIFI6-Touch-LCD-5 (`WS_P4_5`) — brought up 2026-09-06, the dev board since (`BRINGUP_WS_P4_TOUCH_LCD_5.md`; the note below is the original)
 
 BSP modeled directly against the latest Waveshare repo for this exact device, which (unlike
 past P4 boards) included real Arduino-specific samples/code, not just ESP-IDF. Compiles

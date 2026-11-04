@@ -6,8 +6,29 @@ values the kit reads) and `card-sheet.md` (what the window is).
 
 The kit is `include/UI/Kit.h`, `include/UI/Sheet.h` and `src/UI/Kit/`. It is the layer between the
 tokens and a screen: a screen asks for a dialog, a row of chips, a panel of rows or a whole window
-(the Sheet, §3), and the kit builds it in the house style. The card window is its first client,
-"About this board" its second; #92's chart options can be the next.
+(the Sheet, §3), and the kit builds it in the house style. Its clients: the card window (with its
+group view), "About this board", UI Tweaks, Edit cards, New group and the hidden cards (§3's table).
+
+**Added in 2.13** (rounds 1-4; how they are used: `ha-cards.md` §4):
+- **A bare sheet** - `Kit::sheetBare(S, bare, radius)` (`Sheet.h`): no header row, no padding, a
+  clear window with the client's corners; the stage is the window; while bare the window and stage
+  draw past their edges by `UI::shadowReachPx()`, so the client's shadow is not clipped. The group
+  view uses it. `Kit::sheetResized(S)` keeps the title and countdown bar with a moved window.
+- **A greyed chip row** - `ChipRowSpec::greyed`: the chips dimmed (`LV_OPA_40`) and untappable, for
+  an option that does not apply where it stands (K155: options never move).
+- **Item marks** - `Kit::itemMark(o, MARK_DOOMED / MARK_COMING / MARK_CHOSEN)`, roles
+  `KS_ITEM_DOOMED`, `KS_ITEM_COMING`, `KS_ITEM_CHOSEN`: a row going (red), coming (dashed) or chosen
+  (a lit chip). A marked item shows no finish, so mark it after `finish()`. Edit cards uses them.
+- **Fitted text** - `Kit::fitLabel(label, text, w, faces, n)` (K152, after NINA's ladder): the
+  largest of the given faces whose measured text fits, else the smallest, cut with "...".
+- **Helper notes** - `Kit::helperNote()`, `helperShown()`, `setHelperShown()`: the grey notes under
+  rows, hidden everywhere by UI Tweaks' "Show helper text" (K128).
+- **Glyph squares** - `KS_CLUSTER_GLYPH_SQUARE` / `_CIRCLE`: the header glyph's frame at a cluster
+  header's size; Members and Edit cards end a member's row in one (its header glyph, or `MDI_PIN`).
+- **The Edit cards list** - `UI/EditCards.h` (not a kit file, but built only from kit parts): the
+  column of lists, rows with marks and squares, the foot's buttons, and the tap cycle (`Spec::cycle`).
+- **Dialog roles**: DESTRUCTIVE and CONFIRM (the edge in the accent); bodies take `#RRGGBB words#`
+  colour runs, up to four paragraphs.
 
 ---
 
@@ -73,9 +94,10 @@ The brief listed QUIET too. No button in the house is one today - the row button
 ### Dialog - `Kit::dialog(spec)`
 
 A question over everything, on the top layer, the rest dimmed (`GROUND` at 60%): a title, up to
-two centred paragraphs, and up to two buttons side by side; a tap outside the box calls the spec's
-`outside`. Returns the dim; deleting it closes the dialog. One role so far, **DESTRUCTIVE** (the
-box's edge in `ST_BAD`, `LINE_HEAVY`). The box: the scheme's card radius, `SURFACE_ALT`, padding
+four centred paragraphs (`#RRGGBB words#` recolours a run), and up to two buttons side by side; a
+tap outside the box calls the spec's `outside`. Returns the dim; deleting it closes the dialog. Two
+roles: **DESTRUCTIVE** (the box's edge in `ST_BAD`, `LINE_HEAVY`) and **CONFIRM** (the edge in the
+accent - Move this card, Edit cards' adds). The box: the scheme's card radius, `SURFACE_ALT`, padding
 `S9`, rows `S7`. The buttons are `W_DIALOG_BTN` wide where that fits; in a narrower row they share
 it, `S7` between and beside them (#96). `countdown` in the spec shows the countdown of the sheet
 under it, on the box's bottom edge, for a dialog that closes with that sheet (#23). "Remove card"
@@ -156,7 +178,7 @@ the accent. An ACTION (the window's Power) sits on a ribbon of its own before th
 selector never lands on it. The spec gives the choices' icons, the chosen one, the action, whether
 it is quiet (a paused window), what to ask before anything moves (`blocked`) and what to call when
 the selector arrives (`onChosen`). `Kit::Selector` is its state, kept by the caller while it shows.
-Up to four choices (`SELECTOR_MAX`).
+Up to five choices (`SELECTOR_MAX`).
 
 **Compact** (`spec.compact`, #92): the same selector a span chip's height (`H_CHIP`), its choices
 **words** in the label face (`TAG`; the chosen one on the selector in `NAME`, a size up) and no
@@ -272,7 +294,7 @@ only.
 
 **The bar** (`KS_HDR_BAR`): full width, the header's height, `SURFACE_ALT` with the accent line
 along its bottom (`LINE`) and the scheme's drop shadow - kept off an open panel, whose face the bar
-paints back over its shadow (round 6, `Kit::drawerCoverBarShadow()`) - the look `Panel_Header` set locally before
+paints back over its shadow (round 6, in `Kit::drawerOverBar()`) - the look `Panel_Header` set locally before
 it had slots; it lays nothing out itself - **where each slot stands is the header plan's**
 (`Layout/HeaderPlan.h`, round 2: the sides at the bar's ends `EDGE` in, `SPACE` between slots, the
 middle on the centre, `CLEAR` kept between a side and the middle). **A slot** (`KS_HDR_SLOT`): the
@@ -354,7 +376,8 @@ corner images and four 16 px edge strips (tiled), black, ordered-dithered (4 x 4
 from the scheme's ground) and painted once per size and scheme into PSRAM, it costs ~28 ms on the
 same frame and does not band. `haloAttach()` draws it in the object's `DRAW_MAIN_BEGIN`, under it,
 and widens the object's redraw area by `haloWidth()`; nothing is drawn while the object is smaller
-than its own corners (a panel's first frames).
+than its own corners (a panel's first frames). A bare sheet (2.13's group view) has the halo too,
+and also lets its client's own drop shadow out (`UI::shadowReachPx()`).
 
 ### Cards - the `KS_CARD_*` roles (2.11 round 1)
 
@@ -429,7 +452,10 @@ only folds it. Forgotten when the sheet closes.
 
 | Client | What it adds to the frame |
 |---|---|
-| The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties, Card UI; a cluster's window opens on Members with the CLUSTER panel and Header options, K129), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity; its own timeout, bar and selector look (Card UI, D-28) |
+| The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties, Card UI, Visibility; a group's window has the GROUP panel, K155; **the group view** is this window made bare, showing the group's own cluster, 2.13 K154), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity; its own timeout, bar and selector look (Card UI, D-28) |
+| Edit cards (`UI/EditCardsSheet`, 2.13 K148; the page panel's CARDS) | the `UI/EditCards` list over the page, no panels; from a group the same list is built in the card window (`Popup/PopupCluster.cpp`) |
+| New group (`UI/NewClusterSheet`, 2.13 round 1) | an HA area's entities to start a group from |
+| The hidden cards (`UI/HiddenSheet`, 2.11) | no longer offered on the glass: Edit cards' Hidden list replaced it (K148). Its code is still built - a candidate to remove (`PLAN_2.13.md`) |
 | "About this board" (`UI/AboutSheet`; every build, from the About button on the system panel, K74, #97; debug builds also `GET /popup?about=1`) | one view of fact rows - the board, its screen and chip, the firmware, how long it has run, free memory and LVGL's pool, updated each second; no tabs, no panels |
 | "UI Tweaks" (`UI/TweaksSheet`, 2.8 round 3; the system panel's UI Tweaks button, a swipe down on the left half, debug builds `GET /popup?tweaks=1`) | one view of choice rows, then Tokens and Reset all (asked in a dialog); what each row sets is `GUIManagerTweaks.cpp`'s; the deck rises beside it (`sheetBeside()`) |
 

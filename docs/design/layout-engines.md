@@ -31,6 +31,16 @@ the PC in `host-tests/test/test_layout`.
 (`src/Cards/CardPage.cpp`). **A new arrangement is a new class implementing `Layout::Engine`**, with
 host tests for its properties before it draws anything; a page chooses its engine.
 
+## The group view's tiles: one capped size (2.13, K159, K162)
+
+The group view (`ha-cards.md` §4.2) does not stretch tiles to a page's rows. **`Layout::cappedGrid(n,
+w, h, gap, cap)`** (`include/Layout/Cluster.h`, `TileCap { maxW, maxH, tall, wide }`) chooses the
+columns whose tile - capped at `C_TILE_MAX_W` x `C_TILE_MAX_H`, never wider than `wide` times its
+height - is largest, then fewest empty places, then the shape closest to the box; every tile is one
+size. **`cappedTileAt(g, n, i, gap, w, h, x, y)`** places tile `i` with the spare room spread evenly
+between and around the tiles (`evenGap`: `max((room - count*size) / (count+1), gap)`), a short last
+row centred on the same spacing. Host-tested in `host-tests/test/test_cluster`.
+
 ## A cluster is a container inside an item
 
 On the page, a cluster (a group panel, `group-cards.md` §5.3) is one item, its span from its member
@@ -90,7 +100,7 @@ packing, each cluster in turn grabbing what is beside it. Version 5, in the arti
 
 - **`Layout::arrange()`** (`include/Layout/Arranger.h`, `src/Layout/Arranger.cpp`): a line-for-line
   port of the playground's `arrangeV5()` - doubles, the same loops and tie-breaks. **Its host tests
-  are the playground's own answers** (`host-tests/test_arranger`: the playground's House blocks on
+  are the playground's own answers** (`host-tests/test/test_arranger`: the playground's House blocks on
   its seven boards, run with node on its code): every grid, place and score matches.
 - **Run when a page's blocks change, and kept** (`Cards/PageArranger`): a page's blocks are its
   cards and clusters (a cluster's tiles, header members and members). Its answer is kept in the

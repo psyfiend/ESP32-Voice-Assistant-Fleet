@@ -15,7 +15,7 @@ Three separate layers, deliberately not merged:
 
 | Layer | Answers | Lives in | Milestone |
 |---|---|---|---|
-| **Design tokens** | What colour is "active"? How round? Which font size? | `include/UITokens.h` | **2.2** |
+| **Design tokens** | What colour is "active"? How round? Which font size? | `include/UI/UITokens.h` | **2.2** |
 | **Card type rules** | A light uses state colour; a sensor uses a quantity tint | `Card` subclasses | 2.4 |
 | **Card instance config** | *This* card shows `deck_temp`, spans 2, sits at row 1 col 3 | Build sheet | Phase 3, #20 |
 
@@ -111,7 +111,12 @@ Flat structs with `const` instances and designated initialisers — the same idi
 because the project already knows its shape and its traps are documented (declaration order,
 macro collisions). One idiom beats two.
 
-Four groups, deliberately not nested:
+Four groups, deliberately not nested (2.2's four; **six since 2.12 and 2.8**: `UIShape`, the card
+window's millimetres, §7, and `UIHeader`, the page header's slots, §8 - reached as `UI::shape()` and
+`UI::hdr()`; per-scheme looks added since - the active frames, the halo, the shadow - are
+`UIMetrics` rows such as `ACTIVE_RING`, `CUT_PCT`, `HALO_PCT`, `SHADOW_Y`, `SHADOW_OPA`, read in
+`UITokens.h`). `UI::shadowReachPx()` is how far a card's shadow reaches past it, used to let shadows
+out of their parents (`UI::unclipShadows()`, and a bare sheet in 2.13):
 
 - **`UIPalette`** — ground, surface, text, accent, the **semantic state palette** (active / idle /
   ok / warn / bad) and the sensor quantity tints. State colours are separate from `ACCENT` on
@@ -125,6 +130,9 @@ Four groups, deliberately not nested:
 - **`UIType`** — the font shortlist and icon size. Fleet-wide.
 
 ### Font cost — measured 2026-09-10, and it corrects an earlier claim here
+
+*(Corrected again 2026-09-22: the 96 KB figure below was one large full-ASCII face. Measured per
+face, a referenced face costs 6-73 KB by kind and size - CLAUDE.md, "Two costs worth knowing".)*
 
 An earlier note in this file said `lv_conf.h` enabling every Montserrat size from 8 to 48 meant
 21 faces were "compiled into every board". **That was wrong.** Enabling a size in `lv_conf.h` puts
@@ -284,7 +292,7 @@ sparks' `SPARK_*_MM` in `src/UI/Kit/KitSparks.cpp`), since nothing else draws on
 
 **Its own struct, not `UIMetrics`** (the 2.12 brief said `UIMetrics`; this is the zero-risk
 reading of it). `UIMetrics` is per scheme and in logical pixels; these are fleet-wide and physical.
-Fifty-six floats in `UIMetrics` would give every scheme a copy to keep in step, and changing that
+Its floats (fifty-six then, some seventy now) in `UIMetrics` would give every scheme a copy to keep in step, and changing that
 struct's layout is the build-cache trap (CLAUDE.md). One `const` instance, in flash, no RAM. If a
 scheme ever wants its own corners, `UI::shape()` can return a per-scheme copy and no caller changes.
 

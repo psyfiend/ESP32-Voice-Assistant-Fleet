@@ -575,7 +575,9 @@ BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept i
   state (Any / All members are on - groups defined here only); Label (Default / From HA / State /
   Custom / None); Visibility (Show on dashboard / only in group / only as member / Hidden); Tap action
   (Toggle / Details / Members / History view / Cycle scenes / Nothing); Scenes (Visible scenes only /
-  Show all / Disabled); and in debug builds, Deck look. Label, Visibility and Tap action are shown
+  Show all / Disabled); and in debug builds, Deck look. *(2.10a's list. Since 2.11 Visibility is a
+  button to its own view; since 2.13 Tap action offers Group view for a cluster and a **Long press
+  opens** row follows it (K151, K156) - `ha-cards.md` §4.)* Label, Visibility and Tap action are shown
   greyed until saving (2.10d); Custom name joins when Label can be Custom.
 - ~~**Scenes and Colour (wide): the slider and the buttons or swatches are one group**, centred~~
   (superseded in round 7 by the slider's place, below). Scenes are **a stack**: one column of
@@ -682,8 +684,8 @@ malformed one or a duplicate draws but is never given its id, so it saves nothin
 |---|---|
 | Shown | - |
 | Dropped because the grid is too small | still on its page; nothing changes |
-| Hidden from its page (2.11, K96: Visibility's "Hide from this page" - K66's remove, every card) | in the page's pool, kept (`removed`: `yes`); listed in the page slot's panel, where Restore brings it back |
-| Hidden from its cluster (2.11, K96, K104) | still in the cluster's list (`hidden`: `yes`); restored from its own Visibility, through the cluster's Members (K125, K129) |
+| Hidden from its page (2.11, K96: Visibility's "Hide from this page" - K66's remove, every card) | in the page's pool, kept (`removed`: `yes`); listed under Hidden in the page's Edit cards (K148), where Restore brings it back |
+| Unpinned from its group (K160; was "hidden from its cluster", K96, K104) | still a member (`hidden`: `yes`), off the page, in the group view and Members; Pin this card, or Edit cards' tap, puts it back |
 | Deleted | only by the owner, from the pool; gone |
 | No longer in the dashboard definition | kept, listed as "unclaimed", cleared only by the owner |
 | Its entity gone from HA | kept, listed as "entity missing" - the board cannot tell "gone" from "HA restarting" or "renamed" |
@@ -743,7 +745,9 @@ second rebuild"), installed 2026-10-08; the owner's look at the same tests after
 next save replaced it (Desk's Scenes). Not explained; a file that will not read now makes the boot
 read-only instead, and `/settings?stats=1` says what the boot saw.
 
-**Groups as built (K46, which replaced the first model the next day).** One kind of group: the
+**Groups as built (K46, which replaced the first model the next day; the words since 2.13 are K146
+and K158 - a page card has a *label*, a *group* is a cluster or a group shown as one card,
+`ha-cards.md` §4.1).** One kind of group: the
 dashboard's own version of an area - a name, a colour, perhaps a link to an HA area - belonging to
 the device, so it spans pages. Colour is the default key to a group; a card's words are the group's
 name unless it has its own.

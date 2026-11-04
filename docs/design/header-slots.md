@@ -124,6 +124,10 @@ DECISIONS D-11 to D-15.
    does - one slot's area, never the bar or the screen (#19).
 
 Cluster headers were built in 2.11 (`v0.2.19`; K115, K129); the notification queue is #76 (2.14).
+**Since 2.13**: the notice queue exists for info notices (K142, `UIToolkit.h`; alerts join it in
+2.14); the page slot's panel is PAGES, HEADER and **CARDS** (Edit cards, New group - its HIDDEN
+section went into Edit cards, K148); in the group view a tap on the cluster header's sensors drops a
+panel of them, each row opening its member (K163, `ClusterCard::setSlotsTap`).
 
 ## 9. Round 1 on glass, and the owner's reaction (2026-10-15)
 

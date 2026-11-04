@@ -4,8 +4,13 @@
 `archive/TEST_2.11.md`). §1-5 are the draft taxonomy of 2026-10-01 and the owner's model of
 2026-10-12; §6 the interview and its answers (K88-K105); §7 the build plan and what was built.
 Where §1-5 disagree with §6, §6 wins; where §6 disagrees with K106-K129 in `DECISIONS.md`, those
-win - **a cluster's window is its Members since K129** (no management screen). Not built: the group
-view and Add cards from HA (2.13, K118, K119, K123, K130). Related:
+win - **a cluster's window is its Members since K129** (no management screen).
+
+**2.13 changed much of this** (K138-K164): a tap on a cluster opens its **group view**, a long press
+its Members; the CLUSTER panel is **GROUP**; members are **pinned** to the page or not (`hidden`:
+`yes` now means unpinned); Visibility says Pin / Unpin this card, Change group, Change label, Add to
+group; **Edit cards** replaced Add cards and the page's hidden-cards list. Where this file says
+otherwise, **`ha-cards.md` §4 is what the glass does now**. Related:
 `card-sheet.md` §6 (aggregate vs area, draft 2), `look-and-feel.md` §3.8 (clusters, the arranger),
 `ha-websocket.md` (area resolution, measured).
 
@@ -247,7 +252,8 @@ card, the card becomes its own unique thing detached from the entity itself".
    that cannot fit** (a small screen) is shown as its 1x1 card, and the arranger says so - which
    answers §4 Q7.
 7. **The header's slots are filled from members**; a member in a slot is not also a tile.
-8. **Visibility inside a group card is Shown / Hidden.** K68's third choice, "available for the
+8. **Visibility inside a group card is Shown / Hidden** (since K160: **pinned** to the page or not;
+   an unpinned member is in the group view and Members only). K68's third choice, "available for the
    dashboard", goes: any member can be copied to a page at any time ("Add card to dashboard"), so it
    says nothing. *K68 was the owner's, so this is his to confirm.*
 9. **A member copied to a page asks which group, in one tap**: the group card's group (chosen
@@ -454,7 +460,8 @@ group pages. The settings file's new entries are additive (same file, `schema` 1
 sections): a group card's `present` (card / cluster / summary), `slots` (member ids, highest
 priority first), `cl_style` (swatch / bar), `cl_icons` (off); a member's `in`, `hidden` (yes / no),
 `tap_set`; `removed` on every card; a page's `cl_style`, `layout` (the arranger's kept answer),
-`of` (a group page); `system.arranger.*`. A cluster's header: long press its window, tap nothing.
+`of` (a group page); `system.arranger.*`. A cluster's header: long press its window, tap nothing
+(2.11; since 2.13 a tap runs the cluster's Tap action, by default its group view - `ha-cards.md` §4.2).
 Built on `feat/2.11-group-cards`; the owner's sheet is `docs/archive/TEST_2.11.md`.
 
 - **Round 1 - clusters on the page.** The cards come onto the kit first (`ui-architecture.md` §6:
@@ -508,3 +515,8 @@ on the kit, in the card window's views:
   dashboard / Change group / Add to cluster, each a target, Copy / Move and a dialog, and **Restore**
   in place of Move back and Remove; New group names a group on the glass. What changed and how it
   is kept: `archive/TEST_2.11_FOLLOWUPS.md`, "Round 2 - what changed" and "How it is kept".
+- **Since 2.13 (K146-K164)** the words and the window changed again: GROUP holds Rename group,
+  Header options, Edit cards, Show as, Face and Area; a tile's Visibility is Pin / Unpin this card,
+  Add to dashboard, Change group; a page card's Hide from this page, Change label, Add to group;
+  removing a member is the second tap in Edit cards; the page's hidden cards are under Hidden in
+  the page's Edit cards. `ha-cards.md` §4.

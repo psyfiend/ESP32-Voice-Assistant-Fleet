@@ -454,7 +454,9 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
   copied into a cluster** (2.11, K91) have `in` (the cluster's id) where a page card has `page`, and
   are built after its compiled members. Their ids are made as K33's. **Any card hidden from its page**
   (K96, K66's remove - compiled or added) has `removed`: `yes`: the page's pool, never built, listed
-  in the page's hidden cards with Restore. **A card moved into a cluster** has `removed`: `moved` -
+  under Hidden in the page's Edit cards with Restore (K148). **A card made from HA** (2.13) also has
+  `ha` (the entity id), `ha_dc` and `ha_unit`; `SystemCore` creates its entity at boot from them
+  (`adoptHaCard`), and the ids HA has offered are `system.ha.known`. **A card moved into a cluster** has `removed`: `moved` -
   off its page and NOT in its pool; its copy in the cluster has `from` (the card it came from), and
   removing that copy puts the card back (K111). A member **not pinned** to the page (`hidden`: `yes`;
   "Pin" on the glass means on the page, K160) is in its group's Members and group view only, never
@@ -467,10 +469,13 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
 - **Every change is logged** with its time and task (`loopTask` = the card window, `httpd` = a
   browser); the last ten are in `/settings?stats=1`.
 - **UI Tweaks' choices are `system.ui.*`** (scheme, card label, entity label, card state,
-  density), the glyphs `system.header.glyphs`, the window's `system.window.close` / `bar`, the
+  density, `group_view`), the glyphs `system.header.glyphs`, the window's `system.window.close` / `bar`, the
   selector's look per scheme (`schemes.<name>.selector`); **a
   card's own Card UI choices sit on its card entry** (`selector`, `density`, `close`, `bar`,
-  `label_text`), absent while it inherits (2.8).
+  `label_text`), absent while it inherits (2.8). **A group card's own** (2.11-2.13): `present`
+  (cluster or solo card), `slots` (its header members), `face`, `tap` / `long` as a cluster and
+  `card_tap` / `card_long` as a solo card (K156), `card_state`, `group_view` (K162); a group's HA
+  area link is `groups.<id>.ha_area`. The whole 2.13 picture: `docs/design/ha-cards.md` §4.
 - `GET /settings` serves the file; `?stats=1` its counters, files and anything unclaimed. The PC
   addresses that set things until the web UI exists are listed in `Settings.h` and §17.
 

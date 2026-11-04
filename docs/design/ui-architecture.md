@@ -1,7 +1,8 @@
 # UI architecture - how the screen is built, and how to change it safely
 
 **Read this before any UI work.** It is the map as of `v0.2.19` (2026-10-30, milestone 2.11, group
-cards) and 2.8's header bar (`v0.2.18`), built on the foundation milestone 2.12 laid at `v0.2.13` without changing a pixel
+cards) and 2.8's header bar (`v0.2.18`), with 2.13's additions on `feat/2.13-add-from-ha` (rounds
+1-4, 2026-11-04: the group view, Edit cards, pinned members - §7), built on the foundation milestone 2.12 laid at `v0.2.13` without changing a pixel
 (`ui-foundation.md` is that milestone's record). The rules here are load-bearing; CLAUDE.md states each one briefly, this file says where
 each lives and how to work with it. What things look like: `components.md` (the kit, with pictures)
 and `tokens.md` (colours, sizes, type). What the card window is, view by view: `card-sheet.md`
@@ -19,7 +20,7 @@ Each layer uses the ones below it and never reaches up. Lower layers include no 
 | The screen | the root screen, the header and its slots' panels (2.8), the pages, the system panel and its pages, UI Tweaks' choices (2.8 round 3) | `GUIManager` (+ `GUIManagerHeader.cpp`, `GUIManagerTweaks.cpp`), `src/UI/Panel_*`, `UI/HeaderSlots` + `UI/SlotPanels` + `UI/GlyphShapes`, `LogPage`, `ReferencePage` |
 | Pages | a grid of cards built from data (`PageSpec`, the dashboards in `include/Dashboards/`); where each card goes is a **layout engine's** decision | `CardPage` + `Layout::` (`include/Layout/`) |
 | Cards | a card per entity or group, its type from the entity's kind; bound to its entities so it redraws when they change; "on" shown by its card state (2.8) | `src/Cards/` (`Card`, `CardFrame` - the active frames, `CardCatalog`, `CardBinder`, `StateCard`, `ValueCard`) |
-| Windows | everything that opens over the page is a **Sheet**: the card window, "About this board", "UI Tweaks" | `Kit::Sheet` (`include/UI/Sheet.h`); clients `CardPopup` + `src/Cards/Popup/`, `UI/AboutSheet`, `UI/TweaksSheet` |
+| Windows | everything that opens over the page is a **Sheet**: the card window (and its group view, a *bare* sheet), "About this board", "UI Tweaks", Edit cards, New group, the hidden cards | `Kit::Sheet` (`include/UI/Sheet.h`); clients `CardPopup` + `src/Cards/Popup/`, `UI/AboutSheet`, `UI/TweaksSheet`, `UI/EditCardsSheet`, `UI/NewClusterSheet`, `UI/HiddenSheet` |
 | Components | buttons, dialogs, chip rows and chip tables, list items, panel rows, folder panels, drawers, the header's bar and slots, the selector, icon buttons, label roles; the finishes (satin, glass, lit glass) | `Kit::` (`include/UI/Kit.h`, `src/UI/Kit/`) |
 | Tokens | every colour, size, font and shape | `UI::` (`include/UI/UITokens.h`, `src/UI/UITokens.cpp`) |
 
@@ -35,13 +36,14 @@ whose stack is in internal RAM - the settings task.
 | a colour, a size, a font, a radius | `include/UI/UITokens.h` (`UIPalette`, `UIMetrics`, `UIShape`, `UIGrid`, `UIType`); values in `src/UI/UITokens.cpp`; why: `tokens.md` |
 | a component and its looks | `include/UI/Kit.h`; `src/UI/Kit/Kit<Name>.cpp`; the roles' styles in `KitStyles.cpp`; pictures in `components.md` |
 | the window frame | `include/UI/Sheet.h`, `src/UI/Kit/KitSheet.cpp` (frame, auto-close, the tap catcher), `KitSheetPanels.cpp` (the two folder panels), `KitSparks.cpp` |
-| the card window's contents | `src/Cards/CardPopup.cpp` (the client: tabs, views, open/close) and `src/Cards/Popup/` - one file per concern, sharing `PopupState.h`: controls and the light hero (`PopupControls`, `PopupLight`, `PopupDeck`), `PopupScenes`, `PopupMembers`, History (`PopupHistory`, `...Chart`, `...Activity`), `PopupProps`, `PopupCardUi` (Card UI, 2.8 round 3), a cluster's window `PopupCluster` (2.11, K104, K129: it opens on Members, with the CLUSTER panel - Rename cluster, Header options, Add cards), Visibility, Add to a cluster and "which group?" `PopupVisibility` (2.11, K96), the panels' rows (`PopupSettingsRows`, `PopupSideRows`, `PopupPanels`), `PopupDialog` (Hide, Remove this copy), the hold (`PopupHold`), helpers (`PopupCommon`), and the PC's handles (`PopupDebug`, `PopupTree`) |
+| the card window's contents | `src/Cards/CardPopup.cpp` (the client: tabs, views, open/close) and `src/Cards/Popup/` - one file per concern, sharing `PopupState.h`: controls and the light hero (`PopupControls`, `PopupLight`, `PopupDeck`), `PopupScenes`, `PopupMembers`, History (`PopupHistory`, `...Chart`, `...Activity`), `PopupProps`, `PopupCardUi` (Card UI, 2.8 round 3), a cluster's window `PopupCluster` (2.11, K104, K129; since 2.13 the GROUP panel - Rename group, Header options, Edit cards, Show as, Face, Area - and a group's Edit cards `doEditSave()`), the group view `PopupGroup` (2.13, K154: the group's own cluster in a bare sheet), the moves' views and dialogs `PopupMove`, the thermostat's window `PopupClimate` (2.13, read-only), Visibility `PopupVisibility` (2.11, K96; Pin / Unpin this card since K160), the panels' rows (`PopupSettingsRows`, `PopupSideRows`, `PopupPanels`), `PopupDialog` (Hide, Remove this copy), the hold (`PopupHold`), helpers (`PopupCommon`), and the PC's handles (`PopupDebug`, `PopupTree`) |
 | typing words (a name) | `Kit::keyboard()`, `src/UI/Kit/KitKeyboard.cpp` (2.11, K95); `components.md` "Keyboard" |
-| a card hidden from its page, a copy in a cluster | `Cards/CardAdded` (`hide()`, `restore()`, `pool()`; `addTo()`, `membersIn()`); the page's list in `src/UI/SlotPanels.cpp`, filled in `GUIManagerHeader.cpp`; the development Reset (2.11 round 9) `CardAdded::resetToCompiled()`, run by `GUIManager::resetDashboard()` from the system panel |
+| adding, hiding, pinning or removing cards (2.13) | `UI/EditCards` (the one list: In this group, On the page, Hidden, HA's areas; the tap cycle), `UI/EditCardsSheet` (from the page), `Popup/PopupCluster.cpp` (from a group), `UI/HaOffer` + `UI/HaPicker` (what HA offers, "N new"), `UI/NewClusterSheet` (New group); `ha-cards.md` §4 |
+| a card hidden from its page, a copy in a cluster | `Cards/CardAdded` (`hide()`, `restore()`, `pool()`; `addTo()`, `membersIn()`, `moveBack()`); the page's hidden cards are Edit cards' Hidden list (2.13); the development Reset (2.11 round 9) `CardAdded::resetToCompiled()`, run by `GUIManager::resetDashboard()` from the system panel |
 | where cards go on a page | `include/Layout/Layout.h` (`FlowEngine`), `src/Cards/CardPage.cpp`; the arranger (below); the engines: `layout-engines.md` |
 | a group card, a cluster and its mini tiles (2.11) | the spec: `CardSpec::members` / `present` / `slots` (`PageSpec.h`), the House page's in `Dashboard_HA.h`; built by `CardPage::makeGroupCard()`; drawn by `Cards/ClusterCard` and `Cards/MiniTile.cpp`; the arithmetic `include/Layout/Cluster.h` (host-tested); `group-cards.md` §6-7 |
 | the arranger (#78, K105) | `include/Layout/Arranger.h` (pure, host-tested against the playground), `Cards/PageArranger` (kept answers, the background run), `CardPage::arrangePage()`; `layout-engines.md` "As built" |
-| the halo round panels and windows (D-35) | `Kit::haloAttach()`, `src/UI/Kit/KitHalo.cpp`; the panel on the bar `Kit::drawerOverBar()` in `KitDrawer.cpp` |
+| the halo round panels and windows (D-35) | `Kit::haloAttach()`, `src/UI/Kit/KitHalo.cpp`; the panel on the bar `Kit::drawerOverBar()` in `KitDrawer.cpp`; a bare sheet lets its client's shadow out (`Kit::sheetBare()`, `UI::shadowReachPx()`, 2.13) |
 | what the header shows and where | `include/UI/HeaderSlots.h` (the slots as data, each kind's keeps), `include/Layout/HeaderPlan.h` (the planner: three places, claims, keep), `src/UI/Panel_Header.cpp` (each kind's build and update), `src/UI/SlotPanels.cpp` (their panels), `include/UI/GlyphShapes.h` (the status glyphs as strokes, round 3); `header-slots.md` §10-12 |
 | UI Tweaks and the system panel's choices | `src/GUIManagerTweaks.cpp` (each row: what it sets, where it is saved; the scheme; the grid's counts; the deck under the window), `src/UI/TweaksSheet.cpp` (the window), `src/UI/Panel_System.cpp` (CONNECTIVITY, SYSTEM - DIAGNOSTICS) |
 | a card's "on" look | `src/Cards/StateCard.cpp` (`render()` picks the state: Fill, Icon glow, Bracket, Corner cut), `src/Cards/CardFrame.cpp` (`Card::activeFrame()`: the frames drawn in draw events; the corner cut's corners as cached images with LVGL's own shadow, measured - D-33) |
@@ -64,7 +66,11 @@ whose stack is in internal RAM - the settings task.
   (`KS_X`, `KS_X_PRESSED`); two shared styles on one object are ordered by when they were added.
 - **A window is a Sheet client.** It gives a `Kit::SheetSpec` - its tabs, its first view, a tick,
   its closing hooks, its panels' rows - and builds its views into `s.stage`; the frame, the header,
-  auto-close (60 s), the quiet build, the tap catcher and both folder panels are the Sheet's. One
+  auto-close (60 s), the quiet build, the tap catcher and both folder panels are the Sheet's. A
+  **bare** sheet (`Kit::sheetBare(S, true, radius)`, 2.13's group view) has no header row and no
+  padding, a clear window with the client's corners, its stage the window itself, and lets the
+  client's shadow out; `Kit::sheetResized()` keeps the title and countdown bar in step when a
+  client moves or resizes its window. One
   sheet shows at a time, and its tap catcher takes every touch outside it - which is also what
   keeps page swipes from happening under a window. `GUIManager`'s swipe handler has a second check
   for the card window only (`CardPopup::isOpen()`); `Kit::sheetShowing()` would make it cover any
@@ -148,5 +154,11 @@ sweep:
 **Group cards (2.11, `v0.2.19`)** were built on it: a cluster is a container inside an item, placed
 by the arranger on its own sub-grid (`layout-engines.md`); its header is the page header's planner
 and claims again (`cards.md` §8, `Layout/HeaderPlan.h`); its members are borderless mini tiles on
-roles; its window is a Sheet client like the card's (K129). The next pressure is **2.13's group
-view and Add cards from HA, and 2.14's alerts on the header claim model** (K130).
+roles; its window is a Sheet client like the card's (K129).
+
+**2.13 (rounds 1-4, on a branch)** fitted the same way: the group view is the group's own
+`ClusterCard` in a bare sheet, its tiles capped by `Layout::cappedGrid` (host-tested); Edit cards is
+one list component (`UI/EditCards`) used by two clients; an option that does not apply is a greyed
+chip row (`ChipRowSpec::greyed`), never moved (K155); text fits its room through `Kit::fitLabel`
+(K152); "Show helper text" is the kit's (`Kit::helperShown()`). The next pressure is **2.14's alerts
+on the header claim model** (K130, K138) and a thermostat with controls (`PLAN_2.13.md`).

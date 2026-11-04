@@ -185,6 +185,12 @@ improvement (it says where a header lives) but is a whole-tree edit, and therefo
 
 ## 4. Start order, with reasons
 
+*(2.1's order, 2026-09-09. `SystemCore::begin()` has grown since and is the truth: the HTTP server,
+`PanelDebug` and `HangWatch` first; `Settings::begin()` after the entity storage and before the GUI;
+then the battery, virtual and HA providers (`_ha`, `_haRest`, `_haProv`), the HA cards made on the
+board adopted from the settings file (2.13, `adoptHaCard`), the command router and HA history. The
+reasoning below still holds.)*
+
 `SystemCore::begin()`. Each step states its constraint.
 
 > **Correction, 2026-09-09.** This section originally claimed the order was *exactly* the old
