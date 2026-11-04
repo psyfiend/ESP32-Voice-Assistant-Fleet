@@ -42,7 +42,7 @@ the 4B (its settings put back after). **Swipes and taps on the glass are untried
 | T6 | Office's Members | a pin beside each tile on the page, the header's glyphs beside its sensors |
 | T7 | Long-press a tile, Visibility, **Unpin this card** | no dialog; the window closes and the tile leaves the page; it is still in the group view |
 | T8 | That member's Visibility from Members: **Pin this card** | it is back on the page when the window closes |
-| T9 | Kitchen's Edit cards, On the page: tap Table twice, **Save 2**... | Table back in Kitchen as a tile; its page card gone; "Saved 1 change to Kitchen" |
+| T9 | Kitchen's Edit cards, On the page: tap Table twice, **Save 1** | Table back in Kitchen as a tile; its page card gone; "Saved 1 change to Kitchen" |
 | T10 | Edit cards: tap a member once, twice, three times | lit with its square gone (or a pin come); a made card red at two, a built-in one back at two; as it was at three |
 | T11 | Edit cards: add a card from Home Assistant once, Save | it joins Kitchen but not the page; the group view shows it |
 | T12 | UI Tweaks, Group view: Cards; tap Office | members drawn as cards, bordered, even spacing |
