@@ -1,4 +1,89 @@
-# Test sheet - 2.13, cards from Home Assistant (rounds 1 and 2)
+# Test sheet - 2.13, cards from Home Assistant (rounds 1 to 3)
+
+# Round 3
+
+**Branch** `feat/2.13-add-from-ha` at `1edb552`. **Boards** WS_P4_5 and WS_P4_4B run it (app only,
+each board's settings saved first in `bench/settings/<board>/20261103-182*.json`, 0 differences
+after). **CYD_P4_1060 is not flashed**: its USB link dropped as the flash began (esptool could not
+open COM9 at any rate) and it stopped answering - replug it holding BOOT (LESSONS, "A dark screen
+after a good flash"); its app was not written, so it still has round 2. CYD_P4_4880 runs round 2;
+WS_S3_4B compiles (#69; RAM 47.0%, flash 37.3%). **Decisions** K154-K158.
+
+The P4_5 tests marked *(run)* were driven by Claude over `/popup` with screenshots, then the P4_5's
+settings put back (0 differences). **Taps and long presses on the glass are untried** - `/popup` has
+no way to tap a tile.
+
+## What changed on screen
+
+- **The group view is the cluster** (K154): Office drawn as on the page - its header and its tiles,
+  the hidden ones last, dimmed, "Hidden" - with no title bar and no X, sized to fit its tiles at the
+  page's tile size, a gap above the panels. A tap outside closes it.
+- **Its tiles act as on the page**: a light's tap switches it, a sensor's opens its History; a long
+  press opens that member - in this window. A tap on its header opens Members.
+- **A group keeps its GROUP panel in every presentation** (K155): Rename group, Header options,
+  Edit cards, Show as, Face, Area - Header options greyed as a solo card, Face greyed as a cluster.
+  SETTINGS no longer has Show as or Face.
+- **Tap action and Long press per presentation** (K156): a solo card's choices and the cluster's are
+  kept apart. A cluster ignores a tap it does not offer: P4_5's Office, which had kept a solo card's
+  Toggle, opens its group view again.
+- **Members of a solo group card list every member**, the header's sensors with their glyphs (K157).
+- **Desk in Office** (K157): Members > Office Desk opens "Office > Desk" with Desk's Members tab;
+  its lamps open "Desk > lamp". The back arrow steps back one level at a time.
+- **Members past the sixth** open: the rows come from the group, not the window's six entities.
+- **Edit cards**: a row ticked to add or restore looks like a lit chip; the list showing in the
+  column is glass, not lit.
+- **Label words** (K158): adding cards to the page asks "Select label for these cards:" (Area, the
+  page's labels, New label, None); its dialog says "The cards will be labeled Garage."; Change label
+  says "This card's label will change from A to B."; Properties says Card label.
+
+## Tests
+
+**T1 - The group view.** Tap Office. *PASS:* a window that is Office's cluster - swatch, Office,
+occupancy and temperature, Desk and Overhead tiles the size they are on the page - centred, no title
+bar, no X, a gap above the GROUP and SETTINGS tabs. Tap outside: it closes. *(run, opened by
+/popup)*
+
+**T2 - Its tiles.** In the group view tap Overhead: it switches, as on the page (Office lights only;
+switch it back). Long-press Desk: "Office > Desk". Back arrow: the group view again.
+
+**T3 - Its header.** In the group view tap Office's header: Members. Tap Office in the title: the
+group view.
+
+**T4 - Hidden members.** Hide one of Kitchen's tiles (Edit cards, Hide). Tap Kitchen. *PASS:* the
+hidden one is a tile, last, dimmed, "Hidden"; the window is wide enough for both. Restore it. *(run:
+Sink hidden through /settings)*
+
+**T5 - Desk in Office.** Office > Members > Office Desk. *PASS:* "Office > Desk", with the Members
+tab beside History. Tap it: Desk's three lamps. Tap one: "Desk > " and the lamp. Back arrow twice:
+Desk, then Office's Members. *(run: the first step)*
+
+**T6 - Solo card keeps GROUP.** Office > GROUP > Show as > Solo card, close the window. Long-press
+the Office card. *PASS:* the GROUP tab is there; Rename group, Header options greyed, Edit cards,
+Show as says Solo card, Face, Area. SETTINGS has Tap action and Long press opens, no Show as or Face.
+*(run)*
+
+**T7 - Solo Members.** On the solo Office card, tap the Members tab. *PASS:* Office Desk, Office
+Overhead, Office Occupancy and Office Temperature, the last two with their header glyphs. *(run)*
+
+**T8 - Edit cards from a solo card.** GROUP > Edit cards. *PASS:* In this group lists the four, glass
+in the column. *(run)*
+
+**T9 - Tap per presentation.** As a solo card, SETTINGS > Tap action > Toggle. GROUP > Show as >
+Cluster, close. *PASS:* a tap on Office opens its group view. Back to Solo card: a tap switches the
+lights.
+
+**T10 - Chosen rows.** Edit cards from the page, tick a card in an area. *PASS:* it looks like a lit
+chip (tinted, an accent edge), not lit glass; red for a row ticked to hide is unchanged.
+
+**T11 - Label words.** Edit cards from the page, add two cards from Garage. *PASS:* "Select label for
+these cards:", New label, None, and the note; Next: "The cards will be labeled Garage." On a page
+card: Visibility > Change label, pick another: "This card's label will change from ... to ...".
+
+## Not built yet
+
+Units and precision from HA; Removed for built-in cards; the text fitter outside Edit cards; the
+two-level nesting rules; New group from the page's own cards; the thermostat's controls (with you
+there).
 
 # Round 2
 
