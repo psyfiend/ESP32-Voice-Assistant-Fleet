@@ -96,6 +96,9 @@ public:
     // True from the long press until the window has gone. GUIManager asks
     // this before acting on a gesture: the popup is modal.
     static bool isOpen();
+    // A card drawn inside the open window - the group view's cluster or one of
+    // its tiles (K154) - which takes its taps while every other card is locked.
+    static bool inWindow(const Card &card);
 
 #ifdef DEBUG_POPUP
     // GET /popup - open, drive and measure a window from a PC, with nobody at

@@ -1450,8 +1450,9 @@ void Card::eventCb(lv_event_t *e) {
     Card *self = (Card *)lv_event_get_user_data(e);
     if (!self) return;
     // Modal. CardPopup's catcher takes every touch outside an open window
-    // before a card sees it; this is the second lock on the same door.
-    if (CardPopup::isOpen()) return;
+    // before a card sees it; this is the second lock on the same door - not
+    // for a card inside the window (the group view's cluster, K154).
+    if (CardPopup::isOpen() && !CardPopup::inWindow(*self)) return;
     switch (lv_event_get_code(e)) {
         case LV_EVENT_SHORT_CLICKED: self->tap();         break;   // the setting, then onTap()
         case LV_EVENT_LONG_PRESSED:  self->onLongPress(); break;

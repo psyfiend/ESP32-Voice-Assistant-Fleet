@@ -48,9 +48,11 @@ lv_area_t pageArea() {
 }
 
 // THE GROUP VIEW'S SIZE (K154): its tiles at the page's tile size, as few rows as
-// the page's width allows, the rows evened out; never narrower than the cluster on
-// the page. Where they do not fit at that size, the page's room, the tiles smaller.
-lv_area_t fitted(const lv_area_t &room) {
+// the page's width allows, the rows evened out - and NEVER SMALLER THAN THE
+// WINDOW'S OWN SIZE (`normal`; the owner, round 3: the page's size looked odd),
+// the tiles then laid out for the room. Where they do not fit at that size, the
+// page's room, the tiles smaller.
+lv_area_t fitted(const lv_area_t &room, const lv_area_t &normal) {
     const ClusterCard *pg = heldCluster();
     const int32_t maxW = lv_area_get_width(&room), maxH = lv_area_get_height(&room);
     const int32_t g  = mm(UI::shape().C_TILE_GAP);
@@ -80,7 +82,11 @@ lv_area_t fitted(const lv_area_t &room) {
         H = LV_MIN(maxH, lv_obj_get_height(pg->root()));
         W = minW;
     }
-    W = LV_MIN(maxW, LV_MAX(W, minW));
+    W = LV_MAX(W, minW);
+    const int32_t nW = lv_area_get_width(&normal), nH = lv_area_get_height(&normal);
+    if (s_view && (W < nW || H < nH)) s_view->setTileCols(0);   // the room's own rule (Layout::tileGrid)
+    W = LV_MIN(maxW, LV_MAX(W, nW));
+    H = LV_MIN(maxH, LV_MAX(H, nH));
     lv_area_t a;
     a.x1 = room.x1 + (maxW - W) / 2;
     a.x2 = a.x1 + W - 1;
@@ -116,7 +122,8 @@ void groupWindowFor(PopupView v) {
         ClusterCard *pg = heldCluster();
         if (pg && pg->hasId() && s_groupMaker) s_view = s_groupMaker(pg->id(), true);
         const lv_area_t room = pageArea();
-        const lv_area_t r = fitted(room);
+        const lv_area_t normal = s_moved ? s_smallRect : s.winRect;   // the window's own place
+        const lv_area_t r = fitted(room, normal);
         place(&r, s_view != nullptr);
     } else if (v == PopupView::VIEW_CLUSTER_ADD) {
         const lv_area_t room = pageArea();
@@ -155,15 +162,21 @@ void buildGroup() {
 // A TILE IN THE GROUP VIEW ASKED FOR A WINDOW (K154): its member here, as from its
 // row in Members - its card on the page's cluster (the view's goes when the view
 // does), on the view it asked for. The view's own header: Members.
+bool groupViewHas(const Card &card) {
+    if (!s_view) return false;
+    if (&card == s_view) return true;
+    for (uint8_t i = 0; i < s_view->memberCount(); i++)
+        if (s_view->memberAt(i) == &card) return true;
+    return false;
+}
+
 bool groupViewRoute(Card &card, uint8_t view) {
     if (!s_view || s.view != PopupView::VIEW_GROUP || s.phase != PopupPhase::PHASE_OPEN) return false;
     if (&card == s_view) {
         lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_MEMBERS); }, nullptr);
         return true;
     }
-    bool mine = false;
-    for (uint8_t i = 0; i < s_view->memberCount() && !mine; i++) mine = s_view->memberAt(i) == &card;
-    if (!mine) return false;
+    if (!groupViewHas(card)) return false;
     ClusterCard *g = heldGroup();
     Card *twin = nullptr;
     for (uint8_t i = 0; g && i < g->memberCount() && !twin; i++) {

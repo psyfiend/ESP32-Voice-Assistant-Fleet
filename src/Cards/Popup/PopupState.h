@@ -453,6 +453,7 @@ void groupForget();                   // ...the window went
 // A card inside the window asked to open (a group view's tile, or its header -
 // K154): true when it was the group view's, now routed into the window.
 bool groupViewRoute(Card &card, uint8_t view);
+bool groupViewHas(const Card &card);  // the group view's cluster, or one of its tiles
 // THE GROUP THE WINDOW STANDS FOR (K155): the held cluster, or - for a group shown
 // as one card - its cluster made again from the page and kept while the window is
 // open (never built). Null for any other card.

@@ -470,6 +470,8 @@ void CardPopup::begin() {
 
 bool CardPopup::isOpen() { return s.phase != PopupPhase::PHASE_CLOSED; }
 
+bool CardPopup::inWindow(const Card &card) { return s.phase == PopupPhase::PHASE_OPEN && groupViewHas(card); }
+
 void CardPopup::close() {
     if (s.phase != PopupPhase::PHASE_OPEN) return;
     Kit::sheetClose(s);
