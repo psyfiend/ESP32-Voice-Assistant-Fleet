@@ -58,6 +58,54 @@ void tileAt(const TileGrid &g, uint8_t n, uint8_t i, int32_t gap, int32_t &x, in
     y = row * (g.tileH + gap);
 }
 
+namespace {
+void capSize(int32_t &tw, int32_t &th, const TileCap &c) {
+    if (c.maxW > 0 && tw > c.maxW) tw = c.maxW;
+    if (c.maxH > 0 && th > c.maxH) th = c.maxH;
+    if (c.tall > 0.f && th > (int32_t)((float)tw * c.tall)) th = (int32_t)((float)tw * c.tall);
+    if (c.wide > 0.f && tw > (int32_t)((float)th * c.wide)) tw = (int32_t)((float)th * c.wide);
+}
+}  // namespace
+
+TileGrid cappedGrid(uint8_t n, int32_t w, int32_t h, int32_t gap, const TileCap &cap) {
+    TileGrid best;
+    if (n == 0 || w <= 0 || h <= 0) return best;
+    const float box = (float)w / (float)h;
+    int32_t bestM = -1, bestEmpty = 0;
+    float   bestShape = 0.f;
+    for (uint8_t c = 1; c <= n; c++) {
+        const uint8_t r = (uint8_t)((n + c - 1) / c);
+        int32_t tw = (w - (c - 1) * gap) / c;
+        int32_t th = (h - (r - 1) * gap) / r;
+        if (tw <= 0 || th <= 0) continue;
+        capSize(tw, th, cap);
+        if (tw <= 0 || th <= 0) continue;
+        const int32_t m = tw < th ? tw : th;
+        const int32_t empty = c * r - n;
+        const float gw = (float)(c * tw + (c - 1) * gap), gh = (float)(r * th + (r - 1) * gap);
+        const float shape = fabsf(logf((gw / gh) / box));
+        const bool better = m > bestM || (m == bestM && (empty < bestEmpty || (empty == bestEmpty && shape < bestShape)));
+        if (!better) continue;
+        bestM = m; bestEmpty = empty; bestShape = shape;
+        best.cols = c;
+        best.rows = r;
+        best.tileW = best.lastW = tw;
+        best.tileH = th;
+    }
+    return best;
+}
+
+void cappedTileAt(const TileGrid &g, uint8_t n, uint8_t i, int32_t gap, int32_t w, int32_t h, int32_t &x, int32_t &y) {
+    const uint8_t cols = g.cols ? g.cols : 1;
+    const uint8_t row  = (uint8_t)(i / cols);
+    const uint8_t col  = (uint8_t)(i % cols);
+    const int32_t inRow = (row + 1 == g.rows) ? (int32_t)n - (int32_t)row * cols : cols;
+    const int32_t rowW  = inRow * g.tileW + (inRow - 1) * gap;
+    const int32_t gridH = g.rows * g.tileH + (g.rows - 1) * gap;
+    x = (w - rowW) / 2 + col * (g.tileW + gap);
+    y = (h - gridH) / 2 + row * (g.tileH + gap);
+}
+
 ClusterSpan clusterSpan(uint8_t n, const ClusterGeom &g, uint8_t maxCols, uint8_t maxRows) {
     ClusterSpan out;
     if (n == 0 || maxCols == 0 || maxRows == 0) return out;

@@ -220,6 +220,11 @@ struct UIShape {
                         //      centred in its slot (round 12: "Desk is much taller than it is wider")
     float C_TILE_FOOT_AT; // 18.0 a tile this tall or taller keeps the whole C_TILE_FOOT; a shorter
                         //      one keeps it in step with its height, for its disc (round 13: the 4B's)
+    float C_TILE_MAX_W; // 25.0 THE BIGGEST A TILE IS, in the group view (2.13 round 4, K159): the owner's
+    float C_TILE_MAX_H; // 20.0 "Tiles need a max size, period" - the P4_5's Table card (24.7 x 19.7) and
+                        //      the 1060's solo cards (25.8 x 19.8); the spare room goes round the tiles
+    float C_TILE_WIDE;  // 2.0  A RATIO: a group view tile no wider than this times its height (K159:
+                        //      "not allowed to stretch out twice as wide as it is tall")
 
     // --- Panels and windows float over the page (D-35, the "Panel Edges" mock) ---
     float HALO;         // 5.0  the halo round a header slot's panel and every window: black at

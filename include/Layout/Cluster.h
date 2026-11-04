@@ -34,6 +34,20 @@ TileGrid tileGrid(uint8_t n, int32_t w, int32_t h, int32_t gap, uint8_t cols = 0
 // from the box's top-left corner.
 void tileAt(const TileGrid &g, uint8_t n, uint8_t i, int32_t gap, int32_t &x, int32_t &y, int32_t &w);
 
+// THE GROUP VIEW'S TILES (2.13 round 4, K159): every tile the same size - a short
+// last row's too, centred under the rest - and never bigger than a tile may be:
+// maxW x maxH, no taller than `tall` times its width, no wider than `wide` times
+// its height (0: no limit). The grid is the one whose tiles come out biggest within
+// those limits, then the one with the fewest empty places, then the one shaped most
+// like the box; the spare room goes round it.
+struct TileCap {
+    int32_t maxW = 0, maxH = 0;
+    float   tall = 0.f, wide = 0.f;
+};
+TileGrid cappedGrid(uint8_t n, int32_t w, int32_t h, int32_t gap, const TileCap &cap);
+// Where tile i stands in a cappedGrid, the grid centred in the w x h box, from its top-left.
+void cappedTileAt(const TileGrid &g, uint8_t n, uint8_t i, int32_t gap, int32_t w, int32_t h, int32_t &x, int32_t &y);
+
 // The page's cells and a cluster's own frame, in pixels.
 struct ClusterGeom {
     int32_t cellW = 0, cellH = 0;   // one cell

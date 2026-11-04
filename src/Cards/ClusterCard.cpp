@@ -104,6 +104,13 @@ int32_t ClusterCard::tileHeight() const {
     return LV_MIN(g.tileH, (int32_t)(g.tileW * UI::shape().C_TILE_TALL));
 }
 
+bool ClusterCard::headerHas(const lv_point_t &p) const {
+    if (!_hdr) return false;
+    lv_area_t a;
+    lv_obj_get_coords(_hdr, &a);
+    return p.x >= a.x1 && p.x <= a.x2 && p.y >= a.y1 && p.y <= a.y2;
+}
+
 bool ClusterCard::owns(const char *entityId) const {
     if (!entityId || !entityId[0]) return false;
     for (const Slot &s : _slot) {
@@ -182,17 +189,20 @@ void ClusterCard::buildBody(lv_obj_t *body) {
 
     // The tiles.
     const uint8_t nTiles = tileCount();
-    const Layout::TileGrid g = tileGrid();
+    // IN THE GROUP VIEW (K159): one size, capped, the grid centred in the room.
+    const int32_t roomW = surfaceWidthPx() - chromeW(), roomH = surfaceHeightPx() - chromeH();
+    const Layout::TileGrid g = _capped ? Layout::cappedGrid(nTiles, roomW, roomH, tgap(), _cap) : tileGrid();
     // Each tile near square (tileHeight()), or halfway down to the page's height
     // when that is shorter (round 12b, the owner: the page's height alone left
     // Kitchen's wide tiles squat - "split the difference"), centred in its slot.
-    int32_t th = tileHeight();
-    if (_tileHCap > 0 && _tileHCap < th) th = (th + _tileHCap) / 2;
+    int32_t th = _capped ? g.tileH : tileHeight();
+    if (!_capped && _tileHCap > 0 && _tileHCap < th) th = (th + _tileHCap) / 2;
     uint8_t t = 0;
     for (uint8_t i = 0; i < _n; i++) {
         if (!_tile[i]) continue;
-        int32_t x = 0, y = 0, w = 0;
-        Layout::tileAt(g, nTiles, t++, tgap(), x, y, w);
+        int32_t x = 0, y = 0, w = g.tileW;
+        if (_capped) Layout::cappedTileAt(g, nTiles, t++, tgap(), roomW, roomH, x, y);
+        else         Layout::tileAt(g, nTiles, t++, tgap(), x, y, w);
         Card *m = _m[i];
         m->setCellWidthPx(w);
         m->setCellHeightPx(th);
@@ -221,13 +231,16 @@ void ClusterCard::render() {
     const bool     bar  = (_style == ClusterStyle::CLSTYLE_BAR);
     const uint32_t gcol = headerColor();   // the group's colour (K46)
     const uint32_t ink  = bar ? p.SURFACE : p.TEXT;
+    // The group view's frame has the window's corners (K159: no jump to Members).
+    const int32_t frameR = _frameR ? _frameR : UI::sc(UI::met().RADIUS);
+    if (_frameR && surface()) lv_obj_set_style_radius(surface(), _frameR, 0);
 
     // THE GROUP'S COLOUR (K102): a bar across the header, or a swatch beside its
     // name. Never colour alone: the name says which group it is.
     if (bar) {
         lv_obj_set_style_bg_color   (_hdr, UI::c(gcol), 0);
         lv_obj_set_style_bg_opa     (_hdr, LV_OPA_COVER, 0);
-        lv_obj_set_style_radius     (_hdr, UI::sc(UI::met().RADIUS) - UI::met().BORDER_W, 0);
+        lv_obj_set_style_radius     (_hdr, frameR - UI::met().BORDER_W, 0);
         lv_obj_set_style_border_width(_hdr, 0, 0);
         lv_obj_set_style_bg_color   (_skirt, UI::c(gcol), 0);
         lv_obj_set_style_bg_opa     (_skirt, LV_OPA_COVER, 0);
@@ -239,7 +252,7 @@ void ClusterCard::render() {
         // SURFACE_ALT, its corners the frame's, its foot square (the skirt).
         lv_obj_remove_local_style_prop(_hdr, LV_STYLE_BG_COLOR, 0);
         lv_obj_remove_local_style_prop(_hdr, LV_STYLE_BG_OPA, 0);
-        lv_obj_set_style_radius     (_hdr, UI::sc(UI::met().RADIUS) - UI::met().BORDER_W, 0);
+        lv_obj_set_style_radius     (_hdr, frameR - UI::met().BORDER_W, 0);
         lv_obj_remove_local_style_prop(_hdr, LV_STYLE_BORDER_WIDTH, 0);
         lv_obj_set_style_bg_color   (_skirt, UI::c(p.SURFACE_ALT), 0);
         lv_obj_set_style_bg_opa     (_skirt, LV_OPA_COVER, 0);

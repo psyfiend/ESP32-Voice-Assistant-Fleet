@@ -61,6 +61,13 @@ public:
     // ONE TILE HEIGHT A PAGE (round 12b): the page gives every cluster the
     // shortest any of them draws; a taller one draws halfway down to it. 0: its own.
     void setTileHeightCap(int32_t px) { _tileHCap = px; }
+    // THE GROUP VIEW (K159), before build(): every tile one size, no bigger than
+    // `cap`, the grid centred (Layout::cappedGrid()) - in place of the page's rule;
+    // and its frame's corners `radius` (the window's), the header's following.
+    void setTileCap(const Layout::TileCap &cap) { _cap = cap; _capped = true; }
+    void setFrameRadius(int32_t px) { _frameR = px; }
+    // Is this point (screen coordinates) on its header row?
+    bool headerHas(const lv_point_t &p) const;
     // The header values' icons in the page header's glyph style (round 11, K115):
     // framed on a Swatch header, bare on a Band. Every cluster's, from the next build.
     static void setGlyphStyle(GlyphStyle g) { s_glyphs = g; }
@@ -101,6 +108,9 @@ private:
     bool        _icons = true;
     uint8_t     _tileCols = 0;
     int32_t     _tileHCap = 0;
+    Layout::TileCap _cap;
+    bool        _capped = false;
+    int32_t     _frameR = 0;   // 0: a card's corners
 
     lv_obj_t *_room = nullptr;  // the card's body: the header and the tiles stand in it
     // The header: the row, its bar's skirt, the swatch, the name, and a value per slot.
