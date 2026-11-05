@@ -71,14 +71,7 @@ lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberSho
 
 // THE HEADER'S GLYPH, SQUARE (owner, round 2 of the follow-ups): the one the
 // cluster's header shows for this member, in its colour, `gap` from the row.
-const char *headerGlyphOf(const Entity &e, uint32_t &tint) {
-    const UIPalette &p = UI::pal();
-    const bool binary = e.value.type == ValueType::BOOL;
-    const bool on = binary && e.value.b;
-    tint = binary ? (on ? p.ST_ACTIVE : p.TEXT_DIM) : cardTintFor(e.desc);
-    if (!e.everSet || !e.available) tint = p.TEXT_DIM;
-    return binary ? cardHeroIcon(e, on) : cardCornerIcon(e, false);
-}
+const char *headerGlyphOf(const Entity &e, uint32_t &tint) { return cardHeaderGlyph(e, tint); }   // CardIcons
 
 static void headerGlyph(lv_obj_t *col, const Entity &e, int32_t gap) {
     lv_obj_t *g = plain(col);

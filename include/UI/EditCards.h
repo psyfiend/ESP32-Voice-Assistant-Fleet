@@ -83,6 +83,7 @@ struct Spec {
     // The glyph a group's header would show for an HA row (cycle, a sensor's third
     // tap: its square). Null: none shown.
     const char *(*haGlyph)(const HaOffer::Row &r, uint32_t &tint) = nullptr;
+    const char *saveWord = nullptr;  // cycle's button: "<word> N" - null "Save" (New group: "Create group", K168)
 };
 // AT THE LIMIT (K176): no card can be chosen to add - every add row is flat. Within
 // 25% of it, build() says so in a toast that stays until tapped.

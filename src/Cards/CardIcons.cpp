@@ -1,6 +1,7 @@
 #include "Cards/CardIcons.h"
 #include "UI/UITokens.h"
 #include "UI/UIIcons.h"
+#include "HaValue.h"      // haDescriptor(): cardHeaderGlyphFor()
 #include <lvgl.h>
 #include <stdio.h>
 #include <string.h>
@@ -198,6 +199,28 @@ CardLabel cardResolveLabel(CardLabel want) {
     if (s_labelMode == CardLabel::LBL_STATE || s_labelMode == CardLabel::LBL_NONE) return s_labelMode;
     if (want == CardLabel::LBL_INHERIT) want = CardLabel::LBL_HA;
     return want;
+}
+
+// A group header's glyph (2.11 K101; moved here from the card window, 2.13 round 5).
+const char *cardHeaderGlyph(const Entity &e, uint32_t &tint) {
+    const UIPalette &p = UI::pal();
+    const bool binary = e.value.type == ValueType::BOOL;
+    const bool on = binary && e.value.b;
+    tint = binary ? (on ? p.ST_ACTIVE : p.TEXT_DIM) : cardTintFor(e.desc);
+    if (!e.everSet || !e.available) tint = p.TEXT_DIM;
+    return binary ? cardHeroIcon(e, on) : cardCornerIcon(e, false);
+}
+
+const char *cardHeaderGlyphFor(const char *ref, const char *deviceClass, const char *unit, uint32_t &tint) {
+    EntityDescriptor d;
+    if (!haDescriptor(ref, deviceClass, unit, d)) return nullptr;
+    static Entity probe;   // ~1 KB: not on the caller's stack
+    probe = Entity{};
+    probe.desc = d;
+    probe.value.type = d.valueType;
+    probe.everSet = true;
+    probe.available = true;
+    return cardHeaderGlyph(probe, tint);
 }
 
 const char *cardBatteryGlyph(int pct) {

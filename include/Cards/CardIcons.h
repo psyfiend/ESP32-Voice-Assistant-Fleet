@@ -58,6 +58,14 @@ uint32_t cardTintFor(const EntityDescriptor &d);
 // The battery glyph for a percentage, in six steps.
 const char *cardBatteryGlyph(int pct);
 
+// THE GLYPH A GROUP'S HEADER SHOWS FOR AN ENTITY, and its tint (the active
+// palette's, never cached): an on/off thing its hero glyph, lit or dim; a
+// reading its corner glyph in its kind's tint. Members, Edit cards and New group.
+const char *cardHeaderGlyph(const Entity &e, uint32_t &tint);
+// ...for an HA entity not on the board yet: as HA describes it (domain, device
+// class, unit). Null when no card can show it.
+const char *cardHeaderGlyphFor(const char *ref, const char *deviceClass, const char *unit, uint32_t &tint);
+
 // A stable colour for an area name. The same name always gives the same
 // colour, on every board and across reboots, because it is derived from the
 // string rather than handed out in arrival order - two panels showing the same

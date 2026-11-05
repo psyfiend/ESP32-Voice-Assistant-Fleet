@@ -1,14 +1,16 @@
 #pragma once
 //
-// NewClusterSheet - "New cluster" from the page panel (2.13, DECISIONS K140 and
-// K91's "making a cluster"; artifact "2.13 Add Cards Mocks", screen 3).
+// NewClusterSheet - "New group" from the page panel's CARDS (2.13 round 5, the
+// owner's design, DECISIONS K168; it replaced round 1's area chips and picker, K140).
 //
-// First the area, as chips; then its entities labelled "fleet", the K92 tap set
-// (lights and switches) and the header's sensors (temperature, occupancy, light
-// level - K115's order, four at most) ticked to start with; Create. The cluster
-// is named for the area and is in its group (K141: so linked to it); the ticked
-// sensors fill its header, the rest are its tiles. It goes on the page showing,
-// after the page's own cards; Rename cluster renames it.
+// Full size, as Edit cards. First "Model this group after an existing HA area?" -
+// HA's areas, then Create new. Then Edit cards' flow: the new group's own list
+// first ("Office (new)", or "New group"), HA's areas after it; a tap adds a card,
+// a second pins it, a sensor's third puts it in the header (K168), the next takes
+// it off; "Create group N". Then its name - the area's, or "New group" when a group
+// has that name already - with Change name (the keyboard, "New group name"); Next
+// asks "Create new group?" in the owner's words. The group is linked to the area
+// it was modelled after (K141); its cluster goes on the page after the page's own.
 //
 // A Sheet client (UI/Sheet.h). LVGL thread.
 //
@@ -18,8 +20,8 @@ bool open(const char *pageTitle);
 void close();
 bool isOpen();
 #ifdef DEBUG_POPUP
-bool areaDebug(const char *areaId);   // /popup?ncarea=<id>: an area chosen
-bool createDebug();                   // /popup?nccreate=1: its Create
+bool areaDebug(const char *areaId);   // /popup?ncarea=<id>: an area chosen ("" Create new)
+bool createDebug();                   // /popup?nccreate=1: the next step's button
 #endif
 
 }  // namespace NewClusterSheet

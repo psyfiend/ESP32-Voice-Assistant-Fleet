@@ -517,8 +517,10 @@ void fillFoot() {
             static const char *const CM[] = { "Copy", "Move" };
             Kit::chipRow(s_foot, CM, 2, s_move ? 1 : 0, 0, moveCb);
         }
-        snprintf(w, sizeof(w), "Save %u", (unsigned)s_nChosen);   // the owner's (2026-11-04)
-        Kit::button(s_foot, Kit::ButtonRole::BTN_CONFIRM, w, bw, bh, saveCb);
+        // "Save N" (the owner's, 2026-11-04); New group's "Create group N" (K168).
+        snprintf(w, sizeof(w), "%s %u", s_spec.saveWord ? s_spec.saveWord : "Save", (unsigned)s_nChosen);
+        const int32_t sw = LV_MAX(bw, Kit::textW(w, UI::type().NAME) + 2 * UI::mm(UI::shape().S7));
+        Kit::button(s_foot, Kit::ButtonRole::BTN_CONFIRM, w, sw, bh, saveCb);
         return;
     }
     if (t == Tick::TICK_ADD) {

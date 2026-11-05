@@ -432,15 +432,7 @@ uint8_t fillPage(EditCards::Item *out, uint8_t cap, void *) {
 // (K168, a sensor's third tap): its kind as HA describes it.
 const char *haRowGlyph(const HaOffer::Row &r, uint32_t &tint) {
     if (r.have) return headerGlyphOf(*r.have, tint);
-    EntityDescriptor d;
-    if (!haDescriptor(r.ref, r.dc, r.unit, d)) return nullptr;
-    static Entity probe;
-    probe = Entity{};
-    probe.desc = d;
-    probe.value.type = d.valueType;
-    probe.everSet = true;
-    probe.available = true;
-    return headerGlyphOf(probe, tint);
+    return cardHeaderGlyphFor(r.ref, r.dc, r.unit, tint);
 }
 
 // INTO THE HEADER (K168): `id` after the group's header members, four at most.
