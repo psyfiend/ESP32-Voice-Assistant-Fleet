@@ -76,6 +76,8 @@ bool ClusterCard::addMember(Card *m, bool tile, int8_t slot) {
     return true;
 }
 
+int32_t ClusterCard::gapPx() const { return _gapPx >= 0 ? _gapPx : tgap(); }
+
 void ClusterCard::groundSurface() {
     if (surface()) lv_obj_set_style_bg_color(surface(), UI::c(UI::pal().GROUND), 0);
 }
@@ -96,7 +98,7 @@ int32_t ClusterCard::chromeW() { return 2 * UI::met().BORDER_W + 2 * pad(); }
 int32_t ClusterCard::chromeH() { return 2 * UI::met().BORDER_W + tilesTop() + pad(); }
 
 Layout::TileGrid ClusterCard::tileGrid() const {
-    return Layout::tileGrid(tileCount(), surfaceWidthPx() - chromeW(), surfaceHeightPx() - chromeH(), tgap(),
+    return Layout::tileGrid(tileCount(), surfaceWidthPx() - chromeW(), surfaceHeightPx() - chromeH(), gapPx(),
                             _tileCols);
 }
 
@@ -199,7 +201,7 @@ void ClusterCard::buildBody(lv_obj_t *body) {
     const uint8_t nTiles = tileCount();
     // IN THE GROUP VIEW (K159): one size, capped, the grid centred in the room.
     const int32_t roomW = surfaceWidthPx() - chromeW(), roomH = surfaceHeightPx() - chromeH();
-    const Layout::TileGrid g = _capped ? Layout::cappedGrid(nTiles, roomW, roomH, tgap(), _cap) : tileGrid();
+    const Layout::TileGrid g = _capped ? Layout::cappedGrid(nTiles, roomW, roomH, gapPx(), _cap) : tileGrid();
     // Each tile near square (tileHeight()), or halfway down to the page's height
     // when that is shorter (round 12b, the owner: the page's height alone left
     // Kitchen's wide tiles squat - "split the difference"), centred in its slot.
@@ -209,8 +211,8 @@ void ClusterCard::buildBody(lv_obj_t *body) {
     for (uint8_t i = 0; i < _n; i++) {
         if (!_tile[i]) continue;
         int32_t x = 0, y = 0, w = g.tileW;
-        if (_capped) Layout::cappedTileAt(g, nTiles, t++, tgap(), roomW, roomH, x, y);
-        else         Layout::tileAt(g, nTiles, t++, tgap(), x, y, w);
+        if (_capped) Layout::cappedTileAt(g, nTiles, t++, gapPx(), roomW, roomH, x, y);
+        else         Layout::tileAt(g, nTiles, t++, gapPx(), x, y, w);
         Card *m = _m[i];
         m->setCellWidthPx(w);
         m->setCellHeightPx(th);

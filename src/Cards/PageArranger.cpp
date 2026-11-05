@@ -67,18 +67,23 @@ struct Fp {
     void dbl(double v) { i32((int32_t)lround(v * 1000.0)); }
 };
 
+// WHAT IS ON THE PAGE, NOT HOW TALL IT IS (owner, 2026-11-05, K167): the page's
+// height is left out - the system header shown or hidden keeps the arrangement,
+// the height it gains or loses going to the space round the cards (kept()). So are
+// the members nobody sees there (unpinned ones) and how many sensors a header
+// holds: its tiles, and that it has a header, are what take room.
 uint32_t fingerprint(const Input &in, const Layout::ArrWeights &w) {
     Fp f;
-    f.byte(9);   // the arranger's version: v9
+    f.byte(10);   // the arranger's version: v10 (K167)
     f.str(in.slug);
     f.i32(in.n);
     for (uint8_t i = 0; i < in.n; i++) {
         const Layout::ArrBlock &b = in.blocks[i];
-        f.byte(b.cluster); f.byte(b.tiles); f.byte(b.hdr); f.byte(b.members); f.dbl(b.aspect);
+        f.byte(b.cluster); f.byte(b.tiles); f.byte(b.hdr ? 1 : 0); f.dbl(b.aspect);
         f.str(in.ids[i]);
     }
     const Layout::ArrScreen &s = in.scr;
-    f.dbl(s.pmm); f.dbl(s.aw); f.dbl(s.ah); f.dbl(s.gap); f.dbl(s.tagH); f.byte((uint8_t)s.label);
+    f.dbl(s.pmm); f.dbl(s.aw); f.dbl(s.gap); f.dbl(s.tagH); f.byte((uint8_t)s.label);
     f.byte(s.recCols); f.byte(s.recRows); f.byte(s.fixCols); f.byte(s.fixRows);
     f.dbl(w.size); f.dbl(w.square); f.dbl(w.wide); f.dbl(w.twin); f.dbl(w.gap8); f.dbl(w.order); f.dbl(w.big);
     if (w.budget != Layout::ARR_BUDGET_BOARD) f.i32((int32_t)w.budget);   // the default leaves kept answers as they are
@@ -108,8 +113,10 @@ bool kept(const Input &in, Layout::ArrResult &out) {
     // finish (Layout::finishPage()) is run again here: cheap, and the same every
     // time. Older answers (v1 cells, v2 round 9's finished boxes, v3 round 11's
     // search) are not read.
+    // v5 (K167): "v5 <fingerprint> <cols>x<rows> <height> ..." - the page's height
+    // it was arranged for, in px, after the grid.
     char *p = v;
-    if (strncmp(p, "v4 ", 3)) return false;
+    if (strncmp(p, "v5 ", 3)) return false;
     p += 3;
     const uint32_t fp = (uint32_t)strtoul(p, &p, 16);
     if (fp != fingerprint(in, w)) return false;
@@ -117,6 +124,8 @@ bool kept(const Input &in, Layout::ArrResult &out) {
     if (*p != 'x') return false;
     const long rows = strtol(p + 1, &p, 10);
     if (cols < 1 || rows < 1 || cols > Layout::ARR_UNITS_MAX || rows > Layout::ARR_UNITS_MAX) return false;
+    const long arrangedH = strtol(p, &p, 10);
+    if (arrangedH < 1) return false;
     for (uint8_t i = 0; i < in.n; i++) {
         long q[5];
         for (int j = 0; j < 5; j++) {
@@ -138,9 +147,19 @@ bool kept(const Input &in, Layout::ArrResult &out) {
     out.ok = true;
     out.cols = (uint8_t)cols;
     out.rows = (uint8_t)rows;
-    Layout::finishPage(in.scr, in.blocks, in.n, out.cols, out.rows, out.pos, out.box, out.rect);
-    snprintf(s_use, sizeof(s_use), "%s built from its kept answer, %u blocks on %ldx%ld units",
-             in.slug, (unsigned)in.n, cols, rows);
+    // TALLER THAN IT WAS ARRANGED FOR (the system header hidden, K167): the cards
+    // keep the size they had, and each unit row gets an even share of the height
+    // gained, half above its cards and half below. Shorter: the cards are fitted
+    // to the room there is.
+    Layout::ArrScreen scr = in.scr;
+    const int32_t extra = (int32_t)lround(in.scr.ah) - (int32_t)arrangedH;
+    if (extra > 0) scr.ah = (double)arrangedH;
+    Layout::finishPage(scr, in.blocks, in.n, out.cols, out.rows, out.pos, out.box, out.rect);
+    if (extra > 0)
+        for (uint8_t i = 0; i < in.n; i++)
+            out.rect[i].y += (int32_t)((int64_t)extra * (2 * out.box[i].r + out.box[i].h) / (2 * rows));
+    snprintf(s_use, sizeof(s_use), "%s built from its kept answer, %u blocks on %ldx%ld units%s",
+             in.slug, (unsigned)in.n, cols, rows, extra > 0 ? ", spaced" : "");
     return true;
 }
 
@@ -172,8 +191,8 @@ bool takeDone() {
     bool keptNew = false;
     if (s_res.ok) {
         char v[VALUE_MAX];
-        int len = snprintf(v, sizeof(v), "v4 %08lx %ux%u", (unsigned long)s_fp, (unsigned)s_res.cols,
-                           (unsigned)s_res.rows);
+        int len = snprintf(v, sizeof(v), "v5 %08lx %ux%u %ld", (unsigned long)s_fp, (unsigned)s_res.cols,
+                           (unsigned)s_res.rows, (long)lround(s_in.scr.ah));   // K167: the height it is for
         for (uint8_t i = 0; i < s_in.n && len < (int)sizeof(v); i++) {
             const Layout::ArrPlace &q = s_res.pos[i];
             len += snprintf(v + len, sizeof(v) - len, " %u,%u,%u,%u,%u", (unsigned)q.c, (unsigned)q.r,

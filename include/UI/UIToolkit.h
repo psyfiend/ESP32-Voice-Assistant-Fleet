@@ -79,6 +79,8 @@ public:
     // after it. Info notices only until 2.14's alerts join the queue. A readout
     // (show_toast) still shows at once; the queue carries on after it.
     static void     show_notice(const char* text, uint32_t duration_ms = 5000);
+    // A toast that stays until it is tapped (K176).
+    static void     show_sticky(const char* text);
 
     // Widget Generators
     static lv_obj_t*    create_collapsible_panel(lv_obj_t* parent, const char* title, lv_obj_t** content_container);

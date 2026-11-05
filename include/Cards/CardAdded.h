@@ -37,8 +37,13 @@ class Card;
 namespace CardAdded {
 
 // Cards added on one device and on its pages (removed ones are in the file
-// only). 24 until 2.13; Add card from HA makes them by the handful.
-constexpr uint8_t MAX = 64;
+// only). 24 until 2.13; Add card from HA makes them by the handful. 128 since
+// 2.13 round 5 (owner, K176): every card is one once the compiled ones retire (K171).
+constexpr uint8_t MAX = 128;
+uint8_t count();   // how many there are, of MAX
+
+// WITHIN 25% OF THE LIMIT (K176): opening Edit cards says so (EditCards::build()).
+bool nearLimit();
 
 // Read the added cards from the settings file. `compiledId` says whether an id
 // is a compiled card's (so a new id never repeats one). Once, at boot, before

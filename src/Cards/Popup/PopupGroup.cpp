@@ -62,6 +62,8 @@ Layout::TileCap groupCap() {
     return c;
 }
 
+int32_t groupGap();   // below: its Card margins (K167)
+
 // THE GROUP VIEW'S SIZE (K154, K159): THE WINDOW'S OWN SIZE (`normal`) unless
 // its tiles would come out smaller there than they are on the page; then as
 // much bigger as it takes for them to be the page's size (no bigger than a tile
@@ -70,7 +72,7 @@ Layout::TileCap groupCap() {
 lv_area_t fitted(const lv_area_t &room, const lv_area_t &normal) {
     const ClusterCard *pg = heldCluster();
     const int32_t maxW = lv_area_get_width(&room), maxH = lv_area_get_height(&room);
-    const int32_t g  = mm(UI::shape().C_TILE_GAP);
+    const int32_t g  = groupGap();   // K167
     const int32_t cw = ClusterCard::chromeW(), ch = ClusterCard::chromeH();
     const Layout::TileCap cap = groupCap();
     // The page's tile, as big as a tile may be at most.
@@ -122,6 +124,16 @@ void place(const lv_area_t *r, bool bare) {
     lv_obj_set_size(s.win, lv_area_get_width(&s.winRect), lv_area_get_height(&s.winRect));
     Kit::sheetBare(s, bare, mm(UI::shape().R_WINDOW));
     Kit::sheetLayoutTitle(s);
+}
+
+// ITS CARD MARGINS (K167): the group's own (Card UI's Group view section), else UI
+// Tweaks' - the gap between its tiles or cards, the least of it (K162 spreads the rest).
+int32_t groupGap() {
+    char v[12];
+    const ClusterCard *pg = heldCluster();
+    const uint16_t pct = (pg && pg->hasId() && Settings::card(pg->id(), "margins", v, sizeof(v))) ? UI::marginPct(v)
+                                                                                                 : UI::deviceMarginPct();
+    return mm(UI::shape().C_TILE_GAP) * pct / 100;
 }
 
 // TILES OR CARDS (K162): the group's own choice (Card UI), else UI Tweaks'.
@@ -324,6 +336,7 @@ void buildGroup() {
     // K159: its tiles no bigger than a tile may be; its corners the window's.
     s_view->setTileCols(0);
     s_view->setTileCap(groupCap());
+    s_view->setTileGap(groupGap());   // K167
     s_view->setFrameRadius(mm(UI::shape().R_WINDOW));
     s_view->setSlotsTap(slotsTapCb);   // K163
     // AS CARDS (K162): each member a solo card - border, corners, shadow - with no

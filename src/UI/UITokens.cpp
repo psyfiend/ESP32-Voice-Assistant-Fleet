@@ -1,5 +1,7 @@
 #include "UI/UITokens.h"
+#include "Settings.h"   // Card margins (K167): UI Tweaks' choice
 #include <Arduino.h>
+#include <string.h>
 
 // ---------------------------------------------------------------------------
 // Schemes
@@ -630,6 +632,19 @@ int32_t minTouch() {
     const uint16_t ppi = bspPixelDensity();
     if (!ppi) return sc(44);          // no density declared — a sane default
     return (int32_t)((ppi * 9) / 25.4f + 0.5f);   // 9 mm
+}
+
+// CARD MARGINS (K167): by name, so the steps can be reordered.
+const char *const MARGIN_NAMES[MARGIN_STEPS] = { "small", "medium", "large", "xlarge" };
+uint16_t marginPct(const char *name) {
+    static const uint16_t PCT[MARGIN_STEPS] = { 50, 100, 150, 200 };
+    if (!name || !name[0]) return 100;
+    for (uint8_t i = 0; i < MARGIN_STEPS; i++) if (!strcmp(name, MARGIN_NAMES[i])) return PCT[i];
+    return 100;
+}
+uint16_t deviceMarginPct() {
+    char v[12];
+    return Settings::system("ui", "margins", v, sizeof(v)) ? marginPct(v) : 100;
 }
 
 } // namespace UI

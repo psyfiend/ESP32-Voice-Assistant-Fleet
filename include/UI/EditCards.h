@@ -84,6 +84,8 @@ struct Spec {
     // tap: its square). Null: none shown.
     const char *(*haGlyph)(const HaOffer::Row &r, uint32_t &tint) = nullptr;
 };
+// AT THE LIMIT (K176): no card can be chosen to add - every add row is flat. Within
+// 25% of it, build() says so in a toast that stays until tapped.
 
 // The list, `w` x `h` in `parent`. Nothing ticked to start with, unless keepTicks.
 lv_obj_t *build(lv_obj_t *parent, int32_t w, int32_t h, const Spec &spec);

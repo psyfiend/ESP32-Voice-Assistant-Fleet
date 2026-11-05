@@ -183,14 +183,36 @@ static void notice_next() {
     lv_anim_start(&a);
 }
 
+// A TOAST THAT STAYS UNTIL TAPPED (owner, 2026-11-05, K176: the card limit's
+// warning "must be actively dismissed, it does not time out"). A tap on it hides
+// it; the notice queue carries on after.
+static bool toast_sticky = false;
+static void sticky_tap_cb(lv_event_t *) {
+    if (!toast_sticky || !toast_panel) return;
+    toast_sticky = false;
+    lv_obj_add_flag(toast_panel, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(toast_panel, LV_OBJ_FLAG_CLICKABLE);
+    if (notice_n) notice_next();
+}
+
+void UIToolkit::show_sticky(const char* text) {
+    if (!toast_panel || !text || !text[0]) return;
+    show_toast(text, 1000);
+    if (toast_timer_handle) { lv_timer_del(toast_timer_handle); toast_timer_handle = NULL; }
+    toast_sticky = true;
+    lv_obj_add_flag(toast_panel, LV_OBJ_FLAG_CLICKABLE);
+    static bool hooked = false;
+    if (!hooked) { lv_obj_add_event_cb(toast_panel, sticky_tap_cb, LV_EVENT_CLICKED, NULL); hooked = true; }
+}
+
 void UIToolkit::show_notice(const char* text, uint32_t duration_ms) {
     if (!text || !text[0]) return;
     if (notice_n < NOTICE_Q) {
         snprintf(notice_q[notice_n], sizeof(notice_q[0]), "%s", text);
         notice_ms[notice_n++] = duration_ms;
     }
-    // Nothing showing: this one now. Else it waits for the timer.
-    if (!toast_timer_handle) notice_next();
+    // Nothing showing: this one now. Else it waits for the timer (or the tap).
+    if (!toast_timer_handle && !toast_sticky) notice_next();
 }
 
 // Expanded Accordion Panel Accessor

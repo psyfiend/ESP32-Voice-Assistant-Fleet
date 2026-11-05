@@ -532,4 +532,13 @@ void tameScroll(lv_obj_t *o);
 // than a number someone guessed per board.
 int32_t minTouch();
 
+// CARD MARGINS (owner, 2026-11-05, K167): the gap between neighbours as a share of
+// its token - "small" 50, "medium" (or nothing) 100, "large" 150, "xlarge" 200
+// percent. UI Tweaks' (system.ui.margins) for the page and every group view; a
+// group's own ("margins") for its group view.
+constexpr uint8_t MARGIN_STEPS = 4;
+extern const char *const MARGIN_NAMES[MARGIN_STEPS];   // "small", "medium", "large", "xlarge"
+uint16_t marginPct(const char *name);
+uint16_t deviceMarginPct();   // UI Tweaks' choice, as a percentage
+
 } // namespace UI

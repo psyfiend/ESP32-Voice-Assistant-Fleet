@@ -33,9 +33,17 @@ static const char *const STATE_IS[]  = { nullptr, "fill", "glow", "bracket", "co
 // group's row in both presentations, greyed while it is shown as a solo card.
 static const char *const GVIEW_W[]   = { "Inherit", "Tiles", "Cards" };
 static const char *const GVIEW_IS[]  = { nullptr, "tiles", "cards" };
+// ITS GROUP VIEW'S CARD MARGINS (K167): UI Tweaks' words, Inherit first.
+static const char *const MARGIN_W[]  = { "Inherit", "Small", "Medium", "Large", "X-large" };
+static const char *const MARGIN_IS[] = { nullptr, "small", "medium", "large", "xlarge" };
 
+// THE GROUP VIEW SECTION (owner, 2026-11-05, K167): at the foot of a group's Card
+// UI, under its own title, what affects only its group view - Card appearance (K162's
+// choice) and Card margins.
 enum CuiRow : uint8_t { CUI_ENTITY, CUI_CLABEL, CUI_METAL, CUI_SHAPE, CUI_DENSITY, CUI_TIMEOUT, CUI_BAR, CUI_STATE,
-                        CUI_GVIEW, CUI_ROWS };
+                        CUI_GVIEW, CUI_GMARGIN, CUI_ROWS };
+static lv_obj_t *s_table2 = nullptr;   // the Group view section's rows
+static uint8_t   s_n1 = 0;             // the rows in the first table
 
 static Card *held() { return settingsSubject(); }   // a member's own card in its view (K166)
 
@@ -59,7 +67,8 @@ static bool rowApplies(CuiRow r) {
         case CUI_SHAPE:   return !cluster && s.lightHero;
         case CUI_DENSITY: return !cluster && !mini;
         case CUI_STATE:   return cluster;   // its tiles'
-        case CUI_GVIEW:   return (cluster || s.groupCard) && !inMember();   // a group's, either way it is shown
+        case CUI_GVIEW:
+        case CUI_GMARGIN: return (cluster || s.groupCard) && !inMember();   // a group's, either way it is shown
         default:          return true;   // the window's own timeout and bar
     }
 }
@@ -97,8 +106,15 @@ static uint8_t litOf(uint8_t row) {
         case CUI_BAR:     return savedPos("bar", BAR_IS, 3);
         case CUI_STATE:   return savedPos("card_state", STATE_IS, 5);
         case CUI_GVIEW:   return savedPos("group_view", GVIEW_IS, 3);
+        case CUI_GMARGIN: return savedPos("margins", MARGIN_IS, 5);
     }
     return 0;
+}
+
+// Row `r` of the view (either table's) lit as the card has it now.
+static void relight(uint8_t r) {
+    if (r < s_n1) Kit::chipTableLit(s_table, r, litOf(s_rowAt[r]));
+    else if (s_table2) Kit::chipTableLit(s_table2, (uint8_t)(r - s_n1), litOf(s_rowAt[r]));
 }
 
 // This window's wait and bar, as the card now has them - at once (round 4).
@@ -207,17 +223,27 @@ static void chooseAsync(void *p) {
         case CUI_GVIEW:   // read as the group view opens (PopupGroup.cpp)
             if (!s.groupCard) keepCardSetting("group_view", GVIEW_IS[i < 3 ? i : 0]);
             break;
+        case CUI_GMARGIN: // read as the group view opens (PopupGroup.cpp, K167)
+            if (!s.groupCard) keepCardSetting("margins", MARGIN_IS[i < 5 ? i : 0]);
+            break;
         default: break;
     }
     // Every row lit as the card now has it (a look chosen moves the shape's chip too).
     if (s.view == PopupView::VIEW_CARD_UI)
-        for (uint8_t r = 0; r < s_nRows; r++) Kit::chipTableLit(s_table, r, litOf(s_rowAt[r]));
+        for (uint8_t r = 0; r < s_nRows; r++) relight(r);
     if (row == CUI_ENTITY && ENTITY_IS[i < 5 ? i : 0] == CardLabel::LBL_NAME) typeWords(true);
     if (row == CUI_CLABEL && i == (uint8_t)CardGroups::LS_CUSTOM)          typeWords(false);
 }
 
 static void chipCb(lv_event_t *ev) {
     lv_async_call(chooseAsync, lv_event_get_user_data(ev));
+}
+
+// The Group view section's chips: their rows after the first table's.
+static void chipCb2(lv_event_t *ev) {
+    const uintptr_t v = (uintptr_t)lv_event_get_user_data(ev);
+    const uintptr_t at = ((v >> 8) & 0xFF) + s_n1;
+    lv_async_call(chooseAsync, (void *)((at << 8) | (v & 0xFF)));
 }
 
 // --- The view ----------------------------------------------------------------------
@@ -232,18 +258,29 @@ void buildCardUi() {
         { "Window timeout", TIMEOUT_W, 5, litOf(CUI_TIMEOUT) },
         { "Timer bar",      BAR_W,     3, litOf(CUI_BAR)     },
         { "Card state",     STATE_W,   5, litOf(CUI_STATE)   },   // a cluster's (its place in the list: to confirm)
-        { "Group view",     GVIEW_W,   3, litOf(CUI_GVIEW)   },   // K162
+        { "Card appearance", GVIEW_W,  3, litOf(CUI_GVIEW)   },   // K162, named so in its section (K167)
+        { "Card margins",   MARGIN_W,  5, litOf(CUI_GMARGIN) },   // K167
     };
     Kit::ChipRowSpec rows[CUI_ROWS];
     s_nRows = 0;
+    s_n1 = 0;
     for (uint8_t r = 0; r < CUI_ROWS; r++) {
         if (!rowApplies((CuiRow)r)) continue;
         s_rowAt[s_nRows] = (CuiRow)r;
         rows[s_nRows] = all[r];
-        if (r == CUI_GVIEW && s.groupCard) rows[s_nRows].greyed = true;   // shown as a solo card (K162)
+        // Shown as a solo card, it has no group view (K162).
+        if ((r == CUI_GVIEW || r == CUI_GMARGIN) && s.groupCard) rows[s_nRows].greyed = true;
+        if (r < CUI_GVIEW) s_n1++;
         s_nRows++;
     }
-    s_table = Kit::chipTable(s.stage, lv_area_get_width(&s.winRect) - 2 * s.pad, rows, s_nRows, chipCb);
+    const int32_t w = lv_area_get_width(&s.winRect) - 2 * s.pad;
+    s_table = Kit::chipTable(s.stage, w, rows, s_n1, chipCb);
+    s_table2 = nullptr;
+    if (s_nRows > s_n1) {
+        lv_obj_t *t = Kit::drawerTitle(s.stage, "Group view");   // the section's title (K167)
+        lv_obj_set_width(t, w);
+        s_table2 = Kit::chipTable(s.stage, w, rows + s_n1, (uint8_t)(s_nRows - s_n1), chipCb2);
+    }
 }
 
 // The card's own window look, before its window is built: its timeout and bar

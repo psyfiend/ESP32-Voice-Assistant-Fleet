@@ -2,6 +2,7 @@
 #include "UI/EditCards.h"
 #include "UI/HaPicker.h"      // stateWords(): an HA row's state as a card says it
 #include "HaValue.h"          // haDescriptor(): a row's kind - a sensor can go in the header (K168)
+#include "Cards/CardAdded.h"  // the made cards' limit (K176)
 #include "UI/Kit.h"
 #include "UI/UITokens.h"
 #include "UI/UIToolkit.h"     // show_toast()
@@ -136,6 +137,15 @@ void asListed(Item &it, const char *ref) {
     }
 }
 
+// AT THE LIMIT (K176): nothing more can be made, so no row can be chosen to add;
+// a card already chosen stays so (it was counted when it was).
+void atLimit() {
+    if (CardAdded::count() + addsChosen() < CardAdded::MAX) return;
+    for (uint8_t i = 0; i < s_n; i++)
+        if (s_rows[i].tick == Tick::TICK_ADD && !s_rows[i].coming && chosenAt(s_rows[i].key) < 0)
+            s_rows[i].tick = Tick::TICK_NONE;
+}
+
 // THE ROWS SHOWING: a caller's list - in its target, the cards being added
 // before its first row to restore (the hidden ones last) - or an HA area's.
 void readRows() {
@@ -162,6 +172,7 @@ void readRows() {
             n = (uint8_t)(n + add);
         }
         s_n = n;
+        atLimit();
         return;
     }
     const uint8_t n = HaOffer::rows(s_area, s_haRows, ROWS_MAX);
@@ -188,6 +199,7 @@ void readRows() {
         if (held && s_spec.cycle) asListed(it, r.ref);
     }
     s_n = n;
+    atLimit();
 }
 
 // A ROW'S LOOK: ticked to add or restore, a lit chip's (round 3); ticked to hide or remove,
@@ -557,6 +569,14 @@ lv_obj_t *build(lv_obj_t *parent, int32_t w, int32_t h, const Spec &spec) {
     if (!s_rows || !s_count || !s_chosen || !s_chosenRow || !s_haRows || !s_areas) return nullptr;
     s_spec = spec;
     s_nAreas = HaOffer::ready() ? HaOffer::areas(s_areas, HaCatalog::AREAS_MAX) : 0;
+    // NEAR THE LIMIT (owner's words, K176): every time Edit cards opens; it stays
+    // until tapped.
+    if (!spec.keepTicks && CardAdded::nearLimit()) {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "Approaching limit of %u cards: %u currently",
+                 (unsigned)CardAdded::MAX, (unsigned)CardAdded::count());
+        UIToolkit::show_sticky(msg);
+    }
     if (!spec.keepTicks) {
         s_nChosen = 0;
         s_move = false;

@@ -30,7 +30,7 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, uint8_t subdivision) 
     const UIGrid &g = UI::grid();
 
     const int32_t inset = UI::sc(g.INSET);
-    _gap = UI::sc(g.GAP);
+    _gap = UI::sc(g.GAP) * UI::deviceMarginPct() / 100;   // UI Tweaks' Card margins (K167)
 
     _sub = subdivision ? subdivision : 1;
     if (_sub > 4) _sub = 4;     // thirds are already exotic; quarters are the

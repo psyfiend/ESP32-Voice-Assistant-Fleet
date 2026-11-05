@@ -217,6 +217,9 @@ uint8_t merge(const PageSpec &page, CardSpec *out, uint8_t cap) {
     return n;
 }
 
+uint8_t count() { return s_n; }
+bool nearLimit() { return (uint16_t)s_n * 4 >= (uint16_t)MAX * 3; }   // within 25% (K176)
+
 bool known(const char *cardId) {
     if (!cardId) return false;
     for (uint8_t i = 0; i < s_n; i++) if (!strcmp(s_rec[i].id, cardId)) return true;

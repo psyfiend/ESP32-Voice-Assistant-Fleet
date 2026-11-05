@@ -217,7 +217,7 @@ void GUIManager::setGlyphs(GlyphStyle g) {
 // every scheme's selector, the window timeout and its bar. Not the scheme or
 // the grid - those are the system panel's.
 void GUIManager::resetUiTweaks() {
-    static const char *const KEYS[] = { "label", "entity", "state", "density", "group_view" };
+    static const char *const KEYS[] = { "label", "entity", "state", "density", "group_view", "margins" };
     for (const char *k : KEYS) Settings::setSystem("ui", k, nullptr);
     Settings::setSystem("header", "glyphs", nullptr);
     Settings::setSystem("window", "close", nullptr);
@@ -306,6 +306,7 @@ struct GUITweaks {
     static constexpr const char *TIMEOUT[] = { "60 s", "30 s", "10 s", "Off" };
     static constexpr const char *ONOFF[]   = { "On", "Off" };
     static constexpr const char *GVIEW[]   = { "Tiles", "Cards" };   // K162
+    static constexpr const char *MARGINS[] = { "Small", "Medium", "Large", "X-large" };   // K167
 
     // ...and what each position is.
     static constexpr CardHeaderStyle LABEL_IS[]   = { CardHeaderStyle::HDR_TAG_FLOAT, CardHeaderStyle::HDR_BAND,
@@ -384,6 +385,22 @@ struct GUITweaks {
         Settings::save();
     }
 
+    // CARD MARGINS (K167): the gap between cards and groups on the page, and the
+    // least between tiles or cards in every group view without its own. By name
+    // (system.ui.margins); Medium, today's, as nothing. The page is arranged again.
+    static uint8_t marginsNow() {
+        char v[12];
+        if (!Settings::system("ui", "margins", v, sizeof(v))) return 1;
+        for (uint8_t i = 0; i < UI::MARGIN_STEPS; i++) if (!strcmp(v, UI::MARGIN_NAMES[i])) return i;
+        return 1;
+    }
+    static void marginsSet(uint8_t i) {
+        if (i >= UI::MARGIN_STEPS) return;
+        Settings::setSystem("ui", "margins", i == 1 ? nullptr : UI::MARGIN_NAMES[i]);
+        Settings::save();
+        if (g) g->rebuildDashboard();
+    }
+
     static uint8_t helperNow()          { return Kit::helperShown() ? 1 : 0; }
     static void    helperSet(uint8_t i) { Kit::setHelperShown(i != 0); }
     static uint8_t barNow()          { return Kit::windowBarShown() ? 0 : 1; }
@@ -401,6 +418,7 @@ struct GUITweaks {
         { "Selector",       METAL,   3, metalNow,   metalSet   },
         { "Selector shape", SHAPE,   2, shapeNow,   shapeSet   },
         { "Card density",   DENSITY, 3, densityNow, densitySet },
+        { "Card margins",   MARGINS, 4, marginsNow, marginsSet },     // K167
         { "Group view",     GVIEW,   2, groupViewNow, groupViewSet },   // K162
         { "Window timeout", TIMEOUT, 4, timeoutNow, timeoutSet },
         { "Timer bar",      ONOFF,   2, barNow,     barSet     },

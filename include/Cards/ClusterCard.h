@@ -79,6 +79,10 @@ public:
     // THE GROUP VIEW'S CARDS STAND ON THE PAGE'S GROUND (K173): its surface the
     // page's ground once built, so its members drawn as cards read as on the page.
     void groundSurface();
+    // THE GAP BETWEEN ITS TILES (K167, a group view's Card margins): `px`, or -1
+    // for the token's (C_TILE_GAP). Before build().
+    void    setTileGap(int32_t px) { _gapPx = px; }
+    int32_t gapPx() const;
     uint8_t memberCount() const { return _n; }
     uint8_t tileCount() const;
     uint8_t headerCount() const;   // the members in its header
@@ -117,6 +121,7 @@ private:
     int32_t     _tileHCap = 0;
     Layout::TileCap _cap;
     bool        _capped = false;
+    int32_t     _gapPx  = -1;      // setTileGap(): a group view's Card margins (K167)
     int32_t     _frameR = 0;   // 0: a card's corners
     lv_event_cb_t _slotsCb = nullptr;
 
