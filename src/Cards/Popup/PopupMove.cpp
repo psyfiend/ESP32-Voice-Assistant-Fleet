@@ -402,6 +402,9 @@ void doCluster() {
             CardAdded::moveOut(sid, id);
         }
     }
+    // NEW MEMBERS JOIN UNPINNED (K160; 1.7: Visibility's Add to group too, as Edit
+    // cards does) - joining never moves the page; Pin this card puts it there.
+    Settings::setCard(isMade(sid) && m.move ? sid : id, "hidden", "yes");
     if (T.hidden) CardAdded::restore(T.id);    // a hidden cluster is used again
     if (last) CardAdded::hide(m.from->id());   // an empty cluster hides itself (owner's 15)
     done();

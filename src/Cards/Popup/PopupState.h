@@ -330,6 +330,9 @@ extern size_t s_treeLen;
 // CardPopup.cpp
 void showView(PopupView v);
 void groupShowAs(bool asCard);   // PopupCluster.cpp: Visibility's Show as (K174)
+void groupViewPress(lv_obj_t *obj);   // PopupGroup.cpp: a hold on a group view tile (1.4)
+void groupViewRelease();
+bool movedTooFar();                   // PopupHold.cpp
 void markDirectView();   // the view just shown was opened directly: back returns (K169)
 PopupView controlsView();
 

@@ -20,6 +20,7 @@
 #include "UI/HaOffer.h"        // 2.13: Add cards from Home Assistant
 #include "UI/EditCards.h"      // 2.13 round 2: Edit cards (K148)
 #include "HaCatalog.h"         // AREAS_MAX: the Area row's choices
+#include "HaValue.h"           // haDescriptor(): an HA row's header glyph (K168)
 #include <stdarg.h>
 
 namespace popup {
@@ -382,6 +383,7 @@ uint8_t fillMembers(EditCards::Item *out, uint8_t cap, void *) {
             EditCards::Item &it = out[n++];
             it = EditCards::Item{};
             snprintf(it.key, sizeof(it.key), "%s", idOf(m));
+            if (e->desc.source == EntitySource::HA) snprintf(it.ref, sizeof(it.ref), "%s", e->desc.externalRef);   // 1.5
             snprintf(it.name, sizeof(it.name), "%s", clusterMemberName(i));
             char st[48];
             memberState(*e, MemberShown::SHOWN_TILE, st, sizeof(st));
@@ -411,14 +413,50 @@ uint8_t fillPage(EditCards::Item *out, uint8_t cap, void *) {
         EditCards::Item &it = out[n++];
         it = EditCards::Item{};
         snprintf(it.key, sizeof(it.key), "%s", k->id());
+        if (k->firstEntity()->desc.source == EntitySource::HA)
+            snprintf(it.ref, sizeof(it.ref), "%s", k->firstEntity()->desc.externalRef);   // 1.5
         snprintf(it.name, sizeof(it.name), "%s", k->shownName(CardLabel::LBL_NAME));
         char st[48];
         memberState(*k->firstEntity(), MemberShown::SHOWN_TILE, st, sizeof(st));
         snprintf(it.state, sizeof(it.state), "%s", st);
         it.from = EditCards::From::FROM_PAGE;
         it.tick = EditCards::Tick::TICK_ADD;
+        const EntityKind kind = k->firstEntity()->desc.kind;
+        it.sensor = kind == EntityKind::SENSOR || kind == EntityKind::BINARY_SENSOR;   // K168
+        if (it.sensor) it.signIcon = headerGlyphOf(*k->firstEntity(), it.signTint);
     }
     return n;
+}
+
+// The glyph this group's header would show for an HA row not on the board yet
+// (K168, a sensor's third tap): its kind as HA describes it.
+const char *haRowGlyph(const HaOffer::Row &r, uint32_t &tint) {
+    if (r.have) return headerGlyphOf(*r.have, tint);
+    EntityDescriptor d;
+    if (!haDescriptor(r.ref, r.dc, r.unit, d)) return nullptr;
+    static Entity probe;
+    probe = Entity{};
+    probe.desc = d;
+    probe.value.type = d.valueType;
+    probe.everSet = true;
+    probe.available = true;
+    return headerGlyphOf(probe, tint);
+}
+
+// INTO THE HEADER (K168): `id` after the group's header members, four at most.
+void headerAppend(const ClusterCard &cl, const char *id) {
+    char list[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1] = "";
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < cl.memberCount() && n < CLUSTER_SLOTS_MAX; i++) {
+        if (!clusterMemberInHeader(cl, i)) continue;
+        const Card *m = cl.memberAt(i);
+        if (!m || !m->hasId()) continue;
+        snprintf(list + strlen(list), sizeof(list) - strlen(list), "%s%s", n ? "," : "", m->id());
+        n++;
+    }
+    if (n >= CLUSTER_SLOTS_MAX) return;   // full: it stays a member, unpinned
+    snprintf(list + strlen(list), sizeof(list) - strlen(list), "%s%s", n ? "," : "", id);
+    Settings::setCard(cl.id(), "slots", list);
 }
 
 // The dialog's words: four lines at most, names in the accent (as PopupMove's).
@@ -566,8 +604,10 @@ void doEditSave() {
                 if (s_eMove) CardAdded::moveOut(k->id(), id);
             }
         }
-        // Unpinned unless tapped twice (K160): new members never move the page.
+        // Unpinned unless tapped twice (K160): new members never move the page. A
+        // sensor's third tap: in the header, not a tile (K168).
         Settings::setCard(id, "hidden", it.step == 2 ? nullptr : "yes");
+        if (it.step == 3) headerAppend(*cl, id);
         done++;
     }
     if (!done) return;
@@ -596,7 +636,7 @@ void editAct(EditCards::Act a, void *) {
     // membership): one line per kind of change - added, pinned, unpinned, removed -
     // each naming its cards. The words follow K149's; to confirm (round 5).
     if (a == EditCards::Act::ACT_SAVE) {
-        enum Kind : uint8_t { K_ADD, K_PIN, K_UNPIN, K_GONE, K_KINDS };
+        enum Kind : uint8_t { K_ADD, K_PIN, K_UNPIN, K_GONE, K_HEADER, K_KINDS };
         auto kindsOf = [](const EditCards::Item &it, bool out[K_KINDS]) {
             for (uint8_t k = 0; k < K_KINDS; k++) out[k] = false;
             if (it.from == F::FROM_GROUP) {
@@ -604,7 +644,8 @@ void editAct(EditCards::Act a, void *) {
                 else              out[it.pinned ? K_UNPIN : K_PIN] = true;
             } else {
                 out[K_ADD] = true;
-                if (it.step == 2) out[K_PIN] = true;   // added pinned
+                if (it.step == 2) out[K_PIN] = true;      // added pinned
+                if (it.step == 3) out[K_HEADER] = true;   // added to the header (K168)
             }
         };
         static char list[K_KINDS][300];
@@ -630,6 +671,9 @@ void editAct(EditCards::Act a, void *) {
         if (cnt[K_PIN])
             eLine(cnt[K_PIN] > 1 ? "The cards %s will be pinned, and visible from the page in the group %s."
                                  : "The card %s will be pinned, and visible from the page in the group %s.", list[K_PIN], g);
+        if (cnt[K_HEADER])
+            eLine(cnt[K_HEADER] > 1 ? "The cards %s will be shown in the header of %s."
+                                    : "The card %s will be shown in the header of %s.", list[K_HEADER], g);
         if (cnt[K_UNPIN])
             eLine(cnt[K_UNPIN] > 1 ? "The cards %s will be unpinned: still members of %s, shown in its 'Group view' and 'Members view'."
                                    : "The card %s will be unpinned: still a member of %s, shown in its 'Group view' and 'Members view'.",
@@ -713,6 +757,7 @@ void buildClusterAdd() {
     sp.ctx      = cl;
     sp.copyMove = true;
     sp.cycle    = true;   // K161
+    sp.haGlyph  = haRowGlyph;   // K168: a sensor's third tap
     sp.act      = editAct;
     EditCards::build(s.stage, lv_obj_get_content_width(s.stage), lv_obj_get_content_height(s.stage), sp);
 }

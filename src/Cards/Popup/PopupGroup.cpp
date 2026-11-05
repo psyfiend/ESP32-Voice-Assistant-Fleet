@@ -137,11 +137,41 @@ bool groupViewCards() {
 // - its glyph, HA's full name, its state - and a row opens that sensor's History,
 // as a tap on it would. A second tap on the sensors folds it.
 lv_obj_t *s_drop = nullptr;
+lv_obj_t *s_dropCatch = nullptr;   // the window under the panel: a tap there folds it, nothing else (1.7)
 
 void dropClose() {
     if (s_drop) lv_obj_delete(s_drop);
+    if (s_dropCatch) lv_obj_delete(s_dropCatch);
+    s_drop = nullptr;
+    s_dropCatch = nullptr;
+}
+
+// IT SLIDES AS THE SYSTEM HEADER'S PANELS DO (1.3): its height from nothing to its
+// rows' and back, eased out over the drawers' time (KitDrawer's SLIDE_MS).
+constexpr uint32_t DROP_SLIDE_MS = 350;
+void dropHeightExec(void *o, int32_t v) { lv_obj_set_height((lv_obj_t *)o, v); }
+void dropSlide(lv_obj_t *o, int32_t from, int32_t to, bool deleteAfter) {
+    lv_anim_delete(o, dropHeightExec);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, o);
+    lv_anim_set_values(&a, from, to);
+    lv_anim_set_duration(&a, DROP_SLIDE_MS);
+    lv_anim_set_exec_cb(&a, dropHeightExec);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    if (deleteAfter) lv_anim_set_completed_cb(&a, [](lv_anim_t *an) { lv_obj_delete_async((lv_obj_t *)an->var); });
+    lv_anim_start(&a);
+}
+
+// Folded by a tap: it slides up, then goes. (dropClose() is at once: the window is going.)
+void dropFold() {
+    if (s_dropCatch) lv_obj_delete(s_dropCatch);
+    s_dropCatch = nullptr;
+    if (s_drop) dropSlide(s_drop, lv_obj_get_height(s_drop), 0, true);
     s_drop = nullptr;
 }
+
+void dropCatchCb(lv_event_t *) { lv_async_call([](void *) { dropFold(); }, nullptr); }
 
 void dropRowCb(lv_event_t *ev) {
     if (!s_view || s.phase != PopupPhase::PHASE_OPEN) return;
@@ -166,6 +196,14 @@ void dropOpen() {
     lv_obj_get_coords(s.win, &wa);
     const int32_t winW = lv_area_get_width(&wa);
     const int32_t w = LV_MIN(winW - 2 * gap, winW * (winW < mm(100) ? 72 : 48) / 100);
+    // A TAP ANYWHERE ELSE IN THE WINDOW FOLDS IT FIRST (1.7): an invisible catcher
+    // over the window, under the panel, so a tile under the tap does nothing.
+    s_dropCatch = plain(s.win);
+    lv_obj_add_flag(s_dropCatch, LV_OBJ_FLAG_FLOATING);
+    lv_obj_add_flag(s_dropCatch, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_pos(s_dropCatch, 0, 0);
+    lv_obj_set_size(s_dropCatch, winW, lv_area_get_height(&wa));
+    lv_obj_add_event_cb(s_dropCatch, dropCatchCb, LV_EVENT_CLICKED, nullptr);
     s_drop = plain(s.win);
     lv_obj_add_flag(s_drop, LV_OBJ_FLAG_FLOATING);
     lv_obj_add_flag(s_drop, LV_OBJ_FLAG_CLICKABLE);   // a tap between its rows stays in it
@@ -209,10 +247,14 @@ void dropOpen() {
     for (uint8_t i = 0; i < nr; i++)
         Kit::finish(rows[i], lv_obj_get_width(rows[i]), lv_obj_get_height(rows[i]),
                     lv_obj_get_style_radius(rows[i], LV_PART_MAIN), Kit::Finish::FINISH_SATIN);
+    const int32_t full = lv_obj_get_height(s_drop);
+    lv_obj_remove_flag(s_drop, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_height(s_drop, 0);
+    dropSlide(s_drop, 0, full, false);
 }
 
 void slotsTapCb(lv_event_t *) {
-    if (s_drop) { lv_async_call([](void *) { dropClose(); }, nullptr); return; }
+    if (s_drop) { lv_async_call([](void *) { dropFold(); }, nullptr); return; }
     lv_async_call([](void *) { dropOpen(); }, nullptr);
 }
 
@@ -329,6 +371,71 @@ bool groupViewRoute(Card &card, uint8_t view) {
     enterMember(twin, twin ? nullptr : card.firstEntity(), v);
     return true;
 }
+
+// --- A HOLD ON A TILE IN THE GROUP VIEW (1.4) -----------------------------------------
+// As on the page (PopupHold.cpp): from touch-down the tile presses in while its edge
+// fades toward the accent over the long-press time, and fades back if the finger
+// lifts or moves. The window's own hold (`h`) is its owner's, so this one is apart.
+namespace {
+lv_obj_t *s_gvHold = nullptr;
+int32_t   s_gvV = 0;
+
+void gvLook(lv_obj_t *sf, int32_t v) {
+    if (Card *c = cardOf(sf)) c->pressLook((uint8_t)v, mm(HOLD_SINK_MM) * v / 255);
+}
+void gvDeletedCb(lv_event_t *e) {
+    if ((lv_obj_t *)lv_event_get_target(e) == s_gvHold) s_gvHold = nullptr;
+}
+void gvExec(void *var, int32_t v);   // below
+void gvLetGoExec(void *var, int32_t v) { gvLook((lv_obj_t *)var, v); }
+void gvLetGoDone(lv_anim_t *a) {
+    if (Card *c = cardOf((lv_obj_t *)a->var)) c->pressClear();
+}
+void gvLetGo() {
+    lv_obj_t *sf = s_gvHold;
+    if (!sf) return;
+    s_gvHold = nullptr;
+    lv_obj_remove_event_cb(sf, gvDeletedCb);
+    lv_anim_delete(sf, gvExec);
+    lv_anim_delete(sf, gvLetGoExec);
+    const uint32_t ms = HOLD_LETGO_MS * (uint32_t)s_gvV / 255;
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, sf);
+    lv_anim_set_values(&a, s_gvV, 0);
+    lv_anim_set_duration(&a, ms ? ms : 1);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_set_exec_cb(&a, gvLetGoExec);
+    lv_anim_set_completed_cb(&a, gvLetGoDone);
+    lv_anim_start(&a);
+}
+void gvExec(void *var, int32_t v) {
+    s_gvV = v;
+    gvLook((lv_obj_t *)var, v);
+    if (movedTooFar()) lv_async_call([](void *) { gvLetGo(); }, nullptr);
+}
+}  // namespace
+
+void groupViewPress(lv_obj_t *obj) {
+    if (!s_view || s.view != PopupView::VIEW_GROUP || !obj || !lv_obj_has_flag(obj, CardPopup::CARD_SURFACE_FLAG))
+        return;
+    Card *c = cardOf(obj);
+    if (!c || c == s_view || !groupViewHas(*c)) return;
+    gvLetGo();
+    s_gvHold = obj;
+    s_gvV = 0;
+    lv_obj_add_event_cb(obj, gvDeletedCb, LV_EVENT_DELETE, nullptr);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, obj);
+    lv_anim_set_values(&a, 0, 255);
+    lv_anim_set_duration(&a, CardPopup::LONG_PRESS_MS);
+    lv_anim_set_path_cb(&a, lv_anim_path_linear);
+    lv_anim_set_exec_cb(&a, gvExec);
+    lv_anim_start(&a);
+}
+
+void groupViewRelease() { gvLetGo(); }
 
 // --- A group shown as one card: its cluster, read only (K155) --------------------------
 ClusterCard *heldGroup() {

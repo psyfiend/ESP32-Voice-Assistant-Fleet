@@ -22,7 +22,7 @@
 // A GROUP'S LIST IS A TAP CYCLE (Spec::cycle; K160, K161): a member's first tap
 // flips its pin, its second marks it for removal (red; only one made on the
 // board), its third puts it back; a card not in the group is added, then added
-// and pinned, then not. Kinds mix. Each row ends in a square saying what will be
+// and pinned, then - a sensor only - added to the header (K168), then not. Kinds mix. Each row ends in a square saying what will be
 // on the page - a header glyph, or a pin - and one button, Save N, calls act(ACT_SAVE).
 //
 #include <lvgl.h>
@@ -39,6 +39,7 @@ enum class From : uint8_t { FROM_HA, FROM_PAGE, FROM_GROUP };
 // member in the header, a card crowded off the page), flat and not tappable.
 struct Item {
     char key[72];        // an HA row's entity ref; else a card's id
+    char ref[72];        // a card's HA entity ref, when it has one: its row in an HA area is this one (1.5)
     char name[48];
     char state[28];      // as its card says it
     char mark[40];       // words in place of the tick: "In the header", "Hidden"
@@ -47,6 +48,7 @@ struct Item {
     Tick tick;
     bool canRemove;      // a row to hide that may be removed instead
     bool fresh;          // an HA row new to the board (HaOffer): "New"
+    bool sensor;         // a reading: added, its third tap puts it in the header (K168)
     // A GROUP'S MEMBER (cycle): pinned now, and the square saying so - its header
     // glyph in `signTint`, or the pin (null: not on the page).
     bool        pinned;
@@ -78,6 +80,9 @@ struct Spec {
     void      (*act)(Act a, void *ctx) = nullptr;
     bool        keepTicks = false;   // made again (back from a step): the ticks and list kept
     bool        cycle = false;       // a group's: the tap cycle and Save N (K161)
+    // The glyph a group's header would show for an HA row (cycle, a sensor's third
+    // tap: its square). Null: none shown.
+    const char *(*haGlyph)(const HaOffer::Row &r, uint32_t &tint) = nullptr;
 };
 
 // The list, `w` x `h` in `parent`. Nothing ticked to start with, unless keepTicks.

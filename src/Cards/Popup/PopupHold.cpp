@@ -139,6 +139,8 @@ void pressCb(lv_event_t *ev) {
     if (s.phase == PopupPhase::PHASE_CLOSED && obj &&
         lv_obj_has_flag(obj, CardPopup::CARD_SURFACE_FLAG)) {
         holdStart(obj);
+    } else if (s.phase == PopupPhase::PHASE_OPEN) {
+        groupViewPress(obj);   // a tile in the group view holds as on the page (1.4)
     }
 }
 
@@ -148,6 +150,7 @@ void pressCb(lv_event_t *ev) {
 void releaseCb(lv_event_t *ev) {
     (void)ev;
     if (h.phase == HoldPhase::HOLD_PRESSING) letGo();
+    groupViewRelease();
 }
 
 // The tap catcher - "tap outside" and the modal rule - is the sheet's

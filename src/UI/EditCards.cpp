@@ -1,6 +1,7 @@
 // Edit cards (2.13 round 2, DECISIONS K148, K149) - see include/UI/EditCards.h.
 #include "UI/EditCards.h"
 #include "UI/HaPicker.h"      // stateWords(): an HA row's state as a card says it
+#include "HaValue.h"          // haDescriptor(): a row's kind - a sensor can go in the header (K168)
 #include "UI/Kit.h"
 #include "UI/UITokens.h"
 #include "UI/UIToolkit.h"     // show_toast()
@@ -94,6 +95,7 @@ const char *signOf(const Item &it, uint8_t step, uint32_t &tint) {
         if (!it.signIcon || strcmp(it.signIcon, MDI_PIN)) tint = it.signTint;
         return it.signIcon;
     }
+    if (step == 3) { tint = it.signTint; return it.signIcon; }   // into the header (K168)
     return step == 2 ? MDI_PIN : nullptr;
 }
 
@@ -111,6 +113,27 @@ void comingMark(const Item &c, char *out, size_t cap) {
     const char *a = c.areaId[0] ? HaOffer::areaName(c.areaId) : "";
     if (a && a[0]) snprintf(out, cap, "From %s", a);          // the mock's "From Office"
     else           snprintf(out, cap, "From Home Assistant");   // to confirm: an entity with no area
+}
+
+// The row of `ref` as a caller's list has it (its card's), into `it`; unchanged
+// when no list holds it. Lists are read into s_count, the counts' buffer.
+void asListed(Item &it, const char *ref) {
+    if (!ref || !ref[0] || !s_count) return;
+    for (uint8_t k = 0; k < s_spec.nLists; k++) {
+        const EditCards::List &L = s_spec.lists[k];
+        const uint8_t n = L.fill ? L.fill(s_count, ROWS_MAX, s_spec.ctx) : 0;
+        for (uint8_t i = 0; i < n; i++) {
+            if (strcmp(s_count[i].ref, ref)) continue;
+            const char *area = it.areaId;
+            char keepArea[sizeof(it.areaId)];
+            snprintf(keepArea, sizeof(keepArea), "%s", area);
+            it = s_count[i];
+            snprintf(it.areaId, sizeof(it.areaId), "%s", keepArea);
+            it.coming = false;
+            it.list = (int8_t)k;   // ticked as from its own list
+            return;
+        }
+    }
 }
 
 // THE ROWS SHOWING: a caller's list - in its target, the cards being added
@@ -156,6 +179,13 @@ void readRows() {
         const char *held = s_spec.held ? s_spec.held(r, s_spec.ctx) : nullptr;
         if (held) snprintf(it.mark, sizeof(it.mark), "%s", held);
         it.tick = held ? Tick::TICK_NONE : Tick::TICK_ADD;
+        EntityDescriptor d;
+        it.sensor = haDescriptor(r.ref, r.dc, r.unit, d) &&
+                    (d.kind == EntityKind::SENSOR || d.kind == EntityKind::BINARY_SENSOR);
+        if (s_spec.cycle && it.sensor && s_spec.haGlyph) it.signIcon = s_spec.haGlyph(r, it.signTint);
+        // A CARD ALREADY HERE, IN A GROUP'S LIST (1.5, K161): its row as its own list
+        // has it - the square, the tap cycle - so the area's rows say the same thing.
+        if (held && s_spec.cycle) asListed(it, r.ref);
     }
     s_n = n;
 }
@@ -232,7 +262,8 @@ void cycleTap(uint8_t i) {
         s_nChosen++;
     } else {
         Item &c = s_chosen[k];
-        const uint8_t last = (c.from == From::FROM_GROUP && !c.canRemove) ? 1 : 2;
+        // A sensor being added: added, pinned, in the header, off (K168).
+        const uint8_t last = (c.from == From::FROM_GROUP) ? (c.canRemove ? 2 : 1) : (c.sensor && c.signIcon ? 3 : 2);
         if (c.step < last) {
             c.step++;
         } else {
@@ -354,15 +385,16 @@ void fillBody(bool keepScroll) {
         lv_obj_t *n = Kit::label(r, tappable ? KS::KS_LABEL_NAME : KS::KS_LABEL_NAME_DIM);
         lv_obj_set_flex_grow(n, 1);
         const bool fresh = it.fresh && !it.coming;
-        fitName(n, it.name, rowW - 2 * gap() - besideW(it.state, it.mark, tappable ? tickW : 0) -
+        // NO CHECK MARK (owner, 2026-11-05, K168): the lit chip says it's chosen, and
+        // nothing inside a row moves when it is - no room kept for one either.
+        (void)tickW;
+        fitName(n, it.name, rowW - 2 * gap() - besideW(it.state, it.mark, 0) -
                             (fresh ? Kit::textW("New", tagF) + gap() : 0));
         if (fresh) lv_label_set_text(Kit::label(r, KS::KS_LABEL_TAG_ACTIVE), "New");   // K145
         if (it.state[0]) lv_label_set_text(Kit::label(r, KS::KS_LABEL_TAG), it.state);
         if (it.mark[0]) lv_label_set_text(Kit::label(r, it.coming ? KS::KS_LABEL_TAG_ACCENT : KS::KS_LABEL_TAG_DIM), it.mark);
         if (tappable) {
-            lv_obj_t *t = Kit::label(r, KS::KS_LABEL_TAG_ACTIVE);
-            lv_obj_set_width(t, tickW);
-            if (i < ROWS_MAX) { s_rowObj[i] = r; s_tick[i] = t; }
+            if (i < ROWS_MAX) { s_rowObj[i] = r; s_tick[i] = nullptr; }
             lv_obj_add_event_cb(r, rowCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
         } else {
             lv_obj_remove_flag(r, LV_OBJ_FLAG_CLICKABLE);
