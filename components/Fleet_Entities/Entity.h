@@ -421,6 +421,7 @@ struct Entity {
     uint8_t     members[ENTITY_MEMBERS_MAX] = {0};
     uint8_t     nMembers       = 0;
     bool        learnt         = false;   // registered from a group's member list
+    bool        adopted        = false;   // a card made from HA stands for it (adopt(), 2.13) - asked as a given one
 
     // A LIGHT'S SCENES, learnt the same way (2.10c, DECISIONS K15): HA's scene
     // entities on the light's own device - for a Hue room, the scenes made in

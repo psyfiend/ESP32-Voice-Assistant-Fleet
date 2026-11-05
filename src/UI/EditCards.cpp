@@ -87,10 +87,11 @@ uint8_t addsChosen() {
 // THE SQUARE A ROW ENDS IN: what will be on the page (K160) - a member's header
 // glyph or pin, its first tap flipping it; a card being added pinned on its second.
 const char *signOf(const Item &it, uint8_t step, uint32_t &tint) {
-    tint = 0;
+    // The pin is the accent color (K178); a header glyph keeps its own tint.
+    tint = UI::pal().ACCENT;
     if (it.from == From::FROM_GROUP && !it.coming) {
         if (step == 1) return it.pinned ? nullptr : MDI_PIN;
-        tint = it.signTint;
+        if (!it.signIcon || strcmp(it.signIcon, MDI_PIN)) tint = it.signTint;
         return it.signIcon;
     }
     return step == 2 ? MDI_PIN : nullptr;

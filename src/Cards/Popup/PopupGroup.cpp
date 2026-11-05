@@ -241,7 +241,9 @@ void groupWindowFor(PopupView v) {
         const lv_area_t r = fitted(room, normal);
         place(&r, s_view != nullptr);
     } else if (v == PopupView::VIEW_CLUSTER_ADD) {
-        const lv_area_t room = pageArea();
+        // No panels under it (1.6): down to the screen's foot, as from the page.
+        lv_area_t room = pageArea();
+        room.y2 = lv_obj_get_height(lv_screen_active()) - mm(UI::shape().S4) - 1;
         place(&room, false);
     } else {
         place(nullptr, false);
@@ -288,6 +290,10 @@ void buildGroup() {
         for (uint8_t i = 0; i < s_view->memberCount(); i++)
             if (Card *m = s_view->memberAt(i)) m->setMini(false);
     s_view->build(s.stage);
+    // AS CARDS ON THE PAGE'S GROUND (K173): the cards the page's card color, so they
+    // stand out as on the page; a cut corner cuts to the ground behind it (1.2).
+    // Tiles keep the cluster's surface.
+    if (groupViewCards()) s_view->groundSurface();
     lv_obj_set_size(s_view->root(), W, H);
     lv_obj_clear_flag(s_view->root(), LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_event_cb(s_view->root(), groupSwipeCb, LV_EVENT_GESTURE, nullptr);

@@ -592,32 +592,59 @@ void editAct(EditCards::Act a, void *) {
     s_eN = 0;
     const bool many = s_eNItems > 1;
     using F = EditCards::From;
-    // SAVE (K161): a question only when something is to be removed - K149's words.
+    // SAVE (K161) ALWAYS ASKS (owner, 2026-11-05, K165: every change to a group's
+    // membership): one line per kind of change - added, pinned, unpinned, removed -
+    // each naming its cards. The words follow K149's; to confirm (round 5).
     if (a == EditCards::Act::ACT_SAVE) {
-        uint8_t gone = 0;
-        names[0] = '\0';
+        enum Kind : uint8_t { K_ADD, K_PIN, K_UNPIN, K_GONE, K_KINDS };
+        auto kindsOf = [](const EditCards::Item &it, bool out[K_KINDS]) {
+            for (uint8_t k = 0; k < K_KINDS; k++) out[k] = false;
+            if (it.from == F::FROM_GROUP) {
+                if (it.step == 2) out[K_GONE] = true;
+                else              out[it.pinned ? K_UNPIN : K_PIN] = true;
+            } else {
+                out[K_ADD] = true;
+                if (it.step == 2) out[K_PIN] = true;   // added pinned
+            }
+        };
+        static char list[K_KINDS][300];
+        uint8_t cnt[K_KINDS] = {};
+        bool in[K_KINDS];
+        for (uint8_t i = 0; i < s_eNItems; i++) { kindsOf(s_eItems[i], in); for (uint8_t k = 0; k < K_KINDS; k++) cnt[k] += in[k]; }
         const unsigned long acc = (unsigned long)(UI::pal().ACCENT & 0xFFFFFF);
-        for (uint8_t i = 0; i < s_eNItems; i++) {
-            if (s_eItems[i].from != F::FROM_GROUP || s_eItems[i].step != 2) continue;
-            gone++;
+        for (uint8_t k = 0; k < K_KINDS; k++) {
+            list[k][0] = '\0';
+            uint8_t at = 0;
+            for (uint8_t i = 0; i < s_eNItems; i++) {
+                kindsOf(s_eItems[i], in);
+                if (!in[k]) continue;
+                const size_t used = strlen(list[k]);
+                snprintf(list[k] + used, sizeof(list[k]) - used, "%s#%06lX %s#",
+                         at == 0 ? "" : (at + 1 == cnt[k] ? " and " : ", "), acc, s_eItems[i].name);
+                at++;
+            }
         }
-        if (!gone) { doEditSave(); return; }
-        uint8_t k = 0;
-        for (uint8_t i = 0; i < s_eNItems; i++) {
-            if (s_eItems[i].from != F::FROM_GROUP || s_eItems[i].step != 2) continue;
-            const size_t used = strlen(names);
-            snprintf(names + used, sizeof(names) - used, "%s#%06lX %s#",
-                     k == 0 ? "" : (k + 1 == gone ? " and " : ", "), acc, s_eItems[i].name);
-            k++;
-        }
-        const bool plural = gone > 1;
-        eLine(plural ? "The cards %s will be removed from this device." : "The card %s will be removed from this device.",
-              names);
-        eLine("Nothing will be removed from Home Assistant. You can always add these entities back to your device.");
-        eLine(plural ? "Tap Remove to confirm you wish to remove these cards from the device."
-                     : "Tap Remove to confirm you wish to remove this card from the device.");
-        confirmAsk(Kit::DialogRole::DLG_DESTRUCTIVE, plural ? "Remove these cards?" : "Remove this card?", s_eLines,
-                   s_eN, "Remove", Kit::ButtonRole::BTN_DESTRUCTIVE, doEditSave);
+        if (cnt[K_ADD])
+            eLine(cnt[K_ADD] > 1 ? "The cards %s will be added to the group %s." : "The card %s will be added to the group %s.",
+                  list[K_ADD], g);
+        if (cnt[K_PIN])
+            eLine(cnt[K_PIN] > 1 ? "The cards %s will be pinned, and visible from the page in the group %s."
+                                 : "The card %s will be pinned, and visible from the page in the group %s.", list[K_PIN], g);
+        if (cnt[K_UNPIN])
+            eLine(cnt[K_UNPIN] > 1 ? "The cards %s will be unpinned: still members of %s, shown in its 'Group view' and 'Members view'."
+                                   : "The card %s will be unpinned: still a member of %s, shown in its 'Group view' and 'Members view'.",
+                  list[K_UNPIN], g);
+        if (cnt[K_GONE])
+            eLine(cnt[K_GONE] > 1 ? "The cards %s will be removed from this device. Nothing will be removed from Home Assistant."
+                                  : "The card %s will be removed from this device. Nothing will be removed from Home Assistant.",
+                  list[K_GONE]);
+        if (!s_eN) { doEditSave(); return; }
+        char title[48];
+        static char titleKeep[48];
+        snprintf(title, sizeof(title), "Save %u change%s?", (unsigned)s_eNItems, s_eNItems == 1 ? "" : "s");
+        snprintf(titleKeep, sizeof(titleKeep), "%s", title);
+        confirmAsk(cnt[K_GONE] ? Kit::DialogRole::DLG_DESTRUCTIVE : Kit::DialogRole::DLG_CONFIRM, titleKeep, s_eLines,
+                   s_eN, "Save", cnt[K_GONE] ? Kit::ButtonRole::BTN_DESTRUCTIVE : Kit::ButtonRole::BTN_CONFIRM, doEditSave);
         return;
     }
     if (a == EditCards::Act::ACT_ADD) {
@@ -662,7 +689,11 @@ void editAct(EditCards::Act a, void *) {
         confirmAsk(Kit::DialogRole::DLG_DESTRUCTIVE, many ? "Remove these cards?" : "Remove this card?", s_eLines, s_eN,
                    "Remove", Kit::ButtonRole::BTN_DESTRUCTIVE, doEditRemove);
     } else {
-        doEditRestore();   // nothing goes: no question
+        // RESTORE ASKS TOO (K165: every Edit cards action). Words to confirm (round 5).
+        eLine(many ? "The cards %s will be restored to their original configuration."
+                   : "The card %s will be restored to its original configuration.", names);
+        confirmAsk(Kit::DialogRole::DLG_CONFIRM, many ? "Restore these cards?" : "Restore this card?", s_eLines, s_eN,
+                   "Restore", Kit::ButtonRole::BTN_CONFIRM, doEditRestore);
     }
 }
 
@@ -755,11 +786,12 @@ static char    s_addWords[12];
 // SHOW AS (K151): the group as a cluster or as one card - the members that switch
 // together behind it, or the one Face picks. The page is built again once the
 // window has gone. Here in every presentation (K155).
-static void showAsCb(lv_event_t *ev) {
-    const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
+// Since 2.13 round 5 (K174) a chip row in Visibility, with Rename group: what the
+// group looks like and does on the page.
+void groupShowAs(bool asCard) {
     ClusterCard *cl = held();
     if (!cl || !cl->hasId()) return;
-    Settings::setCard(cl->id(), "present", k ? "card" : "cluster");
+    Settings::setCard(cl->id(), "present", asCard ? "card" : "cluster");
     changed();
 }
 
@@ -848,11 +880,10 @@ uint8_t clusterSpecs(DeckRowSpec *r) {
     snprintf(s_addWords, sizeof(s_addWords), fresh ? "%u new" : "Open", (unsigned)fresh);   // K145
     // THE SAME ROWS IN EVERY PRESENTATION (K155): what does not apply greyed -
     // Header options while the group is one card, Face while it is a cluster.
-    r[n++] = { "Rename group", DeckRowKind::ROW_BUTTON, "Edit", 0, live, renameCb, nullptr };
+    // WHAT CONCERNS ITS MEMBERS (owner, 2026-11-05, K174): Rename group and Show as
+    // went to Visibility, with the rest of how it stands on the page.
     r[n++] = { "Header options", DeckRowKind::ROW_BUTTON, "Open", 0, live && s.cluster, slotsViewCb, nullptr };
     r[n++] = { "Edit cards", DeckRowKind::ROW_BUTTON, s_addWords, 0, live, addViewCb, nullptr };   // K148
-    r[n++] = { "Show as", DeckRowKind::ROW_DROP, "Cluster\nSolo card", (uint16_t)(s.cluster ? 0 : 1), live, showAsCb,
-               nullptr };   // K151
     const uint16_t face = cl ? faceRowBuild(*cl) : 0;
     if (!cl) snprintf(s_faceOpts, sizeof(s_faceOpts), "All members");
     r[n++] = { "Face", DeckRowKind::ROW_DROP, s_faceOpts, face, live && !s.cluster, faceDropCb, nullptr };   // K151

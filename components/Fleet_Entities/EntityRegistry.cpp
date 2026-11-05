@@ -174,8 +174,10 @@ const Entity *EntityRegistry::adopt(const EntityDescriptor &d) {
     std::lock_guard<std::mutex> lk(_mx);
     if (!_items) return nullptr;
     for (uint8_t i = 0; i < _count; i++)
-        if (_items[i].desc.source == d.source && strcmp(_items[i].desc.externalRef, d.externalRef) == 0)
+        if (_items[i].desc.source == d.source && strcmp(_items[i].desc.externalRef, d.externalRef) == 0) {
+            _items[i].adopted = true;
             return &_items[i];
+        }
     if (_count >= _capacity) {
         ESP_LOGW(ENT_TAG, "table full; %s not added", d.externalRef);
         return nullptr;
@@ -197,6 +199,7 @@ const Entity *EntityRegistry::adopt(const EntityDescriptor &d) {
     e.desc       = n;
     e.value.type = n.valueType;
     e.learnt     = true;   // its name is the source's (adoptName)
+    e.adopted    = true;   // a card's own: its scenes are asked (1.12)
     _count.store((uint8_t)(slot + 1), std::memory_order_release);
     _learnt.store(true);   // pauses and areas are asked again
     ESP_LOGI(ENT_TAG, "added %s (%s)", n.id, d.externalRef);

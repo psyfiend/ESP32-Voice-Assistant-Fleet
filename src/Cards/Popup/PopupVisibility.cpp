@@ -119,21 +119,52 @@ Card *cardWithId(lv_obj_t *o, const char *id) {
     return nullptr;
 }
 
-// UNPIN THIS CARD (K160): off the page, still in the group - nothing lost, so no
-// dialog (Hide from the group had one).
+// The group's name as its header says it, for a dialog's words.
+const char *groupWords(const ClusterCard *cl) {
+    if (!cl) return "";
+    return cl->area()[0] ? cl->area() : cl->shownName(CardLabel::LBL_NAME);
+}
+
+// UNPIN AND PIN ASK FIRST (owner, 2026-11-05, K165; refines K160's "no dialog"):
+// every change to a group's membership says what will happen, in his words.
+void unpinGo() { if (s.phase == PopupPhase::PHASE_OPEN) visibilityHideTile(); }
+
+void pinGo() {
+    Card *c = visibilitySubject();
+    ClusterCard *cl = clusterOfSubject();
+    const int8_t i = (cl && c) ? clusterMemberOf(*cl, c->firstEntity()) : -1;
+    if (i < 0 || s.phase != PopupPhase::PHASE_OPEN) return;
+    clusterMemberShow(*cl, (uint8_t)i, true);
+    showView(PopupView::VIEW_VISIBILITY);   // it says so at once; the cluster when the window closes
+}
+
+// UNPIN THIS CARD (K160): off the page, still in the group.
 void unpinTileCb(lv_event_t *) {
-    lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) visibilityHideTile(); }, nullptr);
+    lv_async_call([](void *) {
+        Card *c = visibilitySubject();
+        if (!c || s.phase != PopupPhase::PHASE_OPEN) return;
+        const char *g = groupWords(clusterOfSubject());
+        static char l1[160], l2[200];
+        snprintf(l1, sizeof(l1), "This will hide the card \"%s\" from the group when looking at the page.",
+                 c->shownName(CardLabel::LBL_NAME));
+        snprintf(l2, sizeof(l2), "The card will still be a member of group \"%s\" and will be visible on the "
+                                 "'Group view' and the 'Members view'.", g);
+        const char *lines[] = { l1, l2 };
+        confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Unpin this card?", lines, 2, "Confirm",
+                   Kit::ButtonRole::BTN_CONFIRM, unpinGo);
+    }, nullptr);
 }
 
 // PIN THIS CARD (K160): on the page as a tile.
 void showTileCb(lv_event_t *) {
     lv_async_call([](void *) {
-        Card *c = visibilitySubject();
-        ClusterCard *cl = clusterOfSubject();
-        const int8_t i = (cl && c) ? clusterMemberOf(*cl, c->firstEntity()) : -1;
-        if (i < 0 || s.phase != PopupPhase::PHASE_OPEN) return;
-        clusterMemberShow(*cl, (uint8_t)i, true);
-        showView(PopupView::VIEW_VISIBILITY);   // it says so at once; the cluster when the window closes
+        if (s.phase != PopupPhase::PHASE_OPEN) return;
+        static char l1[160];
+        snprintf(l1, sizeof(l1), "This will make the card visible from the page as a member of group \"%s\".",
+                 groupWords(clusterOfSubject()));
+        const char *lines[] = { l1 };
+        confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Pin this card?", lines, 1, "Confirm",
+                   Kit::ButtonRole::BTN_CONFIRM, pinGo);
     }, nullptr);
 }
 
@@ -157,6 +188,23 @@ void pausedChipCb(lv_event_t *ev) {
     const uintptr_t v = (uintptr_t)lv_event_get_user_data(ev);
     Kit::chipTableLit(s_table, (uint8_t)(v >> 8), (uint8_t)(v & 0xFF));
     lv_async_call(pausedChoose, (void *)(v & 0xFF));
+}
+
+// A GROUP'S OWN VISIBILITY (owner, 2026-11-05, K174): how it stands on the page -
+// Show as (Cluster, Solo card) beside Paused, and Rename group with its buttons.
+const char *const SHOW_AS_W[] = { "Cluster", "Solo card" };   // K151's words
+enum VisRow : uint8_t { VR_PAUSED, VR_SHOW_AS };
+VisRow s_visRow[2];
+void groupChipCb(lv_event_t *ev) {
+    const uintptr_t v = (uintptr_t)lv_event_get_user_data(ev);
+    const uint8_t at = (uint8_t)(v >> 8), i = (uint8_t)(v & 0xFF);
+    if (at >= 2) return;
+    Kit::chipTableLit(s_table, at, i);
+    if (s_visRow[at] == VR_PAUSED) lv_async_call(pausedChoose, (void *)(uintptr_t)i);
+    else                           groupShowAs(i == 1);   // the page is built again once the window has gone
+}
+void renameGroupCb(lv_event_t *) {
+    lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) clusterRename(); }, nullptr);
 }
 
 }  // namespace
@@ -210,11 +258,24 @@ void buildVisibility() {
     ClusterCard *cl = clusterOfSubject();
     // Paused, for anything that is not a cluster itself (K110).
     const bool clusterSelf = s.cluster && !inMember();
+    const bool groupSelf = !inMember() && (s.cluster || s.groupCard);   // K174
     const Kit::ChipRowSpec paused = { "Paused", PAUSED_W, 2, (uint8_t)(aggregate().paused ? 1 : 0) };
-    lv_obj_t *list = clusterSelf ? table(nullptr, 0, nullptr) : table(&paused, 1, pausedChipCb);
+    lv_obj_t *list;
+    if (groupSelf) {
+        Kit::ChipRowSpec rows[2];
+        uint8_t nr = 0;
+        if (!clusterSelf) { rows[nr] = paused; s_visRow[nr++] = VR_PAUSED; }
+        rows[nr] = { "Show as", SHOW_AS_W, 2, (uint8_t)(s.cluster ? 0 : 1) };
+        rows[nr].greyed = !c->hasId();
+        s_visRow[nr++] = VR_SHOW_AS;
+        list = table(rows, nr, groupChipCb);
+    } else {
+        list = clusterSelf ? table(nullptr, 0, nullptr) : table(&paused, 1, pausedChipCb);
+    }
     const bool restore = c->hasId() && restoreOffered(c);
-    Action a[3];
+    Action a[4];
     uint8_t n = 0;
+    if (groupSelf && c->hasId()) a[n++] = { "Rename group", Kit::ButtonRole::BTN_CANCEL, renameGroupCb };   // K174
     if (cl) {
         // MOVED OUT (the sprint after round 7): its card is elsewhere now, and its
         // Restore brings it back.

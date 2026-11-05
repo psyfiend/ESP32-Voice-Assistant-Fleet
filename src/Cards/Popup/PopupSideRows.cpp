@@ -28,7 +28,7 @@ uint16_t tapSceneRowBuild(const Card &c, uint8_t &n) {
 // for the card; and when its Tap action is "Scenes...", the tap does it now.
 void sceneActionDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
-    Card *c = cardOf(h.surface);
+    Card *c = settingsSubject();   // K166
     if (!c) return;
     const TapAction want = k ? TapAction::TAP_CYCLE_SCENES : TapAction::TAP_LOAD_SCENE;
     keepCardSetting("scene_action", k ? "cycle" : "load");
@@ -42,7 +42,7 @@ void sceneActionDropCb(lv_event_t *ev) {
 
 void tapSceneDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
-    Card *c = cardOf(h.surface);
+    Card *c = settingsSubject();   // K166
     if (!c || k >= s_tapSceneN) return;
     c->setTapScene(s_tapSceneRefs[k]);   // the scene on that line when the row was made
     keepCardSetting("tap_scene", s_tapSceneRefs[k]);
@@ -184,7 +184,7 @@ uint8_t scenesSpecs(DeckRowSpec *r) {
 void hiddenScenesCb(lv_event_t *ev) {
     const bool all = lv_obj_has_state((lv_obj_t *)lv_event_get_target(ev), LV_STATE_CHECKED);
     s.sceneShow = all ? SceneShow::SCENES_ALL : SceneShow::SCENES_VISIBLE;
-    if (Card *c = cardOf(h.surface)) c->setSceneShow(s.sceneShow);
+    if (Card *c = settingsSubject()) c->setSceneShow(s.sceneShow);
     keepCardSetting("scenes", sceneShowName(s.sceneShow));
     s.lastScene = -1;   // the offered list changed under the ring
     if (s.view != PopupView::VIEW_SCENES) return;

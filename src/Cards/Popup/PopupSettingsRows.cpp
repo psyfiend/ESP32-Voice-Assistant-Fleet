@@ -36,6 +36,13 @@ TapAction s_tapMap[8];
 uint8_t   s_tapN = 0;
 char      s_tapOpts[128];
 
+Card *settingsSubject() {
+    if (inMember()) return memberCard();
+    return cardOf(h.surface);
+}
+
+bool isClusterCard(const Card &c) { return !strcmp(c.typeName(), "cluster"); }
+
 TapAction tapShown(const Card &c) {
     const TapAction t = c.tapAction();
     if (t != TapAction::TAP_DEFAULT) return t;
@@ -65,17 +72,18 @@ uint16_t tapRowBuild(const Card &c) {
         s_tapMap[s_tapN++] = t;
     };
     const Entity *sc[ENTITY_SCENES_MAX];
+    const bool cl = isClusterCard(c);   // the subject's own kind: a member of a cluster is not one (K166)
     if (c.tapToggles()) add(TapAction::TAP_TOGGLE, "Toggle");
     // A cluster has no Details view (round 16): its window is Members.
-    if (!s.cluster)     add(TapAction::TAP_DETAILS, "Details view");
-    if (s.cluster)      add(TapAction::TAP_GROUP, "Group view");   // 2.13, K143 (to confirm: the row's word)
+    if (!cl)            add(TapAction::TAP_DETAILS, "Details view");
+    if (cl)             add(TapAction::TAP_GROUP, "Group view");   // 2.13, K143 (to confirm: the row's word)
     if (hasMembers())   add(TapAction::TAP_MEMBERS, "Members view");
     add(TapAction::TAP_HISTORY, "History view");
     // One line for both (owner, 2026-10-13): which one is SCENES' Scene action.
     if (c.offeredScenes(sc, ENTITY_SCENES_MAX)) add(sceneActionOf(c), "Scenes...");
     add(TapAction::TAP_NOTHING, "Nothing");
     TapAction cur = tapShown(c);
-    if (s.cluster && cur == TapAction::TAP_DETAILS) cur = TapAction::TAP_GROUP;   // what it opens now (2.13)
+    if (cl && cur == TapAction::TAP_DETAILS) cur = TapAction::TAP_GROUP;   // what it opens now (2.13)
     for (uint8_t i = 0; i < s_tapN; i++) if (s_tapMap[i] == cur) return i;
     return 0;
 }
@@ -97,7 +105,7 @@ uint16_t longRowBuild(const Card &c) {
         used += snprintf(s_longOpts + used, sizeof(s_longOpts) - used, "%s%s", s_longN ? "\n" : "", word);
         s_longMap[s_longN++] = v;
     };
-    if (s.cluster) {
+    if (isClusterCard(c)) {
         add(CardPopup::OPEN_MEMBERS, "Members view");
         add(CardPopup::OPEN_GROUP, "Group view");
     } else {
@@ -117,7 +125,7 @@ const char *longKey(const Card &c) { return c.groupCard() ? "card_long" : "long"
 
 void longDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
-    Card *c = cardOf(h.surface);
+    Card *c = settingsSubject();
     if (!c || k >= s_longN) return;
     c->setLongOpen(k ? s_longMap[k] : 0xFF);
     keepCardSetting(longKey(*c), k ? CardPopup::openViewName(s_longMap[k]) : nullptr);
@@ -155,23 +163,30 @@ void addCardCb(lv_event_t *ev);
 uint8_t deckSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
     Card *held = cardOf(h.surface);
+    // THE CARD THESE ROWS ARE FOR (K166, owner 2026-11-05): a member opened from
+    // the group view or Members has its own rows live, saved on its own card, as
+    // from its tile on the page - a tap does the same thing wherever it is. A
+    // member with no card of its own (one of Desk's lamps) keeps them greyed.
+    Card *subj = settingsSubject();
+    const bool subjCluster = subj && isClusterCard(*subj);
     // PAUSED IS VISIBILITY'S since round 7 (the owner). A cluster has no Active
     // state (round 6): it never counts as on; its members do.
     // When a group defined here counts as on - HA's group helper option.
     // Not for a group defined in HA or Hue: the source decides (2.10c).
-    if (s.nEnt > 1 && !s.native && !inMember() && !s.cluster)
+    if (s.nEnt > 1 && !s.native && !subjCluster && (!inMember() || subj))
         r[n++] = { "Active state", DeckRowKind::ROW_DROP, "Any members are on\nAll members are on",
                    (uint16_t)(s.groupOn == GroupOn::GROUP_ON_ALL), true, groupDropCb, &s.ddGroup };
     // Entity label and Card label are Card UI's since 2.8 round 3 (D-25, D-28).
     // Visibility is a button to a view since 2.11 (K96): the card's options by
     // where it is - below, before Card UI.
     // Tap action (2.10d). Long press always opens the window (K39), whatever
-    // this says. Greyed in a member's own view: it is the card's.
-    const bool cardRows = held && held->hasId() && !inMember();
-    if (held) {
-        const uint16_t sel = tapRowBuild(*held);
+    // this says.
+    const bool cardRows = subj && subj->hasId();
+    Card *rowsOf = subj ? subj : held;   // a member without a card: the rows shown greyed
+    if (rowsOf) {
+        const uint16_t sel = tapRowBuild(*rowsOf);
         r[n++] = { "Tap action", DeckRowKind::ROW_DROP, s_tapOpts, sel, cardRows, tapDropCb, nullptr };
-        r[n++] = { "Long press opens", DeckRowKind::ROW_DROP, s_longOpts, longRowBuild(*held), cardRows,
+        r[n++] = { "Long press opens", DeckRowKind::ROW_DROP, s_longOpts, longRowBuild(*rowsOf), cardRows,
                    longDropCb, nullptr };   // K151; to confirm
     }
     // A group's Show as and Face are its GROUP panel's, in every presentation (K155).
@@ -180,9 +195,9 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     // system panel (K45): it is device-wide, per scheme.
     // UNITS (owner, 2.10e round 2): a temperature's °C or °F, for this card;
     // only where there is a choice to make.
-    if (unitsRowFor() && !inMember()) {
+    if (unitsRowFor() && (!inMember() || subj)) {
         r[n++] = { "Units", DeckRowKind::ROW_DROP, "\xC2\xB0" "C\n\xC2\xB0" "F", (uint16_t)unitsShownF(),
-                   held && held->hasId(), unitsDropCb, nullptr };
+                   cardRows, unitsDropCb, nullptr };
     }
     // ENTITY PROPERTIES (owner): a view of its own, from here - no room for
     // another corner icon.
@@ -193,10 +208,11 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     // member made a card of its own), in a member's own view too: one place.
     if (held)
         r[n++] = { "Visibility", DeckRowKind::ROW_BUTTON, "Open", 0,
-                   cardRows || (inMember() && (!heldGroup() || visibilitySubject())), visibilityCb, nullptr };
+                   (!inMember() && held->hasId()) || (inMember() && (!heldGroup() || visibilitySubject())),
+                   visibilityCb, nullptr };
     // CARD UI (2.8 round 3, D-27): the card's own looks, a view of their own -
-    // at the foot. The card's, so greyed in a member's view; a card without a
-    // usable id cannot keep them.
+    // at the foot. A member's are its own card's (K166); a card without a usable
+    // id cannot keep them.
     if (held)
         r[n++] = { "Card UI", DeckRowKind::ROW_BUTTON, "Open", 0, cardRows, cardUiCb, nullptr };
 #ifdef DEBUG_POPUP
@@ -219,7 +235,7 @@ void deckRender() {
 // A card setting changed in SETTINGS, kept for the held card under its id
 // (2.10d). In RAM until the window closes - closeNow() asks for the write.
 void keepCardSetting(const char *key, const char *value) {
-    Card *c = cardOf(h.surface);
+    Card *c = settingsSubject();   // a member's own card in its own view (K166)
     if (c && c->hasId()) Settings::setCard(c->id(), key, value);
 }
 
@@ -228,7 +244,7 @@ void keepCardSetting(const char *key, const char *value) {
 void groupDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     s.groupOn = k ? GroupOn::GROUP_ON_ALL : GroupOn::GROUP_ON_ANY;
-    if (Card *c = cardOf(h.surface)) c->setGroupOn(s.groupOn);
+    if (Card *c = settingsSubject()) c->setGroupOn(s.groupOn);
     keepCardSetting("active", groupOnName(s.groupOn));
     renderMain();
 }
@@ -248,7 +264,7 @@ void ensureDefaultScene(Card &c) {
 // id. "Scenes..." is SCENES' Scene action, with a default scene ready.
 void tapDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
-    Card *c = cardOf(h.surface);
+    Card *c = settingsSubject();
     if (!c || k >= s_tapN) return;
     const TapAction t = s_tapMap[k];
     c->setTapAction(t);
@@ -262,7 +278,7 @@ void unitsDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     const TempUnit u = k ? TempUnit::TEMP_F : TempUnit::TEMP_C;
     s.tempUnit = u;
-    if (Card *c = cardOf(h.surface)) { c->setTempUnit(u); restyleHeld(*c); }
+    if (Card *c = settingsSubject()) { c->setTempUnit(u); restyleHeld(*c); }
     keepCardSetting("units", tempUnitName(u));
     renderMain();
     if (s.view == PopupView::VIEW_HISTORY) histDraw();

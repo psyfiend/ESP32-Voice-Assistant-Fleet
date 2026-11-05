@@ -70,10 +70,11 @@ void StateCard::buildBody(lv_obj_t *body) {
     lv_obj_align   (_mixed, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_flag(_mixed, LV_OBJ_FLAG_HIDDEN);
 
-    // The DOMAIN icon, top-left, out of the flow - the same object and the
-    // same placement ValueCard uses. cards.md section 11: the corner says what
-    // kind of card this is, the disc says which thing and in what state.
-    _corner = makeCornerIcon(body);
+    // NO CORNER ICON (owner, 2026-11-05, K172): the disc's hero icon already says
+    // what this is - a light, a door, a switch, someone there. Value cards keep
+    // theirs (a number alone does not say what it measures). renderCornerIcon()
+    // takes the null.
+    _corner = nullptr;
 }
 
 bool StateCard::onFill(int32_t fromBottom, int pct) const {
@@ -163,7 +164,10 @@ void StateCard::render() {
     // is unaffected. Address it with the user-selectable active colours (4.1):
     // each needs a darker ink for that mode.
     const uint32_t chrome = stateColor();   // stale/refused override, or 0
-    const bool fill = (s_fill == StateCardFill::FILL_SURFACE);
+    // ITS GROUP'S CARD STATE when it has one (a group view's card, 1.17), as a
+    // mini tile takes it (MiniTile.cpp); else the device's.
+    const StateCardFill eff = ownFill() >= 0 ? (StateCardFill)ownFill() : s_fill;
+    const bool fill = (eff == StateCardFill::FILL_SURFACE);
     const bool compact = (variant() == CardVariant::VAR_COMPACT);
 
     // --- What the line under the hero says --------------------------------
@@ -287,8 +291,8 @@ void StateCard::render() {
     // cuts (CardFrame.cpp), where the card's square one used to be left behind.
     CardFrame frame = CardFrame::FRAME_NONE;
     if (isOn && !chrome) {
-        if (s_fill == StateCardFill::FRAME_BRACKET) frame = CardFrame::FRAME_BRACKET;
-        if (s_fill == StateCardFill::FRAME_CORNER)  frame = CardFrame::FRAME_CORNER;
+        if (eff == StateCardFill::FRAME_BRACKET) frame = CardFrame::FRAME_BRACKET;
+        if (eff == StateCardFill::FRAME_CORNER)  frame = CardFrame::FRAME_CORNER;
     }
     activeFrame(frame, p.ST_ACTIVE);
 

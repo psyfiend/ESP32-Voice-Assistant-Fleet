@@ -99,8 +99,9 @@ int HaProvider::sendSubscribe(uint8_t from, uint8_t to, uint8_t *reached) {
 bool HaProvider::sendSceneQuery() {
     if (!_reg || !_ha) return false;
 
-    // The lights we were given (not learnt members - a single bulb's device
-    // carries no scenes). Single quotes inside, so the JSON needs no escapes.
+    // The lights we were given, and those a card made from HA stands for (2.13,
+    // 1.12: Eric Bedroom had none) - not learnt members, whose single bulb's device
+    // carries no scenes. Single quotes inside, so the JSON needs no escapes.
     // 3 KB since 2.10d: the same template also asks each entity's area. 8 KB in
     // PSRAM since 2.13: the areas of 190 entities, not 70.
     static constexpr size_t FRAME = 8192;
@@ -113,7 +114,7 @@ bool HaProvider::sendSceneQuery() {
     uint8_t named = 0;
     for (uint8_t i = 0; i < _reg->count(); i++) {
         const Entity *e = _reg->at(i);
-        if (!e || e->learnt || e->desc.source != EntitySource::HA) continue;
+        if (!e || (e->learnt && !e->adopted) || e->desc.source != EntitySource::HA) continue;
         if (strncmp(e->desc.externalRef, "light.", 6) != 0) continue;
         const int add = snprintf(frame + n, FRAME - n, "%s'%s'", named ? "," : "",
                                  e->desc.externalRef);

@@ -317,11 +317,17 @@ static void act(Act a, void *) {
     s_nItems = EditCards::chosen(s_items, 24);
     if (!s_nItems) return;
     if (a == Act::ACT_ADD)     { showStep(); return; }
-    if (a == Act::ACT_RESTORE) { doRestore(); return; }   // nothing goes: no question
     static char names[400];
     EditCards::namesOf(names, sizeof(names));
     const bool many = s_nItems > 1;
     s_nLines = 0;
+    if (a == Act::ACT_RESTORE) {   // RESTORE ASKS TOO (K165: every Edit cards action); words to confirm
+        line(many ? "The cards %s will be restored to their original configuration."
+                  : "The card %s will be restored to its original configuration.", names);
+        ask(Kit::DialogRole::DLG_CONFIRM, many ? "Restore these cards?" : "Restore this card?", "Restore",
+            Kit::ButtonRole::BTN_CONFIRM, doRestore);
+        return;
+    }
     if (a == Act::ACT_HIDE) {
         line(many ? "The cards %s will be hidden from this page." : "The card %s will be hidden from this page.", names);
         line("Hidden cards can always be restored from Edit cards.");   // to confirm

@@ -44,9 +44,11 @@ void sideFor(PopupView v) {
         if (histFromHa(s_hv.e)) side = s_hv.chart ? SIDE_CHART : SIDE_ACTIVITY;
     } else if (v == PopupView::VIEW_SCENES) {
         side = SIDE_SCENES;
-    } else if (!inMember() && (s.cluster ? (v == PopupView::VIEW_MEMBERS || v == PopupView::VIEW_GROUP)    // K150
-                                         : s.groupCard && (v == PopupView::VIEW_MAIN || v == PopupView::VIEW_MEMBERS))) {
-        side = SIDE_CLUSTER;   // A GROUP'S PANEL IN EVERY PRESENTATION (K155)
+    } else if (!inMember() && (s.cluster || s.groupCard) && v != PopupView::VIEW_CLUSTER_ADD) {
+        // A GROUP'S PANEL IN EVERY PRESENTATION (K155) AND ON EVERY VIEW WITHOUT
+        // PANELS OF ITS OWN (owner, 2026-11-05, K175) - History and Scenes keep
+        // theirs; Edit cards has none (1.6).
+        side = SIDE_CLUSTER;
     }
     if (s.left.root && s.left.kind != side) chartEnd();
     if (side != SIDE_NONE && !s.left.root) Kit::sheetSide(s, side, sideTitle(side), sideRows(side));

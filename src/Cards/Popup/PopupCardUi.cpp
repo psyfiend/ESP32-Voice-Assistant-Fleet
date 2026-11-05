@@ -37,7 +37,7 @@ static const char *const GVIEW_IS[]  = { nullptr, "tiles", "cards" };
 enum CuiRow : uint8_t { CUI_ENTITY, CUI_CLABEL, CUI_METAL, CUI_SHAPE, CUI_DENSITY, CUI_TIMEOUT, CUI_BAR, CUI_STATE,
                         CUI_GVIEW, CUI_ROWS };
 
-static Card *held() { return cardOf(h.surface); }
+static Card *held() { return settingsSubject(); }   // a member's own card in its view (K166)
 
 // ONLY WHAT THIS CARD CAN USE (round 6, the owner: Card UI "should read the
 // specific features of whichever card it was launched from"). A cluster wears
@@ -51,7 +51,7 @@ static uint8_t s_nRows = 0;
 static bool rowApplies(CuiRow r) {
     const Card *c = held();
     if (!c) return false;
-    const bool cluster = s.cluster, mini = c->mini();
+    const bool cluster = isClusterCard(*c), mini = c->mini();
     switch (r) {
         case CUI_ENTITY:  return !cluster;
         case CUI_CLABEL:  return !cluster && !mini;

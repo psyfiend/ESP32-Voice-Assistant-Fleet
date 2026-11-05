@@ -76,6 +76,9 @@ public:
     // framed on a Swatch header, bare on a Band. Every cluster's, from the next build.
     static void setGlyphStyle(GlyphStyle g) { s_glyphs = g; }
 
+    // THE GROUP VIEW'S CARDS STAND ON THE PAGE'S GROUND (K173): its surface the
+    // page's ground once built, so its members drawn as cards read as on the page.
+    void groundSurface();
     uint8_t memberCount() const { return _n; }
     uint8_t tileCount() const;
     uint8_t headerCount() const;   // the members in its header

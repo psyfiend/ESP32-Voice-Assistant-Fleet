@@ -100,10 +100,17 @@ void forgetWidgets() {
 // every view of the window; inside one member the arrow goes back to Members.
 void cornerLook(lv_obj_t *b, bool shown, bool lit) { Kit::sheetTabLook(b, shown, lit); }
 
+// OPENED STRAIGHT ONTO HISTORY (K169): a header sensor's row, a tile's or a card's
+// Long press opens: History. Back then goes where it was opened from; any other
+// view shown since makes back hard-linked again.
+static bool s_directView = false;
+void markDirectView() { s_directView = true; }
+
 void showView(PopupView v) {
     // A CLUSTER HAS NO CONTROLS VIEW (round 16, the owner: its Details held
     // settings, not details): its window is Members, whatever asked for the main view.
     if (v == PopupView::VIEW_MAIN && s.cluster) v = PopupView::VIEW_MEMBERS;
+    if (v != PopupView::VIEW_HISTORY) s_directView = false;
     const PopupView was = s.view;
     s.view = v;
     forgetMainWidgets();
@@ -199,6 +206,9 @@ void showView(PopupView v) {
     else if (v == PopupView::VIEW_GROUP)      buildGroup();           // 2.13, K143
     else                                   buildMain();
     deckSync();     // SETTINGS' rows are the view's (a member's own has more)
+    // EDIT CARDS HAS NO PANELS (1.6, as from the page): more room for its lists.
+    if (v == PopupView::VIEW_CLUSTER_ADD)      deckSet(DECK_HIDDEN);
+    else if (was == PopupView::VIEW_CLUSTER_ADD) deckSet(DECK_PEEK);
     deckRender();   // Paused follows whatever the window is showing now
     s.lastSig = signature();
 }
@@ -219,7 +229,16 @@ void cornerTap(PopupView v) { showView(s.view == v ? controlsView() : v); }
 //   a member                  -> Members
 //   a member's History/Scenes -> that member
 // On the controls it is the X, and closes the window.
+// EXCEPT A VIEW OPENED DIRECTLY (owner, 2026-11-05, K169): History opened straight
+// from the page closes; a member's opened straight from the group view or Members
+// goes back there. Back never shows a view you have not seen.
 void goBack() {
+    if (s_directView && s.view == PopupView::VIEW_HISTORY) {
+        s_directView = false;
+        if (inMember()) leaveMember(PopupView::VIEW_MEMBERS);   // where it was opened from
+        else            CardPopup::close();
+        return;
+    }
     switch (s.view) {
         case PopupView::VIEW_MAIN:   CardPopup::close();     break;
         case PopupView::VIEW_GROUP:  CardPopup::close();     break;   // a cluster's own view: its X
@@ -558,7 +577,7 @@ bool CardPopup::takeRebuildWanted() {
 }
 
 static void openView(uint8_t view) {
-    if (view == CardPopup::OPEN_HISTORY)                      showView(PopupView::VIEW_HISTORY);
+    if (view == CardPopup::OPEN_HISTORY)                      { showView(PopupView::VIEW_HISTORY); markDirectView(); }
     else if (view == CardPopup::OPEN_MEMBERS && hasMembers()) showView(PopupView::VIEW_MEMBERS);
     else if (view == CardPopup::OPEN_GROUP && s.cluster)      showView(PopupView::VIEW_GROUP);   // 2.13, K143
 }

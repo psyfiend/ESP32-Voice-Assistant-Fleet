@@ -76,6 +76,10 @@ bool ClusterCard::addMember(Card *m, bool tile, int8_t slot) {
     return true;
 }
 
+void ClusterCard::groundSurface() {
+    if (surface()) lv_obj_set_style_bg_color(surface(), UI::c(UI::pal().GROUND), 0);
+}
+
 uint8_t ClusterCard::tileCount() const {
     uint8_t n = 0;
     for (uint8_t i = 0; i < _n; i++) if (_tile[i]) n++;

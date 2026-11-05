@@ -329,6 +329,8 @@ extern size_t s_treeLen;
 
 // CardPopup.cpp
 void showView(PopupView v);
+void groupShowAs(bool asCard);   // PopupCluster.cpp: Visibility's Show as (K174)
+void markDirectView();   // the view just shown was opened directly: back returns (K169)
 PopupView controlsView();
 
 // PopupCommon.cpp
@@ -528,6 +530,11 @@ void sideFor(PopupView v);
 TapAction sceneActionOf(const Card &c);
 uint8_t deckSpecs(DeckRowSpec *r);
 void deckRender();
+// WHOSE SETTINGS THESE ARE (K166): the card the window shows - in a member's own
+// view, that member's card (its tile's on the page), else the held card. Null for
+// a member with no card (one of Desk's lamps).
+Card *settingsSubject();
+bool  isClusterCard(const Card &c);
 void keepCardSetting(const char *key, const char *value);
 void groupDropCb(lv_event_t *ev);
 void ensureDefaultScene(Card &c);

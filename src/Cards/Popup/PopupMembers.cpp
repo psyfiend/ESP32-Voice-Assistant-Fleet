@@ -99,6 +99,7 @@ void pinGlyph(lv_obj_t *col, int32_t gap) {
     lv_obj_align(g, LV_ALIGN_LEFT_MID, gap, 0);
     lv_obj_t *ic = Kit::label(g, KS::KS_CARD_ICON_SM);
     lv_label_set_text(ic, MDI_PIN);
+    lv_obj_set_style_text_color(ic, UI::c(UI::pal().ACCENT), 0);   // K178
     lv_obj_center(ic);
 }
 
@@ -259,6 +260,7 @@ void enterMemberAsync(void *unused) {
                       : s_pickView == PopupView::VIEW_MEMBERS && hasMembers() ? PopupView::VIEW_MEMBERS
                       : PopupView::VIEW_MEMBER;
     showView(v);
+    if (v == PopupView::VIEW_HISTORY) markDirectView();   // back returns here (K169)
 }
 
 void pickMemberRow(uint8_t i) {
