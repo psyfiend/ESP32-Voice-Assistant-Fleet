@@ -1,4 +1,110 @@
-# Test sheet - 2.13, cards from Home Assistant (rounds 1 to 4)
+# Test sheet - 2.13, cards from Home Assistant (rounds 1 to 5)
+
+# Round 5
+
+**Branch** `feat/2.13-add-from-ha` at `5c03eaa` (four commits: `4966cb0`, `65d6f28`, `4c977d6`,
+`5c03eaa`). **Boards** WS_P4_5, WS_P4_4B and CYD_P4_1060 run it (app only, flashed unattended on
+11-05 with the owner's leave; settings saved first in `bench/settings/<board>/20261105-0310.json`).
+**After the flash each board's only settings difference is its page's `layout` key**, v4 to v5: the
+arranger's kept answer now records the height it was made for (K167), so each page arranged once -
+to the same arrangement on all three. WS_S3_4B compiles (#69). **Decisions** K165-K178. Checked by
+Claude over `/popup` and screenshots on the P4_5: Desk's SETTINGS live inside Office (K166); Office's
+Visibility with Show as and Rename group, the GROUP panel beside it (K174, K175). **Everything else
+is untried on the glass.**
+
+**Not in this round** (questions below): retiring the compiled cards (K171), HA groups as board
+groups (K170), 1.10's four millimetre numbers.
+
+## What changed on screen
+
+- **The pin is the accent color** in Members and Edit cards (K178).
+- **On/off cards have no corner icon** - lights, doors, occupancy, switches; value cards keep theirs
+  (K172).
+- **The group view in Cards mode stands on the page's ground**, its cards the page's card color; a
+  cut corner cuts to the ground (K173, 1.2). **A group's own Card state reaches its group view**
+  (1.17).
+- **The header sensors' drop-down slides** open and shut; **a tap anywhere else folds it first** (1.3,
+  1.7). **A long press on a group view tile presses it in** as on the page (1.4).
+- **A member opened from the group view or Members** has Tap action, Long press opens, Card UI,
+  Units and Active state live, saved on its own card (K166). One of Desk's lamps (no card of its
+  own) keeps them greyed.
+- **History opened directly** (a header sensor's row, Long press opens: History) goes back where it
+  was opened from (K169).
+- **The GROUP panel** is on every view of a group except History and Scenes; **none under a group's
+  Edit cards**, which now reaches the screen's foot (K175, 1.6).
+- **Show as and Rename group are in Visibility** (K174); GROUP keeps Header options, Edit cards,
+  Face, Area.
+- **Pin this card / Unpin this card ask first**, in the owner's words (K165). **Edit cards' Save
+  always asks**, a line per kind of change; **Restore asks** too, from a group or the page.
+- **Edit cards**: an HA area's rows for cards already here take the square and the tap cycle (1.5);
+  **no check mark** on a chosen row (K168); **a sensor being added: third tap, the header** - its
+  glyph in the square - fourth, off (K168).
+- **Visibility's Add to group joins unpinned** (1.7).
+- **New group** (K168): full size; "Model this group after an existing HA area?" with HA's areas and
+  Create new; Edit cards with "Office (new)" (or "New group") first; "Create group N"; the name step
+  ("The group will be named 'Office'. Do you want to enter a different name?", Office / Change name,
+  Next); "Create new group?".
+- **The arranger** keeps its arrangement when the system header is shown or hidden - the height
+  goes to the space round the cards, which keep their size - and when unpinned members join or a
+  header's sensors change (K167).
+- **Card margins**: UI Tweaks' Card margins (Small, Medium, Large, X-large) for the page and group
+  views; a group's Card UI ends in a **Group view** section - Card appearance (Inherit, Tiles,
+  Cards) and Card margins (Inherit, Small ... X-large) (K167).
+- **128 cards** made on the board; within 25% of it Edit cards opens with "Approaching limit of 128
+  cards: XX currently", which stays until tapped; at the limit nothing can be chosen to add (K176).
+- **Scenes for a light added from HA** (Eric Bedroom) - asked of HA at boot (1.12).
+
+## Tests
+
+| # | Do this | PASS if |
+|---|---|---|
+| T1 | Members or Edit cards of Office | the pins in the accent color |
+| T2 | Look at a light, a door and occupancy card; a temperature card | no corner icon on the first three; the temperature keeps its corner icon |
+| T3 | UI Tweaks, Group view: Cards; Linen; tap Office | the window's ground is the page's, cards the page's card color, cut corners the ground's color |
+| T4 | Office's Card UI: Card state Fill; open its group view | its members use Fill there too |
+| T5 | Group view: tap the header sensors; tap a tile while the panel is down | it slides down; the tile tap only folds it (sliding up) |
+| T6 | Long-press a group view tile | it presses in as on the page, then opens the member |
+| T7 | In the group view long-press Desk; SETTINGS | Tap action, Long press opens, Card UI live; change Tap action, close; on the page Desk's tap does the new thing |
+| T8 | Group view: a header sensor's row, then back | back to the group view (not the sensor's Details) |
+| T9 | A card whose Long press opens is History: long-press, then back | the window closes |
+| T10 | Office's Visibility | Show as (Cluster, Solo card), Rename group, Hide from this page; the GROUP panel beside it |
+| T11 | Office: Members, Card UI, Properties | the GROUP panel on each; on History, CHART or ACTIVITY instead |
+| T12 | Office's Edit cards | no panels under it; it reaches the screen's foot |
+| T13 | A member's Visibility: Unpin this card; then Pin this card | each asks first, in the owner's words; Confirm does it |
+| T14 | Edit cards: tap two cards to add, one twice; Save | "Save 3 changes?" naming them - added, pinned; Save does it |
+| T15 | Edit cards: an HA area with Office's cards in it | Office's members there show the square and take the tap cycle |
+| T16 | Edit cards: tap a temperature sensor not yet in Office three times | its square shows the header glyph; Save: it is in Office's header |
+| T17 | Edit cards: choose a row | no check mark; nothing in the row moves |
+| T18 | A page card's Visibility: Add to group, into Office | it joins Office unpinned (not on the page; in the group view) |
+| T19 | Page panel, CARDS, New group: Office; add two cards; Create group 2; Next; Create | the steps as above; Office's name taken, so "New group" is offered; the new group on the page |
+| T20 | Hide the system header; show it | no "arranging" pause; the cards keep their size, the spare height spread round them |
+| T21 | UI Tweaks: Card margins Large | the page re-arranges with wider gaps; a group view's gaps wider too |
+| T22 | Office's Card UI, Group view section: Card margins Small | only Office's group view changes |
+| T23 | Eric Bedroom's light card | a Scenes button, its Hue scenes listed |
+
+## To confirm (words and looks Claude chose)
+
+- **New group's dialog says "You can rename this group from the GROUP menu"** (the owner's words), but
+  Rename group moved to Visibility (K174). Which should it say?
+- Save's dialog lines: "The cards X will be added to the group G." / "...will be pinned, and visible
+  from the page in the group G." / "...will be unpinned: still members of G, shown in its 'Group
+  view' and 'Members view'." / "...will be shown in the header of G." / "...will be removed from
+  this device. Nothing will be removed from Home Assistant."; title "Save N changes?", button Save.
+- Restore's dialog: "Restore this card?", "The card X will be restored to its original
+  configuration.", Restore.
+- Pin and Unpin name the card and group in quotes; the owner's lines had none.
+- New group's area buttons show names only (round 1's had a count); New group offers HA's areas
+  only, not the page's cards (§3.6 is that).
+- The Card margins steps: 50, 100, 150 and 200% of today's gap.
+- The card limit's toast has no "tap to dismiss" words; a later ordinary toast replaces it.
+
+## Not built yet
+
+- **K171** (retire the compiled cards) and **K170** (HA groups as board groups) - questions in the
+  session's report and `PLAN_2.13.md`.
+- The 4-tap cycle's header step for a group's existing members (only cards being added have it).
+- The Active state row in a member's own view starts from the held card's value.
+- 1.10's four millimetre numbers.
 
 # Round 4
 

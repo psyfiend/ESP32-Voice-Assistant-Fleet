@@ -18,6 +18,24 @@ not listed yet - ask for them before building round 5.
 
 Agreed in direction; each is small. Where the cause is already known, it is given.
 
+**Round 5 progress (unattended, 2026-11-05; the owner granted: build, flash the P4_5 / 4B / 1060 with
+settings saved and setdiff after, convert their settings for K171, commit and push; no PR):**
+- **Built, flashed to the three dev boards, round 5's sheet written** (`4966cb0`, `65d6f28`,
+  `4c977d6`, `5c03eaa`): 1.1-1.7, 1.12, 1.13 (K166), 1.14 (K168), 1.17, 1.18 (K173), K165's
+  dialogs, K167 (the arranger keeps its answer, v5; Card margins), K169, K172, K174, K175, K176,
+  K178, the check mark (K168).
+- **Stopped before K171 and K170** - they need the owner's answers (never assume):
+  - K171: the Fleet page holds more than Panel and MQTT - the three test fixtures (Avail, Reading,
+    Refuse), Battery (two), All Lamps and Lamps 1-3 (virtual), Switch and Stuck. Keep them as made
+    cards on the dev boards, or let them go? Panel's IP Address has no card today (`sys_ip` exists).
+    Garage Doors is a summary card (K98), which a group made on the board cannot be yet: keep it
+    compiled until 2.14 (2.4), or make it an ordinary group shown as a solo card? Panel built in:
+    on the Fleet page only? The compiled entity table (`ExternalEntities_HA.h`) stays, so made cards
+    can name its entities - agreed?
+  - K170 follows K171 (Desk is a compiled card today).
+- Still to do after those: 1.10's four mm numbers; the header step of the 4-tap cycle for existing
+  members; the Active state row in a member view (it starts from the held card's value).
+
 | # | Item | What is known |
 |---|---|---|
 | 1.1 | **The pin is black** in Members and Edit cards | `pinGlyph()` (`Popup/PopupMembers.cpp:96`) and Edit cards' sign (`UI/EditCards.cpp:92`) set no color, so the pin takes the icon role's default. **The accent color (K178)** |
@@ -29,7 +47,7 @@ Agreed in direction; each is small. Where the cause is already known, it is give
 | 1.7 | Round 4's gaps: **Visibility's Add to group joins unpinned** (K160: only Edit cards does today); **a tap outside the header drop-down folds it** before anything else | `TEST_2.13.md` round 4, "Not built yet" |
 | 1.8 | Round 1's knowns, to recheck on the glass | a humidity's decimal (43.0 %: 3.2 below), the 4B's °F over a number (likely gone with the capped tiles), HA's long names wrapping in tiles |
 | 1.9 | The 4B stopped answering HTTP for minutes after a settings restore's reboot (11-04); opening its serial port reset it | watch for it; nothing to fix yet |
-| 1.10 | **Drift the structure check found in 2.13's code** (11-04) | four millimetre numbers where a `UIShape` token belongs: `PopupGroup.cpp:168` `mm(100)`, `EditCards.cpp:307` `mm(80)` and `:560` `mm(100)`, `HaPicker.cpp:120` `mm(80)`; `UI/HiddenSheet` is no longer reachable on the glass (Edit cards replaced it) - **kept for now** (owner, 11-05: hiding and pinning may change as group views and pages grow). Files over 1,000 lines: `GUIManager.cpp` 1,529, `Card.cpp` 1,462 (unchanged in 2.13) |
+| 1.10 | **Drift the structure check found in 2.13's code** (11-04) | four millimetre numbers where a `UIShape` token belongs: `PopupGroup.cpp:168` `mm(100)`, `EditCards.cpp:307` `mm(80)` and `:560` `mm(100)`, `HaPicker.cpp:120` `mm(80)`; `UI/HiddenSheet` is no longer reachable on the glass (Edit cards replaced it) - **kept for now** (owner, 11-05: hiding and pinning may change as group views and pages grow). Files over 1,000 lines: `GUIManager.cpp` 1,529, `Card.cpp` 1,462 (unchanged in 2.13); **round 5 put `Popup/PopupCluster.cpp` at 1,005** - Edit cards' save and its dialogs want a file of their own (`PopupEditCards.cpp`). The mm numbers have moved: `PopupGroup.cpp:210`, `EditCards.cpp:351` and `:615` |
 | 1.11 | **A dialog for Unpin / Pin this card** (round 4 T7, T8). The owner's words for Unpin: headline "Unpin this card?"; "This will hide the card <card> from the group when looking at the page."; "The card will still be a member of group <group> and will be visible on the 'Group view' and the 'Members view'."; Cancel, Confirm. Pin's words to agree | today no dialog (K160) |
 | 1.12 | **No Scenes for a light added from HA** (Eric Bedroom, `light.eric_bedroom_lights_hue`; Desk has them) | the scene query asks only lights that are not `learnt` (`HaProvider.cpp:116`), to skip a group's members; `adoptHaCard` makes a made card's entity `learnt` too. Ask adopted cards as well (a flag of their own). Then check HA's `device_id()` gives the Hue group a device |
 | 1.13 | **A member's SETTINGS greyed when opened from the group view or Members** (Tap action, Long press opens, Card UI; also Units, Active state); live from its page tile | greyed on purpose in a member view (`PopupSettingsRows.cpp:170`, `!inMember()`: "it is the card's"). The fix is a settings subject - the member's own card - for these rows and their callbacks, as Visibility already has (`visibilitySubject()`); changing the flag alone would save to the cluster |

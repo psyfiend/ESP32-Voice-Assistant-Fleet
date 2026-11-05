@@ -101,6 +101,12 @@ lights, and reword HA's docs for K133.
 
 What the glass does now; the decisions hold the reasons, `TEST_2.13.md` the rounds.
 
+**Round 5 (2026-11-05, `5c03eaa`) changed some of this and is not folded in yet:** Show as and Rename
+group are Visibility's (K174); GROUP is on every view without its own panels (K175); a member's
+settings are live in its own view (K166); membership changes ask first (K165); New group is Edit
+cards' flow (K168); the arranger's key leaves out the page's height (K167); Card margins (K167); 128
+made cards (K176). `TEST_2.13.md` round 5 lists them.
+
 ### 4.1 Group and label (K146, K158)
 
 A **group** is the bordered block - a cluster, or a group shown as one card - and its members share
