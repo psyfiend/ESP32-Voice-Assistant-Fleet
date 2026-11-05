@@ -20,7 +20,7 @@ Agreed in direction; each is small. Where the cause is already known, it is give
 
 | # | Item | What is known |
 |---|---|---|
-| 1.1 | **The pin is black** in Members and Edit cards | `pinGlyph()` (`Popup/PopupMembers.cpp:96`) and Edit cards' sign (`UI/EditCards.cpp:92`) set no color, so the pin takes the icon role's default. Pick its color with the owner (the header glyphs carry their own tint) |
+| 1.1 | **The pin is black** in Members and Edit cards | `pinGlyph()` (`Popup/PopupMembers.cpp:96`) and Edit cards' sign (`UI/EditCards.cpp:92`) set no color, so the pin takes the icon role's default. **The accent color (K178)** |
 | 1.2 | **Corner cut on Linen in the group view** (Cards mode): the cut corners show the wrong color | `Cards/CardFrame.cpp:418` paints a cut corner in the page's `GROUND` unless the card is a mini tile; a group view card is a full card standing on the cluster's `SURFACE`. The corner wants the color actually behind the card |
 | 1.3 | **The header sensors' drop-down animates** as the system header's slot panels do | `dropOpen()` in `Popup/PopupGroup.cpp` builds a plain panel that appears at once; the system header's panels are `Kit::Drawer` |
 | 1.4 | **Long press on a group view tile or card** animates as it does on the page | the page's long-press feedback is not on the group view's members |
@@ -29,19 +29,31 @@ Agreed in direction; each is small. Where the cause is already known, it is give
 | 1.7 | Round 4's gaps: **Visibility's Add to group joins unpinned** (K160: only Edit cards does today); **a tap outside the header drop-down folds it** before anything else | `TEST_2.13.md` round 4, "Not built yet" |
 | 1.8 | Round 1's knowns, to recheck on the glass | a humidity's decimal (43.0 %: 3.2 below), the 4B's °F over a number (likely gone with the capped tiles), HA's long names wrapping in tiles |
 | 1.9 | The 4B stopped answering HTTP for minutes after a settings restore's reboot (11-04); opening its serial port reset it | watch for it; nothing to fix yet |
-| 1.10 | **Drift the structure check found in 2.13's code** (11-04) | four millimetre numbers where a `UIShape` token belongs: `PopupGroup.cpp:168` `mm(100)`, `EditCards.cpp:307` `mm(80)` and `:560` `mm(100)`, `HaPicker.cpp:120` `mm(80)`; `UI/HiddenSheet` is no longer reachable on the glass (Edit cards replaced it) - remove it or keep it on purpose. Files over 1,000 lines: `GUIManager.cpp` 1,529, `Card.cpp` 1,462 (unchanged in 2.13) |
+| 1.10 | **Drift the structure check found in 2.13's code** (11-04) | four millimetre numbers where a `UIShape` token belongs: `PopupGroup.cpp:168` `mm(100)`, `EditCards.cpp:307` `mm(80)` and `:560` `mm(100)`, `HaPicker.cpp:120` `mm(80)`; `UI/HiddenSheet` is no longer reachable on the glass (Edit cards replaced it) - **kept for now** (owner, 11-05: hiding and pinning may change as group views and pages grow). Files over 1,000 lines: `GUIManager.cpp` 1,529, `Card.cpp` 1,462 (unchanged in 2.13) |
+| 1.11 | **A dialog for Unpin / Pin this card** (round 4 T7, T8). The owner's words for Unpin: headline "Unpin this card?"; "This will hide the card <card> from the group when looking at the page."; "The card will still be a member of group <group> and will be visible on the 'Group view' and the 'Members view'."; Cancel, Confirm. Pin's words to agree | today no dialog (K160) |
+| 1.12 | **No Scenes for a light added from HA** (Eric Bedroom, `light.eric_bedroom_lights_hue`; Desk has them) | the scene query asks only lights that are not `learnt` (`HaProvider.cpp:116`), to skip a group's members; `adoptHaCard` makes a made card's entity `learnt` too. Ask adopted cards as well (a flag of their own). Then check HA's `device_id()` gives the Hue group a device |
+| 1.13 | **A member's SETTINGS greyed when opened from the group view or Members** (Tap action, Long press opens, Card UI; also Units, Active state); live from its page tile | greyed on purpose in a member view (`PopupSettingsRows.cpp:170`, `!inMember()`: "it is the card's"). The fix is a settings subject - the member's own card - for these rows and their callbacks, as Visibility already has (`visibilitySubject()`); changing the flag alone would save to the cluster |
+| 1.14 | **New group redone as Edit cards** (owner's design, 11-04): full-size window, "New group", "Model this group after an existing HA area?" with HA's areas and "Create new"; then Edit cards' flow, its first list "New group" or "<area> (new)", taps add / add pinned; "Create group N"; then a dialog in the owner's words: headline "Create new group?"; "A new group will be created named <area name selected> (or new group). You can rename this group from the GROUP menu."; "The cards that will be added to the group are: <cards>" (K168); "From the GROUP menu you can add or remove cards, and from the 'Members view' you can change which cards are pinned."; Cancel, Create | `NewClusterSheet.cpp` uses chips and the old `HaPicker`, default window size, every member pinned. Edit cards needs a group context of {card id, area, group id} in place of a live `ClusterCard` (`doEditSave`, `fillMembers`); `CardAdded::addTo(id, area, gid, ...)` already takes strings. **Mock first** |
+| 1.15 | **The arranger runs when nothing on the page moves** | (a) showing / hiding the system header rebuilds and re-searches: the kept answer's key includes the page's height (`PageArranger.cpp:81`); the kept arrangement could be re-fitted to the new height instead. (b) adding unpinned members re-searches: the key counts every member (`b.members`, `CardPage.cpp:556`), pinned or not, and any `CardAdded` change rebuilds the page |
+| 1.16 | **Compiled members cannot be removed** (round 4 T9, T10): a tap only flips the pin | `canRemove` is only for made cards (`PopupCluster.cpp:396`). Answered by 3.3 if that comes first; otherwise a note on the row (owner: "This card was manually added and cannot be removed at this time."). **Moot: K171 retires them first in round 5** |
+| 1.17 | **A group's own Card state is ignored in its group view**, which follows UI Tweaks (owner, 11-05) | the group view's cards should take the group's Card UI choice |
+| 1.18 | **The group view's colors** (K173): its background the page's ground, its cards the page's card color | today its background is the card color |
+| 1.19 | **Everything else settled 11-05**: Pin dialog and dialogs for membership changes (K165), member settings live (K166), no arrange for the header or unpinned members, spare height as spacing (K167), New group's tap cycle, no check mark, naming step (K168), HA groups as groups (K170), compiled cards retired (K171), corner icons (K172), Show as / Rename group to Visibility (K174), GROUP on every view (K175), 128 cards (K176) | see each decision |
 
 ## 2. To settle with the owner before building
 
 | # | Question | Notes |
 |---|---|---|
-| 2.1 | **Corner icons on cards: still needed?** | the corner icon was the card's kind (cards.md); since 2.11 a tile and a solo card share one icon size, and value cards squeeze their value to clear it (#73's half) |
-| 2.2 | **GROUP panel's Show as and Rename group move to Visibility?** | K155 says a group's options never move between presentations; this would be a deliberate one-time move, so the GROUP panel and Visibility each need one clear job |
-| 2.3 | **A GROUP panel on views that have none** (History, Scenes)? | today those views show no panels |
-| 2.4 | **"Garage - Doors" becomes an ordinary group** | still the bespoke card K98 left open |
-| 2.5 | **How many made cards?** `CardAdded::MAX` is 64 | the owner asked on 11-03; 128 costs about 40 KB of PSRAM. Hidden page cards do not count |
-| 2.6 | **Which unit is shown** (°F / °C) - the owner: never assume, and let the user choose | with 3.2; a device-wide choice in UI Tweaks is the obvious home |
+| 2.1 | **Corner icons on cards: still needed?** | **Settled, K172**: only on value sensors. The corner icon was the card's kind (cards.md); since 2.11 a tile and a solo card share one icon size, and value cards squeeze their value to clear it (#73's half) |
+| 2.2 | **GROUP panel's Show as and Rename group move to Visibility?** | **Settled, K174**: they move to Visibility |
+| 2.3 | **A GROUP panel on views that have none** (History, Scenes)? | **Settled, K175**: GROUP on every view without panels of its own; History and Scenes keep theirs |
+| 2.4 | **"Garage - Doors" becomes an ordinary group** | still the bespoke card K98 left open. **Open (11-05)**: the owner wants roll-up entities in HA (`binary_sensor.garage_doors` with attribute `open`: North / South / Both / none; `sensor.doors_open` with `names`, `entities`) that a card shows while its members stay reachable. Claude's proposal (11-05): HA's binary sensor group helper where "any open" is the job, the board reading members from `entity_id`; a template carrying `entity_id` for anything more. **Deferred to 2.14** (owner): Garage Doors may be the only roll-up whose members are commanded; most will be informative (several temperatures, one History) or alerts |
+| 2.5 | **How many made cards?** `CardAdded::MAX` is 64 | **Settled, K176**: 128, a warning within 25%. Hidden page cards do not count |
+| 2.6 | **Which unit is shown** (°F / °C) - the owner: never assume, and let the user choose | **Settled, K177**: UI Tweaks, Inherit / F / C; precision HA's. Built with 3.2 |
 | 2.7 | "Create N" or "Add N" for a new group; label and group words | judge on the glass; re-read every on-screen "group" against K146 / K158 once more |
+| 2.8 | **Back from History reached directly** (round 4 T2): back to where you came from, or always to Details? | **Settled, K169**: back to where it was opened from. Back is hard-linked today (`CardPopup.cpp:216`); no view stack, only each member level's way out - the level needs to know it was entered straight onto History |
+| 2.9 | **HA light groups as groups** (Desk `light.office_lights_hue`, Bedroom `light.eric_bedroom_lights_hue`): the GROUP panel, Show as, Edit cards. (a) a group made on the board from the HA group's members; (b) change the HA group's members through Spook | **Settled, K170**: (a). Today such a card has Members through its entity (`s.native`) and no link to a group card; Desk and Bedroom are Hue groups, defined in the Hue bridge |
+| 2.10 | **Retire the compiled dashboard's cards now** (3.3 pulled forward; the owner: "as soon as possible") | **Settled, K171**: they retire in 2.13, as made cards with their ids. How a board with no settings file starts is still to settle |
 
 ## 3. The bigger pieces still in 2.13
 
@@ -60,7 +72,7 @@ Agreed in direction; each is small. Where the cause is already known, it is give
    entity's display precision from the entity registry; never assume a unit.
 3. **Removed for built-in cards** (K148) - or retire the compiled dashboard's cards in favour of
    cards made from HA, which the owner would prefer ("leave those behind sooner rather than later").
-   Needs a decision first.
+   **Decided 11-04 (K171): retire them**, pulled forward to round 5 or 6 - see 2.10.
 4. **The text fitter beyond Edit cards** (K152): Members, the label step, tile names. `fitLabel` is in
    the kit.
 5. **Two levels of nesting** (K147) enforced: a group shown as one card may join one other group,
@@ -103,7 +115,10 @@ commit -> `flash_release.ps1`, the 4880 by hand -> HA's `fleet-2.13-done`.
   relay is back.
 - **The web app** (#87): choosing the page in Add to dashboard; Edit cards beyond the House page;
   true delete; designing a page with a preview.
-- Mirroring the boards' groups as HA group entities (owner's idea, 11-03; deferred).
+- Mirroring the boards' groups as HA group entities (owner's idea, 11-03, extended 11-04; deferred):
+  each board group as a discrete HA group entity, so HA shows every board's groups - perhaps to
+  manage the fleet from HA, sync a group across boards, or deploy the same groups to several boards
+  at once. Also changing HA's own group entities' members through Spook (K170; never Hue groups).
 - The old cell pinning, shelved (K164, `FUTURE_IMPROVEMENTS.md`).
 - **Voice and the ESPHome API** (A18, Phase 7, `design/voice-esphome.md`).
 - Look at NINA's repo now and then for ideas (`REFERENCE_PROJECTS.md`).

@@ -48,6 +48,26 @@ the 4B (its settings put back after). **Swipes and taps on the glass are untried
 | T12 | UI Tweaks, Group view: Cards; tap Office | members drawn as cards, bordered, even spacing |
 | T13 | A cluster's Card UI: Group view; a solo group card's | Inherit / Tiles / Cards; greyed on the solo card |
 
+## Results (owner, on the glass, 2026-11-04)
+
+| # | Result | Notes |
+|---|---|---|
+| T1 | PASS | |
+| T2 | PARTIAL | The panel drops and a row opens that sensor's History, but the back arrow goes to the sensor's Details, not the group view. Open question: back returns to the previous window, or History's back always goes to Details? |
+| T3 | PASS | |
+| T4 | PASS | |
+| T5 | PASS | |
+| T6 | PASS | The pins are black; they should be colored (PLAN 1.1) |
+| T7 | PASS | Wants a confirmation dialog (wording in PLAN 1.11) |
+| T8 | PASS | Wants a confirmation dialog, as T7 |
+| T9 | PARTIAL | Kitchen's members (at least on the 1060) are compiled into the dashboard, so they cannot be removed: each tap only flips the pin, over and over. The owner wants the compiled cards retired soon (PLAN 3.3); until then, a note that the card cannot be removed |
+| T10 | PASS | Only for cards made on the board; compiled ones only flip, as T9 |
+| T11 | PASS | |
+| T12 | PASS | |
+| T13 | PASS | |
+
+Found besides the sheet: listed in `PLAN_2.13.md` §1 (1.11-1.16) and §2 (2.8-2.10).
+
 ## Not built yet
 
 - Moving a page card into a group from its Visibility (Add to group) still pins it; only Edit cards

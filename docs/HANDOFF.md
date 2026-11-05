@@ -33,7 +33,7 @@ This file is rewritten at a handoff.
 
 **2.13 (cards from Home Assistant) is being built** on `feat/2.13-add-from-ha`, off `main` at
 `fd3d59e` (`v0.2.20`). Four rounds, 2026-11-02 to 11-04, the last at `5fbc9ee` (docs `22a17af`,
-then this handoff's docs commit). **Nothing is pushed.** Round 4 was checked by Claude over `/popup`
+then this handoff's docs commit). **The branch is pushed** (`origin` matched `2635fa4` on 11-04). Round 4 was checked by Claude over `/popup`
 and screenshots; **the owner has not tried it on the glass yet**. His reaction to what he has seen:
 "I cannot believe how much functionality there is and how slick everything looks."
 
@@ -177,7 +177,7 @@ not use NINA's C6 updater** - it hung `WS_P4_5`. `reference/` is gitignored.
 - **PlatformIO keeps one environment's build at a time** - copy an image you want to keep. Clear
   `.pio/build_cache` after a BSP, struct-layout or `lv_conf.h` edit.
 - **DECISIONS numbers are claimed by branch** - check the open branches before numbering a row. The
-  next is **K165**.
+  next is **K179**.
 - **A kept arranger answer outlives a search change** unless its version moves (`v4`).
 - **A task that never blocks runs at `tskIDLE_PRIORITY`** or the task watchdog reboots the chip.
 - **LVGL 9.5 clips `DRAW_POST` to the object** - draw outside it in `DRAW_MAIN_END`. **A child's
