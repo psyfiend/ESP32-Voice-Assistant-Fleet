@@ -184,7 +184,7 @@ static void askCreate() {
     static char l1[200], l2[420], names[400];
     char acc[64];
     snprintf(acc, sizeof(acc), "#%06lX %s#", (unsigned long)(UI::pal().ACCENT & 0xFFFFFF), s_name);
-    snprintf(l1, sizeof(l1), "A new group will be created named %s. You can rename this group from the GROUP menu.", acc);
+    snprintf(l1, sizeof(l1), "A new group will be created named %s. You can rename this group from the 'Visibility' menu.", acc);
     EditCards::namesOf(names, sizeof(names));
     snprintf(l2, sizeof(l2), "The cards that will be added to the group are: %s", names);
     Kit::DialogSpec d = {};

@@ -143,12 +143,14 @@ void unpinTileCb(lv_event_t *) {
     lv_async_call([](void *) {
         Card *c = visibilitySubject();
         if (!c || s.phase != PopupPhase::PHASE_OPEN) return;
+        // Names in the accent (owner, 2026-11-05: every card or group name a dialog shows).
+        const unsigned long acc = (unsigned long)(UI::pal().ACCENT & 0xFFFFFF);
         const char *g = groupWords(clusterOfSubject());
-        static char l1[160], l2[200];
-        snprintf(l1, sizeof(l1), "This will hide the card \"%s\" from the group when looking at the page.",
-                 c->shownName(CardLabel::LBL_NAME));
-        snprintf(l2, sizeof(l2), "The card will still be a member of group \"%s\" and will be visible on the "
-                                 "'Group view' and the 'Members view'.", g);
+        static char l1[180], l2[220];
+        snprintf(l1, sizeof(l1), "This will hide the card #%06lX %s# from the group when looking at the page.",
+                 acc, c->shownName(CardLabel::LBL_NAME));
+        snprintf(l2, sizeof(l2), "The card will still be a member of group #%06lX %s# and will be visible on the "
+                                 "'Group view' and the 'Members view'.", acc, g);
         const char *lines[] = { l1, l2 };
         confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Unpin this card?", lines, 2, "Confirm",
                    Kit::ButtonRole::BTN_CONFIRM, unpinGo);
@@ -159,9 +161,9 @@ void unpinTileCb(lv_event_t *) {
 void showTileCb(lv_event_t *) {
     lv_async_call([](void *) {
         if (s.phase != PopupPhase::PHASE_OPEN) return;
-        static char l1[160];
-        snprintf(l1, sizeof(l1), "This will make the card visible from the page as a member of group \"%s\".",
-                 groupWords(clusterOfSubject()));
+        static char l1[180];
+        snprintf(l1, sizeof(l1), "This will make the card visible from the page as a member of group #%06lX %s#.",
+                 (unsigned long)(UI::pal().ACCENT & 0xFFFFFF), groupWords(clusterOfSubject()));
         const char *lines[] = { l1 };
         confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Pin this card?", lines, 1, "Confirm",
                    Kit::ButtonRole::BTN_CONFIRM, pinGo);
@@ -296,7 +298,9 @@ void buildVisibility() {
         note(list, VIS_NOTE_MEMBER);
         return;
     }
-    if (c->hasId()) a[n++] = { "Hide from this page", Kit::ButtonRole::BTN_CANCEL, hideCardCb };
+    // A BUILT-IN GROUP IS NEVER HIDDEN (K171: the Fleet page's Panel).
+    const CardSpec *spec = c->hasId() ? CardAdded::specOf(c->id()) : nullptr;
+    if (c->hasId() && !(spec && spec->builtIn)) a[n++] = { "Hide from this page", Kit::ButtonRole::BTN_CANCEL, hideCardCb };
     if (c->hasId() && !clusterSelf) {
         a[n++] = { "Change label", Kit::ButtonRole::BTN_CANCEL, toDashCb };   // K146
         a[n++] = { "Add to group", Kit::ButtonRole::BTN_CANCEL, toClusterCb };

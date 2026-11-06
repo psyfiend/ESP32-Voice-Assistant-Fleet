@@ -120,6 +120,9 @@ struct CardSpec {
     uint8_t         memberCount = 0;
     GroupPresent    present     = GroupPresent::PRESENT_CARD;
     const char     *slots[CLUSTER_SLOTS_MAX] = {nullptr};
+    // BUILT IN (2.13, K171): on every board and never hidden from its page - the
+    // Fleet page's Panel group. Visibility offers no Hide for it.
+    bool            builtIn     = false;
 };
 
 // Every card a page's spec holds, in order: each card, and right after a group

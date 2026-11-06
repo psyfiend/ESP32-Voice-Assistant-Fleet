@@ -41,6 +41,9 @@ namespace CardAdded {
 // 2.13 round 5 (owner, K176): every card is one once the compiled ones retire (K171).
 constexpr uint8_t MAX = 128;
 uint8_t count();   // how many there are, of MAX
+// Each made card as a spec (the page's and its clusters' members alike), i < count():
+// CardGroups reads their areas, as it reads the compiled cards' (K171).
+const CardSpec &specAt(uint8_t i);
 
 // WITHIN 25% OF THE LIMIT (K176): opening Edit cards says so (EditCards::build()).
 bool nearLimit();

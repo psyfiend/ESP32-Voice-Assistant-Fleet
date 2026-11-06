@@ -65,7 +65,45 @@ static constexpr uint8_t PRI_NORMAL   = 160;
 static constexpr uint8_t PRI_NICE     = 100;
 static constexpr uint8_t PRI_DEBUG    = 40;    // first to be dropped
 
+// --- 2.13 ROUND 5: PANEL, THE ONE BUILT-IN GROUP (owner, 2026-11-05, K171) ---
+//
+// Every board's Fleet page has the Panel group - Free Heap and Uptime, IP Address
+// and Signal - and it cannot be hidden. Its members keep the ids they had as page
+// cards, so what was saved on them is still theirs. Everything else this page
+// had is retired: the deck's three cards are the dev boards' MQTT group, made on
+// the board (their settings files); the test fixtures, the battery, the lamps and
+// the two test switches are in scripts/release/test_cards.json, to add back when
+// a test needs them. The old list is kept below, unbuilt, as the record.
+inline const CardSpec FLEET_PANEL[] = {
+    // Free Heap and Uptime were three units across as page cards (Uptime's
+    // HH:MM:SS); as tiles they are the group's one size (to confirm on glass).
+    { .id        = "panel_free_heap_261008_0310",
+      .primaries = { SYS_ENT_HEAP },   .label = "Free Heap",  .area = "Panel",
+      .place     = { .prefSpanX = 3, .minSpanX = U_CELL, .priority = PRI_DEBUG } },
+    { .id        = "panel_uptime_261008_0310",
+      .primaries = { SYS_ENT_UPTIME }, .label = "Uptime",     .area = "Panel",
+      .place     = { .prefSpanX = 3, .minSpanX = U_CELL, .priority = PRI_DEBUG + 10 } },
+    { .id        = "panel_ip_address_261105_0500",   // new in round 5 (K171)
+      .primaries = { SYS_ENT_IP },     .label = "IP Address", .area = "Panel",
+      .place     = { .prefSpanX = 3, .minSpanX = U_CELL, .priority = PRI_DEBUG } },
+    { .id        = "panel_signal_261008_0310",
+      .primaries = { SYS_ENT_RSSI },   .label = "Signal",     .area = "Panel",
+      .place     = { .priority = PRI_DEBUG } },
+};
+
 inline const CardSpec FLEET_CARDS[] = {
+    { .id          = "panel_261105_0500",
+      .label       = "Panel",
+      .area        = "Panel",
+      .place       = { .priority = PRI_NORMAL },
+      .members     = FLEET_PANEL,
+      .memberCount = (uint8_t)(sizeof(FLEET_PANEL) / sizeof(FLEET_PANEL[0])),
+      .present     = GroupPresent::PRESENT_CLUSTER,
+      .builtIn     = true },
+};
+
+#if 0   // the retired cards (K171)
+inline const CardSpec FLEET_CARDS_RETIRED[] = {
     // --- Test fixtures, 2026-09-23 -----------------------------------------
     //
     // The owner's three HA helpers - see ExternalEntities_HA.h. Above
@@ -254,6 +292,7 @@ inline const CardSpec FLEET_CARDS[] = {
                        .priority  = PRI_DEBUG + 10 },
     },
 };
+#endif
 
 inline const PageSpec FLEET_PAGE = {
     // Page 1 is home, and 1 stays home forever. See PageSpec's comment: ids

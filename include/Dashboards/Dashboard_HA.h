@@ -39,18 +39,15 @@ static constexpr uint8_t HA_PRI_LIGHT    = 140;
 static constexpr uint8_t HA_PRI_INDOOR   = 100;
 static constexpr uint8_t HA_PRI_EXTRA    = 60;    // first to go
 
-// --- 2.11: CLUSTERS (DECISIONS K88-K92, K100-K104) ---------------------------
+// --- 2.13 ROUND 5: THE COMPILED CARDS RETIRED (owner, 2026-11-05, K171) -------
 //
-// Office, Kitchen and Outside are group cards made on the device, shown as
-// clusters: one border, the members inside as mini tiles, a header filled from
-// the members (the "2.11 Clusters" mock's House page). The members are the cards
-// these areas had before - SAME IDS, so every setting the owner saved on them
-// (Desk's tap, the history spans) is still theirs. They wear their cluster's
-// group (K92 rule 2), so their own area below only says where they came from.
-//
-// The header's members (`slots`) are not tiles unless made visible (K104).
-// A cluster's priority is its most important member's, so it stands where that
-// card stood in the page's order.
+// Outside, Kitchen and Office, Living's Overhead, the thermostat, Eric and the
+// garage's temperature are cards made on the board now, in each board's settings
+// file, with the ids they had here - so what was saved on them is still theirs.
+// scripts/release/retire_compiled.py made them from these specs; they are kept
+// below, unbuilt, as that script's record of what they were. Only Garage - Doors
+// stays compiled until 2.14 (its summary, K98, is a compiled card's).
+#if 0
 inline const CardSpec HA_OUTSIDE[] = {
     { .id        = "outside_porch_261008_0310",
       .primaries = { "outside_front_light" },
@@ -133,6 +130,8 @@ inline const CardSpec HA_OFFICE[] = {
       .place     = { .priority = HA_PRI_INDOOR } },
 };
 
+#endif   // the retired cards (K171)
+
 // --- Garage: the doors ------------------------------------------------------
 //
 // These two report device_class garage_door. Since 2.11 round 4 they are the
@@ -162,7 +161,10 @@ inline const CardSpec HA_CARDS[] = {
       .members     = HA_GARAGE_DOORS,
       .memberCount = (uint8_t)(sizeof(HA_GARAGE_DOORS) / sizeof(HA_GARAGE_DOORS[0])),
       .present     = GroupPresent::PRESENT_SUMMARY },
+};
 
+#if 0   // the retired cards (K171): made on the board now
+inline const CardSpec HA_CARDS_RETIRED[] = {
     // --- The clusters (2.11) - Outside, then the two rooms with presence ----
     // Ids made 2026-10-19 (K33); the members are above, with the ids they had.
     { .id          = "outside_261019_0500",
@@ -218,6 +220,7 @@ inline const CardSpec HA_CARDS[] = {
       .area      = "Garage",
       .place     = { .priority = HA_PRI_EXTRA } },
 };
+#endif
 
 inline const PageSpec HA_PAGE = {
     // Page 2. Ids are append-only and 1 is home forever - see PageSpec. When

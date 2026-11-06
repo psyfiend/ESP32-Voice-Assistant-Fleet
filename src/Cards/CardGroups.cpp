@@ -1,5 +1,6 @@
 // CardGroups - see CardGroups.h.
 #include "Cards/CardGroups.h"
+#include "Cards/CardAdded.h"   // the made cards' areas (K171)
 #include "Cards/Card.h"
 #include "Cards/CardIcons.h"   // cardAreaColor(), the card-label palette
 #include "Cards/PageSpec.h"
@@ -32,18 +33,24 @@ void slugInto(const char *prefix, const char *name, char *out, size_t cap) {
 
 bool startsWith(const char *s, const char *p) { return !strncmp(s, p, strlen(p)); }
 
+// EVERY CARD SPEC: each page's compiled ones (a group card's members too), then
+// the cards made on the board - since K171 most of the dashboard (2.13 round 5).
+template <typename F> void eachSpec(F f) {
+    for (uint8_t p = 0; p < s_nPages; p++) forEachCardSpec(*s_pages[p], f);
+    for (uint8_t i = 0; i < CardAdded::count(); i++) f(CardAdded::specAt(i));
+}
+
 // The dashboard's areas, each once, in page order.
 uint8_t sheetAreas(const char **out, uint8_t cap) {
     uint8_t n = 0;
     // A group card's members too (2.11): a cluster's area is its members'.
-    for (uint8_t p = 0; p < s_nPages; p++)
-        forEachCardSpec(*s_pages[p], [&](const CardSpec &cs) {
-            const char *a = cs.area;
-            if (!a || !a[0]) return;
-            bool seen = false;
-            for (uint8_t k = 0; k < n && !seen; k++) seen = !strcmp(out[k], a);
-            if (!seen && n < cap) out[n++] = a;
-        });
+    eachSpec([&](const CardSpec &cs) {
+        const char *a = cs.area;
+        if (!a || !a[0]) return;
+        bool seen = false;
+        for (uint8_t k = 0; k < n && !seen; k++) seen = !strcmp(out[k], a);
+        if (!seen && n < cap) out[n++] = a;
+    });
     return n;
 }
 
@@ -58,14 +65,13 @@ const char *linkOf(const char *area) {
     if (!s_reg || !area || !area[0]) return id;
     // A group card's members count (2.11): a cluster has no entity of its own.
     bool split = false;
-    for (uint8_t p = 0; p < s_nPages && !split; p++)
-        forEachCardSpec(*s_pages[p], [&](const CardSpec &cs) {
-            if (split || !cs.area || strcmp(cs.area, area) != 0 || !cs.primaries[0]) return;
-            const Entity *e = s_reg->find(cs.primaries[0]);
-            if (!e || e->desc.source != EntitySource::HA || !e->sourceAreaId[0]) return;
-            if (!id[0]) snprintf(id, sizeof(id), "%s", e->sourceAreaId);
-            else if (strcmp(id, e->sourceAreaId) != 0) split = true;
-        });
+    eachSpec([&](const CardSpec &cs) {
+        if (split || !cs.area || strcmp(cs.area, area) != 0 || !cs.primaries[0]) return;
+        const Entity *e = s_reg->find(cs.primaries[0]);
+        if (!e || e->desc.source != EntitySource::HA || !e->sourceAreaId[0]) return;
+        if (!id[0]) snprintf(id, sizeof(id), "%s", e->sourceAreaId);
+        else if (strcmp(id, e->sourceAreaId) != 0) split = true;
+    });
     if (split) id[0] = '\0';
     return id;
 }

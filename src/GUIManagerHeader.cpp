@@ -246,6 +246,8 @@ uint8_t GUIManager::editFillPage(EditCards::Item *out, uint8_t cap, void *gui) {
         else if (const Entity *e = k->firstEntity()) entityWords(*e, it.state, sizeof(it.state));
         it.from = EditCards::From::FROM_PAGE;
         if (!k->hasId()) continue;   // nothing can be kept for it
+        const CardSpec *spec = CardAdded::specOf(k->id());
+        if (spec && spec->builtIn) { snprintf(it.mark, sizeof(it.mark), "Built in"); continue; }   // K171; to confirm
         it.tick = EditCards::Tick::TICK_HIDE;
         it.canRemove = CardAdded::isAdded(k->id()) && !CardAdded::movedHere(k->id());
     }

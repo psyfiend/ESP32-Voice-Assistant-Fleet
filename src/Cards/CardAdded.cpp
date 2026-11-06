@@ -218,6 +218,7 @@ uint8_t merge(const PageSpec &page, CardSpec *out, uint8_t cap) {
 }
 
 uint8_t count() { return s_n; }
+const CardSpec &specAt(uint8_t i) { return s_spec[i < s_n ? i : 0]; }
 bool nearLimit() { return (uint16_t)s_n * 4 >= (uint16_t)MAX * 3; }   // within 25% (K176)
 
 bool known(const char *cardId) {
