@@ -207,7 +207,7 @@ void dropOpen() {
     lv_obj_get_coords(hdr, &ha);
     lv_obj_get_coords(s.win, &wa);
     const int32_t winW = lv_area_get_width(&wa);
-    const int32_t w = LV_MIN(winW - 2 * gap, winW * (winW < mm(100) ? 72 : 48) / 100);
+    const int32_t w = LV_MIN(winW - 2 * gap, winW * (winW < mm(k.W_NARROW) ? 72 : 48) / 100);
     // A TAP ANYWHERE ELSE IN THE WINDOW FOLDS IT FIRST (1.7): an invisible catcher
     // over the window, under the panel, so a tile under the tap does nothing.
     s_dropCatch = plain(s.win);

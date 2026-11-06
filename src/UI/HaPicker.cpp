@@ -117,7 +117,7 @@ void fillBody() {
     // (the mock's), one on a narrow one: the card window is a fixed size, and
     // its rows are what there is room for.
     const int32_t bodyW = lv_obj_get_content_width(s_body);
-    const bool two = bodyW >= UI::mm(80);
+    const bool two = bodyW >= UI::mm(UI::shape().W_TWO_COL);
     const int32_t rowW = two ? (bodyW - gap()) / 2 : bodyW;
     for (uint8_t i = 0; i < s_n; i++) {
         const HaOffer::Row &row = s_rows[i];

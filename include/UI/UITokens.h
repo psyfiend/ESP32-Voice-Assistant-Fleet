@@ -182,6 +182,8 @@ struct UIShape {
     float W_WINDOW_MAX; // 100  the widest a window gets (a hand's span)
     float W_ROWS_MAX;   // 70   activity's rows at most
     float W_DIALOG_MAX; // 90   a dialog at most
+    float W_NARROW;     // 100  a window narrower is narrow: Edit cards' column and the group view's drop-down take a larger share (2.13 round 5, 1.10)
+    float W_TWO_COL;    // 80   a list at least this wide shows two columns of rows (Edit cards, the HA picker; 1.10)
     float W_DIALOG_BTN; // 24   a dialog's buttons, at most: narrower, they share the row (#96)
     float SWATCH;       // 6.5  a colour swatch; the least height of a scene button
     float CARET_W;      // 2.4  a panel's caret

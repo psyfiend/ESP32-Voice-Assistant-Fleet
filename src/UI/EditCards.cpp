@@ -348,7 +348,7 @@ void fillBody(bool keepScroll) {
     // TWO COLUMNS where the window is wide enough for two names side by side
     // (the mock's), one on a narrow one (the 4B, mock 9).
     const int32_t bodyW = lv_obj_get_content_width(s_body);
-    const bool two = bodyW >= UI::mm(80);
+    const bool two = bodyW >= UI::mm(UI::shape().W_TWO_COL);
     const int32_t cellW = two ? (bodyW - gap()) / 2 : bodyW;
     // A GROUP'S ROWS END IN A SQUARE (K160, K161): shorter, the square beside them
     // as Members has it - a header glyph, a pin, or an empty place.
@@ -612,7 +612,7 @@ lv_obj_t *build(lv_obj_t *parent, int32_t w, int32_t h, const Spec &spec) {
     lv_obj_set_style_pad_column(top, gap() * 2, 0);
     s_nav = column(top);
     // The column a little wider on a narrow window (the 4B), where its names are cut first.
-    lv_obj_set_size(s_nav, w * (w < UI::mm(100) ? 31 : 27) / 100, lv_pct(100));
+    lv_obj_set_size(s_nav, w * (w < UI::mm(UI::shape().W_NARROW) ? 31 : 27) / 100, lv_pct(100));
     s_body = column(top, true);
     lv_obj_set_height(s_body, lv_pct(100));
     lv_obj_set_flex_grow(s_body, 1);

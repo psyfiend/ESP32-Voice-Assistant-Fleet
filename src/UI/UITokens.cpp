@@ -203,7 +203,7 @@ const UIShape UI_SHAPE = {
     .LINE_HAIR = 0.2f, .LINE_MID = 0.3f, .LINE_HEAVY = 0.4f, .LINE_PLOT = 0.45f,
     .DASH = 0.6f, .RING_W = 0.4f, .RING_PAD = 0.3f, .TRACK_PILL = 0.2f, .TRACK_TAB = 0.4f,
     .H_CONTROL = 6.0f, .H_CHIP = 6.0f, .H_ROW = 7.2f, .H_BAR = 0.17f, .H_TABS = 6.0f,
-    .W_SIDE_MIN = 6.0f, .W_WINDOW_MAX = 100.0f, .W_ROWS_MAX = 70.0f, .W_DIALOG_MAX = 90.0f,
+    .W_SIDE_MIN = 6.0f, .W_WINDOW_MAX = 100.0f, .W_ROWS_MAX = 70.0f, .W_DIALOG_MAX = 90.0f, .W_NARROW = 100.0f, .W_TWO_COL = 80.0f,
     .W_DIALOG_BTN = 24.0f, .SWATCH = 6.5f, .CARET_W = 2.4f, .CARET_H = 1.0f,
     .SLOP_SELECTOR = 1.0f, .SLOP_KNOB = 1.2f, .SLOP_HOLD = 4.0f,
     .P_GAP = 4.0f, .P_STACK_GAP = 3.0f, .P_GRIP_INSET = 1.4f, .P_GRIP_H = 0.5f, .P_GRIP_MIN = 5.0f,
