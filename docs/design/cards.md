@@ -455,7 +455,10 @@ and keeps the icon, because §4 says state *is* the icon and its colour.
 
 ### The corner icon is per DOMAIN; the hero icon is per THING
 
-Owner's direction, 2026-09-14, recorded before it is built.
+Owner's direction, 2026-09-14, recorded before it is built. **Revised 2026-11-05 (K172): only
+value cards (temperature, humidity, light level) keep a corner icon; on/off cards - lights, doors,
+occupancy, switches - have none, their hero icon says it** (`StateCard.cpp`). What follows is the
+2026-09-14 reasoning, kept as history.
 
 **Every card carries a small icon in its top-left corner**, including the ones
 that already show a large one in the middle. The two answer different questions
@@ -583,7 +586,7 @@ state pairs therefore stay the main source for binary sensors, not a fallback no
 
 | | Question it answers | Source, first match wins |
 |---|---|---|
-| **Corner** | what KIND of card this is | build-sheet override -> **our table**, keyed on `device_class`, then domain. HA has no per-entity "type" icon, so this is always ours |
+| **Corner** | what KIND of card this is (value cards only since K172) | build-sheet override -> **our table**, keyed on `device_class`, then domain. HA has no per-entity "type" icon, so this is always ours |
 | **Hero** | this particular THING, in its current state | build-sheet on/off pair -> build-sheet icon -> HA's live `attributes.icon` -> our `device_class` state pair -> the corner icon |
 
 Until the build sheet exists, `EntityDescriptor` stands in for it: `icon` is the user's override,

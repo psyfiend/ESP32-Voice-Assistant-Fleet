@@ -515,8 +515,10 @@ on the kit, in the card window's views:
   dashboard / Change group / Add to cluster, each a target, Copy / Move and a dialog, and **Restore**
   in place of Move back and Remove; New group names a group on the glass. What changed and how it
   is kept: `archive/TEST_2.11_FOLLOWUPS.md`, "Round 2 - what changed" and "How it is kept".
-- **Since 2.13 (K146-K164)** the words and the window changed again: GROUP holds Rename group,
-  Header options, Edit cards, Show as, Face and Area; a tile's Visibility is Pin / Unpin this card,
+- **Since 2.13 (K146-K178)** the words and the window changed again: GROUP holds Header options,
+  Edit cards, Face and Area, and Visibility a group's Show as and Rename group (K174); since K171
+  the compiled group cards are retired - groups are cards made on the board, but for Garage - Doors
+  and the Fleet page's built-in Panel; a tile's Visibility is Pin / Unpin this card,
   Add to dashboard, Change group; a page card's Hide from this page, Change label, Add to group;
   removing a member is the second tap in Edit cards; the page's hidden cards are under Hidden in
   the page's Edit cards. `ha-cards.md` §4.

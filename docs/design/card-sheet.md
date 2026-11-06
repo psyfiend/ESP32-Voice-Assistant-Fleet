@@ -662,6 +662,11 @@ Decided with the owner on 2026-10-08: `DECISIONS.md` K33-K38. What the problem i
 words: how does a device stay customised instead of reverting to its compiled configuration at every
 reset?
 
+**Since 2.13 round 5 (K171) the file is most of the dashboard**: the compiled cards are retired
+but for Garage - Doors and the Fleet page's built-in Panel group; every other card is a card made on
+the board, kept in the file with its old id (`scripts/release/retire_compiled.py` converted the
+boards). What follows is how the layers combine for whatever is still compiled.
+
 **How it works.** The board boots from the compiled dashboard, then applies the owner's saved
 changes from one file on top. A value comes from the first layer that sets it: the file, the card's
 spec, the page's spec, the built-in default (D-7's order). New firmware with a changed dashboard

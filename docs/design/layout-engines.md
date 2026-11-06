@@ -286,6 +286,15 @@ worked out from across, which the finish needs to grow them. Host tests: 30. Ope
 4 x 4 fills the screen unevenly - the search counts empty units before clusters grow, so it does
 not see that three equal rows would grow to fill; scoring a page after its growth is the fix.
 
+**2.13 round 5 (K167) - as it is now.** The fingerprint (version byte 10, `PageArranger.cpp`) is
+what is on the page: the blocks, their ids, tiles and aspect, **whether** a cluster has a header -
+not the page's height, not a cluster's member count (its unpinned members), not how many sensors a
+header holds. Kept answers are **`v5 <fp> <C>x<R> <height> ...`**: the height it was arranged for.
+Built in a taller room (the system header hidden), the cards keep their size and each unit row gets
+an even share of the extra height, half above and half below; in a shorter one they are fitted to
+it. Card margins (`system.ui.margins`, 50 / 100 / 150 / 200 % of `UIGrid::GAP`) is the gap the
+search plans with, so changing it arranges once.
+
 ## The domain weight map
 
 Which cards earn space: a weight per card - its domain's (climate and media heavier than a lone

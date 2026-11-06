@@ -452,7 +452,7 @@ only folds it. Forgotten when the sheet closes.
 
 | Client | What it adds to the frame |
 |---|---|
-| The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties, Card UI, Visibility; a group's window has the GROUP panel, K155; **the group view** is this window made bare, showing the group's own cluster, 2.13 K154), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity; its own timeout, bar and selector look (Card UI, D-28) |
+| The card window (`CardPopup`) | its views (controls, History, Members, a member's own, Scenes, Properties, Card UI, Visibility; a group's window has the GROUP panel on every view but History and Scenes and none under its Edit cards, K155, K175; **the group view** is this window made bare, showing the group's own cluster, 2.13 K154 - in Cards mode on the page's ground, K173; a member's own view has its own SETTINGS, K166; back from a view opened directly returns to where it was opened from, K169), which tabs are lit, the titles and the back rules, SETTINGS' rows, the left panel per view, following the entity; its own timeout, bar and selector look (Card UI, D-28) |
 | Edit cards (`UI/EditCardsSheet`, 2.13 K148; the page panel's CARDS) | the `UI/EditCards` list over the page, no panels; from a group the same list is built in the card window (`Popup/PopupCluster.cpp`) |
 | New group (`UI/NewClusterSheet`, 2.13 round 1) | an HA area's entities to start a group from |
 | The hidden cards (`UI/HiddenSheet`, 2.11) | no longer offered on the glass: Edit cards' Hidden list replaced it (K148). Its code is still built - a candidate to remove (`PLAN_2.13.md`) |

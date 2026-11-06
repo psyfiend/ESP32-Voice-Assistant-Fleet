@@ -1,13 +1,13 @@
 # What we built in 2.13 so far - a recap for Eric
 
-Written 2026-11-04, at the end of the long session that ran from 2026-11-02 to 11-04. This is the
-readable version: what changed on the boards, what changed in Home Assistant, and what changed in
-how we work. The exact record lives in `DECISIONS.md` (K138-K164), `TEST_2.13.md` (the four rounds)
-and `docs/design/ha-cards.md` §4. What is left is `PLAN_2.13.md`. When 2.13 merges, this file is
-where the `CHANGELOG.md` entry comes from.
+Written 2026-11-04 at the end of the 11-02 to 11-04 session; round 5 added on 2026-11-05. This is
+the readable version: what changed on the boards, what changed in Home Assistant, and what changed
+in how we work. The exact record lives in `DECISIONS.md` (K138-K178), `TEST_2.13.md` (five rounds)
+and `docs/design/ha-cards.md` §4. What is left is `PLAN_2.13.md` (§7 lists what is not built). When
+2.13 merges, this file is where the `CHANGELOG.md` entry comes from.
 
-**In numbers:** 29 commits on `feat/2.13-add-from-ha`, four test rounds, 27 decisions. The
-project's own code went from 64,629 lines in 260 files (`v0.2.20`) to **69,478 lines in 277
+**In numbers:** 39 commits on `feat/2.13-add-from-ha`, five test rounds, 41 decisions. The
+project's own code went from 64,629 lines in 260 files (`v0.2.20`) to **70,266 lines in 277
 files**. 78 host tests pass.
 
 ---
@@ -81,6 +81,38 @@ emptied cluster hides itself, and Members shows HA's full names.
 - The system panel's Grid line says **fixed** for a held column or row count. The old idea of
   pinning a card to a grid cell is shelved in `FUTURE_IMPROVEMENTS.md`.
 
+### Round 5 (2026-11-05, built while you slept, then finished that afternoon)
+
+You tested round 4 on the glass (T1-T13: eleven passes, two partial) and brought a list of your
+own; we settled it together (K165-K178).
+
+- **The compiled cards are gone** (K171). Every card on the House page is a card made on the
+  board, in its settings file, with the id it always had - so Kitchen's members can be removed like
+  any other. Only Garage - Doors stays compiled, until 2.14. The Fleet page keeps one built-in
+  group, **Panel** (Free Heap, Uptime, a new IP Address, Signal), which cannot be hidden; the dev
+  boards have an **MQTT** group for the deck sensor. The test cards wait in a file, ready to add
+  back for a test.
+- **Membership changes ask first**: Pin and Unpin this card in your words, every Save in Edit cards
+  (a line per kind of change), every Restore. Names in dialogs are in the accent.
+- **New group is Edit cards' flow**: "Model this group after an existing HA area?", then the new
+  group's own list, "Create group N", the name, and "Create new group?".
+- **A sensor being added takes a third tap into the header.** No more check marks on chosen rows.
+- **A member opened inside a group has its own settings live** - Tap action, Long press opens, Card
+  UI - and a tap does the same thing wherever the card is.
+- **Show as and Rename group live in Visibility**; the GROUP panel shows on every view of a group
+  except History and Scenes, and not under Edit cards, which now has the whole height.
+- **The arranger no longer re-arranges for nothing**: hiding the header, adding unpinned members or
+  changing a header's sensors keeps the arrangement, and the spare height becomes space round the
+  cards.
+- **Card margins** in UI Tweaks, and a group's own in a new Group view section of its Card UI.
+- **Looks**: pins in the accent; no corner icon on lights, doors, occupancy and switches; the group
+  view's Cards on the page's colors; the drop-down slides; tiles press in under a long press.
+- **Fixes**: Back from a History opened directly goes where you came from; Eric Bedroom asks HA for
+  its scenes; a group's own Card state reaches its group view; up to 128 cards made on a board,
+  with a warning near the limit.
+- **Decided, not built yet**: HA group entities (Desk, Bedroom) as groups on the board (K170); the
+  unit choice in UI Tweaks (K177).
+
 ### Designed, for later
 
 - **Alerts (2.14)**, from the "2.13 Alert Flow Mocks": one parent alert per rule with its causes,
@@ -94,6 +126,9 @@ emptied cluster hides itself, and Members shows HA's full names.
 - **Changed:** only wording, on 2026-11-02 - `FLEET_REFERENCE.md` rule 3 and `HOUSE_RULES.md` §7
   now say HA *offers* and you choose (K133). HA commit `d8293c5`; logged in
   `projects/2026-10_fleet-2.13/README.md`.
+- **Looked at, not changed (11-05):** the garage doors' roll-up (`binary_sensor.garage_doors`) and
+  `sensor.doors_open`, for how such roll-ups could become groups on the board - deferred to 2.14;
+  three lights read unavailable in HA (Kitchen sink and table, the porch), so the boards show N/A.
 - **Looked at, not changed:**
   - the Security dashboard: its picker offers only security-class entities, so problem and
     battery alerts will need their own view;
@@ -126,3 +161,7 @@ emptied cluster hides itself, and Members shows HA's full names.
   - `PLAN_2.13.md` - the rest of 2.13, in order;
   - this recap.
 - The icon font gained a pin, and the host tests gained the group view's tile grid.
+- **Round 5**: your round-4 results were recorded before anything was built; "never assume - say
+  what you would have assumed and ask two questions" is back in `DECISIONS.md` (W7) and in memory;
+  round 5's settings conversion went through `scripts/release/retire_compiled.py`, each board's file
+  put back before its flash, 0 differences after.

@@ -175,6 +175,9 @@ added to it; the face decides what a tap can do. What building it needs, found o
 
 | Item | Where it stands |
 |---|---|
+| **The system panel's development Reset wipes the House page** (found at the handoff, 11-05) | `CardAdded::resetToCompiled()` deletes every card made on the board - since K171 that is nearly everything. Its id buffer (`RESET_IDS`) is also smaller than 128 made cards. Decide what Reset means now (a saved baseline file? remove it?) before anyone taps it |
+| **Moving a card home by hand is no longer a Restore** (K171, found at the handoff) | `homeCluster()` (`Popup/PopupMove.cpp:96`) and `CardAdded::specOf()` search only compiled specs; the former compiled groups are made cards now. Look home up among the made cards too; test Restore of Kitchen's Overhead and Outside's Garage |
+| The golden harness (`scripts/ui_golden.py`) | its 62 states and "telling the house apart" were set before K171; check it still walks after round 5 |
 | The 4-tap cycle's header step for a group's **existing** members (K168) | only cards being added have it; a member's cycle is still pin, remove, back. Its order with remove is to settle |
 | The Active state row in a member's own view | live since K166, but it starts from the held card's value, not the member's |
 | `Popup/PopupCluster.cpp` is 1,005 lines (structure check, round 5) | move Edit cards' save and dialogs (`editAct`, `doEditSave` and the rest) into `PopupEditCards.cpp` |

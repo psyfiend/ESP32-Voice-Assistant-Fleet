@@ -56,7 +56,7 @@ levels arrive with 2.10c), **#47** discovery payload size, **#48** reason 36.
 | 2.9 | Display stack: esp_lcd (**#67**) | six of nine boards, merged 2026-09-29; left: CYD_S3_8048, WS_S3_5B - `display/README.md` |
 | 2.10 | Card popup (**#65**) | **DONE 2026-10-12.** 2.10a `v0.2.8`; 2.10b `v0.2.9`; 2.10c `v0.2.10` (HA light levels, members of HA groups, scenes, the window redesigned - `design/card-sheet.md` §14-16). **2.10d + 2.10e `v0.2.11`** (merged together, K51): stable ids and saving (§17), History from HA - charts and activity (§18). Sheets in `archive/`. Left over, filed: #90, #91, #92 (K17 done, `v0.2.12`) |
 | 2.11 | Group cards (**#66**) | **DONE 2026-10-30, `v0.2.19`** - sixteen rounds, 54 builds, signed off by the owner (`archive/TEST_2.11.md`; design `design/group-cards.md` §6-7; K88-K129). Clusters and solo cards on the page, **the arranger by the owner's rules in units** (Playground v9, #78, K109, K120, K121; `design/layout-engines.md`), tiles as the mock's E, near square, one height a page (K116, K122, K124), cluster headers in one order (K114-K119), what the glass edits (Visibility, Copy / Move, hidden cards and Restore, the keyboard), **a cluster's window is its Members** with the CLUSTER panel (K129), the House page on HA's new names (K127). The group view and Add cards from HA are 2.13. **Follow-ups DONE 2026-10-31, `v0.2.20`**: moving a card in the owner's words, Restore the one way back (K137, `archive/TEST_2.11_FOLLOWUPS.md`) |
-| 2.13 | HA integration: Add cards from HA (**#116**, the **#66** follow-on) | **BUILDING** - four test rounds on `feat/2.13-add-from-ha` (2026-11-02 to 11-04, K138-K164; `TEST_2.13.md`, design `design/ha-cards.md` §4); **what is left, in order: `PLAN_2.13.md`** |
+| 2.13 | HA integration: Add cards from HA (**#116**, the **#66** follow-on) | **BUILDING** - five test rounds on `feat/2.13-add-from-ha` (2026-11-02 to 11-05, K138-K178; `TEST_2.13.md`, design `design/ha-cards.md` §4); round 5 retired the compiled cards - a board's settings file is its dashboard (K171); **what is left: `PLAN_2.13.md` §7, §3-5** |
 | 2.14 | Alerts on the claim model (**#76**) | designed with 2.13 (K130), **built after 2.15**: its night form needs the night face |
 | 2.15 | Bedroom alarm clock (**#35**, #100, #74, #75) | after 2.13 (K131) - the clock page and its alarms, night dimming, weather and temperature cards, and **OTA (5.1, 5.2) pulled forward** |
 | 2.12 | UI foundation - the refactor | **DONE 2026-10-14, `v0.2.13`** - the card window rebuilt on a foundation (safety net, the split, `UIShape`, the component kit, the Sheet, `Layout::FlowEngine` with host tests, the structure check), nothing changed on screen. How it is built: `design/ui-architecture.md`; the record: `design/ui-foundation.md`. Follow-ups #96, #97 and more: **DONE, `v0.2.15`** (`archive/TEST_UI_FOLLOWUPS.md`) |
@@ -131,8 +131,8 @@ The numbers above are identity, not sequence. Agreed with the owner:
    two rounds; K137; artifact "Card Moves on the Glass"): moving a card in the owner's words,
    **Restore** the one way back, an emptied cluster hiding, HA's full names in Members, a swipe in a
    sheet never a tap.
-6. **2.13 - Add cards from HA, HA's organisation offered** - **building; four rounds done
-   (2026-11-04), the rest in `PLAN_2.13.md`.** As first planned (owner, 2026-10-29; HA's
+6. **2.13 - Add cards from HA, HA's organisation offered** - **building; five rounds done
+   (2026-11-05), the rest in `PLAN_2.13.md` (§7: not built, not explored enough).** As first planned (owner, 2026-10-29; HA's
    `FLEET_REFERENCE.md` and `HOUSE_RULES.md`), **designed together with 2.14 and with improvements
    on HA's side** (K130, K132-K136; `HANDOFF.md`, "Home Assistant"). **HA's side so far**: the
    milestone's log is the HA folder's `projects/2026-10_fleet-2.13/`, tagged `fleet-2.13-start`

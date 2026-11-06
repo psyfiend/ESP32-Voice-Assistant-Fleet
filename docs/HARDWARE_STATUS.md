@@ -296,7 +296,8 @@ the 7B to be the better board for its features and its maker. Unexplained; nobod
 
 **Added 2026-09-28; flashed since (esp_lcd, 2 x 5 portrait signed off - `display/README.md`). Runs
 2.13's round-2 test build (`d8d3d26`) since 2026-11-03 (COM19); it booted on the PC's USB without
-its LiPo.** Its first boot
+its LiPo. It still has the compiled cards: convert its settings file (`retire_compiled.py`, K171)
+before it takes round 5's firmware** (the WS_P4_5, WS_P4_4B and CYD_P4_1060 run round 5, converted). Its first boot
 could not mount the settings: the `spiffs` partition held an empty SPIFFS from older firmware (block
 headers only, no files), and A17 leaves a partition with anything in it alone. Erased with the
 owner's yes (`esptool erase-region 0xc90000 0x360000`, a copy kept first); the next boot formatted

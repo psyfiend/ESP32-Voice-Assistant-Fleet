@@ -426,12 +426,21 @@ new `Layout::Engine`, not placement code in a page. Keep a module there pure, or
 ## Saved settings (`include/Settings.h`, since 2.10d)
 
 The owner's changes live in **one JSON file, `/cfg/settings.json`, on LittleFS** (the 16 MB layout's
-`spiffs` partition), applied over the compiled dashboard: a value comes from the file, else the
-card's spec, else the page's, else the default. It is Q2's runtime layer, so the 3.1 build sheet
-replaces the specs underneath it with nothing to convert. Design: `docs/design/card-sheet.md` §17.
+`spiffs` partition): a value comes from the file, else the card's spec, else the page's, else the
+default. It is Q2's runtime layer. Design: `docs/design/card-sheet.md` §17.
+
+**Since 2.13 round 5 (K171) the file IS the dashboard.** The compiled cards are retired: the House
+page compiles only Garage - Doors (until 2.14), the Fleet page only the built-in **Panel** group
+(`CardSpec::builtIn`: never hidden). Every other card is a card made on the board (`CardAdded`, up to
+128, K176), kept in the file with the id it had. `scripts/release/retire_compiled.py` converts a
+pre-round-5 file (`--mqtt` the dev boards' MQTT group, `--tests` the test cards in
+`scripts/release/test_cards.json`). **A wiped partition leaves a board with Panel and Doors only** -
+and the system panel's development **Reset** (`CardAdded::resetToCompiled`) deletes every made card,
+which is now the whole House page.
 
 - **Cards are keyed by `CardSpec::id`** (`<area>_<label>_<yymmdd>_<hhmm>`, K33), never by position.
-  A new card in a dashboard file needs one; `checkCardIds()` refuses duplicates at boot.
+  A card made on the board gets one when it is made; `checkCardIds()` refuses duplicate compiled ids
+  at boot.
 - **Choices are saved by name** (`"custom"`, never an enum number), so an enum can be reordered.
   New settings get a name table beside their enum (`CardTypes.h` has the pattern).
 - **Set in RAM, written once when the card window closes** (`Settings::save(400)` in `closeNow()`),
@@ -449,10 +458,11 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
 - **Groups for card labels** are `CardGroups` (K46): one kind of group, device-wide, HA areas linked
   in as groups; a card's card label shows its group's name (or its own words) in the group's colour.
   **Colour is the key to a group and never follows a rename.**
-- **Cards added on the device** (K17, `CardAdded`) are card entries with `page`, `after` and `entity`
-  keys, merged into their page right after the card they came from when it is built; **members
-  copied into a cluster** (2.11, K91) have `in` (the cluster's id) where a page card has `page`, and
-  are built after its compiled members. Their ids are made as K33's. **Any card hidden from its page**
+- **Cards made on the board** (K17, `CardAdded`; since K171 nearly every card) are card entries with
+  `page`, `after` and `entity` keys (and `area`, `pri`, `name`, `label`), merged into their page right
+  after the card they came from when it is built; a group made here has `kind`: `cluster` and its
+  `name`; **its members** (2.11, K91) have `in` (the group's id) where a page card has `page`. Their
+  ids are made as K33's. **Any card hidden from its page**
   (K96, K66's remove - compiled or added) has `removed`: `yes`: the page's pool, never built, listed
   under Hidden in the page's Edit cards with Restore (K148). **A card made from HA** (2.13) also has
   `ha` (the entity id), `ha_dc` and `ha_unit`; `SystemCore` creates its entity at boot from them
@@ -469,12 +479,13 @@ replaces the specs underneath it with nothing to convert. Design: `docs/design/c
 - **Every change is logged** with its time and task (`loopTask` = the card window, `httpd` = a
   browser); the last ten are in `/settings?stats=1`.
 - **UI Tweaks' choices are `system.ui.*`** (scheme, card label, entity label, card state,
-  density, `group_view`), the glyphs `system.header.glyphs`, the window's `system.window.close` / `bar`, the
+  density, `group_view`, `margins` - Card margins, K167), the glyphs `system.header.glyphs`, the window's `system.window.close` / `bar`, the
   selector's look per scheme (`schemes.<name>.selector`); **a
   card's own Card UI choices sit on its card entry** (`selector`, `density`, `close`, `bar`,
   `label_text`), absent while it inherits (2.8). **A group card's own** (2.11-2.13): `present`
   (cluster or solo card), `slots` (its header members), `face`, `tap` / `long` as a cluster and
-  `card_tap` / `card_long` as a solo card (K156), `card_state`, `group_view` (K162); a group's HA
+  `card_tap` / `card_long` as a solo card (K156), `card_state`, `group_view` (K162), `margins` (its
+  group view's, K167); a group's HA
   area link is `groups.<id>.ha_area`. The whole 2.13 picture: `docs/design/ha-cards.md` §4.
 - `GET /settings` serves the file; `?stats=1` its counters, files and anything unclaimed. The PC
   addresses that set things until the web UI exists are listed in `Settings.h` and §17.
