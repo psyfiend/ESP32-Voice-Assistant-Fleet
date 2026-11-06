@@ -12,8 +12,12 @@ Claude over `/popup` and screenshots on the P4_5: Desk's SETTINGS live inside Of
 Visibility with Show as and Rename group, the GROUP panel beside it (K174, K175). **Everything else
 is untried on the glass.**
 
-**Not in this round** (questions below): retiring the compiled cards (K171), HA groups as board
-groups (K170), 1.10's four millimetre numbers.
+**Added later on 11-05, after the owner's answers** (`835b870`): **K171** - the compiled cards
+retired, each board's settings file converted and put back before the flash (0 differences after);
+Pin/Unpin names in the accent; New group's dialog says 'Visibility'. Seen on the P4_5's House page
+(screenshot): every group and card as before, the area groups' colors and card labels kept.
+**The Fleet page is unseen** (no way to change page from the PC). **Not in this round:** K170
+(`PLAN_2.13.md` §7.1).
 
 ## What changed on screen
 
@@ -81,11 +85,17 @@ groups (K170), 1.10's four millimetre numbers.
 | T21 | UI Tweaks: Card margins Large | the page re-arranges with wider gaps; a group view's gaps wider too |
 | T22 | Office's Card UI, Group view section: Card margins Small | only Office's group view changes |
 | T23 | Eric Bedroom's light card | a Scenes button, its Hue scenes listed |
+| T24 | The House page | as before: Doors, Outside, Kitchen, Office, Thermo, Eric, the rest; each card's own settings (Desk's tap, the spans) kept |
+| T25 | Kitchen's Edit cards: tap Sink three times | it cycles pin, remove (red), back - a card made on the board now (K171) |
+| T26 | The Fleet page | the Panel group (Free Heap, Uptime, IP Address, Signal) and the MQTT group (the deck's temperature, light level, occupancy); nothing else |
+| T27 | Panel's Visibility; the page's Edit cards | no Hide from this page; Panel's row marked "Built in" with nothing to tick |
 
 ## To confirm (words and looks Claude chose)
 
-- **New group's dialog says "You can rename this group from the GROUP menu"** (the owner's words), but
-  Rename group moved to Visibility (K174). Which should it say?
+- *Settled 11-05:* New group's dialog says "from the 'Visibility' menu"; names in dialogs are in the
+  accent. The owner accepted the rest of this list as written.
+- **"Built in"** on Panel's row in Edit cards (K171), and Panel's tiles all one size (Free Heap,
+  Uptime and IP Address were wide page cards).
 - Save's dialog lines: "The cards X will be added to the group G." / "...will be pinned, and visible
   from the page in the group G." / "...will be unpinned: still members of G, shown in its 'Group
   view' and 'Members view'." / "...will be shown in the header of G." / "...will be removed from
@@ -100,11 +110,7 @@ groups (K170), 1.10's four millimetre numbers.
 
 ## Not built yet
 
-- **K171** (retire the compiled cards) and **K170** (HA groups as board groups) - questions in the
-  session's report and `PLAN_2.13.md`.
-- The 4-tap cycle's header step for a group's existing members (only cards being added have it).
-- The Active state row in a member's own view starts from the held card's value.
-- 1.10's four millimetre numbers.
+- **K170** (HA groups as board groups) and the rest of `PLAN_2.13.md` §7.
 
 # Round 4
 

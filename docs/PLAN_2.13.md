@@ -5,14 +5,16 @@ session is lost. Check items off here as they land; this file is archived beside
 when 2.13 merges. Decisions still go to `DECISIONS.md`, test rounds to `TEST_2.13.md`, the design
 to `docs/design/ha-cards.md` - this file only orders the work and says where each piece stands.
 
-**Where it stands:** branch `feat/2.13-add-from-ha`, four rounds built (K138-K164), round 4 at
-`5fbc9ee` on the P4_5, the 4B and the 1060. The CYD_P4_4880 runs round 2. **Round 4 is untried on
-the glass** (taps, swipes, Save N). Nothing pushed.
+**Where it stands (2026-11-05):** branch `feat/2.13-add-from-ha`, pushed; five rounds built
+(K138-K178). Round 5 (`835b870`, plus `b588cab`'s tokens, which change nothing on the glass) runs on
+the P4_5, the 4B and the 1060, their settings converted for K171. The CYD_P4_4880 runs round 2 with
+its compiled cards: it needs `retire_compiled.py` before it takes round 5's firmware. **Round 5 is
+untried on the glass** - `TEST_2.13.md` round 5, T1-T23 and K171's T24-T27. **What is not built yet
+and what was discussed but not explored enough: §7.**
 
-## 0. First: the owner's round-4 test
+## 0. First: the owner's round-4 test - done 11-04
 
-`TEST_2.13.md` round 4, T1-T13, plus the "couple of minor bugs" the owner mentioned on 11-04 but has
-not listed yet - ask for them before building round 5.
+Recorded in `TEST_2.13.md` round 4; his further findings became 1.11-1.19 and 2.8-2.10.
 
 ## 1. Round 5 - the owner's visual list and small fixes
 
@@ -24,17 +26,12 @@ settings saved and setdiff after, convert their settings for K171, commit and pu
   `4c977d6`, `5c03eaa`): 1.1-1.7, 1.12, 1.13 (K166), 1.14 (K168), 1.17, 1.18 (K173), K165's
   dialogs, K167 (the arranger keeps its answer, v5; Card margins), K169, K172, K174, K175, K176,
   K178, the check mark (K168).
-- **Stopped before K171 and K170** - they need the owner's answers (never assume):
-  - K171: the Fleet page holds more than Panel and MQTT - the three test fixtures (Avail, Reading,
-    Refuse), Battery (two), All Lamps and Lamps 1-3 (virtual), Switch and Stuck. Keep them as made
-    cards on the dev boards, or let them go? Panel's IP Address has no card today (`sys_ip` exists).
-    Garage Doors is a summary card (K98), which a group made on the board cannot be yet: keep it
-    compiled until 2.14 (2.4), or make it an ordinary group shown as a solo card? Panel built in:
-    on the Fleet page only? The compiled entity table (`ExternalEntities_HA.h`) stays, so made cards
-    can name its entities - agreed?
-  - K170 follows K171 (Desk is a compiled card today).
-- Still to do after those: 1.10's four mm numbers; the header step of the 4-tap cycle for existing
-  members; the Active state row in a member view (it starts from the held card's value).
+- **K171 built after the owner's answers (11-05, `835b870`)**: the compiled cards retired; Panel the
+  Fleet page's one built-in group (with IP Address); Garage - Doors compiled until 2.14; the test
+  cards in `scripts/release/test_cards.json`; the dev boards' MQTT group; the three boards' settings
+  converted (`scripts/release/retire_compiled.py`) and put back before the flash, 0 differences.
+  Pin/Unpin names in the accent; New group's dialog says 'Visibility'. **1.10 done** (`b588cab`).
+- **Not built: K170** (§7.1), and the smaller pieces in §7.2.
 
 | # | Item | What is known |
 |---|---|---|
@@ -137,8 +134,80 @@ commit -> `flash_release.ps1`, the 4880 by hand -> HA's `fleet-2.13-done`.
   each board group as a discrete HA group entity, so HA shows every board's groups - perhaps to
   manage the fleet from HA, sync a group across boards, or deploy the same groups to several boards
   at once. Also changing HA's own group entities' members through Spook (K170; never Hue groups).
+  The owner's further thought (11-05): each board group as an HA group entity whose attributes say
+  which members are in the header, or with a companion helper entity holding its settings - for
+  Phases 3 and 4. He would recreate Desk and Bedroom as HA groups but for Hue scenes, which only
+  target groups made in the Hue app.
 - The old cell pinning, shelved (K164, `FUTURE_IMPROVEMENTS.md`).
 - **Voice and the ESPHome API** (A18, Phase 7, `design/voice-esphome.md`).
 - Look at NINA's repo now and then for ideas (`REFERENCE_PROJECTS.md`).
 - **#73** stays open: chrome text still comes from two fixed sets chosen by `bspUiScale() >= 1.3`
   (`UI/UIToolkit.cpp:51`), and value cards still pick VALUE or VALUE_SM each on their own.
+
+## 7. Not built yet, and not explored enough (written 2026-11-05, after round 5)
+
+Gathered from this plan and the 11-04/05 session, so nothing agreed or floated is lost. Each item
+says where it stands; settle the open ones with the owner before building.
+
+### 7.1 K170 - an HA group entity is a group on the board (decided, not built)
+
+The biggest piece left. Decided: every HA group entity (Desk `light.office_lights_hue`, Bedroom
+`light.eric_bedroom_lights_hue`) is a group on the board, shown as a Solo card by default, with the
+GROUP panel, Show as and Edit cards; a command goes in one call to the HA group entity and any card
+added to it; the face decides what a tap can do. What building it needs, found on 11-04/05:
+
+- **A group as a member of a group** (K147's two levels): a card made on the board that is a cluster
+  cannot be a member yet - `CardAdded`'s member records need an entity (`readMember()`), and Desk
+  sits inside Office.
+- **Its members as cards**: today Desk's lamps are entities learnt from `attributes.entity_id`
+  (`haLearn`, `EntityRegistry::learnMembers`), with no cards - so nothing can be saved on them (K166's
+  Long press opens for Desk's lamps, shown as a cluster, has nowhere to go).
+- **The command path**: one service call naming the group entity plus the extras; today a group
+  card commands its members one by one.
+- **Scenes stay the group entity's** (Hue scenes target the Hue group): the board group's Scenes
+  come from its HA entity (1.12's query now asks a card's own lights).
+- **Questions still open**: is it automatic for every HA group entity found (decided: yes) - and when
+  is the board group made: at boot from the HA entity, or the first time its card is made? What
+  happens when HA's member list changes (a lamp added in the Hue app)? Which domains beyond
+  `light.*` (switch groups, `group.*`; the owner: "every HA group entity").
+
+### 7.2 Smaller pieces not built
+
+| Item | Where it stands |
+|---|---|
+| The 4-tap cycle's header step for a group's **existing** members (K168) | only cards being added have it; a member's cycle is still pin, remove, back. Its order with remove is to settle |
+| The Active state row in a member's own view | live since K166, but it starts from the held card's value, not the member's |
+| `Popup/PopupCluster.cpp` is 1,005 lines (structure check, round 5) | move Edit cards' save and dialogs (`editAct`, `doEditSave` and the rest) into `PopupEditCards.cpp` |
+| **Panel's tiles one size** (K171) | the owner wants Free Heap, Uptime and IP Address wide enough for their values; tiles in a group are one size - a tile span per member, or Panel's tile columns, is unbuilt. Not yet seen on the glass |
+| **The Fleet page is unseen after K171** | `/popup` has no way to change page: add `?gopage=N` (DEBUG_POPUP) so Panel and MQTT can be checked from the PC |
+| **The arranger with the header shown again** (K167) | a page arranged while the header was hidden, shown again, fits its cards to the shorter room (they shrink) - not re-arranged. To confirm |
+| The card limit's toast (K176) | a later ordinary toast replaces it; the header alert waits for 2.14 |
+| Units, device-wide (K177: Inherit / F / C in UI Tweaks) | decided, built with §3.2 |
+| New group from the page's own cards (§3.6, K91) | New group offers HA's areas only |
+| **The CYD_P4_4880** | runs round 2 and still has compiled cards; convert its settings (`retire_compiled.py --mqtt`?) before it takes round 5 - ask the owner whether it is a dev board for MQTT |
+| WS_P4_7B, WS_S3_4B (and the other S3s) | K171: the S3_4B takes the P4_4B's settings file, the 7B the 1060's - at the release flash, not yet done; S3_4B stays unflashed until the owner says (#69) |
+| All Lamps (four entities on one card) | cannot be a card made on the board; left out of `test_cards.json` |
+| A converted group's member order | made members come in the settings file's order, which may differ from the compiled one |
+| `UI/HiddenSheet` | kept on purpose (owner, 11-05), unreachable on the glass |
+
+### 7.3 Discussed, not explored enough
+
+- **Roll-up entities and Garage - Doors** (2.4, deferred to 2.14 by the owner): HA's binary sensor
+  group helper where "any open" is the job, members read from `entity_id`; a template carrying
+  `entity_id` for richer roll-ups (`sensor.doors_open`'s count). The owner: Garage Doors may be the
+  only roll-up whose members are commanded; most will be informative (a group temperature card with
+  several lines on one History graph) or alerts in the system or group headers.
+- **Card margins' steps** (K167): 50 / 100 / 150 / 200 % of today's gap, Claude's numbers - judge on
+  the glass. Whether UI Tweaks' "Group view" row should also become a section like Card UI's.
+- **Card UI's Card state row** - its place in the list is still "to confirm" (round 3).
+- **"Built in"** - the mark Edit cards shows on Panel's row instead of a Hide tick (K171): Claude's
+  words, to confirm.
+- **2.7**: "Create N" / "Add N" and re-reading every on-screen "group" against K146 / K158 - New
+  group's "Create group N" is settled (K168); the rest to judge on the glass.
+- **1.8 / 1.9**: round 1's knowns (a humidity's decimal, the 4B's °F, long names in tiles) and the
+  4B's slow HTTP after a restore - recheck on the glass.
+- **Three lights read unavailable in HA** on 11-05 (`light.kitchen_light_sink`,
+  `light.kitchen_light_table`, `light.porch_light`) - the boards show N/A, which is correct; an HA-side
+  matter for the owner.
+- **Issues**: #52 (auto-sort) - close if the owner agrees it is superseded; #116 - bring it up to date
+  from this plan.
