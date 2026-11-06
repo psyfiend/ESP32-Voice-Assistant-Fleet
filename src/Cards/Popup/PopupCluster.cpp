@@ -219,8 +219,10 @@ void renameCb(lv_event_t *ev) {
     Kit::keyboard(k);
 }
 
+// The GROUP panel folds as the view opens, as Visibility's and Card UI's do (owner, 2026-11-06).
 void slotsViewCb(lv_event_t *ev) {
     (void)ev;
+    deckSet(DECK_PEEK);
     lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_CLUSTER_SLOTS); },
                   nullptr);
 }

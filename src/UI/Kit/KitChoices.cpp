@@ -113,6 +113,7 @@ lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_
         total = maxName = maxSpan = 0;
         uint8_t longest = 0;
         for (uint8_t r = 0; r < n; r++) {
+            if (rows[r].section) continue;   // a title across the table: no column of its own
             int32_t widest = 0;
             for (uint8_t i = 0; i < rows[r].n; i++) widest = LV_MAX(widest, textW(rows[r].words[i], UI::type().TAG));
             cw[r]    = LV_MAX(minChip, widest + 2 * side);
@@ -153,6 +154,10 @@ lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_
     const int32_t sliderW = maxSpan > 0 ? LV_MIN(maxSpan, w) : w / 2;
     for (uint8_t r = 0; r < n; r++) {
         const ChipRowSpec &row = rows[r];
+        if (row.section) {   // the row's place in the list is still its child index
+            drawerTitle(list, row.what);
+            continue;
+        }
         lv_obj_t *line = plain(list);
         lv_obj_t *words = label(line, nameLook);
         lv_label_set_text(words, row.what);
@@ -238,6 +243,7 @@ lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_
 void chipTableLit(lv_obj_t *table, uint8_t row, uint8_t lit) {
     lv_obj_t *line = table ? lv_obj_get_child(table, row) : nullptr;
     if (!line || lit == CHIP_SLIDER || lit == CHIP_CHECK) return;
+    if (!lv_obj_check_type(lv_obj_get_child(line, 0), &lv_label_class)) return;   // a section row: a rule first
     if (lv_obj_check_type(lv_obj_get_child(line, 1), &lv_slider_class)) return;   // a slider row
     if (checkOf(table, row)) return;                                              // a check row
     if (lv_obj_get_child_count(line) == 2 && lv_obj_check_type(lv_obj_get_child(line, 1), &lv_label_class))

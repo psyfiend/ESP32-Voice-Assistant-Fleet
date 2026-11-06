@@ -205,14 +205,32 @@ void UIToolkit::show_sticky(const char* text) {
     if (!hooked) { lv_obj_add_event_cb(toast_panel, sticky_tap_cb, LV_EVENT_CLICKED, NULL); hooked = true; }
 }
 
+// A TOAST HELD WHILE SOMETHING WORKS (owner, 2026-11-06): no timer and no bar,
+// hidden by end_held(); notices wait behind it.
+static bool toast_held = false;
+
+void UIToolkit::show_held(const char* text) {
+    if (!toast_panel || !text || !text[0] || toast_sticky) return;
+    show_toast(text, 1000);
+    if (toast_timer_handle) { lv_timer_del(toast_timer_handle); toast_timer_handle = NULL; }
+    toast_held = true;
+}
+
+void UIToolkit::end_held() {
+    if (!toast_held) return;
+    toast_held = false;
+    if (toast_panel && !toast_sticky && !toast_timer_handle) lv_obj_add_flag(toast_panel, LV_OBJ_FLAG_HIDDEN);
+    if (notice_n && !toast_sticky && !toast_timer_handle) notice_next();
+}
+
 void UIToolkit::show_notice(const char* text, uint32_t duration_ms) {
     if (!text || !text[0]) return;
     if (notice_n < NOTICE_Q) {
         snprintf(notice_q[notice_n], sizeof(notice_q[0]), "%s", text);
         notice_ms[notice_n++] = duration_ms;
     }
-    // Nothing showing: this one now. Else it waits for the timer (or the tap).
-    if (!toast_timer_handle && !toast_sticky) notice_next();
+    // Nothing showing: this one now. Else it waits for the timer (or the tap, or the work).
+    if (!toast_timer_handle && !toast_sticky && !toast_held) notice_next();
 }
 
 // Expanded Accordion Panel Accessor

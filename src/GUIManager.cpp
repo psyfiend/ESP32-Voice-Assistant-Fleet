@@ -1513,6 +1513,23 @@ void GUIManager::tick() {
 #ifdef HAS_AUDIO_HW
     _pnlAudio.tick();
 #endif
+    // WHILE THE PAGE IS ARRANGED (owner, 2026-11-06): a toast held until the arranger
+    // has its answer - after a short wait, so a quick one does not flash it.
+    {
+        constexpr uint32_t ARRANGE_TOAST_AFTER_MS = 250;
+        static uint32_t since = 0;
+        static bool shown = false;
+        if (PageArranger::running()) {
+            if (!since) since = now | 1;
+            if (!shown && now - since >= ARRANGE_TOAST_AFTER_MS) {
+                UIToolkit::show_held("Optimizing page view...");
+                shown = true;
+            }
+        } else {
+            since = 0;
+            if (shown) { UIToolkit::end_held(); shown = false; }
+        }
+    }
     // K17: a card added or removed shows once no card window is open (the window holds the
     // page's cards); one whose entity was learnt late, once the table has grown; the arranger's answer once kept.
     if (!CardPopup::isOpen()) {

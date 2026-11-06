@@ -180,7 +180,10 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
         g.tileGap = UI::mm(UI::shape().C_TILE_GAP);
         g.minTile = UI::mm(UI::shape().C_TILE_MIN);
         const uint8_t cellCols = _uCols / _sub ? _uCols / _sub : 1;
-        const Layout::ClusterSpan sp = Layout::clusterSpan(nTiles, g, cellCols, _maxRows);
+        // NO MEMBER PINNED (owner, 2026-11-06: Indoor temp, made with its members
+        // unpinned, could not be a cluster): its header alone, in the room one tile
+        // would take - never turned into its one card for having no tiles.
+        const Layout::ClusterSpan sp = Layout::clusterSpan(nTiles ? nTiles : 1, g, cellCols, _maxRows);
         if (sp.fits) {
             ClusterCard *cl = newCluster(cs, spec, reg, false);
             CardPlacement pl = cs.place;

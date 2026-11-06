@@ -218,6 +218,8 @@ bool takeDone() {
     return keptNew;
 }
 
+bool running() { return s_state.load() == 1; }
+
 void flowed(const char *slug, const char *why) {
     snprintf(s_use, sizeof(s_use), "%s flowed (%s)", slug ? slug : "?", why ? why : "");
 }

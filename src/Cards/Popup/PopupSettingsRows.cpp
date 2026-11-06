@@ -173,7 +173,15 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     // state (round 6): it never counts as on; its members do.
     // When a group defined here counts as on - HA's group helper option.
     // Not for a group defined in HA or Hue: the source decides (2.10c).
-    if (s.nEnt > 1 && !s.native && !subjCluster && (!inMember() || subj))
+    // ONLY WHERE A MEMBER CAN BE ON (owner, 2026-11-06): a group of temperatures
+    // has no on to count - the row is for the kind, as Units is (never greyed).
+    bool onOff = false;
+    for (uint8_t i = 0; i < s.nEnt && !onOff; i++) {
+        const Entity *e = s.ent[i];
+        onOff = e && (e->value.type == ValueType::BOOL || e->desc.kind == EntityKind::LIGHT ||
+                      e->desc.kind == EntityKind::SWITCH);
+    }
+    if (s.nEnt > 1 && onOff && !s.native && !subjCluster && (!inMember() || subj))
         r[n++] = { "Active state", DeckRowKind::ROW_DROP, "Any members are on\nAll members are on",
                    (uint16_t)(s.groupOn == GroupOn::GROUP_ON_ALL), true, groupDropCb, &s.ddGroup };
     // Entity label and Card label are Card UI's since 2.8 round 3 (D-25, D-28).

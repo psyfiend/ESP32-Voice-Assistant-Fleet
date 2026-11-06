@@ -39,11 +39,11 @@ static const char *const MARGIN_IS[] = { nullptr, "small", "medium", "large", "x
 
 // THE GROUP VIEW SECTION (owner, 2026-11-05, K167): at the foot of a group's Card
 // UI, under its own title, what affects only its group view - Card appearance (K162's
-// choice) and Card margins.
+// choice) and Card margins. ONE LIST (owner, 2026-11-06): the title is a section row
+// of the same table, centred between the panels' rules, scrolling with the rest.
 enum CuiRow : uint8_t { CUI_ENTITY, CUI_CLABEL, CUI_METAL, CUI_SHAPE, CUI_DENSITY, CUI_TIMEOUT, CUI_BAR, CUI_STATE,
                         CUI_GVIEW, CUI_GMARGIN, CUI_ROWS };
-static lv_obj_t *s_table2 = nullptr;   // the Group view section's rows
-static uint8_t   s_n1 = 0;             // the rows in the first table
+constexpr CuiRow CUI_SECTION = CUI_ROWS;   // the table's GROUP VIEW title: no option
 
 static Card *held() { return settingsSubject(); }   // a member's own card in its view (K166)
 
@@ -53,7 +53,7 @@ static Card *held() { return settingsSubject(); }   // a member's own card in it
 // and bar. A mini tile names its entity, and has no card label or density. The
 // selector rows are for a window that has one - a light's controls. The table's
 // rows, in order, as CuiRows.
-static CuiRow  s_rowAt[CUI_ROWS];
+static CuiRow  s_rowAt[CUI_ROWS + 1];   // the options and, for a group, its section's title
 static uint8_t s_nRows = 0;
 
 static bool rowApplies(CuiRow r) {
@@ -111,10 +111,9 @@ static uint8_t litOf(uint8_t row) {
     return 0;
 }
 
-// Row `r` of the view (either table's) lit as the card has it now.
+// Row `r` of the view lit as the card has it now.
 static void relight(uint8_t r) {
-    if (r < s_n1) Kit::chipTableLit(s_table, r, litOf(s_rowAt[r]));
-    else if (s_table2) Kit::chipTableLit(s_table2, (uint8_t)(r - s_n1), litOf(s_rowAt[r]));
+    if (s_rowAt[r] != CUI_SECTION) Kit::chipTableLit(s_table, r, litOf(s_rowAt[r]));
 }
 
 // This window's wait and bar, as the card now has them - at once (round 4).
@@ -239,13 +238,6 @@ static void chipCb(lv_event_t *ev) {
     lv_async_call(chooseAsync, lv_event_get_user_data(ev));
 }
 
-// The Group view section's chips: their rows after the first table's.
-static void chipCb2(lv_event_t *ev) {
-    const uintptr_t v = (uintptr_t)lv_event_get_user_data(ev);
-    const uintptr_t at = ((v >> 8) & 0xFF) + s_n1;
-    lv_async_call(chooseAsync, (void *)((at << 8) | (v & 0xFF)));
-}
-
 // --- The view ----------------------------------------------------------------------
 void buildCardUi() {
     if (!held()) return;
@@ -261,26 +253,26 @@ void buildCardUi() {
         { "Card appearance", GVIEW_W,  3, litOf(CUI_GVIEW)   },   // K162, named so in its section (K167)
         { "Card margins",   MARGIN_W,  5, litOf(CUI_GMARGIN) },   // K167
     };
-    Kit::ChipRowSpec rows[CUI_ROWS];
+    Kit::ChipRowSpec rows[CUI_ROWS + 1];
     s_nRows = 0;
-    s_n1 = 0;
+    bool titled = false;
     for (uint8_t r = 0; r < CUI_ROWS; r++) {
         if (!rowApplies((CuiRow)r)) continue;
+        if (r >= CUI_GVIEW && !titled) {   // the section's title, once, above its rows (K167)
+            rows[s_nRows] = {};
+            rows[s_nRows].what    = "GROUP VIEW";
+            rows[s_nRows].section = true;
+            s_rowAt[s_nRows++] = CUI_SECTION;
+            titled = true;
+        }
         s_rowAt[s_nRows] = (CuiRow)r;
         rows[s_nRows] = all[r];
         // Shown as a solo card, it has no group view (K162).
         if ((r == CUI_GVIEW || r == CUI_GMARGIN) && s.groupCard) rows[s_nRows].greyed = true;
-        if (r < CUI_GVIEW) s_n1++;
         s_nRows++;
     }
     const int32_t w = lv_area_get_width(&s.winRect) - 2 * s.pad;
-    s_table = Kit::chipTable(s.stage, w, rows, s_n1, chipCb);
-    s_table2 = nullptr;
-    if (s_nRows > s_n1) {
-        lv_obj_t *t = Kit::drawerTitle(s.stage, "Group view");   // the section's title (K167)
-        lv_obj_set_width(t, w);
-        s_table2 = Kit::chipTable(s.stage, w, rows + s_n1, (uint8_t)(s_nRows - s_n1), chipCb2);
-    }
+    s_table = Kit::chipTable(s.stage, w, rows, s_nRows, chipCb);
 }
 
 // The card's own window look, before its window is built: its timeout and bar

@@ -112,6 +112,27 @@ Pin/Unpin names in the accent; New group's dialog says 'Visibility'. Seen on the
 
 - **K170** (HA groups as board groups) and the rest of `PLAN_2.13.md` §7.
 
+## Found on the glass before the tests (owner, 2026-11-05 evening; T1-T27 not run yet)
+
+Fixed on the branch 2026-11-06, compiled on the three dev boards, **not flashed or seen yet**:
+
+1. **Header options left the GROUP panel open.** It now folds as the view opens, as Visibility
+   and Card UI do.
+2. **Indoor temp (the 1060) could not be a cluster, and came up as a Solo card.** Both had one
+   cause: a cluster with no pinned member had no tiles, so the page fell back to its one card
+   (a made group's default is Cluster). It now stands as a cluster with its header alone, in
+   the room one tile would take.
+3. **Card UI's GROUP VIEW split the list in two**, each part scrolling on its own. It is one list
+   again, with **GROUP VIEW** as a centred section title between the panels' rules, as the
+   system panel's section titles.
+4. **Active state on a group of temperatures.** Shown now only where a member can be on (K183).
+5. **No sign while the page arranges.** "Optimizing page view..." is held while the arranger
+   works, after a quarter second so a quick run does not flash it (K183).
+
+Answered: Indoor temp's face on **All members** shows its **first** member's reading - the card
+takes its type and value from its first entity. Not changed; see the summary question in
+`PLAN_2.13.md` §8.
+
 # Round 4
 
 **Branch** `feat/2.13-add-from-ha` at `5fbc9ee`. **Boards** WS_P4_5, WS_P4_4B and CYD_P4_1060 run it

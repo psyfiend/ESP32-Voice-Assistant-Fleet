@@ -48,6 +48,9 @@ void start(const Input &in);
 // True once after an answer has been kept: the page should be built again.
 bool takeDone();
 
+// True while an arrangement is being worked out (the "Optimizing page view..." toast).
+bool running();
+
 // A page built without the arranger (it is switched off, or the page has too many
 // blocks): said in lastText().
 void flowed(const char *slug, const char *why);

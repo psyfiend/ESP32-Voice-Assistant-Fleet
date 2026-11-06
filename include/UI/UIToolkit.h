@@ -81,6 +81,11 @@ public:
     static void     show_notice(const char* text, uint32_t duration_ms = 5000);
     // A toast that stays until it is tapped (K176).
     static void     show_sticky(const char* text);
+    // A toast held while something works, gone when end_held() says it is done
+    // (owner, 2026-11-06: "Optimizing page view..." while the arranger runs). Not
+    // over a sticky one, which waits for its tap; the queue carries on after.
+    static void     show_held(const char* text);
+    static void     end_held();
 
     // Widget Generators
     static lv_obj_t*    create_collapsible_panel(lv_obj_t* parent, const char* title, lv_obj_t** content_container);

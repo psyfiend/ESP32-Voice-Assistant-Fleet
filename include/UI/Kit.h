@@ -332,6 +332,10 @@ struct ChipRowSpec {
     // GREYED (K155, K162: options never move): the row shown, its chips dim and
     // not to be tapped, where the option does not apply.
     bool               greyed = false;
+    // A SECTION ROW (owner, 2026-11-06: Card UI's GROUP VIEW): `what` centred with
+    // the panels' rules either side (drawerTitle()), in the table's own list so it
+    // scrolls with the rows; nothing to tap, and no part in the columns' measure.
+    bool               section = false;
 };
 lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_t n, lv_event_cb_t cb);
 void      chipTableLit(lv_obj_t *table, uint8_t row, uint8_t lit);   // after a choice

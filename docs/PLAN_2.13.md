@@ -214,3 +214,38 @@ added to it; the face decides what a tap can do. What building it needs, found o
   matter for the owner.
 - **Issues**: #52 (auto-sort) - close if the owner agrees it is superseded; #116 - bring it up to date
   from this plan.
+
+## 8. Settled on 11-06, and what is still open (after the K170, summary and backup reports)
+
+Settled (K179-K183): Hue groups read-only, Indoors not offered, Desk to become an HA light group
+(the owner's job); the boards keep their own configuration - nothing mirrored into HA, no Spook for
+now; a full backup and restore before Phase 3; summary cards are one shared framework, designed with
+2.14's alerts; Active state only where a member can be on; the arranging toast; Card UI's one list.
+
+**K170, open**
+- **"The mirror" is a group on the board**, nothing made in HA (K180): HA's members in it,
+  read-only, beside any cards the owner adds; a command is the group entity's call plus the extras';
+  a scene reaches only the HA members. Claude's reading of the owner's message - to confirm.
+- **Which HA entities with members become groups**: lights and switches certainly; the owner also
+  wants **sensor groups** (temperatures, a door count) to open as groups. Claude's proposal: any HA
+  entity whose `entity_id` lists 2 or more members, members read-only, the face HA's own value;
+  one-member aliases stay plain cards. A sensor group's face is then a summary (K182) - the two meet.
+- Desk as an HA light group: check after the owner makes it that its HA scenes are offered.
+
+**K181 (backup), open**
+- Where it lives: on the board (LittleFS, beside the settings file), and on the PC through
+  `save_settings.ps1` as now.
+- **The arranged layout is already in the settings file** (`pages.<slug>.layout`, fingerprinted with
+  the screen): restored on the same board it is used as is; on another board the screen differs and
+  the page is arranged again. That is the owner's "store the layout so it need not re-arrange", for
+  free.
+- Whether Restore replaces the system panel's Reset (§7.2: Reset wipes the House page today).
+- Whether board-specific values (brightness, the MQTT group) stay out of a backup meant for
+  another board.
+
+**From the glass (TEST_2.13 round 5's "Found on the glass")**
+- **Should New group pin the members chosen for it?** K160's "new members join unpinned" was for
+  adding to a group that is already on the page; a new group with nothing pinned shows only its
+  header.
+- A group of temperatures on All members shows its first member; the owner wants an average, a
+  chosen member, and a History of every member that can be shown or hidden - K182's work.
