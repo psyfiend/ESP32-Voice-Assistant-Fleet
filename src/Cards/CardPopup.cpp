@@ -186,6 +186,7 @@ void showView(PopupView v) {
                               : v == PopupView::VIEW_CARD_UI ? "Card UI"
                               : v == PopupView::VIEW_CLUSTER_SLOTS ? "Header options"
                               : v == PopupView::VIEW_VISIBILITY ? "Visibility"
+                              : v == PopupView::VIEW_SHOW_AS ? "Show as"
                               : v == PopupView::VIEW_ADD_TO ? "Add to group"
                               : v == PopupView::VIEW_CLUSTER_ADD ? "Edit cards"
                               : v == PopupView::VIEW_JOIN ? visibilityJoinTitle() : "Members");
@@ -204,6 +205,7 @@ void showView(PopupView v) {
     else if (v == PopupView::VIEW_CLUSTER_ADD) buildClusterAdd();     // K104's Add cards
     else if (v == PopupView::VIEW_JOIN)       buildJoin();            // K92 rule 9
     else if (v == PopupView::VIEW_GROUP)      buildGroup();           // 2.13, K143
+    else if (v == PopupView::VIEW_SHOW_AS)    buildShowAs();          // K191
     else                                   buildMain();
     deckSync();     // SETTINGS' rows are the view's (a member's own has more)
     // EDIT CARDS HAS NO PANELS (1.6, as from the page): more room for its lists.
@@ -250,6 +252,10 @@ void goBack() {
         case PopupView::VIEW_ADD_TO: showView(PopupView::VIEW_VISIBILITY); break;   // its view's own
         case PopupView::VIEW_JOIN:   // every move opens from Visibility (round 2 of the 2.11 follow-ups)
             if (visibilityJoinBack()) break;
+            showView(PopupView::VIEW_VISIBILITY);
+            break;
+        case PopupView::VIEW_SHOW_AS:   // K191: a step back, then Visibility
+            if (showAsBack()) break;
             showView(PopupView::VIEW_VISIBILITY);
             break;
         default:                     showView(controlsView()); break;

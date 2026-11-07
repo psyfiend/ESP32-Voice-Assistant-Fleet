@@ -124,6 +124,7 @@ struct DbgReq { int card = -1; int deck = -1; int ctl = -1; int set = -1; int vi
                 int tap = -1; int groups = -1; int clabel = -1; int span = -1; int row = -1; int x = -1;
                 int catalog = -1;                          // 2.13: what HA offers (1 lists, 2 asks HA again)
                 int haSrc = -1, haTick = -1, haGo = -1;    // ...Add cards' source, a picker row, its Add
+                int showAs = -1;                           // ...Show as... (K191): 0 open, N a chip, 99 Next
                 int pageCard = -1, pageAdd = -1;           // ...the page's Edit cards: open it, a group step chip
                 int haYes = -1;                            // ...the question's button
                 int ncOpen = -1, ncCreate = -1;            // ...New cluster: open it, its Create
@@ -204,6 +205,7 @@ esp_err_t handlePopup(httpd_req_t *req) {
         if (httpd_query_key_value(q, "pagecard", v, sizeof(v)) == ESP_OK) a.pageCard = atoi(v);
         if (httpd_query_key_value(q, "pageadd", v, sizeof(v)) == ESP_OK) a.pageAdd = atoi(v);
         if (httpd_query_key_value(q, "hayes", v, sizeof(v)) == ESP_OK) a.haYes = atoi(v);
+        if (httpd_query_key_value(q, "showas", v, sizeof(v)) == ESP_OK) a.showAs = atoi(v);
         if (httpd_query_key_value(q, "ncopen", v, sizeof(v)) == ESP_OK) a.ncOpen = atoi(v);
         if (httpd_query_key_value(q, "nccreate", v, sizeof(v)) == ESP_OK) a.ncCreate = atoi(v);
         if (httpd_query_key_value(q, "ncarea", a.ncArea, sizeof(a.ncArea)) == ESP_OK) a.ncAreaSet = true;
@@ -428,6 +430,11 @@ void CardPopup::debugService(lv_timer_t *t) {
     }
     if (a.pageAdd >= 0) {
         dbgOut(EditCardsSheet::groupDebug((uint8_t)a.pageAdd) ? "group chip %d\n" : "no group step (%d)\n", a.pageAdd);
+        s_dreq.store(DREQ_DONE);
+        return;
+    }
+    if (a.showAs >= 0) {   // K191: showas=0 opens it (Visibility first), 1..N the Nth chip or check, 99 Next
+        dbgOut(showAsDebug(a.showAs) ? "show as: %d\n" : "no Show as here (%d)\n", a.showAs);
         s_dreq.store(DREQ_DONE);
         return;
     }
@@ -666,7 +673,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             else if (a.view == 8) showView(PopupView::VIEW_VISIBILITY);   // 2.11 (K96): as SETTINGS' Visibility
             else if (a.view == 9) showView(PopupView::VIEW_ADD_TO);       // ... and its Add to a cluster
             else if (a.view == 10 && heldGroup()) showView(PopupView::VIEW_CLUSTER_ADD);   // a group's Edit cards (K155)
-            else if (a.view == 11 && s.cluster) showView(PopupView::VIEW_GROUP);         // its group view (2.13)
+            else if (a.view == 11 && (s.cluster || s.groupCard)) showView(PopupView::VIEW_GROUP);         // its group view (2.13)
             dbgMem(mem, sizeof(mem));
             dbgOut("view %d; %s\n", a.view, mem);
             // Why the last commands failed, newest first (G8).

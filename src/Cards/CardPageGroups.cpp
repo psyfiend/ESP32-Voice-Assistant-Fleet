@@ -74,12 +74,13 @@ void groupMembers(const CardSpec &cs, GroupMembers &g) {
     }
 }
 
-// NOT ALL LIGHTS AND SWITCHES (K188): its solo card's tap toggles nothing.
+// NOT ALL LIGHTS AND SWITCHES (K188): its solo card's tap toggles nothing. The
+// header's sensors do not count - they are the group view's header, not its cards.
 bool groupMixed(const GroupMembers &g, EntityRegistry &reg) {
     for (uint8_t k = 0; k < g.n; k++) {
         const char *pid = g.mem[k]->primaries[0];
         const Entity *e = pid ? reg.find(pid) : nullptr;
-        if (!e || GroupMembers::movedOut(*g.mem[k])) continue;
+        if (!e || GroupMembers::movedOut(*g.mem[k]) || g.slotOf(g.mem[k]->id) >= 0) continue;
         if (!(e->desc.writable && (e->desc.kind == EntityKind::LIGHT || e->desc.kind == EntityKind::SWITCH))) return true;
     }
     return false;

@@ -1,4 +1,132 @@
-# Test sheet - 2.13, cards from Home Assistant (rounds 1 to 5)
+# Test sheet - 2.13, cards from Home Assistant (rounds 1 to 5, and the final suite)
+
+# Final suite - for signing off 2.13
+
+**This is the one sheet to run.** It replaces round 5's T1-T27, which were never run: those still
+standing are carried below as F21-F42, and the two that changed (T10, T19) are F1 and F11-F12.
+
+**Branch** `feat/2.13-add-from-ha`. **Boards** WS_P4_5, WS_P4_4B and CYD_P4_1060 run it (app only;
+each board's settings saved first and compared after - 0 differences). **Scope** K192: K188-K191,
+Reset removed, Restore of a moved card fixed. **Not in 2.13**: Backup and Restore (next milestone),
+the mirror and HA groups as board groups (K184, K170), summary cards and sensor groups (2.14).
+
+**Checked by Claude on the P4_5 over `/popup`** (and put back after): Kitchen through Show as... to a
+solo card (face Sink, Group view) and back to Group, the pins kept; the solo card's Visibility line,
+group view and Members (no pins); New group with one card pinned - the dialog, face and tap steps,
+and what it saved. **Nothing here is seen on the glass yet.**
+
+## What changed since round 5
+
+- **Show as... is a flow** (K191): a group's Visibility opens with "Group card being presented as
+  'Solo card'" (or 'Group'); **Show as...** walks Solo card (face, then tap) or Group (pins), then a
+  dialog says what will happen. The Show as chips are gone.
+- **A group with fewer than two pinned cards shows as its solo card**; pins are kept through any
+  switch (K188).
+- **A solo group card opens its group view**: Group view is in its Tap action and Long press opens.
+  Its Members show **no pins**, only the header glyphs of its group view's header sensors (K188).
+- **A mixed group's solo card toggles nothing**: Members by default, no Toggle. Sensors in the
+  header do not make a group mixed (K188).
+- **New group**: a card's first tap adds it **pinned**; then the header (a sensor), unpinned, off
+  (K190). With fewer than two pinned, "This will create a group on the page shown as a 'Solo card'."
+  and the face and tap steps (K191).
+- **"Group" replaces "cluster"** on screen (K191). **Reset** is gone from the system panel (K192).
+- **Restore of a card moved out of a group** works again (the groups made on the board since K171).
+- The five fixes found on the glass on 11-05 (below, round 5's "Found on the glass").
+
+## Tests
+
+**Groups: Show as..., the solo card, pins**
+
+| # | Do this | PASS if |
+|---|---|---|
+| F1 | Kitchen's Visibility | "Group card being presented as 'Group'" at the top; Show as..., Rename group, Hide from this page; no Show as chips; the GROUP panel beside it |
+| F2 | Show as..., Solo card, Next | "Select card to show as the face:" - All lights, then Sink, Overhead, Table and the header sensors |
+| F3 | Choose Sink, Next | "Select tap action:" - Toggle, Group view, Members view, History view (Toggle offered: Kitchen's header sensors do not count) |
+| F4 | Choose Group view, Next | "Show group as solo card?" naming Kitchen, Sink, the 'Group view', and that pinned cards are kept; Cancel changes nothing |
+| F5 | Again to the dialog; Confirm | Kitchen is one card showing Sink; "Optimizing page view..." while the page arranges |
+| F6 | Tap the Kitchen card | its group view, the header sensors at the top; tap its name: Members |
+| F7 | Kitchen's Members | no pins; the header sensors show their header glyph beside them |
+| F8 | Kitchen's SETTINGS: Tap action; Long press opens | Toggle, Details view, Group view, Members view, History view, Nothing; Long press has Group view |
+| F9 | Kitchen's GROUP panel | Face live (it is a solo card); Header options greyed |
+| F10 | Show as..., Group, Next | "Select cards to pin:" - Sink, Overhead, Table, each ticked (the pins were kept); the line "The group will be shown on the page with its pinned cards." |
+| F11 | Untick two | the line becomes "Fewer than two cards are pinned, so the group will still be shown as a solo card." |
+| F12 | Tick them again; Next; Confirm | "Show group as group?" naming the pinned cards; Kitchen is a group again, its tiles as before |
+| F13 | In Show as..., the back arrow on each step | one step back; from the first, Visibility |
+| F14 | A member's Visibility: Unpin this card, on Kitchen, until one tile is left | the page shows Kitchen as its solo card; Pin the second back: a group again |
+| F15 | A group with a light and an occupancy sensor (both pinned), Show as... Solo card | no Toggle in the tap step; on the page its tap opens Members; SETTINGS' Tap action has no Toggle |
+
+**New group (K190, K191)**
+
+| # | Do this | PASS if |
+|---|---|---|
+| F16 | Page panel, CARDS, New group, Office: tap a light once, twice, three times | pinned (the pin in the square), then unpinned, then off |
+| F17 | Tap a temperature sensor once, twice, three times, four | pinned, in the header (its glyph), unpinned, off |
+| F18 | Two lights pinned; Create group 2; Next; Create | no solo card dialog; "New group" offered (Office is taken); the new group on the page as a group |
+| F19 | New group again: one light pinned, one unpinned; Create group 2 | "This will create a group on the page shown as a 'Solo card'." - Cancel, Next |
+| F20 | Next | the face step with the pinned light lit; then the tap step (Toggle first); then the name; Create: a solo card with that face and tap |
+
+**Round 5's tests still standing (T1-T27 less T10, T19, T25's wording)**
+
+| # | Do this | PASS if |
+|---|---|---|
+| F21 | Members or Edit cards of Office | the pins in the accent color |
+| F22 | Look at a light, a door and occupancy card; a temperature card | no corner icon on the first three; the temperature keeps its corner icon |
+| F23 | UI Tweaks, Group view: Cards; Linen; tap Office | the window's ground is the page's, cards the page's card color, cut corners the ground's color |
+| F24 | Office's Card UI: Card state Fill; open its group view | its members use Fill there too |
+| F25 | Group view: tap the header sensors; tap a tile while the panel is down | it slides down; the tile tap only folds it (sliding up) |
+| F26 | Long-press a group view tile | it presses in as on the page, then opens the member |
+| F27 | In the group view long-press Desk; SETTINGS | Tap action, Long press opens, Card UI live; change Tap action, close; on the page Desk's tap does the new thing |
+| F28 | Group view: a header sensor's row, then back | back to the group view (not the sensor's Details) |
+| F29 | A card whose Long press opens is History: long-press, then back | the window closes |
+| F30 | Office: Members, Card UI, Properties | the GROUP panel on each; on History, CHART or ACTIVITY instead |
+| F31 | Office's Edit cards | no panels under it; it reaches the screen's foot |
+| F32 | A member's Visibility: Unpin this card; then Pin this card | each asks first, in the owner's words; Confirm does it |
+| F33 | Office's Edit cards: tap two cards to add, one twice; Save | "Save 3 changes?" naming them - added, pinned; Save does it |
+| F34 | Edit cards: an HA area with Office's cards in it | Office's members there show the square and take the tap cycle |
+| F35 | Edit cards: tap a temperature sensor not yet in Office three times | its square shows the header glyph; Save: it is in Office's header |
+| F36 | Edit cards: choose a row | no check mark; nothing in the row moves |
+| F37 | A page card's Visibility: Add to group, into Office | it joins Office unpinned (not on the page; in the group view) |
+| F38 | Hide the system header; show it | the cards keep their size, the spare height spread round them |
+| F39 | UI Tweaks: Card margins Large; then Office's Card UI, Group view section: Card margins Small | the page re-arranges with wider gaps; then only Office's group view changes |
+| F40 | Eric Bedroom's light card | a Scenes button, its Hue scenes listed |
+| F41 | Kitchen's Edit cards: tap Sink three times | it cycles pin, remove (red), back |
+| F42 | The Fleet page (swipe), Panel's Visibility, the page's Edit cards | the Panel group and the MQTT group, nothing else; no Hide from this page on Panel; Panel's row "Built in" |
+
+**The rest**
+
+| # | Do this | PASS if |
+|---|---|---|
+| F43 | System panel | SYSTEM - DIAGNOSTICS: Log, UI Tweaks, About - no Reset |
+| F44 | Kitchen's Overhead: Visibility, Add to dashboard, Move; then the new card's Restore | the dialog says it goes back to Kitchen; Restore: back in Kitchen as a tile, its page card gone |
+| F45 | Anywhere on screen | the word "cluster" nowhere (the hidden cards' notes, Show as) |
+| F46 | Office: GROUP, Header options | the GROUP panel folds as the view opens |
+| F47 | Office's Card UI | one list, GROUP VIEW a centred title between rules, scrolling with the rest |
+| F48 | Indoor temp (the 1060): SETTINGS | no Active state row |
+| F49 | The House page | as before: Doors, Outside, Kitchen, Office, Thermo, Eric, the rest; each card's own settings kept |
+
+## To confirm (words Claude chose; the owner's are in K191)
+
+- Step prompts: "Show this group as:" (Solo card, Group), "Select tap action:", "Select cards to pin:"
+  - and the pins lines: "The group will be shown on the page with its pinned cards." / "Fewer than
+  two cards are pinned, so the group will still be shown as a solo card."
+- The dialogs: titles **"Show group as solo card?"** and **"Show group as group?"** (the second reads
+  oddly - a better one?); lines "The group X will be shown on the page as a solo card." / "The card
+  X will be shown as the face." (or "The face will show all of the group's lights." / "...members.")
+  / "Tapping the card will turn the group on or off." (or "...will open the 'Group view'.", "'Members
+  view'", "'History view'") / "Pinned cards are kept and will be shown again if the group is shown
+  as a group." / "The pinned cards will be: ...".
+- New group's solo dialog: title **"Create group"**, the owner's line, buttons Cancel and Next.
+- The view's title "Kitchen > Show as".
+
+## Open (to settle at sign-off or after)
+
+- **A face chosen on a solo card decides what its tap toggles**: Face = Sink means Toggle switches
+  Sink alone. Claude recommended a tap always toggle the whole group (unanswered, 11-06).
+- **Pin / Unpin this card stay in a member's Visibility on a solo card**; with fewer than two pinned
+  they change nothing on the page until a second is pinned.
+- A group made on the board whose group card was hidden: Restore of a card moved out of it still
+  makes a copy (the hidden group is not read back). Rare; not fixed.
+- K191's "Face greyed for an HA group entity" waits for K170: no HA group entity is a board group yet.
 
 # Round 5
 

@@ -99,7 +99,7 @@ using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
 // cluster (K91, K100).
 enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER, VIEW_SCENES, VIEW_PROPS,
                                   VIEW_CARD_UI, VIEW_CLUSTER_SLOTS, VIEW_VISIBILITY, VIEW_ADD_TO,
-                                  VIEW_CLUSTER_ADD, VIEW_JOIN, VIEW_GROUP };
+                                  VIEW_CLUSTER_ADD, VIEW_JOIN, VIEW_GROUP, VIEW_SHOW_AS };
 enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // Where the held card is. OWNED: its window is open, and it stays pressed in,
 // with the accent border, until the window closes.
@@ -595,6 +595,12 @@ void removeFromPageCb(lv_event_t *ev);   // PopupDialog.cpp: "Remove this card?"
 bool visibilityTakeRebuild();        // a choice wants the page built again, once the window has gone
 const char *visibilityJoinTitle();   // VIEW_JOIN's name: "Move this card" for a cluster's tile
 bool visibilityJoinBack();           // its back arrow inside the view; false: back to Visibility
+// SHOW AS... (PopupShowAs.cpp, K191): a group's presentation, face and tap, or its
+// pins, step by step from Visibility, confirmed in a dialog.
+void showAsOpen();
+void buildShowAs();
+bool showAsBack();                   // a step back; false: back to Visibility
+bool showAsDebug(int v);             // /popup?showas=: 0 open, 1..N the Nth chip or check, 99 Next
 // Where a member moved out has gone, in words for its row: "On the page", or
 // "In <cluster>" for one on this page; null when it has not moved.
 const char *movedWords(const Card *member, char *buf, size_t cap);

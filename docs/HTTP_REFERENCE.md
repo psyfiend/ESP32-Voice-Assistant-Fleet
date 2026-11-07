@@ -320,7 +320,7 @@ order.
 | `/popup?removecard=6` / `7` / `8` | (K112) on a card made on the glass: `6` its Remove from the page, no dialog; `7` that dialog; on a card moved out of a cluster, `8` its Move back to the cluster - each closes the window | `6`: the card's entry deleted; `8`: the entry deleted and the tile's `hidden` cleared |
 | `/popup?kbpress=1` | the keyboard's Save (2.11, K95) | what it was opened for: a cluster's `label_text` (none: its group's name), a card's `name`, or its card label's `label_text` - when the window closes |
 | `/popup?grid=a\|cu\|cd\|ru\|rd` | (2.11 round 9) the system panel's **Auto**, **Col +**, **Col -**, **Row +**, **Row -** on the page showing | the page's `cols` / `rows` pins (Auto removes both); the page arranges again |
-| `/popup?dash=1` | (round 9) the system panel opens with the development **Reset**'s dialog, which counts what would go - nothing changes unless its Reset is tapped (`slot=-1` takes it down) | nothing |
+| `/popup?dash=1` | (round 9; its button left the system panel on 11-06, K192 - this address is the only way to the dialog now) the system panel opens with the development **Reset**'s dialog, which counts what would go - nothing changes unless its Reset is tapped (`slot=-1` takes it down) | nothing |
 | `/popup?dash=2` | **the Reset done, no dialog**: every card made on the board deleted (`page` / `in` entries), every hide and move undone (`removed`, `hidden`), group cards' `slots` and `present` removed, every page's `layout` removed. **Never on the owner's real settings** - a test copy, then `restore_settings.ps1` | as described; the looks, schemes, UI Tweaks and pins stay |
 
 ### 2.13: Edit cards, New group, the group view (debug builds)
@@ -339,7 +339,8 @@ written for 2.11's windows; several of those buttons are gone or renamed since 2
 | `/popup?hago=1`..`4` | Edit cards' Add, Hide, Remove, Restore (a group's Save N has no handle yet) | **Saved** once its dialog's button is tapped (`hayes=1`) |
 | `/popup?pageadd=N` | chip N of the label step ("Select label for these cards:") | UI |
 | `/popup?hayes=1` | the question's go button, or the label step's Next | **Saved**: what the dialog said |
-| `/popup?ncopen=1`, `ncarea=<id>`, `nccreate=1` | New group (K168): open it; choose its HA area (`""` Create new) - straight to its Edit cards step; `nccreate=1` presses the next step's button - Create group N, then the name step's Next, then the dialog's Create | the last `nccreate`: **Saved**, a new group and its cards |
+| `/popup?showas=0` / `1`..`N` / `99` | (K191) on a group's open window: `0` its Visibility's **Show as...**; `N` a tap on the Nth chip of the step showing (Solo card / Group, the face, the tap) or the Nth check of the pins step; `99` its Next - the last raises the dialog, whose Confirm is `hayes=1` | **Saved** only at Confirm: `present`, and `face` / `card_tap` (solo card) or the members' `hidden` (group) |
+| `/popup?ncopen=1`, `ncarea=<id>`, `nccreate=1` | New group (K168): open it; choose its HA area (`""` Create new) - straight to its Edit cards step; `nccreate=1` presses the next step's button - Create group N, then (fewer than two pinned, K191) the solo card dialog's Next, the face step's and the tap step's Next, then the name step's Next, then the dialog's Create | the last `nccreate`: **Saved**, a new group and its cards |
 | `/popup?drop=1` | a tap on the group view's header sensors: their panel drops or folds (K163) | UI |
 
 ### **Device** - these command real lights and scenes

@@ -192,18 +192,11 @@ void pausedChipCb(lv_event_t *ev) {
     lv_async_call(pausedChoose, (void *)(v & 0xFF));
 }
 
-// A GROUP'S OWN VISIBILITY (owner, 2026-11-05, K174): how it stands on the page -
-// Show as (Cluster, Solo card) beside Paused, and Rename group with its buttons.
-const char *const SHOW_AS_W[] = { "Cluster", "Solo card" };   // K151's words
-enum VisRow : uint8_t { VR_PAUSED, VR_SHOW_AS };
-VisRow s_visRow[2];
-void groupChipCb(lv_event_t *ev) {
-    const uintptr_t v = (uintptr_t)lv_event_get_user_data(ev);
-    const uint8_t at = (uint8_t)(v >> 8), i = (uint8_t)(v & 0xFF);
-    if (at >= 2) return;
-    Kit::chipTableLit(s_table, at, i);
-    if (s_visRow[at] == VR_PAUSED) lv_async_call(pausedChoose, (void *)(uintptr_t)i);
-    else                           groupShowAs(i == 1);   // the page is built again once the window has gone
+// A GROUP'S OWN VISIBILITY (owner, 2026-11-05, K174; 2026-11-06, K191): a line saying
+// how it is presented, Paused (not for a group itself), and Show as... and Rename
+// group with its buttons. Show as is a flow (PopupShowAs.cpp), never a chip.
+void showAsCb(lv_event_t *) {
+    lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showAsOpen(); }, nullptr);
 }
 void renameGroupCb(lv_event_t *) {
     lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) clusterRename(); }, nullptr);
@@ -263,20 +256,21 @@ void buildVisibility() {
     const bool groupSelf = !inMember() && (s.cluster || s.groupCard);   // K174
     const Kit::ChipRowSpec paused = { "Paused", PAUSED_W, 2, (uint8_t)(aggregate().paused ? 1 : 0) };
     lv_obj_t *list;
+    list = clusterSelf ? table(nullptr, 0, nullptr) : table(&paused, 1, pausedChipCb);
     if (groupSelf) {
-        Kit::ChipRowSpec rows[2];
-        uint8_t nr = 0;
-        if (!clusterSelf) { rows[nr] = paused; s_visRow[nr++] = VR_PAUSED; }
-        rows[nr] = { "Show as", SHOW_AS_W, 2, (uint8_t)(s.cluster ? 0 : 1) };
-        rows[nr].greyed = !c->hasId();
-        s_visRow[nr++] = VR_SHOW_AS;
-        list = table(rows, nr, groupChipCb);
-    } else {
-        list = clusterSelf ? table(nullptr, 0, nullptr) : table(&paused, 1, pausedChipCb);
+        // The owner's words (K191): how the page shows it now.
+        lv_obj_t *l = Kit::label(list, KS::KS_LABEL_NAME);
+        lv_obj_set_width(l, lv_pct(100));
+        lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+        lv_label_set_text(l, s.cluster ? "Group card being presented as 'Group'"
+                                       : "Group card being presented as 'Solo card'");
+        lv_obj_move_to_index(l, 0);
     }
     const bool restore = c->hasId() && restoreOffered(c);
-    Action a[4];
+    Action a[5];
     uint8_t n = 0;
+    if (groupSelf && c->hasId()) a[n++] = { "Show as...", Kit::ButtonRole::BTN_CANCEL, showAsCb };       // K191
     if (groupSelf && c->hasId()) a[n++] = { "Rename group", Kit::ButtonRole::BTN_CANCEL, renameGroupCb };   // K174
     if (cl) {
         // MOVED OUT (the sprint after round 7): its card is elsewhere now, and its
