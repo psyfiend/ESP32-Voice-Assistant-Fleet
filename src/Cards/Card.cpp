@@ -1128,7 +1128,13 @@ void Card::applyState() {
 
     // A card label in its own colour shows even with no words (K44).
     const bool wantArea = _showArea && (_area[0] || _labelAlways);
-    lv_label_set_text(_lblArea, wantArea ? _area : "");
+    // A GROUP SHOWN AS ITS SOLO CARD SAYS SO (owner, 2026-11-07): a small group glyph
+    // after its card label's words - the stock face's stacked squares, in the words'
+    // colour, so no second face or object.
+    char words[sizeof(_area) + 8];
+    snprintf(words, sizeof(words), "%s%s%s", wantArea ? _area : "", wantArea && _groupCard && _area[0] ? " " : "",
+             wantArea && _groupCard ? LV_SYMBOL_COPY : "");
+    lv_label_set_text(_lblArea, words);
     lv_label_set_text(_badge,   mark);
 
     // --- the area holder ---------------------------------------------------

@@ -135,7 +135,10 @@ void pinGo() {
     const int8_t i = (cl && c) ? clusterMemberOf(*cl, c->firstEntity()) : -1;
     if (i < 0 || s.phase != PopupPhase::PHASE_OPEN) return;
     clusterMemberShow(*cl, (uint8_t)i, true);
-    showView(PopupView::VIEW_VISIBILITY);   // it says so at once; the cluster when the window closes
+    // THE WINDOW CLOSES AND THE PAGE ARRANGES (owner, 2026-11-07, F14): a pin changes
+    // the page - a solo card can become a group - so it is shown at once.
+    s_rebuildPage = true;
+    CardPopup::close();
 }
 
 // UNPIN THIS CARD (K160): off the page, still in the group.

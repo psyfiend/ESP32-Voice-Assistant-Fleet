@@ -436,7 +436,7 @@ void showWindow() {
     k = Kit::SheetSpec{};
     k.leftCb  = leftCb;
     k.crumbCb = crumbCb;
-    if (s.cluster) k.nameCb = nameCb;
+    if (s.cluster || s.groupCard) k.nameCb = nameCb;   // a solo card's group name too (F52, owner 11-07)
     k.nTabs   = membersTab() ? 2 : 1;
     if (k.nTabs == 2) { k.tabGlyph[0] = MDI_LIGHTBULB_GROUP; k.tabCb[0] = membersCb; }
     k.tabGlyph[k.nTabs - 1] = MDI_CHART_BAR;

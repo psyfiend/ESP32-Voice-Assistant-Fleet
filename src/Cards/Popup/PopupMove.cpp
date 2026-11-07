@@ -46,6 +46,11 @@ int32_t listW() { return lv_area_get_width(&s.winRect) - 2 * s.pad; }
 
 bool isMade(const char *id) { return id && (CardAdded::isAdded(id) || CardAdded::isMember(id)); }
 
+// A COPY OR A MOVE: a made card that names the card it came from ("from"). Since
+// K171 nearly every card is made, so "made" no longer means "a copy" - an original
+// treated as one was deleted by its Restore (F44, owner 11-07: the 1060's Overhead).
+bool isCopy(const char *id) { return isMade(id) && CardAdded::fromOf(id); }
+
 // --- The clusters -------------------------------------------------------------------
 ClusterCard *s_cl[PICK_MAX] = {};
 uint8_t      s_nCl = 0;
@@ -298,12 +303,12 @@ bool lastTile() {
     return mine && tiles == 1;
 }
 
-// A card's group changed. A compiled card keeps the one it had (orig_group), and
-// coming back to it leaves nothing to restore.
+// A card's group changed. An original (no "from") keeps the one it had (orig_group),
+// and coming back to it leaves nothing to restore.
 void regroup(const char *id, const char *gid, const char *sheetArea) {
     char cur[48];
     const bool had = Settings::card(id, "group", cur, sizeof(cur));
-    if (!isMade(id)) {
+    if (!isCopy(id)) {
         char was[48];
         if (!Settings::card(id, "orig_group", was, sizeof(was)))
             Settings::setCard(id, "orig_group", had ? cur : "inherit");
@@ -695,7 +700,7 @@ char s_rid[CARD_ID_MAX + 1] = "";
 const char *restoreTarget(const Card *c) {
     if (!c || !c->hasId()) return nullptr;
     if (CardAdded::isMovedToPage(c->id())) return CardAdded::becameOf(c->id());
-    if (isMade(c->id())) return c->id();
+    if (isCopy(c->id())) return c->id();
     char v[48];
     return Settings::card(c->id(), "orig_group", v, sizeof(v)) ? c->id() : nullptr;
 }
@@ -785,7 +790,7 @@ void restoreAsk(const Card *c) {
     char a[96], b[96];
     lines();
     CardGroups::Group g;
-    if (!isMade(s_rid)) {
+    if (!isCopy(s_rid)) {
         // A GROUP CHANGED, NOTHING MOVED: its group back.
         char was[48];
         Settings::card(s_rid, "orig_group", was, sizeof(was));

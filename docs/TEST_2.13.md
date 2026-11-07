@@ -113,6 +113,35 @@ and what it saved. **Nothing here is seen on the glass yet.**
 | F52 | Indoor Temp's Members | the title "Indoor Temp" alone; tap it: the group view; tap the group view's name: Members |
 | F53 | Show as..., Solo card: choose a face, then leave the flow without Confirm | nothing changes - the face is saved only at the dialog's Confirm (what happened on the glass: GROUP's Face still said All members) |
 
+## Results, 11-06 night (owner, on the 1060)
+
+**Passed:** F1, F2, F4-F7, F9, F10, F12, F13, F15-F19, F21-F43, F45, F47-F51, F53.
+**Failed:** F3, F8, F11, F14 (partly), F20, F44, F46, F52.
+
+| # | What was wrong | Cause | Now |
+|---|---|---|---|
+| F3, F8 | No Toggle for Kitchen | Not the offline Tuya switches. **The 1060's Kitchen has the Front Thermostat as a member** (unpinned), so it is mixed and K188 offers no Toggle | Unchanged; a question below (Open, 1) |
+| F20 | No Toggle in New group or after | Not reproduced: with two Office lamps Claude got Toggle in the tap step and in the card's SETTINGS. Your two test groups' members were removed, so which cards you picked cannot be read back | Which cards did you pick? A sensor or the thermostat would explain it (Open, 1) |
+| F11 | The pins line and the dialog miscounted | The prompt sits first in the check table, so each check read the row above it | **Fixed** |
+| F14 | Pin's Confirm left the window open | It returned to Visibility by design (K160) | **Fixed**: Confirm closes the window and the page arranges. Unpin unchanged (Open, 3) |
+| F44 | Restore deleted Overhead | Since K171 every card is "made", and Restore took any made card for a copy. On the 1060, Kitchen's Overhead was the Living page card moved into Kitchen (10-26), so Move put that page card back (owner's 17), and its Restore then deleted it | **Fixed**: Restore deletes or moves only a card that is a copy. **The 1060's Overhead is back** in Kitchen from the 11-06 21:05 backup. HA calls it "Laundry Light", which is why Edit cards had no "Overhead" |
+| F44 | Copy and Move chips flat | That chip row had no finish | **Fixed**: unlit is satin |
+| F46 | GROUP stayed open over Header options | GROUP is the left panel; only the right one was folded | **Fixed** |
+| F52 | Tapping "Indoor Temp" in Members did nothing | A solo card's window title was never made a link | **Fixed** |
+
+**Flashed 11-07 00:45, app only, on all three (0 settings differences).** Retest:
+
+| # | Do this | PASS if |
+|---|---|---|
+| R1 | Show as..., Group: untick and tick the pins in any order, several times | the line always matches the number ticked; the dialog names exactly the ticked cards |
+| R2 | Unpin Kitchen's tiles until one is left; then a member's Visibility, Pin this card, Confirm | the window closes, "Optimizing page view...", Kitchen is a group again |
+| R3 | Office: GROUP, Header options | GROUP folds as the view opens |
+| R4 | Indoor Temp's Members: tap the title "Indoor Temp" | the group view; tap its name: Members |
+| R5 | Any card's Visibility, Add to dashboard | Copy and Move: the unlit one is satin |
+| R6 | Kitchen's Overhead (1060): Visibility, Add to dashboard, Move; then the page card's Visibility | Overhead is a page card again; its Restore (if offered) gives back its card label, never deletes it |
+| R7 | Look at Indoor Temp, and Kitchen shown as a solo card | a small two-squares glyph after the card label's words; no other card has it |
+| R8 | Right after a reboot, watch Indoor Temp | its entity id for up to a minute, then "Front Room Temperature" by itself (it no longer waits for the page to be rebuilt) |
+
 ## To confirm (words Claude chose; the owner's are in K191)
 
 - Step prompts: "Show this group as:" (Solo card, Group), "Select tap action:", "Select cards to pin:"
@@ -127,19 +156,37 @@ and what it saved. **Nothing here is seen on the glass yet.**
 - New group's solo dialog: title **"Create group"**, the owner's line, buttons Cancel and Next.
 - The view's title "Kitchen > Show as".
 
-## Open (to settle at sign-off or after)
+## Open (to settle at sign-off or after) - each with a way to see it
 
-- **A face chosen on a solo card decides what its tap toggles**: Face = Sink means Toggle switches
-  Sink alone. Claude recommended a tap always toggle the whole group (unanswered, 11-06).
-- **Pin / Unpin this card stay in a member's Visibility on a solo card**; with fewer than two pinned
-  they change nothing on the page until a second is pinned.
-- A group made on the board whose group card was hidden: Restore of a card moved out of it still
-  makes a copy (the hidden group is not read back). Rare; not fixed.
-- K191's "Face greyed for an HA group entity" waits for K170: no HA group entity is a board group yet.
-- **Right after a boot, a card made from HA may carry its entity id as its name** (`sensor.front_room_temperature`,
-  `light.deck_light`) until the page is next built: HA's names arrive after the page is first built.
-  Seen in `/popup`'s list; whether the glass shows it is to check (F50 just after a flash).
-- **Marking a solo card as a group on the page** (owner, 11-06): to decide - see the reply of 11-06.
+1. **Which members make a group "mixed" (no Toggle)?** Now: any member that is not a light or switch,
+   pinned or not, except header sensors. *See it:* the 1060's Kitchen (Thermo is an unpinned member):
+   Show as..., Solo card, Next, Next - no Toggle. *Choose:* (a) as now; (b) only pinned members count;
+   (c) the face decides - a light or switch face offers Toggle.
+2. **What a solo card's Toggle switches.** Now: its face (Face = Sink: Sink alone; "All lights": every
+   light). *See it:* a light group as a solo card with one light as its face, Toggle as the tap, tap
+   it. Claude's recommendation (11-06): the whole group, whatever the face shows.
+3. **Unpin this card keeps the window open** (K160), while Pin now closes it (F14). *See it:* a
+   member's Visibility, Unpin, Confirm. Close on Unpin too?
+4. **Deleting a group.** Now there is no Delete: removing the last member hides the group (owner's
+   15: "An empty group will be hidden automatically but can be used again"); its record stays (the
+   1060 holds two empty "New group" groups from your F18-F20 tests). *Proposal (words to agree):* a
+   **Delete group** button in the group's Visibility, after Hide from this page; a dialog "Delete
+   group?" - "The group X and its N cards will be deleted. Cards moved into it go back where they
+   came from." - Cancel, Delete. And: should an empty group be deleted instead of hidden?
+5. **A card moved out of a group onto the page has no way back.** Since K171 every card is made, and
+   a made card moving out of a group relocates: nothing records its group, so Restore cannot return
+   it (K137 says Restore is the one way back). *See it:* Office's Desk: Visibility, Add to dashboard,
+   Move; its Visibility has no Restore. *Proposal:* the move remembers the group, and Restore sends
+   it back as a tile.
+6. **Found by Claude, not fixed:** while a group made by New group from an HA area that already has a
+   group is on the page (a "New group" from Office), Office's cards made from HA open titled
+   "New group > Eric" instead of "Office > Eric". Gone once that group is gone. Cause not found yet.
+7. A group made on the board whose group card was hidden: Restore of a card moved out of it still
+   makes a copy (the hidden group is not read back). Rare; not fixed.
+8. K191's "Face greyed for an HA group entity" waits for K170: no HA group entity is a board group yet.
+
+**Settled 11-07:** the solo card's marker - a small group glyph after its card label's words
+(owner: "I like the small group glyph beside the card label"); built, R7.
 
 # Round 5
 

@@ -241,10 +241,14 @@ void gridCb(lv_event_t *ev) {
     Kit::chipGridLit(s_grid, i);
 }
 
+// The prompt stands first in the check table (buildShowAs), so check row k is the
+// table's child k + 1 - reading child k read the row above it (F11, owner 11-07).
+constexpr uint8_t PIN_ROW0 = 1;
+
 void pinCb(lv_event_t *ev) {
     const uint8_t row = (uint8_t)((uintptr_t)lv_event_get_user_data(ev) >> 8);
     if (row >= s_nPin || !s_table) return;
-    a.pin[row] = Kit::chipTableChecked(s_table, row);
+    a.pin[row] = Kit::chipTableChecked(s_table, (uint8_t)(row + PIN_ROW0));
     if (s_says) lv_label_set_text(s_says, pinsSay());
 }
 
@@ -288,7 +292,7 @@ bool showAsDebug(int v) {
     const uint8_t i = (uint8_t)(v - 1);
     if (a.step == Step::SA_PINS) {
         if (i >= s_nPin || !s_table) return false;
-        Kit::chipTableCheck(s_table, i, !a.pin[i]);
+        Kit::chipTableCheck(s_table, (uint8_t)(i + PIN_ROW0), !a.pin[i]);
         a.pin[i] = !a.pin[i];
         if (s_says) lv_label_set_text(s_says, pinsSay());
         return true;

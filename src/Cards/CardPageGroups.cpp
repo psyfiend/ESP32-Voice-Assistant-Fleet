@@ -264,11 +264,19 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
     if (faceMem) {
         char nm[ENTITY_NAME_MAX];
         const Entity *fe = reg.find(faceMem->primaries[0]);
-        if (!(cardIdUsable(faceMem->id) && Settings::card(faceMem->id, "name", nm, sizeof(nm)) && nm[0]))
-            // HA's name for it (a learnt entity's desc.name is its entity id), else ours.
+        if (cardIdUsable(faceMem->id) && Settings::card(faceMem->id, "name", nm, sizeof(nm)) && nm[0]) {
+            c->setLabel(nm);   // the name typed on the member
+        } else if (fe && fe->learnt) {
+            // A LEARNT ENTITY'S NAME ARRIVES AFTER THE PAGE IS BUILT (its entity id
+            // until HA's first state, owner's glass 11-07): no label of its own, so
+            // the card reads its entity's name at every render, as Deck Light does.
+            c->setLabel("");
+        } else {
+            // A declared one's own name is fixed; HA's is the owner's word for it.
             snprintf(nm, sizeof(nm), "%s", fe && fe->sourceName[0] ? fe->sourceName
                                          : fe && fe->desc.name[0] ? fe->desc.name : faceMem->label ? faceMem->label : "");
-        if (nm[0]) c->setLabel(nm);
+            if (nm[0]) c->setLabel(nm);
+        }
     }
     // ITS OWN TAP AND LONG PRESS (K156): "card_tap" and "card_long" - makeCard()
     // read the cluster's ("tap", "long") under the same id.
