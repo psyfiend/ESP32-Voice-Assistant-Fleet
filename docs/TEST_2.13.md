@@ -104,6 +104,15 @@ and what it saved. **Nothing here is seen on the glass yet.**
 | F48 | Indoor temp (the 1060): SETTINGS | no Active state row |
 | F49 | The House page | as before: Doors, Outside, Kitchen, Office, Thermo, Eric, the rest; each card's own settings kept |
 
+**Found on the glass on 11-06 evening, fixed and flashed the same night**
+
+| # | Do this | PASS if |
+|---|---|---|
+| F50 | Indoor Temp (the 1060; Claude saved its face as Front Room through Show as... while checking) | the card shows Front Room's reading and is named "Front Room Temperature", its card label still Indoor Temp; GROUP's Face says Front Room Temperature |
+| F51 | Long-press Indoor Temp | the title "Indoor Temp > Front Room Temperature" |
+| F52 | Indoor Temp's Members | the title "Indoor Temp" alone; tap it: the group view; tap the group view's name: Members |
+| F53 | Show as..., Solo card: choose a face, then leave the flow without Confirm | nothing changes - the face is saved only at the dialog's Confirm (what happened on the glass: GROUP's Face still said All members) |
+
 ## To confirm (words Claude chose; the owner's are in K191)
 
 - Step prompts: "Show this group as:" (Solo card, Group), "Select tap action:", "Select cards to pin:"
@@ -127,6 +136,10 @@ and what it saved. **Nothing here is seen on the glass yet.**
 - A group made on the board whose group card was hidden: Restore of a card moved out of it still
   makes a copy (the hidden group is not read back). Rare; not fixed.
 - K191's "Face greyed for an HA group entity" waits for K170: no HA group entity is a board group yet.
+- **Right after a boot, a card made from HA may carry its entity id as its name** (`sensor.front_room_temperature`,
+  `light.deck_light`) until the page is next built: HA's names arrive after the page is first built.
+  Seen in `/popup`'s list; whether the glass shows it is to check (F50 just after a flash).
+- **Marking a solo card as a group on the page** (owner, 11-06): to decide - see the reply of 11-06.
 
 # Round 5
 

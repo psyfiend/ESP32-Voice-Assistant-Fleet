@@ -237,11 +237,14 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
     }
     // ITS FACE (K151): one member chosen in its GROUP panel ("face", that member's
     // id); else the members that switch together, else every member.
+    const CardSpec *faceMem = nullptr;
     if (hasId && Settings::card(cs.id, "face", v, sizeof(v)))
         for (uint8_t k = 0; k < nMem && !n; k++)
             if (mem[k]->id && !strcmp(mem[k]->id, v) && mem[k]->primaries[0] && reg.find(mem[k]->primaries[0]) &&
-                !movedOut(*mem[k]))
+                !movedOut(*mem[k])) {
                 one.primaries[n++] = mem[k]->primaries[0];
+                faceMem = mem[k];
+            }
     for (int pass = 0; pass < 2 && !n; pass++)
         for (uint8_t k = 0; k < nMem && n < CARD_PRIMARY_MAX; k++) {
             const char *pid = mem[k]->primaries[0];
@@ -256,6 +259,17 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
     if (!c) return nullptr;
     c->setGroupCard(true);   // its GROUP panel (K151, K155)
     c->setGroupMixed(groupMixed(gm, reg));   // K188: a tap toggles only lights and switches
+    // A FACE CHOSEN: THE CARD IS NAMED AS THAT MEMBER (owner, 2026-11-06) - "Front Room
+    // Temperature", its card label still the group's ("Indoor Temp").
+    if (faceMem) {
+        char nm[ENTITY_NAME_MAX];
+        const Entity *fe = reg.find(faceMem->primaries[0]);
+        if (!(cardIdUsable(faceMem->id) && Settings::card(faceMem->id, "name", nm, sizeof(nm)) && nm[0]))
+            // HA's name for it (a learnt entity's desc.name is its entity id), else ours.
+            snprintf(nm, sizeof(nm), "%s", fe && fe->sourceName[0] ? fe->sourceName
+                                         : fe && fe->desc.name[0] ? fe->desc.name : faceMem->label ? faceMem->label : "");
+        if (nm[0]) c->setLabel(nm);
+    }
     // ITS OWN TAP AND LONG PRESS (K156): "card_tap" and "card_long" - makeCard()
     // read the cluster's ("tap", "long") under the same id.
     c->setTapAction(TapAction::TAP_DEFAULT);

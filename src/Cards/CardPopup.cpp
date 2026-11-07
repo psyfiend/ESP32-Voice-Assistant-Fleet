@@ -159,10 +159,13 @@ void showView(PopupView v) {
     // name, "Desk", where it has one (K157).
     const char *who = member ? memberName() : s.name;
     char title[ENTITY_NAME_MAX + 16];
-    if (v == PopupView::VIEW_GROUP || (v == PopupView::VIEW_MEMBERS && s.cluster && !member)) {
-        // A group's name alone, on either of its views (K150): a tap on it is the other view.
+    if (v == PopupView::VIEW_GROUP || (v == PopupView::VIEW_MEMBERS && (s.cluster || s.groupCard) && !member)) {
+        // A group's name alone, on either of its views (K150): a tap on it is the other
+        // view - a group shown as its solo card too, named as its group, not its face
+        // (owner, 2026-11-06).
+        const ClusterCard *g = s.cluster ? nullptr : heldGroup();
         setText(s.lblTitleArea, "");
-        setText(s.lblTitleName, s.name);
+        setText(s.lblTitleName, g ? (g->area()[0] ? g->area() : g->shownName(CardLabel::LBL_NAME)) : s.name);
     } else if (v == PopupView::VIEW_MAIN) {
         // A cluster's name is its group's: "Office", never "Office > Office".
         if (s.area[0] && !(s.cluster && !strcmp(s.area, s.name))) {
@@ -278,7 +281,7 @@ void nameCb(lv_event_t *ev) {
     (void)ev;
     if (inMember()) return;
     if (s.view == PopupView::VIEW_GROUP)                        showView(PopupView::VIEW_MEMBERS);   // a solo card's too (K188)
-    else if (s.view == PopupView::VIEW_MEMBERS && s.cluster)    showView(PopupView::VIEW_GROUP);
+    else if (s.view == PopupView::VIEW_MEMBERS && (s.cluster || s.groupCard)) showView(PopupView::VIEW_GROUP);
 }
 void historyCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_HISTORY); }
 void membersCb(lv_event_t *ev) {
