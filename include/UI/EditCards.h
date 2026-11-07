@@ -80,6 +80,8 @@ struct Spec {
     void      (*act)(Act a, void *ctx) = nullptr;
     bool        keepTicks = false;   // made again (back from a step): the ticks and list kept
     bool        cycle = false;       // a group's: the tap cycle and Save N (K161)
+    bool        pinFirst = false;    // New group's (K190): a card's first tap adds it pinned, then
+                                     // the header (a sensor), then unpinned, then off
     // The glyph a group's header would show for an HA row (cycle, a sensor's third
     // tap: its square). Null: none shown.
     const char *(*haGlyph)(const HaOffer::Row &r, uint32_t &tint) = nullptr;

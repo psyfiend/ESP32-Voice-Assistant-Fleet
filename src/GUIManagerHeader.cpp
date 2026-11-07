@@ -148,7 +148,7 @@ uint8_t collectHidden(const PageSpec &page, const EntityRegistry &reg, const Car
         h = Hidden{};
         snprintf(h.id, sizeof(h.id), "%s", k.id);
         snprintf(h.where, sizeof(h.where), "%s", k.area);
-        snprintf(h.name, sizeof(h.name), k.cluster ? "%s cluster" : "%s", k.name);
+        snprintf(h.name, sizeof(h.name), k.cluster ? "%s group" : "%s", k.name);
         h.crowded = true;
     }
     // Two cards called the same say where each is from ("Office Right (Office)").

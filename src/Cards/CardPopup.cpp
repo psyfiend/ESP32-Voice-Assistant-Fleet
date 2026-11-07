@@ -270,9 +270,9 @@ void crumbCb(lv_event_t *ev) {
 // A GROUP'S NAME GOES BETWEEN ITS TWO VIEWS (K150); elsewhere it is no link.
 void nameCb(lv_event_t *ev) {
     (void)ev;
-    if (!s.cluster || inMember()) return;
-    if (s.view == PopupView::VIEW_GROUP)        showView(PopupView::VIEW_MEMBERS);
-    else if (s.view == PopupView::VIEW_MEMBERS) showView(PopupView::VIEW_GROUP);
+    if (inMember()) return;
+    if (s.view == PopupView::VIEW_GROUP)                        showView(PopupView::VIEW_MEMBERS);   // a solo card's too (K188)
+    else if (s.view == PopupView::VIEW_MEMBERS && s.cluster)    showView(PopupView::VIEW_GROUP);
 }
 void historyCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_HISTORY); }
 void membersCb(lv_event_t *ev) {
@@ -579,7 +579,7 @@ bool CardPopup::takeRebuildWanted() {
 static void openView(uint8_t view) {
     if (view == CardPopup::OPEN_HISTORY)                      { showView(PopupView::VIEW_HISTORY); markDirectView(); }
     else if (view == CardPopup::OPEN_MEMBERS && hasMembers()) showView(PopupView::VIEW_MEMBERS);
-    else if (view == CardPopup::OPEN_GROUP && s.cluster)      showView(PopupView::VIEW_GROUP);   // 2.13, K143
+    else if (view == CardPopup::OPEN_GROUP && (s.cluster || s.groupCard)) showView(PopupView::VIEW_GROUP);   // K143, K188
 }
 
 void CardPopup::openOn(Card &card, uint8_t view) {

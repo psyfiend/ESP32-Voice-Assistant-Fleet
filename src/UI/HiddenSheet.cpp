@@ -57,7 +57,7 @@ static void fill() {
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     // The owner's words (2.11 round 14b); a member hidden from its cluster is not here (K125).
     lv_label_set_text(l, s_n ? "Tap to restore a card back to the dashboard with its original settings intact.\n"
-                               "Cards hidden from clusters can be restored from the cluster 'Members' view."
+                               "Cards hidden from groups can be restored from the group 'Members' view."   // K191: "Group"
                              : "No hidden cards on this page.");
     if (s_n) Kit::helperNote(l);   // UI Tweaks' Show helper text (2.13); "none" is not help, it is the list
     if (s_n && s_spec.note && !Kit::helperShown()) return;

@@ -181,9 +181,14 @@ void setPage(const char *slugName, const PageSpec *compiled) {
 const PageSpec *pageSpec() { return s_pageSpec; }
 
 const CardSpec *specOf(const char *cardId) {
-    if (!cardId || !s_pageSpec) return nullptr;
+    if (!cardId) return nullptr;
     const CardSpec *found = nullptr;
-    forEachCardSpec(*s_pageSpec, [&](const CardSpec &cs) { if (!found && cs.id && !strcmp(cs.id, cardId)) found = &cs; });
+    if (s_pageSpec)
+        forEachCardSpec(*s_pageSpec, [&](const CardSpec &cs) { if (!found && cs.id && !strcmp(cs.id, cardId)) found = &cs; });
+    // SINCE K171 NEARLY EVERY CARD IS MADE HERE (2026-11-06): look among the made
+    // ones too, or Restore and the names it says never find a former compiled group.
+    for (uint8_t i = 0; !found && i < count(); i++)
+        if (specAt(i).id && !strcmp(specAt(i).id, cardId)) found = &specAt(i);
     return found;
 }
 

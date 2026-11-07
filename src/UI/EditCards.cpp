@@ -268,7 +268,7 @@ void cycleTap(uint8_t i) {
         Item &c = s_chosen[s_nChosen];
         c = it;
         c.list = s_list;
-        c.step = 1;
+        c.step = (s_spec.pinFirst && it.from != From::FROM_GROUP) ? 2 : 1;   // K190: New group pins
         c.coming = false;
         if (it.from == From::FROM_HA && s_list < 0) s_chosenRow[s_nChosen] = s_haRows[i];
         s_nChosen++;
@@ -276,7 +276,16 @@ void cycleTap(uint8_t i) {
         Item &c = s_chosen[k];
         // A sensor being added: added, pinned, in the header, off (K168).
         const uint8_t last = (c.from == From::FROM_GROUP) ? (c.canRemove ? 2 : 1) : (c.sensor && c.signIcon ? 3 : 2);
-        if (c.step < last) {
+        if (s_spec.pinFirst && c.from != From::FROM_GROUP) {
+            // K190: pinned, in the header (a sensor), unpinned, off.
+            if (c.step == 2)      c.step = (c.sensor && c.signIcon) ? 3 : 1;
+            else if (c.step == 3) c.step = 1;
+            else {
+                memmove(s_chosen + k, s_chosen + k + 1, sizeof(Item) * (s_nChosen - k - 1));
+                memmove(s_chosenRow + k, s_chosenRow + k + 1, sizeof(HaOffer::Row) * (s_nChosen - k - 1));
+                s_nChosen--;
+            }
+        } else if (c.step < last) {
             c.step++;
         } else {
             memmove(s_chosen + k, s_chosen + k + 1, sizeof(Item) * (s_nChosen - k - 1));

@@ -100,7 +100,14 @@ void pinGlyph(lv_obj_t *col, int32_t gap) {
 // glyph, a pin, or nothing.
 void pageSign(lv_obj_t *col, const ClusterCard &cl, uint8_t i, const Entity &e, int32_t gap) {
     if (clusterMemberInHeader(cl, i))                          headerGlyph(col, e, gap);
-    else if (clusterMemberShown(cl, i) == MemberShown::SHOWN_TILE) pinGlyph(col, gap);
+    // A GROUP SHOWN AS ITS SOLO CARD SHOWS NO PINS (owner, 2026-11-06, K188): only
+    // which members stand in its group view's header. Its pins are kept.
+    else if (s.cluster && clusterMemberShown(cl, i) == MemberShown::SHOWN_TILE) pinGlyph(col, gap);
+}
+
+// Whether a member has a sign beside its row.
+static bool hasSign(const ClusterCard &cl, uint8_t i) {
+    return clusterMemberInHeader(cl, i) || (s.cluster && clusterMemberPinned(cl, i));
 }
 
 // The width a sign's column takes beside a row: the square and its gap.
@@ -132,7 +139,7 @@ void buildMembers() {
     // as wide as the sign and its gap - a header member's glyph, a pinned tile's
     // pin - only when one of them is on the page.
     bool anyHeader = false;
-    for (uint8_t i = 0; cl && i < cl->memberCount(); i++) anyHeader |= clusterMemberPinned(*cl, i);
+    for (uint8_t i = 0; cl && i < cl->memberCount(); i++) anyHeader |= hasSign(*cl, i);
     const int32_t gap = mm(UI::shape().S5);
     const int32_t side = anyHeader ? pageSignW(gap) : 0;
     const int32_t avail = lv_area_get_width(&s.winRect) - 2 * s.pad;

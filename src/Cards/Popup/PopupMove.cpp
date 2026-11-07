@@ -98,6 +98,9 @@ const CardSpec *homeCluster(const char *memberId) {
     for (uint8_t c = 0; memberId && p && c < p->count; c++)
         for (uint8_t k = 0; k < p->cards[c].memberCount && p->cards[c].members; k++)
             if (p->cards[c].members[k].id && !strcmp(p->cards[c].members[k].id, memberId)) return &p->cards[c];
+    // A MEMBER MADE HERE (since K171, nearly all): its "in" names its group.
+    char in[CARD_ID_MAX + 1];
+    if (memberId && Settings::card(memberId, "in", in, sizeof(in))) return CardAdded::specOf(in);
     return nullptr;
 }
 

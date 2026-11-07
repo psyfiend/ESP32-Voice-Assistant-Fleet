@@ -140,16 +140,18 @@ void Panel_System::buildContent() {
 
     // --- SYSTEM - DIAGNOSTICS: development tools for now (D-17) ------------
     Kit::drawerTitle(_ui_content, "SYSTEM - DIAGNOSTICS");
-    // Reset (2.11 round 9, the development Reset) asks first: its dialog says
-    // what would go.
+    // RESET IS GONE UNTIL BACKUP AND RESTORE TAKE ITS PLACE (owner, 2026-11-06, K187,
+    // K192): since K171 it wiped the House page. Its dialog stays behind
+    // /popup?dash=1, and dash=2 resets a development board without one.
     lv_obj_t *r = Kit::drawerRow(_ui_content);
-    const int32_t w4 = (inner - 3 * gap) / 4;
-    const int32_t wT = LV_MAX(w4, Kit::textW("UI Tweaks", UI::type().NAME) + 2 * UI::mm(UI::shape().S5));
-    const int32_t w3 = (inner - 3 * gap - wT) / 3;   // the other three share what UI Tweaks leaves
-    Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Log", w3, btnH, logCb);
+    const int32_t w4 = (inner - 3 * gap) / 4;   // the grid's buttons, below
+    const int32_t w3 = (inner - 2 * gap) / 3;
+    const int32_t wT = LV_MAX(w3, Kit::textW("UI Tweaks", UI::type().NAME) + 2 * UI::mm(UI::shape().S5));
+    const int32_t w2 = (inner - 2 * gap - wT) / 2;   // the other two share what UI Tweaks leaves
+    Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Log", w2, btnH, logCb);
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "UI Tweaks", wT, btnH, tweaksCb);
-    Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "About", w3, btnH, aboutCb);
-    Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "Reset", w3, btnH, dashAskCb);
+    Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "About", w2, btnH, aboutCb);
+    (void)dashAskCb;
 
     // "Scheme:" and one of three (round 4: the Status bar toggle went - the page
     // panel's Show / Hide is the one way to hide the header).

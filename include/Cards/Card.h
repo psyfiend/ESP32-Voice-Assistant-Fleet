@@ -152,6 +152,11 @@ public:
     // A group card shown as one card (K151): SETTINGS offers Show as and Face.
     Card &setGroupCard(bool g) { _groupCard = g; return *this; }
     bool groupCard() const { return _groupCard; }
+    // A group's solo card whose members are not all lights and switches (K188):
+    // its tap toggles nothing - Members by default, and Toggle is not offered.
+    Card &setGroupMixed(bool m) { _groupMixed = m; return *this; }
+    bool groupMixed() const { return _groupMixed; }
+    bool canToggle() const { return tapToggles() && !_groupMixed; }
     Card &setTapScene(const char *ref);
     const char *tapScene() const { return _tapScene; }
     // Does this card's own tap toggle (switch, light, button)? Decides what
@@ -635,6 +640,7 @@ private:
     TapAction   _tap = TapAction::TAP_DEFAULT;
     uint8_t     _longOpen = 0xFF;    // K151
     bool        _groupCard = false;  // K151
+    bool        _groupMixed = false; // K188
     char        _tapScene[ENTITY_TOPIC_MAX] = {0};   // as EntityDescriptor::externalRef
     char _area[ENTITY_SHORT_MAX] = {0};
     uint32_t _areaColor = 0;   // 0 = use the accent

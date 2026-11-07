@@ -46,7 +46,9 @@ bool isClusterCard(const Card &c) { return !strcmp(c.typeName(), "cluster"); }
 TapAction tapShown(const Card &c) {
     const TapAction t = c.tapAction();
     if (t != TapAction::TAP_DEFAULT) return t;
-    // Nothing to toggle: History (owner, 2.10e round 2) - as Card::tap().
+    // Nothing to toggle: History (owner, 2.10e round 2) - as Card::tap(); a mixed
+    // group's solo card, Members (K188).
+    if (c.groupMixed()) return TapAction::TAP_MEMBERS;
     return c.tapToggles() ? TapAction::TAP_TOGGLE : TapAction::TAP_HISTORY;
 }
 
@@ -73,10 +75,11 @@ uint16_t tapRowBuild(const Card &c) {
     };
     const Entity *sc[ENTITY_SCENES_MAX];
     const bool cl = isClusterCard(c);   // the subject's own kind: a member of a cluster is not one (K166)
-    if (c.tapToggles()) add(TapAction::TAP_TOGGLE, "Toggle");
+    if (c.canToggle()) add(TapAction::TAP_TOGGLE, "Toggle");   // never a mixed group's (K188)
     // A cluster has no Details view (round 16): its window is Members.
     if (!cl)            add(TapAction::TAP_DETAILS, "Details view");
-    if (cl)             add(TapAction::TAP_GROUP, "Group view");   // 2.13, K143 (to confirm: the row's word)
+    // A group's solo card opens its group view too (K188, a hard requirement).
+    if (cl || (c.groupCard() && !inMember())) add(TapAction::TAP_GROUP, "Group view");   // K143
     if (hasMembers())   add(TapAction::TAP_MEMBERS, "Members view");
     add(TapAction::TAP_HISTORY, "History view");
     // One line for both (owner, 2026-10-13): which one is SCENES' Scene action.
@@ -111,6 +114,7 @@ uint16_t longRowBuild(const Card &c) {
     } else {
         add(CardPopup::OPEN_CONTROLS, "Details view");
         if (hasMembers()) add(CardPopup::OPEN_MEMBERS, "Members view");
+        if (c.groupCard() && !inMember()) add(CardPopup::OPEN_GROUP, "Group view");   // K188
     }
     add(CardPopup::OPEN_HISTORY, "History view");
     for (uint8_t i = 0; i < s_longN; i++) if (s_longMap[i] == c.longOpen()) return i;

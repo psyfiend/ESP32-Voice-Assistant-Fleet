@@ -74,6 +74,17 @@ void groupMembers(const CardSpec &cs, GroupMembers &g) {
     }
 }
 
+// NOT ALL LIGHTS AND SWITCHES (K188): its solo card's tap toggles nothing.
+bool groupMixed(const GroupMembers &g, EntityRegistry &reg) {
+    for (uint8_t k = 0; k < g.n; k++) {
+        const char *pid = g.mem[k]->primaries[0];
+        const Entity *e = pid ? reg.find(pid) : nullptr;
+        if (!e || GroupMembers::movedOut(*g.mem[k])) continue;
+        if (!(e->desc.writable && (e->desc.kind == EntityKind::LIGHT || e->desc.kind == EntityKind::SWITCH))) return true;
+    }
+    return false;
+}
+
 bool isGroupSpec(const CardSpec &cs) {
     return (cs.memberCount && cs.members) || (cs.present == GroupPresent::PRESENT_CLUSTER && !cs.primaries[0]);
 }
@@ -180,11 +191,10 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
         g.tileGap = UI::mm(UI::shape().C_TILE_GAP);
         g.minTile = UI::mm(UI::shape().C_TILE_MIN);
         const uint8_t cellCols = _uCols / _sub ? _uCols / _sub : 1;
-        // NO MEMBER PINNED (owner, 2026-11-06: Indoor temp, made with its members
-        // unpinned, could not be a cluster): its header alone, in the room one tile
-        // would take - never turned into its one card for having no tiles.
+        // FEWER THAN TWO PINNED SHOWS ITS SOLO CARD (owner, 2026-11-06, K188): the
+        // pins are kept, and a second pin makes it a group again.
         const Layout::ClusterSpan sp = Layout::clusterSpan(nTiles ? nTiles : 1, g, cellCols, _maxRows);
-        if (sp.fits) {
+        if (nTiles >= 2 && sp.fits) {
             ClusterCard *cl = newCluster(cs, spec, reg, false);
             CardPlacement pl = cs.place;
             pl.prefSpanX = pl.minSpanX = (uint8_t)(sp.cols * _sub);
@@ -196,7 +206,7 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
                           (unsigned)sp.cols, (unsigned)sp.rows);
             return cl;
         }
-        Serial.printf("[Cards] cluster %s: %u tiles do not fit this page - shown as its card\n",
+        Serial.printf("[Cards] cluster %s: %u tiles - fewer than two, or too many for this page: shown as its card\n",
                       cs.label ? cs.label : "?", (unsigned)nTiles);
     }
 
@@ -244,6 +254,7 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
     Card *c = n ? makeCard(one, spec, reg, 0) : nullptr;
     if (!c) return nullptr;
     c->setGroupCard(true);   // its GROUP panel (K151, K155)
+    c->setGroupMixed(groupMixed(gm, reg));   // K188: a tap toggles only lights and switches
     // ITS OWN TAP AND LONG PRESS (K156): "card_tap" and "card_long" - makeCard()
     // read the cluster's ("tap", "long") under the same id.
     c->setTapAction(TapAction::TAP_DEFAULT);

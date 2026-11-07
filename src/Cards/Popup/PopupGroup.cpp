@@ -70,7 +70,7 @@ int32_t groupGap();   // below: its Card margins (K167)
 // may be), within the page's room. The tiles in it never bigger than a tile may
 // be, the spare room round them (ClusterCard::setTileCap()).
 lv_area_t fitted(const lv_area_t &room, const lv_area_t &normal) {
-    const ClusterCard *pg = heldCluster();
+    const ClusterCard *pg = heldGroup();   // a solo card's group too (K188)
     const int32_t maxW = lv_area_get_width(&room), maxH = lv_area_get_height(&room);
     const int32_t g  = groupGap();   // K167
     const int32_t cw = ClusterCard::chromeW(), ch = ClusterCard::chromeH();
@@ -130,7 +130,7 @@ void place(const lv_area_t *r, bool bare) {
 // Tweaks' - the gap between its tiles or cards, the least of it (K162 spreads the rest).
 int32_t groupGap() {
     char v[12];
-    const ClusterCard *pg = heldCluster();
+    const ClusterCard *pg = heldGroup();   // a solo card's group too (K188)
     const uint16_t pct = (pg && pg->hasId() && Settings::card(pg->id(), "margins", v, sizeof(v))) ? UI::marginPct(v)
                                                                                                  : UI::deviceMarginPct();
     return mm(UI::shape().C_TILE_GAP) * pct / 100;
@@ -139,7 +139,7 @@ int32_t groupGap() {
 // TILES OR CARDS (K162): the group's own choice (Card UI), else UI Tweaks'.
 bool groupViewCards() {
     char v[8];
-    const ClusterCard *pg = heldCluster();
+    const ClusterCard *pg = heldGroup();   // a solo card's group too (K188)
     if (pg && pg->hasId() && Settings::card(pg->id(), "group_view", v, sizeof(v))) return !strcmp(v, "cards");
     return Settings::system("ui", "group_view", v, sizeof(v)) && !strcmp(v, "cards");
 }
@@ -288,7 +288,7 @@ void groupSwipeCb(lv_event_t *) {
 void groupWindowFor(PopupView v) {
     if (!s.win) return;
     if (v == PopupView::VIEW_GROUP) {
-        ClusterCard *pg = heldCluster();
+        ClusterCard *pg = heldGroup();   // a group shown as a solo card opens it too (K188)
         if (pg && pg->hasId() && s_groupMaker) s_view = s_groupMaker(pg->id(), true);
         const lv_area_t room = pageArea();
         const lv_area_t normal = s_moved ? s_smallRect : s.winRect;   // the window's own place

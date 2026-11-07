@@ -226,10 +226,15 @@ void Card::tap() {
         case TapAction::TAP_DEFAULT:
             // A card whose tap toggles nothing - a sensor, a binary sensor -
             // opens on its History (owner, 2.10e round 2).
+            // A mixed group's solo card toggles nothing: Members (K188).
+            if (_groupMixed) { CardPopup::openOn(*this, CardPopup::OPEN_MEMBERS); return; }
             if (!tapToggles()) { CardPopup::openOn(*this, CardPopup::OPEN_HISTORY); return; }
             onTap();
             return;
-        case TapAction::TAP_TOGGLE:  onTap(); return;
+        case TapAction::TAP_TOGGLE:
+            if (_groupMixed) { CardPopup::openOn(*this, CardPopup::OPEN_MEMBERS); return; }
+            onTap();
+            return;
         case TapAction::TAP_DETAILS: CardPopup::openOn(*this, CardPopup::OPEN_CONTROLS); return;
         case TapAction::TAP_MEMBERS: CardPopup::openOn(*this, CardPopup::OPEN_MEMBERS);  return;
         case TapAction::TAP_GROUP:   CardPopup::openOn(*this, CardPopup::OPEN_GROUP);    return;

@@ -243,7 +243,12 @@ whole settings file while the board's own MQTT discovery stays compiled.
 A room group can stand as a solo card and still open its group view (a hard requirement: Group view
 must be among a solo card's tap choices - today `PopupSettingsRows.cpp` offers it to clusters only).
 Pins stay the cluster's; fewer than two pinned shows the solo card; Face only on groups made on the
-board; New group pins what it adds; summaries are their own kind (K189).
+board; New group pins what it adds; summaries are their own kind (K189). **Show as... becomes a
+flow** and "Group" replaces "Cluster" on screen (K191).
+
+**2.13's scope is closed (K192)**: K188-K191, Reset removed, Restore of a moved card fixed, the final
+test sheet, the merge. Backup and Restore is the next milestone; the mirror and K170 wait; §7.1 is
+out of 2.13.
 
 **From the glass**
 - A group of temperatures on All members shows its first member; the owner wants an average, a
