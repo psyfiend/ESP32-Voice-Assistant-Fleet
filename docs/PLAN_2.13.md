@@ -182,7 +182,7 @@ added to it; the face decides what a tap can do. What building it needs, found o
 | The Active state row in a member's own view | live since K166, but it starts from the held card's value, not the member's |
 | `Popup/PopupCluster.cpp` is 1,005 lines (structure check, round 5) | move Edit cards' save and dialogs (`editAct`, `doEditSave` and the rest) into `PopupEditCards.cpp` |
 | **Panel's tiles one size** (K171) | the owner wants Free Heap, Uptime and IP Address wide enough for their values; tiles in a group are one size - a tile span per member, or Panel's tile columns, is unbuilt. Not yet seen on the glass |
-| **The Fleet page is unseen after K171** | `/popup` has no way to change page: add `?gopage=N` (DEBUG_POPUP) so Panel and MQTT can be checked from the PC |
+| **The Fleet page is unseen after K171** | check Panel and MQTT from the PC: `/bench?what=full&page=N&keep=1` changes page (corrected 11-06 - this row said no address could) |
 | **The arranger with the header shown again** (K167) | a page arranged while the header was hidden, shown again, fits its cards to the shorter room (they shrink) - not re-arranged. To confirm |
 | The card limit's toast (K176) | a later ordinary toast replaces it; the header alert waits for 2.14 |
 | Units, device-wide (K177: Inherit / F / C in UI Tweaks) | decided, built with §3.2 |
@@ -239,20 +239,11 @@ whole settings file while the board's own MQTT discovery stays compiled.
   the screen): restored on the same board it is used as is; on another board the page is arranged
   again.
 
-**A group shown as one card opens its group view - a hard requirement** (owner, 2026-11-06, after
-Indoor temp on the glass). Five or six room groups can stand as single cards, each tap opening that
-room's group view. "When viewed as a solo card, if there is a single member pinned then it should be
-the face. Pinning additional members turns it into a cluster." Today a solo card cannot offer Group
-view (`PopupSettingsRows.cpp` offers it to clusters only), its face is the Face row (K151), and
-Visibility chooses cluster or solo card by hand (K174). Claude's proposal, to confirm:
-- **Pins decide the presentation**: none pinned - one card with the group's face (its switching
-  members, else all); one pinned - one card whose face is that member; two or more - a cluster.
-  Summary stays a choice of its own.
-- That makes the Face row and Visibility's cluster / solo chips the same thing as Pin - one of them
-  goes, or shows what the pins chose, greyed (an option never moves).
-- A solo group card's tap offers Group view; whether it is the default (Bedroom's tap toggling the
-  lights today) is the owner's call.
-- It replaces 11-06's "a cluster with nothing pinned shows its header alone" (`CardPageGroups.cpp`).
+**A group's solo card: settled as K188-K190** (owner, 2026-11-06, after Indoor temp on the glass).
+A room group can stand as a solo card and still open its group view (a hard requirement: Group view
+must be among a solo card's tap choices - today `PopupSettingsRows.cpp` offers it to clusters only).
+Pins stay the cluster's; fewer than two pinned shows the solo card; Face only on groups made on the
+board; New group pins what it adds; summaries are their own kind (K189).
 
 **From the glass**
 - A group of temperatures on All members shows its first member; the owner wants an average, a
