@@ -222,30 +222,38 @@ Settled (K179-K183): Hue groups read-only, Indoors not offered, Desk to become a
 now; a full backup and restore before Phase 3; summary cards are one shared framework, designed with
 2.14's alerts; Active state only where a member can be on; the arranging toast; Card UI's one list.
 
+Settled later the same day (K184-K187): the mirror is a board group with HA's members read-only
+plus the owner's extras; a mixed light group shows every control any member has (built); any HA
+entity with members opens as a group; Backup and Restore take Reset's place, and a backup holds the
+whole settings file while the board's own MQTT discovery stays compiled.
+
 **K170, open**
-- **"The mirror" is a group on the board**, nothing made in HA (K180): HA's members in it,
-  read-only, beside any cards the owner adds; a command is the group entity's call plus the extras';
-  a scene reaches only the HA members. Claude's reading of the owner's message - to confirm.
-- **Which HA entities with members become groups**: lights and switches certainly; the owner also
-  wants **sensor groups** (temperatures, a door count) to open as groups. Claude's proposal: any HA
-  entity whose `entity_id` lists 2 or more members, members read-only, the face HA's own value;
-  one-member aliases stay plain cards. A sensor group's face is then a summary (K182) - the two meet.
+- Which members count: Claude's proposal is any HA entity whose `entity_id` lists 2 or more
+  members, members read-only, the face HA's own value; one-member aliases stay plain cards.
 - Desk as an HA light group: check after the owner makes it that its HA scenes are offered.
 
 **K181 (backup), open**
 - Where it lives: on the board (LittleFS, beside the settings file), and on the PC through
   `save_settings.ps1` as now.
 - **The arranged layout is already in the settings file** (`pages.<slug>.layout`, fingerprinted with
-  the screen): restored on the same board it is used as is; on another board the screen differs and
-  the page is arranged again. That is the owner's "store the layout so it need not re-arrange", for
-  free.
-- Whether Restore replaces the system panel's Reset (§7.2: Reset wipes the House page today).
-- Whether board-specific values (brightness, the MQTT group) stay out of a backup meant for
-  another board.
+  the screen): restored on the same board it is used as is; on another board the page is arranged
+  again.
 
-**From the glass (TEST_2.13 round 5's "Found on the glass")**
-- **Should New group pin the members chosen for it?** K160's "new members join unpinned" was for
-  adding to a group that is already on the page; a new group with nothing pinned shows only its
-  header.
+**A group shown as one card opens its group view - a hard requirement** (owner, 2026-11-06, after
+Indoor temp on the glass). Five or six room groups can stand as single cards, each tap opening that
+room's group view. "When viewed as a solo card, if there is a single member pinned then it should be
+the face. Pinning additional members turns it into a cluster." Today a solo card cannot offer Group
+view (`PopupSettingsRows.cpp` offers it to clusters only), its face is the Face row (K151), and
+Visibility chooses cluster or solo card by hand (K174). Claude's proposal, to confirm:
+- **Pins decide the presentation**: none pinned - one card with the group's face (its switching
+  members, else all); one pinned - one card whose face is that member; two or more - a cluster.
+  Summary stays a choice of its own.
+- That makes the Face row and Visibility's cluster / solo chips the same thing as Pin - one of them
+  goes, or shows what the pins chose, greyed (an option never moves).
+- A solo group card's tap offers Group view; whether it is the default (Bedroom's tap toggling the
+  lights today) is the owner's call.
+- It replaces 11-06's "a cluster with nothing pinned shows its header alone" (`CardPageGroups.cpp`).
+
+**From the glass**
 - A group of temperatures on All members shows its first member; the owner wants an average, a
   chosen member, and a History of every member that can be shown or hidden - K182's work.
