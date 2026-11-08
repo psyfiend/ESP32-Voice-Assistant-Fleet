@@ -105,7 +105,15 @@ and still open - is `design/carried-from-2.13.md`, by section.
 - The arranger when the system header comes back (K167), to confirm on the glass. Carried §6.
 - The Active state row in a member's own view starts from the held card's value (a bug). Carried §6.
 - `/popup?dash=2` wipes the House page without asking, and `CardAdded::resetToCompiled()` resets
-  at most 64 cards; both go when Backup and Restore replace Reset (2.16). Carried §4.
+  at most 64 cards; both go when Backup and Restore replace Reset (2.16), with the Reset wiring
+  `Panel_System` still carries (`askDashReset`, `confirmDashReset`, `dashAskCb`). Carried §4.
+- Code tidy found by the sign-off scrub (strings, so not changed there): `Fleet_Display.cpp`'s
+  `#error` text ("2.9 step 5 adds QSPI"), `AudioManager.cpp`'s "no longer matches" warnings,
+  `DeviceIdentity.cpp`'s "fleet-dev" fallback message (the slug is "dev"); `HiddenSheet` and
+  `SlotPanels`' `viewHidden` reachable only from `/popup`; the arranger test generator
+  (`host-tests/tools/`) and `playground.html` keep their version notes.
+- `docs/display/test-log.md` is a dated log of test sheets; decide which sheets still earn their
+  place.
 - `Popup/PopupCluster.cpp` is over 1,000 lines: move Edit cards' save and dialogs into a file of
   their own. Carried §6.
 - The golden harness (`scripts/ui_golden.py`) re-run against the made-card dashboard. Carried §6.

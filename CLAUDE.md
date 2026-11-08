@@ -61,7 +61,7 @@ turns it into the character it denotes:
 
 **Only the first one announces itself.** The other three produce a file that builds and behaves
 wrongly, which is why this keeps costing real time instead of being caught immediately. The 0x08
-case landed in `docs/LESSONS.md` on 2026-09-18 while writing the lesson warning about it.
+case once landed in `docs/LESSONS.md` while writing the lesson warning about it.
 
 ### What to use, by job
 
@@ -91,8 +91,8 @@ Sometimes it is — renaming a symbol across thirty files, say. Then:
 ### `Edit` has one trap of its own: deleting a line in a CRLF file
 
 Most files here are CRLF. Removing a whole line by matching `"\n    the line"` (leading newline,
-nothing after) and replacing it with `""` **joined the previous line to the next one** twice on
-2026-09-23 — once commenting out a member declaration behind a `//`, which broke the build, once
+nothing after) and replacing it with `""` **joins the previous line to the next one** - once it
+commented out a member declaration behind a `//`, which broke the build, once
 silently gluing two statements onto one line, which did not. Delete a line by matching it *with its
 neighbours* and writing the neighbours back, then check `git diff` for a `+` line that holds two
 statements.
@@ -306,8 +306,7 @@ which `CYD_S3_8048`, `WS_S3_5B` and `CYD_S3_3248` still run.
   selects assert-HIGH / release-LOW, mirroring `esp_lcd panel_hx8394_reset`. The Waveshare
   P4-5's HX8394 needs `1` — with the active-low sequence the pin ends asserted and the panel
   is held in reset, which manifests as DSI init commands filling the host FIFO and blocking
-  part-way through `gfx->begin()`. That cost most of a session to find. Confirmed fixed on
-  hardware 2026-09-06; see `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
+  part-way through `gfx->begin()`. Confirmed on hardware; see `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
 - **When a vendor ships a known-working copy of a library you have forked, diff the whole tree
   before theorising.** The reset-polarity fix sat in Waveshare's own copy of
   `Arduino_DSI_Display.cpp`, with a comment naming the exact failure mode. Several rounds of
@@ -319,7 +318,7 @@ Two copies existed for most of this project's life - `include/lvgl/lv_conf.h` an
 `components/lv_conf.h` - left over from the original fight to get LVGL's config found at all.
 Nobody knew which one the build read, which meant nobody could trust an edit to either.
 
-**Settled 2026-09-17, by experiment rather than by reading the include chain.** An `#error` was
+**Settled by experiment rather than by reading the include chain.** An `#error` was
 placed at the top of `components/lv_conf.h` and `WS_P4_TOUCH_LCD_5` was rebuilt with a cleared
 `build_cache`. It compiled. That file was never being read, and it has been deleted; it is in git
 history if it is ever wanted.
@@ -649,7 +648,7 @@ add a new `DEBUG_<AREA>` flag for future debugging needs rather than ad-hoc unco
   expressions as-is (confirmed via compiler error, not assumption).
 ## Vendored code and submodules
 
-As of Phase 0 (2026-09-03) there are exactly **two submodules**, both mapped in `.gitmodules`
+There are exactly **two submodules**, both mapped in `.gitmodules`
 (which previously did not exist at all — five gitlinks were recorded with no URL mapping, so a
 fresh clone produced empty directories and `git submodule status` failed outright):
 
@@ -676,7 +675,7 @@ Every local library is declared as `NAME =symlink://c:/Users/Marge/Documents/Pla
 
 **Consequence: renaming or moving the project folder breaks all 8 environments at once**, and so does restoring a backup to a different path. The fix is a search-and-replace of that prefix across `platformio.ini` — 30 seconds once you know, mystifying if you don't.
 
-The absolute path is load-bearing and **four alternatives were tested and all failed** (2026-09-03, each with a cold `.pio` in a scratch clone):
+The absolute path is load-bearing and **four alternatives were tested and all failed** (each with a cold `.pio` in a scratch clone):
 
 | Attempt | Result |
 |---|---|
