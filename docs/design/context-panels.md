@@ -1,103 +1,62 @@
-# Context panels — idea capture, not a design
+# Context panels - an idea, not a design
 
-**Status: captured 2026-09-09, not designed, not scheduled.** Raised by the owner during the
-Phase 2.1 discussion. Written down so it is not lost, and so the analysis below does not have to
-be redone. Blocks on the `Card` base class (#15, milestone 2.4) and build-sheet schema v1 (#20,
-milestone 3.1) — nothing here should be built before both exist.
+**Status: not designed, not scheduled.** ROADMAP Phase 4.4 (#26) holds it. The analysis below is
+kept so it is not redone. The Sheet's folder panels (`Kit::Sheet`, `components.md`) already do half
+of it: the card window's SETTINGS and view panels are opened by a card and filled from that card's
+entity.
 
-Related: ROADMAP §4.3 (what happens to the existing panels), Phase 4.4 (context sheets).
+## The idea
 
----
+A framework to instantiate a panel - animations, label, size, font, slots - that is called into
+existence by filling in what the content should be, plus an addressing system that says "page 2,
+left panel". The worked example is a full-screen Weather Forecast view whose bottom-left panel
+declares `Title: "Update Frequency" | Row: toggle "Auto-Update" | Row: (if auto-update) radio "1hr,
+6hr, 12hr, 24hr"`. Users would design their own context panels and apply them to their own pages.
 
-## The idea, as raised
+The owner's objection: on a page full of disparate cards, how do the context panels know which card
+to pull from?
 
-> Is there a way to leverage the panel concept similar to the core of the build-sheet idea, where
-> we create the framework to instantiate a panel — animations, label, size/font/slots — and then
-> the panel can be called into existence by filling in the blanks of what the content should be,
-> plus some addressing system that says "page 2, left panel"?
+## Two different features
 
-With a worked example: a full-screen Weather Forecast view whose bottom-left panel declares
-`Title: "Update Frequency" | Row: toggle "Auto-Update" | Row: (if auto-update) radio "1hr, 6hr,
-12hr, 24hr"`. Users would be able to design their own context panels and apply them to their own
-pages.
+Both render as an accordion panel; they differ in **who supplies the binding**, which is the only
+hard question.
 
-And the owner's own objection, which is the sharp part:
+### A. The invoked context sheet - binding comes from the invocation
 
-> On a page full of disparate cards I'm not sure how the context panels will know which card to
-> pull from.
+Long-press a light card and the sheet opens with brightness and color temperature; long-press a
+media card and it shows transport controls. There is no addressing problem: the sheet is opened by
+a specific card, and that card passes its own entity in. "Which card does it pull from" has one
+answer: the one you long-pressed. What varies is the interior, a function of the entity's `kind`
+(a `light` gets brightness and color temperature, a `switch` an on/off and a history strip), chosen
+the way a card type is: by kind, with an override available.
 
----
+### B. The page-slot panel - binding comes from the page's data
 
-## The analysis: that is two different features
+"Page 2, left panel" is not invoked by anything; it is part of the page, like a card. It needs no
+new addressing system: it is declared next to the cards with its own entity bindings. In the Weather
+Forecast example, `Update Frequency` is a property of the *view*, not pulled from a card. A thing
+placed on a page with a declared binding is a card (tall, panel-shaped, control-bearing), with the
+same placement, binding and lifecycle; building it as a parallel concept would duplicate the layout
+engine, the binding logic and the staleness handling.
 
-The objection dissolves once they are separated. They look alike because both render as an
-accordion panel; they differ in **who supplies the binding**, which is the only hard question.
+**A is a mechanism. B is a card type.** The reusable "panel template" is the *interior*
+vocabulary both render into.
 
-### A. The invoked context sheet — binding comes from the invocation
+## The constraint
 
-Long-press a light card, the sheet opens with brightness and colour temperature. Long-press a
-media card, transport controls. This is ROADMAP §4.3's proposal and Phase 4.4's milestone.
+A declarative grammar for panel interiors (`Row: toggle "Auto-Update"`) must be **the same grammar
+the settings file and card specs already use**, not a second one: two schemas, two parsers and two
+sets of validation errors for one concept. Whatever primitives cards gain (rows, labels, toggles,
+sliders, option lists, conditional visibility) are the primitives panel interiors are assembled
+from.
 
-**There is no addressing problem here.** The sheet is not ambient and does not survey the page
-looking for something to bind to — it is *opened by* a specific card, and that card passes its own
-entity in. One sheet object, reused, re-populated per invocation. "Which card does it pull from"
-has exactly one answer: the one you long-pressed.
+A conditional row (`Row: (if auto-update) radio ...`) is the point at which a spec stops being data
+and starts being a program. Decide deliberately whether conditional visibility bound to another
+control's value is supported, because retrofitting it is a schema break, and saved references must
+never silently re-point.
 
-What varies is the *interior*, and that is a function of the entity's `kind` — a `light` gets
-brightness and colour temp, a `switch` gets an on/off and a history strip. So the interior is
-selected the same way a card type is: by kind, with an override available.
+## `Panel_Audio` and `Panel_Display`
 
-### B. The page-slot panel — binding comes from the build sheet
-
-"Page 2, left panel" is a different animal. It is not invoked by anything; it is *part of the
-page*, like a card is. Which means it does not need a new addressing system at all — it is
-declared in the build sheet next to the cards, with its own entity bindings written there.
-
-The Weather Forecast example is this one, not A. `Update Frequency` is not pulled from a card on
-the page; it is a property of the *view*, declared alongside it.
-
-**Consequence worth stating:** if B is "a thing you place on a page with a declared binding," then
-B is a card. A tall, panel-shaped, control-bearing card, but structurally a card — same placement
-grammar, same binding, same lifecycle. Building it as a separate parallel concept would duplicate
-the grid engine, the binding logic and the staleness handling for no gain.
-
-**So: A is a mechanism. B is a card type.** The reusable "panel template" the owner is describing
-is real and worth building — it is the *interior* vocabulary that A and B both render into.
-
----
-
-## The trap to avoid
-
-The pseudocode sketch (`Row: toggle "Auto-Update"`, `Row: radio "1hr, 6hr…"`) is a declarative
-grammar for panel interiors. That is genuinely the right instinct — but it must be **the same
-grammar the build sheet already uses**, not a second one.
-
-Inventing a second declarative language means two schemas, two parsers, two sets of validation
-errors, and two things to document, for one concept. Whatever primitives the build sheet gains for
-cards — rows, labels, toggles, sliders, option lists, conditional visibility — are the primitives
-panel interiors should be assembled from.
-
-This is why the note at the top says it blocks on schema v1. Designing the panel grammar first
-guarantees inventing it twice.
-
-The conditional in the example (`Row: (if auto-update) radio …`) is worth flagging separately: it
-is the point at which a build sheet stops being data and starts being a program. Schema v1 should
-decide deliberately whether it supports conditional visibility bound to another control's value,
-because retrofitting it is a schema break and HANDOFF already records that persisted sheet
-references must never silently re-point.
-
----
-
-## What happens to `Panel_Audio` and `Panel_Display` meanwhile
-
-**Nothing, deliberately.** They stay exactly as they are.
-
-They are currently the only working UI in the project, which makes them the regression baseline
-for Phase 2.1 — "does the board still behave identically" is only answerable while they exist
-unchanged. Their fate is already decided (ROADMAP §4.3): they become settings pages in Phase 4.1,
-and the accordion mechanism inside `UIToolkit` becomes the context sheet in Phase 4.4. Their
-use-case-specific content — audio test controls, touch-point visualiser — is genuinely
-developer-facing and there is no reason to delete it; a settings page is a fine home for it.
-
-The part worth keeping is the accordion *mechanism*, not the panels' contents. That is already
-in `UIToolkit`, not in `Panel_Audio`, which is why nothing needs to move yet.
+They stay as they are: developer-facing content (audio test controls, the touch-point visualiser)
+that is the regression baseline for the UI. The accordion mechanism in `UIToolkit` is the part
+worth keeping for a context sheet.

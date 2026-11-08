@@ -9,7 +9,7 @@ tokens and a screen: a screen asks for a dialog, a row of chips, a panel of rows
 (the Sheet, §3), and the kit builds it in the house style. Its clients: the card window (with its
 group view), "About this board", UI Tweaks, Edit cards and New group (§3's table).
 
-**Parts the group windows use** (how they are used: `ha-cards.md` §4):
+**Parts the group windows use** (how they are used: `ha-cards.md` §3):
 - **A bare sheet** - `Kit::sheetBare(S, bare, radius)` (`Sheet.h`): no header row, no padding, a
   clear window with the client's corners; the stage is the window; while bare the window and stage
   draw past their edges by `UI::shadowReachPx()`, so the client's shadow is not clipped. The group
