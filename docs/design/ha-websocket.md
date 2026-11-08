@@ -1,16 +1,15 @@
 # Home Assistant over the websocket — what the API actually gives us
 
-**Status: measured, not designed.** Every number here came from the owner's live instance
-(HA 2026.8.1 at `192.168.0.70:8123`) on 2026-09-15 and 2026-09-16, run from a PC. The standing
-instruction was not to guess what HA exposes; this is the answer to that, and the design for
-issue #43 should be built against it.
+**Status: measurements, and the design built on them.** Every number here came from the owner's
+live instance (HA 2026.8.1 at `192.168.0.70:8123`), run from a PC. The rule it serves: do not
+guess what HA exposes.
 
-**Built since** (#43, then 2.13): `HaProvider` subscribes with `subscribe_trigger` in frame-sized
+**As built** (#43): `HaProvider` subscribes with `subscribe_trigger` in frame-sized
 parts (~45 ids a 1,536-byte frame; any number of entities), asks scene and area names in one
 `render_template`, fetches the `fleet` catalogue (areas, floors, each entity's area - `HaCatalog`,
 48 areas / 160 entities), and listens for `entity_registry_updated` and `area_registry_updated`.
-`ha-cards.md` §2 is how; the numbers below are the measurements it was built on. Where this file
-says "not implemented", read it as the reasoning at the time.
+`ha-cards.md` §1 is how; the numbers below are the measurements it was built on. Sections below
+that describe a plan ("not implemented", "would") record the reasoning behind what was built.
 
 ---
 
@@ -254,12 +253,11 @@ own `area_id` is null and which §4 specifically warns about.
 its dependencies change, so it must be cancelled with `unsubscribe_events` once the answer is in,
 or it becomes a permanent feed. That is one extra message, not a reason to avoid it.
 
-### Why this is not implemented yet *(it is now: `HaProvider::sendSceneQuery` resolves areas at runtime, and the 2.13 catalogue gives each entity's area and floor)*
+### How areas are resolved on the board
 
-Areas are currently hardcoded in `Dashboard_HA.h` and they are correct, so resolving them at
-runtime changes nothing visible today. It earns its keep when pages are grouped by area - the
-owner's "a button for Bedroom that takes you to the Bedroom page" - and it should be built then,
-against this measurement rather than against §4's plan.
+`HaProvider::sendSceneQuery` resolves scene and area names at runtime with one `render_template`,
+and the `fleet` catalogue gives each entity's area and floor. This measurement, not §4's plan, is
+what it is built on.
 
 Note the names HA returns are its own: `Living Room`, `Eric Bedroom`, `Front Room`. The owner
 shortened these deliberately, and `HA_AREA_NAMES` in `ExternalEntities_HA.h` is the override table

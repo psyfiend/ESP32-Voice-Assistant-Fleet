@@ -1,6 +1,6 @@
 # Display architecture — how it works now
 
-The esp_lcd path as built (2026-09-29). Status per board: [README.md](README.md). The reasoning
+The esp_lcd path as built. Status per board: [README.md](README.md). The reasoning
 behind each decision, in full: `docs/archive/display/display-stack.md` and `esplcd-step2.md`.
 
 ## 1. The pieces
@@ -129,20 +129,20 @@ worth doing before a board that needs a specific PHY clock. Reset polarity is pe
   `CONFIG_LCD_RGB_RESTART_IN_VSYNC`.
 - The ST7262 boards (8048, S3_5B) have no init commands: plain RGB timing.
 - `-D FLEET_LV_MEM_PSRAM` puts LVGL's pool in PSRAM (`lv_conf.h`): every P4 at 512 KB
-  (`[P4-options]`, 2026-10-06, #88), and `WS_S3_4B` at 128 KB (#70).
+  (`[P4-options]`, #88) and every S3 at 128 KB (`[S3-options]`, A11; #70 for tuning it).
 
 **QSPI (`CYD_S3_3248`):** not moved. The vendor never sends a row address over QSPI (writes start
 at row 0 or continue), so arbitrary partial windows are unproven; the panel has a TE pin (GPIO 38).
 `docs/archive/display/waveshare-esp-lcd-survey.md` §5.
 
-## 6. Decisions that still stand (owner, 2026-09-25)
+## 6. Design choices (DECISIONS A9)
 
-| | Decision | Why |
-|---|---|---|
-| D1 | Raw `esp_lcd`, not `ESP32_Display_Panel` | Native IDF; no HX8394 driver there |
-| D2 | Measure first, then one board at a time | Every change judged against `/bench` |
-| D4 | Per-board `-D DISPLAY_ESPLCD`; Arduino_GFX deleted only when every board has moved | A board moves back by deleting one line |
-| D5 | Our own glue, modelled on `esp_lvgl_adapter`, not the adapter itself | The adapter would change LVGL's threading (`LV_OS_FREERTOS`, own task) and allocator (`LV_USE_CLIB_MALLOC`) at the same time. Revisit at the ESP-IDF migration |
+| Choice | Why |
+|---|---|
+| Raw `esp_lcd`, without `ESP32_Display_Panel` | Native IDF; the library has no HX8394 driver |
+| Every change is judged against `/bench`, one board at a time | Measured gains, no regressions hidden by a different board |
+| Per-board `-D DISPLAY_ESPLCD`; Arduino_GFX is deleted only when every board has moved | A board moves back by deleting one line |
+| Our own glue, modelled on `esp_lvgl_adapter`, without the adapter itself | The adapter changes LVGL's threading (`LV_OS_FREERTOS`, own task) and allocator (`LV_USE_CLIB_MALLOC`) together. Revisit at the ESP-IDF migration |
 
 LVGL stays on `loop()` with `LV_OS_NONE`: measured, `LV_OS_FREERTOS` made drawing 20-51 % slower on
 the P4_5 ([performance.md](performance.md)).

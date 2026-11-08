@@ -3,11 +3,12 @@
 **The one status page for the display.** Where every board stands, what is open, and which file
 answers which question. Kept current; if a line here is wrong, fix it here first.
 
-Milestone 2.9 (#67) moved the fleet from Arduino_GFX to raw `esp_lcd`, one board at a time behind
-`-D DISPLAY_ESPLCD`. Scope was narrowed on 2026-09-29 to "esp_lcd working on every board we can
-test"; tuning and features were split into their own issues.
+The fleet is moving from Arduino_GFX to raw `esp_lcd`, one board at a time behind the per-board
+`-D DISPLAY_ESPLCD` (#67). The scope is "esp_lcd working on every board we can test"; tuning and
+features have their own issues. Six boards run it (all five P4s and `WS_S3_4B`); the three below
+them in the table still run Arduino_GFX.
 
-## Where each board is (2026-09-29)
+## Where each board is
 
 | Board | Bus / panel | Path | Present mode | Rot | Soak | Glass | Open |
 |---|---|---|---|---|---|---|---|
@@ -16,22 +17,22 @@ test"; tuning and features were split into their own issues.
 | `WS_P4_7B` | DSI, EK79007, 1024x600 | esp_lcd | `TRIPLE_PARTIAL`, PPA 180 | 2 | 2 h | signed off | - |
 | `CYD_P4_1060` | DSI, JD9165, 1024x600 | esp_lcd | `TRIPLE_PARTIAL` | 0 | 2 h | signed off | - |
 | `CYD_P4_4880` | DSI, ST7701, 480x800 | esp_lcd | `TRIPLE_PARTIAL` | 0 | - | signed off (2x5 portrait) | #73 fonts |
-| `WS_S3_4B` | RGB, ST7701 (init over expander SPI), 480x480 | esp_lcd | `DOUBLE_DIRECT` | 0 | 6 h | clean after the RTNI change | #69, #70 |
+| `WS_S3_4B` | RGB, ST7701 (init over expander SPI), 480x480 | esp_lcd | `DOUBLE_DIRECT` | 0 | 6 h | clean with the RTNI setting; the board has since locked up and waits to be troubleshot | #69, #70 |
 | `CYD_S3_8048` | RGB, ST7262, 800x480 | Arduino_GFX | - | | | | **#67: to do** |
 | `WS_S3_5B` | RGB, ST7262, 1024x600 | Arduino_GFX | - | | | | **#67: to do** |
-| `CYD_S3_3248` | QSPI, AXS15231B, 320x480 | Arduino_GFX | - | | | | hardware broken (USB); step 5 + deleting Arduino_GFX wait on it |
+| `CYD_S3_3248` | QSPI, AXS15231B, 320x480 | Arduino_GFX | - | | | | hardware broken (USB); the QSPI move and deleting Arduino_GFX wait on it |
 
 ## Open issues
 
 | Issue | What |
 |---|---|
-| #67 | 2.9 itself: `CYD_S3_8048` and `WS_S3_5B` on esp_lcd, then close |
+| #67 | the display move itself: `CYD_S3_8048` and `WS_S3_5B` on esp_lcd, then close |
 | #69 | Panel timing on the 4B pair - a 7-day watch on the glass |
 | #70 | S3 LVGL performance: LVGL's pool back in SRAM, S3 framework settings |
 | #71 | Rotation as a setting; auto-rotate from the S3_4B's IMU |
 | #73 | Type ladder - chrome text sizes (seen first on the 4880) |
-| (no issue yet) | The S3 RGB boards (S3_4B, S3_5B, 8048) probably flash on flash writes as the P4s did before A14: `CONFIG_LCD_RGB_ISR_IRAM_SAFE` is off in the stock S3 libraries. Untested - none of them was working on the desk when the P4 fix landed (2.10d) |
-| (no issue yet) | `WS_P4_4B` washed out twice (2.10a, 2.10c): whole picture near-white and lurid while `/screenshot` was right - the panel, not the frame buffer. `GET /panel?resend=1` waits for the next time (below) |
+| (no issue yet) | The S3 RGB boards (S3_4B, S3_5B, 8048) probably flash on flash writes as the P4s did before A14: `CONFIG_LCD_RGB_ISR_IRAM_SAFE` is off in the stock S3 libraries. Untested |
+| (no issue yet) | `WS_P4_4B` has washed out twice: the whole picture near-white and lurid while `/screenshot` was right - the panel, not the frame buffer. `GET /panel?resend=1` is the instrument for the next time (below) |
 
 ## Which file answers what
 
@@ -51,11 +52,8 @@ documents are in `docs/archive/display/`, unchanged, for the full reasoning behi
 ## Instruments
 
 - `GET /panel?resend=1` (DSI boards on esp_lcd; `src/PanelDebug.cpp`) - sends the BSP's init
-  sequence again, without a reset. **It reads nothing from the panel**: a version that read DCS
-  0Ah-0Dh at the end of boot left all three P4s black with the backlight on (LESSONS). The readings
-  it got before that, through `/panel` on running boards (power, MADCTL, pixel format, image mode):
-  ST7703 `9C 00 70 00`, HX8394 `1C 00 55 00`, JD9165 `14 00 00 00` - and those reads may themselves
-  be what blanked the screens; nobody was looking at the glass.
+  sequence again, without a reset. **It reads nothing from the panel**: a DSI register read while
+  the panel streams video stops the picture (LESSONS). Full address list: `docs/HTTP_REFERENCE.md`.
 
 - `GET /bench` (`src/UI/Bench.cpp`, field meanings at its top) and `python scripts/bench.py <host>` -
   full, card, anim, page, copy and verify runs.

@@ -185,20 +185,14 @@ improvement (it says where a header lives) but is a whole-tree edit, and therefo
 
 ## 4. Start order, with reasons
 
-*(2.1's order, 2026-09-09. `SystemCore::begin()` has grown since and is the truth: the HTTP server,
-`PanelDebug` and `HangWatch` first; `Settings::begin()` after the entity storage and before the GUI;
-then the battery, virtual and HA providers (`_ha`, `_haRest`, `_haProv`), the HA cards made on the
-board adopted from the settings file (2.13, `adoptHaCard`), the command router and HA history. The
-reasoning below still holds.)*
+`SystemCore::begin()` is the source of truth for the order; the table gives the core steps and
+each one's constraint. Steps the table folds together: the HTTP server, `PanelDebug` and `HangWatch`
+start with the display; `Settings::begin()` runs after the registry storage and before the GUI; the
+battery, virtual and HA providers (`_ha`, `_haRest`, `_haProv`, the `fleet` catalogue `_haCat`)
+follow the other providers; the HA cards made on the board are adopted from the settings file
+(`adoptHaCard`); the command router and HA history come last.
 
-`SystemCore::begin()`. Each step states its constraint.
-
-> **Correction, 2026-09-09.** This section originally claimed the order was *exactly* the old
-> order and that nothing was re-sequenced. That was wrong, and the boot log is what showed it.
-> **LVGL initialisation moved from position 3 to position 8.** Previously `gui.begin()` did
-> display → touch → *LVGL* as one unit, before audio, connectivity, MQTT and the registry ever
-> ran. Now everything non-UI completes first and LVGL initialises last. See §4.1 for why that is
-> being kept rather than reverted.
+LVGL initialises after every non-UI subsystem (§4.1).
 
 | # | Step | Why here |
 |---|---|---|
@@ -220,14 +214,12 @@ Then, back in `main.cpp` and only if a GUI is built:
 | 11 | `gui.begin(core)` | `UIToolkit::init()` then screen content. Needs LVGL alive. |
 | 12 | `SystemReport::run(core, false)` | Last, so it reports the finished state of everything above. |
 
-### 4.1 The one real re-sequencing: LVGL now initialises last
+### 4.1 LVGL initialises last
 
-Old order: display → touch → **LVGL** → audio → connectivity → MQTT → registry → providers.
-New order: display → touch → audio → connectivity → MQTT → registry → providers → **LVGL**.
+Order: display → touch → audio → connectivity → MQTT → registry → providers → **LVGL**.
 
-This was a side effect of the split — the LVGL step could not stay bundled inside `gui.begin()`
-once `gui` stopped owning the hardware — rather than a decision anyone made. Worth being explicit
-about, because **it changes who gets first claim on internal SRAM**, and this project has already
+`gui` does not own the hardware, so the LVGL step is not bundled inside `gui.begin()`. Worth being
+explicit about, because **it decides who gets first claim on internal SRAM**, and this project has already
 lost a session to exactly that class of bug (`CYD_S3_3248`, `softAP()` panicking inside
 `ieee80211_hostap_attach`).
 
