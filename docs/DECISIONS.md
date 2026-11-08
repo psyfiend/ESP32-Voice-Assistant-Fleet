@@ -310,6 +310,6 @@ How to use it:
 | K195 | **A solo card's Toggle switches the whole group**: with a toggleable face, a tap turns every light and switch among the members on or off, as the face shows | 2026-11-07 | owner |
 | K196 | **Unpin closes the window**, as Pin does; the page arranges at once | 2026-11-07 | owner |
 | K197 | Replaced by K200 | 2026-11-07 | - |
-| K198 | **Restore stays as built, and is not developed further**: cards are easy to add, move and group. If it returns, it goes one level back, from a record of where each card lived and with what settings (an issue) | 2026-11-07 | owner |
+| K198 | **Restore stays as built, and is not developed further**: cards are easy to add, move and group. If it returns, it goes one level back, from a record of where each card lived and with what settings (#118) | 2026-11-07 | owner |
 | K199 | **A group made on the board never names an HA area**: its cards do not count when deciding which HA area a page area is | 2026-11-07 | owner |
 | K200 | **A group made on the board is deleted when no card is in it**, with its label group if no other card wears it (`CardAdded::emptied()`). A group a member was moved out of keeps that member (its Restore goes back there) and is hidden until a card returns. A compiled group is never deleted; deleting anything else stays the web app's (K117) | 2026-11-08 | owner |

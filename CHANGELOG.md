@@ -6,6 +6,39 @@ signed-off merges to `main` in the order they happen - it does not follow milest
 began finishing out of order (decided 2026-10-05; `docs/DECISIONS.md` W3). This file is where a
 version is matched to its milestones.
 
+## v0.2.21 - 2026-11-08
+
+Milestone 2.13 - cards from Home Assistant (#116; DECISIONS K140-K200; design
+`docs/design/ha-cards.md`; what it left open: ROADMAP's Phase 2 summary and
+`docs/design/carried-from-2.13.md`).
+
+- **Cards come from HA on the glass**: entities labelled `fleet` in HA, by area under HA's floors.
+  **Edit cards** (from the page panel's CARDS or a group's GROUP panel) adds, pins, hides, removes and
+  restores, the lists showing the result before anything is saved; **New group** is its flow, modelled
+  on an HA area or new, named at the end. Every membership change asks first (K165).
+- **The compiled dashboard is retired** (K171): every card but the built-in Panel group and Garage -
+  Doors is made on the board and kept in the settings file, which is now the board's dashboard. Each
+  board's file was converted (`scripts/release/retire_compiled.py`); the test cards moved to
+  `scripts/release/test_cards.json`.
+- **Groups**: a group's cluster shows its **pinned** members (K160); the **group view** (a tap) draws
+  the whole group as it stands on the page, as Tiles or Cards, with its header sensors' panel (K154,
+  K159, K162, K163); **Show as...** presents a group as a solo card, with a face and a tap that
+  switches the whole group (K188, K191, K195); "Group" replaces "Cluster" on screen. A group made on
+  the board is deleted when no card is in it, with its label group (K200).
+- **Options in fixed places**: Visibility holds how a card or group stands on the page, the GROUP
+  panel what concerns its members, on every view of a group (K155, K174, K175); a member's settings
+  are the same wherever it is opened (K166).
+- An HA area linked to a group lists first in Edit cards, and "New in Office: ..." notices tell of new
+  entities there (K141, K142). The thermostat is a read-only card (K144). Corner icons only where a
+  card has no hero icon (K172). Card margins (K167). Text fitted to its room in Edit cards (K152). Up
+  to 128 cards made on the board, with a warning near the limit (K176).
+- The page arranges only when its content changes, and stays up while it works (K167, K183).
+- Restore of a moved card fixed; Reset removed until Backup and Restore (2.16) replace it.
+- **Memory**: every S3 takes LVGL's pool in PSRAM, and the large window buffers come from PSRAM
+  (`PsramArray`) - without it three S3s no longer linked (A11).
+- Signed off by the owner on the P4 dev boards (WS_P4_5, WS_P4_4B, CYD_P4_1060; CYD_P4_4880
+  converted and flashed); all nine environments build.
+
 ## v0.2.20 - 2026-10-31
 
 The 2.11 follow-ups - the owner's notes on `v0.2.19` (#66; DECISIONS K137; `docs/archive/TEST_2.11_FOLLOWUPS.md`).

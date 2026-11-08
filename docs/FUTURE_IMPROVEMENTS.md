@@ -1,723 +1,273 @@
 # Future Improvements
 
-Ideas, enhancements, and fixes that affect the **entire build environment / HAL** — not tied
-to one device or a small group of devices (that's `HARDWARE_STATUS.md`'s job). Deliberately
-deferred work, not bugs, not blocking anything currently. Lower volatility than
-`HARDWARE_STATUS.md`; safe to leave stale for a while, but prune entries once actually done.
+Ideas, enhancements and fixes that affect the whole build environment or HAL, or that the owner has
+asked to keep: not tied to one device (that is `HARDWARE_STATUS.md`), not bugs, not blocking
+anything. Each item says what it is, why it is deferred and what it touches. An item is deleted when
+it is built. Open questions for a milestone live in its GitHub issue; this file holds what has no
+issue.
 
-## Startup / GUI reorganization — **DONE 2026-09-09**
+## Display and LVGL
 
-Landed as ROADMAP Phase 2.1 / issue #12. Ended up a five-way split rather than the three-way
-one sketched here: `main` / `SystemCore` / `SystemReport` / `LVGL_Startup` / `GUIManager`.
-`SystemCore` and `SystemReport` were not anticipated when this entry was written — the ten
-subsystem globals needed an owner, and the System Doctor turned out to be the thing standing
-between us and an LVGL-free `main`.
+### The last three boards on Arduino_GFX
 
-Design, reasoning and acceptance criteria: `docs/design/startup.md`. **Built and flashed
-(2026-09-09); every board has run it since.**
+`CYD_S3_8048` and `WS_S3_5B` (RGB) and `CYD_S3_3248` (QSPI) still run Arduino_GFX; the other six
+boards run raw `esp_lcd` (`docs/display/README.md`, `docs/display/architecture.md`). Moving them is
+the rest of ROADMAP 2.9 (#67), done one board at a time behind a per-board `-D DISPLAY_ESPLCD`.
 
-## LVGL / Display
+Why the move is worth it:
 
-> **The three display items below have one answer: move off Arduino_GFX onto `esp_lcd`.**
-> Scheduled as **ROADMAP milestone 2.9**, after the card system and before Phase 3 — deliberately
-> given a slot rather than left as an ephemeral "later". Full analysis in
-> `docs/archive/display/display-stack-migration.md`. The short version is here so this file stands alone.
+- `Arduino_GFX::getFrameBuffer()` returns a single `uint16_t *`, so the API cannot express double
+  buffering. The RGB class requests two hardware framebuffers and hands out one, which is a framebuffer
+  of PSRAM paid for and never used, and is the reason `WS_S3_5B` (1024x600) tears.
+- The QSPI path (`Arduino_Canvas`) transforms rotation per pixel on the CPU. `CYD_S3_3248` runs in its
+  native portrait orientation, where no transform happens; a board's native orientation is the
+  cheapest fix and is worth checking before assuming rotation is required.
+- `ESP32_Display_Panel` (Espressif, Apache-2.0) covers most of these controllers.
 
-### 2.9 — Arduino_GFX to `esp_lcd`
+Not done yet, so deferred: judging a render-stack change needs the demanding workload (cards, swipes,
+animation) running on it, which is why it came after the card system.
 
-**This is not a framework migration.** arduino-esp32 3.x *is* ESP-IDF 5.x underneath, and the
-libraries are already linked into every binary we ship. Verified on this machine:
+### Diff the Arduino_GFX fork against every vendor tree (#40)
 
-- `esp_lcd`, `esp_lcd_mipi_dsi.h` and `esp_lcd_panel_rgb.h` are on the include path for both P4
-  package variants, and `-lesp_lcd` is in **every** environment's default link flags.
-- `-lesp_driver_ppa` is already linked on the P4 variants. `SOC_PPA_SUPPORTED` is `1` there and
-  undefined on S3, which is the real gate — the header ships for every target, so its presence
-  proves nothing.
-- Arduino_GFX's own RGB and DSI classes turn out to be thin wrappers over these same `esp_lcd`
-  calls.
-
-So "port to `esp_lcd`" means *removing a wrapper*, not adopting a new stack. No `platformio.ini`
-change is needed to start calling it.
-
-**Why it is worth doing, in the order the reasons actually matter:**
-
-1. **Framebuffers. `Arduino_GFX::getFrameBuffer()` returns a single `uint16_t *`** — the API shape
-   is the ceiling, and no fix behind that signature can express double buffering. The RGB path
-   already allocates `.num_fbs = 2` and hands out only `fb0`: a whole framebuffer of PSRAM
-   allocated and never touched, on every RGB board. The DSI path has a `NUM_FB` BSP field that
-   would waste memory the same way. See the correction note below.
-2. **Rotation.** Both the QSPI (`Arduino_Canvas`) and MIPI/DSI paths do CPU per-pixel transforms.
-   The stutter the owner sees on P4 boards in non-native orientation is exactly this. **Note the
-   cheapest fix is not code:** `CYD_S3_3248` was moved to portrait (rotation 0) on 2026-09-10
-   precisely because native orientation runs no transform at all — worth checking per board before
-   assuming rotation is a requirement.
-3. **`esp_lvgl_adapter`.** Espressif's current LVGL porting layer, which the newest Waveshare BSPs
-   (P4-4B and P4-7B, `3.0.1`) depend on; older repos use `esp_lvgl_port`. Reaching it means real
-   framebuffer management and tear-avoidance modes rather than our hand-rolled flush path.
-4. **Alignment with ESP-IDF design philosophy**, which matters beyond this milestone: it is the
-   same direction the voice-assistant work would eventually pull (`esp_codec_dev`, `esp-sr`), so
-   the two long-term goals stop fighting each other.
-5. **PPA** is a P4-only bonus, not the point. LVGL 9.5 already ships a PPA draw unit at
-   `components/lvgl/src/draw/espressif/ppa/`, disabled (`LV_USE_PPA 0`) — **and enabling it will
-   not fix the stutter**, because `lv_draw_ppa.c:123` explicitly declines rotated draws
-   (`dsc->rotation == 0`). Rotation needs hand-written code against the raw PPA API.
-
-**Why 2.9 and not sooner.** Cards are insulated from the display stack by LVGL — a card talks to
-LVGL, LVGL talks to `LVGL_Startup`, `LVGL_Startup` talks to `DisplayManager`. Building twenty cards
-makes this swap exactly as hard as building zero, so the "do it before X or it gets expensive"
-logic that made 2.1 urgent does not apply. What *does* apply: **you cannot judge a render-stack
-change without a demanding workload running on it.** Swapping before the card system exists means
-measuring six static test panels, which proves nothing about tearing, tileview swipes or rotation
-under load. Phase 3 is pure data-layer work and does not care about the display stack, so nothing
-downstream is blocked by waiting.
-
-**Known obstacles, from the research:**
-
-- `ESP32_Display_Panel` (Espressif's own, Apache-2.0, so legally reusable) covers 7 of 8 boards'
-  controllers but has **no HX8394 driver** — the `WS_P4_5` panel that already cost a full bring-up
-  session. It does have AXS15231B. Writing a vendor init for a panel whose sequence we already
-  possess is bounded work, not a blocker.
-- Touch mapping, the BSP init-command fields, and `Arduino_Canvas` rotation all assume the current
-  stack and will need revisiting.
-- Eight working boards is the real risk. The research recommends one board converted first, behind
-  the existing `DisplayManager` interface, with the other seven untouched.
-
-**Deliberately skipped:** a scoped "PPA rotation inside `LVGL_Startup::disp_flush()`" experiment.
-It would work, but it is throwaway work if the wrapper is coming out anyway. The cost of that
-decision is living with the P4 stutter until 2.9 — accepted, on the grounds that the *S3* boards
-are where the real sluggishness is and PPA cannot help them at all.
+`reference/Waveshare Official Repos/` holds vendor repos that each ship a working copy of
+`Arduino_GFX` for their board: `WS_P4_4B`, `WS_P4_5`, `WS_P4_7B`, `WS_S3_4B`, `WS_S3_5B`, and an
+AMOLED 2.06 board that is not in the fleet. Only the P4-5's has been diffed, and only two files; that
+diff found the reset-polarity fix. The rest have never been compared. The files known to differ and not
+examined are `Arduino_GFX.h`, `Arduino_ESP32RGBPanel.cpp`, `Arduino_ESP32SPIDMA.cpp`,
+`Arduino_DSI_Display.h` and `Arduino_RGB_Display.h`; the RGB ones bear on `WS_S3_5B`'s tearing. Do this
+before tuning buffering on any board that stays on Arduino_GFX. It matters less for a board that moves
+to `esp_lcd`.
 
 ### Smaller display items
 
-- **Per-board minimum-brightness floor as a real BSP field.** Currently hardcoded directly
-  in `Panel_Display.cpp` (43 for the two 4B boards, 3 for everyone else, based on one
-  hardware measurement on the 7B) rather than being a per-device, per-hardware-measured value.
-- **Per-device LVGL buffering optimization, backed by actual testing.** The
-  `DOUBLE_BUFFERING`/`BUFFER_SIZE_PX` BSP fields exist on every board but are currently
-  unused/dead in `GuiManager.cpp` (now `LVGL_Startup.cpp`; the esp_lcd boards derive their
-  framebuffers from `bspPresentMode()`) — every board gets the same buffering strategy regardless
-  of what these fields say. Measure which boards actually benefit and build real per-device
-  logic around it.
-- **PPA rotation** — folded into 2.9 above. Kept as a pointer because the buffer discipline is
-  the part that will bite: 64-byte alignment, `MALLOC_CAP_DMA | MALLOC_CAP_SPIRAM`, and explicit
-  cache writeback/invalidate around every operation. `REFERENCE_PROJECTS.md` covers what is
-  minable from Allsky's `ppa_accelerator.h` — approach only, that repo is unlicensed.
-
-- **A written PSRAM allocation-order budget.** *(2.3 measured the LVGL side and found cards cost
-  ~715 B in a 124 KB pool, so this is no longer urgent — but the internal-SRAM table below is
-  still the useful artefact and nobody has written it.)* Raised
-  2026-09-09 after reading Allsky's `docs/developer/architecture.md`, which publishes an exact
-  PSRAM map and states that its buffers must be allocated *before* display init so the
-  framebuffer still finds contiguous space.
-
-  **Their problem is not ours, and the numbers say so.** Allsky juggles ~15.7 MB in four
-  multi-megabyte image buffers where fragmentation genuinely bites. Our PSRAM residents are the
-  entity registry (~21 KB) and the LVGL draw buffers; on a MIPI/RGB board the draw buffers are
-  full-frame and the largest thing we allocate, and there is nothing else competing.
-
-  **But the *practice* transfers, and we have already been bitten by its sibling.** The
-  `CYD_S3_3248` softAP crash was an allocation-order and allocation-location problem in internal
-  SRAM — the scarce pool for us — found the expensive way. 2.3 already has to measure per-card
-  heap on the smallest board; it should also produce the table: what lives where, in what order,
-  and what the headroom is on the worst board. Cheap as a deliverable of a measuring milestone,
-  expensive as an archaeology exercise in Phase 6.
-
-  **Starting numbers, measured on `CYD_S3_3248` during the #45 test (2026-09-09):**
-
-  | Measurement | Value |
-  |---|---|
-  | Static internal RAM (link time) | 188,048 bytes of 327,680 - **57.4%** |
-  | Free internal heap just before `softAP()` | 21,968 bytes |
-  | Largest free internal block at that moment | 13,300 bytes |
-  | LVGL draw buffers (internal SRAM, x2) | 30,720 bytes each |
-  | Entity registry (PSRAM) | 22,080 bytes |
-
-  The largest-free-block figure is the one to watch: `softAP()` succeeded from 13,300 bytes, and
-  the WiFi driver allocates more per associated station. That is the real headroom, and it is
-  thinner than the free-heap total suggests. The 57.4% is only visible at all since the
-  `maximum_ram_size` fix - the board previously reported 35.9% against a denominator 1.6x too
-  large.
-- **`Arduino_ESP32RGBPanel` `num_fbs` investigation.** Requests two hardware framebuffers but
-  only ever draws into/reads back one — no real
-  double-buffering on any board using this class, causing visible tearing on
-  `WS_S3_TOUCH_LCD_5B` (worst case, 1024x600). Real fix needs genuine buffer-swap support
-  added to the class, matching Waveshare's own `switchFrameBufferTo()` — real `Arduino_GFX`
-  internals work, not a config tweak. See `docs/BRINGUP_WS_S3_TOUCH_LCD_5B.md` for the
-  investigation that found this.
-
-### ⚠️ BEFORE tuning LVGL buffering: diff the fork against EVERY vendor GFX tree
-
-**Tracked as GitHub issue #40. Do this first — it is the highest-value hour available on this
-topic and it has never been done.**
-
-`reference/Waveshare Official Repos/` holds six vendor repos, each shipping its own
-**confirmed-working** copy of `Arduino_GFX` for the board it came with:
-
-| repo | fleet board |
-|---|---|
-| `Waveshare-P4-WIFI6-Touch-LCD-4B` | `WS_P4_4B` |
-| `Waveshare-P4-WIFI6-Touch-LCD-5` | `WS_P4_5` |
-| `Waveshare-P4-WIFI6-Touch-LCD-7B` | `WS_P4_7B` |
-| `Waveshare-S3-Touch-LCD-4B` | `WS_S3_4B` |
-| `WaveShare-S3-Touch-LCD-5B` | `WS_S3_5B` (the tearing board) |
-| `Waveshare-S3-Touch-AMOLED-2.06` | not in the fleet — still a free source of fixes |
-
-**Exactly one of these has ever been diffed** (the P4-5), and within it only two files.
-That single partial diff is what produced the reset-polarity fix that unblocked the P4-5
-after most of a session of wrong theories — the patch was sitting in Waveshare's own
-`Arduino_DSI_Display.cpp` with a comment naming the exact failure mode. Assume the other
-five carry fixes nobody here has seen.
-
-Files known to differ and never examined (from the P4-5 tree alone): `Arduino_GFX.h`,
-`Arduino_ESP32RGBPanel.cpp`, `Arduino_ESP32SPIDMA.cpp`, `Arduino_DSI_Display.h`,
-`Arduino_RGB_Display.h`. The RGB ones bear directly on the `num_fbs` item above.
-
-**Why this belongs to the buffering work specifically.** Framebuffer count is the one setting
-where the fork and the vendors are known to disagree, and the disagreement is not consistent:
-
-> **Correction, 2026-09-10 — "index 1" was a misreading, and the truth is worse.**
->
-> `esp_lcd_rgb_panel_get_frame_buffer()` and `esp_lcd_dpi_panel_get_frame_buffer()` are
-> **variadic**, and their second parameter is `fb_num` — *"Number of frame buffer(s) to get. This
-> value must be the same as the number of the followed parameters."* Verified in
-> `esp_lcd_mipi_dsi.h:131` and `esp_lcd_panel_rgb.h:249`.
->
-> So `get_frame_buffer(panel, 1, &frame_buffer)` does not fetch *index 1*. It says **"give me one
-> framebuffer"** and returns **fb0**. Both wrappers are asking for exactly one, and getting the
-> first.
->
-> Which makes the real defect a shape problem, not an off-by-one:
->
-> | Path | Allocated | Reachable through the wrapper |
-> |---|---|---|
-> | RGB (`Arduino_ESP32RGBPanel.cpp:74`) | `.num_fbs = 2` | **fb0 only** |
-> | DSI (`Arduino_ESP32DSIPanel.cpp:89`) | `NUM_FB` BSP field, default 1 | **fb0 only** |
->
-> On every RGB board we are **allocating a second full framebuffer and never touching it** — pure
-> wasted PSRAM. And raising `DisplayConfig.NUM_FB` on a DSI board would do the same thing, because
-> the getter cannot express a second buffer either way.
->
-> **`Arduino_GFX::getFrameBuffer()` returns a single `uint16_t *`.** No amount of fixing behind
-> that signature produces double buffering; the API shape is the ceiling. That is the concrete,
-> verified argument for going to `esp_lcd` directly rather than patching the wrapper — see
-> `docs/archive/display/display-stack-migration.md`.
-
-- **RGB path** — our fork requests `.num_fbs = 2` but `getFrameBuffer()` returns index
-  1, so it never actually double-buffers (the item above). Two buffers of PSRAM paid for, one
-  used.
-- **DSI path** — the fork hardcoded `num_fbs = 1` until `DisplayConfig.NUM_FB` was added.
-  Waveshare's P4-5 copy uses `2`. Only `WS_P4_5` currently sets it, so `WS_P4_7B`,
-  `WS_P4_4B` and `CYD_P4_1060` are still single-buffered at the panel level.
-
-So the fleet currently has one class allocating a buffer it never uses and another not
-allocating one it might want. Settle both against the vendor trees before writing any
-per-board buffering logic — otherwise that logic gets built on top of two unexamined
-defaults.
-
-Caution learned the hard way: the 1-vs-2 `num_fbs` test run during P4-5 bring-up came back
-"no difference," but it was run against the reset-polarity hang, which masked everything
-downstream. **It is not evidence about buffering.** Treat `num_fbs` as untested on this fleet.
-
-### Per-device DPI and font scaling - **DONE 2026-09-10 (milestone 2.2)**
-
-Retired. `HIGH_DPI_DISPLAY` and the `UI_SCALE` macro are gone; scale is derived from
-`DisplayConfig.DIAGONAL_IN` plus the resolution via `bspUiScale()` in `bsp_loader.h`, and
-`lv_display_set_dpi()` gets the board's real PPI.
-
-This entry predicted the problem exactly - *"a 720x1280 4-inch panel and a 1024x600 7-inch panel
-want different scaling even though a single flag treats them as one case"* - and the measurement
-bore it out. The old boolean was better than it looked (the fleet clusters at 165-187 and 237-294
-PPI with a clean gap) but the high cluster spans 24%, so `WS_P4_5` at 294 PPI and `WS_S3_5B` at
-237 PPI both got 1.5x. Two boards were visibly mis-scaled and one was a dev target.
-
-Density table and per-board scales: `docs/HARDWARE_STATUS.md`. Reasoning: `docs/design/tokens.md`
-section 2. The diagnostics dump now reports the real computed scale, as this entry asked for.
-
-**One piece deliberately not built: a viewing-distance term.** Pure density scaling makes
-everything the same *physical* size, which is right for touch targets (a fingertip is 9 mm on
-every board) and arguably wrong for text on a 7-inch panel across a room. Add a small per-board
-nudge only if something still looks wrong on glass.
-
-### `UI::sc()` duplicates LVGL's own `lv_dpx()` - collapse it eventually
-
-Found 2026-09-11 while answering "are we over-engineering this?", and the honest answer for this
-one piece was yes.
-
-    UI::sc(n)   =  n * PPI / 170          UITokens.cpp
-    lv_dpx(n)   =  n * PPI / 160          lv_display.h:716, as LV_DPX_CALC
-
-The same function with a different reference constant. Ours is not layered on top of LVGL's
-mechanism - it *is* LVGL's mechanism, spelled again, against a 170 baseline instead of 160.
-
-**Deliberately not fixed now.** The whole difference is 1.0625x, which is not visible, so the fix
-buys no behaviour - only one less concept - and it costs a pass over every token in
-`UITokens.cpp` plus a flash to confirm nothing shifted. The owner's call: note it, keep moving,
-and do it when something else is already touching those values.
-
-The same class of thing as the duplicated touch rotation logic in `TouchManager::mapCoordinates()`,
-which `bb_captouch` turns out to implement itself - neither is a bug, both are a second
-implementation of something we already had, and both are worth removing on a day when that is the
-job rather than a detour.
-
-**What this does NOT cover, and the reason it is worth being precise here:** DPI in LVGL only ever
-scales *shapes*. Verified in this tree - every DPI-sensitive path goes through `LV_DPX_CALC`, and
-the complete list of callers is `lv_obj.c` (default size of an unsized object), `lv_obj_scroll.c`
-(minimum scrollbar), `lv_slider.c` (click area), `lv_arc.c` (touch tolerance) and
-`lv_theme_default.c` (radius, border, padding, shadow). **No DPI path touches fonts**, in any
-version - the default theme takes `font_normal` as a parameter and never consults DPI to pick it.
-So `lv_display_set_dpi()` is not an alternative to the generated type scale, and setting it would
-not have moved the too-small text of 2.4's first flash by a single pixel.
+- **Minimum brightness as a BSP field.** `Panel_Display.cpp` hardcodes the slider's floor (45 for the
+  two 4B boards, 3 for the rest, from one measurement on the 7B). It belongs in `DisplayConfig`, measured
+  per board.
+- **LVGL buffering for the Arduino_GFX boards, from measurement.** `DOUBLE_BUFFERING` and
+  `BUFFER_SIZE_PX` are honoured by both flush paths, but that path's flush is synchronous, so a second
+  buffer buys nothing there. Measure before building per-device logic; the esp_lcd boards derive their
+  buffering from `bspPresentMode()`.
+- **PPA rotation outside the esp_lcd path** is not planned: the Arduino_GFX boards are not P4s and the
+  S3 has no PPA. For a P4 using it, the buffers need 64-byte alignment, `MALLOC_CAP_DMA |
+  MALLOC_CAP_SPIRAM` and explicit cache writeback/invalidate around every operation (`REFERENCE_PROJECTS.md`
+  covers what is minable from Allsky's `ppa_accelerator.h`: approach only, that repo is unlicensed).
+- **A written memory budget.** A table of what lives in internal SRAM and in PSRAM, in what allocation
+  order, and the headroom on the worst board (`CYD_S3_3248`, whose QSPI draw buffers must stay internal).
+  The largest free internal block matters more than the free-heap total: `softAP()` succeeded from a
+  13 KB block, and the Wi-Fi driver allocates more per associated station. Nobody has written the table;
+  `lv_mem_monitor()` and `ESP.getFreeHeap()` are the instruments.
+- **A viewing-distance term for scaling.** Density scaling makes everything the same physical size,
+  which is right for touch targets (a fingertip is 9 mm on every board) and arguably wrong for text on a
+  7" panel across a room. Add a small per-board nudge only if something still looks wrong on glass.
+- **`UI::sc()` duplicates LVGL's `lv_dpx()`.** `UI::sc(n)` is `n * PPI / 170` (`UITokens.cpp`);
+  `lv_dpx(n)` is `n * PPI / 160` (`LV_DPX_CALC`, `lv_display.h`). The same function against a different
+  reference constant. Collapsing them removes a concept and changes nothing visible (1.0625x), at the
+  cost of a pass over every token and a flash to confirm nothing shifted: do it when something else is
+  already touching those values. The same kind of duplicate is the touch rotation in
+  `TouchManager::mapCoordinates()`, which `bb_captouch` implements itself. DPI in LVGL scales only
+  shapes, never fonts, so `lv_display_set_dpi()` cannot replace the generated type scale.
 
 ## Audio
 
-- **AEC stays deprioritized indefinitely**, not just paused. If from-scratch
-  voice-assistant work (wake word, on-device AEC) resumes, the plan is a full ESP-IDF
-  rewrite (separate project) or adopting/extending ESPHome, not continuing to build AEC out
-  here. `ENABLE_AEC` stays off by default. **Superseded in direction 2026-11-02 (DECISIONS
-  A18)**: voice comes back as ROADMAP Phase 7, the ESPHome native API served by this firmware;
-  `design/voice-esphome.md`.
-- **ES8311/ES7210 mic gain and output volume tuning**, based on Waveshare's recent official
-  sample repos/documentation rather than chip defaults. Directly relevant: `CYD_S3_8048W550`
-  audio is notably quieter than other boards, unexplained — could be a gain issue.
-- **Generic capability pattern for "extraneous" sensors/peripherals** (IMU, RTC, power
-  management chips, temp/humidity, etc.) — extend the existing `HAS_X` BSP flag pattern to
-  cover these too, each paired with a small manager class (mirroring `AudioManager`/
-  `TouchManager`'s no-op-unless-flagged shape) and a GUI panel gated the same way
-  `Panel_Audio.cpp` already gates its widgets. Directly relevant once the
-  AXP2101/PCF85063/QMI8658/SHTC3-bearing boards get real firmware attention.
-- **Third, simpler `AudioManager` audio path** for bare I2S mic/amp modules with no
-  register-based codec chip at all (ICS43434/INMP441 mics, MAX98357A amps) — the current
-  driver only knows how to talk to ES7210/ES8311-style codecs over I2C/registers. Open
-  question: is this still needed given the current board lineup, or only relevant for a
-  future "basic boards" project? Investigate/test external hardware of this kind and how it
-  would actually plug into `AudioManager`'s existing shape before committing to a design.
+- **AEC is off indefinitely** (`ENABLE_AEC`). Voice returns as ROADMAP Phase 7: the boards speak
+  ESPHome's native API from this firmware (DECISIONS A18, `design/voice-esphome.md`).
+- **ES8311/ES7210 mic gain and output volume tuning**, from Waveshare's current sample repos rather than
+  chip defaults. `CYD_S3_8048W550` audio is notably quieter than the other boards, unexplained; it may be
+  a gain issue.
+- **A generic pattern for other peripherals** (IMU, RTC, power management, temperature/humidity): extend
+  the `HAS_X` BSP flag pattern, each paired with a small manager class that does nothing unless flagged
+  (the shape of `AudioManager` and `TouchManager`) and a GUI panel gated the same way `Panel_Audio.cpp`
+  gates its widgets. Relevant once the boards with an AXP2101, PCF85063, QMI8658 or SHTC3 get firmware.
+- **A third `AudioManager` path** for bare I2S mics and amps with no register-based codec (ICS43434,
+  INMP441, MAX98357A); the driver only knows ES7210/ES8311-style codecs. Open question: whether the
+  current board lineup needs it at all, or only a future "basic boards" project.
 
-## Connectivity (WiFi / MQTT / Home Assistant)
+## Connectivity and Home Assistant
 
-### The panel's own settings as HA entities (owner, 2026-10-07)
+- **The panel's own settings as HA entities.** Screen brightness (a `number`), dimming and screen timeout
+  (`select` / `number`), perhaps the color scheme, published over MQTT discovery as the device's own
+  sensors are, so an HA automation can use the house's sensors (a room's lux setting the panel's
+  brightness, the screen sleeping when the room is empty). Belongs with the settings page (4.1, #23,
+  D-7): each setting gets one definition that the page, the build sheet and HA all read and write. The
+  `/popup`-style debug endpoints stay debug.
+- **MQTT stays for what the board publishes.** HA's entities arrive over the websocket (`Fleet_HA`); the
+  board's own entities and plain broker topics go out over MQTT discovery. MQTT discovery is the only way
+  to publish entities that HA backs with a device and keeps across a restart, so the owner's plan to add
+  sensors, hardware and controls to boards depends on it.
+- **More entities the panel could expose to HA**: battery information; **custom toast popups an HA
+  automation can invoke** (an inbound command entity, a different shape from the state we publish
+  today); and further out something like Android's Live Updates or iOS's Live Activities, a persistent,
+  updating notification surface driven from HA, probably a card type with a lifecycle rather than a
+  toast. With a full web UI doing detailed configuration, not everything needs to be manageable from HA.
+- **A per-peripheral discovery descriptor**: each `HAS_X`-gated peripheral registers a small descriptor
+  (component type, object id, name, device class, state topic suffix) into a registry that the MQTT layer
+  walks at connect time, injecting the device id (`<device_id>_<object_id>` as `unique_id`), so a
+  peripheral advertises its entity whichever board it is wired to.
+- **NVS encryption.** Connectivity settings are stored unencrypted in NVS (`Preferences`). The standard
+  scheme ties NVS encryption to full flash encryption (an irreversible eFuse burn in release mode, not
+  something to flip while boards are still being reflashed); chips with an HMAC peripheral (S3 confirmed,
+  P4 unconfirmed) support a narrower key-derivation scheme. Either is a one-time per-device provisioning
+  step (eFuse plus an `nvs_keys` partition), and the `Preferences` call sites are the same with or
+  without it. Whether PlatformIO's Arduino build exposes the needed sdkconfig options is unchecked.
+- **A first-boot access point and a web UI that configures everything** (#6 captive portal, #27 web
+  config, #36 distribution `platformio.ini`; scoped with the companion web app #87). A first-boot flag
+  defaulting to STA+AP lets a user connect to the device and set up connectivity, MQTT, HA access, cards,
+  pages and preferences in a browser; virtually everything should be reachable there, not only in the
+  on-device GUI. It makes shipping a flashable binary viable, which is what lowers the barrier to anyone
+  else adopting the project. A lean custom portal (native `WiFi.h` plus `DNSServer`) rather than
+  `tzapu/WiFiManager`, because that library owns the whole scan, connect and portal flow with its own web
+  UI and would fight the touchscreen as the primary settings surface. Stretch, not a priority: a web
+  interface that builds a build sheet and compiles a custom binary.
+- **Platform pin.** Reaching the P4/C6 boards needed pioarduino `55.03.311` (arduino-esp32 `3.3.11`) and
+  PlatformIO Core `6.1.19`: the P4 has no radio and depends on its onboard C6 over SDIO (`esp_hosted`),
+  and older host drivers could not complete the RPC handshake. Do not float that pin without rebuilding
+  all nine environments.
+- **Still open from Phase 1**: the captive portal (#6), the on-device connectivity screen (#7) and
+  outbound entity commands beyond on/off and light levels (#44).
 
-Seeing how much of a board could be driven from the PC during 2.10c (`/popup`, `/panel`, schemes),
-the owner asked for the settings that matter to be **entities in HA**, published over MQTT discovery
-as the device already publishes its own sensors: screen brightness (a `number`), dimming and the
-screen timeout (a `select` / `number`), perhaps the colour scheme. Then HA automations can use the
-house's own sensors - a room's lux sensor setting the panel's brightness, the screen sleeping when the
-room is empty. Belongs with the settings model (4.1, #23, DECISIONS D-7): each setting gets one
-definition, and the settings page, the build sheet and HA all read and write that one. Not the
-`/popup`-style debug endpoints themselves - those stay debug.
+## Cards and the page
 
-### MQTT is the wrong transport for Home Assistant ENTITIES - websocket is the real path
+- **Icon face from the cell as well as the density.** Icon faces are picked by pixel density alone, so
+  they are the same physical size whatever the card: right across boards, wrong across card sizes on one
+  board (a puny corner icon and a lost hero on a big card; the sensor window's hero on a 7"). The faces
+  already exist per board. The cost is flash: every face a translation unit references is linked, so a
+  third referenced size is real money (CLAUDE.md, "Two costs"). Measure before doing it; it lands with
+  the card library (#31).
+- **The old card pinning, shelved** (K164). "Pin" on the glass means "shown on the page". The first grid
+  engine's pinning, a card at a fixed cell (`PageSpec`'s place, `CardPage`'s "pin rejected ... flowing",
+  `Layout.cpp`'s invalid pin), predates the arranger, which seldom lets a page overflow, and the layout web
+  app makes a hand-placed cell less useful still. Its code is still there, along with the arranger's own
+  "pinned" vocabulary (`_pinCols` / `_pinRows`, Arranger.cpp's pinned counts; the Grid line on the glass
+  says "fixed"). Remove it, or refit it to the arranger under a new name once hand arranging is designed,
+  and never under the word "pin".
+- **A full-screen detail page for every card** (2.7, 3.2, 4.4), modelled on HA's more-info dialog: tap a
+  card, get the extra information and controls for that entity, with the context panels sliding up and
+  the cards visible behind. Interest is recorded in `REFERENCE_PROJECTS.md` (`esphome-modular-lvgl-buttons`'
+  `detail.yaml`). The card window covers part of this; the rest lands across 2.7 (what each domain shows),
+  3.2 (how a sheet declares it) and 4.4 (the context-sheet mechanism).
+- **A manila-folder tag.** `HDR_TAG` draws a rounded rectangle above the card's top-left corner. The owner
+  wants the tag's bottom corners to curve outward so it reads as a tab pushed up from inside the card,
+  probably inset slightly from the left edge. Low priority; try it on glass.
+- **Two cards for when the engine allows**: an irrigation card (the owner's HA irrigation system:
+  scheduling and queuing, valve and zone entities decoupled from hardware, climate-driven run times, a
+  guardian for stuck valves; probably a group card with its own detail page), and thermostat controls
+  (`EntityKind::CLIMATE` shows read-only today, DECISIONS K144).
+- **Switching a light's control live while the selector is dragged**, rather than on release. Measure
+  frames with `DEBUG_FRAMES` first (W6).
+- **Linen's panel slides** are a little choppier than the dark schemes' on the P4_5 (frames 8-40 ms,
+  "totally passable"). Linen may get chrome of its own.
+- **The 4880 shows the card window in portrait** and nothing was tuned for it (font sizes and fit); far
+  down the list.
+- **A rotation switcher** (with #71). Rotate-and-restart from UI Tweaks is small: the board already works
+  out its frame path, layout and touch mapping from the rotation at boot. Switching live, without a
+  restart, is a larger job.
+- **The Card label row is greyed** until its redesign (K48): Current group / None / Custom, with a name
+  window. With it: moving a card to another group gets its own row and window (a list of groups, each
+  openable to its members, "change the label" or "move into a group panel"); NINA-style toasts; scene
+  secondary info (#89); names and groups from the web UI (#87); the Selector look as a device-wide choice
+  on the settings page (4.1).
 
-Owner's conclusion, 2026-09-13, and it reframes issue #43 from "an alternative
-way to reach HA" into "the way HA entities are actually going to work".
+### Arranging by hand, and an order by domain
 
-The problem is not that any single piece of metadata is missing. It is that
-**MQTT carries a value per topic and nothing else.** A light at
-`/home/office/light/state` tells you the light's state. Its area, its battery,
-its last-seen, the device it belongs to - each of those needs its own
-hand-crafted topic on the HA side, or an automation maintaining it per entity.
-At a handful of entities that is tedious; at hundreds it is unmanageable, and
-it is work the user has to do before our panel shows anything useful.
+Pages arrange themselves (K109); the owner wants these beside that:
 
-A JSON payload helps a little and does not fix it: someone still has to decide
-and configure what goes in that JSON, per entity, on the HA side.
+- **A priority order for tiles by domain** (lights and switches first, then binary sensors, then
+  sensors, or similar), so a cluster's tiles and the page's blocks fall in an order that means something
+  before anyone moves them.
+- **Arranging on the device**: a manual arrange mode, perhaps from the page slot's panel, where tiles,
+  cards and clusters are dragged and dropped ("at a minimum some form of rudimentary manual arrangement
+  mechanism"). He likes iPhone's jiggle and a temporary badge on each movable one. What a hand
+  arrangement does to the arranger's answer (kept as pins, or the arranger re-run around them) is the
+  design question.
+- **The web app** shaping pages, clusters, cards and their sizes in detail makes the automatic answer
+  matter less (3.1's build sheet). Its dashboard arranging could be the first part built at 3.1, so
+  layouts and configurations can be tried quickly.
+- **Each card's size, and tiles in a group by hand**: see ideas 3 and 4 in the brainstorm below.
 
-**This corrects an assumption in `docs/design/cards.md` section 2**, which says
-"Area comes free: Home Assistant already carries it on devices, so
-`MqttProvider` can populate it from discovery rather than anyone tagging
-entities by hand." Verified against the code: nothing in the tree publishes or
-reads an area, and MQTT discovery's `suggested_area` runs OUTBOUND - it is how
-a device suggests its own area to HA, not a way to learn someone else's. That
-sentence should be struck when cards.md is next edited.
+### Brainstorm
 
-**Not yet designed, and deliberately not guessed at here.** What the websocket
-API does and does not expose is worth confirming against the real thing rather
-than assumed - the owner's instruction on exactly this point was "don't make
-any assumptions about what does or doesn't come from HA". What is settled is
-the direction: full HA entity integration goes over the websocket, and MQTT
-stays for what it is genuinely good at - our own telemetry outbound, and plain
-broker topics that have nothing to do with HA.
+Five ideas the owner wanted written down. None is scheduled or agreed design; each says what it extends
+and where it would land.
 
-Consequences to think through when it is scheduled:
-
-- Area, and any custom grouping, become available rather than build-sheet-only.
-  `Card::setShowArea()` and the header modes were built assuming area might
-  arrive from somewhere later; that is the somewhere.
-- It overlaps the sensor-history fetch cards.md section 4 needs, which was
-  already going to want an HTTP or websocket client.
-- `MqttProvider` does not go away. It stops being the way HA entities arrive.
-
-
-
-**Phase 1 is COMPLETE — see `ROADMAP.md` for what was built and what was descoped.** The
-narrative that used to live here (progress logs, the `wifi-testing` branch, the platform
-upgrade) has been removed: it described work that is now done, and git history is a better
-record of how it went than a stale status section.
-
-What this project originally meant by "WiFi tested" — station mode, AP fallback, and a
-portable MQTT component that registers the device and its peripherals with Home Assistant
-via discovery, the way an ESPHome device does — is now largely satisfied. Discovery works,
-and entities flow in both directions.
-
-**Still deferred, each with an open GitHub issue:** the captive portal (#6), the on-device
-settings screen (#7), HA access without an MQTT broker (#43), and outbound entity commands
-(part of #10).
-
-The build-environment consequence worth keeping: reaching the P4/C6 boards at all required a
-fleet-wide bump to pioarduino `55.03.311` / arduino-esp32 `3.3.11` and PlatformIO Core
-`6.1.19`. The P4 has no radio of its own and depends entirely on an onboard ESP32-C6 over
-SDIO (`esp_hosted`); older host drivers could not complete the RPC handshake. Do not float
-that platform pin without rebuilding all eight environments.
-
-The settings-layering design below still stands and still describes the intended shape.
-
-Architecture agreed so far:
-
-- **Not part of `Fleet_BSP.h`.** BSP structs are hardware-wiring facts; WiFi/MQTT settings
-  are deployment config, a different axis entirely. New component,
-  `components/Fleet_Connectivity/`, holds a `ConnectivityDefaults.h` with flat structs in the
-  BSP's style (`WiFiDefaults`, `MqttDefaults` kept separate — WiFi has to succeed before MQTT
-  is meaningful, and they'll get separate GUI panels).
-- **One fleet-wide default, not per-device files.** All devices are expected to join the same
-  home AP, so WiFi needs little to no per-device variation. Where a device genuinely needs to
-  differ, override individual fields with `#ifdef WS_P4_7B` / etc. blocks in the same header —
-  reusing the unique per-board identity macro every `BSP_<NAME>.h` already defines, no new
-  build_flag or file-selection mechanism needed. Promote a field to a real per-board file only
-  if it turns out to need heavy variation later; don't build that machinery speculatively.
-- **Compile-time struct is only the fresh-flash fallback.** Source of truth at runtime is NVS
-  (`Preferences` library) via a `ConnectivityManager`: read NVS first, fall back to the
-  compile-time default if unconfigured. Every GUI-driven change (scan-and-connect, portal
-  settings) writes straight to NVS. Unencrypted for now — see encryption note below.
-- **MQTT device-identity fields** (device name, device ID, broker address, base topic) follow
-  the same default-plus-NVS-override layering as WiFi. **Per-peripheral MQTT entities do
-  not** — a peripheral (audio, and eventually IMU/RTC/battery/relay per this file's own
-  "generic capability pattern" item above) should be able to advertise its own HA discovery
-  entity regardless of which board it's wired to. Planned shape once the MQTT phase starts:
-  each `HAS_X`-gated peripheral registers a small `MqttEntityDescriptor` (component type,
-  object_id, name, device_class, state topic suffix) into a central registry; one
-  `MqttManager` walks it at connect time and publishes discovery payloads with the device ID
-  injected centrally (`<device_id>_<object_id>` as `unique_id`), so descriptors stay portable
-  across boards and never need to know their own device ID. This is the same underlying
-  problem as `docs/archive/GUI_FRAMEWORK.md`'s manifest/data-source-abstraction vision (layer 3) —
-  worth building with an eye toward that reuse, not as a throwaway.
-- **NVS encryption: deferred, not designed out.** The standard scheme ties NVS encryption to
-  full flash encryption (irreversible eFuse burn in release mode, not something to flip while
-  still actively reflashing boards for bring-up); chips with an HMAC peripheral (S3 confirmed,
-  P4 unconfirmed) support a narrower key-derivation scheme without encrypting all of flash.
-  Either way it's a one-time per-physical-device provisioning step (eFuse + a `nvs_keys`
-  partition-table entry), not a code change — `Preferences` call sites are identical with or
-  without it, so starting unencrypted doesn't force a later rewrite. Needs its own
-  investigation into whether PlatformIO's Arduino-framework build exposes the necessary
-  sdkconfig options before committing to a scheme.
-- **Custom lean AP/captive-portal, not `tzapu/WiFiManager`.** That library owns the whole
-  scan/connect/portal flow with its own web UI, which would fight the LVGL touchscreen being
-  the primary settings surface instead of complementing it. Native `WiFi.h` (STA scan/connect,
-  `softAP()`) + `DNSServer` for the captive-portal DNS redirect; a web page only as a minimal
-  phone/laptop fallback for credential entry, not the main UX.
-
-## Owner's ideas, recorded 2026-09-15
-
-Passed over verbatim-in-substance so they are not lost. None are scheduled; each notes where it
-would land.
-
-### More, 2026-09-16 (after the first dashboard flash)
-
-**Icons look undersized on large cards.** Observed at 189x202 px: the corner icon looks puny and
-the hero looks lost in the middle of a big empty disc. Both faces are picked by PIXEL DENSITY
-alone, so they are the same physical size whatever the card - which is right across boards and
-wrong across card sizes on one board. The fix is to choose the icon face from the CELL as well as
-the density, and the faces already exist (18/20/26/28/30/32/34/42/46/52 are generated per board).
-The cost is flash: each face a translation unit REFERENCES is linked, so a third referenced size
-is real money. Wants measuring before it is done. Lands with 2.7 or the card-library work.
-
-**Long-press opens a detail view, with the context panels sliding up.** The owner's framing: the
-background dims or blurs so the cards stay visible behind the popup, and the deck's panel HEADERS
-animate up from the bottom, expanding only when tapped. This is the same feature as the per-card
-detail page recorded above and as `cards.md` section 4's long-press sheet - three descriptions of
-one thing, and it should be built once. 2.4 deliberately left the overlay unbuilt.
-
-**Button-press feedback.** Cards shrink slightly while held and pop back on release. Cheap with
-LVGL transforms, and it is the one animation that makes a touch panel feel like it is working.
-
-### The panel should advertise its OWN entities to Home Assistant, and that capability must survive #43
-
-**This is a constraint on #43, not a wish.** The owner intends to add sensors, hardware and
-controls to several boards, so publishing entities INTO Home Assistant has to keep working. MQTT
-discovery is the only way to do that - HA's REST API can set arbitrary states, but entities made
-that way are not backed by a device and do not survive a restart.
-
-So the split stays exactly as #43 describes it: **websocket inbound for HA's entities, MQTT
-outbound for ours.** Whoever builds #43 must not treat MQTT as legacy.
-
-Beyond local sensors, he wants the panel itself to expose device entities for automation:
-
-- screen brightness, sleep-mode settings
-- battery information
-- **custom toast popups an HA automation can invoke** - an inbound command entity, which is a
-  different shape from everything we publish today (we publish state; this receives it)
-- other device and fleet-specific controls
-
-And, further out: **something like Android's Live Updates / iOS's Live Activities** - a
-persistent, updating notification surface driven from HA. Worth thinking about as a card type
-with a lifecycle rather than as a toast.
-
-Tempering note from the owner himself: with a full web UI doing detailed configuration, not
-everything needs to be manageable from HA.
-
-### First-boot AP and a web UI that configures everything (relates to #6, #27, #36)
-
-A **first-boot flag defaulting to STA+AP**, so a user connects to the device and does initial
-setup in a browser: connectivity, MQTT, HA access, cards, pages, preferences. Not everything needs
-to be in the on-device GUI, but virtually everything should be reachable from the web UI.
-
-**The point is distribution.** It makes shipping a flashable binary viable, which is what lowers
-the barrier to anyone else adopting this. That reframes #6 (captive portal) and #27 (web config)
-from conveniences into the adoption path.
-
-Stretch idea, explicitly not a priority: a **web interface that builds a build sheet and compiles
-a custom binary** the user flashes and runs immediately.
-
-### Every card gets a full-screen detail page (2.7 / 3.2 / 4.4)
-
-Formalising the interest `REFERENCE_PROJECTS.md` records in `esphome-modular-lvgl-buttons`'
-`detail.yaml` - a full-screen detail view for complex types. The model is Home Assistant's own
-more-info dialog: tap a card, get the extra information and controls for that entity.
-
-This is the thing `cards.md` section 4's long-press-opens-a-sheet was reaching for, and 2.4
-deliberately left the overlay unbuilt. It lands across 2.7 (what each domain shows), 3.2 (how a
-sheet declares it) and 4.4 (the context-sheet mechanism).
-
-### Tag mode should look like a manila folder tab
-
-`HDR_TAG` currently draws a rounded rectangle above the card's top-left corner. The owner wants
-the tag's BOTTOM corners to curve OUTWARD instead of inward, so it reads as a tab pushed up from
-inside the card rather than a separate pill sitting on top. Likely needs the tag inset slightly
-from the left edge to look natural. Explicitly low priority, and a case for experimenting on glass.
-
-### Two cards he wants to build once the engine allows it
-
-- **An irrigation integration.** He built a full irrigation system in HA over summer 2026:
-  scheduling and queuing, valve and zone entities decoupled from hardware so valves can be swapped
-  without breaking configuration, climate-driven run-time adjustment, and a guardian watching for
-  stuck valves. A card - probably a group card with its own detail page - is the target.
-- **A thermostat card.** `EntityKind::CLIMATE` already exists with no card behind it.
-
-### Carried out of HANDOFF, 2026-10-14 (from 2.10 and K17)
-
-Open ends of the card window's milestones that are not issues and not decisions. None blocks
-anything; each says where it lands.
-
-- **The sensor hero on a large window**: its disc grows with the window while its icon is a fixed
-  face, so on a 7" the glyph looks small in it. A bigger icon face costs flash (CLAUDE.md, "Two
-  costs"). With the card-library work.
-- **Switching a light's control live while the selector is dragged**, rather than on release.
-  Measure frames with `DEBUG_FRAMES` first (W6).
-- **Linen's panel slides** are a little choppier than the dark schemes' on the P4_5 ("totally
-  passable"; frames 8-40 ms). Linen may also get chrome of its own one day (owner).
-- **The 4880 shows the window in portrait**; nothing was tuned for it. The owner's 2.11 follow-up
-  notes: its font sizes and fit, far down the list.
-- **A rotation switcher** (owner, 2.11 follow-ups; with #71): rotate-and-restart from UI Tweaks is
-  small - the board already works out its frame path, layout and touch mapping from the rotation at
-  boot; switching live, without a restart, is a larger job.
-- **The Card label row is greyed** until its redesign (K48): Current group / None / Custom, with a
-  name window. With it, the owner's notes from 2.10d: moving a card to another group gets its own
-  row and window (a list of groups, each openable to its members - "change the label" or "move
-  into a group panel"); and the three things called "group" now have names of their own (K88:
-  group, group card, cluster - `group-cards.md` §6.1, built in 2.11).
-  Also from those notes: NINA-style toasts, scene secondary info (#89), names and groups from the
-  web UI (#87), and the Selector look as a device-wide choice on the settings page (4.1).
-
-### Arranging by hand, and an order by domain (owner, 2026-10-20, 2.11 round 6)
-
-Pages now arrange themselves (K109); these are what he wants beside that:
-
-- **A priority order for tiles by domain** - lights and switches first, then binary sensors, then
-  sensors, or similar - so a cluster's tiles, and the page's blocks, fall in an order that means
-  something before anyone moves them.
-- **Arranging on the device**: a "manual arrange" mode, perhaps from the page slot's panel, where
-  tiles, cards and clusters are dragged and dropped - "at a minimum some form of rudimentary manual
-  arrangement mechanism". He likes iPhone's jiggle (icons wobbling while they can be moved) and a
-  temporary badge on each movable one. What a hand arrangement does to the arranger's answer (kept
-  as pins, or the arranger re-run around them) is the design question it raises.
-- **The web app** shaping pages, clusters, cards and their sizes in detail makes the automatic
-  answer matter less (owner) - 3.1's build sheet. **Its dashboard arranging could be the first part
-  built** at 3.1, so layouts and configurations can be tried quickly (owner, 2026-10-20).
-- **Each card's size, and tiles in a group by hand** (owner, 2026-11-07): see "Brainstorm,
-  2026-11-07" below, ideas 3 and 4.
-
-### The old card pinning, shelved (owner, 2026-11-04, DECISIONS K164)
-
-**"Pin" on the glass now means "shown on the page"** (a group's pinned members, K160). The first
-grid engine's pinning - a card placed at a fixed cell (`PageSpec`'s place, `CardPage`'s "pin
-rejected ... flowing", `Layout.cpp`'s invalid pin) - predates the arranger, which seldom lets a page
-overflow, and the layout web app makes a hand-placed cell even less useful. **Its code is still
-there**, along with the arranger's own "pinned" vocabulary (`_pinCols` / `_pinRows`, Arranger.cpp's
-pinned counts; on the glass the Grid line now says "fixed"). Either remove it, or refit it to the
-arranger with a new name once the hand-arranging above is designed - never under the word "pin".
-
-### Brainstorm, 2026-11-07 (owner, during 2.13's last round)
-
-Five ideas he wanted written down before they were lost. None is scheduled; each says what it
-extends and where it would land. Nothing here is agreed design yet.
-
-1. **A roll-up entity per HA area, kept by HA** - one persistent entity for each area's doors, one
-   for its lights, one for its sensors, that always reports its members and their states, *including
-   after the members change* (a light moved to another area, a new door sensor added). The board
-   would hold one entity per area and kind instead of a list it has to keep in step.
-   - *Extends:* 2.13's open "per-room status entities for cluster headers" (ROADMAP, running order
-     6) and K170 (an HA group entity is a group on the board). The cluster header would read the
-     roll-up's members (2.8's slots, K129's Header options).
+1. **A roll-up entity per HA area, kept by HA** - one persistent entity for each area's doors, one for
+   its lights, one for its sensors, that always reports its members and their states, including after
+   the members change (a light moved to another area, a new door sensor added). The board would hold
+   one entity per area and kind instead of a list it has to keep in step.
+   - *Extends:* per-room status entities for cluster headers (`design/carried-from-2.13.md`, which
+     notes the boards count from a group's members and may not need them) and K170 (an HA group entity is a group on the board; not built). The cluster header would read the
+     roll-up's members (the header slots, K129's Header options).
    - *HA side:* a template entity built on `area_entities()` follows area changes on its own; a plain
-     group helper does not, because its member list is fixed. It must be something the owner can
-     read and manage without AI (the HA folder's process), named by function, one per area and kind.
-     Open: one entity per kind, or one per area with members by kind as attributes; what its state
-     says ("2 of 5 on", "1 open").
-   - *Lands:* HA's side of the 2.13 follow-on or 2.14 (alerts read the same roll-ups: a door left
-     open is the door roll-up's state).
-2. **The same for a group made on the board** - a group whose lights are in several HA areas
-   reports its members and their states live, perhaps in its header.
-   - *Extends:* the cluster header (2.11, K114-K119), the summary card (K98's words: "2 open",
-     "Both"), K170's "mirroring the boards' groups into HA" (a later idea there), and "The panel
-     should advertise its OWN entities" above: a board group published to HA over MQTT discovery
-     would be the roll-up of idea 1, made on the board.
-   - Open: on the board only (a header slot such as "3 of 5 on" that opens the members), or in HA
-     too (the mirror); which board owns a group that several boards show (idea 5).
+     group helper does not, because its member list is fixed. It must be something the owner can read and
+     manage without AI (the HA folder's process), named by function, one per area and kind. Open: one
+     entity per kind, or one per area with members by kind as attributes; what its state says ("2 of 5
+     on", "1 open").
+   - *Lands:* HA's side of the 2.13 follow-on or 2.14 (alerts read the same roll-ups: a door left open
+     is the door roll-up's state).
+2. **The same for a group made on the board** - a group whose lights are in several HA areas reports its
+   members and their states live, perhaps in its header.
+   - *Extends:* the cluster header (K114-K119), the summary card (K98's words: "2 open", "Both"; the
+     summary card is its own design, K189, not built beyond the compiled Garage - Doors), K170's
+     "mirroring the boards' groups into HA" (a later idea there), and the panel advertising its own
+     entities above: a board group published to HA over MQTT discovery would be the roll-up of idea 1,
+     made on the board.
+   - Open: on the board only (a header slot such as "3 of 5 on" that opens the members), or in HA too
+     (the mirror); which board owns a group that several boards show (idea 5).
 3. **More card presentations**:
    - a **card with a dimmer bar** - a light's level on the card face, set without opening the window
      (#31 card library, #86 control styles);
-   - **revisit the card's layout** - where "last updated" goes, and a group shown as its solo card
-     with **several members on its face** instead of one (K151's face, K191, K193);
+   - **revisit the card's layout** - where "last updated" goes, and a group shown as its solo card with
+     **several members on its face** instead of one (K191, K193);
    - **card sizes from the grid** - half-size cards, cards of other widths, a solo card wide enough to
-     show more. The arranger works in units already (K109, K120; `design/layout-engines.md`), so a
-     size is a claim of units; what the arranger does with mixed sizes is the design question.
-     Relates to "Icons look undersized on large cards" above (the face per cell) and 4.2.
+     show more. The arranger works in units already (K109, K120; `design/layout-engines.md`), so a size
+     is a claim of units; what the arranger does with mixed sizes is the design question. Relates to the
+     icon face from the cell above, and 4.2.
 4. **Arranging by hand** - choosing what goes where on a page and in a group, and each card's size.
-   Already recorded above ("Arranging by hand", 2026-10-20: the jiggle mode, the web app's
-   arranging first at 3.1); this adds **size per card** as part of it (idea 3), and tiles inside a
-   group arranged by hand as well as the page.
+   Adds **size per card** (idea 3) and tiles inside a group arranged by hand as well as the page, to the
+   arranging items above.
 5. **Synchronizing boards** - with Fleet peer work (#55), push a group's configuration, or a whole
    board's, to other boards, or keep boards in step.
-   - *Extends:* #55 peer discovery; K181 (a backup from one board is meant to restore on another -
-     the first, manual form of this); Phase 3's export and import with the companion web app (#87).
-   - Open: one-time push or kept in step; what is per board and never copied (its screen's
-     arrangement, its own sensors, the Panel group); which board, or the web app, is the source.
+   - *Extends:* #55 peer discovery; K181 (Backup and Restore, not built; a backup from one board is
+     meant to restore on another, the first manual form of this); Phase 3's export and import with the
+     companion web app (#87).
+   - Open: one-time push or kept in step; what is per board and never copied (its screen's arrangement,
+     its own sensors, the Panel group); which board, or the web app, is the source.
 
-## bb_captouch_fork
+## Touch
 
-- **Detach from the original author's repo.** `components/bb_captouch_fork` is currently a
-  nested, separate git repo (own remote, `psyfiend/bb_captouch`) rather than a normal part of
-  this project — investigate what it'd take to fully absorb it as plain project files with no
-  outside remote tie. Treat cautiously either way: an earlier, extensive set of local
-  modifications here was reverted to stock and is unrecoverable via git.
-- **Investigate the library's own built-in per-controller orientation system**
-  (`setOrientation()` + `_iOrientation` + `fixSamples()`) — never used in this project;
-  all rotation handling has always been the custom `TouchManager::mapCoordinates()` instead.
-  Worth a real comparison against the vendor path.
+- **The library's own orientation system.** `bb_captouch` has per-controller orientation support
+  (`setOrientation()`, `_iOrientation`, `fixSamples()`) that this project never uses; all rotation is the
+  custom `TouchManager::mapCoordinates()`. Worth a real comparison against the vendor path.
 
-## Battery / power management
+## Hardware
 
-Keep as-is for now — see `HARDWARE_STATUS.md` for the one low-priority fleet-wide item
-(battery ADC "gauge" investigation).
-
-## General
-
-- **Sync BSPs with Waveshare's latest repos.** WS has very recently updated repos for all
-  their devices, particularly the P4 boards, which until now were ESP-IDF-only with no
-  Arduino code. Do an exhaustive pass per board: compare audio, display, and LVGL bring-up
-  against this project's own; import/examine vendor demos for any hardware unique to that
-  board (IMU, RTC, power management, etc.) that isn't in this HAL yet.
-
-## Lithium battery power
-
-3D-printed enclosures exist for most devices with room for a battery. Goal: a single USB-C
-port on the enclosure that powers the device, charges the battery, and provides a data
-connection to a PC simultaneously. Some boards have native battery headers (see
-`HARDWARE_STATUS.md` per-device notes for which). Fallback for boards without one: TP4056
-modules on hand (USB-C input, plus separate +/- pads for input, battery, and device output).
-
-## P4 silicon revision — what it is and why it matters
-
-ESP32-P4 chips ship in two silicon revision families, `rev1_3` and `rev3_x`, each requiring a
-different Arduino `Chip Variant` build setting (`prev3` / `postv3` respectively) and — more
-importantly for this project — a different MIPI-DSI PHY clock source (`PLL_F20M` for
-`rev1_3`, XTAL default for `rev3_x`). This is a **silicon** revision, not a board/PCB
-revision — two physical units of the same board model can ship with different chip
-revisions depending on manufacture date, and it's confirmed only via a chip-ID probe, never
-from the PCB silkscreen alone.
-
-**Updated 2026-09-06 (`feat/p4-5-display-bringup`).** Three things are now known that were not
-when the above was written:
-
-- **`pioarduino` already handles the build-setting half automatically.** It ships two prebuilt
-  lib variants — `esp32p4_es` (pre-rev3: `SELECTS_REV_LESS_V3=y`, `REV_MIN_1`) and `esp32p4`
-  (`REV_MIN_301`) — and selects between them from the board definition. `board =
-  esp32-p4-evboard` picks **`esp32p4_es`**, so the fleet is already built for pre-rev3 silicon
-  and the `Chip Variant` concern is handled. Beware: `framework-arduinoespressif32-libs/` holds
-  *both* variants' `sdkconfig` files, and reading the wrong one is very easy — it cost most of
-  a session.
-- **The PHY clock source is now selectable per board.** `DisplayConfig.PHY_CLK_SRC` plus a
-  constructor parameter on `Arduino_ESP32DSIPanel` does exactly the wiring-up this section
-  anticipated. `0` = keep the library's `PLL_F20M`, so no existing board changed.
-- **It did not matter in practice.** `PLL_F20M` and IDF-auto were tested head-to-head on a
-  confirmed rev1.3 chip and behaved identically. The display bug that prompted the
-  investigation turned out to be panel reset polarity, not the clock source. So treat the
-  rev1_3/rev3_x PHY-clock distinction as real but so far unobserved — do not assume it explains
-  a DSI failure.
-
-One measured data point exists: the `WS_P4_5` unit is **rev v1.3** (eFuse
-`WAFER_VERSION_MAJOR=1`, `MINOR=3`). The other three P4 boards have never been probed — one
-`esptool flash-id` each would settle what the fleet actually contains.
-
-`bsp_hw.SI_REV` remains inert and should stay `"unconfirmed"`: silicon revision is a per-chip
-property, so a per-board-model header cannot represent it correctly. If it is ever made
-load-bearing, read the revision at runtime and compare, the way `checkAudioBspSanity()` does.
-
-Full detail: `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
-
-## New hardware
-
-### WaveShare ESP32-P4-WIFI6-Touch-LCD-5 (`WS_P4_5`) — brought up 2026-09-06, the dev board since (`BRINGUP_WS_P4_TOUCH_LCD_5.md`; the note below is the original)
-
-BSP modeled directly against the latest Waveshare repo for this exact device, which (unlike
-past P4 boards) included real Arduino-specific samples/code, not just ESP-IDF. Compiles
-clean across all 8 environments; has not been flashed or tested on physical hardware yet.
-
-### WaveShare ESP32-S3 RGB Matrix board + 128x64 HUB75 panel
-
-- Has ES8311, ES7210, and dual mics — same audio codec pairing as several boards already in
-  this fleet, so `AudioManager` should mostly just work here once BSP'd.
-- Also has a QMI8658 (IMU) and an SHTC3 temp/humidity sensor.
-- Plan is to drive the HUB75 panel using the `mrcodetastic/ESP32-HUB75-MatrixPanel-DMA`
-  library (external dependency, not part of this project's existing display stack).
-
-### `CYD_P4_1060`'s camera (owner, 2026-09-28)
-
-The board has a camera, with a through-hole in the front at the top in landscape - the owner had
-forgotten it was there until the esp_lcd bring-up. Get it running. **Nothing checked yet:** the
-sensor model, how it connects (the P4 has a MIPI-CSI camera input, but whether this board uses it
-is unconfirmed), and whether Guition's pack in `reference/Guition Examples/` has an example for it.
-The P4 4B also has a CSI port, unpopulated on our unit (`HARDWARE_STATUS.md`). Uses to think about:
-presence detection, a doorbell-style view, a snapshot to Home Assistant.
-
-### WaveShare Modbus-RTU-Relay-B (8-channel RS485 relay module)
-
-No microcontroller on this board — a dumb RS485-controlled relay bank, intended to be driven
-by `WS_S3_TOUCH_LCD_5B`. Its intended use (a sprinkler controller) is a **special project
-outside the scope of this environment** — see `HARDWARE_STATUS.md`'s `WS_S3_5B` entry for the
-immediate to-do (basic Modbus communication + relay switching only).
-
-## Done
-
-Kept brief — enough to know what changed and why, not a full narrative. See git history for
-the rest.
-
-- **Unified `Fleet_BSP.h`.** Was two separately-drifting struct families
-  (`Fleet_BSP.h`/`Fleet_BSP_P4.h`), then one nested struct, now seven independent flat
-  structs (`BoardHardware`, `ExpanderConfig`, `DisplayConfig`, `TouchConfig`, `LvglConfig`,
-  `AudioConfig`, `StorageConfig`) aliased to `bsp_hw`/`bsp_display`/etc. See `CLAUDE.md`'s BSP
-  pattern section and `HARDWARE_STATUS.md` for the summary.
-- **Board-identity macro moved out of `build_flags`.** Each `BSP_<NAME>.h` now defines its
-  own short device macro at the top of the file instead of a redundant separate build flag.
-  `HAS_X` capability flags are unaffected, still in `build_flags`.
-- **`bb_captouch_fork` GT911 "Invalid IO 255" noise fixed** — guarded `iINT` GPIO calls with
-  `if (iINT != -1)`, matching the pattern already used for every other controller type in
-  that file.
+- **Sync BSPs with Waveshare's latest repos.** Waveshare has updated the repos for all its devices, the
+  P4 boards in particular, which were ESP-IDF-only before. Do an exhaustive pass per board: compare audio,
+  display and LVGL bring-up against this project's, and import or examine vendor demos for hardware unique
+  to that board (IMU, RTC, power management) that is not in this HAL yet.
+- **P4 silicon revision.** Chips ship as `rev1_3` or `rev3_x`, a per-chip property (two units of one board
+  model can differ) confirmed only by a chip-ID probe. `pioarduino` picks the matching prebuilt library
+  variant from the board definition (`esp32-p4-evboard` selects `esp32p4_es`, pre-rev3), so the build
+  setting is handled. `DisplayConfig.PHY_CLK_SRC` selects the DSI PHY clock per board; `PLL_F20M` and the
+  IDF default behaved identically on a rev1.3 chip, so the rev1_3 / rev3_x clock distinction is real but
+  unobserved and does not explain a DSI failure. Only the `WS_P4_5` has been probed (rev v1.3; one
+  `esptool flash-id` per other P4 would settle what the fleet holds). `bsp_hw.SI_REV` stays
+  `"unconfirmed"`; if it ever becomes load-bearing, read the revision at runtime and compare, as
+  `checkAudioBspSanity()` does. Detail: `docs/BRINGUP_WS_P4_TOUCH_LCD_5.md`.
+- **`CYD_P4_1060`'s camera.** The board has a camera, with a through-hole in the front at the top in
+  landscape. Unchecked: the sensor model, how it connects (the P4 has a MIPI-CSI input; whether this board
+  uses it is unconfirmed), and whether Guition's pack in `reference/Guition Examples/` has an example. The
+  P4 4B also has a CSI port, unpopulated on the owner's unit (`HARDWARE_STATUS.md`). Uses: presence
+  detection, a doorbell-style view, a snapshot to Home Assistant.
+- **WaveShare ESP32-S3 RGB Matrix board with a 128x64 HUB75 panel.** It has an ES8311, an ES7210 and dual
+  mics, the codec pairing several boards already use, so `AudioManager` should mostly work once it has a
+  BSP; also a QMI8658 (IMU) and an SHTC3. The HUB75 panel would be driven by
+  `mrcodetastic/ESP32-HUB75-MatrixPanel-DMA`, an external dependency outside the display stack.
+- **WaveShare Modbus-RTU-Relay-B** (8-channel RS485 relay module, no microcontroller of its own),
+  intended to be driven by `WS_S3_TOUCH_LCD_5B` as a sprinkler controller, a special project outside this
+  environment. The immediate to-do is in `HARDWARE_STATUS.md`'s `WS_S3_5B` entry (basic Modbus
+  communication and relay switching).
+- **Lithium battery power.** 3D-printed enclosures exist for most devices with room for a battery. Goal:
+  one USB-C port on the enclosure that powers the device, charges the battery and carries data to a PC at
+  once. Some boards have native battery headers (`HARDWARE_STATUS.md`); for the rest, TP4056 modules are on
+  hand (USB-C input, with separate pads for input, battery and device output). The one fleet-wide
+  battery item is the battery ADC "gauge" investigation, in `HARDWARE_STATUS.md`.

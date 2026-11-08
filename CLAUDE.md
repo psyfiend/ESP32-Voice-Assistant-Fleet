@@ -10,12 +10,13 @@ elsewhere, and it is worth checking those first for "is X already known or plann
 
 | Doc | Answers |
 |---|---|
-| `docs/HANDOFF.md` | Where we left off, what to know that the other docs do not say. **Start here.** |
+| `docs/HANDOFF.md` | Where the project stands: goals, findings, boards, environment, how to work with the owner. **Start here.** |
 | `docs/design/ui-architecture.md` | **How the UI is built**: the layers, where things live, the rules, how to change it and prove nothing broke. Read before any UI work |
-| `docs/ROADMAP.md` | What we are building, in what order, what is done - and **where each kind of note belongs** |
-| `docs/DECISIONS.md` | Every decision that shapes later work, one line each, pointing at its reasoning |
+| `docs/ROADMAP.md` | What we are building, in what order, what is done, **how a milestone runs**, each phase's open work - and **where each kind of note belongs** |
+| `docs/DECISIONS.md` | Every settled decision, one line each, pointing at its reasoning; added at a milestone's sign-off |
 | `CHANGELOG.md` | What each tagged version contains |
-| `docs/TEST_<milestone>.md` | The owner's test sheet for the milestone in progress (archived when done) |
+| `docs/PLAN_<milestone>.md` | The milestone in progress: goal, deliverables, working decisions, parking lot, what is done (archived at sign-off) |
+| `docs/TEST_<milestone>.md` | The owner's test sheet for the milestone in progress, started when something is ready on the glass (archived at sign-off) |
 | `docs/HARDWARE_STATUS.md` | Which board does what, what is untested, build-environment issues |
 | `docs/LESSONS.md` | Mistakes that cost real time, written down so they cost it once |
 | `docs/FUTURE_IMPROVEMENTS.md` | Deliberately deferred fleet-wide work |
@@ -103,7 +104,7 @@ containing an escape will silently fail to match, and a script that then "succes
 nothing is indistinguishable from one that worked. If a scripted edit reports success, confirm the
 file actually changed.
 
-## Guards that run, not rules that are read (since 2026-10-13, DECISIONS W10)
+## Guards that run, not rules that are read (DECISIONS W10)
 
 Markdown is interpreted; these are executed. Know they exist, and do not route around them - if a
 guard blocks something that is genuinely needed, stop and ask the owner to run it himself.
@@ -131,7 +132,7 @@ Files git does not hold - the two secrets headers, `reference/`, `legacy_testing
 `screenshots/`, the local `platformio.ini`, the rebuilt P4 libraries - cannot be recovered from
 GitHub. Treat any command that could touch them as irreversible.
 
-## Subagents (since 2026-10-13, DECISIONS W11)
+## Subagents (DECISIONS W11)
 
 - **Read-only work goes to read-only agents**, in parallel when it helps: `explorer` (Sonnet:
   understanding code, finding callers, mapping a subsystem) and `auditor` (Haiku: complete
@@ -327,14 +328,18 @@ The live file is on the include path via `-I include/lvgl` in the shared `[S3-op
 had `LV_USE_LOG 0` and `LV_MEM_SIZE 64KB`, and the fleet demonstrably prints `[LVGL] [Warn]` lines
 and behaves like a 128KB pool.
 
-**LVGL's pool: 512 KB in PSRAM on every P4, 128 KB elsewhere** (owner, 2026-10-06, #88).
-`[P4-options]` sets `-D FLEET_LV_MEM_PSRAM -D FLEET_LV_MEM_KB=512`: LVGL keeps its own allocator
-(TLSF, `lv_mem_monitor()`) but takes the pool from PSRAM at `lv_init()`, so its size costs no
-internal RAM - WS_P4_5 went from 233 to 361 KB internal free, full-screen frames ~10% slower.
-WS_S3_4B has the PSRAM pool at 128 KB; the other S3s keep a 128 KB static array in internal RAM,
-where 192 KB once broke the network and 256 KB does not link (LESSONS). **Never hand LVGL to the
-system `malloc` on the P4** - NINA's `lv_mem_psram.c` records it fragmenting the internal heap until
-esp-hosted's WiFi receive buffer failed (LESSONS, "Small LVGL traps from 2.10b").
+**LVGL's pool is in PSRAM on every board: 512 KB on the P4s, 128 KB on the S3s** (A11, #88).
+`[P4-options]` sets `-D FLEET_LV_MEM_PSRAM -D FLEET_LV_MEM_KB=512`, `[S3-options]` `-D
+FLEET_LV_MEM_PSRAM` (the 128 KB default): LVGL keeps its own allocator (TLSF, `lv_mem_monitor()`)
+but takes the pool from PSRAM at `lv_init()`, so its size costs no internal RAM - full-screen frames
+are about 5-10% slower. On an S3 a static pool in internal RAM leaves too little for the network and,
+with 2.13's code, does not link. **Never hand LVGL to the system `malloc` on the P4** - NINA's
+`lv_mem_psram.c` records it fragmenting the internal heap until esp-hosted's WiFi receive buffer
+failed (LESSONS).
+
+**Large fixed buffers go to PSRAM too**: declare one as `PsramArray<T, N>` (`include/PsramArray.h`)
+in place of `static T name[N]` - used the same way, its storage taken from PSRAM on first use. A
+window's working lists are the usual case; internal RAM on the S3s is what runs out first.
 
 ## PlatformIO build cache can silently ignore BSP header edits
 
@@ -371,8 +376,7 @@ nothing and is immune.
 
 ## Application layout (`src/` + `include/`)
 
-Since Phase 2.1 (2026-09-09) startup is a five-way split, each file with one job. Design and
-reasoning: `docs/design/startup.md`.
+Startup is a five-way split, each file with one job. Design and reasoning: `docs/design/startup.md`.
 
 | File | Owns |
 |---|---|
@@ -383,7 +387,7 @@ reasoning: `docs/design/startup.md`.
 | `GUIManager` | Screen content: root screen, decks, header, panels |
 | `HttpServer` | The one HTTP server (`esp_http_server`, port 80), owned by `SystemCore`. Routes are registered by their owners; it starts only if one exists. **Handlers run on the server's own task: never touch LVGL from one** (see `UI/Screenshot.cpp` for the hand-off to the LVGL thread) |
 
-**Prefer ESP-IDF facilities over Arduino-only ones** (owner, 2026-09-24): a move to ESP-IDF is
+**Prefer ESP-IDF facilities over Arduino-only ones** (W4): a move to ESP-IDF is
 expected eventually, and anything built on an Arduino-only library is something to port then.
 `esp_http_server` over Arduino `WebServer` was the first decision made on that basis. New code
 still logs through `Serial` like the rest of the tree, on the view that it is a mechanical swap
@@ -423,20 +427,21 @@ or ESP-IDF header - so it is tested off the board in `host-tests/`, with `TimeFo
 `CardPage` turns its cards into items and lays out what the engine returns; a new arrangement is a
 new `Layout::Engine`, not placement code in a page. Keep a module there pure, or it cannot be tested.
 
-## Saved settings (`include/Settings.h`, since 2.10d)
+## Saved settings (`include/Settings.h`)
 
 The owner's changes live in **one JSON file, `/cfg/settings.json`, on LittleFS** (the 16 MB layout's
 `spiffs` partition): a value comes from the file, else the card's spec, else the page's, else the
 default. It is Q2's runtime layer. Design: `docs/design/card-sheet.md` §17.
 
-**Since 2.13 round 5 (K171) the file IS the dashboard.** The compiled cards are retired: the House
-page compiles only Garage - Doors (until 2.14), the Fleet page only the built-in **Panel** group
-(`CardSpec::builtIn`: never hidden). Every other card is a card made on the board (`CardAdded`, up to
-128, K176), kept in the file with the id it had. `scripts/release/retire_compiled.py` converts a
-pre-round-5 file (`--mqtt` the dev boards' MQTT group, `--tests` the test cards in
-`scripts/release/test_cards.json`). **A wiped partition leaves a board with Panel and Doors only** -
-and the system panel's development **Reset** (`CardAdded::resetToCompiled`) deletes every made card,
-which is now the whole House page.
+**The file IS the dashboard (K171).** The House page compiles only Garage - Doors (until 2.14's
+summaries), the Fleet page only the built-in **Panel** group (`CardSpec::builtIn`: never hidden).
+Every other card is a card made on the board (`CardAdded`, up to 128, K176), kept in the file.
+`scripts/release/retire_compiled.py` converts a file from before the compiled cards were retired
+(`--mqtt` the dev boards' MQTT group, `--tests` the test cards in `scripts/release/test_cards.json`).
+**A wiped partition leaves a board with Panel and Doors only** - and the development address
+`/popup?dash=2` (`CardAdded::resetToCompiled`) deletes every made card without asking, which is the
+whole House page. A group made on the board is deleted when no card is in it (K200,
+`CardAdded::emptied()`).
 
 - **Cards are keyed by `CardSpec::id`** (`<area>_<label>_<yymmdd>_<hhmm>`, K33), never by position.
   A card made on the board gets one when it is made; `checkCardIds()` refuses duplicate compiled ids
@@ -458,13 +463,13 @@ which is now the whole House page.
 - **Groups for card labels** are `CardGroups` (K46): one kind of group, device-wide, HA areas linked
   in as groups; a card's card label shows its group's name (or its own words) in the group's colour.
   **Colour is the key to a group and never follows a rename.**
-- **Cards made on the board** (K17, `CardAdded`; since K171 nearly every card) are card entries with
+- **Cards made on the board** (`CardAdded`; nearly every card, K171) are card entries with
   `page`, `after` and `entity` keys (and `area`, `pri`, `name`, `label`), merged into their page right
   after the card they came from when it is built; a group made here has `kind`: `cluster` and its
-  `name`; **its members** (2.11, K91) have `in` (the group's id) where a page card has `page`. Their
-  ids are made as K33's. **Any card hidden from its page**
-  (K96, K66's remove - compiled or added) has `removed`: `yes`: the page's pool, never built, listed
-  under Hidden in the page's Edit cards with Restore (K148). **A card made from HA** (2.13) also has
+  `name`, and is deleted when no entry is `in` it (K200); **its members** (K91) have `in` (the
+  group's id) where a page card has `page`. Their ids are made as K33's. **Any card hidden from its
+  page** (K96, K66's remove - compiled or added) has `removed`: `yes`: the page's pool, never built,
+  listed under Hidden in the page's Edit cards with Restore (K148). **A card made from HA** also has
   `ha` (the entity id), `ha_dc` and `ha_unit`; `SystemCore` creates its entity at boot from them
   (`adoptHaCard`), and the ids HA has offered are `system.ha.known`. **A card moved into a cluster** has `removed`: `moved` -
   off its page and NOT in its pool; its copy in the cluster has `from` (the card it came from), and
@@ -482,17 +487,17 @@ which is now the whole House page.
   density, `group_view`, `margins` - Card margins, K167), the glyphs `system.header.glyphs`, the window's `system.window.close` / `bar`, the
   selector's look per scheme (`schemes.<name>.selector`); **a
   card's own Card UI choices sit on its card entry** (`selector`, `density`, `close`, `bar`,
-  `label_text`), absent while it inherits (2.8). **A group card's own** (2.11-2.13): `present`
+  `label_text`), absent while it inherits. **A group card's own**: `present`
   (cluster or solo card), `slots` (its header members), `face`, `tap` / `long` as a cluster and
   `card_tap` / `card_long` as a solo card (K156), `card_state`, `group_view` (K162), `margins` (its
   group view's, K167); a group's HA
-  area link is `groups.<id>.ha_area`. The whole 2.13 picture: `docs/design/ha-cards.md` §4.
+  area link is `groups.<id>.ha_area`. Cards from HA in full: `docs/design/ha-cards.md`.
 - `GET /settings` serves the file; `?stats=1` its counters, files and anything unclaimed. The PC
   addresses that set things until the web UI exists are listed in `Settings.h` and §17.
 
 ## Design tokens — no colour or size literals in UI code
 
-Since Phase 2.2 (2026-09-10). `include/UI/UITokens.h` is the single source for how anything looks.
+`include/UI/UITokens.h` is the single source for how anything looks.
 Design and the measurements behind it: `docs/design/tokens.md`; what a card *contains* is
 `docs/design/cards.md`.
 
@@ -532,7 +537,7 @@ Rules that are load-bearing rather than stylistic:
   both on one widget.
 - **All token values are logical pixels** - except `UIShape`'s. Run them through `UI::sc()` at the
   point of use. Never store a scaled value — the scale is per board.
-- **The card window's sizes are `UIShape` millimetres, never a number** (since 2.12 P2). The
+- **The card window's sizes are `UIShape` millimetres, never a number** (K72). The
   window draws in real millimetres - `mm(UI::shape().S5)`, or `pm()` for the `P_` group (P4_5
   millimetres, a share of the window). A new radius, gap, line or size is a new token in
   `UITokens.h` §2b with a comment saying what uses it, and a row in `tokens.md` §7. Tokens close in
@@ -587,18 +592,17 @@ are derived rather than guessed per board.
 
 ### Two costs worth knowing before adding anything visual
 
-- **A referenced font face costs 6–73 KB of flash, by kind and size — not "~96 KB".** That figure
-  was ONE large full-ASCII Montserrat, and it was applied to every face for months. Measured
-  2026-09-22 from object files: generated digits-only VALUE faces 6–10 KB, MDI icon faces 10–73 KB,
-  Montserrat 14–24 at 14–29 KB. Enabling a size in `lv_conf.h` is free (the linker drops
+- **A referenced font face costs 6–73 KB of flash, by kind and size.** Measured from object files:
+  generated digits-only VALUE faces 6–10 KB, MDI icon faces 10–73 KB, Montserrat 14–24 at 14–29 KB
+  (the ~96 KB sometimes quoted is one large full-ASCII Montserrat). Enabling a size in `lv_conf.h` is free (the linker drops
   unreferenced font objects); *referencing* one is what costs. `UIType` is still a budget — a much
   smaller one. `gen_type_scale.py` prefers a built-in Montserrat when one exists, which for a
   digits-only role is the expensive choice; `VALUE_SM` is forced to the generated subset for that
   reason.
 - **Card-size faces (2.7, #62).** `VALUE_SM` and `ICON_MD` let a card step its hero and corner with
   its own cell. Name, unit and tag faces never change per card. See `cards.md` §13.
-- **A card costs ~715 bytes of `lv_mem`**, LVGL's own pool (512 KB in PSRAM on the P4s, a 128 KB
-  static array in internal DRAM on most S3s - see above), not the system heap. `ESP.getFreeHeap()` barely moves when a widget is created;
+- **A card costs ~715 bytes of `lv_mem`**, LVGL's own pool (in PSRAM: 512 KB on the P4s, 128 KB on
+  the S3s - see above), not the system heap. `ESP.getFreeHeap()` barely moves when a widget is created;
   `lv_mem_monitor()` is the instrument.
 
 ### Anything drawn on a panel stays ASCII, except the degree sign
@@ -608,7 +612,7 @@ as empty boxes on the panels. `°` is in range. Extending the range costs flash 
 
 ## Naming: UI and GUI keep their capitals
 
-Project-wide, from 2026-09-09: the initialisms **UI** and **GUI** are always capitalised, in
+Project-wide: the initialisms **UI** and **GUI** are always capitalised, in
 filenames and in code. `UIToolkit`, `GUIManager` — never `UiToolkit` or `GuiManager`.
 
 This is not only taste. `include/UIToolkit.h` was already correct on disk but was included as both

@@ -4,9 +4,9 @@ Modular desktop firmware for a fleet of ESP32-S3 and ESP32-P4 touchscreen panels
 Home Assistant dashboards today, local voice assistants later. Nine boards from Waveshare and
 Guition, 3.5" to 7", one codebase, the board picked at build time.
 
-**Status:** hobby project in active development (`v0.2.7`, Phase 2 of the
-[roadmap](docs/ROADMAP.md)). The dashboard runs on every board; voice is on the roadmap for later.
-MIT licensed - see [License](#license).
+**Status:** hobby project in active development (Phase 2 of the [roadmap](docs/ROADMAP.md); the
+[changelog](CHANGELOG.md) lists what each version holds). The dashboard runs on all nine boards;
+voice is on the roadmap for later. MIT licensed - see [License](#license).
 
 <p align="center">
   <img src="images/ws-p4-5-house-linen.png" width="100%" alt="The House page on the 5-inch Waveshare P4, Linen scheme">
@@ -22,12 +22,18 @@ one thread-safe registry: Home Assistant over its websocket API, MQTT (Zigbee2MQ
 and the panel's own telemetry, which it publishes back to Home Assistant through MQTT discovery.
 Cards render whatever the registry holds, and grey out when a value goes stale.
 
-Pages are declared as data: a list of card specs, each with a label, an area and a **priority**.
-The grid is derived from the screen itself - a card has a target width in millimetres, the panel's
-real pixel density gives the column count, and when a small screen runs out of room the
-lowest-priority cards drop first. One page definition gives 7 columns on a 7" panel and 2 on a
-3.5" portrait one: the same page, trimmed to fit. Swipe between pages; tap a card to toggle it
-(long-press controls - brightness, colour - are next on the roadmap).
+**The settings file is the dashboard.** The cards, their groups and the choices that shape them live
+in one JSON file on the board (`/cfg/settings.json`, on LittleFS), and it survives a reflash. Cards
+are made on the touchscreen, from the Home Assistant entities the board has been offered, so a board
+with no file shows only the panel's own card on the Fleet page and the garage doors on the House page.
+A group of cards is one block under a header, and a group can also stand as a single card. `GET
+/settings` serves the file; `scripts/release/save_settings.ps1` and `restore_settings.ps1` keep copies.
+
+The layout is derived from the screen itself: a card has a target width in millimetres, the panel's
+real pixel density gives the column count, and a page arranger places the cards and groups. One page
+gives 7 columns on a 7" panel and 2 on a 3.5" portrait one. Swipe between pages; tap a card to
+act on it, and long-press to open its window (a light's brightness and color, its members, its
+history from Home Assistant, its settings).
 
 <p align="center">
   <img src="images/ws-p4-4b-fleet-page.png" width="480" alt="The Fleet page on the 4-inch Waveshare P4">
@@ -43,7 +49,8 @@ lowest-priority cards drop first. One page definition gives 7 columns on a 7" pa
 - **UI sized from physics.** Text and touch targets are sized from each panel's measured pixels per
   inch, so they come out the same size in millimetres from 165 to 294 PPI. Design tokens (colour,
   spacing, type) live in one header, and three colour schemes switch live.
-- **A display stack moved to raw `esp_lcd`**, board by board, measured at every step. On the P4s
+- **A display stack moving to raw `esp_lcd`**: six of the nine boards run it, the other three still
+  use Arduino_GFX, and each step was measured. On the P4s
   the hardware 2D engine (PPA) rotates each strip while LVGL draws the next, with triple buffering
   and an on-device check that the glass shows exactly what LVGL rendered. Full-screen redraws went
   from 163 to 85 ms on the 5" P4. Each board's frame-delivery mode is derived from its bus and
@@ -81,7 +88,7 @@ display, [docs/display/README.md](docs/display/README.md).
 <p align="center">
   <img src="images/cyd-p4-4880-portrait.png" width="300" alt="The House page on the 4.3-inch Guition P4 in portrait">
   <br><em>The same House page on the 4.3" Guition P4 in portrait (480x800): two columns, derived
-  from the screen, with the lowest-priority cards left off.</em>
+  from the screen.</em>
 </p>
 
 ## FAQ
@@ -100,8 +107,12 @@ things the hard way is more fun. (Sometimes.)
   registry, so the hardware side stays free of UI code.
 - **Components** (`components/`): `Fleet_BSP` (the board headers), `Fleet_Display` (the esp_lcd
   stack and vendored panel drivers), `Fleet_Entities` (the registry), `Fleet_Providers`,
-  `Fleet_HA`, `Fleet_MQTT`, `Fleet_Connectivity`, `AudioManager`, `TouchManager`, plus two
-  submodules: LVGL and a fork of Arduino_GFX (being retired board by board).
+  `Fleet_HA`, `Fleet_MQTT`, `Fleet_Connectivity`, `AudioManager`, `TouchManager`,
+  `DisplayManager`, plus two submodules: LVGL and a fork of Arduino_GFX (used by the three boards
+  not yet on `esp_lcd`).
+- **Documentation by job.** `CLAUDE.md` is the stable reference for how the HAL and BSP work,
+  `docs/HTTP_REFERENCE.md` lists every address the boards serve, and `docs/DECISIONS.md` holds the
+  decisions that shape later work.
 
 ### Building
 
@@ -109,6 +120,9 @@ things the hard way is more fun. (Sometimes.)
 git clone --recurse-submodules https://github.com/psyfiend/ESP32-Voice-Assistant-Fleet.git
 pio run -e WS_P4_TOUCH_LCD_5 -t upload --upload-port COMx
 ```
+
+The environment names are in the table above. Always pass `--upload-port`, and set
+`PYTHONIOENCODING=utf-8` first if the output is piped, or `pio` crashes on its own upload summary.
 
 Good to know first:
 
@@ -128,6 +142,8 @@ Good to know first:
 | [CLAUDE.md](CLAUDE.md) | How the HAL, the BSP and the rest work - the stable reference |
 | [docs/HANDOFF.md](docs/HANDOFF.md) | Where development is right now |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | What is being built, and in what order |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | The decisions that shape later work |
+| [docs/HARDWARE_STATUS.md](docs/HARDWARE_STATUS.md) | Which board does what |
 | [docs/LESSONS.md](docs/LESSONS.md) | Hard-won lessons |
 | [docs/display/](docs/display/README.md) | The display stack |
 | [docs/design/](docs/design/) | Cards, pages, tokens, startup and the rest of the UI design |
