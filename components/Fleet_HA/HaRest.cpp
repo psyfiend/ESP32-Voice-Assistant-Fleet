@@ -53,9 +53,8 @@ void HaRest::loop(uint32_t nowMs) {
     //
     // A pause drops inbound updates, so on release the held value is from the
     // moment of the pause and a change-driven feed will never correct it - the
-    // change already happened while nobody was listening. Issue #60's
-    // follow-up: the owner unpaused an occupancy card he knew was occupied and
-    // it still read unoccupied.
+    // change already happened while nobody was listening (issue #60): an
+    // unpaused occupancy card would go on reading unoccupied.
     //
     // One per pass, like the initial fetch and for the same reason: this
     // blocks the loop task.
@@ -73,7 +72,7 @@ void HaRest::loop(uint32_t nowMs) {
         }
     }
 
-    // THE TABLE CAN GROW (2.10c): a group's members are registered when the
+    // THE TABLE CAN GROW: a group's members are registered when the
     // group reports. Once a pass has run, an entity beyond the cursor is one
     // learnt since, and gets its initial value the same way.
     if (_done) {
@@ -168,7 +167,7 @@ bool HaRest::fetchOne(const char *entityRef, const char *ourId) {
                 EntityAttrs attrs;
                 haReadAttrs(doc["attributes"], attrs);
                 _reg->setAttrs(ourId, attrs);
-                if (e) haLearn(*_reg, *e, doc["attributes"]);   // 2.10c
+                if (e) haLearn(*_reg, *e, doc["attributes"]);
 
                 EntityValue v;
                 if (e && haCoerceState(e->desc, state, v)) {

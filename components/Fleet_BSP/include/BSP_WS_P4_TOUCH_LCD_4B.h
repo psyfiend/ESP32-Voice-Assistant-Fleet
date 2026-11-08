@@ -22,7 +22,7 @@ static const lcd_init_cmd_t ws_p4_touch_lcd_4b_init[] = {
     {0xB9, (uint8_t[]){0xF1, 0x12, 0x83}, 3, 0},
 
     // BA SETMIPI byte 3 = IHSRX, the HS receiver drive (ST7703 DS v01): 0x0F is
-    // x16, Waveshare's driver default; ours was 0x05 on a 1000 Mbps link.
+    // x16, Waveshare's driver default. The alternative 0x05 (1000 Mbps link) is the line below.
     // {0xBA, (uint8_t[]){0x31, 0x81, 0x05, 0xF9, 0x0E, 0x0E, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x44, 0x25, 0x00, 0x90, 0x0A, 0x00, 0x00, 0x01, 0x4F, 0x01, 0x00, 0x00, 0x37}, 27, 0},
     {0xBA, (uint8_t[]){0x31, 0x81, 0x0F, 0xF9, 0x0E, 0x0E, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x44, 0x25, 0x00, 0x90, 0x0A, 0x00, 0x00, 0x01, 0x4F, 0x01, 0x00, 0x00, 0x37}, 27, 0},
     {0xB8, (uint8_t[]){0x25, 0x22, 0xF0, 0x63}, 4, 0},
@@ -57,7 +57,7 @@ const BoardHardware WS_P4_TOUCH_LCD_4B_HARDWARE = {
 
     .SDA_PIN = 7,
     .SCL_PIN = 8,
-    .I2C_CLOCK_SPEED = 100000, // The one board where the old general-bus and touch-controller values actually agreed
+    .I2C_CLOCK_SPEED = 100000,
 
     .BOOT_BUTTON_PIN = 35,
     .I2S_AMP_EN      = 53,   // NS4150B on WS Smart86 boxes
@@ -68,7 +68,7 @@ const DisplayConfig WS_P4_TOUCH_LCD_4B_DISPLAY = {
     .PANEL_MODEL = BSP_STR(BSP_PANEL_DRIVER),
     .WIDTH       = 720,
     .HEIGHT      = 720,
-    .ROTATION    = 0,     // native; owner 2026-09-26: no reason for anything else. Was 2 (USB port on left side - a legacy preference, no longer applicable)
+    .ROTATION    = 0,     // native orientation
     .AUTO_FLUSH  = true,
 
     .BL_PIN      = 26,
@@ -163,10 +163,10 @@ inline const StorageConfig& bsp_storage = WS_P4_TOUCH_LCD_4B_STORAGE;
 
 const LvglConfig WS_P4_TOUCH_LCD_4B_LVGL = {
     .DOUBLE_BUFFERING = true,
-    // esp_lcd (2.9 step 3), measured 2026-09-26 - full screen / deck-swap frame:
+    // esp_lcd, measured - full screen / deck-swap frame:
     //   25 lines 70.7 / 19.2 ms,  50 lines 51.5 / 17.0,  100 lines 54.8 / 22.0,  720 (full) 77.9 / 25.6
-    // 50 wins on every measure (display-stack.md s8.8). Was 0 ("no override", which on
-    // Arduino_GFX meant full-frame buffers; on esp_lcd, 0 falls back to 50 anyway).
+    // 50 wins on every measure (docs/display/performance.md). 0 would mean "no override"
+    // (full-frame buffers on Arduino_GFX; on esp_lcd it falls back to 50).
     .DRAW_BUF_HEIGHT  = 50,
     .BUFFER_SIZE_PX   = 36000, // 720 * 50, // WIDTH * DRAW_BUF_HEIGHT
 };

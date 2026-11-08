@@ -5,10 +5,9 @@
 #include <esp_wifi.h>
 #include "Fleet_BSP.h"
 
-// NVS layout. Namespace renamed from the Phase-1 prototype's "wifi" so the
-// stored shape can grow past a bare SSID/password pair; loadConfigFromNvs()
-// migrates the old namespace on first boot rather than silently losing
-// credentials someone already provisioned.
+// NVS layout. loadConfigFromNvs() migrates the legacy "wifi" namespace
+// (a bare SSID/password pair) on first boot, so credentials someone already
+// provisioned are kept.
 static const char *NVS_NS          = "fleetconn";
 static const char *NVS_LEGACY_NS   = "wifi";
 static const char *K_CONFIGURED    = "configured";
@@ -20,21 +19,18 @@ static const char *K_MACSFX        = "macsfx";
 static const char *K_MIGRATED      = "migrated";
 static const char *K_PROVEN        = "proven";
 
-// How often to re-attempt STA while parked in AP fallback. Without this a
-// device whose router rebooted would sit in AP mode until someone power-cycled
-// it - the failure mode that makes AP fallback feel broken rather than helpful.
-// AP-mode STA retry backoff. A device sitting in AP mode should still notice
-// when the real network comes back - but it must not retry forever on a fixed
-// one-minute tick, which is what an earlier version did: with wrong
-// credentials it re-attempted indefinitely, and on a marginal supply every
-// radio burst is another brownout opportunity. Doubles from base to cap;
-// resets on a successful connect or a credential change.
+// AP-mode STA retry backoff. A device parked in AP fallback should still notice
+// when the real network comes back (a router that rebooted must not leave it in
+// AP mode until someone power-cycles it) - but it must not retry forever on a
+// fixed short tick: with wrong credentials that re-attempts indefinitely, and on
+// a marginal supply every radio burst is another brownout opportunity. Doubles
+// from base to cap; resets on a successful connect or a credential change.
 static const uint32_t AP_RETRY_BASE_MS  = 120000;    // 2 min
 static const uint32_t AP_RETRY_MAX_MS   = 1800000;   // 30 min
 static const uint32_t JOIN_TIMEOUT_MS   = 20000;
 static const uint32_t BOOT_HOLD_MS      = 1500;
 
-// --- Auth-failure policy (docs: "Connectivity behavior spec", signed off) ---
+// --- Auth-failure policy ---
 // A wrong password cannot fix itself, so it is never retried on a timer. But a
 // router in a momentarily odd state looks identical to a wrong password from
 // here, so the credentials get exactly one second chance before being written
@@ -178,16 +174,13 @@ IPAddress ConnectivityManager::getApIP() const { return WiFi.softAPIP(); }
 bool ConnectivityManager::isOnline() const {
     // A CONFIRMED-DEAD LINK IS NOT ONLINE, whatever the driver says.
     //
-    // This one line is what makes the #49 verdict mean something to the rest
-    // of the system rather than only to the header glyph. Everything above
-    // asks isOnline() and nothing above asks getLinkHealth(), so a board that
-    // had convicted its own link still told MqttManager it was fine - and
-    // MqttManager then spent up to SOCKET_TIMEOUT_S blocking the loop task on
-    // a TCP connect that could not succeed.
-    //
-    // That is the owner's "the device frequently locks up where screen taps do
-    // nothing". LVGL runs on that same task. The UI was not slow; it was not
-    // running.
+    // This one line makes the link-health verdict (#49) count for the rest of
+    // the system, not only the header glyph. Everything above asks isOnline()
+    // and nothing above asks getLinkHealth(); without this line a board that
+    // had convicted its own link would still tell MqttManager it was fine, and
+    // MqttManager would block the loop task for up to SOCKET_TIMEOUT_S on a
+    // TCP connect that cannot succeed. LVGL runs on that same task, so the UI
+    // would stop responding to taps.
     if ((LinkHealth)_health.load() == LinkHealth::LINK_DEAD) return false;
 
     ConnState s = (ConnState)_state.load();
@@ -196,7 +189,7 @@ bool ConnectivityManager::isOnline() const {
 IPAddress ConnectivityManager::getIP() const { return WiFi.localIP(); }
 
 // Reason-code classification. The exact set treated as "auth" is taken from
-// the NINA project's wifi_join.c, which was tuned against real hardware - a
+// the NINA project's wifi_join.c, which is tuned against real hardware - a
 // broader set (e.g. folding in AUTH_EXPIRE) misreports ordinary roaming
 // disassociations as a wrong password.
 JoinResult ConnectivityManager::classifyDisconnect(uint8_t reason) {
@@ -280,9 +273,8 @@ void ConnectivityManager::loadConfigFromNvs() {
     }
     // Apply the stored MAC-suffix policy BEFORE anything reads a derived name.
     // DeviceIdentity caches its strings on first use, so a late call here would
-    // leave hostname/AP SSID built against the wrong policy - which is exactly
-    // what happened when this call went missing: APPEND_MAC_SUFFIX = false had
-    // no effect at all, because nothing ever told DeviceIdentity about it.
+    // leave hostname/AP SSID built against the wrong policy; without this call
+    // APPEND_MAC_SUFFIX = false would have no effect.
     {
         Preferences q;
         bool appendMac = _defaults.APPEND_MAC_SUFFIX;
@@ -484,9 +476,6 @@ bool ConnectivityManager::raiseAp(const char *why) {
     // mode - so dropping the STA interface here would strand a board that raised
     // its AP over a router reboot in AP mode until someone power-cycled it,
     // which is the exact failure AP_RETRY_BASE_MS exists to prevent.
-    //
-    // This was previously a ternary whose two branches were both WIFI_AP_STA -
-    // a leftover from an earlier design in which the fallback AP was AP-only.
     WiFi.mode(WIFI_AP_STA);
     // Internal RAM at the moment of truth. softAP() allocates from INTERNAL
     // DRAM, and when that allocation fails the WiFi driver does not report it -
@@ -503,9 +492,9 @@ bool ConnectivityManager::raiseAp(const char *why) {
     WiFi.softAPConfig(ip, ip, sub);
     bool ok = WiFi.softAP(getApSsid(), getApPassword());
     if (!ok) {
-        // Notably possible on the P4 boards, where WiFi runs over an ESP32-C6
-        // co-processor via esp_hosted - softAP support there is exactly what
-        // GitHub issue #5 exists to establish.
+        // Possible on the P4 boards, where WiFi runs over an ESP32-C6
+        // co-processor via esp_hosted - softAP support there is the subject of
+        // GitHub issue #5.
         Serial.printf("[Conn] softAP() FAILED (%s). AP unavailable on this board.\n", why);
         return false;
     }
@@ -532,7 +521,8 @@ void ConnectivityManager::stopAp(const char *why) {
 }
 
 // Decide where an exhausted attempt cycle lands, and when (or whether) to try
-// again. The three outcomes come straight from the signed-off behavior spec.
+// again. Three outcomes: a second auth round, a terminal stop, or an
+// environmental retry with backoff.
 void ConnectivityManager::escalateAfterFailure(uint32_t now) {
     JoinResult why  = (JoinResult)_lastFailure.load();
     ConnMode   mode = (ConnMode)_mode.load();
@@ -837,16 +827,16 @@ void ConnectivityManager::loop() {
 // ---------------------------------------------------------------------------
 // Link liveness - issue #49.
 //
-// THE FAULT THIS EXISTS FOR, because it dictates every choice below. Boards
-// sat in STA_CONNECTED holding an IP, with WiFi.status() returning
+// THE FAULT THIS EXISTS FOR, because it dictates every choice below. A board
+// sits in STA_CONNECTED holding an IP, with WiFi.status() returning
 // WL_CONNECTED and WiFi.RSSI() returning the value it read at association,
-// while nothing on the LAN could reach them. WS_P4_5 at ~3-4 h, WS_P4_4B at
-// ~5-6 h, WS_P4_7B intermittently. The UI ran perfectly throughout.
+// while nothing on the LAN can reach it (seen on WS_P4_5, WS_P4_4B and
+// WS_P4_7B after hours of uptime). The UI keeps running throughout.
 //
 // So: NOTHING HERE MAY ASK THE DRIVER HOW IT IS DOING. Every signal in this
 // section is either a round trip that left the board, or a report from a
-// layer above about something it failed to reach. WiFi.status() appears
-// exactly nowhere in it, and that is the point rather than an oversight.
+// layer above about something it failed to reach. WiFi.status() deliberately
+// appears nowhere in it.
 // ---------------------------------------------------------------------------
 
 uint32_t ConnectivityManager::rssiAgeMs() const {
@@ -862,21 +852,15 @@ bool ConnectivityManager::isRssiFresh() const {
 void ConnectivityManager::pollRssi(uint32_t now) {
     // THIS CALL CAN BLOCK FOR TEN SECONDS, AND ON A SICK P4 IT ALWAYS DOES.
     //
-    // MEASURED on WS_P4_4B, 2026-09-20, after 30 hours with a dead C6 link:
+    // With a dead C6 link the log shows, every 10 s:
     //
     //   E rpc_core: Response not received for [0x126](Req_WifiStaGetApInfo)
     //   [Conn:debug] RSSI read returned 0 - not storing
     //
-    // ...every 10 s, forever. WiFi.RSSI() on a P4 is an RPC to the ESP32-C6
-    // over SDIO. When that link is dead the request is never answered and the
-    // call sits on its timeout - on the LOOP TASK, where LVGL lives. The owner
-    // reported the panel "freezing every few seconds, for a few seconds". That
-    // was this, and it was introduced by #49's own detection code, on exactly
-    // the boards #49 exists for.
-    //
-    // The comment that used to sit further down said whether a failing read
-    // fires during the fault was UNMEASURED. It fires. It is also ruinously
-    // expensive, which that note did not anticipate.
+    // WiFi.RSSI() on a P4 is an RPC to the ESP32-C6 over SDIO. When that link
+    // is dead the request is never answered and the call sits on its timeout -
+    // on the LOOP TASK, where LVGL lives, so the panel freezes for seconds at
+    // a time.
     //
     // BACKOFF RATHER THAN REMOVAL, because the failing read is still the
     // cheapest evidence we have that the hosted transport is gone - deleting
@@ -900,11 +884,9 @@ void ConnectivityManager::pollRssi(uint32_t now) {
     // the timestamp alone lets the value age out into SignalBand::NONE, which
     // is the honest answer: we asked and did not get one.
     //
-    // Worth watching on the P4 boards specifically. RSSI there is an RPC to
-    // the ESP32-C6 over SDIO, so a failing read is itself evidence about the
-    // hosted transport - the cheapest liveness signal available, if it fires.
-    // Whether it actually does during the fault is UNMEASURED; this logs it
-    // so the next soak answers the question instead of us guessing again.
+    // On the P4 boards RSSI is an RPC to the ESP32-C6 over SDIO, so a failing
+    // read is itself evidence about the hosted transport. DEBUG_WIFI logs each
+    // one.
     if (r == 0) {
         // Cap the streak so the shift above cannot run away, and so the
         // interval is a predictable five minutes rather than an accident of
@@ -928,11 +910,9 @@ void ConnectivityManager::setHealth(LinkHealth h, const char *why) {
     LinkHealth prev = (LinkHealth)_health.load();
     if (prev == h) return;
     _health.store((int32_t)h);
-    // Printed unconditionally, not behind DEBUG_WIFI. The single loudest fact
-    // about the original fault was that the log contained no [Conn] lines at
-    // all for hours - the connectivity layer never noticed anything, so there
-    // was nothing to read. A health transition is exactly the line whose
-    // absence was the evidence.
+    // Printed unconditionally, not behind DEBUG_WIFI: during the fault the log
+    // has no [Conn] lines at all, so a health transition is exactly the line
+    // whose presence or absence matters.
     Serial.printf("[Conn] Link health %s -> %s (%s)\n",
                   linkHealthName(prev), linkHealthName(h), why ? why : "");
 }
@@ -977,13 +957,9 @@ void ConnectivityManager::probeOnEnd(esp_ping_handle_t, void *args) {
 
 // Which host this probe should aim at.
 //
-// A LADDER, not a single target, and the owner's reasoning for it is exactly
-// right: "The router/gateway will always respond to a ping so long as the
-// router is turned on. I can't say the same if I were to boot the devices up
-// on a different network though, and not all routers will respond to a ping."
-//
-// There is a second reason he did not raise and it may matter more: **routers
-// rate-limit ICMP**. A gateway that normally answers can drop a burst of them
+// A LADDER of targets rather than a single one. The gateway answers a ping
+// while the router is on, but not every router answers pings and a fleet may
+// boot on a different network. Also, **routers rate-limit ICMP**. A gateway that normally answers can drop a burst of them
 // and look dead for exactly as long as it takes us to convict the link and
 // cycle a working radio. Rotating the target means the failures that convict
 // must come from three different hosts, which no rate-limiter produces.
@@ -1140,9 +1116,7 @@ void ConnectivityManager::liveness(uint32_t now) {
             //
             // So a probe only becomes evidence once it has been seen to
             // succeed at least once on this network. Until then a failure
-            // means "this test does not work here", not "the link is down" -
-            // which is the same discipline as this project's oldest rule,
-            // pointed at our own instrument instead of at the device.
+            // means "this test does not work here", not "the link is down".
             if (!_probeEverWorked) {
                 if (_probeFails == _defaults.PROBE_FAILS_SUSPECT) {
                     Serial.println("[Conn] Gateway does not answer ICMP - liveness probing "
@@ -1248,8 +1222,8 @@ void ConnectivityManager::runRecovery(uint32_t now) {
     // into checking occasionally.
     //
     // It converges on "keep the UI alive, keep looking, stop thrashing", which
-    // is the right behaviour for a wall panel: the fault is not ours to fix
-    // and the owner will notice the house's network before they notice us.
+    // is the right behaviour for a wall panel: a fault upstream of the board is
+    // not the board's to fix.
     uint32_t step = _defaults.RECOVERY_STEP_MS;
     for (uint8_t i = 0; i < _laddersRun && step < 15UL * 60UL * 1000UL; i++) step *= 2;
 
@@ -1285,9 +1259,7 @@ void ConnectivityManager::runRecovery(uint32_t now) {
     default:
         // Give the state machine the fault properly, so AP fallback and the
         // normal retry ladder take over. From here the board behaves exactly
-        // as it would after any other failed association - which is the
-        // behaviour that was missing entirely, because nothing ever told it
-        // the link had gone.
+        // as it would after any other failed association.
         if (_laddersRun < 255) _laddersRun++;
         Serial.printf("[Conn] RECOVERY 3/3: handing back to the state machine "
                       "(ladder %u since the last good link).\n", (unsigned)_laddersRun);
@@ -1405,10 +1377,9 @@ void ConnectivityManager::handleEvent(int32_t eventId, void *infoPtr) {
 
         if (cur == ConnState::STA_CONNECTING) {
             // ASSOC_LEAVE is OUR OWN disconnect - the give-up path calls
-            // WiFi.disconnect() and the resulting event used to set the
-            // re-issue flag, immediately restarting a connect we had just
-            // abandoned. Never treat a self-inflicted disconnect as a reason
-            // to retry.
+            // WiFi.disconnect(). Setting the re-issue flag for it would
+            // immediately restart a connect just abandoned, so a
+            // self-inflicted disconnect is never a reason to retry.
             if (reason == WIFI_REASON_ASSOC_LEAVE) break;
 
             JoinResult r = classifyDisconnect(reason);
@@ -1456,9 +1427,8 @@ void ConnectivityManager::handleEvent(int32_t eventId, void *infoPtr) {
             }
 
             // Genuinely transient. Routers commonly answer a first association
-            // with AUTH_EXPIRE (reason 2) and accept the immediate retry -
-            // observed on real hardware, where waiting out the 15 s deadline
-            // instead cost ~13 s of avoidable boot time.
+            // with AUTH_EXPIRE (reason 2) and accept the immediate retry;
+            // waiting out the 15 s deadline instead would cost ~13 s of boot time.
             if (_reissueCount.load() < 6) {
                 _reissueCount.fetch_add(1);
                 _reissuePending.store(1);
@@ -1593,10 +1563,8 @@ void ConnectivityManager::dumpStatus(Print &out) const {
         out.printf("  SSID: %s\n", ssid);
         out.printf("  IP: %s\n", WiFi.localIP().toString().c_str());
         out.printf("  Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
-        // The age is printed beside the value on purpose. "RSSI: -42 dBm" was
-        // a true statement for six hours while the board was off the network
-        // (issue #49); "-42 dBm (measured 21341 s ago)" could never have been
-        // read that way by anyone.
+        // The age is printed beside the value on purpose: a bare "-42 dBm" can
+        // stay on screen long after the board left the network (issue #49).
         uint32_t age = rssiAgeMs();
         if (age == UINT32_MAX) {
             out.println("  RSSI: never measured");

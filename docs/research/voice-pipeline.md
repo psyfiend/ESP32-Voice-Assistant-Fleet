@@ -1,6 +1,7 @@
 # Building the voice-assistant half — signal path, integration targets, MVP
 
-**Status: research only, no decision.** Written 2026-09-10. Tags: **verified in `<path>`**
+**Status: research. Voice is planned (DECISIONS A12, A18, `design/voice-esphome.md`); the route into
+HA is the ESPHome native API, not the integration targets compared here.** Tags: **verified in `<path>`**
 (read directly in this repo), **verified via web** (fetched/searched this session, source
 cited), **believed** (confident, not directly checked this session), **unknown**.
 
@@ -127,13 +128,12 @@ P4 on equal footing for speech work, ahead of the smaller C-series chips.
 
 ### 3.1 The bundled Arduino `ESP_SR` library — verified by reading the actual installed files
 
-> **Second pass, 2026-09-10 — independently re-verified, and the picture is better than this
-> section originally concluded.** Every item below was read off this machine, not inferred.
+> **Independently re-verified** - every item below was read off the installed files, not inferred.
 >
 > | Check | Result |
 > |---|---|
 > | `libraries/ESP_SR/` in core `3.3.11` | **present** — the exact pinned core |
-> | Target gate in `ESP_SR.h` | `CONFIG_IDF_TARGET_ESP32S3 \|\| CONFIG_IDF_TARGET_ESP32P4` — **all 8 boards** |
+> | Target gate in `ESP_SR.h` | `CONFIG_IDF_TARGET_ESP32S3 \|\| CONFIG_IDF_TARGET_ESP32P4` — **all nine boards** |
 > | Second gate: `CONFIG_MODEL_IN_FLASH \|\| CONFIG_MODEL_IN_SDCARD` | **already satisfied** — `CONFIG_MODEL_IN_FLASH=y` in the prebuilt `sdkconfig` for **both** `esp32s3` and `esp32p4_es` |
 > | Wake-word model selected | `CONFIG_SR_WN_WN9_HIESP=y` — "Hi ESP" enabled by default |
 > | Archives | `libespressif__esp-sr.a`, `libwakenet.a`, `libmultinet.a`, `libdl_lib.a` all shipped |
@@ -205,8 +205,8 @@ of the exact arduino-esp32 3.3.11 package this project's `platformio.ini` pins.
   each (vs. this project's current unspecified default OTA split under `default_16MB.csv`), a 6MB
   `spiffs` partition, and a **dedicated 3.9MB `model` partition** (`0xC10000`, size `0x3E0000`,
   mounted as spiffs) for WakeNet/MultiNet model files. Adopting `ESP_SR` means adopting this (or
-  an equivalent custom) partition table — which is exactly the kind of change ROADMAP §6.10
-  already flags as needing to be decided **before** the first OTA-capable release, because
+  an equivalent custom) partition table — which is exactly the kind of change that must be
+  decided **before** the first OTA-capable release (ROADMAP 5.1), because
   changing it later needs a full serial reflash of every board, not an OTA push.
 
 **Net read on §3:** on-device wake word (and command recognition for a small fixed set) is
@@ -327,7 +327,7 @@ Reasoning, tying together everything above:
   all.** MultiNet's fixed-vocabulary matching (§3) is enough for "turn on the kitchen light" /
   "turn off the fan" style commands, and this project already has a working, proven path from a
   recognized event to Home Assistant: write to `EntityRegistry`, let `MqttProvider`/`HaPublisher`
-  carry it out over the MQTT session that's been hardware-verified on 8 boards since Phase 1.
+  carry it out over the MQTT session that's been hardware-verified on every board.
   Zero new integration surface on the HA side.
 - **It plausibly needs no ESP-IDF migration.** Per §3.1, the bundled `arduino-esp32` 3.3.11
   `ESP_SR` library targets exactly this shape (WakeNet wake word → MultiNet fixed commands) and
@@ -335,9 +335,8 @@ Reasoning, tying together everything above:
   migration. The two real risks are the `I2SClass`-vs-native-I2S ownership conflict with
   `AudioManager` (§3.1) and the partition-table change, both spike-able in isolation before
   committing.
-- **Board choice: `WS_P4_TOUCH_LCD_5`, not a stress-test board.** It is already this project's
-  primary dev target (ROADMAP §Q11) with the display/touch/connectivity/MQTT stack proven on
-  real hardware. It has **both** ES7210 (4-channel mic ADC — the multi-mic input WakeNet/AFE
+- **Board choice: `WS_P4_TOUCH_LCD_5`, not a stress-test board.** It is a primary dev board
+  with the display/touch/connectivity/MQTT stack proven on real hardware. It has **both** ES7210 (4-channel mic ADC — the multi-mic input WakeNet/AFE
   wants) and ES8311 (speaker output) per its `HAS_ES7210`/`HAS_ES8311` build flags — verified in
   `platformio.ini`. It is a P4 board, one of the two chip families esp-sr explicitly recommends
   for speech work. By contrast, `CYD_S3_3248` (the fleet's other dev/stress target) has **neither
@@ -423,7 +422,7 @@ this project's actual use case, and it would cost a real dependency tree to adop
 provisioning transport that doesn't need a phone to join the device's own AP and use a web
 form** — BluFi (BLE) or SmartConfig let a phone push credentials without ever associating to the
 device's network. That's a real UX improvement over "join `Fleet-XXXXXX`, open a captive portal"
-(ROADMAP #6, currently descoped to Phase 4 anyway). But it comes bundled with `esp_dispatcher` +
+(the captive portal, Phase 4). But it comes bundled with `esp_dispatcher` +
 `esp_actions` + `audio_sal` + Bluetooth + mbedTLS as hard dependencies, all to get a feature this
 project could add far more cheaply via IDF's own `wifi_provisioning` (BLE/SoftAP), or by simply
 keeping the AP+captive-portal path already on the roadmap. **Recommendation: do not adopt

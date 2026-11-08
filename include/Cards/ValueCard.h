@@ -20,20 +20,13 @@
 // on every sensor card in the fleet. Card::setLabel() is how a page supplies
 // it; falling back to the entity's name is a convenience, not the intent.
 //
-// THIS IS A LAYOUT, NOT A CARD TYPE, and the distinction is the whole point of
-// the rename that produced this file.
+// THIS IS A LAYOUT, NOT A CARD TYPE.
 //
-// docs/design/cards.md - the spec - lists card types by HOME ASSISTANT DOMAIN:
-// sensor, binary_sensor, light, action/scene, weather, group. ROADMAP milestone
-// 2.7 names the first four the same way. The "two layout families" framing
-// exists in exactly one place, HANDOFF.md, as a paraphrase written to brief the
-// next session - and that paraphrase got promoted to the class names, which
-// skipped the domain layer underneath it entirely.
-//
-// The result was a user having to know that a temperature reading wants a
-// "measure" card. They should pick `sensor`, give it a topic, and never learn
-// where the number goes. What the thing IS and how it is ARRANGED are two
-// axes, and only the first one belongs to whoever is configuring a dashboard.
+// docs/design/cards.md lists card types by HOME ASSISTANT DOMAIN: sensor,
+// binary_sensor, light, action/scene, weather, group. A user picks `sensor`,
+// gives it a topic, and never learns where the number goes. What the thing IS
+// and how it is ARRANGED are two axes, and only the first belongs to whoever
+// is configuring a dashboard.
 //
 // So this class deliberately does NOT implement typeName(): it stays abstract,
 // and the compiler refuses to let anyone instantiate a layout. Concrete types
@@ -50,14 +43,13 @@ protected:
     virtual bool statusWords(const Entity &e, char *out, size_t cap) const { (void)e; (void)out; (void)cap; return false; }
 
 private:
-    // As a cluster's MINI TILE (2.11, K89): the value and its unit, its entity
+    // As a cluster's MINI TILE (K89): the value and its unit, its entity
     // label under them. Cards/MiniTile.cpp.
     void buildMiniBody(lv_obj_t *body);
     void renderMini();
 
-    // A vertical stack. Nothing here is positioned against anything else -
-    // every hand-alignment in the previous version resolved against a position
-    // layout had not computed yet. See the .cpp.
+    // A vertical stack. Nothing here is positioned against anything else.
+    // See the .cpp.
     lv_obj_t *_icon      = nullptr;   // top-left corner, OUT of the flow
 
     lv_obj_t *_mid       = nullptr;   // grows; centres value+name as a group

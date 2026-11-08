@@ -43,7 +43,7 @@ char g_deviceId[64]   = {0};
 char g_apSsid[36]     = {0};
 char g_apPassword[16] = {0};
 bool g_built          = false;
-bool g_appendMac      = true;   // default: unique names out of the box
+bool g_appendMac      = true;   // until configure() runs; the suffix keeps names unique per unit
 
 void buildOnce() {
     if (g_built) return;

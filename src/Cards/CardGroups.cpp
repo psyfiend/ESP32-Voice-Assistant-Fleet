@@ -35,18 +35,18 @@ void slugInto(const char *prefix, const char *name, char *out, size_t cap) {
 bool startsWith(const char *s, const char *p) { return !strncmp(s, p, strlen(p)); }
 
 // EVERY CARD SPEC: each page's compiled ones (a group card's members too), then
-// the cards made on the board - since K171 most of the dashboard (2.13 round 5).
+// the cards made on the board - most of the dashboard (K171).
 template <typename F> void eachSpec(F f) {
     for (uint8_t p = 0; p < s_nPages; p++) forEachCardSpec(*s_pages[p], f);
-    // Not a card deleted this boot (owner's glass, 2026-11-07, T4): a removed member
-    // still voted its HA area until the next boot, naming HA's Office "New group".
+    // Only cards still live: a removed member would otherwise vote its HA area
+    // until the next boot, naming HA's Office "New group".
     for (uint8_t i = 0; i < CardAdded::count(); i++) if (CardAdded::liveAt(i)) f(CardAdded::specAt(i));
 }
 
 // The dashboard's areas, each once, in page order.
 uint8_t sheetAreas(const char **out, uint8_t cap) {
     uint8_t n = 0;
-    // A group card's members too (2.11): a cluster's area is its members'.
+    // A group card's members too: a cluster's area is its members'.
     eachSpec([&](const CardSpec &cs) {
         const char *a = cs.area;
         if (!a || !a[0]) return;
@@ -74,10 +74,10 @@ const char *linkOf(const char *area) {
     static char id[40];
     id[0] = '\0';
     if (!s_reg || !area || !area[0]) return id;
-    // A group card's members count (2.11): a cluster has no entity of its own.
-    // A GROUP MADE ON THE BOARD NEVER NAMES AN HA AREA (owner, 2026-11-07): its
-    // cards do not vote. Found on the 1060: a New group of Office lamps named
-    // HA's Office "New group", and every Office card from HA said so.
+    // A group card's members count: a cluster has no entity of its own.
+    // A GROUP MADE ON THE BOARD NEVER NAMES AN HA AREA: its cards do not vote.
+    // Otherwise a New group of Office lamps would name HA's Office "New group",
+    // and every Office card from HA would say so.
     bool split = false;
     eachSpec([&](const CardSpec &cs) {
         if (split || !cs.area || strcmp(cs.area, area) != 0 || !cs.primaries[0] || inMadeGroup(cs)) return;
@@ -194,7 +194,7 @@ bool savedColour(const char *gid, uint32_t &c) {
     return true;
 }
 
-// GROUPS TRY TO HAVE COLOURS OF THEIR OWN (owner, 2026-10-09), unless one was
+// GROUPS TRY TO HAVE COLOURS OF THEIR OWN (K47), unless one was
 // set on purpose to match another. The order decides who keeps what: the
 // dashboard's areas page by page, then the other HA areas, then the groups
 // made here. A colour set on purpose is taken first; then each group keeps the

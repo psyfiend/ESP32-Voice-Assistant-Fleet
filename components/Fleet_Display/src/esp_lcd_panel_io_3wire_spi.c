@@ -7,8 +7,8 @@
 /* ---- FLEET LOCAL CHANGES (components/Fleet_Display/README.md) --------------
  * Vendored from espressif/esp_lcd_panel_io_additions 1.0.1 (Apache-2.0,
  * LICENSE_esp_lcd_panel_io_additions.txt): the 3-wire SPI half only. Two
- * changes: (1) compiles only for boards on the esp_lcd RGB path (WS_S3_4B,
- * 2.9 step 4); (2) the version macros IDF's component build would inject come
+ * changes: (1) compiles only for boards on the esp_lcd RGB path (WS_S3_4B);
+ * (2) the version macros IDF's component build would inject come
  * from fleet_display_versions.h.
  * ------------------------------------------------------------------------- */
 #if defined(DISPLAY_ESPLCD) && defined(HAS_RGB_PANEL)

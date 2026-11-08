@@ -155,25 +155,19 @@ The other nine are temperatures and an illuminance with no icon set, which fall 
 `binary_sensor.kitchen_occupancy` has no registry icon but its attributes say
 `mdi:motion-sensor-off` while it is `off`.
 
-> **CORRECTED 2026-09-22 — the next sentence was a generalisation from one entity, and it is
-> wrong.** It read: *"HA computes the state-dependent glyph and ships it on every state update."*
-> Re-measured by querying the entity registry alongside the states: the two occupancy sensors are
-> **template** entities (`platform: template`, `original_icon: mdi:motion-sensor-off`), and it is
-> their template that switches the icon. HA core does not put a state-dependent icon into the state
-> object; its frontend picks default icons client-side. `attributes.icon` exists only when a user or
-> an integration set one — none of the temperatures, and not the garage doors once their override
-> was removed. Our own state pairs are therefore the main source, not a fallback. The decision that
-> follows from this is `cards.md` §13.
+HA does **not** ship a state-dependent glyph on every state update. The two occupancy sensors are
+**template** entities (`platform: template`, `original_icon: mdi:motion-sensor-off`), and it is
+their template that switches the icon. HA core does not put a state-dependent icon into the state
+object; its frontend picks default icons client-side. `attributes.icon` exists only when a user or
+an integration set one - none of the temperatures, and not the garage doors once their override
+was removed. The board's own state pairs are therefore the main source of icons. The decision
+that follows from this is `cards.md` §13.
 
-**The exception is worth telling the owner about.** The garage doors have a *static* registry
-override of `mdi:garage`, so they will never show `mdi:garage-open` — his own override is
-suppressing the behaviour he asked for. Removing the icon override in HA would give the
-open/closed pair automatically, since the entities already carry `device_class: garage_door`.
-
-> **Update 2026-09-22:** the owner removed the override. He also reported that the panel's garage
-> icons had been switching open/closed correctly all along - because `cardIconForState()` checked
-> `device_class` before any icon and the live icon was never read. The paragraph above describes
-> what HA's frontend does, not what this panel did.
+**A static registry icon override suppresses the open/closed pair.** A garage door with an
+override of `mdi:garage` never shows `mdi:garage-open`; with the override removed, the entity's
+`device_class: garage_door` gives the pair automatically. The panel's own garage icons switch
+open/closed from `device_class`, because `cardIconForState()` checks `device_class` before any
+icon and never reads the live icon.
 
 ---
 
@@ -213,16 +207,16 @@ a filter that keeps `entity_id`, `state` and `attributes.icon` and discards `old
 `switch.toggle` and the rest. Note this is the point where the panel starts *changing* the house
 rather than reading it, and it is the first thing in the project that does.
 
-**MQTT does not go away.** The owner's constraint, recorded 2026-09-15: he intends to add sensors
+**MQTT does not go away.** The owner's constraint: he intends to add sensors
 and controls to these boards, and publishing entities *into* HA is an MQTT-discovery feature that
 the websocket cannot replace. Websocket inbound for HA's entities, MQTT outbound for ours.
 
 ---
 
-## 7a. SUPERSEDED — do not stream the device registry. Ask HA to resolve areas.
+## 7a. Do not stream the device registry. Ask HA to resolve areas.
 
-**§4 and §7 say to fetch the 120 KB device registry and keep `id` + `area_id`. Do not.** Measured
-2026-09-20, and there is a far better way that was not considered when §4 was written.
+**§4 and §7 describe fetching the 120 KB device registry and keeping `id` + `area_id`. The board
+does not do that**: asking HA to resolve areas is far cheaper.
 
 | Route | Bytes | Time |
 |---|---|---|
@@ -265,13 +259,11 @@ keyed on `area_id`.
 
 ---
 
-## 7b. Measured 2026-09-20 — request ids, and what a reconnect costs
+## 7b. Request ids, and what a reconnect costs
 
-Run from a PC against the live instance, read-only, no `call_service`.
-
-**The instance has moved to HA 2026.9.2** (this document's other numbers were taken against
-2026.8.1). The area registry is now 14 areas in **3,405 bytes**, down slightly from 3,663. Nothing
-else re-measured, so treat the §2 table as approximate rather than current.
+Run from a PC against the live instance (HA 2026.9.2), read-only, no `call_service`. The area
+registry measured 14 areas in **3,405 bytes** on that version (3,663 on 2026.8.1); the other
+numbers in this document were taken on 2026.8.1, so treat the §2 table as approximate.
 
 ### Request ids must strictly increase within a connection
 
@@ -313,9 +305,7 @@ entity list small.
 - **The trigger event shape on a real change of one of OUR entities.** The 60-second window caught
   zero — those entities were simply quiet. The shape was confirmed against a busy solar sensor
   instead (`event.variables.trigger.to_state`), and it should be re-confirmed on a light.
-- ~~**`call_service` has not been exercised at all.**~~ **DONE 2026-09-20**, with the owner's
-  explicit permission and on the one entity he named (`light.office_overhead`, "harmless and
-  won't disturb anybody"). Turned on, then off, and confirmed left exactly as found.
+- **`call_service`**, measured on `light.office_overhead` (turned on, then off, left as found):
 
   | | |
   |---|---|
@@ -323,19 +313,18 @@ entity list small.
   | **echo back via `subscribe_trigger`** | **~91 ms** |
   | echo event size | 1,462 / 1,492 B |
 
-  **That 91 ms is the number #44's optimistic-write reconcile window should be built around** -
-  the registry currently reverts on a timeout measured in seconds, which is two orders of
-  magnitude of slack. The HA half of #44 now has no unknowns left in it.
+  That 91 ms is the number an optimistic write's reconcile window is built around; the registry
+  reverts on a timeout measured in seconds, two orders of magnitude of slack.
 - **Sensor history** (`history/stream` or the REST history endpoint) for the sparkline `cards.md`
   §4 wants. Not looked at.
 
 ---
 
-## 9. Lights with levels, measured 2026-10-06 (2.10c, #65)
+## 9. Lights with levels (#65)
 
-Run from a PC against HA 2026.9.2, with the owner's permission to command any Office light.
-`light.office_lamp` (a Hue bulb) and then `light.office` (a Hue room of three bulbs, bridge at
-least five years old) were commanded; all four were put back as found (100%, 2710 K) and checked.
+Run from a PC against HA 2026.9.2. `light.office_lamp` (a Hue bulb) and then `light.office` (a Hue
+room of three bulbs, bridge at least five years old) were commanded and put back as found (100%,
+2710 K).
 
 ### What the dashboard's lights report
 
@@ -344,7 +333,7 @@ least five years old) were commanded; all four were put back as found (100%, 271
 | `light.office` | `color_temp`, `xy` | `is_hue_group`, `hue_type: room`, `entity_id` (three members), `lights` (their names), `hue_scenes`; 2000-6535 K; 853 B over REST |
 | `light.dining_room_light` | `brightness` | |
 | `light.kitchen_switch_1`, `light.office_overhead`, `light.porch_switch_1` | `onoff` | |
-| `switch.tv_room_switch_1` | - | was `unavailable` at the time |
+| `switch.tv_room_switch_1` | - | `unavailable` when measured |
 
 `hs_color` is present in every mode, colour temperature included ([28.4, 65.4] at 2710 K).
 `min_color_temp_kelvin` / `max_color_temp_kelvin` were seen on lights that were on; not checked on

@@ -43,7 +43,7 @@ bool BatteryProvider::begin(EntityRegistry *reg) {
     if (_begun || !reg) return _begun;
     // Two conditions, deliberately separate: the BOARD can take a battery (the
     // BSP's divider), and this UNIT has one fitted (-D HAS_BATTERY in its
-    // environment - owner, 2026-09-30: not every board will carry a cell).
+    // environment - not every board carries a cell).
 #ifndef HAS_BATTERY
     return false;
 #endif

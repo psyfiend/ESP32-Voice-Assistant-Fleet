@@ -14,10 +14,6 @@ can find `bsp_loader.h`.
 Git does not track empty directories, so a bare `src/` would not survive a clone.
 This README exists to keep the directory tracked. Do not delete it.
 
-Observed 2026-09-05 on a fresh clone (PlatformIO 6.1.19); adding this directory fixed
-both the build and IntelliSense. Whether other environments avoided this for the same
-or a different reason has not been established.
-
-(An alternative fix is a `library.json` with `"build": {"includeDir": "include"}`,
-which routes to `PlatformIOLibBuilder` instead. Not used here, to avoid two manifests
-in one library.)
+An alternative is a `library.json` with `"build": {"includeDir": "include"}`, which routes
+to `PlatformIOLibBuilder` instead. It is not used here, to avoid two manifests in one
+library.

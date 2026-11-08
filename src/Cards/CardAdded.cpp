@@ -19,19 +19,19 @@ namespace {
 struct Rec {
     char    id[CARD_ID_MAX + 1];
     char    page[24];
-    char    in[CARD_ID_MAX + 1];      // a member added to this cluster (2.11, K91), else ""
-    char    from[CARD_ID_MAX + 1];    // ...the card it was copied or moved from (round 7), else ""
+    char    in[CARD_ID_MAX + 1];      // a member added to this cluster (K91), else ""
+    char    from[CARD_ID_MAX + 1];    // ...the card it was copied or moved from (K111), else ""
     char    after[CARD_ID_MAX + 1];
     char    entity[ENTITY_ID_MAX];
     char    area[ENTITY_SHORT_MAX];
     uint8_t pri;
     bool    removed;
-    bool    cluster;                  // a cluster made here (2.13, K140): "kind": "cluster", no entity
+    bool    cluster;                  // a cluster made here (K140): "kind": "cluster", no entity
     char    name[ENTITY_SHORT_MAX];   // ...its name
 };
 
-// MAX of each, allocated once by begin() - in PSRAM since 2.13, when MAX went
-// from 24 to 64: ~40 KB with the specs, too much for an S3's internal RAM.
+// MAX of each, allocated once by begin() in PSRAM: the records and specs are
+// too big for an S3's internal RAM.
 Rec      *s_rec  = nullptr;
 CardSpec *s_spec = nullptr;        // each record as a spec - built once, never moved
 uint8_t  s_n = 0;
@@ -53,7 +53,7 @@ void specFor(uint8_t i) {
     cs.label        = nullptr;                    // Inherit: HA's name (K65)
     cs.labelMode    = CardLabel::LBL_INHERIT;
     cs.place.priority = r.pri;
-    // A CLUSTER MADE HERE (2.13): no entity of its own; its members are the
+    // A CLUSTER MADE HERE: no entity of its own; its members are the
     // records "in" it (membersIn()), its words its name.
     if (r.cluster) {
         cs.primaries[0] = nullptr;
@@ -77,7 +77,7 @@ void readOne(const char *id, const char *page, void *) {
     r.pri = Settings::card(id, "pri", v, sizeof(v)) ? (uint8_t)atoi(v) : 128;
     // REMOVED ONES STAY IN THE FILE ONLY (the page's pool, K66): a slot here is
     // for a card on a page. known() and idTaken() still find them in the file.
-    // So do ones moved into a cluster (round 7): off the page, not in its pool.
+    // So do ones moved into a cluster (K111): off the page, not in its pool.
     if (Settings::card(id, "removed", v, sizeof(v)) && (!strcmp(v, "yes") || !strcmp(v, "moved"))) { s_pooled++; return; }
     r.removed = false;
     if (Settings::card(id, "kind", v, sizeof(v)) && !strcmp(v, "cluster")) {
@@ -89,7 +89,7 @@ void readOne(const char *id, const char *page, void *) {
     s_n++;
 }
 
-// A MEMBER ADDED TO A CLUSTER ON THE DEVICE (2.11, K91, K100): a card entry with
+// A MEMBER ADDED TO A CLUSTER ON THE DEVICE (K91): a card entry with
 // "in" (the cluster's id) where a page card has "page" - a copy with an id of
 // its own (K92: a grouping is of copies), wearing its cluster's group.
 void readMember(const char *id, const char *in, void *) {
@@ -185,8 +185,8 @@ const CardSpec *specOf(const char *cardId) {
     const CardSpec *found = nullptr;
     if (s_pageSpec)
         forEachCardSpec(*s_pageSpec, [&](const CardSpec &cs) { if (!found && cs.id && !strcmp(cs.id, cardId)) found = &cs; });
-    // SINCE K171 NEARLY EVERY CARD IS MADE HERE (2026-11-06): look among the made
-    // ones too, or Restore and the names it says never find a former compiled group.
+    // NEARLY EVERY CARD IS MADE HERE (K171): look among the made ones too, or
+    // Restore and the names it says never find a group that was once compiled.
     for (uint8_t i = 0; !found && i < count(); i++)
         if (specAt(i).id && !strcmp(specAt(i).id, cardId)) found = &specAt(i);
     return found;
@@ -208,7 +208,7 @@ uint8_t merge(const PageSpec &page, CardSpec *out, uint8_t cap) {
         }
     };
     for (uint8_t c = 0; c < page.count && n < cap; c++) {
-        // K96: hidden, in the pool; round 7: moved into a cluster, in neither.
+        // K96: hidden, in the pool; K111: moved into a cluster, in neither.
         if (!isHidden(page.cards[c].id) && !isMoved(page.cards[c].id)) out[n++] = page.cards[c];
         followers(page.cards[c].id, followers);
     }
@@ -270,7 +270,7 @@ bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, cons
     if (r.area[0]) Settings::setCard(r.id, "area", r.area);
     if (r.from[0]) Settings::setCard(r.id, "from", r.from);
     Settings::setCard(r.id, "pri", pri);
-    // ITS PARENT'S GROUP (owner, K65): the card label's words, colour and type.
+    // ITS PARENT'S GROUP (K65): the card label's words, colour and type.
     CardGroups::Group g;
     if (CardGroups::ofCard(parent, g)) Settings::setCard(r.id, "group", g.id);
 
@@ -378,10 +378,10 @@ bool isMember(const char *cardId) {
     return false;
 }
 
-// A MEMBER MOVED OUT KNOWS WHICH CARD IT BECAME (the follow-ups): "moved_to",
-// that card's id - a page card, or a copy in another cluster. Without it (a move
-// saved before it existed) any card it came from is that card, as before.
-// A page card moved into a cluster (round 2 of the follow-ups) knows it too.
+// A MEMBER MOVED OUT KNOWS WHICH CARD IT BECAME (K137): "moved_to", that card's
+// id - a page card, or a copy in another cluster. With no "moved_to" saved, any
+// card it came from counts as that card. A page card moved into a cluster
+// knows it too.
 static bool becameThis(const char *origId, const char *cardId) {
     if (!isMovedToPage(origId) && !isMoved(origId)) return false;
     char v[CARD_ID_MAX + 1];
@@ -407,7 +407,7 @@ const char *becameOf(const char *origId) {
     return nullptr;
 }
 
-// Deleted, entry and all, wherever it is. A MOVED CARD GOES BACK (round 7): the
+// Deleted, entry and all, wherever it is. A MOVED CARD GOES BACK (K111): the
 // card it was moved from is home again - on its page, or a tile in its cluster -
 // the move undone, nothing lost. A copy's original is untouched.
 bool unmake(const char *cardId) {
@@ -432,7 +432,7 @@ const char *clusterOf(const char *cardId) {
     return nullptr;
 }
 
-// A GROUP MADE ON THE BOARD IS DELETED WHEN NO CARD IS IN IT: no entry names it
+// A GROUP MADE ON THE BOARD IS DELETED WHEN NO CARD IS IN IT (K200): no entry names it
 // in "in". A member moved out to the page keeps its "in" (its Restore goes back
 // there), so that group stays, hidden by the caller. Its label group goes with
 // it unless another card wears it. A compiled group is never deleted. Called once
@@ -545,7 +545,7 @@ bool rehome(const char *memberId, const Card &cluster) {
     return rehome(memberId, cluster.id(), cluster.sheetArea(), CardGroups::ofCard(cluster, g) ? g.id : nullptr);
 }
 
-// A card made here RELOCATES (round 2 of the follow-ups): out of a cluster or off
+// A card made here RELOCATES (K137): out of a cluster or off
 // the page, into another cluster - its record changes, its id and settings stay.
 bool rehome(const char *cardId, const char *clusterId, const char *clusterArea, const char *groupId) {
     if (!cardId || !clusterId || !cardIdWellFormed(clusterId)) return false;

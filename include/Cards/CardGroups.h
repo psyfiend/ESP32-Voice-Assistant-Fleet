@@ -1,13 +1,13 @@
 #pragma once
 //
 // CardGroups - which GROUP a card is in, and so what its CARD LABEL says and
-// what colour it is (2.10d, DECISIONS K42, K44, K46; design: docs/design/
-// card-sheet.md section 17).
+// what colour it is (DECISIONS K42, K46; design: docs/design/card-sheet.md
+// section 17).
 //
 // ONE KIND OF GROUP (K46): the dashboard's own version of an area. A name, a
 // colour, and perhaps a link to an HA area. Groups belong to the device, not to
 // a page, so a group spans pages as an HA area does. A card is in one group or
-// none (per card, K44 G1). COLOUR IS THE GROUP'S IDENTITY: every card in a
+// none. COLOUR IS THE GROUP'S IDENTITY: every card in a
 // group wears its colour; the words are the group's name unless the card has
 // its own (and keeps the colour). Being together on a page means nothing.
 //
@@ -24,7 +24,7 @@
 //
 // A card's group: its saved "group" (a group id, or "none"), else its
 // dashboard area's. A group's colour: its saved one, else the colour of its
-// name - so an untouched dashboard looks exactly as before 2.10d. A new group
+// name, so an untouched dashboard keeps the colours its area names give. A new group
 // made here takes a colour no other group is using, while one is left.
 //
 // UI code; LVGL thread. Not thread-safe.
@@ -55,7 +55,7 @@ struct Group {
 
 // A group by id; false if no such group is known.
 bool byId(const char *gid, Group &g);
-// The card's group now; false = none.
+// The card's group; false = none.
 bool ofCard(const Card &c, Group &g);
 // The same for a card that is not built (a hidden cluster, a card moved away):
 // its id and its dashboard area.
@@ -64,8 +64,8 @@ bool ofId(const char *cardId, const char *sheetArea, Group &g);
 // /popup?groups=1: each dashboard area, the group it is, and each card's vote.
 void dumpLinks(void (*out)(const char *line, void *ctx), void *ctx);
 
-// A GROUP MADE BY THE OWNER, NAMED ON THE KEYBOARD (Visibility's "New group", the
-// 2.11 follow-ups): kept until deleted, in a colour no other group is using
+// A GROUP MADE BY THE OWNER, NAMED ON THE KEYBOARD (Visibility's "New group"):
+// in a colour no other group is using
 // while one is left. Its id into `idOut`.
 bool make(const char *name, char *idOut, size_t cap);
 
@@ -83,10 +83,10 @@ uint8_t rowChoices(const Card &c, Choice *out, uint8_t cap, char *opts, size_t o
 // nothing else is in deletes it.
 void choose(Card &c, const Choice &ch, bool areaColor);
 
-// Card UI's Card label row (2.8 round 3, D-28): where the card label's words
-// come from - its group's name (Inherit), its own words (Custom: the words it
-// shows when chosen, kept, and the keyboard opens on them - K95), or no card
-// label (None). The group itself is chosen another way, later.
+// Card UI's Card label row (D-28): where the card label's words come from - its
+// group's name (Inherit), its own words (Custom: the words it shows when
+// chosen, kept, and the keyboard opens on them - K95), or no card label (None).
+// The group itself is chosen with rowChoices() and choose().
 enum LabelSource : uint8_t { LS_INHERIT, LS_CUSTOM, LS_NONE };
 LabelSource labelSource(const Card &c);
 void        setLabelSource(Card &c, LabelSource ls, bool areaColor);

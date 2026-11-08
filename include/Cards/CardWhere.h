@@ -1,7 +1,7 @@
 #pragma once
 //
 // CardWhere - where an entity already is on the screen, in the owner's words
-// (2.13, K140, K145): what a picker row says instead of offering a tick.
+// (K140, K145): what a picker row says instead of offering a tick.
 //
 //   "In this cluster" / "In the header"   a member of `self`, a tile / a header sensor
 //   "In <cluster>"                        a member of another cluster ("In Outside")

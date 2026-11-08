@@ -23,7 +23,7 @@ typedef struct {
 // per-board structs (not nested inside one another) grouped by function:
 // BoardHardware, ExpanderConfig, DisplayConfig, TouchConfig, LvglConfig,
 // AudioConfig, StorageConfig. A board only declares the ones it actually
-// needs (e.g. only 2 of 8 boards populate an ExpanderConfig instance).
+// needs (e.g. only 2 of 9 boards populate an ExpanderConfig instance).
 //
 // Naming convention per board (see any BSP_<NAME>.h for a concrete example):
 //   - `#define <BOARD>`               short device-identity macro (e.g. WS_P4_7B),
@@ -54,15 +54,13 @@ typedef struct {
 // Physical-interface-level scalars that don't belong to a specific
 // peripheral group: shared I2C bus, device identity strings, and the
 // handful of standalone GPIOs (button, battery ADC, amp enable) not worth
-// their own struct. I2C_CLOCK_SPEED lives here as the single shared value -
-// previously duplicated as a dead I2C-bus-level field plus a separately
-// consumed per-touch-controller field; only the touch-controller value was
-// ever actually read by any code, so this is that same value, unified.
+// their own struct. I2C_CLOCK_SPEED is the one clock for the shared I2C bus;
+// it is what reaches the touch controller's init call.
 struct BoardHardware {
     const char *device_name;   // Full display string, e.g. "Waveshare ESP32-P4-Touch-LCD-7B" - used for the GUI header label only
     const char *MANUFACTURER;  // e.g. "Waveshare", "Guition"
     const char *MODEL;         // Board model designation, e.g. "ESP32-P4-WIFI6-Touch-LCD-7B" - NOT the LCD driver chip (see DisplayConfig.PANEL_MODEL for that)
-    const char *SI_REV;        // P4 chip revision, either "rev1_3" or "rev3_x" - documentary only for now, nothing branches on it yet
+    const char *SI_REV;        // "unconfirmed" on P4 boards (the silicon revision belongs to the chip, not the board model; the System Doctor reads the real one), "n/a" on S3 - documentary only, nothing branches on it
 
     int8_t   SDA_PIN, SCL_PIN;
     uint32_t I2C_CLOCK_SPEED;
@@ -108,8 +106,8 @@ struct ExpanderConfig {
 // CS/SCK/MOSI/QSPI_D1-3 and leaves the RGB pins alone.
 // --- DSI PHY PLL reference clock source selectors (DisplayConfig.PHY_CLK_SRC) ---
 // 0 is the zero-filled default for any board that does not set the field, and
-// deliberately means "change nothing", so adding this field cannot alter the
-// behaviour of a board that was working before it existed.
+// deliberately means "change nothing": a board that omits the field keeps the
+// DSI library's own choice.
 #define BSP_PHY_CLK_SRC_DEFAULT   0  // keep the DSI library's existing choice (PLL_F20M)
 #define BSP_PHY_CLK_SRC_IDF_AUTO  1  // pass IDF's 0 sentinel; IDF picks per silicon revision
 #define BSP_PHY_CLK_SRC_PLL_F20M  2  // explicit; ESP32-P4 rev < 3.0 only
@@ -128,14 +126,15 @@ struct ExpanderConfig {
 // framebuffers FOLLOWS from the mode (bspPresentFrameBuffers()); it is never
 // set on its own, so no board can ask for a combination that cannot work.
 //
-// A mode that is not built yet falls back to TRIPLE_PARTIAL, loudly (boot log
-// and System Doctor), so a board never goes dark over it.
+// Each bus has one flush built. A mode with no flush for the board's bus is
+// refused, loudly (boot log and System Doctor), and the bus's own mode runs, so
+// a board never goes dark over it.
 #define BSP_PRESENT_AUTO            0  // the rule decides
-#define BSP_PRESENT_TRIPLE_PARTIAL  1  // 3 FBs; LVGL draws strips, copied (and rotated) into the free FB; stale areas repaired. BUILT (P4 DSI)
+#define BSP_PRESENT_TRIPLE_PARTIAL  1  // 3 FBs; LVGL draws strips, copied (and rotated) into the free FB; stale areas repaired. BUILT (DSI)
 #define BSP_PRESENT_DOUBLE_PARTIAL  2  // as above with 2 FBs, waiting for the panel to switch before reusing one - not built
-#define BSP_PRESENT_DOUBLE_DIRECT   3  // 2 FBs; LVGL draws changed areas straight into the FB, no copy; rotation 0 only - not built (S3 RGB, 2.9 step 4)
+#define BSP_PRESENT_DOUBLE_DIRECT   3  // 2 FBs; LVGL draws changed areas straight into the FB, no copy; rotation 0 only. BUILT (RGB)
 #define BSP_PRESENT_TRIPLE_FULL     4  // 3 FBs; LVGL redraws the whole screen every frame - not built
-#define BSP_PRESENT_TE_SYNC         5  // panel with its own RAM (QSPI): one full frame per TE pulse - not built (CYD_S3_3248, 2.9 step 5)
+#define BSP_PRESENT_TE_SYNC         5  // panel with its own RAM (QSPI): one full frame per TE pulse - not built
 #define BSP_PRESENT_NONE            6  // no tear protection: 1 FB, or none on a QSPI panel - not built
 
 struct DisplayConfig {
@@ -154,8 +153,8 @@ struct DisplayConfig {
     int8_t RST, CS, SCK, MOSI; // MOSI doubles as QSPI_D0
     int8_t QSPI_D1, QSPI_D2, QSPI_D3;
     int8_t TE;
-    // Panel reset polarity. 0 (the zero-filled default) = active LOW, which is the
-    // generic Arduino sequence and correct for every board that predates this field.
+    // Panel reset polarity. 0 (the zero-filled default) = active LOW, the
+    // generic Arduino sequence.
     // 1 = active HIGH: assert = HIGH, release = LOW. The Waveshare P4-5's HX8394 needs
     // this (its ESP-IDF BSP sets flags.reset_active_high = 1); driving it active-low
     // leaves the panel held in reset forever. Only honoured by the DSI display path.
@@ -191,10 +190,10 @@ struct DisplayConfig {
     // repoint every board if Espressif ever reordered that enum. The DSI
     // panel driver maps these to the real constants by name.
     uint8_t  PHY_CLK_SRC;
-    // Number of DPI framebuffers. 0 = leave the DSI library's default (1) alone, so
-    // boards predating this field are unchanged. Waveshare's own Arduino library uses 2.
+    // Number of DPI framebuffers. 0 = leave the DSI library's default (1) alone.
+    // Waveshare's own Arduino library uses 2.
     // ARDUINO_GFX PATH ONLY. The esp_lcd path ignores it: there the count follows
-    // from PRESENT_MODE (below). Deleted with Arduino_GFX at 2.9 step 6.
+    // from PRESENT_MODE (below). Goes away with the Arduino_GFX path.
     uint8_t  NUM_FB;
 
     // --- Panel init command tables ---
@@ -213,25 +212,21 @@ struct DisplayConfig {
     // member buys nothing here.
     //
     // This is what lets UI scale be DERIVED rather than declared. See
-    // docs/design/tokens.md section 2: the fleet spans 165-294 PPI, and the
-    // old blanket `-D HIGH_DPI_DISPLAY` (1.5x on three boards, 1.0x on five)
-    // left CYD_S3_8048 and WS_P4_5 visibly mis-scaled.
+    // docs/design/tokens.md section 2: the fleet spans 165-294 PPI, too wide
+    // for one blanket scale factor.
     //
-    // Appended as a TRAILING member on purpose - designated initialisers must
-    // list members in declaration order, so adding at the end keeps every
-    // existing board header valid. 0 means "unknown", and bspUiScale() falls
-    // back to 1.0 rather than guessing.
+    // 0 means "unknown", and bspUiScale() falls back to 1.0 rather than guessing.
     uint8_t                DIAGONAL_IN;
 
     // How frames reach the panel on the esp_lcd path: a BSP_PRESENT_* code, or 0
     // (the zero-fill default) to let bspPresentMode() derive it. See the codes
-    // above. Trailing, like DIAGONAL_IN, so no board header has to change.
+    // above.
     uint8_t                PRESENT_MODE;
 
-    // The panel's init sequence for the esp_lcd RGB path (2.9 step 4), as a
+    // The panel's init sequence for the esp_lcd RGB path, as a
     // structured list. INIT_CMDS_RGB above is Arduino_GFX's byte stream and
     // shares INIT_CMDS_SIZE with it, so it cannot double as this. The DSI boards
-    // use INIT_CMDS_DSI on both paths; step 6 folds the three into one field.
+    // use INIT_CMDS_DSI on both paths.
     const lcd_init_cmd_t  *INIT_CMDS_ESPLCD;
     size_t                 INIT_CMDS_ESPLCD_COUNT;
 };

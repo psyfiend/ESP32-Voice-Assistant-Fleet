@@ -1,6 +1,6 @@
 # Voice and the ESPHome native API (Phase 7)
 
-**Status: intent, not design.** Recorded 2026-11-02 (DECISIONS A18) so that the choices made before
+**Status: intent, not design** (DECISIONS A18), recorded so that the choices made before
 Phase 7 do not block it. Nothing here is built; the design is done when the phase is placed in the
 running order.
 

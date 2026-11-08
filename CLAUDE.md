@@ -289,8 +289,9 @@ which `CYD_S3_8048`, `WS_S3_5B` and `CYD_S3_3248` still run.
   `soc_module_clk_t`, so storing their integers would silently repoint every board if
   Espressif reordered that enum. `Arduino_ESP32DSIPanel` maps the codes to the real
   constants by name. `0` is both the zero-fill default and "change nothing", so a board that
-  omits the field keeps the library's historical `PLL_F20M` choice untouched — which is what
-  `WS_P4_7B`, `WS_P4_4B` and `CYD_P4_1060` rely on.
+  omits the field keeps the library's historical `PLL_F20M` choice untouched. **It acts on the
+  Arduino_GFX path only**: every P4 now runs `esp_lcd`, where the field is not wired through
+  and IDF picks the clock (`components/Fleet_Display/README.md`).
 - **`pioarduino` ships two prebuilt P4 lib variants and picks one from the board definition.**
   `esp32p4_es` (pre-rev3 silicon: `SELECTS_REV_LESS_V3=y`, `REV_MIN_1`) and `esp32p4`
   (`REV_MIN_301`). `board = esp32-p4-evboard` selects **`esp32p4_es`**, so the fleet is already

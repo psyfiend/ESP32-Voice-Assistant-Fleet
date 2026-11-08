@@ -1,16 +1,15 @@
-// A MINI TILE (2.11, DECISIONS K89, K100, K104): a cluster's member, drawn inside
+// A MINI TILE (DECISIONS K89, K100, K104): a cluster's member, drawn inside
 // the cluster with no border, header or card label of its own - its hero, and its
 // entity label under it. It is still a whole card: its id and its settings, its
 // tap, its window on a long press, its state (a STALE badge, the long-stale
 // diagonal). The cluster sizes it (Card::setCellWidthPx / setCellHeightPx) and
 // places it (Cards/ClusterCard.cpp).
 //
-// "On" is the LIT DISC (K100, the owner's C1): a solid disc in the active colour
-// behind a dark glyph, against the faint disc of "off" - fill and shape tell
-// them apart, never colour alone, and it is a solo card's hero in small. The
-// owner's warning: "the disc itself can sometimes shrink beyond its useful limit
-// if too crowded" - a disc that cannot hold its glyph is not drawn, and the glyph
-// takes the colour instead.
+// "On" is the LIT DISC (K100): a solid disc in the active colour behind a dark
+// glyph, against the faint disc of "off" - fill and shape tell them apart,
+// never colour alone, and it is a solo card's hero in small. A disc that
+// cannot hold its glyph (too crowded) is not drawn, and the glyph takes the
+// colour instead.
 #include "Cards/StateCard.h"
 #include "Cards/ValueCard.h"
 #include "Cards/CardIcons.h"
@@ -39,19 +38,18 @@ void column(lv_obj_t *o) {
 // Between the hero and the label.
 int32_t heroGap() { return UI::mm(UI::shape().C_TILE_GAP); }
 
-// Off the tile's top and foot (round 12): the label sat on the tile's foot, in
-// its active frame's glow. A SHORT TILE KEEPS LESS (round 13, the owner: the
-// 4B's discs had shrunk for it): the whole C_TILE_FOOT from C_TILE_FOOT_AT tall,
-// in step with the tile's height below that.
+// Off the tile's top and foot, so the label does not sit in its active frame's
+// glow. A SHORT TILE KEEPS LESS, or its disc would shrink for it: the whole
+// C_TILE_FOOT from C_TILE_FOOT_AT tall, in step with the tile's height below
+// that.
 int32_t foot(int32_t tileH) {
     const int32_t full = UI::mm(UI::shape().C_TILE_FOOT);
     const int32_t at   = UI::mm(UI::shape().C_TILE_FOOT_AT);
     return tileH > 0 && tileH < at ? full * tileH / at : full;
 }
 
-// THE TILE'S COLUMN (round 12, the owner: "no reason why the hero shouldn't be
-// centered within the tile frame like it is for solo cards"): the hero and its
-// label as one, centred in the tile, clear of its top and foot.
+// THE TILE'S COLUMN: the hero and its label as one, centred in the tile as a
+// solo card's hero is, clear of its top and foot.
 void tileColumn(lv_obj_t *body, lv_obj_t *mid) {
     lv_obj_set_size(mid, lv_pct(100), LV_SIZE_CONTENT);
     column(mid);
@@ -67,7 +65,7 @@ void setFoot(lv_obj_t *mid, int32_t f) {
 // The disc a state tile w x h (inside its foot) gets with its label in face `nf`
 // and `gap` between them: most of the room left over, never wider than most of
 // the tile, capped at twice ICON - or twice ICON_XL where the room holds most of
-// that (`roomy`, round 9). StateCard::renderMini() says why.
+// that (`roomy`). StateCard::renderMini() says why.
 int32_t discFor(int32_t w, int32_t h, const lv_font_t *nf, int32_t gap, bool &roomy) {
     const UIType &t = UI::type();
     const int32_t xl = lv_font_get_line_height(t.ICON_XL);
@@ -78,9 +76,8 @@ int32_t discFor(int32_t w, int32_t h, const lv_font_t *nf, int32_t gap, bool &ro
     return d < 0 ? 0 : d;
 }
 
-// A BIGGER LABEL (round 12, the owner: tiles on the P4_5 and 1060 "could handle a
-// bump in the entity label font size"): the name's face where it costs a state
-// tile's disc nothing, the tag's otherwise. By the tile's size alone, so every
+// A BIGGER LABEL: the name's face where it costs a state tile's disc nothing,
+// the tag's otherwise. By the tile's size alone, so every
 // tile of a cluster - state or value - has the same.
 const lv_font_t *labelFace(int32_t w, int32_t h, int32_t gap) {
     const UIType &t = UI::type();
@@ -90,8 +87,8 @@ const lv_font_t *labelFace(int32_t w, int32_t h, int32_t gap) {
 }
 
 // The gap the tile's column keeps between its hero and its label: the theme's
-// row padding, which its plain holders keep (round 4: a tile limited by its
-// height, now clusters fill their cells, got a disc too big for its middle).
+// row padding, which its plain holders keep (without it a tile limited by its
+// height gets a disc too big for its middle).
 int32_t rowGap(lv_obj_t *mid) {
     lv_obj_t *col = mid ? lv_obj_get_parent(mid) : nullptr;
     return col ? lv_obj_get_style_pad_row(col, LV_PART_MAIN) : 0;
@@ -179,13 +176,12 @@ void StateCard::renderMini() {
 
     // The disc: most of the room left over, never wider than most of the tile,
     // never larger than a solo card's at its largest (Card::heroDiscPx()) - and
-    // THE SOLO CARDS' OWN wherever that much room is there (round 4: "it is
-    // really not a good look when dashboard icons are different sizes"), unless
-    // they are squeezed (round 6: the page sets none then, CardPage::commit()).
-    // THE ROOMY HERO (round 9, the owner on the 1060: "the icons inside each
-    // cluster are relatively tiny"): the cap was twice ICON, which is ~4.5 mm on
-    // every board - a third of a 27 mm tile. Where the room holds most of twice
-    // ICON_XL (the 7" boards' 1.5 x ICON; ICON elsewhere), that is the cap and face.
+    // THE SOLO CARDS' OWN wherever that much room is there (dashboard icons are
+    // one size), unless they are squeezed (the page sets none then,
+    // CardPage::commit()).
+    // THE ROOMY HERO: a cap of twice ICON is ~4.5 mm on every board - a third of
+    // a 27 mm tile. Where the room holds most of twice ICON_XL (the 7" boards'
+    // 1.5 x ICON; ICON elsewhere), that is the cap and face.
     const lv_font_t *nameFace = labelFace(w, h, gap);
     bool roomy = false;
     int32_t d = discFor(w, h, showName ? nameFace : nullptr, gap, roomy);
@@ -228,9 +224,9 @@ void StateCard::renderMini() {
     lv_label_set_text         (_icon, cardHeroIcon(*e, on));
     lv_obj_set_style_text_font(_icon, face, 0);
 
-    // THE CARD STATE, ON A TILE TOO (round 11, the owner's E - K116): an active
-    // tile framed as a solo card is (Corner cut, Bracket), its lit disc kept.
-    // Its cluster's own card state, when it has one (2.13), else the device's.
+    // THE CARD STATE, ON A TILE TOO (K116): an active tile framed as a solo
+    // card is (Corner cut, Bracket), its lit disc kept. Its cluster's own card
+    // state, when it has one, else the device's.
     const StateCardFill fill = ownFill() >= 0 ? (StateCardFill)ownFill() : s_fill;
     CardFrame frame = CardFrame::FRAME_NONE;
     if (on && !chrome) {

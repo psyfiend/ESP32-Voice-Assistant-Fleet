@@ -33,8 +33,8 @@ static void closeObj(String &j) {
 void HaPublisher::begin(EntityRegistry *reg, MqttManager *mqtt) {
     _reg  = reg;
     _mqtt = mqtt;
-    // PSRAM since 2.13: ~62 bytes a registry slot, and the registry grew to 192
-    // slots - 12 KB that CYD_S3_3248's internal RAM cannot spare. Zeroed.
+    // PSRAM: ~62 bytes a registry slot over 192 slots is 12 KB that
+    // CYD_S3_3248's internal RAM cannot spare. Zeroed.
     if (!_slot) {
         _slot = (Slot *)heap_caps_calloc(ENTITY_MAX, sizeof(Slot), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         if (!_slot) _slot = (Slot *)calloc(ENTITY_MAX, sizeof(Slot));
@@ -42,21 +42,19 @@ void HaPublisher::begin(EntityRegistry *reg, MqttManager *mqtt) {
 }
 
 void HaPublisher::stateTopicFor(const Entity &e, char *out, size_t outLen) const {
-    // ROADMAP Q5: state = <base>/<object_id>/state
+    // DECISIONS C2: state = <base>/<object_id>/state
     snprintf(out, outLen, "%s/%s/state", _mqtt->getBaseTopic(), e.desc.id);
 }
 
-// ROADMAP Q5: command = <base>/<object_id>/set. Issue #44.
+// DECISIONS C2: command = <base>/<object_id>/set. Issue #44.
 //
-// The /state and /set pair is not a house style - it is HA's own discovery
-// convention (state_topic vs command_topic), it is what Zigbee2MQTT does, and
-// it is what the owner's Shed Power Monitor already does with
-// `.../motion_timer/state` and `.../motion_timer/set`. Three independent
-// sources agreeing was worth checking before inventing a fourth.
+// The /state and /set pair is HA's own discovery convention (state_topic vs
+// command_topic), it is what Zigbee2MQTT does, and it is what the Shed Power
+// Monitor does with `.../motion_timer/state` and `.../motion_timer/set`.
 //
 // Derived here rather than stored on the descriptor, deliberately: for an
-// entity WE own, the topic follows from the device identity, and ROADMAP 4.1
-// is explicit that a descriptor never spells its own topics out. Only entities
+// entity WE own, the topic follows from the device identity, and a descriptor
+// never spells its own topics out. Only entities
 // someone ELSE owns carry a commandRef, because only they have an address we
 // cannot compute.
 void HaPublisher::commandTopicFor(const Entity &e, char *out, size_t outLen) const {
@@ -203,12 +201,11 @@ void HaPublisher::publishDiscovery() {
 // Published to the ENTITY'S OWN STATE TOPIC, not to an availability topic,
 // because there is no per-entity availability topic: discovery points every
 // entity at the DEVICE-level LWT (pl_avail / pl_not_avail above). Using that
-// would mark the whole panel offline, which is the opposite of what the owner
-// asked for - "set it as Unavailable for the sensor only, obviously not for the
-// board itself or any other entities".
+// would mark the whole panel offline; a pause makes the one sensor unavailable
+// and nothing else.
 //
 // Retained, so HA still sees it after a broker reconnect - a pause that
-// survives our reboot but not the broker's would be a odd half-promise.
+// survives our reboot but not the broker's would be an odd half-promise.
 //
 // NOT YET CONFIRMED ON HARDWARE: HA special-cases the literal payload
 // "unavailable" on a state topic for sensor and binary_sensor. That is the
@@ -272,11 +269,10 @@ void HaPublisher::loop(uint32_t nowMs) {
 
         // PAUSED ENTITIES STOP TRANSMITTING. Issue #60.
         //
-        // The owner's case: "if the device was sending temp data to HA but I
-        // knew the temp sensor was broken, I would not want it sending bogus
-        // data to HA." So we go quiet - but we say so FIRST, once, rather than
-        // just stopping. Silence would leave HA showing the last good reading
-        // indefinitely, which is precisely the bogus data he is trying to stop.
+        // A sensor known to be broken must not send bogus data to HA. So we go
+        // quiet - but we say so FIRST, once, rather than just stopping. Silence
+        // would leave HA showing the last good reading indefinitely, which is
+        // precisely the bogus data a pause is meant to stop.
         //
         // Scoped to this entity. The board's own availability topic and every
         // other entity are untouched: a paused deck probe must not make the

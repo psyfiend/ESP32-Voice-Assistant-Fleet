@@ -45,10 +45,9 @@ bool TouchManager::begin() {
         }
 
         // Initialize bb_captouch with explicit pins
-        // TP_I2C_CLOCK_SPEED was declared in every BSP but never actually
-        // reached bb_captouch - init() silently defaulted to its own
-        // built-in 400kHz regardless of what a board's BSP said. WS_P4_Smart86's
-        // BSP has said 100000 this whole time without it ever taking effect.
+        // bsp_hw.I2C_CLOCK_SPEED is passed to init(); without it bb_captouch
+        // would use its own built-in 400kHz regardless of the board's BSP
+        // (WS_P4_4B's says 100000).
         Serial.println("[TouchMgr] No bb_captouch ID defined, using manual pin config...");
         Serial.printf("[TouchMgr] Init SDA:%d SCL:%d IRQ:%d RST:%d Speed:%lu\n", sda, scl, irq, rst, (unsigned long)bsp_hw.I2C_CLOCK_SPEED);
         int touchtest = _touch.init(sda, scl, rst, irq, bsp_hw.I2C_CLOCK_SPEED);
@@ -151,7 +150,8 @@ void TouchManager::mapCoordinates(TouchPoint *point) {
 
     // ==========================================================
     // ROTATION LOGIC
-    // GUITION 3.5" (Native 320x480)
+    // Every board except WS_P4_7B: a transform per bsp_display.ROTATION
+    // (written for the Guition 3.5", native 320x480 portrait)
     // ==========================================================
     // #ifdef CYD_S3_3248
     #ifndef WS_P4_7B
@@ -189,10 +189,10 @@ void TouchManager::mapCoordinates(TouchPoint *point) {
             }
         }   
     // ==========================================================
-    // WAVESHARE S3/P4 BOXES (Native Square/Landscape)
+    // WS_P4_7B (native landscape)
     // ==========================================================
-    //elif defined(WS_S3_4B) || defined(WS_P4_4B) || defined(WS_P4_7B)
-    // Pass through for now as hardware is often 1:1 mapped on these panels
+    // Raw passthrough regardless of rotation: its mapping was not re-tested
+    // against the transform above.
     #else
          point->x = rawX;
          point->y = rawY;
@@ -203,10 +203,10 @@ void TouchManager::mapCoordinates(TouchPoint *point) {
     // width/height swap the display itself uses at 90/270 degree rotations
     // (matches gfx->width()/height()) - bsp_display.WIDTH/HEIGHT alone are the raw,
     // UNROTATED native panel dimensions and don't swap with rotation, so
-    // using them directly here was silently clamping any touch past the
-    // native boundary to a fixed, wrong edge coordinate instead of its real
-    // position - e.g. every touch past x=319 on a 320x480 panel in landscape
-    // (where the real screen is 480 wide) collapsed to exactly x=319.
+    // using them directly would clamp any touch past the native boundary to a
+    // fixed, wrong edge coordinate - e.g. every touch past x=319 on a 320x480
+    // panel in landscape (where the real screen is 480 wide) would collapse
+    // to exactly x=319.
     bool swapped = (bsp_display.ROTATION == 1 || bsp_display.ROTATION == 3);
     int32_t maxX = (swapped ? bsp_display.HEIGHT : bsp_display.WIDTH) - 1;
     int32_t maxY = (swapped ? bsp_display.WIDTH : bsp_display.HEIGHT) - 1;

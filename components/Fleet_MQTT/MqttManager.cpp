@@ -77,7 +77,7 @@ void MqttManager::begin(ConnectivityManager *link, const MqttSettings &settings)
 
     // Topics are derived from the same device identity the hostname comes
     // from, so an MQTT topic and a DHCP lease can never disagree about which
-    // board is which. Per ROADMAP Q5.
+    // board is which (DECISIONS C2).
     snprintf(_baseTopic, sizeof(_baseTopic), "%s/%s",
              _cfg.TOPIC_PREFIX, DeviceIdentity::deviceId());
     snprintf(_availTopic, sizeof(_availTopic), "%s/status", _baseTopic);
@@ -126,8 +126,8 @@ void MqttManager::loop() {
     // and note this is deliberately the ONLY thing MqttManager asks about the
     // link. It never learns whether it is WiFi, AP or Ethernet.
     if (!_link || !_link->isOnline()) {
-        // Unconditional, for the same reason as the drop path below: the guard
-        // that used to be here skips exactly the case that needs it, because a
+        // Unconditional, for the same reason as the drop path below: a
+        // connected() guard would skip exactly the case that needs it, because a
         // link that has gone away is precisely when connected() is already
         // false and the socket is still held.
         _client.disconnect();
@@ -142,9 +142,7 @@ void MqttManager::loop() {
 
     // Was connected, is not any more.
     if (_state == MqttState::CONNECTED) {
-        // WHY, not just THAT. PubSubClient records a reason code and we were
-        // throwing it away, which left "Disconnected from broker." as the only
-        // evidence for a fault that has now cost two evenings.
+        // Log WHY as well as THAT: PubSubClient records a reason code.
         //
         //   -4 timeout   -3 connection LOST (the broker closed it)
         //   -2 connect failed   -1 clean disconnect by us
@@ -159,24 +157,16 @@ void MqttManager::loop() {
                       _client.state(), (unsigned long)heldMs,
                       (unsigned long)ESP.getFreeHeap(),
                       WiFi.status() == WL_CONNECTED ? "up" : "DOWN");
-        // RELEASE THE SOCKET. This is the bug, and the broker's own log is what
-        // named it: "Client fleet_cyd_s3_3248_98d510 [192.168.0.165:61323]
-        // disconnected: exceeded timeout."
+        // RELEASE THE SOCKET. PubSubClient::connected() going false does not
+        // close anything; it only reports. Reconnecting without telling the TCP
+        // client to let go leaves a socket open on every cycle and opens a NEW
+        // one, so the broker sees the source port climb and each abandoned
+        // session sits there until ITS keepalive lapses (45 seconds later).
         //
-        // We noticed the session was gone, backed off, and reconnected - but
-        // never told the TCP client to let go. PubSubClient::connected() going
-        // false does not close anything; it only reports. So every cycle left
-        // a socket open and opened a NEW one, which is why the broker saw the
-        // source port climb - 61323, 61328, 61329 - and why each abandoned
-        // session sat there until ITS keepalive lapsed 45 seconds later. The
-        // broker was not rejecting us. It was timing out the ghosts we left
-        // behind, one every few minutes, while the device churned every five
-        // seconds.
-        //
-        // Two consequences, both observed: LWIP runs out of sockets and new
-        // connects start failing outright (raw=-2, raw=-4), and Home Assistant
-        // flaps because the availability topic keeps getting the Will from
-        // sessions that died minutes ago.
+        // Two consequences: LWIP runs out of sockets and new connects start
+        // failing outright (raw=-2, raw=-4), and Home Assistant flaps because
+        // the availability topic keeps getting the Will from sessions that died
+        // minutes ago.
         //
         // disconnect() is called unconditionally rather than behind a
         // connected() guard - the guard is exactly what would skip it here,
@@ -365,20 +355,16 @@ bool MqttManager::addSub(const char *topic, bool isCommand) {
     // This table holds TOPICS, and several entities routinely share one - a
     // Zigbee2MQTT device publishes temperature, illuminance, occupancy and
     // battery in a single message, so four entities name the same topic and
-    // MqttProvider asks for it four times. Each of those was appended as its
-    // own row.
+    // MqttProvider asks for it four times. Appending each as its own row would
+    // be survivable once, but MqttProvider asks again after every reconnect
+    // while MqttManager ALSO replays the table, so the rows would multiply
+    // (four, eight, twelve, sixteen) until the table is full: sixteen SUBSCRIBE
+    // packets per connect for one topic, publishes failing on small payloads,
+    // the broker dropping the session, and a reconnect into the same loop.
     //
-    // That alone was survivable. What made it fatal is that MqttProvider asks
-    // again after every reconnect while MqttManager ALSO replays the table -
-    // so four rows became eight, then twelve, then sixteen, and the table was
-    // full. The device then sent sixteen SUBSCRIBE packets per connect for one
-    // topic, publishes started failing on a 4-byte payload, the broker dropped
-    // it, and it reconnected into the same loop. Both boards spent an evening
-    // flickering in and out of Home Assistant.
-    //
-    // Subscribing to the same topic twice was never meaningful - the broker
-    // sends one copy either way, and MqttProvider already fans one message out
-    // to every entity that named it.
+    // Subscribing to the same topic twice is meaningless - the broker sends one
+    // copy either way, and MqttProvider fans one message out to every entity
+    // that named it.
     for (uint8_t i = 0; i < _subCount; i++) {
         if (strcmp(_subs[i].topic, topic) != 0) continue;
         // A topic first seen as state and later wanted as a command has to be

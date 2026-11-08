@@ -4,17 +4,17 @@
 
 #include "Cards/Card.h"
 #include "Layout/Cluster.h"   // TileGrid
-#include "UI/HeaderSlots.h"   // GlyphStyle (round 11)
+#include "UI/HeaderSlots.h"   // GlyphStyle
 
 class CardBinder;
 
 // ---------------------------------------------------------------------------
-// ClusterCard - a GROUP CARD shown as a CLUSTER (2.11, DECISIONS K88-K92,
+// ClusterCard - a GROUP CARD shown as a CLUSTER (DECISIONS K88-K92,
 // K100-K104; docs/design/group-cards.md §6): one border on the page, a header
 // row, and the members inside it as MINI TILES with no border of their own.
+// On screen it is a group.
 //
-// The seam Card.h kept for "a card that contains other cards". The cluster OWNS
-// its members - each a whole card, built from its own spec with its own id and
+// A card that contains other cards. The cluster OWNS its members - each a whole card, built from its own spec with its own id and
 // settings, registered with the binder like any card - and draws the tiles
 // where Layout::tileGrid() puts them.
 //
@@ -28,8 +28,8 @@ class CardBinder;
 //            sensor's number. A tap is the member's own; a long press opens the
 //            member's own window (K104).
 //   itself   a long press on the header opens the cluster's window on its
-//            Members; a tap there does nothing (the owner, 2026-10-19: so a brush
-//            cannot switch a room off).
+//            Members; a tap there does nothing (K107: so a brush cannot switch a
+//            room off).
 //
 // It has no state of its own: its members show theirs. Its header follows the
 // members it shows (owns() / onSnapshot()).
@@ -53,12 +53,12 @@ public:
     bool hiddenAt(uint8_t i) const { return i < _n && _hidden[i]; }
     void setStyle(ClusterStyle s) { _style = s; }
     void setIcons(bool on) { _icons = on; }
-    // The tiles across, as the arranger chose them (v8's tc); 0: Layout::tileGrid()'s rule.
+    // The tiles across, as the arranger chose them (tc); 0: Layout::tileGrid()'s rule.
     void setTileCols(uint8_t c) { _tileCols = c; }
     // Once sized (setCellWidthPx / setCellHeightPx): how tall its tiles are drawn
     // on their own - near square, no taller than C_TILE_TALL their width.
     int32_t tileHeight() const;
-    // ONE TILE HEIGHT A PAGE (round 12b): the page gives every cluster the
+    // ONE TILE HEIGHT A PAGE: the page gives every cluster the
     // shortest any of them draws; a taller one draws halfway down to it. 0: its own.
     void setTileHeightCap(int32_t px) { _tileHCap = px; }
     // THE GROUP VIEW (K159), before build(): every tile one size, no bigger than
@@ -72,7 +72,7 @@ public:
     // them is `cb`'s (its user data this cluster) - the name's stays the card's.
     void setSlotsTap(lv_event_cb_t cb) { _slotsCb = cb; }
     lv_obj_t *headerRow() const { return _hdr; }
-    // The header values' icons in the page header's glyph style (round 11, K115):
+    // The header values' icons in the page header's glyph style (K115):
     // framed on a Swatch header, bare on a Band. Every cluster's, from the next build.
     static void setGlyphStyle(GlyphStyle g) { s_glyphs = g; }
 

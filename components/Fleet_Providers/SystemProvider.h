@@ -8,10 +8,10 @@
 
 // ---------------------------------------------------------------------------
 // SystemProvider - this board's own telemetry, as entities.
-// ROADMAP milestone 1.7: "SystemProvider populates rssi/ip/uptime/heap".
+// It populates rssi, ip, uptime and heap.
 //
 // A provider is the ONLY kind of code that bridges a source to the registry
-// (ROADMAP 4.1). The boundary it respects:
+// (DECISIONS A3). The boundary it respects:
 //
 //   - It writes values INTO the registry. It never renders anything, never
 //     touches LVGL, and never publishes to MQTT. Discovery and publishing are

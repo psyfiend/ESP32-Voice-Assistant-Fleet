@@ -5,7 +5,7 @@
 #include "EntityRegistry.h"
 
 // ---------------------------------------------------------------------------
-// VirtualProvider - the other half of VirtualEntities.h, and just as temporary.
+// VirtualProvider - the other half of VirtualEntities.h, a test harness.
 //
 // It is a provider in the ordinary sense: it writes values into the registry
 // and never touches LVGL. What makes it a test harness rather than a peripheral
@@ -18,12 +18,12 @@
 //   test_stuck   is never touched at all. EntityRegistry::tick() reaches its
 //                reconcile deadline, reverts the optimistic value and dirties
 //                the entity, and the card renders that as ST_REFUSED.
-//   test_lamp_*  four kinds of light (2.10b): dimmable, white range, colour,
+//   test_lamp_*  four kinds of light: dimmable, white range, colour,
 //                on/off only. Each remembers its levels while off and takes
 //                a light command VIRT_ECHO_DELAY_MS after the last one. See
 //                the table in VirtualProvider.cpp.
 //
-// Goes away with VirtualEntities.h when #44 lands.
+// SystemCore does not start it; see VirtualEntities.h.
 // ---------------------------------------------------------------------------
 
 class VirtualProvider {

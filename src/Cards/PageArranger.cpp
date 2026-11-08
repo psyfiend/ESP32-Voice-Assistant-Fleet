@@ -1,4 +1,4 @@
-// The arranger for the dashboard's pages (2.11): include/Cards/PageArranger.h
+// The arranger for the dashboard's pages: include/Cards/PageArranger.h
 // says what and why.
 #include "Cards/PageArranger.h"
 #include "Settings.h"
@@ -15,8 +15,8 @@ namespace PageArranger {
 
 namespace {
 
-// "v4 fp CxR" and "c,r,w,h,tc" a block, in units. The version moves when the
-// search does (v4: round 12's shapes), so every page arranges once on new firmware.
+// "v5 fp CxR height" and "c,r,w,h,tc" a block, in units. The version moves when the
+// search does, so every page arranges once on new firmware.
 constexpr size_t VALUE_MAX = 24 + 16 * Layout::ARR_BLOCKS_MAX;
 
 // The search recurses a level a unit (Layout::ARR_CELLS_MAX at most), each
@@ -67,14 +67,14 @@ struct Fp {
     void dbl(double v) { i32((int32_t)lround(v * 1000.0)); }
 };
 
-// WHAT IS ON THE PAGE, NOT HOW TALL IT IS (owner, 2026-11-05, K167): the page's
+// WHAT IS ON THE PAGE, NOT HOW TALL IT IS (K167): the page's
 // height is left out - the system header shown or hidden keeps the arrangement,
 // the height it gains or loses going to the space round the cards (kept()). So are
 // the members nobody sees there (unpinned ones) and how many sensors a header
 // holds: its tiles, and that it has a header, are what take room.
 uint32_t fingerprint(const Input &in, const Layout::ArrWeights &w) {
     Fp f;
-    f.byte(10);   // the arranger's version: v10 (K167)
+    f.byte(10);   // the search's version (K167): a new one invalidates every kept answer
     f.str(in.slug);
     f.i32(in.n);
     for (uint8_t i = 0; i < in.n; i++) {
@@ -108,13 +108,11 @@ bool kept(const Input &in, Layout::ArrResult &out) {
     tuning(w);
     char v[VALUE_MAX];
     if (!Settings::page(in.slug, "layout", v, sizeof(v))) return false;
-    // "v4 <fingerprint> <cols>x<rows> c,r,w,h,tc ..." - units; each block as the
+    // "v5 <fingerprint> <cols>x<rows> <height> c,r,w,h,tc ..." (K167) - units;
+    // <height> is the page's height in px it was arranged for. Each block as the
     // search placed it, a cluster's tiles across; one per block, in order. The
     // finish (Layout::finishPage()) is run again here: cheap, and the same every
-    // time. Older answers (v1 cells, v2 round 9's finished boxes, v3 round 11's
-    // search) are not read.
-    // v5 (K167): "v5 <fingerprint> <cols>x<rows> <height> ..." - the page's height
-    // it was arranged for, in px, after the grid.
+    // time. An answer of any other version is not read.
     char *p = v;
     if (strncmp(p, "v5 ", 3)) return false;
     p += 3;
@@ -139,8 +137,8 @@ bool kept(const Input &in, Layout::ArrResult &out) {
         Layout::ArrPlace &b = out.pos[i];
         b.c = (uint8_t)q[0]; b.r = (uint8_t)q[1]; b.w = (uint8_t)q[2]; b.h = (uint8_t)q[3];
         b.tc = (uint8_t)q[4];
-        // Its tiles down follow from across (round 12: without them the finish
-        // saw no room for a kept page's clusters to grow).
+        // Its tiles down follow from across; the finish needs them to see room
+        // for a kept page's clusters to grow.
         const uint8_t nt = in.blocks[i].tiles;
         b.tr = in.blocks[i].cluster && b.tc ? (uint8_t)((nt + b.tc - 1) / b.tc) : 0;
     }
@@ -176,9 +174,9 @@ void start(const Input &in) {
     s_state.store(1);
     // The idle task's own priority, so the screen and the network go first and
     // core 0's idle task still runs, time-sliced with it: at priority 1 a search
-    // longer than the task watchdog's 5 s starved IDLE0 and rebooted the board,
-    // every boot (the 4B on "auto", round 12: ~1.07 M steps). Its stack in
-    // internal RAM; the search's own room is made once, from the heap.
+    // longer than the task watchdog's 5 s starves IDLE0 and reboots the board.
+    // Its stack is in internal RAM; the search's own room is made once, from
+    // the heap.
     if (xTaskCreatePinnedToCore(task, "arrange", TASK_STACK, nullptr, tskIDLE_PRIORITY, nullptr, 0) != pdPASS) {
         s_state.store(0);
         snprintf(s_last, sizeof(s_last), "%s: could not start the arranger", s_slug);

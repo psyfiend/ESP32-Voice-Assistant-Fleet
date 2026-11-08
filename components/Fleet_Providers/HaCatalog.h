@@ -7,7 +7,7 @@
 #include <mutex>
 
 // ---------------------------------------------------------------------------
-// WHAT HOME ASSISTANT OFFERS THE BOARDS, 2.13 (DECISIONS K140; design/ha-cards.md
+// WHAT HOME ASSISTANT OFFERS THE BOARDS (DECISIONS K140; design/ha-cards.md
 // section 2.4): the entities the owner labels "fleet", each with its area, and
 // HA's floors and areas in order - what the pickers list.
 //

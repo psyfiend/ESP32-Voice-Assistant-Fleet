@@ -8,7 +8,7 @@
  * Vendored from espressif/esp_io_expander 1.2.1 (Apache-2.0,
  * LICENSE_esp_io_expander.txt): esp_io_expander.{c,h} only - the GPIO-API
  * wrapper files are left out. One change: the whole file compiles only for
- * boards on the esp_lcd RGB path (the TCA9554 on WS_S3_4B, 2.9 step 4), so no
+ * boards on the esp_lcd RGB path (the TCA9554 on WS_S3_4B), so no
  * other environment compiles any of it.
  * ------------------------------------------------------------------------- */
 #if defined(DISPLAY_ESPLCD) && defined(HAS_RGB_PANEL)

@@ -18,8 +18,8 @@ bool HaCatalog::begin() {
 //   A>area_id>Area name>floor_id|             an area ("" floor: on none)
 //   E>entity_id>area_id>Name>device_class>unit>state|
 // Floors and their areas in HA's own order, then the areas on no floor, then
-// the entities. Measured 2026-11-02 on the owner's HA: 2 floors, 16 areas, 70
-// entities, about 9 KB.
+// the entities. On the owner's HA that is 2 floors, 16 areas, 70 entities,
+// about 9 KB.
 const char *HaCatalog::templateText() {
     return
         "{% for f in floors() %}F>{{ f }}>{{ floor_name(f) }}|"

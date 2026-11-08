@@ -1,7 +1,7 @@
 #pragma once
 //
-// fleet_dsi_panel - MIPI-DSI panel bring-up on raw esp_lcd. Milestone 2.9,
-// step 2: docs/archive/display/esplcd-step2.md.
+// fleet_dsi_panel - MIPI-DSI panel bring-up on raw esp_lcd
+// (docs/display/architecture.md).
 //
 // C, not C++, on purpose: the panel drivers' configuration macros use
 // designated initialisers out of declaration order, which C accepts and C++
@@ -99,7 +99,7 @@ esp_err_t fleet_dsi_panel_new(const fleet_dsi_cfg_t *cfg, const fleet_dsi_driver
 // For the wrappers: `out` = a calloc'd copy of cfg's init sequence in the
 // driver's own init-command `type`, field by field (so a driver whose type
 // differs fails to compile rather than misreading memory - "copied rather
-// than cast", as step 2 decided). NULL when there is no sequence; the driver
+// than cast"). NULL when there is no sequence; the driver
 // then uses its own default. Returns ESP_ERR_NO_MEM from the CALLER when out
 // of memory. The drivers read it only during init(): free() it straight after.
 #define FLEET_DSI_COPY_CMDS(type, cfg, out)                                     \

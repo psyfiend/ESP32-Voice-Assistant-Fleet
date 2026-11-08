@@ -50,7 +50,7 @@ struct MqttSettings {
 
     // --- Topics ---
     // Base topic is built as "<TOPIC_PREFIX>/<deviceId>", e.g.
-    // "fleet/fleet_ws_p4_5_e0d24b". Per ROADMAP Q5.
+    // "fleet/fleet_ws_p4_5_e0d24b" (DECISIONS C2).
     const char *TOPIC_PREFIX;
     // Where Home Assistant listens for discovery. Configurable because a
     // non-default value is a real (if uncommon) HA setting, and hardcoding it
@@ -95,25 +95,23 @@ inline constexpr MqttSettings MQTT_DEFAULT_SETTINGS = {
 
     .BUFFER_SIZE      = 4096,
     .KEEPALIVE_S      = 30,
-    // FOUR SECONDS, DOWN FROM TEN, AND THE UNIT HERE IS "UI FREEZE".
+    // FOUR SECONDS, AND THE UNIT HERE IS "UI FREEZE".
     //
     // PubSubClient::connect() is synchronous and runs on the loop task - the
     // same task as LVGL - so this value is not "how patient are we with the
     // broker", it is "how long can the screen stop responding to a finger".
     //
-    // BE PRECISE ABOUT WHAT IT BOUNDS, because the obvious reading is wrong
-    // and was believed here for a while. Checked in PubSubClient.cpp:
-    // socketTimeout is used only in the post-connect wait loops (lines 259 and
-    // 293 - waiting for CONNACK, and readByte). It is NOT passed to
-    // _client->connect() at line 190. The TCP connect has its own bound:
-    // NetworkClient's WIFI_CLIENT_DEF_CONN_TIMEOUT_MS, 3000 ms.
+    // WHAT IT BOUNDS, precisely (checked in PubSubClient.cpp): socketTimeout is
+    // used only in the post-connect wait loops (lines 259 and 293 - waiting for
+    // CONNACK, and readByte). It is NOT passed to _client->connect() at line
+    // 190. The TCP connect has its own bound: NetworkClient's
+    // WIFI_CLIENT_DEF_CONN_TIMEOUT_MS, 3000 ms.
     //
     // So one bad attempt blocks the UI for roughly (up to 3 s of TCP connect)
-    // + (up to this, waiting for a CONNACK that never comes). At 10 s that was
-    // up to thirteen seconds of dead screen per attempt; at 4 it is seven, and
-    // 4 s is still far longer than a LAN broker needs.
+    // + (up to this, waiting for a CONNACK that never comes): seven seconds at
+    // 4. 4 s is still far longer than a LAN broker needs.
     //
-    // The REAL fix is that isOnline() now returns false on LINK_DEAD, so the
+    // The main protection is that isOnline() returns false on LINK_DEAD, so the
     // attempt is not made at all. This is the backstop for a link that is
     // merely slow rather than gone.
     .SOCKET_TIMEOUT_S = 4,

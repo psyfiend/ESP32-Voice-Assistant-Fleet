@@ -17,7 +17,7 @@
 //                   else owns them; we subscribe and read.
 //
 // Both write to the same registry, and a card cannot tell which one filled a
-// value in. That is ROADMAP 4.1 working as intended.
+// value in (DECISIONS A3).
 //
 // Subscriptions are derived from the entity table, not hardcoded: register an
 // entity with an externalRef and this subscribes to it. Several entities may

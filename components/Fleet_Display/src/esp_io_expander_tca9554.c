@@ -7,7 +7,7 @@
 /* ---- FLEET LOCAL CHANGES (components/Fleet_Display/README.md) --------------
  * Vendored from espressif/esp_io_expander_tca9554 2.0.3 (Apache-2.0,
  * LICENSE_esp_io_expander_tca9554.txt). One change: the whole file compiles
- * only for boards on the esp_lcd RGB path (WS_S3_4B, 2.9 step 4). It uses the
+ * only for boards on the esp_lcd RGB path (WS_S3_4B). It uses the
  * i2c_master driver, so it shares Arduino Wire's bus (i2cBusHandle(0)).
  * ------------------------------------------------------------------------- */
 #if defined(DISPLAY_ESPLCD) && defined(HAS_RGB_PANEL)

@@ -2,29 +2,27 @@
 #include "Cards/ClusterCard.h"   // a group's members (K157)
 
 // See CardPopup.h for what this is and docs/design/card-sheet.md sections 11-13
-// for why it looks the way it does. Step 1 of 2.10a: the window, its header,
-// the four ways to close, the body and the inner views. The settings deck
-// comes next.
+// for why it looks the way it does. This file: the window, its header, the
+// four ways to close, the body and the inner views.
 //
-// USABLE FIRST (owner, 2026-10-04 evening). The window used to grow out of the
-// card and land with the dim; every version of that was measured, and the
-// motion was never the slow part - the frame it landed in was (a full-screen
-// redraw for the dim, ~120 ms on Midnight, ~200 ms on Linen, after ~240 ms of
-// growing). The window now appears complete in the first frame after the long
-// press, and closes in one. What was learned is in docs/LESSONS.md, "Effects
-// that cover the screen". Nothing is drawn behind it: the dim was tried that
-// evening, drawn around the window a frame after it, and the owner chose
-// speed - "the delay seems like an eternity and adds very little".
+// USABLE FIRST. The window appears complete in the first frame after the long
+// press, and closes in one. Growing out of the card and landing with a dim
+// costs a full-screen redraw (~120 ms on Midnight, ~200 ms on Linen) on top of
+// ~240 ms of growing; the motion was never the slow part, the frame it landed
+// in was. What was learned is in docs/LESSONS.md, "Effects that cover the
+// screen". Nothing is drawn behind the window: a dim drawn around it a frame
+// later adds very little for its delay.
 //
 // What the eye gets instead is cheap because it is small: the held card is
 // pressed in while its border fades to the accent (see "The hold"), now and
 // then a spark runs along the window's edge (see "Interference"), and the
 // switch's knob slides - and can be dragged.
 //
-// 2.12 P1: this file is open and close, the corner icons, the views and the clock, and the
-// public interface. The rest of the window is in src/Cards/Popup/, listed in PopupState.h.
-// 2.12 P4: the frame itself - the window, its header row, the auto-close, the quiet build, the
-// tap catcher, the panels, the sparks - is the kit's Sheet (UI/Sheet.h); this is its client.
+// This file is open and close, the corner icons, the views and the clock, and
+// the public interface. The rest of the window is in src/Cards/Popup/, listed
+// in PopupState.h. The frame itself - the window, its header row, the
+// auto-close, the quiet build, the tap catcher, the panels, the sparks - is the
+// kit's Sheet (UI/Sheet.h); this is its client.
 
 namespace popup {
 
@@ -41,7 +39,7 @@ uint32_t signature() {
     auto mixIn = [&h](uint32_t v) { h = (h ^ v) * 16777619u; };
     // The entities shown, and - for a group defined at the source - its
     // members, whose rows the Members view shows and whose pauses change what
-    // the window stands for (2.10c).
+    // the window stands for (K14).
     // A group's members, all of them (K157: Members lists past the window's six).
     constexpr uint8_t ALL_MAX = 2 * POPUP_ENT_MAX + GROUP_MEMBERS_MAX;
     const Entity *all[ALL_MAX];
@@ -60,7 +58,7 @@ uint32_t signature() {
         mixIn((e->available ? 1u : 0u) | (e->paused ? 2u : 0u) | (e->pending ? 4u : 0u) |
               (e->cmdFailed ? 8u : 0u) | (e->everSet ? 16u : 0u) | (e->attrPending ? 32u : 0u));
         if (e->value.type == ValueType::BOOL) mixIn(e->value.b ? 1u : 0u);
-        // A light's levels move without its value changing (2.10b).
+        // A light's levels move without its value changing.
         const EntityAttrs &at = e->attrs;
         mixIn((uint32_t)(uint16_t)at.brightness | ((uint32_t)at.lightCaps << 16) | ((uint32_t)at.lightMode << 24));
         mixIn((uint32_t)(uint16_t)at.colorTempK | ((uint32_t)(uint16_t)at.hue << 16));
@@ -90,7 +88,7 @@ void forgetWidgets() {
     forgetMainWidgets();
 }
 
-// --- THE CORNER ICONS (owner, 2026-10-06) ------------------------------------
+// --- THE CORNER ICONS --------------------------------------------------------
 // History (the chart), Members and Scenes are views of their own, and the icons
 // in the corner are the sheet's tabs (Kit::sheetTabLook()): shown on every view
 // they belong to, the one showing lit, and a tap on a lit one goes back to the
@@ -107,8 +105,8 @@ static bool s_directView = false;
 void markDirectView() { s_directView = true; }
 
 void showView(PopupView v) {
-    // A CLUSTER HAS NO CONTROLS VIEW (round 16, the owner: its Details held
-    // settings, not details): its window is Members, whatever asked for the main view.
+    // A CLUSTER HAS NO CONTROLS VIEW (K129): its window is Members, whatever
+    // asked for the main view.
     if (v == PopupView::VIEW_MAIN && s.cluster) v = PopupView::VIEW_MEMBERS;
     if (v != PopupView::VIEW_HISTORY) s_directView = false;
     const PopupView was = s.view;
@@ -116,11 +114,11 @@ void showView(PopupView v) {
     forgetMainWidgets();
     groupViewForget();   // the group view's cluster: its cards before their widgets (K154)
     lv_obj_clean(s.stage);
-    // HISTORY REACHES UP INTO THE HEADER ROW (owner, round 6): see histTopRow().
+    // HISTORY REACHES UP INTO THE HEADER ROW: see histTopRow().
     lv_obj_set_style_pad_row(s.win, v == PopupView::VIEW_HISTORY ? -histLift() : mm(UI::shape().S5), 0);
 
-    // SCENES SHOWS THE BRIGHTNESS SLIDER (owner): whatever the slider showed
-    // before comes back with the controls.
+    // SCENES SHOWS THE BRIGHTNESS SLIDER: whatever the slider showed before
+    // comes back with the controls.
     if (v == PopupView::VIEW_SCENES && was != PopupView::VIEW_SCENES) {
         s.ctlBeforeScenes = s.lightCtl;
         if (lightAggregate().caps & LIGHT_CAN_DIM) s.lightCtl = LCTL_DIM;
@@ -134,7 +132,7 @@ void showView(PopupView v) {
     // page's room (K148); every other view the window's own. Before the title is
     // laid out: it is sized from the window.
     groupWindowFor(v);
-    // X on the controls, the back arrow everywhere else (owner, round 4). A
+    // X on the controls, the back arrow everywhere else. A
     // cluster opens on either of its two views, so both have the X.
     setText(s.lblLeft, (v == controlsView() || v == PopupView::VIEW_GROUP) && !member ? LV_SYMBOL_CLOSE : LV_SYMBOL_LEFT);
     cornerLook(s.btnHistory, true, v == PopupView::VIEW_HISTORY);
@@ -142,7 +140,7 @@ void showView(PopupView v) {
         // A MEMBER WITH MEMBERS OF ITS OWN HAS THEM (K157): Desk's lamps.
         cornerLook(s.btnMembers, hasMembers(), v == PopupView::VIEW_MEMBERS);
     } else if (s.cluster && s.btnMembers) {
-        // A GROUP'S TWO VIEWS (K150): its name in the title goes between them;
+        // A GROUP'S TWO VIEWS (K154): its name in the title goes between them;
         // the group view has no tabs, Members shows its own lit.
         const bool groupView = v == PopupView::VIEW_GROUP;
         cornerLook(s.btnMembers, !member && !groupView, v == PopupView::VIEW_MEMBERS);
@@ -160,9 +158,8 @@ void showView(PopupView v) {
     const char *who = member ? memberName() : s.name;
     char title[ENTITY_NAME_MAX + 16];
     if (v == PopupView::VIEW_GROUP || (v == PopupView::VIEW_MEMBERS && (s.cluster || s.groupCard) && !member)) {
-        // A group's name alone, on either of its views (K150): a tap on it is the other
-        // view - a group shown as its solo card too, named as its group, not its face
-        // (owner, 2026-11-06).
+        // A group's name alone, on either of its views (K154): a tap on it is the other
+        // view - a group shown as its solo card too, named as its group, not its face.
         const ClusterCard *g = s.cluster ? nullptr : heldGroup();
         setText(s.lblTitleArea, "");
         setText(s.lblTitleName, g ? (g->area()[0] ? g->area() : g->shownName(CardLabel::LBL_NAME)) : s.name);
@@ -196,7 +193,7 @@ void showView(PopupView v) {
     }
     // SIZED BEFORE THE VIEW IS BUILT: placeWide() lays the window out, and a
     // DOT label laid out at the last view's width rewrites its own text - the
-    // layout then measured "Sce..." and kept it (round 7, the 4B).
+    // layout then measures "Sce..." and keeps it.
     Kit::sheetLayoutTitle(s);
     if (v == PopupView::VIEW_HISTORY)      buildHistory();
     else if (v == PopupView::VIEW_MEMBERS) buildMembers();
@@ -207,7 +204,7 @@ void showView(PopupView v) {
     else if (v == PopupView::VIEW_ADD_TO)     buildAddTo();           // K91, K100
     else if (v == PopupView::VIEW_CLUSTER_ADD) buildClusterAdd();     // K104's Add cards
     else if (v == PopupView::VIEW_JOIN)       buildJoin();            // K92 rule 9
-    else if (v == PopupView::VIEW_GROUP)      buildGroup();           // 2.13, K143
+    else if (v == PopupView::VIEW_GROUP)      buildGroup();           // K154
     else if (v == PopupView::VIEW_SHOW_AS)    buildShowAs();          // K191
     else                                   buildMain();
     deckSync();     // SETTINGS' rows are the view's (a member's own has more)
@@ -219,7 +216,7 @@ void showView(PopupView v) {
 }
 
 // The controls view of whatever the window is showing: the window's, or one
-// member's. A cluster's is its Members (round 16).
+// member's. A cluster's is its Members (K129).
 PopupView controlsView() {
     if (inMember()) return PopupView::VIEW_MEMBER;
     return s.cluster ? PopupView::VIEW_MEMBERS : PopupView::VIEW_MAIN;
@@ -228,13 +225,13 @@ PopupView controlsView() {
 // A corner icon: its view, or - when lit - back to the controls.
 void cornerTap(PopupView v) { showView(s.view == v ? controlsView() : v); }
 
-// BACK IS HARD-LINKED, NOT A HISTORY (owner, round 4): every view has one
-// fixed place it goes back to, so "back" never depends on how you got there.
+// BACK IS HARD-LINKED, NOT A HISTORY: every view has one fixed place it goes
+// back to, so "back" never depends on how you got there.
 //   History, Members, Scenes  -> the controls
 //   a member                  -> Members
 //   a member's History/Scenes -> that member
 // On the controls it is the X, and closes the window.
-// EXCEPT A VIEW OPENED DIRECTLY (owner, 2026-11-05, K169): History opened straight
+// EXCEPT A VIEW OPENED DIRECTLY (K169): History opened straight
 // from the page closes; a member's opened straight from the group view or Members
 // goes back there. Back never shows a view you have not seen.
 void goBack() {
@@ -253,7 +250,7 @@ void goBack() {
             break;
         case PopupView::VIEW_MEMBER: leaveMember();          break;
         case PopupView::VIEW_ADD_TO: showView(PopupView::VIEW_VISIBILITY); break;   // its view's own
-        case PopupView::VIEW_JOIN:   // every move opens from Visibility (round 2 of the 2.11 follow-ups)
+        case PopupView::VIEW_JOIN:   // every move opens from Visibility (K137)
             if (visibilityJoinBack()) break;
             showView(PopupView::VIEW_VISIBILITY);
             break;
@@ -267,16 +264,16 @@ void goBack() {
 
 void leftCb(lv_event_t *ev) { (void)ev; goBack(); }
 
-// THE TITLE'S FIRST PART IS A LINK (owner, round 4): "Desk >" goes to Desk's
-// controls, "Office lamp >" to that member's - from any view below them. On
-// the controls themselves it is the area, which leads nowhere yet.
+// THE TITLE'S FIRST PART IS A LINK: "Desk >" goes to Desk's controls, "Office
+// lamp >" to that member's - from any view below them. On the controls
+// themselves it is the area, which leads nowhere.
 void crumbCb(lv_event_t *ev) {
     (void)ev;
     if (s.view == PopupView::VIEW_MAIN) return;
     if (s.view == PopupView::VIEW_MEMBER) { leaveMember(PopupView::VIEW_MAIN); return; }
     showView(controlsView());
 }
-// A GROUP'S NAME GOES BETWEEN ITS TWO VIEWS (K150); elsewhere it is no link.
+// A GROUP'S NAME GOES BETWEEN ITS TWO VIEWS (K154); elsewhere it is no link.
 void nameCb(lv_event_t *ev) {
     (void)ev;
     if (inMember()) return;
@@ -286,7 +283,7 @@ void nameCb(lv_event_t *ev) {
 void historyCb(lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_HISTORY); }
 void membersCb(lv_event_t *ev) {
     (void)ev;
-    // A cluster's tab goes between its group view and Members (K143).
+    // A cluster's tab goes between its group view and Members (K154).
     if (s.cluster && !inMember())
         showView(s.view == PopupView::VIEW_GROUP ? PopupView::VIEW_MEMBERS : PopupView::VIEW_GROUP);
     else
@@ -297,7 +294,7 @@ void scenesCb (lv_event_t *ev) { (void)ev; cornerTap(PopupView::VIEW_SCENES); }
 #ifdef DEBUG_POPUP
 // The interference trial: a long press on the title cycles how often a spark
 // runs along the edge - now and then, once per window, never - from the next
-// window. Debug builds only, until the owner chooses (a setting, later).
+// window. Debug builds only.
 void intfCycleCb(lv_event_t *ev) {
     (void)ev;
     using M = Kit::SparksMode;
@@ -314,8 +311,7 @@ void intfCycleCb(lv_event_t *ev) {
 // The window's contents - the sheet's frame (Kit::sheetOpen()) with the
 // window's tabs: History - the mock's chart icon, axes and bars (mdi:chart-bar)
 // - always in the corner; a card standing for several things gets the members
-// icon INSIDE it (owner, 2026-10-06: nearly every window has a chart, few have
-// members); Scenes under them, floating, shown when the light has scenes
+// icon INSIDE it (nearly every window has a chart, few have members); Scenes under them, floating, shown when the light has scenes
 // (mdi:movie-open, a clapperboard - HA's own scene icon, the palette, is
 // Colour's here).
 // ---------------------------------------------------------------------------
@@ -336,7 +332,7 @@ void buildFirst() {
 void tick(uint32_t now) {
     if (s.phase != PopupPhase::PHASE_OPEN) return;
 
-    // A MEMBER OF A GROUP DEFINED IN HA PAUSED OR RESUMED (2.10c): the window
+    // A MEMBER OF A GROUP DEFINED IN HA PAUSED OR RESUMED (K17): the window
     // now stands for the members, or for the group again. Checked every tick,
     // not only on a change, because leaving a member's own view settles the
     // signature before this could see it. Not in a member's own view, whose
@@ -350,7 +346,7 @@ void tick(uint32_t now) {
         return;
     }
 
-    // History's answer (2.10e), drawn when it arrives.
+    // History's answer, drawn when it arrives.
     histPoll();
 
     // A scene's ring goes when the light no longer looks as the scene left it.
@@ -431,12 +427,12 @@ void showWindow() {
     const uint32_t t0 = micros();
 #endif
     s.phase = PopupPhase::PHASE_OPEN;
-    s_hv = HistView{};   // History starts on 24 hours in every window (2.10e)
+    s_hv = HistView{};   // History starts on 24 hours in every window
     Kit::SheetSpec &k = s_spec;
     k = Kit::SheetSpec{};
     k.leftCb  = leftCb;
     k.crumbCb = crumbCb;
-    if (s.cluster || s.groupCard) k.nameCb = nameCb;   // a solo card's group name too (F52, owner 11-07)
+    if (s.cluster || s.groupCard) k.nameCb = nameCb;   // a solo card's group name too
     k.nTabs   = membersTab() ? 2 : 1;
     if (k.nTabs == 2) { k.tabGlyph[0] = MDI_LIGHTBULB_GROUP; k.tabCb[0] = membersCb; }
     k.tabGlyph[k.nTabs - 1] = MDI_CHART_BAR;
@@ -539,7 +535,7 @@ void CardPopup::open(Card &card) {
     if (!s_openFromTap)
         if (lv_indev_t *in = lv_indev_active()) lv_indev_wait_release(in);
     s.reg      = Card::s_reg;
-    // One entity that HA defines as a group, with its members learnt (2.10c).
+    // One entity that HA defines as a group, with its members learnt (K17).
     s.native   = (s.nEnt == 1 && s.ent[0]->nMembers) ? s.ent[0] : nullptr;
     applyNative();
     s.tempUnit = card.tempUnit();
@@ -588,7 +584,7 @@ bool CardPopup::takeRebuildWanted() {
 static void openView(uint8_t view) {
     if (view == CardPopup::OPEN_HISTORY)                      { showView(PopupView::VIEW_HISTORY); markDirectView(); }
     else if (view == CardPopup::OPEN_MEMBERS && hasMembers()) showView(PopupView::VIEW_MEMBERS);
-    else if (view == CardPopup::OPEN_GROUP && (s.cluster || s.groupCard)) showView(PopupView::VIEW_GROUP);   // K143, K188
+    else if (view == CardPopup::OPEN_GROUP && (s.cluster || s.groupCard)) showView(PopupView::VIEW_GROUP);   // K154, K188
 }
 
 void CardPopup::openOn(Card &card, uint8_t view) {

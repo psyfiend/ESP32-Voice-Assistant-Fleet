@@ -3,9 +3,9 @@
 #include "Cards/CardIcons.h"
 #include "Cards/CardPopup.h"
 #include "UI/UITokens.h"
-#include "UI/Kit.h"         // the card's roles (2.11 round 1)
-#include "UI/UIToolkit.h"   // the scene toast (2.10d; NINA's toasts after 2.10d)
-#include "Cards/CardGroups.h"   // the card label's colour, following the HA area (K44)
+#include "UI/Kit.h"         // the card's roles
+#include "UI/UIToolkit.h"   // the scene toast
+#include "Cards/CardGroups.h"   // the card label's colour, following the HA area (K46)
 #include <Arduino.h>
 #include <string.h>
 
@@ -70,7 +70,7 @@ Card &Card::setSheetArea(const char *a) { copyBounded(_sheetArea, sizeof(_sheetA
 const char *Card::haArea() const { const Entity *p = primary(); return p ? p->sourceArea : ""; }
 
 Card &Card::setPaused(bool p) {
-    // THE FLAG LIVES ON THE ENTITY, NOT HERE. Issue #60.
+    // THE FLAG LIVES ON THE ENTITY, NOT HERE.
     //
     // A card is a view; pausing is a statement about the thing. Writing it to
     // the registry means every card bound to the same entity agrees by
@@ -79,7 +79,7 @@ Card &Card::setPaused(bool p) {
     //
     // Applied to every primary. A card showing two things pauses both, because
     // a half-paused card is not a state anyone can read at a glance.
-    // A group defined at the source pauses with its members (2.10c): paused
+    // A group defined at the source pauses with its members (K17): paused
     // as a whole means every member is, as in a group defined here, and its
     // own report stops too.
     if (s_reg) {
@@ -121,7 +121,7 @@ Card &Card::setGroupOn(GroupOn g) {
     return *this;
 }
 
-// A PAUSED MEMBER IS OUT OF THE GROUP (owner, 2.10b round 1): not counted for
+// A PAUSED MEMBER IS OUT OF THE GROUP (K14): not counted for
 // on or off, not commanded, not failed, not stale - as if it were not there.
 // Only when EVERY member is paused is the card itself paused, and then it shows
 // the members as they were frozen.
@@ -164,8 +164,8 @@ bool Card::groupIsOn() const {
 
 // Is this card paused? Asked of the ENTITIES, so a card built after the pause -
 // or a second card on the same entity - reports it correctly without being told.
-// EVERY primary: a group with one paused member is not paused (owner, 2.10b) -
-// that member is simply out of it (counts()).
+// EVERY primary: a group with one paused member is not paused (K14) - that
+// member is simply out of it (counts()).
 bool Card::isPaused() const {
     const Entity *live[CARD_LIVE_MAX];
     const uint8_t nLive = liveEntities(live);
@@ -202,7 +202,7 @@ uint8_t Card::offeredScenes(const Entity **out, uint8_t cap) const {
 namespace {
 // Where each card's Cycle scenes has got to, by card id: the card object is
 // rebuilt with its page, the place in the cycle is not. RAM only, so every
-// boot starts from the first scene (owner, K37).
+// boot starts from the first scene (K37).
 struct CyclePos { const char *id; uint8_t next; };
 CyclePos s_cycle[16] = {};
 
@@ -230,9 +230,9 @@ void Card::addGroupSwitch(const Entity *e) {
 void Card::toggleTap() {
     if (!_nGroupSwitch) { onTap(); return; }
     // The whole group, as the face shows it: a face that is on turns them all
-    // off. A paused member is out of it (2.10b).
+    // off. A paused member is out of it (K14).
     const bool on = !groupIsOn();
-    onTap();   // the face, as before
+    onTap();   // the face
     for (uint8_t i = 0; i < _nGroupSwitch; i++)
         if (!_groupSwitch[i]->paused) commandEntity(_groupSwitch[i], EntityValue::makeBool(on));
 }
@@ -241,7 +241,7 @@ void Card::tap() {
     switch (_tap) {
         case TapAction::TAP_DEFAULT:
             // A card whose tap toggles nothing - a sensor, a binary sensor -
-            // opens on its History (owner, 2.10e round 2).
+            // opens on its History.
             // A mixed group's solo card toggles nothing: Members (K188).
             if (_groupMixed) { CardPopup::openOn(*this, CardPopup::OPEN_MEMBERS); return; }
             if (!tapToggles()) { CardPopup::openOn(*this, CardPopup::OPEN_HISTORY); return; }
@@ -282,7 +282,7 @@ void Card::tap() {
     sceneToast(label(), ok ? pick->desc.name : "refused");
 }
 
-// The name the card shows for a resolved Label (2.10d, K40). "From HA" is the
+// The name the card shows for a resolved Label (K40). "From HA" is the
 // source's own name once it has said one; until then, and for anything not
 // from HA, the card's own.
 const char *Card::shownName(CardLabel lbl) const {
@@ -295,11 +295,10 @@ const char *Card::shownName(CardLabel lbl) const {
 
 // The header band's real height.
 //
-// UIMetrics::HEADER_H is a token and stays one, but a fixed 14 logical px is a
-// height that can be SMALLER THAN ITS OWN TEXT - and when the type scale grows
-// (which it must; see below) that is exactly what happens, and the band clips
-// the word it exists to show. So the token is a floor, not a value: the band is
-// whichever is larger, the token or the font's line height plus breathing room.
+// UIMetrics::HEADER_H is a token, but a fixed logical px height can be SMALLER
+// THAN ITS OWN TEXT when the type scale grows, and the band would clip the word
+// it exists to show. So the token is a floor: the band is whichever is larger,
+// the token or the font's line height plus breathing room.
 //
 // Deriving rather than declaring is the same move tokens.md already made for UI
 // scale, and for the same reason - a declared number is right on one board and
@@ -320,10 +319,10 @@ int32_t Card::headerHeight() {
 // The budget is the tallest thing each layout stacks: a title row, the hero,
 // and an optional row, plus the padding between them. A card that cannot seat
 // all three goes compact and drops the optional one.
-// What a FULL layout needs, in real pixels. Lifted out of resolveVariant() so
-// that CardPage can ask the same question before it decides how many rows to
-// carve the page into - it used to guess, and a guess that disagrees with this
-// function is how a page plans a row no card can live in.
+// What a FULL layout needs, in real pixels. Separate from resolveVariant() so
+// that CardPage asks the same question before it decides how many rows to carve
+// the page into - a guess that disagrees with this function is how a page plans
+// a row no card can live in.
 int32_t Card::fullCellNeedPx(CardHeaderStyle style, const lv_font_t *hero) {
     const UIType    &t = UI::type();
     const UIMetrics &m = UI::met();
@@ -344,7 +343,7 @@ int32_t Card::fullCellNeedPx(CardHeaderStyle style, const lv_font_t *hero) {
     // A MARGIN, because "it exactly fits" is not a safe answer. A font's line
     // box is taller than the ink in it, labels round up, and the body's own
     // padding is approximate here. Landing within a pixel or two of the cell
-    // meant CYD_S3_3248 claimed a full layout at 121 px and then overflowed -
+    // would let CYD_S3_3248 claim a full layout at 121 px and then overflow -
     // the name clipped in half and drawn over the status row.
     return need + UI::sc(8);
 }
@@ -353,9 +352,9 @@ int32_t Card::fullCellNeedPx(CardHeaderStyle style, const lv_font_t *hero) {
 // the padding, plus the same safety margin. A page will not plan a row shorter
 // than this.
 //
-// The name is counted since 2026-09-17, when compact stopped dropping it -
-// compact now drops the secondary row and nothing else, so the floor has to
-// include a name or the page could plan a row that a compact card overflows.
+// The name is counted: compact drops the secondary row and nothing else, so
+// the floor has to include a name or the page could plan a row that a compact
+// card overflows.
 int32_t Card::compactCellNeedPx() {
     const UIMetrics &m = UI::met();
     return lv_font_get_line_height(UI::type().VALUE)
@@ -377,15 +376,13 @@ void Card::resolveVariant() {
     const int32_t need   = fullCellNeedPx(_hdrStyle, t.VALUE);
     const int32_t needSm = fullCellNeedPx(_hdrStyle, t.VALUE_SM);
 
-    // THE HERO STEPS DOWN A SIZE BEFORE THE CARD DROPS A ROW. #62.
+    // THE HERO STEPS DOWN A SIZE BEFORE THE CARD DROPS A ROW.
     //
-    // The order used to be "full at VALUE, else compact at VALUE" - draw less,
-    // never the same thing smaller. That rule was written when a page held a
-    // handful of cards; with eighteen on a 4-inch panel the owner found values
-    // and names that "would actually fit if they were smaller". So a cell too
-    // short for a full layout at VALUE now tries VALUE_SM first, and only goes
-    // compact if even that will not seat. Name, unit and tag faces never
-    // change - only the one role that dominates the vertical stack does.
+    // With many cards on a small panel, a value or name would often fit if it
+    // were smaller. So a cell too short for a full layout at VALUE tries
+    // VALUE_SM first, and only goes compact if even that will not seat. Name,
+    // unit and tag faces never change - only the one role that dominates the
+    // vertical stack does.
     //
     //   full    at VALUE      the cell seats everything at full size
     //   full    at VALUE_SM   it does with a smaller number
@@ -401,7 +398,7 @@ void Card::resolveVariant() {
     // A pinned variant still gets the hero size ITS layout can carry. Compact
     // has no status row, so it keeps the full-size value in cells where full
     // would have had to shrink it - which is most of the point of compact, and
-    // since 2.7 round two it is the fleet default.
+    // it is the fleet default.
     if (_variant != CardVariant::VAR_AUTO) {
         _resolved = _variant;
         if (_variant == CardVariant::VAR_FULL) {
@@ -412,14 +409,12 @@ void Card::resolveVariant() {
             _valueSmall = (h < needC);
         }
     }
-    // Beside tiles, the tiles' face (round 13, K126: the owner found the 4B's
-    // Thermo far larger than the tile next to it, and clipping its corner icon).
+    // Beside tiles, the tiles' face (K126): a larger number would dwarf the
+    // tile next to it and clip its corner icon.
     if (_besideTiles) _valueSmall = true;
 
-    // Printed once per card, because this decision was guessed at twice and
-    // both times the guess was wrong. The numbers are cheap and they end the
-    // argument - and they say WHY a card went compact rather than leaving it
-    // to be inferred from what is missing on screen.
+    // Printed once per card: the numbers say WHY a card went compact rather
+    // than leaving it to be inferred from what is missing on screen.
     DBG_CARDS("%s: cell %ld need %ld / %ld (sm) -> %s%s\n",
               typeName(), (long)h, (long)need, (long)needSm,
               cardVariantName(_resolved), _valueSmall ? ", small value" : "");
@@ -436,13 +431,10 @@ int32_t Card::shortSidePx() const {
     return (w < h) ? w : h;
 }
 
-// Long press opens the popup, on every card type. 2.10a.
-//
-// It used to toggle PAUSE - cards.md section 3's "the user's own choice rather
-// than a failure". Pause is still reachable on every card, one tap further in:
-// the popup's SETTINGS deck (card-sheet.md section 13).
+// Long press opens the popup, on every card type (K3). Pause is reachable on
+// every card in the popup's SETTINGS deck (card-sheet.md section 13).
 void Card::onLongPress() {
-    if (_longOpen != 0xFF) CardPopup::openHeldOn(*this, _longOpen);   // K151
+    if (_longOpen != 0xFF) CardPopup::openHeldOn(*this, _longOpen);   // K156
     else                   CardPopup::open(*this);
 }
 
@@ -454,44 +446,37 @@ void Card::build(lv_obj_t *parent) {
     if (_mini) { buildMini(parent); return; }   // a cluster's tile: Cards/MiniTile.cpp
     const UIMetrics &m = UI::met();
 
-    // THE TAG LIVES INSIDE THE CELL, above the card. It used to hang outside
-    // it, and it never once appeared on hardware.
+    // THE TAG LIVES INSIDE THE CELL, above the card.
     //
     // LV_OBJ_FLAG_OVERFLOW_VISIBLE stops a card's own root clipping its
     // children - but the GRID CONTAINER above it clips too, and that one is
-    // scrollable, so anything drawn above a cell was cut away. All that showed
-    // was the two-pixel overlap, and only once a paused card went translucent
-    // enough to see through. Escaping two levels of clipping to sit in a gap
-    // the page had to be widened to create was a lot of machinery for a thing
-    // that cannot be made to work reliably.
+    // scrollable, so anything drawn above a cell would be cut away. A tag
+    // hanging outside the cell cannot be made to show reliably.
     //
-    // A flex column inside the cell gets the same result with none of it:
+    // A flex column inside the cell gets the result with none of that:
     //
     //     [ tag row   ]  headerHeight(), only in HDR_TAG
     //     [ surface   ]  everything else, flex_grow 1
     //
     // The card is shorter by exactly the tag's height, every card in the mode
     // takes that same height, and the space between a tag and the card above
-    // it is the page's ordinary row gap - which is precisely the owner's rule,
-    // now satisfied by construction rather than by arithmetic. CardPage no
-    // longer widens anything.
+    // it is the page's ordinary row gap, by construction. CardPage widens
+    // nothing.
     _root = lv_obj_create(parent);
     Kit::add(_root, Kit::KitStyle::KS_CARD_ROOT);   // transparent, unpadded, a flex column
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag             (_root, LV_OBJ_FLAG_CLICKABLE);
     // THE SHADOW LIVES OUTSIDE THIS WRAPPER, so the wrapper must not clip it.
-    // The surface fills _root exactly, which put every pixel of its shadow
-    // outside its parent - and a parent clips its children - so no card has
-    // ever shown one, whatever the metrics asked for. Overflow-visible costs no
-    // layer: it REMOVES a clip rather than adding one. The page's gaps and
-    // inset are where the shadows land.
+    // The surface fills _root exactly, which puts every pixel of its shadow
+    // outside its parent - and a parent clips its children. Overflow-visible
+    // costs no layer: it REMOVES a clip rather than adding one. The page's gaps
+    // and inset are where the shadows land.
     //
-    // AND THE FLAG ALONE IS NOT ENOUGH - round three shipped with only the
-    // flag, and the owner saw shadow only in the rounded corners, "like mud
-    // hanging off the corners", cut off sharply at the card's edge. LVGL 9.5's
-    // lv_obj_redraw() (lv_refr.c) clips an overflow-visible object's children
-    // to its coords PLUS ITS OWN ext_draw_size - and a transparent wrapper has
-    // none. So the wrapper declares one, big enough for its surface's shadow -
+    // AND THE FLAG ALONE IS NOT ENOUGH: LVGL 9.5's lv_obj_redraw() (lv_refr.c)
+    // clips an overflow-visible object's children to its coords PLUS ITS OWN
+    // ext_draw_size - and a transparent wrapper has none, so the shadow would
+    // show only in the rounded corners, cut off sharply at the card's edge. The
+    // wrapper declares one, big enough for its surface's shadow -
     // UI::unclipShadows(), shared with every other container that lets a
     // child's shadow out (the drawer's button rows, the tag row below).
     UI::unclipShadows(_root);
@@ -517,48 +502,33 @@ void Card::build(lv_obj_t *parent) {
     Kit::add(_surface, Kit::KitStyle::KS_CARD_SURFACE);   // its look; the body owns padding
     lv_obj_clear_flag             (_surface, LV_OBJ_FLAG_SCROLLABLE);
 
-    // CLIP_CORNER ONLY WHERE SOMETHING ACTUALLY NEEDS CLIPPING.
-    //
-    // It forces LVGL to render the whole card to an intermediate LAYER so it
-    // can mask the rounded corners - and a layer is a buffer allocation, per
-    // card, per frame. With a page rebuilt while the old one is still alive
-    // that is thirty-six allocations, and the P4 filled its draw buffers and
-    // spewed "lv_draw_layer_alloc_buf: Allocating layer buffer failed" until
-    // it was reset. Only an edge-to-edge header band needs it.
-    // NO CLIP_CORNER, EVEN FOR THE BAND. This froze WS_P4_5 on boot.
+    // NO CLIP_CORNER, EVEN FOR THE BAND.
     //
     // clip_corner makes LVGL render the object to an intermediate LAYER so it
     // can mask the rounded corners, and that layer is sized by the object's
-    // WIDTH. A two-cell card is 482 px, so it asked for 32,776 bytes out of
-    // the 128 KB lv_mem pool - which already holds thirteen cards - failed,
-    // and retried forever: "lv_draw_layer_alloc_buf: Allocating layer buffer
-    // failed. Try later", with 80 KB of system heap still free. Draw buffers
-    // come from lv_mem, not the heap, which is why the heap looked healthy.
+    // WIDTH. A layer is a buffer allocation per card per frame; a two-cell
+    // card is 482 px, so it asks for 32,776 bytes out of the lv_mem pool,
+    // which already holds the page's other cards. On WS_P4_5 that failed and
+    // retried forever ("lv_draw_layer_alloc_buf: Allocating layer buffer
+    // failed"), with the system heap still healthy - draw buffers come from
+    // lv_mem, not the heap - and the board froze (LESSONS.md).
     //
-    // This was already a known liability, logged against 2.8. It became a
-    // FREEZE rather than a risk the moment HDR_BAND became the default header
-    // mode, because every card now wants the layer.
-    //
-    // The band gets the card's own radius instead. Its lower corners round too
-    // where they used to be square - a real visual difference, and the honest
-    // trade for a board that does not hang. Revisit with the slot rework.
+    // The band gets the card's own radius instead (see buildHeader() for how
+    // its bottom stays straight).
 
     // LVGL fires LV_EVENT_SHORT_CLICKED for a tap and LV_EVENT_LONG_PRESSED
     // once the press passes its threshold. CLICKED is deliberately not used:
     // it also fires at the end of a long press, so a long press would run both.
     lv_obj_add_flag       (_surface, LV_OBJ_FLAG_CLICKABLE);
-    // EVENTS BUBBLE UP TO THE SCREEN, which the 2.6 swipe handling needs.
+    // EVENTS BUBBLE UP TO THE SCREEN, which the swipe handling needs.
     //
     // A clickable object consumes its events, so a press that lands on a card
     // never reaches the screen - and the screen is where the swipe origin is
-    // recorded. Without this the origin stayed at its initial {0,0}, which
-    // reads as "left half, top edge" for EVERY gesture: the owner got the log
-    // page from a downward swipe anywhere on the display, and could never
-    // reach the system drawer by swiping at all.
+    // recorded. Without it the origin stays at its initial {0,0}, which reads
+    // as "left half, top edge" for EVERY gesture.
     //
-    // Bubbling ADDS the ancestors as listeners, it does not take the event
-    // away from this card - taps and long-presses still work exactly as
-    // before.
+    // Bubbling ADDS the ancestors as listeners; it does not take the event
+    // away from this card, so taps and long-presses still work.
     lv_obj_add_flag       (_surface, LV_OBJ_FLAG_EVENT_BUBBLE);
     lv_obj_add_event_cb   (_surface, eventCb, LV_EVENT_SHORT_CLICKED, this);
     lv_obj_add_event_cb   (_surface, eventCb, LV_EVENT_LONG_PRESSED,  this);
@@ -602,9 +572,8 @@ void Card::buildHeader() {
     const bool tag   = cardHeaderIsTag(_hdrStyle);
     const bool float_ = (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT);
 
-    // HDR_NONE builds no area holder at all. The owner was explicit: "no header
-    // mode: Area is not displayed." There is nowhere in that mode for an area
-    // to go, which is what makes it the mode you pick when you do not want one.
+    // HDR_NONE builds no area holder at all: in that mode the area is not
+    // displayed, which makes it the mode to pick when you do not want one.
     if (_hdrStyle == CardHeaderStyle::HDR_NONE) {
         _badge = lv_label_create(_surface);
         Kit::add(_badge, Kit::KitStyle::KS_CARD_BADGE);
@@ -626,7 +595,7 @@ void Card::buildHeader() {
         // tagSidePx() (half that). The out part is paid for INSIDE the cell:
         // the root's left padding (build()) moves the card right by it, and the
         // pill sits at the cell's own left edge, so the gap to the card on the
-        // left is the page's ordinary gap - the owner's rule, 2026-10-01.
+        // left is the page's ordinary gap.
         _header = makeStrip(_root);
         lv_obj_add_flag  (_header, LV_OBJ_FLAG_IGNORE_LAYOUT);
         lv_obj_set_width (_header, LV_SIZE_CONTENT);
@@ -634,19 +603,16 @@ void Card::buildHeader() {
 
         // The STATUS pill (STALE, FAILED, PAUSED...) FOLLOWS the header style -
         // it floats on the top edge like the area pill - but never sticks out
-        // past the card's right edge. The owner, round three: the only thing
-        // wrong with the first version was the right overhang (it hit the next
-        // card's tag); moving it inside the card was a step too far. Inset by
-        // half the card's radius so it clears the rounded corner. A long area
-        // name gives way to it - see applyState().
+        // past the card's right edge (it would hit the next card's tag). Inset
+        // by half the card's radius so it clears the rounded corner. A long
+        // area name gives way to it - see applyState().
         _stale = makeStrip(_root);
         lv_obj_add_flag  (_stale, LV_OBJ_FLAG_IGNORE_LAYOUT);
         lv_obj_set_width (_stale, LV_SIZE_CONTENT);
         lv_obj_align     (_stale, LV_ALIGN_TOP_RIGHT, -UI::sc(UI::met().RADIUS) / 2, 0);
 
-        // Lying on the card, they cast their shadow ONTO it on Linen - the
-        // owner's hope for this style, confirmed on glass. Same paint as the
-        // attached pills.
+        // Lying on the card, they cast their shadow ONTO it on Linen. Same
+        // paint as the attached pills.
         lv_obj_add_style (_header, UI::paint(UIPaint::PAINT_LIFT), 0);
         lv_obj_add_style (_stale,  UI::paint(UIPaint::PAINT_LIFT), 0);
         Kit::add(_header, Kit::KitStyle::KS_CARD_PILL);
@@ -654,9 +620,8 @@ void Card::buildHeader() {
     } else if (tag) {
         _header = makeStrip(_tagRow);
 
-        // FLUSH with the card's left edge. They were inset and crowded each
-        // other in the middle; the owner wants them "at the side edges of the
-        // cards... and push inwards depending on width".
+        // FLUSH with the card's left edge, the pills at the side edges of the
+        // card, pushed inwards by their width.
         lv_obj_set_width (_header, LV_SIZE_CONTENT);
         lv_obj_align     (_header, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 
@@ -666,8 +631,7 @@ void Card::buildHeader() {
         lv_obj_align     (_stale, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
 
         // Both pills float above the page like the card does, so they cast
-        // the same shadow - nothing on a scheme without one. The owner's
-        // Linen request, 2026-09-23.
+        // the same shadow - nothing on a scheme without one.
         lv_obj_add_style (_header, UI::paint(UIPaint::PAINT_LIFT), 0);
         lv_obj_add_style (_stale,  UI::paint(UIPaint::PAINT_LIFT), 0);
         Kit::add(_header, Kit::KitStyle::KS_CARD_PILL);
@@ -677,13 +641,12 @@ void Card::buildHeader() {
         lv_obj_set_width (_header, lv_pct(100));
         lv_obj_align     (_header, LV_ALIGN_TOP_MID, 0, 0);
 
-        // ROUND TOP, STRAIGHT BOTTOM, AND NO LAYER. cards.md section 12: the
-        // band used to poke square corners past the card's rounded top, and
-        // clip_corner - the obvious fix - renders the card to a layer and froze
-        // WS_P4_5 (LESSONS.md). Giving the band the card's radius rounds all
-        // four of its corners, which the owner rejected on glass 2026-10-01:
-        // "the bottom of the colored band should be completely straight all
-        // the way across the card".
+        // ROUND TOP, STRAIGHT BOTTOM, AND NO LAYER. cards.md section 12: a
+        // square band pokes square corners past the card's rounded top, and
+        // clip_corner - the obvious fix - renders the card to a layer and
+        // freezes WS_P4_5 (LESSONS.md). Giving the band the card's radius
+        // rounds all four of its corners, but the bottom of the band must be
+        // completely straight across the card.
         //
         // So two plain rectangles: the band, rounded like the card (applyState
         // sets it), and a SKIRT over its lower half with radius 0, in the same
@@ -726,7 +689,7 @@ void Card::buildHeader() {
 // ---------------------------------------------------------------------------
 
 // The surface's colour: the card's own, mixed toward the ground while paused. A
-// mini tile keeps its role's faint panel (KS_TILE, 2.11 round 11) unless paused.
+// mini tile keeps its role's faint panel (KS_TILE, K116) unless paused.
 void Card::paintSurface() {
     const UIPalette &p = UI::pal();
     if (_mini && !_dimmed) lv_obj_remove_local_style_prop(_surface, LV_STYLE_BG_COLOR, 0);
@@ -744,12 +707,10 @@ void Card::restyle() {
     // The colour is the card's own: a paused card mixes it toward the ground.
     paintSurface();
 
-    // BAR ONLY. This said "not TAG", which also reserved a header's height in
-    // HDR_NONE - a mode whose whole point is that it reserves nothing, and
-    // which build() above and fullCellNeedPx() both already treated that way.
-    // restyle() runs at the end of build(), so it silently won: every No-hdr
-    // card carried an invisible empty band, and the corner icon sat a band's
-    // height below the corner. The owner's report, 2026-09-22.
+    // BAND ONLY (and the floating tag's inset): HDR_NONE reserves nothing, as
+    // build() and fullCellNeedPx() also treat it. restyle() runs at the end of
+    // build(), so reserving a header's height here would win and leave every
+    // No-hdr card an invisible empty band.
     if (_hdrStyle == CardHeaderStyle::HDR_BAND) {
         lv_obj_set_style_pad_top  (_body, Card::headerHeight() + UI::sc(m.PAD), 0);
     } else if (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT) {
@@ -761,8 +722,8 @@ void Card::restyle() {
         lv_obj_set_height          (_header, Card::headerHeight());
         // ONE LINE, fixed. LV_LABEL_LONG_DOT only shortens text that overflows
         // the label's HEIGHT; a content-height label wraps instead, and a
-        // narrowed area name ("Outdoor" beside STALE on WS_P4_4B) showed as its
-        // middle line, "doo". See the stale holder in applyState().
+        // narrowed area name ("Outdoor" beside STALE on WS_P4_4B) would show as
+        // its middle line, "doo". See the stale holder in applyState().
         lv_obj_set_height(_lblArea, lv_font_get_line_height(UI::type().TAG));
     }
     if (_stale) lv_obj_set_height(_stale, Card::headerHeight());
@@ -798,9 +759,9 @@ uint32_t Card::tagColor() const {
         case CardState::ST_REFUSED:    return p.ST_BAD;
         case CardState::ST_UNAVAILABLE: return p.ST_BAD;
         // Paused gets a colour of its own - muted, because the state means
-        // "the user asked for quiet", but a colour nonetheless. Returning 0
-        // meant its badge got no chip in bar mode and was painted the same
-        // hue as the band it sat in, so it did not read as a badge at all.
+        // "the user asked for quiet", but a colour nonetheless. With 0 its badge
+        // would get no chip in bar mode and be painted the same hue as the band
+        // it sits in, so it would not read as a badge at all.
         case CardState::ST_PAUSED:     return p.ST_IDLE;
         case CardState::ST_LIVE:       return 0;
     }
@@ -810,7 +771,7 @@ uint32_t Card::tagColor() const {
 int32_t Card::topBandHeight() {
     // Plus a couple of pixels. An icon GLYPH can be taller than its font's
     // nominal line height - the MDI subset is drawn to its own metrics, not
-    // Montserrat's - and a band sized to the line height alone clipped the top
+    // Montserrat's - and a band sized to the line height alone clips the top
     // of the thermometer on CYD_S3_3248.
     return lv_font_get_line_height(UI::type().ICON_SM) + UI::sc(2);
 }
@@ -818,9 +779,8 @@ int32_t Card::topBandHeight() {
 int32_t Card::statusBandHeight() {
     // Whichever of the two things that can sit here is taller. The battery
     // glyph comes from the icon face and the percentage from the text face,
-    // and sizing to only one of them made a card with a battery sit its status
-    // line lower than a card with just an age on it - which is exactly what
-    // the owner spotted comparing the temperature and lux cards.
+    // and sizing to only one of them would put a card with a battery's status
+    // line lower than a card with just an age on it.
     const int32_t a = lv_font_get_line_height(UI::type().ICON_SM);
     const int32_t b = lv_font_get_line_height(UI::type().TAG);
     return ((a > b) ? a : b) + UI::sc(2);
@@ -832,8 +792,8 @@ int32_t Card::midGap() {
 
 // How tall this card's cell really is.
 //
-// The page measures it and hands it over, because spans are in grid UNITS at
-// 2.5 and a unit's height is the page's business. The fallback is ONE WHOLE
+// The page measures it and hands it over, because spans are in grid UNITS and
+// a unit's height is the page's business. The fallback is ONE WHOLE
 // CELL rather than cellH * prefSpanY: multiplying by a unit span would double
 // an ordinary card, and a card built outside a page is by definition one that
 // nobody sized.
@@ -849,12 +809,10 @@ int32_t Card::midHeight() const {
 
     // ALWAYS charges for a header, whatever this card's mode is.
     //
-    // A hero sized from the real band grew in HDR_NONE, where there is no
-    // header to pay for - so the same card's disc was one size in bar and tag
-    // and a bigger one with no header, which is what the owner saw as "in
-    // no-hdr mode the icon grows in size and clips". Sizing to the most
-    // constrained mode makes a card's hero identical in all three, which is
-    // what a reader expects of the same card wearing different chrome.
+    // A hero sized from the real band would grow in HDR_NONE, where there is
+    // no header to pay for, and clip. Sizing to the most constrained mode makes
+    // a card's hero identical in all modes, which is what a reader expects of
+    // the same card wearing different chrome.
     h -= Card::headerHeight();
 
     h -= UI::sc(m.PAD) * 2;                       // the body's own padding
@@ -892,10 +850,9 @@ int32_t Card::tagInsetPx() const {
     return 0;
 }
 
-// HALF the rise. The owner, round three (2026-10-01): sticking out as far to
-// the left as above made a 4x3 on the square boards narrow, so "split the
-// difference" - the same height above, half the distance to the side. It looks
-// more tacked on than precisely set, and gives the card a little width back.
+// HALF the rise: the same height above, half the distance to the side.
+// Sticking out as far to the left as above would make a 4x3 on the square
+// boards narrow.
 int32_t Card::tagSidePx() const {
     return (_hdrStyle == CardHeaderStyle::HDR_TAG_FLOAT) ? Card::headerHeight() / 4 : 0;
 }
@@ -906,13 +863,13 @@ int32_t Card::surfaceWidthPx() const {
 }
 
 // LG, then MD, then SM: the largest glyph that fits the hero band with a
-// margin. See StateCard::render() for the history - a cramped card used to
-// keep LG and lose its disc.
+// margin. See StateCard::render() for why - a cramped card that kept LG would
+// lose its disc.
 const lv_font_t *Card::heroIconFace() const {
     const UIType &t = UI::type();
     const int32_t room = midHeight();
     if (room <= 0) return t.ICON;
-    // The roomy hero (2.11 round 9): where most of its disc fits (the tiles' rule, MiniTile.cpp).
+    // The roomy hero: where most of its disc fits (the tiles' rule, MiniTile.cpp).
     if (t.ICON_XL != t.ICON && room * 10 >= lv_font_get_line_height(t.ICON_XL) * 16) return t.ICON_XL;
     if (room >= lv_font_get_line_height(t.ICON)    + UI::sc(4)) return t.ICON;
     if (room >= lv_font_get_line_height(t.ICON_MD) + UI::sc(4)) return t.ICON_MD;
@@ -920,7 +877,7 @@ const lv_font_t *Card::heroIconFace() const {
 }
 
 // Twice the glyph's line height is the look on a large card, clamped to the
-// band - a disc sized from the font alone was clipped by its own parent on
+// band - a disc sized from the font alone is clipped by its own parent on
 // CYD_S3_3248, and a disc larger than its band forces a layer (LESSONS.md).
 int32_t Card::heroDiscPx() const {
     const int32_t room = midHeight();
@@ -1006,7 +963,7 @@ void Card::pressLook(uint8_t toAccent, int32_t sink) {
 }
 
 // Back to exactly what restyle() gives every card - and its state drawn again,
-// an active frame with it (round 4).
+// an active frame with it.
 void Card::pressClear() {
     pressLook(0, 0);
     if (_surface) {
@@ -1017,32 +974,21 @@ void Card::pressClear() {
     }
 }
 
-// The active frames (Card::activeFrame(), 2.8 round 4): CardFrame.cpp.
+// The active frames (Card::activeFrame()): CardFrame.cpp.
 
-// THE CORNER ICON SCALES WITH THE PAGE, by ROW COUNT. 2.7 round four.
+// THE CORNER ICON SCALES WITH THE CARD'S PHYSICAL HEIGHT.
 //
-// The first rule aimed at ~15% of the card's short side. On glass it failed
-// the owner's test in the wrong direction: on the 7B at 6x3 the icons were
-// small with both the header and the deck showing, jumped up when either was
-// hidden, and shrank again at a 7th column. His rule, 2026-09-23, and it is
-// simpler and describes what he actually sees:
-//
-//   "the larger icons should remain if there are 3 or fewer rows no matter
-//    the columns. It's only when you add a 4th row that the hero moves up
-//    towards the icon which requires the smaller icon size."
-//
-// Round five: rows alone gave the P4_5 the large corner too, and there it ran
-// into text ("I don't think the P4_5 needs the larger icons like the 7B did").
-// A row count is not a size - three rows on a 5-inch panel are much shorter
-// cards than three rows on a 7-inch one. What the owner was describing on the
-// 7B is PHYSICAL card height, and what varies with columns (the width) is
-// what he said should not matter.
+// The larger icon stays where the card is tall enough, whatever the column
+// count; once the hero moves up towards the icon (a fourth row on the 7-inch
+// boards) the smaller icon is needed. A row count is not a size - three rows
+// on a 5-inch panel are much shorter cards than three rows on a 7-inch one -
+// and neither is a share of the card's short side, which varies with columns.
 //
 // So: MD when the card is at least CORNER_MD_MIN_MM tall, in millimetres on
 // glass, whatever the columns. At the default grids that puts the 7B's
 // three-row cards (~20-23 mm, deck and header or not) on MD and its four-row
 // cards (~15 mm) on SM, and keeps WS_P4_5 (~16 mm) on SM. The 4-inch pair
-// land near 19 mm and get MD - unjudged on glass.
+// land near 19 mm and get MD.
 static constexpr float CORNER_MD_MIN_MM = 17.5f;
 
 const lv_font_t *Card::cornerFont() const {
@@ -1065,12 +1011,8 @@ void Card::renderCornerIcon(lv_obj_t *icon, const char *glyph, uint32_t hex) con
     // In No-header mode one more thing is needed. A label's box is a LINE box
     // with leading above the ink, so a flush box puts the visible glyph lower
     // than it is far from the side. Measured from the font - see
-    // cardGlyphTopBearing() - and applied in HDR_NONE only, which is the
-    // owner's call: in bar and tag the icon already sits where he wants it.
-    //
-    // The other half of the owner's "too low in No-header" report was not
-    // here at all: restyle() was reserving a header's worth of top padding in
-    // HDR_NONE too. See restyle().
+    // cardGlyphTopBearing() - and applied in HDR_NONE only: in band and tag
+    // modes the icon already sits where it should.
     const int32_t lift = (_hdrStyle == CardHeaderStyle::HDR_NONE)
                        ? cardGlyphTopBearing(f, glyph) : 0;
     lv_obj_align               (icon, LV_ALIGN_TOP_LEFT, 0, -lift);
@@ -1079,11 +1021,9 @@ void Card::renderCornerIcon(lv_obj_t *icon, const char *glyph, uint32_t hex) con
 
 // The area's colour, or the accent when it has none.
 //
-// The owner's idea, and it is what the header is FOR: "have the areas be
-// differentiated by color so cards could be ID'd visually at a glance. Header
-// bars and tag colors would be the same for cards within a group." Two cards in
-// the same area therefore carry the same band, and the name on it becomes
-// confirmation rather than the only cue.
+// This is what the header is FOR: areas differentiated by colour so cards can
+// be ID'd visually at a glance. Band and tag colours are the same for cards
+// within a group, so the name on them confirms what the colour already says.
 uint32_t Card::headerColor() const {
     return _areaColor ? _areaColor : UI::pal().ACCENT;
 }
@@ -1107,10 +1047,8 @@ void Card::applyState() {
     // below LV_OPA_COVER on a container makes LVGL render that whole subtree to
     // an intermediate layer buffer, and on a page of cards those allocations
     // are what exhausted the P4's draw buffers.
-    // APPLIED HERE, not in restyle(). Setting the flag and leaving the colour
-    // to restyle() meant a paused card never actually dimmed: applyState()
-    // runs on every transition, restyle() only on a scheme change. That is the
-    // regression the owner spotted - "cards no longer dim when paused".
+    // APPLIED HERE, not in restyle(): applyState() runs on every transition,
+    // restyle() only on a scheme change, so a paused card would never dim.
     _dimmed = cardStateMayDim(_state);
     paintSurface();
 
@@ -1122,7 +1060,7 @@ void Card::applyState() {
         case CardState::ST_PARTIAL:    mark = "PARTIAL"; break;
         case CardState::ST_PAUSED:     mark = "PAUSED";  break;
         // The SOURCE said so, which is a different claim from STALE and gets a
-        // different word. Issue #56.
+        // different word.
         case CardState::ST_UNAVAILABLE: mark = "N/A";    break;
         case CardState::ST_LIVE:       mark = "";        break;
     }
@@ -1142,9 +1080,9 @@ void Card::applyState() {
         return;
     }
 
-    // A card label in its own colour shows even with no words (K44).
+    // A card label in its own colour shows even with no words (K46).
     const bool wantArea = _showArea && (_area[0] || _labelAlways);
-    // A GROUP SHOWN AS ITS SOLO CARD SAYS SO (owner, 2026-11-07): a small group glyph
+    // A GROUP SHOWN AS ITS SOLO CARD SAYS SO: a small group glyph
     // after its card label's words - the stock face's stacked squares, in the words'
     // colour, so no second face or object.
     char words[sizeof(_area) + 8];
@@ -1163,30 +1101,28 @@ void Card::applyState() {
         if (wantArea) lv_obj_clear_flag(_header, LV_OBJ_FLAG_HIDDEN);
         else          lv_obj_add_flag  (_header, LV_OBJ_FLAG_HIDDEN);
     } else {
-        // HDR_BAND. The band keeps the ACCENT and only the BADGE takes the state
-        // colour - the owner's call after seeing a whole header go yellow:
-        // "instead of the entire bar changing color only the badge section
-        // should turn yellow around STALE".
+        // HDR_BAND. The band keeps the group's colour and only the BADGE takes
+        // the state colour: the whole header does not turn yellow, only the
+        // badge section around STALE.
         lv_obj_set_style_bg_color  (_header, UI::c(headerColor()), 0);
         lv_obj_set_style_bg_opa    (_header, LV_OPA_COVER, 0);
         // THE CARD'S OWN CURVE on top, the skirt squaring the bottom - see
-        // buildHeader(). This line said 0, and it ran after buildHeader() had
-        // set a radius, so the 2026-09-18 attempt never took effect and a
-        // square band stuck out past the card's rounded corners in bar mode.
+        // buildHeader(); a square band would stick out past the card's rounded
+        // corners.
         //
         // The card's radius LESS ITS BORDER: LVGL places children inside the
         // border (lv_obj_get_style_space_left), so the band's corner meets the
         // border's INNER curve, whose radius is the card's minus the border
-        // width. With the full radius there was a sliver of card showing in
-        // each corner - invisible at 1 px, plain when the press widened the
-        // border (owner, round 7 Q2). pressLook() keeps it in step.
+        // width. With the full radius a sliver of card shows in each corner -
+        // invisible at 1 px, plain when the press widens the border.
+        // pressLook() keeps it in step.
         lv_obj_set_style_radius    (_header, UI::sc(m.RADIUS) - m.BORDER_W, 0);
         if (_bandSkirt) lv_obj_set_style_bg_color(_bandSkirt, UI::c(headerColor()), 0);
         // Text in the card's BACKGROUND colour - dark on a light accent, light
         // on a dark one, without anyone picking per scheme (cards.md section 2):
         // the words' role, KS_CARD_TAGTEXT.
-        // The badge carries the state, as its own chip inside the band - and
-        // now for every state that has a colour, paused included.
+        // The badge carries the state, as its own chip inside the band, for
+        // every state that has a colour, paused included.
         if (tc) {
             lv_obj_set_style_bg_color  (_badge, UI::c(tc), 0);
             lv_obj_set_style_bg_opa    (_badge, LV_OPA_COVER, 0);
@@ -1207,7 +1143,7 @@ void Card::applyState() {
         else         lv_obj_add_flag  (_stale, LV_OBJ_FLAG_HIDDEN);
 
         // THE AREA GIVES WAY TO THE STATUS. Both pills share one edge, and on a
-        // narrow card (WS_P4_4B at 4x3) "Outdoor" and "STALE" overlapped. The
+        // narrow card (WS_P4_4B at 4x3) "Outdoor" and "STALE" would overlap. The
         // status is the news, so the area name is shortened with an ellipsis
         // while a status is showing, and gets its full width back after.
         // Measured from the text, not from layout - see applyDiagonal() on why
@@ -1231,12 +1167,9 @@ void Card::applyState() {
     applyDiagonal();
 }
 
-// The loud treatment, shared by every mode.
-//
-// cards.md section 3 offers two candidates - a growing tag or a
-// corner-to-corner diagonal - and asks for both to be prototyped. This is the
-// one a header bar cannot express, which is also why it has to live outside
-// the per-mode branching above.
+// The loud treatment, shared by every mode: a corner-to-corner diagonal
+// (cards.md section 3), which a header bar cannot express - which is why it
+// lives outside the per-mode branching above.
 void Card::applyDiagonal() {
     const bool wantDiag = (_state == CardState::ST_LONG_STALE ||
                            _state == CardState::ST_REFUSED   ||
@@ -1254,14 +1187,12 @@ void Card::applyDiagonal() {
 
     // Sized from what the PAGE handed over, not by measuring: a card has no
     // laid-out size when this first runs, and lv_obj_update_layout() here
-    // walked the whole screen once per card per repaint.
+    // would walk the whole screen once per card per repaint.
     //
-    // The fallback used to be UI::grid().cellW x prefSpanX - which has been
-    // WRONG since 2.5 made spans UNITS: a one-cell card is prefSpan 2, so the
-    // line was drawn for a card twice the size. It only looked right because
-    // a later restyle, with the card laid out, read the real size instead. The
-    // owner caught it at 2.6: reboot with a card already N/A, swipe to it, and
-    // the diagonal was in the wrong place until a knob forced a restyle.
+    // The fallback is not UI::grid().cellW x prefSpanX: spans are UNITS, so a
+    // one-cell card is prefSpan 2 and the line would be drawn for a card twice
+    // the size until a later restyle, with the card laid out, read the real
+    // size.
     int32_t w = surfaceWidthPx();
     int32_t h = surfaceHeightPx();
     const int32_t mw = lv_obj_get_width(_surface);
@@ -1273,13 +1204,9 @@ void Card::applyDiagonal() {
     //
     // Half the line width covers the rounded cap overhanging its endpoint. It
     // does NOT cover the card's own RADIUS: a diagonal to the true corner of a
-    // rounded rectangle leaves the shape well before it gets there, which is
-    // why the line still appeared to escape at both ends. The distance from
-    // the corner to the arc along a 45 degree line is r*(1 - 1/sqrt(2)),
-    // about 0.293r.
-    //
-    // Bar mode looked right throughout only because clip_corner was masking
-    // the overhang for it.
+    // rounded rectangle leaves the shape well before it gets there. The
+    // distance from the corner to the arc along a 45 degree line is
+    // r*(1 - 1/sqrt(2)), about 0.293r.
     const int32_t half = UI::sc(3) + (UI::sc(UI::met().RADIUS) * 293) / 1000;
     _diagPts[0].x = half;
     _diagPts[0].y = half;
@@ -1296,16 +1223,16 @@ void Card::applyDiagonal() {
 // ---------------------------------------------------------------------------
 
 CardState Card::deriveState(uint32_t nowMs) const {
-    // Order is the priority order, and it is a decision rather than an
-    // accident. Pause is the user's, so it outranks everything. A command
+    // Order is the priority order, and it is deliberate. Pause is the user's,
+    // so it outranks everything. A command
     // failure outranks staleness because the two mean different things -
     // cards.md section 3: stale is "I have not heard from this", refused is
     // "I told it to do something and it refused" - and the one the user just
     // caused is the one they need to see.
-    // Read off the ENTITY. Issue #60 - see setPaused().
+    // Read off the ENTITY - see setPaused().
     if (isPaused()) return CardState::ST_PAUSED;
 
-    // UNAVAILABLE OUTRANKS EVERYTHING EXCEPT THE USER'S OWN CHOICE. Issue #56.
+    // UNAVAILABLE OUTRANKS EVERYTHING EXCEPT THE USER'S OWN CHOICE.
     //
     // Above staleness because it is a better class of evidence: stale is our
     // inference from silence, unavailable is the source's own statement. Above
@@ -1316,7 +1243,7 @@ CardState Card::deriveState(uint32_t nowMs) const {
     // ANY primary being unavailable is enough. A card showing two things, one
     // of which is gone, is not a card that can be trusted at a glance.
     // A paused member is out of the group (counts()), here and below - a
-    // member of a group defined at the source too (liveEntities(), 2.10c).
+    // member of a group defined at the source too (liveEntities(), K17).
     const Entity *live[CARD_LIVE_MAX];
     const uint8_t nLive = liveEntities(live);
     for (uint8_t i = 0; i < nLive; i++) {
@@ -1326,14 +1253,12 @@ CardState Card::deriveState(uint32_t nowMs) const {
 
     // THE FAILURE STATE IS READ OFF THE ENTITIES, NOT OFF THIS CARD.
     //
-    // The card used to track which of its own commands had failed, in a
-    // bitmask. That made a parent card and a child card bound to the same
-    // switch disagree, because each only knew about commands IT had issued -
-    // so "Both" reported something different depending on whether you had
-    // tapped it or tapped one of its children. The owner's rule is that a
-    // parent reflects where its children ARE, not the path they took to get
-    // there, and reading Entity::cmdFailed makes that true by construction:
-    // every card bound to an entity reads the identical fact.
+    // A card that tracked which of its own commands had failed would disagree
+    // with a card bound to the same switch, because each only knows about
+    // commands IT issued. A parent reflects where its children ARE, not the
+    // path they took to get there, and reading Entity::cmdFailed makes that
+    // true by construction: every card bound to an entity reads the identical
+    // fact.
     uint8_t failed = 0, commandable = 0;
     for (uint8_t i = 0; i < nLive; i++) {
         const Entity *e = live[i];
@@ -1344,13 +1269,11 @@ CardState Card::deriveState(uint32_t nowMs) const {
     if (failed) {
         // Every child that has an answer failed -> the card itself failed.
         // Some but not all -> the body is still telling the truth about the
-        // children, so only the tag changes. cards.md and the owner agree on
-        // this one from opposite directions.
+        // children, so only the tag changes (cards.md section 3).
         // Against EVERY commandable child, not just the resolved ones. While
         // one child is still in flight the only child with a verdict may be a
-        // failed one, and comparing against the resolved subset made a
-        // two-switch card flash FAILED for a second on its way to PARTIAL -
-        // exactly what the owner saw tapping Obeys while Ignores was failed.
+        // failed one, and comparing against the resolved subset would make a
+        // two-switch card flash FAILED on its way to PARTIAL.
         return (failed == commandable) ? CardState::ST_REFUSED
                                        : CardState::ST_PARTIAL;
     }
@@ -1371,8 +1294,7 @@ CardState Card::deriveState(uint32_t nowMs) const {
     return worst;
 }
 
-// True when an outstanding command's outcome just became known, so the caller
-// knows it has to repaint the body as well as the chrome.
+// Testing only: pins the card to a state (see Card.h).
 void Card::debugForceState(CardState s, bool force) {
     _forced = force;
     if (!_root) return;
@@ -1389,7 +1311,7 @@ void Card::pollState(uint32_t nowMs) {
 
     // The common case is no transition: touch no LVGL at all. That is what
     // makes a 10 Hz poll over every card on a page cost nothing worth
-    // measuring - and it is now the ONLY thing this method does, because the
+    // measuring - and it is the ONLY thing this method does, because the
     // registry resolves commands itself.
     if (next == _state) return;
 
@@ -1409,7 +1331,7 @@ bool Card::owns(const char *entityId) const {
         if (!e) continue;
         if (strcmp(e->desc.id, entityId) == 0) return true;
         // A member of a group defined at the source repaints the card too
-        // (2.10c): pausing one changes what the card stands for.
+        // (K17): pausing one changes what the card stands for.
         for (uint8_t k = 0; s_reg && k < e->nMembers; k++) {
             const Entity *m = s_reg->memberOf(*e, k);
             if (m && strcmp(m->desc.id, entityId) == 0) return true;
@@ -1422,10 +1344,8 @@ bool Card::owns(const char *entityId) const {
 
 // AND RENDERS. applyState() paints the surface its plain colour; render() is
 // what puts an on card's fill back over it. Without it, a card that was on
-// when HA's areas settled kept its dark on-fill icon and name on a plain
-// surface until its next value (owner, 2026-10-12: Office occupancy and Desk
-// at boot, some boots and not others - whichever came first, the values or
-// the areas).
+// when HA's areas settled would keep its dark on-fill icon and name on a plain
+// surface until its next value.
 void Card::reapplyGroup() {
     if (!_root) return;
     CardGroups::apply(*this, _pageAreaColor);
@@ -1466,10 +1386,9 @@ bool Card::commandEntity(const Entity *e, const EntityValue &v) {
     if (!e || !e->desc.writable) return false;
     if (!s_reg) return false;
 
-    // No bookkeeping left here at all. commandValue() clears the entity's own
-    // cmdFailed and arms the reconcile window; EntityRegistry decides the
-    // outcome; deriveState() reads it back. Three bitmasks and a resolver went
-    // away when the fact moved to where it belonged.
+    // No bookkeeping here. commandValue() clears the entity's own cmdFailed and
+    // arms the reconcile window; EntityRegistry decides the outcome;
+    // deriveState() reads it back.
     return s_reg->commandValue(e->desc.id, v, millis());
 }
 

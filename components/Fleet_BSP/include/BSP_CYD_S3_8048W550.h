@@ -12,7 +12,7 @@
 // -------------------------------------------------------------------------
 
 #define CYD_S3_8048
-#define BSP_PANEL_DRIVER ST7262   // panel chip, a bare name: sets PANEL_MODEL; picks the esp_lcd driver from 2.9 step 4 (Fleet_BSP.h)
+#define BSP_PANEL_DRIVER ST7262   // panel chip, a bare name: sets PANEL_MODEL; the esp_lcd RGB path picks its driver from it (Fleet_BSP.h)
 
 const BoardHardware CYD_S3_8048W550_HARDWARE = {
     .device_name  = "CYD S3 JC8048W550",
@@ -66,11 +66,8 @@ const DisplayConfig CYD_S3_8048W550_DISPLAY = {
     .PCLK_ACTIVE_NEG = 1,
     .PREFER_SPEED    = 16000000, // 12000000, // PCLK_HZ
     .USE_BIG_ENDIAN  = false,
-    // Explicitly set to match what Arduino_ESP32RGBPanel.cpp used to hardcode
-    // unconditionally (480 * 20) before it started respecting this field -
-    // 800 * 12 is the same 9600px bounce buffer, still a whole number of
-    // scanlines at this board's width. Preserves this board's exact existing
-    // (working) behavior.
+    // 800 * 12 = 9600 px, the same bounce buffer size as Arduino_ESP32RGBPanel.cpp's
+    // 480 * 20 default, and a whole number of scanlines at this board's width.
     .BOUNCE_BUFFER_SIZE_PX = 800 * 12,
 
     // Panel diagonal in tenths of an inch (5.0" Guition JC8048W550).
@@ -124,7 +121,7 @@ inline const StorageConfig& bsp_storage = CYD_S3_8048W550_STORAGE;
 
 const LvglConfig CYD_S3_8048W550_LVGL = {
     .DOUBLE_BUFFERING = false,
-    .DRAW_BUF_HEIGHT  = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
+    .DRAW_BUF_HEIGHT  = 0,    // 0 = no override: LVGL_Flush_Gfx.cpp picks the buffer size for the bus
     .BUFFER_SIZE_PX   = 800 * 20, // Width x 20 rows
 };
 inline const LvglConfig& bsp_lvgl = CYD_S3_8048W550_LVGL;

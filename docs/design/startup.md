@@ -1,18 +1,18 @@
-# Startup design — Phase 2.1 (issue #12)
+# Startup design (issue #12)
 
-**Status: agreed 2026-09-09, implemented.** Written before the code, per ROADMAP §2.2.
-Sections 1-7 are as signed off; sections 8 and 9 record what actually happened.
+**Status: implemented.** `SystemCore::begin()` and `LVGL_Startup` are the code; this document
+gives the reasoning.
 
 What this doc settles: which file owns what at boot, the order things start in *and why*, and
-where the LVGL boundary sits. It does not change behaviour — every decision below is either
-"move this code, unchanged" or "reverse a dependency arrow." If a board behaves differently
-after this milestone, that is a bug, not a feature.
+where the LVGL boundary sits. The split moved code and reversed dependency arrows without changing
+behaviour; a board that behaves differently from before the split has a bug.
 
 ---
 
-## 1. The problem, concretely
+## 1. The problem the split solved
 
-`src/LVGL_Test_UI.cpp` is 459 lines doing five unrelated jobs:
+Startup used to live in one file, `src/LVGL_Test_UI.cpp` (459 lines), doing five unrelated jobs.
+In this section and §3, "currently" and "today" describe that file, not the present code:
 
 | Lines | Job | Belongs to |
 |---|---|---|
@@ -31,8 +31,7 @@ And two dependency arrows point the wrong way:
 - `Panel_System.cpp:4` declares `extern void debug_dump_config(bool)` — a UI file calling back
   into `main`. That single line is what would stop a GUI-less build from linking.
 
-Neither is a bug today. Both get expensive once cards exist, which is why #12 is Phase 2.1 and
-not Phase 2.9.
+Neither was a bug, and both get expensive once cards exist.
 
 ---
 
@@ -147,39 +146,25 @@ of the formatting.
 now the whole report runs once at boot and on demand. Gating individual sections is easy to add
 once the Settings page exists and we can see which sections anyone actually reads.
 
-### 3.5 Subfolders — yes, but at 2.4, not here
-
-`src/` stays flat through this milestone and gains folders when the card library arrives.
-
-**Why not now:** this milestone renames five files, moves ~450 lines between them and claims to
-change no behaviour. Adding a directory restructure to that diff makes the one property we are
-relying on — that a reviewer can see each line land somewhere — impossible to check. There is also
-nothing to sort yet: nine files is not a navigation problem.
-
-**Why 2.4 (`Card` base class) is the right moment:** that is the first milestone that *adds*
-files rather than moving them, and card types multiply — eight of them by Phase 6, plus whatever
-a user writes. Sorting nine files is cosmetic; sorting thirty is structural.
-
-Planned layout, so new files land pre-sorted rather than being swept up later:
+### 3.5 Subfolders
 
 ```
-src/                 main, SystemCore, SystemReport, LVGL_Startup, GUIManager
-src/UI/              UIToolkit, Panel_*, Widget_* - design system and shell
-src/Cards/           Card base class and card types            (2.4 onward)
+src/                 main, SystemCore, SystemReport, LVGL_Startup, GUIManager, Settings, HttpServer
+src/UI/              UIToolkit, tokens, panels, the component kit (UI/Kit/)
+src/Cards/           Card base class, card types, the card window (Cards/Popup/)
+src/Layout/          placement
 include/UI/          matching headers
 include/Cards/
+include/Layout/
 ```
 
 Directory names are `PascalCase` to match the files inside them, and `UI` keeps its capitals
-under the project-wide rule. Your `coreUI/` works equally well; `UI/` wins on "core" doing no
-work in the name.
+under the project-wide rule.
 
-Two things to know before doing it. `build_src_filter = +<*>` already recurses, so most
-environments need no change — but `WS_S3_TOUCH_LCD_5B`'s `-<Panel_Audio.cpp>` exclusion becomes
-`-<UI/Panel_Audio.cpp>`, and that is exactly the kind of silent breakage that shows up as a link
-error on one board only. And subfolders of `include/` are **not** automatically on the include
-path the way `include/` itself is, so includes become `"UI/Panel_Header.h"` — which is an
-improvement (it says where a header lives) but is a whole-tree edit, and therefore its own commit.
+- `build_src_filter = +<*>` recurses, so most environments need no change. An exclusion names the
+  path: `WS_S3_TOUCH_LCD_5B` excludes `UI/Panel_Audio.cpp`.
+- Subfolders of `include/` are **not** on the include path the way `include/` itself is, so an
+  include names its path from `include/` (`"UI/Panel_Header.h"`).
 
 ---
 
@@ -224,21 +209,17 @@ lost a session to exactly that class of bug (`CYD_S3_3248`, `softAP()` panicking
 `ieee80211_hostap_attach`).
 
 Concretely, on `CYD_S3_3248` — the only board whose LVGL draw buffers must live in internal SRAM —
-LVGL used to allocate its 30,720 bytes before the WiFi driver had taken anything. Now the WiFi
-driver goes first.
+the WiFi driver takes its internal RAM first and LVGL allocates its 30,720-byte buffers after it.
 
 **Keeping the new order, deliberately, for one reason: LVGL degrades and WiFi does not.**
 `LVGL_Startup::begin()` has a three-step fallback — internal SRAM, then PSRAM, then plain
 `malloc()` — so a squeezed LVGL gets slower, not broken. The WiFi driver has no fallback; when its
 internal DRAM allocation fails it dereferences the null and panics with no error message. Giving
 the allocator with no fallback first claim is the safer arrangement, and it is the one we now
-have. It was luck rather than judgement, and it is recorded here so the next person does not
-"fix" it back.
+have. Do not move LVGL's initialisation earlier.
 
-**Hardware-confirmed 2026-09-09, both dev targets.** `CYD_S3_3248W535` reports
-`[LVGL] Allocating: 30720 bytes per buffer... Success.` with 22 KB of internal heap still free
-afterwards. That is the number to watch: milestone 2.3's memory spike should measure it properly
-rather than leaving it as one observation on one boot.
+The number to watch on `CYD_S3_3248W535` is the internal heap free after
+`[LVGL] Allocating: 30720 bytes per buffer... Success.` (22 KB when measured).
 
 `loop()` keeps today's call order — LVGL first, then the data layer:
 
@@ -334,53 +315,31 @@ conditional compilation that rots — the same reason `LESSONS.md` distinguishes
 
 ---
 
-## 8. Acceptance criteria
+## 8. Invariants
 
-1. **MET.** `WS_P4_TOUCH_LCD_5` and `CYD_S3_3248W535` both build clean, after clearing
-   `build_cache`. Cost on the small board: RAM +88 bytes, flash +632 — the sink and section
-   tables plus a few statics.
-2. **MET — hardware-verified 2026-09-09 on both dev targets.** Both boards flashed and behaved
-   identically to `v0.2.0`: same UI behaviour, same boot serial, same dashboard, same panels,
-   same eight registry entities, same HA discovery. The full report renders on both, with
-   `[UI STATE]` still between `[DISPLAY]` and `[I2C BUS SCAN]`. `WS_P4_5` also exercised the
-   MIPI/full-frame-PSRAM buffer path and `CYD_S3_3248` the QSPI/internal-SRAM one, so both
-   branches of the allocation matrix in `LVGL_Startup` are covered.
-3. **MET.** `src/main.cpp` is 73 lines and calls no `lv_*` function directly.
-4. **MET.** `SystemCore` and `SystemReport` include no LVGL header.
-5. **MET.** No `extern` function declarations remain in any `Panel_*.cpp`.
+1. `WS_P4_TOUCH_LCD_5` and `CYD_S3_3248W535` build clean. Together they cover both branches of the
+   allocation matrix in `LVGL_Startup`: the MIPI full-frame PSRAM path and the QSPI internal-SRAM
+   path.
+2. `src/main.cpp` calls no `lv_*` function directly.
+3. `SystemCore` and `SystemReport` include no LVGL header.
+4. No `extern` function declarations remain in any `Panel_*.cpp`.
+5. The full System Doctor report renders with `[UI STATE]` between `[DISPLAY]` and
+   `[I2C BUS SCAN]`.
 
-Clear `.pio/build_cache` before the verification build — not because a BSP header changed, but
-because file renames are exactly the case where a content-addressed cache is worth not trusting.
+Clear `.pio/build_cache` before verifying a build after file renames: a content-addressed cache
+is not worth trusting there.
 
 ---
 
-## 9. Implementation — what actually happened
+## 9. Implementation notes
 
-Planned as four commits; landed as three.
+- `GUIManager` could not stop owning `DisplayManager` and `TouchManager` until `LVGL_Startup`
+  existed to receive them, so the hardware-ownership move and the `LVGL_Startup` extraction are one
+  change. The `SystemReport` inversion went in with it, because `main.cpp` cannot shed
+  `debug_dump_config()` and keep it at once.
+- `FleetI2C::begin()` is hoisted into `SystemCore::begin()` as step 1, and `DisplayManager`'s own
+  call stays. That is safe because `FleetI2C::begin()` is idempotent, so `DisplayManager` remains
+  usable standalone and nothing initialises twice.
+- The generic device-info prints (firmware version, device name, touch panel, PSRAM and flash size)
+  live in `SystemCore::printIdentity()`, called as step 0, not in the display driver.
 
-1. `b4b4336` — `raiseAp()` mode ternary, and the stale `GUIManager.h` include in `UIToolkit.h`.
-2. `b9890e4` — casing normalisation (`UiToolkit` → `UIToolkit`, `GuiManager` → `GUIManager`).
-3. `f867ad4` — the split itself.
-
-**The deviation, and why.** The plan had the hardware-ownership move and the `LVGL_Startup`
-extraction as separate commits. They are the same edit: `GUIManager` cannot stop owning
-`DisplayManager`/`TouchManager` until something else exists to receive them, and that something
-is `LVGL_Startup`. Splitting them would have produced an intermediate state that builds but
-represents nothing anyone designed. The `SystemReport` inversion was folded in for the same
-reason — `main.cpp` cannot shed `debug_dump_config()` and keep it at once.
-
-One design detail settled during implementation, not before: `FleetI2C::begin()` is hoisted into
-`SystemCore::begin()` as step 1, and `DisplayManager`'s own call is left in place. This was only
-safe because `FleetI2C::begin()` is explicitly idempotent (`FleetI2C.cpp:136`), which was checked
-rather than assumed — so `DisplayManager` remains usable standalone and nothing initialises twice.
-
-4. `9079061` — move the device-identity banner out of `DisplayManager`.
-
-**The fourth commit was scope this milestone had and missed.** FUTURE_IMPROVEMENTS asked for
-`main` to absorb the generic device-info prints misplaced in `DisplayManager::begin()`; the split
-landed without doing it, and the verification boot log is what made it obvious — the display
-driver was still announcing firmware version, device name, touch panel, PSRAM and flash size.
-Now `SystemCore::printIdentity()`, called as step 0. Output is byte-identical by construction,
-but that half is not yet re-flashed.
-
-**Status: milestone complete apart from re-flashing after commit 4.** Nothing else is outstanding.

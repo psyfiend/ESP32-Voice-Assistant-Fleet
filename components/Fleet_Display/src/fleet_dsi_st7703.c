@@ -1,5 +1,5 @@
 // fleet_dsi_st7703 - the ST7703 driver as fleet_dsi_panel_new() sees it.
-// WS_P4_4B (2.9 step 3). Reached through BSP_PANEL_DRIVER = ST7703; see the
+// WS_P4_4B. Reached through BSP_PANEL_DRIVER = ST7703; see the
 // fleet_dsi_driver_t comment in fleet_dsi_panel.h.
 #include "fleet_dsi_panel.h"
 #if SOC_MIPI_DSI_SUPPORTED

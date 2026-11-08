@@ -1,7 +1,8 @@
 # Migrating from Arduino to native ESP-IDF — what it would take
 
-**Status: research only, no decision.** Written 2026-09-10. Assumes the decision to explore
-this seriously has already been made, per the brief. Every claim below is tagged **verified in
+**Status: research. A migration is expected eventually (DECISIONS W4); when is not decided.** It
+assumes the decision to explore this seriously has been made. The counts and file sizes are from the
+time of writing; the structure of the argument is what to rely on. Every claim below is tagged **verified in
 `<path>`** (read directly), **verified via web** (fetched/searched this session, source cited),
 **believed** (confident but not directly checked this session), or **unknown**.
 
@@ -49,13 +50,14 @@ and the two hardware-init calls — this maps directly onto ESP-IDF's `app_main(
 `while(1)` or a dedicated FreeRTOS task). `SystemCore`/`SystemReport` already exclude LVGL by
 rule (CLAUDE.md); they also turn out to mostly exclude *display* framework calls too, since
 hardware bring-up is delegated to the manager classes covered in §1.1. `LVGL_Startup.cpp`
-(201 lines) already allocates its draw buffers with `heap_caps_malloc(..., MALLOC_CAP_DMA |
+already allocates its draw buffers with `heap_caps_malloc(..., MALLOC_CAP_DMA |
 MALLOC_CAP_SPIRAM/INTERNAL)` — native ESP-IDF heap API, verified in `LVGL_Startup.cpp` — so only
-the flush callback (currently calling into `Arduino_GFX`) and the touch-read callback change.
+the flush callback and the touch-read callback change. The flush is already raw `esp_lcd` on six
+boards (`docs/display/README.md`); the other three still call `Arduino_GFX`.
 `GUIManager.cpp` and the `Panel_*`/`Widget_*`/`UIToolkit` files are pure LVGL widget-tree code
 with no Arduino calls beyond incidental `String`/`millis()` — low-risk, high-volume mechanical
 work (this is most of the ~40% of "40% survives / 40% moves / 20% replaced" UI estimate already
-recorded in ROADMAP §4.3 for a *different* refactor, and it applies again here).
+estimated for the earlier startup refactor, and it applies again here).
 
 **Net picture:** of roughly 9,600 lines across `components/` (excluding vendored `lvgl` and
 `GFX_Library_for_Arduino`), a rough weighted estimate is **60-70% survives with no logic
@@ -69,7 +71,7 @@ change**, ~20% needs mechanical API substitution (I2C, GPIO, logging, NVS, WiFi 
 - **Component manager** (`idf_component.yml` + the ESP Component Registry, components.espressif.com). Verified locally: `C:\Users\Marge\.platformio\platforms\espressif32\examples\espidf-arduino-matter-light\main\idf_component.yml` exists and pulls versioned components declaratively — closer to `npm`/`pip` than PlatformIO's `lib_deps` symlink hack this project currently needs (CLAUDE.md's "hardcodes this machine's path" problem). This is a real, if modest, win independent of voice features.
 - **`menuconfig`** — fine-grained control over FreeRTOS tick rate, heap allocation strategy, WiFi buffer counts, and (relevant to a memory-constrained board like `CYD_S3_3248`) exact internal-SRAM vs PSRAM placement policy, instead of the current per-board `#ifdef`/build-flag pile.
 - **`esp_lvgl_port` / `esp_lvgl_adapter`** — Espressif-maintained LVGL porting layers with a proper `lvgl_port_lock()`/`unlock()` and a dedicated LVGL task. Directly relevant to `docs/design/startup.md` §5's decision to keep `LV_OS_NONE` with no-op locks *specifically so this door stays open* — this is the payoff of that design choice, not a new idea.
-- **Unit tests on host** — **partially already true, and migration doesn't unlock it so much as formalize it.** `Fleet_Entities` already compiles and (per ROADMAP 1.7) has been tested standalone with a plain host compiler — that's *not* an ESP-IDF feature, it's a consequence of the zero-dependency design. ESP-IDF additionally has an official (if still labeled "preview"/experimental) Linux host target — `idf.py --preview set-target linux` — verified via web search (docs.espressif.com host-apps.html, multiple ESP-IDF versions) that lets a whole component's ESP-IDF-facing code run under host GCC with GDB/Valgrind, not just framework-agnostic code. That's a genuine step up from today's "manually compile the zero-dep parts standalone," but it's explicitly a preview feature — expect rough edges.
+- **Unit tests on host** — **partially already true, and migration doesn't unlock it so much as formalize it.** `Fleet_Entities` already compiles and (`host-tests/`) has been tested standalone with a plain host compiler — that's *not* an ESP-IDF feature, it's a consequence of the zero-dependency design. ESP-IDF additionally has an official (if still labeled "preview"/experimental) Linux host target — `idf.py --preview set-target linux` — verified via web search (docs.espressif.com host-apps.html, multiple ESP-IDF versions) that lets a whole component's ESP-IDF-facing code run under host GCC with GDB/Valgrind, not just framework-agnostic code. That's a genuine step up from today's "manually compile the zero-dep parts standalone," but it's explicitly a preview feature — expect rough edges.
 - **PPA** (Picture Processing Accelerator, P4's 2D hardware block) — **not actually gated behind this migration.** Verified in `docs/REFERENCE_PROJECTS.md`: the `ESP32-P4-Allsky-Display` reference project runs a working `PPAAccelerator` class over `driver/ppa.h` **from Arduino framework**, because arduino-esp32 3.x exposes ESP-IDF driver headers directly. Migrating to ESP-IDF would not newly unlock PPA; it's already reachable. `docs/archive/display/display-stack-migration.md` (a separate, narrower investigation into this exact question) independently confirmed it further: PPA is gated by `SOC_PPA_SUPPORTED` (defined on P4, undefined on S3) and only the P4 package variants link `-lesp_driver_ppa` — so it's specifically P4-only silicon, not a framework limitation either way. That same report also found LVGL 9.5 (already vendored here) ships its own PPA draw unit, currently disabled (`LV_USE_PPA 0`), but it explicitly refuses to accelerate anything with `rotation != 0` — so turning it on would speed up fills/image blends but would **not**, by itself, fix the whole-framebuffer rotation stutter CPU-side rotation currently causes; that would still need hand-written code calling `ppa_do_scale_rotate_mirror()` directly, on Arduino or IDF alike.
 - **`esp-adf` / `esp-sr` access** — this is the real, migration-relevant gain, covered fully in Report 2. Short version: both are ESP-IDF-first; using them from Arduino means either the "Arduino as IDF component" pattern (§4) or hoping their headers happen to compile under arduino-esp32 (unverified, likely fragile for anything beyond individual .h/.c files).
 - **Native TLS/mTLS via `esp-mqtt` and `esp_http_client`** — relevant if a cloud voice path (Report 2 §5b) is ever built; `esp-mqtt` has built-in TLS with certificate bundles, more mature than PubSubClient+WiFiClientSecure.
@@ -162,8 +164,7 @@ biggest rewrite and the thing most boards can't run without.
 
 ## 6. Cost estimate and recommendation
 
-**Estimate, in sessions (this project's own unit of work, per ROADMAP §2 — "one session, one
-milestone"):**
+**Estimate, in sessions (this project's own unit of work):**
 
 | Phase | Work | Sessions |
 |---|---|---|
@@ -174,7 +175,7 @@ milestone"):**
 | `Fleet_Connectivity` → `esp_wifi`/`esp_event`/NVS | The one with the most logic to re-verify | 1-2 |
 | `Fleet_MQTT` → `esp-mqtt` | Medium | 1 |
 | `DisplayManager` → `esp_lcd` + `esp_lvgl_port`/`adapter`, per panel family (RGB / QSPI / DSI) | The critical path | 2-3 |
-| Fleet-wide re-verification (8 boards) | This project already treats "verified on 2 dev targets, spot-checked on the rest" as the bar (ROADMAP §Q11) | 1 |
+| Fleet-wide re-verification (9 boards) | The bar is the all-nine compile gate plus a look on glass (DECISIONS W2) | 1 |
 
 **Total: roughly 9-12 sessions**, i.e. weeks of hobbyist time at the project's own historical
 pace (Phase 0+1 together took about a week of sessions per the git log), **not** a rewrite —
@@ -183,21 +184,20 @@ but not a weekend either, and the display rewrite is genuinely hard, not just lo
 **Recommendation on timing: not now.** Three independent reasons, all already implicit in this
 project's own decisions:
 
-1. **ROADMAP Q8 already answered this "not yet, but design for it."** The constraint it imposes
-   — keep `Fleet_Entities`/registry/grid/build-sheet Arduino-free — is already being honored and
-   is exactly what keeps this migration's blast radius contained to the HAL layer rather than
-   the whole dashboard. Nothing about Phase 2 (UI foundation, in progress) makes migration
-   harder later; if anything, finishing the card library on the current stack means fewer files
-   are mid-refactor when a migration eventually happens.
-2. **The single biggest migration cost (display/`esp_lcd`) and the single biggest Phase 2 cost
-   (design system, card base class) are unrelated work on the same files.** Doing both at once
-   multiplies risk for no benefit; sequencing them serially is strictly cheaper in review effort.
+1. **The standing answer is "not yet, but design for it"** (DECISIONS W4, A12). The constraint it
+   imposes — keep `Fleet_Entities`/registry/grid/build-sheet Arduino-free — is honored and is
+   exactly what keeps this migration's blast radius contained to the HAL layer rather than the
+   whole dashboard. Building the UI on the current stack does not make migration harder later; it
+   means fewer files are mid-refactor when a migration happens.
+2. **The single biggest migration cost (display/`esp_lcd`) and the UI work are unrelated work on
+   the same files.** Doing both at once multiplies risk for no benefit; sequencing them serially
+   is cheaper in review effort. The display half has started on its own (`docs/display/README.md`).
 3. **This project's own prior note is the same conclusion, independently reached.**
    `docs/FUTURE_IMPROVEMENTS.md` already states that if voice work resumes, "the plan is a full
-   ESP-IDF rewrite (separate project) ... not continuing to build AEC out here" — i.e. the
-   owner has already implicitly decided migration is a *voice-feature* decision, not a
-   *dashboard* decision. That argues for revisiting this analysis when voice work is actually
-   scheduled (see Report 2), not against the current Phase 2/3/4 roadmap.
+   ESP-IDF rewrite (separate project) ... not continuing to build AEC out here" — i.e. migration
+   is a *voice-feature* decision, not a *dashboard* decision. Voice is planned (DECISIONS A18,
+   `design/voice-esphome.md`), so this analysis is the one to revisit when it is scheduled (see
+   `voice-pipeline.md`).
 
 **When it would make sense:** immediately before starting real voice-assistant work, if that
 work turns out to need `esp-sr`/`esp-adf` (see Report 2) badly enough to justify it — and even

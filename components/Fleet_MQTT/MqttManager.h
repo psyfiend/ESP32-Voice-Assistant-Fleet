@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 // Fleet MQTT - broker session only.
 //
-// Per ROADMAP Q9 this library owns the broker session and nothing else: it
+// Per DECISIONS A6 this library owns the broker session and nothing else: it
 // never learns what an entity is, and it never learns whether the link under
 // it is WiFi or Ethernet. Entities live in Fleet_Entities; the code that
 // bridges the two is a provider, not this class.
@@ -85,13 +85,13 @@ public:
 
     // --- Evidence about the world, for whoever owns both halves -----------
     //
-    // Issue #49: a board sat for hours printing "connect failed raw=-2 ->
-    // broker unreachable" while ConnectivityManager insisted the link was up.
-    // That log line was the only true statement the device made about itself,
-    // and nothing consumed it. These two accessors are how it gets consumed.
+    // Issue #49: a board can sit for hours printing "connect failed raw=-2 ->
+    // broker unreachable" while ConnectivityManager insists the link is up.
+    // That log line is the only true statement the device makes about itself.
+    // These two accessors are how it gets consumed.
     //
     // They are READ-ONLY and this class still calls nothing outward. Fleet_MQTT
-    // must not know what carries it (ROADMAP Q9) - so it reports, and
+    // must not know what carries it (DECISIONS A6) - so it reports, and
     // SystemCore, which owns both objects, is what joins them up. Putting the
     // call here instead would be the shorter patch and the wrong dependency.
 
@@ -116,11 +116,10 @@ public:
     // sensor's value old" are different questions with different answers, and
     // the header indicator is only entitled to ask the first one.
     //
-    // The owner's rule, 2026-09-18, after the MQTT glyph sat amber overnight
-    // because his outdoor sensors are quiet: the icon "should never reflect
-    // the status of individual entities and the conditions for it turning
-    // orange should be entirely independent from what makes a card go STALE."
-    // A card going stale is a statement about one sensor; this is a statement
+    // The MQTT glyph "should never reflect the status of individual entities
+    // and the conditions for it turning orange should be entirely independent
+    // from what makes a card go STALE" (a quiet outdoor sensor must not turn it
+    // amber). A card going stale is a statement about one sensor; this is a statement
     // about the pipe.
     uint32_t msSinceLastInbound() const {
         if (_lastInboundMs == 0) return UINT32_MAX;
@@ -128,7 +127,7 @@ public:
     }
 
     // "<TOPIC_PREFIX>/<deviceId>", e.g. "fleet/fleet_ws_p4_5_e0d24b".
-    // Per ROADMAP Q5. Valid after begin().
+    // DECISIONS C2. Valid after begin().
     const char *getBaseTopic() const { return _baseTopic; }
 
     // "<baseTopic>/status" - the LWT / birth topic every discovery payload

@@ -1,21 +1,21 @@
-// A PAGE'S GROUP CARDS (2.11, K88-K92; 2.13 round 3, K154-K156): CardPage's
-// members that make a group card - a cluster, its one card or its summary - and
-// the cluster the card window asks for (makeGroup()). Split from CardPage.cpp at
-// 2.13 round 3, which this had taken past the structure check's 1,000 lines.
+// A PAGE'S GROUP CARDS (K88-K92, K154-K156): CardPage's members that make a
+// group card - a cluster, its one card or its summary - and the cluster the
+// card window asks for (makeGroup()). Split from CardPage.cpp to keep both
+// under the structure check's 1,000 lines.
 #include "Cards/CardPage.h"
 #include "Cards/CardTypes.h"
 #include "Cards/CardCatalog.h"
 #include "Cards/CardGroups.h"
-#include "Cards/CardAdded.h"     // a cluster's members added on the device (2.11, K91)
+#include "Cards/CardAdded.h"     // a cluster's members added on the device (K91)
 #include "Cards/ClusterCard.h"
-#include "Cards/CardPopup.h"     // a card's Long press opens, by name (K151)
+#include "Cards/CardPopup.h"     // a card's Long press opens, by name (K156)
 #include "Layout/Cluster.h"
 #include "UI/UITokens.h"
 #include "Settings.h"
 #include <Arduino.h>
 #include <string.h>
 
-// A GROUP CARD MADE ON THE DEVICE (2.11, K88-K92): its presentation is the
+// A GROUP CARD MADE ON THE DEVICE (K88-K92): its presentation is the
 // saved "present", else the dashboard's. As a CLUSTER its members become mini
 // tiles (the visible ones) and header values (the `slots`); it asks for as many
 // cells as its tiles need (Layout::clusterSpan(), until the arranger). A cluster
@@ -33,8 +33,8 @@ struct GroupMembers {
     const char *slotIds[CLUSTER_SLOTS_MAX] = {nullptr};
     char        saved[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1] = "";
 
-    // A MEMBER MOVED OUT TO THE PAGE ("hidden": "moved", the sprint after round
-    // 7): its card is on the page now, so it is no tile, no header value, and
+    // A MEMBER MOVED OUT TO THE PAGE ("hidden": "moved", K112): its card is on
+    // the page now, so it is no tile, no header value, and
     // not behind the one card - still a member, so Members lists it.
     static bool movedOut(const CardSpec &m) { return cardIdUsable(m.id) && CardAdded::isMovedToPage(m.id); }
     int8_t slotOf(const char *id) const {
@@ -91,7 +91,7 @@ bool isGroupSpec(const CardSpec &cs) {
 }
 }  // namespace
 
-// THE CLUSTER ITSELF (2.11; 2.13 round 3 for the window): its members made and
+// THE CLUSTER ITSELF (for the page and the card window): its members made and
 // configured, its header's style, its tap. `allTiles`: the group view's (K154).
 ClusterCard *CardPage::newCluster(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, bool allTiles) {
     char v[64];
@@ -99,7 +99,7 @@ ClusterCard *CardPage::newCluster(const CardSpec &cs, const PageSpec &spec, Enti
     GroupMembers g;
     groupMembers(cs, g);
     ClusterCard *cl = new ClusterCard();
-    // ITS OWN CARD STATE FOR ITS TILES (2.13): "card_state", a StateCardFill
+    // ITS OWN CARD STATE FOR ITS TILES: "card_state", a StateCardFill
     // by name in GUIManagerTweaks' order; none, the device's.
     int8_t ownFill = -1;
     if (hasId && Settings::card(cs.id, "card_state", v, sizeof(v))) {
@@ -125,10 +125,9 @@ ClusterCard *CardPage::newCluster(const CardSpec &cs, const PageSpec &spec, Enti
     if (cs.label) cl->setLabel(cs.label);
     cl->setSheetArea(cs.area);
     CardGroups::apply(*cl, spec.areaColor);
-    // A CLUSTER FILLS ITS CELLS (owner, round 4): Float and Tag take room
-    // from a solo card for its label, and a cluster has none - its header
-    // names it. Round 1 kept the tag's room above it to line its top up
-    // with its neighbours', and the owner saw its tiles shrink for it.
+    // A CLUSTER FILLS ITS CELLS: Float and Tag take room from a solo card for
+    // its label, and a cluster has none - its header names it. Reserving the
+    // tag's room above it would shrink its tiles.
     cl->setHeaderStyle(CardHeaderStyle::HDR_NONE);
     cl->setShowArea(false);
     // The header's style (K102): the cluster's own, else the page's, else the spec's.
@@ -137,20 +136,19 @@ ClusterCard *CardPage::newCluster(const CardSpec &cs, const PageSpec &spec, Enti
     if (hasId && Settings::card(cs.id, "cl_style", v, sizeof(v))) clusterStyleFromName(v, st);
     cl->setStyle(st);
     cl->setIcons(!(hasId && Settings::card(cs.id, "cl_icons", v, sizeof(v)) && !strcmp(v, "off")));
-    // ITS TAP (round 6): the one chosen in SETTINGS, read here because a
-    // cluster is not made by makeCard() - it went back to Nothing whenever
-    // the page was built again (the owner). Else Members, which lists every
-    // member, hidden ones too (refines K107: opening a list switches nothing).
-    // 2.13 (K143): its group view - a long press opens Members.
+    // ITS TAP: the one chosen in SETTINGS, read here because a cluster is not
+    // made by makeCard(). Else its group view (K154); a long press opens
+    // Members, which lists every member, hidden ones too (refines K107:
+    // opening a list switches nothing).
     TapAction ta = TapAction::TAP_GROUP;
     if (hasId && Settings::card(cs.id, "tap", v, sizeof(v))) tapActionFromName(v, ta);
-    // ONLY WHAT A CLUSTER OFFERS (K156): a saved Details view meant "its window"
-    // (K129: a cluster has none), and a Toggle saved while it was a solo card -
-    // before each presentation kept its own - is no cluster's: its group view.
+    // ONLY WHAT A CLUSTER OFFERS (K156): a saved Details view would mean "its
+    // window" (K129: a cluster has none), and a Toggle is no cluster's: both
+    // fall back to its group view.
     if (ta != TapAction::TAP_MEMBERS && ta != TapAction::TAP_HISTORY && ta != TapAction::TAP_NOTHING)
         ta = TapAction::TAP_GROUP;
     cl->setTapAction(ta);
-    uint8_t lo;   // Long press opens (K151)
+    uint8_t lo;   // Long press opens (K156)
     if (hasId && Settings::card(cs.id, "long", v, sizeof(v)) && CardPopup::openViewFromName(v, lo)) cl->setLongOpen(lo);
     return cl;
 }
@@ -188,11 +186,11 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
         g.cellH   = (int32_t)UI::grid().cellH;
         g.gap     = _gap;
         g.chromeW = ClusterCard::chromeW();
-        g.chromeH = ClusterCard::chromeH();   // whole cells: no tag's room (round 4, below)
+        g.chromeH = ClusterCard::chromeH();   // whole cells: no tag's room
         g.tileGap = UI::mm(UI::shape().C_TILE_GAP);
         g.minTile = UI::mm(UI::shape().C_TILE_MIN);
         const uint8_t cellCols = _uCols / _sub ? _uCols / _sub : 1;
-        // FEWER THAN TWO PINNED SHOWS ITS SOLO CARD (owner, 2026-11-06, K188): the
+        // FEWER THAN TWO PINNED SHOWS ITS SOLO CARD (K188): the
         // pins are kept, and a second pin makes it a group again.
         const Layout::ClusterSpan sp = Layout::clusterSpan(nTiles ? nTiles : 1, g, cellCols, _maxRows);
         if (nTiles >= 2 && sp.fits) {
@@ -235,7 +233,7 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
         if (c && !(hasId && Settings::card(cs.id, "tap", t, sizeof(t)))) c->setTapAction(TapAction::TAP_MEMBERS);
         return c;
     }
-    // ITS FACE (K151): one member chosen in its GROUP panel ("face", that member's
+    // ITS FACE (K191): one member chosen in its GROUP panel ("face", that member's
     // id); else the members that switch together, else every member.
     const CardSpec *faceMem = nullptr;
     if (hasId && Settings::card(cs.id, "face", v, sizeof(v)))
@@ -257,9 +255,9 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
         }
     Card *c = n ? makeCard(one, spec, reg, 0) : nullptr;
     if (!c) return nullptr;
-    c->setGroupCard(true);   // its GROUP panel (K151, K155)
+    c->setGroupCard(true);   // its GROUP panel (K191, K155)
     c->setGroupMixed(groupMixed(gm, reg));   // K188: a tap toggles only lights and switches
-    // A FACE TOGGLES THE WHOLE GROUP (owner, 2026-11-07): its other lights and switches.
+    // A FACE TOGGLES THE WHOLE GROUP: its other lights and switches.
     if (faceMem)
         for (uint8_t k = 0; k < nMem; k++) {
             const Entity *e = mem[k] != faceMem && mem[k]->primaries[0] ? reg.find(mem[k]->primaries[0]) : nullptr;
@@ -267,7 +265,7 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
                 (e->desc.kind == EntityKind::LIGHT || e->desc.kind == EntityKind::SWITCH))
                 c->addGroupSwitch(e);
         }
-    // A FACE CHOSEN: THE CARD IS NAMED AS THAT MEMBER (owner, 2026-11-06) - "Front Room
+    // A FACE CHOSEN: THE CARD IS NAMED AS THAT MEMBER - "Front Room
     // Temperature", its card label still the group's ("Indoor Temp").
     if (faceMem) {
         char nm[ENTITY_NAME_MAX];
@@ -276,7 +274,7 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
             c->setLabel(nm);   // the name typed on the member
         } else if (fe && fe->learnt) {
             // A LEARNT ENTITY'S NAME ARRIVES AFTER THE PAGE IS BUILT (its entity id
-            // until HA's first state, owner's glass 11-07): no label of its own, so
+            // until HA's first state): no label of its own, so
             // the card reads its entity's name at every render, as Deck Light does.
             c->setLabel("");
         } else {

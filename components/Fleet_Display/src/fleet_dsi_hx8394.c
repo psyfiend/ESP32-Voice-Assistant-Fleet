@@ -1,5 +1,5 @@
 // fleet_dsi_hx8394 - the HX8394 driver as fleet_dsi_panel_new() sees it.
-// WS_P4_5 (2.9 step 2). Reached through BSP_PANEL_DRIVER = HX8394; see the
+// WS_P4_5. Reached through BSP_PANEL_DRIVER = HX8394; see the
 // fleet_dsi_driver_t comment in fleet_dsi_panel.h.
 #include "fleet_dsi_panel.h"
 #if SOC_MIPI_DSI_SUPPORTED

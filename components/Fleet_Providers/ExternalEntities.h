@@ -7,10 +7,9 @@
 // ---------------------------------------------------------------------------
 // Entities owned by OTHER devices, which this panel reads and displays.
 //
-// TEMPORARY. This table is a stand-in for the build sheet (issue #20), which
-// is where per-device entity selection belongs. It exists now so the inbound
-// half of the pipeline can be tested against a real sensor rather than a mock.
-// When the build sheet lands, this file goes away.
+// A compiled stand-in for per-device entity selection (issue #20), so the
+// inbound half of the MQTT pipeline runs against a real sensor rather than a
+// mock.
 //
 // Every entry here is:
 //   source    = MQTT   - it arrives over the broker

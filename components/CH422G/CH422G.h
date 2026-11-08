@@ -5,7 +5,7 @@
 // Minimal hand-rolled driver for the WCH CH422G IO expander.
 //
 // NOT protocol-compatible with the XCA9554 that Arduino_XCA9554SWSPI (used by
-// WS_S3_SMART86) expects. CH422G has no single addressable register file -
+// WS_S3_4B) expects. CH422G has no single addressable register file -
 // it responds on four fixed 7-bit pseudo-addresses, one per register, and
 // ignores any I2C address you configure it with. See the datasheet or
 // Waveshare's esp_io_expander_ch422g.c (ESP32_IO_Expander lib) for the

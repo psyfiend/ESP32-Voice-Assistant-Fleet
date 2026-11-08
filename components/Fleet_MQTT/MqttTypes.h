@@ -49,8 +49,8 @@ const char *mqttStateName(MqttState s);
 const char *mqttFailureName(MqttFailure f);
 
 // Classify a PubSubClient::state() return code. Kept as a free function with
-// no dependencies so it can be unit-tested on a PC, the same way ROADMAP Q9
-// wants Fleet_Entities to be testable.
+// no dependencies so it can be unit-tested on a PC, as Fleet_Entities can
+// (DECISIONS A6).
 //
 // PubSubClient's codes:
 //   -4 timeout   -3 connection lost   -2 connect failed   -1 disconnected

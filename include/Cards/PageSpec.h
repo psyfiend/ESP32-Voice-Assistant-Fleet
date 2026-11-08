@@ -4,34 +4,26 @@
 
 #include "Cards/CardTypes.h"
 
-struct SlotSpec;   // UI/HeaderSlots.h - a page's header slots (2.8)
+struct SlotSpec;   // UI/HeaderSlots.h - a page's header slots
 
 // ---------------------------------------------------------------------------
 // What a page IS, as data.
 //
-// This is the shape milestone 2.5 owes and the shape the build sheet (#20)
-// will serialise into. Everything on a dashboard today is constructed by hand
-// in CardDemo.cpp; a CardSpec is that same construction written down instead
-// of performed, and the difference is the whole point: 3.3's JSON loader fills
-// in these structs, so it becomes a parser rather than a second design.
-//
-// It carries exactly what milestone 2.4 established a sheet entry has to
-// express, and HANDOFF.md lists:
+// A page is data: a CardSpec is a card's construction written down. What a
+// card spec expresses:
 //
 //   a domain          NOT here - see below
-//   a header mode     bar / tag / none, or inherit the page's
+//   a header mode     band / tag / none, or inherit the page's
 //   area on, colour on   two independent settings, on the page
 //   spans and priority   CardPlacement, in UNITS - see CardTypes.h
 //   a variant override   for when VAR_AUTO guesses wrong
 //   staleness overrides  longStaleMs, per card
 //
-// THERE IS NO DOMAIN FIELD, and that is deliberate rather than an omission.
-// A card's type comes from its primary entity's EntityKind by way of
-// cardForEntity(), which is already how every card in the project is built.
-// Writing the domain here as well would let a sheet disagree with the registry
-// about what a thing is, and there is no good answer to that disagreement.
-// When the build sheet learns to DECLARE entities as well as place them, the
-// domain belongs on the declaration - next to the topic - and not here.
+// THERE IS NO DOMAIN FIELD, deliberately. A card's type comes from its primary
+// entity's EntityKind by way of cardForEntity(), which is how every card in the
+// project is built. Writing the domain here as well would let a spec disagree
+// with the registry about what a thing is, and there is no good answer to that
+// disagreement.
 // ---------------------------------------------------------------------------
 
 // The page's header mode, rather than this card's own. Not a value of
@@ -39,7 +31,7 @@ struct SlotSpec;   // UI/HeaderSlots.h - a page's header slots (2.8)
 // cannot mean "inherit" - it has to be a sentinel outside the enum's range.
 static constexpr uint8_t CARD_HDR_INHERIT = 0xFF;
 
-// Sub-grid units. ROADMAP Q3b, decided 2026-09-03 and unchanged:
+// Sub-grid units (D-4):
 //
 //   "Author the page as 3x3 CELLS, but allocate 6x6 UNITS underneath (each
 //    cell = 2x2 units). Cards span in units. A quarter-page card is 3x3 units
@@ -47,7 +39,7 @@ static constexpr uint8_t CARD_HDR_INHERIT = 0xFF;
 //
 // So a page declares how finely its cells divide and every span, every
 // coordinate and every minimum below is in UNITS. Two is the default because
-// halves are the case that actually comes up; a page needing thirds sets 3.
+// halves are the common case; a page needing thirds sets 3.
 static constexpr uint8_t PAGE_SUBDIVISION_DEFAULT = 2;
 
 // Sentinel for "no explicit coordinate - let the page flow me".
@@ -64,7 +56,7 @@ static constexpr int8_t PAGE_FLOW = -1;
 // does not draw that card rather than failing to build a page.
 // ---------------------------------------------------------------------------
 struct CardSpec {
-    // STABLE IDENTITY (2.10d, DECISIONS K33). Saved settings are keyed by it,
+    // STABLE IDENTITY (DECISIONS K33). Saved settings are keyed by it,
     // so it never changes once a card exists - not when the card is relabelled,
     // moved to another page or given other entities - and is never reused.
     // Unique across every page on the device. Never shown in normal use.
@@ -109,7 +101,7 @@ struct CardSpec {
 
     bool paused = false;
 
-    // A GROUP CARD MADE ON THE DEVICE (2.11, K88-K92): no primaries of its own,
+    // A GROUP CARD MADE ON THE DEVICE (K88-K92): no primaries of its own,
     // its MEMBERS instead - each a card of its own, with its own id (K33) and
     // settings, wearing the group card's group (K92 rule 2). One level only: a
     // member is never a group card made here (rule 3). `present` is how it is
@@ -120,7 +112,7 @@ struct CardSpec {
     uint8_t         memberCount = 0;
     GroupPresent    present     = GroupPresent::PRESENT_CARD;
     const char     *slots[CLUSTER_SLOTS_MAX] = {nullptr};
-    // BUILT IN (2.13, K171): on every board and never hidden from its page - the
+    // BUILT IN (K171): on every board and never hidden from its page - the
     // Fleet page's Panel group. Visibility offers no Hide for it.
     bool            builtIn     = false;
 };
@@ -136,21 +128,15 @@ template <typename F> void forEachCardSpec(const struct PageSpec &page, F fn);
 struct PageSpec {
     // STABLE IDENTITY, and it is append-only.
     //
-    // Straight out of docs/REFERENCE_PROJECTS.md's reading of the NINA
-    // project's page_registry.h, which is the one part of that project our own
-    // notes call "the most valuable part for our actual purpose". Their rule,
-    // learned the hard way: a page needs a stable numeric id AND a stable
+    // The rule (from the NINA project's page_registry.h, docs/
+    // REFERENCE_PROJECTS.md): a page has a stable numeric id AND a stable
     // string slug, a retired id is reserved forever and never reused, and
-    // reordering the table must never renumber anything.
-    //
-    // It matters here for the same reason it mattered there: the moment a
-    // build sheet or a saved setting persists "which page", a refactor that
-    // renumbers pages silently re-points a user's dashboard at a different
-    // one. Adding these now costs two fields; adding them after anything has
-    // been persisted costs a migration.
+    // reordering the table never renumbers anything. A saved setting persists
+    // "which page", so a refactor that renumbers pages would silently re-point
+    // a user's dashboard at a different one.
     //
     // id   - internal, never reused, never reordered
-    // slug - the external key. What a build sheet, a URL or an NVS value holds
+    // slug - the external key. What the settings file or a URL holds
     uint8_t     id   = 0;
     const char *slug = nullptr;
 
@@ -162,7 +148,7 @@ struct PageSpec {
     // The default every card inherits unless it overrides.
     CardHeaderStyle headerDefault = CardHeaderStyle::HDR_TAG;
 
-    // Compact-vs-full for the whole page, added with #50's manual override.
+    // Compact-vs-full for the whole page.
     //
     // VAR_AUTO doubles as the inherit sentinel, which is exactly right here
     // rather than a shortcut: a card whose own variant is VAR_AUTO is saying
@@ -172,8 +158,8 @@ struct PageSpec {
     // genuinely different answers.
     CardVariant     variantDefault = CardVariant::VAR_AUTO;
 
-    // Two independent settings, not one. The owner was explicit: the colour
-    // should be available whether or not the area's NAME is displayed.
+    // Two independent settings: the colour is available whether or not the
+    // area's NAME is displayed.
     bool showArea  = true;
     bool areaColor = true;
 
@@ -181,7 +167,7 @@ struct PageSpec {
     TempUnit tempUnit    = TempUnit::TEMP_INHERIT;
     CardLabel labelMode  = CardLabel::LBL_INHERIT;
 
-    // THE PAGE'S HEADER (2.8, UI/HeaderSlots.h): its slots, each with its place
+    // THE PAGE'S HEADER (UI/HeaderSlots.h): its slots, each with its place
     // (nullptr: the ones every page has, HEADER_DEFAULT), and whether it shows.
     // `headerShown` is the compiled default; the owner's choice for the page is
     // saved by its slug and wins (Settings: pages.<slug>.header). A full-screen
@@ -190,7 +176,7 @@ struct PageSpec {
     uint8_t  headerSlotCount = 0;
     bool     headerShown     = true;
 
-    // Its clusters' header style (2.11, K102); the saved pages.<slug>.cl_style
+    // Its clusters' header style (K102); the saved pages.<slug>.cl_style
     // wins, and a cluster's own over both.
     ClusterStyle clusterStyle = ClusterStyle::CLSTYLE_SWATCH;
 };
@@ -204,7 +190,7 @@ template <typename F> void forEachCardSpec(const PageSpec &page, F fn) {
 }
 
 // ---------------------------------------------------------------------------
-// Card ids (2.10d). checkCardIds() runs once at boot over every page: it logs
+// Card ids. checkCardIds() runs once at boot over every page: it logs
 // each card with no id, a malformed one or one used twice, and returns how many
 // problems it found. cardIdUsable() is then false for those, and such a card
 // draws but is never given its id, so nothing is ever saved under an id that

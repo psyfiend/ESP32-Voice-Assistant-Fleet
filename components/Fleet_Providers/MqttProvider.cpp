@@ -115,11 +115,10 @@ void MqttProvider::handle(const char *topic, const uint8_t *payload, unsigned in
 
     // Parse ONCE for the whole message, straight from the library's buffer.
     //
-    // Deliberately no intermediate copy. An earlier version copied into a
-    // fixed 257-byte buffer first, which silently TRUNCATED any larger payload
-    // and then handed the fragment to the parser - every Zigbee2MQTT message
-    // is bigger than that, so every one failed as "not JSON". The lesson
-    // generalises: a fixed buffer sized by guess in the middle of a data path
+    // Deliberately no intermediate copy: a fixed buffer would silently
+    // TRUNCATE any larger payload and hand the fragment to the parser (every
+    // Zigbee2MQTT message is bigger than a small buffer, so each would fail as
+    // "not JSON"). A fixed buffer sized by guess in the middle of a data path
     // fails as corruption, not as an error.
     //
     // ArduinoJson reads (pointer, length) directly and never needs the payload

@@ -14,17 +14,12 @@
 // Turn Home Assistant's string state into an EntityValue of the declared type.
 //
 // ONE COPY, DELIBERATELY. Both paths that receive a value need this: HaRest
-// on the initial fetch and HaProvider on every live trigger event. The obvious
-// thing is a private method on each, and this session has already been bitten
-// TWICE by exactly that - a rule implemented in one code path and a second
-// path that did the same job slightly differently (the swipe press origin, the
-// drawer top offset). Both times the fix was to delete the second copy rather
-// than to synchronise it.
+// on the initial fetch and HaProvider on every live trigger event. A private
+// method on each would let the two drift apart.
 //
-// A divergence here would be worse than either of those, because it would be
-// invisible: the boot value and the live value for the same entity would
-// disagree about what "closed" or "12.5" means, and only after something
-// changed.
+// A divergence here would be invisible: the boot value and the live value for
+// the same entity would disagree about what "closed" or "12.5" means, and only
+// after something changed.
 // ---------------------------------------------------------------------------
 
 // Returns false when `state` is not a value at all. The caller must NOT write
@@ -40,9 +35,8 @@ inline bool haCoerceState(const EntityDescriptor &d, const char *state,
         case ValueType::BOOL: {
             // HA reports on/off for switches, lights AND binary sensors. A
             // binary_sensor with device_class garage_door still says on/off -
-            // the device class only changes how HA's own frontend words it,
-            // which was confirmed against the live instance rather than
-            // assumed. open/closed/true/false are accepted anyway so a future
+            // the device class only changes how HA's own frontend words it.
+            // open/closed/true/false are accepted anyway so a future
             // entity that does report them is not silently dropped.
             const bool on  = (strcmp(state, "on")     == 0) ||
                              (strcmp(state, "open")   == 0) ||
@@ -82,7 +76,7 @@ inline bool haCoerceState(const EntityDescriptor &d, const char *state,
 }
 
 // ---------------------------------------------------------------------------
-// The attributes a card draws, and ONE copy of how they are read. Milestone 2.7.
+// The attributes a card draws, and ONE copy of how they are read.
 //
 // Same reasoning as haCoerceState() above: HaRest reads them on the initial
 // fetch and HaProvider on every live event, and two readers that disagree
@@ -90,14 +84,13 @@ inline bool haCoerceState(const EntityDescriptor &d, const char *state,
 //
 // haAttrFilter() marks the fields in an ArduinoJson filter; haReadAttrs()
 // reads them back. Kept side by side so a field cannot be added to one and
-// forgotten in the other - which is how the icon ended up filtered IN on the
-// websocket for weeks and never read by anything.
+// forgotten in the other.
 // ---------------------------------------------------------------------------
 inline void haAttrFilter(JsonObject attrs) {
     attrs["icon"]       = true;
     attrs["brightness"] = true;
     attrs["rgb_color"]  = true;
-    // A light's, 2.10c (#65). ha-websocket.md section 9 has what the owner's
+    // A light's (#65). ha-websocket.md section 9 has what the owner's
     // lights send; xy_color is left out - hs_color says the same in our terms.
     attrs["supported_color_modes"] = true;
     attrs["color_mode"]            = true;
@@ -105,7 +98,7 @@ inline void haAttrFilter(JsonObject attrs) {
     attrs["min_color_temp_kelvin"] = true;
     attrs["max_color_temp_kelvin"] = true;
     attrs["hs_color"]              = true;
-    // A thermostat's, 2.13 (K144).
+    // A thermostat's (K144).
     attrs["current_temperature"]   = true;
     attrs["temperature"]           = true;
     attrs["current_humidity"]      = true;
@@ -160,8 +153,8 @@ inline void haReadAttrs(JsonVariantConst attrs, EntityAttrs &out) {
         out.brightness = (int16_t)(v < 0 ? 0 : (v > 255 ? 255 : v));
     }
 
-    // Present for every colour mode, colour temperature included - measured
-    // on light.office, which reads [255,167,88] at 2710 K. Null when off.
+    // Present for every colour mode, colour temperature included (light.office
+    // reads [255,167,88] at 2710 K). Null when off.
     JsonArrayConst rgb = attrs["rgb_color"];
     if (!rgb.isNull() && rgb.size() == 3) {
         const uint32_t r = rgb[0] | 0, g = rgb[1] | 0, bl = rgb[2] | 0;
@@ -169,7 +162,7 @@ inline void haReadAttrs(JsonVariantConst attrs, EntityAttrs &out) {
         out.hasRgb = true;
     }
 
-    // WHAT A LIGHT CAN DO, 2.10c: the union of its supported modes. Sent with
+    // WHAT A LIGHT CAN DO: the union of its supported modes. Sent with
     // every state, off included, so it is never remembered between reports.
     // Absent (a switch, a sensor) leaves 0: "not reported", the big toggle.
     JsonArrayConst modes = attrs["supported_color_modes"];
@@ -199,8 +192,8 @@ inline void haReadAttrs(JsonVariantConst attrs, EntityAttrs &out) {
         }
     }
 
-    // A thermostat's (2.13, K144). Every climate entity sends these; nothing
-    // else on the owner's HA sends a bare "temperature" attribute.
+    // A thermostat's (K144). Every climate entity sends these; nothing else
+    // on the owner's HA sends a bare "temperature" attribute.
     out.curTemp10 = haTenths(attrs["current_temperature"]);
     out.target10  = haTenths(attrs["temperature"]);
     JsonVariantConst hum = attrs["current_humidity"];
@@ -210,7 +203,7 @@ inline void haReadAttrs(JsonVariantConst attrs, EntityAttrs &out) {
 }
 
 // ---------------------------------------------------------------------------
-// AN ENTITY THE BOARD WAS NEVER TOLD ABOUT, 2.13 (design/ha-cards.md 2.3): a
+// AN ENTITY THE BOARD WAS NEVER TOLD ABOUT (design/ha-cards.md 2.3): a
 // card added from HA's catalogue. Its kind from HA's domain, the way the
 // compiled table declares each by hand; device class and unit as HA reported
 // them when it was added. False for a domain no card can show yet.
@@ -239,8 +232,8 @@ inline bool haDescriptor(const char *ref, const char *deviceClass, const char *u
         if (num) snprintf(d.stateClass, sizeof(d.stateClass), "measurement");
     } else if (is("climate")) {
         // The mode is its state; the readings are attributes, in HA's own unit
-        // - Fahrenheit on the owner's HA, assumed until a board asks HA which
-        // (to confirm with the owner before another house uses it).
+        // - Fahrenheit on the owner's HA, assumed here; a board does not ask
+        // HA which unit system it uses.
         d.kind = EntityKind::CLIMATE;       d.valueType = ValueType::TEXT_VAL;
         deviceClass = "temperature";
         unit = "\xC2\xB0" "F";
@@ -258,11 +251,11 @@ inline bool haDescriptor(const char *ref, const char *deviceClass, const char *u
 }
 
 // ---------------------------------------------------------------------------
-// What a state says about the ENTITY rather than its value - 2.10c (#65).
+// What a state says about the ENTITY rather than its value (#65).
 // Read by both paths for the same reason as the two above.
 //
 //   friendly_name  a learnt member's name (a declared entity keeps its own);
-//                  for every entity, Entity::sourceName (Label "From HA")
+//                  for every entity, Entity::sourceName (entity label "HA name")
 //   entity_id      a light group's members, as HA or Hue define them. On the
 //                  owner's light.office: three bulbs. Its `lights` list holds
 //                  their names in a DIFFERENT order, so it is never read:
@@ -277,7 +270,7 @@ inline void haEntityFilter(JsonObject attrs) {
 inline void haLearn(EntityRegistry &reg, const Entity &e, JsonVariantConst attrs) {
     if (attrs.isNull()) return;
     if (e.learnt) reg.adoptName(e.desc.id, attrs["friendly_name"] | "");
-    reg.setSourceName(e.desc.id, attrs["friendly_name"] | "");   // Label "From HA" (2.10d)
+    reg.setSourceName(e.desc.id, attrs["friendly_name"] | "");   // entity label "HA name"
 
     // Lights only: a group of lights is commanded as one light, which is what
     // the window does with it. Other domains' groups wait for their cards.

@@ -16,7 +16,7 @@ static bool dc(const EntityDescriptor &d, const char *what) {
 }
 
 // ---------------------------------------------------------------------------
-// THE BINARY SENSOR TABLE. Milestone 2.7, cards.md section 13.
+// THE BINARY SENSOR TABLE. cards.md section 13.
 //
 // One row per device_class, and one card type for all of them. A row carries
 // everything that differs between a garage door and a motion sensor: the
@@ -24,8 +24,8 @@ static bool dc(const EntityDescriptor &d, const char *what) {
 // place of the name. Adding a class is adding a row.
 //
 // HA's own "Show as" setting is a device_class override, so it lands here with
-// no extra work - the owner's garage doors are `opening` underneath and
-// `garage_door` as shown.
+// no extra work - a garage door is `opening` underneath and `garage_door` as
+// shown.
 //
 // Every glyph here must be in the generated subset (scripts/gen_icon_font.py);
 // the words are HA's own English wording for each class, so the panel and HA's
@@ -157,8 +157,8 @@ const char *cardHeroIcon(const Entity &e, bool on) {
 
     // 3. What the source says RIGHT NOW. Only present when a user or an
     //    integration set one - measured, see cards.md section 13 - but when it
-    //    is, it may already be state-dependent (the owner's template occupancy
-    //    sensors flip it) and it is his choice made in HA.
+    //    is, it may already be state-dependent (a template occupancy sensor
+    //    can flip it) and it is a choice made in HA.
     if (const char *g = mdiGlyph(e.attrs.icon)) return g;
 
     // 4. Our own state pair, by device_class.
@@ -189,8 +189,7 @@ static CardLabel s_labelMode = CardLabel::LBL_NAME;
 void      cardSetLabelMode(CardLabel m) { s_labelMode = m; }
 CardLabel cardLabelMode()               { return s_labelMode; }
 
-// THE KNOB IS A TEST TOOL (owner, 2026-10-09, K49), not the page- or
-// device-wide setting it will one day be: State or None shows the whole page
+// THE DEVICE'S ENTITY LABEL (K49): State or None shows the whole page
 // that way, whatever each card chose; Name shows each card's own choice -
 // Custom its custom name, HA name HA's. A card left on Inherit has no name of
 // its own, so its name is HA's (Card::shownName() falls back to the card's
@@ -201,7 +200,7 @@ CardLabel cardResolveLabel(CardLabel want) {
     return want;
 }
 
-// A group header's glyph (2.11 K101; moved here from the card window, 2.13 round 5).
+// A group header's glyph (K101).
 const char *cardHeaderGlyph(const Entity &e, uint32_t &tint) {
     const UIPalette &p = UI::pal();
     const bool binary = e.value.type == ValueType::BOOL;
@@ -237,7 +236,7 @@ const char *cardBatteryGlyph(int pct) {
 // amber or red for that reason. Eight hues spread right around the wheel,
 // deliberately far apart rather than merely different - two areas next to each
 // other on a page have to be told apart at a glance, not on inspection. At file
-// scope since 2.10d: a new group takes one no other group is using (K46).
+// scope: a new group takes one no other group is using (K46).
 static const uint32_t AREA_HUES[] = {
     0x3E8FD9,   // blue
     0x38B24A,   // green
@@ -296,7 +295,7 @@ uint32_t cardTintFor(const EntityDescriptor &d) {
         dc(d, "carbon_dioxide") ||
         dc(d, "volatile_organic_compounds")) return p.TINT_AIR;
 
-    // By kind of THING, for the corner icons of state cards - 2.7 round two.
+    // By kind of THING, for the corner icons of state cards.
     if (dc(d, "garage_door") || dc(d, "door") || dc(d, "window") ||
         dc(d, "opening") || dc(d, "lock"))             return p.TINT_OPENING;
     if (dc(d, "occupancy") || dc(d, "motion") ||
@@ -321,8 +320,8 @@ void cardFormatAge(uint32_t ageMs, char *out, size_t cap) {
 namespace {
 
 // The fleet default. Fahrenheit because that is the owner's standing
-// preference; a build sheet overrides it per page or per card, and TEMP_SOURCE
-// turns conversion off entirely.
+// preference; a page or a card overrides it, and TEMP_SOURCE turns conversion
+// off entirely.
 TempUnit s_tempUnit = TempUnit::TEMP_F;
 
 DurationFormat s_durFormat = DurationFormat::DUR_AUTO;
@@ -518,8 +517,8 @@ void cardFormatValue(const Entity &e, char *out, size_t cap, bool withUnit, Temp
 
     const char *unit = withUnit ? cardDisplayUnit(e, want) : "";
 
-    // A THERMOSTAT's number is the room's temperature, an attribute (2.13,
-    // K144); its state is its mode.
+    // A THERMOSTAT's number is the room's temperature, an attribute
+    // (K144); its state is its mode.
     if (e.desc.kind == EntityKind::CLIMATE) {
         if (e.attrs.curTemp10 == EntityAttrs::ATTR_NONE) { snprintf(out, cap, "--"); return; }
         snprintf(out, cap, "%.1f%s", (double)cardDisplayNumber(e, e.attrs.curTemp10 / 10.0f, want), unit);

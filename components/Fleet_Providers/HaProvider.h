@@ -19,17 +19,17 @@
 // takes to start receiving it.
 //
 //
-// ONE subscribe_trigger, NOT subscribe_events. This is the single most
-// important decision in the file and it is measured, not preferred.
-// ha-websocket.md section 3: subscribing to all state_changed on this instance
-// is 731 events and 913 KB per minute - roughly 15 KB/s of JSON parsed
+// ONE subscribe_trigger, NOT subscribe_events. This is the most important
+// decision in the file and it rests on measurement (DECISIONS A8).
+// ha-websocket.md section 3: subscribing to all state_changed on the owner's
+// instance is 731 events and 913 KB per minute - roughly 15 KB/s of JSON parsed
 // continuously - to find the handful we care about. The same window filtered
 // server-side to our entities was ZERO bytes. Three solar sensors alone
 // produced 140 of those 731 events.
 //
 //
-// A RECONNECT IS A COLD START. Measured 2026-09-20: HA discards a subscription
-// with its connection, and a fresh socket accepts the same request id again. So
+// A RECONNECT IS A COLD START. HA discards a subscription with its
+// connection, and a fresh socket accepts the same request id again. So
 // there is nothing to clean up after a drop and everything to rebuild after
 // one. This class watches HaClient::sessions() rather than its state, because
 // the session COUNTER is what distinguishes "still connected" from
@@ -67,20 +67,20 @@ public:
     // house unless something asks this.
     bool     subscriptionAccepted() const { return _subAccepted; }
 
-    // HA's REPLY TO ANY OTHER REQUEST, 2.10c. Every message arrives here, so the
+    // HA's REPLY TO ANY OTHER REQUEST. Every message arrives here, so the
     // replies to CommandRouter's call_service do too; they are handed on by id.
     // Called ON THE WEBSOCKET TASK, like everything this class receives.
     // `code` and `msg` are "" on success and valid only during the call.
     typedef void (*ResultFn)(uint32_t id, bool ok, const char *code, const char *msg, void *ctx);
     void setResultHook(ResultFn fn, void *ctx) { _resultFn = fn; _resultCtx = ctx; }
 
-    // A RAW LOOK AT EVERY MESSAGE FIRST (2.10e): HaHistory's answers are big and
+    // A RAW LOOK AT EVERY MESSAGE FIRST: HaHistory's answers are big and
     // its own to parse, so it sees each message before the filtered parse and
     // returns true for the ones that were its. Websocket task.
     typedef bool (*RawFn)(const char *json, size_t len, void *ctx);
     void setRawHook(RawFn fn, void *ctx) { _rawFn = fn; _rawCtx = ctx; }
 
-    // WHAT HA OFFERS, 2.13 (HaCatalog.h). Asked once a session, again when HA
+    // WHAT HA OFFERS (HaCatalog.h). Asked once a session, again when HA
     // says an entity or an area changed in its registries (a label added, an
     // entity moved), and whenever requestCatalog() is called (a picker opening).
     // Any task.
@@ -98,12 +98,12 @@ private:
     // two copies would let the boot value and the live value for one entity
     // disagree about what "closed" means, and only after something changed.
     // One subscribe_trigger for the HA entities at registry indices [from, to),
-    // as many as one frame holds (2.13): `reached` is where the next frame
+    // as many as one frame holds: `reached` is where the next frame
     // starts - `to` when they all fit. Returns how many it named, 0 for none,
     // -1 if it could not be sent.
     int sendSubscribe(uint8_t from, uint8_t to, uint8_t *reached);
 
-    // THE SCENES OF EVERY LIGHT ON THE BOARD (2.10c): one render_template,
+    // THE SCENES OF EVERY LIGHT ON THE BOARD: one render_template,
     // ha-websocket.md section 7a's pattern - HA's scene entities on each
     // light's own device ("light>scene>Name|..."), learnt into the registry.
     // A template is a subscription, so it is cancelled once answered. False
@@ -111,7 +111,7 @@ private:
     bool sendSceneQuery();
     void parseScenes(const char *result);   // websocket task
 
-    // The catalogue's template, and the two registry subscriptions (2.13).
+    // The catalogue's template, and the two registry subscriptions.
     bool sendCatalogQuery();
     bool sendRegistrySubs();
     void catalogLoop(uint32_t session);
@@ -133,11 +133,11 @@ private:
     // subscribed"; HaClient::sessions() starts at 1 on the first auth_ok.
     uint32_t _subscribedForSession = 0;
     // How much of the registry the session's subscriptions cover: entities
-    // learnt later (2.10c) sit beyond it and get a subscription of their own.
+    // learnt later sit beyond it and get a subscription of their own.
     uint8_t  _subscribedCount = 0;
 
     // The ids of the latest subscribe_triggers (a ring: a subscription goes in
-    // parts since 2.13), and whether every part so far was accepted.
+    // parts), and whether every part so far was accepted.
     static constexpr uint8_t SUB_IDS = 8;
     std::atomic<uint32_t> _subIds[SUB_IDS] = {};
     uint8_t  _subHead     = 0;
