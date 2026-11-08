@@ -1,4 +1,4 @@
-// Layout's flow engine (2.12 P5): the dashboard's placement rules, each pinned down by a test.
+// Layout's flow engine: the dashboard's placement rules, each pinned down by a test.
 // Units: at the default subdivision of 2, one cell is 2x2 units.
 #include <unity.h>
 #include "Layout/Layout.h"

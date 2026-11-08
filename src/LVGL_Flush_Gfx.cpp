@@ -1,6 +1,5 @@
 // LVGL_Flush, Arduino_GFX path - every board without -D DISPLAY_ESPLCD.
-// See LVGL_Flush.h. Moved out of LVGL_Startup.cpp unchanged in behaviour at
-// 2.9 step 2, so that the esp_lcd path could sit beside it in its own file.
+// See LVGL_Flush.h. The esp_lcd paths sit beside it, each in its own file.
 #if !defined(DISPLAY_ESPLCD)
 
 #include "LVGL_Flush.h"
@@ -137,22 +136,15 @@ lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info) {
 
     // Allocate Second Buffer - ONLY IF THE BOARD ASKED FOR ONE.
     //
-    // This used to allocate unconditionally, which quietly ignored
-    // bsp_lvgl.DOUBLE_BUFFERING. CYD_S3_3248 sets it FALSE and got two buffers
-    // anyway: 2 x 30,720 bytes of INTERNAL SRAM, on the one board in the fleet
-    // that cannot spare it - the only QSPI panel, so the only one whose draw
-    // buffers must be internal rather than PSRAM.
+    // bsp_lvgl.DOUBLE_BUFFERING is honoured. CYD_S3_3248 sets it FALSE: two
+    // buffers there would be 2 x 30,720 bytes of INTERNAL SRAM, on the one
+    // board in the fleet that cannot spare it - the only QSPI panel, so the
+    // only one whose draw buffers must be internal rather than PSRAM. With
+    // the heap at 2-8 KB the WiFi driver and LWIP cannot allocate a TCP
+    // connection and MQTT dies at the keepalive.
     //
-    // The cost was the whole evening. It booted with 10 KB of internal heap
-    // free, the WiFi driver and LWIP had nothing to allocate sockets from, and
-    // MQTT died at the keepalive every single time with "state=-3 ... heap
-    // 5588". It looked like a leak and was not: the heap never trended down,
-    // it simply sat at 2-8 KB, which is below what a TCP connection needs.
-    //
-    // 2.9 confirmed the owner's caveat from source: this path's flush is
-    // synchronous, so the second buffer buys nothing on any board
-    // (docs/archive/display/display-stack.md §2). It stays honoured, not removed, until
-    // each board moves to the esp_lcd path.
+    // This path's flush is synchronous, so the second buffer buys nothing on
+    // any board.
     if (bsp_lvgl.DOUBLE_BUFFERING) {
         s_draw_buf2 = (uint16_t *)allocDrawBuf(byte_count, malloc_flags);
         if (!s_draw_buf2) s_draw_buf2 = (uint16_t *)allocDrawBuf(byte_count, MALLOC_CAP_8BIT);

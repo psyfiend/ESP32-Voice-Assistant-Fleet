@@ -1,5 +1,5 @@
-// TimeFormat (2.10e): every wording the panel uses for a time or a duration, pinned down - the
-// owner's own words (his HA template, rounds 4-5). Run in UTC so local time is the epoch's.
+// TimeFormat: every wording the panel uses for a time or a duration, pinned down - the
+// owner's own words (his HA template). Run in UTC so local time is the epoch's.
 #include <unity.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,23 +1,22 @@
 #pragma once
 // ---------------------------------------------------------------------------
-// THE ARRANGER (2.11, #78; DECISIONS K105, K109, K120) - where a page's blocks
+// THE ARRANGER (#78; DECISIONS K105, K109, K120) - where a page's blocks
 // go: its solo cards and its clusters, each in any shape its limits allow, on a
 // grid of UNITS - the device's own, a cell's halves - so a cluster can be 2.5
-// cells wide and a row 1.5 cells tall. Layout Playground version 9, ported line
-// for line (the "Layout Playground" artifact, its page v11, 2026-10-26) with the
-// owner's tuned knobs as its defaults. Plain arithmetic like the rest of Layout -
-// no LVGL, Arduino or ESP-IDF - tested on the PC (host-tests/test_arranger),
+// cells wide and a row 1.5 cells tall. A line-for-line port of Layout
+// Playground version 9 (the "Layout Playground" artifact) with the owner's
+// tuned knobs as its defaults. Plain arithmetic like the rest of Layout - no
+// LVGL, Arduino or ESP-IDF - tested on the PC (host-tests/test_arranger),
 // where the playground's own answers for the same blocks are the expected values.
-// docs/design/layout-engines.md, "Then version 9". Versions 5 and 8 are in git
-// history and still selectable in the playground.
+// docs/design/layout-engines.md, "Then version 9".
 //
-// v9 over v8 (the owner's notes after round 9, K120): a solo card bigger than
-// the page's entities pays BIG; a card may PREFER A SHAPE (its spec's span - the
-// Fleet page's 1.5-cell Free Heap and Uptime); and the finish SHARES THE SPARE
-// ROOM OUT in pixels - bands of blocks spread down the page, columns spread
-// across each band, each column centred in its band's height (finishPage()).
+// Version 9's features (K120): a solo card bigger than the page's entities
+// pays BIG; a card may PREFER A SHAPE (its spec's span - the Fleet page's
+// 1.5-cell Free Heap and Uptime); and the finish SHARES THE SPARE ROOM OUT in
+// pixels - bands of blocks spread down the page, columns spread across each
+// band, each column centred in its band's height (finishPage()).
 //
-// The owner's rules (TEST_2.11 round 5), and what the search is paid for:
+// The owner's rules, and what the search is paid for:
 //   - every ENTITY THE SAME SIZE - a solo card and each cluster's tiles, the size
 //     the side of the square with its own area, its label and header paid -
 //     against the page's equal share first, then against the average the first
@@ -52,20 +51,19 @@ namespace Layout {
 
 constexpr uint8_t  ARR_BLOCKS_MAX = 24;      // a page's blocks
 constexpr uint8_t  ARR_SHAPES_CHEAP = 10;    // a block's cheapest shapes kept, per grid (the playground's)
-constexpr uint8_t  ARR_SHAPES_MAX = ARR_SHAPES_CHEAP + 1;   // ...and its tightest (round 12)
+constexpr uint8_t  ARR_SHAPES_MAX = ARR_SHAPES_CHEAP + 1;   // ...and its tightest
 constexpr uint8_t  ARR_UNITS_MAX  = 24;      // units across or down, at most
 constexpr uint16_t ARR_CELLS_MAX  = 192;     // units on a grid, at most: the search recurses a level a unit
 constexpr uint8_t  ARR_WINDOW     = 3;       // the next unplaced blocks tried at each empty unit
 constexpr uint32_t ARR_BUDGET     = 20000;   // steps per pass per grid before the search stops: the
                                              // playground's, which the host tests check against
-// THE BOARDS' BUDGET (round 13, the owner: the 4B's ~10 s "is asking a lot"):
-// 7,000 found the 4B's House page in 4.9 s, the same page and score as 20,000's
-// 10.2 s (10,000: 6.2 s). Only a search that hits the budget is touched - the
-// P4_5's and 1060's never do.
+// THE BOARDS' BUDGET: 7,000 steps. On the 4B it finds the House page in 4.9 s,
+// the same page and score as 20,000 steps in 10.2 s (10,000: 6.2 s). Only a
+// search that hits the budget is affected - the P4_5's and 1060's never do.
 constexpr uint32_t ARR_BUDGET_BOARD = 7000;
 
-// The owner's knobs (2026-10-20, tuned in the playground: its defaults now),
-// adjustable from the PC (system.arranger.*).
+// The owner's knobs, tuned in the playground and its defaults, adjustable from
+// the PC (system.arranger.*).
 struct ArrWeights {
     double size   = 75.0;   // entities of different sizes: x log(size / target)^2 each
     double square = 30.0;   // a solo card far from square: x 4 log(h / w)^2 (a tile 0.4 of that)
@@ -74,8 +72,8 @@ struct ArrWeights {
     double gap8   = 11.0;   // an empty unit, per entity-sized area it wastes
     double order  = 4.0;    // each block placed ahead of an earlier one
     double big    = 60.0;   // v9: a solo card bigger than the rest, on top: x log(size / target)^2
-    // Not a weight: the search's steps per pass per grid (round 13, the owner: the
-    // 4B's ~10 s is "asking a lot"). Fewer is faster, perhaps a worse page.
+    // Not a weight: the search's steps per pass per grid. Fewer is faster,
+    // perhaps a worse page.
     uint32_t budget = ARR_BUDGET_BOARD;
 };
 
@@ -142,8 +140,8 @@ bool arrange(const ArrScreen &scr, const ArrBlock *blocks, uint8_t n, const ArrW
 // THE FINISH (the playground's finishV9()), from the search's places on a grid of
 // cols x rows units: each solo card trimmed toward square in units (`box`), then
 // every block's pixel rectangle (`rect`) - a loose card drawn at its tallest
-// allowed shape, clusters grown into the spare height (round 12, to square tiles
-// at most), what is left shared out. Cheap
+// allowed shape, clusters grown into the spare height (to square tiles at
+// most), what is left shared out. Cheap
 // and deterministic, so a kept answer keeps only `pos` and is finished again.
 void finishPage(const ArrScreen &scr, const ArrBlock *blocks, uint8_t n, uint8_t cols, uint8_t rows,
                 const ArrPlace *pos, ArrPlace *box, ArrRect *rect);

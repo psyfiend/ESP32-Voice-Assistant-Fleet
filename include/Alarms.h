@@ -1,15 +1,14 @@
 #pragma once
 // ---------------------------------------------------------------------------
 // THE BOARD'S ALARMS (K84) - not built yet. What exists is what the header asks
-// (2.8, D-20, D-21):
+// (D-21):
 //   - is an alarm set, and when does it go off next (the clock's panel);
-//   - is it within a week - THE BELL beside the clock (D-21: "set at all, or
-//     will go off within 7 days or so");
+//   - is it within a week - THE BELL beside the clock;
 //   - is it within the owner's warning time - THE NOTICE among the status
 //     icons, 12 hours unless the owner chose otherwise on the clock's panel
 //     (1, 3, 6, 12 hours, or off; Settings system.alarm.warn) - and has its
 //     notice been dismissed (until the next alarm comes due).
-// An unset alarm is not missing data, so with none set nothing shows.
+// An unset alarm shows nothing.
 //
 // Until K84 builds alarms, only a PC sets one, to see all this:
 // /popup?alarm=HHMM (DEBUG_POPUP builds; 24-hour, the next such time from now),

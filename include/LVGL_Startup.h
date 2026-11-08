@@ -3,15 +3,14 @@
 // LVGL_Startup - the LVGL engine, and nothing that draws.
 //
 // Buffer allocation, lv_init(), the tick and log callbacks, the flush and
-// touch-read bridges, and display + indev registration. What used to be all of
-// GUIManager.cpp despite the name.
+// touch-read bridges, and display + indev registration.
 //
 // The signature deliberately mirrors Espressif's lvgl_port_init(lcd, tp) and
 // Waveshare's bsp_display_start(): hardware is initialised by SystemCore first
 // and handed in here. LVGL_Startup borrows the managers, it never owns them.
 //
 #include <lvgl.h>
-#include "BoardDisplayFwd.h"   // DisplayManager or Fleet_Display, per board (2.9)
+#include "BoardDisplayFwd.h"   // DisplayManager or Fleet_Display, per board
 
 class TouchManager;
 
@@ -61,14 +60,13 @@ private:
 lv_display_t *display();
 lv_indev_t   *indev();
 
-// --= Flush timing, for GET /bench (milestone 2.9, #67) =--
+// --= Flush timing, for GET /bench (#67) =--
 //
-// The flush callback lives in this file, so the only honest place to time it
-// is here. While a FlushStats is attached, disp_flush() adds to it; with none
+// While a FlushStats is attached, the flush callback adds to it; with none
 // attached it costs one pointer test per chunk.
 //
-// The two halves are what 2.9 is about, named for what they do on today's
-// Arduino_GFX path so the esp_lcd path can report the same two fields later:
+// The two timings, as the Arduino_GFX path fills them (the esp_lcd path
+// reports its own copy and present times in the same two fields):
 //   copyUs    - draw16bitRGBBitmap(): the CPU copy (and rotation) of each
 //               chunk into the library's framebuffer or canvas
 //   presentUs - gfx->flush() on the last chunk: the whole-framebuffer cache

@@ -6,30 +6,21 @@
 #include "ExternalEntities_HA.h"
 
 // ---------------------------------------------------------------------------
-// THE REAL DASHBOARD - the owner's 18 Home Assistant entities.
+// THE HOUSE PAGE.
 //
-// This is docs/design/dashboard-target-7b.md rendered. That document is the
-// spec; ExternalEntities_HA.h is the entity half of the transcription and this
-// is the layout half. If any of the three disagree, the DOC wins.
+// Page 1 of the swipe order on every board - House first, then Fleet
+// (GUIManager::initPages()). Its id is 2: ids are frozen identities, order is
+// a separate list. Most of its cards are made on the board and kept in the
+// settings file (K171); only Garage - Doors is compiled. The design is
+// docs/design/dashboard-target-7b.md; ExternalEntities_HA.h is the entity
+// half.
 //
-// PAGE 1 OF THE SWIPE ORDER on every board since 2.6 - House first, then
-// Fleet (GUIManager::initPages()). It used to REPLACE the fleet page under
-// -D USE_HA_DASHBOARD, because a board could only show one page; that flag is
-// gone. Its id stays 2: ids are frozen identities, order is a separate list.
-//
-//
-// PRIORITY IS THE COLUMN THAT MATTERS, AND THE RULE IS THE SAME ONE
-// Dashboard_Fleet.h USES: what you cannot see from where you are standing
-// outranks what you can.
-//
-// That puts the garage doors at the top - a door left open is the only thing
-// on this page that is expensive to miss - then the outdoor readings, then
-// lights, then indoor comfort. The 3248 in portrait shows roughly six cells,
-// so this ordering is not academic: it decides what that board actually is.
-//
-// The 7B shows 18 to 21 cells and fits the whole list with nothing spare,
-// which makes this page a genuine test of degradation rather than a
-// theoretical one.
+// PRIORITY is what a small board reads when it runs out of room, by the same
+// rule Dashboard_Fleet.h uses: what you cannot see from where you are standing
+// outranks what you can. That puts the garage doors at the top - a door left
+// open is the only thing on this page that is expensive to miss - then the
+// outdoor readings, then lights, then indoor comfort. The 3248 in portrait
+// shows roughly six cells, so this ordering decides what that board shows.
 // ---------------------------------------------------------------------------
 
 static constexpr uint8_t HA_PRI_DOORS    = 230;   // cannot see them, costly to miss
@@ -39,14 +30,14 @@ static constexpr uint8_t HA_PRI_LIGHT    = 140;
 static constexpr uint8_t HA_PRI_INDOOR   = 100;
 static constexpr uint8_t HA_PRI_EXTRA    = 60;    // first to go
 
-// --- 2.13 ROUND 5: THE COMPILED CARDS RETIRED (owner, 2026-11-05, K171) -------
+// --- THE COMPILED CARDS RETIRED (K171) ---------------------------------------
 //
 // Outside, Kitchen and Office, Living's Overhead, the thermostat, Eric and the
-// garage's temperature are cards made on the board now, in each board's settings
-// file, with the ids they had here - so what was saved on them is still theirs.
-// scripts/release/retire_compiled.py made them from these specs; they are kept
-// below, unbuilt, as that script's record of what they were. Only Garage - Doors
-// stays compiled until 2.14 (its summary, K98, is a compiled card's).
+// garage's temperature are cards made on the board, in each board's settings
+// file, with the ids they had here. scripts/release/retire_compiled.py made
+// them from these specs; the specs are kept below, unbuilt, for reference. Only
+// Garage - Doors stays compiled (its summary, K98, is a compiled card's; a
+// summary made on the board is not built, K189).
 #if 0
 inline const CardSpec HA_OUTSIDE[] = {
     { .id        = "outside_porch_261008_0310",
@@ -134,10 +125,9 @@ inline const CardSpec HA_OFFICE[] = {
 
 // --- Garage: the doors ------------------------------------------------------
 //
-// These two report device_class garage_door. Since 2.11 round 4 they are the
-// members of a SUMMARY (K98): one card, open while either door is, its words
-// naming the open one ("North", "South", "Both"). Same ids as the two cards
-// they were, so what was saved on them is still theirs.
+// These two report device_class garage_door. They are the members of a SUMMARY
+// (K98): one card, open while either door is, its words naming the open one
+// ("North", "South", "Both").
 inline const CardSpec HA_GARAGE_DOORS[] = {
     { .id        = "garage_north_261008_0310",
       .primaries = { "garage_door_north" },
@@ -153,7 +143,7 @@ inline const CardSpec HA_GARAGE_DOORS[] = {
 
 inline const CardSpec HA_CARDS[] = {
     // --- Garage: the doors, first - the priority is about what matters -------
-    // Id made 2026-10-19 (K33).
+    // The id is made as K33's.
     { .id          = "garage_doors_261019_1050",
       .label       = "Doors",
       .area        = "Garage",
@@ -223,15 +213,14 @@ inline const CardSpec HA_CARDS_RETIRED[] = {
 #endif
 
 inline const PageSpec HA_PAGE = {
-    // Page 2. Ids are append-only and 1 is home forever - see PageSpec. When
-    // 2.6 lands and both pages can coexist, this id is already correct.
+    // Page 2. Ids are append-only and 1 is home forever - see PageSpec.
     .id    = 2,
     .slug  = "house",
     .title = "House",
     .cards = HA_CARDS,
     .count = (uint8_t)(sizeof(HA_CARDS) / sizeof(HA_CARDS[0])),
 
-    .headerDefault = CardHeaderStyle::HDR_TAG_FLOAT,   // owner 2026-10-01
+    .headerDefault = CardHeaderStyle::HDR_TAG_FLOAT,
     .showArea      = true,
     .areaColor     = true,
 
@@ -239,7 +228,7 @@ inline const PageSpec HA_PAGE = {
 
     // Fahrenheit, matching the fleet page and the owner's instance. Entities
     // that arrive in Celsius are converted; those already in Fahrenheit are
-    // left alone, which is what makes the two deck readings agree.
+    // left alone.
     .tempUnit = TempUnit::TEMP_F,
 };
 

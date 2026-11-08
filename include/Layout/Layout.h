@@ -2,21 +2,21 @@
 #ifndef LAYOUT_H
 #define LAYOUT_H
 // ---------------------------------------------------------------------------
-// LAYOUT (2.12 P5) - where things go on a grid, as plain arithmetic: no LVGL,
+// LAYOUT - where things go on a grid, as plain arithmetic: no LVGL,
 // no Arduino, no ESP-IDF, so it runs - and is tested - anywhere (host-tests/).
 // docs/design/layout-engines.md.
 //
 // An ENGINE takes a CONTAINER (a grid of units: columns and rows) and the
 // ITEMS to place in it - each with the span it would like and the least it
 // will accept, an optional pinned spot, and a priority - and decides where
-// each goes, or that it does not fit. CardPage's dashboard grid is its first
-// container; a cluster's sub-grid (2.11) will be another.
+// each goes, or that it does not fit. CardPage's dashboard grid is the
+// container.
 //
-// FlowEngine is the dashboard's placement as it has always been (2.5, ROADMAP
-// Q3b): pinned items first, then each in turn at the first free position with
-// the widest span that fits there, and while anything does not fit the lowest
-// priority is dropped and the whole layout tried again. Other engines - the
-// packing ("bento") one 2.11 wants - implement the same interface.
+// FlowEngine is the dashboard's placement: pinned items first, then each in
+// turn at the first free position with the widest span that fits there, and
+// while anything does not fit the lowest priority is dropped and the whole
+// layout tried again. Other engines implement the same interface; the
+// arranger (Arranger.h) is a separate search over a page's blocks.
 // ---------------------------------------------------------------------------
 #include <stdint.h>
 

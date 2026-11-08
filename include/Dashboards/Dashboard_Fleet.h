@@ -9,18 +9,14 @@
 #include "VirtualEntities.h"
 
 // ---------------------------------------------------------------------------
-// THE DASHBOARD. One page, fleet-wide, rendered on every board.
+// THE FLEET PAGE. One page, fleet-wide, rendered on every board.
 //
-// This is the file that turns the card library into a device you can use. It
-// is deliberately DATA rather than code: CardDemo.cpp builds its page by
-// calling methods, and everything it does that way would have to be redesigned
-// when the build sheet lands. Everything here is a struct the build sheet's
-// JSON loader (#20, milestone 3.3) will fill in instead, so the loader becomes
-// a parser rather than a second design.
+// It is DATA rather than code: structs the build sheet's JSON loader (#20,
+// milestone 3.3) will fill in instead, so the loader becomes a parser rather
+// than a second design.
 //
-// ONE DEFINITION FOR THE WHOLE FLEET, and that is the owner's call (2026-09-15:
-// "Fleet-wide is fine for now but per-board is definitely important later").
-// It works because nothing here is board-specific:
+// ONE DEFINITION FOR THE WHOLE FLEET (per-board comes later). It works because
+// nothing here is board-specific:
 //
 //   - the GRID is derived from the panel, not declared. WS_P4_7B gets 7 cells
 //     across and CYD_S3_3248 portrait gets 2, from the same table.
@@ -29,61 +25,47 @@
 //   - a spec whose entity is not in this board's registry is skipped and
 //     reported, never fatal.
 //
-// So the 3248 renders a true subset of the 7B rather than a different page,
-// and flashing it is a free check on the whole degradation scheme.
+// So the 3248 renders a true subset of the 7B rather than a different page.
 //
-// WHEN PER-BOARD ARRIVES it wants to be another PageSpec selected by the board
+// When per-board arrives it wants to be another PageSpec selected by the board
 // identity macro every BSP header already defines - the same mechanism
-// ConnectivityDefaults.h uses for per-board overrides, and no new machinery.
+// ConnectivityDefaults.h uses for per-board overrides.
 //
 // ---------------------------------------------------------------------------
-// WHAT IS ON IT TODAY, AND WHY IT IS NOT YOUR HOUSE
+// WHAT IS ON IT
 //
-// Eleven entities exist on this device: four Zigbee2MQTT values off one deck
-// sensor, four pieces of this board's own telemetry, and the virtual switches
-// that exist so the command path has something to command. That is the whole
-// supply until Home Assistant arrives over the websocket (#43), which is the
-// next milestone and the one that makes this list real.
-//
-// The owner's actual dashboard - office and kitchen lights, temperature and
-// occupancy, the living room lights, the indoor temperatures, and the front
-// door, deck and garage - is roughly 18 cards and every one of them needs #43.
-// Until then this page is the same structure with the entities we have, which
-// is what makes it worth booting into rather than a placeholder.
+// Only the Panel group (below) is compiled. Every other card on this page is a
+// card made on the board and kept in the settings file (K171).
 // ---------------------------------------------------------------------------
 
-// PRIORITY IS THE INTERESTING COLUMN HERE.
-//
-// It is what a small board reads when it runs out of room, and until 2.5
-// nothing read it at all. The ordering below says: the things outside that you
-// cannot see from indoors matter most, the lights matter next, and the panel's
-// own diagnostics are the first things to go - they are on the System page
-// anyway, and a 2-column portrait board showing its own free heap instead of
-// the temperature outside would be exactly backwards.
+// PRIORITY is what a small board reads when it runs out of room. The ordering:
+// the things outside that you cannot see from indoors matter most, the lights
+// matter next, and the panel's own diagnostics are the first to go - a
+// 2-column portrait board showing its own free heap instead of the temperature
+// outside would be backwards.
 static constexpr uint8_t PRI_CRITICAL = 220;   // survives on the smallest board
 static constexpr uint8_t PRI_NORMAL   = 160;
 static constexpr uint8_t PRI_NICE     = 100;
 static constexpr uint8_t PRI_DEBUG    = 40;    // first to be dropped
 
-// --- 2.13 ROUND 5: PANEL, THE ONE BUILT-IN GROUP (owner, 2026-11-05, K171) ---
+// --- PANEL, THE ONE BUILT-IN GROUP (K171) --------------------------------------
 //
 // Every board's Fleet page has the Panel group - Free Heap and Uptime, IP Address
-// and Signal - and it cannot be hidden. Its members keep the ids they had as page
-// cards, so what was saved on them is still theirs. Everything else this page
-// had is retired: the deck's three cards are the dev boards' MQTT group, made on
-// the board (their settings files); the test fixtures, the battery, the lamps and
-// the two test switches are in scripts/release/test_cards.json, to add back when
-// a test needs them. The old list is kept below, unbuilt, as the record.
+// and Signal - and it cannot be hidden. The retired cards are not compiled: the
+// dev boards' MQTT group is made on the board (in their settings files); the
+// test fixtures, the battery, the lamps and the two test switches are in
+// scripts/release/test_cards.json, to add back when a test needs them. The
+// retired list is kept below, unbuilt, for reference.
 inline const CardSpec FLEET_PANEL[] = {
-    // Free Heap and Uptime were three units across as page cards (Uptime's
-    // HH:MM:SS); as tiles they are the group's one size (to confirm on glass).
+    // Free Heap and Uptime ask for three units across (prefSpanX) as page
+    // cards; as tiles of the group they take its one tile size.
     { .id        = "panel_free_heap_261008_0310",
       .primaries = { SYS_ENT_HEAP },   .label = "Free Heap",  .area = "Panel",
       .place     = { .prefSpanX = 3, .minSpanX = U_CELL, .priority = PRI_DEBUG } },
     { .id        = "panel_uptime_261008_0310",
       .primaries = { SYS_ENT_UPTIME }, .label = "Uptime",     .area = "Panel",
       .place     = { .prefSpanX = 3, .minSpanX = U_CELL, .priority = PRI_DEBUG + 10 } },
-    { .id        = "panel_ip_address_261105_0500",   // new in round 5 (K171)
+    { .id        = "panel_ip_address_261105_0500",
       .primaries = { SYS_ENT_IP },     .label = "IP Address", .area = "Panel",
       .place     = { .prefSpanX = 3, .minSpanX = U_CELL, .priority = PRI_DEBUG } },
     { .id        = "panel_signal_261008_0310",
@@ -299,27 +281,21 @@ inline const PageSpec FLEET_PAGE = {
     // are append-only and slugs are the external key.
     .id    = 1,
     .slug  = "home",
-    // Title "Fleet" since 2.6, when it became page 2 behind House. The TITLE is
-    // display text and free to change; the id and slug are the frozen keys and
-    // stay exactly as they were.
+    // The TITLE ("Fleet", page 2 behind House) is display text and free to
+    // change; the id and slug are the frozen keys.
     .title = "Fleet",
     .cards = FLEET_CARDS,
     .count = (uint8_t)(sizeof(FLEET_CARDS) / sizeof(FLEET_CARDS[0])),
 
-    // Two of the three header modes are still open questions the owner has to
-    // answer on glass (HANDOFF: "which header mode is the default" is "what a
-    // card looks like when nobody chose", not an elimination). HDR_TAG is what
-    // the 2.4 bench defaulted to and the only mode that costs the card body
-    // nothing, so it is the one to be talked out of rather than into.
-    .headerDefault = CardHeaderStyle::HDR_TAG_FLOAT,   // owner 2026-10-01 (bar was 2026-09-17)
+    // The card label type a card gets when nobody chose: a floating tag, which
+    // costs the card body nothing.
+    .headerDefault = CardHeaderStyle::HDR_TAG_FLOAT,
     .showArea      = true,
     .areaColor     = true,
 
     .subdivision = PAGE_SUBDIVISION_DEFAULT,
 
     // Fahrenheit, fleet-wide, converting anything that arrives in Celsius.
-    // The owner's standing preference, and the deck sensor reports Celsius -
-    // so this page is its own test of the conversion.
     .tempUnit = TempUnit::TEMP_F,
 };
 

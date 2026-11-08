@@ -1,10 +1,10 @@
-// The arranger (2.11, K109, K120): Layout Playground v9's answers are the expected values.
-// GENERATED from the playground's own code (host-tests/tools/playground.html, its page v12,
-// 2026-10-26) by host-tests/tools/gen_arranger_tests.py with run_playground.js - do not edit the
+// The arranger (K109, K120): Layout Playground v9's answers are the expected values.
+// GENERATED from the playground's own code (host-tests/tools/playground.html) by
+// host-tests/tools/gen_arranger_tests.py with run_playground.js - do not edit the
 // cases by hand; run it again when the playground changes.
-// Four sets of blocks: DEVICE (the House page as the boards showed it in round 6: Doors, Kitchen
-// 4 tiles, Outside and Office 3), PLAYGROUND (its own House page by area), P1060 (the 1060's page in
-// round 9: Doors, three 3-tile clusters, Thermo) and FLEET (sixteen solo cards, Free Heap and Uptime
+// Four sets of blocks: DEVICE (a House page: Doors, Kitchen 4 tiles, Outside and Office 3),
+// PLAYGROUND (its own House page by area), P1060 (the 1060's page: Doors, three 3-tile
+// clusters, Thermo) and FLEET (sixteen solo cards, Free Heap and Uptime
 // preferring 1.5 cells across). The screens are the playground's boards, its geometry() worked out
 // for each, Float labels. Every grid, place, trimmed box, finished rectangle, score and empty unit
 // is checked.
@@ -283,7 +283,7 @@ void test_fleet_p47b() {
     check(s, FLEET, 16, 12, 6, 25.128440489225042, 4, false, want);
 }
 
-// the P4_5's House page as the owner pinned it
+// the P4_5's House page pinned at 4 x 2
 void test_device_p45_pinned_4x2() {
     ArrScreen s = screen(11.563817165786343, 1222.0, 604.0, 21.0, 33.0, 5, 3);
     s.fixCols = 4; s.fixRows = 2;
@@ -316,7 +316,7 @@ void test_device_p44b_pinned_4x5() {
     check(s, DEVICE, 4, 8, 10, 43.488537944050535, 6, false, want);
 }
 
-// the 4B pinned at its own 4 x 3: a page, its clusters at their tightest (round 12)
+// the 4B pinned at its own 4 x 3: a page, its clusters at their tightest
 void test_device_p44b_pinned_4x3() {
     ArrScreen s = screen(10.021985875084926, 670.0, 620.0, 18.0, 29.0, 4, 3);
     s.fixCols = 4; s.fixRows = 3;
@@ -327,7 +327,7 @@ void test_device_p44b_pinned_4x3() {
     check(s, DEVICE, 4, 8, 6, 32.20086821057672, 4, false, want);
 }
 
-// the 4B's House at 4 x 5: its clusters grown into the spare height (round 12)
+// the 4B's House at 4 x 5: its clusters grown into the spare height
 void test_p1060_p44b_pinned_4x5() {
     ArrScreen s = screen(10.021985875084926, 670.0, 620.0, 18.0, 29.0, 4, 3);
     s.fixCols = 4; s.fixRows = 5;
@@ -339,7 +339,7 @@ void test_p1060_p44b_pinned_4x5() {
     check(s, P1060, 5, 8, 10, 62.180868253569116, 14, true, want);
 }
 
-// the 4B's House at 4 x 3: a page, where round 11 had none
+// the 4B's House at 4 x 3: a page, which the tightest shapes make possible
 void test_p1060_p44b_pinned_4x3() {
     ArrScreen s = screen(10.021985875084926, 670.0, 620.0, 18.0, 29.0, 4, 3);
     s.fixCols = 4; s.fixRows = 3;
@@ -388,7 +388,7 @@ void test_finish_again() {
     }
 }
 
-// A kept answer holds a cluster's tiles across, not down (round 12): finished without them, the
+// A kept answer holds a cluster's tiles across, not down: finished without them, the
 // page is the same - its clusters still grow into the spare height (the 4B's House at 4 x 5).
 void test_finish_without_tiles_down() {
     ArrScreen s = screen(10.021985875084926, 670.0, 620.0, 18.0, 29.0, 4, 3);

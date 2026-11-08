@@ -1,13 +1,13 @@
 #pragma once
 // ---------------------------------------------------------------------------
-// HEADER PLAN (2.8 round 2, DECISIONS D-19) - where the page header's slots
+// HEADER PLAN (DECISIONS D-19) - where the page header's slots
 // stand, as plain arithmetic: no LVGL, no Arduino, no ESP-IDF, so it is tested
-// on the PC (host-tests/test_header_plan). docs/design/header-slots.md §10.
+// on the PC (host-tests/test_header_plan). docs/design/header-slots.md §4.
 //
 // The header has three PLACES: the left and the right, pinned to the bar's
 // ends, and the middle, which stands on the bar's centre and never moves. Each
 // slot in a place makes a CLAIM on its room: what it would show in each of its
-// FORMS (form 0 the fullest - the alarm's bell and time; form 1 the bell), and
+// FORMS (form 0 the fullest - the clock's time and bell; form 1 the time), and
 // how hard each form holds its room - its KEEP, a priority.
 //
 // When a side would run into the middle, the lowest keep among that side's

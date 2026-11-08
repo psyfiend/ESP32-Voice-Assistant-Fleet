@@ -1,4 +1,4 @@
-// Cluster arithmetic (2.11 round 1): how mini tiles share a cluster, and how many
+// Cluster arithmetic: how mini tiles share a cluster, and how many
 // cells a cluster asks for. Sizes are the P4_5's and the 4B's in real pixels.
 #include <unity.h>
 #include "Layout/Cluster.h"

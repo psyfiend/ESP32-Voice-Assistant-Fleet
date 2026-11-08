@@ -3,15 +3,15 @@
 // SystemCore - everything the device is, minus the screen.
 //
 // Owns every non-UI subsystem and starts them in one place, in an order whose
-// constraints are written down rather than implied by line order (which is all
-// setup() used to be). See docs/design/startup.md section 4.
+// constraints are written down rather than implied by line order.
+// See docs/design/startup.md section 4.
 //
 // This file deliberately includes no LVGL header, and must not grow one. That
 // property is what makes a GUI-less variant a build_src_filter line rather than
 // a redesign - see docs/design/startup.md section 7.
 //
 #include <Arduino.h>
-#include "BoardDisplay.h"   // DisplayManager or Fleet_Display, per board (2.9)
+#include "BoardDisplay.h"   // DisplayManager or Fleet_Display, per board
 #include "TouchManager.h"
 #include "ConnectivityManager.h"
 #include "MqttManager.h"
@@ -38,13 +38,12 @@ public:
     // by bisecting. Internal heap is what the WiFi driver and LWIP allocate
     // from, and on CYD_S3_3248 - the only QSPI board, so the only one whose
     // LVGL buffers must ALSO be internal - it is the scarcest thing on the
-    // device. A board that boots with a few KB free cannot hold a socket, and
-    // nothing in the log used to say so.
+    // device. A board that boots with a few KB free cannot hold a socket.
     static void heapMark(const char *stage);
 
     // Hardware, then the data layer. Returns false only when the display fails
-    // to initialise - the one startup failure the previous code treated as
-    // fatal. The caller decides what fatal means; SystemCore does not halt.
+    // to initialise - the one startup failure that is fatal. The caller
+    // decides what fatal means; SystemCore does not halt.
     bool begin();
 
     // Non-blocking pump for everything above. Call every loop().
@@ -57,7 +56,7 @@ public:
     EntityRegistry      &entities() { return _entities; }
     HaClient            &ha()       { return _ha; }
     HaHistory           &history()  { return _haHist; }
-    HaCatalog           &catalog()  { return _haCat; }    // what HA offers (2.13)
+    HaCatalog           &catalog()  { return _haCat; }    // what HA offers
     HaProvider          &haProvider() { return _haProv; }
     HttpServer          &http()     { return _http; }
     BatteryProvider     &battery()  { return _battProvider; }
@@ -102,20 +101,16 @@ private:
     // whatever external entities are registered.
     MqttProvider        _mqttProv;
 
-    // TEMPORARY, with #44. The fleet has no writable entity of any kind, so
-    // the registry's optimistic-write path has never once executed on
-    // hardware. This provides two switches to tap - one that answers and one
-    // that does not. See VirtualEntities.h.
+    // TEMPORARY test scaffolding: two writable switches to tap - one that
+    // answers and one that does not. See VirtualEntities.h.
     VirtualProvider     _virtProv;
 
     // The Home Assistant websocket session (#43). Owns the socket and the auth
     // handshake only - it knows nothing about areas, entities or cards.
     //
-    // THE FIRST COMPONENT IN THIS PROJECT THAT RUNS ON ITS OWN TASK. Its
-    // receive path is called by esp_websocket_client's task, not by loop(), so
-    // it must never touch LVGL and writes through EntityRegistry's mutex
-    // instead. That rule has always been in CLAUDE.md for providers; this is
-    // the first one that could actually break it. See HaClient.h.
+    // IT RUNS ON ITS OWN TASK. Its receive path is called by
+    // esp_websocket_client's task, not by loop(), so it must never touch LVGL
+    // and writes through EntityRegistry's mutex instead. See HaClient.h.
     HaClient            _ha;
 
     // One-shot initial values over REST, because HA's websocket has NO
@@ -131,11 +126,11 @@ private:
     // new session has begun, and tells _haRest to re-fetch when it does.
     HaProvider          _haProv;
 
-    // What HA offers the pickers (2.13): the "fleet" entities by area, asked by
+    // What HA offers the pickers: the "fleet" entities by area, asked by
     // _haProv. See HaCatalog.h.
     HaCatalog           _haCat;
 
-    // An entity's past, for a card window's History view (2.10e): asked on the
+    // An entity's past, for a card window's History view: asked on the
     // same session, answered through _haProv's raw hook. See HaHistory.h.
     HaHistory           _haHist;
 

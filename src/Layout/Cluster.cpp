@@ -1,4 +1,4 @@
-// Cluster arithmetic (2.11 round 1): include/Layout/Cluster.h says what and why.
+// Cluster arithmetic: include/Layout/Cluster.h says what and why.
 #include "Layout/Cluster.h"
 #include <math.h>
 

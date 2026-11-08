@@ -1,7 +1,7 @@
 #pragma once
 //
 // LVGL_Flush - how LVGL's finished pixels reach the panel. Private to
-// LVGL_Startup. Milestone 2.9 (#67), docs/archive/display/esplcd-step2.md §7 A.
+// LVGL_Startup (#67, docs/display/architecture.md).
 //
 // Exactly ONE of these is compiled into a build, each wholly inside one #if:
 //
@@ -27,9 +27,8 @@ lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info);
 // Draw buffers must start on an LV_DRAW_BUF_ALIGN boundary, or
 // lv_display_set_buffers() fails its alignment assert - which on this fleet is
 // `while(1);`, a silent freeze at boot. Plain heap_caps_malloc() only promises
-// 4 (internal) or 16 (PSRAM) bytes, which was enough while LV_DRAW_BUF_ALIGN
-// was 4 and stops being enough the moment it is 64 (the PPA's cache line).
-// The size is rounded up too, because a cache sync over a buffer wants whole
+// 4 (internal) or 16 (PSRAM) bytes, which is not enough for an alignment of 64
+// (the PPA's cache line). The size is rounded up too, because a cache sync over a buffer wants whole
 // cache lines.
 inline void *allocDrawBuf(size_t &bytes, uint32_t caps) {
     constexpr size_t A = LV_DRAW_BUF_ALIGN;
@@ -55,10 +54,9 @@ uint32_t panelFramesScanned();
 uint8_t softwareRotation();
 
 // GET /bench?what=copy: how fast each engine copies frame-buffer memory on
-// this board, PSRAM to PSRAM - the question behind the PPA's unexplained
-// ~110 MB/s (display-stack.md s8.5) and whether esp_async_fbcpy would make
-// a better repair engine. Averages of `reps` runs, microseconds. LVGL thread
-// only; uses the free frame buffer and leaves it holding the newest frame.
+// this board, PSRAM to PSRAM (the PPA, esp_async_fbcpy and the CPU). Averages
+// of `reps` runs, microseconds. LVGL thread only; uses the free frame buffer
+// and leaves it holding the newest frame.
 struct CopyBench {
     uint32_t  frameBytes = 0;     // one whole frame
     uint32_t  rotBytes   = 0;     // the square block the rotation test moves
@@ -86,7 +84,7 @@ struct CopyBench {
     // inside each range; changed pixels outside both. NOTE the dual test
     // passes only because both copies START at once: a copy that has to QUEUE
     // behind another is corrupted (esp_async_fbcpy_priv.h) - this test cannot
-    // show that, the flush's verify (what=verify) did.
+    // show that; the flush's verify (what=verify) can.
     uint32_t  dualA = 0, dualB = 0, dualOutside = 0;
     uint32_t  mixF = 0, mixP = 0, mixOutside = 0;
 };

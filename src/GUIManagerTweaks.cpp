@@ -1,5 +1,5 @@
-// GUIManager - UI Tweaks (2.8 round 3, D-22 / D-25 / D-27). Split from
-// GUIManager.cpp as the header's half was: what each of UI Tweaks' rows sets
+// GUIManager - UI Tweaks (D-22 / D-25). Apart from GUIManager.cpp, as the
+// header's half is: what each of UI Tweaks' rows sets
 // and where it is saved, the scheme and the grid's counts (the system panel's),
 // the system panel's CONNECTIVITY words, and the deck rising under the window.
 // The window itself is UI/TweaksSheet.
@@ -9,8 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "Settings.h"
-#include "Cards/CardAdded.h"     // the development Reset (round 9)
-#include "Cards/ClusterCard.h"   // the clusters' header glyphs (round 11)
+#include "Cards/CardAdded.h"     // the development Reset
+#include "Cards/ClusterCard.h"   // the clusters' header glyphs
 #include "Cards/CardIcons.h"     // cardLabelMode(), cardSetLabelMode()
 #include "Cards/CardPopup.h"
 #include "UI/Sheet.h"            // windowCloseMs(), sheetBeside()
@@ -67,9 +67,9 @@ void GUIManager::applySavedScheme() {
     if (readName("scheme", SCHEME_NAMES, SCHEME_N, i)) UI::setSchemeIndex(i);
 }
 
-// DEVICE-WIDE since 2.8 round 3: every page takes it, and it is saved. A
-// rebuild rather than a restyle - a METRICS change moves radii and padding,
-// which a card reads when it is built.
+// DEVICE-WIDE (D-29): every page takes it, and it is saved. It rebuilds the
+// dashboard rather than restyling it, because a METRICS change moves radii and
+// padding, which a card reads when it is built.
 void GUIManager::chooseScheme(uint8_t i, bool save) {
     if (i >= SCHEME_N) return;
     const bool changed = UI::schemeIndex() != i;
@@ -86,11 +86,10 @@ void GUIManager::chooseScheme(uint8_t i, bool save) {
 }
 
 // --- The grid's counts (the system panel's Col / Row) -------------------------------
-// PER PAGE, as they always were (owner, 2026-09-23: "a page built for a fixed
-// set of cards needs its own arrangement") - and saved with the page now.
-// SINCE 2.11 ROUND 9 A COUNT IS A PIN: saved only while pinned, kept by the
-// arranger, which chooses the rest; unpinned, the flow (a page the arranger does
-// not place) takes the board's own grid.
+// PER PAGE (D-29), since a page built for a fixed set of cards needs its own
+// arrangement - and saved with the page. A COUNT IS A PIN: saved only while
+// pinned, kept by the arranger, which chooses the rest; unpinned, the flow (a
+// page the arranger does not place) takes the board's own grid.
 void GUIManager::saveGrid() {
     _colsOverride = _pinCols ? _pinCols : s_ship.cols;
     _rowsOverride = _pinRows ? _pinRows : s_ship.rows;
@@ -112,9 +111,9 @@ void GUIManager::saveGrid() {
     Serial.printf("[UI] grid pins -> %u x %u (0: the arranger's)\n", (unsigned)_pinCols, (unsigned)_pinRows);
 }
 
-// --- The development Reset (the system panel's, 2.11 round 9) ----------------------
-// THE DASHBOARD AND ITS CLUSTERS BACK TO THE COMPILED ONES (the owner: "a Reset
-// button would help during development"): CardAdded's reset - every card made
+// --- The development Reset ------------------------------------------------------------
+// The system panel has no Reset button (K187, K192); only /popup?dash=2 runs it.
+// THE DASHBOARD AND ITS CLUSTERS BACK TO THE COMPILED ONES: CardAdded's reset - every card made
 // here deleted, every hide and move undone, the clusters' members and header
 // slots as built - and every page's kept arrangement forgotten, so each arranges
 // itself again. The looks, the schemes, UI Tweaks and the pins stay. The page is
@@ -130,7 +129,7 @@ void GUIManager::resetDashboard() {
     rebuildDashboard();
 }
 
-// The system panel's Dashboard line, and the dialog's count of what goes.
+// The Dashboard summary, and the dialog's count of what goes.
 void GUIManager::dashboardText(char *brief, size_t nb, char *detail, size_t nd) {
     const CardAdded::ResetCount c = CardAdded::resetToCompiled(false);
     const unsigned all = (unsigned)c.made + c.hidden + c.members + c.clusters;
@@ -204,10 +203,10 @@ void GUIManager::setDensity(CardVariant v) {
 
 void GUIManager::setGlyphs(GlyphStyle g) {
     _header.setGlyphStyle(g);
-    // Saved by name; the default (square, D-20) as nothing.
+    // Saved by name; the default (square) as nothing.
     Settings::setSystem("header", "glyphs", g == GLYPH_DEFAULT ? nullptr : glyphStyleName(g));
     Settings::save();
-    // The clusters' header values take it too (round 11, K115).
+    // The clusters' header values take it too (K115).
     ClusterCard::setGlyphStyle(g);
     rebuildDashboard();
     Serial.printf("[UI] header glyphs -> %s\n", glyphStyleName(g));
@@ -230,7 +229,7 @@ void GUIManager::resetUiTweaks() {
     _header.setGlyphStyle(savedGlyphStyle());
     ClusterCard::setGlyphStyle(savedGlyphStyle());
     rebuildDashboard();
-    // The open window waits as shipped from now (round 4: at once).
+    // The open window waits as shipped from now, at once.
     if (Kit::Sheet *s = Kit::sheetShowing()) Kit::sheetRetime(*s, Kit::windowCloseMs(), Kit::windowBarShown());
     Serial.println("[UI] UI Tweaks reset");
 }
@@ -335,7 +334,7 @@ struct GUITweaks {
     static uint8_t densityNow()         { return g ? posOf(DENSITY_IS, g->_variant) : 0; }
     static void    densitySet(uint8_t i){ if (g && i < 3) g->setDensity(DENSITY_IS[i]); }
 
-    // THE SELECTOR'S LOOK, for the scheme showing (K45): its metal - the
+    // THE SELECTOR'S LOOK, for the scheme showing: its metal - the
     // scheme's own, or chosen - and its shape. Choosing a shape chooses the look.
     static uint8_t metalNow() {
         const int8_t l = Kit::selectorLook();
@@ -351,15 +350,15 @@ struct GUITweaks {
         Settings::save();
     }
 
-    // How long a window waits, and its bar (T6): system.window.
+    // How long a window waits, and its bar (K79): system.window.
     static uint8_t timeoutNow() {
         char v[8];
         if (!Settings::system("window", "close", v, sizeof(v))) return 0;
         for (uint8_t i = 1; i < 4; i++) if (!strcmp(v, TIMEOUT_IS[i])) return i;
         return 0;
     }
-    // AT ONCE (owner, round 4): this window waits as chosen from now, its bar
-    // coming or going with it.
+    // AT ONCE: this window waits as chosen from now, its bar coming or going
+    // with it.
     static void retime() {
         if (Kit::Sheet *s = Kit::sheetShowing()) Kit::sheetRetime(*s, Kit::windowCloseMs(), Kit::windowBarShown());
     }
@@ -369,7 +368,7 @@ struct GUITweaks {
         Settings::save();
         retime();
     }
-    // THE HALO'S STRENGTH (2.11 round 4), for the scheme showing: a slider, kept
+    // THE HALO'S STRENGTH (D-35), for the scheme showing: a slider, kept
     // per scheme (schemes.<name>.halo); its own value is the scheme's (50 / 30).
     static int16_t haloNow()          { return (int16_t)Kit::haloStrength(); }
     static void    haloSet(int16_t v) { Kit::keepHaloStrength((uint8_t)LV_CLAMP(0, v, 100)); Settings::save(); }
@@ -387,7 +386,7 @@ struct GUITweaks {
 
     // CARD MARGINS (K167): the gap between cards and groups on the page, and the
     // least between tiles or cards in every group view without its own. By name
-    // (system.ui.margins); Medium, today's, as nothing. The page is arranged again.
+    // (system.ui.margins); Medium, the default, as nothing. The page is arranged again.
     static uint8_t marginsNow() {
         char v[12];
         if (!Settings::system("ui", "margins", v, sizeof(v))) return 1;
@@ -412,7 +411,7 @@ struct GUITweaks {
 
     static constexpr TweaksSheet::Row ROWS[] = {
         { "Glyphs",         GLYPHS,  3, glyphsNow,  glyphsSet  },
-        { "Label type",     LABEL,   4, labelNow,   labelSet   },   // the card label's TYPE; Card UI's "Card label" is its words (round 10)
+        { "Label type",     LABEL,   4, labelNow,   labelSet   },   // the card label's TYPE; Card UI's "Card label" is its words
         { "Entity label",   ENTITY,  4, entityNow,  entitySet  },
         { "Card state",     STATE,   4, stateNow,   stateSet   },
         { "Selector",       METAL,   3, metalNow,   metalSet   },
@@ -423,7 +422,7 @@ struct GUITweaks {
         { "Window timeout", TIMEOUT, 4, timeoutNow, timeoutSet },
         { "Timer bar",      ONOFF,   2, barNow,     barSet     },
         { "Halo",           nullptr, 0, nullptr,    nullptr,   0, 100, haloNow, haloSet, "%" },
-        // A CHECKBOX (K128: one thing on or off), the owner's words (round 14).
+        // A CHECKBOX (K128: one thing on or off).
         { "Show helper text", nullptr, 0, helperNow, helperSet },
     };
 
@@ -477,7 +476,7 @@ struct GUITweaks {
         lv_obj_set_pos (d, win.x1 - pad, foot - h + strip);
         lv_obj_clear_flag(d, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(d);
-        // In the window's colour, as the card window's panels are (U10).
+        // In the window's colour, as the card window's panels are.
         panelsFace(d, true);
         g->_deckRaised = true;
         beside.holder = d;

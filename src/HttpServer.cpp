@@ -38,7 +38,7 @@ bool HttpServer::start() {
     // encode starves IDLE0, and this framework builds with the task watchdog
     // watching IDLE0 and set to PANIC after 5 s - a reboot, not a warning.
     // Core 1's idle task is not watched (CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1
-    // is unset in both esp32s3 and esp32p4_es sdkconfigs, checked 2026-09-24).
+    // is unset in both the esp32s3 and esp32p4_es sdkconfigs).
     //
     // begin-from-loop() means xPortGetCoreID() is loopTask's core, which keeps
     // this correct without naming an Arduino macro.

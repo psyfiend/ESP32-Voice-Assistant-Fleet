@@ -1,4 +1,4 @@
-// The header's planner (2.8 round 2). See include/Layout/HeaderPlan.h.
+// The header's planner. See include/Layout/HeaderPlan.h.
 #include "Layout/HeaderPlan.h"
 
 namespace Layout {

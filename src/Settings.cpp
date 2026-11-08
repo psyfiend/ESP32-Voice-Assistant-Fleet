@@ -78,10 +78,9 @@ JsonObject objectAt(JsonObject parent, const char *key) {
     return parent[key].to<JsonObject>();
 }
 
-// WHO CHANGED WHAT (2.10d). Desk's Tap action was found set on the P4_5 with
-// nobody at the panel, and nothing said how. Every change is now logged with
-// its time and the task that made it - "loopTask" is the card window (the LVGL
-// thread), "httpd" a browser - and the last few are kept for ?stats=1.
+// WHO CHANGED WHAT. Every change is logged with its time and the task that
+// made it - "loopTask" is the card window (the LVGL thread), "httpd" a
+// browser - and the last few are kept for ?stats=1.
 constexpr uint8_t CHANGES_KEPT = 10;
 char    s_changes[CHANGES_KEPT][112];
 uint8_t s_changeHead = 0, s_changeN = 0;
@@ -224,11 +223,9 @@ void note(const char *fmt, ...) {
     Serial.printf("[Settings] %s\n", s_bootNote);
 }
 
-// A FILE THAT EXISTS BUT CANNOT BE READ IS NEVER OVERWRITTEN. 2026-10-08: one
-// boot of WS_P4_5 started with an empty store although the file was there (no
-// settings.bad, so it was not bad JSON), and the next save replaced it - a
-// card's saved Scenes was lost. Whatever the cause, the cure is the same:
-// such a boot is read-only, and says so.
+// A FILE THAT EXISTS BUT CANNOT BE READ IS NEVER OVERWRITTEN: such a boot has
+// an empty store, and the next save would replace the file. That boot is
+// read-only, and says so.
 void readFile() {
     errno = 0;
     FILE *f = fopen(PATH, "r");
@@ -282,13 +279,12 @@ void readFile() {
          (unsigned)cards, (unsigned)schemes, (unsigned)ents, ents == 1 ? "y" : "ies");
 }
 
-// A FAILED MOUNT NEVER COSTS THE SETTINGS (A17). Until 2026-10-15 the mount
-// formatted the partition whenever LittleFS would not mount it, and the P4_5
-// lost its file on 2026-10-14, most likely that way. Now the partition is
-// formatted only when it is blank - every byte 0xFF, a first boot - and
-// anything else is left exactly as it is: the boot runs read-only from RAM
-// and says so. The WHOLE partition is checked, not only its start: an erased
-// start with the file's blocks still behind it is what A16's erase mode left.
+// A FAILED MOUNT NEVER COSTS THE SETTINGS (A17). The partition is formatted
+// only when it is blank - every byte 0xFF, a first boot - and anything else is
+// left exactly as it is: the boot runs read-only from RAM and says so. The
+// WHOLE partition is checked, not only its start: an erased start with the
+// file's blocks still behind it is what an erase of the partition's start
+// leaves (A16).
 // Reads the flash, so begin()'s caller only (a task whose stack is internal).
 //   0: blank; 1: holds data, `at` is the first byte that is not 0xFF;
 //   -1: could not be read.

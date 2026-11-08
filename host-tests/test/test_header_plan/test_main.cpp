@@ -1,4 +1,4 @@
-// The header's planner (2.8 round 2, D-19): the three places and the claims on them, each rule
+// The header's planner (D-19): the three places and the claims on them, each rule
 // pinned down by a test. Widths are px; the numbers are round so the arithmetic can be read.
 #include <unity.h>
 #include "Layout/HeaderPlan.h"
@@ -67,8 +67,9 @@ void test_middle_never_moves() {
     TEST_ASSERT_EQUAL_INT32(400, s[1].x);
 }
 
-// The narrowest board, as round 2's mock drew it: the alarm's time goes first, then the
-// temperature's icon, then the page's name - each the lowest keep left among the claims that help.
+// The narrowest board: a claim with two forms (bell and time, then the bell) goes first, then
+// the temperature's icon, then the page's name - each the lowest keep left among the claims that
+// help.
 void test_narrow_bar_sheds_in_keep_order() {
     HeaderClaim c[5] = {
         one(LEFT, 60),                       // the clock

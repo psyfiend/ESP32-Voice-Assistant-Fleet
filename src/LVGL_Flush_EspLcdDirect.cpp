@@ -1,5 +1,5 @@
 // LVGL_Flush, esp_lcd path for RGB panels - the DOUBLE_DIRECT present mode
-// (Fleet_BSP.h). WS_S3_4B from 2.9 step 4. See LVGL_Flush.h; the MIPI-DSI
+// (Fleet_BSP.h), used by WS_S3_4B. See LVGL_Flush.h; the MIPI-DSI
 // boards' flush is LVGL_Flush_EspLcd.cpp (TRIPLE_PARTIAL).
 //
 // THE SHAPE. LVGL draws straight into the panel's own frame buffers - two of

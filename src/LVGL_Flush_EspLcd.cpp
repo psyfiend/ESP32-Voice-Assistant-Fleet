@@ -1,6 +1,5 @@
-// LVGL_Flush, esp_lcd path - boards with -D DISPLAY_ESPLCD (WS_P4_5 from
-// 2.9 step 2, WS_P4_4B from step 3). See LVGL_Flush.h, and docs/archive/display/esplcd-step2.md §3 for the
-// sequence this implements. esp_lvgl_adapter 0.6.4 (Apache-2.0,
+// LVGL_Flush, esp_lcd path, MIPI-DSI boards with -D DISPLAY_ESPLCD. See
+// LVGL_Flush.h and docs/display/architecture.md. esp_lvgl_adapter 0.6.4 (Apache-2.0,
 // reference/esp-registry/) was read as the reference; no code was copied.
 //
 // THE SHAPE, per frame:
@@ -9,7 +8,7 @@
 //                 to show, and REPAIR it: copy in, from the newest frame, every
 //                 area it is behind on (it last held a frame two presents ago)
 //                 LESS what this frame redraws - on the DMA2D copier, by a
-//                 worker on core 0, while LVGL draws (display-stack.md s8.10)
+//                 worker on core 0, while LVGL draws
 //   every chunk   rotate LVGL's unrotated chunk into that buffer with the PPA
 //   last chunk    wait for the repair list, then hand the buffer to the panel,
 //                 which switches to it at the start of its next frame - no
@@ -62,10 +61,9 @@ int32_t  s_pw = 0, s_ph = 0;         // physical (panel) size
 // at boot. A merged area can cover pixels that did not change: copying them
 // is wasted work, never wrong.
 //
-// It used to go wholly stale past 8 areas instead. During a deck-panel
-// animation - 3 areas a frame, a buffer 2-3 frames behind - that meant a
-// whole-frame repair every few frames, ~33 ms of PPA each
-// (/bench?what=anim, 2026-09-26).
+// Merging, rather than going wholly stale past a fixed count, keeps a
+// deck-panel animation - 3 areas a frame, a buffer 2-3 frames behind - from
+// needing a whole-frame repair (~33 ms of PPA) every few frames.
 constexpr uint8_t MAX_RECTS = 16;
 struct Stale {
     lv_area_t r[MAX_RECTS];
@@ -149,11 +147,11 @@ ppa_srm_rotation_angle_t ppaAngle() {
 // this single store (lv_display.c:656-659), written here directly so the
 // interrupt calls nothing in flash.
 #ifdef DEBUG_HANG
-// WHAT THE PPA WAS LAST ASKED (2.10d, HangWatch). The P4_5 froze three times
-// on 2026-10-09 with loop() waiting forever inside ppa_do_operation() - for
-// the SRM engine to finish a job that never finished. This keeps the last
-// jobs, which one never returned, how many were asked and finished, and the
-// PPA's and DMA2D's registers at the hang (hangReport(), in /hang).
+// WHAT THE PPA WAS LAST ASKED (HangWatch). If loop() waits forever inside
+// ppa_do_operation() - for the SRM engine to finish a job that never finishes -
+// this has the last jobs, which one never returned, how many were asked and
+// finished, and the PPA's and DMA2D's registers at the hang (hangReport(), in
+// /hang).
 struct PpaRec { uint32_t ms; uint16_t x, y, w, h, dx, dy; uint8_t angle, blocking; int32_t ret; };
 constexpr uint8_t PPA_RECS = 16;
 constexpr int32_t PPA_PENDING = 0x7fffffff;
@@ -183,10 +181,9 @@ bool IRAM_ATTR onFbcpyDone(esp_async_fbcpy_handle_t mcp, esp_async_fbcpy_event_d
 
 // --= Repairs on the DMA2D copier (esp_async_fbcpy) =--
 //
-// Measured 2026-09-26 (/bench?what=copy): the DMA2D copier moves frame-buffer
-// memory at ~140-150 MB/s where the PPA manages ~45-50, on both boards - and
-// it runs on its own DMA2D channels, so repairs now run ALONGSIDE the PPA's
-// strip rotations. That is safe because a repair covers only what this frame
+// Measured with /bench?what=copy: the DMA2D copier moves frame-buffer memory at
+// ~140-150 MB/s where the PPA manages ~45-50 - and it runs on its own DMA2D
+// channels, so repairs run ALONGSIDE the PPA's strip rotations. That is safe because a repair covers only what this frame
 // does NOT redraw (repairArea subtracts the redraw), while every strip lies
 // inside what it does redraw: the two never write the same pixel.
 //
@@ -194,13 +191,12 @@ bool IRAM_ATTR onFbcpyDone(esp_async_fbcpy_handle_t mcp, esp_async_fbcpy_event_d
 // driver a pointer to ONE static transaction config shared by every handle
 // (esp_lcd/src/esp_async_fbcpy.c at IDF 2553c5ad432), and the driver reads it
 // only when a queued job STARTS. With several copies queued, each start sees
-// the LAST caller's handle: some pieces copied twice, others never. Found
-// 2026-09-26 as stale pixels on WS_P4_5 when this ran a pool of 16 handles
-// (esp_async_fbcpy_priv.h). Espressif's own DPI driver uses one handle, one
-// copy at a time, which is why it never meets it.
+// the LAST caller's handle: some pieces copied twice, others never, which
+// shows as stale pixels (esp_async_fbcpy_priv.h). Espressif's own DPI driver
+// uses one handle, one copy at a time, which is why it never meets it.
 //
 // So a frame's repair pieces go on a list, and one worker task on core 0 -
-// idle while LVGL draws on core 1 (display-stack.md s8.3) - copies them one
+// idle while LVGL draws on core 1 - copies them one
 // after another on a single handle. They still run alongside the PPA's strip
 // rotations. endFrame() waits for the whole list: the panel is never handed a
 // buffer that is still being written.
@@ -419,15 +415,14 @@ void repairBlit(void *from, void *to, const lv_area_t &r, LVGL_Startup::FlushSta
 
 // THE WHOLE-AREA FALLBACK, DONE NOW AND WAITED FOR - never queued.
 //
-// A whole-area repair overlaps what this frame redraws. Queued, it ran on the
-// DMA2D copier ALONGSIDE the PPA's strip rotations - breaking the one rule
-// that makes that overlap safe (see "Repairs on the DMA2D copier" above) - and
-// whichever finished second won. When the copy won, it put the PREVIOUS
-// frame's pixels back over freshly drawn ones. Found 2026-10-03 by the owner
-// as straight lines with rounded ends left on screen after the card popup's
-// outline shrank away: its eight moving pieces change ~16 thin areas a frame,
-// which cut a stale area into more than PIECES_MAX pieces. A deck panel
-// changes 3 and never reached the fallback.
+// A whole-area repair overlaps what this frame redraws. Queued, it would run
+// on the DMA2D copier ALONGSIDE the PPA's strip rotations - breaking the one
+// rule that makes that overlap safe (see "Repairs on the DMA2D copier" above) -
+// and whichever finished second would win. When the copy won, it would put the
+// PREVIOUS frame's pixels back over freshly drawn ones (stray lines left on
+// screen). The fallback is reached when a stale area is cut into more than
+// PIECES_MAX pieces, as the card popup's outline does (~16 thin areas a
+// frame); a deck panel changes 3 and never reaches it.
 //
 // Done synchronously here it cannot race: beginFrame() runs before the frame's
 // first strip is rotated (disp_flush), so every strip lands on top of it. The
@@ -454,8 +449,8 @@ void repairBlitNow(const void *from, void *to, const lv_area_t &r, LVGL_Startup:
 // thin. If the pieces outgrow PIECES_MAX, `r` is repaired whole, at once,
 // before any strip is drawn - see repairBlitNow().
 //
-// 64 since 2026-10-03 (was 32), so the popup's outline - ~16 thin areas a
-// frame - normally stays on the fast, parallel path. Static rather than on
+// 64, so the popup's outline - ~16 thin areas a frame - normally stays on the
+// fast, parallel path. Static rather than on
 // the stack: 2 KB of pieces is too much for the loop task's stack, and this
 // only ever runs on the LVGL thread.
 constexpr uint8_t PIECES_MAX = 64;
@@ -606,7 +601,7 @@ lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info) {
 
     // The repair copier: one handle, one worker on core 0 (see repairWorker).
     // If any part is refused, s_fbc stays null and every repair stays on the
-    // PPA, as before - slower, never wrong.
+    // PPA - slower, never wrong.
     s_rqStart = xSemaphoreCreateBinary();
     s_rqDone  = xSemaphoreCreateBinary();
     s_rqPiece = xSemaphoreCreateBinary();
@@ -639,7 +634,7 @@ lv_display_t *create(BoardDisplay &display, LVGL_Startup::DrawBufInfo &info) {
                   bsp_lvgl.DOUBLE_BUFFERING ? 2u : 1u);
     // DMA | SPIRAM, 64-aligned: what the PPA's DMA needs, per the rules
     // recorded from the Allsky/NINA author's working PPA code and LVGL's own
-    // (docs/archive/display/display-stack-migration.md, "Buffer-requirements summary").
+    // (docs/display/architecture.md).
     const uint32_t caps = MALLOC_CAP_DMA | MALLOC_CAP_SPIRAM;
     void *b1 = allocDrawBuf(bytes, caps);
     void *b2 = bsp_lvgl.DOUBLE_BUFFERING ? allocDrawBuf(bytes, caps) : nullptr;

@@ -91,11 +91,10 @@ void reportEntities(SystemCore &core) {
 
     // PAUSED ENTITIES ARE LISTED HERE BECAUSE NOTHING ELSE WOULD SHOW THEM.
     //
-    // Issue #60 made pause persist across reboots, which turns it from a glance
-    // tool into a setting - and a setting with no inventory is a trap. Someone
-    // pauses a probe in October, forgets, and spends February wondering why one
-    // sensor never updates. The dump is the one place that answers it without
-    // hunting for the tile and long-pressing to see if it toggles.
+    // Pause persists across reboots (#60), which makes it a setting, and a
+    // setting with no inventory is a trap: a forgotten pause looks like a
+    // sensor that never updates. The dump answers it without hunting for the
+    // tile and long-pressing to see if it toggles.
     const uint8_t nPaused = entities.pausedCount();
     if (nPaused) {
         SystemReport::line("[ENTITIES] %u PAUSED by the user:", (unsigned)nPaused);
@@ -136,18 +135,14 @@ void reportHardware(SystemCore &core) {
     SystemReport::line("  I2C Backend: %s", FleetI2C::backendName());
     SystemReport::line("  Uptime: %lu ms", millis());
     // Same labels and same units as the boot banner in SystemCore, on purpose:
-    // these are the same quantities and used to be reported three different
-    // ways.
+    // these are the same quantities.
     SystemReport::line("  Free Heap: %s", SystemReport::fmtBytes(ESP.getFreeHeap(), b, sizeof(b)));
 
-    // THE LVGL THREAD'S REMAINING STACK, and the one number that would have
-    // caught every crash in milestone 2.4 immediately.
-    //
-    // All of them were "Stack canary watchpoint triggered (loopTask)" - LVGL's
-    // draw walk recursing once per level of widget nesting, inside the 8 KB
-    // arduino-esp32 gives loopTask by default. main.cpp raises it; this is how
-    // we know by how much rather than hoping. A high-water mark trending toward
-    // zero as cards get more deeply nested is the warning.
+    // THE LVGL THREAD'S REMAINING STACK. LVGL's draw walk recurses once per
+    // level of widget nesting, inside the stack main.cpp gives loopTask (16 KB,
+    // against arduino-esp32's default 8 KB). This is how we know by how much
+    // that suffices rather than hoping. A high-water mark trending toward zero
+    // as cards get more deeply nested is the warning.
     SystemReport::line("  LVGL task stack free: %s (low-water mark)",
                        SystemReport::fmtBytes(uxTaskGetStackHighWaterMark(NULL),
                                               b, sizeof(b)));
@@ -226,7 +221,7 @@ void reportDisplay(SystemCore &core) {
     SystemReport::line("  Rotation: %d", bsp_display.ROTATION);
     SystemReport::line("  Brightness: %d%%", core.display().getBrightness());
 
-    // WHICH DISPLAY LIBRARY, and what it brought up (2.9, #67). esp_lcd itself
+    // WHICH DISPLAY LIBRARY, and what it brought up (#67). esp_lcd itself
     // is part of ESP-IDF - its version is the IDF version under [FIRMWARE].
 #ifdef DISPLAY_ESPLCD
     Fleet_Display &d = core.display();
@@ -410,23 +405,17 @@ void line(const char *fmt, ...) {
     if (s_echoSerial) {
         Serial.println(buf);
         // Flush every echoed line, so that where the output STOPS is where the
-        // code stopped.
-        //
-        // Without this the two are different questions and the answer misleads.
-        // Six of eight boards are ARDUINO_USB_CDC_ON_BOOT=1, where Serial is a
-        // buffered USB endpoint: if the report hangs part-way, everything still
-        // sitting in that buffer is never sent. Chasing the 2026-09-18 Dump
-        // Config freeze on CYD_S3_3248, the output ended at "[CONNECTIVITY]"
-        // and the hang was NOT there - it was wherever the buffer happened to
-        // fill, which is a completely different place and cost an inference.
+        // code stopped. Six of the nine boards are ARDUINO_USB_CDC_ON_BOOT=1,
+        // where Serial is a buffered USB endpoint: if the report hangs
+        // part-way, everything still sitting in that buffer is never sent, and
+        // the output would end somewhere other than the hang.
         //
         // Only manual dumps echo, so this costs nothing on the boot run.
         //
-        // GUARDED, and the guard is not decoration. On a USB CDC board
-        // Serial.flush() waits for the host to drain the endpoint, and with no
-        // host attached there is nothing to drain it - the exact shape of hang
-        // this line was added to diagnose. `if (Serial)` is false when no host
-        // has opened the port, so an unattended board never waits on one.
+        // GUARDED: on a USB CDC board Serial.flush() waits for the host to
+        // drain the endpoint, and with no host attached there is nothing to
+        // drain it. `if (Serial)` is false when no host has opened the port,
+        // so an unattended board never waits on one.
         if (Serial) Serial.flush();
     }
     for (uint8_t i = 0; i < s_sinkCount; i++) s_sinks[i](buf);
@@ -469,7 +458,7 @@ void run(SystemCore &core, bool echoSerial) {
     reportDisplay(core);
 
     // Caller-registered sections - today just [UI STATE] from GUIManager.
-    // Placed here so the I2C scan stays last, as it was.
+    // Placed here so the I2C scan stays last.
     for (uint8_t i = 0; i < s_sectionCount; i++) {
         line("[%s]", s_sections[i].name);
         s_sections[i].fill();
