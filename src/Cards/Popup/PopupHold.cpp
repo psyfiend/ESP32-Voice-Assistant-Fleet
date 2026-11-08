@@ -1,17 +1,16 @@
-// The hold on a card (2.12 P1, split from CardPopup.cpp).
+// The hold on a card.
 #include "PopupState.h"
 
 namespace popup {
 
 // ---------------------------------------------------------------------------
-// The hold (owner, 2026-10-04)
+// The hold
 //
 // From touch-down the card is pressed in while its border fades toward the
 // scheme's ACCENT over the long-press time, a little wider - so a tap shows the
 // start of it, and a hold shows it arriving. The card STAYS pressed in, with
 // the accent, while its window is open: that says which card the window
-// belongs to, and it does not snap back the moment the window appears (the
-// owner found the snap-back "funky" with the leap).
+// belongs to, and it does not snap back the moment the window appears.
 //
 // The look itself is the card's: Card::pressLook(), which also moves what is
 // attached to the card's edges. Here is only the timing. One card redraw per
@@ -30,8 +29,7 @@ void holdRestore(lv_obj_t *sf) {
     if (Card *c = cardOf(sf)) c->pressClear();
 }
 
-// THE HELD CARD STAYS PRESSED IN while its window is open (owner, round 3's
-// U15): a restyle - its label changed in Card UI, its units in SETTINGS - would
+// THE HELD CARD STAYS PRESSED IN while its window is open: a restyle - its label changed in Card UI, its units in SETTINGS - would
 // otherwise drop the pressed look and its border.
 void restyleHeld(Card &c) {
     c.restyle();
@@ -63,8 +61,8 @@ void letGoExec(void *var, int32_t v) {
 }
 
 // THE HELD CARD CAN BE DELETED UNDER THE FINGER - a swipe that started on it
-// rebuilds the page. Twice on 2026-10-04 that left h.surface pointing at freed
-// memory, and the finger's release then styled it: a load access fault inside
+// rebuilds the page. That would leave h.surface pointing at freed memory, and
+// the finger's release would then style it: a load access fault inside
 // lv_realloc (lv_obj_set_local_style_prop). Checking lv_obj_is_valid() is not
 // enough either: the rebuild allocates new cards from the same pool, so the old
 // address is soon a live, different object. So the card says when it goes.
@@ -140,7 +138,7 @@ void pressCb(lv_event_t *ev) {
         lv_obj_has_flag(obj, CardPopup::CARD_SURFACE_FLAG)) {
         holdStart(obj);
     } else if (s.phase == PopupPhase::PHASE_OPEN) {
-        groupViewPress(obj);   // a tile in the group view holds as on the page (1.4)
+        groupViewPress(obj);   // a tile in the group view holds as on the page
     }
 }
 
@@ -154,5 +152,5 @@ void releaseCb(lv_event_t *ev) {
 }
 
 // The tap catcher - "tap outside" and the modal rule - is the sheet's
-// (KitSheet.cpp) since 2.12 P4.
+// (KitSheet.cpp).
 } // namespace popup

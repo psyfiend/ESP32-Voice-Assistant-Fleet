@@ -69,19 +69,14 @@ FONT_DIR = os.path.join(ROOT, "src", "UI", "fonts")
 #   LG  the disc glyph on a state card   - paired with its 4.50 mm ICON role
 #   SM  the tinted glyph on a value card - paired with its 2.66 mm NAME role
 #
-# cards.md section 9 says "one icon size, generous glyph count", on the estimate
-# that a face costs ~96 KB. That figure was measured on a 95-glyph FULL ASCII
-# face; this is a ~70-glyph subset, so the second size costs a fraction of it.
-# Both are generated and the real cost is reported below - if it turns out not
-# to be worth it, deleting SM is one line here and one fallback in CardIcons.
+# Each size is generated and its real cost reported below; deleting SM is one
+# line here and one fallback in CardIcons.
 #
-# MD, added at 2.7 (cards.md section 13, #62): the icons now step with the
-# CARD, not only with the board. One face in between does two jobs - the corner
-# icon on a large card, where 2.66 mm looked lost (the owner, on the 7B), and
+# MD: the icons step with the CARD as well as the board. One face in between
+# does two jobs - the corner icon on a large card, where 2.66 mm looks lost, and
 # the hero on a cramped card, where 4.50 mm will not fit its disc. It is the
-# full glyph set rather than a corner-only subset so that a build-sheet corner
-# override draws at any size. Measured cost of a face at these sizes: 10-73 KB,
-# not the ~96 KB of the note above.
+# full glyph set rather than a corner-only subset so that a corner override
+# draws at any size. Measured cost of a face at these sizes: 10-73 KB.
 SIZES_MM = {"LG": 4.50, "MD": 3.50, "SM": 2.66}
 
 # ---------------------------------------------------------------------------

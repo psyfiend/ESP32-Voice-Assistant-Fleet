@@ -1,11 +1,11 @@
-// The Hide dialog (2.12 P1, split from CardPopup.cpp; 2.11 round 3: K96's Hide).
+// The Hide dialog (K96's Hide).
 #include "PopupState.h"
 
 namespace popup {
 
-// "Hide from this page" (K96; K66's remove, for every card since 2.11) ASKS IN
-// A DIALOG YOU CANNOT MISS (owner, K17 run 2: a button that changed to "Sure?"
-// was easy to overlook). Over everything - the window, its panels - on the top
+// "Hide from this page" (K96; K66's remove, for every card) ASKS IN
+// A DIALOG YOU CANNOT MISS (a button that changed to "Sure?" would be easy to
+// overlook). Over everything - the window, its panels - on the top
 // layer, the rest dimmed; Cancel, or a tap outside, leaves it; Hide sends the
 // card to the page's pool and closes the window, and the page is built again
 // without it. Rare, so the dim's one full-screen redraw is worth it here (the
@@ -24,7 +24,7 @@ void confirmHide() {
     confirmClose();
     Card *held = CardPopup::isOpen() ? cardOf(h.surface) : nullptr;
     if (!held || !held->hasId()) return;
-    // The owner's words for Remove (K17 round 3), in K96's.
+    // The words for Remove, as K96 has them.
     char buf[200];
     snprintf(buf, sizeof(buf), "The card \"%s\" will be hidden from this page, any other "
                                "instances of this card will be unaffected.", s.name);
@@ -44,19 +44,19 @@ void confirmHide() {
     spec.nButtons = 2;
     spec.width    = LV_MIN(lv_area_get_width(&s.winRect) * 3 / 4, mm(UI::shape().W_DIALOG_MAX));
     spec.outside  = confirmCancelCb;   // a tap that misses the box: Cancel
-    spec.countdown = true;             // it closes with the window (closing hook): it says so (#23)
+    spec.countdown = true;             // it closes with the window (closing hook): it says so
     s_confirm = Kit::dialog(spec);
 }
 
 // A member's Hide from the group and its dialog went with K160: Unpin this card
 // loses nothing, so it asks nothing (PopupVisibility.cpp).
 
-// A COPY IN A CLUSTER, REMOVED (2.11, K91): it was made on the glass, so
+// A COPY IN A CLUSTER, REMOVED (K91): it is made on the glass, so
 // removing it deletes it - after the same dialog. The card it was copied from
 // is untouched.
 void confirmRemoveCopy() {
     confirmClose();
-    // The held tile, or - in a cluster's window - the member whose view this is (round 6).
+    // The held tile, or - in a cluster's window - the member whose view this is.
     Card *held = CardPopup::isOpen() ? visibilitySubject() : nullptr;
     if (!held || !CardAdded::isMember(held->id())) return;
     char buf[200];
@@ -91,9 +91,8 @@ void removeCopyCb(lv_event_t *ev) {
     lv_async_call([](void *) { confirmRemoveCopy(); }, nullptr);
 }
 
-// A CARD MADE ON THE GLASS, REMOVED FROM THE PAGE (the sprint after round 7, the
-// owner: a card copied out of a cluster "can go without being hidden"): deleted,
-// entry and all - it does not join the hidden cards. A card MOVED out of a
+// A CARD MADE ON THE GLASS, REMOVED FROM THE PAGE (a card copied out of a
+// cluster can go without being hidden): deleted, entry and all - it does not join the hidden cards. A card MOVED out of a
 // cluster is never offered this: it is the card itself, and goes back.
 void confirmRemoveFromPage() {
     confirmClose();
@@ -126,8 +125,8 @@ void removeFromPageCb(lv_event_t *ev) {
     lv_async_call([](void *) { confirmRemoveFromPage(); }, nullptr);
 }
 
-// MOVE, COPY, CHANGE OR RESTORE, ASKED FIRST (owner, after v0.2.19; round 2 of the
-// follow-ups): what will happen, in the owner's words, before anything changes.
+// MOVE, COPY, CHANGE OR RESTORE, ASKED FIRST: what will happen is said in words
+// before anything changes (K137).
 // `go` does it; the window then closes.
 static void (*s_go)() = nullptr;
 void confirmAsk(Kit::DialogRole role, const char *title, const char *const *lines, uint8_t n, const char *verb,

@@ -1,5 +1,4 @@
-// SHOW AS... (owner, 2026-11-06, K191; replaces K174's Show as chips, which applied
-// at a tap with no word of it and nothing to confirm). A group's Visibility opens
+// SHOW AS... (K191). A group's Visibility opens
 // it; it walks as Add to dashboard does (PopupMove.cpp) - a choice per step, Next,
 // then a dialog that says what will happen - and nothing changes until Confirm.
 //
@@ -81,7 +80,7 @@ void faceChoices(const ClusterCard &g) {
     s_nFace = 0;
     bool lights = false;
     for (uint8_t i = 0; i < g.memberCount(); i++) lights |= usable(g.memberAt(i)) && switches(g.memberAt(i)->firstEntity());
-    s_faceW[0] = lights ? "All lights" : "All members";   // the Face row's words (K151)
+    s_faceW[0] = lights ? "All lights" : "All members";   // the Face row's words (K191)
     char cur[CARD_ID_MAX + 1] = "";
     if (g.hasId()) Settings::card(g.id(), "face", cur, sizeof(cur));
     int8_t only = -1;   // the one pinned card, when there is one (K191)
@@ -158,7 +157,7 @@ void goGroup() {
     finish();
 }
 
-// The dialog: what will happen, in the owner's pattern (names in the accent).
+// The dialog: what will happen, in the pattern of the Move dialogs (names in the accent).
 char s_line[4][240];
 const char *s_lines[4];
 uint8_t s_n = 0;
@@ -242,7 +241,7 @@ void gridCb(lv_event_t *ev) {
 }
 
 // The prompt stands first in the check table (buildShowAs), so check row k is the
-// table's child k + 1 - reading child k read the row above it (F11, owner 11-07).
+// table's child k + 1 (child k would be the row above it).
 constexpr uint8_t PIN_ROW0 = 1;
 
 void pinCb(lv_event_t *ev) {

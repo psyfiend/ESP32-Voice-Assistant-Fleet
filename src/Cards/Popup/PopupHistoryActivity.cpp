@@ -1,4 +1,4 @@
-// History: activity (2.12 P1, split from CardPopup.cpp).
+// History: activity.
 #include "PopupState.h"
 
 namespace popup {
@@ -37,16 +37,15 @@ void histStateWord(const HistEvent &ev, char *out, size_t n) {
 void histDrawActivity(lv_obj_t *body) {
     const HaHistory &H = *s_hist;
     const uint16_t n = H.events();
-    // The span buttons, as on the chart (owner, round 2), centred (round 6);
-    // turned off, the span in words in their place (round 3).
+    // The span buttons, as on the chart, centred; turned off, the span in
+    // words in their place.
     histTopMiddle(histTopRow(body));
     if (!n) {
         histNote(body, s_hv.period ? "No changes in the last 7 days" : "No changes in the last 24 hours");
         return;
     }
-    // In from the window's sides (owner, round 2: the rows were wider than
-    // they need be, even on the 4B), and NO WIDER THAN W_ROWS_MAX (round 6: on
-    // the P4_5 and the 1060 the state and its time sat a long way apart). The
+    // In from the window's sides, and NO WIDER THAN W_ROWS_MAX (on a wide
+    // window the state and its time would sit a long way apart). The
     // 4B's window is narrower than that, so it keeps its rows.
     const UIShape &k = UI::shape();
     lv_obj_update_layout(body);
@@ -60,7 +59,7 @@ void histDrawActivity(lv_obj_t *body) {
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(list, mm(k.S3), 0);
 
-    // ONE VIEW (owner, round 5). The state and when are what matter: the state
+    // ONE VIEW. The state and when are what matter: the state
     // on the left in the larger text; on the right the time in the larger
     // text over how long ago ("12 minutes ago", "Yesterday", "3 days ago - Oct
     // 8"). Under the state, in the small text: how long it lasted (Show

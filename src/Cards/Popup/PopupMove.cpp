@@ -1,6 +1,5 @@
-// MOVING A CARD, AND ITS ONE WAY BACK (owner, round 2 of the 2.11 follow-ups).
-// Every word on the glass here is the owner's (docs/archive/TEST_2.11_FOLLOWUPS.md,
-// round 2; K137); none is made up here.
+// MOVING A CARD, AND ITS ONE WAY BACK (K137).
+// Every word on the glass here is the owner's (K137); none is made up here.
 //
 //   A cluster's tile   Add to dashboard (a group, Copy or Move) and Change cluster
 //                      (another cluster, Copy or Move)
@@ -14,7 +13,7 @@
 // is deleted, a moved card goes home, a regrouped one takes its group back
 // (CardAdded.h, "One card, one way back").
 //
-// The groups offered are the ones on this page (owner: the rest only exist on
+// The groups offered are the ones on this page (the rest only exist on
 // other pages), its own marked with an asterisk, then New group and None. The
 // clusters offered are this page's that can take it - hidden ones too, marked
 // "(h)" - never one that holds it already.
@@ -47,8 +46,8 @@ int32_t listW() { return lv_area_get_width(&s.winRect) - 2 * s.pad; }
 bool isMade(const char *id) { return id && (CardAdded::isAdded(id) || CardAdded::isMember(id)); }
 
 // A COPY OR A MOVE: a made card that names the card it came from ("from"). Since
-// K171 nearly every card is made, so "made" no longer means "a copy" - an original
-// treated as one was deleted by its Restore (F44, owner 11-07: the 1060's Overhead).
+// K171 nearly every card is made, so "made" does not mean "a copy": an original
+// treated as one would be deleted by its Restore.
 bool isCopy(const char *id) { return isMade(id) && CardAdded::fromOf(id); }
 
 // --- The clusters -------------------------------------------------------------------
@@ -103,14 +102,14 @@ const CardSpec *homeCluster(const char *memberId) {
     for (uint8_t c = 0; memberId && p && c < p->count; c++)
         for (uint8_t k = 0; k < p->cards[c].memberCount && p->cards[c].members; k++)
             if (p->cards[c].members[k].id && !strcmp(p->cards[c].members[k].id, memberId)) return &p->cards[c];
-    // A MEMBER MADE HERE (since K171, nearly all): its "in" names its group.
+    // A MEMBER MADE HERE (K171: nearly all are): its "in" names its group.
     char in[CARD_ID_MAX + 1];
     if (memberId && Settings::card(memberId, "in", in, sizeof(in))) return CardAdded::specOf(in);
     return nullptr;
 }
 
 // It holds the entity as a member already - a tile, a hidden one, a copy - but
-// not one moved out of it, which can come back (owner's 17).
+// not one moved out of it, which can come back.
 bool holds(const ClusterCard &cl, const char *eid) {
     for (uint8_t i = 0; i < cl.memberCount(); i++) {
         const Card *mc = cl.memberAt(i);
@@ -128,7 +127,7 @@ bool holdsSpec(const CardSpec &cs, const char *eid) {
     return CardAdded::inCluster(cs.id, eid);
 }
 
-// ONE LEVEL OF NESTING (K92; the owner, round 2): a group card may be a cluster's
+// ONE LEVEL OF NESTING (K92): a group card may be a cluster's
 // member, but not one whose own members are groups.
 bool nested(const Entity &e) {
     for (uint8_t k = 0; k < e.nMembers && s.reg; k++) {
@@ -257,7 +256,7 @@ const char *pickName() {
 }
 
 // --- Words for the dialogs -------------------------------------------------------------
-// A name in the accent (the owner's mock): the dialog's words are recoloured.
+// A name in the accent: the dialog's words are recoloured.
 const char *acc(char *buf, size_t cap, const char *name) {
     snprintf(buf, cap, "#%06lX %s#", (unsigned long)(UI::pal().ACCENT & 0xFFFFFF), name ? name : "");
     return buf;
@@ -350,7 +349,7 @@ void doDash() {
         nameLike(id, *m.subject);
     } else if (isMade(sid)) {
         // A CARD MADE HERE RELOCATES - unless it is a page card moved in, and going
-        // back to the page is its Restore (owner's 17).
+        // back to the page is its Restore.
         const char *o = CardAdded::fromOf(sid);
         if (CardAdded::isMoveOf(sid) && o && CardAdded::isMoved(o)) {
             char orig[CARD_ID_MAX + 1];
@@ -371,7 +370,7 @@ void doDash() {
         CardAdded::moveToPage(sid, id);
         CardAdded::keepHome(sid, clName(m.from), fromHas ? fg.id : nullptr);
     }
-    if (last && !CardAdded::emptied(m.from->id())) CardAdded::hide(m.from->id());   // gone, else hidden
+    if (last && !CardAdded::emptied(m.from->id())) CardAdded::hide(m.from->id());   // gone (K200), else hidden
     done();
 }
 
@@ -380,7 +379,7 @@ void doCluster() {
     if (m.pick >= s_nTgt || !m.subject) return;
     const Target T = s_tgt[m.pick];
     const char *sid = m.subject->id();
-    // MOVED BACK HOME BY HAND IS A RESTORE (owner's 17).
+    // MOVED BACK HOME BY HAND IS A RESTORE.
     if (m.move && isMade(sid) && CardAdded::isMoveOf(sid)) {
         const CardSpec *hc = homeCluster(CardAdded::fromOf(sid));
         if (hc && !strcmp(hc->id, T.id)) {
@@ -414,7 +413,7 @@ void doCluster() {
     // cards does) - joining never moves the page; Pin this card puts it there.
     Settings::setCard(isMade(sid) && m.move ? sid : id, "hidden", "yes");
     if (T.hidden) CardAdded::restore(T.id);    // a hidden cluster is used again
-    if (last && !CardAdded::emptied(m.from->id())) CardAdded::hide(m.from->id());   // gone, else hidden
+    if (last && !CardAdded::emptied(m.from->id())) CardAdded::hide(m.from->id());   // gone (K200), else hidden
     done();
 }
 
@@ -568,7 +567,7 @@ void nextRow(lv_obj_t *list, bool copyMove, bool copyOnly) {
     Kit::button(row, Kit::ButtonRole::BTN_CONFIRM, "Next", w, Kit::controlH(), nextCb);
 }
 
-// The entity is on the page already, as a card of its own (round 7: no second
+// The entity is on the page already, as a card of its own (K111: no second
 // card of one entity on the dashboard).
 bool onPage(lv_obj_t *o, const char *eid) {
     const uint32_t n = lv_obj_get_child_count(o);
@@ -767,7 +766,7 @@ void goMove() {
         CardAdded::home(orig, hn, sizeof(hn), hg, sizeof(hg));
         clusterNameNow(hc->id, now, sizeof(now));
         if (hn[0] && strcmp(hn, now)) {
-            // RENAMED OR REPURPOSED (owner's 16): onto the dashboard, in its group as
+            // RENAMED OR REPURPOSED: onto the dashboard, in its group as
             // it was, with its name as it was.
             if (CardAdded::isMember(s_rid) && !CardAdded::toPage(s_rid, hc->id, hc->place.priority)) return;
             if (hg[0]) Settings::setCard(s_rid, "group", hg);

@@ -1,5 +1,4 @@
-// A CARD'S OPTIONS BY WHERE IT IS (2.11 round 3, K96; the buttons the owner's,
-// round 2 of the 2.11 follow-ups): SETTINGS' Visibility row opens this view, and
+// A CARD'S OPTIONS BY WHERE IT IS (K96, K137): SETTINGS' Visibility row opens this view, and
 // what it offers depends on where the held card is.
 //
 //   On the page    Hide from this page - to the page's pool, after its dialog
@@ -14,7 +13,7 @@
 // where the moves and their dialogs are).
 //
 // A member's own view inside a CLUSTER's window has this view too, the same as
-// its tile's (round 6: one member, one answer); one moved out of the cluster
+// its tile's (one member, one answer); one moved out of the cluster
 // offers only its Restore.
 #include "PopupState.h"
 #include "Cards/ClusterCard.h"
@@ -39,8 +38,7 @@ ClusterCard *clusterOfTile() {
     return nullptr;
 }
 
-// THE VIEWS ARE CHIP TABLES (round 4, the owner: "look more like the Card UI or
-// UI Tweaks sheet"): choices as chip rows, actions as buttons below them.
+// THE VIEWS ARE CHIP TABLES, as Card UI's and UI Tweaks' are: choices as chip rows, actions as buttons below them.
 int32_t listW() { return lv_area_get_width(&s.winRect) - 2 * s.pad; }
 lv_obj_t *s_table = nullptr;
 
@@ -55,7 +53,7 @@ void note(lv_obj_t *list, const char *words) {
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     lv_label_set_text(l, words);
-    Kit::helperNote(l);   // UI Tweaks' Show helper text (2.13)
+    Kit::helperNote(l);   // UI Tweaks' Show helper text
 }
 
 void restoreCb(lv_event_t *) {
@@ -63,8 +61,8 @@ void restoreCb(lv_event_t *) {
 }
 
 // Buttons, one to a row, one width - the longest words' - centred. RESTORE ON
-// THE BOTTOM ROW, OFF TO THE RIGHT (owner, round 2): the column as it was, and
-// Restore beside its last button; a row of its own where there is no room.
+// THE BOTTOM ROW, OFF TO THE RIGHT: the column stays centred, and
+// Restore sits beside its last button; a row of its own where there is no room.
 struct Action { const char *words; Kit::ButtonRole role; lv_event_cb_t cb; };
 void actions(lv_obj_t *list, const Action *a, uint8_t n, bool restore) {
     const UIShape &k = UI::shape();
@@ -87,7 +85,7 @@ void actions(lv_obj_t *list, const Action *a, uint8_t n, bool restore) {
     lv_obj_align(r, LV_ALIGN_RIGHT_MID, 0, 0);
 }
 
-// THE SAME WORDS FOR CARDS AND TILES (round 14, the owner's) - a member's without
+// THE SAME WORDS FOR CARDS AND TILES - a member's without
 // the hidden cards' half (K160: a member is unpinned, never hidden).
 const char *const VIS_NOTE = "Paused cards will not send or receive any updates. Hidden cards can be restored.";
 const char *const VIS_NOTE_MEMBER = "Paused cards will not send or receive any updates.";
@@ -125,8 +123,8 @@ const char *groupWords(const ClusterCard *cl) {
     return cl->area()[0] ? cl->area() : cl->shownName(CardLabel::LBL_NAME);
 }
 
-// UNPIN AND PIN ASK FIRST (owner, 2026-11-05, K165; refines K160's "no dialog"):
-// every change to a group's membership says what will happen, in his words.
+// UNPIN AND PIN ASK FIRST (K165): every change to a group's membership says
+// what will happen.
 void unpinGo() { if (s.phase == PopupPhase::PHASE_OPEN) visibilityHideTile(); }
 
 void pinGo() {
@@ -135,7 +133,7 @@ void pinGo() {
     const int8_t i = (cl && c) ? clusterMemberOf(*cl, c->firstEntity()) : -1;
     if (i < 0 || s.phase != PopupPhase::PHASE_OPEN) return;
     clusterMemberShow(*cl, (uint8_t)i, true);
-    // THE WINDOW CLOSES AND THE PAGE ARRANGES (owner, 2026-11-07, F14): a pin changes
+    // THE WINDOW CLOSES AND THE PAGE ARRANGES: a pin changes
     // the page - a solo card can become a group - so it is shown at once.
     s_rebuildPage = true;
     CardPopup::close();
@@ -146,7 +144,7 @@ void unpinTileCb(lv_event_t *) {
     lv_async_call([](void *) {
         Card *c = visibilitySubject();
         if (!c || s.phase != PopupPhase::PHASE_OPEN) return;
-        // Names in the accent (owner, 2026-11-05: every card or group name a dialog shows).
+        // Names in the accent: every card or group name a dialog shows.
         const unsigned long acc = (unsigned long)(UI::pal().ACCENT & 0xFFFFFF);
         const char *g = groupWords(clusterOfSubject());
         static char l1[180], l2[220];
@@ -173,7 +171,7 @@ void showTileCb(lv_event_t *) {
     }, nullptr);
 }
 
-// PAUSED (round 7, the owner: SETTINGS' Paused belongs with Visibility): the
+// PAUSED (it belongs with Visibility, not SETTINGS): the
 // card's own, a tile's, or - in a member's own view - that member's alone.
 const char *const PAUSED_W[] = { "No", "Yes" };
 void pausedChoose(void *p) {
@@ -195,7 +193,7 @@ void pausedChipCb(lv_event_t *ev) {
     lv_async_call(pausedChoose, (void *)(v & 0xFF));
 }
 
-// A GROUP'S OWN VISIBILITY (owner, 2026-11-05, K174; 2026-11-06, K191): a line saying
+// A GROUP'S OWN VISIBILITY (K174, K191): a line saying
 // how it is presented, Paused (not for a group itself), and Show as... and Rename
 // group with its buttons. Show as is a flow (PopupShowAs.cpp), never a chip.
 void showAsCb(lv_event_t *) {
@@ -226,8 +224,8 @@ void visibilityHideTile() {
     ClusterCard *cl = clusterOfSubject();
     if (!c || !c->hasId() || !c->mini() || s.phase != PopupPhase::PHASE_OPEN) return;
     const int8_t i = cl ? clusterMemberOf(*cl, c->firstEntity()) : -1;
-    // UNPIN CLOSES THE WINDOW TOO (owner, 2026-11-07), as Pin does (F14): the page
-    // arranges at once - a group can become a solo card. K160 kept it open.
+    // UNPIN CLOSES THE WINDOW TOO, as Pin does: the page
+    // arranges at once - a group can become a solo card.
     if (i >= 0)                           clusterMemberShow(*cl, (uint8_t)i, false);   // out of the header too
     else if (!(heldGroup() && inMember())) Settings::setCard(c->id(), "hidden", "yes");
     s_rebuildPage = true;
@@ -236,7 +234,7 @@ void visibilityHideTile() {
 
 void buildVisibility() {
     Card *held_ = held();
-    // A GROUP CARD'S MEMBER (Desk's lamp, round 7): its Paused, and Add card to
+    // A GROUP CARD'S MEMBER (Desk's lamp): its Paused, and Add card to
     // dashboard - a copy (PopupMove.cpp says when it cannot be).
     if (held_ && inMember() && !heldGroup()) {
         const Kit::ChipRowSpec paused = { "Paused", PAUSED_W, 2, (uint8_t)(aggregate().paused ? 1 : 0) };
@@ -258,7 +256,7 @@ void buildVisibility() {
     lv_obj_t *list;
     list = clusterSelf ? table(nullptr, 0, nullptr) : table(&paused, 1, pausedChipCb);
     if (groupSelf) {
-        // The owner's words (K191): how the page shows it now.
+        // How the page shows it now (K191).
         lv_obj_t *l = Kit::label(list, KS::KS_LABEL_NAME);
         lv_obj_set_width(l, lv_pct(100));
         lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
@@ -273,7 +271,7 @@ void buildVisibility() {
     if (groupSelf && c->hasId()) a[n++] = { "Show as...", Kit::ButtonRole::BTN_CANCEL, showAsCb };       // K191
     if (groupSelf && c->hasId()) a[n++] = { "Rename group", Kit::ButtonRole::BTN_CANCEL, renameGroupCb };   // K174
     if (cl) {
-        // MOVED OUT (the sprint after round 7): its card is elsewhere now, and its
+        // MOVED OUT: its card is elsewhere now, and its
         // Restore brings it back.
         if (c->hasId() && CardAdded::isMovedToPage(c->id())) {
             actions(list, a, 0, restore);

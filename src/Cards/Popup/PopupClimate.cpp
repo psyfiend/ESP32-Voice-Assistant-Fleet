@@ -1,11 +1,10 @@
-// A THERMOSTAT'S WINDOW, READ ONLY (2.13, DECISIONS K144; artifact "2.13 Add Cards
-// Mocks", screen 6 B): the room's temperature large with what it is doing under
+// A THERMOSTAT'S WINDOW, READ ONLY (K144): the room's temperature large with what it is doing under
 // it, and beside them the facts - its mode, its setpoint, what it is doing, the
 // humidity and the fan, each only when HA says it. History is its tab, as any
-// card's. Controls - the setpoint, the mode - come with the card library (#31).
+// card's. Controls - the setpoint, the mode - are not built (card library, #31).
 //
-// Words to confirm with the owner: "Mode", "Heat to" (K145's, as a row), "Doing",
-// "Humidity", "Fan" - the mock's.
+// Wording still to confirm with the owner: "Mode", "Heat to" (K145's, as a row),
+// "Doing", "Humidity", "Fan".
 #include "PopupState.h"
 
 namespace popup {

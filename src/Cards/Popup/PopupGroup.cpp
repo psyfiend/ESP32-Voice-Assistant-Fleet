@@ -1,4 +1,4 @@
-// THE GROUP VIEW IS THE CLUSTER (2.13 round 3, DECISIONS K154; refines K143, K150).
+// THE GROUP VIEW IS THE CLUSTER (K154).
 //
 // A tap on a cluster opens it: the group drawn as its cluster is on the page - its
 // own header (swatch or band, name, header sensors) and real tiles that tap and
@@ -9,7 +9,7 @@
 // tiles would be smaller there than on the page; then bigger, bounded only by the
 // page - under the system header, a gap above the panels' tabs. Its tiles are one
 // size and never bigger than a tile may be, the spare room round them (K159). A
-// tap on its header opens Members, whose name comes back here.
+// tap on its header opens Members.
 //
 // The cluster is the page's own code (CardPage::makeGroup(), a ClusterCard): made
 // for the view, live through the binder, deleted before the stage is cleaned. A
@@ -38,7 +38,7 @@ ClusterCard *heldCluster() {
 }
 
 // THE PAGE'S ROOM (K154): under the system header, above the panels' tabs, a
-// visible gap from each - the owner: the window "kisses the top of the panels".
+// visible gap from each, so the window does not touch the top of the panels.
 lv_area_t pageArea() {
     const int32_t sw = lv_obj_get_width(lv_screen_active()), sh = lv_obj_get_height(lv_screen_active());
     const int32_t gap = mm(UI::shape().S4);
@@ -144,12 +144,12 @@ bool groupViewCards() {
     return Settings::system("ui", "group_view", v, sizeof(v)) && !strcmp(v, "cards");
 }
 
-// --- THE HEADER'S SENSORS (K163; round 2's mocks 2-3) -------------------------------
+// --- THE HEADER'S SENSORS (K163) -------------------------------
 // A tap on them drops a panel from under the header, on the right: a row for each
 // - its glyph, HA's full name, its state - and a row opens that sensor's History,
 // as a tap on it would. A second tap on the sensors folds it.
 lv_obj_t *s_drop = nullptr;
-lv_obj_t *s_dropCatch = nullptr;   // the window under the panel: a tap there folds it, nothing else (1.7)
+lv_obj_t *s_dropCatch = nullptr;   // the window under the panel: a tap there folds it, nothing else
 
 void dropClose() {
     if (s_drop) lv_obj_delete(s_drop);
@@ -158,7 +158,7 @@ void dropClose() {
     s_dropCatch = nullptr;
 }
 
-// IT SLIDES AS THE SYSTEM HEADER'S PANELS DO (1.3): its height from nothing to its
+// IT SLIDES AS THE SYSTEM HEADER'S PANELS DO: its height from nothing to its
 // rows' and back, eased out over the drawers' time (KitDrawer's SLIDE_MS).
 constexpr uint32_t DROP_SLIDE_MS = 350;
 void dropHeightExec(void *o, int32_t v) { lv_obj_set_height((lv_obj_t *)o, v); }
@@ -208,7 +208,7 @@ void dropOpen() {
     lv_obj_get_coords(s.win, &wa);
     const int32_t winW = lv_area_get_width(&wa);
     const int32_t w = LV_MIN(winW - 2 * gap, winW * (winW < mm(k.W_NARROW) ? 72 : 48) / 100);
-    // A TAP ANYWHERE ELSE IN THE WINDOW FOLDS IT FIRST (1.7): an invisible catcher
+    // A TAP ANYWHERE ELSE IN THE WINDOW FOLDS IT FIRST: an invisible catcher
     // over the window, under the panel, so a tile under the tap does nothing.
     s_dropCatch = plain(s.win);
     lv_obj_add_flag(s_dropCatch, LV_OBJ_FLAG_FLOATING);
@@ -295,7 +295,7 @@ void groupWindowFor(PopupView v) {
         const lv_area_t r = fitted(room, normal);
         place(&r, s_view != nullptr);
     } else if (v == PopupView::VIEW_CLUSTER_ADD) {
-        // No panels under it (1.6): down to the screen's foot, as from the page.
+        // No panels under it: down to the screen's foot, as from the page.
         lv_area_t room = pageArea();
         room.y2 = lv_obj_get_height(lv_screen_active()) - mm(UI::shape().S4) - 1;
         place(&room, false);
@@ -346,7 +346,7 @@ void buildGroup() {
             if (Card *m = s_view->memberAt(i)) m->setMini(false);
     s_view->build(s.stage);
     // AS CARDS ON THE PAGE'S GROUND (K173): the cards the page's card color, so they
-    // stand out as on the page; a cut corner cuts to the ground behind it (1.2).
+    // stand out as on the page; a cut corner cuts to the ground behind it.
     // Tiles keep the cluster's surface.
     if (groupViewCards()) s_view->groundSurface();
     lv_obj_set_size(s_view->root(), W, H);
@@ -385,7 +385,7 @@ bool groupViewRoute(Card &card, uint8_t view) {
     return true;
 }
 
-// --- A HOLD ON A TILE IN THE GROUP VIEW (1.4) -----------------------------------------
+// --- A HOLD ON A TILE IN THE GROUP VIEW -----------------------------------------
 // As on the page (PopupHold.cpp): from touch-down the tile presses in while its edge
 // fades toward the accent over the long-press time, and fades back if the finger
 // lifts or moves. The window's own hold (`h`) is its owner's, so this one is apart.

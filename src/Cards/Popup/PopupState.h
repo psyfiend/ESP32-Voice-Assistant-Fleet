@@ -2,12 +2,12 @@
 #ifndef POPUP_STATE_H
 #define POPUP_STATE_H
 
-// THE CARD WINDOW'S INSIDES, SHARED (2.12 P1 - docs/design/ui-foundation.md). Not public:
+// THE CARD WINDOW'S INSIDES, SHARED (docs/design/ui-foundation.md). Not public:
 // only src/Cards/CardPopup.cpp and the files in src/Cards/Popup/ include it; everything else
-// uses Cards/CardPopup.h, which is unchanged.
+// uses Cards/CardPopup.h.
 //
-// Until 2.12 the window was one 6,325-line file whose parts shared one file-static state. The
-// parts now have a file each and share that state through this header, in namespace popup:
+// The window's parts have a file each and share one state through this header, in
+// namespace popup:
 //
 //   CardPopup.cpp            open and close, the corner icons, the views, the clock
 //   PopupCommon.cpp          sizes (mm, pm), bare objects and labels, what the entities say
@@ -25,14 +25,21 @@
 //   PopupSettingsRows.cpp    SETTINGS' rows and what they do
 //   PopupSideRows.cpp        CHART's, ACTIVITY's and SCENES' rows
 //   PopupDialog.cpp          the Remove dialog
+//   PopupCardUi.cpp          Card UI: the card's own looks
+//   PopupCluster.cpp         a group's Members, GROUP panel, Header options, Edit cards
+//   PopupGroup.cpp           the group view
+//   PopupShowAs.cpp          Show as...
+//   PopupMove.cpp            moving, copying, regrouping a card, and Restore
+//   PopupVisibility.cpp      a card's options by where it is
+//   PopupClimate.cpp         a thermostat's window (read only)
 //   PopupDebug.cpp           GET /popup (DEBUG_POPUP)
 //   PopupTree.cpp            GET /popup?tree= (DEBUG_POPUP)
 //
-// The window is a client of the kit (UI/Kit.h, 2.12 P3) and its frame is the kit's Sheet
-// (UI/Sheet.h, P4): the window, its header row, the auto-close, the tap catcher, the folder
+// The window is a client of the kit (UI/Kit.h) and its frame is the kit's Sheet
+// (UI/Sheet.h): the window, its header row, the auto-close, the tap catcher, the folder
 // panels and the sparks. Its state extends the sheet's (struct Popup : Kit::Sheet).
 //
-// The code moved verbatim at P1; its comments still say "below" and "above" about what is now in
+// A comment saying "below" or "above" may mean a declaration now in
 // another file - the declarations at the end of this header say where.
 
 #include "Cards/CardPopup.h"
@@ -41,14 +48,14 @@
 #include "LightColor.h"
 #include "UI/UITokens.h"
 #include "UI/UIToolkit.h"
-#include "UI/Kit.h"             // the component kit (2.12 P3)
-#include "UI/Sheet.h"           // the window's frame (2.12 P4)
-#include "Settings.h"   // 2.10d: SETTINGS' rows are kept by card id
+#include "UI/Kit.h"             // the component kit
+#include "UI/Sheet.h"           // the window's frame
+#include "Settings.h"   // SETTINGS' rows are kept by card id
 #include "Cards/CardGroups.h"   // the Card label row (K44)
 #include "Cards/CardAdded.h"    // K17: Add as a card, Remove card
 #include "Cards/PageSpec.h"     // CARD_ID_MAX
-#include "HaHistory.h"          // the History view's source (2.10e); no LVGL in it
-#include "TimeFormat.h"         // every time and duration it says (2.10e round 4)
+#include "HaHistory.h"          // the History view's source; no LVGL in it
+#include "TimeFormat.h"         // every time and duration it says
 #include <Arduino.h>
 #include <ctype.h>
 #include <math.h>
@@ -85,18 +92,19 @@ using KS = Kit::KitStyle;   // the kit's shared styles, by role (UI/Kit.h)
 
 // Compound names, never a bare ALL-CAPS word - Arduino's pin-mode macros eat
 // those (CLAUDE.md, "Arduino's global macro namespace will eat your enum").
-// VIEW_MEMBER: one member's own controls, reached from VIEW_MEMBERS (2.10b).
-// VIEW_SCENES: the light's scenes beside its brightness slider (2.10c).
+// VIEW_MEMBER: one member's own controls, reached from VIEW_MEMBERS.
+// VIEW_SCENES: the light's scenes beside its brightness slider.
 // History, Members and Scenes are reached by the corner icons, which work as
-// tabs (owner, 2026-10-06): see "The corner icons".
-// VIEW_PROPS: the entity's properties, read-only, from SETTINGS' button (2.10e).
-// VIEW_CARD_UI: the card's own looks, from SETTINGS' last row (2.8 round 3, D-28).
-// A CLUSTER'S WINDOW (2.11, K104; round 16): it opens on Members - a cluster has
-// no controls view of its own - with the CLUSTER panel beside SETTINGS (Rename
-// cluster, Header options, Add cards); VIEW_CLUSTER_SLOTS is Header options.
+// tabs: see "The corner icons".
+// VIEW_PROPS: the entity's properties, read-only, from SETTINGS' button.
+// VIEW_CARD_UI: the card's own looks, from SETTINGS' last row (D-28).
+// A CLUSTER'S WINDOW (K104): it has no controls view of its own and lists
+// Members, with the GROUP panel beside SETTINGS (Header options, Edit cards,
+// Area, Face); VIEW_CLUSTER_SLOTS is Header options, VIEW_CLUSTER_ADD is Edit
+// cards (K148), VIEW_GROUP the group view (K154), VIEW_SHOW_AS Show as... (K191).
 // VIEW_VISIBILITY: a card's options by where it is, from SETTINGS' Visibility
-// row (2.11 round 3, K96; PopupVisibility.cpp); VIEW_ADD_TO its Add to a
-// cluster (K91, K100).
+// row (K96; PopupVisibility.cpp); VIEW_ADD_TO its Add to a
+// cluster (K91, K100); VIEW_JOIN Add card to dashboard's "which group?" (K92).
 enum class PopupView  : uint8_t { VIEW_MAIN, VIEW_HISTORY, VIEW_MEMBERS, VIEW_MEMBER, VIEW_SCENES, VIEW_PROPS,
                                   VIEW_CARD_UI, VIEW_CLUSTER_SLOTS, VIEW_VISIBILITY, VIEW_ADD_TO,
                                   VIEW_CLUSTER_ADD, VIEW_JOIN, VIEW_GROUP, VIEW_SHOW_AS };
@@ -105,26 +113,24 @@ enum class PopupPhase : uint8_t { PHASE_CLOSED, PHASE_OPEN };
 // with the accent border, until the window closes.
 enum class HoldPhase  : uint8_t { HOLD_NONE, HOLD_PRESSING, HOLD_LETTING_GO, HOLD_OWNED };
 
-// THE P4_5 IS THE REFERENCE (owner, 2026-10-05: its toggle "is the perfect
-// size"). Its window is 787 x 545 px (68.1 x 47.1 mm) with the system header
+// THE P4_5 IS THE REFERENCE (its toggle is the right size). Its window is 787 x 545 px (68.1 x 47.1 mm) with the system header
 // showing, and its hero 349 px of that height (30.2 mm, measured with calipers
 // at 30). What is inside a window is sized as the same share of the biggest
 // window of THIS shape that fits in it - see the sheet's propH, and pm().
-// (The window itself has been up to 2:1 since 2026-10-06.)
+// (The window itself can be up to 2:1.)
 constexpr float REF_WIN_H_MM  = 47.1f;   // the P4_5 window's height, header showing
 constexpr float HERO_H_MM     = 30.2f;   // its hero's
 
-// The hold, in millimetres so it looks the same on every board. THE LEAP IS
-// GONE (owner, round 6): it was clipped by the card's wrapper, and the window
-// waiting two frames for it made the popup feel slower than it was - "the
-// simple pressing down further visual effect of a long-press is by itself a
-// really catchy visual".
+// The hold, in millimetres so it looks the same on every board. There is no
+// leap: it would be clipped by the card's wrapper, and the window waiting two
+// frames for it would make the popup feel slower than it is - the card
+// pressing down further is the whole visual effect of a long press.
 constexpr float    HOLD_SINK_MM    = 0.4f;   // how far the card is pressed in at the long press
 constexpr uint32_t HOLD_LETGO_MS   = 120;    // a tap lets go this fast, from full
 constexpr uint32_t KNOB_SLIDE_MS   = 160;
 
 // A window's entities: a card's primaries, or the members of a group defined
-// at the source (2.10c), whichever list is longer.
+// at the source, whichever list is longer.
 constexpr uint8_t POPUP_ENT_MAX = (CARD_PRIMARY_MAX > ENTITY_MEMBERS_MAX) ? CARD_PRIMARY_MAX
                                                                           : ENTITY_MEMBERS_MAX;
 
@@ -137,7 +143,7 @@ struct Popup : Kit::Sheet {
     // Copied from the card at open - see "the window holds the entities".
     const Entity   *ent[POPUP_ENT_MAX] = {nullptr};
     uint8_t         nEnt = 0;
-    // A GROUP DEFINED AT THE SOURCE (2.10c, DECISIONS K17): the card's one
+    // A GROUP DEFINED AT THE SOURCE (K17): the card's one
     // entity - light.office - whose members the registry learnt. With none of
     // them paused, ent[] is the group itself: HA's report is shown and a
     // command goes to the group, which keeps its bulbs in step. While any
@@ -147,13 +153,13 @@ struct Popup : Kit::Sheet {
     bool            expanded = false;
     EntityRegistry *reg  = nullptr;
     TempUnit        tempUnit = TempUnit::TEMP_INHERIT;
-    bool            cluster = false;   // a cluster's window (2.11): its main view manages it
+    bool            cluster = false;   // a cluster's window: its main view manages it
     char area[ENTITY_SHORT_MAX] = {0};
     char name[ENTITY_NAME_MAX]  = {0};
 
     // The sheet's tabs, by what they are (buildFirst()).
     lv_obj_t *btnHistory = nullptr, *btnMembers = nullptr;
-    lv_obj_t *btnScenes = nullptr;   // under the chart, on the light's own views (2.10c)
+    lv_obj_t *btnScenes = nullptr;   // under the chart, on the light's own views
 
     // The main view's widgets; null while another view is showing.
     lv_obj_t *hero = nullptr, *knob = nullptr, *heroIcon = nullptr;
@@ -167,19 +173,19 @@ struct Popup : Kit::Sheet {
     bool      knobDragging = false, swallowClick = false;
     int32_t   dragStartY = 0, dragKnobY0 = 0;
 
-    // A light's controls (2.10b): see "The light's controls".
+    // A light's controls: see "The light's controls".
     GroupOn   groupOn = GroupOn::GROUP_ON_ANY;   // copied from the card at open
-    SceneShow sceneShow = SceneShow::SCENES_VISIBLE;   // likewise (2.10c)
+    SceneShow sceneShow = SceneShow::SCENES_VISIBLE;   // likewise
     lv_obj_t *ddGroup = nullptr;      // SETTINGS' live dropdown
     lv_obj_t *ddTapScene = nullptr;   // SCENES' Default scene
     bool      builtPaused = false, rebuildQueued = false;   // "A paused window"
     uint8_t   builtCaps = 0;                     // what the selector was built for
     lv_obj_t *pill = nullptr;                    // PAUSED
-    // A member's own views, reached from Members or the group view (2.10b; two
-    // deep since 2.13 round 3, K157): how deep. Each level's entities are set
+    // A member's own views, reached from Members or the group view (two
+    // deep at most, K157): how deep. Each level's entities are set
     // aside in PopupMembers.cpp while ent[] holds the member's.
     uint8_t   depth = 0;
-    // A GROUP SHOWN AS ONE CARD (K151, K155): its GROUP panel, and its Members
+    // A GROUP SHOWN AS ONE CARD (K191, K155): its GROUP panel, and its Members
     // listing every member, read from the group's cluster made again (heldGroup()).
     bool      groupCard = false;
     bool      lightHero = false;
@@ -187,7 +193,7 @@ struct Popup : Kit::Sheet {
     lv_obj_t *fill = nullptr, *grip = nullptr, *mark = nullptr;
     lv_obj_t *btnCtl[4] = {nullptr, nullptr, nullptr, nullptr};   // power, dim, temp, colour
     lv_obj_t *swatch[8] = {nullptr};
-    // Scenes (2.10c): their buttons; the one loaded from this window (-1:
+    // Scenes: their buttons; the one loaded from this window (-1:
     // none), when, and the light's levels once that scene had settled - see
     // sceneRingCheck(); and the control the slider showed before Scenes.
     lv_obj_t *sceneBtn[ENTITY_SCENES_MAX] = {nullptr};
@@ -253,12 +259,12 @@ const char *const  HIST_SPAN_CHIP[HIST_SPANS] = { "24 h", "12 h", "6 h", "1 h" }
 constexpr uint8_t  HIST_PERIODS = 2;
 constexpr uint32_t HIST_PERIOD_SEC[HIST_PERIODS] = { 86400, 7 * 86400 };
 const char *const  HIST_PERIOD_CHIP[HIST_PERIODS] = { "24 h", "7 d" };
-constexpr uint8_t  HIST_ROWS_FIRST = 10;   // owner, 2026-10-02: 10 rows, then "Show more"
+constexpr uint8_t  HIST_ROWS_FIRST = 10;   // 10 rows, then "Show more"
 constexpr uint8_t  HIST_ROWS_MAX   = 60;   // what "Show more" draws at most (LVGL's pool)
-// The chart's Legend (owner, round 2), in the panel's order.
-enum : uint8_t { LEGEND_NONE = 0, LEGEND_X, LEGEND_Y, LEGEND_BOTH };   // None: round 4
+// The chart's Legend, in the panel's order.
+enum : uint8_t { LEGEND_NONE = 0, LEGEND_X, LEGEND_Y, LEGEND_BOTH };   // None: no legend
 
-// KEPT PER CARD (owner, round 2 - H3): every History choice is saved under the
+// KEPT PER CARD: every History choice is saved under the
 // card's id, by name, like Tap action; a member's own History is not a card's,
 // so it keeps nothing.
 const char *const HIST_SPAN_NAME[HIST_SPANS]     = { "24h", "12h", "6h", "1h" };
@@ -275,7 +281,7 @@ struct HistView {
     uint8_t  legend = LEGEND_BOTH;
     bool     chips = true;       // the span buttons on the chart
     bool     actChips = true;    // and on activity
-    Kit::Selector spanSel;       // the span buttons: a compact selector (#92), while it shows
+    Kit::Selector spanSel;       // the span buttons: a compact selector, while it shows
     int32_t  chipRoom = 0;       // the chart's selector's room, only ever narrowing (histChipRoom())
     bool     causes = true;      // activity's "by ..." lines (Show triggers)
     bool     duration = false;   // activity's "for: 2 hrs 38 min" lines (Show duration)
@@ -296,8 +302,8 @@ struct HistView {
 // The left panel's kinds - the sheet's s.left.kind (sideFor(), PopupPanels.cpp).
 enum : uint8_t { SIDE_NONE, SIDE_CHART, SIDE_SCENES, SIDE_ACTIVITY, SIDE_CLUSTER };
 
-// A panel's rows are the kit's (2.12 P3): Kit::RowSpec, built by Kit::rows().
-// ROW_BUTTON (2.10e): a button that does something - its words in `opts`.
+// A panel's rows are the kit's: Kit::RowSpec, built by Kit::rows().
+// ROW_BUTTON: a button that does something - its words in `opts`.
 using DeckRowKind = Kit::RowKind;
 using DeckRowSpec = Kit::RowSpec;
 constexpr uint8_t DECK_ROWS_MAX = Kit::ROWS_MAX;
@@ -330,7 +336,7 @@ extern size_t s_treeLen;
 // CardPopup.cpp
 void showView(PopupView v);
 void groupShowAs(bool asCard);   // PopupCluster.cpp: Visibility's Show as (K174)
-void groupViewPress(lv_obj_t *obj);   // PopupGroup.cpp: a hold on a group view tile (1.4)
+void groupViewPress(lv_obj_t *obj);   // PopupGroup.cpp: a hold on a group view tile
 void groupViewRelease();
 bool movedTooFar();                   // PopupHold.cpp
 void markDirectView();   // the view just shown was opened directly: back returns (K169)
@@ -448,15 +454,15 @@ void cardUiCb(lv_event_t *ev);                           // SETTINGS' Card UI ro
 bool cardUiTakeRebuild();                                // a choice wants the page built again
 void cardUiTypeWords(bool name);                         // the keyboard: the card's name, or its card label's words (K95)
 
-// PopupCluster.cpp (2.11, K104; round 16 - Members is a cluster's window)
-uint8_t clusterSpecs(DeckRowSpec *r);   // the CLUSTER panel's rows, on Members
+// PopupCluster.cpp (K104: Members is a cluster's window)
+uint8_t clusterSpecs(DeckRowSpec *r);   // the GROUP panel's rows, on Members
 void buildClusterSlots();               // VIEW_CLUSTER_SLOTS: Header options
 bool clusterTakeRebuild();   // a choice wants the page built again, once the window has gone
 void clusterRename();        // the keyboard on the cluster's name, as Rename opens it (K95)
-void buildClusterAdd();      // VIEW_CLUSTER_ADD: Edit cards (2.13 round 2, K148)
+void buildClusterAdd();      // VIEW_CLUSTER_ADD: Edit cards (K148)
 uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask);   // /popup: the page's picked cards in; the window closes
-void buildGroup();                    // 2.13 (K143, K154): VIEW_GROUP, the group's cluster (PopupGroup.cpp)
-void buildClimate();                  // 2.13 (K144): a thermostat's main view, read only (PopupClimate.cpp)
+void buildGroup();                    // K154: VIEW_GROUP, the group's cluster (PopupGroup.cpp)
+void buildClimate();                  // K144: a thermostat's main view, read only (PopupClimate.cpp)
 void groupWindowFor(PopupView v);     // ...the window for view v: fitted to the group view, the page's for Edit cards
 void groupViewForget();               // ...the group view's cluster deleted, before the stage is cleaned
 void groupForget();                   // ...the window went
@@ -477,7 +483,7 @@ extern ClusterCard *(*s_groupMaker)(const char *id, bool allTiles);   // CardPag
 void clusterMemberShow(const ClusterCard &cl, uint8_t i, bool want);
 bool clusterMemberPinned(const ClusterCard &cl, uint8_t i);   // a tile or in the header, as the next build
 // Member `i` as the next build will show it: a tile, in the header, hidden - or
-// moved out to the page, its card there (the sprint after round 7).
+// moved out to the page, its card there.
 enum class MemberShown : uint8_t { SHOWN_TILE, SHOWN_HEADER, SHOWN_HIDDEN, SHOWN_MOVED };
 MemberShown clusterMemberShown(const ClusterCard &cl, uint8_t i);
 bool clusterMemberInHeader(const ClusterCard &cl, uint8_t i);   // one of its header's sensors
@@ -568,7 +574,7 @@ void confirmAsk(Kit::DialogRole role, const char *title, const char *const *line
                 Kit::ButtonRole verbRole, void (*go)());
 bool confirmGoDebug();           // /popup: the asked dialog's button, as a tap (false: none up)
 
-// PopupMove.cpp (round 2 of the 2.11 follow-ups): a card moved, copied or
+// PopupMove.cpp (K137): a card moved, copied or
 // regrouped, and its Restore. `from`: the cluster a tile is in (null on the page);
 // `toCluster`: Change cluster / Add to cluster, else Add to dashboard / Change group.
 void moveOpen(Card *subject, ClusterCard *from, bool toCluster);
@@ -576,18 +582,18 @@ bool restoreOffered(const Card *c);   // something to restore: a copy, a move, a
 void restoreAsk(const Card *c);       // its dialog
 void visibilityWantRebuild();         // PopupVisibility.cpp: the page built again once the window goes
 
-// PopupVisibility.cpp (2.11 round 3, K96)
+// PopupVisibility.cpp (K96)
 void buildVisibility();
 void visibilityCb(lv_event_t *ev);   // SETTINGS' Visibility row
 void visibilityHideTile();           // Hide from the cluster: the held mini tile, and the window closes
 // Whose visibility the view is about: the held card, or - in a cluster's window,
-// one member's own view - that member's card (round 6). Null when there is none.
+// one member's own view - that member's card. Null when there is none.
 Card *visibilitySubject();
 void buildAddTo();                   // VIEW_ADD_TO: Add to a cluster - which, Copy or Move (K91, K100)
 bool visibilityAddTo(uint8_t pick, bool move);   // ...done: the window closes; false when it cannot
 // WHICH GROUP? (K92 rule 9): Add card to dashboard asks it first - VIEW_JOIN.
-// `memberCard`: the cluster's tile it is, so it asks Copy or Move too (the
-// sprint after round 7); null for a group card's member - a copy only.
+// `memberCard`: the cluster's tile it is, so it asks Copy or Move too;
+// null for a group card's member - a copy only.
 void visibilityJoinOpen(Card *parent, const Entity *member, Card *memberCard = nullptr);
 void buildJoin();
 bool visibilityJoin(uint8_t pick, bool move = false);   // made, in group `pick` (0: its group card's)

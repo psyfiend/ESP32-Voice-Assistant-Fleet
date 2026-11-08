@@ -1,4 +1,4 @@
-// The control deck (2.12 P1, split from CardPopup.cpp; the kit's selector since P3): a light's
+// The control deck: a light's
 // controls - dim, white, colour - as the kit's Selector, with Power as its action.
 #include "PopupState.h"
 
@@ -7,11 +7,11 @@ namespace popup {
 Deck d;
 
 // ---------------------------------------------------------------------------
-// THE CONTROL DECK (owner, 2026-10-07 - after HTC's TouchFLO 3D): Kit::selector()
+// THE CONTROL DECK: Kit::selector()
 // - a ribbon of the light's controls, a metal selector slid or glided between
 // them, Power a plain button at the start. Only what is showing is built, so
 // the control chosen rebuilds the view - after the glide, never during. The
-// deck is the same size as before its ribbon got shorter, so nothing around it
+// deck keeps its size whatever its ribbon holds, so nothing around it
 // moves. Its four looks are the kit's (Kit::selectorLook()), chosen per scheme
 // on the system panel (K45).
 // ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
-// Card UI (2.8 round 3, D-25 / D-28; round 5): the card's own looks, a view of
+// Card UI (D-25, D-28): the card's own looks, a view of
 // the card window reached from the foot of SETTINGS. The kit's chip table, as UI
-// Tweaks' - one row per option, Inherit its first chip (owner, round 5: round
-// 4's Inherit buttons and selectors gone). "Inherit" follows UI Tweaks. Kept
+// Tweaks' - one row per option, Inherit its first chip, and it follows UI
+// Tweaks. Kept
 // under the card's id; written when the window closes, as SETTINGS' rows are.
 #include "PopupState.h"
 
@@ -24,7 +24,7 @@ static const char *const TIMEOUT_IS[] = { nullptr, "60", "30", "10", "off" };
 static const char *const BAR_W[]     = { "Inherit", "On", "Off" };
 static const char *const BAR_IS[]    = { nullptr, "on", "off" };
 
-// A CLUSTER'S OWN CARD STATE FOR ITS TILES (2.11's final pass, 2.13): UI Tweaks'
+// A CLUSTER'S OWN CARD STATE FOR ITS TILES: UI Tweaks'
 // words with Inherit first; saved on the cluster as "card_state" (K106's way).
 static const char *const STATE_W[]   = { "Inherit", "Fill", "Icon glow", "Bracket", "Corner cut" };
 static const char *const STATE_IS[]  = { nullptr, "fill", "glow", "bracket", "corner" };
@@ -37,9 +37,9 @@ static const char *const GVIEW_IS[]  = { nullptr, "tiles", "cards" };
 static const char *const MARGIN_W[]  = { "Inherit", "Small", "Medium", "Large", "X-large" };
 static const char *const MARGIN_IS[] = { nullptr, "small", "medium", "large", "xlarge" };
 
-// THE GROUP VIEW SECTION (owner, 2026-11-05, K167): at the foot of a group's Card
+// THE GROUP VIEW SECTION (K167): at the foot of a group's Card
 // UI, under its own title, what affects only its group view - Card appearance (K162's
-// choice) and Card margins. ONE LIST (owner, 2026-11-06): the title is a section row
+// choice) and Card margins. It is ONE LIST: the title is a section row
 // of the same table, centred between the panels' rules, scrolling with the rest.
 enum CuiRow : uint8_t { CUI_ENTITY, CUI_CLABEL, CUI_METAL, CUI_SHAPE, CUI_DENSITY, CUI_TIMEOUT, CUI_BAR, CUI_STATE,
                         CUI_GVIEW, CUI_GMARGIN, CUI_ROWS };
@@ -47,8 +47,8 @@ constexpr CuiRow CUI_SECTION = CUI_ROWS;   // the table's GROUP VIEW title: no o
 
 static Card *held() { return settingsSubject(); }   // a member's own card in its view (K166)
 
-// ONLY WHAT THIS CARD CAN USE (round 6, the owner: Card UI "should read the
-// specific features of whichever card it was launched from"). A cluster wears
+// ONLY WHAT THIS CARD CAN USE: Card UI reads the features of the card it was
+// launched from. A group (cluster) wears
 // no label of either kind, has no density and no selector: its window's timeout
 // and bar. A mini tile names its entity, and has no card label or density. The
 // selector rows are for a window that has one - a light's controls. The table's
@@ -116,7 +116,7 @@ static void relight(uint8_t r) {
     if (s_rowAt[r] != CUI_SECTION) Kit::chipTableLit(s_table, r, litOf(s_rowAt[r]));
 }
 
-// This window's wait and bar, as the card now has them - at once (round 4).
+// This window's wait and bar, as the card now has them - at once.
 static void retime() {
     uint8_t i = savedPos("close", TIMEOUT_IS, 5);
     const uint32_t ms = i == 0 ? Kit::windowCloseMs() : i == 4 ? 0 : (uint32_t)atoi(TIMEOUT_IS[i]) * 1000;
@@ -129,7 +129,7 @@ static void lookKeep(int8_t look) {
     Kit::selectorLookOverride(look);
 }
 
-// --- CUSTOM TYPES ITS WORDS (2.11, K95) ----------------------------------------------
+// --- CUSTOM TYPES ITS WORDS (K95) ----------------------------------------------
 // A tap on Custom - lit already or not - opens the keyboard on the words the card
 // shows now; Save keeps them, Cancel leaves the card Custom with the words it had.
 static void relightAsync(void *) { if (s.phase == PopupPhase::PHASE_OPEN) showView(PopupView::VIEW_CARD_UI); }
@@ -151,7 +151,7 @@ static void nameSaved(const char *words, void *) {
 }
 
 // The card label's words, in its group's colour (K46 rename a). None is a card
-// label in the colour alone, as Custom has always allowed.
+// label in the colour alone, as Custom allows.
 static void labelSaved(const char *words, void *) {
     Card *c = held();
     if (!c || s.phase != PopupPhase::PHASE_OPEN) return;
@@ -192,7 +192,7 @@ static void chooseAsync(void *p) {
     const CuiRow row = s_rowAt[at];   // the table's row, as the option it is
     switch (row) {
         case CUI_ENTITY: {
-            // Inherit too, since K49 (a card the dashboard names is Custom unless told otherwise).
+            // Inherit is a saved choice like the others (K49: a card the dashboard names is Custom unless told otherwise).
             const CardLabel l = ENTITY_IS[i < 5 ? i : 0];
             keepCardSetting("label", cardLabelName(l));
             c->setLabelMode(l);

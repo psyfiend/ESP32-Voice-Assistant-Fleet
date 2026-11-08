@@ -1,4 +1,4 @@
-// The controls view (2.12 P1, split from CardPopup.cpp): the hero beside what it shows - the
+// The controls view: the hero beside what it shows - the
 // toggle and its knob, a sensor's disc, the column of words, and where the slider goes in a wide
 // view. A light's slider itself is PopupLight.cpp.
 #include "PopupState.h"
@@ -7,8 +7,8 @@ namespace popup {
 
 void knobExec(void *var, int32_t v) { lv_obj_set_y((lv_obj_t *)var, v); }
 
-// The switch's knob SLIDES to its new end (owner, 2026-10-04: "absolutely" on
-// the control giving feedback), except when the view is first built, where it
+// The switch's knob SLIDES to its new end, as feedback from the control, except
+// when the view is first built, where it
 // is simply placed. The knob is inside the window, which covers the page, so
 // each frame redraws only the toggle. The animation's var is the knob, so
 // LVGL deletes it with the window.
@@ -34,7 +34,7 @@ void placeKnob(int32_t y) {
 }
 
 // "Changed 3m ago", "Paused", "No reading yet" - under the value, every view.
-// A group with members left out says how many (owner, 2.10b): a group must
+// A group with members left out says how many: a group must
 // never quietly do less than it seems to.
 void renderAgo(const Agg &a) {
     if (!s.lblAgo) return;
@@ -55,7 +55,7 @@ void renderAgo(const Agg &a) {
 
 // The column's first line: what it is ("Brightness"), and the PAUSED pill
 // BESIDE it - on the same line, the same height, so nothing below moves when
-// it comes or goes (owner, round 3: it used to sit above and push the rest down).
+// it comes or goes.
 void makeLabelRow(lv_obj_t *col) {
     lv_obj_t *row = plain(col);
     lv_obj_set_size     (row, LV_SIZE_CONTENT, lv_font_get_line_height(UI::type().TAG));
@@ -70,12 +70,12 @@ void makeLabelRow(lv_obj_t *col) {
 
 // THE COLUMN BESIDE A TOGGLE OR SLIDER: as wide as THIS light's selector, or
 // a fixed allowance for the words, whichever is wider - and as tall as the
-// hero - and the row is centred in the window (owner, round 4, "centre by real
-// width"). So a toggle and its words sit centred; a light with four or five
+// hero - and the row is centred in the window by its real
+// width. So a toggle and its words sit centred; a light with four or five
 // controls is centred as a whole; one with two or three moves in from the
 // left edge. For any one light nothing moves - not with the control showing,
-// a pause, or changing words, which the allowance covers (a round 3 lesson:
-// a column sized from its text moved the slider every time the text changed).
+// a pause, or changing words, which the allowance covers (a column sized from
+// its text would move the slider every time the text changed).
 // The control deck's width (buildControlDeck()): the kit's selector with Power
 // and the light's modes.
 int32_t selectorW(uint8_t caps) {
@@ -112,12 +112,11 @@ int32_t stageH() {
 
 int32_t controlDeckH();   // below
 
-// MEMBERS' WIDTH (round 6): the main view's slider and words together. A
-// cluster's window has no slider, and its Members took whatever the last window
-// had left (the owner: "sometimes the satin buttons span the entire window,
-// sometimes not") - so it is a group light's, as Desk's would be in this window.
+// MEMBERS' WIDTH: the main view's slider and words together. A cluster's
+// window has no slider, so its Members take a group light's width, as Desk's
+// would in this window; the width never depends on the previous window.
 int32_t membersRowW() {
-    // A card whose controls have no slider (a disc: Garage Doors, round 16) gets
+    // A card whose controls have no slider (a disc: Garage Doors) gets
     // a group light's width too, as every other Members does.
     if (!s.cluster && s.mainRowW > 0) return s.mainRowW;
     const int32_t keepW = s.heroW, keepH = s.heroH;   // colWidth() reads the hero's width
@@ -228,7 +227,7 @@ void renderMain() {
 void commandAll(bool on) {
     if (!s.reg) return;
     const uint32_t now = millis();
-    s.lastScene = -1;   // S5, as lightSend()
+    s.lastScene = -1;   // the light is no longer as a scene left it, as lightSend()
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
         if (e && e->desc.writable && !e->paused)   // a paused member is out of the group
@@ -237,7 +236,7 @@ void commandAll(bool on) {
     renderMain();
 }
 
-// A PAUSED window's controls are greyed and do nothing (owner, 2.10b round 1);
+// A PAUSED window's controls are greyed and do nothing;
 // a touch on one says why, rather than leaving the finger wondering.
 bool pausedBlocks() {
     if (!aggregate().paused) return false;
@@ -253,8 +252,7 @@ void toggleCb(lv_event_t *ev) {
     commandAll(!aggregate().on);
 }
 
-// THE KNOB CAN BE DRAGGED (owner, round 7): a knob that slides on a tap but
-// cannot be moved by a finger is "jarring". It follows the finger up and down
+// THE KNOB CAN BE DRAGGED as well as tapped. It follows the finger up and down
 // the track; let go, and it goes to whichever half it is in - the rest of the
 // way by the same slide a tap uses - and the switch follows it. Dragged all the
 // way, or most of the way, the switch changes; less than half, the knob slides
@@ -292,7 +290,7 @@ void knobDragCb(lv_event_t *ev) {
     }
 }
 
-// WHERE THE SLIDER GOES IN A WIDE VIEW (owner, round 7). Where the controls
+// WHERE THE SLIDER GOES IN A WIDE VIEW. Where the controls
 // put it, whenever that works: one column of scenes, or the swatches, sit
 // just beside it. Only what does not fit moves it, and only as far as it must:
 //  - wider than the room to the right (extra scene columns): the slider goes
@@ -347,7 +345,7 @@ void buildMain() {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const Entity    &e = *s.ent[0];
-    if (e.desc.kind == EntityKind::CLIMATE) { buildClimate(); return; }   // 2.13, read only (K144)
+    if (e.desc.kind == EntityKind::CLIMATE) { buildClimate(); return; }   // read only (K144)
 
     lv_obj_t *row = plain(s.stage);
     lv_obj_set_size     (row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -355,18 +353,16 @@ void buildMain() {
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(row, pm(UI::shape().P_GAP), 0);
 
-    // THE SAME SHARE OF THE WINDOW ON EVERY BOARD (owner, 2026-10-05). It used
-    // to be the window's height less the header row and margins, which on a
-    // 7" panel made a toggle twice the P4_5's (60 mm on calipers) and on the 4B
-    // nearly 40 mm.
+    // THE SAME SHARE OF THE WINDOW ON EVERY BOARD. A height taken from the
+    // window less the header row and margins would make a toggle twice the
+    // P4_5's on a 7" panel and nearly 40 mm on the 4B.
     s.heroH = pm(HERO_H_MM);
     if (s.heroH < UI::minTouch()) s.heroH = UI::minTouch();
 
-    // D3: every writable thing opens on its control. A light that can dim, or
-    // has a white range or a colour, gets its slider (2.10b - "The light's
-    // controls"); a switch, an on/off light, and a light whose source has not
-    // said what it can do (an HA light until 2.10c) get the big toggle, which
-    // is HA's own dialog for those.
+    // Every writable thing opens on its control. A light that can dim, or
+    // has a white range or a colour, gets its slider; a switch, an on/off
+    // light, and a light whose source has not said what it can do get the big
+    // toggle, which is HA's own dialog for those.
     s.builtPaused   = aggregate().paused;
     s.rebuildQueued = false;
     const bool writableLight = (e.desc.kind == EntityKind::LIGHT && e.desc.writable);
@@ -385,8 +381,8 @@ void buildMain() {
         if (!(caps & bit)) s.lightCtl = firstCtl(caps);
         s.builtCaps = caps;
 
-        // THE CONTROL DECK UNDER THE HERO WHERE THE WINDOW HAS THE HEIGHT
-        // (owner, 2026-10-07): the 4B and the 7" panels. The P4_5 is the one
+        // THE CONTROL DECK UNDER THE HERO WHERE THE WINDOW HAS THE HEIGHT:
+        // the 4B and the 7" panels. The P4_5 is the one
         // board too short for it - its screen is the widest shape - and keeps
         // the deck beside the slider. Worked out from the window, not a list
         // of boards. The slider, its words and the deck are centred.
@@ -408,7 +404,7 @@ void buildMain() {
         lv_obj_t *col = plain(row);
         // Sized for everything the members CAN do, paused or not: a pause
         // hides buttons, and a narrower column re-centred the whole group
-        // (owner, round 5 - All Lamps paused).
+        // (as with All Lamps paused).
         // WIDE: the column is as wide as what it holds - the swatches, or the
         // scene buttons - and starts where the controls' column starts.
         const int32_t ctlColW = colWidth(true, LA.allCaps, !s.stacked);
@@ -416,7 +412,7 @@ void buildMain() {
         int32_t colW = ctlColW;
         if (wide) {
             int32_t maxW = stageW - s.heroW - pm(UI::shape().P_GAP);
-            // THE THIRD WAY CLEAR OF THE CHIP (round 7, the 4B's "show all"):
+            // THE THIRD WAY CLEAR OF THE CHIP (the 4B's "show all"):
             // when the scenes can neither drop below the clapperboard (their
             // rows fill the slider's height) nor clear it with the slider at
             // the edge, they get fewer columns - those that fit beside the
@@ -446,10 +442,9 @@ void buildMain() {
         } else {
             lv_obj_t *deckParent = col;
             if (s.stacked) {
-                // THE STAGE'S FULL WIDTH, the deck centred in it (L5, measured
-                // on the 1060): content-sized, it was centred inside a "track"
+                // THE STAGE'S FULL WIDTH, the deck centred in it: content-sized, it would be centred inside a "track"
                 // as wide as the widest child, itself centred in the stage -
-                // two roundings, and Color's wider row moved the deck a pixel.
+                // two roundings, and Color's wider row would move the deck a pixel.
                 deckParent = plain(s.stage);
                 lv_obj_set_size(deckParent, lv_pct(100), LV_SIZE_CONTENT);
                 lv_obj_set_flex_flow(deckParent, LV_FLEX_FLOW_ROW);
@@ -505,15 +500,15 @@ void buildMain() {
     const int32_t colMax = lv_area_get_width(&s.winRect) - 2 * s.pad - s.heroW - pm(UI::shape().P_GAP);
     lv_obj_set_style_max_width(col, colMax, 0);
     // AND NEVER NARROWER THAN ITS LONGEST ORDINARY WORDS. The row is centred,
-    // so a column that changed width moved the whole group - the owner's B1:
-    // the first tap turned "Changed 12m ago" into "Changed just now" and the
-    // hero jumped left. Sized for the longest lines it will normally show.
+    // so a column that changed width would move the whole group (the first
+    // tap turns "Changed 12m ago" into "Changed just now"). Sized for the
+    // longest lines it will normally show.
     int32_t colMin = textW("Changed just now", t.TAG);
     if (textW("No reading yet", t.TAG) > colMin) colMin = textW("No reading yet", t.TAG);
     if (textW("Unavailable", UIToolkit::Font_Hero) > colMin) colMin = textW("Unavailable", UIToolkit::Font_Hero);
     lv_obj_set_style_min_width(col, colMin < colMax ? colMin : colMax, 0);
     // A toggle's column is the slider's: the same size, the lines in the
-    // same places (owner, round 3).
+    // same places.
     if (s.toggleHero) fixColumn(col, colWidth(false, 0));
     s.mainRowW = s.toggleHero ? s.heroW + pm(UI::shape().P_GAP) + colWidth(false, 0) : 0;
 

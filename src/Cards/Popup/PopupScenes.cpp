@@ -1,10 +1,10 @@
-// The Scenes view (2.12 P1, split from CardPopup.cpp): which scenes are offered, the mark on the
-// one loaded from the window (a ring until #99, glass since), and the stack of buttons.
+// The Scenes view: which scenes are offered, the mark on the
+// one loaded from the window (glass), and the stack of buttons.
 #include "PopupState.h"
 
 namespace popup {
 
-// THE LIGHT WHOSE SCENES ARE OFFERED (2.10c): the one light the window shows -
+// THE LIGHT WHOSE SCENES ARE OFFERED: the one light the window shows -
 // a card's own, a group defined in HA as itself, or a member in its own view
 // (a bulb has none, a room does). None while the window works through a
 // group's members (a scene would reach the paused one), or for a group
@@ -16,7 +16,7 @@ const Entity *sceneHost() {
     return (s.nEnt == 1) ? s.ent[0] : nullptr;
 }
 
-// THE SCENES OFFERED, by the card's Scenes setting (owner, 2026-10-07): those
+// THE SCENES OFFERED, by the card's Scenes setting (K21): those
 // not hidden in HA's own UI, all of them, or none. `i` counts offered scenes.
 uint8_t shownScenes() {
     const Entity *h = sceneHost();
@@ -43,8 +43,8 @@ const Entity *shownScene(uint8_t i) {
 
 bool hasScenes() { return shownScenes() > 0; }
 
-// THE MARK ON A LOADED SCENE (owner, 2.10c S5; a ring until #99, glass since -
-// K77, "the ring" in the names below) says "the light is as that
+// THE MARK ON A LOADED SCENE (glass, K77; "the ring" in the names below is
+// the mark's old name) says "the light is as that
 // scene left it", so it lasts only while that is true: until the window
 // closes, any command from the window, or a change from elsewhere. A scene
 // fades in over a second or two and the bridge reports as it goes, so a
@@ -89,19 +89,18 @@ void sceneCb(lv_event_t *ev) {
     renderLight();
 }
 
-// THE SCENES VIEW (2.10c; owner, 2026-10-06): the brightness slider stays where
+// THE SCENES VIEW: the brightness slider stays where
 // it is on the controls view, and the scene buttons take the column - the
 // label, the value and the selector all give way, so three rows fit. Reached
 // by the scenes icon under the chart, like the other views; the column is the
 // controls view's own width, so the slider does not move.
 //
-// SIZED AS A SHARE OF THE WINDOW, like the slider (owner: on the 4B they were
-// large for their window): 9 "P4_5 millimetres" tall - a full touch target on
+// SIZED AS A SHARE OF THE WINDOW, like the slider (a fixed size is too large
+// for the 4B's window): 9 "P4_5 millimetres" tall - a full touch target on
 // the P4_5 - never under the swatches' 6.5 mm, and three rows at most in the
 // slider's height. Centred; it scrolls if a light has more than fit. Names as
 // the source gives them, sorted ("Bright" .. "Relax").
-// A STACK, NOT A FLOW (owner, after round 5: wrapped like text, the buttons
-// looked scattered). One column of buttons all as wide as the longest name,
+// A STACK: buttons wrapped like text look scattered. One column of buttons all as wide as the longest name,
 // centred in the slider's height; a second column only when one is full, and
 // so on while the room lasts - then it scrolls. Measured before building, so
 // the slider can sit beside exactly what is there.
@@ -112,9 +111,9 @@ SceneStack sceneStack(int32_t maxW) {
     SceneStack k;
     k.gap = pm(u.P_SCENE_GAP);
     // The stack's own padding held the ring round a loaded scene (outline pad
-    // + width), which its edge would otherwise have clipped. The ring went
-    // with #99 - a loaded scene is glass - and the padding stays, so the
-    // buttons keep their size and place.
+    // + width), which its edge would otherwise have clipped. A loaded scene
+    // is glass and has no ring now; the padding stays, so the buttons keep
+    // their size and place.
     k.pad = LV_MAX(2, mm(u.RING_PAD)) + LV_MAX(2, mm(u.RING_W)) + 1;
     k.ch  = LV_MAX(mm(u.SWATCH), LV_MIN(pm(u.P_SCENE_H), (s.heroH - 2 * k.gap - 2 * k.pad) / 3));
     k.bw  = k.ch * 16 / 10;
@@ -160,7 +159,7 @@ void buildSceneGrid(lv_obj_t *col, int32_t colW) {
     }
     lv_obj_set_style_pad_column(grid, gap, 0);
     lv_obj_set_style_pad_row   (grid, gap, 0);
-    lv_obj_set_style_pad_all   (grid, pad, 0);   // the ring's old room (sceneStack())
+    lv_obj_set_style_pad_all   (grid, pad, 0);   // the room the ring needed (sceneStack())
 
     for (uint8_t i = 0; i < shownScenes() && i < ENTITY_SCENES_MAX; i++) {
         const Entity *sc = shownScene(i);
@@ -170,7 +169,7 @@ void buildSceneGrid(lv_obj_t *col, int32_t colW) {
         Kit::add(b, KS::KS_PILL);
         Kit::add(b, KS::KS_PILL_PRESSED, UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
         // Greyed in a paused window, as everything else is: its own colours.
-        // Else satin, glass while it is the scene loaded (#99, K77) - from the
+        // Else satin, glass while it is the scene loaded (K77) - from the
         // first frame, and renderLight() keeps it so.
         const bool loaded = i == s.lastScene;
         if (s.builtPaused) lv_obj_set_style_bg_color(b, UI::c(quiet(p.SURFACE)), 0);

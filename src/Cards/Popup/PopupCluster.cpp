@@ -1,24 +1,23 @@
-// A CLUSTER'S WINDOW IS ITS MEMBERS (2.11 round 16, the owner: the Details view
-// held settings, not details). A long press on its header (K107) opens Members -
-// every member, hidden ones too, each opening its own view, whose Visibility
-// shows or hides it - with the CLUSTER panel beside SETTINGS:
+// A GROUP'S (CLUSTER'S) WINDOW LISTS ITS MEMBERS - every member, hidden ones
+// too, each opening its own view, whose Visibility shows or hides it - with the
+// GROUP panel beside SETTINGS, which holds what concerns its members (K174):
 //
-//   Rename group - the group's name on the keyboard (K95, K146); Header options - which
-//   sensors its header shows (four at most), Sensor icons and Header style (the
-//   page's, Swatch or Band - K102); Add cards - the page's cards that can join,
-//   Copy or Move (K91, K100).
+//   Header options - which sensors its header shows (four at most), Sensor
+//   icons and Header style (the page's, Swatch or Band - K102); Edit cards -
+//   the page's cards that can join, Copy or Move (K91, K100, K148); Area (K141);
+//   Face (K191). Rename group (K95, K146) and Show as are in Visibility.
 //
 // Kept under the cluster's id (label_text, cl_style, cl_icons, slots) and each member's
-// (hidden) - the settings file's entries agreed in K106 - written when the
+// (hidden) - the settings file's entries listed in K106 - written when the
 // window closes, as SETTINGS' rows are; the page is built again once it has
 // gone, so what the cluster shows follows. Every state shown is read from the
 // file first, then from the cluster as built, so the view says what the next
 // build will draw.
 #include "PopupState.h"
 #include "Cards/ClusterCard.h"
-#include "Cards/CardWhere.h"   // 2.13: what a picker row says it already is
-#include "UI/HaOffer.h"        // 2.13: Add cards from Home Assistant
-#include "UI/EditCards.h"      // 2.13 round 2: Edit cards (K148)
+#include "Cards/CardWhere.h"   // what a picker row says it already is
+#include "UI/HaOffer.h"        // Add cards from Home Assistant
+#include "UI/EditCards.h"      // Edit cards (K148)
 #include "HaCatalog.h"         // AREAS_MAX: the Area row's choices
 #include "HaValue.h"           // haDescriptor(): an HA row's header glyph (K168)
 #include "PsramArray.h"
@@ -36,12 +35,12 @@ constexpr uint8_t ADD_MAX = 16;
 Card       *s_cand[ADD_MAX] = {};
 uint8_t     s_nCand = 0;
 
-// THE OPTIONS ARE CHIP TABLES (round 4, the owner: "look more like the Card UI or
-// UI Tweaks sheet"): an option's name right-justified against its chips.
-const char *const STYLE_W[]  = { "Inherit", "Swatch", "Band" };   // "Band", as the label type's (round 10); saved as "bar"
+// THE OPTIONS ARE CHIP TABLES, as the Card UI and UI Tweaks sheets are: an
+// option's name right-justified against its chips.
+const char *const STYLE_W[]  = { "Inherit", "Swatch", "Band" };   // "Band", as the label type's; saved as "bar"
 const char *const STYLE_IS[] = { nullptr, "swatch", "bar" };
 const char *const ICONS_W[]  = { "Show", "Hide" };
-constexpr uint8_t ROW_ICONS = 0, ROW_STYLE = 1;   // Header options' chip rows, under the sensors (round 16)
+constexpr uint8_t ROW_ICONS = 0, ROW_STYLE = 1;   // Header options' chip rows, under the sensors
 
 lv_obj_t *s_table = nullptr;   // the view's chip table
 
@@ -88,8 +87,8 @@ bool visible(const ClusterCard &cl, uint8_t i, const char *const *ids, uint8_t n
 
 bool movedOut(const Card *m) { return m && m->hasId() && CardAdded::isMovedToPage(m->id()); }
 
-// THE LISTS NAME A MEMBER IN FULL (owner, after v0.2.19 and again after round 1:
-// "Eric Bedroom Temperature", never "Eric"): HA's name, always, in both lists.
+// THE LISTS NAME A MEMBER IN FULL ("Eric Bedroom Temperature", never "Eric"):
+// HA's name, always, in both lists.
 // The tile keeps the dashboard's short label.
 void nameOf(const Card *m, char *out, size_t cap) {
     const Entity *e = m ? m->firstEntity() : nullptr;
@@ -129,7 +128,7 @@ void note(lv_obj_t *list, const char *words) {
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     lv_label_set_text(l, words);
-    Kit::helperNote(l);   // UI Tweaks' Show helper text (2.13)
+    Kit::helperNote(l);   // UI Tweaks' Show helper text
 }
 
 // The foot's buttons, as Card UI's and UI Tweaks' are: a row, one width, centred.
@@ -208,7 +207,7 @@ void renameCb(lv_event_t *ev) {
     if (!cl || !cl->hasId()) return;
     if (ev) chartSet(DECK_PEEK);   // from the CLUSTER panel: it folds under the keyboard
     static char now[40], dflt[48];
-    snprintf(now, sizeof(now), "%s", s.name);   // as it is shown: its group's, or its own words from before K146
+    snprintf(now, sizeof(now), "%s", s.name);   // as it is shown: its group's, or its own words
     CardGroups::Group g;
     snprintf(dflt, sizeof(dflt), "%s", CardGroups::ofCard(*cl, g) && g.haName[0] ? g.haName : now);
     Kit::KeyboardSpec k = {};
@@ -220,9 +219,9 @@ void renameCb(lv_event_t *ev) {
     Kit::keyboard(k);
 }
 
-// The GROUP panel folds as the view opens, as Visibility's and Card UI's do (owner, 2026-11-06).
-// GROUP is the left panel (CHART's place, PopupPanels.cpp's sideTitle) - folding only
-// the right one left it open over Header options (F46, owner 11-07).
+// The GROUP panel folds as the view opens, as Visibility's and Card UI's do.
+// GROUP is the left panel (CHART's place, PopupPanels.cpp's sideTitle), so both
+// panels fold: the left one would otherwise stay open over Header options.
 void slotsViewCb(lv_event_t *ev) {
     (void)ev;
     deckSet(DECK_PEEK);
@@ -231,7 +230,7 @@ void slotsViewCb(lv_event_t *ev) {
                   nullptr);
 }
 
-// A SENSOR'S ROW IS A BUTTON (round 16, components.md's surfaces): satin while
+// A SENSOR'S ROW IS A BUTTON (components.md's surfaces): satin while
 // it can be chosen, glass while it is in the header. A tap puts it in the
 // header - appended, last in priority - or takes it out. A member that leaves
 // the header comes back as a tile unless hidden (K104).
@@ -291,8 +290,8 @@ void slotRowCb(lv_event_t *ev) {
 }
 
 // --- Add cards -------------------------------------------------------------------------
-// One moved out to the page is not in the group (K161: Table, moved out of
-// Kitchen, was counted in and could not be added back).
+// One moved out to the page is not in the group (Table, moved out of Kitchen,
+// is not counted in, so it can be added back).
 bool memberHas(const ClusterCard &cl, const Entity &e) {
     for (uint8_t i = 0; i < cl.memberCount(); i++) {
         const Card *m = cl.memberAt(i);
@@ -341,7 +340,7 @@ uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask) {
         if (!CardAdded::addTo(*cl, *k->firstEntity(), id, sizeof(id), k->id())) break;   // full
         const char *name = k->shownName(CardLabel::LBL_NAME);
         if (name && name[0]) Settings::setCard(id, "name", name);
-        if (move) CardAdded::moveOut(k->id());   // off the page, not one of its hidden cards (round 7)
+        if (move) CardAdded::moveOut(k->id());   // off the page, not one of its hidden cards
         n++;
     }
     if (!n) return 0;
@@ -352,7 +351,7 @@ uint8_t clusterAddCards(uint32_t copyMask, uint32_t moveMask) {
     return n;
 }
 
-// --- Edit cards (2.13 round 2, K148, K149; mocks 8 and 8b) -------------------------------
+// --- Edit cards (K148, K149) -------------------------------
 // The group's members, the page's cards that can join and HA's areas in one list
 // (UI/EditCards): ticked to add, to hide or remove, or to restore - one kind at a
 // time - then the go-or-no-go question; the window closes and the page is built
@@ -494,7 +493,7 @@ void editDone(uint8_t n, const char *fmt) {
 
 // ADD: HA's entities as members made here ("in"), each one the compiled table
 // lacks keeping its HA id (design/ha-cards.md 2.3); the page's cards copied in,
-// or moved - off the page, not one of its hidden cards (round 7).
+// or moved - off the page, not one of its hidden cards.
 void doEditAdd() {
     ClusterCard *cl = held();
     if (!cl || !cl->hasId()) return;
@@ -613,7 +612,7 @@ void doEditSave() {
     if (!done) return;
     CardAdded::emptied(cl->id());   // every member removed and none added: the group goes
     char msg[64];
-    snprintf(msg, sizeof(msg), "Saved %u change%s to %s", (unsigned)done, done == 1 ? "" : "s", s.name);   // the owner's (K161)
+    snprintf(msg, sizeof(msg), "Saved %u change%s to %s", (unsigned)done, done == 1 ? "" : "s", s.name);   // the toast
     UIToolkit::show_toast(msg);
     EditCards::forget();
     changed();
@@ -633,9 +632,9 @@ void editAct(EditCards::Act a, void *) {
     s_eN = 0;
     const bool many = s_eNItems > 1;
     using F = EditCards::From;
-    // SAVE (K161) ALWAYS ASKS (owner, 2026-11-05, K165: every change to a group's
-    // membership): one line per kind of change - added, pinned, unpinned, removed -
-    // each naming its cards. The words follow K149's; to confirm (round 5).
+    // SAVE ALWAYS ASKS (K165: every change to a group's membership): one line
+    // per kind of change - added, pinned, unpinned, removed - each naming its
+    // cards. The words follow K149's; wording still to confirm.
     if (a == EditCards::Act::ACT_SAVE) {
         enum Kind : uint8_t { K_ADD, K_PIN, K_UNPIN, K_GONE, K_HEADER, K_KINDS };
         auto kindsOf = [](const EditCards::Item &it, bool out[K_KINDS]) {
@@ -734,7 +733,7 @@ void editAct(EditCards::Act a, void *) {
         confirmAsk(Kit::DialogRole::DLG_DESTRUCTIVE, many ? "Remove these cards?" : "Remove this card?", s_eLines, s_eN,
                    "Remove", Kit::ButtonRole::BTN_DESTRUCTIVE, doEditRemove);
     } else {
-        // RESTORE ASKS TOO (K165: every Edit cards action). Words to confirm (round 5).
+        // RESTORE ASKS TOO (K165: every Edit cards action). Wording still to confirm.
         eLine(many ? "The cards %s will be restored to their original configuration."
                    : "The card %s will be restored to its original configuration.", names);
         confirmAsk(Kit::DialogRole::DLG_CONFIRM, many ? "Restore these cards?" : "Restore this card?", s_eLines, s_eN,
@@ -819,9 +818,9 @@ int8_t clusterMemberOf(const ClusterCard &cl, const Entity *e) {
 }
 
 // --- The views ------------------------------------------------------------------------
-// THE CLUSTER PANEL (round 16): on Members, beside SETTINGS. Greyed for a
+// THE CLUSTER PANEL: on Members, beside SETTINGS. Greyed for a
 // cluster without a usable id, which could keep none of it.
-// AREA (2.13, K141): the HA area or floor the cluster's GROUP is linked to -
+// AREA (K141): the HA area or floor the cluster's GROUP is linked to -
 // None, then each floor and its areas. A choice changes the group's link, so
 // every card in that group follows it.
 static char    s_areaOpts[768];
@@ -829,10 +828,10 @@ static char    s_areaIds[HaCatalog::AREAS_MAX + 8][32];
 static uint8_t s_areaN = 0;
 static char    s_addWords[12];
 
-// SHOW AS (K151): the group as a cluster or as one card - the members that switch
+// SHOW AS (K191): the group as a cluster or as one card - the members that switch
 // together behind it, or the one Face picks. The page is built again once the
 // window has gone. Here in every presentation (K155).
-// Since 2.13 round 5 (K174) a chip row in Visibility, with Rename group: what the
+// A chip row in Visibility (K174), with Rename group: what the
 // group looks like and does on the page.
 void groupShowAs(bool asCard) {
     ClusterCard *cl = held();
@@ -841,7 +840,7 @@ void groupShowAs(bool asCard) {
     changed();
 }
 
-// FACE (K151): which member a group shown as one card shows - the members that
+// FACE (K191): which member a group shown as one card shows - the members that
 // switch together ("All lights"), or one. Greyed while it is a cluster (K155).
 static char    s_faceOpts[400];
 static char    s_faceIds[GROUP_MEMBERS_MAX][CARD_ID_MAX + 1];
@@ -926,19 +925,19 @@ uint8_t clusterSpecs(DeckRowSpec *r) {
     snprintf(s_addWords, sizeof(s_addWords), fresh ? "%u new" : "Open", (unsigned)fresh);   // K145
     // THE SAME ROWS IN EVERY PRESENTATION (K155): what does not apply greyed -
     // Header options while the group is one card, Face while it is a cluster.
-    // WHAT CONCERNS ITS MEMBERS (owner, 2026-11-05, K174): Rename group and Show as
-    // went to Visibility, with the rest of how it stands on the page.
+    // WHAT CONCERNS ITS MEMBERS (K174): Rename group and Show as
+    // are in Visibility, with the rest of how it stands on the page.
     r[n++] = { "Header options", DeckRowKind::ROW_BUTTON, "Open", 0, live && s.cluster, slotsViewCb, nullptr };
     r[n++] = { "Edit cards", DeckRowKind::ROW_BUTTON, s_addWords, 0, live, addViewCb, nullptr };   // K148
     const uint16_t face = cl ? faceRowBuild(*cl) : 0;
     if (!cl) snprintf(s_faceOpts, sizeof(s_faceOpts), "All members");
-    r[n++] = { "Face", DeckRowKind::ROW_DROP, s_faceOpts, face, live && !s.cluster, faceDropCb, nullptr };   // K151
+    r[n++] = { "Face", DeckRowKind::ROW_DROP, s_faceOpts, face, live && !s.cluster, faceDropCb, nullptr };   // K191
     const uint16_t sel = areaOptions(area);
     r[n++] = { "Area", DeckRowKind::ROW_DROP, s_areaOpts, sel, live && HaOffer::ready(), areaDropCb, nullptr };   // K145
     return n;
 }
 
-// HEADER OPTIONS (round 16, the owner's layout): which sensors the header
+// HEADER OPTIONS: which sensors the header
 // shows - each a member's row as Members has it, with its reading - then Sensor
 // icons and Header style. One column holds it all, so it scrolls as one; the
 // chip table's rows are found by their place in it, so it holds only its own.
@@ -984,7 +983,7 @@ void buildClusterSlots() {
     clusterMemberNames(*cl);
     for (uint8_t i = 0; i < cl->memberCount() && s_nSlotRows < GROUP_MEMBERS_MAX; i++) {
         if (movedOut(cl->memberAt(i))) continue;   // its card is on the page: not the cluster's to show
-        // SENSORS ONLY (round 10, the owner): a light or a switch is a tile. One
+        // SENSORS ONLY: a light or a switch is a tile. One
         // already in the header is listed, so it can be taken out.
         const bool in = inList(idOf(cl->memberAt(i)), ids, nIds);
         const Entity *e = cl->memberAt(i) ? cl->memberAt(i)->firstEntity() : nullptr;

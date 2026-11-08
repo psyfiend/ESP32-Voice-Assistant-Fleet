@@ -1,4 +1,4 @@
-// The left panel's rows: CHART, ACTIVITY and SCENES (2.12 P1, split from CardPopup.cpp).
+// The left panel's rows: CHART, ACTIVITY and SCENES.
 #include "PopupState.h"
 
 namespace popup {
@@ -24,8 +24,8 @@ uint16_t tapSceneRowBuild(const Card &c, uint8_t &n) {
     return sel;
 }
 
-// SCENES' Scene action (owner, 2026-10-13): Load default / Cycle scenes. Kept
-// for the card; and when its Tap action is "Scenes...", the tap does it now.
+// SCENES' Scene action: Load default / Cycle scenes. Kept
+// for the card; and when its Tap action is "Scenes...", the tap does it.
 void sceneActionDropCb(lv_event_t *ev) {
     const uint32_t k = lv_dropdown_get_selected((lv_obj_t *)lv_event_get_target(ev));
     Card *c = settingsSubject();   // K166
@@ -48,13 +48,12 @@ void tapSceneDropCb(lv_event_t *ev) {
     keepCardSetting("tap_scene", s_tapSceneRefs[k]);
 }
 
-// --- CHART and ACTIVITY: History's own options (2.10e) ----------------------
+// --- CHART and ACTIVITY: History's own options ----------------------
 // CHART, for a number: the span (as the chips on the view - the two follow
 // each other), the Legend, the min and max, the shading, the span buttons.
-// ACTIVITY, for anything that turns on and off: its Span (named so since round
-// 2, as the chart's), whether each change says how long it lasted and what
-// caused it, the span buttons. Every
-// choice is kept under the card's id (owner, round 2 - H3).
+// ACTIVITY, for anything that turns on and off: its Span (as the chart's),
+// whether each change says how long it lasted and what caused it, the span
+// buttons. Every choice is kept under the card's id.
 lv_obj_t *s_ddSpan = nullptr;   // the panel's Span, kept in step with the chips
 
 bool checked(lv_event_t *ev) { return lv_obj_has_state((lv_obj_t *)lv_event_get_target(ev), LV_STATE_CHECKED); }
@@ -84,14 +83,14 @@ void legendDropCb(lv_event_t *ev) {
     histDraw();
 }
 
-// Shading: under line (owner, round 5) - the chart's gradient fill.
+// Shading: under line - the chart's gradient fill.
 void shadeCb(lv_event_t *ev) {
     s_hv.shade = checked(ev);
     histKeep("hist_shade", onOff(s_hv.shade));
     histDraw();
 }
 
-// ACTIVITY's Show duration (owner, round 5 - it replaced Details).
+// ACTIVITY's Show duration.
 void durationCb(lv_event_t *ev) {
     s_hv.duration = checked(ev);
     histKeep("act_duration", onOff(s_hv.duration));
@@ -130,7 +129,7 @@ void histSyncPanel() {
 
 uint8_t chartSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
-    // The owner's order and words (rounds 4 and 5).
+    // The rows' order and words.
     r[n++] = { "Span", DeckRowKind::ROW_DROP, "24 hours\n12 hours\n6 hours\n1 hour", s_hv.span, true,
                spanDropCb, &s_ddSpan };
     r[n++] = { "Legend", DeckRowKind::ROW_DROP, "None\nX axis\nY axis\nX / Y axes", s_hv.legend, true, legendDropCb, nullptr };
@@ -150,7 +149,7 @@ uint8_t activitySpecs(DeckRowSpec *r) {
     return n;
 }
 
-// --- SCENES: the Scenes view's own options (K43; owner, 2026-10-13) ---------
+// --- SCENES: the Scenes view's own options (K43) ---------
 // Show hidden scenes, a checkbox (the card's Scenes setting: Visible / All -
 // "Off" was dropped); the Default scene; and the Scene action - what SETTINGS'
 // Tap action "Scenes..." does: Load default or Cycle scenes. The default

@@ -1,16 +1,16 @@
-// SETTINGS' rows and what they do (2.12 P1, split from CardPopup.cpp).
+// SETTINGS' rows and what they do.
 #include "PopupState.h"
 
 namespace popup {
 
 // ---------------------------------------------------------------------------
-// THE SETTINGS PANEL'S ROWS (owner, 2026-10-07)
+// THE SETTINGS PANEL'S ROWS
 //
 // One list says what the rows are, and both the panel's size and its contents
 // are read from it, so the two cannot disagree. Choices are DROPDOWNS (the row
 // is shorter than a line of chips, and a list of choices can grow); Paused is
-// a CHECKBOX. A row that does not work yet (until saving, 2.10d) is shown,
-// greyed, so the owner can see the whole list.
+// a CHECKBOX. A row that does not apply is shown greyed, never moved or
+// removed (K45, K155).
 // ---------------------------------------------------------------------------
 #ifdef DEBUG_POPUP
 uint8_t s_dbgRows = 0;                  // GET /popup?rows=N: test rows added to SETTINGS
@@ -19,14 +19,14 @@ uint8_t s_dbgRows = 0;                  // GET /popup?rows=N: test rows added to
 void groupDropCb(lv_event_t *ev);
 
 // The card's group, from a PC (/popup?clabel=N): HA area / the dashboard's
-// areas and the owner's groups / Own group / None (CardGroups.h). SETTINGS'
-// Card label row went to Card UI as Inherit / Custom / None (2.8 round 3,
-// D-28): the group is chosen another way, later.
+// areas and the dashboard's own groups / Own group / None (CardGroups.h). The
+// Card label row is Card UI's (Inherit / Custom / None, D-28); a card's group
+// is changed from Visibility (K137).
 CardGroups::Choice s_clMap[24];
 uint8_t s_clN = 0;
 char    s_clOpts[24 * 44];
 
-// SETTINGS' Tap action row (2.10d, K37, K39): only what the held card can do -
+// SETTINGS' Tap action row (K37, K39): only what the held card can do -
 // Toggle where its tap toggles, Members where it has members, the two scene
 // actions where its light offers scenes. Rebuilt with the rows; the map says
 // which action each line is.
@@ -46,13 +46,13 @@ bool isClusterCard(const Card &c) { return !strcmp(c.typeName(), "cluster"); }
 TapAction tapShown(const Card &c) {
     const TapAction t = c.tapAction();
     if (t != TapAction::TAP_DEFAULT) return t;
-    // Nothing to toggle: History (owner, 2.10e round 2) - as Card::tap(); a mixed
+    // Nothing to toggle: History - as Card::tap(); a mixed
     // group's solo card, Members (K188).
     if (c.groupMixed()) return TapAction::TAP_MEMBERS;
     return c.tapToggles() ? TapAction::TAP_TOGGLE : TapAction::TAP_HISTORY;
 }
 
-// WHAT "Scenes..." DOES (owner, 2026-10-13; interview §12): SCENES' Scene
+// WHAT "Scenes..." DOES: SCENES' Scene
 // action row - Load default or Cycle scenes. The card's own when its Tap
 // action is a scene's, else the choice kept for when it becomes one.
 TapAction sceneActionOf(const Card &c) {
@@ -76,22 +76,22 @@ uint16_t tapRowBuild(const Card &c) {
     const Entity *sc[ENTITY_SCENES_MAX];
     const bool cl = isClusterCard(c);   // the subject's own kind: a member of a cluster is not one (K166)
     if (c.canToggle()) add(TapAction::TAP_TOGGLE, "Toggle");   // never a mixed group's (K188)
-    // A cluster has no Details view (round 16): its window is Members.
+    // A cluster has no Details view: its window is Members.
     if (!cl)            add(TapAction::TAP_DETAILS, "Details view");
     // A group's solo card opens its group view too (K188, a hard requirement).
-    if (cl || (c.groupCard() && !inMember())) add(TapAction::TAP_GROUP, "Group view");   // K143
+    if (cl || (c.groupCard() && !inMember())) add(TapAction::TAP_GROUP, "Group view");   // K154
     if (hasMembers())   add(TapAction::TAP_MEMBERS, "Members view");
     add(TapAction::TAP_HISTORY, "History view");
-    // One line for both (owner, 2026-10-13): which one is SCENES' Scene action.
+    // One line for both: which one is SCENES' Scene action.
     if (c.offeredScenes(sc, ENTITY_SCENES_MAX)) add(sceneActionOf(c), "Scenes...");
     add(TapAction::TAP_NOTHING, "Nothing");
     TapAction cur = tapShown(c);
-    if (cl && cur == TapAction::TAP_DETAILS) cur = TapAction::TAP_GROUP;   // what it opens now (2.13)
+    if (cl && cur == TapAction::TAP_DETAILS) cur = TapAction::TAP_GROUP;   // what it opens
     for (uint8_t i = 0; i < s_tapN; i++) if (s_tapMap[i] == cur) return i;
     return 0;
 }
 
-// LONG PRESS OPENS (K151): the view a long press opens the window on - a
+// LONG PRESS OPENS (K156): the view a long press opens the window on - a
 // cluster's Members first, any other card's Details view first - never a
 // toggle: a long press always opens the window (K3, K39). The first is the
 // default, kept as nothing. Rebuilt with the rows.
@@ -167,17 +167,17 @@ void addCardCb(lv_event_t *ev);
 uint8_t deckSpecs(DeckRowSpec *r) {
     uint8_t n = 0;
     Card *held = cardOf(h.surface);
-    // THE CARD THESE ROWS ARE FOR (K166, owner 2026-11-05): a member opened from
+    // THE CARD THESE ROWS ARE FOR (K166): a member opened from
     // the group view or Members has its own rows live, saved on its own card, as
     // from its tile on the page - a tap does the same thing wherever it is. A
     // member with no card of its own (one of Desk's lamps) keeps them greyed.
     Card *subj = settingsSubject();
     const bool subjCluster = subj && isClusterCard(*subj);
-    // PAUSED IS VISIBILITY'S since round 7 (the owner). A cluster has no Active
-    // state (round 6): it never counts as on; its members do.
+    // PAUSED IS VISIBILITY'S. A cluster has no Active
+    // state: it never counts as on; its members do.
     // When a group defined here counts as on - HA's group helper option.
-    // Not for a group defined in HA or Hue: the source decides (2.10c).
-    // ONLY WHERE A MEMBER CAN BE ON (owner, 2026-11-06): a group of temperatures
+    // Not for a group defined in HA or Hue: the source decides.
+    // ONLY WHERE A MEMBER CAN BE ON: a group of temperatures
     // has no on to count - the row is for the kind, as Units is (never greyed).
     bool onOff = false;
     for (uint8_t i = 0; i < s.nEnt && !onOff; i++) {
@@ -188,10 +188,10 @@ uint8_t deckSpecs(DeckRowSpec *r) {
     if (s.nEnt > 1 && onOff && !s.native && !subjCluster && (!inMember() || subj))
         r[n++] = { "Active state", DeckRowKind::ROW_DROP, "Any members are on\nAll members are on",
                    (uint16_t)(s.groupOn == GroupOn::GROUP_ON_ALL), true, groupDropCb, &s.ddGroup };
-    // Entity label and Card label are Card UI's since 2.8 round 3 (D-25, D-28).
-    // Visibility is a button to a view since 2.11 (K96): the card's options by
+    // Entity label and Card label are Card UI's (D-25, D-28).
+    // Visibility is a button to a view (K96): the card's options by
     // where it is - below, before Card UI.
-    // Tap action (2.10d). Long press always opens the window (K39), whatever
+    // Tap action. Long press always opens the window (K39), whatever
     // this says.
     const bool cardRows = subj && subj->hasId();
     Card *rowsOf = subj ? subj : held;   // a member without a card: the rows shown greyed
@@ -199,37 +199,36 @@ uint8_t deckSpecs(DeckRowSpec *r) {
         const uint16_t sel = tapRowBuild(*rowsOf);
         r[n++] = { "Tap action", DeckRowKind::ROW_DROP, s_tapOpts, sel, cardRows, tapDropCb, nullptr };
         r[n++] = { "Long press opens", DeckRowKind::ROW_DROP, s_longOpts, longRowBuild(*rowsOf), cardRows,
-                   longDropCb, nullptr };   // K151; to confirm
+                   longDropCb, nullptr };   // K156
     }
     // A group's Show as and Face are its GROUP panel's, in every presentation (K155).
     // Show hidden scenes and Tap scene are in the SCENES panel, in the Scenes
-    // view (K43); Scenes "Off" was dropped. The Selector look moved to the
+    // view (K43); there is no Scenes "Off". The Selector look is in the
     // system panel (K45): it is device-wide, per scheme.
-    // UNITS (owner, 2.10e round 2): a temperature's °C or °F, for this card;
+    // UNITS: a temperature's °C or °F, for this card;
     // only where there is a choice to make.
     if (unitsRowFor() && (!inMember() || subj)) {
         r[n++] = { "Units", DeckRowKind::ROW_DROP, "\xC2\xB0" "C\n\xC2\xB0" "F", (uint16_t)unitsShownF(),
                    cardRows, unitsDropCb, nullptr };
     }
-    // ENTITY PROPERTIES (owner): a view of its own, from here - no room for
+    // ENTITY PROPERTIES: a view of its own, from here - no room for
     // another corner icon.
     r[n++] = { "Entity properties", DeckRowKind::ROW_BUTTON, "View", 0, true, propsCb, nullptr };
     // VISIBILITY (K96): what the card can do where it is - hidden from the page
-    // (K66's remove, every card since 2.11) or from its cluster - and, since
-    // round 7, Paused, and a member's Add card to dashboard (K17: a group card's
+    // (K66's remove, every card) or from its cluster - and Paused, and a member's Add card to dashboard (K17: a group card's
     // member made a card of its own), in a member's own view too: one place.
     if (held)
         r[n++] = { "Visibility", DeckRowKind::ROW_BUTTON, "Open", 0,
                    (!inMember() && held->hasId()) || (inMember() && (!heldGroup() || visibilitySubject())),
                    visibilityCb, nullptr };
-    // CARD UI (2.8 round 3, D-27): the card's own looks, a view of their own -
+    // CARD UI (D-28): the card's own looks, a view of their own -
     // at the foot. A member's are its own card's (K166); a card without a usable
     // id cannot keep them.
     if (held)
         r[n++] = { "Card UI", DeckRowKind::ROW_BUTTON, "Open", 0, cardRows, cardUiCb, nullptr };
 #ifdef DEBUG_POPUP
     // GET /popup?rows=N: N greyed test rows, so SETTINGS is too tall for the
-    // screen and the panel's drag can be tried (P1b round 2).
+    // screen and the panel's drag can be tried.
     for (uint8_t k = 0; k < s_dbgRows && n < DECK_ROWS_MAX; k++)
         r[n++] = { "Test row", DeckRowKind::ROW_DROP, "Test", 0, false, nullptr, nullptr };
 #endif
@@ -245,7 +244,7 @@ void deckRender() {
 }
 
 // A card setting changed in SETTINGS, kept for the held card under its id
-// (2.10d). In RAM until the window closes - closeNow() asks for the write.
+// In RAM until the window closes - closeNow() asks for the write.
 void keepCardSetting(const char *key, const char *value) {
     Card *c = settingsSubject();   // a member's own card in its own view (K166)
     if (c && c->hasId()) Settings::setCard(c->id(), key, value);

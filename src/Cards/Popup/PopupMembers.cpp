@@ -1,4 +1,4 @@
-// Members, and a member's own controls (2.12 P1, split from CardPopup.cpp).
+// Members, and a member's own controls.
 #include "PopupState.h"
 #include "Cards/ClusterCard.h"
 #include "Cards/CardIcons.h"
@@ -12,18 +12,18 @@ void chartSet(uint8_t state);       // below, with the deck: the CHART panel
 void chartFold();                   // open: back to its tab
 void sideFor(PopupView v);          // below: the left panel a view wants (CHART / SCENES)
 
-// ITS STATE IN COLOUR (owner, the #99 mock): on in the active colour, off and
+// ITS STATE IN COLOUR: on in the active colour, off and
 // any other value in white, paused or unavailable dimmed. Returns the role.
 KS memberState(const Entity &e, MemberShown shown, char *buf, size_t cap) {
     const EntityAttrs &at = e.attrs;
     if (shown == MemberShown::SHOWN_MOVED) {
-        // Moved out (the sprint after round 7): its card is on the page. An
+        // Moved out: its card is on the page. An
         // unpinned member says its state like any other (K160).
         snprintf(buf, cap, "On the page");
         return KS::KS_LABEL_TAG_DIM;
     }
     if (e.paused) {
-        // Out of the group, but still listed and saying why (owner, 2.10b).
+        // Out of the group, but still listed and saying why.
         snprintf(buf, cap, "Paused");
         return KS::KS_LABEL_TAG_DIM;
     }
@@ -33,7 +33,7 @@ KS memberState(const Entity &e, MemberShown shown, char *buf, size_t cap) {
     }
     if (e.desc.kind == EntityKind::LIGHT && e.value.type == ValueType::BOOL && e.value.b && at.brightness >= 0) {
         // A light's levels, so a group's commands can be checked member by
-        // member (2.10b): "On, 40%, 2700 K", "On, 40%, colour 30".
+        // member: "On, 40%, 2700 K", "On, 40%, colour 30".
         const int pct = LV_MAX(1, (at.brightness * 100 + 127) / 255);
         if (at.lightMode == LightMode::LMODE_TEMP && at.colorTempK > 0)
             snprintf(buf, cap, "On, %d%%, %d K", pct, at.colorTempK);
@@ -69,7 +69,7 @@ lv_obj_t *memberRow(lv_obj_t *list, const char *name, const Entity &e, MemberSho
     return r;
 }
 
-// THE HEADER'S GLYPH, SQUARE (owner, round 2 of the follow-ups): the one the
+// THE HEADER'S GLYPH, SQUARE: the one the
 // cluster's header shows for this member, in its colour, `gap` from the row.
 const char *headerGlyphOf(const Entity &e, uint32_t &tint) { return cardHeaderGlyph(e, tint); }   // CardIcons
 
@@ -100,7 +100,7 @@ void pinGlyph(lv_obj_t *col, int32_t gap) {
 // glyph, a pin, or nothing.
 void pageSign(lv_obj_t *col, const ClusterCard &cl, uint8_t i, const Entity &e, int32_t gap) {
     if (clusterMemberInHeader(cl, i))                          headerGlyph(col, e, gap);
-    // A GROUP SHOWN AS ITS SOLO CARD SHOWS NO PINS (owner, 2026-11-06, K188): only
+    // A GROUP SHOWN AS ITS SOLO CARD SHOWS NO PINS (K188): only
     // which members stand in its group view's header. Its pins are kept.
     else if (s.cluster && clusterMemberShown(cl, i) == MemberShown::SHOWN_TILE) pinGlyph(col, gap);
 }
@@ -127,15 +127,14 @@ static ClusterCard *rowGroup() { return inMember() ? nullptr : heldGroup(); }
 void buildMembers() {
     // The stage's height, scrolling if a group has more members than fit. As
     // wide as the controls view's slider and words together, centred, so the
-    // rows line up with them (owner, 2.10c G2: full width looked awkward on
-    // the P4_5).
-    // Centred vertically too (owner, round 4): as tall as its rows, never
+    // rows line up with them (full width looks awkward on the P4_5).
+    // Centred vertically too: as tall as its rows, never
     // taller than the stage, which centres it.
     lv_obj_t *list = plain(s.stage);
     const int32_t rowW = membersRowW();
     const ClusterCard *cl = rowGroup();
-    // ON THE PAGE, ITS SIGN OUTSIDE THE ROW ON THE RIGHT (owner, round 2 of the
-    // follow-ups; K160): the rows as they were, centred, with a column each side
+    // ON THE PAGE, ITS SIGN OUTSIDE THE ROW ON THE RIGHT (K160): the rows
+    // stay centred, with a column each side
     // as wide as the sign and its gap - a header member's glyph, a pinned tile's
     // pin - only when one of them is on the page.
     bool anyHeader = false;
@@ -158,7 +157,7 @@ void buildMembers() {
     for (uint8_t i = 0; i < total; i++) {
         const Entity *e = cl ? (cl->memberAt(i) ? cl->memberAt(i)->firstEntity() : nullptr) : memberAt(i);
         if (!e) continue;
-        // A tap opens that member's own views (owner, 2.10b; K157).
+        // A tap opens that member's own views (K157).
         const int8_t k = cl ? (int8_t)i : -1;
         const MemberShown shown = k >= 0 ? clusterMemberShown(*cl, (uint8_t)k) : MemberShown::SHOWN_TILE;
         // A cluster's member: its name as Header options gives it, whether its
@@ -187,10 +186,10 @@ void buildMembers() {
         if (nRows < ROWS) rows[nRows++] = r;
     }
     lv_obj_t *note = Kit::label(list, KS::KS_LABEL_TAG_DIM);
-    // Owner's words, 2026-10-07; a cluster's member is shown or hidden from its own view.
-    lv_label_set_text(note, "Tap a member for details");   // the owner's words, round 14
-    Kit::helperNote(note);   // UI Tweaks' Show helper text (2.13)
-    // SATIN (#99, K77): a row can be tapped and is not chosen. Painted at the
+    // A cluster's member is shown or hidden from its own view.
+    lv_label_set_text(note, "Tap a member for details");   // under the rows
+    Kit::helperNote(note);   // UI Tweaks' Show helper text
+    // SATIN (K77): a row can be tapped and is not chosen. Painted at the
     // rows' laid-out size, which only the layout knows.
     lv_obj_update_layout(list);
     for (uint8_t i = 0; i < nRows; i++)
@@ -198,13 +197,14 @@ void buildMembers() {
                     lv_obj_get_style_radius(rows[i], LV_PART_MAIN), Kit::Finish::FINISH_SATIN);
 }
 
-// --- A MEMBER'S OWN VIEWS (2.10b; owner: tap a row in Members) --------------
+// --- A MEMBER'S OWN VIEWS (a tap on a row in Members) --------------
 // The same window and the same views, pointed at one member: the window's
 // entities are set aside, and the back arrow puts them back and returns where
 // the member was opened from - Members, or the group view. It needs no card of
 // its own, so Lamp 4 works too. A MEMBER THAT IS A CARD OF ITS OWN opens as a
 // long press on its tile does (K157): its entities, its name, its own Members -
-// Desk in Office, and one of Desk's lamps from there. Two levels at most (K147).
+// Desk in Office, and one of Desk's lamps from there. Two levels at most
+// (DEPTH_MAX).
 namespace {
 constexpr uint8_t DEPTH_MAX = 2;
 struct Level {
@@ -228,7 +228,7 @@ PopupView     s_pickView = PopupView::VIEW_MEMBER;
 void enterMemberAsync(void *unused) {
     (void)unused;
     if (s.phase != PopupPhase::PHASE_OPEN || s.depth >= DEPTH_MAX ||
-        (s.view != PopupView::VIEW_MEMBERS && s.view != PopupView::VIEW_GROUP)) return;   // a row, or a tile (2.13)
+        (s.view != PopupView::VIEW_MEMBERS && s.view != PopupView::VIEW_GROUP)) return;   // a row, or a tile
     Card *mc = s_pickCard;
     const Entity *m = mc ? mc->firstEntity() : s_pickEnt;
     if (!m) return;
