@@ -157,6 +157,10 @@ public:
     Card &setGroupMixed(bool m) { _groupMixed = m; return *this; }
     bool groupMixed() const { return _groupMixed; }
     bool canToggle() const { return tapToggles() && !_groupMixed; }
+    // A GROUP'S SOLO CARD WITH A FACE TOGGLES THE WHOLE GROUP (owner, 2026-11-07):
+    // every light and switch among its members, on or off as the face shows.
+    // Without a face its primaries are those members already.
+    void addGroupSwitch(const Entity *e);
     Card &setTapScene(const char *ref);
     const char *tapScene() const { return _tapScene; }
     // Does this card's own tap toggle (switch, light, button)? Decides what
@@ -164,6 +168,7 @@ public:
     virtual bool tapToggles() const { return false; }
     // The tap, as the card's setting says. From the card's event handler.
     void tap();
+    void toggleTap();   // onTap(), and the group's switches (addGroupSwitch())
     // The scenes this card's window would offer, in its order: the card's one
     // light, filtered by its Scenes setting. Fills `out`, returns the count.
     uint8_t offeredScenes(const Entity **out, uint8_t cap) const;
@@ -641,6 +646,8 @@ private:
     uint8_t     _longOpen = 0xFF;    // K151
     bool        _groupCard = false;  // K151
     bool        _groupMixed = false; // K188
+    const Entity *_groupSwitch[CARD_LIVE_MAX] = {};   // addGroupSwitch()
+    uint8_t     _nGroupSwitch = 0;
     char        _tapScene[ENTITY_TOPIC_MAX] = {0};   // as EntityDescriptor::externalRef
     char _area[ENTITY_SHORT_MAX] = {0};
     uint32_t _areaColor = 0;   // 0 = use the accent

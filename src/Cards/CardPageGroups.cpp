@@ -259,6 +259,14 @@ Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRe
     if (!c) return nullptr;
     c->setGroupCard(true);   // its GROUP panel (K151, K155)
     c->setGroupMixed(groupMixed(gm, reg));   // K188: a tap toggles only lights and switches
+    // A FACE TOGGLES THE WHOLE GROUP (owner, 2026-11-07): its other lights and switches.
+    if (faceMem)
+        for (uint8_t k = 0; k < nMem; k++) {
+            const Entity *e = mem[k] != faceMem && mem[k]->primaries[0] ? reg.find(mem[k]->primaries[0]) : nullptr;
+            if (e && !movedOut(*mem[k]) && e->desc.writable &&
+                (e->desc.kind == EntityKind::LIGHT || e->desc.kind == EntityKind::SWITCH))
+                c->addGroupSwitch(e);
+        }
     // A FACE CHOSEN: THE CARD IS NAMED AS THAT MEMBER (owner, 2026-11-06) - "Front Room
     // Temperature", its card label still the group's ("Indoor Temp").
     if (faceMem) {

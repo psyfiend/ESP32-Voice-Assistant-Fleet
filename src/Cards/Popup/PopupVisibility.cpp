@@ -226,13 +226,10 @@ void visibilityHideTile() {
     ClusterCard *cl = clusterOfSubject();
     if (!c || !c->hasId() || !c->mini() || s.phase != PopupPhase::PHASE_OPEN) return;
     const int8_t i = cl ? clusterMemberOf(*cl, c->firstEntity()) : -1;
-    if (heldGroup() && inMember()) {
-        if (i >= 0) clusterMemberShow(*cl, (uint8_t)i, false);
-        showView(PopupView::VIEW_VISIBILITY);
-        return;
-    }
-    if (i >= 0) clusterMemberShow(*cl, (uint8_t)i, false);   // out of the header too
-    else        Settings::setCard(c->id(), "hidden", "yes");
+    // UNPIN CLOSES THE WINDOW TOO (owner, 2026-11-07), as Pin does (F14): the page
+    // arranges at once - a group can become a solo card. K160 kept it open.
+    if (i >= 0)                           clusterMemberShow(*cl, (uint8_t)i, false);   // out of the header too
+    else if (!(heldGroup() && inMember())) Settings::setCard(c->id(), "hidden", "yes");
     s_rebuildPage = true;
     CardPopup::close();
 }

@@ -180,13 +180,50 @@ and what it saved. **Nothing here is seen on the glass yet.**
    it back as a tile.
 6. **Found by Claude, not fixed:** while a group made by New group from an HA area that already has a
    group is on the page (a "New group" from Office), Office's cards made from HA open titled
-   "New group > Eric" instead of "Office > Eric". Gone once that group is gone. Cause not found yet.
+   "New group > Eric" instead of "Office > Eric". Gone once that group is gone. **Cause (11-07):**
+   those cards' group is HA's Office area (`group`: `ha_office`), and an HA area's group takes its
+   name from a page area whose cards all sit in that HA area (`CardGroups::baseName()` via
+   `linkOf()`). The board's own Office holds a bedroom sensor and a bedroom light, so it does not
+   qualify; a New group of Office lamps carries the card label "New group" and does, so it names HA's
+   Office. *Fix proposed:* a group made on the board never names an HA area.
 7. A group made on the board whose group card was hidden: Restore of a card moved out of it still
    makes a copy (the hidden group is not read back). Rare; not fixed.
 8. K191's "Face greyed for an HA group entity" waits for K170: no HA group entity is a board group yet.
 
 **Settled 11-07:** the solo card's marker - a small group glyph after its card label's words
 (owner: "I like the small group glyph beside the card label"); built, R7.
+
+**Retests, 11-07:** R1-R5, R7, R8 PASS. **R6 partial**: Overhead (originally the Living page card,
+moved into Kitchen) moved out to the page; its Restore offers to give back the card label "Living" -
+the place before last, where the owner's answer 5 below wants the place it just left (Kitchen).
+
+**Owner's answers, 11-07** (nothing built yet):
+
+- Words: the step prompts, the pins lines, the solo dialog, "Create group" and "Kitchen > Show as"
+  are agreed. **"Show group as group?" becomes "Show as group?"**
+- 1: **Mixed = lights or switches AND any member that cannot be toggled or switched.** Pinned or not
+  (F3/F8 are right: Kitchen has the Thermostat). Still open: is a header sensor exempt, as now?
+- 2: **Toggle on a solo card with a toggleable face switches every light and switch in the group.**
+  Changes K191's face-only Toggle.
+- 3: **Unpin closes the window too**, as Pin does (changes K160).
+- 4: **Delete offered inside "Hide from this page"**, before its confirmation; **an empty group is
+  deleted**, not hidden (changes owner's 15). Or delete lives only in the web app, where undo is
+  easier - not chosen yet.
+- 5: Restore matters less now that cards are easy to add, move and group. If kept, **Restore goes
+  one level back**: each card keeps a history of where it lived and with what settings (replaces
+  K111, K112, K137's rules). Not chosen yet: in 2.13, or later.
+- 6: cause found 11-07 - see the item. 7: folded into 5.
+
+**Settled 11-07, later:** header sensors stay exempt (K194); no Delete on the board, it goes to the
+web app (K197); Restore tabled (K198); item 6 fixed as proposed (K199). Built with K195, K196 and
+"Show as group?". Retest:
+
+| # | Do this | PASS if |
+|---|---|---|
+| T1 | A light group as a solo card, one light as its face, Toggle as the tap; tap it | every light and switch in the group follows the face, pinned or not |
+| T2 | A member's Visibility, Unpin this card, Confirm | the window closes and the page arranges |
+| T3 | Show as..., Group, through to the dialog | its title reads "Show as group?" |
+| T4 | New group from the Office HA area with only Office lamps; open an Office card from HA (Eric) | its title is "Office > Eric", never "New group > Eric" |
 
 # Round 5
 

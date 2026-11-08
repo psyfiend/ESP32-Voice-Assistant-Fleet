@@ -59,14 +59,25 @@ uint8_t sheetAreas(const char **out, uint8_t cap) {
 // dashboard's (shorter) name. Cards HA has not placed, and entities that are
 // not HA's (the Fleet page's virtual lamps), do not count either way. "" when
 // they disagree or nothing is known yet.
+// A card in a group made on the board: its `group` names that group's own id,
+// never a dashboard area's ("sheet_") or an HA area's ("ha_").
+bool inMadeGroup(const CardSpec &cs) {
+    char v[48];
+    if (!cs.id || !Settings::card(cs.id, "group", v, sizeof(v)) || !v[0]) return false;
+    return strcmp(v, "none") && !startsWith(v, CardGroups::SHEET_PREFIX) && !startsWith(v, CardGroups::HA_PREFIX);
+}
+
 const char *linkOf(const char *area) {
     static char id[40];
     id[0] = '\0';
     if (!s_reg || !area || !area[0]) return id;
     // A group card's members count (2.11): a cluster has no entity of its own.
+    // A GROUP MADE ON THE BOARD NEVER NAMES AN HA AREA (owner, 2026-11-07): its
+    // cards do not vote. Found on the 1060: a New group of Office lamps named
+    // HA's Office "New group", and every Office card from HA said so.
     bool split = false;
     eachSpec([&](const CardSpec &cs) {
-        if (split || !cs.area || strcmp(cs.area, area) != 0 || !cs.primaries[0]) return;
+        if (split || !cs.area || strcmp(cs.area, area) != 0 || !cs.primaries[0] || inMadeGroup(cs)) return;
         const Entity *e = s_reg->find(cs.primaries[0]);
         if (!e || e->desc.source != EntitySource::HA || !e->sourceAreaId[0]) return;
         if (!id[0]) snprintf(id, sizeof(id), "%s", e->sourceAreaId);

@@ -211,7 +211,7 @@ void ask() {
         }
         if (names[0]) line("The pinned cards will be: %s", names);
         if (pinnedCount() < 2) line("Fewer than two cards are pinned, so the group will still be shown as a solo card.");
-        confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Show group as group?", s_lines, s_n, "Confirm",
+        confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Show as group?", s_lines, s_n, "Confirm",
                    Kit::ButtonRole::BTN_CONFIRM, goGroup);
     }
 }

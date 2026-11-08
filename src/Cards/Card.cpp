@@ -221,6 +221,22 @@ void sceneToast(const char *card, const char *scene) {
 }
 }  // namespace
 
+void Card::addGroupSwitch(const Entity *e) {
+    if (!e || _nGroupSwitch >= CARD_LIVE_MAX) return;
+    for (uint8_t i = 0; i < _nGroupSwitch; i++) if (_groupSwitch[i] == e) return;
+    _groupSwitch[_nGroupSwitch++] = e;
+}
+
+void Card::toggleTap() {
+    if (!_nGroupSwitch) { onTap(); return; }
+    // The whole group, as the face shows it: a face that is on turns them all
+    // off. A paused member is out of it (2.10b).
+    const bool on = !groupIsOn();
+    onTap();   // the face, as before
+    for (uint8_t i = 0; i < _nGroupSwitch; i++)
+        if (!_groupSwitch[i]->paused) commandEntity(_groupSwitch[i], EntityValue::makeBool(on));
+}
+
 void Card::tap() {
     switch (_tap) {
         case TapAction::TAP_DEFAULT:
@@ -229,11 +245,11 @@ void Card::tap() {
             // A mixed group's solo card toggles nothing: Members (K188).
             if (_groupMixed) { CardPopup::openOn(*this, CardPopup::OPEN_MEMBERS); return; }
             if (!tapToggles()) { CardPopup::openOn(*this, CardPopup::OPEN_HISTORY); return; }
-            onTap();
+            toggleTap();
             return;
         case TapAction::TAP_TOGGLE:
             if (_groupMixed) { CardPopup::openOn(*this, CardPopup::OPEN_MEMBERS); return; }
-            onTap();
+            toggleTap();
             return;
         case TapAction::TAP_DETAILS: CardPopup::openOn(*this, CardPopup::OPEN_CONTROLS); return;
         case TapAction::TAP_MEMBERS: CardPopup::openOn(*this, CardPopup::OPEN_MEMBERS);  return;
