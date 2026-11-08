@@ -51,7 +51,7 @@ fonts, `lvgl`, `GFX_Library_for_Arduino`, `SensorLib`, `XPowersLib`, `bb_captouc
 | `v0.2.18` | 2.8, the header bar v2 | 57,224 | 244 |
 | `v0.2.19` | 2.11, group cards | 63,694 | 259 |
 | `v0.2.20` | 2.11 follow-ups | 64,629 | 260 |
-| `v0.2.21` | 2.13, cards from HA | LOC_213 | FILES_213 |
+| `v0.2.21` | 2.13, cards from HA | 70,945 | 279 |
 
 Counted with `git grep -c -e '^' <rev> -- src include components ':!components/lvgl' ...` (the
 exclusions above, and `':!*font*' ':!*Font*'`), summing `.c .cpp .h .hpp`. **In PowerShell use
