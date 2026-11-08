@@ -1,10 +1,10 @@
 #pragma once
 // ---------------------------------------------------------------------------
-// THE PAGE HEADER - three places of slots (2.8, #19; UI/HeaderSlots.h).
+// THE PAGE HEADER - three places of slots (UI/HeaderSlots.h).
 //
-// The left holds the clock and the weather, the middle the page's name and
-// dots on the bar's centre, the right the alarm (while one is set) and the
-// status glyphs (D-16, D-18). What a page's header holds is data -
+// The left holds the clock (with its bell) and the weather, the middle the page's
+// name and dots on the bar's centre, the right the alarm's notice, the AP mast
+// and the status glyphs (D-16, D-21). What a page's header holds is data -
 // PageSpec::headerSlots, else HEADER_DEFAULT - and each kind of slot is a build
 // and an update in Panel_Header.cpp's table. The bar, a slot, a glyph's frame
 // are the kit's (Kit::headerBar(), headerSlot(), glyphFrame()); their looks are
@@ -12,18 +12,18 @@
 //
 // WHERE EACH SLOT STANDS is the header plan's (Layout/HeaderPlan.h, D-19): each
 // slot claims its room in its forms - measured here, from what it shows - and
-// when a side would run into the middle the lowest keep gives way (the alarm's
-// time, the temperature's icon, the page's name). Planned again only when a
+// when a side would run into the middle the lowest keep gives way (the clock's
+// bell, the temperature's icon, the page's name). Planned again only when a
 // slot's width may have changed.
 //
-// CHEAP TO KEEP (#19): tick() redraws a slot only when what it shows changes -
+// CHEAP TO KEEP: tick() redraws a slot only when what it shows changes -
 // the clock on a new minute, a sensor on a new value - so a redraw is that
 // slot's labels, and a slot moves only if the plan moves it.
 //
 // A tap on a slot calls the tap callback with its index; GUIManager opens that
 // slot's panel (the status slot's is the system panel) and marks the slot open
 // (setOpenSlot()), which draws it in the panel's face so the panel pours down
-// out of it (D-18).
+// out of it (D-23).
 // ---------------------------------------------------------------------------
 #include <lvgl.h>
 #include <Arduino.h>
@@ -49,7 +49,7 @@ public:
     // colours (and a circle's bar-coloured strokes) are drawn again here.
     void restyle();
     // A sensor slot shown as failed - its dashes and "!" - whatever its entity
-    // says (T10: from a PC, /popup?sensorerr=1; RAM only, until 0 or a reboot).
+    // says (from a PC, /popup?sensorerr=1; RAM only, until 0 or a reboot).
     void pretendSensorError(bool on) { _sensorErr = on; restyle(); }
 
     // THE PAGE: its title, its index among `count` pages, and its own slots
@@ -60,7 +60,7 @@ public:
                  const SlotSpec *slots = nullptr, uint8_t nSlots = 0);
     static constexpr uint8_t PAGE_DOTS_MAX = 12;
 
-    // How every glyph in the bar is framed (#19). Rebuilds the slots.
+    // How every glyph in the bar is framed. Rebuilds the slots.
     void       setGlyphStyle(GlyphStyle s);
     GlyphStyle glyphStyle() const { return _style; }
 

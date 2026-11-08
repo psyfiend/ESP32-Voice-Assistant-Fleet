@@ -1,5 +1,4 @@
-// "New group" (2.13 round 5, the owner's design, DECISIONS K168; replaces round 1's
-// area chips and picker, K140) - see include/UI/NewClusterSheet.h.
+// "New group" (DECISIONS K168) - see include/UI/NewClusterSheet.h.
 #include "UI/NewClusterSheet.h"
 #include "UI/EditCards.h"
 #include "UI/HaOffer.h"
@@ -257,7 +256,7 @@ static void showName() {
     Kit::button(row, Kit::ButtonRole::BTN_CONFIRM, "Next", bw, Kit::controlH(), nextCb);
 }
 
-// --- SHOWN AS A SOLO CARD (owner, 2026-11-06, K191) ---------------------------------------
+// --- SHOWN AS A SOLO CARD (K191) ----------------------------------------------------------
 // Fewer than two cards pinned: a dialog says so, then the face and the tap are asked
 // as Show as... asks them (Cards/Popup/PopupShowAs.cpp), then the name.
 static const Entity *itemEntity(const Item &it) {
@@ -317,7 +316,7 @@ static void showFace() {
     s_step = Step::STEP_FACE;
     bool lights = false;
     for (uint8_t i = 0; i < s_nItems; i++) lights |= itemSwitches(s_items[i]);
-    s_faceW[0] = lights ? "All lights" : "All members";   // the Face row's words (K151)
+    s_faceW[0] = lights ? "All lights" : "All members";   // the Face row's words (K191)
     for (uint8_t i = 0; i < s_nItems; i++) s_faceW[i + 1] = s_items[i].name;
     stepView("Select card to show as the face:", s_faceW, (uint8_t)(s_nItems + 1), s_face);
 }
@@ -353,7 +352,7 @@ static void askSolo() {
     Kit::DialogSpec d = {};
     d.role    = Kit::DialogRole::DLG_CONFIRM;
     d.title   = "Create group";
-    d.body[0] = "This will create a group on the page shown as a 'Solo card'.";   // the owner's words (K191)
+    d.body[0] = "This will create a group on the page shown as a 'Solo card'.";   // K191's words
     d.buttons[0] = { "Cancel", Kit::ButtonRole::BTN_CANCEL, [](lv_event_t *) {
         lv_async_call([](void *) { dlgClose(); }, nullptr);
     } };
@@ -375,7 +374,7 @@ static bool create() {
     char areaGid[48];
     snprintf(areaGid, sizeof(areaGid), "%s%s", CardGroups::HA_PREFIX, s_area);
     if (s_area[0] && !strcmp(s_name, areaName) && !s_nameTaken && !CardGroups::byId(areaGid, g)) {
-        // The area's own group (K141: linked to it by its id), as round 1 made it.
+        // The area's own group (K141: linked to it by its id).
         snprintf(gid, sizeof(gid), "%s", areaGid);
     } else {
         // A group of its own: the area's is another group's already, or it has

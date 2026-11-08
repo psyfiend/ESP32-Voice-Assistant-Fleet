@@ -1,4 +1,4 @@
-// The kit's basics (2.12 P3): the bare object everything starts from, and labels.
+// The kit's basics: the bare object everything starts from, and labels.
 #include "UI/Kit.h"
 
 namespace Kit {
@@ -38,7 +38,7 @@ lv_obj_t *factList(lv_obj_t *parent) {
     return list;
 }
 
-// TWO LEFT-ALIGNED COLUMNS (owner, TEST_2.12): the words, then the value
+// TWO LEFT-ALIGNED COLUMNS: the words, then the value
 // beside them - a value that wraps keeps to its column, the words at its first
 // line. S5 between them until factColumns() centres the two and spaces them.
 lv_obj_t *factRow(lv_obj_t *list, const char *what, const char *value) {
@@ -56,7 +56,7 @@ lv_obj_t *factRow(lv_obj_t *list, const char *what, const char *value) {
     return b;
 }
 
-// THE TWO COLUMNS, CENTRED (owner, 2026-10-14, on this branch's first build):
+// THE TWO COLUMNS, CENTRED:
 // both left-justified, the words as wide as the longest words, the values as
 // wide as the longest value, and the room left over shared equally - the same
 // space from each wall and between the two. Values too long to leave room for

@@ -1,4 +1,4 @@
-// The sparks along a sheet's edge (2.12 P4, moved from the card window's PopupSparks.cpp).
+// The sparks along a sheet's edge.
 #include "KitSheetInternal.h"
 #include <Arduino.h>
 
@@ -10,27 +10,26 @@ SparksMode sparksMode()                { return s_mode; }
 void       setSparksMode(SparksMode m) { s_mode = m; }
 
 // ---------------------------------------------------------------------------
-// Interference: a spark that travels the window's edge (owner, 2026-10-04)
+// Interference: a spark that travels the window's edge
 //
 // The window is a projection, and now and then a spark of it runs along a
 // short stretch of its border: a bright core in a wider glow, a fading tail
 // behind, the odd fleck thrown off. It travels a section of the edge, then
 // often runs again a little further on, overlapping the last run - so it reads
-// as something CRAWLING along the border. Round 3 (owner, 2026-10-05): faster
-// and more frenetic, more runs, each with its own dice - see tickCb().
+// as something CRAWLING along the border. Fast and frenetic, with several runs,
+// each with its own dice - see tickCb().
 //
-// Round 1 was ten scattered pieces living one to three frames, all over the
-// edge, all at once. The owner: it looked like "small porch timing issues or
-// the wrong pclk frequency" - a real fault - not like electricity, and on a
-// light scheme it could not be seen at all. So now: ONE spark at a time, slow
-// enough to follow (a run was 250-600 ms; 120-300 ms since round 8, see
-// nextRun()), in one place (a quarter of a side or less), in electric colours
-// - whites and pale blues on a dark scheme, deep blues and violet on a light
-// one. Every roll of the dice is new: which edge, where on it, how long the
-// section, the spark's length, its width, its colours, its speed, how many runs.
+// ONE spark at a time: many scattered short-lived pieces look like a display
+// fault ("small porch timing issues or the wrong pclk frequency") rather than
+// electricity, and cannot be seen at all on a light scheme. A run lasts 120-300
+// ms (nextRun()), in one place (a quarter of a side or less), in electric
+// colours - whites and pale blues on a dark scheme, deep blues and violet on a
+// light one. Every roll of the dice is new: which edge, where on it, how long
+// the section, the spark's length, its width, its colours, its speed, how many
+// runs.
 //
-// When: never as the window appears - the owner read an immediate one as a
-// render problem - but INTF_FIRST_MIN_MS..MAX after, then every
+// When: never as the window appears - an immediate one reads as a render
+// problem - but INTF_FIRST_MIN_MS..MAX after, then every
 // INTF_GAP_MIN_MS..MAX, and never within INTF_QUIET_MS of a touch. A setting,
 // later; the trial switch (the card window's title, long pressed, in debug
 // builds) has "now and then", "once", off.
@@ -46,7 +45,7 @@ constexpr uint32_t INTF_GAP_MAX_MS   = 12000;
 constexpr uint32_t INTF_QUIET_MS     = 2000;
 
 // The dice, in millimetres so a spark looks alike on every board. They are the
-// effect's own, not shape tokens (2.12 P2): nothing else draws a spark.
+// effect's own, not shape tokens: nothing else draws a spark.
 constexpr float SPARK_LEN_MM        = 1.2f;    // the head's length: this, plus up to
 constexpr float SPARK_LEN_RAND_MM   = 3.3f;    //   this much more
 constexpr float SPARK_THICK_MM      = 0.3f;    // its width: this, plus up to
@@ -129,7 +128,7 @@ static void allOff() {
     for (uint8_t i = 0; i < PIECE_COUNT; i++) if (g.o[i]) lv_obj_set_size(g.o[i], 0, 0);
 }
 
-// Fast and frenetic (owner, round 8): a run is 120-300 ms.
+// Fast and frenetic: a run is 120-300 ms.
 static void nextRun() {
     g.runMs    = lv_rand(120, 300);
     g.runStart = millis();
@@ -150,7 +149,7 @@ static void startSpark() {
     g.runFrom = r + (int32_t)lv_rand(0, (uint32_t)LV_MAX(1, g.limit - r - g.secLen));
     g.runTo   = g.runFrom + g.secLen;
     g.runsLeft = (uint8_t)lv_rand(2, 5);
-    // ONE DIRECTION PER SPARK (owner, round 9): clockwise or anticlockwise
+    // ONE DIRECTION PER SPARK: clockwise or anticlockwise
     // round the window, every run the same way - never back and forth over
     // itself. Along the top and right edges clockwise is the way `along`
     // counts; along the bottom and left it is the other way.
@@ -180,10 +179,10 @@ static void tickCb(lv_timer_t *t) {
 
     const uint32_t el = now - g.runStart;
     if (el >= g.runMs) {
-        // This run is over. EACH RUN ROLLS ITS OWN DICE (owner, round 8: the
-        // same spark repeated three times read as a loop): a new speed, and
+        // This run is over. EACH RUN ROLLS ITS OWN DICE (the same spark repeated
+        // three times reads as a loop): a new speed, and
         // EITHER a new length OR a new width - never both at once, so the runs
-        // still look like one spark. It keeps its direction (round 9) and
+        // still look like one spark. It keeps its direction and
         // edges on along it: a step of 0-45% of the section, so each run
         // mostly overlaps the last.
         if (--g.runsLeft) {

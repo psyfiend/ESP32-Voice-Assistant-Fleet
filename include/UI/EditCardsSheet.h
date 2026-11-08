@@ -1,8 +1,7 @@
 #pragma once
 //
-// "Edit cards" from the page panel's CARDS (2.13 round 2, DECISIONS K148, K149;
-// artifact "2.13 Round 2 Mocks", screens 7, 9, 10, 12 and 13). Replaces the page's
-// Add card and its hidden cards' sheet.
+// "Edit cards" from the page panel's CARDS (DECISIONS K148, K149). It holds the
+// page's adding, hiding, removing and restoring of cards in one window.
 //
 // A window with the page's room holding EditCards: the page's cards (to hide or
 // remove), its hidden cards (to restore) and Home Assistant's areas (to add).

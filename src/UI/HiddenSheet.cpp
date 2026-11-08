@@ -1,4 +1,4 @@
-// "Hidden cards" (2.11 round 6) - see include/UI/HiddenSheet.h. One view: the
+// "Hidden cards" - see include/UI/HiddenSheet.h. One view: the
 // page's hidden cards, each a row of the kit's chip table with one chip,
 // Restore. A card restored leaves the list at once and is back on the page -
 // which is built again under the sheet (it holds no card of the page's).
@@ -55,11 +55,11 @@ static void fill() {
     lv_obj_set_width(l, lv_pct(100));
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
-    // The owner's words (2.11 round 14b); a member hidden from its cluster is not here (K125).
+    // A member hidden from its cluster is not here (K125).
     lv_label_set_text(l, s_n ? "Tap to restore a card back to the dashboard with its original settings intact.\n"
                                "Cards hidden from groups can be restored from the group 'Members' view."   // K191: "Group"
                              : "No hidden cards on this page.");
-    if (s_n) Kit::helperNote(l);   // UI Tweaks' Show helper text (2.13); "none" is not help, it is the list
+    if (s_n) Kit::helperNote(l);   // UI Tweaks' Show helper text; "none" is not help, it is the list
     if (s_n && s_spec.note && !Kit::helperShown()) return;
     if (s_n && s_spec.note) {
         lv_obj_t *m = Kit::label(t, Kit::KitStyle::KS_LABEL_TAG_DIM);

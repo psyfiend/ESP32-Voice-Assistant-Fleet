@@ -1,8 +1,8 @@
 #include "UI/Widget_MqttStatus.h"
 #include "UI/UIToolkit.h"
 
-// Colours - semantic: these ARE the information. Since 2.8 round 3 they are
-// the scheme's own (UIPalette SIG_*, D-27), shared with the Wi-Fi glyph so the
+// Colours - semantic: these ARE the information. They are the scheme's own
+// (UIPalette SIG_*, D-27), shared with the Wi-Fi glyph so the
 // two speak one language: amber means the same thing on both, and so does red.
 // The violet is the "Fleet Status Glyphs" mock's.
 
@@ -10,20 +10,15 @@ static const uint32_t POLL_MS = 400;   // matched to the WiFi glyph
 
 // Connected, but NOTHING has arrived on ANY subscribed topic for this long.
 //
-// This is a statement about the PIPE and nothing else. The owner's rule,
-// 2026-09-18: this icon "should never reflect the status of individual
-// entities and the conditions for it turning orange should be entirely
-// independent from what makes a card go STALE."
+// This is a statement about the PIPE and nothing else. The owner's rule: this
+// icon "should never reflect the status of individual entities and the
+// conditions for it turning orange should be entirely independent from what
+// makes a card go STALE." Two sources do not meet that rule:
 //
-// Two earlier attempts got this wrong in the same direction and are worth
-// recording so a third does not:
-//
-//   1. A blanket ten minutes measured against the newest ENTITY update. Wrong
-//      within two hours of reaching hardware - two boards sat amber all
-//      evening because his outdoor Zigbee sensors are simply quiet.
-//   2. Asking EntityRegistry::isStale() per entity instead. Better, and still
-//      wrong by the rule above: that is literally the call that makes a card
-//      grey out, so the header would have been a second opinion on the same
+//   1. A blanket ten minutes measured against the newest ENTITY update: boards
+//      sit amber because outdoor Zigbee sensors are simply quiet.
+//   2. Asking EntityRegistry::isStale() per entity: that is the call that makes
+//      a card grey out, so the header would be a second opinion on the same
 //      question rather than a different question.
 //
 // Half an hour, because it is not trying to catch a quiet sensor - the cards
@@ -144,12 +139,9 @@ Widget_MqttStatus::Look Widget_MqttStatus::resolveLook() const {
             return Look::CONNECTING;
 
         case MqttState::NO_LINK:
-            // NOT "connecting", which is what this used to say and what the
-            // owner saw: "the MQTT icon frequently switches from softly
-            // blinking (meaning trying to connect?) and stuck in a dimmed
-            // state". It was blinking because it was being drawn as busy, and
-            // it is not busy - MqttManager::loop() returns immediately while
-            // the link is down and makes no attempts at all.
+            // NOT "connecting": an icon drawn as busy blinks, and this state is
+            // not busy - MqttManager::loop() returns immediately while the link
+            // is down and makes no attempts at all.
             //
             // Motion means TRANSIENT and "working on it"; animating here
             // claimed effort that is not happening. Not red either: the WiFi

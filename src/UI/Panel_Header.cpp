@@ -1,4 +1,4 @@
-// The page header: three places of slots (2.8). See include/UI/Panel_Header.h;
+// The page header: three places of slots. See include/UI/Panel_Header.h;
 // the slots' data is UI/HeaderSlots.h, where they stand Layout/HeaderPlan.h,
 // their panels SlotPanels.cpp.
 #include "UI/Panel_Header.h"
@@ -28,7 +28,7 @@ int32_t hashText(const char *s) {
     return (int32_t)(h & 0x3FFFFFFF);
 }
 
-// "6:56" and "am", as the owner wrote the time: 12-hour, no seconds.
+// "6:56" and "am": 12-hour, no seconds.
 void clockText(time_t when, char *hm, size_t cap, const char **ampm) {
     struct tm t;
     localtime_r(&when, &t);
@@ -299,8 +299,8 @@ void Panel_Header::paintGlyph(Slot &s, uint32_t col) {
 }
 
 // --- The clock ------------------------------------------------------------------
-// "1:55am", as the owner wrote it: 12-hour, am / pm small beside it, no seconds
-// (Q2: as built). Dashes until the clock holds a real time (D-15). Redrawn when
+// "1:55am": 12-hour, am / pm small beside it, no seconds. Dashes until the
+// clock holds a real time (D-15). Redrawn when
 // the minute changes, and only then. THE BELL (D-21) stands inside the clock's
 // slot while an alarm is within a week - the slot's extra, the first thing the
 // bar sheds; a tap on either opens the clock's panel, which says when.
@@ -413,7 +413,7 @@ void Panel_Header::updateSensor(Slot &s, bool force) {
     uint8_t state = 0;   // 0 live, 1 nothing yet, 2 an error
     if (!e || !e->everSet) state = 1;
     else if (!e->available || _reg->isStale(*e, millis())) state = 2;
-    if (_sensorErr) state = 2;   // a PC asked to see it (T10)
+    if (_sensorErr) state = 2;   // a PC asked to see it (pretendSensorError())
     const bool number = e && (e->value.type == ValueType::FLOAT || e->value.type == ValueType::INT);
     if (state) {
         snprintf(text, sizeof(text), "--%s", temp ? DEG : "");
@@ -466,7 +466,7 @@ void Panel_Header::updateAlarm(Slot &s, bool force) {
 // --- The access point ---------------------------------------------------------------
 // The mast (D-24, D-27 "B") while the board hosts its setup AP - amber,
 // provisioning being a working state, not a fault. Its own claim beside the
-// Wi-Fi fan, where it used to be a badge under it. A tap opens the system
+// Wi-Fi fan. A tap opens the system
 // panel, as the status glyphs' does.
 void Panel_Header::buildAp(Slot &s) {
     glyphIn(s, s.box, Glyphs::Shape::AP_MAST);

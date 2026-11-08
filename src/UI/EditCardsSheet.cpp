@@ -1,4 +1,4 @@
-// "Edit cards" from the page panel (2.13 round 2, K148, K149) - see
+// "Edit cards" from the page panel (K148, K149) - see
 // include/UI/EditCardsSheet.h.
 #include "UI/EditCardsSheet.h"
 #include "UI/HaOffer.h"
@@ -32,7 +32,7 @@ static bool           s_step = false;        // the group step showing
 static lv_obj_t      *s_dlg = nullptr;       // the question, while it is up
 static void         (*s_go)() = nullptr;     // ...what its button does
 
-static PsramArray<Item, 24> s_items;         // what was ticked when Add, Hide... was tapped (~7 KB)
+static PsramArray<Item, 24> s_items;         // what is ticked when Add, Hide... is tapped (~7 KB)
 static uint8_t s_nItems = 0;
 
 static void showLists(bool keep);
@@ -234,7 +234,7 @@ static void doAdd() {
         }
         added++;
     }
-    done(added, "Added %u");   // to confirm (round 1's)
+    done(added, "Added %u");   // the toast
 }
 
 static void askAdd() {

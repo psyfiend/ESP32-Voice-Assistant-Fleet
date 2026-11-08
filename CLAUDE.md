@@ -246,7 +246,7 @@ reads closer to official ESP-IDF audio examples.
 
 - `ENABLE_AEC` in `AudioManager.h` is **off by default**. The 4-channel TDM/AEC (acoustic
   echo cancellation) code path exists but is unfinished and untested on real hardware —
-  AEC development is on hold, not abandoned.
+  AEC development is on hold until voice returns with the ESPHome API (A18, ROADMAP Phase 7).
 - Two mutually-exclusive mic input paths: a dedicated ES7210 ADC chip (`HAS_ES7210`), or —
   on boards without one — the ES8311's own built-in ADC (`initCodecOutput()` sets
   `AUDIO_HAL_CODEC_MODE_BOTH` instead of `DECODE`-only in that case). Never assume ES8311 is

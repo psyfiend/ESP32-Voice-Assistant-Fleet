@@ -1,8 +1,8 @@
 #pragma once
-// "UI Tweaks" (2.8 round 3, D-22 / D-25 / D-27): the development window of the
-// card looks - a Sheet client like "About this board". Every row is one choice
-// made outright on a row of chips (round 5: the kit's chip table - round 3's
-// selectors took too much room); Tokens and Reset all below them. What a row
+// "UI Tweaks" (D-22, D-25): the development window of the card looks - a Sheet
+// client like "About this board". Every row is one choice made outright on a row
+// of chips (the kit's chip table, which takes less room than selectors would);
+// Tokens and Reset all below them. What a row
 // sets, and where it is saved, is its owner's (GUIManagerTweaks.cpp): this
 // file builds the window and says which choice was made.
 // docs/design/components.md, "Sheet".
@@ -11,10 +11,10 @@
 
 namespace TweaksSheet {
 
-constexpr uint8_t ROWS_MAX = 12;   // the chip table's own most (Kit::CHIP_ROWS_MAX); 10 until 2.13's helper text
+constexpr uint8_t ROWS_MAX = 12;   // the chip table's own most (Kit::CHIP_ROWS_MAX)
 
 // A row: what it sets, its choices, which is chosen now, and what choosing one does.
-// A SLIDER ROW (2.11 round 4) has no choices: `hi` above `lo`, its value now
+// A SLIDER ROW has no choices: `hi` above `lo`, its value now
 // and what setting one does (on release), `unit` after the number.
 struct Row {
     const char        *what;

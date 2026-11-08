@@ -1,14 +1,13 @@
-// The selector and the round icon buttons (2.12 P3, moved from the card
-// window's control deck and corner icons).
+// The selector and the round icon buttons.
 //
-// THE SELECTOR (owner, 2026-10-07 - after HTC's TouchFLO 3D): a RIBBON a little
+// THE SELECTOR (after HTC's TouchFLO 3D): a RIBBON a little
 // shorter than the choices, and on it a SELECTOR as tall as the whole, which
 // can be grabbed and slid along it. The selector carries the chosen choice's
 // icon at the next size up, in the accent; its icon changes to a neighbour's
 // once the selector is more than halfway over it, and on release it snaps to
 // the nearest choice, which is then chosen. A tap on a choice glides the
 // selector there. An ACTION (the window's Power) is a button at the start -
-// satin, glass while lit (#99) - and the selector never lands on it.
+// glass, lit glass while on - and the selector never lands on it.
 #include "UI/Kit.h"
 
 namespace Kit {
@@ -23,8 +22,7 @@ static uint32_t quietHex(bool quiet, uint32_t hex) {
 // Round icon buttons
 // ---------------------------------------------------------------------------
 
-// SATIN (owner, #99 test: "make the navigation buttons appear as satin" -
-// they were soft dents, round 6): close, back and the tabs can be tapped and
+// SATIN: close, back and the tabs can be tapped and
 // are not chosen. Pressed, satin's own feedback (Kit::finish()).
 lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f, lv_event_cb_t cb,
                      lv_obj_t **outLabel) {
@@ -43,8 +41,8 @@ lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f, lv
     return b;
 }
 
-// Lit as the selector is (owner, 2026-10-07): glass, the icon a face up and in
-// the accent. Unlit: satin (#99).
+// Lit as the selector is: glass, the icon a face up and in the accent. Unlit:
+// satin.
 void iconButtonLit(lv_obj_t *b, bool lit) {
     if (!b) return;
     const UIPalette &p = UI::pal();
@@ -173,7 +171,7 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     S.onChosen = spec.onChosen;
 
     // Its size. Full: a touch target per choice, the action before them.
-    // COMPACT (#92): a span chip's height; each choice as wide as the widest
+    // COMPACT: a span chip's height; each choice as wide as the widest
     // word and its sides (S7, as a chip's), the sides shrinking to fit `room`,
     // as far as S1; no action.
     const bool hasAction = !compact && spec.actionGlyph;
@@ -204,7 +202,7 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     lv_obj_set_size(S.obj, W, H);
 
     // The ribbon: three quarters of a choice tall, centred - IN TWO PIECES
-    // (owner: no divider line - the selector never goes to the action anyway).
+    // (no divider line - the selector never goes to the action anyway).
     // The action has a short ribbon of its own; a break; then the choices'.
     const int32_t rh = slotH * 72 / 100;
     auto ribbon = [&](int32_t x0, int32_t w) {
@@ -216,7 +214,7 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
         lv_obj_set_style_bg_opa  (rib, LV_OPA_COVER, 0);
     };
     // The action stands on a ribbon of its own only in a quiet selector; else
-    // it has a finish (#99).
+    // it has a finish.
     if (hasAction && q) ribbon(0, actionW);
     if (S.n) ribbon(actionW + brk, W - actionW - brk);
 
@@ -234,7 +232,7 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
         return b;
     };
 
-    // THE ACTION'S FINISH (#99, K77): satin, and glass while what it switches is
+    // THE ACTION'S FINISH (K77): glass, and lit glass while what it switches is
     // on (selectorActionLit()) - a choice's size, its corners the selector's.
     // A quiet one keeps it plain (actW 0: never finished).
     S.actLit = -1;
@@ -266,7 +264,7 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     lv_obj_set_style_radius(S.sel, selectorRadius(), 0);
     // Its face is metal, curved and brushed (KitFaces.cpp), the rail showing
     // through it as through a lens - a fifth taller than the rail outside
-    // (owner, #99). Greyed when quiet, as everything else is.
+    // Greyed when quiet, as everything else is.
     const int32_t selR = (selectorLookNow() & 1) ? LV_MIN(S.selW, H) / 2 : UI::mm(UI::shape().R_CONTROL);
     const int32_t lens = LV_MIN(rh * 12 / 10, H * 85 / 100);
     if (lv_obj_t *img = setFace(S.sel, S.selW, H, selR, metalKind(), quietHex(q, UI::pal().GROUND), 0, lens)) {
@@ -285,7 +283,7 @@ void selector(Selector &S, lv_obj_t *parent, const SelectorSpec &spec) {
     // Compact: the chosen word in the name face, a size up from the ribbon's.
     S.selIcon = label(S.sel, compact ? t.NAME : t.ICON, quietHex(q, col.chosen));
     lv_obj_center(S.selIcon);
-    // LARGER, TO FILL MORE OF THE SELECTOR (owner, round 7). ICON is the
+    // LARGER, TO FILL MORE OF THE SELECTOR. ICON is the
     // largest icon face there is, so it is scaled up 1.4x about its centre -
     // drawn through a layer, the size of the icon. If that is visibly soft on
     // glass, the answer is a face of just these few glyphs at this size (a few
@@ -307,8 +305,8 @@ void selectorSet(Selector &S, uint8_t i) {
 }
 
 // Only on a change: the window refreshes its state often.
-// Glass while off, LIT glass while what it switches is on (owner, round 5: the
-// glass itself lit from within; #99 had satin-off / glass-on, round 4 a border).
+// Glass while off, LIT glass while what it switches is on (the glass itself lit
+// from within).
 void selectorActionLit(Selector &S, bool lit) {
     if (!S.action || S.actW <= 0 || S.actLit == (int8_t)lit) return;
     S.actLit = (int8_t)lit;

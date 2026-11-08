@@ -1,5 +1,5 @@
 #pragma once
-// What the sheet's files share and no one else sees (2.12 P4): KitSheet.cpp (the
+// What the sheet's files share and no one else sees: KitSheet.cpp (the
 // frame), KitSheetPanels.cpp (the two folder panels), KitSparks.cpp (the sparks).
 #include "UI/Sheet.h"
 

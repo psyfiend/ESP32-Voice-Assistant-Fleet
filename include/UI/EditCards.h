@@ -1,7 +1,7 @@
 #pragma once
 //
-// EditCards - one list of cards to add, hide, remove or restore (2.13 round 2,
-// DECISIONS K148, K149; artifact "2.13 Round 2 Mocks", screens 7-9).
+// EditCards - one list of cards to add, hide, remove or restore (DECISIONS K148,
+// K149).
 //
 // A column on the left - the caller's lists ("In this group", "On the page",
 // "Hidden"), then Home Assistant's areas by floor - and the rows of the one
@@ -49,7 +49,7 @@ struct Item {
     bool canRemove;      // a row to hide that may be removed instead
     bool fresh;          // an HA row new to the board (HaOffer): "New"
     bool sensor;         // a reading: added, its third tap puts it in the header (K168)
-    // A GROUP'S MEMBER (cycle): pinned now, and the square saying so - its header
+    // A GROUP'S MEMBER (cycle): pinned, and the square saying so - its header
     // glyph in `signTint`, or the pin (null: not on the page).
     bool        pinned;
     const char *signIcon;

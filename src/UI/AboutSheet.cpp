@@ -1,7 +1,6 @@
-// "About this board" (2.12 P4) - see include/UI/AboutSheet.h. The Sheet's second client, made to
-// prove the frame is a component: one view, no tabs, no panels; the X closes it, and it closes
-// itself after a minute untouched, as the card window does. In every build since #97 (K74): the
-// system panel's About button opens it.
+// "About this board" - see include/UI/AboutSheet.h. A Sheet client with one view, no tabs and no
+// panels; the X closes it, and it closes itself after the window timeout untouched, as the card
+// window does. In every build the system panel's About button opens it (K74).
 #include "UI/AboutSheet.h"
 #include "UI/Sheet.h"
 #include "bsp_loader.h"

@@ -1,4 +1,4 @@
-// The status glyphs as data (2.8 round 3). See include/UI/GlyphShapes.h.
+// The status glyphs as data. See include/UI/GlyphShapes.h.
 #include "UI/GlyphShapes.h"
 
 #include <math.h>
@@ -10,8 +10,8 @@ namespace {
 using K = StrokeKind;
 
 // WI-FI: the Linen mock's fan ("M2 9a15 15 0 0 1 20 0", ...) as arcs about
-// their own centres, moved so the ink sits on the grid's centre (the fan's
-// origin used to sit four fifths down its box, so its ink sat low).
+// their own centres, moved so the ink sits on the grid's centre (the mock's
+// origin sits four fifths down its box, which would leave the ink low).
 const Stroke WIFI[] = {
     { K::ARC,  WIFI_ARC1,  12.0f, 18.92f,  5.0f, 225.6f, 314.4f },
     { K::ARC,  WIFI_ARC2,  12.0f, 18.99f, 10.0f, 225.6f, 314.4f },
@@ -29,7 +29,7 @@ const Stroke LINK[] = {
     { K::LINE, 0,  4.0f, 15.5f,  8.0f, 19.5f, 0.0f },
 };
 
-// THE AP MAST (D-27, "B"): a mast, its tip, and two waves to either side.
+// THE AP MAST (D-27): a mast, its tip, and two waves to either side.
 const Stroke AP_MAST[] = {
     { K::LINE, 0, 12.0f, 12.3f, 12.0f, 20.5f,   0.0f },
     { K::DOT,  0, 12.0f, 10.0f,  1.8f,  0.0f,   0.0f },
@@ -51,7 +51,7 @@ const Stroke AP_MAST[] = {
 
 const Stroke BELL[] = { BELL_STROKES };
 
-// RINGING: the bell and a stroke either side - the 12-hour notice (D-21).
+// RINGING: the bell and a stroke either side - the alarm's notice (D-21).
 const Stroke BELL_RING[] = {
     BELL_STROKES,
     { K::LINE, 0,  3.0f,  7.4f,  5.4f,  3.4f, 0.0f },

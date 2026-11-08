@@ -1,4 +1,4 @@
-// Chip tables (2.8 round 5) - see include/UI/Kit.h, "CHIP TABLES". UI Tweaks'
+// Chip tables - see include/UI/Kit.h, "CHIP TABLES". UI Tweaks'
 // rows and a card window's Card UI: an option's name and its chips, one row each.
 #include "UI/Kit.h"
 #include "UI/UITokens.h"
@@ -7,7 +7,7 @@
 namespace Kit {
 
 namespace {
-// UNLIT IS SATIN (owner, round 6): flat, a chip "just looks like a void on the
+// UNLIT IS SATIN: flat, a chip "just looks like a void on the
 // window" on the dark schemes and a white pill lost in it on Linen, where
 // satin's edge is a shade. Lit keeps its role's tint and accent ring.
 void chipFinish(lv_obj_t *b, bool on) {
@@ -31,7 +31,7 @@ lv_obj_t *chipAt(lv_obj_t *line, const char *word, int32_t cw, bool on, lv_event
     return b;
 }
 
-// A SLIDER ROW (2.11 round 4): its words - the value - follow the knob as it
+// A SLIDER ROW: its words - the value - follow the knob as it
 // moves (the row's last child, after the slider); the caller hears it on
 // release, as it hears a chip's tap.
 void sliderWords(lv_obj_t *words, int32_t v, const char *unit) {
@@ -90,7 +90,7 @@ lv_obj_t *checkOf(lv_obj_t *table, uint8_t row) {
 }
 }  // namespace
 
-// THE LAYOUT (owner, round 5): the longest row - name, gap, chips - centred in
+// THE LAYOUT: the longest row - name, gap, chips - centred in
 // the window; every other row's name right-justified against it, its chips
 // left-justified from the same column. A row's chips one width (its longest
 // word and sides, at least two chips' heights - the timeouts a little wider
@@ -252,7 +252,7 @@ void chipTableLit(lv_obj_t *table, uint8_t row, uint8_t lit) {
         lightChip(lv_obj_get_child(line, (int32_t)i), (i - 1) == lit);
 }
 
-// A CHIP GRID (round 14, the owner's group picker): the chips one width - the
+// A CHIP GRID (a group picker): the chips one width - the
 // longest word's - wrapping in rows, centred, the chosen one lit.
 lv_obj_t *chipGrid(lv_obj_t *parent, int32_t w, const char *const *words, uint8_t n, uint8_t lit,
                    lv_event_cb_t cb) {

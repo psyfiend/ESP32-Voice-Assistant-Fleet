@@ -10,12 +10,11 @@
 // diagonal strike for deliberately-disabled.
 //
 // Design and full state table: the "Fleet Status Glyphs" artifact; the fan
-// itself, since 2.8 round 3 (D-24, D-27), the "Linen Fill and Header Glyphs"
-// mock's, drawn from UI/GlyphShapes.h - centred, and the same size bare or in
-// a frame. Its colours are the scheme's (UIPalette SIG_*). An access point is
-// no longer a badge under the fan: it is a glyph of its own, the AP mast, a
-// claim in the status place (D-24); the words a badge used to carry ("RETRY",
-// a dead link) are the system panel's CONNECTIVITY row's.
+// itself is the "Linen Fill and Header Glyphs" mock's (D-24, D-27), drawn from
+// UI/GlyphShapes.h - centred, and the same size bare or in a frame. Its colours
+// are the scheme's (UIPalette SIG_*). An access point is a glyph of its own, the
+// AP mast, a claim in the status place (D-24); the words a badge would carry
+// ("RETRY", a dead link) are the system panel's CONNECTIVITY row's.
 //
 // Two rules from the mock are load-bearing rather than decorative:
 //   * The strike means CHOSEN, never BROKEN. Faults change colour and arc
@@ -45,7 +44,7 @@ public:
     //   OFF   - no motion at all.
     enum class Motion : uint8_t { OFF, BLINK, PULSE };
 
-    // `style` frames the fan (2.8, #19): bare, in the header's rounded square,
+    // `style` frames the fan: bare, in the header's rounded square,
     // or in a circle of the state's colour with the fan drawn in the bar's.
     // Called again on new objects (the header rebuilds its slots), it starts
     // over. `px` (0: the header's glyph) is the drawing box.

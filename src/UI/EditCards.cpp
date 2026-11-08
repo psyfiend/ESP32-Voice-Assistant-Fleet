@@ -1,4 +1,4 @@
-// Edit cards (2.13 round 2, DECISIONS K148, K149) - see include/UI/EditCards.h.
+// Edit cards (DECISIONS K148, K149) - see include/UI/EditCards.h.
 #include "UI/EditCards.h"
 #include "UI/HaPicker.h"      // stateWords(): an HA row's state as a card says it
 #include "HaValue.h"          // haDescriptor(): a row's kind - a sensor can go in the header (K168)
@@ -138,7 +138,7 @@ void asListed(Item &it, const char *ref) {
 }
 
 // AT THE LIMIT (K176): nothing more can be made, so no row can be chosen to add;
-// a card already chosen stays so (it was counted when it was).
+// a card already chosen stays so (it was counted when chosen).
 void atLimit() {
     if (CardAdded::count() + addsChosen() < CardAdded::MAX) return;
     for (uint8_t i = 0; i < s_n; i++)
@@ -202,7 +202,7 @@ void readRows() {
     atLimit();
 }
 
-// A ROW'S LOOK: ticked to add or restore, a lit chip's (round 3); ticked to hide or remove,
+// A ROW'S LOOK: ticked to add or restore, a lit chip's; ticked to hide or remove,
 // red; one being added, dashed; one that can be ticked, satin; information, or
 // a row of another kind while one kind is ticked, flat - the latter dimmed. The
 // tick says it too, never colour alone.
@@ -258,7 +258,7 @@ void ticksChanged(bool rebuild) {
 }
 
 // THE TAP CYCLE (K161): a member flips its pin, then (one made here) is to be
-// removed, then is as it was; a card not in the group is added, then added and
+// removed, then is back as it was; a card not in the group is added, then added and
 // pinned, then not. The rows made again: their squares say the result.
 void cycleTap(uint8_t i) {
     const Item &it = s_rows[i];
@@ -315,7 +315,7 @@ void rowCb(lv_event_t *ev) {
         if (before != Tick::TICK_NONE && before != it.tick) {
             char msg[96];
             snprintf(msg, sizeof(msg), "Cards cannot be selected to %s while cards are selected to %s.",
-                     verb(it.tick), verb(before));   // the owner's words (round-2 Q3), trimmed
+                     verb(it.tick), verb(before));
             UIToolkit::show_toast(msg, 3000);
             return;
         }
@@ -406,7 +406,7 @@ void fillBody(bool keepScroll) {
         lv_obj_t *n = Kit::label(r, tappable ? KS::KS_LABEL_NAME : KS::KS_LABEL_NAME_DIM);
         lv_obj_set_flex_grow(n, 1);
         const bool fresh = it.fresh && !it.coming;
-        // NO CHECK MARK (owner, 2026-11-05, K168): the lit chip says it's chosen, and
+        // NO CHECK MARK (K168): the lit chip says it's chosen, and
         // nothing inside a row moves when it is - no room kept for one either.
         (void)tickW;
         fitName(n, it.name, rowW - 2 * gap() - besideW(it.state, it.mark, 0) -
@@ -491,7 +491,7 @@ void fillNav() {
         const bool on = i < s_spec.nLists ? s_list == (int8_t)i
                                           : (s_list < 0 && !strcmp(s_areas[i - s_spec.nLists].id, s_area));
         Kit::finish(items[i], lv_obj_get_width(items[i]), lv_obj_get_height(items[i]),
-                    lv_obj_get_style_radius(items[i], LV_PART_MAIN), on ? Kit::Finish::FINISH_GLASS : Kit::Finish::FINISH_SATIN);   // round 3: the list showing is glass
+                    lv_obj_get_style_radius(items[i], LV_PART_MAIN), on ? Kit::Finish::FINISH_GLASS : Kit::Finish::FINISH_SATIN);   // the list showing is glass
     }
 }
 
@@ -526,7 +526,7 @@ void fillFoot() {
             static const char *const CM[] = { "Copy", "Move" };
             Kit::chipRow(s_foot, CM, 2, s_move ? 1 : 0, 0, moveCb);
         }
-        // "Save N" (the owner's, 2026-11-04); New group's "Create group N" (K168).
+        // "Save N"; New group's "Create group N" (K168).
         snprintf(w, sizeof(w), "%s %u", s_spec.saveWord ? s_spec.saveWord : "Save", (unsigned)s_nChosen);
         const int32_t sw = LV_MAX(bw, Kit::textW(w, UI::type().NAME) + 2 * UI::mm(UI::shape().S7));
         Kit::button(s_foot, Kit::ButtonRole::BTN_CONFIRM, w, sw, bh, saveCb);
@@ -580,7 +580,7 @@ lv_obj_t *build(lv_obj_t *parent, int32_t w, int32_t h, const Spec &spec) {
     if (!s_rows || !s_count || !s_chosen || !s_chosenRow || !s_haRows || !s_areas) return nullptr;
     s_spec = spec;
     s_nAreas = HaOffer::ready() ? HaOffer::areas(s_areas, HaCatalog::AREAS_MAX) : 0;
-    // NEAR THE LIMIT (owner's words, K176): every time Edit cards opens; it stays
+    // NEAR THE LIMIT (K176): every time Edit cards opens; it stays
     // until tapped.
     if (!spec.keepTicks && CardAdded::nearLimit()) {
         char msg[64];
@@ -593,7 +593,7 @@ lv_obj_t *build(lv_obj_t *parent, int32_t w, int32_t h, const Spec &spec) {
         s_move = false;
     }
     // The area shown first: the caller's, or the first on its floor (Outside),
-    // else the first list - or, with none, the first area. Back from a step, as it was.
+    // else the first list - or, with none, the first area. Back from a step, as left.
     bool kept = false;
     if (spec.keepTicks) {
         kept = s_list >= 0 && s_list < (int8_t)spec.nLists;

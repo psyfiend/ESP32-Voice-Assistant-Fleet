@@ -1,6 +1,5 @@
-// The on-screen keyboard (2.11, K95): words typed on the glass. Put off three
-// times (K37) and taken on for 2.11, where group and cluster names first need
-// it; the card's custom name (K37) uses it too. LVGL's own keyboard and text
+// The on-screen keyboard (K95): words typed on the glass - group names, and the
+// card's custom name (K37). LVGL's own keyboard and text
 // area, every theme style taken off and the kit's roles put on, so a scheme
 // change repaints it like everything else. Costs lv_mem only while it shows.
 #include "UI/Kit.h"

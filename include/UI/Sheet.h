@@ -1,6 +1,6 @@
 #pragma once
 // ---------------------------------------------------------------------------
-// THE SHEET (2.12 P4) - docs/design/components.md, "Sheet"
+// THE SHEET - docs/design/components.md, "Sheet"
 //
 // A window over the page, from a spec: placed in the middle of the screen,
 // with a header row (a close or back button, a title in two parts, tabs on the
@@ -13,16 +13,16 @@
 //
 // What a sheet shows is its client's - its views, which tabs are lit, its
 // titles, its rows, what changes while it is open; the frame is the sheet's.
-// The card window (CardPopup) is the first client; "About this board" (debug
-// builds) the second. One sheet is open at a time.
+// The clients are the card window (CardPopup), "About this board", "UI Tweaks"
+// and "Hidden cards" (K74). One sheet is open at a time.
 // ---------------------------------------------------------------------------
 #include "UI/Kit.h"
 
 namespace Kit {
 
 constexpr uint8_t  SHEET_TABS_MAX     = 2;
-constexpr uint32_t SHEET_AUTOCLOSE_MS = 60000;   // D6: it closes after 60 s untouched - unless the
-                                                 // system setting window.close says otherwise (T6)
+constexpr uint32_t SHEET_AUTOCLOSE_MS = 60000;   // K9: it closes after 60 s untouched - unless the
+                                                 // system setting window.close says otherwise (K79)
 constexpr uint32_t SHEET_TICK_MS      = 250;
 constexpr uint32_t SHEET_NEVER        = UINT32_MAX;   // SheetSpec::closeMs: never closes itself
 
@@ -109,23 +109,23 @@ void   sheetOpen(Sheet &S, const SheetSpec &spec);   // spec: kept until it clos
 void   sheetClose(Sheet &S);                 // from the next timer pass, never inside an event
 Sheet *sheetShowing();                       // the open sheet, or null
 void   sheetLayoutTitle(Sheet &S);           // after the title's words change
-// A BARE SHEET (2.13 round 3, K154): no header row and no padding, the window
+// A BARE SHEET (K154): no header row and no padding, the window
 // itself clear - what its stage holds is the window (the card window's group view:
 // a cluster, with its own surface and border). Its corners `radius`, for the halo
-// and the countdown bar. False: as it was.
+// and the countdown bar. False: the framed window again.
 void   sheetBare(Sheet &S, bool bare, int32_t radius);
 // The window was moved or resized (S.winRect, a view with a room of its own): the
 // countdown bar follows its bottom edge.
 void   sheetResized(Sheet &S);
 void   sheetTabLook(lv_obj_t *tab, bool shown, bool lit);   // lit: the tab of the view showing
 uint32_t sheetLeftMs(const Sheet &S);        // until it closes itself (0: closing; UINT32_MAX: never)
-// The system settings every window follows (T6): how long one waits untouched
+// The system settings every window follows (K79): how long one waits untouched
 // before it closes (0: never), and whether it shows the countdown. The header's
-// panels close on the same timeout (2.8 round 3, D-22).
+// panels close on the same timeout (D-22).
 uint32_t windowCloseMs();
 bool     windowBarShown();
 
-// --- Beside the window (2.8 round 3, D-25) ----------------------------------------
+// --- Beside the window (D-25) ------------------------------------------------------
 // Objects the open sheet lets presses through to, outside its window: the
 // CHILDREN of `holder` (the deck's panels, risen under UI Tweaks). While
 // `isOpen()` says one of them is open, the window is out of reach as it is
@@ -138,11 +138,11 @@ struct SheetBeside {
 };
 void sheetBeside(const SheetBeside *b);   // null: none
 
-// --- The countdown bar (#97, #23) ----------------------------------------------------
+// --- The countdown bar ---------------------------------------------------------------
 // How long until the open sheet closes itself: a thin bar (H_BAR) on the bottom
 // edge of `box` - inside its border, between its rounded corners - shrinking
 // toward its middle. The sheet's window has one (S.autoBar; null when the system
-// settings hide it, or the window never closes itself - T6); a dialog over the
+// settings hide it, or the window never closes itself); a dialog over the
 // sheet shows the same. `boxW`: the box's width as set, before LVGL has laid it out.
 lv_obj_t *countdownBar(lv_obj_t *box, int32_t boxW);
 void      countdownSet(lv_obj_t *bar, const Sheet &S);   // as long as S has left to wait
@@ -151,7 +151,7 @@ void      countdownSet(lv_obj_t *bar, const Sheet &S);   // as long as S has lef
 // Null when the sheet shows no bar, or none is open.
 lv_obj_t *countdownFollow(lv_obj_t *box, int32_t boxW);
 // An open sheet's timeout (0: never) and bar changed now: the wait starts again,
-// the bar comes or goes (round 4: a choice in UI Tweaks or Card UI shows at once).
+// the bar comes or goes (a choice in UI Tweaks or Card UI shows at once).
 void      sheetRetime(Sheet &S, uint32_t closeMs, bool bar);
 
 // --- The panels (KitSheetPanels.cpp) -------------------------------------------------

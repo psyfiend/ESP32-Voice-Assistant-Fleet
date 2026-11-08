@@ -42,12 +42,12 @@ void close() {
     if (s_onClose) s_onClose();
 }
 
-// Diagnostics for the Dump Config freeze, 2026-09-18. Enable with
+// Diagnostics for a freeze while the Dump Config report is shown. Enable with
 // -D DEBUG_LOGPAGE in an environment's build_flags.
 //
-// The report itself was ruled out by proving it completes - the closing
-// separator reaches the serial line - so the hang is in one of the two calls
-// below and this says which. Each print is flushed, because on a CDC board an
+// The report itself completes - the closing separator reaches the serial line -
+// so a hang is in one of the two calls below and this says which. Each print
+// is flushed, because on a CDC board an
 // unflushed line is lost when the CPU stops and the last thing you see is not
 // the last thing that ran.
 #ifdef DEBUG_LOGPAGE
@@ -104,17 +104,16 @@ void show(const char *text) {
         (void)e;
         // The redraw is NOT done here. The report's lines go into a queue that
         // Panel_System drains five per tick, so calling refresh() on this line
-        // would redraw the text from before the dump - which is exactly what it
-        // used to do, and why the owner had to leave the page and come back.
-        // The drain notifies us instead, and the log scrolls as it fills.
+        // would redraw the text from before the dump. The drain notifies us
+        // instead, and the log scrolls as it fills.
         // The handler empties the log first, so the page shows this one report
         // alone. There is no Clear button: with one report on the page there
-        // is nothing to clear (owner, 2026-09-30).
+        // is nothing to clear.
         if (s_onDump) s_onDump();
     });
 
-    // The report itself. This is the scroller that used to live inside the
-    // System panel and make its height animation stutter.
+    // The report itself. It scrolls here rather than inside the System panel,
+    // where it would make the panel's height animation stutter.
     lv_obj_t *box = lv_obj_create(col);
     lv_obj_set_width              (box, lv_pct(100));
     lv_obj_set_flex_grow          (box, 1);

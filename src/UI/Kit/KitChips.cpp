@@ -1,4 +1,4 @@
-// Chips (2.12 P3, from History's span buttons - owner, 2.10e round 2): a row of
+// Chips (History's span buttons): a row of
 // small buttons, the chosen one lit in the accent.
 #include "UI/Kit.h"
 
@@ -32,7 +32,7 @@ lv_obj_t *chipRow(lv_obj_t *parent, const char *const *words, uint8_t n, uint8_t
         add(b, KitStyle::KS_CHIP_PRESSED, UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
         lv_obj_set_style_pad_hor(b, padH, 0);
         // ITS OWN WIDTH, SO IT CAN WEAR A FINISH: unlit is satin, as every chip is
-        // (KitChoices.cpp, owner round 6) - Copy and Move were flat (F44, owner 11-07).
+        // (KitChoices.cpp), including Copy and Move.
         const int32_t w = textW(words[i], UI::type().TAG) + 2 * padH;
         lv_obj_set_width(b, w);
         if (cb) lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);

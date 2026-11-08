@@ -1,5 +1,4 @@
-// The system panel - the status icons' panel (2.8 round 3). See
-// include/UI/Panel_System.h.
+// The system panel - the status icons' panel. See include/UI/Panel_System.h.
 #include "UI/Panel_System.h"
 #include "UI/AboutSheet.h"
 #include "UI/UIIcons.h"          // MDI_HOME_ASSISTANT
@@ -48,7 +47,7 @@ static void rowDownCb(lv_event_t *) { if (s_self) s_self->requestGrid(Panel_Syst
 static void rowUpCb(lv_event_t *)   { if (s_self) s_self->requestGrid(Panel_System::GridAction::ASPECT_UP); }
 static void gridAutoCb(lv_event_t *) { if (s_self) s_self->requestGrid(Panel_System::GridAction::GRID_AUTO); }
 
-// The development Reset's question (2.11 round 9), on the top layer over the panel.
+// The development Reset's question, on the top layer over the panel.
 static lv_obj_t *s_confirm = nullptr;
 static void confirmClose() {
     if (s_confirm) { lv_obj_delete(s_confirm); s_confirm = nullptr; }
@@ -68,7 +67,7 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     s_self = this;
     SystemReport::addSink(reportSink);
 
-    // WIDTH IS DERIVED FROM THE SCREEN, NOT FROM THE BOARD (issue #50): half a
+    // WIDTH IS DERIVED FROM THE SCREEN, NOT FROM THE BOARD: half a
     // wide screen, three quarters of a middling one, all of a narrow one - in
     // LOGICAL pixels, a judgement about how much fits. The fleet lands in four
     // well-separated groups: 330 (CYD_S3_3248) | 480 (both 4B) | 727-740
@@ -81,9 +80,9 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
     else                                     panelW = screenW;
 
     // THE FRAME IS THE KIT'S DRAWER (D-20): the clip that grows, the face
-    // riding its edge (#81), one shape with the status slot's tab (D-23). It
-    // hangs under the status slot (setAnchorX()); its top is the live header's
-    // (setTopOffset() - a stale number once detached it from the bar, #50).
+    // riding its edge, one shape with the status slot's tab (D-23). It hangs
+    // under the status slot (setAnchorX()); its top is the live header's
+    // (setTopOffset(); a stale number would detach it from the bar).
     Kit::drawer(_drawer, parent, panelW);
     _drawer.onClosed   = [](void *u) { Panel_System *p = (Panel_System *)u; if (p->_onClosed) p->_onClosed(); };
     _drawer.closedUser = this;
@@ -100,13 +99,11 @@ void Panel_System::init(lv_obj_t* parent, Panel_Header* headerRef) {
 }
 
 // THE ROWS ARE BUILT AGAIN whenever the panel opens and whenever the scheme
-// changes. Their buttons and the selector are finished faces (#99), and a face
-// lives in a cache of 16 slots that each new window may take back: built once,
-// at boot, the panel's buttons went on pointing at slots UI Tweaks' selectors
-// had repainted (round 3: doubled faces, Col / Row turned silver). And a face
-// is painted in the scheme it was made in (Linen once showed Midnight's dark
-// buttons). The panel is closed whenever a window opens, so building at open
-// is enough.
+// changes. Their buttons and the selector are finished faces, and a face lives
+// in a cache of 16 slots that each new window may take back: buttons built once
+// would keep pointing at slots another window had repainted. And a face is
+// painted in the scheme it was made in, so a scheme change needs fresh ones.
+// The panel is closed whenever a window opens, so building at open is enough.
 void Panel_System::rebuild() {
     if (!_ui_content) return;
     lv_obj_clean(_ui_content);
@@ -140,9 +137,9 @@ void Panel_System::buildContent() {
 
     // --- SYSTEM - DIAGNOSTICS: development tools for now (D-17) ------------
     Kit::drawerTitle(_ui_content, "SYSTEM - DIAGNOSTICS");
-    // RESET IS GONE UNTIL BACKUP AND RESTORE TAKE ITS PLACE (owner, 2026-11-06, K187,
-    // K192): since K171 it wiped the House page. Its dialog stays behind
-    // /popup?dash=1, and dash=2 resets a development board without one.
+    // There is no Reset button: it would wipe the House page, so Backup and Restore
+    // are to take its place (K187, K192). Its dialog stays behind /popup?dash=1,
+    // and dash=2 resets a development board without one.
     lv_obj_t *r = Kit::drawerRow(_ui_content);
     const int32_t w4 = (inner - 3 * gap) / 4;   // the grid's buttons, below
     const int32_t w3 = (inner - 2 * gap) / 3;
@@ -153,8 +150,8 @@ void Panel_System::buildContent() {
     Kit::button(r, Kit::ButtonRole::BTN_CANCEL, "About", w2, btnH, aboutCb);
     (void)dashAskCb;
 
-    // "Scheme:" and one of three (round 4: the Status bar toggle went - the page
-    // panel's Show / Hide is the one way to hide the header).
+    // "Scheme:" and one of three (the page panel's Show / Hide is the one way to
+    // hide the header).
     r = Kit::drawerRow(_ui_content);
     lv_label_set_text(Kit::label(r, Kit::KitStyle::KS_LABEL_NAME_DIM), "Scheme:");
     static const char *const SCHEMES[] = { "Fleet", "Midnight", "Linen" };
@@ -167,7 +164,7 @@ void Panel_System::buildContent() {
     sp.onChosen = schemeChosen;
     Kit::selector(_schemeSel, r, sp);
 
-    // The page's grid (2.11 round 9): pinned counts or the arranger's choice, in
+    // The page's grid: pinned counts or the arranger's choice, in
     // words, and Auto to take the pins away; then the counts, each press a pin.
     r = Kit::drawerRow(_ui_content);
     lv_label_set_text(Kit::label(r, Kit::KitStyle::KS_LABEL_NAME_DIM), "Grid:");
@@ -237,8 +234,7 @@ void Panel_System::refreshConnectivity() {
 }
 
 // Open or close. How tall it opens is MEASURED from its face, never guessed
-// (#50: it once opened to most of the screen whatever it held) - the drawer's
-// own rule, Kit::drawerOpen(), as every slot's panel.
+// - the drawer's own rule, Kit::drawerOpen(), as every slot's panel.
 void Panel_System::toggle() {
     _expanded = !_expanded;
     if (_onToggle) _onToggle(_expanded);
@@ -296,9 +292,8 @@ void Panel_System::_tick() {
 
     // Process LOG Queue
     if (_log_dirty) {
-        // Drained into a STRING, not into a label. No LVGL work happens here
-        // at all now, which is the point: this used to insert text into a
-        // widget five lines per tick whether or not anyone was looking at it.
+        // Drained into a STRING, not into a label: no LVGL work happens here,
+        // whether or not anyone is looking at the log.
         int processed = 0;
         while (!_log_queue.empty() && processed < 5) {
             _log_queue_bytes -= _log_queue.front().size() + 1;

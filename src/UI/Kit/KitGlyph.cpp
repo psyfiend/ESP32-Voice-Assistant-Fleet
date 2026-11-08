@@ -1,4 +1,4 @@
-// A stroke glyph (2.8 round 3, D-24, D-27): one of the status glyphs drawn from
+// A stroke glyph (D-24, D-27): one of the status glyphs drawn from
 // its strokes on the 24-unit grid (UI/GlyphShapes.h) with LVGL's own arcs,
 // lines and dots, at any size. See Kit.h.
 #include "UI/Kit.h"

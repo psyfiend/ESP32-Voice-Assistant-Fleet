@@ -1,18 +1,18 @@
 // Screenshot - issue #58. The design is in Screenshot.h; the reasons are here.
 //
-// Modelled on agillis/esphome-lvgl-screenshot (MIT), which the owner found in
-// reference/esphome-modular-lvgl-buttons/components/lvgl_screenshot/. What was
+// Modelled on agillis/esphome-lvgl-screenshot (MIT), in
+// reference/esphome-modular-lvgl-buttons/components/lvgl_screenshot/. What is
 // kept: snapshot -> repack -> stb_image_write PNG -> esp_http_server, and a
-// request/done handshake so the capture happens on the LVGL thread. What had to
-// change, each for a reason found in the source rather than on the glass:
+// request/done handshake so the capture happens on the LVGL thread. What
+// differs, each for a reason found in the source:
 //
 //   - lv_snapshot_take() is NOT used. It allocates through lv_draw_buf_create()
-//     -> lv_malloc, which on this fleet is LVGL's own 128 KB pool
-//     (LV_STDLIB_BUILTIN). A full screen is 0.3-2.7 MB. It could never work.
+//     -> lv_malloc, which on this fleet is LVGL's own pool (LV_STDLIB_BUILTIN,
+//     128-512 KB). A full screen is 0.3-2.7 MB, which cannot fit.
 //     We allocate in PSRAM and use lv_snapshot_take_to_draw_buf() instead.
-//   - The top and system layers are composited on, because the owner asked for
-//     the screen exactly as it is. A snapshot of the screen object alone
-//     leaves out every toast and the FPS monitor.
+//   - The top and system layers are composited on, so the picture is the
+//     screen exactly as it is. A snapshot of the screen object alone leaves
+//     out every toast and the FPS monitor.
 //   - The screen is rendered in the DISPLAY's colour format (RGB565), not
 //     RGB888, so the PNG carries the colours the panel shows rather than a
 //     smoother 24-bit re-render the panel never displayed.
@@ -58,7 +58,7 @@ constexpr uint32_t PICKUP_WAIT_MS = 5000;
 
 constexpr uint32_t PSRAM_CAPS = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
 
-// PNG encoder defaults, MEASURED on WS_P4_5 at 1280x720, 2026-09-24:
+// PNG encoder defaults, MEASURED on WS_P4_5 at 1280x720:
 //
 //   stb default (z8, all filters)   encode 3097 ms   89 KB
 //   z5, filter 1 (Sub)              encode 1192 ms   85 KB
@@ -194,7 +194,7 @@ bool layerHasContent(lv_obj_t *layer) {
 }
 
 #ifdef DISPLAY_ESPLCD
-// ?fb=1 on the esp_lcd path (2.9 step 2): the frame buffer the panel is
+// ?fb=1 on the esp_lcd path: the frame buffer the panel is
 // actually showing, copied as-is - physical orientation (WS_P4_5 comes out
 // portrait), no overlays re-rendered, no LVGL involved. The one check of
 // "what is on the glass" that does not trust LVGL, the rotation or the
