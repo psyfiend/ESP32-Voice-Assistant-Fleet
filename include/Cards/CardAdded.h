@@ -164,6 +164,11 @@ bool toPage(const char *cardId, const char *afterId, uint8_t pri);   // a cluste
 bool isMoveOf(const char *cardId);           // made here, and it IS its original moved
 const char *becameOf(const char *origId);    // the card a moved original became; null
 bool unmake(const char *cardId);             // deleted wherever it is; a move's original back home
+// A board-made group with no card in it is deleted, with its label group if no
+// other card wears it: true when it is gone (or was already). False for a compiled
+// group or one a card is still in - one emptied by a move, which the caller hides.
+bool emptied(const char *clusterId);
+const char *clusterOf(const char *cardId);   // the group a member made here is in; null
 void keepHome(const char *memberId, const char *name, const char *groupId);   // with moveToPage()
 bool home(const char *memberId, char *name, size_t nameCap, char *groupId, size_t gidCap);
 

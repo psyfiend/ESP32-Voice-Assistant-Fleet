@@ -531,9 +531,19 @@ void CardPopup::debugService(lv_timer_t *t) {
             confirmRemoveCopy();
             dbgOut(CardAdded::isMember(held->id()) ? "dialog up\n" : "not a copy made here\n");
         } else if (a.removeCard == 5) {
-            // removecard=5: the copy removed, as the dialog's Remove - its entry deleted.
-            snprintf(id, sizeof(id), "%s", held->id());
-            if (CardAdded::removeMember(id)) { dbgOut("removed %s\n", id); close(); s_dreq.store(DREQ_CLOSING); return; }
+            // removecard=5: the copy removed, as the dialog's Remove - its entry deleted;
+            // the member whose own view is showing (member=N), else the held card.
+            Card *subj = inMember() ? visibilitySubject() : nullptr;
+            snprintf(id, sizeof(id), "%s", subj && subj->hasId() ? subj->id() : held->id());
+            char in[CARD_ID_MAX + 1] = "";
+            if (const char *c = CardAdded::clusterOf(id)) snprintf(in, sizeof(in), "%s", c);
+            if (CardAdded::removeMember(id)) {
+                const bool gone = in[0] && CardAdded::emptied(in);
+                dbgOut("removed %s%s%s\n", id, gone ? "; its group deleted: " : "", gone ? in : "");
+                close();
+                s_dreq.store(DREQ_CLOSING);
+                return;
+            }
             dbgOut("%s is not a copy made here\n", id);
         } else if (a.removeCard == 6 || a.removeCard == 7 || a.removeCard == 8) {
             // The sprint after round 7: a card taken out of a cluster. 6 Remove from

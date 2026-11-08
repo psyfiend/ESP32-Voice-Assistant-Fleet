@@ -371,7 +371,7 @@ void doDash() {
         CardAdded::moveToPage(sid, id);
         CardAdded::keepHome(sid, clName(m.from), fromHas ? fg.id : nullptr);
     }
-    if (last) CardAdded::hide(m.from->id());   // an empty cluster hides itself (owner's 15)
+    if (last && !CardAdded::emptied(m.from->id())) CardAdded::hide(m.from->id());   // gone, else hidden
     done();
 }
 
@@ -387,7 +387,7 @@ void doCluster() {
             const bool last = lastTile();
             CardAdded::unmake(sid);
             if (T.hidden) CardAdded::restore(T.id);
-            if (last) CardAdded::hide(m.from->id());
+            if (last && !CardAdded::emptied(m.from->id())) CardAdded::hide(m.from->id());
             done();
             return;
         }
@@ -414,7 +414,7 @@ void doCluster() {
     // cards does) - joining never moves the page; Pin this card puts it there.
     Settings::setCard(isMade(sid) && m.move ? sid : id, "hidden", "yes");
     if (T.hidden) CardAdded::restore(T.id);    // a hidden cluster is used again
-    if (last) CardAdded::hide(m.from->id());   // an empty cluster hides itself (owner's 15)
+    if (last && !CardAdded::emptied(m.from->id())) CardAdded::hide(m.from->id());   // gone, else hidden
     done();
 }
 
@@ -732,8 +732,16 @@ void restoreClosed() {
     CardPopup::close();
 }
 
+// The group a Restore takes a copy out of goes if it was the last one in it.
+void tidyAfter(const char *clusterId) {
+    if (clusterId && clusterId[0]) CardAdded::emptied(clusterId);
+}
+
 void goDelete() {
+    char in[CARD_ID_MAX + 1] = "";
+    if (const char *c = CardAdded::clusterOf(s_rid)) snprintf(in, sizeof(in), "%s", c);
     CardAdded::unmake(s_rid);
+    tidyAfter(in);
     restoreClosed();
 }
 
@@ -751,6 +759,8 @@ void goMove() {
     const char *o = CardAdded::fromOf(s_rid);
     char orig[CARD_ID_MAX + 1];
     snprintf(orig, sizeof(orig), "%s", o ? o : "");
+    char in[CARD_ID_MAX + 1] = "";   // the group it leaves, if it is a member
+    if (const char *c = CardAdded::clusterOf(s_rid)) snprintf(in, sizeof(in), "%s", c);
     const CardSpec *hc = homeCluster(orig);
     if (hc) {
         char hn[48], hg[48], now[48];
@@ -764,16 +774,19 @@ void goMove() {
             char bn[48];
             builtName(orig, bn, sizeof(bn));
             Settings::setCard(s_rid, "name", bn);
+            tidyAfter(in);
             restoreClosed();
             return;
         }
         const bool hidden = CardAdded::isHidden(hc->id);
         CardAdded::unmake(s_rid);
         if (hidden) CardAdded::restore(hc->id);   // the cluster is used again
+        tidyAfter(in);
         restoreClosed();
         return;
     }
     CardAdded::unmake(s_rid);   // a page card: back on its page
+    tidyAfter(in);
     restoreClosed();
 }
 

@@ -426,6 +426,39 @@ bool unmake(const char *cardId) {
     return false;
 }
 
+const char *clusterOf(const char *cardId) {
+    for (uint8_t i = 0; cardId && i < s_n; i++)
+        if (!s_rec[i].removed && s_rec[i].in[0] && !strcmp(s_rec[i].id, cardId)) return s_rec[i].in;
+    return nullptr;
+}
+
+// A GROUP MADE ON THE BOARD IS DELETED WHEN NO CARD IS IN IT: no entry names it
+// in "in". A member moved out to the page keeps its "in" (its Restore goes back
+// there), so that group stays, hidden by the caller. Its label group goes with
+// it unless another card wears it. A compiled group is never deleted. Called once
+// a change is complete, never between a removal and an add in the same save.
+bool emptied(const char *clusterId) {
+    if (!clusterId || !cardIdWellFormed(clusterId)) return false;
+    if (s_compiled && s_compiled(clusterId)) return false;
+    char v[48];
+    if (!Settings::card(clusterId, "kind", v, sizeof(v)) || strcmp(v, "cluster")) return true;   // already gone
+    if (Settings::countCards("in", clusterId)) return false;
+    char gid[48] = "";
+    Settings::card(clusterId, "group", gid, sizeof(gid));
+    for (uint8_t i = 0; i < s_n; i++)
+        if (!strcmp(s_rec[i].id, clusterId)) s_rec[i].removed = true;   // the record stays until the next boot
+    Settings::dropCard(clusterId);
+    if (gid[0] && !Settings::countCards("group", gid)) {
+        Settings::setGroup(gid, "name", nullptr);
+        Settings::setGroup(gid, "color", nullptr);
+        Settings::setGroup(gid, "kind", nullptr);
+        Settings::setGroup(gid, "ha_area", nullptr);
+    }
+    s_changed = true;
+    Serial.printf("[CardAdded] %s deleted: no card is in it%s\n", clusterId, gid[0] ? " (and its label group)" : "");
+    return true;
+}
+
 void keepHome(const char *memberId, const char *name, const char *groupId) {
     if (!memberId) return;
     Settings::setCard(memberId, "home_name", name && name[0] ? name : nullptr);

@@ -71,7 +71,12 @@ void confirmRemoveCopy() {
         lv_async_call([](void *) {
             confirmClose();
             Card *held = CardPopup::isOpen() ? visibilitySubject() : nullptr;
-            if (held && CardAdded::removeMember(held->id())) CardPopup::close();
+            if (!held) return;
+            char in[CARD_ID_MAX + 1] = "";
+            if (const char *c = CardAdded::clusterOf(held->id())) snprintf(in, sizeof(in), "%s", c);
+            if (!CardAdded::removeMember(held->id())) return;
+            if (in[0]) CardAdded::emptied(in);   // the last one out: the group goes
+            CardPopup::close();
         }, nullptr);
     } };
     spec.nButtons = 2;

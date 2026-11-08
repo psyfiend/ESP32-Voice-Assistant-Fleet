@@ -541,8 +541,10 @@ void doEditHide() {
 }
 
 void doEditRemove() {
+    ClusterCard *cl = held();
     uint8_t n = 0;
     for (uint8_t i = 0; i < s_eNItems; i++) n += CardAdded::removeMember(s_eItems[i].key) ? 1 : 0;
+    if (n && cl && cl->hasId()) CardAdded::emptied(cl->id());   // the last one out: the group goes
     editDone(n, "Removed %u from %s");   // to confirm
 }
 
@@ -609,6 +611,7 @@ void doEditSave() {
         done++;
     }
     if (!done) return;
+    CardAdded::emptied(cl->id());   // every member removed and none added: the group goes
     char msg[64];
     snprintf(msg, sizeof(msg), "Saved %u change%s to %s", (unsigned)done, done == 1 ? "" : "s", s.name);   // the owner's (K161)
     UIToolkit::show_toast(msg);
