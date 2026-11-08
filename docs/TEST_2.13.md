@@ -225,6 +225,16 @@ web app (K197); Restore tabled (K198); item 6 fixed as proposed (K199). Built wi
 | T3 | Show as..., Group, through to the dialog | its title reads "Show as group?" |
 | T4 | New group from the Office HA area with only Office lamps; open an Office card from HA (Eric) | its title is "Office > Eric", never "New group > Eric" |
 
+**Results 11-07:** T1-T3 PASS. **T4 FAIL**: Eric's long press still said "New group > Eric" (its
+Members row said "Office > Eric", which reads the cluster's name). Cause: a member removed this boot
+(the earlier New group's Office Overhead) is dropped from the file but its record stays in RAM until
+the next boot, and it still voted HA's Office for "New group". After a reboot the 1060 read "Office"
+- the fix worked for what the file holds. **Fixed**: deleted and hidden records no longer count.
+
+| # | Do this | PASS if |
+|---|---|---|
+| T4b | Without rebooting: New group from Office with two lamps, remove one member, then long-press Office's Eric | "Office > Eric" |
+
 # Round 5
 
 **Branch** `feat/2.13-add-from-ha` at `5c03eaa` (four commits: `4966cb0`, `65d6f28`, `4c977d6`,

@@ -44,6 +44,9 @@ uint8_t count();   // how many there are, of MAX
 // Each made card as a spec (the page's and its clusters' members alike), i < count():
 // CardGroups reads their areas, as it reads the compiled cards' (K171).
 const CardSpec &specAt(uint8_t i);
+// Still a card: not deleted or hidden this boot. Such a record stays (a Card points
+// at its id) until the next boot, which does not read it - nor should anything else.
+bool liveAt(uint8_t i);
 
 // WITHIN 25% OF THE LIMIT (K176): opening Edit cards says so (EditCards::build()).
 bool nearLimit();

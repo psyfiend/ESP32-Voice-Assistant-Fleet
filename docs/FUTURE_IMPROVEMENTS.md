@@ -541,6 +541,8 @@ Pages now arrange themselves (K109); these are what he wants beside that:
 - **The web app** shaping pages, clusters, cards and their sizes in detail makes the automatic
   answer matter less (owner) - 3.1's build sheet. **Its dashboard arranging could be the first part
   built** at 3.1, so layouts and configurations can be tried quickly (owner, 2026-10-20).
+- **Each card's size, and tiles in a group by hand** (owner, 2026-11-07): see "Brainstorm,
+  2026-11-07" below, ideas 3 and 4.
 
 ### The old card pinning, shelved (owner, 2026-11-04, DECISIONS K164)
 
@@ -551,6 +553,53 @@ overflow, and the layout web app makes a hand-placed cell even less useful. **It
 there**, along with the arranger's own "pinned" vocabulary (`_pinCols` / `_pinRows`, Arranger.cpp's
 pinned counts; on the glass the Grid line now says "fixed"). Either remove it, or refit it to the
 arranger with a new name once the hand-arranging above is designed - never under the word "pin".
+
+### Brainstorm, 2026-11-07 (owner, during 2.13's last round)
+
+Five ideas he wanted written down before they were lost. None is scheduled; each says what it
+extends and where it would land. Nothing here is agreed design yet.
+
+1. **A roll-up entity per HA area, kept by HA** - one persistent entity for each area's doors, one
+   for its lights, one for its sensors, that always reports its members and their states, *including
+   after the members change* (a light moved to another area, a new door sensor added). The board
+   would hold one entity per area and kind instead of a list it has to keep in step.
+   - *Extends:* 2.13's open "per-room status entities for cluster headers" (ROADMAP, running order
+     6) and K170 (an HA group entity is a group on the board). The cluster header would read the
+     roll-up's members (2.8's slots, K129's Header options).
+   - *HA side:* a template entity built on `area_entities()` follows area changes on its own; a plain
+     group helper does not, because its member list is fixed. It must be something the owner can
+     read and manage without AI (the HA folder's process), named by function, one per area and kind.
+     Open: one entity per kind, or one per area with members by kind as attributes; what its state
+     says ("2 of 5 on", "1 open").
+   - *Lands:* HA's side of the 2.13 follow-on or 2.14 (alerts read the same roll-ups: a door left
+     open is the door roll-up's state).
+2. **The same for a group made on the board** - a group whose lights are in several HA areas
+   reports its members and their states live, perhaps in its header.
+   - *Extends:* the cluster header (2.11, K114-K119), the summary card (K98's words: "2 open",
+     "Both"), K170's "mirroring the boards' groups into HA" (a later idea there), and "The panel
+     should advertise its OWN entities" above: a board group published to HA over MQTT discovery
+     would be the roll-up of idea 1, made on the board.
+   - Open: on the board only (a header slot such as "3 of 5 on" that opens the members), or in HA
+     too (the mirror); which board owns a group that several boards show (idea 5).
+3. **More card presentations**:
+   - a **card with a dimmer bar** - a light's level on the card face, set without opening the window
+     (#31 card library, #86 control styles);
+   - **revisit the card's layout** - where "last updated" goes, and a group shown as its solo card
+     with **several members on its face** instead of one (K151's face, K191, K193);
+   - **card sizes from the grid** - half-size cards, cards of other widths, a solo card wide enough to
+     show more. The arranger works in units already (K109, K120; `design/layout-engines.md`), so a
+     size is a claim of units; what the arranger does with mixed sizes is the design question.
+     Relates to "Icons look undersized on large cards" above (the face per cell) and 4.2.
+4. **Arranging by hand** - choosing what goes where on a page and in a group, and each card's size.
+   Already recorded above ("Arranging by hand", 2026-10-20: the jiggle mode, the web app's
+   arranging first at 3.1); this adds **size per card** as part of it (idea 3), and tiles inside a
+   group arranged by hand as well as the page.
+5. **Synchronizing boards** - with Fleet peer work (#55), push a group's configuration, or a whole
+   board's, to other boards, or keep boards in step.
+   - *Extends:* #55 peer discovery; K181 (a backup from one board is meant to restore on another -
+     the first, manual form of this); Phase 3's export and import with the companion web app (#87).
+   - Open: one-time push or kept in step; what is per board and never copied (its screen's
+     arrangement, its own sensors, the Panel group); which board, or the web app, is the source.
 
 ## bb_captouch_fork
 

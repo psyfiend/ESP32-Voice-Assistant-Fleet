@@ -822,6 +822,7 @@ void CardPopup::debugService(lv_timer_t *t) {
             dbgOut("group %-28s %-14s #%06lX %s%s%s\n", g.id, g.name, (unsigned long)g.color,
                    g.haName[0] ? "HA area " : "local", g.haName, g.solo ? " (solo)" : "");
         }, nullptr);
+        if (a.groups > 1) CardGroups::dumpLinks([](const char *line, void *) { dbgOut("%s", line); }, nullptr);
         for (int i = 0; i < n; i++) {
             Card *c = cardOf(cards[i]);
             if (!c) continue;

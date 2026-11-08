@@ -37,7 +37,9 @@ bool startsWith(const char *s, const char *p) { return !strncmp(s, p, strlen(p))
 // the cards made on the board - since K171 most of the dashboard (2.13 round 5).
 template <typename F> void eachSpec(F f) {
     for (uint8_t p = 0; p < s_nPages; p++) forEachCardSpec(*s_pages[p], f);
-    for (uint8_t i = 0; i < CardAdded::count(); i++) f(CardAdded::specAt(i));
+    // Not a card deleted this boot (owner's glass, 2026-11-07, T4): a removed member
+    // still voted its HA area until the next boot, naming HA's Office "New group".
+    for (uint8_t i = 0; i < CardAdded::count(); i++) if (CardAdded::liveAt(i)) f(CardAdded::specAt(i));
 }
 
 // The dashboard's areas, each once, in page order.
@@ -300,6 +302,25 @@ bool ofId(const char *cardId, const char *sheetArea, Group &g) {
     char gid[48];
     sheetGroupId(sheetArea, gid, sizeof(gid));
     return byId(gid, g);
+}
+
+void dumpLinks(void (*out)(const char *line, void *ctx), void *ctx) {
+    const char *areas[32];
+    const uint8_t na = sheetAreas(areas, 32);
+    char line[160], gid[48];
+    for (uint8_t i = 0; i < na; i++) {
+        sheetGroupId(areas[i], gid, sizeof(gid));
+        snprintf(line, sizeof(line), "area \"%s\" -> %s\n", areas[i], gid);
+        out(line, ctx);
+        eachSpec([&](const CardSpec &cs) {
+            if (!cs.area || strcmp(cs.area, areas[i]) != 0) return;
+            const Entity *e = (s_reg && cs.primaries[0]) ? s_reg->find(cs.primaries[0]) : nullptr;
+            snprintf(line, sizeof(line), "   %-40s %-32s %s%s\n", cs.id ? cs.id : "(no id)",
+                     cs.primaries[0] ? cs.primaries[0] : "-", e ? e->sourceAreaId : "",
+                     inMadeGroup(cs) ? " (made group)" : "");
+            out(line, ctx);
+        });
+    }
 }
 
 bool make(const char *name, char *idOut, size_t cap) {

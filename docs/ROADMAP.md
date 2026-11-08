@@ -178,3 +178,6 @@ ordered); #69 4B panel timing (WS_S3_4B locked up, waiting to be troubleshot); #
   candidate to close); #53 auto-fill and #54 auto-adjust closed, answered by #78's arranger.
 - **Fleet**: #55 peer discovery, #36 distribution `platformio.ini`, #37 `library.json` manifests, #40
   GFX fork diff.
+- **Ideas not yet scheduled** (owner, 2026-11-07): HA roll-up entities per area, live member reports
+  for board groups, card presentations and sizes, arranging by hand, synchronizing boards -
+  `FUTURE_IMPROVEMENTS.md`, "Brainstorm, 2026-11-07".

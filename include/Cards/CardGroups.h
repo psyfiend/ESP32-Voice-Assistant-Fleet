@@ -61,6 +61,9 @@ bool ofCard(const Card &c, Group &g);
 // its id and its dashboard area.
 bool ofId(const char *cardId, const char *sheetArea, Group &g);
 
+// /popup?groups=1: each dashboard area, the group it is, and each card's vote.
+void dumpLinks(void (*out)(const char *line, void *ctx), void *ctx);
+
 // A GROUP MADE BY THE OWNER, NAMED ON THE KEYBOARD (Visibility's "New group", the
 // 2.11 follow-ups): kept until deleted, in a colour no other group is using
 // while one is left. Its id into `idOut`.
