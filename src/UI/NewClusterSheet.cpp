@@ -13,6 +13,7 @@
 #include "HaCatalog.h"
 #include "Entity.h"
 #include "Settings.h"
+#include "PsramArray.h"
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -35,11 +36,11 @@ static bool             s_nameTaken = false;  // a group already has the area's 
 static uint8_t          s_namePick = 0;       // 0 the name, 1 Change name
 static lv_obj_t        *s_nameGrid = nullptr;
 static lv_obj_t        *s_dlg = nullptr;
-static HaOffer::AreaRow s_areas[HaCatalog::AREAS_MAX];
+static PsramArray<HaOffer::AreaRow, HaCatalog::AREAS_MAX> s_areas;   // ~6.5 KB
 static uint8_t          s_nAreas = 0;
 static uint8_t          s_areaAt[HaCatalog::AREAS_MAX];   // a chip's area
 static const char      *s_words[HaCatalog::AREAS_MAX + 1];
-static Item             s_items[32];
+static PsramArray<Item, 32> s_items;   // ~10 KB
 static uint8_t          s_nItems = 0;
 // SHOWN AS A SOLO CARD (K191): fewer than two cards pinned - its face (0 all, else
 // s_items[face - 1]) and its tap, asked before its name.

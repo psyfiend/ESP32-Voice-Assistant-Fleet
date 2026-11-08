@@ -13,6 +13,7 @@
 #include "Cards/CardWhere.h"
 #include "Entity.h"
 #include "Settings.h"
+#include "PsramArray.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -31,7 +32,7 @@ static bool           s_step = false;        // the group step showing
 static lv_obj_t      *s_dlg = nullptr;       // the question, while it is up
 static void         (*s_go)() = nullptr;     // ...what its button does
 
-static Item    s_items[24];                  // what was ticked when Add, Hide... was tapped
+static PsramArray<Item, 24> s_items;         // what was ticked when Add, Hide... was tapped (~7 KB)
 static uint8_t s_nItems = 0;
 
 static void showLists(bool keep);

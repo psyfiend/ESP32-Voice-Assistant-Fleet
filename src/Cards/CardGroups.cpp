@@ -8,6 +8,7 @@
 #include "Settings.h"
 #include <Arduino.h>   // millis(): autoColour()'s refresh
 #include <ctype.h>
+#include "PsramArray.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -112,7 +113,7 @@ void sheetGroupId(const char *area, char *out, size_t cap) {
 // Every known group, each once: the dashboard's areas (as linked HA groups
 // where they are one), every HA area an entity here is in, and the groups in
 // the settings file. LVGL thread only (one static list).
-Group   s_list[32];
+PsramArray<Group, 32> s_list;   // ~4 KB
 uint8_t s_listN = 0;
 
 void addListed(const char *gid) {

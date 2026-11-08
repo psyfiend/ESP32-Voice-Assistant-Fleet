@@ -21,6 +21,7 @@
 #include "UI/EditCards.h"      // 2.13 round 2: Edit cards (K148)
 #include "HaCatalog.h"         // AREAS_MAX: the Area row's choices
 #include "HaValue.h"           // haDescriptor(): an HA row's header glyph (K168)
+#include "PsramArray.h"
 #include <stdarg.h>
 
 namespace popup {
@@ -477,7 +478,7 @@ const char *eAcc(char *buf, size_t cap, const char *name) {
 }
 
 // What was ticked when the question was asked.
-EditCards::Item s_eItems[24];
+PsramArray<EditCards::Item, 24> s_eItems;   // ~7 KB
 uint8_t         s_eNItems = 0;
 bool            s_eMove = false;
 
@@ -885,7 +886,7 @@ static void areaDropCb(lv_event_t *ev) {
 }
 
 static uint16_t areaOptions(const char *current) {
-    static HaOffer::AreaRow rows[HaCatalog::AREAS_MAX];   // ~6 KB: not on the loop task's stack
+    static PsramArray<HaOffer::AreaRow, HaCatalog::AREAS_MAX> rows;   // ~6.5 KB: not on the loop task's stack
     const uint8_t na = HaOffer::areas(rows, HaCatalog::AREAS_MAX);
     size_t used = (size_t)snprintf(s_areaOpts, sizeof(s_areaOpts), "None");
     s_areaIds[0][0] = '\0';
