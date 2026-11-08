@@ -259,6 +259,7 @@ order.
 | `/popup?tree=1` | the open window's LVGL objects, one line each: class, place, size, flags, events, text and style as LVGL resolves it (2.12 P0) | Reads |
 | `/popup?tree=page` | the same for the whole screen | Reads |
 | `/popup?groups=1` | every card-label group (id, name, colour, HA area or local) and each card's group | Reads |
+| `/popup?groups=2` | the same, then each page area, the group it is, and each card's vote for its HA area (id, entity, HA area, "(made group)") - why an HA area's group carries the name it does (2.13, K199) | Reads |
 | `/popup?hist=1` | with History showing: what HaHistory holds - state, points, events, the last answer's size and time | Reads |
 
 ### The window (each **UI**; nothing kept)

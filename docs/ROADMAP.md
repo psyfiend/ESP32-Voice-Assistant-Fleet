@@ -181,3 +181,6 @@ ordered); #69 4B panel timing (WS_S3_4B locked up, waiting to be troubleshot); #
 - **Ideas not yet scheduled** (owner, 2026-11-07): HA roll-up entities per area, live member reports
   for board groups, card presentations and sizes, arranging by hand, synchronizing boards -
   `FUTURE_IMPROVEMENTS.md`, "Brainstorm, 2026-11-07".
+- **What 2.13 set aside** (2026-11-07): HA groups as board groups and the mirror, summary cards,
+  Backup and Restore, Restore's history and deleting groups, the thermostat, units, and the smaller
+  pieces - each with what was said, decided and still open: `design/carried-from-2.13.md`.

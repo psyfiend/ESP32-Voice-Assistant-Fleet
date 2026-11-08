@@ -235,6 +235,9 @@ the next boot, and it still voted HA's Office for "New group". After a reboot th
 |---|---|---|
 | T4b | Without rebooting: New group from Office with two lamps, remove one member, then long-press Office's Eric | "Office > Eric" |
 
+**Results 11-07, later:** T4b PASS. Every test on this sheet now passes; the all-nine gate is next.
+What 2.13 set aside, with its reasoning, is `design/carried-from-2.13.md`.
+
 # Round 5
 
 **Branch** `feat/2.13-add-from-ha` at `5c03eaa` (four commits: `4966cb0`, `65d6f28`, `4c977d6`,
